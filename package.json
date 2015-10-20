@@ -1,0 +1,43 @@
+{
+  "name": "polar",
+  "version": "0.0.1",
+  "gulpfile": {
+    "transforms": [
+      "glslify"
+    ],
+    "paths": {
+      "entry": "./js",
+      "js": [
+        "js/**/*.js",
+        "gulpfile.js"
+      ],
+      "jsWatch": [
+        "js/**/*",
+        "gulpfile.js"
+      ],
+      "hint": [
+        "assets/build/bundle.js",
+        "gulpfile.js"
+      ],
+      "build": "./assets/build/",
+      "bundleName": "bundle.js",
+      "minName": "bundle.min.js",
+      "mapName": "bundle.min.map",
+      "svg": "./assets/svg/*.svg",
+      "svgBuild": "./assets/fonts/icons",
+      "svgTemplates": "./assets/svg/templates/"
+    }
+  },
+  "devDependencies": {
+    "crossroads": "^0.12.0",
+    "glsl-noise": "0.0.0",
+    "glslify": "^1.6.0",
+    "gulp": "^3.8.7",
+    "gulpfile": "git://github.com/TatumCreative/gulpfile.git#v1.2.1",
+    "hasher": "^1.2.0",
+    "localforage": "^1.2.0",
+    "soundcloud-badge": "0.0.0",
+    "three-glslify": "^2.0.1",
+    "underscore": "^1.7.0"
+  }
+}
