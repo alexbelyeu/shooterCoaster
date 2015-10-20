@@ -1,6 +1,6 @@
 ![ShooterCoaster logo](https://raw.githubusercontent.com/alexbelyeu/shooterCoaster/master/assets/images/shootercoasterlogo.png "ShooterCoaster")
 
-A WebGL rollercoaster game built with Three.js. based on mr.doob's rollercoaster and TatumCreative's Polar Space.
+A WebGL rollercoaster game built with Three.js. Based on mr.doob's rollercoaster and TatumCreative's Polar Space.
 
 Play it right now at http://alexbelyeu.github.io/shooterCoaster/
 
