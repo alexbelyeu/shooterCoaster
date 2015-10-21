@@ -117,6 +117,7 @@
 			poem.div = document.getElementById( 'container' );
 			poem.scene = new THREE.Scene();
 			poem.requestedFrame = undefined;
+			poem.skybox = new Skybox( poem, level.config.skybox );
 			poem.started = false;
 			
 			poem.clock = new Clock();
@@ -194,7 +195,7 @@
 				poem.bulletSpeed = 120;
 			} else {poem.bulletSpeed = 75;}
 
-			poem.skybox = new Skybox( poem, level.config.skybox );
+			
 			poem.scoringAndWinning = new ScoringAndWinning( poem, level.config.scoringAndWinning );
 			raycaster = new THREE.Raycaster();
 
