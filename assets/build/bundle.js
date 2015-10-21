@@ -2964,7 +2964,7 @@
 	"../sound/Music":"/Users/abely_000/Documents/Programacion/Threejs/shooterCoaster/js/sound/Music.js"}],
 
 "/Users/abely_000/Documents/Programacion/Threejs/shooterCoaster/js/levels/level4.js":[function(require,module,exports){
-	var numberOfSnowmen = 1;
+	var numberOfSnowmen = 40;
 	
 	module.exports = {
 	name : "Antarctica",
