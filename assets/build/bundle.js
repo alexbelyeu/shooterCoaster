@@ -208,11 +208,9 @@
 					poem.addRenderer();
 				}
 				poem.addEventListeners();
-				
-				poem.start();
-		}, 
-		function ( xhr ) {
-			console.log( Math.round(xhr.loaded / xhr.total * 100) + '% loaded' );
+			setTimeout(function() {
+				poem.start();		
+			}.bind(this), 1000);
 		});
 	};
 
