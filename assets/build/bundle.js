@@ -2738,7 +2738,7 @@
 	"../sound/Music":"/Users/abely_000/Documents/Programacion/Threejs/shooterCoaster/js/sound/Music.js"}],
 
 "/Users/abely_000/Documents/Programacion/Threejs/shooterCoaster/js/levels/level1.js":[function(require,module,exports){
-	var numberOfBalloons =20;
+	var numberOfBalloons =25;
 	
 	module.exports = {
 	name : "Theme Park",
