@@ -210,7 +210,7 @@
 				poem.addEventListeners();
 			setTimeout(function() {
 				poem.start();		
-			}.bind(this), 8000);
+			}.bind(this), 5000);
 		});
 	};
 
