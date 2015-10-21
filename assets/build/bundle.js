@@ -211,7 +211,7 @@
 				poem.start();
 		}, 
 		function ( xhr ) {
-			console.log( Math.round(xhr.loaded / xhr.total * 100) + '% loaded' );
+			console.log( Math.round(xhr.loaded / xhr.total * 100) + '% loadedddd' );
 		});
 	};
 
