@@ -2556,7 +2556,10 @@
 	var titleHideTimeout = null;
 	
 	function showTitles() {
-	
+		
+		$('.score').css('opacity', 0);
+		$('.timer').css('opacity', 0);
+		
 		clearTimeout( titleHideTimeout );
 		
 		$('#title')
@@ -2567,10 +2570,9 @@
 		
 		setTimeout(function() {
 			$('#title').removeClass('hide');
-		}, 1);
+		}, 7000);
 		
-		$('.score').css('opacity', 0);
-		$('.timer').css('opacity', 0);
+		
 		
 	}
 	

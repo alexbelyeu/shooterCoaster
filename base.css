@@ -311,6 +311,12 @@ h1.blink {}
 	position: relative;
 	z-index: 1;
 }
+.info-keys {
+	padding-bottom: 2em;
+    margin-top: 12%;
+    height: 57%;
+    width: auto;
+}
 .menu {
     -webkit-transform: translateX(-300px);
        -moz-transform: translateX(-300px);
