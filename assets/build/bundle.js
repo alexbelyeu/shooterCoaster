@@ -2845,7 +2845,7 @@
 		music : {
 			object: require("../sound/Music"),
 			properties: {
-				url: "https://soundcloud.com/flume/lorde-tennis-court-flume-remix",
+				url: "https://soundcloud.com/bns-1/kid-cudi-cudderisback",
 				startTime: 90
 			}
 		}
@@ -2918,7 +2918,7 @@
 		music : {
 			object: require("../sound/Music"),
 			properties: {
-				url: "https://soundcloud.com/feedme/i-do-coke-with-kill-the-noise",
+				url: "https://soundcloud.com/flume/lorde-tennis-court-flume-remix",
 				startTime: 42
 			}
 		}
