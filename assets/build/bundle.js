@@ -2569,7 +2569,7 @@
 		
 		setTimeout(function() {
 			$('#title').removeClass('hide');
-		}, 7000);
+		}, 8000);
 		
 		
 		
@@ -2601,7 +2601,7 @@
 			$('#countdown3')
 			.addClass('transform-transition')
 			.addClass('hide');
-		}, 1000);
+		}, 750);
 
 		setTimeout(function() {
 			$('#countdown2')
@@ -2613,8 +2613,8 @@
 				$('#countdown2')
 				.addClass('transform-transition')
 				.addClass('hide');
-			}, 1000);
-		}, 2000);
+			}, 750);
+		}, 1500);
 		setTimeout(function() {
 			$('#countdown1')
 			.removeClass('hide')
@@ -2625,8 +2625,8 @@
 				$('#countdown1')
 				.addClass('transform-transition')
 				.addClass('hide');
-			}, 1000);
-		}, 3000);
+			}, 750);
+		}, 2500);
 		setTimeout(function() {
 			$('#countdownGo')
 			.removeClass('hide')
@@ -2829,8 +2829,8 @@
 			properties: {
 				color1: 0xffffff,
 				color2: 0xffff00,
-				rollerSpeed: 0.00001,
-				minRollerSpeed: 0.00009,
+				rollerSpeed: 0.00002,
+				minRollerSpeed: 0.0001,
 				varA: 3,
 				varB: 17,
 				varC: 4,
@@ -2906,8 +2906,8 @@
 			properties: {
 				color1: 0x51411a,
 				color2: 0x812a2a,
-				rollerSpeed: 0.000005,
-				minRollerSpeed: 0.00009,
+				rollerSpeed: 0.000006,
+				minRollerSpeed: 0.0001,
 				varA: 5,
 				varB: 27,
 				varC: 2, 
@@ -2982,8 +2982,8 @@
 			properties: {
 				color1: 0x416fa0,
 				color2: 0x31ffd5,
-				rollerSpeed: 0.000012,
-				minRollerSpeed: 0.00012,
+				rollerSpeed: 0.000014,
+				minRollerSpeed: 0.00014,
 				varA: 3,
 				varB: 36,
 				varC: 4,
@@ -3062,8 +3062,8 @@
 			properties: {
 				color1: 0x909090,
 				color2: 0xffffff,
-				rollerSpeed: 0.000007,
-				minRollerSpeed: 0.00007,
+				rollerSpeed: 0.000008,
+				minRollerSpeed: 0.00008,
 				varA: 3,
 				varB: 36,
 				varC: 4,
