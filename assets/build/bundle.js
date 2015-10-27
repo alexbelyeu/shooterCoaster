@@ -2818,7 +2818,7 @@
 				color1: 0xffffff,
 				color2: 0xffff00,
 				rollerSpeed: 0.00002,
-				minRollerSpeed: 0.0001,
+				minRollerSpeed: 0.00009,
 				varA: 3,
 				varB: 17,
 				varC: 4,
