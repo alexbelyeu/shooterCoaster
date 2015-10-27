@@ -2616,18 +2616,6 @@
 			}, 750);
 		}, 1500);
 		setTimeout(function() {
-			$('#countdown1')
-			.removeClass('hide')
-			.removeClass('transform-transition')
-			.addClass('transform-transition')
-			.show();
-			setTimeout(function(){
-				$('#countdown1')
-				.addClass('transform-transition')
-				.addClass('hide');
-			}, 750);
-		}, 2500);
-		setTimeout(function() {
 			$('#countdownGo')
 			.removeClass('hide')
 			.removeClass('transform-transition')
