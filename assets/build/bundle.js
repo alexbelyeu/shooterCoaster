@@ -2613,7 +2613,7 @@
 				$('#countdown2')
 				.addClass('transform-transition')
 				.addClass('hide');
-			}, 750);
+			}, 1000);
 		}, 1500);
 		setTimeout(function() {
 			$('#countdownGo')
@@ -3015,7 +3015,7 @@
 		scoringAndWinning: {
 			message: "You've made it!. Congrats!",
 			nextLevel: "menu",
-			timerCount: 60,
+			timerCount: 65,
 			conditions: [
 				{
 					//No arachnids left
@@ -3051,8 +3051,8 @@
 			properties: {
 				color1: 0x909090,
 				color2: 0xffffff,
-				rollerSpeed: 0.000008,
-				minRollerSpeed: 0.00008,
+				rollerSpeed: 0.000007,
+				minRollerSpeed: 0.00007,
 				varA: 3,
 				varB: 36,
 				varC: 4,
