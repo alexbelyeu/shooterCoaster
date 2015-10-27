@@ -2846,7 +2846,8 @@
 			object: require("../sound/Music"),
 			properties: {
 				url: "https://soundcloud.com/bns-1/kid-cudi-cudderisback",
-				startTime: 90
+				startTime: 0,
+				volume: 20
 			}
 		}
 	}
@@ -2919,7 +2920,7 @@
 			object: require("../sound/Music"),
 			properties: {
 				url: "https://soundcloud.com/flume/lorde-tennis-court-flume-remix",
-				startTime: 42
+				startTime: 90
 			}
 		}
 	}
