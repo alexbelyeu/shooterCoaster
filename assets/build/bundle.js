@@ -2486,7 +2486,7 @@
 	this.position = new THREE.Vector3(x,y,z);
 
 	this.dead = false;
-	this.radius = 100;
+	this.radius = 115;
 
 	this.addObject();
 	this.object.position.copy(this.position);
