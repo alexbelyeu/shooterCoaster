@@ -192,7 +192,7 @@
 			poem.gun = new Gun( poem );
 
 			if (poem.slug == "level4") {
-				poem.bulletSpeed = 120;
+				poem.bulletSpeed = 200;
 			} else {poem.bulletSpeed = 75;}
 
 			
@@ -375,7 +375,6 @@
 	var Camera = function( poem, properties, objects ) {
 	
 		this.poem = poem;
-		this.polarObj = new THREE.Object3D();
 		this.speed = 0.032;
 		
 		this.rollerSpeed = objects.rollercoastergenerator.properties.rollerSpeed;
@@ -2146,7 +2145,6 @@
 	this.poem = poem;
 	this.manager = manager;
 	this.scene = poem.scene;
-	this.polarObj = new THREE.Object3D();
 	this.object = null;
 
 	this.name = "Balloon";
@@ -2488,7 +2486,7 @@
 	this.position = new THREE.Vector3(x,y,z);
 
 	this.dead = false;
-	this.radius = 80;
+	this.radius = 100;
 
 	this.addObject();
 	this.object.position.copy(this.position);
@@ -2515,7 +2513,8 @@
 	addObject : function() {
 		var geometry = this.manager.shared.geometry;
 		this.object = new THREE.Mesh(geometry, poem.snowman.material);
-		this.object.scale.z=0.2;
+		this.object.scale.z=0.4;
+		this.object.scale.x=this.object.scale.y=1.2;
 		this.object.rotation.x= Math.PI;
 		poem.scene.add( this.object );
 	},
@@ -2535,7 +2534,7 @@
 		} else {
 			this.object.position.z += 5 * Math.cos((poem.clock.time/1000)*this.theta)/this.theta;
 			this.object.position.x += 5 * Math.sin((poem.clock.time/1000)*this.theta)/this.theta;
-			this.object.position.y += 1.2 + Math.cos((poem.clock.time)*this.theta);
+			this.object.position.y += 0.75 + 20 * Math.sin((poem.clock.time/4000)*this.theta + 2000);
 			//console.log(this.object.position.y);
 		}
 	}
@@ -2591,8 +2590,55 @@
 		
 				$('#title').hide();
 		
-			}, 1);
-		}			
+			}, 1000);
+		}
+		$('#countdown3')
+			.removeClass('hide')
+			.removeClass('transform-transition')
+			.addClass('transform-transition')
+			.show();
+		setTimeout(function(){
+			$('#countdown3')
+			.addClass('transform-transition')
+			.addClass('hide');
+		}, 1000);
+
+		setTimeout(function() {
+			$('#countdown2')
+			.removeClass('hide')
+			.removeClass('transform-transition')
+			.addClass('transform-transition')
+			.show();
+			setTimeout(function(){
+				$('#countdown2')
+				.addClass('transform-transition')
+				.addClass('hide');
+			}, 1000);
+		}, 2000);
+		setTimeout(function() {
+			$('#countdown1')
+			.removeClass('hide')
+			.removeClass('transform-transition')
+			.addClass('transform-transition')
+			.show();
+			setTimeout(function(){
+				$('#countdown1')
+				.addClass('transform-transition')
+				.addClass('hide');
+			}, 1000);
+		}, 3000);
+		setTimeout(function() {
+			$('#countdownGo')
+			.removeClass('hide')
+			.removeClass('transform-transition')
+			.addClass('transform-transition')
+			.show();
+			setTimeout(function(){
+				$('#countdownGo')
+				.addClass('transform-transition')
+				.addClass('hide');
+			}, 1250);
+		}, 4500);
 		
 	}
 	
@@ -2740,7 +2786,7 @@
 	"../sound/Music":"/Users/abely_000/Documents/Programacion/Threejs/shooterCoaster/js/sound/Music.js"}],
 
 "/Users/abely_000/Documents/Programacion/Threejs/shooterCoaster/js/levels/level1.js":[function(require,module,exports){
-	var numberOfBalloons =25;
+	var numberOfBalloons = 30;
 	
 	module.exports = {
 	name : "Theme Park",
@@ -2969,7 +3015,7 @@
 	module.exports = {
 	name : "Antarctica",
 	description : "The living snowmen",
-	maxScore : (30 * numberOfSnowmen)/1.2,
+	maxScore : (30 * numberOfSnowmen)/1.5,
 	order: 4,
 	config : {
 		isSnow: "yes",
@@ -3016,8 +3062,8 @@
 			properties: {
 				color1: 0x909090,
 				color2: 0xffffff,
-				rollerSpeed: 0.000008,
-				minRollerSpeed: 0.00008,
+				rollerSpeed: 0.000007,
+				minRollerSpeed: 0.00007,
 				varA: 3,
 				varB: 36,
 				varC: 4,
@@ -3061,6 +3107,14 @@
 	this.liveBullets = [];
 	this.bullets = [];
 	this.bornAt = 0;
+
+	if (this.poem.slug == "level4") {
+		this.bulletSize = 40;
+		this.bulletColor = 0x000000;
+	} else {
+		this.bulletSize = 10;
+		this.bulletColor = 0xff0000;
+	}
 
 	this.addObject();
 	this.addSound();
@@ -3156,11 +3210,11 @@
 		this.object = new THREE.Points(
 			geometry,
 			new THREE.PointsMaterial({
-				 size: 10,
+				 size: this.bulletSize,
 				 map: sprite,
 				 alphaTest: 0.9,
 				 transparent: true,
-				 color: 0xff0000
+				 color: this.bulletColor
 			}
 		));
 		this.object.frustumCulled = false;
@@ -3236,7 +3290,7 @@
 	var hasher = require('hasher');
 	var levelLoader = require('./levelLoader');
 	
-	var baseUrl = '/polar';
+	var baseUrl = '/shooterCoaster';
 	var defaultLevel = "menu";
 	var currentLevel = "";
 	
@@ -4044,7 +4098,6 @@
 	{"underscore":"node_modules/underscore/underscore.js"}],	
 
 "/Users/abely_000/Documents/Programacion/Threejs/shooterCoaster/js/utils/CoordinatesXYZ.js":[function(require,module,exports){
-	// Translates 2d points into 3d polar space
 	
 	var CoordinatesXYZ = function( poem ) {
 	this.poem = poem;

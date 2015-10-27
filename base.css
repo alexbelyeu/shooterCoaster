@@ -242,6 +242,21 @@ h1.blink {}
     font-size: 1.3em;
 	display:none;
 }
+.countdown3, .countdown2, .countdown1, .countdownGo {
+	position: absolute;
+    width: 100%;
+    text-align: center;
+    height: 100%;
+	transform: scale(1);
+	opacity: 1;
+    font-size: 5em;
+    color: rgba(0, 0, 0, 1);;
+	display:none;
+	margin-top: 25%;
+}
+.countdown2{font-size: 6.5em;}
+.countdown1{font-size: 8em;}
+.countdownGo{font-size: 9.5em;}
 .transform-transition {
 	-webkit-transition: -webkit-transform 1000ms, opacity 1000ms;
 	   -moz-transition: -moz-transform 1000ms, opacity 1000ms;
