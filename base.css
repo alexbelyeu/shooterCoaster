@@ -310,6 +310,13 @@ h1.blink {}
 	margin:8% auto 0;
 	display:none;
 }
+.title-firefox {
+	text-transform:none;
+	letter-spacing:0;
+	max-width:80%;
+	margin:8% auto 0;
+	display:none;
+}
 .title-webgl-error p {
 	margin:1em 0;
 }

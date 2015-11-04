@@ -610,7 +610,7 @@
 		var sound = this.explosionSound;
 
 		//Start sound
-		sound.setGain(0.5, 0, 0.001);
+		sound.setGain(0.3, 0, 0.001);
 		sound.setFrequency(freq, 0, 0);
 		
 		var step = 0.02;
@@ -2661,7 +2661,13 @@
 		});
 		
 		window.poem = currentPoem;
-	
+
+		this.isFirefox = typeof InstallTrigger !== 'undefined';
+		if (this.isFirefox) {
+			$('.title-firefox').show();
+			currentPoem.pause();
+		}
+
 		return true;
 	}
 		
@@ -2835,7 +2841,7 @@
 			properties: {
 				url: "https://soundcloud.com/bns-1/kid-cudi-cudderisback",
 				startTime: 0,
-				volume: 20
+				volume: 1
 			}
 		}
 	}
