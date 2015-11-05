@@ -2823,8 +2823,8 @@
 			properties: {
 				color1: 0xffffff,
 				color2: 0xffff00,
-				rollerSpeed: 0.00002,
-				minRollerSpeed: 0.00009,
+				rollerSpeed: 0.00001,
+				minRollerSpeed: 0.00008,
 				varA: 3,
 				varB: 17,
 				varC: 4,
@@ -2901,8 +2901,8 @@
 			properties: {
 				color1: 0x51411a,
 				color2: 0x812a2a,
-				rollerSpeed: 0.000006,
-				minRollerSpeed: 0.0001,
+				rollerSpeed: 0.000005,
+				minRollerSpeed: 0.00009,
 				varA: 5,
 				varB: 27,
 				varC: 2, 
@@ -2977,8 +2977,8 @@
 			properties: {
 				color1: 0x416fa0,
 				color2: 0x31ffd5,
-				rollerSpeed: 0.000014,
-				minRollerSpeed: 0.00014,
+				rollerSpeed: 0.000013,
+				minRollerSpeed: 0.00013,
 				varA: 3,
 				varB: 36,
 				varC: 4,
@@ -3057,8 +3057,8 @@
 			properties: {
 				color1: 0x909090,
 				color2: 0xffffff,
-				rollerSpeed: 0.000007,
-				minRollerSpeed: 0.00007,
+				rollerSpeed: 0.000006,
+				minRollerSpeed: 0.00006,
 				varA: 3,
 				varB: 36,
 				varC: 4,
