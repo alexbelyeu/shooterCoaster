@@ -1,6 +1,6 @@
-var routing = require('../routing');
+	var routing = require('../routing');
 
-	var Curve1 = function (varA, varB, varC, scalar) {
+	var Curve2 = function (varA, varB, varC, scalar) {
 	
 		this.vector = new THREE.Vector3();
 		this.vector2 = new THREE.Vector3();
@@ -11,7 +11,7 @@ var routing = require('../routing');
 				t = t * PI2;
 
 				var x = Math.sin( t * varA ) * Math.cos( t * varC ) * varC*13;
-				var y = Math.cos( t * varC*2 ) * varC + Math.cos( t * varB ) + 5;
+				var y = Math.cos( t * varC*2 )*(t/2) * varC + Math.cos( t * varB ) + 15;
 				var z = Math.sin( t ) * Math.sin( t * varC ) * varC*13;
 				vector.set( x, y, z ).multiplyScalar( scalar );
 				return vector;
@@ -26,4 +26,5 @@ var routing = require('../routing');
 				return vector2.copy( this.getPointAt ( t2 ) ).sub( this.getPointAt( t1 ) ).normalize();
 
 			}
+		};
 		};

@@ -1,149 +1,307 @@
-var Coordinates = require('./utils/Coordinates');
-var Camera = require('./components/Camera');
-var Gun = require('./managers/Gun');
-var Ship = require('./Ship');
-var Stars = require('./components/Stars');
-var AsteroidField = require('./managers/AsteroidField');
-var Stats = require('./utils/Stats');
-var EventDispatcher = require('./utils/EventDispatcher');
-var JellyShip = require('./entities/JellyShip');
-var EntityManager = require('./managers/EntityManager');
-var ScoringAndWinning = require('./components/ScoringAndWinning');
-var Clock = require('./utils/Clock');
+var CoordinatesXYZ = require('./utils/CoordinatesXYZ');
+	var Camera = require('./components/Camera');
+	var RollerCoasterGenerator = require('./components/RollerCoasterGenerator');
+	var Gun = require('./managers/Gun');
+	var Skybox = require('./components/Skybox');
+	var TreeField = require('./managers/TreeField');
+	var Stats = require('./utils/Stats');
+	var EventDispatcher = require('./utils/EventDispatcher');
+	var ScoringAndWinning = require('./components/ScoringAndWinning');
+	var Clock = require('./utils/Clock');
 
-var renderer;
+	var renderer, waterNormals, water, mirrorMesh;
+	var mouse = new THREE.Vector2();
+	var raycaster;
 
-var Poem = function( level, slug ) {
+	var Poem = function( level, slug ) {
+		
+		// Loaded Objects
+		this.loader = new THREE.ColladaLoader();
+		this.loader.options.convertUpAxis = true;
+		this.loader.load( './js/entities/models/newcoupleShade.dae', function (collada){
+			//console.log(collada.scene)
+			var shark   = collada.scene.children[0].children[0];
+			//var minion  = collada.scene.children[1].children[0];
+			var snowman = collada.scene.children[2].children[0];
+			var crow  = collada.scene.children[3].children[0];
 
-	this.circumference = level.config.circumference || 750;
-	this.height = level.config.height || 120;
-	this.r = level.config.r || 240;
-	this.circumferenceRatio = (2 * Math.PI) / this.circumference; //Map 2d X coordinates to polar coordinates
-	this.ratio = window.devicePixelRatio >= 1 ? window.devicePixelRatio : 1;
-	this.slug = slug;	
-	
-	this.controls = undefined;
-	this.div = document.getElementById( 'container' );
-	this.scene = new THREE.Scene();
-	this.requestedFrame = undefined;
-	this.started = false;
+			crow.traverse(function(child){
 
-	this.clock = new Clock();
-	this.coordinates = new Coordinates( this );
-	this.camera = new Camera( this, level.config );
-	this.scene.fog = new THREE.Fog( 0x222222, this.camera.object.position.z / 2, this.camera.object.position.z * 2 );
-	
-	this.gun = new Gun( this );
-	this.ship = new Ship( this );
-	this.stars = new Stars( this, level.config.stars );
-	this.scoringAndWinning = new ScoringAndWinning( this, level.config.scoringAndWinning );
-	
-	this.parseLevel( level );
-	
-	this.dispatch({
-		type: 'levelParsed'
-	});
-	
-	if(!renderer) {
-		this.addRenderer();
-	}
-//	this.addStats();
-	this.addEventListeners();
-	
-	this.start();
-	
-};
+				if (child instanceof THREE.Mesh){
+					child.traverse(function(e){
+						e.castShadow = true;
+						e.receiveShadow = true;
+						e.material.needsUpdate = true;
+					})
+				}
+			});
+			shark.traverse(function(child){
 
-module.exports = Poem;
+				if (child instanceof THREE.Mesh){
+					child.traverse(function(e){
+						e.castShadow = true;
+						e.receiveShadow = true;
+						e.material.needsUpdate = true;
+					})
+				}
+			});
+			snowman.traverse(function(child){
 
-Poem.prototype = {
+				if (child instanceof THREE.Mesh){
+					child.traverse(function(e){
+						e.castShadow = true;
+						e.receiveShadow = true;
+						e.material.needsUpdate = true;
+					})
+				}
+			});
+			poem.crow = crow;
+			poem.shark = shark;
+			poem.snowman = snowman;
+			crow.updateMatrix();
+			shark.updateMatrix();
+			//snowman.updateMatrix();
+			
+			//Stuff
+			poem.slug = slug;
 	
-	parseLevel : function( level ) {
-		_.each( level.objects, function loadComponent( value, key ) {
-			if(_.isObject( value )) {
-				this[ key ] = new value.object( this, value.properties );
-			} else {
-				this[ key ] = value;
+			poem.groundWidth = level.config.groundWidth || 5000;
+			poem.groundHeight = level.config.groundHeight || 5000;
+			poem.groundWidthSegments = level.config.groundWidthSegments || 30;
+			poem.groundHeightSegments = level.config.groundHeightSegments || 30;
+			poem.groundColor = level.config.groundColor || 	0x407000;
+			poem.isOcean = level.config.isOcean || "no";
+			poem.isSnow = level.config.isSnow || "no";
+			poem.div = document.getElementById( 'container' );
+			poem.scene = new THREE.Scene();
+			poem.requestedFrame = undefined;
+			poem.skybox = new Skybox( poem, level.config.skybox );
+			poem.started = false;
+			
+			poem.clock = new Clock();
+			poem.coordinatesXYZ = new CoordinatesXYZ( poem );
+			poem.light = new THREE.HemisphereLight( 0xfff0f0, 0x606066 );
+			poem.directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
+			poem.directionalLight.position.set( 1, 1, 1 );
+			poem.scene.add( poem.directionalLight );
+			
+			poem.scene.add( poem.light );
+			poem.camera = new Camera( poem, level.config, level.objects );
+			
+			//Ground
+				poem.ground = new THREE.PlaneGeometry( 
+					poem.groundWidth, poem.groundHeight, 
+					poem.groundWidthSegments, poem.groundHeightSegments 
+					);
+				poem.ground.applyMatrix( new THREE.Matrix4().makeRotationX( - Math.PI / 2 ) );
+				poem.material = new THREE.MeshPhongMaterial( { color: poem.groundColor, shading: THREE.FlatShading } );
+				if(poem.isOcean =="no" && poem.isSnow == "no"){
+					poem.scene.fog = new THREE.Fog( 0x202020, 1, 4000 );
+					for ( var i = 0; i < poem.ground.vertices.length; i ++ ) {
+					
+						var vertex = poem.ground.vertices[ i ];
+					
+						vertex.x += Math.random() * 100 - 50;
+						vertex.z += Math.random() * 100 - 50;
+					
+						var distance = ( vertex.distanceTo( poem.scene.position ) / 5 ) - 250;
+					
+						vertex.y = Math.random() * Math.max( 0, distance );
+					}
+					poem.ground.computeFaceNormals();
+				} else if(poem.isSnow = "yes" && poem.isOcean == "no"){
+					poem.scene.fog = new THREE.Fog( 0xd0d8ea, 1, 4000 );
+					poem.scene.fogExp2 = new THREE.FogExp2( 0xffffff, 0.001 );
+				}
+				poem.mesh = new THREE.Mesh( poem.ground, poem.material );
+				poem.scene.add( poem.mesh );
+
+				if (poem.isSnow = "no" && poem.isOcean == "yes"){
+					poem.mesh.visible = false;
+					waterNormals = new THREE.ImageUtils.loadTexture('assets/images/textures/waternormals.jpg');
+					waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping;
+					renderer = new THREE.WebGLRenderer({
+						alpha : true,
+						antialias: true
+					});
+					renderer.setPixelRatio( window.devicePixelRatio );
+					renderer.setSize( window.innerWidth, window.innerHeight );
+					renderer.shadowMap.enabled = true;
+					renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+					poem.div.appendChild( renderer.domElement );
+					poem.water = new THREE.Water(renderer, poem.camera.object, poem.scene, {
+						textureWidth: 512,
+						textureHeight: 512,
+						waterNormals: waterNormals,
+						alpha: 1,
+						sunDirection: poem.directionalLight.position.clone().normalize(),
+						sunColor: 0xffffff,
+						waterColor: 0x004f41,
+						distortionScale: 25,
+					});
+		
+					mirrorMesh = new THREE.Mesh(
+						new THREE.PlaneBufferGeometry(5000, 5000), poem.water.material);
+					mirrorMesh.add(poem.water);
+					mirrorMesh.rotation.x = (-Math.PI*0.5);
+					poem.scene.add(mirrorMesh);
+				}
+			
+			poem.gun = new Gun( poem );
+
+			if (poem.slug == "level4") {
+				poem.bulletSpeed = 200;
+			} else {poem.bulletSpeed = 75;}
+
+			
+			poem.scoringAndWinning = new ScoringAndWinning( poem, level.config.scoringAndWinning );
+			raycaster = new THREE.Raycaster();
+
+			poem.parseLevel( level );
+			poem.dispatch({
+				type: 'levelParsed'
+			});
+			
+			if(!renderer) {
+					poem.addRenderer();
+				}
+				poem.addEventListeners();
+			setTimeout(function() {
+				poem.start();		
+			}.bind(this), 5000);
+		});
+	};
+
+	module.exports = Poem;
+
+	Poem.prototype = {
+	
+		parseLevel : function( level ) {
+			_.each( level.objects, function loadComponent( value, key ) {
+				if(_.isObject( value )) {
+					poem[ key ] = new value.object( poem, value.properties );
+				} else {
+					poem[ key ] = value;
+				}
+				
+			}, poem);
+		},
+		
+		addRenderer : function() {
+			renderer = new THREE.WebGLRenderer({
+				alpha : true,
+				antialias: true
+			});
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			renderer.shadowMap.enabled = true;
+			renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+			poem.div.appendChild( renderer.domElement );
+		},
+		
+		getCanvas : function() {
+			if( renderer ) {
+				return renderer.domElement;
 			}
+		},
+		
+		addStats : function() {
+			poem.stats = new Stats();
+			poem.stats.domElement.style.position = 'absolute';
+			poem.stats.domElement.style.top = '0px';
+			$("#container").append( poem.stats.domElement );
+		},
 			
-		}, this);
-	},
-	
-	addRenderer : function() {
-		renderer = new THREE.WebGLRenderer({
-			alpha : true
-		});
-		renderer.setSize( window.innerWidth, window.innerHeight );
-		this.div.appendChild( renderer.domElement );
-	},
-	
-	getCanvas : function() {
-		if( renderer ) {
-			return renderer.domElement;
-		}
-	},
-	
-	addStats : function() {
-		this.stats = new Stats();
-		this.stats.domElement.style.position = 'absolute';
-		this.stats.domElement.style.top = '0px';
-		$("#container").append( this.stats.domElement );
-	},
-		
-	addEventListeners : function() {
-		$(window).on('resize', this.resizeHandler.bind(this));
-	},
-	
-	resizeHandler : function() {
-		
-		this.camera.resize();
-		renderer.setSize( window.innerWidth, window.innerHeight );
-
-	},
-	
-	start : function() {
-		if( !this.started ) {
-			this.loop();
-		}
-		this.started = true;
-	},
-	
-	loop : function() {
-
-		this.requestedFrame = requestAnimationFrame( this.loop.bind(this) );
-		this.update();
-
-	},
-	
-	pause : function() {
-		
-		window.cancelAnimationFrame( this.requestedFrame );
-		this.started = false;
-		
-	},
+		addEventListeners : function() {
+			$(window).on('resize', poem.resizeHandler.bind(poem));
+			//$(window).on('keydown', poem.fullScreen.bind(poem));
+			document.addEventListener('mousemove', poem.onMouseMove, false);
+			document.addEventListener('mousedown', poem.onMouseDown, false);
 			
-	update : function() {
-		
-		// this.stats.update();
-		
-		this.dispatch({
-			type: "update",
-			dt: this.clock.getDelta(),
-			time: this.clock.time
-		});
-		
-		renderer.render( this.scene, this.camera.object );
+		},
 
-	},
+		fullScreen : function(e) {
+			if( e.keyCode !== 32 ) return;
+			THREEx.FullScreen.request();
+		},
+		
+		resizeHandler : function() {
+			
+			poem.camera.resize();
+			renderer.setSize( window.innerWidth, window.innerHeight );
 	
-	destroy : function() {
+		},
 		
-		window.cancelAnimationFrame( this.requestedFrame );
+		start : function() {
+			if( !poem.started ) {
+				poem.loop();
+			}
+			poem.started = true;
+		},
 		
-		this.dispatch({
-			type: "destroy"
-		});
-	}
-};
+		loop : function() {
+	
+			poem.requestedFrame = requestAnimationFrame( poem.loop.bind(poem) );
+			poem.update();	
+		},
+		
+		pause : function() {
+			
+			window.cancelAnimationFrame( poem.requestedFrame );
+			poem.started = false;
+			
+		},
+				
+		update : function() {
+			try{
+				poem.water.material.uniforms.time.value += 1.0/60.0;
+				poem.water.render();
+			} catch (e){}
 
-EventDispatcher.prototype.apply( Poem.prototype );
+			try{
+				poem.dispatch({
+					type: "update",
+					dt: poem.clock.getDelta(),
+					time: poem.clock.time
+				});
+				poem.scoringAndWinning.adjustTimer();		
+				renderer.render( poem.scene, poem.camera.object );
+				
+			} catch (e){
+				poem.pause();
+			}
+	
+		},
+		
+		destroy : function() {
+			
+			window.cancelAnimationFrame( poem.requestedFrame );
+			
+			poem.dispatch({
+				type: "destroy"
+			});
+		},
+
+		onMouseMove : function(e) {
+			e.preventDefault();
+			mouse.x = (event.clientX / window.innerWidth)*2 -1;
+			mouse.y = - (event.clientY / window.innerHeight)*2 +1;
+		},
+
+		onMouseDown : function(e) {
+			e.preventDefault();
+			raycaster.setFromCamera (mouse, poem.camera.object);
+
+			var xO = poem.camera.object.position.x;
+			var yO = poem.camera.object.position.y;
+			var zO = poem.camera.object.position.z;
+
+			var intersects = raycaster.intersectObjects(poem.scene.children);
+			var xD = intersects[0].point.x;
+			var yD = intersects[0].point.y;
+			var zD = intersects[0].point.z;
+
+			var r = Math.sqrt((xD-xO)*(xD-xO) + (yD-yO)*(yD-yO) + (zD-zO)*(zD-zO));
+
+			poem.gun.fire( xO, xD, yO, yD, zO, zD, r, poem.bulletSpeed );
+		}
+	};

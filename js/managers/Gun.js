@@ -1,8 +1,9 @@
-var Bullet = require('../entities/Bullet');
-var Collider = require('../utils/Collider');
-var SoundGenerator = require('../sound/SoundGenerator');
-var destroyMesh = require('../utils/destroyMesh');
-var Gun = function( poem ) {
+	var Bullet = require('../entities/Bullet');
+	var ColliderXYZ = require('../utils/ColliderXYZ');
+	var SoundGenerator = require('../sound/SoundGenerator');
+	var destroyMesh = require('../utils/destroyMesh');
+	
+	var Gun = function( poem ) {
 	this.poem = poem;
 	this.object = null;
 	this.sound = null;
@@ -15,15 +16,23 @@ var Gun = function( poem ) {
 	this.bullets = [];
 	this.bornAt = 0;
 
+	if (this.poem.slug == "level4") {
+		this.bulletSize = 40;
+		this.bulletColor = 0x000000;
+	} else {
+		this.bulletSize = 10;
+		this.bulletColor = 0xff0000;
+	}
+
 	this.addObject();
 	this.addSound();
 	
 	this.poem.on('update', this.update.bind(this) );
-};
-
-module.exports = Gun;
-
-Gun.prototype = {
+	};
+	
+	module.exports = Gun;
+	
+	Gun.prototype = {
 	
 	fire : function() {
 		
@@ -31,7 +40,7 @@ Gun.prototype = {
 			return !bullet.alive;
 		};
 		
-		return function(x, y, speed, theta) {
+		return function(xO, xD, yO, yD, zO, zD, r, speed) {
 			
 			var now = this.poem.clock.time;
 			
@@ -47,7 +56,7 @@ Gun.prototype = {
 		
 			this.liveBullets.push( bullet );
 		
-			bullet.fire(x, y, speed, theta);
+			bullet.fire(xO, xD, yO, yD, zO, zD, r, speed);
 
 
 			var freq = 1900;
@@ -86,7 +95,7 @@ Gun.prototype = {
 	},
 	
 	killBullet : function( bullet ) {
-		
+
 		var i = this.liveBullets.indexOf( bullet );
 		
 		if( i >= 0 ) {
@@ -101,15 +110,19 @@ Gun.prototype = {
 	
 	addObject : function() {
 		
-		var geometry, lineMaterial;
+		var geometry, sprite, lineMaterial;
 		
 		geometry = this.generateGeometry();
+		sprite = THREE.ImageUtils.loadTexture( "./assets/images/disc.png" );
 		
-		this.object = new THREE.PointCloud(
+		this.object = new THREE.Points(
 			geometry,
-			new THREE.PointCloudMaterial({
-				 size: 1 * this.poem.ratio,
-				 color: 0xff0000
+			new THREE.PointsMaterial({
+				 size: this.bulletSize,
+				 map: sprite,
+				 alphaTest: 0.9,
+				 transparent: true,
+				 color: this.bulletColor
 			}
 		));
 		this.object.frustumCulled = false;
@@ -119,13 +132,14 @@ Gun.prototype = {
 	
 	update : function( e )  {
 		var bullet, time;
-		
+
 		for(var i=0; i<this.liveBullets.length; i++) {
 			bullet = this.liveBullets[i];
 			
 			if(bullet.bornAt + this.bulletAge < e.time) {
 				this.killBullet( bullet );
 				i--;
+				
 			} else {
 				bullet.update( e.dt );
 			}
@@ -138,8 +152,8 @@ Gun.prototype = {
 	
 	setBarrierCollider : function( collection ) {
 		
-		//Collide bullets with asteroids
-		new Collider(
+		//Collide bullets with funfairs
+		new ColliderXYZ(
 			
 			this.poem,
 			
@@ -172,4 +186,4 @@ Gun.prototype = {
 		sound.start();
 		
 	}
-};
+	};

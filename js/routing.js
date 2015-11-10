@@ -1,12 +1,12 @@
 var crossroads = require('crossroads');
-var hasher = require('hasher');
-var levelLoader = require('./levelLoader');
-
-var baseUrl = '/polar';
-var defaultLevel = "titles";
-var currentLevel = "";
-
-var routing = {
+	var hasher = require('hasher');
+	var levelLoader = require('./levelLoader');
+	
+	var baseUrl = '/shooterCoaster';
+	var defaultLevel = "menu";
+	var currentLevel = "";
+	
+	var routing = {
 	
 	start : function( Poem, levels ) {
 		
@@ -51,7 +51,5 @@ var routing = {
 	
 	on : levelLoader.on.bind( levelLoader ),
 	off : levelLoader.off.bind( levelLoader )
-	
-};
-
-module.exports = routing;
+		
+	};

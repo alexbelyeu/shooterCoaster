@@ -3,20 +3,20 @@ var Bullet = function( poem, gun, vertex ) {
 	this.gun = gun;
 	this.vertex = vertex;
 	
-	this.speed = new THREE.Vector2(0,0);
-	this.position = new THREE.Vector2(0,0);
-	this.radius = 1;
+	this.speed = new THREE.Vector3(0,0,0);
+	this.position = new THREE.Vector3(0,0,0);
+	this.radius = 10;
 	
 	this.bornAt = 0;
 	this.alive = false;
-};
-
-module.exports = Bullet;
-
-Bullet.prototype = {
+	};
+	
+	module.exports = Bullet;
+	
+	Bullet.prototype = {
 	
 	kill : function() {
-		this.vertex.set(0, 0 ,1000);
+		this.vertex.set(0, -10000 ,0);
 		this.alive = false;
 	},
 	
@@ -25,22 +25,22 @@ Bullet.prototype = {
 		
 		this.position.x += this.speed.x;
 		this.position.y += this.speed.y;
+		this.position.z += this.speed.z;
 		
-		this.poem.coordinates.setVector( this.vertex, this.position );
-		
+		this.poem.coordinatesXYZ.setVector( this.vertex, this.position );
+		//if (e%1000) {console.log(this.poem)};
 	},
 	
-	fire : function(x, y, speed, theta) {
-				
-		this.poem.coordinates.setVector( this.vertex, x, y );
-		
-		this.position.set(x,y);
-		
-		this.speed.x = Math.cos( theta ) * speed;
-		this.speed.y = Math.sin( theta ) * speed;
+	fire : function(xO, xD, yO, yD, zO, zD, r, speed) {
+
+		this.position.set(xO, yO, zO);
+
+		this.speed.x = ((xD-xO)/r)*speed;
+		this.speed.y = ((yD-yO)/r)*speed;
+		this.speed.z = ((zD-zO)/r)*speed;
 		
 		this.bornAt = this.poem.clock.time;
 		this.alive = true;
 		
 	}
-};
+	};

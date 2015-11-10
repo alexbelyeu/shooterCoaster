@@ -1,19 +1,18 @@
-var _ = require('underscore');
-
-var Collider = function( poem, getCollectionA, getCollectionB, onCollision ) {
+	var _ = require('underscore');
+	
+	var ColliderXYZ = function( poem, getCollectionA, getCollectionB, onCollision ) {
 	
 	this.poem = poem;
 	
 	this.getCollectionA = getCollectionA;
 	this.getCollectionB = getCollectionB;
 	this.onCollision = onCollision;
-	
 	this.poem.on('update', this.update.bind(this) );
-};
-
-module.exports = Collider;
-
-Collider.prototype = {
+	};
+	
+	module.exports = ColliderXYZ;
+	
+	ColliderXYZ.prototype = {
 	
 	update : function( e ) {
 
@@ -24,12 +23,13 @@ Collider.prototype = {
 			var collidedItemFromB = _.find( this.getCollectionB(), function( itemFromB ) {
 				
 				
-				var dx, dy, distance;
-			
-				dx = this.poem.coordinates.circumferenceDistance( itemFromA.position.x, itemFromB.position.x );
+				var dx, dy, dz, distance;
+
+				dx = itemFromA.position.x - itemFromB.position.x;
 				dy = itemFromA.position.y - itemFromB.position.y;
+				dz = itemFromA.position.z - itemFromB.position.z;
 			
-				distance = Math.sqrt(dx * dx + dy * dy);
+				distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 				
 			
 				return distance < itemFromA.radius + itemFromB.radius;
@@ -47,5 +47,5 @@ Collider.prototype = {
 			this.onCollision( items[0], items[1] );
 		}, this);
 	}
-	
-};
+		
+	};
