@@ -2891,7 +2891,7 @@
 	"../sound/Music":"/Users/abely_000/Documents/Programacion/Threejs/shooterCoaster/js/sound/Music.js"}],
 
 "/Users/abely_000/Documents/Programacion/Threejs/shooterCoaster/js/levels/level4.js":[function(require,module,exports){
-	var numberOfSnowmen = 40;
+	var numberOfSnowmen = 45;
 	
 	module.exports = {
 	name : "Antarctica",
@@ -2907,7 +2907,7 @@
 		scoringAndWinning: {
 			message: "You've made it!. Congrats!",
 			nextLevel: "menu",
-			timerCount: 65,
+			timerCount: 85,
 			conditions: [
 				{
 					component: "manager",
@@ -8673,70 +8673,70 @@
 	"promise":"node_modules/localforage/node_modules/promise/index.js"}],
 	
 	"node_modules/soundcloud-badge/index.js":[function(require,module,exports){
-	var resolve = require('soundcloud-resolve')
-	var fonts = require('google-fonts')
-	var minstache = require('minstache')
-	var insert = require('insert-css')
-	var fs = require('fs')
+		var resolve = require('soundcloud-resolve')
+		var fonts = require('google-fonts')
+		var minstache = require('minstache')
+		var insert = require('insert-css')
+		var fs = require('fs')
+		
+		var icons = {
+ 		   black: 'http://developers.soundcloud.com/assets/logo_black.png'
+ 		 , white: 'http://developers.soundcloud.com/assets/logo_white.png'
+		}
+		
+		module.exports = badge
+		function noop(err){ if (err) throw err }
+		
+		var inserted = false
+		var gwfadded = false
+		var template = null
+		
+		function badge(options, callback) {
+ 		 if (!inserted) insert(".npm-scb-wrap {\n  font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;\n  font-weight: 200;\n  position: absolute;\n  top: 0;\n  left: 0;\n  z-index: 999;\n}\n\n.npm-scb-wrap a {\n  text-decoration: none;\n  color: #000;\n}\n.npm-scb-white\n.npm-scb-wrap a {\n  color: #fff;\n}\n\n.npm-scb-inner {\n  position: absolute;\n  top: -120px; left: 0;\n  padding: 8px;\n  width: 100%;\n  height: 150px;\n  z-index: 2;\n  -webkit-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n     -moz-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n      -ms-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n       -o-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n          transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n}\n.npm-scb-wrap:hover\n.npm-scb-inner {\n  top: 0;\n}\n\n.npm-scb-artwork {\n  position: absolute;\n  top: 16px; left: 16px;\n  width: 104px; height: 104px;\n  box-shadow: 0 0 8px -3px #000;\n  outline: 1px solid rgba(0,0,0,0.1);\n  z-index: 2;\n}\n.npm-scb-white\n.npm-scb-artwork {\n  outline: 1px solid rgba(255,255,255,0.1);\n  box-shadow: 0 0 10px -2px rgba(255,255,255,0.9);\n}\n\n.npm-scb-info {\n  position: absolute;\n  top: 16px;\n  left: 120px;\n  width: 300px;\n  z-index: 1;\n}\n\n.npm-scb-info > a {\n  display: block;\n}\n\n.npm-scb-now-playing {\n  font-size: 12px;\n  line-height: 12px;\n  position: absolute;\n  width: 500px;\n  z-index: 1;\n  padding: 15px 0;\n  top: 0; left: 138px;\n  opacity: 1;\n  -webkit-transition: opacity 0.25s;\n     -moz-transition: opacity 0.25s;\n      -ms-transition: opacity 0.25s;\n       -o-transition: opacity 0.25s;\n          transition: opacity 0.25s;\n}\n\n.npm-scb-wrap:hover\n.npm-scb-now-playing {\n  opacity: 0;\n}\n\n.npm-scb-white\n.npm-scb-now-playing {\n  color: #fff;\n}\n.npm-scb-now-playing > a {\n  font-weight: bold;\n}\n\n.npm-scb-info > a > p {\n  margin: 0;\n  padding-bottom: 0.25em;\n  line-height: 1.35em;\n  margin-left: 1em;\n  font-size: 1em;\n}\n\n.npm-scb-title {\n  font-weight: bold;\n}\n\n.npm-scb-icon {\n  position: absolute;\n  top: 120px;\n  padding-top: 0.75em;\n  left: 16px;\n}\n"), inserted = true
+ 	 	 if (!template) template = minstache.compile("<div class=\"npm-scb-wrap\">\n  <div class=\"npm-scb-inner\">\n    <a target=\"_blank\" href=\"{{urls.song}}\">\n      <img class=\"npm-scb-icon\" src=\"{{icon}}\">\n      <img class=\"npm-scb-artwork\" src=\"{{artwork}}\">\n    </a>\n    <div class=\"npm-scb-info\">\n      <a target=\"_blank\" href=\"{{urls.song}}\">\n        <p class=\"npm-scb-title\">{{title}}</p>\n      </a>\n      <a target=\"_blank\" href=\"{{urls.artist}}\">\n        <p class=\"npm-scb-artist\">{{artist}}</p>\n      </a>\n    </div>\n  </div>\n  <div class=\"npm-scb-now-playing\">\n    Now Playing:\n    <a href=\"{{urls.song}}\">{{title}}</a>\n    by\n    <a href=\"{{urls.artist}}\">{{artist}}</a>\n  </div>\n</div>\n")
+		
+ 		 if (!gwfadded && options.getFonts) {
+ 		   fonts.add({ 'Open Sans': [300, 600] })
+ 		   gwfadded = true
+ 		}
+		
+ 		 options = options || {}
+ 		 callback = callback || noop
+		
+ 		 var div   = options.el || document.createElement('div')
+ 		 var icon  = !('dark' in options) || options.dark ? 'black' : 'white'
+ 		 var id    = options.client_id
+ 		 var song  = options.song
+		
+ 		 resolve(id, song, function(err, json) {
+ 	   			if (err) return callback(err)
+ 	   			if (json.kind !== 'track') throw new Error(
+ 	   			  'soundcloud-badge only supports individual tracks at the moment'
+ 	   			)
+			
+ 	   		div.classList[
+ 	   		  icon === 'black' ? 'remove' : 'add'
+ 	   		]('npm-scb-white')
+			
+ 	   		div.innerHTML = template({
+ 	   		    artwork: json.artwork_url || json.user.avatar_url
+ 	   		  , artist: json.user.username
+ 	   		  , title: json.title
+ 	   		  , icon: icons[icon]
+ 	   		  , urls: {
+ 	   		      song: json.permalink_url
+ 	   		    , artist: json.user.permalink_url
+ 	   		  }
+ 	   		})
+			
+ 	   		document.body.appendChild(div)
+			
+ 	   		callback(null, json.stream_url + '?client_id=' + id, json, div)
+ 	 	})
 	
-	var icons = {
-    black: 'http://developers.soundcloud.com/assets/logo_black.png'
-  , white: 'http://developers.soundcloud.com/assets/logo_white.png'
-	}
-	
-	module.exports = badge
-	function noop(err){ if (err) throw err }
-	
-	var inserted = false
-	var gwfadded = false
-	var template = null
-	
-	function badge(options, callback) {
-  if (!inserted) insert(".npm-scb-wrap {\n  font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;\n  font-weight: 200;\n  position: absolute;\n  top: 0;\n  left: 0;\n  z-index: 999;\n}\n\n.npm-scb-wrap a {\n  text-decoration: none;\n  color: #000;\n}\n.npm-scb-white\n.npm-scb-wrap a {\n  color: #fff;\n}\n\n.npm-scb-inner {\n  position: absolute;\n  top: -120px; left: 0;\n  padding: 8px;\n  width: 100%;\n  height: 150px;\n  z-index: 2;\n  -webkit-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n     -moz-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n      -ms-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n       -o-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n          transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n}\n.npm-scb-wrap:hover\n.npm-scb-inner {\n  top: 0;\n}\n\n.npm-scb-artwork {\n  position: absolute;\n  top: 16px; left: 16px;\n  width: 104px; height: 104px;\n  box-shadow: 0 0 8px -3px #000;\n  outline: 1px solid rgba(0,0,0,0.1);\n  z-index: 2;\n}\n.npm-scb-white\n.npm-scb-artwork {\n  outline: 1px solid rgba(255,255,255,0.1);\n  box-shadow: 0 0 10px -2px rgba(255,255,255,0.9);\n}\n\n.npm-scb-info {\n  position: absolute;\n  top: 16px;\n  left: 120px;\n  width: 300px;\n  z-index: 1;\n}\n\n.npm-scb-info > a {\n  display: block;\n}\n\n.npm-scb-now-playing {\n  font-size: 12px;\n  line-height: 12px;\n  position: absolute;\n  width: 500px;\n  z-index: 1;\n  padding: 15px 0;\n  top: 0; left: 138px;\n  opacity: 1;\n  -webkit-transition: opacity 0.25s;\n     -moz-transition: opacity 0.25s;\n      -ms-transition: opacity 0.25s;\n       -o-transition: opacity 0.25s;\n          transition: opacity 0.25s;\n}\n\n.npm-scb-wrap:hover\n.npm-scb-now-playing {\n  opacity: 0;\n}\n\n.npm-scb-white\n.npm-scb-now-playing {\n  color: #fff;\n}\n.npm-scb-now-playing > a {\n  font-weight: bold;\n}\n\n.npm-scb-info > a > p {\n  margin: 0;\n  padding-bottom: 0.25em;\n  line-height: 1.35em;\n  margin-left: 1em;\n  font-size: 1em;\n}\n\n.npm-scb-title {\n  font-weight: bold;\n}\n\n.npm-scb-icon {\n  position: absolute;\n  top: 120px;\n  padding-top: 0.75em;\n  left: 16px;\n}\n"), inserted = true
-  if (!template) template = minstache.compile("<div class=\"npm-scb-wrap\">\n  <div class=\"npm-scb-inner\">\n    <a target=\"_blank\" href=\"{{urls.song}}\">\n      <img class=\"npm-scb-icon\" src=\"{{icon}}\">\n      <img class=\"npm-scb-artwork\" src=\"{{artwork}}\">\n    </a>\n    <div class=\"npm-scb-info\">\n      <a target=\"_blank\" href=\"{{urls.song}}\">\n        <p class=\"npm-scb-title\">{{title}}</p>\n      </a>\n      <a target=\"_blank\" href=\"{{urls.artist}}\">\n        <p class=\"npm-scb-artist\">{{artist}}</p>\n      </a>\n    </div>\n  </div>\n  <div class=\"npm-scb-now-playing\">\n    Now Playing:\n    <a href=\"{{urls.song}}\">{{title}}</a>\n    by\n    <a href=\"{{urls.artist}}\">{{artist}}</a>\n  </div>\n</div>\n")
-
-  if (!gwfadded && options.getFonts) {
-    fonts.add({ 'Open Sans': [300, 600] })
-    gwfadded = true
-  }
-
-  options = options || {}
-  callback = callback || noop
-
-  var div   = options.el || document.createElement('div')
-  var icon  = !('dark' in options) || options.dark ? 'black' : 'white'
-  var id    = options.client_id
-  var song  = options.song
-
-  resolve(id, song, function(err, json) {
-    if (err) return callback(err)
-    if (json.kind !== 'track') throw new Error(
-      'soundcloud-badge only supports individual tracks at the moment'
-    )
-
-    div.classList[
-      icon === 'black' ? 'remove' : 'add'
-    ]('npm-scb-white')
-
-    div.innerHTML = template({
-        artwork: json.artwork_url || json.user.avatar_url
-      , artist: json.user.username
-      , title: json.title
-      , icon: icons[icon]
-      , urls: {
-          song: json.permalink_url
-        , artist: json.user.permalink_url
-      }
-    })
-
-    document.body.appendChild(div)
-
-    callback(null, json.stream_url + '?client_id=' + id, json, div)
-  })
-
-  return div
-	}
-	
+ 	 	return div
+		}
+		
 	},
 	{"fs":"node_modules/gulpfile/node_modules/browserify/lib/_empty.js",
 	"google-fonts":"node_modules/soundcloud-badge/node_modules/google-fonts/index.js",
@@ -8745,45 +8745,45 @@
 	"soundcloud-resolve":"node_modules/soundcloud-badge/node_modules/soundcloud-resolve/browser.js"}],
 	
 	"node_modules/soundcloud-badge/node_modules/google-fonts/index.js":[function(require,module,exports){
-	module.exports = asString
-	module.exports.add = append
-	
-	function asString(fonts) {
-  var href = getHref(fonts)
-  return '<link href="' + href + '" rel="stylesheet" type="text/css">'
-	}
-	
-	function asElement(fonts) {
-  var href = getHref(fonts)
-  var link = document.createElement('link')
-  link.setAttribute('href', href)
-  link.setAttribute('rel', 'stylesheet')
-  link.setAttribute('type', 'text/css')
-  return link
-	}
-	
-	function getHref(fonts) {
-  var family = Object.keys(fonts).map(function(name) {
-    var details = fonts[name]
-    name = name.replace(/\s+/, '+')
-    return typeof details === 'boolean'
-      ? name
-      : name + ':' + makeArray(details).join(',')
-  }).join('|')
-
-  return 'http://fonts.googleapis.com/css?family=' + family
-	}
-	
-	function append(fonts) {
-  var link = asElement(fonts)
-  document.head.appendChild(link)
-  return link
-	}
-	
-	function makeArray(arr) {
-  return Array.isArray(arr) ? arr : [arr]
-	}
-	
+		module.exports = asString
+		module.exports.add = append
+		
+		function asString(fonts) {
+	  		var href = getHref(fonts)
+	  		return '<link href="' + href + '" rel="stylesheet" type="text/css">'
+		}
+		
+		function asElement(fonts) {
+	 	 var href = getHref(fonts)
+	 	 var link = document.createElement('link')
+	 	 link.setAttribute('href', href)
+	 	 link.setAttribute('rel', 'stylesheet')
+	 	 link.setAttribute('type', 'text/css')
+	 	 return link
+		}
+		
+		function getHref(fonts) {
+	  		var family = Object.keys(fonts).map(function(name) {
+	  		  var details = fonts[name]
+	  		  name = name.replace(/\s+/, '+')
+	  		  return typeof details === 'boolean'
+	  		    ? name
+	  		    : name + ':' + makeArray(details).join(',')
+	  		}).join('|')
+			
+	  		return 'http://fonts.googleapis.com/css?family=' + family
+		}
+		
+		function append(fonts) {
+	 		var link = asElement(fonts)
+	 		document.head.appendChild(link)
+	 		return link
+		}
+		
+		function makeArray(arr) {
+	 		return Array.isArray(arr) ? arr : [arr]
+		}
+		
 	},
 	{}],
 	
