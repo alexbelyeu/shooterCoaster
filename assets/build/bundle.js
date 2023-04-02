@@ -2595,7 +2595,7 @@
 	maxScore : 13 * numberOfBalloons,
 	config : {
 		scoringAndWinning: {
-			message: "Well, that was soooo easy...",
+			message: "Well, that was easy...",
 			nextLevel: "level2",
 			conditions: [
 				{
@@ -2675,9 +2675,9 @@
 	maxScore : 13 * numberOfBalloons,
 	config : {
 		scoringAndWinning: {
-			message: "Well, that was sooo easy...",
+			message: "Well, that was easy...",
 			nextLevel: "level2",
-			timerCount: 45,
+			timerCount: 90,
 			conditions: [
 				{
 					component: "manager",
@@ -2709,8 +2709,8 @@
 			properties: {
 				color1: 0xffffff,
 				color2: 0xffff00,
-				rollerSpeed: 0.00001,
-				minRollerSpeed: 0.00008,
+				rollerSpeed: 0.000001,
+				minRollerSpeed: 0.000008,
 				varA: 3,
 				varB: 17,
 				varC: 4,

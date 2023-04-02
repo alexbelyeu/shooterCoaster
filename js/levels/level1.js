@@ -6,7 +6,7 @@ order : 1,
 maxScore : 13 * numberOfBalloons,
 config : {
 	scoringAndWinning: {
-		message: "Well, that was so easy...",
+		message: "Well, that was easy...",
 		nextLevel: "level2",
 		timerCount: 45,
 		conditions: [
