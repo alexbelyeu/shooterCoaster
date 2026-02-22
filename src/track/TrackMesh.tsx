@@ -1,6 +1,8 @@
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useContext } from 'react'
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
+import { TerrainContext } from '@/levels/environments/TerrainContext'
+import type { HeightFunction } from '@/utils/terrainNoise'
 
 interface TrackMeshProps {
   curve: TrackCurve
@@ -150,24 +152,26 @@ function buildTrackGeometry(
   return geometry
 }
 
-/** Generate support pillar positions along the track */
+/** Generate support pillar positions along the track, terrain-aware */
 function generatePillarPositions(
   curve: TrackCurve,
   count: number,
-): { x: number; y: number; z: number; height: number }[] {
-  const pillars: { x: number; y: number; z: number; height: number }[] = []
+  heightFn: HeightFunction,
+): { x: number; groundY: number; z: number; pillarHeight: number }[] {
+  const pillars: { x: number; groundY: number; z: number; pillarHeight: number }[] = []
 
   for (let i = 0; i < count; i++) {
     const t = i / count
     const point = curve.getPointAt(t)
-    const height = point.y
-    // Only place pillars where track is above ground level
-    if (height > 5) {
+    const groundY = heightFn(point.x, point.z)
+    const pillarHeight = point.y - groundY
+    // Only place pillars where track is above terrain
+    if (pillarHeight > 5) {
       pillars.push({
         x: point.x,
-        y: 0,
+        groundY,
         z: point.z,
-        height,
+        pillarHeight,
       })
     }
   }
@@ -176,7 +180,8 @@ function generatePillarPositions(
 }
 
 function TrackPillars({ curve }: { curve: TrackCurve }) {
-  const pillars = useMemo(() => generatePillarPositions(curve, 50), [curve])
+  const heightFn = useContext(TerrainContext)
+  const pillars = useMemo(() => generatePillarPositions(curve, 50, heightFn), [curve, heightFn])
 
   const setRef = useCallback(
     (mesh: THREE.InstancedMesh | null) => {
@@ -186,8 +191,8 @@ function TrackPillars({ curve }: { curve: TrackCurve }) {
 
       for (let i = 0; i < pillars.length; i++) {
         const p = pillars[i]
-        scale.set(1, p.height, 1)
-        mat.makeTranslation(p.x, p.height / 2, p.z)
+        scale.set(1, p.pillarHeight, 1)
+        mat.makeTranslation(p.x, p.groundY + p.pillarHeight / 2, p.z)
         mat.scale(scale)
         mesh.setMatrixAt(i, mat)
       }
