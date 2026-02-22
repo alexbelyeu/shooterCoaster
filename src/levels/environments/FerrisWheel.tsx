@@ -31,11 +31,9 @@ export default function FerrisWheel({
     return arr
   }, [gondolaCount])
 
-  // Counter-rotate gondolas so they always hang down
   useFrame((_, delta) => {
     if (wheelRef.current) {
       wheelRef.current.rotation.z += ROTATION_SPEED * delta
-      // Counter-rotate each gondola to keep it upright
       const wheelAngle = wheelRef.current.rotation.z
       for (let i = 0; i < gondolaRefs.current.length; i++) {
         const g = gondolaRefs.current[i]
@@ -44,73 +42,90 @@ export default function FerrisWheel({
     }
   })
 
-  const hubY = radius + 10 // hub height above ground
-  const legHeight = hubY + 5
-  const legSpread = radius * 0.3
+  const hubY = radius + 10
+  const legSpread = radius * 0.7 // wide base for a proper A-frame
+  const zGap = 8 // distance between front and back frames
+
+  // Leg from foot (±legSpread/2, 0) to hub (0, hubY)
+  const legLength = Math.sqrt((legSpread / 2) ** 2 + hubY ** 2)
+  const legAngle = Math.atan2(legSpread / 2, hubY)
 
   return (
     <group position={position}>
-      {/* A-frame support legs (front pair) */}
-      <mesh
-        position={[-legSpread * 0.5, legHeight * 0.5, 6]}
-        rotation={[0, 0, Math.atan2(legSpread * 0.5, legHeight)]}
-      >
-        <boxGeometry args={[2.5, legHeight * 1.02, 2.5]} />
-        <meshPhongMaterial color="#555555" flatShading />
-      </mesh>
-      <mesh
-        position={[legSpread * 0.5, legHeight * 0.5, 6]}
-        rotation={[0, 0, -Math.atan2(legSpread * 0.5, legHeight)]}
-      >
-        <boxGeometry args={[2.5, legHeight * 1.02, 2.5]} />
-        <meshPhongMaterial color="#555555" flatShading />
-      </mesh>
+      {/* ---- A-FRAME SUPPORTS (front & back) ---- */}
+      {[zGap / 2, -zGap / 2].map((z, zi) => (
+        <group key={`frame-${zi}`}>
+          {/* Left leg — foot at (-legSpread/2, 0), top at (0, hubY) */}
+          <mesh
+            position={[-legSpread / 4, hubY / 2, z]}
+            rotation={[0, 0, -legAngle]}
+          >
+            <boxGeometry args={[2.5, legLength, 2.5]} />
+            <meshPhongMaterial color="#555555" flatShading />
+          </mesh>
+          {/* Right leg — foot at (+legSpread/2, 0), top at (0, hubY) */}
+          <mesh
+            position={[legSpread / 4, hubY / 2, z]}
+            rotation={[0, 0, legAngle]}
+          >
+            <boxGeometry args={[2.5, legLength, 2.5]} />
+            <meshPhongMaterial color="#555555" flatShading />
+          </mesh>
+          {/* Lower cross brace */}
+          <mesh position={[0, hubY * 0.3, z]}>
+            <boxGeometry args={[legSpread * 0.45, 1.5, 1.5]} />
+            <meshPhongMaterial color="#444444" flatShading />
+          </mesh>
+          {/* Upper cross brace */}
+          <mesh position={[0, hubY * 0.6, z]}>
+            <boxGeometry args={[legSpread * 0.22, 1.5, 1.5]} />
+            <meshPhongMaterial color="#444444" flatShading />
+          </mesh>
+        </group>
+      ))}
 
-      {/* A-frame support legs (back pair) */}
-      <mesh
-        position={[-legSpread * 0.5, legHeight * 0.5, -6]}
-        rotation={[0, 0, Math.atan2(legSpread * 0.5, legHeight)]}
-      >
-        <boxGeometry args={[2.5, legHeight * 1.02, 2.5]} />
-        <meshPhongMaterial color="#555555" flatShading />
-      </mesh>
-      <mesh
-        position={[legSpread * 0.5, legHeight * 0.5, -6]}
-        rotation={[0, 0, -Math.atan2(legSpread * 0.5, legHeight)]}
-      >
-        <boxGeometry args={[2.5, legHeight * 1.02, 2.5]} />
-        <meshPhongMaterial color="#555555" flatShading />
-      </mesh>
+      {/* Horizontal braces connecting front and back frames */}
+      {[-legSpread * 0.35, legSpread * 0.35].map((x, xi) => (
+        <mesh key={`zbrace-${xi}`} position={[x, 2, 0]}>
+          <boxGeometry args={[1.5, 1.5, zGap + 2]} />
+          <meshPhongMaterial color="#444444" flatShading />
+        </mesh>
+      ))}
 
-      {/* Cross brace between legs */}
-      <mesh position={[0, legHeight * 0.4, 6]}>
-        <boxGeometry args={[legSpread * 1.2, 1.5, 1.5]} />
-        <meshPhongMaterial color="#444444" flatShading />
-      </mesh>
-      <mesh position={[0, legHeight * 0.4, -6]}>
-        <boxGeometry args={[legSpread * 1.2, 1.5, 1.5]} />
-        <meshPhongMaterial color="#444444" flatShading />
+      {/* Base platform */}
+      <mesh position={[0, 0.5, 0]}>
+        <boxGeometry args={[legSpread * 0.85, 1, zGap + 4]} />
+        <meshPhongMaterial color="#666666" flatShading />
       </mesh>
 
       {/* Hub axle */}
       <mesh position={[0, hubY, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[3, 3, 16, 8]} />
+        <cylinderGeometry args={[3.5, 3.5, zGap + 4, 8]} />
         <meshPhongMaterial color="#888888" flatShading />
+      </mesh>
+      {/* Hub caps */}
+      <mesh position={[0, hubY, zGap / 2 + 2.5]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[5, 5, 1, 8]} />
+        <meshPhongMaterial color="#aaaaaa" flatShading />
+      </mesh>
+      <mesh position={[0, hubY, -(zGap / 2 + 2.5)]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[5, 5, 1, 8]} />
+        <meshPhongMaterial color="#aaaaaa" flatShading />
       </mesh>
 
       {/* Rotating wheel group */}
       <group ref={wheelRef} position={[0, hubY, 0]}>
         {/* Outer rim (two rings for front/back) */}
-        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 4]}>
+        <mesh position={[0, 0, zGap / 2]}>
           <torusGeometry args={[radius, 1.5, 6, 36]} />
           <meshPhongMaterial color="#cc3333" flatShading />
         </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -4]}>
+        <mesh position={[0, 0, -zGap / 2]}>
           <torusGeometry args={[radius, 1.5, 6, 36]} />
           <meshPhongMaterial color="#cc3333" flatShading />
         </mesh>
 
-        {/* Spokes — thin cylinders from center to rim */}
+        {/* Spokes */}
         {gondolaAngles.map((angle, i) => (
           <mesh
             key={`spoke-${i}`}
@@ -121,7 +136,7 @@ export default function FerrisWheel({
             ]}
             rotation={[0, 0, angle + Math.PI / 2]}
           >
-            <cylinderGeometry args={[0.6, 0.6, radius, 4]} />
+            <cylinderGeometry args={[0.5, 0.5, radius, 4]} />
             <meshPhongMaterial color="#999999" flatShading />
           </mesh>
         ))}
@@ -138,26 +153,30 @@ export default function FerrisWheel({
           >
             {/* Cross-bar between the two rim rings */}
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.8, 0.8, 10, 4]} />
+              <cylinderGeometry args={[0.8, 0.8, zGap + 2, 4]} />
               <meshPhongMaterial color="#777777" flatShading />
             </mesh>
 
             {/* Gondola group — counter-rotated to hang down */}
             <group ref={(el) => { gondolaRefs.current[i] = el }}>
-              {/* Hanging arm */}
-              <mesh position={[0, -5, 0]}>
-                <cylinderGeometry args={[0.4, 0.4, 6, 4]} />
+              {/* Hanging arms (two) */}
+              <mesh position={[-2.5, -5, 0]}>
+                <cylinderGeometry args={[0.3, 0.3, 6, 4]} />
                 <meshPhongMaterial color="#666666" flatShading />
               </mesh>
-              {/* Cabin */}
-              <mesh position={[0, -11, 0]}>
-                <boxGeometry args={[7, 6, 5]} />
-                <meshPhongMaterial color={GONDOLA_COLORS[i % GONDOLA_COLORS.length]} flatShading />
+              <mesh position={[2.5, -5, 0]}>
+                <cylinderGeometry args={[0.3, 0.3, 6, 4]} />
+                <meshPhongMaterial color="#666666" flatShading />
               </mesh>
               {/* Cabin roof */}
-              <mesh position={[0, -7.5, 0]}>
-                <boxGeometry args={[8, 1, 6]} />
+              <mesh position={[0, -8, 0]}>
+                <boxGeometry args={[8, 0.8, 6]} />
                 <meshPhongMaterial color="#dddddd" flatShading />
+              </mesh>
+              {/* Cabin body */}
+              <mesh position={[0, -11.5, 0]}>
+                <boxGeometry args={[7, 6, 5]} />
+                <meshPhongMaterial color={GONDOLA_COLORS[i % GONDOLA_COLORS.length]} flatShading />
               </mesh>
             </group>
           </group>

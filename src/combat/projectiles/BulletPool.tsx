@@ -56,6 +56,8 @@ export default function BulletPool({
   const lastFireTime = useRef(0)
   const tempMatrix = useMemo(() => new THREE.Matrix4(), [])
   const tempColor = useMemo(() => new THREE.Color(bulletColor), [bulletColor])
+  const scaleVec = useRef(new THREE.Vector3()).current
+  const zeroVec = useRef(new THREE.Vector3(0, 0, 0)).current
 
   const fire = useCallback(
     (origin: THREE.Vector3, direction: THREE.Vector3) => {
@@ -98,15 +100,14 @@ export default function BulletPool({
         }
       }
 
-      tempMatrix.makeTranslation(bullet.position.x, bullet.position.y, bullet.position.z)
-
       if (bullet.alive) {
         const scale = bulletSize * 0.1
         tempMatrix.makeTranslation(bullet.position.x, bullet.position.y, bullet.position.z)
-        tempMatrix.scale(new THREE.Vector3(scale, scale, scale))
+        scaleVec.set(scale, scale, scale)
+        tempMatrix.scale(scaleVec)
       } else {
         tempMatrix.makeTranslation(0, -9999, 0)
-        tempMatrix.scale(new THREE.Vector3(0, 0, 0))
+        tempMatrix.scale(zeroVec)
       }
 
       meshRef.current.setMatrixAt(i, tempMatrix)

@@ -209,6 +209,7 @@ function ShootableBalloon({
   onPop: (worldPos: THREE.Vector3, color: string) => void
 }) {
   const groupRef = useRef<THREE.Group>(null)
+  const _wp = useRef(new THREE.Vector3()).current
   const [alive, setAlive] = useState(true)
   const popScale = useRef(1)
   const [fullyGone, setFullyGone] = useState(false)
@@ -228,9 +229,8 @@ function ShootableBalloon({
       setAlive(false)
       // Get world position of the balloon for pop burst
       if (groupRef.current) {
-        const wp = new THREE.Vector3()
-        groupRef.current.getWorldPosition(wp)
-        onPop(wp, color)
+        groupRef.current.getWorldPosition(_wp)
+        onPop(_wp, color)
       }
     },
     [alive, color, onPop],
@@ -281,9 +281,12 @@ function Balloons() {
 
   const handlePop = useCallback((worldPos: THREE.Vector3, color: string) => {
     const id = popId.current++
-    setPops((prev) => [...prev, { id, pos: worldPos, color }])
-    // Clean up after animation
-    setTimeout(() => setPops((prev) => prev.filter((p) => p.id !== id)), 700)
+    // Defer adding the pop burst to the next frame so the click frame stays light
+    // and we avoid layout/jank from synchronous heavy re-render
+    requestAnimationFrame(() => {
+      setPops((prev) => [...prev, { id, pos: worldPos.clone(), color }])
+      setTimeout(() => setPops((prev) => prev.filter((p) => p.id !== id)), 700)
+    })
   }, [])
 
   return (
@@ -313,14 +316,14 @@ function TitleClickRaycaster() {
       raycaster.setFromCamera(ndc, camera)
       const hits = raycaster.intersectObjects(scene.children, true)
       if (hits.length > 0) {
-        // Simulate an R3F onClick by finding the first hit object
-        // and dispatching a synthetic click event through its handlers
         let obj: THREE.Object3D | null = hits[0].object
         while (obj) {
           const handlers = (obj as unknown as Record<string, unknown>).__r3f as
             | { eventCount?: number; handlers?: Record<string, (e: unknown) => void> }
             | undefined
           if (handlers?.handlers?.onClick) {
+            e.preventDefault()
+            e.stopPropagation()
             handlers.handlers.onClick({
               stopPropagation: () => {},
               object: hits[0].object,
@@ -333,8 +336,8 @@ function TitleClickRaycaster() {
         }
       }
     }
-    window.addEventListener('click', onClick)
-    return () => window.removeEventListener('click', onClick)
+    window.addEventListener('click', onClick, { capture: true })
+    return () => window.removeEventListener('click', onClick, { capture: true })
   }, [camera, scene, size, raycaster, ndc])
 
   return null

@@ -25,7 +25,8 @@ export default function ParticleExplosion({
   const fireRef = useRef<THREE.InstancedMesh>(null)
   const sparkRef = useRef<THREE.InstancedMesh>(null)
   const startTime = useRef(performance.now())
-  const [lightIntensity, setLightIntensity] = useState(8)
+  // Start at 0 and ramp up in useFrame to avoid a sudden lighting jump (layout/jitter)
+  const [lightIntensity, setLightIntensity] = useState(0)
 
   const sparkCount = Math.floor(count * 0.5)
 
@@ -66,14 +67,17 @@ export default function ParticleExplosion({
   }, [position, sparkCount, speed])
 
   const tempMatrix = useMemo(() => new THREE.Matrix4(), [])
+  const scaleVec = useRef(new THREE.Vector3()).current
 
   useFrame(() => {
     const elapsed = (performance.now() - startTime.current) / 1000
     const fade = Math.max(0, 1 - elapsed / 1.5)
 
-    // Flash fades quickly
-    if (elapsed < 0.15) {
-      setLightIntensity(8 * (1 - elapsed / 0.15))
+    // Flash: ramp up then fade quickly to avoid sudden light appearance
+    if (elapsed < 0.04) {
+      setLightIntensity(8 * (elapsed / 0.04))
+    } else if (elapsed < 0.15) {
+      setLightIntensity(8 * (1 - (elapsed - 0.04) / 0.11))
     } else if (lightIntensity > 0) {
       setLightIntensity(0)
     }
@@ -87,7 +91,8 @@ export default function ParticleExplosion({
 
         const scale = fade * 1.2
         tempMatrix.makeTranslation(p.pos.x, p.pos.y, p.pos.z)
-        tempMatrix.scale(new THREE.Vector3(scale, scale, scale))
+        scaleVec.set(scale, scale, scale)
+        tempMatrix.scale(scaleVec)
         fireRef.current.setMatrixAt(i, tempMatrix)
       }
       fireRef.current.instanceMatrix.needsUpdate = true
@@ -103,7 +108,8 @@ export default function ParticleExplosion({
 
         const scale = fade * 0.5
         tempMatrix.makeTranslation(p.pos.x, p.pos.y, p.pos.z)
-        tempMatrix.scale(new THREE.Vector3(scale, scale, scale))
+        scaleVec.set(scale, scale, scale)
+        tempMatrix.scale(scaleVec)
         sparkRef.current.setMatrixAt(i, tempMatrix)
       }
       sparkRef.current.instanceMatrix.needsUpdate = true
