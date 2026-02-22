@@ -6,6 +6,8 @@ import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
 import TrackMesh from '@/track/TrackMesh'
 import CoasterCamera from '@/track/CoasterCamera'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
+import { TerrainContext } from '@/levels/environments/TerrainContext'
+import { createHeightFunction, sampleTrackPath } from '@/utils/terrainNoise'
 import BulletPool from '@/combat/projectiles/BulletPool'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
 import ShootingController from './ShootingController'
@@ -63,6 +65,9 @@ function LevelScene({ levelId }: { levelId: string }) {
     return factory(track.varA, track.varB, track.varC, track.scalar)
   }, [track])
 
+  const trackSamples = useMemo(() => sampleTrackPath((t) => curve.getPointAt(t)), [curve])
+  const heightFn = useMemo(() => createHeightFunction(biome, trackSamples), [biome, trackSamples])
+
   const color1 = useMemo(() => hexToRgb(track.color1), [track.color1])
   const color2 = useMemo(() => hexToRgb(track.color2), [track.color2])
 
@@ -71,7 +76,7 @@ function LevelScene({ levelId }: { levelId: string }) {
   const bulletSize = levelId === 'level4' ? 40 : 10
 
   return (
-    <>
+    <TerrainContext.Provider value={heightFn}>
       <CoasterCamera
         curve={curve}
         rollerSpeed={track.rollerSpeed}
@@ -101,7 +106,7 @@ function LevelScene({ levelId }: { levelId: string }) {
         <Vignette eskil={false} offset={0.1} darkness={0.4} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       </EffectComposer>
-    </>
+    </TerrainContext.Provider>
   )
 }
 
