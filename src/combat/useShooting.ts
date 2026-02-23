@@ -8,6 +8,7 @@ import { playFireSound } from '@/audio/SFXManager'
 const _raycaster = new THREE.Raycaster()
 const _ndc = new THREE.Vector2()
 const _direction = new THREE.Vector3()
+const _origin = new THREE.Vector3()
 
 /**
  * Hook that handles mouse click → fire bullet.
@@ -40,7 +41,8 @@ export function useShooting() {
     _raycaster.setFromCamera(_ndc, camera)
     _direction.copy(_raycaster.ray.direction)
 
-    pool.fire(camera.position.clone(), _direction.clone())
+    _origin.copy(camera.position)
+    pool.fire(_origin, _direction)
     playFireSound()
   }, [camera])
 

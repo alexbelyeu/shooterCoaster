@@ -9,6 +9,7 @@ import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import { createHeightFunction, sampleTrackPath } from '@/utils/terrainNoise'
 import BulletPool from '@/combat/projectiles/BulletPool'
+import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
@@ -91,6 +92,7 @@ function LevelScene({ levelId }: { levelId: string }) {
         treeCount={environment.treeCount}
       />
       <BulletPool bulletColor={bulletColor} bulletSize={bulletSize} />
+      <ParticleExplosionPool />
       <EnemySpawner waves={enemies} />
       <ShootingController />
       <GameTimer seconds={timerSeconds} />

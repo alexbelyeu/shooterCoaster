@@ -1,7 +1,10 @@
 import { useCallback, useRef, useState } from 'react'
-import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import {
+  BALLOON_BODY_GEO, BALLOON_KNOT_GEO, BALLOON_STRING_GEO,
+  GOLDEN_BODY_MAT, GOLDEN_KNOT_MAT, GOLDEN_STRING_MAT,
+} from './SharedEnemyAssets'
 
 /**
  * Golden bonus balloon: 5x points, emissive gold, bobs up and down,
@@ -33,29 +36,13 @@ export default function GoldenBalloon(props: EnemyProps) {
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group>
         {/* Golden balloon body */}
-        <mesh scale={[1, 1.3, 1]}>
-          <sphereGeometry args={[30, 16, 16]} />
-          <meshStandardMaterial
-            color="#ffd700"
-            emissive="#ffd700"
-            emissiveIntensity={1.5}
-            metalness={0.6}
-            roughness={0.2}
-            toneMapped={false}
-          />
-        </mesh>
+        <mesh scale={[1, 1.3, 1]} geometry={BALLOON_BODY_GEO} material={GOLDEN_BODY_MAT} />
 
         {/* Knot */}
-        <mesh position={[0, -35, 0]}>
-          <sphereGeometry args={[4, 8, 8]} />
-          <meshStandardMaterial color="#cc9900" metalness={0.5} roughness={0.3} />
-        </mesh>
+        <mesh position={[0, -35, 0]} geometry={BALLOON_KNOT_GEO} material={GOLDEN_KNOT_MAT} />
 
         {/* String */}
-        <mesh position={[0, -65, 0]}>
-          <cylinderGeometry args={[0.5, 0.5, 55, 4]} />
-          <meshBasicMaterial color="#cc9900" />
-        </mesh>
+        <mesh position={[0, -65, 0]} geometry={BALLOON_STRING_GEO} material={GOLDEN_STRING_MAT} />
       </group>
     </EnemyBase>
   )

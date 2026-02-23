@@ -1,10 +1,10 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
-import { getBulletPool } from '@/combat/projectiles/BulletPool'
 import { playExplosionSound } from '@/audio/SFXManager'
 import { eventBus } from '@/core/EventBus'
+import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
 import type { EnemyType } from '@/types/level'
 
 export interface EnemyProps {
@@ -28,7 +28,7 @@ interface EnemyBaseProps extends EnemyProps {
 
 /**
  * Shared base for all enemy types.
- * Handles visibility, collision detection with bullets, and death.
+ * Handles visibility, collision registration, and death.
  */
 export default function EnemyBase({
   id,
@@ -41,12 +41,14 @@ export default function EnemyBase({
 }: EnemyBaseProps) {
   const meshRef = useRef<THREE.Group>(null)
   const [alive, setAlive] = useState(true)
+  const aliveRef = useRef(true)
   const addScore = useGameStore((s) => s.addScore)
   const registerKill = useGameStore((s) => s.registerKill)
   const phase = useGameStore((s) => s.phase)
 
   const kill = useCallback(() => {
-    if (!alive) return
+    if (!aliveRef.current) return
+    aliveRef.current = false
     setAlive(false)
     addScore(scoreValue)
     registerKill()
@@ -63,31 +65,33 @@ export default function EnemyBase({
       })
       onKill(id, pos)
     }
-  }, [alive, id, scoreValue, addScore, registerKill, onKill])
+  }, [id, scoreValue, addScore, registerKill, onKill])
+
+  // Register with CollisionManager
+  const deadPos = useRef(new THREE.Vector3(0, -9999, 0)).current
+  useEffect(() => {
+    const getPosition = () => meshRef.current?.position ?? deadPos
+    registerCollisionTarget({
+      id,
+      getPosition,
+      radiusSq: radius * radius,
+      onHit: kill,
+    })
+    return () => unregisterCollisionTarget(id)
+  }, [id, radius, kill])
+
+  // Unregister when dead
+  useEffect(() => {
+    if (!alive) {
+      unregisterCollisionTarget(id)
+    }
+  }, [alive, id])
 
   useFrame(({ clock }, delta) => {
     if (!meshRef.current || phase !== 'playing') return
 
-    if (alive) {
+    if (aliveRef.current) {
       updatePosition(meshRef.current, spawnPosition, clock.elapsedTime, delta)
-
-      // Check bullet collisions
-      const pool = getBulletPool()
-      if (pool) {
-        const liveBullets = pool.getLiveBullets()
-        const pos = meshRef.current.position
-        for (const bullet of liveBullets) {
-          if (bullet.alive) {
-            const dist = pos.distanceTo(bullet.position)
-            if (dist < radius) {
-              bullet.alive = false
-              bullet.position.set(0, -9999, 0)
-              kill()
-              break
-            }
-          }
-        }
-      }
     }
   })
 

@@ -13,9 +13,11 @@ export default function GameTimer({ seconds }: GameTimerProps) {
   const phase = useGameStore((s) => s.phase)
 
   const startTime = useRef<number | null>(null)
+  const lastCeiled = useRef<number>(-1)
 
   useEffect(() => {
     startTime.current = null
+    lastCeiled.current = -1
     setTimeRemaining(seconds)
   }, [seconds, setTimeRemaining])
 
@@ -28,7 +30,12 @@ export default function GameTimer({ seconds }: GameTimerProps) {
 
     const elapsed = clock.elapsedTime - startTime.current
     const remaining = Math.max(0, seconds - elapsed)
-    setTimeRemaining(remaining)
+
+    const ceiled = Math.ceil(remaining)
+    if (ceiled !== lastCeiled.current) {
+      lastCeiled.current = ceiled
+      setTimeRemaining(remaining)
+    }
 
     if (remaining <= 0) {
       setPhase('results')

@@ -110,15 +110,29 @@ export function stopWindWhoosh(): void {
   }
 }
 
+export function disposeSFX(): void {
+  if (fireSynth) { fireSynth.dispose(); fireSynth = null }
+  if (popPing) { popPing.dispose(); popPing = null }
+  if (popSnap) { popSnap.dispose(); popSnap = null }
+}
+
+let lastExplosionTime = 0
+const EXPLOSION_SOUND_MIN_INTERVAL = 30 // ms — throttle rapid pops
+
 export function playExplosionSound(comboCount: number = 0): void {
   if (!isAudioReady()) return
+
+  const now = performance.now()
+  if (now - lastExplosionTime < EXPLOSION_SOUND_MIN_INTERVAL) return
+  lastExplosionTime = now
+
   ensureSynths()
 
-  const now = Tone.now()
+  const toneNow = Tone.now()
   // Balloon pop — snappy white noise burst
-  popSnap!.triggerAttackRelease(0.05 + Math.random() * 0.02, now)
+  popSnap!.triggerAttackRelease(0.05 + Math.random() * 0.02, toneNow)
 
   // Rubber-snap ping — pitch rises with combo for satisfying feedback
   const pingFreq = 1400 + Math.min(comboCount, 10) * 80 + Math.random() * 300
-  popPing!.triggerAttackRelease(pingFreq, 0.04, now)
+  popPing!.triggerAttackRelease(pingFreq, 0.04, toneNow)
 }

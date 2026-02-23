@@ -12,12 +12,11 @@ export default function Crosshair() {
   const onDown = useCallback(() => setFiring(true), [])
   const onUp = useCallback(() => setFiring(false), [])
 
-  // Follow the mouse cursor
+  // Follow the mouse cursor (use transform to avoid layout reflow)
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (ref.current) {
-        ref.current.style.left = `${e.clientX}px`
-        ref.current.style.top = `${e.clientY}px`
+        ref.current.style.transform = `translate(${e.clientX - 24}px, ${e.clientY - 24}px)`
       }
     }
     window.addEventListener('mousemove', onMove)

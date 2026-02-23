@@ -174,17 +174,17 @@ canvas {
   z-index: 10;
 }
 
-/* Crosshair — SVG reticle, follows mouse via JS */
+/* Crosshair — SVG reticle, follows mouse via JS transform (no left/top reflow) */
 .crosshair-svg {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
+  transform: translate(calc(50vw - 24px), calc(50vh - 24px));
   pointer-events: none;
   z-index: 20;
   filter: drop-shadow(0 0 4px rgba(255, 100, 100, 0.4));
   transition: opacity 0.06s ease-out;
-  will-change: left, top;
+  will-change: transform;
 }
 
 /* Level select */
@@ -324,13 +324,15 @@ canvas {
 
 .score-popup {
   position: absolute;
-  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
   font-size: 1.4rem;
   font-weight: 700;
   color: #ffd700;
   text-shadow: 0 0 8px rgba(255, 200, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.6);
   white-space: nowrap;
   pointer-events: none;
+  will-change: transform, opacity;
 }
 
 .score-popup-combo {

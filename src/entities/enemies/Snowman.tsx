@@ -1,6 +1,9 @@
 import { useCallback, useMemo } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import {
+  SNOWMAN_BOTTOM_GEO, SNOWMAN_MIDDLE_GEO, SNOWMAN_TOP_GEO, SNOWMAN_MAT,
+} from './SharedEnemyAssets'
 
 /**
  * Port of Snowman.js: orbit + sinusoidal Y bobbing.
@@ -22,18 +25,9 @@ export default function Snowman(props: EnemyProps) {
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group scale={[1.2, 1.2, 0.4]} rotation={[Math.PI, 0, 0]}>
-        <mesh position={[0, 0, 0]}>
-          <sphereGeometry args={[20, 12, 12]} />
-          <meshPhongMaterial color="#f0f0f0" flatShading />
-        </mesh>
-        <mesh position={[0, 25, 0]}>
-          <sphereGeometry args={[14, 12, 12]} />
-          <meshPhongMaterial color="#f0f0f0" flatShading />
-        </mesh>
-        <mesh position={[0, 42, 0]}>
-          <sphereGeometry args={[10, 12, 12]} />
-          <meshPhongMaterial color="#f0f0f0" flatShading />
-        </mesh>
+        <mesh position={[0, 0, 0]} geometry={SNOWMAN_BOTTOM_GEO} material={SNOWMAN_MAT} />
+        <mesh position={[0, 25, 0]} geometry={SNOWMAN_MIDDLE_GEO} material={SNOWMAN_MAT} />
+        <mesh position={[0, 42, 0]} geometry={SNOWMAN_TOP_GEO} material={SNOWMAN_MAT} />
       </group>
     </EnemyBase>
   )

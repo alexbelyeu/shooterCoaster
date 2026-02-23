@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
 import { startMusic, stopMusic, setMusicIntensity } from '@/audio/MusicManager'
+import { disposeSFX } from '@/audio/SFXManager'
 import { syncVolumes } from '@/audio/AudioEngine'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 
@@ -20,6 +21,7 @@ export default function MusicController() {
     startMusic(biome)
     return () => {
       stopMusic()
+      disposeSFX()
     }
   }, [currentLevel])
 

@@ -204,7 +204,9 @@ export function stopTitleMusic(): void {
   chimeSynth?.dispose(); chimeSynth = null
   tamb?.dispose(); tamb = null
 
-  Tone.getTransport().stop()
+  const transport = Tone.getTransport()
+  transport.stop()
+  transport.cancel()
   isPlaying = false
 }
 

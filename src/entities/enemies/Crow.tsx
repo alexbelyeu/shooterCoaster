@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { CROW_BODY_GEO, CROW_MAT } from './SharedEnemyAssets'
 
 /**
  * Port of Crows.js: dark shapes that fly horizontally.
@@ -20,10 +21,7 @@ export default function Crow(props: EnemyProps) {
 
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
-      <mesh scale={[10, 10, 10]}>
-        <coneGeometry args={[3, 8, 4]} />
-        <meshPhongMaterial color="#111111" flatShading />
-      </mesh>
+      <mesh scale={[10, 10, 10]} geometry={CROW_BODY_GEO} material={CROW_MAT} />
     </EnemyBase>
   )
 }

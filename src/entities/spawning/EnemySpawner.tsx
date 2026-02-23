@@ -8,7 +8,7 @@ import Crow from '../enemies/Crow'
 import Shark from '../enemies/Shark'
 import Snowman from '../enemies/Snowman'
 import GoldenBalloon from '../enemies/GoldenBalloon'
-import ParticleExplosion from '@/effects/ParticleExplosion'
+import { getExplosionPool } from '@/effects/ParticleExplosion'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -133,10 +133,24 @@ const ENEMY_COMPONENTS: Record<EnemyType, React.ComponentType<any>> = {
   snowman: Snowman,
 }
 
+const EXPLOSION_COLORS = ['#ff4444', '#ffaa00', '#ffffff', '#44aaff', '#00ff88']
+
 export default function EnemySpawner({ waves }: EnemySpawnerProps) {
   const enemies = useMemo(() => generateEnemies(waves), [waves])
   const goldenBalloons = useMemo(() => generateGoldenBalloons(3), [])
   const phase = useGameStore((s) => s.phase)
+
+  // Pre-computed lookups to avoid linear scans in onKill
+  const enemyWaveMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const e of enemies) map.set(e.id, e.waveIndex)
+    return map
+  }, [enemies])
+  const waveSizes = useMemo(() => {
+    const sizes = new Map<number, number>()
+    for (const e of enemies) sizes.set(e.waveIndex, (sizes.get(e.waveIndex) ?? 0) + 1)
+    return sizes
+  }, [enemies])
 
   // Wave state
   const [activeWaveIndex, setActiveWaveIndex] = useState(0)
@@ -173,10 +187,6 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
     return () => waveTimers.current.forEach(clearTimeout)
   }, [])
 
-  const [explosions, setExplosions] = useState<
-    { id: string; position: THREE.Vector3; color: string }[]
-  >([])
-
   const onKill = useCallback(
     (id: string, position: THREE.Vector3) => {
       killedEnemies.current.add(id)
@@ -185,31 +195,27 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
       const remaining = totalEnemyCount - killedEnemies.current.size
       useGameStore.getState().setEnemyCounts(Math.max(0, remaining), totalEnemyCount)
 
-      // Find which wave this enemy belongs to
-      const enemy = enemies.find((e) => e.id === id)
-      if (enemy && enemy.waveIndex >= 0) {
-        waveKillCounts.current[enemy.waveIndex]++
+      // Find which wave this enemy belongs to (O(1) lookup)
+      const waveIndex = enemyWaveMap.get(id) ?? -1
+      if (waveIndex >= 0) {
+        waveKillCounts.current[waveIndex]++
 
         // Check if current wave is fully killed
-        const currentWaveEnemies = enemies.filter(
-          (e) => e.waveIndex === activeWaveIndex,
-        )
-        const currentWaveKilled = currentWaveEnemies.filter((e) =>
-          killedEnemies.current.has(e.id),
-        ).length
-
-        if (currentWaveKilled >= currentWaveEnemies.length) {
-          // Advance to next wave after delay
-          const nextWave = activeWaveIndex + 1
-          if (nextWave < waves.length) {
-            const delay = (waves[nextWave].spawnDelay ?? 3) * 1000
-            const t = setTimeout(() => {
-              setActiveWaveIndex(nextWave)
-              if (waves[nextWave].waveLabel) {
-                setWaveAnnouncement(waves[nextWave].waveLabel!)
-              }
-            }, delay)
-            waveTimers.current.push(t)
+        if (waveIndex === activeWaveIndex) {
+          const waveSize = waveSizes.get(activeWaveIndex) ?? 0
+          if (waveKillCounts.current[activeWaveIndex] >= waveSize) {
+            // Advance to next wave after delay
+            const nextWave = activeWaveIndex + 1
+            if (nextWave < waves.length) {
+              const delay = (waves[nextWave].spawnDelay ?? 3) * 1000
+              const t = setTimeout(() => {
+                setActiveWaveIndex(nextWave)
+                if (waves[nextWave].waveLabel) {
+                  setWaveAnnouncement(waves[nextWave].waveLabel!)
+                }
+              }, delay)
+              waveTimers.current.push(t)
+            }
           }
         }
       }
@@ -223,17 +229,11 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
         }, 1500)
       }
 
-      // Explosion
-      const colors = ['#ff4444', '#ffaa00', '#ffffff', '#44aaff', '#00ff88']
-      setExplosions((prev) => [
-        ...prev,
-        { id, position, color: colors[Math.floor(Math.random() * colors.length)] },
-      ])
-      setTimeout(() => {
-        setExplosions((prev) => prev.filter((e) => e.id !== id))
-      }, 2000)
+      // Fire explosion from pool
+      const color = EXPLOSION_COLORS[Math.floor(Math.random() * EXPLOSION_COLORS.length)]
+      getExplosionPool()?.activate(position, color)
     },
-    [enemies, activeWaveIndex, waves, totalEnemyCount],
+    [enemyWaveMap, waveSizes, activeWaveIndex, waves, totalEnemyCount],
   )
 
   // Emit wave announcement via EventBus for UI to pick up
@@ -275,9 +275,6 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
           radius={gb.radius}
           onKill={onKill}
         />
-      ))}
-      {explosions.map((exp) => (
-        <ParticleExplosion key={exp.id} position={exp.position} color={exp.color} />
       ))}
     </>
   )

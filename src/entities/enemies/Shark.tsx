@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { SHARK_BODY_GEO, SHARK_MAT } from './SharedEnemyAssets'
 
 /**
  * Port of Sharks.js: circular orbit + lookAt(camera).
@@ -24,10 +25,7 @@ export default function Shark(props: EnemyProps) {
 
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
-      <mesh scale={[15, 15, 15]}>
-        <coneGeometry args={[2, 6, 6]} />
-        <meshPhongMaterial color="#4466aa" flatShading />
-      </mesh>
+      <mesh scale={[15, 15, 15]} geometry={SHARK_BODY_GEO} material={SHARK_MAT} />
     </EnemyBase>
   )
 }

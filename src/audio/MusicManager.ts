@@ -232,7 +232,9 @@ export function stopMusic(): void {
   percSynth?.dispose(); percSynth = null
   leadSynth?.dispose(); leadSynth = null
 
-  Tone.getTransport().stop()
+  const transport = Tone.getTransport()
+  transport.stop()
+  transport.cancel()
   isPlaying = false
   currentIntensity = 0
 }
