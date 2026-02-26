@@ -278,15 +278,28 @@ function Balloons() {
 
   const [pops, setPops] = useState<{ id: number; pos: THREE.Vector3; color: string }[]>([])
   const popId = useRef(0)
+  const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const rafIdsRef = useRef<number[]>([])
 
   const handlePop = useCallback((worldPos: THREE.Vector3, color: string) => {
     const id = popId.current++
     // Defer adding the pop burst to the next frame so the click frame stays light
     // and we avoid layout/jank from synchronous heavy re-render
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       setPops((prev) => [...prev, { id, pos: worldPos.clone(), color }])
-      setTimeout(() => setPops((prev) => prev.filter((p) => p.id !== id)), 700)
+      const timeoutId = setTimeout(() => setPops((prev) => prev.filter((p) => p.id !== id)), 700)
+      timeoutIdsRef.current.push(timeoutId)
     })
+    rafIdsRef.current.push(rafId)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of timeoutIdsRef.current) clearTimeout(timeoutId)
+      timeoutIdsRef.current = []
+      for (const rafId of rafIdsRef.current) cancelAnimationFrame(rafId)
+      rafIdsRef.current = []
+    }
   }, [])
 
   return (

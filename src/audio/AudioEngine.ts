@@ -33,3 +33,4 @@ export function syncVolumes(): void {
     musicChannel.volume.value = Tone.gainToDb(musicVolume)
   }
 }
+

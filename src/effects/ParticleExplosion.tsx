@@ -1,7 +1,8 @@
-import { useRef, useMemo } from 'react'
+import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { randomRange, randomRangeLow } from '@/utils/math'
+import { setExplosionPool } from './explosionPoolHandle'
 
 const POOL_SLOTS = 5
 const FIRE_COUNT = 30
@@ -22,15 +23,6 @@ interface ExplosionSlot {
   fireVelocities: THREE.Vector3[]
   sparkPositions: THREE.Vector3[]
   sparkVelocities: THREE.Vector3[]
-}
-
-interface ExplosionPoolHandle {
-  activate: (position: THREE.Vector3, color: string) => void
-}
-
-let poolHandle: ExplosionPoolHandle | null = null
-export function getExplosionPool(): ExplosionPoolHandle | null {
-  return poolHandle
 }
 
 function createSlot(): ExplosionSlot {
@@ -125,7 +117,10 @@ export default function ParticleExplosionPool() {
     [slots, fireMats],
   )
 
-  poolHandle = { activate }
+  useEffect(() => {
+    setExplosionPool({ activate })
+    return () => setExplosionPool(null)
+  }, [activate])
 
   useFrame(() => {
     const now = performance.now()

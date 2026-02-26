@@ -21,3 +21,9 @@ export function unregisterCollisionTarget(id: string): void {
 export function getCollisionTargets(): Map<string, CollisionTarget> {
   return targets
 }
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    targets.clear()
+  })
+}

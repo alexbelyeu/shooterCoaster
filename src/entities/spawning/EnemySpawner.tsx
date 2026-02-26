@@ -8,7 +8,7 @@ import Crow from '../enemies/Crow'
 import Shark from '../enemies/Shark'
 import Snowman from '../enemies/Snowman'
 import GoldenBalloon from '../enemies/GoldenBalloon'
-import { getExplosionPool } from '@/effects/ParticleExplosion'
+import { getExplosionPool } from '@/effects/explosionPoolHandle'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -159,6 +159,7 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
   )
   const waveKillCounts = useRef<number[]>(waves.map(() => 0))
   const waveTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const slowMoResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Track killed enemies per wave
   const killedEnemies = useRef(new Set<string>())
@@ -184,7 +185,13 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
 
   // Clean up timers
   useEffect(() => {
-    return () => waveTimers.current.forEach(clearTimeout)
+    return () => {
+      waveTimers.current.forEach(clearTimeout)
+      waveTimers.current = []
+      if (slowMoResetTimer.current) clearTimeout(slowMoResetTimer.current)
+      slowMoResetTimer.current = null
+      killedEnemies.current.clear()
+    }
   }, [])
 
   const onKill = useCallback(
@@ -224,7 +231,8 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
       if (killedEnemies.current.size >= totalEnemyCount) {
         const store = useGameStore.getState()
         store.setTimeScale(0.1)
-        setTimeout(() => {
+        if (slowMoResetTimer.current) clearTimeout(slowMoResetTimer.current)
+        slowMoResetTimer.current = setTimeout(() => {
           useGameStore.getState().setTimeScale(1)
         }, 1500)
       }

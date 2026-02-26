@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useContext } from 'react'
+import { useMemo, useCallback, useContext, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -182,12 +182,12 @@ function generatePillarPositions(
 function TrackPillars({ curve }: { curve: TrackCurve }) {
   const heightFn = useContext(TerrainContext)
   const pillars = useMemo(() => generatePillarPositions(curve, 50, heightFn), [curve, heightFn])
+  const mat = useRef(new THREE.Matrix4()).current
+  const scale = useRef(new THREE.Vector3()).current
 
   const setRef = useCallback(
     (mesh: THREE.InstancedMesh | null) => {
       if (!mesh) return
-      const mat = new THREE.Matrix4()
-      const scale = new THREE.Vector3()
 
       for (let i = 0; i < pillars.length; i++) {
         const p = pillars[i]
@@ -221,6 +221,12 @@ export default function TrackMesh({
     () => buildTrackGeometry(curve, segments, color1, color2),
     [curve, segments, color1, color2],
   )
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose()
+    }
+  }, [geometry])
 
   return (
     <>
