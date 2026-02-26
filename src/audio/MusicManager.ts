@@ -122,6 +122,24 @@ let leadLoop: Tone.Sequence | null = null
 let currentIntensity = 0
 let isPlaying = false
 
+function resetMusicState() {
+  padLoop?.dispose(); padLoop = null
+  bassLoop?.dispose(); bassLoop = null
+  percLoop?.dispose(); percLoop = null
+  leadLoop?.dispose(); leadLoop = null
+
+  padSynth?.dispose(); padSynth = null
+  bassSynth?.dispose(); bassSynth = null
+  percSynth?.dispose(); percSynth = null
+  leadSynth?.dispose(); leadSynth = null
+
+  const transport = Tone.getTransport()
+  transport.stop()
+  transport.cancel()
+  isPlaying = false
+  currentIntensity = 0
+}
+
 // ── Instrument setup ───────────────────────────────────────────
 
 function createInstruments() {
@@ -221,22 +239,7 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
 
 export function stopMusic(): void {
   if (!isPlaying) return
-
-  padLoop?.dispose(); padLoop = null
-  bassLoop?.dispose(); bassLoop = null
-  percLoop?.dispose(); percLoop = null
-  leadLoop?.dispose(); leadLoop = null
-
-  padSynth?.dispose(); padSynth = null
-  bassSynth?.dispose(); bassSynth = null
-  percSynth?.dispose(); percSynth = null
-  leadSynth?.dispose(); leadSynth = null
-
-  const transport = Tone.getTransport()
-  transport.stop()
-  transport.cancel()
-  isPlaying = false
-  currentIntensity = 0
+  resetMusicState()
 }
 
 export function setMusicIntensity(intensity: number): void {
@@ -249,3 +252,4 @@ export function setMusicIntensity(intensity: number): void {
 export function getMusicIntensity(): number {
   return currentIntensity
 }
+

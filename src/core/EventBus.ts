@@ -25,3 +25,9 @@ class EventBus {
 }
 
 export const eventBus = new EventBus()
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    eventBus.clear()
+  })
+}

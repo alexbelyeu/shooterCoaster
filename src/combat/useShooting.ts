@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { getBulletPool } from './projectiles/BulletPool'
+import { getBulletPool } from './projectiles/bulletPoolHandle'
 import { useGameStore } from '@/store/useGameStore'
 import { playFireSound } from '@/audio/SFXManager'
 

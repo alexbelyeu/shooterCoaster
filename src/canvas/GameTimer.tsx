@@ -16,10 +16,12 @@ export default function GameTimer({ seconds }: GameTimerProps) {
   const lastCeiled = useRef<number>(-1)
 
   useEffect(() => {
-    startTime.current = null
-    lastCeiled.current = -1
-    setTimeRemaining(seconds)
-  }, [seconds, setTimeRemaining])
+    if (phase === 'playing') {
+      startTime.current = null
+      lastCeiled.current = -1
+      setTimeRemaining(seconds)
+    }
+  }, [phase, seconds, setTimeRemaining])
 
   useFrame(({ clock }) => {
     if (phase !== 'playing') return

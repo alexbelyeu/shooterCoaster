@@ -24,6 +24,25 @@ let bassLoop: Tone.Sequence | null = null
 let chimeLoop: Tone.Loop | null = null
 let tambLoop: Tone.Sequence | null = null
 
+function resetTitleMusicState() {
+  melodyLoop?.dispose(); melodyLoop = null
+  padLoop?.dispose(); padLoop = null
+  bassLoop?.dispose(); bassLoop = null
+  chimeLoop?.dispose(); chimeLoop = null
+  tambLoop?.dispose(); tambLoop = null
+
+  melodyBox?.dispose(); melodyBox = null
+  padSynth?.dispose(); padSynth = null
+  bassSynth?.dispose(); bassSynth = null
+  chimeSynth?.dispose(); chimeSynth = null
+  tamb?.dispose(); tamb = null
+
+  const transport = Tone.getTransport()
+  transport.stop()
+  transport.cancel()
+  isPlaying = false
+}
+
 // — Melody: music-box calliope feel, 2-bar phrase ————————————
 const melodyNotes = [
   // Bar 1 — ascending, bouncy
@@ -189,27 +208,10 @@ export function startTitleMusic(): void {
 
 export function stopTitleMusic(): void {
   if (!isPlaying) return
-
-  // Dispose loops so they don't conflict with game music on the shared transport
-  melodyLoop?.dispose(); melodyLoop = null
-  padLoop?.dispose(); padLoop = null
-  bassLoop?.dispose(); bassLoop = null
-  chimeLoop?.dispose(); chimeLoop = null
-  tambLoop?.dispose(); tambLoop = null
-
-  // Dispose synths so they can be re-created fresh next time
-  melodyBox?.dispose(); melodyBox = null
-  padSynth?.dispose(); padSynth = null
-  bassSynth?.dispose(); bassSynth = null
-  chimeSynth?.dispose(); chimeSynth = null
-  tamb?.dispose(); tamb = null
-
-  const transport = Tone.getTransport()
-  transport.stop()
-  transport.cancel()
-  isPlaying = false
+  resetTitleMusicState()
 }
 
 export function isTitleMusicPlaying(): boolean {
   return isPlaying
 }
+

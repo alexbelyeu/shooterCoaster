@@ -1,33 +1,15 @@
-import { useRef, useMemo, useCallback } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useRef, useMemo, useCallback, useEffect } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import { getCollisionTargets } from '@/combat/CollisionManager'
+import type { Bullet, BulletPoolHandle } from './bulletPoolHandle'
+import { setBulletPool } from './bulletPoolHandle'
 
 const POOL_SIZE = 350
 const FIRE_DELAY_MS = 100
 const BULLET_LIFETIME_MS = 5000
 const BULLET_SPEED = 8
-
-interface Bullet {
-  alive: boolean
-  bornAt: number
-  position: THREE.Vector3
-  direction: THREE.Vector3
-  speed: number
-}
-
-interface BulletPoolHandle {
-  fire: (origin: THREE.Vector3, direction: THREE.Vector3) => void
-  getLiveBullets: () => Bullet[]
-  getLiveBulletCount: () => number
-}
-
-// Singleton ref for external access
-let poolHandle: BulletPoolHandle | null = null
-export function getBulletPool(): BulletPoolHandle | null {
-  return poolHandle
-}
 
 interface BulletPoolProps {
   bulletSize?: number
@@ -95,8 +77,10 @@ export default function BulletPool({
   const getLiveBullets = useCallback(() => liveBulletBuffer.current, [])
   const getLiveBulletCount = useCallback(() => liveBulletCount.current, [])
 
-  // Expose the pool handle
-  poolHandle = { fire, getLiveBullets, getLiveBulletCount }
+  useEffect(() => {
+    setBulletPool({ fire, getLiveBullets, getLiveBulletCount })
+    return () => setBulletPool(null)
+  }, [fire, getLiveBullets, getLiveBulletCount])
 
   useFrame(() => {
     if (!meshRef.current || phase !== 'playing') return

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { eventBus } from '@/core/EventBus'
 
@@ -7,14 +7,20 @@ import { eventBus } from '@/core/EventBus'
  */
 export default function WaveAnnouncement() {
   const [text, setText] = useState<string | null>(null)
+  const clearTextTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const handler = (label: unknown) => {
       setText(label as string)
-      setTimeout(() => setText(null), 2000)
+      if (clearTextTimeoutRef.current) clearTimeout(clearTextTimeoutRef.current)
+      clearTextTimeoutRef.current = setTimeout(() => setText(null), 2000)
     }
     eventBus.on('wave:announce', handler)
-    return () => eventBus.off('wave:announce', handler)
+    return () => {
+      if (clearTextTimeoutRef.current) clearTimeout(clearTextTimeoutRef.current)
+      clearTextTimeoutRef.current = null
+      eventBus.off('wave:announce', handler)
+    }
   }, [])
 
   return (

@@ -23,6 +23,8 @@ export default function ScorePopups() {
   const [popups, setPopups] = useState<ScorePopup[]>([])
   const pendingRef = useRef<ScorePopup[]>([])
   const flushScheduled = useRef(false)
+  const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const mountedRef = useRef(true)
 
   const handleKill = useCallback((data: unknown) => {
     const { screenX, screenY, combo, score } = data as {
@@ -36,14 +38,17 @@ export default function ScorePopups() {
     pendingRef.current.push({ id, score, combo, screenX, screenY })
 
     // Schedule removal
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
+      if (!mountedRef.current) return
       setPopups((prev) => prev.filter((p) => p.id !== id))
     }, 1000)
+    timeoutIdsRef.current.push(timeoutId)
 
     // Batch: flush pending popups once per microtask
     if (!flushScheduled.current) {
       flushScheduled.current = true
       queueMicrotask(() => {
+        if (!mountedRef.current) return
         const batch = pendingRef.current
         pendingRef.current = []
         flushScheduled.current = false
@@ -57,7 +62,14 @@ export default function ScorePopups() {
 
   useEffect(() => {
     eventBus.on('enemy:killed:screen', handleKill)
-    return () => eventBus.off('enemy:killed:screen', handleKill)
+    return () => {
+      mountedRef.current = false
+      for (const timeoutId of timeoutIdsRef.current) clearTimeout(timeoutId)
+      timeoutIdsRef.current = []
+      pendingRef.current = []
+      flushScheduled.current = false
+      eventBus.off('enemy:killed:screen', handleKill)
+    }
   }, [handleKill])
 
   return (
