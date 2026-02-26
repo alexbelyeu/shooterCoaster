@@ -11,8 +11,6 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
  * stops on unmount (level exit).
  */
 export default function MusicController() {
-  const combo = useGameStore((s) => s.combo)
-  const timeRemaining = useGameStore((s) => s.timeRemaining)
   const currentLevel = useGameStore((s) => s.currentLevel)
 
   useEffect(() => {
@@ -26,6 +24,7 @@ export default function MusicController() {
   }, [currentLevel])
 
   useFrame(() => {
+    const { combo, timeRemaining } = useGameStore.getState()
     // Intensity ramps up quickly so the music feels alive from the start
     const comboFactor = Math.min(combo.count / 5, 1) * 0.3
     const timePressure = timeRemaining < 20 ? (1 - timeRemaining / 20) * 0.3 : 0
