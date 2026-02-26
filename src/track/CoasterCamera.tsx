@@ -24,15 +24,11 @@ const MAX_VELOCITY_MULT = 5 // max velocity = minRollerSpeed * this
 
 // FOV kick settings
 const BASE_FOV = 80
-const KICK_FOV = 90
-const FOV_KICK_MILESTONES = [5, 10, 15]
-const FOV_RETURN_SPEED = 3 // degrees per second to return to base
 
 /**
  * Exact port of Camera.js updateCamGame.
  * Camera rides the track, always looking forward along tangent.
  * Mouse does NOT rotate the camera — it only controls aim for shooting.
- * FOV kicks on combo milestones for game feel.
  */
 export default function CoasterCamera({
   curve,
@@ -44,7 +40,7 @@ export default function CoasterCamera({
   heightOffset = 6,
   enabled = true,
 }: CoasterCameraProps) {
-  const { set, camera, gl } = useThree()
+  const { set } = useThree()
   const cameraRef = useRef<THREE.PerspectiveCamera>(null)
 
   // Track state (mutable refs for useFrame perf — no allocations)
@@ -53,10 +49,6 @@ export default function CoasterCamera({
   const _position = useRef(new THREE.Vector3())
   const _tangent = useRef(new THREE.Vector3())
   const _lookAt = useRef(new THREE.Vector3())
-
-  // FOV kick state
-  const currentFov = useRef(fov)
-  const lastComboForKick = useRef(0)
 
   // Set as default camera on mount
   useEffect(() => {
@@ -78,10 +70,6 @@ export default function CoasterCamera({
   useFrame((_, delta) => {
     const cam = cameraRef.current
     if (!cam || !enabled) return
-
-    // Original physics were frame-rate dependent at 60fps.
-    // Normalize: scale by (delta * 60) so behaviour matches original at any refresh rate.
-    const dtScale = Math.min(delta * 60, 3) // clamp to avoid spiral on tab-switch
 
     // Slow-mo support: check timeScale from game store
     const timeScale = useGameStore.getState().timeScale ?? 1
@@ -115,22 +103,8 @@ export default function CoasterCamera({
     )
     updateWindWhoosh(Math.max(0, velocityNorm))
 
-    // FOV kick on combo milestones
-    const combo = useGameStore.getState().combo.count
-    if (combo !== lastComboForKick.current && FOV_KICK_MILESTONES.includes(combo)) {
-      currentFov.current = KICK_FOV
-      lastComboForKick.current = combo
-    } else {
-      lastComboForKick.current = combo
-    }
-
-    // Ease FOV back to base
-    if (currentFov.current > fov) {
-      currentFov.current = Math.max(fov, currentFov.current - FOV_RETURN_SPEED * delta * 60)
-    }
-
-    if (Math.abs(cam.fov - currentFov.current) > 0.01) {
-      cam.fov = currentFov.current
+    if (Math.abs(cam.fov - fov) > 0.01) {
+      cam.fov = fov
       cam.updateProjectionMatrix()
     }
   })
