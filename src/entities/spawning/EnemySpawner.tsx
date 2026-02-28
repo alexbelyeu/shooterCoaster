@@ -64,15 +64,10 @@ function generateEnemies(waves: EnemyWave[], heightFn: HeightFunction): SpawnedE
   const enemies: SpawnedEnemy[] = []
   let id = 0
 
-  // Assign logical wave groups: consecutive entries with spawnDelay 0
-  // (or undefined) share the same wave group. A non-zero spawnDelay
-  // starts a new group.
-  let logicalWave = 0
+  // Each config entry is its own wave group. Waves activate at their
+  // spawnDelay (seconds from level start) via time-based progression.
   for (let waveIdx = 0; waveIdx < waves.length; waveIdx++) {
     const wave = waves[waveIdx]
-    if (waveIdx > 0 && (wave.spawnDelay ?? 0) > 0) {
-      logicalWave++
-    }
     for (let i = 0; i < wave.count; i++) {
       let x: number, y: number, z: number
 
@@ -143,7 +138,7 @@ function generateEnemies(waves: EnemyWave[], heightFn: HeightFunction): SpawnedE
         position: new THREE.Vector3(x, y, z),
         scoreValue: SCORE_VALUES[wave.type],
         radius: RADII[wave.type],
-        waveIndex: logicalWave,
+        waveIndex: waveIdx,
       })
     }
   }
@@ -195,29 +190,38 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
   const goldenBalloons = useMemo(() => generateGoldenBalloons(3, heightFn), [heightFn])
   const phase = useGameStore((s) => s.phase)
 
-  // Pre-computed lookups to avoid linear scans in onKill
-  const enemyWaveMap = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const e of enemies) map.set(e.id, e.waveIndex)
-    return map
-  }, [enemies])
-  const waveSizes = useMemo(() => {
-    const sizes = new Map<number, number>()
-    for (const e of enemies) sizes.set(e.waveIndex, (sizes.get(e.waveIndex) ?? 0) + 1)
-    return sizes
-  }, [enemies])
-
-  // Wave state
-  const [activeWaveIndex, setActiveWaveIndex] = useState(0)
+  // Wave state — time-based progression
+  // All waves with spawnDelay 0 are immediately active
+  const initialActiveWave = useMemo(
+    () => waves.reduce((max, w, i) => ((w.spawnDelay ?? 0) === 0 ? i : max), 0),
+    [waves],
+  )
+  const [activeWaveIndex, setActiveWaveIndex] = useState(initialActiveWave)
   const [waveAnnouncement, setWaveAnnouncement] = useState<string | null>(
     waves[0]?.waveLabel ?? null,
   )
-  const waveKillCounts = useRef<number[]>(waves.map(() => 0))
   const waveTimers = useRef<ReturnType<typeof setTimeout>[]>([])
   const slowMoResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Track killed enemies per wave
   const killedEnemies = useRef(new Set<string>())
+
+  // Generation counter — increments on replay to force enemy remount
+  const [generation, setGeneration] = useState(0)
+  const prevPhaseRef = useRef(phase)
+
+  // Reset wave state and bump generation when re-entering 'playing'
+  useEffect(() => {
+    const wasPlaying = prevPhaseRef.current === 'playing'
+    prevPhaseRef.current = phase
+
+    if (phase === 'playing' && !wasPlaying) {
+      setActiveWaveIndex(initialActiveWave)
+      setWaveAnnouncement(waves[0]?.waveLabel ?? null)
+      killedEnemies.current.clear()
+      setGeneration((g) => g + 1)
+    }
+  }, [phase, initialActiveWave, waves])
 
   // Slow-mo on final kill
   const totalEnemyCount = useMemo(
@@ -238,7 +242,32 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
     return () => clearTimeout(t)
   }, [waveAnnouncement])
 
-  // Clean up timers
+  // Time-based wave activation: schedule each wave's appearance from level start
+  useEffect(() => {
+    if (phase !== 'playing') return
+
+    const timers: ReturnType<typeof setTimeout>[] = []
+    for (let i = 0; i < waves.length; i++) {
+      const delay = (waves[i].spawnDelay ?? 0) * 1000
+      if (delay > 0) {
+        const t = setTimeout(() => {
+          setActiveWaveIndex(i)
+          if (waves[i].waveLabel) {
+            setWaveAnnouncement(waves[i].waveLabel!)
+          }
+        }, delay)
+        timers.push(t)
+      }
+    }
+    waveTimers.current = timers
+
+    return () => {
+      timers.forEach(clearTimeout)
+      waveTimers.current = []
+    }
+  }, [phase, waves])
+
+  // Clean up on unmount
   useEffect(() => {
     return () => {
       waveTimers.current.forEach(clearTimeout)
@@ -257,31 +286,6 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
       const remaining = totalEnemyCount - killedEnemies.current.size
       useGameStore.getState().setEnemyCounts(Math.max(0, remaining), totalEnemyCount)
 
-      // Find which wave this enemy belongs to (O(1) lookup)
-      const waveIndex = enemyWaveMap.get(id) ?? -1
-      if (waveIndex >= 0) {
-        waveKillCounts.current[waveIndex]++
-
-        // Check if current wave is fully killed
-        if (waveIndex === activeWaveIndex) {
-          const waveSize = waveSizes.get(activeWaveIndex) ?? 0
-          if (waveKillCounts.current[activeWaveIndex] >= waveSize) {
-            // Advance to next wave after delay
-            const nextWave = activeWaveIndex + 1
-            if (nextWave < waves.length) {
-              const delay = (waves[nextWave].spawnDelay ?? 3) * 1000
-              const t = setTimeout(() => {
-                setActiveWaveIndex(nextWave)
-                if (waves[nextWave].waveLabel) {
-                  setWaveAnnouncement(waves[nextWave].waveLabel!)
-                }
-              }, delay)
-              waveTimers.current.push(t)
-            }
-          }
-        }
-      }
-
       // Check if this was the final enemy kill for slow-mo
       if (killedEnemies.current.size >= totalEnemyCount) {
         const store = useGameStore.getState()
@@ -296,7 +300,7 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
       const color = EXPLOSION_COLORS[Math.floor(Math.random() * EXPLOSION_COLORS.length)]
       getExplosionPool()?.activate(position, color)
     },
-    [enemyWaveMap, waveSizes, activeWaveIndex, waves, totalEnemyCount],
+    [totalEnemyCount],
   )
 
   // Emit wave announcement via EventBus for UI to pick up
@@ -318,7 +322,7 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
         if (!Component) return null
         return (
           <Component
-            key={enemy.id}
+            key={`${enemy.id}-${generation}`}
             id={enemy.id}
             type={enemy.type}
             spawnPosition={enemy.position}
@@ -330,7 +334,7 @@ export default function EnemySpawner({ waves }: EnemySpawnerProps) {
       })}
       {goldenBalloons.map((gb) => (
         <GoldenBalloon
-          key={gb.id}
+          key={`${gb.id}-${generation}`}
           id={gb.id}
           type="balloon"
           spawnPosition={gb.position}

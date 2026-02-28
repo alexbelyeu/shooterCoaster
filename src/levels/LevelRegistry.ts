@@ -23,7 +23,9 @@ const LEVELS: LevelConfig[] = [
       color2: 0xffff00,
     },
     enemies: [
-      { type: 'balloon', count: 150, spawnDelay: 0 },
+      { type: 'balloon', count: 50, spawnDelay: 0, waveLabel: 'Pop em!' },
+      { type: 'balloon', count: 50, spawnDelay: 20, waveLabel: 'More Balloons!' },
+      { type: 'balloon', count: 50, spawnDelay: 45, waveLabel: 'Final Wave!' },
     ],
     starThresholds: [0.3, 0.6, 0.9],
     environment: {
@@ -56,7 +58,8 @@ const LEVELS: LevelConfig[] = [
     },
     enemies: [
       { type: 'scorpion', count: 30, spawnDelay: 0, waveLabel: 'Incoming!' },
-      { type: 'crow', count: 50, spawnDelay: 0 },
+      { type: 'crow', count: 25, spawnDelay: 15, waveLabel: 'A Murder of Crows!' },
+      { type: 'crow', count: 25, spawnDelay: 35, waveLabel: 'More Crows!' },
     ],
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
@@ -87,8 +90,8 @@ const LEVELS: LevelConfig[] = [
     },
     enemies: [
       { type: 'jellyfish', count: 20, spawnDelay: 0, waveLabel: 'Into the Deep!' },
-      { type: 'shark', count: 25, spawnDelay: 0 },
-      { type: 'flyingFish', count: 30, spawnDelay: 0 },
+      { type: 'shark', count: 25, spawnDelay: 15, waveLabel: 'Sharks!' },
+      { type: 'flyingFish', count: 30, spawnDelay: 35, waveLabel: 'Flying Fish!' },
     ],
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
@@ -120,8 +123,8 @@ const LEVELS: LevelConfig[] = [
     },
     enemies: [
       { type: 'snowmanScout', count: 25, spawnDelay: 0, waveLabel: 'Scout Party' },
-      { type: 'snowman', count: 20, spawnDelay: 0 },
-      { type: 'snowmanBrute', count: 8, spawnDelay: 0 },
+      { type: 'snowman', count: 20, spawnDelay: 20, waveLabel: 'Snowmen Incoming!' },
+      { type: 'snowmanBrute', count: 8, spawnDelay: 45, waveLabel: 'Brutes!' },
     ],
     starThresholds: [0.2, 0.5, 0.8],
     environment: {
