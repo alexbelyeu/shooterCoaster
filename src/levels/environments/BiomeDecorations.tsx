@@ -57,7 +57,7 @@ export default function BiomeDecorations({ biome, heightFn }: BiomeDecorationsPr
 
 function DesertDecorations({ heightFn }: { heightFn: HeightFunction }) {
   // Cacti
-  const cactiPositions = useMemo(() => scatterPositions(100, 400, 2800, heightFn), [heightFn])
+  const cactiPositions = useMemo(() => scatterPositions(150, 400, 2800, heightFn), [heightFn])
   const cactiGeo = useMemo(() => new THREE.CylinderGeometry(1.5, 2, 1, 6), [])
   const cactiMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#2d6b1e', flatShading: true }), [])
 
@@ -77,7 +77,7 @@ function DesertDecorations({ heightFn }: { heightFn: HeightFunction }) {
   }, [cactiPositions])
 
   // Rocks
-  const rockPositions = useMemo(() => scatterPositions(60, 300, 2800, heightFn), [heightFn])
+  const rockPositions = useMemo(() => scatterPositions(80, 300, 2800, heightFn), [heightFn])
   const rockGeo = useMemo(() => new THREE.DodecahedronGeometry(1, 0), [])
   const rockMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#8b6b4a', flatShading: true }), [])
 
@@ -144,14 +144,59 @@ function DesertDecorations({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [bonePositions])
 
+  // Skull clusters
+  const skullPositions = useMemo(() => scatterPositions(20, 400, 2500, heightFn), [heightFn])
+  const skullGeo = useMemo(() => new THREE.SphereGeometry(1, 6, 6), [])
+  const skullMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#e8dcc8', flatShading: true }), [])
+
+  const setSkullRef = useCallback((mesh: THREE.InstancedMesh | null) => {
+    if (!mesh) return
+    const mat = new THREE.Matrix4()
+    const q = new THREE.Quaternion()
+    const euler = new THREE.Euler()
+    for (let i = 0; i < skullPositions.length; i++) {
+      const p = skullPositions[i]
+      const s = 2 + Math.random() * 2
+      euler.set(Math.random() * 0.3, Math.random() * Math.PI * 2, Math.random() * 0.3)
+      q.setFromEuler(euler)
+      mat.compose(
+        new THREE.Vector3(p.x, p.y + s * 0.4, p.z),
+        q,
+        new THREE.Vector3(s, s * 0.8, s * 0.9),
+      )
+      mesh.setMatrixAt(i, mat)
+    }
+    mesh.instanceMatrix.needsUpdate = true
+  }, [skullPositions])
+
+  // Desert flowers
+  const flowerPositions = useMemo(() => scatterPositions(15, 300, 2200, heightFn), [heightFn])
+  const flowerGeo = useMemo(() => new THREE.ConeGeometry(0.6, 1.2, 5), [])
+  const flowerMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#ff6644', flatShading: true }), [])
+
+  const setFlowerRef = useCallback((mesh: THREE.InstancedMesh | null) => {
+    if (!mesh) return
+    const mat = new THREE.Matrix4()
+    for (let i = 0; i < flowerPositions.length; i++) {
+      const p = flowerPositions[i]
+      const s = 2 + Math.random() * 3
+      mat.makeTranslation(p.x, p.y + s * 0.5, p.z)
+      mat.scale(new THREE.Vector3(s, s, s))
+      mesh.setMatrixAt(i, mat)
+    }
+    mesh.instanceMatrix.needsUpdate = true
+  }, [flowerPositions])
+
   useEffect(() => {
     return () => {
       cactiGeo.dispose(); cactiMat.dispose()
       rockGeo.dispose(); rockMat.dispose()
       twGeo.dispose(); twMat.dispose()
       boneGeo.dispose(); boneMat.dispose()
+      skullGeo.dispose(); skullMat.dispose()
+      flowerGeo.dispose(); flowerMat.dispose()
     }
-  }, [cactiGeo, cactiMat, rockGeo, rockMat, twGeo, twMat, boneGeo, boneMat])
+  }, [cactiGeo, cactiMat, rockGeo, rockMat, twGeo, twMat, boneGeo, boneMat, skullGeo, skullMat, flowerGeo, flowerMat])
 
   return (
     <>
@@ -159,6 +204,8 @@ function DesertDecorations({ heightFn }: { heightFn: HeightFunction }) {
       <instancedMesh ref={setRockRef} args={[rockGeo, rockMat, rockPositions.length]} frustumCulled />
       <instancedMesh ref={setTwRef} args={[twGeo, twMat, tumbleweedPositions.length]} frustumCulled />
       <instancedMesh ref={setBoneRef} args={[boneGeo, boneMat, bonePositions.length]} frustumCulled />
+      <instancedMesh ref={setSkullRef} args={[skullGeo, skullMat, skullPositions.length]} frustumCulled />
+      <instancedMesh ref={setFlowerRef} args={[flowerGeo, flowerMat, flowerPositions.length]} frustumCulled />
     </>
   )
 }
@@ -186,10 +233,9 @@ function OceanDecorations({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [pillarPositions])
 
-  // Coral clusters
+  // Coral clusters (increased from 60 to 120)
   const coralPositions = useMemo(() => {
-    // Only place coral underwater
-    return scatterPositions(60, 300, 2500, heightFn, Math.PI / 2)
+    return scatterPositions(120, 200, 2500, heightFn, Math.PI / 2)
       .filter(p => p.y < 0)
   }, [heightFn])
   const coralGeo = useMemo(() => new THREE.SphereGeometry(1, 5, 4), [])
@@ -281,14 +327,78 @@ function OceanDecorations({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [islandPositions])
 
+  // Anemones — blobby shapes on the seafloor
+  const anemonePositions = useMemo(() => {
+    return scatterPositions(30, 200, 2200, heightFn, Math.PI / 2)
+      .filter(p => p.y < -3)
+  }, [heightFn])
+  const anemoneGeo = useMemo(() => new THREE.SphereGeometry(1, 6, 5), [])
+  const anemoneMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#ffaa22', flatShading: true }), [])
+
+  const setAnemoneRef = useCallback((mesh: THREE.InstancedMesh | null) => {
+    if (!mesh) return
+    const mat = new THREE.Matrix4()
+    for (let i = 0; i < anemonePositions.length; i++) {
+      const p = anemonePositions[i]
+      const s = 2 + Math.random() * 5
+      mat.makeTranslation(p.x, p.y + s * 0.3, p.z)
+      mat.scale(new THREE.Vector3(s, s * 0.6, s))
+      mesh.setMatrixAt(i, mat)
+    }
+    mesh.instanceMatrix.needsUpdate = true
+  }, [anemonePositions])
+
+  // Bioluminescent orbs — small emissive spheres
+  const orbPositions = useMemo(() => {
+    return scatterPositions(25, 150, 2000, heightFn, Math.PI / 2)
+      .filter(p => p.y < -2)
+  }, [heightFn])
+  const orbGeo = useMemo(() => new THREE.SphereGeometry(1, 6, 6), [])
+  const orbMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: '#44ffaa',
+    emissive: '#44ffaa',
+    emissiveIntensity: 2,
+    toneMapped: false,
+  }), [])
+
+  const orbColors = useMemo(() => {
+    const n = orbPositions.length
+    const attr = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3)
+    const palette = [
+      new THREE.Color('#44ffaa'), new THREE.Color('#44aaff'),
+      new THREE.Color('#ff44aa'), new THREE.Color('#aaff44'),
+    ]
+    for (let i = 0; i < n; i++) {
+      const c = palette[Math.floor(Math.random() * palette.length)]
+      attr.setXYZ(i, c.r, c.g, c.b)
+    }
+    return attr
+  }, [orbPositions])
+
+  const setOrbRef = useCallback((mesh: THREE.InstancedMesh | null) => {
+    if (!mesh) return
+    mesh.instanceColor = orbColors
+    const mat = new THREE.Matrix4()
+    for (let i = 0; i < orbPositions.length; i++) {
+      const p = orbPositions[i]
+      const s = 0.8 + Math.random() * 1.5
+      mat.makeTranslation(p.x, p.y + 3 + Math.random() * 8, p.z)
+      mat.scale(new THREE.Vector3(s, s, s))
+      mesh.setMatrixAt(i, mat)
+    }
+    mesh.instanceMatrix.needsUpdate = true
+  }, [orbPositions, orbColors])
+
   useEffect(() => {
     return () => {
       pillarGeo.dispose(); pillarMat.dispose()
       coralGeo.dispose(); coralMat.dispose()
       swGeo.dispose(); swMat.dispose()
       islandGeo.dispose(); islandMat.dispose()
+      anemoneGeo.dispose(); anemoneMat.dispose()
+      orbGeo.dispose(); orbMat.dispose()
     }
-  }, [pillarGeo, pillarMat, coralGeo, coralMat, swGeo, swMat, islandGeo, islandMat])
+  }, [pillarGeo, pillarMat, coralGeo, coralMat, swGeo, swMat, islandGeo, islandMat, anemoneGeo, anemoneMat, orbGeo, orbMat])
 
   return (
     <>
@@ -300,6 +410,12 @@ function OceanDecorations({ heightFn }: { heightFn: HeightFunction }) {
         <instancedMesh ref={setSwRef} args={[swGeo, swMat, seaweedPositions.length]} frustumCulled />
       )}
       <instancedMesh ref={setIslandRef} args={[islandGeo, islandMat, islandPositions.length]} frustumCulled />
+      {anemonePositions.length > 0 && (
+        <instancedMesh ref={setAnemoneRef} args={[anemoneGeo, anemoneMat, anemonePositions.length]} frustumCulled />
+      )}
+      {orbPositions.length > 0 && (
+        <instancedMesh ref={setOrbRef} args={[orbGeo, orbMat, orbPositions.length]} frustumCulled={false} />
+      )}
     </>
   )
 }
@@ -307,8 +423,8 @@ function OceanDecorations({ heightFn }: { heightFn: HeightFunction }) {
 // --- ARCTIC ---
 
 function ArcticDecorations({ heightFn }: { heightFn: HeightFunction }) {
-  // Ice crystal shards (stretched octahedrons)
-  const crystalPositions = useMemo(() => scatterPositions(100, 400, 3500, heightFn), [heightFn])
+  // Ice crystal shards (stretched octahedrons) — increased to 140
+  const crystalPositions = useMemo(() => scatterPositions(140, 300, 3500, heightFn), [heightFn])
   const crystalGeo = useMemo(() => new THREE.OctahedronGeometry(1, 0), [])
   const crystalMat = useMemo(() => new THREE.MeshPhongMaterial({
     color: '#a0d0f0',
@@ -339,8 +455,8 @@ function ArcticDecorations({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [crystalPositions])
 
-  // Snow-covered boulders
-  const boulderPositions = useMemo(() => scatterPositions(60, 300, 3500, heightFn), [heightFn])
+  // Snow-covered boulders — increased to 80
+  const boulderPositions = useMemo(() => scatterPositions(80, 300, 3500, heightFn), [heightFn])
   const boulderGeo = useMemo(() => new THREE.DodecahedronGeometry(1, 0), [])
   const boulderMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#d8e0e8', flatShading: true }), [])
 
@@ -364,8 +480,8 @@ function ArcticDecorations({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [boulderPositions])
 
-  // Tall ice columns (semi-transparent)
-  const columnPositions = useMemo(() => scatterPositions(30, 600, 4000, heightFn), [heightFn])
+  // Tall ice columns (semi-transparent) — increased to 45
+  const columnPositions = useMemo(() => scatterPositions(45, 500, 4000, heightFn), [heightFn])
   const columnGeo = useMemo(() => new THREE.CylinderGeometry(2, 4, 1, 6), [])
   const columnMat = useMemo(() => new THREE.MeshPhongMaterial({
     color: '#b0d8f0',
@@ -389,19 +505,76 @@ function ArcticDecorations({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [columnPositions])
 
+  // Frozen pond patches — flat translucent blue circles on the ground
+  const pondPositions = useMemo(() => scatterPositions(20, 400, 3000, heightFn, Math.PI / 6), [heightFn])
+  const pondGeo = useMemo(() => new THREE.CircleGeometry(1, 8), [])
+  const pondMat = useMemo(() => new THREE.MeshPhongMaterial({
+    color: '#88bbdd',
+    emissive: '#304858',
+    emissiveIntensity: 0.2,
+    flatShading: true,
+    transparent: true,
+    opacity: 0.6,
+    side: THREE.DoubleSide,
+  }), [])
+
+  const setPondRef = useCallback((mesh: THREE.InstancedMesh | null) => {
+    if (!mesh) return
+    const mat = new THREE.Matrix4()
+    const q = new THREE.Quaternion()
+    const euler = new THREE.Euler()
+    for (let i = 0; i < pondPositions.length; i++) {
+      const p = pondPositions[i]
+      const s = 15 + Math.random() * 30
+      euler.set(-Math.PI / 2, 0, Math.random() * Math.PI * 2)
+      q.setFromEuler(euler)
+      mat.compose(
+        new THREE.Vector3(p.x, p.y + 0.5, p.z),
+        q,
+        new THREE.Vector3(s, s * (0.6 + Math.random() * 0.4), 1),
+      )
+      mesh.setMatrixAt(i, mat)
+    }
+    mesh.instanceMatrix.needsUpdate = true
+  }, [pondPositions])
+
+  // Snow mounds — soft dome shapes
+  const moundPositions = useMemo(() => scatterPositions(40, 200, 3000, heightFn), [heightFn])
+  const moundGeo = useMemo(() => new THREE.SphereGeometry(1, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), [])
+  const moundMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#e8eef4', flatShading: true }), [])
+
+  const setMoundRef = useCallback((mesh: THREE.InstancedMesh | null) => {
+    if (!mesh) return
+    const mat = new THREE.Matrix4()
+    for (let i = 0; i < moundPositions.length; i++) {
+      const p = moundPositions[i]
+      const s = 5 + Math.random() * 15
+      mat.makeTranslation(p.x, p.y, p.z)
+      mat.scale(new THREE.Vector3(s, s * 0.4, s))
+      mesh.setMatrixAt(i, mat)
+    }
+    mesh.instanceMatrix.needsUpdate = true
+  }, [moundPositions])
+
   useEffect(() => {
     return () => {
       crystalGeo.dispose(); crystalMat.dispose()
       boulderGeo.dispose(); boulderMat.dispose()
       columnGeo.dispose(); columnMat.dispose()
+      pondGeo.dispose(); pondMat.dispose()
+      moundGeo.dispose(); moundMat.dispose()
     }
-  }, [crystalGeo, crystalMat, boulderGeo, boulderMat, columnGeo, columnMat])
+  }, [crystalGeo, crystalMat, boulderGeo, boulderMat, columnGeo, columnMat, pondGeo, pondMat, moundGeo, moundMat])
 
   return (
     <>
       <instancedMesh ref={setCrystalRef} args={[crystalGeo, crystalMat, crystalPositions.length]} frustumCulled />
       <instancedMesh ref={setBoulderRef} args={[boulderGeo, boulderMat, boulderPositions.length]} frustumCulled />
       <instancedMesh ref={setColumnRef} args={[columnGeo, columnMat, columnPositions.length]} frustumCulled />
+      {pondPositions.length > 0 && (
+        <instancedMesh ref={setPondRef} args={[pondGeo, pondMat, pondPositions.length]} frustumCulled />
+      )}
+      <instancedMesh ref={setMoundRef} args={[moundGeo, moundMat, moundPositions.length]} frustumCulled />
     </>
   )
 }

@@ -28,11 +28,15 @@ export default function HUD() {
 
   const config = currentLevel ? getLevelConfig(currentLevel) : null
 
-  // Escape key to pause
+  // Escape key to pause, backtick (`) to freeze/unfreeze for screenshots
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setPhase('paused')
+      }
+      if (e.key === '`') {
+        const store = useGameStore.getState()
+        store.setTimeScale(store.timeScale === 0 ? 1 : 0)
       }
     },
     [setPhase],

@@ -1,12 +1,19 @@
-import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
+import { useMemo, useState, useCallback, useEffect, useRef, useContext } from 'react'
 import * as THREE from 'three'
 import type { EnemyType, EnemyWave } from '@/types/level'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
+import { TerrainContext } from '@/levels/environments/TerrainContext'
+import type { HeightFunction } from '@/utils/terrainNoise'
 import Balloon from '../enemies/Balloon'
 import Crow from '../enemies/Crow'
+import Scorpion from '../enemies/Scorpion'
 import Shark from '../enemies/Shark'
+import Jellyfish from '../enemies/Jellyfish'
+import FlyingFish from '../enemies/FlyingFish'
 import Snowman from '../enemies/Snowman'
+import SnowmanScout from '../enemies/SnowmanScout'
+import SnowmanBrute from '../enemies/SnowmanBrute'
 import GoldenBalloon from '../enemies/GoldenBalloon'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 
@@ -26,56 +33,96 @@ interface SpawnedEnemy {
 const SCORE_VALUES: Record<EnemyType, number> = {
   balloon: 13,
   crow: 15,
+  scorpion: 20,
   shark: 25,
+  jellyfish: 18,
+  flyingFish: 12,
   snowman: 30,
+  snowmanScout: 15,
+  snowmanBrute: 50,
 }
 
 const RADII: Record<EnemyType, number> = {
   balloon: 45,
-  crow: 35,
+  crow: 50,
+  scorpion: 55,
   shark: 50,
+  jellyfish: 40,
+  flyingFish: 35,
   snowman: 115,
+  snowmanScout: 70,
+  snowmanBrute: 180,
 }
 
 /**
- * Spawn enemies using the EXACT original Manager.js patterns:
- * - Balloons: radial r=0..2300, y = random ±25
- * - Crows: radial x, z = -2000, y = 200..400
- * - Sharks: radial r=0..2500, y = 2
- * - Snowmen: radial r=0..6000, y = random ±25
+ * Spawn enemies with terrain-aware positioning.
+ * Ground enemies (scorpion, snowman) sit on the terrain surface.
+ * Flying enemies (crow, balloon) hover above the terrain.
+ * Sharks sit at water level (y=2).
  */
-function generateEnemies(waves: EnemyWave[]): SpawnedEnemy[] {
+function generateEnemies(waves: EnemyWave[], heightFn: HeightFunction): SpawnedEnemy[] {
   const enemies: SpawnedEnemy[] = []
   let id = 0
 
+  // Assign logical wave groups: consecutive entries with spawnDelay 0
+  // (or undefined) share the same wave group. A non-zero spawnDelay
+  // starts a new group.
+  let logicalWave = 0
   for (let waveIdx = 0; waveIdx < waves.length; waveIdx++) {
     const wave = waves[waveIdx]
+    if (waveIdx > 0 && (wave.spawnDelay ?? 0) > 0) {
+      logicalWave++
+    }
     for (let i = 0; i < wave.count; i++) {
       let x: number, y: number, z: number
 
       switch (wave.type) {
         case 'crow': {
-          const r = Math.random() * 2500
-          const theta = Math.random() * 2 * Math.PI
-          x = Math.cos(theta) * r
-          z = -2000
-          y = Math.random() * 200 + 200
-          break
-        }
-        case 'shark': {
-          const r = Math.random() * 2500
+          const r = Math.sqrt(Math.random()) * 1200 + 100
           const theta = Math.random() * 2 * Math.PI
           x = Math.cos(theta) * r
           z = Math.sin(theta) * r
-          y = 2
+          y = heightFn(x, z) + 15 + Math.random() * 45
           break
         }
-        case 'snowman': {
-          const r = Math.random() * 6000
+        case 'scorpion': {
+          const r = Math.sqrt(Math.random()) * 900 + 150
           const theta = Math.random() * 2 * Math.PI
           x = Math.cos(theta) * r
           z = Math.sin(theta) * r
-          y = (0.5 - Math.random()) * 50
+          y = heightFn(x, z) + 5
+          break
+        }
+        case 'shark':
+        case 'jellyfish':
+        case 'flyingFish': {
+          // Aquatic enemies: only spawn where terrain is below water (y=0)
+          let attempts = 0
+          do {
+            const r = Math.sqrt(Math.random()) * 1000 + 100
+            const theta = Math.random() * 2 * Math.PI
+            x = Math.cos(theta) * r
+            z = Math.sin(theta) * r
+            attempts++
+          } while (heightFn(x, z) > -5 && attempts < 20)
+
+          if (wave.type === 'shark') {
+            y = 2
+          } else if (wave.type === 'jellyfish') {
+            y = -15 - Math.random() * 30
+          } else {
+            y = 0
+          }
+          break
+        }
+        case 'snowman':
+        case 'snowmanScout':
+        case 'snowmanBrute': {
+          const r = Math.sqrt(Math.random()) * 2000 + 100
+          const theta = Math.random() * 2 * Math.PI
+          x = Math.cos(theta) * r
+          z = Math.sin(theta) * r
+          y = heightFn(x, z) + 5
           break
         }
         default: {
@@ -85,7 +132,7 @@ function generateEnemies(waves: EnemyWave[]): SpawnedEnemy[] {
           const theta = Math.random() * 2 * Math.PI
           x = Math.cos(theta) * r
           z = Math.sin(theta) * r
-          y = 40 + Math.random() * 160
+          y = heightFn(x, z) + 40 + Math.random() * 160
           break
         }
       }
@@ -96,7 +143,7 @@ function generateEnemies(waves: EnemyWave[]): SpawnedEnemy[] {
         position: new THREE.Vector3(x, y, z),
         scoreValue: SCORE_VALUES[wave.type],
         radius: RADII[wave.type],
-        waveIndex: waveIdx,
+        waveIndex: logicalWave,
       })
     }
   }
@@ -105,18 +152,20 @@ function generateEnemies(waves: EnemyWave[]): SpawnedEnemy[] {
 }
 
 // Generate golden balloon spawn positions
-function generateGoldenBalloons(count: number): SpawnedEnemy[] {
+function generateGoldenBalloons(count: number, heightFn: HeightFunction): SpawnedEnemy[] {
   const goldens: SpawnedEnemy[] = []
   for (let i = 0; i < count; i++) {
     const r = Math.sqrt(Math.random()) * 3000
     const theta = Math.random() * 2 * Math.PI
+    const x = Math.cos(theta) * r
+    const z = Math.sin(theta) * r
     goldens.push({
       id: `golden-${i}`,
       type: 'goldenBalloon',
       position: new THREE.Vector3(
-        Math.cos(theta) * r,
-        50 + Math.random() * 100,
-        Math.sin(theta) * r,
+        x,
+        heightFn(x, z) + 50 + Math.random() * 100,
+        z,
       ),
       scoreValue: 13 * 5, // 5x points
       radius: 45,
@@ -129,15 +178,21 @@ function generateGoldenBalloons(count: number): SpawnedEnemy[] {
 const ENEMY_COMPONENTS: Record<EnemyType, React.ComponentType<any>> = {
   balloon: Balloon,
   crow: Crow,
+  scorpion: Scorpion,
   shark: Shark,
+  jellyfish: Jellyfish,
+  flyingFish: FlyingFish,
   snowman: Snowman,
+  snowmanScout: SnowmanScout,
+  snowmanBrute: SnowmanBrute,
 }
 
 const EXPLOSION_COLORS = ['#ff4444', '#ffaa00', '#ffffff', '#44aaff', '#00ff88']
 
 export default function EnemySpawner({ waves }: EnemySpawnerProps) {
-  const enemies = useMemo(() => generateEnemies(waves), [waves])
-  const goldenBalloons = useMemo(() => generateGoldenBalloons(3), [])
+  const heightFn = useContext(TerrainContext)
+  const enemies = useMemo(() => generateEnemies(waves, heightFn), [waves, heightFn])
+  const goldenBalloons = useMemo(() => generateGoldenBalloons(3, heightFn), [heightFn])
   const phase = useGameStore((s) => s.phase)
 
   // Pre-computed lookups to avoid linear scans in onKill

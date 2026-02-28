@@ -2,7 +2,7 @@ import type { Color } from 'three'
 
 export type CurveType = 'curve1' | 'curve2'
 export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic'
-export type EnemyType = 'balloon' | 'crow' | 'shark' | 'snowman'
+export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute'
 
 export interface TrackParams {
   varA: number

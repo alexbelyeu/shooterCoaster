@@ -39,8 +39,8 @@ const LEVELS: LevelConfig[] = [
     description: 'A murder of Crows',
     order: 2,
     biome: 'desert',
-    maxScore: (60 * 15) / 2,
-    timerSeconds: 40,
+    maxScore: 30 * 20 + 50 * 15, // 600 + 750 = 1350
+    timerSeconds: 60,
     message: 'Ready for this one?',
     nextLevel: 'level3',
     track: {
@@ -48,13 +48,16 @@ const LEVELS: LevelConfig[] = [
       varB: 27,
       varC: 2,
       scalar: 60,
-      rollerSpeed: 0.000005,
-      minRollerSpeed: 0.00009,
+      rollerSpeed: 0.000004,
+      minRollerSpeed: 0.00006,
       curve: 'curve1',
       color1: 0x51411a,
       color2: 0x812a2a,
     },
-    enemies: [{ type: 'crow', count: 60 }],
+    enemies: [
+      { type: 'scorpion', count: 30, spawnDelay: 0, waveLabel: 'Incoming!' },
+      { type: 'crow', count: 50, spawnDelay: 0 },
+    ],
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
       groundColor: 0x473500,
@@ -67,8 +70,8 @@ const LEVELS: LevelConfig[] = [
     description: 'Aim for the snout!',
     order: 3,
     biome: 'ocean',
-    maxScore: (25 * 40) * 0.75,
-    timerSeconds: 40,
+    maxScore: 20 * 18 + 25 * 25 + 30 * 12, // 360 + 625 + 360 = 1345
+    timerSeconds: 65,
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
     track: {
@@ -76,14 +79,18 @@ const LEVELS: LevelConfig[] = [
       varB: 36,
       varC: 4,
       scalar: 20,
-      rollerSpeed: 0.000013,
-      minRollerSpeed: 0.00013,
+      rollerSpeed: 0.00001,
+      minRollerSpeed: 0.0001,
       curve: 'curve1',
       color1: 0x416fa0,
       color2: 0x31ffd5,
     },
-    enemies: [{ type: 'shark', count: 40 }],
-    starThresholds: [0.25, 0.5, 0.8],
+    enemies: [
+      { type: 'jellyfish', count: 20, spawnDelay: 0, waveLabel: 'Into the Deep!' },
+      { type: 'shark', count: 25, spawnDelay: 0 },
+      { type: 'flyingFish', count: 30, spawnDelay: 0 },
+    ],
+    starThresholds: [0.25, 0.55, 0.85],
     environment: {
       groundColor: 0x294c48,
       skybox: 'emerald',
@@ -96,8 +103,8 @@ const LEVELS: LevelConfig[] = [
     description: 'The living snowmen',
     order: 4,
     biome: 'arctic',
-    maxScore: (30 * 40) / 1.5,
-    timerSeconds: 65,
+    maxScore: 25 * 15 + 20 * 30 + 8 * 50, // 375 + 600 + 400 = 1375
+    timerSeconds: 75,
     message: "You've made it! Congrats!",
     nextLevel: null,
     track: {
@@ -111,7 +118,11 @@ const LEVELS: LevelConfig[] = [
       color1: 0x909090,
       color2: 0xffffff,
     },
-    enemies: [{ type: 'snowman', count: 40 }],
+    enemies: [
+      { type: 'snowmanScout', count: 25, spawnDelay: 0, waveLabel: 'Scout Party' },
+      { type: 'snowman', count: 20, spawnDelay: 0 },
+      { type: 'snowmanBrute', count: 8, spawnDelay: 0 },
+    ],
     starThresholds: [0.2, 0.5, 0.8],
     environment: {
       groundColor: 0xffffff,

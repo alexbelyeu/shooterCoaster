@@ -89,9 +89,11 @@ export default function EnemyBase({
 
   useFrame(({ clock }, delta) => {
     if (!meshRef.current || phase !== 'playing') return
+    const timeScale = useGameStore.getState().timeScale
+    if (timeScale === 0) return
 
     if (aliveRef.current) {
-      updatePosition(meshRef.current, spawnPosition, clock.elapsedTime, delta)
+      updatePosition(meshRef.current, spawnPosition, clock.elapsedTime, delta * timeScale)
     }
   })
 
