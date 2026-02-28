@@ -688,7 +688,7 @@ function OceanDecorations({ heightFn }: { heightFn: HeightFunction }) {
 
 function ArcticDecorations({ heightFn }: { heightFn: HeightFunction }) {
   // Ice crystal shards (stretched octahedrons) — increased to 140
-  const crystalPositions = useMemo(() => scatterPositions(140, 300, 3500, heightFn), [heightFn])
+  const crystalPositions = useMemo(() => scatterPositions(140, 150, 3500, heightFn), [heightFn])
   const crystalGeo = useMemo(() => new THREE.OctahedronGeometry(1, 0), [])
   const crystalMat = useMemo(() => new THREE.MeshPhongMaterial({
     color: '#a0d0f0',
@@ -720,7 +720,7 @@ function ArcticDecorations({ heightFn }: { heightFn: HeightFunction }) {
   }, [crystalPositions])
 
   // Snow-covered boulders — increased to 80
-  const boulderPositions = useMemo(() => scatterPositions(80, 300, 3500, heightFn), [heightFn])
+  const boulderPositions = useMemo(() => scatterPositions(80, 150, 3500, heightFn), [heightFn])
   const boulderGeo = useMemo(() => new THREE.DodecahedronGeometry(1, 0), [])
   const boulderMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#d8e0e8', flatShading: true }), [])
 
@@ -745,33 +745,45 @@ function ArcticDecorations({ heightFn }: { heightFn: HeightFunction }) {
   }, [boulderPositions])
 
   // Tall ice columns (semi-transparent) — increased to 45
-  const columnPositions = useMemo(() => scatterPositions(45, 500, 4000, heightFn), [heightFn])
-  const columnGeo = useMemo(() => new THREE.CylinderGeometry(2, 4, 1, 6), [])
+  const columnPositions = useMemo(() => scatterPositions(45, 200, 3500, heightFn), [heightFn])
+  const columnGeo = useMemo(() => {
+    const iceColumnPoints: THREE.Vector2[] = []
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12
+      const r = 4 * (1 - t * 0.7) + Math.sin(t * 6) * 0.3
+      iceColumnPoints.push(new THREE.Vector2(r, t * 60))
+    }
+    return new THREE.LatheGeometry(iceColumnPoints, 10)
+  }, [])
   const columnMat = useMemo(() => new THREE.MeshPhongMaterial({
     color: '#b0d8f0',
     flatShading: true,
     transparent: true,
     opacity: 0.7,
   }), [])
+  const columnScales = useMemo(() => {
+    return columnPositions.map(() => 0.5 + Math.random())
+  }, [columnPositions])
 
   const setColumnRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
     const mat = new THREE.Matrix4()
+    const quat = new THREE.Quaternion()
     const scale = new THREE.Vector3()
     for (let i = 0; i < columnPositions.length; i++) {
       const p = columnPositions[i]
-      const h = 30 + Math.random() * 60
-      mat.makeTranslation(p.x, p.y + h / 2, p.z)
-      scale.set(1, h, 1)
-      mat.scale(scale)
+      const s = columnScales[i]
+      const h = 60 * s
+      scale.set(s, s, s)
+      mat.compose(new THREE.Vector3(p.x, p.y + h / 2, p.z), quat, scale)
       mesh.setMatrixAt(i, mat)
     }
     mesh.instanceMatrix.needsUpdate = true
-  }, [columnPositions])
+  }, [columnPositions, columnScales])
 
   // Frozen pond patches — flat translucent blue circles on the ground
-  const pondPositions = useMemo(() => scatterPositions(20, 400, 3000, heightFn, Math.PI / 6), [heightFn])
-  const pondGeo = useMemo(() => new THREE.CircleGeometry(1, 8), [])
+  const pondPositions = useMemo(() => scatterPositions(20, 150, 3000, heightFn, Math.PI / 6), [heightFn])
+  const pondGeo = useMemo(() => new THREE.CircleGeometry(1, 24), [])
   const pondMat = useMemo(() => new THREE.MeshPhongMaterial({
     color: '#88bbdd',
     emissive: '#304858',
@@ -803,7 +815,7 @@ function ArcticDecorations({ heightFn }: { heightFn: HeightFunction }) {
   }, [pondPositions])
 
   // Snow mounds — soft dome shapes
-  const moundPositions = useMemo(() => scatterPositions(40, 200, 3000, heightFn), [heightFn])
+  const moundPositions = useMemo(() => scatterPositions(40, 100, 3000, heightFn), [heightFn])
   const moundGeo = useMemo(() => new THREE.SphereGeometry(1, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), [])
   const moundMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#e8eef4', flatShading: true }), [])
 

@@ -7,8 +7,8 @@ interface IceFortressProps {
 }
 
 // Shared geometries
-const TOWER_GEO = new THREE.CylinderGeometry(15, 18, 1, 6)
-const SIDE_TOWER_GEO = new THREE.CylinderGeometry(8, 10, 1, 6)
+const TOWER_GEO = new THREE.CylinderGeometry(15, 18, 120, 8)
+const SIDE_TOWER_GEO = new THREE.CylinderGeometry(8, 10, 80, 8)
 const WALL_GEO = new THREE.BoxGeometry(1, 40, 4)
 const BATTLEMENT_GEO = new THREE.BoxGeometry(5, 8, 5)
 const GATE_GEO = new THREE.TorusGeometry(20, 4, 6, 12, Math.PI)
@@ -148,7 +148,6 @@ export default function IceFortress({ position }: IceFortressProps) {
         geometry={TOWER_GEO}
         material={ICE_MAT}
         position={[0, 60, 0]}
-        scale={[1, 120, 1]}
       />
       {/* Central tower conical cap */}
       <mesh geometry={CONE_CAP_GEO} material={CAP_MAT} position={[0, 125, 0]} />
@@ -160,7 +159,6 @@ export default function IceFortress({ position }: IceFortressProps) {
             geometry={SIDE_TOWER_GEO}
             material={ICE_MAT}
             position={[t.x, 40, t.z]}
-            scale={[1, 80, 1]}
           />
           <mesh geometry={SIDE_CONE_CAP_GEO} material={CAP_MAT} position={[t.x, 85, t.z]} />
         </group>

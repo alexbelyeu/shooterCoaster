@@ -114,7 +114,7 @@ function generateEnemies(waves: EnemyWave[], heightFn: HeightFunction): SpawnedE
         case 'snowman':
         case 'snowmanScout':
         case 'snowmanBrute': {
-          const r = Math.sqrt(Math.random()) * 2000 + 100
+          const r = Math.sqrt(Math.random()) * 2200 + 200
           const theta = Math.random() * 2 * Math.PI
           x = Math.cos(theta) * r
           z = Math.sin(theta) * r

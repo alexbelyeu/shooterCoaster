@@ -362,7 +362,7 @@ export default function BiomeEnvironment({
 
       {/* Arctic landmark */}
       {biome === 'arctic' && (
-        <IceFortress position={[-500, heightFn(-500, 800), 800]} />
+        <IceFortress position={[2200, heightFn(2200, -1200), -1200]} />
       )}
 
       {/* Funfair decorations for theme park */}
@@ -426,10 +426,10 @@ function getTreeTypes(biome: BiomeType): TreeTypeConfig[] {
     case 'arctic':
       return [
         {
-          trunkColor: '#6a6a6a',
-          canopyColors: () => `hsl(${180 + Math.random() * 30}, ${10 + Math.random() * 15}%, ${40 + Math.random() * 20}%)`,
-          canopyGeoFactory: () => new THREE.ConeGeometry(1, 1, 5),
-          heightRange: [20, 50],
+          trunkColor: '#3a2818',
+          canopyColors: () => `hsl(${140 + Math.random() * 20}, ${20 + Math.random() * 15}%, ${20 + Math.random() * 10}%)`,
+          canopyGeoFactory: () => new THREE.ConeGeometry(1, 1, 6),
+          heightRange: [25, 70],
         },
       ]
     default:
@@ -441,7 +441,7 @@ function getTreeCount(biome: BiomeType, requested: number): number {
   switch (biome) {
     case 'themePark': return requested // 120
     case 'desert': return Math.min(15, requested)
-    case 'arctic': return Math.min(20, requested)
+    case 'arctic': return Math.min(80, requested)
     case 'ocean': return 0
     default: return requested
   }
@@ -463,9 +463,9 @@ function TreeField({
   const trees = useMemo(() => {
     if (actualCount === 0 || treeTypes.length === 0) return []
     const arr: { x: number; y: number; z: number; height: number; color: string; typeIdx: number }[] = []
-    const minR = biome === 'themePark' ? 800 : 300
-    const maxR = biome === 'themePark' ? 3000 : 2500
-    const maxSlopeAngle = Math.PI / 4 // 45 degrees
+    const minR = biome === 'themePark' ? 800 : 200
+    const maxR = biome === 'themePark' ? 3000 : 4000
+    const maxSlopeAngle = biome === 'arctic' ? Math.PI / 8 : Math.PI / 4 // 22.5° for mountains, 45° elsewhere
 
     let attempts = 0
     while (arr.length < actualCount && attempts < actualCount * 5) {

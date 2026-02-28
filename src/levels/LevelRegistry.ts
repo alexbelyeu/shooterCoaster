@@ -114,7 +114,7 @@ const LEVELS: LevelConfig[] = [
       varA: 3,
       varB: 36,
       varC: 4,
-      scalar: 70,
+      scalar: 35,
       rollerSpeed: 0.000006,
       minRollerSpeed: 0.00006,
       curve: 'curve2',
@@ -130,6 +130,8 @@ const LEVELS: LevelConfig[] = [
     environment: {
       groundColor: 0xffffff,
       skybox: 'iceflow',
+      hasTrees: true,
+      treeCount: 80,
     },
   },
 ]

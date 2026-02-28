@@ -506,7 +506,12 @@ export const FFISH_EYE_MAT = new THREE.MeshPhongMaterial({
 export const SNOWMAN_BOTTOM_GEO = new THREE.SphereGeometry(20, 12, 12)
 export const SNOWMAN_MIDDLE_GEO = new THREE.SphereGeometry(14, 12, 12)
 export const SNOWMAN_TOP_GEO = new THREE.SphereGeometry(10, 12, 12)
-export const SNOWMAN_MAT = new THREE.MeshPhongMaterial({ color: '#f0f0f0', flatShading: true })
+export const SNOWMAN_MAT = new THREE.MeshPhongMaterial({
+  color: '#e8eeff',
+  specular: '#aaccff',
+  shininess: 30,
+  flatShading: true,
+})
 
 // Accessories shared across snowman variants
 export const SNOWMAN_EYE_GEO = new THREE.SphereGeometry(1.5, 6, 6)
@@ -515,24 +520,52 @@ export const SNOWMAN_NOSE_GEO = new THREE.ConeGeometry(1.2, 6, 5)
 export const SNOWMAN_NOSE_MAT = new THREE.MeshPhongMaterial({ color: '#ff6600', flatShading: true })
 export const SNOWMAN_BUTTON_GEO = new THREE.SphereGeometry(1, 6, 6)
 export const SNOWMAN_BUTTON_MAT = new THREE.MeshPhongMaterial({ color: '#222222', flatShading: true })
+export const SNOWMAN_MOUTH_GEO = new THREE.SphereGeometry(0.8, 6, 6)
+export const SNOWMAN_MOUTH_MAT = new THREE.MeshPhongMaterial({ color: '#111111', flatShading: true })
 export const SNOWMAN_ARM_GEO = new THREE.CylinderGeometry(0.5, 0.3, 14, 4)
 export const SNOWMAN_ARM_MAT = new THREE.MeshPhongMaterial({ color: '#4a3020', flatShading: true })
+export const SNOWMAN_TWIG_GEO = new THREE.CylinderGeometry(0.15, 0.1, 5, 3)
+export const SNOWMAN_TWIG_MAT = SNOWMAN_ARM_MAT
 
 // Scout — icy blue tint
-export const SNOWMAN_SCOUT_MAT = new THREE.MeshPhongMaterial({ color: '#d0e8ff', flatShading: true })
+export const SNOWMAN_SCOUT_MAT = new THREE.MeshPhongMaterial({
+  color: '#d0e8ff',
+  specular: '#88bbff',
+  shininess: 35,
+  flatShading: true,
+})
 export const SNOWMAN_SCOUT_SHARD_GEO = new THREE.ConeGeometry(2, 8, 4)
 export const SNOWMAN_SCOUT_SHARD_MAT = new THREE.MeshPhongMaterial({
   color: '#80d0ff',
   emissive: '#3080cc',
-  emissiveIntensity: 0.5,
+  emissiveIntensity: 1.5,
   flatShading: true,
   transparent: true,
   opacity: 0.8,
+  toneMapped: false,
 })
 
 // Brute — top hat and scarf
 export const SNOWMAN_HAT_BRIM_GEO = new THREE.CylinderGeometry(8, 8, 1.5, 8)
 export const SNOWMAN_HAT_TOP_GEO = new THREE.CylinderGeometry(5.5, 6, 10, 8)
-export const SNOWMAN_HAT_MAT = new THREE.MeshPhongMaterial({ color: '#111111', flatShading: true })
+export const SNOWMAN_HAT_BAND_GEO = new THREE.CylinderGeometry(6.1, 6.1, 1.2, 8)
+export const SNOWMAN_HAT_MAT = new THREE.MeshPhongMaterial({
+  color: '#111111',
+  specular: '#333333',
+  shininess: 15,
+  flatShading: true,
+})
 export const SNOWMAN_SCARF_GEO = new THREE.TorusGeometry(11, 2, 6, 12)
-export const SNOWMAN_SCARF_MAT = new THREE.MeshPhongMaterial({ color: '#cc2222', flatShading: true })
+export const SNOWMAN_SCARF_TAIL_GEO = new THREE.BoxGeometry(2, 8, 1)
+export const SNOWMAN_SCARF_MAT = new THREE.MeshPhongMaterial({
+  color: '#cc2222',
+  specular: '#ff6644',
+  shininess: 20,
+  flatShading: true,
+})
+export const SNOWMAN_HAT_BAND_MAT = new THREE.MeshPhongMaterial({
+  color: '#cc2222',
+  specular: '#ff6644',
+  shininess: 20,
+  flatShading: true,
+})
