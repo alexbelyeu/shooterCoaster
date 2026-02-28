@@ -67,7 +67,7 @@ export function useShooting() {
   useEffect(() => {
     const interval = setInterval(() => {
       if (isDown.current) fireShot()
-    }, 100)
+    }, 60)
     return () => clearInterval(interval)
   }, [fireShot])
 }

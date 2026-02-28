@@ -7,9 +7,9 @@ import type { Bullet, BulletPoolHandle } from './bulletPoolHandle'
 import { setBulletPool } from './bulletPoolHandle'
 
 const POOL_SIZE = 350
-const FIRE_DELAY_MS = 100
+const FIRE_DELAY_MS = 60
 const BULLET_LIFETIME_MS = 5000
-const BULLET_SPEED = 8
+const BULLET_SPEED = 14
 
 interface BulletPoolProps {
   bulletSize?: number

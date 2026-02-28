@@ -19,6 +19,7 @@ import { getExplosionPool } from '@/effects/explosionPoolHandle'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
+  goldenBalloonCount?: number
 }
 
 interface SpawnedEnemy {
@@ -44,7 +45,7 @@ const SCORE_VALUES: Record<EnemyType, number> = {
 
 const RADII: Record<EnemyType, number> = {
   balloon: 45,
-  crow: 50,
+  crow: 65,
   scorpion: 55,
   shark: 50,
   jellyfish: 40,
@@ -77,11 +78,11 @@ function generateEnemies(waves: EnemyWave[], heightFn: HeightFunction): SpawnedE
           const theta = Math.random() * 2 * Math.PI
           x = Math.cos(theta) * r
           z = Math.sin(theta) * r
-          y = heightFn(x, z) + 15 + Math.random() * 45
+          y = heightFn(x, z) + 100 + Math.random() * 160
           break
         }
         case 'scorpion': {
-          const r = Math.sqrt(Math.random()) * 900 + 150
+          const r = Math.sqrt(Math.random()) * 600 + 100
           const theta = Math.random() * 2 * Math.PI
           x = Math.cos(theta) * r
           z = Math.sin(theta) * r
@@ -184,10 +185,10 @@ const ENEMY_COMPONENTS: Record<EnemyType, React.ComponentType<any>> = {
 
 const EXPLOSION_COLORS = ['#ff4444', '#ffaa00', '#ffffff', '#44aaff', '#00ff88']
 
-export default function EnemySpawner({ waves }: EnemySpawnerProps) {
+export default function EnemySpawner({ waves, goldenBalloonCount = 0 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
   const enemies = useMemo(() => generateEnemies(waves, heightFn), [waves, heightFn])
-  const goldenBalloons = useMemo(() => generateGoldenBalloons(3, heightFn), [heightFn])
+  const goldenBalloons = useMemo(() => generateGoldenBalloons(goldenBalloonCount, heightFn), [goldenBalloonCount, heightFn])
   const phase = useGameStore((s) => s.phase)
 
   // Wave state — time-based progression

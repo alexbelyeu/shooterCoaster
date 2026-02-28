@@ -350,14 +350,14 @@ export default function BiomeEnvironment({
       {/* Desert landmarks */}
       {biome === 'desert' && (
         <>
-          <Pyramid position={[800, heightFn(800, -600), -600]} />
+          <Pyramid position={[2000, heightFn(2000, -1600), -1600]} />
           <RockArches />
         </>
       )}
 
       {/* Ocean landmark */}
       {biome === 'ocean' && (
-        <SunkenCity position={[400, -15, -400]} />
+        <SunkenCity position={[1800, -15, -1400]} />
       )}
 
       {/* Arctic landmark */}
