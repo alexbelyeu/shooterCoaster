@@ -12,6 +12,9 @@ import Pyramid from './Pyramid'
 import RockArches from './RockArches'
 import SunkenCity from './SunkenCity'
 import IceFortress from './IceFortress'
+import Volcano from './Volcano'
+import { eventBus } from '@/core/EventBus'
+import { createLavaMaterial } from './LavaShader'
 
 interface BiomeEnvironmentProps {
   biome: BiomeType
@@ -70,6 +73,15 @@ const BIOME_SETTINGS: Record<
     fogNear: 1,
     fogFar: 5500,
   },
+  volcanic: {
+    sunPosition: [80, 30, -60],
+    skyScale: 12000,
+    ambientIntensity: 0.5,
+    dirIntensity: 0.7,
+    fogColor: 0x3a1a0a,
+    fogNear: 1,
+    fogFar: 6000,
+  },
 }
 
 // --- Vertex color ramps per biome ---
@@ -123,6 +135,18 @@ const BIOME_COLOR_RAMPS: Record<BiomeType, { stops: ColorStop[]; cliffColor: THR
       { height: 1.0, color: new THREE.Color(0xa0c0e0) },  // blue ice peaks
     ],
     cliffColor: new THREE.Color(0x7090b0),
+  },
+  volcanic: {
+    stops: [
+      { height: 0.0, color: new THREE.Color(0x1a0e08) },  // dark volcanic black
+      { height: 0.15, color: new THREE.Color(0x2a1510) }, // dark charcoal-brown
+      { height: 0.3, color: new THREE.Color(0x3a2018) },  // warm dark brown
+      { height: 0.5, color: new THREE.Color(0x4a2a1a) },  // burnt umber
+      { height: 0.7, color: new THREE.Color(0x3a2015) },  // darkening again
+      { height: 0.85, color: new THREE.Color(0x2a1810) }, // near-black peaks
+      { height: 1.0, color: new THREE.Color(0x1a1008) },  // obsidian black peaks
+    ],
+    cliffColor: new THREE.Color(0x5a3020),
   },
 }
 
@@ -303,15 +327,168 @@ export default function BiomeEnvironment({
   const settings = BIOME_SETTINGS[biome]
   const fogColor = fog?.color ?? settings.fogColor
   const heightFn = useContext(TerrainContext)
+  const fogRef = useRef<THREE.Fog>(null)
+  const cameraShakeRef = useRef({ active: false, startTime: 0 })
 
   const groundGeo = useMemo(() => {
-    const size = biome === 'arctic' ? 10000 : 6000
+    const size = biome === 'arctic' ? 10000 : biome === 'volcanic' ? 12000 : 6000
     return createNoiseTerrain(biome, heightFn, size, 128)
   }, [biome, heightFn])
 
   useEffect(() => {
     return () => groundGeo.dispose()
   }, [groundGeo])
+
+  // Lava shader material — animated procedural molten rock
+  const lavaRiverMat = useMemo(() => biome === 'volcanic' ? createLavaMaterial(0.08, 1.2) : null, [biome])
+  const lavaFlowMat = useMemo(() => biome === 'volcanic' ? createLavaMaterial(0.12, 1.5) : null, [biome])
+
+  // Lava rivers — terrain-conforming strips that drape over the heightmap
+  const lavaRiverGeos = useMemo(() => {
+    if (biome !== 'volcanic') return []
+
+    const geos: THREE.BufferGeometry[] = []
+    const riverConfigs = [
+      { angle: 0.3, rStart: 800, rEnd: 3000, halfWidth: 15 },
+      { angle: 1.2, rStart: 900, rEnd: 2800, halfWidth: 12 },
+      { angle: 2.5, rStart: 1000, rEnd: 3200, halfWidth: 18 },
+      { angle: 3.8, rStart: 700, rEnd: 2600, halfWidth: 14 },
+      { angle: 5.0, rStart: 850, rEnd: 2900, halfWidth: 16 },
+    ]
+
+    // The terrain mesh is 128 segments over 12000 units (~94 units/cell).
+    // Between terrain vertices the GPU interpolates linearly, but heightFn
+    // gives exact noise.  To guarantee the lava strip always sits visibly
+    // *above* the rendered terrain surface we:
+    //  1. Sample a 5×5 grid around each vertex (matching the terrain cell size)
+    //     and take the MAX height so we clear any nearby peak.
+    //  2. Add a generous Y offset (8 units).
+    //  3. Use 120 segments so the strip follows the terrain closely.
+
+    const TERRAIN_CELL = 12000 / 128  // ~93.75
+    const Y_OFFSET = 8
+    const SEGMENTS = 120
+
+    /** Return the highest terrain value in a small neighbourhood */
+    function safeHeight(x: number, z: number): number {
+      const half = TERRAIN_CELL * 0.6
+      let maxH = heightFn(x, z)
+      // sample a cross pattern around the point
+      for (const ox of [-half, 0, half]) {
+        for (const oz of [-half, 0, half]) {
+          const h = heightFn(x + ox, z + oz)
+          if (h > maxH) maxH = h
+        }
+      }
+      return maxH + Y_OFFSET
+    }
+
+    for (const cfg of riverConfigs) {
+      const dx = Math.cos(cfg.angle)
+      const dz = Math.sin(cfg.angle)
+      const px = -dz // perpendicular
+      const pz = dx
+
+      const positions: number[] = []
+      const uvs: number[] = []
+      const indices: number[] = []
+
+      for (let i = 0; i <= SEGMENTS; i++) {
+        const t = i / SEGMENTS
+        const r = cfg.rStart + (cfg.rEnd - cfg.rStart) * t
+        const cx = dx * r
+        const cz = dz * r
+        const wander = Math.sin(t * 4) * 30 + Math.cos(t * 7) * 15
+
+        const lx = cx + (px * cfg.halfWidth) + px * wander
+        const lz = cz + (pz * cfg.halfWidth) + pz * wander
+        const rx = cx - (px * cfg.halfWidth) + px * wander
+        const rz = cz - (pz * cfg.halfWidth) + pz * wander
+
+        // Use the max of all three sample points so the whole cross-section clears
+        const centerH = safeHeight(cx + px * wander, cz + pz * wander)
+        const leftH = safeHeight(lx, lz)
+        const rightH = safeHeight(rx, rz)
+        const rowY = Math.max(centerH, leftH, rightH)
+
+        positions.push(lx, rowY, lz)
+        positions.push(rx, rowY, rz)
+        uvs.push(0, t)
+        uvs.push(1, t)
+
+        if (i < SEGMENTS) {
+          const base = i * 2
+          indices.push(base, base + 1, base + 2)
+          indices.push(base + 1, base + 3, base + 2)
+        }
+      }
+
+      const geo = new THREE.BufferGeometry()
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+      geo.setIndex(indices)
+      geo.computeVertexNormals()
+      geos.push(geo)
+    }
+    return geos
+  }, [biome, heightFn])
+
+  useEffect(() => {
+    return () => {
+      lavaRiverMat?.dispose()
+      lavaFlowMat?.dispose()
+      lavaRiverGeos.forEach(g => g.dispose())
+    }
+  }, [lavaRiverMat, lavaFlowMat, lavaRiverGeos])
+
+  // Eruption event handling — fog pulse + camera shake
+  useEffect(() => {
+    if (biome !== 'volcanic') return
+    const onEruption = () => {
+      cameraShakeRef.current = { active: true, startTime: performance.now() / 1000 }
+    }
+    eventBus.on('eruption:start', onEruption)
+    return () => { eventBus.off('eruption:start', onEruption) }
+  }, [biome])
+
+  useFrame(({ camera, clock }) => {
+    if (biome !== 'volcanic') return
+
+    // Drive lava shader time
+    const t = clock.elapsedTime
+    if (lavaRiverMat) lavaRiverMat.uniforms.uTime.value = t
+    if (lavaFlowMat) lavaFlowMat.uniforms.uTime.value = t
+
+    const shake = cameraShakeRef.current
+    if (!shake.active) return
+    const elapsed = clock.elapsedTime - shake.startTime
+    if (elapsed < 0) {
+      shake.startTime = clock.elapsedTime
+      return
+    }
+
+    // Camera shake: 3s duration, damped
+    if (elapsed < 3) {
+      const amplitude = 3 * (1 - elapsed / 3)
+      camera.position.x += Math.sin(elapsed * 30) * amplitude * 0.02
+      camera.position.y += Math.cos(elapsed * 25) * amplitude * 0.02
+    }
+
+    // Fog pulse: close in over 2s, recover over 8s
+    if (fogRef.current) {
+      const baseFar = settings.fogFar
+      if (elapsed < 2) {
+        const t = elapsed / 2
+        fogRef.current.far = baseFar + (200 - baseFar) * t
+      } else if (elapsed < 10) {
+        const t = (elapsed - 2) / 8
+        fogRef.current.far = 200 + (baseFar - 200) * t
+      } else {
+        fogRef.current.far = baseFar
+        shake.active = false
+      }
+    }
+  })
 
   return (
     <>
@@ -327,6 +504,7 @@ export default function BiomeEnvironment({
 
       {/* Fog */}
       <fog
+        ref={fogRef}
         attach="fog"
         args={[fogColor, fog?.near ?? settings.fogNear, fog?.far ?? settings.fogFar]}
       />
@@ -363,6 +541,20 @@ export default function BiomeEnvironment({
       {/* Arctic landmark */}
       {biome === 'arctic' && (
         <IceFortress position={[2200, heightFn(2200, -1200), -1200]} />
+      )}
+
+      {/* Volcanic landmark + lava rivers */}
+      {biome === 'volcanic' && (
+        <>
+          <Volcano position={[2400, heightFn(2400, -1500), -1500]} lavaMaterial={lavaFlowMat} />
+          {lavaRiverMat && lavaRiverGeos.map((geo, i) => (
+            <mesh
+              key={`lava-river-${i}`}
+              geometry={geo}
+              material={lavaRiverMat}
+            />
+          ))}
+        </>
       )}
 
       {/* Funfair decorations for theme park */}
@@ -432,6 +624,15 @@ function getTreeTypes(biome: BiomeType): TreeTypeConfig[] {
           heightRange: [25, 70],
         },
       ]
+    case 'volcanic':
+      return [
+        {
+          trunkColor: '#1a1008',
+          canopyColors: () => '#1a1008',
+          canopyGeoFactory: () => new THREE.ConeGeometry(0.3, 0.5, 3),
+          heightRange: [15, 50],
+        },
+      ]
     default:
       return []
   }
@@ -442,6 +643,7 @@ function getTreeCount(biome: BiomeType, requested: number): number {
     case 'themePark': return requested // 120
     case 'desert': return Math.min(15, requested)
     case 'arctic': return Math.min(80, requested)
+    case 'volcanic': return Math.min(60, requested)
     case 'ocean': return 0
     default: return requested
   }
@@ -465,7 +667,7 @@ function TreeField({
     const arr: { x: number; y: number; z: number; height: number; color: string; typeIdx: number }[] = []
     const minR = biome === 'themePark' ? 800 : 200
     const maxR = biome === 'themePark' ? 3000 : 4000
-    const maxSlopeAngle = biome === 'arctic' ? Math.PI / 8 : Math.PI / 4 // 22.5° for mountains, 45° elsewhere
+    const maxSlopeAngle = (biome === 'arctic' || biome === 'volcanic') ? Math.PI / 6 : Math.PI / 4
 
     let attempts = 0
     while (arr.length < actualCount && attempts < actualCount * 5) {

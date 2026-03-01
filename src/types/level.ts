@@ -1,8 +1,8 @@
 import type { Color } from 'three'
 
 export type CurveType = 'curve1' | 'curve2'
-export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic'
-export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute'
+export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic'
+export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake'
 
 export interface TrackParams {
   varA: number
@@ -21,6 +21,7 @@ export interface EnemyWave {
   count: number
   spawnDelay?: number
   waveLabel?: string
+  isEruption?: boolean
 }
 
 export interface LevelConfig {

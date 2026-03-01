@@ -162,6 +162,18 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     flatRadius: 600,
     transitionWidth: 900,
   },
+  volcanic: {
+    frequency: 0.0006,
+    amplitude: 250,
+    octaves: 5,
+    persistence: 0.5,
+    lacunarity: 2.2,
+    exponent: 1.3,
+    ridgeMode: true,
+    baseY: 0,
+    flatRadius: 600,
+    transitionWidth: 900,
+  },
 }
 
 /** Desert gets an extra macro-scale mesa layer */

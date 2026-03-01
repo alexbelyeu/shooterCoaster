@@ -105,6 +105,26 @@ const CONFIGS: Record<BiomeType, BiomeConfig> = {
     ],
     hasPerc: false,
   },
+
+  // Dark, driving — D minor, relentless urgency
+  volcanic: {
+    tempo: 140,
+    padChords: [
+      ['D3', 'F3', 'A3'],
+      ['G3', 'Bb3', 'D4'],
+      ['A3', 'C4', 'E4'],
+      ['Bb3', 'D4', 'F4'],
+    ],
+    bassNotes: [
+      'D2', null, 'D2', null, 'A1', null, 'D2', null,
+      'G2', null, 'G2', null, 'D2', null, 'A1', null,
+    ],
+    leadNotes: [
+      null, null, 'D5', null, null, null, null, null,
+      null, null, null, null, 'F5', null, null, null,
+    ],
+    hasPerc: false,
+  },
 }
 
 // ── State ──────────────────────────────────────────────────────

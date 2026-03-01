@@ -569,3 +569,178 @@ export const SNOWMAN_HAT_BAND_MAT = new THREE.MeshPhongMaterial({
   shininess: 20,
   flatShading: true,
 })
+
+// ── Ember Wisp ────────────────────────────────────────────────
+export const EMBER_WISP_CORE_GEO = new THREE.SphereGeometry(3, 8, 8)
+export const EMBER_WISP_TENDRIL_GEO = new THREE.ConeGeometry(1, 4, 4)
+
+export const EMBER_WISP_CORE_MAT = new THREE.MeshPhongMaterial({
+  color: '#ff6600',
+  emissive: '#ff3300',
+  emissiveIntensity: 0.8,
+  flatShading: true,
+})
+export const EMBER_WISP_TENDRIL_MAT = new THREE.MeshPhongMaterial({
+  color: '#ffaa00',
+  emissive: '#ff6600',
+  emissiveIntensity: 0.5,
+  transparent: true,
+  opacity: 0.7,
+  flatShading: true,
+})
+
+// ── Lava Golem ────────────────────────────────────────────────
+const lavaGolemProfile = [
+  new THREE.Vector2(0, 0),
+  new THREE.Vector2(4, 1),
+  new THREE.Vector2(5.5, 3),
+  new THREE.Vector2(6, 6),
+  new THREE.Vector2(5.5, 9),
+  new THREE.Vector2(5, 12),
+  new THREE.Vector2(4, 15),
+  new THREE.Vector2(3.5, 18),
+  new THREE.Vector2(0, 20),
+]
+export const LAVA_GOLEM_BODY_GEO = new THREE.LatheGeometry(lavaGolemProfile, 10)
+export const LAVA_GOLEM_HEAD_GEO = new THREE.SphereGeometry(3, 8, 6)
+export const LAVA_GOLEM_ARM_GEO = new THREE.BoxGeometry(2, 8, 2)
+export const LAVA_GOLEM_EYE_GEO = new THREE.SphereGeometry(0.8, 6, 6)
+
+export const LAVA_GOLEM_BODY_MAT = new THREE.MeshPhongMaterial({
+  color: '#4a2a10',
+  specular: '#ff6633',
+  shininess: 50,
+  flatShading: true,
+})
+export const LAVA_GOLEM_CRACK_MAT = new THREE.MeshPhongMaterial({
+  color: '#ff4400',
+  emissive: '#ff2200',
+  emissiveIntensity: 0.6,
+  flatShading: true,
+})
+export const LAVA_GOLEM_EYE_MAT = new THREE.MeshStandardMaterial({
+  color: '#ff4400',
+  emissive: '#ff2200',
+  emissiveIntensity: 1.5,
+  toneMapped: false,
+})
+
+// ── Fire Imp ──────────────────────────────────────────────────
+const fireImpProfile = [
+  new THREE.Vector2(0, 0),
+  new THREE.Vector2(2, 0.5),
+  new THREE.Vector2(3, 2),
+  new THREE.Vector2(3.2, 4),
+  new THREE.Vector2(2.8, 6),
+  new THREE.Vector2(2, 7.5),
+  new THREE.Vector2(0, 8),
+]
+export const FIRE_IMP_BODY_GEO = new THREE.LatheGeometry(fireImpProfile, 8)
+export const FIRE_IMP_HORN_GEO = new THREE.ConeGeometry(0.6, 3, 4)
+export const FIRE_IMP_TAIL_GEO = new THREE.CylinderGeometry(0.3, 0.15, 6, 4)
+export const FIRE_IMP_TAIL_SPIKE_GEO = new THREE.ConeGeometry(0.5, 1.5, 4)
+export const FIRE_IMP_EYE_GEO = new THREE.SphereGeometry(0.5, 6, 6)
+
+export const FIRE_IMP_BODY_MAT = new THREE.MeshPhysicalMaterial({
+  color: '#8b1a1a',
+  metalness: 0.2,
+  roughness: 0.5,
+  iridescence: 0.3,
+  iridescenceIOR: 1.3,
+  flatShading: true,
+})
+export const FIRE_IMP_HORN_MAT = new THREE.MeshPhongMaterial({
+  color: '#2a0808',
+  flatShading: true,
+})
+export const FIRE_IMP_EYE_MAT = new THREE.MeshStandardMaterial({
+  color: '#ffcc00',
+  emissive: '#ff8800',
+  emissiveIntensity: 1.5,
+  toneMapped: false,
+})
+
+// ── Infernal Drake ────────────────────────────────────────────
+const infernalDrakeProfile = [
+  new THREE.Vector2(0, 0),
+  new THREE.Vector2(1.5, 1),
+  new THREE.Vector2(3, 3),
+  new THREE.Vector2(3.5, 6),
+  new THREE.Vector2(3.2, 9),
+  new THREE.Vector2(2.8, 12),
+  new THREE.Vector2(2, 15),
+  new THREE.Vector2(1, 17),
+  new THREE.Vector2(0, 18),
+]
+export const DRAKE_BODY_GEO = new THREE.LatheGeometry(infernalDrakeProfile, 10)
+export const DRAKE_HEAD_GEO = new THREE.SphereGeometry(2.5, 8, 6)
+export const DRAKE_SPIKE_GEO = new THREE.ConeGeometry(0.8, 3, 4)
+export const DRAKE_TAIL_GEO = new THREE.CylinderGeometry(1.5, 0.3, 12, 6)
+export const DRAKE_EYE_GEO = new THREE.SphereGeometry(0.6, 6, 6)
+export const DRAKE_JAW_GEO = new THREE.BoxGeometry(2.5, 0.8, 3)
+
+// Drake wing — custom bat-like membrane (4 segments)
+function makeDrakeWingGeo(): THREE.BufferGeometry {
+  const verts = new Float32Array([
+    // top
+    0, 0.1, 1.5,     // 0: shoulder
+    3, 0.1, 1,        // 1: mid leading
+    6, 0.08, 0.5,     // 2: outer leading
+    8, 0.05, -0.5,    // 3: wingtip
+    6, 0.08, -1.5,    // 4: trailing outer
+    3, 0.1, -1.8,     // 5: trailing mid
+    0, 0.1, -1,       // 6: trailing shoulder
+    // bottom
+    0, -0.1, 1.5,     // 7
+    3, -0.1, 1,        // 8
+    6, -0.08, 0.5,     // 9
+    8, -0.05, -0.5,    // 10
+    6, -0.08, -1.5,    // 11
+    3, -0.1, -1.8,     // 12
+    0, -0.1, -1,       // 13
+  ])
+  const indices = [
+    // top face
+    0, 1, 6, 1, 5, 6, 1, 2, 5, 2, 4, 5, 2, 3, 4,
+    // bottom face
+    7, 13, 8, 8, 13, 12, 8, 12, 9, 9, 12, 11, 9, 11, 10,
+    // edges
+    0, 7, 8, 0, 8, 1, 3, 10, 11, 3, 11, 4,
+    0, 6, 13, 0, 13, 7,
+  ]
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  return geo
+}
+export const DRAKE_WING_GEO = makeDrakeWingGeo()
+
+export const DRAKE_BODY_MAT = new THREE.MeshPhysicalMaterial({
+  color: '#2a0a0a',
+  metalness: 0.3,
+  roughness: 0.4,
+  iridescence: 0.5,
+  iridescenceIOR: 1.4,
+  iridescenceThicknessRange: [200, 500],
+  flatShading: true,
+})
+export const DRAKE_WING_MAT = new THREE.MeshPhongMaterial({
+  color: '#660000',
+  emissive: '#ff2200',
+  emissiveIntensity: 0.3,
+  transparent: true,
+  opacity: 0.75,
+  flatShading: true,
+  side: THREE.DoubleSide,
+})
+export const DRAKE_SPIKE_MAT = new THREE.MeshPhongMaterial({
+  color: '#1a0505',
+  flatShading: true,
+})
+export const DRAKE_EYE_MAT = new THREE.MeshStandardMaterial({
+  color: '#ff4400',
+  emissive: '#ff2200',
+  emissiveIntensity: 2,
+  toneMapped: false,
+})

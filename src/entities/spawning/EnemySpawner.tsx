@@ -14,6 +14,10 @@ import FlyingFish from '../enemies/FlyingFish'
 import Snowman from '../enemies/Snowman'
 import SnowmanScout from '../enemies/SnowmanScout'
 import SnowmanBrute from '../enemies/SnowmanBrute'
+import EmberWisp from '../enemies/EmberWisp'
+import LavaGolem from '../enemies/LavaGolem'
+import FireImp from '../enemies/FireImp'
+import InfernalDrake from '../enemies/InfernalDrake'
 import GoldenBalloon from '../enemies/GoldenBalloon'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 
@@ -41,6 +45,10 @@ const SCORE_VALUES: Record<EnemyType, number> = {
   snowman: 30,
   snowmanScout: 15,
   snowmanBrute: 50,
+  emberWisp: 12,
+  lavaGolem: 35,
+  fireImp: 18,
+  infernalDrake: 60,
 }
 
 const RADII: Record<EnemyType, number> = {
@@ -53,6 +61,10 @@ const RADII: Record<EnemyType, number> = {
   snowman: 115,
   snowmanScout: 70,
   snowmanBrute: 180,
+  emberWisp: 35,
+  lavaGolem: 130,
+  fireImp: 55,
+  infernalDrake: 200,
 }
 
 /**
@@ -121,6 +133,38 @@ function generateEnemies(waves: EnemyWave[], heightFn: HeightFunction): SpawnedE
           y = heightFn(x, z) + 5
           break
         }
+        case 'emberWisp': {
+          const r = Math.sqrt(Math.random()) * 2800 + 200
+          const theta = Math.random() * 2 * Math.PI
+          x = Math.cos(theta) * r
+          z = Math.sin(theta) * r
+          y = heightFn(x, z) + 60 + Math.random() * 140
+          break
+        }
+        case 'lavaGolem': {
+          const r = Math.sqrt(Math.random()) * 2400 + 200
+          const theta = Math.random() * 2 * Math.PI
+          x = Math.cos(theta) * r
+          z = Math.sin(theta) * r
+          y = heightFn(x, z) + 5
+          break
+        }
+        case 'fireImp': {
+          const r = Math.sqrt(Math.random()) * 2200 + 200
+          const theta = Math.random() * 2 * Math.PI
+          x = Math.cos(theta) * r
+          z = Math.sin(theta) * r
+          y = heightFn(x, z) + 5
+          break
+        }
+        case 'infernalDrake': {
+          const r = Math.sqrt(Math.random()) * 2600 + 300
+          const theta = Math.random() * 2 * Math.PI
+          x = Math.cos(theta) * r
+          z = Math.sin(theta) * r
+          y = heightFn(x, z) + 150 + Math.random() * 100
+          break
+        }
         default: {
           // Scatter balloons across a huge area well beyond the track (~±1100).
           // Use sqrt for uniform area density across a circle of radius 3500.
@@ -181,6 +225,10 @@ const ENEMY_COMPONENTS: Record<EnemyType, React.ComponentType<any>> = {
   snowman: Snowman,
   snowmanScout: SnowmanScout,
   snowmanBrute: SnowmanBrute,
+  emberWisp: EmberWisp,
+  lavaGolem: LavaGolem,
+  fireImp: FireImp,
+  infernalDrake: InfernalDrake,
 }
 
 const EXPLOSION_COLORS = ['#ff4444', '#ffaa00', '#ffffff', '#44aaff', '#00ff88']
@@ -255,6 +303,9 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0 }: EnemySpa
           setActiveWaveIndex(i)
           if (waves[i].waveLabel) {
             setWaveAnnouncement(waves[i].waveLabel!)
+          }
+          if (waves[i].isEruption) {
+            eventBus.emit('eruption:start')
           }
         }, delay)
         timers.push(t)
