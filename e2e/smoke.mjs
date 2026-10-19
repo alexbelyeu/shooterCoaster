@@ -339,6 +339,11 @@ async function runMobile(browser, base) {
     fallbackKills = await page.evaluate(() => window.__SC_TEST__.killNearest(3))
     await waitFrames(page, 1, { maxMs: 5000, pollMs: 30 })
   }
+  // The level timer runs on wall-clock time, so on a slow runner the level can
+  // time out (HUD unmounts) before the layout + pause checks. Freeze game time
+  // now that the touch-input checks are done; pause still works while frozen.
+  if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the HUD layout checks`)
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}.png`) })
   const end = await getStats(page)
   if (end.kills === 0 && end.score <= 0) problems.push('no kill reached')
@@ -353,6 +358,7 @@ async function runMobile(browser, base) {
   await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-landscape.png`) })
 
   // Pause is a button (touch has no Escape key).
+  if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the pause tap`)
   await page.locator('.hud-pause-button').tap({ timeout: 30000 }).catch((e) => problems.push(`tap pause: ${e.message}`))
   await waitPhase('paused', 15000)
   if ((await phase()) !== 'paused') problems.push('tapping Pause did not pause')
