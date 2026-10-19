@@ -49,7 +49,8 @@ interface GameState {
   isLevelUnlocked: (levelId: string) => boolean
 }
 
-const COMBO_TIMEOUT = 2000 // 2s window for combos
+/** Real-time window (ms, performance.now) in which the next kill extends the combo. */
+export const COMBO_TIMEOUT = 2000
 
 export const useGameStore = create<GameState>()(
   persist(
