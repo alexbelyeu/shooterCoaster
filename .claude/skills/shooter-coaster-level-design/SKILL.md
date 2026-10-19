@@ -25,7 +25,7 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 2. **Never use height-via-scale trick** — `CylinderGeometry(r, r, 1, N)` + `scale.set(1, h, 1)` creates hexagonal sticks. Bake height into geometry.
 3. **Ground enemies must sample `heightFn` every frame** via `TerrainContext` — not just at spawn
 4. **Paired InstancedMesh callbacks need shared config** — pre-compute random values in `useMemo` arrays
-5. **Enemy colors must contrast with terrain** — dark-on-dark = invisible
+5. **Enemy colors must contrast with terrain** — dark-on-dark = invisible. Keep base colours ΔE ≥ ~15 from the biome's terrain ramp, and wrap every lit enemy material in `withRim()` (`enemyRim.ts`: fresnel rim + reduced fog)
 6. **Add `specular` to MeshPhongMaterial** — flat matte looks like plastic
 7. **Scatter radii must extend beyond track extent** — otherwise outer track sections are empty
 8. **CircleGeometry needs 24+ segments** — 8 segments = visible octagon
@@ -144,7 +144,8 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 1. `src/types/level.ts` — add to `EnemyType` union
 2. `src/entities/enemies/SharedEnemyAssets.ts` — geometry + material singletons (with specular/iridescence)
 3. `src/entities/enemies/NewEnemy.tsx` — R3F component using `<EnemyBase>` wrapper
-4. `src/entities/spawning/EnemySpawner.tsx` — ALL of:
+4. `src/entities/enemies/enemyReadability.ts` — add `ENEMY_SILHOUETTE` (world-unit size after scale; drives the ≥12 px readable-spawn rule)
+5. `src/entities/spawning/EnemySpawner.tsx` — ALL of:
    - Import the component
    - Add score value to `ENEMY_SCORES`
    - Add collision radius to `ENEMY_RADII`
@@ -163,6 +164,7 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 |---------|-------|-----|
 | Enemies invisible | Scale too small (1-3x) | Use 8x minimum for small-geometry enemies |
 | Enemies invisible | Colors match terrain | Ensure contrast with biome colors |
+| Enemies read as grey blobs | Biome lighting too dim for the albedo | Emissive lift in the shadow tint + `withRim()`; check the `<level>-enemy.png` smoke close-up |
 | Feature clips through terrain | Using flat PlaneGeometry | Build custom BufferGeometry with safeHeight() |
 | Feature clips through terrain | Y offset too small | Use 8+ units above max 3x3 neighborhood |
 | Decorations flicker/z-fight | Y offset < 1 unit | Use 3-8 unit offset above heightFn |

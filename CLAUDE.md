@@ -25,12 +25,13 @@ npm run verify            # build + bundle budget + smoke — run before every P
 Headless browser in Claude cloud sessions: the Playwright CDN is blocked, so run
 `export SC_CHROME="$(scripts/ensure-browser.sh)"` once per session before `npm run smoke`.
 The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
-triangles, avg frame ms, errors) to `e2e-results/`. **Look at the screenshots** with
+triangles, avg frame ms, on-screen enemy counts/sizes, errors) to `e2e-results/`,
+plus a 4× close-up of the largest on-screen enemy per level (`<level>-enemy.png`). **Look at the screenshots** with
 the Read tool — that is how you playtest visually.
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 (`levels()`, `startLevel(id)`, `frames`, `drawCalls`, `triangles`, `avgFrameMs`,
-`errors`). See `src/testing/e2eHook.tsx`. Extend it when you need new test surfaces.
+`enemies()`, `setTimeScale(s)`, `errors`). See `src/testing/e2eHook.tsx`. Extend it when you need new test surfaces.
 
 ## Stack
 
