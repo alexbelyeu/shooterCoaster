@@ -144,12 +144,14 @@ export default function CoasterCamera({
     const k = shake.current
     let shakeLen = 0
     if (k.fireMs > 0 || k.killMs > 0) {
+      // Sample the envelopes before decaying them so even a single very long
+      // frame still shows the kick at full strength once.
+      const fireEnv = (k.fireMs / FIRE_KICK_MS) ** 2
+      const killEnv = (k.killMs / KILL_SHAKE_MS) ** 2
       const dtMs = effectiveDelta * 1000
       k.time += effectiveDelta
       k.fireMs = Math.max(0, k.fireMs - dtMs)
       k.killMs = Math.max(0, k.killMs - dtMs)
-      const fireEnv = (k.fireMs / FIRE_KICK_MS) ** 2
-      const killEnv = (k.killMs / KILL_SHAKE_MS) ** 2
 
       if (fireEnv > 0) {
         // Recoil: mostly pitch-up with a little random yaw (~1–2 px).
