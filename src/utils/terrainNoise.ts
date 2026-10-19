@@ -187,7 +187,7 @@ function mesaNoise(x: number, z: number): number {
 export type HeightFunction = (x: number, z: number) => number
 
 /** Pre-sampled track point for terrain suppression */
-interface TrackSample {
+export interface TrackSample {
   x: number
   y: number
   z: number

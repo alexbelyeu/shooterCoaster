@@ -4,7 +4,8 @@ import type { EnemyType, EnemyWave } from '@/types/level'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
-import type { HeightFunction } from '@/utils/terrainNoise'
+import type { HeightFunction, TrackSample } from '@/utils/terrainNoise'
+import { maxReadableDistance } from '../enemies/enemyReadability'
 import Balloon from '../enemies/Balloon'
 import Crow from '../enemies/Crow'
 import Scorpion from '../enemies/Scorpion'
@@ -24,6 +25,8 @@ import { getExplosionPool } from '@/effects/explosionPoolHandle'
 interface EnemySpawnerProps {
   waves: EnemyWave[]
   goldenBalloonCount?: number
+  /** Track path samples; when given, spawns are kept within readable range of the track. */
+  trackSamples?: TrackSample[]
 }
 
 interface SpawnedEnemy {
@@ -67,13 +70,158 @@ const RADII: Record<EnemyType, number> = {
   infernalDrake: 200,
 }
 
+/** One random spawn position for `type` (terrain-aware, biome rules). */
+function pickSpawn(type: EnemyType, heightFn: HeightFunction): THREE.Vector3 {
+  let x: number, y: number, z: number
+
+  switch (type) {
+    case 'crow': {
+      const r = Math.sqrt(Math.random()) * 1200 + 100
+      const theta = Math.random() * 2 * Math.PI
+      x = Math.cos(theta) * r
+      z = Math.sin(theta) * r
+      y = heightFn(x, z) + 100 + Math.random() * 160
+      break
+    }
+    case 'scorpion': {
+      const r = Math.sqrt(Math.random()) * 600 + 100
+      const theta = Math.random() * 2 * Math.PI
+      x = Math.cos(theta) * r
+      z = Math.sin(theta) * r
+      y = heightFn(x, z) + 5
+      break
+    }
+    case 'shark':
+    case 'jellyfish':
+    case 'flyingFish': {
+      // Aquatic enemies: only spawn where terrain is below water (y=0)
+      let attempts = 0
+      do {
+        const r = Math.sqrt(Math.random()) * 1000 + 100
+        const theta = Math.random() * 2 * Math.PI
+        x = Math.cos(theta) * r
+        z = Math.sin(theta) * r
+        attempts++
+      } while (heightFn(x, z) > -5 && attempts < 20)
+
+      if (type === 'shark') {
+        y = 2
+      } else if (type === 'jellyfish') {
+        y = -15 - Math.random() * 30
+      } else {
+        y = 0
+      }
+      break
+    }
+    case 'snowman':
+    case 'snowmanScout':
+    case 'snowmanBrute': {
+      const r = Math.sqrt(Math.random()) * 2200 + 200
+      const theta = Math.random() * 2 * Math.PI
+      x = Math.cos(theta) * r
+      z = Math.sin(theta) * r
+      y = heightFn(x, z) + 5
+      break
+    }
+    case 'emberWisp': {
+      const r = Math.sqrt(Math.random()) * 2800 + 200
+      const theta = Math.random() * 2 * Math.PI
+      x = Math.cos(theta) * r
+      z = Math.sin(theta) * r
+      y = heightFn(x, z) + 60 + Math.random() * 140
+      break
+    }
+    case 'lavaGolem': {
+      const r = Math.sqrt(Math.random()) * 2400 + 200
+      const theta = Math.random() * 2 * Math.PI
+      x = Math.cos(theta) * r
+      z = Math.sin(theta) * r
+      y = heightFn(x, z) + 5
+      break
+    }
+    case 'fireImp': {
+      const r = Math.sqrt(Math.random()) * 2200 + 200
+      const theta = Math.random() * 2 * Math.PI
+      x = Math.cos(theta) * r
+      z = Math.sin(theta) * r
+      y = heightFn(x, z) + 5
+      break
+    }
+    case 'infernalDrake': {
+      const r = Math.sqrt(Math.random()) * 2600 + 300
+      const theta = Math.random() * 2 * Math.PI
+      x = Math.cos(theta) * r
+      z = Math.sin(theta) * r
+      y = heightFn(x, z) + 150 + Math.random() * 100
+      break
+    }
+    default: {
+      // Scatter balloons across a huge area well beyond the track (~±1100).
+      // Use sqrt for uniform area density across a circle of radius 3500.
+      const r = Math.sqrt(Math.random()) * 3500
+      const theta = Math.random() * 2 * Math.PI
+      x = Math.cos(theta) * r
+      z = Math.sin(theta) * r
+      y = heightFn(x, z) + 40 + Math.random() * 160
+      break
+    }
+  }
+  return new THREE.Vector3(x, y, z)
+}
+
+/** Squared distance from (x, y, z) to the nearest track sample (every 2nd sample). */
+function trackDistSq(p: THREE.Vector3, samples: TrackSample[]): number {
+  let best = Infinity
+  for (let i = 0; i < samples.length; i += 2) {
+    const s = samples[i]
+    const dx = s.x - p.x
+    const dy = s.y - p.y
+    const dz = s.z - p.z
+    const d = dx * dx + dy * dy + dz * dz
+    if (d < best) best = d
+  }
+  return best
+}
+
+const READABLE_SPAWN_ATTEMPTS = 30
+
+/**
+ * Like pickSpawn, but re-rolls until the enemy is within maxReadableDistance of
+ * some point of the track, so it reaches ≥ MIN_ENEMY_PX on screen at least once
+ * during the ride (issue #15). Falls back to the closest candidate.
+ */
+function pickReadableSpawn(
+  type: EnemyType | 'goldenBalloon',
+  heightFn: HeightFunction,
+  trackSamples: TrackSample[] | undefined,
+  pick: () => THREE.Vector3 = () => pickSpawn(type as EnemyType, heightFn),
+): THREE.Vector3 {
+  if (!trackSamples || trackSamples.length === 0) return pick()
+  const maxSq = maxReadableDistance(type) ** 2
+  let best = pick()
+  let bestSq = trackDistSq(best, trackSamples)
+  for (let i = 1; i < READABLE_SPAWN_ATTEMPTS && bestSq > maxSq; i++) {
+    const p = pick()
+    const d = trackDistSq(p, trackSamples)
+    if (d < bestSq) {
+      best = p
+      bestSq = d
+    }
+  }
+  return best
+}
+
 /**
  * Spawn enemies with terrain-aware positioning.
  * Ground enemies (scorpion, snowman) sit on the terrain surface.
  * Flying enemies (crow, balloon) hover above the terrain.
  * Sharks sit at water level (y=2).
  */
-function generateEnemies(waves: EnemyWave[], heightFn: HeightFunction): SpawnedEnemy[] {
+function generateEnemies(
+  waves: EnemyWave[],
+  heightFn: HeightFunction,
+  trackSamples?: TrackSample[],
+): SpawnedEnemy[] {
   const enemies: SpawnedEnemy[] = []
   let id = 0
 
@@ -82,105 +230,12 @@ function generateEnemies(waves: EnemyWave[], heightFn: HeightFunction): SpawnedE
   for (let waveIdx = 0; waveIdx < waves.length; waveIdx++) {
     const wave = waves[waveIdx]
     for (let i = 0; i < wave.count; i++) {
-      let x: number, y: number, z: number
-
-      switch (wave.type) {
-        case 'crow': {
-          const r = Math.sqrt(Math.random()) * 1200 + 100
-          const theta = Math.random() * 2 * Math.PI
-          x = Math.cos(theta) * r
-          z = Math.sin(theta) * r
-          y = heightFn(x, z) + 100 + Math.random() * 160
-          break
-        }
-        case 'scorpion': {
-          const r = Math.sqrt(Math.random()) * 600 + 100
-          const theta = Math.random() * 2 * Math.PI
-          x = Math.cos(theta) * r
-          z = Math.sin(theta) * r
-          y = heightFn(x, z) + 5
-          break
-        }
-        case 'shark':
-        case 'jellyfish':
-        case 'flyingFish': {
-          // Aquatic enemies: only spawn where terrain is below water (y=0)
-          let attempts = 0
-          do {
-            const r = Math.sqrt(Math.random()) * 1000 + 100
-            const theta = Math.random() * 2 * Math.PI
-            x = Math.cos(theta) * r
-            z = Math.sin(theta) * r
-            attempts++
-          } while (heightFn(x, z) > -5 && attempts < 20)
-
-          if (wave.type === 'shark') {
-            y = 2
-          } else if (wave.type === 'jellyfish') {
-            y = -15 - Math.random() * 30
-          } else {
-            y = 0
-          }
-          break
-        }
-        case 'snowman':
-        case 'snowmanScout':
-        case 'snowmanBrute': {
-          const r = Math.sqrt(Math.random()) * 2200 + 200
-          const theta = Math.random() * 2 * Math.PI
-          x = Math.cos(theta) * r
-          z = Math.sin(theta) * r
-          y = heightFn(x, z) + 5
-          break
-        }
-        case 'emberWisp': {
-          const r = Math.sqrt(Math.random()) * 2800 + 200
-          const theta = Math.random() * 2 * Math.PI
-          x = Math.cos(theta) * r
-          z = Math.sin(theta) * r
-          y = heightFn(x, z) + 60 + Math.random() * 140
-          break
-        }
-        case 'lavaGolem': {
-          const r = Math.sqrt(Math.random()) * 2400 + 200
-          const theta = Math.random() * 2 * Math.PI
-          x = Math.cos(theta) * r
-          z = Math.sin(theta) * r
-          y = heightFn(x, z) + 5
-          break
-        }
-        case 'fireImp': {
-          const r = Math.sqrt(Math.random()) * 2200 + 200
-          const theta = Math.random() * 2 * Math.PI
-          x = Math.cos(theta) * r
-          z = Math.sin(theta) * r
-          y = heightFn(x, z) + 5
-          break
-        }
-        case 'infernalDrake': {
-          const r = Math.sqrt(Math.random()) * 2600 + 300
-          const theta = Math.random() * 2 * Math.PI
-          x = Math.cos(theta) * r
-          z = Math.sin(theta) * r
-          y = heightFn(x, z) + 150 + Math.random() * 100
-          break
-        }
-        default: {
-          // Scatter balloons across a huge area well beyond the track (~±1100).
-          // Use sqrt for uniform area density across a circle of radius 3500.
-          const r = Math.sqrt(Math.random()) * 3500
-          const theta = Math.random() * 2 * Math.PI
-          x = Math.cos(theta) * r
-          z = Math.sin(theta) * r
-          y = heightFn(x, z) + 40 + Math.random() * 160
-          break
-        }
-      }
+      const p = pickReadableSpawn(wave.type, heightFn, trackSamples)
 
       enemies.push({
         id: `enemy-${id++}`,
         type: wave.type,
-        position: new THREE.Vector3(x, y, z),
+        position: p,
         scoreValue: SCORE_VALUES[wave.type],
         radius: RADII[wave.type],
         waveIndex: waveIdx,
@@ -192,21 +247,24 @@ function generateEnemies(waves: EnemyWave[], heightFn: HeightFunction): SpawnedE
 }
 
 // Generate golden balloon spawn positions
-function generateGoldenBalloons(count: number, heightFn: HeightFunction): SpawnedEnemy[] {
+function generateGoldenBalloons(
+  count: number,
+  heightFn: HeightFunction,
+  trackSamples?: TrackSample[],
+): SpawnedEnemy[] {
   const goldens: SpawnedEnemy[] = []
-  for (let i = 0; i < count; i++) {
+  const pick = () => {
     const r = Math.sqrt(Math.random()) * 3000
     const theta = Math.random() * 2 * Math.PI
     const x = Math.cos(theta) * r
     const z = Math.sin(theta) * r
+    return new THREE.Vector3(x, heightFn(x, z) + 50 + Math.random() * 100, z)
+  }
+  for (let i = 0; i < count; i++) {
     goldens.push({
       id: `golden-${i}`,
       type: 'goldenBalloon',
-      position: new THREE.Vector3(
-        x,
-        heightFn(x, z) + 50 + Math.random() * 100,
-        z,
-      ),
+      position: pickReadableSpawn('goldenBalloon', heightFn, trackSamples, pick),
       scoreValue: 13 * 5, // 5x points
       radius: 45,
       waveIndex: -1, // always visible
@@ -233,10 +291,16 @@ const ENEMY_COMPONENTS: Record<EnemyType, React.ComponentType<any>> = {
 
 const EXPLOSION_COLORS = ['#ff4444', '#ffaa00', '#ffffff', '#44aaff', '#00ff88']
 
-export default function EnemySpawner({ waves, goldenBalloonCount = 0 }: EnemySpawnerProps) {
+export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSamples }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
-  const enemies = useMemo(() => generateEnemies(waves, heightFn), [waves, heightFn])
-  const goldenBalloons = useMemo(() => generateGoldenBalloons(goldenBalloonCount, heightFn), [goldenBalloonCount, heightFn])
+  const enemies = useMemo(
+    () => generateEnemies(waves, heightFn, trackSamples),
+    [waves, heightFn, trackSamples],
+  )
+  const goldenBalloons = useMemo(
+    () => generateGoldenBalloons(goldenBalloonCount, heightFn, trackSamples),
+    [goldenBalloonCount, heightFn, trackSamples],
+  )
   const phase = useGameStore((s) => s.phase)
 
   // Wave state — time-based progression

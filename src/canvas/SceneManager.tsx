@@ -93,7 +93,11 @@ function LevelScene({ levelId }: { levelId: string }) {
       />
       <BulletPool bulletColor={bulletColor} bulletSize={bulletSize} />
       <ParticleExplosionPool />
-      <EnemySpawner waves={enemies} goldenBalloonCount={biome === 'themePark' ? 3 : 0} />
+      <EnemySpawner
+        waves={enemies}
+        goldenBalloonCount={biome === 'themePark' ? 3 : 0}
+        trackSamples={trackSamples}
+      />
       <ShootingController />
       <GameTimer seconds={timerSeconds} />
       <MusicController />
