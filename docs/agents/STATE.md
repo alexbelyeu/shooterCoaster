@@ -72,9 +72,9 @@ score %; replay / next).
   `agent:qa-approved` + green `verify`.
 - Nightly + post-deploy production smoke → `agent:prod-broken` issue on failure.
 - Test hook `?e2e=1` → `window.__SC_TEST__` (`levels`, `startLevel`, `frames`,
-  `drawCalls`, `triangles`, `avgFrameMs`, `errors`). **No gameplay surface yet**: the
-  smoke test never fires a shot, so explosions, popups, combos and the results
-  screen are untested and unscreenshotted.
+  `drawCalls`, `triangles`, `avgFrameMs`, `errors`, plus `autoFire`, `killNearest`,
+  `stats`, `endLevel`, `setTimeScale` since #44). Smoke saves `<level>-combat.png` and
+  `<level>-results.png` and fails a level on zero kills.
 - No unit tests. Leva + drei `Stats` behind the "show FPS" setting.
 
 ## Numbers (2026-10-19, `npm run verify` on main @ 247c69a, headless SwiftShader)
@@ -115,15 +115,17 @@ chunk; no code splitting.
     on 144 Hz). At headless ~1 fps they travel ~70 units and never hit anything, which
     is why the smoke autofire gets 0 kills. Fix: scale by `delta` (Maintainer, 2026-10-19).
 12. Level 4 explosions render as large dark blobs instead of orange (seen in the
-    #17 combat screenshots; likely the same material/lighting issue as #3).
+    PR #44 combat screenshots; likely the same material/lighting issue as known bug 3 above).
 13. Smoke ride checks pass by a thin margin in Claude cloud sessions (11–15 frames per
     10 s window vs `MIN_FRAMES=10`, 2-core SwiftShader). The title check polls to a
-    deadline since #43; the level checks still use a fixed window, so they may flake.
+    deadline since #43; the level checks still use a fixed window and do flake
+    (9 frames seen). Tracked in #50.
 14. Level 4 and 5 tracks (`TrigCurve2`) are not closed loops. The `(angle / 2)` altitude
     ramp makes the end π·varC·scalar higher than the start (≈440 units on level4, ≈628 on
     level5), and `useTrackProgress` wraps a full lap back to t=0, so the camera
     would fall by that height. It shows as the near-vertical track sections in those
-    screenshots. #46 pins the current behaviour in a unit test (found 2026-10-19).
+    screenshots. PR #46 (open) adds a unit test that pins the current behaviour
+    (found 2026-10-19).
 
 ## Tech debt / architecture notes
 
