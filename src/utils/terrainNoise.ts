@@ -198,7 +198,7 @@ const TRACK_HARD_RADIUS = 40
 /** Soft blend radius — terrain transitions from suppressed to natural */
 const TRACK_SOFT_RADIUS = 120
 /** Extra clearance below the track */
-const TRACK_CLEARANCE = 15
+export const TRACK_CLEARANCE = 15
 
 /**
  * Pre-sample a track curve to build a lookup table for terrain suppression.
