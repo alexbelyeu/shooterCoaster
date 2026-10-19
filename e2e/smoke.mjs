@@ -29,6 +29,9 @@ const args = Object.fromEntries(
 const SECONDS = Number(args.seconds ?? 10)
 const OUT = path.resolve(args.out ?? 'e2e-results')
 const MIN_FRAMES = Number(args['min-frames'] ?? 10)
+// SwiftShader on a shared 2-core box can take >30s (Playwright's default) to produce
+// a frame for the heavier biomes; a slow screenshot is not a game bug.
+const SHOT_TIMEOUT = Number(args['shot-timeout'] ?? 120000)
 fs.mkdirSync(OUT, { recursive: true })
 
 // Console noise that is expected in headless/sandboxed runs and is not a game bug.
@@ -124,7 +127,7 @@ async function run() {
   const f0 = await t.page.evaluate(() => window.__SC_TEST__.frames)
   await t.page.waitForTimeout(4000)
   const f1 = await t.page.evaluate(() => window.__SC_TEST__.frames)
-  const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png') })
+  const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png'), timeout: SHOT_TIMEOUT })
   const titleImg = await imageStats(t.page, titlePng)
   const titleOk = f1 - f0 >= MIN_FRAMES && t.errors.length === 0 && titleImg.stddev > 4
   failed ||= !titleOk
@@ -141,9 +144,9 @@ async function run() {
     await page.waitForTimeout(SECONDS * 1000)
     const stats = await page.evaluate(() => {
       const s = window.__SC_TEST__
-      return { frames: s.frames, avgFrameMs: s.avgFrameMs, drawCalls: s.drawCalls, triangles: s.triangles, phase: s.phase(), hookErrors: s.errors }
+      return { frames: s.frames, avgFrameMs: s.avgFrameMs, drawCalls: s.drawCalls, triangles: s.triangles, phase: s.phase(), hookErrors: s.errors, scene: s.sceneStats?.() ?? null }
     })
-    const png = await page.screenshot({ path: path.join(OUT, `${id}.png`) })
+    const png = await page.screenshot({ path: path.join(OUT, `${id}.png`), timeout: SHOT_TIMEOUT })
     const img = await imageStats(page, png)
     const allErrors = [...errors, ...stats.hookErrors]
     const frames = stats.frames - a
@@ -163,12 +166,22 @@ async function run() {
 
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
   for (const r of results) {
-    const extra = r.id === 'title' ? '' : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}`
+    const extra = r.id === 'title' ? '' : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)} frames=${r.frames}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
   console.log(`Screenshots + results.json in ${OUT}`)
   process.exit(failed ? 1 : 0)
+}
+
+/** Camera-independent totals: whole scene, and objects whose name starts with "track". */
+function sceneSummary(scene) {
+  if (!scene) return ''
+  let objs = 0, tris = 0
+  for (const [name, e] of Object.entries(scene.byName)) {
+    if (name.startsWith('track')) { objs += e.objects; tris += e.triangles }
+  }
+  return ` | scene objs=${scene.objects} tris=${scene.triangles} (track objs=${objs} tris=${tris})`
 }
 
 run().catch((e) => {
