@@ -36,6 +36,9 @@ const args = Object.fromEntries(
 const SECONDS = Number(args.seconds ?? 10)
 const OUT = path.resolve(args.out ?? 'e2e-results')
 const MIN_FRAMES = Number(args['min-frames'] ?? 10)
+// SwiftShader on a shared 2-core box can take >30s (Playwright's default) to produce
+// a frame for the heavier biomes; a slow screenshot is not a game bug.
+const SHOT_TIMEOUT = Number(args['shot-timeout'] ?? 120000)
 const COMBAT_SECONDS = Number(args['combat-seconds'] ?? 4)
 const COMBAT_MIN_FRAMES = Number(args['combat-min-frames'] ?? 4)
 fs.mkdirSync(OUT, { recursive: true })
@@ -140,7 +143,7 @@ async function playLevel(page, id) {
   const afterFire = await getStats(page)
   const nearestKilled = await page.evaluate(() => window.__SC_TEST__.killNearest(5))
   await waitFrames(page, 1, { maxMs: 5000, pollMs: 30 })
-  await page.screenshot({ path: path.join(OUT, `${id}-combat.png`) })
+  await page.screenshot({ path: path.join(OUT, `${id}-combat.png`), timeout: SHOT_TIMEOUT })
   await page.evaluate(() => window.__SC_TEST__.autoFire(false))
   const combat = await getStats(page)
 
@@ -158,7 +161,7 @@ async function playLevel(page, id) {
       { timeout: 30000, polling: 250 },
     )
     .then(() => true, () => false)
-  await page.screenshot({ path: path.join(OUT, `${id}-results.png`) })
+  await page.screenshot({ path: path.join(OUT, `${id}-results.png`), timeout: SHOT_TIMEOUT })
   const end = await getStats(page)
 
   if (combat.kills === 0) problems.push('no kills (enemies missing or unhittable?)')
@@ -217,7 +220,7 @@ async function run() {
     f1 = await t.page.evaluate(() => window.__SC_TEST__.frames)
     if (f1 - f0 >= MIN_FRAMES) break
   }
-  const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png') })
+  const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png'), timeout: SHOT_TIMEOUT })
   const titleImg = await imageStats(t.page, titlePng)
   const titleOk = f1 - f0 >= MIN_FRAMES && t.errors.length === 0 && titleImg.stddev > 4
   failed ||= !titleOk
@@ -234,9 +237,9 @@ async function run() {
     await page.waitForTimeout(SECONDS * 1000)
     const stats = await page.evaluate(() => {
       const s = window.__SC_TEST__
-      return { frames: s.frames, avgFrameMs: s.avgFrameMs, drawCalls: s.drawCalls, triangles: s.triangles, phase: s.phase(), hookErrors: s.errors }
+      return { frames: s.frames, avgFrameMs: s.avgFrameMs, drawCalls: s.drawCalls, triangles: s.triangles, phase: s.phase(), hookErrors: s.errors, scene: s.sceneStats?.() ?? null }
     })
-    const png = await page.screenshot({ path: path.join(OUT, `${id}.png`) })
+    const png = await page.screenshot({ path: path.join(OUT, `${id}.png`), timeout: SHOT_TIMEOUT })
     const img = await imageStats(page, png)
     const frames = stats.frames - a
     const problems = []
@@ -265,13 +268,23 @@ async function run() {
   for (const r of results) {
     const extra = r.id === 'title'
       ? ''
-      : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}` +
+      : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}) score=${r.score} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)} frames=${r.frames}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
   console.log(`Screenshots + results.json in ${OUT} (total ${((Date.now() - runStarted) / 1000).toFixed(0)}s)`)
   process.exit(failed ? 1 : 0)
+}
+
+/** Camera-independent totals: whole scene, and objects whose name starts with "track". */
+function sceneSummary(scene) {
+  if (!scene) return ''
+  let objs = 0, tris = 0
+  for (const [name, e] of Object.entries(scene.byName)) {
+    if (name.startsWith('track')) { objs += e.objects; tris += e.triangles }
+  }
+  return ` | scene objs=${scene.objects} tris=${scene.triangles} (track objs=${objs} tris=${tris})`
 }
 
 run().catch((e) => {
