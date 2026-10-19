@@ -14,7 +14,13 @@ interface GameState {
   // Score
   score: number
   addScore: (points: number) => void
+  /** Resets score plus the per-run kills / shotsFired counters. */
   resetScore: () => void
+
+  // Per-run counters (reset by resetScore)
+  kills: number
+  shotsFired: number
+  registerShot: () => void
 
   // Combo
   combo: ComboState
@@ -56,7 +62,11 @@ export const useGameStore = create<GameState>()(
 
       score: 0,
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
-      resetScore: () => set({ score: 0 }),
+      resetScore: () => set({ score: 0, kills: 0, shotsFired: 0 }),
+
+      kills: 0,
+      shotsFired: 0,
+      registerShot: () => set((s) => ({ shotsFired: s.shotsFired + 1 })),
 
       combo: { count: 0, multiplier: 1, lastKillTime: 0 },
       registerKill: () =>
@@ -65,7 +75,7 @@ export const useGameStore = create<GameState>()(
           const isCombo = now - s.combo.lastKillTime < COMBO_TIMEOUT
           const count = isCombo ? s.combo.count + 1 : 1
           const multiplier = Math.min(1 + (count - 1) * 0.25, 4) // max 4x
-          return { combo: { count, multiplier, lastKillTime: now } }
+          return { kills: s.kills + 1, combo: { count, multiplier, lastKillTime: now } }
         }),
       resetCombo: () => set({ combo: { count: 0, multiplier: 1, lastKillTime: 0 } }),
 

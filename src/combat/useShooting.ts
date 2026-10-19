@@ -11,6 +11,29 @@ const _direction = new THREE.Vector3()
 const _origin = new THREE.Vector3()
 
 /**
+ * Fire one bullet from the camera through a point in normalized device
+ * coordinates (-1..1, y up). Shared by mouse input and the e2e autofire hook.
+ * Returns true if a bullet actually left the pool (false when not playing,
+ * throttled by the fire delay, or the pool is missing/exhausted).
+ */
+export function fireAtNDC(x: number, y: number, camera: THREE.Camera): boolean {
+  if (useGameStore.getState().phase !== 'playing') return false
+
+  const pool = getBulletPool()
+  if (!pool) return false
+
+  _ndc.set(x, y)
+  _raycaster.setFromCamera(_ndc, camera)
+  _direction.copy(_raycaster.ray.direction)
+  _origin.copy(camera.position)
+
+  if (!pool.fire(_origin, _direction)) return false
+  useGameStore.getState().registerShot()
+  playFireSound()
+  return true
+}
+
+/**
  * Hook that handles mouse click → fire bullet.
  * Reads camera from R3F, converts mouse to world ray, fires from bullet pool.
  */
@@ -31,19 +54,7 @@ export function useShooting() {
   }, [size])
 
   const fireShot = useCallback(() => {
-    const phase = useGameStore.getState().phase
-    if (phase !== 'playing') return
-
-    const pool = getBulletPool()
-    if (!pool) return
-
-    _ndc.set(mouseRef.current.x, mouseRef.current.y)
-    _raycaster.setFromCamera(_ndc, camera)
-    _direction.copy(_raycaster.ray.direction)
-
-    _origin.copy(camera.position)
-    pool.fire(_origin, _direction)
-    playFireSound()
+    fireAtNDC(mouseRef.current.x, mouseRef.current.y, camera)
   }, [camera])
 
   useEffect(() => {
