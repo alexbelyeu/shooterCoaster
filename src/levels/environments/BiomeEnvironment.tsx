@@ -1,7 +1,8 @@
 import { useMemo, useRef, useCallback, useEffect, useContext } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { Sky } from '@react-three/drei'
+import SkyDome from './SkyDome'
+import { ATMOSPHERES } from './atmosphere'
 import type { BiomeType } from '@/types/level'
 import { createHeightFunction, getTerrainSlope, type HeightFunction } from '@/utils/terrainNoise'
 import { TerrainContext } from './TerrainContext'
@@ -19,69 +20,22 @@ import { createLavaMaterial } from './LavaShader'
 interface BiomeEnvironmentProps {
   biome: BiomeType
   groundColor: number
-  fog?: { color: number; near: number; far: number }
   hasWater?: boolean
   hasTrees?: boolean
   treeCount?: number
 }
 
-const BIOME_SETTINGS: Record<
-  BiomeType,
-  {
-    sunPosition: [number, number, number]
-    skyScale: number
-    ambientIntensity: number
-    dirIntensity: number
-    fogColor: number
-    fogNear: number
-    fogFar: number
-  }
-> = {
-  themePark: {
-    sunPosition: [100, 200, 100],
-    skyScale: 4500,
-    ambientIntensity: 0.6,
-    dirIntensity: 1.2,
-    fogColor: 0x202020,
-    fogNear: 1,
-    fogFar: 5000,
-  },
-  desert: {
-    sunPosition: [200, 150, -50],
-    skyScale: 4500,
-    ambientIntensity: 0.8,
-    dirIntensity: 1.5,
-    fogColor: 0xd2a679,
-    fogNear: 100,
-    fogFar: 6000,
-  },
-  ocean: {
-    sunPosition: [50, 100, 200],
-    skyScale: 5800,
-    ambientIntensity: 0.5,
-    dirIntensity: 1.0,
-    fogColor: 0x4a7d7c,
-    fogNear: 100,
-    fogFar: 5800,
-  },
-  arctic: {
-    sunPosition: [100, 50, 100],
-    skyScale: 10000,
-    ambientIntensity: 0.7,
-    dirIntensity: 0.9,
-    fogColor: 0xd0d8ea,
-    fogNear: 1,
-    fogFar: 5500,
-  },
-  volcanic: {
-    sunPosition: [80, 30, -60],
-    skyScale: 12000,
-    ambientIntensity: 0.5,
-    dirIntensity: 0.7,
-    fogColor: 0x3a1a0a,
-    fogNear: 1,
-    fogFar: 6000,
-  },
+/** Applies the biome's tone-mapping exposure (read by the ACES ToneMapping effect); restores on unmount. */
+function AtmosphereExposure({ exposure }: { exposure: number }) {
+  const gl = useThree((s) => s.gl)
+  useEffect(() => {
+    const prev = gl.toneMappingExposure
+    gl.toneMappingExposure = exposure
+    return () => {
+      gl.toneMappingExposure = prev
+    }
+  }, [gl, exposure])
+  return null
 }
 
 // --- Vertex color ramps per biome ---
@@ -318,14 +272,16 @@ function OceanWater() {
 
 export default function BiomeEnvironment({
   biome,
-  groundColor,
-  fog,
   hasWater = false,
   hasTrees = false,
   treeCount = 0,
 }: BiomeEnvironmentProps) {
-  const settings = BIOME_SETTINGS[biome]
-  const fogColor = fog?.color ?? settings.fogColor
+  const atmosphere = ATMOSPHERES[biome]
+  const sunPosition = useMemo<[number, number, number]>(() => {
+    const [x, y, z] = atmosphere.sunDirection
+    const len = Math.hypot(x, y, z) || 1
+    return [(x / len) * 1000, (y / len) * 1000, (z / len) * 1000]
+  }, [atmosphere])
   const heightFn = useContext(TerrainContext)
   const fogRef = useRef<THREE.Fog>(null)
   const cameraShakeRef = useRef({ active: false, startTime: 0 })
@@ -476,7 +432,7 @@ export default function BiomeEnvironment({
 
     // Fog pulse: close in over 2s, recover over 8s
     if (fogRef.current) {
-      const baseFar = settings.fogFar
+      const baseFar = atmosphere.fogFar
       if (elapsed < 2) {
         const t = elapsed / 2
         fogRef.current.far = baseFar + (200 - baseFar) * t
@@ -492,21 +448,25 @@ export default function BiomeEnvironment({
 
   return (
     <>
-      {/* Sky */}
-      <Sky
-        distance={settings.skyScale}
-        sunPosition={settings.sunPosition}
+      {/* Sky + atmosphere (per-biome, see atmosphere.ts) */}
+      <SkyDome atmosphere={atmosphere} />
+      <AtmosphereExposure exposure={atmosphere.exposure} />
+
+      {/* Lighting: tinted hemisphere ambient + coloured sun */}
+      <hemisphereLight
+        args={[atmosphere.hemiSkyColor, atmosphere.hemiGroundColor, atmosphere.hemiIntensity]}
+      />
+      <directionalLight
+        position={sunPosition}
+        color={atmosphere.sunLightColor}
+        intensity={atmosphere.sunLightIntensity}
       />
 
-      {/* Lighting */}
-      <hemisphereLight args={[0xfff0f0, 0x606066, 1]} />
-      <directionalLight position={[1, 1, 1]} intensity={0.5} />
-
-      {/* Fog */}
+      {/* Fog — colour is the dome's horizon colour (single source of truth) */}
       <fog
         ref={fogRef}
         attach="fog"
-        args={[fogColor, fog?.near ?? settings.fogNear, fog?.far ?? settings.fogFar]}
+        args={[atmosphere.sky.horizon, atmosphere.fogNear, atmosphere.fogFar]}
       />
 
       {/* Terrain mesh */}
