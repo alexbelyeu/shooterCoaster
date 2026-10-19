@@ -16,11 +16,19 @@ role definition in `.claude/agents/` before doing anything else.
 ```bash
 npm ci                    # install
 npm run dev               # dev server (vite)
+npm test                  # vitest unit tests for pure modules (~1s; `npm run test:watch` to iterate)
 npm run build             # typecheck (tsc -b) + production build -> dist/
 npm run check:bundle      # bundle-size budget (budgets.json)
 npm run smoke             # headless playtest of title + every level (needs a build)
-npm run verify            # build + bundle budget + smoke — run before every PR
+npm run verify            # test + build + bundle budget + smoke — run before every PR
 ```
+
+Unit tests live next to the code as `src/**/*.test.ts` and run in plain Node
+(`vitest.config.ts`): no DOM, no WebGL. Test pure logic (track curves, terrain
+noise, scoring/stars in `src/levels/scoring.ts`, store actions, level configs);
+keep pure helpers free of React/three imports so they stay testable. Adding a
+level? `src/levels/LevelRegistry.test.ts` checks its `maxScore`, star thresholds
+and `nextLevel` chain, and the curve/terrain tests sample its track automatically.
 
 Headless browser in Claude cloud sessions: the Playwright CDN is blocked, so run
 `export SC_CHROME="$(scripts/ensure-browser.sh)"` once per session before `npm run smoke`.
@@ -58,6 +66,7 @@ replays — currently in-memory placeholders).
 | `src/app/App.tsx` | Phase-driven UI shell (title → levelSelect → playing → paused → results) |
 | `src/canvas/` | `GameCanvas` (R3F Canvas), `SceneManager` (picks title vs level scene), shooting, timer, music |
 | `src/levels/LevelRegistry.ts` | **Level configs** — track params, biome, timer, waves, star thresholds |
+| `src/levels/scoring.ts` | `SCORE_VALUES` per enemy, `computeMaxScore`, `computeStars` (pure, unit-tested) |
 | `src/levels/environments/` | Biome environments, landmarks (FerrisWheel, Pyramid, Volcano…), decorations, terrain |
 | `src/track/` | Procedural track curves, track mesh, coaster camera, progress |
 | `src/entities/enemies/` | Enemy models/behaviours; `entities/spawning/EnemySpawner` waves |
