@@ -65,7 +65,7 @@ replays — currently in-memory placeholders).
 | `src/effects/` | Explosions (pooled), score popups |
 | `src/audio/` | Tone.js engine, music + SFX managers |
 | `src/store/` | zustand stores: game, player, settings (persisted) |
-| `src/ui/` | HUD + screens |
+| `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter, wave banner) + screens; `theme.ts` per-biome UI accents |
 | `src/testing/` | e2e hook |
 | `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser |
 | `docs/` | Specs, perf notes, and the agent operating system in `docs/agents/` |
