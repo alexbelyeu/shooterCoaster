@@ -10,6 +10,18 @@
 # Usage:  export SC_CHROME="$(scripts/ensure-browser.sh)"
 set -euo pipefail
 
+# 0. Pre-installed Chromium (Claude cloud images ship one at PLAYWRIGHT_BROWSERS_PATH,
+#    default /opt/pw-browsers, with a stable `chromium` symlink).
+PW_DIR="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}"
+if [ -x "$PW_DIR/chromium" ]; then
+  echo "$PW_DIR/chromium"
+  exit 0
+fi
+if ls "$PW_DIR"/chromium-*/chrome-linux*/chrome >/dev/null 2>&1; then
+  ls "$PW_DIR"/chromium-*/chrome-linux*/chrome | head -1
+  exit 0
+fi
+
 # 1. Playwright-managed browser already present?
 if ls "${HOME}/.cache/ms-playwright"/chromium*/chrome-linux*/chrome >/dev/null 2>&1; then
   ls "${HOME}/.cache/ms-playwright"/chromium*/chrome-linux*/chrome | head -1
@@ -17,7 +29,8 @@ if ls "${HOME}/.cache/ms-playwright"/chromium*/chrome-linux*/chrome >/dev/null 2
 fi
 
 # 2. Try the normal Playwright install (works on unrestricted networks).
-if npx --yes playwright install chromium >/dev/null 2>&1; then
+if npx --yes playwright install chromium >/dev/null 2>&1 \
+  && ls "${HOME}/.cache/ms-playwright"/chromium*/chrome-linux*/chrome >/dev/null 2>&1; then
   ls "${HOME}/.cache/ms-playwright"/chromium*/chrome-linux*/chrome | head -1
   exit 0
 fi
