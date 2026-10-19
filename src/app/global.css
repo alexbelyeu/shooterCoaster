@@ -187,6 +187,33 @@ canvas {
   will-change: transform;
 }
 
+/* Hitmarker: 4-tick X, white on hit, gold on kill (toggled from Crosshair.tsx) */
+.crosshair-svg .hitmarker {
+  opacity: 0;
+  stroke: #ffffff;
+  transform-box: view-box;
+  transform-origin: 24px 24px;
+}
+.crosshair-svg .hitmarker.is-hit {
+  animation: sc-hitmarker 0.16s ease-out forwards;
+}
+.crosshair-svg .hitmarker.is-kill {
+  stroke: #ffc933;
+  filter: drop-shadow(0 0 3px rgba(255, 190, 40, 0.9));
+  animation: sc-hitmarker 0.32s ease-out forwards;
+}
+/* e2e only: hold the hitmarker at its peak so screenshots can capture it */
+.crosshair-svg .hitmarker.is-hold {
+  animation: none;
+  opacity: 1;
+  transform: scale(1.15);
+}
+@keyframes sc-hitmarker {
+  0% { opacity: 1; transform: scale(1.35); }
+  35% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
 /* Level select */
 .level-select {
   position: fixed;

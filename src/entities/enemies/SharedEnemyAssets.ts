@@ -744,3 +744,12 @@ export const DRAKE_EYE_MAT = new THREE.MeshStandardMaterial({
   emissiveIntensity: 2,
   toneMapped: false,
 })
+
+// ── Hit flash (shared by every enemy) ───────────────────────────────
+// On hit, EnemyBase swaps each mesh's material to this one for the kill-pop
+// window instead of cloning materials per enemy. Colour > 1 so it blooms.
+export const ENEMY_HIT_FLASH_MAT = new THREE.MeshBasicMaterial({
+  color: new THREE.Color(2.2, 2.2, 2.2),
+  toneMapped: false,
+  fog: false,
+})
