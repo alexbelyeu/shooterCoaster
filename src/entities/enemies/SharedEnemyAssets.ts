@@ -1,4 +1,9 @@
 import * as THREE from 'three'
+import { withRim } from './enemyRim'
+
+// Readability rules (issue #15): every lit enemy material gets a fresnel rim via
+// withRim(); base colours keep ΔE ≥ ~15 from their biome's dominant terrain
+// colours (see docs/agents/DECISIONS.md, 2026-10-19 enemy readability).
 
 // ── Balloon geometries (shared by Balloon + GoldenBalloon) ──────────
 export const BALLOON_BODY_GEO = new THREE.SphereGeometry(30, 16, 16)
@@ -12,11 +17,11 @@ const BALLOON_COLORS = [
 ]
 
 export const BALLOON_BODY_MATS = BALLOON_COLORS.map(
-  (c) => new THREE.MeshPhongMaterial({ color: c, specular: '#ffffff', shininess: 60 }),
+  (c) => withRim(new THREE.MeshPhongMaterial({ color: c, specular: '#ffffff', shininess: 60 })),
 )
 
 export const BALLOON_KNOT_MATS = BALLOON_COLORS.map(
-  (c) => new THREE.MeshPhongMaterial({ color: c }),
+  (c) => withRim(new THREE.MeshPhongMaterial({ color: c })),
 )
 
 export const BALLOON_STRING_MAT = new THREE.MeshBasicMaterial({ color: '#888888' })
@@ -33,11 +38,11 @@ export const GOLDEN_BODY_MAT = new THREE.MeshStandardMaterial({
   toneMapped: false,
 })
 
-export const GOLDEN_KNOT_MAT = new THREE.MeshStandardMaterial({
+export const GOLDEN_KNOT_MAT = withRim(new THREE.MeshStandardMaterial({
   color: '#cc9900',
   metalness: 0.5,
   roughness: 0.3,
-})
+}))
 
 export const GOLDEN_STRING_MAT = new THREE.MeshBasicMaterial({ color: '#cc9900' })
 
@@ -145,18 +150,21 @@ export const CROW_WING_OUTER_GEO = makeWingGeo(
 export const CROW_TAIL_GEO = new THREE.BoxGeometry(1.2, 0.15, 4)
 export const CROW_BREAST_GEO = new THREE.SphereGeometry(2.6, 8, 6)
 
-// Materials: MeshPhysicalMaterial with iridescence for feather sheen
-export const CROW_BODY_MAT = new THREE.MeshPhysicalMaterial({
-  color: '#1a1a2e',
+// Materials: MeshPhysicalMaterial with iridescence for feather sheen.
+// Dark silhouette on the pale sky + a blue-grey rim sheen so crows also read
+// against the hazy horizon and the red mesas.
+const CROW_RIM = { color: '#a8bce0', intensity: 0.5, power: 3 }
+export const CROW_BODY_MAT = withRim(new THREE.MeshPhysicalMaterial({
+  color: '#1c1c30',
   metalness: 0.15,
   roughness: 0.6,
   iridescence: 0.4,
   iridescenceIOR: 1.3,
   iridescenceThicknessRange: [200, 400],
   flatShading: true,
-})
+}), CROW_RIM)
 
-export const CROW_WING_MAT = new THREE.MeshPhysicalMaterial({
+export const CROW_WING_MAT = withRim(new THREE.MeshPhysicalMaterial({
   color: '#18182a',
   metalness: 0.2,
   roughness: 0.55,
@@ -164,9 +172,9 @@ export const CROW_WING_MAT = new THREE.MeshPhysicalMaterial({
   iridescenceIOR: 1.3,
   iridescenceThicknessRange: [200, 500],
   flatShading: true,
-})
+}), CROW_RIM)
 
-export const CROW_BREAST_MAT = new THREE.MeshPhysicalMaterial({
+export const CROW_BREAST_MAT = withRim(new THREE.MeshPhysicalMaterial({
   color: '#2a2a3e',
   metalness: 0.1,
   roughness: 0.7,
@@ -174,9 +182,9 @@ export const CROW_BREAST_MAT = new THREE.MeshPhysicalMaterial({
   iridescenceIOR: 1.3,
   iridescenceThicknessRange: [200, 400],
   flatShading: true,
-})
+}), CROW_RIM)
 
-export const CROW_HEAD_MAT = new THREE.MeshPhysicalMaterial({
+export const CROW_HEAD_MAT = withRim(new THREE.MeshPhysicalMaterial({
   color: '#1e1e30',
   metalness: 0.15,
   roughness: 0.6,
@@ -184,19 +192,22 @@ export const CROW_HEAD_MAT = new THREE.MeshPhysicalMaterial({
   iridescenceIOR: 1.3,
   iridescenceThicknessRange: [200, 400],
   flatShading: true,
-})
+}), CROW_RIM)
 
-export const CROW_BEAK_MAT = new THREE.MeshPhongMaterial({ color: '#3a3020', flatShading: true })
+export const CROW_BEAK_MAT = withRim(
+  new THREE.MeshPhongMaterial({ color: '#d8a028', specular: '#ffe08a', shininess: 40, flatShading: true }),
+  CROW_RIM,
+)
 
-export const CROW_TAIL_MAT = new THREE.MeshPhysicalMaterial({
-  color: '#1a1a2e',
+export const CROW_TAIL_MAT = withRim(new THREE.MeshPhysicalMaterial({
+  color: '#1c1c30',
   metalness: 0.15,
   roughness: 0.6,
   iridescence: 0.4,
   iridescenceIOR: 1.3,
   iridescenceThicknessRange: [200, 400],
   flatShading: true,
-})
+}), CROW_RIM)
 
 export const CROW_EYE_MAT = new THREE.MeshStandardMaterial({
   color: '#ffcc00',
@@ -217,36 +228,39 @@ export const SCORPION_STINGER_GEO = new THREE.ConeGeometry(0.6, 2, 4)
 export const SCORPION_LEG_UPPER_GEO = new THREE.CylinderGeometry(0.25, 0.22, 1.5, 4)
 export const SCORPION_LEG_LOWER_GEO = new THREE.CylinderGeometry(0.22, 0.15, 1.8, 4)
 
-// Desert amber chitin materials with specular highlights
-export const SCORPION_BODY_MAT = new THREE.MeshPhongMaterial({
-  color: '#6b4423',
-  specular: '#aa8855',
-  shininess: 40,
+// Dark plum-black chitin ("dark on gold") with bright amber leg highlights.
+// The old amber/brown body sat at ΔE≈9 from the desert cliff colour.
+const SCORPION_RIM = { color: '#ffd9a0', intensity: 0.7, power: 2.2 }
+export const SCORPION_BODY_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#2a1626',
+  specular: '#c89a70',
+  shininess: 50,
   flatShading: true,
-})
-export const SCORPION_HEAD_MAT = new THREE.MeshPhongMaterial({
-  color: '#5a3a1e',
-  specular: '#998866',
-  shininess: 35,
-  flatShading: true,
-})
-export const SCORPION_PINCER_MAT = new THREE.MeshPhongMaterial({
-  color: '#4a2a15',
-  specular: '#887755',
+}), SCORPION_RIM)
+export const SCORPION_HEAD_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#24121e',
+  specular: '#b8906a',
   shininess: 45,
   flatShading: true,
-})
-export const SCORPION_LEG_MAT = new THREE.MeshPhongMaterial({
-  color: '#7a5533',
-  specular: '#998866',
-  shininess: 30,
+}), SCORPION_RIM)
+export const SCORPION_PINCER_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#3a1622',
+  specular: '#d0a070',
+  shininess: 55,
   flatShading: true,
-})
+}), SCORPION_RIM)
+export const SCORPION_LEG_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#e0701e',
+  emissive: '#5a1c00',
+  specular: '#ffd090',
+  shininess: 40,
+  flatShading: true,
+}), SCORPION_RIM)
 export const SCORPION_EYE_MAT = new THREE.MeshPhongMaterial({ color: '#111111', flatShading: true })
 export const SCORPION_STINGER_MAT = new THREE.MeshStandardMaterial({
-  color: '#ff2222',
-  emissive: '#ff0000',
-  emissiveIntensity: 1.5,
+  color: '#ff4422',
+  emissive: '#ff2200',
+  emissiveIntensity: 2.2,
   toneMapped: false,
 })
 
@@ -332,31 +346,33 @@ export const SHARK_MOUTH_GEO = new THREE.BoxGeometry(2, 0.15, 0.5)
 export const SHARK_TOOTH_GEO = new THREE.ConeGeometry(0.15, 0.5, 3)
 export const SHARK_GILL_GEO = new THREE.BoxGeometry(0.05, 0.8, 0.15)
 
-// Materials: dark steel-grey with wet specular sheen
-export const SHARK_BODY_MAT = new THREE.MeshPhongMaterial({
-  color: '#3a4a5a',
-  specular: '#667788',
+// Materials: steel-blue back + white belly with wet specular sheen. The old
+// dark slate (#2a3a4a-#3a4a5a) disappeared into the deep-water colour.
+const SHARK_RIM = { color: '#e0f4ff', intensity: 0.65, power: 2.5 }
+export const SHARK_BODY_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#5a6e82',
+  specular: '#a0b4c8',
   shininess: 50,
   flatShading: true,
-})
-export const SHARK_SNOUT_MAT = new THREE.MeshPhongMaterial({
-  color: '#445566',
-  specular: '#778899',
+}), SHARK_RIM)
+export const SHARK_SNOUT_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#62788c',
+  specular: '#a8bccf',
   shininess: 45,
   flatShading: true,
-})
-export const SHARK_FIN_MAT = new THREE.MeshPhongMaterial({
-  color: '#2a3a4a',
-  specular: '#556677',
+}), SHARK_RIM)
+export const SHARK_FIN_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#485c70',
+  specular: '#90a4b8',
   shininess: 55,
   flatShading: true,
-})
-export const SHARK_BELLY_MAT = new THREE.MeshPhongMaterial({
-  color: '#8899aa',
-  specular: '#aabbcc',
+}), SHARK_RIM)
+export const SHARK_BELLY_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#e8eef4',
+  specular: '#ffffff',
   shininess: 40,
   flatShading: true,
-})
+}), SHARK_RIM)
 export const SHARK_EYE_MAT = new THREE.MeshStandardMaterial({
   color: '#111111',
   emissive: '#222222',
@@ -380,13 +396,16 @@ export const JELLY_TENTACLE_GEO = new THREE.CylinderGeometry(0.15, 0.08, 5, 4)
 
 const JELLY_COLORS = ['#ff88cc', '#88ccff', '#cc88ff', '#88ffcc']
 export const JELLY_DOME_MATS = JELLY_COLORS.map(
-  (c) => new THREE.MeshPhongMaterial({ color: c, transparent: true, opacity: 0.55, flatShading: true, side: THREE.DoubleSide }),
+  (c) => withRim(
+    new THREE.MeshPhongMaterial({ color: c, transparent: true, opacity: 0.55, flatShading: true, side: THREE.DoubleSide }),
+    { color: c, intensity: 0.8, power: 2 },
+  ),
 )
 export const JELLY_INNER_MATS = JELLY_COLORS.map(
   (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.5, toneMapped: false }),
 )
 export const JELLY_TENTACLE_MATS = JELLY_COLORS.map(
-  (c) => new THREE.MeshPhongMaterial({ color: c, transparent: true, opacity: 0.4, flatShading: true }),
+  (c) => withRim(new THREE.MeshPhongMaterial({ color: c, transparent: true, opacity: 0.4, flatShading: true }), { color: c }),
 )
 export const JELLY_COLOR_COUNT = JELLY_COLORS.length
 
@@ -461,40 +480,41 @@ export const FFISH_DORSAL_GEO = makeWingGeo(
 
 export const FFISH_EYE_GEO = new THREE.SphereGeometry(0.3, 6, 6)
 
-// Materials: tropical iridescent fish with wet sheen
-export const FFISH_BODY_MAT = new THREE.MeshPhongMaterial({
-  color: '#4488bb',
-  specular: '#99ccee',
+// Materials: silver-blue fish with wet sheen (VISION: flying fish read silver)
+const FFISH_RIM = { color: '#f0faff', intensity: 0.65, power: 2.5 }
+export const FFISH_BODY_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#7aa8cc',
+  specular: '#e0f2ff',
   shininess: 60,
   flatShading: true,
-})
-export const FFISH_BELLY_MAT = new THREE.MeshPhongMaterial({
-  color: '#aaccdd',
-  specular: '#ddeeff',
+}), FFISH_RIM)
+export const FFISH_BELLY_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#dce8f0',
+  specular: '#ffffff',
   shininess: 50,
   flatShading: true,
-})
-export const FFISH_WING_MAT = new THREE.MeshPhongMaterial({
-  color: '#6699cc',
-  specular: '#88bbdd',
+}), FFISH_RIM)
+export const FFISH_WING_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#9cc4e4',
+  specular: '#e0f2ff',
   shininess: 40,
   transparent: true,
   opacity: 0.75,
   flatShading: true,
   side: THREE.DoubleSide,
-})
-export const FFISH_TAIL_MAT = new THREE.MeshPhongMaterial({
-  color: '#5588bb',
-  specular: '#77aacc',
+}), FFISH_RIM)
+export const FFISH_TAIL_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#6a98c0',
+  specular: '#c8e4f8',
   shininess: 45,
   flatShading: true,
-})
-export const FFISH_FIN_MAT = new THREE.MeshPhongMaterial({
-  color: '#5599bb',
-  specular: '#88bbdd',
+}), FFISH_RIM)
+export const FFISH_FIN_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#6a9cc0',
+  specular: '#c8e4f8',
   shininess: 40,
   flatShading: true,
-})
+}), FFISH_RIM)
 export const FFISH_EYE_MAT = new THREE.MeshPhongMaterial({
   color: '#111111',
   specular: '#444444',
@@ -506,34 +526,56 @@ export const FFISH_EYE_MAT = new THREE.MeshPhongMaterial({
 export const SNOWMAN_BOTTOM_GEO = new THREE.SphereGeometry(20, 12, 12)
 export const SNOWMAN_MIDDLE_GEO = new THREE.SphereGeometry(14, 12, 12)
 export const SNOWMAN_TOP_GEO = new THREE.SphereGeometry(10, 12, 12)
-export const SNOWMAN_MAT = new THREE.MeshPhongMaterial({
-  color: '#e8eeff',
-  specular: '#aaccff',
+// Snow bodies are deliberately near the snow's albedo (they are snowmen), so they
+// read through *luminance*, not hue: a blue-tinted emissive lift keeps the body
+// bright-white with blue shadows while the surrounding terrain stays shaded, a
+// cool rim outlines the silhouette, and accessories are saturated or glossy coal.
+// (Without the lift, the same lighting that greys the snow made snowmen read as
+// dull grey blobs.)
+const SNOW_RIM = { color: '#dceaff', intensity: 0.55, power: 2.2 }
+export const SNOWMAN_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#f6f9ff',
+  emissive: '#8094c8',
+  emissiveIntensity: 0.95,
+  specular: '#ffffff',
+  shininess: 40,
+  flatShading: true,
+}), SNOW_RIM)
+
+// Accessories shared across snowman variants — glossy coal (specular highlight
+// keeps it from reading as a hole), saturated carrot, warm brown sticks.
+const COAL_PARAMS = { color: '#0c0c14', specular: '#8890a8', shininess: 80, flatShading: true }
+export const SNOWMAN_EYE_GEO = new THREE.SphereGeometry(1.5, 6, 6)
+export const SNOWMAN_EYE_MAT = new THREE.MeshPhongMaterial(COAL_PARAMS)
+export const SNOWMAN_NOSE_GEO = new THREE.ConeGeometry(1.2, 6, 5)
+export const SNOWMAN_NOSE_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#ff6a00',
+  emissive: '#802800',
+  specular: '#ffc080',
   shininess: 30,
   flatShading: true,
-})
-
-// Accessories shared across snowman variants
-export const SNOWMAN_EYE_GEO = new THREE.SphereGeometry(1.5, 6, 6)
-export const SNOWMAN_EYE_MAT = new THREE.MeshPhongMaterial({ color: '#111111', flatShading: true })
-export const SNOWMAN_NOSE_GEO = new THREE.ConeGeometry(1.2, 6, 5)
-export const SNOWMAN_NOSE_MAT = new THREE.MeshPhongMaterial({ color: '#ff6600', flatShading: true })
+}), { color: '#ffd0a0', intensity: 0.5 })
 export const SNOWMAN_BUTTON_GEO = new THREE.SphereGeometry(1, 6, 6)
-export const SNOWMAN_BUTTON_MAT = new THREE.MeshPhongMaterial({ color: '#222222', flatShading: true })
+export const SNOWMAN_BUTTON_MAT = new THREE.MeshPhongMaterial(COAL_PARAMS)
 export const SNOWMAN_MOUTH_GEO = new THREE.SphereGeometry(0.8, 6, 6)
-export const SNOWMAN_MOUTH_MAT = new THREE.MeshPhongMaterial({ color: '#111111', flatShading: true })
+export const SNOWMAN_MOUTH_MAT = SNOWMAN_EYE_MAT
 export const SNOWMAN_ARM_GEO = new THREE.CylinderGeometry(0.5, 0.3, 14, 4)
-export const SNOWMAN_ARM_MAT = new THREE.MeshPhongMaterial({ color: '#4a3020', flatShading: true })
+export const SNOWMAN_ARM_MAT = withRim(
+  new THREE.MeshPhongMaterial({ color: '#6a4026', specular: '#a07050', shininess: 20, flatShading: true }),
+  { color: '#ffe0c0', intensity: 0.5 },
+)
 export const SNOWMAN_TWIG_GEO = new THREE.CylinderGeometry(0.15, 0.1, 5, 3)
 export const SNOWMAN_TWIG_MAT = SNOWMAN_ARM_MAT
 
-// Scout — icy blue tint
-export const SNOWMAN_SCOUT_MAT = new THREE.MeshPhongMaterial({
-  color: '#d0e8ff',
-  specular: '#88bbff',
-  shininess: 35,
+// Scout — icy blue tint (stronger blue lift than the standard snowman)
+export const SNOWMAN_SCOUT_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#e4f2ff',
+  emissive: '#6094d8',
+  emissiveIntensity: 0.9,
+  specular: '#c0e0ff',
+  shininess: 45,
   flatShading: true,
-})
+}), { color: '#c8e8ff', intensity: 0.6, power: 2.2 })
 export const SNOWMAN_SCOUT_SHARD_GEO = new THREE.ConeGeometry(2, 8, 4)
 export const SNOWMAN_SCOUT_SHARD_MAT = new THREE.MeshPhongMaterial({
   color: '#80d0ff',
@@ -545,49 +587,48 @@ export const SNOWMAN_SCOUT_SHARD_MAT = new THREE.MeshPhongMaterial({
   toneMapped: false,
 })
 
-// Brute — top hat and scarf
+// Brute — navy top hat with red band, saturated red scarf
 export const SNOWMAN_HAT_BRIM_GEO = new THREE.CylinderGeometry(8, 8, 1.5, 8)
 export const SNOWMAN_HAT_TOP_GEO = new THREE.CylinderGeometry(5.5, 6, 10, 8)
 export const SNOWMAN_HAT_BAND_GEO = new THREE.CylinderGeometry(6.1, 6.1, 1.2, 8)
-export const SNOWMAN_HAT_MAT = new THREE.MeshPhongMaterial({
-  color: '#111111',
-  specular: '#333333',
-  shininess: 15,
+export const SNOWMAN_HAT_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#16205a',
+  emissive: '#0a1450',
+  emissiveIntensity: 0.6,
+  specular: '#6070c0',
+  shininess: 50,
   flatShading: true,
-})
+}), { color: '#a0b8ff', intensity: 0.6 })
 export const SNOWMAN_SCARF_GEO = new THREE.TorusGeometry(11, 2, 6, 12)
 export const SNOWMAN_SCARF_TAIL_GEO = new THREE.BoxGeometry(2, 8, 1)
-export const SNOWMAN_SCARF_MAT = new THREE.MeshPhongMaterial({
-  color: '#cc2222',
-  specular: '#ff6644',
-  shininess: 20,
+export const SNOWMAN_SCARF_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#e01828',
+  emissive: '#a00818',
+  emissiveIntensity: 0.6,
+  specular: '#ff8070',
+  shininess: 25,
   flatShading: true,
-})
-export const SNOWMAN_HAT_BAND_MAT = new THREE.MeshPhongMaterial({
-  color: '#cc2222',
-  specular: '#ff6644',
-  shininess: 20,
-  flatShading: true,
-})
+}), { color: '#ffc0b0', intensity: 0.5 })
+export const SNOWMAN_HAT_BAND_MAT = SNOWMAN_SCARF_MAT
 
 // ── Ember Wisp ────────────────────────────────────────────────
 export const EMBER_WISP_CORE_GEO = new THREE.SphereGeometry(3, 8, 8)
 export const EMBER_WISP_TENDRIL_GEO = new THREE.ConeGeometry(1, 4, 4)
 
-export const EMBER_WISP_CORE_MAT = new THREE.MeshPhongMaterial({
+export const EMBER_WISP_CORE_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#ff6600',
   emissive: '#ff3300',
   emissiveIntensity: 0.8,
   flatShading: true,
-})
-export const EMBER_WISP_TENDRIL_MAT = new THREE.MeshPhongMaterial({
+}), { color: '#ffd080', intensity: 0.7 })
+export const EMBER_WISP_TENDRIL_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#ffaa00',
   emissive: '#ff6600',
   emissiveIntensity: 0.5,
   transparent: true,
   opacity: 0.7,
   flatShading: true,
-})
+}), { color: '#ffd080', intensity: 0.6 })
 
 // ── Lava Golem ────────────────────────────────────────────────
 const lavaGolemProfile = [
@@ -606,18 +647,20 @@ export const LAVA_GOLEM_HEAD_GEO = new THREE.SphereGeometry(3, 8, 6)
 export const LAVA_GOLEM_ARM_GEO = new THREE.BoxGeometry(2, 8, 2)
 export const LAVA_GOLEM_EYE_GEO = new THREE.SphereGeometry(0.8, 6, 6)
 
-export const LAVA_GOLEM_BODY_MAT = new THREE.MeshPhongMaterial({
-  color: '#4a2a10',
-  specular: '#ff6633',
+// Ash-grey basalt (old #4a2a10 was ΔE≈6 from the volcanic terrain) with a lava rim
+const VOLCANIC_RIM = { color: '#ff9a50', intensity: 0.8, power: 2.2 }
+export const LAVA_GOLEM_BODY_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#5c5450',
+  specular: '#ff8844',
   shininess: 50,
   flatShading: true,
-})
-export const LAVA_GOLEM_CRACK_MAT = new THREE.MeshPhongMaterial({
+}), VOLCANIC_RIM)
+export const LAVA_GOLEM_CRACK_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#ff4400',
   emissive: '#ff2200',
   emissiveIntensity: 0.6,
   flatShading: true,
-})
+}), VOLCANIC_RIM)
 export const LAVA_GOLEM_EYE_MAT = new THREE.MeshStandardMaterial({
   color: '#ff4400',
   emissive: '#ff2200',
@@ -641,18 +684,21 @@ export const FIRE_IMP_TAIL_GEO = new THREE.CylinderGeometry(0.3, 0.15, 6, 4)
 export const FIRE_IMP_TAIL_SPIKE_GEO = new THREE.ConeGeometry(0.5, 1.5, 4)
 export const FIRE_IMP_EYE_GEO = new THREE.SphereGeometry(0.5, 6, 6)
 
-export const FIRE_IMP_BODY_MAT = new THREE.MeshPhysicalMaterial({
-  color: '#8b1a1a',
+// Orange imp (VISION) with bone horns; the old maroon/near-black read as terrain
+export const FIRE_IMP_BODY_MAT = withRim(new THREE.MeshPhysicalMaterial({
+  color: '#e0561c',
   metalness: 0.2,
   roughness: 0.5,
   iridescence: 0.3,
   iridescenceIOR: 1.3,
   flatShading: true,
-})
-export const FIRE_IMP_HORN_MAT = new THREE.MeshPhongMaterial({
-  color: '#2a0808',
+}), VOLCANIC_RIM)
+export const FIRE_IMP_HORN_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#e8d8b0',
+  specular: '#ffffff',
+  shininess: 40,
   flatShading: true,
-})
+}), VOLCANIC_RIM)
 export const FIRE_IMP_EYE_MAT = new THREE.MeshStandardMaterial({
   color: '#ffcc00',
   emissive: '#ff8800',
@@ -716,16 +762,17 @@ function makeDrakeWingGeo(): THREE.BufferGeometry {
 }
 export const DRAKE_WING_GEO = makeDrakeWingGeo()
 
-export const DRAKE_BODY_MAT = new THREE.MeshPhysicalMaterial({
-  color: '#2a0a0a',
+// Crimson drake with bone spikes (old #2a0a0a body was ΔE≈7 from obsidian terrain)
+export const DRAKE_BODY_MAT = withRim(new THREE.MeshPhysicalMaterial({
+  color: '#7a1020',
   metalness: 0.3,
   roughness: 0.4,
   iridescence: 0.5,
   iridescenceIOR: 1.4,
   iridescenceThicknessRange: [200, 500],
   flatShading: true,
-})
-export const DRAKE_WING_MAT = new THREE.MeshPhongMaterial({
+}), VOLCANIC_RIM)
+export const DRAKE_WING_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#660000',
   emissive: '#ff2200',
   emissiveIntensity: 0.3,
@@ -733,11 +780,13 @@ export const DRAKE_WING_MAT = new THREE.MeshPhongMaterial({
   opacity: 0.75,
   flatShading: true,
   side: THREE.DoubleSide,
-})
-export const DRAKE_SPIKE_MAT = new THREE.MeshPhongMaterial({
-  color: '#1a0505',
+}), VOLCANIC_RIM)
+export const DRAKE_SPIKE_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: '#d8c8a8',
+  specular: '#ffffff',
+  shininess: 40,
   flatShading: true,
-})
+}), VOLCANIC_RIM)
 export const DRAKE_EYE_MAT = new THREE.MeshStandardMaterial({
   color: '#ff4400',
   emissive: '#ff2200',
