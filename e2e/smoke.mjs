@@ -6,6 +6,10 @@
  * screen renders, then loads EVERY registered level via the ?e2e=1 test hook and
  * verifies: no uncaught errors, the render loop advances, and the frame is not
  * blank. Saves a screenshot + stats per level to e2e-results/.
+ * Then a combat probe shoots the nearest on-screen enemy via the test hook and
+ * saves <level>-combat.png (muzzle flash + gold hitmarker held on the kill
+ * frame), checking the kill registers and the camera shake stays <= 3 units
+ * and returns exactly to the track.
  *
  * Usage:
  *   npm run build && node e2e/smoke.mjs                 # all levels
@@ -152,16 +156,57 @@ async function run() {
     })
     const png = await page.screenshot({ path: path.join(OUT, `${id}.png`) })
     const img = await imageStats(page, png)
-    const allErrors = [...errors, ...stats.hookErrors]
     const frames = stats.frames - a
     const problems = []
+
+    // Combat probe (hit feedback): shoot the nearest visible enemy, capture the kill frame.
+    let combat = null
+    if (stats.phase === 'playing') {
+      const shot = await page.evaluate(() => {
+        const s = window.__SC_TEST__
+        s.holdFeedback = true
+        const kills = s.combat.kills
+        return { target: s.shootNearest(), kills }
+      })
+      combat = { target: shot.target }
+      if (shot.target) {
+        const deadline = Date.now() + 10000
+        let kills = shot.kills
+        while (Date.now() < deadline && kills <= shot.kills) {
+          await page.waitForTimeout(250)
+          kills = await page.evaluate(() => window.__SC_TEST__.combat.kills)
+        }
+        combat.killed = kills > shot.kills
+        if (!combat.killed) problems.push('combat probe: hit did not produce a kill')
+      }
+      await page.screenshot({ path: path.join(OUT, `${id}-combat.png`) })
+      // Release the hold and let the shake decay; it must return exactly to 0.
+      await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+      const f = await page.evaluate(() => window.__SC_TEST__.frames)
+      const settle = Date.now() + 10000
+      let shake = await page.evaluate(() => window.__SC_TEST__.cameraShake)
+      while (Date.now() < settle) {
+        await page.waitForTimeout(250)
+        const now = await page.evaluate(() => ({ frames: window.__SC_TEST__.frames, ...window.__SC_TEST__.cameraShake }))
+        shake = now
+        if (now.frames - f >= 5 && now.current === 0) break
+      }
+      combat.shakeMax = shake.max
+      combat.shakeIdle = shake.current
+      combat.counts = await page.evaluate(() => window.__SC_TEST__.combat)
+      if (shake.max > 3 + 1e-6) problems.push(`camera shake ${shake.max.toFixed(2)} > 3 units`)
+      if (shake.current !== 0) problems.push(`camera shake did not reset (${shake.current})`)
+    }
+
+    const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
+    const allErrors = [...errors, ...hookErrors]
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${SECONDS}s)`)
     if (allErrors.length) problems.push(`${allErrors.length} error(s)`)
     if (img.stddev < 4 || img.distinctColors < 8) problems.push('frame looks blank')
     if (!['playing', 'results'].includes(stats.phase)) problems.push(`unexpected phase "${stats.phase}"`)
     const ok = problems.length === 0
     failed ||= !ok
-    results.push({ id, ok, problems, frames, seconds: (Date.now() - started) / 1000, ...stats, image: img, errors: allErrors })
+    results.push({ id, ok, problems, frames, seconds: (Date.now() - started) / 1000, ...stats, image: img, combat, errors: allErrors })
     await ctx.close()
   }
 
@@ -170,7 +215,9 @@ async function run() {
 
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
   for (const r of results) {
-    const extra = r.id === 'title' ? '' : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}`
+    const c = r.combat
+    const combatStr = !c ? '' : c.target ? ` combat=${c.killed ? 'kill' : 'NO-KILL'} shakeMax=${c.shakeMax.toFixed(2)}` : ' combat=no-target'
+    const extra = r.id === 'title' ? '' : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${combatStr}`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)} frames=${r.frames}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
