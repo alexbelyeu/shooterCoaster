@@ -119,6 +119,11 @@ chunk; no code splitting.
 13. Smoke ride checks pass by a thin margin in Claude cloud sessions (11–15 frames per
     10 s window vs `MIN_FRAMES=10`, 2-core SwiftShader). The title check polls to a
     deadline since #43; the level checks still use a fixed window, so they may flake.
+14. Level 4 and 5 tracks (`TrigCurve2`) are not closed loops. The `(angle / 2)` altitude
+    ramp makes the end π·varC·scalar higher than the start (≈440 units on level4, ≈628 on
+    level5), and `useTrackProgress` wraps a full lap back to t=0, so the camera
+    would fall by that height. It shows as the near-vertical track sections in those
+    screenshots. #46 pins the current behaviour in a unit test (found 2026-10-19).
 
 ## Tech debt / architecture notes
 
