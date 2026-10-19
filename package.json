@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "smoke": "node e2e/smoke.mjs",
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "verify": "npm run build && npm run check:bundle && npm run smoke"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.0",

@@ -1,0 +1,90 @@
+# Agent protocol
+
+How the autonomous ShooterCoaster studio works. Every scheduled session reads this.
+
+## The loop
+
+| Role | Model | When (America/New_York) | Job |
+|---|---|---|---|
+| **Reporter** | Sonnet | Mon ~06:15 | Writes last week's report, emails Alex |
+| **Director** | Fable (latest) | Mon ~07:45 | Reads report + steering, updates vision/state, plans the week as issues |
+| **Builders** | Opus | daily ~08:45, ~13:45, ~18:45 | Each run: up to N parallel builder subagents, one issue each → PRs |
+| **QA** | Opus | daily ~11:50, ~16:50, ~22:50 | Independent review + playtest of open PRs; merges or requests changes |
+| **Maintainer** | Opus | daily ~03:35 | Keeps `main` healthy: prod-broken issues, reverts, stale claims, tech debt |
+
+Each scheduled task session is a thin **dispatcher**: it reads this file and its
+role file, then delegates the actual work to the matching agent in `.claude/agents/`
+(which pins the model) using the Agent tool. Builders are dispatched in parallel with
+`isolation: "worktree"` so they never share a working tree.
+
+## Source of truth
+
+| File | Owner | Purpose |
+|---|---|---|
+| `docs/agents/STEERING.md` | **Alex** | Direction from Alex. Overrides everything except CLAUDE.md hard rules. Agents never edit it, except the Director may tick items as done. |
+| `docs/agents/VISION.md` | Director | What the finished game is, the quality bar, the roadmap |
+| `docs/agents/STATE.md` | Director (weekly), Maintainer (fixes) | Honest snapshot of what exists, what's broken, what's half-done |
+| `docs/agents/DECISIONS.md` | Anyone, append-only | Architecture/design decisions with reasons |
+| `docs/reports/` | Reporter | Weekly reports |
+| GitHub Issues | Director creates, builders consume | The work queue |
+| `budgets.json` | Director | CI-enforced budgets |
+
+## Labels
+
+- Queue: `agent:ready` → `agent:in-progress` → (PR) `agent:needs-qa` → merged, or `agent:changes-requested` → back to the builder.
+- `agent:blocked` — can't proceed; the comment says why. Director re-plans it.
+- `agent:prod-broken` — production smoke test failed (opened by the nightly workflow). Maintainer drops everything for it.
+- `steering` — an issue from Alex. Director treats it like STEERING.md.
+- Priority: `P1` (this week, do first), `P2` (this week), `P3` (if time).
+- Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`.
+- `epic` — umbrella issue the Director breaks into `agent:ready` children. Never claimed by builders.
+
+## Issue contract (Director writes these)
+
+Every `agent:ready` issue must be completable by one builder in one session and has:
+**Goal** (player-facing why), **Scope** (files/systems likely touched), **Acceptance
+criteria** (checkable, including what the smoke-test screenshot should show),
+**Out of scope**, and **Notes** (relevant skills, decisions, pitfalls).
+
+## Claiming work (Builders)
+
+1. First: your own open PRs labelled `agent:changes-requested` (oldest first). Fix and push to the same branch.
+2. Otherwise: the highest-priority `agent:ready` issue (P1 > P2 > P3, then oldest), skipping `epic`.
+3. Claim it immediately: swap `agent:ready` → `agent:in-progress` and comment `Claimed by builder run <date time>`. When dispatching several builders, the dispatcher claims all issues **before** spawning them so two builders never take the same one.
+4. Branch: `agent/<issue-number>-<short-slug>`. One issue per PR.
+
+## Pull requests
+
+- Title: conventional style (`feat(level6): …`, `fix(combat): …`, `perf(terrain): …`).
+- Body: `Closes #<n>`, what changed and why, **how you verified it** (paste the smoke-test summary lines), screenshots attached or described, risks, follow-ups.
+- Label `agent:needs-qa`. Builders never merge their own PRs.
+- Before opening: `npm run verify` passes locally, you **looked at** the relevant screenshots, CLAUDE.md/docs updated if behaviour or structure changed.
+
+## Merging (QA only)
+
+A PR may be merged only when **all** hold:
+1. GitHub check `verify` is `success` on the PR's head SHA (`gh api repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs`).
+2. QA re-ran `npm run verify` on the branch itself and looked at the screenshots.
+3. The acceptance criteria are met and CLAUDE.md hard rules are respected.
+4. The branch is up to date with `main` (rebase it if not, re-verify).
+
+Merge with squash: `gh api -X PUT repos/alexbelyeu/shootercoaster/pulls/<n>/merge -f merge_method=squash`.
+
+## When main breaks
+
+Revert first, investigate second. Open a PR that `git revert`s the offending merge
+commit, verify, merge it (Maintainer or QA may merge a pure revert as soon as
+`verify` is green), then reopen the original issue with what went wrong.
+
+## Environment facts (Claude cloud sessions)
+
+- Network is allowlisted: npm, pip and GitHub work; arbitrary websites (including the Vercel deployments and the Playwright CDN) do not. Don't retry blocked hosts with other tools.
+- Headless Chromium: `export SC_CHROME="$(scripts/ensure-browser.sh)"`. Rendering is software (SwiftShader), so **frame times are much slower than real hardware** — use them only for relative comparisons; draw calls and triangle counts are reliable.
+- GitHub through `gh api` (REST only). GraphQL, repository-settings writes, branch deletion and GitHub Actions API paths are blocked by the proxy. `gh pr create` may work; if not, use `gh api -X POST repos/alexbelyeu/shootercoaster/pulls`.
+- Auto-merge route if needed: `PUT repos/alexbelyeu/shootercoaster/pulls/<n>/ccr/auto_merge`.
+- You cannot read CI logs through the API. Reproduce failures locally with `npm run verify`.
+- No image, model or audio generation tools. Visuals come from code: procedural geometry, shaders, instancing, post-processing. Audio comes from Tone.js synthesis.
+
+## Commits
+
+End each commit message with the attribution lines your session's instructions give you.
