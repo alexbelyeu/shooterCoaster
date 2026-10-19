@@ -176,6 +176,7 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 | Landmark feels tiny | Undersized geometry | Double initial size estimate |
 | Landmark feels disconnected | Placed too far (>3000) | Keep within ~2400 units of origin |
 | Hexagonal stick geometry | height-via-scale trick | Bake height into CylinderGeometry constructor |
+| Grounded object floats / sinks on ridged terrain | Placed on `heightFn`, but the drawn mesh is linear between grid vertices (up to ~55 units off on Arctic) | Sample `createTerrainSurface(heightFn, getTerrainMeshSize(biome))` for things that must touch the visible ground (see `src/track/supportTowers.ts`) |
 | Terrain holes/spikes | Missing noise config | Add entry to terrainNoise.ts |
 | No music plays | Missing MusicManager entry | Add biome config to CONFIGS record |
 | Enemies don't spawn | Missing spawner registration | Check all 4 spawner touchpoints |

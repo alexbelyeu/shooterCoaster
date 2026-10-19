@@ -4,10 +4,16 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import { createTrigCurve } from '@/track/curves/TrigCurve'
 import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
 import TrackMesh from '@/track/TrackMesh'
+import { getTrackDimensions } from '@/track/trackDimensions'
 import CoasterCamera from '@/track/CoasterCamera'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
-import { createHeightFunction, sampleTrackPath } from '@/utils/terrainNoise'
+import {
+  createHeightFunction,
+  createTerrainSurface,
+  getTerrainMeshSize,
+  sampleTrackPath,
+} from '@/utils/terrainNoise'
 import BulletPool from '@/combat/projectiles/BulletPool'
 import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
@@ -68,7 +74,12 @@ function LevelScene({ levelId }: { levelId: string }) {
 
   const trackSamples = useMemo(() => sampleTrackPath((t) => curve.getPointAt(t)), [curve])
   const heightFn = useMemo(() => createHeightFunction(biome, trackSamples), [biome, trackSamples])
+  const groundFn = useMemo(
+    () => createTerrainSurface(heightFn, getTerrainMeshSize(biome)),
+    [heightFn, biome],
+  )
 
+  const trackDims = useMemo(() => getTrackDimensions(track), [track])
   const color1 = useMemo(() => hexToRgb(track.color1), [track.color1])
   const color2 = useMemo(() => hexToRgb(track.color2), [track.color2])
 
@@ -82,8 +93,15 @@ function LevelScene({ levelId }: { levelId: string }) {
         curve={curve}
         rollerSpeed={track.rollerSpeed}
         minRollerSpeed={track.minRollerSpeed}
+        heightOffset={trackDims.eyeHeight}
       />
-      <TrackMesh curve={curve} color1={color1} color2={color2} />
+      <TrackMesh
+        curve={curve}
+        color1={color1}
+        color2={color2}
+        dims={trackDims}
+        groundFn={groundFn}
+      />
       <BiomeEnvironment
         biome={biome}
         groundColor={environment.groundColor}
