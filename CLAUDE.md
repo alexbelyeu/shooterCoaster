@@ -26,11 +26,15 @@ Headless browser in Claude cloud sessions: the Playwright CDN is blocked, so run
 `export SC_CHROME="$(scripts/ensure-browser.sh)"` once per session before `npm run smoke`.
 The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, errors) to `e2e-results/`. **Look at the screenshots** with
-the Read tool — that is how you playtest visually.
+the Read tool — that is how you playtest visually. `drawCalls`/`triangles` depend on
+where the camera happens to be (frustum culling, spawned enemies) and vary run to run;
+for before/after comparisons use the camera-independent `scene` totals it also prints
+(`track objs/tris` = objects named `track*`). Slow SwiftShader frames: screenshot
+timeout is 120 s (`--shot-timeout <ms>`).
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 (`levels()`, `startLevel(id)`, `frames`, `drawCalls`, `triangles`, `avgFrameMs`,
-`errors`). See `src/testing/e2eHook.tsx`. Extend it when you need new test surfaces.
+`errors`, `sceneStats()`). See `src/testing/e2eHook.tsx`. Extend it when you need new test surfaces.
 
 ## Stack
 
@@ -49,7 +53,7 @@ replays — currently in-memory placeholders).
 | `src/canvas/` | `GameCanvas` (R3F Canvas), `SceneManager` (picks title vs level scene), shooting, timer, music |
 | `src/levels/LevelRegistry.ts` | **Level configs** — track params, biome, timer, waves, star thresholds |
 | `src/levels/environments/` | Biome environments, landmarks (FerrisWheel, Pyramid, Volcano…), decorations, terrain |
-| `src/track/` | Procedural track curves, track mesh, coaster camera, progress |
+| `src/track/` | Procedural track curves, track mesh (rails + ties), lattice support towers, `trackDimensions` (structure scale per level), coaster camera, progress |
 | `src/entities/enemies/` | Enemy models/behaviours; `entities/spawning/EnemySpawner` waves |
 | `src/combat/` | Aim, collisions, projectiles, weapons, crosshair |
 | `src/effects/` | Explosions (pooled), score popups |
