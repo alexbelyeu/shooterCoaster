@@ -116,7 +116,7 @@ const DOME_RADIUS = 11000 * 0.9
 export default function SkyDome({ atmosphere }: { atmosphere: AtmosphereConfig }) {
   const { sky, sunDirection } = atmosphere
 
-  const geometry = useMemo(() => new THREE.SphereGeometry(DOME_RADIUS, 48, 24), [])
+  const geometry = useMemo(() => new THREE.SphereGeometry(DOME_RADIUS, 32, 16), [])
 
   const material = useMemo(
     () =>

@@ -48,7 +48,7 @@ replays — currently in-memory placeholders).
 | `src/app/App.tsx` | Phase-driven UI shell (title → levelSelect → playing → paused → results) |
 | `src/canvas/` | `GameCanvas` (R3F Canvas), `SceneManager` (picks title vs level scene), shooting, timer, music |
 | `src/levels/LevelRegistry.ts` | **Level configs** — track params, biome, timer, waves, star thresholds |
-| `src/levels/environments/` | Biome environments, landmarks (FerrisWheel, Pyramid, Volcano…), decorations, terrain |
+| `src/levels/environments/` | Biome environments, landmarks (FerrisWheel, Pyramid, Volcano…), decorations, terrain; per-biome sky/light/fog/exposure in `atmosphere.ts` + `SkyDome.tsx` |
 | `src/track/` | Procedural track curves, track mesh, coaster camera, progress |
 | `src/entities/enemies/` | Enemy models/behaviours; `entities/spawning/EnemySpawner` waves |
 | `src/combat/` | Aim, collisions, projectiles, weapons, crosshair |

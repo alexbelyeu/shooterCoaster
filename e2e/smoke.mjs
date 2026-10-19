@@ -29,6 +29,10 @@ const args = Object.fromEntries(
 const SECONDS = Number(args.seconds ?? 10)
 const OUT = path.resolve(args.out ?? 'e2e-results')
 const MIN_FRAMES = Number(args['min-frames'] ?? 10)
+// SwiftShader on a 2-core cloud box can take ~40s to produce a screenshot frame
+// (Playwright's 30s default times out even on main), so allow more headroom.
+const SHOT_TIMEOUT = Number(args['shot-timeout'] ?? 120000)
+let preview
 fs.mkdirSync(OUT, { recursive: true })
 
 // Console noise that is expected in headless/sandboxed runs and is not a game bug.
@@ -99,7 +103,6 @@ async function imageStats(page, png) {
 }
 
 async function run() {
-  let preview
   const base = args.url ?? (preview = await startPreview()).url
   const browser = await launch()
   const results = []
@@ -131,7 +134,7 @@ async function run() {
     f1 = await t.page.evaluate(() => window.__SC_TEST__.frames)
     if (f1 - f0 >= MIN_FRAMES) break
   }
-  const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png') })
+  const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png'), timeout: SHOT_TIMEOUT })
   const titleImg = await imageStats(t.page, titlePng)
   const titleOk = f1 - f0 >= MIN_FRAMES && t.errors.length === 0 && titleImg.stddev > 4
   failed ||= !titleOk
@@ -150,7 +153,7 @@ async function run() {
       const s = window.__SC_TEST__
       return { frames: s.frames, avgFrameMs: s.avgFrameMs, drawCalls: s.drawCalls, triangles: s.triangles, phase: s.phase(), hookErrors: s.errors }
     })
-    const png = await page.screenshot({ path: path.join(OUT, `${id}.png`) })
+    const png = await page.screenshot({ path: path.join(OUT, `${id}.png`), timeout: SHOT_TIMEOUT })
     const img = await imageStats(page, png)
     const allErrors = [...errors, ...stats.hookErrors]
     const frames = stats.frames - a
@@ -180,5 +183,6 @@ async function run() {
 
 run().catch((e) => {
   console.error(e)
+  preview?.proc.kill() // don't leak the vite preview server on failure
   process.exit(1)
 })
