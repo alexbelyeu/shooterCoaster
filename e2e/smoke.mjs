@@ -124,9 +124,16 @@ async function run() {
   // 1. Title screen
   const t = await newPage()
   const levels = await t.page.evaluate(() => window.__SC_TEST__.levels())
+  // Wait until the title has rendered MIN_FRAMES (or a deadline passes). A fixed
+  // short wait false-fails under slow software rendering (~1 fps on 2-core SwiftShader).
   const f0 = await t.page.evaluate(() => window.__SC_TEST__.frames)
-  await t.page.waitForTimeout(4000)
-  const f1 = await t.page.evaluate(() => window.__SC_TEST__.frames)
+  const titleDeadline = Date.now() + Math.max(4, SECONDS) * 1000
+  let f1 = f0
+  while (Date.now() < titleDeadline) {
+    await t.page.waitForTimeout(500)
+    f1 = await t.page.evaluate(() => window.__SC_TEST__.frames)
+    if (f1 - f0 >= MIN_FRAMES) break
+  }
   const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png'), timeout: SHOT_TIMEOUT })
   const titleImg = await imageStats(t.page, titlePng)
   const titleOk = f1 - f0 >= MIN_FRAMES && t.errors.length === 0 && titleImg.stddev > 4
