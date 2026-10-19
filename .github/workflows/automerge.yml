@@ -91,7 +91,7 @@ jobs:
                 core.warning(`#${number}: merge failed — ${e.message}`)
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: number,
-                  body: `Auto-merge failed: ${e.message}\nThe branch probably conflicts with main: merge `origin/main` into it, resolve, re-verify and push (never force-push).`,
+                  body: `Auto-merge failed: ${e.message}\nThe branch probably conflicts with main: merge origin/main into it, resolve, re-verify and push (never force-push).`,
                 })
               }
             }
