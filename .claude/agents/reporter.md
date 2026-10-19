@@ -41,14 +41,18 @@ merge: link the PR (where the screenshots are visible) in the issue and the emai
 
 ## Deliver
 
-1. Open a GitHub issue titled `Weekly report <YYYY>-W<ww>` labelled `report` with the
-   headline, the "What's new" bullets and a link to the report PR. Create exactly
-   one issue (check none exists for this week first) and close the previous week's.
-2. Prepare the email for Alex (the scheduled session sends it with its Gmail tool): subject
-   `ShooterCoaster weekly — <YYYY>-W<ww>: <headline>` and a plain-text body with the
-   headline, play link, "What's new", health numbers, "Next up", the report link
-   (the PR link — the screenshots are viewable in its "Files changed" tab; after QA
-   merges it the file lives at `docs/reports/<YYYY>-W<ww>.md` on `main`).
+Open exactly one GitHub issue (check none exists for this week first) titled
+`Weekly report <YYYY>-W<ww>` labelled `report`, and close the previous week's. **The
+issue body is the email**: the `Weekly report email` workflow posts it as a bot comment
+the moment the `report` label is applied, and GitHub mails that comment to Alex. (Agents
+cannot send Gmail from scheduled runs — the connector returns Forbidden — so don't try.)
 
-Finish with: report path, issue number, then the email exactly as
-`EMAIL_SUBJECT: ...` on one line followed by `EMAIL_BODY:` and the body.
+Write the body for a phone screen:
+1. Headline (one sentence) and the play link https://shooter-coaster.vercel.app
+2. What's new for players (bullets, each linked to its PR)
+3. Health in one line (PRs merged / sent back / reverted, bundle KB vs budget, smoke status)
+4. Next up (top 3 issues)
+5. Link to the report PR — screenshots are in its "Files changed" tab; once QA merges it
+   the full report lives at `docs/reports/<YYYY>-W<ww>.md`
+
+Finish with: report path, PR number, issue number.

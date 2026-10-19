@@ -76,7 +76,10 @@ QA applies `agent:qa-approved` only when **all** hold:
 1. GitHub check `verify` is `success` (or still running) on the PR's head SHA (`gh api repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs`).
 2. QA re-ran `npm run verify` on the branch itself and looked at the screenshots.
 3. The acceptance criteria are met and CLAUDE.md hard rules are respected.
-4. The branch is up to date with `main` (rebase it if not, re-verify).
+4. It still works on top of current `main`: if the branch is behind, rebase it **locally**
+   and re-run `npm run verify` on the result. QA doesn't need to push the rebase — GitHub
+   merges approved PRs that are behind `main` as long as there are no conflicts. Only a
+   real conflict sends the PR back to its author (`agent:changes-requested`).
 
 **There is no self-approval.** Every PR — features, docs-only, reports, reverts —
 needs the `agent:qa-approved` label from a QA run that did not write it. The platform
