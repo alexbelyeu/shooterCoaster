@@ -15,6 +15,7 @@
  * runs unless `installE2EApi()` finds `?e2e=1`, and <E2EFrameProbe> is only
  * mounted under the same flag.
  */
+import { useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
@@ -35,6 +36,12 @@ export interface SCTestApi {
   startLevel: (id: string) => void
   phase: () => string
   errors: string[]
+  /**
+   * Deterministic scene totals, independent of camera/frustum culling:
+   * every visible mesh's triangles (x instance count) and object count, plus a
+   * breakdown for objects with a `name` (e.g. `track`, `track-towers`).
+   */
+  sceneStats: () => SceneStats | null
   /** Every 100 ms (real time, at most once per rendered frame) aim at the nearest
    *  live on-screen enemy and fire a real bullet through the pool. */
   autoFire: (enabled: boolean) => void
@@ -48,6 +55,12 @@ export interface SCTestApi {
   /** Force the results phase. */
   endLevel: () => void
   setTimeScale: (s: number) => void
+}
+
+export interface SceneStats {
+  objects: number
+  triangles: number
+  byName: Record<string, { objects: number; triangles: number }>
 }
 
 export interface SCTestStats {
@@ -142,6 +155,7 @@ export function installE2EApi() {
     },
     phase: () => useGameStore.getState().phase,
     errors: [],
+    sceneStats: () => null,
     autoFire: (enabled: boolean) => {
       autoFireEnabled = enabled
       lastAutoFire = 0
@@ -199,6 +213,11 @@ export function installE2EApi() {
 /** Mount inside <Canvas>. Counts frames and samples renderer stats. */
 export function E2EFrameProbe() {
   const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
+  useEffect(() => {
+    const api = window.__SC_TEST__
+    if (api) api.sceneStats = () => collectSceneStats(scene)
+  }, [scene])
   useFrame((state, delta) => {
     const api = window.__SC_TEST__
     if (!api) return
@@ -216,4 +235,24 @@ export function E2EFrameProbe() {
     gl.info.reset()
   })
   return null
+}
+
+function collectSceneStats(scene: THREE.Scene): SceneStats {
+  const stats: SceneStats = { objects: 0, triangles: 0, byName: {} }
+  scene.traverseVisible((o) => {
+    const m = o as THREE.Mesh & { isInstancedMesh?: boolean; count?: number }
+    if (!m.isMesh || !m.geometry) return
+    const g = m.geometry
+    const verts = g.index ? g.index.count : (g.attributes.position?.count ?? 0)
+    const tris = Math.floor(verts / 3) * (m.isInstancedMesh ? (m.count ?? 1) : 1)
+    stats.objects += 1
+    stats.triangles += tris
+    if (m.name) {
+      const key = m.name
+      const e = (stats.byName[key] ??= { objects: 0, triangles: 0 })
+      e.objects += 1
+      e.triangles += tris
+    }
+  })
+  return stats
 }
