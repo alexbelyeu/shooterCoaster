@@ -45,3 +45,6 @@ node_modules
 dist/
 tsconfig.tsbuildinfo
 .claude/settings.local.json
+
+# Agent / test output
+e2e-results/

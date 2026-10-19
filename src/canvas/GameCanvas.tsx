@@ -4,6 +4,7 @@ import { Leva } from 'leva'
 import * as THREE from 'three'
 import SceneManager from './SceneManager'
 import { useSettingsStore } from '@/store/useSettingsStore'
+import { isE2E, E2EFrameProbe } from '@/testing/e2eHook'
 
 export default function GameCanvas() {
   const showFPS = useSettingsStore((s) => s.showFPS)
@@ -18,6 +19,7 @@ export default function GameCanvas() {
       >
         <SceneManager />
         {showFPS && <Stats />}
+        {isE2E && <E2EFrameProbe />}
       </Canvas>
     </>
   )
