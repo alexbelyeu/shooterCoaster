@@ -349,3 +349,55 @@ export function getTerrainSlope(
   const dz = (hz - h) / delta
   return Math.atan(Math.sqrt(dx * dx + dz * dz))
 }
+
+/** Segments per side of the rendered terrain mesh (BiomeEnvironment). */
+export const TERRAIN_MESH_SEGMENTS = 128
+
+/** Side length of the rendered terrain mesh for a biome. */
+export function getTerrainMeshSize(biome: BiomeType): number {
+  return biome === 'arctic' ? 10000 : biome === 'volcanic' ? 12000 : 6000
+}
+
+/**
+ * Height of the terrain *as drawn*: the rendered mesh only samples `heightFn` at
+ * its grid vertices (~47–94 units apart) and is linear in between, so on ridged
+ * biomes it can differ from `heightFn` by tens of units. Anything that must sit
+ * exactly on the visible ground (support-tower footings) should use this.
+ * Matches THREE.PlaneGeometry's triangulation after rotateX(-PI/2).
+ */
+export function createTerrainSurface(
+  heightFn: HeightFunction,
+  size: number,
+  segments = TERRAIN_MESH_SEGMENTS,
+): HeightFunction {
+  const n = segments + 1
+  const cell = size / segments
+  const half = size / 2
+  const cache = new Float64Array(n * n).fill(NaN)
+  const vertex = (ix: number, iz: number) => {
+    const cx = Math.min(segments, Math.max(0, ix))
+    const cz = Math.min(segments, Math.max(0, iz))
+    const k = cz * n + cx
+    let h = cache[k]
+    if (Number.isNaN(h)) {
+      h = heightFn(-half + cx * cell, -half + cz * cell)
+      cache[k] = h
+    }
+    return h
+  }
+  return (x: number, z: number): number => {
+    const gx = (x + half) / cell
+    const gz = (z + half) / cell
+    const ix = Math.floor(gx)
+    const iz = Math.floor(gz)
+    const fx = gx - ix
+    const fz = gz - iz
+    // PlaneGeometry splits each cell along the (ix, iz+1)–(ix+1, iz) diagonal.
+    if (fx + fz <= 1) {
+      const ha = vertex(ix, iz)
+      return ha + (vertex(ix + 1, iz) - ha) * fx + (vertex(ix, iz + 1) - ha) * fz
+    }
+    const hc = vertex(ix + 1, iz + 1)
+    return hc + (vertex(ix, iz + 1) - hc) * (1 - fx) + (vertex(ix + 1, iz) - hc) * (1 - fz)
+  }
+}
