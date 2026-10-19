@@ -76,8 +76,8 @@ QA applies `agent:qa-approved` only when **all** hold:
 1. GitHub check `verify` is `success` (or still running) on the PR's head SHA (`gh api repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs`).
 2. QA re-ran `npm run verify` on the branch itself and looked at the screenshots.
 3. The acceptance criteria are met and CLAUDE.md hard rules are respected.
-4. It still works on top of current `main`: if the branch is behind, rebase it **locally**
-   and re-run `npm run verify` on the result. QA doesn't need to push the rebase — GitHub
+4. It still works on top of current `main`: if the branch is behind, merge `origin/main`
+   into it **locally** and re-run `npm run verify` on the result. QA doesn't need to push — GitHub
    merges approved PRs that are behind `main` as long as there are no conflicts. Only a
    real conflict sends the PR back to its author (`agent:changes-requested`).
 
@@ -89,8 +89,13 @@ enforces this: an agent's attempt to approve its own PR is blocked. Open your PR
 QA reviews in this order: (1) revert / `agent:prod-broken` fixes, (2) P1, (3) the rest
 oldest first.
 
-If the workflow comments that the merge failed (usually a conflict), rebase the
-branch onto `main`, re-verify, push — then QA re-approves.
+If the workflow comments that the merge failed (usually a conflict), merge `origin/main`
+into the branch, resolve the conflicts, re-verify, and push normally — then QA
+re-approves.
+
+**Updating a pushed branch:** always `git merge origin/main` and push normally. Never
+rebase a branch that is already on GitHub — that needs a force-push, which hard rule 2
+forbids.
 
 ## When main breaks
 

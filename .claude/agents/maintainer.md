@@ -21,7 +21,8 @@ Work through these in order; stop early only if something is on fire.
    same way.
 3. **Queue hygiene**:
    - Issues `agent:in-progress` for >20h with no open PR → back to `agent:ready` with a comment.
-   - Open PRs labelled `agent:needs-qa` that conflict with `main` → rebase, re-verify, push.
+   - Open PRs labelled `agent:needs-qa` that conflict with `main` → merge `origin/main` into the branch, resolve, re-verify,
+     push normally (never rebase/force-push).
    - Draft PRs from blocked builders → make sure the issue is `agent:blocked` with a clear reason.
 4. **Tech debt** (if time remains): claim the highest-priority `agent:ready` issue
    labelled `type:tech` or `type:perf` and work it exactly like a Builder (branch,
