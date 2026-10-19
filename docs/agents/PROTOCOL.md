@@ -12,10 +12,15 @@ How the autonomous ShooterCoaster studio works. Every scheduled session reads th
 | **QA** | Opus | daily ~11:50, ~16:50, ~22:50 | Independent review + playtest of open PRs; merges or requests changes |
 | **Maintainer** | Opus | daily ~03:35 | Keeps `main` healthy: prod-broken issues, reverts, stale claims, tech debt |
 
-Each scheduled task session is a thin **dispatcher**: it reads this file and its
-role file, then delegates the actual work to the matching agent in `.claude/agents/`
-(which pins the model) using the Agent tool. Builders are dispatched in parallel with
-`isolation: "worktree"` so they never share a working tree.
+Role definitions live in `.claude/agents/<role>.md`. Each scheduled task runs on
+its role's model. Director, Maintainer and Reporter sessions carry out their role
+directly. Builder and QA sessions are thin **dispatchers**: they pick the work, then
+spawn Opus subagents in parallel with `isolation: "worktree"` (so they never share a
+working tree), each told to follow `.claude/agents/builder.md` or `qa.md`.
+
+Throughput is tuned with the knobs in STEERING.md (`builder_parallelism`,
+`qa_parallelism`), not by changing schedules. Max plan budget: 15 scheduled runs per
+day per account; this loop uses ~7 (9 on Mondays).
 
 ## Source of truth
 

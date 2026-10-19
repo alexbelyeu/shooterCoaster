@@ -43,7 +43,7 @@ Ship it as a docs-only PR (`agent/report-<YYYY>-W<ww>`); merge it yourself once 
 1. Open a GitHub issue titled `Weekly report <YYYY>-W<ww>` labelled `report` with the
    headline, the "What's new" bullets and a link to the report file on `main`. Close
    the previous week's report issue.
-2. Prepare the email for Alex (the dispatcher sends it): subject
+2. Prepare the email for Alex (the scheduled session sends it with its Gmail tool): subject
    `ShooterCoaster weekly — <YYYY>-W<ww>: <headline>` and a plain-text body with the
    headline, play link, "What's new", health numbers, "Next up", the report link
    (`https://github.com/alexbelyeu/shootercoaster/blob/main/docs/reports/<YYYY>-W<ww>.md`)
