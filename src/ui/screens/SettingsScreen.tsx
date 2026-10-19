@@ -19,8 +19,8 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
   return (
     <div className="pause-screen">
       <h2>Settings</h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', width: '300px' }}>
-        <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="settings-list">
+        <label className="settings-row">
           <span>Music</span>
           <input
             type="range"
@@ -29,10 +29,9 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
             step={0.05}
             value={musicVolume}
             onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
-            style={{ width: '150px' }}
           />
         </label>
-        <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <label className="settings-row">
           <span>SFX</span>
           <input
             type="range"
@@ -41,10 +40,9 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
             step={0.05}
             value={sfxVolume}
             onChange={(e) => setSfxVolume(parseFloat(e.target.value))}
-            style={{ width: '150px' }}
           />
         </label>
-        <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <label className="settings-row">
           <span>Mouse Sensitivity</span>
           <input
             type="range"
@@ -53,10 +51,9 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
             step={0.1}
             value={mouseSensitivity}
             onChange={(e) => setMouseSensitivity(parseFloat(e.target.value))}
-            style={{ width: '150px' }}
           />
         </label>
-        <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <label className="settings-row">
           <span>Show FPS</span>
           <input
             type="checkbox"

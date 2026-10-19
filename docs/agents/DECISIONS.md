@@ -84,3 +84,25 @@ tier, or none) via STEERING.md.
 **Decision:** Accepted for now. The game must render correctly if the request fails
 (system font fallbacks). Self-hosting the fonts (OFL-licensed, record in ASSETS.md)
 is a backlog item if load time or privacy becomes a concern.
+
+## 2026-10-19 — Touch input: Pointer Events only, finger is the aim point (Builder, #16)
+
+**Context:** Input was `mousemove`/`mousedown` on `window`, so phones could not play.
+Listening to touch *and* mouse events double-fires (browsers synthesize mouse events
+after a tap).
+
+**Decision:** `src/input/pointerInput.ts` is the one input source: window-level
+Pointer Events, one active pointer at a time (secondary fingers ignored while one is
+held), presses on interactive UI (`button, a, input, label, [role=button],
+[data-no-fire]`) never fire. Both `useShooting` and `Crosshair` subscribe to it. On
+touch, shots go to the **finger** (a tap fires where you tap); the reticle is drawn
+1.25x size, 40 px above the finger with a dashed tether down to a small ring at the
+real aim point, so it is never hidden. During play `html.is-playing` sets
+`touch-action: none` (plus iOS `gesturestart` blocking) so nothing scrolls or zooms.
+A HUD pause button replaces Escape on touch. `.play-button` styles are now global
+(they were scoped to the title screen, leaving level-select/pause/results buttons as
+unstyled browser defaults under 44 px).
+
+**Consequences:** `npm run smoke` runs the `--mobile` touch playtest too (~90 s
+extra), so CI guards touch input and the phone HUD layout. Gyro/gamepad would plug
+into the same module later.
