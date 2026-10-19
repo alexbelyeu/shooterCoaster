@@ -41,6 +41,7 @@ const MIN_FRAMES = Number(args['min-frames'] ?? 10)
 const SHOT_TIMEOUT = Number(args['shot-timeout'] ?? 120000)
 const COMBAT_SECONDS = Number(args['combat-seconds'] ?? 4)
 const COMBAT_MIN_FRAMES = Number(args['combat-min-frames'] ?? 4)
+let preview // module scope so the top-level catch can kill it
 fs.mkdirSync(OUT, { recursive: true })
 
 // Console noise that is expected in headless/sandboxed runs and is not a game bug.
@@ -188,7 +189,6 @@ async function playLevel(page, id) {
 
 async function run() {
   const runStarted = Date.now()
-  let preview
   const base = args.url ?? (preview = await startPreview()).url
   const browser = await launch()
   const results = []
@@ -289,5 +289,6 @@ function sceneSummary(scene) {
 
 run().catch((e) => {
   console.error(e)
+  preview?.proc.kill() // don't leak the vite preview server on failure
   process.exit(1)
 })

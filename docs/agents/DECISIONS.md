@@ -85,6 +85,22 @@ tier, or none) via STEERING.md.
 (system font fallbacks). Self-hosting the fonts (OFL-licensed, record in ASSETS.md)
 is a backlog item if load time or privacy becomes a concern.
 
+## 2026-10-19 — Atmosphere implementation details (Builder, #12)
+
+**Context:** Implementing per-biome sky domes (see "Procedural sky domes replace drei `Sky`").
+
+**Decision:** Config lives in `src/levels/environments/atmosphere.ts` (`ATMOSPHERES`),
+consumed by `BiomeEnvironment` (lights, fog) and `SkyDome` (shader uniforms). The dome
+is a 32×16 sphere of radius 0.9 × camera far, follows the camera, `renderOrder -1000`
+with depth test/write off, so it costs exactly the one draw the drei `Sky` used.
+Exposure is applied through `gl.toneMappingExposure`, which the postprocessing ACES
+`ToneMapping` effect reads; it is restored on unmount so the title scene is unaffected.
+The smoke test's screenshot timeout was raised to 120 s (`--shot-timeout`) because
+SwiftShader on the 2-core cloud box takes ~40 s per screenshot frame even on `main`.
+
+**Consequences:** New biomes must add an `ATMOSPHERES` entry. Level configs can no
+longer override fog colour (the unused `environment.fog` field was removed).
+
 ## 2026-10-19 — Coaster structure scales with sqrt(scalar); towers sit on the drawn terrain (Builder, #13)
 
 **Context:** Rails were fixed-size while track curves scale with `track.scalar`
