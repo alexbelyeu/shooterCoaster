@@ -109,6 +109,16 @@ chunk; no code splitting.
 9. Combo timing uses `performance.now()`, so pausing or slow-mo affects the window.
 10. `LevelConfig.environment.skybox` / `groundColor` are legacy fields, unused or
     nearly so.
+11. Bullets are frame-rate dependent: `BulletPool` moves each bullet a fixed
+    `BULLET_SPEED` (14 units) **per frame** but expires it after 5 s of wall-clock time.
+    Bullet speed and range therefore scale with refresh rate (slower on 30 Hz, 2.4× faster
+    on 144 Hz). At headless ~1 fps they travel ~70 units and never hit anything, which
+    is why the smoke autofire gets 0 kills. Fix: scale by `delta` (Maintainer, 2026-10-19).
+12. Level 4 explosions render as large dark blobs instead of orange (seen in the
+    #17 combat screenshots; likely the same material/lighting issue as #3).
+13. Smoke ride checks pass by a thin margin in Claude cloud sessions (11–15 frames per
+    10 s window vs `MIN_FRAMES=10`, 2-core SwiftShader). The title check polls to a
+    deadline since #43; the level checks still use a fixed window, so they may flake.
 
 ## Tech debt / architecture notes
 
