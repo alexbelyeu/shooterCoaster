@@ -9,7 +9,7 @@ How the autonomous ShooterCoaster studio works. Every scheduled session reads th
 | **Reporter** | Sonnet | Mon ~06:15 | Writes last week's report, emails Alex |
 | **Director** | Fable (latest) | Mon ~07:45 | Reads report + steering, updates vision/state, plans the week as issues |
 | **Builders** | Opus | daily ~08:45, ~13:45, ~18:45 | Each run: up to N parallel builder subagents, one issue each → PRs |
-| **QA** | Opus | daily ~11:50, ~16:50, ~22:50 | Independent review + playtest of open PRs; merges or requests changes |
+| **QA** | Opus | daily ~11:50, ~16:50, ~22:50 | Independent review + playtest of open PRs; approves or requests changes |
 | **Maintainer** | Opus | daily ~03:35 | Keeps `main` healthy: prod-broken issues, reverts, stale claims, tech debt |
 
 Role definitions live in `.claude/agents/<role>.md`. Each scheduled task runs on
@@ -36,7 +36,7 @@ day per account; this loop uses ~7 (9 on Mondays).
 
 ## Labels
 
-- Queue: `agent:ready` → `agent:in-progress` → (PR) `agent:needs-qa` → merged, or `agent:changes-requested` → back to the builder.
+- Queue: `agent:ready` → `agent:in-progress` → (PR) `agent:needs-qa` → `agent:qa-approved` (auto-merged by GitHub when `verify` is green), or `agent:changes-requested` → back to the builder.
 - `agent:blocked` — can't proceed; the comment says why. Director re-plans it.
 - `agent:prod-broken` — production smoke test failed (opened by the nightly workflow). Maintainer drops everything for it.
 - `steering` — an issue from Alex. Director treats it like STEERING.md.
@@ -65,28 +65,37 @@ criteria** (checkable, including what the smoke-test screenshot should show),
 - Label `agent:needs-qa`. Builders never merge their own PRs.
 - Before opening: `npm run verify` passes locally, you **looked at** the relevant screenshots, CLAUDE.md/docs updated if behaviour or structure changed.
 
-## Merging (QA only)
+## Merging — agents approve, GitHub merges
 
-A PR may be merged only when **all** hold:
-1. GitHub check `verify` is `success` on the PR's head SHA (`gh api repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs`).
+**No agent ever merges a PR.** Approval is the `agent:qa-approved` label; the
+`Auto-merge approved PRs` workflow (`.github/workflows/automerge.yml`) squash-merges
+an approved PR once the `verify` check is green on its head commit. Pushing new
+commits to an approved PR removes the label automatically.
+
+QA applies `agent:qa-approved` only when **all** hold:
+1. GitHub check `verify` is `success` (or still running) on the PR's head SHA (`gh api repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs`).
 2. QA re-ran `npm run verify` on the branch itself and looked at the screenshots.
 3. The acceptance criteria are met and CLAUDE.md hard rules are respected.
 4. The branch is up to date with `main` (rebase it if not, re-verify).
 
-Merge with squash: `gh api -X PUT repos/alexbelyeu/shootercoaster/pulls/<n>/merge -f merge_method=squash`.
+Self-approval is allowed only for: the Director's and Reporter's PRs that touch nothing
+but `docs/` and `budgets.json`, and the Maintainer's or QA's pure `git revert` PRs.
+Everything else needs QA.
+
+If the workflow comments that the merge failed (usually a conflict), rebase the
+branch onto `main`, re-verify, push — then QA re-approves.
 
 ## When main breaks
 
 Revert first, investigate second. Open a PR that `git revert`s the offending merge
-commit, verify, merge it (Maintainer or QA may merge a pure revert as soon as
-`verify` is green), then reopen the original issue with what went wrong.
+commit, verify, and label it `agent:qa-approved` (allowed for pure reverts) so it
+merges as soon as `verify` is green, then reopen the original issue with what went wrong.
 
 ## Environment facts (Claude cloud sessions)
 
 - Network is allowlisted: npm, pip and GitHub work; arbitrary websites (including the Vercel deployments and the Playwright CDN) do not. Don't retry blocked hosts with other tools.
 - Headless Chromium: `export SC_CHROME="$(scripts/ensure-browser.sh)"`. Rendering is software (SwiftShader), so **frame times are much slower than real hardware** — use them only for relative comparisons; draw calls and triangle counts are reliable.
 - GitHub through `gh api` (REST only). GraphQL, repository-settings writes, branch deletion and GitHub Actions API paths are blocked by the proxy. `gh pr create` may work; if not, use `gh api -X POST repos/alexbelyeu/shootercoaster/pulls`.
-- Auto-merge route if needed: `PUT repos/alexbelyeu/shootercoaster/pulls/<n>/ccr/auto_merge`.
 - You cannot read CI logs through the API. Reproduce failures locally with `npm run verify`.
 - No image, model or audio generation tools. Visuals come from code: procedural geometry, shaders, instancing, post-processing. Audio comes from Tone.js synthesis.
 

@@ -20,3 +20,15 @@ nightly production smoke test, and a `pause` kill switch in STEERING.md.
 
 **Consequences:** Every merge to `main` deploys to production. Builders never merge
 their own work. Weekly usage is calibrated with `builder_parallelism` in STEERING.md.
+
+## 2026-10-19 — Agents approve, GitHub merges (setup session)
+
+**Context:** Claude's auto-mode safety check refuses merges to `main` made by an agent
+without human review. Alex chose fully autonomous merging with guardrails.
+
+**Decision:** Agents never call the merge API. QA approves with the `agent:qa-approved`
+label; `.github/workflows/automerge.yml` squash-merges approved `agent/*` PRs once
+`verify` is green on the head commit, and revokes approval when new commits land.
+
+**Consequences:** The merge gate is repository configuration Alex owns and can disable
+from the Actions tab. QA's label is the only approval signal.

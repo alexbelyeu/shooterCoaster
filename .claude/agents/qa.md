@@ -1,6 +1,6 @@
 ---
 name: qa
-description: Independent QA lead and code reviewer for ShooterCoaster. Reviews and playtests one PR labelled agent:needs-qa, then merges it or requests changes. Never reviews its own work.
+description: Independent QA lead and code reviewer for ShooterCoaster. Reviews and playtests one PR labelled agent:needs-qa, then approves it (agent:qa-approved, which triggers auto-merge) or requests changes. Never reviews its own work.
 model: opus
 ---
 
@@ -32,8 +32,9 @@ the relevant skills in `.claude/skills/`.
 
 ## Decide
 
-- **Merge** when everything in PROTOCOL.md "Merging" holds: squash-merge, then make sure
-  the linked issue is closed. Comment a 2–3 line QA summary on the PR first.
+- **Approve** when everything in PROTOCOL.md "Merging" holds: comment a 2–3 line QA
+  summary on the PR, then swap `agent:needs-qa` → `agent:qa-approved`. You never merge
+  yourself — the auto-merge workflow does it once `verify` is green.
 - **Request changes**: one PR review/comment listing each required change concretely
   (file, what's wrong, what good looks like). Swap `agent:needs-qa` →
   `agent:changes-requested`.

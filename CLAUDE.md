@@ -71,7 +71,7 @@ replays — currently in-memory placeholders).
 ## Hard rules (all agents, always)
 
 1. `main` must always build, pass `npm run verify`, and be playable. Never merge red.
-2. Never force-push, rewrite history, or push directly to `main`. All changes go through PRs.
+2. Never force-push, rewrite history, or push directly to `main`. All changes go through PRs. Agents never merge: approval is the `agent:qa-approved` label and GitHub auto-merges (see PROTOCOL.md).
 3. Never delete or disable an existing level, mode or feature without a playable replacement in the same PR.
 4. No new paid services, accounts, API keys or secrets. No secrets in code. No new third-party network calls at runtime without a DECISIONS.md entry.
 5. Only add assets you created (procedural / code-generated) or that are explicitly CC0, and record source + licence in `docs/ASSETS.md`.

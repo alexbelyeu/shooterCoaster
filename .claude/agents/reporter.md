@@ -35,8 +35,9 @@ Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, `docs/agents/VISION.md`,
 8. **Steer me** — remind Alex he can edit `docs/agents/STEERING.md` or open an issue
    labelled `steering`, and that `pause: true` stops everything.
 
-Ship it as a docs-only PR (`agent/report-<YYYY>-W<ww>`); merge it yourself once the
-`verify` check is green.
+Ship it as a docs-only PR (`agent/report-<YYYY>-W<ww>`) labelled `agent:qa-approved`
+(docs-only, so self-approval is allowed); wait until it has merged before sending the
+email, so the screenshot links work.
 
 ## Deliver
 

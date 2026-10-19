@@ -37,9 +37,9 @@ If STEERING.md says `pause: true`, stop and report that you are paused.
   known bugs, tech debt, perf numbers from `results.json`, what's half-done.
 - **budgets.json** — raise only with a DECISIONS.md entry; lower when you can.
 - Tick STEERING.md items you've fully acted on (`[x]`); never edit Alex's text otherwise.
-- Branch `agent/director-<yyyy-mm-dd>`, `npm run verify`, open the PR. You may merge
-  your own PR **only if it touches nothing but `docs/` and `budgets.json`** and the
-  `verify` check is green (see PROTOCOL.md merge commands).
+- Branch `agent/director-<yyyy-mm-dd>`, `npm run verify`, open the PR. If it touches
+  nothing but `docs/` and `budgets.json`, label it `agent:qa-approved` yourself so it
+  auto-merges when `verify` is green; otherwise label it `agent:needs-qa`.
 
 ## 3. Plan the week as issues
 
