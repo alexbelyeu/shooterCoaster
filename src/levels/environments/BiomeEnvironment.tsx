@@ -3,7 +3,13 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Sky } from '@react-three/drei'
 import type { BiomeType } from '@/types/level'
-import { createHeightFunction, getTerrainSlope, type HeightFunction } from '@/utils/terrainNoise'
+import {
+  createHeightFunction,
+  getTerrainMeshSize,
+  getTerrainSlope,
+  TERRAIN_MESH_SEGMENTS,
+  type HeightFunction,
+} from '@/utils/terrainNoise'
 import { TerrainContext } from './TerrainContext'
 import BiomeDecorations from './BiomeDecorations'
 import FerrisWheel from './FerrisWheel'
@@ -331,8 +337,7 @@ export default function BiomeEnvironment({
   const cameraShakeRef = useRef({ active: false, startTime: 0 })
 
   const groundGeo = useMemo(() => {
-    const size = biome === 'arctic' ? 10000 : biome === 'volcanic' ? 12000 : 6000
-    return createNoiseTerrain(biome, heightFn, size, 128)
+    return createNoiseTerrain(biome, heightFn, getTerrainMeshSize(biome), TERRAIN_MESH_SEGMENTS)
   }, [biome, heightFn])
 
   useEffect(() => {

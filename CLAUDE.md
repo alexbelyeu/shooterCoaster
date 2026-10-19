@@ -40,13 +40,17 @@ it gets no kills, autofire never fires at on-screen enemies, or the results scre
 never appears. **Look at the screenshots** with the Read tool — that is how you
 playtest visually. Waits are polled against the frame counter because software
 rendering can run at ~1 fps; tune with `--seconds`, `--combat-seconds`,
-`--min-frames`, `--levels level1,level3`.
+`--min-frames`, `--levels level1,level3`, `--shot-timeout <ms>` (default 120 s).
+`drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
+spawned enemies) and vary run to run; for before/after comparisons use the
+camera-independent `scene` totals the smoke also prints (`track objs/tris` = objects
+named `track*`).
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 (`levels()`, `startLevel(id)`, `frames`, `drawCalls`, `triangles`, `avgFrameMs`,
 `errors`, `phase()`, `stats()` → score/kills/combo/timeRemaining/phase/liveEnemies/
 onScreenEnemies/shotsFired, `autoFire(on)`, `killNearest(n)`, `endLevel()`,
-`setTimeScale(s)`). See `src/testing/e2eHook.tsx`. Extend it when you need new test
+`setTimeScale(s)`, `sceneStats()`). See `src/testing/e2eHook.tsx`. Extend it when you need new test
 surfaces. Note: bullets move a fixed distance per *frame*, so at ~1 fps headless
 autofire rarely lands hits on distant enemies — `killNearest` is what guarantees kills.
 
@@ -68,7 +72,7 @@ replays — currently in-memory placeholders).
 | `src/levels/LevelRegistry.ts` | **Level configs** — track params, biome, timer, waves, star thresholds |
 | `src/levels/scoring.ts` | `SCORE_VALUES` per enemy, `computeMaxScore`, `computeStars` (pure, unit-tested) |
 | `src/levels/environments/` | Biome environments, landmarks (FerrisWheel, Pyramid, Volcano…), decorations, terrain |
-| `src/track/` | Procedural track curves, track mesh, coaster camera, progress |
+| `src/track/` | Procedural track curves, track mesh (rails + ties), lattice support towers, `trackDimensions` (structure scale per level), coaster camera, progress |
 | `src/entities/enemies/` | Enemy models/behaviours; `entities/spawning/EnemySpawner` waves |
 | `src/combat/` | Aim, collisions, projectiles, weapons, crosshair |
 | `src/effects/` | Explosions (pooled), score popups |
