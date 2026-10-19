@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { getBulletPool } from './projectiles/bulletPoolHandle'
 import { useGameStore } from '@/store/useGameStore'
 import { playFireSound } from '@/audio/SFXManager'
+import { eventBus } from '@/core/EventBus'
 
 const _raycaster = new THREE.Raycaster()
 const _ndc = new THREE.Vector2()
@@ -42,8 +43,10 @@ export function useShooting() {
     _direction.copy(_raycaster.ray.direction)
 
     _origin.copy(camera.position)
-    pool.fire(_origin, _direction)
+    if (!pool.fire(_origin, _direction)) return
     playFireSound()
+    // Muzzle flash, camera kick, etc. listen for this (no payload, no allocation).
+    eventBus.emit('weapon:fire')
   }, [camera])
 
   useEffect(() => {

@@ -2,7 +2,7 @@ import { useRef, useMemo, useCallback, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
-import { getCollisionTargets } from '@/combat/CollisionManager'
+import { getCollisionTargets, processHit } from '@/combat/CollisionManager'
 import type { Bullet, BulletPoolHandle } from './bulletPoolHandle'
 import { setBulletPool } from './bulletPoolHandle'
 
@@ -49,7 +49,7 @@ export default function BulletPool({
   const fire = useCallback(
     (origin: THREE.Vector3, direction: THREE.Vector3) => {
       const now = performance.now()
-      if (now - lastFireTime.current < FIRE_DELAY_MS) return
+      if (now - lastFireTime.current < FIRE_DELAY_MS) return false
 
       lastFireTime.current = now
 
@@ -63,13 +63,14 @@ export default function BulletPool({
           break
         }
       }
-      if (!bullet) return
+      if (!bullet) return false
 
       bullet.alive = true
       bullet.bornAt = now
       bullet.position.copy(origin)
       bullet.direction.copy(direction).normalize()
       bullet.speed = BULLET_SPEED
+      return true
     },
     [bullets],
   )
@@ -149,7 +150,7 @@ export default function BulletPool({
       for (const target of targets.values()) {
         if (target.hitThisFrame) {
           target.hitThisFrame = false
-          target.onHit()
+          processHit(target)
         }
       }
     }

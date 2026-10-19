@@ -9,7 +9,8 @@ export interface Bullet {
 }
 
 export interface BulletPoolHandle {
-  fire: (origin: THREE.Vector3, direction: THREE.Vector3) => void
+  /** Returns true if a bullet left the barrel (false when rate-limited or the pool is full). */
+  fire: (origin: THREE.Vector3, direction: THREE.Vector3) => boolean
   getLiveBullets: () => Bullet[]
   getLiveBulletCount: () => number
 }
