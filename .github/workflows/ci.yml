@@ -25,6 +25,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Unit tests (vitest)
+        run: npm test
+
       - name: Typecheck + build
         run: npm run build
 

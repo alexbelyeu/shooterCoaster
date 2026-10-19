@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
+import { computeStars } from '@/levels/scoring'
 
 export default function ResultsScreen() {
   const { score, currentLevel, setPhase, setCurrentLevel, saveScore, resetScore, resetCombo } =
@@ -9,16 +10,7 @@ export default function ResultsScreen() {
   const config = currentLevel ? getLevelConfig(currentLevel) : undefined
   const saved = useRef(false)
 
-  const pct = config ? score / config.maxScore : 0
-  const stars = config
-    ? pct >= config.starThresholds[2]
-      ? 3
-      : pct >= config.starThresholds[1]
-        ? 2
-        : pct >= config.starThresholds[0]
-          ? 1
-          : 0
-    : 0
+  const stars = config ? computeStars(score, config.maxScore, config.starThresholds) : 0
 
   useEffect(() => {
     if (config && !saved.current) {
