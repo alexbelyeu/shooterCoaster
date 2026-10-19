@@ -84,3 +84,13 @@ tier, or none) via STEERING.md.
 **Decision:** Accepted for now. The game must render correctly if the request fails
 (system font fallbacks). Self-hosting the fonts (OFL-licensed, record in ASSETS.md)
 is a backlog item if load time or privacy becomes a concern.
+
+## 2026-10-19 — No self-approval, ever (setup session)
+
+**Context:** In the first end-to-end test the Reporter tried to self-approve its
+docs-only report PR (which PROTOCOL then allowed) and the platform's safety check
+blocked it, as it had blocked agent merges. **Decision:** remove all self-approval:
+every PR, including docs-only and reverts, is approved by a separate QA run. Reverts
+and prod fixes are reviewed first. The Reporter no longer waits for its PR to merge.
+**Consequences:** the Director's plan, reports and reverts land a few hours later
+(next QA run) instead of immediately; QA is the single approval path.

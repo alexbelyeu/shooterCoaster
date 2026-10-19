@@ -15,6 +15,10 @@ the relevant skills in `.claude/skills/`.
 
 ## Review one PR
 
+You are reviewing someone else's work — never approve a PR you (this session) wrote.
+Docs-only PRs (Director plans, reports, STATE updates) get a lighter review: check the
+claims against the code/screenshots and that nothing outside `docs/` changed.
+
 1. Check the `verify` check-run on the head SHA. If it failed, still reproduce locally.
 2. Check out the branch; rebase onto `origin/main` if behind (push the rebase).
 3. `npm ci`, `export SC_CHROME="$(scripts/ensure-browser.sh)"`, `npm run verify`.

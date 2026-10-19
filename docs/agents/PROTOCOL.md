@@ -78,9 +78,13 @@ QA applies `agent:qa-approved` only when **all** hold:
 3. The acceptance criteria are met and CLAUDE.md hard rules are respected.
 4. The branch is up to date with `main` (rebase it if not, re-verify).
 
-Self-approval is allowed only for: the Director's and Reporter's PRs that touch nothing
-but `docs/` and `budgets.json`, and the Maintainer's or QA's pure `git revert` PRs.
-Everything else needs QA.
+**There is no self-approval.** Every PR — features, docs-only, reports, reverts —
+needs the `agent:qa-approved` label from a QA run that did not write it. The platform
+enforces this: an agent's attempt to approve its own PR is blocked. Open your PR with
+`agent:needs-qa` and move on; do not wait for it to merge.
+
+QA reviews in this order: (1) revert / `agent:prod-broken` fixes, (2) P1, (3) the rest
+oldest first.
 
 If the workflow comments that the merge failed (usually a conflict), rebase the
 branch onto `main`, re-verify, push — then QA re-approves.
@@ -88,8 +92,8 @@ branch onto `main`, re-verify, push — then QA re-approves.
 ## When main breaks
 
 Revert first, investigate second. Open a PR that `git revert`s the offending merge
-commit, verify, and label it `agent:qa-approved` (allowed for pure reverts) so it
-merges as soon as `verify` is green, then reopen the original issue with what went wrong.
+commit, verify, and label it `agent:needs-qa` + `P1` with a title starting `revert:` —
+QA reviews reverts first — then reopen the original issue with what went wrong.
 
 ## Environment facts (Claude cloud sessions)
 

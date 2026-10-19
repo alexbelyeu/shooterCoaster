@@ -13,8 +13,8 @@ Work through these in order; stop early only if something is on fire.
 
 1. **Production**: any open issue labelled `agent:prod-broken` (opened by the nightly
    prod-smoke workflow)? Find the culprit merge (`git log`, bisect with
-   `npm run verify` if needed), open a revert PR, verify, label it `agent:qa-approved`
-   (pure reverts may self-approve) so it auto-merges when `verify` is green, comment on the original issue/PR, and reopen the original issue with
+   `npm run verify` if needed), open a revert PR titled `revert: …`, verify, label it
+   `agent:needs-qa` + `P1` (QA reviews reverts first; no self-approval), comment on the original issue/PR, and reopen the original issue with
    what went wrong. Close the prod-broken issue when fixed.
 2. **Main health**: on latest `origin/main` run `npm ci && npm run verify` (with
    `SC_CHROME` set via `scripts/ensure-browser.sh`). If red, revert the culprit the
@@ -28,6 +28,6 @@ Work through these in order; stop early only if something is on fire.
    verify, PR labelled `agent:needs-qa`). If none exist, improve the test harness
    (`e2e/`, `src/testing/`) — e.g. better playtest coverage — via a PR.
 5. Update the "Known issues" section of `docs/agents/STATE.md` if you learned
-   something (docs-only PR; you may label it `agent:qa-approved` yourself).
+   something (docs-only PR labelled `agent:needs-qa`).
 
 Finish with a short health summary: main status, reverts done, queue changes, PRs opened.

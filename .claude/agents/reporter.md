@@ -35,21 +35,20 @@ Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, `docs/agents/VISION.md`,
 8. **Steer me** — remind Alex he can edit `docs/agents/STEERING.md` or open an issue
    labelled `steering`, and that `pause: true` stops everything.
 
-Ship it as a docs-only PR (`agent/report-<YYYY>-W<ww>`) labelled `agent:qa-approved`
-(docs-only, so self-approval is allowed); wait until it has merged before sending the
-email, so the screenshot links work.
+Ship it as a docs-only PR (`agent/report-<YYYY>-W<ww>`) labelled `agent:needs-qa`.
+There is no self-approval, and QA runs later in the day, so do **not** wait for the
+merge: link the PR (where the screenshots are visible) in the issue and the email.
 
 ## Deliver
 
 1. Open a GitHub issue titled `Weekly report <YYYY>-W<ww>` labelled `report` with the
-   headline, the "What's new" bullets and a link to the report file on `main`. Close
-   the previous week's report issue.
+   headline, the "What's new" bullets and a link to the report PR. Create exactly
+   one issue (check none exists for this week first) and close the previous week's.
 2. Prepare the email for Alex (the scheduled session sends it with its Gmail tool): subject
    `ShooterCoaster weekly — <YYYY>-W<ww>: <headline>` and a plain-text body with the
    headline, play link, "What's new", health numbers, "Next up", the report link
-   (`https://github.com/alexbelyeu/shootercoaster/blob/main/docs/reports/<YYYY>-W<ww>.md`)
-   and screenshot links via
-   `https://raw.githubusercontent.com/alexbelyeu/shootercoaster/main/docs/reports/<YYYY>-W<ww>/<file>.jpg`.
+   (the PR link — the screenshots are viewable in its "Files changed" tab; after QA
+   merges it the file lives at `docs/reports/<YYYY>-W<ww>.md` on `main`).
 
 Finish with: report path, issue number, then the email exactly as
 `EMAIL_SUBJECT: ...` on one line followed by `EMAIL_BODY:` and the body.
