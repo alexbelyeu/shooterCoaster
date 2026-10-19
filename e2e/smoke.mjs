@@ -98,6 +98,54 @@ async function imageStats(page, png) {
   }, png.toString('base64'))
 }
 
+/**
+ * Readability probe: freeze game time, list on-screen enemies, and save a 4x
+ * close-up of the largest one as `<id>-enemy.png` (for eyeballing rim light and
+ * contrast). Informational only — never fails the run.
+ */
+async function captureEnemyCloseup(page, id) {
+  try {
+    await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+    const f = await page.evaluate(() => window.__SC_TEST__.frames)
+    await page.waitForFunction((f0) => window.__SC_TEST__.frames >= f0 + 2, f, { timeout: 15000 })
+    const list = await page.evaluate(() => window.__SC_TEST__.enemies())
+    const summary = {
+      onScreen: list.length,
+      largestPx: list[0] ? Math.round(list[0].px) : 0,
+      readable: list.filter((e) => e.px >= 12).length,
+      closeup: null,
+    }
+    // Skip enemies under the HUD (score top-left, timer top-right, mute bottom-right).
+    const target = list.find((e) => e.x > 40 && e.x < 1240 && e.y > 100 && e.y < 650)
+    if (target) {
+      const half = Math.round(Math.min(120, Math.max(40, target.px * 1.5)))
+      const x = Math.max(0, Math.min(1280 - 2 * half, Math.round(target.x - half)))
+      const y = Math.max(0, Math.min(720 - 2 * half, Math.round(target.y - half)))
+      const file = `${id}-enemy.png`
+      // Upscale the crop 4x (nearest) via a 2D canvas so small enemies are inspectable.
+      const crop = await page.screenshot({ clip: { x, y, width: 2 * half, height: 2 * half } })
+      const big = await page.evaluate(async (b64) => {
+        const img = new Image()
+        img.src = `data:image/png;base64,${b64}`
+        await img.decode()
+        const c = document.createElement('canvas')
+        c.width = img.width * 4
+        c.height = img.height * 4
+        const ctx = c.getContext('2d')
+        ctx.imageSmoothingEnabled = false
+        ctx.drawImage(img, 0, 0, c.width, c.height)
+        return c.toDataURL('image/png').split(',')[1]
+      }, crop.toString('base64'))
+      fs.writeFileSync(path.join(OUT, file), Buffer.from(big, 'base64'))
+      summary.closeup = { file, type: target.type, px: Math.round(target.px), distance: Math.round(target.distance) }
+    }
+    await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
+    return summary
+  } catch (e) {
+    return { error: String(e?.message ?? e).split('\n')[0] }
+  }
+}
+
 async function run() {
   let preview
   const base = args.url ?? (preview = await startPreview()).url
@@ -152,6 +200,7 @@ async function run() {
     })
     const png = await page.screenshot({ path: path.join(OUT, `${id}.png`) })
     const img = await imageStats(page, png)
+    const enemyShot = await captureEnemyCloseup(page, id)
     const allErrors = [...errors, ...stats.hookErrors]
     const frames = stats.frames - a
     const problems = []
@@ -161,7 +210,7 @@ async function run() {
     if (!['playing', 'results'].includes(stats.phase)) problems.push(`unexpected phase "${stats.phase}"`)
     const ok = problems.length === 0
     failed ||= !ok
-    results.push({ id, ok, problems, frames, seconds: (Date.now() - started) / 1000, ...stats, image: img, errors: allErrors })
+    results.push({ id, ok, problems, frames, seconds: (Date.now() - started) / 1000, ...stats, image: img, enemies: enemyShot, errors: allErrors })
     await ctx.close()
   }
 
@@ -170,7 +219,10 @@ async function run() {
 
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
   for (const r of results) {
-    const extra = r.id === 'title' ? '' : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}`
+    const en = r.enemies && !r.enemies.error
+      ? ` enemiesOnScreen=${r.enemies.onScreen} readable=${r.enemies.readable} largestPx=${r.enemies.largestPx}`
+      : ''
+    const extra = r.id === 'title' ? '' : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${en}`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)} frames=${r.frames}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
