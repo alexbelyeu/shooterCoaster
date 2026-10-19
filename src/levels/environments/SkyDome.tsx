@@ -101,7 +101,7 @@ const fragmentShader = /* glsl */ `
       float ang = acos(clamp(d, -1.0, 1.0));
       float disc = 1.0 - smoothstep(uSunSize * 0.85, uSunSize, ang);
       float glow = pow(d, 64.0) * 0.6 + pow(d, 8.0) * 0.25;
-      col += uSunColor * (disc * 2.0 + glow * uSunGlow);
+      col += uSunColor * (disc * 1.5 + glow * uSunGlow);
     }
 
     gl_FragColor = vec4(col, 1.0);
