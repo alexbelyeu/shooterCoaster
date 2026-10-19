@@ -68,8 +68,9 @@ export default function EnemyBase({
   const registerKill = useGameStore((s) => s.registerKill)
   const phase = useGameStore((s) => s.phase)
 
-  // Game-ms left in the hit-flash / kill-pop window; < 0 means not dying.
-  const dyingMs = useRef(-1)
+  // Kill-pop state: dying between the hit and the explosion.
+  const dying = useRef(false)
+  const dyingMs = useRef(0)
   const dyingFrames = useRef(0)
 
   const kill = useCallback(() => {
@@ -79,6 +80,7 @@ export default function EnemyBase({
     addScore(scoreValue)
     registerKill()
 
+    dying.current = true
     dyingMs.current = ENEMY_HIT_FLASH_MS
     dyingFrames.current = 0
     const group = meshRef.current
@@ -90,7 +92,7 @@ export default function EnemyBase({
 
   /** End of the kill pop: explosion, events, unmount. */
   const finishKill = useCallback(() => {
-    dyingMs.current = -1
+    dying.current = false
     const combo = useGameStore.getState().combo
     playExplosionSound(combo.count)
 
@@ -135,7 +137,7 @@ export default function EnemyBase({
 
     if (aliveRef.current) {
       updatePosition(meshRef.current, spawnPosition, clock.elapsedTime, delta * timeScale)
-    } else if (dyingMs.current >= 0) {
+    } else if (dying.current) {
       // Frozen in the white pop. The hit may land earlier in this same frame
       // (bullet pool runs first), so require a 2nd tick: the pop is always
       // rendered at least once, even at very low frame rates.
