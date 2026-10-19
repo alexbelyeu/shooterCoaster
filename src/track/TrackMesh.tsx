@@ -1,213 +1,156 @@
-import { useMemo, useCallback, useContext, useEffect, useRef } from 'react'
+import { useMemo, useContext, useEffect, useCallback } from 'react'
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import type { HeightFunction } from '@/utils/terrainNoise'
+import { type TrackDimensions, getTrackDimensions } from './trackDimensions'
+import { type ArcTable, buildArcTable } from './arcLength'
+import { buildTrackGeometry } from './trackGeometry'
+import {
+  type TowerPlan,
+  type TowerInstance,
+  buildFootingGeometry,
+  buildTowerGeometry,
+  getTowerDims,
+  planTowers,
+} from './supportTowers'
 
 interface TrackMeshProps {
   curve: TrackCurve
   segments?: number
   color1?: [number, number, number]
   color2?: [number, number, number]
+  /** Structural dimensions; defaults to a scalar-20 (trackScale 1) coaster. */
+  dims?: TrackDimensions
+  /**
+   * Height of the terrain as rendered (see createTerrainSurface). Footings sit on
+   * this; defaults to the TerrainContext heightFn.
+   */
+  groundFn?: HeightFunction
 }
 
-/**
- * Port of mrdoob's RollerCoaster.js BufferGeometry extrusion.
- * Generates track rails with vertex colors.
- */
-function buildTrackGeometry(
-  curve: TrackCurve,
-  segments: number,
-  color1: [number, number, number],
-  color2: [number, number, number],
-): THREE.BufferGeometry {
-  const vertices: number[] = []
-  const normals: number[] = []
-  const colors: number[] = []
+const DEFAULT_DIMS = getTrackDimensions({ scalar: 20 })
+/** Footing pads stand this far proud of the visible ground. */
+const FOOTING_LIFT = 0.5
 
-  const up = new THREE.Vector3(0, 1, 0)
-  const forward = new THREE.Vector3()
-  const right = new THREE.Vector3()
+const _m = new THREE.Matrix4()
+const _q = new THREE.Quaternion()
+const _p = new THREE.Vector3()
+const _s = new THREE.Vector3()
+const _yAxis = new THREE.Vector3(0, 1, 0)
 
-  const quaternion = new THREE.Quaternion()
-  const prevQuaternion = new THREE.Quaternion()
-  prevQuaternion.setFromAxisAngle(up, Math.PI / 2)
-
-  const point = new THREE.Vector3()
-  const prevPoint = new THREE.Vector3()
-  prevPoint.copy(curve.getPointAt(0))
-
-  // Cross-tie shape (the flat steps between rails)
-  const step = [
-    new THREE.Vector3(-2.25, 0, 0),
-    new THREE.Vector3(0, -0.5, 0),
-    new THREE.Vector3(0, -1.75, 0),
-    new THREE.Vector3(0, -0.5, 0),
-    new THREE.Vector3(2.25, 0, 0),
-    new THREE.Vector3(0, -1.75, 0),
-  ]
-
-  // Tube cross-sections
-  const PI2 = Math.PI * 2
-  const tube1: THREE.Vector3[] = []
-  for (let i = 0; i < 5; i++) {
-    const angle = (i / 5) * PI2
-    tube1.push(new THREE.Vector3(Math.sin(angle) * 0.6, Math.cos(angle) * 0.6, 0))
-  }
-  const tube2: THREE.Vector3[] = []
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * PI2
-    tube2.push(new THREE.Vector3(Math.sin(angle) * 0.25, Math.cos(angle) * 0.25, 0))
-  }
-
-  const vector = new THREE.Vector3()
-  const normal = new THREE.Vector3()
-
-  function drawShape(shape: THREE.Vector3[], color: [number, number, number]) {
-    normal.set(0, 0, -1).applyQuaternion(quaternion)
-    for (let j = 0; j < shape.length; j++) {
-      vector.copy(shape[j]).applyQuaternion(quaternion).add(point)
-      vertices.push(vector.x, vector.y, vector.z)
-      normals.push(normal.x, normal.y, normal.z)
-      colors.push(color[0], color[1], color[2])
-    }
-    normal.set(0, 0, 1).applyQuaternion(quaternion)
-    for (let j = shape.length - 1; j >= 0; j--) {
-      vector.copy(shape[j]).applyQuaternion(quaternion).add(point)
-      vertices.push(vector.x, vector.y, vector.z)
-      normals.push(normal.x, normal.y, normal.z)
-      colors.push(color[0], color[1], color[2])
-    }
-  }
-
-  const v1 = new THREE.Vector3()
-  const v2 = new THREE.Vector3()
-  const v3 = new THREE.Vector3()
-  const v4 = new THREE.Vector3()
-  const n1 = new THREE.Vector3()
-  const n2 = new THREE.Vector3()
-  const n3 = new THREE.Vector3()
-  const n4 = new THREE.Vector3()
-
-  function extrudeShape(
-    shape: THREE.Vector3[],
-    offset: THREE.Vector3,
-    color: [number, number, number],
-  ) {
-    for (let j = 0; j < shape.length; j++) {
-      const p1 = shape[j]
-      const p2 = shape[(j + 1) % shape.length]
-
-      v1.copy(p1).add(offset).applyQuaternion(quaternion).add(point)
-      v2.copy(p2).add(offset).applyQuaternion(quaternion).add(point)
-      v3.copy(p2).add(offset).applyQuaternion(prevQuaternion).add(prevPoint)
-      v4.copy(p1).add(offset).applyQuaternion(prevQuaternion).add(prevPoint)
-
-      vertices.push(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v4.x, v4.y, v4.z)
-      vertices.push(v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, v4.x, v4.y, v4.z)
-
-      n1.copy(p1).applyQuaternion(quaternion).normalize()
-      n2.copy(p2).applyQuaternion(quaternion).normalize()
-      n3.copy(p2).applyQuaternion(prevQuaternion).normalize()
-      n4.copy(p1).applyQuaternion(prevQuaternion).normalize()
-
-      normals.push(n1.x, n1.y, n1.z, n2.x, n2.y, n2.z, n4.x, n4.y, n4.z)
-      normals.push(n2.x, n2.y, n2.z, n3.x, n3.y, n3.z, n4.x, n4.y, n4.z)
-
-      for (let k = 0; k < 6; k++) {
-        colors.push(color[0], color[1], color[2])
-      }
-    }
-  }
-
-  const offset = new THREE.Vector3()
-
-  for (let i = 1; i <= segments; i++) {
-    point.copy(curve.getPointAt(i / segments))
-
-    up.set(0, 1, 0)
-    forward.subVectors(point, prevPoint).normalize()
-    right.crossVectors(up, forward).normalize()
-    up.crossVectors(forward, right)
-
-    const angle = Math.atan2(forward.x, forward.z)
-    quaternion.setFromAxisAngle(up, angle)
-
-    if (i % 2 === 0) {
-      drawShape(step, color2)
-    }
-
-    extrudeShape(tube1, offset.set(0, -1.25, 0), color2)
-    extrudeShape(tube2, offset.set(2, 0, 0), color1)
-    extrudeShape(tube2, offset.set(-2, 0, 0), color1)
-
-    prevPoint.copy(point)
-    prevQuaternion.copy(quaternion)
-  }
-
-  const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
-  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
-  return geometry
-}
-
-/** Generate support pillar positions along the track, terrain-aware */
-function generatePillarPositions(
-  curve: TrackCurve,
-  count: number,
-  heightFn: HeightFunction,
-): { x: number; groundY: number; z: number; pillarHeight: number }[] {
-  const pillars: { x: number; groundY: number; z: number; pillarHeight: number }[] = []
-
-  for (let i = 0; i < count; i++) {
-    const t = i / count
-    const point = curve.getPointAt(t)
-    const groundY = heightFn(point.x, point.z)
-    const pillarHeight = point.y - groundY
-    // Only place pillars where track is above terrain
-    if (pillarHeight > 5) {
-      pillars.push({
-        x: point.x,
-        groundY,
-        z: point.z,
-        pillarHeight,
-      })
-    }
-  }
-
-  return pillars
-}
-
-function TrackPillars({ curve }: { curve: TrackCurve }) {
-  const heightFn = useContext(TerrainContext)
-  const pillars = useMemo(() => generatePillarPositions(curve, 50, heightFn), [curve, heightFn])
-  const mat = useRef(new THREE.Matrix4()).current
-  const scale = useRef(new THREE.Vector3()).current
-
+function TowerBucket({
+  geometry,
+  material,
+  towers,
+}: {
+  geometry: THREE.BufferGeometry
+  material: THREE.Material
+  towers: TowerInstance[]
+}) {
   const setRef = useCallback(
     (mesh: THREE.InstancedMesh | null) => {
       if (!mesh) return
-
-      for (let i = 0; i < pillars.length; i++) {
-        const p = pillars[i]
-        scale.set(1, p.pillarHeight, 1)
-        mat.makeTranslation(p.x, p.groundY + p.pillarHeight / 2, p.z)
-        mat.scale(scale)
-        mesh.setMatrixAt(i, mat)
+      _s.set(1, 1, 1)
+      for (let i = 0; i < towers.length; i++) {
+        const t = towers[i]
+        _q.setFromAxisAngle(_yAxis, t.yaw)
+        _p.set(t.x, t.topY, t.z)
+        mesh.setMatrixAt(i, _m.compose(_p, _q, _s))
       }
       mesh.instanceMatrix.needsUpdate = true
+      mesh.computeBoundingSphere()
     },
-    [pillars],
+    [towers],
+  )
+  return <instancedMesh name="track-towers" ref={setRef} args={[geometry, material, towers.length]} />
+}
+
+/** Lattice towers (one InstancedMesh per height bucket) + footing pads. */
+function SupportTowers({
+  curve,
+  table,
+  dims,
+  groundFn,
+}: {
+  curve: TrackCurve
+  table: ArcTable
+  dims: TrackDimensions
+  groundFn?: HeightFunction
+}) {
+  const heightFn = useContext(TerrainContext)
+  const plan: TowerPlan = useMemo(
+    () => planTowers(curve, table, dims, heightFn, groundFn ?? heightFn),
+    [curve, table, dims, heightFn, groundFn],
   )
 
-  if (pillars.length === 0) return null
+  const td = useMemo(() => getTowerDims(dims), [dims])
+  const bucketGeoms = useMemo(
+    () => plan.bucketHeights.map((h) => buildTowerGeometry(td, h)),
+    [plan, td],
+  )
+  const footingGeom = useMemo(() => buildFootingGeometry(), [])
+  const steel = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#8b939c', roughness: 0.5, metalness: 0.45 }),
+    [],
+  )
+  const concrete = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#a39d92', roughness: 0.95, metalness: 0 }),
+    [],
+  )
+
+  useEffect(
+    () => () => {
+      for (const g of bucketGeoms) g.dispose()
+    },
+    [bucketGeoms],
+  )
+  useEffect(
+    () => () => {
+      footingGeom.dispose()
+      steel.dispose()
+      concrete.dispose()
+    },
+    [footingGeom, steel, concrete],
+  )
+
+  const byBucket = useMemo(
+    () => plan.bucketHeights.map((_, b) => plan.towers.filter((t) => t.bucket === b)),
+    [plan],
+  )
+
+  const footingCount = plan.towers.length * 4
+  const setFootingRef = useCallback(
+    (mesh: THREE.InstancedMesh | null) => {
+      if (!mesh) return
+      let i = 0
+      for (const t of plan.towers) {
+        _q.setFromAxisAngle(_yAxis, t.yaw)
+        for (const f of t.feet) {
+          _p.set(f.x, f.y + FOOTING_LIFT, f.z)
+          _s.set(f.size, f.y + FOOTING_LIFT - f.bottom, f.size)
+          mesh.setMatrixAt(i++, _m.compose(_p, _q, _s))
+        }
+      }
+      mesh.instanceMatrix.needsUpdate = true
+      mesh.computeBoundingSphere()
+    },
+    [plan],
+  )
+
+  if (plan.towers.length === 0) return null
 
   return (
-    <instancedMesh ref={setRef} args={[undefined, undefined, pillars.length]} frustumCulled={false}>
-      <cylinderGeometry args={[0.8, 1.2, 1, 6]} />
-      <meshStandardMaterial color="#666666" roughness={0.7} metalness={0.3} />
-    </instancedMesh>
+    <>
+      {bucketGeoms.map((geom, b) =>
+        byBucket[b].length > 0 ? (
+          <TowerBucket key={geom.uuid} geometry={geom} material={steel} towers={byBucket[b]} />
+        ) : null,
+      )}
+      <instancedMesh
+        name="track-footings"
+        key={footingGeom.uuid + footingCount} ref={setFootingRef} args={[footingGeom, concrete, footingCount]} />
+    </>
   )
 }
 
@@ -216,10 +159,13 @@ export default function TrackMesh({
   segments = 1000,
   color1 = [1, 1, 1],
   color2 = [1, 1, 0],
+  dims = DEFAULT_DIMS,
+  groundFn,
 }: TrackMeshProps) {
+  const table = useMemo(() => buildArcTable(curve), [curve])
   const geometry = useMemo(
-    () => buildTrackGeometry(curve, segments, color1, color2),
-    [curve, segments, color1, color2],
+    () => buildTrackGeometry(curve, table, dims, segments, color1, color2),
+    [curve, table, dims, segments, color1, color2],
   )
 
   useEffect(() => {
@@ -230,10 +176,10 @@ export default function TrackMesh({
 
   return (
     <>
-      <mesh geometry={geometry}>
-        <meshStandardMaterial vertexColors roughness={0.6} metalness={0.2} />
+      <mesh name="track" geometry={geometry}>
+        <meshStandardMaterial vertexColors roughness={0.45} metalness={0.3} />
       </mesh>
-      <TrackPillars curve={curve} />
+      <SupportTowers curve={curve} table={table} dims={dims} groundFn={groundFn} />
     </>
   )
 }

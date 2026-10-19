@@ -104,3 +104,35 @@ github-actions[bot] comment, which GitHub emails to Alex. QA also no longer need
 push rebases: GitHub merges approved PRs that are behind `main` if they don't conflict.
 **Consequences:** the email arrives from notifications@github.com; no agent touches
 Alex's mailbox.
+
+## 2026-10-19 — Coaster structure scales with sqrt(scalar); towers sit on the drawn terrain (Builder, #13)
+
+**Context:** Rails were fixed-size while track curves scale with `track.scalar`
+(20–60), and supports were Y-scaled hexagonal cylinders. Issue #13 asks for lattice
+towers and rails that look equally thick on every level, within +10 draw calls and
++60k triangles per level.
+
+**Decision:**
+- `src/track/trackDimensions.ts` derives `trackScale = clamp(sqrt(scalar / 20), 1, 2.5)`
+  and scales rails, ties, towers **and the rider eye height** (`CoasterCamera`
+  `heightOffset` = 6 × trackScale) by it. Scaling the eye with the steel keeps the
+  near view identical on all levels; sqrt (not linear) keeps the steel from dwarfing
+  fixed-size enemies on big tracks. `TrackParams` gains optional `railRadius` /
+  `tieSpacing` (defaults 0.35 / 10, multiplied by trackScale).
+- Towers are spaced by arc length at 50 × trackScale, but the spacing is widened until
+  all towers fit `TOWER_TRI_BUDGET` (34k triangles). Long, high tracks (Arctic 37k,
+  Volcanic 62k units long, up to ~1200 high) therefore get sparse, very large towers
+  (~700–800 units apart); Theme Park / Ocean get one every ~200–240 units. Ties are
+  capped at 1600 per track for the same reason.
+- One `InstancedMesh` per height bucket (8 quantile buckets). A bucket's geometry is
+  the top H units of the same infinite tower, so shorter towers are sunk into the
+  ground instead of Y-scaled (level-design rule 2).
+- Footings follow the terrain **as drawn** (`createTerrainSurface` in
+  `utils/terrainNoise.ts`), not raw `heightFn`. The 128-segment terrain mesh is linear
+  between vertices 47–94 units apart and differs from `heightFn` by up to ~55 units on
+  Arctic ridges; footings placed on `heightFn` visibly float. Pads and legs extend
+  below `min(drawn, heightFn)` so they are grounded under either surface.
+
+**Consequences:** +8 draw calls and ~+45–52k triangles per level (camera-independent
+count, `sceneStats()` in the e2e hook). Tower density on Arctic/Volcanic is limited by
+the triangle budget; denser support there needs LOD or per-chunk culling (follow-up).
