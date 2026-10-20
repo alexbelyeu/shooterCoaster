@@ -1,6 +1,6 @@
 import type { ComponentType, RefObject } from 'react'
 import type * as THREE from 'three'
-import type { HeightFunction } from '@/utils/terrainNoise'
+import type { HeightFunction, TrackSample } from '@/utils/terrainNoise'
 import type { AtmosphereConfig } from '../atmosphere'
 
 /** One stop of a terrain colour ramp. */
@@ -38,6 +38,10 @@ export interface BiomeTreeConfig {
 /** Props every biome's decorations component receives. */
 export interface BiomeDecorationsProps {
   heightFn: HeightFunction
+  /** Terrain height as drawn (createTerrainSurface): sit grounded props on this. */
+  groundFn: HeightFunction
+  /** For scattering props around the ride (shared/trackScatter.ts). */
+  trackSamples: TrackSample[]
 }
 
 /** Props every biome's features component (landmarks, terrain features, events) receives. */
