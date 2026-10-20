@@ -199,3 +199,23 @@ balloons spawned up to ~4500 units from the camera (≈5 px on screen).
 **Consequences:** New enemy materials must use `withRim()` and be checked against the
 biome palette; new enemy types need an `ENEMY_SILHOUETTE` entry. More enemies are in
 view at any moment, so draw calls per smoke screenshot vary more with spawn RNG.
+
+## 2026-10-19 — HUD render policy and UI palette (Builder, #18)
+
+**Context:** The HUD is DOM over the WebGL canvas. Re-rendering React on every
+frame (or every score tick) would compete with the render loop, and the HUD,
+wave banner and level select need one shared set of per-biome accent colours.
+
+**Decision:** The HUD root subscribes only to `currentLevel`; each widget
+subscribes to its own store slice. The score tween bypasses React entirely
+(`useGameStore.subscribe` + one rAF loop that writes `textContent` while it is
+catching up). The timer bar re-renders ~1×/s (GameTimer writes on whole seconds)
+and eases with a 1 s linear CSS transition; the combo ring drains with a CSS
+animation keyed on `lastKillTime`. Accent colours live in `src/ui/theme.ts`
+(`BIOME_UI`) and reach CSS as `--hud-accent` / `--hud-glow`. Type system:
+Lobster only for the game title and screen headers, Inter (tabular numerals)
+everywhere in the HUD, countdown and wave banner.
+
+**Consequences:** Measured over a 78 s level1 run: HUD root rendered once, timer
+~1×/s, score widget once. New HUD widgets should follow the same pattern
+(slice subscriptions, CSS for continuous motion, no per-frame React state).
