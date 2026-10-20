@@ -4,13 +4,18 @@ export interface Bullet {
   alive: boolean
   bornAt: number
   position: THREE.Vector3
+  /** Position at the start of this frame's step (the swept hit test runs prev → position). */
+  prev: THREE.Vector3
   direction: THREE.Vector3
+  /** World units per second. */
   speed: number
+  /** Multiplier on target hit radii for this bullet (touch shots get a little slack). */
+  hitScale: number
 }
 
 export interface BulletPoolHandle {
   /** Returns true if a bullet left the barrel (false when rate-limited or the pool is full). */
-  fire: (origin: THREE.Vector3, direction: THREE.Vector3) => boolean
+  fire: (origin: THREE.Vector3, direction: THREE.Vector3, hitScale?: number) => boolean
   getLiveBullets: () => Bullet[]
   getLiveBulletCount: () => number
 }

@@ -11,8 +11,8 @@
  * killed, autofire never fired at on-screen enemies, the killNearest hits never
  * produced a kill event, the camera translated off the track pose at all (kill
  * feedback is rotation-only), the kill trauma exceeded 1° or did not decay to 0,
- * the first-person weapon is missing / off screen / covering the centre, or the
- * results screen never appears.
+ * the first-person weapon is missing / off screen / covering the centre, the
+ * camera aspect doesn't match the canvas, or the results screen never appears.
  * Saves screenshots + stats to e2e-results/.
  *
  * All waits are deadline-polled on the hook's frame counter, because software
@@ -26,12 +26,14 @@
  *   node e2e/smoke.mjs --mobile --skip-desktop          # only the touch playtest
  *
  * --mobile: iPhone 13-like context (390x844, touch, mobile UA) that taps PLAY,
- * taps level 1, taps the canvas 10x at on-screen enemies through real touch
- * input, and requires the taps to fire and a kill to happen (killNearest(3) is
- * the fallback when no tapped bullet connects at ~1 fps; reported as
- * tapKills). Checks HUD elements are inside the viewport and don't overlap in
- * portrait and in 844x390 landscape, then taps Pause. Saves
- * mobile-level1.png and mobile-level1-landscape.png.
+ * taps level 1, then in portrait and again after rotating to 844x390 landscape
+ * taps the canvas 10x at on-screen enemies, each tap offset 15-30 px from the
+ * enemy (game time frozen while tapping), and requires the taps to fire and
+ * kill through touch aim assist. Checks the camera aspect matches the canvas
+ * (±0.01) in portrait, landscape and after rotating back (also on desktop for
+ * every level), that HUD elements are inside the viewport and don't overlap in
+ * both orientations, then taps Pause. Saves mobile-level1.png and
+ * mobile-level1-landscape.png.
  *
  * Browser: uses Playwright's bundled Chromium if installed; otherwise set
  * SC_CHROME=/path/to/chromium (see scripts/ensure-browser.sh for cloud sessions).
@@ -439,6 +441,93 @@ async function hudLayoutProblems(page, label) {
   return { problems, rects }
 }
 
+// ── Camera aspect + offset touch taps (issue #66) ──
+
+/** Camera aspect must match the canvas on screen (±0.01), or the world is squashed. */
+async function aspectProblems(page, label) {
+  const view = await page.evaluate(() => window.__SC_TEST__.view?.() ?? null)
+  if (!view || view.cameraAspect == null) return { view, problems: [`${label}: camera view unavailable`] }
+  const off = Math.abs(view.cameraAspect - view.canvasAspect)
+  return {
+    view,
+    problems: off > 0.01
+      ? [`${label}: camera aspect ${view.cameraAspect.toFixed(3)} != canvas ${view.canvasAspect.toFixed(3)} (world squashed)`]
+      : [],
+  }
+}
+
+const TAP_COUNT = 10
+const TAP_MAX_OFFSET = 30
+
+/**
+ * Tap TAP_COUNT times near the nearest on-screen enemy, each tap deliberately
+ * offset 15-30 px from its centre (a fingertip is not a crosshair), and require
+ * kills. Game time is frozen while tapping so the check measures aim + touch
+ * assist rather than how far a target moves during one ~1 fps software frame;
+ * bullets still fly (they run on real time). Time is resumed afterwards so the
+ * kill pops finish. Leaves time running (scale 1).
+ */
+async function offsetTapKills(page, label) {
+  const freezeAndSettle = async () => {
+    await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+    await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  }
+  await freezeAndSettle()
+  const vp = page.viewportSize()
+  const before = await getStats(page)
+  const hitsBefore = await page.evaluate(() => window.__SC_TEST__.combat.hits)
+  let tapsOnEnemies = 0
+  let maxOffset = 0
+  for (let i = 0; i < TAP_COUNT; i++) {
+    const [pt] = await page.evaluate(() => window.__SC_TEST__.enemyScreenPoints(1))
+    let x = vp.width / 2
+    let y = vp.height / 2
+    if (pt) {
+      tapsOnEnemies++
+      const r = TAP_MAX_OFFSET * (0.5 + 0.25 * (i % 3)) // 15, 22.5, 30 px
+      const a = i * 2.39996 // golden angle: offsets all around the target
+      x = pt.x + r * Math.cos(a)
+      y = pt.y + r * Math.sin(a)
+      maxOffset = Math.max(maxOffset, r)
+    }
+    // Keep taps on the canvas, off the HUD buttons in the bottom corners.
+    x = Math.min(Math.max(x, 8), vp.width - 8)
+    y = Math.min(Math.max(y, 8), vp.height - 80)
+    await page.touchscreen.tap(x, y)
+    await waitFrames(page, 1, { minMs: 80, maxMs: 4000, pollMs: 40 })
+  }
+  const afterTaps = await getStats(page)
+  // Bullets need a few frames to reach the (frozen) targets.
+  const hitDeadline = Date.now() + 15000
+  let hits = hitsBefore
+  while (Date.now() < hitDeadline) {
+    await waitFrames(page, 1, { maxMs: 4000, pollMs: 60 })
+    hits = await page.evaluate(() => window.__SC_TEST__.combat.hits)
+    if (hits - hitsBefore >= Math.min(3, tapsOnEnemies)) break
+  }
+  // Resume time so the hit enemies finish their kill pop (enemy:killed).
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
+  const killDeadline = Date.now() + 15000
+  let s = await getStats(page)
+  while (Date.now() < killDeadline && hits > hitsBefore && s.kills === before.kills && s.phase === 'playing') {
+    await waitFrames(page, 1, { maxMs: 4000, pollMs: 60 })
+    s = await getStats(page)
+  }
+  const result = {
+    taps: TAP_COUNT,
+    tapsOnEnemies,
+    maxOffsetPx: maxOffset,
+    tapShots: afterTaps.shotsFired - before.shotsFired,
+    tapHits: hits - hitsBefore,
+    tapKills: s.kills - before.kills,
+  }
+  const problems = []
+  if (result.tapShots === 0) problems.push(`${label}: ${TAP_COUNT} taps fired no shots (touch input broken?)`)
+  else if (tapsOnEnemies > 0 && result.tapKills === 0)
+    problems.push(`${label}: ${TAP_COUNT} taps up to ${TAP_MAX_OFFSET} px off enemies got no kills (${result.tapHits} hits)`)
+  return { result, problems }
+}
+
 /** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
 async function runMobile(browser, base) {
   const started = Date.now()
@@ -478,37 +567,21 @@ async function runMobile(browser, base) {
   const enemyDeadline = Date.now() + Math.max(SECONDS, 10) * 2000
   while (Date.now() < enemyDeadline && (await getStats(page)).onScreenEnemies === 0) await page.waitForTimeout(500)
 
-  // 10 taps on the canvas, each at the nearest on-screen enemy (centre if none).
-  const before = await getStats(page)
-  let tapsOnEnemies = 0
-  const vp = page.viewportSize()
-  for (let i = 0; i < 10; i++) {
-    const [pt] = await page.evaluate(() => window.__SC_TEST__.enemyScreenPoints(1))
-    if (pt) tapsOnEnemies++
-    // Keep taps off the HUD buttons in the bottom corners.
-    const x = Math.min(Math.max(pt?.x ?? vp.width / 2, 8), vp.width - 8)
-    const y = Math.min(Math.max(pt?.y ?? vp.height / 2, 8), vp.height - 80)
-    await page.touchscreen.tap(x, y)
-    await waitFrames(page, 1, { minMs: 80, maxMs: 4000, pollMs: 40 })
-  }
-  const afterTaps = await getStats(page)
-  const tapShots = afterTaps.shotsFired - before.shotsFired
-  if (tapShots === 0) problems.push('10 taps fired no shots (touch input broken?)')
+  const portraitAspect = await aspectProblems(page, 'portrait 390x844')
+  problems.push(...portraitAspect.problems)
+
+  // 10 taps, each offset 15-30 px from the nearest on-screen enemy (touch aim assist).
+  const portraitTaps = await offsetTapKills(page, 'portrait')
+  problems.push(...portraitTaps.problems)
+  const { tapsOnEnemies, tapShots, tapKills } = portraitTaps.result
   const crosshairScale = await page.evaluate(() => {
     const el = document.querySelector('.crosshair-svg')
     return el ? new DOMMatrixReadOnly(getComputedStyle(el).transform).a : 0
   })
   if (Math.abs(crosshairScale - 1.25) > 0.01) problems.push(`crosshair not in touch mode (scale ${crosshairScale})`)
 
-  // Give tapped bullets a few frames to connect, then fall back to killNearest(3)
-  // (3 so the screenshot also shows the combo counter in its phone position).
-  const killDeadline = Date.now() + 15000
-  let s = afterTaps
-  while (Date.now() < killDeadline && s.kills === before.kills) {
-    await waitFrames(page, 1, { maxMs: 4000, pollMs: 100 })
-    s = await getStats(page)
-  }
-  const tapKills = s.kills - before.kills
+  // If the taps got no kill (already reported), killNearest(3) still sets up the
+  // screenshot / HUD checks below (3 so the combo counter shows in its phone position).
   let fallbackKills = 0
   if (tapKills === 0) {
     const killEventsBefore = await page.evaluate(() => window.__SC_TEST__.combat.kills)
@@ -530,6 +603,7 @@ async function runMobile(browser, base) {
   // One more real tap with feedback held, so the screenshot shows the weapon's
   // muzzle flash + tracer (#65); then freeze game time with them on screen.
   {
+    const vp = page.viewportSize()
     const [pt] = await page.evaluate(() => {
       window.__SC_TEST__.holdFeedback = true
       return window.__SC_TEST__.enemyScreenPoints(1)
@@ -551,8 +625,22 @@ async function runMobile(browser, base) {
 
   await page.setViewportSize({ width: 844, height: 390 })
   await waitFrames(page, 2, { minMs: 500, maxMs: 8000 })
+  const landscapeAspect = await aspectProblems(page, 'landscape 844x390 (rotated)')
+  problems.push(...landscapeAspect.problems)
   const landscape = await hudLayoutProblems(page, 'landscape 844x390')
   problems.push(...landscape.problems)
+  // Offset taps must also land in landscape; wait for a target first.
+  const lsEnemyDeadline = Date.now() + 20000
+  while (Date.now() < lsEnemyDeadline && (await getStats(page)).onScreenEnemies === 0) {
+    await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
+    await waitFrames(page, 1, { maxMs: 4000, pollMs: 100 })
+  }
+  const landscapeTaps = (await phase()) === 'playing'
+    ? await offsetTapKills(page, 'landscape')
+    : { result: null, problems: [`landscape: level left 'playing' (${await phase()}) before the taps`] }
+  problems.push(...landscapeTaps.problems)
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  await waitFrames(page, 1, { maxMs: 5000, pollMs: 40 })
   await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-landscape.png`), timeout: SHOT_TIMEOUT })
   const weaponLandscape = await weaponProblems(page, 'landscape 844x390')
   problems.push(...weaponLandscape.problems)
@@ -564,6 +652,12 @@ async function runMobile(browser, base) {
   await waitPhase('paused', 15000)
   if ((await phase()) !== 'paused') problems.push('tapping Pause did not pause')
 
+  // Rotate back to portrait: the camera must follow again.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await waitFrames(page, 2, { minMs: 500, maxMs: 8000 })
+  const backAspect = await aspectProblems(page, 'portrait 390x844 (rotated back)')
+  problems.push(...backAspect.problems)
+
   const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
   const allErrors = [...errors, ...hookErrors]
   if (allErrors.length) problems.push(`${allErrors.length} error(s)`)
@@ -573,7 +667,11 @@ async function runMobile(browser, base) {
     ok: problems.length === 0,
     problems,
     seconds: (Date.now() - started) / 1000,
-    mobile: { taps: 10, tapsOnEnemies, tapShots, tapKills, fallbackKills, crosshairScale },
+    mobile: {
+      taps: 10, tapsOnEnemies, tapShots, tapKills, fallbackKills, crosshairScale,
+      portraitTaps: portraitTaps.result, landscapeTaps: landscapeTaps.result,
+      views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
+    },
     kills: end.kills,
     score: end.score,
     hud: { portrait: portrait.rects, landscape: landscape.rects },
@@ -643,6 +741,9 @@ async function run() {
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${SECONDS}s)`)
     if (img.stddev < 4 || img.distinctColors < 8) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
+    const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
+    problems.push(...desktopAspect.problems)
+    stats.view = desktopAspect.view
     const play = await playLevel(page, id)
     problems.push(...play.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
@@ -677,7 +778,8 @@ async function run() {
       ? ''
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
-          ` tapKills=${r.mobile.tapKills} fallbackKills=${r.mobile.fallbackKills} kills=${r.kills} score=${r.score} ${r.seconds.toFixed(0)}s`
+          ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
+          ` fallbackKills=${r.mobile.fallbackKills} kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
         ` shakeMax=${r.combat.shakeMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}°${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
@@ -686,6 +788,13 @@ async function run() {
   }
   console.log(`Screenshots + results.json in ${OUT} (total ${((Date.now() - runStarted) / 1000).toFixed(0)}s)`)
   process.exit(failed ? 1 : 0)
+}
+
+/** Camera vs canvas aspect + FOV per mobile orientation, for the summary line. */
+function viewSummary(views) {
+  if (!views) return ''
+  const f = (v) => (v ? `${v.cameraAspect?.toFixed(2)}/${v.canvasAspect.toFixed(2)} fov ${v.fov?.toFixed(0)}x${v.hFov?.toFixed(0)}` : '-')
+  return ` aspect cam/canvas portrait=${f(views.portrait)} landscape=${f(views.landscape)} back=${f(views.portraitAgain)}`
 }
 
 /** Camera-independent totals: whole scene, and objects whose name starts with "track". */

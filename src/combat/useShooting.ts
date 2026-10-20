@@ -7,19 +7,23 @@ import { playFireSound } from '@/audio/SFXManager'
 import { eventBus } from '@/core/EventBus'
 import { getPointerState, subscribePointer } from '@/input/pointerInput'
 import { recordShot } from './hitFeedback'
+import { findAssistTargetNDC } from './AimSystem'
+import { assistRadiusPx, hitScaleFor } from './aimAssist'
 
 const _raycaster = new THREE.Raycaster()
 const _ndc = new THREE.Vector2()
 const _direction = new THREE.Vector3()
 const _origin = new THREE.Vector3()
+const _assistNDC = new THREE.Vector2()
 
 /**
  * Fire one bullet from the camera through a point in normalized device
  * coordinates (-1..1, y up). Shared by pointer input and the e2e autofire hook.
  * Returns true if a bullet actually left the pool (false when not playing,
  * throttled by the fire delay, or the pool is missing/exhausted).
+ * `hitScale` widens the bullet's hit radius on targets (touch shots).
  */
-export function fireAtNDC(x: number, y: number, camera: THREE.Camera): boolean {
+export function fireAtNDC(x: number, y: number, camera: THREE.Camera, hitScale = 1): boolean {
   if (useGameStore.getState().phase !== 'playing') return false
 
   const pool = getBulletPool()
@@ -30,10 +34,11 @@ export function fireAtNDC(x: number, y: number, camera: THREE.Camera): boolean {
   _direction.copy(_raycaster.ray.direction)
   _origin.copy(camera.position)
 
-  if (!pool.fire(_origin, _direction)) return false
+  if (!pool.fire(_origin, _direction, hitScale)) return false
   useGameStore.getState().registerShot()
   playFireSound()
-  // Weapon view-model (recoil, muzzle flash, tracer) aims at this shot.
+  // Weapon view-model (recoil, muzzle flash, tracer) aims at this shot. Touch
+  // aim assist passes the assisted NDC in here, so the tracer follows the bullet.
   recordShot(x, y)
   // Listeners read lastShot instead of a payload (no allocation).
   eventBus.emit('weapon:fire')
@@ -45,6 +50,8 @@ export function fireAtNDC(x: number, y: number, camera: THREE.Camera): boolean {
  * Press fires one shot at the pointer; holding auto-fires every 60 ms while the
  * aim follows the pointer (on touch, the finger is the aim point). See
  * `src/input/pointerInput.ts` for the multi-touch / UI-target rules.
+ * Touch shots get aim assist: they snap to an enemy within ~44 CSS px of the
+ * finger and have a slightly larger hit radius (`aimAssist.ts`).
  */
 export function useShooting() {
   const camera = useThree((s) => s.camera)
@@ -60,7 +67,14 @@ export function useShooting() {
   }, [size])
 
   const fireShot = useCallback(() => {
-    fireAtNDC(aimNDC.current.x, aimNDC.current.y, camera)
+    const p = getPointerState()
+    const radius = assistRadiusPx(p.kind)
+    const scale = hitScaleFor(p.kind)
+    if (radius > 0 && findAssistTargetNDC(p.x, p.y, camera, sizeRef.current, radius, _assistNDC)) {
+      fireAtNDC(_assistNDC.x, _assistNDC.y, camera, scale)
+    } else {
+      fireAtNDC(aimNDC.current.x, aimNDC.current.y, camera, scale)
+    }
   }, [camera])
 
   useEffect(() => {

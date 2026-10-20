@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useLayoutEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
@@ -11,6 +11,7 @@ import {
 } from '@/combat/screenShake'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
+import { fovForAspect } from './cameraFov'
 
 interface CoasterCameraProps {
   curve: TrackCurve
@@ -77,16 +78,30 @@ export default function CoasterCamera({
     return () => eventBus.off('enemy:killed', onKill)
   }, [])
 
-  // Set as default camera on mount
+  // ── Projection: aspect + FOV follow the canvas (issue #66) ──
+  // R3F only re-applies camera.aspect when the canvas size/dpr *changes*, not
+  // when a new default camera is set, so a camera mounted mid-session kept the
+  // three.js default aspect of 1 (world squashed on phones, stretched on 16:9).
+  // Apply it ourselves on mount and on every resize / rotation, and widen the
+  // vertical FOV on portrait screens (see cameraFov.ts).
+  const size = useThree((s) => s.size)
+  const effectiveFov = useRef(fov)
+  useLayoutEffect(() => {
+    const cam = cameraRef.current
+    if (!cam || !enabled || size.width <= 0 || size.height <= 0) return
+    const aspect = size.width / size.height
+    effectiveFov.current = fovForAspect(fov, aspect)
+    cam.aspect = aspect
+    cam.fov = effectiveFov.current
+    cam.near = near
+    cam.far = far
+    cam.updateProjectionMatrix()
+  }, [size.width, size.height, enabled, fov, near, far])
+
+  // Set as default camera on mount (projection is already set above).
   useEffect(() => {
-    if (cameraRef.current && enabled) {
-      cameraRef.current.fov = fov
-      cameraRef.current.near = near
-      cameraRef.current.far = far
-      cameraRef.current.updateProjectionMatrix()
-      set({ camera: cameraRef.current })
-    }
-  }, [set, enabled, fov, near, far])
+    if (cameraRef.current && enabled) set({ camera: cameraRef.current })
+  }, [set, enabled])
 
   // Wind whoosh lifecycle
   useEffect(() => {
@@ -159,8 +174,8 @@ export default function CoasterCamera({
     )
     updateWindWhoosh(Math.max(0, velocityNorm))
 
-    if (Math.abs(cam.fov - fov) > 0.01) {
-      cam.fov = fov
+    if (Math.abs(cam.fov - effectiveFov.current) > 0.01) {
+      cam.fov = effectiveFov.current
       cam.updateProjectionMatrix()
     }
   })
