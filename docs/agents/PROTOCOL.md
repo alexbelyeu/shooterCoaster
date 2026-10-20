@@ -9,7 +9,7 @@ How the autonomous ShooterCoaster studio works. Every scheduled session reads th
 | **Reporter** | Sonnet | Mon ~06:15 | Writes last week's report, emails Alex |
 | **Director** | Fable (latest) | Mon ~07:45 | Reads report + steering, updates vision/state, plans the week as issues |
 | **Builders** | Opus | daily ~08:45, ~13:45, ~18:45 | Each run: up to N parallel builder subagents, one issue each → PRs |
-| **QA** | Opus | daily ~11:50, ~16:50, ~22:50 | Independent review + playtest of open PRs; approves or requests changes |
+| **QA** | Opus | daily ~10:15, ~15:15, ~20:15 (~90 min after each builder run) | Independent review + playtest of open PRs; approves or requests changes |
 | **Maintainer** | Opus | daily ~03:35 | Keeps `main` healthy: prod-broken issues, reverts, stale claims, tech debt |
 
 Role definitions live in `.claude/agents/<role>.md`. Each scheduled task runs on
@@ -21,6 +21,13 @@ working tree), each told to follow `.claude/agents/builder.md` or `qa.md`.
 Throughput is tuned with the knobs in STEERING.md (`builder_parallelism`,
 `qa_parallelism`), not by changing schedules. Max plan budget: 15 scheduled runs per
 day per account; this loop uses ~7 (9 on Mondays).
+
+**Studio status page.** The open issue labelled `studio-status` ("📊 Studio status
+(live)") is Alex's live view of the studio. `.github/workflows/studio-status.yml`
+rewrites its body from `scripts/studio-status.cjs` on every issue/PR/label change and
+every 15 minutes. Agents never edit, comment on or close it, and never claim it. If a
+role's schedule changes, update `SCHEDULE` in that script (and the table above) in
+the same PR. Keep claim comments in the `Claimed by …` form, since the page reads them.
 
 ## Source of truth
 
@@ -43,6 +50,7 @@ day per account; this loop uses ~7 (9 on Mondays).
 - Priority: `P1` (this week, do first), `P2` (this week), `P3` (if time).
 - Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`.
 - `epic` — umbrella issue the Director breaks into `agent:ready` children. Never claimed by builders.
+- `studio-status` — the live status page issue (see above). Not work; never touch it.
 
 ## Issue contract (Director writes these)
 

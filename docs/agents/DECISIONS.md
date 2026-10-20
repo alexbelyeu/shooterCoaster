@@ -153,6 +153,23 @@ towers and rails that look equally thick on every level, within +10 draw calls a
 count, `sceneStats()` in the e2e hook). Tower density on Arctic/Volcanic is limited by
 the triangle budget; denser support there needs LOD or per-chunk culling (follow-up).
 
+## 2026-10-19 — Live studio status as a self-updating GitHub issue (setup)
+
+**Context:** Alex can't tell whether the studio is working or stuck. Work only moves
+when a scheduled run fires, and the evidence is scattered across issues, PRs, CI and
+scheduled-task sessions.
+
+**Decision:** One pinned issue labelled `studio-status`, whose body a GitHub workflow
+(`studio-status.yml` → `scripts/studio-status.cjs`) regenerates on every issue/PR/label
+event and every 15 minutes. It shows: what's being built (claim time, last push, quiet
+or stale flags), what's waiting for QA with CI state, approved/sent back/blocked work,
+what shipped in 48h, the production smoke result, and when each role runs next.
+
+**Why this shape:** it costs no agent runs, needs no new service or secret, and works
+in the GitHub mobile app. A claude.ai page can't read GitHub (its CSP blocks
+api.github.com). The schedule is a constant in the script, since the scheduled tasks
+live outside the repo; keep it in sync when schedules change.
+
 ## 2026-10-19 — Touch input: Pointer Events only, finger is the aim point (Builder, #16)
 
 **Context:** Input was `mousemove`/`mousedown` on `window`, so phones could not play.
@@ -195,6 +212,25 @@ and the final-kill slow-mo arrive 80 ms after the hit — a deliberate hit-stop.
 Future multi-HP enemies can reuse the flash helpers in `EnemyBase` for non-lethal
 hits.
 
+## 2026-10-19 — HUD render policy and UI palette (Builder, #18)
+
+**Context:** The HUD is DOM over the WebGL canvas. Re-rendering React on every
+frame (or every score tick) would compete with the render loop, and the HUD,
+wave banner and level select need one shared set of per-biome accent colours.
+
+**Decision:** The HUD root subscribes only to `currentLevel`; each widget
+subscribes to its own store slice. The score tween bypasses React entirely
+(`useGameStore.subscribe` + one rAF loop that writes `textContent` while it is
+catching up). The timer bar re-renders ~1×/s (GameTimer writes on whole seconds)
+and eases with a 1 s linear CSS transition; the combo ring drains with a CSS
+animation keyed on `lastKillTime`. Accent colours live in `src/ui/theme.ts`
+(`BIOME_UI`) and reach CSS as `--hud-accent` / `--hud-glow`. Type system:
+Lobster only for the game title and screen headers, Inter (tabular numerals)
+everywhere in the HUD, countdown and wave banner.
+
+**Consequences:** Measured over a 78 s level1 run: HUD root rendered once, timer
+~1×/s, score widget once. New HUD widgets should follow the same pattern
+(slice subscriptions, CSS for continuous motion, no per-frame React state).
 
 ## 2026-10-20 — Tone.js trigger times are kept strictly increasing (Builder, #14)
 

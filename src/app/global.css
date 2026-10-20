@@ -158,66 +158,275 @@ canvas {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* HUD */
+/* HUD — Inter, tabular numerals; dark glass panels keep text legible over any sky.
+   Accent colours come from src/ui/theme.ts via --hud-accent / --hud-glow. */
 .hud {
+  --hud-accent: #ffd23f;
+  --hud-glow: rgba(255, 210, 63, 0.55);
+  --hud-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.45);
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  padding:
-    calc(1rem + env(safe-area-inset-top))
-    calc(1.5rem + env(safe-area-inset-right))
-    0
-    calc(1.5rem + env(safe-area-inset-left));
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
+  inset: 0;
   pointer-events: none;
   z-index: 10;
+  font-family: 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
 }
 
-.hud-left {
-  min-width: 0;
+.hud-panel {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  padding: 10px 14px 12px;
+  background: linear-gradient(180deg, rgba(8, 10, 22, 0.62), rgba(8, 10, 22, 0.38));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+
+.hud-panel--left {
+  left: max(12px, env(safe-area-inset-left));
+  min-width: clamp(150px, 22vw, 240px);
+}
+
+.hud-panel--right {
+  right: max(12px, env(safe-area-inset-right));
+  width: clamp(130px, 20vw, 240px);
 }
 
 .hud-score {
-  font-size: clamp(1rem, 4.2vw, 1.5rem);
-  font-weight: 700;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-  white-space: nowrap;
+  line-height: 1;
 }
 
+.hud-score-value {
+  display: inline-block;
+  transform-origin: left center;
+  font-size: clamp(1.9rem, 4.2vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-shadow: var(--hud-shadow);
+}
+
+.hud-best {
+  margin-top: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.hud-kills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hud-kills-track {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.16);
+  /* 10 segments with 2px gaps */
+  -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%);
+  mask-image: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%);
+}
+
+.hud-kills-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: var(--hud-accent);
+  box-shadow: 0 0 8px var(--hud-glow);
+  transition: transform 0.25s ease-out;
+}
+
+.hud-kills-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-shadow: var(--hud-shadow);
+}
+
+.hud-kills-total {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* Timer */
 .hud-timer {
-  font-size: clamp(1.1rem, 4.5vw, 1.5rem);
+  --timer-color: #fff;
+  text-align: right;
+}
+
+.hud-timer--warn {
+  --timer-color: #ffb020;
+}
+
+.hud-timer--critical {
+  --timer-color: #ff3b3b;
+}
+
+.hud-timer-value {
+  font-size: clamp(1.9rem, 4.2vw, 2.75rem);
   font-weight: 700;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-  white-space: nowrap;
+  line-height: 1;
+  color: var(--timer-color);
+  text-shadow: var(--hud-shadow);
+  transform-origin: right center;
+  transition: color 0.3s;
 }
 
-.hud-enemies {
-  font-size: clamp(0.75rem, 3vw, 1rem);
-  color: rgba(255, 255, 255, 0.8);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-  white-space: nowrap;
+.hud-timer-unit {
+  margin-left: 2px;
+  font-size: 0.5em;
+  font-weight: 600;
+  opacity: 0.75;
 }
 
+.hud-timer--critical .hud-timer-value {
+  animation: hud-pulse 0.5s ease-in-out infinite alternate;
+}
+
+.hud-timer-track {
+  height: 6px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.hud-timer-fill {
+  height: 100%;
+  transform-origin: right center;
+  border-radius: 3px;
+  background: var(--timer-color);
+  box-shadow: 0 0 8px var(--timer-color);
+  transition: transform 1s linear, background-color 0.3s;
+}
+
+@keyframes hud-pulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.12); text-shadow: 0 0 18px rgba(255, 59, 59, 0.9), 0 1px 2px rgba(0, 0, 0, 0.85); }
+}
+
+/* Combo meter — centre-bottom */
 .hud-combo {
-  position: fixed;
-  top: 50%;
-  right: calc(2rem + env(safe-area-inset-right));
-  transform: translateY(-50%);
-  font-size: 2rem;
-  font-weight: 700;
-  color: #ffd700;
-  text-shadow: 0 0 10px rgba(255, 200, 0, 0.5);
-  text-align: center;
-  pointer-events: none;
-  z-index: 10;
+  position: absolute;
+  left: 50%;
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 64px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px 6px 6px;
+  border-radius: 40px;
+  background: rgba(8, 10, 22, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--combo-color);
+  opacity: 0;
+  transform: translate(-50%, 16px) scale(0.9);
+  /* hide: fade + sink */
+  transition: opacity 0.3s ease-in, transform 0.3s ease-in;
 }
 
+.hud-combo.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  /* show: appear instantly, pop the scale (never caught half-faded) */
+  transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+.hud-combo-ring {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex: none;
+}
+
+.hud-combo-ring svg {
+  display: block;
+  transform: rotate(-90deg);
+}
+
+.hud-combo-ring-bg,
+.hud-combo-ring-fill {
+  fill: none;
+  stroke-width: 5;
+}
+
+.hud-combo-ring-bg {
+  stroke: rgba(255, 255, 255, 0.15);
+}
+
+.hud-combo-ring-fill {
+  stroke: var(--combo-color);
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px var(--combo-color));
+  animation: hud-combo-drain var(--combo-window) linear forwards;
+}
+
+@keyframes hud-combo-drain {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: calc(var(--ring-c) * 1px); }
+}
+
+/* chain count, centred in the ring */
+.hud-combo-count {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: #fff;
+  text-shadow: var(--hud-shadow);
+  animation: hud-combo-pop 0.25s ease-out;
+}
+
+.hud-combo-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1;
+  text-shadow: var(--hud-shadow);
+}
+
+/* multiplier grows with tier */
 .hud-combo-mult {
-  font-size: 1rem;
+  display: inline-block;
+  transform-origin: left center;
+  font-weight: 700;
+  font-size: 1.6rem;
+  animation: hud-combo-pop 0.25s ease-out;
+}
+
+.hud-combo-word {
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+  opacity: 0.85;
+}
+
+.hud-combo--tier1 .hud-combo-mult { font-size: 1.9rem; }
+.hud-combo--tier2 .hud-combo-mult { font-size: 2.2rem; }
+.hud-combo--tier3 .hud-combo-mult { font-size: 2.5rem; }
+.hud-combo--tier3 { box-shadow: 0 0 22px rgba(255, 59, 59, 0.45); }
+
+@keyframes hud-combo-pop {
+  from { transform: scale(1.45); }
+  to { transform: scale(1); }
+}
+
+@media (max-width: 480px) {
+  .hud-panel { padding: 8px 10px 10px; }
+  .hud-combo { bottom: max(84px, calc(env(safe-area-inset-bottom) + 76px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-timer--critical .hud-timer-value,
+  .hud-combo-count,
+  .hud-combo-mult { animation: none; }
 }
 
 /* Pause: needed on touch (no Escape key); bottom-left like the title's settings gear */
@@ -246,33 +455,6 @@ canvas {
   background: rgba(0, 0, 0, 0.75);
 }
 
-/* Compact HUD: phones in portrait (<= 480 px wide) or landscape (<= 480 px tall) */
-@media (max-width: 480px), (max-height: 480px) {
-  .hud {
-    padding:
-      calc(0.6rem + env(safe-area-inset-top))
-      calc(0.9rem + env(safe-area-inset-right))
-      0
-      calc(0.9rem + env(safe-area-inset-left));
-  }
-}
-
-/* Portrait phones: combo moves from the right edge to top-centre, under the score row */
-@media (max-width: 480px) {
-  .hud-combo {
-    top: calc(4.2rem + env(safe-area-inset-top));
-    right: auto;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: clamp(1.1rem, 6vw, 1.6rem);
-    line-height: 1.1;
-    white-space: nowrap;
-  }
-
-  .hud-combo-mult {
-    font-size: 0.8rem;
-  }
-}
 
 /* Crosshair — SVG reticle, follows mouse via JS transform (no left/top reflow) */
 .crosshair-svg {
@@ -553,17 +735,71 @@ canvas {
   color: #ff4444;
 }
 
-/* Wave announcement */
+/* Wave announcement — letterspaced caps between biome-accent rules */
 .wave-announcement {
   position: fixed;
-  top: 25%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-family: 'Lobster', cursive;
-  font-size: clamp(2rem, 9vw, 3rem);
-  white-space: nowrap;
-  color: #fff;
-  text-shadow: 0 0 20px rgba(255, 200, 0, 0.8), 0 4px 8px rgba(0, 0, 0, 0.5);
+  top: 24%;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  padding: 8px 0;
   pointer-events: none;
   z-index: 15;
+}
+
+.wave-banner {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 2vw, 18px);
+  max-width: calc(100vw - 32px);
+}
+
+.wave-banner-text {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.25rem, 4.5vw, 2.4rem);
+  letter-spacing: 0.24em;
+  /* letter-spacing trails the last glyph; balance it */
+  margin-right: -0.24em;
+  text-transform: uppercase;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 0 18px var(--hud-glow), 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.wave-banner-rule {
+  flex: none;
+  width: clamp(28px, 8vw, 90px);
+  height: 3px;
+  border-radius: 2px;
+  background: var(--hud-accent);
+  box-shadow: 0 0 10px var(--hud-glow);
+}
+
+/* Level countdown */
+.countdown {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.countdown-step {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: clamp(2.5rem, 9vw, 4.5rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(255, 200, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.countdown-step--go {
+  font-size: clamp(3.5rem, 13vw, 6.5rem);
+  color: #ffd23f;
 }
