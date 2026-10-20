@@ -38,7 +38,8 @@ triangles, avg frame ms, kills, score, combat stats, errors) to `e2e-results/`:
 (after 4 s of autofire + `killNearest(5)`, with the muzzle flash and gold hitmarker
 held on the kill frame via `holdFeedback`) and `<id>-results.png`. A level fails if
 it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
-enemies, the `killNearest` hits never produce an `enemy:killed`, camera shake exceeds
+enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
+wall-clock level timer already ran out), camera shake exceeds
 3 units or doesn't return exactly to the track, or the results screen never appears.
 `npm run smoke` also passes `--mobile`:
 an iPhone 13-like touch context (390x844) taps PLAY, a level, and the canvas 10x,
