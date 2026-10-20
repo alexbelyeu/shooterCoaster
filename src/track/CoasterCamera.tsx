@@ -61,11 +61,7 @@ export default function CoasterCamera({
   const _tangent = useRef(new THREE.Vector3())
   const _lookAt = useRef(new THREE.Vector3())
 
-  // Camera trauma (issue #65): ROTATION ONLY, on top of the track pose, which
-  // is recomputed from scratch every frame — the camera position is never moved
-  // for feedback, so the rails under it stay put. Kills and world events
-  // (`camera:trauma`, e.g. the volcanic eruption) feed it. Fire recoil lives on
-  // the weapon view-model, not here. Never touches progress/velocity.
+  // Rotation-only trauma from kills and `camera:trauma` world events (#65); see screenShake.ts.
   const shake = useRef({ trauma: 0, decayMs: KILL_TRAUMA_MS, time: 0, seed: 0 })
   const _angles = useRef<ShakeAngles>({ pitch: 0, yaw: 0, roll: 0 })
 
@@ -147,7 +143,6 @@ export default function CoasterCamera({
     _lookAt.current.copy(_position.current).add(_tangent.current)
     cam.lookAt(_lookAt.current)
 
-    // ── Trauma: rotation-only, smooth noise (kills decay to 0 in ≤ 250 ms) ──
     const k = shake.current
     let traumaDeg = 0
     if (k.trauma > 0) {

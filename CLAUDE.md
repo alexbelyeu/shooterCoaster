@@ -99,7 +99,7 @@ replays — currently in-memory placeholders).
 | `src/track/` | Procedural track curves, track mesh (rails + ties), lattice support towers, `trackDimensions` (structure scale per level), coaster camera, progress |
 | `src/entities/enemies/` | Enemy models/behaviours; `entities/spawning/EnemySpawner` waves |
 | `src/input/` | `pointerInput` — the single Pointer Events source (mouse/touch/pen) for aim + fire |
-| `src/combat/` | Aim, collisions, projectiles, weapons, crosshair; `WeaponViewModel` (first-person gun, recoil, muzzle flash, tracer; placement in `weaponLayout.ts`); `screenShake.ts` (rotation-only camera trauma for kills and world events via the `camera:trauma` bus event, Off/Reduced/Full setting) |
+| `src/combat/` | Aim, collisions, projectiles, weapons, crosshair; `WeaponViewModel` (first-person gun, recoil, muzzle flash, tracer; placement + aim in `weaponLayout.ts`, geometry in `weaponModel.ts`); `screenShake.ts` (rotation-only camera trauma for kills and world events via the `camera:trauma` bus event, Off/Reduced/Full setting) |
 | `src/effects/` | Explosions (pooled), score popups |
 | `src/audio/` | Tone.js engine, music + SFX managers |
 | `src/store/` | zustand stores: game, player, settings (persisted) |

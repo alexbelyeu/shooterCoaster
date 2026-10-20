@@ -7,7 +7,6 @@ import Volcano from '../../Volcano'
 import { createLavaMaterial } from '../../LavaShader'
 import { createLavaRiverGeometries } from './lavaRivers'
 
-/** Eruption rumble: rotation-only camera trauma (obeys the Screen shake setting). */
 const ERUPTION_TRAUMA = 0.8
 const ERUPTION_TRAUMA_MS = 3000
 
@@ -29,7 +28,6 @@ export default function VolcanicFeatures({ heightFn, atmosphere, fogRef }: Biome
     }
   }, [lavaRiverMat, lavaFlowMat, lavaRiverGeos])
 
-  // Eruption event handling — fog pulse + camera rumble (via the trauma system)
   useEffect(() => {
     const onEruption = () => {
       const pulse = fogPulseRef.current

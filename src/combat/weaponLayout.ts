@@ -1,15 +1,7 @@
-/**
- * Screen placement + recoil tuning for the first-person weapon view-model
- * (issue #65). Pure (no React / three) so it is unit-tested in plain Node.
- *
- * The gun is anchored bottom-right and sized from the viewport's short side, so
- * it reads the same on desktop, phone portrait and phone landscape while staying
- * clear of the screen centre (the aim area) and the HUD (top panels, combo meter
- * at bottom-centre, pause bottom-left, mute bottom-right corner).
- */
+/** Screen placement, aim and recoil tuning for the first-person weapon (#65). Pure, so it runs in plain Node tests. */
 
 export interface WeaponLayout {
-  /** Gun pivot (receiver centre), CSS px from the viewport's top-left. */
+  /** Gun pivot, CSS px from the viewport's top-left. */
   x: number
   y: number
   /** Screen size of one model unit at the pivot depth, CSS px. */
@@ -17,43 +9,31 @@ export interface WeaponLayout {
 }
 
 /**
- * Placement, as fractions of the viewport's short side: pivot distance from the
- * right / bottom edges and the size of one model unit (the gun is ~1.2 units).
- * Portrait phones sit the gun higher and further right, between the combo
- * meter (bottom-centre) and the mute button (bottom-right corner).
+ * Fractions of the viewport's short side: pivot distance from the right / bottom
+ * edges and one model unit. Portrait sits higher, between the combo meter and mute.
  */
 export const WEAPON_LANDSCAPE = { right: 0.5, bottom: 0.2, unit: 0.28 }
 export const WEAPON_PORTRAIT = { right: 0.2, bottom: 0.48, unit: 0.28 }
 
-/**
- * The barrel points straight at the aim point, except that its on-screen
- * heading (radians clockwise from screen-up) stays at least this far from
- * vertical. A gun pointing straight up the screen is seen end-on and loses its
- * silhouette, so aims inside that narrow cone snap to its nearer edge.
- */
-export const WEAPON_MIN_TILT = 0.15 // ≈ 8.6°
-/** Aims further below the pivot than this heading (radians from up) are clamped to it. */
-export const WEAPON_MAX_TILT = (2 * Math.PI) / 3 // 120°
-/**
- * Aims closer to the pivot than this (fraction of the viewport's short side)
- * are pushed out along the same heading, so the gun keeps a side-on silhouette
- * instead of pointing into the screen. The heading, and so the barrel's
- * on-screen direction, is unchanged.
- */
+/** Min on-screen heading from straight up (rad): pointing straight up, the gun is seen end-on. */
+export const WEAPON_MIN_TILT = 0.15
+/** Max heading from straight up (rad) for aims below the pivot. */
+export const WEAPON_MAX_TILT = (2 * Math.PI) / 3
+/** Min pivot→aim distance (fraction of the short side); closer aims would point the gun into the screen. */
 export const WEAPON_MIN_AIM_DIST = 0.4
 
 /**
- * Screen-space aim target for the gun (px, origin top-left): the aim point,
- * with its heading from the pivot kept between WEAPON_MIN_TILT and
- * WEAPON_MAX_TILT of straight up (on the same side) and its distance at least
- * `minDistPx`. Writes into `out`.
+ * Where the gun points on screen (px): the aim point, with its heading from the
+ * pivot clamped to [WEAPON_MIN_TILT, WEAPON_MAX_TILT] on the same side and its
+ * distance at least `minDistPx`. Distance changes keep the heading, so the
+ * barrel and the tracer stay collinear.
  */
 export function clampWeaponAim(
   pivotX: number, pivotY: number, aimX: number, aimY: number, minDistPx: number,
   out: { x: number; y: number },
 ): { x: number; y: number } {
   const dx = aimX - pivotX
-  const up = pivotY - aimY // screen y grows downward
+  const up = pivotY - aimY
   const heading = Math.atan2(dx, up)
   const side = heading > 0 ? 1 : -1
   const h = side * Math.min(Math.max(Math.abs(heading), WEAPON_MIN_TILT), WEAPON_MAX_TILT)
@@ -69,7 +49,6 @@ export function clampWeaponAim(
   return out
 }
 
-/** Writes the placement for a `width` x `height` viewport into `out`. */
 export function weaponLayout(width: number, height: number, out: WeaponLayout): WeaponLayout {
   const w = Math.max(1, width)
   const h = Math.max(1, height)
@@ -81,9 +60,9 @@ export function weaponLayout(width: number, height: number, out: WeaponLayout): 
   return out
 }
 
-/** World units per model unit when the pivot sits at the default depth. */
+/** World units per model unit at the default depth. */
 export const WEAPON_WORLD_SCALE = 3
-/** Never put the pivot closer than this (camera near plane is 1). */
+/** Closest pivot depth; the camera near plane is 1. */
 export const WEAPON_MIN_DEPTH = 2.6
 
 export interface WeaponDepth {
@@ -93,10 +72,7 @@ export interface WeaponDepth {
   scale: number
 }
 
-/**
- * Pivot depth and world scale that make one model unit `unitPx` tall on a
- * viewport `heightPx` high with vertical FOV `fovDeg`. Writes into `out`.
- */
+/** Pivot depth and scale that make one model unit `unitPx` tall at vertical FOV `fovDeg`. */
 export function weaponDepth(unitPx: number, heightPx: number, fovDeg: number, out: WeaponDepth): WeaponDepth {
   const tanHalf = Math.tan(((fovDeg || 80) * Math.PI) / 360)
   const worldPerPxAtUnitDepth = (2 * tanHalf) / Math.max(1, heightPx)
@@ -105,17 +81,16 @@ export function weaponDepth(unitPx: number, heightPx: number, fovDeg: number, ou
   return out
 }
 
-/** Recoil: the weapon (never the camera) kicks back and up, then settles. */
 export const WEAPON_RECOIL_MS = 110
 export const WEAPON_RECOIL_BACK = 0.12 // model units
 export const WEAPON_RECOIL_PITCH = 0.16 // radians
-/** Tracer streak lifetime and length (world units along the shot ray). */
 export const TRACER_MS = 90
+/** Tracer length, world units along the shot ray. */
 export const TRACER_RANGE = 160
-/** How long the gun keeps pointing at the last shot's aim point before following the pointer again. */
+/** How long the gun keeps pointing at the last shot before following the pointer again. */
 export const SHOT_AIM_HOLD_MS = 300
 
-/** Recoil envelope 1 → 0 from the remaining time: fast snap back, soft settle. */
+/** Recoil envelope 1 → 0 from the remaining time (smoothstep). */
 export function recoilEnvelope(remainingMs: number): number {
   const t = Math.min(Math.max(remainingMs / WEAPON_RECOIL_MS, 0), 1)
   return t * t * (3 - 2 * t)

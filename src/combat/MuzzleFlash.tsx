@@ -5,10 +5,7 @@ import { eventBus } from '@/core/EventBus'
 import { useGameStore } from '@/store/useGameStore'
 import { MUZZLE_FLASH_MS, isFeedbackHeld } from './hitFeedback'
 
-/**
- * Where the flash goes: the weapon view-model writes its barrel tip (camera
- * space) and the flash's world size here every frame, before this renders.
- */
+/** Barrel tip (camera space) and flash size, written by WeaponViewModel each frame before this renders. */
 export interface MuzzleAnchor {
   tip: THREE.Vector3
   size: number
@@ -42,12 +39,7 @@ const fragmentShader = /* glsl */ `
   }
 `
 
-/**
- * Small camera-attached additive muzzle flash at the weapon's barrel tip.
- * Mounted by WeaponViewModel (a child of the gameplay camera), which owns the
- * anchor. One mesh, reused for every shot (pooled by construction); hidden — so
- * zero draw calls — when idle.
- */
+/** Additive muzzle flash at the gun's barrel tip; one reused mesh, hidden (0 draw calls) when idle. */
 export default function MuzzleFlash({ anchor }: { anchor: MuzzleAnchor }) {
   const meshRef = useRef<THREE.Mesh>(null)
   const remainingMs = useRef(0)

@@ -1,7 +1,6 @@
 /**
  * Shared tuning + helpers for the combat hit-feedback pack (issue #14):
- * muzzle flash + tracer, hitmarker, enemy hit flash / kill pop, weapon recoil
- * and camera kill trauma.
+ * muzzle flash + tracer, hitmarker, enemy hit flash / kill pop.
  *
  * Events (all on `eventBus`):
  *   'weapon:fire'   — no payload; a bullet actually left the barrel.
@@ -16,17 +15,8 @@ export const MUZZLE_FLASH_MS = 60
 /** Enemy white flash + 1.2x pop between the hit and the explosion. */
 export const ENEMY_HIT_FLASH_MS = 80
 export const KILL_POP_SCALE = 1.2
-/**
- * Camera feedback is rotation-only kill trauma (see `screenShake.ts`); fire
- * recoil moves the weapon view-model, never the camera (see `weaponLayout.ts`).
- */
 
-/**
- * Aim point (NDC, -1..1, y up) of the most recent shot that actually left the
- * barrel, and when (performance.now()). Written by `fireAtNDC` just before
- * 'weapon:fire' is emitted, so listeners (weapon view-model, tracer) can aim at
- * it without an event payload or allocation.
- */
+/** NDC aim point and performance.now() of the last shot; set by `fireAtNDC` just before 'weapon:fire'. */
 export const lastShot = { x: 0, y: 0, at: 0 }
 
 export function recordShot(ndcX: number, ndcY: number): void {
@@ -35,12 +25,7 @@ export function recordShot(ndcX: number, ndcY: number): void {
   lastShot.at = typeof performance !== 'undefined' ? performance.now() : 0
 }
 
-/**
- * Test-only: when the e2e hook sets `holdFeedback`, transient feedback (muzzle
- * flash, hitmarker) stays at its peak so a screenshot can capture it reliably
- * under slow software rendering. Always false in normal play.
- */
+/** Test-only (e2e `holdFeedback`): freeze transient feedback at its peak for slow headless screenshots. */
 export function isFeedbackHeld(): boolean {
-  // __SC_TEST__ only exists with ?e2e=1 (see src/testing/e2eHook.tsx).
   return typeof window !== 'undefined' && window.__SC_TEST__?.holdFeedback === true
 }

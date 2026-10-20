@@ -15,7 +15,6 @@ describe('screenShake', () => {
     expect(killTrauma(0)).toBeCloseTo(0.55)
     expect(killTrauma(NaN)).toBeCloseTo(0.55)
     expect(killTrauma(5)).toBeGreaterThan(killTrauma(2))
-    // Overlapping kills keep the stronger trauma, never stack past 1.
     expect(addTrauma({ trauma: 0.9, decayMs: KILL_TRAUMA_MS }, killTrauma(1)).trauma).toBe(0.9)
     expect(addTrauma({ trauma: 0.1, decayMs: KILL_TRAUMA_MS }, killTrauma(10)).trauma).toBe(1)
     expect(addTrauma({ trauma: 0, decayMs: KILL_TRAUMA_MS }, 5).trauma).toBe(1)
@@ -25,8 +24,7 @@ describe('screenShake', () => {
     const s: TraumaState = { trauma: 0, decayMs: KILL_TRAUMA_MS }
     addTrauma(s, 0.8, 3000)
     expect(s.trauma).toBe(0.8)
-    expect(s.trauma * s.decayMs).toBeCloseTo(2400) // ms until it reaches 0
-    // A stronger kill mid-rumble raises the level but does not cut the rumble short.
+    expect(s.trauma * s.decayMs).toBeCloseTo(2400)
     decayTrauma(s, 1000)
     addTrauma(s, killTrauma(10))
     expect(s.trauma).toBe(1)
@@ -67,7 +65,7 @@ describe('screenShake', () => {
     }
     expect(maxPY).toBeLessThanOrEqual(MAX_PITCH_YAW_DEG * DEG + 1e-12)
     expect(maxR).toBeLessThanOrEqual(MAX_ROLL_DEG * DEG + 1e-12)
-    expect(maxR).toBeGreaterThan(0.3 * MAX_ROLL_DEG * DEG) // actually moves
+    expect(maxR).toBeGreaterThan(0.3 * MAX_ROLL_DEG * DEG)
     shakeAngles(1, 0.123, 3, 0.5, out)
     const half = Math.abs(out.roll)
     shakeAngles(1, 0.123, 3, 1, out)
@@ -86,7 +84,6 @@ describe('screenShake', () => {
     for (let i = 1; i < 2000; i++) {
       const v = smoothNoise1(i * 0.01, 4)
       expect(Math.abs(v)).toBeLessThanOrEqual(1)
-      // Quintic lattice: slope ≤ 1.875 * 2 per lattice unit → ≤ 0.0375 per 0.01 step.
       expect(Math.abs(v - prev)).toBeLessThanOrEqual(0.04)
       prev = v
     }

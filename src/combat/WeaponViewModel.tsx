@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { eventBus } from '@/core/EventBus'
 import { useGameStore } from '@/store/useGameStore'
 import { getPointerState } from '@/input/pointerInput'
 import MuzzleFlash, { type MuzzleAnchor } from './MuzzleFlash'
 import { isFeedbackHeld, lastShot } from './hitFeedback'
+import {
+  FLASH_SIZE, TIP, TRACER_WIDTH, buildTracerGeometry, buildWeaponGeometry, createTracerMaterial,
+  createWeaponMaterial,
+} from './weaponModel'
 import {
   SHOT_AIM_HOLD_MS, TRACER_MS, TRACER_RANGE, WEAPON_RECOIL_BACK, WEAPON_RECOIL_MS,
   WEAPON_MIN_AIM_DIST, WEAPON_RECOIL_PITCH, clampWeaponAim, recoilEnvelope, weaponDepth, weaponLayout,
@@ -14,159 +17,14 @@ import {
 } from './weaponLayout'
 
 /**
- * First-person weapon view-model (issue #65): a small low-poly, code-generated
- * blaster parented to the gameplay camera, anchored bottom-right and angled at
- * the aim point. Fire recoil kicks the gun (never the camera); every shot shows
- * a small muzzle flash at the barrel tip and a short tracer streak from the
- * barrel to the aim point, so the shot reads as coming from the gun.
- *
- * Cost: the gun is ONE merged mesh (one draw call, ~200 triangles); the tracer
- * and flash are one quad each and hidden (zero draw calls) when idle.
- *
- * The gun's depth is compressed into the front 2% of the depth range in its
- * vertex shader, so it never clips into terrain / track / enemies close to the
- * camera, while still depth-testing against itself (correct self-occlusion).
+ * First-person gun (#65), parented to the coaster camera: anchored bottom-right,
+ * barrel at the aim point, recoil on the gun (never the camera), muzzle flash at
+ * the barrel tip and a tracer from the barrel to the shot's aim point.
  */
 
-// Model space: barrel along -Z, receiver centre at the origin, units ≈ 1.4 long.
-const TIP = new THREE.Vector3(0, 0, -0.93)
-const FLASH_SIZE = 0.42 // model units
-const TRACER_WIDTH = 0.045 // model units, at the barrel end
-const TRACER_FAR_WIDTH_RATIO = 10 // far end width / near end width (perspective taper)
 const AIM_FOLLOW = 18 // 1/s, gun slerps toward the aim
 /** Slight clockwise cant (radians) so the gun's side + top read on screen. */
 const WEAPON_CANT = -0.12
-
-const COLORS = {
-  body: new THREE.Color('#566072'),
-  dark: new THREE.Color('#1f232b'),
-  accent: new THREE.Color('#ff8a1f'),
-  sight: new THREE.Color('#ff3b3b'),
-}
-
-interface Part {
-  geo: THREE.BufferGeometry
-  color: THREE.Color
-  pos: [number, number, number]
-  rotX?: number
-}
-
-function buildWeaponGeometry(): THREE.BufferGeometry {
-  const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d)
-  const cyl = (r: number, len: number, seg = 10) =>
-    new THREE.CylinderGeometry(r, r, len, seg).rotateX(Math.PI / 2)
-  const parts: Part[] = [
-    // Receiver + top rail + rear sight
-    { geo: box(0.2, 0.22, 0.62), color: COLORS.body, pos: [0, 0, 0.02] },
-    { geo: box(0.1, 0.05, 0.52), color: COLORS.dark, pos: [0, 0.135, 0.02] },
-    { geo: box(0.09, 0.07, 0.05), color: COLORS.dark, pos: [0, 0.19, 0.24] },
-    { geo: box(0.025, 0.025, 0.026), color: COLORS.sight, pos: [0, 0.235, 0.24] },
-    // Accent stripe along the receiver sides
-    { geo: box(0.21, 0.035, 0.34), color: COLORS.accent, pos: [0, -0.045, 0.05] },
-    // Handguard / shroud with accent stripe + front sight
-    { geo: box(0.16, 0.16, 0.36), color: COLORS.body, pos: [0, 0, -0.46] },
-    { geo: box(0.168, 0.03, 0.28), color: COLORS.accent, pos: [0, 0.035, -0.46] },
-    { geo: box(0.03, 0.08, 0.03), color: COLORS.dark, pos: [0, 0.11, -0.6] },
-    // Barrel + muzzle brake
-    { geo: cyl(0.036, 0.26), color: COLORS.dark, pos: [0, 0, -0.76] },
-    { geo: cyl(0.054, 0.08, 8), color: COLORS.dark, pos: [0, 0, -0.88] },
-    // Grip, magazine (no stock: it would reach into the bottom-right HUD corner)
-    { geo: box(0.12, 0.3, 0.14), color: COLORS.dark, pos: [0, -0.22, 0.2], rotX: -0.3 },
-    { geo: box(0.1, 0.26, 0.15), color: COLORS.body, pos: [0, -0.2, -0.13], rotX: 0.15 },
-    { geo: box(0.17, 0.18, 0.06), color: COLORS.dark, pos: [0, 0, 0.35] },
-  ]
-  const geos = parts.map(({ geo, color, pos, rotX }) => {
-    if (rotX) geo.rotateX(rotX)
-    geo.translate(pos[0], pos[1], pos[2])
-    const n = geo.attributes.position.count
-    const col = new Float32Array(n * 3)
-    for (let i = 0; i < n; i++) color.toArray(col, i * 3)
-    geo.setAttribute('color', new THREE.BufferAttribute(col, 3))
-    return geo
-  })
-  const merged = mergeGeometries(geos, false)
-  for (const g of geos) g.dispose()
-  if (!merged) throw new Error('WeaponViewModel: failed to merge weapon geometry')
-  merged.computeBoundingBox()
-  merged.computeBoundingSphere()
-  return merged
-}
-
-function createWeaponMaterial(): THREE.MeshStandardMaterial {
-  const mat = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    roughness: 0.42,
-    metalness: 0.3,
-    // Floor so the gun never goes pure black in dark biomes / back-lit turns.
-    emissive: new THREE.Color('#1a1e26'),
-    fog: false,
-  })
-  mat.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <project_vertex>',
-      `#include <project_vertex>
-      // View-model depth: squeeze into the front 2% of the depth range so the
-      // gun draws over the world but still depth-tests against itself.
-      gl_Position.z = (gl_Position.z + gl_Position.w) * 0.02 - gl_Position.w;`,
-    )
-  }
-  mat.customProgramCacheKey = () => 'sc-weapon-viewmodel-v1'
-  return mat
-}
-
-/** Tapered quad along +X (0..1): near end width 1, far end TRACER_FAR_WIDTH_RATIO. */
-function buildTracerGeometry(): THREE.BufferGeometry {
-  const g = new THREE.BufferGeometry()
-  const w1 = TRACER_FAR_WIDTH_RATIO * 0.5
-  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
-    0, -0.5, 0, 1, -w1, 0, 1, w1, 0, 0, 0.5, 0,
-  ]), 3))
-  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2))
-  g.setIndex([0, 1, 2, 0, 2, 3])
-  return g
-}
-
-const tracerVertex = /* glsl */ `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`
-
-// Streak that travels from the barrel to the aim point. uv.x is linear in 3D;
-// convert to the fraction of the on-screen path so the head moves evenly.
-const tracerFragment = /* glsl */ `
-  uniform float uTime;        // 0 → 1 over the tracer's life
-  uniform float uDepthRatio;  // start depth / end depth
-  varying vec2 vUv;
-  void main() {
-    float zRel = mix(1.0, 1.0 / uDepthRatio, vUv.x);          // z / zStart
-    float s = (1.0 - 1.0 / zRel) / max(1.0 - uDepthRatio, 1e-3); // screen fraction
-    float head = uTime * 1.6 + 0.15;
-    float tail = head - 0.55;
-    float along = smoothstep(tail, head, s) * (1.0 - smoothstep(head, head + 0.04, s));
-    float across = 1.0 - pow(abs(vUv.y * 2.0 - 1.0), 2.0);
-    float a = along * across * (1.0 - uTime * 0.6);
-    vec3 col = mix(vec3(1.0, 0.55, 0.15), vec3(1.0, 0.95, 0.75), along);
-    gl_FragColor = vec4(col * a * 1.6, a);
-  }
-`
-
-function createTracerMaterial(): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    vertexShader: tracerVertex,
-    fragmentShader: tracerFragment,
-    uniforms: { uTime: { value: 0 }, uDepthRatio: { value: 0.02 } },
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    depthTest: true,
-    side: THREE.DoubleSide,
-    toneMapped: false,
-    fog: false,
-  })
-}
 
 const UP = new THREE.Vector3(0, 1, 0)
 const _m = new THREE.Matrix4()
@@ -237,7 +95,7 @@ export default function WeaponViewModel() {
     const gun = gunRef.current
     const tracer = tracerRef.current
     const cam = gun?.parent as THREE.PerspectiveCamera | null
-    if (!gun || !tracer || !cam || !(cam as THREE.PerspectiveCamera).isPerspectiveCamera) return
+    if (!gun || !tracer || !cam?.isPerspectiveCamera) return
 
     const { phase, timeScale } = useGameStore.getState()
     const visible = phase === 'playing' || phase === 'paused'
@@ -247,11 +105,9 @@ export default function WeaponViewModel() {
       return
     }
     const held = isFeedbackHeld()
-    // Game-time step: frozen while paused, held or at timeScale 0.
     const dt = held || phase === 'paused' ? 0 : delta * (timeScale ?? 1)
     const s = state.current
 
-    // ── Pivot: bottom-right, sized from the viewport, at a depth past the near plane ──
     const { width, height } = frame.size
     const layout = weaponLayout(width, height, _layout)
     const { depth, scale } = weaponDepth(layout.unitPx, height, cam.fov, _depth)
@@ -260,24 +116,19 @@ export default function WeaponViewModel() {
     const ndcY = 1 - (layout.y / height) * 2
     _pivot.set(ndcX * tanHalf * cam.aspect * depth, ndcY * tanHalf * depth, -depth)
 
-    // ── Aim: the last shot for a moment after firing, otherwise the pointer ──
-    let ax: number
-    let ay: number
+    // Aim at the last shot for a moment after firing, otherwise the pointer.
+    let axPx: number
+    let ayPx: number
     if (held || performance.now() - lastShot.at < SHOT_AIM_HOLD_MS) {
-      ax = lastShot.x
-      ay = lastShot.y
+      axPx = ((lastShot.x + 1) / 2) * width
+      ayPx = ((1 - lastShot.y) / 2) * height
     } else {
       const p = getPointerState()
-      ax = (p.x / Math.max(1, width)) * 2 - 1
-      ay = 1 - (p.y / Math.max(1, height)) * 2
+      axPx = p.x
+      ayPx = p.y
     }
-    // The barrel points at the aim, so the tracer (tip → aim) leaves along it.
-    // The pivot→aim line projects onto the same screen line as pivot→tip, so
-    // only the small never-straight-up guard (clampWeaponAim) bends it.
-    clampWeaponAim(
-      layout.x, layout.y, ((ax + 1) / 2) * width, ((1 - ay) / 2) * height,
-      WEAPON_MIN_AIM_DIST * Math.min(width, height), _aimPx,
-    )
+    // pivot→aim projects onto the same screen line as pivot→tip, so the tracer leaves along the barrel.
+    clampWeaponAim(layout.x, layout.y, axPx, ayPx, WEAPON_MIN_AIM_DIST * Math.min(width, height), _aimPx)
     const ox = (_aimPx.x / Math.max(1, width)) * 2 - 1
     const oy = 1 - (_aimPx.y / Math.max(1, height)) * 2
     aimPoint(cam, ox, oy, TRACER_RANGE, _aim)
@@ -292,9 +143,9 @@ export default function WeaponViewModel() {
       gun.quaternion.slerp(_q, 1 - Math.exp(-AIM_FOLLOW * dt))
     }
 
-    // ── Recoil: kick back along the barrel and pitch the muzzle up ──
+    // Recoil: kick back along the barrel and pitch the muzzle up.
     const env = recoilEnvelope(s.recoilMs)
-    if (!held) s.recoilMs = Math.max(0, s.recoilMs - dt * 1000)
+    s.recoilMs = Math.max(0, s.recoilMs - dt * 1000)
     gun.position.copy(_pivot)
     gun.scale.setScalar(scale)
     if (env > 0) {
@@ -308,11 +159,9 @@ export default function WeaponViewModel() {
     // Undo the recoil rotation on the stored aim so the slerp target stays clean.
     if (env > 0) gun.quaternion.multiply(_qRecoil.invert())
 
-    // ── Muzzle anchor (flash reads it this frame) ──
     anchor.tip.copy(TIP).applyMatrix4(gun.matrix)
     anchor.size = FLASH_SIZE * scale
 
-    // ── Tracer: barrel tip → shot aim point ──
     if (s.tracerPending) {
       s.tracerPending = false
       s.tracerMs = TRACER_MS
@@ -334,12 +183,11 @@ export default function WeaponViewModel() {
     if (s.tracerMs > 0) {
       tracerMaterial.uniforms.uTime.value = held ? 0.35 : 1 - s.tracerMs / TRACER_MS
       tracer.visible = true
-      if (!held) s.tracerMs -= dt * 1000
+      s.tracerMs -= dt * 1000
     } else if (tracer.visible) {
       tracer.visible = false
     }
 
-    // ── e2e: the gun's on-screen box and muzzle tip ──
     const api = window.__SC_TEST__
     if (api) reportWeapon(api, gun, cam, geometry, anchor.tip, width, height)
   }, -1)
