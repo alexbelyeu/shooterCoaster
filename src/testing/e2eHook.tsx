@@ -78,6 +78,21 @@ export interface SCTestApi {
   endLevel: () => void
   /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
   setTimeScale: (s: number) => void
+  // ── View / aspect (issue #66) ──
+  /** Active camera projection vs the canvas's on-screen box (squash checks). */
+  view: () => E2EView | null
+}
+
+export interface E2EView {
+  /** `camera.aspect` of the active (gameplay) camera; null if not perspective. */
+  cameraAspect: number | null
+  /** Width / height of the canvas element as laid out on screen (CSS px). */
+  canvasAspect: number
+  canvasWidth: number
+  canvasHeight: number
+  /** Vertical and horizontal field of view in degrees. */
+  fov: number | null
+  hFov: number | null
 }
 
 export interface SceneStats {
@@ -278,6 +293,7 @@ export function installE2EApi() {
       useGameStore.getState().setPhase('results')
     },
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
+    view: readView,
   }
   eventBus.on('weapon:fire', () => { api.combat.fired += 1 })
   eventBus.on('enemy:hit', () => { api.combat.hits += 1 })
@@ -285,6 +301,28 @@ export function installE2EApi() {
   window.addEventListener('error', (e) => api.errors.push(String(e.message)))
   window.addEventListener('unhandledrejection', (e) => api.errors.push(String(e.reason)))
   window.__SC_TEST__ = api
+}
+
+/** Canvas element captured by <E2EFrameProbe> for view(). */
+let probeCanvas: HTMLCanvasElement | null = null
+
+function readView(): E2EView | null {
+  const cam = probeCamera
+  const canvas = probeCanvas
+  if (!cam || !canvas) return null
+  const r = canvas.getBoundingClientRect()
+  const persp = cam instanceof THREE.PerspectiveCamera ? cam : null
+  const hFov = persp
+    ? THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(persp.fov) / 2) * persp.aspect))
+    : null
+  return {
+    cameraAspect: persp ? persp.aspect : null,
+    canvasAspect: r.height > 0 ? r.width / r.height : 0,
+    canvasWidth: r.width,
+    canvasHeight: r.height,
+    fov: persp ? persp.fov : null,
+    hFov,
+  }
 }
 
 /** Mount inside <Canvas>. Counts frames and samples renderer stats. */
@@ -300,6 +338,7 @@ export function E2EFrameProbe() {
     if (!api) return
     probeCamera = state.camera
     probeSize = state.size
+    probeCanvas = state.gl.domElement
     if (autoFireEnabled) autoFireTick(state.camera)
     // Post-processing renders several passes per frame, and three.js resets
     // gl.info on every render() call by default. Accumulate manually instead:

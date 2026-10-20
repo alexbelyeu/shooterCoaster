@@ -42,11 +42,14 @@ held on the kill frame via `holdFeedback`) and `<id>-results.png`. A level fails
 it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
 enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
 wall-clock level timer already ran out), camera shake exceeds
-3 units or doesn't return exactly to the track, or the results screen never appears.
+3 units or doesn't return exactly to the track, the camera aspect doesn't match the
+canvas (±0.01), or the results screen never appears.
 `npm run smoke` also passes `--mobile`:
-an iPhone 13-like touch context (390x844) taps PLAY, a level, and the canvas 10x,
-checks the HUD is inside the viewport with no overlap in portrait and 844x390
-landscape, and taps Pause (`mobile-level-select.png`, `mobile-level1.png`,
+an iPhone 13-like touch context (390x844) taps PLAY and a level, then in portrait and
+again in 844x390 landscape taps the canvas 10x, each tap 15–30 px off an on-screen
+enemy (game time frozen while tapping), and requires kills (touch aim assist); checks
+camera aspect == canvas aspect in portrait, landscape and after rotating back, that the
+HUD is inside the viewport with no overlap in both orientations, and taps Pause (`mobile-level-select.png`, `mobile-level1.png`,
 `mobile-level1-landscape.png`; `--skip-desktop` runs only that). **Look at the screenshots** with the Read tool — that is how you
 playtest visually. Waits are polled against the frame counter because software
 rendering can run at ~1 fps; tune with `--seconds`, `--combat-seconds`,
@@ -62,9 +65,13 @@ Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 onScreenEnemies/shotsFired, `autoFire(on)`, `killNearest(n)` (fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
 `endLevel()`, `setTimeScale(s)`, `sceneStats()`, `combat` fire/hit/kill event counters,
-`cameraShake` {current, max}, `holdFeedback`). See `src/testing/e2eHook.tsx`. Extend it when you need new test
-surfaces. Note: bullets move a fixed distance per *frame*, so at ~1 fps headless
-autofire rarely lands hits on distant enemies — `killNearest` is what guarantees kills.
+`cameraShake` {current, max}, `holdFeedback`, `view()` → camera vs canvas aspect + FOV).
+See `src/testing/e2eHook.tsx`. Extend it when you need new test
+surfaces. Bullets travel per *second* with a swept hit test (`combat/projectiles/bulletMotion.ts`),
+but enemies and the camera still move a lot during one ~1 fps headless frame, so
+autofire only sometimes lands hits — `killNearest` is what guarantees kills.
+The coaster camera sets its own aspect/FOV from the canvas size (`track/cameraFov.ts`:
+portrait screens get a wider vertical FOV); touch shots get aim assist (`combat/aimAssist.ts`).
 
 ## Stack
 
