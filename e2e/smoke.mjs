@@ -43,20 +43,47 @@ const IGNORED = [
 ]
 const ignored = (msg) => IGNORED.some((re) => re.test(msg))
 
+const portInUse = async (url) => {
+  try {
+    await fetch(url)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Kill the whole `npx → sh → vite` process group (killing npx alone leaks vite). */
+function stopPreview(proc) {
+  try {
+    process.kill(-proc.pid, 'SIGTERM')
+  } catch {
+    proc.kill()
+  }
+}
+
 async function startPreview() {
-  const port = 4173 + Math.floor(Math.random() * 500)
+  // Never reuse a port something is already serving on: another worktree's
+  // preview would make us silently test the wrong build.
+  let port, url
+  for (let i = 0; i < 20; i++) {
+    port = 4173 + Math.floor(Math.random() * 500)
+    url = `http://localhost:${port}`
+    if (!(await portInUse(url))) break
+  }
   const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], {
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
   })
-  const url = `http://localhost:${port}`
-  for (let i = 0; i < 60; i++) {
+  let exited = false
+  proc.on('exit', () => (exited = true))
+  for (let i = 0; i < 60 && !exited; i++) {
     try {
       const r = await fetch(url)
-      if (r.ok) return { url, proc }
+      if (r.ok && !exited) return { url, proc }
     } catch {}
     await new Promise((r) => setTimeout(r, 500))
   }
-  proc.kill()
+  stopPreview(proc)
   throw new Error('vite preview did not start (did you run `npm run build`?)')
 }
 
@@ -146,8 +173,8 @@ async function captureEnemyCloseup(page, id) {
   }
 }
 
+let preview
 async function run() {
-  let preview
   const base = args.url ?? (preview = await startPreview()).url
   const browser = await launch()
   const results = []
@@ -215,7 +242,7 @@ async function run() {
   }
 
   await browser.close()
-  preview?.proc.kill()
+  if (preview) stopPreview(preview.proc)
 
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
   for (const r of results) {
@@ -232,5 +259,6 @@ async function run() {
 
 run().catch((e) => {
   console.error(e)
+  if (preview) stopPreview(preview.proc)
   process.exit(1)
 })
