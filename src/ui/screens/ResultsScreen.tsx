@@ -54,7 +54,7 @@ export default function ResultsScreen() {
       <p style={{ fontSize: '1.5rem' }}>
         Score: {Math.round(score)} / {config.maxScore}
       </p>
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+      <div className="results-actions">
         <button className="play-button" onClick={replay}>
           Replay
         </button>

@@ -9,7 +9,8 @@
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots (fires one real shot, then resolves the
  *     hits through the bullet pool's own processHit path), endLevel() to reach
- *     the results screen, stats() for score / kills / combo / shots
+ *     the results screen, stats() for score / kills / combo / shots,
+ *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events and camera shake (hit feedback checks)
  *
  * Keep this file tiny and side-effect free when the flag is off: nothing here
@@ -60,6 +61,9 @@ export interface SCTestApi {
    *  enemy:killed follows ~80 ms later). Returns how many were hit. */
   killNearest: (n: number) => number
   stats: () => SCTestStats
+  /** Viewport (CSS px) positions of up to n live on-screen enemies, nearest
+   *  first, so a test can tap / click real input at them. */
+  enemyScreenPoints: (n: number) => { x: number; y: number }[]
   /** Force the results phase. */
   endLevel: () => void
   setTimeScale: (s: number) => void
@@ -199,6 +203,20 @@ export function installE2EApi() {
         onScreenEnemies,
         shotsFired: s.shotsFired,
       }
+    },
+    enemyScreenPoints: (n: number) => {
+      if (!probeCamera) return []
+      const out: { x: number; y: number }[] = []
+      const ndc = new THREE.Vector3()
+      for (const { t, visible } of liveTargetsByDistance(probeCamera)) {
+        if (!visible || out.length >= n) break
+        onScreenNDC(t, probeCamera, ndc)
+        out.push({
+          x: ((ndc.x + 1) / 2) * window.innerWidth,
+          y: ((1 - ndc.y) / 2) * window.innerHeight,
+        })
+      }
+      return out
     },
     endLevel: () => {
       autoFireEnabled = false

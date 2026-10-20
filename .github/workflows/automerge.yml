@@ -1,7 +1,7 @@
 name: Auto-merge approved PRs
 
-# The merge gate for the autonomous studio. Agents never merge; QA (or the
-# Director/Maintainer/Reporter for their own docs-only or revert PRs) adds the
+# The merge gate for the autonomous studio. Agents never merge, and no agent can
+# approve its own PR: a separate QA run adds the
 # `agent:qa-approved` label, and this workflow squash-merges the PR once the
 # `verify` check is green on its current head commit.
 #
@@ -91,7 +91,7 @@ jobs:
                 core.warning(`#${number}: merge failed — ${e.message}`)
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: number,
-                  body: `Auto-merge failed: ${e.message}\nThe branch probably needs a rebase onto main.`,
+                  body: `Auto-merge failed: ${e.message}\nThe branch probably conflicts with main: merge origin/main into it, resolve, re-verify and push (never force-push).`,
                 })
               }
             }

@@ -1,0 +1,33 @@
+name: Weekly report email
+
+# Delivers the weekly report to Alex's inbox without any agent sending email.
+# Scheduled Claude sessions can't send Gmail (the connector returns Forbidden), so
+# when the Reporter opens an issue labelled `report`, this workflow posts the
+# report as a comment from github-actions[bot]. GitHub emails that comment to the
+# issue's author (Alex — agents act through his account) like any other
+# notification on a thread he's subscribed to.
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+
+jobs:
+  notify:
+    if: github.event.label.name == 'report'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue
+            const body = [
+              `📬 **${issue.title} is ready.**`,
+              '',
+              issue.body || '_(no summary in the issue body)_',
+              '',
+              `Play it: https://shooter-coaster.vercel.app · Steer: edit \`docs/agents/STEERING.md\` or open an issue labelled \`steering\`.`,
+            ].join('\n')
+            await github.rest.issues.createComment({ ...context.repo, issue_number: issue.number, body })

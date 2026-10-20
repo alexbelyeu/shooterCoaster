@@ -15,8 +15,14 @@ the relevant skills in `.claude/skills/`.
 
 ## Review one PR
 
+You are reviewing someone else's work — never approve a PR you (this session) wrote.
+Docs-only PRs (Director plans, reports, STATE updates) get a lighter review: check the
+claims against the code/screenshots and that nothing outside `docs/` changed.
+
 1. Check the `verify` check-run on the head SHA. If it failed, still reproduce locally.
-2. Check out the branch; rebase onto `origin/main` if behind (push the rebase).
+2. Check out the branch; if it is behind `origin/main`, merge `origin/main` into it **locally** (don't push —
+   you may not be able to, and GitHub merges approved PRs that are behind as long as they
+   don't conflict). If the merge conflicts, request changes instead.
 3. `npm ci`, `export SC_CHROME="$(scripts/ensure-browser.sh)"`, `npm run verify`.
    **Look at the screenshots** of affected levels and compare against `main` when
    it matters (`git stash`/checkout `main`, rebuild, re-run smoke for that level).

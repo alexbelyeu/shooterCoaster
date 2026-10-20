@@ -20,11 +20,21 @@
  *   npm run build && node e2e/smoke.mjs                 # all levels
  *   node e2e/smoke.mjs --levels level1,level5 --seconds 12 --combat-seconds 6
  *   node e2e/smoke.mjs --url https://example.com        # test a deployed site
+ *   node e2e/smoke.mjs --mobile                         # + touch playtest on a phone viewport
+ *   node e2e/smoke.mjs --mobile --skip-desktop          # only the touch playtest
+ *
+ * --mobile: iPhone 13-like context (390x844, touch, mobile UA) that taps PLAY,
+ * taps level 1, taps the canvas 10x at on-screen enemies through real touch
+ * input, and requires the taps to fire and a kill to happen (killNearest(3) is
+ * the fallback when no tapped bullet connects at ~1 fps; reported as
+ * tapKills). Checks HUD elements are inside the viewport and don't overlap in
+ * portrait and in 844x390 landscape, then taps Pause. Saves
+ * mobile-level1.png and mobile-level1-landscape.png.
  *
  * Browser: uses Playwright's bundled Chromium if installed; otherwise set
  * SC_CHROME=/path/to/chromium (see scripts/ensure-browser.sh for cloud sessions).
  */
-import { chromium } from 'playwright'
+import { chromium, devices } from 'playwright'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -140,7 +150,16 @@ async function waitFrames(page, n, { minMs = 0, maxMs = 20000, pollMs = 250 } = 
  */
 async function playLevel(page, id) {
   const problems = []
+  // Desktop mouse: one real click at the screen centre must fire through pointer input.
+  const beforeClick = await getStats(page)
+  const vp = page.viewportSize()
+  await page.mouse.move(vp.width / 2, vp.height / 2)
+  await page.mouse.down()
+  await page.mouse.up()
+  await waitFrames(page, 1, { maxMs: 4000, pollMs: 40 })
   const atStart = await getStats(page)
+  const mouseShots = atStart.shotsFired - beforeClick.shotsFired
+  if (mouseShots === 0) problems.push('mouse click fired no shot')
   await page.evaluate(() => window.__SC_TEST__.autoFire(true))
   const fire = await waitFrames(page, COMBAT_MIN_FRAMES, { minMs: COMBAT_SECONDS * 1000, maxMs: COMBAT_SECONDS * 6000 })
   const afterFire = await getStats(page)
@@ -199,7 +218,7 @@ async function playLevel(page, id) {
 
   if (combat.kills === 0) problems.push('no kills (enemies missing or unhittable?)')
   // Only meaningful when something was on screen to aim at.
-  if (atStart.onScreenEnemies > 0 && afterFire.shotsFired === 0) problems.push('autofire never fired at on-screen enemies')
+  if (atStart.onScreenEnemies > 0 && afterFire.shotsFired - atStart.shotsFired === 0) problems.push('autofire never fired at on-screen enemies')
   if (end.phase !== 'results' || !resultsShown) problems.push(`results screen not shown (phase "${end.phase}")`)
   if (nearestKilled > 0 && killEvents <= killsBefore) problems.push('killNearest hits did not produce an enemy:killed event')
   if (shake.max > 3 + 1e-6) problems.push(`camera shake ${shake.max.toFixed(2)} > 3 units`)
@@ -209,7 +228,8 @@ async function playLevel(page, id) {
     combat: {
       nearestKilled,
       autofireKills: afterFire.kills - atStart.kills,
-      shotsFired: afterFire.shotsFired,
+      shotsFired: afterFire.shotsFired - atStart.shotsFired,
+      mouseShots,
       autofireFrames: fire.frames,
       autofireSeconds: fire.ms / 1000,
       liveEnemies: combat.liveEnemies,
@@ -222,6 +242,180 @@ async function playLevel(page, id) {
     },
     kills: combat.kills,
     score: combat.score,
+  }
+}
+
+const MOBILE_LEVEL = 'level1'
+const HUD_SELECTORS = ['.hud-score', '.hud-enemies', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
+
+/** Wait until `selector` exists, has a size, and it and its ancestors are fully faded in. */
+function waitVisible(page, selector, timeout = 30000) {
+  return page
+    .waitForFunction(
+      (sel) => {
+        const el = document.querySelector(sel)
+        if (!el) return false
+        for (let n = el; n; n = n.parentElement) if (Number(getComputedStyle(n).opacity) < 0.98) return false
+        const r = el.getBoundingClientRect()
+        return r.width > 0 && r.height > 0
+      },
+      selector,
+      { timeout, polling: 250 },
+    )
+    .then(() => true, () => false)
+}
+
+/** HUD layout problems: elements missing, outside the viewport, or overlapping each other. */
+async function hudLayoutProblems(page, label) {
+  const { rects, vw, vh } = await page.evaluate((sels) => {
+    const rects = sels.map((sel) => {
+      const el = document.querySelector(sel)
+      if (!el) return { sel, missing: true }
+      // Text extent, not the block box (a block div spans its whole row).
+      let r
+      if (el.matches('button')) r = el.getBoundingClientRect()
+      else {
+        const range = document.createRange()
+        range.selectNodeContents(el)
+        r = range.getBoundingClientRect()
+      }
+      return { sel, x: r.left, y: r.top, w: r.width, h: r.height }
+    })
+    return { rects, vw: window.innerWidth, vh: window.innerHeight }
+  }, HUD_SELECTORS)
+  const problems = []
+  for (const r of rects) {
+    if (r.missing) {
+      problems.push(`${label}: ${r.sel} missing`)
+      continue
+    }
+    if (r.x < 0 || r.y < 0 || r.x + r.w > vw + 0.5 || r.y + r.h > vh + 0.5)
+      problems.push(`${label}: ${r.sel} outside viewport (${r.x.toFixed(0)},${r.y.toFixed(0)} ${r.w.toFixed(0)}x${r.h.toFixed(0)})`)
+  }
+  const placed = rects.filter((r) => !r.missing)
+  for (let i = 0; i < placed.length; i++)
+    for (let j = i + 1; j < placed.length; j++) {
+      const a = placed[i]
+      const b = placed[j]
+      if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h)
+        problems.push(`${label}: ${a.sel} overlaps ${b.sel}`)
+    }
+  return { problems, rects }
+}
+
+/** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
+async function runMobile(browser, base) {
+  const started = Date.now()
+  const { defaultBrowserType: _unused, ...iphone } = devices['iPhone 13']
+  // Full-screen 390x844 portrait (the descriptor's 664 px viewport assumes Safari's
+  // toolbars); DPR 2 instead of 3 keeps software rendering tolerable.
+  const ctx = await browser.newContext({ ...iphone, viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
+  page.on('console', (m) => {
+    if (m.type() === 'error' && !ignored(m.text())) errors.push(`console: ${m.text()}`)
+  })
+  const problems = []
+  const phase = () => page.evaluate(() => window.__SC_TEST__.phase())
+  const waitPhase = (p, timeout) =>
+    page.waitForFunction((want) => window.__SC_TEST__.phase() === want, p, { timeout }).catch(() => {})
+  await page.goto(`${base}/?e2e=1`, { waitUntil: 'load' })
+  await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
+
+  // Title -> PLAY (tap)
+  if (!(await waitVisible(page, '.title-screen .play-button'))) problems.push('PLAY button never appeared')
+  await page.locator('.title-screen .play-button').tap({ timeout: 30000 }).catch((e) => problems.push(`tap PLAY: ${e.message}`))
+  await waitPhase('levelSelect', 15000)
+  if ((await phase()) !== 'levelSelect') problems.push('tapping PLAY did not open level select')
+
+  // Level select -> level 1 (tap)
+  const card = `.level-card[data-level="${MOBILE_LEVEL}"]`
+  if (!(await waitVisible(page, card))) problems.push('level card never appeared')
+  await page.screenshot({ path: path.join(OUT, 'mobile-level-select.png') })
+  await page.locator(card).tap({ timeout: 30000 }).catch((e) => problems.push(`tap level: ${e.message}`))
+  await waitPhase('playing', 15000)
+  if ((await phase()) !== 'playing') problems.push('tapping the level card did not start the level')
+
+  // Countdown (3 s) -> HUD; then wait for enemies on screen.
+  if (!(await waitVisible(page, '.hud-pause-button', 40000))) problems.push('HUD never appeared')
+  const enemyDeadline = Date.now() + Math.max(SECONDS, 10) * 2000
+  while (Date.now() < enemyDeadline && (await getStats(page)).onScreenEnemies === 0) await page.waitForTimeout(500)
+
+  // 10 taps on the canvas, each at the nearest on-screen enemy (centre if none).
+  const before = await getStats(page)
+  let tapsOnEnemies = 0
+  const vp = page.viewportSize()
+  for (let i = 0; i < 10; i++) {
+    const [pt] = await page.evaluate(() => window.__SC_TEST__.enemyScreenPoints(1))
+    if (pt) tapsOnEnemies++
+    // Keep taps off the HUD buttons in the bottom corners.
+    const x = Math.min(Math.max(pt?.x ?? vp.width / 2, 8), vp.width - 8)
+    const y = Math.min(Math.max(pt?.y ?? vp.height / 2, 8), vp.height - 80)
+    await page.touchscreen.tap(x, y)
+    await waitFrames(page, 1, { minMs: 80, maxMs: 4000, pollMs: 40 })
+  }
+  const afterTaps = await getStats(page)
+  const tapShots = afterTaps.shotsFired - before.shotsFired
+  if (tapShots === 0) problems.push('10 taps fired no shots (touch input broken?)')
+  const crosshairScale = await page.evaluate(() => {
+    const el = document.querySelector('.crosshair-svg')
+    return el ? new DOMMatrixReadOnly(getComputedStyle(el).transform).a : 0
+  })
+  if (Math.abs(crosshairScale - 1.25) > 0.01) problems.push(`crosshair not in touch mode (scale ${crosshairScale})`)
+
+  // Give tapped bullets a few frames to connect, then fall back to killNearest(3)
+  // (3 so the screenshot also shows the combo counter in its phone position).
+  const killDeadline = Date.now() + 15000
+  let s = afterTaps
+  while (Date.now() < killDeadline && s.kills === before.kills) {
+    await waitFrames(page, 1, { maxMs: 4000, pollMs: 100 })
+    s = await getStats(page)
+  }
+  const tapKills = s.kills - before.kills
+  let fallbackKills = 0
+  if (tapKills === 0) {
+    fallbackKills = await page.evaluate(() => window.__SC_TEST__.killNearest(3))
+    await waitFrames(page, 1, { maxMs: 5000, pollMs: 30 })
+  }
+  // The level timer runs on wall-clock time, so on a slow runner the level can
+  // time out (HUD unmounts) before the layout + pause checks. Freeze game time
+  // now that the touch-input checks are done; pause still works while frozen.
+  if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the HUD layout checks`)
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}.png`) })
+  const end = await getStats(page)
+  if (end.kills === 0 && end.score <= 0) problems.push('no kill reached')
+
+  const portrait = await hudLayoutProblems(page, 'portrait 390x844')
+  problems.push(...portrait.problems)
+
+  await page.setViewportSize({ width: 844, height: 390 })
+  await waitFrames(page, 2, { minMs: 500, maxMs: 8000 })
+  const landscape = await hudLayoutProblems(page, 'landscape 844x390')
+  problems.push(...landscape.problems)
+  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-landscape.png`) })
+
+  // Pause is a button (touch has no Escape key).
+  if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the pause tap`)
+  await page.locator('.hud-pause-button').tap({ timeout: 30000 }).catch((e) => problems.push(`tap pause: ${e.message}`))
+  await waitPhase('paused', 15000)
+  if ((await phase()) !== 'paused') problems.push('tapping Pause did not pause')
+
+  const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
+  const allErrors = [...errors, ...hookErrors]
+  if (allErrors.length) problems.push(`${allErrors.length} error(s)`)
+  await ctx.close()
+  return {
+    id: `mobile-${MOBILE_LEVEL}`,
+    ok: problems.length === 0,
+    problems,
+    seconds: (Date.now() - started) / 1000,
+    mobile: { taps: 10, tapsOnEnemies, tapShots, tapKills, fallbackKills, crosshairScale },
+    kills: end.kills,
+    score: end.score,
+    hud: { portrait: portrait.rects, landscape: landscape.rects },
+    errors: allErrors,
   }
 }
 
@@ -266,7 +460,7 @@ async function run() {
   await t.ctx.close()
 
   // 2. Every level (or the requested subset)
-  const wanted = args.levels ? args.levels.split(',') : levels.map((l) => l.id)
+  const wanted = args['skip-desktop'] ? [] : args.levels ? args.levels.split(',') : levels.map((l) => l.id)
   for (const id of wanted) {
     const { ctx, page, errors } = await newPage()
     const started = Date.now()
@@ -300,6 +494,13 @@ async function run() {
     await ctx.close()
   }
 
+  // 3. Optional touch playtest on a phone viewport
+  if (args.mobile) {
+    const m = await runMobile(browser, base)
+    failed ||= !m.ok
+    results.push(m)
+  }
+
   await browser.close()
   preview?.proc.kill()
 
@@ -307,10 +508,13 @@ async function run() {
   for (const r of results) {
     const extra = r.id === 'title'
       ? ''
+      : r.mobile
+        ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
+          ` tapKills=${r.mobile.tapKills} fallbackKills=${r.mobile.fallbackKills} kills=${r.kills} score=${r.score} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}` +
-        ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}) score=${r.score}` +
+        ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
         ` shakeMax=${r.combat.shakeMax?.toFixed(2)} ${r.seconds.toFixed(0)}s`
-    console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)} frames=${r.frames}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
+    console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
   console.log(`Screenshots + results.json in ${OUT} (total ${((Date.now() - runStarted) / 1000).toFixed(0)}s)`)
