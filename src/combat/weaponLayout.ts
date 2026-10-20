@@ -23,7 +23,7 @@ export interface WeaponLayout {
  * meter (bottom-centre) and the mute button (bottom-right corner).
  */
 export const WEAPON_LANDSCAPE = { right: 0.5, bottom: 0.2, unit: 0.28 }
-export const WEAPON_PORTRAIT = { right: 0.18, bottom: 0.44, unit: 0.34 }
+export const WEAPON_PORTRAIT = { right: 0.2, bottom: 0.48, unit: 0.28 }
 
 /**
  * The gun's orientation target stays at least this far left of its pivot
