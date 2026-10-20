@@ -536,7 +536,7 @@ const SNOW_RIM = { color: '#dceaff', intensity: 0.55, power: 2.2 }
 export const SNOWMAN_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#f6f9ff',
   emissive: '#8094c8',
-  emissiveIntensity: 0.95,
+  emissiveIntensity: 1.4,
   specular: '#ffffff',
   shininess: 40,
   flatShading: true,
@@ -571,7 +571,7 @@ export const SNOWMAN_TWIG_MAT = SNOWMAN_ARM_MAT
 export const SNOWMAN_SCOUT_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#e4f2ff',
   emissive: '#6094d8',
-  emissiveIntensity: 0.9,
+  emissiveIntensity: 1.3,
   specular: '#c0e0ff',
   shininess: 45,
   flatShading: true,
