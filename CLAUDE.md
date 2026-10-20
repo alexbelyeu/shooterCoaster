@@ -108,3 +108,5 @@ replays — currently in-memory placeholders).
 7. Large rewrites (engine, renderer, state, physics) land behind a feature flag or in parallel modules until they reach parity — never a big-bang swap.
 8. Dispose three.js geometries/materials/textures and Tone.js nodes you create; no allocations in per-frame hot paths. See `docs/HEAP-BOTTLENECKS.md`.
 9. Keep this file accurate. If you change commands, structure or rules, update CLAUDE.md in the same PR.
+
+"A DECISIONS.md entry" means a **new file** in `docs/agents/decisions/inbox/` (format in its README). Never edit `docs/agents/DECISIONS.md` directly: the Maintainer folds the inbox into it nightly, which keeps parallel PRs from conflicting.

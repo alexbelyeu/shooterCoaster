@@ -10,6 +10,8 @@ How the autonomous ShooterCoaster studio works. Every scheduled session reads th
 | **Director** | Fable (latest) | Mon ~07:45 | Reads report + steering, updates vision/state, plans the week as issues |
 | **Builders** | Opus | daily ~08:45, ~13:45, ~18:45 | Each run: up to N parallel builder subagents, one issue each → PRs |
 | **QA** | Opus | daily ~10:15, ~15:15, ~20:15 (~90 min after each builder run) | Independent review + playtest of open PRs; approves or requests changes |
+| **QA (on label)** | Opus | when a PR gets `agent:needs-qa` | Reviews just that PR |
+| **Fix (on label)** | Opus | when a PR gets `agent:changes-requested` | One builder fixes just that PR |
 | **Maintainer** | Opus | daily ~03:35 | Keeps `main` healthy: prod-broken issues, reverts, stale claims, tech debt |
 
 Role definitions live in `.claude/agents/<role>.md`. Each scheduled task runs on
@@ -36,7 +38,8 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 | `docs/agents/STEERING.md` | **Alex** | Direction from Alex. Overrides everything except CLAUDE.md hard rules. Agents never edit it, except the Director may tick items as done. |
 | `docs/agents/VISION.md` | Director | What the finished game is, the quality bar, the roadmap |
 | `docs/agents/STATE.md` | Director (weekly), Maintainer (fixes) | Honest snapshot of what exists, what's broken, what's half-done |
-| `docs/agents/DECISIONS.md` | Anyone, append-only | Architecture/design decisions with reasons |
+| `docs/agents/DECISIONS.md` | Maintainer (folds the inbox nightly) | Architecture/design decisions with reasons. Read the inbox too for the latest. |
+| `docs/agents/decisions/inbox/` | Anyone, one new file per decision | Where every new decision entry goes. Never edit `DECISIONS.md` directly. |
 | `docs/reports/` | Reporter | Weekly reports |
 | GitHub Issues | Director creates, builders consume | The work queue |
 | `budgets.json` | Director | CI-enforced budgets |
@@ -82,7 +85,9 @@ commits to an approved PR removes the label automatically.
 
 QA applies `agent:qa-approved` only when **all** hold:
 1. GitHub check `verify` is `success` (or still running) on the PR's head SHA (`gh api repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs`).
-2. QA re-ran `npm run verify` on the branch itself and looked at the screenshots.
+2. QA re-ran `npm run verify` on the branch itself and looked at the screenshots, or, when the
+   PR came back only to resolve a merge conflict after a passing full review, did the light
+   re-review in `.claude/agents/qa.md`.
 3. The acceptance criteria are met and CLAUDE.md hard rules are respected.
 4. It still works on top of current `main`: if the branch is behind, merge `origin/main`
    into it **locally** and re-run `npm run verify` on the result. QA doesn't need to push — GitHub
@@ -93,6 +98,17 @@ QA applies `agent:qa-approved` only when **all** hold:
 needs the `agent:qa-approved` label from a QA run that did not write it. The platform
 enforces this: an agent's attempt to approve its own PR is blocked. Open your PR with
 `agent:needs-qa` and move on; do not wait for it to merge.
+
+**Event-driven review loop.** Two more scheduled tasks start on GitHub label events, not
+on a clock: **QA (on label)** runs whenever a PR on an `agent/*` branch gets
+`agent:needs-qa`, and **Fix (on label)** runs whenever one gets
+`agent:changes-requested`. Each handles only that one PR (one reviewer or one builder
+subagent) and stops. So a sent-back PR is fixed and re-reviewed within the hour, until
+it merges or QA closes it after 3 rounds. Every QA session comments
+`QA run <time> reviewing` before it starts, and every builder session comments
+`Builder run <time> is on it`. Any session seeing such a comment from another session
+within the last 2 hours leaves that PR alone. The scheduled Builders runs start new
+issues; the scheduled QA runs catch anything the events missed.
 
 QA reviews in this order: (1) revert / `agent:prod-broken` fixes, (2) P1, (3) the rest
 oldest first.
