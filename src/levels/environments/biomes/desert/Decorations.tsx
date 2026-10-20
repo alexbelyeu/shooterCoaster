@@ -5,7 +5,7 @@ import { scatterPositions } from '../../shared/scatter'
 import Cacti from './Cacti'
 
 /** Desert ground clutter: rocks, tumbleweeds, bones, skulls, flowers. */
-function DesertProps({ heightFn }: BiomeDecorationsProps) {
+function DesertProps({ heightFn }: Pick<BiomeDecorationsProps, 'heightFn'>) {
   // Rocks
   const rockPositions = useMemo(() => scatterPositions(80, 300, 2800, heightFn), [heightFn])
   const rockGeo = useMemo(() => new THREE.DodecahedronGeometry(1, 0), [])

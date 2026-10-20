@@ -14,8 +14,10 @@ How the autonomous ShooterCoaster studio works. Every scheduled session reads th
 | **Fix (on label)** | Opus | when a PR gets `agent:changes-requested` | One builder fixes just that PR |
 | **Maintainer** | Opus | daily ~03:35 | Keeps `main` healthy: prod-broken issues, reverts, stale claims, tech debt |
 
-Role definitions live in `.claude/agents/<role>.md`. Each scheduled task runs on
-its role's model. Director, Maintainer and Reporter sessions carry out their role
+Each scheduled task's prompt is a short bootstrap that runs `scripts/pause-check.sh`
+and then follows its runbook in `docs/agents/runbooks/` (see the README there), so
+changing how a role works is an ordinary reviewed PR. Role definitions live in
+`.claude/agents/<role>.md`. Each scheduled task runs on its role's model. Director, Maintainer and Reporter sessions carry out their role
 directly. Builder and QA sessions are thin **dispatchers**: they pick the work, then
 spawn Opus subagents in parallel with `isolation: "worktree"` (so they never share a
 working tree), each told to follow `.claude/agents/builder.md` or `qa.md`.
@@ -23,6 +25,18 @@ working tree), each told to follow `.claude/agents/builder.md` or `qa.md`.
 Throughput is tuned with the knobs in STEERING.md (`builder_parallelism`,
 `qa_parallelism`), not by changing schedules. Max plan budget: 15 scheduled runs per
 day per account; this loop uses ~7 (9 on Mondays).
+
+**Pausing.** Any open issue labelled `pause` stops the whole studio; so does
+`pause: true` in STEERING.md. Alex opens one with one tap from the link at the bottom
+of the status page. Title `PAUSE` holds until the issue is closed; `PAUSE until
+2026-10-21 08:00` (New York time) resumes by itself: the first agent to run after that
+time closes the issue. Every run checks `scripts/pause-check.sh` first and again before
+each wave of subagents and long step (`npm run verify`, pushing, deciding). When paused,
+an agent starts nothing new, leaves claims and labels as they are (a builder pushes its
+work as a draft PR), and ends with the PAUSED line. A session already in the middle of a
+long step finishes that step first; to stop it immediately, archive the session in the
+Claude app. Approved PRs still auto-merge while paused, since that costs no Claude usage.
+If the check itself fails, agents treat it as paused.
 
 **Studio status page.** The open issue labelled `studio-status` ("📊 Studio status
 (live)") is Alex's live view of the studio. `.github/workflows/studio-status.yml`
@@ -109,6 +123,14 @@ it merges or QA closes it after 3 rounds. Every QA session comments
 `Builder run <time> is on it`. Any session seeing such a comment from another session
 within the last 2 hours leaves that PR alone. The scheduled Builders runs start new
 issues; the scheduled QA runs catch anything the events missed.
+
+**Independent code review.** Besides the playtest reviewer, every PR whose code diff is
+~300 lines or more gets two fresh-context reviewers in parallel: `pr-correctness` (bugs,
+leaks, frame-rate and lifetime problems) and `pr-consistency` (right approach, reuse of
+existing systems, conventions), both reading one review bundle
+(`.claude/scripts/review-bundle.sh`). The QA dispatcher combines the three into one
+decision (`docs/agents/runbooks/review-one-pr.md`, `.claude/commands/wrap-pr.md`).
+Builders run `.claude/commands/deslop.md` over their files before shipping.
 
 QA reviews in this order: (1) revert / `agent:prod-broken` fixes, (2) P1, (3) the rest
 oldest first.

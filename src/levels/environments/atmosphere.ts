@@ -133,7 +133,7 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
   // Pale cold blue, violet horizon, low weak sun
   arctic: {
     sky: {
-      zenith: 0x5a84c2,
+      zenith: 0x34508e, // dark enough for the additive aurora to read
       horizon: 0xb2a6d6,
       ground: 0x8a88b8,
       horizonFalloff: 0.55,
