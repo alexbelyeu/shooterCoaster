@@ -46,10 +46,12 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 | `src/entities/enemies/SharedEnemyAssets.ts` | All shared enemy geometries + materials |
 | `src/entities/enemies/*.tsx` | Individual enemy components |
 | `src/entities/spawning/EnemySpawner.tsx` | Spawn logic, collision radii, scores |
-| `src/levels/environments/BiomeEnvironment.tsx` | Terrain, lights, fog, trees, landmarks, terrain features |
+| `src/levels/environments/BiomeEnvironment.tsx` | Thin host: atmosphere, terrain mesh, water, trees, then the biome's `Decorations` + `Features`. No per-biome code here |
+| `src/levels/environments/biomeRegistry.ts` | `BIOMES: Record<BiomeType, BiomeDefinition>` — one entry per biome |
+| `src/levels/environments/biomes/<biome>/` | Per-biome module: `config.ts` (terrain `COLOR_RAMP`, `TREES` config), `Decorations.tsx` (InstancedMesh scatter), `Features.tsx` (landmarks, terrain features, events), `index.ts` (the `BiomeDefinition`) |
+| `src/levels/environments/shared/` | Biome-agnostic helpers: `types.ts` (`BiomeDefinition`), `terrainMesh.ts` (terrain builder + colour-ramp sampler), `TreeField.tsx`, `OceanWater.tsx` (water shader), `Atmosphere.tsx` (sky/lights/fog/exposure wiring), `scatter.ts` (`scatterPositions`, `hslToRgb`), `safeHeight.ts` |
 | `src/levels/environments/atmosphere.ts` | Per-biome sky/sun/hemisphere/fog/exposure config (`ATMOSPHERES`) |
 | `src/levels/environments/SkyDome.tsx` | Procedural sky dome shader (gradient, sun, fbm clouds), follows camera |
-| `src/levels/environments/BiomeDecorations.tsx` | Per-biome InstancedMesh decorations |
 | `src/levels/environments/LavaShader.ts` | Procedural GLSL lava material (domain warping + Voronoi) |
 | `src/levels/environments/Volcano.tsx` | Volcano landmark component |
 | `src/audio/MusicManager.ts` | Per-biome music configs |
@@ -85,17 +87,13 @@ This is the hardest visual problem. Features that sit on terrain (lava rivers, p
 The terrain mesh uses 128 segments over the terrain size (e.g., 12000 units = ~94 unit cells). Between terrain vertices, the GPU interpolates linearly, but `heightFn()` returns exact noise values. Any geometry sampling `heightFn` will disagree with the rendered terrain surface between grid points — causing features to clip in and out of the terrain.
 
 ### The safeHeight() Pattern (Required)
+Use the shared helper in `src/levels/environments/shared/safeHeight.ts` (max of a
+3x3 neighbourhood ±`half` around the point, plus `yOffset`):
 ```typescript
-function safeHeight(x: number, z: number, step: number): number {
-  let maxH = -Infinity
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dz = -1; dz <= 1; dz++) {
-      maxH = Math.max(maxH, heightFn(x + dx * step, z + dz * step))
-    }
-  }
-  return maxH + 8 // 8+ units above the max neighbor
-}
+import { safeHeight } from '../../shared/safeHeight'
+const y = safeHeight(heightFn, x, z, TERRAIN_CELL * 0.6, 8) // 8+ units above the max neighbor
 ```
+See `biomes/volcanic/lavaRivers.ts` for the full working example.
 
 ### Construction Rules
 1. **Build custom BufferGeometry** — each vertex samples `safeHeight(x, z, terrainCellSize)`
@@ -129,19 +127,24 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 
 ### Biome Registration (all required)
 1. `src/types/level.ts` — add to `BiomeType` union
-2. `src/utils/terrainNoise.ts` — add noise config entry (frequency, amplitude, octaves, ridgeMode)
-3. `src/levels/environments/BiomeEnvironment.tsx` — add entries to ALL of:
-   - (sky/light/fog/exposure now live in `atmosphere.ts` — see step 3b)
-   - `BIOME_COLOR_RAMPS` (terrain vertex colors by height/slope)
-   - `BIOME_TERRAIN_CONFIGS` (segments, size)
-   - Tree type in `BIOME_TREE_TYPES`
-   - `getTreeCount()` case
-   - Terrain size override if needed
-   - Slope rejection angle
-3b. `src/levels/environments/atmosphere.ts` — add an `ATMOSPHERES` entry: sky dome
+2. `src/utils/terrainNoise.ts` — add a `BIOME_TERRAIN_CONFIGS` entry (frequency, amplitude, octaves, ridgeMode, baseY, flatRadius)
+   (terrain mesh size override, if needed, is `getTerrainMeshSize` in the same file)
+3. `src/levels/environments/biomes/<biome>/` — new folder (copy the closest existing biome):
+   - `config.ts` — `COLOR_RAMP` (terrain vertex colours by height + `cliffColor` on slopes)
+     and `TREES` (`BiomeTreeConfig`: tree types, `maxCount` cap, scatter radii, slope
+     rejection angle — `PI/6` for mountains, `PI/4` for flat biomes; `null` = no trees)
+   - `Decorations.tsx` — InstancedMesh scatter (use `shared/scatter.ts`); dispose every
+     geometry/material in a `useEffect` cleanup
+   - `Features.tsx` — landmarks, terrain-conforming features, biome events (gets
+     `heightFn`, `atmosphere`, `fogRef`)
+   - `index.ts` — export the `BiomeDefinition`
+   Keep each file under ~400 lines; split big decoration sets into sibling components.
+3b. `src/levels/environments/biomeRegistry.ts` — add the biome to `BIOMES` (the
+   `Record<BiomeType, …>` type makes a missing entry a compile error).
+3c. `src/levels/environments/atmosphere.ts` — add an `ATMOSPHERES` entry: sky dome
    gradient (zenith/horizon/ground), sun disc/glow, clouds, sun light, hemisphere
    light, fog near/far, tone-mapping exposure. Fog colour is always `sky.horizon`.
-4. `src/levels/environments/BiomeDecorations.tsx` — add decoration case
+4. (Nothing to add to `BiomeEnvironment.tsx` — it renders whatever the registry entry defines.)
 5. `src/audio/MusicManager.ts` — add music config entry (tempo, chords, bass, lead, hasPerc)
 6. `src/levels/LevelRegistry.ts` — add level definition (biome, waves, track config, nextLevel chain)
 
@@ -158,10 +161,10 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
    - Add to `ENEMY_COMPONENTS` map
 
 ### Special Features (if needed)
-- **Eruption/weather events**: Add `isEruption?: boolean` (or similar) to `EnemyWave`, emit via `eventBus` in spawner, listen in `BiomeEnvironment.tsx`
+- **Eruption/weather events**: Add `isEruption?: boolean` (or similar) to `EnemyWave`, emit via `eventBus` in spawner, listen in the biome's `Features.tsx` (see `biomes/volcanic/Features.tsx`)
 - **Terrain-conforming features**: Follow the safeHeight() pattern above
 - **Custom shaders**: Create separate `*Shader.ts` file with `create*Material()` factory, drive uniforms in `useFrame`
-- **Landmark components**: Create in `src/levels/environments/`, accept optional custom material props
+- **Landmark components**: Create in `src/levels/environments/` (render them from the biome's `Features.tsx`), accept optional custom material props
 
 ## Common Pitfalls
 

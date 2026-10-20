@@ -6,6 +6,6 @@ const defaultHeightFn: HeightFunction = () => 0
 
 /**
  * React context sharing the terrain height function.
- * Used by TrackMesh for support towers and BiomeEnvironment for trees/decorations.
+ * Used by TrackMesh for support towers and BiomeEnvironment for trees/decorations/features.
  */
 export const TerrainContext = createContext<HeightFunction>(defaultHeightFn)
