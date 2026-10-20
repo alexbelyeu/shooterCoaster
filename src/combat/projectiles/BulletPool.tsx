@@ -5,11 +5,11 @@ import { useGameStore } from '@/store/useGameStore'
 import { getCollisionTargets, processHit } from '@/combat/CollisionManager'
 import type { Bullet, BulletPoolHandle } from './bulletPoolHandle'
 import { setBulletPool } from './bulletPoolHandle'
+import { BULLET_SPEED_PER_SEC, segmentHitsSphere, stepBullet } from './bulletMotion'
 
 const POOL_SIZE = 350
 const FIRE_DELAY_MS = 60
 const BULLET_LIFETIME_MS = 5000
-const BULLET_SPEED = 14
 
 interface BulletPoolProps {
   bulletSize?: number
@@ -30,8 +30,10 @@ export default function BulletPool({
         alive: false,
         bornAt: 0,
         position: new THREE.Vector3(0, -9999, 0),
+        prev: new THREE.Vector3(0, -9999, 0),
         direction: new THREE.Vector3(0, 0, -1),
-        speed: BULLET_SPEED,
+        speed: BULLET_SPEED_PER_SEC,
+        hitScale: 1,
       })
     }
     return arr
@@ -47,7 +49,7 @@ export default function BulletPool({
   const zeroVec = useRef(new THREE.Vector3(0, 0, 0)).current
 
   const fire = useCallback(
-    (origin: THREE.Vector3, direction: THREE.Vector3): boolean => {
+    (origin: THREE.Vector3, direction: THREE.Vector3, hitScale = 1): boolean => {
       const now = performance.now()
       if (now - lastFireTime.current < FIRE_DELAY_MS) return false
 
@@ -68,8 +70,10 @@ export default function BulletPool({
       bullet.alive = true
       bullet.bornAt = now
       bullet.position.copy(origin)
+      bullet.prev.copy(origin)
       bullet.direction.copy(direction).normalize()
-      bullet.speed = BULLET_SPEED
+      bullet.speed = BULLET_SPEED_PER_SEC
+      bullet.hitScale = hitScale
       return true
     },
     [bullets],
@@ -83,7 +87,7 @@ export default function BulletPool({
     return () => setBulletPool(null)
   }, [fire, getLiveBullets, getLiveBulletCount])
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!meshRef.current || phase !== 'playing') return
 
     const now = performance.now()
@@ -96,7 +100,9 @@ export default function BulletPool({
           bullet.alive = false
           bullet.position.set(0, -9999, 0)
         } else {
-          bullet.position.addScaledVector(bullet.direction, bullet.speed)
+          // Time-based (not per-frame) travel; the hit test below sweeps prev → position.
+          bullet.prev.copy(bullet.position)
+          stepBullet(bullet.position, bullet.direction, bullet.speed, delta)
         }
       }
 
@@ -134,10 +140,10 @@ export default function BulletPool({
         for (const target of targets.values()) {
           if (target.hitThisFrame) continue // already hit, skip
           const pos = target.getPosition()
-          const dx = pos.x - bullet.position.x
-          const dy = pos.y - bullet.position.y
-          const dz = pos.z - bullet.position.z
-          if (dx * dx + dy * dy + dz * dz < target.radiusSq) {
+          const a = bullet.prev
+          const b = bullet.position
+          const rSq = target.radiusSq * bullet.hitScale * bullet.hitScale
+          if (segmentHitsSphere(a.x, a.y, a.z, b.x, b.y, b.z, pos.x, pos.y, pos.z, rSq)) {
             bullet.alive = false
             bullet.position.set(0, -9999, 0)
             target.hitThisFrame = true
