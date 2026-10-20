@@ -13,7 +13,8 @@
  *     hits through the bullet pool's own processHit path), endLevel() to reach
  *     the results screen, stats() for score / kills / combo / shots,
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
- *   - count fire / hit / kill events and camera shake (hit feedback checks)
+ *   - count fire / hit / kill events, camera translation / trauma rotation and
+ *     the weapon view-model's on-screen box (hit feedback checks)
  *
  * Keep this file tiny and side-effect free when the flag is off: nothing here
  * runs unless `installE2EApi()` finds `?e2e=1`, and <E2EFrameProbe> is only
@@ -51,8 +52,16 @@ export interface SCTestApi {
   errors: string[]
   /** Counts of 'weapon:fire' / 'enemy:hit' / 'enemy:killed' since load. */
   combat: { fired: number; hits: number; kills: number }
-  /** Camera shake displacement from the track this frame, and the max seen. */
+  /** Camera translation off the track pose this frame, and the max seen.
+   *  Feedback is rotation-only (issue #65), so this must stay exactly 0. */
   cameraShake: { current: number; max: number }
+  /** Kill-trauma camera rotation this frame and the max seen (largest of
+   *  pitch / yaw / roll, degrees). Decays to 0 within 250 ms. */
+  cameraTrauma: { current: number; max: number }
+  /** First-person weapon view-model on screen (CSS px, origin top-left):
+   *  bounding box of its projected bounds and the muzzle tip. null before the
+   *  first level frame. */
+  weapon: E2EWeaponOnScreen | null
   /** Freeze transient feedback (muzzle flash, hitmarker) at its peak for screenshots. */
   holdFeedback: boolean
   /**
@@ -96,6 +105,19 @@ export interface SCTestStats {
   /** Live enemies in front of the camera and inside the viewport (not occlusion-tested). */
   onScreenEnemies: number
   shotsFired: number
+}
+
+export interface E2EWeaponOnScreen {
+  visible: boolean
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+  tipX: number
+  tipY: number
+  /** Viewport the box was measured in. */
+  width: number
+  height: number
 }
 
 export interface E2EEnemyOnScreen {
@@ -224,6 +246,8 @@ export function installE2EApi() {
     errors: [],
     combat: { fired: 0, hits: 0, kills: 0 },
     cameraShake: { current: 0, max: 0 },
+    cameraTrauma: { current: 0, max: 0 },
+    weapon: null,
     holdFeedback: false,
     sceneStats: () => null,
     autoFire: (enabled: boolean) => {

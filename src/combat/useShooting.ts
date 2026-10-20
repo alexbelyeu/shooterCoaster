@@ -6,6 +6,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { playFireSound } from '@/audio/SFXManager'
 import { eventBus } from '@/core/EventBus'
 import { getPointerState, subscribePointer } from '@/input/pointerInput'
+import { recordShot } from './hitFeedback'
 
 const _raycaster = new THREE.Raycaster()
 const _ndc = new THREE.Vector2()
@@ -32,7 +33,9 @@ export function fireAtNDC(x: number, y: number, camera: THREE.Camera): boolean {
   if (!pool.fire(_origin, _direction)) return false
   useGameStore.getState().registerShot()
   playFireSound()
-  // Muzzle flash, camera kick, etc. listen for this (no payload, no allocation).
+  // Weapon view-model (recoil, muzzle flash, tracer) aims at this shot.
+  recordShot(x, y)
+  // Listeners read lastShot instead of a payload (no allocation).
   eventBus.emit('weapon:fire')
   return true
 }

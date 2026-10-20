@@ -655,6 +655,47 @@ canvas {
   height: 24px;
 }
 
+.settings-note {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+/* Off / Reduced / Full segmented control (44 px touch targets) */
+.settings-segmented {
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.settings-segmented button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 0.6rem;
+  border: 0;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.settings-segmented button + button {
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.settings-segmented button.is-active {
+  background: rgba(255, 210, 63, 0.85);
+  color: #111;
+  font-weight: 600;
+}
+
+.settings-segmented button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 /* Mute button — always visible, bottom-right */
 .mute-button {
   position: fixed;

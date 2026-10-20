@@ -5,12 +5,14 @@ import { eventBus } from '@/core/EventBus'
 import { useGameStore } from '@/store/useGameStore'
 import { MUZZLE_FLASH_MS, isFeedbackHeld } from './hitFeedback'
 
-/** Distance in front of the camera (camera near plane is 1). */
-const DIST = 3
-/** Flash size as a fraction of the view's half-height at DIST. */
-const SIZE = 0.52
-/** Vertical placement: fraction of the half-height below centre (gun position). */
-const DROP = 0.8
+/**
+ * Where the flash goes: the weapon view-model writes its barrel tip (camera
+ * space) and the flash's world size here every frame, before this renders.
+ */
+export interface MuzzleAnchor {
+  tip: THREE.Vector3
+  size: number
+}
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -41,11 +43,12 @@ const fragmentShader = /* glsl */ `
 `
 
 /**
- * Camera-attached additive muzzle flash at the bottom-centre of the view.
- * Mount as a child of the gameplay camera. One mesh, reused for every shot
- * (pooled by construction); hidden — so zero draw calls — when idle.
+ * Small camera-attached additive muzzle flash at the weapon's barrel tip.
+ * Mounted by WeaponViewModel (a child of the gameplay camera), which owns the
+ * anchor. One mesh, reused for every shot (pooled by construction); hidden — so
+ * zero draw calls — when idle.
  */
-export default function MuzzleFlash() {
+export default function MuzzleFlash({ anchor }: { anchor: MuzzleAnchor }) {
   const meshRef = useRef<THREE.Mesh>(null)
   const remainingMs = useRef(0)
 
@@ -97,12 +100,10 @@ export default function MuzzleFlash() {
       return
     }
 
-    const cam = mesh.parent as THREE.PerspectiveCamera | null
-    const halfH = Math.tan(THREE.MathUtils.degToRad((cam?.fov ?? 80) / 2)) * DIST
-    const t = remainingMs.current / MUZZLE_FLASH_MS // 1 → 0
-    const s = halfH * SIZE * ((mesh.userData.flashScale as number) ?? 1) * (0.75 + 0.25 * t)
+    const t = Math.min(remainingMs.current / MUZZLE_FLASH_MS, 1) // 1 → 0
+    const s = anchor.size * ((mesh.userData.flashScale as number) ?? 1) * (0.75 + 0.25 * t)
     mesh.scale.set(s, s, 1)
-    mesh.position.set(0, -halfH * DROP, -DIST)
+    mesh.position.copy(anchor.tip)
     material.uniforms.uIntensity.value = t
     mesh.visible = true
 
