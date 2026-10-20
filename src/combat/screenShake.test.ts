@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   KILL_TRAUMA_MS, MAX_PITCH_YAW_DEG, MAX_ROLL_DEG,
   addTrauma, decayTrauma, effectiveShakeScale, killTrauma, shakeAngles, smoothNoise1,
-  type ShakeAngles,
+  type ShakeAngles, type TraumaState,
 } from './screenShake'
 
 const DEG = Math.PI / 180
@@ -16,20 +16,41 @@ describe('screenShake', () => {
     expect(killTrauma(NaN)).toBeCloseTo(0.55)
     expect(killTrauma(5)).toBeGreaterThan(killTrauma(2))
     // Overlapping kills keep the stronger trauma, never stack past 1.
-    expect(addTrauma(0.9, 1)).toBe(0.9)
-    expect(addTrauma(0.1, 10)).toBe(1)
+    expect(addTrauma({ trauma: 0.9, decayMs: KILL_TRAUMA_MS }, killTrauma(1)).trauma).toBe(0.9)
+    expect(addTrauma({ trauma: 0.1, decayMs: KILL_TRAUMA_MS }, killTrauma(10)).trauma).toBe(1)
+    expect(addTrauma({ trauma: 0, decayMs: KILL_TRAUMA_MS }, 5).trauma).toBe(1)
+  })
+
+  it('long world-event trauma decays over its own duration and keeps its tail', () => {
+    const s: TraumaState = { trauma: 0, decayMs: KILL_TRAUMA_MS }
+    addTrauma(s, 0.8, 3000)
+    expect(s.trauma).toBe(0.8)
+    expect(s.trauma * s.decayMs).toBeCloseTo(2400) // ms until it reaches 0
+    // A stronger kill mid-rumble raises the level but does not cut the rumble short.
+    decayTrauma(s, 1000)
+    addTrauma(s, killTrauma(10))
+    expect(s.trauma).toBe(1)
+    expect(s.trauma * s.decayMs).toBeCloseTo(2400 - 1000)
+    let elapsed = 0
+    while (s.trauma > 0 && elapsed < 10000) {
+      decayTrauma(s, 16.7)
+      elapsed += 16.7
+    }
+    expect(s.trauma).toBe(0)
+    expect(elapsed).toBeLessThanOrEqual(1400 + 16.7)
   })
 
   it('decays to exactly 0 within 250 ms at any frame rate', () => {
     for (const dt of [1, 4, 16.7, 33, 100, 1000]) {
-      let t = 1
+      const s: TraumaState = { trauma: 0, decayMs: KILL_TRAUMA_MS }
+      addTrauma(s, killTrauma(99))
       let elapsed = 0
-      while (t > 0) {
-        t = decayTrauma(t, dt)
+      while (s.trauma > 0) {
+        decayTrauma(s, dt)
         elapsed += dt
         if (elapsed > 5000) break
       }
-      expect(t).toBe(0)
+      expect(s.trauma).toBe(0)
       expect(elapsed).toBeLessThanOrEqual(Math.max(KILL_TRAUMA_MS + dt, dt))
     }
     expect(KILL_TRAUMA_MS).toBeLessThanOrEqual(250)

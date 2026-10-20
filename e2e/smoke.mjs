@@ -11,7 +11,8 @@
  * killed, autofire never fired at on-screen enemies, the killNearest hits never
  * produced a kill event, the camera translated off the track pose at all (kill
  * feedback is rotation-only), the kill trauma exceeded 1° or did not decay to 0,
- * the first-person weapon is missing / off screen / covering the centre, the
+ * the first-person weapon is missing / off screen / covering the centre / not
+ * pointing along the shot's tracer (> 25° on screen), the
  * camera aspect doesn't match the canvas, or the results screen never appears.
  * Saves screenshots + stats to e2e-results/.
  *
@@ -282,7 +283,7 @@ async function playLevel(page, id) {
   const settleDeadline = Date.now() + 30000
   const readShake = () => page.evaluate(() => {
     const s = window.__SC_TEST__
-    return { frames: s.frames, ...s.cameraShake, trauma: s.cameraTrauma.current, traumaMax: s.cameraTrauma.max }
+    return { frames: s.frames, ...s.cameraTranslation, trauma: s.cameraTrauma.current, traumaMax: s.cameraTrauma.max }
   })
   let shake = await readShake()
   while (Date.now() < settleDeadline) {
@@ -333,8 +334,8 @@ async function playLevel(page, id) {
       onScreenAtStart: atStart.onScreenEnemies,
       onScreenBeforeKills: afterFire.onScreenEnemies,
       combo: combat.combo,
-      shakeMax: shake.max,
-      shakeIdle: shake.current,
+      translationMax: shake.max,
+      translationIdle: shake.current,
       traumaMaxDeg: shake.traumaMax,
       weapon: weapon.box,
       events: counts,
@@ -349,6 +350,8 @@ async function playLevel(page, id) {
 const MOBILE_LEVEL = 'level1'
 /** HUD the first-person weapon must stay clear of (#65). */
 const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-button'
+/** Max angle between the barrel and the tracer on screen (#65). */
+const WEAPON_MAX_AIM_DEG = 25
 const HUD_SELECTORS = ['.hud-score', '.hud-kills', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
 
 /** Wait until `selector` exists, has a size, and it and its ancestors are fully faded in. */
@@ -370,8 +373,8 @@ function waitVisible(page, selector, timeout = 30000) {
 
 /**
  * First-person weapon (#65): must be on screen, its muzzle tip inside the
- * viewport, anchored in the lower-right, and never covering the screen centre
- * (where the crosshair usually is).
+ * viewport, anchored in the lower-right, never covering the screen centre
+ * (where the crosshair usually is), and pointing along the last shot's tracer.
  */
 async function weaponProblems(page, label) {
   const { box, hud } = await page.evaluate((sels) => {
@@ -395,6 +398,15 @@ async function weaponProblems(page, label) {
     problems.push(`${label}: weapon covers the screen centre`)
   if ((box.minX + box.maxX) / 2 < vw / 2 || (box.minY + box.maxY) / 2 < vh / 2)
     problems.push(`${label}: weapon not in the lower-right quadrant`)
+  // The shot must read as leaving the barrel: on the held frame, the tracer
+  // (tip → last shot) runs within WEAPON_MAX_AIM_DEG of the barrel (pivot → tip)
+  // for any aim point above the muzzle and not right on top of it.
+  const barrel = Math.atan2(box.tipY - box.pivotY, box.tipX - box.pivotX)
+  const shot = Math.atan2(box.shotY - box.tipY, box.shotX - box.tipX)
+  box.aimErrorDeg = Math.abs(((shot - barrel + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * (180 / Math.PI)
+  const shotFar = Math.hypot(box.shotX - box.tipX, box.shotY - box.tipY) > 0.1 * Math.min(vw, vh)
+  if (box.shotY < box.tipY && shotFar && box.aimErrorDeg > WEAPON_MAX_AIM_DEG)
+    problems.push(`${label}: tracer leaves the barrel ${box.aimErrorDeg.toFixed(0)}° off its direction (> ${WEAPON_MAX_AIM_DEG}°)`)
   // The projected bounding box is conservative (larger than the silhouette).
   for (const r of hud)
     if (box.minX < r.x + r.w && r.x < box.maxX && box.minY < r.y + r.h && r.y < box.maxY)
@@ -779,10 +791,10 @@ async function run() {
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
-          ` fallbackKills=${r.mobile.fallbackKills} kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
+          ` fallbackKills=${r.mobile.fallbackKills} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` shakeMax=${r.combat.shakeMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}°${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}°${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }

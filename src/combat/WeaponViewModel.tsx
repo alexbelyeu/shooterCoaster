@@ -9,7 +9,8 @@ import MuzzleFlash, { type MuzzleAnchor } from './MuzzleFlash'
 import { isFeedbackHeld, lastShot } from './hitFeedback'
 import {
   SHOT_AIM_HOLD_MS, TRACER_MS, TRACER_RANGE, WEAPON_RECOIL_BACK, WEAPON_RECOIL_MS,
-  WEAPON_MIN_LEAD, WEAPON_RECOIL_PITCH, recoilEnvelope, weaponDepth, weaponLayout,
+  WEAPON_MIN_AIM_DIST, WEAPON_RECOIL_PITCH, clampWeaponAim, recoilEnvelope, weaponDepth, weaponLayout,
+  type WeaponDepth, type WeaponLayout,
 } from './weaponLayout'
 
 /**
@@ -33,10 +34,6 @@ const FLASH_SIZE = 0.42 // model units
 const TRACER_WIDTH = 0.045 // model units, at the barrel end
 const TRACER_FAR_WIDTH_RATIO = 10 // far end width / near end width (perspective taper)
 const AIM_FOLLOW = 18 // 1/s, gun slerps toward the aim
-/** Rest aim (NDC) and how far the gun turns from it toward the real aim. */
-const AIM_REST_X = -0.05
-const AIM_REST_Y = 0.05
-const AIM_WEIGHT = 0.65
 /** Slight clockwise cant (radians) so the gun's side + top read on screen. */
 const WEAPON_CANT = -0.12
 
@@ -184,6 +181,9 @@ const _normal = new THREE.Vector3()
 const _xAxis = new THREE.Vector3(1, 0, 0)
 const _zAxis = new THREE.Vector3(0, 0, 1)
 const _corner = new THREE.Vector3()
+const _layout: WeaponLayout = { x: 0, y: 0, unitPx: 0 }
+const _depth: WeaponDepth = { depth: 0, scale: 0 }
+const _aimPx = { x: 0, y: 0 }
 
 /** Camera-space point at distance `dist` along the ray through NDC (x, y). */
 function aimPoint(cam: THREE.PerspectiveCamera, x: number, y: number, dist: number, out: THREE.Vector3) {
@@ -247,13 +247,14 @@ export default function WeaponViewModel() {
       return
     }
     const held = isFeedbackHeld()
-    const dt = held ? 0 : delta * (timeScale ?? 1)
+    // Game-time step: frozen while paused, held or at timeScale 0.
+    const dt = held || phase === 'paused' ? 0 : delta * (timeScale ?? 1)
     const s = state.current
 
     // ── Pivot: bottom-right, sized from the viewport, at a depth past the near plane ──
     const { width, height } = frame.size
-    const layout = weaponLayout(width, height)
-    const { depth, scale } = weaponDepth(layout.unitPx, height, cam.fov)
+    const layout = weaponLayout(width, height, _layout)
+    const { depth, scale } = weaponDepth(layout.unitPx, height, cam.fov, _depth)
     const tanHalf = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2))
     const ndcX = (layout.x / width) * 2 - 1
     const ndcY = 1 - (layout.y / height) * 2
@@ -270,12 +271,15 @@ export default function WeaponViewModel() {
       ax = (p.x / Math.max(1, width)) * 2 - 1
       ay = 1 - (p.y / Math.max(1, height)) * 2
     }
-    // The gun turns most of the way toward the aim but keeps a leftward angle,
-    // so it never points straight up the screen and loses its silhouette. The
-    // tracer still runs to the exact aim point.
-    const leadNdc = (2 * WEAPON_MIN_LEAD * Math.min(width, height)) / Math.max(1, width)
-    const ox = Math.min(AIM_REST_X + (ax - AIM_REST_X) * AIM_WEIGHT, ndcX - leadNdc)
-    const oy = AIM_REST_Y + (ay - AIM_REST_Y) * AIM_WEIGHT
+    // The barrel points at the aim, so the tracer (tip → aim) leaves along it.
+    // The pivot→aim line projects onto the same screen line as pivot→tip, so
+    // only the small never-straight-up guard (clampWeaponAim) bends it.
+    clampWeaponAim(
+      layout.x, layout.y, ((ax + 1) / 2) * width, ((1 - ay) / 2) * height,
+      WEAPON_MIN_AIM_DIST * Math.min(width, height), _aimPx,
+    )
+    const ox = (_aimPx.x / Math.max(1, width)) * 2 - 1
+    const oy = 1 - (_aimPx.y / Math.max(1, height)) * 2
     aimPoint(cam, ox, oy, TRACER_RANGE, _aim)
     _m.lookAt(_pivot, _aim, UP) // -Z (the barrel) toward the aim point
     _q.setFromRotationMatrix(_m)
@@ -285,7 +289,7 @@ export default function WeaponViewModel() {
       gun.quaternion.copy(_q)
       s.initialized = true
     } else {
-      gun.quaternion.slerp(_q, 1 - Math.exp(-AIM_FOLLOW * delta))
+      gun.quaternion.slerp(_q, 1 - Math.exp(-AIM_FOLLOW * dt))
     }
 
     // ── Recoil: kick back along the barrel and pitch the muzzle up ──
@@ -377,7 +381,8 @@ function reportWeapon(
   const box = geometry.boundingBox
   if (!box) return
   const w = (api.weapon ??= {
-    visible: false, minX: 0, minY: 0, maxX: 0, maxY: 0, tipX: 0, tipY: 0, width: 0, height: 0,
+    visible: false, minX: 0, minY: 0, maxX: 0, maxY: 0, tipX: 0, tipY: 0,
+    pivotX: 0, pivotY: 0, shotX: 0, shotY: 0, width: 0, height: 0,
   })
   w.minX = Infinity
   w.minY = Infinity
@@ -399,6 +404,11 @@ function reportWeapon(
   _corner.copy(tip).applyMatrix4(cam.projectionMatrix)
   w.tipX = ((_corner.x + 1) / 2) * width
   w.tipY = ((1 - _corner.y) / 2) * height
+  _corner.setFromMatrixPosition(gun.matrix).applyMatrix4(cam.projectionMatrix)
+  w.pivotX = ((_corner.x + 1) / 2) * width
+  w.pivotY = ((1 - _corner.y) / 2) * height
+  w.shotX = ((lastShot.x + 1) / 2) * width
+  w.shotY = ((1 - lastShot.y) / 2) * height
   w.width = width
   w.height = height
   w.visible = gun.visible

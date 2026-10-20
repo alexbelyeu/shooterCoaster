@@ -1,10 +1,14 @@
 /**
- * Rotation-only kill "trauma" for the coaster camera (issue #65).
+ * Rotation-only camera "trauma" for the coaster camera (issue #65).
  *
  * The camera must never translate off the track pose for feedback: the rails sit
  * directly under it, so any displacement makes the world visibly jump. Instead a
  * kill adds trauma (0..1) that decays linearly to 0 within KILL_TRAUMA_MS and
  * drives small pitch / yaw / roll offsets from smooth 1D value noise.
+ *
+ * World events (the volcanic eruption) add trauma with a longer decay through
+ * the `camera:trauma` bus event, so they obey the same Screen shake setting
+ * and prefers-reduced-motion as kills.
  *
  * Pure (no React / three imports) so it is unit-tested in plain Node.
  */
@@ -38,14 +42,36 @@ export function killTrauma(combo: number): number {
   return 0.55 + 0.45 * ((c - 1) / (KILL_TRAUMA_COMBO_CAP - 1))
 }
 
-/** Combine a new kill with the current trauma: overlapping kills keep the stronger one. */
-export function addTrauma(current: number, combo: number): number {
-  return Math.min(1, Math.max(current, killTrauma(combo)))
+/**
+ * `camera:trauma` bus event: `eventBus.emit(CAMERA_TRAUMA_EVENT, amount, durationMs)`
+ * adds `amount` (0..1) of trauma that takes `durationMs` game-ms to decay from 1.
+ */
+export const CAMERA_TRAUMA_EVENT = 'camera:trauma'
+
+/** Live trauma: level 0..1 and the game-ms a trauma of 1 takes to decay to 0. */
+export interface TraumaState {
+  trauma: number
+  decayMs: number
 }
 
-/** Linear decay: trauma 1 reaches 0 after exactly KILL_TRAUMA_MS. */
-export function decayTrauma(trauma: number, dtMs: number): number {
-  return Math.max(0, trauma - dtMs / KILL_TRAUMA_MS)
+/**
+ * Add `amount` (0..1) of trauma that decays over `durationMs`. Overlapping
+ * sources keep the stronger level and the later end time, so a kill during a
+ * long eruption rumble neither stacks past 1 nor cuts the rumble short.
+ */
+export function addTrauma(state: TraumaState, amount: number, durationMs = KILL_TRAUMA_MS): TraumaState {
+  const a = Math.min(Math.max(Number.isFinite(amount) ? amount : 0, 0), 1)
+  const d = Math.max(1, Number.isFinite(durationMs) ? durationMs : KILL_TRAUMA_MS)
+  const remainingMs = Math.max(state.trauma * state.decayMs, a * d)
+  state.trauma = Math.max(state.trauma, a)
+  state.decayMs = state.trauma > 0 ? remainingMs / state.trauma : KILL_TRAUMA_MS
+  return state
+}
+
+/** Linear decay: trauma 1 reaches 0 after exactly `state.decayMs`. */
+export function decayTrauma(state: TraumaState, dtMs: number): TraumaState {
+  state.trauma = Math.max(0, state.trauma - dtMs / state.decayMs)
+  return state
 }
 
 /** Shake scale for a settings level; prefers-reduced-motion forces it off. */

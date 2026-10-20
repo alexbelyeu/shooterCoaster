@@ -54,9 +54,9 @@ export interface SCTestApi {
   combat: { fired: number; hits: number; kills: number }
   /** Camera translation off the track pose this frame, and the max seen.
    *  Feedback is rotation-only (issue #65), so this must stay exactly 0. */
-  cameraShake: { current: number; max: number }
-  /** Kill-trauma camera rotation this frame and the max seen (largest of
-   *  pitch / yaw / roll, degrees). Decays to 0 within 250 ms. */
+  cameraTranslation: { current: number; max: number }
+  /** Kill / world-event trauma camera rotation this frame and the max seen (largest of
+   *  pitch / yaw / roll, degrees). Kill trauma decays to 0 within 250 ms. */
   cameraTrauma: { current: number; max: number }
   /** First-person weapon view-model on screen (CSS px, origin top-left):
    *  bounding box of its projected bounds and the muzzle tip. null before the
@@ -130,6 +130,12 @@ export interface E2EWeaponOnScreen {
   maxY: number
   tipX: number
   tipY: number
+  /** Gun pivot (receiver centre) on screen: pivot → tip is the barrel's direction. */
+  pivotX: number
+  pivotY: number
+  /** Aim point of the last shot (where the tracer ends). */
+  shotX: number
+  shotY: number
   /** Viewport the box was measured in. */
   width: number
   height: number
@@ -260,7 +266,7 @@ export function installE2EApi() {
     enemies: enemiesOnScreen,
     errors: [],
     combat: { fired: 0, hits: 0, kills: 0 },
-    cameraShake: { current: 0, max: 0 },
+    cameraTranslation: { current: 0, max: 0 },
     cameraTrauma: { current: 0, max: 0 },
     weapon: null,
     holdFeedback: false,

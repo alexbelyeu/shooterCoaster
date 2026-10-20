@@ -26,22 +26,59 @@ export const WEAPON_LANDSCAPE = { right: 0.5, bottom: 0.2, unit: 0.28 }
 export const WEAPON_PORTRAIT = { right: 0.2, bottom: 0.48, unit: 0.28 }
 
 /**
- * The gun's orientation target stays at least this far left of its pivot
- * (fraction of the short side), so it always reads as a diagonal silhouette
- * instead of pointing straight up the screen.
+ * The barrel points straight at the aim point, except that its on-screen
+ * heading (radians clockwise from screen-up) stays at least this far from
+ * vertical. A gun pointing straight up the screen is seen end-on and loses its
+ * silhouette, so aims inside that narrow cone snap to its nearer edge.
  */
-export const WEAPON_MIN_LEAD = 0.6
+export const WEAPON_MIN_TILT = 0.15 // ≈ 8.6°
+/** Aims further below the pivot than this heading (radians from up) are clamped to it. */
+export const WEAPON_MAX_TILT = (2 * Math.PI) / 3 // 120°
+/**
+ * Aims closer to the pivot than this (fraction of the viewport's short side)
+ * are pushed out along the same heading, so the gun keeps a side-on silhouette
+ * instead of pointing into the screen. The heading, and so the barrel's
+ * on-screen direction, is unchanged.
+ */
+export const WEAPON_MIN_AIM_DIST = 0.4
 
-export function weaponLayout(width: number, height: number): WeaponLayout {
+/**
+ * Screen-space aim target for the gun (px, origin top-left): the aim point,
+ * with its heading from the pivot kept between WEAPON_MIN_TILT and
+ * WEAPON_MAX_TILT of straight up (on the same side) and its distance at least
+ * `minDistPx`. Writes into `out`.
+ */
+export function clampWeaponAim(
+  pivotX: number, pivotY: number, aimX: number, aimY: number, minDistPx: number,
+  out: { x: number; y: number },
+): { x: number; y: number } {
+  const dx = aimX - pivotX
+  const up = pivotY - aimY // screen y grows downward
+  const heading = Math.atan2(dx, up)
+  const side = heading > 0 ? 1 : -1
+  const h = side * Math.min(Math.max(Math.abs(heading), WEAPON_MIN_TILT), WEAPON_MAX_TILT)
+  const dist = Math.hypot(dx, up)
+  if (h === heading && dist >= minDistPx) {
+    out.x = aimX
+    out.y = aimY
+    return out
+  }
+  const d = Math.max(dist, minDistPx, 1)
+  out.x = pivotX + Math.sin(h) * d
+  out.y = pivotY - Math.cos(h) * d
+  return out
+}
+
+/** Writes the placement for a `width` x `height` viewport into `out`. */
+export function weaponLayout(width: number, height: number, out: WeaponLayout): WeaponLayout {
   const w = Math.max(1, width)
   const h = Math.max(1, height)
   const m = Math.min(w, h)
   const p = h > w ? WEAPON_PORTRAIT : WEAPON_LANDSCAPE
-  return {
-    x: w - m * p.right,
-    y: h - m * p.bottom,
-    unitPx: m * p.unit,
-  }
+  out.x = w - m * p.right
+  out.y = h - m * p.bottom
+  out.unitPx = m * p.unit
+  return out
 }
 
 /** World units per model unit when the pivot sits at the default depth. */
@@ -49,15 +86,23 @@ export const WEAPON_WORLD_SCALE = 3
 /** Never put the pivot closer than this (camera near plane is 1). */
 export const WEAPON_MIN_DEPTH = 2.6
 
+export interface WeaponDepth {
+  /** Pivot depth, camera space, positive. */
+  depth: number
+  /** World units per model unit. */
+  scale: number
+}
+
 /**
- * Pivot depth (camera space, positive) and world scale that make one model unit
- * `unitPx` tall on a viewport `heightPx` high with vertical FOV `fovDeg`.
+ * Pivot depth and world scale that make one model unit `unitPx` tall on a
+ * viewport `heightPx` high with vertical FOV `fovDeg`. Writes into `out`.
  */
-export function weaponDepth(unitPx: number, heightPx: number, fovDeg: number): { depth: number; scale: number } {
+export function weaponDepth(unitPx: number, heightPx: number, fovDeg: number, out: WeaponDepth): WeaponDepth {
   const tanHalf = Math.tan(((fovDeg || 80) * Math.PI) / 360)
   const worldPerPxAtUnitDepth = (2 * tanHalf) / Math.max(1, heightPx)
-  const depth = Math.max(WEAPON_MIN_DEPTH, WEAPON_WORLD_SCALE / (unitPx * worldPerPxAtUnitDepth))
-  return { depth, scale: unitPx * worldPerPxAtUnitDepth * depth }
+  out.depth = Math.max(WEAPON_MIN_DEPTH, WEAPON_WORLD_SCALE / (unitPx * worldPerPxAtUnitDepth))
+  out.scale = unitPx * worldPerPxAtUnitDepth * out.depth
+  return out
 }
 
 /** Recoil: the weapon (never the camera) kicks back and up, then settles. */

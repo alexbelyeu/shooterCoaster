@@ -7,7 +7,8 @@ import { startWindWhoosh, updateWindWhoosh, stopWindWhoosh } from '@/audio/SFXMa
 import { eventBus } from '@/core/EventBus'
 import WeaponViewModel from '@/combat/WeaponViewModel'
 import {
-  addTrauma, decayTrauma, effectiveShakeScale, shakeAngles, type ShakeAngles,
+  CAMERA_TRAUMA_EVENT, KILL_TRAUMA_MS, addTrauma, decayTrauma, effectiveShakeScale, killTrauma,
+  shakeAngles, type ShakeAngles,
 } from '@/combat/screenShake'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
@@ -60,22 +61,30 @@ export default function CoasterCamera({
   const _tangent = useRef(new THREE.Vector3())
   const _lookAt = useRef(new THREE.Vector3())
 
-  // Kill trauma (issue #65): ROTATION ONLY, on top of the track pose, which is
-  // recomputed from scratch every frame — the camera position is never moved
-  // for feedback, so the rails under it stay put. Fire recoil lives on the
-  // weapon view-model, not here. Never touches progress/velocity.
-  const shake = useRef({ trauma: 0, time: 0, seed: 0 })
+  // Camera trauma (issue #65): ROTATION ONLY, on top of the track pose, which
+  // is recomputed from scratch every frame — the camera position is never moved
+  // for feedback, so the rails under it stay put. Kills and world events
+  // (`camera:trauma`, e.g. the volcanic eruption) feed it. Fire recoil lives on
+  // the weapon view-model, not here. Never touches progress/velocity.
+  const shake = useRef({ trauma: 0, decayMs: KILL_TRAUMA_MS, time: 0, seed: 0 })
   const _angles = useRef<ShakeAngles>({ pitch: 0, yaw: 0, roll: 0 })
 
   useEffect(() => {
-    const onKill = (data: unknown) => {
+    const add = (amount: number, durationMs?: number) => {
       const k = shake.current
-      const combo = (data as { combo?: number } | undefined)?.combo ?? 1
       if (k.trauma === 0) k.seed = (Math.random() * 1000) | 0
-      k.trauma = addTrauma(k.trauma, combo)
+      addTrauma(k, amount, durationMs)
     }
+    const onKill = (data: unknown) =>
+      add(killTrauma((data as { combo?: number } | undefined)?.combo ?? 1))
+    const onTrauma = (amount: unknown, durationMs: unknown) =>
+      add(Number(amount), typeof durationMs === 'number' ? durationMs : undefined)
     eventBus.on('enemy:killed', onKill)
-    return () => eventBus.off('enemy:killed', onKill)
+    eventBus.on(CAMERA_TRAUMA_EVENT, onTrauma as (...args: unknown[]) => void)
+    return () => {
+      eventBus.off('enemy:killed', onKill)
+      eventBus.off(CAMERA_TRAUMA_EVENT, onTrauma as (...args: unknown[]) => void)
+    }
   }, [])
 
   // ── Projection: aspect + FOV follow the canvas (issue #66) ──
@@ -138,7 +147,7 @@ export default function CoasterCamera({
     _lookAt.current.copy(_position.current).add(_tangent.current)
     cam.lookAt(_lookAt.current)
 
-    // ── Kill trauma: rotation-only, smooth noise, decays to 0 in ≤ 250 ms ──
+    // ── Trauma: rotation-only, smooth noise (kills decay to 0 in ≤ 250 ms) ──
     const k = shake.current
     let traumaDeg = 0
     if (k.trauma > 0) {
@@ -149,7 +158,7 @@ export default function CoasterCamera({
       // Sample before decaying so even one very long frame shows the hit once.
       const a = shakeAngles(k.trauma, k.time, k.seed, scale, _angles.current)
       k.time += effectiveDelta
-      k.trauma = decayTrauma(k.trauma, effectiveDelta * 1000)
+      decayTrauma(k, effectiveDelta * 1000)
       if (k.trauma === 0) k.time = 0
       cam.rotateX(a.pitch)
       cam.rotateY(a.yaw)
@@ -161,8 +170,8 @@ export default function CoasterCamera({
       // Translation off the track pose (must always be exactly 0) and the
       // largest trauma rotation this frame, in degrees.
       const offset = cam.position.distanceTo(_position.current)
-      testApi.cameraShake.current = offset
-      if (offset > testApi.cameraShake.max) testApi.cameraShake.max = offset
+      testApi.cameraTranslation.current = offset
+      if (offset > testApi.cameraTranslation.max) testApi.cameraTranslation.max = offset
       testApi.cameraTrauma.current = traumaDeg
       if (traumaDeg > testApi.cameraTrauma.max) testApi.cameraTrauma.max = traumaDeg
     }
