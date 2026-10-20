@@ -567,15 +567,18 @@ export const SNOWMAN_ARM_MAT = withRim(
 export const SNOWMAN_TWIG_GEO = new THREE.CylinderGeometry(0.15, 0.1, 5, 3)
 export const SNOWMAN_TWIG_MAT = SNOWMAN_ARM_MAT
 
-// Scout — icy blue tint (stronger blue lift than the standard snowman)
+// Scout — faint icy tint; its glowing blue shards carry the "scout" identity.
+// The body stays near-white (only slightly bluer than the standard snowman):
+// the arctic atmosphere (#53) shades the snow blue-violet, so a strongly blue
+// body sank into the terrain highlights.
 export const SNOWMAN_SCOUT_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#e4f2ff',
-  emissive: '#6094d8',
-  emissiveIntensity: 1.3,
-  specular: '#c0e0ff',
+  color: '#eef6ff',
+  emissive: '#8098c8',
+  emissiveIntensity: 1.4,
+  specular: '#e0f0ff',
   shininess: 45,
   flatShading: true,
-}), { color: '#c8e8ff', intensity: 0.6, power: 2.2 })
+}), { color: '#e4f0ff', intensity: 0.65, power: 2.2 })
 export const SNOWMAN_SCOUT_SHARD_GEO = new THREE.ConeGeometry(2, 8, 4)
 export const SNOWMAN_SCOUT_SHARD_MAT = new THREE.MeshPhongMaterial({
   color: '#80d0ff',
