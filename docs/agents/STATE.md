@@ -97,11 +97,14 @@ chunk; no code splitting.
 2. Track supports are scaled hexagonal sticks; rails read as thin wires beyond
    ~300 units; rail thickness does not scale with `track.scalar` (Desert = 60 vs
    Theme Park = 20, so the Desert track is relatively 3× thinner).
-3. Level 4 snowmen render near-black against snow (material/lighting), brutes too.
+3. ~~Level 4 snowmen render near-black against snow (material/lighting), brutes too.~~
+   Fixed by #61 (white snowmen, shared rim light).
 4. Long empty stretches: Theme Park plain, Ocean surface, Antarctica mid-ground.
-5. No touch / pointer input: unplayable on phones. HUD not laid out for small screens.
-6. Shooting feedback is thin: no muzzle flash, no hitmarker, no enemy hit flash, no
-   screen kick; every enemy dies the same way.
+5. ~~No touch / pointer input: unplayable on phones. HUD not laid out for small screens.~~
+   Pointer Events + mobile HUD landed (#16); remaining phone issues tracked in #66.
+6. Shooting feedback: muzzle flash, hitmarker, hit flash and screen kick landed in #60.
+   Still open: every enemy dies the same way (#29); kill shake moves the rails and the
+   muzzle flash floats (#65).
 7. HUD is plain text; results and level-select screens are unstyled compared to the
    title screen.
 8. Bullet colour/size are special-cased by `levelId === 'level4'` in `SceneManager`
@@ -119,7 +122,12 @@ chunk; no code splitting.
 13. Smoke ride checks pass by a thin margin in Claude cloud sessions (11–15 frames per
     10 s window vs `MIN_FRAMES=10`, 2-core SwiftShader). The title check polls to a
     deadline since #43; the level checks still use a fixed window and do flake
-    (9 frames seen). Tracked in #50.
+    (9 frames seen). Tracked in #50. Any concurrent CPU load (a second build or smoke
+    in the same session) makes it much worse: on 2026-10-20 a main verify run alongside
+    a builder's build failed levels 3–5 (7–8 frames) **and** the mobile run (level timed
+    out before the HUD checks, cascading into missing-HUD/pause failures); the same
+    commit passed cleanly on its own. Run smoke with nothing else busy before calling a
+    failure real (Maintainer, 2026-10-20).
 14. Level 4 and 5 tracks (`TrigCurve2`) are not closed loops. The `(angle / 2)` altitude
     ramp makes the end π·varC·scalar higher than the start (≈440 units on level4, ≈628 on
     level5), and `useTrackProgress` wraps a full lap back to t=0, so the camera
