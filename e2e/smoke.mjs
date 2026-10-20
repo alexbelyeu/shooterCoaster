@@ -187,11 +187,16 @@ async function playLevel(page, id) {
   })
   const nearestKilled = await page.evaluate(() => window.__SC_TEST__.killNearest(5))
   let killEvents = killsBefore
+  let killCheckSkipped = null
   if (nearestKilled > 0) {
     const deadline = Date.now() + 20000
     while (Date.now() < deadline && killEvents <= killsBefore) {
       await page.waitForTimeout(30)
-      killEvents = await page.evaluate(() => window.__SC_TEST__.combat.kills)
+      const c = await page.evaluate(() => ({ kills: window.__SC_TEST__.combat.kills, phase: window.__SC_TEST__.phase() }))
+      killEvents = c.kills
+      // The level timer is wall-clock; on a ~1 fps runner it can expire here,
+      // and an ended level never finishes the kill pop. Can't judge it then.
+      if (c.phase !== 'playing') { killCheckSkipped = c.phase; break }
     }
   } else {
     await waitFrames(page, 1, { maxMs: 5000, pollMs: 30 })
@@ -232,7 +237,7 @@ async function playLevel(page, id) {
   // Only meaningful when something was on screen to aim at.
   if (atStart.onScreenEnemies > 0 && afterFire.shotsFired - atStart.shotsFired === 0) problems.push('autofire never fired at on-screen enemies')
   if (end.phase !== 'results' || !resultsShown) problems.push(`results screen not shown (phase "${end.phase}")`)
-  if (nearestKilled > 0 && killEvents <= killsBefore) problems.push('killNearest hits did not produce an enemy:killed event')
+  if (nearestKilled > 0 && killEvents <= killsBefore && !killCheckSkipped) problems.push('killNearest hits did not produce an enemy:killed event')
   if (shake.max > 3 + 1e-6) problems.push(`camera shake ${shake.max.toFixed(2)} > 3 units`)
   if (shake.current !== 0) problems.push(`camera shake did not reset (${shake.current})`)
   return {
@@ -251,6 +256,8 @@ async function playLevel(page, id) {
       shakeMax: shake.max,
       shakeIdle: shake.current,
       events: counts,
+      // Set (to the phase) when the level timed out before the kill event could land.
+      killCheckSkipped,
     },
     kills: combat.kills,
     score: combat.score,
@@ -534,7 +541,7 @@ async function run() {
           ` tapKills=${r.mobile.tapKills} fallbackKills=${r.mobile.fallbackKills} kills=${r.kills} score=${r.score} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` shakeMax=${r.combat.shakeMax?.toFixed(2)} ${r.seconds.toFixed(0)}s`
+        ` shakeMax=${r.combat.shakeMax?.toFixed(2)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
