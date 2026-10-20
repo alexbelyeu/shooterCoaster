@@ -6,6 +6,7 @@ import { playExplosionSound } from '@/audio/SFXManager'
 import { eventBus } from '@/core/EventBus'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
 import type { EnemyType } from '@/types/level'
+import { registerE2EEnemy, unregisterE2EEnemy } from '@/testing/e2eHook'
 
 export interface EnemyProps {
   id: string
@@ -32,6 +33,7 @@ interface EnemyBaseProps extends EnemyProps {
  */
 export default function EnemyBase({
   id,
+  type,
   spawnPosition,
   scoreValue,
   radius,
@@ -86,6 +88,13 @@ export default function EnemyBase({
       unregisterCollisionTarget(id)
     }
   }, [alive, id])
+
+  // e2e readability probe (no-op unless ?e2e=1)
+  useEffect(() => {
+    if (!alive || !meshRef.current) return
+    registerE2EEnemy(id, type, meshRef.current)
+    return () => unregisterE2EEnemy(id)
+  }, [alive, id, type])
 
   useFrame(({ clock }, delta) => {
     if (!meshRef.current || phase !== 'playing') return

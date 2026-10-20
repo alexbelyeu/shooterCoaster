@@ -66,20 +66,47 @@ const IGNORED = [
 ]
 const ignored = (msg) => IGNORED.some((re) => re.test(msg))
 
+const portInUse = async (url) => {
+  try {
+    await fetch(url)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Kill the whole `npx → sh → vite` process group (killing npx alone leaks vite). */
+function stopPreview(proc) {
+  try {
+    process.kill(-proc.pid, 'SIGTERM')
+  } catch {
+    proc.kill()
+  }
+}
+
 async function startPreview() {
-  const port = 4173 + Math.floor(Math.random() * 500)
+  // Never reuse a port something is already serving on: another worktree's
+  // preview would make us silently test the wrong build.
+  let port, url
+  for (let i = 0; i < 20; i++) {
+    port = 4173 + Math.floor(Math.random() * 500)
+    url = `http://localhost:${port}`
+    if (!(await portInUse(url))) break
+  }
   const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], {
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
   })
-  const url = `http://localhost:${port}`
-  for (let i = 0; i < 60; i++) {
+  let exited = false
+  proc.on('exit', () => (exited = true))
+  for (let i = 0; i < 60 && !exited; i++) {
     try {
       const r = await fetch(url)
-      if (r.ok) return { url, proc }
+      if (r.ok && !exited) return { url, proc }
     } catch {}
     await new Promise((r) => setTimeout(r, 500))
   }
-  proc.kill()
+  stopPreview(proc)
   throw new Error('vite preview did not start (did you run `npm run build`?)')
 }
 
@@ -119,6 +146,56 @@ async function imageStats(page, png) {
     const mean = sum / n
     return { mean, stddev: Math.sqrt(sumSq / n - mean * mean), distinctColors: colors.size }
   }, png.toString('base64'))
+}
+
+/**
+ * Readability probe: freeze game time, list on-screen enemies, and save a 4x
+ * close-up of the largest one as `<id>-enemy.png` (for eyeballing rim light and
+ * contrast). Informational only — never fails the run.
+ */
+async function captureEnemyCloseup(page, id) {
+  try {
+    await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+    const f = await page.evaluate(() => window.__SC_TEST__.frames)
+    await page.waitForFunction((f0) => window.__SC_TEST__.frames >= f0 + 2, f, { timeout: SHOT_TIMEOUT })
+    const list = await page.evaluate(() => window.__SC_TEST__.enemies())
+    const summary = {
+      onScreen: list.length,
+      largestPx: list[0] ? Math.round(list[0].px) : 0,
+      readable: list.filter((e) => e.px >= 12).length,
+      closeup: null,
+    }
+    // Skip enemies under the HUD (score top-left, timer top-right, mute bottom-right).
+    const target = list.find((e) => e.x > 40 && e.x < 1240 && e.y > 100 && e.y < 650)
+    if (target) {
+      const half = Math.round(Math.min(120, Math.max(40, target.px * 1.5)))
+      const x = Math.max(0, Math.min(1280 - 2 * half, Math.round(target.x - half)))
+      const y = Math.max(0, Math.min(720 - 2 * half, Math.round(target.y - half)))
+      const file = `${id}-enemy.png`
+      // Upscale the crop 4x (nearest) via a 2D canvas so small enemies are inspectable.
+      const crop = await page.screenshot({ clip: { x, y, width: 2 * half, height: 2 * half }, timeout: SHOT_TIMEOUT })
+      const big = await page.evaluate(async (b64) => {
+        const img = new Image()
+        img.src = `data:image/png;base64,${b64}`
+        await img.decode()
+        const c = document.createElement('canvas')
+        c.width = img.width * 4
+        c.height = img.height * 4
+        const ctx = c.getContext('2d')
+        ctx.imageSmoothingEnabled = false
+        ctx.drawImage(img, 0, 0, c.width, c.height)
+        return c.toDataURL('image/png').split(',')[1]
+      }, crop.toString('base64'))
+      fs.writeFileSync(path.join(OUT, file), Buffer.from(big, 'base64'))
+      summary.closeup = { file, type: target.type, px: Math.round(target.px), distance: Math.round(target.distance) }
+    }
+    return summary
+  } catch (e) {
+    return { error: String(e?.message ?? e).split('\n')[0] }
+  } finally {
+    // Always resume time, or the combat phase that follows would run frozen.
+    await page.evaluate(() => window.__SC_TEST__.setTimeScale(1)).catch(() => {})
+  }
 }
 
 const getFrames = (page) => page.evaluate(() => window.__SC_TEST__.frames)
@@ -294,7 +371,7 @@ async function runMobile(browser, base) {
   // Level select -> level 1 (tap)
   const card = `.level-card[data-level="${MOBILE_LEVEL}"]`
   if (!(await waitVisible(page, card))) problems.push('level card never appeared')
-  await page.screenshot({ path: path.join(OUT, 'mobile-level-select.png') })
+  await page.screenshot({ path: path.join(OUT, 'mobile-level-select.png'), timeout: SHOT_TIMEOUT })
   await page.locator(card).tap({ timeout: 30000 }).catch((e) => problems.push(`tap level: ${e.message}`))
   await waitPhase('playing', 15000)
   if ((await phase()) !== 'playing') problems.push('tapping the level card did not start the level')
@@ -345,7 +422,7 @@ async function runMobile(browser, base) {
   // now that the touch-input checks are done; pause still works while frozen.
   if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the HUD layout checks`)
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
-  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}.png`) })
+  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}.png`), timeout: SHOT_TIMEOUT })
   const end = await getStats(page)
   if (end.kills === 0 && end.score <= 0) problems.push('no kill reached')
 
@@ -356,7 +433,7 @@ async function runMobile(browser, base) {
   await waitFrames(page, 2, { minMs: 500, maxMs: 8000 })
   const landscape = await hudLayoutProblems(page, 'landscape 844x390')
   problems.push(...landscape.problems)
-  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-landscape.png`) })
+  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-landscape.png`), timeout: SHOT_TIMEOUT })
 
   // Pause is a button (touch has no Escape key).
   if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the pause tap`)
@@ -435,6 +512,7 @@ async function run() {
     })
     const png = await page.screenshot({ path: path.join(OUT, `${id}.png`), timeout: SHOT_TIMEOUT })
     const img = await imageStats(page, png)
+    const enemyShot = await captureEnemyCloseup(page, id)
     const frames = stats.frames - a
     const problems = []
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${SECONDS}s)`)
@@ -450,7 +528,7 @@ async function run() {
     delete stats.hookErrors
     results.push({
       id, ok, problems, frames, seconds: (Date.now() - started) / 1000, ...stats,
-      kills: play.kills, score: play.score, combat: play.combat, image: img, errors: allErrors,
+      kills: play.kills, score: play.score, combat: play.combat, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
   }
@@ -463,16 +541,19 @@ async function run() {
   }
 
   await browser.close()
-  preview?.proc.kill()
+  if (preview) stopPreview(preview.proc)
 
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
   for (const r of results) {
+    const en = r.enemies && !r.enemies.error
+      ? ` enemiesOnScreen=${r.enemies.onScreen} readable=${r.enemies.readable} largestPx=${r.enemies.largestPx}`
+      : ''
     const extra = r.id === 'title'
       ? ''
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} fallbackKills=${r.mobile.fallbackKills} kills=${r.kills} score=${r.score} ${r.seconds.toFixed(0)}s`
-      : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}` +
+      : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
@@ -493,6 +574,6 @@ function sceneSummary(scene) {
 
 run().catch((e) => {
   console.error(e)
-  preview?.proc.kill() // don't leak the vite preview server on failure
+  if (preview) stopPreview(preview.proc) // don't leak the vite preview server on failure
   process.exit(1)
 })

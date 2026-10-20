@@ -192,6 +192,31 @@ unstyled browser defaults under 44 px).
 extra), so CI guards touch input and the phone HUD layout. Gyro/gamepad would plug
 into the same module later.
 
+## 2026-10-19 — Enemy readability: shared rim light, reduced fog, readable spawns (Builder, #15)
+
+**Context:** Enemies blended into terrain (scorpion/golem/drake/imp base colours were
+ΔE 6–12 from their biome's terrain), snowmen rendered as dull grey on grey snow, and
+balloons spawned up to ~4500 units from the camera (≈5 px on screen).
+
+**Decision:**
+- Every lit enemy material is wrapped in `withRim()` (`src/entities/enemies/enemyRim.ts`):
+  an `onBeforeCompile` fresnel term added before output, plus the scene fog factor
+  scaled by 0.6 for enemies so they keep colour at distance. Parameters are per-material
+  uniforms; all rim materials share one program per material type
+  (`customProgramCacheKey`). Materials stay module-level singletons.
+- Enemy base colours keep ΔE ≥ ~15 from their biome's dominant terrain colours
+  (sRGB → Lab, ΔE76). Exception: snowmen are white on white snow *by design*; they read
+  by luminance (blue-tinted emissive lift keeps them brighter than the shaded snow) plus
+  rim and saturated navy/red/coal accessories.
+- Spawns are re-rolled (≤ 30 tries) until the enemy is within `maxReadableDistance(type)`
+  of some track sample — the distance at which its silhouette is ≥ 12 px at 1280×720,
+  FOV 80 (`src/entities/enemies/enemyReadability.ts`). Spawn radii are unchanged, so
+  enemies still cover the whole ride.
+
+**Consequences:** New enemy materials must use `withRim()` and be checked against the
+biome palette; new enemy types need an `ENEMY_SILHOUETTE` entry. More enemies are in
+view at any moment, so draw calls per smoke screenshot vary more with spawn RNG.
+
 ## 2026-10-19 — HUD render policy and UI palette (Builder, #18)
 
 **Context:** The HUD is DOM over the WebGL canvas. Re-rendering React on every
