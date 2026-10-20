@@ -36,6 +36,21 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
    - Architecture: fits existing patterns, no dead code, no duplicated systems, types sound.
    - Docs updated when structure/behaviour changed.
 
+### Light re-review (conflict-only round trips)
+
+Use this instead of steps 1–4 only when **all** of these hold: an earlier QA comment on
+this PR says the full review passed and the only change requested was resolving a
+merge conflict; and every commit after the head that review named is a merge of
+`origin/main` (`git log --no-merges <reviewed-head>..HEAD` is empty). Then:
+
+- Read how each conflict was resolved: `git show --remerge-diff <merge-commit>` for each
+  new merge. Both sides' behaviour must be kept, nothing from `main` dropped, nothing
+  new added.
+- If a resolved conflict touched `src/` or `e2e/`, also run `npm ci && npm run verify`
+  and look at the screenshots of the affected levels. For docs-only conflicts, rely on
+  CI: auto-merge waits for `verify` to be green anyway.
+- Then decide as below, saying "light re-review" in your comment.
+
 ## Decide
 
 - **Approve** when everything in PROTOCOL.md "Merging" holds: comment a 2–3 line QA

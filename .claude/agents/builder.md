@@ -19,6 +19,10 @@ for anything visual or level-related).
    (for a returned PR: check out its branch, merge `origin/main` into it — never rebase a
    pushed branch — then address
    every QA comment).
+   If QA's only request is "merge conflict only", merge `origin/main`, resolve keeping
+   both sides' behaviour, run `npm test && npm run build`, push, reply, swap the labels
+   and finish. CI runs the full `verify` and QA does a light re-review, so skip steps
+   2–4 unless a conflict touched `src/` or `e2e/`.
 2. Plan briefly, then implement. Stay inside the issue's scope; note follow-ups instead
    of expanding scope.
 3. Verify like a player:
@@ -29,8 +33,9 @@ for anything visual or level-related).
    (e.g. a new level must appear in `levels()` and pass smoke).
 4. Compare `results.json` draw calls / triangles against `main` for levels you
    touched; explain any big increase in the PR.
-5. Update CLAUDE.md / docs if structure or behaviour changed; add DECISIONS.md
-   entries for non-obvious design choices; add assets to `docs/ASSETS.md`.
+5. Update CLAUDE.md / docs if structure or behaviour changed; record non-obvious
+   design choices as a new file in `docs/agents/decisions/inbox/` (never edit
+   `DECISIONS.md` itself); add assets to `docs/ASSETS.md`.
 
 ## Ship
 
