@@ -47,9 +47,9 @@ export default function BulletPool({
   const zeroVec = useRef(new THREE.Vector3(0, 0, 0)).current
 
   const fire = useCallback(
-    (origin: THREE.Vector3, direction: THREE.Vector3) => {
+    (origin: THREE.Vector3, direction: THREE.Vector3): boolean => {
       const now = performance.now()
-      if (now - lastFireTime.current < FIRE_DELAY_MS) return
+      if (now - lastFireTime.current < FIRE_DELAY_MS) return false
 
       lastFireTime.current = now
 
@@ -63,13 +63,14 @@ export default function BulletPool({
           break
         }
       }
-      if (!bullet) return
+      if (!bullet) return false
 
       bullet.alive = true
       bullet.bornAt = now
       bullet.position.copy(origin)
       bullet.direction.copy(direction).normalize()
       bullet.speed = BULLET_SPEED
+      return true
     },
     [bullets],
   )

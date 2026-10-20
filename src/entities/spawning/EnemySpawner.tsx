@@ -21,6 +21,7 @@ import FireImp from '../enemies/FireImp'
 import InfernalDrake from '../enemies/InfernalDrake'
 import GoldenBalloon from '../enemies/GoldenBalloon'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
+import { SCORE_VALUES } from '@/levels/scoring'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -36,22 +37,6 @@ interface SpawnedEnemy {
   scoreValue: number
   radius: number
   waveIndex: number
-}
-
-const SCORE_VALUES: Record<EnemyType, number> = {
-  balloon: 13,
-  crow: 15,
-  scorpion: 20,
-  shark: 25,
-  jellyfish: 18,
-  flyingFish: 12,
-  snowman: 30,
-  snowmanScout: 15,
-  snowmanBrute: 50,
-  emberWisp: 12,
-  lavaGolem: 35,
-  fireImp: 18,
-  infernalDrake: 60,
 }
 
 const RADII: Record<EnemyType, number> = {

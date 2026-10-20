@@ -14,6 +14,10 @@ export interface TrackParams {
   curve: CurveType
   color1: number
   color2: number
+  /** Running-rail radius at trackScale 1 (default 0.35); multiplied by trackScale. See src/track/trackDimensions.ts */
+  railRadius?: number
+  /** Arc-length spacing between cross ties at trackScale 1 (default 10); multiplied by trackScale. */
+  tieSpacing?: number
 }
 
 export interface EnemyWave {
@@ -40,7 +44,6 @@ export interface LevelConfig {
   environment: {
     groundColor: number
     skybox: string
-    fog?: { color: number; near: number; far: number }
     hasWater?: boolean
     hasTrees?: boolean
     treeCount?: number

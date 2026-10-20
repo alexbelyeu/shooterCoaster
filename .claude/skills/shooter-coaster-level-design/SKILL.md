@@ -46,7 +46,9 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 | `src/entities/enemies/SharedEnemyAssets.ts` | All shared enemy geometries + materials |
 | `src/entities/enemies/*.tsx` | Individual enemy components |
 | `src/entities/spawning/EnemySpawner.tsx` | Spawn logic, collision radii, scores |
-| `src/levels/environments/BiomeEnvironment.tsx` | Terrain, sky, fog, trees, landmarks, terrain features |
+| `src/levels/environments/BiomeEnvironment.tsx` | Terrain, lights, fog, trees, landmarks, terrain features |
+| `src/levels/environments/atmosphere.ts` | Per-biome sky/sun/hemisphere/fog/exposure config (`ATMOSPHERES`) |
+| `src/levels/environments/SkyDome.tsx` | Procedural sky dome shader (gradient, sun, fbm clouds), follows camera |
 | `src/levels/environments/BiomeDecorations.tsx` | Per-biome InstancedMesh decorations |
 | `src/levels/environments/LavaShader.ts` | Procedural GLSL lava material (domain warping + Voronoi) |
 | `src/levels/environments/Volcano.tsx` | Volcano landmark component |
@@ -129,13 +131,16 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 1. `src/types/level.ts` — add to `BiomeType` union
 2. `src/utils/terrainNoise.ts` — add noise config entry (frequency, amplitude, octaves, ridgeMode)
 3. `src/levels/environments/BiomeEnvironment.tsx` — add entries to ALL of:
-   - `BIOME_SETTINGS` (sun position, fog color, fog distances, sky scale)
+   - (sky/light/fog/exposure now live in `atmosphere.ts` — see step 3b)
    - `BIOME_COLOR_RAMPS` (terrain vertex colors by height/slope)
    - `BIOME_TERRAIN_CONFIGS` (segments, size)
    - Tree type in `BIOME_TREE_TYPES`
    - `getTreeCount()` case
    - Terrain size override if needed
    - Slope rejection angle
+3b. `src/levels/environments/atmosphere.ts` — add an `ATMOSPHERES` entry: sky dome
+   gradient (zenith/horizon/ground), sun disc/glow, clouds, sun light, hemisphere
+   light, fog near/far, tone-mapping exposure. Fog colour is always `sky.horizon`.
 4. `src/levels/environments/BiomeDecorations.tsx` — add decoration case
 5. `src/audio/MusicManager.ts` — add music config entry (tempo, chords, bass, lead, hasPerc)
 6. `src/levels/LevelRegistry.ts` — add level definition (biome, waves, track config, nextLevel chain)
@@ -173,6 +178,7 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 | Landmark feels tiny | Undersized geometry | Double initial size estimate |
 | Landmark feels disconnected | Placed too far (>3000) | Keep within ~2400 units of origin |
 | Hexagonal stick geometry | height-via-scale trick | Bake height into CylinderGeometry constructor |
+| Grounded object floats / sinks on ridged terrain | Placed on `heightFn`, but the drawn mesh is linear between grid vertices (up to ~55 units off on Arctic) | Sample `createTerrainSurface(heightFn, getTerrainMeshSize(biome))` for things that must touch the visible ground (see `src/track/supportTowers.ts`) |
 | Terrain holes/spikes | Missing noise config | Add entry to terrainNoise.ts |
 | No music plays | Missing MusicManager entry | Add biome config to CONFIGS record |
 | Enemies don't spawn | Missing spawner registration | Check all 4 spawner touchpoints |

@@ -8,15 +8,23 @@
  *   - read basic renderer stats (draw calls, triangles) as a perf signal
  *   - list on-screen enemies with their projected size (readability checks)
  *   - freeze game time so a screenshot matches a query (setTimeScale)
+ *   - play: autoFire at the nearest visible enemy, killNearest(n) for
+ *     deterministic combat screenshots, endLevel() to reach the results screen,
+ *     stats() for score / kills / combo / shots
  *
- * Keep this file tiny and side-effect free when the flag is off.
+ * Keep this file tiny and side-effect free when the flag is off: nothing here
+ * runs unless `installE2EApi()` finds `?e2e=1`, and <E2EFrameProbe> is only
+ * mounted under the same flag.
  */
+import { useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType } from '@/types/level'
+import { getCollisionTargets, type CollisionTarget } from '@/combat/CollisionManager'
+import { fireAtNDC } from '@/combat/useShooting'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -30,8 +38,6 @@ export interface SCTestApi {
   levels: () => { id: string; name: string }[]
   startLevel: (id: string) => void
   phase: () => string
-  /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
-  setTimeScale: (scale: number) => void
   /**
    * Enemies whose centre is inside the view frustum, largest first, with screen
    * position (CSS px, origin top-left) and projected silhouette size in px.
@@ -39,6 +45,41 @@ export interface SCTestApi {
    */
   enemies: () => E2EEnemyOnScreen[]
   errors: string[]
+  /**
+   * Deterministic scene totals, independent of camera/frustum culling:
+   * every visible mesh's triangles (x instance count) and object count, plus a
+   * breakdown for objects with a `name` (e.g. `track`, `track-towers`).
+   */
+  sceneStats: () => SceneStats | null
+  /** Every 100 ms (real time, at most once per rendered frame) aim at the nearest
+   *  live on-screen enemy and fire a real bullet through the pool. */
+  autoFire: (enabled: boolean) => void
+  /** Instantly kill the n nearest live enemies (on-screen ones first) via their
+   *  onHit. Returns how many were killed. */
+  killNearest: (n: number) => number
+  stats: () => SCTestStats
+  /** Force the results phase. */
+  endLevel: () => void
+  /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
+  setTimeScale: (s: number) => void
+}
+
+export interface SceneStats {
+  objects: number
+  triangles: number
+  byName: Record<string, { objects: number; triangles: number }>
+}
+
+export interface SCTestStats {
+  score: number
+  kills: number
+  combo: number
+  timeRemaining: number
+  phase: string
+  liveEnemies: number
+  /** Live enemies in front of the camera and inside the viewport (not occlusion-tested). */
+  onScreenEnemies: number
+  shotsFired: number
 }
 
 export interface E2EEnemyOnScreen {
@@ -59,6 +100,7 @@ export function unregisterE2EEnemy(id: string) {
   if (isE2E) enemyRegistry.delete(id)
 }
 
+/** Camera + viewport captured by <E2EFrameProbe> so non-React test calls can aim/project. */
 let probeCamera: THREE.Camera | null = null
 let probeSize = { width: 1280, height: 720 }
 const _v = new THREE.Vector3()
@@ -93,6 +135,59 @@ declare global {
   }
 }
 
+const AUTOFIRE_INTERVAL_MS = 100
+let autoFireEnabled = false
+let lastAutoFire = 0
+const _fwd = new THREE.Vector3()
+
+function isLive(t: CollisionTarget) {
+  // Dead/unmounted enemies report a parking position far below the world.
+  return t.getPosition().y > -9000
+}
+
+/** NDC of a target if it is in front of the camera and inside the viewport. */
+function onScreenNDC(t: CollisionTarget, camera: THREE.Camera, out: THREE.Vector3): boolean {
+  camera.getWorldDirection(_fwd)
+  _v.copy(t.getPosition()).sub(camera.position)
+  if (_v.dot(_fwd) <= 0) return false
+  out.copy(t.getPosition()).project(camera)
+  return out.z < 1 && Math.abs(out.x) <= 1 && Math.abs(out.y) <= 1
+}
+
+function liveTargetsByDistance(camera: THREE.Camera | null) {
+  const list: { t: CollisionTarget; d: number; visible: boolean }[] = []
+  const ndc = new THREE.Vector3()
+  for (const t of getCollisionTargets().values()) {
+    if (!isLive(t)) continue
+    const d = camera ? t.getPosition().distanceToSquared(camera.position) : 0
+    const visible = camera ? onScreenNDC(t, camera, ndc) : false
+    list.push({ t, d, visible })
+  }
+  // On-screen first, then nearest.
+  list.sort((a, b) => Number(b.visible) - Number(a.visible) || a.d - b.d)
+  return list
+}
+
+const _aim = new THREE.Vector3()
+function autoFireTick(camera: THREE.Camera) {
+  const now = performance.now()
+  if (now - lastAutoFire < AUTOFIRE_INTERVAL_MS) return
+  if (useGameStore.getState().phase !== 'playing') return
+  let best: CollisionTarget | null = null
+  let bestD = Infinity
+  for (const t of getCollisionTargets().values()) {
+    if (!isLive(t) || !onScreenNDC(t, camera, _aim)) continue
+    const d = t.getPosition().distanceToSquared(camera.position)
+    if (d < bestD) {
+      bestD = d
+      best = t
+    }
+  }
+  if (!best) return
+  onScreenNDC(best, camera, _aim)
+  if (fireAtNDC(_aim.x, _aim.y, camera)) lastAutoFire = now
+}
+
 export function installE2EApi() {
   if (!isE2E || window.__SC_TEST__) return
   const api: SCTestApi = {
@@ -109,9 +204,43 @@ export function installE2EApi() {
       s.setPhase('playing')
     },
     phase: () => useGameStore.getState().phase,
-    setTimeScale: (scale: number) => useGameStore.getState().setTimeScale(scale),
     enemies: enemiesOnScreen,
     errors: [],
+    sceneStats: () => null,
+    autoFire: (enabled: boolean) => {
+      autoFireEnabled = enabled
+      lastAutoFire = 0
+    },
+    killNearest: (n: number) => {
+      const victims = liveTargetsByDistance(probeCamera).slice(0, Math.max(0, n))
+      for (const { t } of victims) t.onHit()
+      return victims.length
+    },
+    stats: () => {
+      const s = useGameStore.getState()
+      let liveEnemies = 0
+      let onScreenEnemies = 0
+      for (const t of getCollisionTargets().values()) {
+        if (!isLive(t)) continue
+        liveEnemies++
+        if (probeCamera && onScreenNDC(t, probeCamera, _aim)) onScreenEnemies++
+      }
+      return {
+        score: Math.round(s.score),
+        kills: s.kills,
+        combo: s.combo.count,
+        timeRemaining: s.timeRemaining,
+        phase: s.phase,
+        liveEnemies,
+        onScreenEnemies,
+        shotsFired: s.shotsFired,
+      }
+    },
+    endLevel: () => {
+      autoFireEnabled = false
+      useGameStore.getState().setPhase('results')
+    },
+    setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
   }
   window.addEventListener('error', (e) => api.errors.push(String(e.message)))
   window.addEventListener('unhandledrejection', (e) => api.errors.push(String(e.reason)))
@@ -121,11 +250,17 @@ export function installE2EApi() {
 /** Mount inside <Canvas>. Counts frames and samples renderer stats. */
 export function E2EFrameProbe() {
   const gl = useThree((s) => s.gl)
-  useFrame(({ camera, size }, delta) => {
+  const scene = useThree((s) => s.scene)
+  useEffect(() => {
+    const api = window.__SC_TEST__
+    if (api) api.sceneStats = () => collectSceneStats(scene)
+  }, [scene])
+  useFrame((state, delta) => {
     const api = window.__SC_TEST__
     if (!api) return
-    probeCamera = camera
-    probeSize = size
+    probeCamera = state.camera
+    probeSize = state.size
+    if (autoFireEnabled) autoFireTick(state.camera)
     // Post-processing renders several passes per frame, and three.js resets
     // gl.info on every render() call by default. Accumulate manually instead:
     // read last frame's totals, then reset before this frame renders.
@@ -138,4 +273,24 @@ export function E2EFrameProbe() {
     gl.info.reset()
   })
   return null
+}
+
+function collectSceneStats(scene: THREE.Scene): SceneStats {
+  const stats: SceneStats = { objects: 0, triangles: 0, byName: {} }
+  scene.traverseVisible((o) => {
+    const m = o as THREE.Mesh & { isInstancedMesh?: boolean; count?: number }
+    if (!m.isMesh || !m.geometry) return
+    const g = m.geometry
+    const verts = g.index ? g.index.count : (g.attributes.position?.count ?? 0)
+    const tris = Math.floor(verts / 3) * (m.isInstancedMesh ? (m.count ?? 1) : 1)
+    stats.objects += 1
+    stats.triangles += tris
+    if (m.name) {
+      const key = m.name
+      const e = (stats.byName[key] ??= { objects: 0, triangles: 0 })
+      e.objects += 1
+      e.triangles += tris
+    }
+  })
+  return stats
 }
