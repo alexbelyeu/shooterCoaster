@@ -2,7 +2,8 @@ import { useMemo, useRef, useEffect, useContext } from 'react'
 import type * as THREE from 'three'
 import { ATMOSPHERES } from './atmosphere'
 import type { BiomeType } from '@/types/level'
-import { getTerrainMeshSize, TERRAIN_MESH_SEGMENTS } from '@/utils/terrainNoise'
+import type { ArcTable } from '@/track/arcLength'
+import { getTerrainMeshSize, TERRAIN_MESH_SEGMENTS, type HeightFunction } from '@/utils/terrainNoise'
 import { TerrainContext } from './TerrainContext'
 import { BIOMES } from './biomeRegistry'
 import Atmosphere from './shared/Atmosphere'
@@ -12,6 +13,9 @@ import { createNoiseTerrain } from './shared/terrainMesh'
 
 interface BiomeEnvironmentProps {
   biome: BiomeType
+  /** Terrain as drawn (createTerrainSurface). */
+  groundFn: HeightFunction
+  track: ArcTable
   groundColor: number
   hasWater?: boolean
   hasTrees?: boolean
@@ -25,6 +29,8 @@ interface BiomeEnvironmentProps {
  */
 export default function BiomeEnvironment({
   biome,
+  groundFn,
+  track,
   hasWater = false,
   hasTrees = false,
   treeCount = 0,
@@ -62,10 +68,10 @@ export default function BiomeEnvironment({
       )}
 
       {/* Biome-specific InstancedMesh decorations */}
-      {Decorations && <Decorations heightFn={heightFn} />}
+      {Decorations && <Decorations heightFn={heightFn} groundFn={groundFn} track={track} />}
 
       {/* Biome landmarks, terrain features and events */}
-      {Features && <Features heightFn={heightFn} atmosphere={atmosphere} fogRef={fogRef} />}
+      {Features && <Features heightFn={heightFn} groundFn={groundFn} track={track} atmosphere={atmosphere} fogRef={fogRef} />}
     </>
   )
 }
