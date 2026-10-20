@@ -199,26 +199,6 @@ unstyled browser defaults under 44 px).
 extra), so CI guards touch input and the phone HUD layout. Gyro/gamepad would plug
 into the same module later.
 
-## 2026-10-19 — Hit feedback: kill pop delays the explosion by 80 ms (Builder, #14)
-
-**Context:** Every enemy dies in one hit, so "hit flash" and "kill" are the same
-moment. Flashing an enemy that unmounts in the same frame is invisible.
-
-**Decision:** A hit scores immediately (score, combo and collision removal are
-unchanged), then the enemy freezes at 1.2× scale with every mesh swapped to one
-shared white `ENEMY_HIT_FLASH_MAT` for 80 game-ms (and at least one rendered
-frame). Only then does it emit `enemy:killed`, explode and unmount. The material
-swap stores the original on `mesh.userData` and restores it — no per-enemy
-material clones. `enemy:hit` is emitted from the collision path with one reused
-payload object (listeners must not retain it). Camera kick/shake is an additive
-offset applied after the track pose, so it can never drift the ride. Test-only
-`holdFeedback` freezes the muzzle flash and hitmarker for screenshots.
-
-**Consequences:** The explosion, `enemy:killed` (score popups, hitmarker gold)
-and the final-kill slow-mo arrive 80 ms after the hit — a deliberate hit-stop.
-Future multi-HP enemies can reuse the flash helpers in `EnemyBase` for non-lethal
-hits.
-
 ## 2026-10-19 — Enemy readability: shared rim light, reduced fog, readable spawns (Builder, #15)
 
 **Context:** Enemies blended into terrain (scorpion/golem/drake/imp base colours were
@@ -263,19 +243,3 @@ everywhere in the HUD, countdown and wave banner.
 **Consequences:** Measured over a 78 s level1 run: HUD root rendered once, timer
 ~1×/s, score widget once. New HUD widgets should follow the same pattern
 (slice subscriptions, CSS for continuous motion, no per-frame React state).
-
-## 2026-10-20 — Tone.js trigger times are kept strictly increasing (Builder, #14)
-
-**Context:** CI smoke (mobile run) failed on PR #60 with an uncaught Tone.js
-`Start time must be strictly greater than previous start time`. When the audio
-clock falls behind (headless CI, a busy phone), Tone clamps late `Sequence`
-callback times up to `currentTime`, so two consecutive notes on one mono synth get
-the same start. Two shots in one JS turn hit the same thing via `Tone.now()`.
-
-**Decision:** Every mono `Synth`/`NoiseSynth` trigger in the SFX and music managers
-goes through `nextTriggerTime(synth, time, ctx.currentTime)` (`src/audio/triggerTime.ts`,
-pure and unit-tested). It returns a time that is never in the past and at least
-1 ms after that synth's previous start. PolySynths allocate voices, so they don't need it.
-
-**Consequences:** A late note plays up to 1 ms late instead of throwing out of the
-Transport tick. New audio code that triggers a mono synth should use the helper.
