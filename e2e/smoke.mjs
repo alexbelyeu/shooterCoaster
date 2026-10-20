@@ -371,7 +371,7 @@ async function runMobile(browser, base) {
   // Level select -> level 1 (tap)
   const card = `.level-card[data-level="${MOBILE_LEVEL}"]`
   if (!(await waitVisible(page, card))) problems.push('level card never appeared')
-  await page.screenshot({ path: path.join(OUT, 'mobile-level-select.png') })
+  await page.screenshot({ path: path.join(OUT, 'mobile-level-select.png'), timeout: SHOT_TIMEOUT })
   await page.locator(card).tap({ timeout: 30000 }).catch((e) => problems.push(`tap level: ${e.message}`))
   await waitPhase('playing', 15000)
   if ((await phase()) !== 'playing') problems.push('tapping the level card did not start the level')
@@ -422,7 +422,7 @@ async function runMobile(browser, base) {
   // now that the touch-input checks are done; pause still works while frozen.
   if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the HUD layout checks`)
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
-  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}.png`) })
+  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}.png`), timeout: SHOT_TIMEOUT })
   const end = await getStats(page)
   if (end.kills === 0 && end.score <= 0) problems.push('no kill reached')
 
@@ -433,7 +433,7 @@ async function runMobile(browser, base) {
   await waitFrames(page, 2, { minMs: 500, maxMs: 8000 })
   const landscape = await hudLayoutProblems(page, 'landscape 844x390')
   problems.push(...landscape.problems)
-  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-landscape.png`) })
+  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-landscape.png`), timeout: SHOT_TIMEOUT })
 
   // Pause is a button (touch has no Escape key).
   if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the pause tap`)
