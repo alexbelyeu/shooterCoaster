@@ -72,6 +72,9 @@ async function startPreview() {
   const port = 4173 + Math.floor(Math.random() * 500)
   const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], {
     stdio: ['ignore', 'pipe', 'pipe'],
+    // Own process group, so stopPreview() also kills the vite grandchild that
+    // npx spawns (proc.kill() alone only stops npx and leaks the server).
+    detached: true,
   })
   const url = `http://localhost:${port}`
   for (let i = 0; i < 60; i++) {
@@ -81,8 +84,17 @@ async function startPreview() {
     } catch {}
     await new Promise((r) => setTimeout(r, 500))
   }
-  proc.kill()
+  stopPreview({ proc })
   throw new Error('vite preview did not start (did you run `npm run build`?)')
+}
+
+function stopPreview(p) {
+  if (!p?.proc?.pid) return
+  try {
+    process.kill(-p.proc.pid, 'SIGTERM')
+  } catch {
+    p.proc.kill()
+  }
 }
 
 async function launch() {
@@ -332,7 +344,7 @@ async function runMobile(browser, base) {
   // Level select -> level 1 (tap)
   const card = `.level-card[data-level="${MOBILE_LEVEL}"]`
   if (!(await waitVisible(page, card))) problems.push('level card never appeared')
-  await page.screenshot({ path: path.join(OUT, 'mobile-level-select.png') })
+  await page.screenshot({ path: path.join(OUT, 'mobile-level-select.png'), timeout: SHOT_TIMEOUT })
   await page.locator(card).tap({ timeout: 30000 }).catch((e) => problems.push(`tap level: ${e.message}`))
   await waitPhase('playing', 15000)
   if ((await phase()) !== 'playing') problems.push('tapping the level card did not start the level')
@@ -383,7 +395,7 @@ async function runMobile(browser, base) {
   // now that the touch-input checks are done; pause still works while frozen.
   if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the HUD layout checks`)
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
-  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}.png`) })
+  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}.png`), timeout: SHOT_TIMEOUT })
   const end = await getStats(page)
   if (end.kills === 0 && end.score <= 0) problems.push('no kill reached')
 
@@ -394,7 +406,7 @@ async function runMobile(browser, base) {
   await waitFrames(page, 2, { minMs: 500, maxMs: 8000 })
   const landscape = await hudLayoutProblems(page, 'landscape 844x390')
   problems.push(...landscape.problems)
-  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-landscape.png`) })
+  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-landscape.png`), timeout: SHOT_TIMEOUT })
 
   // Pause is a button (touch has no Escape key).
   if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the pause tap`)
@@ -502,7 +514,7 @@ async function run() {
   }
 
   await browser.close()
-  preview?.proc.kill()
+  stopPreview(preview)
 
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
   for (const r of results) {
@@ -533,6 +545,6 @@ function sceneSummary(scene) {
 
 run().catch((e) => {
   console.error(e)
-  preview?.proc.kill() // don't leak the vite preview server on failure
+  stopPreview(preview) // don't leak the vite preview server on failure
   process.exit(1)
 })
