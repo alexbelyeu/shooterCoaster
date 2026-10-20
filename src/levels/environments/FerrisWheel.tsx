@@ -16,7 +16,7 @@ const Z_GAP = 8 // distance between front and back frames
 const _m = new THREE.Matrix4()
 const _c = new THREE.Color()
 
-/** A-frame supports, braces, base, axle and hub caps (static). */
+/** Static A-frames, braces, base and axle. */
 function buildFrame(radius: number) {
   const hubY = radius + 10
   const legSpread = radius * 0.7
@@ -43,7 +43,7 @@ function buildFrame(radius: number) {
   return mergePainted(parts)
 }
 
-/** Rims, spokes and gondola cross-bars, in the wheel's rotating frame (hub at origin). */
+/** Rims, spokes and cross-bars around the hub at the origin. */
 function buildWheel(radius: number, angles: number[]) {
   const parts = [
     painted(new THREE.TorusGeometry(radius, 1.5, 6, 36), '#cc3333', [0, 0, Z_GAP / 2]),
@@ -60,7 +60,7 @@ function buildWheel(radius: number, angles: number[]) {
   return mergePainted(parts)
 }
 
-/** One gondola hanging from its mount point at the origin: arms + roof (frame) and cabin (tinted). */
+/** A gondola hanging from its mount at the origin: painted frame + tinted cabin. */
 function buildGondola() {
   return {
     frame: mergePainted([
@@ -72,11 +72,7 @@ function buildGondola() {
   }
 }
 
-/**
- * Animated Ferris wheel with proper A-frame supports, thin spokes, and
- * gondolas that hang downward. Four draw calls: the static frame, the rotating
- * wheel, and two InstancedMeshes for the gondolas (moved each frame).
- */
+/** Animated Ferris wheel in four draw calls: frame, wheel, and instanced gondolas that stay upright. */
 export default function FerrisWheel({
   position = [0, 0, 0],
   radius = 80,
@@ -106,7 +102,6 @@ export default function FerrisWheel({
 
   useEffect(() => () => Object.values(assets).forEach((a) => a.dispose()), [assets])
 
-  /** Gondolas sit on the rim at their angle + the wheel's, always upright. */
   const placeGondolas = useCallback(
     (wheelAngle: number) => {
       const frames = gondolaFrames.current
@@ -131,7 +126,7 @@ export default function FerrisWheel({
       for (let i = 0; i < angles.length; i++) mesh.setColorAt(i, _c.set(GONDOLA_COLORS[i % GONDOLA_COLORS.length]))
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
       placeGondolas(wheelRef.current?.rotation.z ?? 0)
-      // The gondolas only ever move around the rim, so one sphere bounds them for good.
+      // Gondolas only move around the rim, so this sphere bounds them for good.
       mesh.computeBoundingSphere()
       gondolaFrames.current?.computeBoundingSphere()
     },
@@ -151,7 +146,6 @@ export default function FerrisWheel({
       <group ref={wheelRef} position={[0, hubY, 0]}>
         <mesh geometry={assets.wheel} material={assets.painted} />
       </group>
-      {/* Gondolas live in the wheel's parent frame so they never rotate. */}
       <instancedMesh ref={gondolaFrames} args={[assets.gondolaFrame, assets.painted, angles.length]} />
       <instancedMesh ref={setCabins} args={[assets.cabin, assets.tinted, angles.length]} />
     </group>

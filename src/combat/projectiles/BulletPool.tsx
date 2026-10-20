@@ -81,7 +81,6 @@ export default function BulletPool({
   const getLiveBullets = useCallback(() => liveBulletBuffer.current, [])
   const getLiveBulletCount = useCallback(() => liveBulletCount.current, [])
 
-  // Nothing to draw until the first bullet is fired.
   useEffect(() => {
     if (meshRef.current) meshRef.current.count = 0
   }, [])
@@ -98,8 +97,7 @@ export default function BulletPool({
     const mesh = meshRef.current
     const scale = bulletSize * 0.1
     scaleVec.set(scale, scale, scale)
-    // Live bullets are packed into the first `drawn` instances and only those are
-    // drawn: the idle pool used to cost 350 zero-scaled spheres (~39k triangles).
+    // Only live bullets are drawn, packed first: the idle pool used to cost ~39k triangles.
     let drawn = 0
 
     for (let i = 0; i < POOL_SIZE; i++) {
@@ -118,7 +116,6 @@ export default function BulletPool({
       tempMatrix.makeTranslation(bullet.position.x, bullet.position.y, bullet.position.z)
       tempMatrix.scale(scaleVec)
       mesh.setMatrixAt(drawn, tempMatrix)
-      // Live bullet buffer, filled in place — no allocation
       liveBulletBuffer.current[drawn++] = bullet
     }
 

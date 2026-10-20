@@ -10,10 +10,7 @@ import { withRim } from './enemyRim'
 export const BALLOON_BODY_GEO = new THREE.SphereGeometry(30, 16, 16)
 export const BALLOON_KNOT_GEO = new THREE.SphereGeometry(4, 8, 8)
 export const BALLOON_STRING_GEO = new THREE.CylinderGeometry(0.5, 0.5, 55, 4)
-/**
- * Regular balloons: teardrop body (1.3x tall, baked) + knot in one geometry, so
- * a balloon is 2 draw calls instead of 3 — Theme Park has ~150 of them.
- */
+/** Teardrop body + knot as one geometry: Theme Park has ~150 balloons, so draw calls add up. */
 export const BALLOON_GEO = mergeGeometries([
   new THREE.SphereGeometry(30, 16, 12).scale(1, 1.3, 1),
   new THREE.SphereGeometry(4, 6, 4).translate(0, -35, 0),

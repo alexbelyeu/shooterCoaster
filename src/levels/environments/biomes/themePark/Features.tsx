@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import FerrisWheel from '../../FerrisWheel'
 import Carousel from '../../Carousel'
 import type { BiomeFeaturesProps } from '../../shared/types'
-import { RIDES, getThemeParkLayout } from './layout'
+import { getThemeParkLayout } from './layout'
+import { RIDES } from './parkSpec'
 import EntranceArch from './EntranceArch'
 
 /** Rides and the entrance arch for the theme park */

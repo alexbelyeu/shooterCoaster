@@ -6,10 +6,10 @@ import {
   ARCH_BOARD_WIDTH,
   ARCH_HALF_SPAN,
   type Arch,
-} from './layout'
+} from './parkSpec'
 
 const TITLE = 'SHOOTER COASTER'
-/** Lobster is loaded by global.css; the canvas falls back to a system face until it is. */
+/** Lobster comes from global.css; until it loads (or if it never does) the canvas uses a system face. */
 const FONT_FAMILY = 'Lobster, "Arial Black", Impact, sans-serif'
 const POST_SIZE = 6
 
@@ -40,11 +40,7 @@ function drawSign(canvas: HTMLCanvasElement) {
   ctx.fillText(TITLE, w / 2, h * 0.53)
 }
 
-/**
- * The park's entrance arch, spanning the track early in the ride: two candy
- * posts and a "SHOOTER COASTER" board the rider passes under. Marquee bulbs on
- * the board come from the layout's shared bulb Points.
- */
+/** "SHOOTER COASTER" board on two posts across the track; its marquee bulbs come from the layout. */
 export default function EntranceArch({ arch }: { arch: Arch }) {
   const assets = useMemo(() => {
     const canvas = document.createElement('canvas')
@@ -61,7 +57,7 @@ export default function EntranceArch({ arch }: { arch: Arch }) {
       texture,
       face,
       trim,
-      // BoxGeometry face order: +x, -x, +y, -y, +z, -z — the sign reads from both sides.
+      // BoxGeometry face order +x, -x, +y, -y, +z, -z: the sign reads from both sides.
       boardMats: [trim, trim, trim, trim, face, face],
       board: new THREE.BoxGeometry(ARCH_BOARD_WIDTH, ARCH_BOARD_HEIGHT, ARCH_BOARD_DEPTH),
       post: new THREE.BoxGeometry(POST_SIZE, arch.postHeight, POST_SIZE),
@@ -71,7 +67,6 @@ export default function EntranceArch({ arch }: { arch: Arch }) {
     }
   }, [arch.postHeight])
 
-  // Redraw once Lobster has loaded (it is usually still downloading on first ride).
   useEffect(() => {
     let live = true
     document.fonts?.load(`64px ${FONT_FAMILY}`).then(() => {

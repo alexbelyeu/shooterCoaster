@@ -1,16 +1,16 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import type { BiomeDecorationsProps } from '../../shared/types'
-import { type ThemeParkLayout, getThemeParkLayout } from './layout'
+import { getThemeParkLayout } from './layout'
+import type { ThemeParkLayout } from './parkSpec'
 import { placeInstances } from './instancing'
 import Midway from './Midway'
 
-/** Height-baked geometry with its base `bury` units below y = 0. */
+/** Base `bury` units below y = 0, so props on slopes don't float. */
 function grounded(geo: THREE.BufferGeometry, height: number, bury = 0) {
   return geo.translate(0, height / 2 - bury, 0)
 }
 
-/** Background dressing beyond the midway: big tents, a hedge boundary, flag poles. */
 function Scatter({ layout }: { layout: ThemeParkLayout }) {
   const { tents, hedges, flagPoles } = layout
   const assets = useMemo(
@@ -54,7 +54,6 @@ function Scatter({ layout }: { layout: ThemeParkLayout }) {
   )
 }
 
-/** Theme park decorations: the midway along the track plus background scatter (see layout.ts). */
 export default function FunfairDecorations({ heightFn, groundFn, track }: BiomeDecorationsProps) {
   const layout = useMemo(() => getThemeParkLayout(track, heightFn, groundFn), [track, heightFn, groundFn])
   return (

@@ -1,10 +1,8 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
-/**
- * Build multi-coloured props as ONE draw call: paint each primitive with a
- * vertex colour, place it, then merge (render with `vertexColors: true`).
- */
+// Multi-coloured props in one draw call: vertex-colour each primitive, place it,
+// merge, and render with `vertexColors: true`.
 
 const _m = new THREE.Matrix4()
 const _e = new THREE.Euler()
@@ -13,7 +11,7 @@ const _p = new THREE.Vector3()
 const _s = new THREE.Vector3(1, 1, 1)
 const _c = new THREE.Color()
 
-/** Non-indexed copy of `geo` (disposed) painted `color`, rotated then moved. */
+/** Non-indexed copy of `geo` (which is disposed), painted, rotated then moved. */
 export function painted(
   geo: THREE.BufferGeometry,
   color: THREE.ColorRepresentation,
@@ -33,7 +31,7 @@ export function painted(
   return g
 }
 
-/** Flat polygon from triangle corners [x, y, z, ...], painted. */
+/** Flat polygon from triangle corners [x, y, z, ...]. */
 export function paintedPolygon(corners: number[], color: THREE.ColorRepresentation): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.Float32BufferAttribute(corners, 3))
@@ -41,7 +39,7 @@ export function paintedPolygon(corners: number[], color: THREE.ColorRepresentati
   return painted(g, color)
 }
 
-/** Merge painted parts into one geometry (the parts are disposed). */
+/** Disposes the parts. */
 export function mergePainted(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   const g = mergeGeometries(parts)
   for (const p of parts) p.dispose()

@@ -48,8 +48,9 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 | `src/entities/spawning/EnemySpawner.tsx` | Spawn logic, collision radii, scores |
 | `src/levels/environments/BiomeEnvironment.tsx` | Thin host: atmosphere, terrain mesh, water, trees, then the biome's `Decorations` + `Features`. No per-biome code here |
 | `src/levels/environments/biomeRegistry.ts` | `BIOMES: Record<BiomeType, BiomeDefinition>` — one entry per biome |
+| `src/levels/environments/biomes/themePark/layout.ts` | Worked example of track-aware placement: stalls along the track, string lights, bunting and an arch across it, all pure and unit-tested against the real track (`layout.test.ts`) |
 | `src/levels/environments/biomes/<biome>/` | Per-biome module: `config.ts` (terrain `COLOR_RAMP`, `TREES` config), `Decorations.tsx` (InstancedMesh scatter), `Features.tsx` (landmarks, terrain features, events), `index.ts` (the `BiomeDefinition`) |
-| `src/levels/environments/shared/` | Biome-agnostic helpers: `types.ts` (`BiomeDefinition`), `terrainMesh.ts` (terrain builder + colour-ramp sampler), `TreeField.tsx`, `OceanWater.tsx` (water shader), `Atmosphere.tsx` (sky/lights/fog/exposure wiring), `scatter.ts` (`scatterPositions`, `hslToRgb`), `safeHeight.ts` |
+| `src/levels/environments/shared/` | Biome-agnostic helpers: `types.ts` (`BiomeDefinition`), `terrainMesh.ts` (terrain builder + colour-ramp sampler), `TreeField.tsx`, `OceanWater.tsx` (water shader), `Atmosphere.tsx` (sky/lights/fog/exposure wiring), `scatter.ts` (`scatterPositions`, `hslToRgb`), `safeHeight.ts`, `trackClearance.ts` (`buildTrackIndex`: is anything of the track within r in XZ? — towers reach the ground, so test 2D), `paintedParts.ts` (vertex-coloured parts merged into one geometry) |
 | `src/levels/environments/atmosphere.ts` | Per-biome sky/sun/hemisphere/fog/exposure config (`ATMOSPHERES`) |
 | `src/levels/environments/SkyDome.tsx` | Procedural sky dome shader (gradient, sun, fbm clouds), follows camera |
 | `src/levels/environments/LavaShader.ts` | Procedural GLSL lava material (domain warping + Voronoi) |
@@ -182,6 +183,8 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 | Landmark feels disconnected | Placed too far (>3000) | Keep within ~2400 units of origin |
 | Hexagonal stick geometry | height-via-scale trick | Bake height into CylinderGeometry constructor |
 | Grounded object floats / sinks on ridged terrain | Placed on `heightFn`, but the drawn mesh is linear between grid vertices (up to ~55 units off on Arctic) | Sample `createTerrainSurface(heightFn, getTerrainMeshSize(biome))` for things that must touch the visible ground (see `src/track/supportTowers.ts`) |
+| Prop or ride intersects the track or a support tower | Placed by radius from the origin, ignoring the track | Plan positions against `buildTrackIndex(track)` (2D clearance) and unit-test them, as `themePark/layout.test.ts` does |
+| Level blows its draw-call budget | One `<mesh>` per prop part (a Ferris wheel was 88 draws) | InstancedMesh per part, or `paintedParts.ts` to merge a multi-coloured prop into one geometry |
 | Terrain holes/spikes | Missing noise config | Add entry to terrainNoise.ts |
 | No music plays | Missing MusicManager entry | Add biome config to CONFIGS record |
 | Enemies don't spawn | Missing spawner registration | Check all 4 spawner touchpoints |

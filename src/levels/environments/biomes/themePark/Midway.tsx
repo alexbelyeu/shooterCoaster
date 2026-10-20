@@ -3,31 +3,29 @@ import * as THREE from 'three'
 import {
   FLAG_DROP,
   FLAG_SPACING,
-  LIGHT_POLE_HEIGHT,
   PALETTE,
   PATH_HALF_WIDTH,
   type Pole,
   type ThemeParkLayout,
   type Wire,
   wirePoint,
-} from './layout'
-import { buildStallGeometries } from './stallGeometry'
+} from './parkSpec'
+import { type StallGeometry, buildStallGeometries } from './stallGeometry'
 import { placeInstances } from './instancing'
 
-/** Bulb colours (linear, > 1 so they clear the bloom threshold with toneMapped off). */
+/** Above 1 so the bulbs clear the bloom threshold (the material is not tone-mapped). */
 const BULB_COLORS = ['#fff2c0', '#ffd040', '#ff6a5a', '#7ad0ff', '#9cff8a'].map((c) =>
   new THREE.Color(c).multiplyScalar(2.4),
 )
 const WIRE_SEGMENTS = 12
 
-/** One stall variant: neutral (vertex-coloured) + accent (instance-coloured) meshes. */
 function StallVariant({
   geometry,
   stalls,
   neutralMat,
   accentMat,
 }: {
-  geometry: { neutral: THREE.BufferGeometry; accent: THREE.BufferGeometry }
+  geometry: StallGeometry
   stalls: ThemeParkLayout['stalls']
   neutralMat: THREE.Material
   accentMat: THREE.Material
@@ -43,7 +41,25 @@ function StallVariant({
   )
 }
 
-/** Wires as line segments: each hanging wire is WIRE_SEGMENTS straight pieces. */
+/**
+ * Poles of any heights from one geometry as tall as the tallest, each sunk into
+ * the ground so its top lands where the layout wants it (no height scaling).
+ */
+function Poles({ poles, material }: { poles: Pole[]; material: THREE.Material }) {
+  const height = useMemo(() => Math.max(1, ...poles.map((p) => p.height)), [poles])
+  const geometry = useMemo(
+    () => new THREE.CylinderGeometry(0.5, 0.7, height, 5, 1, true).translate(0, height / 2, 0),
+    [height],
+  )
+  useEffect(() => () => geometry.dispose(), [geometry])
+  const place = useMemo(
+    () => placeInstances(poles.map((p) => ({ x: p.x, y: p.y + p.height - height, z: p.z, yaw: 0 }))),
+    [poles, height],
+  )
+  if (poles.length === 0) return null
+  return <instancedMesh ref={place} args={[geometry, material, poles.length]} />
+}
+
 function buildWireGeometry(wires: Wire[]): THREE.BufferGeometry {
   const pos = new Float32Array(wires.length * WIRE_SEGMENTS * 6)
   let o = 0
@@ -69,7 +85,7 @@ function buildBulbGeometry(bulbs: number[]): THREE.BufferGeometry {
   return g
 }
 
-/** Soft round dot so Points read as bulbs, not squares. */
+/** Soft round sprite so Points read as bulbs, not squares. */
 function buildDotTexture(): THREE.Texture {
   const size = 32
   const canvas = document.createElement('canvas')
@@ -84,7 +100,6 @@ function buildDotTexture(): THREE.Texture {
   return new THREE.CanvasTexture(canvas)
 }
 
-/** Ribbon through the path rows; gaps where the path is closed (under low track). */
 function buildPathGeometry(rows: ThemeParkLayout['path']): THREE.BufferGeometry {
   const pos: number[] = []
   for (let i = 0; i < rows.length; i++) {
@@ -95,7 +110,7 @@ function buildPathGeometry(rows: ThemeParkLayout['path']): THREE.BufferGeometry 
     const ax1 = a.x + a.nx * PATH_HALF_WIDTH, az1 = a.z + a.nz * PATH_HALF_WIDTH
     const bx0 = b.x - b.nx * PATH_HALF_WIDTH, bz0 = b.z - b.nz * PATH_HALF_WIDTH
     const bx1 = b.x + b.nx * PATH_HALF_WIDTH, bz1 = b.z + b.nz * PATH_HALF_WIDTH
-    // Both edges of a row share its Y (no twisting); wound to face up.
+    // Both edges of a row share its Y so the strip never twists.
     pos.push(ax0, a.y, az0, ax1, a.y, az1, bx1, b.y, bz1, ax0, a.y, az0, bx1, b.y, bz1, bx0, b.y, bz0)
   }
   const g = new THREE.BufferGeometry()
@@ -104,48 +119,43 @@ function buildPathGeometry(rows: ThemeParkLayout['path']): THREE.BufferGeometry 
   return g
 }
 
-/** Pole geometry `height` tall, base at y = 0 (height baked in, never scaled). */
-function poleGeometry(height: number) {
-  return new THREE.CylinderGeometry(0.5, 0.7, height, 5, 1, true).translate(0, height / 2, 0)
+function buildFlagGeometry(): THREE.BufferGeometry {
+  const half = FLAG_SPACING * 0.42
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute([-half, 0, 0, half, 0, 0, 0, -FLAG_DROP, 0], 3))
+  g.computeVertexNormals()
+  return g
 }
 
-function poleInstances(poles: Pole[]) {
-  return poles.map((p) => ({ x: p.x, y: p.y, z: p.z, yaw: 0 }))
-}
-
-/**
- * The midway along the track: stalls, string lights on poles, bunting across
- * the track and paths between the rides. Every piece is one draw call
- * (InstancedMesh / LineSegments / Points), all static.
- */
+/** Stalls, string lights, bunting and paths: static, one draw call per kind of piece. */
 export default function Midway({ layout }: { layout: ThemeParkLayout }) {
   const { stalls, lightPoles, buntingPoles, lightWires, buntingWires, bulbs, flags, path } = layout
 
-  // Bunting poles vary in height: one geometry as tall as the tallest, each sunk
-  // into the ground so its top meets the rope.
-  const buntingPoleHeight = useMemo(() => Math.max(1, ...buntingPoles.map((p) => p.height)), [buntingPoles])
-  const buntingPolePlacements = useMemo(
-    () => buntingPoles.map((p) => ({ x: p.x, y: p.y + p.height - buntingPoleHeight, z: p.z, yaw: 0 })),
-    [buntingPoles, buntingPoleHeight],
+  const stallGeometries = useMemo(() => buildStallGeometries(), [])
+  useEffect(
+    () => () => stallGeometries.forEach((g) => (g.neutral.dispose(), g.accent.dispose())),
+    [stallGeometries],
   )
 
   const assets = useMemo(() => {
-    const flagGeo = new THREE.BufferGeometry()
-    const half = FLAG_SPACING * 0.42
-    flagGeo.setAttribute('position', new THREE.Float32BufferAttribute([-half, 0, 0, half, 0, 0, 0, -FLAG_DROP, 0], 3))
-    flagGeo.computeVertexNormals()
+    const bulbTex = buildDotTexture()
     return {
-      stalls: buildStallGeometries(),
       stallNeutral: new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide, specular: '#222222', shininess: 20 }),
       stallAccent: new THREE.MeshPhongMaterial({ flatShading: true, side: THREE.DoubleSide, specular: '#333333', shininess: 30 }),
-      lightPoleGeo: poleGeometry(LIGHT_POLE_HEIGHT + 1),
-      buntingPoleGeo: poleGeometry(buntingPoleHeight),
       poleMat: new THREE.MeshPhongMaterial({ color: '#f4f0e8', flatShading: true }),
       wireGeo: buildWireGeometry([...lightWires, ...buntingWires]),
       wireMat: new THREE.LineBasicMaterial({ color: '#2a2a2a' }),
       bulbGeo: buildBulbGeometry(bulbs),
-      bulbTex: buildDotTexture(),
-      flagGeo,
+      bulbTex,
+      bulbMat: new THREE.PointsMaterial({
+        size: 2.8,
+        vertexColors: true,
+        map: bulbTex,
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+      flagGeo: buildFlagGeometry(),
       flagMat: new THREE.MeshLambertMaterial({ side: THREE.DoubleSide }),
       pathGeo: buildPathGeometry(path),
       pathMat: new THREE.MeshLambertMaterial({
@@ -156,56 +166,18 @@ export default function Midway({ layout }: { layout: ThemeParkLayout }) {
         polygonOffsetUnits: -2,
       }),
     }
-  }, [lightWires, buntingWires, bulbs, path, buntingPoleHeight])
-
-  const bulbMat = useMemo(
-    () =>
-      new THREE.PointsMaterial({
-        size: 2.8,
-        sizeAttenuation: true,
-        vertexColors: true,
-        map: assets.bulbTex,
-        transparent: true,
-        depthWrite: false,
-        toneMapped: false,
-      }),
-    [assets.bulbTex],
-  )
-
-  useEffect(() => {
-    return () => {
-      for (const s of assets.stalls) {
-        s.neutral.dispose()
-        s.accent.dispose()
-      }
-      assets.stallNeutral.dispose()
-      assets.stallAccent.dispose()
-      assets.lightPoleGeo.dispose()
-      assets.buntingPoleGeo.dispose()
-      assets.poleMat.dispose()
-      assets.wireGeo.dispose()
-      assets.wireMat.dispose()
-      assets.bulbGeo.dispose()
-      assets.bulbTex.dispose()
-      assets.flagGeo.dispose()
-      assets.flagMat.dispose()
-      assets.pathGeo.dispose()
-      assets.pathMat.dispose()
-    }
-  }, [assets])
-  useEffect(() => () => bulbMat.dispose(), [bulbMat])
+  }, [lightWires, buntingWires, bulbs, path])
+  useEffect(() => () => Object.values(assets).forEach((a) => a.dispose()), [assets])
 
   const byVariant = useMemo(
-    () => assets.stalls.map((_, v) => stalls.filter((s) => s.variant === v)),
-    [assets.stalls, stalls],
+    () => stallGeometries.map((_, v) => stalls.filter((s) => s.variant === v)),
+    [stallGeometries, stalls],
   )
-  const placeLightPoles = useMemo(() => placeInstances(poleInstances(lightPoles)), [lightPoles])
-  const placeBuntingPoles = useMemo(() => placeInstances(buntingPolePlacements), [buntingPolePlacements])
   const placeFlags = useMemo(() => placeInstances(flags, flags.map((_, i) => i % PALETTE.length)), [flags])
 
   return (
     <>
-      {assets.stalls.map((geometry, v) => (
+      {stallGeometries.map((geometry, v) => (
         <StallVariant
           key={v}
           geometry={geometry}
@@ -214,15 +186,12 @@ export default function Midway({ layout }: { layout: ThemeParkLayout }) {
           accentMat={assets.stallAccent}
         />
       ))}
-      {lightPoles.length > 0 && (
-        <instancedMesh ref={placeLightPoles} args={[assets.lightPoleGeo, assets.poleMat, lightPoles.length]} />
-      )}
-      {buntingPoles.length > 0 && (
-        <instancedMesh ref={placeBuntingPoles} args={[assets.buntingPoleGeo, assets.poleMat, buntingPoles.length]} />
-      )}
+      <Poles poles={lightPoles} material={assets.poleMat} />
+      <Poles poles={buntingPoles} material={assets.poleMat} />
       {flags.length > 0 && <instancedMesh ref={placeFlags} args={[assets.flagGeo, assets.flagMat, flags.length]} />}
       <lineSegments geometry={assets.wireGeo} material={assets.wireMat} />
-      <points geometry={assets.bulbGeo} material={bulbMat} />
+      <points geometry={assets.bulbGeo} material={assets.bulbMat} />
+      {/* Drawn after the terrain it lies on; depthWrite off + polygon offset avoid z-fighting. */}
       <mesh geometry={assets.pathGeo} material={assets.pathMat} renderOrder={1} />
     </>
   )

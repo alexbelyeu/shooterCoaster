@@ -9,7 +9,8 @@ import {
   getTerrainMeshSize,
   sampleTrackPath,
 } from '@/utils/terrainNoise'
-import { ARCH_BOARD_HEIGHT, FLAG_DROP, RIDES, planThemePark } from './layout'
+import { planThemePark } from './layout'
+import { ARCH_BOARD_HEIGHT, FLAG_DROP, RIDES } from './parkSpec'
 
 const level = getLevelConfig('level1')!
 const { varA, varB, varC, scalar } = level.track

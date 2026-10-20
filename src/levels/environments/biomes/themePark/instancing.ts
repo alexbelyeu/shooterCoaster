@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { PALETTE, type Placement } from './layout'
+import { PALETTE, type Placement } from './parkSpec'
 
 const _m = new THREE.Matrix4()
 const _p = new THREE.Vector3()
@@ -8,11 +8,7 @@ const _s = new THREE.Vector3(1, 1, 1)
 const _y = new THREE.Vector3(0, 1, 0)
 const _c = new THREE.Color()
 
-/**
- * Ref callback that writes one instance per placement (position + yaw, unit
- * scale) and, when `colors` is given, a PALETTE colour per instance. Bounding
- * sphere is recomputed so the whole set is frustum-culled as one.
- */
+/** InstancedMesh ref callback: one instance per placement, optionally tinted PALETTE[colors[i]]. */
 export function placeInstances(items: Placement[], colors?: number[]) {
   return (mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return

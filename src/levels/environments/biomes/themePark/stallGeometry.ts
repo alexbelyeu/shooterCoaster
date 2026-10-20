@@ -1,21 +1,17 @@
 import * as THREE from 'three'
 import { mergePainted, painted, paintedPolygon } from '../../shared/paintedParts'
-import { SIGN_HEIGHT, SIGN_WIDTH, SIGN_Y, SIGN_Z, STALL_DEPTH, STALL_WIDTH } from './layout'
+import { SIGN_HEIGHT, SIGN_WIDTH, SIGN_Y, SIGN_Z, STALL_DEPTH, STALL_WIDTH } from './parkSpec'
 
 /**
- * Midway stall geometry, in the stall's local frame: origin on the ground at
- * the footprint centre, front (serving side, facing the track) towards +z.
- * Walls run SKIRT units below the origin so stalls on gentle slopes don't float.
- *
- * Each variant is two merged geometries: `neutral` (vertex-coloured wood,
- * canvas and white stripes) and `accent` (white, tinted per instance with the
- * stall's colour). One InstancedMesh each, so 3 variants = 6 draw calls.
+ * Origin on the ground at the footprint centre, serving side towards +z. `neutral`
+ * is vertex-coloured; `accent` is white and takes each stall's instance colour.
  */
 export interface StallGeometry {
   neutral: THREE.BufferGeometry
   accent: THREE.BufferGeometry
 }
 
+/** Walls continue below ground so stalls on gentle slopes don't float. */
 const SKIRT = 6
 const W = STALL_WIDTH
 const D = STALL_DEPTH
@@ -25,7 +21,7 @@ const DARK = new THREE.Color('#3b2618')
 const WHITE = new THREE.Color('#ffffff')
 const STRIPES = 6
 
-/** Box from y0 to y1 (both local), centred on (x, z). */
+/** Box from y0 to y1, centred on (x, z). */
 function box(w: number, y0: number, y1: number, d: number, color: THREE.Color, x = 0, z = 0) {
   return painted(new THREE.BoxGeometry(w, y1 - y0, d), color, [x, (y0 + y1) / 2, z])
 }
@@ -35,11 +31,7 @@ const tri = (a: number[], b: number[], c: number[], color: THREE.Color) => paint
 const quad = (a: number[], b: number[], c: number[], d: number[], color: THREE.Color) =>
   paintedPolygon([...a, ...b, ...c, ...a, ...c, ...d], color)
 
-/**
- * A roof slope from the edge at (y0, z0) to the edge at (y1, z1), across the
- * full width, cut into stripes running down the slope; even stripes go to
- * `accent`, odd ones to `neutral` (white).
- */
+/** Roof slope from edge (y0, z0) to edge (y1, z1) in stripes alternating accent / white. */
 function stripedSlope(
   y0: number, z0: number, y1: number, z1: number, width: number,
   accent: THREE.BufferGeometry[], neutral: THREE.BufferGeometry[],
@@ -63,7 +55,6 @@ function stripedRoofStall(): StallGeometry {
   const rw = W + 2
   stripedSlope(12, D / 2 + 3, 21, 0, rw, accent, neutral)
   stripedSlope(12, -D / 2 - 1.5, 21, 0, rw, accent, neutral)
-  // Gable ends.
   for (const x of [-rw / 2, rw / 2]) {
     neutral.push(tri([x, 12, D / 2 + 3], [x, 21, 0], [x, 12, -D / 2 - 1.5], CANVAS))
   }
@@ -82,7 +73,7 @@ function counterStall(): StallGeometry {
   const accent = [box(W - 4, -SKIRT, 9, 4, WHITE, 0, D / 2 - 3)]
   const front = D / 2 + 4
   stripedSlope(15, front, 19, -D / 2, W + 2, accent, neutral)
-  // Valance: triangles hanging from the awning's front edge.
+  // Valance
   const n = 8
   for (let k = 0; k < n; k++) {
     const xa = -(W + 2) / 2 + ((W + 2) * k) / n
@@ -93,7 +84,7 @@ function counterStall(): StallGeometry {
   return { neutral: mergePainted(neutral), accent: mergePainted(accent) }
 }
 
-/** Kiosk with a flat roof and a big framed sign board (marquee bulbs come from the layout). */
+/** Kiosk with a framed sign board; its marquee bulbs come from the layout. */
 function signStall(): StallGeometry {
   const neutral = [
     box(W - 2, -SKIRT, 15, D - 2, CANVAS),
@@ -110,7 +101,7 @@ function signStall(): StallGeometry {
   return { neutral: mergePainted(neutral), accent: mergePainted(accent) }
 }
 
-/** Index = layout variant (SIGN_VARIANT is the sign stall). */
+/** Indexed by `Stall.variant`. */
 export function buildStallGeometries(): StallGeometry[] {
   return [stripedRoofStall(), counterStall(), signStall()]
 }

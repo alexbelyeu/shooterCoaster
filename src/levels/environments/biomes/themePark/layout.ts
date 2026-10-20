@@ -1,63 +1,49 @@
-import type { HeightFunction } from '@/utils/terrainNoise'
+import { type HeightFunction, TERRAIN_MESH_SEGMENTS, getTerrainMeshSize } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
 import { safeHeight } from '../../shared/safeHeight'
-import { type TrackIndex, buildTrackIndex, trackFrameAt } from '../../shared/trackClearance'
+import { type TrackFrame, type TrackIndex, buildTrackIndex, trackFrameAt } from '../../shared/trackClearance'
+import {
+  ARCH_BOARD_DEPTH,
+  ARCH_BOARD_HEIGHT,
+  ARCH_BOARD_WIDTH,
+  ARCH_HALF_SPAN,
+  type Arch,
+  FLAG_DROP,
+  FLAG_SPACING,
+  PALETTE,
+  type PathRow,
+  type Placement,
+  type Pole,
+  RIDES,
+  SIGN_HEIGHT,
+  SIGN_WIDTH,
+  SIGN_Y,
+  SIGN_Z,
+  STALL_DEPTH,
+  STALL_WIDTH,
+  type Stall,
+  type ThemeParkLayout,
+  type Wire,
+  wirePoint,
+} from './parkSpec'
 
-/**
- * Where everything in the Theme Park goes: rides, the entrance arch, paths,
- * midway stalls with string lights, bunting across the track, tents, hedges and
- * flag poles. Pure data (no three/React) so it is unit-tested against the real
- * level 1 track: nothing may stand within reach of the rails, the support
- * towers or the rider's camera.
- */
+// Everything the Theme Park places, as pure data so layout.test.ts can check it
+// against the real level 1 track (rails, towers and the rider's camera).
 
-export interface Ride {
-  kind: 'ferrisWheel' | 'carousel'
-  x: number
-  z: number
-  radius: number
-}
-
-/**
- * The rides, shared by Features (renders them) and the layout (keeps clear of
- * them). Placed where no part of the level 1 track (or its towers) passes over.
- */
-export const RIDES: Ride[] = [
-  { kind: 'ferrisWheel', x: 510, z: -90, radius: 80 },
-  { kind: 'ferrisWheel', x: -500, z: 130, radius: 60 },
-  { kind: 'carousel', x: -450, z: -220, radius: 25 },
-  { kind: 'carousel', x: 220, z: 380, radius: 20 },
-  { kind: 'carousel', x: 360, z: 320, radius: 20 },
-]
-
-export const PALETTE = ['#ff4444', '#ffaa00', '#4488ff', '#44cc44', '#ff44ff', '#ff7a2e']
-
-/** Stall footprint (local x across the front, z front-to-back). */
-export const STALL_WIDTH = 26
-export const STALL_DEPTH = 16
-export const STALL_VARIANTS = 3
-/** Height of the string-light poles above the ground. */
-export const LIGHT_POLE_HEIGHT = 30
-/** Height of the entrance arch posts' top above the track. */
+const STALL_VARIANTS = 3
+const LIGHT_POLE_HEIGHT = 30
+/** Arch board bottom above the track. */
 const ARCH_CLEAR = 30
-/** Arc length before the arch over which the rider must already be below its board. */
 const ARCH_APPROACH = 250
-/** Eye height (6) + 8: how far hanging things stay above the track. */
+/** Level 1 eye height (6) + 8. */
 const RIDER_CLEARANCE = 14
-export const ARCH_HALF_SPAN = 46
-export const ARCH_BOARD_HEIGHT = 26
-export const ARCH_BOARD_WIDTH = ARCH_HALF_SPAN * 2 + 6
-export const ARCH_BOARD_DEPTH = 3
-/** Sign board on the 'sign' stall variant (local frame: centre y, front face z). */
-export const SIGN_VARIANT = 2
-export const SIGN_WIDTH = STALL_WIDTH - 4
-export const SIGN_HEIGHT = 9
-export const SIGN_Y = 23
-export const SIGN_Z = STALL_DEPTH / 2 - 3
+/** XZ gap between a span across the track and any other pass, whose towers reach the ground. */
+const SPAN_TRACK_CLEAR = 14
+const SIGN_VARIANT = 2
 
 const STALL_SPACING = 80
 const STALL_LATERAL: [number, number] = [50, 108]
-/** Min XZ distance from a stall centre to any track sample (stall half-diagonal + tower half-width + margin). */
+/** Stall half-diagonal + tower half-width + margin. */
 const STALL_TRACK_CLEAR = 40
 const STALL_GAP = 36
 const STALL_MAX_STEP = 6
@@ -67,79 +53,16 @@ const BULB_SPACING = 6
 const MAX_STRING = 170
 const BUNTING_COUNT = 10
 const BUNTING_HALF_SPAN = 30
-/** Bunting rope ends this far above the track; flags hang FLAG_DROP below the sagging rope. */
 const BUNTING_RISE = 32
 const BUNTING_SAG = 4
 const BUNTING_APPROACH = 80
-export const FLAG_DROP = 6
-export const FLAG_SPACING = 4.5
 const PATH_STEP = 8
-export const PATH_HALF_WIDTH = 7
 const PATH_LIFT = 2.5
-const TERRAIN_HALF_CELL = (6000 / 128) * 0.6
+const TERRAIN_HALF_CELL = (getTerrainMeshSize('themePark') / TERRAIN_MESH_SEGMENTS) * 0.6
+const SEED = 1
 
-export interface Placement {
-  x: number
-  y: number
-  z: number
-  yaw: number
-}
-
-export interface Stall extends Placement {
-  variant: number
-  color: number
-}
-
-export interface Pole {
-  x: number
-  y: number
-  z: number
-  height: number
-}
-
-/** A hanging line from a to b that sags `sag` at the middle (parabola). */
-export interface Wire {
-  a: [number, number, number]
-  b: [number, number, number]
-  sag: number
-}
-
-export interface PathRow {
-  x: number
-  y: number
-  z: number
-  /** Unit horizontal normal (across the path). */
-  nx: number
-  nz: number
-  /** False where the path would run under low track (it stops short there). */
-  open: boolean
-}
-
-export interface Arch extends Placement {
-  /** World Y of the bottom of the sign board. */
-  boardY: number
-  /** Post height from its foot (lowest post ground) to the top of the board. */
-  postHeight: number
-  groundY: number
-}
-
-export interface ThemeParkLayout {
-  arch: Arch | null
-  path: PathRow[]
-  stalls: Stall[]
-  lightPoles: Pole[]
-  lightWires: Wire[]
-  bulbs: number[]
-  buntingPoles: Pole[]
-  buntingWires: Wire[]
-  flags: Placement[]
-  tents: (Placement & { color: number })[]
-  hedges: Placement[]
-  flagPoles: (Placement & { color: number })[]
-}
-
-/** Deterministic PRNG so the park looks the same every ride (and in tests). */
-export function mulberry32(seed: number): () => number {
+/** Seeded so the park looks the same every ride. */
+function mulberry32(seed: number): () => number {
   let a = seed >>> 0
   return () => {
     a = (a + 0x6d2b79f5) >>> 0
@@ -148,16 +71,6 @@ export function mulberry32(seed: number): () => number {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
-}
-
-/** Point on a wire at u ∈ [0, 1]. */
-export function wirePoint(w: Wire, u: number): [number, number, number] {
-  const sag = 4 * w.sag * u * (1 - u)
-  return [
-    w.a[0] + (w.b[0] - w.a[0]) * u,
-    w.a[1] + (w.b[1] - w.a[1]) * u - sag,
-    w.a[2] + (w.b[2] - w.a[2]) * u,
-  ]
 }
 
 interface Circle {
@@ -174,7 +87,6 @@ function hitsAny(circles: Circle[], x: number, z: number, r: number): boolean {
   return false
 }
 
-/** Every point of the wire (sampled every ~6 units) is at least `clear` from the track in XZ. */
 function wireClear(index: TrackIndex, w: Wire, clear: number): boolean {
   const len = Math.hypot(w.b[0] - w.a[0], w.b[2] - w.a[2])
   const n = Math.max(2, Math.ceil(len / 6))
@@ -185,7 +97,7 @@ function wireClear(index: TrackIndex, w: Wire, clear: number): boolean {
   return true
 }
 
-/** The rider stays RIDER_CLEARANCE below `y` from `approach` units before arc distance `d` to just after it. */
+/** So a span is seen ahead and ridden under, not dived through from above. */
 function riderStaysBelow(table: ArcTable, d: number, approach: number, y: number): boolean {
   for (let a = d - approach; a <= d + 60; a += 10) {
     if (trackFrameAt(table, a).y + RIDER_CLEARANCE > y) return false
@@ -193,34 +105,30 @@ function riderStaysBelow(table: ArcTable, d: number, approach: number, y: number
   return true
 }
 
+/** End points of a span across the track at `f`, if no other pass comes near it. */
+function spanAcross(index: TrackIndex, f: TrackFrame, halfSpan: number, occupied: Circle[]) {
+  const sLocal = index.table.s[f.index]
+  const elsewhere = (i: number) => Math.abs(index.table.s[i] - sLocal) > 2 * halfSpan + 30
+  for (let k = -1; k <= 1.001; k += 0.1) {
+    if (index.near(f.x - f.tz * halfSpan * k, f.z + f.tx * halfSpan * k, SPAN_TRACK_CLEAR, elsewhere)) return null
+  }
+  const ends = [-1, 1].map((k) => ({ x: f.x - f.tz * halfSpan * k, z: f.z + f.tx * halfSpan * k }))
+  return ends.some((p) => hitsAny(occupied, p.x, p.z, 6)) ? null : ends
+}
+
 function planArch(index: TrackIndex, groundFn: HeightFunction, occupied: Circle[]): Arch | null {
   const { table } = index
-  // The first low stretch after the opening drop that the rider reaches on the
-  // level, so the board is seen ahead and ridden under (not dived through).
+  // The first low stretch after the opening drop.
   for (let d = 500; d < 4000; d += 20) {
     const f = trackFrameAt(table, d)
     if (f.y > 70 || (f.tx === 0 && f.tz === 0)) continue
-    const nx = -f.tz
-    const nz = f.tx
     const boardY = f.y + ARCH_CLEAR
     if (!riderStaysBelow(table, d, ARCH_APPROACH, boardY)) continue
+    const feet = spanAcross(index, f, ARCH_HALF_SPAN, occupied)
+    if (!feet) continue
     const top = boardY + ARCH_BOARD_HEIGHT
-    const sLocal = table.s[f.index]
-    // Other passes of the track must stay clear of the whole arch volume.
-    const elsewhere = (i: number) => Math.abs(table.s[i] - sLocal) > 120
-    let ok = true
-    for (let k = -1; k <= 1 && ok; k += 0.1) {
-      const x = f.x + nx * ARCH_HALF_SPAN * k
-      const z = f.z + nz * ARCH_HALF_SPAN * k
-      ok = !index.near(x, z, 14, (i) => elsewhere(i) && table.y[i] < top + 30)
-    }
-    if (!ok) continue
-    const feet = [-1, 1].map((side) => ({
-      x: f.x + nx * ARCH_HALF_SPAN * side,
-      z: f.z + nz * ARCH_HALF_SPAN * side,
-    }))
-    if (feet.some((p) => index.near(p.x, p.z, 12, elsewhere) || hitsAny(occupied, p.x, p.z, 6))) continue
     const groundY = Math.min(...feet.map((p) => groundFn(p.x, p.z)))
+    for (const p of feet) occupied.push({ x: p.x, z: p.z, r: 8 })
     return {
       x: f.x,
       y: f.y,
@@ -234,7 +142,7 @@ function planArch(index: TrackIndex, groundFn: HeightFunction, occupied: Circle[
   return null
 }
 
-/** Closed Catmull-Rom loop through the rides, sampled every PATH_STEP units. */
+/** Closed Catmull-Rom loop through the rides. */
 function planPath(index: TrackIndex, heightFn: HeightFunction): PathRow[] {
   const nodes = [...RIDES].sort((a, b) => Math.atan2(a.z, a.x) - Math.atan2(b.z, b.x))
   const n = nodes.length
@@ -298,7 +206,7 @@ function planStalls(
       if (index.near(x, z, STALL_TRACK_CLEAR)) continue
       if (hitsAny(occupied, x, z, 18) || hitsAny(placed, x, z, STALL_GAP)) continue
       if (path.some((r) => (r.x - x) ** 2 + (r.z - z) ** 2 < 22 * 22)) continue
-      // Face the track point; reject slopes the skirt can't hide.
+      // Face the track; reject slopes the skirt can't hide.
       const yaw = Math.atan2(f.x - x, f.z - z)
       const c = Math.cos(yaw)
       const s = Math.sin(yaw)
@@ -348,14 +256,13 @@ function planLights(index: TrackIndex, groundFn: HeightFunction, sides: Stall[][
   return { poles, lightWires }
 }
 
-/** Local (x, y, z) offset in a frame at (px, py, pz) turned by yaw, pushed to `out`. */
 function pushLocal(out: number[], p: Placement, lx: number, ly: number, lz: number) {
   const c = Math.cos(p.yaw)
   const s = Math.sin(p.yaw)
   out.push(p.x + lx * c + lz * s, p.y + ly, p.z - lx * s + lz * c)
 }
 
-/** Marquee bulbs along the top and bottom edges of a board, on both faces. */
+/** Bulbs along a board's top and bottom edges, on each face in `faceZ`. */
 function marquee(out: number[], p: Placement, width: number, bottom: number, height: number, faceZ: number[], step: number) {
   const n = Math.round(width / step)
   for (const z of faceZ) {
@@ -394,23 +301,15 @@ function planBunting(index: TrackIndex, groundFn: HeightFunction, occupied: Circ
   const flags: Placement[] = []
   const step = table.length / BUNTING_COUNT
   for (let k = 0; k < BUNTING_COUNT; k++) {
+    // Search outwards from the evenly spaced spot: -40, +40, -80, ...
     for (let tries = 0; tries < 20; tries++) {
       const d = step * (k + 0.5) + (tries % 2 ? 1 : -1) * Math.ceil(tries / 2) * 40
       const f = trackFrameAt(table, d)
       if ((f.tx === 0 && f.tz === 0) || f.y > 130) continue
       const ropeY = f.y + BUNTING_RISE
       if (!riderStaysBelow(table, d, BUNTING_APPROACH, ropeY - BUNTING_SAG - FLAG_DROP)) continue
-      const sLocal = table.s[f.index]
-      const elsewhere = (i: number) => Math.abs(table.s[i] - sLocal) > 90
-      const ends = [-1, 1].map((sd) => ({ x: f.x - f.tz * BUNTING_HALF_SPAN * sd, z: f.z + f.tx * BUNTING_HALF_SPAN * sd }))
-      if (ends.some((p) => index.near(p.x, p.z, POLE_TRACK_CLEAR, elsewhere) || hitsAny(occupied, p.x, p.z, 4))) continue
-      let ok = true
-      for (let u = 0; u <= 1 && ok; u += 0.1) {
-        const x = ends[0].x + (ends[1].x - ends[0].x) * u
-        const z = ends[0].z + (ends[1].z - ends[0].z) * u
-        ok = !index.near(x, z, 14, (i) => elsewhere(i) && table.y[i] < ropeY + 25)
-      }
-      if (!ok) continue
+      const ends = spanAcross(index, f, BUNTING_HALF_SPAN, occupied)
+      if (!ends) continue
       const ground = ends.map((p) => groundFn(p.x, p.z) - 1)
       ends.forEach((p, i) => poles.push({ x: p.x, y: ground[i], z: p.z, height: ropeY - ground[i] }))
       const w: Wire = { a: [ends[0].x, ropeY, ends[0].z], b: [ends[1].x, ropeY, ends[1].z], sag: BUNTING_SAG }
@@ -427,7 +326,7 @@ function planBunting(index: TrackIndex, groundFn: HeightFunction, occupied: Circ
   return { poles, wires, flags }
 }
 
-/** Background dressing: tents, a boundary hedge and flag poles, all kept off the track. */
+/** Tents, a boundary hedge and flag poles beyond the midway. */
 function planScatter(index: TrackIndex, groundFn: HeightFunction, occupied: Circle[], rand: () => number) {
   const tents: (Placement & { color: number })[] = []
   const flagPoles: (Placement & { color: number })[] = []
@@ -470,7 +369,7 @@ function planScatter(index: TrackIndex, groundFn: HeightFunction, occupied: Circ
 
 const cache = new WeakMap<ArcTable, ThemeParkLayout>()
 
-/** The layout for a track, planned once and shared by Decorations and Features. */
+/** Planned once per track and shared by Decorations and Features. */
 export function getThemeParkLayout(table: ArcTable, heightFn: HeightFunction, groundFn: HeightFunction): ThemeParkLayout {
   let layout = cache.get(table)
   if (!layout) {
@@ -484,20 +383,12 @@ export function planThemePark(
   table: ArcTable,
   heightFn: HeightFunction,
   groundFn: HeightFunction,
-  seed = 1,
 ): ThemeParkLayout {
-  const rand = mulberry32(seed)
+  const rand = mulberry32(SEED)
   const index = buildTrackIndex(table)
   const occupied: Circle[] = RIDES.map((r) => ({ x: r.x, z: r.z, r: r.radius + 15 }))
 
   const arch = planArch(index, groundFn, occupied)
-  if (arch) {
-    for (const side of [-1, 1]) {
-      const c = Math.cos(arch.yaw) * ARCH_HALF_SPAN * side
-      const s = Math.sin(arch.yaw) * ARCH_HALF_SPAN * side
-      occupied.push({ x: arch.x + c, z: arch.z - s, r: 8 })
-    }
-  }
   const path = planPath(index, heightFn)
   const stallSides = planStalls(index, groundFn, occupied, path, rand)
   const stalls = stallSides.flat()

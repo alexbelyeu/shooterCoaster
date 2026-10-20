@@ -17,7 +17,7 @@ const BOB = 3
 const _m = new THREE.Matrix4()
 const _c = new THREE.Color()
 
-/** Centre pole, cone roof, platform and the horses' brass poles (rotates as one). */
+/** Everything but the horses; rotates as one. */
 function buildBody(radius: number, angles: number[]) {
   const parts = [
     painted(new THREE.CylinderGeometry(1.5, 1.5, 40, 8), '#cccccc', [0, 20, 0]),
@@ -32,7 +32,6 @@ function buildBody(radius: number, angles: number[]) {
   return mergePainted(parts)
 }
 
-/** Simplified horse: body + head, tinted per instance. */
 function buildHorse() {
   return mergePainted([
     painted(new THREE.BoxGeometry(6, 5, 3), '#ffffff'),
@@ -40,10 +39,7 @@ function buildHorse() {
   ])
 }
 
-/**
- * Animated carousel: cone roof + platform + horses bobbing up and down their
- * poles. Two draw calls: the rotating body and the horses (InstancedMesh).
- */
+/** Animated carousel in two draw calls: the body and instanced horses bobbing on their poles. */
 export default function Carousel({
   position = [0, 0, 0],
   radius = 25,
@@ -75,7 +71,7 @@ export default function Carousel({
       if (!mesh) return
       for (let i = 0; i < angles.length; i++) {
         const a = angles[i]
-        // Head (+x) along the direction of travel.
+        // Head (+x) faces the direction of travel.
         _m.makeRotationY(Math.PI / 2 - a).setPosition(
           Math.cos(a) * radius * 0.7,
           HORSE_Y + Math.sin(time * 2 + a) * BOB,
@@ -95,7 +91,6 @@ export default function Carousel({
       for (let i = 0; i < angles.length; i++) mesh.setColorAt(i, _c.set(HORSE_COLORS[i % HORSE_COLORS.length]))
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
       placeHorses(timeRef.current)
-      // Bob is ±BOB around a fixed ring: pad the sphere once instead of recomputing it.
       mesh.computeBoundingSphere()
       if (mesh.boundingSphere) mesh.boundingSphere.radius += BOB
     },

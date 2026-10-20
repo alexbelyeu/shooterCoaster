@@ -1,33 +1,24 @@
 import type { ArcTable } from '@/track/arcLength'
 
 /**
- * Spatial index over the track for placing props next to (or across) it
- * without touching the rails, the support towers or the rider's camera.
- *
- * Every 2nd arc-table sample (~2–5 units apart) is bucketed into a square grid
- * on the XZ plane. Queries are 2D because support towers run from the track
- * straight down to the ground: anything standing within a few units of the
- * track's ground projection can hit a tower, however high the track is there.
+ * XZ grid over the track's arc-table samples, for keeping props off it. Queries
+ * are 2D on purpose: support towers run from the track down to the ground, so
+ * anything near the track's ground projection can hit one however high it is.
  */
 export interface TrackIndex {
-  /** Arc-length table the index was built from. */
   table: ArcTable
-  /**
-   * True if any indexed track sample within `radius` (XZ distance) of (x, z)
-   * passes `filter` (all samples when omitted). `filter` gets the table index.
-   */
+  /** Any sample within `radius` (XZ) of (x, z) that passes `filter` (gets the table index)? */
   near(x: number, z: number, radius: number, filter?: (i: number) => boolean): boolean
 }
 
-/** Point and horizontal heading of the track at an arc distance. */
 export interface TrackFrame {
   x: number
   y: number
   z: number
-  /** Unit horizontal tangent (0, 0 where the track is vertical). */
+  /** Unit horizontal tangent; (0, 0) where the track is vertical. */
   tx: number
   tz: number
-  /** Index of the arc-table sample at or before this distance. */
+  /** Arc-table sample at or before this distance. */
   index: number
 }
 
@@ -71,7 +62,7 @@ export function buildTrackIndex(table: ArcTable): TrackIndex {
   }
 }
 
-/** Track point + horizontal heading at arc distance `dist` (clamped). */
+/** Track point and horizontal heading at arc distance `dist` (clamped). */
 export function trackFrameAt(table: ArcTable, dist: number): TrackFrame {
   const { s, count } = table
   let lo = 0

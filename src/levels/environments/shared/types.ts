@@ -41,7 +41,7 @@ export interface BiomeDecorationsProps {
   heightFn: HeightFunction
   /** Terrain as drawn (`createTerrainSurface`): stand grounded props on this. */
   groundFn: HeightFunction
-  /** Arc-length table of the level's track, for props placed along or across it. */
+  /** Arc-length table of the level's track. */
   track: ArcTable
 }
 
