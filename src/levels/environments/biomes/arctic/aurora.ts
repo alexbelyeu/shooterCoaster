@@ -94,11 +94,12 @@ const noiseGlsl = /* glsl */ `
   }
 
   // fbm with per-octave rotation (no axis-aligned banding)
-  float fbm(vec2 p) {
+  float fbm(vec2 p, int octaves) {
     const mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
     float v = 0.0;
     float a = 0.5;
     for (int i = 0; i < 4; i++) {
+      if (i >= octaves) break;
       v += a * vnoise(p);
       p = rot * p * 2.03 + vec2(17.1, 9.7);
       a *= 0.5;
@@ -107,7 +108,7 @@ const noiseGlsl = /* glsl */ `
   }
 `
 
-// The domain warp only varies along the ribbon, so it runs per vertex; fragments run one fbm.
+// The domain warp only varies along the ribbon, so it runs per vertex; fragments run one short fbm.
 const vertexShader = /* glsl */ `
   uniform float uTime;
   attribute vec2 aRibbon;
@@ -122,8 +123,8 @@ const vertexShader = /* glsl */ `
     float seed = aRibbon.y;
     // w1: where the curtain is bright; w2 (warped by w1): edge height and ray bend
     vec2 q = vec2(s * 0.35 + seed, uTime * 0.04);
-    float w1 = fbm(q + vec2(uTime * 0.02, 0.0));
-    float w2 = fbm(q * 1.7 + vec2(w1 * 1.8, seed - uTime * 0.03));
+    float w1 = fbm(q + vec2(uTime * 0.02, 0.0), 4);
+    float w2 = fbm(q * 1.7 + vec2(w1 * 1.8, seed - uTime * 0.03), 4);
     vWarp = vec2(w1, w2);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
@@ -148,9 +149,6 @@ const fragmentShader = /* glsl */ `
     float w1 = vWarp.x;
     float w2 = vWarp.y;
 
-    float rays = fbm(vec2(s * 4.0 + w2 * 4.0 + t * 0.12, h * 0.8 - t * 0.08 + seed));
-    rays = smoothstep(0.3, 0.75, rays);
-
     // sharp bright edge, soft fade up, faint violet band near the top
     float lower = 0.12 + 0.2 * w2;
     float above = h - lower;
@@ -163,7 +161,12 @@ const fragmentShader = /* glsl */ `
     float patches = smoothstep(0.32, 0.62, w1);
     float ends = smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
 
-    float a = (0.45 + 0.75 * rays) * vertical * (0.25 + 0.75 * patches) * ends * uIntensity;
+    float envelope = vertical * (0.25 + 0.75 * patches) * ends * uIntensity;
+    // most of the ribbon area is empty sky: skip the noise there
+    if (envelope < 0.004) discard;
+
+    float rays = fbm(vec2(s * 4.0 + w2 * 4.0 + t * 0.12, h * 0.8 - t * 0.08 + seed), 3);
+    float a = (0.45 + 0.75 * smoothstep(0.3, 0.75, rays)) * envelope;
 
     vec3 col = mix(uLow, uMid, smoothstep(0.08, 0.4, above));
     col = mix(col, uHigh, smoothstep(0.3, 0.8, above));
