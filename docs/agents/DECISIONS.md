@@ -243,3 +243,56 @@ everywhere in the HUD, countdown and wave banner.
 **Consequences:** Measured over a 78 s level1 run: HUD root rendered once, timer
 ~1×/s, score widget once. New HUD widgets should follow the same pattern
 (slice subscriptions, CSS for continuous motion, no per-frame React state).
+
+## 2026-10-19 — Hit feedback: kill pop delays the explosion by 80 ms (Builder, #14 / PR #60)
+
+**Context:** Every enemy dies in one hit, so "hit flash" and "kill" are the same
+moment. Flashing an enemy that unmounts in the same frame is invisible.
+
+**Decision:** A hit scores immediately (score, combo and collision removal are
+unchanged), then the enemy freezes at 1.2× scale with every mesh swapped to one
+shared white `ENEMY_HIT_FLASH_MAT` for 80 game-ms (and at least one rendered
+frame). Only then does it emit `enemy:killed`, explode and unmount. The material
+swap stores the original on `mesh.userData` and restores it — no per-enemy
+material clones. `enemy:hit` is emitted from the collision path with one reused
+payload object (listeners must not retain it). Camera kick/shake is an additive
+offset applied after the track pose, so it can never drift the ride. Test-only
+`holdFeedback` freezes the muzzle flash and hitmarker for screenshots.
+
+**Consequences:** The explosion, `enemy:killed` (score popups, hitmarker gold)
+and the final-kill slow-mo arrive 80 ms after the hit — a deliberate hit-stop.
+Future multi-HP enemies can reuse the flash helpers in `EnemyBase` for non-lethal
+hits.
+
+## 2026-10-19 — Decisions inbox, folded nightly; light re-review after conflict-only bounces (setup)
+
+**Context:** Almost every PR appended to `DECISIONS.md`, so whenever two PRs were open
+the second to merge conflicted. Each conflict cost a full builder round (full verify)
+plus a full QA review, adding 30–60 min of Opus time per PR.
+
+**Decision:** New decisions are separate files in `docs/agents/decisions/inbox/`; the
+Maintainer is the only writer of `DECISIONS.md` and folds the inbox nightly (archiving
+past years to `decisions/<year>.md` past ~1500 lines). When QA bounces a PR only for a
+merge conflict after a passing full review, the builder just merges `main` and runs
+unit tests + build, and QA does a light re-review of the conflict resolution (full
+verify only if `src/` or `e2e/` conflicted). CI `verify` still gates every merge.
+
+**Consequences:** The main source of conflicts between parallel PRs is gone, and
+conflict round trips take minutes instead of most of an hour. `CLAUDE.md` code-map
+edits can still conflict occasionally; those go through the light path too.
+
+## 2026-10-20 — Tone.js trigger times are kept strictly increasing (Builder, #14 / PR #60)
+
+**Context:** CI smoke (mobile run) failed on PR #60 with an uncaught Tone.js
+`Start time must be strictly greater than previous start time`. When the audio
+clock falls behind (headless CI, a busy phone), Tone clamps late `Sequence`
+callback times up to `currentTime`, so two consecutive notes on one mono synth get
+the same start. Two shots in one JS turn hit the same thing via `Tone.now()`.
+
+**Decision:** Every mono `Synth`/`NoiseSynth` trigger in the SFX and music managers
+goes through `nextTriggerTime(synth, time, ctx.currentTime)` (`src/audio/triggerTime.ts`,
+pure and unit-tested). It returns a time that is never in the past and at least
+1 ms after that synth's previous start. PolySynths allocate voices, so they don't need it.
+
+**Consequences:** A late note plays up to 1 ms late instead of throwing out of the
+Transport tick. New audio code that triggers a mono synth should use the helper.
