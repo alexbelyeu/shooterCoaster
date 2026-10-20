@@ -37,11 +37,21 @@ for anything visual or level-related).
    design choices as a new file in `docs/agents/decisions/inbox/` (never edit
    `DECISIONS.md` itself); add assets to `docs/ASSETS.md`.
 
+6. **Deslop.** Follow `.claude/commands/deslop.md` over every file the branch touches
+   (whole files, not just your lines). Re-run `npm test && npm run build` after cutting.
+
+Run `scripts/pause-check.sh` before `npm run verify` and before shipping. If it prints
+PAUSED: commit and push what you have, open (or keep) the PR as a **draft** with a
+comment saying where you stopped, leave the issue `agent:in-progress`, and end with the
+PAUSED line.
+
 ## Ship
 
 - Commit in logical steps, push the branch, open the PR per PROTOCOL.md
-  (`Closes #<n>`, verification output, risks), label `agent:needs-qa`, and remove
-  `agent:in-progress` from the issue.
+  (`Closes #<n>`, verification output, risks, and a short **How to try it** section for
+  Alex: which level, desktop or phone, what to look for), label `agent:needs-qa`, and
+  remove `agent:in-progress` from the issue. QA then runs a playtest review and two
+  independent code reviews (`.claude/commands/wrap-pr.md`).
 - Returned PR: push fixes to the same branch, reply to each QA comment, swap
   `agent:changes-requested` → `agent:needs-qa`.
 - If you cannot finish: push what you have as a **draft** PR, label the issue
