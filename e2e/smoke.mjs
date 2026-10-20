@@ -387,8 +387,17 @@ async function runMobile(browser, base) {
   const tapKills = s.kills - before.kills
   let fallbackKills = 0
   if (tapKills === 0) {
+    const killEventsBefore = await page.evaluate(() => window.__SC_TEST__.combat.kills)
     fallbackKills = await page.evaluate(() => window.__SC_TEST__.killNearest(3))
-    await waitFrames(page, 1, { maxMs: 5000, pollMs: 30 })
+    // enemy:killed (explosion, HUD enemy count) follows the ~80 ms kill pop, and
+    // the pop freezes once game time is frozen below — let it finish first.
+    const popDeadline = Date.now() + 20000
+    let killEvents = killEventsBefore
+    do {
+      await waitFrames(page, 1, { maxMs: 5000, pollMs: 30 })
+      killEvents = await page.evaluate(() => window.__SC_TEST__.combat.kills)
+    } while (Date.now() < popDeadline && killEvents - killEventsBefore < fallbackKills)
+    if (fallbackKills > 0 && killEvents === killEventsBefore) problems.push('killNearest hits did not produce an enemy:killed event')
   }
   // The level timer runs on wall-clock time, so on a slow runner the level can
   // time out (HUD unmounts) before the layout + pause checks. Freeze game time
