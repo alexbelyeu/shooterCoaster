@@ -153,6 +153,23 @@ towers and rails that look equally thick on every level, within +10 draw calls a
 count, `sceneStats()` in the e2e hook). Tower density on Arctic/Volcanic is limited by
 the triangle budget; denser support there needs LOD or per-chunk culling (follow-up).
 
+## 2026-10-19 — Live studio status as a self-updating GitHub issue (setup)
+
+**Context:** Alex can't tell whether the studio is working or stuck. Work only moves
+when a scheduled run fires, and the evidence is scattered across issues, PRs, CI and
+scheduled-task sessions.
+
+**Decision:** One pinned issue labelled `studio-status`, whose body a GitHub workflow
+(`studio-status.yml` → `scripts/studio-status.cjs`) regenerates on every issue/PR/label
+event and every 15 minutes. It shows: what's being built (claim time, last push, quiet
+or stale flags), what's waiting for QA with CI state, approved/sent back/blocked work,
+what shipped in 48h, the production smoke result, and when each role runs next.
+
+**Why this shape:** it costs no agent runs, needs no new service or secret, and works
+in the GitHub mobile app. A claude.ai page can't read GitHub (its CSP blocks
+api.github.com). The schedule is a constant in the script, since the scheduled tasks
+live outside the repo; keep it in sync when schedules change.
+
 ## 2026-10-19 — Touch input: Pointer Events only, finger is the aim point (Builder, #16)
 
 **Context:** Input was `mousemove`/`mousedown` on `window`, so phones could not play.
