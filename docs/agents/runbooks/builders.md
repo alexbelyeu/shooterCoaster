@@ -6,8 +6,8 @@ Fix (on label) task within minutes, so you only pick those up if they've waited.
 
 1. Read `builder_parallelism` (N) from STEERING.md (default 2, max 4).
 2. Pick up to N assignments, in this order:
-   a. Open, non-draft PRs labelled `agent:changes-requested` with no
-      `Builder run … is on it` comment from the last 2 hours (oldest first).
+   a. Open, non-draft PRs labelled `agent:changes-requested` with no *live*
+      `Builder run … is on it` claim (runbooks README, "Live claims"), oldest first.
    b. Open issues labelled `agent:ready` (never `agent:in-progress`), excluding
       `epic` and `pause`, ordered P1 > P2 > P3; within the same priority, issues
       labelled `steering` (Alex's own requests) first; then oldest first.

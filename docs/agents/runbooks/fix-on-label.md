@@ -9,11 +9,12 @@ pressed Run now), reply "No PR event — nothing to do" and stop.
    `agent/`, and it is labelled `agent:changes-requested`. Otherwise reply "Nothing to
    fix" and stop.
 2. If it has been sent back 3 or more times, leave it for the Director: reply so and stop.
-3. If a `Builder run … is on it` comment was posted on it in the last 2 hours, reply
-   "Already being fixed" and stop. Otherwise comment `Builder run <ISO timestamp> is on
-   it`, wait about 20 seconds and re-read the comments. If another run's `… is on it`
-   comment from the last 2 hours is earlier than yours, comment `Backing off — already
-   claimed by another run` and stop.
+3. If the PR has a *live* `Builder run … is on it` claim (see "Live claims" in the
+   runbooks README: under 2 hours old, posted after the latest QA change request, with
+   no builder reply after it), reply "Already being fixed" and stop. Otherwise comment
+   `Builder run <ISO timestamp> is on it`, wait about 20 seconds and re-read the
+   comments. If another live `… is on it` claim is earlier than yours, comment
+   `Backing off — already claimed by another run` and stop.
 4. Spawn exactly one builder with the Agent tool (`subagent_type: "general-purpose"`,
    `model: "opus"`, `isolation: "worktree"`, `run_in_background: false`), prompt: "You
    are a Builder for ShooterCoaster. Your working directory is a git worktree of
