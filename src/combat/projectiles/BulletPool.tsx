@@ -46,7 +46,6 @@ export default function BulletPool({
   const tempMatrix = useMemo(() => new THREE.Matrix4(), [])
   const tempColor = useMemo(() => new THREE.Color(bulletColor), [bulletColor])
   const scaleVec = useRef(new THREE.Vector3()).current
-  const zeroVec = useRef(new THREE.Vector3(0, 0, 0)).current
 
   const fire = useCallback(
     (origin: THREE.Vector3, direction: THREE.Vector3, hitScale = 1): boolean => {
@@ -82,6 +81,11 @@ export default function BulletPool({
   const getLiveBullets = useCallback(() => liveBulletBuffer.current, [])
   const getLiveBulletCount = useCallback(() => liveBulletCount.current, [])
 
+  // Nothing to draw until the first bullet is fired.
+  useEffect(() => {
+    if (meshRef.current) meshRef.current.count = 0
+  }, [])
+
   useEffect(() => {
     setBulletPool({ fire, getLiveBullets, getLiveBulletCount })
     return () => setBulletPool(null)
@@ -91,43 +95,36 @@ export default function BulletPool({
     if (!meshRef.current || phase !== 'playing') return
 
     const now = performance.now()
+    const mesh = meshRef.current
+    const scale = bulletSize * 0.1
+    scaleVec.set(scale, scale, scale)
+    // Live bullets are packed into the first `drawn` instances and only those are
+    // drawn: the idle pool used to cost 350 zero-scaled spheres (~39k triangles).
+    let drawn = 0
 
     for (let i = 0; i < POOL_SIZE; i++) {
       const bullet = bullets[i]
+      if (!bullet.alive) continue
 
-      if (bullet.alive) {
-        if (now - bullet.bornAt > BULLET_LIFETIME_MS) {
-          bullet.alive = false
-          bullet.position.set(0, -9999, 0)
-        } else {
-          // Time-based (not per-frame) travel; the hit test below sweeps prev → position.
-          bullet.prev.copy(bullet.position)
-          stepBullet(bullet.position, bullet.direction, bullet.speed, delta)
-        }
+      if (now - bullet.bornAt > BULLET_LIFETIME_MS) {
+        bullet.alive = false
+        bullet.position.set(0, -9999, 0)
+        continue
       }
+      // Time-based (not per-frame) travel; the hit test below sweeps prev → position.
+      bullet.prev.copy(bullet.position)
+      stepBullet(bullet.position, bullet.direction, bullet.speed, delta)
 
-      if (bullet.alive) {
-        const scale = bulletSize * 0.1
-        tempMatrix.makeTranslation(bullet.position.x, bullet.position.y, bullet.position.z)
-        scaleVec.set(scale, scale, scale)
-        tempMatrix.scale(scaleVec)
-      } else {
-        tempMatrix.makeTranslation(0, -9999, 0)
-        tempMatrix.scale(zeroVec)
-      }
-
-      meshRef.current.setMatrixAt(i, tempMatrix)
+      tempMatrix.makeTranslation(bullet.position.x, bullet.position.y, bullet.position.z)
+      tempMatrix.scale(scaleVec)
+      mesh.setMatrixAt(drawn, tempMatrix)
+      // Live bullet buffer, filled in place — no allocation
+      liveBulletBuffer.current[drawn++] = bullet
     }
 
-    meshRef.current.instanceMatrix.needsUpdate = true
-
-    // Populate live bullet buffer in-place — no allocation
-    let count = 0
-    for (let i = 0; i < POOL_SIZE; i++) {
-      if (bullets[i].alive) {
-        liveBulletBuffer.current[count++] = bullets[i]
-      }
-    }
+    mesh.count = drawn
+    mesh.instanceMatrix.needsUpdate = true
+    const count = drawn
     liveBulletCount.current = count
 
     // Centralized collision pass — flag hits first, process after

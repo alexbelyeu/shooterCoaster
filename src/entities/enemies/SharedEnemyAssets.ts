@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { withRim } from './enemyRim'
 
 // Readability rules (issue #15): every lit enemy material gets a fresnel rim via
@@ -9,6 +10,14 @@ import { withRim } from './enemyRim'
 export const BALLOON_BODY_GEO = new THREE.SphereGeometry(30, 16, 16)
 export const BALLOON_KNOT_GEO = new THREE.SphereGeometry(4, 8, 8)
 export const BALLOON_STRING_GEO = new THREE.CylinderGeometry(0.5, 0.5, 55, 4)
+/**
+ * Regular balloons: teardrop body (1.3x tall, baked) + knot in one geometry, so
+ * a balloon is 2 draw calls instead of 3 — Theme Park has ~150 of them.
+ */
+export const BALLOON_GEO = mergeGeometries([
+  new THREE.SphereGeometry(30, 16, 12).scale(1, 1.3, 1),
+  new THREE.SphereGeometry(4, 6, 4).translate(0, -35, 0),
+])
 
 // ── Balloon materials (10 color variants) ───────────────────────────
 const BALLOON_COLORS = [
@@ -18,10 +27,6 @@ const BALLOON_COLORS = [
 
 export const BALLOON_BODY_MATS = BALLOON_COLORS.map(
   (c) => withRim(new THREE.MeshPhongMaterial({ color: c, specular: '#ffffff', shininess: 60 })),
-)
-
-export const BALLOON_KNOT_MATS = BALLOON_COLORS.map(
-  (c) => withRim(new THREE.MeshPhongMaterial({ color: c })),
 )
 
 export const BALLOON_STRING_MAT = new THREE.MeshBasicMaterial({ color: '#888888' })
