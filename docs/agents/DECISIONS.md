@@ -85,6 +85,42 @@ tier, or none) via STEERING.md.
 (system font fallbacks). Self-hosting the fonts (OFL-licensed, record in ASSETS.md)
 is a backlog item if load time or privacy becomes a concern.
 
+## 2026-10-19 — No self-approval, ever (setup session)
+
+**Context:** In the first end-to-end test the Reporter tried to self-approve its
+docs-only report PR (which PROTOCOL then allowed) and the platform's safety check
+blocked it, as it had blocked agent merges. **Decision:** remove all self-approval:
+every PR, including docs-only and reverts, is approved by a separate QA run. Reverts
+and prod fixes are reviewed first. The Reporter no longer waits for its PR to merge.
+**Consequences:** the Director's plan, reports and reverts land a few hours later
+(next QA run) instead of immediately; QA is the single approval path.
+
+## 2026-10-19 — Weekly email via GitHub notifications, not Gmail (setup session)
+
+**Context:** Scheduled sessions calling the Gmail connector's send tool get
+`Forbidden`. **Decision:** the Reporter writes the email as the body of the weekly
+`report` issue; `.github/workflows/report-notify.yml` reposts it as a
+github-actions[bot] comment, which GitHub emails to Alex. QA also no longer needs to
+push rebases: GitHub merges approved PRs that are behind `main` if they don't conflict.
+**Consequences:** the email arrives from notifications@github.com; no agent touches
+Alex's mailbox.
+
+## 2026-10-19 — Atmosphere implementation details (Builder, #12)
+
+**Context:** Implementing per-biome sky domes (see "Procedural sky domes replace drei `Sky`").
+
+**Decision:** Config lives in `src/levels/environments/atmosphere.ts` (`ATMOSPHERES`),
+consumed by `BiomeEnvironment` (lights, fog) and `SkyDome` (shader uniforms). The dome
+is a 32×16 sphere of radius 0.9 × camera far, follows the camera, `renderOrder -1000`
+with depth test/write off, so it costs exactly the one draw the drei `Sky` used.
+Exposure is applied through `gl.toneMappingExposure`, which the postprocessing ACES
+`ToneMapping` effect reads; it is restored on unmount so the title scene is unaffected.
+The smoke test's screenshot timeout was raised to 120 s (`--shot-timeout`) because
+SwiftShader on the 2-core cloud box takes ~40 s per screenshot frame even on `main`.
+
+**Consequences:** New biomes must add an `ATMOSPHERES` entry. Level configs can no
+longer override fog colour (the unused `environment.fog` field was removed).
+
 ## 2026-10-19 — Coaster structure scales with sqrt(scalar); towers sit on the drawn terrain (Builder, #13)
 
 **Context:** Rails were fixed-size while track curves scale with `track.scalar`
@@ -116,6 +152,28 @@ towers and rails that look equally thick on every level, within +10 draw calls a
 **Consequences:** +8 draw calls and ~+45–52k triangles per level (camera-independent
 count, `sceneStats()` in the e2e hook). Tower density on Arctic/Volcanic is limited by
 the triangle budget; denser support there needs LOD or per-chunk culling (follow-up).
+
+## 2026-10-19 — Touch input: Pointer Events only, finger is the aim point (Builder, #16)
+
+**Context:** Input was `mousemove`/`mousedown` on `window`, so phones could not play.
+Listening to touch *and* mouse events double-fires (browsers synthesize mouse events
+after a tap).
+
+**Decision:** `src/input/pointerInput.ts` is the one input source: window-level
+Pointer Events, one active pointer at a time (secondary fingers ignored while one is
+held), presses on interactive UI (`button, a, input, label, [role=button],
+[data-no-fire]`) never fire. Both `useShooting` and `Crosshair` subscribe to it. On
+touch, shots go to the **finger** (a tap fires where you tap); the reticle is drawn
+1.25x size, 40 px above the finger with a dashed tether down to a small ring at the
+real aim point, so it is never hidden. During play `html.is-playing` sets
+`touch-action: none` (plus iOS `gesturestart` blocking) so nothing scrolls or zooms.
+A HUD pause button replaces Escape on touch. `.play-button` styles are now global
+(they were scoped to the title screen, leaving level-select/pause/results buttons as
+unstyled browser defaults under 44 px).
+
+**Consequences:** `npm run smoke` runs the `--mobile` touch playtest too (~90 s
+extra), so CI guards touch input and the phone HUD layout. Gyro/gamepad would plug
+into the same module later.
 
 ## 2026-10-19 — HUD render policy and UI palette (Builder, #18)
 

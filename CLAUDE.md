@@ -19,7 +19,7 @@ npm run dev               # dev server (vite)
 npm test                  # vitest unit tests for pure modules (~1s; `npm run test:watch` to iterate)
 npm run build             # typecheck (tsc -b) + production build -> dist/
 npm run check:bundle      # bundle-size budget (budgets.json)
-npm run smoke             # headless playtest of title + every level (needs a build)
+npm run smoke             # headless playtest: title + every level + phone touch run (needs a build)
 npm run verify            # test + build + bundle budget + smoke — run before every PR
 ```
 
@@ -36,8 +36,12 @@ The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, kills, score, combat stats, errors) to `e2e-results/`:
 `title.png`, and per level `<id>.png` (after a 10 s ride), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`) and `<id>-results.png`. A level fails if
-it gets no kills, autofire never fires at on-screen enemies, or the results screen
-never appears. **Look at the screenshots** with the Read tool — that is how you
+it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
+enemies, or the results screen never appears. `npm run smoke` also passes `--mobile`:
+an iPhone 13-like touch context (390x844) taps PLAY, a level, and the canvas 10x,
+checks the HUD is inside the viewport with no overlap in portrait and 844x390
+landscape, and taps Pause (`mobile-level-select.png`, `mobile-level1.png`,
+`mobile-level1-landscape.png`; `--skip-desktop` runs only that). **Look at the screenshots** with the Read tool — that is how you
 playtest visually. Waits are polled against the frame counter because software
 rendering can run at ~1 fps; tune with `--seconds`, `--combat-seconds`,
 `--min-frames`, `--levels level1,level3`, `--shot-timeout <ms>` (default 120 s).
@@ -49,7 +53,7 @@ named `track*`).
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 (`levels()`, `startLevel(id)`, `frames`, `drawCalls`, `triangles`, `avgFrameMs`,
 `errors`, `phase()`, `stats()` → score/kills/combo/timeRemaining/phase/liveEnemies/
-onScreenEnemies/shotsFired, `autoFire(on)`, `killNearest(n)`, `endLevel()`,
+onScreenEnemies/shotsFired, `autoFire(on)`, `killNearest(n)`, `enemyScreenPoints(n)`, `endLevel()`,
 `setTimeScale(s)`, `sceneStats()`). See `src/testing/e2eHook.tsx`. Extend it when you need new test
 surfaces. Note: bullets move a fixed distance per *frame*, so at ~1 fps headless
 autofire rarely lands hits on distant enemies — `killNearest` is what guarantees kills.
@@ -71,9 +75,10 @@ replays — currently in-memory placeholders).
 | `src/canvas/` | `GameCanvas` (R3F Canvas), `SceneManager` (picks title vs level scene), shooting, timer, music |
 | `src/levels/LevelRegistry.ts` | **Level configs** — track params, biome, timer, waves, star thresholds |
 | `src/levels/scoring.ts` | `SCORE_VALUES` per enemy, `computeMaxScore`, `computeStars` (pure, unit-tested) |
-| `src/levels/environments/` | Biome environments, landmarks (FerrisWheel, Pyramid, Volcano…), decorations, terrain |
+| `src/levels/environments/` | Biome environments, landmarks (FerrisWheel, Pyramid, Volcano…), decorations, terrain; per-biome sky/light/fog/exposure in `atmosphere.ts` + `SkyDome.tsx` |
 | `src/track/` | Procedural track curves, track mesh (rails + ties), lattice support towers, `trackDimensions` (structure scale per level), coaster camera, progress |
 | `src/entities/enemies/` | Enemy models/behaviours; `entities/spawning/EnemySpawner` waves |
+| `src/input/` | `pointerInput` — the single Pointer Events source (mouse/touch/pen) for aim + fire |
 | `src/combat/` | Aim, collisions, projectiles, weapons, crosshair |
 | `src/effects/` | Explosions (pooled), score popups |
 | `src/audio/` | Tone.js engine, music + SFX managers |

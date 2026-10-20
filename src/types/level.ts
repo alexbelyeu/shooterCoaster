@@ -44,7 +44,6 @@ export interface LevelConfig {
   environment: {
     groundColor: number
     skybox: string
-    fog?: { color: number; near: number; far: number }
     hasWater?: boolean
     hasTrees?: boolean
     treeCount?: number

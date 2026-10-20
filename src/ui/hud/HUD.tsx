@@ -61,6 +61,18 @@ export default function HUD() {
         <TimerBar totalSeconds={config.timerSeconds} />
       </div>
       <ComboMeter />
+      {/* Touch has no Escape key: an always-available pause button. */}
+      <button
+        className="hud-pause-button"
+        onClick={() => useGameStore.getState().setPhase('paused')}
+        aria-label="Pause"
+        title="Pause (Esc)"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <rect x="6" y="4" width="4" height="16" rx="1" />
+          <rect x="14" y="4" width="4" height="16" rx="1" />
+        </svg>
+      </button>
       {/* Crosshair rendered globally in App.tsx */}
     </div>
   )

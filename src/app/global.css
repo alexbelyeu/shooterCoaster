@@ -14,6 +14,18 @@ html, body, #root {
   font-family: 'Inter', sans-serif;
   color: #fff;
   cursor: default;
+  /* Touch: no double-tap zoom, no grey tap flash, no long-press callout / selection */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+/* During play nothing may scroll, pan or pinch-zoom: every touch is aim + fire. */
+.is-playing, .is-playing body, .is-playing #root, .is-playing canvas {
+  touch-action: none;
 }
 
 /* Hide OS cursor when custom crosshair is visible */
@@ -23,6 +35,7 @@ html, body, #root {
 
 canvas {
   display: block;
+  touch-action: none;
 }
 
 /* HUD overlay base */
@@ -70,8 +83,10 @@ canvas {
   margin-bottom: 2rem;
 }
 
-.title-screen .play-button {
-  padding: 1rem 3rem;
+.play-button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 1rem clamp(1.5rem, 6vw, 3rem);
   font-size: 1.2rem;
   font-weight: 700;
   color: #000;
@@ -84,14 +99,20 @@ canvas {
   letter-spacing: 2px;
 }
 
-.title-screen .play-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 30px rgba(255, 200, 0, 0.6);
+@media (hover: hover) {
+  .play-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(255, 200, 0, 0.6);
+  }
+}
+
+.play-button:active {
+  transform: scale(0.96);
 }
 
 .title-screen .credits {
   position: absolute;
-  bottom: 2rem;
+  bottom: calc(2rem + env(safe-area-inset-bottom));
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.5);
 }
@@ -104,14 +125,14 @@ canvas {
 /* Settings button — bottom-left, glass-morphism */
 .settings-button {
   position: fixed;
-  bottom: 1rem;
-  left: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  left: calc(1rem + env(safe-area-inset-left));
   z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   font-size: 1.4rem;
   background: rgba(0, 0, 0, 0.5);
@@ -125,7 +146,14 @@ canvas {
   -webkit-backdrop-filter: blur(8px);
 }
 
-.settings-button:hover {
+@media (hover: hover) {
+  .settings-button:hover {
+    background: rgba(0, 0, 0, 0.7);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+.settings-button:active {
   background: rgba(0, 0, 0, 0.7);
   border-color: rgba(255, 255, 255, 0.5);
 }
@@ -401,6 +429,33 @@ canvas {
   .hud-combo-mult { animation: none; }
 }
 
+/* Pause: needed on touch (no Escape key); bottom-left like the title's settings gear */
+.hud-pause-button {
+  position: fixed;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  left: calc(1rem + env(safe-area-inset-left));
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.hud-pause-button:active {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+
 /* Crosshair — SVG reticle, follows mouse via JS transform (no left/top reflow) */
 .crosshair-svg {
   position: fixed;
@@ -421,26 +476,35 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   z-index: 100;
   background: rgba(0, 0, 0, 0.85);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding:
+    calc(1.5rem + env(safe-area-inset-top))
+    calc(1rem + env(safe-area-inset-right))
+    calc(1.5rem + env(safe-area-inset-bottom))
+    calc(1rem + env(safe-area-inset-left));
 }
 
 .level-select h2 {
   font-family: 'Lobster', cursive;
-  font-size: 2.5rem;
-  margin-bottom: 2rem;
+  font-size: clamp(2rem, 8vw, 2.5rem);
+  margin-bottom: clamp(1rem, 4vh, 2rem);
 }
 
 .level-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.5rem;
-  max-width: 600px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: clamp(0.75rem, 3vw, 1.5rem);
+  width: min(600px, 100%);
 }
 
 .level-card {
-  padding: 1.5rem;
+  min-height: 44px;
+  padding: clamp(1rem, 4vw, 1.5rem);
   background: rgba(255, 255, 255, 0.1);
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
@@ -448,10 +512,18 @@ canvas {
   transition: all 0.2s;
 }
 
-.level-card:hover {
+@media (hover: hover) {
+  .level-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: #ffd700;
+    transform: translateY(-2px);
+  }
+}
+
+.level-card:active,
+.level-card:focus-visible {
   background: rgba(255, 255, 255, 0.15);
   border-color: #ffd700;
-  transform: translateY(-2px);
 }
 
 .level-card.locked {
@@ -483,8 +555,17 @@ canvas {
 
 .results-screen h2 {
   font-family: 'Lobster', cursive;
-  font-size: 3rem;
+  font-size: clamp(2rem, 9vw, 3rem);
   margin-bottom: 1rem;
+  text-align: center;
+}
+
+.results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2rem;
 }
 
 /* Pause overlay */
@@ -494,26 +575,71 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   z-index: 100;
   background: rgba(0, 0, 0, 0.7);
+  overflow-y: auto;
+  touch-action: pan-y;
+  padding:
+    calc(1rem + env(safe-area-inset-top))
+    calc(1rem + env(safe-area-inset-right))
+    calc(1rem + env(safe-area-inset-bottom))
+    calc(1rem + env(safe-area-inset-left));
+}
+
+.results-screen {
+  padding:
+    calc(1rem + env(safe-area-inset-top))
+    calc(1rem + env(safe-area-inset-right))
+    calc(1rem + env(safe-area-inset-bottom))
+    calc(1rem + env(safe-area-inset-left));
 }
 
 .pause-screen h2 {
   font-family: 'Lobster', cursive;
-  font-size: 3rem;
-  margin-bottom: 2rem;
+  font-size: clamp(2rem, 9vw, 3rem);
+  margin-bottom: clamp(1rem, 4vh, 2rem);
+}
+
+/* Settings rows: full-width label rows with 44 px touch targets */
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: min(300px, 100%);
+}
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  min-height: 44px;
+}
+
+.settings-row input[type='range'] {
+  width: 150px;
+  min-height: 44px;
+  touch-action: pan-x;
+}
+
+.settings-row input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
 }
 
 /* Mute button — always visible, bottom-right */
 .mute-button {
   position: fixed;
-  bottom: 1rem;
-  right: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  right: calc(1rem + env(safe-area-inset-right));
   z-index: 200;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 6px 10px;
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.25);
@@ -524,9 +650,23 @@ canvas {
   pointer-events: auto;
 }
 
-.mute-button:hover {
+@media (hover: hover) {
+  .mute-button:hover {
+    background: rgba(0, 0, 0, 0.7);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+.mute-button:active {
   background: rgba(0, 0, 0, 0.7);
   border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* No keyboard hint on touch-only devices */
+@media (hover: none) and (pointer: coarse) {
+  .mute-key-hint {
+    display: none;
+  }
 }
 
 .mute-key-hint {

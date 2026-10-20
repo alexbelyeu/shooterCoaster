@@ -1,33 +1,48 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
+import { useRef, useEffect, useState } from 'react'
+import { getPointerState, subscribePointer, type PointerKind } from '@/input/pointerInput'
+
+/** On touch the reticle sits this far above the finger so it isn't hidden by it. */
+const TOUCH_OFFSET_PX = 40
+const TOUCH_SCALE = 1.25
+/** Finger position in the SVG's local (unscaled) coordinates. */
+const TOUCH_FINGER_Y = 24 + TOUCH_OFFSET_PX / TOUCH_SCALE
+
+function placeReticle(el: SVGSVGElement, x: number, y: number, kind: PointerKind) {
+  el.style.transform =
+    kind === 'touch'
+      ? `translate(${x - 24}px, ${y - 24 - TOUCH_OFFSET_PX}px) scale(${TOUCH_SCALE})`
+      : `translate(${x - 24}px, ${y - 24}px)`
+}
 
 /**
- * SVG shooter reticle that follows the mouse with fire-feedback animation.
+ * SVG shooter reticle that follows the active pointer with fire-feedback animation.
  * Outer ring + 4 tick marks + glowing center dot.
- * On mousedown the ticks contract inward and the dot flashes.
+ * While the trigger is held the ticks contract inward and the dot flashes.
+ * On touch the reticle is larger and floats above the finger, with a short
+ * tether down to the true aim point (the finger), so it stays visible.
  */
 export default function Crosshair() {
   const ref = useRef<SVGSVGElement>(null)
-  const [firing, setFiring] = useState(false)
+  const [firing, setFiring] = useState(() => getPointerState().down)
+  const [kind, setKind] = useState<PointerKind>(() => getPointerState().kind)
 
-  const onDown = useCallback(() => setFiring(true), [])
-  const onUp = useCallback(() => setFiring(false), [])
-
-  // Follow the mouse cursor (use transform to avoid layout reflow)
+  // Follow the active pointer (transform only, no layout reflow).
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (ref.current) {
-        ref.current.style.transform = `translate(${e.clientX - 24}px, ${e.clientY - 24}px)`
-      }
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mousedown', onDown)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mousedown', onDown)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [onDown, onUp])
+    return subscribePointer((p, type) => {
+      if (ref.current) placeReticle(ref.current, p.x, p.y, p.kind)
+      setKind(p.kind)
+      if (type === 'down') setFiring(true)
+      else if (type === 'up') setFiring(false)
+    })
+  }, [])
+
+  // Place on mount (keeps the aim across screens) and when the pointer kind
+  // changes (touch adds the offset + scale).
+  useEffect(() => {
+    if (!ref.current) return
+    const p = getPointerState()
+    placeReticle(ref.current, p.x, p.y, kind)
+  }, [kind])
 
   const tickOut = firing ? 9 : 13
   const tickIn = firing ? 5 : 7
@@ -42,8 +57,19 @@ export default function Crosshair() {
       width="48"
       height="48"
       viewBox="0 0 48 48"
-      style={{ opacity }}
+      style={{ opacity, overflow: 'visible' }}
     >
+      {/* Touch: tether from the reticle down to the finger (the real aim point) */}
+      {kind === 'touch' && (
+        <g opacity={firing ? 0.9 : 0.55}>
+          <line
+            x1="24" y1={24 + ringR + 2} x2="24" y2={TOUCH_FINGER_Y - 7}
+            stroke="white" strokeWidth="1.2" strokeDasharray="2 2" strokeLinecap="round"
+          />
+          <circle cx="24" cy={TOUCH_FINGER_Y} r="6" fill="none" stroke="rgba(255, 100, 100, 0.8)" strokeWidth="1.2" />
+        </g>
+      )}
+
       {/* Outer ring */}
       <circle
         cx="24" cy="24" r={ringR}
