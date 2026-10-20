@@ -62,6 +62,22 @@ export default function App() {
     return () => el.classList.remove('playing-cursor')
   }, [showCrosshair])
 
+  // During play: no page scroll / pinch-zoom / text-selection gestures (touch).
+  useEffect(() => {
+    if (phase !== 'playing') return
+    const el = document.documentElement
+    el.classList.add('is-playing')
+    // iOS Safari ignores touch-action for pinch on some versions; block its gesture events.
+    const block = (e: Event) => e.preventDefault()
+    document.addEventListener('gesturestart', block)
+    document.addEventListener('gesturechange', block)
+    return () => {
+      el.classList.remove('is-playing')
+      document.removeEventListener('gesturestart', block)
+      document.removeEventListener('gesturechange', block)
+    }
+  }, [phase])
+
   return (
     <>
       <GameCanvas />

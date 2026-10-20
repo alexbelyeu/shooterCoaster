@@ -32,7 +32,14 @@ export default function LevelSelectScreen() {
             <div
               key={level.id}
               className={`level-card ${unlocked ? '' : 'locked'}`}
+              data-level={level.id}
+              role="button"
+              tabIndex={unlocked ? 0 : -1}
+              aria-disabled={!unlocked}
               onClick={() => startLevel(level.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') startLevel(level.id)
+              }}
             >
               <h3>
                 {unlocked ? '' : '🔒 '}

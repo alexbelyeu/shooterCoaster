@@ -16,7 +16,8 @@ for anything visual or level-related).
 ## Do the work
 
 1. `npm ci`. Create or check out branch `agent/<issue>-<slug>` from latest `origin/main`
-   (for a returned PR: check out its branch, rebase onto `origin/main`, then address
+   (for a returned PR: check out its branch, merge `origin/main` into it — never rebase a
+   pushed branch — then address
    every QA comment).
 2. Plan briefly, then implement. Stay inside the issue's scope; note follow-ups instead
    of expanding scope.
