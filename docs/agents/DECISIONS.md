@@ -85,6 +85,54 @@ tier, or none) via STEERING.md.
 (system font fallbacks). Self-hosting the fonts (OFL-licensed, record in ASSETS.md)
 is a backlog item if load time or privacy becomes a concern.
 
+## 2026-10-19 — Atmosphere implementation details (Builder, #12)
+
+**Context:** Implementing per-biome sky domes (see "Procedural sky domes replace drei `Sky`").
+
+**Decision:** Config lives in `src/levels/environments/atmosphere.ts` (`ATMOSPHERES`),
+consumed by `BiomeEnvironment` (lights, fog) and `SkyDome` (shader uniforms). The dome
+is a 32×16 sphere of radius 0.9 × camera far, follows the camera, `renderOrder -1000`
+with depth test/write off, so it costs exactly the one draw the drei `Sky` used.
+Exposure is applied through `gl.toneMappingExposure`, which the postprocessing ACES
+`ToneMapping` effect reads; it is restored on unmount so the title scene is unaffected.
+The smoke test's screenshot timeout was raised to 120 s (`--shot-timeout`) because
+SwiftShader on the 2-core cloud box takes ~40 s per screenshot frame even on `main`.
+
+**Consequences:** New biomes must add an `ATMOSPHERES` entry. Level configs can no
+longer override fog colour (the unused `environment.fog` field was removed).
+
+## 2026-10-19 — Coaster structure scales with sqrt(scalar); towers sit on the drawn terrain (Builder, #13)
+
+**Context:** Rails were fixed-size while track curves scale with `track.scalar`
+(20–60), and supports were Y-scaled hexagonal cylinders. Issue #13 asks for lattice
+towers and rails that look equally thick on every level, within +10 draw calls and
++60k triangles per level.
+
+**Decision:**
+- `src/track/trackDimensions.ts` derives `trackScale = clamp(sqrt(scalar / 20), 1, 2.5)`
+  and scales rails, ties, towers **and the rider eye height** (`CoasterCamera`
+  `heightOffset` = 6 × trackScale) by it. Scaling the eye with the steel keeps the
+  near view identical on all levels; sqrt (not linear) keeps the steel from dwarfing
+  fixed-size enemies on big tracks. `TrackParams` gains optional `railRadius` /
+  `tieSpacing` (defaults 0.35 / 10, multiplied by trackScale).
+- Towers are spaced by arc length at 50 × trackScale, but the spacing is widened until
+  all towers fit `TOWER_TRI_BUDGET` (34k triangles). Long, high tracks (Arctic 37k,
+  Volcanic 62k units long, up to ~1200 high) therefore get sparse, very large towers
+  (~700–800 units apart); Theme Park / Ocean get one every ~200–240 units. Ties are
+  capped at 1600 per track for the same reason.
+- One `InstancedMesh` per height bucket (8 quantile buckets). A bucket's geometry is
+  the top H units of the same infinite tower, so shorter towers are sunk into the
+  ground instead of Y-scaled (level-design rule 2).
+- Footings follow the terrain **as drawn** (`createTerrainSurface` in
+  `utils/terrainNoise.ts`), not raw `heightFn`. The 128-segment terrain mesh is linear
+  between vertices 47–94 units apart and differs from `heightFn` by up to ~55 units on
+  Arctic ridges; footings placed on `heightFn` visibly float. Pads and legs extend
+  below `min(drawn, heightFn)` so they are grounded under either surface.
+
+**Consequences:** +8 draw calls and ~+45–52k triangles per level (camera-independent
+count, `sceneStats()` in the e2e hook). Tower density on Arctic/Volcanic is limited by
+the triangle budget; denser support there needs LOD or per-chunk culling (follow-up).
+
 ## 2026-10-19 — Hit feedback: kill pop delays the explosion by 80 ms (Builder, #14)
 
 **Context:** Every enemy dies in one hit, so "hit flash" and "kill" are the same

@@ -47,7 +47,7 @@ export default function BulletPool({
   const zeroVec = useRef(new THREE.Vector3(0, 0, 0)).current
 
   const fire = useCallback(
-    (origin: THREE.Vector3, direction: THREE.Vector3) => {
+    (origin: THREE.Vector3, direction: THREE.Vector3): boolean => {
       const now = performance.now()
       if (now - lastFireTime.current < FIRE_DELAY_MS) return false
 
