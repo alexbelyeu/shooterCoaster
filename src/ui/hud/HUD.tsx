@@ -13,7 +13,7 @@ const ComboDisplay = memo(function ComboDisplay() {
     >
       {combo.count}x Combo!
       <br />
-      <span style={{ fontSize: '1rem' }}>{combo.multiplier.toFixed(1)}x</span>
+      <span className="hud-combo-mult">{combo.multiplier.toFixed(1)}x</span>
     </div>
   )
 })
@@ -52,7 +52,7 @@ export default function HUD() {
   return (
     <>
       <div className="hud">
-        <div>
+        <div className="hud-left">
           <div className="hud-score">
             Score: {Math.round(score)} / {config.maxScore}
           </div>
@@ -63,6 +63,18 @@ export default function HUD() {
         </div>
       </div>
       <ComboDisplay />
+      {/* Touch has no Escape key: an always-available pause button. */}
+      <button
+        className="hud-pause-button"
+        onClick={() => setPhase('paused')}
+        aria-label="Pause"
+        title="Pause (Esc)"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <rect x="6" y="4" width="4" height="16" rx="1" />
+          <rect x="14" y="4" width="4" height="16" rx="1" />
+        </svg>
+      </button>
       {/* Crosshair rendered globally in App.tsx */}
     </>
   )

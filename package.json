@@ -10,7 +10,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke": "node e2e/smoke.mjs",
+    "smoke": "node e2e/smoke.mjs --mobile",
     "check:bundle": "node scripts/check-bundle.mjs",
     "verify": "npm test && npm run build && npm run check:bundle && npm run smoke"
   },
