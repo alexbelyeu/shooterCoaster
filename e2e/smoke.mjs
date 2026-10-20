@@ -208,7 +208,7 @@ async function playLevel(page, id) {
 }
 
 const MOBILE_LEVEL = 'level1'
-const HUD_SELECTORS = ['.hud-score', '.hud-enemies', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
+const HUD_SELECTORS = ['.hud-score', '.hud-kills', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
 
 /** Wait until `selector` exists, has a size, and it and its ancestors are fully faded in. */
 function waitVisible(page, selector, timeout = 30000) {

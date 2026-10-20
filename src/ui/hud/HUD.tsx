@@ -1,72 +1,70 @@
-import { useEffect, useCallback, memo } from 'react'
+import { useEffect, useMemo, type CSSProperties } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
+import { biomeTheme } from '@/ui/theme'
+import ScoreDisplay from './ScoreDisplay'
+import TimerBar from './TimerBar'
+import ComboMeter from './ComboMeter'
 
-const ComboDisplay = memo(function ComboDisplay() {
-  const combo = useGameStore((s) => s.combo)
-  const visible = combo.count > 1
-
+/** Thin segmented kills / total strip under the score. Renders on kills only. */
+function KillStrip() {
+  const total = useGameStore((s) => s.totalEnemies)
+  const killed = useGameStore((s) => s.totalEnemies - s.enemiesRemaining)
+  const frac = total > 0 ? Math.min(1, killed / total) : 0
   return (
-    <div
-      className="hud-combo"
-      style={{ opacity: visible ? 1 : 0 }}
-    >
-      {combo.count}x Combo!
-      <br />
-      <span className="hud-combo-mult">{combo.multiplier.toFixed(1)}x</span>
+    <div className="hud-kills" aria-label={`${killed} of ${total} enemies`}>
+      <div className="hud-kills-track">
+        <div className="hud-kills-fill" style={{ transform: `scaleX(${frac})` }} />
+      </div>
+      <span className="hud-kills-count">
+        {killed}
+        <span className="hud-kills-total">/{total}</span>
+      </span>
     </div>
   )
-})
+}
 
+/**
+ * In-play HUD. The root only subscribes to the current level, so it renders once
+ * per level; each widget subscribes to its own store slice (see ScoreDisplay for
+ * the rAF score tween).
+ */
 export default function HUD() {
-  const score = useGameStore((s) => s.score)
   const currentLevel = useGameStore((s) => s.currentLevel)
-  const timeRemaining = useGameStore((s) => s.timeRemaining)
-  const enemiesRemaining = useGameStore((s) => s.enemiesRemaining)
-  const totalEnemies = useGameStore((s) => s.totalEnemies)
-  const setPhase = useGameStore((s) => s.setPhase)
-
   const config = currentLevel ? getLevelConfig(currentLevel) : null
-
-  // Escape key to pause, backtick (`) to freeze/unfreeze for screenshots
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setPhase('paused')
-      }
-      if (e.key === '`') {
-        const store = useGameStore.getState()
-        store.setTimeScale(store.timeScale === 0 ? 1 : 0)
-      }
-    },
-    [setPhase],
+  const theme = biomeTheme(config?.biome)
+  const style = useMemo(
+    () => ({ '--hud-accent': theme.accent, '--hud-glow': theme.glow }) as CSSProperties,
+    [theme],
   )
 
+  // Escape key to pause, backtick (`) to freeze/unfreeze for screenshots
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const store = useGameStore.getState()
+      if (e.key === 'Escape') store.setPhase('paused')
+      if (e.key === '`') store.setTimeScale(store.timeScale === 0 ? 1 : 0)
+    }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
+  }, [])
 
-  if (!config) return null
+  if (!config || !currentLevel) return null
 
   return (
-    <>
-      <div className="hud">
-        <div className="hud-left">
-          <div className="hud-score">
-            Score: {Math.round(score)} / {config.maxScore}
-          </div>
-          <div className="hud-enemies">Enemies: {totalEnemies - enemiesRemaining} / {totalEnemies}</div>
-        </div>
-        <div className="hud-timer">
-          {Math.ceil(timeRemaining)}s
-        </div>
+    <div className="hud" style={style}>
+      <div className="hud-panel hud-panel--left">
+        <ScoreDisplay levelId={currentLevel} />
+        <KillStrip />
       </div>
-      <ComboDisplay />
+      <div className="hud-panel hud-panel--right">
+        <TimerBar totalSeconds={config.timerSeconds} />
+      </div>
+      <ComboMeter />
       {/* Touch has no Escape key: an always-available pause button. */}
       <button
         className="hud-pause-button"
-        onClick={() => setPhase('paused')}
+        onClick={() => useGameStore.getState().setPhase('paused')}
         aria-label="Pause"
         title="Pause (Esc)"
       >
@@ -76,6 +74,6 @@ export default function HUD() {
         </svg>
       </button>
       {/* Crosshair rendered globally in App.tsx */}
-    </>
+    </div>
   )
 }
