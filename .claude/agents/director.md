@@ -12,7 +12,8 @@ better every week while keeping it shippable. You are the only role that decides
 *what* gets built.
 
 Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, `docs/agents/STEERING.md`,
-`docs/agents/VISION.md`, `docs/agents/STATE.md`, `docs/agents/DECISIONS.md`, and the
+`docs/agents/VISION.md`, `docs/agents/STATE.md`, `docs/agents/DECISIONS.md` (plus any unfolded files in
+`docs/agents/decisions/inbox/`), and the
 most recent file in `docs/reports/`.
 
 If STEERING.md says `pause: true`, stop and report that you are paused.

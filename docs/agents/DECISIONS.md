@@ -1,6 +1,13 @@
 # Decisions
 
-Append-only log. Newest at the bottom. Format:
+Append-only log. Newest at the bottom.
+
+**Don't edit this file in a feature PR.** Write each new decision as its own file in
+`docs/agents/decisions/inbox/` (see the README there). The Maintainer folds the inbox
+into this file every night. One writer means this file never causes merge conflicts.
+Older years move to `docs/agents/decisions/<year>.md` once this file passes ~1500 lines.
+
+Entry format:
 
 ```
 ## YYYY-MM-DD — Title (role)
