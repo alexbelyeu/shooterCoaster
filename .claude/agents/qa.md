@@ -35,6 +35,12 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
    - Perf: draw calls / triangles vs `main` in `results.json`; instancing used for repeats.
    - Architecture: fits existing patterns, no dead code, no duplicated systems, types sound.
    - Docs updated when structure/behaviour changed.
+   - Tests: for each test the PR adds, is there a plausible wrong version of the change
+     it would catch? Tests that only cover untouched or happy-path behaviour should be
+     cut; pure logic the PR adds (scoring, curves, timing) should be tested.
+5. Before running `npm run verify`, and again before deciding, run
+   `scripts/pause-check.sh`. If it prints PAUSED, stop without a decision and end with
+   that line.
 
 ### Light re-review (conflict-only round trips)
 
@@ -52,6 +58,12 @@ merge conflict; and every commit after the head that review named is a merge of
 - Then decide as below, saying "light re-review" in your comment.
 
 ## Decide
+
+**Combined review.** If your prompt says you are part of a combined review, do not
+comment on the PR or change labels: the dispatcher combines your verdict with the
+independent reviewers' and posts one decision. End with your verdict (approve /
+request changes / close), then the exact comment text you would have posted.
+Otherwise:
 
 - **Approve** when everything in PROTOCOL.md "Merging" holds: comment a 2–3 line QA
   summary on the PR, then swap `agent:needs-qa` → `agent:qa-approved`. You never merge

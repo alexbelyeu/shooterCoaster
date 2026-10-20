@@ -9,8 +9,10 @@ code review.** Alex reads a weekly report, watches the live `studio-status` issu
 `docs/agents/STEERING.md` and GitHub issues labelled `steering`. Everything an
 agent needs to know lives in this repo — sessions have no memory of each other.
 
-If you were started by a scheduled task, read `docs/agents/PROTOCOL.md` and your
-role definition in `.claude/agents/` before doing anything else.
+If you were started by a scheduled task, run `scripts/pause-check.sh` first: if it
+prints PAUSED, stop and reply with that line. Then read `docs/agents/PROTOCOL.md`, your
+runbook in `docs/agents/runbooks/` and your role definition in `.claude/agents/` before
+doing anything else.
 
 ## Commands
 
@@ -100,8 +102,9 @@ replays — currently in-memory placeholders).
 | `src/store/` | zustand stores: game, player, settings (persisted) |
 | `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter, wave banner) + screens; `theme.ts` per-biome UI accents |
 | `src/testing/` | e2e hook |
-| `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser |
-| `docs/` | Specs, perf notes, and the agent operating system in `docs/agents/` |
+| `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser, `pause-check.sh`, `studio-status.cjs` |
+| `.claude/agents/`, `.claude/commands/`, `.claude/scripts/` | Agent roles (incl. `pr-correctness` / `pr-consistency` reviewers), `/deslop` and `/wrap-pr`, the review-bundle script |
+| `docs/` | Specs, perf notes, and the agent operating system in `docs/agents/` (runbooks for every scheduled task in `docs/agents/runbooks/`) |
 | `js/`, `index.legacy.html`, `package.legacy.json`, `gulpfile.js`, `assets/` | **Legacy v1 game (2015).** Not built. Don't extend it. |
 
 ## Skills in this repo
@@ -110,6 +113,11 @@ replays — currently in-memory placeholders).
 - `shooter-coaster-level-design` — **read before touching levels, enemies, decorations, terrain or landmarks.** It encodes hard-won rules (track extent formula, enemy scaling, z-fighting, terrain-following).
 - `threejs-*` — three.js reference for materials, shaders, lighting, postprocessing, etc.
 - `workflow-orchestration` — plan → execute → verify discipline.
+- `branch-review` — the architecture/convention rubric the `pr-consistency` reviewer applies.
+
+Commands: `/deslop` (`.claude/commands/deslop.md`) cuts AI slop from the files a branch
+touches; builders run it before shipping. `/wrap-pr` runs the two independent reviewers
+on a PR; QA runs it on every sizeable PR.
 
 ## Hard rules (all agents, always)
 
