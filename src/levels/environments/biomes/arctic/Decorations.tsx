@@ -2,39 +2,11 @@ import { useMemo, useCallback, useEffect } from 'react'
 import * as THREE from 'three'
 import type { BiomeDecorationsProps } from '../../shared/types'
 import { scatterPositions } from '../../shared/scatter'
+import IceCrystals from './IceCrystals'
+import SnowDrifts from './SnowDrifts'
 
-export default function ArcticDecorations({ heightFn }: BiomeDecorationsProps) {
-  // Ice crystal shards (stretched octahedrons) — increased to 140
-  const crystalPositions = useMemo(() => scatterPositions(140, 150, 3500, heightFn), [heightFn])
-  const crystalGeo = useMemo(() => new THREE.OctahedronGeometry(1, 0), [])
-  const crystalMat = useMemo(() => new THREE.MeshPhongMaterial({
-    color: '#a0d0f0',
-    emissive: '#203040',
-    emissiveIntensity: 0.3,
-    flatShading: true,
-    transparent: true,
-    opacity: 0.85,
-  }), [])
-
-  const setCrystalRef = useCallback((mesh: THREE.InstancedMesh | null) => {
-    if (!mesh) return
-    const mat = new THREE.Matrix4()
-    const q = new THREE.Quaternion()
-    const euler = new THREE.Euler()
-    for (let i = 0; i < crystalPositions.length; i++) {
-      const p = crystalPositions[i]
-      const h = 5 + Math.random() * 20
-      euler.set(Math.random() * 0.3, Math.random() * Math.PI * 2, Math.random() * 0.3)
-      q.setFromEuler(euler)
-      mat.compose(
-        new THREE.Vector3(p.x, p.y + h * 0.5, p.z),
-        q,
-        new THREE.Vector3(2 + Math.random() * 3, h, 2 + Math.random() * 3),
-      )
-      mesh.setMatrixAt(i, mat)
-    }
-    mesh.instanceMatrix.needsUpdate = true
-  }, [crystalPositions])
+export default function ArcticDecorations(props: BiomeDecorationsProps) {
+  const { heightFn } = props
 
   // Snow-covered boulders — increased to 80
   const boulderPositions = useMemo(() => scatterPositions(80, 150, 3500, heightFn), [heightFn])
@@ -131,43 +103,23 @@ export default function ArcticDecorations({ heightFn }: BiomeDecorationsProps) {
     mesh.instanceMatrix.needsUpdate = true
   }, [pondPositions])
 
-  // Snow mounds — soft dome shapes
-  const moundPositions = useMemo(() => scatterPositions(40, 100, 3000, heightFn), [heightFn])
-  const moundGeo = useMemo(() => new THREE.SphereGeometry(1, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), [])
-  const moundMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#e8eef4', flatShading: true }), [])
-
-  const setMoundRef = useCallback((mesh: THREE.InstancedMesh | null) => {
-    if (!mesh) return
-    const mat = new THREE.Matrix4()
-    for (let i = 0; i < moundPositions.length; i++) {
-      const p = moundPositions[i]
-      const s = 5 + Math.random() * 15
-      mat.makeTranslation(p.x, p.y, p.z)
-      mat.scale(new THREE.Vector3(s, s * 0.4, s))
-      mesh.setMatrixAt(i, mat)
-    }
-    mesh.instanceMatrix.needsUpdate = true
-  }, [moundPositions])
-
   useEffect(() => {
     return () => {
-      crystalGeo.dispose(); crystalMat.dispose()
       boulderGeo.dispose(); boulderMat.dispose()
       columnGeo.dispose(); columnMat.dispose()
       pondGeo.dispose(); pondMat.dispose()
-      moundGeo.dispose(); moundMat.dispose()
     }
-  }, [crystalGeo, crystalMat, boulderGeo, boulderMat, columnGeo, columnMat, pondGeo, pondMat, moundGeo, moundMat])
+  }, [boulderGeo, boulderMat, columnGeo, columnMat, pondGeo, pondMat])
 
   return (
     <>
-      <instancedMesh ref={setCrystalRef} args={[crystalGeo, crystalMat, crystalPositions.length]} frustumCulled />
+      <IceCrystals {...props} />
+      <SnowDrifts {...props} />
       <instancedMesh ref={setBoulderRef} args={[boulderGeo, boulderMat, boulderPositions.length]} frustumCulled />
       <instancedMesh ref={setColumnRef} args={[columnGeo, columnMat, columnPositions.length]} frustumCulled />
       {pondPositions.length > 0 && (
         <instancedMesh ref={setPondRef} args={[pondGeo, pondMat, pondPositions.length]} frustumCulled />
       )}
-      <instancedMesh ref={setMoundRef} args={[moundGeo, moundMat, moundPositions.length]} frustumCulled />
     </>
   )
 }
