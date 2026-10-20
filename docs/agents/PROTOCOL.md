@@ -9,7 +9,7 @@ How the autonomous ShooterCoaster studio works. Every scheduled session reads th
 | **Reporter** | Sonnet | Mon ~06:15 | Writes last week's report, emails Alex |
 | **Director** | Fable (latest) | Mon ~07:45 | Reads report + steering, updates vision/state, plans the week as issues |
 | **Builders** | Opus | daily ~08:45, ~13:45, ~18:45 | Each run: up to N parallel builder subagents, one issue each → PRs |
-| **QA** | Opus | daily ~11:50, ~16:50, ~22:50 | Independent review + playtest of open PRs; approves or requests changes |
+| **QA** | Opus | daily ~10:15, ~15:15, ~20:15 (~90 min after each builder run) | Independent review + playtest of open PRs; approves or requests changes |
 | **Maintainer** | Opus | daily ~03:35 | Keeps `main` healthy: prod-broken issues, reverts, stale claims, tech debt |
 
 Role definitions live in `.claude/agents/<role>.md`. Each scheduled task runs on

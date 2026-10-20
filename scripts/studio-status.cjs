@@ -19,7 +19,7 @@ const SCHEDULE = [
   { who: 'Reporter', what: 'weekly report email', times: ['06:13'], days: [1] },
   { who: 'Director', what: 'plans the week, files issues', times: ['07:44'], days: [1] },
   { who: 'Builders', what: 'build the top issues, open PRs', times: ['08:47', '13:47', '18:47'] },
-  { who: 'QA', what: 'review + approve PRs (approved PRs auto-ship)', times: ['11:52', '16:52', '22:52'] },
+  { who: 'QA', what: 'review + approve PRs (approved PRs auto-ship)', times: ['10:17', '15:17', '20:17'] },
   { who: 'Maintainer', what: 'health, stale claims, tech debt', times: ['03:36'] },
 ]
 
