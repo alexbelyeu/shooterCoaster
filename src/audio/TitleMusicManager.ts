@@ -1,4 +1,5 @@
 import * as Tone from 'tone'
+import { nextTriggerTime } from './triggerTime'
 import { musicChannel, isAudioReady } from './AudioEngine'
 
 /**
@@ -153,7 +154,7 @@ export function startTitleMusic(): void {
   // Melody — 8th notes across 4 bars
   melodyLoop = new Tone.Sequence(
     (time, note) => {
-      if (note && melodyBox) melodyBox.triggerAttackRelease(note, '8n', time)
+      if (note && melodyBox) melodyBox.triggerAttackRelease(note, '8n', nextTriggerTime(melodyBox, time, Tone.getContext().currentTime))
     },
     melodyNotes,
     '8n',
@@ -175,7 +176,7 @@ export function startTitleMusic(): void {
   // Bass — 8th notes across 4 bars
   bassLoop = new Tone.Sequence(
     (time, note) => {
-      if (note && bassSynth) bassSynth.triggerAttackRelease(note, '8n', time)
+      if (note && bassSynth) bassSynth.triggerAttackRelease(note, '8n', nextTriggerTime(bassSynth, time, Tone.getContext().currentTime))
     },
     bassNotes,
     '8n',
@@ -187,14 +188,14 @@ export function startTitleMusic(): void {
   chimeLoop = new Tone.Loop((time) => {
     if (!chimeSynth) return
     const note = chimeNotes[Math.floor(Math.random() * chimeNotes.length)]
-    chimeSynth.triggerAttackRelease(note, '16n', time)
+    chimeSynth.triggerAttackRelease(note, '16n', nextTriggerTime(chimeSynth, time, Tone.getContext().currentTime))
   }, '2n.')
   chimeLoop.start('4n') // offset slightly from downbeat
 
   // Tambourine — offbeat 16th notes
   tambLoop = new Tone.Sequence(
     (time, hit) => {
-      if (hit && tamb) tamb.triggerAttackRelease('16n', time)
+      if (hit && tamb) tamb.triggerAttackRelease('16n', nextTriggerTime(tamb, time, Tone.getContext().currentTime))
     },
     tambPattern,
     '8n',

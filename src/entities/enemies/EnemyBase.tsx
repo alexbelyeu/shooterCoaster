@@ -7,6 +7,24 @@ import { eventBus } from '@/core/EventBus'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
 import type { EnemyType } from '@/types/level'
 import { registerE2EEnemy, unregisterE2EEnemy } from '@/testing/e2eHook'
+import { ENEMY_HIT_FLASH_MAT } from './SharedEnemyAssets'
+import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE } from '@/combat/hitFeedback'
+
+// Hit flash: swap every mesh under the enemy to the shared flash material and
+// back. Module-level callbacks so traverse() allocates nothing.
+const ORIGINAL_MATERIAL = '__scOriginalMaterial'
+function flashMesh(o: THREE.Object3D) {
+  const m = o as THREE.Mesh
+  if (!m.isMesh || m.userData[ORIGINAL_MATERIAL] !== undefined) return
+  m.userData[ORIGINAL_MATERIAL] = m.material
+  m.material = ENEMY_HIT_FLASH_MAT
+}
+function restoreMesh(o: THREE.Object3D) {
+  const m = o as THREE.Mesh
+  if (!m.isMesh || m.userData[ORIGINAL_MATERIAL] === undefined) return
+  m.material = m.userData[ORIGINAL_MATERIAL] as THREE.Material
+  delete m.userData[ORIGINAL_MATERIAL]
+}
 
 export interface EnemyProps {
   id: string
@@ -30,6 +48,10 @@ interface EnemyBaseProps extends EnemyProps {
 /**
  * Shared base for all enemy types.
  * Handles visibility, collision registration, and death.
+ *
+ * Death is two-step: on hit the enemy is scored immediately, stops moving and
+ * flashes white at 1.2x scale for ENEMY_HIT_FLASH_MS (game time); then it emits
+ * 'enemy:killed', triggers the explosion via onKill and unmounts.
  */
 export default function EnemyBase({
   id,
@@ -48,18 +70,38 @@ export default function EnemyBase({
   const registerKill = useGameStore((s) => s.registerKill)
   const phase = useGameStore((s) => s.phase)
 
+  // Kill-pop state: dying between the hit and the explosion.
+  const dying = useRef(false)
+  const dyingMs = useRef(0)
+  const dyingFrames = useRef(0)
+
   const kill = useCallback(() => {
     if (!aliveRef.current) return
     aliveRef.current = false
-    setAlive(false)
+    unregisterCollisionTarget(id)
     addScore(scoreValue)
     registerKill()
 
+    dying.current = true
+    dyingMs.current = ENEMY_HIT_FLASH_MS
+    dyingFrames.current = 0
+    const group = meshRef.current
+    if (group) {
+      group.traverse(flashMesh)
+      group.scale.setScalar(KILL_POP_SCALE)
+    }
+  }, [id, scoreValue, addScore, registerKill])
+
+  /** End of the kill pop: explosion, events, unmount. */
+  const finishKill = useCallback(() => {
+    dying.current = false
     const combo = useGameStore.getState().combo
     playExplosionSound(combo.count)
 
-    if (meshRef.current) {
-      const pos = meshRef.current.position.clone()
+    const group = meshRef.current
+    if (group) {
+      group.traverse(restoreMesh)
+      const pos = group.position.clone()
       eventBus.emit('enemy:killed', {
         position: pos,
         combo: combo.count,
@@ -67,7 +109,8 @@ export default function EnemyBase({
       })
       onKill(id, pos)
     }
-  }, [id, scoreValue, addScore, registerKill, onKill])
+    setAlive(false)
+  }, [id, scoreValue, onKill])
 
   // Register with CollisionManager
   const deadPos = useRef(new THREE.Vector3(0, -9999, 0)).current
@@ -103,6 +146,13 @@ export default function EnemyBase({
 
     if (aliveRef.current) {
       updatePosition(meshRef.current, spawnPosition, clock.elapsedTime, delta * timeScale)
+    } else if (dying.current) {
+      // Frozen in the white pop. The hit may land earlier in this same frame
+      // (bullet pool runs first), so require a 2nd tick: the pop is always
+      // rendered at least once, even at very low frame rates.
+      dyingMs.current -= delta * timeScale * 1000
+      dyingFrames.current += 1
+      if (dyingMs.current <= 0 && dyingFrames.current >= 2) finishKill()
     }
   })
 

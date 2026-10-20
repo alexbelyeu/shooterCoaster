@@ -4,6 +4,11 @@ import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
 import { useGameStore } from '@/store/useGameStore'
 import { startWindWhoosh, updateWindWhoosh, stopWindWhoosh } from '@/audio/SFXManager'
+import { eventBus } from '@/core/EventBus'
+import MuzzleFlash from '@/combat/MuzzleFlash'
+import {
+  FIRE_KICK_MS, FIRE_KICK_RAD, KILL_SHAKE_MS, KILL_SHAKE_COMBO_CAP, MAX_SHAKE_UNITS,
+} from '@/combat/hitFeedback'
 
 interface CoasterCameraProps {
   curve: TrackCurve
@@ -24,6 +29,12 @@ const MAX_VELOCITY_MULT = 5 // max velocity = minRollerSpeed * this
 
 // FOV kick settings
 const BASE_FOV = 80
+
+/** Kill-shake displacement (world units) for a combo, capped at MAX_SHAKE_UNITS. */
+function killShakeAmplitude(combo: number): number {
+  const c = Math.min(Math.max(combo, 1), KILL_SHAKE_COMBO_CAP)
+  return 0.8 + (MAX_SHAKE_UNITS - 0.8) * ((c - 1) / (KILL_SHAKE_COMBO_CAP - 1))
+}
 
 /**
  * Exact port of Camera.js updateCamGame.
@@ -49,6 +60,39 @@ export default function CoasterCamera({
   const _position = useRef(new THREE.Vector3())
   const _tangent = useRef(new THREE.Vector3())
   const _lookAt = useRef(new THREE.Vector3())
+  const _shakeOffset = useRef(new THREE.Vector3())
+
+  // Screen kick / shake: purely additive on top of the track pose, which is
+  // recomputed from scratch every frame — so when the timers hit zero the
+  // camera is exactly back on the track. Never touches progress/velocity.
+  const shake = useRef({
+    fireMs: 0, fireSeed: 0,
+    killMs: 0, killAmp: 0, killRoll: 0,
+    time: 0,
+  })
+
+  useEffect(() => {
+    const onFire = () => {
+      const k = shake.current
+      k.fireMs = FIRE_KICK_MS
+      k.fireSeed = Math.random() * Math.PI * 2
+    }
+    const onKill = (data: unknown) => {
+      const k = shake.current
+      const combo = (data as { combo?: number } | undefined)?.combo ?? 1
+      const amp = killShakeAmplitude(combo)
+      // Overlapping kills keep the stronger shake rather than stacking.
+      k.killAmp = k.killMs > 0 ? Math.max(k.killAmp, amp) : amp
+      k.killRoll = 0.002 + 0.006 * (amp / MAX_SHAKE_UNITS)
+      k.killMs = KILL_SHAKE_MS
+    }
+    eventBus.on('weapon:fire', onFire)
+    eventBus.on('enemy:killed', onKill)
+    return () => {
+      eventBus.off('weapon:fire', onFire)
+      eventBus.off('enemy:killed', onKill)
+    }
+  }, [])
 
   // Set as default camera on mount
   useEffect(() => {
@@ -96,6 +140,47 @@ export default function CoasterCamera({
     _lookAt.current.copy(_position.current).add(_tangent.current)
     cam.lookAt(_lookAt.current)
 
+    // ── Screen kick (fire) + shake (kill) ──
+    const k = shake.current
+    let shakeLen = 0
+    if (k.fireMs > 0 || k.killMs > 0) {
+      // Sample the envelopes before decaying them so even a single very long
+      // frame still shows the kick at full strength once.
+      const fireEnv = (k.fireMs / FIRE_KICK_MS) ** 2
+      const killEnv = (k.killMs / KILL_SHAKE_MS) ** 2
+      const dtMs = effectiveDelta * 1000
+      k.time += effectiveDelta
+      k.fireMs = Math.max(0, k.fireMs - dtMs)
+      k.killMs = Math.max(0, k.killMs - dtMs)
+
+      if (fireEnv > 0) {
+        // Recoil: mostly pitch-up with a little random yaw (~1–2 px).
+        cam.rotateX(FIRE_KICK_RAD * fireEnv * (0.7 + 0.3 * Math.sin(k.fireSeed)))
+        cam.rotateY(FIRE_KICK_RAD * 0.5 * fireEnv * Math.cos(k.fireSeed * 3))
+      }
+      if (killEnv > 0) {
+        const a = k.killAmp * killEnv
+        _shakeOffset.current.set(
+          a * Math.sin(k.time * 71 + 1.3),
+          a * Math.sin(k.time * 53 + 4.1),
+          0,
+        )
+        // Hard cap: never more than MAX_SHAKE_UNITS from the track.
+        _shakeOffset.current.clampLength(0, MAX_SHAKE_UNITS)
+        shakeLen = _shakeOffset.current.length()
+        _shakeOffset.current.applyQuaternion(cam.quaternion)
+        cam.position.add(_shakeOffset.current)
+        cam.rotateZ(k.killRoll * killEnv * Math.sin(k.time * 37))
+      } else {
+        k.killAmp = 0
+      }
+    }
+    const testApi = window.__SC_TEST__
+    if (testApi) {
+      testApi.cameraShake.current = shakeLen
+      if (shakeLen > testApi.cameraShake.max) testApi.cameraShake.max = shakeLen
+    }
+
     // Update wind whoosh based on velocity
     const velocityNorm = Math.min(
       (velocity.current - effectiveMinSpeed) / (maxVelocity - effectiveMinSpeed),
@@ -109,5 +194,9 @@ export default function CoasterCamera({
     }
   })
 
-  return <perspectiveCamera ref={cameraRef} />
+  return (
+    <perspectiveCamera ref={cameraRef}>
+      <MuzzleFlash />
+    </perspectiveCamera>
+  )
 }

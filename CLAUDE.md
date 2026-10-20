@@ -37,9 +37,13 @@ The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/sizes, errors)
 to `e2e-results/`: `title.png`, and per level `<id>.png` (after a 10 s ride),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
-(after 4 s of autofire + `killNearest(5)`) and `<id>-results.png`. A level fails if
+(after 4 s of autofire + `killNearest(5)`, with the muzzle flash and gold hitmarker
+held on the kill frame via `holdFeedback`) and `<id>-results.png`. A level fails if
 it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
-enemies, or the results screen never appears. `npm run smoke` also passes `--mobile`:
+enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
+wall-clock level timer already ran out), camera shake exceeds
+3 units or doesn't return exactly to the track, or the results screen never appears.
+`npm run smoke` also passes `--mobile`:
 an iPhone 13-like touch context (390x844) taps PLAY, a level, and the canvas 10x,
 checks the HUD is inside the viewport with no overlap in portrait and 844x390
 landscape, and taps Pause (`mobile-level-select.png`, `mobile-level1.png`,
@@ -55,8 +59,10 @@ named `track*`).
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 (`levels()`, `startLevel(id)`, `frames`, `drawCalls`, `triangles`, `avgFrameMs`,
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/timeRemaining/phase/liveEnemies/
-onScreenEnemies/shotsFired, `autoFire(on)`, `killNearest(n)`, `enemyScreenPoints(n)`, `endLevel()`,
-`setTimeScale(s)`, `sceneStats()`). See `src/testing/e2eHook.tsx`. Extend it when you need new test
+onScreenEnemies/shotsFired, `autoFire(on)`, `killNearest(n)` (fires one real shot,
+then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
+`endLevel()`, `setTimeScale(s)`, `sceneStats()`, `combat` fire/hit/kill event counters,
+`cameraShake` {current, max}, `holdFeedback`). See `src/testing/e2eHook.tsx`. Extend it when you need new test
 surfaces. Note: bullets move a fixed distance per *frame*, so at ~1 fps headless
 autofire rarely lands hits on distant enemies — `killNearest` is what guarantees kills.
 

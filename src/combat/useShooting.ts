@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { getBulletPool } from './projectiles/bulletPoolHandle'
 import { useGameStore } from '@/store/useGameStore'
 import { playFireSound } from '@/audio/SFXManager'
+import { eventBus } from '@/core/EventBus'
 import { getPointerState, subscribePointer } from '@/input/pointerInput'
 
 const _raycaster = new THREE.Raycaster()
@@ -31,6 +32,8 @@ export function fireAtNDC(x: number, y: number, camera: THREE.Camera): boolean {
   if (!pool.fire(_origin, _direction)) return false
   useGameStore.getState().registerShot()
   playFireSound()
+  // Muzzle flash, camera kick, etc. listen for this (no payload, no allocation).
+  eventBus.emit('weapon:fire')
   return true
 }
 

@@ -9,9 +9,11 @@
  *   - list on-screen enemies with their projected size (readability checks)
  *   - freeze game time so a screenshot matches a query (setTimeScale)
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
- *     deterministic combat screenshots, endLevel() to reach the results screen,
- *     stats() for score / kills / combo / shots, enemyScreenPoints(n) to drive
- *     real pointer / touch input at enemies
+ *     deterministic combat screenshots (fires one real shot, then resolves the
+ *     hits through the bullet pool's own processHit path), endLevel() to reach
+ *     the results screen, stats() for score / kills / combo / shots,
+ *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
+ *   - count fire / hit / kill events and camera shake (hit feedback checks)
  *
  * Keep this file tiny and side-effect free when the flag is off: nothing here
  * runs unless `installE2EApi()` finds `?e2e=1`, and <E2EFrameProbe> is only
@@ -22,9 +24,10 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
+import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType } from '@/types/level'
-import { getCollisionTargets, type CollisionTarget } from '@/combat/CollisionManager'
+import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
 
 export const isE2E =
@@ -46,6 +49,12 @@ export interface SCTestApi {
    */
   enemies: () => E2EEnemyOnScreen[]
   errors: string[]
+  /** Counts of 'weapon:fire' / 'enemy:hit' / 'enemy:killed' since load. */
+  combat: { fired: number; hits: number; kills: number }
+  /** Camera shake displacement from the track this frame, and the max seen. */
+  cameraShake: { current: number; max: number }
+  /** Freeze transient feedback (muzzle flash, hitmarker) at its peak for screenshots. */
+  holdFeedback: boolean
   /**
    * Deterministic scene totals, independent of camera/frustum culling:
    * every visible mesh's triangles (x instance count) and object count, plus a
@@ -55,8 +64,11 @@ export interface SCTestApi {
   /** Every 100 ms (real time, at most once per rendered frame) aim at the nearest
    *  live on-screen enemy and fire a real bullet through the pool. */
   autoFire: (enabled: boolean) => void
-  /** Instantly kill the n nearest live enemies (on-screen ones first) via their
-   *  onHit. Returns how many were killed. */
+  /** Kill the n nearest live enemies (on-screen ones first). Fires one real shot
+   *  at the first on-screen victim (bullet, muzzle flash, camera kick; may be
+   *  throttled by the fire delay), then resolves each victim through
+   *  processHit — the bullet pool's own hit path (enemy:hit, hit flash, kill pop;
+   *  enemy:killed follows ~80 ms later). Returns how many were hit. */
   killNearest: (n: number) => number
   stats: () => SCTestStats
   /** Viewport (CSS px) positions of up to n live on-screen enemies, nearest
@@ -210,6 +222,9 @@ export function installE2EApi() {
     phase: () => useGameStore.getState().phase,
     enemies: enemiesOnScreen,
     errors: [],
+    combat: { fired: 0, hits: 0, kills: 0 },
+    cameraShake: { current: 0, max: 0 },
+    holdFeedback: false,
     sceneStats: () => null,
     autoFire: (enabled: boolean) => {
       autoFireEnabled = enabled
@@ -217,7 +232,11 @@ export function installE2EApi() {
     },
     killNearest: (n: number) => {
       const victims = liveTargetsByDistance(probeCamera).slice(0, Math.max(0, n))
-      for (const { t } of victims) t.onHit()
+      const first = victims[0]
+      if (first?.visible && probeCamera && onScreenNDC(first.t, probeCamera, _aim)) {
+        fireAtNDC(_aim.x, _aim.y, probeCamera)
+      }
+      for (const { t } of victims) processHit(t)
       return victims.length
     },
     stats: () => {
@@ -260,6 +279,9 @@ export function installE2EApi() {
     },
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
   }
+  eventBus.on('weapon:fire', () => { api.combat.fired += 1 })
+  eventBus.on('enemy:hit', () => { api.combat.hits += 1 })
+  eventBus.on('enemy:killed', () => { api.combat.kills += 1 })
   window.addEventListener('error', (e) => api.errors.push(String(e.message)))
   window.addEventListener('unhandledrejection', (e) => api.errors.push(String(e.reason)))
   window.__SC_TEST__ = api

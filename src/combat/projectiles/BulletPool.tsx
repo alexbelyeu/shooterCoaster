@@ -2,7 +2,7 @@ import { useRef, useMemo, useCallback, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
-import { getCollisionTargets } from '@/combat/CollisionManager'
+import { getCollisionTargets, processHit } from '@/combat/CollisionManager'
 import type { Bullet, BulletPoolHandle } from './bulletPoolHandle'
 import { setBulletPool } from './bulletPoolHandle'
 
@@ -150,7 +150,7 @@ export default function BulletPool({
       for (const target of targets.values()) {
         if (target.hitThisFrame) {
           target.hitThisFrame = false
-          target.onHit()
+          processHit(target)
         }
       }
     }

@@ -1,4 +1,5 @@
 import * as Tone from 'tone'
+import { nextTriggerTime } from './triggerTime'
 import { musicChannel, isAudioReady } from './AudioEngine'
 import type { BiomeType } from '@/types/level'
 
@@ -219,7 +220,7 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   bassLoop = new Tone.Sequence(
     (time, note) => {
       if (currentIntensity < 0.2) return
-      if (note && bassSynth) bassSynth.triggerAttackRelease(note, '8n', time)
+      if (note && bassSynth) bassSynth.triggerAttackRelease(note, '8n', nextTriggerTime(bassSynth, time, Tone.getContext().currentTime))
     },
     cfg.bassNotes,
     '8n',
@@ -231,7 +232,7 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   leadLoop = new Tone.Sequence(
     (time, note) => {
       if (currentIntensity < 0.5) return
-      if (note && leadSynth) leadSynth.triggerAttackRelease(note, '8n', time, 0.5)
+      if (note && leadSynth) leadSynth.triggerAttackRelease(note, '8n', nextTriggerTime(leadSynth, time, Tone.getContext().currentTime), 0.5)
     },
     cfg.leadNotes,
     '8n',
@@ -245,7 +246,7 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
     percLoop = new Tone.Sequence(
       (time, hit) => {
         if (currentIntensity < 0.3) return
-        if (hit && percSynth) percSynth.triggerAttackRelease('32n', time)
+        if (hit && percSynth) percSynth.triggerAttackRelease('32n', nextTriggerTime(percSynth, time, Tone.getContext().currentTime))
       },
       percPattern,
       '8n',

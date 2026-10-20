@@ -6,9 +6,11 @@
  * screen renders, then loads EVERY registered level via the ?e2e=1 test hook and
  * verifies: no uncaught errors, the render loop advances, and the frame is not
  * blank. Then it plays: autoFire for a few seconds, killNearest(5) (screenshot
- * <id>-combat.png), and endLevel() (screenshot <id>-results.png). A level fails if
- * nothing was killed, autofire never fired at on-screen enemies, or the results
- * screen never appears.
+ * <id>-combat.png, with the muzzle flash + gold hitmarker held on the kill frame),
+ * and endLevel() (screenshot <id>-results.png). A level fails if nothing was
+ * killed, autofire never fired at on-screen enemies, the killNearest hits never
+ * produced a kill event, camera shake exceeded 3 units or did not return exactly
+ * to the track, or the results screen never appears.
  * Saves screenshots + stats to e2e-results/.
  *
  * All waits are deadline-polled on the hook's frame counter, because software
@@ -95,6 +97,8 @@ async function startPreview() {
   }
   const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], {
     stdio: ['ignore', 'pipe', 'pipe'],
+    // Own process group, so stopPreview() also kills the vite grandchild that
+    // npx spawns (proc.kill() alone only stops npx and leaks the server).
     detached: true,
   })
   let exited = false
@@ -238,11 +242,46 @@ async function playLevel(page, id) {
   await page.evaluate(() => window.__SC_TEST__.autoFire(true))
   const fire = await waitFrames(page, COMBAT_MIN_FRAMES, { minMs: COMBAT_SECONDS * 1000, maxMs: COMBAT_SECONDS * 6000 })
   const afterFire = await getStats(page)
+  // Hit feedback: stop autofire (so its kicks don't mask the settle check), hold
+  // the muzzle flash / hitmarker, then killNearest fires one real shot and
+  // resolves the hits. enemy:killed (gold hitmarker, explosion) follows the
+  // ~80 ms kill pop, so wait for the kill event before the screenshot.
+  const killsBefore = await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    s.autoFire(false)
+    s.holdFeedback = true
+    return s.combat.kills
+  })
   const nearestKilled = await page.evaluate(() => window.__SC_TEST__.killNearest(5))
-  await waitFrames(page, 1, { maxMs: 5000, pollMs: 30 })
+  let killEvents = killsBefore
+  let killCheckSkipped = null
+  if (nearestKilled > 0) {
+    const deadline = Date.now() + 20000
+    while (Date.now() < deadline && killEvents <= killsBefore) {
+      await page.waitForTimeout(30)
+      const c = await page.evaluate(() => ({ kills: window.__SC_TEST__.combat.kills, phase: window.__SC_TEST__.phase() }))
+      killEvents = c.kills
+      // The level timer is wall-clock; on a ~1 fps runner it can expire here,
+      // and an ended level never finishes the kill pop. Can't judge it then.
+      if (c.phase !== 'playing') { killCheckSkipped = c.phase; break }
+    }
+  } else {
+    await waitFrames(page, 1, { maxMs: 5000, pollMs: 30 })
+  }
   await page.screenshot({ path: path.join(OUT, `${id}-combat.png`), timeout: SHOT_TIMEOUT })
-  await page.evaluate(() => window.__SC_TEST__.autoFire(false))
   const combat = await getStats(page)
+  // Release the hold and let the shake decay; it must return exactly to 0.
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+  const settleStart = await getFrames(page)
+  const settleDeadline = Date.now() + 30000
+  let shake = await page.evaluate(() => window.__SC_TEST__.cameraShake)
+  while (Date.now() < settleDeadline) {
+    await page.waitForTimeout(250)
+    const now = await page.evaluate(() => ({ frames: window.__SC_TEST__.frames, ...window.__SC_TEST__.cameraShake }))
+    shake = now
+    if (now.frames - settleStart >= 5 && now.current === 0) break
+  }
+  const counts = await page.evaluate(() => window.__SC_TEST__.combat)
 
   await page.evaluate(() => window.__SC_TEST__.endLevel())
   // App uses AnimatePresence mode="wait": the HUD fades out before the results fade in.
@@ -265,6 +304,9 @@ async function playLevel(page, id) {
   // Only meaningful when something was on screen to aim at.
   if (atStart.onScreenEnemies > 0 && afterFire.shotsFired - atStart.shotsFired === 0) problems.push('autofire never fired at on-screen enemies')
   if (end.phase !== 'results' || !resultsShown) problems.push(`results screen not shown (phase "${end.phase}")`)
+  if (nearestKilled > 0 && killEvents <= killsBefore && !killCheckSkipped) problems.push('killNearest hits did not produce an enemy:killed event')
+  if (shake.max > 3 + 1e-6) problems.push(`camera shake ${shake.max.toFixed(2)} > 3 units`)
+  if (shake.current !== 0) problems.push(`camera shake did not reset (${shake.current})`)
   return {
     problems,
     combat: {
@@ -278,6 +320,11 @@ async function playLevel(page, id) {
       onScreenAtStart: atStart.onScreenEnemies,
       onScreenBeforeKills: afterFire.onScreenEnemies,
       combo: combat.combo,
+      shakeMax: shake.max,
+      shakeIdle: shake.current,
+      events: counts,
+      // Set (to the phase) when the level timed out before the kill event could land.
+      killCheckSkipped,
     },
     kills: combat.kills,
     score: combat.score,
@@ -414,8 +461,17 @@ async function runMobile(browser, base) {
   const tapKills = s.kills - before.kills
   let fallbackKills = 0
   if (tapKills === 0) {
+    const killEventsBefore = await page.evaluate(() => window.__SC_TEST__.combat.kills)
     fallbackKills = await page.evaluate(() => window.__SC_TEST__.killNearest(3))
-    await waitFrames(page, 1, { maxMs: 5000, pollMs: 30 })
+    // enemy:killed (explosion, HUD enemy count) follows the ~80 ms kill pop, and
+    // the pop freezes once game time is frozen below — let it finish first.
+    const popDeadline = Date.now() + 20000
+    let killEvents = killEventsBefore
+    do {
+      await waitFrames(page, 1, { maxMs: 5000, pollMs: 30 })
+      killEvents = await page.evaluate(() => window.__SC_TEST__.combat.kills)
+    } while (Date.now() < popDeadline && killEvents - killEventsBefore < fallbackKills)
+    if (fallbackKills > 0 && killEvents === killEventsBefore) problems.push('killNearest hits did not produce an enemy:killed event')
   }
   // The level timer runs on wall-clock time, so on a slow runner the level can
   // time out (HUD unmounts) before the layout + pause checks. Freeze game time
@@ -515,6 +571,7 @@ async function run() {
     const enemyShot = await captureEnemyCloseup(page, id)
     const frames = stats.frames - a
     const problems = []
+
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${SECONDS}s)`)
     if (img.stddev < 4 || img.distinctColors < 8) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
@@ -554,7 +611,8 @@ async function run() {
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} fallbackKills=${r.mobile.fallbackKills} kills=${r.kills} score=${r.score} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
-        ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score} ${r.seconds.toFixed(0)}s`
+        ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
+        ` shakeMax=${r.combat.shakeMax?.toFixed(2)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }

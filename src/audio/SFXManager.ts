@@ -1,4 +1,5 @@
 import * as Tone from 'tone'
+import { nextTriggerTime } from './triggerTime'
 import { sfxChannel, isAudioReady } from './AudioEngine'
 
 let fireSynth: Tone.Synth | null = null
@@ -60,7 +61,7 @@ export function playFireSound(): void {
   // Soft "pew" — start at a random mid-high pitch, sweep down smoothly
   const startFreq = 900 + Math.random() * 500
   const endFreq = 200 + Math.random() * 150
-  const now = Tone.now()
+  const now = nextTriggerTime(fireSynth!, Tone.now(), Tone.getContext().currentTime)
   fireSynth!.triggerAttack(startFreq, now)
   fireSynth!.frequency.exponentialRampTo(endFreq, 0.1, now)
   fireSynth!.triggerRelease(now + 0.12)
@@ -129,11 +130,12 @@ export function playExplosionSound(comboCount: number = 0): void {
   ensureSynths()
 
   const toneNow = Tone.now()
+  const ctxNow = Tone.getContext().currentTime
   // Balloon pop — snappy white noise burst
-  popSnap!.triggerAttackRelease(0.05 + Math.random() * 0.02, toneNow)
+  popSnap!.triggerAttackRelease(0.05 + Math.random() * 0.02, nextTriggerTime(popSnap!, toneNow, ctxNow))
 
   // Rubber-snap ping — pitch rises with combo for satisfying feedback
   const pingFreq = 1400 + Math.min(comboCount, 10) * 80 + Math.random() * 300
-  popPing!.triggerAttackRelease(pingFreq, 0.04, toneNow)
+  popPing!.triggerAttackRelease(pingFreq, 0.04, nextTriggerTime(popPing!, toneNow, ctxNow))
 }
 

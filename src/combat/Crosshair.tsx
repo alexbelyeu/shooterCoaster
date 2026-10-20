@@ -1,11 +1,25 @@
 import { useRef, useEffect, useState } from 'react'
+import { eventBus } from '@/core/EventBus'
 import { getPointerState, subscribePointer, type PointerKind } from '@/input/pointerInput'
+import { isFeedbackHeld } from './hitFeedback'
 
 /** On touch the reticle sits this far above the finger so it isn't hidden by it. */
 const TOUCH_OFFSET_PX = 40
 const TOUCH_SCALE = 1.25
 /** Finger position in the SVG's local (unscaled) coordinates. */
 const TOUCH_FINGER_Y = 24 + TOUCH_OFFSET_PX / TOUCH_SCALE
+
+type HitKind = 'is-hit' | 'is-kill'
+
+/** Restart the hitmarker CSS animation in the given colour (no React render). */
+function flashHitmarker(el: SVGGElement | null, kind: HitKind) {
+  if (!el) return
+  el.classList.remove('is-hit', 'is-kill', 'is-hold')
+  // Force a style flush so re-adding the class restarts the animation.
+  void el.getBoundingClientRect()
+  el.classList.add(kind)
+  if (isFeedbackHeld()) el.classList.add('is-hold')
+}
 
 function placeReticle(el: SVGSVGElement, x: number, y: number, kind: PointerKind) {
   el.style.transform =
@@ -20,11 +34,25 @@ function placeReticle(el: SVGSVGElement, x: number, y: number, kind: PointerKind
  * While the trigger is held the ticks contract inward and the dot flashes.
  * On touch the reticle is larger and floats above the finger, with a short
  * tether down to the true aim point (the finger), so it stays visible.
+ * Hitmarker: a 4-tick "X" that flashes white on 'enemy:hit' and gold on
+ * 'enemy:killed' (CSS classes toggled directly on the DOM node).
  */
 export default function Crosshair() {
   const ref = useRef<SVGSVGElement>(null)
+  const hitRef = useRef<SVGGElement>(null)
   const [firing, setFiring] = useState(() => getPointerState().down)
   const [kind, setKind] = useState<PointerKind>(() => getPointerState().kind)
+
+  useEffect(() => {
+    const onHit = () => flashHitmarker(hitRef.current, 'is-hit')
+    const onKill = () => flashHitmarker(hitRef.current, 'is-kill')
+    eventBus.on('enemy:hit', onHit)
+    eventBus.on('enemy:killed', onKill)
+    return () => {
+      eventBus.off('enemy:hit', onHit)
+      eventBus.off('enemy:killed', onKill)
+    }
+  }, [])
 
   // Follow the active pointer (transform only, no layout reflow).
   useEffect(() => {
@@ -102,6 +130,14 @@ export default function Crosshair() {
         strokeWidth={firing ? 2 : 1}
         style={{ transition: 'all 0.06s ease-out' }}
       />
+
+      {/* Hitmarker "X" — hidden until a hit/kill class is applied */}
+      <g ref={hitRef} className="hitmarker" strokeWidth="2.6" strokeLinecap="round">
+        <line x1="16" y1="16" x2="20" y2="20" />
+        <line x1="32" y1="16" x2="28" y2="20" />
+        <line x1="16" y1="32" x2="20" y2="28" />
+        <line x1="32" y1="32" x2="28" y2="28" />
+      </g>
 
       {/* Centre dot */}
       <circle
