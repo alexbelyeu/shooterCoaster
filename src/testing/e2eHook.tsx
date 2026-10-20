@@ -8,7 +8,8 @@
  *   - read basic renderer stats (draw calls, triangles) as a perf signal
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots, endLevel() to reach the results screen,
- *     stats() for score / kills / combo / shots
+ *     stats() for score / kills / combo / shots, enemyScreenPoints(n) to drive
+ *     real pointer / touch input at enemies
  *
  * Keep this file tiny and side-effect free when the flag is off: nothing here
  * runs unless `installE2EApi()` finds `?e2e=1`, and <E2EFrameProbe> is only
@@ -48,6 +49,9 @@ export interface SCTestApi {
    *  onHit. Returns how many were killed. */
   killNearest: (n: number) => number
   stats: () => SCTestStats
+  /** Viewport (CSS px) positions of up to n live on-screen enemies, nearest
+   *  first, so a test can tap / click real input at them. */
+  enemyScreenPoints: (n: number) => { x: number; y: number }[]
   /** Force the results phase. */
   endLevel: () => void
   setTimeScale: (s: number) => void
@@ -180,6 +184,20 @@ export function installE2EApi() {
         onScreenEnemies,
         shotsFired: s.shotsFired,
       }
+    },
+    enemyScreenPoints: (n: number) => {
+      if (!probeCamera) return []
+      const out: { x: number; y: number }[] = []
+      const ndc = new THREE.Vector3()
+      for (const { t, visible } of liveTargetsByDistance(probeCamera)) {
+        if (!visible || out.length >= n) break
+        onScreenNDC(t, probeCamera, ndc)
+        out.push({
+          x: ((ndc.x + 1) / 2) * window.innerWidth,
+          y: ((1 - ndc.y) / 2) * window.innerHeight,
+        })
+      }
+      return out
     },
     endLevel: () => {
       autoFireEnabled = false
