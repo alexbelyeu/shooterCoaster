@@ -17,6 +17,9 @@ let windGain: Tone.Gain | null = null
 
 function ensureSynths() {
   if (fireSynth) return
+  // Fresh synths have no trigger history.
+  lastFireAt = -1
+  lastPopAt = -1
 
   // Soft laser "pew" — sine wave with smooth pitch sweep
   fireSynth = new Tone.Synth({
@@ -54,13 +57,22 @@ function ensureSynths() {
   }).connect(sfxChannel)
 }
 
+// Tone.js throws if a synth is triggered at a start time <= its previous one.
+// Tone.now() only advances with the audio clock (render quantum), so two shots
+// in the same JS turn, or while the context is stalled, get the same time.
+// Keep each synth's schedule strictly increasing.
+const MIN_TRIGGER_GAP = 0.001 // s
+let lastFireAt = -1
+let lastPopAt = -1
+
 export function playFireSound(): void {
   if (!isAudioReady()) return
   ensureSynths()
   // Soft "pew" — start at a random mid-high pitch, sweep down smoothly
   const startFreq = 900 + Math.random() * 500
   const endFreq = 200 + Math.random() * 150
-  const now = Tone.now()
+  const now = Math.max(Tone.now(), lastFireAt + MIN_TRIGGER_GAP)
+  lastFireAt = now
   fireSynth!.triggerAttack(startFreq, now)
   fireSynth!.frequency.exponentialRampTo(endFreq, 0.1, now)
   fireSynth!.triggerRelease(now + 0.12)
@@ -128,7 +140,8 @@ export function playExplosionSound(comboCount: number = 0): void {
 
   ensureSynths()
 
-  const toneNow = Tone.now()
+  const toneNow = Math.max(Tone.now(), lastPopAt + MIN_TRIGGER_GAP)
+  lastPopAt = toneNow
   // Balloon pop — snappy white noise burst
   popSnap!.triggerAttackRelease(0.05 + Math.random() * 0.02, toneNow)
 
