@@ -17,18 +17,15 @@ interface ClusterSet {
 
 interface ClusterPlacement {
   count: number
-  /** Tallest shard at scale 1. */
   height: number
   scaleRange: [number, number]
-  /** Clearance from the track centreline. */
   minDist: number
   seed: number
 }
 
 const TINTS = [0xffffff, 0xd8f6ff, 0xb8ecff, 0xe8fbff]
 
-// Tall spires stand further back so they frame the ride without hiding snowmen next
-// to the rails; the low splays may come closer.
+// Tall spires stand further back so they don't hide snowmen beside the rails.
 const SPIRES: ClusterPlacement = { count: 90, height: SPIRE_HEIGHT, scaleRange: [1.2, 2.6], minDist: 120, seed: 19 }
 const SPLAYS: ClusterPlacement = { count: 110, height: SPLAY_HEIGHT, scaleRange: [1.2, 2.2], minDist: 70, seed: 1904 }
 
@@ -37,9 +34,7 @@ function placeClusters(
   { count, height, scaleRange, minDist, seed }: ClusterPlacement,
 ): ClusterSet {
   const rng = createRng(seed)
-  // Mid-ground band around the ride, out to 1.5x the track extent, densest near the
-  // rails. Slopes are measured on the drawn surface the clusters stand on; oversample
-  // so clusters on broken ground can be dropped.
+  // Oversampled: settleOnGround drops spots on broken ground.
   const points = scatterNearTrack({
     count: count * 3,
     trackSamples,
@@ -51,7 +46,6 @@ function placeClusters(
     bias: 1.8,
     rng,
   })
-  // at most a fifth of a cluster buried on the uphill side
   const props = settleOnGround(points, groundFn, {
     count,
     scaleRange,
@@ -101,7 +95,7 @@ function ClusterMesh({
   return <instancedMesh ref={setRef} args={[geometry, material, set.matrices.length]} />
 }
 
-/** Glowing cyan crystal clusters in two shapes, scattered around the track and sat on the drawn terrain. */
+/** Glowing cyan crystal clusters around the track. */
 export default function IceCrystals({ groundFn, trackSamples }: BiomeDecorationsProps) {
   const spireGeo = useMemo(() => createSpireClusterGeometry(), [])
   const splayGeo = useMemo(() => createSplayClusterGeometry(), [])

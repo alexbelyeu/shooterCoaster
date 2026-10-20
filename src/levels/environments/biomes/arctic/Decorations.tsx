@@ -8,7 +8,7 @@ import SnowDrifts from './SnowDrifts'
 export default function ArcticDecorations(props: BiomeDecorationsProps) {
   const { heightFn } = props
 
-  // Snow-covered boulders — increased to 80
+  // Snow-covered boulders
   const boulderPositions = useMemo(() => scatterPositions(80, 150, 3500, heightFn), [heightFn])
   const boulderGeo = useMemo(() => new THREE.DodecahedronGeometry(1, 0), [])
   const boulderMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#d8e0e8', flatShading: true }), [])
@@ -33,7 +33,7 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
     mesh.instanceMatrix.needsUpdate = true
   }, [boulderPositions])
 
-  // Tall ice columns (semi-transparent) — increased to 45
+  // Tall ice columns (semi-transparent)
   const columnPositions = useMemo(() => scatterPositions(45, 200, 3500, heightFn), [heightFn])
   const columnGeo = useMemo(() => {
     const iceColumnPoints: THREE.Vector2[] = []

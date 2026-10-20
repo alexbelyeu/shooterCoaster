@@ -40,7 +40,7 @@ export interface BiomeDecorationsProps {
   heightFn: HeightFunction
   /** Terrain height as drawn (createTerrainSurface): sit grounded props on this. */
   groundFn: HeightFunction
-  /** Pre-sampled track path, for scattering props around the ride (shared/trackScatter.ts). */
+  /** For scattering props around the ride (shared/trackScatter.ts). */
   trackSamples: TrackSample[]
 }
 

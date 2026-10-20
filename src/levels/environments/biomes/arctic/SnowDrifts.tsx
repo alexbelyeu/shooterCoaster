@@ -5,16 +5,16 @@ import { createRng, scatterNearTrack, settleOnGround, trackExtent } from '../../
 import { COLOR_RAMP } from './config'
 import { DRIFT_HALF_LENGTH, DRIFT_HEIGHT, createDriftGeometry } from './iceProps'
 
-/** Prevailing wind (radians about +y): drifts line up with it, ± jitter. */
+/** Prevailing wind (yaw): drifts line up with it. */
 const WIND_YAW = 0.7
 
-/** Wind-swept snow drifts on the flat ground beside the track, in the terrain's snow colour. */
+/** Snow drifts on flat ground beside the track. */
 export default function SnowDrifts({ groundFn, trackSamples }: BiomeDecorationsProps) {
   const geometry = useMemo(() => createDriftGeometry(), [])
   const material = useMemo(
     () =>
       new THREE.MeshPhongMaterial({
-        // the ramp's "bright snow" stop, so drifts read as part of the snowfield
+        // the ramp's "bright snow" stop
         color: COLOR_RAMP.stops[3].color,
         specular: '#c8d8ff',
         shininess: 12,
@@ -26,7 +26,6 @@ export default function SnowDrifts({ groundFn, trackSamples }: BiomeDecorationsP
   const matrices = useMemo(() => {
     const rng = createRng(77)
     const count = 90
-    // flat drawn ground only; oversample so drifts on broken ground can be dropped
     const points = scatterNearTrack({
       count: count * 3,
       trackSamples,
@@ -38,7 +37,6 @@ export default function SnowDrifts({ groundFn, trackSamples }: BiomeDecorationsP
       bias: 1.5,
       rng,
     })
-    // keep at least two thirds of each drift above the snow
     const drifts = settleOnGround(points, groundFn, {
       count,
       scaleRange: [10, 32],

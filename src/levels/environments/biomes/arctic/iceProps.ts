@@ -1,22 +1,17 @@
 import * as THREE from 'three'
 
-/**
- * Baked geometry for the Arctic ice props. Heights are baked into the vertices
- * (never scaled per axis); instances only get a uniform scale + yaw.
- */
+/** Arctic ice props, heights baked in: instances only get a uniform scale + yaw. */
 
 interface Shard {
   height: number
   radius: number
-  /** Lean away from the cluster centre (radians). */
+  /** Lean (radians) away from the cluster centre, towards `dir`. */
   tilt: number
-  /** Direction of the lean / offset (radians). */
   dir: number
-  /** Horizontal offset of the base from the cluster centre. */
   offset: number
 }
 
-/** Hex prism with a pointed tip, base `bury` units below y = 0, appended as flat triangles. */
+/** Pointed hex prism, base `bury` units below y = 0 (no cap: it is always underground). */
 function pushShard(out: number[], s: Shard, bury: number) {
   const tipLen = s.radius * 1.6
   const y0 = -bury
@@ -52,19 +47,16 @@ function buildCluster(shards: Shard[], bury: number): THREE.BufferGeometry {
   for (const s of shards) pushShard(pos, s, bury)
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-  geo.computeVertexNormals() // non-indexed → flat facet normals
+  geo.computeVertexNormals()
   geo.computeBoundingSphere()
   return geo
 }
 
-/** Footprint radius of the clusters at scale 1 (for grounding). */
 export const CRYSTAL_FOOTPRINT = 10
 
-/** Height of the tallest shard of each cluster at scale 1. */
 export const SPIRE_HEIGHT = 60
 export const SPLAY_HEIGHT = 24
 
-/** Tall spire: one big central crystal with four leaning satellites. */
 export function createSpireClusterGeometry(): THREE.BufferGeometry {
   return buildCluster(
     [
@@ -78,7 +70,6 @@ export function createSpireClusterGeometry(): THREE.BufferGeometry {
   )
 }
 
-/** Low splay: six short crystals fanning out. */
 export function createSplayClusterGeometry(): THREE.BufferGeometry {
   return buildCluster(
     [
@@ -93,14 +84,10 @@ export function createSplayClusterGeometry(): THREE.BufferGeometry {
   )
 }
 
-/** Half-length of a snow drift along its long (x) axis, and its crest height, at scale 1. */
 export const DRIFT_HALF_LENGTH = 2.6
 export const DRIFT_HEIGHT = 0.45
 
-/**
- * Wind-swept snow drift: a low flattened half-ellipsoid, long along x, with
- * its crest sheared downwind (+x) so one face is gentle and the other steep.
- */
+/** Low half-ellipsoid, long along x, crest sheared downwind (+x) like a wind-swept drift. */
 export function createDriftGeometry(): THREE.BufferGeometry {
   const geo = new THREE.SphereGeometry(1, 14, 5, 0, Math.PI * 2, 0, Math.PI / 2)
   const pos = geo.attributes.position

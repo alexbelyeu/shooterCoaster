@@ -9,7 +9,6 @@ import {
   createAuroraMaterial,
 } from './aurora'
 
-/** Aurora curtains (one draw call) centred on the camera; intensity follows `AURORA_INTENSITY_EVENT`. */
 export default function Aurora() {
   const geometry = useMemo(() => createAuroraGeometry(), [])
   const material = useMemo(() => createAuroraMaterial(), [])
@@ -41,7 +40,6 @@ export default function Aurora() {
     mesh.position.copy(camera.position)
     const u = material.uniforms
     u.uTime.value = clock.elapsedTime
-    // ease toward the requested intensity (~0.5 s time constant)
     u.uIntensity.value += (target.current - u.uIntensity.value) * Math.min(1, delta * 2)
   })
 

@@ -1,11 +1,6 @@
 import type { HeightFunction, TrackSample } from '@/utils/terrainNoise'
 
-/**
- * Track-aware scatter helpers (pure: no three/React, unit-tested). Decorations
- * that should frame the ride (crystals, drifts) are scattered around the track
- * instead of uniformly over the map, so the mid-ground the rider actually sees
- * is dense while the far hills stay sparse.
- */
+/** Scatter props around the track rather than uniformly over the map (pure, unit-tested). */
 
 export interface ScatterPoint {
   x: number
@@ -13,7 +8,7 @@ export interface ScatterPoint {
   z: number
 }
 
-/** Small deterministic PRNG (mulberry32) so a level's scatter is the same every run. */
+/** mulberry32: the same scatter every run. */
 export function createRng(seed: number): () => number {
   let a = seed >>> 0
   return () => {
@@ -25,14 +20,13 @@ export function createRng(seed: number): () => number {
   }
 }
 
-/** Furthest horizontal distance of the track from the origin (≈ varC * 13 * scalar). */
+/** ≈ varC * 13 * scalar. */
 export function trackExtent(samples: readonly TrackSample[]): number {
   let max = 0
   for (const s of samples) max = Math.max(max, Math.hypot(s.x, s.z))
   return max
 }
 
-/** Horizontal distance from (x, z) to the nearest track sample. */
 export function distanceToTrack(samples: readonly TrackSample[], x: number, z: number): number {
   let best = Infinity
   for (const s of samples) {
@@ -48,26 +42,17 @@ export interface NearTrackScatterOptions {
   count: number
   trackSamples: readonly TrackSample[]
   heightFn: HeightFunction
-  /** Horizontal clearance from the track centreline (keeps props out of the train's path and the towers). */
+  /** Horizontal clearance from the track centreline (keeps props off the rails and towers). */
   minDist: number
-  /** Furthest offset from the track. */
   maxDist: number
-  /** Hard limit on distance from the origin. */
   maxRadius: number
-  /** Slope rejection angle in radians. */
   maxSlope: number
   /** Exponent on the offset distribution; > 1 concentrates props near the track. */
   bias: number
   rng: () => number
 }
 
-/**
- * Scatter points around the track: pick a random track sample, step out by an
- * offset biased towards `minDist`, and reject points too close to any part of
- * the track, beyond `maxRadius` or on slopes steeper than `maxSlope`.
- * `y` is `heightFn` at the point; grounded props should re-sample the drawn
- * surface (see `groundedBaseY`).
- */
+/** Points offset from random track samples, rejecting any too close to the track, too far out or too steep. */
 export function scatterNearTrack(opts: NearTrackScatterOptions): ScatterPoint[] {
   const { count, trackSamples, heightFn, minDist, maxDist, maxRadius, maxSlope, bias, rng } = opts
   const out: ScatterPoint[] = []
@@ -91,12 +76,7 @@ export function scatterNearTrack(opts: NearTrackScatterOptions): ScatterPoint[] 
   return out
 }
 
-/**
- * Base height for a prop with a footprint of `radius` on the *drawn* terrain
- * (`groundFn` = createTerrainSurface): the lowest surface point under the
- * footprint, minus `sink`. Using the minimum means no edge of the base ever
- * hangs in the air; on a slope the uphill side is buried instead.
- */
+/** Lowest drawn-ground point under a round footprint, minus `sink`: no edge of the base can hang in the air. */
 export function groundedBaseY(
   groundFn: HeightFunction,
   x: number,
@@ -113,15 +93,13 @@ export function groundedBaseY(
 }
 
 export interface GroundedProp extends ScatterPoint {
-  /** Uniform scale; `y` is the base height for that scale (see groundedBaseY). */
   scale: number
 }
 
 /**
- * Settle candidate points onto the drawn terrain with a random uniform scale,
- * keeping the first `count` whose base buries at most `maxBury` (a fraction) of
- * the prop's height: the base sits at the lowest ground under the footprint, so
- * on uneven ground the uphill side sinks. `footprint` and `height` are at scale 1.
+ * Give each point a random uniform scale and sit it on `groundedBaseY`, keeping the
+ * first `count` whose uphill side is buried by at most `maxBury` of the height
+ * (`footprint` and `height` at scale 1).
  */
 export function settleOnGround(
   points: readonly ScatterPoint[],
