@@ -14,7 +14,10 @@ better every week while keeping it shippable. You are the only role that decides
 Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, `docs/agents/STEERING.md`,
 `docs/agents/VISION.md`, `docs/agents/STATE.md`, `docs/agents/DECISIONS.md` (plus any unfolded files in
 `docs/agents/decisions/inbox/`), and the
-most recent file in `docs/reports/`.
+most recent file in `docs/reports/`, plus `docs/marketing/STRATEGY.md` and the latest
+`docs/marketing/metrics/` file (written by the Marketer an hour before you). Weigh the
+Marketer's `type:growth` issues against the roadmap: a game nobody can find doesn't get better
+by adding levels.
 
 If STEERING.md says `pause: true`, stop and report that you are paused.
 

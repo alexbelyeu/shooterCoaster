@@ -6,6 +6,7 @@ How the autonomous ShooterCoaster studio works. Every scheduled session reads th
 
 | Role | Model | When (America/New_York) | Job |
 |---|---|---|---|
+| **Marketer** | Fable (latest) | Mon ~05:15 | Measures the game (Vercel Web Analytics), keeps `docs/marketing/`, files growth issues, drafts posts and ad campaigns for Alex to place |
 | **Reporter** | Sonnet | Mon ~06:15 | Writes last week's report, emails Alex |
 | **Director** | Fable (latest) | Mon ~07:45 | Reads report + steering, updates vision/state, plans the week as issues |
 | **Builders** | Opus | daily ~08:45, ~13:45, ~18:45 | Each run: up to N parallel builder subagents, one issue each → PRs |
@@ -65,9 +66,10 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 - `agent:prod-broken` — production smoke test failed (opened by the nightly workflow). Maintainer drops everything for it.
 - `steering` — an issue from Alex. Director treats it like STEERING.md.
 - Priority: `P1` (this week, do first), `P2` (this week), `P3` (if time).
-- Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`.
+- Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`, `type:growth`.
 - `epic` — umbrella issue the Director breaks into `agent:ready` children. Never claimed by builders.
 - `studio-status` — the live status page issue (see above). Not work; never touch it.
+- `marketing` + `needs-alex` — a draft post or campaign from the Marketer that only Alex can carry out (agents never post, spend or create accounts). Builders ignore these. `type:growth` — discoverability or growth work for builders, filed by the Marketer.
 - Add `agent:needs-qa` / `agent:changes-requested` **last, in a call of their own**, after any other labels. Each label added while one of those is present fires the on-label task again, so adding three labels at once starts three sessions. When swapping (e.g. `agent:needs-qa` → `agent:changes-requested`), remove the old label first, then add the new one in a separate call.
 
 ## Issue contract (Director writes these)
