@@ -87,6 +87,10 @@ framer-motion (UI), Vite 6, TypeScript strict. Deployed on Vercel: every push to
 `main` goes to production at **https://shooter-coaster.vercel.app** (https://scoaster.com becomes the home once the domain is attached in Vercel). Preview deployments
 are disabled (`git.deploymentEnabled` in `vercel.json`) — verification happens in CI. Serverless stubs in `api/` (leaderboard, daily seed, ghost
 replays — currently in-memory placeholders).
+Vercel Web Analytics (`@vercel/analytics`, page views only) is mounted in `src/main.tsx`
+only on Vercel builds (`__BUILT_ON_VERCEL__`, set in `vite.config.ts` from `VERCEL=1`)
+and never with `?e2e=1` (`src/app/analyticsGate.ts`), so dev, `vite preview`, CI and the
+smoke tests send nothing.
 
 ## Code map
 
