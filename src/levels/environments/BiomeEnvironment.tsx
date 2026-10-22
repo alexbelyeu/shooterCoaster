@@ -13,7 +13,7 @@ import { BIOMES } from './biomeRegistry'
 import Atmosphere from './shared/Atmosphere'
 import OceanWater from './shared/OceanWater'
 import TreeField from './shared/TreeField'
-import { createNoiseTerrain } from './shared/terrainMesh'
+import { addTerrainGlow, createNoiseTerrain, createTerrainMaterial } from './shared/terrainMesh'
 
 interface BiomeEnvironmentProps {
   biome: BiomeType
@@ -45,18 +45,21 @@ export default function BiomeEnvironment({
   const fogRef = useRef<THREE.Fog>(null)
 
   const groundGeo = useMemo(() => {
-    return createNoiseTerrain(def.colorRamp, heightFn, getTerrainMeshSize(biome), TERRAIN_MESH_SEGMENTS)
+    const geo = createNoiseTerrain(def.colorRamp, heightFn, getTerrainMeshSize(biome), TERRAIN_MESH_SEGMENTS)
+    if (def.terrainGlow) addTerrainGlow(geo, def.terrainGlow)
+    return geo
   }, [biome, def, heightFn])
+  const groundMat = useMemo(
+    () => def.createTerrainMaterial?.() ?? createTerrainMaterial(def.terrainGlow),
+    [def],
+  )
 
   useEffect(() => {
     return () => groundGeo.dispose()
   }, [groundGeo])
-
-  const groundMat = useMemo(
-    () => def.createTerrainMaterial?.() ?? new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true }),
-    [def],
-  )
-  useEffect(() => () => groundMat.dispose(), [groundMat])
+  useEffect(() => {
+    return () => groundMat.dispose()
+  }, [groundMat])
 
   const { Decorations, Features } = def
 

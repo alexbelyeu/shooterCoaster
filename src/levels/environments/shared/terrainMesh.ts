@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
-import type { ColorRamp, ColorStop } from './types'
+import type { ColorRamp, ColorStop, TerrainGlow } from './types'
 
 export function sampleColorRamp(stops: ColorStop[], t: number, tmp: THREE.Color): void {
   const clamped = Math.max(0, Math.min(1, t))
@@ -81,4 +81,31 @@ export function createNoiseTerrain(
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
 
   return geo
+}
+
+/** Bakes `glow.sample` into the `glow` vertex attribute that createTerrainMaterial reads. */
+export function addTerrainGlow(geo: THREE.BufferGeometry, glow: TerrainGlow): void {
+  const pos = geo.attributes.position
+  const amounts = new Float32Array(pos.count)
+  for (let i = 0; i < pos.count; i++) amounts[i] = glow.sample(pos.getX(i), pos.getZ(i))
+  geo.setAttribute('glow', new THREE.BufferAttribute(amounts, 1))
+}
+
+/** Flat-shaded vertex-coloured terrain; with `glow`, adds emissive scaled by the `glow` attribute. Caller disposes. */
+export function createTerrainMaterial(glow?: TerrainGlow): THREE.MeshPhongMaterial {
+  const material = new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true })
+  if (!glow) return material
+
+  const glowColor = new THREE.Color(glow.color).multiplyScalar(glow.intensity)
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uGlowColor = { value: glowColor }
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float glow;\nvarying float vGlow;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = glow;')
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uGlowColor;\nvarying float vGlow;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uGlowColor * vGlow;')
+  }
+  material.customProgramCacheKey = () => 'terrain-glow'
+  return material
 }

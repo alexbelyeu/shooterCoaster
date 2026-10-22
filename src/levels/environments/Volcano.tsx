@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import SmokeColumn from './SmokeColumn'
 
 interface VolcanoProps {
   position: [number, number, number]
@@ -12,7 +13,6 @@ const MOUNTAIN_GEO = new THREE.ConeGeometry(1200, 1600, 12)
 const CRATER_GEO = new THREE.TorusGeometry(160, 60, 8, 12)
 const CORE_GEO = new THREE.SphereGeometry(120, 8, 8)
 const LAVA_FLOW_GEO = new THREE.PlaneGeometry(40, 800, 4, 40)
-const PLUME_GEO = new THREE.SphereGeometry(400, 8, 6)
 
 // Materials
 const MOUNTAIN_MAT = new THREE.MeshPhongMaterial({
@@ -38,15 +38,17 @@ const LAVA_FLOW_FALLBACK_MAT = new THREE.MeshPhongMaterial({
   opacity: 0.7,
   side: THREE.DoubleSide,
 })
-const PLUME_MAT = new THREE.MeshPhongMaterial({
-  color: '#3a3030',
-  transparent: true,
-  opacity: 0.3,
-})
+
+/** Smoke puffs rising from the crater (y = 1600), widening as they climb. */
+const SMOKE_PUFFS = [
+  { y: 2050, halfWidth: 380, halfHeight: 520 },
+  { y: 2650, halfWidth: 560, halfHeight: 640 },
+  { y: 3400, halfWidth: 800, halfHeight: 780 },
+]
 
 /**
  * Multi-part erupting volcano landmark.
- * Large cone mountain, glowing crater core, lava flow strips, and ash plume.
+ * Large cone mountain, glowing crater core, lava flow strips, and smoke column.
  */
 export default function Volcano({ position, lavaMaterial }: VolcanoProps) {
   const coreRef = useRef<THREE.Mesh>(null)
@@ -103,12 +105,7 @@ export default function Volcano({ position, lavaMaterial }: VolcanoProps) {
         )
       })}
 
-      {/* Ash plume above crater */}
-      <mesh
-        geometry={PLUME_GEO}
-        material={PLUME_MAT}
-        position={[0, 1900, 0]}
-      />
+      <SmokeColumn puffs={SMOKE_PUFFS} />
     </group>
   )
 }

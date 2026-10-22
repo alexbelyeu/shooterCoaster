@@ -6,13 +6,18 @@ import type { BiomeFeaturesProps } from '../../shared/types'
 import Volcano from '../../Volcano'
 import { createLavaMaterial } from '../../LavaShader'
 import { createLavaRiverGeometries } from './lavaRivers'
+import ParticleField from '../../shared/ParticleField'
+import { ASH_EMBERS } from './config'
 
 const ERUPTION_TRAUMA = 0.8
 const ERUPTION_TRAUMA_MS = 3000
+const EMBER_BOOST_S = 3
+const EMBER_BOOST_FADE_S = 1
 
-/** Volcano landmark, lava rivers, and the eruption event (camera rumble + fog pulse). */
+/** Volcano, lava rivers, ash and embers, and the eruption (camera rumble, fog pulse, ember burst). */
 export default function VolcanicFeatures({ heightFn, atmosphere, fogRef }: BiomeFeaturesProps) {
   const fogPulseRef = useRef({ active: false, startTime: 0 })
+  const emberBoostRef = useRef(0)
 
   // Lava shader material — animated procedural molten rock
   const lavaRiverMat = useMemo(() => createLavaMaterial(0.08, 1.2), [])
@@ -49,6 +54,7 @@ export default function VolcanicFeatures({ heightFn, atmosphere, fogRef }: Biome
     if (!pulse.active) return
     if (pulse.startTime < 0) pulse.startTime = clock.elapsedTime
     const elapsed = clock.elapsedTime - pulse.startTime
+    emberBoostRef.current = 1 - Math.min(1, Math.max(0, (elapsed - EMBER_BOOST_S) / EMBER_BOOST_FADE_S))
 
     // Fog pulse: close in over 2s, recover over 8s
     if (fogRef.current) {
@@ -76,6 +82,7 @@ export default function VolcanicFeatures({ heightFn, atmosphere, fogRef }: Biome
           material={lavaRiverMat}
         />
       ))}
+      <ParticleField preset={ASH_EMBERS} boostRef={emberBoostRef} />
     </>
   )
 }

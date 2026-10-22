@@ -15,14 +15,8 @@ export const lavaVertexShader = /* glsl */ `
   }
 `
 
-export const lavaFragmentShader = /* glsl */ `
-  uniform float uTime;
-  uniform float uFlowSpeed;
-  uniform float uIntensity;
-
-  varying vec2 vUv;
-  varying vec3 vWorldPosition;
-
+/** Gradient noise, Voronoi and rotated fbm, shared by the procedural shaders (lava, smoke). */
+export const noiseGlsl = /* glsl */ `
   // --- Hash / noise primitives ---
   vec2 hash2(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -82,6 +76,17 @@ export const lavaFragmentShader = /* glsl */ `
     }
     return value;
   }
+`
+
+export const lavaFragmentShader = /* glsl */ `
+  uniform float uTime;
+  uniform float uFlowSpeed;
+  uniform float uIntensity;
+
+  varying vec2 vUv;
+  varying vec3 vWorldPosition;
+
+  ${noiseGlsl}
 
   void main() {
     vec2 uv = vUv;

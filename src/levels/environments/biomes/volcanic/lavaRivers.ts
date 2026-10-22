@@ -1,27 +1,13 @@
 import * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import { safeHeight } from '../../shared/safeHeight'
+import { RIVER_CONFIGS, RIVER_SEGMENTS, riverRow } from './lavaRiverPaths'
 
-const RIVER_CONFIGS = [
-  { angle: 0.3, rStart: 800, rEnd: 3000, halfWidth: 15 },
-  { angle: 1.2, rStart: 900, rEnd: 2800, halfWidth: 12 },
-  { angle: 2.5, rStart: 1000, rEnd: 3200, halfWidth: 18 },
-  { angle: 3.8, rStart: 700, rEnd: 2600, halfWidth: 14 },
-  { angle: 5.0, rStart: 850, rEnd: 2900, halfWidth: 16 },
-]
-
-// The terrain mesh is 128 segments over 12000 units (~94 units/cell).
-// Between terrain vertices the GPU interpolates linearly, but heightFn
-// gives exact noise.  To guarantee the lava strip always sits visibly
-// *above* the rendered terrain surface we:
-//  1. Sample a 3×3 grid around each vertex (matching the terrain cell size)
-//     and take the MAX height so we clear any nearby peak.
-//  2. Add a generous Y offset (8 units).
-//  3. Use 120 segments so the strip follows the terrain closely.
+// The drawn terrain is linear between vertices ~94 units apart, so each row sits
+// Y_OFFSET above the max of a 3×3 cell neighbourhood to never clip into it.
 
 const TERRAIN_CELL = 12000 / 128  // ~93.75
 const Y_OFFSET = 8
-const SEGMENTS = 120
 
 /** Lava rivers — terrain-conforming strips that drape over the heightmap. Caller disposes. */
 export function createLavaRiverGeometries(heightFn: HeightFunction): THREE.BufferGeometry[] {
@@ -30,39 +16,28 @@ export function createLavaRiverGeometries(heightFn: HeightFunction): THREE.Buffe
   const sh = (x: number, z: number) => safeHeight(heightFn, x, z, half, Y_OFFSET)
 
   for (const cfg of RIVER_CONFIGS) {
-    const dx = Math.cos(cfg.angle)
-    const dz = Math.sin(cfg.angle)
-    const px = -dz // perpendicular
-    const pz = dx
-
     const positions: number[] = []
     const uvs: number[] = []
     const indices: number[] = []
 
-    for (let i = 0; i <= SEGMENTS; i++) {
-      const t = i / SEGMENTS
-      const r = cfg.rStart + (cfg.rEnd - cfg.rStart) * t
-      const cx = dx * r
-      const cz = dz * r
-      const wander = Math.sin(t * 4) * 30 + Math.cos(t * 7) * 15
+    for (let i = 0; i <= RIVER_SEGMENTS; i++) {
+      const t = i / RIVER_SEGMENTS
+      const { cx, cz, px, pz } = riverRow(cfg, i)
 
-      const lx = cx + (px * cfg.halfWidth) + px * wander
-      const lz = cz + (pz * cfg.halfWidth) + pz * wander
-      const rx = cx - (px * cfg.halfWidth) + px * wander
-      const rz = cz - (pz * cfg.halfWidth) + pz * wander
+      const lx = cx + px * cfg.halfWidth
+      const lz = cz + pz * cfg.halfWidth
+      const rx = cx - px * cfg.halfWidth
+      const rz = cz - pz * cfg.halfWidth
 
       // Use the max of all three sample points so the whole cross-section clears
-      const centerH = sh(cx + px * wander, cz + pz * wander)
-      const leftH = sh(lx, lz)
-      const rightH = sh(rx, rz)
-      const rowY = Math.max(centerH, leftH, rightH)
+      const rowY = Math.max(sh(cx, cz), sh(lx, lz), sh(rx, rz))
 
       positions.push(lx, rowY, lz)
       positions.push(rx, rowY, rz)
       uvs.push(0, t)
       uvs.push(1, t)
 
-      if (i < SEGMENTS) {
+      if (i < RIVER_SEGMENTS) {
         const base = i * 2
         indices.push(base, base + 1, base + 2)
         indices.push(base + 1, base + 3, base + 2)

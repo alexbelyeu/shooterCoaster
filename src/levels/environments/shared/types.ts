@@ -55,6 +55,14 @@ export interface BiomeFeaturesProps {
   fogRef: RefObject<THREE.Fog | null>
 }
 
+/** Ground that gives off its own light (volcanic: beside the lava), baked per terrain vertex. */
+export interface TerrainGlow {
+  color: THREE.ColorRepresentation
+  intensity: number
+  /** 0..1 at world (x, z), sampled once per terrain vertex. */
+  sample: (x: number, z: number) => number
+}
+
 /**
  * Everything BiomeEnvironment needs to render a biome. Sky/light/fog/exposure
  * stay in `atmosphere.ts`; terrain noise stays in `utils/terrainNoise.ts`.
@@ -62,9 +70,10 @@ export interface BiomeFeaturesProps {
  */
 export interface BiomeDefinition {
   colorRamp: ColorRamp
+  terrainGlow?: TerrainGlow
   /** null = this biome never has trees. */
   trees: BiomeTreeConfig | null
-  /** Terrain material (must use vertex colours); default: flat-shaded vertex-coloured Phong. */
+  /** Terrain material (must use vertex colours); default: flat-shaded vertex-coloured Phong with `terrainGlow` applied. A custom material ignores `terrainGlow`. */
   createTerrainMaterial?: () => THREE.Material
   /** Scattered InstancedMesh props (cacti, coral, crystals…). */
   Decorations?: ComponentType<BiomeDecorationsProps>
