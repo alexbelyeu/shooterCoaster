@@ -140,11 +140,13 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
   },
   ocean: {
     frequency: 0.0007,
-    amplitude: 300,
+    // High exponent: only the noise peaks rise above the water (y = 0), so beyond
+    // the lagoon about half the sea is open water, an archipelago for the sea stacks.
+    amplitude: 400,
     octaves: 4,
     persistence: 0.5,
     lacunarity: 2.3,
-    exponent: 1.8,
+    exponent: 3,
     ridgeMode: false,
     baseY: -40,
     flatRadius: 600,
