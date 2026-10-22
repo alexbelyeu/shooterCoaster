@@ -1,17 +1,13 @@
 import * as THREE from 'three'
 import { WATER_WAVE_GLSL } from '../../shared/waterWaves'
 
-/**
- * Animated ocean prop materials. Each factory returns the material plus the
- * `uTime` uniform the caller advances with `clock.elapsedTime` (the water's clock).
- */
+/** `uTime` must be advanced with `clock.elapsedTime`, the water's clock, so foam stays on the waves. */
 export interface AnimatedMaterial<T extends THREE.Material> {
   material: T
   uTime: { value: number }
 }
 
-// ── Foam rings ────────────────────────────────────────────────────────
-/** Ring geometry for `createFoamMaterial`: inner radius 1 (instance scale = inner radius in world units). */
+/** Inner radius 1, so the instance scale is the inner radius in world units. */
 export const FOAM_OUTER = 1.8
 
 export function createFoamRingGeometry(): THREE.BufferGeometry {
@@ -52,11 +48,9 @@ const foamFragment = /* glsl */ `
 
   void main() {
     float seed = vSeed * 6.2832;
-    // Dense foam hugging the rock, thinning out into broken lace.
     float body = pow(1.0 - vRing, 1.8);
     float lace = 0.6 + 0.4 * sin(vAngle * 9.0 + uTime * 0.7 + seed) *
                              sin(vAngle * 5.0 - uTime * 0.45 + seed * 2.0 + vRing * 6.0);
-    // A wash ring that rolls outward and fades.
     float wave = fract(uTime * 0.22 + vSeed);
     float wash = (1.0 - smoothstep(0.0, 0.1, abs(vRing - wave))) * (1.0 - wave) * 0.7;
     float a = clamp(body * lace + wash, 0.0, 1.0) * vFade;
@@ -64,7 +58,6 @@ const foamFragment = /* glsl */ `
   }
 `
 
-/** Additive white foam that rides the water's waves (renders after the water). */
 export function createFoamMaterial(fadeNear: number, fadeFar: number): AnimatedMaterial<THREE.ShaderMaterial> {
   const uTime = { value: 0 }
   const material = new THREE.ShaderMaterial({
@@ -83,11 +76,7 @@ export function createFoamMaterial(fadeNear: number, fadeFar: number): AnimatedM
   return { material, uTime }
 }
 
-// ── Coral ─────────────────────────────────────────────────────────────
-/**
- * Flat-shaded coral that also glows in its own (vertex × instance) colour, so it
- * stays saturated under the teal water and the deep-water fresnel.
- */
+/** Glows in its own vertex × instance colour so it stays saturated under the teal water. */
 export function createCoralMaterial(glow: number): THREE.MeshPhongMaterial {
   const material = new THREE.MeshPhongMaterial({
     vertexColors: true,
@@ -105,8 +94,6 @@ export function createCoralMaterial(glow: number): THREE.MeshPhongMaterial {
   return material
 }
 
-// ── Kelp ──────────────────────────────────────────────────────────────
-/** Kelp blades swaying in the current; reads the `aSway` attribute from `createKelpClumpGeometry`. */
 export function createKelpMaterial(): AnimatedMaterial<THREE.MeshPhongMaterial> {
   const uTime = { value: 0 }
   const material = new THREE.MeshPhongMaterial({
@@ -124,7 +111,6 @@ export function createKelpMaterial(): AnimatedMaterial<THREE.MeshPhongMaterial> 
         '#include <begin_vertex>',
         `#include <begin_vertex>
   {
-    // Per-clump phase from its world position (column 3 of the instance matrix).
     float ph = instanceMatrix[3].x * 0.05 + instanceMatrix[3].z * 0.03;
     float bend = aSway * aSway * 4.0;
     transformed.x += sin(uTime * 1.1 + ph) * bend;
@@ -136,8 +122,6 @@ export function createKelpMaterial(): AnimatedMaterial<THREE.MeshPhongMaterial> 
   return { material, uTime }
 }
 
-// ── Gulls ─────────────────────────────────────────────────────────────
-/** Unlit gull material; reads `aFlap` from `createGullGeometry` and flaps each instance out of phase. */
 export function createGullMaterial(): AnimatedMaterial<THREE.MeshBasicMaterial> {
   const uTime = { value: 0 }
   const material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })
@@ -150,7 +134,6 @@ export function createGullMaterial(): AnimatedMaterial<THREE.MeshBasicMaterial> 
         `#include <begin_vertex>
   {
     float id = float(gl_InstanceID);
-    // Flap in bursts, then glide.
     float burst = 0.35 + 0.65 * smoothstep(-0.2, 0.6, sin(uTime * 0.6 + id * 2.3));
     transformed.y += sin(uTime * 7.0 + id * 1.7) * aFlap * 7.0 * burst;
   }`,

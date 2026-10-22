@@ -1,6 +1,5 @@
-/** Ocean prop dimensions at scale 1, shared by the geometry builders and the placement (pure). */
+/** Ocean prop dimensions at scale 1, shared by the geometry builders and the placement. */
 
-/** One horizontal ring of a rock: height, radius, centre offset. */
 export interface RockRing {
   y: number
   r: number
@@ -8,7 +7,7 @@ export interface RockRing {
   oz?: number
 }
 
-/** Outer radius of a ring profile at height `y` (linear between rings, ignoring jitter). */
+/** Ignores the builders' jitter. */
 export function profileRadiusAt(rings: readonly RockRing[], y: number): number {
   if (y <= rings[0].y) return rings[0].r
   for (let i = 0; i < rings.length - 1; i++) {
@@ -19,7 +18,7 @@ export function profileRadiusAt(rings: readonly RockRing[], y: number): number {
   return rings[rings.length - 1].r
 }
 
-// Sea stack: three eroded tiers with ledges between them (same y, smaller ring).
+// Two rings at the same y make a ledge.
 export const STACK_RINGS: readonly RockRing[] = [
   { y: 0, r: 44 },
   { y: 72, r: 39 },

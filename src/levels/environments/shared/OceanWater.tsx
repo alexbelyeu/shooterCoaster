@@ -31,7 +31,6 @@ const waterFragmentShader = /* glsl */ `
 
   varying vec3 vWorldPosition;
 
-  // Slope of one travelling ripple: direction * d/dphase(a * sin(phase)).
   vec2 ripple(vec2 p, vec2 dir, float k, float w, float a) {
     return dir * (cos(dot(dir, p) * k + uTime * w) * k * a);
   }
@@ -50,8 +49,7 @@ const waterFragmentShader = /* glsl */ `
                     cos(vWorldPosition.z * 0.04 + uTime * 1.5) * 0.05;
     color += shimmer;
 
-    // Sun glint: ripple normals (faded out with distance, where they would alias)
-    // catching the sun's mirror reflection.
+    // Sun glint off ripple normals, flattened with distance where they would alias.
     vec2 p = vWorldPosition.xz;
     vec2 slope = ripple(p, vec2(0.8, 0.6), 0.09, 1.7, 0.9)
                + ripple(p, vec2(-0.5, 0.866), 0.13, 2.3, 0.6)

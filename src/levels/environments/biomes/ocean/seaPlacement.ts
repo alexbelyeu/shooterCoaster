@@ -2,15 +2,13 @@ import type { HeightFunction, TrackSample } from '@/utils/terrainNoise'
 import { createRng, groundedBaseY, scatterNearTrack, trackExtent, type ScatterPoint } from '../../shared/trackScatter'
 import { KELP_HEIGHT, ROCK_FOOTPRINT, ROCK_HEIGHT, STACK_FOOTPRINT, STACK_HEIGHT } from './seaDimensions'
 
-/** Where the ocean props go (pure, unit-tested). The water surface is y = 0. */
-
-/** A prop standing on the seabed: base y on the drawn ground, uniform scale, yaw. */
+/** Where the ocean props go (pure). The water surface is y = 0. */
 export interface SeabedProp extends ScatterPoint {
   scale: number
   yaw: number
 }
 
-/** Highest drawn ground under a round footprint (centre + 6 points on the rim). */
+/** Highest drawn ground under a round footprint. */
 export function maxGroundUnder(groundFn: HeightFunction, x: number, z: number, radius: number): number {
   let max = groundFn(x, z)
   for (let i = 0; i < 6; i++) {
@@ -22,20 +20,16 @@ export function maxGroundUnder(groundFn: HeightFunction, x: number, z: number, r
 
 export interface SeaStackOptions {
   count: number
-  /** Annulus around the origin; the inner edge sits beyond the track. */
   minRadius: number
   maxRadius: number
-  /** Footprint radius at scale 1. */
   footprint: number
   scaleRange: [number, number]
-  /** Minimum distance between two stacks. */
   spacing: number
-  /** Circles to keep clear (the sunken city). */
   avoid: readonly { x: number; z: number; r: number }[]
   rng: () => number
 }
 
-/** Tall rock pillars standing in open water: the whole footprint must be at least 6 units under the surface. */
+/** The whole footprint must be at least 6 under the surface, so every stack stands in open water. */
 export function placeSeaStacks(groundFn: HeightFunction, opts: SeaStackOptions): SeabedProp[] {
   const { count, minRadius, maxRadius, footprint, scaleRange, spacing, avoid, rng } = opts
   const out: SeabedProp[] = []
@@ -57,23 +51,17 @@ export function placeSeaStacks(groundFn: HeightFunction, opts: SeaStackOptions):
 export interface BreachingRockOptions {
   count: number
   trackSamples: readonly TrackSample[]
-  /** Clearance from the track centreline, and how far out rocks may go. */
   minDist: number
   maxDist: number
   maxRadius: number
-  /** Footprint radius and height of the rock geometry at scale 1. */
   footprint: number
   height: number
-  /** How far the top pokes out of the water. */
   topRange: [number, number]
   spacing: number
   rng: () => number
 }
 
-/**
- * Small rocks near the ride that rise from the seabed and break the surface. Each
- * is scaled so its top lands `topRange` above the water, whatever the depth.
- */
+/** Each rock is scaled so its top lands `topRange` above the water, whatever the depth. */
 export function placeBreachingRocks(groundFn: HeightFunction, opts: BreachingRockOptions): SeabedProp[] {
   const { count, trackSamples, minDist, maxDist, maxRadius, footprint, height, topRange, spacing, rng } = opts
   const candidates = scatterNearTrack({
@@ -109,13 +97,11 @@ export interface ReefOptions {
   minDist: number
   maxDist: number
   maxRadius: number
-  /** Only where the ground is at least this deep (negative y). */
   maxGroundY: number
   scaleRange: [number, number]
   rng: () => number
 }
 
-/** Coral / kelp spots on the seabed around the ride, sunk 1 unit into the drawn ground. */
 export function placeReef(groundFn: HeightFunction, opts: ReefOptions): SeabedProp[] {
   const { count, trackSamples, minDist, maxDist, maxRadius, maxGroundY, scaleRange, rng } = opts
   const candidates = scatterNearTrack({
@@ -139,7 +125,7 @@ export function placeReef(groundFn: HeightFunction, opts: ReefOptions): SeabedPr
   return out
 }
 
-/** One gull's circle: centre, radius, height, angular speed (rad/s, sign = direction), start angle. */
+/** `speed` in rad/s; its sign is the direction of travel. */
 export interface GullOrbit {
   cx: number
   cz: number
@@ -149,7 +135,6 @@ export interface GullOrbit {
   phase: number
 }
 
-/** `count` gulls shared out over the first `flocks` stacks, circling above each top. */
 export function placeGullOrbits(
   stacks: readonly { x: number; z: number; top: number }[],
   count: number,
@@ -157,11 +142,12 @@ export function placeGullOrbits(
   rng: () => number,
 ): GullOrbit[] {
   const out: GullOrbit[] = []
-  const used = stacks.slice(0, Math.max(1, flocks))
+  const used = stacks.slice(0, flocks)
   if (used.length === 0) return out
   for (let i = 0; i < count; i++) {
-    const s = used[i % used.length]
-    const dir = (i % used.length) % 2 === 0 ? 1 : -1
+    const flock = i % used.length
+    const s = used[flock]
+    const dir = flock % 2 === 0 ? 1 : -1
     out.push({
       cx: s.x + (rng() - 0.5) * 40,
       cz: s.z + (rng() - 0.5) * 40,
@@ -174,7 +160,6 @@ export function placeGullOrbits(
   return out
 }
 
-/** Kelp tips stay this far under the surface. */
 const KELP_TIP_DEPTH = 6
 
 export interface OceanLayout {
@@ -185,7 +170,7 @@ export interface OceanLayout {
   kelp: SeabedProp[]
 }
 
-/** Every ocean prop for one track (seeded: the same layout every run). `avoid` = landmarks to keep stacks off. */
+/** Seeded: the same layout every run. `avoid` keeps stacks off landmarks. */
 export function layoutOcean(
   groundFn: HeightFunction,
   trackSamples: readonly TrackSample[],
@@ -214,7 +199,7 @@ export function layoutOcean(
     spacing: 70,
     rng: createRng(2101),
   })
-  // Gulls circle the stacks nearest the ride, where they are big enough to see.
+  // Gulls circle the stacks nearest the ride; further out they shrink to specks.
   const nearest = [...stacks]
     .sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))
     .map((s) => ({ x: s.x, z: s.z, top: s.y + STACK_HEIGHT * s.scale }))

@@ -1,9 +1,7 @@
 import * as THREE from 'three'
 import type { ColorRamp } from '../../shared/types'
 
-// The ramp is sampled by |y| / max|y| (max ≈ 236), so the seabed (y = -40 → 0.17)
-// shares stops with low land (y = +40): a teal-green that reads as seagrass under
-// the water and as dark scrub above it. Sand rings every shoreline (|y| < ~12).
+// Sampled by |y| / max|y| (≈ 236): the seabed (y = -40) shares a stop with land at y = +40, so it is a teal-green that works as both.
 export const COLOR_RAMP: ColorRamp = {
   stops: [
     { height: 0.0, color: new THREE.Color(0xcdb985) },  // beach / shallow sand
@@ -21,5 +19,5 @@ export const COLOR_RAMP: ColorRamp = {
 /** Ocean has no trees (the level's treeCount is ignored). */
 export const TREES = null
 
-/** Where the sunken city landmark stands (Features); sea stacks keep clear of it. */
+/** Sea stacks keep clear of it. */
 export const SUNKEN_CITY_POSITION: [number, number, number] = [1800, -15, -1400]

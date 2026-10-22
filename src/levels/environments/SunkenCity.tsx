@@ -44,7 +44,6 @@ const CRYSTAL_MAT = new THREE.MeshStandardMaterial({
 })
 const WALL_MAT = new THREE.MeshPhongMaterial({ color: '#5a7a6a', flatShading: true })
 
-/** Instance matrix from position, Euler rotation and scale. */
 function placed(
   [x, y, z]: [number, number, number],
   [rx, ry, rz]: [number, number, number] = [0, 0, 0],
@@ -57,7 +56,7 @@ function placed(
   )
 }
 
-/** Matrices for every repeated part, laid out once per mount (one draw call per part). */
+/** One instanced draw call per repeated part. */
 function layoutCity() {
   // Column ring: 12 columns, some broken; caps on the tall ones
   const columns: THREE.Matrix4[] = []
@@ -77,7 +76,6 @@ function layoutCity() {
     arches.push(placed([Math.cos(angle) * 130, 25, Math.sin(angle) * 130], [0, angle + Math.PI / 2, 0]))
   }
 
-  // Broken wall sections
   const walls: THREE.Matrix4[] = []
   for (let i = 0; i < 6; i++) {
     const angle = ((i + 0.5) / 6) * Math.PI * 2
@@ -91,7 +89,6 @@ function layoutCity() {
     )
   }
 
-  // Floor slabs (tilted for ruin feel)
   const floors = [
     placed([40, -30, 30], [0.08, 0.2, 0.04]),
     placed([-50, -35, -20], [-0.05, -0.4, 0.03], [0.7, 1, 0.8]),

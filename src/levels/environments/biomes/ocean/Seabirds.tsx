@@ -9,7 +9,6 @@ const BANK = 0.35
 // Big enough to read as birds (not specks) above stacks 1300+ units away.
 const GULL_SCALE = 1.6
 
-/** Gulls circling above the sea stacks: one InstancedMesh, matrices updated each frame. */
 export default function Seabirds({ orbits }: { orbits: readonly GullOrbit[] }) {
   const geometry = useMemo(() => createGullGeometry(), [])
   const gull = useMemo(() => createGullMaterial(), [])

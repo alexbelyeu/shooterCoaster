@@ -42,7 +42,6 @@ describe('layoutOcean (level 3)', () => {
       expect(maxGroundUnder(groundFn, s.x, s.z, STACK_FOOTPRINT * s.scale)).toBeLessThan(-6)
       expect(s.y + STACK_HEIGHT * s.scale).toBeGreaterThan(150)
       expect(Math.hypot(s.x - city.x, s.z - city.z)).toBeGreaterThan(city.r)
-      // Foam ring sits where the stack crosses the water.
       expect(profileRadiusAt(STACK_RINGS, -s.y / s.scale)).toBeGreaterThan(30)
     }
   })

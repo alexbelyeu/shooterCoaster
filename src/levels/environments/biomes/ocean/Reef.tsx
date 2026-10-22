@@ -7,11 +7,9 @@ import { createCoralClusterGeometry, createKelpClumpGeometry, propMatrix } from 
 import { createCoralMaterial, createKelpMaterial } from './seaMaterials'
 import StaticInstances from '../../shared/StaticInstances'
 
-// Tints over the coral's own orange / red / gold: warm hues only, clear of the
-// jellyfish's pastel pink, blue, lilac and mint.
+// Warm tints only: coral must not share a hue with the jellyfish (pastel pink, blue, lilac, mint).
 const CORAL_TINTS = [0xffffff, 0xffd2b0, 0xffe48a, 0xffb39a]
 
-/** Coral clusters and swaying kelp on the seabed, seen through the water. */
 export default function Reef({ coral, kelp }: { coral: readonly SeabedProp[]; kelp: readonly SeabedProp[] }) {
   const coralGeo = useMemo(() => createCoralClusterGeometry(), [])
   const kelpGeo = useMemo(() => createKelpClumpGeometry(), [])

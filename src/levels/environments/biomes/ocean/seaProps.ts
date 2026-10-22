@@ -10,11 +10,7 @@ import {
 } from './seaDimensions'
 import type { SeabedProp } from './seaPlacement'
 
-/**
- * Ocean prop geometry, heights baked in (instances only get a uniform scale + yaw).
- * Every builder is deterministic and returns non-indexed geometry with vertex
- * colours, so `flatShading` gives each facet its own shade.
- */
+/** Ocean prop geometry with heights baked in: instances only get a uniform scale + yaw. */
 
 class GeometryWriter {
   readonly pos: number[] = []
@@ -40,10 +36,7 @@ class GeometryWriter {
   }
 }
 
-/**
- * A jittered `sides`-gon prism through `rings`, capped with a point `capRise` above
- * the last ring. Band i (ring i to i+1) takes `bandColors[i]`; the cap takes `capColor`.
- */
+/** Jittered prism through `rings` with a pointed cap; band i (ring i to i+1) takes `bandColors[i]`. */
 function buildRingedRock(
   rings: readonly RockRing[],
   sides: number,
@@ -85,7 +78,6 @@ const c = (hex: number) => new THREE.Color(hex)
 
 const UP = new THREE.Vector3(0, 1, 0)
 
-/** Instance matrix for a seabed prop: translate, yaw, uniform scale. */
 export function propMatrix(p: SeabedProp): THREE.Matrix4 {
   return new THREE.Matrix4().compose(
     new THREE.Vector3(p.x, p.y, p.z),
@@ -94,7 +86,6 @@ export function propMatrix(p: SeabedProp): THREE.Matrix4 {
   )
 }
 
-// ── Sea stacks ────────────────────────────────────────────────────────
 export function createSeaStackGeometry(): THREE.BufferGeometry {
   const lower = c(0x6c665c)
   const ledge = c(0x7d8a52) // weathered moss on the ledges
@@ -111,7 +102,6 @@ export function createSeaStackGeometry(): THREE.BufferGeometry {
   )
 }
 
-// ── Breaching rocks ───────────────────────────────────────────────────
 export function createBreachingRockGeometry(): THREE.BufferGeometry {
   return buildRingedRock(
     ROCK_RINGS,
@@ -124,8 +114,7 @@ export function createBreachingRockGeometry(): THREE.BufferGeometry {
   )
 }
 
-// ── Coral cluster ─────────────────────────────────────────────────────
-/** A brain-coral dome, a fan of branching coral and a few tube sponges, ~14 radius. */
+/** A brain-coral dome, a fan of branching coral and a few tube sponges. */
 export function createCoralClusterGeometry(): THREE.BufferGeometry {
   const parts: { geo: THREE.BufferGeometry; color: THREE.Color }[] = []
   const brain = new THREE.IcosahedronGeometry(6, 0)
@@ -169,8 +158,7 @@ export function createCoralClusterGeometry(): THREE.BufferGeometry {
   return w.build()
 }
 
-// ── Kelp ──────────────────────────────────────────────────────────────
-/** Three tapering, twisting blades. The `aSway` attribute (0 at the root, 1 at the tip) drives the sway shader. */
+/** Three twisting blades; `aSway` runs 0 at the root to 1 at the tallest tip. */
 export function createKelpClumpGeometry(): THREE.BufferGeometry {
   const rows = 5
   const base = c(0x4f6e1e)
@@ -209,11 +197,7 @@ export function createKelpClumpGeometry(): THREE.BufferGeometry {
   return w.build('aSway')
 }
 
-// ── Gull ──────────────────────────────────────────────────────────────
-/**
- * Body plus two bent wings, nose along +z, ~36 wingspan. The `aFlap` attribute
- * (0 at the shoulder, 1 at the wing tip) drives the flap shader.
- */
+/** Nose along +z; `aFlap` runs 0 at the shoulder to 1 at the wing tip. */
 export function createGullGeometry(): THREE.BufferGeometry {
   const white = c(0xf4f6f8)
   const grey = c(0xc4ccd4)

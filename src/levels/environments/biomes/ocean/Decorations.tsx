@@ -9,7 +9,6 @@ import Reef from './Reef'
 
 const [CITY_X, , CITY_Z] = SUNKEN_CITY_POSITION
 
-/** Sea stacks, breaching rocks with foam, gulls, and the reef under the water. */
 export default function OceanDecorations({ groundFn, trackSamples }: BiomeDecorationsProps) {
   const layout = useMemo(
     () => layoutOcean(groundFn, trackSamples, [{ x: CITY_X, z: CITY_Z, r: 320 }]),
