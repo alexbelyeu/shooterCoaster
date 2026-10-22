@@ -11,7 +11,7 @@
 const TZ = 'America/New_York'
 const STATUS_LABEL = 'studio-status'
 const STATUS_TITLE = '📊 Studio status (live)'
-const SITE = 'https://scoaster.com'
+const SITE = 'https://shooter-coaster.vercel.app'
 const REPO = 'alexbelyeu/shooterCoaster'
 
 // Keep in sync with the scheduled tasks (times are New York wall-clock).

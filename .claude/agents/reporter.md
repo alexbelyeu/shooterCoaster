@@ -51,7 +51,7 @@ the moment the `report` label is applied, and GitHub mails that comment to Alex.
 cannot send Gmail from scheduled runs — the connector returns Forbidden — so don't try.)
 
 Write the body for a phone screen:
-1. Headline (one sentence) and the play link https://scoaster.com
+1. Headline (one sentence) and the same play link as **Play it** in the report
 2. What's new for players (bullets, each linked to its PR)
 3. Players in one line (visitors, top source, week-over-week) and any `needs-alex` drafts
 4. Health in one line (PRs merged / sent back / reverted, bundle KB vs budget, smoke status)

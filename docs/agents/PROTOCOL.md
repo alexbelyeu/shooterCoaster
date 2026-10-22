@@ -66,7 +66,7 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 - `agent:prod-broken` — production smoke test failed (opened by the nightly workflow). Maintainer drops everything for it.
 - `steering` — an issue from Alex. Director treats it like STEERING.md.
 - Priority: `P1` (this week, do first), `P2` (this week), `P3` (if time).
-- Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`.
+- Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`, `type:growth`.
 - `epic` — umbrella issue the Director breaks into `agent:ready` children. Never claimed by builders.
 - `studio-status` — the live status page issue (see above). Not work; never touch it.
 - `marketing` + `needs-alex` — a draft post or campaign from the Marketer that only Alex can carry out (agents never post, spend or create accounts). Builders ignore these. `type:growth` — discoverability or growth work for builders, filed by the Marketer.
