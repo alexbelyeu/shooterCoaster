@@ -68,7 +68,7 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 - Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`.
 - `epic` — umbrella issue the Director breaks into `agent:ready` children. Never claimed by builders.
 - `studio-status` — the live status page issue (see above). Not work; never touch it.
-- Add `agent:needs-qa` / `agent:changes-requested` **last, in a call of their own**, after any other labels. Each label added while one of those is present fires the on-label task again, so adding three labels at once starts three sessions.
+- Add `agent:needs-qa` / `agent:changes-requested` **last, in a call of their own**, after any other labels. Each label added while one of those is present fires the on-label task again, so adding three labels at once starts three sessions. When swapping (e.g. `agent:needs-qa` → `agent:changes-requested`), remove the old label first, then add the new one in a separate call.
 
 ## Issue contract (Director writes these)
 
