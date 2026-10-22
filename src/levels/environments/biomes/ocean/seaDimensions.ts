@@ -1,22 +1,6 @@
+import type { RockRing } from '../../shared/ringedRock'
+
 /** Ocean prop dimensions at scale 1, shared by the geometry builders and the placement. */
-
-export interface RockRing {
-  y: number
-  r: number
-  ox?: number
-  oz?: number
-}
-
-/** Ignores the builders' jitter. */
-export function profileRadiusAt(rings: readonly RockRing[], y: number): number {
-  if (y <= rings[0].y) return rings[0].r
-  for (let i = 0; i < rings.length - 1; i++) {
-    const a = rings[i]
-    const b = rings[i + 1]
-    if (y <= b.y && b.y > a.y) return a.r + ((b.r - a.r) * (y - a.y)) / (b.y - a.y)
-  }
-  return rings[rings.length - 1].r
-}
 
 // Two rings at the same y make a ledge.
 export const STACK_RINGS: readonly RockRing[] = [

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useEffect, useContext } from 'react'
-import type * as THREE from 'three'
+import * as THREE from 'three'
 import { ATMOSPHERES } from './atmosphere'
 import type { BiomeType } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
@@ -49,7 +49,10 @@ export default function BiomeEnvironment({
     if (def.terrainGlow) addTerrainGlow(geo, def.terrainGlow)
     return geo
   }, [biome, def, heightFn])
-  const groundMat = useMemo(() => createTerrainMaterial(def.terrainGlow), [def])
+  const groundMat = useMemo(
+    () => def.createTerrainMaterial?.() ?? createTerrainMaterial(def.terrainGlow),
+    [def],
+  )
 
   useEffect(() => {
     return () => groundGeo.dispose()

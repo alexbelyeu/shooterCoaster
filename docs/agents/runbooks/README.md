@@ -6,6 +6,7 @@ a role works is therefore an ordinary PR, reviewed by QA like any other.
 
 | Scheduled task | When (New York) | Runbook |
 |---|---|---|
+| ShooterCoaster · Marketer (weekly) | Mon 5:13 | `marketer.md` |
 | ShooterCoaster · Weekly report | Mon 6:13 | `reporter.md` |
 | ShooterCoaster · Director (weekly) | Mon 7:44 | `director.md` |
 | ShooterCoaster · Builders (3x daily) | 8:47, 13:47, 18:47 | `builders.md` |

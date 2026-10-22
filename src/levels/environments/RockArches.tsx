@@ -1,25 +1,17 @@
-import { useMemo } from 'react'
-
-interface RockArchesProps {
-  /** Override positions, otherwise uses default scatter */
-  positions?: [number, number, number][]
+export interface ArchConfig {
+  pos: readonly [number, number, number]
+  rotY: number
+  scale: number
 }
-
-const DEFAULT_ARCH_CONFIGS = [
-  { pos: [1200, 0, -400] as const, rotY: 0.3, scale: 1.0 },
-  { pos: [-1000, 0, 800] as const, rotY: 1.5, scale: 0.85 },
-  { pos: [600, 0, 1400] as const, rotY: 2.8, scale: 1.15 },
-  { pos: [-1400, 0, -600] as const, rotY: 4.2, scale: 0.9 },
-]
 
 /**
  * Natural stone arch formations scattered around the desert.
  * Each arch is two pillars with a torus half-arch on top.
  */
-export default function RockArches(_props: RockArchesProps) {
+export default function RockArches({ arches }: { arches: readonly ArchConfig[] }) {
   return (
     <>
-      {DEFAULT_ARCH_CONFIGS.map((config, i) => (
+      {arches.map((config, i) => (
         <RockArch
           key={i}
           position={[config.pos[0], config.pos[1], config.pos[2]]}

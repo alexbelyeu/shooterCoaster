@@ -73,6 +73,8 @@ export interface BiomeDefinition {
   terrainGlow?: TerrainGlow
   /** null = this biome never has trees. */
   trees: BiomeTreeConfig | null
+  /** Terrain material (must use vertex colours); default: flat-shaded vertex-coloured Phong with `terrainGlow` applied. A custom material ignores `terrainGlow`. */
+  createTerrainMaterial?: () => THREE.Material
   /** Scattered InstancedMesh props (cacti, coral, crystals…). */
   Decorations?: ComponentType<BiomeDecorationsProps>
   /** Landmarks, terrain-conforming features and biome events. */
