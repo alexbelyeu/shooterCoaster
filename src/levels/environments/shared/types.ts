@@ -1,6 +1,6 @@
 import type { ComponentType, RefObject } from 'react'
 import type * as THREE from 'three'
-import type { HeightFunction, TrackSample } from '@/utils/terrainNoise'
+import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
 import type { AtmosphereConfig } from '../atmosphere'
 
@@ -41,10 +41,8 @@ export interface BiomeDecorationsProps {
   heightFn: HeightFunction
   /** Terrain as drawn (`createTerrainSurface`): stand grounded props on this. */
   groundFn: HeightFunction
-  /** Dense arc-length table of the level's track (exact placement along/across the ride). */
+  /** The level's only track input: use with `shared/trackClearance.ts` and `shared/trackScatter.ts`. */
   track: ArcTable
-  /** Coarse track samples, for scattering props around the ride (shared/trackScatter.ts). */
-  trackSamples: TrackSample[]
 }
 
 /** Props every biome's features component (landmarks, terrain features, events) receives. */

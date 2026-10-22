@@ -29,7 +29,12 @@ function cellKey(cx: number, cz: number): number {
   return (cx + 2048) * 4096 + (cz + 2048)
 }
 
+const indexCache = new WeakMap<ArcTable, TrackIndex>()
+
+/** Built once per table and shared (the index is read-only). */
 export function buildTrackIndex(table: ArcTable): TrackIndex {
+  const cached = indexCache.get(table)
+  if (cached) return cached
   const cells = new Map<number, number[]>()
   for (let i = 0; i < table.count; i += STRIDE) {
     const key = cellKey(Math.floor(table.x[i] / CELL), Math.floor(table.z[i] / CELL))
@@ -38,7 +43,7 @@ export function buildTrackIndex(table: ArcTable): TrackIndex {
     bucket.push(i)
   }
 
-  return {
+  const index: TrackIndex = {
     table,
     near(x, z, radius, filter) {
       const r2 = radius * radius
@@ -60,6 +65,8 @@ export function buildTrackIndex(table: ArcTable): TrackIndex {
       return false
     },
   }
+  indexCache.set(table, index)
+  return index
 }
 
 /** Track point and horizontal heading at arc distance `dist` (clamped). */

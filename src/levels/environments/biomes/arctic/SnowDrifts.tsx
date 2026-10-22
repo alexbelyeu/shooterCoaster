@@ -9,7 +9,7 @@ import { DRIFT_HALF_LENGTH, DRIFT_HEIGHT, createDriftGeometry } from './iceProps
 const WIND_YAW = 0.7
 
 /** Snow drifts on flat ground beside the track. */
-export default function SnowDrifts({ groundFn, trackSamples }: BiomeDecorationsProps) {
+export default function SnowDrifts({ groundFn, track }: BiomeDecorationsProps) {
   const geometry = useMemo(() => createDriftGeometry(), [])
   const material = useMemo(
     () =>
@@ -28,11 +28,11 @@ export default function SnowDrifts({ groundFn, trackSamples }: BiomeDecorationsP
     const count = 90
     const points = scatterNearTrack({
       count: count * 3,
-      trackSamples,
+      track,
       heightFn: groundFn,
       minDist: 50,
       maxDist: 700,
-      maxRadius: trackExtent(trackSamples) * 1.5,
+      maxRadius: trackExtent(track) * 1.5,
       maxSlope: Math.PI / 12,
       bias: 1.5,
       rng,
@@ -56,7 +56,7 @@ export default function SnowDrifts({ groundFn, trackSamples }: BiomeDecorationsP
         new THREE.Vector3(d.scale, d.scale, d.scale),
       )
     })
-  }, [groundFn, trackSamples])
+  }, [groundFn, track])
 
   const setRef = useCallback(
     (mesh: THREE.InstancedMesh | null) => {

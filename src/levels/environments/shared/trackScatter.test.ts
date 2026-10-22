@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   createRng,
-  distanceToTrack,
   groundedBaseY,
   scatterNearTrack,
   settleOnGround,
   trackExtent,
 } from './trackScatter'
+import { buildTrackIndex } from './trackClearance'
 import { getLevelConfig } from '@/levels/LevelRegistry'
+import { buildArcTable } from '@/track/arcLength'
 import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
 import {
   createHeightFunction,
@@ -20,8 +21,9 @@ import {
 const level = getLevelConfig('level4')!
 const { varA, varB, varC, scalar } = level.track
 const curve = createTrigCurve2(varA, varB, varC, scalar)
-const samples = sampleTrackPath((t) => curve.getPointAt(t))
-const heightFn = createHeightFunction('arctic', samples)
+const table = buildArcTable(curve)
+const index = buildTrackIndex(table)
+const heightFn = createHeightFunction('arctic', sampleTrackPath((t) => curve.getPointAt(t)))
 const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize('arctic'))
 
 describe('createRng', () => {
@@ -39,7 +41,7 @@ describe('createRng', () => {
 
 describe('trackExtent', () => {
   it('matches the varC * 13 * scalar rule for level4', () => {
-    const extent = trackExtent(samples)
+    const extent = trackExtent(table)
     expect(extent).toBeLessThanOrEqual(varC * 13 * scalar * 1.01)
     expect(extent).toBeGreaterThan(varC * 13 * scalar * 0.5)
   })
@@ -48,11 +50,11 @@ describe('trackExtent', () => {
 describe('scatterNearTrack (level4)', () => {
   const opts = {
     count: 150,
-    trackSamples: samples,
+    track: table,
     heightFn,
     minDist: 70,
     maxDist: 900,
-    maxRadius: trackExtent(samples) * 1.5,
+    maxRadius: trackExtent(table) * 1.5,
     maxSlope: Math.PI / 6,
     bias: 1.8,
   }
@@ -64,7 +66,7 @@ describe('scatterNearTrack (level4)', () => {
 
   it('keeps clear of the track, inside maxRadius, on gentle slopes', () => {
     for (const p of points) {
-      expect(distanceToTrack(samples, p.x, p.z)).toBeGreaterThanOrEqual(opts.minDist)
+      expect(index.near(p.x, p.z, opts.minDist)).toBe(false)
       expect(Math.hypot(p.x, p.z)).toBeLessThanOrEqual(opts.maxRadius)
       expect(getTerrainSlope(heightFn, p.x, p.z)).toBeLessThanOrEqual(opts.maxSlope + 1e-9)
       expect(p.y).toBe(heightFn(p.x, p.z))
@@ -72,7 +74,7 @@ describe('scatterNearTrack (level4)', () => {
   })
 
   it('is biased towards the track', () => {
-    const near = points.filter((p) => distanceToTrack(samples, p.x, p.z) < 400).length
+    const near = points.filter((p) => index.near(p.x, p.z, 400)).length
     expect(near / points.length).toBeGreaterThan(0.5)
   })
 
@@ -89,11 +91,11 @@ describe('settleOnGround (level4 crystal settings)', () => {
   const rng = createRng(19)
   const candidates = scatterNearTrack({
     count: count * 3,
-    trackSamples: samples,
+    track: table,
     heightFn: groundFn,
     minDist: 70,
     maxDist: 900,
-    maxRadius: trackExtent(samples) * 1.5,
+    maxRadius: trackExtent(table) * 1.5,
     maxSlope: Math.PI / 6,
     bias: 1.8,
     rng,

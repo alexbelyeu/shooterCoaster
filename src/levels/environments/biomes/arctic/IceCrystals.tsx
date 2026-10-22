@@ -30,18 +30,18 @@ const SPIRES: ClusterPlacement = { count: 90, height: SPIRE_HEIGHT, scaleRange: 
 const SPLAYS: ClusterPlacement = { count: 110, height: SPLAY_HEIGHT, scaleRange: [1.2, 2.2], minDist: 70, seed: 1904 }
 
 function placeClusters(
-  { groundFn, trackSamples }: Pick<BiomeDecorationsProps, 'groundFn' | 'trackSamples'>,
+  { groundFn, track }: Pick<BiomeDecorationsProps, 'groundFn' | 'track'>,
   { count, height, scaleRange, minDist, seed }: ClusterPlacement,
 ): ClusterSet {
   const rng = createRng(seed)
   // Oversampled: settleOnGround drops spots on broken ground.
   const points = scatterNearTrack({
     count: count * 3,
-    trackSamples,
+    track,
     heightFn: groundFn,
     minDist,
     maxDist: 900,
-    maxRadius: trackExtent(trackSamples) * 1.5,
+    maxRadius: trackExtent(track) * 1.5,
     maxSlope: Math.PI / 6,
     bias: 1.8,
     rng,
@@ -96,7 +96,7 @@ function ClusterMesh({
 }
 
 /** Glowing cyan crystal clusters around the track. */
-export default function IceCrystals({ groundFn, trackSamples }: BiomeDecorationsProps) {
+export default function IceCrystals({ groundFn, track }: BiomeDecorationsProps) {
   const spireGeo = useMemo(() => createSpireClusterGeometry(), [])
   const splayGeo = useMemo(() => createSplayClusterGeometry(), [])
   const material = useMemo(
@@ -112,8 +112,8 @@ export default function IceCrystals({ groundFn, trackSamples }: BiomeDecorations
     [],
   )
 
-  const spires = useMemo(() => placeClusters({ groundFn, trackSamples }, SPIRES), [groundFn, trackSamples])
-  const splays = useMemo(() => placeClusters({ groundFn, trackSamples }, SPLAYS), [groundFn, trackSamples])
+  const spires = useMemo(() => placeClusters({ groundFn, track }, SPIRES), [groundFn, track])
+  const splays = useMemo(() => placeClusters({ groundFn, track }, SPLAYS), [groundFn, track])
 
   useEffect(() => {
     return () => {

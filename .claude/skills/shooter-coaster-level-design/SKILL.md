@@ -50,7 +50,7 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 | `src/levels/environments/biomeRegistry.ts` | `BIOMES: Record<BiomeType, BiomeDefinition>` — one entry per biome |
 | `src/levels/environments/biomes/themePark/layout.ts` | Worked example of track-aware placement: stalls along the track, string lights, bunting and an arch across it, all pure and unit-tested against the real track (`layout.test.ts`) |
 | `src/levels/environments/biomes/<biome>/` | Per-biome module: `config.ts` (terrain `COLOR_RAMP`, `TREES` config), `Decorations.tsx` (InstancedMesh scatter), `Features.tsx` (landmarks, terrain features, events), `index.ts` (the `BiomeDefinition`) |
-| `src/levels/environments/shared/` | Biome-agnostic helpers: `types.ts` (`BiomeDefinition`), `terrainMesh.ts` (terrain builder + colour-ramp sampler), `TreeField.tsx`, `OceanWater.tsx` (water shader), `Atmosphere.tsx` (sky/lights/fog/exposure wiring), `scatter.ts` (`scatterPositions`, `hslToRgb`), `trackScatter.ts` (`scatterNearTrack` biases props toward the ride; `settleOnGround` sits them on the drawn terrain with no floating edge — see `biomes/arctic/IceCrystals.tsx`), `safeHeight.ts`, `trackClearance.ts` (`buildTrackIndex`: is anything of the track within r in XZ? — towers reach the ground, so test 2D), `paintedParts.ts` (vertex-coloured parts merged into one geometry). Decorations receive `heightFn`, `groundFn` (terrain as drawn), `track` (dense arc table) and `trackSamples` (coarse samples); Features receive `heightFn`, `groundFn` and `track` |
+| `src/levels/environments/shared/` | Biome-agnostic helpers: `types.ts` (`BiomeDefinition`), `terrainMesh.ts` (terrain builder + colour-ramp sampler), `TreeField.tsx`, `OceanWater.tsx` (water shader), `Atmosphere.tsx` (sky/lights/fog/exposure wiring), `scatter.ts` (`scatterPositions`, `hslToRgb`), `trackScatter.ts` (`scatterNearTrack` biases props toward the ride; `settleOnGround` sits them on the drawn terrain with no floating edge — see `biomes/arctic/IceCrystals.tsx`), `safeHeight.ts`, `trackClearance.ts` (`buildTrackIndex`: is anything of the track within r in XZ? — towers reach the ground, so test 2D), `paintedParts.ts` (vertex-coloured parts merged into one geometry). Decorations and Features both receive `heightFn`, `groundFn` (terrain as drawn) and `track` (the dense `ArcTable`, the only track input); Features also get `atmosphere` and `fogRef` |
 | `src/levels/environments/atmosphere.ts` | Per-biome sky/sun/hemisphere/fog/exposure config (`ATMOSPHERES`) |
 | `src/levels/environments/SkyDome.tsx` | Procedural sky dome shader (gradient, sun, fbm clouds), follows camera |
 | `src/levels/environments/LavaShader.ts` | Procedural GLSL lava material (domain warping + Voronoi) |
@@ -134,10 +134,12 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
    - `config.ts` — `COLOR_RAMP` (terrain vertex colours by height + `cliffColor` on slopes)
      and `TREES` (`BiomeTreeConfig`: tree types, `maxCount` cap, scatter radii, slope
      rejection angle — `PI/6` for mountains, `PI/4` for flat biomes; `null` = no trees)
-   - `Decorations.tsx` — InstancedMesh scatter (use `shared/scatter.ts`); dispose every
+   - `Decorations.tsx` — InstancedMesh scatter (gets `heightFn`, `groundFn`, `track`;
+     use `shared/trackScatter.ts` to frame the ride or `shared/scatter.ts` for open
+     ground, and `shared/trackClearance.ts` to stay off the track); dispose every
      geometry/material in a `useEffect` cleanup
    - `Features.tsx` — landmarks, terrain-conforming features, biome events (gets
-     `heightFn`, `atmosphere`, `fogRef`)
+     `heightFn`, `groundFn`, `track`, `atmosphere`, `fogRef`)
    - `index.ts` — export the `BiomeDefinition`
    Keep each file under ~400 lines; split big decoration sets into sibling components.
 3b. `src/levels/environments/biomeRegistry.ts` — add the biome to `BIOMES` (the

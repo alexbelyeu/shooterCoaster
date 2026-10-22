@@ -113,7 +113,6 @@ function LevelScene({ levelId }: { levelId: string }) {
         hasWater={environment.hasWater}
         hasTrees={environment.hasTrees}
         treeCount={environment.treeCount}
-        trackSamples={trackSamples}
       />
       <BulletPool bulletColor={bulletColor} bulletSize={bulletSize} />
       <ParticleExplosionPool />

@@ -1,6 +1,7 @@
 import { type HeightFunction, TERRAIN_MESH_SEGMENTS, getTerrainMeshSize } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
 import { safeHeight } from '../../shared/safeHeight'
+import { createRng } from '../../shared/trackScatter'
 import { type TrackFrame, type TrackIndex, buildTrackIndex, trackFrameAt } from '../../shared/trackClearance'
 import {
   ARCH_BOARD_DEPTH,
@@ -59,19 +60,8 @@ const BUNTING_APPROACH = 80
 const PATH_STEP = 8
 const PATH_LIFT = 2.5
 const TERRAIN_HALF_CELL = (getTerrainMeshSize('themePark') / TERRAIN_MESH_SEGMENTS) * 0.6
-const SEED = 1
-
 /** Seeded so the park looks the same every ride. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0
-    let t = a
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
+const SEED = 1
 
 interface Circle {
   x: number
@@ -367,6 +357,8 @@ function planScatter(index: TrackIndex, groundFn: HeightFunction, occupied: Circ
   return { tents, hedges, flagPoles }
 }
 
+// Keyed on the table alone: heightFn and groundFn are derived from the same curve
+// (SceneManager), so one table always comes with the same terrain.
 const cache = new WeakMap<ArcTable, ThemeParkLayout>()
 
 /** Planned once per track and shared by Decorations and Features. */
@@ -384,7 +376,7 @@ export function planThemePark(
   heightFn: HeightFunction,
   groundFn: HeightFunction,
 ): ThemeParkLayout {
-  const rand = mulberry32(SEED)
+  const rand = createRng(SEED)
   const index = buildTrackIndex(table)
   const occupied: Circle[] = RIDES.map((r) => ({ x: r.x, z: r.z, r: r.radius + 15 }))
 
