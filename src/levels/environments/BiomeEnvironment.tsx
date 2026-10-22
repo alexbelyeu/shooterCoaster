@@ -64,7 +64,7 @@ export default function BiomeEnvironment({
       </mesh>
 
       {/* Water (ocean level) */}
-      {hasWater && <OceanWater />}
+      {hasWater && <OceanWater atmosphere={atmosphere} />}
 
       {/* Trees */}
       {hasTrees && treeCount > 0 && def.trees && (
