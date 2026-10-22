@@ -8,6 +8,7 @@ import {
   getTerrainMeshSize,
   sampleTrackPath,
 } from '@/utils/terrainNoise'
+import { profileRadiusAt } from '../../shared/ringedRock'
 import { buildTrackIndex } from '../../shared/trackClearance'
 import { trackExtent } from '../../shared/trackScatter'
 import {
@@ -17,7 +18,6 @@ import {
   STACK_FOOTPRINT,
   STACK_HEIGHT,
   STACK_RINGS,
-  profileRadiusAt,
 } from './seaDimensions'
 import { layoutOcean, maxGroundUnder } from './seaPlacement'
 
@@ -80,20 +80,5 @@ describe('layoutOcean (level 3)', () => {
     expect(layout.kelp.length).toBeGreaterThan(40)
     for (const c of layout.coral) expect(c.y).toBeLessThan(-15)
     for (const k of layout.kelp) expect(k.y + KELP_HEIGHT * k.scale).toBeLessThanOrEqual(-6 + 1e-6)
-  })
-})
-
-describe('profileRadiusAt', () => {
-  it('interpolates between rings and clamps at the ends', () => {
-    const rings = [
-      { y: 0, r: 10 },
-      { y: 10, r: 6 },
-      { y: 10, r: 4 },
-      { y: 20, r: 2 },
-    ]
-    expect(profileRadiusAt(rings, -5)).toBe(10)
-    expect(profileRadiusAt(rings, 5)).toBeCloseTo(8)
-    expect(profileRadiusAt(rings, 15)).toBeCloseTo(3)
-    expect(profileRadiusAt(rings, 30)).toBe(2)
   })
 })
