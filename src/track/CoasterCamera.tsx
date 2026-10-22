@@ -128,6 +128,11 @@ export default function CoasterCamera({
 
     const dtScaleSlow = Math.min(effectiveDelta * 60, 3)
 
+    const testApi = window.__SC_TEST__
+    if (testApi?.rideTo != null) {
+      progress.current = testApi.rideTo
+      testApi.rideTo = null
+    }
     progress.current += velocity.current * dtScaleSlow
     progress.current = ((progress.current % 1) + 1) % 1
 
@@ -160,7 +165,6 @@ export default function CoasterCamera({
       cam.rotateZ(a.roll)
       traumaDeg = Math.max(Math.abs(a.pitch), Math.abs(a.yaw), Math.abs(a.roll)) * RAD_TO_DEG
     }
-    const testApi = window.__SC_TEST__
     if (testApi) {
       // Translation off the track pose (must always be exactly 0) and the
       // largest trauma rotation this frame, in degrees.

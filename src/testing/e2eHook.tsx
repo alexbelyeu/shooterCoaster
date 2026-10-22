@@ -87,6 +87,8 @@ export interface SCTestApi {
   endLevel: () => void
   /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
   setTimeScale: (s: number) => void
+  /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
+  rideTo: number | null
   // ── View / aspect (issue #66) ──
   /** Active camera projection vs the canvas's on-screen box (squash checks). */
   view: () => E2EView | null
@@ -323,6 +325,7 @@ export function installE2EApi() {
       useGameStore.getState().setPhase('results')
     },
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
+    rideTo: null,
     view: readView,
   }
   eventBus.on('weapon:fire', () => { api.combat.fired += 1 })

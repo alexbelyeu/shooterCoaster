@@ -1,5 +1,5 @@
 import { useMemo, useRef, useEffect, useContext } from 'react'
-import type * as THREE from 'three'
+import * as THREE from 'three'
 import { ATMOSPHERES } from './atmosphere'
 import type { BiomeType } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
@@ -52,6 +52,12 @@ export default function BiomeEnvironment({
     return () => groundGeo.dispose()
   }, [groundGeo])
 
+  const groundMat = useMemo(
+    () => def.createTerrainMaterial?.() ?? new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true }),
+    [def],
+  )
+  useEffect(() => () => groundMat.dispose(), [groundMat])
+
   const { Decorations, Features } = def
 
   return (
@@ -59,9 +65,7 @@ export default function BiomeEnvironment({
       <Atmosphere atmosphere={atmosphere} fogRef={fogRef} />
 
       {/* Terrain mesh */}
-      <mesh geometry={groundGeo}>
-        <meshPhongMaterial vertexColors flatShading />
-      </mesh>
+      <mesh geometry={groundGeo} material={groundMat} />
 
       {/* Water (ocean level) */}
       {hasWater && <OceanWater atmosphere={atmosphere} />}
