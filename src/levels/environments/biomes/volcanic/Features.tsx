@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { eventBus } from '@/core/EventBus'
+import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake'
 import type { BiomeFeaturesProps } from '../../shared/types'
 import Volcano from '../../Volcano'
 import { createLavaMaterial } from '../../LavaShader'
 import { createLavaRiverGeometries } from './lavaRivers'
 
-/** Volcano landmark, lava rivers, and the eruption event (camera shake + fog pulse). */
+const ERUPTION_TRAUMA = 0.8
+const ERUPTION_TRAUMA_MS = 3000
+
+/** Volcano landmark, lava rivers, and the eruption event (camera rumble + fog pulse). */
 export default function VolcanicFeatures({ heightFn, atmosphere, fogRef }: BiomeFeaturesProps) {
-  const cameraShakeRef = useRef({ active: false, startTime: 0 })
+  const fogPulseRef = useRef({ active: false, startTime: 0 })
 
   // Lava shader material — animated procedural molten rock
   const lavaRiverMat = useMemo(() => createLavaMaterial(0.08, 1.2), [])
@@ -24,35 +28,27 @@ export default function VolcanicFeatures({ heightFn, atmosphere, fogRef }: Biome
     }
   }, [lavaRiverMat, lavaFlowMat, lavaRiverGeos])
 
-  // Eruption event handling — fog pulse + camera shake
   useEffect(() => {
     const onEruption = () => {
-      cameraShakeRef.current = { active: true, startTime: performance.now() / 1000 }
+      const pulse = fogPulseRef.current
+      pulse.active = true
+      pulse.startTime = -1 // set from the R3F clock on the next frame
+      eventBus.emit(CAMERA_TRAUMA_EVENT, ERUPTION_TRAUMA, ERUPTION_TRAUMA_MS)
     }
     eventBus.on('eruption:start', onEruption)
     return () => { eventBus.off('eruption:start', onEruption) }
   }, [])
 
-  useFrame(({ camera, clock }) => {
+  useFrame(({ clock }) => {
     // Drive lava shader time
     const t = clock.elapsedTime
     lavaRiverMat.uniforms.uTime.value = t
     lavaFlowMat.uniforms.uTime.value = t
 
-    const shake = cameraShakeRef.current
-    if (!shake.active) return
-    const elapsed = clock.elapsedTime - shake.startTime
-    if (elapsed < 0) {
-      shake.startTime = clock.elapsedTime
-      return
-    }
-
-    // Camera shake: 3s duration, damped
-    if (elapsed < 3) {
-      const amplitude = 3 * (1 - elapsed / 3)
-      camera.position.x += Math.sin(elapsed * 30) * amplitude * 0.02
-      camera.position.y += Math.cos(elapsed * 25) * amplitude * 0.02
-    }
+    const pulse = fogPulseRef.current
+    if (!pulse.active) return
+    if (pulse.startTime < 0) pulse.startTime = clock.elapsedTime
+    const elapsed = clock.elapsedTime - pulse.startTime
 
     // Fog pulse: close in over 2s, recover over 8s
     if (fogRef.current) {
@@ -65,7 +61,7 @@ export default function VolcanicFeatures({ heightFn, atmosphere, fogRef }: Biome
         fogRef.current.far = 200 + (baseFar - 200) * t
       } else {
         fogRef.current.far = baseFar
-        shake.active = false
+        pulse.active = false
       }
     }
   })

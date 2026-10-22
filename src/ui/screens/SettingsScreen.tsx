@@ -1,4 +1,8 @@
 import { useSettingsStore } from '@/store/useSettingsStore'
+import { SCREEN_SHAKE_LEVELS, type ScreenShakeLevel } from '@/combat/screenShake'
+import { usePrefersReducedMotion } from '@/ui/reducedMotion'
+
+const SHAKE_LABELS: Record<ScreenShakeLevel, string> = { off: 'Off', reduced: 'Reduced', full: 'Full' }
 
 interface SettingsScreenProps {
   onClose: () => void
@@ -10,11 +14,14 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
     sfxVolume,
     mouseSensitivity,
     showFPS,
+    screenShake,
     setMusicVolume,
     setSfxVolume,
     setMouseSensitivity,
     setShowFPS,
+    setScreenShake,
   } = useSettingsStore()
+  const reducedMotion = usePrefersReducedMotion()
 
   return (
     <div className="pause-screen">
@@ -53,6 +60,30 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
             onChange={(e) => setMouseSensitivity(parseFloat(e.target.value))}
           />
         </label>
+        <div className="settings-row">
+          <span id="settings-shake-label">
+            Screen shake
+            {reducedMotion && <small className="settings-note">Off (reduced motion)</small>}
+          </span>
+          <div className="settings-segmented" role="radiogroup" aria-labelledby="settings-shake-label">
+            {SCREEN_SHAKE_LEVELS.map((level) => {
+              const active = reducedMotion ? level === 'off' : screenShake === level
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  className={active ? 'is-active' : undefined}
+                  disabled={reducedMotion}
+                  onClick={() => setScreenShake(level)}
+                >
+                  {SHAKE_LABELS[level]}
+                </button>
+              )
+            })}
+          </div>
+        </div>
         <label className="settings-row">
           <span>Show FPS</span>
           <input
