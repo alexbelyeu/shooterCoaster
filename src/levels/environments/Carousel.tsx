@@ -1,6 +1,7 @@
-import { useRef, useMemo } from 'react'
+import { useRef, useMemo, useEffect, useCallback } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { mergePainted, painted } from './shared/paintedParts'
 
 interface CarouselProps {
   position?: [number, number, number]
@@ -9,86 +10,104 @@ interface CarouselProps {
 }
 
 const ROTATION_SPEED = 0.3 // rad/s
+const HORSE_COLORS = ['#ff4444', '#ffcc00', '#4488ff', '#44cc44', '#ff44ff', '#ffffff', '#ff8800', '#cc33ff']
+const HORSE_Y = 10
+const BOB = 3
 
-/**
- * Animated carousel: cone roof + cylinder base + bobbing horses.
- */
+const _m = new THREE.Matrix4()
+const _c = new THREE.Color()
+
+/** Everything but the horses; rotates as one. */
+function buildBody(radius: number, angles: number[]) {
+  const parts = [
+    painted(new THREE.CylinderGeometry(1.5, 1.5, 40, 8), '#cccccc', [0, 20, 0]),
+    painted(new THREE.ConeGeometry(radius + 5, 12, 12), '#ff3333', [0, 38, 0]),
+    painted(new THREE.CylinderGeometry(radius, radius, 4, 16), '#ddaa44', [0, 2, 0]),
+  ]
+  for (const a of angles) {
+    const x = Math.cos(a) * radius * 0.7
+    const z = Math.sin(a) * radius * 0.7
+    parts.push(painted(new THREE.CylinderGeometry(0.5, 0.5, 28, 4), '#cccccc', [x, 18, z]))
+  }
+  return mergePainted(parts)
+}
+
+function buildHorse() {
+  return mergePainted([
+    painted(new THREE.BoxGeometry(6, 5, 3), '#ffffff'),
+    painted(new THREE.BoxGeometry(3, 3, 2), '#ffffff', [4, 2, 0]),
+  ])
+}
+
+/** Animated carousel in two draw calls: the body and instanced horses bobbing on their poles. */
 export default function Carousel({
   position = [0, 0, 0],
   radius = 25,
   horseCount = 8,
 }: CarouselProps) {
   const platformRef = useRef<THREE.Group>(null)
+  const horsesRef = useRef<THREE.InstancedMesh | null>(null)
   const timeRef = useRef(0)
 
-  const horses = useMemo(() => {
-    const arr: { angle: number; color: string; phase: number }[] = []
-    const colors = ['#ff4444', '#ffcc00', '#4488ff', '#44cc44', '#ff44ff', '#ffffff', '#ff8800', '#cc33ff']
-    for (let i = 0; i < horseCount; i++) {
-      arr.push({
-        angle: (i / horseCount) * Math.PI * 2,
-        color: colors[i % colors.length],
-        phase: (i / horseCount) * Math.PI * 2,
-      })
-    }
-    return arr
-  }, [horseCount])
+  const angles = useMemo(
+    () => Array.from({ length: horseCount }, (_, i) => (i / horseCount) * Math.PI * 2),
+    [horseCount],
+  )
+
+  const assets = useMemo(
+    () => ({
+      body: buildBody(radius, angles),
+      horse: buildHorse(),
+      painted: new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true }),
+      tinted: new THREE.MeshPhongMaterial({ flatShading: true }),
+    }),
+    [radius, angles],
+  )
+  useEffect(() => () => Object.values(assets).forEach((a) => a.dispose()), [assets])
+
+  const placeHorses = useCallback(
+    (time: number) => {
+      const mesh = horsesRef.current
+      if (!mesh) return
+      for (let i = 0; i < angles.length; i++) {
+        const a = angles[i]
+        // Head (+x) faces the direction of travel.
+        _m.makeRotationY(Math.PI / 2 - a).setPosition(
+          Math.cos(a) * radius * 0.7,
+          HORSE_Y + Math.sin(time * 2 + a) * BOB,
+          Math.sin(a) * radius * 0.7,
+        )
+        mesh.setMatrixAt(i, _m)
+      }
+      mesh.instanceMatrix.needsUpdate = true
+    },
+    [angles, radius],
+  )
+
+  const setHorses = useCallback(
+    (mesh: THREE.InstancedMesh | null) => {
+      horsesRef.current = mesh
+      if (!mesh) return
+      for (let i = 0; i < angles.length; i++) mesh.setColorAt(i, _c.set(HORSE_COLORS[i % HORSE_COLORS.length]))
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+      placeHorses(timeRef.current)
+      mesh.computeBoundingSphere()
+      if (mesh.boundingSphere) mesh.boundingSphere.radius += BOB
+    },
+    [angles, placeHorses],
+  )
 
   useFrame((_, delta) => {
-    if (platformRef.current) {
-      platformRef.current.rotation.y += ROTATION_SPEED * delta
-    }
     timeRef.current += delta
+    if (platformRef.current) platformRef.current.rotation.y += ROTATION_SPEED * delta
+    placeHorses(timeRef.current)
   })
 
   return (
     <group position={position}>
-      {/* Central pole */}
-      <mesh position={[0, 20, 0]}>
-        <cylinderGeometry args={[1.5, 1.5, 40, 8]} />
-        <meshPhongMaterial color="#cccccc" flatShading />
-      </mesh>
-
-      {/* Cone roof */}
-      <mesh position={[0, 38, 0]}>
-        <coneGeometry args={[radius + 5, 12, 12]} />
-        <meshPhongMaterial color="#ff3333" flatShading />
-      </mesh>
-
-      {/* Rotating platform with horses */}
       <group ref={platformRef}>
-        {/* Base cylinder */}
-        <mesh position={[0, 2, 0]}>
-          <cylinderGeometry args={[radius, radius, 4, 16]} />
-          <meshPhongMaterial color="#ddaa44" flatShading />
-        </mesh>
-
-        {/* Horses */}
-        {horses.map((horse, i) => {
-          const x = Math.cos(horse.angle) * (radius * 0.7)
-          const z = Math.sin(horse.angle) * (radius * 0.7)
-          const bob = Math.sin(timeRef.current * 2 + horse.phase) * 3
-
-          return (
-            <group key={i} position={[x, 10 + bob, z]}>
-              {/* Pole */}
-              <mesh position={[0, 8, 0]}>
-                <cylinderGeometry args={[0.5, 0.5, 20, 4]} />
-                <meshPhongMaterial color="#cccccc" flatShading />
-              </mesh>
-              {/* Horse body — simplified as a box */}
-              <mesh>
-                <boxGeometry args={[6, 5, 3]} />
-                <meshPhongMaterial color={horse.color} flatShading />
-              </mesh>
-              {/* Horse head */}
-              <mesh position={[4, 2, 0]}>
-                <boxGeometry args={[3, 3, 2]} />
-                <meshPhongMaterial color={horse.color} flatShading />
-              </mesh>
-            </group>
-          )
-        })}
+        <mesh geometry={assets.body} material={assets.painted} />
+        <instancedMesh ref={setHorses} args={[assets.horse, assets.tinted, angles.length]} />
       </group>
     </group>
   )

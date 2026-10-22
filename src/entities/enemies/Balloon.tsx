@@ -2,8 +2,8 @@ import { useCallback, useMemo } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import {
-  BALLOON_BODY_GEO, BALLOON_KNOT_GEO, BALLOON_STRING_GEO,
-  BALLOON_BODY_MATS, BALLOON_KNOT_MATS, BALLOON_STRING_MAT,
+  BALLOON_GEO, BALLOON_STRING_GEO,
+  BALLOON_BODY_MATS, BALLOON_STRING_MAT,
   BALLOON_COLOR_COUNT,
 } from './SharedEnemyAssets'
 
@@ -29,11 +29,8 @@ export default function Balloon(props: EnemyProps) {
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group>
-        {/* Balloon body — teardrop: sphere scaled taller */}
-        <mesh scale={[1, 1.3, 1]} geometry={BALLOON_BODY_GEO} material={BALLOON_BODY_MATS[colorIndex]} />
-
-        {/* Knot at the bottom */}
-        <mesh position={[0, -35, 0]} geometry={BALLOON_KNOT_GEO} material={BALLOON_KNOT_MATS[colorIndex]} />
+        {/* Teardrop body + knot */}
+        <mesh geometry={BALLOON_GEO} material={BALLOON_BODY_MATS[colorIndex]} />
 
         {/* String hanging below */}
         <mesh position={[0, -65, 0]} geometry={BALLOON_STRING_GEO} material={BALLOON_STRING_MAT} />

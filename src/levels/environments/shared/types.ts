@@ -1,6 +1,7 @@
 import type { ComponentType, RefObject } from 'react'
 import type * as THREE from 'three'
-import type { HeightFunction, TrackSample } from '@/utils/terrainNoise'
+import type { HeightFunction } from '@/utils/terrainNoise'
+import type { ArcTable } from '@/track/arcLength'
 import type { AtmosphereConfig } from '../atmosphere'
 
 /** One stop of a terrain colour ramp. */
@@ -38,15 +39,17 @@ export interface BiomeTreeConfig {
 /** Props every biome's decorations component receives. */
 export interface BiomeDecorationsProps {
   heightFn: HeightFunction
-  /** Terrain height as drawn (createTerrainSurface): sit grounded props on this. */
+  /** Terrain as drawn (`createTerrainSurface`): stand grounded props on this. */
   groundFn: HeightFunction
-  /** For scattering props around the ride (shared/trackScatter.ts). */
-  trackSamples: TrackSample[]
+  /** The level's only track input: use with `shared/trackClearance.ts` and `shared/trackScatter.ts`. */
+  track: ArcTable
 }
 
 /** Props every biome's features component (landmarks, terrain features, events) receives. */
 export interface BiomeFeaturesProps {
   heightFn: HeightFunction
+  groundFn: HeightFunction
+  track: ArcTable
   atmosphere: AtmosphereConfig
   /** The scene fog, for biome events that animate it (volcanic eruption). */
   fogRef: RefObject<THREE.Fog | null>

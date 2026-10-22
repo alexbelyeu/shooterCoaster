@@ -141,9 +141,9 @@ function pickSpawn(type: EnemyType, heightFn: HeightFunction): THREE.Vector3 {
       break
     }
     default: {
-      // Scatter balloons across a huge area well beyond the track (~±1100).
-      // Use sqrt for uniform area density across a circle of radius 3500.
-      const r = Math.sqrt(Math.random()) * 3500
+      // Scatter balloons over the park, a little beyond the track (~±1100),
+      // so they float close to the ride (issue #20). sqrt = uniform area density.
+      const r = Math.sqrt(Math.random()) * 1700
       const theta = Math.random() * 2 * Math.PI
       x = Math.cos(theta) * r
       z = Math.sin(theta) * r

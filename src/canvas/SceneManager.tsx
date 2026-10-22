@@ -5,6 +5,7 @@ import { createTrigCurve } from '@/track/curves/TrigCurve'
 import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
 import TrackMesh from '@/track/TrackMesh'
 import { getTrackDimensions } from '@/track/trackDimensions'
+import { buildArcTable } from '@/track/arcLength'
 import CoasterCamera from '@/track/CoasterCamera'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -72,6 +73,7 @@ function LevelScene({ levelId }: { levelId: string }) {
     return factory(track.varA, track.varB, track.varC, track.scalar)
   }, [track])
 
+  const trackTable = useMemo(() => buildArcTable(curve), [curve])
   const trackSamples = useMemo(() => sampleTrackPath((t) => curve.getPointAt(t)), [curve])
   const heightFn = useMemo(() => createHeightFunction(biome, trackSamples), [biome, trackSamples])
   const groundFn = useMemo(
@@ -101,15 +103,16 @@ function LevelScene({ levelId }: { levelId: string }) {
         color2={color2}
         dims={trackDims}
         groundFn={groundFn}
+        table={trackTable}
       />
       <BiomeEnvironment
         biome={biome}
+        groundFn={groundFn}
+        track={trackTable}
         groundColor={environment.groundColor}
         hasWater={environment.hasWater}
         hasTrees={environment.hasTrees}
         treeCount={environment.treeCount}
-        groundFn={groundFn}
-        trackSamples={trackSamples}
       />
       <BulletPool bulletColor={bulletColor} bulletSize={bulletSize} />
       <ParticleExplosionPool />

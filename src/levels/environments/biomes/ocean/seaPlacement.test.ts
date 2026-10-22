@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getLevelConfig } from '@/levels/LevelRegistry'
+import { buildArcTable } from '@/track/arcLength'
 import { createTrigCurve } from '@/track/curves/TrigCurve'
 import {
   createHeightFunction,
@@ -7,7 +8,8 @@ import {
   getTerrainMeshSize,
   sampleTrackPath,
 } from '@/utils/terrainNoise'
-import { distanceToTrack, trackExtent } from '../../shared/trackScatter'
+import { buildTrackIndex } from '../../shared/trackClearance'
+import { trackExtent } from '../../shared/trackScatter'
 import {
   KELP_HEIGHT,
   ROCK_FOOTPRINT,
@@ -22,15 +24,19 @@ import { layoutOcean, maxGroundUnder } from './seaPlacement'
 const level = getLevelConfig('level3')!
 const { varA, varB, varC, scalar } = level.track
 const curve = createTrigCurve(varA, varB, varC, scalar)
-const samples = sampleTrackPath((t) => curve.getPointAt(t))
-const groundFn = createTerrainSurface(createHeightFunction('ocean', samples), getTerrainMeshSize('ocean'))
+const table = buildArcTable(curve)
+const groundFn = createTerrainSurface(
+  createHeightFunction('ocean', sampleTrackPath((t) => curve.getPointAt(t))),
+  getTerrainMeshSize('ocean'),
+)
 const city = { x: 1800, z: -1400, r: 320 }
-const layout = layoutOcean(groundFn, samples, [city])
-const extent = trackExtent(samples)
+const layout = layoutOcean(groundFn, table, [city])
+const extent = trackExtent(table)
+const trackIndex = buildTrackIndex(table)
 
 describe('layoutOcean (level 3)', () => {
   it('is the same every run', () => {
-    expect(layoutOcean(groundFn, samples, [city])).toEqual(layout)
+    expect(layoutOcean(groundFn, table, [city])).toEqual(layout)
   })
 
   it('stands 6–10 sea stacks in open water beyond the track, clear of the city', () => {
@@ -53,7 +59,7 @@ describe('layoutOcean (level 3)', () => {
       expect(top).toBeGreaterThanOrEqual(5 - 1e-6)
       expect(top).toBeLessThanOrEqual(22 + 1e-6)
       expect(r.y).toBeLessThanOrEqual(groundFn(r.x, r.z))
-      expect(distanceToTrack(samples, r.x, r.z)).toBeGreaterThanOrEqual(90)
+      expect(trackIndex.near(r.x, r.z, 90)).toBe(false)
       expect(maxGroundUnder(groundFn, r.x, r.z, ROCK_FOOTPRINT * r.scale)).toBeLessThan(-10)
     }
   })

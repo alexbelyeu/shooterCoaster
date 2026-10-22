@@ -9,10 +9,10 @@ import Reef from './Reef'
 
 const [CITY_X, , CITY_Z] = SUNKEN_CITY_POSITION
 
-export default function OceanDecorations({ groundFn, trackSamples }: BiomeDecorationsProps) {
+export default function OceanDecorations({ groundFn, track }: BiomeDecorationsProps) {
   const layout = useMemo(
-    () => layoutOcean(groundFn, trackSamples, [{ x: CITY_X, z: CITY_Z, r: 320 }]),
-    [groundFn, trackSamples],
+    () => layoutOcean(groundFn, track, [{ x: CITY_X, z: CITY_Z, r: 320 }]),
+    [groundFn, track],
   )
   return (
     <>

@@ -1,4 +1,6 @@
-import type { HeightFunction, TrackSample } from '@/utils/terrainNoise'
+import type { ArcTable } from '@/track/arcLength'
+import type { HeightFunction } from '@/utils/terrainNoise'
+import { buildTrackIndex } from './trackClearance'
 
 /** Scatter props around the track rather than uniformly over the map (pure, unit-tested). */
 
@@ -20,27 +22,16 @@ export function createRng(seed: number): () => number {
   }
 }
 
-/** ≈ varC * 13 * scalar. */
-export function trackExtent(samples: readonly TrackSample[]): number {
+/** Furthest XZ reach of the track from the origin (≈ varC * 13 * scalar). */
+export function trackExtent(table: ArcTable): number {
   let max = 0
-  for (const s of samples) max = Math.max(max, Math.hypot(s.x, s.z))
+  for (let i = 0; i < table.count; i++) max = Math.max(max, Math.hypot(table.x[i], table.z[i]))
   return max
-}
-
-export function distanceToTrack(samples: readonly TrackSample[], x: number, z: number): number {
-  let best = Infinity
-  for (const s of samples) {
-    const dx = x - s.x
-    const dz = z - s.z
-    const d2 = dx * dx + dz * dz
-    if (d2 < best) best = d2
-  }
-  return Math.sqrt(best)
 }
 
 export interface NearTrackScatterOptions {
   count: number
-  trackSamples: readonly TrackSample[]
+  track: ArcTable
   heightFn: HeightFunction
   /** Horizontal clearance from the track centreline (keeps props off the rails and towers). */
   minDist: number
@@ -52,21 +43,22 @@ export interface NearTrackScatterOptions {
   rng: () => number
 }
 
-/** Points offset from random track samples, rejecting any too close to the track, too far out or too steep. */
+/** Points offset from random arc-table samples, rejecting any too close to the track, too far out or too steep. */
 export function scatterNearTrack(opts: NearTrackScatterOptions): ScatterPoint[] {
-  const { count, trackSamples, heightFn, minDist, maxDist, maxRadius, maxSlope, bias, rng } = opts
+  const { count, track, heightFn, minDist, maxDist, maxRadius, maxSlope, bias, rng } = opts
   const out: ScatterPoint[] = []
-  if (trackSamples.length === 0) return out
+  if (track.count === 0) return out
+  const index = buildTrackIndex(track)
   const maxSlopeTan = Math.tan(maxSlope)
   const delta = 5
   for (let attempts = 0; out.length < count && attempts < count * 20; attempts++) {
-    const s = trackSamples[Math.floor(rng() * trackSamples.length)]
+    const i = Math.floor(rng() * track.count)
     const offset = minDist + (maxDist - minDist) * Math.pow(rng(), bias)
     const theta = rng() * Math.PI * 2
-    const x = s.x + Math.cos(theta) * offset
-    const z = s.z + Math.sin(theta) * offset
+    const x = track.x[i] + Math.cos(theta) * offset
+    const z = track.z[i] + Math.sin(theta) * offset
     if (Math.hypot(x, z) > maxRadius) continue
-    if (distanceToTrack(trackSamples, x, z) < minDist) continue
+    if (index.near(x, z, minDist)) continue
     const y = heightFn(x, z)
     const dx = (heightFn(x + delta, z) - y) / delta
     const dz = (heightFn(x, z + delta) - y) / delta
@@ -76,7 +68,7 @@ export function scatterNearTrack(opts: NearTrackScatterOptions): ScatterPoint[] 
   return out
 }
 
-/** Lowest drawn-ground point under a round footprint, minus `sink`: no edge of the base can hang in the air. */
+/** Lowest drawn ground under a round footprint (centre, half and full radius: dips hide inside the rim), minus `sink`. */
 export function groundedBaseY(
   groundFn: HeightFunction,
   x: number,
@@ -85,9 +77,11 @@ export function groundedBaseY(
   sink: number,
 ): number {
   let min = groundFn(x, z)
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2
-    min = Math.min(min, groundFn(x + Math.cos(a) * radius, z + Math.sin(a) * radius))
+  for (const r of [radius * 0.5, radius]) {
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2
+      min = Math.min(min, groundFn(x + Math.cos(a) * r, z + Math.sin(a) * r))
+    }
   }
   return min - sink
 }

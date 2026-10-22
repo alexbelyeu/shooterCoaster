@@ -1,4 +1,5 @@
-import type { HeightFunction, TrackSample } from '@/utils/terrainNoise'
+import type { ArcTable } from '@/track/arcLength'
+import type { HeightFunction } from '@/utils/terrainNoise'
 import { createRng, groundedBaseY, scatterNearTrack, trackExtent, type ScatterPoint } from '../../shared/trackScatter'
 import { KELP_HEIGHT, ROCK_FOOTPRINT, ROCK_HEIGHT, STACK_FOOTPRINT, STACK_HEIGHT } from './seaDimensions'
 
@@ -50,7 +51,7 @@ export function placeSeaStacks(groundFn: HeightFunction, opts: SeaStackOptions):
 
 export interface BreachingRockOptions {
   count: number
-  trackSamples: readonly TrackSample[]
+  track: ArcTable
   minDist: number
   maxDist: number
   maxRadius: number
@@ -63,10 +64,10 @@ export interface BreachingRockOptions {
 
 /** Each rock is scaled so its top lands `topRange` above the water, whatever the depth. */
 export function placeBreachingRocks(groundFn: HeightFunction, opts: BreachingRockOptions): SeabedProp[] {
-  const { count, trackSamples, minDist, maxDist, maxRadius, footprint, height, topRange, spacing, rng } = opts
+  const { count, track, minDist, maxDist, maxRadius, footprint, height, topRange, spacing, rng } = opts
   const candidates = scatterNearTrack({
     count: count * 4,
-    trackSamples,
+    track,
     heightFn: groundFn,
     minDist,
     maxDist,
@@ -93,7 +94,7 @@ export function placeBreachingRocks(groundFn: HeightFunction, opts: BreachingRoc
 
 export interface ReefOptions {
   count: number
-  trackSamples: readonly TrackSample[]
+  track: ArcTable
   minDist: number
   maxDist: number
   maxRadius: number
@@ -103,10 +104,10 @@ export interface ReefOptions {
 }
 
 export function placeReef(groundFn: HeightFunction, opts: ReefOptions): SeabedProp[] {
-  const { count, trackSamples, minDist, maxDist, maxRadius, maxGroundY, scaleRange, rng } = opts
+  const { count, track, minDist, maxDist, maxRadius, maxGroundY, scaleRange, rng } = opts
   const candidates = scatterNearTrack({
     count: count * 2,
-    trackSamples,
+    track,
     heightFn: groundFn,
     minDist,
     maxDist,
@@ -173,10 +174,10 @@ export interface OceanLayout {
 /** Seeded: the same layout every run. `avoid` keeps stacks off landmarks. */
 export function layoutOcean(
   groundFn: HeightFunction,
-  trackSamples: readonly TrackSample[],
+  track: ArcTable,
   avoid: readonly { x: number; z: number; r: number }[],
 ): OceanLayout {
-  const extent = trackExtent(trackSamples)
+  const extent = trackExtent(track)
   const stacks = placeSeaStacks(groundFn, {
     count: 8,
     minRadius: extent * 1.3,
@@ -189,7 +190,7 @@ export function layoutOcean(
   })
   const rocks = placeBreachingRocks(groundFn, {
     count: 18,
-    trackSamples,
+    track,
     minDist: 90,
     maxDist: 450,
     maxRadius: extent * 1.15,
@@ -206,7 +207,7 @@ export function layoutOcean(
   const gulls = placeGullOrbits(nearest, 10, 3, createRng(2102))
   const coral = placeReef(groundFn, {
     count: 110,
-    trackSamples,
+    track,
     minDist: 30,
     maxDist: 600,
     maxRadius: extent * 1.25,
@@ -216,7 +217,7 @@ export function layoutOcean(
   })
   const kelp = placeReef(groundFn, {
     count: 90,
-    trackSamples,
+    track,
     minDist: 40,
     maxDist: 600,
     maxRadius: extent * 1.25,

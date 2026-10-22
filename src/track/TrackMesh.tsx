@@ -27,6 +27,8 @@ interface TrackMeshProps {
    * this; defaults to the TerrainContext heightFn.
    */
   groundFn?: HeightFunction
+  /** Arc-length table of `curve`, if the caller already built one. */
+  table?: ArcTable
 }
 
 const DEFAULT_DIMS = getTrackDimensions({ scalar: 20 })
@@ -161,8 +163,9 @@ export default function TrackMesh({
   color2 = [1, 1, 0],
   dims = DEFAULT_DIMS,
   groundFn,
+  table: tableProp,
 }: TrackMeshProps) {
-  const table = useMemo(() => buildArcTable(curve), [curve])
+  const table = useMemo(() => tableProp ?? buildArcTable(curve), [tableProp, curve])
   const geometry = useMemo(
     () => buildTrackGeometry(curve, table, dims, segments, color1, color2),
     [curve, table, dims, segments, color1, color2],
