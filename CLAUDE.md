@@ -24,6 +24,7 @@ npm run build             # typecheck (tsc -b) + production build -> dist/
 npm run check:bundle      # bundle-size budget (budgets.json)
 npm run smoke             # headless playtest: title + every level + phone touch run (needs a build)
 npm run verify            # test + build + bundle budget + smoke — run before every PR
+npm run og                # re-render the share card public/social/og-1200x630.jpg + apple-touch-icon (needs a build)
 ```
 
 Unit tests live next to the code as `src/**/*.test.ts` and run in plain Node
