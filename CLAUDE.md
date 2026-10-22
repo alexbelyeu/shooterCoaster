@@ -83,7 +83,7 @@ portrait screens get a wider vertical FOV); touch shots get aim assist (`combat/
 React 19 + @react-three/fiber 9 + drei + @react-three/postprocessing, three 0.172,
 @react-three/rapier (physics), Tone.js (procedural audio), zustand (state),
 framer-motion (UI), Vite 6, TypeScript strict. Deployed on Vercel: every push to
-`main` goes to production at https://shooter-coaster.vercel.app. Preview deployments
+`main` goes to production at **https://scoaster.com** (also https://shooter-coaster.vercel.app). Preview deployments
 are disabled (`git.deploymentEnabled` in `vercel.json`) — verification happens in CI. Serverless stubs in `api/` (leaderboard, daily seed, ghost
 replays — currently in-memory placeholders).
 
@@ -107,7 +107,7 @@ replays — currently in-memory placeholders).
 | `src/testing/` | e2e hook |
 | `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser, `pause-check.sh`, `studio-status.cjs` |
 | `.claude/agents/`, `.claude/commands/`, `.claude/scripts/` | Agent roles (incl. `pr-correctness` / `pr-consistency` reviewers), `/deslop` and `/wrap-pr`, the review-bundle script |
-| `docs/` | Specs, perf notes, and the agent operating system in `docs/agents/` (runbooks for every scheduled task in `docs/agents/runbooks/`) |
+| `docs/` | Specs, perf notes, the agent operating system in `docs/agents/` (runbooks for every scheduled task in `docs/agents/runbooks/`), and `docs/marketing/` (strategy, weekly metrics, ad budget ledger; owned by the Marketer) |
 | `js/`, `index.legacy.html`, `package.legacy.json`, `gulpfile.js`, `assets/` | **Legacy v1 game (2015).** Not built. Don't extend it. |
 
 ## Skills in this repo

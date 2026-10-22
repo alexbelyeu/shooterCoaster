@@ -24,15 +24,18 @@ Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, `docs/agents/VISION.md`,
 
 `docs/reports/<YYYY>-W<ww>.md` (ISO week of the week being reported) with:
 1. **Headline** — one sentence on the biggest change a player would notice.
-2. **Play it** — https://shooter-coaster.vercel.app
+2. **Play it** — https://scoaster.com (if it doesn't serve the game yet, https://shooter-coaster.vercel.app)
 3. **What's new for players** — bullets, plain language, each linked to its PR.
 4. **Screenshots** — title + every level, saved as JPEG (quality ~70, 1280×720)
    under `docs/reports/<YYYY>-W<ww>/`, embedded in the markdown.
 5. **Under the hood** — architecture/perf/tooling changes.
-6. **Health** — PRs merged / sent back / reverted, CI pass rate if known, bundle size
+6. **Players** — the headline numbers and trend from this week's
+   `docs/marketing/metrics/<YYYY>-W<ww>.md` (written by the Marketer an hour earlier), and any
+   open `needs-alex` marketing drafts waiting for Alex. Skip if the file doesn't exist.
+7. **Health** — PRs merged / sent back / reverted, CI pass rate if known, bundle size
    vs budget, per-level draw calls & triangles (table), open blockers.
-7. **Next up** — the top `agent:ready` issues and roadmap milestone in progress.
-8. **Steer me** — remind Alex he can edit `docs/agents/STEERING.md` or open an issue
+8. **Next up** — the top `agent:ready` issues and roadmap milestone in progress.
+9. **Steer me** — remind Alex he can edit `docs/agents/STEERING.md` or open an issue
    labelled `steering`, and that `pause: true` stops everything.
 
 Ship it as a docs-only PR (`agent/report-<YYYY>-W<ww>`) labelled `agent:needs-qa`.
@@ -48,11 +51,12 @@ the moment the `report` label is applied, and GitHub mails that comment to Alex.
 cannot send Gmail from scheduled runs — the connector returns Forbidden — so don't try.)
 
 Write the body for a phone screen:
-1. Headline (one sentence) and the play link https://shooter-coaster.vercel.app
+1. Headline (one sentence) and the play link https://scoaster.com
 2. What's new for players (bullets, each linked to its PR)
-3. Health in one line (PRs merged / sent back / reverted, bundle KB vs budget, smoke status)
-4. Next up (top 3 issues)
-5. Link to the report PR — screenshots are in its "Files changed" tab; once QA merges it
+3. Players in one line (visitors, top source, week-over-week) and any `needs-alex` drafts
+4. Health in one line (PRs merged / sent back / reverted, bundle KB vs budget, smoke status)
+5. Next up (top 3 issues)
+6. Link to the report PR — screenshots are in its "Files changed" tab; once QA merges it
    the full report lives at `docs/reports/<YYYY>-W<ww>.md`
 
 Finish with: report path, PR number, issue number.

@@ -11,12 +11,13 @@
 const TZ = 'America/New_York'
 const STATUS_LABEL = 'studio-status'
 const STATUS_TITLE = '📊 Studio status (live)'
-const SITE = 'https://shooter-coaster.vercel.app'
+const SITE = 'https://scoaster.com'
 const REPO = 'alexbelyeu/shooterCoaster'
 
 // Keep in sync with the scheduled tasks (times are New York wall-clock).
 // days: 0 = Sunday … 6 = Saturday; omitted = every day.
 const SCHEDULE = [
+  { who: 'Marketer', what: 'metrics, growth issues, drafts for you', times: ['05:13'], days: [1] },
   { who: 'Reporter', what: 'weekly report email', times: ['06:13'], days: [1] },
   { who: 'Director', what: 'plans the week, files issues', times: ['07:44'], days: [1] },
   { who: 'Builders', what: 'build the top issues, open PRs', times: ['08:47', '13:47', '18:47'] },
@@ -268,6 +269,8 @@ function render(data, now) {
   out.push(ready.slice(0, 5).map((i) => `- #${i.number} ${i.title}`).join('\n') || '- _(empty — builders will draw from the VISION.md backlog)_')
   if (drafts.length) out.push(`\nDraft PRs (unfinished work): ${drafts.map((p) => `#${p.number}`).join(', ')}`)
   if (steering.length) out.push(`\nOpen steering issues: ${steering.map((i) => `#${i.number}`).join(', ')}`)
+  const forAlex = issues.filter((i) => hasLabel(i, 'needs-alex'))
+  if (forAlex.length) out.push(`\n📣 Waiting on you (marketing): ${forAlex.map((i) => `#${i.number} ${short(i.title, 50)}`).join(' · ')}`)
   out.push('')
   out.push(`<sub>⏸ [Pause everything](https://github.com/${REPO}/issues/new?title=PAUSE&labels=pause&body=Close%20this%20issue%20to%20resume.) (or title it \`PAUSE until 2026-10-21 08:00\` to resume by itself) · Steer: edit \`docs/agents/STEERING.md\` or open an issue labelled \`steering\`.</sub>`)
   return out.join('\n')
