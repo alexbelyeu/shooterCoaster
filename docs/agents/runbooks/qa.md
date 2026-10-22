@@ -7,8 +7,8 @@ reviewed within minutes by QA (on label); this run catches anything that slipped
 1. Read `qa_parallelism` (P) from STEERING.md (default 1, max 2).
 2. List open, non-draft PRs labelled `agent:needs-qa`, ordered: reverts and
    `agent:prod-broken` fixes first (title starts `revert:`), then `P1`, then the rest
-   oldest first. Leave out PRs with a `QA run … reviewing` comment from the last 2
-   hours. If none, reply "Nothing to review" and stop.
+   oldest first. Leave out PRs with a *live* `QA run … reviewing` claim (runbooks
+   README, "Live claims"). If none, reply "Nothing to review" and stop.
 3. Review them in waves of up to P PRs, up to 6 PRs this run, each following
    `docs/agents/runbooks/review-one-pr.md`. Pause checkpoint before each wave. Start the
    next wave only after the previous one is decided and its approved PRs have merged

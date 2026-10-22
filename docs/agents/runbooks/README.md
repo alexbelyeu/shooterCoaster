@@ -33,6 +33,11 @@ Rules that apply to every runbook:
 - Read `CLAUDE.md`, `docs/agents/PROTOCOL.md` and `docs/agents/STEERING.md` first.
 - Use `gh api` (REST) for GitHub; GraphQL is blocked. Headless Chromium:
   `export SC_CHROME="$(scripts/ensure-browser.sh)"`.
+- **Live claims.** A claim comment (`QA run … reviewing`, `Builder run … is on it`) is
+  *live* only if it is less than 2 hours old **and** nothing that ends that piece of work
+  was posted after it: a QA decision comment (`QA: approved`, `QA: changes requested`,
+  a close) ends a QA claim; a builder's reply or a label change to `agent:needs-qa` ends
+  a builder claim. Ignore claims that aren't live: they belong to a finished round.
 - **Pause checkpoints.** Run `scripts/pause-check.sh` again before every wave of
   subagents and before any long step. If it prints PAUSED, start nothing new, leave
   claims and labels as they are, and end with the PAUSED line.

@@ -6,8 +6,8 @@ Fix (on label) task within minutes, so you only pick those up if they've waited.
 
 1. Read `builder_parallelism` (N) from STEERING.md (default 2, max 4).
 2. Pick up to N assignments, in this order:
-   a. Open, non-draft PRs labelled `agent:changes-requested` with no
-      `Builder run … is on it` comment from the last 2 hours (oldest first).
+   a. Open, non-draft PRs labelled `agent:changes-requested` with no *live*
+      `Builder run … is on it` claim (runbooks README, "Live claims"), oldest first.
    b. Open issues labelled `agent:ready` (never `agent:in-progress`), excluding
       `epic` and `pause`, ordered P1 > P2 > P3; within the same priority, issues
       labelled `steering` (Alex's own requests) first; then oldest first.
@@ -21,10 +21,12 @@ Fix (on label) task within minutes, so you only pick those up if they've waited.
    `agent:in-progress` and comment `Claimed by builder run <ISO timestamp>`; for
    returned PRs comment `Builder run <ISO timestamp> is on it`.
 4. **Verify every claim.** Wait about 20 seconds, then re-read each issue's/PR's
-   comments. If another run's claim comment is earlier than yours, or another run
-   claimed it within the last 6 hours (2 hours for a returned PR), back off: comment
-   `Backing off — already claimed by another run`, leave its labels alone, and replace
-   it with the next candidate (claim and verify that one the same way).
+   comments. Back off if, for an issue, another run's claim comment is earlier than
+   yours or another run claimed it within the last 6 hours; for a returned PR, only if
+   another *live* `Builder run … is on it` claim (runbooks README, "Live claims") is
+   earlier than yours (the previous round's claim has ended). To back off,
+   comment `Backing off — already claimed by another run`, leave its labels alone, and
+   replace it with the next candidate (claim and verify that one the same way).
 5. Pause checkpoint. Then spawn all builders **in a single message** with the Agent
    tool, one call per verified assignment: `subagent_type: "general-purpose"`,
    `model: "opus"`, `isolation: "worktree"`, `run_in_background: false`, prompt:

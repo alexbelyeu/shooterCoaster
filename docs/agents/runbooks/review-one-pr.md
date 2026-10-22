@@ -6,10 +6,11 @@ criteria, hard rules) and, for larger code changes, the two reviewers from
 `.claude/commands/wrap-pr.md` (`pr-correctness`, `pr-consistency`). You, the
 dispatcher, make one decision from all of them and post it.
 
-1. **Claim.** If a `QA run … reviewing` comment was posted on the PR in the last 2
-   hours, skip it ("Already under review"). Otherwise comment `QA run <ISO timestamp>
-   reviewing`, wait about 20 seconds, re-read the comments, and skip it if another
-   run's `QA run … reviewing` comment from the last 2 hours is earlier than yours.
+1. **Claim.** If the PR has a *live* `QA run … reviewing` claim (see "Live claims" in
+   the runbooks README: under 2 hours old with no QA decision after it), skip it
+   ("Already under review"). Otherwise comment `QA run <ISO timestamp> reviewing`, wait
+   about 20 seconds, re-read the comments, and skip it if another live
+   `QA run … reviewing` claim is earlier than yours.
 2. **Light re-review?** If an earlier QA comment says the full review passed and only a
    merge conflict had to be fixed, and every commit since that reviewed head is a merge
    of `origin/main`, spawn only the playtest reviewer and tell it to do the light
