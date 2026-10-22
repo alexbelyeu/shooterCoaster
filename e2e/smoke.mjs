@@ -64,7 +64,6 @@ fs.mkdirSync(OUT, { recursive: true })
 // Console noise that is expected in headless/sandboxed runs and is not a game bug.
 const IGNORED = [
   /AudioContext/i,
-  /googletagmanager|gtag|google-analytics/i,
   /Failed to load resource/i,
   /net::ERR_/i,
   /WebGL.*(performance|GPU stall|ReadPixels)/i,
