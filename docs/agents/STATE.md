@@ -63,6 +63,10 @@ score %; replay / next).
   persisted best scores), `usePlayerStore`, `useSettingsStore` (persisted).
 - **API** (`api/`): leaderboard, daily seed, ghost — in-memory placeholders, unused
   by the client in any meaningful way.
+- **Analytics** (`src/main.tsx`, `src/app/analyticsGate.ts`): Vercel Web Analytics
+  `<Analytics />`, page views only (custom events need Vercel Pro). Mounted only on
+  Vercel builds and never with `?e2e=1`. Collects nothing until Web Analytics is
+  switched on in the Vercel project's Analytics tab.
 - **Legacy v1** (`js/`, `index.legacy.html`, `assets/`): not built, don't extend.
 
 ### Tooling
