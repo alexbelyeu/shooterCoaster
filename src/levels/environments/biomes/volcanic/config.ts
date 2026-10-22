@@ -1,5 +1,33 @@
 import * as THREE from 'three'
 import type { BiomeTreeConfig, ColorRamp } from '../../shared/types'
+import type { ParticleFieldPreset } from '../../shared/ParticleField'
+
+/** Grey ash drifting down, with tiny orange embers rising through it. */
+export const ASH_EMBERS: ParticleFieldPreset = {
+  count: 3000,
+  box: [520, 280, 520],
+  primary: {
+    color: 0x9a918a,
+    opacity: 0.6,
+    size: 1.0,
+    maxPixels: 4,
+    velocity: [4, -7, 2],
+    sway: 5,
+    flicker: 0,
+    additive: false,
+  },
+  secondary: {
+    color: 0xff6a1a,
+    opacity: 0.9,
+    size: 0.8,
+    maxPixels: 4,
+    velocity: [1, 12, 0],
+    sway: 7,
+    flicker: 1,
+    additive: true,
+  },
+  secondaryShare: 0.2,
+}
 
 export const COLOR_RAMP: ColorRamp = {
   stops: [
