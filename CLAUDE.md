@@ -39,13 +39,15 @@ The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/sizes, errors)
 to `e2e-results/`: `title.png`, and per level `<id>.png` (after a 10 s ride),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
-(after 4 s of autofire + `killNearest(5)`, with the muzzle flash and gold hitmarker
-held on the kill frame via `holdFeedback`) and `<id>-results.png`. A level fails if
+(after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
+gold hitmarker held on the kill frame via `holdFeedback`) and `<id>-results.png`. A level fails if
 it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
 enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
-wall-clock level timer already ran out), camera shake exceeds
-3 units or doesn't return exactly to the track, the camera aspect doesn't match the
-canvas (±0.01), or the results screen never appears.
+wall-clock level timer already ran out), the camera translates off the track pose at all
+(kill feedback is rotation-only trauma, ≤ 1°, back to 0), the first-person weapon is off
+screen / covers the centre / overlaps the HUD / points > 25° off the shot's tracer (also
+checked in mobile portrait + landscape),
+the camera aspect doesn't match the canvas (±0.01), or the results screen never appears.
 `npm run smoke` also passes `--mobile`:
 an iPhone 13-like touch context (390x844) taps PLAY and a level, then in portrait and
 again in 844x390 landscape taps the canvas 10x, each tap 15–30 px off an on-screen
@@ -67,8 +69,9 @@ Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 onScreenEnemies/shotsFired, `autoFire(on)`, `killNearest(n)` (fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
 `endLevel()`, `setTimeScale(s)`, `sceneStats()`, `combat` fire/hit/kill event counters,
-`cameraShake` {current, max}, `holdFeedback`, `view()` → camera vs canvas aspect + FOV).
-See `src/testing/e2eHook.tsx`. Extend it when you need new test
+`cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
+{current, max} in degrees, `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
+`view()` → camera vs canvas aspect + FOV). See `src/testing/e2eHook.tsx`. Extend it when you need new test
 surfaces. Bullets travel per *second* with a swept hit test (`combat/projectiles/bulletMotion.ts`),
 but enemies and the camera still move a lot during one ~1 fps headless frame, so
 autofire only sometimes lands hits — `killNearest` is what guarantees kills.
@@ -96,7 +99,7 @@ replays — currently in-memory placeholders).
 | `src/track/` | Procedural track curves, track mesh (rails + ties), lattice support towers, `trackDimensions` (structure scale per level), coaster camera, progress |
 | `src/entities/enemies/` | Enemy models/behaviours; `entities/spawning/EnemySpawner` waves |
 | `src/input/` | `pointerInput` — the single Pointer Events source (mouse/touch/pen) for aim + fire |
-| `src/combat/` | Aim, collisions, projectiles, weapons, crosshair |
+| `src/combat/` | Aim, collisions, projectiles, weapons, crosshair; `WeaponViewModel` (first-person gun, recoil, muzzle flash, tracer; placement + aim in `weaponLayout.ts`, geometry in `weaponModel.ts`); `screenShake.ts` (rotation-only camera trauma for kills and world events via the `camera:trauma` bus event, Off/Reduced/Full setting) |
 | `src/effects/` | Explosions (pooled), score popups |
 | `src/audio/` | Tone.js engine, music + SFX managers |
 | `src/store/` | zustand stores: game, player, settings (persisted) |

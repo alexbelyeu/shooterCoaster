@@ -12,8 +12,8 @@ back off: comment `Backing off — already claimed by another run`, leave its la
 alone, and pick the next candidate (verify that one too).
 
 **Updating other PRs:** before touching someone else's open PR, check its latest
-comments; if a builder or QA run commented in the last 2 hours, skip it. Update a branch
-by merging `origin/main` into it and pushing normally; never rebase or force-push.
+comments; if it has a live builder or QA claim (runbooks README, "Live claims"), skip
+it. Update a branch by merging `origin/main` into it and pushing normally; never rebase or force-push.
 
 If you take on a tech-debt issue, you may delegate it to one Agent call with
 `subagent_type: "general-purpose"`, `model: "opus"`, `isolation: "worktree"`, telling it

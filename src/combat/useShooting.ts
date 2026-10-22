@@ -6,6 +6,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { playFireSound } from '@/audio/SFXManager'
 import { eventBus } from '@/core/EventBus'
 import { getPointerState, subscribePointer } from '@/input/pointerInput'
+import { recordShot } from './hitFeedback'
 import { findAssistTargetNDC } from './AimSystem'
 import { assistRadiusPx, hitScaleFor } from './aimAssist'
 
@@ -36,7 +37,10 @@ export function fireAtNDC(x: number, y: number, camera: THREE.Camera, hitScale =
   if (!pool.fire(_origin, _direction, hitScale)) return false
   useGameStore.getState().registerShot()
   playFireSound()
-  // Muzzle flash, camera kick, etc. listen for this (no payload, no allocation).
+  // Weapon view-model (recoil, muzzle flash, tracer) aims at this shot. Touch
+  // aim assist passes the assisted NDC in here, so the tracer follows the bullet.
+  recordShot(x, y)
+  // Listeners read lastShot instead of a payload (no allocation).
   eventBus.emit('weapon:fire')
   return true
 }

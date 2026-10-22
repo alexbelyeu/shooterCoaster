@@ -9,9 +9,11 @@
  * <id>-combat.png, with the muzzle flash + gold hitmarker held on the kill frame),
  * and endLevel() (screenshot <id>-results.png). A level fails if nothing was
  * killed, autofire never fired at on-screen enemies, the killNearest hits never
- * produced a kill event, camera shake exceeded 3 units or did not return exactly
- * to the track, the camera aspect doesn't match the canvas, or the results
- * screen never appears.
+ * produced a kill event, the camera translated off the track pose at all (kill
+ * feedback is rotation-only), the kill trauma exceeded 1° or did not decay to 0,
+ * the first-person weapon is missing / off screen / covering the centre / not
+ * pointing along the shot's tracer (> 25° on screen), the
+ * camera aspect doesn't match the canvas, or the results screen never appears.
  * Saves screenshots + stats to e2e-results/.
  *
  * All waits are deadline-polled on the hook's frame counter, because software
@@ -273,16 +275,22 @@ async function playLevel(page, id) {
   }
   await page.screenshot({ path: path.join(OUT, `${id}-combat.png`), timeout: SHOT_TIMEOUT })
   const combat = await getStats(page)
-  // Release the hold and let the shake decay; it must return exactly to 0.
+  const weapon = await weaponProblems(page, 'desktop')
+  problems.push(...weapon.problems)
+  // Release the hold and let the trauma decay; it must return exactly to 0.
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
   const settleStart = await getFrames(page)
   const settleDeadline = Date.now() + 30000
-  let shake = await page.evaluate(() => window.__SC_TEST__.cameraShake)
+  const readShake = () => page.evaluate(() => {
+    const s = window.__SC_TEST__
+    return { frames: s.frames, ...s.cameraTranslation, trauma: s.cameraTrauma.current, traumaMax: s.cameraTrauma.max }
+  })
+  let shake = await readShake()
   while (Date.now() < settleDeadline) {
     await page.waitForTimeout(250)
-    const now = await page.evaluate(() => ({ frames: window.__SC_TEST__.frames, ...window.__SC_TEST__.cameraShake }))
+    const now = await readShake()
     shake = now
-    if (now.frames - settleStart >= 5 && now.current === 0) break
+    if (now.frames - settleStart >= 5 && now.current === 0 && now.trauma === 0) break
   }
   const counts = await page.evaluate(() => window.__SC_TEST__.combat)
 
@@ -308,8 +316,11 @@ async function playLevel(page, id) {
   if (atStart.onScreenEnemies > 0 && afterFire.shotsFired - atStart.shotsFired === 0) problems.push('autofire never fired at on-screen enemies')
   if (end.phase !== 'results' || !resultsShown) problems.push(`results screen not shown (phase "${end.phase}")`)
   if (nearestKilled > 0 && killEvents <= killsBefore && !killCheckSkipped) problems.push('killNearest hits did not produce an enemy:killed event')
-  if (shake.max > 3 + 1e-6) problems.push(`camera shake ${shake.max.toFixed(2)} > 3 units`)
-  if (shake.current !== 0) problems.push(`camera shake did not reset (${shake.current})`)
+  // Kill feedback is rotation-only (#65): the camera never leaves the track pose.
+  if (shake.max > 1e-6) problems.push(`camera translated ${shake.max.toFixed(3)} units off the track pose`)
+  if (shake.current !== 0) problems.push(`camera not back on the track pose (${shake.current})`)
+  if (shake.traumaMax > 1 + 1e-6) problems.push(`kill trauma ${shake.traumaMax.toFixed(2)}° > 1°`)
+  if (shake.trauma !== 0) problems.push(`kill trauma did not decay to 0 (${shake.trauma}°)`)
   return {
     problems,
     combat: {
@@ -323,8 +334,10 @@ async function playLevel(page, id) {
       onScreenAtStart: atStart.onScreenEnemies,
       onScreenBeforeKills: afterFire.onScreenEnemies,
       combo: combat.combo,
-      shakeMax: shake.max,
-      shakeIdle: shake.current,
+      translationMax: shake.max,
+      translationIdle: shake.current,
+      traumaMaxDeg: shake.traumaMax,
+      weapon: weapon.box,
       events: counts,
       // Set (to the phase) when the level timed out before the kill event could land.
       killCheckSkipped,
@@ -335,6 +348,10 @@ async function playLevel(page, id) {
 }
 
 const MOBILE_LEVEL = 'level1'
+/** HUD the first-person weapon must stay clear of (#65). */
+const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-button'
+/** Max angle between the barrel and the tracer on screen (#65). */
+const WEAPON_MAX_AIM_DEG = 25
 const HUD_SELECTORS = ['.hud-score', '.hud-kills', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
 
 /** Wait until `selector` exists, has a size, and it and its ancestors are fully faded in. */
@@ -352,6 +369,50 @@ function waitVisible(page, selector, timeout = 30000) {
       { timeout, polling: 250 },
     )
     .then(() => true, () => false)
+}
+
+/**
+ * First-person weapon (#65): must be on screen, its muzzle tip inside the
+ * viewport, anchored in the lower-right, never covering the screen centre
+ * (where the crosshair usually is), and pointing along the last shot's tracer.
+ */
+async function weaponProblems(page, label) {
+  const { box, hud } = await page.evaluate((sels) => {
+    const w = window.__SC_TEST__.weapon
+    const hud = []
+    for (const el of document.querySelectorAll(sels)) {
+      if (Number(getComputedStyle(el).opacity) < 0.05) continue // e.g. hidden combo meter
+      const r = el.getBoundingClientRect()
+      if (r.width > 0 && r.height > 0) hud.push({ sel: el.className, x: r.left, y: r.top, w: r.width, h: r.height })
+    }
+    return { box: w ? { ...w } : null, hud }
+  }, WEAPON_HUD_SELECTORS)
+  const problems = []
+  if (!box) return { problems: [`${label}: weapon view-model not reported`], box }
+  const { width: vw, height: vh } = box
+  if (!box.visible) problems.push(`${label}: weapon hidden`)
+  if (box.maxX < 0 || box.minX > vw || box.maxY < 0 || box.minY > vh) problems.push(`${label}: weapon off screen`)
+  if (box.tipX < 0 || box.tipX > vw || box.tipY < 0 || box.tipY > vh)
+    problems.push(`${label}: muzzle tip off screen (${box.tipX.toFixed(0)},${box.tipY.toFixed(0)})`)
+  if (box.minX < vw / 2 && box.maxX > vw / 2 && box.minY < vh / 2 && box.maxY > vh / 2)
+    problems.push(`${label}: weapon covers the screen centre`)
+  if ((box.minX + box.maxX) / 2 < vw / 2 || (box.minY + box.maxY) / 2 < vh / 2)
+    problems.push(`${label}: weapon not in the lower-right quadrant`)
+  // The shot must read as leaving the barrel: on the held frame, the tracer
+  // (tip → last shot) runs within WEAPON_MAX_AIM_DEG of the barrel (pivot → tip)
+  // for any aim point above the muzzle and not right on top of it.
+  const barrel = Math.atan2(box.tipY - box.pivotY, box.tipX - box.pivotX)
+  const shot = Math.atan2(box.shotY - box.tipY, box.shotX - box.tipX)
+  box.aimErrorDeg = Math.abs(((shot - barrel + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * (180 / Math.PI)
+  const shotFar = Math.hypot(box.shotX - box.tipX, box.shotY - box.tipY) > 0.1 * Math.min(vw, vh)
+  if (box.shotY < box.tipY && shotFar && box.aimErrorDeg > WEAPON_MAX_AIM_DEG)
+    problems.push(`${label}: tracer leaves the barrel ${box.aimErrorDeg.toFixed(0)}° off its direction (> ${WEAPON_MAX_AIM_DEG}°)`)
+  // The projected bounding box is conservative (larger than the silhouette).
+  for (const r of hud)
+    if (box.minX < r.x + r.w && r.x < box.maxX && box.minY < r.y + r.h && r.y < box.maxY)
+      problems.push(`${label}: weapon overlaps HUD .${String(r.sel).split(' ')[0]}`)
+  box.hudOverlaps = problems.filter((p) => p.includes('overlaps HUD')).length
+  return { problems, box }
 }
 
 /** HUD layout problems: elements missing, outside the viewport, or overlapping each other. */
@@ -551,8 +612,23 @@ async function runMobile(browser, base) {
   // time out (HUD unmounts) before the layout + pause checks. Freeze game time
   // now that the touch-input checks are done; pause still works while frozen.
   if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the HUD layout checks`)
+  // One more real tap with feedback held, so the screenshot shows the weapon's
+  // muzzle flash + tracer (#65); then freeze game time with them on screen.
+  {
+    const vp = page.viewportSize()
+    const [pt] = await page.evaluate(() => {
+      window.__SC_TEST__.holdFeedback = true
+      return window.__SC_TEST__.enemyScreenPoints(1)
+    })
+    const x = Math.min(Math.max(pt?.x ?? vp.width / 2, 8), vp.width - 8)
+    const y = Math.min(Math.max(pt?.y ?? vp.height / 2, 8), vp.height - 80)
+    await page.touchscreen.tap(x, y)
+    await waitFrames(page, 1, { minMs: 80, maxMs: 4000, pollMs: 40 })
+  }
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}.png`), timeout: SHOT_TIMEOUT })
+  const weaponPortrait = await weaponProblems(page, 'portrait 390x844')
+  problems.push(...weaponPortrait.problems)
   const end = await getStats(page)
   if (end.kills === 0 && end.score <= 0) problems.push('no kill reached')
 
@@ -578,6 +654,9 @@ async function runMobile(browser, base) {
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   await waitFrames(page, 1, { maxMs: 5000, pollMs: 40 })
   await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-landscape.png`), timeout: SHOT_TIMEOUT })
+  const weaponLandscape = await weaponProblems(page, 'landscape 844x390')
+  problems.push(...weaponLandscape.problems)
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
 
   // Pause is a button (touch has no Escape key).
   if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the pause tap`)
@@ -608,6 +687,7 @@ async function runMobile(browser, base) {
     kills: end.kills,
     score: end.score,
     hud: { portrait: portrait.rects, landscape: landscape.rects },
+    weapon: { portrait: weaponPortrait.box, landscape: weaponLandscape.box },
     errors: allErrors,
   }
 }
@@ -711,10 +791,10 @@ async function run() {
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
-          ` fallbackKills=${r.mobile.fallbackKills} kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
+          ` fallbackKills=${r.mobile.fallbackKills} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` shakeMax=${r.combat.shakeMax?.toFixed(2)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}°${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }

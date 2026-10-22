@@ -5,10 +5,13 @@ import type { TrackCurve } from './curves/TrackCurve'
 import { useGameStore } from '@/store/useGameStore'
 import { startWindWhoosh, updateWindWhoosh, stopWindWhoosh } from '@/audio/SFXManager'
 import { eventBus } from '@/core/EventBus'
-import MuzzleFlash from '@/combat/MuzzleFlash'
+import WeaponViewModel from '@/combat/WeaponViewModel'
 import {
-  FIRE_KICK_MS, FIRE_KICK_RAD, KILL_SHAKE_MS, KILL_SHAKE_COMBO_CAP, MAX_SHAKE_UNITS,
-} from '@/combat/hitFeedback'
+  CAMERA_TRAUMA_EVENT, KILL_TRAUMA_MS, addTrauma, decayTrauma, effectiveShakeScale, killTrauma,
+  shakeAngles, type ShakeAngles,
+} from '@/combat/screenShake'
+import { useSettingsStore } from '@/store/useSettingsStore'
+import { prefersReducedMotion } from '@/ui/reducedMotion'
 import { fovForAspect } from './cameraFov'
 
 interface CoasterCameraProps {
@@ -31,11 +34,7 @@ const MAX_VELOCITY_MULT = 5 // max velocity = minRollerSpeed * this
 // FOV kick settings
 const BASE_FOV = 80
 
-/** Kill-shake displacement (world units) for a combo, capped at MAX_SHAKE_UNITS. */
-function killShakeAmplitude(combo: number): number {
-  const c = Math.min(Math.max(combo, 1), KILL_SHAKE_COMBO_CAP)
-  return 0.8 + (MAX_SHAKE_UNITS - 0.8) * ((c - 1) / (KILL_SHAKE_COMBO_CAP - 1))
-}
+const RAD_TO_DEG = 180 / Math.PI
 
 /**
  * Exact port of Camera.js updateCamGame.
@@ -61,37 +60,26 @@ export default function CoasterCamera({
   const _position = useRef(new THREE.Vector3())
   const _tangent = useRef(new THREE.Vector3())
   const _lookAt = useRef(new THREE.Vector3())
-  const _shakeOffset = useRef(new THREE.Vector3())
 
-  // Screen kick / shake: purely additive on top of the track pose, which is
-  // recomputed from scratch every frame — so when the timers hit zero the
-  // camera is exactly back on the track. Never touches progress/velocity.
-  const shake = useRef({
-    fireMs: 0, fireSeed: 0,
-    killMs: 0, killAmp: 0, killRoll: 0,
-    time: 0,
-  })
+  // Rotation-only trauma from kills and `camera:trauma` world events (#65); see screenShake.ts.
+  const shake = useRef({ trauma: 0, decayMs: KILL_TRAUMA_MS, time: 0, seed: 0 })
+  const _angles = useRef<ShakeAngles>({ pitch: 0, yaw: 0, roll: 0 })
 
   useEffect(() => {
-    const onFire = () => {
+    const add = (amount: number, durationMs?: number) => {
       const k = shake.current
-      k.fireMs = FIRE_KICK_MS
-      k.fireSeed = Math.random() * Math.PI * 2
+      if (k.trauma === 0) k.seed = (Math.random() * 1000) | 0
+      addTrauma(k, amount, durationMs)
     }
-    const onKill = (data: unknown) => {
-      const k = shake.current
-      const combo = (data as { combo?: number } | undefined)?.combo ?? 1
-      const amp = killShakeAmplitude(combo)
-      // Overlapping kills keep the stronger shake rather than stacking.
-      k.killAmp = k.killMs > 0 ? Math.max(k.killAmp, amp) : amp
-      k.killRoll = 0.002 + 0.006 * (amp / MAX_SHAKE_UNITS)
-      k.killMs = KILL_SHAKE_MS
-    }
-    eventBus.on('weapon:fire', onFire)
+    const onKill = (data: unknown) =>
+      add(killTrauma((data as { combo?: number } | undefined)?.combo ?? 1))
+    const onTrauma = (amount: unknown, durationMs: unknown) =>
+      add(Number(amount), typeof durationMs === 'number' ? durationMs : undefined)
     eventBus.on('enemy:killed', onKill)
+    eventBus.on(CAMERA_TRAUMA_EVENT, onTrauma as (...args: unknown[]) => void)
     return () => {
-      eventBus.off('weapon:fire', onFire)
       eventBus.off('enemy:killed', onKill)
+      eventBus.off(CAMERA_TRAUMA_EVENT, onTrauma as (...args: unknown[]) => void)
     }
   }, [])
 
@@ -155,45 +143,32 @@ export default function CoasterCamera({
     _lookAt.current.copy(_position.current).add(_tangent.current)
     cam.lookAt(_lookAt.current)
 
-    // ── Screen kick (fire) + shake (kill) ──
     const k = shake.current
-    let shakeLen = 0
-    if (k.fireMs > 0 || k.killMs > 0) {
-      // Sample the envelopes before decaying them so even a single very long
-      // frame still shows the kick at full strength once.
-      const fireEnv = (k.fireMs / FIRE_KICK_MS) ** 2
-      const killEnv = (k.killMs / KILL_SHAKE_MS) ** 2
-      const dtMs = effectiveDelta * 1000
+    let traumaDeg = 0
+    if (k.trauma > 0) {
+      const scale = effectiveShakeScale(
+        useSettingsStore.getState().screenShake,
+        prefersReducedMotion(),
+      )
+      // Sample before decaying so even one very long frame shows the hit once.
+      const a = shakeAngles(k.trauma, k.time, k.seed, scale, _angles.current)
       k.time += effectiveDelta
-      k.fireMs = Math.max(0, k.fireMs - dtMs)
-      k.killMs = Math.max(0, k.killMs - dtMs)
-
-      if (fireEnv > 0) {
-        // Recoil: mostly pitch-up with a little random yaw (~1–2 px).
-        cam.rotateX(FIRE_KICK_RAD * fireEnv * (0.7 + 0.3 * Math.sin(k.fireSeed)))
-        cam.rotateY(FIRE_KICK_RAD * 0.5 * fireEnv * Math.cos(k.fireSeed * 3))
-      }
-      if (killEnv > 0) {
-        const a = k.killAmp * killEnv
-        _shakeOffset.current.set(
-          a * Math.sin(k.time * 71 + 1.3),
-          a * Math.sin(k.time * 53 + 4.1),
-          0,
-        )
-        // Hard cap: never more than MAX_SHAKE_UNITS from the track.
-        _shakeOffset.current.clampLength(0, MAX_SHAKE_UNITS)
-        shakeLen = _shakeOffset.current.length()
-        _shakeOffset.current.applyQuaternion(cam.quaternion)
-        cam.position.add(_shakeOffset.current)
-        cam.rotateZ(k.killRoll * killEnv * Math.sin(k.time * 37))
-      } else {
-        k.killAmp = 0
-      }
+      decayTrauma(k, effectiveDelta * 1000)
+      if (k.trauma === 0) k.time = 0
+      cam.rotateX(a.pitch)
+      cam.rotateY(a.yaw)
+      cam.rotateZ(a.roll)
+      traumaDeg = Math.max(Math.abs(a.pitch), Math.abs(a.yaw), Math.abs(a.roll)) * RAD_TO_DEG
     }
     const testApi = window.__SC_TEST__
     if (testApi) {
-      testApi.cameraShake.current = shakeLen
-      if (shakeLen > testApi.cameraShake.max) testApi.cameraShake.max = shakeLen
+      // Translation off the track pose (must always be exactly 0) and the
+      // largest trauma rotation this frame, in degrees.
+      const offset = cam.position.distanceTo(_position.current)
+      testApi.cameraTranslation.current = offset
+      if (offset > testApi.cameraTranslation.max) testApi.cameraTranslation.max = offset
+      testApi.cameraTrauma.current = traumaDeg
+      if (traumaDeg > testApi.cameraTrauma.max) testApi.cameraTrauma.max = traumaDeg
     }
 
     // Update wind whoosh based on velocity
@@ -211,7 +186,7 @@ export default function CoasterCamera({
 
   return (
     <perspectiveCamera ref={cameraRef}>
-      <MuzzleFlash />
+      <WeaponViewModel />
     </perspectiveCamera>
   )
 }

@@ -68,6 +68,7 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 - Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`.
 - `epic` — umbrella issue the Director breaks into `agent:ready` children. Never claimed by builders.
 - `studio-status` — the live status page issue (see above). Not work; never touch it.
+- Add `agent:needs-qa` / `agent:changes-requested` **last, in a call of their own**, after any other labels. Each label added while one of those is present fires the on-label task again, so adding three labels at once starts three sessions. When swapping (e.g. `agent:needs-qa` → `agent:changes-requested`), remove the old label first, then add the new one in a separate call.
 
 ## Issue contract (Director writes these)
 
@@ -120,8 +121,9 @@ on a clock: **QA (on label)** runs whenever a PR on an `agent/*` branch gets
 subagent) and stops. So a sent-back PR is fixed and re-reviewed within the hour, until
 it merges or QA closes it after 3 rounds. Every QA session comments
 `QA run <time> reviewing` before it starts, and every builder session comments
-`Builder run <time> is on it`. Any session seeing such a comment from another session
-within the last 2 hours leaves that PR alone. The scheduled Builders runs start new
+`Builder run <time> is on it`. Any session seeing such a claim that is still *live* (under 2
+hours old, with no decision or builder reply posted after it) leaves that PR alone; a
+claim from a finished round doesn't count. The scheduled Builders runs start new
 issues; the scheduled QA runs catch anything the events missed.
 
 **Independent code review.** Besides the playtest reviewer, every PR whose code diff is
