@@ -24,7 +24,6 @@ export const MESA_RINGS: readonly RockRing[] = [
 ]
 export const MESA_JITTER = 0.08
 export const MESA_HEIGHT = 300
-/** Widest ring plus its jitter. */
 export const MESA_FOOTPRINT = 140 * (1 + MESA_JITTER)
 
 export interface Mesa {
@@ -39,9 +38,9 @@ export interface MesaOptions {
   count: number
   minRadius: number
   maxRadius: number
-  /** XZ gap between the footprint and the track (its towers reach the ground). */
+  /** XZ gap to the track: its towers reach the ground. */
   clearance: number
-  /** ...and at most this far from it, so the ride threads between them. */
+  /** Max gap, so the ride threads between the mesas. */
   maxGap: number
   scaleRange: [number, number]
   spacing: number
@@ -65,37 +64,31 @@ export function placeMesas(groundFn: HeightFunction, track: ArcTable, opts: Mesa
     if (index.near(x, z, reach + clearance)) continue
     if (!index.near(x, z, reach + maxGap)) continue
     const y = groundedBaseY(groundFn, x, z, reach, 6)
-    // Uphill side buried by at most a third of the height.
     if (groundFn(x, z) - y > MESA_HEIGHT * scale * 0.33) continue
     out.push({ x, y, z, scale, yaw: rng() * Math.PI * 2 })
   }
   return out
 }
 
-/** A twisting dust column wandering around (cx, cz). */
 export interface DustDevil {
   cx: number
   cz: number
-  /** Drift amplitude in x and z: the column stays within hypot(driftX, driftZ) of the centre. */
+  /** The foot stays within hypot(driftX, driftZ) of (cx, cz). */
   driftX: number
   driftZ: number
-  /** rad/s of the drift path. */
   driftSpeed: number
   phase: number
   height: number
   /** Radius at the top; the foot is a fifth of it. */
   radius: number
-  /** rad/s of the spin. */
   spin: number
 }
 
 export interface DustDevilOptions {
   count: number
-  /** Centre offset from the track, sideways. */
   offset: [number, number]
-  /** Max drift distance from the centre. */
   drift: number
-  /** XZ gap the whole drift circle keeps from the track. */
+  /** Beyond the drift circle; must cover the column's lean + top radius (DustDevils.tsx, ~95). */
   clearance: number
   avoid: readonly Circle[]
   rng: () => number
@@ -150,7 +143,6 @@ export interface DesertLayout {
   devils: DustDevil[]
 }
 
-/** Seeded: the same layout every run. */
 export function layoutDesert(groundFn: HeightFunction, track: ArcTable): DesertLayout {
   const extent = trackExtent(track)
   const mesas = placeMesas(groundFn, track, {

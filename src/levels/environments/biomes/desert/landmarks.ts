@@ -1,10 +1,6 @@
-/** Fixed desert landmarks, shared by Features (to draw them) and the layout (to keep clear of them). */
+import type { ArchConfig } from '../../RockArches'
 
-export interface ArchConfig {
-  pos: readonly [number, number, number]
-  rotY: number
-  scale: number
-}
+/** Fixed desert landmarks, shared by Features (to draw them) and the layout (to keep clear of them). */
 
 export const ARCHES: readonly ArchConfig[] = [
   { pos: [1200, 0, -400], rotY: 0.3, scale: 1.0 },

@@ -87,8 +87,7 @@ export interface SCTestApi {
   endLevel: () => void
   /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
   setTimeScale: (s: number) => void
-  /** Set to a track fraction (0–1): the coaster jumps there on its next frame,
-   *  so a ~1 fps headless run can look at any point of the ride. */
+  /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null
   // ── View / aspect (issue #66) ──
   /** Active camera projection vs the canvas's on-screen box (squash checks). */

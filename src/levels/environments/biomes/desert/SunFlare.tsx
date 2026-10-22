@@ -5,20 +5,14 @@ import type { HeightFunction } from '@/utils/terrainNoise'
 import { sunOcclusion, type Occluder } from './sunOcclusion'
 
 /**
- * Cheap lens flare for the low desert sun: two additive quads.
- *  - Core: a glow + star billboard at the sun's position, depth-tested, so the
- *    terrain, mesas and pyramid cut it off pixel-exactly.
- *  - Ghosts: one screen-space quad drawing a horizontal streak through the sun
- *    and a few ghost discs along the sun–centre line. It has no depth to test,
- *    so its strength follows `sunOcclusion` (a CPU ray march against the drawn
- *    terrain and the big occluders) and how far the sun is from the screen edge.
+ * Two additive quads: a depth-tested core billboard at the sun (the GPU hides it behind
+ * anything), and screen-space ghosts with no depth to test, faded by `sunOcclusion`.
  */
 
 /** In front of the sky dome (9900), inside the camera's far plane (11000). */
 const CORE_DISTANCE = 8000
 const CORE_SIZE = 2200
-/** 1/s: how fast the ghosts follow occlusion changes. */
-const FADE_RATE = 6
+const FADE_RATE = 6 // 1/s
 
 const coreVertex = /* glsl */ `
 varying vec2 vUv;

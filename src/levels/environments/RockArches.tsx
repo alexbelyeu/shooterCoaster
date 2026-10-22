@@ -1,4 +1,8 @@
-import type { ArchConfig } from './biomes/desert/landmarks'
+export interface ArchConfig {
+  pos: readonly [number, number, number]
+  rotY: number
+  scale: number
+}
 
 /**
  * Natural stone arch formations scattered around the desert.

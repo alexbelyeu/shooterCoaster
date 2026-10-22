@@ -21,12 +21,7 @@ const MAX_DISTANCE = 6000
 const FIRST_STEP = 20
 const GROWTH = 1.22
 
-/**
- * 1 if the ray from `origin` towards the sun (unit `dir`) passes under the drawn
- * terrain or through an occluder, else 0. Marches with growing steps (~30
- * terrain samples), so ridges thinner than a step far away can be missed;
- * the depth-tested flare core still hides behind them.
- */
+/** 1 if the sun ray hits the drawn terrain or an occluder, else 0. Growing steps (~30 samples) can miss thin far ridges; the depth-tested flare core still hides there. */
 export function sunOcclusion(
   origin: Vec3,
   dir: Vec3,
@@ -39,7 +34,6 @@ export function sunOcclusion(
   const h2 = dir.x * dir.x + dir.z * dir.z
   if (h2 < 1e-8) return 0
   for (const o of occluders) {
-    // Closest approach of the ray's XZ projection to the occluder's axis.
     const t = ((o.x - origin.x) * dir.x + (o.z - origin.z) * dir.z) / h2
     if (t <= 0) continue
     const y = origin.y + dir.y * t

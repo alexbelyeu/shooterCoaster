@@ -35,7 +35,7 @@ describe('layoutDesert (level 2)', () => {
     expect(layoutDesert(groundFn, table)).toEqual(layout)
   })
 
-  it('stands 4–6 mesas between 0.6× and 1.3× the track extent, 60+ units off the track', () => {
+  it('stands 4–6 grounded mesas 0.6–1.3× the track extent out, 60–400 units off the track', () => {
     const { mesas } = layout
     expect(mesas.length).toBeGreaterThanOrEqual(4)
     expect(mesas.length).toBeLessThanOrEqual(6)
@@ -45,10 +45,8 @@ describe('layoutDesert (level 2)', () => {
       expect(r).toBeLessThanOrEqual(extent * 1.3)
       const reach = MESA_FOOTPRINT * m.scale
       expect(trackDistance(m.x, m.z) - reach).toBeGreaterThanOrEqual(60)
-      // Close enough that the ride passes between them.
       expect(trackDistance(m.x, m.z) - reach).toBeLessThan(400)
       for (const c of LANDMARK_FOOTPRINTS) expect(Math.hypot(c.x - m.x, c.z - m.z)).toBeGreaterThan(c.r + reach)
-      // Sits on the drawn ground, at most a third buried uphill.
       expect(m.y).toBeLessThanOrEqual(groundFn(m.x, m.z))
       expect(groundFn(m.x, m.z) - m.y).toBeLessThan(MESA_HEIGHT * m.scale * 0.34)
     }
