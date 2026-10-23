@@ -24,7 +24,7 @@ Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, `docs/agents/VISION.md`,
 
 `docs/reports/<YYYY>-W<ww>.md` (ISO week of the week being reported) with:
 1. **Headline** — one sentence on the biggest change a player would notice.
-2. **Play it** — https://scoaster.com (if it doesn't serve the game yet, https://shooter-coaster.vercel.app)
+2. **Play it** — https://scoaster.com
 3. **What's new for players** — bullets, plain language, each linked to its PR.
 4. **Screenshots** — title + every level, saved as JPEG (quality ~70, 1280×720)
    under `docs/reports/<YYYY>-W<ww>/`, embedded in the markdown.

@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      SITE_URL: https://shooter-coaster.vercel.app
+      SITE_URL: https://scoaster.com
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
