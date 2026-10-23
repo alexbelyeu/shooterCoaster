@@ -39,6 +39,7 @@ Rules that apply to every runbook:
   was posted after it: a QA decision comment (`QA: approved`, `QA: changes requested`,
   a close) ends a QA claim; a builder's reply or a label change to `agent:needs-qa` ends
   a builder claim. Ignore claims that aren't live: they belong to a finished round.
+- **No check-ins.** Don't schedule reminders or "safety-net check-ins" on your PRs, and never create, fire, change or delete scheduled tasks (CLAUDE.md hard rule 10). When your PR is labelled `agent:needs-qa`, your part is done: the on-label tasks and the Maintainer take it from there.
 - **Pause checkpoints.** Run `scripts/pause-check.sh` again before every wave of
   subagents and before any long step. If it prints PAUSED, start nothing new, leave
   claims and labels as they are, and end with the PAUSED line.

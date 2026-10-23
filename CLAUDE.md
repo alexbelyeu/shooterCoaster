@@ -147,5 +147,6 @@ on a PR; QA runs it on every sizeable PR.
 7. Large rewrites (engine, renderer, state, physics) land behind a feature flag or in parallel modules until they reach parity — never a big-bang swap.
 8. Dispose three.js geometries/materials/textures and Tone.js nodes you create; no allocations in per-frame hot paths. See `docs/HEAP-BOTTLENECKS.md`.
 9. Keep this file accurate. If you change commands, structure or rules, update CLAUDE.md in the same PR.
+10. Never create, fire, update or delete scheduled tasks or reminders: no safety-net check-ins, no `send_later`, `create_trigger`, `fire_trigger`, `update_trigger` or `delete_trigger`, even if a default habit suggests re-checking a PR later. Follow-up on every PR is already automatic: QA (on label) reviews it, Fix (on label) fixes what QA sends back, and the Maintainer sweeps anything stuck each night. End your session when your runbook's work is done. Only Alex, or his own interactive Claude session, manages scheduled tasks.
 
 "A DECISIONS.md entry" means a **new file** in `docs/agents/decisions/inbox/` (format in its README). Never edit `docs/agents/DECISIONS.md` directly: the Maintainer folds the inbox into it nightly, which keeps parallel PRs from conflicting.
