@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { createRng } from '@/utils/rng'
 import StaticInstances from './shared/StaticInstances'
 
 interface SunkenCityProps {
@@ -58,6 +59,7 @@ function placed(
 
 /** One instanced draw call per repeated part. */
 function layoutCity() {
+  const rng = createRng(2120)
   // Column ring: 12 columns, some broken; caps on the tall ones
   const columns: THREE.Matrix4[] = []
   const caps: THREE.Matrix4[] = []
@@ -65,7 +67,7 @@ function layoutCity() {
     const angle = (i / 12) * Math.PI * 2
     const x = Math.cos(angle) * 130
     const z = Math.sin(angle) * 130
-    const height = Math.random() > 0.5 ? 30 + Math.random() * 40 : 90
+    const height = rng() > 0.5 ? 30 + rng() * 40 : 90
     columns.push(placed([x, height / 2 - 30, z], undefined, [1, height, 1]))
     if (height > 60) caps.push(placed([x, height - 30, z]))
   }
@@ -79,11 +81,11 @@ function layoutCity() {
   const walls: THREE.Matrix4[] = []
   for (let i = 0; i < 6; i++) {
     const angle = ((i + 0.5) / 6) * Math.PI * 2
-    const height = 20 + Math.random() * 30
+    const height = 20 + rng() * 30
     walls.push(
       placed(
         [Math.cos(angle) * 160, height / 2 - 25, Math.sin(angle) * 160],
-        [0, angle, Math.random() * 0.1],
+        [0, angle, rng() * 0.1],
         [1, height / 40, 1],
       ),
     )
@@ -98,11 +100,11 @@ function layoutCity() {
   const runes: THREE.Matrix4[] = []
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2
-    runes.push(placed([Math.cos(angle) * 145, -10 + Math.random() * 40, Math.sin(angle) * 145], [0, angle, 0]))
+    runes.push(placed([Math.cos(angle) * 145, -10 + rng() * 40, Math.sin(angle) * 145], [0, angle, 0]))
   }
   for (let i = 0; i < 6; i++) {
     const angle = (i / 6) * Math.PI * 2
-    runes.push(placed([Math.cos(angle) * 128, 10 + Math.random() * 20, Math.sin(angle) * 128], [0, angle, 0]))
+    runes.push(placed([Math.cos(angle) * 128, 10 + rng() * 20, Math.sin(angle) * 128], [0, angle, 0]))
   }
 
   return { columns, caps, arches, walls, floors, runes }

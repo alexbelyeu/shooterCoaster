@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { createRng } from '../../shared/trackScatter'
+import { createRng } from '@/utils/rng'
 import type { SeabedProp } from './seaPlacement'
 import { createCoralClusterGeometry, createKelpClumpGeometry, propMatrix } from './seaProps'
 import { createCoralMaterial, createKelpMaterial } from './seaMaterials'

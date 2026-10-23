@@ -17,13 +17,13 @@ export const TREES: BiomeTreeConfig = {
   types: [
     {
       trunkColor: '#5c3a1e',
-      canopyColors: () => `hsl(${100 + Math.random() * 40}, ${50 + Math.random() * 30}%, ${25 + Math.random() * 20}%)`,
+      canopyColors: (rng) => `hsl(${rng.range(100, 140)}, ${rng.range(50, 80)}%, ${rng.range(25, 45)}%)`,
       canopyGeoFactory: () => new THREE.ConeGeometry(1, 1, 6),
       heightRange: [30, 90],
     },
     {
       trunkColor: '#6b4422',
-      canopyColors: () => `hsl(${80 + Math.random() * 50}, ${40 + Math.random() * 30}%, ${20 + Math.random() * 25}%)`,
+      canopyColors: (rng) => `hsl(${rng.range(80, 130)}, ${rng.range(40, 70)}%, ${rng.range(20, 45)}%)`,
       canopyGeoFactory: () => new THREE.DodecahedronGeometry(1, 1),
       heightRange: [25, 70],
     },

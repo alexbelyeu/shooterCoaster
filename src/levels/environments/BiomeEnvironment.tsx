@@ -8,6 +8,7 @@ import {
   TERRAIN_MESH_SEGMENTS,
   type HeightFunction,
 } from '@/utils/terrainNoise'
+import { hashString } from '@/utils/rng'
 import { TerrainContext } from './TerrainContext'
 import { BIOMES } from './biomeRegistry'
 import Atmosphere from './shared/Atmosphere'
@@ -75,7 +76,7 @@ export default function BiomeEnvironment({
 
       {/* Trees */}
       {hasTrees && treeCount > 0 && def.trees && (
-        <TreeField count={treeCount} config={def.trees} heightFn={heightFn} />
+        <TreeField count={treeCount} config={def.trees} heightFn={heightFn} seed={hashString(`trees:${biome}`)} />
       )}
 
       {/* Biome-specific InstancedMesh decorations */}

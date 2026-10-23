@@ -1,24 +1,28 @@
 import { useMemo, useRef, useCallback, useEffect } from 'react'
 import * as THREE from 'three'
 import { getTerrainSlope, type HeightFunction } from '@/utils/terrainNoise'
+import { createRng } from '@/utils/rng'
 import { hslToRgb } from './scatter'
 import type { BiomeTreeConfig, TreeTypeConfig } from './types'
 
-/** Trees placed on terrain with slope rejection and biome variety */
+/** Trees placed on terrain with slope rejection and biome variety; `seed` fixes the layout. */
 export default function TreeField({
   count,
   config,
   heightFn,
+  seed,
 }: {
   count: number
   config: BiomeTreeConfig
   heightFn: HeightFunction
+  seed: number
 }) {
   const treeTypes = config.types
   const actualCount = config.maxCount === undefined ? count : Math.min(config.maxCount, count)
 
   const trees = useMemo(() => {
     if (actualCount === 0 || treeTypes.length === 0) return []
+    const rng = createRng(seed)
     const arr: { x: number; y: number; z: number; height: number; color: string; typeIdx: number }[] = []
     const minR = config.minRadius
     const maxR = config.maxRadius
@@ -27,8 +31,8 @@ export default function TreeField({
     let attempts = 0
     while (arr.length < actualCount && attempts < actualCount * 5) {
       attempts++
-      const r = minR + Math.random() * (maxR - minR)
-      const theta = Math.random() * Math.PI * 2
+      const r = minR + rng() * (maxR - minR)
+      const theta = rng() * Math.PI * 2
       const x = Math.cos(theta) * r
       const z = Math.sin(theta) * r
 
@@ -38,21 +42,21 @@ export default function TreeField({
 
       const y = heightFn(x, z)
 
-      const typeIdx = Math.floor(Math.random() * treeTypes.length)
+      const typeIdx = Math.floor(rng() * treeTypes.length)
       const tType = treeTypes[typeIdx]
-      const height = tType.heightRange[0] + Math.random() * (tType.heightRange[1] - tType.heightRange[0])
+      const height = rng.range(tType.heightRange[0], tType.heightRange[1])
 
       arr.push({
         x,
         y,
         z,
         height,
-        color: tType.canopyColors(),
+        color: tType.canopyColors(rng),
         typeIdx,
       })
     }
     return arr
-  }, [actualCount, config, heightFn, treeTypes])
+  }, [actualCount, config, heightFn, treeTypes, seed])
 
   // Group trees by type for instancing
   const groupedTrees = useMemo(() => {

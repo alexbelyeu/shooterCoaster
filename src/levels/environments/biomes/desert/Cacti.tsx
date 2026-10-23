@@ -1,14 +1,15 @@
 import { useMemo, useCallback, useEffect } from 'react'
 import * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
+import { createRng } from '@/utils/rng'
 import { scatterPositions } from '../../shared/scatter'
 
 /** Saguaro, barrel and columnar cacti (rendered first by DesertDecorations). */
 export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
   // ── Cactus positions (3 types split from 150 budget) ────────────────
-  const saguaroPositions = useMemo(() => scatterPositions(40, 400, 2800, heightFn), [heightFn])
-  const barrelPositions = useMemo(() => scatterPositions(50, 300, 2800, heightFn), [heightFn])
-  const columnarPositions = useMemo(() => scatterPositions(60, 400, 2800, heightFn), [heightFn])
+  const saguaroPositions = useMemo(() => scatterPositions(createRng(2310), 40, 400, 2800, heightFn), [heightFn])
+  const barrelPositions = useMemo(() => scatterPositions(createRng(2311), 50, 300, 2800, heightFn), [heightFn])
+  const columnarPositions = useMemo(() => scatterPositions(createRng(2312), 60, 400, 2800, heightFn), [heightFn])
 
   // Cactus material — rich green with waxy specular
   const cactusMat = useMemo(() => new THREE.MeshPhongMaterial({
@@ -45,15 +46,16 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
 
   // Deterministic arm configs per saguaro (0, 1, or 2 arms)
   const saguaroConfigs = useMemo(() => {
+    const rng = createRng(2313)
     return saguaroPositions.map(() => {
-      const r = Math.random()
-      const trunkH = 50 + Math.random() * 40
+      const r = rng()
+      const trunkH = 50 + rng() * 40
       const armCount = r < 0.2 ? 0 : r < 0.6 ? 1 : 2
-      const leftArmH = 15 + Math.random() * 20
-      const rightArmH = 15 + Math.random() * 20
-      const leftArmY = trunkH * (0.3 + Math.random() * 0.3)
-      const rightArmY = trunkH * (0.3 + Math.random() * 0.3)
-      const yRot = Math.random() * Math.PI * 2
+      const leftArmH = 15 + rng() * 20
+      const rightArmH = 15 + rng() * 20
+      const leftArmY = trunkH * (0.3 + rng() * 0.3)
+      const rightArmY = trunkH * (0.3 + rng() * 0.3)
+      const yRot = rng() * Math.PI * 2
       return { trunkH, armCount, leftArmH, rightArmH, leftArmY, rightArmY, yRot }
     })
   }, [saguaroPositions])
@@ -186,11 +188,12 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
 
   // Pre-compute per-instance configs so body + flower use matching values
   const barrelConfigs = useMemo(() => {
+    const rng = createRng(2314)
     return barrelPositions.map(() => {
-      const radius = 4 + Math.random() * 5
-      const height = radius * (1.2 + Math.random() * 0.6)
-      const yRot = Math.random() * Math.PI * 2
-      const hasFlower = Math.random() < 0.6
+      const radius = 4 + rng() * 5
+      const height = radius * (1.2 + rng() * 0.6)
+      const yRot = rng() * Math.PI * 2
+      const hasFlower = rng() < 0.6
       return { radius, height, yRot, hasFlower }
     })
   }, [barrelPositions])
@@ -238,7 +241,8 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
 
   // Pre-compute per-instance scale so trunk and cap use the same value
   const columnarScales = useMemo(() => {
-    return columnarPositions.map(() => 0.8 + Math.random() * 1.2)
+    const rng = createRng(2315)
+    return columnarPositions.map(() => 0.8 + rng() * 1.2)
   }, [columnarPositions])
 
   const setColumnarRef = useCallback((mesh: THREE.InstancedMesh | null) => {
