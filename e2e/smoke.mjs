@@ -14,6 +14,8 @@
  * the first-person weapon is missing / off screen / covering the centre / not
  * pointing along the shot's tracer (> 25° on screen), the
  * camera aspect doesn't match the canvas, or the results screen never appears.
+ * Every level and the phone run (portrait, and after rotating) also run audioBurst():
+ * fails on a late note that throws or a sound dropped by an audio error (#115).
  * Saves screenshots + stats to e2e-results/.
  *
  * Spawns use a fixed --seed (default 1337); the seed check reloads the first level
@@ -299,6 +301,8 @@ async function playLevel(page, id) {
     if (now.frames - settleStart >= 5 && now.current === 0 && now.trauma === 0) break
   }
   const counts = await page.evaluate(() => window.__SC_TEST__.combat)
+  const audio = await audioBurstProblems(page, 'desktop')
+  problems.push(...audio.problems)
 
   await page.evaluate(() => window.__SC_TEST__.endLevel())
   // App uses AnimatePresence mode="wait": the HUD fades out before the results fade in.
@@ -347,6 +351,7 @@ async function playLevel(page, id) {
       events: counts,
       // Set (to the phase) when the level timed out before the kill event could land.
       killCheckSkipped,
+      audioBurst: audio.burst,
     },
     kills: combat.kills,
     score: combat.score,
@@ -546,7 +551,17 @@ async function offsetTapKills(page, label) {
   return { result, problems }
 }
 
-/** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
+/** Tone scheduling stress (#115); page errors are counted by the caller. */
+async function audioBurstProblems(page, label) {
+  const burst = await page.evaluate(() => window.__SC_TEST__.audioBurst(20, 10))
+  const problems = []
+  if (burst.lateScheduleErrors > 0)
+    problems.push(`${label}: ${burst.lateScheduleErrors}/10 late music note pairs threw a Tone scheduling error`)
+  if (burst.dropped > 0)
+    problems.push(`${label}: ${burst.dropped} sound(s) dropped by an audio error (${burst.lastDrop?.split('\n')[0]})`)
+  return { burst, problems }
+}
+
 /** The hook's spawnDigest() once it is set and differs from `prev` (null on timeout). */
 async function nextSpawnDigest(page, prev) {
   return page
@@ -579,6 +594,7 @@ async function seedCheck(page, level) {
   }
 }
 
+/** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
 async function runMobile(browser, base) {
   const started = Date.now()
   const { defaultBrowserType: _unused, ...iphone } = devices['iPhone 13']
@@ -676,6 +692,8 @@ async function runMobile(browser, base) {
     if (audioPortrait.sfxNodes === 0) problems.push('audio unlocked but no SFX nodes after shooting')
     if (!audioPortrait.musicDucked) problems.push('music not ducked with game time frozen (slow-mo low-pass)')
   }
+  const burstPortrait = await audioBurstProblems(page, 'portrait')
+  problems.push(...burstPortrait.problems)
   const weaponPortrait = await weaponProblems(page, 'portrait 390x844')
   problems.push(...weaponPortrait.problems)
   const end = await getStats(page)
@@ -706,6 +724,8 @@ async function runMobile(browser, base) {
   const audioLandscape = await page.evaluate(() => window.__SC_TEST__.audio())
   if (audioPortrait.ready && audioLandscape.sfxNodes !== audioPortrait.sfxNodes)
     problems.push(`SFX nodes grew while playing: ${audioPortrait.sfxNodes} -> ${audioLandscape.sfxNodes} (audio nodes created per shot/kill)`)
+  const burstLandscape = await audioBurstProblems(page, 'landscape (rotated)')
+  problems.push(...burstLandscape.problems)
   const weaponLandscape = await weaponProblems(page, 'landscape 844x390')
   problems.push(...weaponLandscape.problems)
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
@@ -741,6 +761,7 @@ async function runMobile(browser, base) {
       taps: 10, tapsOnEnemies, tapShots, tapKills, fallbackKills, crosshairScale,
       portraitTaps: portraitTaps.result, landscapeTaps: landscapeTaps.result,
       audio: { portrait: audioPortrait, landscape: audioLandscape },
+      audioBurst: { portrait: burstPortrait.burst, landscape: burstLandscape.burst },
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
     },
     kills: end.kills,
@@ -865,15 +886,21 @@ async function run() {
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
-          ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
+          ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}°${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}°${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
   console.log(`Screenshots + results.json in ${OUT} (total ${((Date.now() - runStarted) / 1000).toFixed(0)}s)`)
   process.exit(failed ? 1 : 0)
+}
+
+/** audioBurst result: "ok", or late-note throws + dropped sounds. */
+function burstSummary(b) {
+  if (!b) return '-'
+  return b.lateScheduleErrors || b.dropped ? `late${b.lateScheduleErrors}+drop${b.dropped}` : 'ok'
 }
 
 /** SFX node count after the portrait / landscape taps (equal = no per-shot nodes). */
