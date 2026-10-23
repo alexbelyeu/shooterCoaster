@@ -116,6 +116,9 @@ function LevelScene({ levelId }: { levelId: string }) {
       />
       <BulletPool bulletColor={bulletColor} bulletSize={bulletSize} />
       <ParticleExplosionPool />
+      {/* Before EnemySpawner: its mount effect announces the first wave, and the
+          stinger listener must already be subscribed. */}
+      <MusicController />
       <EnemySpawner
         waves={enemies}
         goldenBalloonCount={biome === 'themePark' ? 3 : 0}
@@ -123,7 +126,6 @@ function LevelScene({ levelId }: { levelId: string }) {
       />
       <ShootingController />
       <GameTimer seconds={timerSeconds} />
-      <MusicController />
       <KillProjector />
       <EffectComposer>
         <Bloom

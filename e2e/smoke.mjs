@@ -36,8 +36,10 @@
  * kill through touch aim assist. Checks the camera aspect matches the canvas
  * (±0.01) in portrait, landscape and after rotating back (also on desktop for
  * every level), that HUD elements are inside the viewport and don't overlap in
- * both orientations, then taps Pause. Saves mobile-level1.png and
- * mobile-level1-landscape.png.
+ * both orientations, then taps Pause. The real PLAY tap unlocks audio, so it
+ * also checks the SFX node count stays flat across the taps (no nodes per
+ * shot / kill) and the music low-pass ducks while time is frozen and opens at
+ * timeScale 1. Saves mobile-level1.png and mobile-level1-landscape.png.
  *
  * Browser: uses Playwright's bundled Chromium if installed; otherwise set
  * SC_CHROME=/path/to/chromium (see scripts/ensure-browser.sh for cloud sessions).
@@ -666,6 +668,14 @@ async function runMobile(browser, base) {
   }
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}.png`), timeout: SHOT_TIMEOUT })
+  // PLAY was a real tap, so audio is unlocked here: the SFX kit exists now (it was
+  // used by the taps) and its node count must not grow with more shots / kills.
+  // Frozen time counts as slow-mo, so the music low-pass must be ducked.
+  const audioPortrait = await page.evaluate(() => window.__SC_TEST__.audio())
+  if (audioPortrait.ready) {
+    if (audioPortrait.sfxNodes === 0) problems.push('audio unlocked but no SFX nodes after shooting')
+    if (!audioPortrait.musicDucked) problems.push('music not ducked with game time frozen (slow-mo low-pass)')
+  }
   const weaponPortrait = await weaponProblems(page, 'portrait 390x844')
   problems.push(...weaponPortrait.problems)
   const end = await getStats(page)
@@ -693,9 +703,18 @@ async function runMobile(browser, base) {
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   await waitFrames(page, 1, { maxMs: 5000, pollMs: 40 })
   await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-landscape.png`), timeout: SHOT_TIMEOUT })
+  const audioLandscape = await page.evaluate(() => window.__SC_TEST__.audio())
+  if (audioPortrait.ready && audioLandscape.sfxNodes !== audioPortrait.sfxNodes)
+    problems.push(`SFX nodes grew while playing: ${audioPortrait.sfxNodes} -> ${audioLandscape.sfxNodes} (audio nodes created per shot/kill)`)
   const weaponLandscape = await weaponProblems(page, 'landscape 844x390')
   problems.push(...weaponLandscape.problems)
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+
+  // Back to normal speed: the music low-pass must open again.
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
+  await waitFrames(page, 1, { maxMs: 5000, pollMs: 40 })
+  if (audioPortrait.ready && (await page.evaluate(() => window.__SC_TEST__.audio().musicDucked)))
+    problems.push('music still ducked at timeScale 1')
 
   // Pause is a button (touch has no Escape key).
   if ((await phase()) !== 'playing') problems.push(`level left 'playing' (${await phase()}) before the pause tap`)
@@ -721,6 +740,7 @@ async function runMobile(browser, base) {
     mobile: {
       taps: 10, tapsOnEnemies, tapShots, tapKills, fallbackKills, crosshairScale,
       portraitTaps: portraitTaps.result, landscapeTaps: landscapeTaps.result,
+      audio: { portrait: audioPortrait, landscape: audioLandscape },
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
     },
     kills: end.kills,
@@ -845,7 +865,7 @@ async function run() {
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
-          ` fallbackKills=${r.mobile.fallbackKills} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
+          ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
         ` translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}°${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
@@ -854,6 +874,11 @@ async function run() {
   }
   console.log(`Screenshots + results.json in ${OUT} (total ${((Date.now() - runStarted) / 1000).toFixed(0)}s)`)
   process.exit(failed ? 1 : 0)
+}
+
+/** SFX node count after the portrait / landscape taps (equal = no per-shot nodes). */
+function audioSummary(a) {
+  return a?.portrait?.ready ? `${a.portrait.sfxNodes}/${a.landscape.sfxNodes}` : 'locked'
 }
 
 /** Camera vs canvas aspect + FOV per mobile orientation, for the summary line. */

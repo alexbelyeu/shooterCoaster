@@ -21,9 +21,10 @@ const _assistNDC = new THREE.Vector2()
  * coordinates (-1..1, y up). Shared by pointer input and the e2e autofire hook.
  * Returns true if a bullet actually left the pool (false when not playing,
  * throttled by the fire delay, or the pool is missing/exhausted).
- * `hitScale` widens the bullet's hit radius on targets (touch shots).
+ * `hitScale` widens the bullet's hit radius on targets (touch shots); `auto`
+ * marks held-trigger auto-fire (quieter fire sound).
  */
-export function fireAtNDC(x: number, y: number, camera: THREE.Camera, hitScale = 1): boolean {
+export function fireAtNDC(x: number, y: number, camera: THREE.Camera, hitScale = 1, auto = false): boolean {
   if (useGameStore.getState().phase !== 'playing') return false
 
   const pool = getBulletPool()
@@ -36,7 +37,7 @@ export function fireAtNDC(x: number, y: number, camera: THREE.Camera, hitScale =
 
   if (!pool.fire(_origin, _direction, hitScale)) return false
   useGameStore.getState().registerShot()
-  playFireSound()
+  playFireSound(auto)
   // Weapon view-model (recoil, muzzle flash, tracer) aims at this shot. Touch
   // aim assist passes the assisted NDC in here, so the tracer follows the bullet.
   recordShot(x, y)
@@ -66,14 +67,14 @@ export function useShooting() {
     toNDC(p.x, p.y, size, aimNDC.current)
   }, [size])
 
-  const fireShot = useCallback(() => {
+  const fireShot = useCallback((auto: boolean) => {
     const p = getPointerState()
     const radius = assistRadiusPx(p.kind)
     const scale = hitScaleFor(p.kind)
     if (radius > 0 && findAssistTargetNDC(p.x, p.y, camera, sizeRef.current, radius, _assistNDC)) {
-      fireAtNDC(_assistNDC.x, _assistNDC.y, camera, scale)
+      fireAtNDC(_assistNDC.x, _assistNDC.y, camera, scale, auto)
     } else {
-      fireAtNDC(aimNDC.current.x, aimNDC.current.y, camera, scale)
+      fireAtNDC(aimNDC.current.x, aimNDC.current.y, camera, scale, auto)
     }
   }, [camera])
 
@@ -85,7 +86,7 @@ export function useShooting() {
       toNDC(p.x, p.y, sizeRef.current, aimNDC.current)
       if (type === 'down') {
         isDown.current = true
-        fireShot()
+        fireShot(false)
       } else if (type === 'up') {
         isDown.current = false
       }
@@ -95,7 +96,7 @@ export function useShooting() {
   // Auto-fire while held
   useEffect(() => {
     const interval = setInterval(() => {
-      if (isDown.current) fireShot()
+      if (isDown.current) fireShot(true)
     }, 60)
     return () => clearInterval(interval)
   }, [fireShot])
