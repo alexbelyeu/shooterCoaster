@@ -24,6 +24,7 @@
 import { useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import * as Tone from 'tone'
 import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
@@ -32,8 +33,10 @@ import type { EnemyType } from '@/types/level'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
-import { isAudioReady, isMusicDucked } from '@/audio/AudioEngine'
-import { sfxNodeCount } from '@/audio/SFXManager'
+import { initAudio, isAudioReady, isMusicDucked } from '@/audio/AudioEngine'
+import { playExplosionSound, playFireSound, playHitTick, playWaveStinger, sfxNodeCount } from '@/audio/SFXManager'
+import { droppedSounds } from '@/audio/soundGuard'
+import { nextTriggerTime } from '@/audio/triggerTime'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -101,7 +104,20 @@ export interface SCTestApi {
   view: () => E2EView | null
   /** Audio state: unlocked yet, live gameplay SFX nodes (must stay flat while
    *  shooting / killing, 0 after level exit), music low-pass ducked (slow-mo). */
-  audio: () => { ready: boolean; sfxNodes: number; musicDucked: boolean }
+  audio: () => E2EAudio
+  /** Tone scheduling stress (#115), in one JS turn while the audio clock ticks: rapid
+   *  shots + layered kills + a stinger, then 10 pairs of late music-loop notes
+   *  (`lateScheduleErrors` counts their throws). Unlocks audio if needed. */
+  audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { lateScheduleErrors: number }>
+}
+
+export interface E2EAudio {
+  ready: boolean
+  sfxNodes: number
+  musicDucked: boolean
+  /** Sounds dropped by a caught audio error since load (must stay 0). */
+  dropped: number
+  lastDrop: string | null
 }
 
 export interface E2EView {
@@ -278,7 +294,8 @@ export function installE2EApi() {
     levels: () => getAllLevels().map((l) => ({ id: l.id, name: l.name })),
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
     spawnDigest: () => spawnDigest,
-    audio: () => ({ ready: isAudioReady(), sfxNodes: sfxNodeCount(), musicDucked: isMusicDucked() }),
+    audio: readAudio,
+    audioBurst,
     phase: () => useGameStore.getState().phase,
     enemies: enemiesOnScreen,
     errors: [],
@@ -347,9 +364,55 @@ export function installE2EApi() {
   eventBus.on('weapon:fire', () => { api.combat.fired += 1 })
   eventBus.on('enemy:hit', () => { api.combat.hits += 1 })
   eventBus.on('enemy:killed', () => { api.combat.kills += 1 })
-  window.addEventListener('error', (e) => api.errors.push(String(e.message)))
+  window.addEventListener('error', (e) => api.errors.push(String(e.error?.stack ?? e.message)))
   window.addEventListener('unhandledrejection', (e) => api.errors.push(String(e.reason)))
   window.__SC_TEST__ = api
+}
+
+/** Spin (max 20 ms) until AudioContext.currentTime moves, which it does mid-task. */
+function waitForAudioTick() {
+  const ctx = Tone.getContext()
+  const t0 = ctx.currentTime
+  const deadline = performance.now() + 20
+  while (ctx.currentTime === t0 && performance.now() < deadline) { /* spin */ }
+}
+
+async function audioBurst(shots: number, kills: number) {
+  if (!isAudioReady()) await initAudio()
+  for (let i = 0; i < shots; i++) {
+    playFireSound(i % 2 === 1)
+    if (i < kills) {
+      playHitTick()
+      playExplosionSound(kills - i)
+    }
+    waitForAudioTick()
+  }
+  playWaveStinger()
+
+  // Tone clamps the first late note to the ticked clock; before #115 the second landed on it.
+  // A fresh synth per pair: only a start from silence records a new start time.
+  const ctx = Tone.getContext()
+  let lateScheduleErrors = 0
+  for (let pair = 0; pair < 10; pair++) {
+    const synth = new Tone.Synth({ envelope: { attack: 0.03, decay: 0.2, sustain: 0.25, release: 0.3 } })
+    for (let i = 0; i < 2; i++) {
+      const now = ctx.currentTime
+      const t = nextTriggerTime(synth, now - 0.5, now)
+      if (i === 0) waitForAudioTick()
+      try {
+        synth.triggerAttackRelease('C3', 0.2, t)
+      } catch {
+        lateScheduleErrors++
+      }
+    }
+    synth.dispose()
+  }
+  return { ...readAudio(), lateScheduleErrors }
+}
+
+function readAudio(): E2EAudio {
+  const d = droppedSounds()
+  return { ready: isAudioReady(), sfxNodes: sfxNodeCount(), musicDucked: isMusicDucked(), dropped: d.count, lastDrop: d.last }
 }
 
 /** Canvas element captured by <E2EFrameProbe> for view(). */
