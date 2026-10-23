@@ -6,4 +6,4 @@ STRATEGY.md). Setup asks (analytics, domain) are not channel actions and are not
 
 | Date | Channel | Action (issue) | Link / UTM | Result (visitors, notes) |
 |---|---|---|---|---|
-| – | – | No posts or campaigns yet (as of 2026-10-22) | – | – |
+| – | – | No posts or campaigns yet (as of 2026-10-22 23:00 NY; first draft is scheduled for Mon 2 Nov, see STRATEGY.md) | – | – |
