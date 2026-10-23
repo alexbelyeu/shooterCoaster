@@ -79,7 +79,7 @@ score %; replay / next).
   `drawCalls`, `triangles`, `avgFrameMs`, `errors`, plus `autoFire`, `killNearest`,
   `stats`, `endLevel`, `setTimeScale` since #44). Smoke saves `<level>-combat.png` and
   `<level>-results.png` and fails a level on zero kills.
-- No unit tests. Leva + drei `Stats` behind the "show FPS" setting.
+- No unit tests. drei `Stats` behind the "show FPS" setting.
 
 ## Numbers (2026-10-19, `npm run verify` on main @ 247c69a, headless SwiftShader)
 

@@ -86,7 +86,7 @@ portrait screens get a wider vertical FOV); touch shots get aim assist (`combat/
 ## Stack
 
 React 19 + @react-three/fiber 9 + drei + @react-three/postprocessing, three 0.172,
-@react-three/rapier (physics), Tone.js (procedural audio), zustand (state),
+Tone.js (procedural audio), zustand (state),
 framer-motion (UI), Vite 6, TypeScript strict. Deployed on Vercel: every push to
 `main` goes to production at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it). Preview deployments
 are disabled (`git.deploymentEnabled` in `vercel.json`) — verification happens in CI. Serverless stubs in `api/` (leaderboard, daily seed, ghost
