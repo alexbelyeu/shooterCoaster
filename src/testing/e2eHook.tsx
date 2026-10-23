@@ -15,6 +15,7 @@
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
  *     the weapon view-model's on-screen box (hit feedback checks)
+ *   - read audio state (live SFX node count, slow-mo music duck)
  *
  * Keep this file tiny and side-effect free when the flag is off: nothing here
  * runs unless `installE2EApi()` finds `?e2e=1`, and <E2EFrameProbe> is only
@@ -31,6 +32,8 @@ import type { EnemyType } from '@/types/level'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
+import { isAudioReady, isMusicDucked } from '@/audio/AudioEngine'
+import { sfxNodeCount } from '@/audio/SFXManager'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -96,6 +99,9 @@ export interface SCTestApi {
   // ── View / aspect (issue #66) ──
   /** Active camera projection vs the canvas's on-screen box (squash checks). */
   view: () => E2EView | null
+  /** Audio state: unlocked yet, live gameplay SFX nodes (must stay flat while
+   *  shooting / killing, 0 after level exit), music low-pass ducked (slow-mo). */
+  audio: () => { ready: boolean; sfxNodes: number; musicDucked: boolean }
 }
 
 export interface E2EView {
@@ -272,6 +278,7 @@ export function installE2EApi() {
     levels: () => getAllLevels().map((l) => ({ id: l.id, name: l.name })),
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
     spawnDigest: () => spawnDigest,
+    audio: () => ({ ready: isAudioReady(), sfxNodes: sfxNodeCount(), musicDucked: isMusicDucked() }),
     phase: () => useGameStore.getState().phase,
     enemies: enemiesOnScreen,
     errors: [],
