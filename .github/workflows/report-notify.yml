@@ -28,6 +28,6 @@ jobs:
               '',
               issue.body || '_(no summary in the issue body)_',
               '',
-              `Play it: https://shooter-coaster.vercel.app · Steer: edit \`docs/agents/STEERING.md\` or open an issue labelled \`steering\`.`,
+              `Play it: https://scoaster.com · Steer: edit \`docs/agents/STEERING.md\` or open an issue labelled \`steering\`.`,
             ].join('\n')
             await github.rest.issues.createComment({ ...context.repo, issue_number: issue.number, body })
