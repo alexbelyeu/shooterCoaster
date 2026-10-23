@@ -98,12 +98,16 @@ function onPointerUp(e: PointerEvent) {
   release()
 }
 
-/** Drop the trigger (pointer lifted / cancelled, or the window lost focus). */
+/** Drop the trigger (pointer lifted / cancelled, the window lost focus or the tab was hidden). */
 function release() {
   if (activeId === null && !state.down) return
   activeId = null
   state.down = false
   emit('up')
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'hidden') release()
 }
 
 function onContextMenu(e: Event) {
@@ -117,6 +121,7 @@ function install() {
   window.addEventListener('pointerup', onPointerUp)
   window.addEventListener('pointercancel', onPointerUp)
   window.addEventListener('blur', release)
+  document.addEventListener('visibilitychange', onVisibilityChange)
   window.addEventListener('contextmenu', onContextMenu)
 }
 
@@ -126,6 +131,7 @@ function uninstall() {
   window.removeEventListener('pointerup', onPointerUp)
   window.removeEventListener('pointercancel', onPointerUp)
   window.removeEventListener('blur', release)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   window.removeEventListener('contextmenu', onContextMenu)
   activeId = null
   state.down = false

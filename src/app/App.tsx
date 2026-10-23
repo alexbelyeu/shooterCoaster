@@ -15,6 +15,7 @@ import ScorePopups from '@/effects/ScorePopups'
 import WaveAnnouncement from '@/ui/hud/WaveAnnouncement'
 import { startTitleMusic, stopTitleMusic } from '@/audio/TitleMusicManager'
 import { isAudioReady } from '@/audio/AudioEngine'
+import { usePauseOnHidden } from './usePauseOnHidden'
 
 const fadeVariants = {
   initial: { opacity: 0 },
@@ -26,10 +27,7 @@ export default function App() {
   const phase = useGameStore((s) => s.phase)
   const [showSettings, setShowSettings] = useState(false)
   const [showCountdown, setShowCountdown] = useState(false)
-  const setPhase = useGameStore((s) => s.setPhase)
-
-  // When entering 'playing', show countdown first
-  const origSetPhase = useGameStore((s) => s.setPhase)
+  usePauseOnHidden()
 
   // Intercept transition to 'playing' to show countdown
   const handleLevelStart = useCallback(() => {

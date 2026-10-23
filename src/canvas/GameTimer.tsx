@@ -1,68 +1,47 @@
 import { useRef, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
-
-/** Accumulated frozen time so the timer doesn't jump when unfreezing */
-let frozenAccum = 0
+import type { GamePhase } from '@/types/game'
 
 interface GameTimerProps {
   seconds: number
 }
 
-/** Counts down the level timer and triggers results when time runs out */
+/** Counts down the level on game time (paused or frozen frames don't count); resuming from `paused` keeps the run's clock. */
 export default function GameTimer({ seconds }: GameTimerProps) {
-  const setTimeRemaining = useGameStore((s) => s.setTimeRemaining)
-  const setPhase = useGameStore((s) => s.setPhase)
   const phase = useGameStore((s) => s.phase)
 
-  const startTime = useRef<number | null>(null)
-  const lastCeiled = useRef<number>(-1)
+  const elapsed = useRef(0)
+  /** The first frame's delta can include the level's load, so counting starts on the second. */
+  const running = useRef(false)
+  const lastCeiled = useRef(-1)
+  const prevPhase = useRef<GamePhase>(phase)
 
   useEffect(() => {
-    if (phase === 'playing') {
-      startTime.current = null
-      lastCeiled.current = -1
-      frozenAccum = 0
-      setTimeRemaining(seconds)
-    }
-  }, [phase, seconds, setTimeRemaining])
+    const resumed = prevPhase.current === 'paused'
+    prevPhase.current = phase
+    if (phase !== 'playing' || resumed) return
+    elapsed.current = 0
+    running.current = false
+    lastCeiled.current = -1
+    useGameStore.getState().setTimeRemaining(seconds)
+  }, [phase, seconds])
 
-  const wasFrozen = useRef(false)
-  const freezeStart = useRef(0)
-
-  useFrame(({ clock }) => {
+  useFrame((_, delta) => {
     if (phase !== 'playing') return
-    const timeScale = useGameStore.getState().timeScale
+    const { timeScale, setTimeRemaining, setPhase } = useGameStore.getState()
+    if (timeScale === 0) return
+    if (running.current) elapsed.current += delta
+    else running.current = true
 
-    // Track frozen duration so timer doesn't jump
-    if (timeScale === 0) {
-      if (!wasFrozen.current) {
-        wasFrozen.current = true
-        freezeStart.current = clock.elapsedTime
-      }
-      return
-    }
-    if (wasFrozen.current) {
-      wasFrozen.current = false
-      frozenAccum += clock.elapsedTime - freezeStart.current
-    }
-
-    if (startTime.current === null) {
-      startTime.current = clock.elapsedTime
-    }
-
-    const elapsed = clock.elapsedTime - startTime.current - frozenAccum
-    const remaining = Math.max(0, seconds - elapsed)
-
+    const remaining = Math.max(0, seconds - elapsed.current)
     const ceiled = Math.ceil(remaining)
     if (ceiled !== lastCeiled.current) {
       lastCeiled.current = ceiled
       setTimeRemaining(remaining)
     }
 
-    if (remaining <= 0) {
-      setPhase('results')
-    }
+    if (remaining <= 0) setPhase('results')
   })
 
   return null
