@@ -5,7 +5,9 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
 
 - **Public name:** ShooterCoaster. **Home:** https://scoaster.com
   (https://shooter-coaster.vercel.app keeps working).
-- **Analytics:** Vercel Web Analytics only (Alex's decision, 2026-10-22).
+- **Analytics:** Vercel Web Analytics only (Alex's decision, 2026-10-22). The team is on
+  Pro, so custom events and UTM dimensions are available; events are listed here once #98
+  ships. Test traffic (`?e2e=1`) is never counted (`src/app/analyticsGate.ts`).
 - **Spend:** the cap is `ad_budget_usd_per_month` in `docs/agents/STEERING.md`. Agents never
   spend, post or create accounts: the Marketer drafts, Alex approves and places, until an ad
   platform is connected and STEERING.md says the Marketer may run campaigns within the cap.
