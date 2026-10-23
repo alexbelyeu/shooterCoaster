@@ -296,3 +296,247 @@ pure and unit-tested). It returns a time that is never in the past and at least
 
 **Consequences:** A late note plays up to 1 ms late instead of throwing out of the
 Transport tick. New audio code that triggers a mono synth should use the helper.
+
+## 2026-10-20 — Arctic aurora and track-biased, ground-settled props (builder, #19)
+
+**Context:** Level 4 needed an aurora and a mid-ground of crystals/drifts. Uniform
+`scatterPositions` rings leave the area the rider actually sees sparse, and props
+placed on `heightFn` float or sink on Arctic's ridged terrain (the drawn mesh is
+linear between vertices, up to ~55 units off).
+**Decision:** Biome `Decorations` now also receive `groundFn` (createTerrainSurface)
+and the track's `ArcTable` (`track`, shared with #20; there is no second track prop).
+New props that frame the ride use `shared/trackScatter.ts`: `scatterNearTrack`
+(offsets from arc-table samples, seeded, kept clear with `trackClearance.buildTrackIndex`) and `settleOnGround` (base at
+the lowest drawn-ground point under the footprint, rejecting spots that bury more than
+a set fraction). The aurora is a camera-following ribbon ring (like `SkyDome`) with
+additive blending; the Arctic sky zenith was darkened (0x5a84c2 → 0x34508e) because an
+additive effect barely reads on a pale sky. Its intensity is driven by the
+`aurora:intensity` event (number, 1 = default).
+**Consequences:** Lighten the Arctic zenith again only together with a non-additive
+aurora. Other biomes can adopt `trackScatter` for grounded props instead of
+`scatterPositions` + `heightFn`.
+
+## 2026-10-20 — Track-aware prop layout; batched rides; only live bullets drawn (builder, #20)
+
+**Context:** Level 1 was at 277 draw calls / ~197k triangles before adding the midway
+(budget in #20: ≤ 215 / ≤ 200k). Each Ferris wheel was ~88 meshes and each carousel ~27;
+the bullet pool drew all 350 instances (~39k triangles) even when idle. Theme Park props
+were scattered by radius from the origin, so two rides and several tents sat under the
+track, with support towers running through them.
+
+**Decision:** Props that must avoid the track are planned as pure data against
+`shared/trackClearance.ts` (`buildTrackIndex`, a 2D XZ query: towers reach the ground, so
+height does not make a spot safe) and unit-tested against the real track
+(`biomes/themePark/layout.ts` + `layout.test.ts`). Anything hung across the track (arch,
+bunting) must also have the rider already below it for a stretch of approach, so it is
+ridden under and not dived through. Biome `Decorations`/`Features` now receive `groundFn`
+and the track's `ArcTable`. Multi-part props are one draw call per part type: InstancedMesh, or
+`shared/paintedParts.ts` (vertex-coloured parts merged into one geometry). The Ferris
+wheel is now 4 draws and the carousel 2. `BulletPool` sets `mesh.count` to the live bullets.
+
+**Consequences:** Level 1 now renders ~100–130 draw calls and ~165k triangles with the
+full midway in view. Moving a ride means updating `RIDES` in `themePark/parkSpec.ts`; the
+layout test fails if it lands on the track. Don't go back to one `<mesh>` per prop part.
+
+## 2026-10-20 — Biome environments are per-biome modules behind a registry (builder, #31)
+
+**Context:** `BiomeEnvironment.tsx` and `BiomeDecorations.tsx` were ~1000 lines each of
+five biomes' worth of switch cases, so every level task edited the same two files and
+parallel builders conflicted.
+
+**Decision:** Each biome owns a folder `src/levels/environments/biomes/<biome>/`
+(`config.ts` with terrain `COLOR_RAMP` + `TREES`, `Decorations.tsx`, `Features.tsx` for
+landmarks / terrain features / events, `index.ts` exporting a `BiomeDefinition`).
+`biomeRegistry.ts` maps `BiomeType → BiomeDefinition` as a `Record`, so a missing biome
+is a compile error. Biome-agnostic code (terrain mesh + colour-ramp sampler, tree field,
+water shader, atmosphere/lights/fog wiring, `scatterPositions`, `safeHeight`) lives once in
+`shared/`. `BiomeEnvironment.tsx` is a thin host that renders atmosphere, terrain, water,
+trees, then the definition's `Decorations` and `Features` — in that order, which preserves
+the previous scene-graph order. No file under `src/levels/environments/` should exceed
+~400 lines; split large decoration sets into sibling components (as `desert/Cacti.tsx`).
+Terrain noise (`BIOME_TERRAIN_CONFIGS`) and sky/fog (`ATMOSPHERES`) stay where they were.
+
+**Consequences:** New biome work touches only its own folder plus one registry line, so
+parallel level PRs stop colliding. Never add per-biome `if (biome === …)` branches back
+into `BiomeEnvironment.tsx`; put them in the biome's `Features.tsx`. Landmark components
+(FerrisWheel, Pyramid, Volcano…) still live at the `environments/` root because the title
+scene reuses some of them.
+
+## 2026-10-20 — Camera feedback is rotation-only; recoil lives on a weapon view-model (builder, #65)
+
+**Context:** The #60 kill shake translated the camera up to 3 units at ~8–11 Hz, so the
+rails directly under it visibly jumped, and the muzzle flash floated at bottom-centre
+with no gun. Alex flagged both in playtest.
+
+**Decision:**
+- The coaster camera is **never translated** for feedback. Kills add "trauma" (0..1,
+  combo-scaled, linear decay to 0 in 240 ms) that drives smooth value-noise pitch/yaw
+  (≤ 0.6°) and roll (≤ 1°) on top of the track pose (`src/combat/screenShake.ts`).
+  World events use the same system: `eventBus.emit('camera:trauma', amount, durationMs)`
+  adds trauma with a longer decay (the volcanic eruption: 0.8 over 3 s). Overlapping
+  sources keep the stronger level and the later end time.
+  Setting **Screen shake: Off / Reduced / Full** (persisted, default Reduced = half);
+  `prefers-reduced-motion` forces Off. The e2e hook reports translation off the track
+  pose and smoke fails if it is ever non-zero.
+- Fire recoil moves a code-generated **first-person weapon** (`WeaponViewModel.tsx`),
+  not the camera. It is one merged mesh (1 draw call, ~200 tris) parented to the camera,
+  anchored bottom-right from the viewport's short side (`weaponLayout.ts`), and its
+  barrel points straight at the aim point, so the tracer leaves along it. The only
+  guard is an ~8.6° cone around straight up (`clampWeaponAim`), where the gun would be
+  seen end-on; smoke fails if the tracer leaves the barrel more than 25° off. Its vertex shader squeezes its depth into the front
+  2% of the depth range, so it never clips into the world but still self-occludes.
+- The muzzle flash sits at the barrel tip, and each shot draws a short tracer from the
+  barrel to the aim point. Bullets still fly from the camera along the aim ray (hit
+  logic unchanged). Shots publish their aim NDC through `lastShot` in `hitFeedback.ts`
+  rather than an event payload, so nothing is allocated.
+
+**Consequences:** Don't reintroduce camera position offsets for feedback or world
+events (the smoke fails for feedback); anything that should shake the camera emits
+`camera:trauma`, so the Screen shake setting and `prefers-reduced-motion` apply. New
+HUD elements in the bottom-right must leave room for the gun (smoke checks
+`.hud-panel`, `.hud-combo`, `.hud-pause-button` and `.mute-button`).
+
+## 2026-10-20 — Camera aspect + portrait FOV, time-based bullets, touch aim assist (Builder, #66)
+
+**Context:** On phones the world looked squashed and taps missed. Root cause confirmed
+with the e2e hook: `CoasterCamera` mounts its own camera and calls `set({ camera })`,
+and R3F only re-applies `camera.aspect` when the canvas *size/dpr changes*, so the
+gameplay camera kept three.js's default aspect of 1 on every screen (squashed on a
+390x844 phone, stretched 1.78x wide on 1280x720 desktop) until a resize. Bullets moved
+14 units per frame with a point-in-sphere hit test, so they were slow at phone frame
+rates and could tunnel through small targets on a long frame.
+
+**Decision:**
+- `CoasterCamera` sets `aspect` (and FOV) from `useThree(s => s.size)` on mount and on
+  every resize/rotation. The level FOV stays the *vertical* FOV (80°); on narrow screens
+  `fovForAspect` (`src/track/cameraFov.ts`) widens it to keep a 60° horizontal FOV,
+  clamped at 100° vertical (390x844 → 100° x 58°, was 80° x 42°). Desktop/landscape keep 80°.
+- Bullets travel `BULLET_SPEED_PER_SEC` (840 = old 14/frame at 60 fps) scaled by the frame
+  delta, and hit-test the swept segment prev → position (`bulletMotion.ts`).
+- Touch shots (only) snap to the nearest enemy whose screen centre is within 44 CSS px
+  of the finger and get a 1.25x hit radius (`aimAssist.ts`). Mouse/pen aim is unchanged.
+
+**Consequences:** Desktop now renders with correct proportions too, which means a wider
+horizontal view (112° at 16:9 instead of 80° stretched): enemies look round and slightly
+narrower, and a few more objects are in view (draw calls up a little; scene totals
+unchanged). Don't "fix" desktop back to aspect 1. Smoke asserts camera aspect == canvas
+aspect (±0.01) on desktop and on phone portrait/landscape/rotated back, and requires
+kills from taps offset up to 30 px from enemies (game time frozen while tapping).
+
+## 2026-10-20 — Pause switch, independent code reviews, runbooks in the repo (setup)
+
+**Context:** Alex needs to stop all agent work quickly when his Claude usage runs low,
+wants Story Pitcher's `/deslop` and `/wrap-pr` review discipline on every PR, and
+changing a scheduled task's prompt needed his hands or hit permission checks.
+
+**Decision:** An open issue labelled `pause` (or `pause: true` in STEERING.md) stops every
+agent at its next checkpoint, via `scripts/pause-check.sh`, which fails closed;
+`PAUSE until <time>` resumes by itself. QA combines a playtest reviewer with two
+fresh-context reviewers (`pr-correctness`, `pr-consistency`) reading one review bundle,
+for code diffs of ~300+ lines, and posts one decision; builders deslop before shipping.
+Scheduled-task prompts become a bootstrap that runs the pause check and follows
+`docs/agents/runbooks/<task>.md`.
+
+**Consequences:** Pausing needs no PR and works from a phone. Big PRs cost two extra
+read-only reviewer runs (~30k tokens of bundle each), offset by fewer QA round trips.
+Behaviour changes to any role now ship as reviewed PRs; the task prompts should rarely
+change again.
+
+## 2026-10-22 — Ocean archipelago terrain, wave-riding foam, warm-only coral (builder, #21)
+
+**Context:** Level 3 needed sea stacks on the horizon beyond 1.2× the track extent,
+but the ocean terrain was ~90% land there (green hills ringing a flat lagoon), so
+there was no open water to stand them in. The terrain ramp is sampled by |y|, so
+shorelines (y ≈ 0) were getting the darkest "deep seafloor" colour.
+**Decision:** Ocean terrain exponent 1.8 → 3 and amplitude 300 → 400: the peaks keep
+their height but about half the sea beyond the lagoon is open water. The ocean ramp
+was redone for |y| sampling: sand at the shorelines, a teal-green that serves as both
+lagoon floor (y = -40) and low scrub (y = +40), grass and rock higher up. Foam rings
+displace with the water's own wave function (`shared/waterWaves.ts`, same
+`clock.elapsedTime`) instead of sitting at a fixed y, so the waves never swallow them.
+Coral uses only warm hues (orange/red/gold), not the magenta the issue suggested,
+because the jellyfish are pastel pink/blue/lilac/mint.
+**Consequences:** Changing the wave formula in one place moves the water and the foam
+together. Sea stacks and rocks only spawn where the whole footprint is under water;
+re-tuning the ocean terrain can change how many stacks fit (the unit test requires 6–10).
+
+## 2026-10-22 — Camera-wrapped particle field and baked terrain glow (builder, #22)
+
+**Context:** Inferno needed ash/embers in the air, a glow on the ground near lava and a smoke column, with no per-frame CPU cost, and other biomes will want snow/dust/bubbles next.
+**Decision:** `shared/ParticleField.tsx` is the one ambient-particle system: a `Points` cloud whose seeds wrap inside a box around `cameraPosition` in the vertex shader, driven by a `ParticleFieldPreset` (two layers + share). Both layers share one draw call through premultiplied blending (`One, OneMinusSrcAlpha`): opaque-ish layers write alpha, additive layers write alpha 0. Ground glow is a `terrainGlow` on the `BiomeDefinition`, baked once into a `glow` vertex attribute and added as emissive by the shared terrain material (`onBeforeCompile`), not a vertex-colour tint, because vertex colours are albedo and the volcanic lighting left them almost black. The old volcano plume sphere is replaced by `SmokeColumn` (camera-facing puffs in one geometry, reusing the lava shader's `noiseGlsl`).
+**Consequences:** New biome particles are a preset, not a new component. The glow band is ~140 units wide (not ~60) because the terrain grid is ~94 units. Smoke gets half the scene fog so it stays readable against the sky.
+
+## 2026-10-22 — Desert terrain material hook, CPU-occluded sun flare (builder, #23)
+
+**Context:** Level 2 needed sand ripples on the terrain, which every biome drew with
+the same inline Phong material in `BiomeEnvironment`. The issue also asked for a lens
+flare hidden "by a depth test on an occlusion probe", but a depth test result only
+comes back to JS through WebGL2 occlusion queries, which three.js doesn't wrap and
+which answer a few frames late.
+**Decision:** `BiomeDefinition.createTerrainMaterial` (optional) lets a biome swap the
+terrain material; the desert's patches Phong with `onBeforeCompile` (`sandRipples.ts`).
+Its sand mask compares vertex-colour g/r in **linear** space (THREE.Color stores hex
+colours linear), so retuning the desert ramp can turn ripples on the red rock or off
+the sand. The flare is two additive quads: a depth-tested core billboard at the sun
+(the GPU hides it behind terrain, mesas and the pyramid pixel-exactly) and a
+screen-space ghost/streak quad whose strength comes from a CPU ray march against the
+drawn terrain (`groundFn`) plus cone occluders for the mesas and pyramid
+(`sunOcclusion.ts`), smoothed over ~0.2 s. `buildRingedRock` moved from the ocean
+biome to `shared/ringedRock.ts` so mesas and sea stacks share it.
+**Consequences:** A new tall desert landmark should be added to the flare's occluder
+list in `biomes/desert/Features.tsx`, or the ghosts will show through it (the core
+still hides).
+
+## 2026-10-22 — Vercel Web Analytics, page views only, off for test traffic (Builder, #59)
+
+**Context:** Alex wants to see real players on the live site, and the weekly Marketer
+reads Vercel Web Analytics. Hard rule 4 needs an entry for a new runtime network call.
+**Decision:** Add `@vercel/analytics` and mount `<Analytics />` in `src/main.tsx`. The
+call is first-party and same-origin (`/_vercel/insights/script.js`, then
+`/_vercel/insights/view`), cookieless; it sends the page URL, referrer and the
+country / browser / OS / device type Vercel derives from the request. No custom events:
+the project lives in the default personal team, which we take to be Hobby (the API
+does not report the plan): 50,000 events/month shared across all projects, 1-month
+reporting window, and custom `track()` events need Pro. The component is mounted only when the
+build ran on Vercel (`VERCEL=1` → `__BUILT_ON_VERCEL__` via `define`) and the URL has no
+`e2e` param (`src/app/analyticsGate.ts`), so dev, `vite preview`, CI and both smoke runs
+(CI and nightly production) send nothing and never hit a missing `/_vercel` route.
+**Consequences:** One page view per load (the app has no routes). Collection starts only
+after Web Analytics is switched on in the Vercel project's Analytics tab, a dashboard
+action for Alex. If the plan moves to Pro, `level_start` / `level_complete` / `share`
+events can be added with `track()` from `@vercel/analytics` (Pro allows 2 properties per
+event). Do not add another analytics tool (Alex, 2026-10-22).
+
+## 2026-10-22 — Share card and SEO head; Google Analytics removed (Builder, #86)
+
+**Context:** Links to the game unfurled with no image and a "voxel" description. Alex
+chose Vercel Web Analytics as the only analytics (`2026-10-22-setup-marketer.md`), so the
+Google Analytics `gtag` block in `index.html` was a leftover third-party runtime call.
+
+**Decision:** The `gtag` script is removed; the game makes no Google network calls. The
+`<head>` carries one block of share/SEO tags with absolute `https://scoaster.com/` URLs
+(canonical, `og:url`, `og:image`), even while the vercel.app alias also serves the site.
+The card is a real gameplay frame rendered by `npm run og` (`scripts/og-image.mjs`) and
+committed as `public/social/og-1200x630.jpg`. It is a JPEG, not a PNG: a PNG of a rendered
+scene at that size is far over the 300 KB budget for unfurl images. `robots.txt` and
+`sitemap.xml` are static files in `public/`, which Vercel serves before the SPA rewrite.
+
+**Consequences:** Re-run `npm run og` and commit the result when the game looks better.
+Portal builds edit only that head block. Adding analytics or any other third-party script
+back needs its own decision entry.
+
+## 2026-10-22 — Weekly Marketer; scoaster.com; Vercel Analytics only (setup)
+
+**Context:** Alex bought scoaster.com and wants an expert marketer agent that decides when
+and how to advertise within a budget and tracks how the game performs.
+
+**Decision:** A weekly Marketer (Fable, Mon 5:13 New York, before the Reporter and Director)
+measures with Vercel Web Analytics only, keeps `docs/marketing/` (strategy, weekly metrics,
+budget ledger, channel log), files up to 3 `type:growth` issues a week for builders, and
+drafts posts and campaigns as `marketing` + `needs-alex` issues. Agents never spend, post or
+create accounts: Alex places everything until an ad platform is connected and STEERING.md
+allows the Marketer to run campaigns. The cap is `ad_budget_usd_per_month` in STEERING.md:
+$0 for the first organic month, then about $100. Public name stays ShooterCoaster.
+
+**Consequences:** Growth work competes with game work in the Director's plan. Paid spend is
+always bounded by a number Alex sets, and every public action has a human on it.
