@@ -1,6 +1,7 @@
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
-import { createRng, groundedBaseY, scatterNearTrack, trackExtent, type ScatterPoint } from '../../shared/trackScatter'
+import { groundedBaseY, scatterNearTrack, trackExtent, type ScatterPoint } from '../../shared/trackScatter'
+import { createRng } from '@/utils/rng'
 import { KELP_HEIGHT, ROCK_FOOTPRINT, ROCK_HEIGHT, STACK_FOOTPRINT, STACK_HEIGHT } from './seaDimensions'
 
 /** Where the ocean props go (pure). The water surface is y = 0. */

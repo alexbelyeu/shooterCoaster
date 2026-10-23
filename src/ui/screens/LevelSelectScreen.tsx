@@ -2,17 +2,13 @@ import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
 
 export default function LevelSelectScreen() {
-  const { setPhase, setCurrentLevel, resetScore, resetCombo, isLevelUnlocked, savedScores } =
-    useGameStore()
+  const { startRun, setPhase, isLevelUnlocked, savedScores } = useGameStore()
 
   const levels = getAllLevels()
 
   function startLevel(levelId: string) {
     if (!isLevelUnlocked(levelId)) return
-    resetScore()
-    resetCombo()
-    setCurrentLevel(levelId)
-    setPhase('playing')
+    startRun(levelId)
   }
 
   function getStars(levelId: string): number {

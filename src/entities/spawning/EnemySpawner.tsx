@@ -22,6 +22,8 @@ import InfernalDrake from '../enemies/InfernalDrake'
 import GoldenBalloon from '../enemies/GoldenBalloon'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { SCORE_VALUES } from '@/levels/scoring'
+import { createRng, type Rng } from '@/utils/rng'
+import { recordE2ESpawns } from '@/testing/e2eHook'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -56,21 +58,21 @@ const RADII: Record<EnemyType, number> = {
 }
 
 /** One random spawn position for `type` (terrain-aware, biome rules). */
-function pickSpawn(type: EnemyType, heightFn: HeightFunction): THREE.Vector3 {
+function pickSpawn(type: EnemyType, heightFn: HeightFunction, rng: Rng): THREE.Vector3 {
   let x: number, y: number, z: number
 
   switch (type) {
     case 'crow': {
-      const r = Math.sqrt(Math.random()) * 1200 + 100
-      const theta = Math.random() * 2 * Math.PI
+      const r = Math.sqrt(rng()) * 1200 + 100
+      const theta = rng() * 2 * Math.PI
       x = Math.cos(theta) * r
       z = Math.sin(theta) * r
-      y = heightFn(x, z) + 100 + Math.random() * 160
+      y = heightFn(x, z) + 100 + rng() * 160
       break
     }
     case 'scorpion': {
-      const r = Math.sqrt(Math.random()) * 600 + 100
-      const theta = Math.random() * 2 * Math.PI
+      const r = Math.sqrt(rng()) * 600 + 100
+      const theta = rng() * 2 * Math.PI
       x = Math.cos(theta) * r
       z = Math.sin(theta) * r
       y = heightFn(x, z) + 5
@@ -82,8 +84,8 @@ function pickSpawn(type: EnemyType, heightFn: HeightFunction): THREE.Vector3 {
       // Aquatic enemies: only spawn where terrain is below water (y=0)
       let attempts = 0
       do {
-        const r = Math.sqrt(Math.random()) * 1000 + 100
-        const theta = Math.random() * 2 * Math.PI
+        const r = Math.sqrt(rng()) * 1000 + 100
+        const theta = rng() * 2 * Math.PI
         x = Math.cos(theta) * r
         z = Math.sin(theta) * r
         attempts++
@@ -92,7 +94,7 @@ function pickSpawn(type: EnemyType, heightFn: HeightFunction): THREE.Vector3 {
       if (type === 'shark') {
         y = 2
       } else if (type === 'jellyfish') {
-        y = -15 - Math.random() * 30
+        y = -15 - rng() * 30
       } else {
         y = 0
       }
@@ -101,53 +103,53 @@ function pickSpawn(type: EnemyType, heightFn: HeightFunction): THREE.Vector3 {
     case 'snowman':
     case 'snowmanScout':
     case 'snowmanBrute': {
-      const r = Math.sqrt(Math.random()) * 2200 + 200
-      const theta = Math.random() * 2 * Math.PI
+      const r = Math.sqrt(rng()) * 2200 + 200
+      const theta = rng() * 2 * Math.PI
       x = Math.cos(theta) * r
       z = Math.sin(theta) * r
       y = heightFn(x, z) + 5
       break
     }
     case 'emberWisp': {
-      const r = Math.sqrt(Math.random()) * 2800 + 200
-      const theta = Math.random() * 2 * Math.PI
+      const r = Math.sqrt(rng()) * 2800 + 200
+      const theta = rng() * 2 * Math.PI
       x = Math.cos(theta) * r
       z = Math.sin(theta) * r
-      y = heightFn(x, z) + 60 + Math.random() * 140
+      y = heightFn(x, z) + 60 + rng() * 140
       break
     }
     case 'lavaGolem': {
-      const r = Math.sqrt(Math.random()) * 2400 + 200
-      const theta = Math.random() * 2 * Math.PI
+      const r = Math.sqrt(rng()) * 2400 + 200
+      const theta = rng() * 2 * Math.PI
       x = Math.cos(theta) * r
       z = Math.sin(theta) * r
       y = heightFn(x, z) + 5
       break
     }
     case 'fireImp': {
-      const r = Math.sqrt(Math.random()) * 2200 + 200
-      const theta = Math.random() * 2 * Math.PI
+      const r = Math.sqrt(rng()) * 2200 + 200
+      const theta = rng() * 2 * Math.PI
       x = Math.cos(theta) * r
       z = Math.sin(theta) * r
       y = heightFn(x, z) + 5
       break
     }
     case 'infernalDrake': {
-      const r = Math.sqrt(Math.random()) * 2600 + 300
-      const theta = Math.random() * 2 * Math.PI
+      const r = Math.sqrt(rng()) * 2600 + 300
+      const theta = rng() * 2 * Math.PI
       x = Math.cos(theta) * r
       z = Math.sin(theta) * r
-      y = heightFn(x, z) + 150 + Math.random() * 100
+      y = heightFn(x, z) + 150 + rng() * 100
       break
     }
     default: {
       // Scatter balloons over the park, a little beyond the track (~±1100),
       // so they float close to the ride (issue #20). sqrt = uniform area density.
-      const r = Math.sqrt(Math.random()) * 1700
-      const theta = Math.random() * 2 * Math.PI
+      const r = Math.sqrt(rng()) * 1700
+      const theta = rng() * 2 * Math.PI
       x = Math.cos(theta) * r
       z = Math.sin(theta) * r
-      y = heightFn(x, z) + 40 + Math.random() * 160
+      y = heightFn(x, z) + 40 + rng() * 160
       break
     }
   }
@@ -177,9 +179,8 @@ const READABLE_SPAWN_ATTEMPTS = 30
  */
 function pickReadableSpawn(
   type: EnemyType | 'goldenBalloon',
-  heightFn: HeightFunction,
   trackSamples: TrackSample[] | undefined,
-  pick: () => THREE.Vector3 = () => pickSpawn(type as EnemyType, heightFn),
+  pick: () => THREE.Vector3,
 ): THREE.Vector3 {
   if (!trackSamples || trackSamples.length === 0) return pick()
   const maxSq = maxReadableDistance(type) ** 2
@@ -205,6 +206,7 @@ function pickReadableSpawn(
 function generateEnemies(
   waves: EnemyWave[],
   heightFn: HeightFunction,
+  rng: Rng,
   trackSamples?: TrackSample[],
 ): SpawnedEnemy[] {
   const enemies: SpawnedEnemy[] = []
@@ -214,8 +216,9 @@ function generateEnemies(
   // spawnDelay (seconds from level start) via time-based progression.
   for (let waveIdx = 0; waveIdx < waves.length; waveIdx++) {
     const wave = waves[waveIdx]
+    const pick = () => pickSpawn(wave.type, heightFn, rng)
     for (let i = 0; i < wave.count; i++) {
-      const p = pickReadableSpawn(wave.type, heightFn, trackSamples)
+      const p = pickReadableSpawn(wave.type, trackSamples, pick)
 
       enemies.push({
         id: `enemy-${id++}`,
@@ -231,25 +234,25 @@ function generateEnemies(
   return enemies
 }
 
-// Generate golden balloon spawn positions
 function generateGoldenBalloons(
   count: number,
   heightFn: HeightFunction,
+  rng: Rng,
   trackSamples?: TrackSample[],
 ): SpawnedEnemy[] {
   const goldens: SpawnedEnemy[] = []
   const pick = () => {
-    const r = Math.sqrt(Math.random()) * 3000
-    const theta = Math.random() * 2 * Math.PI
+    const r = Math.sqrt(rng()) * 3000
+    const theta = rng() * 2 * Math.PI
     const x = Math.cos(theta) * r
     const z = Math.sin(theta) * r
-    return new THREE.Vector3(x, heightFn(x, z) + 50 + Math.random() * 100, z)
+    return new THREE.Vector3(x, heightFn(x, z) + 50 + rng() * 100, z)
   }
   for (let i = 0; i < count; i++) {
     goldens.push({
       id: `golden-${i}`,
       type: 'goldenBalloon',
-      position: pickReadableSpawn('goldenBalloon', heightFn, trackSamples, pick),
+      position: pickReadableSpawn('goldenBalloon', trackSamples, pick),
       scoreValue: 13 * 5, // 5x points
       radius: 45,
       waveIndex: -1, // always visible
@@ -278,14 +281,18 @@ const EXPLOSION_COLORS = ['#ff4444', '#ffaa00', '#ffffff', '#44aaff', '#00ff88']
 
 export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSamples }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
-  const enemies = useMemo(
-    () => generateEnemies(waves, heightFn, trackSamples),
-    [waves, heightFn, trackSamples],
-  )
-  const goldenBalloons = useMemo(
-    () => generateGoldenBalloons(goldenBalloonCount, heightFn, trackSamples),
-    [goldenBalloonCount, heightFn, trackSamples],
-  )
+  const runSeed = useGameStore((s) => s.runSeed)
+  // One stream per run: the same seed gives the same enemies and golden balloons.
+  const { enemies, goldenBalloons } = useMemo(() => {
+    const rng = createRng(runSeed)
+    return {
+      enemies: generateEnemies(waves, heightFn, rng, trackSamples),
+      goldenBalloons: generateGoldenBalloons(goldenBalloonCount, heightFn, rng, trackSamples),
+    }
+  }, [runSeed, waves, goldenBalloonCount, heightFn, trackSamples])
+  useEffect(() => {
+    recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position))
+  }, [enemies, goldenBalloons])
   const phase = useGameStore((s) => s.phase)
 
   // Wave state — time-based progression
@@ -301,7 +308,6 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
   const waveTimers = useRef<ReturnType<typeof setTimeout>[]>([])
   const slowMoResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Track killed enemies per wave
   const killedEnemies = useRef(new Set<string>())
 
   // Generation counter — increments on replay to force enemy remount
@@ -321,19 +327,16 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
     }
   }, [phase, initialActiveWave, waves])
 
-  // Slow-mo on final kill
   const totalEnemyCount = useMemo(
     () => enemies.length,
     [enemies],
   )
 
-  // Report enemy counts to the store for the HUD
   const setEnemyCounts = useGameStore((s) => s.setEnemyCounts)
   useEffect(() => {
     setEnemyCounts(totalEnemyCount, totalEnemyCount)
   }, [totalEnemyCount, setEnemyCounts])
 
-  // Clear announcement after 2s
   useEffect(() => {
     if (!waveAnnouncement) return
     const t = setTimeout(() => setWaveAnnouncement(null), 2000)
@@ -368,7 +371,6 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
     }
   }, [phase, waves])
 
-  // Clean up on unmount
   useEffect(() => {
     return () => {
       waveTimers.current.forEach(clearTimeout)
@@ -383,11 +385,9 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
     (id: string, position: THREE.Vector3) => {
       killedEnemies.current.add(id)
 
-      // Update HUD enemy count
       const remaining = totalEnemyCount - killedEnemies.current.size
       useGameStore.getState().setEnemyCounts(Math.max(0, remaining), totalEnemyCount)
 
-      // Check if this was the final enemy kill for slow-mo
       if (killedEnemies.current.size >= totalEnemyCount) {
         const store = useGameStore.getState()
         store.setTimeScale(0.1)
@@ -397,21 +397,18 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
         }, 1500)
       }
 
-      // Fire explosion from pool
       const color = EXPLOSION_COLORS[Math.floor(Math.random() * EXPLOSION_COLORS.length)]
       getExplosionPool()?.activate(position, color)
     },
     [totalEnemyCount],
   )
 
-  // Emit wave announcement via EventBus for UI to pick up
   useEffect(() => {
     if (waveAnnouncement) {
       eventBus.emit('wave:announce', waveAnnouncement)
     }
   }, [waveAnnouncement])
 
-  // Determine which enemies are visible based on active waves
   const visibleEnemies = useMemo(() => {
     return enemies.filter((e) => e.waveIndex <= activeWaveIndex)
   }, [enemies, activeWaveIndex])
@@ -423,7 +420,7 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
         if (!Component) return null
         return (
           <Component
-            key={`${enemy.id}-${generation}`}
+            key={`${enemy.id}-${generation}-${runSeed}`}
             id={enemy.id}
             type={enemy.type}
             spawnPosition={enemy.position}
@@ -435,7 +432,7 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
       })}
       {goldenBalloons.map((gb) => (
         <GoldenBalloon
-          key={`${gb.id}-${generation}`}
+          key={`${gb.id}-${generation}-${runSeed}`}
           id={gb.id}
           type="balloon"
           spawnPosition={gb.position}

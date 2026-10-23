@@ -4,8 +4,7 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars } from '@/levels/scoring'
 
 export default function ResultsScreen() {
-  const { score, currentLevel, setPhase, setCurrentLevel, saveScore, resetScore, resetCombo } =
-    useGameStore()
+  const { score, currentLevel, setPhase, saveScore, startRun } = useGameStore()
 
   const config = currentLevel ? getLevelConfig(currentLevel) : undefined
   const saved = useRef(false)
@@ -28,17 +27,12 @@ export default function ResultsScreen() {
   if (!config) return null
 
   function replay() {
-    resetScore()
-    resetCombo()
-    setPhase('playing')
+    startRun(config!.id)
   }
 
   function nextLevel() {
     if (config!.nextLevel) {
-      resetScore()
-      resetCombo()
-      setCurrentLevel(config!.nextLevel)
-      setPhase('playing')
+      startRun(config!.nextLevel)
     } else {
       setPhase('levelSelect')
     }

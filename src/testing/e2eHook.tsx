@@ -30,6 +30,7 @@ import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadabili
 import type { EnemyType } from '@/types/level'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
+import { hashString } from '@/utils/rng'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -41,7 +42,10 @@ export interface SCTestApi {
   drawCalls: number
   triangles: number
   levels: () => { id: string; name: string }[]
-  startLevel: (id: string) => void
+  /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one. */
+  startLevel: (id: string, seed?: number) => void
+  /** `<count>:<hash>` of the latest run's spawn positions; null until a spawner has generated them. */
+  spawnDigest: () => string | null
   phase: () => string
   /**
    * Enemies whose centre is inside the view frustum, largest first, with screen
@@ -122,6 +126,7 @@ export interface SCTestStats {
   /** Live enemies in front of the camera and inside the viewport (not occlusion-tested). */
   onScreenEnemies: number
   shotsFired: number
+  runSeed: number
 }
 
 export interface E2EWeaponOnScreen {
@@ -159,6 +164,14 @@ export function registerE2EEnemy(id: string, type: EnemyType | 'goldenBalloon', 
 }
 export function unregisterE2EEnemy(id: string) {
   if (isE2E) enemyRegistry.delete(id)
+}
+
+/** Hash of the current run's spawn positions (all waves + golden balloons), set by EnemySpawner. */
+let spawnDigest: string | null = null
+export function recordE2ESpawns(positions: readonly { x: number; y: number; z: number }[]) {
+  if (!isE2E) return
+  const text = positions.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)}`).join(';')
+  spawnDigest = `${positions.length}:${hashString(text).toString(16)}`
 }
 
 /** Camera + viewport captured by <E2EFrameProbe> so non-React test calls can aim/project. */
@@ -257,13 +270,8 @@ export function installE2EApi() {
     drawCalls: 0,
     triangles: 0,
     levels: () => getAllLevels().map((l) => ({ id: l.id, name: l.name })),
-    startLevel: (id: string) => {
-      const s = useGameStore.getState()
-      s.resetScore()
-      s.resetCombo()
-      s.setCurrentLevel(id)
-      s.setPhase('playing')
-    },
+    startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
+    spawnDigest: () => spawnDigest,
     phase: () => useGameStore.getState().phase,
     enemies: enemiesOnScreen,
     errors: [],
@@ -304,6 +312,7 @@ export function installE2EApi() {
         liveEnemies,
         onScreenEnemies,
         shotsFired: s.shotsFired,
+        runSeed: s.runSeed,
       }
     },
     enemyScreenPoints: (n: number) => {

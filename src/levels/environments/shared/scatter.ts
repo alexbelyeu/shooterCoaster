@@ -1,8 +1,9 @@
 import * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
 
-/** Scatter positions in an annular ring, rejecting steep slopes */
+/** Scatter positions in an annular ring, rejecting steep slopes; pass a fixed-seed rng so the layout never changes. */
 export function scatterPositions(
+  rng: () => number,
   count: number,
   minR: number,
   maxR: number,
@@ -13,8 +14,8 @@ export function scatterPositions(
   let attempts = 0
   while (arr.length < count && attempts < count * 5) {
     attempts++
-    const r = minR + Math.random() * (maxR - minR)
-    const theta = Math.random() * Math.PI * 2
+    const r = minR + rng() * (maxR - minR)
+    const theta = rng() * Math.PI * 2
     const x = Math.cos(theta) * r
     const z = Math.sin(theta) * r
     const y = heightFn(x, z)

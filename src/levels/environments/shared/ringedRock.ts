@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { createRng } from './trackScatter'
+import { createRng } from '@/utils/rng'
 
 /** Rock formations built as a stack of jittered rings (sea stacks, mesas), heights baked in. */
 

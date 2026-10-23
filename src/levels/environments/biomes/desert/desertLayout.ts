@@ -2,7 +2,8 @@ import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { RockRing } from '../../shared/ringedRock'
 import { buildTrackIndex, trackFrameAt } from '../../shared/trackClearance'
-import { createRng, groundedBaseY, trackExtent } from '../../shared/trackScatter'
+import { groundedBaseY, trackExtent } from '../../shared/trackScatter'
+import { createRng } from '@/utils/rng'
 import { LANDMARK_FOOTPRINTS } from './landmarks'
 
 /** Where the desert's mesas and dust devils go (pure, unit-tested against the level 2 track). */

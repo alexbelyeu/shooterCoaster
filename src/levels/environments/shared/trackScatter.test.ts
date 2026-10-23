@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createRng,
-  groundedBaseY,
-  scatterNearTrack,
-  settleOnGround,
-  trackExtent,
-} from './trackScatter'
+import { groundedBaseY, scatterNearTrack, settleOnGround, trackExtent } from './trackScatter'
+import { createRng } from '@/utils/rng'
 import { buildTrackIndex } from './trackClearance'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { buildArcTable } from '@/track/arcLength'
@@ -25,19 +20,6 @@ const table = buildArcTable(curve)
 const index = buildTrackIndex(table)
 const heightFn = createHeightFunction('arctic', sampleTrackPath((t) => curve.getPointAt(t)))
 const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize('arctic'))
-
-describe('createRng', () => {
-  it('is deterministic per seed and stays in [0, 1)', () => {
-    const a = createRng(7)
-    const b = createRng(7)
-    for (let i = 0; i < 1000; i++) {
-      const v = a()
-      expect(v).toBe(b())
-      expect(v).toBeGreaterThanOrEqual(0)
-      expect(v).toBeLessThan(1)
-    }
-  })
-})
 
 describe('trackExtent', () => {
   it('matches the varC * 13 * scalar rule for level4', () => {

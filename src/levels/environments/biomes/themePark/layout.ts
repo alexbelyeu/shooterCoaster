@@ -1,7 +1,7 @@
 import { type HeightFunction, TERRAIN_MESH_SEGMENTS, getTerrainMeshSize } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
 import { safeHeight } from '../../shared/safeHeight'
-import { createRng } from '../../shared/trackScatter'
+import { createRng } from '@/utils/rng'
 import { type TrackFrame, type TrackIndex, buildTrackIndex, trackFrameAt } from '../../shared/trackClearance'
 import {
   ARCH_BOARD_DEPTH,

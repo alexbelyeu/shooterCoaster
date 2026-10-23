@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { GamePhase, ScoreEntry, ComboState } from '@/types/game'
+import { seedFromQuery } from '@/utils/rng'
 
 interface GameState {
   // Phase
@@ -10,6 +11,11 @@ interface GameState {
   // Current level
   currentLevel: string | null
   setCurrentLevel: (level: string | null) => void
+
+  /** Seeds this run's enemy spawns. */
+  runSeed: number
+  /** The one way to start or restart a level; seed precedence: `seed` > `?seed=` > `Date.now()`. */
+  startRun: (levelId: string, seed?: number) => void
 
   // Score
   score: number
@@ -52,6 +58,10 @@ interface GameState {
 /** Real-time window (ms, performance.now) in which the next kill extends the combo. */
 export const COMBO_TIMEOUT = 2000
 
+function urlSeed(): number | null {
+  return typeof window !== 'undefined' && window.location ? seedFromQuery(window.location.search) : null
+}
+
 export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
@@ -60,6 +70,18 @@ export const useGameStore = create<GameState>()(
 
       currentLevel: null,
       setCurrentLevel: (level) => set({ currentLevel: level }),
+
+      runSeed: 0,
+      startRun: (levelId, seed) =>
+        set({
+          score: 0,
+          kills: 0,
+          shotsFired: 0,
+          combo: { count: 0, multiplier: 1, lastKillTime: 0 },
+          currentLevel: levelId,
+          runSeed: (seed ?? urlSeed() ?? Date.now()) >>> 0,
+          phase: 'playing',
+        }),
 
       score: 0,
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),

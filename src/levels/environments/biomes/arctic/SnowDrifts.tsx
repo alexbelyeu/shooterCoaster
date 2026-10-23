@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import type { BiomeDecorationsProps } from '../../shared/types'
-import { createRng, scatterNearTrack, settleOnGround, trackExtent } from '../../shared/trackScatter'
+import { scatterNearTrack, settleOnGround, trackExtent } from '../../shared/trackScatter'
+import { createRng } from '@/utils/rng'
 import { COLOR_RAMP } from './config'
 import { DRIFT_HALF_LENGTH, DRIFT_HEIGHT, createDriftGeometry } from './iceProps'
 

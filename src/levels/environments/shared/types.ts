@@ -2,6 +2,7 @@ import type { ComponentType, RefObject } from 'react'
 import type * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
+import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
 
 /** One stop of a terrain colour ramp. */
@@ -19,7 +20,7 @@ export interface ColorRamp {
 /** One instanced tree species (trunk + canopy). */
 export interface TreeTypeConfig {
   trunkColor: string
-  canopyColors: () => string
+  canopyColors: (rng: Rng) => string
   canopyGeoFactory: () => THREE.BufferGeometry
   heightRange: [number, number]
 }

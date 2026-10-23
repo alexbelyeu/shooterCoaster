@@ -17,7 +17,7 @@ export const TREES: BiomeTreeConfig = {
   types: [
     {
       trunkColor: '#3a2818',
-      canopyColors: () => `hsl(${140 + Math.random() * 20}, ${20 + Math.random() * 15}%, ${20 + Math.random() * 10}%)`,
+      canopyColors: (rng) => `hsl(${rng.range(140, 160)}, ${rng.range(20, 35)}%, ${rng.range(20, 30)}%)`,
       canopyGeoFactory: () => new THREE.ConeGeometry(1, 1, 6),
       heightRange: [25, 70],
     },

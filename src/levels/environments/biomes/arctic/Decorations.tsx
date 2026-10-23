@@ -1,6 +1,7 @@
 import { useMemo, useCallback, useEffect } from 'react'
 import * as THREE from 'three'
 import type { BiomeDecorationsProps } from '../../shared/types'
+import { createRng } from '@/utils/rng'
 import { scatterPositions } from '../../shared/scatter'
 import IceCrystals from './IceCrystals'
 import SnowDrifts from './SnowDrifts'
@@ -9,19 +10,20 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
   const { heightFn } = props
 
   // Snow-covered boulders
-  const boulderPositions = useMemo(() => scatterPositions(80, 150, 3500, heightFn), [heightFn])
+  const boulderPositions = useMemo(() => scatterPositions(createRng(2410), 80, 150, 3500, heightFn), [heightFn])
   const boulderGeo = useMemo(() => new THREE.DodecahedronGeometry(1, 0), [])
   const boulderMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#d8e0e8', flatShading: true }), [])
 
   const setBoulderRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
+    const rng = createRng(2413)
     const mat = new THREE.Matrix4()
     const q = new THREE.Quaternion()
     const euler = new THREE.Euler()
     for (let i = 0; i < boulderPositions.length; i++) {
       const p = boulderPositions[i]
-      const s = 4 + Math.random() * 12
-      euler.set(Math.random() * 0.5, Math.random() * Math.PI * 2, Math.random() * 0.5)
+      const s = 4 + rng() * 12
+      euler.set(rng() * 0.5, rng() * Math.PI * 2, rng() * 0.5)
       q.setFromEuler(euler)
       mat.compose(
         new THREE.Vector3(p.x, p.y + s * 0.3, p.z),
@@ -34,7 +36,7 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
   }, [boulderPositions])
 
   // Tall ice columns (semi-transparent)
-  const columnPositions = useMemo(() => scatterPositions(45, 200, 3500, heightFn), [heightFn])
+  const columnPositions = useMemo(() => scatterPositions(createRng(2411), 45, 200, 3500, heightFn), [heightFn])
   const columnGeo = useMemo(() => {
     const iceColumnPoints: THREE.Vector2[] = []
     for (let i = 0; i <= 12; i++) {
@@ -51,7 +53,8 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
     opacity: 0.7,
   }), [])
   const columnScales = useMemo(() => {
-    return columnPositions.map(() => 0.5 + Math.random())
+    const rng = createRng(2414)
+    return columnPositions.map(() => 0.5 + rng())
   }, [columnPositions])
 
   const setColumnRef = useCallback((mesh: THREE.InstancedMesh | null) => {
@@ -71,7 +74,7 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
   }, [columnPositions, columnScales])
 
   // Frozen pond patches — flat translucent blue circles on the ground
-  const pondPositions = useMemo(() => scatterPositions(20, 150, 3000, heightFn, Math.PI / 6), [heightFn])
+  const pondPositions = useMemo(() => scatterPositions(createRng(2412), 20, 150, 3000, heightFn, Math.PI / 6), [heightFn])
   const pondGeo = useMemo(() => new THREE.CircleGeometry(1, 24), [])
   const pondMat = useMemo(() => new THREE.MeshPhongMaterial({
     color: '#88bbdd',
@@ -85,18 +88,19 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
 
   const setPondRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
+    const rng = createRng(2415)
     const mat = new THREE.Matrix4()
     const q = new THREE.Quaternion()
     const euler = new THREE.Euler()
     for (let i = 0; i < pondPositions.length; i++) {
       const p = pondPositions[i]
-      const s = 15 + Math.random() * 30
-      euler.set(-Math.PI / 2, 0, Math.random() * Math.PI * 2)
+      const s = 15 + rng() * 30
+      euler.set(-Math.PI / 2, 0, rng() * Math.PI * 2)
       q.setFromEuler(euler)
       mat.compose(
         new THREE.Vector3(p.x, p.y + 0.5, p.z),
         q,
-        new THREE.Vector3(s, s * (0.6 + Math.random() * 0.4), 1),
+        new THREE.Vector3(s, s * (0.6 + rng() * 0.4), 1),
       )
       mesh.setMatrixAt(i, mat)
     }

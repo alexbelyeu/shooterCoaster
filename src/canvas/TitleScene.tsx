@@ -2,6 +2,7 @@ import { useRef, useMemo, useState, useCallback, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Sky, PerspectiveCamera, Sparkles, Float } from '@react-three/drei'
 import * as THREE from 'three'
+import { createRng } from '@/utils/rng'
 import FerrisWheel from '@/levels/environments/FerrisWheel'
 import Carousel from '@/levels/environments/Carousel'
 
@@ -264,12 +265,13 @@ function ShootableBalloon({
 /** Balloons + pop bursts + title-screen click-to-shoot raycasting */
 function Balloons() {
   const balloonData = useMemo(() => {
+    const rng = createRng(101)
     const items: { pos: [number, number, number]; color: string }[] = []
     for (let i = 0; i < 10; i++) {
       const angle = (i / 10) * Math.PI * 2 + 0.5
       const r = 40 + (i % 4) * 25
       items.push({
-        pos: [Math.cos(angle) * r, 45 + Math.random() * 20, Math.sin(angle) * r],
+        pos: [Math.cos(angle) * r, 45 + rng() * 20, Math.sin(angle) * r],
         color: BALLOON_COLORS[i],
       })
     }

@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { createRng } from '@/utils/rng'
 
 interface IceFortressProps {
   position: [number, number, number]
@@ -105,13 +106,14 @@ export default function IceFortress({ position }: IceFortressProps) {
 
   // Ice spikes scattered on towers
   const spikes = useMemo(() => {
+    const rng = createRng(2420)
     const arr: { x: number; y: number; z: number; rx: number; rz: number }[] = []
     // Central tower spikes
     for (let i = 0; i < 5; i++) {
       const angle = (i / 5) * Math.PI * 2
       arr.push({
         x: Math.cos(angle) * 14,
-        y: 110 + Math.random() * 15,
+        y: 110 + rng() * 15,
         z: Math.sin(angle) * 14,
         rx: Math.cos(angle) * 0.3,
         rz: Math.sin(angle) * 0.3,
@@ -120,10 +122,10 @@ export default function IceFortress({ position }: IceFortressProps) {
     // Side tower spikes
     for (const t of sideTowers) {
       for (let i = 0; i < 3; i++) {
-        const angle = Math.random() * Math.PI * 2
+        const angle = rng() * Math.PI * 2
         arr.push({
           x: t.x + Math.cos(angle) * 8,
-          y: 75 + Math.random() * 10,
+          y: 75 + rng() * 10,
           z: t.z + Math.sin(angle) * 8,
           rx: Math.cos(angle) * 0.25,
           rz: Math.sin(angle) * 0.25,
