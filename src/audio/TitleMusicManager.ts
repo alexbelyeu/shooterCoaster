@@ -1,5 +1,6 @@
 import * as Tone from 'tone'
 import { nextTriggerTime } from './triggerTime'
+import { dropSound } from './soundGuard'
 import { musicChannel, isAudioReady } from './AudioEngine'
 
 /**
@@ -154,7 +155,12 @@ export function startTitleMusic(): void {
   // Melody — 8th notes across 4 bars
   melodyLoop = new Tone.Sequence(
     (time, note) => {
-      if (note && melodyBox) melodyBox.triggerAttackRelease(note, '8n', nextTriggerTime(melodyBox, time, Tone.getContext().currentTime))
+      if (!note || !melodyBox) return
+      try {
+        melodyBox.triggerAttackRelease(note, '8n', nextTriggerTime(melodyBox, time, Tone.getContext().currentTime))
+      } catch (e) {
+        dropSound('title melody', e)
+      }
     },
     melodyNotes,
     '8n',
@@ -165,7 +171,12 @@ export function startTitleMusic(): void {
   // Pad — one chord per bar (whole note)
   padLoop = new Tone.Sequence(
     (time, chord) => {
-      if (chord && padSynth) padSynth.triggerAttackRelease(chord, '1n', time)
+      if (!chord || !padSynth) return
+      try {
+        padSynth.triggerAttackRelease(chord, '1n', nextTriggerTime(padSynth, time, Tone.getContext().currentTime))
+      } catch (e) {
+        dropSound('title pad', e)
+      }
     },
     padChords,
     '1n',
@@ -176,7 +187,12 @@ export function startTitleMusic(): void {
   // Bass — 8th notes across 4 bars
   bassLoop = new Tone.Sequence(
     (time, note) => {
-      if (note && bassSynth) bassSynth.triggerAttackRelease(note, '8n', nextTriggerTime(bassSynth, time, Tone.getContext().currentTime))
+      if (!note || !bassSynth) return
+      try {
+        bassSynth.triggerAttackRelease(note, '8n', nextTriggerTime(bassSynth, time, Tone.getContext().currentTime))
+      } catch (e) {
+        dropSound('title bass', e)
+      }
     },
     bassNotes,
     '8n',
@@ -188,14 +204,23 @@ export function startTitleMusic(): void {
   chimeLoop = new Tone.Loop((time) => {
     if (!chimeSynth) return
     const note = chimeNotes[Math.floor(Math.random() * chimeNotes.length)]
-    chimeSynth.triggerAttackRelease(note, '16n', nextTriggerTime(chimeSynth, time, Tone.getContext().currentTime))
+    try {
+      chimeSynth.triggerAttackRelease(note, '16n', nextTriggerTime(chimeSynth, time, Tone.getContext().currentTime))
+    } catch (e) {
+      dropSound('title chime', e)
+    }
   }, '2n.')
   chimeLoop.start('4n') // offset slightly from downbeat
 
   // Tambourine — offbeat 16th notes
   tambLoop = new Tone.Sequence(
     (time, hit) => {
-      if (hit && tamb) tamb.triggerAttackRelease('16n', nextTriggerTime(tamb, time, Tone.getContext().currentTime))
+      if (!hit || !tamb) return
+      try {
+        tamb.triggerAttackRelease('16n', nextTriggerTime(tamb, time, Tone.getContext().currentTime))
+      } catch (e) {
+        dropSound('title tambourine', e)
+      }
     },
     tambPattern,
     '8n',
