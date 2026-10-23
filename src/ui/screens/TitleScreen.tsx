@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { browserStorage, isInternalBrowser } from '@/app/analyticsGate'
 import { useGameStore } from '@/store/useGameStore'
 import { initAudio, isAudioReady } from '@/audio/AudioEngine'
 import { startTitleMusic } from '@/audio/TitleMusicManager'
@@ -20,8 +21,8 @@ interface TitleScreenProps {
 export default function TitleScreen({ onSettings }: TitleScreenProps) {
   const setPhase = useGameStore((s) => s.setPhase)
   const musicStarted = useRef(false)
+  const [internal] = useState(() => isInternalBrowser(browserStorage()))
 
-  // Start music on the very first click/tap anywhere on the page
   useEffect(() => {
     if (musicStarted.current) return
     const kickstart = async () => {
@@ -46,7 +47,6 @@ export default function TitleScreen({ onSettings }: TitleScreenProps) {
 
   return (
     <div className="title-screen">
-      {/* Title — per-letter staggered spring entrance */}
       <h1 aria-label={TITLE}>
         {TITLE.split('').map((char, i) => (
           <motion.span
@@ -61,7 +61,6 @@ export default function TitleScreen({ onSettings }: TitleScreenProps) {
         ))}
       </h1>
 
-      {/* Subtitle — three words fade in sequentially */}
       <p className="subtitle">
         {SUBTITLE_WORDS.map((word, i) => (
           <motion.span
@@ -76,7 +75,6 @@ export default function TitleScreen({ onSettings }: TitleScreenProps) {
         ))}
       </p>
 
-      {/* Play button — fades in, then infinite pulsing glow */}
       <motion.button
         className="play-button"
         onClick={handlePlay}
@@ -101,7 +99,6 @@ export default function TitleScreen({ onSettings }: TitleScreenProps) {
         Play
       </motion.button>
 
-      {/* Settings gear — bottom-left */}
       {onSettings && (
         <motion.button
           className="settings-button"
@@ -115,7 +112,6 @@ export default function TitleScreen({ onSettings }: TitleScreenProps) {
         </motion.button>
       )}
 
-      {/* Credits */}
       <motion.div
         className="credits"
         initial={{ opacity: 0 }}
@@ -127,6 +123,8 @@ export default function TitleScreen({ onSettings }: TitleScreenProps) {
           Alex Belyeu
         </a>
       </motion.div>
+
+      {internal && <div className="internal-marker">internal: not tracked</div>}
     </div>
   )
 }
