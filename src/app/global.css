@@ -122,6 +122,15 @@ canvas {
   text-decoration: none;
 }
 
+.title-screen .internal-marker {
+  position: absolute;
+  top: calc(0.75rem + env(safe-area-inset-top));
+  right: calc(0.75rem + env(safe-area-inset-right));
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+}
+
 /* Settings button — bottom-left, glass-morphism */
 .settings-button {
   position: fixed;
