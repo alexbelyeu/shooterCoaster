@@ -90,7 +90,9 @@ framer-motion (UI), Vite 6, TypeScript strict. Deployed on Vercel: every push to
 `main` goes to production at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it). Preview deployments
 are disabled (`git.deploymentEnabled` in `vercel.json`) — verification happens in CI. Serverless stubs in `api/` (leaderboard, daily seed, ghost
 replays — currently in-memory placeholders).
-Vercel Web Analytics (`@vercel/analytics`, page views only) is mounted in `src/main.tsx`
+Vercel Web Analytics (`@vercel/analytics`: page views, plus the `level_start` /
+`level_complete` / `level_quit` custom events mapped from game-store phase changes in
+`src/app/analyticsEvents.ts`, listed in `docs/marketing/README.md`) is mounted in `src/main.tsx`
 only on Vercel builds (`__BUILT_ON_VERCEL__`, set in `vite.config.ts` from `VERCEL=1`)
 and never with `?e2e=1` (`src/app/analyticsGate.ts`), so dev, `vite preview`, CI and the
 smoke tests send nothing.
