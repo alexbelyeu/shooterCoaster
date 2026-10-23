@@ -33,6 +33,7 @@ import type { EnemyType } from '@/types/level'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
+import { getPointerState } from '@/input/pointerInput'
 import { initAudio, isAudioReady, isMusicDucked } from '@/audio/AudioEngine'
 import { playExplosionSound, playFireSound, playHitTick, playWaveStinger, sfxNodeCount } from '@/audio/SFXManager'
 import { droppedSounds } from '@/audio/soundGuard'
@@ -109,6 +110,8 @@ export interface SCTestApi {
    *  shots + layered kills + a stinger, then 10 pairs of late music-loop notes
    *  (`lateScheduleErrors` counts their throws). Unlocks audio if needed. */
   audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { lateScheduleErrors: number }>
+  /** Whether pointer input has the trigger held (released on blur / tab hide). */
+  triggerHeld: () => boolean
 }
 
 export interface E2EAudio {
@@ -360,6 +363,7 @@ export function installE2EApi() {
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
     rideTo: null,
     view: readView,
+    triggerHeld: () => getPointerState().down,
   }
   eventBus.on('weapon:fire', () => { api.combat.fired += 1 })
   eventBus.on('enemy:hit', () => { api.combat.hits += 1 })

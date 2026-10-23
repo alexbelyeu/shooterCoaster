@@ -61,7 +61,10 @@ rendering can run at ~1 fps; tune with `--seconds`, `--combat-seconds`,
 `--min-frames`, `--levels level1,level3`, `--shot-timeout <ms>` (default 120 s),
 `--seed <n>` (default 1337). Every smoke run pins that run seed, so enemy spawns are the
 same each time; a `seed-check` step reloads the first level and requires the same
-`spawnDigest()` for the same seed and a different one for another seed.
+`spawnDigest()` for the same seed and a different one for another seed. A `hidden-pause`
+step fakes a tab hide (`visibilitychange`) on the first level: the run must pause, drop a
+held trigger, keep `timeRemaining` still over 5 s hidden, stay paused when shown again, and
+after Resume neither reset nor jump the timer; a window `blur` must pause too.
 `drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
 spawned enemies) and vary run to run; for before/after comparisons use the
 camera-independent `scene` totals the smoke also prints (`track objs/tris` = objects
@@ -76,7 +79,7 @@ then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPo
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
 {current, max} in degrees, `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
 `view()` → camera vs canvas aspect + FOV, `audio()` → unlocked?, live SFX node count, music ducked?, sounds dropped by a caught audio error,
-`audioBurst(shots, kills)` → rapid SFX + late music notes in one JS turn while the audio clock ticks). See `src/testing/e2eHook.tsx`. Extend it when you need new test
+`audioBurst(shots, kills)` → rapid SFX + late music notes in one JS turn while the audio clock ticks, `triggerHeld()` → pointer trigger down?). See `src/testing/e2eHook.tsx`. Extend it when you need new test
 surfaces. Bullets travel per *second* with a swept hit test (`combat/projectiles/bulletMotion.ts`),
 but enemies and the camera still move a lot during one ~1 fps headless frame, so
 autofire only sometimes lands hits — `killNearest` is what guarantees kills.
@@ -104,7 +107,7 @@ from the URL; `?internal=0` clears it): it sends nothing either, via the same ga
 
 | Path | What |
 |---|---|
-| `src/app/App.tsx` | Phase-driven UI shell (title → levelSelect → playing → paused → results) |
+| `src/app/App.tsx` | Phase-driven UI shell (title → levelSelect → playing → paused → results); `usePauseOnHidden` pauses a run on tab hide / window blur |
 | `src/canvas/` | `GameCanvas` (R3F Canvas), `SceneManager` (picks title vs level scene), shooting, timer, music |
 | `src/levels/LevelRegistry.ts` | **Level configs** — track params, biome, timer, waves, star thresholds |
 | `src/levels/scoring.ts` | `SCORE_VALUES` per enemy, `computeMaxScore`, `computeStars` (pure, unit-tested) |
