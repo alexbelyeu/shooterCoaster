@@ -1,24 +1,19 @@
 /**
- * Tone.js throws "Start time must be strictly greater than previous start time"
- * when a source (the oscillator / noise inside a mono Synth or NoiseSynth) is
- * restarted at or before its previous start. That happens when:
- *   - two triggers land in the same JS turn (Tone.now() only advances per
- *     audio render quantum), e.g. two shots in one frame;
- *   - the audio clock falls behind and Tone clamps late Sequence callback times
- *     up to `currentTime`, so consecutive notes get the same start.
- * nextTriggerTime() keeps each node's schedule strictly increasing and never
- * in the past. Pure (no Tone import) so it stays unit-testable; callers pass
- * the context's `currentTime`.
+ * Trigger times for Tone sources, which throw "Start time must be strictly greater
+ * than previous start time" on a restart at the same time: strictly increasing per
+ * node, and a late time is pushed LATE_MARGIN past currentTime because the audio
+ * clock ticks mid-task and Tone would clamp it to a later time we never record (#115).
  */
 export const MIN_TRIGGER_GAP = 0.001 // seconds
+export const LATE_MARGIN = 0.02 // seconds: inaudible on a note that is already late
 
-// Keyed by synth object: disposed synths drop out on their own, and a freshly
-// created synth starts with no history.
+// Weak, so a disposed synth's history goes with it.
 const lastStart = new WeakMap<object, number>()
 
 export function nextTriggerTime(node: object, time: number, currentTime: number): number {
   const prev = lastStart.get(node)
-  let t = time > currentTime ? time : currentTime
+  const earliest = currentTime + LATE_MARGIN
+  let t = time > earliest ? time : earliest
   if (prev !== undefined && t < prev + MIN_TRIGGER_GAP) t = prev + MIN_TRIGGER_GAP
   lastStart.set(node, t)
   return t

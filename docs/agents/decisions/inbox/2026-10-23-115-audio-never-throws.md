@@ -1,0 +1,5 @@
+## 2026-10-23 — Audio never throws to the page (Builder, #115)
+
+**Context:** Tone.js asserts that a source's start is strictly after its previous one. `nextTriggerTime` (#63) assumed the audio clock is frozen within a JS turn; it is not (`currentTime` ticks every ~3 ms mid-task), so a late music note that Tone clamped to the live clock could be followed by one landing exactly on it, and the throw escaped from Tone's clock callback as a page error (#114).
+**Decision:** `nextTriggerTime` pushes late times `LATE_MARGIN` (20 ms) past `currentTime`, so Tone never clamps a start we scheduled. Every SFX play function and music loop callback also wraps its Tone calls in `try/catch` into `soundGuard.ts`: one sound is dropped and counted, nothing reaches the page. The smoke's `audioBurst` fails on any drop.
+**Consequences:** Route every new trigger through `nextTriggerTime` and every new play function / loop callback through `dropSound`. Don't remove the margin: the guard alone would hide the bug as silent drops.

@@ -1,5 +1,6 @@
 import * as Tone from 'tone'
 import { nextTriggerTime } from './triggerTime'
+import { dropSound } from './soundGuard'
 import { sfxChannel, isAudioReady } from './AudioEngine'
 import {
   FIRE_VARIANTS,
@@ -141,15 +142,19 @@ let fireVariant = 0
 
 /** One shot. `auto` = held-trigger auto-fire, played 6 dB quieter to avoid fatigue. */
 export function playFireSound(auto = false): void {
-  const k = ensureKit()
-  if (!k) return
-  const v = FIRE_VARIANTS[fireVariant]
-  fireVariant = (fireVariant + 1) % FIRE_VARIANTS.length
-  const jitter = 0.94 + Math.random() * 0.12
-  const now = nextTriggerTime(k.fire, Tone.now(), Tone.getContext().currentTime)
-  k.fire.triggerAttack(v.startHz * jitter, now, fireVelocity(auto))
-  k.fire.frequency.exponentialRampTo(v.endHz * jitter, v.sweepS, now)
-  k.fire.triggerRelease(now + v.sweepS + 0.02)
+  try {
+    const k = ensureKit()
+    if (!k) return
+    const v = FIRE_VARIANTS[fireVariant]
+    fireVariant = (fireVariant + 1) % FIRE_VARIANTS.length
+    const jitter = 0.94 + Math.random() * 0.12
+    const now = nextTriggerTime(k.fire, Tone.now(), Tone.getContext().currentTime)
+    k.fire.triggerAttack(v.startHz * jitter, now, fireVelocity(auto))
+    k.fire.frequency.exponentialRampTo(v.endHz * jitter, v.sweepS, now)
+    k.fire.triggerRelease(now + v.sweepS + 0.02)
+  } catch (e) {
+    dropSound('fire', e)
+  }
 }
 
 let lastTickTime = 0
@@ -162,10 +167,14 @@ export function playHitTick(): void {
   if (nowMs - lastTickTime < HIT_TICK_MIN_INTERVAL) return
   lastTickTime = nowMs
 
-  const toneNow = Tone.now()
-  const ctxNow = Tone.getContext().currentTime
-  k.tickNoise.triggerAttackRelease(0.015, nextTriggerTime(k.tickNoise, toneNow, ctxNow))
-  k.tickBlip.triggerAttackRelease(3200 + Math.random() * 700, 0.02, nextTriggerTime(k.tickBlip, toneNow, ctxNow))
+  try {
+    const toneNow = Tone.now()
+    const ctxNow = Tone.getContext().currentTime
+    k.tickNoise.triggerAttackRelease(0.015, nextTriggerTime(k.tickNoise, toneNow, ctxNow))
+    k.tickBlip.triggerAttackRelease(3200 + Math.random() * 700, 0.02, nextTriggerTime(k.tickBlip, toneNow, ctxNow))
+  } catch (e) {
+    dropSound('hit tick', e)
+  }
 }
 
 let lastExplosionTime = 0
@@ -181,24 +190,28 @@ export function playExplosionSound(comboCount: number = 0): void {
   if (nowMs - lastExplosionTime < EXPLOSION_SOUND_MIN_INTERVAL) return
   lastExplosionTime = nowMs
 
-  const toneNow = Tone.now()
-  const ctxNow = Tone.getContext().currentTime
-  k.popSnap.triggerAttackRelease(0.05 + Math.random() * 0.02, nextTriggerTime(k.popSnap, toneNow, ctxNow))
+  try {
+    const toneNow = Tone.now()
+    const ctxNow = Tone.getContext().currentTime
+    k.popSnap.triggerAttackRelease(0.05 + Math.random() * 0.02, nextTriggerTime(k.popSnap, toneNow, ctxNow))
 
-  const combo = Math.min(comboCount, 10)
-  const pingFreq = 1400 + combo * 80 + Math.random() * 300
-  k.popPing.triggerAttackRelease(pingFreq, 0.04, nextTriggerTime(k.popPing, toneNow, ctxNow))
+    const combo = Math.min(comboCount, 10)
+    const pingFreq = 1400 + combo * 80 + Math.random() * 300
+    k.popPing.triggerAttackRelease(pingFreq, 0.04, nextTriggerTime(k.popPing, toneNow, ctxNow))
 
-  const layers = killLayers(comboCount)
-  if (layers.thump) {
-    k.thump.triggerAttackRelease(48 + combo * 2, 0.2, nextTriggerTime(k.thump, toneNow, ctxNow))
-  }
-  if (layers.ring) {
-    k.ring.triggerAttackRelease(900 + combo * 30 + Math.random() * 80, 0.25, nextTriggerTime(k.ring, toneNow, ctxNow))
-  }
-  if (layers.swell && nowMs - lastSwellTime >= SWELL_MIN_INTERVAL) {
-    lastSwellTime = nowMs
-    k.swell.triggerAttackRelease(SWELL_S, nextTriggerTime(k.swell, toneNow, ctxNow))
+    const layers = killLayers(comboCount)
+    if (layers.thump) {
+      k.thump.triggerAttackRelease(48 + combo * 2, 0.2, nextTriggerTime(k.thump, toneNow, ctxNow))
+    }
+    if (layers.ring) {
+      k.ring.triggerAttackRelease(900 + combo * 30 + Math.random() * 80, 0.25, nextTriggerTime(k.ring, toneNow, ctxNow))
+    }
+    if (layers.swell && nowMs - lastSwellTime >= SWELL_MIN_INTERVAL) {
+      lastSwellTime = nowMs
+      k.swell.triggerAttackRelease(SWELL_S, nextTriggerTime(k.swell, toneNow, ctxNow))
+    }
+  } catch (e) {
+    dropSound('kill', e)
   }
 }
 
@@ -206,18 +219,22 @@ export function playWaveStinger(): void {
   const k = ensureKit()
   if (!k) return
   const d = STINGERS[kitBiome]
-  const toneNow = Tone.now()
-  const ctxNow = Tone.getContext().currentTime
-  for (let c = 0; c < 2; c++) {
-    const chord = d.chords[c]
-    const t = toneNow + c * STINGER_CHORD_GAP_S
-    const dur = c === 0 ? STINGER_CHORD_GAP_S * 0.85 : 0.45
-    const velocity = c === 0 ? 0.75 : 1
-    for (let i = 0; i < chord.length; i++) {
-      const voice = k.stinger[i]
-      voice.triggerAttackRelease(chord[i], dur, nextTriggerTime(voice, t, ctxNow), velocity)
+  try {
+    const toneNow = Tone.now()
+    const ctxNow = Tone.getContext().currentTime
+    for (let c = 0; c < 2; c++) {
+      const chord = d.chords[c]
+      const t = toneNow + c * STINGER_CHORD_GAP_S
+      const dur = c === 0 ? STINGER_CHORD_GAP_S * 0.85 : 0.45
+      const velocity = c === 0 ? 0.75 : 1
+      for (let i = 0; i < chord.length; i++) {
+        const voice = k.stinger[i]
+        voice.triggerAttackRelease(chord[i], dur, nextTriggerTime(voice, t, ctxNow), velocity)
+      }
+      if (d.drum) k.thump.triggerAttackRelease(d.drum[c], 0.3, nextTriggerTime(k.thump, t, ctxNow), velocity)
     }
-    if (d.drum) k.thump.triggerAttackRelease(d.drum[c], 0.3, nextTriggerTime(k.thump, t, ctxNow), velocity)
+  } catch (e) {
+    dropSound('wave stinger', e)
   }
 }
 
@@ -240,15 +257,23 @@ export function startWindWhoosh(): void {
 
   windNoise = new Tone.Noise('white')
   windNoise.connect(windFilter)
-  windNoise.start()
+  try {
+    windNoise.start()
+  } catch (e) {
+    dropSound('wind', e)
+  }
 }
 
 /** Update wind intensity based on velocity (0-1 normalized) */
 export function updateWindWhoosh(velocityNormalized: number): void {
   if (!windFilter || !windGain) return
-  const freq = 200 + velocityNormalized * 1800
-  windFilter.frequency.rampTo(freq, 0.1)
-  windGain.gain.rampTo(velocityNormalized * 0.12, 0.1)
+  try {
+    const freq = 200 + velocityNormalized * 1800
+    windFilter.frequency.rampTo(freq, 0.1)
+    windGain.gain.rampTo(velocityNormalized * 0.12, 0.1)
+  } catch (e) {
+    dropSound('wind', e)
+  }
 }
 
 export function stopWindWhoosh(): void {
