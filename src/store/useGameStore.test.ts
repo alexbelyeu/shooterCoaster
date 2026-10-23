@@ -109,6 +109,34 @@ describe('addScore', () => {
   })
 })
 
+describe('startRun', () => {
+  it('resets the run, sets the level and the given seed, and enters playing', () => {
+    store().addScore(50)
+    store().registerShot()
+    store().registerKill()
+    store().startRun('level2', 42)
+    expect(store()).toMatchObject({ phase: 'playing', currentLevel: 'level2', runSeed: 42, score: 0, kills: 0, shotsFired: 0 })
+    expect(store().combo).toEqual({ count: 0, multiplier: 1, lastKillTime: 0 })
+  })
+
+  it('uses ?seed= from the URL when no seed is given', () => {
+    const w = globalThis.window as unknown as { location?: { search: string } }
+    w.location = { search: '?seed=777' }
+    try {
+      store().startRun('level1')
+      expect(store().runSeed).toBe(777)
+    } finally {
+      delete w.location
+    }
+  })
+
+  it('otherwise picks a fresh seed per run', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    store().startRun('level1')
+    expect(store().runSeed).toBe(1_000)
+  })
+})
+
 describe('saveScore', () => {
   it('keeps the best score per level', () => {
     store().saveScore(entry('level1', 500, 1))

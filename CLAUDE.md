@@ -58,16 +58,19 @@ HUD is inside the viewport with no overlap in both orientations, and taps Pause 
 `mobile-level1-landscape.png`; `--skip-desktop` runs only that). **Look at the screenshots** with the Read tool — that is how you
 playtest visually. Waits are polled against the frame counter because software
 rendering can run at ~1 fps; tune with `--seconds`, `--combat-seconds`,
-`--min-frames`, `--levels level1,level3`, `--shot-timeout <ms>` (default 120 s).
+`--min-frames`, `--levels level1,level3`, `--shot-timeout <ms>` (default 120 s),
+`--seed <n>` (default 1337). Every smoke run pins that run seed, so enemy spawns are the
+same each time; a `seed-check` step reloads the first level and requires the same
+`spawnDigest()` for the same seed and a different one for another seed.
 `drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
 spawned enemies) and vary run to run; for before/after comparisons use the
 camera-independent `scene` totals the smoke also prints (`track objs/tris` = objects
 named `track*`).
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
-(`levels()`, `startLevel(id)`, `frames`, `drawCalls`, `triangles`, `avgFrameMs`,
+(`levels()`, `startLevel(id, seed?)`, `spawnDigest()` → hash of the run's spawn positions, `frames`, `drawCalls`, `triangles`, `avgFrameMs`,
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/timeRemaining/phase/liveEnemies/
-onScreenEnemies/shotsFired, `autoFire(on)`, `killNearest(n)` (fires one real shot,
+onScreenEnemies/shotsFired/runSeed, `autoFire(on)`, `killNearest(n)` (fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
 `endLevel()`, `setTimeScale(s)`, `rideTo` (set a track fraction 0–1 to jump the coaster there), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
@@ -102,12 +105,13 @@ smoke tests send nothing.
 | `src/levels/scoring.ts` | `SCORE_VALUES` per enemy, `computeMaxScore`, `computeStars` (pure, unit-tested) |
 | `src/levels/environments/` | `BiomeEnvironment` (thin host) + `biomeRegistry.ts`; per-biome modules in `biomes/<biome>/` (`config.ts` colour ramp + trees, `Decorations.tsx`, `Features.tsx`, `index.ts`); shared terrain/water/trees/atmosphere/scatter helpers in `shared/` (incl. `trackClearance.ts` to keep props off the track and its towers, `paintedParts.ts` to merge multi-coloured props into one draw call, `ringedRock.ts` for stacked-ring rock formations like sea stacks and mesas, `ParticleField.tsx` for ambient air particles from a per-biome preset, e.g. volcanic ash/embers); a biome may supply its own `createTerrainMaterial` (desert sand ripples); biome components get `heightFn`, `groundFn` (terrain as drawn) and the track's arc table; landmarks (FerrisWheel, Pyramid, Volcano…); per-biome sky/light/fog/exposure in `atmosphere.ts` + `SkyDome.tsx` |
 | `src/track/` | Procedural track curves, track mesh (rails + ties), lattice support towers, `trackDimensions` (structure scale per level), coaster camera, progress |
-| `src/entities/enemies/` | Enemy models/behaviours; `entities/spawning/EnemySpawner` waves |
+| `src/entities/enemies/` | Enemy models/behaviours; `entities/spawning/EnemySpawner` waves (spawn positions seeded by the store's `runSeed`) |
+| `src/utils/rng.ts` | The one seeded PRNG (`createRng(seed)` → callable + `range`/`pick`, `hashString`, `seedFromQuery`). Layout/scatter code takes an rng with a fixed seed, never `Math.random` (keep that for per-frame cosmetic jitter) |
 | `src/input/` | `pointerInput` — the single Pointer Events source (mouse/touch/pen) for aim + fire |
 | `src/combat/` | Aim, collisions, projectiles, weapons, crosshair; `WeaponViewModel` (first-person gun, recoil, muzzle flash, tracer; placement + aim in `weaponLayout.ts`, geometry in `weaponModel.ts`); `screenShake.ts` (rotation-only camera trauma for kills and world events via the `camera:trauma` bus event, Off/Reduced/Full setting) |
 | `src/effects/` | Explosions (pooled), score popups |
 | `src/audio/` | Tone.js engine, music + SFX managers |
-| `src/store/` | zustand stores: game, player, settings (persisted) |
+| `src/store/` | zustand stores: game, player, settings (persisted). Start or restart a level only through `startRun(levelId, seed?)` (resets the run, sets `runSeed`: seed > `?seed=` > `Date.now()`) |
 | `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter, wave banner) + screens; `theme.ts` per-biome UI accents |
 | `src/testing/` | e2e hook |
 | `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser, `pause-check.sh`, `studio-status.cjs` |

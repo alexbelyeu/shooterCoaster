@@ -16,6 +16,9 @@
  * camera aspect doesn't match the canvas, or the results screen never appears.
  * Saves screenshots + stats to e2e-results/.
  *
+ * Spawns use a fixed --seed (default 1337); the seed check reloads the first level
+ * and requires the same spawnDigest() for that seed and a different one for another.
+ *
  * All waits are deadline-polled on the hook's frame counter, because software
  * rendering in CI / cloud sessions can run at ~1 fps.
  *
@@ -58,6 +61,8 @@ const MIN_FRAMES = Number(args['min-frames'] ?? 10)
 const SHOT_TIMEOUT = Number(args['shot-timeout'] ?? 120000)
 const COMBAT_SECONDS = Number(args['combat-seconds'] ?? 4)
 const COMBAT_MIN_FRAMES = Number(args['combat-min-frames'] ?? 4)
+// Fixed run seed (enemy spawns) so screenshots are comparable run to run.
+const SEED = Number(args.seed ?? 1337)
 let preview // module scope so the top-level catch can kill it
 fs.mkdirSync(OUT, { recursive: true })
 
@@ -540,6 +545,38 @@ async function offsetTapKills(page, label) {
 }
 
 /** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
+/** The hook's spawnDigest() once it is set and differs from `prev` (null on timeout). */
+async function nextSpawnDigest(page, prev) {
+  return page
+    .waitForFunction((p) => {
+      const d = window.__SC_TEST__.spawnDigest()
+      return d !== null && d !== p ? d : null
+    }, prev, { timeout: 60000, polling: 250 })
+    .then((h) => h.jsonValue())
+    .catch(() => null)
+}
+
+/** Restart `level.id` on a fresh page with SEED, SEED + 1, then SEED again. */
+async function seedCheck(page, level) {
+  const start = (seed) => page.evaluate(([lid, s]) => window.__SC_TEST__.startLevel(lid, s), [level.id, seed])
+  await start(SEED)
+  const reloaded = await nextSpawnDigest(page, null)
+  await start(SEED + 1)
+  const other = await nextSpawnDigest(page, reloaded)
+  await start(SEED)
+  const again = await nextSpawnDigest(page, other)
+  const problems = []
+  if (reloaded !== level.spawnDigest) problems.push(`seed ${SEED} spawned differently after a reload (${reloaded} vs ${level.spawnDigest})`)
+  if (!other) problems.push(`seed ${SEED + 1} gave the same spawns as seed ${SEED}`)
+  if (again !== level.spawnDigest) problems.push(`restarting with seed ${SEED} gave ${again}, not ${level.spawnDigest}`)
+  return {
+    id: 'seed-check',
+    ok: problems.length === 0,
+    problems,
+    seedCheck: { level: level.id, digest: level.spawnDigest, reloaded, other, again },
+  }
+}
+
 async function runMobile(browser, base) {
   const started = Date.now()
   const { defaultBrowserType: _unused, ...iphone } = devices['iPhone 13']
@@ -556,7 +593,8 @@ async function runMobile(browser, base) {
   const phase = () => page.evaluate(() => window.__SC_TEST__.phase())
   const waitPhase = (p, timeout) =>
     page.waitForFunction((want) => window.__SC_TEST__.phase() === want, p, { timeout }).catch(() => {})
-  await page.goto(`${base}/?e2e=1`, { waitUntil: 'load' })
+  // ?seed= pins the run seed for real taps on the level card (the URL override path).
+  await page.goto(`${base}/?e2e=1&seed=${SEED}`, { waitUntil: 'load' })
   await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
 
   // Title -> PLAY (tap)
@@ -572,6 +610,8 @@ async function runMobile(browser, base) {
   await page.locator(card).tap({ timeout: 30000 }).catch((e) => problems.push(`tap level: ${e.message}`))
   await waitPhase('playing', 15000)
   if ((await phase()) !== 'playing') problems.push('tapping the level card did not start the level')
+  const runSeed = await page.evaluate(() => window.__SC_TEST__.stats().runSeed)
+  if (runSeed !== SEED) problems.push(`?seed=${SEED} did not set the run seed (got ${runSeed})`)
 
   // Countdown (3 s) -> HUD; then wait for enemies on screen.
   if (!(await waitVisible(page, '.hud-pause-button', 40000))) problems.push('HUD never appeared')
@@ -736,7 +776,7 @@ async function run() {
   for (const id of wanted) {
     const { ctx, page, errors } = await newPage()
     const started = Date.now()
-    await page.evaluate((lid) => window.__SC_TEST__.startLevel(lid), id)
+    await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [id, SEED])
     const a = await page.evaluate(() => window.__SC_TEST__.frames)
     await page.waitForTimeout(SECONDS * 1000)
     const stats = await page.evaluate(() => {
@@ -748,6 +788,8 @@ async function run() {
     const enemyShot = await captureEnemyCloseup(page, id)
     const frames = stats.frames - a
     const problems = []
+    const spawnDigest = await nextSpawnDigest(page, null)
+    if (!spawnDigest) problems.push('spawnDigest() never reported the spawns')
 
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${SECONDS}s)`)
     if (img.stddev < 4 || img.distinctColors < 8) problems.push('frame looks blank')
@@ -764,13 +806,24 @@ async function run() {
     failed ||= !ok
     delete stats.hookErrors
     results.push({
-      id, ok, problems, frames, seconds: (Date.now() - started) / 1000, ...stats,
+      id, ok, problems, frames, seconds: (Date.now() - started) / 1000, spawnDigest, ...stats,
       kills: play.kills, score: play.score, combat: play.combat, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
   }
 
-  // 3. Optional touch playtest on a phone viewport
+  // 3. Seeded spawns: a fresh page + the same seed gives the same enemies; another seed doesn't
+  const firstLevel = results.find((r) => r.id === wanted[0])
+  if (firstLevel?.spawnDigest) {
+    const s = await newPage()
+    const r = await seedCheck(s.page, firstLevel)
+    r.errors = s.errors
+    failed ||= !r.ok
+    results.push(r)
+    await s.ctx.close()
+  }
+
+  // 4. Optional touch playtest on a phone viewport
   if (args.mobile) {
     const m = await runMobile(browser, base)
     failed ||= !m.ok
@@ -787,6 +840,8 @@ async function run() {
       : ''
     const extra = r.id === 'title'
       ? ''
+      : r.seedCheck
+        ? ` ${r.seedCheck.level} seed ${SEED}: ${r.seedCheck.digest} (reload ${r.seedCheck.reloaded}, again ${r.seedCheck.again}) seed ${SEED + 1}: ${r.seedCheck.other}`
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
