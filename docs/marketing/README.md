@@ -19,6 +19,13 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   Completion rate per level = `level_complete` / `level_start`. There is no share button
   in the game yet, so there is no `share` event. Pausing and resuming send nothing; closing
   the tab mid-run sends no `level_quit` (starts minus completes minus quits ≈ abandons).
+- **Ignore bounce rate.** The game is one page: title, levels and results never load a new
+  page, so Vercel counts nearly every visit as a "bounce" however long it plays (81% on
+  2026-10-23 meant nothing). Engagement = `level_start` / visitors and the completion rate
+  above.
+- **If the Vercel connector answers "Web Analytics not found"** while the dashboard shows
+  data, the connector can't see the "Belyeu's projects" team: say so in the metrics file and
+  the report (no invented numbers) and ask Alex to reconnect it with that team granted.
 - **Spend:** the cap is `ad_budget_usd_per_month` in `docs/agents/STEERING.md`. Agents never
   spend, post or create accounts: the Marketer drafts, Alex approves and places, until an ad
   platform is connected and STEERING.md says the Marketer may run campaigns within the cap.
