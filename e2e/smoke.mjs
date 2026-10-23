@@ -20,6 +20,8 @@
  *
  * Spawns use a fixed --seed (default 1337); the seed check reloads the first level
  * and requires the same spawnDigest() for that seed and a different one for another.
+ * The hidden-pause check fakes a tab hide on the first level: it must pause, drop a
+ * held trigger, keep the timer still, wait for Resume, then neither reset nor jump it.
  *
  * All waits are deadline-polled on the hook's frame counter, because software
  * rendering in CI / cloud sessions can run at ~1 fps.
@@ -594,6 +596,74 @@ async function seedCheck(page, level) {
   }
 }
 
+/** Fake a tab hide / show: headless Chromium can't hide a page on demand. */
+const setHidden = (page, hidden) => page.evaluate((h) => {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (h ? 'hidden' : 'visible') })
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => h })
+  document.dispatchEvent(new Event('visibilitychange'))
+}, hidden)
+
+/** Leaving the tab pauses the run and drops the trigger; nothing drains or resets the timer (#118). */
+async function hiddenPauseCheck(page, levelId) {
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+  await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
+  const vp = page.viewportSize()
+  await page.mouse.move(vp.width / 2, vp.height / 2)
+  await page.mouse.down()
+  const heldBefore = await page.evaluate(() => window.__SC_TEST__.triggerHeld())
+  const before = await getStats(page)
+  await setHidden(page, true)
+  const heldAfter = await page.evaluate(() => window.__SC_TEST__.triggerHeld())
+  await page.mouse.up()
+  const hiddenPhase = await page.evaluate(() => window.__SC_TEST__.phase())
+  await waitFrames(page, 3, { minMs: 5000, maxMs: 30000 })
+  const whileHidden = await getStats(page)
+  await setHidden(page, false)
+  await waitFrames(page, 2, { maxMs: 10000 })
+  const shownPhase = await page.evaluate(() => window.__SC_TEST__.phase())
+  const resumedAt = Date.now()
+  const resumeClicked = await page
+    .getByRole('button', { name: 'Resume' })
+    .click({ timeout: 30000 })
+    .then(() => true, () => false)
+  await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
+  const resumed = await getStats(page)
+  const resumedSeconds = (Date.now() - resumedAt) / 1000
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')))
+  const blurPhase = await page.evaluate(() => window.__SC_TEST__.phase())
+
+  const problems = []
+  if (before.phase !== 'playing') problems.push(`level not playing before hiding ("${before.phase}")`)
+  if (!heldBefore) problems.push('mouse down did not hold the trigger')
+  if (heldAfter) problems.push('trigger still held after the tab was hidden')
+  if (hiddenPhase !== 'paused') problems.push(`hiding the tab left the phase "${hiddenPhase}", not paused`)
+  if (whileHidden.timeRemaining !== before.timeRemaining)
+    problems.push(`timer moved while hidden (${before.timeRemaining.toFixed(2)} -> ${whileHidden.timeRemaining.toFixed(2)})`)
+  if (shownPhase !== 'paused') problems.push(`showing the tab again auto-resumed (phase "${shownPhase}")`)
+  if (!resumeClicked) problems.push('Resume button not clickable')
+  if (resumed.phase !== 'playing') problems.push(`Resume left the phase "${resumed.phase}"`)
+  if (resumed.timeRemaining > before.timeRemaining)
+    problems.push(`timer reset on resume (${before.timeRemaining.toFixed(2)} -> ${resumed.timeRemaining.toFixed(2)})`)
+  // timeRemaining is only stored on whole-second crossings, hence the 1 s slack.
+  if (resumed.timeRemaining < before.timeRemaining - resumedSeconds - 1)
+    problems.push(`timer jumped by the paused time (${before.timeRemaining.toFixed(2)} -> ${resumed.timeRemaining.toFixed(2)} after ${resumedSeconds.toFixed(1)} s of play)`)
+  if (blurPhase !== 'paused') problems.push(`window blur left the phase "${blurPhase}", not paused`)
+  return {
+    id: 'hidden-pause',
+    ok: problems.length === 0,
+    problems,
+    hiddenPause: {
+      level: levelId,
+      before: before.timeRemaining,
+      whileHidden: whileHidden.timeRemaining,
+      resumed: resumed.timeRemaining,
+      resumedSeconds,
+      heldBefore,
+      heldAfter,
+    },
+  }
+}
+
 /** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
 async function runMobile(browser, base) {
   const started = Date.now()
@@ -864,7 +934,19 @@ async function run() {
     await s.ctx.close()
   }
 
-  // 4. Optional touch playtest on a phone viewport
+  // 4. Leaving the tab pauses the run and never drains the timer
+  if (wanted.length) {
+    const h = await newPage()
+    const r = await hiddenPauseCheck(h.page, wanted[0])
+    r.errors = [...h.errors, ...(await h.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await h.ctx.close()
+  }
+
+  // 5. Optional touch playtest on a phone viewport
   if (args.mobile) {
     const m = await runMobile(browser, base)
     failed ||= !m.ok
@@ -883,6 +965,9 @@ async function run() {
       ? ''
       : r.seedCheck
         ? ` ${r.seedCheck.level} seed ${SEED}: ${r.seedCheck.digest} (reload ${r.seedCheck.reloaded}, again ${r.seedCheck.again}) seed ${SEED + 1}: ${r.seedCheck.other}`
+      : r.hiddenPause
+        ? ` ${r.hiddenPause.level} timer ${r.hiddenPause.before.toFixed(1)} -> after 5s hidden ${r.hiddenPause.whileHidden.toFixed(1)}` +
+          ` -> ${r.hiddenPause.resumed.toFixed(1)} after ${r.hiddenPause.resumedSeconds.toFixed(0)}s resumed, trigger held ${r.hiddenPause.heldBefore}->${r.hiddenPause.heldAfter}`
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
