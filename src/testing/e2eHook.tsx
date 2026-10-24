@@ -130,6 +130,10 @@ export interface E2EView {
   canvasAspect: number
   canvasWidth: number
   canvasHeight: number
+  /** Drawing-buffer size in device pixels and the renderer's pixel ratio. */
+  bufferWidth: number
+  bufferHeight: number
+  dpr: number
   /** Vertical and horizontal field of view in degrees. */
   fov: number | null
   hFov: number | null
@@ -421,6 +425,7 @@ function readAudio(): E2EAudio {
 
 /** Canvas element captured by <E2EFrameProbe> for view(). */
 let probeCanvas: HTMLCanvasElement | null = null
+let probeDpr = 1
 
 function readView(): E2EView | null {
   const cam = probeCamera
@@ -436,6 +441,9 @@ function readView(): E2EView | null {
     canvasAspect: r.height > 0 ? r.width / r.height : 0,
     canvasWidth: r.width,
     canvasHeight: r.height,
+    bufferWidth: canvas.width,
+    bufferHeight: canvas.height,
+    dpr: probeDpr,
     fov: persp ? persp.fov : null,
     hFov,
   }
@@ -455,6 +463,7 @@ export function E2EFrameProbe() {
     probeCamera = state.camera
     probeSize = state.size
     probeCanvas = state.gl.domElement
+    probeDpr = state.viewport.dpr
     if (autoFireEnabled) autoFireTick(state.camera)
     // Post-processing renders several passes per frame, and three.js resets
     // gl.info on every render() call by default. Accumulate manually instead:

@@ -997,7 +997,8 @@ function audioSummary(a) {
 function viewSummary(views) {
   if (!views) return ''
   const f = (v) => (v ? `${v.cameraAspect?.toFixed(2)}/${v.canvasAspect.toFixed(2)} fov ${v.fov?.toFixed(0)}x${v.hFov?.toFixed(0)}` : '-')
-  return ` aspect cam/canvas portrait=${f(views.portrait)} landscape=${f(views.landscape)} back=${f(views.portraitAgain)}`
+  const b = (v) => (v ? `${v.bufferWidth}x${v.bufferHeight}@${v.dpr?.toFixed(2)}` : '-')
+  return ` buffer portrait=${b(views.portrait)} landscape=${b(views.landscape)} aspect cam/canvas portrait=${f(views.portrait)} landscape=${f(views.landscape)} back=${f(views.portraitAgain)}`
 }
 
 /** Camera-independent totals: whole scene, and objects whose name starts with "track". */
