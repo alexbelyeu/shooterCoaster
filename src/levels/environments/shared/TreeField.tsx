@@ -1,11 +1,13 @@
 import { useMemo, useRef, useCallback, useEffect } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getTerrainSlope, type HeightFunction } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
 import { hslToRgb } from './scatter'
 import type { BiomeTreeConfig, TreeTypeConfig } from './types'
+import { bakeCrownShade, CANOPY_PART, treeWindTime, TRUNK_PART, withTreeWind } from './treeWind'
 
-/** Trees placed on terrain with slope rejection and biome variety; `seed` fixes the layout. */
+/** Trees placed on terrain with slope rejection and biome variety, swaying in the wind; `seed` fixes the layout. */
 export default function TreeField({
   count,
   config,
@@ -36,7 +38,6 @@ export default function TreeField({
       const x = Math.cos(theta) * r
       const z = Math.sin(theta) * r
 
-      // Slope rejection
       const slope = getTerrainSlope(heightFn, x, z)
       if (slope > maxSlopeAngle) continue
 
@@ -58,7 +59,6 @@ export default function TreeField({
     return arr
   }, [actualCount, config, heightFn, treeTypes, seed])
 
-  // Group trees by type for instancing
   const groupedTrees = useMemo(() => {
     const groups: Map<number, typeof trees> = new Map()
     for (const tree of trees) {
@@ -67,6 +67,10 @@ export default function TreeField({
     }
     return groups
   }, [trees])
+
+  useFrame(({ clock }) => {
+    treeWindTime.value = clock.elapsedTime
+  })
 
   if (trees.length === 0) return null
 
@@ -91,14 +95,18 @@ function TreeTypeInstances({
   treeType: TreeTypeConfig
 }) {
   const trunkGeo = useMemo(() => new THREE.CylinderGeometry(2, 4, 1, 6), [])
-  const canopyGeo = useMemo(() => treeType.canopyGeoFactory(), [treeType])
+  const canopyGeo = useMemo(() => {
+    const geo = treeType.canopyGeoFactory()
+    bakeCrownShade(geo)
+    return geo
+  }, [treeType])
 
   const trunkMat = useMemo(
-    () => new THREE.MeshPhongMaterial({ color: treeType.trunkColor, flatShading: true }),
+    () => withTreeWind(new THREE.MeshPhongMaterial({ color: treeType.trunkColor, flatShading: true }), TRUNK_PART),
     [treeType],
   )
   const canopyMat = useMemo(
-    () => new THREE.MeshPhongMaterial({ flatShading: true, vertexColors: true }),
+    () => withTreeWind(new THREE.MeshPhongMaterial({ flatShading: true, vertexColors: true }), CANOPY_PART),
     [],
   )
 
@@ -120,8 +128,8 @@ function TreeTypeInstances({
       if (!mesh) return
       for (let i = 0; i < trees.length; i++) {
         const t = trees[i]
-        _mat.makeTranslation(t.x, t.y + t.height * 0.3, t.z)
-        _scale.set(1, t.height * 0.6, 1)
+        _mat.makeTranslation(t.x, t.y + t.height * TRUNK_PART.base, t.z)
+        _scale.set(1, t.height * TRUNK_PART.span, 1)
         _mat.scale(_scale)
         mesh.setMatrixAt(i, _mat)
       }
@@ -136,8 +144,8 @@ function TreeTypeInstances({
       mesh.instanceColor = instanceColorAttr
       for (let i = 0; i < trees.length; i++) {
         const t = trees[i]
-        _mat.makeTranslation(t.x, t.y + t.height * 0.75, t.z)
-        _scale.set(t.height * 0.4, t.height * 0.5, t.height * 0.4)
+        _mat.makeTranslation(t.x, t.y + t.height * CANOPY_PART.base, t.z)
+        _scale.set(t.height * 0.4, t.height * CANOPY_PART.span, t.height * 0.4)
         _mat.scale(_scale)
         mesh.setMatrixAt(i, _mat)
       }
