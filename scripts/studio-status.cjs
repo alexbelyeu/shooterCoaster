@@ -13,6 +13,7 @@ const STATUS_LABEL = 'studio-status'
 const STATUS_TITLE = '📊 Studio status (live)'
 const SITE = 'https://scoaster.com'
 const REPO = 'alexbelyeu/shooterCoaster'
+const LEDGER_LABEL = 'token-ledger'
 
 // Keep in sync with the scheduled tasks (times are New York wall-clock).
 // days: 0 = Sunday … 6 = Saturday; omitted = every day.
@@ -108,6 +109,46 @@ function table(head, rows) {
   ].join('\n') + '\n'
 }
 
+// ---------- token ledger ----------
+// Comments appended by scripts/run-usage.cjs end with `<!-- ledger {json} -->`. Parsed
+// here rather than required from that script: the workflow checks out only this file.
+
+const fmtTokens = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(Math.round(n)))
+
+/** Pure: weighted tokens per role and the most expensive refs, from ledger comments since `since` (ms). */
+function ledgerSummary(comments, since) {
+  const bySession = new Map()
+  for (const c of comments) {
+    const m = /<!-- ledger (\{.*\}) -->/.exec(c.body || '')
+    if (!m) continue
+    let e
+    try {
+      e = JSON.parse(m[1])
+    } catch {
+      continue
+    }
+    if (!(Date.parse(e.at || c.created_at) >= since) || !(e.weighted > 0)) continue
+    bySession.set(e.session || c.id, e) // a session that posted twice counts once (its latest)
+  }
+  const roles = {}
+  const refs = {}
+  let total = 0
+  for (const e of bySession.values()) {
+    total += e.weighted
+    const r = (roles[e.role] ||= { runs: 0, weighted: 0 })
+    r.runs += 1
+    r.weighted += e.weighted
+    const nums = String(e.ref || '').match(/#\d+/g) || []
+    for (const n of nums) refs[n] = (refs[n] || 0) + e.weighted / nums.length // shared runs split evenly
+  }
+  return {
+    total,
+    runs: bySession.size,
+    roles: Object.entries(roles).map(([role, r]) => ({ role, ...r })).sort((a, b) => b.weighted - a.weighted),
+    top: Object.entries(refs).map(([ref, weighted]) => ({ ref, weighted })).sort((a, b) => b.weighted - a.weighted).slice(0, 5),
+  }
+}
+
 // ---------- data ----------
 
 async function collect(api, now) {
@@ -170,13 +211,32 @@ async function collect(api, now) {
     steeringPaused = false
   }
 
-  return { issues, prs, drafts, merged, building, ci, prodSmoke, steeringPaused }
+  let ledger = null
+  const ledgerIssue = issues.filter((i) => hasLabel(i, LEDGER_LABEL)).sort((a, b) => a.number - b.number)[0]
+  if (ledgerIssue) {
+    try {
+      const since = now - 7 * DAY
+      const comments = []
+      for (let page = 1; page <= 5; page++) {
+        const batch = await api('GET /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+          issue_number: ledgerIssue.number, since: new Date(since).toISOString(), per_page: 100, page,
+        })
+        comments.push(...batch)
+        if (batch.length < 100) break
+      }
+      ledger = { number: ledgerIssue.number, ...ledgerSummary(comments, since) }
+    } catch {
+      ledger = null
+    }
+  }
+
+  return { issues, prs, drafts, merged, building, ci, prodSmoke, steeringPaused, ledger }
 }
 
 // ---------- render ----------
 
 function render(data, now) {
-  const { issues, prs, drafts, merged, building, ci, prodSmoke, steeringPaused } = data
+  const { issues, prs, drafts, merged, building, ci, prodSmoke, steeringPaused, ledger } = data
   const pauses = issues.filter((i) => hasLabel(i, 'pause'))
   const inQa = prs.filter((p) => hasLabel(p, 'agent:needs-qa'))
     .sort((a, b) => prio(a) - prio(b) || Date.parse(a.created_at) - Date.parse(b.created_at))
@@ -260,6 +320,17 @@ function render(data, now) {
   out.push(`Live-site smoke test: ${smoke}. Open prod-broken issues: ${prodBroken.length ? prodBroken.map((i) => `#${i.number}`).join(', ') : 'none'}.`)
   out.push('')
 
+  if (ledger) {
+    out.push('### 🧮 Token use (last 7 days)')
+    if (!ledger.runs) out.push(`_No runs logged yet in #${ledger.number}._\n`)
+    else {
+      out.push(`~${fmtTokens(ledger.total)} weighted tokens over ${ledger.runs} runs (approximate; per-run log in #${ledger.number}).`)
+      out.push('')
+      out.push(table(['Role', 'Runs', 'Weighted'], ledger.roles.map((r) => [r.role, r.runs, fmtTokens(r.weighted)])))
+      if (ledger.top.length) out.push(`Most expensive: ${ledger.top.map((t) => `${t.ref} ~${fmtTokens(t.weighted)}`).join(' · ')}\n`)
+    }
+  }
+
   out.push('### ⏰ Schedule (New York time)')
   out.push(table(['Who', 'Next run', 'Usual', 'Does'], runs.map((r) => [r.who, when(r), usual(r), r.what])))
 
@@ -308,6 +379,7 @@ module.exports = async function run({ github, context, core }) {
 }
 
 module.exports.render = render
+module.exports.ledgerSummary = ledgerSummary
 module.exports.nextRun = nextRun
 module.exports.SCHEDULE = SCHEDULE
 

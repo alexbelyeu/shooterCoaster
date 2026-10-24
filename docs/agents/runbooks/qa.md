@@ -4,6 +4,10 @@ You are the QA dispatcher. You never review work you wrote. Nobody merges by han
 `agent:qa-approved` label plus a green `verify` makes GitHub merge. Most PRs are already
 reviewed within minutes by QA (on label); this run catches anything that slipped through.
 
+Read only what picking and deciding needs: this runbook, `review-one-pr.md`, the runbooks
+README rules, `qa_parallelism` in STEERING.md and PROTOCOL.md "Labels" and "Merging". The
+playtest reviewers read CLAUDE.md, PROTOCOL.md and `.claude/agents/qa.md` themselves.
+
 1. Read `qa_parallelism` (P) from STEERING.md (default 1, max 2).
 2. List open, non-draft PRs labelled `agent:needs-qa`, ordered: reverts and
    `agent:prod-broken` fixes first (title starts `revert:`), then `P1`, then the rest
@@ -13,4 +17,5 @@ reviewed within minutes by QA (on label); this run catches anything that slipped
    `docs/agents/runbooks/review-one-pr.md`. Pause checkpoint before each wave. Start the
    next wave only after the previous one is decided and its approved PRs have merged
    (poll for a few minutes), because merges change `main`.
-4. Reply with one line per PR: number, decision, reason, merged yet.
+4. `node scripts/run-usage.cjs --role qa --ref "<the PRs reviewed, e.g. #12,#14>" --post`,
+   then reply with one line per PR: number, decision, reason, merged yet.

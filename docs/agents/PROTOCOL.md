@@ -19,9 +19,12 @@ Each scheduled task's prompt is a short bootstrap that runs `scripts/pause-check
 and then follows its runbook in `docs/agents/runbooks/` (see the README there), so
 changing how a role works is an ordinary reviewed PR. Role definitions live in
 `.claude/agents/<role>.md`. Each scheduled task runs on its role's model. Director, Maintainer and Reporter sessions carry out their role
-directly. Builder and QA sessions are thin **dispatchers**: they pick the work, then
-spawn Opus subagents in parallel with `isolation: "worktree"` (so they never share a
-working tree), each told to follow `.claude/agents/builder.md` or `qa.md`.
+directly. The scheduled Builders and QA sessions are thin **dispatchers**: they pick the
+work, then spawn Opus subagents in parallel with `isolation: "worktree"` (so they never
+share a working tree), each told to follow `.claude/agents/builder.md` or `qa.md`. The
+on-label tasks handle one PR and carry out `builder.md` / `qa.md` themselves, so the
+bootstrap isn't paid twice. Every run ends by logging its token use to the
+`token-ledger` issue (`scripts/run-usage.cjs`).
 
 Throughput is tuned with the knobs in STEERING.md (`builder_parallelism`,
 `qa_parallelism`), not by changing schedules. Max plan budget: 15 scheduled runs per
@@ -69,6 +72,7 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 - Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`, `type:growth`.
 - `epic` — umbrella issue the Director breaks into `agent:ready` children. Never claimed by builders.
 - `studio-status` — the live status page issue (see above). Not work; never touch it.
+- `token-ledger` — the "🧮 Token ledger" issue: one comment per run from `scripts/run-usage.cjs` (runbooks README, "Token ledger"). Not work: agents only append comments; builders ignore it; nobody edits or closes it.
 - `marketing` + `needs-alex` — a draft post or campaign from the Marketer that only Alex can carry out (agents never post, spend or create accounts). Builders ignore these. `type:growth` — discoverability or growth work for builders, filed by the Marketer.
 - Add `agent:needs-qa` / `agent:changes-requested` **last, in a call of their own**, after any other labels. Each label added while one of those is present fires the on-label task again, so adding three labels at once starts three sessions. When swapping (e.g. `agent:needs-qa` → `agent:changes-requested`), remove the old label first, then add the new one in a separate call.
 
@@ -102,12 +106,16 @@ commits to an approved PR removes the label automatically.
 
 QA applies `agent:qa-approved` only when **all** hold:
 1. GitHub check `verify` is `success` (or still running) on the PR's head SHA (`gh api repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs`).
-2. QA re-ran `npm run verify` on the branch itself and looked at the screenshots, or, when the
+2. QA playtested the branch as `.claude/agents/qa.md` says (a green CI `verify` stands
+   for the full run; QA builds and smokes the levels the diff affects and looks at those
+   screenshots, or runs the full `npm run verify` when CI is red or missing), or, when the
    PR came back only to resolve a merge conflict after a passing full review, did the light
-   re-review in `.claude/agents/qa.md`.
+   re-review there.
 3. The acceptance criteria are met and CLAUDE.md hard rules are respected.
-4. It still works on top of current `main`: if the branch is behind, merge `origin/main`
-   into it **locally** and re-run `npm run verify` on the result. QA doesn't need to push — GitHub
+4. It still works on top of current `main`: if files changed on `main` since the branch
+   point overlap the PR's files (`git diff --name-only`, see `qa.md`), merge `origin/main`
+   into it **locally** and test the result; otherwise CI (which ran on the PR merged with
+   `main`) and the production smoke after the merge cover it. QA doesn't need to push — GitHub
    merges approved PRs that are behind `main` as long as there are no conflicts. Only a
    real conflict sends the PR back to its author (`agent:changes-requested`).
 
@@ -119,8 +127,8 @@ enforces this: an agent's attempt to approve its own PR is blocked. Open your PR
 **Event-driven review loop.** Two more scheduled tasks start on GitHub label events, not
 on a clock: **QA (on label)** runs whenever a PR on an `agent/*` branch gets
 `agent:needs-qa`, and **Fix (on label)** runs whenever one gets
-`agent:changes-requested`. Each handles only that one PR (one reviewer or one builder
-subagent) and stops. So a sent-back PR is fixed and re-reviewed within the hour, until
+`agent:changes-requested`. Each handles only that one PR (as its reviewer or its
+builder, in the same session) and stops. So a sent-back PR is fixed and re-reviewed within the hour, until
 it merges or QA closes it after 3 rounds. Every QA session comments
 `QA run <time> reviewing` before it starts, and every builder session comments
 `Builder run <time> is on it`. Any session seeing such a claim that is still *live* (under 2
@@ -129,10 +137,11 @@ claim from a finished round doesn't count. The scheduled Builders runs start new
 issues; the scheduled QA runs catch anything the events missed.
 
 **Independent code review.** Besides the playtest reviewer, every PR whose code diff is
-~300 lines or more gets two fresh-context reviewers in parallel: `pr-correctness` (bugs,
+~300 lines or more gets, on its first review, two fresh-context reviewers in parallel
+(a re-review after a fix runs them only when the fix itself is ~300 lines or more): `pr-correctness` (bugs,
 leaks, frame-rate and lifetime problems) and `pr-consistency` (right approach, reuse of
 existing systems, conventions), both reading one review bundle
-(`.claude/scripts/review-bundle.sh`). The QA dispatcher combines the three into one
+(`.claude/scripts/review-bundle.sh`). The QA session combines the three into one
 decision (`docs/agents/runbooks/review-one-pr.md`, `.claude/commands/wrap-pr.md`).
 Builders run `.claude/commands/deslop.md` over their files before shipping.
 
@@ -159,6 +168,10 @@ QA reviews reverts first — then reopen the original issue with what went wrong
 - Headless Chromium: `export SC_CHROME="$(scripts/ensure-browser.sh)"`. Rendering is software (SwiftShader), so **frame times are much slower than real hardware** — use them only for relative comparisons; draw calls and triangle counts are reliable.
 - GitHub through `gh api` (REST only). GraphQL, repository-settings writes, branch deletion and GitHub Actions API paths are blocked by the proxy. `gh pr create` may work; if not, use `gh api -X POST repos/alexbelyeu/shootercoaster/pulls`.
 - You cannot read CI logs through the API. Reproduce failures locally with `npm run verify`.
+- **Keep logs out of the conversation.** Redirect long output to a file and print only a
+  summary: `npm run verify > /tmp/verify.log 2>&1; grep -E '^(PASS|FAIL)|Tests |error' /tmp/verify.log; tail -n 40 /tmp/verify.log`.
+  Never dump full logs, `results.json` (query it with `node -e` / `jq`) or long diffs
+  into the conversation; every line you print is re-read on every later turn.
 - No image, model or audio generation tools. Visuals come from code: procedural geometry, shaders, instancing, post-processing. Audio comes from Tone.js synthesis.
 
 ## Commits

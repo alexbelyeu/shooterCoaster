@@ -7,4 +7,5 @@ this session (do not delegate the planning). If this is the first Director run
 (VISION.md still says "v0 seeded during setup"), write the full vision, roadmap and idea
 backlog, and make Week 1 a mix of visible player-facing wins and foundations.
 
-End with the summary that file asks for.
+Then `node scripts/run-usage.cjs --role director --ref "<your plan PR, else none>" --post`,
+and end with the summary that file asks for.

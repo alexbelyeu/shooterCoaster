@@ -18,6 +18,11 @@ Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, `docs/agents/VISION.md`,
 - On latest `main`: `npm ci`, `export SC_CHROME="$(scripts/ensure-browser.sh)"`,
   `npm run verify`. Keep `results.json` numbers (per-level draw calls, triangles,
   pass/fail) and the bundle size from `npm run check:bundle`.
+- Token ledger: the week's comments on the open `token-ledger` issue
+  (`gh api 'repos/alexbelyeu/shootercoaster/issues/<n>/comments?since=<start ISO>&per_page=100'`),
+  using the JSON in each `<!-- ledger {…} -->` marker; count a `session` once (its latest).
+  Sum `weighted` per `role` (and runs), and per merged PR: every run whose `ref` names the
+  PR or the issue it closes, split evenly when a run lists several refs.
 - Compare with last week's report for trends.
 
 ## Write
@@ -34,8 +39,11 @@ Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, `docs/agents/VISION.md`,
    open `needs-alex` marketing drafts waiting for Alex. Skip if the file doesn't exist.
 7. **Health** — PRs merged / sent back / reverted, CI pass rate if known, bundle size
    vs budget, per-level draw calls & triangles (table), open blockers.
-8. **Next up** — the top `agent:ready` issues and roadmap milestone in progress.
-9. **Steer me** — remind Alex he can edit `docs/agents/STEERING.md` or open an issue
+8. **Token use** — approximate weighted tokens: per role (runs, total) and per merged PR
+   (table, most expensive first). Flag the top 3 PRs and say why they cost what they
+   did (rounds sent back, size, long verify loops), plus the week-over-week trend.
+9. **Next up** — the top `agent:ready` issues and roadmap milestone in progress.
+10. **Steer me** — remind Alex he can edit `docs/agents/STEERING.md` or open an issue
    labelled `steering`, and that `pause: true` stops everything.
 
 Ship it as a docs-only PR (`agent/report-<YYYY>-W<ww>`) labelled `agent:needs-qa`.
@@ -55,6 +63,7 @@ Write the body for a phone screen:
 2. What's new for players (bullets, each linked to its PR)
 3. Players in one line (visitors, top source, week-over-week) and any `needs-alex` drafts
 4. Health in one line (PRs merged / sent back / reverted, bundle KB vs budget, smoke status)
+   and tokens in one line (week total, most expensive PR)
 5. Next up (top 3 issues)
 6. Link to the report PR — screenshots are in its "Files changed" tab; once QA merges it
    the full report lives at `docs/reports/<YYYY>-W<ww>.md`

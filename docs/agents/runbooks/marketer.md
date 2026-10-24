@@ -11,4 +11,5 @@ anything.
 
 Pause checkpoint before opening issues and before opening the PR.
 
-End with the summary the role file asks for.
+Then `node scripts/run-usage.cjs --role marketer --ref "<your PR, else none>" --post`, and
+end with the summary the role file asks for.

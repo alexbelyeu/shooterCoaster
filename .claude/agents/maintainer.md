@@ -16,9 +16,10 @@ Work through these in order; stop early only if something is on fire.
    `npm run verify` if needed), open a revert PR titled `revert: …`, verify, label it
    `agent:needs-qa` + `P1` (QA reviews reverts first; no self-approval), comment on the original issue/PR, and reopen the original issue with
    what went wrong. Close the prod-broken issue when fixed.
-2. **Main health**: on latest `origin/main` run `npm ci && npm run verify` (with
-   `SC_CHROME` set via `scripts/ensure-browser.sh`). If red, revert the culprit the
-   same way.
+2. **Main health**: read the `verify` check-run on the latest `origin/main` commit (CI
+   runs the full `verify` on every push to `main`). Only if it is red or missing, run
+   `npm ci && npm run verify` there (with `SC_CHROME` set via
+   `scripts/ensure-browser.sh`). If red, revert the culprit the same way.
 3. **Queue hygiene**:
    - Issues `agent:in-progress` for >20h with no open PR → back to `agent:ready` with a comment.
    - Open PRs labelled `agent:needs-qa` that conflict with `main` → merge `origin/main` into the branch, resolve, re-verify,

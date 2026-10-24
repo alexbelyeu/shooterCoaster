@@ -2,11 +2,11 @@
 
 Two fresh-context reviewers read the PR cold, in parallel: `pr-correctness` (does it
 work: bugs, leaks, frame-rate and lifetime problems) and `pr-consistency` (is it the
-right solution: reuse, architecture, CLAUDE.md conventions). The QA dispatcher runs
-this on every PR alongside the playtest reviewer. Anyone can also run it by hand on a
+right solution: reuse, architecture, CLAUDE.md conventions). QA runs this alongside the
+playtest review on every PR the size gate below lets through. Anyone can also run it by hand on a
 branch: `/wrap-pr` or `/wrap-pr <PR number>`.
 
-This must run in a top-level session (a dispatcher or an interactive session):
+This must run in a top-level session (a QA session or an interactive session):
 subagents cannot spawn subagents.
 
 ## 0. Check out the PR and build the bundle
@@ -24,7 +24,11 @@ diff.
 **Size gate:** if the code diff is small,
 `git diff origin/main...HEAD --shortstat -- src e2e scripts .github` under ~300
 changed lines, or the PR is docs-only, skip the two reviewers: the playtest reviewer
-covers it. Say "independent review skipped (small diff)" in the decision comment.
+covers it. On a **re-review after a fix**, measure only the fix (commits since the head
+the last QA comment reviewed, merges of `main` excluded):
+`git log --no-merges --numstat --format= <reviewed-head>..HEAD -- src e2e scripts .github | awk '{n+=$1+$2} END {print n+0}'`.
+Under ~300, skip them too. Say "independent review skipped (small diff)" or "(small
+fix)" in the decision comment.
 
 ## 1. Two reviewers, in parallel
 

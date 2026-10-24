@@ -1,7 +1,7 @@
 # Fix (on label)
 
 A GitHub event started this run: QA labelled a pull request `agent:changes-requested`.
-Get **only that PR** fixed, through one builder subagent, then stop. New issues are left
+Fix **only that PR**, in this session (no builder subagent), then stop. New issues are left
 to the scheduled builder runs. If no pull-request number came with this run (someone
 pressed Run now), reply "No PR event — nothing to do" and stop.
 
@@ -15,12 +15,10 @@ pressed Run now), reply "No PR event — nothing to do" and stop.
    `Builder run <ISO timestamp> is on it`, wait about 20 seconds and re-read the
    comments. If another live `… is on it` claim is earlier than yours, comment
    `Backing off — already claimed by another run` and stop.
-4. Spawn exactly one builder with the Agent tool (`subagent_type: "general-purpose"`,
-   `model: "opus"`, `isolation: "worktree"`, `run_in_background: false`), prompt: "You
-   are a Builder for ShooterCoaster. Your working directory is a git worktree of
-   alexbelyeu/shootercoaster. Read `.claude/agents/builder.md` and follow it exactly.
-   Your assignment: PR #<n>, returned by QA — address every QA comment."
-5. When the builder finishes, check the PR is labelled `agent:needs-qa` (that label
-   starts a QA review automatically). If the builder died without that, comment what
-   happened and leave the PR labelled `agent:changes-requested` for the next scheduled
-   builder run. Reply with one line: PR number and outcome.
+4. Read `.claude/agents/builder.md` and carry it out yourself. Your assignment: PR #<n>,
+   returned by QA — address every QA comment. Your claim above is the builder claim.
+5. Finish with the PR labelled `agent:needs-qa` (that label starts a QA review
+   automatically). If you can't, comment on the PR what's blocking and leave it
+   labelled `agent:changes-requested` for the next scheduled builder run.
+6. `node scripts/run-usage.cjs --role fix-on-label --ref "#<n>" --post`, then reply with
+   one line: PR number and outcome.

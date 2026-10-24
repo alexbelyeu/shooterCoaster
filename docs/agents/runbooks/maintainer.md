@@ -19,4 +19,5 @@ If you take on a tech-debt issue, you may delegate it to one Agent call with
 `subagent_type: "general-purpose"`, `model: "opus"`, `isolation: "worktree"`, telling it
 to follow `.claude/agents/builder.md` for that issue. Pause checkpoint before it.
 
-End with the health summary that file asks for, plus any claims you backed off from.
+Then `node scripts/run-usage.cjs --role maintainer --ref "<PRs/issues you opened or fixed, else none>" --post`,
+and end with the health summary that file asks for, plus any claims you backed off from.
