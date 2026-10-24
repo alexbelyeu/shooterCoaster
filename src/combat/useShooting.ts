@@ -49,7 +49,8 @@ export function fireAtNDC(x: number, y: number, camera: THREE.Camera, hitScale =
 /**
  * Hook that turns pointer input (mouse, touch, pen) into bullets.
  * Press fires one shot at the pointer; holding auto-fires every 60 ms while the
- * aim follows the pointer (on touch, the finger is the aim point). See
+ * aim follows the pointer (on touch, the finger is the aim point). A press outside
+ * `playing` (e.g. during the countdown) neither fires nor holds the trigger. See
  * `src/input/pointerInput.ts` for the multi-touch / UI-target rules.
  * Touch shots get aim assist: they snap to an enemy within ~44 CSS px of the
  * finger and have a slightly larger hit radius (`aimAssist.ts`).
@@ -85,8 +86,9 @@ export function useShooting() {
     return subscribePointer((p, type) => {
       toNDC(p.x, p.y, sizeRef.current, aimNDC.current)
       if (type === 'down') {
-        isDown.current = true
-        fireShot(false)
+        // A trigger held through the countdown must not start auto-firing on GO.
+        isDown.current = useGameStore.getState().phase === 'playing'
+        if (isDown.current) fireShot(false)
       } else if (type === 'up') {
         isDown.current = false
       }

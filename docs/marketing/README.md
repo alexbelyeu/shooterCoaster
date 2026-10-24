@@ -12,7 +12,7 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
 
   | Event | Properties | Sent when |
   |---|---|---|
-  | `level_start` | `level` (`level1`…) | A run begins: from level select, Replay or Next Level |
+  | `level_start` | `level` (`level1`…) | A run begins: from level select, Replay or Next Level. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start |
   | `level_complete` | `level`, `stars` (0–3) | The timer runs out and the results screen opens |
   | `level_quit` | `level`, `progress_pct` (0, 10 … 100: share of the level timer used) | Quit to Menu from the pause screen |
 

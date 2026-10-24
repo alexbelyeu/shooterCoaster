@@ -23,9 +23,9 @@
  * The hidden-pause check fakes a tab hide on the first level: it must pause, drop a
  * held trigger, keep the timer still, wait for Resume, then neither reset nor jump it.
  * `?e2e=1` skips the Ready / Set / GO countdown; the countdown check loads the first level
- * with `&countdown=1`: the countdown must show (countdown.png), ignore a press, hold the
- * timer, reach playing on GO (the release usually taps it there early), and the shader
- * warm-up must finish.
+ * with `&countdown=1`: the countdown must show (countdown.png), ignore a press (also once
+ * held on into play), hold the timer, reach playing on GO, and the shader warm-up must
+ * finish; on a replay, a tap after the 1 s mark must skip to playing.
  *
  * All waits are deadline-polled on the hook's frame counter, because software
  * rendering in CI / cloud sessions can run at ~1 fps.
@@ -670,19 +670,28 @@ async function hiddenPauseCheck(page, levelId) {
 
 /**
  * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
- * shows over the mounted level, a press during it fires nothing (not even held into GO), the
- * timer holds, the release skips to GO / playing, and the shader warm-up finishes.
+ * shows over the mounted level, a press during it fires nothing (not even when held on into
+ * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
+ * that a tap after the 1 s mark skips to GO / playing.
  */
 async function countdownCheck(page, levelId) {
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
-  const startPhase = await page.evaluate(() => window.__SC_TEST__.phase())
+  const start = () => page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
   // Attached, not faded in: at ~1 fps, waiting on the fade could outlast the countdown.
-  const shown = await page
+  const stepShown = () => page
     .waitForSelector('.countdown-step', { state: 'attached', timeout: 30000 })
     .then(() => true, () => false)
-  // One JS turn, so GO can't land between the phase read and the press (shots fire on pointerdown).
-  // The press holds the trigger and the step (holdFeedback) through the screenshot.
+  // Stats read in the page the moment GO lands (the first playing frame doesn't count, the next may).
+  const waitPlaying = () => page
+    .waitForFunction(() => window.__SC_TEST__.phase() === 'playing' && window.__SC_TEST__.stats(), null, { timeout: 30000, polling: 100 })
+    .then((h) => h.jsonValue(), () => null)
   const pointer = { clientX: 640, clientY: 360, pointerId: 1, isPrimary: true, pointerType: 'mouse', bubbles: true }
+
+  // 1. Press during the countdown and hold it on into play.
+  await start()
+  const startPhase = await page.evaluate(() => window.__SC_TEST__.phase())
+  const shown = await stepShown()
+  // One JS turn, so GO can't land between the phase read and the press (shots fire on pointerdown).
+  // holdFeedback holds the step through the screenshot.
   const during = await page.evaluate((at) => {
     const api = window.__SC_TEST__
     if (api.phase() !== 'countdown') return null
@@ -702,40 +711,68 @@ async function countdownCheck(page, levelId) {
     stepText = await page.locator('.countdown-step').first().textContent().catch(() => null)
     await page.screenshot({ path: path.join(OUT, 'countdown.png'), timeout: SHOT_TIMEOUT })
   }
-  // Releasing after the 1 s mark is a tap that skips to GO (unless GO already came).
-  // Read before the release: by now the level is mounted and its timer reset, held at full.
-  const held = await page.evaluate((at) => {
+  // Read before letting the countdown run on: by now the level is mounted and its timer reset, held at full.
+  const held = await page.evaluate(() => {
     const api = window.__SC_TEST__
     api.holdFeedback = false
-    const stats = api.stats()
-    document.querySelector('canvas').dispatchEvent(new PointerEvent('pointerup', at))
-    return stats
-  }, pointer)
-  // Stats read in the page the moment GO lands (the first playing frame doesn't count, the next may).
-  const goStats = await page
-    .waitForFunction(() => window.__SC_TEST__.phase() === 'playing' && window.__SC_TEST__.stats(), null, { timeout: 30000, polling: 100 })
-    .then((h) => h.jsonValue(), () => null)
-  const reached = goStats !== null
+    return api.stats()
+  })
+  const goStats = await waitPlaying()
   const atGo = goStats ?? (await getStats(page))
+  // Still holding in play: the trigger is down, but a press from the countdown never auto-fires.
+  await waitFrames(page, 3, { minMs: 2000, maxMs: 30000 })
+  const heldInPlay = await page.evaluate((at) => {
+    const api = window.__SC_TEST__
+    const r = { held: api.triggerHeld(), stats: api.stats() }
+    document.querySelector('canvas').dispatchEvent(new PointerEvent('pointerup', at))
+    return r
+  }, pointer)
   const warmup = await page
     .waitForFunction(() => window.__SC_TEST__.shaderWarmup?.done && window.__SC_TEST__.shaderWarmup, null, { timeout: 60000, polling: 250 })
     .then((h) => h.jsonValue(), () => page.evaluate(() => window.__SC_TEST__.shaderWarmup))
+
+  // 2. Replay through results (as the UI does) and tap after the 1 s mark: it skips to GO.
+  await page.evaluate(() => window.__SC_TEST__.endLevel())
+  await start()
+  const shownAgain = await stepShown()
+  await page.waitForTimeout(1200)
+  const tappedIn = await page.evaluate((at) => {
+    const phase = window.__SC_TEST__.phase()
+    const canvas = document.querySelector('canvas')
+    canvas.dispatchEvent(new PointerEvent('pointerdown', at))
+    canvas.dispatchEvent(new PointerEvent('pointerup', at))
+    return phase
+  }, pointer)
+  const afterTap = await waitPlaying()
 
   const problems = []
   if (startPhase !== 'countdown') problems.push(`startLevel entered "${startPhase}", not countdown`)
   if (!shown) problems.push('no Ready / Set / GO on screen')
   if (!during) problems.push('countdown over before the press check')
   else if (during.shotsFired > 0) problems.push(`a press during the countdown fired ${during.shotsFired} shot(s)`)
-  if (atGo.shotsFired > 0) problems.push(`the trigger held through the countdown fired ${atGo.shotsFired} shot(s) by GO`)
-  if (!reached) problems.push(`phase never reached playing (still "${atGo.phase}")`)
+  if (!goStats) problems.push(`phase never reached playing (still "${atGo.phase}")`)
   if (held.phase === 'countdown' && atGo.timeRemaining < held.timeRemaining - 3)
     problems.push(`timer ran during the countdown (${held.timeRemaining.toFixed(1)} -> ${atGo.timeRemaining.toFixed(1)} at GO)`)
+  if (!heldInPlay.held) problems.push('the countdown press was no longer held after GO')
+  if (heldInPlay.stats.shotsFired > 0)
+    problems.push(`the trigger held through the countdown fired ${heldInPlay.stats.shotsFired} shot(s) after GO`)
   if (!warmup?.done) problems.push('shader warm-up never finished')
+  if (!shownAgain) problems.push('no countdown on replay')
+  if (!afterTap) problems.push(`the replay never reached playing after a tap in "${tappedIn}"`)
+  else if (afterTap.shotsFired > 0) problems.push(`the skip tap fired ${afterTap.shotsFired} shot(s)`)
   return {
     id: 'countdown',
     ok: problems.length === 0,
     problems,
-    countdown: { level: levelId, stepText, releasedIn: held.phase, timerDuring: held.timeRemaining, timerAtGo: atGo.timeRemaining, warmup },
+    countdown: {
+      level: levelId,
+      stepText,
+      timerDuring: held.timeRemaining,
+      timerAtGo: atGo.timeRemaining,
+      shotsHeldIntoPlay: heldInPlay.stats.shotsFired,
+      skipTapIn: tappedIn,
+      warmup,
+    },
   }
 }
 
@@ -1056,7 +1093,8 @@ async function run() {
         ? ` ${r.hiddenPause.level} timer ${r.hiddenPause.before.toFixed(1)} -> after 5s hidden ${r.hiddenPause.whileHidden.toFixed(1)}` +
           ` -> ${r.hiddenPause.resumed.toFixed(1)} after ${r.hiddenPause.resumedSeconds.toFixed(0)}s resumed, trigger held ${r.hiddenPause.heldBefore}->${r.hiddenPause.heldAfter}`
       : r.countdown
-        ? ` ${r.countdown.level} "${r.countdown.stepText}"${r.countdown.releasedIn === 'countdown' ? ' (tap skipped to GO)' : ''} timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
+        ? ` ${r.countdown.level} "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
+          ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +
           ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'}`
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +

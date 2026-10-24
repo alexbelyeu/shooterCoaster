@@ -67,7 +67,7 @@ held trigger, keep `timeRemaining` still over 5 s hidden, stay paused when shown
 after Resume neither reset nor jump the timer; a window `blur` must pause too.
 `?e2e=1` skips the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1`: the countdown must show (`countdown.png`),
-a press during it must fire nothing, the timer must hold, the release skips to `playing`,
+a press during it must fire nothing (also when held on into `playing`), the timer must hold, a replay tap after 1 s skips to `playing`,
 and the shader warm-up must finish.
 `drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
 spawned enemies) and vary run to run; for before/after comparisons use the
