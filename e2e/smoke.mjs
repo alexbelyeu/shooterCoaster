@@ -697,12 +697,13 @@ async function countdownCheck(page, levelId) {
     await page.screenshot({ path: path.join(OUT, 'countdown.png'), timeout: SHOT_TIMEOUT })
   }
   // Releasing after the 1 s mark is a tap that skips to GO (unless GO already came).
-  const releasedIn = await page.evaluate((at) => {
+  // Read before the release: by now the level is mounted and its timer reset, held at full.
+  const held = await page.evaluate((at) => {
     const api = window.__SC_TEST__
     api.holdFeedback = false
-    const phase = api.phase()
+    const stats = api.stats()
     document.querySelector('canvas').dispatchEvent(new PointerEvent('pointerup', at))
-    return phase
+    return stats
   }, pointer)
   // Stats read in the page the moment GO lands (the first playing frame doesn't count, the next may).
   const goStats = await page
@@ -721,14 +722,14 @@ async function countdownCheck(page, levelId) {
   else if (during.shotsFired > 0) problems.push(`a press during the countdown fired ${during.shotsFired} shot(s)`)
   if (atGo.shotsFired > 0) problems.push(`the trigger held through the countdown fired ${atGo.shotsFired} shot(s) by GO`)
   if (!reached) problems.push(`phase never reached playing (still "${atGo.phase}")`)
-  if (during && atGo.timeRemaining < during.timeRemaining - 3)
-    problems.push(`timer ran during the countdown (${during.timeRemaining.toFixed(1)} -> ${atGo.timeRemaining.toFixed(1)} at GO)`)
+  if (held.phase === 'countdown' && atGo.timeRemaining < held.timeRemaining - 3)
+    problems.push(`timer ran during the countdown (${held.timeRemaining.toFixed(1)} -> ${atGo.timeRemaining.toFixed(1)} at GO)`)
   if (!warmup?.done) problems.push('shader warm-up never finished')
   return {
     id: 'countdown',
     ok: problems.length === 0,
     problems,
-    countdown: { level: levelId, stepText, releasedIn, timerDuring: during?.timeRemaining ?? NaN, timerAtGo: atGo.timeRemaining, warmup },
+    countdown: { level: levelId, stepText, releasedIn: held.phase, timerDuring: held.timeRemaining, timerAtGo: atGo.timeRemaining, warmup },
   }
 }
 
