@@ -69,6 +69,9 @@ export interface SCTestApi {
   /** Kill / world-event trauma camera rotation this frame and the max seen (largest of
    *  pitch / yaw / roll, degrees). Kill trauma decays to 0 within 250 ms. */
   cameraTrauma: { current: number; max: number }
+  /** Coaster camera weight (#123) applied this frame and the max seen since load:
+   *  bank and pitch (degrees, signed; maxima are absolute) and the speed FOV widening. */
+  cameraWeight: { roll: number; pitch: number; fovKick: number; maxRoll: number; maxPitch: number; maxFovKick: number }
   /** First-person weapon view-model on screen (CSS px, origin top-left):
    *  bounding box of its projected bounds and the muzzle tip. null before the
    *  first level frame. */
@@ -314,6 +317,7 @@ export function installE2EApi() {
     combat: { fired: 0, hits: 0, kills: 0 },
     cameraTranslation: { current: 0, max: 0 },
     cameraTrauma: { current: 0, max: 0 },
+    cameraWeight: { roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0 },
     weapon: null,
     holdFeedback: false,
     shaderWarmup: null,

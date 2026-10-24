@@ -42,3 +42,22 @@ export function fovForAspect(
   const needed = verticalFovFor(minHorizontal, aspect)
   return Math.max(baseVerticalFov, Math.min(needed, maxVertical))
 }
+
+/** Extra vertical FOV (degrees) at top speed on the 'full' Screen-shake setting (#123). */
+export const SPEED_FOV_DEG = 5
+
+/**
+ * The screen's FOV (from `fovForAspect`) widened with speed: `speedNorm` 0–1 times
+ * `scale` (the Screen-shake setting) of SPEED_FOV_DEG, never past `maxVertical`, so
+ * portrait screens already at the cap keep their FOV.
+ */
+export function fovWithSpeed(
+  screenFov: number,
+  speedNorm: number,
+  scale: number,
+  maxVertical = MAX_VERTICAL_FOV,
+): number {
+  const clamp01 = (v: number) => (Number.isFinite(v) ? Math.min(Math.max(v, 0), 1) : 0)
+  const kick = SPEED_FOV_DEG * clamp01(speedNorm) * clamp01(scale)
+  return Math.max(screenFov, Math.min(screenFov + kick, maxVertical))
+}
