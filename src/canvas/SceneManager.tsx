@@ -20,6 +20,7 @@ import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
+import ShaderWarmup from './ShaderWarmup'
 import MusicController from './MusicController'
 import TitleScene from './TitleScene'
 import { COMPOSER_MULTISAMPLING } from './useRenderBudget'
@@ -128,6 +129,7 @@ function LevelScene({ levelId }: { levelId: string }) {
       <ShootingController />
       <GameTimer seconds={timerSeconds} />
       <KillProjector />
+      <ShaderWarmup levelId={levelId} />
       <EffectComposer multisampling={COMPOSER_MULTISAMPLING}>
         <Bloom
           luminanceThreshold={0.9}
@@ -164,7 +166,7 @@ export default function SceneManager() {
     )
   }
 
-  if (currentLevel && (phase === 'playing' || phase === 'paused' || phase === 'results')) {
+  if (currentLevel) {
     return <LevelScene levelId={currentLevel} />
   }
 

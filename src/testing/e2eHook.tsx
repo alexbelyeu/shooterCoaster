@@ -112,6 +112,9 @@ export interface SCTestApi {
   audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { lateScheduleErrors: number }>
   /** Whether pointer input has the trigger held (released on blur / tab hide). */
   triggerHeld: () => boolean
+  /** The current level's shader warm-up (`canvas/ShaderWarmup.tsx`): finished?, how long it took
+   *  from level mount, and the renderer's program count after it. null before the first level. */
+  shaderWarmup: { done: boolean; ms: number; programs: number } | null
 }
 
 export interface E2EAudio {
@@ -311,6 +314,7 @@ export function installE2EApi() {
     cameraTrauma: { current: 0, max: 0 },
     weapon: null,
     holdFeedback: false,
+    shaderWarmup: null,
     sceneStats: () => null,
     autoFire: (enabled: boolean) => {
       autoFireEnabled = enabled

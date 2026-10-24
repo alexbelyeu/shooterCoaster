@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { GamePhase, ScoreEntry, ComboState } from '@/types/game'
 import { seedFromQuery } from '@/utils/rng'
+import { startPhaseFor } from './startPhase'
 
 interface GameState {
   // Phase
@@ -14,7 +15,7 @@ interface GameState {
 
   /** Seeds this run's enemy spawns. */
   runSeed: number
-  /** The one way to start or restart a level; seed precedence: `seed` > `?seed=` > `Date.now()`. */
+  /** The one way to start or restart a level (enters `countdown`, `playing` under `?e2e=1`); seed precedence: `seed` > `?seed=` > `Date.now()`. */
   startRun: (levelId: string, seed?: number) => void
 
   // Score
@@ -51,6 +52,10 @@ interface GameState {
   timeScale: number
   setTimeScale: (s: number) => void
 
+  /** The mounted level's shader warm-up is done (`canvas/ShaderWarmup.tsx`); the countdown holds Ready until then. */
+  sceneReady: boolean
+  setSceneReady: (ready: boolean) => void
+
   // Level unlock
   isLevelUnlocked: (levelId: string) => boolean
 }
@@ -58,8 +63,12 @@ interface GameState {
 /** Real-time window (ms, performance.now) in which the next kill extends the combo. */
 export const COMBO_TIMEOUT = 2000
 
+const urlSearch = (): string | null =>
+  typeof window !== 'undefined' && window.location ? window.location.search : null
+
 function urlSeed(): number | null {
-  return typeof window !== 'undefined' && window.location ? seedFromQuery(window.location.search) : null
+  const search = urlSearch()
+  return search === null ? null : seedFromQuery(search)
 }
 
 export const useGameStore = create<GameState>()(
@@ -80,7 +89,7 @@ export const useGameStore = create<GameState>()(
           combo: { count: 0, multiplier: 1, lastKillTime: 0 },
           currentLevel: levelId,
           runSeed: (seed ?? urlSeed() ?? Date.now()) >>> 0,
-          phase: 'playing',
+          phase: startPhaseFor(urlSearch() ?? ''),
         }),
 
       score: 0,
@@ -111,6 +120,9 @@ export const useGameStore = create<GameState>()(
 
       timeScale: 1,
       setTimeScale: (s) => set({ timeScale: s }),
+
+      sceneReady: false,
+      setSceneReady: (ready) => set({ sceneReady: ready }),
 
       savedScores: {},
       saveScore: (entry) =>

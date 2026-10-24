@@ -98,7 +98,7 @@ export default function WeaponViewModel() {
     if (!gun || !tracer || !cam?.isPerspectiveCamera) return
 
     const { phase, timeScale } = useGameStore.getState()
-    const visible = phase === 'playing' || phase === 'paused'
+    const visible = phase === 'countdown' || phase === 'playing' || phase === 'paused'
     gun.visible = visible
     if (!visible) {
       tracer.visible = false

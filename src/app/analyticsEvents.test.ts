@@ -14,6 +14,13 @@ describe('analyticsEventFor', () => {
     const start = { name: 'level_start', props: { level: 'level1' } }
     expect(analyticsEventFor(snap('levelSelect', { currentLevel: null }), snap('playing'))).toEqual(start)
     expect(analyticsEventFor(snap('results'), snap('playing'))).toEqual(start)
+    expect(analyticsEventFor(snap('levelSelect'), snap('countdown'))).toEqual(start)
+    expect(analyticsEventFor(snap('results'), snap('countdown'))).toEqual(start)
+  })
+
+  it('counts a countdown that ends in GO as one start', () => {
+    expect(analyticsEventFor(snap('countdown'), snap('playing'))).toBeNull()
+    expect(analyticsEventFor(snap('countdown'), snap('paused'))).toBeNull()
   })
 
   it('does not count pausing or resuming', () => {

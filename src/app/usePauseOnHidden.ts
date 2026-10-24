@@ -1,12 +1,12 @@
 import { useEffect } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 
-/** Pauses a run when the tab is hidden or the window loses focus; only the player resumes it. */
+/** Pauses a run (or its countdown) when the tab is hidden or the window loses focus; only the player resumes it. */
 export function usePauseOnHidden() {
   useEffect(() => {
     const pause = () => {
       const { phase, setPhase } = useGameStore.getState()
-      if (phase === 'playing') setPhase('paused')
+      if (phase === 'playing' || phase === 'countdown') setPhase('paused')
     }
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') pause()
