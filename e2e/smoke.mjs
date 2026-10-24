@@ -692,7 +692,13 @@ async function countdownCheck(page, levelId) {
   }, pointer)
   let stepText = null
   if (during) {
-    await waitVisible(page, '.countdown-step')
+    // Settled: the held step has finished its scale-in (an exiting step is still mid-transform).
+    await page
+      .waitForFunction(() => {
+        const el = document.querySelector('.countdown-step')
+        return el && getComputedStyle(el).opacity === '1' && getComputedStyle(el).transform === 'none'
+      }, null, { timeout: 30000, polling: 100 })
+      .catch(() => {})
     stepText = await page.locator('.countdown-step').first().textContent().catch(() => null)
     await page.screenshot({ path: path.join(OUT, 'countdown.png'), timeout: SHOT_TIMEOUT })
   }
