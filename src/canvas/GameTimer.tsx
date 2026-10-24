@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
 import type { GamePhase } from '@/types/game'
@@ -17,7 +17,8 @@ export default function GameTimer({ seconds }: GameTimerProps) {
   const lastCeiled = useRef(-1)
   const prevPhase = useRef<GamePhase>(phase)
 
-  useEffect(() => {
+  // A layout effect, so the reset lands in the same commit as the new `phase` and no frame can tick the old run's time.
+  useLayoutEffect(() => {
     const prev = prevPhase.current
     prevPhase.current = phase
     const starts = phase === 'countdown' || (phase === 'playing' && prev !== 'paused' && prev !== 'countdown')
@@ -29,8 +30,9 @@ export default function GameTimer({ seconds }: GameTimerProps) {
   }, [phase, seconds])
 
   useFrame((_, delta) => {
-    if (phase !== 'playing') return
-    const { timeScale, setTimeRemaining, setPhase } = useGameStore.getState()
+    // The rendered `phase` lags a store change by a render, so a pause from a DOM event (tab hide) is read live.
+    const { phase: livePhase, timeScale, setTimeRemaining, setPhase } = useGameStore.getState()
+    if (phase !== 'playing' || livePhase !== 'playing') return
     if (timeScale === 0) return
     if (running.current) elapsed.current += delta
     else running.current = true

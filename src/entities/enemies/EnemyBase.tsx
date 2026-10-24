@@ -68,7 +68,6 @@ export default function EnemyBase({
   const aliveRef = useRef(true)
   const addScore = useGameStore((s) => s.addScore)
   const registerKill = useGameStore((s) => s.registerKill)
-  const phase = useGameStore((s) => s.phase)
 
   // Kill-pop state: dying between the hit and the explosion.
   const dying = useRef(false)
@@ -140,8 +139,8 @@ export default function EnemyBase({
   }, [alive, id, type])
 
   useFrame(({ clock }, delta) => {
+    const { phase, timeScale } = useGameStore.getState()
     if (!meshRef.current || phase !== 'playing') return
-    const timeScale = useGameStore.getState().timeScale
     if (timeScale === 0) return
 
     if (aliveRef.current) {

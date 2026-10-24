@@ -21,7 +21,6 @@ export default function BulletPool({
   bulletColor = '#ff0000',
 }: BulletPoolProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
-  const phase = useGameStore((s) => s.phase)
 
   const bullets = useMemo<Bullet[]>(() => {
     const arr: Bullet[] = []
@@ -91,7 +90,7 @@ export default function BulletPool({
   }, [fire, getLiveBullets, getLiveBulletCount])
 
   useFrame((_, delta) => {
-    if (!meshRef.current || phase !== 'playing') return
+    if (!meshRef.current || useGameStore.getState().phase !== 'playing') return
 
     const now = performance.now()
     const mesh = meshRef.current

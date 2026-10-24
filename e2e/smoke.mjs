@@ -609,11 +609,13 @@ async function seedCheck(page, level) {
   }
 }
 
-/** Fake a tab hide / show: headless Chromium can't hide a page on demand. */
+/** Fake a tab hide / show (headless Chromium can't); returns stats read in the same JS turn, so no frame lands in between. */
 const setHidden = (page, hidden) => page.evaluate((h) => {
+  const stats = window.__SC_TEST__.stats()
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (h ? 'hidden' : 'visible') })
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => h })
   document.dispatchEvent(new Event('visibilitychange'))
+  return stats
 }, hidden)
 
 /** Leaving the tab pauses the run and drops the trigger; nothing drains or resets the timer (#118). */
@@ -624,8 +626,7 @@ async function hiddenPauseCheck(page, levelId) {
   await page.mouse.move(vp.width / 2, vp.height / 2)
   await page.mouse.down()
   const heldBefore = await page.evaluate(() => window.__SC_TEST__.triggerHeld())
-  const before = await getStats(page)
-  await setHidden(page, true)
+  const before = await setHidden(page, true)
   const heldAfter = await page.evaluate(() => window.__SC_TEST__.triggerHeld())
   await page.mouse.up()
   const hiddenPhase = await page.evaluate(() => window.__SC_TEST__.phase())
