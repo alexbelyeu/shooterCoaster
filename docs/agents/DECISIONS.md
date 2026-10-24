@@ -540,3 +540,67 @@ $0 for the first organic month, then about $100. Public name stays ShooterCoaste
 
 **Consequences:** Growth work competes with game work in the Director's plan. Paid spend is
 always bounded by a number Alex sets, and every public action has a human on it.
+
+## 2026-10-23 — Audio never throws to the page (Builder, #115)
+
+**Context:** Tone.js asserts that a source's start is strictly after its previous one. `nextTriggerTime` (#63) assumed the audio clock is frozen within a JS turn; it is not (`currentTime` ticks every ~3 ms mid-task), so a late music note that Tone clamped to the live clock could be followed by one landing exactly on it, and the throw escaped from Tone's clock callback as a page error (#114).
+**Decision:** `nextTriggerTime` pushes late times `LATE_MARGIN` (20 ms) past `currentTime`, so Tone never clamps a start we scheduled. Every SFX play function and music loop callback also wraps its Tone calls in `try/catch` into `soundGuard.ts`: one sound is dropped and counted, nothing reaches the page. The smoke's `audioBurst` fails on any drop.
+**Consequences:** Route every new trigger through `nextTriggerTime` and every new play function / loop callback through `dropSound`. Don't remove the margin: the guard alone would hide the bug as silent drops.
+
+## 2026-10-23 — Gameplay SFX: one pre-built kit per level, master limiter, music duck (Builder, #24)
+
+**Context:** Kill sounds now layer up with the combo, hits tick, waves get a per-biome
+stinger. Creating Tone.js nodes per shot or kill leaks and stutters on phones, and
+stacked layers + music can clip.
+**Decision:** `SFXManager` builds every gameplay SFX node once per level (`prepareLevelSFX(biome)`,
+from `MusicController`) into an `owned` list, reuses them for every shot / hit / kill / wave,
+and `disposeSFX()` frees the list on level exit. The smoke test's mobile run checks
+`__SC_TEST__.audio().sfxNodes` stays flat across taps. All audio goes through
+`sfxChannel` / `musicChannel` (so mute covers it) into one `Tone.Limiter(-1)`; the music
+bus has a low-pass (`setMusicDucked`) that closes to 800 Hz whenever `timeScale < 1`.
+Sound-design numbers live in pure `src/audio/sfxDesign.ts`. No `PolySynth` for SFX: it
+allocates and garbage-collects voices on its own.
+**Consequences:** New SFX get a node in `createKit` (via `own()`), never in a play
+function. Anything new must connect to one of the two channels, not to the destination.
+
+## 2026-10-23 — Seeded RNG: fixed seeds for layouts, a run seed for spawns (builder, #33)
+
+**Context:** Enemy spawns and most decoration scatter used `Math.random`, so no two runs or
+QA screenshots matched, and daily runs / ghost replays (#11) need reproducible spawns.
+A mulberry32 `createRng` already lived in `shared/trackScatter.ts`.
+
+**Decision:** One PRNG, `src/utils/rng.ts` (`createRng(seed)` is callable like
+`Math.random` and has `next`/`range`/`pick`; `hashString`; `seedFromQuery`). Anything that
+shapes the world uses it:
+- Decorations, trees, landmarks and title props use **fixed seeds in code** (a literal per
+  scatter, trees `hashString('trees:<biome>')`), so every visit looks the same. Each scatter
+  creates its own rng, so adding or reordering props never reshuffles the others.
+- Enemy spawns use the game store's **`runSeed`**, set by `startRun(levelId, seed?)`, the
+  single way to start or restart a level: explicit seed > `?seed=` > `Date.now()`. Replay
+  gets a fresh seed. The smoke test pins seed 1337 and checks `spawnDigest()`.
+- `Math.random` stays for per-frame cosmetic jitter (particles, SFX pitch, muzzle flash,
+  explosion colour) and, for now, the per-enemy motion parameters inside the enemy
+  components (`useMemo(() => Math.random()…)`): spawn positions are seeded, movement is not.
+
+**Consequences:** Never add `Math.random` to scatter/layout code; take an rng. Changing a
+seed or the order of draws from one rng changes that layout (and the screenshots). Ghost
+replays will also need the enemy motion parameters seeded (derive a per-enemy seed from
+`runSeed` + enemy id).
+
+## 2026-10-23 — Analytics custom events from store phase changes, 2 properties max (Builder, #98)
+
+**Context:** The team is on Vercel Pro (Alex, 2026-10-22), so Web Analytics custom events
+are available. They count against the plan's event allowance, and Pro records at most 2
+properties per event.
+**Decision:** `src/app/analyticsEvents.ts` maps game-store phase transitions to
+`level_start` {level}, `level_complete` {level, stars} and `level_quit` {level,
+progress_pct in tens}. `src/main.tsx` subscribes to the store and calls `track()` only
+behind the existing `analyticsEnabled` gate, so dev, `vite preview`, CI and smoke runs send
+nothing. Events come from the store, not from UI buttons, so every way into or out of a run
+is covered once. `level_complete` carries `stars` rather than a score bucket because a third
+property would be dropped on Pro; stars is the game's own score bucket. No `share` event
+until the game has a share action. Pause/resume and tab close send nothing.
+**Consequences:** A run sends at most two events. Adding an event or property means
+checking the 2-property limit and updating the table in `docs/marketing/README.md`. If the
+team adds Web Analytics Plus (8 properties), a `score_pct` property can be added to
+`level_complete`.
