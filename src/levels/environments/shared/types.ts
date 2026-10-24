@@ -65,7 +65,7 @@ export interface TerrainGlow {
 }
 
 /**
- * Everything BiomeEnvironment needs to render a biome. Sky/light/fog/exposure
+ * Everything BiomeEnvironment needs to render a biome. Sky/light/fog/grade
  * stay in `atmosphere.ts`; terrain noise stays in `utils/terrainNoise.ts`.
  * Rendered in order: terrain, (water), trees, Decorations, Features.
  */

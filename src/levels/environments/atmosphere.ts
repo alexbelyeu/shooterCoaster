@@ -1,8 +1,10 @@
 import type { BiomeType } from '@/types/level'
+import type { GradeConfig } from '@/canvas/post/colourGrade'
 
 /**
  * Per-biome atmosphere: sky dome gradient, sun, ambient (hemisphere) light,
- * fog distances and tone-mapping exposure.
+ * fog distances and the post colour grade (`ColourGradeEffect`: exposure, white
+ * balance, split tone, contrast, saturation, vignette).
  *
  * Single source of truth: the scene fog colour is `sky.horizon`, so distant
  * terrain melts into the bottom of the dome with no seam. The directional
@@ -50,10 +52,10 @@ export interface AtmosphereConfig {
   hemiIntensity: number
   fogNear: number
   fogFar: number
-  /** renderer.toneMappingExposure, consumed by the ACES ToneMapping effect */
-  exposure: number
   /** scene.environmentIntensity of the baked sky env map (Standard/Physical materials only) */
   envIntensity: number
+  /** Colour grade applied before ACES tone mapping (includes exposure) */
+  grade: GradeConfig
 }
 
 export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
@@ -80,8 +82,20 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     hemiIntensity: 1.0,
     fogNear: 400,
     fogFar: 5200,
-    exposure: 1.0,
     envIntensity: 0.5,
+    // Sunny and punchy: a touch warm, crisp contrast, lively colour
+    grade: {
+      exposure: 1.0,
+      temperature: 0.08,
+      tint: 0,
+      shadowTint: 0x4a78c8,
+      highlightTint: 0xffd49a,
+      splitTone: 0.2,
+      contrast: 1.06,
+      saturation: 1.05,
+      vibrance: 0.25,
+      vignette: 0.32,
+    },
   },
   // Warm hazy amber horizon, low orange sun, dusty blue overhead
   desert: {
@@ -106,8 +120,20 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     hemiIntensity: 0.85,
     fogNear: 200,
     fogFar: 6000,
-    exposure: 0.8,
     envIntensity: 0.45,
+    // Sun-baked: strong warm balance, teal in the shade, bleached highlights
+    grade: {
+      exposure: 0.8,
+      temperature: 0.22,
+      tint: 0.03,
+      shadowTint: 0x2e7c8a,
+      highlightTint: 0xffb46a,
+      splitTone: 0.35,
+      contrast: 1.1,
+      saturation: 0.95,
+      vibrance: 0.15,
+      vignette: 0.36,
+    },
   },
   // Deep blue zenith to teal horizon
   ocean: {
@@ -132,8 +158,20 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     hemiIntensity: 0.95,
     fogNear: 200,
     fogFar: 5800,
-    exposure: 1.0,
     envIntensity: 0.5,
+    // Cool and clear: blue-green balance, deep blue shadows, rich water colour
+    grade: {
+      exposure: 1.0,
+      temperature: -0.1,
+      tint: -0.04,
+      shadowTint: 0x1e4ea8,
+      highlightTint: 0xfff0d0,
+      splitTone: 0.25,
+      contrast: 1.04,
+      saturation: 1.08,
+      vibrance: 0.3,
+      vignette: 0.3,
+    },
   },
   // Pale cold blue, violet horizon, low weak sun
   arctic: {
@@ -158,8 +196,20 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     hemiIntensity: 0.9,
     fogNear: 100,
     fogFar: 5500,
-    exposure: 0.85,
     envIntensity: 0.45,
+    // Cold and pale: blue balance, violet shadows, gentle contrast, muted colour
+    grade: {
+      exposure: 0.85,
+      temperature: -0.2,
+      tint: 0.04,
+      shadowTint: 0x5a4ab8,
+      highlightTint: 0xe6f0ff,
+      splitTone: 0.3,
+      contrast: 0.97,
+      saturation: 0.9,
+      vibrance: 0.1,
+      vignette: 0.3,
+    },
   },
   // Dark ash sky with deep red underglow; no visible sun — the volcano dominates
   volcanic: {
@@ -185,8 +235,21 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     hemiIntensity: 0.9,
     fogNear: 1,
     fogFar: 6000,
-    exposure: 1.0,
     // The ash sky is near-black: reflections only pick up the red horizon
     envIntensity: 0.6,
+    // Hellish: warm balance, ember highlights over cooler ash shadows. The scene sits
+    // mostly below mid grey, so exposure is lifted and contrast kept low to keep the terrain readable
+    grade: {
+      exposure: 1.15,
+      temperature: 0.12,
+      tint: 0,
+      shadowTint: 0x3a5a7a,
+      highlightTint: 0xff8a3a,
+      splitTone: 0.2,
+      contrast: 1.04,
+      saturation: 1.05,
+      vibrance: 0.15,
+      vignette: 0.36,
+    },
   },
 }

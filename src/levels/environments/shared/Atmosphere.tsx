@@ -37,20 +37,7 @@ function SkyEnvironment({ atmosphere }: { atmosphere: AtmosphereConfig }) {
   return null
 }
 
-/** Applies the biome's tone-mapping exposure (read by the ACES ToneMapping effect); restores on unmount. */
-function AtmosphereExposure({ exposure }: { exposure: number }) {
-  const gl = useThree((s) => s.gl)
-  useEffect(() => {
-    const prev = gl.toneMappingExposure
-    gl.toneMappingExposure = exposure
-    return () => {
-      gl.toneMappingExposure = prev
-    }
-  }, [gl, exposure])
-  return null
-}
-
-/** Sky dome, its baked env map, exposure, hemisphere + sun lights and fog for one biome (see atmosphere.ts). */
+/** Sky dome, its baked env map, hemisphere + sun lights and fog for one biome (see atmosphere.ts). */
 export default function Atmosphere({
   atmosphere,
   fogRef,
@@ -68,7 +55,6 @@ export default function Atmosphere({
     <>
       {/* Sky + atmosphere (per-biome, see atmosphere.ts) */}
       <SkyDome atmosphere={atmosphere} />
-      <AtmosphereExposure exposure={atmosphere.exposure} />
       <SkyEnvironment atmosphere={atmosphere} />
 
       {/* Lighting: tinted hemisphere ambient + coloured sun */}
