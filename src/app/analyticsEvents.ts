@@ -16,7 +16,7 @@ export interface RunSnapshot {
   timeRemaining: number
 }
 
-const inRun = (phase: GamePhase) => phase === 'playing' || phase === 'paused'
+const inRun = (phase: GamePhase) => phase === 'countdown' || phase === 'playing' || phase === 'paused'
 
 export function tensPercent(fraction: number): number {
   return Math.min(100, Math.max(0, Math.floor(fraction * 10) * 10))
@@ -28,7 +28,7 @@ export function analyticsEventFor(prev: RunSnapshot, next: RunSnapshot): Analyti
   if (!config) return null
   const level = config.id
 
-  if (next.phase === 'playing' && !inRun(prev.phase)) {
+  if (inRun(next.phase) && !inRun(prev.phase)) {
     return { name: 'level_start', props: { level } }
   }
   if (next.phase === 'results' && prev.phase === 'playing') {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import GameCanvas from '@/canvas/GameCanvas'
 import { useGameStore } from '@/store/useGameStore'
@@ -26,17 +26,8 @@ const fadeVariants = {
 export default function App() {
   const phase = useGameStore((s) => s.phase)
   const [showSettings, setShowSettings] = useState(false)
-  const [showCountdown, setShowCountdown] = useState(false)
   usePauseOnHidden()
-
-  // Intercept transition to 'playing' to show countdown
-  const handleLevelStart = useCallback(() => {
-    setShowCountdown(true)
-  }, [])
-
-  const onCountdownComplete = useCallback(() => {
-    setShowCountdown(false)
-  }, [])
+  const inPlay = phase === 'countdown' || phase === 'playing'
 
   // Start/stop title music based on phase
   useEffect(() => {
@@ -49,7 +40,7 @@ export default function App() {
   }, [phase])
 
   // Hide OS cursor whenever custom crosshair is visible
-  const showCrosshair = phase === 'title' || phase === 'levelSelect' || phase === 'playing'
+  const showCrosshair = phase === 'title' || phase === 'levelSelect' || inPlay
   useEffect(() => {
     const el = document.documentElement
     if (showCrosshair) {
@@ -62,7 +53,7 @@ export default function App() {
 
   // During play: no page scroll / pinch-zoom / text-selection gestures (touch).
   useEffect(() => {
-    if (phase !== 'playing') return
+    if (!inPlay) return
     const el = document.documentElement
     el.classList.add('is-playing')
     // iOS Safari ignores touch-action for pinch on some versions; block its gesture events.
@@ -74,7 +65,7 @@ export default function App() {
       document.removeEventListener('gesturestart', block)
       document.removeEventListener('gesturechange', block)
     }
-  }, [phase])
+  }, [inPlay])
 
   return (
     <>
@@ -99,13 +90,7 @@ export default function App() {
           </motion.div>
         )}
 
-        {phase === 'playing' && showCountdown && (
-          <motion.div key="countdown" {...fadeVariants} transition={{ duration: 0.2 }}>
-            <Countdown onComplete={onCountdownComplete} />
-          </motion.div>
-        )}
-
-        {phase === 'playing' && !showCountdown && (
+        {phase === 'playing' && (
           <motion.div key="hud" {...fadeVariants} transition={{ duration: 0.2 }}>
             <HUD />
           </motion.div>
@@ -123,6 +108,8 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {inPlay && <Countdown />}
 
       {showSettings && <SettingsScreen onClose={() => setShowSettings(false)} />}
 

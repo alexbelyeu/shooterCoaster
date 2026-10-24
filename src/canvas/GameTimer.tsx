@@ -7,7 +7,7 @@ interface GameTimerProps {
   seconds: number
 }
 
-/** Counts down the level on game time (paused or frozen frames don't count); resuming from `paused` keeps the run's clock. */
+/** Counts down the level on game time; reset when a run starts (`countdown`, or `playing` without one), kept through GO and resume. */
 export default function GameTimer({ seconds }: GameTimerProps) {
   const phase = useGameStore((s) => s.phase)
 
@@ -18,9 +18,10 @@ export default function GameTimer({ seconds }: GameTimerProps) {
   const prevPhase = useRef<GamePhase>(phase)
 
   useEffect(() => {
-    const resumed = prevPhase.current === 'paused'
+    const prev = prevPhase.current
     prevPhase.current = phase
-    if (phase !== 'playing' || resumed) return
+    const starts = phase === 'countdown' || (phase === 'playing' && prev !== 'paused' && prev !== 'countdown')
+    if (!starts) return
     elapsed.current = 0
     running.current = false
     lastCeiled.current = -1

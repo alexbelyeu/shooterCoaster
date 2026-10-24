@@ -110,12 +110,12 @@ describe('addScore', () => {
 })
 
 describe('startRun', () => {
-  it('resets the run, sets the level and the given seed, and enters playing', () => {
+  it('resets the run, sets the level and the given seed, and enters the countdown', () => {
     store().addScore(50)
     store().registerShot()
     store().registerKill()
     store().startRun('level2', 42)
-    expect(store()).toMatchObject({ phase: 'playing', currentLevel: 'level2', runSeed: 42, score: 0, kills: 0, shotsFired: 0 })
+    expect(store()).toMatchObject({ phase: 'countdown', currentLevel: 'level2', runSeed: 42, score: 0, kills: 0, shotsFired: 0 })
     expect(store().combo).toEqual({ count: 0, multiplier: 1, lastKillTime: 0 })
   })
 

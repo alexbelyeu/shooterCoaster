@@ -22,6 +22,10 @@
  * and requires the same spawnDigest() for that seed and a different one for another.
  * The hidden-pause check fakes a tab hide on the first level: it must pause, drop a
  * held trigger, keep the timer still, wait for Resume, then neither reset nor jump it.
+ * `?e2e=1` skips the Ready / Set / GO countdown; the countdown check loads the first level
+ * with `&countdown=1`: the countdown must show (countdown.png), ignore a press, hold the
+ * timer, reach playing on GO (the release usually taps it there early), and the shader
+ * warm-up must finish.
  *
  * All waits are deadline-polled on the hook's frame counter, because software
  * rendering in CI / cloud sessions can run at ~1 fps.
@@ -664,6 +668,70 @@ async function hiddenPauseCheck(page, levelId) {
   }
 }
 
+/**
+ * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
+ * shows over the mounted level, a press during it fires nothing (not even held into GO), the
+ * timer holds, the release skips to GO / playing, and the shader warm-up finishes.
+ */
+async function countdownCheck(page, levelId) {
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+  const startPhase = await page.evaluate(() => window.__SC_TEST__.phase())
+  // Attached, not faded in: at ~1 fps, waiting on the fade could outlast the countdown.
+  const shown = await page
+    .waitForSelector('.countdown-step', { state: 'attached', timeout: 30000 })
+    .then(() => true, () => false)
+  // One JS turn, so GO can't land between the phase read and the press (shots fire on pointerdown).
+  // The press holds the trigger and the step (holdFeedback) through the screenshot.
+  const pointer = { clientX: 640, clientY: 360, pointerId: 1, isPrimary: true, pointerType: 'mouse', bubbles: true }
+  const during = await page.evaluate((at) => {
+    const api = window.__SC_TEST__
+    if (api.phase() !== 'countdown') return null
+    document.querySelector('canvas').dispatchEvent(new PointerEvent('pointerdown', at))
+    api.holdFeedback = true
+    return api.stats()
+  }, pointer)
+  let stepText = null
+  if (during) {
+    await waitVisible(page, '.countdown-step')
+    stepText = await page.locator('.countdown-step').first().textContent().catch(() => null)
+    await page.screenshot({ path: path.join(OUT, 'countdown.png'), timeout: SHOT_TIMEOUT })
+  }
+  // Releasing after the 1 s mark is a tap that skips to GO (unless GO already came).
+  const releasedIn = await page.evaluate((at) => {
+    const api = window.__SC_TEST__
+    api.holdFeedback = false
+    const phase = api.phase()
+    document.querySelector('canvas').dispatchEvent(new PointerEvent('pointerup', at))
+    return phase
+  }, pointer)
+  // Stats read in the page the moment GO lands (the first playing frame doesn't count, the next may).
+  const goStats = await page
+    .waitForFunction(() => window.__SC_TEST__.phase() === 'playing' && window.__SC_TEST__.stats(), null, { timeout: 30000, polling: 100 })
+    .then((h) => h.jsonValue(), () => null)
+  const reached = goStats !== null
+  const atGo = goStats ?? (await getStats(page))
+  const warmup = await page
+    .waitForFunction(() => window.__SC_TEST__.shaderWarmup?.done && window.__SC_TEST__.shaderWarmup, null, { timeout: 60000, polling: 250 })
+    .then((h) => h.jsonValue(), () => page.evaluate(() => window.__SC_TEST__.shaderWarmup))
+
+  const problems = []
+  if (startPhase !== 'countdown') problems.push(`startLevel entered "${startPhase}", not countdown`)
+  if (!shown) problems.push('no Ready / Set / GO on screen')
+  if (!during) problems.push('countdown over before the press check')
+  else if (during.shotsFired > 0) problems.push(`a press during the countdown fired ${during.shotsFired} shot(s)`)
+  if (atGo.shotsFired > 0) problems.push(`the trigger held through the countdown fired ${atGo.shotsFired} shot(s) by GO`)
+  if (!reached) problems.push(`phase never reached playing (still "${atGo.phase}")`)
+  if (during && atGo.timeRemaining < during.timeRemaining - 3)
+    problems.push(`timer ran during the countdown (${during.timeRemaining.toFixed(1)} -> ${atGo.timeRemaining.toFixed(1)} at GO)`)
+  if (!warmup?.done) problems.push('shader warm-up never finished')
+  return {
+    id: 'countdown',
+    ok: problems.length === 0,
+    problems,
+    countdown: { level: levelId, stepText, releasedIn, timerDuring: during?.timeRemaining ?? NaN, timerAtGo: atGo.timeRemaining, warmup },
+  }
+}
+
 /** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
 async function runMobile(browser, base) {
   const started = Date.now()
@@ -849,7 +917,7 @@ async function run() {
   const results = []
   let failed = false
 
-  const newPage = async () => {
+  const newPage = async (query = 'e2e=1') => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
     const page = await ctx.newPage()
     const errors = []
@@ -857,7 +925,7 @@ async function run() {
     page.on('console', (m) => {
       if (m.type() === 'error' && !ignored(m.text())) errors.push(`console: ${m.text()}`)
     })
-    await page.goto(`${base}/?e2e=1`, { waitUntil: 'load' })
+    await page.goto(`${base}/?${query}`, { waitUntil: 'load' })
     await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
     return { ctx, page, errors }
   }
@@ -946,7 +1014,19 @@ async function run() {
     await h.ctx.close()
   }
 
-  // 5. Optional touch playtest on a phone viewport
+  // 5. A real start: Ready / Set / GO over the warming-up level, then playing
+  if (wanted.length) {
+    const c = await newPage('e2e=1&countdown=1')
+    const r = await countdownCheck(c.page, wanted[0])
+    r.errors = [...c.errors, ...(await c.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await c.ctx.close()
+  }
+
+  // 6. Optional touch playtest on a phone viewport
   if (args.mobile) {
     const m = await runMobile(browser, base)
     failed ||= !m.ok
@@ -968,6 +1048,9 @@ async function run() {
       : r.hiddenPause
         ? ` ${r.hiddenPause.level} timer ${r.hiddenPause.before.toFixed(1)} -> after 5s hidden ${r.hiddenPause.whileHidden.toFixed(1)}` +
           ` -> ${r.hiddenPause.resumed.toFixed(1)} after ${r.hiddenPause.resumedSeconds.toFixed(0)}s resumed, trigger held ${r.hiddenPause.heldBefore}->${r.hiddenPause.heldAfter}`
+      : r.countdown
+        ? ` ${r.countdown.level} "${r.countdown.stepText}"${r.countdown.releasedIn === 'countdown' ? ' (tap skipped to GO)' : ''} timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
+          ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'}`
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +

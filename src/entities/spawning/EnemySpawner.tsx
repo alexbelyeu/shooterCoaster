@@ -303,7 +303,7 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
   )
   const [activeWaveIndex, setActiveWaveIndex] = useState(initialActiveWave)
   const [waveAnnouncement, setWaveAnnouncement] = useState<string | null>(
-    waves[0]?.waveLabel ?? null,
+    phase === 'playing' ? waves[0]?.waveLabel ?? null : null,
   )
   const waveTimers = useRef<ReturnType<typeof setTimeout>[]>([])
   const slowMoResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -314,14 +314,17 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
   const [generation, setGeneration] = useState(0)
   const prevPhaseRef = useRef(phase)
 
-  // Reset wave state and bump generation when re-entering 'playing'
+  // A run (re)start resets the waves and remounts the enemies; GO after a countdown only announces wave 1.
   useEffect(() => {
-    const wasPlaying = prevPhaseRef.current === 'playing'
+    const prev = prevPhaseRef.current
     prevPhaseRef.current = phase
+    if (phase === prev) return
 
-    if (phase === 'playing' && !wasPlaying) {
-      setActiveWaveIndex(initialActiveWave)
+    if (phase === 'playing' && prev === 'countdown') {
       setWaveAnnouncement(waves[0]?.waveLabel ?? null)
+    } else if (phase === 'countdown' || phase === 'playing') {
+      setActiveWaveIndex(initialActiveWave)
+      setWaveAnnouncement(phase === 'playing' ? waves[0]?.waveLabel ?? null : null)
       killedEnemies.current.clear()
       setGeneration((g) => g + 1)
     }

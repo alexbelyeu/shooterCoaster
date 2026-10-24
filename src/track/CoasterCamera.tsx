@@ -118,9 +118,9 @@ export default function CoasterCamera({
     const cam = cameraRef.current
     if (!cam || !enabled) return
 
-    // Slow-mo support: check timeScale from game store
-    const timeScale = useGameStore.getState().timeScale ?? 1
-    const effectiveDelta = delta * timeScale
+    // Slow-mo scales the ride; the car waits at the start through the countdown.
+    const { timeScale, phase } = useGameStore.getState()
+    const effectiveDelta = phase === 'countdown' ? 0 : delta * (timeScale ?? 1)
 
     const effectiveRollerSpeed = rollerSpeed * SPEED_FACTOR
     const effectiveMinSpeed = minRollerSpeed * SPEED_FACTOR
