@@ -11,6 +11,7 @@
  * killed, autofire never fired at on-screen enemies, the killNearest hits never
  * produced a kill event, the camera translated off the track pose at all (kill
  * feedback is rotation-only), the kill trauma exceeded 1° or did not decay to 0,
+ * the coaster camera's bank / pitch / speed FOV went past their caps (#123),
  * the first-person weapon is missing / off screen / covering the centre / not
  * pointing along the shot's tracer (> 25° on screen), the
  * camera aspect doesn't match the canvas, or the results screen never appears.
@@ -297,7 +298,7 @@ async function playLevel(page, id) {
   const settleDeadline = Date.now() + 30000
   const readShake = () => page.evaluate(() => {
     const s = window.__SC_TEST__
-    return { frames: s.frames, ...s.cameraTranslation, trauma: s.cameraTrauma.current, traumaMax: s.cameraTrauma.max }
+    return { frames: s.frames, ...s.cameraTranslation, trauma: s.cameraTrauma.current, traumaMax: s.cameraTrauma.max, weight: s.cameraWeight }
   })
   let shake = await readShake()
   while (Date.now() < settleDeadline) {
@@ -337,6 +338,10 @@ async function playLevel(page, id) {
   if (shake.current !== 0) problems.push(`camera not back on the track pose (${shake.current})`)
   if (shake.traumaMax > 1 + 1e-6) problems.push(`kill trauma ${shake.traumaMax.toFixed(2)}° > 1°`)
   if (shake.trauma !== 0) problems.push(`kill trauma did not decay to 0 (${shake.trauma}°)`)
+  const w = shake.weight
+  if (w.maxRoll > CAMERA_WEIGHT_CAPS.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.roll}°`)
+  if (w.maxPitch > CAMERA_WEIGHT_CAPS.pitch + 1e-6) problems.push(`camera pitch ${w.maxPitch.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.pitch}°`)
+  if (w.maxFovKick > CAMERA_WEIGHT_CAPS.fovKick + 1e-6) problems.push(`speed FOV kick ${w.maxFovKick.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.fovKick}°`)
   return {
     problems,
     combat: {
@@ -353,6 +358,7 @@ async function playLevel(page, id) {
       translationMax: shake.max,
       translationIdle: shake.current,
       traumaMaxDeg: shake.traumaMax,
+      cameraWeight: w,
       weapon: weapon.box,
       events: counts,
       // Set (to the phase) when the level timed out before the kill event could land.
@@ -369,6 +375,9 @@ const MOBILE_LEVEL = 'level1'
 const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-button'
 /** Max angle between the barrel and the tracer on screen (#65). */
 const WEAPON_MAX_AIM_DEG = 25
+/** Caps on the coaster camera weight (#123): MAX_BANK_DEG / MAX_PITCH_DEG in
+ *  src/track/cameraRig.ts and SPEED_FOV_DEG in src/track/cameraFov.ts. */
+const CAMERA_WEIGHT_CAPS = { roll: 8, pitch: 3, fovKick: 5 }
 const HUD_SELECTORS = ['.hud-score', '.hud-kills', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
 
 /** Wait until `selector` exists, has a size, and it and its ancestors are fully faded in. */
@@ -1103,7 +1112,7 @@ async function run() {
           ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}°${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}°${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
@@ -1121,6 +1130,10 @@ function burstSummary(b) {
 function audioSummary(a) {
   return a?.portrait?.ready ? `${a.portrait.sfxNodes}/${a.landscape.sfxNodes}` : 'locked'
 }
+
+/** Coaster camera weight now / max since load, for the summary line. */
+const weightSummary = (w) =>
+  w ? `roll ${w.roll.toFixed(1)}/${w.maxRoll.toFixed(1)}° pitch ${w.pitch.toFixed(1)}/${w.maxPitch.toFixed(1)}° fov+${w.fovKick.toFixed(1)}/${w.maxFovKick.toFixed(1)}°` : '-'
 
 /** Camera vs canvas aspect + FOV per mobile orientation, for the summary line. */
 function viewSummary(views) {

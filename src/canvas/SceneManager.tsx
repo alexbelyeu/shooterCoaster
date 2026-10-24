@@ -95,6 +95,8 @@ function LevelScene({ levelId }: { levelId: string }) {
     <TerrainContext.Provider value={heightFn}>
       <CoasterCamera
         curve={curve}
+        trackLength={trackTable.length}
+        trackScale={trackDims.trackScale}
         rollerSpeed={track.rollerSpeed}
         minRollerSpeed={track.minRollerSpeed}
         heightOffset={trackDims.eyeHeight}

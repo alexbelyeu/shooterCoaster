@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { fovForAspect, horizontalFov, verticalFovFor, MAX_VERTICAL_FOV, MIN_HORIZONTAL_FOV } from './cameraFov'
+import {
+  fovForAspect, fovWithSpeed, horizontalFov, verticalFovFor, MAX_VERTICAL_FOV, MIN_HORIZONTAL_FOV, SPEED_FOV_DEG,
+} from './cameraFov'
 
 describe('cameraFov', () => {
   it('converts between vertical and horizontal FOV', () => {
@@ -33,5 +35,27 @@ describe('cameraFov', () => {
     expect(fovForAspect(80, 0)).toBe(80)
     expect(fovForAspect(80, Number.NaN)).toBe(80)
     expect(fovForAspect(80, Number.POSITIVE_INFINITY)).toBe(80)
+  })
+})
+
+describe('fovWithSpeed', () => {
+  it('widens by up to SPEED_FOV_DEG at top speed, scaled by the setting', () => {
+    expect(fovWithSpeed(80, 0, 1)).toBe(80)
+    expect(fovWithSpeed(80, 1, 1)).toBe(80 + SPEED_FOV_DEG)
+    expect(fovWithSpeed(80, 1, 0.5)).toBe(80 + SPEED_FOV_DEG / 2)
+    expect(fovWithSpeed(80, 0.5, 1)).toBe(80 + SPEED_FOV_DEG / 2)
+  })
+
+  it('is off with the setting off and clamps bad inputs', () => {
+    expect(fovWithSpeed(80, 1, 0)).toBe(80)
+    expect(fovWithSpeed(80, 7, 3)).toBe(80 + SPEED_FOV_DEG)
+    expect(fovWithSpeed(80, Number.NaN, 1)).toBe(80)
+    expect(fovWithSpeed(80, -1, 1)).toBe(80)
+  })
+
+  it('never widens past the vertical cap, nor narrows a screen already above it', () => {
+    expect(fovWithSpeed(MAX_VERTICAL_FOV - 1, 1, 1)).toBe(MAX_VERTICAL_FOV)
+    expect(fovWithSpeed(MAX_VERTICAL_FOV, 1, 1)).toBe(MAX_VERTICAL_FOV)
+    expect(fovWithSpeed(MAX_VERTICAL_FOV + 2, 1, 1)).toBe(MAX_VERTICAL_FOV + 2)
   })
 })
