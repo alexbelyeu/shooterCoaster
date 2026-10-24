@@ -23,9 +23,9 @@ import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
 import MusicController from './MusicController'
 import TitleScene from './TitleScene'
-import { COMPOSER_MULTISAMPLING } from './useRenderBudget'
-import { EffectComposer, Bloom, Vignette, ToneMapping } from '@react-three/postprocessing'
-import { ToneMappingMode } from 'postprocessing'
+import PostEffects, { type BloomSettings } from './post/PostEffects'
+import { TITLE_GRADE } from './post/colourGrade'
+import { ATMOSPHERES } from '@/levels/environments/atmosphere'
 import { eventBus } from '@/core/EventBus'
 import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
@@ -132,59 +132,29 @@ function LevelScene({ levelId }: { levelId: string }) {
       <GameTimer seconds={timerSeconds} />
       <KillProjector />
       <ShaderWarmup levelId={levelId} />
-      <EffectComposer multisampling={COMPOSER_MULTISAMPLING}>
-        <Bloom
-          luminanceThreshold={0.9}
-          luminanceSmoothing={0.4}
-          intensity={0.6}
-          mipmapBlur
-        />
-        <Vignette eskil={false} offset={0.1} darkness={0.4} />
-        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-      </EffectComposer>
     </TerrainContext.Provider>
   )
 }
+
+const LEVEL_BLOOM: BloomSettings = { threshold: 0.9, intensity: 0.6 }
+const TITLE_BLOOM: BloomSettings = { threshold: 0.8, intensity: 0.8 }
 
 export default function SceneManager() {
   const phase = useGameStore((s) => s.phase)
   const currentLevel = useGameStore((s) => s.currentLevel)
 
-  if (phase === 'title' || phase === 'levelSelect') {
-    return (
-      <>
-        <TitleScene />
-        <EffectComposer multisampling={COMPOSER_MULTISAMPLING}>
-          <Bloom
-            luminanceThreshold={0.8}
-            luminanceSmoothing={0.4}
-            intensity={0.8}
-            mipmapBlur
-          />
-          <Vignette eskil={false} offset={0.1} darkness={0.5} />
-          <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-        </EffectComposer>
-      </>
-    )
-  }
-
-  if (currentLevel) {
-    return <LevelScene levelId={currentLevel} />
-  }
+  const level = phase === 'title' || phase === 'levelSelect' || !currentLevel ? null : currentLevel
+  const biome = level ? getLevelConfig(level)?.biome : undefined
 
   return (
     <>
-      <TitleScene />
-      <EffectComposer multisampling={COMPOSER_MULTISAMPLING}>
-        <Bloom
-          luminanceThreshold={0.8}
-          luminanceSmoothing={0.4}
-          intensity={0.8}
-          mipmapBlur
-        />
-        <Vignette eskil={false} offset={0.1} darkness={0.5} />
-        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-      </EffectComposer>
+      {level ? <LevelScene levelId={level} /> : <TitleScene />}
+      {/* Keyed so a bloom change remounts the composer; a biome change only updates grade uniforms */}
+      <PostEffects
+        key={level ? 'level' : 'title'}
+        bloom={level ? LEVEL_BLOOM : TITLE_BLOOM}
+        grade={biome ? ATMOSPHERES[biome].grade : TITLE_GRADE}
+      />
     </>
   )
 }
