@@ -3,7 +3,11 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { AtmosphereConfig } from './atmosphere'
 
-/** Procedural per-biome sky dome, centred on the camera and drawn first with depth off so the scene paints over it. */
+/**
+ * Procedural per-biome sky dome, centred on the camera and drawn first with depth off
+ * so the scene paints over it. The scene fog colour is the same `sky.horizon`, so
+ * fogged terrain blends into the bottom of the dome without a seam.
+ */
 
 const vertexShader = /* glsl */ `
   varying vec3 vDir;
@@ -91,7 +95,8 @@ const fragmentShader = /* glsl */ `
     if (uSunSize > 0.0 || uSunGlow > 0.0) {
       float d = max(dot(dir, normalize(uSunDir)), 0.0);
       float ang = acos(clamp(d, -1.0, 1.0));
-      float disc = 1.0 - smoothstep(uSunSize * 0.85, uSunSize, ang);
+      // smoothstep is undefined when edge0 >= edge1, so skip the disc when it has no size (env bake)
+      float disc = uSunSize > 0.0 ? 1.0 - smoothstep(uSunSize * 0.85, uSunSize, ang) : 0.0;
       float glow = pow(d, 64.0) * 0.6 + pow(d, 8.0) * 0.25;
       col += uSunColor * (disc * 1.5 + glow * uSunGlow);
     }
