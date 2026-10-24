@@ -22,6 +22,7 @@ import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
 import MusicController from './MusicController'
 import TitleScene from './TitleScene'
+import { COMPOSER_MULTISAMPLING } from './useRenderBudget'
 import { EffectComposer, Bloom, Vignette, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { eventBus } from '@/core/EventBus'
@@ -127,7 +128,7 @@ function LevelScene({ levelId }: { levelId: string }) {
       <ShootingController />
       <GameTimer seconds={timerSeconds} />
       <KillProjector />
-      <EffectComposer>
+      <EffectComposer multisampling={COMPOSER_MULTISAMPLING}>
         <Bloom
           luminanceThreshold={0.9}
           luminanceSmoothing={0.4}
@@ -149,7 +150,7 @@ export default function SceneManager() {
     return (
       <>
         <TitleScene />
-        <EffectComposer>
+        <EffectComposer multisampling={COMPOSER_MULTISAMPLING}>
           <Bloom
             luminanceThreshold={0.8}
             luminanceSmoothing={0.4}
@@ -170,7 +171,7 @@ export default function SceneManager() {
   return (
     <>
       <TitleScene />
-      <EffectComposer>
+      <EffectComposer multisampling={COMPOSER_MULTISAMPLING}>
         <Bloom
           luminanceThreshold={0.8}
           luminanceSmoothing={0.4}

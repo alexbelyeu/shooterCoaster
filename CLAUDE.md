@@ -78,7 +78,7 @@ then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPo
 `endLevel()`, `setTimeScale(s)`, `rideTo` (set a track fraction 0–1 to jump the coaster there), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
 {current, max} in degrees, `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
-`view()` → camera vs canvas aspect + FOV, `audio()` → unlocked?, live SFX node count, music ducked?, sounds dropped by a caught audio error,
+`view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `audio()` → unlocked?, live SFX node count, music ducked?, sounds dropped by a caught audio error,
 `audioBurst(shots, kills)` → rapid SFX + late music notes in one JS turn while the audio clock ticks, `triggerHeld()` → pointer trigger down?). See `src/testing/e2eHook.tsx`. Extend it when you need new test
 surfaces. Bullets travel per *second* with a swept hit test (`combat/projectiles/bulletMotion.ts`),
 but enemies and the camera still move a lot during one ~1 fps headless frame, so
@@ -108,7 +108,7 @@ from the URL; `?internal=0` clears it): it sends nothing either, via the same ga
 | Path | What |
 |---|---|
 | `src/app/App.tsx` | Phase-driven UI shell (title → levelSelect → playing → paused → results); `usePauseOnHidden` pauses a run on tab hide / window blur |
-| `src/canvas/` | `GameCanvas` (R3F Canvas), `SceneManager` (picks title vs level scene), shooting, timer, music |
+| `src/canvas/` | `GameCanvas` (R3F Canvas; dpr from a pixel budget, smaller on touch screens: `renderBudget.ts`), `SceneManager` (picks title vs level scene; EffectComposer MSAA 8, 4 on touch), shooting, timer, music |
 | `src/levels/LevelRegistry.ts` | **Level configs** — track params, biome, timer, waves, star thresholds |
 | `src/levels/scoring.ts` | `SCORE_VALUES` per enemy, `computeMaxScore`, `computeStars` (pure, unit-tested) |
 | `src/levels/environments/` | `BiomeEnvironment` (thin host) + `biomeRegistry.ts`; per-biome modules in `biomes/<biome>/` (`config.ts` colour ramp + trees, `Decorations.tsx`, `Features.tsx`, `index.ts`); shared terrain/water/trees/atmosphere/scatter helpers in `shared/` (incl. `trackClearance.ts` to keep props off the track and its towers, `paintedParts.ts` to merge multi-coloured props into one draw call, `ringedRock.ts` for stacked-ring rock formations like sea stacks and mesas, `ParticleField.tsx` for ambient air particles from a per-biome preset, e.g. volcanic ash/embers); a biome may supply its own `createTerrainMaterial` (desert sand ripples); biome components get `heightFn`, `groundFn` (terrain as drawn) and the track's arc table; landmarks (FerrisWheel, Pyramid, Volcano…); per-biome sky/light/fog/exposure in `atmosphere.ts` + `SkyDome.tsx` |

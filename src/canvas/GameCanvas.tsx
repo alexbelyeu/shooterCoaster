@@ -4,14 +4,17 @@ import * as THREE from 'three'
 import SceneManager from './SceneManager'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { isE2E, E2EFrameProbe } from '@/testing/e2eHook'
+import { useBudgetDpr } from './useRenderBudget'
 
 export default function GameCanvas() {
   const showFPS = useSettingsStore((s) => s.showFPS)
+  const dpr = useBudgetDpr()
 
   return (
     <Canvas
-      gl={{ antialias: true, alpha: false, toneMapping: THREE.NoToneMapping }}
-      dpr={[1, 2]}
+      // The EffectComposer renders into its own multisampled target, so canvas MSAA is wasted.
+      gl={{ antialias: false, alpha: false, toneMapping: THREE.NoToneMapping }}
+      dpr={dpr}
       style={{ position: 'fixed', inset: 0 }}
     >
       <SceneManager />
