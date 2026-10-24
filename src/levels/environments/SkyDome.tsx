@@ -3,15 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { AtmosphereConfig } from './atmosphere'
 
-/**
- * Procedural per-biome sky: an inverted sphere centred on the camera every frame,
- * drawn first (renderOrder -1000) with depth test/write off so the scene always
- * paints over it. Gradient zenith → horizon → ground, optional sun disc + glow and
- * low-frequency fbm clouds / ash bands — all driven by uniforms from the biome's
- * AtmosphereConfig. One draw call; uniforms are updated in place (no per-frame
- * allocations). The scene fog colour is the same `sky.horizon`, so fogged terrain
- * blends into the bottom of the dome without a seam.
- */
+/** Procedural per-biome sky dome, centred on the camera and drawn first with depth off so the scene paints over it. */
 
 const vertexShader = /* glsl */ `
   varying vec3 vDir;
@@ -113,37 +105,54 @@ const fragmentShader = /* glsl */ `
 /** CoasterCamera's far plane is 11000; keep the dome just inside it. */
 const DOME_RADIUS = 11000 * 0.9
 
+export function createSkyMaterial(): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    vertexShader,
+    fragmentShader,
+    uniforms: {
+      uZenith: { value: new THREE.Color() },
+      uHorizon: { value: new THREE.Color() },
+      uGround: { value: new THREE.Color() },
+      uHorizonFalloff: { value: 0.5 },
+      uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+      uSunColor: { value: new THREE.Color() },
+      uSunSize: { value: 0 },
+      uSunGlow: { value: 0 },
+      uCloudiness: { value: 0 },
+      uCloudColor: { value: new THREE.Color() },
+      uCloudStretch: { value: 1 },
+      uCloudOffset: { value: new THREE.Vector2() },
+    },
+    side: THREE.BackSide,
+    depthWrite: false,
+    depthTest: false,
+    fog: false,
+  })
+}
+
+/** `sunDisc: false` keeps the glow but drops the disc, whose >1 values would sparkle in a baked env map. */
+export function setSkyUniforms(
+  material: THREE.ShaderMaterial,
+  { sky, sunDirection }: AtmosphereConfig,
+  sunDisc = true,
+) {
+  const u = material.uniforms
+  ;(u.uZenith.value as THREE.Color).setHex(sky.zenith)
+  ;(u.uHorizon.value as THREE.Color).setHex(sky.horizon)
+  ;(u.uGround.value as THREE.Color).setHex(sky.ground)
+  u.uHorizonFalloff.value = sky.horizonFalloff
+  ;(u.uSunDir.value as THREE.Vector3).set(sunDirection[0], sunDirection[1], sunDirection[2]).normalize()
+  ;(u.uSunColor.value as THREE.Color).setHex(sky.sunColor)
+  u.uSunSize.value = sunDisc ? sky.sunSize : 0
+  u.uSunGlow.value = sky.sunGlow
+  u.uCloudiness.value = sky.cloudiness
+  ;(u.uCloudColor.value as THREE.Color).setHex(sky.cloudColor)
+  u.uCloudStretch.value = sky.cloudStretch
+}
+
 export default function SkyDome({ atmosphere }: { atmosphere: AtmosphereConfig }) {
-  const { sky, sunDirection } = atmosphere
-
   const geometry = useMemo(() => new THREE.SphereGeometry(DOME_RADIUS, 32, 16), [])
-
-  const material = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        vertexShader,
-        fragmentShader,
-        uniforms: {
-          uZenith: { value: new THREE.Color() },
-          uHorizon: { value: new THREE.Color() },
-          uGround: { value: new THREE.Color() },
-          uHorizonFalloff: { value: 0.5 },
-          uSunDir: { value: new THREE.Vector3(0, 1, 0) },
-          uSunColor: { value: new THREE.Color() },
-          uSunSize: { value: 0 },
-          uSunGlow: { value: 0 },
-          uCloudiness: { value: 0 },
-          uCloudColor: { value: new THREE.Color() },
-          uCloudStretch: { value: 1 },
-          uCloudOffset: { value: new THREE.Vector2() },
-        },
-        side: THREE.BackSide,
-        depthWrite: false,
-        depthTest: false,
-        fog: false,
-      }),
-    [],
-  )
+  const material = useMemo(createSkyMaterial, [])
 
   const mesh = useMemo(() => {
     const m = new THREE.Mesh(geometry, material)
@@ -153,21 +162,7 @@ export default function SkyDome({ atmosphere }: { atmosphere: AtmosphereConfig }
     return m
   }, [geometry, material])
 
-  // Push the biome config into the uniforms (in place)
-  useEffect(() => {
-    const u = material.uniforms
-    ;(u.uZenith.value as THREE.Color).setHex(sky.zenith)
-    ;(u.uHorizon.value as THREE.Color).setHex(sky.horizon)
-    ;(u.uGround.value as THREE.Color).setHex(sky.ground)
-    u.uHorizonFalloff.value = sky.horizonFalloff
-    ;(u.uSunDir.value as THREE.Vector3).set(sunDirection[0], sunDirection[1], sunDirection[2]).normalize()
-    ;(u.uSunColor.value as THREE.Color).setHex(sky.sunColor)
-    u.uSunSize.value = sky.sunSize
-    u.uSunGlow.value = sky.sunGlow
-    u.uCloudiness.value = sky.cloudiness
-    ;(u.uCloudColor.value as THREE.Color).setHex(sky.cloudColor)
-    u.uCloudStretch.value = sky.cloudStretch
-  }, [material, sky, sunDirection])
+  useEffect(() => setSkyUniforms(material, atmosphere), [material, atmosphere])
 
   useEffect(() => {
     return () => {
@@ -176,7 +171,7 @@ export default function SkyDome({ atmosphere }: { atmosphere: AtmosphereConfig }
     }
   }, [geometry, material])
 
-  const speed = sky.cloudSpeed * 0.01
+  const speed = atmosphere.sky.cloudSpeed * 0.01
   useFrame(({ camera, clock }) => {
     // Keep the dome centred on the camera so it never clips the far plane
     mesh.position.copy(camera.position)

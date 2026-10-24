@@ -52,6 +52,8 @@ export interface AtmosphereConfig {
   fogFar: number
   /** renderer.toneMappingExposure, consumed by the ACES ToneMapping effect */
   exposure: number
+  /** scene.environmentIntensity of the baked sky env map (Standard/Physical materials only) */
+  envIntensity: number
 }
 
 export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
@@ -79,6 +81,7 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     fogNear: 400,
     fogFar: 5200,
     exposure: 1.0,
+    envIntensity: 0.5,
   },
   // Warm hazy amber horizon, low orange sun, dusty blue overhead
   desert: {
@@ -104,6 +107,7 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     fogNear: 200,
     fogFar: 6000,
     exposure: 0.8,
+    envIntensity: 0.45,
   },
   // Deep blue zenith to teal horizon
   ocean: {
@@ -129,6 +133,7 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     fogNear: 200,
     fogFar: 5800,
     exposure: 1.0,
+    envIntensity: 0.5,
   },
   // Pale cold blue, violet horizon, low weak sun
   arctic: {
@@ -154,6 +159,7 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     fogNear: 100,
     fogFar: 5500,
     exposure: 0.85,
+    envIntensity: 0.45,
   },
   // Dark ash sky with deep red underglow; no visible sun — the volcano dominates
   volcanic: {
@@ -180,5 +186,7 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     fogNear: 1,
     fogFar: 6000,
     exposure: 1.0,
+    // The ash sky is near-black: reflections only pick up the red horizon
+    envIntensity: 0.6,
   },
 }

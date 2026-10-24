@@ -905,6 +905,7 @@ async function run() {
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${SECONDS}s)`)
     if (img.stddev < 4 || img.distinctColors < 8) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
+    if (stats.scene && !stats.scene.environment) problems.push('no scene.environment (sky env map not baked)')
     const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
     problems.push(...desktopAspect.problems)
     stats.view = desktopAspect.view
@@ -1008,7 +1009,9 @@ function sceneSummary(scene) {
   for (const [name, e] of Object.entries(scene.byName)) {
     if (name.startsWith('track')) { objs += e.objects; tris += e.triangles }
   }
-  return ` | scene objs=${scene.objects} tris=${scene.triangles} (track objs=${objs} tris=${tris})`
+  const env = scene.environment
+  const envText = env ? ` env=${env.intensity} bake=${env.bakeMs?.toFixed(1)}ms` : ' env=none'
+  return ` | scene objs=${scene.objects} tris=${scene.triangles} (track objs=${objs} tris=${tris})${envText}`
 }
 
 run().catch((e) => {

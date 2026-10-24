@@ -143,6 +143,8 @@ export interface SceneStats {
   objects: number
   triangles: number
   byName: Record<string, { objects: number; triangles: number }>
+  /** scene.environment (the baked sky env map), or null when none is set */
+  environment: { name: string; intensity: number; bakeMs: number | null } | null
 }
 
 export interface SCTestStats {
@@ -480,7 +482,15 @@ export function E2EFrameProbe() {
 }
 
 function collectSceneStats(scene: THREE.Scene): SceneStats {
-  const stats: SceneStats = { objects: 0, triangles: 0, byName: {} }
+  const env = scene.environment
+  const stats: SceneStats = {
+    objects: 0,
+    triangles: 0,
+    byName: {},
+    environment: env
+      ? { name: env.name, intensity: scene.environmentIntensity, bakeMs: (env.userData.bakeMs as number | undefined) ?? null }
+      : null,
+  }
   scene.traverseVisible((o) => {
     const m = o as THREE.Mesh & { isInstancedMesh?: boolean; count?: number }
     if (!m.isMesh || !m.geometry) return
