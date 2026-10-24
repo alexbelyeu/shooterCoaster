@@ -1,6 +1,6 @@
 ---
 name: pr-consistency
-description: Fresh-context architecture and convention review of a ShooterCoaster PR, driven by a prebuilt review bundle. Spawned by the QA dispatcher (or /wrap-pr). Judges whether the PR is the right solution, not whether it runs.
+description: Fresh-context architecture and convention review of a ShooterCoaster PR, driven by a prebuilt review bundle. Spawned by QA (or /wrap-pr). Judges whether the PR is the right solution, not whether it runs.
 tools: Bash, Read, Grep, Glob
 model: opus
 ---

@@ -1,6 +1,6 @@
 ---
 name: pr-correctness
-description: Fresh-context correctness review of a ShooterCoaster PR, driven by a prebuilt review bundle. Spawned by the QA dispatcher (or /wrap-pr). Hunts bugs, edge cases, leaks and regressions only — never style or architecture.
+description: Fresh-context correctness review of a ShooterCoaster PR, driven by a prebuilt review bundle. Spawned by QA (or /wrap-pr). Hunts bugs, edge cases, leaks and regressions only — never style or architecture.
 tools: Bash, Read, Grep, Glob
 model: opus
 ---

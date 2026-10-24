@@ -31,7 +31,9 @@ If a GitHub event started this run, its details arrive with this message. Use on
 
 Rules that apply to every runbook:
 
-- Read `CLAUDE.md`, `docs/agents/PROTOCOL.md` and `docs/agents/STEERING.md` first.
+- Read `CLAUDE.md`, `docs/agents/PROTOCOL.md` and `docs/agents/STEERING.md` first. The
+  Builders and QA dispatchers are the exception: they read only what their runbook lists,
+  since their subagents read the role files themselves.
 - Use `gh api` (REST) for GitHub; GraphQL is blocked. Headless Chromium:
   `export SC_CHROME="$(scripts/ensure-browser.sh)"`.
 - **Live claims.** A claim comment (`QA run … reviewing`, `Builder run … is on it`) is
@@ -40,6 +42,12 @@ Rules that apply to every runbook:
   a close) ends a QA claim; a builder's reply or a label change to `agent:needs-qa` ends
   a builder claim. Ignore claims that aren't live: they belong to a finished round.
 - **No check-ins.** Don't schedule reminders or "safety-net check-ins" on your PRs, and never create, fire, change or delete scheduled tasks (CLAUDE.md hard rule 10). When your PR is labelled `agent:needs-qa`, your part is done: the on-label tasks and the Maintainer take it from there.
+- **Token ledger.** The last step of every runbook is
+  `node scripts/run-usage.cjs --role <role> --ref <PR/issue numbers worked on, e.g. "#12,#14", or none> --post`:
+  it sums this session's tokens, its subagents included, and appends one comment to the
+  `token-ledger` issue (the status page and weekly report read it). Run it once, from the
+  session that runs the runbook, never from a subagent. Skip it when the run stopped at
+  the pause check or had nothing to do. It never fails the run.
 - **Pause checkpoints.** Run `scripts/pause-check.sh` again before every wave of
   subagents and before any long step. If it prints PAUSED, start nothing new, leave
   claims and labels as they are, and end with the PAUSED line.

@@ -10,9 +10,10 @@ code review.** Alex reads a weekly report, watches the live `studio-status` issu
 agent needs to know lives in this repo — sessions have no memory of each other.
 
 If you were started by a scheduled task, run `scripts/pause-check.sh` first: if it
-prints PAUSED, stop and reply with that line. Then read `docs/agents/PROTOCOL.md`, your
-runbook in `docs/agents/runbooks/` and your role definition in `.claude/agents/` before
-doing anything else.
+prints PAUSED, stop and reply with that line. Then read your runbook in
+`docs/agents/runbooks/` and what it lists (normally `docs/agents/PROTOCOL.md` and your role
+definition in `.claude/agents/`; the Builders and QA dispatchers read less) before doing
+anything else.
 
 ## Commands
 
@@ -27,7 +28,7 @@ npm run verify            # test + build + bundle budget + smoke — run before 
 npm run og                # re-render the share card public/social/og-1200x630.jpg + apple-touch-icon (needs a build)
 ```
 
-Unit tests live next to the code as `src/**/*.test.ts` and run in plain Node
+Unit tests live next to the code as `src/**/*.test.ts` (and `scripts/**/*.test.ts` for agent tooling) and run in plain Node
 (`vitest.config.ts`): no DOM, no WebGL. Test pure logic (track curves, terrain
 noise, scoring/stars in `src/levels/scoring.ts`, store actions, level configs);
 keep pure helpers free of React/three imports so they stay testable. Adding a
@@ -128,7 +129,7 @@ from the URL; `?internal=0` clears it): it sends nothing either, via the same ga
 | `src/store/` | zustand stores: game, player, settings (persisted). Start or restart a level only through `startRun(levelId, seed?)` (resets the run, sets `runSeed`: seed > `?seed=` > `Date.now()`, enters `countdown`, or `playing` under `?e2e=1`: `startPhase.ts`). Code gated on `phase === 'playing'` (clock, spawns, shooting, enemy motion) waits through the countdown |
 | `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter, wave banner) + screens; `theme.ts` per-biome UI accents |
 | `src/testing/` | e2e hook |
-| `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser, `pause-check.sh`, `studio-status.cjs` |
+| `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser, `pause-check.sh`, `studio-status.cjs`, `run-usage.cjs` (token use of this session + its subagents; `--post` appends it to the `token-ledger` issue, the last step of every runbook) |
 | `.claude/agents/`, `.claude/commands/`, `.claude/scripts/` | Agent roles (incl. `pr-correctness` / `pr-consistency` reviewers), `/deslop` and `/wrap-pr`, the review-bundle script |
 | `docs/` | Specs, perf notes, the agent operating system in `docs/agents/` (runbooks for every scheduled task in `docs/agents/runbooks/`), and `docs/marketing/` (strategy, weekly metrics, ad budget ledger; owned by the Marketer) |
 | `js/`, `index.legacy.html`, `package.legacy.json`, `gulpfile.js`, `assets/` | **Legacy v1 game (2015).** Not built. Don't extend it. |

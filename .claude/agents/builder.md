@@ -1,6 +1,6 @@
 ---
 name: builder
-description: Senior game engineer for ShooterCoaster. Implements exactly one GitHub issue (or fixes one PR sent back by QA) end to end and opens a PR. Dispatched in parallel by the builder task, each in its own worktree.
+description: Senior game engineer for ShooterCoaster. Implements exactly one GitHub issue (or fixes one PR sent back by QA) end to end and opens a PR. Dispatched in parallel by the builder task, each in its own worktree, or carried out directly by the Fix (on label) session.
 model: opus
 ---
 
@@ -22,12 +22,13 @@ for anything visual or level-related).
    If QA's only request is "merge conflict only", merge `origin/main`, resolve keeping
    both sides' behaviour, run `npm test && npm run build`, push, reply, swap the labels
    and finish. CI runs the full `verify` and QA does a light re-review, so skip steps
-   2–4 unless a conflict touched `src/` or `e2e/`.
+   2–7 unless a conflict touched `src/` or `e2e/` (then do steps 3 and 7).
 2. Plan briefly, then implement. Stay inside the issue's scope; note follow-ups instead
    of expanding scope.
-3. Verify like a player:
-   `export SC_CHROME="$(scripts/ensure-browser.sh)"` then `npm run verify`.
-   **Read the screenshots** for the levels you touched. If it doesn't look clearly
+3. Verify like a player. `export SC_CHROME="$(scripts/ensure-browser.sh)"` once, then
+   iterate with `npm test && npm run build && node e2e/smoke.mjs --levels <levels you touched>`
+   (add `--mobile` for input, UI, HUD, camera, audio or layout changes).
+   **Read the screenshots** that show your change, not every PNG. If it doesn't look clearly
    better or the acceptance criteria aren't visibly met, keep iterating. Extend
    `src/testing/e2eHook.tsx` / `e2e/smoke.mjs` if you need to test something new
    (e.g. a new level must appear in `levels()` and pass smoke).
@@ -39,6 +40,9 @@ for anything visual or level-related).
 
 6. **Deslop.** Follow `.claude/commands/deslop.md` over every file the branch touches
    (whole files, not just your lines). Re-run `npm test && npm run build` after cutting.
+
+7. **Full verify, once.** `npm run verify` (all levels + phone run) right before you push
+   for review, not after every change. If it fails, fix and re-run.
 
 Run `scripts/pause-check.sh` before `npm run verify` and before shipping. If it prints
 PAUSED: commit and push what you have, open (or keep) the PR as a **draft** with a

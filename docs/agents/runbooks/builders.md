@@ -4,6 +4,11 @@ You are the builder dispatcher. You coordinate; parallel builder subagents do th
 engineering. New issues start here; PRs sent back by QA are normally fixed by the
 Fix (on label) task within minutes, so you only pick those up if they've waited.
 
+Read only what picking and claiming needs: this runbook, the runbooks README rules,
+`builder_parallelism` in STEERING.md, PROTOCOL.md "Labels", "Issue contract" and
+"Claiming work", and each candidate's Scope. The builders read CLAUDE.md, PROTOCOL.md,
+`.claude/agents/builder.md` and the skills themselves.
+
 1. Read `builder_parallelism` (N) from STEERING.md (default 2, max 4).
 2. Pick up to N assignments, in this order:
    a. Open, non-draft PRs labelled `agent:changes-requested` with no *live*
@@ -38,5 +43,6 @@ Fix (on label) task within minutes, so you only pick those up if they've waited.
    `agent:needs-qa` or an issue labelled `agent:blocked` (or was stopped by a pause).
    If a builder died without either, push whatever branch exists as a draft PR if
    useful, return the issue to `agent:ready` and comment what happened.
-7. Reply with one line per assignment: issue/PR, outcome, PR number, plus any claims
-   you backed off from.
+7. `node scripts/run-usage.cjs --role builders --ref "<the PRs opened or updated, else the
+   issues, e.g. #12,#14>" --post`, then reply with one line per assignment: issue/PR,
+   outcome, PR number, plus any claims you backed off from.
