@@ -75,8 +75,12 @@ export interface SCTestApi {
    *  pitch / yaw / roll, degrees). Kill trauma decays to 0 within 250 ms. */
   cameraTrauma: { current: number; max: number }
   /** Coaster camera weight (#123) applied this frame and the max seen since load:
-   *  bank and pitch (degrees, signed; maxima are absolute) and the speed FOV widening. */
-  cameraWeight: { roll: number; pitch: number; fovKick: number; maxRoll: number; maxPitch: number; maxFovKick: number }
+   *  bank and pitch (degrees, signed; maxima are absolute), the speed + drop FOV widening,
+   *  the smoothed ride speed (0–1) and the wind-streak opacity (#27). */
+  cameraWeight: {
+    roll: number; pitch: number; fovKick: number; maxRoll: number; maxPitch: number; maxFovKick: number
+    speed: number; streaks: number; maxStreaks: number
+  }
   /** First-person weapon view-model on screen (CSS px, origin top-left):
    *  bounding box of its projected bounds and the muzzle tip. null before the
    *  first level frame. */
@@ -108,6 +112,8 @@ export interface SCTestApi {
   setTimeScale: (s: number) => void
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null
+  /** Set to a speed (0–1 between the level's min and max velocity) to put the coaster at it on its next frame. */
+  rideSpeed: number | null
   // ── View / aspect (issue #66) ──
   /** Active camera projection vs the canvas's on-screen box (squash checks). */
   view: () => E2EView | null
@@ -327,7 +333,7 @@ export function installE2EApi() {
     combat: { fired: 0, hits: 0, kills: 0 },
     cameraTranslation: { current: 0, max: 0 },
     cameraTrauma: { current: 0, max: 0 },
-    cameraWeight: { roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0 },
+    cameraWeight: { roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0, speed: 0, streaks: 0, maxStreaks: 0 },
     weapon: null,
     holdFeedback: false,
     shaderWarmup: null,
@@ -389,6 +395,7 @@ export function installE2EApi() {
     },
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
     rideTo: null,
+    rideSpeed: null,
     view: readView,
     triggerHeld: () => getPointerState().down,
   }

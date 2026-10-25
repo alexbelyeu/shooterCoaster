@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   fovForAspect, fovWithSpeed, horizontalFov, verticalFovFor, MAX_VERTICAL_FOV, MIN_HORIZONTAL_FOV, SPEED_FOV_DEG,
+  DROP_FOV_DEG,
 } from './cameraFov'
 
 describe('cameraFov', () => {
@@ -44,6 +45,14 @@ describe('fovWithSpeed', () => {
     expect(fovWithSpeed(80, 1, 1)).toBe(80 + SPEED_FOV_DEG)
     expect(fovWithSpeed(80, 1, 0.5)).toBe(80 + SPEED_FOV_DEG / 2)
     expect(fovWithSpeed(80, 0.5, 1)).toBe(80 + SPEED_FOV_DEG / 2)
+  })
+
+  it('adds up to DROP_FOV_DEG on a steep drop, scaled by the setting', () => {
+    expect(fovWithSpeed(80, 0, 1, 1)).toBe(80 + DROP_FOV_DEG)
+    expect(fovWithSpeed(80, 1, 1, 1)).toBe(80 + SPEED_FOV_DEG + DROP_FOV_DEG)
+    expect(fovWithSpeed(80, 1, 0.5, 1)).toBe(80 + (SPEED_FOV_DEG + DROP_FOV_DEG) / 2)
+    expect(fovWithSpeed(80, 0, 0, 1)).toBe(80)
+    expect(fovWithSpeed(80, 0, 1, Number.NaN)).toBe(80)
   })
 
   it('is off with the setting off and clamps bad inputs', () => {

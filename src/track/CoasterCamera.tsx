@@ -13,6 +13,8 @@ import {
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
 import { fovForAspect, fovWithSpeed } from './cameraFov'
+import WindStreaks, { type StreakDrive } from './WindStreaks'
+import { streakOpacity, streakRate } from './windStreaks'
 import {
   CURVATURE_SAMPLE_UNITS, LOOK_AHEAD_UNITS, LOOK_RESPONSE, createRigState, lookAheadDirection,
   resetRig, smoothingFactor, stepRig,
@@ -75,6 +77,7 @@ export default function CoasterCamera({
   const lookDir = useRef(new THREE.Vector3())
   const lookSnapped = useRef(false)
   const rig = useRef(createRigState())
+  const streaks = useRef<StreakDrive>({ opacity: 0, time: 0 })
 
   // Rotation-only trauma from kills and `camera:trauma` world events (#65); see screenShake.ts.
   const shake = useRef({ trauma: 0, decayMs: KILL_TRAUMA_MS, time: 0, seed: 0 })
@@ -148,6 +151,10 @@ export default function CoasterCamera({
       testApi.rideTo = null
       jumped = true
     }
+    if (testApi?.rideSpeed != null) {
+      velocity.current = effectiveMinSpeed + Math.min(Math.max(testApi.rideSpeed, 0), 1) * (maxVelocity - effectiveMinSpeed)
+      testApi.rideSpeed = null
+    }
     progress.current += velocity.current * dtScaleSlow
     progress.current = wrap01(progress.current)
     const t = progress.current
@@ -199,7 +206,7 @@ export default function CoasterCamera({
     cam.lookAt(_lookAt.current)
 
     const motionScale = effectiveShakeScale(useSettingsStore.getState().screenShake, prefersReducedMotion())
-    const r = stepRig(rig.current, lateral, speed, velocityNorm, effectiveDelta, trackScale)
+    const r = stepRig(rig.current, lateral, speed, velocityNorm, effectiveDelta, trackScale, -_tangent.current.y)
     const roll = r.roll * motionScale
     const pitch = r.pitch * motionScale
     if (motionScale > 0) {
@@ -221,7 +228,10 @@ export default function CoasterCamera({
       traumaDeg = Math.max(Math.abs(a.pitch), Math.abs(a.yaw), Math.abs(a.roll)) * RAD_TO_DEG
     }
 
-    const fov = fovWithSpeed(effectiveFov.current, r.speedNorm, motionScale)
+    const fov = fovWithSpeed(effectiveFov.current, r.speedNorm, motionScale, r.drop)
+    const wind = streaks.current
+    wind.opacity = streakOpacity(r.speedNorm, motionScale)
+    wind.time += effectiveDelta * streakRate(r.speedNorm)
     if (Math.abs(cam.fov - fov) > 0.01) {
       cam.fov = fov
       cam.updateProjectionMatrix()
@@ -240,6 +250,9 @@ export default function CoasterCamera({
       w.maxRoll = Math.max(w.maxRoll, Math.abs(w.roll))
       w.maxPitch = Math.max(w.maxPitch, Math.abs(w.pitch))
       w.maxFovKick = Math.max(w.maxFovKick, w.fovKick)
+      w.speed = r.speedNorm
+      w.streaks = wind.opacity
+      w.maxStreaks = Math.max(w.maxStreaks, wind.opacity)
     }
 
     updateWindWhoosh(velocityNorm)
@@ -247,6 +260,7 @@ export default function CoasterCamera({
 
   return (
     <perspectiveCamera ref={cameraRef}>
+      <WindStreaks drive={streaks.current} />
       <WeaponViewModel />
     </perspectiveCamera>
   )

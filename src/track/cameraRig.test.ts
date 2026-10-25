@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BANK_RESPONSE, LATERAL_ACCEL_REF, MAX_BANK_DEG, MAX_LOOK_AHEAD_DEG, MAX_PITCH_DEG,
-  bankAngle, createRigState, damp, lookAheadDirection, pitchAngle, resetRig, smoothingFactor, stepRig,
+  bankAngle, createRigState, damp, dropAmount, lookAheadDirection, pitchAngle, resetRig, smoothingFactor, stepRig,
 } from './cameraRig'
 
 const DEG = Math.PI / 180
@@ -47,6 +47,22 @@ describe('bank and pitch', () => {
   })
 })
 
+describe('dropAmount', () => {
+  it('is 0 on the flat and climbs, 1 on steep drops, monotonic in between', () => {
+    expect(dropAmount(0)).toBe(0)
+    expect(dropAmount(-0.5)).toBe(0)
+    expect(dropAmount(0.05)).toBe(0)
+    expect(dropAmount(0.45)).toBe(1)
+    expect(dropAmount(0.9)).toBe(1)
+    expect(dropAmount(Number.NaN)).toBe(0)
+    let prev = 0
+    for (let d = 0; d <= 0.5; d += 0.01) {
+      expect(dropAmount(d)).toBeGreaterThanOrEqual(prev)
+      prev = dropAmount(d)
+    }
+  })
+})
+
 describe('stepRig', () => {
   it('eases into a sustained turn and settles at its bank angle', () => {
     const s = createRigState()
@@ -68,9 +84,17 @@ describe('stepRig', () => {
     expect(s.pitch).toBeLessThanOrEqual(MAX_PITCH_DEG * DEG)
   })
 
+  it('eases toward the drop amount of the current descent', () => {
+    const s = createRigState()
+    for (let i = 0; i < 600; i++) stepRig(s, 0, 100, 0, 1 / 60, 1, 0.6)
+    expect(s.drop).toBeCloseTo(1, 6)
+    for (let i = 0; i < 600; i++) stepRig(s, 0, 100, 0, 1 / 60, 1, -0.3)
+    expect(s.drop).toBeCloseTo(0, 6)
+  })
+
   it('is untouched by frozen frames and cleared by a reset', () => {
     const s = createRigState()
-    for (let i = 0; i < 30; i++) stepRig(s, 200, 100 + i, 1, 1 / 60, 1)
+    for (let i = 0; i < 30; i++) stepRig(s, 200, 100 + i, 1, 1 / 60, 1, 0.5)
     const before = { ...s }
     stepRig(s, -500, 0, 0, 0, 1)
     expect(s).toEqual(before)

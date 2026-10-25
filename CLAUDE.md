@@ -76,7 +76,8 @@ the phone run checks its cards fit 390 px.
 `?e2e=1` skips the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1`: the countdown must show (`countdown.png`),
 a press during it must fire nothing (also when held on into `playing`), the timer must hold, a replay tap after 1 s skips to `playing`,
-and the shader warm-up must finish.
+and the shader warm-up must finish. A `speed` step holds the first level at top speed on the most
+banked of ten sampled track points: the wind streaks must show and the camera must bank ≥ 1° (`speed.png`).
 `drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
 spawned enemies) and vary run to run; for before/after comparisons use the
 camera-independent `scene` totals the smoke also prints (`track objs/tris` = objects
@@ -88,9 +89,9 @@ Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/timeRemaining/phase/liveEnemies/
 onScreenEnemies/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `killNearest(n)` (fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
-`endLevel()`, `setTimeScale(s)`, `rideTo` (set a track fraction 0–1 to jump the coaster there), `sceneStats()`, `combat` fire/hit/kill event counters,
+`endLevel()`, `setTimeScale(s)`, `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideSpeed` (set 0–1 to put the coaster at that speed), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
-{current, max} in degrees, `cameraWeight` → bank / pitch / speed-FOV kick now and max (degrees), `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
+{current, max} in degrees, `cameraWeight` → bank / pitch / speed + drop FOV kick now and max (degrees), smoothed speed 0–1, wind-streak opacity, `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
 `view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `audio()` → unlocked?, live SFX node count, music ducked?, sounds dropped by a caught audio error,
 `audioBurst(shots, kills)` → rapid SFX + late music notes in one JS turn while the audio clock ticks, `triggerHeld()` → pointer trigger down?,
 `shaderWarmup` {done, ms, programs} for the current level). See `src/testing/e2eHook.tsx`. Extend it when you need new test
@@ -98,9 +99,11 @@ surfaces. Bullets travel per *second* with a swept hit test (`combat/projectiles
 but enemies and the camera still move a lot during one ~1 fps headless frame, so
 autofire only sometimes lands hits — `killNearest` is what guarantees kills.
 The coaster camera sets its own aspect/FOV from the canvas size (`track/cameraFov.ts`:
-portrait screens get a wider vertical FOV, plus a few degrees with speed) and has rotation-only
+portrait screens get a wider vertical FOV, plus a few degrees with speed and on steep drops) and has rotation-only
 weight (`track/cameraRig.ts`: look-ahead into curves, bank into turns, pitch with speed changes;
-bank, pitch and the FOV kick scale with the Screen-shake setting, and the smoke fails past their caps); touch shots get aim assist (`combat/aimAssist.ts`).
+bank, pitch and the FOV kick scale with the Screen-shake setting, and the smoke fails past their caps).
+Above ~70% of top speed, camera-space wind streaks fade in (`track/WindStreaks.tsx`, numbers in `windStreaks.ts`;
+one draw call, hidden when slow, also scaled by Screen shake); touch shots get aim assist (`combat/aimAssist.ts`).
 
 ## Stack
 
@@ -128,7 +131,7 @@ from the URL; `?internal=0` clears it): it sends nothing either, via the same ga
 | `src/levels/LevelRegistry.ts` | **Level configs** — track params, biome, timer, waves, star thresholds |
 | `src/levels/scoring.ts` | `SCORE_VALUES` per enemy, `computeMaxScore`, `computeStars` (pure, unit-tested) |
 | `src/levels/environments/` | `BiomeEnvironment` (thin host) + `biomeRegistry.ts`; per-biome modules in `biomes/<biome>/` (`config.ts` colour ramp + trees, `Decorations.tsx`, `Features.tsx`, `index.ts`); shared terrain/water/trees/atmosphere/scatter helpers in `shared/` (incl. `trackClearance.ts` to keep props off the track and its towers, `paintedParts.ts` to merge multi-coloured props into one draw call, `ringedRock.ts` for stacked-ring rock formations like sea stacks and mesas, `ParticleField.tsx` for ambient air particles from a per-biome preset, e.g. volcanic ash/embers, `treeWind.ts` for the `TreeField` wind sway vertex patch); a biome may supply its own `createTerrainMaterial` (desert sand ripples); biome components get `heightFn`, `groundFn` (terrain as drawn) and the track's arc table; landmarks (FerrisWheel, Pyramid, Volcano…); per-biome sky/light/fog/`envIntensity`/colour `grade` in `atmosphere.ts` + `SkyDome.tsx`; `shared/Atmosphere.tsx` bakes the sky into `scene.environment` once per level (PMREM), which only Standard/Physical materials reflect |
-| `src/track/` | Procedural track curves, track mesh (rails + ties), lattice support towers, `trackDimensions` (structure scale per level), coaster camera (`cameraRig.ts` weight, `cameraFov.ts` projection), progress |
+| `src/track/` | Procedural track curves, track mesh (rails + ties), lattice support towers, `trackDimensions` (structure scale per level), coaster camera (`cameraRig.ts` weight, `cameraFov.ts` projection, `WindStreaks.tsx` speed lines), progress |
 | `src/entities/enemies/` | Enemy models/behaviours; geometries + materials are module-level exports of `SharedEnemyAssets.ts` (that is how `ShaderWarmup` finds every enemy shader, later waves included); `entities/spawning/EnemySpawner` waves (spawn positions seeded by the store's `runSeed`) |
 | `src/utils/rng.ts` | The one seeded PRNG (`createRng(seed)` → callable + `range`/`pick`, `hashString`, `seedFromQuery`). Layout/scatter code takes an rng with a fixed seed, never `Math.random` (keep that for per-frame cosmetic jitter) |
 | `src/input/` | `pointerInput` — the single Pointer Events source (mouse/touch/pen) for aim + fire |

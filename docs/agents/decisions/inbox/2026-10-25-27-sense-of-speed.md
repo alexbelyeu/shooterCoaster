@@ -1,0 +1,5 @@
+## 2026-10-25 — Sense of speed stays rotation-only; streaks draw in the opaque pass (Builder, #27)
+
+**Context:** #27 asked for 18° banking, +6° / +4° FOV kicks, wind streaks and a head bob. #123 had already shipped rotation-only bank (8°), pitch and a 5° speed FOV kick, and the smoke requires zero camera translation (#65).
+**Decision:** Keep #123's bank cap; add a 3° drop FOV kick on steep descents (total cap 8°, `CAMERA_WEIGHT_CAPS` in the smoke) and camera-space wind streaks above 70% of top speed, both scaled by the Screen-shake setting. No head bob: it is a translation. `WindStreaks` builds its quads in clip space and is *not* `transparent`, with additive blending, no depth test and renderOrder 9: it sorts in the opaque list after the world (renderOrder 0) and before the gun (10), so the world never hides it and the gun stays on top.
+**Consequences:** Transparent world objects (water, particles) draw over the streaks. A gun or other camera-attached opaque mesh must keep renderOrder above 9 to stay over them.
