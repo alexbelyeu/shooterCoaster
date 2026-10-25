@@ -39,7 +39,8 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
   async function play() {
     if (started.current) return
     started.current = true
-    await startMusic()
+    // A browser that refuses audio still gets to play.
+    await startMusic().catch(() => {})
     onPlay()
   }
 
