@@ -68,6 +68,11 @@ same each time; a `seed-check` step reloads the first level and requires the sam
 step fakes a tab hide (`visibilitychange`) on the first level: the run must pause, drop a
 held trigger, keep `timeRemaining` still over 5 s hidden, stay paused when shown again, and
 after Resume neither reset nor jump the timer; a window `blur` must pause too.
+A `levelSelect` step seeds saved progress (3★ + 1★), opens the level select (`levelSelect.png`)
+and requires one card per level, the right locked count and `★ x / 15` total, every card
+inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move focus, Enter on a
+locked card does nothing, Enter on an open one plays the launch transition and starts that level);
+the phone run checks its cards fit 390 px.
 `?e2e=1` skips the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1`: the countdown must show (`countdown.png`),
 a press during it must fire nothing (also when held on into `playing`), the timer must hold, a replay tap after 1 s skips to `playing`,
@@ -79,9 +84,9 @@ named `track*`; `env=` is the baked sky env map's intensity and bake time; a lev
 without `scene.environment` fails).
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
-(`levels()`, `startLevel(id, seed?)`, `spawnDigest()` → hash of the run's spawn positions, `frames`, `drawCalls`, `triangles`, `avgFrameMs`,
+(`levels()`, `startLevel(id, seed?)`, `setPhase(phase)`, `setSavedScores(scores)`, `spawnDigest()` → hash of the run's spawn positions, `frames`, `drawCalls`, `triangles`, `avgFrameMs`,
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/timeRemaining/phase/liveEnemies/
-onScreenEnemies/shotsFired/hits/bestCombo/runSeed, `autoFire(on)`, `killNearest(n)` (fires one real shot,
+onScreenEnemies/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `killNearest(n)` (fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
 `endLevel()`, `setTimeScale(s)`, `rideTo` (set a track fraction 0–1 to jump the coaster there), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
@@ -131,7 +136,7 @@ from the URL; `?internal=0` clears it): it sends nothing either, via the same ga
 | `src/effects/` | Explosions (pooled), score popups |
 | `src/audio/` | Tone.js engine (`sfxChannel` / `musicChannel` → master limiter; slow-mo low-pass duck on the music bus), music + SFX managers. `SFXManager` pre-builds one node kit per level (`prepareLevelSFX`, disposed by `disposeSFX`): fire variants, hit tick, kill layers by combo, per-biome wave stinger; numbers in pure `sfxDesign.ts`. Never create Tone nodes in a play function. Every trigger time goes through `nextTriggerTime` (`triggerTime.ts`: strictly increasing per node, late times pushed past the live audio clock), and every play function / music loop callback catches into `soundGuard.ts` (drops that one sound, never throws to the page) |
 | `src/store/` | zustand stores: game, player, settings (persisted). Start or restart a level only through `startRun(levelId, seed?)` (resets the run, sets `runSeed`: seed > `?seed=` > `Date.now()`, enters `countdown`, or `playing` under `?e2e=1`: `startPhase.ts`). Code gated on `phase === 'playing'` (clock, spawns, shooting, enemy motion) waits through the countdown |
-| `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter, wave banner) + screens (`ResultsScreen`: staged reveal of score count-up, star pops with `playStarChime`, star-threshold bar, stats, NEW RECORD; tap skips it, reduced motion shows it at once; Enter = next, R = replay; numbers in pure `resultsStats.ts`); `theme.ts` per-biome UI accents |
+| `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter, wave banner) + screens (`LevelSelectScreen`: biome cards with an inline-SVG landmark postcard (`LevelPostcard`), stars, best score, locked hint, `★ x / 15` total, arrow-key / Enter / Esc navigation, 300 ms launch before `startRun`; data + nav in pure `levelSelectModel.ts`; `ResultsScreen`: staged reveal of score count-up, star pops with `playStarChime`, star-threshold bar, stats, NEW RECORD; tap skips it, reduced motion shows it at once; Enter = next, R = replay; numbers in pure `resultsStats.ts`); `theme.ts` per-biome UI accents + postcard sky |
 | `src/testing/` | e2e hook |
 | `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser, `pause-check.sh`, `studio-status.cjs`, `run-usage.cjs` (token use of this session + its subagents; `--post` appends it to the `token-ledger` issue, the last step of every runbook) |
 | `.claude/agents/`, `.claude/commands/`, `.claude/scripts/` | Agent roles (incl. `pr-correctness` / `pr-consistency` reviewers), `/deslop` and `/wrap-pr`, the review-bundle script |
