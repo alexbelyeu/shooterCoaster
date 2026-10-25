@@ -7,6 +7,8 @@ export interface ScoreEntry {
   maxScore: number
   stars: number
   timestamp: number
+  /** Longest kill streak ever on this level. Missing on entries saved before it existed. */
+  bestCombo?: number
 }
 
 export interface ComboState {

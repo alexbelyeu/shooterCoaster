@@ -1,60 +1,245 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { animate, motion } from 'framer-motion'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars } from '@/levels/scoring'
+import { playStarChime } from '@/audio/SFXManager'
+import { biomeTheme } from '@/ui/theme'
+import { usePrefersReducedMotion } from '@/ui/reducedMotion'
+import { barFill, formatAccuracy, formatTimeLeft, isNewRecord, nextStar } from './resultsStats'
+
+const fmt = new Intl.NumberFormat('en-US')
+
+const STAGE = { title: 0, count: 1, star: 2, stats: 5, done: 6 } as const
+const STAGE_AT_MS = [0, 350, 1700, 2050, 2400, 2800, 3500]
+const COUNT_UP_S = 1.2
+
+/** The finished run, read once on mount so a Replay / Next during the exit fade doesn't repaint it. */
+function snapshotRun() {
+  const s = useGameStore.getState()
+  return {
+    levelId: s.currentLevel,
+    score: Math.round(s.score),
+    kills: s.kills,
+    totalEnemies: s.totalEnemies,
+    hits: s.hits,
+    shotsFired: s.shotsFired,
+    bestCombo: s.bestCombo,
+    timeRemaining: s.timeRemaining,
+    previousBest: s.currentLevel ? (s.savedScores[s.currentLevel]?.score ?? 0) : 0,
+  }
+}
 
 export default function ResultsScreen() {
-  const { score, currentLevel, setPhase, saveScore, startRun } = useGameStore()
-
-  const config = currentLevel ? getLevelConfig(currentLevel) : undefined
+  const [run] = useState(snapshotRun)
+  const config = run.levelId ? getLevelConfig(run.levelId) : undefined
+  const reducedMotion = usePrefersReducedMotion()
+  const [stage, setStage] = useState<number>(reducedMotion ? STAGE.done : STAGE.title)
+  const scoreRef = useRef<HTMLSpanElement>(null)
+  const fillRef = useRef<HTMLDivElement>(null)
   const saved = useRef(false)
+  const left = useRef(false)
 
-  const stars = config ? computeStars(score, config.maxScore, config.starThresholds) : 0
+  const stars = config ? computeStars(run.score, config.maxScore, config.starThresholds) : 0
+  const fill = config ? barFill(run.score, config.maxScore) : 0
+  const record = isNewRecord(run.score, run.previousBest)
+  const counting = stage >= STAGE.count
+  const done = stage >= STAGE.done
+
+  /** Once only: the screen lingers through its exit fade. */
+  function leave(levelId: string | null) {
+    if (left.current) return
+    left.current = true
+    if (levelId) useGameStore.getState().startRun(levelId)
+    else useGameStore.getState().setPhase('levelSelect')
+  }
+
+  // previousBest was read before this save, so the record check isn't fooled by it.
+  useEffect(() => {
+    if (!config || saved.current) return
+    saved.current = true
+    useGameStore.getState().saveScore({
+      level: config.id,
+      score: run.score,
+      maxScore: config.maxScore,
+      stars,
+      timestamp: Date.now(),
+      bestCombo: run.bestCombo,
+    })
+  }, [config, run, stars])
 
   useEffect(() => {
-    if (config && !saved.current) {
-      saved.current = true
-      saveScore({
-        level: config.id,
-        score,
-        maxScore: config.maxScore,
-        stars,
-        timestamp: Date.now(),
-      })
+    if (done) return
+    const timer = setTimeout(() => setStage(stage + 1), STAGE_AT_MS[stage + 1] - STAGE_AT_MS[stage])
+    return () => clearTimeout(timer)
+  }, [stage, done])
+
+  useEffect(() => {
+    const i = stage - STAGE.star
+    if (i >= 0 && i < 3 && i < stars) playStarChime(i)
+  }, [stage, stars])
+
+  useEffect(() => {
+    const scoreEl = scoreRef.current
+    const fillEl = fillRef.current
+    if (!scoreEl || !fillEl) return
+    const paint = (v: number) => {
+      scoreEl.textContent = fmt.format(Math.round(v))
+      fillEl.style.width = `${(run.score > 0 ? v / run.score : 0) * fill * 100}%`
     }
-  }, [config, score, stars, saveScore])
+    if (!counting) {
+      paint(0)
+      return
+    }
+    if (done) {
+      paint(run.score)
+      return
+    }
+    const controls = animate(0, run.score, { duration: COUNT_UP_S, ease: 'easeOut', onUpdate: paint })
+    return () => controls.stop()
+  }, [counting, done, run.score, fill])
+
+  useEffect(() => {
+    if (!config) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
+      // A focused button already turns Enter into its own click.
+      if (e.key === 'Enter' && e.target instanceof HTMLButtonElement) return
+      if (e.key === 'Enter') leave(config.nextLevel)
+      else if (e.key === 'r' || e.key === 'R') leave(config.id)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [config])
 
   if (!config) return null
 
-  function replay() {
-    startRun(config!.id)
-  }
-
-  function nextLevel() {
-    if (config!.nextLevel) {
-      startRun(config!.nextLevel)
-    } else {
-      setPhase('levelSelect')
-    }
-  }
+  const theme = biomeTheme(config.biome)
+  const next = nextStar(run.score, config.maxScore, config.starThresholds)
+  const instant = { duration: 0 }
+  const reveal = (from: number) => (stage >= from ? 'shown' : 'hidden')
+  const rows: [string, string][] = [
+    ['Kills', `${run.kills} / ${run.totalEnemies}`],
+    ['Accuracy', formatAccuracy(run.hits, run.shotsFired)],
+    ['Best combo', run.bestCombo > 0 ? `×${run.bestCombo}` : '—'],
+    ['Time left', formatTimeLeft(run.timeRemaining)],
+  ]
 
   return (
-    <div className="results-screen">
-      <h2>{config.message}</h2>
-      <p style={{ fontSize: '3rem', margin: '1rem 0' }}>
-        {'★'.repeat(stars)}
-        {'☆'.repeat(3 - stars)}
-      </p>
-      <p style={{ fontSize: '1.5rem' }}>
-        Score: {Math.round(score)} / {config.maxScore}
-      </p>
-      <div className="results-actions">
-        <button className="play-button" onClick={replay}>
-          Replay
-        </button>
-        <button className="play-button" onClick={nextLevel}>
-          {config.nextLevel ? 'Next Level' : 'Back to Menu'}
-        </button>
+    <div
+      className="results-screen"
+      data-sequence={done ? 'done' : 'running'}
+      style={{ '--accent': theme.accent, '--accent-glow': theme.glow } as CSSProperties}
+      onPointerDown={() => {
+        if (!done) setStage(STAGE.done)
+      }}
+    >
+      <div className="results-card">
+        <div className="results-main">
+          <motion.h2
+            initial={reducedMotion ? false : { opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={reducedMotion ? instant : { duration: 0.35 }}
+          >
+            {config.name}
+          </motion.h2>
+          <p className="results-message">{config.message}</p>
+
+          <div className="results-stars" aria-label={`${stars} of 3 stars`}>
+            {[0, 1, 2].map((i) => (
+              <span key={i} className="results-star">
+                ☆
+                {i < stars && (
+                  <motion.span
+                    className="results-star-earned"
+                    initial={false}
+                    variants={{ hidden: { scale: 0, opacity: 0, rotate: -40 }, shown: { scale: 1, opacity: 1, rotate: 0 } }}
+                    animate={reveal(STAGE.star + i)}
+                    transition={done ? instant : { type: 'spring', stiffness: 420, damping: 13 }}
+                  >
+                    ★
+                  </motion.span>
+                )}
+              </span>
+            ))}
+          </div>
+
+          <div className="results-score">
+            <span ref={scoreRef} className="results-score-value">
+              0
+            </span>
+            {record && (
+              <motion.span
+                className="results-record"
+                initial={false}
+                variants={{ hidden: { scale: 1.8, opacity: 0, rotate: -12 }, shown: { scale: 1, opacity: 1, rotate: -6 } }}
+                animate={reveal(STAGE.stats)}
+                transition={done ? instant : { type: 'spring', stiffness: 500, damping: 18 }}
+              >
+                NEW RECORD
+              </motion.span>
+            )}
+          </div>
+          {!record && run.previousBest > 0 && (
+            <p className="results-best">Best {fmt.format(Math.round(run.previousBest))}</p>
+          )}
+
+          <div className="results-bar" role="presentation">
+            <div ref={fillRef} className="results-bar-fill" />
+            {config.starThresholds.map((t, i) => (
+              <span
+                key={i}
+                className={`results-bar-marker${run.score >= t * config.maxScore ? ' reached' : ''}`}
+                style={{ left: `${t * 100}%` }}
+              >
+                {'★'.repeat(i + 1)}
+              </span>
+            ))}
+          </div>
+          <p className="results-next" style={{ visibility: stage >= STAGE.stats ? 'visible' : 'hidden' }}>
+            {next ? `${fmt.format(next.points)} pts to ${'★'.repeat(next.stars)}` : 'All stars!'}
+          </p>
+        </div>
+
+        <div className="results-side">
+          <ul className="results-stats">
+            {rows.map(([label, value], i) => (
+              <motion.li
+                key={label}
+                className="results-stat"
+                initial={false}
+                variants={{ hidden: { opacity: 0, x: -24 }, shown: { opacity: 1, x: 0 } }}
+                animate={reveal(STAGE.stats)}
+                transition={done ? instant : { duration: 0.25, delay: i * 0.08 }}
+              >
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </motion.li>
+            ))}
+          </ul>
+
+          <motion.div
+            className="results-actions"
+            initial={false}
+            variants={{ hidden: { opacity: 0, y: 12 }, shown: { opacity: 1, y: 0 } }}
+            animate={reveal(STAGE.done)}
+            transition={reducedMotion ? instant : { duration: 0.25 }}
+            style={{ pointerEvents: done ? 'auto' : 'none' }}
+          >
+            <button className="play-button results-secondary" onClick={() => leave(null)}>
+              Levels
+            </button>
+            <button className="play-button results-secondary" onClick={() => leave(config.id)}>
+              Replay
+            </button>
+            {config.nextLevel && (
+              <button className="play-button" onClick={() => leave(config.nextLevel)}>
+                Next Level
+              </button>
+            )}
+          </motion.div>
+          <p className="results-keys">{config.nextLevel ? 'Enter: next' : 'Enter: levels'} · R: replay</p>
+        </div>
       </div>
     </div>
   )

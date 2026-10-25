@@ -105,3 +105,5 @@ export const STINGERS: Record<BiomeType, StingerDesign> = {
 }
 
 export const STINGER_VOICES = 3
+
+export const STAR_CHIME_NOTES = ['E5', 'G5', 'C6'] as const

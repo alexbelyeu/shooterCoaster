@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
+import { useGameStore } from '@/store/useGameStore'
 
 export interface CollisionTarget {
   id: string
@@ -36,10 +37,11 @@ export function getCollisionTargets(): Map<string, CollisionTarget> {
 
 /**
  * Resolve one hit on a target: emit `enemy:hit` (UI / audio / feedback react to
- * it) and then run the target's own hit handler. Used by the bullet pool's
+ * it), count it for accuracy, then run the target's own hit handler. Used by the bullet pool's
  * collision pass and by the e2e test hook so both take the same path.
  */
 export function processHit(target: CollisionTarget): void {
+  useGameStore.getState().registerHit()
   hitEvent.id = target.id
   hitEvent.position.copy(target.getPosition())
   eventBus.emit('enemy:hit', hitEvent)
