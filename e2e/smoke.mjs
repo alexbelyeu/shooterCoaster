@@ -14,7 +14,8 @@
  * the coaster camera's bank / pitch / speed FOV went past their caps (#123),
  * the first-person weapon is missing / off screen / covering the centre / not
  * pointing along the shot's tracer (> 25° on screen), the
- * camera aspect doesn't match the canvas, or the results screen never appears.
+ * camera aspect doesn't match the canvas, or the results screen never finishes its
+ * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats().
  * Every level and the phone run (portrait, and after rotating) also run audioBurst():
  * fails on a late note that throws or a sound dropped by an audio error (#115).
  * Saves screenshots + stats to e2e-results/.
@@ -1145,12 +1146,16 @@ async function run() {
           ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}°${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}°${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
   console.log(`Screenshots + results.json in ${OUT} (total ${((Date.now() - runStarted) / 1000).toFixed(0)}s)`)
   process.exit(failed ? 1 : 0)
+}
+
+function resultsSummary(s) {
+  return s ? ` results=${s.stars}★ acc=${s.rows.Accuracy} combo=${s.rows['Best combo']}` : ''
 }
 
 /** audioBurst result: "ok", or late-note throws + dropped sounds. */
