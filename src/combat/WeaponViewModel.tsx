@@ -5,7 +5,7 @@ import { eventBus } from '@/core/EventBus'
 import { useGameStore } from '@/store/useGameStore'
 import { getPointerState } from '@/input/pointerInput'
 import MuzzleFlash, { type MuzzleAnchor } from './MuzzleFlash'
-import { isFeedbackHeld, lastShot } from './hitFeedback'
+import { isFeedbackHeld, lastShot, muzzleTip } from './hitFeedback'
 import {
   FLASH_SIZE, TIP, TRACER_WIDTH, buildTracerGeometry, buildWeaponGeometry, createTracerMaterial,
   createWeaponMaterial,
@@ -74,6 +74,7 @@ export default function WeaponViewModel() {
       material.dispose()
       tracerGeometry.dispose()
       tracerMaterial.dispose()
+      muzzleTip.ready = false
     },
     [geometry, material, tracerGeometry, tracerMaterial],
   )
@@ -161,6 +162,10 @@ export default function WeaponViewModel() {
 
     anchor.tip.copy(TIP).applyMatrix4(gun.matrix)
     anchor.size = FLASH_SIZE * scale
+    muzzleTip.x = anchor.tip.x
+    muzzleTip.y = anchor.tip.y
+    muzzleTip.z = anchor.tip.z
+    muzzleTip.ready = true
 
     if (s.tracerPending) {
       s.tracerPending = false

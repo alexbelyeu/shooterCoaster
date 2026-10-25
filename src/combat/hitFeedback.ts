@@ -25,6 +25,9 @@ export function recordShot(ndcX: number, ndcY: number): void {
   lastShot.at = typeof performance !== 'undefined' ? performance.now() : 0
 }
 
+/** Camera-space muzzle tip, set every frame by `WeaponViewModel`; BulletPool draws fresh bullets from it. */
+export const muzzleTip = { x: 0, y: 0, z: 0, ready: false }
+
 /** Test-only (e2e `holdFeedback`): freeze transient feedback at its peak for slow headless screenshots. */
 export function isFeedbackHeld(): boolean {
   return typeof window !== 'undefined' && window.__SC_TEST__?.holdFeedback === true

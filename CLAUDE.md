@@ -42,14 +42,16 @@ triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/size
 to `e2e-results/`: `title.png`, and per level `<id>.png` (after a 10 s ride),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
-gold hitmarker held on the kill frame via `holdFeedback`) and `<id>-results.png`. A level fails if
+gold hitmarker held on the kill frame via `holdFeedback`), `<id>-shot.png` (one real shot two 40 ms
+steps into its flight, time frozen) and `<id>-results.png`. A level fails if
 it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
 enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
 wall-clock level timer already ran out), the camera translates off the track pose at all
 (kill feedback is rotation-only trauma, ≤ 1°, back to 0), the first-person weapon is off
 screen / covers the centre / overlaps the HUD / points > 25° off the shot's tracer (also
 checked in mobile portrait + landscape),
-the camera aspect doesn't match the canvas (±0.01), or the results screen never finishes its
+the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
+canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
 reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left) or the
 Levels / Replay buttons, shows NaN, or disagrees with `stats()` on score or kills.
 `npm run smoke` also passes `--mobile`:
@@ -89,13 +91,15 @@ Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/timeRemaining/phase/liveEnemies/
 onScreenEnemies/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `killNearest(n)` (fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
-`endLevel()`, `setTimeScale(s)`, `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideSpeed` (set 0–1 to put the coaster at that speed), `sceneStats()`, `combat` fire/hit/kill event counters,
+`fireShot(x, y)` (one real shot through NDC), `bullets()` → drawn count, largest screen radius now / since load, newest bullet's
+screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)`, `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideSpeed` (set 0–1 to put the coaster at that speed), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
 {current, max} in degrees, `cameraWeight` → bank / pitch / speed + drop FOV kick now and max (degrees), smoothed speed 0–1, wind-streak opacity, `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
 `view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `audio()` → unlocked?, live SFX node count, music ducked?, sounds dropped by a caught audio error,
 `audioBurst(shots, kills)` → rapid SFX + late music notes in one JS turn while the audio clock ticks, `triggerHeld()` → pointer trigger down?,
 `shaderWarmup` {done, ms, programs} for the current level). See `src/testing/e2eHook.tsx`. Extend it when you need new test
-surfaces. Bullets travel per *second* with a swept hit test (`combat/projectiles/bulletMotion.ts`),
+surfaces. Bullets travel per *second* with a swept hit test (`combat/projectiles/bulletMotion.ts`) along the camera ray;
+they are *drawn* from the gun's muzzle into that ray, capped to 1.5% of the canvas height on screen (`bulletVisual.ts`),
 but enemies and the camera still move a lot during one ~1 fps headless frame, so
 autofire only sometimes lands hits — `killNearest` is what guarantees kills.
 The coaster camera sets its own aspect/FOV from the canvas size (`track/cameraFov.ts`:

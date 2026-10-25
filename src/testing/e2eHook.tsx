@@ -87,6 +87,13 @@ export interface SCTestApi {
   weapon: E2EWeaponOnScreen | null
   /** Freeze transient feedback (muzzle flash, hitmarker) at its peak for screenshots. */
   holdFeedback: boolean
+  /** Seconds every live bullet flies per frame instead of the frame time, and no bullet expires;
+   *  0 freezes them (e.g. a fresh one at the muzzle), null is normal play. */
+  bulletStep: number | null
+  /** Drawn bullets (#165): count, largest screen radius (fraction of canvas height) now and since load, newest one's CSS px point. */
+  bullets: () => E2EBullets
+  /** Fire one real shot through NDC (x, y), like a click there. False if not fired (phase, fire delay). */
+  fireShot: (x: number, y: number) => boolean
   /**
    * Deterministic scene totals, independent of camera/frustum culling:
    * every visible mesh's triangles (x instance count) and object count, plus a
@@ -180,6 +187,13 @@ export interface SCTestStats {
   currentLevel: string | null
 }
 
+export interface E2EBullets {
+  drawn: number
+  screenFrac: number
+  maxScreenFrac: number
+  newest: { x: number; y: number } | null
+}
+
 export interface E2EWeaponOnScreen {
   visible: boolean
   minX: number
@@ -230,6 +244,25 @@ let probeCamera: THREE.Camera | null = null
 let probeSize = { width: 1280, height: 720 }
 const _v = new THREE.Vector3()
 const _w = new THREE.Vector3()
+
+/** Written by BulletPool every playing frame when the e2e flag is on; read through `bullets()`. */
+export const e2eBullets = {
+  drawn: 0,
+  screenFrac: 0,
+  maxScreenFrac: 0,
+  hasNewest: false,
+  newest: new THREE.Vector3(),
+}
+
+function readBullets(): E2EBullets {
+  const b = e2eBullets
+  let newest: E2EBullets['newest'] = null
+  if (b.hasNewest && probeCamera) {
+    _v.copy(b.newest).project(probeCamera)
+    if (_v.z < 1) newest = { x: ((_v.x + 1) / 2) * probeSize.width, y: ((1 - _v.y) / 2) * probeSize.height }
+  }
+  return { drawn: b.drawn, screenFrac: b.screenFrac, maxScreenFrac: b.maxScreenFrac, newest }
+}
 
 function enemiesOnScreen(): E2EEnemyOnScreen[] {
   const cam = probeCamera
@@ -336,6 +369,9 @@ export function installE2EApi() {
     cameraWeight: { roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0, speed: 0, streaks: 0, maxStreaks: 0 },
     weapon: null,
     holdFeedback: false,
+    bulletStep: null,
+    bullets: readBullets,
+    fireShot: (x: number, y: number) => (probeCamera ? fireAtNDC(x, y, probeCamera) : false),
     shaderWarmup: null,
     sceneStats: () => null,
     autoFire: (enabled: boolean) => {
