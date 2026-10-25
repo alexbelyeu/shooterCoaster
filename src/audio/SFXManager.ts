@@ -120,7 +120,6 @@ function createKit(biome: BiomeType): Kit {
     })).connect(stingerBus))
   }
 
-  // Bell: near-harmonic FM, long decay.
   const chime = own(new Tone.Synth({
     oscillator: { type: 'fmsine', harmonicity: 2, modulationIndex: 3 },
     envelope: { attack: 0.002, decay: 0.9, sustain: 0, release: 0.4 },
@@ -248,7 +247,7 @@ export function playWaveStinger(): void {
   }
 }
 
-/** Results screen: chime for star `starIndex` (0-2) popping in. Uses the level's kit, still alive on results. */
+/** Uses the level's kit, which stays mounted under the results screen. */
 export function playStarChime(starIndex: number): void {
   const k = ensureKit()
   if (!k) return

@@ -21,7 +21,6 @@ interface GameState {
   // Score
   score: number
   addScore: (points: number) => void
-  /** Resets score plus the per-run counters below. */
   resetScore: () => void
 
   // Per-run counters (reset by resetScore / startRun)
@@ -29,7 +28,6 @@ interface GameState {
   shotsFired: number
   /** Bullets that hit an enemy (`processHit`). */
   hits: number
-  /** Longest combo count reached this run. */
   bestCombo: number
   registerShot: () => void
   registerHit: () => void

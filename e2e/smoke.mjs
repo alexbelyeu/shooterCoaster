@@ -312,8 +312,7 @@ async function playLevel(page, id) {
   problems.push(...audio.problems)
 
   await page.evaluate(() => window.__SC_TEST__.endLevel())
-  // App uses AnimatePresence mode="wait": the HUD fades out before the results fade in,
-  // then the results screen plays its reveal (score count-up, stars, stats, buttons).
+  // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
   const resultsShown = await page
     .waitForFunction(
       () => {
@@ -376,7 +375,6 @@ async function playLevel(page, id) {
   }
 }
 
-/** The results screen (#25): stats rows, buttons, revealed stars, no NaN. */
 async function resultsScreenProblems(page, stats) {
   const screen = await page.evaluate(() => {
     const el = document.querySelector('.results-screen')

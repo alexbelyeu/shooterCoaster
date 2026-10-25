@@ -10,7 +10,6 @@ import { barFill, formatAccuracy, formatTimeLeft, isNewRecord, nextStar } from '
 
 const fmt = new Intl.NumberFormat('en-US')
 
-/** Reveal order; `STAGE_AT_MS[stage]` is when each one starts. */
 const STAGE = { title: 0, count: 1, star: 2, stats: 5, done: 6 } as const
 const STAGE_AT_MS = [0, 350, 1700, 2050, 2400, 2800, 3500]
 const COUNT_UP_S = 1.2
@@ -47,7 +46,7 @@ export default function ResultsScreen() {
   const counting = stage >= STAGE.count
   const done = stage >= STAGE.done
 
-  /** Start `levelId`, or go to level select with null. Once: the screen lingers through its exit fade. */
+  /** Once only: the screen lingers through its exit fade. */
   function leave(levelId: string | null) {
     if (left.current) return
     left.current = true
@@ -55,7 +54,7 @@ export default function ResultsScreen() {
     else useGameStore.getState().setPhase('levelSelect')
   }
 
-  // Save once; previousBest was read before this, so the record check isn't fooled by our own save.
+  // previousBest was read before this save, so the record check isn't fooled by it.
   useEffect(() => {
     if (!config || saved.current) return
     saved.current = true
@@ -69,20 +68,17 @@ export default function ResultsScreen() {
     })
   }, [config, run, stars])
 
-  // Stage clock. Skipping (tap / reduced motion) jumps straight to `done`.
   useEffect(() => {
     if (done) return
     const timer = setTimeout(() => setStage(stage + 1), STAGE_AT_MS[stage + 1] - STAGE_AT_MS[stage])
     return () => clearTimeout(timer)
   }, [stage, done])
 
-  // Chime as each earned star pops in (not when skipped past).
   useEffect(() => {
     const i = stage - STAGE.star
     if (i >= 0 && i < 3 && i < stars) playStarChime(i)
   }, [stage, stars])
 
-  // Score count-up and bar fill together (restarts only when the count begins or is skipped).
   useEffect(() => {
     const scoreEl = scoreRef.current
     const fillEl = fillRef.current
