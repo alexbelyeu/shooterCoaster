@@ -13,7 +13,9 @@ import {
   buildTowerGeometry,
   getTowerDims,
   planTowers,
+  towerShadowCasters,
 } from './supportTowers'
+import { useContactShadows } from '@/levels/environments/shared/ContactShadows'
 
 interface TrackMeshProps {
   curve: TrackCurve
@@ -85,6 +87,7 @@ function SupportTowers({
     () => planTowers(curve, table, dims, heightFn, groundFn ?? heightFn),
     [curve, table, dims, heightFn, groundFn],
   )
+  useContactShadows(useMemo(() => towerShadowCasters(plan), [plan]))
 
   const td = useMemo(() => getTowerDims(dims), [dims])
   const bucketGeoms = useMemo(

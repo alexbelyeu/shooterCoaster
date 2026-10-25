@@ -5,6 +5,8 @@ import { getThemeParkLayout } from './layout'
 import type { ThemeParkLayout } from './parkSpec'
 import { placeInstances } from './instancing'
 import Midway from './Midway'
+import { themeParkShadowCasters } from './shadows'
+import { useContactShadows } from '../../shared/ContactShadows'
 
 /** Base `bury` units below y = 0, so props on slopes don't float. */
 function grounded(geo: THREE.BufferGeometry, height: number, bury = 0) {
@@ -56,6 +58,7 @@ function Scatter({ layout }: { layout: ThemeParkLayout }) {
 
 export default function FunfairDecorations({ heightFn, groundFn, track }: BiomeDecorationsProps) {
   const layout = useMemo(() => getThemeParkLayout(track, heightFn, groundFn), [track, heightFn, groundFn])
+  useContactShadows(useMemo(() => themeParkShadowCasters(layout), [layout]))
   return (
     <>
       <Midway layout={layout} />
