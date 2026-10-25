@@ -4,6 +4,7 @@ import { dropSound } from './soundGuard'
 import { sfxChannel, isAudioReady } from './AudioEngine'
 import {
   FIRE_VARIANTS,
+  STAR_CHIME_NOTES,
   STINGERS,
   STINGER_CHORD_GAP_S,
   STINGER_VOICES,
@@ -21,6 +22,7 @@ import type { BiomeType } from '@/types/level'
  *   Balloon pop: -14 snap + -18 ping → punchy but brief
  *   Kill layers: thump -14 (combo 3+), ring -26 (6+), swell -24 (10+)
  *   Stinger    : -18…-26 per biome, once per wave
+ *   Star chime : -16 bell, up to 3 on the results screen
  *   Wind       : gain 0–0.12 → ambient bed, never dominates
  */
 
@@ -34,6 +36,7 @@ interface Kit {
   ring: Tone.Synth
   swell: Tone.NoiseSynth
   stinger: Tone.Synth[]
+  chime: Tone.Synth
 }
 
 const owned: Tone.ToneAudioNode[] = []
@@ -117,7 +120,14 @@ function createKit(biome: BiomeType): Kit {
     })).connect(stingerBus))
   }
 
-  return { fire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, stinger }
+  // Bell: near-harmonic FM, long decay.
+  const chime = own(new Tone.Synth({
+    oscillator: { type: 'fmsine', harmonicity: 2, modulationIndex: 3 },
+    envelope: { attack: 0.002, decay: 0.9, sustain: 0, release: 0.4 },
+    volume: -16,
+  })).connect(sfxChannel)
+
+  return { fire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, stinger, chime }
 }
 
 function ensureKit(): Kit | null {
@@ -235,6 +245,18 @@ export function playWaveStinger(): void {
     }
   } catch (e) {
     dropSound('wave stinger', e)
+  }
+}
+
+/** Results screen: chime for star `starIndex` (0-2) popping in. Uses the level's kit, still alive on results. */
+export function playStarChime(starIndex: number): void {
+  const k = ensureKit()
+  if (!k) return
+  try {
+    const t = nextTriggerTime(k.chime, Tone.now(), Tone.getContext().currentTime)
+    k.chime.triggerAttackRelease(STAR_CHIME_NOTES[starIndex] ?? STAR_CHIME_NOTES[2], 0.5, t)
+  } catch (e) {
+    dropSound('star chime', e)
   }
 }
 

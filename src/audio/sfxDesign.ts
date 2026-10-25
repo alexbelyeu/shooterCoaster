@@ -105,3 +105,6 @@ export const STINGERS: Record<BiomeType, StingerDesign> = {
 }
 
 export const STINGER_VOICES = 3
+
+/** Results-screen star chime: one rising note per star earned (1st, 2nd, 3rd). */
+export const STAR_CHIME_NOTES = ['E5', 'G5', 'C6'] as const
