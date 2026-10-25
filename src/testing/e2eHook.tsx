@@ -11,7 +11,7 @@
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots (fires one real shot, then resolves the
  *     hits through the bullet pool's own processHit path), endLevel() to reach
- *     the results screen, stats() for score / kills / combo / shots,
+ *     the results screen, stats() for score / kills / combo / shots / hits,
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
  *     the weapon view-model's on-screen box (hit feedback checks)
@@ -163,6 +163,8 @@ export interface SCTestStats {
   /** Live enemies in front of the camera and inside the viewport (not occlusion-tested). */
   onScreenEnemies: number
   shotsFired: number
+  hits: number
+  bestCombo: number
   runSeed: number
 }
 
@@ -353,6 +355,8 @@ export function installE2EApi() {
         liveEnemies,
         onScreenEnemies,
         shotsFired: s.shotsFired,
+        hits: s.hits,
+        bestCombo: s.bestCombo,
         runSeed: s.runSeed,
       }
     },

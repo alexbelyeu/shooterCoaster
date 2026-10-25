@@ -49,7 +49,9 @@ wall-clock level timer already ran out), the camera translates off the track pos
 (kill feedback is rotation-only trauma, ≤ 1°, back to 0), the first-person weapon is off
 screen / covers the centre / overlaps the HUD / points > 25° off the shot's tracer (also
 checked in mobile portrait + landscape),
-the camera aspect doesn't match the canvas (±0.01), or the results screen never appears.
+the camera aspect doesn't match the canvas (±0.01), or the results screen never finishes its
+reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left) or the
+Levels / Replay buttons, shows NaN, or disagrees with `stats()` on score or kills.
 `npm run smoke` also passes `--mobile`:
 an iPhone 13-like touch context (390x844) taps PLAY and a level, then in portrait and
 again in 844x390 landscape taps the canvas 10x, each tap 15–30 px off an on-screen
@@ -79,7 +81,7 @@ without `scene.environment` fails).
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 (`levels()`, `startLevel(id, seed?)`, `spawnDigest()` → hash of the run's spawn positions, `frames`, `drawCalls`, `triangles`, `avgFrameMs`,
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/timeRemaining/phase/liveEnemies/
-onScreenEnemies/shotsFired/runSeed, `autoFire(on)`, `killNearest(n)` (fires one real shot,
+onScreenEnemies/shotsFired/hits/bestCombo/runSeed, `autoFire(on)`, `killNearest(n)` (fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
 `endLevel()`, `setTimeScale(s)`, `rideTo` (set a track fraction 0–1 to jump the coaster there), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
@@ -129,7 +131,7 @@ from the URL; `?internal=0` clears it): it sends nothing either, via the same ga
 | `src/effects/` | Explosions (pooled), score popups |
 | `src/audio/` | Tone.js engine (`sfxChannel` / `musicChannel` → master limiter; slow-mo low-pass duck on the music bus), music + SFX managers. `SFXManager` pre-builds one node kit per level (`prepareLevelSFX`, disposed by `disposeSFX`): fire variants, hit tick, kill layers by combo, per-biome wave stinger; numbers in pure `sfxDesign.ts`. Never create Tone nodes in a play function. Every trigger time goes through `nextTriggerTime` (`triggerTime.ts`: strictly increasing per node, late times pushed past the live audio clock), and every play function / music loop callback catches into `soundGuard.ts` (drops that one sound, never throws to the page) |
 | `src/store/` | zustand stores: game, player, settings (persisted). Start or restart a level only through `startRun(levelId, seed?)` (resets the run, sets `runSeed`: seed > `?seed=` > `Date.now()`, enters `countdown`, or `playing` under `?e2e=1`: `startPhase.ts`). Code gated on `phase === 'playing'` (clock, spawns, shooting, enemy motion) waits through the countdown |
-| `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter, wave banner) + screens; `theme.ts` per-biome UI accents |
+| `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter, wave banner) + screens (`ResultsScreen`: staged reveal of score count-up, star pops with `playStarChime`, star-threshold bar, stats, NEW RECORD; tap skips it, reduced motion shows it at once; Enter = next, R = replay; numbers in pure `resultsStats.ts`); `theme.ts` per-biome UI accents |
 | `src/testing/` | e2e hook |
 | `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser, `pause-check.sh`, `studio-status.cjs`, `run-usage.cjs` (token use of this session + its subagents; `--post` appends it to the `token-ledger` issue, the last step of every runbook) |
 | `.claude/agents/`, `.claude/commands/`, `.claude/scripts/` | Agent roles (incl. `pr-correctness` / `pr-consistency` reviewers), `/deslop` and `/wrap-pr`, the review-bundle script |

@@ -312,12 +312,13 @@ async function playLevel(page, id) {
   problems.push(...audio.problems)
 
   await page.evaluate(() => window.__SC_TEST__.endLevel())
-  // App uses AnimatePresence mode="wait": the HUD fades out before the results fade in.
+  // App uses AnimatePresence mode="wait": the HUD fades out before the results fade in,
+  // then the results screen plays its reveal (score count-up, stars, stats, buttons).
   const resultsShown = await page
     .waitForFunction(
       () => {
         const el = document.querySelector('.results-screen')
-        if (!el) return false
+        if (!el || el.getAttribute('data-sequence') !== 'done') return false
         for (let n = el; n; n = n.parentElement) if (Number(getComputedStyle(n).opacity) < 0.98) return false
         return true
       },
@@ -325,8 +326,12 @@ async function playLevel(page, id) {
       { timeout: 30000, polling: 250 },
     )
     .then(() => true, () => false)
+  // Let the buttons' fade-in settle (a frame can take ~1 s headless) before the screenshot.
+  await page.waitForTimeout(1500)
   await page.screenshot({ path: path.join(OUT, `${id}-results.png`), timeout: SHOT_TIMEOUT })
   const end = await getStats(page)
+  const results = await resultsScreenProblems(page, end)
+  problems.push(...results.problems)
 
   if (combat.kills === 0) problems.push('no kills (enemies missing or unhittable?)')
   // Only meaningful when something was on screen to aim at.
@@ -367,7 +372,36 @@ async function playLevel(page, id) {
     },
     kills: combat.kills,
     score: combat.score,
+    results: results.screen,
   }
+}
+
+/** The results screen (#25): stats rows, buttons, revealed stars, no NaN. */
+async function resultsScreenProblems(page, stats) {
+  const screen = await page.evaluate(() => {
+    const el = document.querySelector('.results-screen')
+    if (!el) return null
+    const rows = Object.fromEntries(
+      [...el.querySelectorAll('.results-stat')].map((r) => [r.children[0].textContent, r.children[1].textContent]),
+    )
+    const buttons = [...el.querySelectorAll('.results-actions button')]
+      .filter((b) => b.getBoundingClientRect().width > 0)
+      .map((b) => b.textContent)
+    const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
+    return { rows, buttons, stars, score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent }
+  })
+  const problems = []
+  if (!screen) return { problems: ['results screen missing'], screen }
+  const { text, ...shown } = screen
+  if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
+  for (const label of ['Kills', 'Accuracy', 'Best combo', 'Time left']) {
+    if (!(label in screen.rows)) problems.push(`results screen has no "${label}" row`)
+  }
+  if (screen.rows.Kills && !screen.rows.Kills.startsWith(`${stats.kills} /`)) problems.push(`results kills "${screen.rows.Kills}" != ${stats.kills}`)
+  if (stats.shotsFired > 0 && !/^\d+%$/.test(screen.rows.Accuracy ?? '')) problems.push(`results accuracy "${screen.rows.Accuracy}" with ${stats.shotsFired} shots`)
+  if (!screen.buttons.includes('Replay') || !screen.buttons.includes('Levels')) problems.push(`results buttons ${JSON.stringify(screen.buttons)}`)
+  if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
+  return { problems, screen: shown }
 }
 
 const MOBILE_LEVEL = 'level1'
@@ -1041,7 +1075,7 @@ async function run() {
     delete stats.hookErrors
     results.push({
       id, ok, problems, frames, seconds: (Date.now() - started) / 1000, spawnDigest, ...stats,
-      kills: play.kills, score: play.score, combat: play.combat, image: img, enemies: enemyShot, errors: allErrors,
+      kills: play.kills, score: play.score, combat: play.combat, results: play.results, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
   }
