@@ -30,6 +30,7 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType } from '@/types/level'
+import type { GamePhase, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
@@ -54,6 +55,10 @@ export interface SCTestApi {
   /** `<count>:<hash>` of the latest run's spawn positions; null until a spawner has generated them. */
   spawnDigest: () => string | null
   phase: () => string
+  /** Jump to a UI phase (e.g. `levelSelect`) without clicking through the screens before it. */
+  setPhase: (phase: GamePhase) => void
+  /** Replace the saved best scores / stars (persisted to localStorage like real saves). */
+  setSavedScores: (scores: Record<string, ScoreEntry>) => void
   /**
    * Enemies whose centre is inside the view frustum, largest first, with screen
    * position (CSS px, origin top-left) and projected silhouette size in px.
@@ -166,6 +171,7 @@ export interface SCTestStats {
   hits: number
   bestCombo: number
   runSeed: number
+  currentLevel: string | null
 }
 
 export interface E2EWeaponOnScreen {
@@ -310,6 +316,8 @@ export function installE2EApi() {
     triangles: 0,
     levels: () => getAllLevels().map((l) => ({ id: l.id, name: l.name })),
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
+    setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
+    setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
     spawnDigest: () => spawnDigest,
     audio: readAudio,
     audioBurst,
@@ -358,6 +366,7 @@ export function installE2EApi() {
         hits: s.hits,
         bestCombo: s.bestCombo,
         runSeed: s.runSeed,
+        currentLevel: s.currentLevel,
       }
     },
     enemyScreenPoints: (n: number) => {

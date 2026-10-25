@@ -717,6 +717,84 @@ async function hiddenPauseCheck(page, levelId) {
  * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
  * that a tap after the 1 s mark skips to GO / playing.
  */
+/** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
+async function levelSelectCheck(page, levels) {
+  const problems = []
+  const scores = {}
+  const earned = [3, 1]
+  levels.slice(0, 2).forEach((l, i) => {
+    scores[l.id] = { level: l.id, score: 1000 * (2 - i), maxScore: 0, stars: earned[i], timestamp: 0 }
+  })
+  const expectStars = earned.slice(0, levels.length).reduce((a, b) => a + b, 0)
+  const expectOpen = Math.min(levels.length, 3)
+  await page.evaluate((s) => {
+    window.__SC_TEST__.setSavedScores(s)
+    window.__SC_TEST__.setPhase('levelSelect')
+  }, scores)
+  if (!(await waitVisible(page, '.level-select-back'))) problems.push('level select never appeared')
+  await page.waitForTimeout(800) // fade-in
+  await waitFrames(page, 2, { maxMs: 10000 })
+  await page.screenshot({ path: path.join(OUT, 'levelSelect.png'), timeout: SHOT_TIMEOUT })
+
+  const layout = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.level-card')]
+    const root = document.querySelector('.level-select')
+    const off = cards.filter((c) => {
+      const r = c.getBoundingClientRect()
+      return r.left < 0 || r.top < 0 || r.right > window.innerWidth || r.bottom > window.innerHeight
+    })
+    return {
+      cards: cards.length,
+      locked: cards.filter((c) => c.dataset.locked === 'true').length,
+      total: document.querySelector('.level-select-total')?.dataset.stars ?? null,
+      totalText: document.querySelector('.level-select-total')?.textContent ?? '',
+      offscreen: off.map((c) => c.dataset.level),
+      hScroll: root ? root.scrollWidth > root.clientWidth : true,
+      focused: document.activeElement?.dataset?.level ?? null,
+    }
+  })
+  if (layout.cards !== levels.length) problems.push(`${layout.cards} level cards for ${levels.length} levels`)
+  if (layout.locked !== levels.length - expectOpen) problems.push(`${layout.locked} locked cards, expected ${levels.length - expectOpen}`)
+  if (Number(layout.total) !== expectStars || !layout.totalText.includes(`${expectStars} / ${levels.length * 3}`)) {
+    problems.push(`star total "${layout.totalText.trim()}", expected ${expectStars} / ${levels.length * 3}`)
+  }
+  if (layout.offscreen.length) problems.push(`cards off a 1280x720 screen: ${layout.offscreen.join(',')}`)
+  if (layout.hScroll) problems.push('level select scrolls sideways')
+
+  const focused = () => page.evaluate(() => document.activeElement?.dataset?.level ?? null)
+  const target = levels[Math.min(2, levels.length - 1)].id
+  if (layout.focused !== target) problems.push(`initial focus on ${layout.focused}, expected ${target}`)
+  let keyboard = null
+  if (levels.length >= 4) {
+    await page.keyboard.press('ArrowLeft')
+    const left = await focused()
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('ArrowRight')
+    const locked = await focused()
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(700)
+    const phaseAfterLocked = await page.evaluate(() => window.__SC_TEST__.phase())
+    await page.keyboard.press('ArrowLeft')
+    await page.evaluate(() => {
+      window.__sawLaunch = false
+      const root = document.querySelector('.level-select')
+      new MutationObserver(() => {
+        if (root?.classList.contains('is-launching')) window.__sawLaunch = true
+      }).observe(root, { attributes: true, attributeFilter: ['class'] })
+    })
+    await page.keyboard.press('Enter')
+    await page.waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 15000 }).catch(() => {})
+    const after = await page.evaluate(() => ({ phase: window.__SC_TEST__.phase(), level: window.__SC_TEST__.stats().currentLevel, sawLaunch: window.__sawLaunch }))
+    keyboard = { left, locked, phaseAfterLocked, ...after }
+    if (left !== levels[1].id) problems.push(`ArrowLeft focused ${left}, expected ${levels[1].id}`)
+    if (locked !== levels[3].id) problems.push(`ArrowRight x2 focused ${locked}, expected ${levels[3].id}`)
+    if (phaseAfterLocked !== 'levelSelect') problems.push(`Enter on a locked card left level select (${phaseAfterLocked})`)
+    if (!after.sawLaunch) problems.push('no launch transition before the run started')
+    if (after.phase !== 'playing' || after.level !== target) problems.push(`Enter started ${after.level} (${after.phase}), expected ${target}`)
+  }
+  return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
+}
+
 async function countdownCheck(page, levelId) {
   const start = () => page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
   // Attached, not faded in: at ~1 fps, waiting on the fade could outlast the countdown.
@@ -850,6 +928,17 @@ async function runMobile(browser, base) {
   const card = `.level-card[data-level="${MOBILE_LEVEL}"]`
   if (!(await waitVisible(page, card))) problems.push('level card never appeared')
   await page.screenshot({ path: path.join(OUT, 'mobile-level-select.png'), timeout: SHOT_TIMEOUT })
+  const selectLayout = await page.evaluate(() => {
+    const root = document.querySelector('.level-select')
+    const cards = [...document.querySelectorAll('.level-card')]
+    const tooNarrow = cards.filter((c) => {
+      const r = c.getBoundingClientRect()
+      return r.left < 0 || r.right > window.innerWidth || r.height < 44
+    })
+    return { hScroll: root ? root.scrollWidth > root.clientWidth : true, bad: tooNarrow.map((c) => c.dataset.level) }
+  })
+  if (selectLayout.hScroll) problems.push('phone level select scrolls sideways')
+  if (selectLayout.bad.length) problems.push(`phone level cards off screen or under 44 px: ${selectLayout.bad.join(',')}`)
   await page.locator(card).tap({ timeout: 30000 }).catch((e) => problems.push(`tap level: ${e.message}`))
   await waitPhase('playing', 15000)
   if ((await phase()) !== 'playing') problems.push('tapping the level card did not start the level')
@@ -1037,6 +1126,18 @@ async function run() {
   results.push({ id: 'title', ok: titleOk, frames: f1 - f0, image: titleImg, errors: t.errors })
   await t.ctx.close()
 
+  // 1b. Level select with saved progress + keyboard-only start
+  if (!args['skip-desktop']) {
+    const l = await newPage()
+    const r = await levelSelectCheck(l.page, levels)
+    r.errors = [...l.errors, ...(await l.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await l.ctx.close()
+  }
+
   // 2. Every level (or the requested subset)
   const wanted = args['skip-desktop'] ? [] : args.levels ? args.levels.split(',') : levels.map((l) => l.id)
   for (const id of wanted) {
@@ -1131,6 +1232,9 @@ async function run() {
       : ''
     const extra = r.id === 'title'
       ? ''
+      : r.levelSelect
+        ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total}` +
+          (r.levelSelect.keyboard ? ` keys: ${r.levelSelect.focused} <- ${r.levelSelect.keyboard.left}, locked ${r.levelSelect.keyboard.locked} Enter -> ${r.levelSelect.keyboard.phaseAfterLocked}, Enter -> ${r.levelSelect.keyboard.level} ${r.levelSelect.keyboard.phase}` : '')
       : r.seedCheck
         ? ` ${r.seedCheck.level} seed ${SEED}: ${r.seedCheck.digest} (reload ${r.seedCheck.reloaded}, again ${r.seedCheck.again}) seed ${SEED + 1}: ${r.seedCheck.other}`
       : r.hiddenPause

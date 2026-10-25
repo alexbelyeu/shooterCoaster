@@ -514,7 +514,7 @@ canvas {
   align-items: center;
   justify-content: safe center;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.85);
+  background: radial-gradient(ellipse at 50% 35%, rgba(24, 22, 48, 0.78), rgba(0, 0, 0, 0.92));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
@@ -525,56 +525,326 @@ canvas {
     calc(1rem + env(safe-area-inset-left));
 }
 
-.level-select h2 {
-  font-family: 'Lobster', cursive;
-  font-size: clamp(2rem, 8vw, 2.5rem);
+.level-select-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
   margin-bottom: clamp(1rem, 4vh, 2rem);
 }
 
+.level-select h2 {
+  font-family: 'Lobster', cursive;
+  font-size: clamp(2rem, 8vw, 2.75rem);
+  text-shadow: 0 0 18px rgba(255, 200, 0, 0.45), 0 3px 6px rgba(0, 0, 0, 0.6);
+}
+
+.level-select-total {
+  padding: 0.3rem 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid rgba(255, 210, 63, 0.45);
+  border-radius: 999px;
+  background: rgba(255, 210, 63, 0.1);
+}
+
+.level-select-total-star {
+  color: #ffd23f;
+  text-shadow: 0 0 8px rgba(255, 210, 63, 0.8);
+}
+
 .level-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-  gap: clamp(0.75rem, 3vw, 1.5rem);
-  width: min(600px, 100%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(0.75rem, 1.4vw, 1.25rem);
+  width: min(1200px, 100%);
 }
 
 .level-card {
+  --accent: #ffd23f;
+  --accent-glow: rgba(255, 210, 63, 0.55);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: clamp(180px, 17vw, 224px);
   min-height: 44px;
-  padding: clamp(1rem, 4vw, 1.5rem);
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  padding: 0;
+  overflow: hidden;
+  font: inherit;
+  color: #fff;
+  text-align: left;
+  background: rgba(14, 14, 22, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s, box-shadow 0.3s, opacity 0.3s;
 }
 
 @media (hover: hover) {
-  .level-card:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: #ffd700;
-    transform: translateY(-2px);
+  .level-card:not(.locked):hover {
+    border-color: var(--accent);
+    transform: translateY(-6px);
+    box-shadow: 0 12px 30px var(--accent-glow);
   }
 }
 
-.level-card:active,
 .level-card:focus-visible {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: #ffd700;
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  border-color: var(--accent);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px var(--accent-glow);
+}
+
+.level-card:not(.locked):active {
+  transform: scale(0.97);
+}
+
+.level-postcard {
+  position: relative;
+  aspect-ratio: 2 / 1;
+  flex-shrink: 0;
+  border-bottom: 2px solid var(--accent);
+  transition: filter 0.3s;
+}
+
+.level-postcard svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.level-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.7rem 0.85rem 0.8rem;
+}
+
+.level-card-index {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.level-card-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.level-card-desc {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.3;
+}
+
+.level-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.level-card-stars {
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.level-card-stars .earned {
+  color: #ffd23f;
+  text-shadow: 0 0 6px rgba(255, 210, 63, 0.8);
+}
+
+.level-card-best {
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.level-card-locked-hint {
+  margin-top: 0.35rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .level-card.locked {
-  opacity: 0.4;
   cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
-.level-card h3 {
-  font-size: 1.2rem;
-  margin-bottom: 0.3rem;
+.level-card.locked .level-postcard {
+  filter: grayscale(1) brightness(0.4);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
 }
 
-.level-card p {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+.level-card.locked .level-card-index,
+.level-card.locked .level-card-name,
+.level-card.locked .level-card-desc {
+  opacity: 0.55;
+}
+
+.level-card-lock {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  aspect-ratio: 2 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.level-card-lock svg {
+  width: 34px;
+  height: 34px;
+  fill: rgba(255, 255, 255, 0.85);
+  stroke: rgba(255, 255, 255, 0.85);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+}
+
+.level-select.is-launching .level-card {
+  opacity: 0.2;
+  transform: scale(0.96);
+}
+
+.level-select.is-launching .level-card.is-selected {
+  z-index: 1;
+  opacity: 1;
+  transform: scale(1.1);
+  border-color: var(--accent);
+  box-shadow: 0 0 40px var(--accent-glow);
+}
+
+.level-select.is-launching .level-card.is-selected .level-postcard {
+  filter: brightness(1.25) saturate(1.2);
+}
+
+.level-select-back {
+  margin-top: clamp(1.25rem, 4vh, 2rem);
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .level-card,
+  .level-select.is-launching .level-card,
+  .level-select.is-launching .level-card.is-selected,
+  .level-card:focus-visible {
+    transform: none;
+  }
+}
+
+/* Short landscape screens (phones on their side): one compact row. */
+@media (max-height: 520px) and (min-width: 601px) {
+  .level-select-header {
+    margin-bottom: 0.75rem;
+  }
+
+  .level-select h2 {
+    font-size: 1.8rem;
+  }
+
+  .level-grid {
+    gap: 0.6rem;
+  }
+
+  .level-card {
+    width: clamp(132px, 17.5vw, 180px);
+  }
+
+  .level-card-desc {
+    display: none;
+  }
+
+  .level-card-body {
+    padding: 0.5rem 0.65rem 0.6rem;
+  }
+
+  .level-card-name {
+    font-size: 1rem;
+  }
+
+  .level-card-locked-hint {
+    font-size: 0.66rem;
+  }
+
+  .level-select-back {
+    margin-top: 0.9rem;
+    padding-block: 0.7rem;
+  }
+}
+
+/* Phones: one full-width row per world, postcard on the left. */
+@media (max-width: 600px) {
+  .level-grid {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    width: min(480px, 100%);
+    gap: 0.6rem;
+  }
+
+  .level-card {
+    flex-direction: row;
+    width: 100%;
+    min-height: 96px;
+  }
+
+  .level-postcard {
+    width: 44%;
+    aspect-ratio: auto;
+    border-bottom: none;
+    border-right: 2px solid var(--accent);
+  }
+
+  .level-card.locked .level-postcard {
+    border-right-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .level-card-lock {
+    bottom: 0;
+    right: auto;
+    width: 44%;
+    aspect-ratio: auto;
+  }
+
+  .level-card-body {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .level-card-name {
+    font-size: 1.05rem;
+  }
+
+  .level-card-desc {
+    font-size: 0.75rem;
+  }
+
+  .level-card-meta,
+  .level-card-locked-hint {
+    margin-top: 0.15rem;
+  }
+
+  .level-card:focus-visible,
+  .level-card:not(.locked):hover {
+    transform: none;
+  }
 }
 
 /* Results screen */

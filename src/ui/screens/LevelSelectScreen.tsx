@@ -1,63 +1,163 @@
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
+import { biomeTheme } from '@/ui/theme'
+import { prefersReducedMotion } from '@/ui/reducedMotion'
+import LevelPostcard from './LevelPostcard'
+import {
+  STARS_PER_LEVEL,
+  buildLevelCards,
+  initialFocusIndex,
+  isNavKey,
+  navigateCards,
+  totalStars,
+} from './levelSelectModel'
+
+/** Card expand + fade before the run starts. */
+const LAUNCH_MS = 300
+
+const DENIED_SHAKE: Keyframe[] = [
+  { transform: 'translateX(0)' },
+  { transform: 'translateX(-6px)' },
+  { transform: 'translateX(6px)' },
+  { transform: 'translateX(-3px)' },
+  { transform: 'translateX(0)' },
+]
 
 export default function LevelSelectScreen() {
-  const { startRun, setPhase, isLevelUnlocked, savedScores } = useGameStore()
+  const startRun = useGameStore((s) => s.startRun)
+  const setPhase = useGameStore((s) => s.setPhase)
+  const savedScores = useGameStore((s) => s.savedScores)
+  const isLevelUnlocked = useGameStore((s) => s.isLevelUnlocked)
 
-  const levels = getAllLevels()
+  const cards = useMemo(
+    () => buildLevelCards(getAllLevels(), savedScores, isLevelUnlocked),
+    [savedScores, isLevelUnlocked],
+  )
+  const total = totalStars(cards)
 
-  function startLevel(levelId: string) {
-    if (!isLevelUnlocked(levelId)) return
-    startRun(levelId)
+  const [launching, setLaunching] = useState<string | null>(null)
+  const [focusIndex, setFocusIndex] = useState(() => initialFocusIndex(cards))
+  const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const launchTimer = useRef<number | undefined>(undefined)
+
+  // Mount only: start keyboard players on the next level to play.
+  useEffect(() => {
+    cardRefs.current[focusIndex]?.focus({ preventScroll: true })
+  }, [])
+
+  useEffect(() => () => window.clearTimeout(launchTimer.current), [])
+
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape' && !launching) setPhase('title')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [launching, setPhase])
+
+  function select(i: number) {
+    const card = cards[i]
+    if (launching || !card) return
+    if (!card.unlocked) {
+      if (!prefersReducedMotion()) cardRefs.current[i]?.animate(DENIED_SHAKE, { duration: 280, easing: 'ease-out' })
+      return
+    }
+    setLaunching(card.id)
+    launchTimer.current = window.setTimeout(() => startRun(card.id), LAUNCH_MS)
   }
 
-  function getStars(levelId: string): number {
-    return savedScores[levelId]?.stars ?? 0
+  function onGridKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    // A held Enter from the title's PLAY must not click straight through to a level.
+    if (e.repeat && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault()
+      return
+    }
+    if (!isNavKey(e.key) || launching) return
+    e.preventDefault()
+    const rects = cardRefs.current.map((el) => {
+      const r = el?.getBoundingClientRect()
+      return { x: r?.left ?? 0, y: r?.top ?? 0, width: r?.width ?? 0, height: r?.height ?? 0 }
+    })
+    const next = navigateCards(rects, focusIndex, e.key)
+    setFocusIndex(next)
+    cardRefs.current[next]?.focus()
   }
 
   return (
-    <div className="level-select">
-      <h2>Select World</h2>
-      <div className="level-grid">
-        {levels.map((level) => {
-          const unlocked = isLevelUnlocked(level.id)
-          const stars = getStars(level.id)
-          const bestScore = savedScores[level.id]?.score ?? 0
+    <div className={`level-select${launching ? ' is-launching' : ''}`}>
+      <header className="level-select-header">
+        <h2>Select World</h2>
+        <p className="level-select-total" data-stars={total.earned} aria-label={`${total.earned} of ${total.max} stars`}>
+          <span className="level-select-total-star">★</span> {total.earned} / {total.max}
+        </p>
+      </header>
 
+      <div className="level-grid" role="group" aria-label="Levels" onKeyDown={onGridKeyDown}>
+        {cards.map((card, i) => {
+          const theme = biomeTheme(card.biome)
+          const classes = ['level-card']
+          if (!card.unlocked) classes.push('locked')
+          if (launching === card.id) classes.push('is-selected')
           return (
-            <div
-              key={level.id}
-              className={`level-card ${unlocked ? '' : 'locked'}`}
-              data-level={level.id}
-              role="button"
-              tabIndex={unlocked ? 0 : -1}
-              aria-disabled={!unlocked}
-              onClick={() => startLevel(level.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') startLevel(level.id)
+            <button
+              key={card.id}
+              ref={(el) => {
+                cardRefs.current[i] = el
               }}
+              type="button"
+              className={classes.join(' ')}
+              data-level={card.id}
+              data-locked={card.unlocked ? undefined : 'true'}
+              style={{ '--accent': theme.accent, '--accent-glow': theme.glow } as CSSProperties}
+              tabIndex={i === focusIndex ? 0 : -1}
+              aria-disabled={!card.unlocked}
+              aria-label={
+                card.unlocked
+                  ? `${card.name}: ${card.stars} of ${STARS_PER_LEVEL} stars${card.bestScore > 0 ? `, best ${card.bestScore}` : ''}`
+                  : `${card.name}: locked${card.unlockedBy ? `, earn a star on ${card.unlockedBy}` : ''}`
+              }
+              onFocus={() => setFocusIndex(i)}
+              onClick={() => select(i)}
             >
-              <h3>
-                {unlocked ? '' : '🔒 '}
-                {level.name}
-              </h3>
-              <p>{level.description}</p>
-              {unlocked && (
-                <p style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
-                  {'★'.repeat(stars)}
-                  {'☆'.repeat(3 - stars)}
-                  {bestScore > 0 && ` ${bestScore}/${level.maxScore}`}
-                </p>
+              <LevelPostcard biome={card.biome} />
+              {!card.unlocked && (
+                <span className="level-card-lock" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <rect x="5" y="10.5" width="14" height="10" rx="2" />
+                    <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" strokeWidth="2.4" />
+                  </svg>
+                </span>
               )}
-            </div>
+              <span className="level-card-body">
+                <span className="level-card-index">World {i + 1}</span>
+                <span className="level-card-name">{card.name}</span>
+                <span className="level-card-desc">{card.description}</span>
+                {card.unlocked ? (
+                  <span className="level-card-meta">
+                    <span className="level-card-stars" data-stars={card.stars}>
+                      {Array.from({ length: STARS_PER_LEVEL }, (_, s) => (
+                        <span key={s} className={s < card.stars ? 'earned' : undefined}>
+                          ★
+                        </span>
+                      ))}
+                    </span>
+                    <span className="level-card-best">
+                      {card.bestScore > 0 ? `Best ${card.bestScore.toLocaleString('en-US')}` : 'New'}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="level-card-locked-hint">
+                    Locked{card.unlockedBy ? ` — earn ★ on ${card.unlockedBy}` : ''}
+                  </span>
+                )}
+              </span>
+            </button>
           )
         })}
       </div>
-      <button
-        className="play-button"
-        style={{ marginTop: '2rem' }}
-        onClick={() => setPhase('title')}
-      >
+
+      <button className="play-button level-select-back" onClick={() => setPhase('title')} disabled={!!launching}>
         Back
       </button>
     </div>
