@@ -19,6 +19,14 @@ describe('LevelRegistry', () => {
     expect(getLevelConfig('nope')).toBeUndefined()
   })
 
+  it('combat overrides are hex colours and positive sizes', () => {
+    for (const { combat } of levels) {
+      if (combat?.bulletColor !== undefined) expect(combat.bulletColor).toMatch(/^#[0-9a-f]{6}$/i)
+      if (combat?.bulletSize !== undefined) expect(combat.bulletSize).toBeGreaterThan(0)
+    }
+    expect(getLevelConfig('level4')?.combat).toEqual({ bulletColor: '#000000', bulletSize: 40 })
+  })
+
   it.each(levels.map((l) => [l.id, l] as const))(
     '%s: maxScore equals Σ(count × SCORE_VALUES)',
     (_id, level) => {

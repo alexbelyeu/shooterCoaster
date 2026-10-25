@@ -68,7 +68,7 @@ function LevelScene({ levelId }: { levelId: string }) {
   const config = getLevelConfig(levelId)
   if (!config) return null
 
-  const { track, environment, biome, enemies, timerSeconds } = config
+  const { track, environment, biome, enemies, timerSeconds, combat } = config
 
   const curve = useMemo(() => {
     const factory = track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve
@@ -86,10 +86,6 @@ function LevelScene({ levelId }: { levelId: string }) {
   const trackDims = useMemo(() => getTrackDimensions(track), [track])
   const color1 = useMemo(() => hexToRgb(track.color1), [track.color1])
   const color2 = useMemo(() => hexToRgb(track.color2), [track.color2])
-
-  // Determine bullet appearance based on level
-  const bulletColor = levelId === 'level4' ? '#000000' : '#ff0000'
-  const bulletSize = levelId === 'level4' ? 40 : 10
 
   return (
     <TerrainContext.Provider value={heightFn}>
@@ -113,12 +109,11 @@ function LevelScene({ levelId }: { levelId: string }) {
         biome={biome}
         groundFn={groundFn}
         track={trackTable}
-        groundColor={environment.groundColor}
         hasWater={environment.hasWater}
         hasTrees={environment.hasTrees}
         treeCount={environment.treeCount}
       />
-      <BulletPool bulletColor={bulletColor} bulletSize={bulletSize} />
+      <BulletPool bulletColor={combat?.bulletColor} bulletSize={combat?.bulletSize} />
       <ParticleExplosionPool />
       {/* Before EnemySpawner: its mount effect announces the first wave, and the
           stinger listener must already be subscribed. */}
