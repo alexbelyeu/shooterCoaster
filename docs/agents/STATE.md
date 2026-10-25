@@ -111,11 +111,10 @@ chunk; no code splitting.
    muzzle flash floats (#65).
 7. HUD is plain text; results and level-select screens are unstyled compared to the
    title screen.
-8. Bullet colour/size are special-cased by `levelId === 'level4'` in `SceneManager`
-   (should be config).
+8. ~~Bullet colour/size are special-cased by `levelId === 'level4'` in `SceneManager`.~~
+   Now `LevelConfig.combat` (#38).
 9. Combo timing uses `performance.now()`, so pausing or slow-mo affects the window.
-10. `LevelConfig.environment.skybox` / `groundColor` are legacy fields, unused or
-    nearly so.
+10. ~~`LevelConfig.environment.skybox` / `groundColor` are legacy fields.~~ Removed (#38).
 11. Bullets are frame-rate dependent: `BulletPool` moves each bullet a fixed
     `BULLET_SPEED` (14 units) **per frame** but expires it after 5 s of wall-clock time.
     Bullet speed and range therefore scale with refresh rate (slower on 30 Hz, 2.4× faster
@@ -138,6 +137,15 @@ chunk; no code splitting.
     would fall by that height. It shows as the near-vertical track sections in those
     screenshots. PR #46 (open) adds a unit test that pins the current behaviour
     (found 2026-10-19).
+15. CI `verify` never runs on `main`: the auto-merge workflow merges with `GITHUB_TOKEN`,
+    and pushes made with that token don't trigger other workflows, so the `push: main`
+    trigger in `ci.yml` never fires (no `verify` check-run on any of the last 8 `main`
+    commits). Each PR's `verify` (run on the PR merged with `main`) plus the post-deploy
+    production smoke are what cover `main`. The Maintainer therefore always runs the full
+    verify locally, where on 2 cores it often trips bug 13 (level1/level4 at 9 frames,
+    twice, on 2026-10-25, everything else passing). A fix could have `automerge.yml`
+    dispatch `ci.yml` on `main` after a merge (`workflow_dispatch` is exempt from that
+    rule; needs `actions: write`) (Maintainer, 2026-10-25).
 
 ## Tech debt / architecture notes
 
