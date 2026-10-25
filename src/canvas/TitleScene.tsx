@@ -1,29 +1,30 @@
-import { useRef, useMemo, useState, useCallback, useEffect } from 'react'
+import { useRef, useMemo, useState, useCallback, useEffect, useLayoutEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Sky, PerspectiveCamera, Sparkles, Float } from '@react-three/drei'
 import * as THREE from 'three'
 import { createRng } from '@/utils/rng'
 import FerrisWheel from '@/levels/environments/FerrisWheel'
 import Carousel from '@/levels/environments/Carousel'
+import { titleCameraPose, type Vec3 } from './titleCamera'
 
 const TENT_COLORS = ['#ff4444', '#ff8800', '#4488ff', '#44cc44', '#ff44ff', '#ffffff']
+const BALLOON_DRIFT_RAD_S = 0.04
 const BALLOON_COLORS = ['#ff4444', '#ff8800', '#ffcc00', '#44cc44', '#4488ff', '#ff44ff', '#ffffff', '#cc33ff', '#ff6688', '#44dddd']
 
-/** Orbiting camera that slowly circles the mini theme-park */
-function OrbitingCamera() {
+/** Fly-by camera: the orbit and the low dolly of `titleCamera.ts`, taking turns. */
+function FlyByCamera() {
   const camRef = useRef<THREE.PerspectiveCamera>(null)
+  const elapsed = useRef(0)
+  const pos = useRef<Vec3>([0, 0, 0]).current
+  const target = useRef<Vec3>([0, 0, 0]).current
 
-  useFrame(({ clock }) => {
-    if (!camRef.current) return
-    const t = clock.elapsedTime * 0.08
-    const radius = 180
-    const height = 60
-    camRef.current.position.set(
-      Math.cos(t) * radius,
-      height + Math.sin(t * 0.5) * 8,
-      Math.sin(t) * radius,
-    )
-    camRef.current.lookAt(0, 30, 0)
+  useFrame((_, delta) => {
+    const cam = camRef.current
+    if (!cam) return
+    elapsed.current += delta
+    titleCameraPose(elapsed.current, pos, target)
+    cam.position.set(pos[0], pos[1], pos[2])
+    cam.lookAt(target[0], target[1], target[2])
   })
 
   return <PerspectiveCamera ref={camRef} makeDefault fov={55} near={1} far={2000} />
@@ -123,7 +124,7 @@ function StringLights() {
     return pts
   }, [])
 
-  useMemo(() => {
+  useLayoutEffect(() => {
     if (!meshRef.current) return
     const dummy = new THREE.Object3D()
     for (let i = 0; i < count; i++) {
@@ -304,11 +305,19 @@ function Balloons() {
     }
   }, [])
 
+  // The whole bunch drifts slowly round the park; bursts stay where the balloon popped.
+  const driftRef = useRef<THREE.Group>(null)
+  useFrame((_, delta) => {
+    if (driftRef.current) driftRef.current.rotation.y += BALLOON_DRIFT_RAD_S * delta
+  })
+
   return (
     <group>
-      {balloonData.map((b, i) => (
-        <ShootableBalloon key={i} position={b.pos} color={b.color} onPop={handlePop} />
-      ))}
+      <group ref={driftRef}>
+        {balloonData.map((b, i) => (
+          <ShootableBalloon key={i} position={b.pos} color={b.color} onPop={handlePop} />
+        ))}
+      </group>
       {pops.map((p) => (
         <PopBurst key={p.id} position={p.pos} color={p.color} />
       ))}
@@ -362,7 +371,7 @@ function TitleClickRaycaster() {
 export default function TitleScene() {
   return (
     <>
-      <OrbitingCamera />
+      <FlyByCamera />
 
       {/* Golden-hour sunset sky */}
       <Sky distance={4500} sunPosition={[50, 10, -100]} />
