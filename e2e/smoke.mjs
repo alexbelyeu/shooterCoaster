@@ -28,6 +28,8 @@
  * with `&countdown=1`: the countdown must show (countdown.png), ignore a press (also once
  * held on into play), hold the timer, reach playing on GO, and the shader warm-up must
  * finish; on a replay, a tap after the 1 s mark must skip to playing.
+ * The speed check holds the first level at top speed on its most banked sampled point:
+ * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  *
  * All waits are deadline-polled on the hook's frame counter, because software
  * rendering in CI / cloud sessions can run at ~1 fps.
@@ -409,8 +411,8 @@ const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-b
 /** Max angle between the barrel and the tracer on screen (#65). */
 const WEAPON_MAX_AIM_DEG = 25
 /** Caps on the coaster camera weight (#123): MAX_BANK_DEG / MAX_PITCH_DEG in
- *  src/track/cameraRig.ts and SPEED_FOV_DEG in src/track/cameraFov.ts. */
-const CAMERA_WEIGHT_CAPS = { roll: 8, pitch: 3, fovKick: 5 }
+ *  src/track/cameraRig.ts and SPEED_FOV_DEG + DROP_FOV_DEG in src/track/cameraFov.ts. */
+const CAMERA_WEIGHT_CAPS = { roll: 8, pitch: 3, fovKick: 8 }
 const HUD_SELECTORS = ['.hud-score', '.hud-kills', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
 
 /** Wait until `selector` exists, has a size, and it and its ancestors are fully faded in. */
@@ -709,6 +711,46 @@ async function hiddenPauseCheck(page, levelId) {
       heldAfter,
     },
   }
+}
+
+/** Track fractions the speed check tries for its banked fast section. */
+const SPEED_SCAN = [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
+
+/** Hold top speed at `fraction` for ≥ 1.5 s so the rig and streaks ease in; returns the camera weight. */
+async function rideFast(page, fraction) {
+  await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, fraction)
+  const start = Date.now()
+  const f0 = await getFrames(page)
+  let w
+  while (Date.now() - start < 20000) {
+    await page.evaluate(() => { window.__SC_TEST__.rideSpeed = 1 })
+    await page.waitForTimeout(250)
+    const now = await page.evaluate(() => ({ frames: window.__SC_TEST__.frames, w: window.__SC_TEST__.cameraWeight }))
+    w = now.w
+    if (now.frames - f0 >= 3 && Date.now() - start >= 1500) break
+  }
+  return { ...w }
+}
+
+/** Sense of speed (#27) at the default Screen-shake setting: streaks and bank at top speed, within the caps (speed.png). */
+async function speedCheck(page, levelId) {
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+  await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
+  let best = { fraction: SPEED_SCAN[0], roll: -1 }
+  for (const fraction of SPEED_SCAN) {
+    const w = await rideFast(page, fraction)
+    if (Math.abs(w.roll) > best.roll) best = { fraction, roll: Math.abs(w.roll) }
+  }
+  const w = await rideFast(page, best.fraction)
+  await page.screenshot({ path: path.join(OUT, 'speed.png'), timeout: SHOT_TIMEOUT })
+  const problems = []
+  if (!(w.streaks > 0.05)) problems.push(`no wind streaks at top speed (opacity ${w.streaks?.toFixed(3)}, speed ${w.speed?.toFixed(2)})`)
+  if (!(Math.abs(w.roll) >= 1)) problems.push(`camera barely banks at top speed (${w.roll.toFixed(2)}° at track ${best.fraction})`)
+  if (w.maxRoll > CAMERA_WEIGHT_CAPS.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.roll}°`)
+  if (w.maxFovKick > CAMERA_WEIGHT_CAPS.fovKick + 1e-6) problems.push(`FOV kick ${w.maxFovKick.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.fovKick}°`)
+  const translation = await page.evaluate(() => window.__SC_TEST__.cameraTranslation.max)
+  if (translation > 1e-6) problems.push(`camera translated ${translation.toFixed(3)} units off the track pose`)
+  return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w } }
 }
 
 /**
@@ -1114,7 +1156,19 @@ async function run() {
     await c.ctx.close()
   }
 
-  // 6. Optional touch playtest on a phone viewport
+  // 6. Top speed: banking + wind streaks (speed.png)
+  if (wanted.length) {
+    const sp = await newPage()
+    const r = await speedCheck(sp.page, wanted[0])
+    r.errors = [...sp.errors, ...(await sp.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await sp.ctx.close()
+  }
+
+  // 7. Optional touch playtest on a phone viewport
   if (args.mobile) {
     const m = await runMobile(browser, base)
     failed ||= !m.ok
@@ -1140,6 +1194,8 @@ async function run() {
         ? ` ${r.countdown.level} "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
           ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +
           ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'}`
+      : r.speed
+        ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
