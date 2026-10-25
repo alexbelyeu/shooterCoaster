@@ -15,7 +15,8 @@
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
  *     the weapon view-model's on-screen box (hit feedback checks)
- *   - read audio state (live SFX node count, slow-mo music duck)
+ *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses)
+ *   - read the camera pose (title fly-by), shader program count and longest frame (first-shot hitch)
  *
  * Keep this file tiny and side-effect free when the flag is off: nothing here
  * runs unless `installE2EApi()` finds `?e2e=1`, and <E2EFrameProbe> is only
@@ -39,6 +40,7 @@ import { initAudio, isAudioReady, isMusicDucked } from '@/audio/AudioEngine'
 import { playExplosionSound, playFireSound, playHitTick, playWaveStinger, sfxNodeCount } from '@/audio/SFXManager'
 import { droppedSounds } from '@/audio/soundGuard'
 import { nextTriggerTime } from '@/audio/triggerTime'
+import { musicState, type MusicFade } from '@/audio/musicBus'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -47,6 +49,12 @@ export interface SCTestApi {
   frames: number
   /** Rolling average frame time in ms (last ~120 frames). */
   avgFrameMs: number
+  /** Longest frame in ms since a test last set this to 0 (first-shot hitch check). */
+  maxFrameMs: number
+  /** Shader programs the renderer has compiled so far (a rise mid-play is a compile hitch). */
+  programs: () => number
+  /** Active camera's world position and unit view direction (title fly-by check). */
+  cameraPose: () => { position: [number, number, number]; forward: [number, number, number] } | null
   drawCalls: number
   triangles: number
   levels: () => { id: string; name: string }[]
@@ -138,6 +146,8 @@ export interface E2EAudio {
   /** Sounds dropped by a caught audio error since load (must stay 0). */
   dropped: number
   lastDrop: string | null
+  /** Music buses still connected (`audio/musicBus.ts`) with their gain now, and the last few gain ramps. */
+  music: { buses: { name: string; gain: number; fading: boolean }[]; fades: MusicFade[] }
 }
 
 export interface E2EView {
@@ -318,6 +328,9 @@ export function installE2EApi() {
   const api: SCTestApi = {
     frames: 0,
     avgFrameMs: 0,
+    maxFrameMs: 0,
+    programs: () => probeGl?.info.programs?.length ?? 0,
+    cameraPose: readCameraPose,
     drawCalls: 0,
     triangles: 0,
     levels: () => getAllLevels().map((l) => ({ id: l.id, name: l.name })),
@@ -450,11 +463,30 @@ async function audioBurst(shots: number, kills: number) {
 
 function readAudio(): E2EAudio {
   const d = droppedSounds()
-  return { ready: isAudioReady(), sfxNodes: sfxNodeCount(), musicDucked: isMusicDucked(), dropped: d.count, lastDrop: d.last }
+  return {
+    ready: isAudioReady(),
+    sfxNodes: sfxNodeCount(),
+    musicDucked: isMusicDucked(),
+    dropped: d.count,
+    lastDrop: d.last,
+    music: isAudioReady() ? musicState() : { buses: [], fades: [] },
+  }
+}
+
+const _poseDir = new THREE.Vector3()
+const _posePos = new THREE.Vector3()
+
+function readCameraPose() {
+  const cam = probeCamera
+  if (!cam) return null
+  cam.getWorldDirection(_poseDir)
+  const p = cam.getWorldPosition(_posePos)
+  return { position: [p.x, p.y, p.z] as [number, number, number], forward: [_poseDir.x, _poseDir.y, _poseDir.z] as [number, number, number] }
 }
 
 /** Canvas element captured by <E2EFrameProbe> for view(). */
 let probeCanvas: HTMLCanvasElement | null = null
+let probeGl: THREE.WebGLRenderer | null = null
 let probeDpr = 1
 
 function readView(): E2EView | null {
@@ -493,6 +525,7 @@ export function E2EFrameProbe() {
     probeCamera = state.camera
     probeSize = state.size
     probeCanvas = state.gl.domElement
+    probeGl = state.gl
     probeDpr = state.viewport.dpr
     if (autoFireEnabled) autoFireTick(state.camera)
     // Post-processing renders several passes per frame, and three.js resets
@@ -502,6 +535,7 @@ export function E2EFrameProbe() {
     api.frames += 1
     const ms = delta * 1000
     api.avgFrameMs = api.avgFrameMs === 0 ? ms : api.avgFrameMs + (ms - api.avgFrameMs) / 120
+    if (ms > api.maxFrameMs) api.maxFrameMs = ms
     api.drawCalls = gl.info.render.calls
     api.triangles = gl.info.render.triangles
     gl.info.reset()
