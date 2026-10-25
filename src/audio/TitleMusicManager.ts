@@ -59,7 +59,6 @@ const tambPattern = [
   null, 1, null, 1, null, 1, null, 1,
 ]
 
-// Sparkle chime notes to pick from
 const chimeNotes = ['E6', 'G6', 'A6', 'C7', 'D7', 'E7', 'G7']
 
 function createTrack(): TitleTrack {
@@ -77,7 +76,6 @@ function createTrack(): TitleTrack {
     volume: -12,
   }).connect(bus.gain)
 
-  // Warm sustained pad
   const padSynth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sine' },
     envelope: {
@@ -89,7 +87,6 @@ function createTrack(): TitleTrack {
     volume: -18,
   }).connect(bus.gain)
 
-  // Bouncy triangle bass
   const bassSynth = new Tone.Synth({
     oscillator: { type: 'triangle' },
     envelope: {
@@ -101,7 +98,6 @@ function createTrack(): TitleTrack {
     volume: -14,
   }).connect(bus.gain)
 
-  // Sparkle chimes — high sine pings
   const chimeSynth = new Tone.Synth({
     oscillator: { type: 'sine' },
     envelope: {
@@ -113,7 +109,6 @@ function createTrack(): TitleTrack {
     volume: -20,
   }).connect(bus.gain)
 
-  // Soft tambourine — filtered noise
   const tamb = new Tone.NoiseSynth({
     noise: { type: 'white' },
     envelope: {
@@ -124,7 +119,6 @@ function createTrack(): TitleTrack {
     volume: -24,
   }).connect(bus.gain)
 
-  // PLAY whoosh: band-passed noise swept upward, on the SFX bus
   const whooshFilter = new Tone.Filter({ type: 'bandpass', frequency: 300, Q: 1.2 }).connect(sfxChannel)
   const whoosh = new Tone.NoiseSynth({
     noise: { type: 'pink' },
@@ -143,7 +137,6 @@ export function startTitleMusic(): void {
   const bar = startTransportAt(108)
   const at = `${bar}i`
 
-  // Melody — 8th notes across 4 bars
   const melodyLoop = new Tone.Sequence(
     (time, note) => {
       if (!note) return
@@ -159,7 +152,6 @@ export function startTitleMusic(): void {
   melodyLoop.loop = true
   melodyLoop.start(at)
 
-  // Pad — one chord per bar (whole note)
   const padLoop = new Tone.Sequence(
     (time, chord) => {
       if (!chord) return
@@ -175,7 +167,6 @@ export function startTitleMusic(): void {
   padLoop.loop = true
   padLoop.start(at)
 
-  // Bass — 8th notes across 4 bars
   const bassLoop = new Tone.Sequence(
     (time, note) => {
       if (!note) return
@@ -202,7 +193,6 @@ export function startTitleMusic(): void {
   }, '2n.')
   chimeLoop.start(`${bar + Tone.getTransport().PPQ}i`) // a beat after the downbeat
 
-  // Tambourine — offbeat 16th notes
   const tambLoop = new Tone.Sequence(
     (time, hit) => {
       if (!hit) return
@@ -221,7 +211,6 @@ export function startTitleMusic(): void {
   t.loops.push(melodyLoop, padLoop, bassLoop, chimeLoop, tambLoop)
 }
 
-/** Fades the title music out over MUSIC_FADE_S (the level music fades in over it). */
 export function stopTitleMusic(): void {
   if (!track) return
   const { bus, loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whoosh, whooshFilter } = track
@@ -229,7 +218,7 @@ export function stopTitleMusic(): void {
   fadeOutMusicBus(bus, [...loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whoosh, whooshFilter])
 }
 
-/** PLAY's whoosh into the fade-to-black. Built with the title music, so silent before audio unlocks. */
+/** Built with the title music, so silent before audio unlocks. */
 export function playTitleWhoosh(): void {
   if (!track) return
   const { whoosh, whooshFilter } = track

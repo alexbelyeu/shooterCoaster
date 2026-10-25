@@ -1,17 +1,11 @@
-/**
- * Title-screen fly-by: two keyframed camera shots that take turns, each held for SHOT_S and blended
- * into the next over BLEND_S with a crane-up so the move clears the tents and flags.
- * Pure (no three / React) so the timeline is unit-tested; poses are written into caller-owned tuples.
- */
+/** Title fly-by: two camera shots take turns, each blended into the next with a lift that clears the tents and flags. */
 
 export type Vec3 = [number, number, number]
 
 export const SHOT_S = 12
 export const BLEND_S = 4
-/** Extra height at the middle of a blend. */
 const BLEND_LIFT = 22
 
-/** Wide orbit around the whole park, as the title always had. */
 function orbitShot(t: number, pos: Vec3, target: Vec3) {
   const a = t * 0.08
   pos[0] = Math.cos(a) * 180
@@ -50,12 +44,11 @@ function shotPose(index: number, t: number, pos: Vec3, target: Vec3) {
 const nextPos: Vec3 = [0, 0, 0]
 const nextTarget: Vec3 = [0, 0, 0]
 
-/** Index of the shot that owns time t (the one being blended out of, during a blend). */
 export function titleShotIndex(t: number): number {
   return Math.floor(Math.max(0, t) / SHOT_S)
 }
 
-/** Camera position and look-at target at time t (seconds since the title appeared). */
+/** t = seconds since the title appeared. */
 export function titleCameraPose(t: number, pos: Vec3, target: Vec3): void {
   const time = Math.max(0, t)
   const index = titleShotIndex(time)

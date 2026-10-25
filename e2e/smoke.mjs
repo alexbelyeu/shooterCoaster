@@ -837,10 +837,7 @@ async function levelSelectCheck(page, levels) {
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
 }
 
-/**
- * Title fly-by (#28): `title-2.png` 6 s after `title.png` shows another camera angle; the start hint
- * shows; a key press fades to black and opens level select.
- */
+/** Title (#28): another camera angle 6 s later (`title-2.png`), the start hint, and a key press fading to level select. */
 async function titleFlyBy(page) {
   const problems = []
   const pose = () => page.evaluate(() => window.__SC_TEST__.cameraPose())
@@ -1001,11 +998,7 @@ async function countdownCheck(page, levelId) {
   }
 }
 
-/**
- * Title -> level music (#28): the title track ramps out from full and is disposed, the level track
- * ramps in from silence, and no music bus is cut without a ramp. Reads the ramp log, because at
- * ~1 fps a 1 s fade can start and end between two polls.
- */
+/** Title -> level music (#28) crossfades: read from the ramp log, since at ~1 fps a 1 s fade fits between two polls. */
 async function musicCrossfade(page) {
   const problems = []
   const read = () => page.evaluate(() => window.__SC_TEST__.audio())

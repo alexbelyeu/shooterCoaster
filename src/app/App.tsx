@@ -35,8 +35,6 @@ export default function App() {
   usePauseOnHidden()
   const inPlay = phase === 'countdown' || phase === 'playing'
 
-  // Title music runs through title and level select; anything else fades it out while the level
-  // music fades in (`audio/musicBus.ts`), so there is no hard cut.
   useEffect(() => {
     if (phase === 'title' || phase === 'levelSelect') {
       if (isAudioReady()) startTitleMusic()
@@ -57,7 +55,6 @@ export default function App() {
     veilTimer.current = window.setTimeout(() => setPhase('levelSelect'), TITLE_FADE_S * 1000)
   }
 
-  // Hide OS cursor whenever custom crosshair is visible
   const showCrosshair = phase === 'title' || phase === 'levelSelect' || inPlay
   useEffect(() => {
     const el = document.documentElement

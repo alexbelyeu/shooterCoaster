@@ -30,7 +30,6 @@ function FlyByCamera() {
   return <PerspectiveCamera ref={camRef} makeDefault fov={55} near={1} far={2000} />
 }
 
-/** Ring of 6 colourful tents */
 function Tents() {
   const tents = useMemo(() => {
     const items: { pos: [number, number, number]; color: string }[] = []
@@ -63,7 +62,6 @@ function Tents() {
   )
 }
 
-/** 12 poles with coloured flags scattered between tents */
 function FlagPoles() {
   const poles = useMemo(() => {
     const items: { pos: [number, number, number]; color: string }[] = []
@@ -200,7 +198,6 @@ function PopBurst({ position, color }: { position: THREE.Vector3; color: string 
   )
 }
 
-/** Single balloon that can be popped */
 function ShootableBalloon({
   position,
   color,
@@ -229,7 +226,6 @@ function ShootableBalloon({
       if (!alive) return
       e.stopPropagation()
       setAlive(false)
-      // Get world position of the balloon for pop burst
       if (groupRef.current) {
         groupRef.current.getWorldPosition(_wp)
         onPop(_wp, color)
@@ -263,7 +259,6 @@ function ShootableBalloon({
   )
 }
 
-/** Balloons + pop bursts + title-screen click-to-shoot raycasting */
 function Balloons() {
   const balloonData = useMemo(() => {
     const rng = createRng(101)
@@ -286,8 +281,7 @@ function Balloons() {
 
   const handlePop = useCallback((worldPos: THREE.Vector3, color: string) => {
     const id = popId.current++
-    // Defer adding the pop burst to the next frame so the click frame stays light
-    // and we avoid layout/jank from synchronous heavy re-render
+    // Next frame, so the click frame stays light.
     const rafId = requestAnimationFrame(() => {
       setPops((prev) => [...prev, { id, pos: worldPos.clone(), color }])
       const timeoutId = setTimeout(() => setPops((prev) => prev.filter((p) => p.id !== id)), 700)
@@ -305,7 +299,7 @@ function Balloons() {
     }
   }, [])
 
-  // The whole bunch drifts slowly round the park; bursts stay where the balloon popped.
+  // Bursts stay outside the drift, where the balloon popped.
   const driftRef = useRef<THREE.Group>(null)
   useFrame((_, delta) => {
     if (driftRef.current) driftRef.current.rotation.y += BALLOON_DRIFT_RAD_S * delta

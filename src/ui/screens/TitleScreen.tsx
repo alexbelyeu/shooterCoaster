@@ -11,18 +11,15 @@ const SUBTITLE_WORDS = ['Ride.', 'Aim.', 'Shoot.']
 /** The title has landed by here; PLAY and the rest follow. */
 const PLAY_IN_S = 1.3
 
-/** The start hint shows on the first title of a page load only. */
 let hintShownThisLoad = false
 
 const touchFirst = () => typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches
 
 interface TitleScreenProps {
-  /** Starts the fade out to level select (audio is unlocked and the music running by then). */
   onPlay: () => void
   onSettings?: () => void
 }
 
-/** Unlocks audio and starts the title music: on the first press anywhere, or on PLAY. */
 async function startMusic() {
   if (!isAudioReady()) await initAudio()
   startTitleMusic()
@@ -47,7 +44,6 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
   }
 
   useEffect(() => {
-    // Music starts on the first interaction of any kind, before PLAY.
     const kickstart = () => void startMusic()
     const onKey = (e: KeyboardEvent) => {
       kickstart()
