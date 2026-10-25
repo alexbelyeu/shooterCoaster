@@ -1,0 +1,5 @@
+## 2026-10-25 — Results-screen run stats: where hits and best combo come from (builder, #25)
+
+**Context:** The results screen shows accuracy and best combo, and `savedScores` now keeps `bestCombo` per level.
+**Decision:** A hit is counted in `processHit` (`combat/CollisionManager.ts`), the one path both the bullet pool and the e2e hook use, so accuracy = `hits / shotsFired` (capped at 100%, "—" with no shots). `saveScore` still keeps the higher score's entry, but `bestCombo` is the max over every run, so a lower-scoring run with a longer streak still updates it. `bestCombo` is optional on `ScoreEntry`; entries saved before it read as 0. The results screen snapshots the run on mount (and reads the previous best before saving), so NEW RECORD is right and the screen doesn't repaint with the next run's zeros during its exit fade.
+**Consequences:** Anything that adds another hit path must go through `processHit` or accuracy drifts. Don't make `saveScore` replace whole entries again without carrying `bestCombo` over.
