@@ -1,5 +1,0 @@
-## 2026-10-24 — Coaster camera weight is rotation only and follows Screen shake (Builder, #123)
-
-**Context:** The coaster camera was a bare `lookAt(pos + tangent)`. Alex asked for bank, pitch, look-ahead and a speed FOV without breaking the rotation-only camera rule from #65.
-**Decision:** `src/track/cameraRig.ts` computes bank from curvature × v² along the camera's right axis and pitch from the change in world speed, both soft-capped with tanh (8° / 3° on Full) and eased with `1 - exp(-dt·k)` in game time. They are applied with `rotateX` / `rotateZ` after `lookAt`, and the eye looks half way to a point 30 × trackScale units ahead (capped 12° off the tangent). Bank, pitch and the speed FOV kick (5°) scale with the Screen-shake setting (Off and prefers-reduced-motion disable them); the look-ahead always applies, since it only aims the view along the track. A frozen game clock freezes the rig, so frozen-time taps hit what is on screen.
-**Consequences:** The default ('reduced') rides at half the gains. The smoke fails if bank, pitch or the FOV kick exceeds those caps; keep `CAMERA_WEIGHT_CAPS` in `e2e/smoke.mjs` in step with the constants.

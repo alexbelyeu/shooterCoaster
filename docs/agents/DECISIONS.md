@@ -604,3 +604,115 @@ until the game has a share action. Pause/resume and tab close send nothing.
 checking the 2-property limit and updating the table in `docs/marketing/README.md`. If the
 team adds Web Analytics Plus (8 properties), a `score_pct` property can be added to
 `level_complete`.
+
+## 2026-10-24 — Countdown phase + shader warm-up behind it (Builder, #119)
+
+**Context:** The Ready / Set / GO `<Countdown>` was dead code, and a level's materials
+compiled the first time they drew mid-play (first kill, explosion, a later wave's enemy
+type), a visible hitch on phones.
+
+**Decision:** Starting a run enters a new `countdown` game phase (`startRun`; `?e2e=1`
+goes straight to `playing` unless `&countdown=1`). The level is mounted during it; the
+timer, wave timers, enemy motion, the coaster car and shooting all wait for `playing`,
+which GO sets. `canvas/ShaderWarmup.tsx` (the approach of mrdoob's MIT-licensed
+slop-newyork `precompileShaders` + warm-up frame, written from the issue's description
+since that repo isn't readable from agent sessions; credited in its header) runs
+`compileAsync` on the scene plus one hidden mesh per shared enemy material, then draws one
+off-screen frame with culling off, everything visible and empty instanced pools given one
+instance. Both target an off-screen float render target, because programs compiled for
+the canvas (sRGB output) differ from the ones the EffectComposer's render pass uses
+(linear output). The countdown holds Ready until the warm-up reports `sceneReady` (at
+most 4 s); a tap after 1 s skips to GO.
+
+**Consequences:** Enemy materials must stay module-level exports of
+`SharedEnemyAssets.ts` to be warmed; a material created per component is not. Code that
+gates on `phase === 'playing'` is right for the countdown too; code that should run while
+the level is on screen must also accept `countdown`. Pausing during the countdown resumes
+straight into `playing`.
+
+## 2026-10-24 — Each level's sky is baked into scene.environment (Builder, #121)
+
+**Context:** Nothing set `scene.environment`, so metallic Standard materials (rails and
+towers, the gun, golden balloons, eyes, stingers, the pyramid capstone) reflected black
+and looked flat and dark. Idea from a review of mrdoob's MIT-licensed slop-newyork
+(`lighting.js:bakeEnvironmentMap`); no code was copied, the bake uses three's own
+`PMREMGenerator.fromScene`.
+**Decision:** `SkyEnvironment` in `shared/Atmosphere.tsx` renders the biome's sky shader
+(shared with `SkyDome` via `createSkyMaterial` / `setSkyUniforms`, sun disc off, glow
+kept) on a unit dome into a PMREM once on level mount and sets `scene.environment` +
+`scene.environmentIntensity` from `AtmosphereConfig.envIntensity` (0.45–0.6). The
+render target is disposed on unmount. The bake is static: clouds don't scroll in the
+reflections.
+**Consequences:** Phong materials ignore `scene.environment`, so terrain, trees, props
+and most enemy bodies keep their low-poly look. The crows are the exception: their
+body, wing, breast, head and tail materials are `MeshPhysicalMaterial`, so they now pick
+up the sky lighting too. Switching a material to Standard makes it reflect the sky
+(tune with `metalness`/`roughness`). Every new biome needs an `envIntensity`. The smoke
+fails a level without `scene.environment`. Cost: a one-off bake on mount (72 ms to
+~5 s under SwiftShader on a loaded 2-CPU box), plus
+shading cost every frame, because each Standard/Physical fragment now samples the env
+map. QA measured level1 under SwiftShader at roughly 556 → 684 ms/frame (72 vs 56 frames
+in a 40 s ride, bake subtracted); not yet measured on a real GPU.
+
+## 2026-10-24 — Per-biome colour grade replaces the stock Vignette and the exposure knob (Builder, #122)
+
+**Context:** Every biome went through the same Bloom → stock `<Vignette>` → ACES chain, so
+the only per-biome colour control was `renderer.toneMappingExposure`, and the stock
+vignette measured distance in UV space, so it stretched into an ellipse on portrait phones.
+Idea from a review of mrdoob's MIT-licensed slop-newyork (`post-processing.js` "looks");
+that repo was not reachable from this session, so no code was copied: the grade is written
+from scratch and carries no third-party notice.
+**Decision:** One custom `postprocessing` Effect, `src/canvas/post/ColourGradeEffect.ts`,
+sits between Bloom and ToneMapping in the composer's single EffectPass (no extra
+full-screen pass). It works on linear HDR colour: exposure, white balance (luminance-
+preserving gains), split tone weighted by `l / (l + 0.18)`, contrast as
+`0.18 * pow(c / 0.18, k)` per RGB channel, saturation + vibrance, and a vignette whose
+distance is aspect-corrected and divided by the corner radius (round on any screen, 1 at the
+corners). Values live in `AtmosphereConfig.grade`; `AtmosphereConfig.exposure` moved into
+`grade.exposure` and the `AtmosphereExposure` component that set
+`renderer.toneMappingExposure` is gone (it now stays 1). The three duplicated
+`EffectComposer` blocks are one `PostEffects` component; the title uses `TITLE_GRADE`
+(vignette only).
+**Consequences:** Every new biome needs a `grade` (the `Record<BiomeType, …>` type and
+`colourGrade.test.ts` enforce the keys and sane ranges). Don't re-add `toneMappingExposure`
+anywhere: it would multiply with `grade.exposure`. Switching title ↔ level remounts the
+composer (keyed), as before; switching between levels only updates uniforms.
+
+## 2026-10-24 — Coaster camera weight is rotation only and follows Screen shake (Builder, #123)
+
+**Context:** The coaster camera was a bare `lookAt(pos + tangent)`. Alex asked for bank, pitch, look-ahead and a speed FOV without breaking the rotation-only camera rule from #65.
+**Decision:** `src/track/cameraRig.ts` computes bank from curvature × v² along the camera's right axis and pitch from the change in world speed, both soft-capped with tanh (8° / 3° on Full) and eased with `1 - exp(-dt·k)` in game time. They are applied with `rotateX` / `rotateZ` after `lookAt`, and the eye looks half way to a point 30 × trackScale units ahead (capped 12° off the tangent). Bank, pitch and the speed FOV kick (5°) scale with the Screen-shake setting (Off and prefers-reduced-motion disable them); the look-ahead always applies, since it only aims the view along the track. A frozen game clock freezes the rig, so frozen-time taps hit what is on screen.
+**Consequences:** The default ('reduced') rides at half the gains. The smoke fails if bank, pitch or the FOV kick exceeds those caps; keep `CAMERA_WEIGHT_CAPS` in `e2e/smoke.mjs` in step with the constants.
+
+## 2026-10-24 — Tree wind sway is a vertex patch on one shared clock (Builder, #124)
+
+**Context:** Trees were static. Idea from Alex's review of mrdoob's MIT-licensed
+slop-newyork (`createTreeMaterial`); its source was not read in this session, so the GLSL
+was written from the issue's description and carries no third-party notice.
+**Decision:** `shared/treeWind.ts` patches the trunk and canopy Phong materials at
+`<begin_vertex>`: a world-space push of H·(h/H)² along a fixed wind direction, gusts as a
+travelling wave over `instanceMatrix[3].xz` plus a per-tree hashed flutter. h/H comes
+from a per-part uniform (`TRUNK_PART` / `CANOPY_PART`, which also build the instance
+matrices), so both parts bend as one field and share one program. Every tree material
+reads the module-level `treeWindTime`, set once per frame by `TreeField` from the R3F
+clock (wall time, so trees keep swaying while paused or in slow-mo, like the kelp).
+Canopy geometries now get a baked `color` attribute (darker underside): the canopy
+material had `vertexColors` on with no such attribute, so every canopy rendered black.
+**Consequences:** Tree instance matrices must stay translate + scale (the shader divides
+the sway by the instance's X/Z scale). A new canopy geometry is shaded by `bakeCrownShade`
+automatically; don't add `color` attributes in `canopyGeoFactory`.
+
+## 2026-10-24 — Token ledger per run; QA trusts CI verify (interactive session for Alex, #147)
+
+**Context:** Weekly Claude usage hit 40% in two days. Nothing measured tokens per run, and the
+same full `npm run verify` ran several times per PR (CI, builder iterations, QA, QA again
+after merging `main`), while on-label tasks bootstrapped twice (session + one subagent).
+**Decision:** Every run logs its token use with `scripts/run-usage.cjs --post` to the
+`token-ledger` issue; the status page and weekly report sum it. A green CI `verify` on the PR
+head is QA's pass/fail: QA builds and smokes only the affected levels, and re-tests on top of
+`main` only when `main`'s changes since the branch point overlap the PR's files. On-label
+QA/Fix work in the main session. Independent reviewers re-run on a fix only if the fix is
+≥~300 lines. Builders run the full verify once, before review.
+**Consequences:** Semantic conflicts between a PR and unrelated `main` changes can reach
+`main` and are caught by the post-merge production smoke (revert first). Don't restore the
+repeated full verifies without checking the ledger for what they cost.
