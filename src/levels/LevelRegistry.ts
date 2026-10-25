@@ -29,8 +29,6 @@ const LEVELS: LevelConfig[] = [
     ],
     starThresholds: [0.3, 0.6, 0.9],
     environment: {
-      groundColor: 0x3a7d3a,
-      skybox: 'skyboxsun25degtest',
       hasTrees: true,
       treeCount: 120,
     },
@@ -63,8 +61,6 @@ const LEVELS: LevelConfig[] = [
     ],
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
-      groundColor: 0x473500,
-      skybox: 'devilpunch',
     },
   },
   {
@@ -95,8 +91,6 @@ const LEVELS: LevelConfig[] = [
     ],
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
-      groundColor: 0x294c48,
-      skybox: 'emerald',
       hasWater: true,
     },
   },
@@ -127,9 +121,8 @@ const LEVELS: LevelConfig[] = [
       { type: 'snowmanBrute', count: 8, spawnDelay: 45, waveLabel: 'Brutes!' },
     ],
     starThresholds: [0.2, 0.5, 0.8],
+    combat: { bulletColor: '#000000', bulletSize: 40 }, // big dark snowballs against the snow
     environment: {
-      groundColor: 0xffffff,
-      skybox: 'iceflow',
       hasTrees: true,
       treeCount: 80,
     },
@@ -165,8 +158,6 @@ const LEVELS: LevelConfig[] = [
     ],
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
-      groundColor: 0x1a1210,
-      skybox: 'inferno',
       hasTrees: true,
       treeCount: 60,
     },

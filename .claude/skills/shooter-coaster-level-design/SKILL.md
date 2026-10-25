@@ -152,6 +152,8 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 4. (Nothing to add to `BiomeEnvironment.tsx` — it renders whatever the registry entry defines.)
 5. `src/audio/MusicManager.ts` — add music config entry (tempo, chords, bass, lead, hasPerc)
 6. `src/levels/LevelRegistry.ts` — add level definition (biome, waves, track config, nextLevel chain)
+   and, optionally, `combat` (`bulletColor` / `bulletSize`, read by `SceneManager`; never
+   special-case a level id in scene code)
 
 ### Enemy Registration (all required)
 1. `src/types/level.ts` — add to `EnemyType` union

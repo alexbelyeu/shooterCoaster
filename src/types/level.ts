@@ -41,9 +41,12 @@ export interface LevelConfig {
   track: TrackParams
   enemies: EnemyWave[]
   starThresholds: [number, number, number] // 1-star, 2-star, 3-star percentages
+  /** Per-level bullet look; unset fields fall back to BulletPool's defaults (red, size 10). */
+  combat?: {
+    bulletColor?: string
+    bulletSize?: number
+  }
   environment: {
-    groundColor: number
-    skybox: string
     hasWater?: boolean
     hasTrees?: boolean
     treeCount?: number

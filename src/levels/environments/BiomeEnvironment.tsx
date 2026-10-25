@@ -21,7 +21,6 @@ interface BiomeEnvironmentProps {
   /** Terrain as drawn (createTerrainSurface). */
   groundFn: HeightFunction
   track: ArcTable
-  groundColor: number
   hasWater?: boolean
   hasTrees?: boolean
   treeCount?: number

@@ -34,9 +34,8 @@ Complete reference for building levels in the Three.js on-rails shooter coaster 
     { type: 'crow', count: 50, spawnDelay: 15, waveLabel: 'Crows!' },
   ],
   starThresholds: [0.2, 0.5, 0.8],
+  combat: { bulletColor: '#ff0000', bulletSize: 10 }, // optional; these are the defaults
   environment: {
-    groundColor: 0xd2a860,
-    skybox: 'desert',
     hasTrees: true,     // optional
     treeCount: 80,      // optional
     hasWater: false,     // optional
