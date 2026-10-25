@@ -22,6 +22,10 @@ export const BANK_RESPONSE = 4
 const PITCH_RESPONSE = 3
 export const LOOK_RESPONSE = 5
 const SPEED_FOV_RESPONSE = 2
+const DROP_RESPONSE = 3
+/** Track descent (-tangent.y) where the drop FOV kick starts and where it is full (~6° and ~27° down). */
+const DROP_START = 0.1
+const DROP_FULL = 0.45
 
 /** Distances along the track in world units × trackScale. */
 export const LOOK_AHEAD_UNITS = 30
@@ -53,27 +57,37 @@ export function pitchAngle(longitudinalAccel: number, trackScale: number): numbe
   return MAX_PITCH_DEG * DEG * Math.tanh(longitudinalAccel / (LONGITUDINAL_ACCEL_REF * trackScale))
 }
 
+/** 0 on the flat or climbing, easing to 1 on a steep drop. */
+export function dropAmount(descent: number): number {
+  if (!Number.isFinite(descent)) return 0
+  const x = Math.min(Math.max((descent - DROP_START) / (DROP_FULL - DROP_START), 0), 1)
+  return x * x * (3 - 2 * x)
+}
+
 export interface RigState {
   /** Radians, before the Screen-shake scale (so Off is exactly 0 at once). */
   roll: number
   pitch: number
   speedNorm: number
+  /** Smoothed `dropAmount`, 0–1. */
+  drop: number
   lastSpeed: number | null
 }
 
 export function createRigState(): RigState {
-  return { roll: 0, pitch: 0, speedNorm: 0, lastSpeed: null }
+  return { roll: 0, pitch: 0, speedNorm: 0, drop: 0, lastSpeed: null }
 }
 
 export function resetRig(state: RigState): RigState {
   state.roll = 0
   state.pitch = 0
   state.speedNorm = 0
+  state.drop = 0
   state.lastSpeed = null
   return state
 }
 
-/** Game-time step; a frozen frame keeps the view still so frozen-time taps hit what they see. */
+/** Game-time step; a frozen frame keeps the view still so frozen-time taps hit what they see. `descent` is -tangent.y. */
 export function stepRig(
   state: RigState,
   lateralAccel: number,
@@ -81,6 +95,7 @@ export function stepRig(
   speedNorm: number,
   dt: number,
   trackScale: number,
+  descent = 0,
 ): RigState {
   if (!(dt > 0)) return state
   const longitudinal = state.lastSpeed === null ? 0 : (speed - state.lastSpeed) / dt
@@ -88,6 +103,7 @@ export function stepRig(
   state.roll = damp(state.roll, bankAngle(lateralAccel, trackScale), BANK_RESPONSE, dt)
   state.pitch = damp(state.pitch, pitchAngle(longitudinal, trackScale), PITCH_RESPONSE, dt)
   state.speedNorm = damp(state.speedNorm, Math.min(Math.max(speedNorm, 0), 1), SPEED_FOV_RESPONSE, dt)
+  state.drop = damp(state.drop, dropAmount(descent), DROP_RESPONSE, dt)
   return state
 }
 
