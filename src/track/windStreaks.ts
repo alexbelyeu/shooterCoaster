@@ -5,7 +5,7 @@ export const STREAK_COUNT = 24
 /** `RigState.speedNorm` where streaks start to fade in. */
 export const STREAK_SPEED_THRESHOLD = 0.7
 /** Peak opacity at top speed on the 'full' Screen-shake setting. */
-export const STREAK_MAX_OPACITY = 0.5
+export const STREAK_MAX_OPACITY = 0.8
 /** Streaks are born this far from the centre, so the crosshair area stays clear. */
 export const STREAK_INNER_RADIUS = 0.4
 /** Seconds one streak takes from birth to the screen edge at threshold speed. */
