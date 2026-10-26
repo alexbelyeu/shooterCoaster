@@ -9,6 +9,7 @@ import { buildArcTable } from '@/track/arcLength'
 import CoasterCamera from '@/track/CoasterCamera'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
+import ContactShadows from '@/levels/environments/shared/ContactShadows'
 import {
   createHeightFunction,
   createTerrainSurface,
@@ -97,22 +98,24 @@ function LevelScene({ levelId }: { levelId: string }) {
         minRollerSpeed={track.minRollerSpeed}
         heightOffset={trackDims.eyeHeight}
       />
-      <TrackMesh
-        curve={curve}
-        color1={color1}
-        color2={color2}
-        dims={trackDims}
-        groundFn={groundFn}
-        table={trackTable}
-      />
-      <BiomeEnvironment
-        biome={biome}
-        groundFn={groundFn}
-        track={trackTable}
-        hasWater={environment.hasWater}
-        hasTrees={environment.hasTrees}
-        treeCount={environment.treeCount}
-      />
+      <ContactShadows groundFn={groundFn}>
+        <TrackMesh
+          curve={curve}
+          color1={color1}
+          color2={color2}
+          dims={trackDims}
+          groundFn={groundFn}
+          table={trackTable}
+        />
+        <BiomeEnvironment
+          biome={biome}
+          groundFn={groundFn}
+          track={trackTable}
+          hasWater={environment.hasWater}
+          hasTrees={environment.hasTrees}
+          treeCount={environment.treeCount}
+        />
+      </ContactShadows>
       <BulletPool bulletColor={combat?.bulletColor} bulletSize={combat?.bulletSize} />
       <ParticleExplosionPool />
       {/* Before EnemySpawner: its mount effect announces the first wave, and the

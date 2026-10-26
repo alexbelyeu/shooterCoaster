@@ -8,6 +8,11 @@ import { ARCHES, PYRAMID } from './landmarks'
 import Mesas from './Mesas'
 import SunFlare from './SunFlare'
 import type { Occluder } from './sunOcclusion'
+import { roundCaster, type ShadowCaster } from '../../shared/contactShadows'
+import { useContactShadows } from '../../shared/ContactShadows'
+
+/** Half the pyramid's square base (`reach` is its half-diagonal). */
+const PYRAMID_HALF = PYRAMID.reach / Math.SQRT2
 
 /** Desert landmarks, mesas the ride threads between, dust devils and the sun flare. */
 export default function DesertFeatures({ heightFn, groundFn, track, atmosphere }: BiomeFeaturesProps) {
@@ -28,6 +33,16 @@ export default function DesertFeatures({ heightFn, groundFn, track, atmosphere }
       })),
     ],
     [layout, pyramidY],
+  )
+
+  useContactShadows(
+    useMemo<ShadowCaster[]>(
+      () => [
+        { x: PYRAMID.x, z: PYRAMID.z, halfX: PYRAMID_HALF, halfZ: PYRAMID_HALF, spread: 70, strength: 0.5 },
+        ...layout.mesas.map((m) => roundCaster(m.x, m.z, 120 * m.scale, 0.45, 0.35)),
+      ],
+      [layout],
+    ),
   )
 
   return (

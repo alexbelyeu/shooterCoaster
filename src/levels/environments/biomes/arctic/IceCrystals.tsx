@@ -10,10 +10,13 @@ import {
   createSpireClusterGeometry,
   createSplayClusterGeometry,
 } from './iceProps'
+import { roundCaster, type ShadowCaster } from '../../shared/contactShadows'
+import { useContactShadows } from '../../shared/ContactShadows'
 
 interface ClusterSet {
   matrices: THREE.Matrix4[]
   colors: THREE.Color[]
+  shadows: ShadowCaster[]
 }
 
 interface ClusterPlacement {
@@ -67,7 +70,8 @@ function placeClusters(
     )
   })
   const colors = props.map(() => new THREE.Color(TINTS[Math.floor(rng() * TINTS.length)]))
-  return { matrices, colors }
+  const shadows = props.map((p) => roundCaster(p.x, p.z, CRYSTAL_FOOTPRINT * p.scale, 0.6, 0.8))
+  return { matrices, colors, shadows }
 }
 
 function ClusterMesh({
@@ -115,6 +119,7 @@ export default function IceCrystals({ groundFn, track }: BiomeDecorationsProps) 
 
   const spires = useMemo(() => placeClusters({ groundFn, track }, SPIRES), [groundFn, track])
   const splays = useMemo(() => placeClusters({ groundFn, track }, SPLAYS), [groundFn, track])
+  useContactShadows(useMemo(() => [...spires.shadows, ...splays.shadows], [spires, splays]))
 
   useEffect(() => {
     return () => {

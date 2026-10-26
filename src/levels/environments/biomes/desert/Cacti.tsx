@@ -3,6 +3,8 @@ import * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
 import { scatterPositions } from '../../shared/scatter'
+import { roundCaster } from '../../shared/contactShadows'
+import { useContactShadows } from '../../shared/ContactShadows'
 
 /** Saguaro, barrel and columnar cacti (rendered first by DesertDecorations). */
 export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
@@ -10,6 +12,7 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
   const saguaroPositions = useMemo(() => scatterPositions(createRng(2310), 40, 400, 2800, heightFn), [heightFn])
   const barrelPositions = useMemo(() => scatterPositions(createRng(2311), 50, 300, 2800, heightFn), [heightFn])
   const columnarPositions = useMemo(() => scatterPositions(createRng(2312), 60, 400, 2800, heightFn), [heightFn])
+  useContactShadows(useMemo(() => saguaroPositions.map((p) => roundCaster(p.x, p.z, 4, 0.5, 1.5)), [saguaroPositions]))
 
   // Cactus material — rich green with waxy specular
   const cactusMat = useMemo(() => new THREE.MeshPhongMaterial({

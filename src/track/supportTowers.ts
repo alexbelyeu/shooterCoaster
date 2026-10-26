@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
 import type { HeightFunction } from '@/utils/terrainNoise'
+import type { ShadowCaster } from '@/levels/environments/shared/contactShadows'
 import type { TrackDimensions } from './trackDimensions'
 import { type ArcTable, tAtDistance } from './arcLength'
 import { trackFrame } from './trackGeometry'
@@ -230,6 +231,22 @@ function planAtSpacing(
   for (const c of candidates) triangles += towerTriangles(td, bucketHeights[c.bucket])
 
   return { towers: candidates, bucketHeights, spacing, triangles }
+}
+
+/** A dark pool under each footing pad, and a faint square under the whole lattice. */
+export function towerShadowCasters(plan: TowerPlan): ShadowCaster[] {
+  const out: ShadowCaster[] = []
+  for (const t of plan.towers) {
+    let reach = 0
+    for (const f of t.feet) {
+      out.push({ x: f.x, z: f.z, halfX: f.size / 2, halfZ: f.size / 2, yaw: t.yaw, radius: f.size / 4, spread: f.size * 2.5, strength: 0.7 })
+      reach += Math.hypot(f.x - t.x, f.z - t.z)
+    }
+    // Feet sit on the corners: half-width = half-diagonal / √2.
+    const half = reach / t.feet.length / Math.SQRT2
+    out.push({ x: t.x, z: t.z, halfX: half, halfZ: half, yaw: t.yaw, radius: half * 0.3, spread: half * 0.5, strength: 0.3 })
+  }
+  return out
 }
 
 function legHalfAt(td: TowerDims, depth: number) {
