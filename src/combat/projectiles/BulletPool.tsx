@@ -3,13 +3,21 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import { getCollisionTargets, processHit } from '@/combat/CollisionManager'
+import { muzzleTip } from '@/combat/hitFeedback'
+import { e2eBullets, isE2E } from '@/testing/e2eHook'
 import type { Bullet, BulletPoolHandle } from './bulletPoolHandle'
 import { setBulletPool } from './bulletPoolHandle'
 import { BULLET_SPEED_PER_SEC, segmentHitsSphere, stepBullet } from './bulletMotion'
+import { BULLET_RADIUS_PER_SIZE, drawnBulletRadius, muzzleOffsetWeight, screenRadiusFraction } from './bulletVisual'
 
 const POOL_SIZE = 350
 const FIRE_DELAY_MS = 60
 const BULLET_LIFETIME_MS = 5000
+
+const _forward = new THREE.Vector3()
+const _muzzle = new THREE.Vector3()
+const _drawn = new THREE.Vector3()
+const _toBullet = new THREE.Vector3()
 
 interface BulletPoolProps {
   bulletSize?: number
@@ -33,6 +41,9 @@ export default function BulletPool({
         direction: new THREE.Vector3(0, 0, -1),
         speed: BULLET_SPEED_PER_SEC,
         hitScale: 1,
+        muzzleOffset: new THREE.Vector3(),
+        muzzlePending: false,
+        travelled: 0,
       })
     }
     return arr
@@ -72,6 +83,8 @@ export default function BulletPool({
       bullet.direction.copy(direction).normalize()
       bullet.speed = BULLET_SPEED_PER_SEC
       bullet.hitScale = hitScale
+      bullet.muzzlePending = true
+      bullet.travelled = 0
       return true
     },
     [bullets],
@@ -89,13 +102,21 @@ export default function BulletPool({
     return () => setBulletPool(null)
   }, [fire, getLiveBullets, getLiveBulletCount])
 
-  useFrame((_, delta) => {
+  useFrame(({ camera }, delta) => {
     if (!meshRef.current || useGameStore.getState().phase !== 'playing') return
 
     const now = performance.now()
     const mesh = meshRef.current
-    const scale = bulletSize * 0.1
-    scaleVec.set(scale, scale, scale)
+    const fullRadius = bulletSize * BULLET_RADIUS_PER_SIZE
+    const fov = (camera as THREE.PerspectiveCamera).fov ?? 75
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(fov / 2))
+    // From the pose, not matrixWorld: the coaster camera moved this frame and has not rendered yet.
+    _forward.set(0, 0, -1).applyQuaternion(camera.quaternion)
+    // WeaponViewModel (priority -1) has already turned the gun to the shot: the tracer starts from this same tip.
+    if (muzzleTip.ready) _muzzle.set(muzzleTip.x, muzzleTip.y, muzzleTip.z).applyQuaternion(camera.quaternion).add(camera.position)
+    const testStep = isE2E ? (window.__SC_TEST__?.bulletStep ?? null) : null
+    let maxFrac = 0
+    let newestBorn = -Infinity
     // Only live bullets are drawn, packed first: the idle pool used to cost ~39k triangles.
     let drawn = 0
 
@@ -103,25 +124,49 @@ export default function BulletPool({
       const bullet = bullets[i]
       if (!bullet.alive) continue
 
-      if (now - bullet.bornAt > BULLET_LIFETIME_MS) {
+      if (bullet.muzzlePending) {
+        bullet.muzzlePending = false
+        if (muzzleTip.ready) bullet.muzzleOffset.subVectors(_muzzle, bullet.position)
+        else bullet.muzzleOffset.set(0, 0, 0)
+      }
+      if (testStep === null && now - bullet.bornAt > BULLET_LIFETIME_MS) {
         bullet.alive = false
         bullet.position.set(0, -9999, 0)
         continue
       }
       // Time-based (not per-frame) travel; the hit test below sweeps prev → position.
       bullet.prev.copy(bullet.position)
-      stepBullet(bullet.position, bullet.direction, bullet.speed, delta)
+      stepBullet(bullet.position, bullet.direction, bullet.speed, testStep ?? delta)
+      bullet.travelled += bullet.prev.distanceTo(bullet.position)
 
-      tempMatrix.makeTranslation(bullet.position.x, bullet.position.y, bullet.position.z)
+      _drawn.copy(bullet.muzzleOffset).multiplyScalar(muzzleOffsetWeight(bullet.travelled)).add(bullet.position)
+      const depth = _toBullet.subVectors(_drawn, camera.position).dot(_forward)
+      const radius = drawnBulletRadius(fullRadius, depth, tanHalf)
+      scaleVec.set(radius, radius, radius)
+      tempMatrix.makeTranslation(_drawn.x, _drawn.y, _drawn.z)
       tempMatrix.scale(scaleVec)
       mesh.setMatrixAt(drawn, tempMatrix)
       liveBulletBuffer.current[drawn++] = bullet
+
+      if (isE2E && radius > 0) {
+        maxFrac = Math.max(maxFrac, screenRadiusFraction(radius, depth, tanHalf))
+        if (bullet.bornAt > newestBorn) {
+          newestBorn = bullet.bornAt
+          e2eBullets.newest.copy(_drawn)
+        }
+      }
     }
 
     mesh.count = drawn
     mesh.instanceMatrix.needsUpdate = true
     const count = drawn
     liveBulletCount.current = count
+    if (isE2E) {
+      e2eBullets.drawn = drawn
+      e2eBullets.screenFrac = maxFrac
+      e2eBullets.maxScreenFrac = Math.max(e2eBullets.maxScreenFrac, maxFrac)
+      e2eBullets.hasNewest = newestBorn > -Infinity
+    }
 
     // Centralized collision pass — flag hits first, process after
     const targets = getCollisionTargets()

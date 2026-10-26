@@ -18,6 +18,9 @@
  * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats().
  * Every level and the phone run (portrait, and after rotating) also run audioBurst():
  * fails on a late note that throws or a sound dropped by an audio error (#115).
+ * Bullets (#165): no drawn bullet may exceed 2% of the canvas height on screen (every
+ * level and the phone run), and one real shot with time + bullets frozen must be drawn
+ * next to the muzzle tip; <id>-shot.png shows it two 40 ms steps into its flight.
  * Saves screenshots + stats to e2e-results/.
  *
  * Spawns use a fixed --seed (default 1337); the seed check reloads the first level
@@ -313,6 +316,8 @@ async function playLevel(page, id) {
   const counts = await page.evaluate(() => window.__SC_TEST__.combat)
   const audio = await audioBurstProblems(page, 'desktop')
   problems.push(...audio.problems)
+  const shot = await freshShotProblems(page, id)
+  problems.push(...shot.problems)
 
   await page.evaluate(() => window.__SC_TEST__.endLevel())
   // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
@@ -371,11 +376,63 @@ async function playLevel(page, id) {
       // Set (to the phase) when the level timed out before the kill event could land.
       killCheckSkipped,
       audioBurst: audio.burst,
+      freshShot: shot.result,
     },
     kills: combat.kills,
     score: combat.score,
     results: results.screen,
   }
+}
+
+/** Largest screen radius a drawn bullet may have, as a fraction of the canvas height (#165). */
+const BULLET_SCREEN_CAP = 0.02
+
+/** Bullets under the cap since load (#165); one frozen real shot must be drawn at the muzzle tip, then <id>-shot.png mid-flight. */
+async function freshShotProblems(page, id) {
+  const problems = []
+  const read = () => page.evaluate(() => ({ bullets: window.__SC_TEST__.bullets(), weapon: window.__SC_TEST__.weapon }))
+  const capProblem = (frac, what) => {
+    if (frac > BULLET_SCREEN_CAP) problems.push(`${what} covered ${(frac * 100).toFixed(1)}% of the canvas height (cap ${BULLET_SCREEN_CAP * 100}%)`)
+  }
+  capProblem((await read()).bullets.maxScreenFrac, 'a bullet')
+  if ((await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return { problems, result: { skipped: true } }
+
+  await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    s.setTimeScale(0)
+    s.bulletStep = 0
+    s.holdFeedback = true
+  })
+  await page.waitForTimeout(100) // past the pool's 60 ms fire delay
+  const fired = await page.evaluate(() => window.__SC_TEST__.fireShot(0.25, 0.15))
+  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  const atMuzzle = await read()
+  // Two 40 ms steps of flight, then freeze again for the screenshot.
+  await page.evaluate(() => { window.__SC_TEST__.bulletStep = 0.04 })
+  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  await page.evaluate(() => { window.__SC_TEST__.bulletStep = 0 })
+  await waitFrames(page, 1, { maxMs: 8000, pollMs: 40 })
+  await page.screenshot({ path: path.join(OUT, `${id}-shot.png`), timeout: SHOT_TIMEOUT })
+  const inFlight = await read()
+  await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    s.bulletStep = null
+    s.holdFeedback = false
+    s.setTimeScale(1)
+  })
+
+  const { bullets, weapon } = atMuzzle
+  const result = { fired, muzzleFrac: bullets.screenFrac, flightFrac: inFlight.bullets.screenFrac, maxScreenFrac: inFlight.bullets.maxScreenFrac, tipDistPx: null }
+  if (!fired) problems.push('fresh shot: fireShot() fired nothing')
+  else if (!bullets.newest) problems.push('fresh shot: no bullet drawn in front of the camera')
+  else if (weapon) {
+    result.tipDistPx = Math.hypot(bullets.newest.x - weapon.tipX, bullets.newest.y - weapon.tipY)
+    const maxPx = 0.08 * Math.min(weapon.width, weapon.height)
+    if (result.tipDistPx > maxPx) problems.push(`fresh shot drawn ${result.tipDistPx.toFixed(0)} px from the muzzle tip (> ${maxPx.toFixed(0)})`)
+  }
+  capProblem(bullets.screenFrac, 'the fresh shot at the muzzle')
+  capProblem(inFlight.bullets.maxScreenFrac, 'a bullet in flight')
+  return { problems, result }
 }
 
 async function resultsScreenProblems(page, stats) {
@@ -1084,6 +1141,9 @@ async function runMobile(browser, base) {
   problems.push(...burstLandscape.problems)
   const weaponLandscape = await weaponProblems(page, 'landscape 844x390')
   problems.push(...weaponLandscape.problems)
+  const bullets = await page.evaluate(() => window.__SC_TEST__.bullets())
+  if (bullets.maxScreenFrac > BULLET_SCREEN_CAP)
+    problems.push(`a bullet covered ${(bullets.maxScreenFrac * 100).toFixed(1)}% of the canvas height (cap ${BULLET_SCREEN_CAP * 100}%)`)
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
 
   // Back to normal speed: the music low-pass must open again.
@@ -1119,6 +1179,7 @@ async function runMobile(browser, base) {
       audio: { portrait: audioPortrait, landscape: audioLandscape },
       audioBurst: { portrait: burstPortrait.burst, landscape: burstLandscape.burst },
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
+      bulletMaxScreenFrac: bullets.maxScreenFrac,
     },
     kills: end.kills,
     score: end.score,
@@ -1306,7 +1367,7 @@ async function run() {
           ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}°${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
@@ -1319,6 +1380,14 @@ function resultsSummary(s) {
 }
 
 /** audioBurst result: "ok", or late-note throws + dropped sounds. */
+/** Largest bullet screen radius (% of canvas height) since load, and the fresh shot's distance from the muzzle tip. */
+function bulletSummary(b) {
+  if (!b) return '?'
+  const tip = b.tipDistPx == null ? '' : ` tip+${b.tipDistPx.toFixed(0)}px`
+  if (b.skipped) return 'shot skipped (level ended)'
+  return `muzzle ${(b.muzzleFrac * 100).toFixed(2)}% flight ${(b.flightFrac * 100).toFixed(2)}% max ${(b.maxScreenFrac * 100).toFixed(2)}%${tip}`
+}
+
 function burstSummary(b) {
   if (!b) return '-'
   return b.lateScheduleErrors || b.dropped ? `late${b.lateScheduleErrors}+drop${b.dropped}` : 'ok'

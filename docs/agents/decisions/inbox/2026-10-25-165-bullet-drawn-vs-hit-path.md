@@ -1,0 +1,5 @@
+## 2026-10-25 — Bullets are drawn apart from their hit test, with a screen-size cap (Builder, #165)
+
+**Context:** Bullets spawned on the camera and drew at full `bulletSize`, so Antarctica's radius-4 snowballs covered up to half the screen for a frame after every shot. The hit test has to stay on the camera ray: aim and touch aim assist are tuned against it.
+**Decision:** `bullet.position` is still the hit test (camera ray, swept). Only the drawn copy changes (`combat/projectiles/bulletVisual.ts`): it starts at the muzzle tip the view-model placed on the bullet's first frame (the tracer's start) and merges into the ray over `TRACER_RANGE`, so it flies along the tracer. Its radius is capped by view depth to 1.5% of the canvas height, so it grows from small at the lens to full size. The smoke fails above 2%.
+**Consequences:** For its first ~160 units a drawn bullet is up to one muzzle offset away from where it can hit. A new projectile type, or a bigger `bulletSize`, gets the same cap for free.
