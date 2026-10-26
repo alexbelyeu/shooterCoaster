@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import GameCanvas from '@/canvas/GameCanvas'
 import { useGameStore } from '@/store/useGameStore'
@@ -13,9 +13,12 @@ import MuteButton from '@/ui/MuteButton'
 import Crosshair from '@/combat/Crosshair'
 import ScorePopups from '@/effects/ScorePopups'
 import WaveAnnouncement from '@/ui/hud/WaveAnnouncement'
-import { startTitleMusic, stopTitleMusic } from '@/audio/TitleMusicManager'
+import { playTitleWhoosh, startTitleMusic, stopTitleMusic } from '@/audio/TitleMusicManager'
 import { isAudioReady } from '@/audio/AudioEngine'
 import { usePauseOnHidden } from './usePauseOnHidden'
+
+/** PLAY fades the title to black (with a whoosh) over this long, then opens level select. */
+const TITLE_FADE_S = 0.4
 
 const fadeVariants = {
   initial: { opacity: 0 },
@@ -25,21 +28,33 @@ const fadeVariants = {
 
 export default function App() {
   const phase = useGameStore((s) => s.phase)
+  const setPhase = useGameStore((s) => s.setPhase)
   const [showSettings, setShowSettings] = useState(false)
+  const [veiled, setVeiled] = useState(false)
+  const veilTimer = useRef<number | undefined>(undefined)
   usePauseOnHidden()
   const inPlay = phase === 'countdown' || phase === 'playing'
 
-  // Start/stop title music based on phase
   useEffect(() => {
-    if ((phase === 'title' || phase === 'levelSelect') && isAudioReady()) {
-      startTitleMusic()
+    if (phase === 'title' || phase === 'levelSelect') {
+      if (isAudioReady()) startTitleMusic()
     } else {
       stopTitleMusic()
     }
-    return () => stopTitleMusic()
   }, [phase])
+  useEffect(() => () => stopTitleMusic(), [])
 
-  // Hide OS cursor whenever custom crosshair is visible
+  useEffect(() => {
+    if (phase !== 'title') setVeiled(false)
+  }, [phase])
+  useEffect(() => () => window.clearTimeout(veilTimer.current), [])
+
+  function playFromTitle() {
+    setVeiled(true)
+    playTitleWhoosh()
+    veilTimer.current = window.setTimeout(() => setPhase('levelSelect'), TITLE_FADE_S * 1000)
+  }
+
   const showCrosshair = phase === 'title' || phase === 'levelSelect' || inPlay
   useEffect(() => {
     const el = document.documentElement
@@ -78,9 +93,9 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 1.05, filter: 'blur(8px)' }}
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
           >
-            <TitleScreen onSettings={() => setShowSettings(true)} />
+            <TitleScreen onPlay={playFromTitle} onSettings={() => setShowSettings(true)} />
           </motion.div>
         )}
 
@@ -110,6 +125,19 @@ export default function App() {
       </AnimatePresence>
 
       {inPlay && <Countdown />}
+
+      {/* Black over everything from PLAY until level select has mounted under it. */}
+      <AnimatePresence>
+        {veiled && (
+          <motion.div
+            key="veil"
+            className="screen-veil"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: TITLE_FADE_S, ease: 'easeIn' } }}
+            exit={{ opacity: 0, transition: { duration: 0.4, delay: 0.3, ease: 'easeOut' } }}
+          />
+        )}
+      </AnimatePresence>
 
       {showSettings && <SettingsScreen onClose={() => setShowSettings(false)} />}
 

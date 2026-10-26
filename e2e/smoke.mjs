@@ -915,6 +915,45 @@ async function levelSelectCheck(page, levels) {
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
 }
 
+/** Title (#28): another camera angle 6 s later (`title-2.png`), the start hint, and a key press fading to level select. */
+async function titleFlyBy(page) {
+  const problems = []
+  const pose = () => page.evaluate(() => window.__SC_TEST__.cameraPose())
+  const a = await pose()
+  const at = Date.now()
+  await waitFrames(page, 2, { minMs: 6000, maxMs: 30000 })
+  const b = await pose()
+  const waited = (Date.now() - at) / 1000
+  await page.screenshot({ path: path.join(OUT, 'title-2.png'), timeout: SHOT_TIMEOUT })
+  let turnedDeg = 0
+  let moved = 0
+  if (!a || !b) problems.push('no title camera')
+  else {
+    const dot = a.forward.reduce((sum, v, i) => sum + v * b.forward[i], 0)
+    turnedDeg = (Math.acos(Math.min(1, dot)) * 180) / Math.PI
+    moved = Math.hypot(...a.position.map((v, i) => v - b.position[i]))
+    if (turnedDeg < 8 && moved < 30)
+      problems.push(`title camera barely moved in ${waited.toFixed(1)} s (${turnedDeg.toFixed(1)} deg, ${moved.toFixed(0)} units)`)
+  }
+  const hint = await page.locator('.title-hint').textContent({ timeout: 5000 }).catch(() => null)
+  if (!hint) problems.push('no start hint on the first title')
+
+  await page.keyboard.press('Enter')
+  const veiled = await page
+    .waitForSelector('.screen-veil', { state: 'attached', timeout: 10000 })
+    .then(() => true, () => false)
+  if (!veiled) problems.push('a key press on the title did not fade to black')
+  const opened = await page
+    .waitForFunction(() => window.__SC_TEST__.phase() === 'levelSelect', null, { timeout: 30000 })
+    .then(() => true, () => false)
+  if (!opened) problems.push('a key press on the title did not open level select')
+  const veilGone = await page
+    .waitForSelector('.screen-veil', { state: 'detached', timeout: 30000 })
+    .then(() => true, () => false)
+  if (!veilGone) problems.push('the fade to black never cleared over level select')
+  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened } }
+}
+
 async function countdownCheck(page, levelId) {
   const start = () => page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
   // Attached, not faded in: at ~1 fps, waiting on the fade could outlast the countdown.
@@ -971,6 +1010,22 @@ async function countdownCheck(page, levelId) {
   const warmup = await page
     .waitForFunction(() => window.__SC_TEST__.shaderWarmup?.done && window.__SC_TEST__.shaderWarmup, null, { timeout: 60000, polling: 250 })
     .then((h) => h.jsonValue(), () => page.evaluate(() => window.__SC_TEST__.shaderWarmup))
+  // First shot + kill after the warm-up: a new shader program here is the first-shot hitch (#28).
+  const shotStart = await page.evaluate((at) => {
+    const api = window.__SC_TEST__
+    const r = { programs: api.programs(), avgFrameMs: api.avgFrameMs }
+    api.maxFrameMs = 0
+    const canvas = document.querySelector('canvas')
+    canvas.dispatchEvent(new PointerEvent('pointerdown', at))
+    canvas.dispatchEvent(new PointerEvent('pointerup', at))
+    api.killNearest(1)
+    return r
+  }, pointer)
+  await waitFrames(page, 4, { minMs: 1500, maxMs: 30000 })
+  const firstShot = await page.evaluate((before) => {
+    const api = window.__SC_TEST__
+    return { ...before, programsAfter: api.programs(), maxFrameMs: api.maxFrameMs, shots: api.stats().shotsFired }
+  }, shotStart)
 
   // 2. Replay through results (as the UI does) and tap after the 1 s mark: it skips to GO.
   await page.evaluate(() => window.__SC_TEST__.endLevel())
@@ -998,6 +1053,9 @@ async function countdownCheck(page, levelId) {
   if (heldInPlay.stats.shotsFired > 0)
     problems.push(`the trigger held through the countdown fired ${heldInPlay.stats.shotsFired} shot(s) after GO`)
   if (!warmup?.done) problems.push('shader warm-up never finished')
+  if (firstShot.shots === 0) problems.push('the first-shot check fired nothing')
+  if (firstShot.programsAfter > firstShot.programs)
+    problems.push(`the first shot + kill compiled ${firstShot.programsAfter - firstShot.programs} shader program(s) after the warm-up`)
   if (!shownAgain) problems.push('no countdown on replay')
   if (!afterTap) problems.push(`the replay never reached playing after a tap in "${tappedIn}"`)
   else if (afterTap.shotsFired > 0) problems.push(`the skip tap fired ${afterTap.shotsFired} shot(s)`)
@@ -1013,8 +1071,35 @@ async function countdownCheck(page, levelId) {
       shotsHeldIntoPlay: heldInPlay.stats.shotsFired,
       skipTapIn: tappedIn,
       warmup,
+      firstShot,
     },
   }
+}
+
+/** Title -> level music (#28) crossfades: read from the ramp log, since at ~1 fps a 1 s fade fits between two polls. */
+async function musicCrossfade(page) {
+  const problems = []
+  const read = () => page.evaluate(() => window.__SC_TEST__.audio())
+  const first = await read()
+  if (!first.ready) return { problems: ['PLAY tap did not unlock audio'], result: null }
+  const deadline = Date.now() + 30000
+  let now = first
+  while (Date.now() < deadline) {
+    const names = now.music.buses.map((b) => b.name)
+    if (names.includes('level') && !names.includes('title')) break
+    await page.waitForTimeout(250)
+    now = await read()
+  }
+  const { fades, buses } = now.music
+  const titleOut = fades.findLast((f) => f.name === 'title' && f.ramp === 'out')
+  const levelIn = fades.findLast((f) => f.name === 'level' && f.ramp === 'in')
+  if (!titleOut) problems.push('the title music never faded out when the level started')
+  else if (titleOut.from < 0.5 || titleOut.seconds < 0.5)
+    problems.push(`title music fade-out was not a ramp from full (from ${titleOut.from.toFixed(2)} over ${titleOut.seconds} s)`)
+  if (!levelIn || levelIn.seconds < 0.5) problems.push('the level music did not fade in')
+  if (buses.some((b) => b.name === 'title')) problems.push('the title music bus was never disposed')
+  if (!buses.some((b) => b.name === 'level' && !b.fading)) problems.push('no level music playing')
+  return { problems, result: { fades, buses } }
 }
 
 /** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
@@ -1062,6 +1147,8 @@ async function runMobile(browser, base) {
   await page.locator(card).tap({ timeout: 30000 }).catch((e) => problems.push(`tap level: ${e.message}`))
   await waitPhase('playing', 15000)
   if ((await phase()) !== 'playing') problems.push('tapping the level card did not start the level')
+  const music = await musicCrossfade(page)
+  problems.push(...music.problems)
   const runSeed = await page.evaluate(() => window.__SC_TEST__.stats().runSeed)
   if (runSeed !== SEED) problems.push(`?seed=${SEED} did not set the run seed (got ${runSeed})`)
 
@@ -1197,7 +1284,7 @@ async function runMobile(browser, base) {
     mobile: {
       taps: 10, tapsOnEnemies, tapShots, tapKills, fallbackKills, crosshairScale,
       portraitTaps: portraitTaps.result, landscapeTaps: landscapeTaps.result,
-      audio: { portrait: audioPortrait, landscape: audioLandscape },
+      audio: { portrait: audioPortrait, landscape: audioLandscape, music: music.result },
       audioBurst: { portrait: burstPortrait.burst, landscape: burstLandscape.burst },
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
       bulletMaxScreenFrac: bullets.maxScreenFrac,
@@ -1245,9 +1332,14 @@ async function run() {
   }
   const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png'), timeout: SHOT_TIMEOUT })
   const titleImg = await imageStats(t.page, titlePng)
-  const titleOk = f1 - f0 >= MIN_FRAMES && t.errors.length === 0 && titleImg.stddev > 4
+  const fly = await titleFlyBy(t.page)
+  const titleProblems = [...fly.problems]
+  if (f1 - f0 < MIN_FRAMES) titleProblems.push(`only ${f1 - f0} frames`)
+  if (titleImg.stddev <= 4) titleProblems.push('title.png is blank')
+  if (t.errors.length) titleProblems.push(`${t.errors.length} error(s)`)
+  const titleOk = titleProblems.length === 0
   failed ||= !titleOk
-  results.push({ id: 'title', ok: titleOk, frames: f1 - f0, image: titleImg, errors: t.errors })
+  results.push({ id: 'title', ok: titleOk, problems: titleProblems, frames: f1 - f0, image: titleImg, title: fly.result, errors: t.errors })
   await t.ctx.close()
 
   // 1b. Level select with saved progress + keyboard-only start
@@ -1367,7 +1459,7 @@ async function run() {
       ? ` enemiesOnScreen=${r.enemies.onScreen} readable=${r.enemies.readable} largestPx=${r.enemies.largestPx}`
       : ''
     const extra = r.id === 'title'
-      ? ''
+      ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '')
       : r.levelSelect
         ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total}` +
           (r.levelSelect.keyboard ? ` keys: ${r.levelSelect.focused} <- ${r.levelSelect.keyboard.left}, locked ${r.levelSelect.keyboard.locked} Enter -> ${r.levelSelect.keyboard.phaseAfterLocked}, Enter -> ${r.levelSelect.keyboard.level} ${r.levelSelect.keyboard.phase}` : '')
@@ -1379,7 +1471,8 @@ async function run() {
       : r.countdown
         ? ` ${r.countdown.level} "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
           ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +
-          ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'}`
+          ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'},` +
+          ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})`
       : r.speed
         ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile

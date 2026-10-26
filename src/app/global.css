@@ -110,6 +110,24 @@ canvas {
   transform: scale(0.96);
 }
 
+.title-screen .title-hint {
+  margin-top: 1.25rem;
+  font-size: 0.85rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+/* PLAY's fade to black, over every screen and button. */
+.screen-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: #000;
+}
+
 .title-screen .credits {
   position: absolute;
   bottom: calc(2rem + env(safe-area-inset-bottom));

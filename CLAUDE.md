@@ -39,7 +39,8 @@ Headless browser in Claude cloud sessions: the Playwright CDN is blocked, so run
 `export SC_CHROME="$(scripts/ensure-browser.sh)"` once per session before `npm run smoke`.
 The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/sizes, errors)
-to `e2e-results/`: `title.png`, and per level `<id>.png` (after a 10 s ride),
+to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the fly-by camera must have turned ≥ 8° or moved ≥ 30 units;
+the start hint must show and a key press must fade to black and open level select), and per level `<id>.png` (after a 10 s ride),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
 gold hitmarker held on the kill frame via `holdFeedback`), `<id>-shot.png` (one real shot two 40 ms
@@ -55,7 +56,7 @@ canvas height (also checked on the phone run), a fresh shot isn't drawn at the m
 reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left) or the
 Levels / Replay buttons, shows NaN, or disagrees with `stats()` on score or kills.
 `npm run smoke` also passes `--mobile`:
-an iPhone 13-like touch context (390x844) taps PLAY and a level, then in portrait and
+an iPhone 13-like touch context (390x844) taps PLAY and a level (the title music must ramp out from full and be disposed, the level music ramp in), then in portrait and
 again in 844x390 landscape taps the canvas 10x, each tap 15–30 px off an on-screen
 enemy (game time frozen while tapping), and requires kills (touch aim assist); checks
 camera aspect == canvas aspect in portrait, landscape and after rotating back, that the
@@ -78,7 +79,8 @@ the phone run checks its cards fit 390 px.
 `?e2e=1` skips the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1`: the countdown must show (`countdown.png`),
 a press during it must fire nothing (also when held on into `playing`), the timer must hold, a replay tap after 1 s skips to `playing`,
-and the shader warm-up must finish. A `speed` step holds the first level at top speed on the most
+and the shader warm-up must finish; after it, the first shot + kill must compile no new shader program
+(`programs()`; the longest frame is reported). A `speed` step holds the first level at top speed on the most
 banked of ten sampled track points: the wind streaks must show and the camera must bank ≥ 1° (`speed.png`).
 `drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
 spawned enemies) and vary run to run; for before/after comparisons use the
@@ -87,7 +89,7 @@ named `track*`; `env=` is the baked sky env map's intensity and bake time; a lev
 without `scene.environment` fails).
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
-(`levels()`, `startLevel(id, seed?)`, `setPhase(phase)`, `setSavedScores(scores)`, `spawnDigest()` → hash of the run's spawn positions, `frames`, `drawCalls`, `triangles`, `avgFrameMs`,
+(`levels()`, `startLevel(id, seed?)`, `setPhase(phase)`, `setSavedScores(scores)`, `spawnDigest()` → hash of the run's spawn positions, `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction),
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/timeRemaining/phase/liveEnemies/
 onScreenEnemies/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `killNearest(n)` (fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
@@ -95,7 +97,7 @@ then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPo
 screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)`, `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideSpeed` (set 0–1 to put the coaster at that speed), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
 {current, max} in degrees, `cameraWeight` → bank / pitch / speed + drop FOV kick now and max (degrees), smoothed speed 0–1, wind-streak opacity, `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
-`view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `audio()` → unlocked?, live SFX node count, music ducked?, sounds dropped by a caught audio error,
+`view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `audio()` → unlocked?, live SFX node count, music ducked?, sounds dropped by a caught audio error, `music` (live music buses with their gain + the last few fade ramps),
 `audioBurst(shots, kills)` → rapid SFX + late music notes in one JS turn while the audio clock ticks, `triggerHeld()` → pointer trigger down?,
 `shaderWarmup` {done, ms, programs} for the current level). See `src/testing/e2eHook.tsx`. Extend it when you need new test
 surfaces. Bullets travel per *second* with a swept hit test (`combat/projectiles/bulletMotion.ts`) along the camera ray;
@@ -130,8 +132,8 @@ from the URL; `?internal=0` clears it): it sends nothing either, via the same ga
 
 | Path | What |
 |---|---|
-| `src/app/App.tsx` | Phase-driven UI shell (title → levelSelect → countdown → playing → paused → results); `usePauseOnHidden` pauses a run (or its countdown) on tab hide / window blur; `ui/hud/Countdown` shows Ready / Set / GO and sets `playing` on GO |
-| `src/canvas/` | `GameCanvas` (R3F Canvas; dpr from a pixel budget, smaller on touch screens: `renderBudget.ts`), `SceneManager` (picks title vs level scene), `post/PostEffects` (the one EffectComposer, MSAA 8, 4 on touch: Bloom + `ColourGradeEffect` + ACES tone mapping merged into one EffectPass; the grade does exposure, white balance, split tone, contrast, saturation/vibrance and a vignette that stays round on any aspect), `ShaderWarmup` (compiles every level + enemy shader and draws one off-screen warm-up frame behind the countdown; sets `sceneReady`), shooting, timer, music |
+| `src/app/App.tsx` | Phase-driven UI shell (title → levelSelect → countdown → playing → paused → results); PLAY (or any key on the title, `ui/screens/titleKeys.ts`) fades to black with a whoosh before level select; `usePauseOnHidden` pauses a run (or its countdown) on tab hide / window blur; `ui/hud/Countdown` shows Ready / Set / GO and sets `playing` on GO |
+| `src/canvas/` | `TitleScene` (title park; fly-by camera: two shots taking turns every 12 s in pure `titleCamera.ts`), `GameCanvas` (R3F Canvas; dpr from a pixel budget, smaller on touch screens: `renderBudget.ts`), `SceneManager` (picks title vs level scene), `post/PostEffects` (the one EffectComposer, MSAA 8, 4 on touch: Bloom + `ColourGradeEffect` + ACES tone mapping merged into one EffectPass; the grade does exposure, white balance, split tone, contrast, saturation/vibrance and a vignette that stays round on any aspect), `ShaderWarmup` (compiles every level + enemy shader and draws one off-screen warm-up frame behind the countdown; sets `sceneReady`), shooting, timer, music |
 | `src/levels/LevelRegistry.ts` | **Level configs** — track params, biome, timer, waves, star thresholds |
 | `src/levels/scoring.ts` | `SCORE_VALUES` per enemy, `computeMaxScore`, `computeStars` (pure, unit-tested) |
 | `src/levels/environments/` | `BiomeEnvironment` (thin host) + `biomeRegistry.ts`; per-biome modules in `biomes/<biome>/` (`config.ts` colour ramp + trees, `Decorations.tsx`, `Features.tsx`, `index.ts`); shared terrain/water/trees/atmosphere/scatter helpers in `shared/` (incl. `trackClearance.ts` to keep props off the track and its towers, `paintedParts.ts` to merge multi-coloured props into one draw call, `ringedRock.ts` for stacked-ring rock formations like sea stacks and mesas, `ParticleField.tsx` for ambient air particles from a per-biome preset, e.g. volcanic ash/embers, `treeWind.ts` for the `TreeField` wind sway vertex patch); a biome may supply its own `createTerrainMaterial` (desert sand ripples); biome components get `heightFn`, `groundFn` (terrain as drawn) and the track's arc table; landmarks (FerrisWheel, Pyramid, Volcano…); per-biome sky/light/fog/`envIntensity`/colour `grade` in `atmosphere.ts` + `SkyDome.tsx`; `shared/Atmosphere.tsx` bakes the sky into `scene.environment` once per level (PMREM), which only Standard/Physical materials reflect |
@@ -141,7 +143,7 @@ from the URL; `?internal=0` clears it): it sends nothing either, via the same ga
 | `src/input/` | `pointerInput` — the single Pointer Events source (mouse/touch/pen) for aim + fire |
 | `src/combat/` | Aim, collisions, projectiles, weapons, crosshair; `WeaponViewModel` (first-person gun, recoil, muzzle flash, tracer; placement + aim in `weaponLayout.ts`, geometry in `weaponModel.ts`); `screenShake.ts` (rotation-only camera trauma for kills and world events via the `camera:trauma` bus event, Off/Reduced/Full setting) |
 | `src/effects/` | Explosions (pooled), score popups |
-| `src/audio/` | Tone.js engine (`sfxChannel` / `musicChannel` → master limiter; slow-mo low-pass duck on the music bus), music + SFX managers. `SFXManager` pre-builds one node kit per level (`prepareLevelSFX`, disposed by `disposeSFX`): fire variants, hit tick, kill layers by combo, per-biome wave stinger; numbers in pure `sfxDesign.ts`. Never create Tone nodes in a play function. Every trigger time goes through `nextTriggerTime` (`triggerTime.ts`: strictly increasing per node, late times pushed past the live audio clock), and every play function / music loop callback catches into `soundGuard.ts` (drops that one sound, never throws to the page) |
+| `src/audio/` | Tone.js engine (`sfxChannel` / `musicChannel` → master limiter; slow-mo low-pass duck on the music bus), music + SFX managers. Title and level music each play into their own `musicBus.ts` gain stage on one shared Transport that is never stopped: a track change is a 1 s crossfade (ramp in / ramp out, then dispose), never a cut. `SFXManager` pre-builds one node kit per level (`prepareLevelSFX`, disposed by `disposeSFX`): fire variants, hit tick, kill layers by combo, per-biome wave stinger; numbers in pure `sfxDesign.ts`. Never create Tone nodes in a play function. Every trigger time goes through `nextTriggerTime` (`triggerTime.ts`: strictly increasing per node, late times pushed past the live audio clock), and every play function / music loop callback catches into `soundGuard.ts` (drops that one sound, never throws to the page) |
 | `src/store/` | zustand stores: game, player, settings (persisted). Start or restart a level only through `startRun(levelId, seed?)` (resets the run, sets `runSeed`: seed > `?seed=` > `Date.now()`, enters `countdown`, or `playing` under `?e2e=1`: `startPhase.ts`). Code gated on `phase === 'playing'` (clock, spawns, shooting, enemy motion) waits through the countdown |
 | `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter, wave banner) + screens (`LevelSelectScreen`: biome cards with an inline-SVG landmark postcard (`LevelPostcard`), stars, best score, locked hint, `★ x / 15` total, arrow-key / Enter / Esc navigation, 300 ms launch before `startRun`; data + nav in pure `levelSelectModel.ts`; `ResultsScreen`: staged reveal of score count-up, star pops with `playStarChime`, star-threshold bar, stats, NEW RECORD; tap skips it, reduced motion shows it at once; Enter = next, R = replay; numbers in pure `resultsStats.ts`); `theme.ts` per-biome UI accents + postcard sky |
 | `src/testing/` | e2e hook |

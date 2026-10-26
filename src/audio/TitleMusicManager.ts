@@ -1,7 +1,8 @@
 import * as Tone from 'tone'
 import { nextTriggerTime } from './triggerTime'
 import { dropSound } from './soundGuard'
-import { musicChannel, isAudioReady } from './AudioEngine'
+import { sfxChannel, isAudioReady } from './AudioEngine'
+import { fadeOutMusicBus, openMusicBus, startTransportAt, type MusicBus } from './musicBus'
 
 /**
  * Whimsical carnival title-screen music.
@@ -10,40 +11,19 @@ import { musicChannel, isAudioReady } from './AudioEngine'
  * Tempo: 108 BPM — relaxed merry-go-round feel.
  */
 
-let isPlaying = false
-
-// Synths
-let melodyBox: Tone.Synth | null = null
-let padSynth: Tone.PolySynth | null = null
-let bassSynth: Tone.Synth | null = null
-let chimeSynth: Tone.Synth | null = null
-let tamb: Tone.NoiseSynth | null = null
-
-// Loops
-let melodyLoop: Tone.Sequence | null = null
-let padLoop: Tone.Sequence | null = null
-let bassLoop: Tone.Sequence | null = null
-let chimeLoop: Tone.Loop | null = null
-let tambLoop: Tone.Sequence | null = null
-
-function resetTitleMusicState() {
-  melodyLoop?.dispose(); melodyLoop = null
-  padLoop?.dispose(); padLoop = null
-  bassLoop?.dispose(); bassLoop = null
-  chimeLoop?.dispose(); chimeLoop = null
-  tambLoop?.dispose(); tambLoop = null
-
-  melodyBox?.dispose(); melodyBox = null
-  padSynth?.dispose(); padSynth = null
-  bassSynth?.dispose(); bassSynth = null
-  chimeSynth?.dispose(); chimeSynth = null
-  tamb?.dispose(); tamb = null
-
-  const transport = Tone.getTransport()
-  transport.stop()
-  transport.cancel()
-  isPlaying = false
+interface TitleTrack {
+  bus: MusicBus
+  melodyBox: Tone.Synth
+  padSynth: Tone.PolySynth
+  bassSynth: Tone.Synth
+  chimeSynth: Tone.Synth
+  tamb: Tone.NoiseSynth
+  whooshFilter: Tone.Filter
+  whoosh: Tone.NoiseSynth
+  loops: (Tone.Sequence | Tone.Loop)[]
 }
+
+let track: TitleTrack | null = null
 
 // — Melody: music-box calliope feel, 2-bar phrase ————————————
 const melodyNotes = [
@@ -79,14 +59,13 @@ const tambPattern = [
   null, 1, null, 1, null, 1, null, 1,
 ]
 
-// Sparkle chime notes to pick from
 const chimeNotes = ['E6', 'G6', 'A6', 'C7', 'D7', 'E7', 'G7']
 
-function ensureInstruments() {
-  if (melodyBox) return
+function createTrack(): TitleTrack {
+  const bus = openMusicBus('title')
 
   // Music-box melody — sine with fast decay for bell-like tone
-  melodyBox = new Tone.Synth({
+  const melodyBox = new Tone.Synth({
     oscillator: { type: 'sine' },
     envelope: {
       attack: 0.005,
@@ -95,10 +74,9 @@ function ensureInstruments() {
       release: 0.4,
     },
     volume: -12,
-  }).connect(musicChannel)
+  }).connect(bus.gain)
 
-  // Warm sustained pad
-  padSynth = new Tone.PolySynth(Tone.Synth, {
+  const padSynth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sine' },
     envelope: {
       attack: 0.8,
@@ -107,10 +85,9 @@ function ensureInstruments() {
       release: 1.5,
     },
     volume: -18,
-  }).connect(musicChannel)
+  }).connect(bus.gain)
 
-  // Bouncy triangle bass
-  bassSynth = new Tone.Synth({
+  const bassSynth = new Tone.Synth({
     oscillator: { type: 'triangle' },
     envelope: {
       attack: 0.01,
@@ -119,10 +96,9 @@ function ensureInstruments() {
       release: 0.2,
     },
     volume: -14,
-  }).connect(musicChannel)
+  }).connect(bus.gain)
 
-  // Sparkle chimes — high sine pings
-  chimeSynth = new Tone.Synth({
+  const chimeSynth = new Tone.Synth({
     oscillator: { type: 'sine' },
     envelope: {
       attack: 0.001,
@@ -131,10 +107,9 @@ function ensureInstruments() {
       release: 0.8,
     },
     volume: -20,
-  }).connect(musicChannel)
+  }).connect(bus.gain)
 
-  // Soft tambourine — filtered noise
-  tamb = new Tone.NoiseSynth({
+  const tamb = new Tone.NoiseSynth({
     noise: { type: 'white' },
     envelope: {
       attack: 0.001,
@@ -142,20 +117,29 @@ function ensureInstruments() {
       sustain: 0,
     },
     volume: -24,
-  }).connect(musicChannel)
+  }).connect(bus.gain)
+
+  const whooshFilter = new Tone.Filter({ type: 'bandpass', frequency: 300, Q: 1.2 }).connect(sfxChannel)
+  const whoosh = new Tone.NoiseSynth({
+    noise: { type: 'pink' },
+    envelope: { attack: 0.12, decay: 0.25, sustain: 0, release: 0.1 },
+    volume: -14,
+  }).connect(whooshFilter)
+
+  return { bus, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whooshFilter, whoosh, loops: [] }
 }
 
 export function startTitleMusic(): void {
-  if (isPlaying || !isAudioReady()) return
-  ensureInstruments()
+  if (track || !isAudioReady()) return
+  const t = createTrack()
+  const { melodyBox, padSynth, bassSynth, chimeSynth, tamb } = t
+  track = t
+  const bar = startTransportAt(108)
+  const at = `${bar}i`
 
-  const transport = Tone.getTransport()
-  transport.bpm.value = 108
-
-  // Melody — 8th notes across 4 bars
-  melodyLoop = new Tone.Sequence(
+  const melodyLoop = new Tone.Sequence(
     (time, note) => {
-      if (!note || !melodyBox) return
+      if (!note) return
       try {
         melodyBox.triggerAttackRelease(note, '8n', nextTriggerTime(melodyBox, time, Tone.getContext().currentTime))
       } catch (e) {
@@ -166,12 +150,11 @@ export function startTitleMusic(): void {
     '8n',
   )
   melodyLoop.loop = true
-  melodyLoop.start(0)
+  melodyLoop.start(at)
 
-  // Pad — one chord per bar (whole note)
-  padLoop = new Tone.Sequence(
+  const padLoop = new Tone.Sequence(
     (time, chord) => {
-      if (!chord || !padSynth) return
+      if (!chord) return
       try {
         padSynth.triggerAttackRelease(chord, '1n', nextTriggerTime(padSynth, time, Tone.getContext().currentTime))
       } catch (e) {
@@ -182,12 +165,11 @@ export function startTitleMusic(): void {
     '1n',
   )
   padLoop.loop = true
-  padLoop.start(0)
+  padLoop.start(at)
 
-  // Bass — 8th notes across 4 bars
-  bassLoop = new Tone.Sequence(
+  const bassLoop = new Tone.Sequence(
     (time, note) => {
-      if (!note || !bassSynth) return
+      if (!note) return
       try {
         bassSynth.triggerAttackRelease(note, '8n', nextTriggerTime(bassSynth, time, Tone.getContext().currentTime))
       } catch (e) {
@@ -198,11 +180,10 @@ export function startTitleMusic(): void {
     '8n',
   )
   bassLoop.loop = true
-  bassLoop.start(0)
+  bassLoop.start(at)
 
   // Sparkle chimes — random note every 1.5 beats
-  chimeLoop = new Tone.Loop((time) => {
-    if (!chimeSynth) return
+  const chimeLoop = new Tone.Loop((time) => {
     const note = chimeNotes[Math.floor(Math.random() * chimeNotes.length)]
     try {
       chimeSynth.triggerAttackRelease(note, '16n', nextTriggerTime(chimeSynth, time, Tone.getContext().currentTime))
@@ -210,12 +191,11 @@ export function startTitleMusic(): void {
       dropSound('title chime', e)
     }
   }, '2n.')
-  chimeLoop.start('4n') // offset slightly from downbeat
+  chimeLoop.start(`${bar + Tone.getTransport().PPQ}i`) // a beat after the downbeat
 
-  // Tambourine — offbeat 16th notes
-  tambLoop = new Tone.Sequence(
+  const tambLoop = new Tone.Sequence(
     (time, hit) => {
-      if (!hit || !tamb) return
+      if (!hit) return
       try {
         tamb.triggerAttackRelease('16n', nextTriggerTime(tamb, time, Tone.getContext().currentTime))
       } catch (e) {
@@ -226,18 +206,29 @@ export function startTitleMusic(): void {
     '8n',
   )
   tambLoop.loop = true
-  tambLoop.start(0)
+  tambLoop.start(at)
 
-  transport.start()
-  isPlaying = true
+  t.loops.push(melodyLoop, padLoop, bassLoop, chimeLoop, tambLoop)
 }
 
 export function stopTitleMusic(): void {
-  if (!isPlaying) return
-  resetTitleMusicState()
+  if (!track) return
+  const { bus, loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whoosh, whooshFilter } = track
+  track = null
+  fadeOutMusicBus(bus, [...loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whoosh, whooshFilter])
 }
 
-export function isTitleMusicPlaying(): boolean {
-  return isPlaying
+/** Built with the title music, so silent before audio unlocks. */
+export function playTitleWhoosh(): void {
+  if (!track) return
+  const { whoosh, whooshFilter } = track
+  try {
+    const now = nextTriggerTime(whoosh, Tone.now(), Tone.getContext().currentTime)
+    whooshFilter.frequency.cancelScheduledValues(now)
+    whooshFilter.frequency.setValueAtTime(300, now)
+    whooshFilter.frequency.exponentialRampToValueAtTime(3200, now + 0.4)
+    whoosh.triggerAttackRelease(0.3, now)
+  } catch (e) {
+    dropSound('title whoosh', e)
+  }
 }
-
