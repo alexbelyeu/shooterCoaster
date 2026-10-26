@@ -296,7 +296,9 @@ async function playLevel(page, id) {
   }
   await page.screenshot({ path: path.join(OUT, `${id}-combat.png`), timeout: SHOT_TIMEOUT })
   const combat = await getStats(page)
-  const weapon = await weaponProblems(page, 'desktop')
+  // The gun's aim is checked on the frozen fresh shot (freshShotProblems): here the
+  // target and the recoil depend on frame timing (#158).
+  const weapon = await weaponProblems(page, 'desktop', { aim: false })
   problems.push(...weapon.problems)
   // Release the hold and let the trauma decay; it must return exactly to 0.
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
@@ -422,7 +424,13 @@ async function freshShotProblems(page, id) {
   })
 
   const { bullets, weapon } = atMuzzle
-  const result = { fired, muzzleFrac: bullets.screenFrac, flightFrac: inFlight.bullets.screenFrac, maxScreenFrac: inFlight.bullets.maxScreenFrac, tipDistPx: null }
+  const result = { fired, muzzleFrac: bullets.screenFrac, flightFrac: inFlight.bullets.screenFrac, maxScreenFrac: inFlight.bullets.maxScreenFrac, tipDistPx: null, aimErrorDeg: null }
+  // Gun aim (#65) on this shot: fixed aim point, time frozen, recoil held at its peak, so the angle is repeatable (#158).
+  if (fired && weapon) {
+    const p = weaponAimProblem(weapon, 'desktop')
+    if (p) problems.push(p)
+    result.aimErrorDeg = weapon.aimErrorDeg
+  }
   if (!fired) problems.push('fresh shot: fireShot() fired nothing')
   else if (!bullets.newest) problems.push('fresh shot: no bullet drawn in front of the camera')
   else if (weapon) {
@@ -492,9 +500,10 @@ function waitVisible(page, selector, timeout = 30000) {
 /**
  * First-person weapon (#65): must be on screen, its muzzle tip inside the
  * viewport, anchored in the lower-right, never covering the screen centre
- * (where the crosshair usually is), and pointing along the last shot's tracer.
+ * (where the crosshair usually is), and (unless `aim` is false) pointing along
+ * the last shot's tracer.
  */
-async function weaponProblems(page, label) {
+async function weaponProblems(page, label, { aim = true } = {}) {
   const { box, hud } = await page.evaluate((sels) => {
     const w = window.__SC_TEST__.weapon
     const hud = []
@@ -516,21 +525,33 @@ async function weaponProblems(page, label) {
     problems.push(`${label}: weapon covers the screen centre`)
   if ((box.minX + box.maxX) / 2 < vw / 2 || (box.minY + box.maxY) / 2 < vh / 2)
     problems.push(`${label}: weapon not in the lower-right quadrant`)
-  // The shot must read as leaving the barrel: on the held frame, the tracer
-  // (tip → last shot) runs within WEAPON_MAX_AIM_DEG of the barrel (pivot → tip)
-  // for any aim point above the muzzle and not right on top of it.
-  const barrel = Math.atan2(box.tipY - box.pivotY, box.tipX - box.pivotX)
-  const shot = Math.atan2(box.shotY - box.tipY, box.shotX - box.tipX)
-  box.aimErrorDeg = Math.abs(((shot - barrel + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * (180 / Math.PI)
-  const shotFar = Math.hypot(box.shotX - box.tipX, box.shotY - box.tipY) > 0.1 * Math.min(vw, vh)
-  if (box.shotY < box.tipY && shotFar && box.aimErrorDeg > WEAPON_MAX_AIM_DEG)
-    problems.push(`${label}: tracer leaves the barrel ${box.aimErrorDeg.toFixed(0)}° off its direction (> ${WEAPON_MAX_AIM_DEG}°)`)
+  if (aim) {
+    const p = weaponAimProblem(box, label)
+    if (p) problems.push(p)
+  }
   // The projected bounding box is conservative (larger than the silhouette).
   for (const r of hud)
     if (box.minX < r.x + r.w && r.x < box.maxX && box.minY < r.y + r.h && r.y < box.maxY)
       problems.push(`${label}: weapon overlaps HUD .${String(r.sel).split(' ')[0]}`)
   box.hudOverlaps = problems.filter((p) => p.includes('overlaps HUD')).length
   return { problems, box }
+}
+
+/**
+ * The shot must read as leaving the barrel: on a held frame, the tracer
+ * (tip → last shot) runs within WEAPON_MAX_AIM_DEG of the barrel (pivot → tip)
+ * for any aim point above the muzzle and not right on top of it. Sets
+ * `box.aimErrorDeg`. Only meaningful when nothing moved between the shot and the
+ * read (game time frozen, feedback held), or the angle is frame-timing noise (#158).
+ */
+function weaponAimProblem(box, label) {
+  const barrel = Math.atan2(box.tipY - box.pivotY, box.tipX - box.pivotX)
+  const shot = Math.atan2(box.shotY - box.tipY, box.shotX - box.tipX)
+  box.aimErrorDeg = Math.abs(((shot - barrel + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * (180 / Math.PI)
+  const shotFar = Math.hypot(box.shotX - box.tipX, box.shotY - box.tipY) > 0.1 * Math.min(box.width, box.height)
+  if (box.shotY < box.tipY && shotFar && box.aimErrorDeg > WEAPON_MAX_AIM_DEG)
+    return `${label}: tracer leaves the barrel ${box.aimErrorDeg.toFixed(0)}° off its direction (> ${WEAPON_MAX_AIM_DEG}°)`
+  return null
 }
 
 /** HUD layout problems: elements missing, outside the viewport, or overlapping each other. */
@@ -1367,7 +1388,7 @@ async function run() {
           ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
