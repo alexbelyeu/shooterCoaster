@@ -16,7 +16,8 @@ gameplay clip (#100).
 What the game still is **not**: a run has no shape. Waves are random scatters that
 exist from t=0, nothing arrives, nothing threatens, every enemy dies the same way, and
 each level ends when a timer hits zero. Combos are a flat multiplier on wall-clock time.
-That is M2's job (see VISION.md). Three things look wrong in this week's screenshots and
+That is M2's job (see VISION.md; epics #176 arcade loop, #177 finales & spectacle; 38
+`agent:ready` issues: 9 P1, 18 P2, 11 P3). Three things look wrong in this week's screenshots and
 go first: **Antarctica's enemies are invisible** in the ride (0 of 4 on-screen enemies
 readable, largest 9 px) and its trees are black silhouettes; **levels 4 and 5 show a
 near-vertical rail climbing into the sky** (the `TrigCurve2` loop does not close);
@@ -123,13 +124,13 @@ nobody reached 5; **0 of 9 mobile visitors started a level** (too few to conclud
    leaves the end π·varC·scalar above the start (≈ 440 units on level 4, ≈ 628 on
    level 5); the seam renders as a near-vertical rail into the sky, visible top-centre of
    both ride screenshots. `src/track/curves/TrigCurve.test.ts` pins the current shape.
-   Filed this week.
+   **#178 (P1).**
 2. **Antarctica enemies unreadable**: snowmen spawn on the ground far below a track that
    runs over mountain tops; 0 of 4 readable, largest 9 px (W43 report saw the same).
-   Filed this week.
+   **#179 (P1).**
 3. **Inferno too dark**: volcano silhouette black on black, lava rivers and track barely
    lit, enemies 15 px dots; a vertical dotted yellow streak beside the track in every
-   shot (a particle or lava column needs a look). Filed this week.
+   shot (a particle or lava column needs a look). **#180 (P1).**
 4. Arctic / theme park tree canopies render as flat black silhouettes (#62; #149's fix
    covered the wind-sway canopies, the dark umbrellas remain in `level4.png`).
 5. Desert draw calls 268 > 250 budget (crows unbatched, #92; scene has 1,191 objects).
@@ -148,14 +149,14 @@ nobody reached 5; **0 of 9 mobile visitors started a level** (too few to conclud
     whose pushes don't trigger `ci.yml`'s `push: main`. PR `verify` (run on the PR merged
     with `main`) and the post-deploy production smoke cover `main`. Fix: have
     `automerge.yml` dispatch `ci.yml` after a merge (`workflow_dispatch`, `actions: write`).
-    Filed this week.
+    **#189 (P2).**
 12. Results screen offers NEXT LEVEL after a 0★ run even though the next level needs 1★
     (`previousLevel()` rule, #162).
 13. Ocean water reads as khaki shallows rather than water in the mid-ground; the sharks
     read as grey blobs head-on. Not filed; candidate for a polish pass after M2's core.
 14. Distant rails and lattice thin to hairlines / shimmer beyond ~400 units on every
-    level (most visible on Desert and Antarctica). Filed this week (minimum on-screen
-    rail thickness).
+    level (most visible on Desert and Antarctica). **#186 (P2)** (minimum on-screen rail
+    thickness).
 
 ## Tech debt / architecture notes
 
@@ -175,7 +176,7 @@ nobody reached 5; **0 of 9 mobile visitors started a level** (too few to conclud
   launch, with a decisions entry.
 - Runtime third-party call: Google Fonts CSS (DECISIONS). Tone.js in the main chunk.
 - `docs/HEAP-BOTTLENECKS.md` findings (source maps in prod, Tone graph size) not acted on
-  (folded into the lazy-Tone issue this week).
+  (folded into the lazy-Tone issue #187).
 - Alex's `abelyeu.*` branches are fully merged; `gh-pages` / `master` are legacy.
 
 ## Half-done / placeholders
