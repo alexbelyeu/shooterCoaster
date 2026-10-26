@@ -138,8 +138,8 @@ Exit criteria:
 Ranked. Each must still be filed as an issue by whoever picks it up, following the
 issue contract in PROTOCOL.md. Items that are already filed as issues this week are
 not repeated here (bosses for Theme Park and Ocean, fireworks, combo tiers,
-choreography, death variety, pickups, leaderboard, daily run, pause, settings,
-positional SFX, gamepad, photo mode, drone orbit, perf gate, lazy Tone).
+choreography, death variety, pickups, leaderboard, daily run, pause, settings, perf
+gate, lazy Tone, rail thickness, the three screenshot bugs).
 
 1. **Giant Scorpion finale (Desert)** — rises from the dunes at the last wave;
    weak point: the tail stinger; segments break off per hit.
@@ -147,41 +147,49 @@ positional SFX, gamepad, photo mode, drone orbit, perf gate, lazy Tone).
    the chest when it roars.
 3. **Magma Titan finale (Inferno)** — climbs out of the lava river on the final
    eruption; cracks glow brighter as HP drops.
-4. **Whale set-piece (Ocean)** — a huge low-poly whale breaches across the track at
+4. **Positional kill and hit sounds** — pan + low-pass from the enemy position at
+   trigger time through one pooled panner per kit (slop `audio-system.js`).
+5. **Drone orbit behind the results screen + a 2–3 s swoop intro per level** — a
+   second camera preset used only outside `playing`; never moves the ride camera.
+6. **Gamepad** — right stick as a virtual cursor, RT fire, Start pause, A/B in menus
+   (~60 lines, dead zone + analog triggers + edge suppression).
+7. **Photo mode** — pause, hide the HUD, orbit + zoom, PNG save; feeds the Marketer's
+   share images.
+8. **Whale set-piece (Ocean)** — a huge low-poly whale breaches across the track at
    ~40 s; camera shake, splash particles.
-5. **Blizzard / sandstorm waves** — a weather pulse (fog near distance + particle
+9. **Blizzard / sandstorm waves** — a weather pulse (fog near distance + particle
    burst) tied to one wave per level; readability must survive it.
-6. **Level 6: Neon Metropolis** — street canyons on a procedural grid, instanced
+10. **Level 6: Neon Metropolis** — street canyons on a procedural grid, instanced
    traffic as scenery, emissive signage, hover drones and billboard bots, helicopter
    boss, synthwave music (merges the earlier "Neon Night City" with Alex's city idea).
-7. **Track set-pieces** — tunnel segments (instanced arches with interior lights),
+11. **Track set-pieces** — tunnel segments (instanced arches with interior lights),
    loop-the-loop curve type with camera roll.
-8. **Night Ride variants** — the same level with a night lighting/grade preset and
+12. **Night Ride variants** — the same level with a night lighting/grade preset and
    emissive props; selectable from the level card once the level has 3★.
-9. **Track-progress radar** — a cached offscreen-canvas minimap of the track with the
+13. **Track-progress radar** — a cached offscreen-canvas minimap of the track with the
    coaster and enemies as dots; hidden in portrait.
-10. **Fog tinted by the sky in the view direction** — GLSL patch applied through one
+14. **Fog tinted by the sky in the view direction** — GLSL patch applied through one
     shared `onBeforeCompile` helper (touches every material; measure first).
-11. **Spatial chunking + fog-distance cut** for whole-level InstancedMeshes; only
+15. **Spatial chunking + fog-distance cut** for whole-level InstancedMeshes; only
     after `sceneStats()` shows a level over budget.
-12. **Per-biome acoustics** — one procedural impulse response + convolver send
+16. **Per-biome acoustics** — one procedural impulse response + convolver send
     (desert slapback, dry open sea, cavernous Inferno).
-13. **Wind/speed bed with gust modulation** replacing the per-frame `rampTo` whoosh.
-14. **Baked one-shot SFX buffers + voice budget** — bake kits to AudioBuffers at
+17. **Wind/speed bed with gust modulation** replacing the per-frame `rampTo` whoosh.
+18. **Baked one-shot SFX buffers + voice budget** — bake kits to AudioBuffers at
     `prepareLevelSFX`, play each trigger as a native `AudioBufferSourceNode`; priority
     stealing, device-aware voice limits. Changes the "no Tone nodes in play functions"
     rule, so it needs a decisions-inbox entry. After launch.
-15. **Level 7: Jungle Ruins** — mist, temples, vines, toucans and spider swarms.
-16. **Level 8: Sky Harbour** — floating islands, airships, cloud layer below the track.
-17. **Loading screen** — branded progress on boot (the per-level warm-up already runs
+19. **Level 7: Jungle Ruins** — mist, temples, vines, toucans and spider swarms.
+20. **Level 8: Sky Harbour** — floating islands, airships, cloud layer below the track.
+21. **Loading screen** — branded progress on boot (the per-level warm-up already runs
     behind the countdown).
-18. **Reduced-motion & colour-blind modes** — settings toggles; enemy palettes
+22. **Reduced-motion & colour-blind modes** — settings toggles; enemy palettes
     verified for deuteranopia.
-19. **Share screenshot** — results screen button renders a branded PNG of the final frame.
-20. **Ghost replay (local)** — record aim/fire timeline, replay as a translucent crosshair.
-21. **WebGPU capability event** — one anonymous `webgpu: yes/no` analytics event per
+23. **Share screenshot** — results screen button renders a branded PNG of the final frame.
+24. **Ghost replay (local)** — record aim/fire timeline, replay as a translucent crosshair.
+25. **WebGPU capability event** — one anonymous `webgpu: yes/no` analytics event per
     visitor after launch, so the renderer decision can be made on real data.
-22. **Online leaderboard** — **needs Alex's decision on a backend** (rule 4: no new paid
+26. **Online leaderboard** — **needs Alex's decision on a backend** (rule 4: no new paid
     services). Candidates: Vercel KV / Supabase free tier.
 
 Not doing (from the slop-newyork review, #126): unpinned three.js from a CDN,

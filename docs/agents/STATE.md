@@ -171,7 +171,7 @@ nobody reached 5; **0 of 9 mobile visitors started a level** (too few to conclud
 - `SharedEnemyAssets.ts` is 809 lines of geometry + material constants; acceptable while
   it is the warm-up's source of truth.
 - Audio: Tone.js synths per kit; polyphony limited per node; no voice budget. The
-  slop-newyork baked-buffer approach (VISION backlog 14) is the planned replacement, after
+  slop-newyork baked-buffer approach (VISION backlog 18) is the planned replacement, after
   launch, with a decisions entry.
 - Runtime third-party call: Google Fonts CSS (DECISIONS). Tone.js in the main chunk.
 - `docs/HEAP-BOTTLENECKS.md` findings (source maps in prod, Tone graph size) not acted on

@@ -15,11 +15,11 @@ removes a screenshot-worthy bug (the three above, the smoke flake that blocks ho
 verification in every cloud session, combo tiers, spawn choreography, fireworks, and the
 clip). **Bosses enter the vision**: every level gets a finale through one boss framework
 (multi-hit, weak points, HP bar, tell, reward), Theme Park and Ocean first. Alex's
-slop-newyork backlog (#126) is split: the cheap, launch-safe items (gamepad, photo mode,
-drone orbit, positional SFX, perf gate, lazy Tone, WebGPU capability event) become ranked
-issues; the structural ones (baked SFX buffers + voice budget, aerial fog, chunk culling,
-Metropolis, helicopter boss, Night Ride) go to the VISION backlog with an owner and a
-trigger. The issue queue is consolidated: QA follow-ups that touch the same files are
+slop-newyork backlog (#126) is split: the launch-safe foundations (perf gate, lazy
+Tone.js) become issues now; the feature items (positional SFX, drone orbit, gamepad, photo
+mode) are ranked at the top of the VISION backlog for the week after launch; the
+structural ones (baked SFX buffers + voice budget, aerial fog, chunk culling, Metropolis,
+helicopter boss, Night Ride, WebGPU capability event) sit lower with a trigger each. The issue queue is consolidated: QA follow-ups that touch the same files are
 merged into one issue each, fixed bugs are closed, and the total stays near the
 ~30-issue weekly capacity.
 
