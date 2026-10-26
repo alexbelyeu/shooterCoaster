@@ -7,5 +7,5 @@ proposed until Web Analytics is on and an organic channel has shown traction.
 
 | Month | Cap | Proposed | Approved | Spent | Notes |
 |---|---:|---:|---:|---:|---|
-| 2026-10 | $0 | $0 | $0 | $0 | Organic first. Stage 0 completed 22 Oct (analytics on, scoaster.com attached); baseline week until 1 Nov — nothing to spend on. |
-| 2026-11 | $0 (knob) | $0 | – | – | Alex's plan: raise the knob to ~$100 after the first organic month. Earliest sensible test is Stage 3 (see STRATEGY.md): Reddit ads, 7 days at ~$14/day, stop rule < 30 visitors/day for 3 days. Not proposed until the knob is raised. |
+| 2026-10 | $0 | $0 | $0 | $0 | Organic first. Stage 0 completed 26 Oct (analytics reading, events live, scoaster.com attached); baseline week until 1 Nov — nothing to spend on. Checked 26 Oct: knob still 0, nothing proposed. |
+| 2026-11 | $0 (knob) | $0 | – | – | Alex's plan: raise the knob to ~$100 after the first organic month. Earliest sensible test is Stage 3 (see STRATEGY.md): Reddit ads, 7 days at ~$14/day, stop rule < 30 visitors/day for 3 days. Not proposed until the knob is raised **and** campaign landing paths exist (UTM breakdowns are paywalled on Vercel Pro, so paid clicks would otherwise be unattributable). |

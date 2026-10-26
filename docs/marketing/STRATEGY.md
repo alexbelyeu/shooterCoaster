@@ -1,6 +1,6 @@
 # Marketing strategy
 
-_v1, written by the first Marketer run (2026-10-22). Rewritten or amended every week;
+_v1.2 (2026-10-26). First written 2026-10-22; rewritten or amended every week;
 the "What changed" section at the bottom is the changelog._
 
 Alex's direction (2026-10-22): organic first (web-game portals, communities, short
@@ -32,7 +32,7 @@ Public name: **ShooterCoaster**. Home: **https://scoaster.com**
 | Segment | Who | Where they are | What they want to hear |
 |---|---|---|---|
 | **A. Browser-game casuals** | 13–35, play 5-minute games on a laptop at school/work or on a phone in a queue; mobile-heavy | CrazyGames, Poki, itch.io, Newgrounds, Y8; r/WebGames | "Free, loads instantly, plays with one thumb, has a timer and a high score." |
-| **B. Web devs / three.js people** | Front-end devs, creative coders, R3F users | three.js forum Showcase, r/threejs, X/Bluesky `#threejs`, Hacker News, the r3f Discord | "All procedural, no assets, 550 KB gz, open source; here's how the track/terrain/shaders work." |
+| **B. Web devs / three.js people** | Front-end devs, creative coders, R3F users | three.js forum Showcase, r/threejs, X/Bluesky `#threejs`, Hacker News, the r3f Discord | "All procedural, no assets, ~500 KB gz, open source; here's how the track/terrain/shaders work." |
 | **C. Rail-shooter nostalgics** | 25–45, Time Crisis / House of the Dead / Star Fox fans | r/IndieGaming, r/playmygame, r/retrogaming, YouTube | "A light-gun arcade feeling in a tab, no quarters needed." |
 
 Segment B is first: cheapest to reach, overlaps with Alex's own network, and gives
@@ -48,7 +48,7 @@ no post does. Segment C comes with the arcade loop (M2: leaderboards, daily run)
 | 3 | **r/WebGames** and **r/playmygame** | A, C | Players who want a browser game *now*. r/playmygame rules are quoted below; r/WebGames rules could not be read from the agent sandbox (Reddit is blocked) — Alex checks the sidebar before posting. One post per sub per month. | 2 posts | 1 |
 | 4 | **Show HN** | B | Highest ceiling of any single post; one shot, needs the game to be polished and the first 30 s to be flawless. "The project should be non-trivial", must be tryable "without barriers such as signups". Save it for the M2 arcade loop with leaderboards. | 1 post, Alex on the thread all day | 3 |
 | 5 | **Short-form video** (TikTok / Shorts / Reels) of the ride | A, C | The ride is visual; a 15 s vertical clip of the Inferno drop or the Ferris wheel pass is the ad. Agents have no screen-capture or video tools, so Alex records (phone screen recording is enough). | Alex's time | 2–3 |
-| 6 | **SEO** on scoaster.com | A | "rollercoaster shooter game", "rail shooter browser", "free online shooting game no download" are long-tail and slow. Table stakes shipped in #96 (title/description, OG card, sitemap, robots). Still missing: indexable text — the page is an empty `<div id="root">` to a crawler — and `VideoGame` structured data (growth issue). | builder work | 0–1 |
+| 6 | **SEO** on scoaster.com | A | "rollercoaster shooter game", "rail shooter browser", "free online shooting game no download" are long-tail and slow. Table stakes shipped in #96 (title/description, OG card, sitemap, robots). Still missing: indexable text — the page is an empty `<div id="root">` to a crawler — and `VideoGame` structured data (#101, queued P2). | builder work | 0–1 |
 | 7 | **Paid test** (~$100) — Reddit ads on r/WebGames-style interests, or Meta/TikTok to the clip | A | Only after analytics works and an organic channel shows which audience converts to a second level. | $100 cap (STEERING) | 3 |
 
 Not now: press / game journalists (no story yet), Steam (not a Steam game), Discord
@@ -58,59 +58,70 @@ servers (needs a community to exist first), Product Hunt (weak fit for a game).
 
 | Stage | Name | Gate to enter | What happens |
 |---|---|---|---|
-| **0** | **Get measurable** (done 22 Oct, bar the first page view) | – | Web Analytics on ✅, scoaster.com attached ✅, OG card + meta ✅, GA tag removed ✅. No traffic pushed; baseline week runs 23 Oct – 1 Nov. |
-| 1 | Soft launch (target **Mon 2 Nov**) | Readiness gate below all green (#28 title hook, #70 closed, a clip exists); M1 exit ("looks and feels like a game", ~2 Nov); custom events #98 live | three.js Showcase (drafted), r/threejs, r/WebGames, r/playmygame, one X/Bluesky thread — one channel at a time, a week apart, so each has its own clean measurement. Collect feedback into issues. |
+| **0** | **Get measurable** — **done 26 Oct** | – | Web Analytics on and reading ✅ (first page view 22 Oct; 31 visitors in W43, all direct), scoaster.com attached ✅, OG card + meta ✅, GA tag removed ✅, custom events live ✅ (#98). No traffic pushed; baseline week runs 24 Oct – 1 Nov. |
+| **1** | **Soft launch** (target **Mon 2 Nov**) — **we are here, waiting on the clip** | Readiness gate below all green: #28 ✅ (merged 26 Oct), #70 ✅ (closed 23 Oct), #98 ✅, campaign landing paths ✅ (`/go/<campaign>` already served; #171 pins it), **a clip exists ❌ (#100, P1)** | three.js Showcase (drafted, #102), r/threejs, r/WebGames, r/playmygame, one X/Bluesky thread — one channel at a time, a week apart, so each has its own clean measurement. Collect feedback into issues. |
 | 2 | Portals | Embeddable build ships; soft-launch feedback addressed | itch.io + Newgrounds uploads, CrazyGames Basic Launch. First short clip. |
 | 3 | Big swing | M2 arcade loop (combo tiers, leaderboard, daily run) | Show HN; clip series; the $100 paid test on whichever channel had the best second-level rate. |
 
-**We are at the end of Stage 0** (22 Oct, 23:00 NY): the domain is attached, analytics is
-on and waiting for its first page view, the share card is live. Stage 1 opens on **Mon 2 Nov**
-if the baseline week (experiment 1) has run, M1 has exited and #28 / #70 are closed. One
-launch draft is prepared ahead for that date (three.js Showcase, below); nothing is posted
-before it.
+**Stage 0 is done; we are in Stage 1 waiting on one item** (26 Oct, 05:30 NY): analytics
+reads (W43: 31 visitors, 47 views, 18 level starts, 8 completes — all direct, mostly Alex
+and the people he sent the link to), the title fly-by shipped this morning (#167), production
+smoke is green. The 2 Nov Showcase post (#102) goes ahead **only if a clip exists by then**
+(#100, now P1, or Alex's own screen recording) — the draft says so. UTM breakdowns turned
+out to be paywalled on Vercel Pro, so links now use `/go/<campaign>` landing paths; the game
+already serves at those paths (verified locally this run; #171 pins it), and the Showcase
+link was switched to `/go/showcase` today.
 
-## Readiness gate (checked 2026-10-22 23:00 NY, after Alex's setup)
+## Readiness gate (checked 2026-10-26 05:30 NY)
 
 | Check | Status | Evidence / what closes it |
 |---|---|---|
-| scoaster.com serves the game over HTTPS | ✅ | Attached 22:55 NY as the production domain, `verified: true`, `misconfigured: false`, `www` → apex 308. Alex confirms HTTPS issued (#85). The sandbox cannot open the site (blocked host), so this rests on Vercel's report. |
-| Analytics on | ✅ (pending first hit) | Dashboard toggle on (Alex, 22 Oct); `@vercel/analytics` mounted by #97, never with `?e2e=1`. API still 404 until the first production page view. Custom events: #98 (P1, Pro plan). |
+| scoaster.com serves the game over HTTPS | ✅ | Production domain, verified; production deployment `8c43d5b` READY at 04:56 NY today (#167 + #155). 31 real visitors reached it in W43 from 7 countries on desktop and mobile. The sandbox still cannot open the site itself (blocked host). |
+| Analytics on | ✅ | **Reading.** Page views since 22 Oct; `level_start` / `level_complete` / `level_quit` since #98 (23 Oct). Per-level, per-stars and per-progress breakdowns work via `eventData/*`. **UTM dimensions are paywalled (402)** → attribution by referrer + `requestPath` (`/go/<campaign>` landing paths, live; #171 pins them). |
 | Title, description, social preview card | ✅ | #96: title, description, canonical, full `og:*` + `twitter:card=summary_large_image` with a real gameplay frame (`public/social/og-1200x630.jpg`), `robots.txt`, `sitemap.xml`, GA tag gone. Card shows the HUD and no title text — fine for v1; experiment 4 tests a titled card. |
-| Loads fast | ✅ / ⚠️ | 546 KB gz total (three 172, r3f 121, **app 253 of 260 KB** — 97% of the largest-chunk budget; the next feature tips it, #41 is queued P3). No loading screen yet (#39, P3). |
-| Plays on a phone | ✅ | Smoke `--mobile` passed on `eeff064` (22 Oct: 10 taps → 7 kills portrait, 7 landscape; HUD inside the viewport); CI `verify` runs the same check on every merge since, including #96/#97. |
-| First 10 seconds exciting | ⚠️ | Still a static park with the Lobster title → PLAY → level select → 3-2-1 → ride. #28 (title fly-by, pulsing PLAY) is queued P2 and is the one gate item left for Stage 1. |
-| Production smoke green | ⚠️ | #70 `agent:prod-broken` open since 20 Oct (deploys READY; likely the 2-core flake #50). Maintainer's. |
-| A clip to post | ❌ | Every Stage 1 post needs a 10–20 s gameplay clip and the agents have no video tools. → growth issue: deterministic frame-stepped capture of a clip from the smoke rig (ffmpeg → MP4 + GIF), or Alex records a phone/desktop screen capture. |
+| Loads fast | ✅ | Re-measured on `main` @ `8c43d5b` this run: **498 KB gz total** (three 172, r3f 114, app **211 of 260 KB**) — down from 546 / 253 on 22 Oct. No loading screen yet (#39, P3), but the shader warm-up now runs behind the Ready / Set / GO countdown, so the first ride doesn't stutter. |
+| Plays on a phone | ✅ / ❓ | Smoke `--mobile` passes on every merge (taps → kills in portrait and landscape, HUD inside the viewport). **But** the 9 mobile visitors in W43 started 0 levels while 4 desktop visitors started 18. Too few to call; W44 decides (see experiment 3). |
+| First 10 seconds exciting | ✅ (shipped today, not yet seen by players) | #28 → #167 merged 26 Oct 04:47 NY: two fly-by camera shots, title drop-in, pulsing PLAY, any key starts, fade-to-black whoosh, title → level music crossfade. First real-player reaction comes with the Showcase thread. |
+| Production smoke green | ✅ | #70 closed 23 Oct; no `agent:prod-broken` issue open. |
+| A clip to post | ❌ | **The last gate item.** #100 (`npm run clip`, frame-stepped MP4 + GIF from the headless rig) has been `agent:ready` since 23 Oct and unclaimed; raised to **P1** this run. Fallback: Alex records 15 s of the Theme Park ride on his phone or desktop. |
 
 ## Experiment queue (ranked)
 
-1. **Referrer baseline** (running: W43 remainder + W44, 23 Oct – 1 Nov) — analytics is on,
-   no posts, so we know what "nobody is marketing this" looks like (expected: single digits,
-   mostly Alex).
-2. **three.js Showcase post** (drafted, earliest Mon 2 Nov) — measure `utm_campaign=showcase`
-   + referrer `discourse.threejs.org` for 7 days; success = 100 visitors and a
-   `level_complete` rate we can quote.
-3. **r/WebGames vs r/playmygame** — same week, different UTM campaigns; which sub sends
-   more visitors and which sends visitors who finish a level (`level_complete`, #98).
-4. **OG card A/B** — the current HUD gameplay frame vs a titled card (game name + "free
+1. **Referrer baseline** (running: 24 Oct – 1 Nov) — analytics is on, no posts, so we know
+   what "nobody is marketing this" looks like. First reading (24–25 Oct UTC): 14 visitors,
+   26 views, 15 level starts from 3 people, all direct. Expected for the full week: a few a
+   day, mostly Alex's circle.
+2. **three.js Showcase post** (drafted #102, earliest Mon 2 Nov, needs the clip) — measure
+   `requestPath = /go/showcase` and referrer `discourse.threejs.org` for 7 days; success = 100 visitors, ≥ 30 % start a level, ≥ 10 % complete one.
+3. **Mobile start rate** (W44, passive) — `level_start` visitors on mobile ÷ mobile visitors.
+   W43: 0 of 9. If W44 has ≥ 20 mobile visitors and the rate is still ~0, file a P1 bug on
+   the phone title → PLAY → level path (with a one-shot `title_play` event only if nothing
+   else explains it); if phones start levels like desktops do, drop this.
+4. **r/WebGames vs r/playmygame** — same week, different landing paths (`/go/webgames`,
+   `/go/playmygame`); which sub sends more visitors and which sends visitors who finish a
+   level.
+5. **OG card A/B** — the current HUD gameplay frame vs a titled card (game name + "free
    browser rail shooter" over the same frame); measured by click-through from the
    X/Bluesky thread (manual count).
-5. **Portal cross-traffic** — does the CrazyGames Basic Launch send anyone to scoaster.com
-   (link in the description where allowed)?
-6. **Paid $100** — Reddit ads, 7 days, $14/day, stop rule: < 30 visitors/day for 3 days.
+6. **Portal cross-traffic** — does the CrazyGames Basic Launch send anyone to scoaster.com
+   (link in the description where allowed → `/go/crazygames`)?
+7. **Paid $100** — Reddit ads, 7 days, $14/day, stop rule: < 30 visitors/day for 3 days.
 
 ## Measurement notes
 
-- The Vercel team is on **Pro** (Alex, 22 Oct), so Web Analytics has **custom events and
-  UTM dimensions** (`utmSource`, `utmMedium`, `utmCampaign` filter and break down in the
-  query API), plus referrer hostname, country, device and OS. The W42 note about Hobby limits
-  no longer applies; the event allowance still counts every custom event, so #98 keeps them
-  to ≤ 4 per run.
-- Every link we hand out carries UTMs
-  (`?utm_source=<site>&utm_medium=<organic|paid>&utm_campaign=<name>`); the weekly file
-  reports both the UTM campaign and the referrer, because people re-share bare links.
-- Success metric per post, once #98 ships: visitors **and** `level_complete` ÷ `level_start`
-  (did they finish a run), split by device. Until then: visitors and mobile share.
+- The Vercel team is on **Pro** (Alex, 22 Oct), so Web Analytics has **custom events** with
+  properties (`eventData/level`, `/stars`, `/progress_pct` break down in the query API), plus
+  referrer hostname, request path, country, device, OS and browser. **UTM dimensions do not
+  work on Pro** (26 Oct: `402 … Enterprise plan or the Web Analytics Plus add-on`), so the
+  UTM-based plan from 22 Oct is replaced by **campaign landing paths**: each post links to
+  `https://scoaster.com/go/<campaign>` (served by the `vercel.json` catch-all rewrite, recorded
+  as `requestPath`; #171 pins it), and the weekly file reports `requestPath` **and** referrer, because people
+  re-share bare links. Links keep `?utm_*` too — free, and other tools read them. The event
+  allowance still counts every custom event, so events stay at ≤ 2 per run.
+- Success metric per post: visitors on the campaign path / referrer **and**
+  `level_complete` ÷ `level_start` (did they finish a run), split by device.
+- The API snaps date ranges to **UTC days**; weekly files say so and never relabel UTC days
+  as New York days.
 - Test traffic (`?e2e=1`, CI, nightly and post-deploy production smoke) never counts
   (`src/app/analyticsGate.ts`, shipped in #97).
 - The query API answers 404 until the project has recorded its first production page
@@ -149,6 +160,17 @@ before it.
 
 ## What changed
 
+- **2026-10-26 (v1.2, weekly run).** First real numbers: W43 = 31 visitors, 47 views, 18
+  level starts → 8 completes (44 %) from 4 desktop players, 29 % mobile share with **0 mobile
+  level starts**, 100 % direct (no posts yet; 22–23 Oct is Alex's setup). Stage 0 closed:
+  analytics reads, custom events live, #28 (title first 30 s) merged this morning, #70
+  closed, bundle down to 498 KB gz (app 211/260). **UTM dimensions are paywalled on Pro
+  (402)** — attribution moves to `/go/<campaign>` landing paths (already served by the
+  catch-all rewrite, verified locally; #171 pins it, P2) plus referrer; README, measurement
+  notes, CHANNELS and BUDGET updated. #100 (clip) raised to P1: the last gate item for the
+  2 Nov Showcase post; #102 updated with the gate status, the `/go/showcase` link and the
+  shipped title screen. New experiment 3: mobile start rate (W44 decides whether the phone
+  title → PLAY path is a P1 bug). No spend (knob 0).
 - **2026-10-22, 23:00 NY (v1.1, extra run after Alex's setup).** Stage 0 is done bar the
   first page view: scoaster.com attached and verified (22:55 NY), Web Analytics on, share
   card + SEO head live (#96), analytics mounted (#97), GA tag gone. The team is on **Pro**,

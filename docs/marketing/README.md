@@ -6,7 +6,16 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
 - **Public name:** ShooterCoaster. **Home:** https://scoaster.com
   (https://shooter-coaster.vercel.app keeps working).
 - **Analytics:** Vercel Web Analytics only (Alex's decision, 2026-10-22). The team is on
-  Pro, so custom events and UTM dimensions are available. Test traffic (`?e2e=1`) and
+  Pro, so custom events (with their properties) are available. **UTM dimensions are not:**
+  the query API answers `402 … UTM dimensions require an Enterprise plan or the Web Analytics
+  Plus add-on` (read 2026-10-26), so `utm_*` parameters on our links are invisible to us.
+  Campaign attribution uses the **referrer hostname** and the **request path**: every link we
+  hand out points at a campaign landing path `https://scoaster.com/go/<campaign>` (the
+  `vercel.json` catch-all rewrite serves the game at any path and the page view records it as
+  `requestPath`; verified locally 2026-10-26, pinned by a smoke step in #171). One campaign
+  name per post or placement: `showcase`, `webgames`, `playmygame`, `share` (the results-screen
+  share button, #87), `crazygames` … Keep the `utm_*` parameters on the
+  links anyway: they cost nothing and other tools read them. Test traffic (`?e2e=1`) and
   internal browsers are never counted (`src/app/analyticsGate.ts`). Custom events (`src/app/analyticsEvents.ts`; at most
   two per run, at most 2 properties each, the Pro limit):
 
@@ -34,6 +43,14 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   page, so Vercel counts nearly every visit as a "bounce" however long it plays (81% on
   2026-10-23 meant nothing). Engagement = `level_start` / visitors and the completion rate
   above.
+- **Querying.** Team `team_krR6Pnp5Vum0BzUHDl5TSjOK` ("Belyeu's projects"), project
+  `prj_dJiZbChPwWWNFzebuIjEGcypBOpP`. The API worked with `teamId` from the first page view
+  (2026-10-26 run). It snaps `since` / `until` to **UTC days**, so a New York week is queried
+  as `2026-10-19T04:00Z … 2026-10-26T04:00Z` and the daily rows come back as UTC days; say so
+  in the metrics file rather than pretending they are New York days. Available breakdowns:
+  `day`, `country`, `deviceType`, `osName`, `browserName`, `referrerHostname`, `requestPath`;
+  events by `eventName` and `eventData/<property>` (`level`, `stars`, `progress_pct`).
+  Bounce rate is not in the API (and meaningless here, below).
 - **If the Vercel connector answers "Web Analytics not found"** while the dashboard shows
   data, the connector can't see the "Belyeu's projects" team: say so in the metrics file and
   the report (no invented numbers) and ask Alex to reconnect it with that team granted.
