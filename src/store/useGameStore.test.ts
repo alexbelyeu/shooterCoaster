@@ -79,6 +79,17 @@ describe('combo', () => {
     expect(store().combo.multiplier).toBe(4)
   })
 
+  it('bestCombo tracks the longest streak of the run, not the current one', () => {
+    for (let i = 0; i < 4; i++) {
+      store().registerKill()
+      now += 100
+    }
+    now += 3000
+    store().registerKill()
+    expect(store().combo.count).toBe(1)
+    expect(store().bestCombo).toBe(4)
+  })
+
   it('resetCombo clears it', () => {
     store().registerKill()
     store().resetCombo()
@@ -113,9 +124,19 @@ describe('startRun', () => {
   it('resets the run, sets the level and the given seed, and enters the countdown', () => {
     store().addScore(50)
     store().registerShot()
+    store().registerHit()
     store().registerKill()
     store().startRun('level2', 42)
-    expect(store()).toMatchObject({ phase: 'countdown', currentLevel: 'level2', runSeed: 42, score: 0, kills: 0, shotsFired: 0 })
+    expect(store()).toMatchObject({
+      phase: 'countdown',
+      currentLevel: 'level2',
+      runSeed: 42,
+      score: 0,
+      kills: 0,
+      shotsFired: 0,
+      hits: 0,
+      bestCombo: 0,
+    })
     expect(store().combo).toEqual({ count: 0, multiplier: 1, lastKillTime: 0 })
   })
 
@@ -151,9 +172,23 @@ describe('saveScore', () => {
     const first = entry('level2', 400, 1)
     store().saveScore(first)
     store().saveScore({ ...entry('level2', 400, 1), timestamp: 2 })
-    expect(store().savedScores.level2).toBe(first)
+    expect(store().savedScores.level2.timestamp).toBe(first.timestamp)
     store().saveScore(entry('level3', 10, 0))
     expect(Object.keys(store().savedScores).sort()).toEqual(['level2', 'level3'])
+  })
+
+  it('keeps the highest bestCombo across runs, even when the score is not a record', () => {
+    store().saveScore({ ...entry('level1', 500, 1), bestCombo: 4 })
+    store().saveScore({ ...entry('level1', 300, 0), bestCombo: 9 })
+    expect(store().savedScores.level1).toMatchObject({ score: 500, bestCombo: 9 })
+    store().saveScore({ ...entry('level1', 800, 2), bestCombo: 2 })
+    expect(store().savedScores.level1).toMatchObject({ score: 800, bestCombo: 9 })
+  })
+
+  it('accepts old entries saved without bestCombo', () => {
+    useGameStore.setState({ savedScores: { level1: entry('level1', 500, 1) } })
+    store().saveScore({ ...entry('level1', 100, 0), bestCombo: 3 })
+    expect(store().savedScores.level1).toMatchObject({ score: 500, bestCombo: 3 })
   })
 
   it('persists only savedScores (not score, combo or phase)', () => {

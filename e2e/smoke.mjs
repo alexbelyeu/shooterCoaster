@@ -14,9 +14,13 @@
  * the coaster camera's bank / pitch / speed FOV went past their caps (#123),
  * the first-person weapon is missing / off screen / covering the centre / not
  * pointing along the shot's tracer (> 25° on screen), the
- * camera aspect doesn't match the canvas, or the results screen never appears.
+ * camera aspect doesn't match the canvas, or the results screen never finishes its
+ * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats().
  * Every level and the phone run (portrait, and after rotating) also run audioBurst():
  * fails on a late note that throws or a sound dropped by an audio error (#115).
+ * Bullets (#165): no drawn bullet may exceed 2% of the canvas height on screen (every
+ * level and the phone run), and one real shot with time + bullets frozen must be drawn
+ * next to the muzzle tip; <id>-shot.png shows it two 40 ms steps into its flight.
  * Saves screenshots + stats to e2e-results/.
  *
  * Spawns use a fixed --seed (default 1337); the seed check reloads the first level
@@ -27,6 +31,8 @@
  * with `&countdown=1`: the countdown must show (countdown.png), ignore a press (also once
  * held on into play), hold the timer, reach playing on GO, and the shader warm-up must
  * finish; on a replay, a tap after the 1 s mark must skip to playing.
+ * The speed check holds the first level at top speed on its most banked sampled point:
+ * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  *
  * All waits are deadline-polled on the hook's frame counter, because software
  * rendering in CI / cloud sessions can run at ~1 fps.
@@ -290,7 +296,9 @@ async function playLevel(page, id) {
   }
   await page.screenshot({ path: path.join(OUT, `${id}-combat.png`), timeout: SHOT_TIMEOUT })
   const combat = await getStats(page)
-  const weapon = await weaponProblems(page, 'desktop')
+  // The gun's aim is checked on the frozen fresh shot (freshShotProblems): here the
+  // target and the recoil depend on frame timing (#158).
+  const weapon = await weaponProblems(page, 'desktop', { aim: false })
   problems.push(...weapon.problems)
   // Release the hold and let the trauma decay; it must return exactly to 0.
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
@@ -310,14 +318,16 @@ async function playLevel(page, id) {
   const counts = await page.evaluate(() => window.__SC_TEST__.combat)
   const audio = await audioBurstProblems(page, 'desktop')
   problems.push(...audio.problems)
+  const shot = await freshShotProblems(page, id)
+  problems.push(...shot.problems)
 
   await page.evaluate(() => window.__SC_TEST__.endLevel())
-  // App uses AnimatePresence mode="wait": the HUD fades out before the results fade in.
+  // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
   const resultsShown = await page
     .waitForFunction(
       () => {
         const el = document.querySelector('.results-screen')
-        if (!el) return false
+        if (!el || el.getAttribute('data-sequence') !== 'done') return false
         for (let n = el; n; n = n.parentElement) if (Number(getComputedStyle(n).opacity) < 0.98) return false
         return true
       },
@@ -325,8 +335,12 @@ async function playLevel(page, id) {
       { timeout: 30000, polling: 250 },
     )
     .then(() => true, () => false)
+  // Let the buttons' fade-in settle (a frame can take ~1 s headless) before the screenshot.
+  await page.waitForTimeout(1500)
   await page.screenshot({ path: path.join(OUT, `${id}-results.png`), timeout: SHOT_TIMEOUT })
   const end = await getStats(page)
+  const results = await resultsScreenProblems(page, end)
+  problems.push(...results.problems)
 
   if (combat.kills === 0) problems.push('no kills (enemies missing or unhittable?)')
   // Only meaningful when something was on screen to aim at.
@@ -364,10 +378,96 @@ async function playLevel(page, id) {
       // Set (to the phase) when the level timed out before the kill event could land.
       killCheckSkipped,
       audioBurst: audio.burst,
+      freshShot: shot.result,
     },
     kills: combat.kills,
     score: combat.score,
+    results: results.screen,
   }
+}
+
+/** Largest screen radius a drawn bullet may have, as a fraction of the canvas height (#165). */
+const BULLET_SCREEN_CAP = 0.02
+
+/** Bullets under the cap since load (#165); one frozen real shot must be drawn at the muzzle tip, then <id>-shot.png mid-flight. */
+async function freshShotProblems(page, id) {
+  const problems = []
+  const read = () => page.evaluate(() => ({ bullets: window.__SC_TEST__.bullets(), weapon: window.__SC_TEST__.weapon }))
+  const capProblem = (frac, what) => {
+    if (frac > BULLET_SCREEN_CAP) problems.push(`${what} covered ${(frac * 100).toFixed(1)}% of the canvas height (cap ${BULLET_SCREEN_CAP * 100}%)`)
+  }
+  capProblem((await read()).bullets.maxScreenFrac, 'a bullet')
+  if ((await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return { problems, result: { skipped: true } }
+
+  await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    s.setTimeScale(0)
+    s.bulletStep = 0
+    s.holdFeedback = true
+  })
+  await page.waitForTimeout(100) // past the pool's 60 ms fire delay
+  const fired = await page.evaluate(() => window.__SC_TEST__.fireShot(0.25, 0.15))
+  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  const atMuzzle = await read()
+  // Two 40 ms steps of flight, then freeze again for the screenshot.
+  await page.evaluate(() => { window.__SC_TEST__.bulletStep = 0.04 })
+  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  await page.evaluate(() => { window.__SC_TEST__.bulletStep = 0 })
+  await waitFrames(page, 1, { maxMs: 8000, pollMs: 40 })
+  await page.screenshot({ path: path.join(OUT, `${id}-shot.png`), timeout: SHOT_TIMEOUT })
+  const inFlight = await read()
+  await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    s.bulletStep = null
+    s.holdFeedback = false
+    s.setTimeScale(1)
+  })
+
+  const { bullets, weapon } = atMuzzle
+  const result = { fired, muzzleFrac: bullets.screenFrac, flightFrac: inFlight.bullets.screenFrac, maxScreenFrac: inFlight.bullets.maxScreenFrac, tipDistPx: null, aimErrorDeg: null }
+  // Gun aim (#65) on this shot: fixed aim point, time frozen, recoil held at its peak, so the angle is repeatable (#158).
+  if (fired && weapon) {
+    const p = weaponAimProblem(weapon, 'desktop')
+    if (p) problems.push(p)
+    result.aimErrorDeg = weapon.aimErrorDeg
+  }
+  if (!fired) problems.push('fresh shot: fireShot() fired nothing')
+  else if (!bullets.newest) problems.push('fresh shot: no bullet drawn in front of the camera')
+  else if (weapon) {
+    result.tipDistPx = Math.hypot(bullets.newest.x - weapon.tipX, bullets.newest.y - weapon.tipY)
+    const maxPx = 0.08 * Math.min(weapon.width, weapon.height)
+    if (result.tipDistPx > maxPx) problems.push(`fresh shot drawn ${result.tipDistPx.toFixed(0)} px from the muzzle tip (> ${maxPx.toFixed(0)})`)
+  }
+  capProblem(bullets.screenFrac, 'the fresh shot at the muzzle')
+  capProblem(inFlight.bullets.maxScreenFrac, 'a bullet in flight')
+  return { problems, result }
+}
+
+async function resultsScreenProblems(page, stats) {
+  const screen = await page.evaluate(() => {
+    const el = document.querySelector('.results-screen')
+    if (!el) return null
+    const rows = Object.fromEntries(
+      [...el.querySelectorAll('.results-stat')].map((r) => [r.children[0].textContent, r.children[1].textContent]),
+    )
+    const buttons = [...el.querySelectorAll('.results-actions button')]
+      .filter((b) => b.getBoundingClientRect().width > 0)
+      .map((b) => b.textContent)
+    const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
+    return { rows, buttons, stars, score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent }
+  })
+  const problems = []
+  if (!screen) return { problems: ['results screen missing'], screen }
+  const { text, ...shown } = screen
+  if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
+  for (const label of ['Kills', 'Accuracy', 'Best combo', 'Time left']) {
+    if (!(label in screen.rows)) problems.push(`results screen has no "${label}" row`)
+  }
+  if (screen.rows.Kills && !screen.rows.Kills.startsWith(`${stats.kills} /`)) problems.push(`results kills "${screen.rows.Kills}" != ${stats.kills}`)
+  if (stats.shotsFired > 0 && !/^\d+%$/.test(screen.rows.Accuracy ?? '')) problems.push(`results accuracy "${screen.rows.Accuracy}" with ${stats.shotsFired} shots`)
+  if (!screen.buttons.includes('Replay') || !screen.buttons.includes('Levels')) problems.push(`results buttons ${JSON.stringify(screen.buttons)}`)
+  if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
+  return { problems, screen: shown }
 }
 
 const MOBILE_LEVEL = 'level1'
@@ -376,8 +476,8 @@ const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-b
 /** Max angle between the barrel and the tracer on screen (#65). */
 const WEAPON_MAX_AIM_DEG = 25
 /** Caps on the coaster camera weight (#123): MAX_BANK_DEG / MAX_PITCH_DEG in
- *  src/track/cameraRig.ts and SPEED_FOV_DEG in src/track/cameraFov.ts. */
-const CAMERA_WEIGHT_CAPS = { roll: 8, pitch: 3, fovKick: 5 }
+ *  src/track/cameraRig.ts and SPEED_FOV_DEG + DROP_FOV_DEG in src/track/cameraFov.ts. */
+const CAMERA_WEIGHT_CAPS = { roll: 8, pitch: 3, fovKick: 8 }
 const HUD_SELECTORS = ['.hud-score', '.hud-kills', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
 
 /** Wait until `selector` exists, has a size, and it and its ancestors are fully faded in. */
@@ -400,9 +500,10 @@ function waitVisible(page, selector, timeout = 30000) {
 /**
  * First-person weapon (#65): must be on screen, its muzzle tip inside the
  * viewport, anchored in the lower-right, never covering the screen centre
- * (where the crosshair usually is), and pointing along the last shot's tracer.
+ * (where the crosshair usually is), and (unless `aim` is false) pointing along
+ * the last shot's tracer.
  */
-async function weaponProblems(page, label) {
+async function weaponProblems(page, label, { aim = true } = {}) {
   const { box, hud } = await page.evaluate((sels) => {
     const w = window.__SC_TEST__.weapon
     const hud = []
@@ -424,21 +525,33 @@ async function weaponProblems(page, label) {
     problems.push(`${label}: weapon covers the screen centre`)
   if ((box.minX + box.maxX) / 2 < vw / 2 || (box.minY + box.maxY) / 2 < vh / 2)
     problems.push(`${label}: weapon not in the lower-right quadrant`)
-  // The shot must read as leaving the barrel: on the held frame, the tracer
-  // (tip → last shot) runs within WEAPON_MAX_AIM_DEG of the barrel (pivot → tip)
-  // for any aim point above the muzzle and not right on top of it.
-  const barrel = Math.atan2(box.tipY - box.pivotY, box.tipX - box.pivotX)
-  const shot = Math.atan2(box.shotY - box.tipY, box.shotX - box.tipX)
-  box.aimErrorDeg = Math.abs(((shot - barrel + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * (180 / Math.PI)
-  const shotFar = Math.hypot(box.shotX - box.tipX, box.shotY - box.tipY) > 0.1 * Math.min(vw, vh)
-  if (box.shotY < box.tipY && shotFar && box.aimErrorDeg > WEAPON_MAX_AIM_DEG)
-    problems.push(`${label}: tracer leaves the barrel ${box.aimErrorDeg.toFixed(0)}° off its direction (> ${WEAPON_MAX_AIM_DEG}°)`)
+  if (aim) {
+    const p = weaponAimProblem(box, label)
+    if (p) problems.push(p)
+  }
   // The projected bounding box is conservative (larger than the silhouette).
   for (const r of hud)
     if (box.minX < r.x + r.w && r.x < box.maxX && box.minY < r.y + r.h && r.y < box.maxY)
       problems.push(`${label}: weapon overlaps HUD .${String(r.sel).split(' ')[0]}`)
   box.hudOverlaps = problems.filter((p) => p.includes('overlaps HUD')).length
   return { problems, box }
+}
+
+/**
+ * The shot must read as leaving the barrel: on a held frame, the tracer
+ * (tip → last shot) runs within WEAPON_MAX_AIM_DEG of the barrel (pivot → tip)
+ * for any aim point above the muzzle and not right on top of it. Sets
+ * `box.aimErrorDeg`. Only meaningful when nothing moved between the shot and the
+ * read (game time frozen, feedback held), or the angle is frame-timing noise (#158).
+ */
+function weaponAimProblem(box, label) {
+  const barrel = Math.atan2(box.tipY - box.pivotY, box.tipX - box.pivotX)
+  const shot = Math.atan2(box.shotY - box.tipY, box.shotX - box.tipX)
+  box.aimErrorDeg = Math.abs(((shot - barrel + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * (180 / Math.PI)
+  const shotFar = Math.hypot(box.shotX - box.tipX, box.shotY - box.tipY) > 0.1 * Math.min(box.width, box.height)
+  if (box.shotY < box.tipY && shotFar && box.aimErrorDeg > WEAPON_MAX_AIM_DEG)
+    return `${label}: tracer leaves the barrel ${box.aimErrorDeg.toFixed(0)}° off its direction (> ${WEAPON_MAX_AIM_DEG}°)`
+  return null
 }
 
 /** HUD layout problems: elements missing, outside the viewport, or overlapping each other. */
@@ -678,12 +791,130 @@ async function hiddenPauseCheck(page, levelId) {
   }
 }
 
+/** Track fractions the speed check tries for its banked fast section. */
+const SPEED_SCAN = [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
+
+/** Hold top speed at `fraction` for ≥ 1.5 s so the rig and streaks ease in; returns the camera weight. */
+async function rideFast(page, fraction) {
+  await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, fraction)
+  const start = Date.now()
+  const f0 = await getFrames(page)
+  let w
+  while (Date.now() - start < 20000) {
+    await page.evaluate(() => { window.__SC_TEST__.rideSpeed = 1 })
+    await page.waitForTimeout(250)
+    const now = await page.evaluate(() => ({ frames: window.__SC_TEST__.frames, w: window.__SC_TEST__.cameraWeight }))
+    w = now.w
+    if (now.frames - f0 >= 3 && Date.now() - start >= 1500) break
+  }
+  return { ...w }
+}
+
+/** Sense of speed (#27) at the default Screen-shake setting: streaks and bank at top speed, within the caps (speed.png). */
+async function speedCheck(page, levelId) {
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+  await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
+  let best = { fraction: SPEED_SCAN[0], roll: -1 }
+  for (const fraction of SPEED_SCAN) {
+    const w = await rideFast(page, fraction)
+    if (Math.abs(w.roll) > best.roll) best = { fraction, roll: Math.abs(w.roll) }
+  }
+  const w = await rideFast(page, best.fraction)
+  await page.screenshot({ path: path.join(OUT, 'speed.png'), timeout: SHOT_TIMEOUT })
+  const problems = []
+  if (!(w.streaks > 0.05)) problems.push(`no wind streaks at top speed (opacity ${w.streaks?.toFixed(3)}, speed ${w.speed?.toFixed(2)})`)
+  if (!(Math.abs(w.roll) >= 1)) problems.push(`camera barely banks at top speed (${w.roll.toFixed(2)}° at track ${best.fraction})`)
+  if (w.maxRoll > CAMERA_WEIGHT_CAPS.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.roll}°`)
+  if (w.maxFovKick > CAMERA_WEIGHT_CAPS.fovKick + 1e-6) problems.push(`FOV kick ${w.maxFovKick.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.fovKick}°`)
+  const translation = await page.evaluate(() => window.__SC_TEST__.cameraTranslation.max)
+  if (translation > 1e-6) problems.push(`camera translated ${translation.toFixed(3)} units off the track pose`)
+  return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w } }
+}
+
 /**
  * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
  * shows over the mounted level, a press during it fires nothing (not even when held on into
  * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
  * that a tap after the 1 s mark skips to GO / playing.
  */
+/** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
+async function levelSelectCheck(page, levels) {
+  const problems = []
+  const scores = {}
+  const earned = [3, 1]
+  levels.slice(0, 2).forEach((l, i) => {
+    scores[l.id] = { level: l.id, score: 1000 * (2 - i), maxScore: 0, stars: earned[i], timestamp: 0 }
+  })
+  const expectStars = earned.slice(0, levels.length).reduce((a, b) => a + b, 0)
+  const expectOpen = Math.min(levels.length, 3)
+  await page.evaluate((s) => {
+    window.__SC_TEST__.setSavedScores(s)
+    window.__SC_TEST__.setPhase('levelSelect')
+  }, scores)
+  if (!(await waitVisible(page, '.level-select-back'))) problems.push('level select never appeared')
+  await page.waitForTimeout(800) // fade-in
+  await waitFrames(page, 2, { maxMs: 10000 })
+  await page.screenshot({ path: path.join(OUT, 'levelSelect.png'), timeout: SHOT_TIMEOUT })
+
+  const layout = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.level-card')]
+    const root = document.querySelector('.level-select')
+    const off = cards.filter((c) => {
+      const r = c.getBoundingClientRect()
+      return r.left < 0 || r.top < 0 || r.right > window.innerWidth || r.bottom > window.innerHeight
+    })
+    return {
+      cards: cards.length,
+      locked: cards.filter((c) => c.dataset.locked === 'true').length,
+      total: document.querySelector('.level-select-total')?.dataset.stars ?? null,
+      totalText: document.querySelector('.level-select-total')?.textContent ?? '',
+      offscreen: off.map((c) => c.dataset.level),
+      hScroll: root ? root.scrollWidth > root.clientWidth : true,
+      focused: document.activeElement?.dataset?.level ?? null,
+    }
+  })
+  if (layout.cards !== levels.length) problems.push(`${layout.cards} level cards for ${levels.length} levels`)
+  if (layout.locked !== levels.length - expectOpen) problems.push(`${layout.locked} locked cards, expected ${levels.length - expectOpen}`)
+  if (Number(layout.total) !== expectStars || !layout.totalText.includes(`${expectStars} / ${levels.length * 3}`)) {
+    problems.push(`star total "${layout.totalText.trim()}", expected ${expectStars} / ${levels.length * 3}`)
+  }
+  if (layout.offscreen.length) problems.push(`cards off a 1280x720 screen: ${layout.offscreen.join(',')}`)
+  if (layout.hScroll) problems.push('level select scrolls sideways')
+
+  const focused = () => page.evaluate(() => document.activeElement?.dataset?.level ?? null)
+  const target = levels[Math.min(2, levels.length - 1)].id
+  if (layout.focused !== target) problems.push(`initial focus on ${layout.focused}, expected ${target}`)
+  let keyboard = null
+  if (levels.length >= 4) {
+    await page.keyboard.press('ArrowLeft')
+    const left = await focused()
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('ArrowRight')
+    const locked = await focused()
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(700)
+    const phaseAfterLocked = await page.evaluate(() => window.__SC_TEST__.phase())
+    await page.keyboard.press('ArrowLeft')
+    await page.evaluate(() => {
+      window.__sawLaunch = false
+      const root = document.querySelector('.level-select')
+      new MutationObserver(() => {
+        if (root?.classList.contains('is-launching')) window.__sawLaunch = true
+      }).observe(root, { attributes: true, attributeFilter: ['class'] })
+    })
+    await page.keyboard.press('Enter')
+    await page.waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 15000 }).catch(() => {})
+    const after = await page.evaluate(() => ({ phase: window.__SC_TEST__.phase(), level: window.__SC_TEST__.stats().currentLevel, sawLaunch: window.__sawLaunch }))
+    keyboard = { left, locked, phaseAfterLocked, ...after }
+    if (left !== levels[1].id) problems.push(`ArrowLeft focused ${left}, expected ${levels[1].id}`)
+    if (locked !== levels[3].id) problems.push(`ArrowRight x2 focused ${locked}, expected ${levels[3].id}`)
+    if (phaseAfterLocked !== 'levelSelect') problems.push(`Enter on a locked card left level select (${phaseAfterLocked})`)
+    if (!after.sawLaunch) problems.push('no launch transition before the run started')
+    if (after.phase !== 'playing' || after.level !== target) problems.push(`Enter started ${after.level} (${after.phase}), expected ${target}`)
+  }
+  return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
+}
+
 async function countdownCheck(page, levelId) {
   const start = () => page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
   // Attached, not faded in: at ~1 fps, waiting on the fade could outlast the countdown.
@@ -817,6 +1048,17 @@ async function runMobile(browser, base) {
   const card = `.level-card[data-level="${MOBILE_LEVEL}"]`
   if (!(await waitVisible(page, card))) problems.push('level card never appeared')
   await page.screenshot({ path: path.join(OUT, 'mobile-level-select.png'), timeout: SHOT_TIMEOUT })
+  const selectLayout = await page.evaluate(() => {
+    const root = document.querySelector('.level-select')
+    const cards = [...document.querySelectorAll('.level-card')]
+    const tooNarrow = cards.filter((c) => {
+      const r = c.getBoundingClientRect()
+      return r.left < 0 || r.right > window.innerWidth || r.height < 44
+    })
+    return { hScroll: root ? root.scrollWidth > root.clientWidth : true, bad: tooNarrow.map((c) => c.dataset.level) }
+  })
+  if (selectLayout.hScroll) problems.push('phone level select scrolls sideways')
+  if (selectLayout.bad.length) problems.push(`phone level cards off screen or under 44 px: ${selectLayout.bad.join(',')}`)
   await page.locator(card).tap({ timeout: 30000 }).catch((e) => problems.push(`tap level: ${e.message}`))
   await waitPhase('playing', 15000)
   if ((await phase()) !== 'playing') problems.push('tapping the level card did not start the level')
@@ -920,6 +1162,9 @@ async function runMobile(browser, base) {
   problems.push(...burstLandscape.problems)
   const weaponLandscape = await weaponProblems(page, 'landscape 844x390')
   problems.push(...weaponLandscape.problems)
+  const bullets = await page.evaluate(() => window.__SC_TEST__.bullets())
+  if (bullets.maxScreenFrac > BULLET_SCREEN_CAP)
+    problems.push(`a bullet covered ${(bullets.maxScreenFrac * 100).toFixed(1)}% of the canvas height (cap ${BULLET_SCREEN_CAP * 100}%)`)
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
 
   // Back to normal speed: the music low-pass must open again.
@@ -955,6 +1200,7 @@ async function runMobile(browser, base) {
       audio: { portrait: audioPortrait, landscape: audioLandscape },
       audioBurst: { portrait: burstPortrait.burst, landscape: burstLandscape.burst },
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
+      bulletMaxScreenFrac: bullets.maxScreenFrac,
     },
     kills: end.kills,
     score: end.score,
@@ -1004,6 +1250,18 @@ async function run() {
   results.push({ id: 'title', ok: titleOk, frames: f1 - f0, image: titleImg, errors: t.errors })
   await t.ctx.close()
 
+  // 1b. Level select with saved progress + keyboard-only start
+  if (!args['skip-desktop']) {
+    const l = await newPage()
+    const r = await levelSelectCheck(l.page, levels)
+    r.errors = [...l.errors, ...(await l.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await l.ctx.close()
+  }
+
   // 2. Every level (or the requested subset)
   const wanted = args['skip-desktop'] ? [] : args.levels ? args.levels.split(',') : levels.map((l) => l.id)
   for (const id of wanted) {
@@ -1041,7 +1299,7 @@ async function run() {
     delete stats.hookErrors
     results.push({
       id, ok, problems, frames, seconds: (Date.now() - started) / 1000, spawnDigest, ...stats,
-      kills: play.kills, score: play.score, combat: play.combat, image: img, enemies: enemyShot, errors: allErrors,
+      kills: play.kills, score: play.score, combat: play.combat, results: play.results, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
   }
@@ -1081,7 +1339,19 @@ async function run() {
     await c.ctx.close()
   }
 
-  // 6. Optional touch playtest on a phone viewport
+  // 6. Top speed: banking + wind streaks (speed.png)
+  if (wanted.length) {
+    const sp = await newPage()
+    const r = await speedCheck(sp.page, wanted[0])
+    r.errors = [...sp.errors, ...(await sp.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await sp.ctx.close()
+  }
+
+  // 7. Optional touch playtest on a phone viewport
   if (args.mobile) {
     const m = await runMobile(browser, base)
     failed ||= !m.ok
@@ -1098,6 +1368,9 @@ async function run() {
       : ''
     const extra = r.id === 'title'
       ? ''
+      : r.levelSelect
+        ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total}` +
+          (r.levelSelect.keyboard ? ` keys: ${r.levelSelect.focused} <- ${r.levelSelect.keyboard.left}, locked ${r.levelSelect.keyboard.locked} Enter -> ${r.levelSelect.keyboard.phaseAfterLocked}, Enter -> ${r.levelSelect.keyboard.level} ${r.levelSelect.keyboard.phase}` : '')
       : r.seedCheck
         ? ` ${r.seedCheck.level} seed ${SEED}: ${r.seedCheck.digest} (reload ${r.seedCheck.reloaded}, again ${r.seedCheck.again}) seed ${SEED + 1}: ${r.seedCheck.other}`
       : r.hiddenPause
@@ -1107,13 +1380,15 @@ async function run() {
         ? ` ${r.countdown.level} "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
           ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +
           ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'}`
+      : r.speed
+        ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
           ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.weapon?.aimErrorDeg?.toFixed(0)}°${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
@@ -1121,7 +1396,19 @@ async function run() {
   process.exit(failed ? 1 : 0)
 }
 
+function resultsSummary(s) {
+  return s ? ` results=${s.stars}★ acc=${s.rows.Accuracy} combo=${s.rows['Best combo']}` : ''
+}
+
 /** audioBurst result: "ok", or late-note throws + dropped sounds. */
+/** Largest bullet screen radius (% of canvas height) since load, and the fresh shot's distance from the muzzle tip. */
+function bulletSummary(b) {
+  if (!b) return '?'
+  const tip = b.tipDistPx == null ? '' : ` tip+${b.tipDistPx.toFixed(0)}px`
+  if (b.skipped) return 'shot skipped (level ended)'
+  return `muzzle ${(b.muzzleFrac * 100).toFixed(2)}% flight ${(b.flightFrac * 100).toFixed(2)}% max ${(b.maxScreenFrac * 100).toFixed(2)}%${tip}`
+}
+
 function burstSummary(b) {
   if (!b) return '-'
   return b.lateScheduleErrors || b.dropped ? `late${b.lateScheduleErrors}+drop${b.dropped}` : 'ok'

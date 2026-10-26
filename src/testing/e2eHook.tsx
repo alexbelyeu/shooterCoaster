@@ -11,7 +11,7 @@
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots (fires one real shot, then resolves the
  *     hits through the bullet pool's own processHit path), endLevel() to reach
- *     the results screen, stats() for score / kills / combo / shots,
+ *     the results screen, stats() for score / kills / combo / shots / hits,
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
  *     the weapon view-model's on-screen box (hit feedback checks)
@@ -30,6 +30,7 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType } from '@/types/level'
+import type { GamePhase, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
@@ -54,6 +55,10 @@ export interface SCTestApi {
   /** `<count>:<hash>` of the latest run's spawn positions; null until a spawner has generated them. */
   spawnDigest: () => string | null
   phase: () => string
+  /** Jump to a UI phase (e.g. `levelSelect`) without clicking through the screens before it. */
+  setPhase: (phase: GamePhase) => void
+  /** Replace the saved best scores / stars (persisted to localStorage like real saves). */
+  setSavedScores: (scores: Record<string, ScoreEntry>) => void
   /**
    * Enemies whose centre is inside the view frustum, largest first, with screen
    * position (CSS px, origin top-left) and projected silhouette size in px.
@@ -70,14 +75,25 @@ export interface SCTestApi {
    *  pitch / yaw / roll, degrees). Kill trauma decays to 0 within 250 ms. */
   cameraTrauma: { current: number; max: number }
   /** Coaster camera weight (#123) applied this frame and the max seen since load:
-   *  bank and pitch (degrees, signed; maxima are absolute) and the speed FOV widening. */
-  cameraWeight: { roll: number; pitch: number; fovKick: number; maxRoll: number; maxPitch: number; maxFovKick: number }
+   *  bank and pitch (degrees, signed; maxima are absolute), the speed + drop FOV widening,
+   *  the smoothed ride speed (0–1) and the wind-streak opacity (#27). */
+  cameraWeight: {
+    roll: number; pitch: number; fovKick: number; maxRoll: number; maxPitch: number; maxFovKick: number
+    speed: number; streaks: number; maxStreaks: number
+  }
   /** First-person weapon view-model on screen (CSS px, origin top-left):
    *  bounding box of its projected bounds and the muzzle tip. null before the
    *  first level frame. */
   weapon: E2EWeaponOnScreen | null
   /** Freeze transient feedback (muzzle flash, hitmarker) at its peak for screenshots. */
   holdFeedback: boolean
+  /** Seconds every live bullet flies per frame instead of the frame time, and no bullet expires;
+   *  0 freezes them (e.g. a fresh one at the muzzle), null is normal play. */
+  bulletStep: number | null
+  /** Drawn bullets (#165): count, largest screen radius (fraction of canvas height) now and since load, newest one's CSS px point. */
+  bullets: () => E2EBullets
+  /** Fire one real shot through NDC (x, y), like a click there. False if not fired (phase, fire delay). */
+  fireShot: (x: number, y: number) => boolean
   /**
    * Deterministic scene totals, independent of camera/frustum culling:
    * every visible mesh's triangles (x instance count) and object count, plus a
@@ -103,6 +119,8 @@ export interface SCTestApi {
   setTimeScale: (s: number) => void
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null
+  /** Set to a speed (0–1 between the level's min and max velocity) to put the coaster at it on its next frame. */
+  rideSpeed: number | null
   // ── View / aspect (issue #66) ──
   /** Active camera projection vs the canvas's on-screen box (squash checks). */
   view: () => E2EView | null
@@ -163,7 +181,17 @@ export interface SCTestStats {
   /** Live enemies in front of the camera and inside the viewport (not occlusion-tested). */
   onScreenEnemies: number
   shotsFired: number
+  hits: number
+  bestCombo: number
   runSeed: number
+  currentLevel: string | null
+}
+
+export interface E2EBullets {
+  drawn: number
+  screenFrac: number
+  maxScreenFrac: number
+  newest: { x: number; y: number } | null
 }
 
 export interface E2EWeaponOnScreen {
@@ -216,6 +244,25 @@ let probeCamera: THREE.Camera | null = null
 let probeSize = { width: 1280, height: 720 }
 const _v = new THREE.Vector3()
 const _w = new THREE.Vector3()
+
+/** Written by BulletPool every playing frame when the e2e flag is on; read through `bullets()`. */
+export const e2eBullets = {
+  drawn: 0,
+  screenFrac: 0,
+  maxScreenFrac: 0,
+  hasNewest: false,
+  newest: new THREE.Vector3(),
+}
+
+function readBullets(): E2EBullets {
+  const b = e2eBullets
+  let newest: E2EBullets['newest'] = null
+  if (b.hasNewest && probeCamera) {
+    _v.copy(b.newest).project(probeCamera)
+    if (_v.z < 1) newest = { x: ((_v.x + 1) / 2) * probeSize.width, y: ((1 - _v.y) / 2) * probeSize.height }
+  }
+  return { drawn: b.drawn, screenFrac: b.screenFrac, maxScreenFrac: b.maxScreenFrac, newest }
+}
 
 function enemiesOnScreen(): E2EEnemyOnScreen[] {
   const cam = probeCamera
@@ -308,6 +355,8 @@ export function installE2EApi() {
     triangles: 0,
     levels: () => getAllLevels().map((l) => ({ id: l.id, name: l.name })),
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
+    setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
+    setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
     spawnDigest: () => spawnDigest,
     audio: readAudio,
     audioBurst,
@@ -317,9 +366,12 @@ export function installE2EApi() {
     combat: { fired: 0, hits: 0, kills: 0 },
     cameraTranslation: { current: 0, max: 0 },
     cameraTrauma: { current: 0, max: 0 },
-    cameraWeight: { roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0 },
+    cameraWeight: { roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0, speed: 0, streaks: 0, maxStreaks: 0 },
     weapon: null,
     holdFeedback: false,
+    bulletStep: null,
+    bullets: readBullets,
+    fireShot: (x: number, y: number) => (probeCamera ? fireAtNDC(x, y, probeCamera) : false),
     shaderWarmup: null,
     sceneStats: () => null,
     autoFire: (enabled: boolean) => {
@@ -353,7 +405,10 @@ export function installE2EApi() {
         liveEnemies,
         onScreenEnemies,
         shotsFired: s.shotsFired,
+        hits: s.hits,
+        bestCombo: s.bestCombo,
         runSeed: s.runSeed,
+        currentLevel: s.currentLevel,
       }
     },
     enemyScreenPoints: (n: number) => {
@@ -376,6 +431,7 @@ export function installE2EApi() {
     },
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
     rideTo: null,
+    rideSpeed: null,
     view: readView,
     triggerHeld: () => getPointerState().down,
   }

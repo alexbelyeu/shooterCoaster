@@ -11,6 +11,11 @@ export interface Bullet {
   speed: number
   /** Multiplier on target hit radii for this bullet (touch shots get a little slack). */
   hitScale: number
+  /** Drawn position minus hit-test position at birth (muzzle tip − camera). */
+  muzzleOffset: THREE.Vector3
+  /** The pool sets muzzleOffset on the first frame, once the gun has turned to the shot. */
+  muzzlePending: boolean
+  travelled: number
 }
 
 export interface BulletPoolHandle {

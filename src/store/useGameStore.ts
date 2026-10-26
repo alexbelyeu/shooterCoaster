@@ -21,13 +21,16 @@ interface GameState {
   // Score
   score: number
   addScore: (points: number) => void
-  /** Resets score plus the per-run kills / shotsFired counters. */
   resetScore: () => void
 
-  // Per-run counters (reset by resetScore)
+  // Per-run counters (reset by resetScore / startRun)
   kills: number
   shotsFired: number
+  /** Bullets that hit an enemy (`processHit`). */
+  hits: number
+  bestCombo: number
   registerShot: () => void
+  registerHit: () => void
 
   // Combo
   combo: ComboState
@@ -45,6 +48,7 @@ interface GameState {
 
   // Saved scores (persisted)
   savedScores: Record<string, ScoreEntry>
+  /** Keeps the higher score's entry; `bestCombo` is kept at its max across runs either way. */
   saveScore: (entry: ScoreEntry) => void
   resetSavedScores: () => void
 
@@ -62,6 +66,8 @@ interface GameState {
 
 /** Real-time window (ms, performance.now) in which the next kill extends the combo. */
 export const COMBO_TIMEOUT = 2000
+
+const RUN_COUNTERS = { score: 0, kills: 0, shotsFired: 0, hits: 0, bestCombo: 0 } as const
 
 const urlSearch = (): string | null =>
   typeof window !== 'undefined' && window.location ? window.location.search : null
@@ -83,9 +89,7 @@ export const useGameStore = create<GameState>()(
       runSeed: 0,
       startRun: (levelId, seed) =>
         set({
-          score: 0,
-          kills: 0,
-          shotsFired: 0,
+          ...RUN_COUNTERS,
           combo: { count: 0, multiplier: 1, lastKillTime: 0 },
           currentLevel: levelId,
           runSeed: (seed ?? urlSeed() ?? Date.now()) >>> 0,
@@ -94,11 +98,14 @@ export const useGameStore = create<GameState>()(
 
       score: 0,
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
-      resetScore: () => set({ score: 0, kills: 0, shotsFired: 0 }),
+      resetScore: () => set(RUN_COUNTERS),
 
       kills: 0,
       shotsFired: 0,
+      hits: 0,
+      bestCombo: 0,
       registerShot: () => set((s) => ({ shotsFired: s.shotsFired + 1 })),
+      registerHit: () => set((s) => ({ hits: s.hits + 1 })),
 
       combo: { count: 0, multiplier: 1, lastKillTime: 0 },
       registerKill: () =>
@@ -107,7 +114,11 @@ export const useGameStore = create<GameState>()(
           const isCombo = now - s.combo.lastKillTime < COMBO_TIMEOUT
           const count = isCombo ? s.combo.count + 1 : 1
           const multiplier = Math.min(1 + (count - 1) * 0.25, 4) // max 4x
-          return { kills: s.kills + 1, combo: { count, multiplier, lastKillTime: now } }
+          return {
+            kills: s.kills + 1,
+            bestCombo: Math.max(s.bestCombo, count),
+            combo: { count, multiplier, lastKillTime: now },
+          }
         }),
       resetCombo: () => set({ combo: { count: 0, multiplier: 1, lastKillTime: 0 } }),
 
@@ -128,8 +139,12 @@ export const useGameStore = create<GameState>()(
       saveScore: (entry) =>
         set((s) => {
           const existing = s.savedScores[entry.level]
+          const bestCombo = Math.max(existing?.bestCombo ?? 0, entry.bestCombo ?? 0)
           if (!existing || entry.score > existing.score) {
-            return { savedScores: { ...s.savedScores, [entry.level]: entry } }
+            return { savedScores: { ...s.savedScores, [entry.level]: { ...entry, bestCombo } } }
+          }
+          if (bestCombo > (existing.bestCombo ?? 0)) {
+            return { savedScores: { ...s.savedScores, [entry.level]: { ...existing, bestCombo } } }
           }
           return {}
         }),
