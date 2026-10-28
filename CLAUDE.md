@@ -40,7 +40,7 @@ Headless browser in Claude cloud sessions: the Playwright CDN is blocked, so run
 The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/sizes, errors)
 to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the fly-by camera must have turned ≥ 8° or moved ≥ 30 units;
-the start hint must show and a key press must fade to black and open level select), and per level `<id>.png` (after a 10 s ride),
+the start hint must show and a key press must fade to black and open level select), and per level `<id>.png` (after a ride of `--seconds` 10, longer until `--min-frames` 10 frames have rendered; it fails as a stalled render loop only if they haven't by 4× `--seconds`, and the summary line prints `frames=N in Xs`; the title waits the same way),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
 gold hitmarker held on the kill frame via `holdFeedback`; on the first level a primed 14-kill chain makes
