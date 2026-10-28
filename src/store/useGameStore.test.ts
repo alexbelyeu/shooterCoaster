@@ -105,7 +105,7 @@ describe('addScore', () => {
   })
 
   it('applies the current combo multiplier', () => {
-    for (let i = 0; i < 4; i++) store().registerKill() // 2x
+    for (let i = 0; i < 4; i++) store().registerKill()
     store().addScore(20)
     expect(store().score).toBe(40)
     store().addScore(20)

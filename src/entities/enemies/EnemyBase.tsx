@@ -78,7 +78,6 @@ export default function EnemyBase({
     if (!aliveRef.current) return
     aliveRef.current = false
     unregisterCollisionTarget(id)
-    // Kill first, so this kill is scored at the tier it reaches (as its popup shows).
     registerKill()
     addScore(scoreValue)
 
@@ -105,6 +104,7 @@ export default function EnemyBase({
       eventBus.emit('enemy:killed', {
         position: pos,
         combo: combo.count,
+        multiplier: combo.multiplier,
         score: Math.round(scoreValue * combo.multiplier),
       })
       onKill(id, pos)

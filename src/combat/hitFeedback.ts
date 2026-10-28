@@ -5,7 +5,7 @@
  * Events (all on `eventBus`):
  *   'weapon:fire'   — no payload; a bullet actually left the barrel.
  *   'enemy:hit'     — EnemyHitEvent (reused object, read synchronously).
- *   'enemy:killed'  — { position, combo, score }, emitted after the kill pop.
+ *   'enemy:killed'  — { position, combo (chain count), multiplier, score }, emitted after the kill pop.
  *
  * Durations are in *game* milliseconds: consumers advance them with
  * `delta * timeScale` so slow-mo stretches them.

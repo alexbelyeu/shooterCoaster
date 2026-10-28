@@ -8,16 +8,9 @@ import { comboColor } from '@/ui/theme'
 
 const RING_R = 26
 const RING_C = 2 * Math.PI * RING_R
-/** How long a lapsed 2×+ chain stays up shaking "COMBO LOST". */
 const LOST_MS = 900
 
-/**
- * Centre-bottom combo meter: a ring that drains over the combo's game-time window,
- * the chain count inside it, and the tier multiplier (coloured and sized by tier)
- * beside it. When a 2×+ chain lapses (`combo:broken`) it shakes "COMBO LOST" with
- * the lost chain, then hides. The ring is drawn from the game clock each animation
- * frame, so pause and slow-mo hold and stretch it like the window itself.
- */
+/** Centre-bottom combo meter; its ring drains on the game clock, so pause and slow-mo hold it like the window itself. */
 export default function ComboMeter() {
   const count = useGameStore((s) => s.combo.count)
   const lastKillTime = useGameStore((s) => s.combo.lastKillTime)
@@ -55,7 +48,11 @@ export default function ComboMeter() {
   }, [live, count, lastKillTime])
 
   const showLost = !live && lost !== null
-  const shown = showLost ? lost.count : count
+  // While it fades out, keep showing what it last showed (the store's chain is already 0).
+  const lastShown = useRef({ count: 0, lost: false })
+  if (live) lastShown.current = { count, lost: false }
+  else if (showLost) lastShown.current = { count: lost.count, lost: true }
+  const shown = lastShown.current.count
   const tier = comboTierIndex(shown)
   const style = { '--combo-color': comboColor(tier), '--ring-c': RING_C } as CSSProperties
 
@@ -87,7 +84,7 @@ export default function ComboMeter() {
         <span key={tier} className="hud-combo-mult">
           ×{COMBO_TIERS[tier].multiplier}
         </span>
-        <span className="hud-combo-word">{showLost ? 'COMBO LOST' : 'COMBO'}</span>
+        <span className="hud-combo-word">{lastShown.current.lost ? 'COMBO LOST' : 'COMBO'}</span>
       </div>
     </div>
   )

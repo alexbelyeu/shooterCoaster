@@ -8,7 +8,7 @@ const HOLD_POLL_MS = 200
 
 type Stage = 'off' | 'on' | 'out'
 
-/** "×5 FRENZY" and a red edge pulse for the top-tier slow-mo (`combo:frenzy`); held by e2e `holdFeedback`. */
+/** "×5 FRENZY" and a red edge pulse on `combo:frenzy`, held by e2e `holdFeedback`. */
 export default function FrenzyFlash() {
   const [stage, setStage] = useState<Stage>('off')
   const [shownAt, setShownAt] = useState(0)

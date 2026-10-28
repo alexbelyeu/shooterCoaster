@@ -1,8 +1,4 @@
-/**
- * Game-time seconds of the current run: advanced by `delta × timeScale` on playing frames
- * (`combat/comboRuntime.ts`, from `GameTimer`), so it stands still while paused and in the
- * countdown, and runs slow in slow-mo. Reset when a run starts.
- */
+/** Game-time seconds of the run (`delta × timeScale` on playing frames only), advanced and reset by `combat/comboRuntime.ts`. */
 let seconds = 0
 
 export function gameTime(): number {

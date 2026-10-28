@@ -1,11 +1,6 @@
 /**
- * Per-frame combo upkeep, ticked by `GameTimer` on playing frames: advances the game
- * clock, breaks a chain whose window lapsed (`combo:broken`), and runs the top-tier
- * slow-mo (`combo:frenzy`) through the store's `timeScale`.
- *
- * Events:
- *   'combo:broken' — { count, tier }, when a chain of tier ≥ 1 (2× or more) lapses.
- *   'combo:frenzy' — { count }, on entering the top tier (5×) outside the cooldown.
+ * Combo upkeep ticked by `GameTimer` on playing frames: the game clock, lapsed chains and the 5× slow-mo.
+ * Emits 'combo:broken' { count, tier } when a 2×+ chain lapses and 'combo:frenzy' { count } on entering 5×.
  */
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
@@ -19,7 +14,7 @@ export interface ComboBrokenEvent {
 }
 
 let prevTier = 0
-/** Real playing seconds since this run's last frenzy started; Infinity before the first. */
+/** Real playing seconds since this run's last frenzy started. */
 let sinceFrenzy = Infinity
 /** The time scale the frenzy last wrote, or null when it isn't running. */
 let written: number | null = null
@@ -27,7 +22,6 @@ let written: number | null = null
 const brokenEvent: ComboBrokenEvent = { count: 0, tier: 0 }
 const frenzyEvent = { count: 0 }
 
-/** Call when a run starts: clears the game clock and any frenzy. */
 export function resetComboRuntime(): void {
   resetGameTime()
   prevTier = 0
@@ -35,16 +29,14 @@ export function resetComboRuntime(): void {
   written = null
 }
 
-/** True while the frenzy slow-mo owns `timeScale`. */
 export function frenzyActive(): boolean {
   return written !== null
 }
 
-/** One playing frame of `delta` real seconds (timeScale > 0). */
 export function tickCombo(delta: number): void {
   const store = useGameStore.getState()
 
-  // Before the clock moves: a kill since the last frame that entered the top tier counts even if the chain lapses this frame.
+  // Before the clock moves, so a chain that reached 5× and lapses in the same (long) frame still counts.
   const { count, lastKillTime } = store.combo
   const tier = comboTierIndex(count)
   if (tier === TOP_TIER && prevTier < TOP_TIER && sinceFrenzy >= FRENZY.cooldownS) {

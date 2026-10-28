@@ -1,13 +1,9 @@
-/**
- * Combo tier table and slow-mo envelope (pure; no React, three or store imports).
- * Windows are game-time seconds (`core/gameClock.ts`): pause and slow-mo stretch them.
- */
+/** Combo tiers and the 5× slow-mo envelope; pure, so keep React / three / store imports out. */
 
 export interface ComboTier {
-  /** Consecutive kills that reach this tier. */
   minCount: number
   multiplier: number
-  /** Game-time seconds after a kill in which the next one keeps the chain. */
+  /** Game-time seconds (`core/gameClock.ts`) after a kill in which the next one keeps the chain. */
   windowS: number
 }
 
@@ -20,7 +16,6 @@ export const COMBO_TIERS: readonly ComboTier[] = [
 
 export const TOP_TIER = COMBO_TIERS.length - 1
 
-/** 0 (1×) … 3 (5×). A count of 0 is tier 0. */
 export function comboTierIndex(count: number): number {
   for (let i = TOP_TIER; i > 0; i--) if (count >= COMBO_TIERS[i].minCount) return i
   return 0
@@ -34,7 +29,6 @@ export function comboWindowS(count: number): number {
   return COMBO_TIERS[comboTierIndex(count)].windowS
 }
 
-/** True once the chain of `count` kills, the last at `lastKillTime`, can no longer be extended at `now`. */
 export function comboExpired(count: number, lastKillTime: number, now: number): boolean {
   return count > 0 && now - lastKillTime >= comboWindowS(count)
 }
@@ -43,7 +37,6 @@ export function comboExpired(count: number, lastKillTime: number, now: number): 
 export const FRENZY = {
   durationS: 1.5,
   timeScale: 0.35,
-  /** Ease in at the start and out at the end. */
   easeS: 0.3,
   /** From one frenzy's start to the earliest next one. */
   cooldownS: 10,
@@ -51,7 +44,6 @@ export const FRENZY = {
 
 const smoothstep = (x: number): number => x * x * (3 - 2 * x)
 
-/** Time scale `t` seconds into a frenzy: 1 → 0.35 → 1, eased; 1 outside [0, durationS]. */
 export function frenzyTimeScale(t: number): number {
   const { durationS, timeScale, easeS } = FRENZY
   if (!(t > 0) || t >= durationS) return 1

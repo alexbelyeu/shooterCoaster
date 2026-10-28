@@ -36,7 +36,7 @@ interface GameState {
 
   // Combo (tiers and windows: combat/comboTiers.ts; expiry and slow-mo: combat/comboRuntime.ts)
   combo: ComboState
-  /** Extends the chain if the last kill is inside its game-time window, else starts a new one. Call before `addScore`. */
+  /** Call before `addScore`, so the kill scores at the tier it reaches. */
   registerKill: () => void
   resetCombo: () => void
 

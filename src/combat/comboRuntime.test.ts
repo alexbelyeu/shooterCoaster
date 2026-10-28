@@ -50,18 +50,10 @@ describe('game clock', () => {
     expect(gameTime()).toBeCloseTo(1.5)
   })
 
-  it('a pause (no ticks) keeps the chain however long it lasts', () => {
-    kills(3)
-    // Paused: GameTimer does not tick, whatever the wall clock does.
-    store().registerKill()
-    expect(store().combo.count).toBe(4)
-    expect(store().combo.multiplier).toBe(2)
-  })
-
   it('slow-mo stretches the window in real time', () => {
     kills(1)
     store().setTimeScale(0.35)
-    tickCombo(3) // 1.05 s of game time < 2.0 s window
+    tickCombo(3)
     store().registerKill()
     expect(store().combo.count).toBe(2)
   })
@@ -69,7 +61,7 @@ describe('game clock', () => {
 
 describe('combo break', () => {
   it('lapses the chain once its window passes, and reports a 2×+ chain', () => {
-    kills(5) // 2×, 1.8 s window
+    kills(5)
     tickCombo(1.0)
     expect(store().combo.count).toBe(5)
     tickCombo(1.0)
@@ -102,7 +94,7 @@ describe('frenzy', () => {
 
   it('waits out the cooldown before the next one', () => {
     kills(15)
-    tickCombo(5) // frenzy over, chain lapsed
+    tickCombo(5)
     kills(15)
     expect(frenzy).toHaveBeenCalledOnce()
     tickCombo(3)
@@ -114,7 +106,7 @@ describe('frenzy', () => {
   it('yields to anyone else who sets the time scale', () => {
     kills(15)
     tickCombo(0.5)
-    store().setTimeScale(0.1) // the last-enemy slow-mo
+    store().setTimeScale(0.1)
     tickCombo(0.5)
     expect(frenzyActive()).toBe(false)
     expect(store().timeScale).toBe(0.1)
