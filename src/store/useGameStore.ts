@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { GamePhase, ScoreEntry, ComboState } from '@/types/game'
 import { seedFromQuery } from '@/utils/rng'
+import { gameTime } from '@/core/gameClock'
+import { comboExpired, comboMultiplier } from '@/combat/comboTiers'
 import { startPhaseFor } from './startPhase'
 
 interface GameState {
@@ -32,8 +34,9 @@ interface GameState {
   registerShot: () => void
   registerHit: () => void
 
-  // Combo
+  // Combo (tiers and windows: combat/comboTiers.ts; expiry and slow-mo: combat/comboRuntime.ts)
   combo: ComboState
+  /** Call before `addScore`, so the kill scores at the tier it reaches. */
   registerKill: () => void
   resetCombo: () => void
 
@@ -64,10 +67,8 @@ interface GameState {
   isLevelUnlocked: (levelId: string) => boolean
 }
 
-/** Real-time window (ms, performance.now) in which the next kill extends the combo. */
-export const COMBO_TIMEOUT = 2000
-
 const RUN_COUNTERS = { score: 0, kills: 0, shotsFired: 0, hits: 0, bestCombo: 0 } as const
+const NO_COMBO: ComboState = { count: 0, multiplier: 1, lastKillTime: 0 }
 
 const urlSearch = (): string | null =>
   typeof window !== 'undefined' && window.location ? window.location.search : null
@@ -90,7 +91,8 @@ export const useGameStore = create<GameState>()(
       startRun: (levelId, seed) =>
         set({
           ...RUN_COUNTERS,
-          combo: { count: 0, multiplier: 1, lastKillTime: 0 },
+          combo: NO_COMBO,
+          timeScale: 1,
           currentLevel: levelId,
           runSeed: (seed ?? urlSeed() ?? Date.now()) >>> 0,
           phase: startPhaseFor(urlSearch() ?? ''),
@@ -107,20 +109,19 @@ export const useGameStore = create<GameState>()(
       registerShot: () => set((s) => ({ shotsFired: s.shotsFired + 1 })),
       registerHit: () => set((s) => ({ hits: s.hits + 1 })),
 
-      combo: { count: 0, multiplier: 1, lastKillTime: 0 },
+      combo: NO_COMBO,
       registerKill: () =>
         set((s) => {
-          const now = performance.now()
-          const isCombo = now - s.combo.lastKillTime < COMBO_TIMEOUT
-          const count = isCombo ? s.combo.count + 1 : 1
-          const multiplier = Math.min(1 + (count - 1) * 0.25, 4) // max 4x
+          const now = gameTime()
+          const { count: prev, lastKillTime } = s.combo
+          const count = comboExpired(prev, lastKillTime, now) ? 1 : prev + 1
           return {
             kills: s.kills + 1,
             bestCombo: Math.max(s.bestCombo, count),
-            combo: { count, multiplier, lastKillTime: now },
+            combo: { count, multiplier: comboMultiplier(count), lastKillTime: now },
           }
         }),
-      resetCombo: () => set({ combo: { count: 0, multiplier: 1, lastKillTime: 0 } }),
+      resetCombo: () => set({ combo: NO_COMBO }),
 
       timeRemaining: 0,
       setTimeRemaining: (t) => set({ timeRemaining: t }),

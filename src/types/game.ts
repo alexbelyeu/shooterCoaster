@@ -14,5 +14,6 @@ export interface ScoreEntry {
 export interface ComboState {
   count: number
   multiplier: number
+  /** Game-time seconds (`core/gameClock.ts`) of the last kill. */
   lastKillTime: number
 }

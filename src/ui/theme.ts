@@ -68,18 +68,9 @@ export const HUD_COLORS = {
   amber: '#ffb020',
 } as const
 
-/** Combo colour by multiplier: white → gold → orange → red. */
-export function comboColor(multiplier: number): string {
-  if (multiplier >= 3.5) return HUD_COLORS.red
-  if (multiplier >= 2.5) return HUD_COLORS.orange
-  if (multiplier >= 1.5) return HUD_COLORS.gold
-  return HUD_COLORS.text
-}
+const COMBO_COLORS = [HUD_COLORS.text, HUD_COLORS.gold, HUD_COLORS.orange, HUD_COLORS.red] as const
 
-/** Combo tier 0..3 for text sizing (matches comboColor thresholds). */
-export function comboTier(multiplier: number): 0 | 1 | 2 | 3 {
-  if (multiplier >= 3.5) return 3
-  if (multiplier >= 2.5) return 2
-  if (multiplier >= 1.5) return 1
-  return 0
+/** Combo colour by tier (`combat/comboTiers.ts`): 1× white, 2× gold, 3× orange, 5× red. */
+export function comboColor(tier: number): string {
+  return COMBO_COLORS[Math.min(Math.max(tier, 0), COMBO_COLORS.length - 1)]
 }

@@ -11,7 +11,8 @@
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots (fires one real shot, then resolves the
  *     hits through the bullet pool's own processHit path), endLevel() to reach
- *     the results screen, stats() for score / kills / combo / shots / hits,
+ *     the results screen, stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
+ *     primeCombo(n) to set up a long chain,
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
  *     the weapon view-model's on-screen box (hit feedback checks)
@@ -35,6 +36,9 @@ import type { GamePhase, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
+import { gameTime } from '@/core/gameClock'
+import { comboMultiplier } from '@/combat/comboTiers'
+import { frenzyActive } from '@/combat/comboRuntime'
 import { getPointerState } from '@/input/pointerInput'
 import { initAudio, isAudioReady, isMusicDucked } from '@/audio/AudioEngine'
 import { playExplosionSound, playFireSound, playHitTick, playWaveStinger, sfxNodeCount } from '@/audio/SFXManager'
@@ -123,6 +127,8 @@ export interface SCTestApi {
   /** Viewport (CSS px) positions of up to n live on-screen enemies, nearest
    *  first, so a test can tap / click real input at them. */
   enemyScreenPoints: (n: number) => { x: number; y: number }[]
+  /** Set the live combo chain to `count` kills, the last one now (game time), so the next kill extends it. */
+  primeCombo: (count: number) => void
   /** Force the results phase. */
   endLevel: () => void
   /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
@@ -195,6 +201,11 @@ export interface SCTestStats {
   shotsFired: number
   hits: number
   bestCombo: number
+  /** Current combo tier multiplier (1, 2, 3, 5). */
+  multiplier: number
+  timeScale: number
+  /** The top-tier slow-mo owns timeScale. */
+  frenzy: boolean
   runSeed: number
   currentLevel: string | null
 }
@@ -423,6 +434,9 @@ export function installE2EApi() {
         shotsFired: s.shotsFired,
         hits: s.hits,
         bestCombo: s.bestCombo,
+        multiplier: s.combo.multiplier,
+        timeScale: s.timeScale,
+        frenzy: frenzyActive(),
         runSeed: s.runSeed,
         currentLevel: s.currentLevel,
       }
@@ -441,6 +455,8 @@ export function installE2EApi() {
       }
       return out
     },
+    primeCombo: (count: number) =>
+      useGameStore.setState({ combo: { count, multiplier: comboMultiplier(count), lastKillTime: gameTime() } }),
     endLevel: () => {
       autoFireEnabled = false
       useGameStore.getState().setPhase('results')

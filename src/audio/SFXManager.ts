@@ -3,6 +3,7 @@ import { nextTriggerTime } from './triggerTime'
 import { dropSound } from './soundGuard'
 import { sfxChannel, isAudioReady } from './AudioEngine'
 import {
+  COMBO_BREAK,
   FIRE_VARIANTS,
   STAR_CHIME_NOTES,
   STINGERS,
@@ -20,7 +21,8 @@ import type { BiomeType } from '@/types/level'
  *   Fire pew   : -20 (-26 when auto-firing) → background, fires 10×/sec
  *   Hit tick   : -24 noise + -22 blip → crisp, ~30 ms
  *   Balloon pop: -14 snap + -18 ping → punchy but brief
- *   Kill layers: thump -14 (combo 3+), ring -26 (6+), swell -24 (10+)
+ *   Kill layers: thump -14 (combo 2×), ring -26 (3×), swell -24 (5×)
+ *   Combo break: -20 falling triangle, when a 2×+ chain lapses
  *   Stinger    : -18…-26 per biome, once per wave
  *   Star chime : -16 bell, up to 3 on the results screen
  *   Wind       : gain 0–0.12 → ambient bed, never dominates
@@ -35,6 +37,7 @@ interface Kit {
   thump: Tone.MembraneSynth
   ring: Tone.Synth
   swell: Tone.NoiseSynth
+  comboBreak: Tone.Synth
   stinger: Tone.Synth[]
   chime: Tone.Synth
 }
@@ -103,6 +106,12 @@ function createKit(biome: BiomeType): Kit {
     volume: -24,
   })).connect(swellFilter)
 
+  const comboBreak = own(new Tone.Synth({
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.004, decay: COMBO_BREAK.sweepS, sustain: 0, release: 0.08 },
+    volume: COMBO_BREAK.volume,
+  })).connect(sfxChannel)
+
   const d = STINGERS[biome]
   let stingerOut: Tone.ToneAudioNode = sfxChannel
   if (d.drive > 0) stingerOut = own(new Tone.Distortion(d.drive)).connect(sfxChannel)
@@ -126,7 +135,7 @@ function createKit(biome: BiomeType): Kit {
     volume: -16,
   })).connect(sfxChannel)
 
-  return { fire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, stinger, chime }
+  return { fire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, comboBreak, stinger, chime }
 }
 
 function ensureKit(): Kit | null {
@@ -221,6 +230,19 @@ export function playExplosionSound(comboCount: number = 0): void {
     }
   } catch (e) {
     dropSound('kill', e)
+  }
+}
+
+export function playComboBreak(): void {
+  const k = ensureKit()
+  if (!k) return
+  try {
+    const t = nextTriggerTime(k.comboBreak, Tone.now(), Tone.getContext().currentTime)
+    k.comboBreak.triggerAttack(COMBO_BREAK.startHz, t, 0.8)
+    k.comboBreak.frequency.exponentialRampTo(COMBO_BREAK.endHz, COMBO_BREAK.sweepS, t)
+    k.comboBreak.triggerRelease(t + COMBO_BREAK.sweepS)
+  } catch (e) {
+    dropSound('combo break', e)
   }
 }
 

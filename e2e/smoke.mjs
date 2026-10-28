@@ -26,7 +26,9 @@
  * Spawns use a fixed --seed (default 1337); the seed check reloads the first level
  * and requires the same spawnDigest() for that seed and a different one for another.
  * The hidden-pause check fakes a tab hide on the first level: it must pause, drop a
- * held trigger, keep the timer still, wait for Resume, then neither reset nor jump it.
+ * held trigger, keep the timer still (and a primed combo intact), wait for Resume, then
+ * neither reset nor jump it. On the first level the killNearest kills enter the 5× combo
+ * tier: <id>-combat.png must show the "×5 FRENZY" flash during its slow-mo.
  * `?e2e=1` skips the Ready / Set / GO countdown; the countdown check loads the first level
  * with `&countdown=1`: the countdown must show (countdown.png), ignore a press (also once
  * held on into play), hold the timer, reach playing on GO, and the shader warm-up must
@@ -252,8 +254,10 @@ async function waitFrames(page, n, { minMs = 0, maxMs = 20000, pollMs = 250 } = 
  * view, which killNearest(5) would wipe out). The kills come last because
  * explosions/popups fade after ~1-1.5 s of real time, which at ~1 fps is one or
  * two frames, so they are captured on the very next rendered frame.
+ * With `frenzy` (the first level) the kills enter the 5× combo tier: <id>-combat.png
+ * must show the "×5 FRENZY" flash during its slow-mo.
  */
-async function playLevel(page, id) {
+async function playLevel(page, id, { frenzy = false } = {}) {
   const problems = []
   // Desktop mouse: one real click at the screen centre must fire through pointer input.
   const beforeClick = await getStats(page)
@@ -278,7 +282,12 @@ async function playLevel(page, id) {
     s.holdFeedback = true
     return s.combat.kills
   })
-  const nearestKilled = await page.evaluate(() => window.__SC_TEST__.killNearest(5))
+  // With `frenzy`, a 14-kill chain is primed (in the same JS turn) so the first kill enters 5× and its slow-mo.
+  const nearestKilled = await page.evaluate((primed) => {
+    const s = window.__SC_TEST__
+    if (primed) s.primeCombo(primed)
+    return s.killNearest(5)
+  }, frenzy ? FRENZY_PRIME : 0)
   let killEvents = killsBefore
   let killCheckSkipped = null
   if (nearestKilled > 0) {
@@ -294,8 +303,20 @@ async function playLevel(page, id) {
   } else {
     await waitFrames(page, 1, { maxMs: 5000, pollMs: 30 })
   }
+  let frenzyShown = null
+  if (frenzy && nearestKilled > 0 && !killCheckSkipped) {
+    frenzyShown = await page
+      .waitForFunction(() => {
+        const el = document.querySelector('.hud-frenzy')
+        return el && Number(getComputedStyle(el).opacity) > 0.98 && window.__SC_TEST__.stats().timeScale < 0.5
+      }, null, { timeout: 20000, polling: 100 })
+      .then(() => true, () => false)
+  }
   await page.screenshot({ path: path.join(OUT, `${id}-combat.png`), timeout: SHOT_TIMEOUT })
   const combat = await getStats(page)
+  if (frenzyShown === false) {
+    problems.push(`a kill entering 5× showed no FRENZY flash + slow-mo (combo ${combat.combo}, ×${combat.multiplier}, timeScale ${combat.timeScale.toFixed(2)})`)
+  }
   // The gun's aim is checked on the frozen fresh shot (freshShotProblems): here the
   // target and the recoil depend on frame timing (#158).
   const weapon = await weaponProblems(page, 'desktop', { aim: false })
@@ -369,6 +390,8 @@ async function playLevel(page, id) {
       onScreenAtStart: atStart.onScreenEnemies,
       onScreenBeforeKills: afterFire.onScreenEnemies,
       combo: combat.combo,
+      multiplier: combat.multiplier,
+      frenzy: frenzyShown === null ? null : { shown: frenzyShown, timeScale: combat.timeScale },
       translationMax: shake.max,
       translationIdle: shake.current,
       traumaMaxDeg: shake.traumaMax,
@@ -478,6 +501,8 @@ const WEAPON_MAX_AIM_DEG = 25
 /** Caps on the coaster camera weight (#123): MAX_BANK_DEG / MAX_PITCH_DEG in
  *  src/track/cameraRig.ts and SPEED_FOV_DEG + DROP_FOV_DEG in src/track/cameraFov.ts. */
 const CAMERA_WEIGHT_CAPS = { roll: 8, pitch: 3, fovKick: 8 }
+/** Chain primed before the first level's kills, so the next kill enters the 5× tier (src/combat/comboTiers.ts). */
+const FRENZY_PRIME = 14
 const HUD_SELECTORS = ['.hud-score', '.hud-kills', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
 
 /** Wait until `selector` exists, has a size, and it and its ancestors are fully faded in. */
@@ -738,7 +763,10 @@ async function hiddenPauseCheck(page, levelId) {
   const vp = page.viewportSize()
   await page.mouse.move(vp.width / 2, vp.height / 2)
   await page.mouse.down()
-  const heldBefore = await page.evaluate(() => window.__SC_TEST__.triggerHeld())
+  const heldBefore = await page.evaluate(() => {
+    window.__SC_TEST__.primeCombo(3)
+    return window.__SC_TEST__.triggerHeld()
+  })
   const before = await setHidden(page, true)
   const heldAfter = await page.evaluate(() => window.__SC_TEST__.triggerHeld())
   await page.mouse.up()
@@ -748,6 +776,7 @@ async function hiddenPauseCheck(page, levelId) {
   await setHidden(page, false)
   await waitFrames(page, 2, { maxMs: 10000 })
   const shownPhase = await page.evaluate(() => window.__SC_TEST__.phase())
+  const pausedStats = await getStats(page)
   const resumedAt = Date.now()
   const resumeClicked = await page
     .getByRole('button', { name: 'Resume' })
@@ -767,6 +796,9 @@ async function hiddenPauseCheck(page, levelId) {
   if (whileHidden.timeRemaining !== before.timeRemaining)
     problems.push(`timer moved while hidden (${before.timeRemaining.toFixed(2)} -> ${whileHidden.timeRemaining.toFixed(2)})`)
   if (shownPhase !== 'paused') problems.push(`showing the tab again auto-resumed (phase "${shownPhase}")`)
+  // The combo window runs on game time: a pause, however long, never breaks the chain.
+  if (before.combo < 3 || whileHidden.combo !== before.combo || pausedStats.combo !== before.combo)
+    problems.push(`the pause changed the combo (${before.combo} -> ${whileHidden.combo} hidden -> ${pausedStats.combo} shown)`)
   if (!resumeClicked) problems.push('Resume button not clickable')
   if (resumed.phase !== 'playing') problems.push(`Resume left the phase "${resumed.phase}"`)
   if (resumed.timeRemaining > before.timeRemaining)
@@ -785,6 +817,7 @@ async function hiddenPauseCheck(page, levelId) {
       whileHidden: whileHidden.timeRemaining,
       resumed: resumed.timeRemaining,
       resumedSeconds,
+      combo: [before.combo, whileHidden.combo, pausedStats.combo],
       heldBefore,
       heldAfter,
     },
@@ -1421,7 +1454,7 @@ async function run() {
     const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
     problems.push(...desktopAspect.problems)
     stats.view = desktopAspect.view
-    const play = await playLevel(page, id)
+    const play = await playLevel(page, id, { frenzy: id === wanted[0] })
     problems.push(...play.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
     const allErrors = [...errors, ...hookErrors]
