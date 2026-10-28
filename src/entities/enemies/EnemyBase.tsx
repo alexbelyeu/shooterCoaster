@@ -34,11 +34,10 @@ export interface EnemyProps {
   scoreValue: number
   radius: number
   onKill: (id: string, position: THREE.Vector3) => void
-  /** Formation arrival: fly in from `entry.from` to `spawnPosition` first. */
+  /** Fly in from `entry.from` to `spawnPosition` first. */
   entry?: EnemyEntry
-  /** Formation members share this XZ heading (`atan2(dz, dx)`) and speed, so the shape holds. */
+  /** XZ angle (`atan2(dz, dx)`) a formation moves on together. */
   heading?: number
-  /** The wave's formation, when it has one. */
   formation?: Formation
 }
 
@@ -62,10 +61,7 @@ interface EnemyBaseProps extends EnemyProps {
 /**
  * Shared base for all enemy types.
  * Handles visibility, collision registration, formation entry and death.
- *
- * With `entry`, the enemy first flies from `entry.from` to its spawn position
- * (game time, like `updatePosition`) and only becomes a collision target once it
- * is in place, so shots and touch aim assist never chase an enemy still arriving.
+ * An entering enemy is not a collision target until it reaches its slot, so touch aim assist never snaps to one still flying in.
  *
  * Death is two-step: on hit the enemy is scored immediately, stops moving and
  * flashes white at 1.2x scale for ENEMY_HIT_FLASH_MS (game time); then it emits

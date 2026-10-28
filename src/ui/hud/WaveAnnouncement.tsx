@@ -10,9 +10,7 @@ const SHOW_MS = 2000
 /**
  * Wave banner: letterspaced caps between two accent rules, slides in from the
  * left and out to the right, tinted with the level's biome accent.
- *
- * `wave:incoming` (1 s before a wave arrives) shows the label early and pulses a
- * screen-edge glow; `wave:announce` (on arrival, and the first wave) shows it too.
+ * `wave:incoming`, 1 s before a wave, shows it early with a screen-edge pulse.
  */
 export default function WaveAnnouncement() {
   const [text, setText] = useState<string | null>(null)

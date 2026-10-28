@@ -37,25 +37,22 @@ interface EnemySpawnerProps {
   goldenBalloonCount?: number
   /** Track path samples; when given, spawns are kept within readable range of the track. */
   trackSamples?: TrackSample[]
-  /** Arc table of the track: formations are anchored ahead of the rider on it. */
   trackTable: ArcTable
-  /** Terrain as drawn: formations stay on / above it. */
+  /** Terrain as drawn, not `heightFn`. */
   groundFn: HeightFunction
 }
 
 interface SpawnedEnemy {
   id: string
   type: EnemyType | 'goldenBalloon'
-  /** Scatter spawn point; formation members get theirs when the wave activates. */
+  /** Scatter waves only: formation members are placed from their `slot` when the wave activates. */
   position: THREE.Vector3 | null
-  /** Formation members: slot in the group's frame. */
   slot: FormationSlot | null
   scoreValue: number
   radius: number
   waveIndex: number
 }
 
-/** Where a mounted enemy is and how it arrives. */
 interface Placed {
   position: THREE.Vector3
   entry?: EnemyEntry
@@ -303,7 +300,6 @@ const EXPLOSION_COLORS = ['#ff4444', '#ffaa00', '#ffffff', '#44aaff', '#00ff88']
 
 const toVector3 = (p: Vec3) => new THREE.Vector3(p.x, p.y, p.z)
 
-/** The wave tell (`wave:incoming`) leads a wave's activation by this much. */
 const WAVE_TELL_MS = 1000
 
 export default function EnemySpawner({
@@ -325,12 +321,11 @@ export default function EnemySpawner({
     }
   }, [runSeed, waves, goldenBalloonCount, heightFn, trackSamples])
   useEffect(() => {
-    // Formation members digest their seeded slots: where they end up depends on where the rider is at activation.
+    // Formation members digest their seeded slots: their world positions depend on where the rider is at activation.
     recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position ?? e.slot!.local))
   }, [enemies, goldenBalloons])
   const phase = useGameStore((s) => s.phase)
 
-  /** Placements for wave `waveIdx` with the rider at track sample `riderIndex`. */
   const placeWave = useCallback(
     (waveIdx: number, riderIndex: number, camera: Vec3): [string, Placed][] => {
       const wave = waves[waveIdx]
@@ -425,7 +420,7 @@ export default function EnemySpawner({
     return () => clearTimeout(t)
   }, [waveAnnouncement])
 
-  /** Bring wave `i` in now: place it ahead of the rider (once per run), mount it, announce it. */
+  /** Places wave `i` ahead of the rider (once per run), mounts and announces it. */
   const activateWave = useCallback(
     (i: number) => {
       const p = getThree().camera.position

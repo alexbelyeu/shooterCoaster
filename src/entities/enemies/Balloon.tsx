@@ -23,7 +23,7 @@ export default function Balloon(props: EnemyProps) {
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number, delta: number) => {
       if (holdSlot) {
-        // A ring balloon bobs in its slot so the hoop is still there when the rider arrives.
+        // Floating up would carry the hoop off before the rider gets there.
         mesh.position.y = spawnPos.y + Math.sin(time * 1.6 + bobPhase) * 6
         return
       }

@@ -71,7 +71,6 @@ describe('track frame', () => {
     for (const i of [0, 1000, 5000, table.count - 2]) expect(nearestTrackIndex(table, trackPoint(table, i))).toBe(i)
     const i = indexAhead(table, 100, 500)
     expect(table.s[i] - table.s[100]).toBeCloseTo(500, -1)
-    // Past the end it wraps to the start.
     const wrapped = indexAhead(table, table.count - 10, 500)
     expect(wrapped).toBeLessThan(table.count / 2)
   })
@@ -90,7 +89,7 @@ describe('track frame', () => {
 describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves', (_id, { level, table, groundFn }) => {
   const waves = level.enemies.filter((w) => choreographed(w.formation))
 
-  it.each(waves.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: ahead of the rider, outside the near field, never under the ground', (_name, wave) => {
+  it.each(waves.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: first group ahead of the rider, nothing in the near field or under the ground', (_name, wave) => {
     const formation = wave.formation as ChoreographedFormation
     const slots = formationSlots(formation, wave.count, createRng(1337))
     const surface = enemySurface(wave.type)
@@ -110,7 +109,6 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
         expect(dist(p.from, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
         expect(p.entrySeconds).toBeGreaterThanOrEqual(1)
         expect(p.entrySeconds).toBeLessThanOrEqual(2)
-        // The nearest group arrives in front of the rider, not behind.
         if (slots[i].group === 0) {
           const d = { x: p.position.x - camera.x, z: p.position.z - camera.z }
           if (d.x * forward.x + d.z * forward.z > 0) ahead++
@@ -145,12 +143,12 @@ describe('entryPoint', () => {
   const from = { x: 0, y: -50, z: 0 }
   const to = { x: 100, y: 200, z: 0 }
 
-  it('runs from the start to the slot, eased', () => {
+  it('runs from the start to the slot, past halfway at half time (ease-out)', () => {
     const out = { x: 0, y: 0, z: 0 }
     expect(entryPoint(out, from, to, 0, 0)).toEqual(from)
     expect(entryPoint(out, from, to, 1, 0)).toEqual(to)
     entryPoint(out, from, to, 0.5, 0)
-    expect(out.x).toBeGreaterThan(50) // ease-out: past halfway at half time
+    expect(out.x).toBeGreaterThan(50)
     expect(out.x).toBeLessThan(100)
   })
 
@@ -160,7 +158,7 @@ describe('entryPoint', () => {
     expect(out.x).toBeCloseTo(to.x)
     expect(out.z).toBeCloseTo(to.z)
     entryPoint(out, from, to, 0.3, Math.PI * 3)
-    expect(Math.abs(out.z)).toBeGreaterThan(1) // off the straight line
+    expect(Math.abs(out.z)).toBeGreaterThan(1)
   })
 })
 

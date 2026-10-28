@@ -834,11 +834,7 @@ async function speedCheck(page, levelId) {
 /** The wave the spawn-choreography check watches arrive: level2's first crow wave, a V (#30). */
 const WAVE_CHECK = { level: 'level2', type: 'crow', label: 'A Murder of Crows!', minOnScreen: 5 }
 
-/**
- * Spawn choreography (#30): ride level2 until its crow wave's tell (screen-edge pulse + label,
- * `wave:incoming`) and then the wave itself (`wave:announce`, ≥ 0.3 s later); let the V fly in,
- * freeze and screenshot it (`level2-wave.png`). Its crows must be on screen, outside the near field.
- */
+/** Spawn choreography (#30): the crow wave's tell must lead it, then its V flies in, frozen for `level2-wave.png`. */
 async function waveCheck(page) {
   const { level, type, label, minOnScreen } = WAVE_CHECK
   const problems = []

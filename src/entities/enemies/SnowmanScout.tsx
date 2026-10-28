@@ -12,7 +12,7 @@ import {
   SNOWMAN_SCOUT_SHARD_GEO, SNOWMAN_SCOUT_SHARD_MAT,
 } from './SharedEnemyAssets'
 
-/** Units per 60 fps frame a scout in a marching rank covers. */
+/** Per 60 fps frame: slow enough that a rank is still ahead when the rider reaches it. */
 const MARCH_SPEED = 0.6
 
 /**
@@ -36,7 +36,6 @@ export default function SnowmanScout(props: EnemyProps) {
         mesh.position.z += ((moveSpeed * Math.cos(time * theta)) / theta) * dt
         mesh.position.x += ((moveSpeed * Math.sin(time * theta)) / theta) * dt
       } else {
-        // In a rank: march in step along the shared heading.
         mesh.position.x += Math.cos(heading) * MARCH_SPEED * dt
         mesh.position.z += Math.sin(heading) * MARCH_SPEED * dt
       }

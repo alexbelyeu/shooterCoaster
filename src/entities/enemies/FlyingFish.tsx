@@ -17,7 +17,7 @@ const WATER_Y = 0
  * Wings spread when airborne, fold when submerged.
  */
 export default function FlyingFish(props: EnemyProps) {
-  // A school shares heading and speed so it crosses together.
+  // One speed for the whole school, or it strings out.
   const moveAngle = useMemo(() => props.heading ?? Math.random() * Math.PI * 2, [props.heading])
   const moveSpeed = useMemo(() => (props.heading === undefined ? 0.8 + Math.random() * 0.5 : 1), [props.heading])
   const launchSpeed = useMemo(() => 1.5 + Math.random() * 1.0, [])

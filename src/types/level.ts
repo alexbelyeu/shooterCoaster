@@ -20,18 +20,14 @@ export interface TrackParams {
   tieSpacing?: number
 }
 
-/**
- * How a wave arrives (`entities/spawning/spawnPlacement.ts`). `scatter` (the default)
- * spreads it over the level; the others build groups ahead of the rider at activation
- * that fly, rise or swirl into their slots.
- */
+/** How a wave arrives; anything but `scatter` (the default) is laid out ahead of the rider by `spawnPlacement.ts`. */
 export type Formation = 'scatter' | 'v' | 'line' | 'school' | 'spiral' | 'ring'
 
-/** A formation's anchor relative to the rider's track position at activation (world units). */
+/** Relative to the rider's track position at activation, in world units. */
 export interface FormationOrigin {
   /** Arc distance ahead along the track. */
   ahead: number
-  /** Sideways off the track (+ = right of travel); later groups alternate sides. */
+  /** + = right of travel; later groups alternate sides. */
   side: number
   /** Height above the track. */
   up: number
