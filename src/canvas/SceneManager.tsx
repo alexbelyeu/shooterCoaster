@@ -125,6 +125,8 @@ function LevelScene({ levelId }: { levelId: string }) {
         waves={enemies}
         goldenBalloonCount={biome === 'themePark' ? 3 : 0}
         trackSamples={trackSamples}
+        trackTable={trackTable}
+        groundFn={groundFn}
       />
       <ShootingController />
       <GameTimer seconds={timerSeconds} />

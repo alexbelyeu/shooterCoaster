@@ -1,6 +1,8 @@
 import { useMemo, useState, useCallback, useEffect, useRef, useContext } from 'react'
+import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { EnemyType, EnemyWave } from '@/types/level'
+import type { ArcTable } from '@/track/arcLength'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -24,21 +26,40 @@ import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { SCORE_VALUES } from '@/levels/scoring'
 import { createRng, type Rng } from '@/utils/rng'
 import { recordE2ESpawns } from '@/testing/e2eHook'
+import type { EnemyEntry } from '../enemies/EnemyBase'
+import {
+  formationSlots, nearestTrackIndex, outsideNearField, placeFormationWave, trackPoint,
+  type FormationSlot, type Vec3,
+} from './spawnPlacement'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
   goldenBalloonCount?: number
   /** Track path samples; when given, spawns are kept within readable range of the track. */
   trackSamples?: TrackSample[]
+  /** Arc table of the track: formations are anchored ahead of the rider on it. */
+  trackTable: ArcTable
+  /** Terrain as drawn: formations stay on / above it. */
+  groundFn: HeightFunction
 }
 
 interface SpawnedEnemy {
   id: string
   type: EnemyType | 'goldenBalloon'
-  position: THREE.Vector3
+  /** Scatter spawn point; formation members get theirs when the wave activates. */
+  position: THREE.Vector3 | null
+  /** Formation members: slot in the group's frame. */
+  slot: FormationSlot | null
   scoreValue: number
   radius: number
   waveIndex: number
+}
+
+/** Where a mounted enemy is and how it arrives. */
+interface Placed {
+  position: THREE.Vector3
+  entry?: EnemyEntry
+  heading?: number
 }
 
 const RADII: Record<EnemyType, number> = {
@@ -216,31 +237,31 @@ function generateEnemies(
   // spawnDelay (seconds from level start) via time-based progression.
   for (let waveIdx = 0; waveIdx < waves.length; waveIdx++) {
     const wave = waves[waveIdx]
+    const base = { type: wave.type, scoreValue: SCORE_VALUES[wave.type], radius: RADII[wave.type], waveIndex: waveIdx }
+    if (wave.formation && wave.formation !== 'scatter') {
+      for (const slot of formationSlots(wave.formation, wave.count, rng)) {
+        enemies.push({ id: `enemy-${id++}`, position: null, slot, ...base })
+      }
+      continue
+    }
     const pick = () => pickSpawn(wave.type, heightFn, rng)
     for (let i = 0; i < wave.count; i++) {
-      const p = pickReadableSpawn(wave.type, trackSamples, pick)
-
-      enemies.push({
-        id: `enemy-${id++}`,
-        type: wave.type,
-        position: p,
-        scoreValue: SCORE_VALUES[wave.type],
-        radius: RADII[wave.type],
-        waveIndex: waveIdx,
-      })
+      enemies.push({ id: `enemy-${id++}`, position: pickReadableSpawn(wave.type, trackSamples, pick), slot: null, ...base })
     }
   }
 
   return enemies
 }
 
+type GoldenBalloonSpawn = SpawnedEnemy & { position: THREE.Vector3 }
+
 function generateGoldenBalloons(
   count: number,
   heightFn: HeightFunction,
   rng: Rng,
   trackSamples?: TrackSample[],
-): SpawnedEnemy[] {
-  const goldens: SpawnedEnemy[] = []
+): GoldenBalloonSpawn[] {
+  const goldens: GoldenBalloonSpawn[] = []
   const pick = () => {
     const r = Math.sqrt(rng()) * 3000
     const theta = rng() * 2 * Math.PI
@@ -253,6 +274,7 @@ function generateGoldenBalloons(
       id: `golden-${i}`,
       type: 'goldenBalloon',
       position: pickReadableSpawn('goldenBalloon', trackSamples, pick),
+      slot: null,
       scoreValue: 13 * 5, // 5x points
       radius: 45,
       waveIndex: -1, // always visible
@@ -279,8 +301,20 @@ const ENEMY_COMPONENTS: Record<EnemyType, React.ComponentType<any>> = {
 
 const EXPLOSION_COLORS = ['#ff4444', '#ffaa00', '#ffffff', '#44aaff', '#00ff88']
 
-export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSamples }: EnemySpawnerProps) {
+const toVector3 = (p: Vec3) => new THREE.Vector3(p.x, p.y, p.z)
+
+/** The wave tell (`wave:incoming`) leads a wave's activation by this much. */
+const WAVE_TELL_MS = 1000
+
+export default function EnemySpawner({
+  waves,
+  goldenBalloonCount = 0,
+  trackSamples,
+  trackTable,
+  groundFn,
+}: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
+  const getThree = useThree((s) => s.get)
   const runSeed = useGameStore((s) => s.runSeed)
   // One stream per run: the same seed gives the same enemies and golden balloons.
   const { enemies, goldenBalloons } = useMemo(() => {
@@ -291,9 +325,36 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
     }
   }, [runSeed, waves, goldenBalloonCount, heightFn, trackSamples])
   useEffect(() => {
-    recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position))
+    // Formation members digest their seeded slots: where they end up depends on where the rider is at activation.
+    recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position ?? e.slot!.local))
   }, [enemies, goldenBalloons])
   const phase = useGameStore((s) => s.phase)
+
+  /** Placements for wave `waveIdx` with the rider at track sample `riderIndex`. */
+  const placeWave = useCallback(
+    (waveIdx: number, riderIndex: number, camera: Vec3): [string, Placed][] => {
+      const wave = waves[waveIdx]
+      const members = enemies.filter((e) => e.waveIndex === waveIdx)
+      if (!wave.formation || wave.formation === 'scatter') {
+        return members.map((e) => [e.id, { position: toVector3(outsideNearField(e.position!, camera)) }])
+      }
+      const placed = placeFormationWave({
+        table: trackTable,
+        riderIndex,
+        camera,
+        formation: wave.formation,
+        origin: wave.formationOrigin,
+        type: wave.type,
+        groundFn,
+        slots: members.map((e) => e.slot!),
+      })
+      return members.map((e, i) => {
+        const p = placed[i]
+        return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, heading: p.heading }]
+      })
+    },
+    [waves, enemies, trackTable, groundFn],
+  )
 
   // Wave state — time-based progression
   // All waves with spawnDelay 0 are immediately active
@@ -301,6 +362,23 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
     () => waves.reduce((max, w, i) => ((w.spawnDelay ?? 0) === 0 ? i : max), 0),
     [waves],
   )
+  // Waves live from the start are placed for the start of the track, where every run begins.
+  const initialPlacements = useMemo(() => {
+    const start = trackPoint(trackTable, 0)
+    const m = new Map<string, Placed>()
+    for (let i = 0; i <= initialActiveWave; i++) {
+      for (const [id, p] of placeWave(i, 0, start)) m.set(id, p)
+    }
+    return m
+  }, [placeWave, initialActiveWave, trackTable])
+  const [placements, setPlacements] = useState(initialPlacements)
+  // A new seed (same level restarted while playing) re-places during render, before stale positions mount.
+  const [placementsSource, setPlacementsSource] = useState(initialPlacements)
+  if (placementsSource !== initialPlacements) {
+    setPlacementsSource(initialPlacements)
+    setPlacements(initialPlacements)
+  }
+
   const [activeWaveIndex, setActiveWaveIndex] = useState(initialActiveWave)
   const [waveAnnouncement, setWaveAnnouncement] = useState<string | null>(
     phase === 'playing' ? waves[0]?.waveLabel ?? null : null,
@@ -324,11 +402,12 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
       setWaveAnnouncement(waves[0]?.waveLabel ?? null)
     } else if (phase === 'countdown' || phase === 'playing') {
       setActiveWaveIndex(initialActiveWave)
+      setPlacements(initialPlacements)
       setWaveAnnouncement(phase === 'playing' ? waves[0]?.waveLabel ?? null : null)
       killedEnemies.current.clear()
       setGeneration((g) => g + 1)
     }
-  }, [phase, initialActiveWave, waves])
+  }, [phase, initialActiveWave, initialPlacements, waves])
 
   const totalEnemyCount = useMemo(
     () => enemies.length,
@@ -346,7 +425,27 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
     return () => clearTimeout(t)
   }, [waveAnnouncement])
 
-  // Time-based wave activation: schedule each wave's appearance from level start
+  /** Bring wave `i` in now: place it ahead of the rider (once per run), mount it, announce it. */
+  const activateWave = useCallback(
+    (i: number) => {
+      const p = getThree().camera.position
+      const camera = { x: p.x, y: p.y, z: p.z }
+      const riderIndex = nearestTrackIndex(trackTable, camera)
+      setPlacements((prev) => {
+        const first = enemies.find((e) => e.waveIndex === i)
+        if (!first || prev.has(first.id)) return prev
+        const next = new Map(prev)
+        for (const [id, placed] of placeWave(i, riderIndex, camera)) next.set(id, placed)
+        return next
+      })
+      setActiveWaveIndex((a) => Math.max(a, i))
+      if (waves[i].waveLabel) setWaveAnnouncement(waves[i].waveLabel!)
+      if (waves[i].isEruption) eventBus.emit('eruption:start')
+    },
+    [getThree, trackTable, enemies, placeWave, waves],
+  )
+
+  // Time-based wave activation: schedule each wave's tell and appearance from level start
   useEffect(() => {
     if (phase !== 'playing') return
 
@@ -354,16 +453,9 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
     for (let i = 0; i < waves.length; i++) {
       const delay = (waves[i].spawnDelay ?? 0) * 1000
       if (delay > 0) {
-        const t = setTimeout(() => {
-          setActiveWaveIndex(i)
-          if (waves[i].waveLabel) {
-            setWaveAnnouncement(waves[i].waveLabel!)
-          }
-          if (waves[i].isEruption) {
-            eventBus.emit('eruption:start')
-          }
-        }, delay)
-        timers.push(t)
+        const label = waves[i].waveLabel
+        timers.push(setTimeout(() => eventBus.emit('wave:incoming', label), Math.max(0, delay - WAVE_TELL_MS)))
+        timers.push(setTimeout(() => activateWave(i), delay))
       }
     }
     waveTimers.current = timers
@@ -372,7 +464,7 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
       timers.forEach(clearTimeout)
       waveTimers.current = []
     }
-  }, [phase, waves])
+  }, [phase, waves, activateWave])
 
   useEffect(() => {
     return () => {
@@ -412,21 +504,21 @@ export default function EnemySpawner({ waves, goldenBalloonCount = 0, trackSampl
     }
   }, [waveAnnouncement])
 
-  const visibleEnemies = useMemo(() => {
-    return enemies.filter((e) => e.waveIndex <= activeWaveIndex)
-  }, [enemies, activeWaveIndex])
-
   return (
     <>
-      {visibleEnemies.map((enemy) => {
+      {enemies.map((enemy) => {
+        const placed = enemy.waveIndex <= activeWaveIndex ? placements.get(enemy.id) : undefined
         const Component = ENEMY_COMPONENTS[enemy.type as EnemyType]
-        if (!Component) return null
+        if (!placed || !Component) return null
         return (
           <Component
             key={`${enemy.id}-${generation}-${runSeed}`}
             id={enemy.id}
             type={enemy.type}
-            spawnPosition={enemy.position}
+            spawnPosition={placed.position}
+            entry={placed.entry}
+            heading={placed.heading}
+            formation={waves[enemy.waveIndex].formation}
             scoreValue={enemy.scoreValue}
             radius={enemy.radius}
             onKill={onKill}

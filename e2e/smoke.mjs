@@ -831,6 +831,50 @@ async function speedCheck(page, levelId) {
   return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w } }
 }
 
+/** The wave the spawn-choreography check watches arrive: level2's first crow wave, a V (#30). */
+const WAVE_CHECK = { level: 'level2', type: 'crow', label: 'A Murder of Crows!', minOnScreen: 5 }
+
+/**
+ * Spawn choreography (#30): ride level2 until its crow wave's tell (screen-edge pulse + label,
+ * `wave:incoming`) and then the wave itself (`wave:announce`, ≥ 0.3 s later); let the V fly in,
+ * freeze and screenshot it (`level2-wave.png`). Its crows must be on screen, outside the near field.
+ */
+async function waveCheck(page) {
+  const { level, type, label, minOnScreen } = WAVE_CHECK
+  const problems = []
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  const event = (kind) => page
+    .waitForFunction(([k, l]) => window.__SC_TEST__.waveEvents.find((e) => e.kind === k && e.label === l) ?? null, [kind, label], { timeout: 90000, polling: 200 })
+    .then((h) => h.jsonValue(), () => null)
+  const tell = await event('incoming')
+  const tellShown = tell
+    ? await page.evaluate(() => ({ pulse: !!document.querySelector('.wave-tell'), text: document.querySelector('.wave-banner-text')?.textContent ?? null }))
+    : null
+  const arrival = await event('announce')
+  // The entry takes 1.2–1.8 s of game time.
+  await waitFrames(page, 3, { minMs: 2500, maxMs: 30000 })
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const flock = await page.evaluate((t) => window.__SC_TEST__.enemies().filter((e) => e.type === t), type)
+  await page.screenshot({ path: path.join(OUT, `${level}-wave.png`), timeout: SHOT_TIMEOUT })
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
+
+  if (!tell) problems.push(`no wave:incoming tell for "${label}"`)
+  else if (!tellShown?.pulse) problems.push('the tell showed no screen-edge pulse (.wave-tell)')
+  if (tell && tellShown?.text !== label) problems.push(`the tell showed "${tellShown?.text}", not "${label}"`)
+  if (!arrival) problems.push(`the "${label}" wave never arrived`)
+  const leadS = tell && arrival ? (arrival.ms - tell.ms) / 1000 : null
+  if (leadS !== null && leadS < 0.3) problems.push(`the tell came only ${leadS.toFixed(2)} s before the wave`)
+  if (flock.length < minOnScreen) problems.push(`only ${flock.length} ${type}s on screen after the wave flew in (want ≥ ${minOnScreen})`)
+  const nearest = flock.reduce((m, e) => Math.min(m, e.distance), Infinity)
+  if (nearest < 40) problems.push(`a ${type} is ${nearest.toFixed(0)} units from the camera (near field 40)`)
+  return {
+    id: 'wave',
+    problems,
+    wave: { level, onScreen: flock.length, largestPx: Math.round(flock[0]?.px ?? 0), nearest: Math.round(nearest), tellLeadS: leadS },
+  }
+}
+
 /**
  * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
  * shows over the mounted level, a press during it fires nothing (not even when held on into
@@ -1443,6 +1487,18 @@ async function run() {
     await sp.ctx.close()
   }
 
+  // 6b. Spawn choreography: the crow wave's tell, then its V flying in (level2-wave.png)
+  if (wanted.includes(WAVE_CHECK.level)) {
+    const w = await newPage()
+    const r = await waveCheck(w.page)
+    r.errors = [...w.errors, ...(await w.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await w.ctx.close()
+  }
+
   // 7. Optional touch playtest on a phone viewport
   if (args.mobile) {
     const m = await runMobile(browser, base)
@@ -1473,6 +1529,8 @@ async function run() {
           ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +
           ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'},` +
           ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})`
+      : r.wave
+        ? ` ${r.wave.level} tell ${r.wave.tellLeadS?.toFixed(1) ?? '-'}s ahead, on screen ${r.wave.onScreen} (largest ${r.wave.largestPx}px, nearest ${r.wave.nearest})`
       : r.speed
         ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile
