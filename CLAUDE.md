@@ -43,7 +43,8 @@ to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the fly-by camera mu
 the start hint must show and a key press must fade to black and open level select), and per level `<id>.png` (after a 10 s ride),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
-gold hitmarker held on the kill frame via `holdFeedback`), `<id>-shot.png` (one real shot two 40 ms
+gold hitmarker held on the kill frame via `holdFeedback`; on the first level a primed 14-kill chain makes
+that kill enter the 5× combo tier, and the shot must show the "×5 FRENZY" flash with its slow-mo held), `<id>-shot.png` (one real shot two 40 ms
 steps into its flight, time frozen) and `<id>-results.png`. A level fails if
 it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
 enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
@@ -70,7 +71,8 @@ same each time; a `seed-check` step reloads the first level and requires the sam
 `spawnDigest()` for the same seed and a different one for another seed. A `hidden-pause`
 step fakes a tab hide (`visibilitychange`) on the first level: the run must pause, drop a
 held trigger, keep `timeRemaining` still over 5 s hidden, stay paused when shown again, and
-after Resume neither reset nor jump the timer; a window `blur` must pause too.
+after Resume neither reset nor jump the timer, and a combo primed before hiding must survive the pause;
+a window `blur` must pause too.
 A `levelSelect` step seeds saved progress (3★ + 1★), opens the level select (`levelSelect.png`)
 and requires one card per level, the right locked count and `★ x / 15` total, every card
 inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move focus, Enter on a
@@ -89,8 +91,8 @@ named `track*`; `env=` is the baked sky env map's intensity and bake time; a lev
 without `scene.environment` fails).
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
-(`levels()`, `startLevel(id, seed?)`, `setPhase(phase)`, `setSavedScores(scores)`, `spawnDigest()` → hash of the run's spawn positions, `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction),
-`errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/timeRemaining/phase/liveEnemies/
+(`levels()`, `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `spawnDigest()` → hash of the run's spawn positions, `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction),
+`errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/multiplier/timeScale/frenzy/timeRemaining/phase/liveEnemies/
 onScreenEnemies/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `killNearest(n)` (fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
 `fireShot(x, y)` (one real shot through NDC), `bullets()` → drawn count, largest screen radius now / since load, newest bullet's
@@ -141,11 +143,11 @@ from the URL; `?internal=0` clears it): it sends nothing either, via the same ga
 | `src/entities/enemies/` | Enemy models/behaviours; geometries + materials are module-level exports of `SharedEnemyAssets.ts` (that is how `ShaderWarmup` finds every enemy shader, later waves included); `entities/spawning/EnemySpawner` waves (spawn positions seeded by the store's `runSeed`) |
 | `src/utils/rng.ts` | The one seeded PRNG (`createRng(seed)` → callable + `range`/`pick`, `hashString`, `seedFromQuery`). Layout/scatter code takes an rng with a fixed seed, never `Math.random` (keep that for per-frame cosmetic jitter) |
 | `src/input/` | `pointerInput` — the single Pointer Events source (mouse/touch/pen) for aim + fire |
-| `src/combat/` | Aim, collisions, projectiles, weapons, crosshair; `WeaponViewModel` (first-person gun, recoil, muzzle flash, tracer; placement + aim in `weaponLayout.ts`, geometry in `weaponModel.ts`); `screenShake.ts` (rotation-only camera trauma for kills and world events via the `camera:trauma` bus event, Off/Reduced/Full setting) |
+| `src/combat/` | Aim, collisions, projectiles, weapons, crosshair; combo tiers (`comboTiers.ts`: 1×/2×/3×/5× table, game-time windows, FRENZY slow-mo envelope) run by `comboRuntime.ts` (ticked from `GameTimer`: game clock `core/gameClock.ts`, `combo:broken` / `combo:frenzy` events, frenzy `timeScale`); `WeaponViewModel` (first-person gun, recoil, muzzle flash, tracer; placement + aim in `weaponLayout.ts`, geometry in `weaponModel.ts`); `screenShake.ts` (rotation-only camera trauma for kills and world events via the `camera:trauma` bus event, Off/Reduced/Full setting) |
 | `src/effects/` | Explosions (pooled), score popups |
 | `src/audio/` | Tone.js engine (`sfxChannel` / `musicChannel` → master limiter; slow-mo low-pass duck on the music bus), music + SFX managers. Title and level music each play into their own `musicBus.ts` gain stage on one shared Transport that is never stopped: a track change is a 1 s crossfade (ramp in / ramp out, then dispose), never a cut. `SFXManager` pre-builds one node kit per level (`prepareLevelSFX`, disposed by `disposeSFX`): fire variants, hit tick, kill layers by combo, per-biome wave stinger; numbers in pure `sfxDesign.ts`. Never create Tone nodes in a play function. Every trigger time goes through `nextTriggerTime` (`triggerTime.ts`: strictly increasing per node, late times pushed past the live audio clock), and every play function / music loop callback catches into `soundGuard.ts` (drops that one sound, never throws to the page) |
 | `src/store/` | zustand stores: game, player, settings (persisted). Start or restart a level only through `startRun(levelId, seed?)` (resets the run, sets `runSeed`: seed > `?seed=` > `Date.now()`, enters `countdown`, or `playing` under `?e2e=1`: `startPhase.ts`). Code gated on `phase === 'playing'` (clock, spawns, shooting, enemy motion) waits through the countdown |
-| `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter, wave banner) + screens (`LevelSelectScreen`: biome cards with an inline-SVG landmark postcard (`LevelPostcard`), stars, best score, locked hint, `★ x / 15` total, arrow-key / Enter / Esc navigation, 300 ms launch before `startRun`; data + nav in pure `levelSelectModel.ts`; `ResultsScreen`: staged reveal of score count-up, star pops with `playStarChime`, star-threshold bar, stats, NEW RECORD; tap skips it, reduced motion shows it at once; Enter = next, R = replay; numbers in pure `resultsStats.ts`); `theme.ts` per-biome UI accents + postcard sky |
+| `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter (tier colour, game-time ring, "COMBO LOST" shake), FRENZY flash, wave banner) + screens (`LevelSelectScreen`: biome cards with an inline-SVG landmark postcard (`LevelPostcard`), stars, best score, locked hint, `★ x / 15` total, arrow-key / Enter / Esc navigation, 300 ms launch before `startRun`; data + nav in pure `levelSelectModel.ts`; `ResultsScreen`: staged reveal of score count-up, star pops with `playStarChime`, star-threshold bar, stats, NEW RECORD; tap skips it, reduced motion shows it at once; Enter = next, R = replay; numbers in pure `resultsStats.ts`); `theme.ts` per-biome UI accents + postcard sky |
 | `src/testing/` | e2e hook |
 | `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser, `pause-check.sh`, `studio-status.cjs`, `run-usage.cjs` (token use of this session + its subagents; `--post` appends it to the `token-ledger` issue, the last step of every runbook) |
 | `.claude/agents/`, `.claude/commands/`, `.claude/scripts/` | Agent roles (incl. `pr-correctness` / `pr-consistency` reviewers), `/deslop` and `/wrap-pr`, the review-bundle script |

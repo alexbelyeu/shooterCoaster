@@ -78,8 +78,9 @@ export default function EnemyBase({
     if (!aliveRef.current) return
     aliveRef.current = false
     unregisterCollisionTarget(id)
-    addScore(scoreValue)
+    // Kill first, so this kill is scored at the tier it reaches (as its popup shows).
     registerKill()
+    addScore(scoreValue)
 
     dying.current = true
     dyingMs.current = ENEMY_HIT_FLASH_MS

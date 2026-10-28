@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useGameStore } from './useGameStore'
+import { advanceGameTime, resetGameTime } from '@/core/gameClock'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import type { ScoreEntry } from '@/types/game'
 
@@ -30,6 +31,7 @@ let now = 0
 beforeEach(() => {
   memoryStorage.clear()
   useGameStore.setState(initial, true)
+  resetGameTime()
   now = 10_000
   vi.spyOn(performance, 'now').mockImplementation(() => now)
 })
@@ -44,47 +46,46 @@ function entry(level: string, score: number, stars: number): ScoreEntry {
 }
 
 describe('combo', () => {
-  it('first kill starts a 1x combo', () => {
+  it('first kill starts a 1x combo at the game time', () => {
+    advanceGameTime(10)
     store().registerKill()
-    expect(store().combo).toEqual({ count: 1, multiplier: 1, lastKillTime: 10_000 })
+    expect(store().combo).toEqual({ count: 1, multiplier: 1, lastKillTime: 10 })
   })
 
-  it('kills inside the 2s window grow the multiplier by 0.25 each', () => {
-    store().registerKill()
-    now += 1999
-    store().registerKill()
-    expect(store().combo.count).toBe(2)
-    expect(store().combo.multiplier).toBe(1.25)
-    now += 1000
-    store().registerKill()
-    expect(store().combo.multiplier).toBe(1.5)
+  it('kills inside the window step through the 1x / 2x / 3x / 5x tiers', () => {
+    const mults: number[] = []
+    for (let i = 0; i < 15; i++) {
+      store().registerKill()
+      mults.push(store().combo.multiplier)
+      advanceGameTime(1.39)
+    }
+    expect(mults).toEqual([1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 5])
+    expect(store().combo.count).toBe(15)
   })
 
-  it('a kill after the window (>= 2000ms) resets the combo', () => {
+  it("a kill after the tier's game-time window starts a new chain", () => {
     store().registerKill()
-    now += 1000
+    advanceGameTime(1.99)
     store().registerKill()
-    now += 2000
+    advanceGameTime(2)
     store().registerKill()
     expect(store().combo.count).toBe(1)
     expect(store().combo.multiplier).toBe(1)
   })
 
-  it('multiplier caps at 4x', () => {
-    for (let i = 0; i < 30; i++) {
-      store().registerKill()
-      now += 100
-    }
-    expect(store().combo.count).toBe(30)
-    expect(store().combo.multiplier).toBe(4)
+  it('ignores the wall clock (a pause or a slow frame does not break it)', () => {
+    store().registerKill()
+    now += 60_000
+    store().registerKill()
+    expect(store().combo.count).toBe(2)
   })
 
   it('bestCombo tracks the longest streak of the run, not the current one', () => {
     for (let i = 0; i < 4; i++) {
       store().registerKill()
-      now += 100
+      advanceGameTime(0.1)
     }
-    now += 3000
+    advanceGameTime(3)
     store().registerKill()
     expect(store().combo.count).toBe(1)
     expect(store().bestCombo).toBe(4)
@@ -104,13 +105,11 @@ describe('addScore', () => {
   })
 
   it('applies the current combo multiplier', () => {
-    store().registerKill()
-    now += 500
-    store().registerKill() // 1.25x
+    for (let i = 0; i < 4; i++) store().registerKill() // 2x
     store().addScore(20)
-    expect(store().score).toBe(25)
+    expect(store().score).toBe(40)
     store().addScore(20)
-    expect(store().score).toBe(50)
+    expect(store().score).toBe(80)
   })
 
   it('resetScore zeroes it', () => {

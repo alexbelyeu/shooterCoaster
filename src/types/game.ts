@@ -12,7 +12,9 @@ export interface ScoreEntry {
 }
 
 export interface ComboState {
+  /** Consecutive kills; fireworks and the boss reward read it as is. */
   count: number
   multiplier: number
+  /** Game-time seconds (`core/gameClock.ts`) of the last kill. */
   lastKillTime: number
 }
