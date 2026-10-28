@@ -388,12 +388,6 @@ canvas {
   stroke: var(--combo-color);
   stroke-linecap: round;
   filter: drop-shadow(0 0 4px var(--combo-color));
-  animation: hud-combo-drain var(--combo-window) linear forwards;
-}
-
-@keyframes hud-combo-drain {
-  from { stroke-dashoffset: 0; }
-  to { stroke-dashoffset: calc(var(--ring-c) * 1px); }
 }
 
 /* chain count, centred in the ring */
@@ -440,6 +434,77 @@ canvas {
 .hud-combo--tier3 .hud-combo-mult { font-size: 2.5rem; }
 .hud-combo--tier3 { box-shadow: 0 0 22px rgba(255, 59, 59, 0.45); }
 
+/* a lapsed 2×+ chain: greyed, shaken, then hidden */
+.hud-combo.is-lost {
+  color: #a3a8bd;
+  box-shadow: none;
+  animation: hud-combo-shake 0.45s ease-out;
+}
+
+@keyframes hud-combo-shake {
+  0%, 100% { transform: translate(-50%, 0); }
+  15% { transform: translate(calc(-50% - 9px), 0) rotate(-2deg); }
+  35% { transform: translate(calc(-50% + 8px), 0) rotate(2deg); }
+  55% { transform: translate(calc(-50% - 5px), 0) rotate(-1deg); }
+  75% { transform: translate(calc(-50% + 3px), 0); }
+}
+
+/* top-tier slow-mo: "×5 FRENZY" over the combo meter and a red edge pulse */
+.hud-frenzy {
+  position: absolute;
+  left: 50%;
+  bottom: max(150px, calc(env(safe-area-inset-bottom) + 142px));
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 0 18px rgba(255, 59, 59, 0.95), 0 0 36px rgba(255, 154, 31, 0.6), 0 2px 4px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+  animation: hud-frenzy-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+.hud-frenzy.is-out {
+  opacity: 0;
+  transition: opacity 0.35s ease-in;
+}
+
+.hud-frenzy-mult {
+  font-size: clamp(2rem, 7vw, 3rem);
+  color: #ff3b3b;
+}
+
+.hud-frenzy-word {
+  font-size: clamp(1.4rem, 5vw, 2.1rem);
+  letter-spacing: 0.22em;
+  margin-right: -0.22em;
+}
+
+.hud-frenzy-edge {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 90px 10px rgba(255, 59, 59, 0.55);
+  animation: hud-fade-in 0.35s ease-out;
+}
+
+.hud-frenzy-edge.is-out {
+  opacity: 0;
+  transition: opacity 0.35s ease-in;
+}
+
+@keyframes hud-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes hud-frenzy-in {
+  from { opacity: 0; transform: translateX(-50%) scale(1.6); }
+  to { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
 @keyframes hud-combo-pop {
   from { transform: scale(1.45); }
   to { transform: scale(1); }
@@ -448,12 +513,21 @@ canvas {
 @media (max-width: 480px) {
   .hud-panel { padding: 8px 10px 10px; }
   .hud-combo { bottom: max(84px, calc(env(safe-area-inset-bottom) + 76px)); }
+  .hud-frenzy { bottom: max(162px, calc(env(safe-area-inset-bottom) + 154px)); }
+}
+
+/* landscape phones: above the combo meter would cover the crosshair */
+@media (max-height: 480px) {
+  .hud-frenzy { bottom: auto; top: max(12px, env(safe-area-inset-top)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .hud-timer--critical .hud-timer-value,
   .hud-combo-count,
-  .hud-combo-mult { animation: none; }
+  .hud-combo-mult,
+  .hud-combo.is-lost,
+  .hud-frenzy,
+  .hud-frenzy-edge { animation: none; }
 }
 
 /* Pause: needed on touch (no Escape key); bottom-left like the title's settings gear */

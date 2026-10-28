@@ -5,7 +5,7 @@ import { eventBus } from '@/core/EventBus'
 interface ScorePopup {
   id: number
   score: number
-  combo: number
+  multiplier: number
   screenX: number
   screenY: number
 }
@@ -27,15 +27,15 @@ export default function ScorePopups() {
   const mountedRef = useRef(true)
 
   const handleKill = useCallback((data: unknown) => {
-    const { screenX, screenY, combo, score } = data as {
+    const { screenX, screenY, multiplier, score } = data as {
       screenX: number
       screenY: number
-      combo: number
+      multiplier: number
       score: number
     }
 
     const id = nextId++
-    pendingRef.current.push({ id, score, combo, screenX, screenY })
+    pendingRef.current.push({ id, score, multiplier, screenX, screenY })
 
     // Schedule removal
     const timeoutId = setTimeout(() => {
@@ -85,8 +85,8 @@ export default function ScorePopups() {
             transition={{ duration: 0.9, ease: 'easeOut' }}
           >
             +{popup.score}
-            {popup.combo > 1 && (
-              <span className="score-popup-combo">x{popup.combo}</span>
+            {popup.multiplier > 1 && (
+              <span className="score-popup-combo">×{popup.multiplier}</span>
             )}
           </motion.div>
         ))}

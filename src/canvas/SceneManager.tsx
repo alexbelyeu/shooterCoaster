@@ -39,14 +39,14 @@ function KillProjector() {
 
   useEffect(() => {
     const handler = (data: unknown) => {
-      const d = data as { position: THREE.Vector3; combo: number; score: number }
+      const d = data as { position: THREE.Vector3; multiplier: number; score: number }
       vec.copy(d.position).project(camera)
       const screenX = ((vec.x + 1) / 2) * size.width
       const screenY = ((-vec.y + 1) / 2) * size.height
       eventBus.emit('enemy:killed:screen', {
         screenX,
         screenY,
-        combo: d.combo,
+        multiplier: d.multiplier,
         score: d.score,
       })
     }

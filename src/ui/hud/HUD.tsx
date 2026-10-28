@@ -5,6 +5,7 @@ import { biomeTheme } from '@/ui/theme'
 import ScoreDisplay from './ScoreDisplay'
 import TimerBar from './TimerBar'
 import ComboMeter from './ComboMeter'
+import FrenzyFlash from './FrenzyFlash'
 
 /** Thin segmented kills / total strip under the score. Renders on kills only. */
 function KillStrip() {
@@ -60,6 +61,7 @@ export default function HUD() {
       <div className="hud-panel hud-panel--right">
         <TimerBar totalSeconds={config.timerSeconds} />
       </div>
+      <FrenzyFlash />
       <ComboMeter />
       {/* Touch has no Escape key: an always-available pause button. */}
       <button

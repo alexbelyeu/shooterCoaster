@@ -2,12 +2,12 @@ import { useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
 import { startMusic, stopMusic, setMusicIntensity } from '@/audio/MusicManager'
-import { disposeSFX, playHitTick, playWaveStinger, prepareLevelSFX } from '@/audio/SFXManager'
+import { disposeSFX, playComboBreak, playHitTick, playWaveStinger, prepareLevelSFX } from '@/audio/SFXManager'
 import { setMusicDucked, syncVolumes } from '@/audio/AudioEngine'
 import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 
-/** Level audio host: biome music + SFX kit for the level's lifetime, bus-driven hit / wave sounds, slow-mo duck. */
+/** Level audio host: biome music + SFX kit for the level's lifetime, bus-driven hit / wave / combo-break sounds, slow-mo duck. */
 export default function MusicController() {
   const currentLevel = useGameStore((s) => s.currentLevel)
 
@@ -18,7 +18,9 @@ export default function MusicController() {
     prepareLevelSFX(biome)
     eventBus.on('enemy:hit', playHitTick)
     eventBus.on('wave:announce', playWaveStinger)
+    eventBus.on('combo:broken', playComboBreak)
     return () => {
+      eventBus.off('combo:broken', playComboBreak)
       eventBus.off('enemy:hit', playHitTick)
       eventBus.off('wave:announce', playWaveStinger)
       stopMusic()

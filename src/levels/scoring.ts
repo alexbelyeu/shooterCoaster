@@ -5,7 +5,7 @@
  */
 import type { EnemyType, EnemyWave } from '@/types/level'
 
-/** Points awarded per kill, before the combo multiplier. */
+/** Points awarded per kill, before the combo multiplier (`combat/comboTiers.ts`). */
 export const SCORE_VALUES: Record<EnemyType, number> = {
   balloon: 13,
   crow: 15,
@@ -29,7 +29,8 @@ export function computeMaxScore(waves: readonly EnemyWave[]): number {
 
 /**
  * Stars earned for `score` against `maxScore`. Thresholds are fractions of
- * maxScore for 1, 2 and 3 stars. Returns 0-3.
+ * maxScore for 1, 2 and 3 stars. Returns 0-3. `score` includes the combo
+ * multiplier while `maxScore` is the base, so the fraction can pass 1: it is clamped there.
  */
 export function computeStars(
   score: number,
@@ -37,7 +38,7 @@ export function computeStars(
   thresholds: readonly [number, number, number],
 ): 0 | 1 | 2 | 3 {
   if (!(maxScore > 0)) return 0
-  const pct = score / maxScore
+  const pct = Math.min(1, score / maxScore)
   if (pct >= thresholds[2]) return 3
   if (pct >= thresholds[1]) return 2
   if (pct >= thresholds[0]) return 1

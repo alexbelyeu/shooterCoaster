@@ -2,12 +2,16 @@ import { useRef, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
 import type { GamePhase } from '@/types/game'
+import { resetComboRuntime, tickCombo } from '@/combat/comboRuntime'
 
 interface GameTimerProps {
   seconds: number
 }
 
-/** Counts down the level on game time; reset when a run starts (`countdown`, or `playing` without one), kept through GO and resume. */
+/**
+ * Counts down the level; reset when a run starts (`countdown`, or `playing` without one), kept
+ * through GO and resume. Also the frame that owns the combo game clock (`tickCombo`).
+ */
 export default function GameTimer({ seconds }: GameTimerProps) {
   const phase = useGameStore((s) => s.phase)
 
@@ -26,6 +30,7 @@ export default function GameTimer({ seconds }: GameTimerProps) {
     elapsed.current = 0
     running.current = false
     lastCeiled.current = -1
+    resetComboRuntime()
     useGameStore.getState().setTimeRemaining(seconds)
   }, [phase, seconds])
 
@@ -34,8 +39,10 @@ export default function GameTimer({ seconds }: GameTimerProps) {
     const { phase: livePhase, timeScale, setTimeRemaining, setPhase } = useGameStore.getState()
     if (phase !== 'playing' || livePhase !== 'playing') return
     if (timeScale === 0) return
-    if (running.current) elapsed.current += delta
-    else running.current = true
+    if (running.current) {
+      elapsed.current += delta
+      tickCombo(delta)
+    } else running.current = true
 
     const remaining = Math.max(0, seconds - elapsed.current)
     const ceiled = Math.ceil(remaining)

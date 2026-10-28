@@ -3,14 +3,14 @@ import { FIRE_VARIANTS, STINGERS, STINGER_VOICES, fireVelocity, killLayers, kill
 
 describe('killTier / killLayers', () => {
   it('maps combo counts to the four tiers', () => {
-    expect([0, 1, 2, 3, 5, 6, 9, 10, 40].map(killTier)).toEqual([0, 0, 0, 1, 1, 2, 2, 3, 3])
+    expect([0, 1, 3, 4, 7, 8, 14, 15, 40].map(killTier)).toEqual([0, 0, 0, 1, 1, 2, 2, 3, 3])
   })
 
   it('adds one layer per tier on top of the previous ones', () => {
-    expect(killLayers(2)).toEqual({ thump: false, ring: false, swell: false })
+    expect(killLayers(3)).toEqual({ thump: false, ring: false, swell: false })
     expect(killLayers(4)).toEqual({ thump: true, ring: false, swell: false })
-    expect(killLayers(7)).toEqual({ thump: true, ring: true, swell: false })
-    expect(killLayers(12)).toEqual({ thump: true, ring: true, swell: true })
+    expect(killLayers(9)).toEqual({ thump: true, ring: true, swell: false })
+    expect(killLayers(15)).toEqual({ thump: true, ring: true, swell: true })
   })
 })
 

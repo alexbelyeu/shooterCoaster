@@ -1,5 +1,6 @@
 /** Sound design data for SFXManager; no Tone import so it stays unit-testable. */
 import type { BiomeType } from '@/types/level'
+import { comboTierIndex } from '@/combat/comboTiers'
 
 export interface KillLayers {
   thump: boolean
@@ -14,12 +15,9 @@ const KILL_LAYERS: readonly KillLayers[] = [
   { thump: true, ring: true, swell: true },
 ]
 
-/** 0 = pop (combo 1–2), 1 = + thump (3–5), 2 = + ring (6–9), 3 = + swell (10+). */
+/** The combo tier (`combat/comboTiers.ts`): 0 = pop (1×), 1 = + thump (2×), 2 = + ring (3×), 3 = + swell (5×). */
 export function killTier(combo: number): number {
-  if (combo >= 10) return 3
-  if (combo >= 6) return 2
-  if (combo >= 3) return 1
-  return 0
+  return comboTierIndex(combo)
 }
 
 /** Shared objects: don't mutate. */
@@ -62,6 +60,9 @@ export interface StingerDesign {
   /** 0–1; 0 creates no Distortion node. */
   drive: number
 }
+
+/** Combo-break down-tick: a soft falling triangle blip. */
+export const COMBO_BREAK = { startHz: 660, endHz: 300, sweepS: 0.18, volume: -20 } as const
 
 export const STINGER_CHORD_GAP_S = 0.14
 
