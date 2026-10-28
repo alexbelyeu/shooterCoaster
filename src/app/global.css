@@ -516,6 +516,11 @@ canvas {
   .hud-frenzy { bottom: max(162px, calc(env(safe-area-inset-bottom) + 154px)); }
 }
 
+/* landscape phones: above the combo meter would cover the crosshair */
+@media (max-height: 480px) {
+  .hud-frenzy { bottom: auto; top: max(12px, env(safe-area-inset-top)); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hud-timer--critical .hud-timer-value,
   .hud-combo-count,
