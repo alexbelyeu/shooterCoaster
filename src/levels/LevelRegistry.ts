@@ -25,7 +25,7 @@ const LEVELS: LevelConfig[] = [
     enemies: [
       { type: 'balloon', count: 50, spawnDelay: 0, waveLabel: 'Pop em!' },
       { type: 'balloon', count: 50, spawnDelay: 20, waveLabel: 'More Balloons!' },
-      { type: 'balloon', count: 50, spawnDelay: 45, waveLabel: 'Final Wave!' },
+      { type: 'balloon', count: 50, spawnDelay: 45, waveLabel: 'Final Wave!', formation: 'ring' },
     ],
     starThresholds: [0.3, 0.6, 0.9],
     environment: {
@@ -56,8 +56,8 @@ const LEVELS: LevelConfig[] = [
     },
     enemies: [
       { type: 'scorpion', count: 30, spawnDelay: 0, waveLabel: 'Incoming!' },
-      { type: 'crow', count: 25, spawnDelay: 15, waveLabel: 'A Murder of Crows!' },
-      { type: 'crow', count: 25, spawnDelay: 35, waveLabel: 'More Crows!' },
+      { type: 'crow', count: 25, spawnDelay: 15, waveLabel: 'A Murder of Crows!', formation: 'v' },
+      { type: 'crow', count: 25, spawnDelay: 35, waveLabel: 'More Crows!', formation: 'v' },
     ],
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
@@ -87,7 +87,7 @@ const LEVELS: LevelConfig[] = [
     enemies: [
       { type: 'jellyfish', count: 20, spawnDelay: 0, waveLabel: 'Into the Deep!' },
       { type: 'shark', count: 25, spawnDelay: 15, waveLabel: 'Sharks!' },
-      { type: 'flyingFish', count: 30, spawnDelay: 35, waveLabel: 'Flying Fish!' },
+      { type: 'flyingFish', count: 30, spawnDelay: 35, waveLabel: 'Flying Fish!', formation: 'school' },
     ],
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
@@ -116,7 +116,7 @@ const LEVELS: LevelConfig[] = [
       color2: 0xffffff,
     },
     enemies: [
-      { type: 'snowmanScout', count: 25, spawnDelay: 0, waveLabel: 'Scout Party' },
+      { type: 'snowmanScout', count: 25, spawnDelay: 0, waveLabel: 'Scout Party', formation: 'line' },
       { type: 'snowman', count: 20, spawnDelay: 20, waveLabel: 'Snowmen Incoming!' },
       { type: 'snowmanBrute', count: 8, spawnDelay: 45, waveLabel: 'Brutes!' },
     ],
@@ -149,10 +149,10 @@ const LEVELS: LevelConfig[] = [
       color2: 0xff4400,
     },
     enemies: [
-      { type: 'emberWisp', count: 35, spawnDelay: 0, waveLabel: 'Embers Rise!' },
+      { type: 'emberWisp', count: 35, spawnDelay: 0, waveLabel: 'Embers Rise!', formation: 'spiral' },
       { type: 'fireImp', count: 25, spawnDelay: 15, waveLabel: 'Imps Attack!' },
       { type: 'lavaGolem', count: 15, spawnDelay: 30, waveLabel: 'Golems Awaken!' },
-      { type: 'emberWisp', count: 40, spawnDelay: 50, waveLabel: 'Swarm!', isEruption: true },
+      { type: 'emberWisp', count: 40, spawnDelay: 50, waveLabel: 'Swarm!', isEruption: true, formation: 'spiral' },
       { type: 'infernalDrake', count: 6, spawnDelay: 70, waveLabel: 'Drakes Descend!' },
       { type: 'lavaGolem', count: 10, spawnDelay: 85, waveLabel: 'Final Eruption!', isEruption: true },
     ],

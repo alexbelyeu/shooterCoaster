@@ -46,6 +46,7 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 | `src/entities/enemies/SharedEnemyAssets.ts` | All shared enemy geometries + materials |
 | `src/entities/enemies/*.tsx` | Individual enemy components |
 | `src/entities/spawning/EnemySpawner.tsx` | Spawn logic, collision radii, scores |
+| `src/entities/spawning/spawnPlacement.ts` | Formation waves (`formation: 'v' \| 'line' \| 'school' \| 'spiral' \| 'ring'` on an `EnemyWave`): seeded slots at load, anchored ahead of the rider at activation, kept on / above `groundFn` and outside the 40-unit near field, with an entry path. An enemy that moves on its own should honour the `heading` prop so its group keeps its shape (see `Crow.tsx`) |
 | `src/levels/environments/BiomeEnvironment.tsx` | Thin host: atmosphere, terrain mesh, water, trees, then the biome's `Decorations` + `Features`. No per-biome code here |
 | `src/levels/environments/biomeRegistry.ts` | `BIOMES: Record<BiomeType, BiomeDefinition>` — one entry per biome |
 | `src/levels/environments/biomes/themePark/layout.ts` | Worked example of track-aware placement: stalls along the track, string lights, bunting and an arch across it, all pure and unit-tested against the real track (`layout.test.ts`) |

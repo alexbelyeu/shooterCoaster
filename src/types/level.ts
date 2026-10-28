@@ -20,12 +20,28 @@ export interface TrackParams {
   tieSpacing?: number
 }
 
+/** How a wave arrives; anything but `scatter` (the default) is laid out ahead of the rider by `spawnPlacement.ts`. */
+export type Formation = 'scatter' | 'v' | 'line' | 'school' | 'spiral' | 'ring'
+
+/** Relative to the rider's track position at activation, in world units. */
+export interface FormationOrigin {
+  /** Arc distance ahead along the track. */
+  ahead: number
+  /** + = right of travel; later groups alternate sides. */
+  side: number
+  /** Height above the track. */
+  up: number
+}
+
 export interface EnemyWave {
   type: EnemyType
   count: number
   spawnDelay?: number
   waveLabel?: string
   isEruption?: boolean
+  formation?: Formation
+  /** Overrides the formation's default anchor. */
+  formationOrigin?: FormationOrigin
 }
 
 export interface LevelConfig {

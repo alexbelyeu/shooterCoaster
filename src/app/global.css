@@ -1392,6 +1392,24 @@ canvas {
   box-shadow: 0 0 10px var(--hud-glow);
 }
 
+/* Wave tell: one screen-edge glow pulse in the biome accent, 1 s before a wave arrives */
+.wave-tell {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 min(14vw, 120px) min(3vw, 26px) var(--hud-glow);
+  opacity: 0;
+  z-index: 14;
+  animation: wave-tell-pulse 1s ease-out;
+}
+
+/* Opacity only, so it stays under reduced motion too. */
+@keyframes wave-tell-pulse {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* Level countdown */
 .countdown {
   position: fixed;

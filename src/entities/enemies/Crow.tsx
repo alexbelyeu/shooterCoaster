@@ -14,8 +14,9 @@ import {
  * LatheGeometry body, custom BufferGeometry wings, tail feather fan.
  */
 export default function Crow(props: EnemyProps) {
-  const moveAngle = useMemo(() => Math.random() * Math.PI * 2, [])
-  const moveSpeed = useMemo(() => 0.4 + Math.random() * 0.6, [])
+  // One speed for the whole flock, or its V stretches apart.
+  const moveAngle = useMemo(() => props.heading ?? Math.random() * Math.PI * 2, [props.heading])
+  const moveSpeed = useMemo(() => (props.heading === undefined ? 0.4 + Math.random() * 0.6 : 0.7), [props.heading])
   const flapOffset = useMemo(() => Math.random() * Math.PI * 2, [])
   const leftWingInnerRef = useRef<THREE.Group>(null)
   const leftWingOuterRef = useRef<THREE.Group>(null)
