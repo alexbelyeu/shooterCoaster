@@ -58,6 +58,11 @@ The `scalar` value multiplies ALL curve coordinates (x, y, z). A high scalar mak
 | Ocean | curve2 | 20 | Low, near water |
 | Antarctica | curve2 | 35 | Medium, through mountains |
 
+**Altitude:** curve1 `y = (cos(2Cθ)·C + cos(Bθ) + 5)·scalar`; curve2
+`y = (cos(2Cθ)·(1 − cos θ)·π/2·C + cos(Bθ) + 15)·scalar`, so curve2 spans
+`(15 ± (π·C + 1))·scalar` with its biggest swings mid-ride and starts/ends calm (a closed
+loop, #178). Use integer `varA`/`varB`/`varC` or the loop won't close.
+
 ### Track Max Extent Formula
 The farthest point the track reaches from origin:
 ```

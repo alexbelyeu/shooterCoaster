@@ -4,8 +4,8 @@ import type { TrackCurve } from './TrackCurve'
 const PI2 = Math.PI * 2
 
 /**
- * Direct port of original Curve2.js
- * Similar to TrigCurve but with altitude variation that increases with t.
+ * Port of original Curve2.js with the altitude swing peaking mid-ride; the original
+ * linear `angle / 2` envelope left t = 1 π·varC·scalar above t = 0 (a vertical seam).
  */
 export function createTrigCurve2(
   varA: number,
@@ -21,8 +21,9 @@ export function createTrigCurve2(
   function computePoint(t: number, out: THREE.Vector3): THREE.Vector3 {
     const angle = t * PI2
     const x = Math.sin(angle * varA) * Math.cos(angle * varC) * varC * 13
+    const envelope = (1 - Math.cos(angle)) * (Math.PI / 2)
     const y =
-      Math.cos(angle * varC * 2) * (angle / 2) * varC +
+      Math.cos(angle * varC * 2) * envelope * varC +
       Math.cos(angle * varB) +
       15
     const z = Math.sin(angle) * Math.sin(angle * varC) * varC * 13
