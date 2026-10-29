@@ -40,7 +40,7 @@ describe.each(levels.map((l) => [l.id, l.track] as const))('track curve for %s',
     const { varA: A, varB: B, varC: C, scalar: s } = track
     const dx = 13 * C * (A + C)
     const dz = 13 * C * (1 + C)
-    const dy = 2 * Math.PI * C * C + C + B // covers curve2's (θ/2) ramp too
+    const dy = 2 * Math.PI * C * C + (Math.PI / 2) * C + B // covers curve2's envelope too
     const maxStep = (2 * Math.PI * s * (dx + dy + dz)) / SAMPLES
     let prev = pointAt(curve, 0)
     for (let i = 1; i <= SAMPLES; i++) {
@@ -93,16 +93,39 @@ describe('TrigCurve (curve1)', () => {
 })
 
 describe('TrigCurve2 (curve2)', () => {
-  it('has a known vertical seam at t=0/1 of exactly π · varC · scalar', () => {
-    // The (angle / 2) altitude ramp is not periodic, so curve2 tracks end higher
-    // than they start. Documented here so a change to it is deliberate.
-    for (const level of levels.filter((l) => l.track.curve === 'curve2')) {
-      const { varC, scalar } = level.track
-      const curve = curveFor(level.track)
+  const curve2Levels = levels.filter((l) => l.track.curve === 'curve2')
+
+  it('is used by at least one level', () => {
+    expect(curve2Levels.length).toBeGreaterThan(0)
+  })
+
+  describe.each(curve2Levels.map((l) => [l.id, l.track] as const))('%s', (_id, track) => {
+    const curve = curveFor(track)
+
+    it('is a closed loop: getPointAt(1) meets getPointAt(0)', () => {
       const a = pointAt(curve, 0)
       const b = pointAt(curve, 1)
-      expect(b.y - a.y).toBeCloseTo(Math.PI * varC * scalar, 6)
-    }
+      expect(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)).toBeLessThan(1e-3 * track.scalar)
+    })
+
+    it('is smooth across the seam: tangent(0) · tangent(1) > 0.99', () => {
+      const t0 = curve.getTangentAt(0).clone()
+      const t1 = curve.getTangentAt(1)
+      expect(t0.dot(t1)).toBeGreaterThan(0.99)
+    })
+
+    it('wrapping a lap (t → 1, then 0) climbs no steeper than the ride does elsewhere', () => {
+      const N = 2000
+      let maxRise = 0
+      let prevY = curve.getPointAt(0).y
+      for (let i = 1; i < N; i++) {
+        const y = curve.getPointAt(i / N).y
+        maxRise = Math.max(maxRise, Math.abs(y - prevY))
+        prevY = y
+      }
+      const seamRise = Math.abs(curve.getPointAt(0).y - prevY)
+      expect(seamRise).toBeLessThanOrEqual(maxRise)
+    })
   })
 })
 

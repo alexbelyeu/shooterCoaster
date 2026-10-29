@@ -20,7 +20,7 @@ That is M2's job (see VISION.md; epics #176 arcade loop, #177 finales & spectacl
 `agent:ready` issues: 9 P1, 18 P2, 11 P3). Three things look wrong in this week's screenshots and
 go first: **Antarctica's enemies are invisible** in the ride (0 of 4 on-screen enemies
 readable, largest 9 px) and its trees are black silhouettes; **levels 4 and 5 show a
-near-vertical rail climbing into the sky** (the `TrigCurve2` loop does not close);
+near-vertical rail climbing into the sky** (the `TrigCurve2` loop did not close; fixed by #178);
 **Inferno is a black triangle on dark red** with 15 px enemies. The headless smoke still
 flakes on 2-core sessions (every level failed only the frame-count check this run, all
 functional checks passed), which costs every Maintainer, Reporter and Director run
@@ -48,7 +48,7 @@ kills / accuracy / best combo / time left, NEW RECORD; Enter = next, R = replay)
 - **Track** (`src/track/`): `TrigCurve` / `TrigCurve2`, extruded rails + ties scaled by
   `trackDimensions`, lattice support towers on the drawn terrain, arc table, coaster
   camera (`cameraRig.ts` rotation-only bank / look-ahead / pitch, `cameraFov.ts` portrait
-  FOV + speed/drop kicks, `WindStreaks`). **`TrigCurve2` is not a closed loop** (bug 1).
+  FOV + speed/drop kicks, `WindStreaks`). `TrigCurve2` closes its loop since #178.
 - **Environment** (`src/levels/environments/`): per-biome modules behind
   `biomeRegistry.ts`; shared terrain / water / trees (wind sway) / atmosphere (sky dome,
   per-biome light, fog, `envIntensity`, colour `grade`) / scatter / `trackClearance` /
@@ -120,11 +120,11 @@ nobody reached 5; **0 of 9 mobile visitors started a level** (too few to conclud
 
 ## Known bugs and visual problems (ranked)
 
-1. **`TrigCurve2` (levels 4, 5) is not a closed loop.** The `(angle / 2)` altitude ramp
+1. ~~**`TrigCurve2` (levels 4, 5) is not a closed loop.** The `(angle / 2)` altitude ramp
    leaves the end π·varC·scalar above the start (≈ 440 units on level 4, ≈ 628 on
    level 5); the seam renders as a near-vertical rail into the sky, visible top-centre of
-   both ride screenshots. `src/track/curves/TrigCurve.test.ts` pins the current shape.
-   **#178 (P1).**
+   both ride screenshots. `src/track/curves/TrigCurve.test.ts` pins the current shape.~~ Fixed by #178: a `(1 − cos θ)·π/2` envelope closes
+   the loop with matching position and tangent at the seam.
 2. **Antarctica enemies unreadable**: snowmen spawn on the ground far below a track that
    runs over mountain tops; 0 of 4 readable, largest 9 px (W43 report saw the same).
    **#179 (P1).**
