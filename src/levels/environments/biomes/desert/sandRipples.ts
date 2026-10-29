@@ -63,10 +63,9 @@ const fragmentBody = /* glsl */ `
   float flatness = smoothstep(0.8, 0.95, dot(normal, upView));
   // Linear-space vertex colours: sand g/r is 0.57-0.69, red rock and cliffs 0.21-0.31.
   float sandiness = smoothstep(0.38, 0.52, vColor.g / max(vColor.r, 0.001));
-  float mask = flatness * sandiness;
-  if (mask > 0.0) {
-    diffuseColor.rgb *= 1.0 + ${RIPPLE_STRENGTH.toFixed(3)} * mask * sandRipples(vSandPos.xz);
-  }
+  // No branch on the per-pixel mask: sandRipples() takes fwidth(), which is
+  // undefined where a 2x2 pixel quad straddles a non-uniform branch.
+  diffuseColor.rgb *= 1.0 + ${RIPPLE_STRENGTH.toFixed(3)} * flatness * sandiness * sandRipples(vSandPos.xz);
 }
 `
 
