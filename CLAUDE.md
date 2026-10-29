@@ -26,6 +26,7 @@ npm run check:bundle      # bundle-size budget (budgets.json)
 npm run smoke             # headless playtest: title + every level + phone touch run (needs a build)
 npm run verify            # test + build + bundle budget + smoke — run before every PR
 npm run og                # re-render the share card public/social/og-1200x630.jpg + apple-touch-icon (needs a build)
+npm run clip              # render the level-1 gameplay clip (MP4 + GIF + stills) to docs/marketing/media/ in virtual time (needs a build + ffmpeg, ~15 min)
 ```
 
 Unit tests live next to the code as `src/**/*.test.ts` (and `scripts/**/*.test.ts` for agent tooling) and run in plain Node
@@ -112,6 +113,9 @@ weight (`track/cameraRig.ts`: look-ahead into curves, bank into turns, pitch wit
 bank, pitch and the FOV kick scale with the Screen-shake setting, and the smoke fails past their caps).
 Above ~70% of top speed, camera-space wind streaks fade in (`track/WindStreaks.tsx`, numbers in `windStreaks.ts`;
 one draw call, hidden when slow, also scaled by Screen shake); touch shots get aim assist (`combat/aimAssist.ts`).
+`npm run clip` drives the same hook in virtual time (`scripts/clip.mjs`: Playwright's fake clock plus a page
+`requestAnimationFrame` that runs only when the script asks), so each captured frame is exactly 1/30 s of
+game time for every consumer (R3F, timers, framer-motion) however slowly software GL draws it; no game code is involved.
 
 ## Stack
 
@@ -149,7 +153,7 @@ from the URL; `?internal=0` clears it): it sends nothing either, via the same ga
 | `src/store/` | zustand stores: game, player, settings (persisted). Start or restart a level only through `startRun(levelId, seed?)` (resets the run, sets `runSeed`: seed > `?seed=` > `Date.now()`, enters `countdown`, or `playing` under `?e2e=1`: `startPhase.ts`). Code gated on `phase === 'playing'` (clock, spawns, shooting, enemy motion) waits through the countdown |
 | `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter (tier colour, game-time ring, "COMBO LOST" shake), FRENZY flash, wave banner) + screens (`LevelSelectScreen`: biome cards with an inline-SVG landmark postcard (`LevelPostcard`), stars, best score, locked hint, `★ x / 15` total, arrow-key / Enter / Esc navigation, 300 ms launch before `startRun`; data + nav in pure `levelSelectModel.ts`; `ResultsScreen`: staged reveal of score count-up, star pops with `playStarChime`, star-threshold bar, stats, NEW RECORD; tap skips it, reduced motion shows it at once; Enter = next, R = replay; numbers in pure `resultsStats.ts`); `theme.ts` per-biome UI accents + postcard sky |
 | `src/testing/` | e2e hook |
-| `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser, `pause-check.sh`, `studio-status.cjs`, `run-usage.cjs` (token use of this session + its subagents; `--post` appends it to the `token-ledger` issue, the last step of every runbook) |
+| `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser, `og-image.mjs` / `clip.mjs` (share card, gameplay clip; shared preview + browser launch in `headless.mjs`), `pause-check.sh`, `studio-status.cjs`, `run-usage.cjs` (token use of this session + its subagents; `--post` appends it to the `token-ledger` issue, the last step of every runbook) |
 | `.claude/agents/`, `.claude/commands/`, `.claude/scripts/` | Agent roles (incl. `pr-correctness` / `pr-consistency` reviewers), `/deslop` and `/wrap-pr`, the review-bundle script |
 | `docs/` | Specs, perf notes, the agent operating system in `docs/agents/` (runbooks for every scheduled task in `docs/agents/runbooks/`), and `docs/marketing/` (strategy, weekly metrics, ad budget ledger; owned by the Marketer) |
 | `js/`, `index.legacy.html`, `package.legacy.json`, `gulpfile.js`, `assets/` | **Legacy v1 game (2015).** Not built. Don't extend it. |
