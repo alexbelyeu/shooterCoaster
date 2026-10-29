@@ -69,7 +69,7 @@ Geometry with small unit sizes (radius 2-5) needs large entity scale to be visib
 | Ground standard | FireImp | 8x |
 | Ground hulk | LavaGolem | 9x |
 | Boss / large flying | InfernalDrake | 20x |
-| Exception | Snowman (geometry already large) | 1x |
+| Exception | Snowman (geometry already large) | 1.3x (scout 0.9x, brute 1.8x) |
 
 Rule of thumb: if you're unsure, 8x is the safe default for normal enemies. Boss enemies need 15-20x.
 
@@ -165,7 +165,7 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
    - Import the component
    - Add score value to `ENEMY_SCORES`
    - Add collision radius to `ENEMY_RADII`
-   - Add spawn positioning case (radius, height offset)
+   - Add a spawn positioning case in `pickSpawn` (radius, height offset), or, for a ground enemy that should stand beside the ride, list it in `placedBesideTrack` (`spawnPlacement.ts`: seeded slots 700–2200 arc units ahead of the rider, 60–400 to the side, placed on `groundFn` when the wave activates)
    - Add to `ENEMY_COMPONENTS` map
 
 ### Special Features (if needed)

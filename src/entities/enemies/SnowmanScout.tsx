@@ -15,10 +15,7 @@ import {
 /** Per 60 fps frame: slow enough that a rank is still ahead when the rider reaches it. */
 const MARCH_SPEED = 0.6
 
-/**
- * Small, fast scout snowman with icy blue tint and ice-shard crown.
- * 60% scale of the normal snowman, double orbit speed.
- */
+/** Smaller, faster scout snowman (0.9× the base model) with an icy tint and ice-shard crown. */
 export default function SnowmanScout(props: EnemyProps) {
   const theta = useMemo(() => 1 + Math.random() * 2, [])
   const moveSpeed = useMemo(() => 3 + Math.random() * 2, [])
@@ -39,7 +36,7 @@ export default function SnowmanScout(props: EnemyProps) {
         mesh.position.x += Math.cos(heading) * MARCH_SPEED * dt
         mesh.position.z += Math.sin(heading) * MARCH_SPEED * dt
       }
-      mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 12
+      mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 18
 
       if (bodyRef.current) bodyRef.current.rotation.z = Math.sin(time * 3.5) * 0.06
     },
@@ -56,7 +53,7 @@ export default function SnowmanScout(props: EnemyProps) {
 
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
-      <group ref={modelRef} scale={[0.6, 0.6, 0.6]}>
+      <group ref={modelRef} scale={[0.9, 0.9, 0.9]}>
         <group ref={bodyRef}>
           {/* Body — icy blue */}
           <mesh position={[0, 0, 0]} geometry={SNOWMAN_BOTTOM_GEO} material={SNOWMAN_SCOUT_MAT} />

@@ -184,10 +184,14 @@ async function imageStats(page, png) {
   }, png.toString('base64'))
 }
 
+/** Px an enemy must reach to count as readable (MIN_ENEMY_PX in enemyReadability.ts). */
+const READABLE_PX = 12
+const MIN_READABLE = 2
+
 /**
  * Readability probe: freeze game time, list on-screen enemies, and save a 4x
  * close-up of the largest one as `<id>-enemy.png` (for eyeballing rim light and
- * contrast). Informational only — never fails the run.
+ * contrast). The level loop fails a ride with fewer than MIN_READABLE readable enemies.
  */
 async function captureEnemyCloseup(page, id) {
   try {
@@ -198,7 +202,7 @@ async function captureEnemyCloseup(page, id) {
     const summary = {
       onScreen: list.length,
       largestPx: list[0] ? Math.round(list[0].px) : 0,
-      readable: list.filter((e) => e.px >= 12).length,
+      readable: list.filter((e) => e.px >= READABLE_PX).length,
       closeup: null,
     }
     // Skip enemies under the HUD (score top-left, timer top-right, mute bottom-right).
@@ -1456,6 +1460,10 @@ async function run() {
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${frameSeconds.toFixed(0)}s)`)
     if (img.stddev < 4 || img.distinctColors < 8) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
+    if (enemyShot.error) problems.push(`enemy probe failed: ${enemyShot.error}`)
+    else if (enemyShot.readable < MIN_READABLE) {
+      problems.push(`${enemyShot.readable} readable enemies (≥ ${READABLE_PX} px) of ${enemyShot.onScreen} on screen after the ride (need ${MIN_READABLE})`)
+    }
     if (stats.scene && !stats.scene.environment) problems.push('no scene.environment (sky env map not baked)')
     const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
     problems.push(...desktopAspect.problems)
