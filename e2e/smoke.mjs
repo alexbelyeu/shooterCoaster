@@ -37,7 +37,9 @@
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  *
  * All waits are deadline-polled on the hook's frame counter, because software
- * rendering in CI / cloud sessions can run at ~1 fps.
+ * rendering in CI / cloud sessions can run at ~1 fps. The title and each level ride
+ * wait --seconds, longer until --min-frames frames have rendered, and fail as a stalled
+ * render loop only if those frames haven't arrived by 4× --seconds.
  *
  * Usage:
  *   npm run build && node e2e/smoke.mjs                 # all levels
@@ -75,6 +77,8 @@ const args = Object.fromEntries(
 const SECONDS = Number(args.seconds ?? 10)
 const OUT = path.resolve(args.out ?? 'e2e-results')
 const MIN_FRAMES = Number(args['min-frames'] ?? 10)
+// 2-core SwiftShader can drop under 1 fps: a loop is stalled only if MIN_FRAMES miss this deadline.
+const FRAME_DEADLINE_MS = SECONDS * 4000
 // SwiftShader on a shared 2-core box can take >30s (Playwright's default) to produce
 // a frame for the heavier biomes; a slow screenshot is not a game bug.
 const SHOT_TIMEOUT = Number(args['shot-timeout'] ?? 120000)
@@ -244,6 +248,19 @@ async function waitFrames(page, n, { minMs = 0, maxMs = 20000, pollMs = 250 } = 
     if (f - f0 >= n && Date.now() - start >= minMs) break
   }
   return { frames: f - f0, ms: Date.now() - start }
+}
+
+/** Poll `check()` until true; give up once `ms` passed *and* `frames` rendered, or at `ms` + FRAME_DEADLINE_MS. */
+async function pollUntil(page, check, { ms, frames = MIN_FRAMES, pollMs = 500 }) {
+  const start = Date.now()
+  const f0 = await getFrames(page)
+  for (;;) {
+    if (await check()) return true
+    const elapsed = Date.now() - start
+    if (elapsed >= ms + FRAME_DEADLINE_MS) return false
+    if (elapsed >= ms && (await getFrames(page)) - f0 >= frames) return false
+    await page.waitForTimeout(pollMs)
+  }
 }
 
 /**
@@ -1225,10 +1242,8 @@ async function runMobile(browser, base) {
   const runSeed = await page.evaluate(() => window.__SC_TEST__.stats().runSeed)
   if (runSeed !== SEED) problems.push(`?seed=${SEED} did not set the run seed (got ${runSeed})`)
 
-  // Countdown (3 s) -> HUD; then wait for enemies on screen.
-  if (!(await waitVisible(page, '.hud-pause-button', 40000))) problems.push('HUD never appeared')
-  const enemyDeadline = Date.now() + Math.max(SECONDS, 10) * 2000
-  while (Date.now() < enemyDeadline && (await getStats(page)).onScreenEnemies === 0) await page.waitForTimeout(500)
+  if (!(await pollUntil(page, () => waitVisible(page, '.hud-pause-button', 500), { ms: 40000 }))) problems.push('HUD never appeared')
+  await pollUntil(page, async () => (await getStats(page)).onScreenEnemies > 0, { ms: Math.max(SECONDS, 10) * 2000 })
 
   const portraitAspect = await aspectProblems(page, 'portrait 390x844')
   problems.push(...portraitAspect.problems)
@@ -1393,26 +1408,17 @@ async function run() {
   // 1. Title screen
   const t = await newPage()
   const levels = await t.page.evaluate(() => window.__SC_TEST__.levels())
-  // Wait until the title has rendered MIN_FRAMES (or a deadline passes). A fixed
-  // short wait false-fails under slow software rendering (~1 fps on 2-core SwiftShader).
-  const f0 = await t.page.evaluate(() => window.__SC_TEST__.frames)
-  const titleDeadline = Date.now() + Math.max(4, SECONDS) * 1000
-  let f1 = f0
-  while (Date.now() < titleDeadline) {
-    await t.page.waitForTimeout(500)
-    f1 = await t.page.evaluate(() => window.__SC_TEST__.frames)
-    if (f1 - f0 >= MIN_FRAMES) break
-  }
+  const titleWait = await waitFrames(t.page, MIN_FRAMES, { maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
   const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png'), timeout: SHOT_TIMEOUT })
   const titleImg = await imageStats(t.page, titlePng)
   const fly = await titleFlyBy(t.page)
   const titleProblems = [...fly.problems]
-  if (f1 - f0 < MIN_FRAMES) titleProblems.push(`only ${f1 - f0} frames`)
+  if (titleWait.frames < MIN_FRAMES) titleProblems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
   if (titleImg.stddev <= 4) titleProblems.push('title.png is blank')
   if (t.errors.length) titleProblems.push(`${t.errors.length} error(s)`)
   const titleOk = titleProblems.length === 0
   failed ||= !titleOk
-  results.push({ id: 'title', ok: titleOk, problems: titleProblems, frames: f1 - f0, image: titleImg, title: fly.result, errors: t.errors })
+  results.push({ id: 'title', ok: titleOk, problems: titleProblems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg, title: fly.result, errors: t.errors })
   await t.ctx.close()
 
   // 1b. Level select with saved progress + keyboard-only start
@@ -1433,21 +1439,21 @@ async function run() {
     const { ctx, page, errors } = await newPage()
     const started = Date.now()
     await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [id, SEED])
-    const a = await page.evaluate(() => window.__SC_TEST__.frames)
-    await page.waitForTimeout(SECONDS * 1000)
+    const ride = await waitFrames(page, MIN_FRAMES, { minMs: SECONDS * 1000, maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
     const stats = await page.evaluate(() => {
       const s = window.__SC_TEST__
-      return { frames: s.frames, avgFrameMs: s.avgFrameMs, drawCalls: s.drawCalls, triangles: s.triangles, phase: s.phase(), hookErrors: s.errors, scene: s.sceneStats?.() ?? null }
+      return { avgFrameMs: s.avgFrameMs, drawCalls: s.drawCalls, triangles: s.triangles, phase: s.phase(), hookErrors: s.errors, scene: s.sceneStats?.() ?? null }
     })
     const png = await page.screenshot({ path: path.join(OUT, `${id}.png`), timeout: SHOT_TIMEOUT })
     const img = await imageStats(page, png)
     const enemyShot = await captureEnemyCloseup(page, id)
-    const frames = stats.frames - a
+    const { frames } = ride
+    const frameSeconds = ride.ms / 1000
     const problems = []
     const spawnDigest = await nextSpawnDigest(page, null)
     if (!spawnDigest) problems.push('spawnDigest() never reported the spawns')
 
-    if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${SECONDS}s)`)
+    if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${frameSeconds.toFixed(0)}s)`)
     if (img.stddev < 4 || img.distinctColors < 8) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
     if (stats.scene && !stats.scene.environment) problems.push('no scene.environment (sky env map not baked)')
@@ -1463,7 +1469,7 @@ async function run() {
     failed ||= !ok
     delete stats.hookErrors
     results.push({
-      id, ok, problems, frames, seconds: (Date.now() - started) / 1000, spawnDigest, ...stats,
+      id, ok, problems, frames, frameSeconds, seconds: (Date.now() - started) / 1000, spawnDigest, ...stats,
       kills: play.kills, score: play.score, combat: play.combat, results: play.results, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
@@ -1569,7 +1575,7 @@ async function run() {
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
         ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
-    console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames}`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
+    console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
   console.log(`Screenshots + results.json in ${OUT} (total ${((Date.now() - runStarted) / 1000).toFixed(0)}s)`)
