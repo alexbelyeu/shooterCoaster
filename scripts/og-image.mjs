@@ -12,8 +12,7 @@
  *
  * Options: --level level1 --seconds 8 --url http://localhost:4173 (skip vite preview)
  */
-import { chromium } from 'playwright'
-import { spawn } from 'node:child_process'
+import { launchBrowser, startPreview, stopPreview } from './headless.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -27,23 +26,6 @@ const OG_FILE = path.resolve('public/social/og-1200x630.jpg')
 const ICON_FILE = path.resolve('public/apple-touch-icon.png')
 const MAX_OG_BYTES = 300 * 1024
 const TIMEOUT = 120000
-
-async function startPreview() {
-  const port = 4900 + Math.floor(Math.random() * 500)
-  const url = `http://localhost:${port}`
-  const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], {
-    stdio: 'ignore',
-    detached: true, // own process group, so the vite grandchild dies with npx
-  })
-  for (let i = 0; i < 60; i++) {
-    try {
-      if ((await fetch(url)).ok) return { url, proc }
-    } catch {}
-    await new Promise((r) => setTimeout(r, 500))
-  }
-  process.kill(-proc.pid, 'SIGTERM')
-  throw new Error('vite preview did not start (did you run `npm run build`?)')
-}
 
 /** Wait until `n` more frames have rendered and at least `minMs` passed. */
 async function waitFrames(page, n, minMs = 0) {
@@ -122,11 +104,7 @@ try {
   const given = arg('url')
   if (!given) preview = await startPreview()
   const url = given ?? preview.url
-  const browser = await chromium.launch({
-    headless: true,
-    executablePath: process.env.SC_CHROME || undefined,
-    args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox'],
-  })
+  const browser = await launchBrowser()
   const page = await browser.newPage({ viewport: { width: 1200, height: 630 } })
   const { jpg, quality } = await shootCard(page, url)
   fs.mkdirSync(path.dirname(OG_FILE), { recursive: true })
@@ -137,5 +115,5 @@ try {
   console.log(`og: ${path.relative('.', ICON_FILE)} 180x180 ${Math.round(icon.length / 1024)} KB`)
   await browser.close()
 } finally {
-  if (preview) process.kill(-preview.proc.pid, 'SIGTERM')
+  if (preview) stopPreview(preview.proc)
 }
