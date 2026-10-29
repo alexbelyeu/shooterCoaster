@@ -363,11 +363,12 @@ export default function EnemySpawner({
   const [generation, setGeneration] = useState(0)
   const prevPhaseRef = useRef(phase)
 
-  // A run (re)start resets the waves and remounts the enemies; GO after a countdown only announces wave 1.
+  // A run (re)start resets the waves and remounts the enemies (and the boss); GO after a countdown only
+  // announces wave 1, and Resume after a pause changes nothing.
   useEffect(() => {
     const prev = prevPhaseRef.current
     prevPhaseRef.current = phase
-    if (phase === prev) return
+    if (phase === prev || (phase === 'playing' && prev === 'paused')) return
 
     if (phase === 'playing' && prev === 'countdown') {
       setWaveAnnouncement(waves[0]?.waveLabel ?? null)

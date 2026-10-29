@@ -94,7 +94,7 @@ export default function BossBase({
   const parts = useRef(new Map<string, THREE.Group>()).current
   const fx = useRef<PartFx[]>(spec.weakPoints.map(() => ({ flashMs: 0, popMs: 0, popFrames: 0, popping: false, points: 0 }))).current
   const registered = useRef(new Set<string>()).current
-  const clock = useRef({ age: 0, defeatedAt: -1 })
+  const clock = useRef({ age: 0, defeatedAt: -1, placed: false })
   const positions = useMemo(() => spec.weakPoints.map(() => new THREE.Vector3()), [spec])
 
   const targetId = useCallback((wp: string) => `boss:${id}:${wp}`, [id])
@@ -215,9 +215,11 @@ export default function BossBase({
   useFrame((_, delta) => {
     const root = rootRef.current
     const { phase, timeScale } = useGameStore.getState()
-    if (!root || !active || phase !== 'playing' || timeScale === 0) return
-    const dt = delta * timeScale
     const c = clock.current
+    // The arrival frame always places it, even with game time frozen.
+    if (!root || !active || phase !== 'playing' || (timeScale === 0 && c.placed)) return
+    c.placed = true
+    const dt = delta * timeScale
 
     for (let i = 0; i < fx.length; i++) {
       const f = fx[i]

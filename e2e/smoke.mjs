@@ -1300,14 +1300,18 @@ async function musicCrossfade(page) {
 /** Boss bar (#181) on the phone, from a paused run: resumed with the boss summoned, it must sit inside the viewport and clear of the HUD in portrait and landscape (mobile-level1-boss.png). */
 async function mobileBossHud(page) {
   const selectors = [...HUD_SELECTORS, '.hud-boss']
+  // Game time frozen first: the wall-clock level timer may be nearly out by now.
   await page.evaluate(() => {
     const s = window.__SC_TEST__
+    s.setTimeScale(0)
     s.setPhase('playing')
     s.summonBoss()
   })
   const shown = await waitVisible(page, '.hud-boss', 30000)
-  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
-  if (!shown) return { problems: ['phone: the boss bar (.hud-boss) never showed'], rects: null }
+  if (!shown) {
+    const s = await page.evaluate(() => ({ phase: window.__SC_TEST__.phase(), stage: window.__SC_TEST__.boss().stage }))
+    return { problems: [`phone: the boss bar (.hud-boss) never showed (phase ${s.phase}, boss ${s.stage})`], rects: null }
+  }
   await waitFrames(page, 1, { maxMs: 8000, pollMs: 100 })
   const portrait = await hudLayoutProblems(page, 'portrait 390x844 with the boss bar', selectors)
   await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-boss.png`), timeout: SHOT_TIMEOUT })
