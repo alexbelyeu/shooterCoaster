@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { FIRE_VARIANTS, STINGERS, STINGER_VOICES, fireVelocity, killLayers, killTier } from './sfxDesign'
+import { BOSS_SFX, FIRE_VARIANTS, STINGERS, STINGER_VOICES, bossHitHz, fireVelocity, killLayers, killTier } from './sfxDesign'
 
 describe('killTier / killLayers', () => {
   it('maps combo counts to the four tiers', () => {
@@ -38,5 +38,21 @@ describe('wave stingers', () => {
       expect(d.drive).toBeGreaterThanOrEqual(0)
       expect(d.drive).toBeLessThanOrEqual(1)
     }
+  })
+})
+
+describe('boss cues', () => {
+  it('arrival fits the stinger voices, one drum note per chord', () => {
+    for (const chord of BOSS_SFX.arrival.chords) expect(chord.length).toBeLessThanOrEqual(STINGER_VOICES)
+    expect(BOSS_SFX.defeat.chord.length).toBeLessThanOrEqual(STINGER_VOICES)
+    expect(BOSS_SFX.arrival.drum).toHaveLength(BOSS_SFX.arrival.chords.length)
+  })
+
+  it('the hit thud rises as the boss weakens, clamped to its range', () => {
+    expect(bossHitHz(1)).toBe(BOSS_SFX.hit.baseHz)
+    expect(bossHitHz(0)).toBe(BOSS_SFX.hit.topHz)
+    expect(bossHitHz(0.5)).toBeGreaterThan(bossHitHz(0.9))
+    expect(bossHitHz(-1)).toBe(BOSS_SFX.hit.topHz)
+    expect(bossHitHz(2)).toBe(BOSS_SFX.hit.baseHz)
   })
 })

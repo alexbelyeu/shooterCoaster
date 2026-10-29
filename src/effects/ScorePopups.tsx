@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { eventBus } from '@/core/EventBus'
+import { isFeedbackHeld } from '@/combat/hitFeedback'
 
 interface ScorePopup {
   id: number
@@ -8,11 +9,16 @@ interface ScorePopup {
   multiplier: number
   screenX: number
   screenY: number
+  /** Test hold (`holdFeedback`): stays at full opacity until released. */
+  held: boolean
 }
 
 let nextId = 0
 
 const MAX_POPUPS = 6
+const POPUP_MS = 1000
+/** A boss defeat and other big scores get the big popup. */
+const BIG_SCORE = 200
 
 /**
  * Renders floating score popups projected from 3D kill positions.
@@ -35,14 +41,15 @@ export default function ScorePopups() {
     }
 
     const id = nextId++
-    pendingRef.current.push({ id, score, multiplier, screenX, screenY })
+    pendingRef.current.push({ id, score, multiplier, screenX, screenY, held: isFeedbackHeld() })
 
-    // Schedule removal
-    const timeoutId = setTimeout(() => {
+    // Schedule removal (re-armed while a test holds feedback)
+    const remove = () => {
       if (!mountedRef.current) return
-      setPopups((prev) => prev.filter((p) => p.id !== id))
-    }, 1000)
-    timeoutIdsRef.current.push(timeoutId)
+      if (isFeedbackHeld()) timeoutIdsRef.current.push(setTimeout(remove, POPUP_MS))
+      else setPopups((prev) => prev.filter((p) => p.id !== id))
+    }
+    timeoutIdsRef.current.push(setTimeout(remove, POPUP_MS))
 
     // Batch: flush pending popups once per microtask
     if (!flushScheduled.current) {
@@ -78,9 +85,9 @@ export default function ScorePopups() {
         {popups.map((popup) => (
           <motion.div
             key={popup.id}
-            className="score-popup"
+            className={popup.score >= BIG_SCORE ? 'score-popup score-popup--big' : 'score-popup'}
             initial={{ opacity: 1, x: popup.screenX, y: popup.screenY, scale: 0.5 }}
-            animate={{ opacity: 0, x: popup.screenX, y: popup.screenY - 60, scale: 1 }}
+            animate={{ opacity: popup.held ? 1 : 0, x: popup.screenX, y: popup.screenY - 60, scale: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.9, ease: 'easeOut' }}
           >

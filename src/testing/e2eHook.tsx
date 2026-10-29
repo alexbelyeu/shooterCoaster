@@ -18,6 +18,7 @@
  *     the weapon view-model's on-screen box (hit feedback checks)
  *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses)
  *   - read the camera pose (title fly-by), shader program count and longest frame (first-shot hitch)
+ *   - summon the level's boss now, read it (hp, exposed weak points, on-screen box) and hit it through processHit
  *
  * Keep this file tiny and side-effect free when the flag is off: nothing here
  * runs unless `installE2EApi()` finds `?e2e=1`, and <E2EFrameProbe> is only
@@ -45,6 +46,7 @@ import { playExplosionSound, playFireSound, playHitTick, playWaveStinger, sfxNod
 import { droppedSounds } from '@/audio/soundGuard'
 import { nextTriggerTime } from '@/audio/triggerTime'
 import { musicState, type MusicFade } from '@/audio/musicBus'
+import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -152,6 +154,27 @@ export interface SCTestApi {
   /** The current level's shader warm-up (`canvas/ShaderWarmup.tsx`): finished?, how long it took
    *  from level mount, and the renderer's program count after it. null before the first level. */
   shaderWarmup: { done: boolean; ms: number; programs: number } | null
+  // ── Boss (issue #181) ──
+  /** Bring the level's boss in now (tell, then arrival on the next frames) instead of at its level time. */
+  summonBoss: () => void
+  /** The level's boss: stage, hp, exposed weak points on screen, the body's on-screen box. */
+  boss: () => E2EBoss
+  /** n hits on the boss's exposed weak points (nearest first), each through processHit. Returns how many landed. */
+  bossHit: (n: number) => number
+  /** Counts of 'boss:spawn' / 'boss:hit' / 'boss:defeated' since load. */
+  bossEvents: { spawn: number; hit: number; defeated: number }
+}
+
+export type E2EBossStage = 'none' | 'waiting' | 'incoming' | 'active' | 'defeated' | 'done'
+
+export interface E2EBoss {
+  stage: E2EBossStage
+  hpFraction: number | null
+  weakPointsLeft: number
+  /** Exposed weak points: id, hp left, CSS px (origin top-left), NDC, and whether inside the viewport. */
+  exposed: { id: string; hp: number; x: number; y: number; ndcX: number; ndcY: number; onScreen: boolean }[]
+  /** Projected bounds of the body (CSS px) and its width / height as fractions of the canvas. */
+  box: { minX: number; minY: number; maxX: number; maxY: number; widthFrac: number; heightFrac: number } | null
 }
 
 export interface E2EAudio {
@@ -285,6 +308,75 @@ function readBullets(): E2EBullets {
     if (_v.z < 1) newest = { x: ((_v.x + 1) / 2) * probeSize.width, y: ((1 - _v.y) / 2) * probeSize.height }
   }
   return { drawn: b.drawn, screenFrac: b.screenFrac, maxScreenFrac: b.maxScreenFrac, newest }
+}
+
+/** Written by BossSpawner / BossBase when the e2e flag is on; read through `boss()`. */
+export const e2eBoss: {
+  summon: boolean
+  stage: E2EBossStage
+  handle: { body: THREE.Object3D; parts: ReadonlyMap<string, THREE.Object3D>; state: () => BossState } | null
+} = { summon: false, stage: 'none', handle: null }
+
+const _box = new THREE.Box3()
+const _corner = new THREE.Vector3()
+
+function readBoss(): E2EBoss {
+  const h = e2eBoss.handle
+  const out: E2EBoss = { stage: e2eBoss.stage, hpFraction: null, weakPointsLeft: 0, exposed: [], box: null }
+  if (!h) return out
+  const state = h.state()
+  out.hpFraction = hpFraction(state)
+  out.weakPointsLeft = state.hp.filter((hp) => hp > 0).length
+  const cam = probeCamera
+  if (!cam) return out
+  const { width, height } = probeSize
+  for (const w of exposedWeakPoints(state)) {
+    const part = h.parts.get(w.id)
+    if (!part) continue
+    part.getWorldPosition(_v).project(cam)
+    out.exposed.push({
+      id: w.id,
+      hp: weakPointHp(state, w.id),
+      x: ((_v.x + 1) / 2) * width,
+      y: ((1 - _v.y) / 2) * height,
+      ndcX: _v.x,
+      ndcY: _v.y,
+      onScreen: _v.z < 1 && Math.abs(_v.x) <= 1 && Math.abs(_v.y) <= 1,
+    })
+  }
+  _box.setFromObject(h.body)
+  if (_box.isEmpty()) return out
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (let i = 0; i < 8; i++) {
+    _corner.set(i & 1 ? _box.max.x : _box.min.x, i & 2 ? _box.max.y : _box.min.y, i & 4 ? _box.max.z : _box.min.z).project(cam)
+    if (_corner.z > 1) continue
+    const x = Math.min(Math.max(((_corner.x + 1) / 2) * width, 0), width)
+    const y = Math.min(Math.max(((1 - _corner.y) / 2) * height, 0), height)
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x)
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y)
+  }
+  if (minX < maxX) out.box = { minX, minY, maxX, maxY, widthFrac: (maxX - minX) / width, heightFrac: (maxY - minY) / height }
+  return out
+}
+
+function bossHit(n: number): number {
+  let landed = 0
+  for (let i = 0; i < n; i++) {
+    let best: CollisionTarget | null = null
+    let bestD = Infinity
+    for (const t of getCollisionTargets().values()) {
+      if (!t.id.startsWith('boss:')) continue
+      const d = probeCamera ? t.getPosition().distanceToSquared(probeCamera.position) : 0
+      if (d < bestD) {
+        bestD = d
+        best = t
+      }
+    }
+    if (!best) break
+    processHit(best)
+    landed++
+  }
+  return landed
 }
 
 function enemiesOnScreen(): E2EEnemyOnScreen[] {
@@ -466,7 +558,14 @@ export function installE2EApi() {
     rideSpeed: null,
     view: readView,
     triggerHeld: () => getPointerState().down,
+    summonBoss: () => { e2eBoss.summon = true },
+    boss: readBoss,
+    bossHit,
+    bossEvents: { spawn: 0, hit: 0, defeated: 0 },
   }
+  eventBus.on('boss:spawn', () => { api.bossEvents.spawn += 1 })
+  eventBus.on('boss:hit', () => { api.bossEvents.hit += 1 })
+  eventBus.on('boss:defeated', () => { api.bossEvents.defeated += 1 })
   eventBus.on('weapon:fire', () => { api.combat.fired += 1 })
   eventBus.on('enemy:hit', () => { api.combat.hits += 1 })
   eventBus.on('enemy:killed', () => { api.combat.kills += 1 })

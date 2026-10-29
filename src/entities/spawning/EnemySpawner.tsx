@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef, useContext } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { EnemyType, EnemyWave } from '@/types/level'
+import type { EnemyType, EnemyWave, LevelConfig } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
@@ -22,6 +22,7 @@ import LavaGolem from '../enemies/LavaGolem'
 import FireImp from '../enemies/FireImp'
 import InfernalDrake from '../enemies/InfernalDrake'
 import GoldenBalloon from '../enemies/GoldenBalloon'
+import BossSpawner from '../bosses/BossSpawner'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { SCORE_VALUES } from '@/levels/scoring'
 import { createRng, type Rng } from '@/utils/rng'
@@ -40,6 +41,9 @@ interface EnemySpawnerProps {
   trackTable: ArcTable
   /** Terrain as drawn, not `heightFn`. */
   groundFn: HeightFunction
+  /** The level's finale, timed on the level timer of `timerSeconds`. */
+  boss?: LevelConfig['boss']
+  timerSeconds: number
 }
 
 interface SpawnedEnemy {
@@ -277,6 +281,8 @@ export default function EnemySpawner({
   trackSamples,
   trackTable,
   groundFn,
+  boss,
+  timerSeconds,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
   const getThree = useThree((s) => s.get)
@@ -357,11 +363,12 @@ export default function EnemySpawner({
   const [generation, setGeneration] = useState(0)
   const prevPhaseRef = useRef(phase)
 
-  // A run (re)start resets the waves and remounts the enemies; GO after a countdown only announces wave 1.
+  // A run (re)start resets the waves and remounts the enemies (and the boss); GO after a countdown only
+  // announces wave 1, and Resume after a pause changes nothing.
   useEffect(() => {
     const prev = prevPhaseRef.current
     prevPhaseRef.current = phase
-    if (phase === prev) return
+    if (phase === prev || (phase === 'playing' && prev === 'paused')) return
 
     if (phase === 'playing' && prev === 'countdown') {
       setWaveAnnouncement(waves[0]?.waveLabel ?? null)
@@ -500,6 +507,7 @@ export default function EnemySpawner({
           onKill={onKill}
         />
       ))}
+      {boss && <BossSpawner key={`boss-${generation}-${runSeed}`} boss={boss} timerSeconds={timerSeconds} />}
     </>
   )
 }

@@ -35,6 +35,8 @@
  * finish; on a replay, a tap after the 1 s mark must skip to playing.
  * The speed check holds the first level at top speed on its most banked sampled point:
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
+ * The boss check summons level1's Golden Blimp and shoots it down in phase order
+ * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png); see bossCheck().
  *
  * All waits are deadline-polled on the hook's frame counter, because software
  * rendering in CI / cloud sessions can run at ~1 fps. The title and each level ride
@@ -601,7 +603,7 @@ function weaponAimProblem(box, label) {
 }
 
 /** HUD layout problems: elements missing, outside the viewport, or overlapping each other. */
-async function hudLayoutProblems(page, label) {
+async function hudLayoutProblems(page, label, selectors = HUD_SELECTORS) {
   const { rects, vw, vh } = await page.evaluate((sels) => {
     const rects = sels.map((sel) => {
       const el = document.querySelector(sel)
@@ -617,7 +619,7 @@ async function hudLayoutProblems(page, label) {
       return { sel, x: r.left, y: r.top, w: r.width, h: r.height }
     })
     return { rects, vw: window.innerWidth, vh: window.innerHeight }
-  }, HUD_SELECTORS)
+  }, selectors)
   const problems = []
   for (const r of rects) {
     if (r.missing) {
@@ -925,6 +927,104 @@ async function waveCheck(page) {
   }
 }
 
+/** The finale the boss check summons (#181): Theme Park's Golden Blimp. */
+const BOSS_CHECK = { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'] }
+
+/**
+ * Boss (#181), summoned: large with its bar (level1-boss.png), hit in phase order by a real bullet and
+ * `bossHit` (level1-boss-gondola.png), then defeated into confetti + the big popup (level1-boss-down.png).
+ * Game time is frozen while it is hit; if the wall-clock level timer still runs out, the step is skipped.
+ */
+async function bossCheck(page) {
+  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase } = BOSS_CHECK
+  const problems = []
+  const boss = () => page.evaluate(() => window.__SC_TEST__.boss())
+  const events = () => page.evaluate(() => ({ ...window.__SC_TEST__.bossEvents }))
+  const playing = async () => (await page.evaluate(() => window.__SC_TEST__.phase())) === 'playing'
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
+  const startStats = await getStats(page)
+  await page.evaluate(() => window.__SC_TEST__.summonBoss())
+  const spawned = await pollUntil(page, async () => (await events()).spawn > 0, { ms: 20000 })
+  // A couple of frames so it is placed and drawn, then freeze it there.
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const tell = await page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'incoming').map((e) => e.label))
+  const before = await boss()
+  const drawCalls = await page.evaluate(() => window.__SC_TEST__.drawCalls)
+  const bar = await waitVisible(page, '.hud-boss', 10000)
+  const hud = await hudLayoutProblems(page, 'desktop 1280x720 with the boss bar', [...HUD_SELECTORS, '.hud-boss'])
+  await page.screenshot({ path: path.join(OUT, `${level}-boss.png`), timeout: SHOT_TIMEOUT })
+
+  // One real bullet at an exposed weak point: time frozen, bullets stepping 0.25 s a frame.
+  const target = before.exposed.find((e) => e.onScreen)
+  let bulletHit = false
+  if (target) {
+    await page.waitForTimeout(100) // past the pool's fire delay
+    await page.evaluate(({ x, y }) => {
+      window.__SC_TEST__.bulletStep = 0.25
+      window.__SC_TEST__.fireShot(x, y)
+    }, { x: target.ndcX, y: target.ndcY })
+    bulletHit = await pollUntil(page, async () => (await events()).hit > 0, { ms: 8000, frames: 8, pollMs: 200 })
+    await page.evaluate(() => { window.__SC_TEST__.bulletStep = null })
+  }
+
+  // Clear the first phase through processHit: what is left of its hp.
+  const firstHp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
+  const phaseOneHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), firstHp)
+  const midway = await boss()
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  await page.screenshot({ path: path.join(OUT, `${level}-boss-gondola.png`), timeout: SHOT_TIMEOUT })
+  const lastHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), midway.exposed.reduce((sum, e) => sum + e.hp, 0))
+  const finalHits = await boss()
+  // Let the last pop finish (slowly, so the confetti stays near) with its popup held.
+  await page.evaluate(() => {
+    window.__SC_TEST__.holdFeedback = true
+    window.__SC_TEST__.setTimeScale(0.25)
+  })
+  const defeated = await pollUntil(page, async () => (await events()).defeated > 0, { ms: 15000, pollMs: 100 })
+  await waitFrames(page, 2, { minMs: 600, maxMs: 20000, pollMs: 100 })
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  await waitFrames(page, 1, { maxMs: 20000, pollMs: 100 })
+  await page.screenshot({ path: path.join(OUT, `${level}-boss-down.png`), timeout: SHOT_TIMEOUT })
+  const popup = await page.evaluate(() => [...document.querySelectorAll('.score-popup--big')].map((e) => e.textContent))
+  const end = await getStats(page)
+  const after = await boss()
+  const stillPlaying = await playing()
+  await page.evaluate(() => {
+    window.__SC_TEST__.holdFeedback = false
+    window.__SC_TEST__.setTimeScale(1)
+  })
+
+  const result = {
+    level, spawned, tell, bar, drawCalls, widthFrac: before.box?.widthFrac ?? 0, exposedAtStart: before.exposed.map((e) => e.id),
+    bulletHit, phaseOneHits, exposedMidway: midway.exposed.map((e) => e.id), lastHits, hpMidway: midway.hpFraction,
+    stage: after.stage, kills: end.kills - startStats.kills, score: end.score - startStats.score, popup, skipped: false,
+  }
+  if (!stillPlaying && !defeated) {
+    result.skipped = true
+    return { id: 'boss', problems, boss: result }
+  }
+  problems.push(...hud.problems)
+  if (!spawned) problems.push('summonBoss() never brought the boss in (no boss:spawn)')
+  if (!tell.length) problems.push('no tell (wave:incoming) before the boss')
+  if (!bar) problems.push('the boss bar (.hud-boss) never showed')
+  if (!(result.widthFrac >= minWidthFrac)) problems.push(`the boss is ${(result.widthFrac * 100).toFixed(0)}% of the frame wide (want ≥ ${minWidthFrac * 100}%)`)
+  if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !id.startsWith(firstPhase)))
+    problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPhase}*)`)
+  if (!target) problems.push('no exposed weak point on screen to shoot')
+  else if (!bulletHit) problems.push('a real bullet at an exposed weak point never hit it (boss:hit)')
+  if (JSON.stringify(result.exposedMidway) !== JSON.stringify(lastPhase))
+    problems.push(`after the first phase the exposed weak points are [${result.exposedMidway}] (want [${lastPhase}])`)
+  if (!(midway.hpFraction < before.hpFraction)) problems.push(`hp did not drop (${before.hpFraction} -> ${midway.hpFraction})`)
+  if (finalHits.hpFraction !== 0) problems.push(`hp ${finalHits.hpFraction} after hitting the last phase`)
+  if (!defeated) problems.push('boss:defeated never fired')
+  if (result.kills !== weakPoints) problems.push(`${result.kills} kills from the boss (want one per weak point, ${weakPoints})`)
+  if (!popup.length) problems.push('no big score popup for the defeat')
+  return { id: 'boss', problems, boss: result }
+}
+
 /**
  * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
  * shows over the mounted level, a press during it fires nothing (not even when held on into
@@ -1197,6 +1297,31 @@ async function musicCrossfade(page) {
 }
 
 /** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
+/** Boss bar (#181) on the phone, from a paused run: resumed with the boss summoned, it must sit inside the viewport and clear of the HUD in portrait and landscape (mobile-level1-boss.png). */
+async function mobileBossHud(page) {
+  const selectors = [...HUD_SELECTORS, '.hud-boss']
+  // Game time frozen first: the wall-clock level timer may be nearly out by now.
+  await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    s.setTimeScale(0)
+    s.setPhase('playing')
+    s.summonBoss()
+  })
+  const shown = await waitVisible(page, '.hud-boss', 30000)
+  if (!shown) {
+    const s = await page.evaluate(() => ({ phase: window.__SC_TEST__.phase(), stage: window.__SC_TEST__.boss().stage }))
+    return { problems: [`phone: the boss bar (.hud-boss) never showed (phase ${s.phase}, boss ${s.stage})`], rects: null }
+  }
+  await waitFrames(page, 1, { maxMs: 8000, pollMs: 100 })
+  const portrait = await hudLayoutProblems(page, 'portrait 390x844 with the boss bar', selectors)
+  await page.screenshot({ path: path.join(OUT, `mobile-${MOBILE_LEVEL}-boss.png`), timeout: SHOT_TIMEOUT })
+  await page.setViewportSize({ width: 844, height: 390 })
+  await waitFrames(page, 2, { minMs: 500, maxMs: 8000 })
+  const landscape = await hudLayoutProblems(page, 'landscape 844x390 with the boss bar', selectors)
+  await page.setViewportSize({ width: 390, height: 844 })
+  return { problems: [...portrait.problems, ...landscape.problems], rects: { portrait: portrait.rects, landscape: landscape.rects } }
+}
+
 async function runMobile(browser, base) {
   const started = Date.now()
   const { defaultBrowserType: _unused, ...iphone } = devices['iPhone 13']
@@ -1364,6 +1489,9 @@ async function runMobile(browser, base) {
   const backAspect = await aspectProblems(page, 'portrait 390x844 (rotated back)')
   problems.push(...backAspect.problems)
 
+  const bossHud = (await phase()) === 'paused' ? await mobileBossHud(page) : { problems: [], rects: null }
+  problems.push(...bossHud.problems)
+
   const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
   const allErrors = [...errors, ...hookErrors]
   if (allErrors.length) problems.push(`${allErrors.length} error(s)`)
@@ -1383,7 +1511,7 @@ async function runMobile(browser, base) {
     },
     kills: end.kills,
     score: end.score,
-    hud: { portrait: portrait.rects, landscape: landscape.rects },
+    hud: { portrait: portrait.rects, landscape: landscape.rects, boss: bossHud.rects },
     weapon: { portrait: weaponPortrait.box, landscape: weaponLandscape.box },
     errors: allErrors,
   }
@@ -1542,6 +1670,18 @@ async function run() {
     await w.ctx.close()
   }
 
+  // 6c. The Theme Park finale: summoned, shot down in phase order (level1-boss.png, level1-boss-down.png)
+  if (wanted.includes(BOSS_CHECK.level)) {
+    const b = await newPage()
+    const r = await bossCheck(b.page)
+    r.errors = [...b.errors, ...(await b.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await b.ctx.close()
+  }
+
   // 7. Optional touch playtest on a phone viewport
   if (args.mobile) {
     const m = await runMobile(browser, base)
@@ -1574,6 +1714,11 @@ async function run() {
           ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})`
       : r.wave
         ? ` ${r.wave.level} tell ${r.wave.tellLeadS?.toFixed(1) ?? '-'}s ahead, on screen ${r.wave.onScreen} (largest ${r.wave.largestPx}px, nearest ${r.wave.nearest})`
+      : r.boss
+        ? (r.boss.skipped
+          ? ` ${r.boss.level} skipped (level timed out)`
+          : ` ${r.boss.level} tell "${r.boss.tell.at(-1) ?? '-'}" draws=${r.boss.drawCalls} width ${(r.boss.widthFrac * 100).toFixed(0)}% exposed [${r.boss.exposedAtStart.length} ${r.boss.exposedAtStart[0] ?? '-'}…] -> [${r.boss.exposedMidway}]` +
+            ` bullet hit ${r.boss.bulletHit} hits ${r.boss.phaseOneHits}+${r.boss.lastHits} kills ${r.boss.kills} score +${r.boss.score} popup ${r.boss.popup[0] ?? '-'} stage ${r.boss.stage}`)
       : r.speed
         ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile

@@ -7,25 +7,9 @@ import { eventBus } from '@/core/EventBus'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
 import type { EnemyType, Formation } from '@/types/level'
 import { registerE2EEnemy, unregisterE2EEnemy } from '@/testing/e2eHook'
-import { ENEMY_HIT_FLASH_MAT } from './SharedEnemyAssets'
+import { flashMesh, restoreMesh } from './hitFlash'
 import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE } from '@/combat/hitFeedback'
 import { entryPoint, type Vec3 } from '@/entities/spawning/spawnPlacement'
-
-// Hit flash: swap every mesh under the enemy to the shared flash material and
-// back. Module-level callbacks so traverse() allocates nothing.
-const ORIGINAL_MATERIAL = '__scOriginalMaterial'
-function flashMesh(o: THREE.Object3D) {
-  const m = o as THREE.Mesh
-  if (!m.isMesh || m.userData[ORIGINAL_MATERIAL] !== undefined) return
-  m.userData[ORIGINAL_MATERIAL] = m.material
-  m.material = ENEMY_HIT_FLASH_MAT
-}
-function restoreMesh(o: THREE.Object3D) {
-  const m = o as THREE.Mesh
-  if (!m.isMesh || m.userData[ORIGINAL_MATERIAL] === undefined) return
-  m.material = m.userData[ORIGINAL_MATERIAL] as THREE.Material
-  delete m.userData[ORIGINAL_MATERIAL]
-}
 
 export interface EnemyProps {
   id: string

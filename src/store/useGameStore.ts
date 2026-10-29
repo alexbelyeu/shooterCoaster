@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { GamePhase, ScoreEntry, ComboState } from '@/types/game'
+import type { GamePhase, ScoreEntry, ComboState, BossHud } from '@/types/game'
 import { seedFromQuery } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
 import { comboExpired, comboMultiplier } from '@/combat/comboTiers'
@@ -49,6 +49,10 @@ interface GameState {
   totalEnemies: number
   setEnemyCounts: (remaining: number, total: number) => void
 
+  /** The live boss, for the HUD; null when none is up. */
+  boss: BossHud | null
+  setBoss: (boss: BossHud | null) => void
+
   // Saved scores (persisted)
   savedScores: Record<string, ScoreEntry>
   /** Keeps the higher score's entry; `bestCombo` is kept at its max across runs either way. */
@@ -93,6 +97,7 @@ export const useGameStore = create<GameState>()(
           ...RUN_COUNTERS,
           combo: NO_COMBO,
           timeScale: 1,
+          boss: null,
           currentLevel: levelId,
           runSeed: (seed ?? urlSeed() ?? Date.now()) >>> 0,
           phase: startPhaseFor(urlSearch() ?? ''),
@@ -132,6 +137,9 @@ export const useGameStore = create<GameState>()(
 
       timeScale: 1,
       setTimeScale: (s) => set({ timeScale: s }),
+
+      boss: null,
+      setBoss: (boss) => set({ boss }),
 
       sceneReady: false,
       setSceneReady: (ready) => set({ sceneReady: ready }),

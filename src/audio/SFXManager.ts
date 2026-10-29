@@ -3,12 +3,14 @@ import { nextTriggerTime } from './triggerTime'
 import { dropSound } from './soundGuard'
 import { sfxChannel, isAudioReady } from './AudioEngine'
 import {
+  BOSS_SFX,
   COMBO_BREAK,
   FIRE_VARIANTS,
   STAR_CHIME_NOTES,
   STINGERS,
   STINGER_CHORD_GAP_S,
   STINGER_VOICES,
+  bossHitHz,
   fireVelocity,
   killLayers,
 } from './sfxDesign'
@@ -25,6 +27,7 @@ import type { BiomeType } from '@/types/level'
  *   Combo break: -20 falling triangle, when a 2×+ chain lapses
  *   Stinger    : -18…-26 per biome, once per wave
  *   Star chime : -16 bell, up to 3 on the results screen
+ *   Boss       : arrival on the stinger voices + thump; hit thud -12; defeat boom -10 (low-passed brown noise)
  *   Wind       : gain 0–0.12 → ambient bed, never dominates
  */
 
@@ -40,6 +43,8 @@ interface Kit {
   comboBreak: Tone.Synth
   stinger: Tone.Synth[]
   chime: Tone.Synth
+  bossThud: Tone.MembraneSynth
+  bossBoom: Tone.NoiseSynth
 }
 
 const owned: Tone.ToneAudioNode[] = []
@@ -135,7 +140,21 @@ function createKit(biome: BiomeType): Kit {
     volume: -16,
   })).connect(sfxChannel)
 
-  return { fire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, comboBreak, stinger, chime }
+  const bossThud = own(new Tone.MembraneSynth({
+    pitchDecay: 0.08,
+    octaves: 3,
+    envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 },
+    volume: BOSS_SFX.hit.volume,
+  })).connect(sfxChannel)
+
+  const boomFilter = own(new Tone.Filter({ type: 'lowpass', frequency: BOSS_SFX.defeat.boomCutoffHz })).connect(sfxChannel)
+  const bossBoom = own(new Tone.NoiseSynth({
+    noise: { type: 'brown' },
+    envelope: { attack: 0.005, decay: BOSS_SFX.defeat.boomS, sustain: 0, release: 0.2 },
+    volume: BOSS_SFX.defeat.boomVolume,
+  })).connect(boomFilter)
+
+  return { fire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, comboBreak, stinger, chime, bossThud, bossBoom }
 }
 
 function ensureKit(): Kit | null {
@@ -266,6 +285,63 @@ export function playWaveStinger(): void {
     }
   } catch (e) {
     dropSound('wave stinger', e)
+  }
+}
+
+/** Boss arrival: three ominous chords on the biome's stinger voices, a drum hit under each. */
+export function playBossStinger(): void {
+  const k = ensureKit()
+  if (!k) return
+  const { chords, drum, gapS } = BOSS_SFX.arrival
+  try {
+    const toneNow = Tone.now()
+    const ctxNow = Tone.getContext().currentTime
+    for (let c = 0; c < chords.length; c++) {
+      const t = toneNow + c * gapS
+      const last = c === chords.length - 1
+      for (let i = 0; i < chords[c].length; i++) {
+        const voice = k.stinger[i]
+        voice.triggerAttackRelease(chords[c][i], last ? 0.7 : gapS * 0.85, nextTriggerTime(voice, t, ctxNow), last ? 1 : 0.8)
+      }
+      k.thump.triggerAttackRelease(drum[c], 0.3, nextTriggerTime(k.thump, t, ctxNow), last ? 1 : 0.8)
+    }
+  } catch (e) {
+    dropSound('boss stinger', e)
+  }
+}
+
+/** One low thud per boss hit, rising as it weakens (the usual hit tick plays too, from `enemy:hit`). */
+export function playBossHit(event: unknown): void {
+  const k = ensureKit()
+  if (!k) return
+  try {
+    const hp = (event as { hpFraction?: number } | undefined)?.hpFraction ?? 1
+    k.bossThud.triggerAttackRelease(bossHitHz(hp), 0.15, nextTriggerTime(k.bossThud, Tone.now(), Tone.getContext().currentTime))
+  } catch (e) {
+    dropSound('boss hit', e)
+  }
+}
+
+/** Boss down: a long low boom, the kill layers and a bright major chord on top. */
+export function playBossDefeat(): void {
+  const k = ensureKit()
+  if (!k) return
+  const { boomS, chord, chordDelayS } = BOSS_SFX.defeat
+  try {
+    const toneNow = Tone.now()
+    const ctxNow = Tone.getContext().currentTime
+    k.bossBoom.triggerAttackRelease(boomS, nextTriggerTime(k.bossBoom, toneNow, ctxNow))
+    k.thump.triggerAttackRelease('C1', 0.5, nextTriggerTime(k.thump, toneNow, ctxNow))
+    k.popSnap.triggerAttackRelease(0.08, nextTriggerTime(k.popSnap, toneNow, ctxNow))
+    k.ring.triggerAttackRelease(820, 0.5, nextTriggerTime(k.ring, toneNow, ctxNow))
+    k.swell.triggerAttackRelease(SWELL_S, nextTriggerTime(k.swell, toneNow, ctxNow))
+    const t = toneNow + chordDelayS
+    for (let i = 0; i < chord.length; i++) {
+      const voice = k.stinger[i]
+      voice.triggerAttackRelease(chord[i], 0.9, nextTriggerTime(voice, t, ctxNow))
+    }
+  } catch (e) {
+    dropSound('boss defeat', e)
   }
 }
 

@@ -108,3 +108,20 @@ export const STINGERS: Record<BiomeType, StingerDesign> = {
 export const STINGER_VOICES = 3
 
 export const STAR_CHIME_NOTES = ['E5', 'G5', 'C6'] as const
+
+/** Boss cues: arrival chords on the biome's stinger voices + thump, a hit thud, a defeat boom under a major chord. */
+export const BOSS_SFX = {
+  arrival: {
+    chords: [['C3', 'Eb3', 'G3'], ['Ab2', 'C3', 'Eb3'], ['G2', 'B2', 'D3']],
+    drum: ['C1', 'Ab0', 'G0'],
+    gapS: 0.24,
+  },
+  hit: { baseHz: 44, topHz: 70, volume: -12 },
+  defeat: { boomS: 1.6, boomCutoffHz: 700, boomVolume: -10, chord: ['C4', 'E4', 'G4'], chordDelayS: 0.18 },
+} as const
+
+/** Thud pitch for a hit that left the boss at `hpFraction` (0–1). */
+export function bossHitHz(hpFraction: number): number {
+  const f = Math.min(Math.max(hpFraction, 0), 1)
+  return BOSS_SFX.hit.topHz + (BOSS_SFX.hit.baseHz - BOSS_SFX.hit.topHz) * f
+}
