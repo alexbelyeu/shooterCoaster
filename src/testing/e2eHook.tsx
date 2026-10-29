@@ -64,8 +64,10 @@ export interface SCTestApi {
   levels: () => { id: string; name: string }[]
   /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one. */
   startLevel: (id: string, seed?: number) => void
-  /** `<count>:<hash>` of the latest run's spawn positions; null until a spawner has generated them. */
+  /** `<count>:<hash>` of the latest run's spawn positions (formation members: their seeded slots); null until a spawner has generated them. */
   spawnDigest: () => string | null
+  /** Every `wave:incoming` (the tell, ~1 s early) and `wave:announce` (arrival) since load, with performance.now() ms. */
+  waveEvents: { kind: 'incoming' | 'announce'; label: string; ms: number }[]
   phase: () => string
   /** Jump to a UI phase (e.g. `levelSelect`) without clicking through the screens before it. */
   setPhase: (phase: GamePhase) => void
@@ -382,6 +384,7 @@ export function installE2EApi() {
     setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
     setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
     spawnDigest: () => spawnDigest,
+    waveEvents: [],
     audio: readAudio,
     audioBurst,
     phase: () => useGameStore.getState().phase,
@@ -467,6 +470,8 @@ export function installE2EApi() {
   eventBus.on('weapon:fire', () => { api.combat.fired += 1 })
   eventBus.on('enemy:hit', () => { api.combat.hits += 1 })
   eventBus.on('enemy:killed', () => { api.combat.kills += 1 })
+  eventBus.on('wave:incoming', (label) => { api.waveEvents.push({ kind: 'incoming', label: String(label), ms: performance.now() }) })
+  eventBus.on('wave:announce', (label) => { api.waveEvents.push({ kind: 'announce', label: String(label), ms: performance.now() }) })
   window.addEventListener('error', (e) => api.errors.push(String(e.error?.stack ?? e.message)))
   window.addEventListener('unhandledrejection', (e) => api.errors.push(String(e.reason)))
   window.__SC_TEST__ = api

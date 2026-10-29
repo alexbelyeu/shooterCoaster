@@ -5,10 +5,11 @@ import { useGameStore } from '@/store/useGameStore'
 import { playExplosionSound } from '@/audio/SFXManager'
 import { eventBus } from '@/core/EventBus'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
-import type { EnemyType } from '@/types/level'
+import type { EnemyType, Formation } from '@/types/level'
 import { registerE2EEnemy, unregisterE2EEnemy } from '@/testing/e2eHook'
 import { ENEMY_HIT_FLASH_MAT } from './SharedEnemyAssets'
 import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE } from '@/combat/hitFeedback'
+import { entryPoint, type Vec3 } from '@/entities/spawning/spawnPlacement'
 
 // Hit flash: swap every mesh under the enemy to the shared flash material and
 // back. Module-level callbacks so traverse() allocates nothing.
@@ -33,6 +34,18 @@ export interface EnemyProps {
   scoreValue: number
   radius: number
   onKill: (id: string, position: THREE.Vector3) => void
+  /** Fly in from `entry.from` to `spawnPosition` first. */
+  entry?: EnemyEntry
+  /** XZ angle (`atan2(dz, dx)`) a formation moves on together. */
+  heading?: number
+  formation?: Formation
+}
+
+export interface EnemyEntry {
+  from: Vec3
+  /** Radians the path unwinds around the vertical axis through `from`. */
+  spin: number
+  seconds: number
 }
 
 interface EnemyBaseProps extends EnemyProps {
@@ -47,7 +60,8 @@ interface EnemyBaseProps extends EnemyProps {
 
 /**
  * Shared base for all enemy types.
- * Handles visibility, collision registration, and death.
+ * Handles visibility, collision registration, formation entry and death.
+ * An entering enemy is not a collision target until it reaches its slot, so touch aim assist never snaps to one still flying in.
  *
  * Death is two-step: on hit the enemy is scored immediately, stops moving and
  * flashes white at 1.2x scale for ENEMY_HIT_FLASH_MS (game time); then it emits
@@ -60,6 +74,7 @@ export default function EnemyBase({
   scoreValue,
   radius,
   onKill,
+  entry,
   children,
   updatePosition,
 }: EnemyBaseProps) {
@@ -68,6 +83,13 @@ export default function EnemyBase({
   const aliveRef = useRef(true)
   const addScore = useGameStore((s) => s.addScore)
   const registerKill = useGameStore((s) => s.registerKill)
+  const entryT = useRef(entry ? 0 : 1)
+  const [entered, setEntered] = useState(!entry)
+  // Mount-time only: a re-render (e.g. `entered` flipping) must not move the enemy back.
+  const [startPosition] = useState((): [number, number, number] => {
+    const p = entry?.from ?? spawnPosition
+    return [p.x, p.y, p.z]
+  })
 
   // Kill-pop state: dying between the hit and the explosion.
   const dying = useRef(false)
@@ -115,6 +137,7 @@ export default function EnemyBase({
   // Register with CollisionManager
   const deadPos = useRef(new THREE.Vector3(0, -9999, 0)).current
   useEffect(() => {
+    if (!entered) return
     const getPosition = () => meshRef.current?.position ?? deadPos
     registerCollisionTarget({
       id,
@@ -123,7 +146,7 @@ export default function EnemyBase({
       onHit: kill,
     })
     return () => unregisterCollisionTarget(id)
-  }, [id, radius, kill])
+  }, [id, radius, kill, entered])
 
   // Unregister when dead
   useEffect(() => {
@@ -144,7 +167,11 @@ export default function EnemyBase({
     if (!meshRef.current || phase !== 'playing') return
     if (timeScale === 0) return
 
-    if (aliveRef.current) {
+    if (entry && entryT.current < 1) {
+      entryT.current = Math.min(1, entryT.current + (delta * timeScale) / entry.seconds)
+      entryPoint(meshRef.current.position, entry.from, spawnPosition, entryT.current, entry.spin)
+      if (entryT.current === 1) setEntered(true)
+    } else if (aliveRef.current) {
       updatePosition(meshRef.current, spawnPosition, clock.elapsedTime, delta * timeScale)
     } else if (dying.current) {
       // Frozen in the white pop. The hit may land earlier in this same frame
@@ -159,10 +186,7 @@ export default function EnemyBase({
   if (!alive) return null
 
   return (
-    <group
-      ref={meshRef}
-      position={[spawnPosition.x, spawnPosition.y, spawnPosition.z]}
-    >
+    <group ref={meshRef} position={startPosition}>
       {children}
     </group>
   )
