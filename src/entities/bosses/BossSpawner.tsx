@@ -19,11 +19,7 @@ interface BossSpawnerProps {
   timerSeconds: number
 }
 
-/**
- * Mounts the level's boss dormant (hidden, so the shader warm-up compiles it), shows its
- * tell `tell.seconds` before `at` and activates it at `at`, both in level time (GameTimer's
- * `timeRemaining`, which holds through pauses and the countdown). Remount per run.
- */
+/** Tell and arrival run on GameTimer's `timeRemaining`, which holds through pauses and the countdown. */
 export default function BossSpawner({ boss, timerSeconds }: BossSpawnerProps) {
   const spec = BOSS_SPECS[boss.type]
   const [stage, setStage] = useState<Stage>('waiting')

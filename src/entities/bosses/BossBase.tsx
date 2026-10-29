@@ -14,29 +14,23 @@ import {
   type BossSpec, type BossState, type WeakPointSpec,
 } from './bossModel'
 
-/** White flash of a weak point that took a hit but survived (game ms). */
 const BOSS_HIT_FLASH_MS = 60
 const PART_EXPLOSION_COLOR = '#ffd700'
 
-/** Every frame of a live boss: move `root` (and `parts`, if they move on their own). */
 export interface BossFrame {
   root: THREE.Group
-  /** Weak point groups by id, children of `root`, placed at their offsets on mount. */
   parts: ReadonlyMap<string, THREE.Group>
   camera: THREE.Camera
   state: BossState
-  /** Game seconds this frame. */
   dt: number
-  /** Game seconds since the boss arrived. */
   age: number
-  /** Game seconds since it was defeated; -1 while it fights. */
+  /** -1 while it fights. */
   sinceDefeat: number
 }
 
-/** What a concrete boss (e.g. GoldenBlimp) is given by BossSpawner. */
 export interface BossProps {
   id: string
-  /** Mounted dormant with the level (hidden, so the shader warm-up covers it); shown and hittable once active. */
+  /** False while dormant: mounted hidden with the level so the shader warm-up covers it. */
   active: boolean
   onDone: () => void
 }
@@ -44,15 +38,12 @@ export interface BossProps {
 interface BossBaseProps extends BossProps {
   spec: BossSpec
   move: (frame: BossFrame) => void
-  /** Moves with `root`; its bounds are the boss's on-screen size. */
+  /** Its bounds are the boss's on-screen size (e2e `boss().box`). */
   body: ReactNode
-  /** Moves with `root` too, but isn't the body (tow lines, tethers). */
   rigging?: ReactNode
-  /** One weak point's model, drawn in a group at its offset that BossBase flashes, pops and hides. */
   renderWeakPoint: (weakPoint: WeakPointSpec, exposed: boolean) => ReactNode
-  /** Game seconds the defeated boss stays (its fall) before `onDone`. */
   exitSeconds: number
-  /** World-space extras that don't move with the body (e.g. confetti). */
+  /** World space, not moved with the body (e.g. confetti). */
   children?: ReactNode
 }
 
@@ -61,15 +52,14 @@ interface PartFx {
   popMs: number
   popFrames: number
   popping: boolean
-  /** Points the destroying hit scored (before the multiplier). */
   points: number
 }
 
-export interface BossSpawnEvent {
+interface BossSpawnEvent {
   id: string
   name: string
 }
-export interface BossHitEvent {
+interface BossHitEvent {
   id: string
   weakPoint: string
   hpFraction: number
@@ -81,12 +71,8 @@ export interface BossDefeatedEvent {
 }
 
 /**
- * Shared base for bosses: one collision target per *exposed* weak point (registered
- * and dropped as phases change, in the hit itself so a second hit in the same JS turn
- * sees the new phase), hit flash per part, kill pop + explosion + `enemy:killed` per
- * destroyed part, `boss:spawn` / `boss:hit` / `boss:defeated` on the bus and the HUD
- * state in the game store. Motion is the concrete boss's `move`, run on the same
- * `phase === 'playing'` / `timeScale` gates as EnemyBase.
+ * One collision target per exposed weak point, re-synced inside the hit (not an effect) so the
+ * next hit in the same JS turn already sees the new phase; each destroyed part is a normal kill.
  */
 export default function BossBase({
   id,
@@ -119,7 +105,6 @@ export default function BossBase({
     [spec],
   )
 
-  // Defined below; the hit handler and the target sync call each other.
   const syncRef = useRef<(state: BossState) => void>(() => {})
 
   const hit = useCallback(
@@ -174,7 +159,6 @@ export default function BossBase({
     })
   }
 
-  // Arrival: visible, hittable, announced.
   useEffect(() => {
     if (!active) return
     syncRef.current(stateRef.current)
@@ -197,7 +181,6 @@ export default function BossBase({
     }
   }, [parts])
 
-  /** End of a destroyed part's pop: hide it, explode, score popup; the last one defeats the boss. */
   const finishPop = useCallback(
     (index: number) => {
       const w = spec.weakPoints[index]

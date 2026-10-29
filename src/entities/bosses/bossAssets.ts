@@ -3,8 +3,7 @@ import { mergePainted, painted, paintedAt, pose } from '@/levels/environments/sh
 import { withRim } from '@/entities/enemies/enemyRim'
 import { BLIMP_LAYOUT } from './bossSpecs'
 
-// Boss geometries + materials: module-level singletons like SharedEnemyAssets
-// (never disposed); ShaderWarmup walks this module's exports too.
+// Module-level singletons like SharedEnemyAssets; ShaderWarmup walks these exports too.
 
 const { hullX, hullRx, hullR, gondolaY, balloonScale, balloons } = BLIMP_LAYOUT
 
@@ -14,7 +13,6 @@ const CRIMSON = '#c8102e'
 const CREAM = '#fff1cf'
 const BRONZE = '#6b4a1f'
 
-/** Envelope: a flat-shaded ellipsoid, gold with a crimson band round the equator and a cream nose cap. */
 function envelopeGeo(): THREE.BufferGeometry {
   const g = new THREE.SphereGeometry(1, 28, 16).toNonIndexed()
   g.deleteAttribute('uv')
@@ -41,7 +39,6 @@ function envelopeGeo(): THREE.BufferGeometry {
 
 const tailX = hullX - hullRx
 
-/** A swept-back tail fin standing on +y, its root sunk into the envelope. */
 function finGeo(): THREE.BufferGeometry {
   const shape = new THREE.Shape([
     new THREE.Vector2(0, 0),
@@ -54,17 +51,13 @@ function finGeo(): THREE.BufferGeometry {
 
 export const BLIMP_HULL_GEO = mergePainted([
   envelopeGeo(),
-  // Cruciform tail fins.
   ...[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a) => painted(finGeo(), CRIMSON, [tailX + 100, 0, 0], [a, 0, 0])),
-  // Engine pods on struts either side of the gondola.
   ...[1, -1].flatMap((side) => [
     painted(new THREE.CylinderGeometry(10, 7, 46, 8), BRONZE, [hullX - 50, -hullR * 0.72, side * hullR * 0.95], [0, 0, Math.PI / 2]),
     painted(new THREE.BoxGeometry(6, 4, hullR * 0.5), BRONZE, [hullX - 50, -hullR * 0.72, side * hullR * 0.7]),
     painted(new THREE.CylinderGeometry(22, 22, 1.5, 12), CREAM, [hullX - 76, -hullR * 0.72, side * hullR * 0.95], [0, 0, Math.PI / 2]),
   ]),
-  // Struts down to the gondola.
   ...[-38, 38].map((dx) => painted(new THREE.BoxGeometry(4, 34, 4), BRONZE, [hullX + dx, gondolaY + 30, 0])),
-  // Tow hitch at the tail.
   painted(new THREE.SphereGeometry(8, 8, 6), BRONZE, [tailX, 0, 0]),
 ])
 
@@ -74,7 +67,6 @@ export const BLIMP_HULL_MAT = withRim(
   { color: '#fff4d0', intensity: 0.45, power: 3 },
 )
 
-/** Gondola (the phase-2 weak point), centred on its own origin. */
 export const BLIMP_GONDOLA_GEO = mergePainted([
   painted(new THREE.BoxGeometry(124, 38, 44), CREAM),
   painted(new THREE.BoxGeometry(112, 11, 45), '#2a3550', [0, 4, 0]),
@@ -86,7 +78,6 @@ export const BLIMP_GONDOLA_MAT = withRim(
   new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.2, roughness: 0.6, flatShading: true }),
 )
 
-/** Exposed once the balloons are gone: hot glow, pulsed by GoldenBlimp. */
 export const BLIMP_GONDOLA_EXPOSED_MAT = withRim(
   new THREE.MeshStandardMaterial({
     vertexColors: true,
@@ -99,7 +90,7 @@ export const BLIMP_GONDOLA_EXPOSED_MAT = withRim(
   { color: '#ffd27a', intensity: 0.9, power: 2 },
 )
 
-/** The towed golden balloons (BALLOON_GEO): shaded gold, not the bonus balloons' blown-out glow, which reads as flat discs this big. */
+/** Not GOLDEN_BODY_MAT: its blown-out glow reads as flat discs at this size. */
 export const BLIMP_BALLOON_MAT = withRim(
   new THREE.MeshStandardMaterial({
     color: '#ffc61a',
@@ -111,8 +102,8 @@ export const BLIMP_BALLOON_MAT = withRim(
   { color: '#fff0b0', intensity: 0.7, power: 2.5 },
 )
 
-/** Golden balloons hang this far below their centre (BALLOON_GEO's knot at -35, scaled). */
-export const BLIMP_KNOT_DROP = 35 * balloonScale * 1.05
+/** BALLOON_GEO's knot (y -35), scaled. */
+const BLIMP_KNOT_DROP = 35 * balloonScale * 1.05
 
 function cable(from: THREE.Vector3, to: THREE.Vector3): THREE.BufferGeometry {
   const d = new THREE.Vector3().subVectors(to, from)
@@ -122,7 +113,6 @@ function cable(from: THREE.Vector3, to: THREE.Vector3): THREE.BufferGeometry {
   return paintedAt(g, '#4a3a20', m)
 }
 
-/** Tow line from the tail through every golden balloon's knot. */
 export const BLIMP_CABLE_GEO = (() => {
   const knots = [new THREE.Vector3(tailX, 0, 0), ...balloons.map(([x, y]) => new THREE.Vector3(x, y - BLIMP_KNOT_DROP, 0))]
   return mergePainted(knots.slice(1).map((k, i) => cable(knots[i], k)))
@@ -130,7 +120,6 @@ export const BLIMP_CABLE_GEO = (() => {
 
 export const BLIMP_CABLE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true })
 
-// ── Confetti: one instanced quad burst on defeat ────────────────────
 export const CONFETTI_COUNT = 220
 export const CONFETTI_GEO = new THREE.PlaneGeometry(12, 7)
 export const CONFETTI_MAT = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })

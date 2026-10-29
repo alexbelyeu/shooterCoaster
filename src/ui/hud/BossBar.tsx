@@ -1,18 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 
-/**
- * Boss name + segmented hp bar (one segment per weak point, sized by its hp) at the
- * top centre; shakes on each hit, bursts on defeat. State from the game store, so it
- * survives the HUD remounting after a pause.
- */
+/** From the game store, not boss events, so it survives the HUD remounting after a pause. */
 export default function BossBar() {
   const boss = useGameStore((s) => s.boss)
   const barRef = useRef<HTMLDivElement>(null)
   const hpLeft = boss ? boss.hp.reduce((sum, h) => sum + Math.max(0, h), 0) : 0
   const hpTotal = boss ? boss.maxHp.reduce((sum, h) => sum + h, 0) : 0
 
-  // Restart the shake on every hit (a reflow between remove and add replays the animation).
+  // A reflow between remove and add replays the shake.
   const lastHp = useRef(hpLeft)
   useEffect(() => {
     const el = barRef.current

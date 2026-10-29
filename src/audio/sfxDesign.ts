@@ -109,18 +109,13 @@ export const STINGER_VOICES = 3
 
 export const STAR_CHIME_NOTES = ['E5', 'G5', 'C6'] as const
 
-/**
- * Boss cues (#181): an ominous three-chord arrival on the biome's stinger voices
- * over the thump drum, a low thud per hit (rising as its hp drops) and, on defeat,
- * a long low boom under a bright major resolution.
- */
+/** Boss cues: arrival chords on the biome's stinger voices + thump, a hit thud, a defeat boom under a major chord. */
 export const BOSS_SFX = {
   arrival: {
     chords: [['C3', 'Eb3', 'G3'], ['Ab2', 'C3', 'Eb3'], ['G2', 'B2', 'D3']],
     drum: ['C1', 'Ab0', 'G0'],
     gapS: 0.24,
   },
-  /** Thud pitch, Hz: `baseHz` at full hp, rising to `topHz` near defeat. */
   hit: { baseHz: 44, topHz: 70, volume: -12 },
   defeat: { boomS: 1.6, boomCutoffHz: 700, boomVolume: -10, chord: ['C4', 'E4', 'G4'], chordDelayS: 0.18 },
 } as const

@@ -1,36 +1,25 @@
-/**
- * Boss rules, pure (no React / three): weak points with their own hp, taken in
- * phases. Only the weak points of the lowest phase that still has one alive are
- * exposed (hittable); the boss is defeated when every weak point is destroyed.
- * `BossBase.tsx` drives a scene object from this state; `bossSpecs.ts` has the bosses.
- */
+/** Boss rules, pure: only the lowest phase with a live weak point is exposed; all destroyed = defeated. */
 
 export interface WeakPointSpec {
   id: string
-  /** Collision radius, world units. */
   radius: number
-  /** Position in the boss's local frame. */
   offset: readonly [number, number, number]
   hp: number
-  /** Points when this weak point is destroyed (before the combo multiplier). */
   score: number
-  /** 0 first; a phase is exposed once every lower one is destroyed. */
   phase: number
 }
 
 export interface BossSpec {
-  /** HUD name. */
   name: string
-  /** Shown (`wave:incoming` label + edge pulse) this long before the boss arrives. */
+  /** Shown as a `wave:incoming` this long before the boss arrives. */
   tell: { seconds: number; label: string }
-  /** Added to the last weak point's score on defeat. */
   reward: number
   weakPoints: readonly WeakPointSpec[]
 }
 
 export interface BossState {
   spec: BossSpec
-  /** Hp left per weak point, in `spec.weakPoints` order. */
+  /** Per weak point, in `spec.weakPoints` order. */
   hp: readonly number[]
 }
 
@@ -78,19 +67,17 @@ export function maxHp(spec: BossSpec): number {
   return spec.weakPoints.reduce((sum, w) => sum + w.hp, 0)
 }
 
-/** Hp left over total hp, 0–1. */
 export function hpFraction(state: BossState): number {
   const total = maxHp(state.spec)
   if (total <= 0) return 0
   return state.hp.reduce((sum, h) => sum + Math.max(0, h), 0) / total
 }
 
-/** Every weak point plus the reward: the no-combo score for beating the boss. */
 export function bossMaxScore(spec: BossSpec): number {
   return spec.weakPoints.reduce((sum, w) => sum + w.score, spec.reward)
 }
 
-/** Points for destroying weak point `id`, the hit that took `before` to `after`: its score, plus the reward if that defeated the boss. */
+/** Points for the hit `before` → `after` on `id`: its score if that destroyed it, plus the reward if it defeated the boss. */
 export function destroyScore(before: BossState, after: BossState, id: string): number {
   const w = after.spec.weakPoints.find((p) => p.id === id)
   if (!w || weakPointHp(before, id) <= 0 || weakPointHp(after, id) > 0) return 0

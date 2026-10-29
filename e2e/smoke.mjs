@@ -931,14 +931,9 @@ async function waveCheck(page) {
 const BOSS_CHECK = { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'] }
 
 /**
- * Boss (#181), summoned on its level instead of waiting for its level time: the tell and
- * `boss:spawn` fire, the body shows ≥ 15% of the frame wide with the boss bar (level1-boss.png),
- * only the first phase's weak points are exposed, a real bullet hits one, `bossHit` (processHit)
- * clears the phase, exposes the next and defeats it: `boss:defeated`, a kill per weak point and
- * the reward in the score (the exposed gondola: level1-boss-gondola.png), then confetti + the
- * score popup (level1-boss-down.png).
- * Game time is frozen while it is hit, so the wall-clock level timer barely runs; if it still
- * runs out, the step reports itself skipped.
+ * Boss (#181), summoned: large with its bar (level1-boss.png), hit in phase order by a real bullet and
+ * `bossHit` (level1-boss-gondola.png), then defeated into confetti + the big popup (level1-boss-down.png).
+ * Game time is frozen while it is hit; if the wall-clock level timer still runs out, the step is skipped.
  */
 async function bossCheck(page) {
   const { level, minWidthFrac, weakPoints, firstPhase, lastPhase } = BOSS_CHECK

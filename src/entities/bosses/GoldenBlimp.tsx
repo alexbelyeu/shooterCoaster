@@ -11,17 +11,14 @@ import {
   BLIMP_HULL_GEO, BLIMP_HULL_MAT,
 } from './bossAssets'
 
-/** Rides with the coaster: this far ahead of the camera along its (smoothed) heading, and this high above it. */
+/** Rides with the coaster: a fixed boss would be behind the rider within seconds. */
 const AHEAD = 760
 const ABOVE = 170
 const MIN_CLEARANCE = 220
-/** Drifts from SIDE left of the heading to SIDE right of it over CROSS_SECONDS. */
 const SIDE = 340
 const CROSS_SECONDS = 24
-/** Smoothing time constants (game s): the heading lags the camera's turns, the hull lags its anchor. */
 const HEADING_TAU = 2.5
 const FOLLOW_TAU = 1.2
-/** Defeated: falls nose first, accelerating. */
 const FALL_ACCEL = 90
 const FALL_PITCH = 0.5
 const EXIT_SECONDS = 3.5
@@ -40,11 +37,7 @@ function renderWeakPoint(w: WeakPointSpec, exposed: boolean) {
 const hull = <mesh geometry={BLIMP_HULL_GEO} material={BLIMP_HULL_MAT} />
 const towLine = <mesh geometry={BLIMP_CABLE_GEO} material={BLIMP_CABLE_MAT} />
 
-/**
- * Theme Park finale (#181): a gold blimp towing five golden balloons. It keeps pace
- * with the ride, broadside on, drifting across the view; pop the balloons to expose
- * the glowing gondola, three hits on it bring the blimp down in confetti.
- */
+/** Theme Park finale: pop the five towed balloons to expose the gondola, three hits on it bring the blimp down. */
 export default function GoldenBlimp(props: BossProps) {
   const heightFn = useContext(TerrainContext)
   const motion = useRef({ placed: false, heading: new THREE.Vector3(), fallSpeed: 0 }).current
@@ -62,7 +55,6 @@ export default function GoldenBlimp(props: BossProps) {
         motion.heading.normalize()
       }
       const h = motion.heading
-      // Right of the heading; the nose points along it, the tow chain trails back across the view.
       const rx = -h.z
       const rz = h.x
       const side = SIDE * (2 * Math.min(1, age / CROSS_SECONDS) - 1)

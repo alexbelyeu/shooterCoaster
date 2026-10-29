@@ -8,7 +8,7 @@ import { CONFETTI_COLORS, CONFETTI_COUNT, CONFETTI_GEO, CONFETTI_MAT } from './b
 
 const LIFE_S = 3.2
 const GRAVITY = 160
-/** Velocity kept per second: paper slows fast, then flutters down. */
+/** Velocity kept per second. */
 const DRAG = 0.35
 const SPREAD = { x: 200, y: 60, z: 60 }
 
@@ -19,7 +19,6 @@ const _s = new THREE.Vector3()
 const _axis = new THREE.Vector3()
 const _color = new THREE.Color()
 
-/** One instanced burst of paper confetti where boss `bossId` is defeated (`boss:defeated`); game time, so slow-mo and freezes hold it. */
 export default function BossConfetti({ bossId }: { bossId: string }) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const sim = useRef({

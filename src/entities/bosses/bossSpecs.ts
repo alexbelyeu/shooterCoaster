@@ -2,15 +2,14 @@ import { SCORE_VALUES } from '@/levels/scoring'
 import type { BossType } from '@/types/level'
 import type { BossSpec, WeakPointSpec } from './bossModel'
 
-/** Golden Blimp layout, local frame: +x = nose (the drift direction), y = up; the root sits near the middle of hull + tow chain. */
+/** Local frame: +x = nose; the root sits near the middle of hull + tow chain. */
 export const BLIMP_LAYOUT = {
   hullX: 250,
-  /** Envelope half-length / radius. */
   hullRx: 220,
   hullR: 68,
   gondolaY: -96,
   balloonScale: 1.8,
-  /** Tow chain behind the tail: x and the droop of each golden balloon. */
+  /** [x, y] of each towed balloon. */
   balloons: [
     [-60, -20],
     [-195, -50],
@@ -20,7 +19,7 @@ export const BLIMP_LAYOUT = {
   ] as const,
 } as const
 
-/** Golden balloons are worth 5× a balloon (EnemySpawner's bonus balloons). */
+/** 5× a balloon, like EnemySpawner's bonus golden balloons. */
 const GOLDEN_BALLOON_SCORE = SCORE_VALUES.balloon * 5
 
 const blimpBalloons: WeakPointSpec[] = BLIMP_LAYOUT.balloons.map(([x, y], i) => ({
