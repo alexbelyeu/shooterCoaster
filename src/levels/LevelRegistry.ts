@@ -7,7 +7,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Fun at the fair',
     order: 1,
     biome: 'themePark',
-    maxScore: 13 * 150,
+    maxScore: 13 * 150 + 5 * 65 + 400, // 1950 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 2675
     timerSeconds: 75,
     message: 'Well, that was easy...',
     nextLevel: 'level2',
@@ -27,6 +27,7 @@ const LEVELS: LevelConfig[] = [
       { type: 'balloon', count: 50, spawnDelay: 20, waveLabel: 'More Balloons!' },
       { type: 'balloon', count: 50, spawnDelay: 45, waveLabel: 'Final Wave!', formation: 'ring' },
     ],
+    boss: { type: 'goldenBlimp', at: 55 },
     starThresholds: [0.3, 0.6, 0.9],
     environment: {
       hasTrees: true,

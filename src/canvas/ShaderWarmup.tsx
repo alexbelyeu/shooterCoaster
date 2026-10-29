@@ -8,11 +8,12 @@ import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import * as enemyAssets from '@/entities/enemies/SharedEnemyAssets'
+import * as bossAssets from '@/entities/bosses/bossAssets'
 import { useGameStore } from '@/store/useGameStore'
 
 function enemyMaterials(): THREE.Material[] {
   const out: THREE.Material[] = []
-  for (const value of Object.values(enemyAssets)) {
+  for (const value of [...Object.values(enemyAssets), ...Object.values(bossAssets)]) {
     for (const m of Array.isArray(value) ? value : [value]) {
       if (m instanceof THREE.Material) out.push(m)
     }

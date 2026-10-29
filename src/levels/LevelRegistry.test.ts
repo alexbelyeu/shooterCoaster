@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { getAllLevels, getLevelConfig } from './LevelRegistry'
 import { SCORE_VALUES, computeMaxScore, computeStars } from './scoring'
 import type { EnemyType } from '@/types/level'
+import { BOSS_SPECS } from '@/entities/bosses/bossSpecs'
+import { bossMaxScore } from '@/entities/bosses/bossModel'
 
 const levels = getAllLevels()
 
@@ -28,11 +30,27 @@ describe('LevelRegistry', () => {
   })
 
   it.each(levels.map((l) => [l.id, l] as const))(
-    '%s: maxScore equals Σ(count × SCORE_VALUES)',
+    '%s: maxScore equals Σ(count × SCORE_VALUES) plus the boss',
     (_id, level) => {
-      expect(level.maxScore).toBe(computeMaxScore(level.enemies))
+      expect(level.maxScore).toBe(computeMaxScore(level.enemies, level.boss && BOSS_SPECS[level.boss.type]))
     },
   )
+
+  it('Theme Park ends on the Golden Blimp, which raises its maxScore to 2675', () => {
+    const level1 = getLevelConfig('level1')!
+    expect(level1.boss?.type).toBe('goldenBlimp')
+    expect(level1.maxScore).toBe(13 * 150 + bossMaxScore(BOSS_SPECS.goldenBlimp))
+    expect(level1.maxScore).toBe(2675)
+  })
+
+  it('a boss arrives after its tell and before the timer runs out', () => {
+    for (const l of levels) {
+      if (!l.boss) continue
+      const { tell } = BOSS_SPECS[l.boss.type]
+      expect(l.boss.at - tell.seconds, l.id).toBeGreaterThan(0)
+      expect(l.boss.at, l.id).toBeLessThan(l.timerSeconds)
+    }
+  })
 
   it('every enemy type used by a level has a positive score value', () => {
     for (const l of levels) {
@@ -84,6 +102,9 @@ describe('computeMaxScore', () => {
         { type: 'infernalDrake', count: 1 },
       ]),
     ).toBe(2 * SCORE_VALUES.balloon + SCORE_VALUES.infernalDrake)
+    expect(computeMaxScore([{ type: 'balloon', count: 1 }], BOSS_SPECS.goldenBlimp)).toBe(
+      SCORE_VALUES.balloon + bossMaxScore(BOSS_SPECS.goldenBlimp),
+    )
   })
 
   it('has a score value for every enemy type', () => {

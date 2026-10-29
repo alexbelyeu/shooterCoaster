@@ -4,6 +4,7 @@
  * tested under plain Node.
  */
 import type { EnemyType, EnemyWave } from '@/types/level'
+import { bossMaxScore, type BossSpec } from '@/entities/bosses/bossModel'
 
 /** Points awarded per kill, before the combo multiplier (`combat/comboTiers.ts`). */
 export const SCORE_VALUES: Record<EnemyType, number> = {
@@ -22,9 +23,9 @@ export const SCORE_VALUES: Record<EnemyType, number> = {
   infernalDrake: 60,
 }
 
-/** Σ(count × SCORE_VALUES[type]) over every wave: the no-combo, kill-everything score. */
-export function computeMaxScore(waves: readonly EnemyWave[]): number {
-  return waves.reduce((sum, w) => sum + w.count * SCORE_VALUES[w.type], 0)
+/** Σ(count × SCORE_VALUES[type]) over every wave, plus the boss's weak points and reward: the no-combo, kill-everything score. */
+export function computeMaxScore(waves: readonly EnemyWave[], boss?: BossSpec): number {
+  return waves.reduce((sum, w) => sum + w.count * SCORE_VALUES[w.type], boss ? bossMaxScore(boss) : 0)
 }
 
 /**
