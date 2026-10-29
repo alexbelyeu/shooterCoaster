@@ -5,6 +5,8 @@ import { sfxChannel, isAudioReady } from './AudioEngine'
 import {
   BOSS_SFX,
   COMBO_BREAK,
+  FIREWORK_BIOMES,
+  FIREWORK_SFX,
   FIRE_VARIANTS,
   STAR_CHIME_NOTES,
   STINGERS,
@@ -12,6 +14,7 @@ import {
   STINGER_VOICES,
   bossHitHz,
   fireVelocity,
+  fireworkWhistleS,
   killLayers,
 } from './sfxDesign'
 import type { BiomeType } from '@/types/level'
@@ -28,6 +31,7 @@ import type { BiomeType } from '@/types/level'
  *   Stinger    : -18…-26 per biome, once per wave
  *   Star chime : -16 bell, up to 3 on the results screen
  *   Boss       : arrival on the stinger voices + thump; hit thud -12; defeat boom -10 (low-passed brown noise)
+ *   Firework   : whistle -22 (band-passed pink sweep), pop -16 crack + thump (theme park only)
  *   Wind       : gain 0–0.12 → ambient bed, never dominates
  */
 
@@ -45,6 +49,13 @@ interface Kit {
   chime: Tone.Synth
   bossThud: Tone.MembraneSynth
   bossBoom: Tone.NoiseSynth
+  firework: FireworkVoices | null
+}
+
+interface FireworkVoices {
+  whistle: Tone.NoiseSynth
+  whistleBand: Tone.Filter
+  crack: Tone.NoiseSynth
 }
 
 const owned: Tone.ToneAudioNode[] = []
@@ -154,7 +165,26 @@ function createKit(biome: BiomeType): Kit {
     volume: BOSS_SFX.defeat.boomVolume,
   })).connect(boomFilter)
 
-  return { fire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, comboBreak, stinger, chime, bossThud, bossBoom }
+  const firework = FIREWORK_BIOMES.includes(biome) ? createFireworkVoices() : null
+
+  return { fire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, comboBreak, stinger, chime, bossThud, bossBoom, firework }
+}
+
+function createFireworkVoices(): FireworkVoices {
+  const { whistle: w, pop } = FIREWORK_SFX
+  const whistleBand = own(new Tone.Filter({ type: 'bandpass', frequency: w.startHz, Q: w.q })).connect(sfxChannel)
+  const whistle = own(new Tone.NoiseSynth({
+    noise: { type: 'pink' },
+    envelope: { attack: 0.05, decay: 0.01, sustain: 1, release: 0.06 },
+    volume: w.volume,
+  })).connect(whistleBand)
+  const crackFilter = own(new Tone.Filter({ type: 'lowpass', frequency: pop.cutoffHz })).connect(sfxChannel)
+  const crack = own(new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: pop.crackS, sustain: 0, release: 0.05 },
+    volume: pop.volume,
+  })).connect(crackFilter)
+  return { whistle, whistleBand, crack }
 }
 
 function ensureKit(): Kit | null {
@@ -342,6 +372,39 @@ export function playBossDefeat(): void {
     }
   } catch (e) {
     dropSound('boss defeat', e)
+  }
+}
+
+/** A rocket leaving its pad: a rising whistle over its flight (`flightS` game seconds at `timeScale`). */
+export function playFireworkWhistle(flightS: number, timeScale: number): void {
+  const fw = ensureKit()?.firework
+  if (!fw) return
+  try {
+    const { startHz, endHz } = FIREWORK_SFX.whistle
+    const dur = fireworkWhistleS(flightS, timeScale)
+    const t = nextTriggerTime(fw.whistle, Tone.now(), Tone.getContext().currentTime)
+    fw.whistleBand.frequency.cancelScheduledValues(t)
+    fw.whistleBand.frequency.setValueAtTime(startHz, t)
+    fw.whistleBand.frequency.exponentialRampToValueAtTime(endHz, t + dur)
+    fw.whistle.triggerAttackRelease(dur, t)
+  } catch (e) {
+    dropSound('firework whistle', e)
+  }
+}
+
+/** A firework bursting: a bright crack over a low thump. */
+export function playFireworkPop(): void {
+  const k = ensureKit()
+  const fw = k?.firework
+  if (!k || !fw) return
+  try {
+    const { crackS, drum, drumVelocity } = FIREWORK_SFX.pop
+    const toneNow = Tone.now()
+    const ctxNow = Tone.getContext().currentTime
+    fw.crack.triggerAttackRelease(crackS, nextTriggerTime(fw.crack, toneNow, ctxNow))
+    k.thump.triggerAttackRelease(drum, 0.3, nextTriggerTime(k.thump, toneNow, ctxNow), drumVelocity)
+  } catch (e) {
+    dropSound('firework pop', e)
   }
 }
 
