@@ -9,7 +9,7 @@ import { RIVER_CONFIGS, RIVER_SEGMENTS, riverRow } from './lavaRiverPaths'
 const TERRAIN_CELL = 12000 / 128  // ~93.75
 const Y_OFFSET = 8
 
-/** Lava rivers — terrain-conforming strips that drape over the heightmap. Caller disposes. */
+/** Lava rivers — terrain-conforming strips that drape over the heightmap, UVs as `createLavaMaterial` expects. Caller disposes. */
 export function createLavaRiverGeometries(heightFn: HeightFunction): THREE.BufferGeometry[] {
   const geos: THREE.BufferGeometry[] = []
   const half = TERRAIN_CELL * 0.6
@@ -20,9 +20,13 @@ export function createLavaRiverGeometries(heightFn: HeightFunction): THREE.Buffe
     const uvs: number[] = []
     const indices: number[] = []
 
+    const width = cfg.halfWidth * 2
+    let v = 0
+    let prevX = 0, prevZ = 0
     for (let i = 0; i <= RIVER_SEGMENTS; i++) {
-      const t = i / RIVER_SEGMENTS
       const { cx, cz, px, pz } = riverRow(cfg, i)
+      if (i > 0) v += Math.hypot(cx - prevX, cz - prevZ) / width
+      prevX = cx; prevZ = cz
 
       const lx = cx + px * cfg.halfWidth
       const lz = cz + pz * cfg.halfWidth
@@ -34,8 +38,8 @@ export function createLavaRiverGeometries(heightFn: HeightFunction): THREE.Buffe
 
       positions.push(lx, rowY, lz)
       positions.push(rx, rowY, rz)
-      uvs.push(0, t)
-      uvs.push(1, t)
+      uvs.push(0, v)
+      uvs.push(1, v)
 
       if (i < RIVER_SEGMENTS) {
         const base = i * 2

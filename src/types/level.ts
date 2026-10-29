@@ -18,6 +18,8 @@ export interface TrackParams {
   railRadius?: number
   /** Arc-length spacing between cross ties at trackScale 1 (default 10); multiplied by trackScale. */
   tieSpacing?: number
+  /** The track's own colours also glow at this strength (default 0): `color2` spine and ties read ahead in a dark level. */
+  glow?: number
 }
 
 /** How a wave arrives; anything but `scatter` (the default) is laid out ahead of the rider by `spawnPlacement.ts`. */

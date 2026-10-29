@@ -103,6 +103,7 @@ function LevelScene({ levelId }: { levelId: string }) {
           curve={curve}
           color1={color1}
           color2={color2}
+          glow={track.glow}
           dims={trackDims}
           groundFn={groundFn}
           table={trackTable}

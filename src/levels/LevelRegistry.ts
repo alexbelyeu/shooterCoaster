@@ -147,6 +147,7 @@ const LEVELS: LevelConfig[] = [
       curve: 'curve2',
       color1: 0x2a2a2a,
       color2: 0xff4400,
+      glow: 1.0,
     },
     enemies: [
       { type: 'emberWisp', count: 35, spawnDelay: 0, waveLabel: 'Embers Rise!', formation: 'spiral' },

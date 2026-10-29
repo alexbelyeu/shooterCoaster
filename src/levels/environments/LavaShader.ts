@@ -131,6 +131,10 @@ export const lavaFragmentShader = /* glsl */ `
     heat += (1.0 - crustEdge * 0.7) * turb * 0.15;
     heat = clamp(heat, 0.0, 1.0);
 
+    // Cells a few pixels wide alias into yellow sparkle: fade to the average heat
+    float cellsPerPixel = length(fwidth(warpedUV * 1.8));
+    heat = mix(heat, 0.3, smoothstep(0.06, 0.35, cellsPerPixel));
+
     // --- Color ramp: smooth continuous blend ---
     vec3 crustColor = vec3(0.08, 0.03, 0.01);  // near-black cooled rock
     vec3 deepRed    = vec3(0.5, 0.04, 0.0);     // deep red glow
@@ -159,7 +163,7 @@ export const lavaFragmentShader = /* glsl */ `
   }
 `
 
-/** Create a shared lava ShaderMaterial instance */
+/** Lava material: geometry `uv.x` 0..1 across a strip, `uv.y` the distance along it in strip widths (round crust cells); flows towards lower `uv.y`. */
 export function createLavaMaterial(flowSpeed = 0.08, intensity = 1.2): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: {
