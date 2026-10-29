@@ -734,3 +734,114 @@ repeated full verifies without checking the ledger for what they cost.
 **Context:** #27 asked for 18° banking, +6° / +4° FOV kicks, wind streaks and a head bob. #123 had already shipped rotation-only bank (8°), pitch and a 5° speed FOV kick, and the smoke requires zero camera translation (#65).
 **Decision:** Keep #123's bank cap; add a 3° drop FOV kick on steep descents (total cap 8°, `CAMERA_WEIGHT_CAPS` in the smoke) and camera-space wind streaks above 70% of top speed, both scaled by the Screen-shake setting. No head bob: it is a translation. `WindStreaks` builds its quads in clip space and is *not* `transparent`, with additive blending, no depth test and renderOrder 9: it sorts in the opaque list after the world (renderOrder 0) and before the gun (10), so the world never hides it and the gun stays on top.
 **Consequences:** Transparent world objects (water, particles) draw over the streaks. A gun or other camera-attached opaque mesh must keep renderOrder above 9 to stay over them.
+
+## 2026-10-25 — Contact shadows: one merged terrain-following mesh fed by a registry (Builder, #125)
+
+**Context:** Nothing in the game casts a shadow, so towers and props float. The issue suggested one InstancedMesh of terrain-aligned quads, after slop-newyork's `createContactShadowMaterial` (MIT, Copyright (c) 2026 Mr.doob, https://github.com/mrdoob/slop-newyork).
+**Decision:** `shared/ContactShadows.tsx` wraps the track and the biome in `SceneManager`; any component below it calls `useContactShadows(casters)` with footprints it already has (tower plan, theme park layout, mesas, cacti, sea stacks, ice crystals), and all of them are merged into one indexed geometry, rebuilt once when the set changes (`shared/contactShadows.ts`). Each footprint is a grid on `groundFn`, every triangle lifted over the terrain folds it crosses. An InstancedMesh was rejected: one flat quad per instance can't follow ridged ground (Arctic, Volcanic) under a 100-unit tower without clipping. The shading follows slop-newyork's rounded-box distance-field idea and was written from its description, with no code copied.
+**Consequences:** One draw call per level, whatever the caster count. New props get shadows by calling the hook, not by editing the shadow module. The shadows darken, fade out with the fog and draw before other transparent meshes (`renderOrder -1`), so water and ponds blend over them.
+
+## 2026-10-25 — Music crossfades on one never-stopped Transport; title start is any key, not any tap (Builder, #28)
+
+**Context:** #28 asked for a 1 s title → level music crossfade, a "press any key / tap to start" hint and a cinematic title. Both music managers used to `transport.stop()` + `cancel()` on stop, which cut whatever else was scheduled, so two tracks could never overlap.
+**Decision:** Each track plays into its own gain stage (`audio/musicBus.ts`) that ramps in over 1 s on start and out over 1 s on stop, then is disposed with its loops and synths. Nobody stops or cancels the Transport any more: a track only disposes its own loops. New loops start on the next bar line (in ticks), so a track always begins at the top of its phrase, and the tempo ramps when a track starts under one still fading. Start is any key (letters, digits, Space, Enter, arrows; not S, which mutes, and never Tab / Escape / function keys / shortcuts) or PLAY. A tap anywhere does not start, because the title invites you to shoot balloons and a missed one would throw you into level select, so on touch screens the hint reads "Tap PLAY to start". The fly-by blends two camera shots in position (with a lift) rather than a dissolve, which would need a second render target.
+**Consequences:** The Transport runs from the first audio unlock for the whole session. Any future music source must use a `musicBus` and must not stop or cancel the Transport. During a crossfade both tracks' synths are alive for about 1 s.
+
+## 2026-10-26 — Week 2: M1 closed, M2 starts early as "launch week", bosses enter the roadmap (Director)
+
+**Context:** Second Director playtest. Every M1 exit criterion is met on `main` (per-biome
+atmosphere + grade + env map, lattice track, readable enemies on 1–3, hit feedback and a
+gun, HUD / results / level select, touch, combat screenshots, per-biome modules, vitest).
+The first public post goes out Mon 2 Nov (Marketer, #102). The screenshots still show
+three things a visitor would screenshot back at us: no visible enemies on Antarctica,
+a vertical rail into the sky on levels 4 and 5 (`TrigCurve2` doesn't close), and an
+Inferno that is a black triangle on dark red. And a run has no shape: waves are static
+scatters, nothing arrives, every level ends on a timer.
+
+**Decision:** M1 is closed a week early and M2 ("the arcade loop and the finale") starts
+now, framed as launch week: P1 is whatever makes the first Theme Park run better or
+removes a screenshot-worthy bug (the three above, the smoke flake that blocks honest
+verification in every cloud session, combo tiers, spawn choreography, fireworks, and the
+clip). **Bosses enter the vision**: every level gets a finale through one boss framework
+(multi-hit, weak points, HP bar, tell, reward), Theme Park and Ocean first. Alex's
+slop-newyork backlog (#126) is split: the launch-safe foundations (perf gate, lazy
+Tone.js) become issues now; the feature items (positional SFX, drone orbit, gamepad, photo
+mode) are ranked at the top of the VISION backlog for the week after launch; the
+structural ones (baked SFX buffers + voice budget, aerial fog, chunk culling, Metropolis,
+helicopter boss, Night Ride, WebGPU capability event) sit lower with a trigger each. The issue queue is consolidated: QA follow-ups that touch the same files are
+merged into one issue each, fixed bugs are closed, and the total stays near the
+~30-issue weekly capacity.
+
+**Consequences:** Builders touching `EnemySpawner`, `EnemyBase` and `CollisionManager`
+this week (choreography, death variety, boss framework) must keep the pure parts in
+separate modules so parallel PRs don't collide; the boss framework PR goes first and the
+two boss issues depend on it. Changing `TrigCurve2` changes the level 4 / 5 track shape,
+tower layout and the pinned curve test; the skill's track-extent formula must be
+re-checked. The budget stays 700 / 260 KB; the Desert draw-call overage (268 > 250) is a
+P2 fix, not a budget raise.
+
+## 2026-10-28 — Gameplay clips render in virtual time, outside the game (builder, #100)
+
+**Context:** `npm run clip` needs every frame to be exactly 1/30 s of game time while
+SwiftShader takes ~1.5 s to draw one. The issue suggested a fixed-step mode in the e2e hook
+(R3F `frameloop="never"` + `advance()`), but much of the game reads wall time, not the R3F
+delta: wave timers and FRENZY reset (`setTimeout`), explosions, bullets, the golden balloon
+and the shot-aim hold (`performance.now()`), framer-motion HUD tweens. A delta-only mode
+would play those in real time, so an explosion would vanish within one captured frame.
+
+**Decision:** `scripts/clip.mjs` fakes time for the whole page instead: Playwright's
+`page.clock` (paused) owns `performance.now`, `Date` and timers, an init script replaces
+`requestAnimationFrame` with a queue the script flushes once per captured frame, CSS
+animations / transitions are paused and stepped through `document.getAnimations()`, and
+`Math.random` is seeded. No game code changes, so nothing ships to players. Loading waits
+run frames with the clock frozen (boot excepted), so the ride always starts at `--from` with
+the full timer. Screenshots go through CDP `Page.captureScreenshot`: Playwright's
+`page.screenshot` waits for a real animation frame and stalls ~20 s per shot here.
+
+**Consequences:** any new time source in the game is captured correctly as long as it
+reads `performance.now`/`Date`/timers/rAF or is a Web Animation. Anything on another
+clock (the Web Audio clock, a Worker's timers) runs in real time during the clip; keep
+gameplay-visible motion off those. Frames step 33 ms (the fake
+clock ticks whole ms), so a 30 fps clip plays 1% slow.
+
+## 2026-10-28 — Formation waves are placed at activation, relative to the rider (builder, #30)
+
+**Context:** Formations (V, line, school, spiral, ring) only read if they appear where the
+player is looking, and the rider's position when a wave activates depends on coaster speed
+and frame timing, so it can't be precomputed at level load like scatter spawns.
+
+**Decision:** `entities/spawning/spawnPlacement.ts` (pure) lays a formation wave out in two
+steps: at load each member gets a seeded slot in its group's local frame; at activation the
+spawner anchors each group on the track ahead of the rider (first point in the rider's
+forward cone, else straight ahead) and turns slots into world positions plus an entry start.
+`spawnDigest()` hashes the slots, not world positions, so `seed-check` stays deterministic.
+An enemy with an `entry` is not a collision target until it reaches its slot (no shots or
+touch aim assist on enemies still flying in). #179's ground-enemy placement should build on
+the same module (frame + slot → position) rather than in `EnemySpawner.tsx`.
+
+**Consequences:** A formation's world positions differ run to run with the same seed (the
+layout doesn't). Formation members get a shared `heading` (crows, scouts, fish) or hold their
+slot (ring balloons), so the shape survives after the entry. Waves still activate on the
+wall-clock `setTimeout` schedule until #36 moves them to game time; the `wave:incoming` tell
+is a second timer 1 s earlier on that same schedule.
+
+## 2026-10-28 — Combo tiers on a game-time clock (builder, #34)
+
+**Context:** Combos added +0.25× per kill up to 4× inside a 2 s `performance.now()` window, so
+a pause or slow-mo could break a chain, and nothing told the player when one dropped.
+
+**Decision:**
+- One tier table, `src/combat/comboTiers.ts`: 1–3 kills 1×, 4–7 2×, 8–14 3×, 15+ 5×; windows
+  2.0 / 1.8 / 1.6 / 1.4 s. The kill-sound layers (`sfxDesign.killTier`) and HUD colours
+  (`theme.comboColor`) read the same tier index; don't add a second table.
+- Windows are measured on a game clock (`src/core/gameClock.ts`, `delta × timeScale`), advanced
+  only by `GameTimer` on playing frames through `combat/comboRuntime.ts`. That module also breaks
+  lapsed chains (`combo:broken`) and runs the 5× FRENZY slow-mo (`combo:frenzy`).
+- The frenzy writes `timeScale` only while it runs, and gives up when anyone else sets a
+  different value (the last-enemy 0.1 slow-mo, a test freeze). `startRun` resets `timeScale` to 1.
+- Score includes the multiplier, `maxScore` stays the base (no-combo) score, and `computeStars`
+  clamps the fraction at 1. A kill is registered before it is scored, so it scores at the tier it reaches.
+
+**Consequences:** Pause holds the combo exactly. Kill-sound layers now start at 4 / 8 / 15 kills
+(were 3 / 6 / 10). Anything new that changes `timeScale` should set it once and leave it, not
+fight the frenzy every frame.
