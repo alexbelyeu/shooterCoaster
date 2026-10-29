@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { mergePainted, painted, paintedAt, pose } from '@/levels/environments/shared/paintedParts'
 import { withRim } from './enemyRim'
 
 // Readability rules (issue #15): every lit enemy material gets a fresnel rim via
@@ -48,7 +49,7 @@ export const GOLDEN_KNOT_MAT = withRim(new THREE.MeshStandardMaterial({
 
 export const GOLDEN_STRING_MAT = new THREE.MeshBasicMaterial({ color: '#cc9900' })
 
-// ── Crow (~20 primitives) ─────────────────────────────────────────────
+// ── Crow: merged feathers (body, tail, beak, wings) + eyes ───────────
 
 // Body: LatheGeometry with bird-body profile — streamlined with chest bulk + tapered tail
 const crowBodyProfile = [
@@ -61,12 +62,6 @@ const crowBodyProfile = [
   new THREE.Vector2(0.5, 5.5),
   new THREE.Vector2(0, 6),
 ]
-export const CROW_BODY_GEO = new THREE.LatheGeometry(crowBodyProfile, 10)
-
-export const CROW_HEAD_GEO = new THREE.SphereGeometry(2.5, 8, 6)
-export const CROW_BEAK_UPPER_GEO = new THREE.ConeGeometry(0.7, 3.5, 4)
-export const CROW_BEAK_LOWER_GEO = new THREE.ConeGeometry(0.5, 2.5, 4)
-export const CROW_EYE_GEO = new THREE.SphereGeometry(0.55, 6, 6)
 
 // Wings: custom tapered shapes via BufferGeometry — inner (shoulder-to-elbow) + outer (elbow-to-tip)
 function makeWingGeo(
@@ -87,7 +82,7 @@ function makeWingGeo(
 }
 
 // Inner wing — wider, connects at body
-export const CROW_WING_INNER_GEO = makeWingGeo(
+const crowWingInnerGeo = () => makeWingGeo(
   [
     // top face
     [0, 0.15, 2],    // 0: leading edge at body
@@ -111,7 +106,7 @@ export const CROW_WING_INNER_GEO = makeWingGeo(
 )
 
 // Outer wing — tapered with feather notches along trailing edge
-export const CROW_WING_OUTER_GEO = makeWingGeo(
+const crowWingOuterGeo = () => makeWingGeo(
   [
     // top face
     [0, 0.12, 1.5],   // 0: leading edge at elbow
@@ -148,68 +143,107 @@ export const CROW_WING_OUTER_GEO = makeWingGeo(
   ],
 )
 
-// Tail feathers — thin tapered flat shapes
-export const CROW_TAIL_GEO = new THREE.BoxGeometry(1.2, 0.15, 4)
-export const CROW_BREAST_GEO = new THREE.SphereGeometry(2.6, 8, 6)
+/** Right shoulder pivot and the elbow's x offset from it (the left wing mirrors x). */
+const CROW_SHOULDER: [number, number, number] = [2.5, 0.5, 0]
+const CROW_ELBOW_X = 5
 
-// Materials: MeshPhysicalMaterial with iridescence for feather sheen.
-// Dark silhouette on the pale sky + a blue-grey rim sheen so crows also read
-// against the hazy horizon and the red mesas.
+/** `aWing` drives the flap shader: 0 body, ±1 inner wing, ±2 outer wing (+ = right). */
+function wingTagged(g: THREE.BufferGeometry, tag: number): THREE.BufferGeometry {
+  g.setAttribute('aWing', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(tag), 1))
+  return g
+}
+
+const CROW_WING_COLOR = '#18182a'
+const CROW_BEAK_COLOR = '#d8a028'
+
+export const CROW_GEO = mergePainted([
+  painted(new THREE.LatheGeometry(crowBodyProfile, 10), '#1c1c30', [0, 0, -1], [Math.PI / 2, 0, 0]),
+  paintedAt(new THREE.SphereGeometry(2.6, 8, 6), '#2a2a3e', pose([0, -0.5, 1], [0, 0, 0], [0.85, 0.85, 1])),
+  paintedAt(new THREE.SphereGeometry(2.5, 8, 6), '#1e1e30', pose([0, 1, 4], [0, 0, 0], [0.9, 1, 1.1])),
+  // Beak: upper mandible (longer), lower one shorter and slightly open
+  painted(new THREE.ConeGeometry(0.7, 3.5, 4), CROW_BEAK_COLOR, [0, 0.6, 6.5], [Math.PI / 2, 0, 0]),
+  painted(new THREE.ConeGeometry(0.5, 2.5, 4), CROW_BEAK_COLOR, [0, 0.1, 6], [Math.PI / 2 + 0.15, 0, 0]),
+  // Tail fan: 5 feathers spread at angles
+  ...[-0.4, -0.2, 0, 0.2, 0.4].map((a) =>
+    painted(new THREE.BoxGeometry(1.2, 0.15, 4), '#1c1c30', [Math.sin(a) * 1.5, 0.3, -4.5 - Math.abs(a) * 1.5], [0.1, a, 0]),
+  ),
+].map((g) => wingTagged(g, 0)).concat(
+  [1, -1].flatMap((side) => {
+    const [sx, sy, sz] = CROW_SHOULDER
+    const mirror: [number, number, number] = [side, 1, 1]
+    return [
+      wingTagged(paintedAt(crowWingInnerGeo(), CROW_WING_COLOR, pose([side * sx, sy, sz], [0, 0, 0], mirror)), side),
+      wingTagged(
+        paintedAt(crowWingOuterGeo(), CROW_WING_COLOR, pose([side * (sx + CROW_ELBOW_X), sy, sz], [0, 0, 0], mirror)),
+        side * 2,
+      ),
+    ]
+  }),
+))
+
+export const CROW_EYES_GEO = mergeGeometries([
+  new THREE.SphereGeometry(0.55, 6, 6).translate(-1.2, 1.8, 5),
+  new THREE.SphereGeometry(0.55, 6, 6).translate(1.2, 1.8, 5),
+])
+
+const CROW_WING_PARS = /* glsl */ `
+attribute float aWing;
+uniform vec2 uWingFlap;
+`
+
+// Outer wing about the elbow, then the whole wing about the shoulder; flat shading
+// takes normals from screen derivatives, so only positions move.
+const CROW_WING_FLAP = /* glsl */ `
+{
+  float side = sign(aWing);
+  if (side != 0.0) {
+    vec3 shoulder = vec3(side * ${CROW_SHOULDER[0].toFixed(1)}, ${CROW_SHOULDER[1].toFixed(1)}, ${CROW_SHOULDER[2].toFixed(1)});
+    vec3 q = transformed - shoulder;
+    if (abs(aWing) > 1.5) {
+      vec2 elbow = vec2(side * ${CROW_ELBOW_X.toFixed(1)}, 0.0);
+      float b = -side * uWingFlap.y;
+      q.xy = elbow + mat2(cos(b), sin(b), -sin(b), cos(b)) * (q.xy - elbow);
+    }
+    float a = -side * uWingFlap.x;
+    q.xy = mat2(cos(a), sin(a), -sin(a), cos(a)) * q.xy;
+    transformed = shoulder + q;
+  }
+}
+`
+
+// Dark iridescent silhouette on the pale sky + a blue-grey rim sheen so crows
+// also read against the hazy horizon and the red mesas.
 const CROW_RIM = { color: '#a8bce0', intensity: 0.5, power: 3 }
-export const CROW_BODY_MAT = withRim(new THREE.MeshPhysicalMaterial({
-  color: '#1c1c30',
-  metalness: 0.15,
-  roughness: 0.6,
-  iridescence: 0.4,
-  iridescenceIOR: 1.3,
-  iridescenceThicknessRange: [200, 400],
-  flatShading: true,
-}), CROW_RIM)
 
-export const CROW_WING_MAT = withRim(new THREE.MeshPhysicalMaterial({
-  color: '#18182a',
-  metalness: 0.2,
-  roughness: 0.55,
-  iridescence: 0.5,
-  iridescenceIOR: 1.3,
-  iridescenceThicknessRange: [200, 500],
-  flatShading: true,
-}), CROW_RIM)
+export function patchCrowWingVertex(vertexShader: string): string {
+  return vertexShader
+    .replace('#include <common>', `#include <common>\n${CROW_WING_PARS}`)
+    .replace('#include <begin_vertex>', `#include <begin_vertex>\n${CROW_WING_FLAP}`)
+}
 
-export const CROW_BREAST_MAT = withRim(new THREE.MeshPhysicalMaterial({
-  color: '#2a2a3e',
-  metalness: 0.1,
-  roughness: 0.7,
-  iridescence: 0.3,
-  iridescenceIOR: 1.3,
-  iridescenceThicknessRange: [200, 400],
-  flatShading: true,
-}), CROW_RIM)
+/** One crow's feathers, flapping by `flap` (inner, outer radians); every instance shares one program. */
+export function createCrowFeatherMaterial(flap: { value: THREE.Vector2 }): THREE.MeshPhysicalMaterial {
+  const material = withRim(new THREE.MeshPhysicalMaterial({
+    vertexColors: true,
+    metalness: 0.15,
+    roughness: 0.6,
+    iridescence: 0.4,
+    iridescenceIOR: 1.3,
+    iridescenceThicknessRange: [200, 400],
+    flatShading: true,
+  }), CROW_RIM)
+  const rimCompile = material.onBeforeCompile
+  material.onBeforeCompile = (shader, renderer) => {
+    rimCompile(shader, renderer)
+    shader.uniforms.uWingFlap = flap
+    shader.vertexShader = patchCrowWingVertex(shader.vertexShader)
+  }
+  material.customProgramCacheKey = () => 'sc-enemy-rim-v2-crow-wing'
+  return material
+}
 
-export const CROW_HEAD_MAT = withRim(new THREE.MeshPhysicalMaterial({
-  color: '#1e1e30',
-  metalness: 0.15,
-  roughness: 0.6,
-  iridescence: 0.35,
-  iridescenceIOR: 1.3,
-  iridescenceThicknessRange: [200, 400],
-  flatShading: true,
-}), CROW_RIM)
-
-export const CROW_BEAK_MAT = withRim(
-  new THREE.MeshPhongMaterial({ color: '#d8a028', specular: '#ffe08a', shininess: 40, flatShading: true }),
-  CROW_RIM,
-)
-
-export const CROW_TAIL_MAT = withRim(new THREE.MeshPhysicalMaterial({
-  color: '#1c1c30',
-  metalness: 0.15,
-  roughness: 0.6,
-  iridescence: 0.4,
-  iridescenceIOR: 1.3,
-  iridescenceThicknessRange: [200, 400],
-  flatShading: true,
-}), CROW_RIM)
+/** Only for ShaderWarmup: crows build their own instances. */
+export const CROW_FEATHER_MAT = createCrowFeatherMaterial({ value: new THREE.Vector2() })
 
 export const CROW_EYE_MAT = new THREE.MeshStandardMaterial({
   color: '#ffcc00',
@@ -218,47 +252,80 @@ export const CROW_EYE_MAT = new THREE.MeshStandardMaterial({
   toneMapped: false,
 })
 
-// ── Scorpion (~22 primitives) ───────────────────────────────────────
-export const SCORPION_BODY_GEO = new THREE.BoxGeometry(3, 1.5, 3.5)        // cephalothorax (front)
-export const SCORPION_BODY_REAR_GEO = new THREE.BoxGeometry(2.5, 1.2, 3)    // mesosoma (rear)
-export const SCORPION_HEAD_GEO = new THREE.SphereGeometry(1.8, 6, 6)
-export const SCORPION_EYE_GEO = new THREE.SphereGeometry(0.35, 5, 5)
-export const SCORPION_PINCER_GEO = new THREE.BoxGeometry(1.2, 0.8, 3)
-export const SCORPION_CLAW_GEO = new THREE.SphereGeometry(0.5, 5, 5)
-export const SCORPION_TAIL_GEO = new THREE.SphereGeometry(0.7, 5, 5)
-export const SCORPION_STINGER_GEO = new THREE.ConeGeometry(0.6, 2, 4)
-export const SCORPION_LEG_UPPER_GEO = new THREE.CylinderGeometry(0.25, 0.22, 1.5, 4)
-export const SCORPION_LEG_LOWER_GEO = new THREE.CylinderGeometry(0.22, 0.15, 1.8, 4)
+// ── Scorpion: merged shell + swaying tail + glowing stinger ─────────
 
-// Dark plum-black chitin ("dark on gold") with bright amber leg highlights.
+// Dark plum-black chitin ("dark on gold") with bright amber legs.
 // The old amber/brown body sat at ΔE≈9 from the desert cliff colour.
+const SCORPION_BODY_COLOR = '#2a1626'
+const SCORPION_HEAD_COLOR = '#24121e'
+const SCORPION_PINCER_COLOR = '#3a1622'
+const SCORPION_LEG_COLOR = '#e0701e'
+
+function scorpionPincer(side: number): THREE.BufferGeometry[] {
+  const arm = pose([side * 2, 0.3, 3.5], [0, side * 0.5, 0])
+  const at = (p: [number, number, number], r?: [number, number, number], s?: [number, number, number]) =>
+    arm.clone().multiply(pose(p, r, s))
+  const box = () => new THREE.BoxGeometry(1.2, 0.8, 3)
+  const tip = () => new THREE.SphereGeometry(0.5, 5, 5)
+  return [
+    paintedAt(box(), SCORPION_PINCER_COLOR, at([0, 0, 1.5])),
+    paintedAt(box(), SCORPION_PINCER_COLOR, at([-0.4, 0, 3.2], [0, -0.3, 0], [0.5, 1, 0.6])),
+    paintedAt(box(), SCORPION_PINCER_COLOR, at([0.4, 0, 3.2], [0, 0.3, 0], [0.5, 1, 0.6])),
+    // Rounded claw tips
+    paintedAt(tip(), SCORPION_PINCER_COLOR, at([-0.6, 0, 3.8])),
+    paintedAt(tip(), SCORPION_PINCER_COLOR, at([0.6, 0, 3.8])),
+  ]
+}
+
+/** Two-segment leg: upper angled outward and down, lower bent further at the knee. */
+function scorpionLeg(side: number, z: number): THREE.BufferGeometry[] {
+  const hip = pose([side * 2.2, -0.2, z]).multiply(pose([0, 0, 0], [0, 0, side * 0.5]))
+  const knee = hip.clone().multiply(pose([side * 1.2, -1, 0], [0, 0, side * 0.6]))
+  return [
+    paintedAt(
+      new THREE.CylinderGeometry(0.25, 0.22, 1.5, 4),
+      SCORPION_LEG_COLOR,
+      hip.multiply(pose([side * 0.5, -0.4, 0], [0, 0, side * 0.3])),
+    ),
+    paintedAt(new THREE.CylinderGeometry(0.22, 0.15, 1.8, 4), SCORPION_LEG_COLOR, knee.multiply(pose([side * 0.3, -0.6, 0]))),
+  ]
+}
+
+export const SCORPION_GEO = mergePainted([
+  // Cephalothorax (front) and mesosoma (rear, overlapping slightly)
+  painted(new THREE.BoxGeometry(3, 1.5, 3.5), SCORPION_BODY_COLOR, [0, 0, 1]),
+  painted(new THREE.BoxGeometry(2.5, 1.2, 3), SCORPION_BODY_COLOR, [0, -0.1, -1.2]),
+  painted(new THREE.SphereGeometry(1.8, 6, 6), SCORPION_HEAD_COLOR, [0, 0.3, 3.5]),
+  painted(new THREE.SphereGeometry(0.35, 5, 5), '#111111', [-0.7, 1, 4]),
+  painted(new THREE.SphereGeometry(0.35, 5, 5), '#111111', [0.7, 1, 4]),
+  ...scorpionPincer(-1),
+  ...scorpionPincer(1),
+  ...[-1, 1].flatMap((side) => [1.5, 0.5, -0.5, -1.5].flatMap((z) => scorpionLeg(side, z))),
+])
+
+export const SCORPION_TAIL_PIVOT: [number, number, number] = [0, 0.5, -2.5]
+
+// Chain of spheres curling up and over
+export const SCORPION_TAIL_GEO = mergeGeometries(
+  [[0, 0.5, 0], [0, 1.5, -0.3], [0, 2.8, -0.2], [0, 3.8, 0.3], [0, 4.5, 1.0]].map(([x, y, z]) =>
+    new THREE.SphereGeometry(0.7, 5, 5).translate(x, y, z),
+  ),
+)
+export const SCORPION_STINGER_GEO = new THREE.ConeGeometry(0.6, 2, 4).rotateX(0.5).translate(0, 4.8, 1.8)
+
 const SCORPION_RIM = { color: '#ffd9a0', intensity: 0.7, power: 2.2 }
-export const SCORPION_BODY_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#2a1626',
+export const SCORPION_SHELL_MAT = withRim(new THREE.MeshPhongMaterial({
+  vertexColors: true,
   specular: '#c89a70',
   shininess: 50,
   flatShading: true,
 }), SCORPION_RIM)
-export const SCORPION_HEAD_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#24121e',
+export const SCORPION_TAIL_MAT = withRim(new THREE.MeshPhongMaterial({
+  color: SCORPION_HEAD_COLOR,
   specular: '#b8906a',
   shininess: 45,
   flatShading: true,
 }), SCORPION_RIM)
-export const SCORPION_PINCER_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#3a1622',
-  specular: '#d0a070',
-  shininess: 55,
-  flatShading: true,
-}), SCORPION_RIM)
-export const SCORPION_LEG_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#e0701e',
-  emissive: '#5a1c00',
-  specular: '#ffd090',
-  shininess: 40,
-  flatShading: true,
-}), SCORPION_RIM)
-export const SCORPION_EYE_MAT = new THREE.MeshPhongMaterial({ color: '#111111', flatShading: true })
 export const SCORPION_STINGER_MAT = new THREE.MeshStandardMaterial({
   color: '#ff4422',
   emissive: '#ff2200',
