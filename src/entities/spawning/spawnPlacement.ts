@@ -379,6 +379,56 @@ function formationHeading(formation: ChoreographedFormation, f: FormationFrame):
   }
 }
 
+/** Scattered over the map, ground enemies were rarely in view (#179); `ahead` spans ~8–25 s at Antarctica's slowest. */
+export const TRACKSIDE = { aheadMin: 700, aheadMax: 2200, sideMin: 60, sideMax: 400 }
+
+export function placedBesideTrack(type: EnemyType): boolean {
+  switch (type) {
+    case 'snowman':
+    case 'snowmanScout':
+    case 'snowmanBrute':
+    case 'lavaGolem':
+    case 'fireImp':
+      return true
+    default:
+      return false
+  }
+}
+
+export interface TracksideSlot {
+  /** Arc distance past the rider. */
+  ahead: number
+  /** Signed horizontal offset to the right of the track. */
+  side: number
+}
+
+export function tracksideSlots(count: number, rng: Rng): TracksideSlot[] {
+  const { aheadMin, aheadMax, sideMin, sideMax } = TRACKSIDE
+  return Array.from({ length: count }, () => {
+    const ahead = rng.range(aheadMin, aheadMax)
+    const side = rng.range(sideMin, sideMax) * (rng() < 0.5 ? -1 : 1)
+    return { ahead, side }
+  })
+}
+
+export interface PlaceTracksideInput {
+  table: ArcTable
+  riderIndex: number
+  camera: Vec3
+  groundFn: HeightFunction
+  slots: readonly TracksideSlot[]
+}
+
+export function placeTracksideWave({ table, riderIndex, camera, groundFn, slots }: PlaceTracksideInput): Vec3[] {
+  return slots.map((slot) => {
+    const i = indexAhead(table, riderIndex, slot.ahead)
+    const forward = horizontal(trackTangent(table, i))
+    const x = table.x[i] - forward.z * slot.side
+    const z = table.z[i] + forward.x * slot.side
+    return outsideNearField(settle({ x, y: 0, z }, 'ground', groundFn), camera)
+  })
+}
+
 /** Point on an entry path at `t` (0–1, eased out); `spin` unwinds the horizontal offset around `from`. */
 export function entryPoint(out: Vec3, from: Vec3, to: Vec3, t: number, spin: number): Vec3 {
   const u = Math.min(Math.max(t, 0), 1)

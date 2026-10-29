@@ -5,26 +5,27 @@ import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
 import { buildArcTable } from '@/track/arcLength'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
-import type { Formation } from '@/types/level'
+import type { EnemyWave, Formation, LevelConfig } from '@/types/level'
 import {
-  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, WATER_Y, enemySurface, entryPoint, formationFrame, formationSlots,
-  indexAhead, nearestTrackIndex, outsideNearField, placeFormationWave, slotOffset, trackPoint, trackTangent,
-  type ChoreographedFormation, type Vec3,
+  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, TRACKSIDE, WATER_Y, enemySurface, entryPoint, formationFrame, formationSlots,
+  indexAhead, nearestTrackIndex, outsideNearField, placeFormationWave, placeTracksideWave, placedBesideTrack, slotOffset,
+  trackPoint, trackTangent, tracksideSlots, type ChoreographedFormation, type Vec3,
 } from './spawnPlacement'
 
 const choreographed = (f: Formation | undefined): f is ChoreographedFormation => !!f && f !== 'scatter'
+const besideTrack = (w: EnemyWave) => !choreographed(w.formation) && placedBesideTrack(w.type)
 
-/** Every level that has a formation wave, with its real track and drawn terrain. */
-const worlds = getAllLevels()
-  .filter((l) => l.enemies.some((w) => choreographed(w.formation)))
-  .map((level) => {
-    const factory = level.track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve
-    const curve = factory(level.track.varA, level.track.varB, level.track.varC, level.track.scalar)
-    const table = buildArcTable(curve)
-    const heightFn = createHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
-    const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize(level.biome))
-    return { level, table, groundFn }
-  })
+function world(level: LevelConfig) {
+  const factory = level.track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve
+  const curve = factory(level.track.varA, level.track.varB, level.track.varC, level.track.scalar)
+  const table = buildArcTable(curve)
+  const heightFn = createHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
+  const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize(level.biome))
+  return { level, table, groundFn }
+}
+
+const worlds = getAllLevels().filter((l) => l.enemies.some((w) => choreographed(w.formation))).map(world)
+const tracksideWorlds = getAllLevels().filter((l) => l.enemies.some(besideTrack)).map(world)
 
 const RIDER_FRACTIONS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 const dist = (a: Vec3, b: Vec3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
@@ -136,6 +137,55 @@ describe('level3 school', () => {
       }
     }
     expect(wet / total).toBeGreaterThan(0.95)
+  })
+})
+
+describe('tracksideSlots', () => {
+  it('is deterministic per seed and differs between seeds', () => {
+    expect(tracksideSlots(20, createRng(1337))).toEqual(tracksideSlots(20, createRng(1337)))
+    expect(tracksideSlots(20, createRng(1337))).not.toEqual(tracksideSlots(20, createRng(1338)))
+  })
+
+  it('puts slots on both sides, inside the ahead and lateral bands', () => {
+    const slots = tracksideSlots(200, createRng(3))
+    expect(slots.some((s) => s.side < 0) && slots.some((s) => s.side > 0)).toBe(true)
+    for (const s of slots) {
+      expect(s.ahead).toBeGreaterThanOrEqual(TRACKSIDE.aheadMin)
+      expect(s.ahead).toBeLessThanOrEqual(TRACKSIDE.aheadMax)
+      expect(Math.abs(s.side)).toBeGreaterThanOrEqual(TRACKSIDE.sideMin)
+      expect(Math.abs(s.side)).toBeLessThanOrEqual(TRACKSIDE.sideMax)
+    }
+  })
+})
+
+describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s trackside waves', (_id, { level, table, groundFn }) => {
+  const waves = level.enemies.filter(besideTrack)
+
+  it.each(waves.map((w) => [w.type, w] as const))('%s: ahead of the rider along the track and mostly in front in plan, beside the rails, on the ground, outside the near field', (_name, wave) => {
+    const slots = tracksideSlots(wave.count, createRng(1337))
+    let inFront = 0
+    let total = 0
+    for (const fraction of RIDER_FRACTIONS) {
+      const riderIndex = Math.round(fraction * (table.count - 1))
+      const camera = trackPoint(table, riderIndex)
+      const forward = trackTangent(table, riderIndex)
+      const placed = placeTracksideWave({ table, riderIndex, camera, groundFn, slots })
+      expect(placed).toHaveLength(wave.count)
+      placed.forEach((p, i) => {
+        const anchor = indexAhead(table, riderIndex, slots[i].ahead)
+        const arc = (table.s[anchor] - table.s[riderIndex] + table.length) % table.length
+        expect(arc).toBeGreaterThan(TRACKSIDE.aheadMin - 10)
+        expect(arc).toBeLessThan(TRACKSIDE.aheadMax + 10)
+        const lateral = Math.hypot(p.x - table.x[anchor], p.z - table.z[anchor])
+        expect(lateral).toBeGreaterThan(TRACKSIDE.sideMin - 1)
+        expect(lateral).toBeLessThan(TRACKSIDE.sideMax + 1)
+        expect(p.y).toBeGreaterThan(groundFn(p.x, p.z))
+        expect(dist(p, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
+        total++
+        if ((p.x - camera.x) * forward.x + (p.z - camera.z) * forward.z > 0) inFront++
+      })
+    }
+    expect(inFront / total).toBeGreaterThan(0.75)
   })
 })
 

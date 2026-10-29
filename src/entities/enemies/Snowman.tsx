@@ -12,10 +12,6 @@ import {
   SNOWMAN_ARM_GEO, SNOWMAN_ARM_MAT, SNOWMAN_TWIG_GEO, SNOWMAN_TWIG_MAT,
 } from './SharedEnemyAssets'
 
-/**
- * Standard snowman with coal eyes, carrot nose, buttons, and stick arms.
- * Orbit + sinusoidal Y bobbing.
- */
 export default function Snowman(props: EnemyProps) {
   const theta = useMemo(() => 0.5 + Math.random() * 1.5, [])
   const moveSpeed = useMemo(() => 1.5 + Math.random() * 1.5, [])
@@ -31,7 +27,7 @@ export default function Snowman(props: EnemyProps) {
       const dt = delta * 60
       mesh.position.z += ((moveSpeed * Math.cos(time * theta)) / theta) * dt
       mesh.position.x += ((moveSpeed * Math.sin(time * theta)) / theta) * dt
-      mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 20
+      mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 26
 
       if (bodyRef.current) bodyRef.current.rotation.z = Math.sin(time * 3) * 0.06
       if (leftArmRef.current) leftArmRef.current.rotation.x = Math.sin(time * 3) * 0.15
@@ -50,7 +46,7 @@ export default function Snowman(props: EnemyProps) {
 
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
-      <group ref={modelRef} scale={[1, 1, 1]}>
+      <group ref={modelRef} scale={[1.3, 1.3, 1.3]}>
         <group ref={bodyRef}>
           {/* Body */}
           <mesh position={[0, 0, 0]} geometry={SNOWMAN_BOTTOM_GEO} material={SNOWMAN_MAT} />
