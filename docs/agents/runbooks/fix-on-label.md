@@ -17,6 +17,8 @@ pressed Run now), reply "No PR event — nothing to do" and stop.
    `Backing off — already claimed by another run` and stop.
 4. Read `.claude/agents/builder.md` and carry it out yourself. Your assignment: PR #<n>,
    returned by QA — address every QA comment. Your claim above is the builder claim.
+   If the issue the PR closes is labelled `type:audio`, read
+   `.claude/agents/sound-designer.md` too and work as the Sound designer.
 5. Finish with the PR labelled `agent:needs-qa` (that label starts a QA review
    automatically). If you can't, comment on the PR what's blocking and leave it
    labelled `agent:changes-requested` for the next scheduled builder run.

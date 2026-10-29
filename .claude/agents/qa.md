@@ -52,6 +52,12 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
    - Perf: draw calls / triangles vs `main` in `results.json`; instancing used for repeats.
    - Architecture: fits existing patterns, no dead code, no duplicated systems, types sound.
    - Docs updated when structure/behaviour changed.
+   - **Audio PRs** (`type:audio`, or anything under `src/audio/`): the PR has a **How to
+     listen** section, and its renders are committed in `docs/audio/renders/`. The
+     measurements are inside the targets in `docs/audio/SOUND-BIBLE.md` (or the gap is
+     explained). Read the spectrograms it changed. Every score compiles with no bar-count
+     errors. A level's first new theme is not wired in as the default without Alex's pick
+     (a closed `Listen:` issue). Tone.js removal happens only at parity (hard rule 7).
    - Tests: for each test the PR adds, is there a plausible wrong version of the change
      it would catch? Tests that only cover untouched or happy-path behaviour should be
      cut; pure logic the PR adds (scoring, curves, timing) should be tested.

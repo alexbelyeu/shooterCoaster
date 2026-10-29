@@ -25,6 +25,10 @@ Work through these in order; stop early only if something is on fire.
    - Open PRs labelled `agent:needs-qa` that conflict with `main` → merge `origin/main` into the branch, resolve, re-verify,
      push normally (never rebase/force-push).
    - Draft PRs from blocked builders → make sure the issue is `agent:blocked` with a clear reason.
+   - Issues labelled `agent:blocked` whose body or latest comment says `Waiting on #<n>`:
+     if every issue or PR they wait on is closed (merged, or a `Listen:` issue Alex has
+     closed with his pick), swap `agent:blocked` → `agent:ready` and comment
+     `Unblocked: #<n> is done` (quote Alex's closing comment if it has one).
 4. **Fold the decisions inbox** (skip if `docs/agents/decisions/inbox/` holds only its
    README, or if an earlier fold PR is still open): append every inbox entry
    to the bottom of `docs/agents/DECISIONS.md` in date order (filename order), as
