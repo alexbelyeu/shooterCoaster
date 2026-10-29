@@ -163,6 +163,19 @@ export interface SCTestApi {
   bossHit: (n: number) => number
   /** Counts of 'boss:spawn' / 'boss:hit' / 'boss:defeated' since load. */
   bossEvents: { spawn: number; hit: number; defeated: number }
+  // ── Combo-streak fireworks (issue #182) ──
+  /** The level's firework pool (theme park only): mounted?, launches / bursts since mount, live now, the newest burst on screen. */
+  fireworks: () => E2EFireworks
+}
+
+export interface E2EFireworks {
+  mounted: boolean
+  launched: number
+  bursts: number
+  rocketsLive: number
+  burstsLive: number
+  /** Newest burst's centre in CSS px, onScreen = inside the canvas and in front of the camera. */
+  lastBurst: { x: number; y: number; onScreen: boolean } | null
 }
 
 export type E2EBossStage = 'none' | 'waiting' | 'incoming' | 'active' | 'defeated' | 'done'
@@ -298,6 +311,29 @@ export const e2eBullets = {
   maxScreenFrac: 0,
   hasNewest: false,
   newest: new THREE.Vector3(),
+}
+
+/** Written by `effects/Fireworks.tsx` when the e2e flag is on; read through `fireworks()`. */
+export const e2eFireworks = {
+  mounted: false,
+  launched: 0,
+  bursts: 0,
+  rocketsLive: 0,
+  burstsLive: 0,
+  hasLast: false,
+  last: new THREE.Vector3(),
+}
+
+function readFireworks(): E2EFireworks {
+  const f = e2eFireworks
+  let lastBurst: E2EFireworks['lastBurst'] = null
+  if (f.hasLast && probeCamera) {
+    _v.copy(f.last).project(probeCamera)
+    const onScreen = _v.z < 1 && Math.abs(_v.x) <= 1 && Math.abs(_v.y) <= 1
+    lastBurst = { x: ((_v.x + 1) / 2) * probeSize.width, y: ((1 - _v.y) / 2) * probeSize.height, onScreen }
+  }
+  const { mounted, launched, bursts, rocketsLive, burstsLive } = f
+  return { mounted, launched, bursts, rocketsLive, burstsLive, lastBurst }
 }
 
 function readBullets(): E2EBullets {
@@ -562,6 +598,7 @@ export function installE2EApi() {
     boss: readBoss,
     bossHit,
     bossEvents: { spawn: 0, hit: 0, defeated: 0 },
+    fireworks: readFireworks,
   }
   eventBus.on('boss:spawn', () => { api.bossEvents.spawn += 1 })
   eventBus.on('boss:hit', () => { api.bossEvents.hit += 1 })
