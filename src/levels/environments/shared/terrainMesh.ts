@@ -91,8 +91,11 @@ export function addTerrainGlow(geo: THREE.BufferGeometry, glow: TerrainGlow): vo
   geo.setAttribute('glow', new THREE.BufferAttribute(amounts, 1))
 }
 
-/** Flat-shaded vertex-coloured terrain; with `glow`, adds emissive scaled by the `glow` attribute. Caller disposes. */
-export function createTerrainMaterial(glow?: TerrainGlow): THREE.MeshPhongMaterial {
+/**
+ * Flat-shaded vertex-coloured terrain (also the volcano's rock); with `glow`, adds
+ * `glow.color * glow.intensity` scaled by the `glow` vertex attribute as emissive. Caller disposes.
+ */
+export function createTerrainMaterial(glow?: Pick<TerrainGlow, 'color' | 'intensity'>): THREE.MeshPhongMaterial {
   const material = new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true })
   if (!glow) return material
 

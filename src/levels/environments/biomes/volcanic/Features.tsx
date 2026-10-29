@@ -19,9 +19,9 @@ export default function VolcanicFeatures({ heightFn, atmosphere, fogRef }: Biome
   const fogPulseRef = useRef({ active: false, startTime: 0 })
   const emberBoostRef = useRef(0)
 
-  // Lava shader material — animated procedural molten rock
-  const lavaRiverMat = useMemo(() => createLavaMaterial(0.08, 1.2), [])
-  const lavaFlowMat = useMemo(() => createLavaMaterial(0.12, 1.5), [])
+  // Animated molten rock; bright enough that the hot cracks pass the Bloom threshold
+  const lavaRiverMat = useMemo(() => createLavaMaterial(0.08, 1.7), [])
+  const lavaFlowMat = useMemo(() => createLavaMaterial(0.12, 1.8), [])
 
   const lavaRiverGeos = useMemo(() => createLavaRiverGeometries(heightFn), [heightFn])
 

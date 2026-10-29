@@ -1,0 +1,5 @@
+## 2026-10-29 — Dark levels read by emissive edges, not exposure (Builder, #180)
+
+**Context:** Inferno was a black cone on dark red with a dotted yellow line beside the track. The line was a lava river: its UVs ran 0..1 along 2 km, so the lava shader's crust cells were 500 units long and their cracks drew one long yellow line that aliased into dots.
+**Decision:** Lava strips (rivers, volcano streaks) use `uv.x` 0..1 across and `uv.y` = distance along in strip widths, and `LavaShader` fades its crack pattern to an average heat once a cell is a few pixels wide (`fwidth`). The volcano is one vertex-coloured rock mesh with a baked `glow` attribute (reusing `createTerrainMaterial`): HDR crater lip, dim red upper slopes. `TrackParams.glow` adds the track's own (squared, ≈ linear) vertex colours as emissive, so a bright `color2` spine and ties glow while dark rails stay dark. The volcanic grade and sky are unchanged.
+**Consequences:** New lava geometry must follow the UV convention or the stripe comes back. Other dark levels can opt in with `track.glow`; it changes the track's shader program (`track-glow` cache key), which `ShaderWarmup` compiles with the level.

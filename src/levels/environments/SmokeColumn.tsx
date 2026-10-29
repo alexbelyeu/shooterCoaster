@@ -66,8 +66,8 @@ const fragmentShader = /* glsl */ `
     float body = 1.0 - smoothstep(0.25, 1.0, r - n * 0.45);
     float density = body * clamp(0.75 + n * 1.5, 0.0, 1.0);
 
-    // Lit from below by the crater, fading to ash grey above (kept dim so bloom ignores it)
-    vec3 col = mix(uGlowColor, uSmokeColor, smoothstep(0.0, 0.45, vColumnT));
+    // Lit from below by the crater, fading to ash grey above (kept under the Bloom threshold)
+    vec3 col = mix(uGlowColor, uSmokeColor, smoothstep(0.05, 0.6, vColumnT));
     col *= 0.75 + 0.6 * n;
 
     gl_FragColor = vec4(col, density * uOpacity);
@@ -129,7 +129,7 @@ export default function SmokeColumn({ puffs }: SmokeColumnProps) {
       {
         uTime: { value: 0 },
         uSmokeColor: { value: new THREE.Color(0x4a3833) },
-        uGlowColor: { value: new THREE.Color(0xb8461a) },
+        uGlowColor: { value: new THREE.Color(0xe0581c) },
         uOpacity: { value: 0.95 },
       },
     ]),

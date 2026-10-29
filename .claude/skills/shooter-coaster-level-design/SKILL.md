@@ -55,7 +55,7 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 | `src/levels/environments/atmosphere.ts` | Per-biome sky/sun/hemisphere/fog config and post colour `grade` (`ATMOSPHERES`; the grade is applied by `src/canvas/post/ColourGradeEffect.ts`) |
 | `src/levels/environments/SkyDome.tsx` | Procedural sky dome shader (gradient, sun, fbm clouds), follows camera |
 | `src/levels/environments/LavaShader.ts` | Procedural GLSL lava material (domain warping + Voronoi) |
-| `src/levels/environments/Volcano.tsx` | Volcano landmark component |
+| `src/levels/environments/Volcano.tsx` | Volcano landmark component; shapes in pure `volcanoGeometry.ts` (rock + rim with a baked `glow` attribute, lava streaks) |
 | `src/audio/MusicManager.ts` | Per-biome music configs |
 | `src/canvas/SceneManager.tsx` | Wires config to spawner + environment |
 
@@ -123,7 +123,9 @@ See `biomes/volcanic/lavaRivers.ts` for the full working example.
 See `src/levels/environments/LavaShader.ts` for the full working example:
 - `createLavaMaterial(flowSpeed, intensity)` factory returns a `ShaderMaterial`
 - Caller drives `uTime` uniform in `useFrame`
-- Two instances: rivers (flow 0.08, intensity 1.2) and volcano flows (flow 0.12, intensity 1.5)
+- Two instances: rivers (flow 0.08, intensity 1.7) and volcano streaks (flow 0.12, intensity 1.8)
+- **UVs: `uv.x` 0..1 across the strip, `uv.y` = distance along it in strip widths** (see `lavaRivers.ts`, `volcanoGeometry.ts`). A 0..1 `uv.y` over a long strip stretches the crust cells into one bright line that aliases into a dotted yellow streak
+- Far away the shader fades its cracks to an average heat (`fwidth`), so distant lava is a solid orange band instead of sparkle
 
 ## Workflow: Adding a New Level
 

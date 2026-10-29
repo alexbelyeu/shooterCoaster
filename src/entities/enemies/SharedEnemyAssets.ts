@@ -692,7 +692,7 @@ export const EMBER_WISP_CORE_MAT = withRim(new THREE.MeshPhongMaterial({
   emissive: '#ff3300',
   emissiveIntensity: 0.8,
   flatShading: true,
-}), { color: '#ffd080', intensity: 0.7 })
+}), { color: '#ffd080', intensity: 1.1 })
 export const EMBER_WISP_TENDRIL_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#ffaa00',
   emissive: '#ff6600',
@@ -720,7 +720,8 @@ export const LAVA_GOLEM_ARM_GEO = new THREE.BoxGeometry(2, 8, 2)
 export const LAVA_GOLEM_EYE_GEO = new THREE.SphereGeometry(0.8, 6, 6)
 
 // Ash-grey basalt (old #4a2a10 was ΔE≈6 from the volcanic terrain) with a lava rim
-const VOLCANIC_RIM = { color: '#ff9a50', intensity: 0.8, power: 2.2 }
+// Strong rim: Inferno is the darkest biome, so its enemies read by their edges
+const VOLCANIC_RIM = { color: '#ffb070', intensity: 1.2, power: 2.0 }
 export const LAVA_GOLEM_BODY_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#5c5450',
   specular: '#ff8844',
