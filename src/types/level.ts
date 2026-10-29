@@ -39,6 +39,7 @@ export interface FormationOrigin {
 export interface EnemyWave {
   type: EnemyType
   count: number
+  /** Level-timer seconds, whole: the stored timer the spawner reads only changes once a second. */
   spawnDelay?: number
   waveLabel?: string
   isEruption?: boolean

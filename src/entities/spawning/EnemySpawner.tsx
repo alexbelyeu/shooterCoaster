@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef, useContext } from 'react'
-import { useThree } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { EnemyType, EnemyWave, LevelConfig } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
@@ -32,6 +32,7 @@ import {
   formationSlots, nearestTrackIndex, outsideNearField, placeFormationWave, placeTracksideWave, placedBesideTrack,
   trackPoint, tracksideSlots, type FormationSlot, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
+import { newWaveProgress, tickWaves } from './waveSchedule'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -41,8 +42,9 @@ interface EnemySpawnerProps {
   trackTable: ArcTable
   /** Terrain as drawn, not `heightFn`. */
   groundFn: HeightFunction
-  /** The level's finale, timed on the level timer of `timerSeconds`. */
+  /** The level's finale. */
   boss?: LevelConfig['boss']
+  /** The level timer, which waves and the boss run on. */
   timerSeconds: number
 }
 
@@ -273,8 +275,6 @@ const EXPLOSION_COLORS = ['#ff4444', '#ffaa00', '#ffffff', '#44aaff', '#00ff88']
 
 const toVector3 = (p: Vec3) => new THREE.Vector3(p.x, p.y, p.z)
 
-const WAVE_TELL_MS = 1000
-
 export default function EnemySpawner({
   waves,
   goldenBalloonCount = 0,
@@ -355,7 +355,7 @@ export default function EnemySpawner({
   const [waveAnnouncement, setWaveAnnouncement] = useState<string | null>(
     phase === 'playing' ? waves[0]?.waveLabel ?? null : null,
   )
-  const waveTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const waveProgress = useRef(newWaveProgress(waves.length))
   const slowMoResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const killedEnemies = useRef(new Set<string>())
@@ -376,6 +376,7 @@ export default function EnemySpawner({
       setActiveWaveIndex(initialActiveWave)
       setPlacements(initialPlacements)
       setWaveAnnouncement(phase === 'playing' ? waves[0]?.waveLabel ?? null : null)
+      waveProgress.current = newWaveProgress(waves.length)
       killedEnemies.current.clear()
       setGeneration((g) => g + 1)
     }
@@ -417,30 +418,17 @@ export default function EnemySpawner({
     [getThree, trackTable, enemies, placeWave, waves],
   )
 
-  useEffect(() => {
-    if (phase !== 'playing') return
-
-    const timers: ReturnType<typeof setTimeout>[] = []
-    for (let i = 0; i < waves.length; i++) {
-      const delay = (waves[i].spawnDelay ?? 0) * 1000
-      if (delay > 0) {
-        const label = waves[i].waveLabel
-        timers.push(setTimeout(() => eventBus.emit('wave:incoming', label), Math.max(0, delay - WAVE_TELL_MS)))
-        timers.push(setTimeout(() => activateWave(i), delay))
-      }
-    }
-    waveTimers.current = timers
-
-    return () => {
-      timers.forEach(clearTimeout)
-      waveTimers.current = []
-    }
-  }, [phase, waves, activateWave])
+  const waveDelays = useMemo(() => waves.map((w) => w.spawnDelay ?? 0), [waves])
+  const tellWave = useCallback((i: number) => eventBus.emit('wave:incoming', waves[i].waveLabel), [waves])
+  // On the level timer like the boss, so a pause holds them; the rendered phase keeps a restart from reading the last run's timer.
+  useFrame(() => {
+    const s = useGameStore.getState()
+    if (phase !== 'playing' || s.phase !== 'playing') return
+    tickWaves(waveDelays, timerSeconds - s.timeRemaining, waveProgress.current, tellWave, activateWave)
+  })
 
   useEffect(() => {
     return () => {
-      waveTimers.current.forEach(clearTimeout)
-      waveTimers.current = []
       if (slowMoResetTimer.current) clearTimeout(slowMoResetTimer.current)
       slowMoResetTimer.current = null
       killedEnemies.current.clear()

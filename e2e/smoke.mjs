@@ -27,7 +27,7 @@
  * and requires the same spawnDigest() for that seed and a different one for another.
  * The hidden-pause check fakes a tab hide on the first level: it must pause, drop a
  * held trigger, keep the timer still (and a primed combo intact), wait for Resume, then
- * neither reset nor jump it. On the first level the killNearest kills enter the 5× combo
+ * neither reset nor jump it, nor bring back killed enemies. On the first level the killNearest kills enter the 5× combo
  * tier: <id>-combat.png must show the "×5 FRENZY" flash during its slow-mo.
  * `?e2e=1` skips the Ready / Set / GO countdown; the countdown check loads the first level
  * with `&countdown=1`: the countdown must show (countdown.png), ignore a press (also once
@@ -779,10 +779,15 @@ const setHidden = (page, hidden) => page.evaluate((h) => {
   return stats
 }, hidden)
 
-/** Leaving the tab pauses the run and drops the trigger; nothing drains or resets the timer (#118). */
+const waveAnnounces = (page) => page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'announce').length)
+
+/** Leaving the tab pauses the run and drops the trigger; nothing drains or resets the timer (#118), the kills or the enemies (#198). */
 async function hiddenPauseCheck(page, levelId) {
   await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
   await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
+  await page.evaluate(() => window.__SC_TEST__.killNearest(2))
+  await waitFrames(page, 2, { maxMs: 20000 })
+  const announcesBefore = await waveAnnounces(page)
   const vp = page.viewportSize()
   await page.mouse.move(vp.width / 2, vp.height / 2)
   await page.mouse.down()
@@ -808,6 +813,7 @@ async function hiddenPauseCheck(page, levelId) {
   await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
   const resumed = await getStats(page)
   const resumedSeconds = (Date.now() - resumedAt) / 1000
+  const waveArrived = (await waveAnnounces(page)) > announcesBefore
   await page.evaluate(() => window.dispatchEvent(new Event('blur')))
   const blurPhase = await page.evaluate(() => window.__SC_TEST__.phase())
 
@@ -829,6 +835,9 @@ async function hiddenPauseCheck(page, levelId) {
   // timeRemaining is only stored on whole-second crossings, hence the 1 s slack.
   if (resumed.timeRemaining < before.timeRemaining - resumedSeconds - 1)
     problems.push(`timer jumped by the paused time (${before.timeRemaining.toFixed(2)} -> ${resumed.timeRemaining.toFixed(2)} after ${resumedSeconds.toFixed(1)} s of play)`)
+  if (resumed.kills < before.kills) problems.push(`kills reset across the pause (${before.kills} -> ${resumed.kills})`)
+  if (!waveArrived && resumed.liveEnemies > before.liveEnemies)
+    problems.push(`enemies came back across the pause (${before.liveEnemies} -> ${resumed.liveEnemies} live)`)
   if (blurPhase !== 'paused') problems.push(`window blur left the phase "${blurPhase}", not paused`)
   return {
     id: 'hidden-pause',
@@ -840,6 +849,8 @@ async function hiddenPauseCheck(page, levelId) {
       whileHidden: whileHidden.timeRemaining,
       resumed: resumed.timeRemaining,
       resumedSeconds,
+      kills: [before.kills, resumed.kills],
+      liveEnemies: [before.liveEnemies, resumed.liveEnemies],
       combo: [before.combo, whileHidden.combo, pausedStats.combo],
       heldBefore,
       heldAfter,
@@ -890,7 +901,12 @@ async function speedCheck(page, levelId) {
 /** The wave the spawn-choreography check watches arrive: level2's first crow wave, a V (#30). */
 const WAVE_CHECK = { level: 'level2', type: 'crow', label: 'A Murder of Crows!', minOnScreen: 5 }
 
-/** Spawn choreography (#30): the crow wave's tell must lead it, then its V flies in, frozen for `level2-wave.png`. */
+const WAVE_PAUSE_MS = 2000
+
+/**
+ * Spawn choreography (#30): the crow wave's tell must lead it, then its V flies in, frozen for `level2-wave.png`.
+ * The run is paused and resumed between the tell and the wave: the wave must still come, and no tell or wave twice (#198).
+ */
 async function waveCheck(page) {
   const { level, type, label, minOnScreen } = WAVE_CHECK
   const problems = []
@@ -902,6 +918,9 @@ async function waveCheck(page) {
   const tellShown = tell
     ? await page.evaluate(() => ({ pulse: !!document.querySelector('.wave-tell'), text: document.querySelector('.wave-banner-text')?.textContent ?? null }))
     : null
+  await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
+  await page.waitForTimeout(WAVE_PAUSE_MS)
+  await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
   const arrival = await event('announce')
   // The entry takes 1.2–1.8 s of game time.
   await waitFrames(page, 3, { minMs: 2500, maxMs: 30000 })
@@ -917,6 +936,9 @@ async function waveCheck(page) {
   if (!arrival) problems.push(`the "${label}" wave never arrived`)
   const leadS = tell && arrival ? (arrival.ms - tell.ms) / 1000 : null
   if (leadS !== null && leadS < 0.3) problems.push(`the tell came only ${leadS.toFixed(2)} s before the wave`)
+  const events = await page.evaluate(() => window.__SC_TEST__.waveEvents.map((e) => `${e.kind} "${e.label}"`))
+  const repeated = [...new Set(events.filter((e, i) => events.indexOf(e) !== i))]
+  if (repeated.length) problems.push(`wave events fired twice after a pause and Resume: ${repeated.join(', ')}`)
   if (flock.length < minOnScreen) problems.push(`only ${flock.length} ${type}s on screen after the wave flew in (want ≥ ${minOnScreen})`)
   const nearest = flock.reduce((m, e) => Math.min(m, e.distance), Infinity)
   if (nearest < 40) problems.push(`a ${type} is ${nearest.toFixed(0)} units from the camera (near field 40)`)
@@ -1706,7 +1728,8 @@ async function run() {
         ? ` ${r.seedCheck.level} seed ${SEED}: ${r.seedCheck.digest} (reload ${r.seedCheck.reloaded}, again ${r.seedCheck.again}) seed ${SEED + 1}: ${r.seedCheck.other}`
       : r.hiddenPause
         ? ` ${r.hiddenPause.level} timer ${r.hiddenPause.before.toFixed(1)} -> after 5s hidden ${r.hiddenPause.whileHidden.toFixed(1)}` +
-          ` -> ${r.hiddenPause.resumed.toFixed(1)} after ${r.hiddenPause.resumedSeconds.toFixed(0)}s resumed, trigger held ${r.hiddenPause.heldBefore}->${r.hiddenPause.heldAfter}`
+          ` -> ${r.hiddenPause.resumed.toFixed(1)} after ${r.hiddenPause.resumedSeconds.toFixed(0)}s resumed, trigger held ${r.hiddenPause.heldBefore}->${r.hiddenPause.heldAfter},` +
+          ` kills ${r.hiddenPause.kills.join('->')}, live ${r.hiddenPause.liveEnemies.join('->')}`
       : r.countdown
         ? ` ${r.countdown.level} "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
           ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +
