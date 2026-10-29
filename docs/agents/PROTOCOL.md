@@ -26,6 +26,15 @@ on-label tasks handle one PR and carry out `builder.md` / `qa.md` themselves, so
 bootstrap isn't paid twice. Every run ends by logging its token use to the
 `token-ledger` issue (`scripts/run-usage.cjs`).
 
+**Sound designer.** `type:audio` issues go to the Sound designer
+(`.claude/agents/sound-designer.md`) instead of a plain builder. It is a role, not a
+scheduled task: the Builders dispatcher and Fix (on label) hand it audio work. It follows
+`builder.md` for process and adds composing, rendering and measuring sound
+(`docs/audio/SOUND-BIBLE.md`). No agent can hear, so audio PRs commit short renders to
+`docs/audio/renders/` for Alex. The first new theme for each level waits for his pick in a
+`needs-alex` `Listen:` issue; the issue that wires it in stays `agent:blocked` with
+`Waiting on #<n>` until the Maintainer sees the listening issue closed.
+
 Throughput is tuned with the knobs in STEERING.md (`builder_parallelism`,
 `qa_parallelism`), not by changing schedules. Max plan budget: 15 scheduled runs per
 day per account; this loop uses ~7 (9 on Mondays).
@@ -73,6 +82,7 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 - `epic` — umbrella issue the Director breaks into `agent:ready` children. Never claimed by builders.
 - `studio-status` — the live status page issue (see above). Not work; never touch it.
 - `token-ledger` — the "🧮 Token ledger" issue: one comment per run from `scripts/run-usage.cjs` (runbooks README, "Token ledger"). Not work: agents only append comments; builders ignore it; nobody edits or closes it.
+- `needs-alex` + `type:audio`, titled `Listen: …` — renders waiting for Alex's ear; he closes it with his pick. Builders never claim it.
 - `marketing` + `needs-alex` — a draft post or campaign from the Marketer that only Alex can carry out (agents never post, spend or create accounts). Builders ignore these. `type:growth` — discoverability or growth work for builders, filed by the Marketer.
 - Add `agent:needs-qa` / `agent:changes-requested` **last, in a call of their own**, after any other labels. Each label added while one of those is present fires the on-label task again, so adding three labels at once starts three sessions. When swapping (e.g. `agent:needs-qa` → `agent:changes-requested`), remove the old label first, then add the new one in a separate call.
 
@@ -172,7 +182,7 @@ QA reviews reverts first — then reopen the original issue with what went wrong
   summary: `npm run verify > /tmp/verify.log 2>&1; grep -E '^(PASS|FAIL)|Tests |error' /tmp/verify.log; tail -n 40 /tmp/verify.log`.
   Never dump full logs, `results.json` (query it with `node -e` / `jq`) or long diffs
   into the conversation; every line you print is re-read on every later turn.
-- No image, model or audio generation tools. Visuals come from code: procedural geometry, shaders, instancing, post-processing. Audio comes from Tone.js synthesis.
+- No image, model or audio generation tools. Visuals come from code: procedural geometry, shaders, instancing, post-processing. Audio is synthesised in code: Tone.js today, and the Scrimshaw-based engine replacing it (`docs/audio/`). You can't hear audio, but you can render it offline in headless Chromium and measure it (ffmpeg `ebur128`, spectrogram PNGs you read with the Read tool): see `docs/audio/reference/README.md`.
 
 ## Commits
 

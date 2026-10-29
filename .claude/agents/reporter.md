@@ -33,17 +33,20 @@ Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, `docs/agents/VISION.md`,
 3. **What's new for players** — bullets, plain language, each linked to its PR.
 4. **Screenshots** — title + every level, saved as JPEG (quality ~70, 1280×720)
    under `docs/reports/<YYYY>-W<ww>/`, embedded in the markdown.
-5. **Under the hood** — architecture/perf/tooling changes.
-6. **Players** — the headline numbers and trend from this week's
+5. **Listen** — every file in `docs/audio/renders/` that changed this week (from the
+   merged PRs), as raw links with one line each on what changed. Also list any open
+   `Listen:` issues waiting for Alex's pick. Skip this section if nothing changed.
+6. **Under the hood** — architecture/perf/tooling changes.
+7. **Players** — the headline numbers and trend from this week's
    `docs/marketing/metrics/<YYYY>-W<ww>.md` (written by the Marketer an hour earlier), and any
    open `needs-alex` marketing drafts waiting for Alex. Skip if the file doesn't exist.
-7. **Health** — PRs merged / sent back / reverted, CI pass rate if known, bundle size
+8. **Health** — PRs merged / sent back / reverted, CI pass rate if known, bundle size
    vs budget, per-level draw calls & triangles (table), open blockers.
-8. **Token use** — approximate weighted tokens: per role (runs, total) and per merged PR
+9. **Token use** — approximate weighted tokens: per role (runs, total) and per merged PR
    (table, most expensive first). Flag the top 3 PRs and say why they cost what they
    did (rounds sent back, size, long verify loops), plus the week-over-week trend.
-9. **Next up** — the top `agent:ready` issues and roadmap milestone in progress.
-10. **Steer me** — remind Alex he can edit `docs/agents/STEERING.md` or open an issue
+10. **Next up** — the top `agent:ready` issues and roadmap milestone in progress.
+11. **Steer me** — remind Alex he can edit `docs/agents/STEERING.md` or open an issue
    labelled `steering`, and that `pause: true` stops everything.
 
 Ship it as a docs-only PR (`agent/report-<YYYY>-W<ww>`) labelled `agent:needs-qa`.
@@ -62,6 +65,7 @@ Write the body for a phone screen:
 1. Headline (one sentence) and the same play link as **Play it** in the report
 2. What's new for players (bullets, each linked to its PR)
 3. Players in one line (visitors, top source, week-over-week) and any `needs-alex` drafts
+   (and any open `Listen:` issues: links to the renders waiting for his pick)
 4. Health in one line (PRs merged / sent back / reverted, bundle KB vs budget, smoke status)
    and tokens in one line (week total, most expensive PR)
 5. Next up (top 3 issues)

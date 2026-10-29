@@ -39,6 +39,11 @@ Read only what picking and claiming needs: this runbook, the runbooks README rul
    alexbelyeu/shootercoaster. Read `.claude/agents/builder.md` and follow it exactly.
    Your assignment: issue #<n> — <title>" (or "PR #<n>, returned by QA — address every
    QA comment").
+   **Audio work goes to the Sound designer.** If the issue is labelled `type:audio` (for
+   a returned PR: the issue it closes),
+   start the prompt with "You are the Sound designer for ShooterCoaster" and say "Read
+   `.claude/agents/sound-designer.md` and follow it exactly (it builds on
+   `.claude/agents/builder.md`)". Everything else stays the same.
 6. When they finish, check each assignment ended in an open PR labelled
    `agent:needs-qa` or an issue labelled `agent:blocked` (or was stopped by a pause).
    If a builder died without either, push whatever branch exists as a draft PR if
