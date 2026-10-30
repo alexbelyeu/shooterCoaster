@@ -7,7 +7,7 @@ import {
   disposeSFX, playBossDefeat, playBossHit, playBossStinger, playComboBreak, playFireworkPop, playFireworkWhistle, playHitTick,
   playWaveStinger, prepareLevelSFX,
 } from '@/audio/SFXManager'
-import { setMusicDucked, syncVolumes } from '@/audio/AudioEngine'
+import { setMusicDucked, setPauseMix, syncVolumes } from '@/audio/AudioEngine'
 import { MUSIC_ENGINE, withScrim } from '@/audio/musicEngine'
 import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
@@ -15,7 +15,7 @@ import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks
 
 const SCRIM = MUSIC_ENGINE === 'scrim'
 
-/** `?audio=scrim`: the level's score while it runs (held while paused), the results score after it. */
+/** `?audio=scrim`: the level's score while it runs (held while paused, through the resume Ready / GO), the results score after it. */
 function followPhase(phase: GamePhase, level: string) {
   withScrim((p) => {
     if (phase === 'results') p.playScore('results')
@@ -27,7 +27,7 @@ function followPhase(phase: GamePhase, level: string) {
   })
 }
 
-/** Level audio host: biome music + SFX kit for the level's lifetime, bus-driven hit / wave / combo-break / boss / firework sounds, slow-mo duck. */
+/** Level audio host: biome music + SFX kit for the level's lifetime, bus-driven hit / wave / combo-break / boss / firework sounds, slow-mo and pause duck. */
 export default function MusicController() {
   const currentLevel = useGameStore((s) => s.currentLevel)
 
@@ -69,9 +69,20 @@ export default function MusicController() {
     }
   }, [currentLevel])
 
+  // Not in useFrame: a hidden tab gets no frames but must still go quiet.
+  useEffect(() => {
+    const sync = (phase: string) => setPauseMix(phase === 'paused')
+    sync(useGameStore.getState().phase)
+    const unsubscribe = useGameStore.subscribe((s) => sync(s.phase))
+    return () => {
+      unsubscribe()
+      setPauseMix(false, true)
+    }
+  }, [])
+
   useFrame(() => {
-    const { combo, timeRemaining, timeScale } = useGameStore.getState()
-    setMusicDucked(timeScale < 1)
+    const { combo, timeRemaining, timeScale, phase } = useGameStore.getState()
+    setMusicDucked(timeScale < 1 || phase === 'paused')
 
     // Intensity ramps up quickly so the music feels alive from the start
     const comboFactor = Math.min(combo.count / 5, 1) * 0.3

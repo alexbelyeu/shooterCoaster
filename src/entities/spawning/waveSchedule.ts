@@ -32,3 +32,12 @@ export function tickWaves(
     }
   }
 }
+
+/** Level time (s) the next wave still to arrive is due at, or null once every delayed wave is in. */
+export function nextWaveDue(delays: readonly number[], progress: WaveProgress): number | null {
+  let due: number | null = null
+  for (let i = 0; i < delays.length; i++) {
+    if (delays[i] > 0 && !progress.arrived[i] && (due === null || delays[i] < due)) due = delays[i]
+  }
+  return due
+}

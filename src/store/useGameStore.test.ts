@@ -155,6 +155,41 @@ describe('startRun', () => {
     store().startRun('level1')
     expect(store().runSeed).toBe(1_000)
   })
+
+  it('bumps runId every run, the same level and seed included (Restart)', () => {
+    store().startRun('level1', 5)
+    const first = store().runId
+    store().setPhase('paused')
+    store().startRun('level1', 5)
+    expect(store().runId).toBe(first + 1)
+  })
+})
+
+describe('pause and resume', () => {
+  it('resume starts the resume countdown only while paused; GO (setPhase) ends it', () => {
+    store().setPhase('playing')
+    store().resume()
+    expect(store().resuming).toBe(false)
+    store().setPhase('paused')
+    store().resume()
+    expect(store()).toMatchObject({ phase: 'paused', resuming: true })
+    store().setPhase('playing')
+    expect(store().resuming).toBe(false)
+  })
+
+  it('a pause during the resume countdown cancels it', () => {
+    store().setPhase('paused')
+    store().resume()
+    store().setPhase('paused')
+    expect(store().resuming).toBe(false)
+  })
+
+  it('Restart from the pause menu drops a pending resume', () => {
+    store().setPhase('paused')
+    store().resume()
+    store().startRun('level1', 1)
+    expect(store().resuming).toBe(false)
+  })
 })
 
 describe('saveScore', () => {

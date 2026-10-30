@@ -808,7 +808,27 @@ const setHidden = (page, hidden) => page.evaluate((h) => {
 
 const waveAnnounces = (page) => page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'announce').length)
 
-/** Leaving the tab pauses the run and drops the trigger; nothing drains or resets the timer (#118), the kills or the enemies (#198). */
+/** The frozen-world probe the pause checks compare: ride position, live enemies, the wave schedule, the pause mix. */
+const frozenState = (page) => page.evaluate(() => {
+  const t = window.__SC_TEST__
+  return {
+    phase: t.phase(),
+    ride: t.rideProgress,
+    live: t.stats().liveEnemies,
+    wave: t.nextWave(),
+    pauseMix: t.audio().pauseMix,
+    counting: !!document.querySelector('.countdown-step'),
+  }
+})
+
+/** Forward track distance from a to b as a fraction (the ride wraps at 1). */
+const rideAdvance = (a, b) => (((b - a) % 1) + 1) % 1
+
+/**
+ * Leaving the tab pauses the run and drops the trigger; nothing drains or resets the timer (#118), the kills or the enemies (#198).
+ * The world is frozen while paused (#133): the ride, the live enemies and the next wave's due time hold over 5 s and through
+ * the Resume countdown; then the ride goes on from the same spot and the next wave comes at its original level time (#152).
+ */
 async function hiddenPauseCheck(page, levelId) {
   await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
   await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
@@ -823,11 +843,13 @@ async function hiddenPauseCheck(page, levelId) {
     return window.__SC_TEST__.triggerHeld()
   })
   const before = await setHidden(page, true)
+  const frozenAt = await frozenState(page)
   const heldAfter = await page.evaluate(() => window.__SC_TEST__.triggerHeld())
   await page.mouse.up()
   const hiddenPhase = await page.evaluate(() => window.__SC_TEST__.phase())
   await waitFrames(page, 3, { minMs: 5000, maxMs: 30000 })
   const whileHidden = await getStats(page)
+  const frozenAfter = await frozenState(page)
   await setHidden(page, false)
   await waitFrames(page, 2, { maxMs: 10000 })
   const shownPhase = await page.evaluate(() => window.__SC_TEST__.phase())
@@ -837,8 +859,33 @@ async function hiddenPauseCheck(page, levelId) {
     .getByRole('button', { name: 'Resume' })
     .click({ timeout: 30000 })
     .then(() => true, () => false)
+  // Through the Resume countdown the run stays paused and frozen; GO hands it back to `playing`.
+  const countdownSamples = []
+  for (let i = 0; i < 100; i++) {
+    const f = await frozenState(page)
+    if (f.phase !== 'paused') break
+    countdownSamples.push(f)
+    await page.waitForTimeout(100)
+  }
+  // The next wave after the pause must arrive at its own level time: on the first ticks after Resume if it was
+  // already told when the run paused, else at its due time ('ended' if the level ran out first).
+  const due = frozenAt.wave?.due ?? null
+  const waveArrival = due === null
+    ? null
+    : await page
+      .waitForFunction(
+        (d) => {
+          const w = window.__SC_TEST__.nextWave()
+          if (w && w.due !== d) return { levelTime: w.levelTime }
+          return window.__SC_TEST__.phase() === 'results' ? 'ended' : null
+        },
+        due,
+        { timeout: 90000, polling: 100 },
+      )
+      .then((h) => h.jsonValue(), () => null)
   await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
   const resumed = await getStats(page)
+  const resumedFrozen = await frozenState(page)
   const resumedSeconds = (Date.now() - resumedAt) / 1000
   const waveArrived = (await waveAnnounces(page)) > announcesBefore
   await page.evaluate(() => window.dispatchEvent(new Event('blur')))
@@ -851,12 +898,24 @@ async function hiddenPauseCheck(page, levelId) {
   if (hiddenPhase !== 'paused') problems.push(`hiding the tab left the phase "${hiddenPhase}", not paused`)
   if (whileHidden.timeRemaining !== before.timeRemaining)
     problems.push(`timer moved while hidden (${before.timeRemaining.toFixed(2)} -> ${whileHidden.timeRemaining.toFixed(2)})`)
+  if (frozenAfter.ride !== frozenAt.ride) problems.push(`the ride moved while paused (track ${frozenAt.ride.toFixed(4)} -> ${frozenAfter.ride.toFixed(4)})`)
+  if (frozenAfter.live !== frozenAt.live) problems.push(`live enemies changed while paused (${frozenAt.live} -> ${frozenAfter.live})`)
+  if (JSON.stringify(frozenAfter.wave) !== JSON.stringify(frozenAt.wave))
+    problems.push(`the wave schedule moved while paused (${JSON.stringify(frozenAt.wave)} -> ${JSON.stringify(frozenAfter.wave)})`)
+  if (!frozenAt.pauseMix || !frozenAfter.pauseMix) problems.push('the pause mix (music down, SFX silent) was off while paused')
   if (shownPhase !== 'paused') problems.push(`showing the tab again auto-resumed (phase "${shownPhase}")`)
   // The combo window runs on game time: a pause, however long, never breaks the chain.
   if (before.combo < 3 || whileHidden.combo !== before.combo || pausedStats.combo !== before.combo)
     problems.push(`the pause changed the combo (${before.combo} -> ${whileHidden.combo} hidden -> ${pausedStats.combo} shown)`)
   if (!resumeClicked) problems.push('Resume button not clickable')
+  if (!countdownSamples.some((f) => f.counting)) problems.push('Resume showed no Ready / GO countdown')
+  const movedInCountdown = countdownSamples.find((f) => f.ride !== frozenAt.ride)
+  if (movedInCountdown) problems.push(`the ride moved during the Resume countdown (track ${frozenAt.ride.toFixed(4)} -> ${movedInCountdown.ride.toFixed(4)})`)
   if (resumed.phase !== 'playing') problems.push(`Resume left the phase "${resumed.phase}"`)
+  if (resumedFrozen.pauseMix) problems.push('the pause mix stayed on after Resume')
+  const advance = rideAdvance(frozenAt.ride, resumedFrozen.ride)
+  if (!(advance > 0 && advance < 0.5))
+    problems.push(`the ride did not go on from where it paused (track ${frozenAt.ride.toFixed(4)} -> ${resumedFrozen.ride.toFixed(4)})`)
   if (resumed.timeRemaining > before.timeRemaining)
     problems.push(`timer reset on resume (${before.timeRemaining.toFixed(2)} -> ${resumed.timeRemaining.toFixed(2)})`)
   // timeRemaining is only stored on whole-second crossings, hence the 1 s slack.
@@ -865,6 +924,14 @@ async function hiddenPauseCheck(page, levelId) {
   if (resumed.kills < before.kills) problems.push(`kills reset across the pause (${before.kills} -> ${resumed.kills})`)
   if (!waveArrived && resumed.liveEnemies > before.liveEnemies)
     problems.push(`enemies came back across the pause (${before.liveEnemies} -> ${resumed.liveEnemies} live)`)
+  if (due === null) problems.push('no wave still due when the tab was hidden (nextWave)')
+  else if (!waveArrival) problems.push(`the wave due at ${due} s of level time never arrived after Resume`)
+  else if (waveArrival !== 'ended') {
+    // One or two slow software-GL frames of slack; a schedule on wall time would be late by the whole pause (≥ 6 s).
+    const latest = Math.max(due, frozenAt.wave.levelTime) + 3
+    if (!(waveArrival.levelTime >= due && waveArrival.levelTime <= latest))
+      problems.push(`the wave due at ${due} s of level time (paused at ${frozenAt.wave.levelTime.toFixed(2)} s) arrived at ${waveArrival.levelTime.toFixed(2)} s`)
+  }
   if (blurPhase !== 'paused') problems.push(`window blur left the phase "${blurPhase}", not paused`)
   return {
     id: 'hidden-pause',
@@ -879,9 +946,93 @@ async function hiddenPauseCheck(page, levelId) {
       kills: [before.kills, resumed.kills],
       liveEnemies: [before.liveEnemies, resumed.liveEnemies],
       combo: [before.combo, whileHidden.combo, pausedStats.combo],
+      ride: [frozenAt.ride, frozenAfter.ride, resumedFrozen.ride],
+      wave: { due, pausedAt: frozenAt.wave?.levelTime ?? null, arrivedAt: waveArrival?.levelTime ?? waveArrival },
       heldBefore,
       heldAfter,
     },
+  }
+}
+
+/** The pause card must sit inside the viewport with no sideways scroll and 44 px buttons; also returns its title and the focused button. */
+async function pauseCardLayout(page) {
+  const r = await page.evaluate(() => {
+    const card = document.querySelector('.pause-card')
+    const root = document.querySelector('.pause-menu')
+    const b = card?.getBoundingClientRect()
+    const buttons = [...document.querySelectorAll('.pause-actions button')].map((el) => el.getBoundingClientRect())
+    const active = document.activeElement
+    return {
+      rect: b ? { left: Math.round(b.left), top: Math.round(b.top), right: Math.round(b.right), bottom: Math.round(b.bottom) } : null,
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      hScroll: root ? root.scrollWidth > root.clientWidth : true,
+      buttons: buttons.length,
+      smallButtons: buttons.filter((x) => x.height < 44).length,
+      title: card?.querySelector('h2')?.textContent ?? null,
+      focused: active?.closest('.pause-actions') ? active.textContent.trim() : null,
+    }
+  })
+  const problems = []
+  if (!r.rect) problems.push('no pause card')
+  else if (r.rect.left < 0 || r.rect.top < 0 || r.rect.right > r.vw || r.rect.bottom > r.vh)
+    problems.push(`the pause card (${r.rect.left},${r.rect.top})-(${r.rect.right},${r.rect.bottom}) leaves the ${r.vw}x${r.vh} viewport`)
+  if (r.hScroll) problems.push('the pause menu scrolls sideways')
+  if (r.buttons !== 4) problems.push(`${r.buttons} pause buttons, expected Resume / Restart / Settings / Quit`)
+  if (r.smallButtons) problems.push(`${r.smallButtons} pause button(s) under the 44 px touch target`)
+  return { ...r, problems }
+}
+
+/**
+ * The pause menu (#36), opened through the hook: a card inside the viewport with the level name, Resume focused (pause.png);
+ * ArrowDown moves focus, Esc resumes through the Ready / GO countdown, and Restart starts the level over.
+ */
+async function pauseMenuCheck(page, levelId) {
+  const problems = []
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+  await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
+  const name = await page.evaluate((id) => window.__SC_TEST__.levels().find((l) => l.id === id)?.name ?? null, levelId)
+  await page.evaluate(() => window.__SC_TEST__.killNearest(1))
+  await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
+  if (!(await waitVisible(page, '.pause-card', 30000))) return { id: 'pause-menu', problems: ['the pause card never showed'] }
+  // The card fades and the backdrop blurs in; let a frame or two land under it.
+  await waitFrames(page, 1, { minMs: 400, maxMs: 8000 })
+  const card = await pauseCardLayout(page)
+  problems.push(...card.problems.map((p) => `desktop 1280x720: ${p}`))
+  if (name && card.title !== name) problems.push(`the card is titled "${card.title}", not the level name "${name}"`)
+  if (card.focused !== 'Resume') problems.push(`"${card.focused}" has focus when the menu opens, not Resume`)
+  await page.screenshot({ path: path.join(OUT, 'pause.png'), timeout: SHOT_TIMEOUT })
+  await page.keyboard.press('ArrowDown')
+  const afterArrow = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? null)
+  if (afterArrow !== 'Restart') problems.push(`ArrowDown moved focus to "${afterArrow}", not Restart`)
+  await page.keyboard.press('Escape')
+  const resumed = await page
+    .waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 15000, polling: 100 })
+    .then(() => true, () => false)
+  if (!resumed) problems.push('Esc did not resume the run')
+
+  await waitFrames(page, 2, { maxMs: 10000 })
+  const rideBefore = await page.evaluate(() => window.__SC_TEST__.rideProgress)
+  const levelTimeBefore = await page.evaluate(() => window.__SC_TEST__.nextWave()?.levelTime ?? 0)
+  await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
+  await waitVisible(page, '.pause-card', 30000)
+  const restarted = await page
+    .getByRole('button', { name: 'Restart' })
+    .click({ timeout: 30000 })
+    .then(() => true, () => false)
+  await waitFrames(page, 1, { maxMs: 10000 })
+  const after = await page.evaluate(() => ({ ...window.__SC_TEST__.stats(), ride: window.__SC_TEST__.rideProgress }))
+  const levelTime = await page.evaluate(() => window.__SC_TEST__.nextWave()?.levelTime ?? null)
+  if (!restarted) problems.push('Restart button not clickable')
+  if (after.currentLevel !== levelId) problems.push(`Restart opened "${after.currentLevel}", not ${levelId}`)
+  if (after.phase !== 'playing') problems.push(`Restart left the phase "${after.phase}"`)
+  if (after.kills !== 0 || after.score !== 0) problems.push(`Restart kept the run's kills / score (${after.kills} / ${after.score})`)
+  if (!(levelTime !== null && levelTime < levelTimeBefore)) problems.push(`Restart kept the level timer (${levelTimeBefore.toFixed(1)} -> ${levelTime?.toFixed(1)} s in)`)
+  if (!(after.ride < rideBefore)) problems.push(`Restart did not put the coaster back at the start (track ${rideBefore.toFixed(4)} -> ${after.ride.toFixed(4)})`)
+  return {
+    id: 'pause-menu',
+    problems,
+    pauseMenu: { level: levelId, card: card.rect, focusOnOpen: card.focused, afterArrow, restart: { ride: [rideBefore, after.ride], levelTime: [levelTimeBefore, levelTime] } },
   }
 }
 
@@ -1617,12 +1768,26 @@ async function runMobile(browser, base) {
   await page.locator('.hud-pause-button').tap({ timeout: 30000 }).catch((e) => problems.push(`tap pause: ${e.message}`))
   await waitPhase('paused', 15000)
   if ((await phase()) !== 'paused') problems.push('tapping Pause did not pause')
+  let pauseCards = null
+  // Phone frames take seconds under software GL: the HUD fades out before the menu fades in.
+  if (await waitVisible(page, '.pause-card', 60000)) {
+    const landscapeCard = await pauseCardLayout(page)
+    problems.push(...landscapeCard.problems.map((p) => `phone landscape 844x390: ${p}`))
+    await page.screenshot({ path: path.join(OUT, 'mobile-pause-landscape.png'), timeout: SHOT_TIMEOUT })
+    pauseCards = { landscape: landscapeCard.rect }
+  } else problems.push('phone: the pause card never showed')
 
   // Rotate back to portrait: the camera must follow again.
   await page.setViewportSize({ width: 390, height: 844 })
   await waitFrames(page, 2, { minMs: 500, maxMs: 8000 })
   const backAspect = await aspectProblems(page, 'portrait 390x844 (rotated back)')
   problems.push(...backAspect.problems)
+  if (pauseCards) {
+    const portraitCard = await pauseCardLayout(page)
+    problems.push(...portraitCard.problems.map((p) => `phone portrait 390x844: ${p}`))
+    await page.screenshot({ path: path.join(OUT, 'mobile-pause.png'), timeout: SHOT_TIMEOUT })
+    pauseCards.portrait = portraitCard.rect
+  }
 
   const bossHud = (await phase()) === 'paused' ? await mobileBossHud(page) : { problems: [], rects: null }
   problems.push(...bossHud.problems)
@@ -1643,6 +1808,7 @@ async function runMobile(browser, base) {
       audioBurst: { portrait: burstPortrait.burst, landscape: burstLandscape.burst },
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
       bulletMaxScreenFrac: bullets.maxScreenFrac,
+      pauseCards,
     },
     kills: end.kills,
     score: end.score,
@@ -1766,6 +1932,14 @@ async function run() {
     r.ok = r.problems.length === 0
     failed ||= !r.ok
     results.push(r)
+    // 4b. The pause menu on the same page (pause.png): focus, Esc resume, Restart
+    const errorsBefore = r.errors.length
+    const m = await pauseMenuCheck(h.page, wanted[0])
+    m.errors = [...h.errors, ...(await h.page.evaluate(() => window.__SC_TEST__.errors))].slice(errorsBefore)
+    if (m.errors.length) m.problems.push(`${m.errors.length} error(s)`)
+    m.ok = m.problems.length === 0
+    failed ||= !m.ok
+    results.push(m)
     await h.ctx.close()
   }
 
@@ -1854,7 +2028,11 @@ async function run() {
       : r.hiddenPause
         ? ` ${r.hiddenPause.level} timer ${r.hiddenPause.before.toFixed(1)} -> after 5s hidden ${r.hiddenPause.whileHidden.toFixed(1)}` +
           ` -> ${r.hiddenPause.resumed.toFixed(1)} after ${r.hiddenPause.resumedSeconds.toFixed(0)}s resumed, trigger held ${r.hiddenPause.heldBefore}->${r.hiddenPause.heldAfter},` +
-          ` kills ${r.hiddenPause.kills.join('->')}, live ${r.hiddenPause.liveEnemies.join('->')}`
+          ` kills ${r.hiddenPause.kills.join('->')}, live ${r.hiddenPause.liveEnemies.join('->')},` +
+          ` ride ${r.hiddenPause.ride.map((t) => t.toFixed(4)).join('->')}, wave due ${r.hiddenPause.wave.due}s arrived ${typeof r.hiddenPause.wave.arrivedAt === 'number' ? r.hiddenPause.wave.arrivedAt.toFixed(2) + 's' : r.hiddenPause.wave.arrivedAt}`
+      : r.pauseMenu
+        ? ` ${r.pauseMenu.level} card ${JSON.stringify(r.pauseMenu.card)}, focus ${r.pauseMenu.focusOnOpen} -> ${r.pauseMenu.afterArrow},` +
+          ` restart ride ${r.pauseMenu.restart.ride.map((t) => t.toFixed(4)).join('->')} level time ${r.pauseMenu.restart.levelTime.map((t) => t?.toFixed(1)).join('->')}`
       : r.countdown
         ? ` ${r.countdown.level} "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
           ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +

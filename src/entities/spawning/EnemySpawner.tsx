@@ -25,13 +25,13 @@ import GoldenBalloon from '../enemies/GoldenBalloon'
 import BossSpawner from '../bosses/BossSpawner'
 import { SCORE_VALUES } from '@/levels/scoring'
 import { createRng, type Rng } from '@/utils/rng'
-import { recordE2ESpawns } from '@/testing/e2eHook'
+import { recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
 import type { EnemyEntry } from '../enemies/EnemyBase'
 import {
   formationSlots, nearestTrackIndex, outsideNearField, placeFormationWave, placeTracksideWave, placedBesideTrack,
   trackPoint, tracksideSlots, type FormationSlot, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
-import { newWaveProgress, tickWaves } from './waveSchedule'
+import { newWaveProgress, nextWaveDue, tickWaves } from './waveSchedule'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -359,26 +359,29 @@ export default function EnemySpawner({
   const killedEnemies = useRef(new Set<string>())
 
   const [generation, setGeneration] = useState(0)
-  const prevPhaseRef = useRef(phase)
+  const runId = useGameStore((s) => s.runId)
+  const runRef = useRef(runId)
+  const firstWaveAnnounced = useRef(phase === 'playing')
 
-  // A run (re)start resets the waves and remounts the enemies (and the boss); GO after a countdown only
-  // announces wave 1, and Resume after a pause changes nothing.
+  // A new run (Restart from pause included) resets the waves and remounts the enemies and the boss.
   useEffect(() => {
-    const prev = prevPhaseRef.current
-    prevPhaseRef.current = phase
-    if (phase === prev || (phase === 'playing' && prev === 'paused')) return
+    if (runRef.current === runId) return
+    runRef.current = runId
+    setActiveWaveIndex(initialActiveWave)
+    setPlacements(initialPlacements)
+    setWaveAnnouncement(null)
+    firstWaveAnnounced.current = false
+    waveProgress.current = newWaveProgress(waves.length)
+    killedEnemies.current.clear()
+    setGeneration((g) => g + 1)
+  }, [runId, initialActiveWave, initialPlacements, waves])
 
-    if (phase === 'playing' && prev === 'countdown') {
-      setWaveAnnouncement(waves[0]?.waveLabel ?? null)
-    } else if (phase === 'countdown' || phase === 'playing') {
-      setActiveWaveIndex(initialActiveWave)
-      setPlacements(initialPlacements)
-      setWaveAnnouncement(phase === 'playing' ? waves[0]?.waveLabel ?? null : null)
-      waveProgress.current = newWaveProgress(waves.length)
-      killedEnemies.current.clear()
-      setGeneration((g) => g + 1)
-    }
-  }, [phase, initialActiveWave, initialPlacements, waves])
+  // Also after a resume, when the run was paused during its countdown.
+  useEffect(() => {
+    if (phase !== 'playing' || firstWaveAnnounced.current) return
+    firstWaveAnnounced.current = true
+    setWaveAnnouncement(waves[0]?.waveLabel ?? null)
+  }, [phase, runId, waves])
 
   const totalEnemyCount = useMemo(
     () => enemies.length,
@@ -417,6 +420,13 @@ export default function EnemySpawner({
   )
 
   const waveDelays = useMemo(() => waves.map((w) => w.spawnDelay ?? 0), [waves])
+  useEffect(() => {
+    registerE2EWaves(() => ({
+      levelTime: timerSeconds - useGameStore.getState().timeRemaining,
+      due: nextWaveDue(waveDelays, waveProgress.current),
+    }))
+    return () => registerE2EWaves(null)
+  }, [waveDelays, timerSeconds])
   const tellWave = useCallback((i: number) => eventBus.emit('wave:incoming', waves[i].waveLabel), [waves])
   // On the level timer like the boss, so a pause holds them; the rendered phase keeps a restart from reading the last run's timer.
   useFrame(() => {

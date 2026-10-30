@@ -29,6 +29,7 @@ const fadeVariants = {
 export default function App() {
   const phase = useGameStore((s) => s.phase)
   const setPhase = useGameStore((s) => s.setPhase)
+  const resuming = useGameStore((s) => s.phase === 'paused' && s.resuming)
   const [showSettings, setShowSettings] = useState(false)
   const [veiled, setVeiled] = useState(false)
   const veilTimer = useRef<number | undefined>(undefined)
@@ -55,7 +56,7 @@ export default function App() {
     veilTimer.current = window.setTimeout(() => setPhase('levelSelect'), TITLE_FADE_S * 1000)
   }
 
-  const showCrosshair = phase === 'title' || phase === 'levelSelect' || inPlay
+  const showCrosshair = phase === 'title' || phase === 'levelSelect' || inPlay || resuming
   useEffect(() => {
     const el = document.documentElement
     if (showCrosshair) {
@@ -105,15 +106,15 @@ export default function App() {
           </motion.div>
         )}
 
-        {phase === 'playing' && (
+        {(phase === 'playing' || resuming) && (
           <motion.div key="hud" {...fadeVariants} transition={{ duration: 0.2 }}>
             <HUD />
           </motion.div>
         )}
 
-        {phase === 'paused' && (
+        {phase === 'paused' && !resuming && !showSettings && (
           <motion.div key="paused" {...fadeVariants} transition={{ duration: 0.2 }}>
-            <PauseScreen />
+            <PauseScreen onSettings={() => setShowSettings(true)} />
           </motion.div>
         )}
 
@@ -124,7 +125,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {inPlay && <Countdown />}
+      {(inPlay || resuming) && <Countdown />}
 
       {/* Black over everything from PLAY until level select has mounted under it. */}
       <AnimatePresence>
