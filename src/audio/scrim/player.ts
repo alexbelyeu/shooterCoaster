@@ -1,12 +1,8 @@
 /*
- * The score engine in the game: plays `audio/scores/` on Tone's AudioContext into its own stereo
- * music channel (music volume, slow-mo duck and master limiter apply), one `musicBus` per track so a
- * change is the same 1 s crossfade as the Tone.js music. Loaded only under `?audio=scrim`
- * (`musicEngine.ts`).
- *
- * Built on Scrimshaw Jukebox's player (docs/audio/reference/scrimshaw-jukebox.html), simonw/tools
- * commit 5fc8e8b, Apache-2.0 (docs/audio/reference/LICENSE-scrimshaw-apache-2.0.txt). Modified:
- * the page player is replaced by game integration (crossfades, pause / resume mid-song, dispose).
+ * Plays `audio/scores/` in the game: one `musicBus` per score into the stereo `scoreChannel`, so a change is the
+ * Tone.js music's 1 s crossfade. Built on Scrimshaw Jukebox's player (docs/audio/reference/scrimshaw-jukebox.html),
+ * simonw/tools commit 5fc8e8b, Apache-2.0 (docs/audio/reference/LICENSE-scrimshaw-apache-2.0.txt); modified: game
+ * integration (crossfades, pause / resume mid-song, dispose) replaces the page's player.
  */
 
 import * as Tone from 'tone'
@@ -62,7 +58,6 @@ function coreFor(ctx: BaseAudioContext): SynthCore {
   return core
 }
 
-/** One tick of every playing track; allocates nothing. */
 export function tickScores(): void {
   const t = now()
   const hidden = typeof document !== 'undefined' && document.hidden
@@ -153,15 +148,6 @@ export function driveScoresManually(on: boolean): void {
 /** Fades out every track (offline render cleanup). */
 export function disposeScores(): void {
   for (const t of live) if (!t.bus.fading) fadeOut(t)
-}
-
-/** Loop seams (song time) of score `id` before `until`, and its first bar length. */
-export function scoreTiming(id: string, until: number): { seams: number[]; barS: number; introS: number } {
-  const song = songFor(id)
-  const seams: number[] = []
-  if (song.loop.dur > 0) for (let t = song.intro.dur + song.loop.dur; t < until; t += song.loop.dur) seams.push(t)
-  const section = song.loop.sections[0] ?? song.intro.sections[0]
-  return { seams, barS: section.barDur, introS: song.intro.dur }
 }
 
 /** e2e: the tracks (current last), whether each is paused, its song position, and the long-lived nodes. */

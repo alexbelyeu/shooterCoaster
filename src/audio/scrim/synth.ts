@@ -14,7 +14,7 @@ import type { CompiledSong, ScoreEvent, Voice } from './score'
 
 type Ctx = BaseAudioContext
 
-export interface PluckCfg {
+interface PluckCfg {
   id: string
   b: number
   decay: number
@@ -34,7 +34,7 @@ export interface SynthCore {
 }
 
 /** Per-note options: brightness, attack/release overrides and glide (`from` Hz over `glide` s). */
-export interface NoteOpts {
+interface NoteOpts {
   bright: number
   att: number | null
   rel: number | null
@@ -55,7 +55,7 @@ interface Drum {
 }
 
 const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x))
-export const mtof = (m: number) => 440 * Math.pow(2, (m - 69) / 12)
+const mtof = (m: number) => 440 * Math.pow(2, (m - 69) / 12)
 
 /* --------------------------------------------------------------- helpers */
 function G(S: SynthCore, v = 0) {
@@ -239,7 +239,7 @@ function pluck(S: SynthCore, out: AudioNode, t: number, d: number, f: number, v:
   src.stop(Math.min(end, t + e.buf.duration / rate))
 }
 
-export const PLUCK: Record<string, PluckCfg> = {
+const PLUCK: Record<string, PluckCfg> = {
   harp: { id: 'harp', b: .45, decay: .9985, color: .55, dur: 2.8, hang: 1.4, dampTau: .25 },
   guitar: { id: 'gtr', b: .38, decay: .997, color: .4, dur: 1.9, hang: .2, dampTau: .06 },
   banjo: { id: 'banjo', b: .18, decay: .988, color: .05, dur: 1.1, hang: .1, dampTau: .05 },
@@ -249,7 +249,7 @@ export const PLUCK: Record<string, PluckCfg> = {
 }
 
 /* ------------------------------------------------------------ instruments */
-export const INST: Record<string, Instrument> = {
+const INST: Record<string, Instrument> = {
   steeldrum: { rev: 0.22, level: 0.66, play(S, out, t, d, f, v, p) {
     const tau = clamp(0.5 * Math.pow(440 / f, 0.45), 0.15, 1.1)
     const lp = F(S, 'lowpass', 5200 * p.bright, 0.5); lp.connect(out)
@@ -508,7 +508,7 @@ function choirVoice(S: SynthCore, out: AudioNode, t: number, d: number, f: numbe
 }
 
 /* ----------------------------------------------------------------- drums */
-export const DRUM: Record<string, Drum> = {
+const DRUM: Record<string, Drum> = {
   kick: { rev: 0.05, level: 0.95, hit(S, out, t, v) {
     const g = G(S); g.connect(out)
     const end = perc(g.gain, t, { a: .003, tau: .13, peak: v * 1.0 })
@@ -665,7 +665,7 @@ export function createCore(ctx: Ctx): SynthCore {
  */
 export type Voicing = 'jukebox' | 'game'
 
-export const GAME_VOICING = {
+const GAME_VOICING = {
   highPassHz: 32,
   /** Limiter threshold (dBFS) of the music bus; DynamicsCompressor adds its own make-up gain, which `out` absorbs. */
   limiterDb: -6,

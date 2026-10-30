@@ -1,10 +1,6 @@
 import { dropSound } from './soundGuard'
 
-/**
- * Which engine plays the music: the Tone.js managers (default) or the Scrimshaw score engine
- * (`?audio=scrim`, `audio/scrim/`) while it runs in parallel until parity (hard rule 7).
- * SFX stay on Tone.js either way.
- */
+/** The Tone.js music managers (default), or the score engine (`?audio=scrim`, `audio/scrim/`) until it reaches parity. */
 export type MusicEngine = 'tone' | 'scrim'
 
 export function engineFromQuery(search: string): MusicEngine {

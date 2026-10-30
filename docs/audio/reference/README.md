@@ -12,8 +12,9 @@ sessions keep no memory.
 | `scrimshaw-llm-prompt.md` | The page's own "Compose with an LLM" prompt, verbatim. It is the best short spec of the original score format. |
 
 This folder is reference material. The game never loads these files: don't import from
-here, and don't edit them. The port lives in `src/audio/scrim/`. Our extensions to the
-format go in `docs/audio/SCORE-FORMAT.md`, which the engine-port issue creates.
+here (only the parity test `src/audio/scrim/score.test.ts` and `npm run audio:render --
+--score … --engine original` read the page), and don't edit them. The port lives in
+`src/audio/scrim/`; our extensions to the format are recorded in `docs/audio/SCORE-FORMAT.md`.
 
 ## What it is, in one paragraph
 

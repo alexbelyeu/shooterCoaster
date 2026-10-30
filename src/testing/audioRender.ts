@@ -15,6 +15,8 @@ import type { BiomeType } from '@/types/level'
 import type { MusicEngine } from '@/audio/musicEngine'
 import { compile } from '@/audio/scrim/score'
 import { renderOffline as renderScoreOffline, type Voicing } from '@/audio/scrim/synth'
+import { loopSeams } from '@/audio/scrim/scheduler'
+import { SCORES } from '@/audio/scores'
 import { createRng } from '@/utils/rng'
 
 export type AudioRenderRequest =
@@ -78,7 +80,7 @@ function stopAll() {
   }
 }
 
-/** Score-engine music: started at render time 0, ticked every 50 ms of render time like the live 25 ms timer. */
+/** Score-engine music from render time 0, ticked every 50 ms of render time (well inside its 0.3 s look-ahead). */
 function scrimScript(p: ScrimPlayer, id: string, seconds: number) {
   return ({ at }: OfflineRenderScope) => {
     p.driveScoresManually(true)
@@ -88,13 +90,13 @@ function scrimScript(p: ScrimPlayer, id: string, seconds: number) {
 }
 
 function scrimMusicPlan(p: ScrimPlayer, track: string, seconds = 30): Plan {
-  const { seams, barS, introS } = p.scoreTiming(track, seconds)
   const start = p.SCORE_START_DELAY_S
+  const { seams, introS, barS } = loopSeams(compile(SCORES[track]), seconds - 0.5 - start)
   return {
     seconds,
-    events: [{ t: start, name: `${track} score` }, ...(introS ? [{ t: start + introS, name: 'loop starts' }] : [])],
-    seams: seams.map((s) => start + s).filter((s) => s < seconds - 0.5),
-    bar: { startS: start + introS, barS },
+    events: [{ t: start, name: `${track} score` }, { t: start + introS, name: 'loop starts' }],
+    seams: seams.map((s) => start + s),
+    bar: barS ? { startS: start + introS, barS } : null,
     script: scrimScript(p, track, seconds),
   }
 }
@@ -250,12 +252,10 @@ async function renderScore(req: Extract<AudioRenderRequest, { kind: 'score' }>, 
     Math.random = random
   }
   const start = 0.05 // the original's render offset
-  const seams: number[] = []
-  if (song.loop.dur > 0) for (let t = start + song.intro.dur + song.loop.dur; t < seconds - 0.5; t += song.loop.dur) seams.push(t)
-  const bar = (song.loop.sections[0] ?? song.intro.sections[0])?.barDur
+  const { seams, introS, barS } = loopSeams(song, seconds - 0.5 - start)
   return {
     sampleRate: buffer.sampleRate, seconds, pcm: toBase64(buffer),
-    events: [{ t: start, name: song.title }], seams, bar: bar ? { startS: start + song.intro.dur, barS: bar } : null,
+    events: [{ t: start, name: song.title }], seams: seams.map((s) => start + s), bar: barS ? { startS: start + introS, barS } : null,
   }
 }
 

@@ -1,27 +1,21 @@
 /*
- * Look-ahead scheduler for compiled Scrimshaw scores: each tick hands the events due before
- * `now + lookAhead` to `play`, intro once, then the loop forever. Driven by the audio clock
- * (`AudioContext.currentTime`), never by a timer per note.
- *
- * Ported from Scrimshaw Jukebox (docs/audio/reference/scrimshaw-jukebox.html, `player.tick`),
- * simonw/tools commit 5fc8e8b, Apache-2.0 (docs/audio/reference/LICENSE-scrimshaw-apache-2.0.txt).
- * Modified for ShooterCoaster: no UI or visualiser state, always loops, and `start(at, from)` can
- * begin mid-song so a paused track resumes where it stopped. A tick allocates nothing.
+ * Look-ahead scheduler on the audio clock: intro once, then the loop forever.
+ * Ported from Scrimshaw Jukebox (docs/audio/reference/scrimshaw-jukebox.html, `player.tick`), simonw/tools commit
+ * 5fc8e8b, Apache-2.0 (docs/audio/reference/LICENSE-scrimshaw-apache-2.0.txt). Modified: no UI state, always
+ * loops, and `start(at, from)` can begin mid-song so a paused track resumes where it stopped.
  */
 
 import type { CompiledSong, ScoreEvent, Timeline } from './score'
 
 export const LOOK_AHEAD_S = 0.3
 /** Timers are throttled to ~1 s in a hidden tab. */
-export const HIDDEN_LOOK_AHEAD_S = 1.6
+const HIDDEN_LOOK_AHEAD_S = 1.6
 /** An event this late is still played (at once); later than this it is skipped. */
 const LATE_S = 0.03
-/** A late event is played this far after now, so its start is never in the past. */
 const NUDGE_S = 0.005
-/** Events handled per tick at most, so a long stall can't lock the page. */
 const MAX_PER_TICK = 5000
 
-/** First event in `tl` at or after `t` (binary search; events are sorted by time). */
+
 function firstAtOrAfter(tl: Timeline, t: number): number {
   let lo = 0, hi = tl.events.length
   while (lo < hi) {
@@ -30,6 +24,14 @@ function firstAtOrAfter(tl: Timeline, t: number): number {
     else hi = mid
   }
   return lo
+}
+
+/** Song times of the loop seams before `until`, the intro's end, and the loop's bar length (offline renders). */
+export function loopSeams(song: CompiledSong, until: number): { seams: number[]; introS: number; barS: number | null } {
+  const { intro, loop } = song
+  const seams: number[] = []
+  if (loop.dur > 0) for (let t = intro.dur + loop.dur; t < until; t += loop.dur) seams.push(t)
+  return { seams, introS: intro.dur, barS: (loop.sections[0] ?? intro.sections[0])?.barDur ?? null }
 }
 
 export class ScoreScheduler {
@@ -66,11 +68,6 @@ export class ScoreScheduler {
   /** Song time at audio time `now` (negative before the start). */
   position(now: number): number {
     return now - this.startAt
-  }
-
-  /** True once a song without a loop has handed out its last event. */
-  get done(): boolean {
-    return this.ended
   }
 
   tick(now: number, hidden = false): void {

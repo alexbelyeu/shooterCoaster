@@ -7,12 +7,12 @@
  * unchanged and pinned by `score.test.ts` against the original. Format: docs/audio/SCORE-FORMAT.md.
  */
 
-export const MELODIC = ['steeldrum', 'marimba', 'vibes', 'celesta', 'glock', 'xylophone', 'musicbox', 'bell',
+const MELODIC = ['steeldrum', 'marimba', 'vibes', 'celesta', 'glock', 'xylophone', 'musicbox', 'bell',
   'organ', 'pipe', 'strings', 'pad', 'choir', 'voices', 'brass', 'trumpet', 'horn', 'tuba',
   'flute', 'clarinet', 'oboe', 'bassoon', 'accordion', 'fiddle',
   'harp', 'guitar', 'banjo', 'harpsichord', 'pizz', 'upright', 'fretless', 'synbass', 'timpani',
   'chip', 'sine', 'square', 'saw', 'triangle']
-export const DRUMS = ['kick', 'snare', 'rim', 'hat', 'ohat', 'ride', 'crash', 'shaker', 'tamb',
+const DRUMS = ['kick', 'snare', 'rim', 'hat', 'ohat', 'ride', 'crash', 'shaker', 'tamb',
   'conga', 'tumba', 'bongo', 'bongolo', 'clave', 'block', 'cowbell', 'guiro',
   'tomlo', 'tommid', 'tomhi', 'bodhran', 'timbale', 'tri', 'clap', 'gong', 'thunder', 'surf']
 
@@ -20,13 +20,13 @@ const PC: Record<string, number> = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }
 const NOTE_RE = /^([A-Ga-g])(##|bb|#|b)?([0-8])$/
 const ACC: Record<string, number> = { '': 0, '#': 1, '##': 2, b: -1, bb: -2 }
 
-export function noteToMidi(s: string): number | null {
+function noteToMidi(s: string): number | null {
   const m = NOTE_RE.exec(s)
   if (!m) return null
   return 12 * (+m[3] + 1) + PC[m[1].toLowerCase()] + ACC[m[2] || '']
 }
 
-export const CHORDS: Record<string, number[]> = {
+const CHORDS: Record<string, number[]> = {
   '': [0, 4, 7], maj: [0, 4, 7], m: [0, 3, 7], min: [0, 3, 7],
   '7': [0, 4, 7, 10], m7: [0, 3, 7, 10], maj7: [0, 4, 7, 11], mmaj7: [0, 3, 7, 11],
   '6': [0, 4, 7, 9], m6: [0, 3, 7, 9], '9': [0, 4, 7, 10, 14], m9: [0, 3, 7, 10, 14],
@@ -44,7 +44,7 @@ function placeNear(pc: number, lo: number) {
 }
 
 /** `Dm7` or `C/E` → MIDI notes voiced in a window around `center`. */
-export function chordToMidis(sym: string, center: number): number[] | null {
+function chordToMidis(sym: string, center: number): number[] | null {
   const m = /^([A-G])(#|b)?([^/]*)(?:\/([A-G])(#|b)?)?$/.exec(sym)
   if (!m || !(m[3] in CHORDS)) return null
   const root = pcOf(m[1], m[2])
@@ -122,7 +122,7 @@ interface PatternRef {
   ln: number
 }
 
-export interface ParsedSong {
+interface ParsedSong {
   title: string
   composer: string
   about: string
@@ -140,7 +140,7 @@ export interface ParsedSong {
 }
 
 /* ------------------------------------------------------------------ parse */
-export function parse(text: string): { song: ParsedSong; errors: ScoreError[] } {
+function parse(text: string): { song: ParsedSong; errors: ScoreError[] } {
   const errors: ScoreError[] = []
   const err = (ln: number, msg: string) => errors.push({ line: ln, msg })
   const song: ParsedSong = {
