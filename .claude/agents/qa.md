@@ -89,8 +89,10 @@ request changes / close), then the exact comment text you would have posted.
 Otherwise:
 
 - **Approve** when everything in PROTOCOL.md "Merging" holds: comment a 2–3 line QA
-  summary on the PR naming the head SHA you reviewed, then swap `agent:needs-qa` → `agent:qa-approved`. You never merge
-  yourself — the auto-merge workflow does it once `verify` is green.
+  summary on the PR naming the head SHA you reviewed and the actual `verify` state on it
+  (success / running / failed: re-read it just before commenting), then swap `agent:needs-qa` → `agent:qa-approved`. Report that
+  fact, never a forecast of whether or when it will merge. You never merge yourself — the
+  auto-merge workflow does it once `verify` is green.
 - **Request changes**: one PR review/comment listing each required change concretely
   (file, what's wrong, what good looks like). Swap `agent:needs-qa` →
   `agent:changes-requested`.

@@ -41,8 +41,10 @@ reviewer yourself; the scheduled QA dispatcher spawns one per PR instead.
    - **Approve** otherwise: post one comment, "QA: approved", "Reviewed head `<sha>`",
      the playtest reviewer's 2–3 line summary, "Independent review: correctness ✓
      consistency ✓" (or "skipped (small diff)" / "skipped (small fix)"), and any
-     non-blocking suggestions (file `P3` issues for the ones worth doing). Then swap `agent:needs-qa` → `agent:qa-approved`. GitHub
-     merges once `verify` is green.
+     non-blocking suggestions (file `P3` issues for the ones worth doing), and the `verify` state on that head
+     as you just read it: "`verify`: success / running / failed". State that fact only: never
+     predict whether or when the PR will merge (the auto-merge workflow decides that, and says
+     so on the PR if it can't). Then swap `agent:needs-qa` → `agent:qa-approved`.
    - **Close** if it has been sent back 3 times already: close the PR, label its issue
      `agent:blocked`, and explain for the Director.
    - Say "merge conflict only; full review passed" in a change request whose only

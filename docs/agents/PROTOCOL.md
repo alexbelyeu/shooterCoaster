@@ -110,9 +110,14 @@ criteria** (checkable, including what the smoke-test screenshot should show),
 ## Merging — agents approve, GitHub merges
 
 **No agent ever merges a PR.** Approval is the `agent:qa-approved` label; the
-`Auto-merge approved PRs` workflow (`.github/workflows/automerge.yml`) squash-merges
-an approved PR once the `verify` check is green on its head commit. Pushing new
-commits to an approved PR removes the label automatically.
+`Auto-merge approved PRs` workflow (`.github/workflows/automerge.yml`, logic in
+`scripts/automerge.cjs`) squash-merges an approved PR once the `verify` check is green on
+its head commit. It runs on the PR's label events, after every CI run, and as a sweep of
+every open approved PR every 10 minutes, so an approved PR with a green `verify` merges
+within about 10 minutes even if an event was missed. When it can't merge an approved PR
+for any reason but `verify` still running (red `verify`, conflict, draft…), it says so
+once per head in a PR comment starting `Auto-merge skipped:` or `Auto-merge failed:`.
+Pushing new commits to an approved PR removes the label automatically.
 
 QA applies `agent:qa-approved` only when **all** hold:
 1. GitHub check `verify` is `success` (or still running) on the PR's head SHA (`gh api repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs`).
