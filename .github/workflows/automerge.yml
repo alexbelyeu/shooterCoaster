@@ -3,7 +3,14 @@ name: Auto-merge approved PRs
 # The merge gate for the autonomous studio. Agents never merge, and no agent can
 # approve its own PR: a separate QA run adds the
 # `agent:qa-approved` label, and this workflow squash-merges the PR once the
-# `verify` check is green on its current head commit.
+# `verify` check is green on its current head commit. The logic lives in
+# scripts/automerge.cjs (unit tests: automerge.test.ts; local dry run of the sweep:
+# node scripts/automerge.cjs --dry-run).
+#
+# When it runs: on PR label / reopen / ready events, after every successful CI run,
+# and as a sweep of every open approved PR every 10 minutes (plus on demand from the
+# Actions tab, optionally as a dry run), so a missed or stale event can't strand an
+# approved PR. GITHUB_TOKEN writes don't trigger workflows, so it can't loop.
 #
 # Safety:
 # - Only same-repo PRs from `agent/*` branches into `main`, not drafts.
@@ -17,6 +24,14 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only report what would be merged or commented on
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -49,68 +64,20 @@ jobs:
   merge:
     if: >
       (github.event_name == 'pull_request' && github.event.action != 'synchronize') ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
+      # The script at the commit this workflow definition came from: main's head for
+      # CI / schedule / dispatch runs, the PR's merge commit for pull_request runs
+      # (which already take their workflow definition from the PR).
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/automerge.cjs
+          sparse-checkout-cone-mode: false
       - uses: actions/github-script@v7
         with:
           script: |
-            const owner = context.repo.owner, repo = context.repo.repo
-
-            // Collect candidate PR numbers for this event.
-            let numbers = []
-            if (context.eventName === 'pull_request') {
-              numbers = [context.payload.pull_request.number]
-            } else {
-              const sha = context.payload.workflow_run.head_sha
-              const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({ owner, repo, commit_sha: sha })
-              numbers = data.filter((p) => p.state === 'open').map((p) => p.number)
-            }
-
-            const merged = []
-            for (const number of numbers) {
-              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number })
-              const why = (msg) => core.info(`#${number}: skip — ${msg}`)
-              if (pr.state !== 'open') { why('not open'); continue }
-              if (pr.draft) { why('draft'); continue }
-              if (pr.base.ref !== 'main') { why('base is not main'); continue }
-              if (pr.head.repo?.full_name !== `${owner}/${repo}`) { why('fork'); continue }
-              if (!pr.head.ref.startsWith('agent/')) { why('not an agent/* branch'); continue }
-              if (!pr.labels.some((l) => l.name === 'agent:qa-approved')) { why('not approved'); continue }
-
-              const { data: checks } = await github.rest.checks.listForRef({ owner, repo, ref: pr.head.sha, check_name: 'verify' })
-              const verify = checks.check_runs.sort((a, b) => new Date(b.started_at) - new Date(a.started_at))[0]
-              if (!verify || verify.status !== 'completed') { why('verify not finished'); continue }
-              if (verify.conclusion !== 'success') { why(`verify ${verify.conclusion}`); continue }
-
-              try {
-                await github.rest.pulls.merge({
-                  owner, repo, pull_number: number, sha: pr.head.sha, merge_method: 'squash',
-                  commit_title: `${pr.title} (#${number})`,
-                })
-                merged.push(number)
-                core.info(`#${number}: merged`)
-              } catch (e) {
-                core.warning(`#${number}: merge failed — ${e.message}`)
-                await github.rest.issues.createComment({
-                  owner, repo, issue_number: number,
-                  body: `Auto-merge failed: ${e.message}\nThe branch probably conflicts with main: merge origin/main into it, resolve, re-verify and push (never force-push).`,
-                })
-              }
-            }
-
-            // Pushes made with GITHUB_TOKEN don't trigger ci.yml's `push: main`, so start
-            // verify on main explicitly (workflow_dispatch is exempt from that rule). One
-            // run covers every merge in this batch: it tests main's head.
-            if (merged.length) {
-              const { data: head } = await github.rest.repos.getBranch({ owner, repo, branch: 'main' })
-              const label = `${merged.map((n) => `#${n}`).join(', ')} (${head.commit.sha.slice(0, 7)})`
-              try {
-                await github.rest.actions.createWorkflowDispatch({
-                  owner, repo, workflow_id: 'ci.yml', ref: 'main', inputs: { merged: label },
-                })
-                core.info(`dispatched CI on main after ${label}`)
-              } catch (e) {
-                core.warning(`could not dispatch CI on main: ${e.message}`)
-              }
-            }
+            const run = require(`${process.env.GITHUB_WORKSPACE}/scripts/automerge.cjs`)
+            await run({ github, context, core })
