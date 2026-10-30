@@ -1,0 +1,134 @@
+{
+  "name": "baseline-music-level2",
+  "kind": "music",
+  "request": {
+    "kind": "music",
+    "track": "level2"
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.1,
+      "name": "level2 music"
+    }
+  ],
+  "seams": [
+    23.514634146341464
+  ],
+  "bar": {
+    "startS": 0.1,
+    "barS": 2.926829268292683
+  },
+  "metrics": {
+    "seconds": 30,
+    "integrated": -44.3,
+    "shortTermMax": -45.9,
+    "lra": 1.6,
+    "truePeak": -28,
+    "clipped": 0,
+    "silence": 1.8,
+    "correlation": 1,
+    "below30Db": -33,
+    "bands": {
+      "sub": {
+        "pct": 49.8,
+        "db": -3
+      },
+      "low": {
+        "pct": 49.9,
+        "db": -3
+      },
+      "mid": {
+        "pct": 0.3,
+        "db": -25.5
+      },
+      "presence": {
+        "pct": 0,
+        "db": -52.2
+      },
+      "air": {
+        "pct": 0,
+        "db": -66.4
+      },
+      "below30": {
+        "pct": 0,
+        "db": -33
+      }
+    },
+    "seamJumps": [
+      {
+        "at": 23.515,
+        "db": 9.95,
+        "vsBars": 0.07
+      }
+    ],
+    "seamJumpMax": 0.07
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -44.3,
+      "unit": "LUFS",
+      "min": -18,
+      "max": -16,
+      "status": "fail"
+    },
+    {
+      "label": "Short-term max",
+      "value": -45.9,
+      "unit": "LUFS",
+      "min": -15,
+      "max": -13,
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -28,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -33,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 1,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Loop-seam jump vs bar lines",
+      "value": 0.07,
+      "unit": "dB",
+      "max": 1,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 1.6,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 1.8,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

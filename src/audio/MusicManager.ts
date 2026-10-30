@@ -281,6 +281,12 @@ export function setMusicIntensity(intensity: number): void {
   if (padSynth) padSynth.volume.value = -24 + currentIntensity * 2
 }
 
+/** Offline renders: bar length and bars per loop (the pad plays one chord per bar; the 8th-note parts divide it). */
+export function musicLoop(biome: BiomeType): { barS: number; bars: number } {
+  const cfg = CONFIGS[biome]
+  return { barS: (4 * 60) / cfg.tempo, bars: cfg.padChords.length }
+}
+
 export function getMusicIntensity(): number {
   return currentIntensity
 }

@@ -1,0 +1,311 @@
+{
+  "name": "baseline-sfx-sheet-level1",
+  "kind": "sfx",
+  "request": {
+    "kind": "sfxSheet"
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.3,
+      "name": "fire (single shot)"
+    },
+    {
+      "t": 0.9,
+      "name": "fire (auto, held trigger)"
+    },
+    {
+      "t": 1.5,
+      "name": "autofire burst (6 shots, 100 ms apart)"
+    },
+    {
+      "t": 2.7,
+      "name": "hit tick"
+    },
+    {
+      "t": 3.3,
+      "name": "kill 1x"
+    },
+    {
+      "t": 3.9,
+      "name": "kill 2x (+ thump)"
+    },
+    {
+      "t": 4.6,
+      "name": "kill 3x (+ ring)"
+    },
+    {
+      "t": 5.4,
+      "name": "kill 5x (+ swell)"
+    },
+    {
+      "t": 6.4,
+      "name": "combo break"
+    },
+    {
+      "t": 7.2,
+      "name": "wave stinger"
+    },
+    {
+      "t": 8.6,
+      "name": "boss arrival"
+    },
+    {
+      "t": 10.6,
+      "name": "boss hit (full hp)"
+    },
+    {
+      "t": 11.2,
+      "name": "boss hit (low hp)"
+    },
+    {
+      "t": 11.8,
+      "name": "boss defeat"
+    },
+    {
+      "t": 14.2,
+      "name": "firework whistle"
+    },
+    {
+      "t": 15.8,
+      "name": "firework pop"
+    },
+    {
+      "t": 16.8,
+      "name": "star chime 1"
+    },
+    {
+      "t": 17.8,
+      "name": "star chime 2"
+    },
+    {
+      "t": 18.8,
+      "name": "star chime 3"
+    }
+  ],
+  "seams": [],
+  "bar": null,
+  "metrics": {
+    "seconds": 20.3,
+    "integrated": -32.9,
+    "shortTermMax": -31.4,
+    "lra": 12,
+    "truePeak": -11.7,
+    "clipped": 0,
+    "silence": 49.5,
+    "correlation": 1,
+    "below30Db": -17,
+    "bands": {
+      "sub": {
+        "pct": 11.3,
+        "db": -9.5
+      },
+      "low": {
+        "pct": 44.2,
+        "db": -3.5
+      },
+      "mid": {
+        "pct": 26.2,
+        "db": -5.8
+      },
+      "presence": {
+        "pct": 15,
+        "db": -8.2
+      },
+      "air": {
+        "pct": 3.4,
+        "db": -14.7
+      },
+      "below30": {
+        "pct": 2,
+        "db": -17
+      }
+    },
+    "seamJumps": [],
+    "seamJumpMax": null,
+    "gunTailMs": 90,
+    "sounds": [
+      {
+        "t": 0.3,
+        "name": "fire (single shot)",
+        "peakDb": -25,
+        "tailMs": 90
+      },
+      {
+        "t": 0.9,
+        "name": "fire (auto, held trigger)",
+        "peakDb": -31.1,
+        "tailMs": 75
+      },
+      {
+        "t": 1.5,
+        "name": "autofire burst (6 shots, 100 ms apart)",
+        "peakDb": -31,
+        "tailMs": 576
+      },
+      {
+        "t": 2.7,
+        "name": "hit tick",
+        "peakDb": -23.8,
+        "tailMs": 25
+      },
+      {
+        "t": 3.3,
+        "name": "kill 1x",
+        "peakDb": -16.8,
+        "tailMs": 50
+      },
+      {
+        "t": 3.9,
+        "name": "kill 2x (+ thump)",
+        "peakDb": -12.5,
+        "tailMs": 195
+      },
+      {
+        "t": 4.6,
+        "name": "kill 3x (+ ring)",
+        "peakDb": -12.1,
+        "tailMs": 205
+      },
+      {
+        "t": 5.4,
+        "name": "kill 5x (+ swell)",
+        "peakDb": -12.1,
+        "tailMs": 366
+      },
+      {
+        "t": 6.4,
+        "name": "combo break",
+        "peakDb": -27.2,
+        "tailMs": 110
+      },
+      {
+        "t": 7.2,
+        "name": "wave stinger",
+        "peakDb": -24.7,
+        "tailMs": 687
+      },
+      {
+        "t": 8.6,
+        "name": "boss arrival",
+        "peakDb": -18.8,
+        "tailMs": 1258
+      },
+      {
+        "t": 10.6,
+        "name": "boss hit (full hp)",
+        "peakDb": -17.3,
+        "tailMs": 165
+      },
+      {
+        "t": 11.2,
+        "name": "boss hit (low hp)",
+        "peakDb": -17.3,
+        "tailMs": 160
+      },
+      {
+        "t": 11.8,
+        "name": "boss defeat",
+        "peakDb": -14.3,
+        "tailMs": 1168
+      },
+      {
+        "t": 14.2,
+        "name": "firework whistle",
+        "peakDb": -51.2,
+        "tailMs": 972
+      },
+      {
+        "t": 15.8,
+        "name": "firework pop",
+        "peakDb": -19.6,
+        "tailMs": 220
+      },
+      {
+        "t": 16.8,
+        "name": "star chime 1",
+        "peakDb": -21,
+        "tailMs": 496
+      },
+      {
+        "t": 17.8,
+        "name": "star chime 2",
+        "peakDb": -21.1,
+        "tailMs": 501
+      },
+      {
+        "t": 18.8,
+        "name": "star chime 3",
+        "peakDb": -21,
+        "tailMs": 511
+      }
+    ]
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -32.9,
+      "unit": "LUFS",
+      "min": -18,
+      "max": -16,
+      "status": "info"
+    },
+    {
+      "label": "Short-term max",
+      "value": -31.4,
+      "unit": "LUFS",
+      "min": -15,
+      "max": -13,
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -11.7,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -17,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "fail"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 1,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Gun to silence (−60 dB)",
+      "value": 90,
+      "unit": "ms",
+      "max": 150,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 12,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 49.5,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

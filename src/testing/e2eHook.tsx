@@ -16,7 +16,7 @@
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
  *     the weapon view-model's on-screen box (hit feedback checks)
- *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses)
+ *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses) and render it offline
  *   - read the camera pose (title fly-by), shader program count and longest frame (first-shot hitch)
  *   - summon the level's boss now, read it (hp, exposed weak points, on-screen box) and hit it through processHit
  *
@@ -46,6 +46,7 @@ import { playExplosionSound, playFireSound, playHitTick, playWaveStinger, sfxNod
 import { droppedSounds } from '@/audio/soundGuard'
 import { nextTriggerTime } from '@/audio/triggerTime'
 import { musicState, type MusicFade } from '@/audio/musicBus'
+import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
 import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
 
 export const isE2E =
@@ -151,6 +152,9 @@ export interface SCTestApi {
   audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { lateScheduleErrors: number }>
   /** Whether pointer input has the trigger held (released on blur / tab hide). */
   triggerHeld: () => boolean
+  /** Offline render of the game's own music / SFX code (`npm run audio:render`, `testing/audioRender.ts`).
+   *  Only on the title screen before audio unlocks: Tone's global context is offline while it runs. */
+  renderAudio: (req: AudioRenderRequest, seed?: number) => Promise<AudioRenderResult>
   /** The current level's shader warm-up (`canvas/ShaderWarmup.tsx`): finished?, how long it took
    *  from level mount, and the renderer's program count after it. null before the first level. */
   shaderWarmup: { done: boolean; ms: number; programs: number } | null
@@ -515,6 +519,7 @@ export function installE2EApi() {
     waveEvents: [],
     audio: readAudio,
     audioBurst,
+    renderAudio: (req, seed) => import('./audioRender').then((m) => m.renderAudio(req, seed)),
     phase: () => useGameStore.getState().phase,
     enemies: enemiesOnScreen,
     errors: [],

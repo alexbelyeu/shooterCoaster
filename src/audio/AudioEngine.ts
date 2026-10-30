@@ -18,18 +18,61 @@ export function isAudioReady(): boolean {
   return initialized
 }
 
-// sfxChannel and musicChannel → musicDuck both end in the limiter, so stacked kill layers can't clip.
-const masterLimiter = new Tone.Limiter(-1).toDestination()
-
 const DUCK_OPEN_HZ = 20000
 const DUCK_CLOSED_HZ = 800
 const DUCK_RAMP_S = 0.25
 
-const musicDuck = new Tone.Filter({ type: 'lowpass', frequency: DUCK_OPEN_HZ, rolloff: -12 }).connect(masterLimiter)
+// sfx and music → duck both end in the limiter, so stacked kill layers can't clip.
+interface MasterChain {
+  limiter: Tone.Limiter
+  duck: Tone.Filter
+  sfx: Tone.Channel
+  music: Tone.Channel
+}
+
+/** Built in Tone's current context: the live one at import, an offline one while `offlineRender.ts` renders. */
+function createMasterChain(): MasterChain {
+  const limiter = new Tone.Limiter(-1).toDestination()
+  const duck = new Tone.Filter({ type: 'lowpass', frequency: DUCK_OPEN_HZ, rolloff: -12 }).connect(limiter)
+  const sfx = new Tone.Channel(-6, 0).connect(limiter)
+  const music = new Tone.Channel(-10, 0).connect(duck)
+  return { limiter, duck, sfx, music }
+}
+
+let chain = createMasterChain()
+let musicDuck = chain.duck
 let ducked = false
 
-export const sfxChannel = new Tone.Channel(-6, 0).connect(masterLimiter)
-export const musicChannel = new Tone.Channel(-10, 0).connect(musicDuck)
+// Live bindings: an offline render swaps them for the length of the render.
+export let sfxChannel = chain.sfx
+export let musicChannel = chain.music
+
+function setChain(c: MasterChain) {
+  chain = c
+  musicDuck = c.duck
+  sfxChannel = c.sfx
+  musicChannel = c.music
+}
+
+/**
+ * Offline renders only (`offlineRender.ts`): builds a fresh master chain in the current
+ * (offline) Tone context and marks audio ready, so the game's own music and SFX code
+ * plays into the render. Returns the function that puts the live chain back.
+ */
+export function swapInOfflineChain(): () => void {
+  const live = { chain, initialized, ducked }
+  const offline = createMasterChain()
+  setChain(offline)
+  initialized = true
+  ducked = false
+  syncVolumes()
+  return () => {
+    setChain(live.chain)
+    initialized = live.initialized
+    ducked = live.ducked
+    for (const node of [offline.sfx, offline.music, offline.duck, offline.limiter]) node.dispose()
+  }
+}
 
 /** Slow-mo "underwater" low-pass on the music bus. */
 export function setMusicDucked(on: boolean, immediate = false): void {

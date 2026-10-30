@@ -8,4 +8,7 @@ Use a file's raw link to play it in the browser. The Sound designer writes these
 - `<name>.json`: its measurements (LUFS, true peak, band energy, seam jump)
 - `<name>.png`: its spectrogram, at most ~150 KB
 
+`npm run audio:render` writes all three (`npm run audio:check` re-measures any file).
+`baseline-*` is the game's sound before the audio overhaul; `../BASELINE.md` reads it.
+
 Revisions overwrite the same names, so this folder always holds the current sound.

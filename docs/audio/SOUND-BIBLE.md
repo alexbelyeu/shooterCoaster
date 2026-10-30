@@ -65,11 +65,12 @@ These are measured on offline renders, at default settings, with nothing else pl
 
 ## How we check sound, since no agent can hear
 
-1. **Render offline** (the toolkit from the audio epic; until it exists, use the method
-   in `docs/audio/reference/README.md`).
+1. **Render offline** with `npm run audio:render` (music, an SFX sheet or a scripted
+   combat mix; see CLAUDE.md "Commands"). `npm run audio:check` measures any file.
 2. **Measure** loudness (integrated, short-term max, LRA), true peak, clipping, the
    loop-seam level jump, and band energy (sub / low / mid / high). Compare against the
-   targets above and against the previous render.
+   targets above and against the previous render; `BASELINE.md` has the starting point.
+   The targets live in code too (`scripts/audio/metrics.mjs`): change both together.
 3. **Look** at the spectrogram PNG: masking, mud, harsh highs, dead air.
 4. **Lint** every score: it compiles, every bar adds up, and every note is inside its
    instrument's useful range.

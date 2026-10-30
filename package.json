@@ -14,6 +14,8 @@
     "check:bundle": "node scripts/check-bundle.mjs",
     "og": "node scripts/og-image.mjs",
     "clip": "node scripts/clip.mjs",
+    "audio:render": "node scripts/audio/render.mjs",
+    "audio:check": "node scripts/audio/check.mjs",
     "verify": "npm test && npm run build && npm run check:bundle && npm run smoke"
   },
   "dependencies": {

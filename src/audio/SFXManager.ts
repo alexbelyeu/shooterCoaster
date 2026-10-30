@@ -224,13 +224,14 @@ export function playFireSound(auto = false): void {
   }
 }
 
+// Throttles run on the audio clock the sounds play on (an offline render runs its whole timeline in one JS turn).
 let lastTickTime = 0
 const HIT_TICK_MIN_INTERVAL = 25 // ms — several hits in one frame tick once
 
 export function playHitTick(): void {
   const k = ensureKit()
   if (!k) return
-  const nowMs = performance.now()
+  const nowMs = Tone.now() * 1000
   if (nowMs - lastTickTime < HIT_TICK_MIN_INTERVAL) return
   lastTickTime = nowMs
 
@@ -253,7 +254,7 @@ export function playExplosionSound(comboCount: number = 0): void {
   const k = ensureKit()
   if (!k) return
 
-  const nowMs = performance.now()
+  const nowMs = Tone.now() * 1000
   if (nowMs - lastExplosionTime < EXPLOSION_SOUND_MIN_INTERVAL) return
   lastExplosionTime = nowMs
 
@@ -479,5 +480,5 @@ export function disposeSFX(): void {
   for (let i = owned.length - 1; i >= 0; i--) owned[i].dispose()
   owned.length = 0
   kit = null
-  lastSwellTime = 0
+  lastTickTime = lastExplosionTime = lastSwellTime = 0
 }
