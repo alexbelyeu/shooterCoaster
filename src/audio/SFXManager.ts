@@ -8,6 +8,8 @@ import {
   FIREWORK_BIOMES,
   FIREWORK_SFX,
   FIRE_VARIANTS,
+  KILL_TIMBRES,
+  type KillSound,
   STAR_CHIME_NOTES,
   STINGERS,
   STINGER_CHORD_GAP_S,
@@ -16,6 +18,7 @@ import {
   fireVelocity,
   fireworkWhistleS,
   killLayers,
+  killPingHz,
 } from './sfxDesign'
 import type { BiomeType } from '@/types/level'
 
@@ -249,7 +252,7 @@ const EXPLOSION_SOUND_MIN_INTERVAL = 30 // ms — throttle rapid pops
 let lastSwellTime = 0
 const SWELL_MIN_INTERVAL = 600 // ms — let one swell finish before the next
 
-export function playExplosionSound(comboCount: number = 0): void {
+export function playExplosionSound(comboCount: number = 0, sound: KillSound = 'pop'): void {
   const k = ensureKit()
   if (!k) return
 
@@ -260,11 +263,12 @@ export function playExplosionSound(comboCount: number = 0): void {
   try {
     const toneNow = Tone.now()
     const ctxNow = Tone.getContext().currentTime
-    k.popSnap.triggerAttackRelease(0.05 + Math.random() * 0.02, nextTriggerTime(k.popSnap, toneNow, ctxNow))
+    const timbre = KILL_TIMBRES[sound]
+    k.popSnap.envelope.decay = timbre.snapDecay
+    k.popSnap.triggerAttackRelease(timbre.snapS + Math.random() * 0.02, nextTriggerTime(k.popSnap, toneNow, ctxNow))
+    k.popPing.triggerAttackRelease(killPingHz(sound, comboCount, Math.random()), timbre.pingS, nextTriggerTime(k.popPing, toneNow, ctxNow))
 
     const combo = Math.min(comboCount, 10)
-    const pingFreq = 1400 + combo * 80 + Math.random() * 300
-    k.popPing.triggerAttackRelease(pingFreq, 0.04, nextTriggerTime(k.popPing, toneNow, ctxNow))
 
     const layers = killLayers(comboCount)
     if (layers.thump) {
@@ -362,6 +366,7 @@ export function playBossDefeat(): void {
     const ctxNow = Tone.getContext().currentTime
     k.bossBoom.triggerAttackRelease(boomS, nextTriggerTime(k.bossBoom, toneNow, ctxNow))
     k.thump.triggerAttackRelease('C1', 0.5, nextTriggerTime(k.thump, toneNow, ctxNow))
+    k.popSnap.envelope.decay = KILL_TIMBRES.pop.snapDecay
     k.popSnap.triggerAttackRelease(0.08, nextTriggerTime(k.popSnap, toneNow, ctxNow))
     k.ring.triggerAttackRelease(820, 0.5, nextTriggerTime(k.ring, toneNow, ctxNow))
     k.swell.triggerAttackRelease(SWELL_S, nextTriggerTime(k.swell, toneNow, ctxNow))
