@@ -1289,6 +1289,179 @@ canvas {
   margin-bottom: clamp(1rem, 4vh, 2rem);
 }
 
+/* Pause menu */
+.pause-menu {
+  --accent: #ffd23f;
+  --accent-glow: rgba(255, 210, 63, 0.55);
+  background: radial-gradient(ellipse at 50% 40%, rgba(15, 15, 25, 0.45), rgba(0, 0, 0, 0.75));
+  backdrop-filter: blur(10px) saturate(0.8);
+  -webkit-backdrop-filter: blur(10px) saturate(0.8);
+}
+
+.pause-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(100%, 22rem);
+  padding: 1.5rem 1.25rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 3px solid var(--accent);
+  border-radius: 18px;
+  background: rgba(12, 12, 20, 0.72);
+  box-shadow: 0 0 40px var(--accent-glow), 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.pause-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.pause-menu h2 {
+  margin: 0.15rem 0 1rem;
+  font-size: clamp(1.8rem, 8vw, 2.4rem);
+  line-height: 1.1;
+  text-align: center;
+  text-shadow: 0 0 18px var(--accent-glow);
+}
+
+.pause-run {
+  width: 100%;
+  padding: 0.75rem 0.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pause-score {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pause-score strong {
+  font-size: 1.9rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pause-stars {
+  display: flex;
+  gap: 0.2rem;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.pause-stars .earned {
+  color: #ffd23f;
+  text-shadow: 0 0 12px rgba(255, 210, 63, 0.8);
+}
+
+.pause-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.pause-stats div {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.pause-stats dt {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.pause-stats dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pause-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  width: 100%;
+  margin-top: 1.1rem;
+}
+
+.pause-actions .play-button {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  font-size: 1rem;
+  letter-spacing: 1.5px;
+}
+
+.pause-actions .pause-secondary {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.pause-actions .play-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 18px var(--accent-glow);
+}
+
+.pause-keys {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+@media (hover: none) {
+  .pause-keys {
+    display: none;
+  }
+}
+
+/* Phone landscape: the run on the left, the buttons in a 2 x 2 grid on the right. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .pause-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1.25rem;
+    align-items: center;
+    width: min(100%, 40rem);
+    padding: 1rem 1.25rem;
+  }
+
+  .pause-label,
+  .pause-menu h2,
+  .pause-run {
+    grid-column: 1;
+  }
+
+  .pause-label,
+  .pause-menu h2 {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .pause-menu h2 {
+    margin-bottom: 0.5rem;
+    font-size: 1.6rem;
+  }
+
+  .pause-actions {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 0;
+  }
+
+  .pause-keys {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Settings rows: full-width label rows with 44 px touch targets */
 .settings-list {
   display: flex;
