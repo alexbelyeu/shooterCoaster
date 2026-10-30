@@ -1355,8 +1355,9 @@ async function settingsCheck(page) {
   const before = await page.evaluate(() => window.__SC_TEST__.graphics().quality)
   if (before !== 'auto') problems.push(`quality "${before}" by default, expected auto`)
   await page.getByRole('radio', { name: 'Low', exact: true }).click({ timeout: 30000 })
-  await page.locator('.settings-card input[type="range"]').first().fill('0.3')
+  await page.waitForFunction(() => window.__SC_TEST__.graphics().quality === 'low', null, { timeout: 5000 }).catch(() => {})
   const picked = await page.evaluate(() => window.__SC_TEST__.graphics().quality)
+  await page.locator('.settings-card input[type="range"]').first().fill('0.3')
   if (picked !== 'low') problems.push(`clicking Low set the quality to "${picked}"`)
   await page.keyboard.press('Escape')
   const closed = await page

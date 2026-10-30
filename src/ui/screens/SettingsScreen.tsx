@@ -86,15 +86,18 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
   const reducedMotion = usePrefersReducedMotion()
   const systemReducedMotion = useSystemPrefersReducedMotion()
   const card = useRef<HTMLDivElement>(null)
+  const close = useRef(onClose)
+  close.current = onClose
 
+  // Once on open: `onClose` is a fresh arrow on every App render, and refocusing would steal focus.
   useEffect(() => {
     card.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus({ preventScroll: true })
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.repeat) onClose()
+      if (e.key === 'Escape' && !e.repeat) close.current()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [])
 
   return (
     <div className="pause-screen pause-menu settings-screen">
