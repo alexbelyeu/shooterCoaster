@@ -40,10 +40,6 @@ permissions:
   checks: read
   actions: write # dispatch ci.yml on main after a merge
 
-concurrency:
-  group: automerge
-  cancel-in-progress: false
-
 jobs:
   revoke-on-push:
     if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
@@ -66,6 +62,11 @@ jobs:
       (github.event_name == 'pull_request' && github.event.action != 'synchronize') ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
       github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # Job-level, so revoke-on-push is never queued behind (or replaced by) a merge run:
+    # GitHub keeps only one pending run per group, and the sweep queues one every 10 min.
+    concurrency:
+      group: automerge
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
