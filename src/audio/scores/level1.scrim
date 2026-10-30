@@ -1,0 +1,40 @@
+title    Midway Rush
+composer Claude (ShooterCoaster placeholder)
+about    Placeholder Theme Park score that proves the score engine. Organ riff, accordion skank and an oom-pah tuba over a rock beat.
+tempo    156
+beats    4
+steps    2
+reverb   0.22
+
+voice lead   organ     vol=0.75 pan=-0.1
+voice xylo   xylophone vol=0.45 pan=0.35
+voice skank  accordion vol=0.35 pan=0.3  center=A4 gate=0.5
+voice tuba   tuba      vol=0.8  oct=1
+voice kick   kick      vol=0.85
+voice snare  snare     vol=0.55 pan=0.05
+voice hat    hat       vol=0.35 pan=-0.3
+voice crash  crash     vol=0.35 pan=0.2
+
+pattern intro
+xylo  | C5 D5 E5 F5 G5 A5 Bb5 C6 | .- C6- C6- .- |
+kick  | x... x... | x... x.x. |
+snare | .... .... | ..x. XXXX |
+
+pattern A
+lead  | C5 A4 C5 F5- E5 F5 A5 | G5- E5 C5- E5 G5 E5 | F5 D5 Bb4 D5 F5- Bb5- | A5 G5 F5 E5 G5--- |
+skank | .- [F]- .- [F]- | .- [C]- .- [C]- | .- [Bb]- .- [Bb]- | .- [C]- .- [C7]- |
+tuba  | F2- C2- F2- C2- | C2- G1- C2- G1- | Bb1- F2- Bb1- F2- | C2- G1- C2- E2- |
+kick  | x... x... | % | % | x... x.xx |
+snare | ..x. ..x. | % | % | ..x. .xXX |
+hat   | .x.x .x.x | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+# B keeps A's drums; the xylophone doubles the tune two octaves up
+pattern B from A
+lead  | D5- F5- A5- G5 F5 | F5- D5- Bb4--- | A4 C5 F5 A5 C6- A5- | G5 A5 G5 F5 E5- C5- |
+xylo  | D6- F6- A6- G6 F6 | F6- D6- Bb5--- | A5 C6 F6 A6 C7- A6- | G6 A6 G6 F6 E6- C6- |
+skank | .- [Dm]- .- [Dm]- | .- [Bb]- .- [Bb]- | .- [F]- .- [F]- | .- [C]- .- [C7]- |
+tuba  | D2- A1- D2- A1- | Bb1- F2- Bb1- F2- | F2- C2- F2- A2- | C2- G1- C2- G1- |
+
+play intro
+loop A B

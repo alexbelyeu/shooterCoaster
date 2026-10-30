@@ -28,8 +28,9 @@ function logFade(fade: MusicFade) {
   if (fades.length > 8) fades.shift()
 }
 
-export function openMusicBus(name: string): MusicBus {
-  const gain = new Tone.Gain(0).connect(musicChannel)
+/** `channel`: the score engine passes its stereo channel. */
+export function openMusicBus(name: string, channel: Tone.Channel = musicChannel): MusicBus {
+  const gain = new Tone.Gain(0).connect(channel)
   gain.gain.rampTo(1, MUSIC_FADE_S)
   const bus = { name, gain, fading: false }
   live.add(bus)
