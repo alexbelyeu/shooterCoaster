@@ -23,6 +23,7 @@ permissions:
   pull-requests: write
   issues: write
   checks: read
+  actions: write # dispatch ci.yml on main after a merge
 
 concurrency:
   group: automerge
@@ -66,6 +67,7 @@ jobs:
               numbers = data.filter((p) => p.state === 'open').map((p) => p.number)
             }
 
+            const merged = []
             for (const number of numbers) {
               const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number })
               const why = (msg) => core.info(`#${number}: skip — ${msg}`)
@@ -86,6 +88,7 @@ jobs:
                   owner, repo, pull_number: number, sha: pr.head.sha, merge_method: 'squash',
                   commit_title: `${pr.title} (#${number})`,
                 })
+                merged.push(number)
                 core.info(`#${number}: merged`)
               } catch (e) {
                 core.warning(`#${number}: merge failed — ${e.message}`)
@@ -93,5 +96,21 @@ jobs:
                   owner, repo, issue_number: number,
                   body: `Auto-merge failed: ${e.message}\nThe branch probably conflicts with main: merge origin/main into it, resolve, re-verify and push (never force-push).`,
                 })
+              }
+            }
+
+            // Pushes made with GITHUB_TOKEN don't trigger ci.yml's `push: main`, so start
+            // verify on main explicitly (workflow_dispatch is exempt from that rule). One
+            // run covers every merge in this batch: it tests main's head.
+            if (merged.length) {
+              const { data: head } = await github.rest.repos.getBranch({ owner, repo, branch: 'main' })
+              const label = `${merged.map((n) => `#${n}`).join(', ')} (${head.commit.sha.slice(0, 7)})`
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner, repo, workflow_id: 'ci.yml', ref: 'main', inputs: { merged: label },
+                })
+                core.info(`dispatched CI on main after ${label}`)
+              } catch (e) {
+                core.warning(`could not dispatch CI on main: ${e.message}`)
               }
             }

@@ -177,6 +177,7 @@ QA reviews reverts first — then reopen the original issue with what went wrong
 - Network is allowlisted: npm, pip and GitHub work; arbitrary websites (including the Vercel deployments and the Playwright CDN) do not. Don't retry blocked hosts with other tools.
 - Headless Chromium: `export SC_CHROME="$(scripts/ensure-browser.sh)"`. Rendering is software (SwiftShader), so **frame times are much slower than real hardware** — use them only for relative comparisons; draw calls and triangle counts are reliable.
 - GitHub through `gh api` (REST only). GraphQL, repository-settings writes, branch deletion and GitHub Actions API paths are blocked by the proxy. `gh pr create` may work; if not, use `gh api -X POST repos/alexbelyeu/shootercoaster/pulls`.
+- CI `verify` runs on every PR and on `main` after every auto-merge (`automerge.yml` dispatches `ci.yml`, since `GITHUB_TOKEN` pushes don't trigger `push`); read it with `gh api repos/alexbelyeu/shootercoaster/commits/main/check-runs?check_name=verify`. A red `main` run opens or comments on the `agent:prod-broken` issue.
 - You cannot read CI logs through the API. Reproduce failures locally with `npm run verify`.
 - **Keep logs out of the conversation.** Redirect long output to a file and print only a
   summary: `npm run verify > /tmp/verify.log 2>&1; grep -E '^(PASS|FAIL)|Tests |error' /tmp/verify.log; tail -n 40 /tmp/verify.log`.
