@@ -78,6 +78,7 @@ export default function CoasterCamera({
   const lookSnapped = useRef(false)
   const rig = useRef(createRigState())
   const streaks = useRef<StreakDrive>({ opacity: 0, time: 0 })
+  const runId = useRef(-1)
 
   // Rotation-only trauma from kills and `camera:trauma` world events (#65); see screenShake.ts.
   const shake = useRef({ trauma: 0, decayMs: KILL_TRAUMA_MS, time: 0, seed: 0 })
@@ -129,15 +130,17 @@ export default function CoasterCamera({
     const cam = cameraRef.current
     if (!cam || !enabled) return
 
-    // Slow-mo scales the ride; the car waits at the start through the countdown (Replay included).
-    const { timeScale, phase } = useGameStore.getState()
-    const countdown = phase === 'countdown'
+    // Slow-mo scales the ride, a pause holds it; the car waits at the start through the countdown and every new run.
+    const store = useGameStore.getState()
+    const countdown = store.phase === 'countdown'
     let jumped = countdown || !lookSnapped.current
-    if (countdown) {
+    if (countdown || store.runId !== runId.current) {
+      runId.current = store.runId
       progress.current = 0
       velocity.current = 0
+      jumped = true
     }
-    const effectiveDelta = countdown ? 0 : delta * (timeScale ?? 1)
+    const effectiveDelta = countdown || store.phase === 'paused' ? 0 : delta * (store.timeScale ?? 1)
 
     const effectiveRollerSpeed = rollerSpeed * SPEED_FACTOR
     const effectiveMinSpeed = minRollerSpeed * SPEED_FACTOR
@@ -238,6 +241,7 @@ export default function CoasterCamera({
     }
 
     if (testApi) {
+      testApi.rideProgress = t
       const offset = cam.position.distanceTo(_position.current)
       testApi.cameraTranslation.current = offset
       if (offset > testApi.cameraTranslation.max) testApi.cameraTranslation.max = offset

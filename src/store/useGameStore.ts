@@ -9,7 +9,11 @@ import { startPhaseFor } from './startPhase'
 interface GameState {
   // Phase
   phase: GamePhase
+  /** Also ends a resume countdown. */
   setPhase: (phase: GamePhase) => void
+  /** Still `paused` through the resume Ready / GO (`ui/hud/Countdown` sets `playing` on GO), so nothing moves until then. */
+  resuming: boolean
+  resume: () => void
 
   // Current level
   currentLevel: string | null
@@ -17,6 +21,8 @@ interface GameState {
 
   /** Seeds this run's enemy spawns. */
   runSeed: number
+  /** Bumped by every `startRun`: per-run state resets on it, never on a phase change (paused → playing can be a Restart). */
+  runId: number
   /** The one way to start or restart a level (enters `countdown`, `playing` under `?e2e=1`); seed precedence: `seed` > `?seed=` > `Date.now()`. */
   startRun: (levelId: string, seed?: number) => void
 
@@ -86,22 +92,27 @@ export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
       phase: 'title',
-      setPhase: (phase) => set({ phase }),
+      setPhase: (phase) => set({ phase, resuming: false }),
+      resuming: false,
+      resume: () => set((s) => (s.phase === 'paused' ? { resuming: true } : {})),
 
       currentLevel: null,
       setCurrentLevel: (level) => set({ currentLevel: level }),
 
       runSeed: 0,
+      runId: 0,
       startRun: (levelId, seed) =>
-        set({
+        set((s) => ({
           ...RUN_COUNTERS,
           combo: NO_COMBO,
           timeScale: 1,
           boss: null,
           currentLevel: levelId,
           runSeed: (seed ?? urlSeed() ?? Date.now()) >>> 0,
+          runId: s.runId + 1,
           phase: startPhaseFor(urlSearch() ?? ''),
-        }),
+          resuming: false,
+        })),
 
       score: 0,
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),

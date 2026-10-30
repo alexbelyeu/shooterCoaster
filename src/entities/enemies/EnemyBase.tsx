@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import { playExplosionSound } from '@/audio/SFXManager'
 import { eventBus } from '@/core/EventBus'
+import { gameTime } from '@/core/gameClock'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
 import type { EnemyType, Formation } from '@/types/level'
 import { registerE2EEnemy, unregisterE2EEnemy } from '@/testing/e2eHook'
@@ -150,7 +151,7 @@ export default function EnemyBase({
     return () => unregisterE2EEnemy(id)
   }, [alive, id, type])
 
-  useFrame(({ clock }, delta) => {
+  useFrame((_, delta) => {
     const { phase, timeScale } = useGameStore.getState()
     if (!meshRef.current || phase !== 'playing') return
     if (timeScale === 0) return
@@ -160,7 +161,8 @@ export default function EnemyBase({
       entryPoint(meshRef.current.position, entry.from, spawnPosition, entryT.current, entry.spin)
       if (entryT.current === 1) setEntered(true)
     } else if (aliveRef.current) {
-      updatePosition(meshRef.current, spawnPosition, clock.elapsedTime, delta * timeScale)
+      // Game time, not the render clock, so a pause never jumps an orbiting enemy.
+      updatePosition(meshRef.current, spawnPosition, gameTime(), delta * timeScale)
     } else if (dying.current) {
       // Frozen in the white pop. The hit may land earlier in this same frame
       // (bullet pool runs first), so require a 2nd tick: the pop is always

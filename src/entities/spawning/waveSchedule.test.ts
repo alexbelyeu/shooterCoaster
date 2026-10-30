@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
-import { WAVE_TELL_SECONDS, newWaveProgress, tickWaves } from './waveSchedule'
+import { WAVE_TELL_SECONDS, newWaveProgress, nextWaveDue, tickWaves } from './waveSchedule'
 
 /** Ticks the schedule at each elapsed time; returns the events in order. */
 function run(delays: number[], times: number[], progress = newWaveProgress(delays.length)) {
@@ -27,6 +27,20 @@ describe('tickWaves', () => {
     const after = run([0, 20, 45], [25, 30, 44, 45, 60], progress)
     expect(before).toEqual(['tell 1 @19', 'arrive 1 @20'])
     expect(after).toEqual(['tell 2 @44', 'arrive 2 @45'])
+  })
+
+  it('pause at t, resume after any wall time: the next wave is still due at its original level-time offset (#152)', () => {
+    const delays = [0, 20, 45]
+    const progress = newWaveProgress(3)
+    run(delays, [0, 12], progress)
+    expect(nextWaveDue(delays, progress)).toBe(20)
+    expect(run(delays, [12, 12, 12], progress)).toEqual([])
+    expect(nextWaveDue(delays, progress)).toBe(20)
+    expect(run(delays, [13, 19, 20], progress)).toEqual(['tell 1 @19', 'arrive 1 @20'])
+    expect(nextWaveDue(delays, progress)).toBe(45)
+    run(delays, [45], progress)
+    run(delays, [46], progress)
+    expect(nextWaveDue(delays, progress)).toBeNull()
   })
 
   it('a slow frame past both times still tells before the arrival, on the next tick', () => {

@@ -41,7 +41,7 @@ import { gameTime } from '@/core/gameClock'
 import { comboMultiplier } from '@/combat/comboTiers'
 import { frenzyActive } from '@/combat/comboRuntime'
 import { getPointerState } from '@/input/pointerInput'
-import { initAudio, isAudioReady, isMusicDucked } from '@/audio/AudioEngine'
+import { initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
 import { playExplosionSound, playFireSound, playHitTick, playWaveStinger, sfxNodeCount } from '@/audio/SFXManager'
 import { droppedSounds } from '@/audio/soundGuard'
 import { nextTriggerTime } from '@/audio/triggerTime'
@@ -69,8 +69,10 @@ export interface SCTestApi {
   startLevel: (id: string, seed?: number) => void
   /** `<count>:<hash>` of the latest run's spawn positions (formation members: their seeded slots); null until a spawner has generated them. */
   spawnDigest: () => string | null
-  /** Every `wave:incoming` (the tell, ~1 s early) and `wave:announce` (arrival) since load, with performance.now() ms. */
-  waveEvents: { kind: 'incoming' | 'announce'; label: string; ms: number }[]
+  /** Level time (s) now and when the next wave still to come is due (null once all are in); null with no level. */
+  nextWave: () => { levelTime: number; due: number | null } | null
+  /** Every `wave:incoming` (the tell, ~1 s early) and `wave:announce` (arrival) since load, with performance.now() ms and the level time (s). */
+  waveEvents: { kind: 'incoming' | 'announce'; label: string; ms: number; levelTime: number | null }[]
   phase: () => string
   /** Jump to a UI phase (e.g. `levelSelect`) without clicking through the screens before it. */
   setPhase: (phase: GamePhase) => void
@@ -140,6 +142,8 @@ export interface SCTestApi {
   rideTo: number | null
   /** Set to a speed (0–1 between the level's min and max velocity) to put the coaster at it on its next frame. */
   rideSpeed: number | null
+  /** The coaster's track fraction (0–1) on its last frame. */
+  rideProgress: number
   // ── View / aspect (issue #66) ──
   /** Active camera projection vs the canvas's on-screen box (squash checks). */
   view: () => E2EView | null
@@ -209,6 +213,8 @@ export interface E2EAudio {
   ready: boolean
   sfxNodes: number
   musicDucked: boolean
+  /** The pause mix is on: music −12 dB, SFX silent. */
+  pauseMix: boolean
   /** Sounds dropped by a caught audio error since load (must stay 0). */
   dropped: number
   lastDrop: string | null
@@ -311,6 +317,12 @@ export function recordE2ESpawns(positions: readonly { x: number; y: number; z: n
   if (!isE2E) return
   const text = positions.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)}`).join(';')
   spawnDigest = `${positions.length}:${hashString(text).toString(16)}`
+}
+
+/** The mounted spawner's wave schedule, set by EnemySpawner. */
+let waveProbe: (() => { levelTime: number; due: number | null }) | null = null
+export function registerE2EWaves(probe: typeof waveProbe) {
+  if (isE2E) waveProbe = probe
 }
 
 /** Camera + viewport captured by <E2EFrameProbe> so non-React test calls can aim/project. */
@@ -548,6 +560,7 @@ export function installE2EApi() {
     setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
     setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
     spawnDigest: () => spawnDigest,
+    nextWave: () => waveProbe?.() ?? null,
     waveEvents: [],
     audio: readAudio,
     audioBurst,
@@ -629,6 +642,7 @@ export function installE2EApi() {
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
     rideTo: null,
     rideSpeed: null,
+    rideProgress: 0,
     view: readView,
     triggerHeld: () => getPointerState().down,
     summonBoss: () => { e2eBoss.summon = true },
@@ -644,8 +658,11 @@ export function installE2EApi() {
   eventBus.on('weapon:fire', () => { api.combat.fired += 1 })
   eventBus.on('enemy:hit', () => { api.combat.hits += 1 })
   eventBus.on('enemy:killed', () => { api.combat.kills += 1 })
-  eventBus.on('wave:incoming', (label) => { api.waveEvents.push({ kind: 'incoming', label: String(label), ms: performance.now() }) })
-  eventBus.on('wave:announce', (label) => { api.waveEvents.push({ kind: 'announce', label: String(label), ms: performance.now() }) })
+  const onWave = (kind: 'incoming' | 'announce') => (label: unknown) => {
+    api.waveEvents.push({ kind, label: String(label), ms: performance.now(), levelTime: waveProbe?.().levelTime ?? null })
+  }
+  eventBus.on('wave:incoming', onWave('incoming'))
+  eventBus.on('wave:announce', onWave('announce'))
   window.addEventListener('error', (e) => api.errors.push(String(e.error?.stack ?? e.message)))
   window.addEventListener('unhandledrejection', (e) => api.errors.push(String(e.reason)))
   window.__SC_TEST__ = api
@@ -698,6 +715,7 @@ function readAudio(): E2EAudio {
     ready: isAudioReady(),
     sfxNodes: sfxNodeCount(),
     musicDucked: isMusicDucked(),
+    pauseMix: isPauseMixOn(),
     dropped: d.count,
     lastDrop: d.last,
     music: isAudioReady() ? musicState() : { buses: [], fades: [] },
