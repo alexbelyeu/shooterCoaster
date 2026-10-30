@@ -145,11 +145,9 @@ nobody reached 5; **0 of 9 mobile visitors started a level** (too few to conclud
     every functional check passed; same for the Reporter's run and two Maintainer runs.
     CI's runner passes. Polling level checks to a frame-count deadline (as the title check
     does) is the fix (#50, now P1).
-11. CI `verify` never runs on `main`: the auto-merge workflow merges with `GITHUB_TOKEN`,
-    whose pushes don't trigger `ci.yml`'s `push: main`. PR `verify` (run on the PR merged
-    with `main`) and the post-deploy production smoke cover `main`. Fix: have
-    `automerge.yml` dispatch `ci.yml` after a merge (`workflow_dispatch`, `actions: write`).
-    **#189 (P2).**
+11. ~~CI `verify` never runs on `main`: the auto-merge workflow merges with `GITHUB_TOKEN`,
+    whose pushes don't trigger `ci.yml`'s `push: main`.~~ Fixed by #189: `automerge.yml`
+    dispatches `ci.yml` on `main` after each merge; a red `main` opens `agent:prod-broken`.
 12. Results screen offers NEXT LEVEL after a 0★ run even though the next level needs 1★
     (`previousLevel()` rule, #162).
 13. Ocean water reads as khaki shallows rather than water in the mid-ground; the sharks

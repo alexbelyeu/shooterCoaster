@@ -195,6 +195,15 @@ async function collect(api, now) {
   const reviewPrs = prs.filter((p) => hasLabel(p, 'agent:needs-qa') || hasLabel(p, 'agent:qa-approved') || hasLabel(p, 'agent:changes-requested'))
   const ci = Object.fromEntries(await Promise.all(reviewPrs.map(async (p) => [p.number, await verifyOf(p.head.sha)])))
 
+  // verify on main's head: automerge.yml dispatches CI there after every merge.
+  let mainVerify = null
+  try {
+    const r = await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref: 'main', check_name: 'verify' })
+    mainVerify = r.check_runs.sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0] || null
+  } catch {
+    mainVerify = null
+  }
+
   let prodSmoke = null
   try {
     const r = await api('GET /repos/{owner}/{repo}/actions/workflows/{workflow}/runs', { workflow: 'prod-smoke.yml', per_page: 5 })
@@ -230,13 +239,13 @@ async function collect(api, now) {
     }
   }
 
-  return { issues, prs, drafts, merged, building, ci, prodSmoke, steeringPaused, ledger }
+  return { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger }
 }
 
 // ---------- render ----------
 
 function render(data, now) {
-  const { issues, prs, drafts, merged, building, ci, prodSmoke, steeringPaused, ledger } = data
+  const { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger } = data
   const pauses = issues.filter((i) => hasLabel(i, 'pause'))
   const inQa = prs.filter((p) => hasLabel(p, 'agent:needs-qa'))
     .sort((a, b) => prio(a) - prio(b) || Date.parse(a.created_at) - Date.parse(b.created_at))
@@ -317,7 +326,12 @@ function render(data, now) {
   const smoke = prodSmoke
     ? `${prodSmoke.conclusion === 'success' ? '✅ passed' : `❌ ${prodSmoke.conclusion}`} ${ago(Date.parse(prodSmoke.updated_at), now)} ([run](${prodSmoke.html_url}))`
     : 'no run yet'
-  out.push(`Live-site smoke test: ${smoke}. Open prod-broken issues: ${prodBroken.length ? prodBroken.map((i) => `#${i.number}`).join(', ') : 'none'}.`)
+  const mainCi = !mainVerify
+    ? 'no run on the latest commit'
+    : mainVerify.status !== 'completed'
+      ? `⏳ running (${mainVerify.head_sha.slice(0, 7)})`
+      : `${mainVerify.conclusion === 'success' ? '✅ green' : `❌ ${mainVerify.conclusion}`} on ${mainVerify.head_sha.slice(0, 7)} ${ago(Date.parse(mainVerify.completed_at), now)} ([run](${mainVerify.html_url}))`
+  out.push(`\`main\` verify: ${mainCi}. Live-site smoke test: ${smoke}. Open prod-broken issues: ${prodBroken.length ? prodBroken.map((i) => `#${i.number}`).join(', ') : 'none'}.`)
   out.push('')
 
   if (ledger) {
