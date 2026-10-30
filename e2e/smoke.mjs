@@ -37,6 +37,7 @@
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  * The boss check summons level1's Golden Blimp and shoots it down in phase order
  * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png); see bossCheck().
+ * The scrim check loads level1 with `?audio=scrim` (the score engine, #214); see scrimCheck().
  *
  * All waits are deadline-polled on the hook's frame counter, because software
  * rendering in CI / cloud sessions can run at ~1 fps. The title and each level ride
@@ -1598,6 +1599,92 @@ async function musicCrossfade(page) {
   return { problems, result: { fades, buses } }
 }
 
+const SCRIM_CHECK = { level: 'level1', maxNodes: 150 }
+
+/**
+ * `?audio=scrim` (#214): a real click unlocks audio and starts the title score; level1 must crossfade from it, keep its
+ * long-lived node count flat (≤ maxNodes) while it plays, duck with game time frozen, hold its song position while
+ * paused and pick it up again, then crossfade to the results score; nothing dropped, no page errors.
+ */
+async function scrimCheck(page) {
+  const problems = []
+  const audio = () => page.evaluate(() => window.__SC_TEST__.audio())
+  /** Polls `audio()` until `check` holds; returns the last reading. */
+  const until = async (check, ms = 30000) => {
+    const deadline = Date.now() + ms
+    let a = await audio()
+    while (!check(a) && Date.now() < deadline) {
+      await page.waitForTimeout(250)
+      a = await audio()
+    }
+    return a
+  }
+  const busNames = (a) => a.music.buses.map((b) => b.name)
+  const track = (a) => a.scrim?.tracks.at(-1) ?? null
+  const result = { engine: null, title: false, nodes: [], position: [], pausedHeld: null, ducked: null, results: false, dropped: 0 }
+
+  const vp = page.viewportSize()
+  await page.mouse.click(8, vp.height - 8) // any pointer press on the title unlocks audio
+  let a = await until((x) => x.scrim?.current === 'title')
+  result.engine = a.engine
+  if (a.engine !== 'scrim') return { problems: [`?audio=scrim reports engine "${a.engine}"`], result }
+  if (!a.ready) return { problems: ['a click did not unlock audio'], result }
+  result.title = a.scrim?.current === 'title'
+  if (!result.title) problems.push('the title score never started')
+
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [SCRIM_CHECK.level, SEED])
+  a = await until((x) => x.scrim?.current === SCRIM_CHECK.level && !busNames(x).includes('title'))
+  const titleOut = a.music.fades.findLast((f) => f.name === 'title' && f.ramp === 'out')
+  const levelIn = a.music.fades.findLast((f) => f.name === 'level' && f.ramp === 'in')
+  if (a.scrim?.current !== SCRIM_CHECK.level) problems.push(`the ${SCRIM_CHECK.level} score never started (current "${a.scrim?.current}")`)
+  if (!titleOut || titleOut.seconds < 0.5) problems.push('the title score did not fade out')
+  if (!levelIn || levelIn.seconds < 0.5) problems.push('the level score did not fade in')
+  if (busNames(a).includes('title')) problems.push('the title score bus was never disposed')
+
+  result.nodes.push(a.scrim.nodes)
+  result.position.push(track(a)?.position ?? 0)
+  await waitFrames(page, 2, { minMs: 3000, maxMs: 30000 })
+  a = await audio()
+  result.nodes.push(a.scrim.nodes)
+  result.position.push(track(a)?.position ?? 0)
+  if (result.nodes[1] !== result.nodes[0]) problems.push(`score engine nodes grew while playing: ${result.nodes.join(' -> ')}`)
+  if (result.nodes[1] > SCRIM_CHECK.maxNodes) problems.push(`score engine holds ${result.nodes[1]} nodes (≤ ${SCRIM_CHECK.maxNodes})`)
+  if (!(result.position[1] > result.position[0] + 1)) problems.push(`the level score is not advancing (${result.position.map((p) => p.toFixed(2)).join(' -> ')} s)`)
+  if (!a.scrim.ticking) problems.push('the score scheduler is not ticking')
+
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  result.ducked = (await until((x) => x.musicDucked, 20000)).musicDucked
+  if (!result.ducked) problems.push('the score was not ducked with game time frozen')
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
+  if ((await until((x) => !x.musicDucked, 20000)).musicDucked) problems.push('the score stayed ducked at timeScale 1')
+
+  await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
+  a = await until((x) => track(x)?.paused)
+  const heldAt = track(a)?.position ?? 0
+  await page.waitForTimeout(2000)
+  const stillAt = track(await audio())?.position ?? 0
+  await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
+  const resumed = track(await until((x) => track(x) && !track(x).paused))
+  result.pausedHeld = { at: heldAt, after2s: stillAt, resumedAt: resumed?.position ?? null }
+  if (!track(a)?.paused) problems.push('pausing the run did not hold the score')
+  else if (stillAt !== heldAt) problems.push(`the score moved while paused (${heldAt.toFixed(2)} -> ${stillAt.toFixed(2)} s)`)
+  if (!resumed || resumed.paused) problems.push('resuming the run did not resume the score')
+  else if (resumed.position > heldAt + 2 || resumed.position < heldAt - 0.5)
+    problems.push(`the score did not resume where it stopped (${heldAt.toFixed(2)} -> ${resumed.position.toFixed(2)} s)`)
+
+  await page.evaluate(() => window.__SC_TEST__.endLevel())
+  a = await until((x) => x.scrim?.current === 'results' && !busNames(x).includes('level'))
+  const levelOut = a.music.fades.findLast((f) => f.name === 'level' && f.ramp === 'out')
+  const resultsIn = a.music.fades.findLast((f) => f.name === 'results' && f.ramp === 'in')
+  result.results = a.scrim?.current === 'results'
+  if (!result.results) problems.push(`no results score after the run (current "${a.scrim?.current}")`)
+  if (!levelOut || levelOut.seconds < 0.5 || !resultsIn) problems.push('the level score did not crossfade to the results score')
+  if (busNames(a).includes('level')) problems.push('the level score bus was never disposed')
+  result.dropped = a.dropped
+  if (a.dropped) problems.push(`${a.dropped} sound(s) dropped by an audio error (${a.lastDrop?.split('\n')[0]})`)
+  return { problems, result }
+}
+
 /** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
 /** Boss bar (#181) on the phone, from a paused run: resumed with the boss summoned, it must sit inside the viewport and clear of the HUD in portrait and landscape (mobile-level1-boss.png). */
 async function mobileBossHud(page) {
@@ -2039,6 +2126,18 @@ async function run() {
     await b.ctx.close()
   }
 
+  // 6d. The score engine behind ?audio=scrim: title -> level -> pause -> results
+  if (wanted.includes(SCRIM_CHECK.level)) {
+    const sc = await newPage('e2e=1&audio=scrim')
+    const r = await scrimCheck(sc.page)
+    const errors = [...sc.errors, ...(await sc.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (errors.length) r.problems.push(`${errors.length} error(s)`)
+    const ok = r.problems.length === 0
+    failed ||= !ok
+    results.push({ id: 'scrim', ok, problems: r.problems, scrim: r.result, errors })
+    await sc.ctx.close()
+  }
+
   // 7. Optional touch playtest on a phone viewport
   if (args.mobile) {
     const m = await runMobile(browser, base)
@@ -2085,6 +2184,9 @@ async function run() {
           ? ` ${r.boss.level} skipped (level timed out)`
           : ` ${r.boss.level} tell "${r.boss.tell.at(-1) ?? '-'}" draws=${r.boss.drawCalls} width ${(r.boss.widthFrac * 100).toFixed(0)}% exposed [${r.boss.exposedAtStart.length} ${r.boss.exposedAtStart[0] ?? '-'}…] -> [${r.boss.exposedMidway}]` +
             ` bullet hit ${r.boss.bulletHit} hits ${r.boss.phaseOneHits}+${r.boss.lastHits} kills ${r.boss.kills} score +${r.boss.score} popup ${r.boss.popup[0] ?? '-'} stage ${r.boss.stage}`)
+      : r.scrim
+        ? ` engine=${r.scrim.engine} title=${r.scrim.title} nodes ${r.scrim.nodes.join('->')} position ${r.scrim.position.map((p) => p.toFixed(1)).join('->')}s` +
+          ` ducked=${r.scrim.ducked} paused at ${r.scrim.pausedHeld?.at.toFixed(1)}s (${r.scrim.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.scrim.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.scrim.results}`
       : r.speed
         ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile

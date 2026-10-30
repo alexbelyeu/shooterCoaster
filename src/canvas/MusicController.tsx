@@ -1,15 +1,31 @@
 import { useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
+import type { GamePhase } from '@/types/game'
 import { startMusic, stopMusic, setMusicIntensity } from '@/audio/MusicManager'
 import {
   disposeSFX, playBossDefeat, playBossHit, playBossStinger, playComboBreak, playFireworkPop, playFireworkWhistle, playHitTick,
   playWaveStinger, prepareLevelSFX,
 } from '@/audio/SFXManager'
 import { setMusicDucked, setPauseMix } from '@/audio/AudioEngine'
+import { MUSIC_ENGINE, withScrim } from '@/audio/musicEngine'
 import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks'
+
+const SCRIM = MUSIC_ENGINE === 'scrim'
+
+/** `?audio=scrim`: the level's score while it runs (held while paused, through the resume Ready / GO), the results score after it. */
+function followPhase(phase: GamePhase, level: string) {
+  withScrim((p) => {
+    if (phase === 'results') p.playScore('results')
+    else if (phase === 'paused') p.pauseScore(true)
+    else {
+      p.playScore(level)
+      p.pauseScore(false)
+    }
+  })
+}
 
 /** Level audio host: biome music + SFX kit for the level's lifetime, bus-driven hit / wave / combo-break / boss / firework sounds, slow-mo and pause duck. */
 export default function MusicController() {
@@ -17,7 +33,14 @@ export default function MusicController() {
 
   useEffect(() => {
     const biome = (currentLevel ? getLevelConfig(currentLevel)?.biome : undefined) ?? 'themePark'
-    startMusic(biome)
+    const level = currentLevel ?? 'level1'
+    const unfollow = SCRIM
+      ? useGameStore.subscribe((s, prev) => {
+          if (s.phase !== prev.phase) followPhase(s.phase, level)
+        })
+      : null
+    if (SCRIM) followPhase(useGameStore.getState().phase, level)
+    else startMusic(biome)
     prepareLevelSFX(biome)
     eventBus.on('enemy:hit', playHitTick)
     eventBus.on('wave:announce', playWaveStinger)
@@ -36,7 +59,10 @@ export default function MusicController() {
       eventBus.off('combo:broken', playComboBreak)
       eventBus.off('enemy:hit', playHitTick)
       eventBus.off('wave:announce', playWaveStinger)
-      stopMusic()
+      if (unfollow) {
+        unfollow()
+        withScrim((p) => p.stopScore(level, 'results'))
+      } else stopMusic()
       disposeSFX()
       setMusicDucked(false, true)
     }

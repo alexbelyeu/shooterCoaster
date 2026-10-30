@@ -1,0 +1,44 @@
+title    Press Start
+composer Claude (ShooterCoaster placeholder)
+about    Placeholder attract theme that proves the score engine. Saw lead over brass stabs and a rock beat.
+tempo    150
+beats    4
+steps    2        # eighth-note grid: 8 steps a bar
+reverb   0.25
+
+voice lead   saw      vol=0.7  bright=1.2
+voice stab   brass    vol=0.55 pan=0.25  center=G4 gate=0.5
+voice pad    strings  vol=0.35 pan=-0.3  center=E4
+voice bass   synbass  vol=0.8  oct=1
+voice kick   kick     vol=0.85
+voice snare  snare    vol=0.6  pan=0.05
+voice hat    hat      vol=0.4  pan=0.35
+voice crash  crash    vol=0.35 pan=-0.2
+
+pattern intro
+stab  | [G]!- . . [G]!- . . | [D]!- . . [D]!--- |
+kick  | x... x... | x... x... |
+snare | .... .... | x.x. XXXX |
+
+pattern A
+lead  | G4 B4 D5- B4 D5 G5- | F#5 E5 D5 B4- G4 A4 B4 | C5- E5 G5- E5 G5 C6 | B5- A5- F#5--- |
+stab  | .- [G]- .- [G]- | .- [Em]- .- [Em]- | .- [C]- .- [C]- | .- [D]- .- [D]- |
+pad   | [G]?------- | [Em]?------- | [C]?------- | [D]?------- |
+bass  | G1- G2 G1 . G1 G2 D2 | E1- E2 E1 . E1 E2 B1 | C2- C3 C2 . C2 C3 G2 | D2- D3 D2 . D2 D3 A1 |
+kick  | x..x x... | % | % | x..x x.xx |
+snare | ..x. ..x. | % | % | ..x. .xXX |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern B
+lead  | E5- G5- C6-- B5 | A5- F#5- D5--- | G5 F#5 E5 D5 E5- B4- | D5 E5 F#5 A5 B5- A5- |
+stab  | .- [C]- .- [C]- | .- [D]- .- [D]- | .- [Em]- .- [Em]- | [D]!- . [D]! . [D]! [D]!- |
+pad   | [C]?------- | [D]?------- | [Em]?------- | [D]?------- |
+bass  | C2- C3 C2 . C2 C3 G2 | D2- D3 D2 . D2 D3 A2 | E2- E3 E2 . E2 E3 B2 | D2 D2 D2 D2 D2 D2 F#2 A2 |
+kick  | x..x x... | % | % | xxxx xxxx |
+snare | ..x. ..x. | % | % | .xx. XXXX |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+play intro
+loop A B
