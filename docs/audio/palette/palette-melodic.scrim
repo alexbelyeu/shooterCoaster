@@ -1,0 +1,42 @@
+title    Arcade palette: melodic
+composer Claude (ShooterCoaster)
+about    Each new melodic instrument alone for two bars, in its useful range: fmbass, supersaw, distguitar, orchhit, synbrass, riser, downlifter.
+tempo    140
+beats    4
+steps    2
+reverb   0.2
+
+voice fmbass     fmbass     vol=0.8
+voice supersaw   supersaw   vol=0.75
+voice distguitar distguitar vol=0.7
+voice orchhit    orchhit    vol=0.7
+voice synbrass   synbrass   vol=0.7
+voice riser      riser      vol=0.7
+voice downlifter downlifter vol=0.7
+
+pattern fm
+fmbass | E2 E2 E3 E2 G2 A2 B2 D3 | E2- ~G2- A2- . . |
+
+pattern saw
+supersaw | E5- G5- B5--- | A5- G5 F#5 E5--- |
+
+pattern gtr
+distguitar | E3+B3+E4--- . . G3+D4- | E2+B2 E2+B2 E2+B2 . G2+D3-- . |
+
+pattern orch
+orchhit | E4+G4+B4 . . E4+G4+B4 .--- | C4+E4+G4 . D4+F#4+A4 . E4+G4+B4--- |
+
+pattern brass
+synbrass | B4--- . A4 B4 D5 | E5------ . |
+
+pattern rise
+riser | C6------- | = |
+
+pattern fall
+downlifter | C6------- | = |
+
+pattern rest
+fmbass | _ |
+
+play fm saw gtr orch brass rise fall
+loop rest
