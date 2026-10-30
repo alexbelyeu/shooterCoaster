@@ -1,0 +1,43 @@
+title    Breakwater
+composer Claude (ShooterCoaster placeholder)
+about    Placeholder Ocean score that proves the score engine. Steel drum over surf-strum guitar, a pumping upright and a wave rolling in.
+tempo    168
+beats    4
+steps    2
+reverb   0.35
+
+voice lead   steeldrum vol=0.9  pan=-0.15
+voice gtr    guitar    vol=0.55 pan=0.3  center=A4 gate=0.6
+voice bass   upright   vol=0.9  oct=1
+voice kick   kick      vol=0.8
+voice snare  snare     vol=0.55
+voice ride   ride      vol=0.3  pan=0.35
+voice crash  crash     vol=0.35 pan=-0.25
+voice surf   surf      vol=0.5
+
+pattern intro
+surf  | x... .... | .... .... |
+gtr   | [D]- . [D] . [D] [D]- | [A]- . [A] . [A] [A]- |
+snare | .... .... | .... xxXX |
+
+pattern A
+lead  | F#5 A5 F#5 D5- E5 F#5 A5 | B5- A5 F#5- D5 B4- | D5 G5 B5 G5 D5- B4- | C#5 E5 A5- G5 F#5 E5- |
+gtr   | [D]- . [D] . [D] [D]- | [Bm]- . [Bm] . [Bm] [Bm]- | [G]- . [G] . [G] [G]- | [A]- . [A] . [A] [A]- |
+bass  | D2 D2 D2 D2 A1 A1 A1 A1 | B1 B1 B1 B1 F#2 F#2 F#2 F#2 | G1 G1 G1 G1 D2 D2 D2 D2 | A1 A1 A1 A1 E2 E2 E2 E2 |
+kick  | x..x x... | % | % | % |
+snare | ..x. ..x. | % | % | ..x. .xXX |
+ride  | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+surf  | x... .... | _ | _ | _ |
+
+pattern B
+lead  | B5--- A5- G5- | A5--- G5- E5- | F#5 E5 C#5 E5 F#5- A5- | E5 F#5 E5 C#5 A4--- |
+gtr   | [G]- . [G] . [G] [G]- | [A]- . [A] . [A] [A]- | [F#m]- . [F#m] . [F#m] [F#m]- | [A]- . [A] . [A7] [A7]- |
+bass  | G1 G1 G1 G1 D2 D2 D2 D2 | A1 A1 A1 A1 E2 E2 E2 E2 | F#1 F#1 F#1 F#1 C#2 C#2 C#2 C#2 | A1 A1 A1 A1 E2 E2 C#2 E2 |
+kick  | x..x x... | % | % | % |
+snare | ..x. ..x. | % | % | .xx. XXXX |
+ride  | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+play intro
+loop A B

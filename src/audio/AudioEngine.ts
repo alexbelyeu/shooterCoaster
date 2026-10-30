@@ -32,6 +32,8 @@ interface MasterChain {
   sfxPause: Tone.Gain
   sfx: Tone.Channel
   music: Tone.Channel
+  /** The score engine's music (`?audio=scrim`): stereo, where Tone's channels fold to mono. Silent otherwise. */
+  score: Tone.Channel
 }
 
 /** Built in Tone's current context: the live one at import, an offline one while `offlineRender.ts` renders. */
@@ -42,7 +44,8 @@ function createMasterChain(): MasterChain {
   const duck = new Tone.Filter({ type: 'lowpass', frequency: DUCK_OPEN_HZ, rolloff: -12 }).connect(musicPause)
   const sfx = new Tone.Channel(-6, 0).connect(sfxPause)
   const music = new Tone.Channel(-10, 0).connect(duck)
-  return { limiter, duck, musicPause, sfxPause, sfx, music }
+  const score = new Tone.Channel({ volume: -10, channelCount: 2 }).connect(duck)
+  return { limiter, duck, musicPause, sfxPause, sfx, music, score }
 }
 
 let chain = createMasterChain()
@@ -52,11 +55,13 @@ let pauseMix = false
 // Live bindings: an offline render swaps them for the length of the render.
 export let sfxChannel = chain.sfx
 export let musicChannel = chain.music
+export let scoreChannel = chain.score
 
 function setChain(c: MasterChain) {
   chain = c
   sfxChannel = c.sfx
   musicChannel = c.music
+  scoreChannel = c.score
 }
 
 /** `offlineRender.ts`: a fresh chain in the (offline) current context, audio marked ready; returns the restore. */
@@ -73,7 +78,7 @@ export function swapInOfflineChain(): () => void {
     initialized = live.initialized
     ducked = live.ducked
     pauseMix = live.pauseMix
-    for (const node of [offline.sfx, offline.music, offline.duck, offline.musicPause, offline.sfxPause, offline.limiter]) node.dispose()
+    for (const node of [offline.sfx, offline.music, offline.score, offline.duck, offline.musicPause, offline.sfxPause, offline.limiter]) node.dispose()
   }
 }
 
@@ -117,11 +122,8 @@ export function isPauseMixOn(): boolean {
 
 export function syncVolumes(): void {
   const { sfxVolume, musicVolume, muted } = useSettingsStore.getState()
-  if (muted) {
-    sfxChannel.volume.value = -Infinity
-    musicChannel.volume.value = -Infinity
-  } else {
-    sfxChannel.volume.value = Tone.gainToDb(sfxVolume)
-    musicChannel.volume.value = Tone.gainToDb(musicVolume)
-  }
+  const music = muted ? -Infinity : Tone.gainToDb(musicVolume)
+  sfxChannel.volume.value = muted ? -Infinity : Tone.gainToDb(sfxVolume)
+  musicChannel.volume.value = music
+  scoreChannel.volume.value = music
 }
