@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BOSS_SFX, FIREWORK_BIOMES, FIREWORK_SFX, FIRE_VARIANTS, STINGERS, STINGER_VOICES, bossHitHz, fireVelocity, fireworkWhistleS, killLayers, killTier } from './sfxDesign'
+import { BOSS_SFX, FIREWORK_BIOMES, FIREWORK_SFX, FIRE_VARIANTS, STINGERS, STINGER_VOICES, bossHitHz, fireVelocity, fireworkWhistleS, KILL_TIMBRES, killLayers, killPingHz, killTier } from './sfxDesign'
 
 describe('killTier / killLayers', () => {
   it('maps combo counts to the four tiers', () => {
@@ -67,5 +67,26 @@ describe('firework cues', () => {
     expect(fireworkWhistleS(1.1, 0.5)).toBeCloseTo(2.2)
     expect(fireworkWhistleS(1.1, 0)).toBe(FIREWORK_SFX.whistle.maxS)
     expect(fireworkWhistleS(0.1, 1)).toBe(FIREWORK_SFX.whistle.minS)
+  })
+})
+
+describe('kill timbres', () => {
+  it('pop keeps the original kill sound', () => {
+    expect(KILL_TIMBRES.pop).toMatchObject({ snapS: 0.05, snapDecay: 0.06, pingS: 0.04 })
+    expect(killPingHz('pop', 0, 0)).toBeCloseTo(1400)
+    expect(killPingHz('pop', 10, 1)).toBeCloseTo(1400 * 1.78, 0)
+  })
+
+  it('each family has its own snap length and ping pitch', () => {
+    const ts = Object.values(KILL_TIMBRES)
+    expect(new Set(ts.map((t) => t.pingHz)).size).toBe(ts.length)
+    expect(new Set(ts.map((t) => t.snapS)).size).toBe(ts.length)
+    expect(KILL_TIMBRES.crunch.pingHz).toBeLessThan(KILL_TIMBRES.pop.pingHz)
+    expect(KILL_TIMBRES.splash.snapDecay).toBeGreaterThan(KILL_TIMBRES.pop.snapDecay)
+  })
+
+  it('the combo raises the ping and caps at 10', () => {
+    expect(killPingHz('crunch', 5, 0)).toBeGreaterThan(killPingHz('crunch', 0, 0))
+    expect(killPingHz('crunch', 30, 0)).toBe(killPingHz('crunch', 10, 0))
   })
 })

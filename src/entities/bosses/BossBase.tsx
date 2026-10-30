@@ -7,6 +7,7 @@ import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/Col
 import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE } from '@/combat/hitFeedback'
 import { playExplosionSound } from '@/audio/SFXManager'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
+import { BOSS_PART_DEATH_STYLE } from '@/effects/deathStyles'
 import { flashMesh, restoreMesh } from '@/entities/enemies/hitFlash'
 import { e2eBoss, isE2E } from '@/testing/e2eHook'
 import {
@@ -15,7 +16,6 @@ import {
 } from './bossModel'
 
 const BOSS_HIT_FLASH_MS = 60
-const PART_EXPLOSION_COLOR = '#ffd700'
 
 export interface BossFrame {
   root: THREE.Group
@@ -194,7 +194,7 @@ export default function BossBase({
       const position = part.getWorldPosition(new THREE.Vector3())
       const { combo } = useGameStore.getState()
       playExplosionSound(combo.count)
-      getExplosionPool()?.activate(position, PART_EXPLOSION_COLOR)
+      getExplosionPool()?.explode(position, BOSS_PART_DEATH_STYLE)
       eventBus.emit('enemy:killed', {
         position,
         combo: combo.count,

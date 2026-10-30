@@ -25,6 +25,33 @@ export function killLayers(combo: number): KillLayers {
   return KILL_LAYERS[killTier(combo)]
 }
 
+export type KillSound = 'pop' | 'flutter' | 'crunch' | 'splash' | 'hiss'
+
+export interface KillTimbre {
+  /** White-noise snap length and envelope decay, s. */
+  snapS: number
+  snapDecay: number
+  /** Sine ping base pitch and length. */
+  pingHz: number
+  pingS: number
+}
+
+/** Same two voices, reshaped: a short bright pop, a soft brushy flutter, a tight low crunch, a long wash, a thin hiss. */
+export const KILL_TIMBRES: Record<KillSound, KillTimbre> = {
+  pop: { snapS: 0.05, snapDecay: 0.06, pingHz: 1400, pingS: 0.04 },
+  flutter: { snapS: 0.09, snapDecay: 0.12, pingHz: 760, pingS: 0.03 },
+  crunch: { snapS: 0.035, snapDecay: 0.035, pingHz: 230, pingS: 0.08 },
+  splash: { snapS: 0.16, snapDecay: 0.22, pingHz: 520, pingS: 0.06 },
+  hiss: { snapS: 0.22, snapDecay: 0.26, pingHz: 2600, pingS: 0.025 },
+}
+
+/** `jitter` 0–1 of random spread; the combo counts up to 10. */
+export function killPingHz(sound: KillSound, combo: number, jitter: number): number {
+  const { pingHz } = KILL_TIMBRES[sound]
+  const c = Math.min(Math.max(combo, 0), 10)
+  return pingHz * (1 + c * 0.057 + jitter * 0.21)
+}
+
 export interface FireVariant {
   startHz: number
   endHz: number

@@ -10,6 +10,8 @@ import { registerE2EEnemy, unregisterE2EEnemy } from '@/testing/e2eHook'
 import { flashMesh, restoreMesh } from './hitFlash'
 import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE } from '@/combat/hitFeedback'
 import { entryPoint, type Vec3 } from '@/entities/spawning/spawnPlacement'
+import { getExplosionPool } from '@/effects/explosionPoolHandle'
+import { DEATH_STYLES } from '@/effects/deathStyles'
 
 export interface EnemyProps {
   id: string
@@ -17,7 +19,7 @@ export interface EnemyProps {
   type: EnemyType
   scoreValue: number
   radius: number
-  onKill: (id: string, position: THREE.Vector3) => void
+  onKill: (id: string) => void
   /** Fly in from `entry.from` to `spawnPosition` first. */
   entry?: EnemyEntry
   /** XZ angle (`atan2(dz, dx)`) a formation moves on together. */
@@ -49,7 +51,7 @@ interface EnemyBaseProps extends EnemyProps {
  *
  * Death is two-step: on hit the enemy is scored immediately, stops moving and
  * flashes white at 1.2x scale for ENEMY_HIT_FLASH_MS (game time); then it emits
- * 'enemy:killed', triggers the explosion via onKill and unmounts.
+ * 'enemy:killed', plays its type's death effect (`effects/deathStyles.ts`) and unmounts.
  */
 export default function EnemyBase({
   id,
@@ -101,7 +103,8 @@ export default function EnemyBase({
   const finishKill = useCallback(() => {
     dying.current = false
     const combo = useGameStore.getState().combo
-    playExplosionSound(combo.count)
+    const style = DEATH_STYLES[type]
+    playExplosionSound(combo.count, style.sound)
 
     const group = meshRef.current
     if (group) {
@@ -113,10 +116,11 @@ export default function EnemyBase({
         multiplier: combo.multiplier,
         score: Math.round(scoreValue * combo.multiplier),
       })
-      onKill(id, pos)
+      getExplosionPool()?.explode(pos, style)
+      onKill(id)
     }
     setAlive(false)
-  }, [id, scoreValue, onKill])
+  }, [id, type, scoreValue, onKill])
 
   // Register with CollisionManager
   const deadPos = useRef(new THREE.Vector3(0, -9999, 0)).current
