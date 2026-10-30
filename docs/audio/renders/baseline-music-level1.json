@@ -1,0 +1,144 @@
+{
+  "name": "baseline-music-level1",
+  "kind": "music",
+  "request": {
+    "kind": "music",
+    "track": "level1"
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.1,
+      "name": "level1 music"
+    }
+  ],
+  "seams": [
+    8.988888888888889,
+    17.87777777777778,
+    26.76666666666667
+  ],
+  "bar": {
+    "startS": 0.1,
+    "barS": 2.2222222222222223
+  },
+  "metrics": {
+    "seconds": 30,
+    "integrated": -42.4,
+    "shortTermMax": -41.9,
+    "lra": 0.9,
+    "truePeak": -27.9,
+    "clipped": 0,
+    "silence": 0.4,
+    "correlation": 1,
+    "below30Db": -38.8,
+    "bands": {
+      "sub": {
+        "pct": 4.6,
+        "db": -13.3
+      },
+      "low": {
+        "pct": 93.6,
+        "db": -0.3
+      },
+      "mid": {
+        "pct": 1.2,
+        "db": -19.2
+      },
+      "presence": {
+        "pct": 0.1,
+        "db": -29.3
+      },
+      "air": {
+        "pct": 0.5,
+        "db": -23.2
+      },
+      "below30": {
+        "pct": 0,
+        "db": -38.8
+      }
+    },
+    "seamJumps": [
+      {
+        "at": 8.989,
+        "db": 6.2,
+        "vsBars": 0.01
+      },
+      {
+        "at": 17.878,
+        "db": 6.17,
+        "vsBars": 0.02
+      },
+      {
+        "at": 26.767,
+        "db": 6.2,
+        "vsBars": 0
+      }
+    ],
+    "seamJumpMax": 0.02
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -42.4,
+      "unit": "LUFS",
+      "min": -18,
+      "max": -16,
+      "status": "fail"
+    },
+    {
+      "label": "Short-term max",
+      "value": -41.9,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -27.9,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -38.8,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 1,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Loop-seam jump vs bar lines",
+      "value": 0.02,
+      "unit": "dB",
+      "max": 1,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 0.9,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 0.4,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

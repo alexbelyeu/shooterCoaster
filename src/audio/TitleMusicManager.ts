@@ -25,6 +25,10 @@ interface TitleTrack {
 
 let track: TitleTrack | null = null
 
+const TITLE_BPM = 108
+/** Offline renders: melody, pad and bass all repeat every 4 bars (the sparkle chimes are random). */
+export const TITLE_LOOP = { barS: (4 * 60) / TITLE_BPM, bars: 4 }
+
 // — Melody: music-box calliope feel, 2-bar phrase ————————————
 const melodyNotes = [
   // Bar 1 — ascending, bouncy
@@ -134,7 +138,7 @@ export function startTitleMusic(): void {
   const t = createTrack()
   const { melodyBox, padSynth, bassSynth, chimeSynth, tamb } = t
   track = t
-  const bar = startTransportAt(108)
+  const bar = startTransportAt(TITLE_BPM)
   const at = `${bar}i`
 
   const melodyLoop = new Tone.Sequence(
