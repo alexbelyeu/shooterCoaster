@@ -24,8 +24,11 @@ export type AudioRenderRequest =
   | { kind: 'music'; track: string; intensity?: number; seconds?: number; engine?: MusicEngine }
   | { kind: 'sfxSheet'; level?: string }
   | { kind: 'mix'; level: string; seconds?: number; engine?: MusicEngine }
-  /** Score text through the ported engine alone (`synth.renderOffline`, no game chain): parity with the original page. */
-  | { kind: 'score'; text: string; seconds?: number; voicing?: Voicing }
+  /**
+   * Score text through the ported engine alone (`synth.renderOffline`, no game chain): parity with the original page.
+   * `chain: 'game'` plays it through the game's music chain instead, exactly like `music` with `engine: 'scrim'`.
+   */
+  | { kind: 'score'; text: string; seconds?: number; voicing?: Voicing; chain?: 'game' }
 
 export interface AudioRenderResult {
   sampleRate: number
@@ -259,8 +262,25 @@ async function renderScore(req: Extract<AudioRenderRequest, { kind: 'score' }>, 
   }
 }
 
+/** Registers the text as a score for the length of one render, so the player can play it like a game score. */
+let renderedScores = 0
+async function renderScoreInGame(req: Extract<AudioRenderRequest, { kind: 'score' }>, seed: number): Promise<AudioRenderResult> {
+  const song = compile(req.text)
+  if (song.errors.length) throw new Error(`score errors:\n${song.errors.map((e) => `line ${e.line}: ${e.msg}`).join('\n')}`)
+  scrim = await import('@/audio/scrim/player')
+  const id = `render-${++renderedScores}`
+  SCORES[id] = req.text
+  try {
+    const plan = scrimMusicPlan(scrim, id, req.seconds ?? 20)
+    const buffer = await renderOffline({ seconds: plan.seconds, seed }, plan.script, stopAll)
+    return { sampleRate: buffer.sampleRate, seconds: plan.seconds, pcm: toBase64(buffer), events: plan.events, seams: plan.seams, bar: plan.bar }
+  } finally {
+    delete SCORES[id]
+  }
+}
+
 export async function renderAudio(req: AudioRenderRequest, seed = 1): Promise<AudioRenderResult> {
-  if (req.kind === 'score') return renderScore(req, seed)
+  if (req.kind === 'score') return req.chain === 'game' ? renderScoreInGame(req, seed) : renderScore(req, seed)
   if ('engine' in req && req.engine === 'scrim') scrim = await import('@/audio/scrim/player')
   const plan = (RENDERS[req.kind] as (r: GamePlanRequest) => Plan)(req)
   const buffer = await renderOffline({ seconds: plan.seconds, seed }, plan.script, stopAll)
