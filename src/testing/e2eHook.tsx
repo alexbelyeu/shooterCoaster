@@ -46,6 +46,7 @@ import { playExplosionSound, playFireSound, playHitTick, playWaveStinger, sfxNod
 import { droppedSounds } from '@/audio/soundGuard'
 import { nextTriggerTime } from '@/audio/triggerTime'
 import { musicState, type MusicFade } from '@/audio/musicBus'
+import { MUSIC_ENGINE, scrimPlayer, type MusicEngine } from '@/audio/musicEngine'
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
 import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
 
@@ -205,6 +206,8 @@ export interface E2EBoss {
   box: { minX: number; minY: number; maxX: number; maxY: number; widthFrac: number; heightFrac: number } | null
 }
 
+type ScrimState = ReturnType<typeof import('@/audio/scrim/player').scrimState>
+
 export interface E2EAudio {
   ready: boolean
   sfxNodes: number
@@ -214,6 +217,11 @@ export interface E2EAudio {
   lastDrop: string | null
   /** Music buses still connected (`audio/musicBus.ts`) with their gain now, and the last few gain ramps. */
   music: { buses: { name: string; gain: number; fading: boolean }[]; fades: MusicFade[] }
+  /** Which engine plays the music (`?audio=scrim` → 'scrim'). */
+  engine: MusicEngine
+  /** The score engine's tracks (current last), each paused or not with its song position, its long-lived node count,
+   *  and whether its scheduler timer runs; null until it has loaded. */
+  scrim: ScrimState | null
 }
 
 export interface E2EView {
@@ -701,6 +709,8 @@ function readAudio(): E2EAudio {
     dropped: d.count,
     lastDrop: d.last,
     music: isAudioReady() ? musicState() : { buses: [], fades: [] },
+    engine: MUSIC_ENGINE,
+    scrim: scrimPlayer()?.scrimState() ?? null,
   }
 }
 

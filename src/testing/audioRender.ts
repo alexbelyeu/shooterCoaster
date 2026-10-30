@@ -1,4 +1,4 @@
-/** `npm run audio:render`'s renders of the game's own music and SFX code; a new kind (the score engine's) is one more `RENDERS` entry. */
+/** `npm run audio:render`'s renders of the game's own music and SFX code, and of any score through the score engine. */
 import { renderOffline, type OfflineRenderScope } from '@/audio/offlineRender'
 import { setMusicDucked } from '@/audio/AudioEngine'
 import { musicLoop, setMusicIntensity, startMusic, stopMusic } from '@/audio/MusicManager'
@@ -12,12 +12,18 @@ import { FIREWORK_BIOMES } from '@/audio/sfxDesign'
 import { COMBO_TIERS, FRENZY, TOP_TIER } from '@/combat/comboTiers'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import type { BiomeType } from '@/types/level'
+import type { MusicEngine } from '@/audio/musicEngine'
+import { compile } from '@/audio/scrim/score'
+import { renderOffline as renderScoreOffline, type Voicing } from '@/audio/scrim/synth'
+import { createRng } from '@/utils/rng'
 
 export type AudioRenderRequest =
-  /** `track`: 'title' or a level id. */
-  | { kind: 'music'; track: string; intensity?: number; seconds?: number }
+  /** `track`: 'title', a level id, or (score engine) 'results'. */
+  | { kind: 'music'; track: string; intensity?: number; seconds?: number; engine?: MusicEngine }
   | { kind: 'sfxSheet'; level?: string }
-  | { kind: 'mix'; level: string; seconds?: number }
+  | { kind: 'mix'; level: string; seconds?: number; engine?: MusicEngine }
+  /** Score text through the ported engine alone (`synth.renderOffline`, no game chain): parity with the original page. */
+  | { kind: 'score'; text: string; seconds?: number; voicing?: Voicing }
 
 export interface AudioRenderResult {
   sampleRate: number
@@ -56,15 +62,45 @@ function seamsIn(seconds: number, loopS: number): number[] {
   return seams
 }
 
+type ScrimPlayer = typeof import('@/audio/scrim/player')
+/** Loaded by `renderAudio` before a plan that needs it. */
+let scrim: ScrimPlayer | null = null
+
 function stopAll() {
   stopTitleMusic()
   stopMusic()
   stopWindWhoosh()
   disposeSFX()
   setMusicDucked(false, true)
+  if (scrim) {
+    scrim.disposeScores()
+    scrim.driveScoresManually(false)
+  }
 }
 
-function musicPlan(track: string, intensity = DEFAULT_INTENSITY, seconds = 30): Plan {
+/** Score-engine music: started at render time 0, ticked every 50 ms of render time like the live 25 ms timer. */
+function scrimScript(p: ScrimPlayer, id: string, seconds: number) {
+  return ({ at }: OfflineRenderScope) => {
+    p.driveScoresManually(true)
+    p.playScore(id)
+    for (let t = 0.05; t < seconds; t += 0.05) at(t, p.tickScores)
+  }
+}
+
+function scrimMusicPlan(p: ScrimPlayer, track: string, seconds = 30): Plan {
+  const { seams, barS, introS } = p.scoreTiming(track, seconds)
+  const start = p.SCORE_START_DELAY_S
+  return {
+    seconds,
+    events: [{ t: start, name: `${track} score` }, ...(introS ? [{ t: start + introS, name: 'loop starts' }] : [])],
+    seams: seams.map((s) => start + s).filter((s) => s < seconds - 0.5),
+    bar: { startS: start + introS, barS },
+    script: scrimScript(p, track, seconds),
+  }
+}
+
+function musicPlan(track: string, intensity = DEFAULT_INTENSITY, seconds = 30, engine: MusicEngine = 'tone'): Plan {
+  if (engine === 'scrim' && scrim) return scrimMusicPlan(scrim, track, seconds)
   const title = track === 'title'
   const biome = title ? null : biomeOf(track)
   const loop = biome ? musicLoop(biome) : TITLE_LOOP
@@ -131,16 +167,19 @@ function sfxSheetPlan(level = 'level1'): Plan {
 
 const KILL_EVERY_S = 0.75
 
-function mixPlan(level: string, seconds = 20): Plan {
+function mixPlan(level: string, seconds = 20, engine: MusicEngine = 'tone'): Plan {
   const biome = biomeOf(level)
   const events: Plan['events'] = [{ t: TRANSPORT_START_S, name: `${level} music + wind` }]
+  const p = engine === 'scrim' ? scrim : null
   return {
     seconds,
     events,
     seams: [],
     bar: null,
-    script: ({ at }) => {
-      startMusic(biome)
+    script: (scope) => {
+      const { at } = scope
+      if (p) scrimScript(p, level, seconds)(scope)
+      else startMusic(biome)
       setMusicIntensity(DEFAULT_INTENSITY)
       prepareLevelSFX(biome)
       startWindWhoosh()
@@ -175,10 +214,12 @@ function mixPlan(level: string, seconds = 20): Plan {
   }
 }
 
-const RENDERS: { [K in AudioRenderRequest['kind']]: (req: Extract<AudioRenderRequest, { kind: K }>) => Plan } = {
-  music: (r) => musicPlan(r.track, r.intensity, r.seconds),
+type GamePlanRequest = Exclude<AudioRenderRequest, { kind: 'score' }>
+
+const RENDERS: { [K in GamePlanRequest['kind']]: (req: Extract<GamePlanRequest, { kind: K }>) => Plan } = {
+  music: (r) => musicPlan(r.track, r.intensity, r.seconds, r.engine),
   sfxSheet: (r) => sfxSheetPlan(r.level),
-  mix: (r) => mixPlan(r.level, r.seconds),
+  mix: (r) => mixPlan(r.level, r.seconds, r.engine),
 }
 
 function toBase64(buffer: AudioBuffer): string {
@@ -195,8 +236,33 @@ function toBase64(buffer: AudioBuffer): string {
   return btoa(s)
 }
 
+/** The port on its own, seeded like the original page's render in `scripts/audio/render.mjs` (same PRNG, same call order). */
+async function renderScore(req: Extract<AudioRenderRequest, { kind: 'score' }>, seed: number): Promise<AudioRenderResult> {
+  const song = compile(req.text)
+  if (song.errors.length) throw new Error(`score errors:\n${song.errors.map((e) => `line ${e.line}: ${e.msg}`).join('\n')}`)
+  const seconds = req.seconds ?? 20
+  const random = Math.random
+  Math.random = createRng(seed)
+  let buffer: AudioBuffer
+  try {
+    buffer = await renderScoreOffline(song, seconds, 44100, { voicing: req.voicing })
+  } finally {
+    Math.random = random
+  }
+  const start = 0.05 // the original's render offset
+  const seams: number[] = []
+  if (song.loop.dur > 0) for (let t = start + song.intro.dur + song.loop.dur; t < seconds - 0.5; t += song.loop.dur) seams.push(t)
+  const bar = (song.loop.sections[0] ?? song.intro.sections[0])?.barDur
+  return {
+    sampleRate: buffer.sampleRate, seconds, pcm: toBase64(buffer),
+    events: [{ t: start, name: song.title }], seams, bar: bar ? { startS: start + song.intro.dur, barS: bar } : null,
+  }
+}
+
 export async function renderAudio(req: AudioRenderRequest, seed = 1): Promise<AudioRenderResult> {
-  const plan = (RENDERS[req.kind] as (r: AudioRenderRequest) => Plan)(req)
+  if (req.kind === 'score') return renderScore(req, seed)
+  if ('engine' in req && req.engine === 'scrim') scrim = await import('@/audio/scrim/player')
+  const plan = (RENDERS[req.kind] as (r: GamePlanRequest) => Plan)(req)
   const buffer = await renderOffline({ seconds: plan.seconds, seed }, plan.script, stopAll)
   return { sampleRate: buffer.sampleRate, seconds: plan.seconds, pcm: toBase64(buffer), events: plan.events, seams: plan.seams, bar: plan.bar }
 }
