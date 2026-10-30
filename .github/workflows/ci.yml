@@ -1,10 +1,18 @@
 name: CI
+# Auto-merges push to main with GITHUB_TOKEN, which never triggers `push`, so
+# automerge.yml dispatches this workflow on main after each merge (`merged` names the PR).
+run-name: ${{ inputs.merged && format('verify main after {0}', inputs.merged) || github.event.pull_request.title || format('{0} on {1}', github.event_name, github.ref_name) }}
 
 on:
   pull_request:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      merged:
+        description: 'Merge that prompted this run, e.g. "#123 (abc1234)"'
+        required: false
+        default: ''
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -13,6 +21,9 @@ concurrency:
 jobs:
   verify:
     name: verify
+    permissions:
+      contents: read
+      issues: write # report a red main below
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -47,3 +58,28 @@ jobs:
           name: e2e-results
           path: e2e-results/
           retention-days: 14
+
+      # A red main gets the same agent:prod-broken issue as a failing production smoke, so
+      # the Maintainer's revert-first rule applies. One open issue at a time: later
+      # failures comment on it. Superseded runs end `cancelled` and are not reported.
+      - name: Report a red main
+        if: failure() && github.ref == 'refs/heads/main'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const after = context.payload.inputs?.merged ? `, after ${context.payload.inputs.merged}` : ''
+            const body = `CI \`verify\` failed on main @ ${context.sha} (${context.eventName}${after}).\nRun: ${run}\nArtifacts include screenshots and results.json.`
+            const open = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'agent:prod-broken',
+            })
+            if (open.data.length) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: open.data[0].number, body })
+            } else {
+              await github.rest.issues.create({
+                ...context.repo,
+                title: `CI verify failed on main @ ${context.sha.slice(0, 7)}`,
+                body,
+                labels: ['agent:prod-broken', 'P1', 'type:bug'],
+              })
+            }
