@@ -125,3 +125,19 @@ export function bossHitHz(hpFraction: number): number {
   const f = Math.min(Math.max(hpFraction, 0), 1)
   return BOSS_SFX.hit.topHz + (BOSS_SFX.hit.baseHz - BOSS_SFX.hit.topHz) * f
 }
+
+/** Biomes whose kit has the combo-streak firework voices (#182). */
+export const FIREWORK_BIOMES: readonly BiomeType[] = ['themePark']
+
+/** Firework (#182): pink noise through a rising narrow band-pass for the whistle; a low-passed white crack on the kill thump for the pop. */
+export const FIREWORK_SFX = {
+  whistle: { startHz: 900, endHz: 3400, q: 14, volume: -22, minS: 0.4, maxS: 3 },
+  pop: { crackS: 0.45, cutoffHz: 3200, volume: -16, drum: 'G1', drumVelocity: 0.7 },
+} as const
+
+/** Whistle length for a flight of `flightS` game seconds at `timeScale` (slow-mo stretches it). */
+export function fireworkWhistleS(flightS: number, timeScale: number): number {
+  const { minS, maxS } = FIREWORK_SFX.whistle
+  const s = timeScale > 0 ? flightS / timeScale : maxS
+  return Math.min(Math.max(s, minS), maxS)
+}

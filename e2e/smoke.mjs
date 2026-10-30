@@ -278,7 +278,8 @@ async function pollUntil(page, check, { ms, frames = MIN_FRAMES, pollMs = 500 })
  * explosions/popups fade after ~1-1.5 s of real time, which at ~1 fps is one or
  * two frames, so they are captured on the very next rendered frame.
  * With `frenzy` (the first level) the kills enter the 5× combo tier: <id>-combat.png
- * must show the "×5 FRENZY" flash during its slow-mo.
+ * must show the "×5 FRENZY" flash during its slow-mo, and on a level with fireworks
+ * (Theme Park) the 15+ streak's firework burst, held on screen.
  */
 async function playLevel(page, id, { frenzy = false } = {}) {
   const problems = []
@@ -334,6 +335,18 @@ async function playLevel(page, id, { frenzy = false } = {}) {
         return el && Number(getComputedStyle(el).opacity) > 0.98 && window.__SC_TEST__.stats().timeScale < 0.5
       }, null, { timeout: 20000, polling: 100 })
       .then(() => true, () => false)
+  }
+  // Theme Park: the primed streak passes 15, so a pair of fireworks goes up (#182); hold a burst in frame.
+  let fireworks = await page.evaluate(() => window.__SC_TEST__.fireworks())
+  if (fireworks.mounted && frenzy && nearestKilled > 0 && !killCheckSkipped) {
+    const burstShown = await page
+      .waitForFunction(() => {
+        const f = window.__SC_TEST__.fireworks()
+        return f.burstsLive > 0 && f.lastBurst?.onScreen
+      }, null, { timeout: 30000, polling: 100 })
+      .then(() => true, () => false)
+    fireworks = await page.evaluate(() => window.__SC_TEST__.fireworks())
+    if (!burstShown) problems.push(`no firework burst on screen after a 15+ streak (launched ${fireworks.launched}, bursts ${fireworks.bursts}, live ${fireworks.burstsLive})`)
   }
   await page.screenshot({ path: path.join(OUT, `${id}-combat.png`), timeout: SHOT_TIMEOUT })
   const combat = await getStats(page)
@@ -415,6 +428,7 @@ async function playLevel(page, id, { frenzy = false } = {}) {
       combo: combat.combo,
       multiplier: combat.multiplier,
       frenzy: frenzyShown === null ? null : { shown: frenzyShown, timeScale: combat.timeScale },
+      fireworks: fireworks.mounted ? fireworks : null,
       translationMax: shake.max,
       translationIdle: shake.current,
       traumaMaxDeg: shake.traumaMax,
@@ -1750,7 +1764,7 @@ async function run() {
           ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }

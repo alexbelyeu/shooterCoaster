@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BOSS_SFX, FIRE_VARIANTS, STINGERS, STINGER_VOICES, bossHitHz, fireVelocity, killLayers, killTier } from './sfxDesign'
+import { BOSS_SFX, FIREWORK_BIOMES, FIREWORK_SFX, FIRE_VARIANTS, STINGERS, STINGER_VOICES, bossHitHz, fireVelocity, fireworkWhistleS, killLayers, killTier } from './sfxDesign'
 
 describe('killTier / killLayers', () => {
   it('maps combo counts to the four tiers', () => {
@@ -54,5 +54,18 @@ describe('boss cues', () => {
     expect(bossHitHz(0.5)).toBeGreaterThan(bossHitHz(0.9))
     expect(bossHitHz(-1)).toBe(BOSS_SFX.hit.topHz)
     expect(bossHitHz(2)).toBe(BOSS_SFX.hit.baseHz)
+  })
+})
+
+describe('firework cues', () => {
+  it('only the theme park has them', () => {
+    expect(FIREWORK_BIOMES).toEqual(['themePark'])
+  })
+
+  it('stretches the whistle with slow-mo, within bounds', () => {
+    expect(fireworkWhistleS(1.1, 1)).toBeCloseTo(1.1)
+    expect(fireworkWhistleS(1.1, 0.5)).toBeCloseTo(2.2)
+    expect(fireworkWhistleS(1.1, 0)).toBe(FIREWORK_SFX.whistle.maxS)
+    expect(fireworkWhistleS(0.1, 1)).toBe(FIREWORK_SFX.whistle.minS)
   })
 })
