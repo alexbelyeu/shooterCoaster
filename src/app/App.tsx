@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import GameCanvas from '@/canvas/GameCanvas'
 import { useGameStore } from '@/store/useGameStore'
 import TitleScreen from '@/ui/screens/TitleScreen'
@@ -91,7 +91,8 @@ export default function App() {
   }, [inPlay])
 
   return (
-    <>
+    // Framer transitions (countdown, wave banner, screen fades) follow the toggle too, not only the OS setting.
+    <MotionConfig reducedMotion={reducedMotion ? 'always' : 'never'}>
       <GameCanvas />
 
       <AnimatePresence mode="wait">
@@ -155,6 +156,6 @@ export default function App() {
 
       {phase === 'playing' && <ScorePopups />}
       {phase === 'playing' && <WaveAnnouncement />}
-    </>
+    </MotionConfig>
   )
 }

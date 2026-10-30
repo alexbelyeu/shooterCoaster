@@ -132,9 +132,10 @@ function syncVolumes(immediate = false): void {
   ] as const
   const now = Tone.now()
   for (const [channel, db] of levels) {
-    channel.volume.cancelScheduledValues(now)
-    if (immediate) channel.volume.setValueAtTime(db, now)
-    else channel.volume.rampTo(db, VOLUME_RAMP_S, now)
+    if (immediate) {
+      channel.volume.cancelScheduledValues(now)
+      channel.volume.setValueAtTime(db, now)
+    } else channel.volume.rampTo(db, VOLUME_RAMP_S, now)
   }
 }
 
