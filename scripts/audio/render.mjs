@@ -1,21 +1,14 @@
 #!/usr/bin/env node
 /**
- * Renders the game's current music / SFX offline (faster than real time, independent of
- * the frame rate) and measures it, for Alex's ears and the Sound designer's numbers.
+ * Renders the game's current music / SFX offline in the page (`__SC_TEST__.renderAudio`) and measures it.
  *
- *   npm run build && npm run audio:render -- --music level1 [--intensity 0.45] [--seconds 30]
- *   npm run audio:render -- --music title
+ *   npm run build && npm run audio:render -- --music <title|level1..5> [--intensity 0.45] [--seconds 30]
  *   npm run audio:render -- --sfx-sheet [--level level1]
  *   npm run audio:render -- --mix level1 [--seconds 20]
  *
  * Options: --name <file name> (default music-<track> / sfx-sheet-<level> / mix-<level>)
  *   --out docs/audio/renders  --seed 1  --url <running preview>
- * Writes <out>/<name>.mp3 (128 kbps), .json (request, events, loop seams, metrics vs the
- * sound bible's targets) and .png (log-frequency spectrogram); the exact float WAV it
- * measured stays in e2e-results/audio/. Needs ffmpeg; cloud sessions: export SC_CHROME.
- *
- * The page runs `__SC_TEST__.renderAudio` (src/testing/audioRender.ts): Tone's own nodes
- * in an OfflineAudioContext, driven by the game's music and SFX code.
+ * Writes <out>/<name>.{mp3,json,png}; the float WAV it measured stays in e2e-results/audio/.
  */
 import fs from 'node:fs'
 import path from 'node:path'

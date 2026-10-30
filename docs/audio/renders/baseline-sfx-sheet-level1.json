@@ -248,16 +248,12 @@
       "label": "Integrated loudness",
       "value": -32.9,
       "unit": "LUFS",
-      "min": -18,
-      "max": -16,
       "status": "info"
     },
     {
       "label": "Short-term max",
       "value": -31.4,
       "unit": "LUFS",
-      "min": -15,
-      "max": -13,
       "status": "info"
     },
     {

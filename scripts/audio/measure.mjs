@@ -56,13 +56,7 @@ export function loudness(file) {
 
 const round = (x, d = 2) => (x === null || x === undefined || !Number.isFinite(x) ? x ?? null : Math.round(x * 10 ** d) / 10 ** d)
 
-/**
- * Every metric the toolkit reports for one file. `seams`: loop points in seconds; with
- * `bar` ({startS, barS}: where bar 1 starts and how long a bar is) each seam's jump is
- * measured against the jumps at the other bar lines.
- * `sounds`: an SFX sheet's `{t, name}` list; each is measured alone up to the next one,
- * and the single shots (names starting "fire (") give the gun's time to silence.
- */
+/** `bar` ({startS, barS}) lets seams be judged against bar lines; `sounds` ({t, name}, an SFX sheet) are measured one by one. */
 export function measure(file, { seams = [], bar = null, sounds = [] } = {}) {
   const channels = decode(file)
   const bands = bandEnergy(powerSpectrum(channels), SAMPLE_RATE)
@@ -98,7 +92,7 @@ export function measure(file, { seams = [], bar = null, sounds = [] } = {}) {
   }
 }
 
-/** Plain-text table of `metrics` against the sound bible's targets for `kind`; returns [text, anyFail]. */
+/** Returns [table text, any target failed]. */
 export function targetTable(metrics, kind) {
   const rows = compareTargets(metrics, kind)
   const fmt = (v) => (typeof v === 'number' ? String(v) : String(v ?? '—'))
@@ -112,7 +106,6 @@ export function targetTable(metrics, kind) {
   return [text, rows.some((r) => r.status === 'fail')]
 }
 
-/** An SFX sheet's per-sound lines. */
 export function soundLines(sounds) {
   return sounds.map((s) => `  ${String(s.t).padStart(5)} s  ${s.name.padEnd(40)} peak ${s.peakDb} dBFS, silent after ${s.tailMs} ms`).join('\n')
 }

@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 /**
- * Measures one audio file against the mix targets in docs/audio/SOUND-BIBLE.md.
+ * Measures one file against the mix targets in docs/audio/SOUND-BIBLE.md.
  *
  *   npm run audio:check -- <file.wav|mp3> [--kind music|mix|sfx] [--seam 8.99[,17.88]] [--json] [--strict]
  *
- * Integrated / short-term max / LRA / true peak (ffmpeg ebur128), clipped samples, band
- * energy, stereo correlation, loop-seam level jump, digital silence. A render's sidecar
- * JSON (same name, .json) supplies --kind and --seam when they're not given. Exits 1 only
- * with --strict and a target missed.
+ * A render's sidecar JSON (same name) supplies the kind, seams and SFX list. Exits 1 only with --strict.
  */
 import fs from 'node:fs'
 import { measure, requireFfmpeg, soundLines, targetTable } from './measure.mjs'

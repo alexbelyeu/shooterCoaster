@@ -76,8 +76,6 @@
       "label": "Integrated loudness",
       "value": -30.7,
       "unit": "LUFS",
-      "min": -18,
-      "max": -16,
       "status": "info"
     },
     {

@@ -40,7 +40,6 @@ function createMasterChain(): MasterChain {
 }
 
 let chain = createMasterChain()
-let musicDuck = chain.duck
 let ducked = false
 
 // Live bindings: an offline render swaps them for the length of the render.
@@ -49,16 +48,11 @@ export let musicChannel = chain.music
 
 function setChain(c: MasterChain) {
   chain = c
-  musicDuck = c.duck
   sfxChannel = c.sfx
   musicChannel = c.music
 }
 
-/**
- * Offline renders only (`offlineRender.ts`): builds a fresh master chain in the current
- * (offline) Tone context and marks audio ready, so the game's own music and SFX code
- * plays into the render. Returns the function that puts the live chain back.
- */
+/** `offlineRender.ts`: a fresh chain in the (offline) current context, audio marked ready; returns the restore. */
 export function swapInOfflineChain(): () => void {
   const live = { chain, initialized, ducked }
   const offline = createMasterChain()
@@ -81,9 +75,9 @@ export function setMusicDucked(on: boolean, immediate = false): void {
   const hz = on ? DUCK_CLOSED_HZ : DUCK_OPEN_HZ
   if (immediate) {
     const now = Tone.now()
-    musicDuck.frequency.cancelScheduledValues(now)
-    musicDuck.frequency.setValueAtTime(hz, now)
-  } else musicDuck.frequency.rampTo(hz, DUCK_RAMP_S)
+    chain.duck.frequency.cancelScheduledValues(now)
+    chain.duck.frequency.setValueAtTime(hz, now)
+  } else chain.duck.frequency.rampTo(hz, DUCK_RAMP_S)
 }
 
 export function isMusicDucked(): boolean {

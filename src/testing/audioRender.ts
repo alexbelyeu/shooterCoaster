@@ -1,9 +1,4 @@
-/**
- * Offline audio renders for `npm run audio:render` (`scripts/audio/render.mjs`), loaded
- * on demand by `__SC_TEST__.renderAudio`. Each render plays the game's own music and SFX
- * code into `renderOffline`; nothing here changes how the game sounds.
- * A new kind (the score engine's `score`) is one more entry in `RENDERS`.
- */
+/** `npm run audio:render`'s renders of the game's own music and SFX code; a new kind (the score engine's) is one more `RENDERS` entry. */
 import { renderOffline, type OfflineRenderScope } from '@/audio/offlineRender'
 import { setMusicDucked } from '@/audio/AudioEngine'
 import { musicLoop, setMusicIntensity, startMusic, stopMusic } from '@/audio/MusicManager'
@@ -19,11 +14,9 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import type { BiomeType } from '@/types/level'
 
 export type AudioRenderRequest =
-  /** `track`: 'title' or a level id; `intensity` as `MusicController` sets it (0.45 at the start of a run). */
+  /** `track`: 'title' or a level id. */
   | { kind: 'music'; track: string; intensity?: number; seconds?: number }
-  /** Every SFX alone, in order, at least 0.6 s apart. */
   | { kind: 'sfxSheet'; level?: string }
-  /** A scripted combat moment: music, wind, autofire, kills climbing to FRENZY, a wave stinger. */
   | { kind: 'mix'; level: string; seconds?: number }
 
 export interface AudioRenderResult {
@@ -31,11 +24,8 @@ export interface AudioRenderResult {
   seconds: number
   /** Interleaved stereo float32, little-endian, base64. */
   pcm: string
-  /** What starts when, in render seconds (the SFX sheet's spoken order). */
   events: { t: number; name: string }[]
-  /** Music loop points inside the render. */
   seams: number[]
-  /** Music: where bar 1 starts and how long a bar is (seams are measured against the other bar lines). */
   bar: { startS: number; barS: number } | null
 }
 
@@ -45,12 +35,14 @@ interface Plan {
   seams: number[]
   bar: AudioRenderResult['bar']
   script: (scope: OfflineRenderScope) => void
-  cleanup: () => void
 }
 
-/** `renderOffline`'s look-ahead: the transport (and so the first note) starts here. */
+/** `renderOffline`'s look-ahead: where the transport starts. */
 const TRANSPORT_START_S = 0.1
+/** Where `MusicController` starts a run. */
 const DEFAULT_INTENSITY = 0.45
+/** The default weapon's fire delay (`WeaponBase.ts`). */
+const AUTOFIRE_S = 0.1
 
 function biomeOf(level: string): BiomeType {
   const biome = getLevelConfig(level)?.biome
@@ -86,46 +78,42 @@ function musicPlan(track: string, intensity = DEFAULT_INTENSITY, seconds = 30): 
       startMusic(biome)
       setMusicIntensity(intensity)
     },
-    cleanup: stopAll,
   }
 }
 
 function sfxSheetPlan(level = 'level1'): Plan {
   const biome = biomeOf(level)
-  const sheet: { name: string; slotS: number; play: (at: OfflineRenderScope['at'], t: number) => void }[] = [
-    { name: 'fire (single shot)', slotS: 0.6, play: (at, t) => at(t, () => playFireSound(false)) },
-    { name: 'fire (auto, held trigger)', slotS: 0.6, play: (at, t) => at(t, () => playFireSound(true)) },
-    {
-      name: 'autofire burst (6 shots, 100 ms apart)',
-      slotS: 1.2,
-      play: (at, t) => { for (let i = 0; i < 6; i++) at(t + i * 0.1, () => playFireSound(true)) },
-    },
-    { name: 'hit tick', slotS: 0.6, play: (at, t) => at(t, playHitTick) },
-    { name: 'kill 1x', slotS: 0.6, play: (at, t) => at(t, () => playExplosionSound(COMBO_TIERS[0].minCount)) },
-    { name: 'kill 2x (+ thump)', slotS: 0.7, play: (at, t) => at(t, () => playExplosionSound(COMBO_TIERS[1].minCount)) },
-    { name: 'kill 3x (+ ring)', slotS: 0.8, play: (at, t) => at(t, () => playExplosionSound(COMBO_TIERS[2].minCount)) },
-    { name: 'kill 5x (+ swell)', slotS: 1.0, play: (at, t) => at(t, () => playExplosionSound(COMBO_TIERS[TOP_TIER].minCount)) },
-    { name: 'combo break', slotS: 0.8, play: (at, t) => at(t, playComboBreak) },
-    { name: 'wave stinger', slotS: 1.4, play: (at, t) => at(t, playWaveStinger) },
-    { name: 'boss arrival', slotS: 2.0, play: (at, t) => at(t, playBossStinger) },
-    { name: 'boss hit (full hp)', slotS: 0.6, play: (at, t) => at(t, () => playBossHit({ hpFraction: 1 })) },
-    { name: 'boss hit (low hp)', slotS: 0.6, play: (at, t) => at(t, () => playBossHit({ hpFraction: 0.2 })) },
-    { name: 'boss defeat', slotS: 2.4, play: (at, t) => at(t, playBossDefeat) },
+  // Each sound alone in its own slot; `repeat` plays it again every AUTOFIRE_S.
+  const sheet: { name: string; slotS: number; play: () => void; repeat?: number }[] = [
+    { name: 'fire (single shot)', slotS: 0.6, play: () => playFireSound(false) },
+    { name: 'fire (auto, held trigger)', slotS: 0.6, play: () => playFireSound(true) },
+    { name: 'autofire burst (6 shots, 100 ms apart)', slotS: 1.2, play: () => playFireSound(true), repeat: 6 },
+    { name: 'hit tick', slotS: 0.6, play: playHitTick },
+    { name: 'kill 1x', slotS: 0.6, play: () => playExplosionSound(COMBO_TIERS[0].minCount) },
+    { name: 'kill 2x (+ thump)', slotS: 0.7, play: () => playExplosionSound(COMBO_TIERS[1].minCount) },
+    { name: 'kill 3x (+ ring)', slotS: 0.8, play: () => playExplosionSound(COMBO_TIERS[2].minCount) },
+    { name: 'kill 5x (+ swell)', slotS: 1.0, play: () => playExplosionSound(COMBO_TIERS[TOP_TIER].minCount) },
+    { name: 'combo break', slotS: 0.8, play: playComboBreak },
+    { name: 'wave stinger', slotS: 1.4, play: playWaveStinger },
+    { name: 'boss arrival', slotS: 2.0, play: playBossStinger },
+    { name: 'boss hit (full hp)', slotS: 0.6, play: () => playBossHit({ hpFraction: 1 }) },
+    { name: 'boss hit (low hp)', slotS: 0.6, play: () => playBossHit({ hpFraction: 0.2 }) },
+    { name: 'boss defeat', slotS: 2.4, play: playBossDefeat },
     ...(FIREWORK_BIOMES.includes(biome)
       ? [
-          { name: 'firework whistle', slotS: 1.6, play: (at: OfflineRenderScope['at'], t: number) => at(t, () => playFireworkWhistle({ flightS: 1.2, timeScale: 1 })) },
-          { name: 'firework pop', slotS: 1.0, play: (at: OfflineRenderScope['at'], t: number) => at(t, playFireworkPop) },
+          { name: 'firework whistle', slotS: 1.6, play: () => playFireworkWhistle({ flightS: 1.2, timeScale: 1 }) },
+          { name: 'firework pop', slotS: 1.0, play: playFireworkPop },
         ]
       : []),
-    { name: 'star chime 1', slotS: 1.0, play: (at, t) => at(t, () => playStarChime(0)) },
-    { name: 'star chime 2', slotS: 1.0, play: (at, t) => at(t, () => playStarChime(1)) },
-    { name: 'star chime 3', slotS: 1.5, play: (at, t) => at(t, () => playStarChime(2)) },
+    { name: 'star chime 1', slotS: 1.0, play: () => playStarChime(0) },
+    { name: 'star chime 2', slotS: 1.0, play: () => playStarChime(1) },
+    { name: 'star chime 3', slotS: 1.5, play: () => playStarChime(2) },
   ]
   const events: Plan['events'] = []
   let t = 0.3
   for (const s of sheet) {
     events.push({ t, name: s.name })
-    t = Math.round((t + Math.max(0.6, s.slotS)) * 1000) / 1000
+    t = Math.round((t + s.slotS) * 1000) / 1000
   }
   return {
     seconds: Math.ceil(t * 10) / 10,
@@ -134,13 +122,13 @@ function sfxSheetPlan(level = 'level1'): Plan {
     bar: null,
     script: ({ at }) => {
       prepareLevelSFX(biome)
-      sheet.forEach((s, i) => s.play(at, events[i].t))
+      sheet.forEach((s, i) => {
+        for (let k = 0; k < (s.repeat ?? 1); k++) at(events[i].t + k * AUTOFIRE_S, s.play)
+      })
     },
-    cleanup: stopAll,
   }
 }
 
-const AUTOFIRE_S = 0.1 // the default weapon's fire delay (`WeaponBase.ts`)
 const KILL_EVERY_S = 0.75
 
 function mixPlan(level: string, seconds = 20): Plan {
@@ -184,7 +172,6 @@ function mixPlan(level: string, seconds = 20): Plan {
       events.push({ t: 1.6, name: `kills every ${KILL_EVERY_S} s, combo climbing` })
       events.sort((a, b) => a.t - b.t)
     },
-    cleanup: stopAll,
   }
 }
 
@@ -210,6 +197,6 @@ function toBase64(buffer: AudioBuffer): string {
 
 export async function renderAudio(req: AudioRenderRequest, seed = 1): Promise<AudioRenderResult> {
   const plan = (RENDERS[req.kind] as (r: AudioRenderRequest) => Plan)(req)
-  const buffer = await renderOffline({ seconds: plan.seconds, seed }, plan.script, plan.cleanup)
+  const buffer = await renderOffline({ seconds: plan.seconds, seed }, plan.script, stopAll)
   return { sampleRate: buffer.sampleRate, seconds: plan.seconds, pcm: toBase64(buffer), events: plan.events, seams: plan.seams, bar: plan.bar }
 }

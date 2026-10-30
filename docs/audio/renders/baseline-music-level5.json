@@ -97,8 +97,6 @@
       "label": "Short-term max",
       "value": -42.1,
       "unit": "LUFS",
-      "min": -15,
-      "max": -13,
       "status": "info"
     },
     {

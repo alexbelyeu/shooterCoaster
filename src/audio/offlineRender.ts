@@ -2,42 +2,26 @@ import * as Tone from 'tone'
 import { swapInOfflineChain } from './AudioEngine'
 import { createRng } from '@/utils/rng'
 
-/** Same look-ahead as Tone's live context, so loop callbacks and `Tone.now()` see what they see in the game. */
 const LOOK_AHEAD_S = 0.1
 
-/**
- * Tone's OfflineContext has no look-ahead: its loop callbacks fire after their own time
- * and `nextTriggerTime` would push every note late. This one runs ahead like the live
- * context, so a note lands on the sample it was scheduled for.
- */
+/** Tone's OfflineContext has no look-ahead, so `nextTriggerTime` would push every loop note late; this one runs ahead like the live context. */
 class LookAheadOfflineContext extends Tone.OfflineContext {
   now(): number {
     return super.now() + LOOK_AHEAD_S
   }
 }
 
-export interface OfflineRenderOptions {
-  seconds: number
-  sampleRate?: number
-  /** Seeds `Math.random` (fire jitter, title chimes) for the render, so two renders match. */
-  seed?: number
-}
-
-/** What a render script gets: `at(t, fn)` runs `fn` at `t` seconds of render time, with `Tone.now()` there. */
 export interface OfflineRenderScope {
+  /** Runs `fn` at `t` seconds of render time, with `Tone.now()` there. */
   at: (t: number, fn: () => void) => void
 }
 
 /**
- * Renders the game's own audio code faster than real time: `script` starts music and
- * schedules SFX calls with `at`, all against a fresh master chain (`swapInOfflineChain`)
- * inside an offline Tone context. `cleanup` runs before the live context comes back
- * (stop music, dispose the kit). Call it only while no live audio is playing (the
- * title screen before audio unlocks): for the length of the render, Tone's global
- * context is the offline one.
+ * Renders the game's own music / SFX code faster than real time. Tone's global context is
+ * the offline one until it resolves, so call it only while no live audio plays.
  */
 export async function renderOffline(
-  { seconds, sampleRate = 44100, seed = 1 }: OfflineRenderOptions,
+  { seconds, sampleRate = 44100, seed = 1 }: { seconds: number; sampleRate?: number; seed?: number },
   script: (scope: OfflineRenderScope) => void,
   cleanup: () => void,
 ): Promise<AudioBuffer> {

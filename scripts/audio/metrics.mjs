@@ -1,8 +1,4 @@
-/**
- * Pure audio metric maths for `npm run audio:check` / `audio:render` (unit-tested in
- * metrics.test.ts). Inputs are Float32Array channels at a sample rate; loudness and
- * true peak come from ffmpeg's ebur128 instead (measure.mjs).
- */
+/** Pure metric maths for the audio toolkit, on Float32Array channels; loudness and true peak come from ffmpeg (measure.mjs). */
 
 export const dbFromPower = (p) => (p > 0 ? 10 * Math.log10(p) : -Infinity)
 export const dbFromAmp = (a) => (a > 0 ? 20 * Math.log10(a) : -Infinity)
@@ -10,7 +6,6 @@ export const dbFromAmp = (a) => (a > 0 ? 20 * Math.log10(a) : -Infinity)
 /** 16-bit full scale decodes to 32767/32768, so "at full scale" means within that of 1. */
 export const FULL_SCALE = 32767 / 32768
 
-/** Samples at or over digital full scale, across all channels. */
 export function clippedSamples(channels) {
   let n = 0
   for (const ch of channels) for (let i = 0; i < ch.length; i++) if (Math.abs(ch[i]) >= FULL_SCALE) n++
@@ -110,7 +105,7 @@ export const BANDS = [
   { name: 'air', lo: 6000, hi: Infinity },
 ]
 
-/** Each band's share of the total energy, in % and dB relative to the total. A bin belongs to the band its centre falls in. */
+/** Each band's share of the total energy, in % and dB relative to the total. */
 export function bandEnergy(power, sampleRate, size = (power.length - 1) * 2) {
   const binHz = sampleRate / size
   const sums = Object.fromEntries([...BANDS.map((b) => [b.name, 0]), ['below30', 0]])
@@ -139,11 +134,7 @@ function rmsDb(channels, from, to) {
 /** Silence reads as this, so a jump out of silence is a large finite number. */
 const JUMP_FLOOR_DB = -100
 
-/**
- * Level jump across a loop point: RMS of the `windowS` after `seamS` minus the `windowS`
- * before it, in dB (+ = louder after). Windows of ~400 ms (loudness's momentary window)
- * average over a beat or two, so a drum hit next to the seam doesn't read as a jump.
- */
+/** RMS after `seamS` minus RMS before it, in dB; ~400 ms windows (loudness's momentary window) so one drum hit doesn't read as a jump. */
 export function seamJump(channels, sampleRate, seamS, windowS = 0.4) {
   const at = Math.round(seamS * sampleRate)
   const w = Math.round(windowS * sampleRate)
@@ -152,11 +143,8 @@ export function seamJump(channels, sampleRate, seamS, windowS = 0.4) {
 }
 
 /**
- * The seam's jump minus the closest jump at one of the loop's other bar lines
- * (`barTimes`), in dB. Music swells on downbeats, so a clean loop's seam jumps like some
- * bar line inside it does (the closest, not the typical one: a part that rests every other
- * bar has two kinds of bar line). A gap, cut or level change at the seam matches none.
- * Without bar lines it is the raw jump.
+ * The seam's jump minus the closest jump at another bar line of the loop: music swells on downbeats, so a clean seam
+ * jumps like some bar line does. Closest, not median: a part resting every other bar has two kinds of bar line.
  */
 export function seamExcess(channels, sampleRate, seamS, barTimes = []) {
   const jump = seamJump(channels, sampleRate, seamS)
@@ -178,10 +166,7 @@ export function barLines(startS, barS, endS, seams, windowS = 0.4) {
   return bars
 }
 
-/**
- * One SFX alone in [startS, endS): its peak (dBFS) and how long after `startS` its 5 ms
- * RMS envelope last rises above `floorDb` (time to silence).
- */
+/** One SFX alone in [startS, endS): its peak (dBFS) and when its 5 ms RMS last rises above `floorDb` (time to silence). */
 export function soundEnvelope(channels, sampleRate, startS, endS, { floorDb = -60, windowS = 0.005 } = {}) {
   const from = Math.round(startS * sampleRate)
   const to = Math.min(channels[0].length, Math.round(endS * sampleRate))
@@ -193,11 +178,7 @@ export function soundEnvelope(channels, sampleRate, startS, endS, { floorDb = -6
   return { peakDb: dbFromAmp(peak), tailMs: lastLoud < 0 ? 0 : ((lastLoud - from) / sampleRate) * 1000 }
 }
 
-/**
- * Mix targets from docs/audio/SOUND-BIBLE.md, per render kind ('music' = music bus alone,
- * 'mix' = full game mix in combat, 'sfx' = an SFX sheet). `min`/`max` bound the value;
- * a row without a bound is shown for information. Keep in step with the bible.
- */
+/** The mix targets of docs/audio/SOUND-BIBLE.md (keep them in step); `kinds` limits a target to music / mix / sfx renders. */
 export const TARGETS = [
   { key: 'integrated', label: 'Integrated loudness', unit: 'LUFS', kinds: ['music'], min: -18, max: -16 },
   { key: 'shortTermMax', label: 'Short-term max', unit: 'LUFS', kinds: ['mix'], min: -15, max: -13, note: '≈ −14' },
@@ -211,10 +192,7 @@ export const TARGETS = [
   { key: 'silence', label: 'Digital silence', unit: '%' },
 ]
 
-/**
- * One row per target with a value: pass / fail against its bounds where the target
- * applies to `kind`, info otherwise (e.g. a music render's short-term max).
- */
+/** Pass / fail where a target applies to `kind`, info otherwise (e.g. a music render's short-term max). */
 export function compareTargets(metrics, kind) {
   const rows = []
   for (const t of TARGETS) {
@@ -228,7 +206,6 @@ export function compareTargets(metrics, kind) {
   return rows
 }
 
-/** The target as shown in tables; '—' for an info row. */
 export function targetText(t) {
   if (t.status === 'info') return '—'
   if (t.note && t.min !== undefined && t.max !== undefined) return `${t.note} (${t.min}…${t.max})`
