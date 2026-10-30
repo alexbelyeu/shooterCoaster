@@ -23,7 +23,6 @@ import FireImp from '../enemies/FireImp'
 import InfernalDrake from '../enemies/InfernalDrake'
 import GoldenBalloon from '../enemies/GoldenBalloon'
 import BossSpawner from '../bosses/BossSpawner'
-import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { SCORE_VALUES } from '@/levels/scoring'
 import { createRng, type Rng } from '@/utils/rng'
 import { recordE2ESpawns } from '@/testing/e2eHook'
@@ -271,7 +270,6 @@ const ENEMY_COMPONENTS: Record<EnemyType, React.ComponentType<any>> = {
   infernalDrake: InfernalDrake,
 }
 
-const EXPLOSION_COLORS = ['#ff4444', '#ffaa00', '#ffffff', '#44aaff', '#00ff88']
 
 const toVector3 = (p: Vec3) => new THREE.Vector3(p.x, p.y, p.z)
 
@@ -436,7 +434,7 @@ export default function EnemySpawner({
   }, [])
 
   const onKill = useCallback(
-    (id: string, position: THREE.Vector3) => {
+    (id: string) => {
       killedEnemies.current.add(id)
 
       const remaining = totalEnemyCount - killedEnemies.current.size
@@ -450,9 +448,6 @@ export default function EnemySpawner({
           useGameStore.getState().setTimeScale(1)
         }, 1500)
       }
-
-      const color = EXPLOSION_COLORS[Math.floor(Math.random() * EXPLOSION_COLORS.length)]
-      getExplosionPool()?.activate(position, color)
     },
     [totalEnemyCount],
   )

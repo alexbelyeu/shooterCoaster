@@ -1,7 +1,8 @@
 import type * as THREE from 'three'
+import type { DeathStyle } from './deathStyles'
 
 export interface ExplosionPoolHandle {
-  activate: (position: THREE.Vector3, color: string) => void
+  explode: (position: THREE.Vector3, style: DeathStyle) => void
 }
 
 let poolHandle: ExplosionPoolHandle | null = null

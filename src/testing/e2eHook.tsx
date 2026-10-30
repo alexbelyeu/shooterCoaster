@@ -170,6 +170,17 @@ export interface SCTestApi {
   // ── Combo-streak fireworks (issue #182) ──
   /** The level's firework pool (theme park only): mounted?, launches / bursts since mount, live now, the newest burst on screen. */
   fireworks: () => E2EFireworks
+  // ── Death effects (issue #29) ──
+  /** Death effects since mount, live now, the newest one's style (enemy type, 'bossPart' or 'custom') and origin on screen. */
+  deaths: () => E2EDeaths
+}
+
+export interface E2EDeaths {
+  mounted: boolean
+  spawned: number
+  live: number
+  lastStyle: string
+  last: { x: number; y: number; onScreen: boolean } | null
 }
 
 export interface E2EFireworks {
@@ -326,6 +337,27 @@ export const e2eFireworks = {
   burstsLive: 0,
   hasLast: false,
   last: new THREE.Vector3(),
+}
+
+/** Written by `effects/ParticleExplosion.tsx` when the e2e flag is on; read through `deaths()`. */
+export const e2eDeaths = {
+  mounted: false,
+  spawned: 0,
+  live: 0,
+  lastStyle: '',
+  hasLast: false,
+  last: new THREE.Vector3(),
+}
+
+function readDeaths(): E2EDeaths {
+  const d = e2eDeaths
+  let last: E2EDeaths['last'] = null
+  if (d.hasLast && probeCamera) {
+    _v.copy(d.last).project(probeCamera)
+    const onScreen = _v.z < 1 && Math.abs(_v.x) <= 1 && Math.abs(_v.y) <= 1
+    last = { x: ((_v.x + 1) / 2) * probeSize.width, y: ((1 - _v.y) / 2) * probeSize.height, onScreen }
+  }
+  return { mounted: d.mounted, spawned: d.spawned, live: d.live, lastStyle: d.lastStyle, last }
 }
 
 function readFireworks(): E2EFireworks {
@@ -604,6 +636,7 @@ export function installE2EApi() {
     bossHit,
     bossEvents: { spawn: 0, hit: 0, defeated: 0 },
     fireworks: readFireworks,
+    deaths: readDeaths,
   }
   eventBus.on('boss:spawn', () => { api.bossEvents.spawn += 1 })
   eventBus.on('boss:hit', () => { api.bossEvents.hit += 1 })
