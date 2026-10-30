@@ -21,7 +21,9 @@ jobs:
       (github.event.deployment_status.state == 'success' &&
        github.event.deployment.environment == 'Production')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The smoke grows with every level step (boss, waves, fireworks): it passed in 18 min
+    # on 29 Oct and has hit a 20 min cap on every deploy since. Keep ~2x headroom.
+    timeout-minutes: 40
     env:
       SITE_URL: https://scoaster.com
     steps:
@@ -33,6 +35,9 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Smoke test production
+        # Step cap below the job cap: a slow smoke then fails this step (so `failure()` reports
+        # it) and the artifact upload still has time to run.
+        timeout-minutes: 32
         run: npm run smoke -- --url "$SITE_URL" --seconds 10
       - uses: actions/upload-artifact@v4
         if: always()
@@ -41,7 +46,10 @@ jobs:
           path: e2e-results/
           retention-days: 14
       - name: Report failure
-        if: failure()
+        # A run that hits timeout-minutes ends `cancelled`, not `failure`: report it too, or
+        # production goes unwatched without anyone noticing (no concurrency group here, so
+        # nothing else cancels this job).
+        if: failure() || cancelled()
         uses: actions/github-script@v7
         with:
           script: |
@@ -49,7 +57,8 @@ jobs:
             const open = await github.rest.issues.listForRepo({
               ...context.repo, state: 'open', labels: 'agent:prod-broken',
             })
-            const body = `Production smoke test failed (${context.eventName}, ${context.sha}).\nRun: ${run}\nArtifacts include screenshots and results.json.`
+            const outcome = '${{ job.status }}' === 'cancelled' ? 'timed out or was cancelled' : 'failed'
+            const body = `Production smoke test ${outcome} (${context.eventName}, ${context.sha}).\nRun: ${run}\nArtifacts include screenshots and results.json.`
             if (open.data.length) {
               await github.rest.issues.createComment({ ...context.repo, issue_number: open.data[0].number, body })
             } else {
