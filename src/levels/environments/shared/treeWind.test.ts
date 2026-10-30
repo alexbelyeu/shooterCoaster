@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { bakeCrownShade, CANOPY_PART, patchTreeWindVertex, TRUNK_PART } from './treeWind'
+import { bakeCrownShade, CANOPY_PART, patchTreeFillFragment, patchTreeWindVertex, TRUNK_PART } from './treeWind'
 
 describe('tree wind', () => {
   it('patches the Phong vertex shader at both anchors', () => {
@@ -8,6 +8,12 @@ describe('tree wind', () => {
     const patched = patchTreeWindVertex(src)
     expect(patched).toContain('uniform float uWindTime;')
     expect(patched).toMatch(/#include <begin_vertex>\s+#ifdef USE_INSTANCING/)
+  })
+
+  it('patches the Phong fragment shader to add the fill after the emissive map', () => {
+    const patched = patchTreeFillFragment(THREE.ShaderLib.phong.fragmentShader)
+    expect(patched).toContain('uniform float uTreeFill;')
+    expect(patched).toMatch(/#include <emissivemap_fragment>\s+totalEmissiveRadiance \+= diffuseColor\.rgb \* uTreeFill;/)
   })
 
   it('keeps the trunk base planted (h/H = 0 at the bottom of the unit cylinder)', () => {
