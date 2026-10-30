@@ -845,3 +845,105 @@ a pause or slow-mo could break a chain, and nothing told the player when one dro
 **Consequences:** Pause holds the combo exactly. Kill-sound layers now start at 4 / 8 / 15 kills
 (were 3 / 6 / 10). Anything new that changes `timeScale` should set it once and leave it, not
 fight the frenzy every frame.
+
+## 2026-10-29 — Ground enemies stand beside the track ahead of the rider; smoke gates readability (Builder, #179)
+
+**Context:** Antarctica's snowmen (and Inferno's imps and golems) were scattered over a
+disc of radius ~2,400 around the origin while the track runs high over the ridges.
+`pickReadableSpawn` only guarantees an enemy is near *some* track point once per lap, so
+the ride screenshot showed 0 readable snowmen and a scout was 9 px at 1,000 units.
+
+**Decision:**
+- Scatter waves of `snowman` / `snowmanScout` / `snowmanBrute` / `lavaGolem` / `fireImp`
+  (`placedBesideTrack` in `spawnPlacement.ts`) get seeded trackside slots at load (arc
+  distance 700–2200 ahead, 60–400 to either side) and are placed on `groundFn` from the
+  rider's track index when the wave activates. `spawnDigest` hashes the slots, as for
+  formations. Other scatter types keep `pickSpawn` + `pickReadableSpawn`.
+- Snowman model scale 1 → 1.3, scout 0.6 → 0.9 (silhouettes 65 and 48 units; `RADII`
+  scaled to match).
+- `npm run smoke` fails a level whose ride screenshot has fewer than 2 enemies ≥ 12 px
+  on screen.
+
+**Consequences:** A new ground enemy that should be in the player's face goes in
+`placedBesideTrack`, not a bigger `pickSpawn` radius. Removing a type from that list
+brings back the "nothing to shoot" ride. The readability gate means a level design that
+leaves the opening seconds empty now fails CI.
+
+## 2026-10-29 — Dark levels read by emissive edges, not exposure (Builder, #180)
+
+**Context:** Inferno was a black cone on dark red with a dotted yellow line beside the track. The line was a lava river: its UVs ran 0..1 along 2 km, so the lava shader's crust cells were 500 units long and their cracks drew one long yellow line that aliased into dots.
+**Decision:** Lava strips (rivers, volcano streaks) use `uv.x` 0..1 across and `uv.y` = distance along in strip widths, and `LavaShader` fades its crack pattern to an average heat once a cell is a few pixels wide (`fwidth`). The volcano is one vertex-coloured rock mesh with a baked `glow` attribute (reusing `createTerrainMaterial`): HDR crater lip, dim red upper slopes. `TrackParams.glow` adds the track's own (squared, ≈ linear) vertex colours as emissive, so a bright `color2` spine and ties glow while dark rails stay dark. The volcanic grade and sky are unchanged.
+**Consequences:** New lava geometry must follow the UV convention or the stripe comes back. Other dark levels can opt in with `track.glow`; it changes the track's shader program (`track-glow` cache key), which `ShaderWarmup` compiles with the level.
+
+## 2026-10-29 — Boss framework: weak points in phases, mounted dormant, timed on the level timer (Builder, #181)
+
+**Context:** Each level gets a finale boss (VISION; Theme Park's Golden Blimp first, Ocean's Kraken next).
+Bosses need several hit zones, phases, their own HUD and score, without forking the enemy, combo,
+score-popup, SFX or kill-counter paths.
+
+**Decision:**
+- Rules are pure in `src/entities/bosses/bossModel.ts`: a `BossSpec` is a list of weak points
+  (`id`, `radius`, `offset`, `hp`, `score`, `phase`) plus a `reward` and a `tell`. Only the
+  lowest phase with a live weak point is exposed; the boss is defeated when every weak point is
+  destroyed. Total hp is derived (`maxHp`), not stored. Specs live in `bossSpecs.ts`;
+  `computeMaxScore(waves, boss)` adds `bossMaxScore` (Σ weak point scores + reward), so `maxScore`
+  and stars include the boss.
+- `BossBase.tsx` registers one `CollisionManager` target per *exposed* weak point, and re-syncs
+  them inside the hit itself (not in an effect), so the next hit in the same frame or JS turn
+  already sees the new phase and aim assist never snaps to a hidden one. Each destroyed weak point
+  is a normal kill (`registerKill` + `addScore`, kill pop, explosion, `enemy:killed`), so combos,
+  popups, SFX and kills/accuracy work unchanged; the last one also scores the reward. Boss
+  events: `boss:spawn`, `boss:hit`, `boss:defeated`. HUD state is `boss` in the game store
+  (reset by `startRun`), so the bar survives the HUD remounting after a pause.
+- A concrete boss supplies `move(frame)` (root and weak point groups, game time, time since
+  defeat), `body`, `rigging` and `renderWeakPoint`. A Kraken's independently moving tentacles
+  animate their part groups in `move`; a retract phase can be a new `retracted` set on
+  `BossState` filtered by `exposedWeakPoints`.
+- `BossSpawner` mounts the boss **dormant** (invisible, no targets) with the level, so
+  `ShaderWarmup`'s warm-up frame compiles its programs (incl. the instanced confetti); it shows
+  the tell at `at - tell.seconds` and activates at `at`, both read from GameTimer's
+  `timeRemaining` (pause- and countdown-safe), not `setTimeout`.
+- The Golden Blimp rides with the coaster (a fixed distance ahead of the camera's smoothed
+  horizontal heading) rather than holding a world position: the ride covers thousands of units
+  in the ~20 s finale, and a fixed boss would be behind the rider in seconds.
+
+**Consequences:** A new boss is a spec, a component around `BossBase` and an entry in
+`BOSS_COMPONENTS`; its geometry/materials go in `bossAssets.ts` (walked by `ShaderWarmup`).
+The boss's kills count toward `kills` but not the HUD's wave kill strip (`totalEnemies`).
+
+## 2026-10-29 — Streak rewards trigger on the store's combo count, not the `enemy:killed` payload (builder, #182)
+
+**Context:** `enemy:killed` is emitted after the ~80 ms kill pop and reads `combo.count` then, so several kills resolved in one frame (a spread shot, `killNearest`) all report the final count. A "every 5th kill" check on the payload skipped the 5th.
+**Decision:** The combo-streak fireworks subscribe to `useGameStore` and fire when `combo.count` rises by exactly one onto a multiple of 5 (a real kill; `primeCombo` jumps don't count). They are mounted by the Theme Park's `Features.tsx`, so other biomes have none, and their whistle + pop voices are only built into the kit for `FIREWORK_BIOMES`.
+**Consequences:** Future streak rewards should use the same store edge. The payload's `combo` is still the count at the pop, not the kill's own count (follow-up if anything else needs exact per-kill counts).
+
+## 2026-10-29 — Enemy models are merged vertex-coloured geometries; crows flap in the vertex shader (builder, #92)
+
+**Context:** Desert was over the draw-call budget: each scorpion was 37 meshes and each crow 16, so level 2 had ~1,200 scene objects with only scorpions alive and far more once the crows came.
+**Decision:** A multi-part enemy is one merged, vertex-coloured geometry per material (`paintedAt` + `pose` from `shared/paintedParts.ts`, which also bake nested groups, scale and mirroring) built at module level in `SharedEnemyAssets.ts`. Parts that animate as a rigid group stay a child mesh (scorpion tail). Crow wings are in the merged geometry, tagged by an `aWing` attribute, and flap in the feather material's vertex shader. Each crow gets its own material instance from `createCrowFeatherMaterial(flap)` so its flap phase is its own uniform; all instances share one program through `customProgramCacheKey`, and the exported `CROW_FEATHER_MAT` exists so ShaderWarmup compiles that program.
+**Consequences:** Crow = 2 draw calls, scorpion = 3. Parts merged into one material lose per-part material settings (the crow beak is no longer Phong, scorpion legs lost their faint emissive); colour differences live in the vertex colours. Don't split these back into per-part meshes; add a part to the merged list instead.
+
+## 2026-10-29 — Audio moves to a port of Scrimshaw Jukebox; Sound designer role (Alex, interactive session)
+
+**Context:** Sound is the game's weakest area: about a dozen basic Tone.js synths
+playing hard-coded note arrays, and no role owns audio. Alex pointed at Scrimshaw
+Jukebox (Simon Willison, built with Claude Opus 5.5): a plain-text score format that an
+LLM writes reliably, played by a 65-instrument Web Audio synth with no samples. Its
+source is Apache-2.0 (simonw/tools).
+
+**Decision:** Port Scrimshaw's parser, synth and look-ahead scheduler to TypeScript in
+`src/audio/scrim/`. It runs in parallel with Tone.js behind a flag until it reaches
+parity (hard rule 7), then Tone.js is removed. All new music is written as scores (the
+source of truth), not as code. The original is vendored, unmodified, in
+`docs/audio/reference/` with its licence. Ported files keep a credit header naming the
+source and saying they were changed. This is third-party *code* under Apache-2.0, not an
+asset, so it doesn't fall under the CC0-only assets rule. Every sound is still our own
+synthesis, and scores are original compositions. `type:audio` issues go to a new Sound
+designer role. Direction is late-90s Sega arcade rail-shooter (`docs/audio/SOUND-BIBLE.md`).
+Agents can't hear, so sound is checked by offline renders plus measurements. Alex
+listens weekly and picks the first theme for each level in a `Listen:` issue.
+
+**Consequences:** Tone.js work that only polishes the old engine is superseded (#109,
+#168, and the Tone lazy-load half of #187). Audio PRs commit small MP3 renders to
+`docs/audio/renders/` (overwritten in place). The Maintainer unblocks `Waiting on #<n>`
+issues once what they wait on is closed.
