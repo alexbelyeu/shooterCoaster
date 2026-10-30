@@ -6,7 +6,7 @@ import {
   disposeSFX, playBossDefeat, playBossHit, playBossStinger, playComboBreak, playFireworkPop, playFireworkWhistle, playHitTick,
   playWaveStinger, prepareLevelSFX,
 } from '@/audio/SFXManager'
-import { setMusicDucked, setPauseMix, syncVolumes } from '@/audio/AudioEngine'
+import { setMusicDucked, setPauseMix } from '@/audio/AudioEngine'
 import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks'
@@ -16,7 +16,6 @@ export default function MusicController() {
   const currentLevel = useGameStore((s) => s.currentLevel)
 
   useEffect(() => {
-    syncVolumes()
     const biome = (currentLevel ? getLevelConfig(currentLevel)?.biome : undefined) ?? 'themePark'
     startMusic(biome)
     prepareLevelSFX(biome)

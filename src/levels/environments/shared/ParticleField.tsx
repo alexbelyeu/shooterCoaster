@@ -1,6 +1,7 @@
 import { useEffect, useMemo, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { useQualityProfile } from '@/canvas/useRenderBudget'
 
 /** One kind of particle in a field (ash, embers, snowflakes, dust…). */
 export interface ParticleLayer {
@@ -141,7 +142,8 @@ interface ParticleFieldProps {
 
 /** Ambient particles wrapping in a box around the camera: one draw call, no per-frame CPU work but uniforms. */
 export default function ParticleField({ preset, boostRef }: ParticleFieldProps) {
-  const geometry = useMemo(() => createSeeds(preset.count), [preset.count])
+  const count = Math.round(preset.count * useQualityProfile().particleScale)
+  const geometry = useMemo(() => createSeeds(count), [count])
   const material = useMemo(() => createMaterial(preset), [preset])
   const halfHeightPx = useThree(s => s.size.height * s.viewport.dpr * 0.5)
 

@@ -11,7 +11,6 @@ export async function initAudio(): Promise<void> {
   if (initialized) return
   await Tone.start()
   initialized = true
-  syncVolumes()
 }
 
 export function isAudioReady(): boolean {
@@ -67,7 +66,7 @@ export function swapInOfflineChain(): () => void {
   initialized = true
   ducked = false
   pauseMix = false
-  syncVolumes()
+  syncVolumes(true)
   return () => {
     setChain(live.chain)
     initialized = live.initialized
@@ -115,13 +114,25 @@ export function isPauseMixOn(): boolean {
   return pauseMix
 }
 
-export function syncVolumes(): void {
+const VOLUME_RAMP_S = 0.08
+
+/** Settings volume + mute onto the channels: a short ramp, never a cut (a click); `immediate` for a fresh chain. */
+function syncVolumes(immediate = false): void {
   const { sfxVolume, musicVolume, muted } = useSettingsStore.getState()
-  if (muted) {
-    sfxChannel.volume.value = -Infinity
-    musicChannel.volume.value = -Infinity
-  } else {
-    sfxChannel.volume.value = Tone.gainToDb(sfxVolume)
-    musicChannel.volume.value = Tone.gainToDb(musicVolume)
+  const levels = [
+    [sfxChannel, muted ? -Infinity : Tone.gainToDb(sfxVolume)],
+    [musicChannel, muted ? -Infinity : Tone.gainToDb(musicVolume)],
+  ] as const
+  const now = Tone.now()
+  for (const [channel, db] of levels) {
+    channel.volume.cancelScheduledValues(now)
+    if (immediate) channel.volume.setValueAtTime(db, now)
+    else channel.volume.rampTo(db, VOLUME_RAMP_S, now)
   }
 }
+
+// Sliders and the mute button apply live, in game or on the title.
+syncVolumes(true)
+useSettingsStore.subscribe((s, prev) => {
+  if (s.musicVolume !== prev.musicVolume || s.sfxVolume !== prev.sfxVolume || s.muted !== prev.muted) syncVolumes()
+})
