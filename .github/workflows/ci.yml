@@ -25,7 +25,7 @@ jobs:
       contents: read
       issues: write # report a red main below
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40 # verify took 21.5 min on #222; keep headroom as smoke steps grow
     steps:
       - uses: actions/checkout@v4
 

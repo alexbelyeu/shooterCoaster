@@ -155,6 +155,12 @@ nobody reached 5; **0 of 9 mobile visitors started a level** (too few to conclud
 14. Distant rails and lattice thin to hairlines / shimmer beyond ~400 units on every
     level (most visible on Desert and Antarctica). **#186 (P2)** (minimum on-screen rail
     thickness).
+15. The smoke's wall time keeps growing with every new step (boss, crow wave, fireworks):
+    ~18 min for the production smoke and ~21.5 min for CI `verify` by 29 Oct. The prod
+    smoke then hit its old 20 min cap on every deploy from 778cf08 on, and because it ended
+    `cancelled` it reported nothing (#225 raises the caps to 40 min and reports timeouts).
+    New smoke steps should reuse an already-loaded level where they can; if runs pass
+    ~30 min, cut repeated work (e.g. #190, #203) rather than raising the caps again.
 
 ## Tech debt / architecture notes
 
