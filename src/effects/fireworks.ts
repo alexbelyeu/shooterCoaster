@@ -158,6 +158,12 @@ export function pickPad(pads: readonly Vec3[], burst: Vec3, camPos: Vec3, forwar
   return best
 }
 
-/** Bus events: launch `(flightS, timeScale)` as a rocket leaves its pad, burst (no payload). */
+/** Bus events: launch (a `FireworkLaunch` payload) as a rocket leaves its pad, burst (no payload). */
 export const FIREWORK_LAUNCH_EVENT = 'firework:launch'
 export const FIREWORK_BURST_EVENT = 'firework:burst'
+
+/** `firework:launch` payload: the rocket's flight in game seconds and the time scale it launched at. */
+export interface FireworkLaunch {
+  flightS: number
+  timeScale: number
+}

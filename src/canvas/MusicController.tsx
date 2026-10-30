@@ -26,11 +26,11 @@ export default function MusicController() {
     eventBus.on('boss:spawn', playBossStinger)
     eventBus.on('boss:hit', playBossHit)
     eventBus.on('boss:defeated', playBossDefeat)
-    eventBus.on(FIREWORK_LAUNCH_EVENT, playFireworkWhistle as (...args: unknown[]) => void)
+    eventBus.on(FIREWORK_LAUNCH_EVENT, playFireworkWhistle)
     eventBus.on(FIREWORK_BURST_EVENT, playFireworkPop)
     return () => {
       eventBus.off(FIREWORK_BURST_EVENT, playFireworkPop)
-      eventBus.off(FIREWORK_LAUNCH_EVENT, playFireworkWhistle as (...args: unknown[]) => void)
+      eventBus.off(FIREWORK_LAUNCH_EVENT, playFireworkWhistle)
       eventBus.off('boss:defeated', playBossDefeat)
       eventBus.off('boss:hit', playBossHit)
       eventBus.off('boss:spawn', playBossStinger)

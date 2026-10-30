@@ -375,11 +375,12 @@ export function playBossDefeat(): void {
   }
 }
 
-/** A rocket leaving its pad: a rising whistle over its flight (`flightS` game seconds at `timeScale`). */
-export function playFireworkWhistle(flightS: number, timeScale: number): void {
+/** A rocket leaving its pad: a rising whistle over its flight (`FireworkLaunch`: game seconds at a time scale). */
+export function playFireworkWhistle(event: unknown): void {
   const fw = ensureKit()?.firework
   if (!fw) return
   try {
+    const { flightS = 0, timeScale = 1 } = (event as { flightS?: number; timeScale?: number } | undefined) ?? {}
     const { startHz, endHz } = FIREWORK_SFX.whistle
     const dur = fireworkWhistleS(flightS, timeScale)
     const t = nextTriggerTime(fw.whistle, Tone.now(), Tone.getContext().currentTime)

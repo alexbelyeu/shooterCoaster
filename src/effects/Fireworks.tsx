@@ -16,6 +16,7 @@ import {
   FALLBACK_RISE,
   FIREWORK_BURST_EVENT,
   FIREWORK_LAUNCH_EVENT,
+  type FireworkLaunch,
   FLIGHT_S,
   GHOST_LAG_S,
   HOLD_BURST_AGE_S,
@@ -177,6 +178,7 @@ const _up = new THREE.Vector3()
 const _fwd = new THREE.Vector3()
 const _burst = new THREE.Vector3()
 const _scratch = new Float32Array(SPARKS_PER_BURST * 3)
+const _launch: FireworkLaunch = { flightS: FLIGHT_S, timeScale: 1 }
 
 /** Combo-streak fireworks (#182) from the given launch pads, bursting ahead of the camera: one `Points` draw call, hidden while none is up. */
 export default function Fireworks({ pads }: { pads: readonly Vec3[] }) {
@@ -287,7 +289,10 @@ export default function Fireworks({ pads }: { pads: readonly Vec3[] }) {
       const prev = slot.age
       let next = prev + dt
       if (held) next = Math.max(prev, Math.min(next, holdAt))
-      if (prev < 0 && next >= 0) eventBus.emit(FIREWORK_LAUNCH_EVENT, FLIGHT_S, timeScale)
+      if (prev < 0 && next >= 0) {
+        _launch.timeScale = timeScale
+        eventBus.emit(FIREWORK_LAUNCH_EVENT, _launch)
+      }
       if (prev < FLIGHT_S && next >= FLIGHT_S) {
         eventBus.emit(FIREWORK_BURST_EVENT)
         eventBus.emit(CAMERA_TRAUMA_EVENT, BURST_TRAUMA, BURST_TRAUMA_MS)
