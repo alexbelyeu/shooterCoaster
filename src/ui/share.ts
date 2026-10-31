@@ -23,7 +23,6 @@ export function buildShareUrl(campaign: string): string {
   return `${SITE_URL}${SHARE_PATH}?${query}`
 }
 
-/** 3 stars as ★ earned / ☆ missed. */
 export function starString(stars: number): string {
   const earned = Math.max(0, Math.min(3, Math.round(stars)))
   return '★'.repeat(earned) + '☆'.repeat(3 - earned)
@@ -39,7 +38,6 @@ export function buildShareText({ levelName, score, stars, url }: ShareRun): Shar
   }
 }
 
-/** What a finished run shares, or null for an unknown level. */
 export function sharePayloadForRun(levelId: string, score: number): SharePayload | null {
   const config = getLevelConfig(levelId)
   if (!config) return null
@@ -51,12 +49,10 @@ export function sharePayloadForRun(levelId: string, score: number): SharePayload
   })
 }
 
-/** The one string the clipboard fallback copies. */
 export function clipboardText(payload: SharePayload): string {
   return `${payload.text} ${payload.url}`
 }
 
-/** The parts of `navigator` sharing uses, so tests can pass a fake. */
 export interface ShareNavigator {
   share?: (data: ShareData) => Promise<void>
   canShare?: (data: ShareData) => boolean
