@@ -2,10 +2,11 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars } from '@/levels/scoring'
 import type { GamePhase } from '@/types/game'
 import { isInRun } from '@/store/startPhase'
+import type { RunMode } from '@/store/useGameStore'
 
 /** At most 2 properties per event (Vercel Pro), no free text; keep docs/marketing/README.md in sync. */
 export type AnalyticsEvent =
-  | { name: 'level_start'; props: { level: string } }
+  | { name: 'level_start'; props: { level: string; mode: RunMode['mode'] } }
   | { name: 'level_complete'; props: { level: string; stars: number } }
   /** `progress_pct`: share of the level timer used, floored to tens. */
   | { name: 'level_quit'; props: { level: string; progress_pct: number } }
@@ -21,6 +22,7 @@ export function shareEvent(level: string, stars: number): AnalyticsEvent {
 export interface RunSnapshot {
   phase: GamePhase
   currentLevel: string | null
+  runMode: RunMode
   score: number
   timeRemaining: number
 }
@@ -36,7 +38,7 @@ export function analyticsEventFor(prev: RunSnapshot, next: RunSnapshot): Analyti
   const level = config.id
 
   if (isInRun(next.phase) && !isInRun(prev.phase)) {
-    return { name: 'level_start', props: { level } }
+    return { name: 'level_start', props: { level, mode: next.runMode.mode } }
   }
   if (next.phase === 'results' && prev.phase === 'playing') {
     return {

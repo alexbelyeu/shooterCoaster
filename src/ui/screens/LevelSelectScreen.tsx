@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { biomeTheme } from '@/ui/theme'
@@ -7,15 +7,28 @@ import { prepareSfx, sfx } from '@/audio/sfx'
 import LevelPostcard from './LevelPostcard'
 import {
   STARS_PER_LEVEL,
+  buildDailyCard,
   buildLevelCards,
   initialFocusIndex,
   isNavKey,
   navigateCards,
   totalStars,
+  type DailyCard,
 } from './levelSelectModel'
 
 /** Card expand + fade before the run starts. */
 const LAUNCH_MS = 300
+
+const fmt = new Intl.NumberFormat('en-US')
+/** The local date on the card ("Sat, Oct 31"); the run itself is the UTC day's, which the hint explains. */
+const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
+
+function rolloverHint(dateKey: string): string {
+  const next = new Date(`${dateKey}T00:00:00Z`)
+  next.setUTCDate(next.getUTCDate() + 1)
+  return `Same run for everyone today. New Daily Run at 00:00 UTC (${timeFmt.format(next)} your time)`
+}
 
 const DENIED_SHAKE: Keyframe[] = [
   { transform: 'translateX(0)' },
@@ -30,11 +43,18 @@ export default function LevelSelectScreen() {
   const setPhase = useGameStore((s) => s.setPhase)
   const savedScores = useGameStore((s) => s.savedScores)
   const isLevelUnlocked = useGameStore((s) => s.isLevelUnlocked)
+  const savedDaily = useGameStore((s) => s.savedDaily)
+  const dailyStreak = useGameStore((s) => s.dailyStreak)
 
   const cards = useMemo(
     () => buildLevelCards(getAllLevels(), savedScores, isLevelUnlocked),
     [savedScores, isLevelUnlocked],
   )
+  const daily = useMemo(
+    () => buildDailyCard(new Date(), getAllLevels(), savedDaily, dailyStreak),
+    [savedDaily, dailyStreak],
+  )
+  const dailyIndex = cards.length
   const total = totalStars(cards)
 
   const [launching, setLaunching] = useState<string | null>(null)
@@ -63,17 +83,26 @@ export default function LevelSelectScreen() {
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  function launch(key: string, start: () => void) {
+    sfx().ui('launch')
+    setLaunching(key)
+    launchTimer.current = window.setTimeout(start, LAUNCH_MS)
+  }
+
   function select(i: number) {
+    if (launching) return
+    if (i === dailyIndex) {
+      launch('daily', () => startRun(daily.levelId, undefined, { mode: 'daily', dateKey: daily.dateKey }))
+      return
+    }
     const card = cards[i]
-    if (launching || !card) return
+    if (!card) return
     if (!card.unlocked) {
       sfx().ui('back')
       if (!prefersReducedMotion()) cardRefs.current[i]?.animate(DENIED_SHAKE, { duration: 280, easing: 'ease-out' })
       return
     }
-    sfx().ui('launch')
-    setLaunching(card.id)
-    launchTimer.current = window.setTimeout(() => startRun(card.id), LAUNCH_MS)
+    launch(card.id, () => startRun(card.id))
   }
 
   function onGridKeyDown(e: KeyboardEvent<HTMLDivElement>) {
@@ -153,7 +182,7 @@ export default function LevelSelectScreen() {
                       ))}
                     </span>
                     <span className="level-card-best">
-                      {card.bestScore > 0 ? `Best ${card.bestScore.toLocaleString('en-US')}` : 'New'}
+                      {card.bestScore > 0 ? `Best ${fmt.format(card.bestScore)}` : 'New'}
                     </span>
                   </span>
                 ) : (
@@ -165,11 +194,65 @@ export default function LevelSelectScreen() {
             </button>
           )
         })}
+        <DailyCardButton
+          card={daily}
+          ref={(el) => {
+            cardRefs.current[dailyIndex] = el
+          }}
+          focused={focusIndex === dailyIndex}
+          selected={launching === 'daily'}
+          onFocus={() => setFocusIndex(dailyIndex)}
+          onClick={() => select(dailyIndex)}
+        />
       </div>
 
       <button className="play-button level-select-back" onClick={back} disabled={!!launching}>
         Back
       </button>
     </div>
+  )
+}
+
+interface DailyCardButtonProps {
+  card: DailyCard
+  ref: Ref<HTMLButtonElement>
+  focused: boolean
+  selected: boolean
+  onFocus: () => void
+  onClick: () => void
+}
+
+function DailyCardButton({ card, ref, focused, selected, onFocus, onClick }: DailyCardButtonProps) {
+  const theme = biomeTheme(card.biome)
+  const date = dateFmt.format(new Date())
+  const best = card.bestScore > 0 ? `Best today ${fmt.format(card.bestScore)}` : 'Not played yet'
+  const streak = card.streak > 0 ? `${card.streak}-day streak` : null
+  return (
+    <button
+      ref={ref}
+      type="button"
+      className={`level-card level-card-daily${selected ? ' is-selected' : ''}`}
+      data-daily={card.dateKey}
+      style={{ '--accent': theme.accent, '--accent-glow': theme.glow } as CSSProperties}
+      tabIndex={focused ? 0 : -1}
+      title={rolloverHint(card.dateKey)}
+      aria-label={`Daily Run, ${date}: ${card.levelName}. ${best}${streak ? `, ${streak}` : ''}`}
+      onFocus={onFocus}
+      onClick={onClick}
+    >
+      <LevelPostcard biome={card.biome} />
+      <span className="level-card-daily-badge" aria-hidden="true">
+        Daily
+      </span>
+      <span className="level-card-body">
+        <span className="level-card-index">{date}</span>
+        <span className="level-card-name">Daily Run</span>
+        <span className="level-card-desc">{card.levelName}: the same run for everyone today</span>
+        <span className="level-card-meta">
+          <span className="level-card-best">{best}</span>
+          {streak && <span className="level-card-streak">{streak}</span>}
+        </span>
+      </span>
+    </button>
   )
 }
