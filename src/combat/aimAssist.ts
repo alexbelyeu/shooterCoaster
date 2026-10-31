@@ -27,9 +27,8 @@ export function hitScaleFor(kind: PointerKind): number {
 }
 
 /**
- * Index of the candidate screen point nearest to (px, py) within `radiusPx`,
- * or -1 if none is that close. `xs` / `ys` hold `count` candidate points;
- * `weights` (default 1 each) scale a candidate's reach: distances are divided by them.
+ * Index of the candidate screen point nearest to (px, py) within `radiusPx`, or -1.
+ * `weights` (default 1) scale each candidate's reach.
  */
 export function pickAssistTarget(
   px: number,

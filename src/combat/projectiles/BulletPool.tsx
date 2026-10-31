@@ -174,7 +174,6 @@ export default function BulletPool({
         const bullet = liveBulletBuffer.current[b]
         if (!bullet.alive) continue
         for (const target of targets.values()) {
-          // One hit per target per frame; a piercing bullet never hits the same target twice.
           if (target.hitThisFrame || hasHit(bullet, target)) continue
           const pos = target.getPosition()
           const a = bullet.prev

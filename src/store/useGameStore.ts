@@ -30,10 +30,9 @@ interface GameState {
 
   kills: number
   shotsFired: number
-  /** Bullets that hit a target (`processHit`), each once however many it pierces, so never more than `shotsFired`. */
+  /** Bullets that hit a target (`processHit`), each once however many it pierces. */
   hits: number
   bestCombo: number
-  /** One per bullet: a spread pull counts as 3 shots. */
   registerShot: (bullets?: number) => void
   registerHit: () => void
 
@@ -43,7 +42,6 @@ interface GameState {
   registerKill: () => void
   resetCombo: () => void
 
-  /** The weapon pickup this run (`combat/weapons/weaponTypes.ts`). */
   weapon: WeaponState
   pickUpWeapon: (id: PickupWeaponId) => void
 

@@ -1349,17 +1349,11 @@ async function bossCheck(page) {
   return { id: 'boss', problems, boss: result }
 }
 
-/** Weapon pickups (#185): level1's first pickup (spread, in config order) shot with a real bullet. */
 const PICKUP_CHECK = { level: 'level1', min: 2, max: 4, weapon: 'spread', bullets: 3, pauseMs: 3000 }
-/** How far behind a pickup (track parameter) the check parks the coaster to see it ahead. */
+/** Track-parameter leads behind the first pickup to park the coaster at. */
 const PICKUP_LEADS = [0.006, 0.01, 0.015, 0.004, 0.02, 0.03]
 
-/**
- * Weapon pickups (#185): the level has 2–4 pickups; the coaster is parked behind the first with
- * time frozen, one real bullet shoots it, and the spread gun must be active with its badge shown;
- * the next pull fires a fan of 3 bullets (3 shots) with the tinted tracer held (level1-pickup.png).
- * The pickup must hold through a pause, expire after its game time, and a restart brings it back.
- */
+/** Weapon pickups (#185): shoot the first, then the spread fan, badge, pause-safe expiry and restart (level1-pickup.png). */
 async function pickupCheck(page) {
   const { level, min, max, weapon, bullets, pauseMs } = PICKUP_CHECK
   const problems = []
@@ -1397,14 +1391,12 @@ async function pickupCheck(page) {
     }, { x: target.ndcX, y: target.ndcY })
     const got = await pollUntil(page, async () => (await weaponState()).pickup === weapon, { ms: 8000, frames: 8, pollMs: 200 })
     if (!got) problems.push(`shooting the ${target.id} pickup did not arm it (${JSON.stringify(await weaponState())})`)
-    // Let its pop play out (game time), then freeze again for the shot.
     await api(() => window.__SC_TEST__.setTimeScale(1))
     const gone = await pollUntil(page, async () => (await api(() => window.__SC_TEST__.pickups()))[0].gone, { ms: 10000, frames: 1, pollMs: 100 })
     await api(() => window.__SC_TEST__.setTimeScale(0))
     if (!gone) problems.push('the shot pickup never popped')
   }
 
-  // The fan: one pull, three bullets, three shots; tracer + muzzle flash held for the shot.
   const before = await getStats(page)
   await page.waitForTimeout(100) // past the fire interval
   await api(() => {
@@ -1430,7 +1422,6 @@ async function pickupCheck(page) {
     window.__SC_TEST__.bulletStep = null
   })
 
-  // Pause-safe: the pickup's time holds while paused, then runs out on game time (sped up 4×).
   const held = await weaponState()
   await api(() => {
     window.__SC_TEST__.setTimeScale(1)
@@ -1449,7 +1440,6 @@ async function pickupCheck(page) {
   else if (!(await pollUntil(page, () => api(() => !document.querySelector('.hud-weapon.is-visible')), { ms: 5000, frames: 1, pollMs: 250 })))
     problems.push('the weapon badge stayed up after the pickup expired')
 
-  // A restart: blaster again, every pickup back.
   await api(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const restarted = { weapon: await weaponState(), collected: (await api(() => window.__SC_TEST__.pickups())).filter((p) => p.collected).length }

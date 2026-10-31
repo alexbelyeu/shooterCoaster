@@ -207,7 +207,6 @@ export interface E2EPickup {
   id: string
   t: number
   collected: boolean
-  /** Its pop has played out. */
   gone: boolean
   x: number
   y: number
@@ -576,7 +575,7 @@ let autoFireEnabled = false
 let lastAutoFire = 0
 const _fwd = new THREE.Vector3()
 
-/** A live enemy (or boss part): weapon pickups are targets too, but no enemy. */
+/** Weapon pickups are targets too, but no enemy. */
 function isLive(t: CollisionTarget) {
   // Dead/unmounted enemies report a parking position far below the world.
   return t.kind !== 'pickup' && t.getPosition().y > -9000
@@ -773,7 +772,6 @@ function waitForAudioTick() {
   while (ctx.currentTime === t0 && performance.now() < deadline) { /* spin */ }
 }
 
-/** Every gun's shot takes its turn in the burst. */
 const BURST_WEAPONS = ['blaster', 'spread', 'rapid', 'piercing'] as const
 
 async function audioBurst(shots: number, kills: number) {

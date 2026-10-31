@@ -9,7 +9,7 @@ import { sfx } from '@/audio/sfx'
 import { e2ePickups, isE2E } from '@/testing/e2eHook'
 import { placePickups } from './pickupPlacement'
 
-/** Gem radius and the ring around it, world units (an enemy is ~60 across). */
+/** World units; an enemy is ~60 across. */
 const GEM_RADIUS = 10
 const RING_RADIUS = 15
 const HIT_RADIUS = 18
@@ -30,9 +30,7 @@ interface PickupsProps {
 
 export interface LivePickup {
   id: PickupWeaponId
-  /** Track parameter it floats over. */
   t: number
-  /** Where it floats before the bob. */
   home: THREE.Vector3
   position: THREE.Vector3
   targetId: string
@@ -44,7 +42,7 @@ function buildPickupGeometry(): THREE.BufferGeometry {
   const gem = new THREE.OctahedronGeometry(GEM_RADIUS)
   gem.scale(0.8, 1.25, 0.8)
   const ring = new THREE.TorusGeometry(RING_RADIUS, 1.1, 6, 28).toNonIndexed()
-  // Facets alternate bright and dim, so the gem reads as a cut stone without lighting; the ring burns brightest.
+  // Alternating facet shades read as a cut stone without lighting.
   const shade = (g: THREE.BufferGeometry, perFace: (face: number) => number) => {
     const n = g.getAttribute('position').count
     const col = new Float32Array(n * 3)
@@ -68,11 +66,7 @@ const _c = new THREE.Color()
 const _white = new THREE.Color(1, 1, 1)
 const UP = new THREE.Vector3(0, 1, 0)
 
-/**
- * Weapon pickups (#185) floating over the rails: one instanced draw call for all of them.
- * Shooting one (`processHit` on its collision target) swaps the gun for 10 s; it pops and is
- * gone for the rest of the run. Every run of the level starts with all of them back.
- */
+/** Weapon pickups (#185): one instanced draw call; a shot one pops and stays gone until the next run. */
 export default function Pickups({ levelId, ids, pointAt, trackScale }: PickupsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const runId = useGameStore((s) => s.runId)

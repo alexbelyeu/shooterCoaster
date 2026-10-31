@@ -435,7 +435,6 @@ export function playFireworkPop(): void {
 }
 
 /** Uses the level's kit, which stays mounted under the results screen. */
-/** Shooting a weapon pickup: an arpeggio up the chime. */
 export function playPickupChime(): void {
   const k = ensureKit()
   if (!k) return

@@ -6,20 +6,19 @@ export type WeaponId = 'blaster' | PickupWeaponId
 export interface WeaponType {
   id: WeaponId
   label: string
-  /** Least time between two trigger pulls, and the held-trigger cadence. */
+  /** Also the held-trigger cadence. */
   fireIntervalMs: number
-  /** Bullets per pull, fanned across the screen horizontally `angleDeg` apart. */
+  /** Bullets per pull, fanned horizontally `angleDeg` apart. */
   spread: { count: number; angleDeg: number }
   /** Distinct targets one bullet can hit before it stops. */
   pierce: number
-  /** Game seconds a pickup lasts. */
+  /** Game seconds. */
   duration: number
-  /** Linear RGB 0–1: the tracer's streak and the muzzle flash's outer glow. */
+  /** Linear RGB 0–1. */
   tracerColor: readonly [number, number, number]
   muzzleColor: readonly [number, number, number]
-  /** Tracer width multiplier. */
   tracerWidth: number
-  /** CSS colour of the pickup and its HUD badge. */
+  /** The pickup and its HUD badge. */
   uiColor: string
 }
 
@@ -49,7 +48,6 @@ export const WEAPONS: Record<WeaponId, WeaponType> = {
 
 export const PICKUP_WEAPONS: readonly PickupWeaponId[] = ['spread', 'rapid', 'piercing']
 
-/** Most targets any bullet can hit; sizes the per-bullet hit list. */
 export const MAX_PIERCE = Math.max(...Object.values(WEAPONS).map((w) => w.pierce))
 
 /** The run's pickup: `until` is game time (`core/gameClock.ts`), so a pause holds it. */
@@ -60,7 +58,7 @@ export interface WeaponState {
 
 export const NO_PICKUP: WeaponState = { id: null, until: 0 }
 
-/** A new pickup replaces the current one (or refreshes it) for its full duration. */
+/** A new pickup replaces (or refreshes) the current one. */
 export function applyPickup(_state: WeaponState, id: PickupWeaponId, now: number): WeaponState {
   return { id, until: now + WEAPONS[id].duration }
 }
@@ -69,13 +67,12 @@ export function activeWeapon(state: WeaponState, now: number): WeaponType {
   return state.id !== null && now < state.until ? WEAPONS[state.id] : WEAPONS.blaster
 }
 
-/** 1 → 0 over the pickup's life; 0 with none. */
 export function pickupRemaining(state: WeaponState, now: number): number {
   if (state.id === null) return 0
   return Math.min(1, Math.max(0, (state.until - now) / WEAPONS[state.id].duration))
 }
 
-/** Horizontal fan offsets (radians) for each bullet of one pull, centred on the aim. */
+/** Radians off the aim, one per bullet. */
 export function fanAngles(weapon: WeaponType, out: number[]): number[] {
   const { count, angleDeg } = weapon.spread
   out.length = count

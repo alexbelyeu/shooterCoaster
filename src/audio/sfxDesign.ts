@@ -65,22 +65,18 @@ export const FIRE_VARIANTS: readonly FireVariant[] = [
   { startHz: 1320, endHz: 300, sweepS: 0.115 },
 ]
 
-/** The pickup guns (#185): each its own timbre, so the swap is heard. Rapid fires twice as often, so it sits lower. */
+/** Pickup guns (#185): each its own timbre, so the swap is heard; rapid fires twice as often, so it sits lower. */
 export interface WeaponFireDesign extends FireVariant {
   oscillator: 'sawtooth' | 'square' | 'triangle'
   volume: number
 }
 
 export const WEAPON_FIRE_SFX: Record<PickupWeaponId, WeaponFireDesign> = {
-  // A fat, low buzz: three bullets at once.
   spread: { oscillator: 'sawtooth', startHz: 760, endHz: 130, sweepS: 0.12, volume: -24 },
-  // A tight tick an octave up.
   rapid: { oscillator: 'square', startHz: 1900, endHz: 820, sweepS: 0.035, volume: -30 },
-  // A long falling laser.
   piercing: { oscillator: 'triangle', startHz: 2600, endHz: 380, sweepS: 0.17, volume: -19 },
 }
 
-/** Shooting a pickup: a quick major arpeggio on the chime. */
 export const PICKUP_CHIME = { notes: ['C5', 'E5', 'G5', 'C6'], stepS: 0.055, noteS: 0.14 } as const
 
 /** Held-trigger auto-fire sits 6 dB lower. */

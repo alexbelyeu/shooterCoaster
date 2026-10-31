@@ -26,8 +26,8 @@ let lastFireAt = -Infinity
 
 /**
  * Pull the trigger once from the camera through a point in normalized device
- * coordinates (-1..1, y up): one bullet, or the active pickup's fan
- * (`weapons/weaponTypes.ts`). Shared by pointer input and the e2e autofire hook.
+ * coordinates (-1..1, y up): one bullet, or the active pickup's fan.
+ * Shared by pointer input and the e2e autofire hook.
  * Returns true if a bullet actually left the pool (false when not playing,
  * inside the weapon's fire interval, or the pool is missing/exhausted).
  * `hitScale` widens the bullet's hit radius on targets (touch shots); `auto`
@@ -116,7 +116,7 @@ export function useShooting() {
     })
   }, [fireShot])
 
-  // Auto-fire while held, re-timed every pull so a pickup changes the cadence.
+  // Re-timed every pull, so a pickup changes the cadence.
   useEffect(() => {
     let timer = 0
     const tick = () => {

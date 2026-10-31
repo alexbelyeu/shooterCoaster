@@ -7,10 +7,10 @@ export interface CollisionTarget {
   getPosition: () => THREE.Vector3
   radiusSq: number
   onHit: () => void
-  /** A weapon pickup (#185) is shot like an enemy but is no enemy: no `enemy:hit`, no hitmarker. */
+  /** A weapon pickup (#185) is shot like an enemy but is none: no `enemy:hit`. */
   kind?: 'pickup'
   hitThisFrame: boolean
-  /** Set with `hitThisFrame`: the bullet's first hit, so it counts for accuracy (a piercing bullet counts once). */
+  /** The hitting bullet's first target: only that hit counts for accuracy. */
   firstHitThisFrame: boolean
 }
 
@@ -40,10 +40,8 @@ export function getCollisionTargets(): Map<string, CollisionTarget> {
 }
 
 /**
- * Resolve one hit on a target: count it for accuracy (`countHit`: a piercing bullet's
- * later hits don't), emit `enemy:hit` (UI / audio / feedback react to it), then run the
- * target's own hit handler. Used by the bullet pool's collision pass and by the e2e
- * test hook so both take the same path.
+ * Resolve one hit on a target: count it for accuracy, emit `enemy:hit`, then run its own
+ * hit handler. The bullet pool's collision pass and the e2e hook both take this path.
  */
 export function processHit(target: CollisionTarget, countHit = true): void {
   if (countHit) useGameStore.getState().registerHit()

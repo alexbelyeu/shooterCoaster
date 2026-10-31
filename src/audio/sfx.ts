@@ -26,9 +26,7 @@ export type UiSound = 'select' | 'back' | 'launch'
 export interface SfxEngine {
   /** `level` null: the menus' sounds. */
   prepare(level: string | null, biome: BiomeType): Promise<void>
-  /** `weapon`: the pickup gun's own shot (`combat/weapons/weaponTypes.ts`). */
   fire(auto: boolean, weapon?: WeaponId): void
-  /** A weapon pickup was shot. */
   pickup(): void
   hit(combo: number, at: Placement | null): void
   kill(combo: number, sound: KillSound, at: Placement | null): void

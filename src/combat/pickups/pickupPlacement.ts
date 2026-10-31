@@ -1,36 +1,24 @@
 /** Where a level's weapon pickups float (#185); pure, so keep React / three imports out. */
 import { PICKUP_WEAPONS, type PickupWeaponId } from '@/combat/weapons/weaponTypes'
 import { createRng, hashString } from '@/utils/rng'
-
-export interface Vec3 {
-  x: number
-  y: number
-  z: number
-}
+import type { Vec3 } from '@/entities/spawning/spawnPlacement'
 
 export interface PickupSpot {
   id: PickupWeaponId
-  /** Track parameter (the coaster's `rideProgress`). */
+  /** Track parameter, as `rideProgress`. */
   t: number
   position: Vec3
 }
 
 /** Height above the rails at trackScale 1; grows with the track like the rider's eye. */
 export const PICKUP_HEIGHT = 25
-/**
- * Track parameter range the pickups share. A run's ride covers 0.38–0.68 of the
- * track depending on the level, so they all come up before the timer ends.
- */
+/** Every level's run rides at least 0.38 of the track parameter before its timer ends. */
 export const PICKUP_SPAN: readonly [number, number] = [0.05, 0.33]
-/** Each pickup sits in the middle part of its share of the span, so two never bunch up. */
 const SLOT_JITTER = 0.6
 export const MIN_PICKUPS = 2
 export const MAX_PICKUPS = 4
 
-/**
- * Pickups for a level, in config order, along the start of the track. The layout
- * rng is seeded from the level id, so every run of a level has them in the same places.
- */
+/** One per slot of the span, in config order; the layout rng is seeded from the level id. */
 export function placePickups(
   levelId: string,
   ids: readonly PickupWeaponId[] = PICKUP_WEAPONS,

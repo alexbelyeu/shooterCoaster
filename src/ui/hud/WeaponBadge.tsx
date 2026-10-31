@@ -6,7 +6,6 @@ import { WEAPONS, pickupRemaining, type PickupWeaponId } from '@/combat/weapons/
 const RING_R = 22
 const RING_C = 2 * Math.PI * RING_R
 
-/** One glyph per pickup gun, drawn in a 24-unit box. */
 function WeaponIcon({ id }: { id: PickupWeaponId }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 2.4, strokeLinecap: 'round' as const }
   switch (id) {
@@ -33,10 +32,7 @@ function WeaponIcon({ id }: { id: PickupWeaponId }) {
   }
 }
 
-/**
- * The active pickup gun (#185), beside the combo meter: its glyph, name and a ring that
- * drains over its 10 s on the game clock, so a pause or slow-mo holds it like the pickup itself.
- */
+/** The pickup gun (#185) beside the combo meter; its ring drains on the game clock, so a pause holds it. */
 export default function WeaponBadge() {
   const weapon = useGameStore((s) => s.weapon)
   const [shown, setShown] = useState<PickupWeaponId | null>(null)
