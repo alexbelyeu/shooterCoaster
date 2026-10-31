@@ -1735,7 +1735,6 @@ async function scrimCheck(page) {
   return { problems, result }
 }
 
-/** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
 /** Boss bar (#181) on the phone, from a paused run: resumed with the boss summoned, it must sit inside the viewport and clear of the HUD in portrait and landscape (mobile-level1-boss.png). */
 async function mobileBossHud(page) {
   const selectors = [...HUD_SELECTORS, '.hud-boss']
@@ -1761,6 +1760,7 @@ async function mobileBossHud(page) {
   return { problems: [...portrait.problems, ...landscape.problems], rects: { portrait: portrait.rects, landscape: landscape.rects } }
 }
 
+/** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
 async function runMobile(browser, base) {
   const started = Date.now()
   const { defaultBrowserType: _unused, ...iphone } = devices['iPhone 13']

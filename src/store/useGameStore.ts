@@ -7,7 +7,6 @@ import { comboExpired, comboMultiplier } from '@/combat/comboTiers'
 import { startPhaseFor } from './startPhase'
 
 interface GameState {
-  // Phase
   phase: GamePhase
   /** Also ends a resume countdown. */
   setPhase: (phase: GamePhase) => void
@@ -15,9 +14,7 @@ interface GameState {
   resuming: boolean
   resume: () => void
 
-  // Current level
   currentLevel: string | null
-  setCurrentLevel: (level: string | null) => void
 
   /** Seeds this run's enemy spawns. */
   runSeed: number
@@ -26,12 +23,9 @@ interface GameState {
   /** The one way to start or restart a level (enters `countdown`, `playing` under `?e2e=1`); seed precedence: `seed` > `?seed=` > `Date.now()`. */
   startRun: (levelId: string, seed?: number) => void
 
-  // Score
   score: number
   addScore: (points: number) => void
-  resetScore: () => void
 
-  // Per-run counters (reset by resetScore / startRun)
   kills: number
   shotsFired: number
   /** Bullets that hit an enemy (`processHit`). */
@@ -46,11 +40,9 @@ interface GameState {
   registerKill: () => void
   resetCombo: () => void
 
-  // Timer
   timeRemaining: number
   setTimeRemaining: (t: number) => void
 
-  // Enemies
   enemiesRemaining: number
   totalEnemies: number
   setEnemyCounts: (remaining: number, total: number) => void
@@ -59,13 +51,11 @@ interface GameState {
   boss: BossHud | null
   setBoss: (boss: BossHud | null) => void
 
-  // Saved scores (persisted)
   savedScores: Record<string, ScoreEntry>
   /** Keeps the higher score's entry; `bestCombo` is kept at its max across runs either way. */
   saveScore: (entry: ScoreEntry) => void
   resetSavedScores: () => void
 
-  // Time scale (for slow-mo)
   timeScale: number
   setTimeScale: (s: number) => void
 
@@ -73,12 +63,21 @@ interface GameState {
   sceneReady: boolean
   setSceneReady: (ready: boolean) => void
 
-  // Level unlock
   isLevelUnlocked: (levelId: string) => boolean
 }
 
-const RUN_COUNTERS = { score: 0, kills: 0, shotsFired: 0, hits: 0, bestCombo: 0 } as const
 const NO_COMBO: ComboState = { count: 0, multiplier: 1, lastKillTime: 0 }
+/** The per-run state a fresh store and every `startRun` begin from. */
+const FRESH_RUN = {
+  score: 0,
+  kills: 0,
+  shotsFired: 0,
+  hits: 0,
+  bestCombo: 0,
+  combo: NO_COMBO,
+  timeScale: 1,
+  boss: null,
+} satisfies Partial<GameState>
 
 const urlSearch = (): string | null =>
   typeof window !== 'undefined' && window.location ? window.location.search : null
@@ -96,17 +95,14 @@ export const useGameStore = create<GameState>()(
       resuming: false,
       resume: () => set((s) => (s.phase === 'paused' ? { resuming: true } : {})),
 
+      ...FRESH_RUN,
       currentLevel: null,
-      setCurrentLevel: (level) => set({ currentLevel: level }),
 
       runSeed: 0,
       runId: 0,
       startRun: (levelId, seed) =>
         set((s) => ({
-          ...RUN_COUNTERS,
-          combo: NO_COMBO,
-          timeScale: 1,
-          boss: null,
+          ...FRESH_RUN,
           currentLevel: levelId,
           runSeed: (seed ?? urlSeed() ?? Date.now()) >>> 0,
           runId: s.runId + 1,
@@ -114,18 +110,10 @@ export const useGameStore = create<GameState>()(
           resuming: false,
         })),
 
-      score: 0,
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
-      resetScore: () => set(RUN_COUNTERS),
-
-      kills: 0,
-      shotsFired: 0,
-      hits: 0,
-      bestCombo: 0,
       registerShot: () => set((s) => ({ shotsFired: s.shotsFired + 1 })),
       registerHit: () => set((s) => ({ hits: s.hits + 1 })),
 
-      combo: NO_COMBO,
       registerKill: () =>
         set((s) => {
           const now = gameTime()
@@ -146,10 +134,8 @@ export const useGameStore = create<GameState>()(
       totalEnemies: 0,
       setEnemyCounts: (remaining, total) => set({ enemiesRemaining: remaining, totalEnemies: total }),
 
-      timeScale: 1,
       setTimeScale: (s) => set({ timeScale: s }),
 
-      boss: null,
       setBoss: (boss) => set({ boss }),
 
       sceneReady: false,
@@ -173,7 +159,6 @@ export const useGameStore = create<GameState>()(
       isLevelUnlocked: (levelId) => {
         const state = get()
         if (levelId === 'level1') return true
-        // Level N is unlocked if level N-1 has at least 1 star
         const prevNum = parseInt(levelId.replace('level', '')) - 1
         const prevId = `level${prevNum}`
         const prevScore = state.savedScores[prevId]
