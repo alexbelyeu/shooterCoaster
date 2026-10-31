@@ -6,13 +6,17 @@ import { computeStars } from '@/levels/scoring'
 import { sfx } from '@/audio/sfx'
 import { biomeTheme } from '@/ui/theme'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
+import type { LeaderboardEntry } from '@/types/game'
 import { barFill, formatAccuracy, formatTimeLeft, isNewRecord, nextStar } from './resultsStats'
+import { initialsKey, type InitialsState } from './initialsEntry'
+import ResultsLeaderboard from './ResultsLeaderboard'
 
 const fmt = new Intl.NumberFormat('en-US')
 
 const STAGE = { title: 0, count: 1, star: 2, stats: 5, done: 6 } as const
 const STAGE_AT_MS = [0, 350, 1700, 2050, 2400, 2800, 3500]
 const COUNT_UP_S = 1.2
+const NO_BOARD: LeaderboardEntry[] = []
 
 /** The finished run, read once on mount so a Replay / Next during the exit fade doesn't repaint it. */
 function snapshotRun() {
@@ -27,6 +31,7 @@ function snapshotRun() {
     bestCombo: s.bestCombo,
     timeRemaining: s.timeRemaining,
     previousBest: s.currentLevel ? (s.savedScores[s.currentLevel]?.score ?? 0) : 0,
+    date: Date.now(),
   }
 }
 
@@ -38,6 +43,9 @@ export default function ResultsScreen() {
   const scoreRef = useRef<HTMLSpanElement>(null)
   const fillRef = useRef<HTMLDivElement>(null)
   const saved = useRef(false)
+  const board = useGameStore((s) => (run.levelId ? s.leaderboards[run.levelId] : undefined)) ?? NO_BOARD
+  const [rank, setRank] = useState<number | null>(null)
+  const [initials, setInitials] = useState<InitialsState | null>(null)
   const left = useRef(false)
 
   const stars = config ? computeStars(run.score, config.maxScore, config.starThresholds) : 0
@@ -55,10 +63,15 @@ export default function ResultsScreen() {
   }
 
   // previousBest was read before this save, so the record check isn't fooled by it.
+  // The leaderboard entry is stored now under the last initials, so leaving early never loses it.
   useEffect(() => {
     if (!config || saved.current) return
     saved.current = true
-    useGameStore.getState().saveScore({
+    const store = useGameStore.getState()
+    const placed = store.addLeaderboardEntry(config.id, { score: run.score, stars, date: run.date })
+    setRank(placed)
+    if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
+    store.saveScore({
       level: config.id,
       score: run.score,
       maxScore: config.maxScore,
@@ -99,18 +112,43 @@ export default function ResultsScreen() {
     return () => controls.stop()
   }, [counting, done, run.score, fill])
 
+  function initialsInput(key: string): boolean {
+    if (!initials || !config) return false
+    const next = initialsKey(initials, key)
+    if (next === null) return false
+    if (next === 'confirm') {
+      setInitials(null)
+      sfx().ui('launch')
+      return true
+    }
+    if (next.letters !== initials.letters) useGameStore.getState().setEntryInitials(config.id, run.date, next.letters)
+    setInitials(next)
+    sfx().ui('select')
+    return true
+  }
+
   useEffect(() => {
     if (!config) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
       // A focused button already turns Enter into its own click.
       if (e.key === 'Enter' && e.target instanceof HTMLButtonElement) return
+      if (initials) {
+        // The entry owns the keys (R is a letter); Enter before it opens skips the reveal.
+        if (!done) {
+          if (e.key === 'Enter' && !e.repeat) setStage(STAGE.done)
+        } else if (initialsInput(e.key)) {
+          e.preventDefault()
+        }
+        return
+      }
+      if (e.repeat) return
       if (e.key === 'Enter') leave(config.nextLevel)
       else if (e.key === 'r' || e.key === 'R') leave(config.id)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [config])
+  })
 
   if (!config) return null
 
@@ -118,6 +156,7 @@ export default function ResultsScreen() {
   const next = nextStar(run.score, config.maxScore, config.starThresholds)
   const instant = { duration: 0 }
   const reveal = (from: number) => (stage >= from ? 'shown' : 'hidden')
+  const entryOpen = done && initials !== null
   const rows: [string, string][] = [
     ['Kills', `${run.kills} / ${run.totalEnemies}`],
     ['Accuracy', formatAccuracy(run.hits, run.shotsFired)],
@@ -238,8 +277,28 @@ export default function ResultsScreen() {
               </button>
             )}
           </motion.div>
-          <p className="results-keys">{config.nextLevel ? 'Enter: next' : 'Enter: levels'} · R: replay</p>
+          <p className="results-keys">
+            {entryOpen
+              ? 'Type or ▲▼ letters · ◀▶ move · Enter: OK'
+              : `${config.nextLevel ? 'Enter: next' : 'Enter: levels'} · R: replay`}
+          </p>
         </div>
+
+        <motion.div
+          className="results-board-slot"
+          initial={false}
+          variants={{ hidden: { opacity: 0, x: 24 }, shown: { opacity: 1, x: 0 } }}
+          animate={reveal(STAGE.stats)}
+          transition={done ? instant : { duration: 0.3 }}
+        >
+          <ResultsLeaderboard
+            board={board}
+            rank={rank}
+            editing={entryOpen ? initials : null}
+            onKey={initialsInput}
+            onSlot={(slot) => initials && setInitials({ ...initials, slot })}
+          />
+        </motion.div>
       </div>
     </div>
   )

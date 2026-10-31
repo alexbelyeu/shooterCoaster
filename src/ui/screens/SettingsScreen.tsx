@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { useSettingsStore } from '@/store/useSettingsStore'
+import { useGameStore } from '@/store/useGameStore'
 import { SCREEN_SHAKE_LEVELS, type ScreenShakeLevel } from '@/combat/screenShake'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 
@@ -22,6 +24,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
     setScreenShake,
   } = useSettingsStore()
   const reducedMotion = usePrefersReducedMotion()
+  const [clearStep, setClearStep] = useState<'idle' | 'confirm' | 'cleared'>('idle')
 
   return (
     <div className="pause-screen">
@@ -92,6 +95,35 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
             onChange={(e) => setShowFPS(e.target.checked)}
           />
         </label>
+        <div className="settings-row settings-clear" data-step={clearStep}>
+          {clearStep === 'confirm' ? (
+            <>
+              <span>Erase all scores, stars and leaderboards?</span>
+              <div className="settings-clear-actions">
+                <button type="button" onClick={() => setClearStep('idle')}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="is-danger"
+                  onClick={() => {
+                    useGameStore.getState().clearLocalData()
+                    setClearStep('cleared')
+                  }}
+                >
+                  Erase
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <span>{clearStep === 'cleared' ? 'Local data cleared' : 'Scores & leaderboards'}</span>
+              <button type="button" disabled={clearStep === 'cleared'} onClick={() => setClearStep('confirm')}>
+                Clear local data
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <button className="play-button" style={{ marginTop: '2rem' }} onClick={onClose}>
         Back

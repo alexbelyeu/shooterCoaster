@@ -24,7 +24,7 @@ describe('buildLevelCards', () => {
   it('reports stars, best score and the level that unlocks a locked card', () => {
     const scores = { a: entry('a', 800, 2) }
     const unlocked = (id: string) => id === 'a' || id === 'b'
-    const cards = buildLevelCards(levels, scores, unlocked)
+    const cards = buildLevelCards(levels, scores, unlocked, {})
     expect(cards.map((c) => [c.id, c.unlocked, c.stars, c.bestScore, c.unlockedBy])).toEqual([
       ['a', true, 2, 800, null],
       ['b', true, 0, 0, null],
@@ -33,9 +33,16 @@ describe('buildLevelCards', () => {
     expect(totalStars(cards)).toEqual({ earned: 2, max: 9 })
   })
 
+  it('shows the top initials of an open level only', () => {
+    const top = (initials: string) => [{ initials, score: 900, stars: 2, date: 0 }]
+    const boards = { a: top('BOB'), c: top('EVE') }
+    const cards = buildLevelCards(levels, { a: entry('a', 900, 2) }, (id) => id !== 'c', boards)
+    expect(cards.map((c) => c.bestInitials)).toEqual(['BOB', null, null])
+  })
+
   it('never counts stars on a locked level and clamps bad saves', () => {
     const scores = { a: entry('a', 10, 7), c: entry('c', 99, 3) }
-    const cards = buildLevelCards(levels, scores, (id) => id === 'a')
+    const cards = buildLevelCards(levels, scores, (id) => id === 'a', {})
     expect(cards[0].stars).toBe(3)
     expect(cards[2].stars).toBe(0)
     expect(cards[2].bestScore).toBe(0)
@@ -43,7 +50,7 @@ describe('buildLevelCards', () => {
 
   it('covers every registered level with 3 stars each', () => {
     const all = getAllLevels()
-    const cards = buildLevelCards(all, {}, (id) => id === all[0].id)
+    const cards = buildLevelCards(all, {}, (id) => id === all[0].id, {})
     expect(totalStars(cards)).toEqual({ earned: 0, max: all.length * 3 })
     expect(cards.slice(1).every((c) => c.unlockedBy !== null)).toBe(true)
   })
@@ -51,11 +58,11 @@ describe('buildLevelCards', () => {
 
 describe('initialFocusIndex', () => {
   it('focuses the next level to play, else the last unlocked', () => {
-    const fresh = buildLevelCards(levels, {}, (id) => id === 'a')
+    const fresh = buildLevelCards(levels, {}, (id) => id === 'a', {})
     expect(initialFocusIndex(fresh)).toBe(0)
-    const partway = buildLevelCards(levels, { a: entry('a', 1, 1) }, (id) => id !== 'c')
+    const partway = buildLevelCards(levels, { a: entry('a', 1, 1) }, (id) => id !== 'c', {})
     expect(initialFocusIndex(partway)).toBe(1)
-    const done = buildLevelCards(levels, { a: entry('a', 1, 1), b: entry('b', 1, 2) }, (id) => id !== 'c')
+    const done = buildLevelCards(levels, { a: entry('a', 1, 1), b: entry('b', 1, 2) }, (id) => id !== 'c', {})
     expect(initialFocusIndex(done)).toBe(1)
   })
 })

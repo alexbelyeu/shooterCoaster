@@ -1,6 +1,14 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { GamePhase, ScoreEntry, ComboState, BossHud } from '@/types/game'
+import {
+  DEFAULT_INITIALS,
+  insertEntry,
+  normalizeInitials,
+  sanitizeLeaderboards,
+  sanitizeSavedScores,
+  type Leaderboards,
+} from './leaderboard'
 import { seedFromQuery } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
 import { comboExpired, comboMultiplier } from '@/combat/comboTiers'
@@ -63,7 +71,15 @@ interface GameState {
   savedScores: Record<string, ScoreEntry>
   /** Keeps the higher score's entry; `bestCombo` is kept at its max across runs either way. */
   saveScore: (entry: ScoreEntry) => void
-  resetSavedScores: () => void
+
+  leaderboards: Leaderboards
+  /** The default for the next entry. */
+  lastInitials: string
+  /** Enters a run under `lastInitials`; returns its 0-based rank, or null when it misses the board. */
+  addLeaderboardEntry: (levelId: string, run: { score: number; stars: number; date: number }) => number | null
+  setEntryInitials: (levelId: string, date: number, initials: string) => void
+  /** Settings "Clear local data": scores, stars (so unlocks) and leaderboards. */
+  clearLocalData: () => void
 
   // Time scale (for slow-mo)
   timeScale: number
@@ -168,7 +184,29 @@ export const useGameStore = create<GameState>()(
           }
           return {}
         }),
-      resetSavedScores: () => set({ savedScores: {} }),
+
+      leaderboards: {},
+      lastInitials: DEFAULT_INITIALS,
+      addLeaderboardEntry: (levelId, run) => {
+        const s = get()
+        const { board, rank } = insertEntry(s.leaderboards[levelId] ?? [], { ...run, initials: s.lastInitials })
+        if (rank !== null) set({ leaderboards: { ...s.leaderboards, [levelId]: board } })
+        return rank
+      },
+      setEntryInitials: (levelId, date, initials) =>
+        set((s) => {
+          const letters = normalizeInitials(initials)
+          const board = s.leaderboards[levelId]
+          if (!board?.some((e) => e.date === date)) return { lastInitials: letters }
+          return {
+            lastInitials: letters,
+            leaderboards: {
+              ...s.leaderboards,
+              [levelId]: board.map((e) => (e.date === date ? { ...e, initials: letters } : e)),
+            },
+          }
+        }),
+      clearLocalData: () => set({ savedScores: {}, leaderboards: {}, lastInitials: DEFAULT_INITIALS }),
 
       isLevelUnlocked: (levelId) => {
         const state = get()
@@ -182,7 +220,22 @@ export const useGameStore = create<GameState>()(
     }),
     {
       name: 'shootercoaster-scores',
-      partialize: (state) => ({ savedScores: state.savedScores }),
+      partialize: (state) => ({
+        savedScores: state.savedScores,
+        leaderboards: state.leaderboards,
+        lastInitials: state.lastInitials,
+      }),
+      // Hand-edited, older or half-written storage loads as valid data or not at all.
+      merge: (persisted, current) => {
+        const p = (typeof persisted === 'object' && persisted !== null ? persisted : {}) as Record<string, unknown>
+        const savedScores = sanitizeSavedScores(p.savedScores)
+        return {
+          ...current,
+          savedScores,
+          leaderboards: sanitizeLeaderboards(p.leaderboards, savedScores),
+          lastInitials: normalizeInitials(p.lastInitials),
+        }
+      },
     },
   ),
 )

@@ -225,18 +225,73 @@ describe('saveScore', () => {
     expect(store().savedScores.level1).toMatchObject({ score: 500, bestCombo: 3 })
   })
 
-  it('persists only savedScores (not score, combo or phase)', () => {
+  it('persists only saved scores, leaderboards and initials (not score, combo or phase)', () => {
     store().addScore(42)
     store().saveScore(entry('level1', 500, 1))
     const persisted = JSON.parse(memoryStorage.getItem('shootercoaster-scores')!)
-    expect(Object.keys(persisted.state)).toEqual(['savedScores'])
+    expect(Object.keys(persisted.state)).toEqual(['savedScores', 'leaderboards', 'lastInitials'])
     expect(persisted.state.savedScores.level1.score).toBe(500)
   })
+})
 
-  it('resetSavedScores clears everything', () => {
-    store().saveScore(entry('level1', 500, 1))
-    store().resetSavedScores()
+describe('leaderboard', () => {
+  it('enters a run under the last initials and renames it in place', () => {
+    expect(store().addLeaderboardEntry('level1', { score: 500, stars: 1, date: 7 })).toBe(0)
+    expect(store().leaderboards.level1[0]).toEqual({ initials: 'AAA', score: 500, stars: 1, date: 7 })
+    store().setEntryInitials('level1', 7, 'zed')
+    expect(store().leaderboards.level1[0].initials).toBe('ZED')
+    expect(store().lastInitials).toBe('ZED')
+    expect(store().addLeaderboardEntry('level1', { score: 900, stars: 3, date: 8 })).toBe(0)
+    expect(store().leaderboards.level1.map((e) => e.initials)).toEqual(['ZED', 'ZED'])
+  })
+
+  it('a run that misses a full board changes nothing', () => {
+    for (let i = 0; i < 10; i++) store().addLeaderboardEntry('level2', { score: 1000 + i, stars: 1, date: i })
+    const before = store().leaderboards
+    expect(store().addLeaderboardEntry('level2', { score: 999, stars: 1, date: 99 })).toBeNull()
+    expect(store().leaderboards).toBe(before)
+  })
+
+  it('round-trips through storage', async () => {
+    store().addLeaderboardEntry('level1', { score: 500, stars: 1, date: 7 })
+    store().setEntryInitials('level1', 7, 'BOB')
+    const saved = memoryStorage.getItem('shootercoaster-scores')!
+    useGameStore.setState(initial, true)
+    memoryStorage.setItem('shootercoaster-scores', saved)
+    await useGameStore.persist.rehydrate()
+    expect(store().leaderboards.level1[0]).toMatchObject({ initials: 'BOB', score: 500 })
+    expect(store().lastInitials).toBe('BOB')
+  })
+
+  it.each([
+    ['not JSON', '{oops'],
+    ['null state', JSON.stringify({ state: null, version: 0 })],
+    ['wrong types', JSON.stringify({ state: { savedScores: 'x', leaderboards: [1], lastInitials: 42 }, version: 0 })],
+  ])('falls back to empty data on corrupt storage (%s)', async (_, raw) => {
+    memoryStorage.setItem('shootercoaster-scores', raw)
+    await useGameStore.persist.rehydrate()
     expect(store().savedScores).toEqual({})
+    expect(store().leaderboards).toEqual({})
+    expect(store().lastInitials).toBe('AAA')
+    expect(store().isLevelUnlocked('level2')).toBe(false)
+  })
+
+  it('a save from before the leaderboard starts the board with its best', async () => {
+    memoryStorage.setItem('shootercoaster-scores', JSON.stringify({ state: { savedScores: { level1: entry('level1', 800, 2) } }, version: 0 }))
+    await useGameStore.persist.rehydrate()
+    expect(store().leaderboards.level1).toEqual([{ initials: '---', score: 800, stars: 2, date: 1 }])
+    expect(store().isLevelUnlocked('level2')).toBe(true)
+  })
+
+  it('clearLocalData wipes scores, unlocks and boards', () => {
+    store().saveScore(entry('level1', 500, 1))
+    store().addLeaderboardEntry('level1', { score: 500, stars: 1, date: 7 })
+    store().setEntryInitials('level1', 7, 'BOB')
+    store().clearLocalData()
+    expect(store().savedScores).toEqual({})
+    expect(store().leaderboards).toEqual({})
+    expect(store().lastInitials).toBe('AAA')
+    expect(store().isLevelUnlocked('level2')).toBe(false)
   })
 })
 

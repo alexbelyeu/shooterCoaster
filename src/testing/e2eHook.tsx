@@ -33,7 +33,7 @@ import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType } from '@/types/level'
-import type { GamePhase, ScoreEntry } from '@/types/game'
+import type { GamePhase, LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
@@ -79,6 +79,9 @@ export interface SCTestApi {
   setPhase: (phase: GamePhase) => void
   /** Replace the saved best scores / stars (persisted to localStorage like real saves). */
   setSavedScores: (scores: Record<string, ScoreEntry>) => void
+  /** Replace the local leaderboards (and `lastInitials`), persisted like real saves. */
+  setLeaderboards: (boards: Record<string, LeaderboardEntry[]>, lastInitials?: string) => void
+  leaderboards: () => { boards: Record<string, LeaderboardEntry[]>; lastInitials: string }
   /**
    * Enemies whose centre is inside the view frustum, largest first, with screen
    * position (CSS px, origin top-left) and projected silhouette size in px.
@@ -576,6 +579,12 @@ export function installE2EApi() {
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
     setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
     setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
+    setLeaderboards: (boards, lastInitials) =>
+      useGameStore.setState(lastInitials === undefined ? { leaderboards: boards } : { leaderboards: boards, lastInitials }),
+    leaderboards: () => {
+      const s = useGameStore.getState()
+      return { boards: s.leaderboards, lastInitials: s.lastInitials }
+    },
     spawnDigest: () => spawnDigest,
     nextWave: () => waveProbe?.() ?? null,
     waveEvents: [],

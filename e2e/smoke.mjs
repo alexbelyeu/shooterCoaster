@@ -283,7 +283,7 @@ async function pollUntil(page, check, { ms, frames = MIN_FRAMES, pollMs = 500 })
  * (Theme Park) the 15+ streak's firework burst, held on screen. The kill's death effect
  * (its enemy type's style, not the default fireball) must be live in the shot.
  */
-async function playLevel(page, id, { frenzy = false } = {}) {
+async function playLevel(page, id, { frenzy = false, leaderboard = false } = {}) {
   const problems = []
   // Desktop mouse: one real click at the screen centre must fire through pointer input.
   const beforeClick = await getStats(page)
@@ -390,7 +390,23 @@ async function playLevel(page, id, { frenzy = false } = {}) {
   const shot = await freshShotProblems(page, id)
   problems.push(...shot.problems)
 
-  await page.evaluate(() => window.__SC_TEST__.endLevel())
+  // With `leaderboard`, seed nine entries so this run places 4th, in the same turn as the end so the score can't move.
+  const seededRank = await page.evaluate(
+    ([lid, seed]) => {
+      const t = window.__SC_TEST__
+      const score = Math.round(t.stats().score)
+      const seeded = seed && score > 0
+      const above = [3000, 2000, 1000].map((d) => score + d)
+      if (seeded) {
+        const below = [0.6, 0.5, 0.4, 0.3, 0.2, 0.1].map((f) => Math.max(1, Math.floor(score * f)))
+        const row = (s, i) => ({ initials: 'CPU', score: s, stars: 1, date: i + 1 })
+        t.setLeaderboards({ [lid]: [...above, ...below].map(row) }, 'AAA')
+      }
+      t.endLevel()
+      return seeded ? above.length : null
+    },
+    [id, leaderboard],
+  )
   // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
   const resultsShown = await page
     .waitForFunction(
@@ -410,6 +426,11 @@ async function playLevel(page, id, { frenzy = false } = {}) {
   const end = await getStats(page)
   const results = await resultsScreenProblems(page, end)
   problems.push(...results.problems)
+  if (seededRank !== null) {
+    const entry = await leaderboardEntryProblems(page, id, seededRank)
+    problems.push(...entry.problems)
+    results.screen.entry = entry.result
+  }
 
   if (combat.kills === 0) problems.push('no kills (enemies missing or unhittable?)')
   // Only meaningful when something was on screen to aim at.
@@ -527,7 +548,15 @@ async function resultsScreenProblems(page, stats) {
       .filter((b) => b.getBoundingClientRect().width > 0)
       .map((b) => b.textContent)
     const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
-    return { rows, buttons, stars, score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent }
+    const b = el.querySelector('.results-board')
+    const r = b?.getBoundingClientRect()
+    const board = b && {
+      rows: b.querySelectorAll('li').length,
+      rank: b.dataset.rank ?? null,
+      editing: b.dataset.editing === 'true',
+      inView: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
+    }
+    return { rows, buttons, stars, board, score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent }
   })
   const problems = []
   if (!screen) return { problems: ['results screen missing'], screen }
@@ -540,7 +569,58 @@ async function resultsScreenProblems(page, stats) {
   if (stats.shotsFired > 0 && !/^\d+%$/.test(screen.rows.Accuracy ?? '')) problems.push(`results accuracy "${screen.rows.Accuracy}" with ${stats.shotsFired} shots`)
   if (!screen.buttons.includes('Replay') || !screen.buttons.includes('Levels')) problems.push(`results buttons ${JSON.stringify(screen.buttons)}`)
   if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
+  if (!screen.board) problems.push('results screen has no leaderboard')
+  else {
+    if (stats.score > 0 && screen.board.rows === 0) problems.push('leaderboard empty after a scoring run')
+    if (!screen.board.inView) problems.push('leaderboard not fully inside 1280x720')
+  }
   return { problems, screen: shown }
+}
+
+const INITIALS_KEYS = ['ArrowUp', 'r', 'e', 'x']
+
+/** Local leaderboard (#40): a run seeded to place at `rank` takes initials by keyboard (R is a letter there) and persists them. */
+async function leaderboardEntryProblems(page, id, rank) {
+  const problems = []
+  const read = () => page.evaluate((lid) => {
+    const b = document.querySelector('.results-board')
+    return {
+      rank: b?.dataset.rank ?? null,
+      editing: b?.dataset.editing === 'true',
+      rows: b?.querySelectorAll('li').length ?? 0,
+      initials: b?.querySelector('li.is-new .results-board-initials')?.textContent ?? null,
+      phase: window.__SC_TEST__.phase(),
+      stored: window.__SC_TEST__.leaderboards().boards[lid] ?? [],
+      lastInitials: window.__SC_TEST__.leaderboards().lastInitials,
+      persisted: localStorage.getItem('shootercoaster-scores') ?? '',
+    }
+  }, id)
+  const initialsShown = (text) => page
+    .waitForFunction((t) => document.querySelector('.results-board li.is-new .results-board-initials')?.textContent === t, text, { timeout: 5000, polling: 50 })
+    .then(() => true, () => false)
+
+  const opened = await read()
+  if (opened.rank !== String(rank)) problems.push(`leaderboard: run ranked ${opened.rank}, expected ${rank}`)
+  if (opened.rows !== 10) problems.push(`leaderboard shows ${opened.rows} rows, expected 10`)
+  if (!opened.editing) problems.push('leaderboard: no initials entry on a placing run')
+  if (opened.initials !== 'AAA') problems.push(`initials entry starts at "${opened.initials}", expected the last used (AAA)`)
+  await page.keyboard.press(INITIALS_KEYS[0])
+  const cycled = await initialsShown('BAA')
+  if (!cycled) problems.push('ArrowUp did not cycle the first letter')
+  for (const key of INITIALS_KEYS.slice(1)) await page.keyboard.press(key)
+  const typed = await initialsShown('REX')
+  const afterTyping = await read()
+  if (!typed) problems.push(`typing r, e, x gave "${afterTyping.initials}", expected REX`)
+  if (afterTyping.phase !== 'results') problems.push(`typing initials left the results screen (${afterTyping.phase})`)
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(() => !document.querySelector('.results-board[data-editing]'), null, { timeout: 5000, polling: 50 }).catch(() => {})
+  const confirmed = await read()
+  if (confirmed.editing) problems.push('Enter did not close the initials entry')
+  if (confirmed.phase !== 'results') problems.push(`Enter on the entry left the results screen (${confirmed.phase})`)
+  if (confirmed.stored[rank]?.initials !== 'REX' || confirmed.lastInitials !== 'REX')
+    problems.push(`stored entry ${JSON.stringify(confirmed.stored[rank])}, last initials ${confirmed.lastInitials}`)
+  if (!confirmed.persisted.includes('"REX"')) problems.push('leaderboard entry not persisted to localStorage')
+  return { problems, result: { rank, cycled, initials: confirmed.initials, editing: confirmed.editing, phase: confirmed.phase } }
 }
 
 const MOBILE_LEVEL = 'level1'
@@ -1241,10 +1321,18 @@ async function levelSelectCheck(page, levels) {
   })
   const expectStars = earned.slice(0, levels.length).reduce((a, b) => a + b, 0)
   const expectOpen = Math.min(levels.length, 3)
-  await page.evaluate((s) => {
+  const champions = ['ACE', 'BOB']
+  const boards = Object.fromEntries(
+    Object.values(scores).map((e, i) => [e.level, [{ initials: champions[i], score: e.score, stars: e.stars, date: 1 }]]),
+  )
+  // Reloaded so the cards come back from localStorage.
+  await page.evaluate(([s, b]) => {
     window.__SC_TEST__.setSavedScores(s)
-    window.__SC_TEST__.setPhase('levelSelect')
-  }, scores)
+    window.__SC_TEST__.setLeaderboards(b)
+  }, [scores, boards])
+  await page.reload({ waitUntil: 'load' })
+  await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
+  await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
   if (!(await waitVisible(page, '.level-select-back'))) problems.push('level select never appeared')
   await page.waitForTimeout(800) // fade-in
   await waitFrames(page, 2, { maxMs: 10000 })
@@ -1263,6 +1351,7 @@ async function levelSelectCheck(page, levels) {
       total: document.querySelector('.level-select-total')?.dataset.stars ?? null,
       totalText: document.querySelector('.level-select-total')?.textContent ?? '',
       offscreen: off.map((c) => c.dataset.level),
+      initials: cards.map((c) => c.querySelector('.level-card-initials')?.textContent ?? null),
       hScroll: root ? root.scrollWidth > root.clientWidth : true,
       focused: document.activeElement?.dataset?.level ?? null,
     }
@@ -1273,6 +1362,9 @@ async function levelSelectCheck(page, levels) {
     problems.push(`star total "${layout.totalText.trim()}", expected ${expectStars} / ${levels.length * 3}`)
   }
   if (layout.offscreen.length) problems.push(`cards off a 1280x720 screen: ${layout.offscreen.join(',')}`)
+  const expectInitials = levels.map((_, i) => champions[i] ?? null)
+  if (JSON.stringify(layout.initials) !== JSON.stringify(expectInitials))
+    problems.push(`card initials ${JSON.stringify(layout.initials)} after a reload, expected ${JSON.stringify(expectInitials)}`)
   if (layout.hScroll) problems.push('level select scrolls sideways')
 
   const focused = () => page.evaluate(() => document.activeElement?.dataset?.level ?? null)
@@ -1601,6 +1693,64 @@ async function scrimCheck(page) {
   return { problems, result }
 }
 
+/** Phone results (#40): initials by tap through 44 px buttons; the board fits portrait and landscape. */
+async function mobileResultsEntry(page) {
+  const problems = []
+  await page.evaluate(() => window.__SC_TEST__.endLevel())
+  if (!(await waitVisible(page, '.results-initials-ok', 60000))) {
+    return { problems: ['phone: no initials entry on the results screen after a scoring run'], result: null }
+  }
+  const layout = () => page.evaluate(() => {
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const small = [...document.querySelectorAll('.results-initials-pad button, .results-board-initials button')]
+      .map((b) => b.getBoundingClientRect())
+      .filter((r) => r.width < 44 - 0.5 || r.height < 44 - 0.5).length
+    const pad = document.querySelector('.results-initials-pad')?.getBoundingClientRect()
+    const board = document.querySelector('.results-board')?.getBoundingClientRect()
+    const screen = document.querySelector('.results-screen')
+    return {
+      small,
+      padInView: !!pad && pad.left >= 0 && pad.right <= vw && pad.top >= 0 && pad.bottom <= vh,
+      boardInView: !!board && board.left >= 0 && board.right <= vw && board.top >= 0 && board.bottom <= vh,
+      hScroll: screen ? screen.scrollWidth > screen.clientWidth : true,
+    }
+  })
+  const portrait = await layout()
+  if (portrait.small) problems.push(`phone: ${portrait.small} initials button(s) under 44 px`)
+  if (!portrait.padInView) problems.push('phone portrait: the initials pad is not scrolled into view')
+  if (portrait.hScroll) problems.push('phone portrait: the results screen scrolls sideways')
+  const initialsShown = (text) => page
+    .waitForFunction((t) => document.querySelector('.results-board li.is-new .results-board-initials')?.textContent === t, text, { timeout: 10000, polling: 100 })
+    .then(() => true, () => false)
+  const tap = (selector) => page.locator(selector).first().tap({ timeout: 30000 }).catch((e) => problems.push(`phone: tap ${selector}: ${e.message}`))
+  await tap('.results-initials-pad button[aria-label="Next letter"]')
+  const first = await initialsShown('BAA')
+  await tap('.results-board-initials button:nth-child(2)')
+  await tap('.results-initials-pad button[aria-label="Next letter"]')
+  const second = await initialsShown('BBA')
+  if (!first || !second) problems.push('phone: tapping ▲ / a letter did not edit the initials (expected BAA then BBA)')
+  await page.screenshot({ path: path.join(OUT, 'mobile-results.png'), timeout: SHOT_TIMEOUT })
+  await tap('.results-initials-ok')
+  await page.waitForFunction(() => !document.querySelector('.results-board[data-editing]'), null, { timeout: 10000, polling: 100 }).catch(() => {})
+  const stored = await page.evaluate(() => ({
+    phase: window.__SC_TEST__.phase(),
+    editing: !!document.querySelector('.results-board[data-editing]'),
+    top: window.__SC_TEST__.leaderboards().boards.level1?.[0]?.initials ?? null,
+  }))
+  if (stored.editing) problems.push('phone: OK did not close the initials entry')
+  if (stored.phase !== 'results' || stored.top !== 'BBA') problems.push(`phone: after OK phase ${stored.phase}, stored initials ${stored.top}`)
+
+  await page.setViewportSize({ width: 844, height: 390 })
+  await page.waitForTimeout(500)
+  const landscape = await layout()
+  if (!landscape.boardInView) problems.push('phone landscape 844x390: the leaderboard is cut off')
+  if (landscape.hScroll) problems.push('phone landscape 844x390: the results screen scrolls sideways')
+  await page.screenshot({ path: path.join(OUT, 'mobile-results-landscape.png'), timeout: SHOT_TIMEOUT })
+  await page.setViewportSize({ width: 390, height: 844 })
+  return { problems, result: { initials: stored.top, portrait, landscape } }
+}
+
 /** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
 /** Boss bar (#181) on the phone, from a paused run: resumed with the boss summoned, it must sit inside the viewport and clear of the HUD in portrait and landscape (mobile-level1-boss.png). */
 async function mobileBossHud(page) {
@@ -1811,6 +1961,9 @@ async function runMobile(browser, base) {
   const bossHud = (await phase()) === 'paused' ? await mobileBossHud(page) : { problems: [], rects: null }
   problems.push(...bossHud.problems)
 
+  const resultsEntry = await mobileResultsEntry(page)
+  problems.push(...resultsEntry.problems)
+
   const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
   const allErrors = [...errors, ...hookErrors]
   if (allErrors.length) problems.push(`${allErrors.length} error(s)`)
@@ -1828,6 +1981,7 @@ async function runMobile(browser, base) {
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
       bulletMaxScreenFrac: bullets.maxScreenFrac,
       pauseCards,
+      resultsEntry: resultsEntry.result,
     },
     kills: end.kills,
     score: end.score,
@@ -1917,7 +2071,7 @@ async function run() {
     const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
     problems.push(...desktopAspect.problems)
     stats.view = desktopAspect.view
-    const play = await playLevel(page, id, { frenzy: id === wanted[0] })
+    const play = await playLevel(page, id, { frenzy: id === wanted[0], leaderboard: id === wanted[0] })
     problems.push(...play.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
     const allErrors = [...errors, ...hookErrors]
@@ -2041,7 +2195,7 @@ async function run() {
     const extra = r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '')
       : r.levelSelect
-        ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total}` +
+        ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total} top=${r.levelSelect.initials.filter(Boolean).join(',')}` +
           (r.levelSelect.keyboard ? ` keys: ${r.levelSelect.focused} <- ${r.levelSelect.keyboard.left}, locked ${r.levelSelect.keyboard.locked} Enter -> ${r.levelSelect.keyboard.phaseAfterLocked}, Enter -> ${r.levelSelect.keyboard.level} ${r.levelSelect.keyboard.phase}` : '')
       : r.seedCheck
         ? ` ${r.seedCheck.level} seed ${SEED}: ${r.seedCheck.digest} (reload ${r.seedCheck.reloaded}, again ${r.seedCheck.again}) seed ${SEED + 1}: ${r.seedCheck.other}`
@@ -2074,7 +2228,7 @@ async function run() {
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
-          ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
+          ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score} initials=${r.mobile.resultsEntry?.initials ?? '-'}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` particles=${r.particles?.points ?? '-'}${r.particles?.boostPoints ? `+${r.particles.boostPoints}` : ''}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
@@ -2087,7 +2241,10 @@ async function run() {
 }
 
 function resultsSummary(s) {
-  return s ? ` results=${s.stars}★ acc=${s.rows.Accuracy} combo=${s.rows['Best combo']}` : ''
+  if (!s) return ''
+  const board = s.board ? ` board=${s.board.rows}${s.board.rank !== null ? ` #${Number(s.board.rank) + 1}` : ''}` : ' board=none'
+  const entry = s.entry ? ` initials=${s.entry.initials}${s.entry.editing ? '(open)' : ''}` : ''
+  return ` results=${s.stars}★ acc=${s.rows.Accuracy} combo=${s.rows['Best combo']}${board}${entry}`
 }
 
 /** audioBurst result: "ok", or late-note throws + dropped sounds. */

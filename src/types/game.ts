@@ -11,6 +11,16 @@ export interface ScoreEntry {
   bestCombo?: number
 }
 
+/** One row of a level's local top 10 (`store/leaderboard.ts`). */
+export interface LeaderboardEntry {
+  /** Three letters A-Z, or `---` for a best carried over from before the leaderboard. */
+  initials: string
+  score: number
+  stars: number
+  /** Epoch ms of the run; identifies the entry. */
+  date: number
+}
+
 export interface ComboState {
   count: number
   multiplier: number
