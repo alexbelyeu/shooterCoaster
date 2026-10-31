@@ -47,7 +47,9 @@ Headless browser in Claude cloud sessions: the Playwright CDN is blocked, so run
 The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/sizes, errors)
 to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the fly-by camera must have turned ≥ 8° or moved ≥ 30 units;
-the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select), and per level `<id>.png` (after a ride of `--seconds` 10, longer until `--min-frames` 10 frames have rendered; it fails as a stalled render loop only if they haven't by 4× `--seconds`, and the summary line prints `frames=N in Xs`; the title waits the same way),
+the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select); a `landing` step loads the campaign landing path
+`/go/smoke-check?e2e=1&internal=1` (links we post point at `/go/<campaign>`, attributed by the page view's path; `robots.txt` disallows `/go/`):
+it must boot to the title with no failed request, no analytics request and no page error, keep its path (only `internal` stripped) and show the "internal: not tracked" marker (skipped with `--base`); and per level `<id>.png` (after a ride of `--seconds` 10, longer until `--min-frames` 10 frames have rendered; it fails as a stalled render loop only if they haven't by 4× `--seconds`, and the summary line prints `frames=N in Xs`; the title waits the same way),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
 gold hitmarker held on the kill frame via `holdFeedback`; on the first level a primed 14-kill chain makes
@@ -177,8 +179,11 @@ Vercel Web Analytics (`@vercel/analytics`: page views, plus the `level_start` /
 only on Vercel builds (`__BUILT_ON_VERCEL__`, set in `vite.config.ts` from `VERCEL=1`)
 and never with `?e2e=1` (`src/app/analyticsGate.ts`), so dev, `vite preview`, CI and the
 smoke tests send nothing. `?internal=1` marks a browser internal (localStorage flag, stripped
-from the URL; `?internal=0` clears it): it sends nothing either, via the same gate and a
-`beforeSend` that drops every page view and event while the flag is set.
+from the URL; `?internal=0` clears it, any other value is ignored): it sends nothing either, via the same gate and a
+`beforeSend` that drops every page view and event while the flag is set. `applyInternalParam` decides once per page
+load and the title's "internal: not tracked" marker reads that decision (`isInternalThisLoad`), so it shows even when
+storage can't be written. Campaign links use landing paths `/go/<campaign>` (the catch-all rewrite serves the game there;
+never redirect them, the page view's path is the attribution).
 
 ## Code map
 
