@@ -11,7 +11,7 @@
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots (fires one real shot, then resolves the
  *     hits through the bullet pool's own processHit path), endLevel() to reach
- *     the results screen, stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
+ *     the results screen (shareText() for what its Share button sends), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
  *     primeCombo(n) to set up a long chain,
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
@@ -53,6 +53,7 @@ import { musicState, type MusicFade } from '@/audio/musicBus'
 import { MUSIC_ENGINE, scrimPlayer, type MusicEngine } from '@/audio/musicEngine'
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
 import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
+import { clipboardText, sharePayloadForRun } from '@/ui/share'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -141,6 +142,8 @@ export interface SCTestApi {
   primeCombo: (count: number) => void
   /** Force the results phase. */
   endLevel: () => void
+  /** What the results-screen Share button sends for the current level and score (`text url`, as the clipboard gets it), or null. */
+  shareText: () => string | null
   /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
   setTimeScale: (s: number) => void
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
@@ -661,6 +664,11 @@ export function installE2EApi() {
     endLevel: () => {
       autoFireEnabled = false
       useGameStore.getState().setPhase('results')
+    },
+    shareText: () => {
+      const { currentLevel, score } = useGameStore.getState()
+      const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score)) : null
+      return payload ? clipboardText(payload) : null
     },
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
     rideTo: null,
