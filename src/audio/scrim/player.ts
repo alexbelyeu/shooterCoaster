@@ -37,7 +37,7 @@ let current: Track | null = null
 let timer: number | null = null
 let manualClock = false
 
-/** The game's raw context (standardized-audio-context's, which takes the same calls as the DOM one). */
+/** The game's raw context: the page's own AudioContext (`audio/tone.ts`), or an offline render's. */
 const rawContext = () => Tone.getContext().rawContext as unknown as BaseAudioContext
 /** Tone's clock: in an offline render it runs ahead of the raw context's. */
 const now = () => Tone.getContext().currentTime

@@ -5,7 +5,7 @@ import { useGameStore } from '@/store/useGameStore'
 import type { GamePhase } from '@/types/game'
 import { startMusic, stopMusic, setMusicIntensity } from '@/audio/MusicManager'
 import { placeSound, prepareSfx, setSfxListener, sfx } from '@/audio/sfx'
-import { setMusicDucked, setPauseMix } from '@/audio/AudioEngine'
+import { isAudioReady, setMusicDucked, setPauseMix, whenAudioReady } from '@/audio/AudioEngine'
 import { MUSIC_ENGINE, withScrim } from '@/audio/musicEngine'
 import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
@@ -68,14 +68,18 @@ export default function MusicController() {
     const level = currentLevel ?? 'level1'
     const unfollow = SCRIM
       ? useGameStore.subscribe((s, prev) => {
-          if (s.phase !== prev.phase) followPhase(s.phase, level)
+          if (s.phase !== prev.phase && isAudioReady()) followPhase(s.phase, level)
         })
       : null
-    if (SCRIM) followPhase(useGameStore.getState().phase, level)
-    else startMusic(biome)
-    prepareSfx(level, biome)
+    // Tone's chunk can land after the level mounts (PLAY waits for it only briefly).
+    const cancelStart = whenAudioReady(() => {
+      if (SCRIM) followPhase(useGameStore.getState().phase, level)
+      else startMusic(biome)
+      prepareSfx(level, biome)
+    })
     for (const [event, fn] of SFX_EVENTS) eventBus.on(event, fn)
     return () => {
+      cancelStart()
       for (const [event, fn] of SFX_EVENTS) eventBus.off(event, fn)
       if (unfollow) {
         unfollow()
