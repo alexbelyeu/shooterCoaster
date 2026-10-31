@@ -39,6 +39,8 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             three: ['three'],
             r3f: ['@react-three/fiber', '@react-three/drei'],
+            // Loaded on the first gesture (src/audio/tone.ts), never at startup.
+            tone: ['tone', './src/audio/toneLib.ts'],
           },
         },
       },

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { browserStorage, isInternalBrowser } from '@/app/analyticsGate'
-import { initAudio, isAudioReady } from '@/audio/AudioEngine'
+import { initAudio } from '@/audio/AudioEngine'
 import { prepareSfx } from '@/audio/sfx'
-import { startTitleMusic } from '@/audio/TitleMusicManager'
+import { useGameStore } from '@/store/useGameStore'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { motion } from 'framer-motion'
 import { markStartup } from '@/core/startupMarks'
@@ -22,10 +22,16 @@ interface TitleScreenProps {
   onSettings?: () => void
 }
 
-async function startMusic() {
-  if (!isAudioReady()) await initAudio()
-  startTitleMusic()
-  prepareSfx(null, 'themePark')
+/** PLAY waits this long at most for Tone's chunk: the title music starts from App's `whenAudioReady` when it lands. */
+const PLAY_AUDIO_WAIT_MS = 300
+
+/** Every call resumes the context inside its gesture (`initAudio`), so the PLAY click retries what a touch pointerdown couldn't. */
+function startAudio(): Promise<void> {
+  return initAudio().then(() => {
+    // A level that mounted before Tone landed has prepared its own kit already.
+    const { phase } = useGameStore.getState()
+    if (phase === 'title' || phase === 'levelSelect') prepareSfx(null, 'themePark')
+  })
 }
 
 export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
@@ -43,13 +49,14 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
   async function play() {
     if (started.current) return
     started.current = true
-    // A browser that refuses audio still gets to play.
-    await startMusic().catch(() => {})
+    // A browser that refuses audio, or a slow network, still gets to play.
+    const audio = startAudio().catch(() => {})
+    await Promise.race([audio, new Promise((r) => window.setTimeout(r, PLAY_AUDIO_WAIT_MS))])
     onPlay()
   }
 
   useEffect(() => {
-    const kickstart = () => void startMusic()
+    const kickstart = () => void startAudio().catch(() => {})
     const onKey = (e: KeyboardEvent) => {
       kickstart()
       // Enter / Space on a focused button already click it.

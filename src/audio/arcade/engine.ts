@@ -3,7 +3,7 @@ import * as Tone from 'tone'
 import type { BiomeType } from '@/types/level'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { hashString } from '@/utils/rng'
-import { arcadeChannel } from '../AudioEngine'
+import { arcadeChannel, isAudioReady } from '../AudioEngine'
 import { scrimPlayer } from '../musicEngine'
 import { dropSound } from '../soundGuard'
 import { compile } from '../scrim/score'
@@ -133,7 +133,7 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
   wanted = key
   biome = levelBiome
   if (bank && bankKey === key) {
-    ensureGraph()
+    if (isAudioReady()) ensureGraph()
     return Promise.resolve()
   }
   if (baking?.key === key) return baking.promise
@@ -144,7 +144,7 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
       bank = baked
       bankKey = key
       bankSpec = spec
-      ensureGraph()
+      if (isAudioReady()) ensureGraph()
     })
     .finally(() => {
       if (baking?.key === key) baking = null
@@ -155,10 +155,10 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
 
 const NO_PLACE: Placement = { pan: 0, cutoffHz: 20000 }
 
-/** Null before the bank is baked, or when every voice plays something more important. */
+/** Null before audio unlocks or the bank is baked, or when every voice plays something more important. */
 function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: Placement | null = null, loopOffset = -1): Voice | null {
   const buffer = bank?.get(id)?.[variant]
-  if (!buffer) return null
+  if (!buffer || !isAudioReady()) return null
   try {
     const g = ensureGraph()
     const now = clock()

@@ -15,7 +15,7 @@ import Crosshair from '@/combat/Crosshair'
 import ScorePopups from '@/effects/ScorePopups'
 import WaveAnnouncement from '@/ui/hud/WaveAnnouncement'
 import { playTitleWhoosh, startTitleMusic, stopTitleMusic } from '@/audio/TitleMusicManager'
-import { isAudioReady } from '@/audio/AudioEngine'
+import { whenAudioReady } from '@/audio/AudioEngine'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { usePauseOnHidden } from './usePauseOnHidden'
 
@@ -40,11 +40,8 @@ export default function App() {
   const inPlay = isLevelActive(phase)
 
   useEffect(() => {
-    if (phase === 'title' || phase === 'levelSelect') {
-      if (isAudioReady()) startTitleMusic()
-    } else {
-      stopTitleMusic()
-    }
+    if (phase === 'title' || phase === 'levelSelect') return whenAudioReady(startTitleMusic)
+    stopTitleMusic()
   }, [phase])
   useEffect(() => () => stopTitleMusic(), [])
 
