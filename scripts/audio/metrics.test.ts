@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  bandEnergy, barLines, clippedSamples, compareTargets, fft, powerSpectrum, seamExcess, seamJump, silenceShare,
+  bandEnergy, barLines, clippedSamples, compareTargets, fft, killsOverMusic, powerSpectrum, seamExcess, seamJump, silenceShare,
   soundEnvelope, stereoCorrelation,
 } from './metrics.mjs'
 
@@ -126,6 +126,18 @@ describe('stereoCorrelation', () => {
     expect(stereoCorrelation(x, x)).toBeCloseTo(1, 6)
     expect(stereoCorrelation(x, x.map((v) => -v))).toBeCloseTo(-1, 6)
     expect(stereoCorrelation(new Float32Array(10), new Float32Array(10))).toBeNull()
+  })
+})
+
+describe('killsOverMusic', () => {
+  it("reads each kill's peak in the mix against the music stem's peak around it", () => {
+    const music = sine(220, 2, 0.1)
+    const mix = Float32Array.from(music)
+    mix.set(sine(1000, 0.05, 0.4), Math.round(1 * SR))
+    const [k] = killsOverMusic([mix, mix], [music, music], SR, [1])
+    expect(k.musicDb).toBeCloseTo(-20, 0)
+    expect(k.overDb).toBeGreaterThan(10)
+    expect(k.overDb).toBeLessThan(14.5)
   })
 })
 

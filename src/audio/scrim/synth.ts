@@ -6,7 +6,8 @@
  * Modified for ShooterCoaster: TypeScript; the noise buffer, waveforms and plucked-string cache
  * live in a `SynthCore` shared by every track on one context; `createSynth` takes a `voicing`
  * ('jukebox' is the original mix bus, 'game' sits under the SFX) and returns `dispose()`;
- * `session.play` reuses one parameter object instead of allocating per note.
+ * `session.play` reuses one parameter object instead of allocating per note; the helpers, `makeIR` and one-note
+ * access to the instruments and drums are exported for the arcade SFX bake (`audio/arcade/`).
  * The instruments themselves are unchanged.
  */
 
@@ -627,8 +628,31 @@ function tom(S: SynthCore, out: AudioNode, t: number, v: number, f: number) {
   noise(S, out, t, { type: 'lowpass', f: 1600, q: .5, tau: .02, peak: v * .2 })
 }
 
+/* ------------------------------------------------------- SFX toolbox (arcade/) */
+const SFX_NOTE: NoteOpts = { bright: 1, att: null, rel: null, glide: 0.07, from: null }
+
+/** The building blocks the arcade SFX recipes (`audio/arcade/recipes.ts`) bake one-shots from. */
+export const toolbox = { G, F, O, perc, partial, noise, noiseSrc }
+
+/** One note of a score instrument at its score level: `bright` scales its filters like the score's `bright=`. */
+export function playInstrument(S: SynthCore, out: AudioNode, inst: string, t: number, d: number, midi: number, vel: number, bright = 1) {
+  const def = INST[inst]
+  const level = G(S, def.level)
+  level.connect(out)
+  SFX_NOTE.bright = bright
+  def.play(S, level, t, d, mtof(midi), vel, SFX_NOTE)
+}
+
+/** One hit of a score drum at its score level. */
+export function hitDrum(S: SynthCore, out: AudioNode, drum: string, t: number, vel: number) {
+  const def = DRUM[drum]
+  const level = G(S, def.level)
+  level.connect(out)
+  def.hit(S, level, t, vel)
+}
+
 /* ----------------------------------------------------------------- engine */
-function makeIR(ctx: Ctx, seconds: number, decayPow: number) {
+export function makeIR(ctx: Ctx, seconds: number, decayPow: number) {
   const sr = ctx.sampleRate, len = Math.floor(sr * seconds)
   const buf = ctx.createBuffer(2, len, sr)
   const pre = Math.floor(sr * 0.012)
