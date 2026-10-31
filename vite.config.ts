@@ -4,14 +4,15 @@ import path from 'path'
 
 /**
  * Portal pages carry their own share card, canonical URL and structured data, and the zip may
- * not point at another origin: drop those tags and the VideoGame JSON-LD. The #about text stays.
+ * not point at another origin: drop those tags, the web app manifest (scoaster.com's) and the
+ * VideoGame JSON-LD. The #about text stays.
  */
 function portalHtml(): Plugin {
   return {
     name: 'portal-html',
     transformIndexHtml: (html) =>
       html
-        .replace(/^\s*(<!-- Share card[^\n]*|<link rel="canonical"[^\n]*|<meta (property="og:|name="twitter:)[^\n]*)\n/gm, '')
+        .replace(/^\s*(<!-- Share card[^\n]*|<link rel="(canonical|manifest)"[^\n]*|<meta (property="og:|name="twitter:)[^\n]*)\n/gm, '')
         .replace(/^\s*<script type="application\/ld\+json">[\s\S]*?<\/script>\n/m, ''),
   }
 }

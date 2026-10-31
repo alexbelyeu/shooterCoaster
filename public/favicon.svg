@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
+  <!-- Master icon: scripts/og-image.mjs rasterises it into favicon.ico, apple-touch-icon.png and icons/. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f7fd6" />
+      <stop offset="1" stop-color="#9fd4ff" />
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" fill="url(#sky)" />
+  <g id="mark">
+    <g fill="none" stroke="#ffd23f" stroke-linecap="round">
+      <circle cx="90" cy="90" r="50" stroke-width="12" />
+      <path d="M90 20V58M90 122V160M20 90H58M122 90H160" stroke-width="10" />
+    </g>
+    <circle cx="90" cy="90" r="10" fill="#ff3b3b" />
+  </g>
+</svg>
