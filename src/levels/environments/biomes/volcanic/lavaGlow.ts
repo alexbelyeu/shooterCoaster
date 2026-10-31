@@ -1,7 +1,7 @@
-import { RIVER_CONFIGS, RIVER_SEGMENTS, riverRow, type LavaRiverConfig } from './lavaRiverPaths'
+import { RIVER_CONFIGS, RIVER_SEGMENTS, riverRow, TERRAIN_CELL, type LavaRiverConfig } from './lavaRiverPaths'
 
-/** Wider than the lava's own glow would be: the terrain grid is ~94 units, so a 60-unit band would miss most vertices. */
-export const GLOW_RADIUS = 140
+/** 1.5 terrain cells (~140 units), wider than the lava's own glow would be: the glow is baked per terrain vertex, so a narrower band would miss most of them. */
+export const GLOW_RADIUS = 1.5 * TERRAIN_CELL
 
 interface RiverPolyline {
   halfWidth: number
