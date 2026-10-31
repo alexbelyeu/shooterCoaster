@@ -5,6 +5,7 @@ import { prepareSfx } from '@/audio/sfx'
 import { startTitleMusic } from '@/audio/TitleMusicManager'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { motion } from 'framer-motion'
+import { markStartup } from '@/core/startupMarks'
 import { startsGame } from './titleKeys'
 
 const TITLE = 'ShooterCoaster'
@@ -36,6 +37,7 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
 
   useEffect(() => {
     hintShownThisLoad = true
+    markStartup('playReady')
   }, [])
 
   async function play() {

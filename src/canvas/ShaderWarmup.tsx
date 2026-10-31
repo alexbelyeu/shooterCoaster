@@ -10,6 +10,7 @@ import * as THREE from 'three'
 import * as enemyAssets from '@/entities/enemies/SharedEnemyAssets'
 import * as bossAssets from '@/entities/bosses/bossAssets'
 import { useGameStore } from '@/store/useGameStore'
+import { markStartup } from '@/core/startupMarks'
 
 function enemyMaterials(): THREE.Material[] {
   const out: THREE.Material[] = []
@@ -65,6 +66,7 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     const { gl, scene, camera } = get()
     const { setSceneReady } = useGameStore.getState()
     setSceneReady(false)
+    markStartup('levelMounted')
     const started = performance.now()
     const testApi = window.__SC_TEST__
     if (testApi) testApi.shaderWarmup = { done: false, ms: 0, programs: 0 }
@@ -95,6 +97,7 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
       renderWarmupFrame(gl, scene, camera, target)
       cleanup()
       setSceneReady(true)
+      markStartup('warmupDone')
       if (testApi) testApi.shaderWarmup = { done: true, ms: performance.now() - started, programs: gl.info.programs?.length ?? 0 }
     })
 

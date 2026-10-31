@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { GamePhase, ScoreEntry, ComboState, BossHud } from '@/types/game'
 import { seedFromQuery } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
+import { markStartup } from '@/core/startupMarks'
 import { comboExpired, comboMultiplier } from '@/combat/comboTiers'
 import { startPhaseFor } from './startPhase'
 
@@ -100,7 +101,8 @@ export const useGameStore = create<GameState>()(
 
       runSeed: 0,
       runId: 0,
-      startRun: (levelId, seed) =>
+      startRun: (levelId, seed) => {
+        markStartup('runStart')
         set((s) => ({
           ...FRESH_RUN,
           currentLevel: levelId,
@@ -108,7 +110,8 @@ export const useGameStore = create<GameState>()(
           runId: s.runId + 1,
           phase: startPhaseFor(urlSearch() ?? ''),
           resuming: false,
-        })),
+        }))
+      },
 
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
       registerShot: () => set((s) => ({ shotsFired: s.shotsFired + 1 })),

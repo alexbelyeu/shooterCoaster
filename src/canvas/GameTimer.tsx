@@ -2,6 +2,7 @@ import { useRef, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
 import { resetComboRuntime, tickCombo } from '@/combat/comboRuntime'
+import { markStartup } from '@/core/startupMarks'
 
 interface GameTimerProps {
   seconds: number
@@ -33,6 +34,7 @@ export default function GameTimer({ seconds }: GameTimerProps) {
     // The rendered `phase` lags a store change by a render, so a pause from a DOM event (tab hide) is read live.
     const { phase: livePhase, timeScale, setTimeRemaining, setPhase } = useGameStore.getState()
     if (phase !== 'playing' || livePhase !== 'playing') return
+    markStartup('firstPlayingFrame')
     if (timeScale === 0) return
     if (running.current) {
       elapsed.current += delta

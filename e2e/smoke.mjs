@@ -34,6 +34,7 @@
  * with `&countdown=1`: the countdown must show (countdown.png), ignore a press (also once
  * held on into play), hold the timer, reach playing on GO, and the shader warm-up must
  * finish; on a replay, a tap after the 1 s mark must skip to playing.
+ * Perf gate (#188): a level fails past its `scene` ceilings in budgets.json; see sceneBudgetCheck().
  * The speed check holds the first level at top speed on its most banked sampled point:
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  * The boss check summons level1's Golden Blimp and shoots it down in phase order
@@ -222,6 +223,34 @@ async function imageStats(page, png) {
 /** Px an enemy must reach to count as readable (MIN_ENEMY_PX in enemyReadability.ts). */
 const READABLE_PX = 12
 const MIN_READABLE = 2
+
+const SCENE_BUDGETS = JSON.parse(fs.readFileSync(new URL('../budgets.json', import.meta.url), 'utf8')).scene
+const PERF_GATE = !args['no-perf-gate']
+const BUDGET_KEYS = [
+  ['drawCalls', 'draws'],
+  ['objects', 'scene objs'],
+  ['triangles', 'scene tris'],
+  ['trackObjects', 'track objs'],
+  ['trackTriangles', 'track tris'],
+]
+
+/** Each ride total past its ceiling; a level whose entry names `knownOver` (an open issue) only warns. */
+function sceneBudgetCheck(id, stats) {
+  const budget = SCENE_BUDGETS[id]
+  if (!budget) return { over: [`no scene budget for ${id} in budgets.json`], knownOver: null }
+  const track = trackTotals(stats.scene)
+  const measured = {
+    drawCalls: stats.drawCalls,
+    objects: stats.scene?.objects,
+    triangles: stats.scene?.triangles,
+    trackObjects: track?.objects,
+    trackTriangles: track?.triangles,
+  }
+  const over = BUDGET_KEYS
+    .filter(([key]) => measured[key] > budget[key])
+    .map(([key, label]) => `${label}=${measured[key]} (budget ${budget[key]})`)
+  return { over, knownOver: budget.knownOver ?? null }
+}
 
 /**
  * Readability probe: freeze game time, list on-screen enemies, and save a 4x
@@ -1556,6 +1585,9 @@ async function countdownCheck(page, levelId) {
     .then((h) => h.jsonValue(), () => null)
   const pointer = { clientX: 640, clientY: 360, pointerId: 1, isPrimary: true, pointerType: 'mouse', bubbles: true }
 
+  // Let the title draw first, so the startup timings cover it.
+  await page.waitForFunction(() => window.__SC_TEST__.initTimings().titleFrame !== undefined, null, { timeout: 30000, polling: 100 }).catch(() => {})
+
   // 1. Press during the countdown and hold it on into play.
   await start()
   const startPhase = await page.evaluate(() => window.__SC_TEST__.phase())
@@ -1630,6 +1662,7 @@ async function countdownCheck(page, levelId) {
     return phase
   }, pointer)
   const afterTap = await waitPlaying()
+  const initTimings = await page.evaluate(() => window.__SC_TEST__.initTimings())
 
   const problems = []
   if (startPhase !== 'countdown') problems.push(`startLevel entered "${startPhase}", not countdown`)
@@ -1653,6 +1686,7 @@ async function countdownCheck(page, levelId) {
     id: 'countdown',
     ok: problems.length === 0,
     problems,
+    initTimings,
     countdown: {
       level: levelId,
       stepText,
@@ -2158,6 +2192,8 @@ async function run() {
     const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
     problems.push(...desktopAspect.problems)
     stats.view = desktopAspect.view
+    const perfGate = PERF_GATE ? sceneBudgetCheck(id, stats) : null
+    if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
     const play = await playLevel(page, id, { frenzy: id === wanted[0] })
     problems.push(...play.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
@@ -2167,7 +2203,7 @@ async function run() {
     failed ||= !ok
     delete stats.hookErrors
     results.push({
-      id, ok, problems, frames, frameSeconds, seconds: (Date.now() - started) / 1000, spawnDigest, ...stats,
+      id, ok, problems, frames, frameSeconds, seconds: (Date.now() - started) / 1000, spawnDigest, ...stats, perfGate,
       kills: play.kills, score: play.score, combat: play.combat, results: play.results, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
@@ -2311,7 +2347,8 @@ async function run() {
         ? ` ${r.countdown.level} "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
           ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +
           ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'},` +
-          ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})`
+          ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})` +
+          ` | startup ${startupSummary(r.initTimings)}`
       : r.wave
         ? ` ${r.wave.level} tell ${r.wave.tellLeadS?.toFixed(1) ?? '-'}s ahead, on screen ${r.wave.onScreen} (largest ${r.wave.largestPx}px, nearest ${r.wave.nearest})`
       : r.boss
@@ -2334,10 +2371,20 @@ async function run() {
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
         ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
+    if (r.perfGate?.knownOver && r.perfGate.over.length) console.log(`     WARN over budget (known, ${r.perfGate.knownOver}): ${r.perfGate.over.join(', ')}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
   console.log(`Screenshots + results.json in ${OUT} (total ${((Date.now() - runStarted) / 1000).toFixed(0)}s)`)
   process.exit(failed ? 1 : 0)
+}
+
+/** Level phases from the run's start: the smoke picks when that is. */
+function startupSummary(t) {
+  const ms = (v) => (v === undefined ? '-' : `${v}`)
+  const sinceRun = (v) => (v === undefined || t.runStart === undefined ? '-' : `+${v - t.runStart}`)
+  return `boot=${ms(t.boot)} titleFrame=${ms(t.titleFrame)} playReady=${ms(t.playReady)} ms;` +
+    ` run at ${ms(t.runStart)}: mounted=${sinceRun(t.levelMounted)} env=${sinceRun(t.envBaked)}` +
+    ` warmup=${sinceRun(t.warmupDone)} playing=${sinceRun(t.firstPlayingFrame)} ms`
 }
 
 function resultsSummary(s) {
@@ -2375,16 +2422,22 @@ function viewSummary(views) {
   return ` buffer portrait=${b(views.portrait)} landscape=${b(views.landscape)} aspect cam/canvas portrait=${f(views.portrait)} landscape=${f(views.landscape)} back=${f(views.portraitAgain)}`
 }
 
+function trackTotals(scene) {
+  if (!scene) return null
+  const total = { objects: 0, triangles: 0 }
+  for (const [name, e] of Object.entries(scene.byName)) {
+    if (name.startsWith('track')) { total.objects += e.objects; total.triangles += e.triangles }
+  }
+  return total
+}
+
 /** Camera-independent totals: whole scene, and objects whose name starts with "track". */
 function sceneSummary(scene) {
   if (!scene) return ''
-  let objs = 0, tris = 0
-  for (const [name, e] of Object.entries(scene.byName)) {
-    if (name.startsWith('track')) { objs += e.objects; tris += e.triangles }
-  }
+  const track = trackTotals(scene)
   const env = scene.environment
   const envText = env ? ` env=${env.intensity} bake=${env.bakeMs?.toFixed(1)}ms` : ' env=none'
-  return ` | scene objs=${scene.objects} tris=${scene.triangles} (track objs=${objs} tris=${tris})${envText}`
+  return ` | scene objs=${scene.objects} tris=${scene.triangles} (track objs=${track.objects} tris=${track.triangles})${envText}`
 }
 
 run().catch((e) => {
