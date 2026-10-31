@@ -1,9 +1,16 @@
 import { useMemo, useContext, useEffect, useCallback } from 'react'
 import * as THREE from 'three'
+import { useThree } from '@react-three/fiber'
 import type { TrackCurve } from './curves/TrackCurve'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import type { HeightFunction } from '@/utils/terrainNoise'
-import { type TrackDimensions, getTrackDimensions } from './trackDimensions'
+import {
+  type TrackDimensions,
+  LATTICE_MIN_PIXEL_RADIUS,
+  RAIL_MIN_PIXEL_RADIUS,
+  getTrackDimensions,
+} from './trackDimensions'
+import { trackViewportHeight, withMinThickness } from './minThickness'
 import { type ArcTable, buildArcTable } from './arcLength'
 import { buildTrackGeometry } from './trackGeometry'
 import {
@@ -42,15 +49,16 @@ const FOOTING_LIFT = 0.5
 /** Vertex-coloured steel; `glow` adds the squared (≈ linear: dark rails stay dark) sRGB vertex colours as emissive. Caller disposes. */
 function createTrackMaterial(glow: number): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.3 })
-  if (glow <= 0) return material
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.uTrackGlow = { value: glow }
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uTrackGlow;')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vColor.rgb * vColor.rgb * uTrackGlow;')
+  if (glow > 0) {
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uTrackGlow = { value: glow }
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uTrackGlow;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vColor.rgb * vColor.rgb * uTrackGlow;')
+    }
+    material.customProgramCacheKey = () => 'track-glow'
   }
-  material.customProgramCacheKey = () => 'track-glow'
-  return material
+  return withMinThickness(material, RAIL_MIN_PIXEL_RADIUS)
 }
 
 const _m = new THREE.Matrix4()
@@ -112,7 +120,11 @@ function SupportTowers({
   )
   const footingGeom = useMemo(() => buildFootingGeometry(), [])
   const steel = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#8b939c', roughness: 0.5, metalness: 0.45 }),
+    () =>
+      withMinThickness(
+        new THREE.MeshStandardMaterial({ color: '#8b939c', roughness: 0.5, metalness: 0.45 }),
+        LATTICE_MIN_PIXEL_RADIUS,
+      ),
     [],
   )
   const concrete = useMemo(
@@ -195,6 +207,11 @@ export default function TrackMesh({
 
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
+
+  const viewportHeight = useThree((s) => s.size.height * s.viewport.dpr)
+  useEffect(() => {
+    trackViewportHeight.value = Math.max(1, viewportHeight)
+  }, [viewportHeight])
 
   return (
     <>
