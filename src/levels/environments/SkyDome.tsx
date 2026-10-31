@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { AtmosphereConfig } from './atmosphere'
+import { valueNoiseGlsl } from './shared/noiseGlsl'
 
 /**
  * Procedural per-biome sky dome, centred on the camera and drawn first with depth off
@@ -35,23 +36,7 @@ const fragmentShader = /* glsl */ `
 
   varying vec3 vDir;
 
-  float hash(vec2 p) {
-    // Sin-free hash (stable on mobile mediump)
-    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.x + p3.y) * p3.z);
-  }
-
-  float vnoise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(
-      mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-      mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
-      u.y
-    );
-  }
+  ${valueNoiseGlsl}
 
   float fbm(vec2 p) {
     float v = 0.0;

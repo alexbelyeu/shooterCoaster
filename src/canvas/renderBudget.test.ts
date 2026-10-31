@@ -8,6 +8,7 @@ import {
   PIXEL_BUDGET_FINE,
   pixelBudget,
 } from './renderBudget'
+import { QUALITY_PROFILES } from './graphicsQuality'
 
 describe('budgetDpr', () => {
   it('keeps the device dpr when the screen fits the budget', () => {
@@ -45,7 +46,24 @@ describe('budgetDpr', () => {
 describe('budget by pointer', () => {
   it('touch gets the smaller budget and less MSAA', () => {
     expect(pixelBudget(true)).toBeLessThan(pixelBudget(false))
-    expect(composerMultisampling(true)).toBeLessThanOrEqual(4)
-    expect(composerMultisampling(false)).toBe(8)
+    expect(composerMultisampling(true, QUALITY_PROFILES.high)).toBeLessThanOrEqual(4)
+    expect(composerMultisampling(false, QUALITY_PROFILES.high)).toBe(8)
+  })
+})
+
+describe('quality dpr cap', () => {
+  it('caps a dense screen at the quality\'s maxDpr', () => {
+    expect(budgetDpr(3, 390, 844, PIXEL_BUDGET_COARSE, QUALITY_PROFILES.medium.maxDpr)).toBe(1.5)
+    expect(budgetDpr(3, 390, 844, PIXEL_BUDGET_COARSE, QUALITY_PROFILES.low.maxDpr)).toBe(1)
+  })
+
+  it('never lifts the dpr past MAX_DPR or the device', () => {
+    expect(budgetDpr(3, 390, 844, PIXEL_BUDGET_COARSE, 4)).toBe(MAX_DPR)
+    expect(budgetDpr(1, 390, 844, PIXEL_BUDGET_COARSE, 1.5)).toBe(1)
+  })
+
+  it('low quality turns MSAA off', () => {
+    expect(composerMultisampling(false, QUALITY_PROFILES.low)).toBe(0)
+    expect(composerMultisampling(true, QUALITY_PROFILES.low)).toBe(0)
   })
 })

@@ -1,6 +1,7 @@
 import * as Tone from 'tone'
 import { swapInOfflineChain } from './AudioEngine'
 import { createRng } from '@/utils/rng'
+import type { MusicEngine } from './musicEngine'
 
 const LOOK_AHEAD_S = 0.1
 
@@ -21,7 +22,7 @@ export interface OfflineRenderScope {
  * the offline one until it resolves, so call it only while no live audio plays.
  */
 export async function renderOffline(
-  { seconds, sampleRate = 44100, seed = 1 }: { seconds: number; sampleRate?: number; seed?: number },
+  { seconds, sampleRate = 44100, seed = 1, engine = 'tone' }: { seconds: number; sampleRate?: number; seed?: number; engine?: MusicEngine },
   script: (scope: OfflineRenderScope) => void,
   cleanup: () => void,
 ): Promise<AudioBuffer> {
@@ -29,7 +30,7 @@ export async function renderOffline(
   const offline = new LookAheadOfflineContext(2, seconds, sampleRate)
   const random = Math.random
   Tone.setContext(offline)
-  const restoreChain = swapInOfflineChain()
+  const restoreChain = swapInOfflineChain(engine)
   Math.random = createRng(seed)
   try {
     script({ at: (t, fn) => offline.setTimeout(fn, t - LOOK_AHEAD_S) })

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { valueNoiseGlsl } from '../../shared/noiseGlsl'
 
 /**
  * Arctic aurora: vertical ribbons on a ring that follows the camera (like the sky
@@ -76,22 +77,7 @@ export function createAuroraGeometry(): THREE.BufferGeometry {
 }
 
 const noiseGlsl = /* glsl */ `
-  float hash(vec2 p) {
-    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.x + p3.y) * p3.z);
-  }
-
-  float vnoise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(
-      mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-      mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
-      u.y
-    );
-  }
+  ${valueNoiseGlsl}
 
   // fbm with per-octave rotation (no axis-aligned banding)
   float fbm(vec2 p, int octaves) {

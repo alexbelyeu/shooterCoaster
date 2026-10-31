@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:portal": "tsc -b && vite build --mode portal && node scripts/portal/package.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke": "node e2e/smoke.mjs --mobile",
+    "smoke:portal": "node e2e/smoke.mjs --dist dist-portal --base /nested/path/ --levels level1",
     "check:bundle": "node scripts/check-bundle.mjs",
     "og": "node scripts/og-image.mjs",
     "clip": "node scripts/clip.mjs",

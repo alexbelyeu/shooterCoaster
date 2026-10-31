@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
 import { useGameStore } from '@/store/useGameStore'
+import { isInRun } from '@/store/startPhase'
 import { getPointerState } from '@/input/pointerInput'
 import MuzzleFlash, { type MuzzleAnchor } from './MuzzleFlash'
 import { isFeedbackHeld, lastShot, muzzleTip } from './hitFeedback'
@@ -99,7 +100,7 @@ export default function WeaponViewModel() {
     if (!gun || !tracer || !cam?.isPerspectiveCamera) return
 
     const { phase, timeScale } = useGameStore.getState()
-    const visible = phase === 'countdown' || phase === 'playing' || phase === 'paused'
+    const visible = isInRun(phase)
     gun.visible = visible
     if (!visible) {
       tracer.visible = false

@@ -16,5 +16,8 @@ render the same vendored score through the original Scrimshaw page and through t
 (`--score vendored:5 [--engine original]`). `palette-*` is the arcade instrument palette:
 each new instrument alone (`palette-melodic`, `palette-drums`) and an 8-bar groove using only
 it (`palette-groove`), scores in `../palette/`, rendered with `--score <file> --chain game`.
+`scrim-sfx-sheet-*` / `scrim-mix-*` are the arcade SFX
+(`--sfx-sheet --engine scrim`, `--mix <level> --engine scrim`): every sound alone, then 20 s of combat over the
+level score; compare them with `baseline-sfx-sheet-*` / `baseline-mix-*`.
 
 Revisions overwrite the same names, so this folder always holds the current sound.
