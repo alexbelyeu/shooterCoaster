@@ -159,7 +159,7 @@ third-party request at runtime. `vite build --mode portal` (`build:portal`) is t
 `main` goes to production at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it). Preview deployments
 are disabled (`git.deploymentEnabled` in `vercel.json`) — verification happens in CI. `index.html` carries
 the SEO head (meta, share card, `VideoGame` JSON-LD) and a visually hidden `#about` section
-(outside `#root`, so it survives React's mount) that crawlers and screen readers read;
+(outside `#root`, so it survives React's mount) that crawlers and screen readers read (the portal build drops the share-card tags and the JSON-LD, keeps `#about`);
 `src/app/indexHtml.test.ts` checks the JSON-LD, the one `h1` and that it names every level. Serverless stubs in `api/` (leaderboard, daily seed, ghost
 replays — currently in-memory placeholders).
 Vercel Web Analytics (`@vercel/analytics`: page views, plus the `level_start` /
