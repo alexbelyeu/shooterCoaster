@@ -178,6 +178,9 @@ export interface SCTestApi {
   // ── Death effects (issue #29) ──
   /** Death effects since mount, live now, the newest one's style (enemy type, 'bossPart' or 'custom') and origin on screen. */
   deaths: () => E2EDeaths
+  // ── Ambient particles (issue #37) ──
+  /** The biome particle field: mounted?, always-on and boost-only points, boost strength 0..1 now. */
+  particles: () => typeof e2eParticles
 }
 
 export interface E2EDeaths {
@@ -358,6 +361,9 @@ export const e2eFireworks = {
   hasLast: false,
   last: new THREE.Vector3(),
 }
+
+/** Written by `shared/ParticleField.tsx` when the e2e flag is on; read through `particles()`. */
+export const e2eParticles = { mounted: false, points: 0, boostPoints: 0, boost: 0 }
 
 /** Written by `effects/ParticleExplosion.tsx` when the e2e flag is on; read through `deaths()`. */
 export const e2eDeaths = {
@@ -659,6 +665,7 @@ export function installE2EApi() {
     bossEvents: { spawn: 0, hit: 0, defeated: 0 },
     fireworks: readFireworks,
     deaths: readDeaths,
+    particles: () => ({ ...e2eParticles }),
   }
   eventBus.on('boss:spawn', () => { api.bossEvents.spawn += 1 })
   eventBus.on('boss:hit', () => { api.bossEvents.hit += 1 })

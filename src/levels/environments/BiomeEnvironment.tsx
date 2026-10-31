@@ -14,6 +14,7 @@ import { BIOMES } from './biomeRegistry'
 import Atmosphere from './shared/Atmosphere'
 import OceanWater from './shared/OceanWater'
 import TreeField from './shared/TreeField'
+import ParticleField from './shared/ParticleField'
 import { addTerrainGlow, createNoiseTerrain, createTerrainMaterial } from './shared/terrainMesh'
 
 interface BiomeEnvironmentProps {
@@ -61,7 +62,7 @@ export default function BiomeEnvironment({
     return () => groundMat.dispose()
   }, [groundMat])
 
-  const { Decorations, Features } = def
+  const { Decorations, Features, particles } = def
 
   return (
     <>
@@ -83,6 +84,9 @@ export default function BiomeEnvironment({
 
       {/* Biome landmarks, terrain features and events */}
       {Features && <Features heightFn={heightFn} groundFn={groundFn} track={track} atmosphere={atmosphere} fogRef={fogRef} />}
+
+      {/* Ambient air particles around the camera */}
+      {particles && <ParticleField preset={particles} />}
     </>
   )
 }
