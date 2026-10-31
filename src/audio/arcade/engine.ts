@@ -267,10 +267,16 @@ let fireVariant = 0
 
 export const arcadeSfx: SfxEngine = {
   prepare,
-  fire(auto) {
+  fire(auto, weapon = 'blaster') {
+    const db = auto ? AUTO_FIRE_DB : 0
+    if (weapon !== 'blaster') {
+      play(`fire.${weapon}`, 0, 0, 0.96 + Math.random() * 0.08, db, null)
+      return
+    }
     fireVariant = (fireVariant + 1) % 2
-    play('fire', 0, fireVariant, 0.96 + Math.random() * 0.08, auto ? AUTO_FIRE_DB : 0, null)
+    play('fire', 0, fireVariant, 0.96 + Math.random() * 0.08, db, null)
   },
+  pickup: () => void play('pickup'),
   hit: (combo, at) => void play('hit', 0, 0, hitRate(combo) * (0.97 + Math.random() * 0.06), 0, at),
   kill: (combo, sound, at) => playKill(`kill.${sound}`, combo, at),
   bossPart: (combo, partId, at) => {

@@ -27,9 +27,10 @@
  * mounted under the same flag.
  */
 import { useEffect } from 'react'
+import { dailyKey, dailyLevel, dailySeed, type DailyStreak } from '@/levels/daily'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useGameStore } from '@/store/useGameStore'
+import { useGameStore, type RunMode } from '@/store/useGameStore'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
@@ -56,6 +57,8 @@ import { MUSIC_ENGINE, scrimPlayer, type MusicEngine } from '@/audio/musicEngine
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
 import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
 import { clipboardText, sharePayloadForRun } from '@/ui/share'
+import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
+import type { LivePickup } from '@/combat/pickups/Pickups'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -86,6 +89,15 @@ export interface SCTestApi {
   setPhase: (phase: GamePhase) => void
   /** Replace the saved best scores / stars (persisted to localStorage like real saves). */
   setSavedScores: (scores: Record<string, ScoreEntry>) => void
+  /** The Daily Run: today's UTC key, seed and level, the current run's mode, the saved daily bests and the streak. */
+  daily: () => {
+    dateKey: string
+    seed: number
+    level: string
+    runMode: RunMode
+    savedDaily: Record<string, ScoreEntry>
+    streak: DailyStreak
+  }
   /**
    * Enemies whose centre is inside the view frustum, largest first, with screen
    * position (CSS px, origin top-left) and projected silhouette size in px.
@@ -197,6 +209,24 @@ export interface SCTestApi {
   // ── Ambient particles (issue #37) ──
   /** The biome particle field: mounted?, always-on and boost-only points, boost strength 0..1 now. */
   particles: () => typeof e2eParticles
+  // ── Weapon pickups (issue #185) ──
+  /** The run's gun: the active weapon id, the pickup's id (null with none) and its remaining fraction 1 → 0. */
+  weaponState: () => { active: string; pickup: string | null; remaining: number }
+  /** The level's pickups: id, track parameter, collected? (and popped), and where it is on screen (CSS px, NDC). */
+  pickups: () => E2EPickup[]
+}
+
+export interface E2EPickup {
+  id: string
+  t: number
+  collected: boolean
+  gone: boolean
+  x: number
+  y: number
+  ndcX: number
+  ndcY: number
+  onScreen: boolean
+  distance: number
 }
 
 export interface E2EDeaths {
@@ -386,6 +416,34 @@ export const e2eFireworks = {
 /** Written by `shared/ParticleField.tsx` when the e2e flag is on; read through `particles()`. */
 export const e2eParticles = { mounted: false, points: 0, boostPoints: 0, boost: 0 }
 
+/** Written by `combat/pickups/Pickups.tsx` when the e2e flag is on; read through `pickups()`. */
+export const e2ePickups: { list: readonly LivePickup[] } = { list: [] }
+
+const _toPickup = new THREE.Vector3()
+const _camDir = new THREE.Vector3()
+
+function readPickups(): E2EPickup[] {
+  const cam = probeCamera
+  if (!cam) return []
+  cam.getWorldPosition(_w)
+  return e2ePickups.list.map((p) => {
+    _v.copy(p.position).project(cam)
+    const ahead = _toPickup.copy(p.position).sub(_w).dot(cam.getWorldDirection(_camDir)) > 0
+    return {
+      id: p.id,
+      t: p.t,
+      collected: p.popAge >= 0,
+      gone: p.position.y < -9000,
+      x: ((_v.x + 1) / 2) * probeSize.width,
+      y: ((1 - _v.y) / 2) * probeSize.height,
+      ndcX: _v.x,
+      ndcY: _v.y,
+      onScreen: ahead && p.popAge < 0 && Math.abs(_v.x) <= 1 && Math.abs(_v.y) <= 1,
+      distance: p.position.distanceTo(_w),
+    }
+  })
+}
+
 /** Written by `effects/ParticleExplosion.tsx` when the e2e flag is on; read through `deaths()`. */
 export const e2eDeaths = {
   mounted: false,
@@ -532,9 +590,10 @@ let autoFireEnabled = false
 let lastAutoFire = 0
 const _fwd = new THREE.Vector3()
 
+/** Weapon pickups are targets too, but no enemy. */
 function isLive(t: CollisionTarget) {
   // Dead/unmounted enemies report a parking position far below the world.
-  return t.getPosition().y > -9000
+  return t.kind !== 'pickup' && t.getPosition().y > -9000
 }
 
 /** NDC of a target if it is in front of the camera and inside the viewport. */
@@ -594,6 +653,18 @@ export function installE2EApi() {
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
     setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
     setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
+    daily: () => {
+      const dateKey = dailyKey(new Date())
+      const s = useGameStore.getState()
+      return {
+        dateKey,
+        seed: dailySeed(dateKey),
+        level: dailyLevel(dateKey),
+        runMode: s.runMode,
+        savedDaily: s.savedDaily,
+        streak: s.dailyStreak,
+      }
+    },
     spawnDigest: () => spawnDigest,
     nextWave: () => waveProbe?.() ?? null,
     waveEvents: [],
@@ -698,6 +769,12 @@ export function installE2EApi() {
     fireworks: readFireworks,
     deaths: readDeaths,
     particles: () => ({ ...e2eParticles }),
+    weaponState: () => {
+      const { weapon } = useGameStore.getState()
+      const now = gameTime()
+      return { active: activeWeapon(weapon, now).id, pickup: weapon.id, remaining: pickupRemaining(weapon, now) }
+    },
+    pickups: readPickups,
   }
   eventBus.on('boss:spawn', () => { api.bossEvents.spawn += 1 })
   eventBus.on('boss:hit', () => { api.bossEvents.hit += 1 })
@@ -723,6 +800,8 @@ function waitForAudioTick() {
   while (ctx.currentTime === t0 && performance.now() < deadline) { /* spin */ }
 }
 
+const BURST_WEAPONS = ['blaster', 'spread', 'rapid', 'piercing'] as const
+
 async function audioBurst(shots: number, kills: number) {
   if (!isAudioReady()) await initAudio()
   if (MUSIC_ENGINE === 'scrim') {
@@ -732,7 +811,7 @@ async function audioBurst(shots: number, kills: number) {
   }
   const s = sfx()
   for (let i = 0; i < shots; i++) {
-    s.fire(i % 2 === 1)
+    s.fire(i % 2 === 1, BURST_WEAPONS[i % BURST_WEAPONS.length])
     if (i < kills) {
       s.hit(kills - i, null)
       s.kill(kills - i, 'pop', null)

@@ -21,7 +21,7 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
 
   | Event | Properties | Sent when |
   |---|---|---|
-  | `level_start` | `level` (`level1`…) | A run begins: from level select, Replay or Next Level. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start |
+  | `level_start` | `level` (`level1`…), `mode` (`campaign` / `daily`, from 2026-10-31; earlier starts have none) | A run begins: from level select (a level card, or the Daily card: `mode` `daily`), Replay or Next Level. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start |
   | `level_complete` | `level`, `stars` (0–3) | The timer runs out and the results screen opens |
   | `level_quit` | `level`, `progress_pct` (0, 10 … 100: share of the level timer used) | Quit to Menu from the pause screen |
   | `share` | `level`, `stars` (0–3) | The results-screen Share button opened the share sheet and the player picked a target, or copied the line to the clipboard (a dismissed sheet sends nothing). Rare and player-initiated, so it sits outside the ≤ 2 per run count |

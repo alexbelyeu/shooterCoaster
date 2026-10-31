@@ -51,7 +51,7 @@ interface Plan {
 const TRANSPORT_START_S = 0.1
 /** Where `MusicController` starts a run. */
 const DEFAULT_INTENSITY = 0.45
-/** The default weapon's fire delay (`WeaponBase.ts`). */
+/** A held trigger's cadence in the mix renders. */
 const AUTOFIRE_S = 0.1
 
 function biomeOf(level: string): BiomeType {
@@ -162,6 +162,10 @@ function sfxSheetPlan(level = 'level1', engine: MusicEngine = 'tone'): Plan {
     { name: 'fire (single shot)', slotS: 0.6, play: () => s.fire(false) },
     { name: 'fire (auto, held trigger)', slotS: 0.6, play: () => s.fire(true) },
     { name: 'autofire burst (6 shots, 100 ms apart)', slotS: 1.2, play: () => s.fire(true), repeat: 6 },
+    { name: 'fire (spread pickup)', slotS: 0.6, play: () => s.fire(false, 'spread') },
+    { name: 'rapid pickup burst (8 shots, 100 ms apart)', slotS: 1.0, play: () => s.fire(true, 'rapid'), repeat: 8 },
+    { name: 'fire (piercing pickup)', slotS: 0.6, play: () => s.fire(false, 'piercing') },
+    { name: 'pickup chime', slotS: 1.2, play: () => s.pickup() },
     { name: 'hit tick', slotS: 0.6, play: () => s.hit(0, null) },
     { name: 'kill 1x', slotS: 0.6, play: () => s.kill(COMBO_TIERS[0].minCount, 'pop', null) },
     { name: 'kill 2x (+ thump)', slotS: 0.7, play: () => s.kill(COMBO_TIERS[1].minCount, 'pop', null) },

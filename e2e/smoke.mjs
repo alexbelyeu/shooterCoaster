@@ -26,6 +26,8 @@
  *
  * Spawns use a fixed --seed (default 1337); the seed check reloads the first level
  * and requires the same spawnDigest() for that seed and a different one for another.
+ * The daily check starts today's Daily Run from its level-select card on two fresh pages
+ * (today's seed, the same spawns) and checks its results, saves and Replay (#184).
  * The hidden-pause check fakes a tab hide on the first level: it must pause, drop a
  * held trigger, keep the timer still (and a primed combo intact), wait for Resume, then
  * neither reset nor jump it, nor bring back killed enemies. On the first level the killNearest kills enter the 5× combo
@@ -40,6 +42,8 @@
  * The boss checks summon each finale and shoot it down in phase order: level1's Golden Blimp
  * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png) and level3's Kraken
  * (level3-boss.png, level3-boss-head.png, level3-boss-down.png); see bossCheck().
+ * The pickup check shoots level1's first weapon pickup with a real bullet: the spread gun's badge,
+ * a 3-bullet fan with the tinted tracer (level1-pickup.png), pause-safe expiry, reset on restart; see pickupCheck().
  * The scrim check loads level1 with `?audio=scrim` (the score engine, #214, and the arcade SFX, #217); see scrimCheck().
  *
  * All waits are deadline-polled on the hook's frame counter, because software
@@ -1377,6 +1381,105 @@ async function bossCheck(page, check) {
   return { id: 'boss', problems, boss: result }
 }
 
+const PICKUP_CHECK = { level: 'level1', min: 2, max: 4, weapon: 'spread', bullets: 3, pauseMs: 3000 }
+/** Track-parameter leads behind the first pickup to park the coaster at. */
+const PICKUP_LEADS = [0.006, 0.01, 0.015, 0.004, 0.02, 0.03]
+
+/** Weapon pickups (#185): shoot the first, then the spread fan, badge, pause-safe expiry and restart (level1-pickup.png). */
+async function pickupCheck(page) {
+  const { level, min, max, weapon, bullets, pauseMs } = PICKUP_CHECK
+  const problems = []
+  const api = (fn, arg) => page.evaluate(fn, arg)
+  const weaponState = () => api(() => window.__SC_TEST__.weaponState())
+  await api(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
+  await api(() => window.__SC_TEST__.setTimeScale(0))
+
+  let pickups = await api(() => window.__SC_TEST__.pickups())
+  const result = { count: pickups.length, ids: pickups.map((p) => p.id), lead: null, px: null }
+  if (pickups.length < min || pickups.length > max) problems.push(`${pickups.length} pickups (want ${min}–${max})`)
+  const first = pickups[0]
+  let target = null
+  if (first) {
+    for (const lead of PICKUP_LEADS) {
+      await api((t) => { window.__SC_TEST__.rideTo = t }, first.t - lead)
+      await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+      pickups = await api(() => window.__SC_TEST__.pickups())
+      const p = pickups[0]
+      if (p.onScreen && Math.abs(p.ndcX) < 0.8 && Math.abs(p.ndcY) < 0.8) {
+        target = p
+        result.lead = lead
+        break
+      }
+    }
+  }
+  const drawCalls = await api(() => window.__SC_TEST__.drawCalls)
+  if (!target) problems.push(`the first pickup never came on screen from ${PICKUP_LEADS.length} spots behind it`)
+  else {
+    result.px = { x: Math.round(target.x), y: Math.round(target.y), distance: Math.round(target.distance) }
+    await api(({ x, y }) => {
+      window.__SC_TEST__.bulletStep = 0.25
+      window.__SC_TEST__.fireShot(x, y)
+    }, { x: target.ndcX, y: target.ndcY })
+    const got = await pollUntil(page, async () => (await weaponState()).pickup === weapon, { ms: 8000, frames: 8, pollMs: 200 })
+    if (!got) problems.push(`shooting the ${target.id} pickup did not arm it (${JSON.stringify(await weaponState())})`)
+    await api(() => window.__SC_TEST__.setTimeScale(1))
+    const gone = await pollUntil(page, async () => (await api(() => window.__SC_TEST__.pickups()))[0].gone, { ms: 10000, frames: 1, pollMs: 100 })
+    await api(() => window.__SC_TEST__.setTimeScale(0))
+    if (!gone) problems.push('the shot pickup never popped')
+  }
+
+  const before = await getStats(page)
+  await page.waitForTimeout(100) // past the fire interval
+  await api(() => {
+    window.__SC_TEST__.bulletStep = 0
+    window.__SC_TEST__.holdFeedback = true
+    window.__SC_TEST__.fireShot(0.1, 0.35)
+  })
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const after = await getStats(page)
+  const drawn = (await api(() => window.__SC_TEST__.bullets())).drawn
+  result.fan = { shots: after.shotsFired - before.shotsFired, drawn }
+  if (result.fan.shots !== bullets) problems.push(`a spread pull counted ${result.fan.shots} shots (want ${bullets})`)
+  if (drawn < bullets) problems.push(`a spread pull drew ${drawn} bullets (want ${bullets})`)
+  const badge = await waitVisible(page, '.hud-weapon', 10000)
+  if (!badge) problems.push('no weapon badge with a pickup active')
+  const hud = await hudLayoutProblems(page, 'desktop 1280x720 with the weapon badge', [...HUD_SELECTORS, '.hud-weapon'])
+  problems.push(...hud.problems)
+  const label = await api(() => document.querySelector('.hud-weapon-label')?.textContent ?? null)
+  if (label?.toLowerCase() !== weapon) problems.push(`badge reads "${label}" (want ${weapon})`)
+  await page.screenshot({ path: path.join(OUT, `${level}-pickup.png`), timeout: SHOT_TIMEOUT })
+  await api(() => {
+    window.__SC_TEST__.holdFeedback = false
+    window.__SC_TEST__.bulletStep = null
+  })
+
+  const held = await weaponState()
+  await api(() => {
+    window.__SC_TEST__.setTimeScale(1)
+    window.__SC_TEST__.setPhase('paused')
+  })
+  await page.waitForTimeout(pauseMs)
+  const paused = await weaponState()
+  if (Math.abs(paused.remaining - held.remaining) > 1e-6)
+    problems.push(`the pickup ran down while paused (${held.remaining.toFixed(3)} -> ${paused.remaining.toFixed(3)})`)
+  await api(() => {
+    window.__SC_TEST__.setPhase('playing')
+    window.__SC_TEST__.setTimeScale(4)
+  })
+  const expired = await pollUntil(page, async () => (await weaponState()).active === 'blaster', { ms: 60000, frames: 2, pollMs: 500 })
+  if (!expired) problems.push(`the pickup never expired (${JSON.stringify(await weaponState())})`)
+  else if (!(await pollUntil(page, () => api(() => !document.querySelector('.hud-weapon.is-visible')), { ms: 5000, frames: 1, pollMs: 250 })))
+    problems.push('the weapon badge stayed up after the pickup expired')
+
+  await api(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const restarted = { weapon: await weaponState(), collected: (await api(() => window.__SC_TEST__.pickups())).filter((p) => p.collected).length }
+  if (restarted.weapon.pickup !== null) problems.push(`startRun kept the pickup (${restarted.weapon.pickup})`)
+  if (restarted.collected) problems.push(`${restarted.collected} pickup(s) still collected after a restart`)
+  return { id: 'pickup', problems, pickup: { ...result, drawCalls, badge: hud.rects.at(-1) } }
+}
+
 /**
  * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
  * shows over the mounted level, a press during it fires nothing (not even when held on into
@@ -1419,7 +1522,8 @@ async function levelSelectCheck(page, levels) {
       focused: document.activeElement?.dataset?.level ?? null,
     }
   })
-  if (layout.cards !== levels.length) problems.push(`${layout.cards} level cards for ${levels.length} levels`)
+  // One card per level plus the Daily Run card (#184).
+  if (layout.cards !== levels.length + 1) problems.push(`${layout.cards} cards for ${levels.length} levels + Daily`)
   if (layout.locked !== levels.length - expectOpen) problems.push(`${layout.locked} locked cards, expected ${levels.length - expectOpen}`)
   if (Number(layout.total) !== expectStars || !layout.totalText.includes(`${expectStars} / ${levels.length * 3}`)) {
     problems.push(`star total "${layout.totalText.trim()}", expected ${expectStars} / ${levels.length * 3}`)
@@ -1459,6 +1563,98 @@ async function levelSelectCheck(page, levels) {
     if (after.phase !== 'playing' || after.level !== target) problems.push(`Enter started ${after.level} (${after.phase}), expected ${target}`)
   }
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
+}
+
+/** Click the level select's Daily card (#184) and return the run it started and its spawnDigest(). */
+async function startDailyFromCard(page, savedScores) {
+  await page.evaluate((s) => {
+    window.__SC_TEST__.setSavedScores(s)
+    window.__SC_TEST__.setPhase('levelSelect')
+  }, savedScores)
+  if (!(await waitVisible(page, '.level-card-daily'))) return { run: null, digest: null }
+  await page.locator('.level-card-daily').click({ timeout: 30000 })
+  await page.waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 30000 }).catch(() => {})
+  const run = await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    return { ...s.daily(), phase: s.phase(), runSeed: s.stats().runSeed, currentLevel: s.stats().currentLevel }
+  })
+  return { run, digest: await nextSpawnDigest(page, null) }
+}
+
+/**
+ * Daily Run (#184): the card starts today's level on today's seed in daily mode, two loads spawn the same,
+ * the results say DAILY / NEW BEST with no Next Level, Replay keeps the seed, and campaign saves stay as they were.
+ */
+async function dailyCheck(newPage) {
+  const problems = []
+  const campaign = { level1: { level: 'level1', score: 1000, maxScore: 0, stars: 3, timestamp: 0 } }
+  const first = await newPage()
+  const a = await startDailyFromCard(first.page, campaign)
+  const { run } = a
+  if (!run) problems.push('no Daily card on the level select')
+  else {
+    if (run.phase !== 'playing') problems.push(`the Daily card left the game in "${run.phase}"`)
+    if (run.runMode?.mode !== 'daily' || run.runMode.dateKey !== run.dateKey) problems.push(`run mode ${JSON.stringify(run.runMode)}, expected daily ${run.dateKey}`)
+    if (run.runSeed !== run.seed) problems.push(`daily run seed ${run.runSeed}, expected dailySeed(${run.dateKey}) = ${run.seed}`)
+    if (run.currentLevel !== run.level) problems.push(`daily started ${run.currentLevel}, expected ${run.level}`)
+  }
+  if (!a.digest) problems.push('spawnDigest() never reported the daily spawns')
+
+  // Score something so the day's first result is a NEW BEST, then end the run.
+  await first.page.evaluate(() => window.__SC_TEST__.killNearest(3))
+  await waitFrames(first.page, 2, { maxMs: 20000 })
+  await first.page.evaluate(() => window.__SC_TEST__.endLevel())
+  const resultsShown = await first.page
+    .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 60000, polling: 250 })
+    .then(() => true, () => false)
+  await first.page.waitForTimeout(1500)
+  await first.page.screenshot({ path: path.join(OUT, 'daily-results.png'), timeout: SHOT_TIMEOUT })
+  const results = await first.page.evaluate(() => {
+    const el = document.querySelector('.results-screen')
+    const s = window.__SC_TEST__
+    return {
+      mode: el?.dataset.mode ?? null,
+      badge: el?.querySelector('.results-daily-badge')?.textContent ?? null,
+      record: el?.querySelector('.results-record')?.textContent ?? null,
+      buttons: [...(el?.querySelectorAll('.results-actions button') ?? [])].map((b) => b.textContent),
+      score: s.stats().score,
+      daily: s.daily(),
+      savedScores: JSON.parse(localStorage.getItem('shootercoaster-scores') ?? '{}').state?.savedScores ?? null,
+    }
+  })
+  const savedDay = run ? results.daily.savedDaily[run.dateKey] : undefined
+  if (!resultsShown) problems.push('daily results screen never finished its reveal')
+  if (results.mode !== 'daily' || !results.badge) problems.push(`daily results lack the Daily badge (mode ${results.mode})`)
+  if (results.score > 0 && results.record !== 'NEW BEST') problems.push(`first daily result shows "${results.record}", expected NEW BEST`)
+  if (results.buttons.includes('Next Level')) problems.push('daily results offer Next Level')
+  if (!savedDay || savedDay.score !== Math.round(results.score)) problems.push(`today's daily best ${JSON.stringify(savedDay)}, expected score ${Math.round(results.score)}`)
+  if (results.daily.streak.count !== 1 || results.daily.streak.lastKey !== run?.dateKey) problems.push(`daily streak ${JSON.stringify(results.daily.streak)}, expected 1 day`)
+  if (JSON.stringify(results.savedScores) !== JSON.stringify(campaign)) problems.push(`a daily run changed the campaign saves: ${JSON.stringify(results.savedScores)}`)
+
+  // Replay replays the same seed in daily mode.
+  await first.page.locator('.results-actions button', { hasText: 'Replay' }).click({ timeout: 10000 }).catch((e) => problems.push(`click Replay: ${e.message}`))
+  await first.page.waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 30000 }).catch(() => {})
+  const replay = await first.page.evaluate(() => ({ runSeed: window.__SC_TEST__.stats().runSeed, mode: window.__SC_TEST__.daily().runMode.mode }))
+  if (run && (replay.runSeed !== run.seed || replay.mode !== 'daily')) problems.push(`Replay ran seed ${replay.runSeed} (${replay.mode}), expected the daily seed ${run.seed}`)
+  const errors = [...first.errors, ...(await first.page.evaluate(() => window.__SC_TEST__.errors))]
+  await first.ctx.close()
+
+  // A second load on the same date spawns the same enemies.
+  const second = await newPage()
+  const b = await startDailyFromCard(second.page, {})
+  errors.push(...second.errors, ...(await second.page.evaluate(() => window.__SC_TEST__.errors)))
+  await second.ctx.close()
+  if (b.run?.runSeed !== run?.seed) problems.push(`second load ran seed ${b.run?.runSeed}, expected ${run?.seed}`)
+  if (b.digest !== a.digest) problems.push(`two loads of today's daily spawned differently (${a.digest} vs ${b.digest})`)
+  if (errors.length) problems.push(`${errors.length} error(s)`)
+
+  return {
+    id: 'daily',
+    ok: problems.length === 0,
+    problems,
+    errors,
+    daily: { dateKey: run?.dateKey, level: run?.level, seed: run?.seed, digest: a.digest, digestAgain: b.digest, record: results.record, replaySeed: replay.runSeed },
+  }
 }
 
 /** The settings card (#35): inside the viewport, no sideways scroll, every control there and ≥ 44 px tall. */
@@ -2189,6 +2385,13 @@ async function run() {
     await l.ctx.close()
   }
 
+  // 1b'. Daily Run from its card: today's seed, same spawns on a second load, daily results, campaign saves untouched
+  if (!args['skip-desktop']) {
+    const r = await dailyCheck(newPage)
+    failed ||= !r.ok
+    results.push(r)
+  }
+
   // 1c. Settings from the title (settings.png): layout, Esc, persisted across a reload
   if (!args['skip-desktop']) {
     const st = await newPage()
@@ -2338,6 +2541,18 @@ async function run() {
     await b.ctx.close()
   }
 
+  // 6e. Weapon pickups: one shot with a real bullet, the fan, the badge, expiry (level1-pickup.png)
+  if (wanted.includes(PICKUP_CHECK.level)) {
+    const pk = await newPage()
+    const r = await pickupCheck(pk.page)
+    r.errors = [...pk.errors, ...(await pk.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await pk.ctx.close()
+  }
+
   // 6d. The score engine behind ?audio=scrim: title -> level -> pause -> results
   if (wanted.includes(SCRIM_CHECK.level)) {
     const sc = await newPage('e2e=1&audio=scrim')
@@ -2367,6 +2582,8 @@ async function run() {
       : ''
     const extra = r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '')
+      : r.daily
+        ? ` ${r.daily.dateKey} ${r.daily.level} seed=${r.daily.seed} digest=${r.daily.digest} again=${r.daily.digestAgain} record=${r.daily.record} replaySeed=${r.daily.replaySeed}`
       : r.levelSelect
         ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total}` +
           (r.levelSelect.keyboard ? ` keys: ${r.levelSelect.focused} <- ${r.levelSelect.keyboard.left}, locked ${r.levelSelect.keyboard.locked} Enter -> ${r.levelSelect.keyboard.phaseAfterLocked}, Enter -> ${r.levelSelect.keyboard.level} ${r.levelSelect.keyboard.phase}` : '')
@@ -2397,6 +2614,9 @@ async function run() {
           ? ` ${r.boss.level} skipped (level timed out)`
           : ` ${r.boss.level} tell "${r.boss.tell.at(-1) ?? '-'}" draws=${r.boss.drawCalls} width ${(r.boss.widthFrac * 100).toFixed(0)}% exposed [${r.boss.exposedAtStart.length} ${r.boss.exposedAtStart[0] ?? '-'}…] -> [${r.boss.exposedMidway}]` +
             ` bullet hit ${r.boss.bulletHit} hits ${r.boss.phaseOneHits}+${r.boss.lastHits} kills ${r.boss.kills} score +${r.boss.score} popup ${r.boss.popup[0] ?? '-'} stage ${r.boss.stage}`)
+      : r.pickup
+        ? ` ${r.pickup.count} pickups [${r.pickup.ids.join(',')}] draws=${r.pickup.drawCalls} first at ${r.pickup.px ? `${r.pickup.px.x},${r.pickup.px.y} (${r.pickup.px.distance} units, lead ${r.pickup.lead})` : '-'}` +
+          ` fan shots=${r.pickup.fan?.shots} drawn=${r.pickup.fan?.drawn}`
       : r.scrim
         ? ` engine=${r.scrim.engine} title=${r.scrim.title} nodes ${r.scrim.nodes.join('->')} position ${r.scrim.position.map((p) => p.toFixed(1)).join('->')}s` +
           ` sfxNodes ${r.scrim.sfxNodes.join('->')} voices ${r.scrim.voices ? `peak ${r.scrim.voices.peak}/${r.scrim.voices.budget} stolen ${r.scrim.voices.stolen} dropped ${r.scrim.voices.rejected}` : 'none'}` +

@@ -1,23 +1,29 @@
 import type * as Tone from 'tone'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { MUSIC_ENGINE, type MusicEngine } from './musicEngine'
-import { loadTone, tone, unlockAudioContext } from './tone'
+import { adoptGestureContext, loadTone, tone, unlockAudioContext } from './tone'
 
 let initialized = false
 let starting: Promise<void> | null = null
+const readyListeners = new Set<() => void>()
 
-/** Call it from a user gesture (click / tap / key): it unlocks audio there, then loads Tone and builds the master chain. */
+/**
+ * Call it from a user gesture (click / tap / key). Every call resumes the context inside that gesture,
+ * even while the first call is still loading Tone: on iOS the `pointerdown` that starts the load is
+ * not an activation, the PLAY `click` after it is.
+ */
 export function initAudio(): Promise<void> {
+  unlockAudioContext()
   starting ??= loadTone()
     .then(async (T) => {
+      adoptGestureContext(T)
       await T.start()
       setChain(createMasterChain())
       initialized = true
       applyMix()
       syncVolumes(true)
-      // iOS Safari interrupts the context when the tab or portal frame is hidden and resumes it only from a touchend / click.
-      window.addEventListener('touchend', unlockAudioContext, { capture: true, passive: true })
-      window.addEventListener('click', unlockAudioContext, { capture: true })
+      for (const fn of [...readyListeners]) fn()
+      readyListeners.clear()
     })
     .catch((e: unknown) => {
       starting = null
@@ -28,6 +34,16 @@ export function initAudio(): Promise<void> {
 
 export function isAudioReady(): boolean {
   return initialized
+}
+
+/** Runs `fn` now if audio is ready, else once `initAudio` finishes; returns the cancel. */
+export function whenAudioReady(fn: () => void): () => void {
+  if (initialized) {
+    fn()
+    return () => {}
+  }
+  readyListeners.add(fn)
+  return () => readyListeners.delete(fn)
 }
 
 const DUCK_OPEN_HZ = 20000

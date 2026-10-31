@@ -9,6 +9,8 @@ import {
   FIREWORK_BIOMES,
   FIREWORK_SFX,
   FIRE_VARIANTS,
+  PICKUP_CHIME,
+  WEAPON_FIRE_SFX,
   KILL_TIMBRES,
   type KillSound,
   STAR_CHIME_NOTES,
@@ -22,12 +24,14 @@ import {
   killPingHz,
 } from './sfxDesign'
 import type { BiomeType } from '@/types/level'
+import type { PickupWeaponId, WeaponId } from '@/combat/weapons/weaponTypes'
 
 /*
  * Every gameplay SFX node is built once per level into `owned` and reused; never create one in a play function.
  *
  * Volume hierarchy (individual synth dB + sfxChannel -6 dB, then the master limiter):
  *   Fire pew   : -20 (-26 when auto-firing) → background, fires 10×/sec
+ *   Pickup guns: spread -24 saw, rapid -30 square tick, piercing -19 triangle laser; pickup chime on the star chime
  *   Hit tick   : -24 noise + -22 blip → crisp, ~30 ms
  *   Balloon pop: -14 snap + -18 ping → punchy but brief
  *   Kill layers: thump -14 (combo 2×), ring -26 (3×), swell -24 (5×)
@@ -41,6 +45,7 @@ import type { BiomeType } from '@/types/level'
 
 interface Kit {
   fire: Tone.Synth
+  weaponFire: Record<PickupWeaponId, Tone.Synth>
   popPing: Tone.Synth
   popSnap: Tone.NoiseSynth
   tickNoise: Tone.NoiseSynth
@@ -80,6 +85,15 @@ function createKit(biome: BiomeType): Kit {
     envelope: { attack: 0.005, decay: 0.12, sustain: 0, release: 0.06 },
     volume: -20,
   })).connect(sfxChannel)
+
+  const weaponFire = {} as Record<PickupWeaponId, Tone.Synth>
+  for (const [id, d] of Object.entries(WEAPON_FIRE_SFX) as [PickupWeaponId, (typeof WEAPON_FIRE_SFX)[PickupWeaponId]][]) {
+    weaponFire[id] = own(new Synth({
+      oscillator: { type: d.oscillator },
+      envelope: { attack: 0.003, decay: d.sweepS, sustain: 0, release: 0.05 },
+      volume: d.volume,
+    })).connect(sfxChannel)
+  }
 
   const popPing = own(new Synth({
     oscillator: { type: 'sine' },
@@ -172,7 +186,7 @@ function createKit(biome: BiomeType): Kit {
 
   const firework = FIREWORK_BIOMES.includes(biome) ? createFireworkVoices() : null
 
-  return { fire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, comboBreak, stinger, chime, bossThud, bossBoom, firework }
+  return { fire, weaponFire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, comboBreak, stinger, chime, bossThud, bossBoom, firework }
 }
 
 function createFireworkVoices(): FireworkVoices {
@@ -214,17 +228,23 @@ export function sfxNodeCount(): number {
 let fireVariant = 0
 
 /** One shot. `auto` = held-trigger auto-fire, played 6 dB quieter to avoid fatigue. */
-export function playFireSound(auto = false): void {
+export function playFireSound(auto = false, weapon: WeaponId = 'blaster'): void {
   try {
     const k = ensureKit()
     if (!k) return
-    const v = FIRE_VARIANTS[fireVariant]
-    fireVariant = (fireVariant + 1) % FIRE_VARIANTS.length
+    const T = tone()
+    let synth = k.fire
+    let v = FIRE_VARIANTS[fireVariant]
+    if (weapon === 'blaster') fireVariant = (fireVariant + 1) % FIRE_VARIANTS.length
+    else {
+      synth = k.weaponFire[weapon]
+      v = WEAPON_FIRE_SFX[weapon]
+    }
     const jitter = 0.94 + Math.random() * 0.12
-    const now = nextTriggerTime(k.fire, tone().now(), tone().getContext().currentTime)
-    k.fire.triggerAttack(v.startHz * jitter, now, fireVelocity(auto))
-    k.fire.frequency.exponentialRampTo(v.endHz * jitter, v.sweepS, now)
-    k.fire.triggerRelease(now + v.sweepS + 0.02)
+    const now = nextTriggerTime(synth, T.now(), T.getContext().currentTime)
+    synth.triggerAttack(v.startHz * jitter, now, fireVelocity(auto))
+    synth.frequency.exponentialRampTo(v.endHz * jitter, v.sweepS, now)
+    synth.triggerRelease(now + v.sweepS + 0.02)
   } catch (e) {
     dropSound('fire', e)
   }
@@ -237,13 +257,14 @@ const HIT_TICK_MIN_INTERVAL = 25 // ms — several hits in one frame tick once
 export function playHitTick(): void {
   const k = ensureKit()
   if (!k) return
-  const nowMs = tone().now() * 1000
+  const T = tone()
+  const nowMs = T.now() * 1000
   if (nowMs - lastTickTime < HIT_TICK_MIN_INTERVAL) return
   lastTickTime = nowMs
 
   try {
-    const toneNow = tone().now()
-    const ctxNow = tone().getContext().currentTime
+    const toneNow = T.now()
+    const ctxNow = T.getContext().currentTime
     k.tickNoise.triggerAttackRelease(0.015, nextTriggerTime(k.tickNoise, toneNow, ctxNow))
     k.tickBlip.triggerAttackRelease(3200 + Math.random() * 700, 0.02, nextTriggerTime(k.tickBlip, toneNow, ctxNow))
   } catch (e) {
@@ -259,14 +280,15 @@ const SWELL_MIN_INTERVAL = 600 // ms — let one swell finish before the next
 export function playExplosionSound(comboCount: number = 0, sound: KillSound = 'pop'): void {
   const k = ensureKit()
   if (!k) return
+  const T = tone()
 
-  const nowMs = tone().now() * 1000
+  const nowMs = T.now() * 1000
   if (nowMs - lastExplosionTime < EXPLOSION_SOUND_MIN_INTERVAL) return
   lastExplosionTime = nowMs
 
   try {
-    const toneNow = tone().now()
-    const ctxNow = tone().getContext().currentTime
+    const toneNow = T.now()
+    const ctxNow = T.getContext().currentTime
     const timbre = KILL_TIMBRES[sound]
     k.popSnap.envelope.decay = timbre.snapDecay
     k.popSnap.triggerAttackRelease(timbre.snapS + Math.random() * 0.02, nextTriggerTime(k.popSnap, toneNow, ctxNow))
@@ -293,8 +315,9 @@ export function playExplosionSound(comboCount: number = 0, sound: KillSound = 'p
 export function playComboBreak(): void {
   const k = ensureKit()
   if (!k) return
+  const T = tone()
   try {
-    const t = nextTriggerTime(k.comboBreak, tone().now(), tone().getContext().currentTime)
+    const t = nextTriggerTime(k.comboBreak, T.now(), T.getContext().currentTime)
     k.comboBreak.triggerAttack(COMBO_BREAK.startHz, t, 0.8)
     k.comboBreak.frequency.exponentialRampTo(COMBO_BREAK.endHz, COMBO_BREAK.sweepS, t)
     k.comboBreak.triggerRelease(t + COMBO_BREAK.sweepS)
@@ -306,10 +329,11 @@ export function playComboBreak(): void {
 export function playWaveStinger(): void {
   const k = ensureKit()
   if (!k) return
+  const T = tone()
   const d = STINGERS[kitBiome]
   try {
-    const toneNow = tone().now()
-    const ctxNow = tone().getContext().currentTime
+    const toneNow = T.now()
+    const ctxNow = T.getContext().currentTime
     for (let c = 0; c < 2; c++) {
       const chord = d.chords[c]
       const t = toneNow + c * STINGER_CHORD_GAP_S
@@ -330,10 +354,11 @@ export function playWaveStinger(): void {
 export function playBossStinger(): void {
   const k = ensureKit()
   if (!k) return
+  const T = tone()
   const { chords, drum, gapS } = BOSS_SFX.arrival
   try {
-    const toneNow = tone().now()
-    const ctxNow = tone().getContext().currentTime
+    const toneNow = T.now()
+    const ctxNow = T.getContext().currentTime
     for (let c = 0; c < chords.length; c++) {
       const t = toneNow + c * gapS
       const last = c === chords.length - 1
@@ -352,9 +377,10 @@ export function playBossStinger(): void {
 export function playBossHit(event: unknown): void {
   const k = ensureKit()
   if (!k) return
+  const T = tone()
   try {
     const hp = (event as { hpFraction?: number } | undefined)?.hpFraction ?? 1
-    k.bossThud.triggerAttackRelease(bossHitHz(hp), 0.15, nextTriggerTime(k.bossThud, tone().now(), tone().getContext().currentTime))
+    k.bossThud.triggerAttackRelease(bossHitHz(hp), 0.15, nextTriggerTime(k.bossThud, T.now(), T.getContext().currentTime))
   } catch (e) {
     dropSound('boss hit', e)
   }
@@ -364,10 +390,11 @@ export function playBossHit(event: unknown): void {
 export function playBossDefeat(): void {
   const k = ensureKit()
   if (!k) return
+  const T = tone()
   const { boomS, chord, chordDelayS } = BOSS_SFX.defeat
   try {
-    const toneNow = tone().now()
-    const ctxNow = tone().getContext().currentTime
+    const toneNow = T.now()
+    const ctxNow = T.getContext().currentTime
     k.bossBoom.triggerAttackRelease(boomS, nextTriggerTime(k.bossBoom, toneNow, ctxNow))
     k.thump.triggerAttackRelease('C1', 0.5, nextTriggerTime(k.thump, toneNow, ctxNow))
     k.popSnap.envelope.decay = KILL_TIMBRES.pop.snapDecay
@@ -388,11 +415,12 @@ export function playBossDefeat(): void {
 export function playFireworkWhistle(event: unknown): void {
   const fw = ensureKit()?.firework
   if (!fw) return
+  const T = tone()
   try {
     const { flightS = 0, timeScale = 1 } = (event as { flightS?: number; timeScale?: number } | undefined) ?? {}
     const { startHz, endHz } = FIREWORK_SFX.whistle
     const dur = fireworkWhistleS(flightS, timeScale)
-    const t = nextTriggerTime(fw.whistle, tone().now(), tone().getContext().currentTime)
+    const t = nextTriggerTime(fw.whistle, T.now(), T.getContext().currentTime)
     fw.whistleBand.frequency.cancelScheduledValues(t)
     fw.whistleBand.frequency.setValueAtTime(startHz, t)
     fw.whistleBand.frequency.exponentialRampToValueAtTime(endHz, t + dur)
@@ -407,10 +435,11 @@ export function playFireworkPop(): void {
   const k = ensureKit()
   const fw = k?.firework
   if (!k || !fw) return
+  const T = tone()
   try {
     const { crackS, drum, drumVelocity } = FIREWORK_SFX.pop
-    const toneNow = tone().now()
-    const ctxNow = tone().getContext().currentTime
+    const toneNow = T.now()
+    const ctxNow = T.getContext().currentTime
     fw.crack.triggerAttackRelease(crackS, nextTriggerTime(fw.crack, toneNow, ctxNow))
     k.thump.triggerAttackRelease(drum, 0.3, nextTriggerTime(k.thump, toneNow, ctxNow), drumVelocity)
   } catch (e) {
@@ -418,12 +447,29 @@ export function playFireworkPop(): void {
   }
 }
 
+/** The power-up arpeggio, on the star-chime synth. */
+export function playPickupChime(): void {
+  const k = ensureKit()
+  if (!k) return
+  const T = tone()
+  try {
+    const t0 = T.now()
+    const ctxNow = T.getContext().currentTime
+    PICKUP_CHIME.notes.forEach((note, i) => {
+      k.chime.triggerAttackRelease(note, PICKUP_CHIME.noteS, nextTriggerTime(k.chime, t0 + i * PICKUP_CHIME.stepS, ctxNow))
+    })
+  } catch (e) {
+    dropSound('pickup chime', e)
+  }
+}
+
 /** Uses the level's kit, which stays mounted under the results screen. */
 export function playStarChime(starIndex: number): void {
   const k = ensureKit()
   if (!k) return
+  const T = tone()
   try {
-    const t = nextTriggerTime(k.chime, tone().now(), tone().getContext().currentTime)
+    const t = nextTriggerTime(k.chime, T.now(), T.getContext().currentTime)
     k.chime.triggerAttackRelease(STAR_CHIME_NOTES[starIndex] ?? STAR_CHIME_NOTES[2], 0.5, t)
   } catch (e) {
     dropSound('star chime', e)
