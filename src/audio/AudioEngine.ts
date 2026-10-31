@@ -1,25 +1,29 @@
-import * as Tone from 'tone'
+import type * as Tone from 'tone'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { MUSIC_ENGINE, type MusicEngine } from './musicEngine'
+import { loadTone, tone, unlockAudioContext } from './tone'
 
 let initialized = false
+let starting: Promise<void> | null = null
 
-/**
- * Master audio engine wrapping Tone.js.
- * Must be initialized on user gesture (click/tap).
- */
-export async function initAudio(): Promise<void> {
-  if (initialized) return
-  await Tone.start()
-  initialized = true
-  window.addEventListener('touchend', resumeSuspendedContext, { capture: true, passive: true })
-  window.addEventListener('click', resumeSuspendedContext, { capture: true })
-}
-
-/** iOS Safari interrupts the context when the tab or portal frame is hidden and resumes it only from a touchend / click. */
-function resumeSuspendedContext() {
-  const ctx = Tone.getContext()
-  if (ctx.state !== 'running') ctx.resume().catch(() => {})
+/** Call it from a user gesture (click / tap / key): it unlocks audio there, then loads Tone and builds the master chain. */
+export function initAudio(): Promise<void> {
+  starting ??= loadTone()
+    .then(async (T) => {
+      await T.start()
+      setChain(createMasterChain())
+      initialized = true
+      applyMix()
+      syncVolumes(true)
+      // iOS Safari interrupts the context when the tab or portal frame is hidden and resumes it only from a touchend / click.
+      window.addEventListener('touchend', unlockAudioContext, { capture: true, passive: true })
+      window.addEventListener('click', unlockAudioContext, { capture: true })
+    })
+    .catch((e: unknown) => {
+      starting = null
+      throw e
+    })
+  return starting
 }
 
 export function isAudioReady(): boolean {
@@ -55,28 +59,30 @@ const HARD_LIMITER_MAKEUP_DB = -0.6 * HARD_LIMITER.threshold * (1 - 1 / HARD_LIM
 
 /** Built in Tone's current context: the live one at import, an offline one while `offlineRender.ts` renders. */
 function createMasterChain(engine: MusicEngine = MUSIC_ENGINE): MasterChain {
+  const { Channel, Compressor, Filter, Gain, Limiter, dbToGain } = tone()
   const hard = engine === 'scrim'
-  const trim = hard ? new Tone.Gain(Tone.dbToGain(-HARD_LIMITER_MAKEUP_DB)).toDestination() : null
-  const limiter = hard ? new Tone.Compressor(HARD_LIMITER).connect(trim!) : new Tone.Limiter(-1).toDestination()
-  const musicPause = new Tone.Gain(1).connect(limiter)
-  const sfxPause = new Tone.Gain(1).connect(limiter)
-  const duck = new Tone.Filter({ type: 'lowpass', frequency: DUCK_OPEN_HZ, rolloff: -12 }).connect(musicPause)
-  const sfx = new Tone.Channel(-6, 0).connect(sfxPause)
-  const music = new Tone.Channel(-10, 0).connect(duck)
-  const score = new Tone.Channel({ volume: -10, channelCount: 2 }).connect(duck)
-  const arcade = new Tone.Channel({ volume: -6, channelCount: 2 }).connect(sfxPause)
+  const trim = hard ? new Gain(dbToGain(-HARD_LIMITER_MAKEUP_DB)).toDestination() : null
+  const limiter = hard ? new Compressor(HARD_LIMITER).connect(trim!) : new Limiter(-1).toDestination()
+  const musicPause = new Gain(1).connect(limiter)
+  const sfxPause = new Gain(1).connect(limiter)
+  const duck = new Filter({ type: 'lowpass', frequency: DUCK_OPEN_HZ, rolloff: -12 }).connect(musicPause)
+  const sfx = new Channel(-6, 0).connect(sfxPause)
+  const music = new Channel(-10, 0).connect(duck)
+  const score = new Channel({ volume: -10, channelCount: 2 }).connect(duck)
+  const arcade = new Channel({ volume: -6, channelCount: 2 }).connect(sfxPause)
   return { limiter, trim, duck, musicPause, sfxPause, sfx, music, score, arcade }
 }
 
-let chain = createMasterChain()
+/** Built by `initAudio`: read the channels only while `isAudioReady()`. */
+let chain: MasterChain | null = null
 let ducked = false
 let pauseMix = false
 
 // Live bindings: an offline render swaps them for the length of the render.
-export let sfxChannel = chain.sfx
-export let musicChannel = chain.music
-export let scoreChannel = chain.score
-export let arcadeChannel = chain.arcade
+export let sfxChannel: Tone.Channel
+export let musicChannel: Tone.Channel
+export let scoreChannel: Tone.Channel
+export let arcadeChannel: Tone.Channel
 
 function setChain(c: MasterChain) {
   chain = c
@@ -96,7 +102,9 @@ export function swapInOfflineChain(engine: MusicEngine): () => void {
   pauseMix = false
   syncVolumes(true)
   return () => {
-    setChain(live.chain)
+    // Rendered before the first gesture: the channels stay on the disposed chain, unread until `initAudio`.
+    if (live.chain) setChain(live.chain)
+    else chain = null
     initialized = live.initialized
     ducked = live.ducked
     pauseMix = live.pauseMix
@@ -109,12 +117,16 @@ export function swapInOfflineChain(engine: MusicEngine): () => void {
 export function setMusicDucked(on: boolean, immediate = false): void {
   if (on === ducked) return
   ducked = on
-  const hz = on ? DUCK_CLOSED_HZ : DUCK_OPEN_HZ
+  if (chain) applyDuck(chain, immediate)
+}
+
+function applyDuck(c: MasterChain, immediate: boolean) {
+  const hz = ducked ? DUCK_CLOSED_HZ : DUCK_OPEN_HZ
   if (immediate) {
-    const now = Tone.now()
-    chain.duck.frequency.cancelScheduledValues(now)
-    chain.duck.frequency.setValueAtTime(hz, now)
-  } else chain.duck.frequency.rampTo(hz, DUCK_RAMP_S)
+    const now = tone().now()
+    c.duck.frequency.cancelScheduledValues(now)
+    c.duck.frequency.setValueAtTime(hz, now)
+  } else c.duck.frequency.rampTo(hz, DUCK_RAMP_S)
 }
 
 export function isMusicDucked(): boolean {
@@ -125,18 +137,29 @@ export function isMusicDucked(): boolean {
 export function setPauseMix(on: boolean, immediate = false): void {
   if (on === pauseMix) return
   pauseMix = on
-  const music = on ? Tone.dbToGain(PAUSE_MUSIC_DB) : 1
-  const sfx = on ? 0 : 1
+  if (chain) applyPauseMix(chain, immediate)
+}
+
+function applyPauseMix(c: MasterChain, immediate: boolean) {
+  const music = pauseMix ? tone().dbToGain(PAUSE_MUSIC_DB) : 1
+  const sfx = pauseMix ? 0 : 1
   if (immediate) {
-    const now = Tone.now()
-    for (const [node, value] of [[chain.musicPause, music], [chain.sfxPause, sfx]] as const) {
+    const now = tone().now()
+    for (const [node, value] of [[c.musicPause, music], [c.sfxPause, sfx]] as const) {
       node.gain.cancelScheduledValues(now)
       node.gain.setValueAtTime(value, now)
     }
   } else {
-    chain.musicPause.gain.rampTo(music, PAUSE_RAMP_S)
-    chain.sfxPause.gain.rampTo(sfx, PAUSE_RAMP_S)
+    c.musicPause.gain.rampTo(music, PAUSE_RAMP_S)
+    c.sfxPause.gain.rampTo(sfx, PAUSE_RAMP_S)
   }
+}
+
+/** A run can be paused or in slow-mo before the first gesture: the new chain starts in that mix. */
+function applyMix() {
+  if (!chain) return
+  applyDuck(chain, true)
+  applyPauseMix(chain, true)
 }
 
 export function isPauseMixOn(): boolean {
@@ -147,16 +170,18 @@ const VOLUME_RAMP_S = 0.08
 
 /** Settings volume + mute onto the channels: a short ramp, never a cut (a click); `immediate` for a fresh chain. */
 function syncVolumes(immediate = false): void {
+  if (!chain) return
+  const { gainToDb, now: toneNow } = tone()
   const { sfxVolume, musicVolume, muted } = useSettingsStore.getState()
-  const music = muted ? -Infinity : Tone.gainToDb(musicVolume)
-  const sfx = muted ? -Infinity : Tone.gainToDb(sfxVolume)
+  const music = muted ? -Infinity : gainToDb(musicVolume)
+  const sfx = muted ? -Infinity : gainToDb(sfxVolume)
   const levels = [
     [sfxChannel, sfx],
     [arcadeChannel, sfx],
     [musicChannel, music],
     [scoreChannel, music],
   ] as const
-  const now = Tone.now()
+  const now = toneNow()
   for (const [channel, db] of levels) {
     if (immediate) {
       channel.volume.cancelScheduledValues(now)
@@ -166,7 +191,6 @@ function syncVolumes(immediate = false): void {
 }
 
 // Sliders and the mute button apply live, in game or on the title.
-syncVolumes(true)
 useSettingsStore.subscribe((s, prev) => {
   if (s.musicVolume !== prev.musicVolume || s.sfxVolume !== prev.sfxVolume || s.muted !== prev.muted) syncVolumes()
 })

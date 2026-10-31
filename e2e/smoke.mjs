@@ -1564,7 +1564,12 @@ async function qualityCheck(newPage, levelId) {
   return { id: 'quality', problems, errors: [...high.errors, ...low.errors], quality: { level: levelId, drawCalls: [high.drawCalls, low.drawCalls], dpr: [high.dpr, low.dpr] } }
 }
 
-/** Title (#28): another camera angle 6 s later (`title-2.png`), the start hint, and a key press fading to level select. */
+/** Fetches of Tone.js's chunk so far (`audio/tone.ts`: loaded on the first gesture, never at startup). */
+const toneRequests = (page) =>
+  page.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/tone-[^/]*\.js$/.test(e.name)).length)
+
+/** Title (#28): another camera angle 6 s later (`title-2.png`), the start hint, and a key press fading to level select
+ *  that also loads Tone.js (#187: not before it) and unlocks audio. */
 async function titleFlyBy(page) {
   const problems = []
   const pose = () => page.evaluate(() => window.__SC_TEST__.cameraPose())
@@ -1587,6 +1592,8 @@ async function titleFlyBy(page) {
   const hint = await page.locator('.title-hint').textContent({ timeout: 5000 }).catch(() => null)
   if (!hint) problems.push('no start hint on the first title')
 
+  const toneBefore = { requests: await toneRequests(page), loaded: await page.evaluate(() => window.__SC_TEST__.audio().toneLoaded) }
+  if (toneBefore.requests > 0 || toneBefore.loaded) problems.push('Tone.js loaded before the first key press on the title')
   await page.keyboard.press('Enter')
   const veiled = await page
     .waitForSelector('.screen-veil', { state: 'attached', timeout: 10000 })
@@ -1600,7 +1607,11 @@ async function titleFlyBy(page) {
     .waitForSelector('.screen-veil', { state: 'detached', timeout: 30000 })
     .then(() => true, () => false)
   if (!veilGone) problems.push('the fade to black never cleared over level select')
-  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened } }
+  const toneAfter = await page
+    .waitForFunction(() => window.__SC_TEST__.audio().toneLoaded && window.__SC_TEST__.audio().ready, null, { timeout: 30000 })
+    .then(() => true, () => false)
+  if (!toneAfter) problems.push('the key press on the title did not load Tone.js and unlock audio')
+  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter } }
 }
 
 async function countdownCheck(page, levelId) {

@@ -1,4 +1,5 @@
-import * as Tone from 'tone'
+import type * as Tone from 'tone'
+import { tone } from './tone'
 import { musicChannel } from './AudioEngine'
 import { dropSound } from './soundGuard'
 
@@ -30,7 +31,8 @@ function logFade(fade: MusicFade) {
 
 /** `channel`: the score engine passes its stereo channel. */
 export function openMusicBus(name: string, channel: Tone.Channel = musicChannel): MusicBus {
-  const gain = new Tone.Gain(0).connect(channel)
+  const { Gain } = tone()
+  const gain = new Gain(0).connect(channel)
   gain.gain.rampTo(1, MUSIC_FADE_S)
   const bus = { name, gain, fading: false }
   live.add(bus)
@@ -41,7 +43,7 @@ export function openMusicBus(name: string, channel: Tone.Channel = musicChannel)
 /** Disposes `nodes` (loops before instruments) and the bus once the ramp is over. */
 export function fadeOutMusicBus(bus: MusicBus, nodes: { dispose(): unknown }[]): void {
   bus.fading = true
-  logFade({ name: bus.name, ramp: 'out', from: bus.gain.gain.getValueAtTime(Tone.now()), seconds: MUSIC_FADE_S })
+  logFade({ name: bus.name, ramp: 'out', from: bus.gain.gain.getValueAtTime(tone().now()), seconds: MUSIC_FADE_S })
   try {
     bus.gain.gain.rampTo(0, MUSIC_FADE_S)
   } catch (e) {
@@ -56,7 +58,7 @@ export function fadeOutMusicBus(bus: MusicBus, nodes: { dispose(): unknown }[]):
 
 /** Returns the next bar line in ticks, so a new track starts at the top of its phrase; the tempo ramps under a track still fading out. */
 export function startTransportAt(bpm: number): number {
-  const transport = Tone.getTransport()
+  const transport = tone().getTransport()
   if (transport.state === 'started') transport.bpm.rampTo(bpm, MUSIC_FADE_S)
   else transport.bpm.value = bpm
   const bar = transport.PPQ * 4
@@ -66,7 +68,7 @@ export function startTransportAt(bpm: number): number {
 }
 
 export function musicState() {
-  const now = Tone.now()
+  const now = tone().now()
   return {
     buses: [...live].map((b) => ({ name: b.name, gain: b.gain.gain.getValueAtTime(now), fading: b.fading })),
     fades: [...fades],

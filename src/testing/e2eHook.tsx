@@ -29,7 +29,6 @@
 import { useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import * as Tone from 'tone'
 import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
@@ -50,6 +49,7 @@ import { getPointerState } from '@/input/pointerInput'
 import { initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
 import { loadArcade, sfx, type VoiceStats } from '@/audio/sfx'
 import { droppedSounds } from '@/audio/soundGuard'
+import { tone, toneLoaded } from '@/audio/tone'
 import { nextTriggerTime } from '@/audio/triggerTime'
 import { musicState, type MusicFade } from '@/audio/musicBus'
 import { MUSIC_ENGINE, scrimPlayer, type MusicEngine } from '@/audio/musicEngine'
@@ -233,6 +233,8 @@ type ScrimState = ReturnType<typeof import('@/audio/scrim/player').scrimState>
 
 export interface E2EAudio {
   ready: boolean
+  /** Tone.js's chunk has loaded (`audio/tone.ts`): only after the first gesture, or a hook call that unlocks audio. */
+  toneLoaded: boolean
   /** Long-lived SFX nodes (the Tone kit, or the arcade engine's voice pool): must not grow while playing. */
   sfxNodes: number
   /** The arcade engine's voice pool (`?audio=scrim`): budget, live now, the most at once, stolen / dropped by priority. */
@@ -715,7 +717,7 @@ export function installE2EApi() {
 
 /** Spin (max 20 ms) until AudioContext.currentTime moves, which it does mid-task. */
 function waitForAudioTick() {
-  const ctx = Tone.getContext()
+  const ctx = tone().getContext()
   const t0 = ctx.currentTime
   const deadline = performance.now() + 20
   while (ctx.currentTime === t0 && performance.now() < deadline) { /* spin */ }
@@ -742,10 +744,11 @@ async function audioBurst(shots: number, kills: number) {
 
   // Tone clamps the first late note to the ticked clock; before #115 the second landed on it.
   // A fresh synth per pair: only a start from silence records a new start time.
-  const ctx = Tone.getContext()
+  const { Synth, getContext } = tone()
+  const ctx = getContext()
   let lateScheduleErrors = 0
   for (let pair = 0; pair < 10; pair++) {
-    const synth = new Tone.Synth({ envelope: { attack: 0.03, decay: 0.2, sustain: 0.25, release: 0.3 } })
+    const synth = new Synth({ envelope: { attack: 0.03, decay: 0.2, sustain: 0.25, release: 0.3 } })
     for (let i = 0; i < 2; i++) {
       const now = ctx.currentTime
       const t = nextTriggerTime(synth, now - 0.5, now)
@@ -765,6 +768,7 @@ function readAudio(): E2EAudio {
   const d = droppedSounds()
   return {
     ready: isAudioReady(),
+    toneLoaded: toneLoaded(),
     sfxNodes: sfx().nodeCount(),
     sfxVoices: sfx().voices(),
     musicDucked: isMusicDucked(),

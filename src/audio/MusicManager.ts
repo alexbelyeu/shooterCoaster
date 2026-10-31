@@ -1,4 +1,5 @@
-import * as Tone from 'tone'
+import type * as Tone from 'tone'
+import { tone } from './tone'
 import { nextTriggerTime } from './triggerTime'
 import { dropSound } from './soundGuard'
 import { isAudioReady } from './AudioEngine'
@@ -159,25 +160,26 @@ function fadeOutMusicState() {
 // ── Instrument setup ───────────────────────────────────────────
 
 function createInstruments(out: Tone.Gain) {
-  const pad = new Tone.PolySynth(Tone.Synth, {
+  const { NoiseSynth, PolySynth, Synth } = tone()
+  const pad = new PolySynth(Synth, {
     oscillator: { type: 'sine' },
     envelope: { attack: 1.0, decay: 0.5, sustain: 0.6, release: 2.0 },
     volume: -24,
   }).connect(out)
 
-  const bass = new Tone.Synth({
+  const bass = new Synth({
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.03, decay: 0.2, sustain: 0.25, release: 0.3 },
     volume: -22,
   }).connect(out)
 
-  const perc = new Tone.NoiseSynth({
+  const perc = new NoiseSynth({
     noise: { type: 'white' },
     envelope: { attack: 0.001, decay: 0.04, sustain: 0 },
     volume: -30,
   }).connect(out)
 
-  const lead = new Tone.Synth({
+  const lead = new Synth({
     oscillator: { type: 'sine' },
     envelope: { attack: 0.01, decay: 0.25, sustain: 0.05, release: 0.4 },
     volume: -26,
@@ -190,6 +192,7 @@ function createInstruments(out: Tone.Gain) {
 
 export function startMusic(biome: BiomeType = 'themePark'): void {
   if (!isAudioReady() || isPlaying) return
+  const { Sequence } = tone()
 
   const cfg = CONFIGS[biome]
   bus = openMusicBus('level')
@@ -201,11 +204,11 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   leadSynth = lead
   const at = `${startTransportAt(cfg.tempo)}i`
 
-  padLoop = new Tone.Sequence(
+  padLoop = new Sequence(
     (time, chord) => {
       if (!chord) return
       try {
-        pad.triggerAttackRelease(chord, '1n', nextTriggerTime(pad, time, Tone.getContext().currentTime), 0.3)
+        pad.triggerAttackRelease(chord, '1n', nextTriggerTime(pad, time, tone().getContext().currentTime), 0.3)
       } catch (e) {
         dropSound('music pad', e)
       }
@@ -216,12 +219,12 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   padLoop.loop = true
   padLoop.start(at)
 
-  bassLoop = new Tone.Sequence(
+  bassLoop = new Sequence(
     (time, note) => {
       if (currentIntensity < 0.2) return
       if (!note) return
       try {
-        bass.triggerAttackRelease(note, '8n', nextTriggerTime(bass, time, Tone.getContext().currentTime))
+        bass.triggerAttackRelease(note, '8n', nextTriggerTime(bass, time, tone().getContext().currentTime))
       } catch (e) {
         dropSound('music bass', e)
       }
@@ -232,12 +235,12 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   bassLoop.loop = true
   bassLoop.start(at)
 
-  leadLoop = new Tone.Sequence(
+  leadLoop = new Sequence(
     (time, note) => {
       if (currentIntensity < 0.5) return
       if (!note) return
       try {
-        lead.triggerAttackRelease(note, '8n', nextTriggerTime(lead, time, Tone.getContext().currentTime), 0.5)
+        lead.triggerAttackRelease(note, '8n', nextTriggerTime(lead, time, tone().getContext().currentTime), 0.5)
       } catch (e) {
         dropSound('music lead', e)
       }
@@ -250,12 +253,12 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
 
   if (cfg.hasPerc) {
     const percPattern = cfg.bassNotes.map((_, i) => (i % 2 === 1 ? 1 : null))
-    percLoop = new Tone.Sequence(
+    percLoop = new Sequence(
       (time, hit) => {
         if (currentIntensity < 0.3) return
         if (!hit) return
         try {
-          perc.triggerAttackRelease('32n', nextTriggerTime(perc, time, Tone.getContext().currentTime))
+          perc.triggerAttackRelease('32n', nextTriggerTime(perc, time, tone().getContext().currentTime))
         } catch (e) {
           dropSound('music perc', e)
         }
