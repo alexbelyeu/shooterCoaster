@@ -70,7 +70,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Aim for the snout!',
     order: 3,
     biome: 'ocean',
-    maxScore: 20 * 18 + 25 * 25 + 30 * 12, // 360 + 625 + 360 = 1345
+    maxScore: 20 * 18 + 25 * 25 + 30 * 12 + 5 * 60 + 400, // 1345 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 2045
     timerSeconds: 65,
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
@@ -90,6 +90,7 @@ const LEVELS: LevelConfig[] = [
       { type: 'shark', count: 25, spawnDelay: 15, waveLabel: 'Sharks!' },
       { type: 'flyingFish', count: 30, spawnDelay: 35, waveLabel: 'Flying Fish!', formation: 'school' },
     ],
+    boss: { type: 'kraken', at: 40 },
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
       hasWater: true,

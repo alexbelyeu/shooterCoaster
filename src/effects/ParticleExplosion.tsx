@@ -10,6 +10,7 @@ import {
   DEATH_SLOTS,
   BOSS_PART_DEATH_STYLE,
   DEATH_STYLES,
+  KRAKEN_SPLASH_DEATH_STYLE,
   GLOW_PER_SLOT,
   SHAPE_STRETCH,
   isChunk,
@@ -148,7 +149,7 @@ function zero(set: ParticleSet, s: number): void {
 
 function styleName(style: DeathStyle): string {
   for (const [type, s] of Object.entries(DEATH_STYLES)) if (s === style) return type
-  return style === BOSS_PART_DEATH_STYLE ? 'bossPart' : 'custom'
+  return style === BOSS_PART_DEATH_STYLE || style === KRAKEN_SPLASH_DEATH_STYLE ? 'bossPart' : 'custom'
 }
 
 /** Every death effect: two InstancedMeshes shared by all slots (unlit glow shapes, lit chunks), ageing on game time. */

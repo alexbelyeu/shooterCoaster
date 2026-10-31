@@ -37,8 +37,9 @@
  * Perf gate (#188): a level fails past its `scene` ceilings in budgets.json; see sceneBudgetCheck().
  * The speed check holds the first level at top speed on its most banked sampled point:
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
- * The boss check summons level1's Golden Blimp and shoots it down in phase order
- * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png); see bossCheck().
+ * The boss checks summon each finale and shoot it down in phase order: level1's Golden Blimp
+ * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png) and level3's Kraken
+ * (level3-boss.png, level3-boss-head.png, level3-boss-down.png); see bossCheck().
  * The pickup check shoots level1's first weapon pickup with a real bullet: the spread gun's badge,
  * a 3-bullet fan with the tinted tracer (level1-pickup.png), pause-safe expiry, reset on restart; see pickupCheck().
  * The scrim check loads level1 with `?audio=scrim` (the score engine, #214, and the arcade SFX, #217); see scrimCheck().
@@ -1251,16 +1252,39 @@ async function waveCheck(page) {
   }
 }
 
-/** The finale the boss check summons (#181): Theme Park's Golden Blimp. */
-const BOSS_CHECK = { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'] }
+/**
+ * The finales the boss check summons: Theme Park's Golden Blimp (#181) and Ocean's Kraken (#183).
+ * `minOnScreen` first-phase weak points must be on screen after the boss alone has moved `settleS` s (the
+ * Kraken's tentacles rise out of the water first); `midSettleS` lets the last phase surface before `midShot`.
+ */
+const BOSS_CHECKS = [
+  { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
+  { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
+]
+
+/** Moves the boss alone `seconds` (`bossStep`, game time and the level timer frozen) until `ready()`. */
+async function stepBoss(page, seconds, ready) {
+  if (seconds <= 0) return true
+  const step = 0.25
+  const f0 = await getFrames(page)
+  await page.evaluate((s) => { window.__SC_TEST__.bossStep = s }, step)
+  const ok = await pollUntil(
+    page,
+    async () => (await getFrames(page)) - f0 >= seconds / step && (await ready()),
+    { ms: 30000 + seconds * 8000, frames: Math.ceil(seconds / step) * 3, pollMs: 200 },
+  )
+  await page.evaluate(() => { window.__SC_TEST__.bossStep = null })
+  await waitFrames(page, 1, { maxMs: 20000, pollMs: 100 })
+  return ok
+}
 
 /**
- * Boss (#181), summoned: large with its bar (level1-boss.png), hit in phase order by a real bullet and
- * `bossHit` (level1-boss-gondola.png), then defeated into confetti + the big popup (level1-boss-down.png).
+ * Boss, summoned: large with its bar (<level>-boss.png), hit in phase order by a real bullet and
+ * `bossHit` (<level>-<midShot>.png), then defeated into its burst + the big popup (<level>-boss-down.png).
  * Game time is frozen while it is hit; if the wall-clock level timer still runs out, the step is skipped.
  */
-async function bossCheck(page) {
-  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase } = BOSS_CHECK
+async function bossCheck(page, check) {
+  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS } = check
   const problems = []
   const boss = () => page.evaluate(() => window.__SC_TEST__.boss())
   const events = () => page.evaluate(() => ({ ...window.__SC_TEST__.bossEvents }))
@@ -1274,6 +1298,8 @@ async function bossCheck(page) {
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const onScreen = async (min) => (await boss()).exposed.filter((e) => e.onScreen).length >= min
+  const settled = await stepBoss(page, settleS, () => onScreen(minOnScreen))
   const tell = await page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'incoming').map((e) => e.label))
   const before = await boss()
   const drawCalls = await page.evaluate(() => window.__SC_TEST__.drawCalls)
@@ -1299,7 +1325,8 @@ async function bossCheck(page) {
   const phaseOneHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), firstHp)
   const midway = await boss()
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
-  await page.screenshot({ path: path.join(OUT, `${level}-boss-gondola.png`), timeout: SHOT_TIMEOUT })
+  const surfaced = await stepBoss(page, midSettleS, () => onScreen(1))
+  await page.screenshot({ path: path.join(OUT, `${level}-${midShot}.png`), timeout: SHOT_TIMEOUT })
   const lastHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), midway.exposed.reduce((sum, e) => sum + e.hp, 0))
   const finalHits = await boss()
   // Let the last pop finish (slowly, so the confetti stays near) with its popup held.
@@ -1322,7 +1349,7 @@ async function bossCheck(page) {
   })
 
   const result = {
-    level, spawned, tell, bar, drawCalls, widthFrac: before.box?.widthFrac ?? 0, exposedAtStart: before.exposed.map((e) => e.id),
+    level, spawned, settled, surfaced, onScreenAtStart: before.exposed.filter((e) => e.onScreen).length, tell, bar, drawCalls, widthFrac: before.box?.widthFrac ?? 0, exposedAtStart: before.exposed.map((e) => e.id),
     bulletHit, phaseOneHits, exposedMidway: midway.exposed.map((e) => e.id), lastHits, hpMidway: midway.hpFraction,
     stage: after.stage, kills: end.kills - startStats.kills, score: end.score - startStats.score, popup, skipped: false,
   }
@@ -1335,6 +1362,9 @@ async function bossCheck(page) {
   if (!tell.length) problems.push('no tell (wave:incoming) before the boss')
   if (!bar) problems.push('the boss bar (.hud-boss) never showed')
   if (!(result.widthFrac >= minWidthFrac)) problems.push(`the boss is ${(result.widthFrac * 100).toFixed(0)}% of the frame wide (want ≥ ${minWidthFrac * 100}%)`)
+  if (!settled || result.onScreenAtStart < minOnScreen)
+    problems.push(`${result.onScreenAtStart} first-phase weak points on screen after ${settleS} s (want ≥ ${minOnScreen})`)
+  if (!surfaced) problems.push(`the last phase [${lastPhase}] never came on screen within ${midSettleS} s`)
   if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !id.startsWith(firstPhase)))
     problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPhase}*)`)
   if (!target) problems.push('no exposed weak point on screen to shoot')
@@ -2386,10 +2416,10 @@ async function run() {
     await w.ctx.close()
   }
 
-  // 6c. The Theme Park finale: summoned, shot down in phase order (level1-boss.png, level1-boss-down.png)
-  if (wanted.includes(BOSS_CHECK.level)) {
+  // 6c. The finales: summoned, shot down in phase order (<level>-boss.png, <level>-boss-down.png)
+  for (const check of BOSS_CHECKS.filter((c) => wanted.includes(c.level))) {
     const b = await newPage()
-    const r = await bossCheck(b.page)
+    const r = await bossCheck(b.page, check)
     r.errors = [...b.errors, ...(await b.page.evaluate(() => window.__SC_TEST__.errors))]
     if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
     r.ok = r.problems.length === 0

@@ -43,6 +43,14 @@ describe('LevelRegistry', () => {
     expect(level1.maxScore).toBe(2675)
   })
 
+  it('Ocean ends on the Kraken in its last ~25 s, which raises its maxScore to 2045', () => {
+    const level3 = getLevelConfig('level3')!
+    expect(level3.boss?.type).toBe('kraken')
+    expect(level3.timerSeconds - level3.boss!.at).toBe(25)
+    expect(level3.maxScore).toBe(1345 + bossMaxScore(BOSS_SPECS.kraken))
+    expect(level3.maxScore).toBe(2045)
+  })
+
   it('a boss arrives after its tell and before the timer runs out', () => {
     for (const l of levels) {
       if (!l.boss) continue
