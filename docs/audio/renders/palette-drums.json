@@ -1,0 +1,124 @@
+{
+  "name": "palette-drums",
+  "kind": "music",
+  "request": {
+    "kind": "score",
+    "seconds": 21,
+    "chain": "game",
+    "score": "docs/audio/palette/palette-drums.scrim",
+    "engine": "port"
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.15,
+      "name": "render-1 score"
+    },
+    {
+      "t": 20.15,
+      "name": "loop starts"
+    }
+  ],
+  "seams": [],
+  "bar": {
+    "startS": 20.15,
+    "barS": 2
+  },
+  "metrics": {
+    "seconds": 21,
+    "integrated": -23.3,
+    "shortTermMax": -19.1,
+    "lra": 10.7,
+    "truePeak": -9.4,
+    "clipped": 0,
+    "silence": 2.7,
+    "correlation": 1,
+    "below30Db": -41.8,
+    "bands": {
+      "sub": {
+        "pct": 64.6,
+        "db": -1.9
+      },
+      "low": {
+        "pct": 24.1,
+        "db": -6.2
+      },
+      "mid": {
+        "pct": 2.7,
+        "db": -15.7
+      },
+      "presence": {
+        "pct": 2.4,
+        "db": -16.1
+      },
+      "air": {
+        "pct": 6.1,
+        "db": -12.1
+      },
+      "below30": {
+        "pct": 0,
+        "db": -41.8
+      }
+    },
+    "seamJumps": [],
+    "seamJumpMax": null
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -23.3,
+      "unit": "LUFS",
+      "min": -18,
+      "max": -16,
+      "status": "fail"
+    },
+    {
+      "label": "Short-term max",
+      "value": -19.1,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -9.4,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -41.8,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 1,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 10.7,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 2.7,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

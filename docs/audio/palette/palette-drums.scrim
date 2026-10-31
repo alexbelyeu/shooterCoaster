@@ -1,0 +1,34 @@
+title    Arcade palette: drums
+composer Claude (ShooterCoaster)
+about    Each new drum alone for two bars: bigkick, gatesnare, hat909, ohat909, clap909.
+tempo    120
+beats    4
+steps    4
+reverb   0.2
+
+voice bigkick   bigkick   vol=0.85
+voice gatesnare gatesnare vol=0.8
+voice hat909    hat909    vol=0.8
+voice ohat909   ohat909   vol=0.8
+voice clap909   clap909   vol=0.8
+
+pattern kick
+bigkick | x... x... x... x..x | x... .... X... .... |
+
+pattern snare
+gatesnare | .... x... .... x... | .... X... .... .... |
+
+pattern hat
+hat909 | x.x. x.x. xxxx x.x. | xoxo xoxo X... .... |
+
+pattern ohat
+ohat909 | ..x. ..x. ..x. ..x. | X... .... .... .... |
+
+pattern clap
+clap909 | .... x... .... x... | .... X... .... .... |
+
+pattern rest
+bigkick | _ |
+
+play kick snare hat ohat clap
+loop rest
