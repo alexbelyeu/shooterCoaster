@@ -83,3 +83,38 @@ jobs:
                 labels: ['agent:prod-broken', 'P1', 'type:bug'],
               })
             }
+
+  # The itch.io / Newgrounds / CrazyGames zip (#88): relative paths, no other origin,
+  # level 1 played from a sub-path. A job of its own, beside verify: its smoke takes ~5 min.
+  portal:
+    name: portal
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build + check + zip the portal build
+        run: npm run build:portal
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke level 1 under /nested/path/
+        run: npm run smoke:portal -- --out e2e-results-portal
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-portal
+          path: e2e-results-portal/
+          retention-days: 14

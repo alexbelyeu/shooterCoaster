@@ -22,8 +22,10 @@ npm ci                    # install
 npm run dev               # dev server (vite)
 npm test                  # vitest unit tests for pure modules (~1s; `npm run test:watch` to iterate)
 npm run build             # typecheck (tsc -b) + production build -> dist/
+npm run build:portal      # the web-portal build (itch.io / Newgrounds / CrazyGames): relative paths, no analytics or share card -> dist-portal/ + dist-portal.zip (checked by scripts/portal/rules.mjs; needs the zip CLI)
 npm run check:bundle      # bundle-size budget (budgets.json)
 npm run smoke             # headless playtest: title + every level + phone touch run (needs a build)
+npm run smoke:portal      # smoke the portal build served under /nested/path/ (title + level1 checks; CI `portal` job; needs build:portal)
 npm run verify            # test + build + bundle budget + smoke — run before every PR
 npm run og                # re-render the share card public/social/og-1200x630.jpg + apple-touch-icon (needs a build)
 npm run clip              # render the level-1 gameplay clip (MP4 + GIF + stills) to docs/marketing/media/ in virtual time (needs a build + ffmpeg, ~15 min)
@@ -44,7 +46,7 @@ Headless browser in Claude cloud sessions: the Playwright CDN is blocked, so run
 The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/sizes, errors)
 to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the fly-by camera must have turned ≥ 8° or moved ≥ 30 units;
-the start hint must show and a key press must fade to black and open level select), and per level `<id>.png` (after a ride of `--seconds` 10, longer until `--min-frames` 10 frames have rendered; it fails as a stalled render loop only if they haven't by 4× `--seconds`, and the summary line prints `frames=N in Xs`; the title waits the same way),
+the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select), and per level `<id>.png` (after a ride of `--seconds` 10, longer until `--min-frames` 10 frames have rendered; it fails as a stalled render loop only if they haven't by 4× `--seconds`, and the summary line prints `frames=N in Xs`; the title waits the same way),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
 gold hitmarker held on the kill frame via `holdFeedback`; on the first level a primed 14-kill chain makes
@@ -60,7 +62,8 @@ checked in mobile portrait + landscape),
 the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
 reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left) or the
-Levels / Replay buttons, shows NaN, or disagrees with `stats()` on score or kills.
+Levels / Replay buttons, shows NaN, or disagrees with `stats()` on score or kills. Every page of a local run fails on a request to another origin
+(not with `--url`). `--dist <dir> --base <path>` previews another build folder under a sub-path (`smoke:portal`).
 `npm run smoke` also passes `--mobile`:
 an iPhone 13-like touch context (390x844) taps PLAY and a level (the title music must ramp out from full and be disposed, the level music ramp in), then in portrait and
 again in 844x390 landscape taps the canvas 10x, each tap 15–30 px off an on-screen
@@ -151,7 +154,8 @@ game time for every consumer (R3F, timers, framer-motion) however slowly softwar
 
 React 19 + @react-three/fiber 9 + drei + @react-three/postprocessing, three 0.172,
 Tone.js (procedural audio), zustand (state),
-framer-motion (UI), Vite 6, TypeScript strict. Deployed on Vercel: every push to
+framer-motion (UI), Vite 6, TypeScript strict. Fonts (Lobster, Inter) are self-hosted from `public/fonts/` (OFL); the game makes no
+third-party request at runtime. `vite build --mode portal` (`build:portal`) is the same game with `base: './'` for web portals. Deployed on Vercel: every push to
 `main` goes to production at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it). Preview deployments
 are disabled (`git.deploymentEnabled` in `vercel.json`) — verification happens in CI. Serverless stubs in `api/` (leaderboard, daily seed, ghost
 replays — currently in-memory placeholders).
@@ -184,7 +188,7 @@ from the URL; `?internal=0` clears it): it sends nothing either, via the same ga
 | `src/store/` | zustand stores: game, player, settings (persisted). Start or restart a level only through `startRun(levelId, seed?)` (resets the run, sets `runSeed`: seed > `?seed=` > `Date.now()`, bumps `runId`, enters `countdown`, or `playing` under `?e2e=1`: `startPhase.ts`). The level timer, waves and ride reset on `runId`, never on a phase change. Code gated on `phase === 'playing'` (clock, spawns, shooting, enemy motion) waits through the countdown and holds through a pause; the coaster camera also holds while `paused`, and enemy motion runs on game time (`core/gameClock.ts`), so nothing jumps on resume. Resume from the pause menu is `resume()` (a ~1.2 s Ready / GO, then `playing`) |
 | `src/ui/` | HUD (`hud/`: score tween, timer bar, combo meter (tier colour, game-time ring, "COMBO LOST" shake), FRENZY flash, wave banner, `BossBar` (boss name + one hp segment per weak point, top centre, under the panels on phones)) + screens (`LevelSelectScreen`: biome cards with an inline-SVG landmark postcard (`LevelPostcard`), stars, best score, locked hint, `★ x / 15` total, arrow-key / Enter / Esc navigation, 300 ms launch before `startRun`; data + nav in pure `levelSelectModel.ts`; `ResultsScreen`: staged reveal of score count-up, star pops with `playStarChime`, star-threshold bar, stats, NEW RECORD; tap skips it, reduced motion shows it at once; Enter = next, R = replay; numbers in pure `resultsStats.ts`; `PauseScreen`: blurred backdrop, a card in the level's accent with level name, score, stars so far, time left, kills, and Resume / Restart / Settings / Quit; arrows move focus, Esc resumes; keys in pure `pauseMenu.ts`; `SettingsScreen`, from the title and the pause menu: quality, show FPS, music / effects volume (ramped onto the channels by `AudioEngine`), screen shake, Reduced motion (the in-game toggle folds into `ui/reducedMotion.ts` and `html.reduce-motion`, which mirrors the CSS reduced-motion rules), Esc goes back); `theme.ts` per-biome UI accents + postcard sky |
 | `src/testing/` | e2e hook; `audioRender.ts` (lazy-loaded by `__SC_TEST__.renderAudio`: the music / SFX sheet / combat mix renders) |
-| `e2e/`, `scripts/` | Smoke test, bundle check, browser helper, heap analyser, `og-image.mjs` / `clip.mjs` (share card, gameplay clip; shared preview + browser launch in `headless.mjs`), `audio/` (`audio:render` / `audio:check`: ffmpeg side in `measure.mjs`, pure metric maths + sound-bible targets in `metrics.mjs`), `pause-check.sh`, `studio-status.cjs`, `run-usage.cjs` (token use of this session + its subagents; `--post` appends it to the `token-ledger` issue, the last step of every runbook) |
+| `e2e/`, `scripts/` | Smoke test, bundle check, `portal/` (`build:portal` packaging + the portals' zip rules), browser helper, heap analyser, `og-image.mjs` / `clip.mjs` (share card, gameplay clip; shared preview + browser launch in `headless.mjs`), `audio/` (`audio:render` / `audio:check`: ffmpeg side in `measure.mjs`, pure metric maths + sound-bible targets in `metrics.mjs`), `pause-check.sh`, `studio-status.cjs`, `run-usage.cjs` (token use of this session + its subagents; `--post` appends it to the `token-ledger` issue, the last step of every runbook) |
 | `.claude/agents/`, `.claude/commands/`, `.claude/scripts/` | Agent roles (incl. `sound-designer` for `type:audio` issues and the `pr-correctness` / `pr-consistency` reviewers), `/deslop` and `/wrap-pr`, the review-bundle script |
 | `docs/` | Specs, perf notes, the agent operating system in `docs/agents/` (runbooks for every scheduled task in `docs/agents/runbooks/`), `docs/marketing/` (strategy, weekly metrics, ad budget ledger; owned by the Marketer) and `docs/audio/` (owned by the Sound designer: `SOUND-BIBLE.md` direction + mix targets, `renders/` MP3s for Alex to hear (`baseline-*` = the sound before the overhaul, read in `BASELINE.md`), `reference/` the vendored Scrimshaw Jukebox source the new audio engine is ported from; Apache-2.0, never imported by the game) |
 | `js/`, `index.legacy.html`, `package.legacy.json`, `gulpfile.js`, `assets/` | **Legacy v1 game (2015).** Not built. Don't extend it. |
