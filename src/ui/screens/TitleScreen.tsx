@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { browserStorage, isInternalBrowser } from '@/app/analyticsGate'
+import { isInternalThisLoad } from '@/app/analyticsGate'
 import { initAudio, isAudioReady } from '@/audio/AudioEngine'
 import { prepareSfx } from '@/audio/sfx'
 import { startTitleMusic } from '@/audio/TitleMusicManager'
@@ -28,7 +28,7 @@ async function startMusic() {
 }
 
 export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
-  const [internal] = useState(() => isInternalBrowser(browserStorage()))
+  const [internal] = useState(isInternalThisLoad)
   const [showHint] = useState(() => !hintShownThisLoad)
   const [hint] = useState(() => (touchFirst() ? 'Tap PLAY to start' : 'Press any key to start'))
   const reduced = usePrefersReducedMotion()
