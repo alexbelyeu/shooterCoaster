@@ -15,7 +15,8 @@
  * the first-person weapon is missing / off screen / covering the centre / not
  * pointing along the shot's tracer (> 25° on screen), the
  * camera aspect doesn't match the canvas, or the results screen never finishes its
- * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats().
+ * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats(),
+ * or its Share line (shareText()) or "Copied!" click is wrong (#87).
  * Every level and the phone run (portrait, and after rotating) also run audioBurst():
  * fails on a late note that throws or a sound dropped by an audio error (#115).
  * Bullets (#165): no drawn bullet may exceed 2% of the canvas height on screen (every
@@ -527,20 +528,81 @@ async function resultsScreenProblems(page, stats) {
       .filter((b) => b.getBoundingClientRect().width > 0)
       .map((b) => b.textContent)
     const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
-    return { rows, buttons, stars, score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent }
+    const s = window.__SC_TEST__
+    const levelName = s.levels().find((l) => l.id === s.stats().currentLevel)?.name ?? null
+    return {
+      rows, buttons, stars, levelName, shareText: s.shareText(),
+      score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent,
+    }
   })
   const problems = []
   if (!screen) return { problems: ['results screen missing'], screen }
   const { text, ...shown } = screen
+  problems.push(...(await resultsActionsProblems(page, 'desktop')))
+  // #87: the shared line can't drift from the run (score, stars, level) or lose its campaign link.
+  const shareRe = /^I scored ([\d,]+) ([★☆]{3}) on (.+) in ShooterCoaster 🎢 — beat me: (\S+)$/u
+  const share = shareRe.exec(screen.shareText ?? '')
+  if (!share) problems.push(`share text ${JSON.stringify(screen.shareText)} is not in the share format`)
+  else {
+    if (share[1] !== screen.score) problems.push(`share score ${share[1]} != results score ${screen.score}`)
+    if ((share[2].match(/★/g) ?? []).length !== screen.stars) problems.push(`share stars ${share[2]} != ${screen.stars} earned`)
+    if (share[3] !== screen.levelName) problems.push(`share level "${share[3]}" != "${screen.levelName}"`)
+    if (share[4] !== SHARE_URL) problems.push(`share link ${share[4]} != ${SHARE_URL}`)
+  }
+  // Headless Chromium has no share sheet, so a real click takes the clipboard path and confirms it on the button.
+  const shareButton = page.locator('.results-share')
+  if (await shareButton.count()) {
+    await shareButton.click({ timeout: 10000 }).catch((e) => problems.push(`click Share: ${e.message}`))
+    const copied = await page
+      .waitForFunction(() => document.querySelector('.results-share')?.textContent === 'Copied!', null, { timeout: 10000, polling: 100 })
+      .then(() => true, () => false)
+    const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null)
+    if (!copied) problems.push('clicking Share did not show "Copied!"')
+    else if (clip !== null && clip !== screen.shareText) problems.push(`clipboard ${JSON.stringify(clip)} != shareText()`)
+    shown.copied = copied
+  }
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
   for (const label of ['Kills', 'Accuracy', 'Best combo', 'Time left']) {
     if (!(label in screen.rows)) problems.push(`results screen has no "${label}" row`)
   }
   if (screen.rows.Kills && !screen.rows.Kills.startsWith(`${stats.kills} /`)) problems.push(`results kills "${screen.rows.Kills}" != ${stats.kills}`)
   if (stats.shotsFired > 0 && !/^\d+%$/.test(screen.rows.Accuracy ?? '')) problems.push(`results accuracy "${screen.rows.Accuracy}" with ${stats.shotsFired} shots`)
-  if (!screen.buttons.includes('Replay') || !screen.buttons.includes('Levels')) problems.push(`results buttons ${JSON.stringify(screen.buttons)}`)
+  for (const label of ['Levels', 'Replay', 'Share']) {
+    if (!screen.buttons.includes(label)) problems.push(`results buttons ${JSON.stringify(screen.buttons)} lack ${label}`)
+  }
   if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
   return { problems, screen: shown }
+}
+
+/** The results-screen share link (#87, src/ui/share.ts). */
+const SHARE_URL = 'https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=results'
+
+/** Results buttons inside the viewport, none overlapping another, each at least the 44 px touch target. */
+async function resultsActionsProblems(page, label) {
+  const r = await page.evaluate(() => {
+    const boxes = [...document.querySelectorAll('.results-actions button')]
+      .map((b) => ({ name: b.textContent, r: b.getBoundingClientRect() }))
+      .filter((b) => b.r.width > 0)
+    const screen = document.querySelector('.results-screen')
+    return {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      hScroll: screen ? screen.scrollWidth > screen.clientWidth : true,
+      boxes: boxes.map((b) => ({ name: b.name, left: b.r.left, top: b.r.top, right: b.r.right, bottom: b.r.bottom })),
+    }
+  })
+  const problems = []
+  if (r.hScroll) problems.push(`${label}: the results screen scrolls sideways`)
+  for (const [i, a] of r.boxes.entries()) {
+    if (a.left < 0 || a.top < 0 || a.right > r.vw || a.bottom > r.vh)
+      problems.push(`${label}: results button ${a.name} leaves the ${r.vw}x${r.vh} viewport`)
+    if (a.bottom - a.top < 44) problems.push(`${label}: results button ${a.name} under the 44 px touch target`)
+    for (const b of r.boxes.slice(i + 1)) {
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom)
+        problems.push(`${label}: results buttons ${a.name} and ${b.name} overlap`)
+    }
+  }
+  return problems
 }
 
 const MOBILE_LEVEL = 'level1'
@@ -1730,6 +1792,28 @@ async function mobileBossHud(page) {
   return { problems: [...portrait.problems, ...landscape.problems], rects: { portrait: portrait.rects, landscape: landscape.rects } }
 }
 
+/** The results screen on the phone (#87): its four buttons readable in portrait and landscape (mobile-results*.png). */
+async function mobileResults(page) {
+  await page.evaluate(() => window.__SC_TEST__.endLevel())
+  const shown = await page
+    .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 60000, polling: 250 })
+    .then(() => true, () => false)
+  if (!shown) return { problems: ['phone: the results screen never finished its reveal'], buttons: null }
+  // The buttons fade in after the reveal; frames take seconds on the phone run.
+  await waitVisible(page, '.results-actions', 30000)
+  await page.waitForTimeout(1500)
+  const buttons = await page.evaluate(() => [...document.querySelectorAll('.results-actions button')].map((b) => b.textContent))
+  const problems = await resultsActionsProblems(page, 'phone portrait 390x844')
+  if (!buttons.includes('Share')) problems.push(`phone: results buttons ${JSON.stringify(buttons)} lack Share`)
+  await page.screenshot({ path: path.join(OUT, 'mobile-results.png'), timeout: SHOT_TIMEOUT })
+  await page.setViewportSize({ width: 844, height: 390 })
+  await page.waitForTimeout(1000)
+  problems.push(...(await resultsActionsProblems(page, 'phone landscape 844x390')))
+  await page.screenshot({ path: path.join(OUT, 'mobile-results-landscape.png'), timeout: SHOT_TIMEOUT })
+  await page.setViewportSize({ width: 390, height: 844 })
+  return { problems, buttons }
+}
+
 async function runMobile(browser, base) {
   const started = Date.now()
   const { defaultBrowserType: _unused, ...iphone } = devices['iPhone 13']
@@ -1925,6 +2009,9 @@ async function runMobile(browser, base) {
   const bossHud = (await phase()) === 'paused' ? await mobileBossHud(page) : { problems: [], rects: null }
   problems.push(...bossHud.problems)
 
+  const resultsLayout = await mobileResults(page)
+  problems.push(...resultsLayout.problems)
+
   const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
   const allErrors = [...errors, ...hookErrors]
   if (allErrors.length) problems.push(`${allErrors.length} error(s)`)
@@ -1942,6 +2029,7 @@ async function runMobile(browser, base) {
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
       bulletMaxScreenFrac: bullets.maxScreenFrac,
       pauseCards,
+      resultsButtons: resultsLayout.buttons,
     },
     kills: end.kills,
     score: end.score,
@@ -1960,6 +2048,8 @@ async function run() {
 
   const newPage = async (query = 'e2e=1', options = {}) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, ...options })
+    // The results Share check reads back what it copied (#87).
+    await ctx.grantPermissions(['clipboard-read', 'clipboard-write'])
     const page = await ctx.newPage()
     const errors = []
     page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))

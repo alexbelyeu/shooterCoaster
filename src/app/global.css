@@ -1222,6 +1222,11 @@ canvas {
   background: rgba(255, 255, 255, 0.14);
 }
 
+/* Wide enough for "Copied!" so the row doesn't reflow when it swaps in. */
+.results-actions .results-share {
+  min-width: 6.5rem;
+}
+
 .results-keys {
   margin-top: 0.6rem;
   font-size: 0.75rem;

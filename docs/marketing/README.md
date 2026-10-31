@@ -24,9 +24,12 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   | `level_start` | `level` (`level1`…) | A run begins: from level select, Replay or Next Level. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start |
   | `level_complete` | `level`, `stars` (0–3) | The timer runs out and the results screen opens |
   | `level_quit` | `level`, `progress_pct` (0, 10 … 100: share of the level timer used) | Quit to Menu from the pause screen |
+  | `share` | `level`, `stars` (0–3) | The results-screen Share button opened the share sheet and the player picked a target, or copied the line to the clipboard (a dismissed sheet sends nothing). Rare and player-initiated, so it sits outside the ≤ 2 per run count |
 
-  Completion rate per level = `level_complete` / `level_start`. There is no share button
-  in the game yet, so there is no `share` event. Pausing and resuming send nothing; closing
+  Completion rate per level = `level_complete` / `level_start`. The Share button (#87,
+  copy in `src/ui/share.ts`) shares "I scored 1,240 ★★☆ on Theme Park in ShooterCoaster 🎢 —
+  beat me:" with `https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=results`,
+  so its visits show as `requestPath` `/go/share`. Pausing and resuming send nothing; closing
   the tab mid-run sends no `level_quit` (starts minus completes minus quits ≈ abandons).
 - **Internal traffic (Alex's devices).** Open **https://scoaster.com/?internal=1** once in
   each browser and on each device you play on. The browser remembers it (localStorage), the
