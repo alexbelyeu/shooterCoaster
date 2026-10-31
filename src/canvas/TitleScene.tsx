@@ -7,6 +7,7 @@ import FerrisWheel from '@/levels/environments/FerrisWheel'
 import Carousel from '@/levels/environments/Carousel'
 import { titleCameraPose, type Vec3 } from './titleCamera'
 import { isUiTarget } from '@/input/pointerInput'
+import { markStartup } from '@/core/startupMarks'
 
 const TENT_COLORS = ['#ff4444', '#ff8800', '#4488ff', '#44cc44', '#ff44ff', '#ffffff']
 const BALLOON_DRIFT_RAD_S = 0.04
@@ -22,6 +23,7 @@ function FlyByCamera() {
   useFrame((_, delta) => {
     const cam = camRef.current
     if (!cam) return
+    markStartup('titleFrame')
     elapsed.current += delta
     titleCameraPose(elapsed.current, pos, target)
     cam.position.set(pos[0], pos[1], pos[2])

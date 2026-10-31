@@ -39,7 +39,8 @@ Unit tests live next to the code as `src/**/*.test.ts` (and `scripts/**/*.test.t
 noise, scoring/stars in `src/levels/scoring.ts`, store actions, level configs);
 keep pure helpers free of React/three imports so they stay testable. Adding a
 level? `src/levels/LevelRegistry.test.ts` checks its `maxScore`, star thresholds
-and `nextLevel` chain, and the curve/terrain tests sample its track automatically.
+and `nextLevel` chain, and the curve/terrain tests sample its track automatically;
+the smoke fails it until it has a `scene` entry in `budgets.json` (perf gate below).
 
 Headless browser in Claude cloud sessions: the Playwright CDN is blocked, so run
 `export SC_CHROME="$(scripts/ensure-browser.sh)"` once per session before `npm run smoke`.
@@ -104,7 +105,9 @@ the phone run checks its cards fit 390 px.
 loads the first level with `?e2e=1&countdown=1`: the countdown must show (`countdown.png`),
 a press during it must fire nothing (also when held on into `playing`), the timer must hold, a replay tap after 1 s skips to `playing`,
 and the shader warm-up must finish; after it, the first shot + kill must compile no new shader program
-(`programs()`; the longest frame is reported). A `speed` step holds the first level at top speed on the most
+(`programs()`; the longest frame is reported). The step also prints the startup timings (`initTimings()`: boot, first title
+frame and PLAY from navigation; level mounted, env baked, warm-up done and first `playing` frame from the run's start) and writes
+them to `results.json` (`initTimings` on the `countdown` entry); no thresholds, software GL. A `speed` step holds the first level at top speed on the most
 banked of ten sampled track points: the wind streaks must show and the camera must bank ≥ 1° (`speed.png`).
 When level2 is in the run, a `wave` step rides it to the crow wave: its `wave:incoming` tell (screen-edge pulse +
 label) must come before the wave, the run is paused and resumed in between (no tell or wave may fire twice), then the V flies in and is frozen for `level2-wave.png` (≥ 5 crows on screen, none within 40 units).
@@ -123,6 +126,10 @@ spawned enemies) and vary run to run; for before/after comparisons use the
 camera-independent `scene` totals the smoke also prints (`track objs/tris` = objects
 named `track*`; `env=` is the baked sky env map's intensity and bake time; a level
 without `scene.environment` fails).
+**Perf gate:** `budgets.json` `scene` holds per-level ceilings on the ride screenshot's draw calls (+20% headroom, since they
+vary) and on the scene / track objects and triangles (+15%); a level past one fails with `over budget: scene objs=560 (budget 551)`
+(`perfGate` in `results.json`). A level whose entry has `knownOver: "#<open issue>"` only prints a WARN line until that issue lands
+(then drop the key). `--no-perf-gate` skips the gate for local experiments. Ceilings are budgets: only the Director raises them.
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 (`levels()`, `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `shareText()` (what the results Share button sends for the current level + score), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time and level time), `nextWave()` → level time now + when the next wave is due, `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction),
@@ -135,7 +142,7 @@ screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes t
 {current, max} in degrees, `cameraWeight` → bank / pitch / speed + drop FOV kick now and max (degrees), smoothed speed 0–1, wind-streak opacity, `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
 `view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `graphics()` → quality setting, its preset, adaptive steps, reduced motion, `audio()` → unlocked?, long-lived SFX node count, arcade voice pool (`sfxVoices`: budget / live / peak / stolen / dropped), music ducked?, sounds dropped by a caught audio error, `music` (live music buses with their gain + the last few fade ramps), `engine` ('tone' / 'scrim'), `scrim` (score engine: current score, tracks with paused + song position, long-lived nodes, timer running),
 `audioBurst(shots, kills)` → rapid SFX + late music notes in one JS turn while the audio clock ticks, `renderAudio(req, seed?)` → an offline render as base64 PCM (title screen, before audio unlocks; `npm run audio:render`; kinds music / sfxSheet / mix (`stem: 'music'`: without SFX), `engine: 'scrim'`, and `score` for one score through the port alone), `triggerHeld()` → pointer trigger down?,
-`shaderWarmup` {done, ms, programs} for the current level, `summonBoss()` (the level's boss now instead of at its level time),
+`shaderWarmup` {done, ms, programs} for the current level, `initTimings()` (ms from navigation to each startup phase, the first time: `core/startupMarks.ts`), `summonBoss()` (the level's boss now instead of at its level time),
 `boss()` → stage / hp fraction / exposed weak points on screen (with hp) / the hull's on-screen box, `bossHit(n)` (n hits on exposed
 weak points through `processHit`), `bossEvents` spawn/hit/defeated counters, `fireworks()` → mounted?, launches / bursts, live rockets / bursts and the newest burst on screen, `deaths()` → death effects spawned / live, the newest one's style and origin on screen, `particles()` → the biome particle field: mounted?, points, boost-only points, boost strength now). See `src/testing/e2eHook.tsx`. Extend it when you need new test
 surfaces. Bullets travel per *second* with a swept hit test (`combat/projectiles/bulletMotion.ts`) along the camera ray;
