@@ -141,9 +141,9 @@ const volcanicAsh: ParticleFieldPreset = {
 
 export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh } as const
 
-/** Points to draw: always-on and boost-only. Touch screens get half (as `renderBudget.ts` cuts their pixels). */
-export function particleCounts(preset: ParticleFieldPreset, coarsePointer: boolean): { base: number; boost: number } {
-  const scale = coarsePointer ? 0.5 : 1
+/** Points to draw: always-on and boost-only. Touch screens get half (as `renderBudget.ts` cuts their pixels); the graphics quality's `particleScale` thins both. */
+export function particleCounts(preset: ParticleFieldPreset, coarsePointer: boolean, qualityScale = 1): { base: number; boost: number } {
+  const scale = (coarsePointer ? 0.5 : 1) * qualityScale
   return {
     base: Math.round(preset.count * scale),
     boost: Math.round((preset.boost?.count ?? 0) * scale),

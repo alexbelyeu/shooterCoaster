@@ -19,6 +19,7 @@
  *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses) and render it offline
  *   - read the camera pose (title fly-by), shader program count and longest frame (first-shot hitch)
  *   - summon the level's boss now, read it (hp, exposed weak points, on-screen box) and hit it through processHit
+ *   - read the graphics quality, its preset and the adaptive dpr steps
  *
  * Keep this file tiny and side-effect free when the flag is off: nothing here
  * runs unless `installE2EApi()` finds `?e2e=1`, and <E2EFrameProbe> is only
@@ -38,6 +39,9 @@ import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/
 import { fireAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
+import { useSettingsStore } from '@/store/useSettingsStore'
+import { qualityProfile, type GraphicsQuality, type QualityProfile } from '@/canvas/graphicsQuality'
+import { getAdaptiveSteps } from '@/canvas/useRenderBudget'
 import { comboMultiplier } from '@/combat/comboTiers'
 import { frenzyActive } from '@/combat/comboRuntime'
 import { getPointerState } from '@/input/pointerInput'
@@ -151,6 +155,8 @@ export interface SCTestApi {
   // ── View / aspect (issue #66) ──
   /** Active camera projection vs the canvas's on-screen box (squash checks). */
   view: () => E2EView | null
+  /** Graphics quality setting (`?quality=` sets it), its preset, and the `auto` step-downs taken (always 0 under `?e2e=1`). */
+  graphics: () => { quality: GraphicsQuality; profile: QualityProfile; adaptiveSteps: number; reducedMotion: boolean }
   /** Audio state: unlocked yet, live gameplay SFX nodes (must stay flat while
    *  shooting / killing, 0 after level exit), music low-pass ducked (slow-mo). */
   audio: () => E2EAudio
@@ -670,6 +676,10 @@ export function installE2EApi() {
     rideSpeed: null,
     rideProgress: 0,
     view: readView,
+    graphics: () => {
+      const { quality, reducedMotion } = useSettingsStore.getState()
+      return { quality, profile: qualityProfile(quality), adaptiveSteps: getAdaptiveSteps(), reducedMotion }
+    },
     triggerHeld: () => getPointerState().down,
     summonBoss: () => { e2eBoss.summon = true },
     boss: readBoss,

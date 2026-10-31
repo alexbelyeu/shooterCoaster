@@ -1401,6 +1401,109 @@ async function levelSelectCheck(page, levels) {
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
 }
 
+/** The settings card (#35): inside the viewport, no sideways scroll, every control there and ≥ 44 px tall. */
+async function settingsLayout(page, label) {
+  const r = await page.evaluate(() => {
+    const card = document.querySelector('.settings-card')
+    const root = document.querySelector('.settings-screen')
+    const b = card?.getBoundingClientRect()
+    const targets = [...document.querySelectorAll('.settings-card button, .settings-card .settings-row')]
+    return {
+      rect: b ? { left: Math.round(b.left), top: Math.round(b.top), right: Math.round(b.right), bottom: Math.round(b.bottom) } : null,
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      hScroll: root ? root.scrollWidth > root.clientWidth : true,
+      quality: [...document.querySelectorAll('[aria-labelledby="settings-quality-label"] [role="radio"]')].map((el) => el.textContent),
+      sliders: document.querySelectorAll('.settings-card input[type="range"]').length,
+      switches: document.querySelectorAll('.settings-card input[role="switch"]').length,
+      smallTargets: targets.filter((el) => el.getBoundingClientRect().height < 44).length,
+    }
+  })
+  const problems = []
+  if (!r.rect) problems.push('no settings card')
+  else if (r.rect.left < 0 || r.rect.top < 0 || r.rect.right > r.vw || r.rect.bottom > r.vh)
+    problems.push(`the settings card (${r.rect.left},${r.rect.top})-(${r.rect.right},${r.rect.bottom}) leaves the ${r.vw}x${r.vh} viewport`)
+  if (r.hScroll) problems.push('settings scroll sideways')
+  if (r.quality.length !== 4) problems.push(`${r.quality.length} quality options (${r.quality.join('/')}), expected Auto / Low / Med / High`)
+  if (r.sliders !== 2) problems.push(`${r.sliders} volume sliders, expected music + effects`)
+  if (r.switches !== 2) problems.push(`${r.switches} switches, expected show FPS + reduced motion`)
+  if (r.smallTargets) problems.push(`${r.smallTargets} settings control(s) under the 44 px touch target`)
+  return { ...r, problems: problems.map((p) => `${label}: ${p}`) }
+}
+
+/**
+ * Settings from the title (settings.png): the card's layout, Esc back to the title, and the quality +
+ * music volume picked there still set after a reload.
+ */
+async function settingsCheck(page) {
+  const problems = []
+  if (!(await waitVisible(page, '.settings-button'))) return { id: 'settings', problems: ['no settings button on the title'] }
+  await page.locator('.settings-button').click({ timeout: 30000 })
+  if (!(await waitVisible(page, '.settings-card', 30000))) return { id: 'settings', problems: ['the settings card never showed'] }
+  await waitFrames(page, 1, { minMs: 400, maxMs: 8000 })
+  const layout = await settingsLayout(page, 'desktop 1280x720')
+  problems.push(...layout.problems)
+  await page.screenshot({ path: path.join(OUT, 'settings.png'), timeout: SHOT_TIMEOUT })
+
+  const before = await page.evaluate(() => window.__SC_TEST__.graphics().quality)
+  if (before !== 'auto') problems.push(`quality "${before}" by default, expected auto`)
+  await page.getByRole('radio', { name: 'Low', exact: true }).click({ timeout: 30000 })
+  await page.waitForFunction(() => window.__SC_TEST__.graphics().quality === 'low', null, { timeout: 5000 }).catch(() => {})
+  const picked = await page.evaluate(() => window.__SC_TEST__.graphics().quality)
+  await page.locator('.settings-card input[type="range"]').first().fill('0.3')
+  if (picked !== 'low') problems.push(`clicking Low set the quality to "${picked}"`)
+  await page.keyboard.press('Escape')
+  const closed = await page
+    .waitForSelector('.settings-card', { state: 'detached', timeout: 10000 })
+    .then(() => true, () => false)
+  if (!closed) problems.push('Esc did not close settings')
+  if (!(await waitVisible(page, '.title-screen .play-button', 30000))) problems.push('the title did not come back after settings')
+
+  await page.reload({ waitUntil: 'load' })
+  await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
+  const reloaded = await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('shootercoaster-settings') ?? '{}').state ?? {}
+    return { quality: window.__SC_TEST__.graphics().quality, musicVolume: saved.musicVolume }
+  })
+  if (reloaded.quality !== 'low') problems.push(`quality "${reloaded.quality}" after a reload, expected low`)
+  if (reloaded.musicVolume !== 0.3) problems.push(`music volume ${reloaded.musicVolume} after a reload, expected 0.3`)
+  return { id: 'settings', problems, settings: { card: layout.rect, quality: [before, picked, reloaded.quality], musicVolume: reloaded.musicVolume } }
+}
+
+/**
+ * `?quality=low` (#35) against the default on the same level, seed and frozen track point, both at device
+ * dpr 2: dpr 1 instead of 2, no contact shadows, fewer draw calls (no bloom passes). `<id>-low.png`.
+ */
+async function qualityCheck(newPage, levelId) {
+  const sample = async (query, png) => {
+    const { ctx, page, errors } = await newPage(query, { deviceScaleFactor: 2 })
+    await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+    await waitFrames(page, 2, { minMs: 1500, maxMs: 30000 })
+    await page.evaluate(() => {
+      window.__SC_TEST__.setTimeScale(0)
+      window.__SC_TEST__.rideTo = 0.1
+    })
+    await waitFrames(page, 3, { maxMs: 30000 })
+    const s = await page.evaluate(() => {
+      const t = window.__SC_TEST__
+      return { drawCalls: t.drawCalls, dpr: t.view()?.dpr, graphics: t.graphics(), shadows: !!t.sceneStats().byName['contact-shadows'], errors: t.errors }
+    })
+    if (png) await page.screenshot({ path: path.join(OUT, png), timeout: SHOT_TIMEOUT })
+    await ctx.close()
+    return { ...s, errors: [...errors, ...s.errors] }
+  }
+  const high = await sample('e2e=1')
+  const low = await sample('e2e=1&quality=low', `${levelId}-low.png`)
+  const problems = []
+  if (high.graphics.quality !== 'auto' || high.dpr !== 2) problems.push(`default: quality ${high.graphics.quality} at dpr ${high.dpr}, expected auto at 2`)
+  if (low.graphics.quality !== 'low') problems.push(`?quality=low set the quality to "${low.graphics.quality}"`)
+  if (low.dpr !== 1) problems.push(`low quality renders at dpr ${low.dpr}, expected 1`)
+  if (!high.shadows) problems.push('no contact shadows on the default quality')
+  if (low.shadows) problems.push('contact shadows still drawn on low quality')
+  if (!(low.drawCalls < high.drawCalls)) problems.push(`low quality draws ${low.drawCalls} calls, not fewer than the default's ${high.drawCalls}`)
+  return { id: 'quality', problems, errors: [...high.errors, ...low.errors], quality: { level: levelId, drawCalls: [high.drawCalls, low.drawCalls], dpr: [high.dpr, low.dpr] } }
+}
+
 /** Title (#28): another camera angle 6 s later (`title-2.png`), the start hint, and a key press fading to level select. */
 async function titleFlyBy(page) {
   const problems = []
@@ -1956,6 +2059,17 @@ async function runMobile(browser, base) {
     problems.push(...portraitCard.problems.map((p) => `phone portrait 390x844: ${p}`))
     await page.screenshot({ path: path.join(OUT, 'mobile-pause.png'), timeout: SHOT_TIMEOUT })
     pauseCards.portrait = portraitCard.rect
+
+    // Settings from the pause menu (#35): fits 390 px, Back returns to the menu (mobile-settings.png).
+    await page.getByRole('button', { name: 'Settings' }).tap({ timeout: 30000 }).catch((e) => problems.push(`tap Settings: ${e.message}`))
+    if (await waitVisible(page, '.settings-card', 60000)) {
+      const settings = await settingsLayout(page, 'phone portrait 390x844')
+      problems.push(...settings.problems)
+      await page.screenshot({ path: path.join(OUT, 'mobile-settings.png'), timeout: SHOT_TIMEOUT })
+      pauseCards.settings = settings.rect
+      await page.locator('.settings-back').tap({ timeout: 30000 }).catch((e) => problems.push(`tap settings Back: ${e.message}`))
+      if (!(await waitVisible(page, '.pause-card', 60000))) problems.push('phone: Back from settings did not return to the pause menu')
+    } else problems.push('phone: Settings in the pause menu never opened')
   }
 
   const bossHud = (await phase()) === 'paused' ? await mobileBossHud(page) : { problems: [], rects: null }
@@ -1998,8 +2112,8 @@ async function run() {
   const results = []
   let failed = false
 
-  const newPage = async (query = 'e2e=1') => {
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+  const newPage = async (query = 'e2e=1', options = {}) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, ...options })
     const page = await ctx.newPage()
     const errors = []
     page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
@@ -2037,6 +2151,18 @@ async function run() {
     failed ||= !r.ok
     results.push(r)
     await l.ctx.close()
+  }
+
+  // 1c. Settings from the title (settings.png): layout, Esc, persisted across a reload
+  if (!args['skip-desktop']) {
+    const st = await newPage()
+    const r = await settingsCheck(st.page)
+    r.errors = [...st.errors, ...(await st.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await st.ctx.close()
   }
 
   // 2. Every level (or the requested subset)
@@ -2084,6 +2210,15 @@ async function run() {
       kills: play.kills, score: play.score, combat: play.combat, results: play.results, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
+  }
+
+  // 2b. ?quality=low against the default: dpr 1, no contact shadows, fewer draw calls (<id>-low.png)
+  if (wanted.length) {
+    const r = await qualityCheck(newPage, wanted[0])
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
   }
 
   // 3. Seeded spawns: a fresh page + the same seed gives the same enemies; another seed doesn't
@@ -2197,6 +2332,10 @@ async function run() {
       : r.levelSelect
         ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total} top=${r.levelSelect.initials.filter(Boolean).join(',')}` +
           (r.levelSelect.keyboard ? ` keys: ${r.levelSelect.focused} <- ${r.levelSelect.keyboard.left}, locked ${r.levelSelect.keyboard.locked} Enter -> ${r.levelSelect.keyboard.phaseAfterLocked}, Enter -> ${r.levelSelect.keyboard.level} ${r.levelSelect.keyboard.phase}` : '')
+      : r.settings
+        ? ` card ${JSON.stringify(r.settings.card)} quality ${r.settings.quality.join(' -> ')} (reload) music ${r.settings.musicVolume}`
+      : r.quality
+        ? ` ${r.quality.level} draws default=${r.quality.drawCalls[0]} low=${r.quality.drawCalls[1]} dpr ${r.quality.dpr.join(' -> ')}`
       : r.seedCheck
         ? ` ${r.seedCheck.level} seed ${SEED}: ${r.seedCheck.digest} (reload ${r.seedCheck.reloaded}, again ${r.seedCheck.again}) seed ${SEED + 1}: ${r.seedCheck.other}`
       : r.hiddenPause

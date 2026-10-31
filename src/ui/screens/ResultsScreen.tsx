@@ -127,28 +127,32 @@ export default function ResultsScreen() {
     return true
   }
 
-  useEffect(() => {
+  // Read through a ref so the listener sees the live entry state without re-subscribing every render.
+  const keyHandler = useRef<(e: KeyboardEvent) => void>(() => {})
+  keyHandler.current = (e) => {
     if (!config) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      // A focused button already turns Enter into its own click.
-      if (e.key === 'Enter' && e.target instanceof HTMLButtonElement) return
-      if (initials) {
-        // The entry owns the keys (R is a letter); Enter before it opens skips the reveal.
-        if (!done) {
-          if (e.key === 'Enter' && !e.repeat) setStage(STAGE.done)
-        } else if (initialsInput(e.key)) {
-          e.preventDefault()
-        }
-        return
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    // A focused button already turns Enter into its own click.
+    if (e.key === 'Enter' && e.target instanceof HTMLButtonElement) return
+    if (initials) {
+      // The entry owns the keys (R is a letter); Enter before it opens skips the reveal.
+      if (!done) {
+        if (e.key === 'Enter' && !e.repeat) setStage(STAGE.done)
+      } else if (initialsInput(e.key)) {
+        e.preventDefault()
       }
-      if (e.repeat) return
-      if (e.key === 'Enter') leave(config.nextLevel)
-      else if (e.key === 'r' || e.key === 'R') leave(config.id)
+      return
     }
+    if (e.repeat) return
+    if (e.key === 'Enter') leave(config.nextLevel)
+    else if (e.key === 'r' || e.key === 'R') leave(config.id)
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keyHandler.current(e)
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  })
+  }, [])
 
   if (!config) return null
 

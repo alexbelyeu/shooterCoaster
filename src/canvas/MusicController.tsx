@@ -5,7 +5,7 @@ import { useGameStore } from '@/store/useGameStore'
 import type { GamePhase } from '@/types/game'
 import { startMusic, stopMusic, setMusicIntensity } from '@/audio/MusicManager'
 import { placeSound, prepareSfx, setSfxListener, sfx } from '@/audio/sfx'
-import { setMusicDucked, setPauseMix, syncVolumes } from '@/audio/AudioEngine'
+import { setMusicDucked, setPauseMix } from '@/audio/AudioEngine'
 import { MUSIC_ENGINE, withScrim } from '@/audio/musicEngine'
 import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
@@ -64,7 +64,6 @@ export default function MusicController() {
   }, [camera])
 
   useEffect(() => {
-    syncVolumes()
     const biome = (currentLevel ? getLevelConfig(currentLevel)?.biome : undefined) ?? 'themePark'
     const level = currentLevel ?? 'level1'
     const unfollow = SCRIM
