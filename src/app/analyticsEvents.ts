@@ -9,6 +9,14 @@ export type AnalyticsEvent =
   | { name: 'level_complete'; props: { level: string; stars: number } }
   /** `progress_pct`: share of the level timer used, floored to tens. */
   | { name: 'level_quit'; props: { level: string; progress_pct: number } }
+  | { name: 'share'; props: { level: string; stars: number } }
+
+/** Bus event the results screen emits on a completed share: `(levelId, stars)`. */
+export const SHARED_EVENT = 'results:shared'
+
+export function shareEvent(level: string, stars: number): AnalyticsEvent {
+  return { name: 'share', props: { level, stars } }
+}
 
 export interface RunSnapshot {
   phase: GamePhase
