@@ -178,6 +178,27 @@ export function soundEnvelope(channels, sampleRate, startS, endS, { floorDb = -6
   return { peakDb: dbFromAmp(peak), tailMs: lastLoud < 0 ? 0 : ((lastLoud - from) / sampleRate) * 1000 }
 }
 
+function peakIn(channels, sampleRate, startS, endS) {
+  const from = Math.max(0, Math.round(startS * sampleRate))
+  const to = Math.min(channels[0].length, Math.round(endS * sampleRate))
+  let peak = 0
+  for (const ch of channels) for (let i = from; i < to; i++) peak = Math.max(peak, Math.abs(ch[i]))
+  return dbFromAmp(peak)
+}
+
+/** A kill's peak is read over `killS` from it in the mix; "the music around it", ±`aroundS` in the music-only stem. */
+export const KILL_WINDOWS = { killS: 0.12, aroundS: 0.3 }
+
+/** Each kill's peak in the mix over the music's peak around it (the same render without SFX), dB. */
+export function killsOverMusic(mix, music, sampleRate, killTimes) {
+  const { killS, aroundS } = KILL_WINDOWS
+  return killTimes.map((t) => {
+    const killDb = peakIn(mix, sampleRate, t, t + killS)
+    const musicDb = peakIn(music, sampleRate, t - aroundS, t + aroundS)
+    return { t, killDb, musicDb, overDb: killDb - musicDb }
+  })
+}
+
 /** The mix targets of docs/audio/SOUND-BIBLE.md (keep them in step); `kinds` limits a target to music / mix / sfx renders. */
 export const TARGETS = [
   { key: 'integrated', label: 'Integrated loudness', unit: 'LUFS', kinds: ['music'], min: -18, max: -16 },
@@ -188,6 +209,7 @@ export const TARGETS = [
   { key: 'correlation', label: 'Stereo correlation', unit: '', min: 0, note: 'mono-compatible' },
   { key: 'seamJumpMax', label: 'Loop-seam jump vs bar lines', unit: 'dB', max: 1, abs: true, note: 'worst seam' },
   { key: 'gunTailMs', label: 'Gun to silence (−60 dB)', unit: 'ms', kinds: ['sfx'], max: 150 },
+  { key: 'killOverMusicDb', label: 'Kill peak over the music around it', unit: 'dB', kinds: ['mix'], min: 6, note: 'worst kill' },
   { key: 'lra', label: 'Loudness range', unit: 'LU' },
   { key: 'silence', label: 'Digital silence', unit: '%' },
 ]

@@ -168,3 +168,181 @@ export function fireworkWhistleS(flightS: number, timeScale: number): number {
   const s = timeScale > 0 ? flightS / timeScale : maxS
   return Math.min(Math.max(s, minS), maxS)
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * Arcade SFX (`?audio=scrim`, `audio/arcade/`): one-shots baked into AudioBuffers per level, played
+ * through a fixed pool of voices. The recipes are in `arcade/recipes.ts`; the numbers live here.
+ * --------------------------------------------------------------------------------------------- */
+
+/** A score's key: tonic as a MIDI note in octave 4 (C4 = 60) and its third. Pinned to the scores by `scores.test.ts`. */
+export interface MusicKey {
+  tonic: number
+  minor: boolean
+}
+
+/** The keys `audio/scores/*.scrim` are written in: musical SFX (wave tell, FRENZY, payouts, countdown) play in them. */
+export const SCORE_KEYS: Record<string, MusicKey> = {
+  title: { tonic: 67, minor: false }, // G major
+  level1: { tonic: 65, minor: false }, // F major
+  level2: { tonic: 69, minor: true }, // A harmonic minor
+  level3: { tonic: 62, minor: false }, // D major
+  level4: { tonic: 61, minor: true }, // C# minor
+  level5: { tonic: 62, minor: true }, // D minor
+  results: { tonic: 60, minor: false }, // C major
+}
+
+const MAJOR = [0, 2, 4, 5, 7, 9, 11]
+const MINOR = [0, 2, 3, 5, 7, 8, 10]
+
+/** MIDI note of scale degree `degree` (0 = tonic, 7 = the octave above, negative goes down) of `key`, shifted `octave` octaves. */
+export function keyNote(key: MusicKey, degree: number, octave = 0): number {
+  const scale = key.minor ? MINOR : MAJOR
+  const oct = Math.floor(degree / 7)
+  return key.tonic + scale[degree - oct * 7] + 12 * (oct + octave)
+}
+
+export type ArcadeSoundId =
+  | 'fire'
+  | 'hit'
+  | `kill.${KillSound}`
+  | 'kill.thump'
+  | 'kill.ring'
+  | 'kill.payout'
+  | 'comboBreak'
+  | 'frenzy'
+  | 'frenzyLift'
+  | 'waveTell'
+  | 'goldenBalloon'
+  | 'bossArrival'
+  | 'bossHit'
+  | 'bossDefeat'
+  | 'fireworkWhistle'
+  | 'fireworkPop'
+  | 'star1'
+  | 'star2'
+  | 'star3'
+  | 'uiSelect'
+  | 'uiBack'
+  | 'uiLaunch'
+  | 'countReady'
+  | 'countGo'
+
+export interface ArcadeSound {
+  /** Voice priority: a full pool steals the lowest priority (then the oldest); never a higher one. */
+  prio: number
+  /** Peak level, dB: every bake is normalised to 0 dBFS peak, then played at this gain. */
+  db: number
+  /** Send to the level's convolver, 0–1. Guns stay dry: their tail has to be gone in 150 ms. */
+  send: number
+}
+
+export const PRIO = { fire: 1, hit: 2, kill: 3, cue: 4, ui: 5, event: 6 } as const
+
+export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
+  fire: { prio: PRIO.fire, db: -13, send: 0 },
+  hit: { prio: PRIO.hit, db: -15, send: 0.05 },
+  'kill.pop': { prio: PRIO.kill, db: -2, send: 0.12 },
+  'kill.flutter': { prio: PRIO.kill, db: -2, send: 0.12 },
+  'kill.crunch': { prio: PRIO.kill, db: -2, send: 0.1 },
+  'kill.splash': { prio: PRIO.kill, db: -2, send: 0.15 },
+  'kill.hiss': { prio: PRIO.kill, db: -3, send: 0.12 },
+  'kill.thump': { prio: PRIO.kill, db: -6, send: 0.05 },
+  'kill.ring': { prio: PRIO.kill, db: -16, send: 0.2 },
+  'kill.payout': { prio: PRIO.kill, db: -15, send: 0.2 },
+  comboBreak: { prio: PRIO.cue, db: -13, send: 0.2 },
+  frenzy: { prio: PRIO.event, db: -5, send: 0.3 },
+  frenzyLift: { prio: PRIO.event, db: -21, send: 0.1 },
+  waveTell: { prio: PRIO.event, db: -8, send: 0.25 },
+  goldenBalloon: { prio: PRIO.event, db: -6, send: 0.3 },
+  bossArrival: { prio: PRIO.event, db: -6, send: 0.35 },
+  bossHit: { prio: PRIO.cue, db: -8, send: 0.1 },
+  bossDefeat: { prio: PRIO.event, db: -4, send: 0.35 },
+  fireworkWhistle: { prio: PRIO.hit, db: -22, send: 0.3 },
+  fireworkPop: { prio: PRIO.cue, db: -12, send: 0.35 },
+  star1: { prio: PRIO.event, db: -12, send: 0.35 },
+  star2: { prio: PRIO.event, db: -11, send: 0.35 },
+  star3: { prio: PRIO.event, db: -10, send: 0.35 },
+  uiSelect: { prio: PRIO.ui, db: -18, send: 0.1 },
+  uiBack: { prio: PRIO.ui, db: -18, send: 0.1 },
+  uiLaunch: { prio: PRIO.ui, db: -13, send: 0.2 },
+  countReady: { prio: PRIO.ui, db: -14, send: 0.15 },
+  countGo: { prio: PRIO.ui, db: -11, send: 0.2 },
+}
+
+/** Voices playing at once; the e2e `audioBurst(64, 32)` must never take more. */
+export const VOICE_BUDGET = 24
+/** A stolen voice fades out over this long before the new sound starts on it. */
+export const STEAL_FADE_S = 0.004
+/** Held-trigger auto-fire sits this far under a single shot. */
+export const AUTO_FIRE_DB = -4
+
+export interface VoiceState {
+  prio: number
+  startedAt: number
+  /** Audio time the voice is silent; Infinity for a loop. */
+  endsAt: number
+}
+
+/** The voice a sound of `prio` gets at `now`: a free one, else the lowest priority (then oldest) one at or below `prio`; -1 drops the sound. */
+export function pickVoice(voices: readonly VoiceState[], prio: number, now: number): number {
+  let best = -1
+  for (let i = 0; i < voices.length; i++) {
+    const v = voices[i]
+    if (v.endsAt <= now) return i
+    if (v.prio > prio) continue
+    if (best < 0 || v.prio < voices[best].prio || (v.prio === voices[best].prio && v.startedAt < voices[best].startedAt)) best = i
+  }
+  return best
+}
+
+/** Kill body pitch climbs with the chain (playback rate). */
+export function killRate(combo: number): number {
+  return 1 + Math.min(Math.max(combo, 0), 12) * 0.025
+}
+
+/** Hit tick pitch: up a step per combo tier. */
+export function hitRate(combo: number): number {
+  return Math.pow(2, (2 * killTier(combo)) / 12)
+}
+
+/** Boss hit thud rises as it weakens (playback rate for hp 0–1). */
+export function bossHitRate(hpFraction: number): number {
+  return Math.pow(2, (7 * (1 - Math.min(Math.max(hpFraction, 0), 1))) / 12)
+}
+
+/** Positional pan / low-pass: enemies this close are full bandwidth, this far are dull. */
+export const SPATIAL = { panWidth: 0.75, nearM: 30, farM: 220, nearHz: 18000, farHz: 2400 } as const
+
+/**
+ * Pan and low-pass cutoff of a sound at camera-space (x, z) (z < 0 is in front), `tanHalfHFov` the camera's horizontal
+ * half-angle tangent: the screen edge pans `panWidth`, behind the camera pans fully to its side.
+ */
+export function spatial(x: number, z: number, tanHalfHFov: number, out: { pan: number; cutoffHz: number }) {
+  const ahead = -z
+  const side = ahead > 0.5 ? x / (ahead * tanHalfHFov) : Math.sign(x) * 1.5
+  out.pan = Math.max(-1, Math.min(1, side)) * SPATIAL.panWidth
+  const dist = Math.hypot(x, z)
+  const f = Math.min(Math.max((dist - SPATIAL.nearM) / (SPATIAL.farM - SPATIAL.nearM), 0), 1)
+  out.cutoffHz = SPATIAL.nearHz * Math.pow(SPATIAL.farHz / SPATIAL.nearHz, f)
+  return out
+}
+
+/** The first beat at or after `now + leadS` on a grid of `beatS` from `origin`, and its index in a bar of `beats`. */
+export function nextBeat(now: number, origin: number, beatS: number, beats: number, leadS: number, out: { t: number; beatInBar: number }) {
+  const k = Math.max(0, Math.ceil((now + leadS - origin) / beatS - 1e-6))
+  out.t = origin + k * beatS
+  out.beatInBar = k % beats
+  return out
+}
+
+/** Per-biome room for the SFX send (`makeIR` length / decay curve, then a low-pass on the return). */
+export const BIOME_REVERB: Record<BiomeType, { seconds: number; decayPow: number; toneHz: number; level: number }> = {
+  themePark: { seconds: 1.4, decayPow: 3.2, toneHz: 7000, level: 0.8 },
+  desert: { seconds: 1.8, decayPow: 4.5, toneHz: 4500, level: 0.7 },
+  ocean: { seconds: 2.4, decayPow: 3, toneHz: 6000, level: 0.9 },
+  arctic: { seconds: 3, decayPow: 2.6, toneHz: 9000, level: 0.9 },
+  volcanic: { seconds: 2, decayPow: 3.4, toneHz: 2600, level: 0.85 },
+}
+
+/** Whistle bakes (s); a launch plays the nearest, rate-matched to its flight. */
+export const WHISTLE_LENGTHS_S = [0.6, 1.2, 2.4] as const

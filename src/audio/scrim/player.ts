@@ -150,6 +150,28 @@ export function disposeScores(): void {
   for (const t of live) if (!t.bus.fading) fadeOut(t)
 }
 
+export interface MusicGrid {
+  /** Audio time of the current score's song time 0. */
+  origin: number
+  beatS: number
+  beats: number
+}
+
+const grid: MusicGrid = { origin: 0, beatS: 0, beats: 4 }
+
+/** The current score's beat grid while it plays (not paused, not fading out), for SFX quantised to the beat; shared object. */
+export function musicGrid(): MusicGrid | null {
+  const track = current
+  if (!track || track.pausedAt !== null || track.bus.fading) return null
+  const section = track.scheduler.song.loop.sections[0] ?? track.scheduler.song.intro.sections[0]
+  if (!section) return null
+  const t = now()
+  grid.origin = t - track.scheduler.position(t)
+  grid.beats = section.beats
+  grid.beatS = section.barDur / section.beats
+  return grid
+}
+
 /** e2e: the tracks (current last), whether each is paused, its song position, and the long-lived nodes. */
 export function scrimState() {
   const t = now()

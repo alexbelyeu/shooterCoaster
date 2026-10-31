@@ -29,7 +29,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import * as Tone from 'tone'
 import { useGameStore } from '@/store/useGameStore'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType } from '@/types/level'
@@ -42,7 +42,7 @@ import { comboMultiplier } from '@/combat/comboTiers'
 import { frenzyActive } from '@/combat/comboRuntime'
 import { getPointerState } from '@/input/pointerInput'
 import { initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
-import { playExplosionSound, playFireSound, playHitTick, playWaveStinger, sfxNodeCount } from '@/audio/SFXManager'
+import { loadArcade, sfx, type VoiceStats } from '@/audio/sfx'
 import { droppedSounds } from '@/audio/soundGuard'
 import { nextTriggerTime } from '@/audio/triggerTime'
 import { musicState, type MusicFade } from '@/audio/musicBus'
@@ -214,7 +214,10 @@ type ScrimState = ReturnType<typeof import('@/audio/scrim/player').scrimState>
 
 export interface E2EAudio {
   ready: boolean
+  /** Long-lived SFX nodes (the Tone kit, or the arcade engine's voice pool): must not grow while playing. */
   sfxNodes: number
+  /** The arcade engine's voice pool (`?audio=scrim`): budget, live now, the most at once, stolen / dropped by priority. */
+  sfxVoices: VoiceStats | null
   musicDucked: boolean
   /** The pause mix is on: music −12 dB, SFX silent. */
   pauseMix: boolean
@@ -686,15 +689,22 @@ function waitForAudioTick() {
 
 async function audioBurst(shots: number, kills: number) {
   if (!isAudioReady()) await initAudio()
+  if (MUSIC_ENGINE === 'scrim') {
+    const { currentLevel } = useGameStore.getState()
+    await sfx().prepare(currentLevel, (currentLevel ? getLevelConfig(currentLevel)?.biome : undefined) ?? 'themePark')
+    ;(await loadArcade()).resetVoiceStats()
+  }
+  const s = sfx()
   for (let i = 0; i < shots; i++) {
-    playFireSound(i % 2 === 1)
+    s.fire(i % 2 === 1)
     if (i < kills) {
-      playHitTick()
-      playExplosionSound(kills - i)
+      s.hit(kills - i, null)
+      s.kill(kills - i, 'pop', null)
     }
     waitForAudioTick()
   }
-  playWaveStinger()
+  s.waveAnnounce()
+  s.waveIncoming()
 
   // Tone clamps the first late note to the ticked clock; before #115 the second landed on it.
   // A fresh synth per pair: only a start from silence records a new start time.
@@ -721,7 +731,8 @@ function readAudio(): E2EAudio {
   const d = droppedSounds()
   return {
     ready: isAudioReady(),
-    sfxNodes: sfxNodeCount(),
+    sfxNodes: sfx().nodeCount(),
+    sfxVoices: sfx().voices(),
     musicDucked: isMusicDucked(),
     pauseMix: isPauseMixOn(),
     dropped: d.count,

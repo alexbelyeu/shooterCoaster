@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { browserStorage, isInternalBrowser } from '@/app/analyticsGate'
 import { initAudio, isAudioReady } from '@/audio/AudioEngine'
+import { prepareSfx } from '@/audio/sfx'
 import { startTitleMusic } from '@/audio/TitleMusicManager'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { motion } from 'framer-motion'
@@ -23,6 +24,7 @@ interface TitleScreenProps {
 async function startMusic() {
   if (!isAudioReady()) await initAudio()
   startTitleMusic()
+  prepareSfx(null, 'themePark')
 }
 
 export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {

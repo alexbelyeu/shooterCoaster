@@ -37,7 +37,7 @@
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  * The boss check summons level1's Golden Blimp and shoots it down in phase order
  * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png); see bossCheck().
- * The scrim check loads level1 with `?audio=scrim` (the score engine, #214); see scrimCheck().
+ * The scrim check loads level1 with `?audio=scrim` (the score engine, #214, and the arcade SFX, #217); see scrimCheck().
  *
  * All waits are deadline-polled on the hook's frame counter, because software
  * rendering in CI / cloud sessions can run at ~1 fps. The title and each level ride
@@ -1496,12 +1496,14 @@ async function musicCrossfade(page) {
   return { problems, result: { fades, buses } }
 }
 
-const SCRIM_CHECK = { level: 'level1', maxNodes: 150 }
+const SCRIM_CHECK = { level: 'level1', maxNodes: 150, burst: [64, 32] }
 
 /**
  * `?audio=scrim` (#214): a real click unlocks audio and starts the title score; level1 must crossfade from it, keep its
  * long-lived node count flat (≤ maxNodes) while it plays, duck with game time frozen, hold its song position while
  * paused and pick it up again, then crossfade to the results score; nothing dropped, no page errors.
+ * The arcade SFX (#217): `audioBurst(64, 32)` must stay inside the voice budget (stealing, not growing), keep the SFX
+ * node count flat across it, and throw or drop nothing.
  */
 async function scrimCheck(page) {
   const problems = []
@@ -1518,7 +1520,7 @@ async function scrimCheck(page) {
   }
   const busNames = (a) => a.music.buses.map((b) => b.name)
   const track = (a) => a.scrim?.tracks.at(-1) ?? null
-  const result = { engine: null, title: false, nodes: [], position: [], pausedHeld: null, ducked: null, results: false, dropped: 0 }
+  const result = { engine: null, title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, ducked: null, results: false, dropped: 0 }
 
   const vp = page.viewportSize()
   await page.mouse.click(8, vp.height - 8) // any pointer press on the title unlocks audio
@@ -1548,6 +1550,23 @@ async function scrimCheck(page) {
   if (result.nodes[1] > SCRIM_CHECK.maxNodes) problems.push(`score engine holds ${result.nodes[1]} nodes (≤ ${SCRIM_CHECK.maxNodes})`)
   if (!(result.position[1] > result.position[0] + 1)) problems.push(`the level score is not advancing (${result.position.map((p) => p.toFixed(2)).join(' -> ')} s)`)
   if (!a.scrim.ticking) problems.push('the score scheduler is not ticking')
+
+  const burst = await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), SCRIM_CHECK.burst)
+  const v = burst.sfxVoices
+  result.voices = v
+  result.sfxNodes.push(burst.sfxNodes)
+  if (!v) problems.push('no arcade SFX voice pool under ?audio=scrim')
+  else {
+    if (v.peak > v.budget) problems.push(`audioBurst(${SCRIM_CHECK.burst}) took ${v.peak} voices (budget ${v.budget})`)
+    if (v.played === 0) problems.push(`audioBurst(${SCRIM_CHECK.burst}) played no arcade SFX (bank never baked?)`)
+    if (v.stolen + v.rejected === 0) problems.push(`audioBurst(${SCRIM_CHECK.burst}) never stole a voice: the budget is not being exercised`)
+  }
+  if (burst.lateScheduleErrors) problems.push(`audioBurst: ${burst.lateScheduleErrors}/10 late note pairs threw`)
+  if (burst.dropped) problems.push(`audioBurst: ${burst.dropped} sound(s) dropped by an audio error (${burst.lastDrop?.split('\n')[0]})`)
+  await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), SCRIM_CHECK.burst)
+  result.sfxNodes.push((await audio()).sfxNodes)
+  if (result.sfxNodes[1] !== result.sfxNodes[0] || !(result.sfxNodes[0] > 0))
+    problems.push(`arcade SFX nodes not flat across two bursts: ${result.sfxNodes.join(' -> ')}`)
 
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   result.ducked = (await until((x) => x.musicDucked, 20000)).musicDucked
@@ -2047,6 +2066,7 @@ async function run() {
             ` bullet hit ${r.boss.bulletHit} hits ${r.boss.phaseOneHits}+${r.boss.lastHits} kills ${r.boss.kills} score +${r.boss.score} popup ${r.boss.popup[0] ?? '-'} stage ${r.boss.stage}`)
       : r.scrim
         ? ` engine=${r.scrim.engine} title=${r.scrim.title} nodes ${r.scrim.nodes.join('->')} position ${r.scrim.position.map((p) => p.toFixed(1)).join('->')}s` +
+          ` sfxNodes ${r.scrim.sfxNodes.join('->')} voices ${r.scrim.voices ? `peak ${r.scrim.voices.peak}/${r.scrim.voices.budget} stolen ${r.scrim.voices.stolen} dropped ${r.scrim.voices.rejected}` : 'none'}` +
           ` ducked=${r.scrim.ducked} paused at ${r.scrim.pausedHeld?.at.toFixed(1)}s (${r.scrim.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.scrim.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.scrim.results}`
       : r.speed
         ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`

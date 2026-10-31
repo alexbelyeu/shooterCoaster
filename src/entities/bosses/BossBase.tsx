@@ -5,7 +5,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
 import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE } from '@/combat/hitFeedback'
-import { playExplosionSound } from '@/audio/SFXManager'
+import { placeSound, sfx } from '@/audio/sfx'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { BOSS_PART_DEATH_STYLE } from '@/effects/deathStyles'
 import { flashMesh, restoreMesh } from '@/entities/enemies/hitFlash'
@@ -193,7 +193,7 @@ export default function BossBase({
       part.visible = false
       const position = part.getWorldPosition(new THREE.Vector3())
       const { combo } = useGameStore.getState()
-      playExplosionSound(combo.count)
+      sfx().bossPart(combo.count, w.id, placeSound(position))
       getExplosionPool()?.explode(position, BOSS_PART_DEATH_STYLE)
       eventBus.emit('enemy:killed', {
         position,

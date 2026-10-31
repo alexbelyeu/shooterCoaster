@@ -3,7 +3,7 @@ import { animate, motion } from 'framer-motion'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars } from '@/levels/scoring'
-import { playStarChime } from '@/audio/SFXManager'
+import { sfx } from '@/audio/sfx'
 import { biomeTheme } from '@/ui/theme'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { barFill, formatAccuracy, formatTimeLeft, isNewRecord, nextStar } from './resultsStats'
@@ -76,7 +76,7 @@ export default function ResultsScreen() {
 
   useEffect(() => {
     const i = stage - STAGE.star
-    if (i >= 0 && i < 3 && i < stars) playStarChime(i)
+    if (i >= 0 && i < 3 && i < stars) sfx().starChime(i)
   }, [stage, stars])
 
   useEffect(() => {
