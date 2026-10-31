@@ -1,53 +1,44 @@
-import { useEffect, useMemo, type RefObject } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-
-/** One kind of particle in a field (ash, embers, snowflakes, dust…). */
-export interface ParticleLayer {
-  color: THREE.ColorRepresentation
-  opacity: number
-  /** Diameter in world units; on screen it is clamped to [1, maxPixels]. */
-  size: number
-  maxPixels: number
-  /** Drift in world units per second (each point varies it ±30%). */
-  velocity: [number, number, number]
-  sway: number
-  /** 0 = steady, 1 = strong flicker. */
-  flicker: number
-  /** Adds light (embers) instead of covering what is behind it (ash). */
-  additive: boolean
-}
-
-export interface ParticleFieldPreset {
-  count: number
-  /** Box around the camera the points wrap inside, world units. */
-  box: [number, number, number]
-  primary: ParticleLayer
-  secondary: ParticleLayer
-  secondaryShare: number
-}
+import { eventBus } from '@/core/EventBus'
+import { isCoarsePointer, useQualityProfile } from '@/canvas/useRenderBudget'
+import { e2eParticles, isE2E } from '@/testing/e2eHook'
+import type { ParticleFieldPreset } from './types'
+import { boostStrength, particleCounts } from './particlePresets'
 
 const vertexShader = /* glsl */ `
   uniform float uTime;
   uniform float uHalfHeightPx;
   uniform vec3 uBox;
   uniform float uSecondaryShare;
+  uniform float uBoost;
   uniform vec3 uVelocity[2];
   uniform vec4 uShape[2]; // size, maxPixels, sway, flicker
 
+  // [0, 1): always-on point; [1, 2): boost-only secondary point, shown with uBoost
   attribute float aRand;
 
   varying float vSecondary;
   varying float vAlpha;
 
   void main() {
-    float secondary = step(aRand, uSecondaryShare);
+    float boostOnly = step(1.0, aRand);
+    if (boostOnly > 0.5 && uBoost <= 0.0) {
+      // Outside the clip volume: draws nothing
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      gl_PointSize = 0.0;
+      return;
+    }
+    float r = aRand - boostOnly;
+    // A point's layer never changes, so its drift never jumps
+    float secondary = max(step(r, uSecondaryShare), boostOnly);
     int layer = int(secondary + 0.5);
     vec4 shape = uShape[layer];
-    float phase = aRand * 107.0;
+    float phase = r * 107.0;
 
     // position is a seed in [0, 1)^3; drift it, then wrap into the box around the camera
-    vec3 p = position * uBox + uVelocity[layer] * uTime * (0.7 + 0.6 * fract(aRand * 13.7));
+    vec3 p = position * uBox + uVelocity[layer] * uTime * (0.7 + 0.6 * fract(r * 13.7));
     p.x += sin(uTime * 0.7 + phase) * shape.z;
     p.z += cos(uTime * 0.53 + phase * 1.3) * shape.z;
     vec3 rel = mod(p - cameraPosition, uBox) - 0.5 * uBox;
@@ -60,9 +51,9 @@ const vertexShader = /* glsl */ `
 
     vec3 e = abs(rel) / (0.5 * uBox);
     float edgeFade = 1.0 - smoothstep(0.7, 1.0, max(max(e.x, e.y), e.z));
-    float flick = mix(1.0, 0.5 + 0.5 * sin(uTime * (8.0 + aRand * 9.0) + phase), shape.w);
-    // Sub-pixel points fade rather than staying 1px wide
-    vAlpha = edgeFade * flick * min(px, 1.0);
+    float flick = mix(1.0, 0.5 + 0.5 * sin(uTime * (8.0 + r * 9.0) + phase), shape.w);
+    // Sub-pixel points fade rather than staying 1px wide; boost-only points fade with the boost
+    vAlpha = edgeFade * flick * min(px, 1.0) * mix(1.0, uBoost, boostOnly);
     vSecondary = secondary;
   }
 `
@@ -88,20 +79,21 @@ const fragmentShader = /* glsl */ `
   }
 `
 
-/** Seeded so every run (and every smoke screenshot) looks the same. */
-function createSeeds(count: number): THREE.BufferGeometry {
+/** Seeded so every run (and every smoke screenshot) looks the same. Boost-only points follow the always-on ones. */
+function createSeeds(base: number, boost: number): THREE.BufferGeometry {
   let s = 0x9e3779b9
   const rand = () => {
     s = (s * 1664525 + 1013904223) >>> 0
     return s / 4294967296
   }
+  const count = base + boost
   const positions = new Float32Array(count * 3)
   const rands = new Float32Array(count)
   for (let i = 0; i < count; i++) {
     positions[i * 3] = rand()
     positions[i * 3 + 1] = rand()
     positions[i * 3 + 2] = rand()
-    rands[i] = rand()
+    rands[i] = rand() + (i < base ? 0 : 1)
   }
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
@@ -133,31 +125,51 @@ function createMaterial(preset: ParticleFieldPreset): THREE.ShaderMaterial {
   })
 }
 
-interface ParticleFieldProps {
-  preset: ParticleFieldPreset
-  /** 0..1: scales the secondary layer's share and brightness up to 2×. */
-  boostRef?: RefObject<number>
-}
-
 /** Ambient particles wrapping in a box around the camera: one draw call, no per-frame CPU work but uniforms. */
-export default function ParticleField({ preset, boostRef }: ParticleFieldProps) {
-  const geometry = useMemo(() => createSeeds(preset.count), [preset.count])
+export default function ParticleField({ preset }: { preset: ParticleFieldPreset }) {
+  const { base, boost: boostCount } = particleCounts(preset, isCoarsePointer, useQualityProfile().particleScale)
+  const geometry = useMemo(() => createSeeds(base, boostCount), [base, boostCount])
   const material = useMemo(() => createMaterial(preset), [preset])
   const halfHeightPx = useThree(s => s.size.height * s.viewport.dpr * 0.5)
+  // Clock time the current boost started (NaN = none yet); a new event is stamped on the next frame
+  const boostStart = useRef(Number.NaN)
+  const boostPending = useRef(false)
 
   useEffect(() => {
     material.uniforms.uHalfHeightPx.value = halfHeightPx
   }, [material, halfHeightPx])
 
-  useEffect(() => () => geometry.dispose(), [geometry])
+  useEffect(() => {
+    if (isE2E) Object.assign(e2eParticles, { mounted: true, points: base, boostPoints: boostCount, boost: 0 })
+    return () => {
+      geometry.dispose()
+      if (isE2E) e2eParticles.mounted = false
+    }
+  }, [geometry, base, boostCount])
   useEffect(() => () => material.dispose(), [material])
+
+  useEffect(() => {
+    const event = preset.boost?.event
+    if (!event) return
+    const onBoost = () => { boostPending.current = true }
+    eventBus.on(event, onBoost)
+    return () => { eventBus.off(event, onBoost) }
+  }, [preset])
 
   useFrame(({ clock }) => {
     const u = material.uniforms
-    u.uTime.value = clock.elapsedTime
-    const boost = boostRef?.current ?? 0
-    u.uBoost.value = boost
-    u.uSecondaryShare.value = Math.min(1, preset.secondaryShare * (1 + boost))
+    const t = clock.elapsedTime
+    u.uTime.value = t
+    const boost = preset.boost
+    if (!boost) return
+    if (boostPending.current) {
+      boostPending.current = false
+      // Restart the rise from the current strength, so an event during a boost doesn't pop
+      boostStart.current = t - boost.riseS * u.uBoost.value
+    }
+    if (Number.isNaN(boostStart.current)) return
+    u.uBoost.value = boostStrength(boost, t - boostStart.current)
+    if (isE2E) e2eParticles.boost = u.uBoost.value
   })
 
   return <points geometry={geometry} material={material} frustumCulled={false} />

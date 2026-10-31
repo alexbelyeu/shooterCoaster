@@ -1,4 +1,9 @@
+import { getTerrainMeshSize, TERRAIN_MESH_SEGMENTS } from '@/utils/terrainNoise'
+
 /** Lava river layout shared by the strips (`lavaRivers.ts`) and the ground glow (`lavaGlow.ts`). */
+
+/** Spacing of the drawn volcanic terrain grid (~94 units): the drawn ground is linear in between. */
+export const TERRAIN_CELL = getTerrainMeshSize('volcanic') / TERRAIN_MESH_SEGMENTS
 
 export interface LavaRiverConfig {
   angle: number

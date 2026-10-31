@@ -46,7 +46,8 @@ const listeners = new Set<PointerListener>()
 
 const UI_SELECTOR = 'button, a, input, select, textarea, label, [role="button"], [data-no-fire]'
 
-function isUiTarget(target: EventTarget | null): boolean {
+/** A control or other UI element (not the game view) is under the pointer. */
+export function isUiTarget(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(UI_SELECTOR) !== null
 }
 

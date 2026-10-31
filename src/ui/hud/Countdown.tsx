@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '@/store/useGameStore'
 import { subscribePointer } from '@/input/pointerInput'
 import { isFeedbackHeld } from '@/combat/hitFeedback'
+import { sfx } from '@/audio/sfx'
 
 /** GO! sets `playing` and stays up over the HUD for `goHoldMs`: 2.5 s in all on a warm start, ~1.6 s on a resume. */
 const SEQUENCES = {
@@ -61,6 +62,10 @@ export default function Countdown() {
     if (store.phase === 'countdown' || (store.phase === 'paused' && store.resuming)) store.setPhase('playing')
     return stepTimeout(() => setStep(null), goHoldMs)
   }, [step, go, stepMs, goHoldMs])
+
+  useEffect(() => {
+    if (step !== null) sfx().countdown(step === go)
+  }, [step, go])
 
   const counting = step !== null && step < go
   useEffect(() => {

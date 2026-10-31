@@ -3,9 +3,12 @@ import { animate, motion } from 'framer-motion'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars } from '@/levels/scoring'
-import { playStarChime } from '@/audio/SFXManager'
+import { sfx } from '@/audio/sfx'
 import { biomeTheme } from '@/ui/theme'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
+import { SHARED_EVENT } from '@/app/analyticsEvents'
+import { eventBus } from '@/core/EventBus'
+import { shareMethod, sharePayload, sharePayloadForRun } from '@/ui/share'
 import { barFill, formatAccuracy, formatTimeLeft, isNewRecord, nextStar } from './resultsStats'
 
 const fmt = new Intl.NumberFormat('en-US')
@@ -13,6 +16,7 @@ const fmt = new Intl.NumberFormat('en-US')
 const STAGE = { title: 0, count: 1, star: 2, stats: 5, done: 6 } as const
 const STAGE_AT_MS = [0, 350, 1700, 2050, 2400, 2800, 3500]
 const COUNT_UP_S = 1.2
+const COPIED_MS = 2000
 
 /** The finished run, read once on mount so a Replay / Next during the exit fade doesn't repaint it. */
 function snapshotRun() {
@@ -39,6 +43,9 @@ export default function ResultsScreen() {
   const fillRef = useRef<HTMLDivElement>(null)
   const saved = useRef(false)
   const left = useRef(false)
+  const [copied, setCopied] = useState(false)
+  const [share] = useState(() => (run.levelId ? sharePayloadForRun(run.levelId, run.score) : null))
+  const canShare = share !== null && shareMethod(navigator, share) !== null
 
   const stars = config ? computeStars(run.score, config.maxScore, config.starThresholds) : 0
   const fill = config ? barFill(run.score, config.maxScore) : 0
@@ -76,7 +83,7 @@ export default function ResultsScreen() {
 
   useEffect(() => {
     const i = stage - STAGE.star
-    if (i >= 0 && i < 3 && i < stars) playStarChime(i)
+    if (i >= 0 && i < 3 && i < stars) sfx().starChime(i)
   }, [stage, stars])
 
   useEffect(() => {
@@ -98,6 +105,19 @@ export default function ResultsScreen() {
     const controls = animate(0, run.score, { duration: COUNT_UP_S, ease: 'easeOut', onUpdate: paint })
     return () => controls.stop()
   }, [counting, done, run.score, fill])
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), COPIED_MS)
+    return () => clearTimeout(timer)
+  }, [copied])
+
+  async function onShare() {
+    if (!share || !config) return
+    const outcome = await sharePayload(navigator, share)
+    if (outcome === 'copied') setCopied(true)
+    if (outcome === 'shared' || outcome === 'copied') eventBus.emit(SHARED_EVENT, config.id, stars)
+  }
 
   useEffect(() => {
     if (!config) return
@@ -232,6 +252,11 @@ export default function ResultsScreen() {
             <button className="play-button results-secondary" onClick={() => leave(config.id)}>
               Replay
             </button>
+            {canShare && (
+              <button className="play-button results-secondary results-share" onClick={onShare}>
+                {copied ? 'Copied!' : 'Share'}
+              </button>
+            )}
             {config.nextLevel && (
               <button className="play-button" onClick={() => leave(config.nextLevel)}>
                 Next Level

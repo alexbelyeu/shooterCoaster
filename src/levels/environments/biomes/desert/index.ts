@@ -1,4 +1,5 @@
 import type { BiomeDefinition } from '../../shared/types'
+import { PARTICLE_PRESETS } from '../../shared/particlePresets'
 import { COLOR_RAMP, TREES } from './config'
 import Decorations from './Decorations'
 import Features from './Features'
@@ -10,4 +11,5 @@ export const desert: BiomeDefinition = {
   createTerrainMaterial: createSandTerrainMaterial,
   Decorations,
   Features,
+  particles: PARTICLE_PRESETS.desertDust,
 }

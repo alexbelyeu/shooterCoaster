@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { unregisterCollisionTarget } from '@/combat/CollisionManager'
 import {
   BALLOON_BODY_GEO, BALLOON_KNOT_GEO, BALLOON_STRING_GEO,
   GOLDEN_BODY_MAT, GOLDEN_KNOT_MAT, GOLDEN_STRING_MAT,
@@ -8,11 +9,12 @@ import {
 
 /**
  * Golden bonus balloon: 5x points, emissive gold, bobs up and down,
- * auto-despawns after 5 seconds.
+ * auto-despawns after 5 seconds of game time (a pause holds it).
  */
 export default function GoldenBalloon(props: EnemyProps) {
   const [visible, setVisible] = useState(true)
-  const spawnTime = useRef(performance.now())
+  const spawnTime = useRef<number | null>(null)
+  const { id } = props
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
@@ -22,12 +24,14 @@ export default function GoldenBalloon(props: EnemyProps) {
       // Bob up and down
       mesh.position.y += Math.sin(time * 3) * 0.5
 
-      // Auto-despawn after 5 seconds
-      if (performance.now() - spawnTime.current > 5000) {
+      spawnTime.current ??= time
+      if (time - spawnTime.current > 5) {
+        // Off the collision list this frame, not at React's later commit, which can land after a pause.
+        unregisterCollisionTarget(id)
         setVisible(false)
       }
     },
-    [],
+    [id],
   )
 
   if (!visible) return null

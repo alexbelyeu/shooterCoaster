@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>ShooterCoaster — free browser rollercoaster shooter</title>
-    <!-- Share card + SEO. Portal builds override og:url and canonical here. Card image: `npm run og`. -->
+    <!-- Share card + SEO; the portal build drops these tags and the JSON-LD below (vite.config.ts). Card image: `npm run og`. -->
     <meta name="description" content="Ride a rollercoaster through five worlds and blast everything that moves. Free, no install, plays on your phone." />
     <link rel="canonical" href="https://scoaster.com/" />
     <meta property="og:type" content="website" />
@@ -24,8 +24,70 @@
     <meta name="theme-color" content="#4f6071" />
     <link rel="icon" type="image/ico" href="/assets/images/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "ShooterCoaster",
+        "url": "https://scoaster.com/",
+        "description": "Ride a rollercoaster through five worlds and blast everything that moves. Free, no install, plays on your phone.",
+        "image": "https://scoaster.com/social/og-1200x630.jpg",
+        "genre": ["Shooter", "Rail shooter", "Arcade"],
+        "gamePlatform": "Web browser",
+        "applicationCategory": "Game",
+        "operatingSystem": "Any",
+        "playMode": "SinglePlayer",
+        "inLanguage": "en",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "Alex Belyeu" }
+      }
+    </script>
+    <!-- Visually hidden, never display:none: crawlers and screen readers read the #about text, players never see it. -->
+    <style>
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
   </head>
   <body>
+    <main id="about" class="visually-hidden">
+      <h1>ShooterCoaster</h1>
+      <p>
+        ShooterCoaster is a free browser rail shooter: you ride a rollercoaster through five themed
+        worlds and shoot everything that moves before the timer runs out.
+      </p>
+      <h2>Five worlds</h2>
+      <ul>
+        <li>Theme Park: pop balloons past the Ferris wheel, then bring down the Golden Blimp.</li>
+        <li>Desert: scorpions and flocks of crows around the pyramids.</li>
+        <li>Ocean: jellyfish, sharks and schools of flying fish.</li>
+        <li>Antarctica: snowman scouts, snowmen and brutes on the ice.</li>
+        <li>Inferno: ember wisps, fire imps, lava golems and drakes around an erupting volcano.</li>
+      </ul>
+      <h2>How to play</h2>
+      <ul>
+        <li>The coaster drives itself. You aim and shoot.</li>
+        <li>On a computer, aim with the mouse and click to fire. On a phone or tablet, tap an enemy to shoot it.</li>
+        <li>Chain kills quickly to build a combo, up to a five times multiplier and FRENZY slow motion.</li>
+        <li>Every ride runs against a timer of one to two minutes. Score enough for up to three stars; a star unlocks the next world.</li>
+      </ul>
+      <h2>Free, no download</h2>
+      <p>
+        Free to play, with no download, no install and no account. It runs in any modern browser on a
+        desktop, laptop, phone or tablet. ShooterCoaster is made with three.js, React Three Fiber and
+        Tone.js, and its worlds, enemies and music are all generated in code.
+      </p>
+    </main>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

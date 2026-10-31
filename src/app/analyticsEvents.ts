@@ -1,6 +1,7 @@
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars } from '@/levels/scoring'
 import type { GamePhase } from '@/types/game'
+import { isInRun } from '@/store/startPhase'
 
 /** At most 2 properties per event (Vercel Pro), no free text; keep docs/marketing/README.md in sync. */
 export type AnalyticsEvent =
@@ -8,6 +9,14 @@ export type AnalyticsEvent =
   | { name: 'level_complete'; props: { level: string; stars: number } }
   /** `progress_pct`: share of the level timer used, floored to tens. */
   | { name: 'level_quit'; props: { level: string; progress_pct: number } }
+  | { name: 'share'; props: { level: string; stars: number } }
+
+/** Bus event the results screen emits on a completed share: `(levelId, stars)`. */
+export const SHARED_EVENT = 'results:shared'
+
+export function shareEvent(level: string, stars: number): AnalyticsEvent {
+  return { name: 'share', props: { level, stars } }
+}
 
 export interface RunSnapshot {
   phase: GamePhase
@@ -15,8 +24,6 @@ export interface RunSnapshot {
   score: number
   timeRemaining: number
 }
-
-const inRun = (phase: GamePhase) => phase === 'countdown' || phase === 'playing' || phase === 'paused'
 
 export function tensPercent(fraction: number): number {
   return Math.min(100, Math.max(0, Math.floor(fraction * 10) * 10))
@@ -28,7 +35,7 @@ export function analyticsEventFor(prev: RunSnapshot, next: RunSnapshot): Analyti
   if (!config) return null
   const level = config.id
 
-  if (inRun(next.phase) && !inRun(prev.phase)) {
+  if (isInRun(next.phase) && !isInRun(prev.phase)) {
     return { name: 'level_start', props: { level } }
   }
   if (next.phase === 'results' && prev.phase === 'playing') {
@@ -37,7 +44,7 @@ export function analyticsEventFor(prev: RunSnapshot, next: RunSnapshot): Analyti
       props: { level, stars: computeStars(next.score, config.maxScore, config.starThresholds) },
     }
   }
-  if (inRun(prev.phase) && (next.phase === 'levelSelect' || next.phase === 'title')) {
+  if (isInRun(prev.phase) && (next.phase === 'levelSelect' || next.phase === 'title')) {
     return {
       name: 'level_quit',
       props: { level, progress_pct: tensPercent(1 - next.timeRemaining / config.timerSeconds) },
