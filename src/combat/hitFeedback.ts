@@ -18,14 +18,13 @@ export const MUZZLE_FLASH_MS = 60
 export const ENEMY_HIT_FLASH_MS = 80
 export const KILL_POP_SCALE = 1.2
 
-/** NDC aim point, performance.now() and weapon of the last shot; set by `fireAtNDC` just before 'weapon:fire'. */
-export const lastShot: { x: number; y: number; at: number; weapon: WeaponId } = { x: 0, y: 0, at: 0, weapon: 'blaster' }
+/** NDC aim point and weapon of the last shot; set by `fireAtNDC` just before 'weapon:fire'. */
+export const lastShot: { x: number; y: number; weapon: WeaponId } = { x: 0, y: 0, weapon: 'blaster' }
 
 export function recordShot(ndcX: number, ndcY: number, weapon: WeaponId = 'blaster'): void {
   lastShot.x = ndcX
   lastShot.y = ndcY
   lastShot.weapon = weapon
-  lastShot.at = typeof performance !== 'undefined' ? performance.now() : 0
 }
 
 /** Camera-space muzzle tip, set every frame by `WeaponViewModel`; BulletPool draws fresh bullets from it. */

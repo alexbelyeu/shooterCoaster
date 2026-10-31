@@ -13,7 +13,7 @@
  * feedback is rotation-only), the kill trauma exceeded 1° or did not decay to 0,
  * the coaster camera's bank / pitch / speed FOV went past their caps (#123),
  * the first-person weapon is missing / off screen / covering the centre / not
- * pointing along the shot's tracer (> 25° on screen), the
+ * pointing along the shot's tracer (> 25° on screen; also after an un-held aim jump, #79), the
  * camera aspect doesn't match the canvas, or the results screen never finishes its
  * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats(),
  * or its Share line (shareText()) or "Copied!" click is wrong (#87).
@@ -555,6 +555,8 @@ async function freshShotProblems(page, id) {
   await waitFrames(page, 1, { maxMs: 8000, pollMs: 40 })
   await page.screenshot({ path: path.join(OUT, `${id}-shot.png`), timeout: SHOT_TIMEOUT })
   const inFlight = await read()
+  const jump = await aimJumpCheck(page, read)
+  problems.push(...jump.problems)
   await page.evaluate(() => {
     const s = window.__SC_TEST__
     s.bulletStep = null
@@ -563,7 +565,10 @@ async function freshShotProblems(page, id) {
   })
 
   const { bullets, weapon } = atMuzzle
-  const result = { fired, muzzleFrac: bullets.screenFrac, flightFrac: inFlight.bullets.screenFrac, maxScreenFrac: inFlight.bullets.maxScreenFrac, tipDistPx: null, aimErrorDeg: null }
+  const result = {
+    fired, muzzleFrac: bullets.screenFrac, flightFrac: inFlight.bullets.screenFrac, maxScreenFrac: inFlight.bullets.maxScreenFrac,
+    tipDistPx: null, aimErrorDeg: null, aimJump: jump.result,
+  }
   // Gun aim (#65) on this shot: fixed aim point, time frozen, recoil held at its peak, so the angle is repeatable (#158).
   if (fired && weapon) {
     const p = weaponAimProblem(weapon, 'desktop')
@@ -579,6 +584,32 @@ async function freshShotProblems(page, id) {
   }
   capProblem(bullets.screenFrac, 'the fresh shot at the muzzle')
   capProblem(inFlight.bullets.maxScreenFrac, 'a bullet in flight')
+  return { problems, result }
+}
+
+/** Far side of the screen from the fixed-point shot (0.25, 0.15): above the muzzle, so the aim check applies. */
+const AIM_JUMP_SHOT = { x: -0.6, y: 0.55 }
+
+/** A far-side shot without `holdFeedback` (#79); game time stays frozen, so only the shot-frame snap can turn the gun. */
+async function aimJumpCheck(page, read) {
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+  await waitFrames(page, 1, { maxMs: 8000, pollMs: 40 })
+  const before = (await read()).weapon
+  await page.waitForTimeout(300) // past every gun's fire interval
+  const fired = await page.evaluate(({ x, y }) => window.__SC_TEST__.fireShot(x, y), AIM_JUMP_SHOT)
+  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  const after = (await read()).weapon
+  const problems = []
+  const result = { fired, jumpDeg: null, aimErrorDeg: null }
+  if (!fired) problems.push('aim jump: fireShot() fired nothing')
+  else if (before && after) {
+    const barrel = (w) => Math.atan2(w.tipY - w.pivotY, w.tipX - w.pivotX)
+    const turn = Math.abs(((barrel(after) - barrel(before) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI)
+    result.jumpDeg = turn * (180 / Math.PI)
+    const p = weaponAimProblem(after, 'aim jump (no holdFeedback)')
+    if (p) problems.push(p)
+    result.aimErrorDeg = after.aimErrorDeg
+  }
   return { problems, result }
 }
 
@@ -2630,7 +2661,7 @@ async function run() {
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` particles=${r.particles?.points ?? '-'}${r.particles?.boostPoints ? `+${r.particles.boostPoints}` : ''}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° aimJump=${r.combat.freshShot?.aimJump?.aimErrorDeg?.toFixed(0)}°(turn ${r.combat.freshShot?.aimJump?.jumpDeg?.toFixed(0)}°) bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     if (r.perfGate?.knownOver && r.perfGate.over.length) console.log(`     WARN over budget (known, ${r.perfGate.knownOver}): ${r.perfGate.over.join(', ')}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
