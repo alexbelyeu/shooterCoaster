@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import GameCanvas from '@/canvas/GameCanvas'
 import { useGameStore } from '@/store/useGameStore'
 import TitleScreen from '@/ui/screens/TitleScreen'
@@ -15,6 +15,7 @@ import ScorePopups from '@/effects/ScorePopups'
 import WaveAnnouncement from '@/ui/hud/WaveAnnouncement'
 import { playTitleWhoosh, startTitleMusic, stopTitleMusic } from '@/audio/TitleMusicManager'
 import { isAudioReady } from '@/audio/AudioEngine'
+import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { usePauseOnHidden } from './usePauseOnHidden'
 
 /** PLAY fades the title to black (with a whoosh) over this long, then opens level select. */
@@ -34,6 +35,7 @@ export default function App() {
   const [veiled, setVeiled] = useState(false)
   const veilTimer = useRef<number | undefined>(undefined)
   usePauseOnHidden()
+  const reducedMotion = usePrefersReducedMotion()
   const inPlay = phase === 'countdown' || phase === 'playing'
 
   useEffect(() => {
@@ -44,6 +46,11 @@ export default function App() {
     }
   }, [phase])
   useEffect(() => () => stopTitleMusic(), [])
+
+  // The CSS mirrors its prefers-reduced-motion rules under html.reduce-motion for the in-game toggle.
+  useEffect(() => {
+    document.documentElement.classList.toggle('reduce-motion', reducedMotion)
+  }, [reducedMotion])
 
   useEffect(() => {
     if (phase !== 'title') setVeiled(false)
@@ -84,7 +91,8 @@ export default function App() {
   }, [inPlay])
 
   return (
-    <>
+    // Framer transitions (countdown, wave banner, screen fades) follow the toggle too, not only the OS setting.
+    <MotionConfig reducedMotion={reducedMotion ? 'always' : 'never'}>
       <GameCanvas />
 
       <AnimatePresence mode="wait">
@@ -148,6 +156,6 @@ export default function App() {
 
       {phase === 'playing' && <ScorePopups />}
       {phase === 'playing' && <WaveAnnouncement />}
-    </>
+    </MotionConfig>
   )
 }

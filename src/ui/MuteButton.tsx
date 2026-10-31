@@ -1,30 +1,24 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect } from 'react'
 import { useSettingsStore } from '@/store/useSettingsStore'
-import { syncVolumes } from '@/audio/AudioEngine'
 
 export default function MuteButton() {
   const muted = useSettingsStore((s) => s.muted)
   const toggleMute = useSettingsStore((s) => s.toggleMute)
 
-  const handleToggle = useCallback(() => {
-    toggleMute()
-    setTimeout(syncVolumes, 0)
-  }, [toggleMute])
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 's' || e.key === 'S') {
-        handleToggle()
+        toggleMute()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [handleToggle])
+  }, [toggleMute])
 
   return (
     <button
       className="mute-button"
-      onClick={handleToggle}
+      onClick={toggleMute}
       title={muted ? 'Unmute (S)' : 'Mute (S)'}
       aria-label={muted ? 'Unmute' : 'Mute'}
     >
