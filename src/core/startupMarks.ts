@@ -1,24 +1,14 @@
-/**
- * Startup phases as `performance.mark`s (`sc:<phase>`), each placed once per page load: the first
- * time it happens. `startupTimings()` reads them back as ms from navigation (`__SC_TEST__.initTimings()`,
- * printed by the smoke's countdown step); in DevTools they show on the Performance timeline.
- */
+/** Startup phases as one `performance.mark` (`sc:<phase>`) each, the first time they happen in a page load. */
 export const STARTUP_PHASES = [
-  /** main.tsx ran (bundle loaded and evaluated). */
   'boot',
-  /** The title scene's first frame. */
   'titleFrame',
-  /** The title screen mounted: PLAY takes clicks from here (it fades in over the next 1.3 s). */
+  // The title screen's mount: PLAY takes clicks from here, while it fades in.
   'playReady',
-  /** The first `startRun`. */
   'runStart',
-  /** The first level's scene mounted (ShaderWarmup's effect: the level's other effects ran before it). */
+  // ShaderWarmup's mount effect, which runs after the level's other effects.
   'levelMounted',
-  /** Its sky env map baked into `scene.environment`. */
   'envBaked',
-  /** Its shader warm-up finished (`sceneReady`). */
   'warmupDone',
-  /** The first frame in `playing`. */
   'firstPlayingFrame',
 ] as const
 

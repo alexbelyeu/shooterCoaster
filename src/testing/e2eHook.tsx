@@ -18,7 +18,7 @@
  *     the weapon view-model's on-screen box (hit feedback checks)
  *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses) and render it offline
  *   - read the camera pose (title fly-by), shader program count and longest frame (first-shot hitch)
- *   - read startup timings (navigation to first title frame, level mounted, warm-up done, first playing frame)
+ *   - read startup timings (initTimings)
  *   - summon the level's boss now, read it (hp, exposed weak points, on-screen box) and hit it through processHit
  *   - read the graphics quality, its preset and the adaptive dpr steps
  *
@@ -174,7 +174,7 @@ export interface SCTestApi {
   /** The current level's shader warm-up (`canvas/ShaderWarmup.tsx`): finished?, how long it took
    *  from level mount, and the renderer's program count after it. null before the first level. */
   shaderWarmup: { done: boolean; ms: number; programs: number } | null
-  /** ms from navigation to each startup phase reached so far, the first time (`core/startupMarks.ts`). */
+  /** ms from navigation to each startup phase (`core/startupMarks.ts`). */
   initTimings: () => Partial<Record<StartupPhase, number>>
   // ── Boss (issue #181) ──
   /** Bring the level's boss in now (tell, then arrival on the next frames) instead of at its level time. */

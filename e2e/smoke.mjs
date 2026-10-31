@@ -33,10 +33,8 @@
  * `?e2e=1` skips the Ready / Set / GO countdown; the countdown check loads the first level
  * with `&countdown=1`: the countdown must show (countdown.png), ignore a press (also once
  * held on into play), hold the timer, reach playing on GO, and the shader warm-up must
- * finish; on a replay, a tap after the 1 s mark must skip to playing. It also reports the
- * startup timings (`initTimings()`).
- * Perf gate (#188): each level's ride draw calls and scene / track totals must stay under its
- * `scene` ceilings in budgets.json (`--no-perf-gate` skips it); see sceneBudgetCheck().
+ * finish; on a replay, a tap after the 1 s mark must skip to playing.
+ * Perf gate (#188): a level fails past its `scene` ceilings in budgets.json; see sceneBudgetCheck().
  * The speed check holds the first level at top speed on its most banked sampled point:
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  * The boss check summons level1's Golden Blimp and shoots it down in phase order
@@ -226,7 +224,6 @@ async function imageStats(page, png) {
 const READABLE_PX = 12
 const MIN_READABLE = 2
 
-/** Per-level ceilings (budgets.json `scene`, #188); `--no-perf-gate` skips them for local experiments. */
 const SCENE_BUDGETS = JSON.parse(fs.readFileSync(new URL('../budgets.json', import.meta.url), 'utf8')).scene
 const PERF_GATE = !args['no-perf-gate']
 const BUDGET_KEYS = [
@@ -237,10 +234,7 @@ const BUDGET_KEYS = [
   ['trackTriangles', 'track tris'],
 ]
 
-/**
- * A level's ride numbers against its budget: `over` lists each total past its ceiling, as
- * `scene objs=560 (budget 551)`. A level whose budget names `knownOver` (an open issue) only warns.
- */
+/** Each ride total past its ceiling; a level whose entry names `knownOver` (an open issue) only warns. */
 function sceneBudgetCheck(id, stats) {
   const budget = SCENE_BUDGETS[id]
   if (!budget) return { over: [`no scene budget for ${id} in budgets.json`], knownOver: null }
@@ -2384,7 +2378,7 @@ async function run() {
   process.exit(failed ? 1 : 0)
 }
 
-/** Title phases from navigation, level phases from the run's start (the smoke picks when that is). */
+/** Level phases from the run's start: the smoke picks when that is. */
 function startupSummary(t) {
   const ms = (v) => (v === undefined ? '-' : `${v}`)
   const sinceRun = (v) => (v === undefined || t.runStart === undefined ? '-' : `+${v - t.runStart}`)
@@ -2428,7 +2422,6 @@ function viewSummary(views) {
   return ` buffer portrait=${b(views.portrait)} landscape=${b(views.landscape)} aspect cam/canvas portrait=${f(views.portrait)} landscape=${f(views.landscape)} back=${f(views.portraitAgain)}`
 }
 
-/** Objects whose name starts with "track", summed. */
 function trackTotals(scene) {
   if (!scene) return null
   const total = { objects: 0, triangles: 0 }
@@ -2438,7 +2431,7 @@ function trackTotals(scene) {
   return total
 }
 
-/** Camera-independent totals: whole scene, and the track's share. */
+/** Camera-independent totals: whole scene, and objects whose name starts with "track". */
 function sceneSummary(scene) {
   if (!scene) return ''
   const track = trackTotals(scene)
