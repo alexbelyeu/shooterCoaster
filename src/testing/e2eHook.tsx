@@ -59,6 +59,7 @@ import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/en
 import { clipboardText, sharePayloadForRun } from '@/ui/share'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
+import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -80,10 +81,12 @@ export interface SCTestApi {
   startLevel: (id: string, seed?: number) => void
   /** `<count>:<hash>` of the latest run's spawn positions (formation members: their seeded slots); null until a spawner has generated them. */
   spawnDigest: () => string | null
-  /** Level time (s) now and when the next wave still to come is due (null once all are in); null with no level. */
-  nextWave: () => { levelTime: number; due: number | null } | null
-  /** Every `wave:incoming` (the tell, ~1 s early) and `wave:announce` (arrival) since load, with performance.now() ms and the level time (s). */
-  waveEvents: { kind: 'incoming' | 'announce'; label: string; ms: number; levelTime: number | null }[]
+  /** Level time (s) now, when the next wave still to come is due (null once all are in) and the spawner's last wave tick (s); null with no level. */
+  nextWave: () => WaveProbe | null
+  /** Seconds of level time a `wave:incoming` tell is due before its wave (`WAVE_TELL_SECONDS`). */
+  waveTellSeconds: number
+  /** Every `wave:incoming` (tell) and `wave:announce` (arrival) since load; a tell is on time when `lastTick < due - waveTellSeconds <= levelTime`. */
+  waveEvents: { kind: 'incoming' | 'announce'; label: string; ms: number; levelTime: number | null; due: number | null; lastTick: number | null }[]
   phase: () => string
   /** Jump to a UI phase (e.g. `levelSelect`) without clicking through the screens before it. */
   setPhase: (phase: GamePhase) => void
@@ -129,6 +132,8 @@ export interface SCTestApi {
   /** Seconds every live bullet flies per frame instead of the frame time, and no bullet expires;
    *  0 freezes them (e.g. a fresh one at the muzzle), null is normal play. */
   bulletStep: number | null
+  /** Seconds the level timer and game clock advance per playing frame instead of the frame time; null is normal play. */
+  timerStep: number | null
   /** Drawn bullets (#165): count, largest screen radius (fraction of canvas height) now and since load, newest one's CSS px point. */
   bullets: () => E2EBullets
   /** Fire one real shot through NDC (x, y), like a click there. False if not fired (phase, fire delay). */
@@ -382,7 +387,12 @@ export function recordE2ESpawns(positions: readonly { x: number; y: number; z: n
 }
 
 /** The mounted spawner's wave schedule, set by EnemySpawner. */
-let waveProbe: (() => { levelTime: number; due: number | null }) | null = null
+interface WaveProbe {
+  levelTime: number
+  due: number | null
+  lastTick: number | null
+}
+let waveProbe: (() => WaveProbe) | null = null
 export function registerE2EWaves(probe: typeof waveProbe) {
   if (isE2E) waveProbe = probe
 }
@@ -667,6 +677,7 @@ export function installE2EApi() {
     },
     spawnDigest: () => spawnDigest,
     nextWave: () => waveProbe?.() ?? null,
+    waveTellSeconds: WAVE_TELL_SECONDS,
     waveEvents: [],
     audio: readAudio,
     audioBurst,
@@ -681,6 +692,7 @@ export function installE2EApi() {
     weapon: null,
     holdFeedback: false,
     bulletStep: null,
+    timerStep: null,
     bullets: readBullets,
     fireShot: (x: number, y: number) => (probeCamera ? fireAtNDC(x, y, probeCamera) : false),
     shaderWarmup: null,
@@ -783,7 +795,8 @@ export function installE2EApi() {
   eventBus.on('enemy:hit', () => { api.combat.hits += 1 })
   eventBus.on('enemy:killed', () => { api.combat.kills += 1 })
   const onWave = (kind: 'incoming' | 'announce') => (label: unknown) => {
-    api.waveEvents.push({ kind, label: String(label), ms: performance.now(), levelTime: waveProbe?.().levelTime ?? null })
+    const w = waveProbe?.()
+    api.waveEvents.push({ kind, label: String(label), ms: performance.now(), levelTime: w?.levelTime ?? null, due: w?.due ?? null, lastTick: w?.lastTick ?? null })
   }
   eventBus.on('wave:incoming', onWave('incoming'))
   eventBus.on('wave:announce', onWave('announce'))

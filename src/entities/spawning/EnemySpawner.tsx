@@ -354,6 +354,8 @@ export default function EnemySpawner({
     phase === 'playing' ? waves[0]?.waveLabel ?? null : null,
   )
   const waveProgress = useRef(newWaveProgress(waves.length))
+  /** Level time of the last wave tick, for the e2e probe. */
+  const lastWaveTick = useRef<number | null>(null)
   const slowMoResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** Ends a pending last-kill slow-mo now, so it never outlives its run. */
   const endSlowMo = useCallback(() => {
@@ -380,6 +382,7 @@ export default function EnemySpawner({
     setWaveAnnouncement(null)
     firstWaveAnnounced.current = false
     waveProgress.current = newWaveProgress(waves.length)
+    lastWaveTick.current = null
     killedEnemies.current.clear()
     setGeneration((g) => g + 1)
   }, [runId, initialActiveWave, initialPlacements, waves, endSlowMo])
@@ -432,6 +435,7 @@ export default function EnemySpawner({
     registerE2EWaves(() => ({
       levelTime: timerSeconds - useGameStore.getState().timeRemaining,
       due: nextWaveDue(waveDelays, waveProgress.current),
+      lastTick: lastWaveTick.current,
     }))
     return () => registerE2EWaves(null)
   }, [waveDelays, timerSeconds])
@@ -440,7 +444,9 @@ export default function EnemySpawner({
   useFrame(() => {
     const s = useGameStore.getState()
     if (phase !== 'playing' || s.phase !== 'playing') return
-    tickWaves(waveDelays, timerSeconds - s.timeRemaining, waveProgress.current, tellWave, activateWave)
+    const levelTime = timerSeconds - s.timeRemaining
+    tickWaves(waveDelays, levelTime, waveProgress.current, tellWave, activateWave)
+    lastWaveTick.current = levelTime
   })
 
   useEffect(() => {

@@ -114,7 +114,8 @@ frame and PLAY from navigation; level mounted, env baked, warm-up done and first
 them to `results.json` (`initTimings` on the `countdown` entry); no thresholds, software GL. A `speed` step holds the first level at top speed on the most
 banked of ten sampled track points: the wind streaks must show and the camera must bank ≥ 1° (`speed.png`).
 When level2 is in the run, a `wave` step rides it to the crow wave: its `wave:incoming` tell (screen-edge pulse +
-label) must come before the wave, the run is paused and resumed in between (no tell or wave may fire twice), then the V flies in and is frozen for `level2-wave.png` (≥ 5 crows on screen, none within 40 units).
+label) must come before the wave, on time by the level timer (`waveTellSeconds` ahead; the timer steps a fixed 0.25 s a frame
+around it, `timerStep`, so a slow frame can't land both together), the run is paused and resumed in between (no tell or wave may fire twice), then the V flies in and is frozen for `level2-wave.png` (≥ 5 crows on screen, none within 40 units).
 When level1 is in the run, a `scrim` step loads it with `?audio=scrim` (the score engine): a click must unlock audio and start the
 title score, the level score must crossfade from it, keep its long-lived node count flat (≤ 150) and advance, run `audioBurst(64, 32)`
 on the arcade SFX twice (never more voices than the budget, voices stolen, SFX node count flat, nothing thrown or dropped), duck with time frozen,
@@ -143,7 +144,7 @@ vary) and on the scene / track objects and triangles (+15%); a level past one fa
 (then drop the key). `--no-perf-gate` skips the gate for local experiments. Ceilings are budgets: only the Director raises them.
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
-(`levels()`, `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time and level time), `nextWave()` → level time now + when the next wave is due, `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction),
+(`levels()`, `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time, level time, due wave and the wave tick before it), `nextWave()` → level time now + when the next wave is due + the last wave tick, `waveTellSeconds`, `timerStep` (seconds of level time + game clock per frame; null is the frame time), `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction),
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/multiplier/timeScale/frenzy/timeRemaining/phase/liveEnemies/
 onScreenEnemies/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `killNearest(n)` (fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
