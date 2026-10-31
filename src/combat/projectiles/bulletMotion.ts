@@ -59,3 +59,31 @@ export function segmentHitsSphere(
   const dz = acz - abz * t
   return dx * dx + dy * dy + dz * dz < radiusSq
 }
+
+/**
+ * Piercing (#185): a bullet keeps flying after a hit until it has hit `pierce`
+ * distinct targets. `hitTargets` holds the ones it has hit (sized to the most any
+ * weapon pierces), so a target it is still inside next frame is not hit again.
+ */
+export interface PierceState<T> {
+  pierce: number
+  hitCount: number
+  hitTargets: (T | null)[]
+}
+
+export function hasHit<T>(p: PierceState<T>, target: T): boolean {
+  for (let i = 0; i < p.hitCount; i++) if (p.hitTargets[i] === target) return true
+  return false
+}
+
+/** Records a hit; true when the bullet is spent. */
+export function recordHit<T>(p: PierceState<T>, target: T): boolean {
+  p.hitTargets[p.hitCount++] = target
+  return p.hitCount >= p.pierce
+}
+
+export function resetPierce<T>(p: PierceState<T>, pierce: number): void {
+  p.pierce = Math.min(pierce, p.hitTargets.length)
+  for (let i = 0; i < p.hitCount; i++) p.hitTargets[i] = null
+  p.hitCount = 0
+}

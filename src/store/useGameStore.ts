@@ -6,6 +6,7 @@ import { gameTime } from '@/core/gameClock'
 import { markStartup } from '@/core/startupMarks'
 import { comboExpired, comboMultiplier } from '@/combat/comboTiers'
 import { startPhaseFor } from './startPhase'
+import { NO_PICKUP, applyPickup, type PickupWeaponId, type WeaponState } from '@/combat/weapons/weaponTypes'
 
 interface GameState {
   phase: GamePhase
@@ -29,10 +30,11 @@ interface GameState {
 
   kills: number
   shotsFired: number
-  /** Bullets that hit an enemy (`processHit`). */
+  /** Bullets that hit a target (`processHit`), each once however many it pierces, so never more than `shotsFired`. */
   hits: number
   bestCombo: number
-  registerShot: () => void
+  /** One per bullet: a spread pull counts as 3 shots. */
+  registerShot: (bullets?: number) => void
   registerHit: () => void
 
   // Combo (tiers and windows: combat/comboTiers.ts; expiry and slow-mo: combat/comboRuntime.ts)
@@ -40,6 +42,10 @@ interface GameState {
   /** Call before `addScore`, so the kill scores at the tier it reaches. */
   registerKill: () => void
   resetCombo: () => void
+
+  /** The weapon pickup this run (`combat/weapons/weaponTypes.ts`). */
+  weapon: WeaponState
+  pickUpWeapon: (id: PickupWeaponId) => void
 
   timeRemaining: number
   setTimeRemaining: (t: number) => void
@@ -78,6 +84,7 @@ const FRESH_RUN = {
   combo: NO_COMBO,
   timeScale: 1,
   boss: null,
+  weapon: NO_PICKUP,
 } satisfies Partial<GameState>
 
 const urlSearch = (): string | null =>
@@ -114,7 +121,7 @@ export const useGameStore = create<GameState>()(
       },
 
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
-      registerShot: () => set((s) => ({ shotsFired: s.shotsFired + 1 })),
+      registerShot: (bullets = 1) => set((s) => ({ shotsFired: s.shotsFired + bullets })),
       registerHit: () => set((s) => ({ hits: s.hits + 1 })),
 
       registerKill: () =>
@@ -129,6 +136,8 @@ export const useGameStore = create<GameState>()(
           }
         }),
       resetCombo: () => set({ combo: NO_COMBO }),
+
+      pickUpWeapon: (id) => set((s) => ({ weapon: applyPickup(s.weapon, id, gameTime()) })),
 
       timeRemaining: 0,
       setTimeRemaining: (t) => set({ timeRemaining: t }),

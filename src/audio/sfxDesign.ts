@@ -1,6 +1,7 @@
 /** Sound design data for SFXManager; no Tone import so it stays unit-testable. */
 import type { BiomeType } from '@/types/level'
 import { comboTierIndex } from '@/combat/comboTiers'
+import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
 export interface KillLayers {
   thump: boolean
@@ -63,6 +64,24 @@ export const FIRE_VARIANTS: readonly FireVariant[] = [
   { startHz: 980, endHz: 220, sweepS: 0.085 },
   { startHz: 1320, endHz: 300, sweepS: 0.115 },
 ]
+
+/** The pickup guns (#185): each its own timbre, so the swap is heard. Rapid fires twice as often, so it sits lower. */
+export interface WeaponFireDesign extends FireVariant {
+  oscillator: 'sawtooth' | 'square' | 'triangle'
+  volume: number
+}
+
+export const WEAPON_FIRE_SFX: Record<PickupWeaponId, WeaponFireDesign> = {
+  // A fat, low buzz: three bullets at once.
+  spread: { oscillator: 'sawtooth', startHz: 760, endHz: 130, sweepS: 0.12, volume: -24 },
+  // A tight tick an octave up.
+  rapid: { oscillator: 'square', startHz: 1900, endHz: 820, sweepS: 0.035, volume: -30 },
+  // A long falling laser.
+  piercing: { oscillator: 'triangle', startHz: 2600, endHz: 380, sweepS: 0.17, volume: -19 },
+}
+
+/** Shooting a pickup: a quick major arpeggio on the chime. */
+export const PICKUP_CHIME = { notes: ['C5', 'E5', 'G5', 'C6'], stepS: 0.055, noteS: 0.14 } as const
 
 /** Held-trigger auto-fire sits 6 dB lower. */
 export function fireVelocity(auto: boolean): number {
@@ -200,6 +219,8 @@ export function keyNote(key: MusicKey, degree: number, octave = 0): number {
 
 export type ArcadeSoundId =
   | 'fire'
+  | `fire.${PickupWeaponId}`
+  | 'pickup'
   | 'hit'
   | `kill.${KillSound}`
   | 'kill.thump'
@@ -237,6 +258,10 @@ export const PRIO = { fire: 1, hit: 2, kill: 3, cue: 4, ui: 5, event: 6 } as con
 
 export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   fire: { prio: PRIO.fire, db: -13, send: 0 },
+  'fire.spread': { prio: PRIO.fire, db: -12, send: 0 },
+  'fire.rapid': { prio: PRIO.fire, db: -17, send: 0 },
+  'fire.piercing': { prio: PRIO.fire, db: -12, send: 0 },
+  pickup: { prio: PRIO.event, db: -9, send: 0.3 },
   hit: { prio: PRIO.hit, db: -15, send: 0.05 },
   'kill.pop': { prio: PRIO.kill, db: -2, send: 0.12 },
   'kill.flutter': { prio: PRIO.kill, db: -2, send: 0.12 },

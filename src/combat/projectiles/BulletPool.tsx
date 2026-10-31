@@ -3,15 +3,15 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import { getCollisionTargets, processHit } from '@/combat/CollisionManager'
+import { MAX_PIERCE } from '@/combat/weapons/weaponTypes'
 import { muzzleTip } from '@/combat/hitFeedback'
 import { e2eBullets, isE2E } from '@/testing/e2eHook'
 import type { Bullet, BulletPoolHandle } from './bulletPoolHandle'
 import { setBulletPool } from './bulletPoolHandle'
-import { BULLET_SPEED_PER_SEC, segmentHitsSphere, stepBullet } from './bulletMotion'
+import { BULLET_SPEED_PER_SEC, hasHit, recordHit, resetPierce, segmentHitsSphere, stepBullet } from './bulletMotion'
 import { BULLET_RADIUS_PER_SIZE, drawnBulletRadius, muzzleOffsetWeight, screenRadiusFraction } from './bulletVisual'
 
 const POOL_SIZE = 350
-const FIRE_DELAY_MS = 60
 const BULLET_LIFETIME_MS = 5000
 
 const _forward = new THREE.Vector3()
@@ -44,6 +44,9 @@ export default function BulletPool({
         muzzleOffset: new THREE.Vector3(),
         muzzlePending: false,
         travelled: 0,
+        pierce: 1,
+        hitCount: 0,
+        hitTargets: new Array(MAX_PIERCE).fill(null),
       })
     }
     return arr
@@ -52,18 +55,12 @@ export default function BulletPool({
   const liveBulletBuffer = useRef<Bullet[]>(new Array(POOL_SIZE))
   const liveBulletCount = useRef(0)
   const nextFreeIndex = useRef(0)
-  const lastFireTime = useRef(0)
   const tempMatrix = useMemo(() => new THREE.Matrix4(), [])
   const tempColor = useMemo(() => new THREE.Color(bulletColor), [bulletColor])
   const scaleVec = useRef(new THREE.Vector3()).current
 
   const fire = useCallback(
-    (origin: THREE.Vector3, direction: THREE.Vector3, hitScale = 1): boolean => {
-      const now = performance.now()
-      if (now - lastFireTime.current < FIRE_DELAY_MS) return false
-
-      lastFireTime.current = now
-
+    (origin: THREE.Vector3, direction: THREE.Vector3, hitScale = 1, pierce = 1): boolean => {
       // Scan from last known free index, wrapping around once
       let bullet: Bullet | null = null
       for (let i = 0; i < POOL_SIZE; i++) {
@@ -77,7 +74,7 @@ export default function BulletPool({
       if (!bullet) return false
 
       bullet.alive = true
-      bullet.bornAt = now
+      bullet.bornAt = performance.now()
       bullet.position.copy(origin)
       bullet.prev.copy(origin)
       bullet.direction.copy(direction).normalize()
@@ -85,6 +82,7 @@ export default function BulletPool({
       bullet.hitScale = hitScale
       bullet.muzzlePending = true
       bullet.travelled = 0
+      resetPierce(bullet, pierce)
       return true
     },
     [bullets],
@@ -176,16 +174,20 @@ export default function BulletPool({
         const bullet = liveBulletBuffer.current[b]
         if (!bullet.alive) continue
         for (const target of targets.values()) {
-          if (target.hitThisFrame) continue // already hit, skip
+          // One hit per target per frame; a piercing bullet never hits the same target twice.
+          if (target.hitThisFrame || hasHit(bullet, target)) continue
           const pos = target.getPosition()
           const a = bullet.prev
           const b = bullet.position
           const rSq = target.radiusSq * bullet.hitScale * bullet.hitScale
           if (segmentHitsSphere(a.x, a.y, a.z, b.x, b.y, b.z, pos.x, pos.y, pos.z, rSq)) {
-            bullet.alive = false
-            bullet.position.set(0, -9999, 0)
             target.hitThisFrame = true
-            break
+            target.firstHitThisFrame = bullet.hitCount === 0
+            if (recordHit(bullet, target)) {
+              bullet.alive = false
+              bullet.position.set(0, -9999, 0)
+              break
+            }
           }
         }
       }
@@ -194,7 +196,7 @@ export default function BulletPool({
       for (const target of targets.values()) {
         if (target.hitThisFrame) {
           target.hitThisFrame = false
-          processHit(target)
+          processHit(target, target.firstHitThisFrame)
         }
       }
     }

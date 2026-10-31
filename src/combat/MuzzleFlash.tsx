@@ -3,7 +3,8 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
 import { useGameStore } from '@/store/useGameStore'
-import { MUZZLE_FLASH_MS, isFeedbackHeld } from './hitFeedback'
+import { MUZZLE_FLASH_MS, isFeedbackHeld, lastShot } from './hitFeedback'
+import { WEAPONS } from './weapons/weaponTypes'
 
 /** Barrel tip (camera space) and flash size, written by WeaponViewModel each frame before this renders. */
 export interface MuzzleAnchor {
@@ -23,6 +24,7 @@ const vertexShader = /* glsl */ `
 const fragmentShader = /* glsl */ `
   uniform float uIntensity;
   uniform float uSpikes;
+  uniform vec3 uColor;
   varying vec2 vUv;
   void main() {
     vec2 p = vUv * 2.0 - 1.0;
@@ -33,7 +35,7 @@ const fragmentShader = /* glsl */ `
     float glow = exp(-r * r * 3.5) * 0.35;
     float v = (core * 1.4 + spikes * 0.9 + glow) * uIntensity;
     vec3 hot = vec3(1.0, 0.95, 0.8);
-    vec3 warm = vec3(1.0, 0.55, 0.15);
+    vec3 warm = uColor;
     vec3 col = mix(warm, hot, clamp(core * 1.5, 0.0, 1.0)) * 1.8;
     gl_FragColor = vec4(col * v, clamp(v, 0.0, 1.0));
   }
@@ -50,7 +52,7 @@ export default function MuzzleFlash({ anchor }: { anchor: MuzzleAnchor }) {
       new THREE.ShaderMaterial({
         vertexShader,
         fragmentShader,
-        uniforms: { uIntensity: { value: 0 }, uSpikes: { value: 6 } },
+        uniforms: { uIntensity: { value: 0 }, uSpikes: { value: 6 }, uColor: { value: new THREE.Color(...WEAPONS.blaster.muzzleColor) } },
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthTest: false,
@@ -79,6 +81,7 @@ export default function MuzzleFlash({ anchor }: { anchor: MuzzleAnchor }) {
       const s = 0.85 + Math.random() * 0.3
       mesh.userData.flashScale = s
       material.uniforms.uSpikes.value = Math.random() < 0.5 ? 6 : 8
+      material.uniforms.uColor.value.setRGB(...WEAPONS[lastShot.weapon].muzzleColor)
     }
     eventBus.on('weapon:fire', onFire)
     return () => eventBus.off('weapon:fire', onFire)

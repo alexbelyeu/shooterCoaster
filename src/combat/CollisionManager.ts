@@ -7,7 +7,11 @@ export interface CollisionTarget {
   getPosition: () => THREE.Vector3
   radiusSq: number
   onHit: () => void
+  /** A weapon pickup (#185) is shot like an enemy but is no enemy: no `enemy:hit`, no hitmarker. */
+  kind?: 'pickup'
   hitThisFrame: boolean
+  /** Set with `hitThisFrame`: the bullet's first hit, so it counts for accuracy (a piercing bullet counts once). */
+  firstHitThisFrame: boolean
 }
 
 /**
@@ -23,8 +27,8 @@ export interface EnemyHitEvent {
 const targets = new Map<string, CollisionTarget>()
 const hitEvent: EnemyHitEvent = { id: '', position: new THREE.Vector3() }
 
-export function registerCollisionTarget(target: Omit<CollisionTarget, 'hitThisFrame'>): void {
-  targets.set(target.id, { ...target, hitThisFrame: false })
+export function registerCollisionTarget(target: Omit<CollisionTarget, 'hitThisFrame' | 'firstHitThisFrame'>): void {
+  targets.set(target.id, { ...target, hitThisFrame: false, firstHitThisFrame: false })
 }
 
 export function unregisterCollisionTarget(id: string): void {
@@ -36,12 +40,17 @@ export function getCollisionTargets(): Map<string, CollisionTarget> {
 }
 
 /**
- * Resolve one hit on a target: emit `enemy:hit` (UI / audio / feedback react to
- * it), count it for accuracy, then run the target's own hit handler. Used by the bullet pool's
- * collision pass and by the e2e test hook so both take the same path.
+ * Resolve one hit on a target: count it for accuracy (`countHit`: a piercing bullet's
+ * later hits don't), emit `enemy:hit` (UI / audio / feedback react to it), then run the
+ * target's own hit handler. Used by the bullet pool's collision pass and by the e2e
+ * test hook so both take the same path.
  */
-export function processHit(target: CollisionTarget): void {
-  useGameStore.getState().registerHit()
+export function processHit(target: CollisionTarget, countHit = true): void {
+  if (countHit) useGameStore.getState().registerHit()
+  if (target.kind === 'pickup') {
+    target.onHit()
+    return
+  }
   hitEvent.id = target.id
   hitEvent.position.copy(target.getPosition())
   eventBus.emit('enemy:hit', hitEvent)

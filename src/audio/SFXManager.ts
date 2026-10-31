@@ -8,6 +8,8 @@ import {
   FIREWORK_BIOMES,
   FIREWORK_SFX,
   FIRE_VARIANTS,
+  PICKUP_CHIME,
+  WEAPON_FIRE_SFX,
   KILL_TIMBRES,
   type KillSound,
   STAR_CHIME_NOTES,
@@ -21,12 +23,14 @@ import {
   killPingHz,
 } from './sfxDesign'
 import type { BiomeType } from '@/types/level'
+import type { PickupWeaponId, WeaponId } from '@/combat/weapons/weaponTypes'
 
 /*
  * Every gameplay SFX node is built once per level into `owned` and reused; never create one in a play function.
  *
  * Volume hierarchy (individual synth dB + sfxChannel -6 dB, then the master limiter):
  *   Fire pew   : -20 (-26 when auto-firing) → background, fires 10×/sec
+ *   Pickup guns: spread -24 saw, rapid -30 square tick, piercing -19 triangle laser; pickup chime on the star chime
  *   Hit tick   : -24 noise + -22 blip → crisp, ~30 ms
  *   Balloon pop: -14 snap + -18 ping → punchy but brief
  *   Kill layers: thump -14 (combo 2×), ring -26 (3×), swell -24 (5×)
@@ -40,6 +44,7 @@ import type { BiomeType } from '@/types/level'
 
 interface Kit {
   fire: Tone.Synth
+  weaponFire: Record<PickupWeaponId, Tone.Synth>
   popPing: Tone.Synth
   popSnap: Tone.NoiseSynth
   tickNoise: Tone.NoiseSynth
@@ -78,6 +83,15 @@ function createKit(biome: BiomeType): Kit {
     envelope: { attack: 0.005, decay: 0.12, sustain: 0, release: 0.06 },
     volume: -20,
   })).connect(sfxChannel)
+
+  const weaponFire = {} as Record<PickupWeaponId, Tone.Synth>
+  for (const [id, d] of Object.entries(WEAPON_FIRE_SFX) as [PickupWeaponId, (typeof WEAPON_FIRE_SFX)[PickupWeaponId]][]) {
+    weaponFire[id] = own(new Tone.Synth({
+      oscillator: { type: d.oscillator },
+      envelope: { attack: 0.003, decay: d.sweepS, sustain: 0, release: 0.05 },
+      volume: d.volume,
+    })).connect(sfxChannel)
+  }
 
   const popPing = own(new Tone.Synth({
     oscillator: { type: 'sine' },
@@ -170,7 +184,7 @@ function createKit(biome: BiomeType): Kit {
 
   const firework = FIREWORK_BIOMES.includes(biome) ? createFireworkVoices() : null
 
-  return { fire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, comboBreak, stinger, chime, bossThud, bossBoom, firework }
+  return { fire, weaponFire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, comboBreak, stinger, chime, bossThud, bossBoom, firework }
 }
 
 function createFireworkVoices(): FireworkVoices {
@@ -211,17 +225,22 @@ export function sfxNodeCount(): number {
 let fireVariant = 0
 
 /** One shot. `auto` = held-trigger auto-fire, played 6 dB quieter to avoid fatigue. */
-export function playFireSound(auto = false): void {
+export function playFireSound(auto = false, weapon: WeaponId = 'blaster'): void {
   try {
     const k = ensureKit()
     if (!k) return
-    const v = FIRE_VARIANTS[fireVariant]
-    fireVariant = (fireVariant + 1) % FIRE_VARIANTS.length
+    let synth = k.fire
+    let v = FIRE_VARIANTS[fireVariant]
+    if (weapon === 'blaster') fireVariant = (fireVariant + 1) % FIRE_VARIANTS.length
+    else {
+      synth = k.weaponFire[weapon]
+      v = WEAPON_FIRE_SFX[weapon]
+    }
     const jitter = 0.94 + Math.random() * 0.12
-    const now = nextTriggerTime(k.fire, Tone.now(), Tone.getContext().currentTime)
-    k.fire.triggerAttack(v.startHz * jitter, now, fireVelocity(auto))
-    k.fire.frequency.exponentialRampTo(v.endHz * jitter, v.sweepS, now)
-    k.fire.triggerRelease(now + v.sweepS + 0.02)
+    const now = nextTriggerTime(synth, Tone.now(), Tone.getContext().currentTime)
+    synth.triggerAttack(v.startHz * jitter, now, fireVelocity(auto))
+    synth.frequency.exponentialRampTo(v.endHz * jitter, v.sweepS, now)
+    synth.triggerRelease(now + v.sweepS + 0.02)
   } catch (e) {
     dropSound('fire', e)
   }
@@ -416,6 +435,21 @@ export function playFireworkPop(): void {
 }
 
 /** Uses the level's kit, which stays mounted under the results screen. */
+/** Shooting a weapon pickup: an arpeggio up the chime. */
+export function playPickupChime(): void {
+  const k = ensureKit()
+  if (!k) return
+  try {
+    const t0 = Tone.now()
+    const ctxNow = Tone.getContext().currentTime
+    PICKUP_CHIME.notes.forEach((note, i) => {
+      k.chime.triggerAttackRelease(note, PICKUP_CHIME.noteS, nextTriggerTime(k.chime, t0 + i * PICKUP_CHIME.stepS, ctxNow))
+    })
+  } catch (e) {
+    dropSound('pickup chime', e)
+  }
+}
+
 export function playStarChime(starIndex: number): void {
   const k = ensureKit()
   if (!k) return

@@ -9,38 +9,59 @@ import { getPointerState, subscribePointer } from '@/input/pointerInput'
 import { recordShot } from './hitFeedback'
 import { findAssistTargetNDC } from './AimSystem'
 import { assistRadiusPx, hitScaleFor } from './aimAssist'
+import { activeWeapon, fanAngles } from './weapons/weaponTypes'
+import { gameTime } from '@/core/gameClock'
 
 const _raycaster = new THREE.Raycaster()
 const _ndc = new THREE.Vector2()
 const _direction = new THREE.Vector3()
 const _origin = new THREE.Vector3()
 const _assistNDC = new THREE.Vector2()
+const _up = new THREE.Vector3()
+const _pellet = new THREE.Vector3()
+const _fan: number[] = []
+/** A timer tick can land a few ms early; a pull that close to the interval still fires. */
+const FIRE_INTERVAL_SLACK_MS = 5
+let lastFireAt = -Infinity
 
 /**
- * Fire one bullet from the camera through a point in normalized device
- * coordinates (-1..1, y up). Shared by pointer input and the e2e autofire hook.
+ * Pull the trigger once from the camera through a point in normalized device
+ * coordinates (-1..1, y up): one bullet, or the active pickup's fan
+ * (`weapons/weaponTypes.ts`). Shared by pointer input and the e2e autofire hook.
  * Returns true if a bullet actually left the pool (false when not playing,
- * throttled by the fire delay, or the pool is missing/exhausted).
+ * inside the weapon's fire interval, or the pool is missing/exhausted).
  * `hitScale` widens the bullet's hit radius on targets (touch shots); `auto`
  * marks held-trigger auto-fire (quieter fire sound).
  */
 export function fireAtNDC(x: number, y: number, camera: THREE.Camera, hitScale = 1, auto = false): boolean {
-  if (useGameStore.getState().phase !== 'playing') return false
+  const store = useGameStore.getState()
+  if (store.phase !== 'playing') return false
 
   const pool = getBulletPool()
   if (!pool) return false
+
+  const weapon = activeWeapon(store.weapon, gameTime())
+  const now = performance.now()
+  if (now - lastFireAt < weapon.fireIntervalMs - FIRE_INTERVAL_SLACK_MS) return false
 
   _ndc.set(x, y)
   _raycaster.setFromCamera(_ndc, camera)
   _direction.copy(_raycaster.ray.direction)
   _origin.copy(camera.position)
+  _up.setFromMatrixColumn(camera.matrixWorld, 1)
 
-  if (!pool.fire(_origin, _direction, hitScale)) return false
-  useGameStore.getState().registerShot()
-  sfx().fire(auto)
+  let fired = 0
+  for (const angle of fanAngles(weapon, _fan)) {
+    _pellet.copy(_direction).applyAxisAngle(_up, angle)
+    if (pool.fire(_origin, _pellet, hitScale, weapon.pierce)) fired++
+  }
+  if (fired === 0) return false
+  lastFireAt = now
+  store.registerShot(fired)
+  sfx().fire(auto, weapon.id)
   // Weapon view-model (recoil, muzzle flash, tracer) aims at this shot. Touch
   // aim assist passes the assisted NDC in here, so the tracer follows the bullet.
-  recordShot(x, y)
+  recordShot(x, y, weapon.id)
   // Listeners read lastShot instead of a payload (no allocation).
   eventBus.emit('weapon:fire')
   return true
@@ -48,7 +69,7 @@ export function fireAtNDC(x: number, y: number, camera: THREE.Camera, hitScale =
 
 /**
  * Hook that turns pointer input (mouse, touch, pen) into bullets.
- * Press fires one shot at the pointer; holding auto-fires every 60 ms while the
+ * Press fires one shot at the pointer; holding auto-fires at the weapon's fire interval while the
  * aim follows the pointer (on touch, the finger is the aim point). A press outside
  * `playing` (e.g. during the countdown) neither fires nor holds the trigger. See
  * `src/input/pointerInput.ts` for the multi-touch / UI-target rules.
@@ -95,12 +116,16 @@ export function useShooting() {
     })
   }, [fireShot])
 
-  // Auto-fire while held
+  // Auto-fire while held, re-timed every pull so a pickup changes the cadence.
   useEffect(() => {
-    const interval = setInterval(() => {
+    let timer = 0
+    const tick = () => {
       if (isDown.current) fireShot(true)
-    }, 60)
-    return () => clearInterval(interval)
+      const { weapon } = useGameStore.getState()
+      timer = window.setTimeout(tick, activeWeapon(weapon, gameTime()).fireIntervalMs)
+    }
+    tick()
+    return () => clearTimeout(timer)
   }, [fireShot])
 }
 

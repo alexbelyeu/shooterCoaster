@@ -1,6 +1,7 @@
 /** Every SFX goes through here: the Tone.js kit, or the arcade engine under `?audio=scrim` until parity (hard rule 7). */
 import * as THREE from 'three'
 import type { BiomeType } from '@/types/level'
+import type { WeaponId } from '@/combat/weapons/weaponTypes'
 import * as tone from './SFXManager'
 import { MUSIC_ENGINE, type MusicEngine } from './musicEngine'
 import { dropSound } from './soundGuard'
@@ -25,7 +26,10 @@ export type UiSound = 'select' | 'back' | 'launch'
 export interface SfxEngine {
   /** `level` null: the menus' sounds. */
   prepare(level: string | null, biome: BiomeType): Promise<void>
-  fire(auto: boolean): void
+  /** `weapon`: the pickup gun's own shot (`combat/weapons/weaponTypes.ts`). */
+  fire(auto: boolean, weapon?: WeaponId): void
+  /** A weapon pickup was shot. */
+  pickup(): void
   hit(combo: number, at: Placement | null): void
   kill(combo: number, sound: KillSound, at: Placement | null): void
   bossPart(combo: number, partId: string, at: Placement | null): void
@@ -54,7 +58,8 @@ const toneSfx: SfxEngine = {
     if (level) tone.prepareLevelSFX(biome)
     return Promise.resolve()
   },
-  fire: (auto) => tone.playFireSound(auto),
+  fire: (auto, weapon) => tone.playFireSound(auto, weapon),
+  pickup: tone.playPickupChime,
   hit: () => tone.playHitTick(),
   kill: (combo, sound) => tone.playExplosionSound(combo, sound),
   bossPart: (combo) => tone.playExplosionSound(combo),
@@ -92,7 +97,7 @@ const silent = () => {}
 /** A mix render's music-only stem. */
 export const silentSfx: SfxEngine = {
   prepare: () => Promise.resolve(),
-  fire: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, frenzy: silent, frenzyLift: silent,
+  fire: silent, pickup: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, frenzy: silent, frenzyLift: silent,
   waveIncoming: silent, waveAnnounce: silent, bossArrival: silent, bossHit: silent, bossDefeat: silent,
   fireworkWhistle: silent, fireworkPop: silent, starChime: silent, ui: silent, countdown: silent,
   nodeCount: () => 0,

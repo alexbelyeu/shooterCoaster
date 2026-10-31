@@ -12,10 +12,11 @@ import {
   createWeaponMaterial,
 } from './weaponModel'
 import {
-  SHOT_AIM_HOLD_MS, TRACER_MS, TRACER_RANGE, WEAPON_RECOIL_BACK, WEAPON_RECOIL_MS,
+  SHOT_AIM_HOLD_MS, TRACER_MS, TRACER_RANGE, WEAPON_RECOIL_BACK, WEAPON_RECOIL_MS, WEAPON_RECOIL_SCALE,
   WEAPON_MIN_AIM_DIST, WEAPON_RECOIL_PITCH, clampWeaponAim, recoilEnvelope, weaponDepth, weaponLayout,
   type WeaponDepth, type WeaponLayout,
 } from './weaponLayout'
+import { WEAPONS } from './weapons/weaponTypes'
 
 /**
  * First-person gun (#65), parented to the coaster camera: anchored bottom-right,
@@ -62,7 +63,9 @@ export default function WeaponViewModel() {
 
   const state = useRef({
     recoilMs: 0,
+    recoilScale: 1,
     tracerMs: 0,
+    tracerWidth: 1,
     tracerPending: false,
     tracerX: 0,
     tracerY: 0,
@@ -83,14 +86,18 @@ export default function WeaponViewModel() {
   useEffect(() => {
     const onFire = () => {
       const s = state.current
+      const weapon = WEAPONS[lastShot.weapon]
       s.recoilMs = WEAPON_RECOIL_MS
+      s.recoilScale = WEAPON_RECOIL_SCALE[weapon.id]
       s.tracerPending = true
       s.tracerX = lastShot.x
       s.tracerY = lastShot.y
+      s.tracerWidth = weapon.tracerWidth
+      tracerMaterial.uniforms.uColor.value.setRGB(...weapon.tracerColor)
     }
     eventBus.on('weapon:fire', onFire)
     return () => eventBus.off('weapon:fire', onFire)
-  }, [])
+  }, [tracerMaterial])
 
   // Priority -1: runs before MuzzleFlash (0) so the flash uses this frame's tip.
   useFrame((frame, delta) => {
@@ -146,7 +153,7 @@ export default function WeaponViewModel() {
     }
 
     // Recoil: kick back along the barrel and pitch the muzzle up.
-    const env = recoilEnvelope(s.recoilMs)
+    const env = recoilEnvelope(s.recoilMs) * s.recoilScale
     s.recoilMs = Math.max(0, s.recoilMs - dt * 1000)
     gun.position.copy(_pivot)
     gun.scale.setScalar(scale)
@@ -183,7 +190,7 @@ export default function WeaponViewModel() {
       _m.makeBasis(_dir, _side, _normal)
       tracer.quaternion.setFromRotationMatrix(_m)
       tracer.position.copy(anchor.tip)
-      tracer.scale.set(len, TRACER_WIDTH * scale, 1)
+      tracer.scale.set(len, TRACER_WIDTH * s.tracerWidth * scale, 1)
       tracerMaterial.uniforms.uDepthRatio.value = Math.min(0.99, -anchor.tip.z / TRACER_RANGE)
     }
     if (s.tracerMs > 0) {
