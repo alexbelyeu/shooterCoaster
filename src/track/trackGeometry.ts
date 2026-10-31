@@ -61,6 +61,8 @@ export function buildTrackGeometry(
   const positions = new Float32Array((tubeVerts + tieVerts) * 3)
   const normals = new Float32Array((tubeVerts + tieVerts) * 3)
   const colors = new Float32Array((tubeVerts + tieVerts) * 3)
+  // Cross-section direction + radius for the min-thickness patch; ties stay zero (they are wide).
+  const thick = new Float32Array((tubeVerts + tieVerts) * 4)
   const indices: number[] = []
   let v = 0
 
@@ -72,7 +74,13 @@ export function buildTrackGeometry(
   const dir = new THREE.Vector3()
   const center = new THREE.Vector3()
 
-  function pushVertex(p: THREE.Vector3, n: THREE.Vector3, c: RGB) {
+  function pushVertex(p: THREE.Vector3, n: THREE.Vector3, c: RGB, radius = 0) {
+    if (radius > 0) {
+      thick[v * 4] = n.x
+      thick[v * 4 + 1] = n.y
+      thick[v * 4 + 2] = n.z
+      thick[v * 4 + 3] = radius
+    }
     positions[v * 3] = p.x
     positions[v * 3 + 1] = p.y
     positions[v * 3 + 2] = p.z
@@ -113,7 +121,7 @@ export function buildTrackGeometry(
       for (let j = 0; j < tube.sides; j++) {
         const a = (j / tube.sides) * Math.PI * 2
         dir.copy(right).multiplyScalar(Math.cos(a)).addScaledVector(up, Math.sin(a))
-        pushVertex(point.copy(center).addScaledVector(dir, tube.r), dir, tube.color)
+        pushVertex(point.copy(center).addScaledVector(dir, tube.r), dir, tube.color, tube.r)
       }
     }
     for (let i = 0; i < segments; i++) {
@@ -183,6 +191,7 @@ export function buildTrackGeometry(
   geometry.setAttribute('position', new THREE.BufferAttribute(positions.subarray(0, v * 3), 3))
   geometry.setAttribute('normal', new THREE.BufferAttribute(normals.subarray(0, v * 3), 3))
   geometry.setAttribute('color', new THREE.BufferAttribute(colors.subarray(0, v * 3), 3))
+  geometry.setAttribute('aThick', new THREE.BufferAttribute(thick.subarray(0, v * 4), 4))
   geometry.setIndex(indices)
   geometry.computeBoundingSphere()
   return geometry

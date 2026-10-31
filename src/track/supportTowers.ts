@@ -285,9 +285,18 @@ function piercesTrack(
 /* Geometry                                                            */
 /* ------------------------------------------------------------------ */
 
+/** Cross-section direction (unit, away from the beam's axis) and real radius of one vertex; see `minThickness.ts`. */
+interface Thick {
+  dir: THREE.Vector3
+  r: number
+}
+
+const NO_THICK: Thick = { dir: new THREE.Vector3(), r: 0 }
+
 class PrismBuilder {
   positions: number[] = []
   normals: number[] = []
+  thick: number[] = []
   private a = new THREE.Vector3()
   private b = new THREE.Vector3()
   private dir = new THREE.Vector3()
@@ -296,6 +305,8 @@ class PrismBuilder {
   private n = new THREE.Vector3()
   private ca: THREE.Vector3[] = []
   private cb: THREE.Vector3[] = []
+  private ta: Thick[] = []
+  private tb: Thick[] = []
 
   /**
    * Open-ended prism from A to B. `sides` 3 or 4; radius tapers rA -> rB.
@@ -321,24 +332,31 @@ class PrismBuilder {
     while (this.ca.length < sides) {
       this.ca.push(new THREE.Vector3())
       this.cb.push(new THREE.Vector3())
+      const dir = new THREE.Vector3()
+      this.ta.push({ dir, r: 0 })
+      this.tb.push({ dir, r: 0 })
     }
     for (let i = 0; i < sides; i++) {
       const ang = phase + (i / sides) * Math.PI * 2
-      const c = Math.cos(ang)
-      const s = Math.sin(ang)
-      this.ca[i].copy(A).addScaledVector(u, c * rA).addScaledVector(w, s * rA)
-      this.cb[i].copy(B).addScaledVector(u, c * rB).addScaledVector(w, s * rB)
+      const radial = this.ta[i].dir.copy(u).multiplyScalar(Math.cos(ang)).addScaledVector(w, Math.sin(ang))
+      this.ca[i].copy(A).addScaledVector(radial, rA)
+      this.cb[i].copy(B).addScaledVector(radial, rB)
+      this.ta[i].r = rA
+      this.tb[i].r = rB
     }
     for (let i = 0; i < sides; i++) {
       const j = (i + 1) % sides
       const mid = phase + ((i + 0.5) / sides) * Math.PI * 2
       n.copy(u).multiplyScalar(Math.cos(mid)).addScaledVector(w, Math.sin(mid)).normalize()
-      this.quad(this.ca[i], this.ca[j], this.cb[j], this.cb[i], n)
+      this.quad(this.ca[i], this.ca[j], this.cb[j], this.cb[i], n, [this.ta[i], this.ta[j], this.tb[j], this.tb[i]])
     }
   }
 
-  /** Axis-aligned closed box (tower-local), from min to max corner. */
-  box(min: THREE.Vector3, max: THREE.Vector3) {
+  /**
+   * Axis-aligned closed box (tower-local), from min to max corner. `beamAlongX` marks it
+   * a beam along x for the thickness floor: corners widen away from its centre in y and z.
+   */
+  box(min: THREE.Vector3, max: THREE.Vector3, beamAlongX = false) {
     const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
     const [x0, y0, z0, x1, y1, z1] = [min.x, min.y, min.z, max.x, max.y, max.z]
     const faces: [THREE.Vector3[], THREE.Vector3][] = [
@@ -349,18 +367,36 @@ class PrismBuilder {
       [[v(x0, y0, z1), v(x1, y0, z1), v(x1, y1, z1), v(x0, y1, z1)], v(0, 0, 1)],
       [[v(x1, y0, z0), v(x0, y0, z0), v(x0, y1, z0), v(x1, y1, z0)], v(0, 0, -1)],
     ]
-    for (const [q, n] of faces) this.quad(q[0], q[1], q[2], q[3], n)
+    const cy = (y0 + y1) / 2
+    const cz = (z0 + z1) / 2
+    const thickOf = (p: THREE.Vector3): Thick => {
+      if (!beamAlongX) return NO_THICK
+      const dir = new THREE.Vector3(0, p.y - cy, p.z - cz)
+      const r = dir.length()
+      return { dir: dir.divideScalar(r), r }
+    }
+    for (const [q, n] of faces) this.quad(q[0], q[1], q[2], q[3], n, q.map(thickOf))
   }
 
-  /** Quad as two triangles, wound so the face normal agrees with n. */
-  private quad(p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3, p3: THREE.Vector3, n: THREE.Vector3) {
+  /** Quad as two triangles, wound so the face normal agrees with n; `t` is each corner's thickness. */
+  private quad(
+    p0: THREE.Vector3,
+    p1: THREE.Vector3,
+    p2: THREE.Vector3,
+    p3: THREE.Vector3,
+    n: THREE.Vector3,
+    t: Thick[],
+  ) {
     this.a.subVectors(p1, p0)
     this.b.subVectors(p2, p0)
     const flip = this.a.cross(this.b).dot(n) < 0
-    const tris = flip ? [p0, p2, p1, p0, p3, p2] : [p0, p1, p2, p0, p2, p3]
-    for (const p of tris) {
+    const order = flip ? [0, 2, 1, 0, 3, 2] : [0, 1, 2, 0, 2, 3]
+    const ps = [p0, p1, p2, p3]
+    for (const k of order) {
+      const p = ps[k]
       this.positions.push(p.x, p.y, p.z)
       this.normals.push(n.x, n.y, n.z)
+      this.thick.push(t[k].dir.x, t[k].dir.y, t[k].dir.z, t[k].r)
     }
   }
 
@@ -368,6 +404,7 @@ class PrismBuilder {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.positions, 3))
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.normals, 3))
+    g.setAttribute('aThick', new THREE.Float32BufferAttribute(this.thick, 4))
     g.computeBoundingSphere()
     return g
   }
@@ -403,6 +440,7 @@ export function buildTowerGeometry(td: TowerDims, height: number): THREE.BufferG
   pb.box(
     new THREE.Vector3(-bw, -td.beamHalf * 2, -td.beamHalf),
     new THREE.Vector3(bw, 0, td.beamHalf),
+    true,
   )
 
   // Panels: horizontal ring + one diagonal per face, alternating direction.
