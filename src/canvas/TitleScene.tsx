@@ -6,6 +6,7 @@ import { createRng } from '@/utils/rng'
 import FerrisWheel from '@/levels/environments/FerrisWheel'
 import Carousel from '@/levels/environments/Carousel'
 import { titleCameraPose, type Vec3 } from './titleCamera'
+import { isUiTarget } from '@/input/pointerInput'
 
 const TENT_COLORS = ['#ff4444', '#ff8800', '#4488ff', '#44cc44', '#ff44ff', '#ffffff']
 const BALLOON_DRIFT_RAD_S = 0.04
@@ -327,6 +328,8 @@ function TitleClickRaycaster() {
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
+      // A click on a button or a dialog (Settings over the title) is the UI's; stopping it here would swallow it.
+      if (isUiTarget(e.target) || (e.target instanceof Element && e.target.closest('[role="dialog"]'))) return
       ndc.set(
         (e.clientX / size.width) * 2 - 1,
         -(e.clientY / size.height) * 2 + 1,

@@ -538,6 +538,7 @@ canvas {
   .hud-frenzy { bottom: auto; top: max(12px, env(safe-area-inset-top)); }
 }
 
+/* Reduced motion: the OS setting, or the in-game toggle (html.reduce-motion) */
 @media (prefers-reduced-motion: reduce) {
   .hud-timer--critical .hud-timer-value,
   .hud-combo-count,
@@ -545,6 +546,9 @@ canvas {
   .hud-combo.is-lost,
   .hud-frenzy,
   .hud-frenzy-edge { animation: none; }
+}
+.reduce-motion :is(.hud-timer--critical .hud-timer-value, .hud-combo-count, .hud-combo-mult, .hud-combo.is-lost, .hud-frenzy, .hud-frenzy-edge) {
+  animation: none;
 }
 
 /* Boss bar — top centre between the score and timer panels; under them on phones */
@@ -634,6 +638,8 @@ canvas {
   .hud-boss-bar.is-hit { animation: none; }
   .hud-boss.is-defeated { animation: none; opacity: 0.5; }
 }
+.reduce-motion :is(.hud-boss, .hud-boss-bar.is-hit) { animation: none; }
+.reduce-motion .hud-boss.is-defeated { animation: none; opacity: 0.5; }
 
 /* Pause: needed on touch (no Escape key); bottom-left like the title's settings gear */
 .hud-pause-button {
@@ -942,6 +948,9 @@ canvas {
   .level-card:focus-visible {
     transform: none;
   }
+}
+.reduce-motion :is(.level-card, .level-select.is-launching .level-card, .level-select.is-launching .level-card.is-selected, .level-card:focus-visible) {
+  transform: none;
 }
 
 /* Short landscape screens (phones on their side): one compact row. */
@@ -1479,12 +1488,46 @@ canvas {
   }
 }
 
-/* Settings rows: full-width label rows with 44 px touch targets */
-.settings-list {
+/* Settings: the pause card's look, grouped rows with 44 px touch targets */
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: min(100%, 25rem);
+  padding: 1.25rem 1.25rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 3px solid var(--accent);
+  border-radius: 18px;
+  background: rgba(12, 12, 20, 0.72);
+  box-shadow: 0 0 40px var(--accent-glow), 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.settings-screen h2 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.8rem, 8vw, 2.4rem);
+  line-height: 1.1;
+  text-align: center;
+  text-shadow: 0 0 18px var(--accent-glow);
+}
+
+.settings-groups {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  width: min(300px, 100%);
+}
+
+.settings-group {
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-group h3 {
+  margin: 0 0 0.1rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .settings-row {
@@ -1493,26 +1536,87 @@ canvas {
   align-items: center;
   gap: 1rem;
   min-height: 44px;
+  font-size: 0.95rem;
 }
 
-.settings-row input[type='range'] {
-  width: 150px;
+/* Label and note above, the four quality buttons full width below */
+.settings-row--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  padding: 0.2rem 0 0.3rem;
+}
+
+.settings-row--stacked .settings-segmented button {
+  flex: 1;
+}
+
+.settings-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.settings-slider input[type='range'] {
+  width: clamp(110px, 38vw, 160px);
   min-height: 44px;
+  accent-color: var(--accent);
   touch-action: pan-x;
 }
 
-.settings-row input[type='checkbox'] {
-  width: 24px;
-  height: 24px;
+.settings-slider output {
+  width: 2.8rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .settings-note {
   display: block;
-  font-size: 0.7rem;
-  opacity: 0.7;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.6);
 }
 
-/* Off / Reduced / Full segmented control (44 px touch targets) */
+/* Toggle switch on a checkbox: a 44 x 26 track; the whole label row is the touch target */
+.settings-switch {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.settings-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+
+.settings-switch:checked {
+  background: var(--accent);
+}
+
+.settings-switch:checked::after {
+  transform: translateX(18px);
+}
+
+.settings-switch:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Segmented controls (quality, screen shake) */
 .settings-segmented {
   display: flex;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -1537,7 +1641,7 @@ canvas {
 }
 
 .settings-segmented button.is-active {
-  background: rgba(255, 210, 63, 0.85);
+  background: var(--accent);
   color: #111;
   font-weight: 600;
 }
@@ -1545,6 +1649,45 @@ canvas {
 .settings-segmented button:disabled {
   cursor: default;
   opacity: 0.6;
+}
+
+.settings-card :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.settings-back {
+  align-self: center;
+  margin-top: 1rem;
+  padding: 0.7rem 2.5rem;
+  font-size: 1rem;
+}
+
+.reduce-motion .settings-switch,
+.reduce-motion .settings-switch::after {
+  transition: none;
+}
+
+/* Phone landscape: the groups side by side */
+@media (orientation: landscape) and (max-height: 520px) {
+  .settings-card {
+    width: min(100%, 46rem);
+    padding: 0.9rem 1.25rem;
+  }
+
+  .settings-groups {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1.5rem;
+  }
+
+  .settings-group:first-child {
+    grid-row: span 2;
+  }
+
+  .settings-back {
+    margin-top: 0.6rem;
+  }
 }
 
 /* Mute button — always visible, bottom-right */

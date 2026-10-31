@@ -62,6 +62,12 @@ describe('particleCounts', () => {
     expect(particleCounts(p, true)).toEqual({ base: 1500, boost: 300 })
     expect(particleCounts(PARTICLE_PRESETS.arcticSnow, false).boost).toBe(0)
   })
+
+  it('scales both counts by the graphics quality', () => {
+    const p = PARTICLE_PRESETS.volcanicAsh
+    expect(particleCounts(p, false, 0.5)).toEqual({ base: 1500, boost: 300 })
+    expect(particleCounts(p, true, 0.5)).toEqual({ base: 750, boost: 150 })
+  })
 })
 
 describe('boostStrength', () => {

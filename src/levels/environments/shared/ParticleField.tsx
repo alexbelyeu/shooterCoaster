@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
-import { isCoarsePointer } from '@/canvas/useRenderBudget'
+import { isCoarsePointer, useQualityProfile } from '@/canvas/useRenderBudget'
 import { e2eParticles, isE2E } from '@/testing/e2eHook'
 import type { ParticleFieldPreset } from './types'
 import { boostStrength, particleCounts } from './particlePresets'
@@ -127,7 +127,7 @@ function createMaterial(preset: ParticleFieldPreset): THREE.ShaderMaterial {
 
 /** Ambient particles wrapping in a box around the camera: one draw call, no per-frame CPU work but uniforms. */
 export default function ParticleField({ preset }: { preset: ParticleFieldPreset }) {
-  const { base, boost: boostCount } = particleCounts(preset, isCoarsePointer)
+  const { base, boost: boostCount } = particleCounts(preset, isCoarsePointer, useQualityProfile().particleScale)
   const geometry = useMemo(() => createSeeds(base, boostCount), [base, boostCount])
   const material = useMemo(() => createMaterial(preset), [preset])
   const halfHeightPx = useThree(s => s.size.height * s.viewport.dpr * 0.5)
