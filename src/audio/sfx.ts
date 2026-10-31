@@ -1,8 +1,4 @@
-/**
- * The game's one way to play SFX: the Tone.js kit (`SFXManager`, default) or the arcade engine (`arcade/`, under
- * `?audio=scrim` with the score engine, loaded only then) until it reaches parity (hard rule 7). Positions are world
- * space; the listener is the coaster camera (`setSfxListener`).
- */
+/** Every SFX goes through here: the Tone.js kit, or the arcade engine under `?audio=scrim` until parity (hard rule 7). */
 import * as THREE from 'three'
 import type { BiomeType } from '@/types/level'
 import * as tone from './SFXManager'
@@ -27,16 +23,14 @@ export interface VoiceStats {
 export type UiSound = 'select' | 'back' | 'launch'
 
 export interface SfxEngine {
-  /** Builds the level's sounds (`level` null: the menus'); resolves once they can play. */
+  /** `level` null: the menus' sounds. */
   prepare(level: string | null, biome: BiomeType): Promise<void>
   fire(auto: boolean): void
   hit(combo: number, at: Placement | null): void
   kill(combo: number, sound: KillSound, at: Placement | null): void
-  /** A boss weak point destroyed (`partId` from its spec). */
   bossPart(combo: number, partId: string, at: Placement | null): void
   comboBreak(): void
   frenzy(): void
-  /** The looping FRENZY lift: on while the 5× tier holds in a running level. */
   frenzyLift(on: boolean): void
   waveIncoming(): void
   waveAnnounce(): void
@@ -48,10 +42,10 @@ export interface SfxEngine {
   starChime(index: number): void
   ui(sound: UiSound): void
   countdown(go: boolean): void
-  /** Long-lived audio nodes; must not grow while playing. */
+  /** Long-lived nodes: must not grow while playing. */
   nodeCount(): number
   voices(): VoiceStats | null
-  /** Frees the sounds: all of them, or only if they are still `level`'s (a menu may have prepared its own since). */
+  /** With `level`: only if no menu has asked for its own sounds since. */
   dispose(level?: string): void
 }
 
@@ -85,7 +79,7 @@ const toneSfx: SfxEngine = {
 type ArcadeModule = typeof import('./arcade/engine')
 let arcadeModule: Promise<ArcadeModule> | null = null
 
-/** The arcade engine's module, loaded on first use so default players never download it. */
+/** Loaded on first use, so default players never download it. */
 export function loadArcade(): Promise<ArcadeModule> {
   arcadeModule ??= import('./arcade/engine').then((m) => {
     if (active === pendingArcade) active = m.arcadeSfx
@@ -95,7 +89,7 @@ export function loadArcade(): Promise<ArcadeModule> {
 }
 
 const silent = () => {}
-/** Plays nothing: a mix render's music-only stem. */
+/** A mix render's music-only stem. */
 export const silentSfx: SfxEngine = {
   prepare: () => Promise.resolve(),
   fire: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, frenzy: silent, frenzyLift: silent,
@@ -106,7 +100,7 @@ export const silentSfx: SfxEngine = {
   dispose: silent,
 }
 
-/** Stands in for the arcade engine until its chunk has loaded: sounds before then are skipped. */
+/** Until the arcade chunk has loaded. */
 const pendingArcade: SfxEngine = {
   ...silentSfx,
   prepare: (level, biome) => loadArcade().then((m) => m.arcadeSfx.prepare(level, biome)),
@@ -114,17 +108,16 @@ const pendingArcade: SfxEngine = {
 
 let active: SfxEngine = MUSIC_ENGINE === 'scrim' ? pendingArcade : toneSfx
 
-/** The SFX engine this page plays. */
 export function sfx(): SfxEngine {
   return active
 }
 
-/** `audioRender.ts`: the engine a render asks for, whatever this page plays. */
+/** `audioRender.ts`: a render's engine, whatever this page plays. */
 export async function sfxEngine(engine: MusicEngine): Promise<SfxEngine> {
   return engine === 'scrim' ? (await loadArcade()).arcadeSfx : toneSfx
 }
 
-/** Fire-and-forget `prepare`: a failed bake drops the level's sounds, never the page. */
+/** A failed bake drops the level's sounds, never the page. */
 export function prepareSfx(level: string | null, biome: BiomeType): void {
   active.prepare(level, biome).catch((e) => dropSound('sfx prepare', e))
 }
@@ -137,7 +130,7 @@ export function setSfxListener(camera: THREE.Camera | null): void {
   listener = camera
 }
 
-/** Pan and distance low-pass of a world position from the listener; one shared object, null without a listener. */
+/** One shared object; null without a listener. */
 export function placeSound(position: THREE.Vector3 | null | undefined): Placement | null {
   if (!position || !listener) return null
   _local.copy(position).applyMatrix4(listener.matrixWorldInverse)

@@ -66,7 +66,7 @@ function seamsIn(seconds: number, loopS: number): number[] {
 type ScrimPlayer = typeof import('@/audio/scrim/player')
 /** Loaded by `renderAudio` before a plan that needs it. */
 let scrim: ScrimPlayer | null = null
-/** The SFX engine of the render in progress, its sounds prepared before the render starts. */
+/** The render in progress's SFX engine. */
 let sfx: SfxEngine
 
 function stopAll() {
@@ -210,7 +210,7 @@ function sfxSheetPlan(level = 'level1', engine: MusicEngine = 'tone'): Plan {
 
 const KILL_EVERY_S = 0.75
 
-/** Kills land around the stereo field, nearer and farther: the arcade engine pans and low-passes them (the Tone kit is mono). */
+/** Kills around the stereo field, near and far (the Tone kit ignores placement). */
 function killPlacement(n: number, out: Placement): Placement {
   out.pan = 0.6 * Math.sin(n * 2.1)
   out.cutoffHz = n % 3 === 2 ? 5000 : 18000
@@ -322,7 +322,7 @@ export async function renderAudio(req: AudioRenderRequest, seed = 1): Promise<Au
   const engine = ('engine' in req && req.engine) || 'tone'
   if (engine === 'scrim') scrim = await import('@/audio/scrim/player')
   sfx = await sfxEngine(engine)
-  // The arcade engine bakes its sounds first (async); the render then plays them. The Tone kit builds in the render.
+  // The arcade bake is async, so it runs before the render; the Tone kit builds inside it.
   if (engine === 'scrim' && req.kind !== 'music') await sfx.prepare(req.level ?? 'level1', biomeOf(req.level ?? 'level1'))
   const plan = (RENDERS[req.kind] as (r: GamePlanRequest) => Plan)(req)
   const buffer = await renderOffline({ seconds: plan.seconds, seed, engine }, plan.script, stopAll)

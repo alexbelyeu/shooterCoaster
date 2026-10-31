@@ -1,8 +1,4 @@
-/**
- * Renders every arcade recipe once, in one OfflineAudioContext (laid end to end), then cuts the result into one
- * mono AudioBuffer per sound: silence trimmed, normalised to 0 dBFS peak (`ARCADE_SOUNDS.db` sets the level), loops
- * folded seamless. Runs on the audio rendering thread, off the frame loop; a level bakes in well under its countdown.
- */
+/** Every recipe laid end to end in one OfflineAudioContext (rendered off the main thread), cut into mono buffers normalised to 0 dBFS. */
 import { createRng } from '@/utils/rng'
 import type { ArcadeSoundId } from '../sfxDesign'
 import { createCore } from '../scrim/synth'
@@ -14,7 +10,6 @@ const GAP_S = 0.05
 /** Trim each sound where it stays this far under its own peak. */
 const TRIM_DB = -72
 const FADE_S = 0.003
-/** The last share of each slot (at most this long) fades its sound out. */
 const GATE_FADE_SHARE = 0.25
 const GATE_FADE_MAX_S = 0.4
 /** "Nothing below 30 Hz": two 12 dB/oct high-passes on the whole bake. */
@@ -48,7 +43,7 @@ export async function bakeBank(spec: BakeSpec, sampleRate: number, seed: number)
   }
   hp1.connect(hp2).connect(ctx.destination)
 
-  // The graph is built in this turn, before the render: a fixed seed makes every bake of a level the same.
+  // Seeded only while the graph is built (this turn): every bake of a level is the same.
   const random = Math.random
   Math.random = createRng(seed)
   try {
@@ -81,7 +76,7 @@ export async function bakeBank(spec: BakeSpec, sampleRate: number, seed: number)
   return bank
 }
 
-/** A sound's own way into the bake, faded shut at the end of its slot so a long ring never bleeds into the next sound. */
+/** Faded shut at the end of its slot, so a long ring never bleeds into the next sound. */
 function gate(ctx: BaseAudioContext, slot: Slot, out: AudioNode): GainNode {
   const g = ctx.createGain()
   const end = slot.start + slot.length
@@ -98,7 +93,6 @@ function peakOf(pcm: Float32Array): number {
   return peak
 }
 
-/** Up to where the sound last rises above `TRIM_DB` under its peak, with a short fade-out. */
 export function trimTail(pcm: Float32Array<ArrayBuffer>, sampleRate: number): Float32Array<ArrayBuffer> {
   const floor = peakOf(pcm) * Math.pow(10, TRIM_DB / 20)
   let end = pcm.length
@@ -109,7 +103,7 @@ export function trimTail(pcm: Float32Array<ArrayBuffer>, sampleRate: number): Fl
   return out
 }
 
-/** Wraps everything past `n` samples back onto the start, so the loop's tails ring across its seam. */
+/** The tail past `n` samples rings on across the loop seam. */
 export function foldLoop(pcm: Float32Array<ArrayBuffer>, n: number): Float32Array<ArrayBuffer> {
   const out = pcm.slice(0, n)
   for (let i = n; i < pcm.length; i++) out[i % n] += pcm[i]

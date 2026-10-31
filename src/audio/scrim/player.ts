@@ -159,7 +159,7 @@ export interface MusicGrid {
 
 const grid: MusicGrid = { origin: 0, beatS: 0, beats: 4 }
 
-/** The current score's beat grid while it plays (not paused, not fading out), for SFX quantised to the beat; shared object. */
+/** Null while paused, fading or silent; one shared object. */
 export function musicGrid(): MusicGrid | null {
   const track = current
   if (!track || track.pausedAt !== null || track.bus.fading) return null

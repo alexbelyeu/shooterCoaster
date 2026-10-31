@@ -169,18 +169,15 @@ export function fireworkWhistleS(flightS: number, timeScale: number): number {
   return Math.min(Math.max(s, minS), maxS)
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Arcade SFX (`?audio=scrim`, `audio/arcade/`): one-shots baked into AudioBuffers per level, played
- * through a fixed pool of voices. The recipes are in `arcade/recipes.ts`; the numbers live here.
- * --------------------------------------------------------------------------------------------- */
+/* Arcade SFX (`?audio=scrim`, `audio/arcade/`) from here on. */
 
-/** A score's key: tonic as a MIDI note in octave 4 (C4 = 60) and its third. Pinned to the scores by `scores.test.ts`. */
+/** Tonic as a MIDI note in octave 4 (C4 = 60). */
 export interface MusicKey {
   tonic: number
   minor: boolean
 }
 
-/** The keys `audio/scores/*.scrim` are written in: musical SFX (wave tell, FRENZY, payouts, countdown) play in them. */
+/** The keys `audio/scores/*.scrim` are written in, pinned by `scores.test.ts`. */
 export const SCORE_KEYS: Record<string, MusicKey> = {
   title: { tonic: 67, minor: false }, // G major
   level1: { tonic: 65, minor: false }, // F major
@@ -194,7 +191,7 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
 const MAJOR = [0, 2, 4, 5, 7, 9, 11]
 const MINOR = [0, 2, 3, 5, 7, 8, 10]
 
-/** MIDI note of scale degree `degree` (0 = tonic, 7 = the octave above, negative goes down) of `key`, shifted `octave` octaves. */
+/** Scale degree 0 is the tonic, 7 the octave above; negative goes down. */
 export function keyNote(key: MusicKey, degree: number, octave = 0): number {
   const scale = key.minor ? MINOR : MAJOR
   const oct = Math.floor(degree / 7)
@@ -230,7 +227,7 @@ export type ArcadeSoundId =
 export interface ArcadeSound {
   /** Voice priority: a full pool steals the lowest priority (then the oldest); never a higher one. */
   prio: number
-  /** Peak level, dB: every bake is normalised to 0 dBFS peak, then played at this gain. */
+  /** Peak level, dB (every bake is normalised to 0 dBFS). */
   db: number
   /** Send to the level's convolver, 0–1. Guns stay dry: their tail has to be gone in 150 ms. */
   send: number
@@ -271,9 +268,7 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
 
 /** Voices playing at once; the e2e `audioBurst(64, 32)` must never take more. */
 export const VOICE_BUDGET = 24
-/** A stolen voice fades out over this long before the new sound starts on it. */
 export const STEAL_FADE_S = 0.004
-/** Held-trigger auto-fire sits this far under a single shot. */
 export const AUTO_FIRE_DB = -4
 
 export interface VoiceState {
@@ -283,7 +278,7 @@ export interface VoiceState {
   endsAt: number
 }
 
-/** The voice a sound of `prio` gets at `now`: a free one, else the lowest priority (then oldest) one at or below `prio`; -1 drops the sound. */
+/** A free voice, else the lowest-priority (then oldest) one at or below `prio`; -1 drops the sound. */
 export function pickVoice(voices: readonly VoiceState[], prio: number, now: number): number {
   let best = -1
   for (let i = 0; i < voices.length; i++) {
@@ -295,28 +290,21 @@ export function pickVoice(voices: readonly VoiceState[], prio: number, now: numb
   return best
 }
 
-/** Kill body pitch climbs with the chain (playback rate). */
 export function killRate(combo: number): number {
   return 1 + Math.min(Math.max(combo, 0), 12) * 0.025
 }
 
-/** Hit tick pitch: up a step per combo tier. */
 export function hitRate(combo: number): number {
   return Math.pow(2, (2 * killTier(combo)) / 12)
 }
 
-/** Boss hit thud rises as it weakens (playback rate for hp 0–1). */
 export function bossHitRate(hpFraction: number): number {
   return Math.pow(2, (7 * (1 - Math.min(Math.max(hpFraction, 0), 1))) / 12)
 }
 
-/** Positional pan / low-pass: enemies this close are full bandwidth, this far are dull. */
 export const SPATIAL = { panWidth: 0.75, nearM: 30, farM: 220, nearHz: 18000, farHz: 2400 } as const
 
-/**
- * Pan and low-pass cutoff of a sound at camera-space (x, z) (z < 0 is in front), `tanHalfHFov` the camera's horizontal
- * half-angle tangent: the screen edge pans `panWidth`, behind the camera pans fully to its side.
- */
+/** Camera-space (x, z), z < 0 ahead: the screen edge pans `panWidth`, behind the camera pans fully to its side. */
 export function spatial(x: number, z: number, tanHalfHFov: number, out: { pan: number; cutoffHz: number }) {
   const ahead = -z
   const side = ahead > 0.5 ? x / (ahead * tanHalfHFov) : Math.sign(x) * 1.5
@@ -327,7 +315,7 @@ export function spatial(x: number, z: number, tanHalfHFov: number, out: { pan: n
   return out
 }
 
-/** The first beat at or after `now + leadS` on a grid of `beatS` from `origin`, and its index in a bar of `beats`. */
+/** The first beat at or after `now + leadS`, and its place in the bar. */
 export function nextBeat(now: number, origin: number, beatS: number, beats: number, leadS: number, out: { t: number; beatInBar: number }) {
   const k = Math.max(0, Math.ceil((now + leadS - origin) / beatS - 1e-6))
   out.t = origin + k * beatS
@@ -335,7 +323,7 @@ export function nextBeat(now: number, origin: number, beatS: number, beats: numb
   return out
 }
 
-/** Per-biome room for the SFX send (`makeIR` length / decay curve, then a low-pass on the return). */
+/** `makeIR` length / decay curve, a low-pass on the return. */
 export const BIOME_REVERB: Record<BiomeType, { seconds: number; decayPow: number; toneHz: number; level: number }> = {
   themePark: { seconds: 1.4, decayPow: 3.2, toneHz: 7000, level: 0.8 },
   desert: { seconds: 1.8, decayPow: 4.5, toneHz: 4500, level: 0.7 },

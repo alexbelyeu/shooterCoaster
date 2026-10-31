@@ -1,10 +1,4 @@
-/**
- * Arcade SFX (`?audio=scrim`): every one-shot is baked into an AudioBuffer when a level is prepared (`bake.ts`) and
- * played as a fresh AudioBufferSourceNode on one of `VOICE_BUDGET` fixed voices (gain → low-pass → pan, with a send
- * to the level's convolver). A full pool steals its lowest-priority, oldest voice, or drops a sound that ranks below
- * all of them. Nothing else is created per sound, so the node count is fixed, and a buffer source has no "start
- * time" to collide with (decision 2026-10-31-217). Musical cues land on the score's beat (`player.musicGrid`).
- */
+/** Arcade SFX (`?audio=scrim`): baked one-shots, each a fresh buffer source on a fixed, priority-stolen voice pool (decision 2026-10-31-217). */
 import * as Tone from 'tone'
 import type { BiomeType } from '@/types/level'
 import { getLevelConfig } from '@/levels/LevelRegistry'
@@ -45,9 +39,7 @@ interface Graph {
   lift: Voice
 }
 
-/** Lift fade in / out time constant, s. */
 const LIFT_FADE_S = 0.12
-/** Musical cues wait for the next beat at least this far ahead (time to schedule), s. */
 const BEAT_LEAD_S = 0.02
 
 let graph: Graph | null = null
@@ -55,7 +47,7 @@ let bank: Bank | null = null
 let bankKey: string | null = null
 let bankSpec: BakeSpec | null = null
 let biome: BiomeType = 'themePark'
-/** `score:biome` of the last `prepare`, null after `dispose`. */
+/** `score:biome` of the last `prepare`. */
 let wanted: string | null = null
 let baking: { key: string; promise: Promise<void> } | null = null
 let liftOn = false
@@ -63,7 +55,7 @@ let liftOn = false
 const stats: VoiceStats = { budget: VOICE_BUDGET, live: 0, peak: 0, played: 0, stolen: 0, rejected: 0 }
 
 const rawContext = () => Tone.getContext().rawContext as unknown as BaseAudioContext
-/** The time a sound played now starts: the live context's clock, or an offline render's scripted time. */
+/** The live clock, or an offline render's scripted time (its context runs ahead by a look-ahead). */
 const clock = () => Tone.now() - Tone.getContext().lookAhead
 
 function createVoice(ctx: BaseAudioContext, out: AudioNode, verbIn: AudioNode): Voice {
@@ -79,7 +71,7 @@ function createVoice(ctx: BaseAudioContext, out: AudioNode, verbIn: AudioNode): 
   return { gain, lp, pan, send, src: null, prio: 0, startedAt: 0, endsAt: 0 }
 }
 
-/** The voice pool on Tone's current context and channel: rebuilt when either changes (an offline render) or the biome does. */
+/** Rebuilt when Tone's context or channel changes (an offline render) or the biome does. */
 function ensureGraph(): Graph {
   const ctx = rawContext()
   if (graph && graph.ctx === ctx && graph.channel === arcadeChannel && graph.biome === biome) return graph
@@ -133,7 +125,6 @@ function bakeSpec(scoreId: string, levelBiome: BiomeType, level: string | null):
   }
 }
 
-/** Levels play in their own score's key; menus in the title's. */
 const scoreIdOf = (level: string | null) => (level && SCORES[level] ? level : 'title')
 
 /** A bake installs only if it is still the one `wanted`: a menu's and a level's prepare can overlap. */
@@ -164,10 +155,7 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
 
 const NO_PLACE: Placement = { pan: 0, cutoffHz: 20000 }
 
-/**
- * Plays variant `variant` of `id` at `at` (default now) on a free or stolen voice; returns the voice, or null when the
- * bank isn't baked yet or the pool is busy with higher priorities. `db` and `rate` adjust the sound's own level / pitch.
- */
+/** Null before the bank is baked, or when every voice plays something more important. */
 function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: Placement | null = null, loopOffset = -1): Voice | null {
   const buffer = bank?.get(id)?.[variant]
   if (!buffer) return null
@@ -188,7 +176,6 @@ function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: P
       v = g.voices[i]
     }
     if (v.src && v.endsAt > t) {
-      // Steal: fade the old sound out, start the new one when it is gone.
       if (!loop) stats.stolen++
       v.gain.gain.cancelScheduledValues(t)
       v.gain.gain.setTargetAtTime(0, t, STEAL_FADE_S / 3)
@@ -229,7 +216,7 @@ function liveVoices(now: number): number {
 
 const beat = { t: 0, beatInBar: 0 }
 
-/** The next beat of the playing score (`beat`), or null with no score playing (play at once). */
+/** Null with no score playing: the cue plays at once. */
 function onBeat(): typeof beat | null {
   const grid = scrimPlayer()?.musicGrid()
   if (!grid) return null
@@ -326,7 +313,7 @@ export const arcadeSfx: SfxEngine = {
   },
 }
 
-/** e2e: the voice counters back to zero (before a burst). */
+/** e2e, before a burst. */
 export function resetVoiceStats(): void {
   stats.peak = stats.played = stats.stolen = stats.rejected = 0
 }

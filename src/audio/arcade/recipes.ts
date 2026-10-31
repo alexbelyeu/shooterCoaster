@@ -1,8 +1,4 @@
-/**
- * The arcade SFX, built from the score engine's synth (`scrim/synth.ts`): each recipe draws one sound into a bake
- * context (`bake.ts`), which renders them all to AudioBuffers once per level. Levels, priorities and sends are in
- * `sfxDesign.ts` (`ARCADE_SOUNDS`); musical ones are written in scale degrees of the level score's key.
- */
+/** The arcade SFX drawn with the score engine's own instruments; musical ones in scale degrees of the level score's key. */
 import type { BiomeType } from '@/types/level'
 import { keyNote, WHISTLE_LENGTHS_S, FIREWORK_SFX, type ArcadeSoundId, type KillSound, type MusicKey } from '../sfxDesign'
 import { hitDrum, playInstrument, toolbox, type SynthCore } from '../scrim/synth'
@@ -11,7 +7,6 @@ const { G, F, O, perc, partial, noise, noiseSrc } = toolbox
 
 export interface BakeSpec {
   key: MusicKey
-  /** One beat of the level score, s. */
   beatS: number
   beats: number
   biome: BiomeType
@@ -21,27 +16,23 @@ export interface BakeSpec {
 
 export interface Recipe {
   id: ArcadeSoundId
-  /** Takes this long at most (the bake trims the silence after it). */
+  /** At most; the bake fades it shut there and trims the silence. */
   lengthS: (b: BakeSpec, variant: number) => number
   render: (S: SynthCore, out: AudioNode, t: number, b: BakeSpec, variant: number) => void
   variants?: number
-  /** Folded into a seamless loop of this many seconds. */
   loopS?: (b: BakeSpec) => number
   when?: (b: BakeSpec) => boolean
 }
 
-/** Notes of `degrees` in the key, `octave` octaves up, as one chord on `inst`. */
 function chord(S: SynthCore, out: AudioNode, inst: string, t: number, d: number, b: BakeSpec, degrees: readonly number[], octave: number, vel: number) {
   const v = vel / Math.sqrt(degrees.length)
   for (const deg of degrees) playInstrument(S, out, inst, t, d, keyNote(b.key, deg, octave), v)
 }
 
-/** Notes of `degrees` one after another, `stepS` apart. */
 function run(S: SynthCore, out: AudioNode, inst: string, t: number, stepS: number, d: number, b: BakeSpec, degrees: readonly number[], octave: number, vel: number) {
   degrees.forEach((deg, i) => playInstrument(S, out, inst, t + i * stepS, d, keyNote(b.key, deg, octave), vel * (0.8 + 0.2 * (i / degrees.length))))
 }
 
-/** A falling pitched oscillator through a closing low-pass: the zap in guns and pops. */
 function zap(S: SynthCore, out: AudioNode, t: number, type: OscillatorType, fromHz: number, toHz: number, sweepS: number, tau: number, peak: number) {
   const g = G(S)
   const lp = F(S, 'lowpass', 6000, 0.8)
@@ -55,7 +46,6 @@ function zap(S: SynthCore, out: AudioNode, t: number, type: OscillatorType, from
   o.connect(lp)
 }
 
-/** Noise through a band-pass swept from `fromHz` to `toHz`, held at `peak` for `s`: whooshes and whistles. */
 function sweep(S: SynthCore, out: AudioNode, t: number, s: number, fromHz: number, toHz: number, q: number, peak: number) {
   const src = noiseSrc(S, t, t + s + 0.1)
   const bp = F(S, 'bandpass', fromHz, q)
@@ -71,7 +61,7 @@ function sweep(S: SynthCore, out: AudioNode, t: number, s: number, fromHz: numbe
 
 const fixed = (s: number) => () => s
 
-/** Kill bodies by death style (`effects/deathStyles.ts`): what the enemy is made of. */
+/** By death style (`effects/deathStyles.ts`): what the enemy is made of. */
 const KILL_BODIES: Record<KillSound, { lengthS: number; render: (S: SynthCore, out: AudioNode, t: number) => void }> = {
   // Balloon: a rubbery snap, a pitched plip and a punch.
   pop: { lengthS: 0.45, render(S, out, t) {

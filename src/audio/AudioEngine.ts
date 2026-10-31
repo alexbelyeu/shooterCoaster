@@ -28,7 +28,7 @@ const PAUSE_RAMP_S = 0.2
 // sfx → pause gate and music → duck → pause gain both end in the limiter, so stacked kill layers can't clip.
 interface MasterChain {
   limiter: Tone.Limiter | Tone.Compressor
-  /** After the hard limiter: takes back the make-up gain Web Audio's compressor adds. */
+  /** Takes back the hard limiter's make-up gain. */
   trim: Tone.Gain | null
   duck: Tone.Filter
   musicPause: Tone.Gain
@@ -41,10 +41,7 @@ interface MasterChain {
   arcade: Tone.Channel
 }
 
-/**
- * The score + arcade engines' master: a hard-knee limiter, so SFX can sit loud over the music and still stay under
- * −1 dBTP. Tone's Limiter has a 30 dB soft knee, which the Tone.js sound keeps (decision 2026-10-31-217).
- */
+/** Under `?audio=scrim`: a hard knee, so loud SFX stay under −1 dBTP (Tone's Limiter has a 30 dB soft knee; decision 2026-10-31-217). */
 const HARD_LIMITER = { threshold: -3, ratio: 20, knee: 0, attack: 0.001, release: 0.08 }
 /** DynamicsCompressor's built-in make-up gain: 0.6 × the gain it takes off a full-scale signal (Web Audio spec). */
 const HARD_LIMITER_MAKEUP_DB = -0.6 * HARD_LIMITER.threshold * (1 - 1 / HARD_LIMITER.ratio)
