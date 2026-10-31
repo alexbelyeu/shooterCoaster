@@ -2,7 +2,7 @@ import type { Color } from 'three'
 
 export type CurveType = 'curve1' | 'curve2'
 export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic'
-export type BossType = 'goldenBlimp'
+export type BossType = 'goldenBlimp' | 'kraken'
 export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake'
 
 export interface TrackParams {
