@@ -26,6 +26,8 @@
  *
  * Spawns use a fixed --seed (default 1337); the seed check reloads the first level
  * and requires the same spawnDigest() for that seed and a different one for another.
+ * The daily check starts today's Daily Run from its level-select card on two fresh pages
+ * (today's seed, the same spawns) and checks its results, saves and Replay (#184).
  * The hidden-pause check fakes a tab hide on the first level: it must pause, drop a
  * held trigger, keep the timer still (and a primed combo intact), wait for Resume, then
  * neither reset nor jump it, nor bring back killed enemies. On the first level the killNearest kills enter the 5× combo
@@ -1419,7 +1421,8 @@ async function levelSelectCheck(page, levels) {
       focused: document.activeElement?.dataset?.level ?? null,
     }
   })
-  if (layout.cards !== levels.length) problems.push(`${layout.cards} level cards for ${levels.length} levels`)
+  // One card per level plus the Daily Run card (#184).
+  if (layout.cards !== levels.length + 1) problems.push(`${layout.cards} cards for ${levels.length} levels + Daily`)
   if (layout.locked !== levels.length - expectOpen) problems.push(`${layout.locked} locked cards, expected ${levels.length - expectOpen}`)
   if (Number(layout.total) !== expectStars || !layout.totalText.includes(`${expectStars} / ${levels.length * 3}`)) {
     problems.push(`star total "${layout.totalText.trim()}", expected ${expectStars} / ${levels.length * 3}`)
@@ -1459,6 +1462,98 @@ async function levelSelectCheck(page, levels) {
     if (after.phase !== 'playing' || after.level !== target) problems.push(`Enter started ${after.level} (${after.phase}), expected ${target}`)
   }
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
+}
+
+/** Click the level select's Daily card (#184) and return the run it started and its spawnDigest(). */
+async function startDailyFromCard(page, savedScores) {
+  await page.evaluate((s) => {
+    window.__SC_TEST__.setSavedScores(s)
+    window.__SC_TEST__.setPhase('levelSelect')
+  }, savedScores)
+  if (!(await waitVisible(page, '.level-card-daily'))) return { run: null, digest: null }
+  await page.locator('.level-card-daily').click({ timeout: 30000 })
+  await page.waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 30000 }).catch(() => {})
+  const run = await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    return { ...s.daily(), phase: s.phase(), runSeed: s.stats().runSeed, currentLevel: s.stats().currentLevel }
+  })
+  return { run, digest: await nextSpawnDigest(page, null) }
+}
+
+/**
+ * Daily Run (#184): the card starts today's level on today's seed in daily mode, two loads spawn the same,
+ * the results say DAILY / NEW BEST with no Next Level, Replay keeps the seed, and campaign saves stay as they were.
+ */
+async function dailyCheck(newPage) {
+  const problems = []
+  const campaign = { level1: { level: 'level1', score: 1000, maxScore: 0, stars: 3, timestamp: 0 } }
+  const first = await newPage()
+  const a = await startDailyFromCard(first.page, campaign)
+  const { run } = a
+  if (!run) problems.push('no Daily card on the level select')
+  else {
+    if (run.phase !== 'playing') problems.push(`the Daily card left the game in "${run.phase}"`)
+    if (run.runMode?.mode !== 'daily' || run.runMode.dateKey !== run.dateKey) problems.push(`run mode ${JSON.stringify(run.runMode)}, expected daily ${run.dateKey}`)
+    if (run.runSeed !== run.seed) problems.push(`daily run seed ${run.runSeed}, expected dailySeed(${run.dateKey}) = ${run.seed}`)
+    if (run.currentLevel !== run.level) problems.push(`daily started ${run.currentLevel}, expected ${run.level}`)
+  }
+  if (!a.digest) problems.push('spawnDigest() never reported the daily spawns')
+
+  // Score something so the day's first result is a NEW BEST, then end the run.
+  await first.page.evaluate(() => window.__SC_TEST__.killNearest(3))
+  await waitFrames(first.page, 2, { maxMs: 20000 })
+  await first.page.evaluate(() => window.__SC_TEST__.endLevel())
+  const resultsShown = await first.page
+    .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 60000, polling: 250 })
+    .then(() => true, () => false)
+  await first.page.waitForTimeout(1500)
+  await first.page.screenshot({ path: path.join(OUT, 'daily-results.png'), timeout: SHOT_TIMEOUT })
+  const results = await first.page.evaluate(() => {
+    const el = document.querySelector('.results-screen')
+    const s = window.__SC_TEST__
+    return {
+      mode: el?.dataset.mode ?? null,
+      badge: el?.querySelector('.results-daily-badge')?.textContent ?? null,
+      record: el?.querySelector('.results-record')?.textContent ?? null,
+      buttons: [...(el?.querySelectorAll('.results-actions button') ?? [])].map((b) => b.textContent),
+      score: s.stats().score,
+      daily: s.daily(),
+      savedScores: JSON.parse(localStorage.getItem('shootercoaster-scores') ?? '{}').state?.savedScores ?? null,
+    }
+  })
+  const savedDay = run ? results.daily.savedDaily[run.dateKey] : undefined
+  if (!resultsShown) problems.push('daily results screen never finished its reveal')
+  if (results.mode !== 'daily' || !results.badge) problems.push(`daily results lack the Daily badge (mode ${results.mode})`)
+  if (results.score > 0 && results.record !== 'NEW BEST') problems.push(`first daily result shows "${results.record}", expected NEW BEST`)
+  if (results.buttons.includes('Next Level')) problems.push('daily results offer Next Level')
+  if (!savedDay || savedDay.score !== Math.round(results.score)) problems.push(`today's daily best ${JSON.stringify(savedDay)}, expected score ${Math.round(results.score)}`)
+  if (results.daily.streak.count !== 1 || results.daily.streak.lastKey !== run?.dateKey) problems.push(`daily streak ${JSON.stringify(results.daily.streak)}, expected 1 day`)
+  if (JSON.stringify(results.savedScores) !== JSON.stringify(campaign)) problems.push(`a daily run changed the campaign saves: ${JSON.stringify(results.savedScores)}`)
+
+  // Replay replays the same seed in daily mode.
+  await first.page.locator('.results-actions button', { hasText: 'Replay' }).click({ timeout: 10000 }).catch((e) => problems.push(`click Replay: ${e.message}`))
+  await first.page.waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 30000 }).catch(() => {})
+  const replay = await first.page.evaluate(() => ({ runSeed: window.__SC_TEST__.stats().runSeed, mode: window.__SC_TEST__.daily().runMode.mode }))
+  if (run && (replay.runSeed !== run.seed || replay.mode !== 'daily')) problems.push(`Replay ran seed ${replay.runSeed} (${replay.mode}), expected the daily seed ${run.seed}`)
+  const errors = [...first.errors, ...(await first.page.evaluate(() => window.__SC_TEST__.errors))]
+  await first.ctx.close()
+
+  // A second load on the same date spawns the same enemies.
+  const second = await newPage()
+  const b = await startDailyFromCard(second.page, {})
+  errors.push(...second.errors, ...(await second.page.evaluate(() => window.__SC_TEST__.errors)))
+  await second.ctx.close()
+  if (b.run?.runSeed !== run?.seed) problems.push(`second load ran seed ${b.run?.runSeed}, expected ${run?.seed}`)
+  if (b.digest !== a.digest) problems.push(`two loads of today's daily spawned differently (${a.digest} vs ${b.digest})`)
+  if (errors.length) problems.push(`${errors.length} error(s)`)
+
+  return {
+    id: 'daily',
+    ok: problems.length === 0,
+    problems,
+    errors,
+    daily: { dateKey: run?.dateKey, level: run?.level, seed: run?.seed, digest: a.digest, digestAgain: b.digest, record: results.record, replaySeed: replay.runSeed },
+  }
 }
 
 /** The settings card (#35): inside the viewport, no sideways scroll, every control there and ≥ 44 px tall. */
@@ -2178,6 +2273,13 @@ async function run() {
     await l.ctx.close()
   }
 
+  // 1b'. Daily Run from its card: today's seed, same spawns on a second load, daily results, campaign saves untouched
+  if (!args['skip-desktop']) {
+    const r = await dailyCheck(newPage)
+    failed ||= !r.ok
+    results.push(r)
+  }
+
   // 1c. Settings from the title (settings.png): layout, Esc, persisted across a reload
   if (!args['skip-desktop']) {
     const st = await newPage()
@@ -2356,6 +2458,8 @@ async function run() {
       : ''
     const extra = r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '')
+      : r.daily
+        ? ` ${r.daily.dateKey} ${r.daily.level} seed=${r.daily.seed} digest=${r.daily.digest} again=${r.daily.digestAgain} record=${r.daily.record} replaySeed=${r.daily.replaySeed}`
       : r.levelSelect
         ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total}` +
           (r.levelSelect.keyboard ? ` keys: ${r.levelSelect.focused} <- ${r.levelSelect.keyboard.left}, locked ${r.levelSelect.keyboard.locked} Enter -> ${r.levelSelect.keyboard.phaseAfterLocked}, Enter -> ${r.levelSelect.keyboard.level} ${r.levelSelect.keyboard.phase}` : '')
