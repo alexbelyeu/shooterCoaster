@@ -303,7 +303,7 @@ Periodic volcanic eruption events that create gameplay intensity spikes.
 
 1. **Trigger**: At wave 4 (`spawnDelay: 50`) and wave 6 (`spawnDelay: 85`)
 2. **Visual effects**:
-   - Screen shake (camera position oscillation, amplitude 2-5 units, duration 3s)
+   - Screen shake: rotation-only camera trauma via `CAMERA_TRAUMA_EVENT` (`src/combat/screenShake.ts`), never a `camera.position` offset
    - Fog distance drops from 6000 to 200 over 2s, then recovers to 6000 over 8s
    - Landmark volcano glow intensifies (emissiveIntensity pulses to 1.0)
 3. **Gameplay effect**:
@@ -316,7 +316,7 @@ Periodic volcanic eruption events that create gameplay intensity spikes.
 - Add `isEruption` flag to wave config (boolean, optional)
 - EnemySpawner checks flag and adjusts spawn interval
 - BiomeEnvironment listens for eruption events via a shared state/context
-- Camera shake via `useFrame` with damped sinusoidal offset
+- Camera shake: `eventBus.emit(CAMERA_TRAUMA_EVENT, amount, durationMs)`; the coaster camera applies it as rotation only
 - Fog distance animated via `useFrame` lerp
 
 ---

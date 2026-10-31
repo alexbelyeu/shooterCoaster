@@ -143,7 +143,7 @@ export interface SCTestApi {
    *  live on-screen enemy and fire a real bullet through the pool. */
   autoFire: (enabled: boolean) => void
   /** Kill the n nearest live enemies (on-screen ones first). Fires one real shot
-   *  at the first on-screen victim (bullet, muzzle flash, camera kick; may be
+   *  at the first on-screen victim (bullet, muzzle flash, weapon recoil; may be
    *  throttled by the fire delay), then resolves each victim through
    *  processHit — the bullet pool's own hit path (enemy:hit, hit flash, kill pop;
    *  enemy:killed follows ~80 ms later). Returns how many were hit. */
