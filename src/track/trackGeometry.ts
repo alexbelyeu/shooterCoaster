@@ -61,7 +61,7 @@ export function buildTrackGeometry(
   const positions = new Float32Array((tubeVerts + tieVerts) * 3)
   const normals = new Float32Array((tubeVerts + tieVerts) * 3)
   const colors = new Float32Array((tubeVerts + tieVerts) * 3)
-  // Cross-section direction + radius for the min-thickness patch; ties stay zero (they are wide).
+  // Ties keep a zero `aThick`: they are wide enough.
   const thick = new Float32Array((tubeVerts + tieVerts) * 4)
   const indices: number[] = []
   let v = 0

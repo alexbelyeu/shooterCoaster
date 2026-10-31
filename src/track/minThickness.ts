@@ -1,13 +1,8 @@
 import * as THREE from 'three'
 
 /**
- * Minimum on-screen thickness for the coaster's rails and lattice: a vertex patch that
- * pushes each vertex outward along its cross-section direction until the part's
- * projected radius reaches a pixel floor (`minThicknessPush` in `trackDimensions.ts`).
- * Up close the real radius is larger and nothing moves.
- *
- * Geometry carries `aThick` = (unit cross-section direction, real radius) per vertex;
- * (0, 0, 0, 0) leaves a vertex alone (ties, footings). Instances must be unscaled.
+ * Vertex patch mirroring `minThicknessPush` (`trackDimensions.ts`). Geometry carries `aThick` = (unit
+ * cross-section direction, real radius); zeros leave a vertex alone. Instances must be unscaled.
  */
 
 /** Drawing-buffer height in pixels; the one value `TrackMesh` updates, on resize or a dpr change. */
@@ -44,7 +39,6 @@ export function withMinThickness<T extends THREE.Material>(material: T, minPixel
       .replace('#include <common>', `#include <common>\n${PARS}`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${PUSH}`)
   }
-  // The radius lives in a uniform, so rails and lattice share one patch source.
   material.customProgramCacheKey = () => `${prevKey.call(material)}|sc-min-thickness`
   return material
 }

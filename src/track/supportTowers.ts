@@ -352,10 +352,7 @@ class PrismBuilder {
     }
   }
 
-  /**
-   * Axis-aligned closed box (tower-local), from min to max corner. `beamAlongX` marks it
-   * a beam along x for the thickness floor: corners widen away from its centre in y and z.
-   */
+  /** Axis-aligned closed box (tower-local), from min to max corner; a `beamAlongX` box widens in y and z under the thickness floor. */
   box(min: THREE.Vector3, max: THREE.Vector3, beamAlongX = false) {
     const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
     const [x0, y0, z0, x1, y1, z1] = [min.x, min.y, min.z, max.x, max.y, max.z]
@@ -378,7 +375,7 @@ class PrismBuilder {
     for (const [q, n] of faces) this.quad(q[0], q[1], q[2], q[3], n, q.map(thickOf))
   }
 
-  /** Quad as two triangles, wound so the face normal agrees with n; `t` is each corner's thickness. */
+  /** Quad as two triangles, wound so the face normal agrees with n. */
   private quad(
     p0: THREE.Vector3,
     p1: THREE.Vector3,

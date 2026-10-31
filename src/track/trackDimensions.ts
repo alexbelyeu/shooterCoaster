@@ -36,19 +36,12 @@ export const DEFAULT_RAIL_RADIUS = 0.35
 export const DEFAULT_TIE_SPACING = 10
 export const DEFAULT_TOWER_SPACING = 50
 
-/**
- * Line-weight floor (drawing-buffer pixels of projected radius): far rails and spine
- * never thin below this, so the ride ahead reads as a solid ribbon to the horizon.
- */
+/** Projected radius (drawing-buffer px) far rails and spine never thin below. */
 export const RAIL_MIN_PIXEL_RADIUS = 1.5
 /** The same floor for tower legs, braces and cross-beams: about one pixel wide. */
 export const LATTICE_MIN_PIXEL_RADIUS = 0.5
 
-/**
- * World radius that projects to `minPixelRadius` pixels at view-space `depth`.
- * `projScaleY` is the projection matrix's [1][1] (1 / tan(fovY / 2)), so a portrait FOV
- * or the speed FOV kick is accounted for. The vertex patch in `minThickness.ts` mirrors this.
- */
+/** World radius that projects to `minPixelRadius` px at view-space `depth`; `projScaleY` = projectionMatrix[1][1]. */
 export function minWorldRadius(
   depth: number,
   minPixelRadius: number,
@@ -58,7 +51,7 @@ export function minWorldRadius(
   return (2 * Math.max(0, depth) * minPixelRadius) / (projScaleY * viewportHeightPx)
 }
 
-/** How far a vertex of a part `radius` thick is pushed outward at `depth`: 0 wherever the real part is already thicker. */
+/** Outward push for a part `radius` thick; 0 wherever it is already thicker than the floor. */
 export function minThicknessPush(
   radius: number,
   depth: number,

@@ -46,10 +46,7 @@ const DEFAULT_DIMS = getTrackDimensions({ scalar: 20 })
 /** Footing pads stand this far proud of the visible ground. */
 const FOOTING_LIFT = 0.5
 
-/**
- * Vertex-coloured steel with the rails' thickness floor; `glow` adds the squared (≈ linear: dark
- * rails stay dark) sRGB vertex colours as emissive. Caller disposes.
- */
+/** Vertex-coloured steel; `glow` adds the squared (≈ linear: dark rails stay dark) sRGB vertex colours as emissive. Caller disposes. */
 function createTrackMaterial(glow: number): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.3 })
   if (glow > 0) {
@@ -211,7 +208,6 @@ export default function TrackMesh({
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
 
-  // The thickness floor is in drawing-buffer pixels; FOV comes from the projection matrix in the shader.
   const viewportHeight = useThree((s) => s.size.height * s.viewport.dpr)
   useEffect(() => {
     trackViewportHeight.value = Math.max(1, viewportHeight)

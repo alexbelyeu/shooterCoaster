@@ -6,10 +6,8 @@ import {
   minWorldRadius,
 } from './trackDimensions'
 
-/** 1 / tan(fovY / 2) for a vertical FOV in degrees. */
 const projScale = (fovDeg: number) => 1 / Math.tan((fovDeg * Math.PI) / 360)
 
-/** Projected radius in pixels of a part `radius` thick at `depth` (what the floor guarantees). */
 const pixelRadius = (radius: number, depth: number, p: number, h: number) => (radius * p * h) / (2 * depth)
 
 describe('minWorldRadius', () => {
