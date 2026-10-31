@@ -1,0 +1,40 @@
+title    Brimstone Run
+composer Claude (ShooterCoaster placeholder)
+about    Placeholder Inferno score that proves the score engine. Brass over choir stabs, a driving low ostinato, timpani and toms.
+tempo    172
+beats    4
+steps    2
+reverb   0.3
+
+voice lead   brass    vol=0.8  pan=-0.1
+voice choir  choir    vol=0.45 pan=0.25 center=A4 gate=0.6
+voice bass   synbass  vol=0.8  oct=1
+voice timp   timpani  vol=0.7
+voice kick   kick     vol=0.9
+voice snare  snare    vol=0.55
+voice tom    tomlo    vol=0.6  pan=-0.2
+voice crash  crash    vol=0.35 pan=0.2
+
+pattern intro
+timp  | D2!- . . . . . . | A1 A1 A1 A1 A1! A1! A1! A1! |
+tom   | x... x... | x.x. xxXX |
+
+pattern A
+lead  | D5--- F5- E5 D5 | Eb5--- G5- F5 Eb5 | D5- A5- F5- D5- | E5- G5- C5--- |
+choir | [Dm]!- . . [Dm]!- . . | [Eb]!- . . [Eb]!- . . | [Dm]!- . . [Dm]!- . . | [C]!- . . [C]!- . . |
+bass  | D2 D2 D2 D2 D2 D2 D2 D2 | Eb2 Eb2 Eb2 Eb2 Eb2 Eb2 Eb2 Eb2 | D2 D2 D2 D2 D2 D2 D2 D2 | C2 C2 C2 C2 C2 C2 C2 C2 |
+timp  | D2!- . . . . . . | _ | _ | A1 A1 A1 A1 A1! A1! A1! A1! |
+kick  | x.xx x.x. | % | % | % |
+snare | ..x. ..x. | % | % | ..x. xxXX |
+tom   | _ | _ | _ | .... xxXX |
+crash | X... .... | _ | _ | _ |
+
+# B keeps A's drums over a new progression
+pattern B from A
+lead  | F5- D5- Bb4- D5- | E5- C#5- A4--- | D5 E5 F5 G5 A5--- | C#6- A5- E5- C#5- |
+choir | [Bb]!- . . [Bb]!- . . | [A]!- . . [A]!- . . | [Dm]!- . . [Dm]!- . . | [A]!- . . [A7]!- . . |
+bass  | Bb1 Bb1 Bb1 Bb1 Bb1 Bb1 Bb1 Bb1 | A1 A1 A1 A1 A1 A1 A1 A1 | D2 D2 D2 D2 D2 D2 D2 D2 | A1 A1 A1 A1 A1 A1 A1 A1 |
+timp  | Bb1!- . . . . . . | A1!- . . . . . . | D2!- . . . . . . | A1 A1 A1 A1 A1! A1! A1! A1! |
+
+play intro
+loop A B

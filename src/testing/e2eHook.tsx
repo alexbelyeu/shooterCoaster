@@ -11,7 +11,7 @@
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots (fires one real shot, then resolves the
  *     hits through the bullet pool's own processHit path), endLevel() to reach
- *     the results screen, stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
+ *     the results screen (shareText() for what its Share button sends), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
  *     primeCombo(n) to set up a long chain,
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
@@ -19,6 +19,7 @@
  *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses) and render it offline
  *   - read the camera pose (title fly-by), shader program count and longest frame (first-shot hitch)
  *   - summon the level's boss now, read it (hp, exposed weak points, on-screen box) and hit it through processHit
+ *   - read the graphics quality, its preset and the adaptive dpr steps
  *
  * Keep this file tiny and side-effect free when the flag is off: nothing here
  * runs unless `installE2EApi()` finds `?e2e=1`, and <E2EFrameProbe> is only
@@ -29,7 +30,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import * as Tone from 'tone'
 import { useGameStore } from '@/store/useGameStore'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType } from '@/types/level'
@@ -38,16 +39,21 @@ import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/
 import { fireAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
+import { useSettingsStore } from '@/store/useSettingsStore'
+import { qualityProfile, type GraphicsQuality, type QualityProfile } from '@/canvas/graphicsQuality'
+import { getAdaptiveSteps } from '@/canvas/useRenderBudget'
 import { comboMultiplier } from '@/combat/comboTiers'
 import { frenzyActive } from '@/combat/comboRuntime'
 import { getPointerState } from '@/input/pointerInput'
 import { initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
-import { playExplosionSound, playFireSound, playHitTick, playWaveStinger, sfxNodeCount } from '@/audio/SFXManager'
+import { loadArcade, sfx, type VoiceStats } from '@/audio/sfx'
 import { droppedSounds } from '@/audio/soundGuard'
 import { nextTriggerTime } from '@/audio/triggerTime'
 import { musicState, type MusicFade } from '@/audio/musicBus'
+import { MUSIC_ENGINE, scrimPlayer, type MusicEngine } from '@/audio/musicEngine'
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
 import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
+import { clipboardText, sharePayloadForRun } from '@/ui/share'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -136,6 +142,8 @@ export interface SCTestApi {
   primeCombo: (count: number) => void
   /** Force the results phase. */
   endLevel: () => void
+  /** What the results-screen Share button sends for the current level and score (`text url`, as the clipboard gets it), or null. */
+  shareText: () => string | null
   /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
   setTimeScale: (s: number) => void
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
@@ -147,6 +155,8 @@ export interface SCTestApi {
   // ── View / aspect (issue #66) ──
   /** Active camera projection vs the canvas's on-screen box (squash checks). */
   view: () => E2EView | null
+  /** Graphics quality setting (`?quality=` sets it), its preset, and the `auto` step-downs taken (always 0 under `?e2e=1`). */
+  graphics: () => { quality: GraphicsQuality; profile: QualityProfile; adaptiveSteps: number; reducedMotion: boolean }
   /** Audio state: unlocked yet, live gameplay SFX nodes (must stay flat while
    *  shooting / killing, 0 after level exit), music low-pass ducked (slow-mo). */
   audio: () => E2EAudio
@@ -177,6 +187,9 @@ export interface SCTestApi {
   // ── Death effects (issue #29) ──
   /** Death effects since mount, live now, the newest one's style (enemy type, 'bossPart' or 'custom') and origin on screen. */
   deaths: () => E2EDeaths
+  // ── Ambient particles (issue #37) ──
+  /** The biome particle field: mounted?, always-on and boost-only points, boost strength 0..1 now. */
+  particles: () => typeof e2eParticles
 }
 
 export interface E2EDeaths {
@@ -209,9 +222,14 @@ export interface E2EBoss {
   box: { minX: number; minY: number; maxX: number; maxY: number; widthFrac: number; heightFrac: number } | null
 }
 
+type ScrimState = ReturnType<typeof import('@/audio/scrim/player').scrimState>
+
 export interface E2EAudio {
   ready: boolean
+  /** Long-lived SFX nodes (the Tone kit, or the arcade engine's voice pool): must not grow while playing. */
   sfxNodes: number
+  /** The arcade engine's voice pool (`?audio=scrim`): budget, live now, the most at once, stolen / dropped by priority. */
+  sfxVoices: VoiceStats | null
   musicDucked: boolean
   /** The pause mix is on: music −12 dB, SFX silent. */
   pauseMix: boolean
@@ -220,6 +238,11 @@ export interface E2EAudio {
   lastDrop: string | null
   /** Music buses still connected (`audio/musicBus.ts`) with their gain now, and the last few gain ramps. */
   music: { buses: { name: string; gain: number; fading: boolean }[]; fades: MusicFade[] }
+  /** Which engine plays the music (`?audio=scrim` → 'scrim'). */
+  engine: MusicEngine
+  /** The score engine's tracks (current last), each paused or not with its song position, its long-lived node count,
+   *  and whether its scheduler timer runs; null until it has loaded. */
+  scrim: ScrimState | null
 }
 
 export interface E2EView {
@@ -350,6 +373,9 @@ export const e2eFireworks = {
   hasLast: false,
   last: new THREE.Vector3(),
 }
+
+/** Written by `shared/ParticleField.tsx` when the e2e flag is on; read through `particles()`. */
+export const e2eParticles = { mounted: false, points: 0, boostPoints: 0, boost: 0 }
 
 /** Written by `effects/ParticleExplosion.tsx` when the e2e flag is on; read through `deaths()`. */
 export const e2eDeaths = {
@@ -639,11 +665,20 @@ export function installE2EApi() {
       autoFireEnabled = false
       useGameStore.getState().setPhase('results')
     },
+    shareText: () => {
+      const { currentLevel, score } = useGameStore.getState()
+      const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score)) : null
+      return payload ? clipboardText(payload) : null
+    },
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,
     view: readView,
+    graphics: () => {
+      const { quality, reducedMotion } = useSettingsStore.getState()
+      return { quality, profile: qualityProfile(quality), adaptiveSteps: getAdaptiveSteps(), reducedMotion }
+    },
     triggerHeld: () => getPointerState().down,
     summonBoss: () => { e2eBoss.summon = true },
     boss: readBoss,
@@ -651,6 +686,7 @@ export function installE2EApi() {
     bossEvents: { spawn: 0, hit: 0, defeated: 0 },
     fireworks: readFireworks,
     deaths: readDeaths,
+    particles: () => ({ ...e2eParticles }),
   }
   eventBus.on('boss:spawn', () => { api.bossEvents.spawn += 1 })
   eventBus.on('boss:hit', () => { api.bossEvents.hit += 1 })
@@ -678,15 +714,22 @@ function waitForAudioTick() {
 
 async function audioBurst(shots: number, kills: number) {
   if (!isAudioReady()) await initAudio()
+  if (MUSIC_ENGINE === 'scrim') {
+    const { currentLevel } = useGameStore.getState()
+    await sfx().prepare(currentLevel, (currentLevel ? getLevelConfig(currentLevel)?.biome : undefined) ?? 'themePark')
+    ;(await loadArcade()).resetVoiceStats()
+  }
+  const s = sfx()
   for (let i = 0; i < shots; i++) {
-    playFireSound(i % 2 === 1)
+    s.fire(i % 2 === 1)
     if (i < kills) {
-      playHitTick()
-      playExplosionSound(kills - i)
+      s.hit(kills - i, null)
+      s.kill(kills - i, 'pop', null)
     }
     waitForAudioTick()
   }
-  playWaveStinger()
+  s.waveAnnounce()
+  s.waveIncoming()
 
   // Tone clamps the first late note to the ticked clock; before #115 the second landed on it.
   // A fresh synth per pair: only a start from silence records a new start time.
@@ -713,12 +756,15 @@ function readAudio(): E2EAudio {
   const d = droppedSounds()
   return {
     ready: isAudioReady(),
-    sfxNodes: sfxNodeCount(),
+    sfxNodes: sfx().nodeCount(),
+    sfxVoices: sfx().voices(),
     musicDucked: isMusicDucked(),
     pauseMix: isPauseMixOn(),
     dropped: d.count,
     lastDrop: d.last,
     music: isAudioReady() ? musicState() : { buses: [], fades: [] },
+    engine: MUSIC_ENGINE,
+    scrim: scrimPlayer()?.scrimState() ?? null,
   }
 }
 

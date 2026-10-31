@@ -43,6 +43,8 @@ Temporary Items
 .apdisk
 node_modules
 dist/
+dist-portal/
+dist-portal.zip
 tsconfig.tsbuildinfo
 .claude/settings.local.json
 

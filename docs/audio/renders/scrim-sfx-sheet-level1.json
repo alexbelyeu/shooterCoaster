@@ -1,0 +1,428 @@
+{
+  "name": "scrim-sfx-sheet-level1",
+  "kind": "sfx",
+  "request": {
+    "kind": "sfxSheet",
+    "engine": "scrim"
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.3,
+      "name": "fire (single shot)"
+    },
+    {
+      "t": 0.9,
+      "name": "fire (auto, held trigger)"
+    },
+    {
+      "t": 1.5,
+      "name": "autofire burst (6 shots, 100 ms apart)"
+    },
+    {
+      "t": 2.7,
+      "name": "hit tick"
+    },
+    {
+      "t": 3.3,
+      "name": "kill 1x"
+    },
+    {
+      "t": 3.9,
+      "name": "kill 2x (+ thump)"
+    },
+    {
+      "t": 4.6,
+      "name": "kill 3x (+ ring)"
+    },
+    {
+      "t": 5.4,
+      "name": "kill 5x (+ payout)"
+    },
+    {
+      "t": 6.5,
+      "name": "combo break"
+    },
+    {
+      "t": 7.3,
+      "name": "wave tell"
+    },
+    {
+      "t": 8.8,
+      "name": "boss arrival"
+    },
+    {
+      "t": 10.8,
+      "name": "boss hit (full hp)"
+    },
+    {
+      "t": 11.4,
+      "name": "boss hit (low hp)"
+    },
+    {
+      "t": 12,
+      "name": "boss defeat"
+    },
+    {
+      "t": 14.4,
+      "name": "firework whistle"
+    },
+    {
+      "t": 16,
+      "name": "firework pop"
+    },
+    {
+      "t": 17,
+      "name": "star chime 1"
+    },
+    {
+      "t": 18,
+      "name": "star chime 2"
+    },
+    {
+      "t": 19,
+      "name": "star chime 3"
+    },
+    {
+      "t": 20.5,
+      "name": "kill 1x (flutter)"
+    },
+    {
+      "t": 20.95,
+      "name": "kill 1x (crunch)"
+    },
+    {
+      "t": 21.4,
+      "name": "kill 1x (splash)"
+    },
+    {
+      "t": 21.85,
+      "name": "kill 1x (hiss)"
+    },
+    {
+      "t": 22.3,
+      "name": "golden balloon"
+    },
+    {
+      "t": 23.4,
+      "name": "FRENZY sting"
+    },
+    {
+      "t": 25,
+      "name": "FRENZY lift (held 1.5 s)"
+    },
+    {
+      "t": 27.1,
+      "name": "ui select"
+    },
+    {
+      "t": 27.35,
+      "name": "ui back"
+    },
+    {
+      "t": 27.65,
+      "name": "ui launch"
+    },
+    {
+      "t": 28.35,
+      "name": "countdown Ready"
+    },
+    {
+      "t": 28.75,
+      "name": "countdown GO"
+    }
+  ],
+  "seams": [],
+  "bar": null,
+  "metrics": {
+    "seconds": 29.7,
+    "integrated": -20.7,
+    "shortTermMax": -18.5,
+    "lra": 10.3,
+    "truePeak": -2.1,
+    "clipped": 0,
+    "silence": 5.7,
+    "correlation": 0.995,
+    "below30Db": -41.9,
+    "bands": {
+      "sub": {
+        "pct": 8.1,
+        "db": -10.9
+      },
+      "low": {
+        "pct": 45.3,
+        "db": -3.4
+      },
+      "mid": {
+        "pct": 35.3,
+        "db": -4.5
+      },
+      "presence": {
+        "pct": 9.6,
+        "db": -10.2
+      },
+      "air": {
+        "pct": 1.8,
+        "db": -17.4
+      },
+      "below30": {
+        "pct": 0,
+        "db": -41.9
+      }
+    },
+    "seamJumps": [],
+    "seamJumpMax": null,
+    "gunTailMs": 130,
+    "sounds": [
+      {
+        "t": 0.3,
+        "name": "fire (single shot)",
+        "peakDb": -16,
+        "tailMs": 130
+      },
+      {
+        "t": 0.9,
+        "name": "fire (auto, held trigger)",
+        "peakDb": -19.7,
+        "tailMs": 120
+      },
+      {
+        "t": 1.5,
+        "name": "autofire burst (6 shots, 100 ms apart)",
+        "peakDb": -19.1,
+        "tailMs": 621
+      },
+      {
+        "t": 2.7,
+        "name": "hit tick",
+        "peakDb": -17.4,
+        "tailMs": 60
+      },
+      {
+        "t": 3.3,
+        "name": "kill 1x",
+        "peakDb": -4,
+        "tailMs": 561
+      },
+      {
+        "t": 3.9,
+        "name": "kill 2x (+ thump)",
+        "peakDb": -2.3,
+        "tailMs": 631
+      },
+      {
+        "t": 4.6,
+        "name": "kill 3x (+ ring)",
+        "peakDb": -2.4,
+        "tailMs": 797
+      },
+      {
+        "t": 5.4,
+        "name": "kill 5x (+ payout)",
+        "peakDb": -2.6,
+        "tailMs": 932
+      },
+      {
+        "t": 6.5,
+        "name": "combo break",
+        "peakDb": -14.9,
+        "tailMs": 742
+      },
+      {
+        "t": 7.3,
+        "name": "wave tell",
+        "peakDb": -9.9,
+        "tailMs": 1478
+      },
+      {
+        "t": 8.8,
+        "name": "boss arrival",
+        "peakDb": -7.9,
+        "tailMs": 2000
+      },
+      {
+        "t": 10.8,
+        "name": "boss hit (full hp)",
+        "peakDb": -9.5,
+        "tailMs": 596
+      },
+      {
+        "t": 11.4,
+        "name": "boss hit (low hp)",
+        "peakDb": -9.9,
+        "tailMs": 591
+      },
+      {
+        "t": 12,
+        "name": "boss defeat",
+        "peakDb": -5.9,
+        "tailMs": 2395
+      },
+      {
+        "t": 14.4,
+        "name": "firework whistle",
+        "peakDb": -21.4,
+        "tailMs": 1308
+      },
+      {
+        "t": 16,
+        "name": "firework pop",
+        "peakDb": -13.9,
+        "tailMs": 777
+      },
+      {
+        "t": 17,
+        "name": "star chime 1",
+        "peakDb": -14,
+        "tailMs": 997
+      },
+      {
+        "t": 18,
+        "name": "star chime 2",
+        "peakDb": -11.7,
+        "tailMs": 997
+      },
+      {
+        "t": 19,
+        "name": "star chime 3",
+        "peakDb": -9.5,
+        "tailMs": 1498
+      },
+      {
+        "t": 20.5,
+        "name": "kill 1x (flutter)",
+        "peakDb": -3.4,
+        "tailMs": 426
+      },
+      {
+        "t": 20.95,
+        "name": "kill 1x (crunch)",
+        "peakDb": -3.9,
+        "tailMs": 446
+      },
+      {
+        "t": 21.4,
+        "name": "kill 1x (splash)",
+        "peakDb": -4.8,
+        "tailMs": 446
+      },
+      {
+        "t": 21.85,
+        "name": "kill 1x (hiss)",
+        "peakDb": -6.5,
+        "tailMs": 446
+      },
+      {
+        "t": 22.3,
+        "name": "golden balloon",
+        "peakDb": -8,
+        "tailMs": 1097
+      },
+      {
+        "t": 23.4,
+        "name": "FRENZY sting",
+        "peakDb": -6.1,
+        "tailMs": 1599
+      },
+      {
+        "t": 25,
+        "name": "FRENZY lift (held 1.5 s)",
+        "peakDb": -23.5,
+        "tailMs": 1824
+      },
+      {
+        "t": 27.1,
+        "name": "ui select",
+        "peakDb": -19.9,
+        "tailMs": 115
+      },
+      {
+        "t": 27.35,
+        "name": "ui back",
+        "peakDb": -19.9,
+        "tailMs": 200
+      },
+      {
+        "t": 27.65,
+        "name": "ui launch",
+        "peakDb": -14.7,
+        "tailMs": 672
+      },
+      {
+        "t": 28.35,
+        "name": "countdown Ready",
+        "peakDb": -15.9,
+        "tailMs": 396
+      },
+      {
+        "t": 28.75,
+        "name": "countdown GO",
+        "peakDb": -12.9,
+        "tailMs": 842
+      }
+    ]
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -20.7,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "Short-term max",
+      "value": -18.5,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -2.1,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -41.9,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 0.995,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Gun to silence (−60 dB)",
+      "value": 130,
+      "unit": "ms",
+      "max": 150,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 10.3,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 5.7,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode }
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
+import { useQualityProfile } from '@/canvas/useRenderBudget'
 import { buildContactShadowGeometry, createContactShadowMaterial, type ShadowCaster } from './contactShadows'
 
 interface ShadowRegistry {
@@ -16,8 +17,9 @@ export function useContactShadows(casters: readonly ShadowCaster[]) {
   useEffect(() => registry?.add(casters), [registry, casters])
 }
 
-/** Merges every `useContactShadows` list below it into one mesh; mounted from the start so the shader warm-up compiles it. */
+/** Merges every `useContactShadows` list below it into one mesh (hidden on low quality); mounted from the start so the shader warm-up compiles it. */
 export default function ContactShadows({ groundFn, children }: { groundFn: HeightFunction; children: ReactNode }) {
+  const visible = useQualityProfile().contactShadows
   const meshRef = useRef<THREE.Mesh>(null)
   const lists = useRef(new Set<readonly ShadowCaster[]>())
   const dirty = useRef(false)
@@ -59,7 +61,7 @@ export default function ContactShadows({ groundFn, children }: { groundFn: Heigh
     <ContactShadowContext.Provider value={registry}>
       {children}
       {/* Before other transparent props (ponds, water), so they blend over the darkened ground. */}
-      <mesh ref={meshRef} name="contact-shadows" geometry={empty} material={material} renderOrder={-1} />
+      <mesh ref={meshRef} name="contact-shadows" geometry={empty} material={material} renderOrder={-1} visible={visible} />
     </ContactShadowContext.Provider>
   )
 }

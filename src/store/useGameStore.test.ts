@@ -111,12 +111,6 @@ describe('addScore', () => {
     store().addScore(20)
     expect(store().score).toBe(80)
   })
-
-  it('resetScore zeroes it', () => {
-    store().addScore(99)
-    store().resetScore()
-    expect(store().score).toBe(0)
-  })
 })
 
 describe('startRun', () => {
@@ -135,8 +129,27 @@ describe('startRun', () => {
       shotsFired: 0,
       hits: 0,
       bestCombo: 0,
+      boss: null,
     })
     expect(store().combo).toEqual({ count: 0, multiplier: 1, lastKillTime: 0 })
+  })
+
+  it('starts at normal time when the last run ended in slow-mo (quit or restart during the last-kill slow-mo)', () => {
+    store().startRun('level1', 1)
+    store().setTimeScale(0.1)
+    store().setPhase('paused')
+    store().startRun('level1', 1)
+    expect(store().timeScale).toBe(1)
+  })
+
+  it('starts from the same state as a fresh store', () => {
+    const fresh = store()
+    store().addScore(50)
+    store().registerKill()
+    store().setTimeScale(0.5)
+    store().startRun('level1', 1)
+    for (const key of ['score', 'kills', 'shotsFired', 'hits', 'bestCombo', 'combo', 'timeScale', 'boss'] as const)
+      expect(store()[key], key).toEqual(fresh[key])
   })
 
   it('uses ?seed= from the URL when no seed is given', () => {

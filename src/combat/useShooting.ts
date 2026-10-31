@@ -3,7 +3,7 @@ import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getBulletPool } from './projectiles/bulletPoolHandle'
 import { useGameStore } from '@/store/useGameStore'
-import { playFireSound } from '@/audio/SFXManager'
+import { sfx } from '@/audio/sfx'
 import { eventBus } from '@/core/EventBus'
 import { getPointerState, subscribePointer } from '@/input/pointerInput'
 import { recordShot } from './hitFeedback'
@@ -37,7 +37,7 @@ export function fireAtNDC(x: number, y: number, camera: THREE.Camera, hitScale =
 
   if (!pool.fire(_origin, _direction, hitScale)) return false
   useGameStore.getState().registerShot()
-  playFireSound(auto)
+  sfx().fire(auto)
   // Weapon view-model (recoil, muzzle flash, tracer) aims at this shot. Touch
   // aim assist passes the assisted NDC in here, so the tracer follows the bullet.
   recordShot(x, y)

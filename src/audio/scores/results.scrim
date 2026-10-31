@@ -1,0 +1,27 @@
+title    Ride Over
+composer Claude (ShooterCoaster placeholder)
+about    Placeholder results music that proves the score engine. A short bell-and-brass flourish, then a calm vibes loop.
+tempo    100
+beats    4
+steps    2
+reverb   0.4
+
+voice brass  brass   vol=0.6  center=G4
+voice bell   bell    vol=0.5  pan=0.3
+voice timp   timpani vol=0.6
+voice vibes  vibes   vol=1.2  pan=-0.2
+voice pad    strings vol=0.5  pan=0.25 center=E4
+voice bass   upright vol=1.0 oct=1
+
+pattern intro
+brass | [C]!- [F]!- [G]!--- | [C]!------- |
+bell  | C5- E5- G5--- | C6------- |
+timp  | C2 . . . G2 . . . | C2!------- |
+
+pattern A
+vibes | E5- G5- C6--- | B5- A5- G5--- | F5- A5- C6--- | B5--- G5--- |
+pad   | [C]?------- | [Em]?------- | [F]?------- | [G]?------- |
+bass  | C2--- G1--- | E2--- B1--- | F1--- C2--- | G1--- D2--- |
+
+play intro
+loop A

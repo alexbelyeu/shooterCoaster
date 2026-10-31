@@ -1,0 +1,41 @@
+title    Whiteout
+composer Claude (ShooterCoaster placeholder)
+about    Placeholder Antarctica score that proves the score engine. Celesta and bells over an icy pad, a hard four-on-the-floor kick.
+tempo    140
+beats    4
+steps    2
+reverb   0.45
+
+voice lead   celesta  vol=0.9  pan=-0.1
+voice bell   bell     vol=0.4  pan=0.35
+voice pad    pad      vol=0.35 pan=-0.3 center=E4
+voice bass   synbass  vol=0.75 oct=1
+voice kick   kick     vol=0.95
+voice clap   clap     vol=0.35 pan=0.1
+voice hat    hat      vol=0.35 pan=0.3
+
+pattern intro
+pad   | [C#m]?------- | [B]?------- |
+bell  | C#5------- | D#5------- |
+kick  | _ | x.x. x.x. |
+
+pattern A
+lead  | G#5 E5 C#5 E5 G#5- C#6- | B5 A5 E5 C#5 E5--- | G#5 B5 E6 B5 G#5- E5- | F#5 D#5 B4 D#5 F#5--- |
+bell  | C#5------- | A4------- | E5------- | D#5------- |
+pad   | [C#m]?------- | [A]?------- | [E]?------- | [B]?------- |
+bass  | C#2- C#2 C#2 C#2- C#2 C#2 | A1- A1 A1 A1- A1 A1 | E2- E2 E2 E2- E2 E2 | B1- B1 B1 B1- B1 B1 |
+kick  | x.x. x.x. | % | % | % |
+clap  | ..x. ..x. | % | % | % |
+hat   | .x.x .x.x | % | % | % |
+
+pattern B
+lead  | A5- C#6- F#5--- | E5 F#5 G#5 A5 B5--- | C#6- B5 G#5 E5--- | G#5- C6- D#6--- |
+bell  | F#5------- | A4------- | C#5------- | G#4------- |
+pad   | [F#m]?------- | [A]?------- | [C#m]?------- | [G#]?------- |
+bass  | F#1- F#1 F#1 F#1- F#1 F#1 | A1- A1 A1 A1- A1 A1 | C#2- C#2 C#2 C#2- C#2 C#2 | G#1- G#1 G#1 G#1- G#1 G#1 |
+kick  | x.x. x.x. | % | % | % |
+clap  | ..x. ..x. | % | % | ..x. .xxx |
+hat   | .x.x .x.x | % | % | xxxx xxxx |
+
+play intro
+loop A B

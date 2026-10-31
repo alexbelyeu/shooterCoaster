@@ -2,7 +2,8 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import {
-  bandEnergy, barLines, clippedSamples, compareTargets, powerSpectrum, seamExcess, seamJump, silenceShare, soundEnvelope, stereoCorrelation, targetText,
+  bandEnergy, barLines, clippedSamples, compareTargets, killsOverMusic, powerSpectrum, seamExcess, seamJump, silenceShare, soundEnvelope, stereoCorrelation,
+  targetText,
 } from './metrics.mjs'
 
 export const SAMPLE_RATE = 44100
@@ -57,7 +58,11 @@ export function loudness(file) {
 const round = (x, d = 2) => (x === null || x === undefined || !Number.isFinite(x) ? x ?? null : Math.round(x * 10 ** d) / 10 ** d)
 
 /** `bar` ({startS, barS}) lets seams be judged against bar lines; `sounds` ({t, name}, an SFX sheet) are measured one by one. */
-export function measure(file, { seams = [], bar = null, sounds = [] } = {}) {
+/** A combat mix's kills, from its event list (`kill <n>`, `audioRender.ts`). */
+export const killTimes = (events) => events.filter((e) => /^kill \d+$/.test(e.name)).map((e) => e.t)
+
+/** `kills`: times of kills in a combat mix, each measured against `musicFile`, the same mix rendered without SFX. */
+export function measure(file, { seams = [], bar = null, sounds = [], kills = [], musicFile = null } = {}) {
   const channels = decode(file)
   const bands = bandEnergy(powerSpectrum(channels), SAMPLE_RATE)
   const end = channels[0].length / SAMPLE_RATE
@@ -74,6 +79,9 @@ export function measure(file, { seams = [], bar = null, sounds = [] } = {}) {
     return { t: s.t, name: s.name, peakDb: round(env.peakDb, 1), tailMs: Math.round(env.tailMs) }
   })
   const shots = items.filter((s) => s.name.startsWith('fire ('))
+  const killRows = (musicFile && kills.length ? killsOverMusic(channels, decode(musicFile), SAMPLE_RATE, kills) : []).map((k) => ({
+    t: k.t, killDb: round(k.killDb, 1), musicDb: round(k.musicDb, 1), overDb: round(k.overDb, 1),
+  }))
   return {
     seconds: round(channels[0].length / SAMPLE_RATE),
     integrated: round(l.integrated, 1),
@@ -89,6 +97,7 @@ export function measure(file, { seams = [], bar = null, sounds = [] } = {}) {
     seamJumpMax: worst,
     ...(shots.length ? { gunTailMs: Math.max(...shots.map((s) => s.tailMs)) } : {}),
     ...(items.length ? { sounds: items } : {}),
+    ...(killRows.length ? { killOverMusicDb: Math.min(...killRows.map((k) => k.overDb)), kills: killRows } : {}),
   }
 }
 

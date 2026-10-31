@@ -15,7 +15,8 @@
  * the first-person weapon is missing / off screen / covering the centre / not
  * pointing along the shot's tracer (> 25° on screen), the
  * camera aspect doesn't match the canvas, or the results screen never finishes its
- * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats().
+ * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats(),
+ * or its Share line (shareText()) or "Copied!" click is wrong (#87).
  * Every level and the phone run (portrait, and after rotating) also run audioBurst():
  * fails on a late note that throws or a sound dropped by an audio error (#115).
  * Bullets (#165): no drawn bullet may exceed 2% of the canvas height on screen (every
@@ -37,6 +38,7 @@
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  * The boss check summons level1's Golden Blimp and shoots it down in phase order
  * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png); see bossCheck().
+ * The scrim check loads level1 with `?audio=scrim` (the score engine, #214, and the arcade SFX, #217); see scrimCheck().
  *
  * All waits are deadline-polled on the hook's frame counter, because software
  * rendering in CI / cloud sessions can run at ~1 fps. The title and each level ride
@@ -49,6 +51,11 @@
  *   node e2e/smoke.mjs --url https://example.com        # test a deployed site
  *   node e2e/smoke.mjs --mobile                         # + touch playtest on a phone viewport
  *   node e2e/smoke.mjs --mobile --skip-desktop          # only the touch playtest
+ *   node e2e/smoke.mjs --dist dist-portal --base /nested/path/ --levels level1   # the portal zip under a sub-path
+ *
+ * --dist / --base: preview that build folder under that sub-path (`npm run smoke:portal`),
+ * proving its relative asset URLs. Every local run fails on a request to another origin,
+ * and the title fails unless Lobster and Inter (self-hosted, global.css) loaded.
  *
  * --mobile: iPhone 13-like context (390x844, touch, mobile UA) that taps PLAY,
  * taps level 1, then in portrait and again after rotating to 844x390 landscape
@@ -88,6 +95,9 @@ const COMBAT_SECONDS = Number(args['combat-seconds'] ?? 4)
 const COMBAT_MIN_FRAMES = Number(args['combat-min-frames'] ?? 4)
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(args.seed ?? 1337)
+const DIST = args.dist ?? 'dist'
+// Path the build is served under: '/' for the site, a sub-path for the portal zip.
+const BASE_PATH = `/${(args.base ?? '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/$/, '')
 let preview // module scope so the top-level catch can kill it
 fs.mkdirSync(OUT, { recursive: true })
 
@@ -101,6 +111,29 @@ const IGNORED = [
   /Download the React DevTools/i,
 ]
 const ignored = (msg) => IGNORED.some((re) => re.test(msg))
+
+/** Portals forbid requests to other origins (#88); a deployed --url isn't held to it. */
+function collectErrors(page, errors) {
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
+  page.on('console', (m) => {
+    if (m.type() === 'error' && !ignored(m.text())) errors.push(`console: ${m.text()}`)
+  })
+  if (args.url) return
+  page.on('request', (r) => {
+    const url = new URL(r.url())
+    if (/^(https?|wss?):$/.test(url.protocol) && url.hostname !== 'localhost') errors.push(`other-origin request: ${r.url()}`)
+  })
+}
+
+async function fontProblems(page) {
+  const faces = await page.evaluate(async () => {
+    await document.fonts.ready
+    return [...document.fonts].map((f) => ({ family: f.family.replace(/["']/g, ''), status: f.status }))
+  })
+  return ['Lobster', 'Inter']
+    .filter((family) => !faces.some((f) => f.family === family && f.status === 'loaded'))
+    .map((family) => `${family} font not loaded (${JSON.stringify(faces.filter((f) => f.family === family))})`)
+}
 
 const portInUse = async (url) => {
   try {
@@ -126,10 +159,10 @@ async function startPreview() {
   let port, url
   for (let i = 0; i < 20; i++) {
     port = 4173 + Math.floor(Math.random() * 500)
-    url = `http://localhost:${port}`
-    if (!(await portInUse(url))) break
+    url = `http://localhost:${port}${BASE_PATH}`
+    if (!(await portInUse(`http://localhost:${port}`))) break
   }
-  const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], {
+  const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort', '--outDir', DIST, '--base', `${BASE_PATH}/`], {
     stdio: ['ignore', 'pipe', 'pipe'],
     // Own process group, so stopPreview() also kills the vite grandchild that
     // npx spawns (proc.kill() alone only stops npx and leaks the server).
@@ -139,13 +172,13 @@ async function startPreview() {
   proc.on('exit', () => (exited = true))
   for (let i = 0; i < 60 && !exited; i++) {
     try {
-      const r = await fetch(url)
+      const r = await fetch(`${url}/`)
       if (r.ok && !exited) return { url, proc }
     } catch {}
     await new Promise((r) => setTimeout(r, 500))
   }
   stopPreview(proc)
-  throw new Error('vite preview did not start (did you run `npm run build`?)')
+  throw new Error(`vite preview did not start (did you build ${DIST}/?)`)
 }
 
 async function launch() {
@@ -526,20 +559,81 @@ async function resultsScreenProblems(page, stats) {
       .filter((b) => b.getBoundingClientRect().width > 0)
       .map((b) => b.textContent)
     const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
-    return { rows, buttons, stars, score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent }
+    const s = window.__SC_TEST__
+    const levelName = s.levels().find((l) => l.id === s.stats().currentLevel)?.name ?? null
+    return {
+      rows, buttons, stars, levelName, shareText: s.shareText(),
+      score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent,
+    }
   })
   const problems = []
   if (!screen) return { problems: ['results screen missing'], screen }
   const { text, ...shown } = screen
+  problems.push(...(await resultsActionsProblems(page, 'desktop')))
+  // #87: the shared line can't drift from the run (score, stars, level) or lose its campaign link.
+  const shareRe = /^I scored ([\d,]+) ([★☆]{3}) on (.+) in ShooterCoaster 🎢 — beat me: (\S+)$/u
+  const share = shareRe.exec(screen.shareText ?? '')
+  if (!share) problems.push(`share text ${JSON.stringify(screen.shareText)} is not in the share format`)
+  else {
+    if (share[1] !== screen.score) problems.push(`share score ${share[1]} != results score ${screen.score}`)
+    if ((share[2].match(/★/g) ?? []).length !== screen.stars) problems.push(`share stars ${share[2]} != ${screen.stars} earned`)
+    if (share[3] !== screen.levelName) problems.push(`share level "${share[3]}" != "${screen.levelName}"`)
+    if (share[4] !== SHARE_URL) problems.push(`share link ${share[4]} != ${SHARE_URL}`)
+  }
+  // Headless Chromium has no share sheet, so a real click takes the clipboard path and confirms it on the button.
+  const shareButton = page.locator('.results-share')
+  if (await shareButton.count()) {
+    await shareButton.click({ timeout: 10000 }).catch((e) => problems.push(`click Share: ${e.message}`))
+    const copied = await page
+      .waitForFunction(() => document.querySelector('.results-share')?.textContent === 'Copied!', null, { timeout: 10000, polling: 100 })
+      .then(() => true, () => false)
+    const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null)
+    if (!copied) problems.push('clicking Share did not show "Copied!"')
+    else if (clip !== null && clip !== screen.shareText) problems.push(`clipboard ${JSON.stringify(clip)} != shareText()`)
+    shown.copied = copied
+  }
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
   for (const label of ['Kills', 'Accuracy', 'Best combo', 'Time left']) {
     if (!(label in screen.rows)) problems.push(`results screen has no "${label}" row`)
   }
   if (screen.rows.Kills && !screen.rows.Kills.startsWith(`${stats.kills} /`)) problems.push(`results kills "${screen.rows.Kills}" != ${stats.kills}`)
   if (stats.shotsFired > 0 && !/^\d+%$/.test(screen.rows.Accuracy ?? '')) problems.push(`results accuracy "${screen.rows.Accuracy}" with ${stats.shotsFired} shots`)
-  if (!screen.buttons.includes('Replay') || !screen.buttons.includes('Levels')) problems.push(`results buttons ${JSON.stringify(screen.buttons)}`)
+  for (const label of ['Levels', 'Replay', 'Share']) {
+    if (!screen.buttons.includes(label)) problems.push(`results buttons ${JSON.stringify(screen.buttons)} lack ${label}`)
+  }
   if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
   return { problems, screen: shown }
+}
+
+/** The results-screen share link (#87, src/ui/share.ts). */
+const SHARE_URL = 'https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=results'
+
+/** Results buttons inside the viewport, none overlapping another, each at least the 44 px touch target. */
+async function resultsActionsProblems(page, label) {
+  const r = await page.evaluate(() => {
+    const boxes = [...document.querySelectorAll('.results-actions button')]
+      .map((b) => ({ name: b.textContent, r: b.getBoundingClientRect() }))
+      .filter((b) => b.r.width > 0)
+    const screen = document.querySelector('.results-screen')
+    return {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      hScroll: screen ? screen.scrollWidth > screen.clientWidth : true,
+      boxes: boxes.map((b) => ({ name: b.name, left: b.r.left, top: b.r.top, right: b.r.right, bottom: b.r.bottom })),
+    }
+  })
+  const problems = []
+  if (r.hScroll) problems.push(`${label}: the results screen scrolls sideways`)
+  for (const [i, a] of r.boxes.entries()) {
+    if (a.left < 0 || a.top < 0 || a.right > r.vw || a.bottom > r.vh)
+      problems.push(`${label}: results button ${a.name} leaves the ${r.vw}x${r.vh} viewport`)
+    if (a.bottom - a.top < 44) problems.push(`${label}: results button ${a.name} under the 44 px touch target`)
+    for (const b of r.boxes.slice(i + 1)) {
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom)
+        problems.push(`${label}: results buttons ${a.name} and ${b.name} overlap`)
+    }
+  }
+  return problems
 }
 
 const MOBILE_LEVEL = 'level1'
@@ -1308,6 +1402,109 @@ async function levelSelectCheck(page, levels) {
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
 }
 
+/** The settings card (#35): inside the viewport, no sideways scroll, every control there and ≥ 44 px tall. */
+async function settingsLayout(page, label) {
+  const r = await page.evaluate(() => {
+    const card = document.querySelector('.settings-card')
+    const root = document.querySelector('.settings-screen')
+    const b = card?.getBoundingClientRect()
+    const targets = [...document.querySelectorAll('.settings-card button, .settings-card .settings-row')]
+    return {
+      rect: b ? { left: Math.round(b.left), top: Math.round(b.top), right: Math.round(b.right), bottom: Math.round(b.bottom) } : null,
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      hScroll: root ? root.scrollWidth > root.clientWidth : true,
+      quality: [...document.querySelectorAll('[aria-labelledby="settings-quality-label"] [role="radio"]')].map((el) => el.textContent),
+      sliders: document.querySelectorAll('.settings-card input[type="range"]').length,
+      switches: document.querySelectorAll('.settings-card input[role="switch"]').length,
+      smallTargets: targets.filter((el) => el.getBoundingClientRect().height < 44).length,
+    }
+  })
+  const problems = []
+  if (!r.rect) problems.push('no settings card')
+  else if (r.rect.left < 0 || r.rect.top < 0 || r.rect.right > r.vw || r.rect.bottom > r.vh)
+    problems.push(`the settings card (${r.rect.left},${r.rect.top})-(${r.rect.right},${r.rect.bottom}) leaves the ${r.vw}x${r.vh} viewport`)
+  if (r.hScroll) problems.push('settings scroll sideways')
+  if (r.quality.length !== 4) problems.push(`${r.quality.length} quality options (${r.quality.join('/')}), expected Auto / Low / Med / High`)
+  if (r.sliders !== 2) problems.push(`${r.sliders} volume sliders, expected music + effects`)
+  if (r.switches !== 2) problems.push(`${r.switches} switches, expected show FPS + reduced motion`)
+  if (r.smallTargets) problems.push(`${r.smallTargets} settings control(s) under the 44 px touch target`)
+  return { ...r, problems: problems.map((p) => `${label}: ${p}`) }
+}
+
+/**
+ * Settings from the title (settings.png): the card's layout, Esc back to the title, and the quality +
+ * music volume picked there still set after a reload.
+ */
+async function settingsCheck(page) {
+  const problems = []
+  if (!(await waitVisible(page, '.settings-button'))) return { id: 'settings', problems: ['no settings button on the title'] }
+  await page.locator('.settings-button').click({ timeout: 30000 })
+  if (!(await waitVisible(page, '.settings-card', 30000))) return { id: 'settings', problems: ['the settings card never showed'] }
+  await waitFrames(page, 1, { minMs: 400, maxMs: 8000 })
+  const layout = await settingsLayout(page, 'desktop 1280x720')
+  problems.push(...layout.problems)
+  await page.screenshot({ path: path.join(OUT, 'settings.png'), timeout: SHOT_TIMEOUT })
+
+  const before = await page.evaluate(() => window.__SC_TEST__.graphics().quality)
+  if (before !== 'auto') problems.push(`quality "${before}" by default, expected auto`)
+  await page.getByRole('radio', { name: 'Low', exact: true }).click({ timeout: 30000 })
+  await page.waitForFunction(() => window.__SC_TEST__.graphics().quality === 'low', null, { timeout: 5000 }).catch(() => {})
+  const picked = await page.evaluate(() => window.__SC_TEST__.graphics().quality)
+  await page.locator('.settings-card input[type="range"]').first().fill('0.3')
+  if (picked !== 'low') problems.push(`clicking Low set the quality to "${picked}"`)
+  await page.keyboard.press('Escape')
+  const closed = await page
+    .waitForSelector('.settings-card', { state: 'detached', timeout: 10000 })
+    .then(() => true, () => false)
+  if (!closed) problems.push('Esc did not close settings')
+  if (!(await waitVisible(page, '.title-screen .play-button', 30000))) problems.push('the title did not come back after settings')
+
+  await page.reload({ waitUntil: 'load' })
+  await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
+  const reloaded = await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('shootercoaster-settings') ?? '{}').state ?? {}
+    return { quality: window.__SC_TEST__.graphics().quality, musicVolume: saved.musicVolume }
+  })
+  if (reloaded.quality !== 'low') problems.push(`quality "${reloaded.quality}" after a reload, expected low`)
+  if (reloaded.musicVolume !== 0.3) problems.push(`music volume ${reloaded.musicVolume} after a reload, expected 0.3`)
+  return { id: 'settings', problems, settings: { card: layout.rect, quality: [before, picked, reloaded.quality], musicVolume: reloaded.musicVolume } }
+}
+
+/**
+ * `?quality=low` (#35) against the default on the same level, seed and frozen track point, both at device
+ * dpr 2: dpr 1 instead of 2, no contact shadows, fewer draw calls (no bloom passes). `<id>-low.png`.
+ */
+async function qualityCheck(newPage, levelId) {
+  const sample = async (query, png) => {
+    const { ctx, page, errors } = await newPage(query, { deviceScaleFactor: 2 })
+    await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+    await waitFrames(page, 2, { minMs: 1500, maxMs: 30000 })
+    await page.evaluate(() => {
+      window.__SC_TEST__.setTimeScale(0)
+      window.__SC_TEST__.rideTo = 0.1
+    })
+    await waitFrames(page, 3, { maxMs: 30000 })
+    const s = await page.evaluate(() => {
+      const t = window.__SC_TEST__
+      return { drawCalls: t.drawCalls, dpr: t.view()?.dpr, graphics: t.graphics(), shadows: !!t.sceneStats().byName['contact-shadows'], errors: t.errors }
+    })
+    if (png) await page.screenshot({ path: path.join(OUT, png), timeout: SHOT_TIMEOUT })
+    await ctx.close()
+    return { ...s, errors: [...errors, ...s.errors] }
+  }
+  const high = await sample('e2e=1')
+  const low = await sample('e2e=1&quality=low', `${levelId}-low.png`)
+  const problems = []
+  if (high.graphics.quality !== 'auto' || high.dpr !== 2) problems.push(`default: quality ${high.graphics.quality} at dpr ${high.dpr}, expected auto at 2`)
+  if (low.graphics.quality !== 'low') problems.push(`?quality=low set the quality to "${low.graphics.quality}"`)
+  if (low.dpr !== 1) problems.push(`low quality renders at dpr ${low.dpr}, expected 1`)
+  if (!high.shadows) problems.push('no contact shadows on the default quality')
+  if (low.shadows) problems.push('contact shadows still drawn on low quality')
+  if (!(low.drawCalls < high.drawCalls)) problems.push(`low quality draws ${low.drawCalls} calls, not fewer than the default's ${high.drawCalls}`)
+  return { id: 'quality', problems, errors: [...high.errors, ...low.errors], quality: { level: levelId, drawCalls: [high.drawCalls, low.drawCalls], dpr: [high.dpr, low.dpr] } }
+}
+
 /** Title (#28): another camera angle 6 s later (`title-2.png`), the start hint, and a key press fading to level select. */
 async function titleFlyBy(page) {
   const problems = []
@@ -1495,7 +1692,111 @@ async function musicCrossfade(page) {
   return { problems, result: { fades, buses } }
 }
 
-/** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
+const SCRIM_CHECK = { level: 'level1', maxNodes: 150, burst: [64, 32] }
+
+/**
+ * `?audio=scrim` (#214): a real click unlocks audio and starts the title score; level1 must crossfade from it, keep its
+ * long-lived node count flat (≤ maxNodes) while it plays, duck with game time frozen, hold its song position while
+ * paused and pick it up again, then crossfade to the results score; nothing dropped, no page errors.
+ * The arcade SFX (#217): `audioBurst(64, 32)` must stay inside the voice budget (stealing, not growing), keep the SFX
+ * node count flat across it, and throw or drop nothing.
+ */
+async function scrimCheck(page) {
+  const problems = []
+  const audio = () => page.evaluate(() => window.__SC_TEST__.audio())
+  /** Polls `audio()` until `check` holds; returns the last reading. */
+  const until = async (check, ms = 30000) => {
+    const deadline = Date.now() + ms
+    let a = await audio()
+    while (!check(a) && Date.now() < deadline) {
+      await page.waitForTimeout(250)
+      a = await audio()
+    }
+    return a
+  }
+  const busNames = (a) => a.music.buses.map((b) => b.name)
+  const track = (a) => a.scrim?.tracks.at(-1) ?? null
+  const result = { engine: null, title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, ducked: null, results: false, dropped: 0 }
+
+  const vp = page.viewportSize()
+  await page.mouse.click(8, vp.height - 8) // any pointer press on the title unlocks audio
+  let a = await until((x) => x.scrim?.current === 'title')
+  result.engine = a.engine
+  if (a.engine !== 'scrim') return { problems: [`?audio=scrim reports engine "${a.engine}"`], result }
+  if (!a.ready) return { problems: ['a click did not unlock audio'], result }
+  result.title = a.scrim?.current === 'title'
+  if (!result.title) problems.push('the title score never started')
+
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [SCRIM_CHECK.level, SEED])
+  a = await until((x) => x.scrim?.current === SCRIM_CHECK.level && !busNames(x).includes('title'))
+  const titleOut = a.music.fades.findLast((f) => f.name === 'title' && f.ramp === 'out')
+  const levelIn = a.music.fades.findLast((f) => f.name === 'level' && f.ramp === 'in')
+  if (a.scrim?.current !== SCRIM_CHECK.level) problems.push(`the ${SCRIM_CHECK.level} score never started (current "${a.scrim?.current}")`)
+  if (!titleOut || titleOut.seconds < 0.5) problems.push('the title score did not fade out')
+  if (!levelIn || levelIn.seconds < 0.5) problems.push('the level score did not fade in')
+  if (busNames(a).includes('title')) problems.push('the title score bus was never disposed')
+
+  result.nodes.push(a.scrim.nodes)
+  result.position.push(track(a)?.position ?? 0)
+  await waitFrames(page, 2, { minMs: 3000, maxMs: 30000 })
+  a = await audio()
+  result.nodes.push(a.scrim.nodes)
+  result.position.push(track(a)?.position ?? 0)
+  if (result.nodes[1] !== result.nodes[0]) problems.push(`score engine nodes grew while playing: ${result.nodes.join(' -> ')}`)
+  if (result.nodes[1] > SCRIM_CHECK.maxNodes) problems.push(`score engine holds ${result.nodes[1]} nodes (≤ ${SCRIM_CHECK.maxNodes})`)
+  if (!(result.position[1] > result.position[0] + 1)) problems.push(`the level score is not advancing (${result.position.map((p) => p.toFixed(2)).join(' -> ')} s)`)
+  if (!a.scrim.ticking) problems.push('the score scheduler is not ticking')
+
+  const burst = await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), SCRIM_CHECK.burst)
+  const v = burst.sfxVoices
+  result.voices = v
+  result.sfxNodes.push(burst.sfxNodes)
+  if (!v) problems.push('no arcade SFX voice pool under ?audio=scrim')
+  else {
+    if (v.peak > v.budget) problems.push(`audioBurst(${SCRIM_CHECK.burst}) took ${v.peak} voices (budget ${v.budget})`)
+    if (v.played === 0) problems.push(`audioBurst(${SCRIM_CHECK.burst}) played no arcade SFX (bank never baked?)`)
+    if (v.stolen + v.rejected === 0) problems.push(`audioBurst(${SCRIM_CHECK.burst}) never stole a voice: the budget is not being exercised`)
+  }
+  if (burst.lateScheduleErrors) problems.push(`audioBurst: ${burst.lateScheduleErrors}/10 late note pairs threw`)
+  if (burst.dropped) problems.push(`audioBurst: ${burst.dropped} sound(s) dropped by an audio error (${burst.lastDrop?.split('\n')[0]})`)
+  await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), SCRIM_CHECK.burst)
+  result.sfxNodes.push((await audio()).sfxNodes)
+  if (result.sfxNodes[1] !== result.sfxNodes[0] || !(result.sfxNodes[0] > 0))
+    problems.push(`arcade SFX nodes not flat across two bursts: ${result.sfxNodes.join(' -> ')}`)
+
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  result.ducked = (await until((x) => x.musicDucked, 20000)).musicDucked
+  if (!result.ducked) problems.push('the score was not ducked with game time frozen')
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
+  if ((await until((x) => !x.musicDucked, 20000)).musicDucked) problems.push('the score stayed ducked at timeScale 1')
+
+  await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
+  a = await until((x) => track(x)?.paused)
+  const heldAt = track(a)?.position ?? 0
+  await page.waitForTimeout(2000)
+  const stillAt = track(await audio())?.position ?? 0
+  await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
+  const resumed = track(await until((x) => track(x) && !track(x).paused))
+  result.pausedHeld = { at: heldAt, after2s: stillAt, resumedAt: resumed?.position ?? null }
+  if (!track(a)?.paused) problems.push('pausing the run did not hold the score')
+  else if (stillAt !== heldAt) problems.push(`the score moved while paused (${heldAt.toFixed(2)} -> ${stillAt.toFixed(2)} s)`)
+  if (!resumed || resumed.paused) problems.push('resuming the run did not resume the score')
+  else if (resumed.position > heldAt + 2 || resumed.position < heldAt - 0.5)
+    problems.push(`the score did not resume where it stopped (${heldAt.toFixed(2)} -> ${resumed.position.toFixed(2)} s)`)
+
+  await page.evaluate(() => window.__SC_TEST__.endLevel())
+  a = await until((x) => x.scrim?.current === 'results' && !busNames(x).includes('level'))
+  const levelOut = a.music.fades.findLast((f) => f.name === 'level' && f.ramp === 'out')
+  const resultsIn = a.music.fades.findLast((f) => f.name === 'results' && f.ramp === 'in')
+  result.results = a.scrim?.current === 'results'
+  if (!result.results) problems.push(`no results score after the run (current "${a.scrim?.current}")`)
+  if (!levelOut || levelOut.seconds < 0.5 || !resultsIn) problems.push('the level score did not crossfade to the results score')
+  if (busNames(a).includes('level')) problems.push('the level score bus was never disposed')
+  result.dropped = a.dropped
+  if (a.dropped) problems.push(`${a.dropped} sound(s) dropped by an audio error (${a.lastDrop?.split('\n')[0]})`)
+  return { problems, result }
+}
+
 /** Boss bar (#181) on the phone, from a paused run: resumed with the boss summoned, it must sit inside the viewport and clear of the HUD in portrait and landscape (mobile-level1-boss.png). */
 async function mobileBossHud(page) {
   const selectors = [...HUD_SELECTORS, '.hud-boss']
@@ -1521,6 +1822,29 @@ async function mobileBossHud(page) {
   return { problems: [...portrait.problems, ...landscape.problems], rects: { portrait: portrait.rects, landscape: landscape.rects } }
 }
 
+/** The results screen on the phone (#87): its four buttons readable in portrait and landscape (mobile-results*.png). */
+async function mobileResults(page) {
+  await page.evaluate(() => window.__SC_TEST__.endLevel())
+  const shown = await page
+    .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 60000, polling: 250 })
+    .then(() => true, () => false)
+  if (!shown) return { problems: ['phone: the results screen never finished its reveal'], buttons: null }
+  // The buttons fade in after the reveal; frames take seconds on the phone run.
+  await waitVisible(page, '.results-actions', 30000)
+  await page.waitForTimeout(1500)
+  const buttons = await page.evaluate(() => [...document.querySelectorAll('.results-actions button')].map((b) => b.textContent))
+  const problems = await resultsActionsProblems(page, 'phone portrait 390x844')
+  if (!buttons.includes('Share')) problems.push(`phone: results buttons ${JSON.stringify(buttons)} lack Share`)
+  await page.screenshot({ path: path.join(OUT, 'mobile-results.png'), timeout: SHOT_TIMEOUT })
+  await page.setViewportSize({ width: 844, height: 390 })
+  await page.waitForTimeout(1000)
+  problems.push(...(await resultsActionsProblems(page, 'phone landscape 844x390')))
+  await page.screenshot({ path: path.join(OUT, 'mobile-results-landscape.png'), timeout: SHOT_TIMEOUT })
+  await page.setViewportSize({ width: 390, height: 844 })
+  return { problems, buttons }
+}
+
+/** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
 async function runMobile(browser, base) {
   const started = Date.now()
   const { defaultBrowserType: _unused, ...iphone } = devices['iPhone 13']
@@ -1529,10 +1853,7 @@ async function runMobile(browser, base) {
   const ctx = await browser.newContext({ ...iphone, viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
   const page = await ctx.newPage()
   const errors = []
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
-  page.on('console', (m) => {
-    if (m.type() === 'error' && !ignored(m.text())) errors.push(`console: ${m.text()}`)
-  })
+  collectErrors(page, errors)
   const problems = []
   const phase = () => page.evaluate(() => window.__SC_TEST__.phase())
   const waitPhase = (p, timeout) =>
@@ -1700,10 +2021,24 @@ async function runMobile(browser, base) {
     problems.push(...portraitCard.problems.map((p) => `phone portrait 390x844: ${p}`))
     await page.screenshot({ path: path.join(OUT, 'mobile-pause.png'), timeout: SHOT_TIMEOUT })
     pauseCards.portrait = portraitCard.rect
+
+    // Settings from the pause menu (#35): fits 390 px, Back returns to the menu (mobile-settings.png).
+    await page.getByRole('button', { name: 'Settings' }).tap({ timeout: 30000 }).catch((e) => problems.push(`tap Settings: ${e.message}`))
+    if (await waitVisible(page, '.settings-card', 60000)) {
+      const settings = await settingsLayout(page, 'phone portrait 390x844')
+      problems.push(...settings.problems)
+      await page.screenshot({ path: path.join(OUT, 'mobile-settings.png'), timeout: SHOT_TIMEOUT })
+      pauseCards.settings = settings.rect
+      await page.locator('.settings-back').tap({ timeout: 30000 }).catch((e) => problems.push(`tap settings Back: ${e.message}`))
+      if (!(await waitVisible(page, '.pause-card', 60000))) problems.push('phone: Back from settings did not return to the pause menu')
+    } else problems.push('phone: Settings in the pause menu never opened')
   }
 
   const bossHud = (await phase()) === 'paused' ? await mobileBossHud(page) : { problems: [], rects: null }
   problems.push(...bossHud.problems)
+
+  const resultsLayout = await mobileResults(page)
+  problems.push(...resultsLayout.problems)
 
   const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
   const allErrors = [...errors, ...hookErrors]
@@ -1722,6 +2057,7 @@ async function runMobile(browser, base) {
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
       bulletMaxScreenFrac: bullets.maxScreenFrac,
       pauseCards,
+      resultsButtons: resultsLayout.buttons,
     },
     kills: end.kills,
     score: end.score,
@@ -1738,14 +2074,13 @@ async function run() {
   const results = []
   let failed = false
 
-  const newPage = async (query = 'e2e=1') => {
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+  const newPage = async (query = 'e2e=1', options = {}) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, ...options })
+    // The results Share check reads back what it copied (#87).
+    await ctx.grantPermissions(['clipboard-read', 'clipboard-write'])
     const page = await ctx.newPage()
     const errors = []
-    page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
-    page.on('console', (m) => {
-      if (m.type() === 'error' && !ignored(m.text())) errors.push(`console: ${m.text()}`)
-    })
+    collectErrors(page, errors)
     await page.goto(`${base}/?${query}`, { waitUntil: 'load' })
     await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
     return { ctx, page, errors }
@@ -1758,7 +2093,7 @@ async function run() {
   const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png'), timeout: SHOT_TIMEOUT })
   const titleImg = await imageStats(t.page, titlePng)
   const fly = await titleFlyBy(t.page)
-  const titleProblems = [...fly.problems]
+  const titleProblems = [...fly.problems, ...(await fontProblems(t.page))]
   if (titleWait.frames < MIN_FRAMES) titleProblems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
   if (titleImg.stddev <= 4) titleProblems.push('title.png is blank')
   if (t.errors.length) titleProblems.push(`${t.errors.length} error(s)`)
@@ -1779,6 +2114,18 @@ async function run() {
     await l.ctx.close()
   }
 
+  // 1c. Settings from the title (settings.png): layout, Esc, persisted across a reload
+  if (!args['skip-desktop']) {
+    const st = await newPage()
+    const r = await settingsCheck(st.page)
+    r.errors = [...st.errors, ...(await st.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await st.ctx.close()
+  }
+
   // 2. Every level (or the requested subset)
   const wanted = args['skip-desktop'] ? [] : args.levels ? args.levels.split(',') : levels.map((l) => l.id)
   for (const id of wanted) {
@@ -1788,7 +2135,7 @@ async function run() {
     const ride = await waitFrames(page, MIN_FRAMES, { minMs: SECONDS * 1000, maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
     const stats = await page.evaluate(() => {
       const s = window.__SC_TEST__
-      return { avgFrameMs: s.avgFrameMs, drawCalls: s.drawCalls, triangles: s.triangles, phase: s.phase(), hookErrors: s.errors, scene: s.sceneStats?.() ?? null }
+      return { avgFrameMs: s.avgFrameMs, drawCalls: s.drawCalls, triangles: s.triangles, phase: s.phase(), hookErrors: s.errors, scene: s.sceneStats?.() ?? null, particles: s.particles() }
     })
     const png = await page.screenshot({ path: path.join(OUT, `${id}.png`), timeout: SHOT_TIMEOUT })
     const img = await imageStats(page, png)
@@ -1807,6 +2154,7 @@ async function run() {
       problems.push(`${enemyShot.readable} readable enemies (≥ ${READABLE_PX} px) of ${enemyShot.onScreen} on screen after the ride (need ${MIN_READABLE})`)
     }
     if (stats.scene && !stats.scene.environment) problems.push('no scene.environment (sky env map not baked)')
+    if (!stats.particles.mounted || stats.particles.points <= 0) problems.push('no ambient particle field (BiomeDefinition.particles)')
     const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
     problems.push(...desktopAspect.problems)
     stats.view = desktopAspect.view
@@ -1823,6 +2171,15 @@ async function run() {
       kills: play.kills, score: play.score, combat: play.combat, results: play.results, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
+  }
+
+  // 2b. ?quality=low against the default: dpr 1, no contact shadows, fewer draw calls (<id>-low.png)
+  if (wanted.length) {
+    const r = await qualityCheck(newPage, wanted[0])
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
   }
 
   // 3. Seeded spawns: a fresh page + the same seed gives the same enemies; another seed doesn't
@@ -1904,6 +2261,18 @@ async function run() {
     await b.ctx.close()
   }
 
+  // 6d. The score engine behind ?audio=scrim: title -> level -> pause -> results
+  if (wanted.includes(SCRIM_CHECK.level)) {
+    const sc = await newPage('e2e=1&audio=scrim')
+    const r = await scrimCheck(sc.page)
+    const errors = [...sc.errors, ...(await sc.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (errors.length) r.problems.push(`${errors.length} error(s)`)
+    const ok = r.problems.length === 0
+    failed ||= !ok
+    results.push({ id: 'scrim', ok, problems: r.problems, scrim: r.result, errors })
+    await sc.ctx.close()
+  }
+
   // 7. Optional touch playtest on a phone viewport
   if (args.mobile) {
     const m = await runMobile(browser, base)
@@ -1924,6 +2293,10 @@ async function run() {
       : r.levelSelect
         ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total}` +
           (r.levelSelect.keyboard ? ` keys: ${r.levelSelect.focused} <- ${r.levelSelect.keyboard.left}, locked ${r.levelSelect.keyboard.locked} Enter -> ${r.levelSelect.keyboard.phaseAfterLocked}, Enter -> ${r.levelSelect.keyboard.level} ${r.levelSelect.keyboard.phase}` : '')
+      : r.settings
+        ? ` card ${JSON.stringify(r.settings.card)} quality ${r.settings.quality.join(' -> ')} (reload) music ${r.settings.musicVolume}`
+      : r.quality
+        ? ` ${r.quality.level} draws default=${r.quality.drawCalls[0]} low=${r.quality.drawCalls[1]} dpr ${r.quality.dpr.join(' -> ')}`
       : r.seedCheck
         ? ` ${r.seedCheck.level} seed ${SEED}: ${r.seedCheck.digest} (reload ${r.seedCheck.reloaded}, again ${r.seedCheck.again}) seed ${SEED + 1}: ${r.seedCheck.other}`
       : r.hiddenPause
@@ -1946,6 +2319,10 @@ async function run() {
           ? ` ${r.boss.level} skipped (level timed out)`
           : ` ${r.boss.level} tell "${r.boss.tell.at(-1) ?? '-'}" draws=${r.boss.drawCalls} width ${(r.boss.widthFrac * 100).toFixed(0)}% exposed [${r.boss.exposedAtStart.length} ${r.boss.exposedAtStart[0] ?? '-'}…] -> [${r.boss.exposedMidway}]` +
             ` bullet hit ${r.boss.bulletHit} hits ${r.boss.phaseOneHits}+${r.boss.lastHits} kills ${r.boss.kills} score +${r.boss.score} popup ${r.boss.popup[0] ?? '-'} stage ${r.boss.stage}`)
+      : r.scrim
+        ? ` engine=${r.scrim.engine} title=${r.scrim.title} nodes ${r.scrim.nodes.join('->')} position ${r.scrim.position.map((p) => p.toFixed(1)).join('->')}s` +
+          ` sfxNodes ${r.scrim.sfxNodes.join('->')} voices ${r.scrim.voices ? `peak ${r.scrim.voices.peak}/${r.scrim.voices.budget} stolen ${r.scrim.voices.stolen} dropped ${r.scrim.voices.rejected}` : 'none'}` +
+          ` ducked=${r.scrim.ducked} paused at ${r.scrim.pausedHeld?.at.toFixed(1)}s (${r.scrim.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.scrim.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.scrim.results}`
       : r.speed
         ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile
@@ -1953,6 +2330,7 @@ async function run() {
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
           ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
+        ` particles=${r.particles?.points ?? '-'}${r.particles?.boostPoints ? `+${r.particles.boostPoints}` : ''}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
         ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)

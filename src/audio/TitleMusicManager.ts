@@ -2,7 +2,8 @@ import * as Tone from 'tone'
 import { nextTriggerTime } from './triggerTime'
 import { dropSound } from './soundGuard'
 import { sfxChannel, isAudioReady } from './AudioEngine'
-import { fadeOutMusicBus, openMusicBus, startTransportAt, type MusicBus } from './musicBus'
+import { MUSIC_FADE_S, fadeOutMusicBus, openMusicBus, startTransportAt, type MusicBus } from './musicBus'
+import { MUSIC_ENGINE, withScrim } from './musicEngine'
 
 /**
  * Whimsical carnival title-screen music.
@@ -11,16 +12,21 @@ import { fadeOutMusicBus, openMusicBus, startTransportAt, type MusicBus } from '
  * Tempo: 108 BPM — relaxed merry-go-round feel.
  */
 
-interface TitleTrack {
+interface ToneTitleMusic {
   bus: MusicBus
   melodyBox: Tone.Synth
   padSynth: Tone.PolySynth
   bassSynth: Tone.Synth
   chimeSynth: Tone.Synth
   tamb: Tone.NoiseSynth
+  loops: (Tone.Sequence | Tone.Loop)[]
+}
+
+/** The whoosh is an SFX that lives with the title; the music is Tone's, or null when the score engine plays it. */
+interface TitleTrack {
   whooshFilter: Tone.Filter
   whoosh: Tone.NoiseSynth
-  loops: (Tone.Sequence | Tone.Loop)[]
+  music: ToneTitleMusic | null
 }
 
 let track: TitleTrack | null = null
@@ -65,7 +71,17 @@ const tambPattern = [
 
 const chimeNotes = ['E6', 'G6', 'A6', 'C7', 'D7', 'E7', 'G7']
 
-function createTrack(): TitleTrack {
+function createWhoosh() {
+  const whooshFilter = new Tone.Filter({ type: 'bandpass', frequency: 300, Q: 1.2 }).connect(sfxChannel)
+  const whoosh = new Tone.NoiseSynth({
+    noise: { type: 'pink' },
+    envelope: { attack: 0.12, decay: 0.25, sustain: 0, release: 0.1 },
+    volume: -14,
+  }).connect(whooshFilter)
+  return { whooshFilter, whoosh }
+}
+
+function createMusic(): ToneTitleMusic {
   const bus = openMusicBus('title')
 
   // Music-box melody — sine with fast decay for bell-like tone
@@ -123,21 +139,19 @@ function createTrack(): TitleTrack {
     volume: -24,
   }).connect(bus.gain)
 
-  const whooshFilter = new Tone.Filter({ type: 'bandpass', frequency: 300, Q: 1.2 }).connect(sfxChannel)
-  const whoosh = new Tone.NoiseSynth({
-    noise: { type: 'pink' },
-    envelope: { attack: 0.12, decay: 0.25, sustain: 0, release: 0.1 },
-    volume: -14,
-  }).connect(whooshFilter)
-
-  return { bus, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whooshFilter, whoosh, loops: [] }
+  return { bus, melodyBox, padSynth, bassSynth, chimeSynth, tamb, loops: [] }
 }
 
 export function startTitleMusic(): void {
   if (track || !isAudioReady()) return
-  const t = createTrack()
+  if (MUSIC_ENGINE === 'scrim') {
+    track = { ...createWhoosh(), music: null }
+    withScrim((p) => p.playScore('title'))
+    return
+  }
+  const t = createMusic()
   const { melodyBox, padSynth, bassSynth, chimeSynth, tamb } = t
-  track = t
+  track = { ...createWhoosh(), music: t }
   const bar = startTransportAt(TITLE_BPM)
   const at = `${bar}i`
 
@@ -217,8 +231,17 @@ export function startTitleMusic(): void {
 
 export function stopTitleMusic(): void {
   if (!track) return
-  const { bus, loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whoosh, whooshFilter } = track
+  const { music, whoosh, whooshFilter } = track
   track = null
+  if (!music) {
+    withScrim((p) => p.stopScore('title'))
+    window.setTimeout(() => {
+      whoosh.dispose()
+      whooshFilter.dispose()
+    }, MUSIC_FADE_S * 1000)
+    return
+  }
+  const { bus, loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb } = music
   fadeOutMusicBus(bus, [...loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whoosh, whooshFilter])
 }
 
