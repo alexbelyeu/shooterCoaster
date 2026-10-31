@@ -11,6 +11,7 @@ import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks'
 import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
+import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 
 const SCRIM = MUSIC_ENGINE === 'scrim'
 
@@ -27,6 +28,11 @@ function followPhase(phase: GamePhase, level: string) {
 }
 
 const onHit = (e: unknown) => sfx().hit(useGameStore.getState().combo.count, placeSound((e as { position?: THREE.Vector3 }).position))
+const onKilled = (e: unknown) => {
+  const { position, combo, sound = 'pop', bossPart } = e as EnemyKilledEvent
+  if (bossPart) sfx().bossPart(combo, bossPart, placeSound(position))
+  else sfx().kill(combo, sound, placeSound(position))
+}
 const onWaveIncoming = () => sfx().waveIncoming()
 const onWaveAnnounce = () => sfx().waveAnnounce()
 const onComboBreak = () => sfx().comboBreak()
@@ -42,6 +48,7 @@ const onFireworkBurst = () => sfx().fireworkPop()
 
 const SFX_EVENTS: [string, (e: unknown) => void][] = [
   ['enemy:hit', onHit],
+  ['enemy:killed', onKilled],
   ['wave:incoming', onWaveIncoming],
   ['wave:announce', onWaveAnnounce],
   ['combo:broken', onComboBreak],
@@ -53,8 +60,8 @@ const SFX_EVENTS: [string, (e: unknown) => void][] = [
   [FIREWORK_BURST_EVENT, onFireworkBurst],
 ]
 
-/** Level audio host: biome music + SFX for the level's lifetime, bus-driven hit / wave / combo / boss / firework sounds, slow-mo and pause duck. */
-export default function MusicController() {
+/** Level audio host: biome music + SFX for the level's lifetime, bus-driven hit / kill / wave / combo / boss / firework sounds, slow-mo and pause duck. */
+export default function LevelAudio() {
   const currentLevel = useGameStore((s) => s.currentLevel)
   const camera = useThree((s) => s.camera)
 

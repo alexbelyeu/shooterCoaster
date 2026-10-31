@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
 import { useGameStore } from '@/store/useGameStore'
-import { startWindWhoosh, updateWindWhoosh, stopWindWhoosh } from '@/audio/SFXManager'
+import { sfx } from '@/audio/sfx'
 import { eventBus } from '@/core/EventBus'
 import WeaponViewModel from '@/combat/WeaponViewModel'
 import {
@@ -121,10 +121,8 @@ export default function CoasterCamera({
     if (cameraRef.current && enabled) set({ camera: cameraRef.current })
   }, [set, enabled])
 
-  useEffect(() => {
-    startWindWhoosh()
-    return () => stopWindWhoosh()
-  }, [])
+  // The level's sound kit owns the wind nodes; the ride only sets the speed.
+  useEffect(() => () => sfx().wind(0), [])
 
   useFrame((_, delta) => {
     const cam = cameraRef.current
@@ -259,7 +257,7 @@ export default function CoasterCamera({
       w.maxStreaks = Math.max(w.maxStreaks, wind.opacity)
     }
 
-    updateWindWhoosh(velocityNorm)
+    sfx().wind(velocityNorm)
   })
 
   return (

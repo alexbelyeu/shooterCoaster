@@ -18,7 +18,8 @@
  * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats(),
  * or its Share line (shareText()) or "Copied!" click is wrong (#87).
  * Every level and the phone run (portrait, and after rotating) also run audioBurst():
- * fails on a late note that throws or a sound dropped by an audio error (#115).
+ * fails on a late note that throws or a sound dropped by an audio error (#115), or a kill
+ * that never reached the SFX engine (#109).
  * Bullets (#165): no drawn bullet may exceed 2% of the canvas height on screen (every
  * level and the phone run), and one real shot with time + bullets frozen must be drawn
  * next to the muzzle tip; <id>-shot.png shows it two 40 ms steps into its flight.
@@ -912,10 +913,15 @@ async function offsetTapKills(page, label) {
   return { result, problems }
 }
 
-/** Tone scheduling stress (#115); page errors are counted by the caller. */
+/** audioBurst(shots, kills) of every level and the phone run. */
+const BURST = [20, 10]
+
+/** Tone scheduling stress (#115) + every kill reaching Tone (#109); page errors are counted by the caller. */
 async function audioBurstProblems(page, label) {
-  const burst = await page.evaluate(() => window.__SC_TEST__.audioBurst(20, 10))
+  const burst = await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), BURST)
   const problems = []
+  if (burst.ready && burst.killsPlayed !== BURST[1])
+    problems.push(`${label}: ${burst.killsPlayed}/${BURST[1]} audioBurst kills reached the SFX engine (throttled or dropped)`)
   if (burst.lateScheduleErrors > 0)
     problems.push(`${label}: ${burst.lateScheduleErrors}/10 late music note pairs threw a Tone scheduling error`)
   if (burst.dropped > 0)
@@ -2699,7 +2705,6 @@ function resultsSummary(s) {
   return s ? ` results=${s.stars}★ acc=${s.rows.Accuracy} combo=${s.rows['Best combo']}` : ''
 }
 
-/** audioBurst result: "ok", or late-note throws + dropped sounds. */
 /** Largest bullet screen radius (% of canvas height) since load, and the fresh shot's distance from the muzzle tip. */
 function bulletSummary(b) {
   if (!b) return '?'
@@ -2708,9 +2713,11 @@ function bulletSummary(b) {
   return `muzzle ${(b.muzzleFrac * 100).toFixed(2)}% flight ${(b.flightFrac * 100).toFixed(2)}% max ${(b.maxScreenFrac * 100).toFixed(2)}%${tip}`
 }
 
+/** audioBurst result: "ok" or late-note throws + dropped sounds, then the kills that reached the engine. */
 function burstSummary(b) {
   if (!b) return '-'
-  return b.lateScheduleErrors || b.dropped ? `late${b.lateScheduleErrors}+drop${b.dropped}` : 'ok'
+  const kills = `kills${b.killsPlayed}/${BURST[1]}`
+  return b.lateScheduleErrors || b.dropped ? `late${b.lateScheduleErrors}+drop${b.dropped} ${kills}` : `ok ${kills}`
 }
 
 /** SFX node count after the portrait / landscape taps (equal = no per-shot nodes). */

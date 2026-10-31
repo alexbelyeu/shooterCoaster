@@ -108,7 +108,7 @@ export const COMBO_BREAK = { startHz: 660, endHz: 300, sweepS: 0.18, volume: -20
 
 export const STINGER_CHORD_GAP_S = 0.14
 
-/** Chords follow MusicManager's per-biome keys (C major, A minor, Eb major, D sus, D minor). */
+/** Each resolves to the root of MusicManager's per-biome key (C major, A minor, Eb major, D sus, D minor; checked by the test). */
 export const STINGERS: Record<BiomeType, StingerDesign> = {
   // Carnival brass: detuned saws, a V → I fanfare.
   themePark: {
@@ -148,6 +148,38 @@ export const STINGERS: Record<BiomeType, StingerDesign> = {
 }
 
 export const STINGER_VOICES = 3
+
+/** Ride wind: band-passed white noise that opens and brightens with speed (gain 0–0.12, an ambient bed). */
+export const WIND = {
+  q: 0.5,
+  minHz: 200,
+  spanHz: 1800,
+  maxGain: 0.12,
+  /** setTargetAtTime constant: ~95% of the way in 0.1 s. */
+  smoothS: 0.1 / 3,
+  /** Re-aim only after the speed moves this much, at most this often: one automation event per frame would pile up. */
+  minStep: 0.02,
+  minIntervalS: 0.1,
+} as const
+
+export const windHz = (speed: number) => WIND.minHz + speed * WIND.spanHz
+export const windGain = (speed: number) => speed * WIND.maxGain
+
+/** The last speed the wind was aimed at, and when (audio-clock seconds). */
+export interface WindRamp {
+  speed: number
+  at: number
+}
+
+/** Whether to re-aim the wind now; records it in `last` when so. Stopping (speed 0) always gets through the step. */
+export function windUpdateDue(speed: number, now: number, last: WindRamp): boolean {
+  const moved = Math.abs(speed - last.speed)
+  if (moved === 0 || now - last.at < WIND.minIntervalS) return false
+  if (moved < WIND.minStep && speed !== 0) return false
+  last.speed = speed
+  last.at = now
+  return true
+}
 
 export const STAR_CHIME_NOTES = ['E5', 'G5', 'C6'] as const
 

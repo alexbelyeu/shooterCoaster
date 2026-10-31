@@ -6,7 +6,7 @@ at default settings (music volume 0.7, SFX 0.8). Every file is in `renders/` as
 them with the command in its row and compare: the renders are deterministic (two runs
 gave identical metrics).
 
-Level music is rendered at intensity 0.45, which is where `MusicController` starts a run:
+Level music is rendered at intensity 0.45, which is where `LevelAudio` starts a run:
 pad + bass (+ the offbeat noise tick on the Theme Park). The lead only joins above 0.5,
 once a combo builds, so it is in the mix render but not in the level renders.
 

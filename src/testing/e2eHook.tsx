@@ -16,7 +16,9 @@
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
  *     the weapon view-model's on-screen box (hit feedback checks)
- *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses) and render it offline
+ *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses, sounds dropped by a
+ *     caught audio error: `dropped` / `lastDrop`), stress it (audioBurst: rapid SFX, every kill tier past the
+ *     throttles, late music notes) and render it offline
  *   - read the camera pose (title fly-by), shader program count and longest frame (first-shot hitch)
  *   - read startup timings (initTimings)
  *   - summon the level's boss now, read it (hp, exposed weak points, on-screen box) and hit it through processHit
@@ -44,7 +46,7 @@ import { startupTimings, type StartupPhase } from '@/core/startupMarks'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { qualityProfile, type GraphicsQuality, type QualityProfile } from '@/canvas/graphicsQuality'
 import { getAdaptiveSteps } from '@/canvas/useRenderBudget'
-import { comboMultiplier } from '@/combat/comboTiers'
+import { COMBO_TIERS, TOP_TIER, comboMultiplier } from '@/combat/comboTiers'
 import { frenzyActive } from '@/combat/comboRuntime'
 import { getPointerState } from '@/input/pointerInput'
 import { initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
@@ -181,8 +183,9 @@ export interface SCTestApi {
   audio: () => E2EAudio
   /** Tone scheduling stress (#115), in one JS turn while the audio clock ticks: rapid
    *  shots + layered kills + a stinger, then 10 pairs of late music-loop notes
-   *  (`lateScheduleErrors` counts their throws). Unlocks audio if needed. */
-  audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { lateScheduleErrors: number }>
+   *  (`lateScheduleErrors` counts their throws). Kills step down through every combo tier, spaced past the SFX
+   *  throttles, so `killsPlayed` should equal `kills`. Unlocks audio if needed. */
+  audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { lateScheduleErrors: number; killsPlayed: number }>
   /** Whether pointer input has the trigger held (released on blur / tab hide). */
   triggerHeld: () => boolean
   /** Offline render of the game's own music / SFX code (`npm run audio:render`, `testing/audioRender.ts`).
@@ -813,7 +816,19 @@ function waitForAudioTick() {
   while (ctx.currentTime === t0 && performance.now() < deadline) { /* spin */ }
 }
 
+/** Spin (max 100 ms) until AudioContext.currentTime has moved `seconds`. */
+function waitForAudioTime(seconds: number) {
+  const ctx = tone().getContext()
+  const t0 = ctx.currentTime
+  const deadline = performance.now() + 100
+  while (ctx.currentTime - t0 < seconds && performance.now() < deadline) { /* spin */ }
+}
+
 const BURST_WEAPONS = ['blaster', 'spread', 'rapid', 'piercing'] as const
+/** Past SFXManager's kill (30 ms) and hit-tick (25 ms) throttles. */
+const BURST_KILL_SPACING_S = 0.035
+/** The first kill's chain: a step above the top tier, falling to the 1× tier by the last. */
+const BURST_TOP_COMBO = COMBO_TIERS[TOP_TIER].minCount + 1
 
 async function audioBurst(shots: number, kills: number) {
   if (!isAudioReady()) await initAudio()
@@ -823,14 +838,18 @@ async function audioBurst(shots: number, kills: number) {
     ;(await loadArcade()).resetVoiceStats()
   }
   const s = sfx()
+  const killsBefore = s.killsPlayed()
   for (let i = 0; i < shots; i++) {
     s.fire(i % 2 === 1, BURST_WEAPONS[i % BURST_WEAPONS.length])
     if (i < kills) {
-      s.hit(kills - i, null)
-      s.kill(kills - i, 'pop', null)
+      waitForAudioTime(BURST_KILL_SPACING_S)
+      const combo = Math.ceil(((kills - i) / kills) * BURST_TOP_COMBO)
+      s.hit(combo, null)
+      s.kill(combo, 'pop', null)
     }
     waitForAudioTick()
   }
+  const killsPlayed = s.killsPlayed() - killsBefore
   s.waveAnnounce()
   s.waveIncoming()
 
@@ -853,7 +872,7 @@ async function audioBurst(shots: number, kills: number) {
     }
     synth.dispose()
   }
-  return { ...readAudio(), lateScheduleErrors }
+  return { ...readAudio(), lateScheduleErrors, killsPlayed }
 }
 
 function readAudio(): E2EAudio {
