@@ -74,6 +74,13 @@ describe('wind', () => {
     expect(windUpdateDue(0, 0.6, last)).toBe(true)
     expect(windUpdateDue(0, 0.8, last)).toBe(false)
   })
+
+  it('lets a stop through right after a re-aim (the unmount calls wind(0) once)', () => {
+    const last = { speed: 0, at: -Infinity }
+    expect(windUpdateDue(0.7, 1, last)).toBe(true)
+    expect(windUpdateDue(0, last.at + 0.01, last)).toBe(true)
+    expect(last).toEqual({ speed: 0, at: 1.01 })
+  })
 })
 
 describe('boss cues', () => {

@@ -820,7 +820,7 @@ function waitForAudioTick() {
 function waitForAudioTime(seconds: number) {
   const ctx = tone().getContext()
   const t0 = ctx.currentTime
-  const deadline = performance.now() + 100
+  const deadline = performance.now() + 500
   while (ctx.currentTime - t0 < seconds && performance.now() < deadline) { /* spin */ }
 }
 

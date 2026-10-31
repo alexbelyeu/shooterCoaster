@@ -171,11 +171,11 @@ export interface WindRamp {
   at: number
 }
 
-/** Whether to re-aim the wind now; records it in `last` when so. Stopping (speed 0) always gets through the step. */
+/** Whether to re-aim the wind now; records it in `last` when so. A stop (speed 0) skips the step and the interval: it may be the last call. */
 export function windUpdateDue(speed: number, now: number, last: WindRamp): boolean {
   const moved = Math.abs(speed - last.speed)
-  if (moved === 0 || now - last.at < WIND.minIntervalS) return false
-  if (moved < WIND.minStep && speed !== 0) return false
+  if (moved === 0) return false
+  if (speed !== 0 && (moved < WIND.minStep || now - last.at < WIND.minIntervalS)) return false
   last.speed = speed
   last.at = now
   return true

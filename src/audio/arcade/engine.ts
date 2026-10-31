@@ -355,8 +355,11 @@ export const arcadeSfx: SfxEngine = {
   },
   dispose(level) {
     setLift(false)
-    // A menu may already have asked for its own sounds: leave those alone.
-    if (level !== undefined && !wanted?.startsWith(`${scoreIdOf(level)}:`)) return
+    // A menu may already have asked for its own sounds: leave those alone, but silence the ride wind.
+    if (level !== undefined && !wanted?.startsWith(`${scoreIdOf(level)}:`)) {
+      setWind(0)
+      return
+    }
     wanted = null
     disposeGraph()
     bank = null
