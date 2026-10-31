@@ -1,7 +1,8 @@
 import { useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { noiseGlsl } from './LavaShader'
+import { isCoarsePointer } from '@/canvas/useRenderBudget'
+import { gradientNoiseGlsl } from './shared/noiseGlsl'
 
 interface Puff {
   y: number
@@ -50,7 +51,7 @@ const fragmentShader = /* glsl */ `
   varying float vSeed;
   varying float vColumnT;
 
-  ${noiseGlsl}
+  ${gradientNoiseGlsl}
 
   void main() {
     float spin = (uTime * 0.025 + vSeed * 6.2831) * (vSeed > 0.5 ? 1.0 : -1.0);
@@ -124,6 +125,8 @@ export default function SmokeColumn({ puffs }: SmokeColumnProps) {
   const material = useMemo(() => new THREE.ShaderMaterial({
     vertexShader,
     fragmentShader,
+    // Five fbm per pixel on big billboards: one octave fewer on phones cuts the fill cost by a quarter
+    defines: isCoarsePointer ? { FBM_OCTAVES: 3 } : {},
     uniforms: THREE.UniformsUtils.merge([
       THREE.UniformsLib.fog,
       {

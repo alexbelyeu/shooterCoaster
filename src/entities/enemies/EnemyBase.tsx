@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
-import { playExplosionSound } from '@/audio/SFXManager'
+import { placeSound, sfx } from '@/audio/sfx'
 import { eventBus } from '@/core/EventBus'
 import { gameTime } from '@/core/gameClock'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
@@ -105,9 +105,9 @@ export default function EnemyBase({
     dying.current = false
     const combo = useGameStore.getState().combo
     const style = DEATH_STYLES[type]
-    playExplosionSound(combo.count, style.sound)
-
     const group = meshRef.current
+    sfx().kill(combo.count, style.sound, placeSound(group?.position))
+
     if (group) {
       group.traverse(restoreMesh)
       const pos = group.position.clone()

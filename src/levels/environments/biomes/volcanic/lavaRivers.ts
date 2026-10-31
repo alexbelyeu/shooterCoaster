@@ -1,12 +1,10 @@
 import * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import { safeHeight } from '../../shared/safeHeight'
-import { RIVER_CONFIGS, RIVER_SEGMENTS, riverRow } from './lavaRiverPaths'
+import { RIVER_CONFIGS, RIVER_SEGMENTS, riverRow, TERRAIN_CELL } from './lavaRiverPaths'
 
-// The drawn terrain is linear between vertices ~94 units apart, so each row sits
-// Y_OFFSET above the max of a 3×3 cell neighbourhood to never clip into it.
-
-const TERRAIN_CELL = 12000 / 128  // ~93.75
+// The drawn terrain is linear between grid vertices (TERRAIN_CELL apart), so each row
+// sits Y_OFFSET above the max of a 3×3 cell neighbourhood to never clip into it.
 const Y_OFFSET = 8
 
 /** Lava rivers — terrain-conforming strips that drape over the heightmap, UVs as `createLavaMaterial` expects. Caller disposes. */

@@ -3,21 +3,22 @@
  * Renders the game's current music / SFX offline in the page (`__SC_TEST__.renderAudio`) and measures it.
  *
  *   npm run build && npm run audio:render -- --music <title|level1..5|results> [--intensity 0.45] [--seconds 30] [--engine scrim]
- *   npm run audio:render -- --sfx-sheet [--level level1]
+ *   npm run audio:render -- --sfx-sheet [--level level1] [--engine scrim]
  *   npm run audio:render -- --mix level1 [--seconds 20] [--engine scrim]
  *   npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original] [--voicing jukebox|game] [--seconds 20]
  *
- * --engine scrim plays the music through the score engine (`?audio=scrim`). --score renders one score alone: through
+ * --engine scrim plays the music through the score engine and the SFX through the arcade engine (`?audio=scrim`). --score renders one score alone: through
  * the port (default) or the original Scrimshaw page (docs/audio/reference/scrimshaw-jukebox.html), both seeded alike.
  * Options: --name <file name> (default music-<track> / sfx-sheet-<level> / mix-<level>, scrim-… with the score engine,
  *   score-<engine>-<score>) --out docs/audio/renders  --seed 1  --url <running preview>
- * Writes <out>/<name>.{mp3,json,png}; the float WAV it measured stays in e2e-results/audio/.
+ * Writes <out>/<name>.{mp3,json,png}; the float WAV it measured stays in e2e-results/audio/ (a --mix also renders
+ * <name>-music.wav, the same mix without SFX, to measure each kill against the music around it).
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { launchBrowser, startPreview, stopPreview } from '../headless.mjs'
-import { measure, requireFfmpeg, soundLines, spectrogram, targetTable, toMp3, writeFloatWav } from './measure.mjs'
+import { killTimes, measure, requireFfmpeg, soundLines, spectrogram, targetTable, toMp3, writeFloatWav } from './measure.mjs'
 import { compareTargets } from './metrics.mjs'
 
 const argv = process.argv.slice(2)
@@ -50,9 +51,9 @@ if (flag('music')) {
   kind = 'music'
   defaultName = `${scrimPrefix}music-${flag('music')}`
 } else if (argv.includes('--sfx-sheet')) {
-  request = { kind: 'sfxSheet', level: flag('level') }
+  request = { kind: 'sfxSheet', level: flag('level'), engine }
   kind = 'sfx'
-  defaultName = `sfx-sheet-${flag('level') ?? 'level1'}`
+  defaultName = `${scrimPrefix}sfx-sheet-${flag('level') ?? 'level1'}`
 } else if (flag('mix')) {
   request = { kind: 'mix', level: flag('mix'), seconds: num('seconds'), engine }
   kind = 'mix'
@@ -125,6 +126,7 @@ const preview = flag('url') || original ? null : await startPreview()
 const url = flag('url') ?? preview?.url
 const browser = await launchBrowser()
 let result
+let musicStem = null
 let renderS
 try {
   // A tiny canvas: software GL drawing the title scene competes with the render for the CPU.
@@ -144,6 +146,10 @@ try {
   result = original
     ? await renderOriginal(page, request, SEED)
     : await page.evaluate(([req, seed]) => window.__SC_TEST__.renderAudio(req, seed), [request, SEED])
+  // A combat mix's kills are measured against the same mix without SFX: "the music around it".
+  if (request.kind === 'mix') {
+    musicStem = await page.evaluate(([req, seed]) => window.__SC_TEST__.renderAudio(req, seed), [{ ...request, stem: 'music' }, SEED])
+  }
   renderS = (Date.now() - t0) / 1000
   if (errors.length) throw new Error(`page errors during the render:\n${errors.join('\n')}`)
 } finally {
@@ -155,7 +161,13 @@ if (result.seconds > MAX_SECONDS) throw new Error(`render is ${result.seconds} s
 const bytes = Buffer.from(result.pcm, 'base64')
 const wav = path.join(wavDir, `${NAME}.wav`)
 writeFloatWav(wav, new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4), result.sampleRate)
-const metrics = measure(wav, { seams: result.seams, bar: result.bar, sounds: kind === 'sfx' ? result.events : [] })
+let musicFile = null
+if (musicStem) {
+  const stem = Buffer.from(musicStem.pcm, 'base64')
+  musicFile = path.join(wavDir, `${NAME}-music.wav`)
+  writeFloatWav(musicFile, new Float32Array(stem.buffer, stem.byteOffset, stem.byteLength / 4), musicStem.sampleRate)
+}
+const metrics = measure(wav, { seams: result.seams, bar: result.bar, sounds: kind === 'sfx' ? result.events : [], kills: killTimes(result.events), musicFile })
 toMp3(wav, path.join(OUT, `${NAME}.mp3`))
 spectrogram(wav, path.join(OUT, `${NAME}.png`))
 

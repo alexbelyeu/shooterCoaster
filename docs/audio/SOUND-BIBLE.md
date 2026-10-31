@@ -45,7 +45,7 @@ These are measured on offline renders, at default settings, with nothing else pl
 | Music bus alone, integrated | −18 to −16 LUFS (it sits under SFX) |
 | Full game mix in a busy combat moment, short-term max | ≈ −14 LUFS |
 | True peak, master | ≤ −1.0 dBTP; no clipped samples |
-| Single SFX (gun, kill) | peak ≥ 6 dB above the music around it; gun ≤ 150 ms to silence (−60 dB) |
+| Single SFX (gun, kill) | peak ≥ 6 dB above the music around it (each kill of a `--mix` render against the same mix rendered without SFX, ±0.3 s); gun ≤ 150 ms to silence (−60 dB) |
 | Low end | nothing below 30 Hz; kick and bass don't mask each other (check the spectrogram) |
 | Stereo | lead and kick centred; pads, hats and percussion spread; mono-compatible |
 | Loop seams | no click, gap or level jump at the loop point (render across it and check) |
@@ -61,7 +61,12 @@ These are measured on offline renders, at default settings, with nothing else pl
 - Ducking: big moments (boss entry, FRENZY, the results reveal) briefly duck the music.
   Gunfire never does.
 - Keep a voice budget with priority stealing; no sound may grow the node count without
-  bound. The smoke test already checks the node count on the phone run.
+  bound. The smoke test checks the node count on the phone run, and the arcade engine's
+  budget under `audioBurst(64, 32)`.
+- The arcade engine (`?audio=scrim`, `src/audio/arcade/`) bakes every one-shot from the score
+  engine's own instruments when a level starts, so SFX and music share one palette and key.
+  Positional: kills and hits pan with the enemy's place on screen and dull with distance; each
+  biome has its own room on the SFX send. Guns stay dry.
 
 ## How we check sound, since no agent can hear
 

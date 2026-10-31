@@ -3,6 +3,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { biomeTheme } from '@/ui/theme'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
+import { prepareSfx, sfx } from '@/audio/sfx'
 import LevelPostcard from './LevelPostcard'
 import {
   STARS_PER_LEVEL,
@@ -44,25 +45,33 @@ export default function LevelSelectScreen() {
   // Mount only: start keyboard players on the next level to play.
   useEffect(() => {
     cardRefs.current[focusIndex]?.focus({ preventScroll: true })
+    prepareSfx(null, 'themePark')
   }, [])
+
+  function back() {
+    sfx().ui('back')
+    setPhase('title')
+  }
 
   useEffect(() => () => window.clearTimeout(launchTimer.current), [])
 
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape' && !launching) setPhase('title')
+      if (e.key === 'Escape' && !launching) back()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [launching, setPhase])
+  })
 
   function select(i: number) {
     const card = cards[i]
     if (launching || !card) return
     if (!card.unlocked) {
+      sfx().ui('back')
       if (!prefersReducedMotion()) cardRefs.current[i]?.animate(DENIED_SHAKE, { duration: 280, easing: 'ease-out' })
       return
     }
+    sfx().ui('launch')
     setLaunching(card.id)
     launchTimer.current = window.setTimeout(() => startRun(card.id), LAUNCH_MS)
   }
@@ -80,6 +89,7 @@ export default function LevelSelectScreen() {
       return { x: r?.left ?? 0, y: r?.top ?? 0, width: r?.width ?? 0, height: r?.height ?? 0 }
     })
     const next = navigateCards(rects, focusIndex, e.key)
+    if (next !== focusIndex) sfx().ui('select')
     setFocusIndex(next)
     cardRefs.current[next]?.focus()
   }
@@ -157,7 +167,7 @@ export default function LevelSelectScreen() {
         })}
       </div>
 
-      <button className="play-button level-select-back" onClick={() => setPhase('title')} disabled={!!launching}>
+      <button className="play-button level-select-back" onClick={back} disabled={!!launching}>
         Back
       </button>
     </div>

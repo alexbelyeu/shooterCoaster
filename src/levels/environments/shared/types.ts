@@ -64,10 +64,50 @@ export interface TerrainGlow {
   sample: (x: number, z: number) => number
 }
 
+/** One kind of particle in a field (ash, embers, snowflakes, dust…). */
+export interface ParticleLayer {
+  /** sRGB hex. */
+  color: number
+  opacity: number
+  /** Diameter in world units; on screen it is clamped to [1, maxPixels]. */
+  size: number
+  maxPixels: number
+  /** Drift in world units per second (each point varies it ±30%). */
+  velocity: [number, number, number]
+  sway: number
+  /** 0 = steady, 1 = strong flicker. */
+  flicker: number
+  /** Adds light (embers, plankton) instead of covering what is behind it (ash, dust). */
+  additive: boolean
+}
+
+/** A burst of extra secondary-layer points that fade in when a bus event fires (volcanic eruption embers). */
+export interface ParticleBoost {
+  event: string
+  /** Extra points, hidden until the event: they fade in and out, so no point ever changes layer. */
+  count: number
+  /** Seconds: linear fade in, at full strength, linear fade out (no point pops in or out). */
+  riseS: number
+  holdS: number
+  fadeS: number
+}
+
+/** Ambient particles wrapping in a box around the camera (`shared/ParticleField.tsx`, presets in `shared/particlePresets.ts`). */
+export interface ParticleFieldPreset {
+  count: number
+  /** Box around the camera the points wrap inside, world units. */
+  box: [number, number, number]
+  primary: ParticleLayer
+  secondary: ParticleLayer
+  /** Share of `count` drawn as the secondary layer. */
+  secondaryShare: number
+  boost?: ParticleBoost
+}
+
 /**
  * Everything BiomeEnvironment needs to render a biome. Sky/light/fog/grade
  * stay in `atmosphere.ts`; terrain noise stays in `utils/terrainNoise.ts`.
- * Rendered in order: terrain, (water), trees, Decorations, Features.
+ * Rendered in order: terrain, (water), trees, Decorations, Features, particles.
  */
 export interface BiomeDefinition {
   colorRamp: ColorRamp
@@ -80,4 +120,6 @@ export interface BiomeDefinition {
   Decorations?: ComponentType<BiomeDecorationsProps>
   /** Landmarks, terrain-conforming features and biome events. */
   Features?: ComponentType<BiomeFeaturesProps>
+  /** Ambient air particles around the camera (one draw call). */
+  particles?: ParticleFieldPreset
 }

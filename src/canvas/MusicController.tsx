@@ -1,17 +1,16 @@
 import { useEffect } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
+import type * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import type { GamePhase } from '@/types/game'
 import { startMusic, stopMusic, setMusicIntensity } from '@/audio/MusicManager'
-import {
-  disposeSFX, playBossDefeat, playBossHit, playBossStinger, playComboBreak, playFireworkPop, playFireworkWhistle, playHitTick,
-  playWaveStinger, prepareLevelSFX,
-} from '@/audio/SFXManager'
+import { placeSound, prepareSfx, setSfxListener, sfx } from '@/audio/sfx'
 import { setMusicDucked, setPauseMix } from '@/audio/AudioEngine'
 import { MUSIC_ENGINE, withScrim } from '@/audio/musicEngine'
 import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks'
+import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 
 const SCRIM = MUSIC_ENGINE === 'scrim'
 
@@ -27,9 +26,42 @@ function followPhase(phase: GamePhase, level: string) {
   })
 }
 
-/** Level audio host: biome music + SFX kit for the level's lifetime, bus-driven hit / wave / combo-break / boss / firework sounds, slow-mo and pause duck. */
+const onHit = (e: unknown) => sfx().hit(useGameStore.getState().combo.count, placeSound((e as { position?: THREE.Vector3 }).position))
+const onWaveIncoming = () => sfx().waveIncoming()
+const onWaveAnnounce = () => sfx().waveAnnounce()
+const onComboBreak = () => sfx().comboBreak()
+const onFrenzy = () => sfx().frenzy()
+const onBossSpawn = () => sfx().bossArrival()
+const onBossHit = (e: unknown) => sfx().bossHit((e as { hpFraction?: number } | undefined)?.hpFraction ?? 1)
+const onBossDefeated = () => sfx().bossDefeat()
+const onFireworkLaunch = (e: unknown) => {
+  const { flightS = 0, timeScale = 1 } = (e as { flightS?: number; timeScale?: number } | undefined) ?? {}
+  sfx().fireworkWhistle(flightS, timeScale)
+}
+const onFireworkBurst = () => sfx().fireworkPop()
+
+const SFX_EVENTS: [string, (e: unknown) => void][] = [
+  ['enemy:hit', onHit],
+  ['wave:incoming', onWaveIncoming],
+  ['wave:announce', onWaveAnnounce],
+  ['combo:broken', onComboBreak],
+  ['combo:frenzy', onFrenzy],
+  ['boss:spawn', onBossSpawn],
+  ['boss:hit', onBossHit],
+  ['boss:defeated', onBossDefeated],
+  [FIREWORK_LAUNCH_EVENT, onFireworkLaunch],
+  [FIREWORK_BURST_EVENT, onFireworkBurst],
+]
+
+/** Level audio host: biome music + SFX for the level's lifetime, bus-driven hit / wave / combo / boss / firework sounds, slow-mo and pause duck. */
 export default function MusicController() {
   const currentLevel = useGameStore((s) => s.currentLevel)
+  const camera = useThree((s) => s.camera)
+
+  useEffect(() => {
+    setSfxListener(camera)
+    return () => setSfxListener(null)
+  }, [camera])
 
   useEffect(() => {
     const biome = (currentLevel ? getLevelConfig(currentLevel)?.biome : undefined) ?? 'themePark'
@@ -41,29 +73,15 @@ export default function MusicController() {
       : null
     if (SCRIM) followPhase(useGameStore.getState().phase, level)
     else startMusic(biome)
-    prepareLevelSFX(biome)
-    eventBus.on('enemy:hit', playHitTick)
-    eventBus.on('wave:announce', playWaveStinger)
-    eventBus.on('combo:broken', playComboBreak)
-    eventBus.on('boss:spawn', playBossStinger)
-    eventBus.on('boss:hit', playBossHit)
-    eventBus.on('boss:defeated', playBossDefeat)
-    eventBus.on(FIREWORK_LAUNCH_EVENT, playFireworkWhistle)
-    eventBus.on(FIREWORK_BURST_EVENT, playFireworkPop)
+    prepareSfx(level, biome)
+    for (const [event, fn] of SFX_EVENTS) eventBus.on(event, fn)
     return () => {
-      eventBus.off(FIREWORK_BURST_EVENT, playFireworkPop)
-      eventBus.off(FIREWORK_LAUNCH_EVENT, playFireworkWhistle)
-      eventBus.off('boss:defeated', playBossDefeat)
-      eventBus.off('boss:hit', playBossHit)
-      eventBus.off('boss:spawn', playBossStinger)
-      eventBus.off('combo:broken', playComboBreak)
-      eventBus.off('enemy:hit', playHitTick)
-      eventBus.off('wave:announce', playWaveStinger)
+      for (const [event, fn] of SFX_EVENTS) eventBus.off(event, fn)
       if (unfollow) {
         unfollow()
         withScrim((p) => p.stopScore(level, 'results'))
       } else stopMusic()
-      disposeSFX()
+      sfx().dispose(level)
       setMusicDucked(false, true)
     }
   }, [currentLevel])
@@ -82,6 +100,7 @@ export default function MusicController() {
   useFrame(() => {
     const { combo, timeRemaining, timeScale, phase } = useGameStore.getState()
     setMusicDucked(timeScale < 1 || phase === 'paused')
+    sfx().frenzyLift(phase === 'playing' && comboTierIndex(combo.count) === TOP_TIER)
 
     // Intensity ramps up quickly so the music feels alive from the start
     const comboFactor = Math.min(combo.count / 5, 1) * 0.3
