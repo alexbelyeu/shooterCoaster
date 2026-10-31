@@ -10,7 +10,7 @@ import {
   sampleTrackPath,
 } from '@/utils/terrainNoise'
 import { planThemePark } from './layout'
-import { ARCH_BOARD_HEIGHT, FLAG_DROP, RIDES } from './parkSpec'
+import { ARCH_BOARD_HEIGHT, FLAG_DROP, RIDES, STALL_DEPTH, STALL_WIDTH } from './parkSpec'
 
 const level = getLevelConfig('level1')!
 const { varA, varB, varC, scalar } = level.track
@@ -39,6 +39,47 @@ function clearsRider(x: number, z: number, yBottom: number, yTop: number, r = 6)
     if (!above && !below) return false
   }
   return true
+}
+
+interface Footprint {
+  kind: string
+  x: number
+  z: number
+  r: number
+  /** Stalls only: checked as their rectangle against round props. */
+  yaw?: number
+}
+
+const STALL_HALF_DIAGONAL = Math.hypot(STALL_WIDTH, STALL_DEPTH) / 2
+
+/** Sizes as drawn in Decorations.tsx / Midway.tsx. */
+function footprints(): Footprint[] {
+  const round = (kind: string, r: number) => (p: { x: number; z: number }) => ({ kind, x: p.x, z: p.z, r })
+  return [
+    ...RIDES.map((r) => ({ kind: r.kind, x: r.x, z: r.z, r: r.radius })),
+    ...layout.stalls.map((s) => ({ kind: 'stall', x: s.x, z: s.z, r: STALL_HALF_DIAGONAL, yaw: s.yaw })),
+    ...layout.tents.map(round('tent', 25)),
+    ...layout.hedges.map(round('hedge', 9)),
+    ...layout.lightPoles.map(round('light pole', 1)),
+    ...layout.buntingPoles.map(round('bunting pole', 1)),
+    ...layout.flagPoles.map(round('flag pole', 1)),
+  ]
+}
+
+function overlaps(a: Footprint, b: Footprint): boolean {
+  const stall = a.yaw !== undefined ? a : b
+  const disc = stall === a ? b : a
+  if (stall.yaw === undefined || disc.yaw !== undefined) return Math.hypot(a.x - b.x, a.z - b.z) < a.r + b.r
+  // Inverse of layout.ts pushLocal: the disc's centre in the stall's frame.
+  const c = Math.cos(stall.yaw)
+  const s = Math.sin(stall.yaw)
+  const dx = disc.x - stall.x
+  const dz = disc.z - stall.z
+  const lx = dx * c - dz * s
+  const lz = dx * s + dz * c
+  const ex = lx - Math.max(-STALL_WIDTH / 2, Math.min(STALL_WIDTH / 2, lx))
+  const ez = lz - Math.max(-STALL_DEPTH / 2, Math.min(STALL_DEPTH / 2, lz))
+  return Math.hypot(ex, ez) < disc.r
 }
 
 describe('theme park layout (level 1)', () => {
@@ -72,6 +113,27 @@ describe('theme park layout (level 1)', () => {
     for (const r of RIDES) expect(trackNear(r.x, r.z, r.radius)).toEqual([])
     for (const t of layout.tents) expect(trackNear(t.x, t.z, 40)).toEqual([])
     for (const p of layout.flagPoles) expect(trackNear(p.x, p.z, 12)).toEqual([])
+  })
+
+  it('never stands one prop on another', () => {
+    const all = footprints()
+    const clashes: string[] = []
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        const a = all[i]
+        const b = all[j]
+        if (overlaps(a, b)) clashes.push(`${a.kind} (${a.x.toFixed(0)}, ${a.z.toFixed(0)}) on ${b.kind} (${b.x.toFixed(0)}, ${b.z.toFixed(0)})`)
+      }
+    }
+    expect(clashes).toEqual([])
+  })
+
+  it('turns the long side (local x) of each boundary hedge along its ring, not at the centre', () => {
+    expect(layout.hedges.length).toBeGreaterThanOrEqual(20)
+    for (const h of layout.hedges) {
+      const radial = (h.x * Math.cos(h.yaw) - h.z * Math.sin(h.yaw)) / Math.hypot(h.x, h.z)
+      expect(Math.abs(radial)).toBeLessThan(1e-6)
+    }
   })
 
   it('lays a mostly open path between the rides', () => {

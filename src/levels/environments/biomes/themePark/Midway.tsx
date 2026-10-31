@@ -8,10 +8,11 @@ import {
   type Pole,
   type ThemeParkLayout,
   type Wire,
+  paletteColors,
   wirePoint,
 } from './parkSpec'
 import { type StallGeometry, buildStallGeometries } from './stallGeometry'
-import { placeInstances } from './instancing'
+import StaticInstances from '../../shared/StaticInstances'
 
 /** Above 1 so the bulbs clear the bloom threshold (the material is not tone-mapped). */
 const BULB_COLORS = ['#fff2c0', '#ffd040', '#ff6a5a', '#7ad0ff', '#9cff8a'].map((c) =>
@@ -30,13 +31,11 @@ function StallVariant({
   neutralMat: THREE.Material
   accentMat: THREE.Material
 }) {
-  const placeNeutral = useMemo(() => placeInstances(stalls), [stalls])
-  const placeAccent = useMemo(() => placeInstances(stalls, stalls.map((s) => s.color)), [stalls])
-  if (stalls.length === 0) return null
+  const colors = useMemo(() => paletteColors(stalls.map((s) => s.color)), [stalls])
   return (
     <>
-      <instancedMesh ref={placeNeutral} args={[geometry.neutral, neutralMat, stalls.length]} />
-      <instancedMesh ref={placeAccent} args={[geometry.accent, accentMat, stalls.length]} />
+      <StaticInstances placements={stalls} geometry={geometry.neutral} material={neutralMat} />
+      <StaticInstances placements={stalls} colors={colors} geometry={geometry.accent} material={accentMat} />
     </>
   )
 }
@@ -52,12 +51,11 @@ function Poles({ poles, material }: { poles: Pole[]; material: THREE.Material })
     [height],
   )
   useEffect(() => () => geometry.dispose(), [geometry])
-  const place = useMemo(
-    () => placeInstances(poles.map((p) => ({ x: p.x, y: p.y + p.height - height, z: p.z, yaw: 0 }))),
+  const placements = useMemo(
+    () => poles.map((p) => ({ x: p.x, y: p.y + p.height - height, z: p.z, yaw: 0 })),
     [poles, height],
   )
-  if (poles.length === 0) return null
-  return <instancedMesh ref={place} args={[geometry, material, poles.length]} />
+  return <StaticInstances placements={placements} geometry={geometry} material={material} />
 }
 
 function buildWireGeometry(wires: Wire[]): THREE.BufferGeometry {
@@ -173,7 +171,7 @@ export default function Midway({ layout }: { layout: ThemeParkLayout }) {
     () => stallGeometries.map((_, v) => stalls.filter((s) => s.variant === v)),
     [stallGeometries, stalls],
   )
-  const placeFlags = useMemo(() => placeInstances(flags, flags.map((_, i) => i % PALETTE.length)), [flags])
+  const flagColors = useMemo(() => paletteColors(flags.map((_, i) => i % PALETTE.length)), [flags])
 
   return (
     <>
@@ -188,7 +186,7 @@ export default function Midway({ layout }: { layout: ThemeParkLayout }) {
       ))}
       <Poles poles={lightPoles} material={assets.poleMat} />
       <Poles poles={buntingPoles} material={assets.poleMat} />
-      {flags.length > 0 && <instancedMesh ref={placeFlags} args={[assets.flagGeo, assets.flagMat, flags.length]} />}
+      <StaticInstances placements={flags} colors={flagColors} geometry={assets.flagGeo} material={assets.flagMat} />
       <lineSegments geometry={assets.wireGeo} material={assets.wireMat} />
       <points geometry={assets.bulbGeo} material={assets.bulbMat} />
       {/* Drawn after the terrain it lies on; depthWrite off + polygon offset avoid z-fighting. */}
