@@ -2,12 +2,17 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-/** Portal pages carry their own share card and canonical URL, and the zip may not point at another origin. */
+/**
+ * Portal pages carry their own share card, canonical URL and structured data, and the zip may
+ * not point at another origin: drop those tags and the VideoGame JSON-LD. The #about text stays.
+ */
 function portalHtml(): Plugin {
   return {
     name: 'portal-html',
     transformIndexHtml: (html) =>
-      html.replace(/^\s*(<!-- Share card[^\n]*|<link rel="canonical"[^\n]*|<meta (property="og:|name="twitter:)[^\n]*)\n/gm, ''),
+      html
+        .replace(/^\s*(<!-- Share card[^\n]*|<link rel="canonical"[^\n]*|<meta (property="og:|name="twitter:)[^\n]*)\n/gm, '')
+        .replace(/^\s*<script type="application\/ld\+json">[\s\S]*?<\/script>\n/m, ''),
   }
 }
 
