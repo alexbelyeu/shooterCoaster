@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
 import type { BiomeDecorationsProps } from '../../shared/types'
-import { ATMOSPHERES } from '../../atmosphere'
 import { oceanLayout } from './seaPlacement'
 import SeaStacks from './SeaStacks'
 import Seabirds from './Seabirds'
@@ -9,7 +8,7 @@ import { ROCK_FOOTPRINT, STACK_FOOTPRINT } from './seaDimensions'
 import { roundCaster } from '../../shared/contactShadows'
 import { useContactShadows } from '../../shared/ContactShadows'
 
-export default function OceanDecorations({ groundFn, track }: BiomeDecorationsProps) {
+export default function OceanDecorations({ groundFn, track, atmosphere }: BiomeDecorationsProps) {
   const layout = useMemo(() => oceanLayout(groundFn, track), [groundFn, track])
   // On the seabed: the water blends over them.
   useContactShadows(
@@ -23,7 +22,7 @@ export default function OceanDecorations({ groundFn, track }: BiomeDecorationsPr
   )
   return (
     <>
-      <SeaStacks stacks={layout.stacks} rocks={layout.rocks} fadeFar={ATMOSPHERES.ocean.fogFar} />
+      <SeaStacks stacks={layout.stacks} rocks={layout.rocks} fadeFar={atmosphere.fogFar} />
       <Seabirds orbits={layout.gulls} />
       <Reef coral={layout.coral} kelp={layout.kelp} />
     </>

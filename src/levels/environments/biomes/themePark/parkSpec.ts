@@ -1,3 +1,5 @@
+import * as THREE from 'three'
+
 // Theme Park pieces shared by the layout planner and the components that draw them.
 
 interface Ride {
@@ -17,6 +19,8 @@ export const RIDES: Ride[] = [
 ]
 
 export const PALETTE = ['#ff4444', '#ffaa00', '#4488ff', '#44cc44', '#ff44ff', '#ff7a2e']
+
+export const paletteColors = (indices: readonly number[]) => indices.map((i) => new THREE.Color(PALETTE[i]))
 
 /** Stall footprint: x across the front (which faces the track), z front-to-back. */
 export const STALL_WIDTH = 26
