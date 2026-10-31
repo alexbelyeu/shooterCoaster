@@ -27,10 +27,11 @@
  * mounted under the same flag.
  */
 import { useEffect } from 'react'
+import { dailyKey, dailyLevel, dailySeed, type DailyStreak } from '@/levels/daily'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import * as Tone from 'tone'
-import { useGameStore } from '@/store/useGameStore'
+import { useGameStore, type RunMode } from '@/store/useGameStore'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
@@ -86,6 +87,15 @@ export interface SCTestApi {
   setPhase: (phase: GamePhase) => void
   /** Replace the saved best scores / stars (persisted to localStorage like real saves). */
   setSavedScores: (scores: Record<string, ScoreEntry>) => void
+  /** The Daily Run: today's UTC key, seed and level, the current run's mode, the saved daily bests and the streak. */
+  daily: () => {
+    dateKey: string
+    seed: number
+    level: string
+    runMode: RunMode
+    savedDaily: Record<string, ScoreEntry>
+    streak: DailyStreak
+  }
   /**
    * Enemies whose centre is inside the view frustum, largest first, with screen
    * position (CSS px, origin top-left) and projected silhouette size in px.
@@ -589,6 +599,18 @@ export function installE2EApi() {
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
     setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
     setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
+    daily: () => {
+      const dateKey = dailyKey(new Date())
+      const s = useGameStore.getState()
+      return {
+        dateKey,
+        seed: dailySeed(dateKey),
+        level: dailyLevel(dateKey),
+        runMode: s.runMode,
+        savedDaily: s.savedDaily,
+        streak: s.dailyStreak,
+      }
+    },
     spawnDigest: () => spawnDigest,
     nextWave: () => waveProbe?.() ?? null,
     waveEvents: [],
