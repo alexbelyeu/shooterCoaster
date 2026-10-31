@@ -113,6 +113,28 @@ export const RECIPES: readonly Recipe[] = [
     partial(S, out, t, 58 * k, { a: 0.001, tau: 0.026, peak: 0.8, bend: 3, bendTau: 0.012 })
     noise(S, out, t + 0.004, { type: 'bandpass', f: 2200, q: 1.2, a: 0.001, tau: 0.016, peak: 0.35 })
   } },
+  // Pickup guns (#185). Spread: a sawtooth buzz over a wide noise burst and a deeper punch.
+  { id: 'fire.spread', lengthS: fixed(0.2), render(S, out, t) {
+    noise(S, out, t, { type: 'lowpass', f: 2600, q: 0.6, a: 0.0005, tau: 0.03, peak: 0.8 })
+    zap(S, out, t, 'sawtooth', 760, 120, 0.09, 0.03, 0.5)
+    partial(S, out, t, 48, { a: 0.001, tau: 0.035, peak: 0.9, bend: 3, bendTau: 0.014 })
+  } },
+  // Rapid: a tight square tick an octave up.
+  { id: 'fire.rapid', lengthS: fixed(0.08), render(S, out, t) {
+    noise(S, out, t, { type: 'highpass', f: 5000, q: 0.7, a: 0.0005, tau: 0.002, peak: 0.7 })
+    zap(S, out, t, 'square', 1900, 800, 0.03, 0.01, 0.5)
+  } },
+  // Piercing: a long falling triangle laser with a glassy top.
+  { id: 'fire.piercing', lengthS: fixed(0.26), render(S, out, t) {
+    zap(S, out, t, 'triangle', 2600, 380, 0.16, 0.05, 0.7)
+    partial(S, out, t, 5200, { a: 0.0005, tau: 0.03, peak: 0.25, bend: 0.5, bendTau: 0.05 })
+    partial(S, out, t, 70, { a: 0.001, tau: 0.03, peak: 0.6, bend: 2.5, bendTau: 0.012 })
+  } },
+  // Pickup shot: a glock run up the key and a bell on the octave.
+  { id: 'pickup', lengthS: fixed(1.2), render(S, out, t, b) {
+    run(S, out, 'glock', t, 0.05, 0.08, b, [0, 2, 4, 7], 1, 1)
+    playInstrument(S, out, 'bell', t + 0.2, 0.3, keyNote(b.key, 7, 1), 0.8)
+  } },
   // Hit: a bright metallic tink.
   { id: 'hit', lengthS: fixed(0.08), render(S, out, t) {
     partial(S, out, t, 2900, { a: 0.0005, tau: 0.014, peak: 0.6 })

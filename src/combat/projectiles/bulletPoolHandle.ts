@@ -1,6 +1,8 @@
 import type * as THREE from 'three'
+import type { CollisionTarget } from '@/combat/CollisionManager'
+import type { PierceState } from './bulletMotion'
 
-export interface Bullet {
+export interface Bullet extends PierceState<CollisionTarget> {
   alive: boolean
   bornAt: number
   position: THREE.Vector3
@@ -19,8 +21,8 @@ export interface Bullet {
 }
 
 export interface BulletPoolHandle {
-  /** Returns true if a bullet left the barrel (false when rate-limited or the pool is full). */
-  fire: (origin: THREE.Vector3, direction: THREE.Vector3, hitScale?: number) => boolean
+  /** Returns true if a bullet left the barrel (false when the pool is full); `fireAtNDC` paces the trigger. */
+  fire: (origin: THREE.Vector3, direction: THREE.Vector3, hitScale?: number, pierce?: number) => boolean
   getLiveBullets: () => Bullet[]
   getLiveBulletCount: () => number
 }

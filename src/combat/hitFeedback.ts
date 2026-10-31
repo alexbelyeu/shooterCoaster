@@ -10,18 +10,21 @@
  * Durations are in *game* milliseconds: consumers advance them with
  * `delta * timeScale` so slow-mo stretches them.
  */
+import type { WeaponId } from './weapons/weaponTypes'
+
 /** Muzzle flash lifetime. */
 export const MUZZLE_FLASH_MS = 60
 /** Enemy white flash + 1.2x pop between the hit and the explosion. */
 export const ENEMY_HIT_FLASH_MS = 80
 export const KILL_POP_SCALE = 1.2
 
-/** NDC aim point and performance.now() of the last shot; set by `fireAtNDC` just before 'weapon:fire'. */
-export const lastShot = { x: 0, y: 0, at: 0 }
+/** NDC aim point, performance.now() and weapon of the last shot; set by `fireAtNDC` just before 'weapon:fire'. */
+export const lastShot: { x: number; y: number; at: number; weapon: WeaponId } = { x: 0, y: 0, at: 0, weapon: 'blaster' }
 
-export function recordShot(ndcX: number, ndcY: number): void {
+export function recordShot(ndcX: number, ndcY: number, weapon: WeaponId = 'blaster'): void {
   lastShot.x = ndcX
   lastShot.y = ndcY
+  lastShot.weapon = weapon
   lastShot.at = typeof performance !== 'undefined' ? performance.now() : 0
 }
 

@@ -522,6 +522,74 @@ canvas {
   to { opacity: 1; transform: translateX(-50%) scale(1); }
 }
 
+/* Weapon pickup badge (#185) — left of the combo meter; above the pause button on portrait phones */
+.hud-weapon {
+  position: absolute;
+  right: calc(50% + 120px);
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 64px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px 6px 6px;
+  border-radius: 40px;
+  background: rgba(8, 10, 22, 0.5);
+  border: 1px solid var(--weapon-color);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--weapon-color) 45%, transparent);
+  color: var(--weapon-color);
+  opacity: 0;
+  transform: translateY(16px) scale(0.9);
+  transition: opacity 0.3s ease-in, transform 0.3s ease-in;
+}
+
+.hud-weapon.is-visible {
+  opacity: 1;
+  transform: none;
+  transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+.hud-weapon-ring {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  flex: none;
+}
+
+.hud-weapon-ring svg:first-child {
+  display: block;
+  transform: rotate(-90deg);
+}
+
+.hud-weapon-ring-bg,
+.hud-weapon-ring-fill {
+  fill: none;
+  stroke-width: 4;
+}
+
+.hud-weapon-ring-bg {
+  stroke: rgba(255, 255, 255, 0.15);
+}
+
+.hud-weapon-ring-fill {
+  stroke: var(--weapon-color);
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px var(--weapon-color));
+}
+
+.hud-weapon-icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  filter: drop-shadow(0 0 3px var(--weapon-color));
+}
+
+.hud-weapon-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-shadow: var(--hud-shadow);
+}
+
 @keyframes hud-combo-pop {
   from { transform: scale(1.45); }
   to { transform: scale(1); }
@@ -530,6 +598,13 @@ canvas {
 @media (max-width: 480px) {
   .hud-panel { padding: 8px 10px 10px; }
   .hud-combo { bottom: max(84px, calc(env(safe-area-inset-bottom) + 76px)); }
+  .hud-weapon {
+    right: auto;
+    left: calc(12px + env(safe-area-inset-left));
+    bottom: max(72px, calc(env(safe-area-inset-bottom) + 72px));
+    padding: 4px;
+  }
+  .hud-weapon-label { display: none; }
   .hud-frenzy { bottom: max(162px, calc(env(safe-area-inset-bottom) + 154px)); }
 }
 
