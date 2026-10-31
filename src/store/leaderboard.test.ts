@@ -81,6 +81,18 @@ describe('sanitize', () => {
     expect(boards.level2).toEqual([row(400, 'ZZZ')])
   })
 
+  it('clamps corrupt saved stars to 0–3, also in the row it seeds', () => {
+    const saved = sanitizeSavedScores({
+      level1: { score: 500, stars: -1 },
+      level2: { score: 500, stars: 9.6 },
+    })
+    expect(saved.level1.stars).toBe(0)
+    expect(saved.level2.stars).toBe(3)
+    const boards = sanitizeLeaderboards(undefined, saved)
+    expect(boards.level1[0].stars).toBe(0)
+    expect(boards.level2[0].stars).toBe(3)
+  })
+
   it('anything that is not an object loads as empty', () => {
     for (const v of [null, undefined, 3, 'x', []]) {
       expect(sanitizeSavedScores(v)).toEqual({})

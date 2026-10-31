@@ -13,7 +13,7 @@ persist `merge` runs everything loaded through `sanitizeSavedScores` / `sanitize
 best but no board (saves from before this) starts its board with that best under `---`.
 While the entry is open it owns the keyboard (R is a letter, Enter confirms); the screen's
 Enter = next / R = replay return once it is confirmed. Settings "Clear local data" wipes
-scores, stars (so unlocks) and boards, not settings. The Daily Run keeps its own best and never
-enters these boards.
+scores, stars (so unlocks) and boards, not settings. A future daily mode must keep its own
+best and never enter these boards.
 **Consequences:** Anything new in the persisted game store needs its own sanitiser in that
 `merge`, or it bypasses the guard.

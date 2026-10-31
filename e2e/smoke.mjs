@@ -577,9 +577,10 @@ async function resultsScreenProblems(page, stats) {
   return { problems, screen: shown }
 }
 
-const INITIALS_KEYS = ['ArrowUp', 'r', 'e', 'x']
+// R is the replay key and S the mute key outside the entry: both must stay letters in it.
+const INITIALS_KEYS = ['ArrowUp', 'r', 'e', 's']
 
-/** Local leaderboard (#40): a run seeded to place at `rank` takes initials by keyboard (R is a letter there) and persists them. */
+/** Local leaderboard (#40): a run seeded to place at `rank` takes initials by keyboard (R and S are letters there) and persists them. */
 async function leaderboardEntryProblems(page, id, rank) {
   const problems = []
   const read = () => page.evaluate((lid) => {
@@ -593,6 +594,7 @@ async function leaderboardEntryProblems(page, id, rank) {
       stored: window.__SC_TEST__.leaderboards().boards[lid] ?? [],
       lastInitials: window.__SC_TEST__.leaderboards().lastInitials,
       persisted: localStorage.getItem('shootercoaster-scores') ?? '',
+      muted: document.querySelector('.mute-button')?.getAttribute('aria-label') ?? null,
     }
   }, id)
   const initialsShown = (text) => page
@@ -608,18 +610,20 @@ async function leaderboardEntryProblems(page, id, rank) {
   const cycled = await initialsShown('BAA')
   if (!cycled) problems.push('ArrowUp did not cycle the first letter')
   for (const key of INITIALS_KEYS.slice(1)) await page.keyboard.press(key)
-  const typed = await initialsShown('REX')
+  const typed = await initialsShown('RES')
   const afterTyping = await read()
-  if (!typed) problems.push(`typing r, e, x gave "${afterTyping.initials}", expected REX`)
+  if (!typed) problems.push(`typing r, e, s gave "${afterTyping.initials}", expected RES`)
+  if (opened.muted === null) problems.push('no mute button on the results screen to check S against')
+  else if (afterTyping.muted !== opened.muted) problems.push('typing S in the initials toggled mute')
   if (afterTyping.phase !== 'results') problems.push(`typing initials left the results screen (${afterTyping.phase})`)
   await page.keyboard.press('Enter')
   await page.waitForFunction(() => !document.querySelector('.results-board[data-editing]'), null, { timeout: 5000, polling: 50 }).catch(() => {})
   const confirmed = await read()
   if (confirmed.editing) problems.push('Enter did not close the initials entry')
   if (confirmed.phase !== 'results') problems.push(`Enter on the entry left the results screen (${confirmed.phase})`)
-  if (confirmed.stored[rank]?.initials !== 'REX' || confirmed.lastInitials !== 'REX')
+  if (confirmed.stored[rank]?.initials !== 'RES' || confirmed.lastInitials !== 'RES')
     problems.push(`stored entry ${JSON.stringify(confirmed.stored[rank])}, last initials ${confirmed.lastInitials}`)
-  if (!confirmed.persisted.includes('"REX"')) problems.push('leaderboard entry not persisted to localStorage')
+  if (!confirmed.persisted.includes('"RES"')) problems.push('leaderboard entry not persisted to localStorage')
   return { problems, result: { rank, cycled, initials: confirmed.initials, editing: confirmed.editing, phase: confirmed.phase } }
 }
 

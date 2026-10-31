@@ -37,13 +37,15 @@ export function normalizeInitials(value: unknown): string {
 const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
+const clampStars = (v: number) => Math.max(0, Math.min(3, Math.round(v)))
+
 function sanitizeEntry(value: unknown): LeaderboardEntry | null {
   if (!isRecord(value) || !isFiniteNumber(value.score) || value.score <= 0) return null
   const initials = value.initials === UNKNOWN_INITIALS ? UNKNOWN_INITIALS : normalizeInitials(value.initials)
   return {
     initials,
     score: Math.round(value.score),
-    stars: isFiniteNumber(value.stars) ? Math.max(0, Math.min(3, Math.round(value.stars))) : 0,
+    stars: isFiniteNumber(value.stars) ? clampStars(value.stars) : 0,
     date: isFiniteNumber(value.date) ? value.date : 0,
   }
 }
@@ -57,7 +59,7 @@ export function sanitizeSavedScores(value: unknown): Record<string, ScoreEntry> 
       level,
       score: raw.score,
       maxScore: isFiniteNumber(raw.maxScore) ? raw.maxScore : 0,
-      stars: raw.stars,
+      stars: clampStars(raw.stars),
       timestamp: isFiniteNumber(raw.timestamp) ? raw.timestamp : 0,
       ...(isFiniteNumber(raw.bestCombo) ? { bestCombo: raw.bestCombo } : {}),
     }

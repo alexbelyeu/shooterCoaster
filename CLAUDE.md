@@ -62,7 +62,7 @@ canvas height (also checked on the phone run), a fresh shot isn't drawn at the m
 reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left), the
 Levels / Replay buttons or a local leaderboard fully inside 1280×720, shows NaN, or disagrees with `stats()` on score or kills.
 On the first level the leaderboard is seeded so the run places 4th: the row must open for initials at the last ones used (AAA),
-ArrowUp must cycle a letter, typing r e x must give REX without leaving (R is a letter there), and Enter must confirm, store
+ArrowUp must cycle a letter, typing r e s must give RES without leaving or toggling mute (R and S are letters there), and Enter must confirm, store
 and persist it.
 `npm run smoke` also passes `--mobile`:
 an iPhone 13-like touch context (390x844) taps PLAY and a level (the title music must ramp out from full and be disposed, the level music ramp in), then in portrait and

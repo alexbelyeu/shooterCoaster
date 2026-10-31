@@ -1375,6 +1375,7 @@ canvas {
     animation: none;
   }
 }
+.reduce-motion .results-board-initials button.is-active { animation: none; }
 
 /* Desktop: score, stats and buttons on the left, the board beside them. */
 @media (min-width: 900px) and (min-height: 521px) {

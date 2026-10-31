@@ -139,7 +139,9 @@ export default function ResultsScreen() {
       if (!done) {
         if (e.key === 'Enter' && !e.repeat) setStage(STAGE.done)
       } else if (initialsInput(e.key)) {
+        // Capture phase + stop: no other window listener (MuteButton's S) sees a letter.
         e.preventDefault()
+        e.stopImmediatePropagation()
       }
       return
     }
@@ -150,8 +152,8 @@ export default function ResultsScreen() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => keyHandler.current(e)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
   }, [])
 
   if (!config) return null
