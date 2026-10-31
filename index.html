@@ -4,15 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>ShooterCoaster — free browser rollercoaster shooter</title>
-    <!-- Share card + SEO; the portal build drops these tags and the JSON-LD below (vite.config.ts). Card image: `npm run og`. -->
+    <!-- Share card + SEO (checklist: docs/marketing/SEO.md); the portal build drops these tags, the manifest and the JSON-LD below (vite.config.ts). Card image and icons: `npm run og`. -->
     <meta name="description" content="Ride a rollercoaster through five worlds and blast everything that moves. Free, no install, plays on your phone." />
+    <meta name="robots" content="max-image-preview:large" />
     <link rel="canonical" href="https://scoaster.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="ShooterCoaster" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:url" content="https://scoaster.com/" />
     <meta property="og:title" content="ShooterCoaster — free browser rollercoaster shooter" />
     <meta property="og:description" content="Ride a rollercoaster through five worlds and blast everything that moves. Free, no install, plays on your phone." />
     <meta property="og:image" content="https://scoaster.com/social/og-1200x630.jpg" />
+    <meta property="og:image:secure_url" content="https://scoaster.com/social/og-1200x630.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -21,20 +24,23 @@
     <meta name="twitter:title" content="ShooterCoaster — free browser rollercoaster shooter" />
     <meta name="twitter:description" content="Ride a rollercoaster through five worlds and blast everything that moves. Free, no install, plays on your phone." />
     <meta name="twitter:image" content="https://scoaster.com/social/og-1200x630.jpg" />
+    <meta name="twitter:image:alt" content="First-person view from a rollercoaster in a theme park, shooting at floating balloons" />
     <meta name="theme-color" content="#4f6071" />
-    <link rel="icon" type="image/ico" href="/assets/images/favicon.ico" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "VideoGame",
+        "@type": ["VideoGame", "WebApplication"],
         "name": "ShooterCoaster",
         "url": "https://scoaster.com/",
         "description": "Ride a rollercoaster through five worlds and blast everything that moves. Free, no install, plays on your phone.",
         "image": "https://scoaster.com/social/og-1200x630.jpg",
         "genre": ["Shooter", "Rail shooter", "Arcade"],
         "gamePlatform": "Web browser",
-        "applicationCategory": "Game",
+        "applicationCategory": "GameApplication",
         "operatingSystem": "Any",
         "playMode": "SinglePlayer",
         "inLanguage": "en",

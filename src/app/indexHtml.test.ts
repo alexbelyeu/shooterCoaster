@@ -24,15 +24,15 @@ function aboutSection(): string {
 const textOf = (markup: string) => markup.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 
 describe('index.html structured data', () => {
-  it('is one schema.org VideoGame with the required fields', () => {
+  it('is one schema.org VideoGame, co-typed as a web app in Google\'s game category, with the required fields', () => {
     const game = jsonLd()
     expect(game['@context']).toBe('https://schema.org')
-    expect(game['@type']).toBe('VideoGame')
+    expect(game['@type']).toEqual(['VideoGame', 'WebApplication'])
     expect(game.name).toBe('ShooterCoaster')
     expect(game.url).toBe('https://scoaster.com/')
     expect(game.genre).toContain('Shooter')
     expect(game.gamePlatform).toBe('Web browser')
-    expect(game.applicationCategory).toBe('Game')
+    expect(game.applicationCategory).toBe('GameApplication')
     expect(game.operatingSystem).toBe('Any')
     expect(game.offers).toEqual({ '@type': 'Offer', price: '0', priceCurrency: 'USD' })
     expect(game.author).toEqual({ '@type': 'Person', name: 'Alex Belyeu' })

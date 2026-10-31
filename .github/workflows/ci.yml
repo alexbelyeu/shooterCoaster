@@ -48,6 +48,9 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Lighthouse (SEO 100, Accessibility + Best Practices ≥ 95)
+        run: npm run lighthouse
+
       - name: Smoke test every level
         run: npm run smoke -- --seconds 10
 

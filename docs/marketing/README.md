@@ -11,8 +11,9 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   Plus add-on` (read 2026-10-26), so `utm_*` parameters on our links are invisible to us.
   Campaign attribution uses the **referrer hostname** and the **request path**: every link we
   hand out points at a campaign landing path `https://scoaster.com/go/<campaign>` (the
-  `vercel.json` catch-all rewrite serves the game at any path and the page view records it as
-  `requestPath`; verified locally 2026-10-26, pinned by a smoke step in #171). One campaign
+  `vercel.json` `/go/(.*)` rewrite serves the game there and the page view records it as
+  `requestPath`; verified locally 2026-10-26, pinned by a smoke step in #171. Any other unknown
+  path is a real 404 since #193, so campaign links must start with `/go/`). One campaign
   name per post or placement: `showcase`, `webgames`, `playmygame`, `share` (the results-screen
   share button, #87), `crazygames` … Keep the `utm_*` parameters on the
   links anyway: they cost nothing and other tools read them. Test traffic (`?e2e=1`) and
@@ -66,4 +67,5 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
 | `STRATEGY.md` | Positioning, audience, channel ranking, launch stage, experiment queue |
 | `BUDGET.md` | Monthly cap, proposed / approved / spent ledger |
 | `CHANNELS.md` | Every post or campaign and what it did to traffic |
+| `SEO.md` | Search + link-preview checklist with sources, the Lighthouse gate and its baseline |
 | `metrics/<YYYY>-W<ww>.md` | Weekly numbers from Vercel Web Analytics |
