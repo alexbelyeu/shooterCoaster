@@ -13,6 +13,14 @@ export async function initAudio(): Promise<void> {
   await Tone.start()
   initialized = true
   syncVolumes()
+  window.addEventListener('touchend', resumeSuspendedContext, { capture: true, passive: true })
+  window.addEventListener('click', resumeSuspendedContext, { capture: true })
+}
+
+/** iOS Safari interrupts the context when the tab or portal frame is hidden and resumes it only from a touchend / click. */
+function resumeSuspendedContext() {
+  const ctx = Tone.getContext()
+  if (ctx.state !== 'running') ctx.resume().catch(() => {})
 }
 
 export function isAudioReady(): boolean {

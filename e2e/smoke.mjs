@@ -50,6 +50,11 @@
  *   node e2e/smoke.mjs --url https://example.com        # test a deployed site
  *   node e2e/smoke.mjs --mobile                         # + touch playtest on a phone viewport
  *   node e2e/smoke.mjs --mobile --skip-desktop          # only the touch playtest
+ *   node e2e/smoke.mjs --dist dist-portal --base /nested/path/ --levels level1   # the portal zip under a sub-path
+ *
+ * --dist / --base: preview that build folder under that sub-path (`npm run smoke:portal`),
+ * proving its relative asset URLs. Every local run fails on a request to another origin,
+ * and the title fails unless Lobster and Inter (self-hosted, global.css) loaded.
  *
  * --mobile: iPhone 13-like context (390x844, touch, mobile UA) that taps PLAY,
  * taps level 1, then in portrait and again after rotating to 844x390 landscape
@@ -89,6 +94,9 @@ const COMBAT_SECONDS = Number(args['combat-seconds'] ?? 4)
 const COMBAT_MIN_FRAMES = Number(args['combat-min-frames'] ?? 4)
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(args.seed ?? 1337)
+const DIST = args.dist ?? 'dist'
+// Path the build is served under: '/' for the site, a sub-path for the portal zip.
+const BASE_PATH = `/${(args.base ?? '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/$/, '')
 let preview // module scope so the top-level catch can kill it
 fs.mkdirSync(OUT, { recursive: true })
 
@@ -102,6 +110,29 @@ const IGNORED = [
   /Download the React DevTools/i,
 ]
 const ignored = (msg) => IGNORED.some((re) => re.test(msg))
+
+/** Portals forbid requests to other origins (#88); a deployed --url isn't held to it. */
+function collectErrors(page, errors) {
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
+  page.on('console', (m) => {
+    if (m.type() === 'error' && !ignored(m.text())) errors.push(`console: ${m.text()}`)
+  })
+  if (args.url) return
+  page.on('request', (r) => {
+    const url = new URL(r.url())
+    if (/^(https?|wss?):$/.test(url.protocol) && url.hostname !== 'localhost') errors.push(`other-origin request: ${r.url()}`)
+  })
+}
+
+async function fontProblems(page) {
+  const faces = await page.evaluate(async () => {
+    await document.fonts.ready
+    return [...document.fonts].map((f) => ({ family: f.family.replace(/["']/g, ''), status: f.status }))
+  })
+  return ['Lobster', 'Inter']
+    .filter((family) => !faces.some((f) => f.family === family && f.status === 'loaded'))
+    .map((family) => `${family} font not loaded (${JSON.stringify(faces.filter((f) => f.family === family))})`)
+}
 
 const portInUse = async (url) => {
   try {
@@ -127,10 +158,10 @@ async function startPreview() {
   let port, url
   for (let i = 0; i < 20; i++) {
     port = 4173 + Math.floor(Math.random() * 500)
-    url = `http://localhost:${port}`
-    if (!(await portInUse(url))) break
+    url = `http://localhost:${port}${BASE_PATH}`
+    if (!(await portInUse(`http://localhost:${port}`))) break
   }
-  const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], {
+  const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort', '--outDir', DIST, '--base', `${BASE_PATH}/`], {
     stdio: ['ignore', 'pipe', 'pipe'],
     // Own process group, so stopPreview() also kills the vite grandchild that
     // npx spawns (proc.kill() alone only stops npx and leaks the server).
@@ -140,13 +171,13 @@ async function startPreview() {
   proc.on('exit', () => (exited = true))
   for (let i = 0; i < 60 && !exited; i++) {
     try {
-      const r = await fetch(url)
+      const r = await fetch(`${url}/`)
       if (r.ok && !exited) return { url, proc }
     } catch {}
     await new Promise((r) => setTimeout(r, 500))
   }
   stopPreview(proc)
-  throw new Error('vite preview did not start (did you run `npm run build`?)')
+  throw new Error(`vite preview did not start (did you build ${DIST}/?)`)
 }
 
 async function launch() {
@@ -1635,10 +1666,7 @@ async function runMobile(browser, base) {
   const ctx = await browser.newContext({ ...iphone, viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
   const page = await ctx.newPage()
   const errors = []
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
-  page.on('console', (m) => {
-    if (m.type() === 'error' && !ignored(m.text())) errors.push(`console: ${m.text()}`)
-  })
+  collectErrors(page, errors)
   const problems = []
   const phase = () => page.evaluate(() => window.__SC_TEST__.phase())
   const waitPhase = (p, timeout) =>
@@ -1848,10 +1876,7 @@ async function run() {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
     const page = await ctx.newPage()
     const errors = []
-    page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
-    page.on('console', (m) => {
-      if (m.type() === 'error' && !ignored(m.text())) errors.push(`console: ${m.text()}`)
-    })
+    collectErrors(page, errors)
     await page.goto(`${base}/?${query}`, { waitUntil: 'load' })
     await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
     return { ctx, page, errors }
@@ -1864,7 +1889,7 @@ async function run() {
   const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png'), timeout: SHOT_TIMEOUT })
   const titleImg = await imageStats(t.page, titlePng)
   const fly = await titleFlyBy(t.page)
-  const titleProblems = [...fly.problems]
+  const titleProblems = [...fly.problems, ...(await fontProblems(t.page))]
   if (titleWait.frames < MIN_FRAMES) titleProblems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
   if (titleImg.stddev <= 4) titleProblems.push('title.png is blank')
   if (t.errors.length) titleProblems.push(`${t.errors.length} error(s)`)
