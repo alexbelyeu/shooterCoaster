@@ -597,7 +597,8 @@ canvas {
 
 @media (max-width: 480px) {
   .hud-panel { padding: 8px 10px 10px; }
-  .hud-combo { bottom: max(84px, calc(env(safe-area-inset-bottom) + 76px)); }
+  /* bottom row between pause and mute, clear of the first-person gun (#223) */
+  .hud-combo { bottom: calc(1rem + env(safe-area-inset-bottom)); }
   .hud-weapon {
     right: auto;
     left: calc(12px + env(safe-area-inset-left));

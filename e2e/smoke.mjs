@@ -739,6 +739,26 @@ async function weaponProblems(page, label, { aim = true } = {}) {
   return { problems, box }
 }
 
+/** Shot points (NDC) that swing the gun furthest: the screen's left edge high, mid and low, and the top right. */
+const WEAPON_SWEEP_AIMS = [[-0.95, 0.9], [-0.95, 0], [-0.95, -0.85], [0.95, 0.9]]
+
+/** The gun's box depends on its aim (#223): weapon checks at each sweep aim, combo meter showing (leaves a live chain). */
+async function weaponAimSweepProblems(page, label) {
+  await page.evaluate(() => window.__SC_TEST__.primeCombo(3))
+  if (!(await waitVisible(page, '.hud-combo', 15000))) return [`${label}: combo meter never showed for the aim sweep`]
+  const problems = []
+  for (const [x, y] of WEAPON_SWEEP_AIMS) {
+    await page.waitForTimeout(100) // past the trigger interval
+    if (!(await page.evaluate(([x, y]) => window.__SC_TEST__.fireShot(x, y), [x, y]))) {
+      problems.push(`${label}: aim sweep shot at (${x}, ${y}) did not fire`)
+      continue
+    }
+    await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+    problems.push(...(await weaponProblems(page, `${label} aiming at (${x}, ${y})`)).problems)
+  }
+  return problems
+}
+
 /**
  * The shot must read as leaving the barrel: on a held frame, the tracer
  * (tip → last shot) runs within WEAPON_MAX_AIM_DEG of the barrel (pivot → tip)
@@ -2219,6 +2239,7 @@ async function runMobile(browser, base) {
 
   const portrait = await hudLayoutProblems(page, 'portrait 390x844')
   problems.push(...portrait.problems)
+  problems.push(...(await weaponAimSweepProblems(page, 'portrait 390x844')))
 
   await page.setViewportSize({ width: 844, height: 390 })
   await waitFrames(page, 2, { minMs: 500, maxMs: 8000 })

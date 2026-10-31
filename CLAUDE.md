@@ -59,7 +59,7 @@ enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
 wall-clock level timer already ran out), the camera translates off the track pose at all
 (kill feedback is rotation-only trauma, ≤ 1°, back to 0), the first-person weapon is off
 screen / covers the centre / overlaps the HUD / points > 25° off the tracer of the frozen fixed-point shot (also
-checked in mobile portrait + landscape),
+checked in mobile portrait + landscape, and in portrait at four extreme aims with the combo meter showing),
 the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
 reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left) or the
