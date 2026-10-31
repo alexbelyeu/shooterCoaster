@@ -6,6 +6,7 @@ import {
   DEATH_STYLES,
   GLOW_PER_SLOT,
   HOLD_LIFE,
+  KRAKEN_SPLASH_DEATH_STYLE,
   nextAge,
   particleOffset,
   sizeAt,
@@ -16,6 +17,7 @@ import {
 const ALL: [string, DeathStyle][] = [
   ...Object.entries(DEATH_STYLES),
   ['bossPart', BOSS_PART_DEATH_STYLE],
+  ['krakenSplash', KRAKEN_SPLASH_DEATH_STYLE],
 ]
 
 describe('death styles', () => {

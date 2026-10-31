@@ -504,7 +504,15 @@ export default function EnemySpawner({
           onKill={onKill}
         />
       ))}
-      {boss && <BossSpawner key={`boss-${generation}-${runSeed}`} boss={boss} timerSeconds={timerSeconds} />}
+      {boss && (
+        <BossSpawner
+          key={`boss-${generation}-${runSeed}`}
+          boss={boss}
+          timerSeconds={timerSeconds}
+          track={trackTable}
+          groundFn={groundFn}
+        />
+      )}
     </>
   )
 }
