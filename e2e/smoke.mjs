@@ -37,7 +37,7 @@
  * held on into play), hold the timer, reach playing on GO, and the shader warm-up must
  * finish; on a replay, a tap after the 1 s mark must skip to playing.
  * Perf gate (#188): a level fails past its `scene` ceilings in budgets.json; see sceneBudgetCheck().
- * The speed check holds the first level at top speed on its most banked sampled point:
+ * The speed check holds the first level (or `--speed-level <id>`) at top speed on its most banked sampled point:
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  * The boss checks summon each finale and shoot it down in phase order: level1's Golden Blimp
  * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png) and level3's Kraken
@@ -102,6 +102,8 @@ const COMBAT_MIN_FRAMES = Number(args['combat-min-frames'] ?? 4)
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(args.seed ?? 1337)
 const DIST = args.dist ?? 'dist'
+// Level the speed check rides (default: the first level in the run), e.g. a water level for the streaks over the sea.
+const SPEED_LEVEL = args['speed-level']
 // Path the build is served under: '/' for the site, a sub-path for the portal zip.
 const BASE_PATH = `/${(args.base ?? '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/$/, '')
 let preview // module scope so the top-level catch can kill it
@@ -488,9 +490,7 @@ async function playLevel(page, id, { frenzy = false } = {}) {
   if (shake.traumaMax > 1 + 1e-6) problems.push(`kill trauma ${shake.traumaMax.toFixed(2)}° > 1°`)
   if (shake.trauma !== 0) problems.push(`kill trauma did not decay to 0 (${shake.trauma}°)`)
   const w = shake.weight
-  if (w.maxRoll > CAMERA_WEIGHT_CAPS.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.roll}°`)
-  if (w.maxPitch > CAMERA_WEIGHT_CAPS.pitch + 1e-6) problems.push(`camera pitch ${w.maxPitch.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.pitch}°`)
-  if (w.maxFovKick > CAMERA_WEIGHT_CAPS.fovKick + 1e-6) problems.push(`speed FOV kick ${w.maxFovKick.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.fovKick}°`)
+  problems.push(...cameraWeightProblems(w))
   return {
     problems,
     combat: {
@@ -708,7 +708,16 @@ const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-b
 const WEAPON_MAX_AIM_DEG = 25
 /** Caps on the coaster camera weight (#123): MAX_BANK_DEG / MAX_PITCH_DEG in
  *  src/track/cameraRig.ts and SPEED_FOV_DEG + DROP_FOV_DEG in src/track/cameraFov.ts. */
-const CAMERA_WEIGHT_CAPS = { roll: 8, pitch: 3, fovKick: 8 }
+/** Camera weight maxima past the caps the game publishes from its source constants (cameraRig.ts, cameraFov.ts). */
+function cameraWeightProblems(w) {
+  const caps = w.caps
+  if (!caps) return ['cameraWeight.caps missing from the test hook']
+  const problems = []
+  if (w.maxRoll > caps.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${caps.roll}°`)
+  if (w.maxPitch > caps.pitch + 1e-6) problems.push(`camera pitch ${w.maxPitch.toFixed(2)}° > ${caps.pitch}°`)
+  if (w.maxFovKick > caps.fovKick + 1e-6) problems.push(`FOV kick ${w.maxFovKick.toFixed(2)}° > ${caps.fovKick}°`)
+  return problems
+}
 /** Chain primed before the first level's kills, so the next kill enters the 5× tier (src/combat/comboTiers.ts). */
 const FRENZY_PRIME = 14
 const HUD_SELECTORS = ['.hud-score', '.hud-kills', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
@@ -1227,8 +1236,7 @@ async function speedCheck(page, levelId) {
   const problems = []
   if (!(w.streaks > 0.05)) problems.push(`no wind streaks at top speed (opacity ${w.streaks?.toFixed(3)}, speed ${w.speed?.toFixed(2)})`)
   if (!(Math.abs(w.roll) >= 1)) problems.push(`camera barely banks at top speed (${w.roll.toFixed(2)}° at track ${best.fraction})`)
-  if (w.maxRoll > CAMERA_WEIGHT_CAPS.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.roll}°`)
-  if (w.maxFovKick > CAMERA_WEIGHT_CAPS.fovKick + 1e-6) problems.push(`FOV kick ${w.maxFovKick.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.fovKick}°`)
+  problems.push(...cameraWeightProblems(w))
   const translation = await page.evaluate(() => window.__SC_TEST__.cameraTranslation.max)
   if (translation > 1e-6) problems.push(`camera translated ${translation.toFixed(3)} units off the track pose`)
   return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w } }
@@ -2555,7 +2563,7 @@ async function run() {
   // 6. Top speed: banking + wind streaks (speed.png)
   if (wanted.length) {
     const sp = await newPage()
-    const r = await speedCheck(sp.page, wanted[0])
+    const r = await speedCheck(sp.page, SPEED_LEVEL && wanted.includes(SPEED_LEVEL) ? SPEED_LEVEL : wanted[0])
     r.errors = [...sp.errors, ...(await sp.page.evaluate(() => window.__SC_TEST__.errors))]
     if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
     r.ok = r.problems.length === 0

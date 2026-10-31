@@ -2,6 +2,7 @@ import { useRef, useEffect, useLayoutEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
+import type { ArcTable } from './arcLength'
 import { useGameStore } from '@/store/useGameStore'
 import { startWindWhoosh, updateWindWhoosh, stopWindWhoosh } from '@/audio/SFXManager'
 import { eventBus } from '@/core/EventBus'
@@ -16,13 +17,14 @@ import { fovForAspect, fovWithSpeed } from './cameraFov'
 import WindStreaks, { type StreakDrive } from './WindStreaks'
 import { streakOpacity, streakRate } from './windStreaks'
 import {
-  CURVATURE_SAMPLE_UNITS, LOOK_AHEAD_UNITS, LOOK_RESPONSE, createRigState, lookAheadDirection,
-  resetRig, smoothingFactor, stepRig,
+  LOOK_RESPONSE, createRigState, lateralAcceleration, lookAheadDirection, resetRig, sampleTrack,
+  smoothingFactor, stepRig, type TrackSamples,
 } from './cameraRig'
 
 interface CoasterCameraProps {
   curve: TrackCurve
-  trackLength: number
+  /** The curve's arc-length table (SceneManager's `trackTable`). */
+  table: ArcTable
   /** `trackDimensions.trackScale`. */
   trackScale: number
   rollerSpeed: number
@@ -41,14 +43,13 @@ const MAX_VELOCITY_MULT = 5 // max velocity = minRollerSpeed * this
 const BASE_FOV = 80
 
 const RAD_TO_DEG = 180 / Math.PI
-const WORLD_UP = new THREE.Vector3(0, 1, 0)
 
 const wrap01 = (t: number) => ((t % 1) + 1) % 1
 
 /** Rides the track (port of Camera.js updateCamGame) with rotation-only weight from cameraRig.ts; the mouse only aims. */
 export default function CoasterCamera({
   curve,
-  trackLength,
+  table,
   trackScale,
   rollerSpeed,
   minRollerSpeed,
@@ -67,11 +68,8 @@ export default function CoasterCamera({
   const _tangent = useRef(new THREE.Vector3())
   const _lookAt = useRef(new THREE.Vector3())
   const scratch = useRef({
-    behind: new THREE.Vector3(),
-    ahead: new THREE.Vector3(),
+    samples: { behindT: 0, aheadT: 0, lookT: 0, span: 0, unitsPerT: 0 } as TrackSamples,
     tangentBehind: new THREE.Vector3(),
-    accel: new THREE.Vector3(),
-    right: new THREE.Vector3(),
     lookTarget: new THREE.Vector3(),
   })
   const lookDir = useRef(new THREE.Vector3())
@@ -175,25 +173,14 @@ export default function CoasterCamera({
       Math.min((velocity.current - effectiveMinSpeed) / (maxVelocity - effectiveMinSpeed), 1),
     )
 
-    // Lateral acceleration = curvature × v², from the track a few units either side of the car.
+    // Lateral acceleration from the tangents a few units either side of the car, measured along the track.
     const s = scratch.current
-    const h = (CURVATURE_SAMPLE_UNITS * trackScale) / trackLength
-    s.behind.copy(curve.getPointAt(wrap01(t - h)))
-    s.ahead.copy(curve.getPointAt(wrap01(t + h)))
-    const unitsPerT = s.behind.distanceTo(s.ahead) / (2 * h)
-    const speed = velocity.current * 60 * unitsPerT
-    let lateral = 0
-    if (unitsPerT > 0) {
-      s.tangentBehind.copy(curve.getTangentAt(wrap01(t - h)))
-      s.accel
-        .copy(curve.getTangentAt(wrap01(t + h)))
-        .sub(s.tangentBehind)
-        .multiplyScalar((speed * speed) / (2 * h * unitsPerT))
-      lateral = s.accel.dot(s.right.crossVectors(_tangent.current, WORLD_UP).normalize())
-    }
+    const at = sampleTrack(table, t, trackScale, s.samples)
+    const speed = velocity.current * 60 * at.unitsPerT
+    s.tangentBehind.copy(curve.getTangentAt(at.behindT))
+    const lateral = lateralAcceleration(_tangent.current, s.tangentBehind, curve.getTangentAt(at.aheadT), at.span, speed)
 
-    const aheadT = wrap01(t + (LOOK_AHEAD_UNITS * trackScale) / Math.max(unitsPerT, 1e-6))
-    s.lookTarget.copy(curve.getPointAt(aheadT))
+    s.lookTarget.copy(curve.getPointAt(at.lookT))
     s.lookTarget.y += heightOffset
     s.lookTarget.sub(_position.current).normalize()
     lookAheadDirection(_tangent.current, s.lookTarget, s.lookTarget)
