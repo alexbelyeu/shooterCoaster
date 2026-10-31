@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import GameCanvas from '@/canvas/GameCanvas'
 import { useGameStore } from '@/store/useGameStore'
+import { isLevelActive } from '@/store/startPhase'
 import TitleScreen from '@/ui/screens/TitleScreen'
 import LevelSelectScreen from '@/ui/screens/LevelSelectScreen'
 import SettingsScreen from '@/ui/screens/SettingsScreen'
@@ -36,7 +37,7 @@ export default function App() {
   const veilTimer = useRef<number | undefined>(undefined)
   usePauseOnHidden()
   const reducedMotion = usePrefersReducedMotion()
-  const inPlay = phase === 'countdown' || phase === 'playing'
+  const inPlay = isLevelActive(phase)
 
   useEffect(() => {
     if (phase === 'title' || phase === 'levelSelect') {

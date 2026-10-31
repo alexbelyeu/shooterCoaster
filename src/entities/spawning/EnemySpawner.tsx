@@ -355,6 +355,13 @@ export default function EnemySpawner({
   )
   const waveProgress = useRef(newWaveProgress(waves.length))
   const slowMoResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Ends a pending last-kill slow-mo now, so it never outlives its run. */
+  const endSlowMo = useCallback(() => {
+    if (!slowMoResetTimer.current) return
+    clearTimeout(slowMoResetTimer.current)
+    slowMoResetTimer.current = null
+    useGameStore.getState().setTimeScale(1)
+  }, [])
 
   const killedEnemies = useRef(new Set<string>())
 
@@ -367,6 +374,7 @@ export default function EnemySpawner({
   useEffect(() => {
     if (runRef.current === runId) return
     runRef.current = runId
+    endSlowMo()
     setActiveWaveIndex(initialActiveWave)
     setPlacements(initialPlacements)
     setWaveAnnouncement(null)
@@ -374,7 +382,7 @@ export default function EnemySpawner({
     waveProgress.current = newWaveProgress(waves.length)
     killedEnemies.current.clear()
     setGeneration((g) => g + 1)
-  }, [runId, initialActiveWave, initialPlacements, waves])
+  }, [runId, initialActiveWave, initialPlacements, waves, endSlowMo])
 
   // Also after a resume, when the run was paused during its countdown.
   useEffect(() => {
@@ -437,11 +445,10 @@ export default function EnemySpawner({
 
   useEffect(() => {
     return () => {
-      if (slowMoResetTimer.current) clearTimeout(slowMoResetTimer.current)
-      slowMoResetTimer.current = null
+      endSlowMo()
       killedEnemies.current.clear()
     }
-  }, [])
+  }, [endSlowMo])
 
   const onKill = useCallback(
     (id: string) => {
@@ -451,15 +458,12 @@ export default function EnemySpawner({
       useGameStore.getState().setEnemyCounts(Math.max(0, remaining), totalEnemyCount)
 
       if (killedEnemies.current.size >= totalEnemyCount) {
-        const store = useGameStore.getState()
-        store.setTimeScale(0.1)
+        useGameStore.getState().setTimeScale(0.1)
         if (slowMoResetTimer.current) clearTimeout(slowMoResetTimer.current)
-        slowMoResetTimer.current = setTimeout(() => {
-          useGameStore.getState().setTimeScale(1)
-        }, 1500)
+        slowMoResetTimer.current = setTimeout(endSlowMo, 1500)
       }
     },
-    [totalEnemyCount],
+    [totalEnemyCount, endSlowMo],
   )
 
   useEffect(() => {
