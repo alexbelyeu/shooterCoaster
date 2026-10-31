@@ -179,6 +179,9 @@ export interface SCTestApi {
   boss: () => E2EBoss
   /** n hits on the boss's exposed weak points (nearest first), each through processHit. Returns how many landed. */
   bossHit: (n: number) => number
+  /** Seconds the boss moves per frame instead of the frame's game time, also with game time frozen (the level timer
+   *  holds while it rises into place); null is normal play. */
+  bossStep: number | null
   /** Counts of 'boss:spawn' / 'boss:hit' / 'boss:defeated' since load. */
   bossEvents: { spawn: number; hit: number; defeated: number }
   // ── Combo-streak fireworks (issue #182) ──
@@ -683,6 +686,7 @@ export function installE2EApi() {
     summonBoss: () => { e2eBoss.summon = true },
     boss: readBoss,
     bossHit,
+    bossStep: null,
     bossEvents: { spawn: 0, hit: 0, defeated: 0 },
     fireworks: readFireworks,
     deaths: readDeaths,

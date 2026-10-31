@@ -101,7 +101,16 @@ export const BOSS_PART_DEATH_STYLE: DeathStyle = {
   lifetime: 1.5, scale: 1, lift: 0, flash: 8, flashColor: '#ffaa44', sound: 'pop',
 }
 
-const BALLOON_CONFETTI = ['#ff3b6b', '#ffd23f', '#3bc9ff', '#7dff6a', '#c86bff']
+/** The Kraken's splashes (pads, slams, surfacing, the head going down): a shark's splash, over twice the size, in the ocean's foam and cyan. */
+export const KRAKEN_SPLASH_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'drop', count: 40, colors: ['#ffffff', '#c8f8ff', '#5fe8f8'], glow: 1.9, speed: [15, 55], up: 95, drag: 0.5, gravity: 150, size: 3.5, hold: 0.6 }),
+    layer({ shape: 'mote', count: 8, colors: ['#eafcff', '#9ff4ff'], glow: 1.4, speed: [20, 50], drag: 2.5, size: 4, hold: 0.3 }),
+  ],
+  lifetime: 1.8, scale: 2.4, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'splash',
+}
+
+const BALLOON_CONFETTI =['#ff3b6b', '#ffd23f', '#3bc9ff', '#7dff6a', '#c86bff']
 
 const SNOW_CRUMBLE = (ice: string): readonly DeathLayer[] => [
   layer({ shape: 'chunk', count: 9, colors: ['#f4f8ff', '#e2ecf8', ice], speed: [25, 70], up: 30, drag: 0.8, gravity: 140, size: 5.5, spin: 6, hold: 0.7 }),

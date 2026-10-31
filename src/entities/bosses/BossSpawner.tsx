@@ -7,9 +7,13 @@ import { e2eBoss, isE2E, type E2EBossStage } from '@/testing/e2eHook'
 import { BOSS_SPECS } from './bossSpecs'
 import type { BossProps } from './BossBase'
 import GoldenBlimp from './GoldenBlimp'
+import Kraken from './Kraken'
+import type { ArcTable } from '@/track/arcLength'
+import type { HeightFunction } from '@/utils/terrainNoise'
 
 const BOSS_COMPONENTS: Record<BossType, React.ComponentType<BossProps>> = {
   goldenBlimp: GoldenBlimp,
+  kraken: Kraken,
 }
 
 type Stage = Exclude<E2EBossStage, 'none' | 'defeated'>
@@ -17,10 +21,12 @@ type Stage = Exclude<E2EBossStage, 'none' | 'defeated'>
 interface BossSpawnerProps {
   boss: NonNullable<LevelConfig['boss']>
   timerSeconds: number
+  track: ArcTable
+  groundFn: HeightFunction
 }
 
 /** Tell and arrival run on GameTimer's `timeRemaining`, which holds through pauses and the countdown. */
-export default function BossSpawner({ boss, timerSeconds }: BossSpawnerProps) {
+export default function BossSpawner({ boss, timerSeconds, track, groundFn }: BossSpawnerProps) {
   const spec = BOSS_SPECS[boss.type]
   const [stage, setStage] = useState<Stage>('waiting')
   const stageRef = useRef<Stage>('waiting')
@@ -62,5 +68,5 @@ export default function BossSpawner({ boss, timerSeconds }: BossSpawnerProps) {
 
   if (stage === 'done') return null
   const Boss = BOSS_COMPONENTS[boss.type]
-  return <Boss id={boss.type} active={stage === 'active'} onDone={onDone} />
+  return <Boss id={boss.type} active={stage === 'active'} onDone={onDone} track={track} groundFn={groundFn} />
 }

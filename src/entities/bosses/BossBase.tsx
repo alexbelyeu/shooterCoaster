@@ -7,9 +7,11 @@ import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/Col
 import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE } from '@/combat/hitFeedback'
 import { placeSound, sfx } from '@/audio/sfx'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
-import { BOSS_PART_DEATH_STYLE } from '@/effects/deathStyles'
+import { BOSS_PART_DEATH_STYLE, type DeathStyle } from '@/effects/deathStyles'
 import { flashMesh, restoreMesh } from '@/entities/enemies/hitFlash'
 import { e2eBoss, isE2E } from '@/testing/e2eHook'
+import type { ArcTable } from '@/track/arcLength'
+import type { HeightFunction } from '@/utils/terrainNoise'
 import {
   applyHit, createBossState, destroyScore, hpFraction, isDefeated, isExposed, weakPointHp,
   type BossSpec, type BossState, type WeakPointSpec,
@@ -33,9 +35,12 @@ export interface BossProps {
   /** False while dormant: mounted hidden with the level so the shader warm-up covers it. */
   active: boolean
   onDone: () => void
+  track: ArcTable
+  /** Terrain as drawn. */
+  groundFn: HeightFunction
 }
 
-interface BossBaseProps extends BossProps {
+interface BossBaseProps extends Omit<BossProps, 'track' | 'groundFn'> {
   spec: BossSpec
   move: (frame: BossFrame) => void
   /** Its bounds are the boss's on-screen size (e2e `boss().box`). */
@@ -43,6 +48,8 @@ interface BossBaseProps extends BossProps {
   rigging?: ReactNode
   renderWeakPoint: (weakPoint: WeakPointSpec, exposed: boolean) => ReactNode
   exitSeconds: number
+  /** Each destroyed weak point's burst. */
+  deathStyle?: DeathStyle
   /** World space, not moved with the body (e.g. confetti). */
   children?: ReactNode
 }
@@ -84,6 +91,7 @@ export default function BossBase({
   rigging,
   renderWeakPoint,
   exitSeconds,
+  deathStyle = BOSS_PART_DEATH_STYLE,
   children,
 }: BossBaseProps) {
   const camera = useThree((s) => s.camera)
@@ -194,7 +202,7 @@ export default function BossBase({
       const position = part.getWorldPosition(new THREE.Vector3())
       const { combo } = useGameStore.getState()
       sfx().bossPart(combo.count, w.id, placeSound(position))
-      getExplosionPool()?.explode(position, BOSS_PART_DEATH_STYLE)
+      getExplosionPool()?.explode(position, deathStyle)
       eventBus.emit('enemy:killed', {
         position,
         combo: combo.count,
@@ -209,17 +217,18 @@ export default function BossBase({
         eventBus.emit('boss:defeated', event)
       }
     },
-    [id, spec, parts, fx, publishHud],
+    [id, spec, parts, fx, publishHud, deathStyle],
   )
 
   useFrame((_, delta) => {
     const root = rootRef.current
     const { phase, timeScale } = useGameStore.getState()
     const c = clock.current
+    const testStep = isE2E ? (window.__SC_TEST__?.bossStep ?? null) : null
     // The arrival frame always places it, even with game time frozen.
-    if (!root || !active || phase !== 'playing' || (timeScale === 0 && c.placed)) return
+    if (!root || !active || phase !== 'playing' || (timeScale === 0 && c.placed && testStep === null)) return
     c.placed = true
-    const dt = delta * timeScale
+    const dt = testStep ?? delta * timeScale
 
     for (let i = 0; i < fx.length; i++) {
       const f = fx[i]

@@ -1,8 +1,7 @@
 import { useMemo } from 'react'
 import type { BiomeDecorationsProps } from '../../shared/types'
 import { ATMOSPHERES } from '../../atmosphere'
-import { SUNKEN_CITY_POSITION } from './config'
-import { layoutOcean } from './seaPlacement'
+import { oceanLayout } from './seaPlacement'
 import SeaStacks from './SeaStacks'
 import Seabirds from './Seabirds'
 import Reef from './Reef'
@@ -10,13 +9,8 @@ import { ROCK_FOOTPRINT, STACK_FOOTPRINT } from './seaDimensions'
 import { roundCaster } from '../../shared/contactShadows'
 import { useContactShadows } from '../../shared/ContactShadows'
 
-const [CITY_X, , CITY_Z] = SUNKEN_CITY_POSITION
-
 export default function OceanDecorations({ groundFn, track }: BiomeDecorationsProps) {
-  const layout = useMemo(
-    () => layoutOcean(groundFn, track, [{ x: CITY_X, z: CITY_Z, r: 320 }]),
-    [groundFn, track],
-  )
+  const layout = useMemo(() => oceanLayout(groundFn, track), [groundFn, track])
   // On the seabed: the water blends over them.
   useContactShadows(
     useMemo(
