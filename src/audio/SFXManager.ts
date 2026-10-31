@@ -434,7 +434,7 @@ export function playFireworkPop(): void {
   }
 }
 
-/** Uses the level's kit, which stays mounted under the results screen. */
+/** The power-up arpeggio, on the star-chime synth. */
 export function playPickupChime(): void {
   const k = ensureKit()
   if (!k) return
@@ -449,6 +449,7 @@ export function playPickupChime(): void {
   }
 }
 
+/** Uses the level's kit, which stays mounted under the results screen. */
 export function playStarChime(starIndex: number): void {
   const k = ensureKit()
   if (!k) return

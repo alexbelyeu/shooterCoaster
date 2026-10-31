@@ -10,8 +10,17 @@ export interface PickupSpot {
   position: Vec3
 }
 
-/** Height above the rails at trackScale 1; grows with the track like the rider's eye. */
-export const PICKUP_HEIGHT = 25
+/**
+ * Sizes at trackScale 1, in world units (an enemy is ~60 across); every one grows with the
+ * track like the rider's eye. The rider passes under each pickup, so the height keeps the eye
+ * outside the hit sphere at the bottom of the bob, or every shot fired there would collect it.
+ */
+export const PICKUP_HEIGHT = 50
+export const PICKUP_GEM_RADIUS = 10
+export const PICKUP_RING_RADIUS = 15
+export const PICKUP_RING_TUBE = 1.1
+export const PICKUP_HIT_RADIUS = 18
+export const PICKUP_BOB = 3
 /** Every level's run rides at least 0.38 of the track parameter before its timer ends. */
 export const PICKUP_SPAN: readonly [number, number] = [0.05, 0.33]
 const SLOT_JITTER = 0.6

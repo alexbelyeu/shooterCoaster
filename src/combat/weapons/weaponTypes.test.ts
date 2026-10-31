@@ -23,7 +23,7 @@ describe('pickup state', () => {
   })
 
   it('lasts its duration of game time, then falls back to the blaster', () => {
-    const s = applyPickup(NO_PICKUP, 'spread', 5)
+    const s = applyPickup('spread', 5)
     expect(activeWeapon(s, 5).id).toBe('spread')
     expect(activeWeapon(s, 14.99).id).toBe('spread')
     expect(pickupRemaining(s, 10)).toBeCloseTo(0.5)
@@ -32,7 +32,7 @@ describe('pickup state', () => {
   })
 
   it('a new pickup replaces the current one for its full duration', () => {
-    const s = applyPickup(applyPickup(NO_PICKUP, 'spread', 0), 'piercing', 8)
+    const s = applyPickup('piercing', 8)
     expect(activeWeapon(s, 17).id).toBe('piercing')
     expect(pickupRemaining(s, 8)).toBe(1)
   })

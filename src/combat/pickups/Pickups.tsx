@@ -7,14 +7,11 @@ import { WEAPONS, type PickupWeaponId } from '@/combat/weapons/weaponTypes'
 import { useGameStore } from '@/store/useGameStore'
 import { sfx } from '@/audio/sfx'
 import { e2ePickups, isE2E } from '@/testing/e2eHook'
-import { placePickups } from './pickupPlacement'
+import {
+  PICKUP_BOB, PICKUP_GEM_RADIUS, PICKUP_HIT_RADIUS, PICKUP_RING_RADIUS, PICKUP_RING_TUBE, placePickups,
+} from './pickupPlacement'
 
-/** World units; an enemy is ~60 across. */
-const GEM_RADIUS = 10
-const RING_RADIUS = 15
-const HIT_RADIUS = 18
 const SPIN_PER_S = 1.2
-const BOB_UNITS = 3
 const BOB_PER_S = 2.2
 const POP_S = 0.3
 /** Above the bloom threshold, so the pickup glows. */
@@ -38,10 +35,10 @@ export interface LivePickup {
   popAge: number
 }
 
-function buildPickupGeometry(): THREE.BufferGeometry {
-  const gem = new THREE.OctahedronGeometry(GEM_RADIUS)
+function buildPickupGeometry(scale: number): THREE.BufferGeometry {
+  const gem = new THREE.OctahedronGeometry(PICKUP_GEM_RADIUS * scale)
   gem.scale(0.8, 1.25, 0.8)
-  const ring = new THREE.TorusGeometry(RING_RADIUS, 1.1, 6, 28).toNonIndexed()
+  const ring = new THREE.TorusGeometry(PICKUP_RING_RADIUS * scale, PICKUP_RING_TUBE * scale, 6, 28).toNonIndexed()
   // Alternating facet shades read as a cut stone without lighting.
   const shade = (g: THREE.BufferGeometry, perFace: (face: number) => number) => {
     const n = g.getAttribute('position').count
@@ -70,7 +67,7 @@ const UP = new THREE.Vector3(0, 1, 0)
 export default function Pickups({ levelId, ids, pointAt, trackScale }: PickupsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const runId = useGameStore((s) => s.runId)
-  const geometry = useMemo(buildPickupGeometry, [])
+  const geometry = useMemo(() => buildPickupGeometry(trackScale), [trackScale])
   const material = useMemo(() => new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }), [])
   const pickups = useMemo<LivePickup[]>(
     () =>
@@ -104,7 +101,7 @@ export default function Pickups({ levelId, ids, pointAt, trackScale }: PickupsPr
         id: p.targetId,
         kind: 'pickup',
         getPosition: () => p.position,
-        radiusSq: HIT_RADIUS * HIT_RADIUS,
+        radiusSq: (PICKUP_HIT_RADIUS * trackScale) ** 2,
         onHit: () => {
           if (p.popAge >= 0) return
           p.popAge = 0
@@ -120,7 +117,7 @@ export default function Pickups({ levelId, ids, pointAt, trackScale }: PickupsPr
       for (const p of pickups) unregisterCollisionTarget(p.targetId)
       if (isE2E) e2ePickups.list = []
     }
-  }, [pickups, runId])
+  }, [pickups, runId, trackScale])
 
   useFrame((_, delta) => {
     const mesh = meshRef.current
@@ -130,7 +127,8 @@ export default function Pickups({ levelId, ids, pointAt, trackScale }: PickupsPr
     clock.current += dt
     const t = clock.current
     let colorsChanged = false
-    pickups.forEach((p, i) => {
+    for (let i = 0; i < pickups.length; i++) {
+      const p = pickups[i]
       let scale = 1
       if (p.popAge >= 0) {
         p.popAge += dt
@@ -138,18 +136,18 @@ export default function Pickups({ levelId, ids, pointAt, trackScale }: PickupsPr
         if (u >= 1) {
           p.position.y = PARKED_Y
           mesh.setMatrixAt(i, _m.makeScale(0, 0, 0))
-          return
+          continue
         }
         scale = 1 + 1.4 * u
         mesh.setColorAt(i, _c.set(WEAPONS[p.id].uiColor).lerp(_white, u).multiplyScalar(GLOW * (1 - u)))
         colorsChanged = true
       } else {
-        p.position.y = p.home.y + Math.sin(t * BOB_PER_S + i * 2.1) * BOB_UNITS
+        p.position.y = p.home.y + Math.sin(t * BOB_PER_S + i * 2.1) * PICKUP_BOB * trackScale
       }
       _q.setFromAxisAngle(UP, t * SPIN_PER_S + i)
       _s.setScalar(scale)
       mesh.setMatrixAt(i, _m.compose(p.position, _q, _s))
-    })
+    }
     mesh.instanceMatrix.needsUpdate = true
     if (colorsChanged && mesh.instanceColor) mesh.instanceColor.needsUpdate = true
   })

@@ -161,7 +161,7 @@ export const useGameStore = create<GameState>()(
         }),
       resetCombo: () => set({ combo: NO_COMBO }),
 
-      pickUpWeapon: (id) => set((s) => ({ weapon: applyPickup(s.weapon, id, gameTime()) })),
+      pickUpWeapon: (id) => set({ weapon: applyPickup(id, gameTime()) }),
 
       timeRemaining: 0,
       setTimeRemaining: (t) => set({ timeRemaining: t }),

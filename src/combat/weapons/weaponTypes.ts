@@ -59,7 +59,7 @@ export interface WeaponState {
 export const NO_PICKUP: WeaponState = { id: null, until: 0 }
 
 /** A new pickup replaces (or refreshes) the current one. */
-export function applyPickup(_state: WeaponState, id: PickupWeaponId, now: number): WeaponState {
+export function applyPickup(id: PickupWeaponId, now: number): WeaponState {
   return { id, until: now + WEAPONS[id].duration }
 }
 

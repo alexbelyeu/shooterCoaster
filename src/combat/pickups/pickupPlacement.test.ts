@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { createTrigCurve } from '@/track/curves/TrigCurve'
 import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
-import { getTrackScale } from '@/track/trackDimensions'
-import { MAX_PICKUPS, MIN_PICKUPS, PICKUP_HEIGHT, PICKUP_SPAN, placePickups } from './pickupPlacement'
+import { getTrackDimensions, getTrackScale } from '@/track/trackDimensions'
+import { TOUCH_HIT_SCALE } from '@/combat/aimAssist'
+import {
+  MAX_PICKUPS, MIN_PICKUPS, PICKUP_BOB, PICKUP_HEIGHT, PICKUP_HIT_RADIUS, PICKUP_RING_RADIUS, PICKUP_RING_TUBE,
+  PICKUP_SPAN, placePickups,
+} from './pickupPlacement'
 
 const flat = (t: number) => ({ x: t * 1000, y: 10, z: 0 })
 
@@ -38,6 +42,16 @@ describe('placePickups', () => {
       expect(spots.length).toBeGreaterThanOrEqual(MIN_PICKUPS)
       expect(spots.length).toBeLessThanOrEqual(MAX_PICKUPS)
       for (const s of spots) expect(Number.isFinite(s.position.x + s.position.y + s.position.z)).toBe(true)
+    }
+  })
+
+  it("every level keeps the passing rider's eye outside the pickup, its touch hit sphere and its ring", () => {
+    for (const level of getAllLevels()) {
+      const s = getTrackScale(level.track.scalar)
+      const { eyeHeight } = getTrackDimensions(level.track)
+      const lowestCentre = (PICKUP_HEIGHT - PICKUP_BOB) * s
+      const reach = Math.max(PICKUP_HIT_RADIUS * TOUCH_HIT_SCALE, PICKUP_RING_RADIUS + PICKUP_RING_TUBE) * s
+      expect(lowestCentre - eyeHeight, level.id).toBeGreaterThan(reach + 5 * s)
     }
   })
 })
