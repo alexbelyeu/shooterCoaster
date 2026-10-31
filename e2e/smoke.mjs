@@ -1238,6 +1238,9 @@ async function speedCheck(page, levelId) {
 const WAVE_CHECK = { level: 'level2', type: 'crow', label: 'A Murder of Crows!', minOnScreen: 5 }
 
 const WAVE_PAUSE_MS = 2000
+/** From this level time (s) the timer steps a fixed `WAVE_TIMER_STEP` s a frame, so a slow frame can't jump the tell and the wave together. */
+const WAVE_STEP_FROM = 12
+const WAVE_TIMER_STEP = 0.25
 
 /**
  * Spawn choreography (#30): the crow wave's tell must lead it, then its V flies in, frozen for `level2-wave.png`.
@@ -1250,6 +1253,8 @@ async function waveCheck(page) {
   const event = (kind) => page
     .waitForFunction(([k, l]) => window.__SC_TEST__.waveEvents.find((e) => e.kind === k && e.label === l) ?? null, [kind, label], { timeout: 90000, polling: 200 })
     .then((h) => h.jsonValue(), () => null)
+  await page.waitForFunction((t) => (window.__SC_TEST__.nextWave()?.levelTime ?? 0) >= t, WAVE_STEP_FROM, { timeout: 90000, polling: 100 }).catch(() => {})
+  await page.evaluate((s) => { window.__SC_TEST__.timerStep = s }, WAVE_TIMER_STEP)
   const tell = await event('incoming')
   const tellShown = tell
     ? await page.evaluate(() => ({ pulse: !!document.querySelector('.wave-tell'), text: document.querySelector('.wave-banner-text')?.textContent ?? null }))
@@ -1258,6 +1263,7 @@ async function waveCheck(page) {
   await page.waitForTimeout(WAVE_PAUSE_MS)
   await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
   const arrival = await event('announce')
+  await page.evaluate(() => { window.__SC_TEST__.timerStep = null })
   // The entry takes 1.2–1.8 s of game time.
   await waitFrames(page, 3, { minMs: 2500, maxMs: 30000 })
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
@@ -1270,9 +1276,19 @@ async function waveCheck(page) {
   else if (!tellShown?.pulse) problems.push('the tell showed no screen-edge pulse (.wave-tell)')
   if (tell && tellShown?.text !== label) problems.push(`the tell showed "${tellShown?.text}", not "${label}"`)
   if (!arrival) problems.push(`the "${label}" wave never arrived`)
-  const leadS = tell && arrival ? (arrival.ms - tell.ms) / 1000 : null
-  if (leadS !== null && leadS < 0.3) problems.push(`the tell came only ${leadS.toFixed(2)} s before the wave`)
-  const events = await page.evaluate(() => window.__SC_TEST__.waveEvents.map((e) => `${e.kind} "${e.label}"`))
+  // On level time, not wall time (#262): the tell is on time when the wave tick before it was still short of `due - tellS`.
+  const { tellS, log } = await page.evaluate(() => ({ tellS: window.__SC_TEST__.waveTellSeconds, log: window.__SC_TEST__.waveEvents }))
+  const order = (kind) => log.findIndex((e) => e.kind === kind && e.label === label)
+  const timing = tell ? { due: tell.due, tellAt: tell.levelTime, tickBefore: tell.lastTick } : null
+  if (tell && arrival) {
+    const { due, tellAt, tickBefore } = timing
+    if (order('announce') < order('incoming')) problems.push('the wave arrived before its tell')
+    else if (tellAt < due - tellS) problems.push(`the tell came early: at ${tellAt.toFixed(2)} s, ${(due - tellAt).toFixed(2)} s before the wave at ${due} s`)
+    else if (tickBefore !== null && tickBefore >= due - tellS) {
+      problems.push(`the tell came late: the wave tick at ${tickBefore.toFixed(2)} s was already within ${tellS} s of the wave at ${due} s`)
+    }
+  }
+  const events = log.map((e) => `${e.kind} "${e.label}"`)
   const repeated = [...new Set(events.filter((e, i) => events.indexOf(e) !== i))]
   if (repeated.length) problems.push(`wave events fired twice after a pause and Resume: ${repeated.join(', ')}`)
   if (flock.length < minOnScreen) problems.push(`only ${flock.length} ${type}s on screen after the wave flew in (want ≥ ${minOnScreen})`)
@@ -1281,7 +1297,7 @@ async function waveCheck(page) {
   return {
     id: 'wave',
     problems,
-    wave: { level, onScreen: flock.length, largestPx: Math.round(flock[0]?.px ?? 0), nearest: Math.round(nearest), tellLeadS: leadS },
+    wave: { level, onScreen: flock.length, largestPx: Math.round(flock[0]?.px ?? 0), nearest: Math.round(nearest), timing },
   }
 }
 
@@ -2639,7 +2655,7 @@ async function run() {
           ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})` +
           ` | startup ${startupSummary(r.initTimings)}`
       : r.wave
-        ? ` ${r.wave.level} tell ${r.wave.tellLeadS?.toFixed(1) ?? '-'}s ahead, on screen ${r.wave.onScreen} (largest ${r.wave.largestPx}px, nearest ${r.wave.nearest})`
+        ? ` ${r.wave.level} wave at ${r.wave.timing?.due ?? '-'}s: tell at ${r.wave.timing?.tellAt?.toFixed(2) ?? '-'}s (tick before ${r.wave.timing?.tickBefore?.toFixed(2) ?? '-'}s), on screen ${r.wave.onScreen} (largest ${r.wave.largestPx}px, nearest ${r.wave.nearest})`
       : r.boss
         ? (r.boss.skipped
           ? ` ${r.boss.level} skipped (level timed out)`
