@@ -6,6 +6,12 @@ import { gameTime } from '@/core/gameClock'
 import { markStartup } from '@/core/startupMarks'
 import { comboExpired, comboMultiplier } from '@/combat/comboTiers'
 import { startPhaseFor } from './startPhase'
+import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/daily'
+
+/** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
+export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }
+
+const CAMPAIGN: RunMode = { mode: 'campaign' }
 
 interface GameState {
   phase: GamePhase
@@ -21,8 +27,14 @@ interface GameState {
   runSeed: number
   /** Bumped by every `startRun`: per-run state resets on it, never on a phase change (paused → playing can be a Restart). */
   runId: number
-  /** The one way to start or restart a level (enters `countdown`, `playing` under `?e2e=1`); seed precedence: `seed` > `?seed=` > `Date.now()`. */
-  startRun: (levelId: string, seed?: number) => void
+  runMode: RunMode
+  /**
+   * The one way to start a level (enters `countdown`, `playing` under `?e2e=1`); seed precedence:
+   * `seed` > `?seed=` > the daily seed of `mode.dateKey` (daily runs) > `Date.now()`.
+   */
+  startRun: (levelId: string, seed?: number, mode?: RunMode) => void
+  /** Restarts the current level in the same mode: a daily keeps its seed, a campaign run gets a fresh one. */
+  restartRun: () => void
 
   score: number
   addScore: (points: number) => void
@@ -56,6 +68,12 @@ interface GameState {
   /** Keeps the higher score's entry; `bestCombo` is kept at its max across runs either way. */
   saveScore: (entry: ScoreEntry) => void
   resetSavedScores: () => void
+
+  /** Best daily run per UTC day (`YYYY-MM-DD`), the last `DAILY_KEEP_DAYS` only; never touches `savedScores`. */
+  savedDaily: Record<string, ScoreEntry>
+  dailyStreak: DailyStreak
+  /** Keeps the higher score of the day and extends the streak. */
+  saveDailyScore: (entry: ScoreEntry, dateKey: string) => void
 
   timeScale: number
   setTimeScale: (s: number) => void
@@ -101,16 +119,24 @@ export const useGameStore = create<GameState>()(
 
       runSeed: 0,
       runId: 0,
-      startRun: (levelId, seed) => {
+      runMode: CAMPAIGN,
+      startRun: (levelId, seed, mode = CAMPAIGN) => {
         markStartup('runStart')
+        const fallback = mode.mode === 'daily' ? dailySeed(mode.dateKey) : Date.now()
         set((s) => ({
           ...FRESH_RUN,
           currentLevel: levelId,
-          runSeed: (seed ?? urlSeed() ?? Date.now()) >>> 0,
+          runSeed: (seed ?? urlSeed() ?? fallback) >>> 0,
+          runMode: mode,
           runId: s.runId + 1,
           phase: startPhaseFor(urlSearch() ?? ''),
           resuming: false,
         }))
+      },
+      restartRun: () => {
+        const { currentLevel, runMode, runSeed, startRun } = get()
+        if (!currentLevel) return
+        startRun(currentLevel, runMode.mode === 'daily' ? runSeed : undefined, runMode)
       },
 
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
@@ -159,6 +185,18 @@ export const useGameStore = create<GameState>()(
         }),
       resetSavedScores: () => set({ savedScores: {} }),
 
+      savedDaily: {},
+      dailyStreak: { count: 0, lastKey: null },
+      saveDailyScore: (entry, dateKey) =>
+        set((s) => {
+          const existing = s.savedDaily[dateKey]
+          const best = existing && existing.score >= entry.score ? existing : entry
+          return {
+            savedDaily: pruneDaily({ ...s.savedDaily, [dateKey]: best }, dateKey),
+            dailyStreak: extendStreak(s.dailyStreak, dateKey),
+          }
+        }),
+
       isLevelUnlocked: (levelId) => {
         const state = get()
         if (levelId === 'level1') return true
@@ -170,7 +208,11 @@ export const useGameStore = create<GameState>()(
     }),
     {
       name: 'shootercoaster-scores',
-      partialize: (state) => ({ savedScores: state.savedScores }),
+      partialize: (state) => ({
+        savedScores: state.savedScores,
+        savedDaily: state.savedDaily,
+        dailyStreak: state.dailyStreak,
+      }),
     },
   ),
 )

@@ -6,16 +6,24 @@ import { analyticsEventFor, tensPercent, type RunSnapshot } from './analyticsEve
 const level1 = getLevelConfig('level1')!
 
 function snap(phase: GamePhase, extra: Partial<RunSnapshot> = {}): RunSnapshot {
-  return { phase, currentLevel: 'level1', score: 0, timeRemaining: level1.timerSeconds, ...extra }
+  return { phase, currentLevel: 'level1', runMode: { mode: 'campaign' }, score: 0, timeRemaining: level1.timerSeconds, ...extra }
 }
 
 describe('analyticsEventFor', () => {
   it('sends level_start when a run begins from the menu or the results screen', () => {
-    const start = { name: 'level_start', props: { level: 'level1' } }
+    const start = { name: 'level_start', props: { level: 'level1', mode: 'campaign' } }
     expect(analyticsEventFor(snap('levelSelect', { currentLevel: null }), snap('playing'))).toEqual(start)
     expect(analyticsEventFor(snap('results'), snap('playing'))).toEqual(start)
     expect(analyticsEventFor(snap('levelSelect'), snap('countdown'))).toEqual(start)
     expect(analyticsEventFor(snap('results'), snap('countdown'))).toEqual(start)
+  })
+
+  it('tags a Daily Run start with its mode', () => {
+    const daily = snap('countdown', { runMode: { mode: 'daily', dateKey: '2026-10-31' } })
+    expect(analyticsEventFor(snap('levelSelect'), daily)).toEqual({
+      name: 'level_start',
+      props: { level: 'level1', mode: 'daily' },
+    })
   })
 
   it('counts a countdown that ends in GO as one start', () => {
@@ -53,7 +61,7 @@ describe('analyticsEventFor', () => {
     expect(analyticsEventFor(snap('levelSelect'), snap('playing', { currentLevel: 'nope' }))).toBeNull()
   })
 
-  it('keeps every event to at most 2 properties: the level id and small integers (Vercel Pro)', () => {
+  it('keeps every event to at most 2 properties: the level id, the run mode and small integers (Vercel Pro)', () => {
     const events = [
       analyticsEventFor(snap('levelSelect'), snap('playing')),
       analyticsEventFor(snap('playing'), snap('results', { score: 123.4 })),
@@ -63,7 +71,7 @@ describe('analyticsEventFor', () => {
       const values = Object.values(event!.props)
       expect(values.length).toBeLessThanOrEqual(2)
       for (const value of values) {
-        expect(typeof value === 'number' ? Number.isInteger(value) : value === 'level1').toBe(true)
+        expect(typeof value === 'number' ? Number.isInteger(value) : value === 'level1' || value === 'campaign').toBe(true)
       }
     }
   })
