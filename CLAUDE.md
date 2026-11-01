@@ -47,7 +47,7 @@ Headless browser in Claude cloud sessions: the Playwright CDN is blocked, so run
 `export SC_CHROME="$(scripts/ensure-browser.sh)"` once per session before `npm run smoke`.
 The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/sizes, errors)
-to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the fly-by camera must have turned ≥ 8° or moved ≥ 30 units;
+to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the 3D scene behind the title UI must not look blank, polled on a cold start; the fly-by camera must have turned ≥ 8° or moved ≥ 30 units;
 the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select; Tone.js's `tone-*.js` chunk must not be fetched before that press, and the press must load it and unlock audio), and per level `<id>.png` (after a ride of `--seconds` 10, longer until `--min-frames` 10 frames have rendered; it fails as a stalled render loop only if they haven't by 4× `--seconds`, and the summary line prints `frames=N in Xs`; the title waits the same way),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
@@ -107,8 +107,8 @@ daily mode, a second load must give the same `spawnDigest()`, the results must s
 (`daily-results.png`), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 `?e2e=1` skips the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1`: the countdown must show (`countdown.png`),
-a press during it must fire nothing (also when held on into `playing`), the timer must hold, a replay tap after 1 s skips to `playing`,
-and the shader warm-up must finish; after it, the first shot + kill must compile no new shader program
+a press during it must fire nothing (also when held on into `playing`), the timer must hold, a replay tap after 1 s (Ready held by `holdFeedback`) skips to `playing`,
+and the shader warm-up must finish (and leaving a level mid-warm-up must log no error); after it, the first shot + kill must compile no new shader program
 (`programs()`; the longest frame is reported). The step also prints the startup timings (`initTimings()`: boot, first title
 frame and PLAY from navigation; level mounted, env baked, warm-up done and first `playing` frame from the run's start) and writes
 them to `results.json` (`initTimings` on the `countdown` entry); no thresholds, software GL. A `speed` step holds the first level (or `--speed-level <id>`) at top speed on the most
