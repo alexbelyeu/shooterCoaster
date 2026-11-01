@@ -717,6 +717,38 @@ async function resultsEnterProblems(page, screen) {
   return []
 }
 
+/** The level timer running out mid-FRENZY (#195): holdFeedback keeps the slow-mo deep while one huge timerStep ends the run. */
+async function frenzyEndProblems(page, id) {
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [id, SEED])
+  await waitFrames(page, 2, { maxMs: 20000 })
+  await page.evaluate((count) => {
+    const s = window.__SC_TEST__
+    s.holdFeedback = true
+    s.primeCombo(count)
+  }, FRENZY_PRIME + 1)
+  const slowed = await page
+    .waitForFunction(() => window.__SC_TEST__.stats().timeScale < 0.5, null, { timeout: 20000, polling: 50 })
+    .then(() => true, () => false)
+  await page.evaluate(() => { window.__SC_TEST__.timerStep = 1e4 })
+  const ended = await page
+    .waitForFunction(() => window.__SC_TEST__.phase() === 'results', null, { timeout: 20000, polling: 50 })
+    .then(() => true, () => false)
+  await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    s.timerStep = null
+    s.holdFeedback = false
+  })
+  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  const after = await page.evaluate(() => ({ timeScale: window.__SC_TEST__.stats().timeScale, ducked: window.__SC_TEST__.audio().musicDucked }))
+  const result = { slowed, ended, ...after }
+  if (!slowed) return { result, problems: ['frenzy end: a primed 5× chain never slowed time'] }
+  if (!ended) return { result, problems: ['frenzy end: the level timer never ended the run'] }
+  const problems = []
+  if (after.timeScale !== 1) problems.push(`frenzy end: results screen at timeScale ${after.timeScale.toFixed(2)}, not 1`)
+  if (after.ducked) problems.push('frenzy end: music still ducked on the results screen')
+  return { result, problems }
+}
+
 /** The results-screen share link (#87, src/ui/share.ts). */
 const SHARE_URL = 'https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=results'
 
@@ -2673,6 +2705,8 @@ async function run() {
     if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
     const play = await playLevel(page, id, { frenzy: id === wanted[0] })
     problems.push(...play.problems)
+    const frenzyEnd = id === wanted[0] ? await frenzyEndProblems(page, id) : null
+    if (frenzyEnd) problems.push(...frenzyEnd.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
     const allErrors = [...errors, ...hookErrors]
     if (allErrors.length) problems.push(`${allErrors.length} error(s)`)
@@ -2681,7 +2715,7 @@ async function run() {
     delete stats.hookErrors
     results.push({
       id, ok, problems, frames, frameSeconds, seconds: (Date.now() - started) / 1000, spawnDigest, ...stats, perfGate,
-      kills: play.kills, score: play.score, combat: play.combat, results: play.results, image: img, enemies: enemyShot, errors: allErrors,
+      kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
   }

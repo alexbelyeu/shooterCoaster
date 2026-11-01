@@ -1,7 +1,7 @@
-import { useRef, useLayoutEffect } from 'react'
+import { useEffect, useRef, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
-import { resetComboRuntime, tickCombo } from '@/combat/comboRuntime'
+import { endFrenzy, resetComboRuntime, tickCombo } from '@/combat/comboRuntime'
 import { markStartup } from '@/core/startupMarks'
 import { isE2E } from '@/testing/e2eHook'
 
@@ -31,6 +31,11 @@ export default function GameTimer({ seconds }: GameTimerProps) {
     useGameStore.getState().setTimeRemaining(seconds)
   }, [runId, seconds])
 
+  // However the run reached results (timer, `endLevel`), the slow-mo must not follow it there.
+  useEffect(() => {
+    if (phase === 'results') endFrenzy()
+  }, [phase])
+
   useFrame((_, delta) => {
     // The rendered `phase` lags a store change by a render, so a pause from a DOM event (tab hide) is read live.
     const { phase: livePhase, timeScale, setTimeRemaining, setPhase } = useGameStore.getState()
@@ -50,7 +55,10 @@ export default function GameTimer({ seconds }: GameTimerProps) {
       setTimeRemaining(remaining)
     }
 
-    if (remaining <= 0) setPhase('results')
+    if (remaining <= 0) {
+      endFrenzy()
+      setPhase('results')
+    }
   })
 
   return null

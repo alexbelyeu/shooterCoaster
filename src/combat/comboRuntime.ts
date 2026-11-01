@@ -33,6 +33,14 @@ export function frenzyActive(): boolean {
   return written !== null
 }
 
+/** `tickCombo` runs only on playing frames, so a run that ends mid-frenzy must hand the time scale back here. */
+export function endFrenzy(): void {
+  if (written === null) return
+  const store = useGameStore.getState()
+  if (store.timeScale === written) store.setTimeScale(1)
+  written = null
+}
+
 export function tickCombo(delta: number): void {
   const store = useGameStore.getState()
 
