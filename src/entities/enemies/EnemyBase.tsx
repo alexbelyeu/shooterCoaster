@@ -5,11 +5,11 @@ import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { gameTime } from '@/core/gameClock'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
-import type { EnemyType, Formation } from '@/types/level'
+import type { EnemyType } from '@/types/level'
 import { registerE2EEnemy, unregisterE2EEnemy } from '@/testing/e2eHook'
 import { flashMesh, restoreMesh } from './hitFlash'
 import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE, type EnemyKilledEvent } from '@/combat/hitFeedback'
-import { entryPoint, type Vec3 } from '@/entities/spawning/spawnPlacement'
+import { entryPoint, type FormationMotion, type Vec3 } from '@/entities/spawning/spawnPlacement'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { DEATH_STYLES } from '@/effects/deathStyles'
 
@@ -22,9 +22,8 @@ export interface EnemyProps {
   onKill: (id: string) => void
   /** Fly in from `entry.from` to `spawnPosition` first. */
   entry?: EnemyEntry
-  /** XZ angle (`atan2(dz, dx)`) a formation moves on together. */
-  heading?: number
-  formation?: Formation
+  /** A formation member's motion after its entry. */
+  motion?: FormationMotion
 }
 
 export interface EnemyEntry {
