@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { VIEWMODEL_DEPTH_RANGE } from '@/core/cameraLayers'
+import { WEAPONS } from './weapons/weaponTypes'
 
 // Model space: barrel along -Z, receiver centre at the origin, ~1.4 units long.
 export const TIP = new THREE.Vector3(0, 0, -0.93)
@@ -71,8 +73,8 @@ export function createWeaponMaterial(): THREE.MeshStandardMaterial {
     shader.vertexShader = shader.vertexShader.replace(
       '#include <project_vertex>',
       `#include <project_vertex>
-      // Front 2% of the depth range: draws over the world, still self-occludes.
-      gl_Position.z = (gl_Position.z + gl_Position.w) * 0.02 - gl_Position.w;`,
+      // Front of the depth range: draws over the world, still self-occludes.
+      gl_Position.z = (gl_Position.z + gl_Position.w) * ${VIEWMODEL_DEPTH_RANGE.toFixed(3)} - gl_Position.w;`,
     )
   }
   mat.customProgramCacheKey = () => 'sc-weapon-viewmodel-v1'
@@ -103,6 +105,7 @@ const tracerVertex = /* glsl */ `
 const tracerFragment = /* glsl */ `
   uniform float uTime;        // 0 → 1 over the tracer's life
   uniform float uDepthRatio;  // start depth / end depth
+  uniform vec3 uColor;        // the weapon's streak colour, weapons/weaponTypes.ts
   varying vec2 vUv;
   void main() {
     float zRel = mix(1.0, 1.0 / uDepthRatio, vUv.x);          // z / zStart
@@ -112,7 +115,7 @@ const tracerFragment = /* glsl */ `
     float along = smoothstep(tail, head, s) * (1.0 - smoothstep(head, head + 0.04, s));
     float across = 1.0 - pow(abs(vUv.y * 2.0 - 1.0), 2.0);
     float a = along * across * (1.0 - uTime * 0.6);
-    vec3 col = mix(vec3(1.0, 0.55, 0.15), vec3(1.0, 0.95, 0.75), along);
+    vec3 col = mix(uColor, mix(uColor, vec3(1.0), 0.75), along);
     gl_FragColor = vec4(col * a * 1.6, a);
   }
 `
@@ -121,7 +124,7 @@ export function createTracerMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexShader: tracerVertex,
     fragmentShader: tracerFragment,
-    uniforms: { uTime: { value: 0 }, uDepthRatio: { value: 0.02 } },
+    uniforms: { uTime: { value: 0 }, uDepthRatio: { value: 0.02 }, uColor: { value: new THREE.Color(...WEAPONS.blaster.tracerColor) } },
     transparent: true,
     blending: THREE.AdditiveBlending,
     depthWrite: false,

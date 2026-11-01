@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
 import type { ScoreEntry } from '@/types/game'
+import { dailyLevel } from '@/levels/daily'
 import {
+  buildDailyCard,
   buildLevelCards,
   initialFocusIndex,
   navigateCards,
@@ -11,9 +13,9 @@ import {
 } from './levelSelectModel'
 
 const levels: LevelSelectSource[] = [
-  { id: 'a', name: 'Alpha', description: '', biome: 'themePark', maxScore: 1000, nextLevel: 'b' },
-  { id: 'b', name: 'Bravo', description: '', biome: 'desert', maxScore: 2000, nextLevel: 'c' },
-  { id: 'c', name: 'Charlie', description: '', biome: 'ocean', maxScore: 3000, nextLevel: null },
+  { id: 'a', name: 'Alpha', description: '', biome: 'themePark', nextLevel: 'b' },
+  { id: 'b', name: 'Bravo', description: '', biome: 'desert', nextLevel: 'c' },
+  { id: 'c', name: 'Charlie', description: '', biome: 'ocean', nextLevel: null },
 ]
 
 const entry = (level: string, score: number, stars: number): ScoreEntry => ({
@@ -46,6 +48,12 @@ describe('buildLevelCards', () => {
     const cards = buildLevelCards(all, {}, (id) => id === all[0].id)
     expect(totalStars(cards)).toEqual({ earned: 0, max: all.length * 3 })
     expect(cards.slice(1).every((c) => c.unlockedBy !== null)).toBe(true)
+  })
+
+  it('a locked card names the level the unlock rule waits on (previousLevel)', () => {
+    const all = getAllLevels()
+    const cards = buildLevelCards(all, {}, (id) => id === all[0].id)
+    for (const c of cards.slice(1)) expect(c.unlockedBy, c.id).toBe(getLevelConfig(previousLevel(c.id)!)!.name)
   })
 })
 
@@ -86,5 +94,22 @@ describe('navigateCards', () => {
     const row = [rect(0, 0), rect(110, 0)]
     expect(navigateCards(row, 0, 'ArrowDown')).toBe(0)
     expect(navigateCards([], 0, 'ArrowRight')).toBe(0)
+  })
+})
+
+describe('buildDailyCard', () => {
+  const all = getAllLevels()
+  const now = new Date('2026-10-31T15:00:00Z')
+
+  it("shows today's level, today's best and a live streak", () => {
+    const card = buildDailyCard(now, all, { '2026-10-31': entry('level1', 1234, 2) }, { count: 3, lastKey: '2026-10-30' })
+    expect(card).toMatchObject({ dateKey: '2026-10-31', levelId: dailyLevel('2026-10-31'), bestScore: 1234, streak: 3 })
+    expect(card.levelName).toBe(all.find((l) => l.id === card.levelId)!.name)
+  })
+
+  it('reads 0 for a best from another day and for a broken streak', () => {
+    const card = buildDailyCard(now, all, { '2026-10-30': entry('level1', 99, 1) }, { count: 5, lastKey: '2026-10-28' })
+    expect(card.bestScore).toBe(0)
+    expect(card.streak).toBe(0)
   })
 })

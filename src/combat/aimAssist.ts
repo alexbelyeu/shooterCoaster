@@ -13,6 +13,8 @@ import type { PointerKind } from '@/input/pointerInput'
 export const TOUCH_ASSIST_RADIUS_PX = 44
 /** Hit-radius multiplier for bullets fired by touch (1 = exact). */
 export const TOUCH_HIT_SCALE = 1.25
+/** Weapon pickups snap from a shorter reach and lose a tie to an enemy (#185). */
+export const PICKUP_ASSIST_WEIGHT = 0.6
 
 /** Snap radius (CSS px) for a pointer kind; 0 = no assist. */
 export function assistRadiusPx(kind: PointerKind): number {
@@ -25,8 +27,8 @@ export function hitScaleFor(kind: PointerKind): number {
 }
 
 /**
- * Index of the candidate screen point nearest to (px, py) within `radiusPx`,
- * or -1 if none is that close. `xs` / `ys` hold `count` candidate points.
+ * Index of the candidate screen point nearest to (px, py) within `radiusPx`, or -1.
+ * `weights` (default 1) scale each candidate's reach.
  */
 export function pickAssistTarget(
   px: number,
@@ -35,6 +37,7 @@ export function pickAssistTarget(
   ys: ArrayLike<number>,
   count: number,
   radiusPx: number,
+  weights?: ArrayLike<number>,
 ): number {
   if (!(radiusPx > 0)) return -1
   let best = -1
@@ -42,7 +45,8 @@ export function pickAssistTarget(
   for (let i = 0; i < count; i++) {
     const dx = xs[i] - px
     const dy = ys[i] - py
-    const d = dx * dx + dy * dy
+    const w = weights ? weights[i] : 1
+    const d = (dx * dx + dy * dy) / (w * w)
     if (d <= bestSq) {
       bestSq = d
       best = i

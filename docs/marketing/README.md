@@ -11,8 +11,9 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   Plus add-on` (read 2026-10-26), so `utm_*` parameters on our links are invisible to us.
   Campaign attribution uses the **referrer hostname** and the **request path**: every link we
   hand out points at a campaign landing path `https://scoaster.com/go/<campaign>` (the
-  `vercel.json` catch-all rewrite serves the game at any path and the page view records it as
-  `requestPath`; verified locally 2026-10-26, pinned by a smoke step in #171). One campaign
+  `vercel.json` `/go/(.*)` rewrite serves the game there and the page view records it as
+  `requestPath`; verified locally 2026-10-26, pinned by a smoke step in #171. Any other unknown
+  path is a real 404 since #193, so campaign links must start with `/go/`). One campaign
   name per post or placement: `showcase`, `webgames`, `playmygame`, `share` (the results-screen
   share button, #87), `crazygames` … Keep the `utm_*` parameters on the
   links anyway: they cost nothing and other tools read them. Test traffic (`?e2e=1`) and
@@ -21,7 +22,7 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
 
   | Event | Properties | Sent when |
   |---|---|---|
-  | `level_start` | `level` (`level1`…) | A run begins: from level select, Replay or Next Level. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start |
+  | `level_start` | `level` (`level1`…), `mode` (`campaign` / `daily`, from 2026-10-31; earlier starts have none) | A run begins: from level select (a level card, or the Daily card: `mode` `daily`), Replay or Next Level. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start |
   | `level_complete` | `level`, `stars` (0–3) | The timer runs out and the results screen opens |
   | `level_quit` | `level`, `progress_pct` (0, 10 … 100: share of the level timer used) | Quit to Menu from the pause screen |
   | `share` | `level`, `stars` (0–3) | The results-screen Share button opened the share sheet and the player picked a target, or copied the line to the clipboard (a dismissed sheet sends nothing). Rare and player-initiated, so it sits outside the ≤ 2 per run count |
@@ -66,4 +67,5 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
 | `STRATEGY.md` | Positioning, audience, channel ranking, launch stage, experiment queue |
 | `BUDGET.md` | Monthly cap, proposed / approved / spent ledger |
 | `CHANNELS.md` | Every post or campaign and what it did to traffic |
+| `SEO.md` | Search + link-preview checklist with sources, the Lighthouse gate and its baseline |
 | `metrics/<YYYY>-W<ww>.md` | Weekly numbers from Vercel Web Analytics |

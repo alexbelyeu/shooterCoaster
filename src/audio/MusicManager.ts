@@ -1,6 +1,7 @@
-import * as Tone from 'tone'
+import type * as Tone from 'tone'
+import { tone } from './tone'
 import { nextTriggerTime } from './triggerTime'
-import { dropSound } from './soundGuard'
+import { guarded } from './soundGuard'
 import { isAudioReady } from './AudioEngine'
 import { fadeOutMusicBus, openMusicBus, startTransportAt, type MusicBus } from './musicBus'
 import type { BiomeType } from '@/types/level'
@@ -146,9 +147,9 @@ let bus: MusicBus | null = null
 let currentIntensity = 0
 let isPlaying = false
 
-function fadeOutMusicState() {
+function fadeOutMusicState(untilNextTrack: boolean) {
   const nodes = [padLoop, bassLoop, percLoop, leadLoop, padSynth, bassSynth, percSynth, leadSynth]
-  if (bus) fadeOutMusicBus(bus, nodes.filter((n) => n !== null))
+  if (bus) fadeOutMusicBus(bus, nodes.filter((n) => n !== null), untilNextTrack)
   bus = null
   padLoop = bassLoop = percLoop = leadLoop = null
   padSynth = bassSynth = percSynth = leadSynth = null
@@ -159,25 +160,26 @@ function fadeOutMusicState() {
 // ── Instrument setup ───────────────────────────────────────────
 
 function createInstruments(out: Tone.Gain) {
-  const pad = new Tone.PolySynth(Tone.Synth, {
+  const { NoiseSynth, PolySynth, Synth } = tone()
+  const pad = new PolySynth(Synth, {
     oscillator: { type: 'sine' },
     envelope: { attack: 1.0, decay: 0.5, sustain: 0.6, release: 2.0 },
     volume: -24,
   }).connect(out)
 
-  const bass = new Tone.Synth({
+  const bass = new Synth({
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.03, decay: 0.2, sustain: 0.25, release: 0.3 },
     volume: -22,
   }).connect(out)
 
-  const perc = new Tone.NoiseSynth({
+  const perc = new NoiseSynth({
     noise: { type: 'white' },
     envelope: { attack: 0.001, decay: 0.04, sustain: 0 },
     volume: -30,
   }).connect(out)
 
-  const lead = new Tone.Synth({
+  const lead = new Synth({
     oscillator: { type: 'sine' },
     envelope: { attack: 0.01, decay: 0.25, sustain: 0.05, release: 0.4 },
     volume: -26,
@@ -190,58 +192,48 @@ function createInstruments(out: Tone.Gain) {
 
 export function startMusic(biome: BiomeType = 'themePark'): void {
   if (!isAudioReady() || isPlaying) return
+  const { Sequence } = tone()
 
   const cfg = CONFIGS[biome]
-  bus = openMusicBus('level')
+  const start = startTransportAt(cfg.tempo)
+  bus = openMusicBus('level', start.time)
   // The loops play these locals, not the module slots: a track fading out keeps its synths after a stop clears them.
   const { pad, bass, perc, lead } = createInstruments(bus.gain)
   padSynth = pad
   bassSynth = bass
   percSynth = perc
   leadSynth = lead
-  const at = `${startTransportAt(cfg.tempo)}i`
+  const at = `${start.ticks}i`
 
-  padLoop = new Tone.Sequence(
-    (time, chord) => {
+  padLoop = new Sequence(
+    guarded('music pad', (time, chord) => {
       if (!chord) return
-      try {
-        pad.triggerAttackRelease(chord, '1n', nextTriggerTime(pad, time, Tone.getContext().currentTime), 0.3)
-      } catch (e) {
-        dropSound('music pad', e)
-      }
-    },
+      pad.triggerAttackRelease(chord, '1n', nextTriggerTime(pad, time, tone().getContext().currentTime), 0.3)
+    }),
     cfg.padChords,
     '1n',
   )
   padLoop.loop = true
   padLoop.start(at)
 
-  bassLoop = new Tone.Sequence(
-    (time, note) => {
+  bassLoop = new Sequence(
+    guarded('music bass', (time, note) => {
       if (currentIntensity < 0.2) return
       if (!note) return
-      try {
-        bass.triggerAttackRelease(note, '8n', nextTriggerTime(bass, time, Tone.getContext().currentTime))
-      } catch (e) {
-        dropSound('music bass', e)
-      }
-    },
+      bass.triggerAttackRelease(note, '8n', nextTriggerTime(bass, time, tone().getContext().currentTime))
+    }),
     cfg.bassNotes,
     '8n',
   )
   bassLoop.loop = true
   bassLoop.start(at)
 
-  leadLoop = new Tone.Sequence(
-    (time, note) => {
+  leadLoop = new Sequence(
+    guarded('music lead', (time, note) => {
       if (currentIntensity < 0.5) return
       if (!note) return
-      try {
-        lead.triggerAttackRelease(note, '8n', nextTriggerTime(lead, time, Tone.getContext().currentTime), 0.5)
-      } catch (e) {
-        dropSound('music lead', e)
-      }
-    },
+      lead.triggerAttackRelease(note, '8n', nextTriggerTime(lead, time, tone().getContext().currentTime), 0.5)
+    }),
     cfg.leadNotes,
     '8n',
   )
@@ -250,16 +242,12 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
 
   if (cfg.hasPerc) {
     const percPattern = cfg.bassNotes.map((_, i) => (i % 2 === 1 ? 1 : null))
-    percLoop = new Tone.Sequence(
-      (time, hit) => {
+    percLoop = new Sequence(
+      guarded('music perc', (time, hit) => {
         if (currentIntensity < 0.3) return
         if (!hit) return
-        try {
-          perc.triggerAttackRelease('32n', nextTriggerTime(perc, time, Tone.getContext().currentTime))
-        } catch (e) {
-          dropSound('music perc', e)
-        }
-      },
+        perc.triggerAttackRelease('32n', nextTriggerTime(perc, time, tone().getContext().currentTime))
+      }),
       percPattern,
       '8n',
     )
@@ -270,9 +258,10 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   isPlaying = true
 }
 
-export function stopMusic(): void {
+/** `untilNextTrack`: play on until the next track opens and fade under it (`fadeOutMusicBus`). */
+export function stopMusic(untilNextTrack = false): void {
   if (!isPlaying) return
-  fadeOutMusicState()
+  fadeOutMusicState(untilNextTrack)
 }
 
 export function setMusicIntensity(intensity: number): void {
@@ -287,7 +276,8 @@ export function musicLoop(biome: BiomeType): { barS: number; bars: number } {
   return { barS: (4 * 60) / cfg.tempo, bars: cfg.padChords.length }
 }
 
-export function getMusicIntensity(): number {
-  return currentIntensity
+/** The loop's first pad chord: its root is the biome's key, which the wave stinger resolves to (`sfxDesign.test.ts`). */
+export function openingChord(biome: BiomeType): readonly string[] {
+  return CONFIGS[biome].padChords[0] ?? []
 }
 

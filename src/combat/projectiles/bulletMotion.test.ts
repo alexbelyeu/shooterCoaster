@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { BULLET_SPEED_PER_SEC, MAX_BULLET_STEP_SEC, segmentHitsSphere, stepBullet } from './bulletMotion'
+import {
+  BULLET_SPEED_PER_SEC, MAX_BULLET_STEP_SEC, hasHit, recordHit, resetPierce, segmentHitsSphere, stepBullet, type PierceState,
+} from './bulletMotion'
 
 /** Simulate `seconds` of flight at a fixed frame rate; return the distance covered. */
 function flyFor(seconds: number, fps: number): number {
@@ -54,5 +56,40 @@ describe('segmentHitsSphere', () => {
   it('degenerates to a point test for a zero-length segment', () => {
     expect(segmentHitsSphere(1, 2, 3, 1, 2, 3, 1, 2, 5, 9)).toBe(true)
     expect(segmentHitsSphere(1, 2, 3, 1, 2, 3, 1, 2, 7, 9)).toBe(false)
+  })
+})
+
+describe('piercing', () => {
+  const bullet = (): PierceState<string> => ({ pierce: 1, hitCount: 0, hitTargets: [null, null, null] })
+
+  it('a normal bullet is spent on its first hit', () => {
+    const b = bullet()
+    resetPierce(b, 1)
+    expect(recordHit(b, 'a')).toBe(true)
+  })
+
+  it('a piercing bullet hits 3 distinct targets, never the same one twice', () => {
+    const b = bullet()
+    resetPierce(b, 3)
+    expect(recordHit(b, 'a')).toBe(false)
+    expect(hasHit(b, 'a')).toBe(true)
+    expect(hasHit(b, 'b')).toBe(false)
+    expect(recordHit(b, 'b')).toBe(false)
+    expect(recordHit(b, 'c')).toBe(true)
+  })
+
+  it('a reused bullet forgets its old targets', () => {
+    const b = bullet()
+    resetPierce(b, 3)
+    recordHit(b, 'a')
+    resetPierce(b, 1)
+    expect(hasHit(b, 'a')).toBe(false)
+    expect(b.hitTargets).toEqual([null, null, null])
+  })
+
+  it('never pierces more than the hit list holds', () => {
+    const b = bullet()
+    resetPierce(b, 9)
+    expect(b.pierce).toBe(3)
   })
 })

@@ -3,6 +3,7 @@ import { useGameStore } from './useGameStore'
 import { advanceGameTime, resetGameTime } from '@/core/gameClock'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import type { ScoreEntry } from '@/types/game'
+import { dailySeed } from '@/levels/daily'
 
 // Node has no window/localStorage. zustand's persist reads `window.localStorage`
 // when the store is created, so install a tiny in-memory Storage on a bare
@@ -178,6 +179,57 @@ describe('startRun', () => {
   })
 })
 
+describe('daily runs', () => {
+  const daily = { mode: 'daily', dateKey: '2026-10-31' } as const
+
+  it('seeds a daily run from its date, and ?seed= still overrides it', () => {
+    store().startRun('level2', undefined, daily)
+    expect(store().runSeed).toBe(dailySeed('2026-10-31'))
+    expect(store().runMode).toEqual(daily)
+    const w = globalThis.window as unknown as { location?: { search: string } }
+    w.location = { search: '?seed=777' }
+    try {
+      store().startRun('level2', undefined, daily)
+      expect(store().runSeed).toBe(777)
+    } finally {
+      delete w.location
+    }
+  })
+
+  it('a plain startRun is a campaign run', () => {
+    store().startRun('level2', undefined, daily)
+    store().startRun('level1', 3)
+    expect(store().runMode).toEqual({ mode: 'campaign' })
+  })
+
+  it('restartRun keeps a daily run and its seed, and reseeds a campaign run', () => {
+    store().startRun('level3', 99, daily)
+    store().restartRun()
+    expect(store()).toMatchObject({ currentLevel: 'level3', runSeed: 99, runMode: daily })
+    vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    store().startRun('level1', 5)
+    store().restartRun()
+    expect(store()).toMatchObject({ currentLevel: 'level1', runSeed: 1_000, runMode: { mode: 'campaign' } })
+  })
+
+  it('saves the day best and the streak without touching campaign scores or unlocks', () => {
+    store().saveDailyScore(entry('level2', 500, 2), '2026-10-30')
+    store().saveDailyScore(entry('level2', 300, 1), '2026-10-31')
+    store().saveDailyScore(entry('level2', 200, 1), '2026-10-31')
+    expect(store().savedDaily['2026-10-31'].score).toBe(300)
+    expect(store().savedDaily['2026-10-30'].score).toBe(500)
+    expect(store().dailyStreak).toEqual({ count: 2, lastKey: '2026-10-31' })
+    expect(store().savedScores).toEqual({})
+    expect(store().isLevelUnlocked('level3')).toBe(false)
+  })
+
+  it('drops daily bests older than 30 days', () => {
+    store().saveDailyScore(entry('level1', 1, 0), '2026-09-01')
+    store().saveDailyScore(entry('level1', 1, 0), '2026-10-31')
+    expect(Object.keys(store().savedDaily)).toEqual(['2026-10-31'])
+  })
+})
+
 describe('pause and resume', () => {
   it('resume starts the resume countdown only while paused; GO (setPhase) ends it', () => {
     store().setPhase('playing')
@@ -238,11 +290,11 @@ describe('saveScore', () => {
     expect(store().savedScores.level1).toMatchObject({ score: 500, bestCombo: 3 })
   })
 
-  it('persists only savedScores (not score, combo or phase)', () => {
+  it('persists only saved scores and the daily record (not score, combo or phase)', () => {
     store().addScore(42)
     store().saveScore(entry('level1', 500, 1))
     const persisted = JSON.parse(memoryStorage.getItem('shootercoaster-scores')!)
-    expect(Object.keys(persisted.state)).toEqual(['savedScores'])
+    expect(Object.keys(persisted.state)).toEqual(['savedScores', 'savedDaily', 'dailyStreak'])
     expect(persisted.state.savedScores.level1.score).toBe(500)
   })
 
@@ -259,6 +311,10 @@ describe('isLevelUnlocked', () => {
   it('only level1 is unlocked on a fresh save', () => {
     expect(store().isLevelUnlocked('level1')).toBe(true)
     for (const l of levels.slice(1)) expect(store().isLevelUnlocked(l.id), l.id).toBe(false)
+  })
+
+  it('an unknown level id is never unlocked', () => {
+    expect(store().isLevelUnlocked('level99')).toBe(false)
   })
 
   it('a 0-star result does not unlock the next level', () => {

@@ -17,7 +17,7 @@
 
 **Actions:**
 
-- **Production build:** Disable or strip source maps for production (`build.sourcemap: false` in Vite), or host source maps separately and load only when needed.
+- **Production build:** Done: `vite.config.ts` sets `build.sourcemap: false`, so `dist/` ships no `.map` files and no inline maps (checked 2026-10-31, #187). The base64 maps in this snapshot are the dev server's.
 - **Dev:** If the snapshot was taken in dev, expect lower memory in production; still consider excluding heavy extensions when profiling.
 
 ---

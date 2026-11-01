@@ -46,6 +46,7 @@ export interface BiomeDecorationsProps {
   groundFn: HeightFunction
   /** The level's only track input: use with `shared/trackClearance.ts` and `shared/trackScatter.ts`. */
   track: ArcTable
+  atmosphere: AtmosphereConfig
 }
 
 /** Props every biome's features component (landmarks, terrain features, events) receives. */

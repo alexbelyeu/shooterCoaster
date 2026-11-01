@@ -947,3 +947,148 @@ listens weekly and picks the first theme for each level in a `Listen:` issue.
 #168, and the Tone lazy-load half of #187). Audio PRs commit small MP3 renders to
 `docs/audio/renders/` (overwritten in place). The Maintainer unblocks `Waiting on #<n>`
 issues once what they wait on is closed.
+
+## 2026-10-30 — Audio is checked by rendering the game's own code offline (Sound designer, #213)
+
+**Context:** No agent can hear. The toolkit has to render what the game really plays, deterministically and
+faster than real time, without depending on software GL's ~1 fps.
+**Decision:** `src/audio/offlineRender.ts` swaps Tone's global context for an offline one for the length of a
+render and builds a fresh master chain in it (`AudioEngine.swapInOfflineChain`; the channels are live
+bindings), so the unchanged music and SFX managers play into it. The offline context keeps Tone's live 0.1 s
+look-ahead, so loop callbacks schedule notes exactly as in the game, and `Math.random` is seeded for the
+render. SFX throttles now run on the audio clock (`Tone.now()`), not `performance.now()`, since an offline
+render runs its whole timeline in one JS turn. A render only runs on the title screen before audio unlocks.
+Loop seams are judged against the closest bar line inside the loop, not as a raw level jump: music swells on
+every downbeat. Mix targets are mirrored in `scripts/audio/metrics.mjs`.
+**Consequences:** Capturing real-time output is not needed. Anything that adds a module-level Tone node outside
+`createMasterChain` would not follow the swap. The future score engine plugs in as one more render kind
+(`RENDERS` in `src/testing/audioRender.ts`).
+
+## 2026-10-30 — The score engine runs on Tone's context, in its own stereo channel, loaded only under ?audio=scrim (Sound designer, #214)
+
+**Context:** The Scrimshaw port has to run beside Tone.js until it reaches parity (hard rule 7), share the
+game's ducking, volume and limiter, and leave default players' sound and bundle untouched.
+**Decision:** `src/audio/scrim/` creates its Web Audio nodes on Tone's raw context (standardized-audio-context's,
+so they connect to Tone nodes) and plays into `AudioEngine.scoreChannel`, a second music channel built with
+`channelCount: 2`: Tone's channels fold their input to mono, which would flatten the scores' panning. It is
+silent and unused without the flag (renders of the default sound match the baseline to −142 dB). The engine
+and the scores are one lazy chunk (`musicEngine.withScrim`), so `?audio=scrim` costs default players nothing.
+The `game` voicing (`GAME_VOICING` in `synth.ts`: 32 Hz high-pass, −6 dB limiter, out 0.53) sets scores to
+−18…−16 LUFS through that channel; the port's `jukebox` voicing stays the original's, for parity renders.
+Unlike the Tone.js music, a score holds its position while the run is paused and resumes there, and the results
+screen gets its own score.
+**Consequences:** When the score engine becomes the default, `musicChannel` and the Tone music managers can go;
+`scoreChannel` stays. Offline renders seed `Math.random` the same way for the original page and the port, so a
+parity render of the same score is near bit-identical; any change to the port's call order of `Math.random`
+shows up there.
+
+## 2026-10-30 — Death effects: one pool, styles as data, shared meshes (Builder, #29)
+
+**Context:** Every enemy died in the same random-coloured fireball. Each type needs its own
+death (confetti, feathers, splash, shards, motes…), and the boss framework reuses the pool
+for weak points.
+
+**Decision:** `ParticleExplosion` stays the one pooled effect, with `explode(position, style)`.
+A `DeathStyle` (layers of shape / colours / speed / drag / gravity / size / spin, plus
+lifetime, scale, lift, flash, kill timbre) per `EnemyType` lives in pure `effects/deathStyles.ts`.
+All 8 slots share two InstancedMeshes (unlit boxes for every glow / flat shape via per-instance
+stretch, and lit dodecahedra for chunks), with per-instance colour, instead of meshes per slot:
+2 draw calls instead of the old 10. Ages run on game time (frenzy slow-mo slows a death; pause
+holds it) and `holdFeedback` stops them at `HOLD_LIFE` so combat screenshots show the style.
+Kill timbre per family (pop / flutter / crunch / splash / hiss) reshapes the existing snap +
+ping voices (`KILL_TIMBRES`), so no new Tone nodes.
+
+**Consequences:** A new enemy type needs a `DEATH_STYLES` entry (the `Record` enforces it; the
+unit test checks it fits a slot and differs from the other types in its level). New effect
+looks are new data, not new components. Particle fade is a size shrink (one shared opaque
+material per mesh), so no per-particle opacity.
+
+## 2026-10-30 — Graphics quality presets and one-way adaptive resolution (builder, #35)
+
+**Context:** Weak GPUs and phones needed a way down; the issue asked for a quality setting, an automatic dpr scaler and an in-game Reduced motion toggle.
+**Decision:** `quality: 'auto' | 'low' | 'medium' | 'high'`, default `auto`, which renders like `high`. The presets live in pure `src/canvas/graphicsQuality.ts` (dpr cap, MSAA, Bloom, particle scale, contact shadows), and consumers read them with `useQualityProfile()`. Only `auto` adapts. It times frames in `playing` only (the countdown's shader warm-up and pauses are left out). After 2 s of a smoothed frame time over 24 ms it scales the pixel budget by 0.7, at most 4 times. It never steps back up within a page load, so the resolution never flips back and forth, and it is off under `?e2e=1` so the smoke's dpr checks stay fixed. An explicit preset turns adaptation off. The Reduced motion setting is ORed with the OS query inside `prefersReducedMotion()`, so every existing consumer follows it, and `html.reduce-motion` mirrors the CSS `prefers-reduced-motion` rules.
+**Consequences:** A new pixel-heavy effect should read `useQualityProfile()` and add a field to the presets instead of checking the quality name. Code that needs the OS-only value uses `systemPrefersReducedMotion()`.
+
+## 2026-10-30 — Pause freezes the world; runs reset on `runId`; resume stays `paused` until GO (Builder, #36)
+
+**Context:** Only the level timer stopped while paused: the coaster kept riding, bobbing enemies jumped
+(they read the render clock), and Restart from the pause menu under `?e2e=1` (`paused` → `playing`) looked
+like a resume to `GameTimer` / `EnemySpawner`, which reset on phase transitions.
+
+**Decision:**
+- Gameplay systems keep gating on `phase === 'playing'` (they already did); the coaster camera additionally
+  holds at `effectiveDelta = 0` while `paused`. Enemy `updatePosition` gets game time (`gameTime()`, playing
+  frames × `timeScale`) instead of `clock.elapsedTime`. Ambient scenery (water, trees, sky, particles) keeps
+  wall time on purpose, so the frozen scene behind the menu still breathes.
+- A run starts when `startRun` bumps `runId`, not on a phase change. `GameTimer`, `EnemySpawner` and
+  `CoasterCamera` reset on it; wave 1 is announced on the run's first `playing`.
+- Resume is a store flag, not a phase: `resume()` sets `resuming` while the phase stays `paused`, so
+  everything stays frozen through the ~1.2 s Ready / GO and no gate needs a new phase; `Countdown` sets
+  `playing` on GO. Any `setPhase` clears `resuming`, so a tab hide or Esc during it pauses again.
+- Pause mix: dedicated gain stages after the music duck and on the SFX bus (`setPauseMix`), driven from a store
+  subscription (a hidden tab gets no frames): music −12 dB with the slow-mo low-pass, SFX silent.
+
+**Consequences:** New gameplay code that moves things must gate on `playing` (or use game time) to respect
+pause. Code that resets per run should key on `runId`.
+
+## 2026-10-31 — Arcade SFX are baked into AudioBuffers per level and played on a fixed voice pool (Sound designer, #217)
+
+**Context:** The Tone.js kit reuses one synth per sound, so overlapping shots and kills cut each other off, every
+trigger needs `nextTriggerTime` to dodge Tone's "start time must be greater" error, and "never create Tone nodes in
+a play function" keeps it to a handful of voices. The new SFX (behind `?audio=scrim`, beside the Tone kit until
+parity, hard rule 7) should be arcade-loud, layered and positional.
+**Decision:** `src/audio/arcade/` renders every one-shot once per level (`bake.ts`: one OfflineAudioContext, the
+score engine's instruments and helpers, the level score's key and tempo) into mono AudioBuffers, and plays each as a
+fresh AudioBufferSourceNode on one of `VOICE_BUDGET` (24) pre-built voices (gain → low-pass → pan, send to a
+per-biome convolver). The source node is the only thing created per sound; it is single-use by design, so there is
+no start-time collision to guard. A full pool steals its lowest-priority, oldest voice with a 4 ms fade, or drops a
+sound ranked below everything playing (`pickVoice`). For this engine that replaces the "no Tone nodes in a play
+function" rule: long-lived node count is fixed (`4 × (24 + 1) + 4`), checked by the smoke under `audioBurst(64, 32)`.
+Under the flag the master limiter is a hard-knee compressor (−3 dB, ratio 20, its make-up gain trimmed back), because
+Tone's Limiter has a 30 dB soft knee that let kills loud enough to sit 6 dB over the music clip; the default
+(Tone.js) sound keeps the old limiter and renders match `main` to −147 dB.
+**Consequences:** Changing a sound means changing its recipe or `ARCADE_SOUNDS` and re-rendering
+`scrim-sfx-sheet-level1`; a level costs one bake (~25 s of mono audio, a few MB) while its countdown runs. When the
+arcade engine becomes the default, `SFXManager` and the soft limiter can go.
+
+## 2026-10-31 — Biome particles are a BiomeDefinition field; a boost fades extra points, never re-layers them (Builder, #37)
+
+**Context:** `ParticleField` was mounted by hand in the volcanic `Features.tsx`, and its eruption boost raised the secondary layer's share, so points switched layer and velocity mid-flight and teleported (#95).
+**Decision:** Every biome sets `BiomeDefinition.particles` to a preset in the pure `shared/particlePresets.ts` (bounds unit-tested so no field reads as noise); `BiomeEnvironment` renders it. A point's layer is fixed by its seed. A preset `boost` adds a separate set of secondary points (seed `aRand` in [1, 2)) that are clipped away until its bus event, then fade in over `riseS`, hold, and fade out; a repeat event restarts the rise from the current strength. Touch screens draw half the points (until a quality setting lands, #35). The always-on seeds come first from the same LCG, so the volcanic field's normal look is unchanged.
+**Consequences:** No biome code mounts particles itself; a new biome adds a preset. Don't drive a boost by changing `uSecondaryShare` or any per-point layer input at runtime: that brings the teleport back.
+
+## 2026-10-31 — Results Share links land on /go/share and send a `share` event (builder, #87)
+
+**Context:** #87 asked for `https://scoaster.com/?utm_source=share&…`, but UTM dimensions are
+paywalled on Vercel Pro (docs/marketing/README.md), so a root link with only `utm_*` would be
+unattributable. The README already reserves the campaign landing path `/go/share` for this button.
+The Marketer's rule keeps custom events at ≤ 2 per run.
+
+**Decision:** The shared link is `https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=results`
+(path for Vercel, UTM kept for other tools), built in `src/ui/share.ts`. A completed share or copy
+(not a dismissed sheet) sends one `share` event (`level`, `stars`) through the `results:shared` bus
+event, which only `main.tsx` turns into `track()` behind the analytics gate. It is player-initiated
+and rare, so it is outside the ≤ 2 per run count.
+
+**Consequences:** Changing the link or the copy is a one-file edit to `share.ts`; the smoke pins the
+URL (`SHARE_URL` in `e2e/smoke.mjs`) and the text format, so update both together.
+
+## 2026-10-31 — Self-hosted OFL fonts; portal build (builder, #88)
+
+**Context:** The portal zip (itch.io, Newgrounds, CrazyGames) may not call other origins,
+and `global.css` loaded Lobster + Inter from Google Fonts (the 2026-10-19 decision that
+accepted that call named self-hosting as the way out). ASSETS.md allows only our own or CC0
+assets without a decision.
+
+**Decision:** Vendor the latin-subset woff2 files of Lobster and Inter (SIL OFL 1.1, which
+allows bundling and redistribution with the licence) in `public/fonts/` beside their licence
+texts, and use them in **every** build, not only the portal one. Both builds then make no
+third-party request at runtime; this supersedes the 2026-10-19 Google Fonts exception. OFL
+fonts are an accepted exception to the CC0-only asset rule; any other font still needs its
+own entry. The portal build is `vite build --mode portal` (`base: './'`, no analytics, no
+share-card tags); the normal build keeps `base: '/'`.
+
+**Consequences:** ~80 KB of fonts come from our origin instead of Google's. Characters
+outside the latin subset fall back to system fonts, as before for anything our English text
+uses. The smoke fails if either face does not load, or on any request that leaves the
+page's origin in a local run.

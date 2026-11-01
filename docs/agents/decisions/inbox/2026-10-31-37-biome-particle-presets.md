@@ -1,5 +1,0 @@
-## 2026-10-31 — Biome particles are a BiomeDefinition field; a boost fades extra points, never re-layers them (Builder, #37)
-
-**Context:** `ParticleField` was mounted by hand in the volcanic `Features.tsx`, and its eruption boost raised the secondary layer's share, so points switched layer and velocity mid-flight and teleported (#95).
-**Decision:** Every biome sets `BiomeDefinition.particles` to a preset in the pure `shared/particlePresets.ts` (bounds unit-tested so no field reads as noise); `BiomeEnvironment` renders it. A point's layer is fixed by its seed. A preset `boost` adds a separate set of secondary points (seed `aRand` in [1, 2)) that are clipped away until its bus event, then fade in over `riseS`, hold, and fade out; a repeat event restarts the rise from the current strength. Touch screens draw half the points (until a quality setting lands, #35). The always-on seeds come first from the same LCG, so the volcanic field's normal look is unchanged.
-**Consequences:** No biome code mounts particles itself; a new biome adds a preset. Don't drive a boost by changing `uSecondaryShare` or any per-point layer input at runtime: that brings the teleport back.

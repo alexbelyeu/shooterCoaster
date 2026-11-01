@@ -1,4 +1,5 @@
 /** Screen placement, aim and recoil tuning for the first-person weapon (#65). Pure, so it runs in plain Node tests. */
+import type { WeaponId } from './weapons/weaponTypes'
 
 export interface WeaponLayout {
   /** Gun pivot, CSS px from the viewport's top-left. */
@@ -84,10 +85,12 @@ export function weaponDepth(unitPx: number, heightPx: number, fovDeg: number, ou
 export const WEAPON_RECOIL_MS = 110
 export const WEAPON_RECOIL_BACK = 0.12 // model units
 export const WEAPON_RECOIL_PITCH = 0.16 // radians
+/** Recoil kick per weapon: the rapid gun's lighter shots kick less. */
+export const WEAPON_RECOIL_SCALE: Record<WeaponId, number> = { blaster: 1, spread: 1.3, rapid: 0.55, piercing: 1.15 }
 export const TRACER_MS = 90
 /** Tracer length, world units along the shot ray. */
 export const TRACER_RANGE = 160
-/** How long the gun keeps pointing at the last shot before following the pointer again. */
+/** How long (game ms) the gun keeps pointing at the last shot before following the pointer again. */
 export const SHOT_AIM_HOLD_MS = 300
 
 /** Recoil envelope 1 → 0 from the remaining time (smoothstep). */

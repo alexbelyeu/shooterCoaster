@@ -17,12 +17,13 @@ import {
   sampleTrackPath,
 } from '@/utils/terrainNoise'
 import BulletPool from '@/combat/projectiles/BulletPool'
+import Pickups from '@/combat/pickups/Pickups'
 import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
-import MusicController from './MusicController'
+import LevelAudio from './LevelAudio'
 import TitleScene from './TitleScene'
 import PostEffects, { type BloomSettings } from './post/PostEffects'
 import { TITLE_GRADE } from './post/colourGrade'
@@ -69,7 +70,7 @@ function LevelScene({ levelId }: { levelId: string }) {
   const config = getLevelConfig(levelId)
   if (!config) return null
 
-  const { track, environment, biome, enemies, timerSeconds, combat, boss } = config
+  const { track, environment, biome, enemies, timerSeconds, combat, boss, pickups } = config
 
   const curve = useMemo(() => {
     const factory = track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve
@@ -77,6 +78,7 @@ function LevelScene({ levelId }: { levelId: string }) {
   }, [track])
 
   const trackTable = useMemo(() => buildArcTable(curve), [curve])
+  const pointAt = useMemo(() => (t: number) => curve.getPointAt(t), [curve])
   const trackSamples = useMemo(() => sampleTrackPath((t) => curve.getPointAt(t)), [curve])
   const heightFn = useMemo(() => createHeightFunction(biome, trackSamples), [biome, trackSamples])
   const groundFn = useMemo(
@@ -92,7 +94,7 @@ function LevelScene({ levelId }: { levelId: string }) {
     <TerrainContext.Provider value={heightFn}>
       <CoasterCamera
         curve={curve}
-        trackLength={trackTable.length}
+        table={trackTable}
         trackScale={trackDims.trackScale}
         rollerSpeed={track.rollerSpeed}
         minRollerSpeed={track.minRollerSpeed}
@@ -119,9 +121,10 @@ function LevelScene({ levelId }: { levelId: string }) {
       </ContactShadows>
       <BulletPool bulletColor={combat?.bulletColor} bulletSize={combat?.bulletSize} />
       <ParticleExplosionPool />
+      <Pickups levelId={levelId} ids={pickups} pointAt={pointAt} trackScale={trackDims.trackScale} />
       {/* Before EnemySpawner: its mount effect announces the first wave, and the
           stinger listener must already be subscribed. */}
-      <MusicController />
+      <LevelAudio />
       <EnemySpawner
         waves={enemies}
         goldenBalloonCount={biome === 'themePark' ? 3 : 0}

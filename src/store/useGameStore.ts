@@ -3,8 +3,17 @@ import { persist } from 'zustand/middleware'
 import type { GamePhase, ScoreEntry, ComboState, BossHud } from '@/types/game'
 import { seedFromQuery } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
+import { markStartup } from '@/core/startupMarks'
 import { comboExpired, comboMultiplier } from '@/combat/comboTiers'
 import { startPhaseFor } from './startPhase'
+import { NO_PICKUP, applyPickup, type PickupWeaponId, type WeaponState } from '@/combat/weapons/weaponTypes'
+import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/daily'
+import { getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
+
+/** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
+export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }
+
+const CAMPAIGN: RunMode = { mode: 'campaign' }
 
 interface GameState {
   phase: GamePhase
@@ -20,18 +29,24 @@ interface GameState {
   runSeed: number
   /** Bumped by every `startRun`: per-run state resets on it, never on a phase change (paused → playing can be a Restart). */
   runId: number
-  /** The one way to start or restart a level (enters `countdown`, `playing` under `?e2e=1`); seed precedence: `seed` > `?seed=` > `Date.now()`. */
-  startRun: (levelId: string, seed?: number) => void
+  runMode: RunMode
+  /**
+   * The one way to start a level (enters `countdown`, `playing` under `?e2e=1`); seed precedence:
+   * `seed` > `?seed=` > the daily seed of `mode.dateKey` (daily runs) > `Date.now()`.
+   */
+  startRun: (levelId: string, seed?: number, mode?: RunMode) => void
+  /** Restarts the current level in the same mode: a daily keeps its seed, a campaign run gets a fresh one. */
+  restartRun: () => void
 
   score: number
   addScore: (points: number) => void
 
   kills: number
   shotsFired: number
-  /** Bullets that hit an enemy (`processHit`). */
+  /** Bullets that hit a target (`processHit`), each once however many it pierces. */
   hits: number
   bestCombo: number
-  registerShot: () => void
+  registerShot: (bullets?: number) => void
   registerHit: () => void
 
   // Combo (tiers and windows: combat/comboTiers.ts; expiry and slow-mo: combat/comboRuntime.ts)
@@ -39,6 +54,9 @@ interface GameState {
   /** Call before `addScore`, so the kill scores at the tier it reaches. */
   registerKill: () => void
   resetCombo: () => void
+
+  weapon: WeaponState
+  pickUpWeapon: (id: PickupWeaponId) => void
 
   timeRemaining: number
   setTimeRemaining: (t: number) => void
@@ -55,6 +73,12 @@ interface GameState {
   /** Keeps the higher score's entry; `bestCombo` is kept at its max across runs either way. */
   saveScore: (entry: ScoreEntry) => void
   resetSavedScores: () => void
+
+  /** Best daily run per UTC day (`YYYY-MM-DD`), the last `DAILY_KEEP_DAYS` only; never touches `savedScores`. */
+  savedDaily: Record<string, ScoreEntry>
+  dailyStreak: DailyStreak
+  /** Keeps the higher score of the day and extends the streak. */
+  saveDailyScore: (entry: ScoreEntry, dateKey: string) => void
 
   timeScale: number
   setTimeScale: (s: number) => void
@@ -77,6 +101,7 @@ const FRESH_RUN = {
   combo: NO_COMBO,
   timeScale: 1,
   boss: null,
+  weapon: NO_PICKUP,
 } satisfies Partial<GameState>
 
 const urlSearch = (): string | null =>
@@ -100,18 +125,28 @@ export const useGameStore = create<GameState>()(
 
       runSeed: 0,
       runId: 0,
-      startRun: (levelId, seed) =>
+      runMode: CAMPAIGN,
+      startRun: (levelId, seed, mode = CAMPAIGN) => {
+        markStartup('runStart')
+        const fallback = mode.mode === 'daily' ? dailySeed(mode.dateKey) : Date.now()
         set((s) => ({
           ...FRESH_RUN,
           currentLevel: levelId,
-          runSeed: (seed ?? urlSeed() ?? Date.now()) >>> 0,
+          runSeed: (seed ?? urlSeed() ?? fallback) >>> 0,
+          runMode: mode,
           runId: s.runId + 1,
           phase: startPhaseFor(urlSearch() ?? ''),
           resuming: false,
-        })),
+        }))
+      },
+      restartRun: () => {
+        const { currentLevel, runMode, runSeed, startRun } = get()
+        if (!currentLevel) return
+        startRun(currentLevel, runMode.mode === 'daily' ? runSeed : undefined, runMode)
+      },
 
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
-      registerShot: () => set((s) => ({ shotsFired: s.shotsFired + 1 })),
+      registerShot: (bullets = 1) => set((s) => ({ shotsFired: s.shotsFired + bullets })),
       registerHit: () => set((s) => ({ hits: s.hits + 1 })),
 
       registerKill: () =>
@@ -126,6 +161,8 @@ export const useGameStore = create<GameState>()(
           }
         }),
       resetCombo: () => set({ combo: NO_COMBO }),
+
+      pickUpWeapon: (id) => set({ weapon: applyPickup(id, gameTime()) }),
 
       timeRemaining: 0,
       setTimeRemaining: (t) => set({ timeRemaining: t }),
@@ -156,18 +193,31 @@ export const useGameStore = create<GameState>()(
         }),
       resetSavedScores: () => set({ savedScores: {} }),
 
+      savedDaily: {},
+      dailyStreak: { count: 0, lastKey: null },
+      saveDailyScore: (entry, dateKey) =>
+        set((s) => {
+          const existing = s.savedDaily[dateKey]
+          const best = existing && existing.score >= entry.score ? existing : entry
+          return {
+            savedDaily: pruneDaily({ ...s.savedDaily, [dateKey]: best }, dateKey),
+            dailyStreak: extendStreak(s.dailyStreak, dateKey),
+          }
+        }),
+
       isLevelUnlocked: (levelId) => {
-        const state = get()
-        if (levelId === 'level1') return true
-        const prevNum = parseInt(levelId.replace('level', '')) - 1
-        const prevId = `level${prevNum}`
-        const prevScore = state.savedScores[prevId]
-        return prevScore ? prevScore.stars >= 1 : false
+        if (!getLevelConfig(levelId)) return false
+        const prev = previousLevel(levelId)
+        return prev === null || (get().savedScores[prev]?.stars ?? 0) >= 1
       },
     }),
     {
       name: 'shootercoaster-scores',
-      partialize: (state) => ({ savedScores: state.savedScores }),
+      partialize: (state) => ({
+        savedScores: state.savedScores,
+        savedDaily: state.savedDaily,
+        dailyStreak: state.dailyStreak,
+      }),
     },
   ),
 )
