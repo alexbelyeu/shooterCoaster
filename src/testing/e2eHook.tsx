@@ -149,14 +149,14 @@ export interface SCTestApi {
   /** Every 100 ms (real time, at most once per rendered frame) aim at the nearest
    *  live on-screen enemy and fire a real bullet through the pool. */
   autoFire: (enabled: boolean) => void
-  /** Kill the n nearest live enemies (on-screen ones first). Fires one real shot
+  /** Kill the n nearest live enemies (on-screen ones first; never a boss weak point, see bossHit). Fires one real shot
    *  at the first on-screen victim (bullet, muzzle flash, weapon recoil; may be
    *  throttled by the fire delay), then resolves each victim through
    *  processHit — the bullet pool's own hit path (enemy:hit, hit flash, kill pop;
    *  enemy:killed follows ~80 ms later). Returns how many were hit. */
   killNearest: (n: number) => number
   stats: () => SCTestStats
-  /** Viewport (CSS px) positions of up to n live on-screen enemies, nearest
+  /** Viewport (CSS px) positions of up to n live on-screen enemies (no boss weak points), nearest
    *  first, so a test can tap / click real input at them. */
   enemyScreenPoints: (n: number) => { x: number; y: number }[]
   /** Set the live combo chain to `count` kills, the last one now (game time), so the next kill extends it. */
@@ -549,13 +549,15 @@ function readBoss(): E2EBoss {
   return out
 }
 
+const isBossTarget = (t: CollisionTarget) => t.id.startsWith('boss:')
+
 function bossHit(n: number): number {
   let landed = 0
   for (let i = 0; i < n; i++) {
     let best: CollisionTarget | null = null
     let bestD = Infinity
     for (const t of getCollisionTargets().values()) {
-      if (!t.id.startsWith('boss:')) continue
+      if (!isBossTarget(t)) continue
       const d = probeCamera ? t.getPosition().distanceToSquared(probeCamera.position) : 0
       if (d < bestD) {
         bestD = d
@@ -618,11 +620,13 @@ function onScreenNDC(t: CollisionTarget, camera: THREE.Camera, out: THREE.Vector
   return out.z < 1 && Math.abs(out.x) <= 1 && Math.abs(out.y) <= 1
 }
 
+/** Live normal enemies, on-screen first, then nearest. Boss weak points are left out: `bossHit` is the one
+ *  way a test damages a boss, so a slow run that reaches the boss's level time doesn't kill a part by accident. */
 function liveTargetsByDistance(camera: THREE.Camera | null) {
   const list: { t: CollisionTarget; d: number; visible: boolean }[] = []
   const ndc = new THREE.Vector3()
   for (const t of getCollisionTargets().values()) {
-    if (!isLive(t)) continue
+    if (!isLive(t) || isBossTarget(t)) continue
     const d = camera ? t.getPosition().distanceToSquared(camera.position) : 0
     const visible = camera ? onScreenNDC(t, camera, ndc) : false
     list.push({ t, d, visible })
