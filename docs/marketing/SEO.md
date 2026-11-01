@@ -14,7 +14,7 @@ Lighthouse gate (`npm run lighthouse`, part of `npm run verify` and CI).
 |---|---|---|---|
 | JavaScript SEO, SPAs, status codes | [Understand the JavaScript SEO basics](https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics) | 2026-03-04 | Use real status codes (404 for missing pages); an SPA that answers every path with 200 makes soft 404s. Keep one `rel=canonical` in the HTML and never change it from JS. Pages that return 200 go to rendering. |
 | Fixing JS search problems | [Fix Search-related JavaScript problems](https://developers.google.com/search/docs/crawling-indexing/javascript/fix-search-javascript) | 2025-12-18 | Soft 404 fix for SPAs: serve a real 404 or `noindex` the error view. Fingerprint file names (Googlebot caches hard). Feature-detect WebGL and keep crawlable content without it (our `#about` text). |
-| Robots meta | [Robots meta tag, data-nosnippet, and X-Robots-Tag](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag) | 2026-03-24 | `max-image-preview:large` allows a large image preview; `X-Robots-Tag` works on any response (we `noindex` `/api/*`). |
+| Robots meta | [Robots meta tag, data-nosnippet, and X-Robots-Tag](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag) | 2026-03-24 | `max-image-preview:large` allows a large image preview; `X-Robots-Tag` works on any response (we have no non-page responses that need it). |
 | Structured data | [Software app (SoftwareApplication) structured data](https://developers.google.com/search/docs/appearance/structured-data/software-app) | 2026-09-08 | `VideoGame` only counts as a co-type of a software app type; `applicationCategory` should be a supported value (`GameApplication`). A rich result also needs `aggregateRating` or `review`, which we don't have and must not invent. |
 | Favicon in Search | [Define a favicon to show in search results](https://developers.google.com/search/docs/appearance/favicon-in-search) | 2026-10-27 | Square, larger than 48×48 recommended, `rel="icon"`, crawlable, stable URL, one per hostname. |
 | Sitemaps / lastmod | [Sitemaps ping endpoint is going away](https://developers.google.com/search/blog/2023/06/sitemaps-lastmod-ping#the-lastmod-element) (Google, June 2023; summarised by [Vercel KB](https://vercel.com/kb/guide/correct-lastmod-nextjs-sitemap)) | 2023-06 | The ping endpoint is gone: submit the sitemap in Search Console. `lastmod` is used only when it is consistently accurate and tracks significant changes (main content, structured data, links). |
@@ -52,9 +52,9 @@ needed (Discord and Slack show wide images large, a square one only as a thumbna
 ## Checklist
 
 **Crawling and indexing**
-- [x] Real 404s: unknown paths get `404.html` (`noindex`, links home) with status 404. `vercel.json` rewrites only `/api/*` (functions) and `/go/*` (campaign paths, #171) to the game; everything else is a file or a 404. Tested by the route model in `scripts/site.test.ts`.
+- [x] Real 404s: unknown paths get `404.html` (`noindex`, links home) with status 404. `vercel.json` rewrites only `/go/*` (campaign paths, #171) to the game; everything else is a file or a 404. Tested by the route model in `scripts/site.test.ts`.
 - [x] One `rel=canonical` (`https://scoaster.com/`) in the static HTML, so `/go/<campaign>` visits fold into `/`. Not touched by JS.
-- [x] `robots.txt` allows everything and names the sitemap. `/api/*` answers carry `X-Robots-Tag: noindex`.
+- [x] `robots.txt` allows everything and names the sitemap.
 - [x] `sitemap.xml` lists `/`. **No `lastmod`:** the one URL is the game, which deploys several times a day, so a build date would be "every deploy" rather than significant changes, and Google ignores dates that aren't accurate. Add `lastmod` only if the site grows real content pages.
 - [x] Crawlable text without WebGL or JS: the visually hidden `#about` (#101): one `h1`, names every world, how to play.
 - [x] `lang="en"`, `<meta charset>` first, viewport tag. No `hreflang` (English only).
