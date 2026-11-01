@@ -147,9 +147,9 @@ let bus: MusicBus | null = null
 let currentIntensity = 0
 let isPlaying = false
 
-function fadeOutMusicState() {
+function fadeOutMusicState(untilNextTrack: boolean) {
   const nodes = [padLoop, bassLoop, percLoop, leadLoop, padSynth, bassSynth, percSynth, leadSynth]
-  if (bus) fadeOutMusicBus(bus, nodes.filter((n) => n !== null))
+  if (bus) fadeOutMusicBus(bus, nodes.filter((n) => n !== null), untilNextTrack)
   bus = null
   padLoop = bassLoop = percLoop = leadLoop = null
   padSynth = bassSynth = percSynth = leadSynth = null
@@ -258,9 +258,10 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   isPlaying = true
 }
 
-export function stopMusic(): void {
+/** `untilNextTrack`: play on until the next track opens and fade under it (`fadeOutMusicBus`). */
+export function stopMusic(untilNextTrack = false): void {
   if (!isPlaying) return
-  fadeOutMusicState()
+  fadeOutMusicState(untilNextTrack)
 }
 
 export function setMusicIntensity(intensity: number): void {

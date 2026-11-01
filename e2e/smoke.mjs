@@ -2026,18 +2026,21 @@ async function countdownCheck(page, levelId) {
   }
 }
 
-/** #168: on every switch, the incoming track's first note must land before the bus fading out under it reaches 0. */
-function crossfadeGaps(fades) {
-  const gaps = []
-  for (const incoming of fades) {
-    if (incoming.ramp !== 'in' || incoming.firstNote == null) continue
-    for (const out of fades) {
-      if (out.ramp !== 'out' || out.at > incoming.at + incoming.seconds || out.at + out.seconds < incoming.at) continue
-      if (incoming.firstNote >= out.at + out.seconds)
-        gaps.push(`${out.name} -> ${incoming.name}: first note ${(incoming.firstNote - out.at).toFixed(2)} s into a ${out.seconds} s fade-out (a gap)`)
-    }
-  }
-  return gaps
+/** #168: a `from` -> `to` switch must overlap: the latest `to` fade-in needs a `from` fade-out running under it, and its first note must land before that fade-out reaches 0. */
+function crossfadeGaps(fades, from, to) {
+  const incoming = fades.findLast((f) => f.name === to && f.ramp === 'in')
+  if (!incoming) return []
+  const overlapping = fades.filter(
+    (f) => f !== incoming && f.name === from && f.ramp === 'out' && f.at <= incoming.at + incoming.seconds && f.at + f.seconds >= incoming.at,
+  )
+  if (!overlapping.length) return [`${from} -> ${to}: no ${from} fade-out overlaps the ${to} fade-in (the switch did not crossfade)`]
+  return overlapping
+    .filter((out) => incoming.firstNote == null || incoming.firstNote >= out.at + out.seconds)
+    .map((out) =>
+      incoming.firstNote == null
+        ? `${from} -> ${to}: the fade-in logged no first note`
+        : `${from} -> ${to}: first note ${(incoming.firstNote - out.at).toFixed(2)} s into a ${out.seconds} s fade-out (a gap)`,
+    )
 }
 
 /** Level -> next level and level -> level select (#168), after the phone run's results: each must fade out, fade in, leave one bus and pass `crossfadeGaps`. */
@@ -2061,7 +2064,7 @@ async function musicSwitches(page) {
     const fades = fresh()
     switches.push({ label, fades })
     if (!done()) problems.push(`${label}: no ${from} fade-out + ${to} fade-in leaving one bus (${m.buses.map((b) => b.name).join(',')})`)
-    problems.push(...crossfadeGaps(fades).map((g) => `${label}: ${g}`))
+    problems.push(...crossfadeGaps(fades, from, to).map((g) => `${label}: ${g}`))
   }
   await run('level -> next level', 'level', 'level', () => page.evaluate((seed) => window.__SC_TEST__.startLevel('level2', seed), SEED))
   await run('level -> level select', 'level', 'title', () => page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect')))
@@ -2089,7 +2092,7 @@ async function musicCrossfade(page) {
   else if (titleOut.from < 0.5 || titleOut.seconds < 0.5)
     problems.push(`title music fade-out was not a ramp from full (from ${titleOut.from.toFixed(2)} over ${titleOut.seconds} s)`)
   if (!levelIn || levelIn.seconds < 0.5) problems.push('the level music did not fade in')
-  problems.push(...crossfadeGaps(fades))
+  problems.push(...crossfadeGaps(fades, 'title', 'level'))
   if (buses.some((b) => b.name === 'title')) problems.push('the title music bus was never disposed')
   if (!buses.some((b) => b.name === 'level' && !b.fading)) problems.push('no level music playing')
   return { problems, result: { fades, buses } }
@@ -2138,7 +2141,7 @@ async function scrimCheck(page) {
   if (!titleOut || titleOut.seconds < 0.5) problems.push('the title score did not fade out')
   if (!levelIn || levelIn.seconds < 0.5) problems.push('the level score did not fade in')
   if (busNames(a).includes('title')) problems.push('the title score bus was never disposed')
-  problems.push(...crossfadeGaps(a.music.fades))
+  problems.push(...crossfadeGaps(a.music.fades, 'title', 'level'))
 
   result.nodes.push(a.scrim.nodes)
   result.position.push(track(a)?.position ?? 0)
@@ -2196,7 +2199,7 @@ async function scrimCheck(page) {
   if (!result.results) problems.push(`no results score after the run (current "${a.scrim?.current}")`)
   if (!levelOut || levelOut.seconds < 0.5 || !resultsIn) problems.push('the level score did not crossfade to the results score')
   if (busNames(a).includes('level')) problems.push('the level score bus was never disposed')
-  problems.push(...crossfadeGaps(a.music.fades))
+  problems.push(...crossfadeGaps(a.music.fades, 'level', 'results'))
   result.dropped = a.dropped
   if (a.dropped) problems.push(`${a.dropped} sound(s) dropped by an audio error (${a.lastDrop?.split('\n')[0]})`)
   return { problems, result }

@@ -7,5 +7,8 @@ new bpm on that beat instead of ramping, so the incoming track is in time from i
 outgoing track's last ~fraction of its fade). Both gain ramps still start at the switch, a constant-sum crossfade. The
 fade log records each ramp's start and the incoming track's `firstNote`; the smoke fails a switch whose first note lands
 after the outgoing fade ends.
+Entering a run, the title track is handed over (`fadeOutMusicBus(..., untilNextTrack)`, scrim `handOverScore`): it keeps
+playing until the level's track opens once its scene has mounted, and only then fades out under it (a 20 s fallback fades
+it if no track opens). The smoke requires every checked switch to have an overlapping fade-out / fade-in pair.
 **Consequences:** tracks no longer line up with the old track's bar grid (inaudible: it is fading out). Do not go back to
 bar-aligned starts without also delaying the outgoing fade to the new track's first note.

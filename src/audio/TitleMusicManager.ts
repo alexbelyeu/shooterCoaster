@@ -213,12 +213,13 @@ export function startTitleMusic(): void {
   t.loops.push(melodyLoop, padLoop, bassLoop, chimeLoop, tambLoop)
 }
 
-export function stopTitleMusic(): void {
+/** `untilNextTrack`: keep the music playing until the next track opens and crossfade under it (entering a run). */
+export function stopTitleMusic(untilNextTrack = false): void {
   if (!track) return
   const { music, whoosh, whooshFilter } = track
   track = null
   if (!music) {
-    withScrim((p) => p.stopScore('title'))
+    withScrim((p) => (untilNextTrack ? p.handOverScore('title') : p.stopScore('title')))
     window.setTimeout(() => {
       whoosh.dispose()
       whooshFilter.dispose()
@@ -226,7 +227,7 @@ export function stopTitleMusic(): void {
     return
   }
   const { bus, loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb } = music
-  fadeOutMusicBus(bus, [...loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whoosh, whooshFilter])
+  fadeOutMusicBus(bus, [...loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whoosh, whooshFilter], untilNextTrack)
 }
 
 /** Built with the title music, so silent before audio unlocks. */

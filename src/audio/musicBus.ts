@@ -24,7 +24,12 @@ export interface MusicFade {
   firstNote?: number
 }
 
+/** A handed-over track fades anyway if no track opens within this long (a level that never starts its music). */
+export const HANDOVER_TIMEOUT_S = 20
+
 const live = new Set<MusicBus>()
+/** Buses held at full until the next track opens, then faded from that track's start (#168). */
+const handovers = new Map<MusicBus, { nodes: { dispose(): unknown }[]; timer: number }>()
 /** For e2e: at ~1 fps a whole fade can happen between two polls. */
 const fades: MusicFade[] = []
 
@@ -37,6 +42,7 @@ function logFade(fade: MusicFade) {
 export function openMusicBus(name: string, firstNote: number, channel: Tone.Channel = musicChannel): MusicBus {
   const { Gain } = tone()
   const gain = new Gain(0).connect(channel)
+  for (const held of [...handovers.keys()]) releaseHandover(held)
   const at = tone().now()
   gain.gain.rampTo(1, MUSIC_FADE_S, at)
   const bus = { name, gain, fading: false }
@@ -45,8 +51,22 @@ export function openMusicBus(name: string, firstNote: number, channel: Tone.Chan
   return bus
 }
 
-/** Disposes `nodes` (loops before instruments) and the bus once the ramp is over. */
-export function fadeOutMusicBus(bus: MusicBus, nodes: { dispose(): unknown }[]): void {
+/**
+ * Disposes `nodes` (loops before instruments) and the bus once the ramp is over.
+ * `untilNextTrack`: keep playing until the next `openMusicBus` and fade under it, so a switch that waits on a scene
+ * mount (title -> level) still overlaps.
+ */
+export function fadeOutMusicBus(bus: MusicBus, nodes: { dispose(): unknown }[], untilNextTrack = false): void {
+  const held = handovers.get(bus)
+  if (held) {
+    handovers.delete(bus)
+    window.clearTimeout(held.timer)
+  }
+  if (untilNextTrack) {
+    const timer = window.setTimeout(() => releaseHandover(bus), HANDOVER_TIMEOUT_S * 1000)
+    handovers.set(bus, { nodes, timer })
+    return
+  }
   bus.fading = true
   const at = tone().now()
   logFade({ name: bus.name, ramp: 'out', from: bus.gain.gain.getValueAtTime(at), at, seconds: MUSIC_FADE_S })
@@ -60,6 +80,11 @@ export function fadeOutMusicBus(bus: MusicBus, nodes: { dispose(): unknown }[]):
     bus.gain.dispose()
     live.delete(bus)
   }, MUSIC_FADE_S * 1000 + 100)
+}
+
+function releaseHandover(bus: MusicBus) {
+  const held = handovers.get(bus)
+  if (held) fadeOutMusicBus(bus, held.nodes)
 }
 
 /** The next beat, not bar (up to 3.3 s), so the first note lands inside the outgoing fade (#168); the tempo steps to `bpm` on it. */
