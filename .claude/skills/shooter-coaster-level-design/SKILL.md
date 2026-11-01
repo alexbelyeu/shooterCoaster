@@ -46,7 +46,7 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 | `src/entities/enemies/SharedEnemyAssets.ts` | All shared enemy geometries + materials |
 | `src/entities/enemies/*.tsx` | Individual enemy components |
 | `src/entities/spawning/EnemySpawner.tsx` | Spawn logic, collision radii, scores |
-| `src/entities/spawning/spawnPlacement.ts` | Formation waves (`formation: 'v' \| 'line' \| 'school' \| 'spiral' \| 'ring'` on an `EnemyWave`): seeded slots at load, anchored ahead of the rider at activation, kept on / above `groundFn` and outside the 40-unit near field, with an entry path. An enemy that moves on its own should honour the `heading` prop so its group keeps its shape (see `Crow.tsx`) |
+| `src/entities/spawning/spawnPlacement.ts` | Formation waves (`formation: 'v' \| 'line' \| 'school' \| 'spiral' \| 'ring'` on an `EnemyWave`): seeded slots at load, anchored ahead of the rider at activation, kept on / above `groundFn` and outside the 40-unit near field, with an entry path. Each placement carries a `motion` intent: an enemy that moves on its own should follow `marchHeading(props.motion)` so its group keeps its shape (see `Crow.tsx`), and stay at its slot on `{ kind: 'hold' }` (see `Balloon.tsx`) |
 | `src/levels/environments/BiomeEnvironment.tsx` | Thin host: atmosphere, terrain mesh, water, trees, then the biome's `Decorations` + `Features`. No per-biome code here |
 | `src/levels/environments/biomeRegistry.ts` | `BIOMES: Record<BiomeType, BiomeDefinition>` — one entry per biome |
 | `src/levels/environments/biomes/themePark/layout.ts` | Worked example of track-aware placement: stalls along the track, string lights, bunting and an arch across it, all pure and unit-tested against the real track (`layout.test.ts`) |
@@ -167,11 +167,11 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 2. `src/entities/enemies/SharedEnemyAssets.ts` — geometry + material singletons (with specular/iridescence)
 3. `src/entities/enemies/NewEnemy.tsx` — R3F component using `<EnemyBase>` wrapper
 4. `src/entities/enemies/enemyReadability.ts` — add `ENEMY_SILHOUETTE` (world-unit size after scale; drives the ≥12 px readable-spawn rule)
-5. `src/entities/spawning/EnemySpawner.tsx` — ALL of:
+5. `src/entities/spawning/enemyPlacement.ts` — add its `ENEMY_PLACEMENT` rule, the one table of per-enemy placement: `surface` (`air` / `ground` / `water`, what formations settle it on; water uses `WATER_Y`) and `scatter`: a band (radius from the origin, height above the terrain or the water) for scatter waves, or `'trackside'` for a ground enemy that should stand beside the ride (seeded slots 700–2200 arc units ahead of the rider, 60–400 to the side, placed on `groundFn` when the wave activates)
+6. `src/levels/scoring.ts` — add its score to `SCORE_VALUES`
+7. `src/entities/spawning/EnemySpawner.tsx` — ALL of:
    - Import the component
-   - Add score value to `ENEMY_SCORES`
-   - Add collision radius to `ENEMY_RADII`
-   - Add a spawn positioning case in `pickSpawn` (radius, height offset), or, for a ground enemy that should stand beside the ride, list it in `placedBesideTrack` (`spawnPlacement.ts`: seeded slots 700–2200 arc units ahead of the rider, 60–400 to the side, placed on `groundFn` when the wave activates)
+   - Add collision radius to `RADII`
    - Add to `ENEMY_COMPONENTS` map
 
 ### Special Features (if needed)

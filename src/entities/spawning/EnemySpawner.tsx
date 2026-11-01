@@ -2,12 +2,12 @@ import { useMemo, useState, useCallback, useEffect, useRef, useContext } from 'r
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { EnemyType, EnemyWave, LevelConfig } from '@/types/level'
-import type { ArcTable } from '@/track/arcLength'
+import { indexAtT, type ArcTable } from '@/track/arcLength'
+import { rideProgress } from '@/track/rideProgress'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
-import type { HeightFunction, TrackSample } from '@/utils/terrainNoise'
-import { maxReadableDistance } from '../enemies/enemyReadability'
+import type { HeightFunction } from '@/utils/terrainNoise'
 import Balloon from '../enemies/Balloon'
 import Crow from '../enemies/Crow'
 import Scorpion from '../enemies/Scorpion'
@@ -28,16 +28,15 @@ import { createRng, type Rng } from '@/utils/rng'
 import { recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
 import type { EnemyEntry } from '../enemies/EnemyBase'
 import {
-  formationSlots, nearestTrackIndex, outsideNearField, placeFormationWave, placeTracksideWave, placedBesideTrack,
-  trackPoint, tracksideSlots, type FormationSlot, type TracksideSlot, type Vec3,
+  formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, trackPoint, tracksideSlots,
+  type FormationMotion, type FormationSlot, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
+import { ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, readableScatterSpawn } from './enemyPlacement'
 import { newWaveProgress, nextWaveDue, tickWaves } from './waveSchedule'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
   goldenBalloonCount?: number
-  /** Track path samples; when given, spawns are kept within readable range of the track. */
-  trackSamples?: TrackSample[]
   trackTable: ArcTable
   /** Terrain as drawn, not `heightFn`. */
   groundFn: HeightFunction
@@ -62,7 +61,7 @@ interface SpawnedEnemy {
 interface Placed {
   position: THREE.Vector3
   entry?: EnemyEntry
-  heading?: number
+  motion?: FormationMotion
 }
 
 const RADII: Record<EnemyType, number> = {
@@ -81,120 +80,14 @@ const RADII: Record<EnemyType, number> = {
   infernalDrake: 200,
 }
 
-function pickSpawn(type: EnemyType, heightFn: HeightFunction, rng: Rng): THREE.Vector3 {
-  let x: number, y: number, z: number
-
-  switch (type) {
-    case 'crow': {
-      const r = Math.sqrt(rng()) * 1200 + 100
-      const theta = rng() * 2 * Math.PI
-      x = Math.cos(theta) * r
-      z = Math.sin(theta) * r
-      y = heightFn(x, z) + 100 + rng() * 160
-      break
-    }
-    case 'scorpion': {
-      const r = Math.sqrt(rng()) * 600 + 100
-      const theta = rng() * 2 * Math.PI
-      x = Math.cos(theta) * r
-      z = Math.sin(theta) * r
-      y = heightFn(x, z) + 5
-      break
-    }
-    case 'shark':
-    case 'jellyfish':
-    case 'flyingFish': {
-      let attempts = 0
-      do {
-        const r = Math.sqrt(rng()) * 1000 + 100
-        const theta = rng() * 2 * Math.PI
-        x = Math.cos(theta) * r
-        z = Math.sin(theta) * r
-        attempts++
-      } while (heightFn(x, z) > -5 && attempts < 20)
-
-      if (type === 'shark') {
-        y = 2
-      } else if (type === 'jellyfish') {
-        y = -15 - rng() * 30
-      } else {
-        y = 0
-      }
-      break
-    }
-    case 'emberWisp': {
-      const r = Math.sqrt(rng()) * 2800 + 200
-      const theta = rng() * 2 * Math.PI
-      x = Math.cos(theta) * r
-      z = Math.sin(theta) * r
-      y = heightFn(x, z) + 60 + rng() * 140
-      break
-    }
-    case 'infernalDrake': {
-      const r = Math.sqrt(rng()) * 2600 + 300
-      const theta = rng() * 2 * Math.PI
-      x = Math.cos(theta) * r
-      z = Math.sin(theta) * r
-      y = heightFn(x, z) + 150 + rng() * 100
-      break
-    }
-    default: {
-      // Scatter balloons over the park, a little beyond the track (~±1100),
-      // so they float close to the ride (issue #20). sqrt = uniform area density.
-      const r = Math.sqrt(rng()) * 1700
-      const theta = rng() * 2 * Math.PI
-      x = Math.cos(theta) * r
-      z = Math.sin(theta) * r
-      y = heightFn(x, z) + 40 + rng() * 160
-      break
-    }
-  }
-  return new THREE.Vector3(x, y, z)
-}
-
-/** Squared distance from (x, y, z) to the nearest track sample (every 2nd sample). */
-function trackDistSq(p: THREE.Vector3, samples: TrackSample[]): number {
-  let best = Infinity
-  for (let i = 0; i < samples.length; i += 2) {
-    const s = samples[i]
-    const dx = s.x - p.x
-    const dy = s.y - p.y
-    const dz = s.z - p.z
-    const d = dx * dx + dy * dy + dz * dz
-    if (d < best) best = d
-  }
-  return best
-}
-
-const READABLE_SPAWN_ATTEMPTS = 30
-
-/** Re-rolls `pick` until it lands within maxReadableDistance of some track point (#15), else the closest try. */
-function pickReadableSpawn(
-  type: EnemyType | 'goldenBalloon',
-  trackSamples: TrackSample[] | undefined,
-  pick: () => THREE.Vector3,
-): THREE.Vector3 {
-  if (!trackSamples || trackSamples.length === 0) return pick()
-  const maxSq = maxReadableDistance(type) ** 2
-  let best = pick()
-  let bestSq = trackDistSq(best, trackSamples)
-  for (let i = 1; i < READABLE_SPAWN_ATTEMPTS && bestSq > maxSq; i++) {
-    const p = pick()
-    const d = trackDistSq(p, trackSamples)
-    if (d < bestSq) {
-      best = p
-      bestSq = d
-    }
-  }
-  return best
-}
+const toVector3 = (p: Vec3) => new THREE.Vector3(p.x, p.y, p.z)
 
 /** Every enemy of the level: scatter positions now, formation and trackside slots for placement at activation. */
 function generateEnemies(
   waves: EnemyWave[],
   heightFn: HeightFunction,
   rng: Rng,
-  trackSamples?: TrackSample[],
+  table: ArcTable,
 ): SpawnedEnemy[] {
   const enemies: SpawnedEnemy[] = []
   let id = 0
@@ -208,15 +101,16 @@ function generateEnemies(
       }
       continue
     }
-    if (placedBesideTrack(wave.type)) {
+    const { surface, scatter } = ENEMY_PLACEMENT[wave.type]
+    if (scatter === 'trackside') {
       for (const trackside of tracksideSlots(wave.count, rng)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside, ...base })
       }
       continue
     }
-    const pick = () => pickSpawn(wave.type, heightFn, rng)
     for (let i = 0; i < wave.count; i++) {
-      enemies.push({ id: `enemy-${id++}`, position: pickReadableSpawn(wave.type, trackSamples, pick), slot: null, trackside: null, ...base })
+      const position = toVector3(readableScatterSpawn(wave.type, scatter, surface, table, heightFn, rng))
+      enemies.push({ id: `enemy-${id++}`, position, slot: null, trackside: null, ...base })
     }
   }
 
@@ -229,21 +123,14 @@ function generateGoldenBalloons(
   count: number,
   heightFn: HeightFunction,
   rng: Rng,
-  trackSamples?: TrackSample[],
+  table: ArcTable,
 ): GoldenBalloonSpawn[] {
   const goldens: GoldenBalloonSpawn[] = []
-  const pick = () => {
-    const r = Math.sqrt(rng()) * 3000
-    const theta = rng() * 2 * Math.PI
-    const x = Math.cos(theta) * r
-    const z = Math.sin(theta) * r
-    return new THREE.Vector3(x, heightFn(x, z) + 50 + rng() * 100, z)
-  }
   for (let i = 0; i < count; i++) {
     goldens.push({
       id: `golden-${i}`,
       type: 'goldenBalloon',
-      position: pickReadableSpawn('goldenBalloon', trackSamples, pick),
+      position: toVector3(readableScatterSpawn('goldenBalloon', GOLDEN_BALLOON_SCATTER, 'air', table, heightFn, rng)),
       slot: null,
       trackside: null,
       scoreValue: 13 * 5, // 5x points
@@ -271,12 +158,9 @@ const ENEMY_COMPONENTS: Record<EnemyType, React.ComponentType<any>> = {
 }
 
 
-const toVector3 = (p: Vec3) => new THREE.Vector3(p.x, p.y, p.z)
-
 export default function EnemySpawner({
   waves,
   goldenBalloonCount = 0,
-  trackSamples,
   trackTable,
   groundFn,
   boss,
@@ -289,10 +173,10 @@ export default function EnemySpawner({
   const { enemies, goldenBalloons } = useMemo(() => {
     const rng = createRng(runSeed)
     return {
-      enemies: generateEnemies(waves, heightFn, rng, trackSamples),
-      goldenBalloons: generateGoldenBalloons(goldenBalloonCount, heightFn, rng, trackSamples),
+      enemies: generateEnemies(waves, heightFn, rng, trackTable),
+      goldenBalloons: generateGoldenBalloons(goldenBalloonCount, heightFn, rng, trackTable),
     }
-  }, [runSeed, waves, goldenBalloonCount, heightFn, trackSamples])
+  }, [runSeed, waves, goldenBalloonCount, heightFn, trackTable])
   useEffect(() => {
     // Formation and trackside members digest their seeded slots: their world positions depend on where the rider is at activation.
     recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position ?? e.slot?.local ?? { x: e.trackside!.ahead, y: 0, z: e.trackside!.side }))
@@ -322,7 +206,7 @@ export default function EnemySpawner({
       })
       return members.map((e, i) => {
         const p = placed[i]
-        return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, heading: p.heading }]
+        return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
     [waves, enemies, trackTable, groundFn],
@@ -341,11 +225,12 @@ export default function EnemySpawner({
     }
     return m
   }, [placeWave, initialActiveWave, trackTable])
+  const runId = useGameStore((s) => s.runId)
   const [placements, setPlacements] = useState(initialPlacements)
-  // A new seed (same level restarted while playing) re-places during render, before stale positions mount.
-  const [placementsSource, setPlacementsSource] = useState(initialPlacements)
-  if (placementsSource !== initialPlacements) {
-    setPlacementsSource(initialPlacements)
+  // A new run or seed re-places during render, before stale positions mount.
+  const [placedFor, setPlacedFor] = useState({ runId, initialPlacements })
+  if (placedFor.runId !== runId || placedFor.initialPlacements !== initialPlacements) {
+    setPlacedFor({ runId, initialPlacements })
     setPlacements(initialPlacements)
   }
 
@@ -368,7 +253,6 @@ export default function EnemySpawner({
   const killedEnemies = useRef(new Set<string>())
 
   const [generation, setGeneration] = useState(0)
-  const runId = useGameStore((s) => s.runId)
   const runRef = useRef(runId)
   const firstWaveAnnounced = useRef(phase === 'playing')
 
@@ -378,14 +262,13 @@ export default function EnemySpawner({
     runRef.current = runId
     endSlowMo()
     setActiveWaveIndex(initialActiveWave)
-    setPlacements(initialPlacements)
     setWaveAnnouncement(null)
     firstWaveAnnounced.current = false
     waveProgress.current = newWaveProgress(waves.length)
     lastWaveTick.current = null
     killedEnemies.current.clear()
     setGeneration((g) => g + 1)
-  }, [runId, initialActiveWave, initialPlacements, waves, endSlowMo])
+  }, [runId, initialActiveWave, waves, endSlowMo])
 
   // Also after a resume, when the run was paused during its countdown.
   useEffect(() => {
@@ -415,7 +298,7 @@ export default function EnemySpawner({
     (i: number) => {
       const p = getThree().camera.position
       const camera = { x: p.x, y: p.y, z: p.z }
-      const riderIndex = nearestTrackIndex(trackTable, camera)
+      const riderIndex = indexAtT(trackTable, rideProgress())
       setPlacements((prev) => {
         const first = enemies.find((e) => e.waveIndex === i)
         if (!first || prev.has(first.id)) return prev
@@ -491,8 +374,7 @@ export default function EnemySpawner({
             type={enemy.type}
             spawnPosition={placed.position}
             entry={placed.entry}
-            heading={placed.heading}
-            formation={waves[enemy.waveIndex].formation}
+            motion={placed.motion}
             scoreValue={enemy.scoreValue}
             radius={enemy.radius}
             onKill={onKill}

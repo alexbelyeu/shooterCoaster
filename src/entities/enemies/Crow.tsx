@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { marchHeading } from '@/entities/spawning/spawnPlacement'
 import { CROW_GEO, CROW_EYES_GEO, CROW_EYE_MAT, createCrowFeatherMaterial } from './SharedEnemyAssets'
 
 /**
@@ -10,8 +11,9 @@ import { CROW_GEO, CROW_EYES_GEO, CROW_EYE_MAT, createCrowFeatherMaterial } from
  */
 export default function Crow(props: EnemyProps) {
   // One speed for the whole flock, or its V stretches apart.
-  const moveAngle = useMemo(() => props.heading ?? Math.random() * Math.PI * 2, [props.heading])
-  const moveSpeed = useMemo(() => (props.heading === undefined ? 0.4 + Math.random() * 0.6 : 0.7), [props.heading])
+  const heading = marchHeading(props.motion)
+  const moveAngle = useMemo(() => heading ?? Math.random() * Math.PI * 2, [heading])
+  const moveSpeed = useMemo(() => (heading === undefined ? 0.4 + Math.random() * 0.6 : 0.7), [heading])
   const flapOffset = useMemo(() => Math.random() * Math.PI * 2, [])
   const flap = useMemo(() => ({ value: new THREE.Vector2() }), [])
   const featherMat = useMemo(() => createCrowFeatherMaterial(flap), [flap])

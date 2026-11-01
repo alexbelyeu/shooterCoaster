@@ -2,15 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { createTrigCurve } from '@/track/curves/TrigCurve'
 import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
-import { buildArcTable } from '@/track/arcLength'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig } from '@/types/level'
+import { buildArcTable, type ArcTable } from '@/track/arcLength'
 import {
-  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, TRACKSIDE, WATER_Y, enemySurface, entryPoint, formationFrame, formationSlots,
-  indexAhead, nearestTrackIndex, outsideNearField, placeFormationWave, placeTracksideWave, placedBesideTrack, slotOffset,
-  trackPoint, trackTangent, tracksideSlots, type ChoreographedFormation, type Vec3,
+  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, TRACKSIDE, entryPoint, formationFrame, formationSlots, indexAhead, marchHeading,
+  outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint, trackTangent, tracksideSlots,
+  type ChoreographedFormation, type Vec3,
 } from './spawnPlacement'
+import { ENEMY_PLACEMENT, WATER_Y, placedBesideTrack } from './enemyPlacement'
 
 const choreographed = (f: Formation | undefined): f is ChoreographedFormation => !!f && f !== 'scatter'
 const besideTrack = (w: EnemyWave) => !choreographed(w.formation) && placedBesideTrack(w.type)
@@ -29,6 +30,12 @@ const tracksideWorlds = getAllLevels().filter((l) => l.enemies.some(besideTrack)
 
 const RIDER_FRACTIONS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 const dist = (a: Vec3, b: Vec3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
+
+function nearestIndex(table: ArcTable, p: Vec3): number {
+  let best = 0
+  for (let i = 1; i < table.count; i++) if (dist(trackPoint(table, i), p) < dist(trackPoint(table, best), p)) best = i
+  return best
+}
 
 describe('formationSlots', () => {
   it('is deterministic per seed and differs between seeds', () => {
@@ -68,8 +75,7 @@ describe('formationSlots', () => {
 describe('track frame', () => {
   const { table } = worlds[0]
 
-  it('finds the rider on the track and walks ahead around the loop', () => {
-    for (const i of [0, 1000, 5000, table.count - 2]) expect(nearestTrackIndex(table, trackPoint(table, i))).toBe(i)
+  it('walks ahead around the loop', () => {
     const i = indexAhead(table, 100, 500)
     expect(table.s[i] - table.s[100]).toBeCloseTo(500, -1)
     const wrapped = indexAhead(table, table.count - 10, 500)
@@ -81,7 +87,7 @@ describe('track frame', () => {
     const b = formationFrame(table, 0, 'line', 1)
     expect(a.sideSign).toBe(1)
     expect(b.sideSign).toBe(-1)
-    expect(nearestTrackIndex(table, b.track)).toBeGreaterThan(nearestTrackIndex(table, a.track))
+    expect(nearestIndex(table, b.track)).toBeGreaterThan(nearestIndex(table, a.track))
     expect(Math.hypot(a.forward.x, a.forward.z)).toBeCloseTo(1)
     expect(a.forward.x * a.right.x + a.forward.z * a.right.z).toBeCloseTo(0)
   })
@@ -93,7 +99,7 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
   it.each(waves.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: first group ahead of the rider, nothing in the near field or under the ground', (_name, wave) => {
     const formation = wave.formation as ChoreographedFormation
     const slots = formationSlots(formation, wave.count, createRng(1337))
-    const surface = enemySurface(wave.type)
+    const surface = ENEMY_PLACEMENT[wave.type].surface
     for (const fraction of RIDER_FRACTIONS) {
       const riderIndex = Math.round(fraction * (table.count - 1))
       const camera = trackPoint(table, riderIndex)
@@ -110,6 +116,14 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
         expect(dist(p.from, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
         expect(p.entrySeconds).toBeGreaterThanOrEqual(1)
         expect(p.entrySeconds).toBeLessThanOrEqual(2)
+        if (formation === 'ring') expect(p.motion).toEqual({ kind: 'hold' })
+        else if (formation === 'spiral') expect(p.motion).toBeUndefined()
+        else {
+          // One heading per group, so its shape holds.
+          const leader = placed[slots.findIndex((s) => s.group === slots[i].group)]
+          expect(marchHeading(p.motion)).toBeTypeOf('number')
+          expect(marchHeading(p.motion)).toBe(marchHeading(leader.motion))
+        }
         if (slots[i].group === 0) {
           const d = { x: p.position.x - camera.x, z: p.position.z - camera.z }
           if (d.x * forward.x + d.z * forward.z > 0) ahead++
