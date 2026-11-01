@@ -1,7 +1,7 @@
 import type * as Tone from 'tone'
 import { tone } from './tone'
 import { nextTriggerTime } from './triggerTime'
-import { dropSound } from './soundGuard'
+import { guarded } from './soundGuard'
 import { isAudioReady } from './AudioEngine'
 import { fadeOutMusicBus, openMusicBus, startTransportAt, type MusicBus } from './musicBus'
 import type { BiomeType } from '@/types/level'
@@ -205,14 +205,10 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   const at = `${startTransportAt(cfg.tempo)}i`
 
   padLoop = new Sequence(
-    (time, chord) => {
+    guarded('music pad', (time, chord) => {
       if (!chord) return
-      try {
-        pad.triggerAttackRelease(chord, '1n', nextTriggerTime(pad, time, tone().getContext().currentTime), 0.3)
-      } catch (e) {
-        dropSound('music pad', e)
-      }
-    },
+      pad.triggerAttackRelease(chord, '1n', nextTriggerTime(pad, time, tone().getContext().currentTime), 0.3)
+    }),
     cfg.padChords,
     '1n',
   )
@@ -220,15 +216,11 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   padLoop.start(at)
 
   bassLoop = new Sequence(
-    (time, note) => {
+    guarded('music bass', (time, note) => {
       if (currentIntensity < 0.2) return
       if (!note) return
-      try {
-        bass.triggerAttackRelease(note, '8n', nextTriggerTime(bass, time, tone().getContext().currentTime))
-      } catch (e) {
-        dropSound('music bass', e)
-      }
-    },
+      bass.triggerAttackRelease(note, '8n', nextTriggerTime(bass, time, tone().getContext().currentTime))
+    }),
     cfg.bassNotes,
     '8n',
   )
@@ -236,15 +228,11 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   bassLoop.start(at)
 
   leadLoop = new Sequence(
-    (time, note) => {
+    guarded('music lead', (time, note) => {
       if (currentIntensity < 0.5) return
       if (!note) return
-      try {
-        lead.triggerAttackRelease(note, '8n', nextTriggerTime(lead, time, tone().getContext().currentTime), 0.5)
-      } catch (e) {
-        dropSound('music lead', e)
-      }
-    },
+      lead.triggerAttackRelease(note, '8n', nextTriggerTime(lead, time, tone().getContext().currentTime), 0.5)
+    }),
     cfg.leadNotes,
     '8n',
   )
@@ -254,15 +242,11 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   if (cfg.hasPerc) {
     const percPattern = cfg.bassNotes.map((_, i) => (i % 2 === 1 ? 1 : null))
     percLoop = new Sequence(
-      (time, hit) => {
+      guarded('music perc', (time, hit) => {
         if (currentIntensity < 0.3) return
         if (!hit) return
-        try {
-          perc.triggerAttackRelease('32n', nextTriggerTime(perc, time, tone().getContext().currentTime))
-        } catch (e) {
-          dropSound('music perc', e)
-        }
-      },
+        perc.triggerAttackRelease('32n', nextTriggerTime(perc, time, tone().getContext().currentTime))
+      }),
       percPattern,
       '8n',
     )
@@ -288,5 +272,10 @@ export function setMusicIntensity(intensity: number): void {
 export function musicLoop(biome: BiomeType): { barS: number; bars: number } {
   const cfg = CONFIGS[biome]
   return { barS: (4 * 60) / cfg.tempo, bars: cfg.padChords.length }
+}
+
+/** The loop's first pad chord: its root is the biome's key, which the wave stinger resolves to (`sfxDesign.test.ts`). */
+export function openingChord(biome: BiomeType): readonly string[] {
+  return CONFIGS[biome].padChords[0] ?? []
 }
 

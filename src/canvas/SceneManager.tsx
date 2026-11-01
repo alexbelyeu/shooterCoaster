@@ -23,7 +23,7 @@ import EnemySpawner from '@/entities/spawning/EnemySpawner'
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
-import MusicController from './MusicController'
+import LevelAudio from './LevelAudio'
 import TitleScene from './TitleScene'
 import PostEffects, { type BloomSettings } from './post/PostEffects'
 import { TITLE_GRADE } from './post/colourGrade'
@@ -94,7 +94,7 @@ function LevelScene({ levelId }: { levelId: string }) {
     <TerrainContext.Provider value={heightFn}>
       <CoasterCamera
         curve={curve}
-        trackLength={trackTable.length}
+        table={trackTable}
         trackScale={trackDims.trackScale}
         rollerSpeed={track.rollerSpeed}
         minRollerSpeed={track.minRollerSpeed}
@@ -124,7 +124,7 @@ function LevelScene({ levelId }: { levelId: string }) {
       <Pickups levelId={levelId} ids={pickups} pointAt={pointAt} trackScale={trackDims.trackScale} />
       {/* Before EnemySpawner: its mount effect announces the first wave, and the
           stinger listener must already be subscribed. */}
-      <MusicController />
+      <LevelAudio />
       <EnemySpawner
         waves={enemies}
         goldenBalloonCount={biome === 'themePark' ? 3 : 0}

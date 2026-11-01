@@ -1,7 +1,7 @@
 import type * as Tone from 'tone'
 import { tone } from './tone'
 import { nextTriggerTime } from './triggerTime'
-import { dropSound } from './soundGuard'
+import { dropSound, guarded } from './soundGuard'
 import { sfxChannel, isAudioReady } from './AudioEngine'
 import { MUSIC_FADE_S, fadeOutMusicBus, openMusicBus, startTransportAt, type MusicBus } from './musicBus'
 import { MUSIC_ENGINE, withScrim } from './musicEngine'
@@ -160,14 +160,10 @@ export function startTitleMusic(): void {
   const at = `${bar}i`
 
   const melodyLoop = new Sequence(
-    (time, note) => {
+    guarded('title melody', (time, note) => {
       if (!note) return
-      try {
-        melodyBox.triggerAttackRelease(note, '8n', nextTriggerTime(melodyBox, time, tone().getContext().currentTime))
-      } catch (e) {
-        dropSound('title melody', e)
-      }
-    },
+      melodyBox.triggerAttackRelease(note, '8n', nextTriggerTime(melodyBox, time, tone().getContext().currentTime))
+    }),
     melodyNotes,
     '8n',
   )
@@ -175,14 +171,10 @@ export function startTitleMusic(): void {
   melodyLoop.start(at)
 
   const padLoop = new Sequence(
-    (time, chord) => {
+    guarded('title pad', (time, chord) => {
       if (!chord) return
-      try {
-        padSynth.triggerAttackRelease(chord, '1n', nextTriggerTime(padSynth, time, tone().getContext().currentTime))
-      } catch (e) {
-        dropSound('title pad', e)
-      }
-    },
+      padSynth.triggerAttackRelease(chord, '1n', nextTriggerTime(padSynth, time, tone().getContext().currentTime))
+    }),
     padChords,
     '1n',
   )
@@ -190,14 +182,10 @@ export function startTitleMusic(): void {
   padLoop.start(at)
 
   const bassLoop = new Sequence(
-    (time, note) => {
+    guarded('title bass', (time, note) => {
       if (!note) return
-      try {
-        bassSynth.triggerAttackRelease(note, '8n', nextTriggerTime(bassSynth, time, tone().getContext().currentTime))
-      } catch (e) {
-        dropSound('title bass', e)
-      }
-    },
+      bassSynth.triggerAttackRelease(note, '8n', nextTriggerTime(bassSynth, time, tone().getContext().currentTime))
+    }),
     bassNotes,
     '8n',
   )
@@ -205,25 +193,17 @@ export function startTitleMusic(): void {
   bassLoop.start(at)
 
   // Sparkle chimes — random note every 1.5 beats
-  const chimeLoop = new Loop((time) => {
+  const chimeLoop = new Loop(guarded('title chime', (time) => {
     const note = chimeNotes[Math.floor(Math.random() * chimeNotes.length)]
-    try {
-      chimeSynth.triggerAttackRelease(note, '16n', nextTriggerTime(chimeSynth, time, tone().getContext().currentTime))
-    } catch (e) {
-      dropSound('title chime', e)
-    }
-  }, '2n.')
+    chimeSynth.triggerAttackRelease(note, '16n', nextTriggerTime(chimeSynth, time, tone().getContext().currentTime))
+  }), '2n.')
   chimeLoop.start(`${bar + tone().getTransport().PPQ}i`) // a beat after the downbeat
 
   const tambLoop = new Sequence(
-    (time, hit) => {
+    guarded('title tambourine', (time, hit) => {
       if (!hit) return
-      try {
-        tamb.triggerAttackRelease('16n', nextTriggerTime(tamb, time, tone().getContext().currentTime))
-      } catch (e) {
-        dropSound('title tambourine', e)
-      }
-    },
+      tamb.triggerAttackRelease('16n', nextTriggerTime(tamb, time, tone().getContext().currentTime))
+    }),
     tambPattern,
     '8n',
   )

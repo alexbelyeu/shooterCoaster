@@ -25,14 +25,18 @@ diff.
 `git diff origin/main...HEAD --shortstat -- src e2e scripts .github` under ~300
 changed lines, or the PR is docs-only, skip the two reviewers: the playtest reviewer
 covers it. On a **re-review after a fix**, measure only the fix (commits since the head
-the last QA comment reviewed, merges of `main` excluded):
-`git log --no-merges --numstat --format= <reviewed-head>..HEAD -- src e2e scripts .github | awk '{n+=$1+$2} END {print n+0}'`.
+the last QA comment reviewed; `--first-parent` keeps out the commits a merge of `main`
+brings in):
+`git log --first-parent --no-merges --numstat --format= <reviewed-head>..HEAD -- src e2e scripts .github | awk '{n+=$1+$2} END {print n+0}'`.
 Under ~300, skip them too. Say "independent review skipped (small diff)" or "(small
 fix)" in the decision comment.
 
 ## 1. Two reviewers, in parallel
 
-Spawn both in a **single message**, no worktree needed (they only read):
+Spawn both in a **single message**, no worktree needed. They read this checkout as well
+as the bundle, so leave it on the PR branch until both have finished: no merges and no
+checkout of `main` here (QA on label playtests in a worktree of its own,
+`docs/agents/runbooks/review-one-pr.md` step 4).
 
 - `subagent_type: "pr-correctness"` and `subagent_type: "pr-consistency"`, if those
   agent types are available in this session. Otherwise use

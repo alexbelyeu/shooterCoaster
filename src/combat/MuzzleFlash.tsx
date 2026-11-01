@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { CAMERA_LAYER_ORDER } from '@/core/cameraLayers'
 import { eventBus } from '@/core/EventBus'
 import { useGameStore } from '@/store/useGameStore'
 import { MUZZLE_FLASH_MS, isFeedbackHeld, lastShot } from './hitFeedback'
@@ -115,7 +116,7 @@ export default function MuzzleFlash({ anchor }: { anchor: MuzzleAnchor }) {
       material={material}
       visible={false}
       frustumCulled={false}
-      renderOrder={999}
+      renderOrder={CAMERA_LAYER_ORDER.muzzleFlash}
     />
   )
 }
