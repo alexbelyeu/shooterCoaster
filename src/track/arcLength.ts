@@ -60,3 +60,17 @@ export function tAtDistance(table: ArcTable, dist: number): number {
   const f = span > 0 ? (dist - s[lo]) / span : 0
   return t[lo] + (t[hi] - t[lo]) * f
 }
+
+/** Arc distance from t = 0 to `t` (clamped to [0, 1]); the inverse of `tAtDistance`. */
+export function distanceAtT(table: ArcTable, t: number): number {
+  const n = table.count - 1
+  const x = Math.min(Math.max(t, 0), 1) * n
+  const i = Math.min(Math.floor(x), n - 1)
+  return table.s[i] + (table.s[i + 1] - table.s[i]) * (x - i)
+}
+
+/** `tAtDistance` on a closed loop: any distance wraps around the seam. */
+export function tAtLoopDistance(table: ArcTable, dist: number): number {
+  const len = table.length
+  return len > 0 ? tAtDistance(table, ((dist % len) + len) % len) : 0
+}

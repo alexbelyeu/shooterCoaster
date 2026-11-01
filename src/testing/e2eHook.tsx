@@ -62,6 +62,8 @@ import { clipboardText, sharePayloadForRun } from '@/ui/share'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
+import { MAX_BANK_DEG, MAX_PITCH_DEG } from '@/track/cameraRig'
+import { DROP_FOV_DEG, SPEED_FOV_DEG } from '@/track/cameraFov'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -120,10 +122,11 @@ export interface SCTestApi {
   cameraTrauma: { current: number; max: number }
   /** Coaster camera weight (#123) applied this frame and the max seen since load:
    *  bank and pitch (degrees, signed; maxima are absolute), the speed + drop FOV widening,
-   *  the smoothed ride speed (0–1) and the wind-streak opacity (#27). */
+   *  the smoothed ride speed (0–1), the wind-streak opacity (#27) and the caps (degrees) from the source constants. */
   cameraWeight: {
     roll: number; pitch: number; fovKick: number; maxRoll: number; maxPitch: number; maxFovKick: number
     speed: number; streaks: number; maxStreaks: number
+    caps: { roll: number; pitch: number; fovKick: number }
   }
   /** First-person weapon view-model on screen (CSS px, origin top-left):
    *  bounding box of its projected bounds and the muzzle tip. null before the
@@ -695,7 +698,10 @@ export function installE2EApi() {
     combat: { fired: 0, hits: 0, kills: 0 },
     cameraTranslation: { current: 0, max: 0 },
     cameraTrauma: { current: 0, max: 0 },
-    cameraWeight: { roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0, speed: 0, streaks: 0, maxStreaks: 0 },
+    cameraWeight: {
+      roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0, speed: 0, streaks: 0, maxStreaks: 0,
+      caps: { roll: MAX_BANK_DEG, pitch: MAX_PITCH_DEG, fovKick: SPEED_FOV_DEG + DROP_FOV_DEG },
+    },
     weapon: null,
     holdFeedback: false,
     bulletStep: null,

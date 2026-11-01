@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { CAMERA_LAYER_ORDER } from '@/core/cameraLayers'
 import { eventBus } from '@/core/EventBus'
 import { useGameStore } from '@/store/useGameStore'
 import { isInRun } from '@/store/startPhase'
@@ -218,7 +219,7 @@ export default function WeaponViewModel() {
         geometry={geometry}
         material={material}
         frustumCulled={false}
-        renderOrder={10}
+        renderOrder={CAMERA_LAYER_ORDER.gun}
         matrixAutoUpdate={false}
       />
       <mesh
@@ -228,7 +229,7 @@ export default function WeaponViewModel() {
         material={tracerMaterial}
         visible={false}
         frustumCulled={false}
-        renderOrder={998}
+        renderOrder={CAMERA_LAYER_ORDER.tracer}
       />
       <MuzzleFlash anchor={anchor} />
     </>
