@@ -254,8 +254,7 @@ export const CROW_EYE_MAT = new THREE.MeshStandardMaterial({
 
 // ── Scorpion: merged shell + swaying tail + glowing stinger ─────────
 
-// Dark plum-black chitin ("dark on gold") with bright amber legs.
-// The old amber/brown body sat at ΔE≈9 from the desert cliff colour.
+// Dark plum-black chitin with amber legs: an amber body sat at ΔE≈9 from the desert cliffs.
 const SCORPION_BODY_COLOR = '#2a1626'
 const SCORPION_HEAD_COLOR = '#24121e'
 const SCORPION_PINCER_COLOR = '#3a1622'
@@ -314,16 +313,17 @@ export const SCORPION_TAIL_GEO = mergeGeometries(
 export const SCORPION_STINGER_GEO = new THREE.ConeGeometry(0.6, 2, 4).rotateX(0.5).translate(0, 4.8, 1.8)
 
 const SCORPION_RIM = { color: '#ffd9a0', intensity: 0.7, power: 2.2 }
-export const SCORPION_SHELL_MAT = withRim(new THREE.MeshPhongMaterial({
+// Lacquered chitin: Standard, so its facets catch the baked sky (scene.environment).
+export const SCORPION_SHELL_MAT = withRim(new THREE.MeshStandardMaterial({
   vertexColors: true,
-  specular: '#c89a70',
-  shininess: 50,
+  metalness: 0.3,
+  roughness: 0.35,
   flatShading: true,
 }), SCORPION_RIM)
-export const SCORPION_TAIL_MAT = withRim(new THREE.MeshPhongMaterial({
+export const SCORPION_TAIL_MAT = withRim(new THREE.MeshStandardMaterial({
   color: SCORPION_HEAD_COLOR,
-  specular: '#b8906a',
-  shininess: 45,
+  metalness: 0.3,
+  roughness: 0.35,
   flatShading: true,
 }), SCORPION_RIM)
 export const SCORPION_STINGER_MAT = new THREE.MeshStandardMaterial({
@@ -415,31 +415,30 @@ export const SHARK_MOUTH_GEO = new THREE.BoxGeometry(2, 0.15, 0.5)
 export const SHARK_TOOTH_GEO = new THREE.ConeGeometry(0.15, 0.5, 3)
 export const SHARK_GILL_GEO = new THREE.BoxGeometry(0.05, 0.8, 0.15)
 
-// Materials: steel-blue back + white belly with wet specular sheen. The old
-// dark slate (#2a3a4a-#3a4a5a) disappeared into the deep-water colour.
+// Steel-blue back (dark slate vanished into the deep water), white belly; Standard so the wet skin reflects the sky env map.
 const SHARK_RIM = { color: '#e0f4ff', intensity: 0.65, power: 2.5 }
-export const SHARK_BODY_MAT = withRim(new THREE.MeshPhongMaterial({
+export const SHARK_BODY_MAT = withRim(new THREE.MeshStandardMaterial({
   color: '#5a6e82',
-  specular: '#a0b4c8',
-  shininess: 50,
+  metalness: 0.25,
+  roughness: 0.3,
   flatShading: true,
 }), SHARK_RIM)
-export const SHARK_SNOUT_MAT = withRim(new THREE.MeshPhongMaterial({
+export const SHARK_SNOUT_MAT = withRim(new THREE.MeshStandardMaterial({
   color: '#62788c',
-  specular: '#a8bccf',
-  shininess: 45,
+  metalness: 0.25,
+  roughness: 0.32,
   flatShading: true,
 }), SHARK_RIM)
-export const SHARK_FIN_MAT = withRim(new THREE.MeshPhongMaterial({
+export const SHARK_FIN_MAT = withRim(new THREE.MeshStandardMaterial({
   color: '#485c70',
-  specular: '#90a4b8',
-  shininess: 55,
+  metalness: 0.25,
+  roughness: 0.28,
   flatShading: true,
 }), SHARK_RIM)
-export const SHARK_BELLY_MAT = withRim(new THREE.MeshPhongMaterial({
+export const SHARK_BELLY_MAT = withRim(new THREE.MeshStandardMaterial({
   color: '#e8eef4',
-  specular: '#ffffff',
-  shininess: 40,
+  metalness: 0.05,
+  roughness: 0.4,
   flatShading: true,
 }), SHARK_RIM)
 export const SHARK_EYE_MAT = new THREE.MeshStandardMaterial({
@@ -595,12 +594,7 @@ export const FFISH_EYE_MAT = new THREE.MeshPhongMaterial({
 export const SNOWMAN_BOTTOM_GEO = new THREE.SphereGeometry(20, 12, 12)
 export const SNOWMAN_MIDDLE_GEO = new THREE.SphereGeometry(14, 12, 12)
 export const SNOWMAN_TOP_GEO = new THREE.SphereGeometry(10, 12, 12)
-// Snow bodies are deliberately near the snow's albedo (they are snowmen), so they
-// read through *luminance*, not hue: a blue-tinted emissive lift keeps the body
-// bright-white with blue shadows while the surrounding terrain stays shaded, a
-// cool rim outlines the silhouette, and accessories are saturated or glossy coal.
-// (Without the lift, the same lighting that greys the snow made snowmen read as
-// dull grey blobs.)
+// Snow-white by design, so snowmen read by luminance: the blue emissive lift keeps them brighter than the shaded snow.
 const SNOW_RIM = { color: '#dceaff', intensity: 0.55, power: 2.2 }
 export const SNOWMAN_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#f6f9ff',
@@ -611,11 +605,15 @@ export const SNOWMAN_MAT = withRim(new THREE.MeshPhongMaterial({
   flatShading: true,
 }), SNOW_RIM)
 
-// Accessories shared across snowman variants — glossy coal (specular highlight
+// Accessories shared across snowman variants — glossy coal (its sky reflection
 // keeps it from reading as a hole), saturated carrot, warm brown sticks.
-const COAL_PARAMS = { color: '#0c0c14', specular: '#8890a8', shininess: 80, flatShading: true }
 export const SNOWMAN_EYE_GEO = new THREE.SphereGeometry(1.5, 6, 6)
-export const SNOWMAN_EYE_MAT = new THREE.MeshPhongMaterial(COAL_PARAMS)
+export const SNOWMAN_EYE_MAT = new THREE.MeshStandardMaterial({
+  color: '#0c0c14',
+  metalness: 0.5,
+  roughness: 0.2,
+  flatShading: true,
+})
 export const SNOWMAN_NOSE_GEO = new THREE.ConeGeometry(1.2, 6, 5)
 export const SNOWMAN_NOSE_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#ff6a00',
@@ -625,7 +623,7 @@ export const SNOWMAN_NOSE_MAT = withRim(new THREE.MeshPhongMaterial({
   flatShading: true,
 }), { color: '#ffd0a0', intensity: 0.5 })
 export const SNOWMAN_BUTTON_GEO = new THREE.SphereGeometry(1, 6, 6)
-export const SNOWMAN_BUTTON_MAT = new THREE.MeshPhongMaterial(COAL_PARAMS)
+export const SNOWMAN_BUTTON_MAT = SNOWMAN_EYE_MAT
 export const SNOWMAN_MOUTH_GEO = new THREE.SphereGeometry(0.8, 6, 6)
 export const SNOWMAN_MOUTH_MAT = SNOWMAN_EYE_MAT
 export const SNOWMAN_ARM_GEO = new THREE.CylinderGeometry(0.5, 0.3, 14, 4)
@@ -636,10 +634,7 @@ export const SNOWMAN_ARM_MAT = withRim(
 export const SNOWMAN_TWIG_GEO = new THREE.CylinderGeometry(0.15, 0.1, 5, 3)
 export const SNOWMAN_TWIG_MAT = SNOWMAN_ARM_MAT
 
-// Scout — faint icy tint; its glowing blue shards carry the "scout" identity.
-// The body stays near-white (only slightly bluer than the standard snowman):
-// the arctic atmosphere (#53) shades the snow blue-violet, so a strongly blue
-// body sank into the terrain highlights.
+// Scout: near-white body (a strongly blue one sank into the blue-violet snow); the glowing shards carry its identity.
 export const SNOWMAN_SCOUT_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#eef6ff',
   emissive: '#8098c8',
@@ -719,8 +714,7 @@ export const LAVA_GOLEM_HEAD_GEO = new THREE.SphereGeometry(3, 8, 6)
 export const LAVA_GOLEM_ARM_GEO = new THREE.BoxGeometry(2, 8, 2)
 export const LAVA_GOLEM_EYE_GEO = new THREE.SphereGeometry(0.8, 6, 6)
 
-// Ash-grey basalt (old #4a2a10 was ΔE≈6 from the volcanic terrain) with a lava rim
-// Strong rim: Inferno is the darkest biome, so its enemies read by their edges
+// Ash-grey basalt (brown sat at ΔE≈6 from the terrain); a strong rim, since Inferno enemies read by their edges.
 const VOLCANIC_RIM = { color: '#ffb070', intensity: 1.2, power: 2.0 }
 export const LAVA_GOLEM_BODY_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#5c5450',
