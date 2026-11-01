@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Renders the launch-post gameplay clip: title → level select → ride with autofire, as
- * docs/marketing/media/clip-<level>-<size>.{mp4,gif} plus -{start,mid,end}.jpg stills.
+ * docs/marketing/media/clip-<level>-<size>.mp4 plus -{start,mid,end}.jpg stills, and a GIF of the
+ * ride's start next to the frames in e2e-results/clip/<size>/ (not committed: docs/marketing/media/README.md).
  *
  *   npm run build && npm run clip        (needs ffmpeg; cloud sessions: export SC_CHROME first)
  *
@@ -15,12 +16,8 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { launchBrowser, startPreview, stopPreview } from './headless.mjs'
+import { arg, launchBrowser, startPreview, stopPreview } from './headless.mjs'
 
-const arg = (name, fallback) => {
-  const i = process.argv.indexOf(`--${name}`)
-  return i > 0 ? process.argv[i + 1] : fallback
-}
 const LEVEL = arg('level', 'level1')
 const FROM = Number(arg('from', 0.42))
 const RIDE_S = Number(arg('seconds', 15))
@@ -144,9 +141,17 @@ async function render(browser, url) {
   await page.goto(`${url}/?e2e=1&seed=${SEED}`)
   // Boot needs timers to run (canvas measure debounce); nothing is captured yet.
   await settle('the game to boot', 50, () => window.__SC_TEST__?.levels().length > 0 && window.__SC_TEST__.frames >= 3)
-  if (!(await hook((id) => window.__SC_TEST__.levels().some((l) => l.id === id), LEVEL))) {
-    throw new Error(`clip: unknown level ${LEVEL}`)
-  }
+  // Starring every level before LEVEL unlocks it and puts the level select's first focus on it.
+  const unlocked = await hook((id) => {
+    const t = window.__SC_TEST__
+    const levels = t.levels()
+    const at = levels.findIndex((l) => l.id === id)
+    if (at < 0) return false
+    const best = (l) => ({ level: l.id, score: Math.round(l.maxScore * 0.92), maxScore: l.maxScore, stars: 3, timestamp: 0 })
+    t.setSavedScores(Object.fromEntries(levels.slice(0, at).map((l) => [l.id, best(l)])))
+    return t.levels().find((l) => l.id === id).unlocked
+  }, LEVEL)
+  if (!unlocked) throw new Error(`clip: unknown level ${LEVEL}, or still locked after starring the levels before it`)
 
   await capture(Math.round(INTRO_S * FPS))
   await page.keyboard.press('Enter')
@@ -250,7 +255,7 @@ function writeStills(frames) {
 function encode(run) {
   fs.mkdirSync(OUT_DIR, { recursive: true })
   const mp4 = path.join(OUT_DIR, `${NAME}.mp4`)
-  const gif = path.join(OUT_DIR, `${NAME}.gif`)
+  const gif = path.join(FRAME_DIR, `${NAME}.gif`)
   const m = encodeMp4(mp4, run.frames)
   console.log(`clip: ${path.relative('.', mp4)} ${m.kbps} kb/s ${kb(m.bytes)}`)
   const g = encodeGif(gif, run.rideStart + 1)
