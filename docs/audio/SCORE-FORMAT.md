@@ -54,10 +54,45 @@ voiced around the voice's `center`, `x X o .` a drum lane. Every bar must add up
 | Loading | — | the engine and scores are a separate chunk, loaded only under `?audio=scrim` |
 | Plucked strings | built on demand, `warm()` in idle slices | the same; a track warms its whole score when it starts (the countdown, for a level) |
 | Randomness | `Math.random` | the same in play; offline renders seed it (`createRng`), so the original page and the port render the same score near bit-identically (`renders/parity-*`) |
+| Instruments | 38 melodic, 27 drums | the same, plus the arcade palette below (7 melodic, 5 drums) |
 
-Not there yet (later issues): named intensity layers (base / +drums / +lead / FRENZY),
-beat-quantised stingers, and the arcade instruments (FM bass, supersaw, distorted guitar,
-orchestra hit, big kick, gated snare). Each one gets a row here when it lands.
+Not there yet (later issues): named intensity layers (base / +drums / +lead / FRENZY) and
+beat-quantised stingers. Each one gets a row here when it lands.
+
+## Instruments
+
+Every instrument the synth plays. `src/audio/scrim/palette.test.ts` checks this list
+against the synth and the compiler both ways, and the ranges below against `lintRanges`.
+
+From Scrimshaw, unchanged (`reference/scrimshaw-llm-prompt.md` says what each one is;
+their ranges are in `scrim/lint.ts`):
+
+- Melodic: `steeldrum` `marimba` `vibes` `celesta` `glock` `xylophone` `musicbox` `bell` `organ` `pipe` `harpsichord` `strings` `pizz` `fiddle` `harp` `guitar` `banjo` `upright` `flute` `clarinet` `oboe` `bassoon` `accordion` `trumpet` `brass` `horn` `tuba` `choir` `voices` `pad` `fretless` `synbass` `timpani` `chip` `sine` `square` `saw` `triangle`
+- Drums: `kick` `snare` `rim` `hat` `ohat` `ride` `crash` `clap` `conga` `tumba` `bongo` `bongolo` `timbale` `bodhran` `shaker` `tamb` `clave` `block` `cowbell` `guiro` `tri` `tomlo` `tommid` `tomhi` `gong` `thunder` `surf`
+
+### Arcade palette
+
+ShooterCoaster's own instruments for the arcade rail-shooter sound (`SOUND-BIBLE.md`): pure
+Web Audio synthesis, each note's nodes disconnected when it ends. Levels are calibrated
+against the nearest original instrument (the arcade one sits 0–3 dB louder at the same
+`vol`). Hear them in `renders/palette-melodic.mp3`, `palette-drums.mp3` and
+`palette-groove.mp3` (scores in `palette/`; `npm run audio:render -- --score
+docs/audio/palette/palette-groove.scrim --chain game` renders one through the game's music chain).
+
+| Instrument | Kind | Range | What it is | Defaults and `bright` |
+|---|---|---|---|---|
+| `fmbass` | melodic | E1–D4 | 2-operator FM bass: sine carrier, sine modulator at 3× (harmonics 1, 2, 4, 5, 7…, no DC). The index jumps on the attack, more with velocity, and falls in ~55 ms: a slap, then a round tone. Write it in octaves 2–3 | reverb 0.05. `bright` scales the FM index and the 2.4 kHz low-pass |
+| `supersaw` | melodic | C3–C7 | Seven saws (centre plus ±11, ±23, ±37 cents, the sides panned ±0.55) through a low-pass that snaps open in 20 ms and settles; 140 Hz high-pass; late vibrato. The lead of the title brief | reverb 0.3, attack 6 ms, release 0.18 s. `bright` scales the filter's peak and sustain |
+| `distguitar` | melodic | E2–E5 | Saw + square into the voice's own amp: 110 Hz high-pass, asymmetric tanh drive (4× oversampled), 24 dB/oct high-pass at 90 Hz (no DC, no difference-tone rumble), then a cab (−4 dB at 520 Hz, +3 dB at 1.9 kHz, low-passes at 4.6 and 6.2 kHz). A voice's notes share one amp, so `E2+B2` is a real power chord. `gate=0.5` for chugs | reverb 0.15. `bright` scales the cab low-passes |
+| `orchhit` | melodic | C2–C6 | Orchestra stab: two brass saws, two string saws an octave up, a square an octave down and a bow-noise burst. Fixed ~0.5 s decay whatever the length; play chords (`E4+G4+B4`, `[Em]`) | reverb 0.4. `bright` scales the attack's filter |
+| `synbrass` | melodic | E2–E6 | 90s synth brass: two saws (±7 cents) and a sub square, a 3% scoop into the pitch, a resonant filter that swells over 70 ms; late vibrato. Stabs and pads | reverb 0.25, attack 25 ms, release 0.14 s. `bright` scales the filter swell |
+| `riser` | melodic | C3–C7 | Transition sweep as long as the written note: band-passed noise plus a saw climbing from half the note to 8× it, getting louder, cut at the end. `C6-------` is a one-bar riser at 8 steps | reverb 0.45. `bright` scales the top of the sweep |
+| `downlifter` | melodic | C3–C7 | The riser backwards: starts loud at 8× the note and falls to half of it over the written length | reverb 0.45. `bright` scales the start of the sweep |
+| `bigkick` | drum | — | Sine diving 210 → 60 Hz in 45 ms and settling at 50 Hz, damped by 0.3 s, with a knock and a click. Bigger than `kick`; keep the bass off its notes' lowest octave | reverb 0.04 |
+| `gatesnare` | drum | — | Snare with a gated-reverb tail: dense noise held ~220 ms, then shut. Has its own room, so keep `rev` low | reverb 0.08 |
+| `hat909` | drum | — | Tight, bright 909-style closed hat: more noise than ring | reverb 0.08 |
+| `ohat909` | drum | — | The open version, ~0.6 s. There is no choke group: a closed hat doesn't cut it | reverb 0.12 |
+| `clap909` | drum | — | Four quick taps and a short tail around 1.2 kHz | reverb 0.2 |
 
 ## House rules for game scores
 
@@ -81,4 +116,5 @@ These are not enforced by the compiler; `src/audio/scores/scores.test.ts` checks
   through the game's music chain (`docs/audio/renders/scrim-music-*`).
 - `npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original]
   [--voicing jukebox|game]`: one score alone through the port, or through the original
-  page for comparison.
+  page for comparison. Add `--chain game` to play a score file through the game's music
+  chain instead, measured like a level's score.

@@ -13,7 +13,10 @@ Use a file's raw link to play it in the browser. The Sound designer writes these
 `scrim-music-*` is the score engine (`?audio=scrim`) playing its placeholder scores through
 the game's music chain (`--music <id> --engine scrim`). `parity-original-*` / `parity-port-*`
 render the same vendored score through the original Scrimshaw page and through the port
-(`--score vendored:5 [--engine original]`). `scrim-sfx-sheet-*` / `scrim-mix-*` are the arcade SFX
+(`--score vendored:5 [--engine original]`). `palette-*` is the arcade instrument palette:
+each new instrument alone (`palette-melodic`, `palette-drums`) and an 8-bar groove using only
+it (`palette-groove`), scores in `../palette/`, rendered with `--score <file> --chain game`.
+`scrim-sfx-sheet-*` / `scrim-mix-*` are the arcade SFX
 (`--sfx-sheet --engine scrim`, `--mix <level> --engine scrim`): every sound alone, then 20 s of combat over the
 level score; compare them with `baseline-sfx-sheet-*` / `baseline-mix-*`.
 

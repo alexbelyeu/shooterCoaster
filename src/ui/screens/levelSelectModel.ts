@@ -1,13 +1,14 @@
 /** Pure data + keyboard navigation behind the level select (no React / DOM, unit-tested). */
 import type { BiomeType } from '@/types/level'
 import type { ScoreEntry } from '@/types/game'
+import { currentStreak, dailyKey, dailyLevel, type DailyStreak } from '@/levels/daily'
+import { previousLevel } from '@/levels/LevelRegistry'
 
 export interface LevelSelectSource {
   id: string
   name: string
   description: string
   biome: BiomeType
-  maxScore: number
   nextLevel: string | null
 }
 
@@ -19,7 +20,6 @@ export interface LevelCard {
   unlocked: boolean
   stars: number
   bestScore: number
-  maxScore: number
   /** Name of the level whose star unlocks this one (null when unlocked or first). */
   unlockedBy: string | null
 }
@@ -34,7 +34,7 @@ export function buildLevelCards(
   return levels.map((level) => {
     const unlocked = isUnlocked(level.id)
     const saved = savedScores[level.id]
-    const previous = levels.find((l) => l.nextLevel === level.id)
+    const previousId = unlocked ? null : previousLevel(level.id, levels)
     return {
       id: level.id,
       name: level.name,
@@ -43,10 +43,40 @@ export function buildLevelCards(
       unlocked,
       stars: unlocked ? Math.max(0, Math.min(STARS_PER_LEVEL, saved?.stars ?? 0)) : 0,
       bestScore: unlocked ? Math.max(0, saved?.score ?? 0) : 0,
-      maxScore: level.maxScore,
-      unlockedBy: unlocked ? null : (previous?.name ?? null),
+      unlockedBy: levels.find((l) => l.id === previousId)?.name ?? null,
     }
   })
+}
+
+export interface DailyCard {
+  dateKey: string
+  levelId: string
+  levelName: string
+  biome: BiomeType
+  /** Today's best daily score, 0 when not played yet. */
+  bestScore: number
+  /** Consecutive days with a finished daily, 0 once a day is missed. */
+  streak: number
+}
+
+/** The Daily Run card for `now`'s UTC day; never locked, whatever the campaign progress. */
+export function buildDailyCard(
+  now: Date,
+  levels: readonly LevelSelectSource[],
+  savedDaily: Record<string, ScoreEntry | undefined>,
+  streak: DailyStreak,
+): DailyCard {
+  const dateKey = dailyKey(now)
+  const levelId = dailyLevel(dateKey)
+  const level = levels.find((l) => l.id === levelId)
+  return {
+    dateKey,
+    levelId,
+    levelName: level?.name ?? levelId,
+    biome: level?.biome ?? 'themePark',
+    bestScore: Math.max(0, savedDaily[dateKey]?.score ?? 0),
+    streak: currentStreak(streak, dateKey),
+  }
 }
 
 export function totalStars(cards: readonly LevelCard[]): { earned: number; max: number } {

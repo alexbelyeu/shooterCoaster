@@ -13,9 +13,11 @@ import {
 } from './app/analyticsGate'
 import './app/global.css'
 import { eventBus } from './core/EventBus'
+import { markStartup } from './core/startupMarks'
 import { useGameStore } from './store/useGameStore'
 import { installE2EApi } from './testing/e2eHook'
 
+markStartup('boot')
 installE2EApi()
 
 const { search, pathname, hash } = window.location

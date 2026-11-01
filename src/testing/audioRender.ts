@@ -3,7 +3,6 @@ import { renderOffline, type OfflineRenderScope } from '@/audio/offlineRender'
 import { setMusicDucked } from '@/audio/AudioEngine'
 import { musicLoop, setMusicIntensity, startMusic, stopMusic } from '@/audio/MusicManager'
 import { TITLE_LOOP, startTitleMusic, stopTitleMusic } from '@/audio/TitleMusicManager'
-import { startWindWhoosh, stopWindWhoosh, updateWindWhoosh } from '@/audio/SFXManager'
 import { sfxEngine, silentSfx, type Placement, type SfxEngine } from '@/audio/sfx'
 import { FIREWORK_BIOMES, type KillSound } from '@/audio/sfxDesign'
 import { COMBO_TIERS, FRENZY, TOP_TIER } from '@/combat/comboTiers'
@@ -23,8 +22,11 @@ export type AudioRenderRequest =
   | { kind: 'sfxSheet'; level?: string; engine?: MusicEngine }
   /** `stem: 'music'`: the same mix without SFX or wind, to measure the kills against. */
   | { kind: 'mix'; level: string; seconds?: number; engine?: MusicEngine; stem?: 'music' }
-  /** Score text through the ported engine alone (`synth.renderOffline`, no game chain): parity with the original page. */
-  | { kind: 'score'; text: string; seconds?: number; voicing?: Voicing }
+  /**
+   * Score text through the ported engine alone (`synth.renderOffline`, no game chain): parity with the original page.
+   * `chain: 'game'` plays it through the game's music chain instead, exactly like `music` with `engine: 'scrim'`.
+   */
+  | { kind: 'score'; text: string; seconds?: number; voicing?: Voicing; chain?: 'game' }
 
 export interface AudioRenderResult {
   sampleRate: number
@@ -46,9 +48,9 @@ interface Plan {
 
 /** `renderOffline`'s look-ahead: where the transport starts. */
 const TRANSPORT_START_S = 0.1
-/** Where `MusicController` starts a run. */
+/** Where `LevelAudio` starts a run. */
 const DEFAULT_INTENSITY = 0.45
-/** The default weapon's fire delay (`WeaponBase.ts`). */
+/** A held trigger's cadence in the mix renders. */
 const AUTOFIRE_S = 0.1
 
 function biomeOf(level: string): BiomeType {
@@ -72,7 +74,6 @@ let sfx: SfxEngine
 function stopAll() {
   stopTitleMusic()
   stopMusic()
-  stopWindWhoosh()
   sfx.dispose()
   setMusicDucked(false, true)
   if (scrim) {
@@ -159,6 +160,10 @@ function sfxSheetPlan(level = 'level1', engine: MusicEngine = 'tone'): Plan {
     { name: 'fire (single shot)', slotS: 0.6, play: () => s.fire(false) },
     { name: 'fire (auto, held trigger)', slotS: 0.6, play: () => s.fire(true) },
     { name: 'autofire burst (6 shots, 100 ms apart)', slotS: 1.2, play: () => s.fire(true), repeat: 6 },
+    { name: 'fire (spread pickup)', slotS: 0.6, play: () => s.fire(false, 'spread') },
+    { name: 'rapid pickup burst (8 shots, 100 ms apart)', slotS: 1.0, play: () => s.fire(true, 'rapid'), repeat: 8 },
+    { name: 'fire (piercing pickup)', slotS: 0.6, play: () => s.fire(false, 'piercing') },
+    { name: 'pickup chime', slotS: 1.2, play: () => s.pickup() },
     { name: 'hit tick', slotS: 0.6, play: () => s.hit(0, null) },
     { name: 'kill 1x', slotS: 0.6, play: () => s.kill(COMBO_TIERS[0].minCount, 'pop', null) },
     { name: 'kill 2x (+ thump)', slotS: 0.7, play: () => s.kill(COMBO_TIERS[1].minCount, 'pop', null) },
@@ -234,10 +239,9 @@ function mixPlan(level: string, seconds = 20, engine: MusicEngine = 'tone', musi
       else startMusic(biome)
       setMusicIntensity(DEFAULT_INTENSITY)
       void s.prepare(level, biome)
-      if (!musicOnly) startWindWhoosh()
       for (let t = 0.2; t < seconds; t += 0.5) {
         const speed = 0.7 + 0.2 * Math.sin(t * 0.8)
-        at(t, () => updateWindWhoosh(speed))
+        at(t, () => s.wind(speed))
       }
       events.push({ t: 1, name: 'autofire starts (held trigger)' })
       for (let t = 1; t < seconds - 0.5; t += AUTOFIRE_S) at(t, () => s.fire(true))
@@ -247,7 +251,7 @@ function mixPlan(level: string, seconds = 20, engine: MusicEngine = 'tone', musi
         s.waveIncoming()
         s.waveAnnounce()
       })
-      // As MusicController: combo lifts the intensity, the 5× tier's slow-mo ducks the music and holds the FRENZY lift.
+      // As LevelAudio: combo lifts the intensity, the 5× tier's slow-mo ducks the music and holds the FRENZY lift.
       let combo = 0
       for (let t = 1.6; t < seconds - 0.5; t += KILL_EVERY_S) {
         const n = ++combo
@@ -317,8 +321,26 @@ async function renderScore(req: Extract<AudioRenderRequest, { kind: 'score' }>, 
   }
 }
 
+/** Registers the text as a score for the length of one render, so the player can play it like a game score. */
+let renderedScores = 0
+async function renderScoreInGame(req: Extract<AudioRenderRequest, { kind: 'score' }>, seed: number): Promise<AudioRenderResult> {
+  const song = compile(req.text)
+  if (song.errors.length) throw new Error(`score errors:\n${song.errors.map((e) => `line ${e.line}: ${e.msg}`).join('\n')}`)
+  scrim = await import('@/audio/scrim/player')
+  sfx = await sfxEngine('scrim')
+  const id = `render-${++renderedScores}`
+  SCORES[id] = req.text
+  try {
+    const plan = scrimMusicPlan(scrim, id, req.seconds ?? 20)
+    const buffer = await renderOffline({ seconds: plan.seconds, seed, engine: 'scrim' }, plan.script, stopAll)
+    return { sampleRate: buffer.sampleRate, seconds: plan.seconds, pcm: toBase64(buffer), events: plan.events, seams: plan.seams, bar: plan.bar }
+  } finally {
+    delete SCORES[id]
+  }
+}
+
 export async function renderAudio(req: AudioRenderRequest, seed = 1): Promise<AudioRenderResult> {
-  if (req.kind === 'score') return renderScore(req, seed)
+  if (req.kind === 'score') return req.chain === 'game' ? renderScoreInGame(req, seed) : renderScore(req, seed)
   const engine = ('engine' in req && req.engine) || 'tone'
   if (engine === 'scrim') scrim = await import('@/audio/scrim/player')
   sfx = await sfxEngine(engine)

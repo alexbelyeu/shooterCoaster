@@ -115,8 +115,11 @@ function table(head, rows) {
 
 const fmtTokens = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(Math.round(n)))
 
-/** Pure: weighted tokens per role and the most expensive refs, from ledger comments since `since` (ms). */
-function ledgerSummary(comments, since) {
+/**
+ * Pure: weighted tokens per role and per ref (most expensive first), from the ledger
+ * comments of runs logged in [since, until) (ms). Also used by `run-usage.cjs --summary`.
+ */
+function ledgerSummary(comments, since, until = Infinity) {
   const bySession = new Map()
   for (const c of comments) {
     const m = /<!-- ledger (\{.*\}) -->/.exec(c.body || '')
@@ -127,7 +130,8 @@ function ledgerSummary(comments, since) {
     } catch {
       continue
     }
-    if (!(Date.parse(e.at || c.created_at) >= since) || !(e.weighted > 0)) continue
+    const at = Date.parse(e.at || c.created_at)
+    if (!(at >= since && at < until) || !(e.weighted > 0)) continue
     bySession.set(e.session || c.id, e) // a session that posted twice counts once (its latest)
   }
   const roles = {}
@@ -145,8 +149,28 @@ function ledgerSummary(comments, since) {
     total,
     runs: bySession.size,
     roles: Object.entries(roles).map(([role, r]) => ({ role, ...r })).sort((a, b) => b.weighted - a.weighted),
-    top: Object.entries(refs).map(([ref, weighted]) => ({ ref, weighted })).sort((a, b) => b.weighted - a.weighted).slice(0, 5),
+    refs: Object.entries(refs).map(([ref, weighted]) => ({ ref, weighted })).sort((a, b) => b.weighted - a.weighted),
   }
+}
+
+/**
+ * The open ledger issue's summary for runs logged in [since, until) (ms), or null when
+ * there is no ledger issue. Its own label query, since the ledger can fall outside the
+ * first 100 open issues; pages through the comments.
+ */
+async function collectLedger(api, since, until = Infinity) {
+  const open = await api('GET /repos/{owner}/{repo}/issues', { state: 'open', labels: LEDGER_LABEL, per_page: 10 })
+  const issue = open.sort((a, b) => a.number - b.number)[0]
+  if (!issue) return null
+  const comments = []
+  for (let page = 1; page <= 20; page++) {
+    const batch = await api('GET /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+      issue_number: issue.number, since: new Date(since).toISOString(), per_page: 100, page,
+    })
+    comments.push(...batch)
+    if (batch.length < 100) break
+  }
+  return { number: issue.number, ...ledgerSummary(comments, since, until) }
 }
 
 // ---------- data ----------
@@ -220,24 +244,7 @@ async function collect(api, now) {
     steeringPaused = false
   }
 
-  let ledger = null
-  const ledgerIssue = issues.filter((i) => hasLabel(i, LEDGER_LABEL)).sort((a, b) => a.number - b.number)[0]
-  if (ledgerIssue) {
-    try {
-      const since = now - 7 * DAY
-      const comments = []
-      for (let page = 1; page <= 5; page++) {
-        const batch = await api('GET /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-          issue_number: ledgerIssue.number, since: new Date(since).toISOString(), per_page: 100, page,
-        })
-        comments.push(...batch)
-        if (batch.length < 100) break
-      }
-      ledger = { number: ledgerIssue.number, ...ledgerSummary(comments, since) }
-    } catch {
-      ledger = null
-    }
-  }
+  const ledger = await collectLedger(api, now - 7 * DAY).catch(() => null)
 
   return { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger }
 }
@@ -341,7 +348,7 @@ function render(data, now) {
       out.push(`~${fmtTokens(ledger.total)} weighted tokens over ${ledger.runs} runs (approximate; per-run log in #${ledger.number}).`)
       out.push('')
       out.push(table(['Role', 'Runs', 'Weighted'], ledger.roles.map((r) => [r.role, r.runs, fmtTokens(r.weighted)])))
-      if (ledger.top.length) out.push(`Most expensive: ${ledger.top.map((t) => `${t.ref} ~${fmtTokens(t.weighted)}`).join(' · ')}\n`)
+      if (ledger.refs.length) out.push(`Most expensive: ${ledger.refs.slice(0, 5).map((t) => `${t.ref} ~${fmtTokens(t.weighted)}`).join(' · ')}\n`)
     }
   }
 
@@ -392,25 +399,31 @@ module.exports = async function run({ github, context, core }) {
   core.info(`Studio status issue #${res.number} ${res.changed ? 'updated' : 'unchanged'}`)
 }
 
-module.exports.render = render
-module.exports.ledgerSummary = ledgerSummary
-module.exports.nextRun = nextRun
-module.exports.SCHEDULE = SCHEDULE
-
-// Local dry run through the `gh` CLI: node scripts/studio-status.cjs --dry-run
-if (require.main === module) {
+/** A read-only `api` like the workflow's, through the `gh` CLI (local runs). */
+function ghReadApi(repo = process.env.GITHUB_REPOSITORY || REPO) {
   const { execFileSync } = require('node:child_process')
-  const repo = process.env.GITHUB_REPOSITORY || 'alexbelyeu/shooterCoaster'
   const [owner, name] = repo.split('/')
-  const api = async (route, params = {}) => {
+  return async (route, params = {}) => {
     const [method, tmpl] = route.split(' ')
-    if (method !== 'GET') throw new Error('dry run is read-only')
+    if (method !== 'GET') throw new Error('gh api adapter is read-only')
     const all = { owner, repo: name, ...params }
     const used = new Set()
     const path = tmpl.replace(/\{(\w+)\}/g, (_, k) => (used.add(k), encodeURIComponent(all[k])))
     const qs = Object.entries(all).filter(([k]) => !used.has(k)).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')
     return JSON.parse(execFileSync('gh', ['api', qs ? `${path}?${qs}` : path], { encoding: 'utf8', maxBuffer: 64e6 }))
   }
+}
+
+module.exports.render = render
+module.exports.ledgerSummary = ledgerSummary
+module.exports.collectLedger = collectLedger
+module.exports.ghReadApi = ghReadApi
+module.exports.nextRun = nextRun
+module.exports.SCHEDULE = SCHEDULE
+
+// Local dry run through the `gh` CLI: node scripts/studio-status.cjs --dry-run
+if (require.main === module) {
+  const api = ghReadApi()
   const now = Date.now()
   collect(api, now).then((d) => console.log(render(d, now))).catch((e) => {
     console.error(e)

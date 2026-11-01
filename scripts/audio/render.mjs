@@ -6,9 +6,11 @@
  *   npm run audio:render -- --sfx-sheet [--level level1] [--engine scrim]
  *   npm run audio:render -- --mix level1 [--seconds 20] [--engine scrim]
  *   npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original] [--voicing jukebox|game] [--seconds 20]
+ *   npm run audio:render -- --score <file.scrim> --chain game [--seconds 20]
  *
  * --engine scrim plays the music through the score engine and the SFX through the arcade engine (`?audio=scrim`). --score renders one score alone: through
- * the port (default) or the original Scrimshaw page (docs/audio/reference/scrimshaw-jukebox.html), both seeded alike.
+ * the port (default) or the original Scrimshaw page (docs/audio/reference/scrimshaw-jukebox.html), both seeded alike;
+ * with --chain game it plays through the game's music chain instead, measured like a level's score.
  * Options: --name <file name> (default music-<track> / sfx-sheet-<level> / mix-<level>, scrim-… with the score engine,
  *   score-<engine>-<score>) --out docs/audio/renders  --seed 1  --url <running preview>
  * Writes <out>/<name>.{mp3,json,png}; the float WAV it measured stays in e2e-results/audio/ (a --mix also renders
@@ -61,9 +63,11 @@ if (flag('music')) {
 } else if (flag('score')) {
   const { text, label } = readScore(flag('score'))
   original = engine === 'original'
-  request = { kind: 'score', text, seconds: num('seconds') ?? 20, voicing: flag('voicing') }
+  const chain = flag('chain')
+  if (chain && (chain !== 'game' || original)) throw new Error('--chain takes only "game", and not with --engine original')
+  request = { kind: 'score', text, seconds: num('seconds') ?? 20, voicing: flag('voicing'), chain }
   kind = 'music'
-  defaultName = `score-${original ? 'original' : 'port'}-${label}`
+  defaultName = `score-${chain === 'game' ? 'game' : original ? 'original' : 'port'}-${label}`
 } else {
   console.error('usage: npm run audio:render -- --music <title|level1..level5|results> | --sfx-sheet [--level <id>] | --mix <level> | --score <file|vendored:N>  [--engine scrim|port|original] [--name n] [--out dir] [--seed n]')
   process.exit(2)

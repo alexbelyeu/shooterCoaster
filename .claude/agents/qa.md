@@ -70,7 +70,8 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
 Use this instead of steps 1–4 only when **all** of these hold: an earlier QA comment on
 this PR says the full review passed and the only change requested was resolving a
 merge conflict; and every commit after the head that review named is a merge of
-`origin/main` (`git log --no-merges <reviewed-head>..HEAD` is empty). Then:
+`origin/main` (`git log --first-parent --no-merges <reviewed-head>..HEAD` is empty;
+without `--first-parent` it also lists the commits those merges brought in). Then:
 
 - Read how each conflict was resolved: `git show --remerge-diff <merge-commit>` for each
   new merge. Both sides' behaviour must be kept, nothing from `main` dropped, nothing

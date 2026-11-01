@@ -1,0 +1,55 @@
+title    Arcade palette: groove
+composer Claude (ShooterCoaster)
+about    Eight bars of arcade rail-shooter drive in E minor using only the arcade palette. Supersaw hook over FM bass, power-chord chugs, synth-brass stabs and a 909 kit.
+tempo    150
+beats    4
+steps    4
+reverb   0.25
+
+voice lead  supersaw   vol=0.7
+voice brass synbrass   vol=0.35 pan=-0.3 center=G4
+voice gtr   distguitar vol=0.45 pan=0.35 gate=0.55
+voice bass  fmbass     vol=0.7  gate=0.7
+voice hit   orchhit    vol=0.5
+voice rise  riser      vol=0.4
+voice fall  downlifter vol=0.4
+voice kick  bigkick    vol=0.75
+voice snare gatesnare  vol=0.6
+voice clap  clap909    vol=0.3  pan=0.2
+voice hat   hat909     vol=0.35 pan=0.3
+voice ohat  ohat909    vol=0.3  pan=-0.3
+
+pattern intro
+hit   | E4+G4+B4+E5 .-------------- |
+fall  | E6--------------- |
+kick  | X... .... .... .... |
+snare | .... .... x.x. XXXX |
+
+pattern G
+lead  | E5--- G5--- B5- A5- G5- F#5- | E5------- .... G5- E5- | F#5--- A5--- D6--- C6- B5- | B5----------- .... |
+lead  | E5--- G5--- B5- A5- G5- B5- | C6--- B5--- G5--- E5--- | A5--- C6--- E6--- D6- C6- | B5------- D#6--- F#6--- |
+brass | .----- [Em]- .----- [Em]- | .----- [C]- .----- [C]- | .----- [D]- .----- [D]- | .----- [Em]- .----- [Em]- |
+brass | .----- [Em]- .----- [Em]- | .----- [C]- .----- [C]- | .----- [Am]- .----- [Am]- | .----- [B]- .----- [B]- |
+gtr   | E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- | C3+G3- C3+G3- C3+G3- C3+G3- C3+G3- C3+G3- C3+G3- C3+G3- |
+gtr   | D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- D3+A3- | E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- |
+gtr   | E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- E3+B3- | C3+G3- C3+G3- C3+G3- C3+G3- C3+G3- C3+G3- C3+G3- C3+G3- |
+gtr   | A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- A2+E3- | B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- B2+F#3- |
+bass  | E2- E2- E3- E2- E2- E3- E2- D3- | C2- C2- C3- C2- C2- C3- C2- B2- | D2- D2- D3- D2- D2- D3- D2- C#3- | E2- E2- E3- E2- G2- A2- B2- D3- |
+bass  | E2- E2- E3- E2- E2- E3- E2- D3- | C2- C2- C3- C2- C2- C3- C2- B2- | A2- A2- A3- A2- A2- A3- A2- B2- | B2- B2- B3- B2- B2- B3- A2- F#2- |
+hit   | E4+G4+B4+E5 .-------------- | _ | _ | _ |
+hit   | E4+G4+B4+E5 .-------------- | _ | _ | _ |
+rise  | _ | _ | _ | _ |
+rise  | _ | _ | _ | B5--------------- |
+kick  | x... x... x... x... | % | % | x... x... x... x.x. |
+kick  | x... x... x... x... | % | % | x... x... x..x x.x. |
+snare | .... X... .... X... | % | % | % |
+snare | .... X... .... X... | % | % | .... X... ..x. XxXX |
+clap  | .... x... .... x... | % | % | % |
+clap  | .... x... .... x... | % | % | % |
+hat   | xo.o xo.o xo.o xo.o | % | % | % |
+hat   | xo.o xo.o xo.o xo.o | % | % | xoxo xoxo xxxx xxxx |
+ohat  | ..x. ..x. ..x. ..x. | % | % | % |
+ohat  | ..x. ..x. ..x. ..x. | % | % | ..x. ..x. .... .... |
+
+play intro
+loop G

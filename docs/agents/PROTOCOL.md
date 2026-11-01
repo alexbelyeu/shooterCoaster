@@ -106,6 +106,10 @@ criteria** (checkable, including what the smoke-test screenshot should show),
 - Body: `Closes #<n>`, what changed and why, **how you verified it** (paste the smoke-test summary lines), screenshots attached or described, risks, follow-ups.
 - Label `agent:needs-qa`. Builders never merge their own PRs.
 - Before opening: `npm run verify` passes locally, you **looked at** the relevant screenshots, CLAUDE.md/docs updated if behaviour or structure changed.
+  Exceptions, where CI's `verify` is the check: the Director's and the Reporter's docs-only
+  PRs (the `verify` they ran on `main` while gathering covers them) and a returned PR whose
+  only change is a merge of `origin/main` that didn't touch `src/` or `e2e/` (`npm test &&
+  npm run build` is enough; `builder.md` step 1).
 
 ## Merging — agents approve, GitHub merges
 

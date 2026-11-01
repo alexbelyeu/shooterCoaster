@@ -1,21 +1,10 @@
 import * as THREE from 'three'
 import { GeometryWriter, buildRingedRock } from '../../shared/ringedRock'
 import { KELP_HEIGHT, ROCK_CAP_RISE, ROCK_RINGS, STACK_CAP_RISE, STACK_RINGS } from './seaDimensions'
-import type { SeabedProp } from './seaPlacement'
 
 /** Ocean prop geometry with heights baked in: instances only get a uniform scale + yaw. */
 
 const c = (hex: number) => new THREE.Color(hex)
-
-const UP = new THREE.Vector3(0, 1, 0)
-
-export function propMatrix(p: SeabedProp): THREE.Matrix4 {
-  return new THREE.Matrix4().compose(
-    new THREE.Vector3(p.x, p.y, p.z),
-    new THREE.Quaternion().setFromAxisAngle(UP, p.yaw),
-    new THREE.Vector3(p.scale, p.scale, p.scale),
-  )
-}
 
 export function createSeaStackGeometry(): THREE.BufferGeometry {
   const lower = c(0x6c665c)
