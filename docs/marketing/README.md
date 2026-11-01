@@ -12,8 +12,10 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   Campaign attribution uses the **referrer hostname** and the **request path**: every link we
   hand out points at a campaign landing path `https://scoaster.com/go/<campaign>` (the
   `vercel.json` `/go/(.*)` rewrite serves the game there and the page view records it as
-  `requestPath`; verified locally 2026-10-26, pinned by a smoke step in #171. Any other unknown
-  path is a real 404 since #193, so campaign links must start with `/go/`). One campaign
+  `requestPath`). Any other unknown path is a real 404 since #193, so campaign links must start
+  with `/go/`. The smoke `landing` step (#171) pins it: `/go/smoke-check` must boot to the
+  title with no failed request and keep its path, and `robots.txt` keeps `/go/` out of search
+  results. Don't redirect these paths to `/`: the page view would lose them. One campaign
   name per post or placement: `showcase`, `webgames`, `playmygame`, `share` (the results-screen
   share button, #87), `crazygames` … Keep the `utm_*` parameters on the
   links anyway: they cost nothing and other tools read them. Test traffic (`?e2e=1`) and
@@ -37,7 +39,8 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   parameter disappears from the address bar, and from then on that browser sends no page
   views and no events, including that first visit. The title screen shows a small
   "internal: not tracked" in the top-right corner while it's on. **https://scoaster.com/?internal=0**
-  turns it off. Clearing site data or a private window forgets it, so open the link again.
+  turns it off; any other value (`?internal=false`) changes nothing. Clearing site data or a
+  private window forgets it, so open the link again.
   Vercel Web Analytics has no IP or user exclusion, so this is the only filter.
 - **2026-10-22 and 2026-10-23 traffic is internal.** Every visitor and every level event on
   those two days was Alex setting up and testing on his own devices. They are not players:

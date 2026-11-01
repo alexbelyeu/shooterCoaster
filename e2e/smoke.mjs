@@ -1913,6 +1913,44 @@ async function titleFlyBy(page) {
   return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter } }
 }
 
+const LANDING_PATH = '/go/smoke-check'
+
+/** Posted links point at `/go/<campaign>` and analytics attributes them by that path, so it must boot and survive (#171). */
+async function landingPathCheck(browser, base) {
+  const problems = []
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+  const page = await ctx.newPage()
+  const errors = []
+  collectErrors(page, errors)
+  const failed = []
+  const analytics = []
+  page.on('response', (r) => r.status() >= 400 && failed.push(`${r.status()} ${r.url()}`))
+  page.on('requestfailed', (r) => failed.push(`${r.failure()?.errorText ?? 'failed'} ${r.url()}`))
+  page.on('request', (r) => /\/_vercel\/insights\//.test(r.url()) && analytics.push(r.url()))
+  const pathname = new URL(`${base}${LANDING_PATH}`).pathname
+  await page.goto(`${base}${LANDING_PATH}?e2e=1&internal=1`, { waitUntil: 'load' })
+  // A wrong asset base serves index.html for the scripts here, so the game never boots.
+  const booted = await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 }).then(() => true, () => false)
+  if (!booted) {
+    await ctx.close()
+    const landing = { requested: pathname, pathname: '-', search: '', phase: 'none', marker: false, failed: failed.length }
+    return { id: 'landing', ok: false, problems: [`the game did not boot on ${LANDING_PATH}`, ...failed.slice(0, 3)], errors, landing }
+  }
+  await waitFrames(page, 2, { minMs: 2000, maxMs: FRAME_DEADLINE_MS })
+  const marker = await page.locator('.internal-marker').isVisible().catch(() => false)
+  const after = await page.evaluate(() => ({ pathname: location.pathname, search: location.search, phase: window.__SC_TEST__.phase() }))
+  errors.push(...(await page.evaluate(() => window.__SC_TEST__.errors)))
+  if (after.phase !== 'title') problems.push(`phase "${after.phase}" on ${LANDING_PATH} (want title)`)
+  if (after.pathname !== pathname) problems.push(`path rewritten on boot: ${pathname} -> ${after.pathname}`)
+  if (after.search !== '?e2e=1') problems.push(`search "${after.search}" after boot (want ?internal stripped, ?e2e=1 kept)`)
+  if (!marker) problems.push('no "internal: not tracked" marker after ?internal=1')
+  if (failed.length) problems.push(`${failed.length} failed request(s): ${failed.slice(0, 3).join(', ')}`)
+  if (analytics.length) problems.push(`analytics request under ?e2e=1: ${analytics[0]}`)
+  if (errors.length) problems.push(`${errors.length} error(s)`)
+  await ctx.close()
+  return { id: 'landing', ok: problems.length === 0, problems, errors, landing: { requested: pathname, ...after, marker, failed: failed.length } }
+}
+
 /**
  * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
  * shows over the mounted level, a press during it fires nothing (not even when held on into
@@ -2561,6 +2599,13 @@ async function run() {
   results.push({ id: 'title', ok: titleOk, problems: titleProblems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg, title: fly.result, errors: t.errors })
   await t.ctx.close()
 
+  // 1a. Campaign landing path; not for portal builds (--base), which portals serve at their own path.
+  if (!args['skip-desktop'] && !args.base) {
+    const r = await landingPathCheck(browser, base)
+    failed ||= !r.ok
+    results.push(r)
+  }
+
   // 1b. Level select with saved progress + keyboard-only start
   if (!args['skip-desktop']) {
     const l = await newPage()
@@ -2770,6 +2815,8 @@ async function run() {
       : ''
     const extra = r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '')
+      : r.landing
+        ? ` ${r.landing.requested} -> ${r.landing.pathname}${r.landing.search} phase=${r.landing.phase} internal marker=${r.landing.marker} failed requests=${r.landing.failed}`
       : r.daily
         ? ` ${r.daily.dateKey} ${r.daily.level} seed=${r.daily.seed} digest=${r.daily.digest} again=${r.daily.digestAgain} record=${r.daily.record} replaySeed=${r.daily.replaySeed}`
       : r.levelSelect

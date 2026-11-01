@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { browserStorage, isInternalBrowser } from '@/app/analyticsGate'
+import { isInternalThisLoad } from '@/app/analyticsGate'
 import { initAudio } from '@/audio/AudioEngine'
 import { prepareSfx } from '@/audio/sfx'
 import { useGameStore } from '@/store/useGameStore'
@@ -35,7 +35,7 @@ function startAudio(): Promise<void> {
 }
 
 export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
-  const [internal] = useState(() => isInternalBrowser(browserStorage()))
+  const [internal] = useState(isInternalThisLoad)
   const [showHint] = useState(() => !hintShownThisLoad)
   const [hint] = useState(() => (touchFirst() ? 'Tap PLAY to start' : 'Press any key to start'))
   const reduced = usePrefersReducedMotion()
