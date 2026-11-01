@@ -53,7 +53,7 @@ the self-hosted Lobster and Inter faces must have loaded; the start hint must sh
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
 gold hitmarker held on the kill frame via `holdFeedback`; on the first level a primed 14-kill chain makes
 that kill enter the 5× combo tier, and the shot must show the "×5 FRENZY" flash with its slow-mo held and, on the Theme Park,
-the streak-15 firework burst held on screen; the kill's death effect must be live in the shot in its enemy type's style, held mid-spread, `death=<type>` in the summary), `<id>-shot.png` (one real shot two 40 ms
+the streak-15 firework burst held on screen; the kill's death effect must be live in the shot in its enemy type's style, held mid-spread, `death=<type>` in the summary; the first level then starts over, primes 5× and ends through the level timer mid-FRENZY: its results must be at `timeScale` 1 with the music not ducked, `frenzyEnd` in `results.json`), `<id>-shot.png` (one real shot two 40 ms
 steps into its flight, time frozen) and `<id>-results.png`. A level fails if
 fewer than 2 enemies are ≥ 12 px on screen right after the ride (`enemiesOnScreen` / `readable` / `largestPx` in the summary), its biome particle field isn't mounted (`particles=` in the summary), it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
 enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
