@@ -15,14 +15,10 @@
  *
  * Options: --icons, --level level1 --seconds 8 --url http://localhost:4173 (skip vite preview)
  */
-import { launchBrowser, startPreview, stopPreview } from './headless.mjs'
+import { arg, launchBrowser, startPreview, stopPreview } from './headless.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const arg = (name, fallback) => {
-  const i = process.argv.indexOf(`--${name}`)
-  return i > 0 ? process.argv[i + 1] : fallback
-}
 const LEVEL = arg('level', 'level1')
 const RIDE_SECONDS = Number(arg('seconds', 8))
 const ICONS_ONLY = process.argv.includes('--icons')

@@ -8,13 +8,9 @@ import lighthouse from 'lighthouse'
 import desktopConfig from 'lighthouse/core/config/desktop-config.js'
 import fs from 'node:fs'
 import path from 'node:path'
-import { launchBrowser, startPreview, stopPreview } from './headless.mjs'
+import { arg, launchBrowser, startPreview, stopPreview } from './headless.mjs'
 import { gateProblems, THRESHOLDS } from './lighthouseGate.mjs'
 
-const arg = (name, fallback) => {
-  const i = process.argv.indexOf(`--${name}`)
-  return i > 0 ? process.argv[i + 1] : fallback
-}
 const FORMS = arg('form') ? [arg('form')] : ['mobile', 'desktop']
 const OUT = path.resolve('e2e-results/lighthouse.json')
 const CATEGORIES = ['seo', 'accessibility', 'best-practices', 'performance']
