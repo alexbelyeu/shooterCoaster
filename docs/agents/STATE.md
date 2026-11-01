@@ -76,13 +76,10 @@ kills / accuracy / best combo / time left, NEW RECORD; Enter = next, R = replay)
   `musicBus`; every trigger through `nextTriggerTime`, every play guarded by
   `soundGuard`. Slow-mo ducks the music bus. No positional audio.
 - **State** (`src/store/`): `useGameStore` (phase, `startRun`, run counters, combo, timer,
-  persisted `savedScores` with `bestCombo`), `usePlayerStore` (barely used),
-  `useSettingsStore` (persisted).
+  persisted `savedScores` with `bestCombo`), `useSettingsStore` (persisted).
 - **Analytics**: Vercel Web Analytics page views + `level_start` / `level_complete` /
   `level_quit`; off for `?e2e=1`, CI, smokes and `?internal=1`. UTM dimensions are
   paywalled on Pro → `/go/<campaign>` landing paths (#171 pins them).
-- **API** (`api/`): in-memory stubs, unused by the client.
-- **Legacy v1** (`js/`, `index.legacy.html`, `assets/`): not built, don't extend.
 
 ### Tooling
 
@@ -191,8 +188,6 @@ nobody reached 5; **0 of 9 mobile visitors started a level** (too few to conclud
 
 ## Half-done / placeholders
 
-- `api/` serverless stubs (leaderboard, daily, ghost) — in-memory, not wired to UI.
-- `usePlayerStore` exists but gameplay barely uses it.
 - Settings screen: show FPS + screen shake only.
 - `ParticleField` has one preset (volcanic); the other biomes have no ambient particles (#37).
 - Pause screen is unstyled and does not freeze the ride (#36).
