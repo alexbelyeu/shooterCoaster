@@ -80,7 +80,8 @@ export interface SCTestApi {
   cameraPose: () => { position: [number, number, number]; forward: [number, number, number] } | null
   drawCalls: number
   triangles: number
-  levels: () => { id: string; name: string }[]
+  /** Every level in play order, its `nextLevel` and whether the unlock rule opens it now. */
+  levels: () => { id: string; name: string; nextLevel: string | null; unlocked: boolean }[]
   /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one. */
   startLevel: (id: string, seed?: number) => void
   /** `<count>:<hash>` of the latest run's spawn positions (formation members: their seeded slots); null until a spawner has generated them. */
@@ -669,7 +670,10 @@ export function installE2EApi() {
     cameraPose: readCameraPose,
     drawCalls: 0,
     triangles: 0,
-    levels: () => getAllLevels().map((l) => ({ id: l.id, name: l.name })),
+    levels: () => {
+      const { isLevelUnlocked } = useGameStore.getState()
+      return getAllLevels().map((l) => ({ id: l.id, name: l.name, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id) }))
+    },
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
     setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
     setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
