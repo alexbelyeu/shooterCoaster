@@ -5,6 +5,11 @@
 // Reporter read the comments back.
 //
 //   node scripts/run-usage.cjs --role qa --ref "#123" [--note "..."] [--json] [--post]
+//   node scripts/run-usage.cjs --summary --since <ISO> [--until <ISO>]
+//
+// --summary prints the ledger's runs logged in [since, until) as JSON (total, runs,
+// per-role and per-ref weighted tokens, a session counted once), through the same
+// ledgerSummary as the status page; the Reporter's token section reads it.
 //
 // Transcripts: ~/.claude/projects/<cwd-slug>/<session>.jsonl and
 // ~/.claude/projects/<cwd-slug>/<session>/subagents/*.jsonl. The session is
@@ -102,7 +107,8 @@ function fmtTokens(n) {
 
 /** Pure: the ledger comment (one human line + a machine-readable marker). */
 function ledgerComment(entry) {
-  const ref = entry.ref === 'none' ? 'no ref' : entry.ref
+  // In backticks, so `#123` doesn't add a cross-reference to that PR's timeline every run.
+  const ref = entry.ref === 'none' ? 'no ref' : `\`${entry.ref}\``
   const line = `🧮 **${entry.role}** · ${ref} · ~${fmtTokens(entry.weighted)} weighted tokens · ` +
     `${entry.turns} turns · ${entry.subagents} subagents · ${entry.minutes} min` +
     (entry.note ? ` · ${entry.note}` : '')
@@ -173,18 +179,30 @@ function ledgerIssue(repo) {
 // ---------- CLI ----------
 
 function parseArgs(argv) {
-  const a = { role: 'unknown', ref: 'none', note: '', json: false, post: false }
+  const a = { role: 'unknown', ref: 'none', note: '', since: '', until: '', json: false, post: false, summary: false }
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i]
     if (k === '--json') a.json = true
     else if (k === '--post') a.post = true
-    else if (k === '--role' || k === '--ref' || k === '--note') a[k.slice(2)] = argv[++i] || ''
+    else if (k === '--summary') a.summary = true
+    else if (['--role', '--ref', '--note', '--since', '--until'].includes(k)) a[k.slice(2)] = argv[++i] || ''
   }
   return a
 }
 
+/** --summary: the ledger's runs in [since, until) as JSON, summed like the status page. */
+async function printSummary(args) {
+  const since = Date.parse(args.since)
+  const until = args.until ? Date.parse(args.until) : Infinity
+  if (Number.isNaN(since) || Number.isNaN(until)) throw new Error('--summary needs --since <ISO> (and optionally --until <ISO>)')
+  const status = require('./studio-status.cjs')
+  const ledger = await status.collectLedger(status.ghReadApi(repoSlug()), since, until)
+  console.log(JSON.stringify(ledger || { number: null, total: 0, runs: 0, roles: [], refs: [] }, null, 2))
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2))
+  if (args.summary) return printSummary(args)
   const session = findSession()
   const files = [
     { text: fs.readFileSync(session.main, 'utf8'), subagent: false },
@@ -221,10 +239,8 @@ function main() {
 module.exports = { summarize, weighted, ledgerComment, normalizeRef, fmtTokens }
 
 if (require.main === module) {
-  try {
-    main()
-  } catch (e) {
-    console.warn(`run-usage: warning, skipped (${e && e.message ? e.message.split('\n')[0] : e})`)
-  }
-  process.exit(0)
+  Promise.resolve()
+    .then(main)
+    .catch((e) => console.warn(`run-usage: warning, skipped (${e && e.message ? e.message.split('\n')[0] : e})`))
+    .then(() => process.exit(0))
 }

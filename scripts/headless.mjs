@@ -44,10 +44,10 @@ export async function startPreview() {
   throw new Error('vite preview did not start (did you run `npm run build`?)')
 }
 
-export function launchBrowser() {
+export function launchBrowser(extraArgs = []) {
   return chromium.launch({
     headless: true,
     executablePath: process.env.SC_CHROME || undefined,
-    args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox'],
+    args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox', ...extraArgs],
   })
 }

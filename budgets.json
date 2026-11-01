@@ -1,5 +1,43 @@
 {
   "_comment": "Guardrail budgets enforced by CI. Only the Director may raise these, with a DECISIONS.md entry explaining why.",
   "jsTotalGzipKB": 700,
-  "jsLargestChunkGzipKB": 260
+  "jsLargestChunkGzipKB": 260,
+  "scene": {
+    "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands.",
+    "level1": {
+      "drawCalls": 101,
+      "objects": 179,
+      "triangles": 220922,
+      "trackObjects": 12,
+      "trackTriangles": 99282
+    },
+    "level2": {
+      "drawCalls": 135,
+      "objects": 188,
+      "triangles": 245614,
+      "trackObjects": 12,
+      "trackTriangles": 96577
+    },
+    "level3": {
+      "drawCalls": 89,
+      "objects": 198,
+      "triangles": 188821,
+      "trackObjects": 12,
+      "trackTriangles": 98353
+    },
+    "level4": {
+      "drawCalls": 472,
+      "objects": 551,
+      "triangles": 246321,
+      "trackObjects": 12,
+      "trackTriangles": 90952
+    },
+    "level5": {
+      "drawCalls": 353,
+      "objects": 319,
+      "triangles": 170739,
+      "trackObjects": 12,
+      "trackTriangles": 99742
+    }
+  }
 }

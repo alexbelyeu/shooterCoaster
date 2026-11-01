@@ -1,6 +1,7 @@
 /** Every SFX goes through here: the Tone.js kit, or the arcade engine under `?audio=scrim` until parity (hard rule 7). */
 import * as THREE from 'three'
 import type { BiomeType } from '@/types/level'
+import type { WeaponId } from '@/combat/weapons/weaponTypes'
 import * as tone from './SFXManager'
 import { MUSIC_ENGINE, type MusicEngine } from './musicEngine'
 import { dropSound } from './soundGuard'
@@ -25,7 +26,8 @@ export type UiSound = 'select' | 'back' | 'launch'
 export interface SfxEngine {
   /** `level` null: the menus' sounds. */
   prepare(level: string | null, biome: BiomeType): Promise<void>
-  fire(auto: boolean): void
+  fire(auto: boolean, weapon?: WeaponId): void
+  pickup(): void
   hit(combo: number, at: Placement | null): void
   kill(combo: number, sound: KillSound, at: Placement | null): void
   bossPart(combo: number, partId: string, at: Placement | null): void
@@ -42,8 +44,12 @@ export interface SfxEngine {
   starChime(index: number): void
   ui(sound: UiSound): void
   countdown(go: boolean): void
-  /** Long-lived nodes: must not grow while playing. */
+  /** The ride wind from the coaster's speed (0–1), every frame; silent without a level's sounds. */
+  wind(speed: number): void
+  /** Long-lived nodes, the wind's included: must not grow while playing. */
   nodeCount(): number
+  /** e2e: kills since load that reached the audio engine (not throttled, not refused a voice). */
+  killsPlayed(): number
   voices(): VoiceStats | null
   /** With `level`: only if no menu has asked for its own sounds since. */
   dispose(level?: string): void
@@ -54,7 +60,8 @@ const toneSfx: SfxEngine = {
     if (level) tone.prepareLevelSFX(biome)
     return Promise.resolve()
   },
-  fire: (auto) => tone.playFireSound(auto),
+  fire: (auto, weapon) => tone.playFireSound(auto, weapon),
+  pickup: tone.playPickupChime,
   hit: () => tone.playHitTick(),
   kill: (combo, sound) => tone.playExplosionSound(combo, sound),
   bossPart: (combo) => tone.playExplosionSound(combo),
@@ -71,7 +78,9 @@ const toneSfx: SfxEngine = {
   starChime: tone.playStarChime,
   ui: () => {},
   countdown: () => {},
+  wind: tone.setWind,
   nodeCount: tone.sfxNodeCount,
+  killsPlayed: tone.sfxKillsPlayed,
   voices: () => null,
   dispose: () => tone.disposeSFX(),
 }
@@ -92,10 +101,11 @@ const silent = () => {}
 /** A mix render's music-only stem. */
 export const silentSfx: SfxEngine = {
   prepare: () => Promise.resolve(),
-  fire: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, frenzy: silent, frenzyLift: silent,
+  fire: silent, pickup: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, frenzy: silent, frenzyLift: silent,
   waveIncoming: silent, waveAnnounce: silent, bossArrival: silent, bossHit: silent, bossDefeat: silent,
-  fireworkWhistle: silent, fireworkPop: silent, starChime: silent, ui: silent, countdown: silent,
+  fireworkWhistle: silent, fireworkPop: silent, starChime: silent, ui: silent, countdown: silent, wind: silent,
   nodeCount: () => 0,
+  killsPlayed: () => 0,
   voices: () => null,
   dispose: silent,
 }
