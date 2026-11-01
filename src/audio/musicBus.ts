@@ -17,7 +17,11 @@ export interface MusicFade {
   name: string
   ramp: 'in' | 'out'
   from: number
+  /** Context time the ramp starts. */
+  at: number
   seconds: number
+  /** 'in' only: context time of the track's first note. */
+  firstNote?: number
 }
 
 const live = new Set<MusicBus>()
@@ -29,23 +33,25 @@ function logFade(fade: MusicFade) {
   if (fades.length > 8) fades.shift()
 }
 
-/** `channel`: the score engine passes its stereo channel. */
-export function openMusicBus(name: string, channel: Tone.Channel = musicChannel): MusicBus {
+/** `firstNote`: context time the track's first note plays. `channel`: the score engine passes its stereo channel. */
+export function openMusicBus(name: string, firstNote: number, channel: Tone.Channel = musicChannel): MusicBus {
   const { Gain } = tone()
   const gain = new Gain(0).connect(channel)
-  gain.gain.rampTo(1, MUSIC_FADE_S)
+  const at = tone().now()
+  gain.gain.rampTo(1, MUSIC_FADE_S, at)
   const bus = { name, gain, fading: false }
   live.add(bus)
-  logFade({ name, ramp: 'in', from: 0, seconds: MUSIC_FADE_S })
+  logFade({ name, ramp: 'in', from: 0, at, seconds: MUSIC_FADE_S, firstNote })
   return bus
 }
 
 /** Disposes `nodes` (loops before instruments) and the bus once the ramp is over. */
 export function fadeOutMusicBus(bus: MusicBus, nodes: { dispose(): unknown }[]): void {
   bus.fading = true
-  logFade({ name: bus.name, ramp: 'out', from: bus.gain.gain.getValueAtTime(tone().now()), seconds: MUSIC_FADE_S })
+  const at = tone().now()
+  logFade({ name: bus.name, ramp: 'out', from: bus.gain.gain.getValueAtTime(at), at, seconds: MUSIC_FADE_S })
   try {
-    bus.gain.gain.rampTo(0, MUSIC_FADE_S)
+    bus.gain.gain.rampTo(0, MUSIC_FADE_S, at)
   } catch (e) {
     dropSound(`${bus.name} music fade`, e)
   }
@@ -56,15 +62,19 @@ export function fadeOutMusicBus(bus: MusicBus, nodes: { dispose(): unknown }[]):
   }, MUSIC_FADE_S * 1000 + 100)
 }
 
-/** Returns the next bar line in ticks, so a new track starts at the top of its phrase; the tempo ramps under a track still fading out. */
-export function startTransportAt(bpm: number): number {
+/** The next beat, not bar (up to 3.3 s), so the first note lands inside the outgoing fade (#168); the tempo steps to `bpm` on it. */
+export function startTransportAt(bpm: number): { ticks: number; time: number } {
   const transport = tone().getTransport()
-  if (transport.state === 'started') transport.bpm.rampTo(bpm, MUSIC_FADE_S)
-  else transport.bpm.value = bpm
-  const bar = transport.PPQ * 4
-  const startTicks = Math.ceil(transport.ticks / bar) * bar
-  if (transport.state !== 'started') transport.start()
-  return startTicks
+  if (transport.state !== 'started') {
+    transport.bpm.value = bpm
+    const time = tone().now()
+    transport.start(time)
+    return { ticks: 0, time }
+  }
+  const time = transport.nextSubdivision('4n')
+  transport.bpm.cancelScheduledValues(time)
+  transport.bpm.setValueAtTime(bpm, time)
+  return { ticks: Math.round(transport.getTicksAtTime(time)), time }
 }
 
 export function musicState() {

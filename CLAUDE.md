@@ -91,7 +91,9 @@ name, Resume focused, ArrowDown moves focus, Esc resumes, and Restart starts the
 phone run checks the card after its Pause tap in landscape and portrait (`mobile-pause-landscape.png`, `mobile-pause.png`: inside
 the viewport, no sideways scroll, 44 px buttons), then taps its Settings (`mobile-settings.png`: fits 390 px, 44 px targets)
 and Back to the menu, then ends the level: the results buttons must fit and not overlap in portrait and landscape
-(`mobile-results.png`, `mobile-results-landscape.png`).
+(`mobile-results.png`, `mobile-results-landscape.png`), then starts level2 and goes back to level select: on every music
+switch (there, title → level, and the `scrim` step's) the incoming track's first note must land before the outgoing bus has
+faded to 0 (`audio().music.fades` log each ramp's start and the incoming `firstNote`; tracks start on the next beat, `musicBus.ts`).
 A `settings` step opens Settings from the title (`settings.png`: the card inside 1280×720 with the four quality
 options, two volume sliders and two switches), picks Low and a music volume, closes with Esc, and requires both
 to survive a reload. A `quality` step loads the first level at device dpr 2 with the default quality and with

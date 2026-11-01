@@ -97,7 +97,8 @@ export function playScore(id: string): void {
   if (current?.id === id || !isAudioReady()) return
   if (current) fadeOut(current)
   const song = songFor(id)
-  const bus = openMusicBus(busName(id), scoreChannel)
+  const start = now() + SCORE_START_DELAY_S
+  const bus = openMusicBus(busName(id), start, scoreChannel)
   const synth = createSynth(coreFor(rawContext()), bus.gain.input as unknown as AudioNode, { voicing: 'game' })
   const track: Track = {
     id,
@@ -108,7 +109,7 @@ export function playScore(id: string): void {
     pausedAt: null,
     stopWarm: synth.warm(song),
   }
-  track.scheduler.start(now() + SCORE_START_DELAY_S)
+  track.scheduler.start(start)
   live.push(track)
   current = track
   ensureTimer()

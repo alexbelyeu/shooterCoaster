@@ -195,14 +195,15 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   const { Sequence } = tone()
 
   const cfg = CONFIGS[biome]
-  bus = openMusicBus('level')
+  const start = startTransportAt(cfg.tempo)
+  bus = openMusicBus('level', start.time)
   // The loops play these locals, not the module slots: a track fading out keeps its synths after a stop clears them.
   const { pad, bass, perc, lead } = createInstruments(bus.gain)
   padSynth = pad
   bassSynth = bass
   percSynth = perc
   leadSynth = lead
-  const at = `${startTransportAt(cfg.tempo)}i`
+  const at = `${start.ticks}i`
 
   padLoop = new Sequence(
     guarded('music pad', (time, chord) => {

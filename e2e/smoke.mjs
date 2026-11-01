@@ -2026,6 +2026,48 @@ async function countdownCheck(page, levelId) {
   }
 }
 
+/** #168: on every switch, the incoming track's first note must land before the bus fading out under it reaches 0. */
+function crossfadeGaps(fades) {
+  const gaps = []
+  for (const incoming of fades) {
+    if (incoming.ramp !== 'in' || incoming.firstNote == null) continue
+    for (const out of fades) {
+      if (out.ramp !== 'out' || out.at > incoming.at + incoming.seconds || out.at + out.seconds < incoming.at) continue
+      if (incoming.firstNote >= out.at + out.seconds)
+        gaps.push(`${out.name} -> ${incoming.name}: first note ${(incoming.firstNote - out.at).toFixed(2)} s into a ${out.seconds} s fade-out (a gap)`)
+    }
+  }
+  return gaps
+}
+
+/** Level -> next level and level -> level select (#168), after the phone run's results: each must fade out, fade in, leave one bus and pass `crossfadeGaps`. */
+async function musicSwitches(page) {
+  const problems = []
+  const read = () => page.evaluate(() => window.__SC_TEST__.audio().music)
+  const latest = (m) => Math.max(0, ...m.fades.map((f) => f.at))
+  const switches = []
+  const run = async (label, from, to, act) => {
+    const since = latest(await read())
+    await act()
+    const deadline = Date.now() + 30000
+    let m = await read()
+    const fresh = () => m.fades.filter((f) => f.at > since)
+    const done = () =>
+      fresh().some((f) => f.name === from && f.ramp === 'out') && fresh().some((f) => f.name === to && f.ramp === 'in') && m.buses.length === 1
+    while (!done() && Date.now() < deadline) {
+      await page.waitForTimeout(250)
+      m = await read()
+    }
+    const fades = fresh()
+    switches.push({ label, fades })
+    if (!done()) problems.push(`${label}: no ${from} fade-out + ${to} fade-in leaving one bus (${m.buses.map((b) => b.name).join(',')})`)
+    problems.push(...crossfadeGaps(fades).map((g) => `${label}: ${g}`))
+  }
+  await run('level -> next level', 'level', 'level', () => page.evaluate((seed) => window.__SC_TEST__.startLevel('level2', seed), SEED))
+  await run('level -> level select', 'level', 'title', () => page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect')))
+  return { problems, switches }
+}
+
 /** Title -> level music (#28) crossfades: read from the ramp log, since at ~1 fps a 1 s fade fits between two polls. */
 async function musicCrossfade(page) {
   const problems = []
@@ -2047,6 +2089,7 @@ async function musicCrossfade(page) {
   else if (titleOut.from < 0.5 || titleOut.seconds < 0.5)
     problems.push(`title music fade-out was not a ramp from full (from ${titleOut.from.toFixed(2)} over ${titleOut.seconds} s)`)
   if (!levelIn || levelIn.seconds < 0.5) problems.push('the level music did not fade in')
+  problems.push(...crossfadeGaps(fades))
   if (buses.some((b) => b.name === 'title')) problems.push('the title music bus was never disposed')
   if (!buses.some((b) => b.name === 'level' && !b.fading)) problems.push('no level music playing')
   return { problems, result: { fades, buses } }
@@ -2095,6 +2138,7 @@ async function scrimCheck(page) {
   if (!titleOut || titleOut.seconds < 0.5) problems.push('the title score did not fade out')
   if (!levelIn || levelIn.seconds < 0.5) problems.push('the level score did not fade in')
   if (busNames(a).includes('title')) problems.push('the title score bus was never disposed')
+  problems.push(...crossfadeGaps(a.music.fades))
 
   result.nodes.push(a.scrim.nodes)
   result.position.push(track(a)?.position ?? 0)
@@ -2152,6 +2196,7 @@ async function scrimCheck(page) {
   if (!result.results) problems.push(`no results score after the run (current "${a.scrim?.current}")`)
   if (!levelOut || levelOut.seconds < 0.5 || !resultsIn) problems.push('the level score did not crossfade to the results score')
   if (busNames(a).includes('level')) problems.push('the level score bus was never disposed')
+  problems.push(...crossfadeGaps(a.music.fades))
   result.dropped = a.dropped
   if (a.dropped) problems.push(`${a.dropped} sound(s) dropped by an audio error (${a.lastDrop?.split('\n')[0]})`)
   return { problems, result }
@@ -2399,6 +2444,8 @@ async function runMobile(browser, base) {
 
   const resultsLayout = await mobileResults(page)
   problems.push(...resultsLayout.problems)
+  const switches = await musicSwitches(page)
+  problems.push(...switches.problems)
 
   const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
   const allErrors = [...errors, ...hookErrors]
@@ -2412,7 +2459,7 @@ async function runMobile(browser, base) {
     mobile: {
       taps: 10, tapsOnEnemies, tapShots, tapKills, fallbackKills, crosshairScale,
       portraitTaps: portraitTaps.result, landscapeTaps: landscapeTaps.result,
-      audio: { portrait: audioPortrait, landscape: audioLandscape, music: music.result },
+      audio: { portrait: audioPortrait, landscape: audioLandscape, music: music.result, switches: switches.switches },
       audioBurst: { portrait: burstPortrait.burst, landscape: burstLandscape.burst },
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
       bulletMaxScreenFrac: bullets.maxScreenFrac,
