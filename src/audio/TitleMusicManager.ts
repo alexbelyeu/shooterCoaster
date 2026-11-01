@@ -83,9 +83,9 @@ function createWhoosh() {
   return { whooshFilter, whoosh }
 }
 
-function createMusic(): ToneTitleMusic {
+function createMusic(firstNote: number): ToneTitleMusic {
   const { NoiseSynth, PolySynth, Synth } = tone()
-  const bus = openMusicBus('title')
+  const bus = openMusicBus('title', firstNote)
 
   // Music-box melody — sine with fast decay for bell-like tone
   const melodyBox = new Synth({
@@ -153,11 +153,11 @@ export function startTitleMusic(): void {
     withScrim((p) => p.playScore('title'))
     return
   }
-  const t = createMusic()
+  const start = startTransportAt(TITLE_BPM)
+  const t = createMusic(start.time)
   const { melodyBox, padSynth, bassSynth, chimeSynth, tamb } = t
   track = { ...createWhoosh(), music: t }
-  const bar = startTransportAt(TITLE_BPM)
-  const at = `${bar}i`
+  const at = `${start.ticks}i`
 
   const melodyLoop = new Sequence(
     guarded('title melody', (time, note) => {
@@ -197,7 +197,7 @@ export function startTitleMusic(): void {
     const note = chimeNotes[Math.floor(Math.random() * chimeNotes.length)]
     chimeSynth.triggerAttackRelease(note, '16n', nextTriggerTime(chimeSynth, time, tone().getContext().currentTime))
   }), '2n.')
-  chimeLoop.start(`${bar + tone().getTransport().PPQ}i`) // a beat after the downbeat
+  chimeLoop.start(`${start.ticks + tone().getTransport().PPQ}i`) // a beat in
 
   const tambLoop = new Sequence(
     guarded('title tambourine', (time, hit) => {
@@ -213,12 +213,13 @@ export function startTitleMusic(): void {
   t.loops.push(melodyLoop, padLoop, bassLoop, chimeLoop, tambLoop)
 }
 
-export function stopTitleMusic(): void {
+/** `untilNextTrack`: keep the music playing until the next track opens and crossfade under it (entering a run). */
+export function stopTitleMusic(untilNextTrack = false): void {
   if (!track) return
   const { music, whoosh, whooshFilter } = track
   track = null
   if (!music) {
-    withScrim((p) => p.stopScore('title'))
+    withScrim((p) => (untilNextTrack ? p.handOverScore('title') : p.stopScore('title')))
     window.setTimeout(() => {
       whoosh.dispose()
       whooshFilter.dispose()
@@ -226,7 +227,7 @@ export function stopTitleMusic(): void {
     return
   }
   const { bus, loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb } = music
-  fadeOutMusicBus(bus, [...loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whoosh, whooshFilter])
+  fadeOutMusicBus(bus, [...loops, melodyBox, padSynth, bassSynth, chimeSynth, tamb, whoosh, whooshFilter], untilNextTrack)
 }
 
 /** Built with the title music, so silent before audio unlocks. */

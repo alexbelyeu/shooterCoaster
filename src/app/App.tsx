@@ -41,7 +41,7 @@ export default function App() {
 
   useEffect(() => {
     if (phase === 'title' || phase === 'levelSelect') return whenAudioReady(startTitleMusic)
-    stopTitleMusic()
+    stopTitleMusic(true) // the level's music opens once its scene mounts; fade under it, not before (#168)
   }, [phase])
   useEffect(() => () => stopTitleMusic(), [])
 
