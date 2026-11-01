@@ -60,6 +60,24 @@ describe('ledger comments → studio status', () => {
     expect(l.runs).toBe(3)
     expect(l.total).toBe(2_600_100)
     expect(l.roles.map((r: { role: string }) => r.role)).toEqual(['qa', 'builders', 'fix'])
-    expect(l.top).toEqual([{ ref: '#12', weighted: 2_300_000 }, { ref: '#14', weighted: 300_100 }])
+    expect(l.refs).toEqual([{ ref: '#12', weighted: 2_300_000 }, { ref: '#14', weighted: 300_100 }])
+  })
+
+  it('keeps every ref, excludes runs at or after `until`, and renders only the top 5', () => {
+    const comments = [1, 2, 3, 4, 5, 6].map((n) => comment(entry('builders', `#${n}`, n * 1000, `s${n}`), n))
+    comments.push(comment(entry('qa', '#7', 9000, 's7', '2026-10-24T12:00:00Z'), 7))
+    const l = status.ledgerSummary(comments, since, now)
+
+    expect(l.runs).toBe(6)
+    expect(l.refs.map((r: { ref: string }) => r.ref)).toEqual(['#6', '#5', '#4', '#3', '#2', '#1'])
+    const md = status.render(
+      { issues: [], prs: [], drafts: [], merged: [], building: [], ci: [], mainVerify: null, prodSmoke: null, steeringPaused: false, ledger: { number: 1, ...l } },
+      now,
+    )
+    expect(md).toContain('Most expensive: #6 ~6k · #5 ~5k · #4 ~4k · #3 ~3k · #2 ~2k\n')
+  })
+
+  it('puts the ref in backticks in the human line', () => {
+    expect(usage.ledgerComment(entry('qa', '#12', 1000, 'a')).split('\n')[0]).toContain('· `#12` ·')
   })
 })

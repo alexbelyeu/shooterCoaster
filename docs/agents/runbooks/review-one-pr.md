@@ -14,17 +14,23 @@ reviewer yourself; the scheduled QA dispatcher spawns one per PR instead.
    `QA run … reviewing` claim is earlier than yours.
 2. **Light re-review?** If an earlier QA comment says the full review passed and only a
    merge conflict had to be fixed, and every commit since that reviewed head is a merge
-   of `origin/main`, do only the light re-review in `qa.md` (the dispatcher spawns the
-   playtest reviewer for it). Skip to step 5.
+   of `origin/main`, do only the light re-review in `qa.md`. In a QA (on label) run you
+   do it yourself; the scheduled QA dispatcher spawns the playtest reviewer for it, as in
+   step 4. Skip to step 5.
 3. **Bundle.** Build the review bundle and fill in its Intent, per step 0 of
    `.claude/commands/wrap-pr.md`, unless the size gate there says to skip the two
    independent reviewers.
 4. **Review.** Unless the size gate skipped them, spawn `pr-correctness` and
    `pr-consistency` in one message with the branch name and bundle path, as step 1 of
    `wrap-pr.md` describes. Then the playtest review:
-   - QA (on label): start the two with `run_in_background: true`, then follow
+   - QA (on label): start the two with `run_in_background: true`. They read this
+     checkout, so leave it on the PR branch and playtest in a worktree of your own:
+     `git worktree add --detach ../qa-<n> pr-<n>`, then work in `../qa-<n>` (detached,
+     since `pr-<n>` is checked out here). `qa.md`'s local merge of `origin/main` and any
+     `git checkout --detach origin/main` comparison happen there. Follow
      `.claude/agents/qa.md` yourself for this PR as a combined review (no comment or
-     label changes before step 5), and collect their findings.
+     label changes before step 5), collect their findings, then
+     `git worktree remove --force ../qa-<n>`.
    - Scheduled QA dispatcher: spawn the playtest reviewer in that same message:
      `subagent_type: "general-purpose"`, `model: "opus"`, `isolation: "worktree"`,
      `run_in_background: false`, prompt: "You are QA for ShooterCoaster. Your working
