@@ -10,7 +10,7 @@ import {
   sampleTrackPath,
 } from '@/utils/terrainNoise'
 import { planThemePark } from './layout'
-import { ARCH_BOARD_HEIGHT, FLAG_DROP, RIDES, STALL_DEPTH, STALL_WIDTH } from './parkSpec'
+import { ARCH_BOARD_HEIGHT, ARCH_HALF_SPAN, FLAG_DROP, RIDES, STALL_DEPTH, STALL_WIDTH } from './parkSpec'
 
 const level = getLevelConfig('level1')!
 const { varA, varB, varC, scalar } = level.track
@@ -103,10 +103,18 @@ describe('theme park layout (level 1)', () => {
     for (const p of [...layout.lightPoles, ...layout.buntingPoles]) expect(trackNear(p.x, p.z, 10)).toEqual([])
   })
 
-  it('builds an entrance arch the rider passes under', () => {
+  it('builds an entrance arch the rider passes under, its posts at the board ends off the track', () => {
     const arch = layout.arch!
     expect(arch).not.toBeNull()
     expect(clearsRider(arch.x, arch.z, arch.boardY, arch.boardY + ARCH_BOARD_HEIGHT, 40)).toBe(true)
+    expect(arch.feet).toHaveLength(2)
+    for (const f of arch.feet) {
+      const lx = (f.x - arch.x) * Math.cos(arch.yaw) - (f.z - arch.z) * Math.sin(arch.yaw)
+      const lz = (f.x - arch.x) * Math.sin(arch.yaw) + (f.z - arch.z) * Math.cos(arch.yaw)
+      expect(Math.abs(lx)).toBeCloseTo(ARCH_HALF_SPAN, 6)
+      expect(lz).toBeCloseTo(0, 6)
+      expect(trackNear(f.x, f.z, 10)).toEqual([])
+    }
   })
 
   it('keeps rides, tents and flag poles off the track', () => {

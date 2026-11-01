@@ -32,8 +32,8 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 9. **Tree slope rejection must be tight for mountains** — `PI/6` for volcanic/arctic vs `PI/4` for flat biomes
 10. **Enemy scale must be 8-20x** when geometry uses small units (radius 2-5) — see Enemy Scaling section
 11. **Landmarks must be massive** — double your first intuitive size estimate
-12. **Decoration Y offset must be 3-8 units** above terrain — values < 1 cause z-fighting
-13. **Terrain-conforming geometry must use safeHeight()** — never flat planes. See Terrain-Conforming Features section
+12. **Decoration Y offset must be 3-8 units** above terrain — values < 1 cause z-fighting (exception: contact shadows, see Ground-Hugging Decals)
+13. **Terrain-conforming geometry must use safeHeight()** — never flat planes. See Terrain-Conforming Features section (same exception)
 14. **Procedural shaders must use domain warping** — single-direction flow creates stripe artifacts. See Shader section
 
 ## Key Files
@@ -55,6 +55,7 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 | `src/levels/environments/atmosphere.ts` | Per-biome sky/sun/hemisphere/fog config and post colour `grade` (`ATMOSPHERES`; the grade is applied by `src/canvas/post/ColourGradeEffect.ts`) |
 | `src/levels/environments/SkyDome.tsx` | Procedural sky dome shader (gradient, sun, fbm clouds), follows camera |
 | `src/levels/environments/LavaShader.ts` | Procedural GLSL lava material (domain warping + Voronoi) |
+| `src/levels/environments/landmarkDimensions.ts` | Pyramid and rock-arch sizes (`PYRAMID_REACH`, `ARCH_REACH`, `archFeet`). Anything that keeps clear of, occludes or shadows a landmark derives its footprint from here, never a copied number |
 | `src/levels/environments/Volcano.tsx` | Volcano landmark component; shapes in pure `volcanoGeometry.ts` (rock + rim with a baked `glow` attribute, lava streaks) |
 | `src/audio/MusicManager.ts` | Per-biome music configs |
 | `src/canvas/SceneManager.tsx` | Wires config to spawner + environment |
@@ -104,6 +105,15 @@ See `biomes/volcanic/lavaRivers.ts` for the full working example.
 4. **Y offset of 8+ units** above the max neighborhood sample
 5. **No vertex shader displacement** on terrain-conforming geometry — it fights the conforming
 6. **Use `depthWrite: false`** on the material to avoid z-fighting artifacts
+
+### Exception: Ground-Hugging Decals (Contact Shadows)
+Contact shadows (`shared/contactShadows.ts`) must touch the ground, so they break rules 4 and 12 on purpose: an 8-unit
+lift makes a shadow float off the ground. `buildContactShadowGeometry` samples `groundFn` (the terrain as drawn) on a fine
+grid, lifts it only `SHADOW_LIFT` (0.6), then raises each triangle by its worst deficit against the drawn terrain inside the
+cell (lift-by-deficit), and the material is transparent with `depthWrite: false` and a negative `polygonOffset`. That
+combination is what keeps a 0.6 lift from z-fighting. Don't lift the shadows to 3-8 units, and don't copy the 0.6 lift to
+opaque or depth-writing geometry: without the polygon offset it z-fights. To add a shadow, register the prop's footprint
+with `useContactShadows` (its scales must come from a `useMemo`, not an rng inside a ref callback) and leave the mesh alone.
 
 ## Procedural Shaders (Lava, Water, etc.)
 
