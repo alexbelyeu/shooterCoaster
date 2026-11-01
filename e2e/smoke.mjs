@@ -1875,8 +1875,9 @@ async function titleFlyBy(page) {
   await waitFrames(page, 2, { minMs: 6000, maxMs: 30000 })
   const b = await pose()
   const waited = (Date.now() - at) / 1000
-  const scene2 = await imageStats(page, await page.screenshot({ path: path.join(OUT, 'title-2.png'), timeout: SHOT_TIMEOUT }), TITLE_UI)
-  if (looksBlank(scene2)) problems.push('title-2.png: the 3D scene behind the UI looks blank')
+  // Re-shot like title.png: a GPU CI runner can return one black canvas capture (#291 CI), a black scene stays black.
+  const scene2 = await captureTitleScene(page, path.join(OUT, 'title-2.png'), 10000)
+  if (looksBlank(scene2)) problems.push(`title-2.png: the 3D scene behind the UI looks blank (mean ${scene2.mean.toFixed(1)} stddev ${scene2.stddev.toFixed(1)} colours ${scene2.distinctColors})`)
   let turnedDeg = 0
   let moved = 0
   if (!a || !b) problems.push('no title camera')
