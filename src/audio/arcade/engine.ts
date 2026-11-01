@@ -2,8 +2,8 @@
 import * as Tone from 'tone'
 import type { BiomeType } from '@/types/level'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { hashString } from '@/utils/rng'
-import { arcadeChannel } from '../AudioEngine'
+import { createRng, hashString } from '@/utils/rng'
+import { arcadeChannel, isAudioReady } from '../AudioEngine'
 import { scrimPlayer } from '../musicEngine'
 import { dropSound } from '../soundGuard'
 import { compile } from '../scrim/score'
@@ -11,8 +11,8 @@ import { makeIR } from '../scrim/synth'
 import { SCORES } from '../scores'
 import {
   ARCADE_SOUNDS, AUTO_FIRE_DB, BIOME_REVERB, FIREWORK_BIOMES, STEAL_FADE_S, VOICE_BUDGET, WHISTLE_LENGTHS_S, SCORE_KEYS,
-  bossHitRate, fireworkWhistleS, hitRate, killRate, killTier, nextBeat, pickVoice,
-  type ArcadeSoundId, type VoiceState,
+  WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, killTier, nextBeat, pickVoice, windGain, windHz, windUpdateDue,
+  type ArcadeSoundId, type VoiceState, type WindRamp,
 } from '../sfxDesign'
 import type { Placement, SfxEngine, VoiceStats } from '../sfx'
 import { bakeBank, type Bank } from './bake'
@@ -37,6 +37,10 @@ interface Graph {
   voices: Voice[]
   /** The FRENZY lift's own voice: a loop, never stolen. */
   lift: Voice
+  /** The ride wind, as in the Tone kit: looped noise → band-pass → gain, silent until `wind` opens it. */
+  windSrc: AudioBufferSourceNode
+  windBand: BiquadFilterNode
+  windAmp: GainNode
 }
 
 const LIFT_FADE_S = 0.12
@@ -89,8 +93,45 @@ function ensureGraph(): Graph {
   verb.connect(verbTone).connect(verbReturn).connect(out)
   const voices: Voice[] = []
   for (let i = 0; i < VOICE_BUDGET; i++) voices.push(createVoice(ctx, out, verb))
-  graph = { ctx, channel: arcadeChannel, biome, out, verb, verbTone, verbReturn, voices, lift: createVoice(ctx, out, verb) }
+  graph = { ctx, channel: arcadeChannel, biome, out, verb, verbTone, verbReturn, voices, lift: createVoice(ctx, out, verb), ...createWind(ctx, out) }
   return graph
+}
+
+const WIND_LOOP_S = 2
+
+function createWind(ctx: BaseAudioContext, out: AudioNode) {
+  const buffer = ctx.createBuffer(1, Math.round(ctx.sampleRate * WIND_LOOP_S), ctx.sampleRate)
+  const data = buffer.getChannelData(0)
+  const rng = createRng(hashString('wind'))
+  for (let i = 0; i < data.length; i++) data[i] = rng() * 2 - 1
+  const windAmp = ctx.createGain()
+  windAmp.gain.value = 0
+  const windBand = ctx.createBiquadFilter()
+  windBand.type = 'bandpass'
+  windBand.frequency.value = WIND.minHz
+  windBand.Q.value = WIND.q
+  const windSrc = ctx.createBufferSource()
+  windSrc.buffer = buffer
+  windSrc.loop = true
+  windSrc.connect(windBand).connect(windAmp).connect(out)
+  windSrc.start()
+  windRamp.speed = 0
+  windRamp.at = -Infinity
+  return { windSrc, windBand, windAmp }
+}
+
+const windRamp: WindRamp = { speed: 0, at: -Infinity }
+
+function setWind(speed: number) {
+  if (!graph) return
+  try {
+    const t = clock()
+    if (!windUpdateDue(speed, t, windRamp)) return
+    graph.windBand.frequency.setTargetAtTime(windHz(speed), t, WIND.smoothS)
+    graph.windAmp.gain.setTargetAtTime(windGain(speed), t, WIND.smoothS)
+  } catch (e) {
+    dropSound('wind', e)
+  }
 }
 
 function disposeGraph() {
@@ -103,13 +144,15 @@ function disposeGraph() {
     }
     for (const n of [v.src, v.gain, v.lp, v.pan, v.send]) n?.disconnect()
   }
-  for (const n of [graph.verb, graph.verbTone, graph.verbReturn, graph.out]) n.disconnect()
+  graph.windSrc.stop()
+  for (const n of [graph.windSrc, graph.windBand, graph.windAmp, graph.verb, graph.verbTone, graph.verbReturn, graph.out]) n.disconnect()
   graph = null
   liftOn = false
 }
 
 const VOICE_NODES = 4
 const BUS_NODES = 4
+const WIND_NODES = 3
 
 function bakeSpec(scoreId: string, levelBiome: BiomeType, level: string | null): BakeSpec {
   const song = compile(SCORES[scoreId])
@@ -133,7 +176,7 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
   wanted = key
   biome = levelBiome
   if (bank && bankKey === key) {
-    ensureGraph()
+    if (isAudioReady()) ensureGraph()
     return Promise.resolve()
   }
   if (baking?.key === key) return baking.promise
@@ -144,7 +187,7 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
       bank = baked
       bankKey = key
       bankSpec = spec
-      ensureGraph()
+      if (isAudioReady()) ensureGraph()
     })
     .finally(() => {
       if (baking?.key === key) baking = null
@@ -155,10 +198,10 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
 
 const NO_PLACE: Placement = { pan: 0, cutoffHz: 20000 }
 
-/** Null before the bank is baked, or when every voice plays something more important. */
+/** Null before audio unlocks or the bank is baked, or when every voice plays something more important. */
 function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: Placement | null = null, loopOffset = -1): Voice | null {
   const buffer = bank?.get(id)?.[variant]
-  if (!buffer) return null
+  if (!buffer || !isAudioReady()) return null
   try {
     const g = ensureGraph()
     const now = clock()
@@ -255,8 +298,10 @@ function setLift(on: boolean) {
   }
 }
 
+let killsPlayed = 0
+
 function playKill(body: ArcadeSoundId, combo: number, at: Placement | null) {
-  play(body, 0, 0, killRate(combo), 0, at)
+  if (play(body, 0, 0, killRate(combo), 0, at)) killsPlayed++
   const tier = killTier(combo)
   if (tier >= 1) play('kill.thump', 0, 0, 1, 0, at)
   if (tier >= 2) play('kill.ring', 0, 0, 1, 0, at)
@@ -301,15 +346,20 @@ export const arcadeSfx: SfxEngine = {
   starChime: (index) => void play(index <= 0 ? 'star1' : index === 1 ? 'star2' : 'star3'),
   ui: (sound) => void play(sound === 'select' ? 'uiSelect' : sound === 'back' ? 'uiBack' : 'uiLaunch'),
   countdown: (go) => void play(go ? 'countGo' : 'countReady'),
-  nodeCount: () => (graph ? BUS_NODES + VOICE_NODES * (graph.voices.length + 1) : 0),
+  wind: setWind,
+  nodeCount: () => (graph ? BUS_NODES + WIND_NODES + VOICE_NODES * (graph.voices.length + 1) : 0),
+  killsPlayed: () => killsPlayed,
   voices() {
     stats.live = liveVoices(clock())
     return stats
   },
   dispose(level) {
     setLift(false)
-    // A menu may already have asked for its own sounds: leave those alone.
-    if (level !== undefined && !wanted?.startsWith(`${scoreIdOf(level)}:`)) return
+    // A menu may already have asked for its own sounds: leave those alone, but silence the ride wind.
+    if (level !== undefined && !wanted?.startsWith(`${scoreIdOf(level)}:`)) {
+      setWind(0)
+      return
+    }
     wanted = null
     disposeGraph()
     bank = null

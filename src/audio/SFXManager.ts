@@ -1,4 +1,5 @@
-import * as Tone from 'tone'
+import type * as Tone from 'tone'
+import { tone } from './tone'
 import { nextTriggerTime } from './triggerTime'
 import { dropSound } from './soundGuard'
 import { sfxChannel, isAudioReady } from './AudioEngine'
@@ -16,17 +17,24 @@ import {
   STINGERS,
   STINGER_CHORD_GAP_S,
   STINGER_VOICES,
+  WIND,
+  type WindRamp,
   bossHitHz,
   fireVelocity,
   fireworkWhistleS,
   killLayers,
   killPingHz,
+  windGain,
+  windHz,
+  windUpdateDue,
 } from './sfxDesign'
 import type { BiomeType } from '@/types/level'
 import type { PickupWeaponId, WeaponId } from '@/combat/weapons/weaponTypes'
 
 /*
- * Every gameplay SFX node is built once per level into `owned` and reused; never create one in a play function.
+ * Every gameplay SFX node, the ride wind included, is built once per level through `own()` and reused; never create one
+ * in a play function. `sfxNodeCount()` sees only `own()`ed nodes (not Tone's per-note internals), so `SFXManager.test.ts`
+ * fails a bare `new`.
  *
  * Volume hierarchy (individual synth dB + sfxChannel -6 dB, then the master limiter):
  *   Fire pew   : -20 (-26 when auto-firing) → background, fires 10×/sec
@@ -39,7 +47,7 @@ import type { PickupWeaponId, WeaponId } from '@/combat/weapons/weaponTypes'
  *   Star chime : -16 bell, up to 3 on the results screen
  *   Boss       : arrival on the stinger voices + thump; hit thud -12; defeat boom -10 (low-passed brown noise)
  *   Firework   : whistle -22 (band-passed pink sweep), pop -16 crack + thump (theme park only)
- *   Wind       : gain 0–0.12 → ambient bed, never dominates
+ *   Wind       : gain 0–0.12 with ride speed → ambient bed, never dominates
  */
 
 interface Kit {
@@ -58,6 +66,9 @@ interface Kit {
   bossThud: Tone.MembraneSynth
   bossBoom: Tone.NoiseSynth
   firework: FireworkVoices | null
+  /** The wind runs silent for the kit's lifetime; `setWind` opens it with speed. */
+  windBand: Tone.Filter
+  windAmp: Tone.Gain
 }
 
 interface FireworkVoices {
@@ -78,7 +89,8 @@ function own<T extends Tone.ToneAudioNode>(node: T): T {
 }
 
 function createKit(biome: BiomeType): Kit {
-  const fire = own(new Tone.Synth({
+  const { Distortion, Filter, Gain, MembraneSynth, Noise, NoiseSynth, Synth } = tone()
+  const fire = own(new Synth({
     oscillator: { type: 'sine' },
     envelope: { attack: 0.005, decay: 0.12, sustain: 0, release: 0.06 },
     volume: -20,
@@ -86,38 +98,38 @@ function createKit(biome: BiomeType): Kit {
 
   const weaponFire = {} as Record<PickupWeaponId, Tone.Synth>
   for (const [id, d] of Object.entries(WEAPON_FIRE_SFX) as [PickupWeaponId, (typeof WEAPON_FIRE_SFX)[PickupWeaponId]][]) {
-    weaponFire[id] = own(new Tone.Synth({
+    weaponFire[id] = own(new Synth({
       oscillator: { type: d.oscillator },
       envelope: { attack: 0.003, decay: d.sweepS, sustain: 0, release: 0.05 },
       volume: d.volume,
     })).connect(sfxChannel)
   }
 
-  const popPing = own(new Tone.Synth({
+  const popPing = own(new Synth({
     oscillator: { type: 'sine' },
     envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.03 },
     volume: -18,
   })).connect(sfxChannel)
 
-  const popSnap = own(new Tone.NoiseSynth({
+  const popSnap = own(new NoiseSynth({
     noise: { type: 'white' },
     envelope: { attack: 0.001, decay: 0.06, sustain: 0 },
     volume: -14,
   })).connect(sfxChannel)
 
-  const tickNoise = own(new Tone.NoiseSynth({
+  const tickNoise = own(new NoiseSynth({
     noise: { type: 'white' },
     envelope: { attack: 0.001, decay: 0.02, sustain: 0, release: 0.01 },
     volume: -24,
   })).connect(sfxChannel)
-  const tickBlip = own(new Tone.Synth({
+  const tickBlip = own(new Synth({
     oscillator: { type: 'sine' },
     envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.01 },
     volume: -22,
   })).connect(sfxChannel)
 
   // Also the stinger drum.
-  const thump = own(new Tone.MembraneSynth({
+  const thump = own(new MembraneSynth({
     pitchDecay: 0.04,
     octaves: 4,
     envelope: { attack: 0.001, decay: 0.25, sustain: 0, release: 0.1 },
@@ -125,21 +137,21 @@ function createKit(biome: BiomeType): Kit {
   })).connect(sfxChannel)
 
   // Inharmonic FM ratio → metallic ring.
-  const ring = own(new Tone.Synth({
+  const ring = own(new Synth({
     oscillator: { type: 'fmsine', harmonicity: 3.7, modulationIndex: 14 },
     envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.2 },
     volume: -26,
   })).connect(sfxChannel)
 
   // Reverse-cymbal swell: high-passed pink noise that fades in, then cuts.
-  const swellFilter = own(new Tone.Filter({ type: 'highpass', frequency: 3000 })).connect(sfxChannel)
-  const swell = own(new Tone.NoiseSynth({
+  const swellFilter = own(new Filter({ type: 'highpass', frequency: 3000 })).connect(sfxChannel)
+  const swell = own(new NoiseSynth({
     noise: { type: 'pink' },
     envelope: { attack: SWELL_S, decay: 0.04, sustain: 0, release: 0.04 },
     volume: -24,
   })).connect(swellFilter)
 
-  const comboBreak = own(new Tone.Synth({
+  const comboBreak = own(new Synth({
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.004, decay: COMBO_BREAK.sweepS, sustain: 0, release: 0.08 },
     volume: COMBO_BREAK.volume,
@@ -147,36 +159,36 @@ function createKit(biome: BiomeType): Kit {
 
   const d = STINGERS[biome]
   let stingerOut: Tone.ToneAudioNode = sfxChannel
-  if (d.drive > 0) stingerOut = own(new Tone.Distortion(d.drive)).connect(sfxChannel)
-  const stingerBus = own(new Tone.Filter({ type: 'lowpass', frequency: d.cutoffHz })).connect(stingerOut)
+  if (d.drive > 0) stingerOut = own(new Distortion(d.drive)).connect(sfxChannel)
+  const stingerBus = own(new Filter({ type: 'lowpass', frequency: d.cutoffHz })).connect(stingerOut)
   const oscillator =
     d.oscillator === 'fmsine'
       ? { type: 'fmsine' as const, harmonicity: d.harmonicity ?? 1, modulationIndex: d.modulationIndex ?? 2 }
       : { type: d.oscillator }
   const stinger: Tone.Synth[] = []
   for (let i = 0; i < STINGER_VOICES; i++) {
-    stinger.push(own(new Tone.Synth({
+    stinger.push(own(new Synth({
       oscillator: oscillator as Tone.SynthOptions['oscillator'],
       envelope: { attack: d.attack, decay: d.decay, sustain: d.sustain, release: d.release },
       volume: d.volume,
     })).connect(stingerBus))
   }
 
-  const chime = own(new Tone.Synth({
+  const chime = own(new Synth({
     oscillator: { type: 'fmsine', harmonicity: 2, modulationIndex: 3 },
     envelope: { attack: 0.002, decay: 0.9, sustain: 0, release: 0.4 },
     volume: -16,
   })).connect(sfxChannel)
 
-  const bossThud = own(new Tone.MembraneSynth({
+  const bossThud = own(new MembraneSynth({
     pitchDecay: 0.08,
     octaves: 3,
     envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 },
     volume: BOSS_SFX.hit.volume,
   })).connect(sfxChannel)
 
-  const boomFilter = own(new Tone.Filter({ type: 'lowpass', frequency: BOSS_SFX.defeat.boomCutoffHz })).connect(sfxChannel)
-  const bossBoom = own(new Tone.NoiseSynth({
+  const boomFilter = own(new Filter({ type: 'lowpass', frequency: BOSS_SFX.defeat.boomCutoffHz })).connect(sfxChannel)
+  const bossBoom = own(new NoiseSynth({
     noise: { type: 'brown' },
     envelope: { attack: 0.005, decay: BOSS_SFX.defeat.boomS, sustain: 0, release: 0.2 },
     volume: BOSS_SFX.defeat.boomVolume,
@@ -184,19 +196,27 @@ function createKit(biome: BiomeType): Kit {
 
   const firework = FIREWORK_BIOMES.includes(biome) ? createFireworkVoices() : null
 
-  return { fire, weaponFire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, comboBreak, stinger, chime, bossThud, bossBoom, firework }
+  const windAmp = own(new Gain(0)).connect(sfxChannel)
+  const windBand = own(new Filter({ type: 'bandpass', frequency: WIND.minHz, Q: WIND.q })).connect(windAmp)
+  own(new Noise('white')).connect(windBand).start()
+
+  return {
+    fire, weaponFire, popPing, popSnap, tickNoise, tickBlip, thump, ring, swell, comboBreak, stinger, chime, bossThud, bossBoom, firework,
+    windBand, windAmp,
+  }
 }
 
 function createFireworkVoices(): FireworkVoices {
+  const { Filter, NoiseSynth } = tone()
   const { whistle: w, pop } = FIREWORK_SFX
-  const whistleBand = own(new Tone.Filter({ type: 'bandpass', frequency: w.startHz, Q: w.q })).connect(sfxChannel)
-  const whistle = own(new Tone.NoiseSynth({
+  const whistleBand = own(new Filter({ type: 'bandpass', frequency: w.startHz, Q: w.q })).connect(sfxChannel)
+  const whistle = own(new NoiseSynth({
     noise: { type: 'pink' },
     envelope: { attack: 0.05, decay: 0.01, sustain: 1, release: 0.06 },
     volume: w.volume,
   })).connect(whistleBand)
-  const crackFilter = own(new Tone.Filter({ type: 'lowpass', frequency: pop.cutoffHz })).connect(sfxChannel)
-  const crack = own(new Tone.NoiseSynth({
+  const crackFilter = own(new Filter({ type: 'lowpass', frequency: pop.cutoffHz })).connect(sfxChannel)
+  const crack = own(new NoiseSynth({
     noise: { type: 'white' },
     envelope: { attack: 0.001, decay: pop.crackS, sustain: 0, release: 0.05 },
     volume: pop.volume,
@@ -229,6 +249,7 @@ export function playFireSound(auto = false, weapon: WeaponId = 'blaster'): void 
   try {
     const k = ensureKit()
     if (!k) return
+    const T = tone()
     let synth = k.fire
     let v = FIRE_VARIANTS[fireVariant]
     if (weapon === 'blaster') fireVariant = (fireVariant + 1) % FIRE_VARIANTS.length
@@ -237,7 +258,7 @@ export function playFireSound(auto = false, weapon: WeaponId = 'blaster'): void 
       v = WEAPON_FIRE_SFX[weapon]
     }
     const jitter = 0.94 + Math.random() * 0.12
-    const now = nextTriggerTime(synth, Tone.now(), Tone.getContext().currentTime)
+    const now = nextTriggerTime(synth, T.now(), T.getContext().currentTime)
     synth.triggerAttack(v.startHz * jitter, now, fireVelocity(auto))
     synth.frequency.exponentialRampTo(v.endHz * jitter, v.sweepS, now)
     synth.triggerRelease(now + v.sweepS + 0.02)
@@ -251,15 +272,15 @@ let lastTickTime = 0
 const HIT_TICK_MIN_INTERVAL = 25 // ms — several hits in one frame tick once
 
 export function playHitTick(): void {
-  const k = ensureKit()
-  if (!k) return
-  const nowMs = Tone.now() * 1000
-  if (nowMs - lastTickTime < HIT_TICK_MIN_INTERVAL) return
-  lastTickTime = nowMs
-
   try {
-    const toneNow = Tone.now()
-    const ctxNow = Tone.getContext().currentTime
+    const k = ensureKit()
+    if (!k) return
+    const T = tone()
+    const toneNow = T.now()
+    const nowMs = toneNow * 1000
+    if (nowMs - lastTickTime < HIT_TICK_MIN_INTERVAL) return
+    lastTickTime = nowMs
+    const ctxNow = T.getContext().currentTime
     k.tickNoise.triggerAttackRelease(0.015, nextTriggerTime(k.tickNoise, toneNow, ctxNow))
     k.tickBlip.triggerAttackRelease(3200 + Math.random() * 700, 0.02, nextTriggerTime(k.tickBlip, toneNow, ctxNow))
   } catch (e) {
@@ -271,18 +292,23 @@ let lastExplosionTime = 0
 const EXPLOSION_SOUND_MIN_INTERVAL = 30 // ms — throttle rapid pops
 let lastSwellTime = 0
 const SWELL_MIN_INTERVAL = 600 // ms — let one swell finish before the next
+let killsPlayed = 0
+
+/** e2e: kills that got past the throttle and reached Tone since load. */
+export function sfxKillsPlayed(): number {
+  return killsPlayed
+}
 
 export function playExplosionSound(comboCount: number = 0, sound: KillSound = 'pop'): void {
-  const k = ensureKit()
-  if (!k) return
-
-  const nowMs = Tone.now() * 1000
-  if (nowMs - lastExplosionTime < EXPLOSION_SOUND_MIN_INTERVAL) return
-  lastExplosionTime = nowMs
-
   try {
-    const toneNow = Tone.now()
-    const ctxNow = Tone.getContext().currentTime
+    const k = ensureKit()
+    if (!k) return
+    const T = tone()
+    const toneNow = T.now()
+    const nowMs = toneNow * 1000
+    if (nowMs - lastExplosionTime < EXPLOSION_SOUND_MIN_INTERVAL) return
+    lastExplosionTime = nowMs
+    const ctxNow = T.getContext().currentTime
     const timbre = KILL_TIMBRES[sound]
     k.popSnap.envelope.decay = timbre.snapDecay
     k.popSnap.triggerAttackRelease(timbre.snapS + Math.random() * 0.02, nextTriggerTime(k.popSnap, toneNow, ctxNow))
@@ -301,16 +327,18 @@ export function playExplosionSound(comboCount: number = 0, sound: KillSound = 'p
       lastSwellTime = nowMs
       k.swell.triggerAttackRelease(SWELL_S, nextTriggerTime(k.swell, toneNow, ctxNow))
     }
+    killsPlayed++
   } catch (e) {
     dropSound('kill', e)
   }
 }
 
 export function playComboBreak(): void {
-  const k = ensureKit()
-  if (!k) return
   try {
-    const t = nextTriggerTime(k.comboBreak, Tone.now(), Tone.getContext().currentTime)
+    const k = ensureKit()
+    if (!k) return
+    const T = tone()
+    const t = nextTriggerTime(k.comboBreak, T.now(), T.getContext().currentTime)
     k.comboBreak.triggerAttack(COMBO_BREAK.startHz, t, 0.8)
     k.comboBreak.frequency.exponentialRampTo(COMBO_BREAK.endHz, COMBO_BREAK.sweepS, t)
     k.comboBreak.triggerRelease(t + COMBO_BREAK.sweepS)
@@ -320,12 +348,13 @@ export function playComboBreak(): void {
 }
 
 export function playWaveStinger(): void {
-  const k = ensureKit()
-  if (!k) return
-  const d = STINGERS[kitBiome]
   try {
-    const toneNow = Tone.now()
-    const ctxNow = Tone.getContext().currentTime
+    const k = ensureKit()
+    if (!k) return
+    const T = tone()
+    const d = STINGERS[kitBiome]
+    const toneNow = T.now()
+    const ctxNow = T.getContext().currentTime
     for (let c = 0; c < 2; c++) {
       const chord = d.chords[c]
       const t = toneNow + c * STINGER_CHORD_GAP_S
@@ -344,12 +373,13 @@ export function playWaveStinger(): void {
 
 /** Boss arrival: three ominous chords on the biome's stinger voices, a drum hit under each. */
 export function playBossStinger(): void {
-  const k = ensureKit()
-  if (!k) return
-  const { chords, drum, gapS } = BOSS_SFX.arrival
   try {
-    const toneNow = Tone.now()
-    const ctxNow = Tone.getContext().currentTime
+    const k = ensureKit()
+    if (!k) return
+    const T = tone()
+    const { chords, drum, gapS } = BOSS_SFX.arrival
+    const toneNow = T.now()
+    const ctxNow = T.getContext().currentTime
     for (let c = 0; c < chords.length; c++) {
       const t = toneNow + c * gapS
       const last = c === chords.length - 1
@@ -366,11 +396,12 @@ export function playBossStinger(): void {
 
 /** One low thud per boss hit, rising as it weakens (the usual hit tick plays too, from `enemy:hit`). */
 export function playBossHit(event: unknown): void {
-  const k = ensureKit()
-  if (!k) return
   try {
+    const k = ensureKit()
+    if (!k) return
+    const T = tone()
     const hp = (event as { hpFraction?: number } | undefined)?.hpFraction ?? 1
-    k.bossThud.triggerAttackRelease(bossHitHz(hp), 0.15, nextTriggerTime(k.bossThud, Tone.now(), Tone.getContext().currentTime))
+    k.bossThud.triggerAttackRelease(bossHitHz(hp), 0.15, nextTriggerTime(k.bossThud, T.now(), T.getContext().currentTime))
   } catch (e) {
     dropSound('boss hit', e)
   }
@@ -378,12 +409,13 @@ export function playBossHit(event: unknown): void {
 
 /** Boss down: a long low boom, the kill layers and a bright major chord on top. */
 export function playBossDefeat(): void {
-  const k = ensureKit()
-  if (!k) return
-  const { boomS, chord, chordDelayS } = BOSS_SFX.defeat
   try {
-    const toneNow = Tone.now()
-    const ctxNow = Tone.getContext().currentTime
+    const k = ensureKit()
+    if (!k) return
+    const T = tone()
+    const { boomS, chord, chordDelayS } = BOSS_SFX.defeat
+    const toneNow = T.now()
+    const ctxNow = T.getContext().currentTime
     k.bossBoom.triggerAttackRelease(boomS, nextTriggerTime(k.bossBoom, toneNow, ctxNow))
     k.thump.triggerAttackRelease('C1', 0.5, nextTriggerTime(k.thump, toneNow, ctxNow))
     k.popSnap.envelope.decay = KILL_TIMBRES.pop.snapDecay
@@ -402,13 +434,14 @@ export function playBossDefeat(): void {
 
 /** A rocket leaving its pad: a rising whistle over its flight (`FireworkLaunch`: game seconds at a time scale). */
 export function playFireworkWhistle(event: unknown): void {
-  const fw = ensureKit()?.firework
-  if (!fw) return
   try {
+    const fw = ensureKit()?.firework
+    if (!fw) return
+    const T = tone()
     const { flightS = 0, timeScale = 1 } = (event as { flightS?: number; timeScale?: number } | undefined) ?? {}
     const { startHz, endHz } = FIREWORK_SFX.whistle
     const dur = fireworkWhistleS(flightS, timeScale)
-    const t = nextTriggerTime(fw.whistle, Tone.now(), Tone.getContext().currentTime)
+    const t = nextTriggerTime(fw.whistle, T.now(), T.getContext().currentTime)
     fw.whistleBand.frequency.cancelScheduledValues(t)
     fw.whistleBand.frequency.setValueAtTime(startHz, t)
     fw.whistleBand.frequency.exponentialRampToValueAtTime(endHz, t + dur)
@@ -420,13 +453,14 @@ export function playFireworkWhistle(event: unknown): void {
 
 /** A firework bursting: a bright crack over a low thump. */
 export function playFireworkPop(): void {
-  const k = ensureKit()
-  const fw = k?.firework
-  if (!k || !fw) return
   try {
+    const k = ensureKit()
+    const fw = k?.firework
+    if (!k || !fw) return
+    const T = tone()
     const { crackS, drum, drumVelocity } = FIREWORK_SFX.pop
-    const toneNow = Tone.now()
-    const ctxNow = Tone.getContext().currentTime
+    const toneNow = T.now()
+    const ctxNow = T.getContext().currentTime
     fw.crack.triggerAttackRelease(crackS, nextTriggerTime(fw.crack, toneNow, ctxNow))
     k.thump.triggerAttackRelease(drum, 0.3, nextTriggerTime(k.thump, toneNow, ctxNow), drumVelocity)
   } catch (e) {
@@ -436,11 +470,12 @@ export function playFireworkPop(): void {
 
 /** The power-up arpeggio, on the star-chime synth. */
 export function playPickupChime(): void {
-  const k = ensureKit()
-  if (!k) return
   try {
-    const t0 = Tone.now()
-    const ctxNow = Tone.getContext().currentTime
+    const k = ensureKit()
+    if (!k) return
+    const T = tone()
+    const t0 = T.now()
+    const ctxNow = T.getContext().currentTime
     PICKUP_CHIME.notes.forEach((note, i) => {
       k.chime.triggerAttackRelease(note, PICKUP_CHIME.noteS, nextTriggerTime(k.chime, t0 + i * PICKUP_CHIME.stepS, ctxNow))
     })
@@ -451,67 +486,30 @@ export function playPickupChime(): void {
 
 /** Uses the level's kit, which stays mounted under the results screen. */
 export function playStarChime(starIndex: number): void {
-  const k = ensureKit()
-  if (!k) return
   try {
-    const t = nextTriggerTime(k.chime, Tone.now(), Tone.getContext().currentTime)
+    const k = ensureKit()
+    if (!k) return
+    const T = tone()
+    const t = nextTriggerTime(k.chime, T.now(), T.getContext().currentTime)
     k.chime.triggerAttackRelease(STAR_CHIME_NOTES[starIndex] ?? STAR_CHIME_NOTES[2], 0.5, t)
   } catch (e) {
     dropSound('star chime', e)
   }
 }
 
-let windNoise: Tone.Noise | null = null
-let windFilter: Tone.Filter | null = null
-let windGain: Tone.Gain | null = null
+const windRamp: WindRamp = { speed: 0, at: -Infinity }
 
-/** Start continuous wind whoosh noise — call once on level start */
-export function startWindWhoosh(): void {
-  if (!isAudioReady() || windNoise) return
-
-  windFilter = new Tone.Filter({
-    frequency: 400,
-    type: 'bandpass',
-    Q: 0.5,
-  })
-
-  windGain = new Tone.Gain(0).connect(sfxChannel)
-  windFilter.connect(windGain)
-
-  windNoise = new Tone.Noise('white')
-  windNoise.connect(windFilter)
+/** The ride's wind from the coaster's speed (0–1), called every frame: re-aims the kit's wind only when `windUpdateDue`. */
+export function setWind(speed: number): void {
   try {
-    windNoise.start()
+    // Never builds the kit: a camera unmounting after the level's `disposeSFX` must not bring it back.
+    if (!kit) return
+    const t = tone().now()
+    if (!windUpdateDue(speed, t, windRamp)) return
+    kit.windBand.frequency.setTargetAtTime(windHz(speed), t, WIND.smoothS)
+    kit.windAmp.gain.setTargetAtTime(windGain(speed), t, WIND.smoothS)
   } catch (e) {
     dropSound('wind', e)
-  }
-}
-
-/** Update wind intensity based on velocity (0-1 normalized) */
-export function updateWindWhoosh(velocityNormalized: number): void {
-  if (!windFilter || !windGain) return
-  try {
-    const freq = 200 + velocityNormalized * 1800
-    windFilter.frequency.rampTo(freq, 0.1)
-    windGain.gain.rampTo(velocityNormalized * 0.12, 0.1)
-  } catch (e) {
-    dropSound('wind', e)
-  }
-}
-
-export function stopWindWhoosh(): void {
-  if (windNoise) {
-    windNoise.stop()
-    windNoise.dispose()
-    windNoise = null
-  }
-  if (windFilter) {
-    windFilter.dispose()
-    windFilter = null
-  }
-  if (windGain) {
-    windGain.dispose()
-    windGain = null
   }
 }
 
@@ -520,4 +518,6 @@ export function disposeSFX(): void {
   owned.length = 0
   kit = null
   lastTickTime = lastExplosionTime = lastSwellTime = 0
+  windRamp.speed = 0
+  windRamp.at = -Infinity
 }

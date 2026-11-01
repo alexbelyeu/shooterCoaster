@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels, getLevelConfig } from './LevelRegistry'
-import { SCORE_VALUES, computeMaxScore, computeStars } from './scoring'
+import { getAllLevels, getLevelConfig, previousLevel } from './LevelRegistry'
+import { SCORE_VALUES, computeMaxScore, computeStars, nextStar } from './scoring'
 import type { EnemyType } from '@/types/level'
 import { BOSS_SPECS } from '@/entities/bosses/bossSpecs'
 import { bossMaxScore } from '@/entities/bosses/bossModel'
@@ -19,6 +19,14 @@ describe('LevelRegistry', () => {
   it('getLevelConfig finds every level and rejects unknown ids', () => {
     for (const l of levels) expect(getLevelConfig(l.id)).toBe(l)
     expect(getLevelConfig('nope')).toBeUndefined()
+  })
+
+  it('previousLevel inverts the nextLevel chain; only the first level has none', () => {
+    expect(previousLevel(levels[0].id)).toBeNull()
+    for (const l of levels) if (l.nextLevel) expect(previousLevel(l.nextLevel), l.nextLevel).toBe(l.id)
+    expect(levels.filter((l) => previousLevel(l.id) === null).map((l) => l.id)).toEqual(['level1'])
+    expect(previousLevel('nope')).toBeNull()
+    expect(previousLevel('y', [{ id: 'x', nextLevel: 'y' }, { id: 'y', nextLevel: null }])).toBe('x')
   })
 
   it('combat overrides are hex colours and positive sizes', () => {
@@ -148,6 +156,41 @@ describe('computeStars', () => {
   it('a perfect no-combo run earns 3 stars on every level', () => {
     for (const l of levels) {
       expect(computeStars(l.maxScore, l.maxScore, l.starThresholds), l.id).toBe(3)
+    }
+  })
+})
+
+describe('nextStar', () => {
+  const t = [0.3, 0.6, 0.9] as const
+  it('names the next star and the points to it', () => {
+    expect(nextStar(0, 1000, t)).toEqual({ stars: 1, points: 300 })
+    expect(nextStar(299.5, 1000, t)).toEqual({ stars: 1, points: 1 })
+    expect(nextStar(300, 1000, t)).toEqual({ stars: 2, points: 300 })
+    expect(nextStar(899, 1000, t)).toEqual({ stars: 3, points: 1 })
+  })
+
+  it('does not round a float threshold product like 0.55 × 100 up a point', () => {
+    expect(nextStar(54, 100, [0.25, 0.55, 0.85])).toEqual({ stars: 2, points: 1 })
+  })
+
+  it('is null with all stars or no max score', () => {
+    expect(nextStar(900, 1000, t)).toBeNull()
+    expect(nextStar(10, 0, t)).toBeNull()
+  })
+
+  it('agrees with computeStars at every whole score on every level', () => {
+    for (const l of levels) {
+      for (let score = 0; score <= l.maxScore; score++) {
+        const earned = computeStars(score, l.maxScore, l.starThresholds)
+        const next = nextStar(score, l.maxScore, l.starThresholds)
+        if (earned === 3) {
+          expect(next, `${l.id} @ ${score}`).toBeNull()
+          continue
+        }
+        expect(next?.stars, `${l.id} @ ${score}`).toBe(earned + 1)
+        expect(computeStars(score + next!.points, l.maxScore, l.starThresholds), `${l.id} @ ${score}`).toBe(earned + 1)
+        expect(computeStars(score + next!.points - 1, l.maxScore, l.starThresholds), `${l.id} @ ${score}`).toBe(earned)
+      }
     }
   })
 })

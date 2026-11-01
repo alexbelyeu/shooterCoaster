@@ -16,7 +16,9 @@
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
  *     the weapon view-model's on-screen box (hit feedback checks)
- *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses) and render it offline
+ *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses, sounds dropped by a
+ *     caught audio error: `dropped` / `lastDrop`), stress it (audioBurst: rapid SFX, every kill tier past the
+ *     throttles, late music notes) and render it offline
  *   - read the camera pose (title fly-by), shader program count and longest frame (first-shot hitch)
  *   - read startup timings (initTimings)
  *   - summon the level's boss now, read it (hp, exposed weak points, on-screen box) and hit it through processHit
@@ -30,7 +32,6 @@ import { useEffect } from 'react'
 import { dailyKey, dailyLevel, dailySeed, type DailyStreak } from '@/levels/daily'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import * as Tone from 'tone'
 import { useGameStore, type RunMode } from '@/store/useGameStore'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
@@ -45,12 +46,13 @@ import { startupTimings, type StartupPhase } from '@/core/startupMarks'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { qualityProfile, type GraphicsQuality, type QualityProfile } from '@/canvas/graphicsQuality'
 import { getAdaptiveSteps } from '@/canvas/useRenderBudget'
-import { comboMultiplier } from '@/combat/comboTiers'
+import { COMBO_TIERS, TOP_TIER, comboMultiplier } from '@/combat/comboTiers'
 import { frenzyActive } from '@/combat/comboRuntime'
 import { getPointerState } from '@/input/pointerInput'
 import { initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
 import { loadArcade, sfx, type VoiceStats } from '@/audio/sfx'
 import { droppedSounds } from '@/audio/soundGuard'
+import { tone, toneLoaded } from '@/audio/tone'
 import { nextTriggerTime } from '@/audio/triggerTime'
 import { musicState, type MusicFade } from '@/audio/musicBus'
 import { MUSIC_ENGINE, scrimPlayer, type MusicEngine } from '@/audio/musicEngine'
@@ -59,6 +61,9 @@ import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/en
 import { clipboardText, sharePayloadForRun } from '@/ui/share'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
+import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
+import { MAX_BANK_DEG, MAX_PITCH_DEG } from '@/track/cameraRig'
+import { DROP_FOV_DEG, SPEED_FOV_DEG } from '@/track/cameraFov'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -75,15 +80,18 @@ export interface SCTestApi {
   cameraPose: () => { position: [number, number, number]; forward: [number, number, number] } | null
   drawCalls: number
   triangles: number
-  levels: () => { id: string; name: string }[]
+  /** Every level in play order, its `nextLevel` and whether the unlock rule opens it now. */
+  levels: () => { id: string; name: string; nextLevel: string | null; unlocked: boolean }[]
   /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one. */
   startLevel: (id: string, seed?: number) => void
   /** `<count>:<hash>` of the latest run's spawn positions (formation members: their seeded slots); null until a spawner has generated them. */
   spawnDigest: () => string | null
-  /** Level time (s) now and when the next wave still to come is due (null once all are in); null with no level. */
-  nextWave: () => { levelTime: number; due: number | null } | null
-  /** Every `wave:incoming` (the tell, ~1 s early) and `wave:announce` (arrival) since load, with performance.now() ms and the level time (s). */
-  waveEvents: { kind: 'incoming' | 'announce'; label: string; ms: number; levelTime: number | null }[]
+  /** Level time (s) now, when the next wave still to come is due (null once all are in) and the spawner's last wave tick (s); null with no level. */
+  nextWave: () => WaveProbe | null
+  /** Seconds of level time a `wave:incoming` tell is due before its wave (`WAVE_TELL_SECONDS`). */
+  waveTellSeconds: number
+  /** Every `wave:incoming` (tell) and `wave:announce` (arrival) since load; a tell is on time when `lastTick < due - waveTellSeconds <= levelTime`. */
+  waveEvents: { kind: 'incoming' | 'announce'; label: string; ms: number; levelTime: number | null; due: number | null; lastTick: number | null }[]
   phase: () => string
   /** Jump to a UI phase (e.g. `levelSelect`) without clicking through the screens before it. */
   setPhase: (phase: GamePhase) => void
@@ -115,10 +123,11 @@ export interface SCTestApi {
   cameraTrauma: { current: number; max: number }
   /** Coaster camera weight (#123) applied this frame and the max seen since load:
    *  bank and pitch (degrees, signed; maxima are absolute), the speed + drop FOV widening,
-   *  the smoothed ride speed (0–1) and the wind-streak opacity (#27). */
+   *  the smoothed ride speed (0–1), the wind-streak opacity (#27) and the caps (degrees) from the source constants. */
   cameraWeight: {
     roll: number; pitch: number; fovKick: number; maxRoll: number; maxPitch: number; maxFovKick: number
     speed: number; streaks: number; maxStreaks: number
+    caps: { roll: number; pitch: number; fovKick: number }
   }
   /** First-person weapon view-model on screen (CSS px, origin top-left):
    *  bounding box of its projected bounds and the muzzle tip. null before the
@@ -129,6 +138,8 @@ export interface SCTestApi {
   /** Seconds every live bullet flies per frame instead of the frame time, and no bullet expires;
    *  0 freezes them (e.g. a fresh one at the muzzle), null is normal play. */
   bulletStep: number | null
+  /** Seconds the level timer and game clock advance per playing frame instead of the frame time; null is normal play. */
+  timerStep: number | null
   /** Drawn bullets (#165): count, largest screen radius (fraction of canvas height) now and since load, newest one's CSS px point. */
   bullets: () => E2EBullets
   /** Fire one real shot through NDC (x, y), like a click there. False if not fired (phase, fire delay). */
@@ -142,14 +153,14 @@ export interface SCTestApi {
   /** Every 100 ms (real time, at most once per rendered frame) aim at the nearest
    *  live on-screen enemy and fire a real bullet through the pool. */
   autoFire: (enabled: boolean) => void
-  /** Kill the n nearest live enemies (on-screen ones first). Fires one real shot
-   *  at the first on-screen victim (bullet, muzzle flash, camera kick; may be
+  /** Kill the n nearest live enemies (on-screen ones first; never a boss weak point, see bossHit). Fires one real shot
+   *  at the first on-screen victim (bullet, muzzle flash, weapon recoil; may be
    *  throttled by the fire delay), then resolves each victim through
    *  processHit — the bullet pool's own hit path (enemy:hit, hit flash, kill pop;
    *  enemy:killed follows ~80 ms later). Returns how many were hit. */
   killNearest: (n: number) => number
   stats: () => SCTestStats
-  /** Viewport (CSS px) positions of up to n live on-screen enemies, nearest
+  /** Viewport (CSS px) positions of up to n live on-screen enemies (no boss weak points), nearest
    *  first, so a test can tap / click real input at them. */
   enemyScreenPoints: (n: number) => { x: number; y: number }[]
   /** Set the live combo chain to `count` kills, the last one now (game time), so the next kill extends it. */
@@ -176,8 +187,9 @@ export interface SCTestApi {
   audio: () => E2EAudio
   /** Tone scheduling stress (#115), in one JS turn while the audio clock ticks: rapid
    *  shots + layered kills + a stinger, then 10 pairs of late music-loop notes
-   *  (`lateScheduleErrors` counts their throws). Unlocks audio if needed. */
-  audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { lateScheduleErrors: number }>
+   *  (`lateScheduleErrors` counts their throws). Kills step down through every combo tier, spaced past the SFX
+   *  throttles, so `killsPlayed` should equal `kills`. Unlocks audio if needed. */
+  audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { lateScheduleErrors: number; killsPlayed: number }>
   /** Whether pointer input has the trigger held (released on blur / tab hide). */
   triggerHeld: () => boolean
   /** Offline render of the game's own music / SFX code (`npm run audio:render`, `testing/audioRender.ts`).
@@ -263,6 +275,8 @@ type ScrimState = ReturnType<typeof import('@/audio/scrim/player').scrimState>
 
 export interface E2EAudio {
   ready: boolean
+  /** Tone.js's chunk has loaded (`audio/tone.ts`): only after the first gesture, or a hook call that unlocks audio. */
+  toneLoaded: boolean
   /** Long-lived SFX nodes (the Tone kit, or the arcade engine's voice pool): must not grow while playing. */
   sfxNodes: number
   /** The arcade engine's voice pool (`?audio=scrim`): budget, live now, the most at once, stolen / dropped by priority. */
@@ -380,7 +394,12 @@ export function recordE2ESpawns(positions: readonly { x: number; y: number; z: n
 }
 
 /** The mounted spawner's wave schedule, set by EnemySpawner. */
-let waveProbe: (() => { levelTime: number; due: number | null }) | null = null
+interface WaveProbe {
+  levelTime: number
+  due: number | null
+  lastTick: number | null
+}
+let waveProbe: (() => WaveProbe) | null = null
 export function registerE2EWaves(probe: typeof waveProbe) {
   if (isE2E) waveProbe = probe
 }
@@ -534,13 +553,15 @@ function readBoss(): E2EBoss {
   return out
 }
 
+const isBossTarget = (t: CollisionTarget) => t.id.startsWith('boss:')
+
 function bossHit(n: number): number {
   let landed = 0
   for (let i = 0; i < n; i++) {
     let best: CollisionTarget | null = null
     let bestD = Infinity
     for (const t of getCollisionTargets().values()) {
-      if (!t.id.startsWith('boss:')) continue
+      if (!isBossTarget(t)) continue
       const d = probeCamera ? t.getPosition().distanceToSquared(probeCamera.position) : 0
       if (d < bestD) {
         bestD = d
@@ -603,11 +624,13 @@ function onScreenNDC(t: CollisionTarget, camera: THREE.Camera, out: THREE.Vector
   return out.z < 1 && Math.abs(out.x) <= 1 && Math.abs(out.y) <= 1
 }
 
+/** Live normal enemies, on-screen first, then nearest. Boss weak points are left out: `bossHit` is the one
+ *  way a test damages a boss, so a slow run that reaches the boss's level time doesn't kill a part by accident. */
 function liveTargetsByDistance(camera: THREE.Camera | null) {
   const list: { t: CollisionTarget; d: number; visible: boolean }[] = []
   const ndc = new THREE.Vector3()
   for (const t of getCollisionTargets().values()) {
-    if (!isLive(t)) continue
+    if (!isLive(t) || isBossTarget(t)) continue
     const d = camera ? t.getPosition().distanceToSquared(camera.position) : 0
     const visible = camera ? onScreenNDC(t, camera, ndc) : false
     list.push({ t, d, visible })
@@ -647,7 +670,10 @@ export function installE2EApi() {
     cameraPose: readCameraPose,
     drawCalls: 0,
     triangles: 0,
-    levels: () => getAllLevels().map((l) => ({ id: l.id, name: l.name })),
+    levels: () => {
+      const { isLevelUnlocked } = useGameStore.getState()
+      return getAllLevels().map((l) => ({ id: l.id, name: l.name, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id) }))
+    },
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
     setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
     setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
@@ -665,6 +691,7 @@ export function installE2EApi() {
     },
     spawnDigest: () => spawnDigest,
     nextWave: () => waveProbe?.() ?? null,
+    waveTellSeconds: WAVE_TELL_SECONDS,
     waveEvents: [],
     audio: readAudio,
     audioBurst,
@@ -675,10 +702,14 @@ export function installE2EApi() {
     combat: { fired: 0, hits: 0, kills: 0 },
     cameraTranslation: { current: 0, max: 0 },
     cameraTrauma: { current: 0, max: 0 },
-    cameraWeight: { roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0, speed: 0, streaks: 0, maxStreaks: 0 },
+    cameraWeight: {
+      roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0, speed: 0, streaks: 0, maxStreaks: 0,
+      caps: { roll: MAX_BANK_DEG, pitch: MAX_PITCH_DEG, fovKick: SPEED_FOV_DEG + DROP_FOV_DEG },
+    },
     weapon: null,
     holdFeedback: false,
     bulletStep: null,
+    timerStep: null,
     bullets: readBullets,
     fireShot: (x: number, y: number) => (probeCamera ? fireAtNDC(x, y, probeCamera) : false),
     shaderWarmup: null,
@@ -781,7 +812,8 @@ export function installE2EApi() {
   eventBus.on('enemy:hit', () => { api.combat.hits += 1 })
   eventBus.on('enemy:killed', () => { api.combat.kills += 1 })
   const onWave = (kind: 'incoming' | 'announce') => (label: unknown) => {
-    api.waveEvents.push({ kind, label: String(label), ms: performance.now(), levelTime: waveProbe?.().levelTime ?? null })
+    const w = waveProbe?.()
+    api.waveEvents.push({ kind, label: String(label), ms: performance.now(), levelTime: w?.levelTime ?? null, due: w?.due ?? null, lastTick: w?.lastTick ?? null })
   }
   eventBus.on('wave:incoming', onWave('incoming'))
   eventBus.on('wave:announce', onWave('announce'))
@@ -792,13 +824,25 @@ export function installE2EApi() {
 
 /** Spin (max 20 ms) until AudioContext.currentTime moves, which it does mid-task. */
 function waitForAudioTick() {
-  const ctx = Tone.getContext()
+  const ctx = tone().getContext()
   const t0 = ctx.currentTime
   const deadline = performance.now() + 20
   while (ctx.currentTime === t0 && performance.now() < deadline) { /* spin */ }
 }
 
+/** Spin (max 100 ms) until AudioContext.currentTime has moved `seconds`. */
+function waitForAudioTime(seconds: number) {
+  const ctx = tone().getContext()
+  const t0 = ctx.currentTime
+  const deadline = performance.now() + 500
+  while (ctx.currentTime - t0 < seconds && performance.now() < deadline) { /* spin */ }
+}
+
 const BURST_WEAPONS = ['blaster', 'spread', 'rapid', 'piercing'] as const
+/** Past SFXManager's kill (30 ms) and hit-tick (25 ms) throttles. */
+const BURST_KILL_SPACING_S = 0.035
+/** The first kill's chain: a step above the top tier, falling to the 1× tier by the last. */
+const BURST_TOP_COMBO = COMBO_TIERS[TOP_TIER].minCount + 1
 
 async function audioBurst(shots: number, kills: number) {
   if (!isAudioReady()) await initAudio()
@@ -808,23 +852,28 @@ async function audioBurst(shots: number, kills: number) {
     ;(await loadArcade()).resetVoiceStats()
   }
   const s = sfx()
+  const killsBefore = s.killsPlayed()
   for (let i = 0; i < shots; i++) {
     s.fire(i % 2 === 1, BURST_WEAPONS[i % BURST_WEAPONS.length])
     if (i < kills) {
-      s.hit(kills - i, null)
-      s.kill(kills - i, 'pop', null)
+      waitForAudioTime(BURST_KILL_SPACING_S)
+      const combo = Math.ceil(((kills - i) / kills) * BURST_TOP_COMBO)
+      s.hit(combo, null)
+      s.kill(combo, 'pop', null)
     }
     waitForAudioTick()
   }
+  const killsPlayed = s.killsPlayed() - killsBefore
   s.waveAnnounce()
   s.waveIncoming()
 
   // Tone clamps the first late note to the ticked clock; before #115 the second landed on it.
   // A fresh synth per pair: only a start from silence records a new start time.
-  const ctx = Tone.getContext()
+  const { Synth, getContext } = tone()
+  const ctx = getContext()
   let lateScheduleErrors = 0
   for (let pair = 0; pair < 10; pair++) {
-    const synth = new Tone.Synth({ envelope: { attack: 0.03, decay: 0.2, sustain: 0.25, release: 0.3 } })
+    const synth = new Synth({ envelope: { attack: 0.03, decay: 0.2, sustain: 0.25, release: 0.3 } })
     for (let i = 0; i < 2; i++) {
       const now = ctx.currentTime
       const t = nextTriggerTime(synth, now - 0.5, now)
@@ -837,13 +886,14 @@ async function audioBurst(shots: number, kills: number) {
     }
     synth.dispose()
   }
-  return { ...readAudio(), lateScheduleErrors }
+  return { ...readAudio(), lateScheduleErrors, killsPlayed }
 }
 
 function readAudio(): E2EAudio {
   const d = droppedSounds()
   return {
     ready: isAudioReady(),
+    toneLoaded: toneLoaded(),
     sfxNodes: sfx().nodeCount(),
     sfxVoices: sfx().voices(),
     musicDucked: isMusicDucked(),

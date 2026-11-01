@@ -45,7 +45,8 @@ Rules that apply to every runbook:
 - **Token ledger.** The last step of every runbook is
   `node scripts/run-usage.cjs --role <role> --ref <PR/issue numbers worked on, e.g. "#12,#14", or none> --post`:
   it sums this session's tokens, its subagents included, and appends one comment to the
-  `token-ledger` issue (the status page and weekly report read it). Run it once, from the
+  `token-ledger` issue (the status page and the weekly report, through
+  `run-usage.cjs --summary`, read it). Run it once, from the
   session that runs the runbook, never from a subagent. Skip it when the run stopped at
   the pause check or had nothing to do. It never fails the run.
 - **Pause checkpoints.** Run `scripts/pause-check.sh` again before every wave of

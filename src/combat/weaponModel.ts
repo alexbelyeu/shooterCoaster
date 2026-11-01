@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { VIEWMODEL_DEPTH_RANGE } from '@/core/cameraLayers'
 import { WEAPONS } from './weapons/weaponTypes'
 
 // Model space: barrel along -Z, receiver centre at the origin, ~1.4 units long.
@@ -72,8 +73,8 @@ export function createWeaponMaterial(): THREE.MeshStandardMaterial {
     shader.vertexShader = shader.vertexShader.replace(
       '#include <project_vertex>',
       `#include <project_vertex>
-      // Front 2% of the depth range: draws over the world, still self-occludes.
-      gl_Position.z = (gl_Position.z + gl_Position.w) * 0.02 - gl_Position.w;`,
+      // Front of the depth range: draws over the world, still self-occludes.
+      gl_Position.z = (gl_Position.z + gl_Position.w) * ${VIEWMODEL_DEPTH_RANGE.toFixed(3)} - gl_Position.w;`,
     )
   }
   mat.customProgramCacheKey = () => 'sc-weapon-viewmodel-v1'

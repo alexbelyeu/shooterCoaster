@@ -13,12 +13,13 @@
  * feedback is rotation-only), the kill trauma exceeded 1° or did not decay to 0,
  * the coaster camera's bank / pitch / speed FOV went past their caps (#123),
  * the first-person weapon is missing / off screen / covering the centre / not
- * pointing along the shot's tracer (> 25° on screen), the
+ * pointing along the shot's tracer (> 25° on screen; also after an un-held aim jump, #79), the
  * camera aspect doesn't match the canvas, or the results screen never finishes its
  * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats(),
  * or its Share line (shareText()) or "Copied!" click is wrong (#87).
  * Every level and the phone run (portrait, and after rotating) also run audioBurst():
- * fails on a late note that throws or a sound dropped by an audio error (#115).
+ * fails on a late note that throws or a sound dropped by an audio error (#115), or a kill
+ * that never reached the SFX engine (#109).
  * Bullets (#165): no drawn bullet may exceed 2% of the canvas height on screen (every
  * level and the phone run), and one real shot with time + bullets frozen must be drawn
  * next to the muzzle tip; <id>-shot.png shows it two 40 ms steps into its flight.
@@ -37,7 +38,7 @@
  * held on into play), hold the timer, reach playing on GO, and the shader warm-up must
  * finish; on a replay, a tap after the 1 s mark must skip to playing.
  * Perf gate (#188): a level fails past its `scene` ceilings in budgets.json; see sceneBudgetCheck().
- * The speed check holds the first level at top speed on its most banked sampled point:
+ * The speed check holds the first level (or `--speed-level <id>`) at top speed on its most banked sampled point:
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  * The boss checks summon each finale and shoot it down in phase order: level1's Golden Blimp
  * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png) and level3's Kraken
@@ -102,6 +103,8 @@ const COMBAT_MIN_FRAMES = Number(args['combat-min-frames'] ?? 4)
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(args.seed ?? 1337)
 const DIST = args.dist ?? 'dist'
+// Level the speed check rides (default: the first level in the run), e.g. a water level for the streaks over the sea.
+const SPEED_LEVEL = args['speed-level']
 // Path the build is served under: '/' for the site, a sub-path for the portal zip.
 const BASE_PATH = `/${(args.base ?? '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/$/, '')
 let preview // module scope so the top-level catch can kill it
@@ -199,9 +202,9 @@ async function launch() {
   return chromium.launch({ headless: true, executablePath, args: flags })
 }
 
-/** Pixel stats of a PNG screenshot, computed in the page with a 2D canvas (no deps). */
-async function imageStats(page, png) {
-  return page.evaluate(async (b64) => {
+/** Pixel stats of a PNG screenshot, computed in the page with a 2D canvas (no deps), leaving out the `skip` rects [x0, y0, x1, y1] (frame fractions). */
+async function imageStats(page, png, skip = []) {
+  return page.evaluate(async ([b64, skip]) => {
     const img = new Image()
     img.src = `data:image/png;base64,${b64}`
     await img.decode()
@@ -211,18 +214,36 @@ async function imageStats(page, png) {
     const ctx = c.getContext('2d')
     ctx.drawImage(img, 0, 0, c.width, c.height)
     const d = ctx.getImageData(0, 0, c.width, c.height).data
-    let sum = 0, sumSq = 0
+    let sum = 0, sumSq = 0, n = 0
     const colors = new Set()
     for (let i = 0; i < d.length; i += 4) {
+      const x = ((i / 4) % c.width) / c.width
+      const y = Math.floor(i / 4 / c.width) / c.height
+      if (skip.some(([x0, y0, x1, y1]) => x >= x0 && x < x1 && y >= y0 && y < y1)) continue
       const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
       sum += l
       sumSq += l * l
+      n++
       colors.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4))
     }
-    const n = d.length / 4
     const mean = sum / n
     return { mean, stddev: Math.sqrt(sumSq / n - mean * mean), distinctColors: colors.size }
-  }, png.toString('base64'))
+  }, [png.toString('base64'), skip])
+}
+
+const looksBlank = (img) => img.stddev < 4 || img.distinctColors < 8
+
+/** The title UI (logo, PLAY, hint; corner buttons and byline), left out so a black 3D scene behind it can't pass (#136). */
+const TITLE_UI = [[0.25, 0.25, 0.75, 0.75], [0, 0.85, 1, 1]]
+
+/** Re-shoots the title into `file` until its 3D scene has drawn (a cold start can show it black) or `maxMs` runs out. */
+async function captureTitleScene(page, file, maxMs) {
+  const until = Date.now() + maxMs
+  for (;;) {
+    const scene = await imageStats(page, await page.screenshot({ path: file, timeout: SHOT_TIMEOUT }), TITLE_UI)
+    if (!looksBlank(scene) || Date.now() >= until) return scene
+    await page.waitForTimeout(1000)
+  }
 }
 
 /** Px an enemy must reach to count as readable (MIN_ENEMY_PX in enemyReadability.ts). */
@@ -476,6 +497,7 @@ async function playLevel(page, id, { frenzy = false } = {}) {
   const end = await getStats(page)
   const results = await resultsScreenProblems(page, end)
   problems.push(...results.problems)
+  if (frenzy) problems.push(...(await resultsEnterProblems(page, results.screen)))
 
   if (combat.kills === 0) problems.push('no kills (enemies missing or unhittable?)')
   // Only meaningful when something was on screen to aim at.
@@ -488,9 +510,7 @@ async function playLevel(page, id, { frenzy = false } = {}) {
   if (shake.traumaMax > 1 + 1e-6) problems.push(`kill trauma ${shake.traumaMax.toFixed(2)}° > 1°`)
   if (shake.trauma !== 0) problems.push(`kill trauma did not decay to 0 (${shake.trauma}°)`)
   const w = shake.weight
-  if (w.maxRoll > CAMERA_WEIGHT_CAPS.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.roll}°`)
-  if (w.maxPitch > CAMERA_WEIGHT_CAPS.pitch + 1e-6) problems.push(`camera pitch ${w.maxPitch.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.pitch}°`)
-  if (w.maxFovKick > CAMERA_WEIGHT_CAPS.fovKick + 1e-6) problems.push(`speed FOV kick ${w.maxFovKick.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.fovKick}°`)
+  problems.push(...cameraWeightProblems(w))
   return {
     problems,
     combat: {
@@ -555,6 +575,8 @@ async function freshShotProblems(page, id) {
   await waitFrames(page, 1, { maxMs: 8000, pollMs: 40 })
   await page.screenshot({ path: path.join(OUT, `${id}-shot.png`), timeout: SHOT_TIMEOUT })
   const inFlight = await read()
+  const jump = await aimJumpCheck(page, read)
+  problems.push(...jump.problems)
   await page.evaluate(() => {
     const s = window.__SC_TEST__
     s.bulletStep = null
@@ -563,7 +585,10 @@ async function freshShotProblems(page, id) {
   })
 
   const { bullets, weapon } = atMuzzle
-  const result = { fired, muzzleFrac: bullets.screenFrac, flightFrac: inFlight.bullets.screenFrac, maxScreenFrac: inFlight.bullets.maxScreenFrac, tipDistPx: null, aimErrorDeg: null }
+  const result = {
+    fired, muzzleFrac: bullets.screenFrac, flightFrac: inFlight.bullets.screenFrac, maxScreenFrac: inFlight.bullets.maxScreenFrac,
+    tipDistPx: null, aimErrorDeg: null, aimJump: jump.result,
+  }
   // Gun aim (#65) on this shot: fixed aim point, time frozen, recoil held at its peak, so the angle is repeatable (#158).
   if (fired && weapon) {
     const p = weaponAimProblem(weapon, 'desktop')
@@ -582,6 +607,32 @@ async function freshShotProblems(page, id) {
   return { problems, result }
 }
 
+/** Far side of the screen from the fixed-point shot (0.25, 0.15): above the muzzle, so the aim check applies. */
+const AIM_JUMP_SHOT = { x: -0.6, y: 0.55 }
+
+/** A far-side shot without `holdFeedback` (#79); game time stays frozen, so only the shot-frame snap can turn the gun. */
+async function aimJumpCheck(page, read) {
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+  await waitFrames(page, 1, { maxMs: 8000, pollMs: 40 })
+  const before = (await read()).weapon
+  await page.waitForTimeout(300) // past every gun's fire interval
+  const fired = await page.evaluate(({ x, y }) => window.__SC_TEST__.fireShot(x, y), AIM_JUMP_SHOT)
+  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  const after = (await read()).weapon
+  const problems = []
+  const result = { fired, jumpDeg: null, aimErrorDeg: null }
+  if (!fired) problems.push('aim jump: fireShot() fired nothing')
+  else if (before && after) {
+    const barrel = (w) => Math.atan2(w.tipY - w.pivotY, w.tipX - w.pivotX)
+    const turn = Math.abs(((barrel(after) - barrel(before) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI)
+    result.jumpDeg = turn * (180 / Math.PI)
+    const p = weaponAimProblem(after, 'aim jump (no holdFeedback)')
+    if (p) problems.push(p)
+    result.aimErrorDeg = after.aimErrorDeg
+  }
+  return { problems, result }
+}
+
 async function resultsScreenProblems(page, stats) {
   const screen = await page.evaluate(() => {
     const el = document.querySelector('.results-screen')
@@ -594,9 +645,13 @@ async function resultsScreenProblems(page, stats) {
       .map((b) => b.textContent)
     const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
     const s = window.__SC_TEST__
-    const levelName = s.levels().find((l) => l.id === s.stats().currentLevel)?.name ?? null
+    const all = s.levels()
+    const level = all.find((l) => l.id === s.stats().currentLevel)
+    const next = all.find((l) => l.id === level?.nextLevel)
     return {
-      rows, buttons, stars, levelName, shareText: s.shareText(),
+      rows, buttons, stars, levelName: level?.name ?? null, shareText: s.shareText(),
+      nextLevel: next ? { id: next.id, unlocked: next.unlocked } : null,
+      keys: el.querySelector('.results-keys')?.textContent ?? '',
       score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent,
     }
   })
@@ -635,8 +690,31 @@ async function resultsScreenProblems(page, stats) {
   for (const label of ['Levels', 'Replay', 'Share']) {
     if (!screen.buttons.includes(label)) problems.push(`results buttons ${JSON.stringify(screen.buttons)} lack ${label}`)
   }
+  // #162: Next Level only when the unlock rule opens it (a 0★ run on a fresh save leaves it locked); Enter replays instead.
+  const nextOffered = screen.buttons.includes('Next Level')
+  const nextOpen = screen.nextLevel?.unlocked === true
+  if (nextOffered !== nextOpen)
+    problems.push(`results ${nextOffered ? 'offer' : 'hide'} Next Level with ${screen.nextLevel?.id ?? 'no next level'} ${nextOpen ? 'unlocked' : 'locked'}`)
+  if (screen.nextLevel && !nextOpen && !/Enter \/ R: replay/.test(screen.keys)) problems.push(`locked next level, but the keys hint reads "${screen.keys}"`)
   if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
   return { problems, screen: shown }
+}
+
+/** #162: Enter with focus on a button outside the results (the mute toggle) still plays on: the next level if open, else a replay. */
+async function resultsEnterProblems(page, screen) {
+  if (!screen) return []
+  const current = await page.evaluate(() => window.__SC_TEST__.stats().currentLevel)
+  const target = screen.nextLevel?.unlocked ? screen.nextLevel.id : screen.nextLevel ? current : null
+  await page.focus('.mute-button')
+  await page.keyboard.press('Enter')
+  const after = await page
+    .waitForFunction(() => window.__SC_TEST__.phase() !== 'results', null, { timeout: 10000, polling: 100 })
+    .then(() => page.evaluate(() => ({ phase: window.__SC_TEST__.phase(), level: window.__SC_TEST__.stats().currentLevel })), () => null)
+  if (!after) return ['Enter with the mute button focused left the results screen up']
+  const expected = target ? ['playing', target] : ['levelSelect', current]
+  if (after.phase !== expected[0] || (target && after.level !== target))
+    return [`Enter on the results went to ${after.phase} ${after.level}, expected ${expected.join(' ')}`]
+  return []
 }
 
 /** The results-screen share link (#87, src/ui/share.ts). */
@@ -677,7 +755,16 @@ const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-b
 const WEAPON_MAX_AIM_DEG = 25
 /** Caps on the coaster camera weight (#123): MAX_BANK_DEG / MAX_PITCH_DEG in
  *  src/track/cameraRig.ts and SPEED_FOV_DEG + DROP_FOV_DEG in src/track/cameraFov.ts. */
-const CAMERA_WEIGHT_CAPS = { roll: 8, pitch: 3, fovKick: 8 }
+/** Camera weight maxima past the caps the game publishes from its source constants (cameraRig.ts, cameraFov.ts). */
+function cameraWeightProblems(w) {
+  const caps = w.caps
+  if (!caps) return ['cameraWeight.caps missing from the test hook']
+  const problems = []
+  if (w.maxRoll > caps.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${caps.roll}°`)
+  if (w.maxPitch > caps.pitch + 1e-6) problems.push(`camera pitch ${w.maxPitch.toFixed(2)}° > ${caps.pitch}°`)
+  if (w.maxFovKick > caps.fovKick + 1e-6) problems.push(`FOV kick ${w.maxFovKick.toFixed(2)}° > ${caps.fovKick}°`)
+  return problems
+}
 /** Chain primed before the first level's kills, so the next kill enters the 5× tier (src/combat/comboTiers.ts). */
 const FRENZY_PRIME = 14
 const HUD_SELECTORS = ['.hud-score', '.hud-kills', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
@@ -901,10 +988,15 @@ async function offsetTapKills(page, label) {
   return { result, problems }
 }
 
-/** Tone scheduling stress (#115); page errors are counted by the caller. */
+/** audioBurst(shots, kills) of every level and the phone run. */
+const BURST = [20, 10]
+
+/** Tone scheduling stress (#115) + every kill reaching Tone (#109); page errors are counted by the caller. */
 async function audioBurstProblems(page, label) {
-  const burst = await page.evaluate(() => window.__SC_TEST__.audioBurst(20, 10))
+  const burst = await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), BURST)
   const problems = []
+  if (burst.ready && burst.killsPlayed !== BURST[1])
+    problems.push(`${label}: ${burst.killsPlayed}/${BURST[1]} audioBurst kills reached the SFX engine (throttled or dropped)`)
   if (burst.lateScheduleErrors > 0)
     problems.push(`${label}: ${burst.lateScheduleErrors}/10 late music note pairs threw a Tone scheduling error`)
   if (burst.dropped > 0)
@@ -1216,8 +1308,7 @@ async function speedCheck(page, levelId) {
   const problems = []
   if (!(w.streaks > 0.05)) problems.push(`no wind streaks at top speed (opacity ${w.streaks?.toFixed(3)}, speed ${w.speed?.toFixed(2)})`)
   if (!(Math.abs(w.roll) >= 1)) problems.push(`camera barely banks at top speed (${w.roll.toFixed(2)}° at track ${best.fraction})`)
-  if (w.maxRoll > CAMERA_WEIGHT_CAPS.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.roll}°`)
-  if (w.maxFovKick > CAMERA_WEIGHT_CAPS.fovKick + 1e-6) problems.push(`FOV kick ${w.maxFovKick.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.fovKick}°`)
+  problems.push(...cameraWeightProblems(w))
   const translation = await page.evaluate(() => window.__SC_TEST__.cameraTranslation.max)
   if (translation > 1e-6) problems.push(`camera translated ${translation.toFixed(3)} units off the track pose`)
   return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w } }
@@ -1227,6 +1318,9 @@ async function speedCheck(page, levelId) {
 const WAVE_CHECK = { level: 'level2', type: 'crow', label: 'A Murder of Crows!', minOnScreen: 5 }
 
 const WAVE_PAUSE_MS = 2000
+/** From this level time (s) the timer steps a fixed `WAVE_TIMER_STEP` s a frame, so a slow frame can't jump the tell and the wave together. */
+const WAVE_STEP_FROM = 12
+const WAVE_TIMER_STEP = 0.25
 
 /**
  * Spawn choreography (#30): the crow wave's tell must lead it, then its V flies in, frozen for `level2-wave.png`.
@@ -1239,6 +1333,8 @@ async function waveCheck(page) {
   const event = (kind) => page
     .waitForFunction(([k, l]) => window.__SC_TEST__.waveEvents.find((e) => e.kind === k && e.label === l) ?? null, [kind, label], { timeout: 90000, polling: 200 })
     .then((h) => h.jsonValue(), () => null)
+  await page.waitForFunction((t) => (window.__SC_TEST__.nextWave()?.levelTime ?? 0) >= t, WAVE_STEP_FROM, { timeout: 90000, polling: 100 }).catch(() => {})
+  await page.evaluate((s) => { window.__SC_TEST__.timerStep = s }, WAVE_TIMER_STEP)
   const tell = await event('incoming')
   const tellShown = tell
     ? await page.evaluate(() => ({ pulse: !!document.querySelector('.wave-tell'), text: document.querySelector('.wave-banner-text')?.textContent ?? null }))
@@ -1247,6 +1343,7 @@ async function waveCheck(page) {
   await page.waitForTimeout(WAVE_PAUSE_MS)
   await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
   const arrival = await event('announce')
+  await page.evaluate(() => { window.__SC_TEST__.timerStep = null })
   // The entry takes 1.2–1.8 s of game time.
   await waitFrames(page, 3, { minMs: 2500, maxMs: 30000 })
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
@@ -1259,9 +1356,19 @@ async function waveCheck(page) {
   else if (!tellShown?.pulse) problems.push('the tell showed no screen-edge pulse (.wave-tell)')
   if (tell && tellShown?.text !== label) problems.push(`the tell showed "${tellShown?.text}", not "${label}"`)
   if (!arrival) problems.push(`the "${label}" wave never arrived`)
-  const leadS = tell && arrival ? (arrival.ms - tell.ms) / 1000 : null
-  if (leadS !== null && leadS < 0.3) problems.push(`the tell came only ${leadS.toFixed(2)} s before the wave`)
-  const events = await page.evaluate(() => window.__SC_TEST__.waveEvents.map((e) => `${e.kind} "${e.label}"`))
+  // On level time, not wall time (#262): the tell is on time when the wave tick before it was still short of `due - tellS`.
+  const { tellS, log } = await page.evaluate(() => ({ tellS: window.__SC_TEST__.waveTellSeconds, log: window.__SC_TEST__.waveEvents }))
+  const order = (kind) => log.findIndex((e) => e.kind === kind && e.label === label)
+  const timing = tell ? { due: tell.due, tellAt: tell.levelTime, tickBefore: tell.lastTick } : null
+  if (tell && arrival) {
+    const { due, tellAt, tickBefore } = timing
+    if (order('announce') < order('incoming')) problems.push('the wave arrived before its tell')
+    else if (tellAt < due - tellS) problems.push(`the tell came early: at ${tellAt.toFixed(2)} s, ${(due - tellAt).toFixed(2)} s before the wave at ${due} s`)
+    else if (tickBefore !== null && tickBefore >= due - tellS) {
+      problems.push(`the tell came late: the wave tick at ${tickBefore.toFixed(2)} s was already within ${tellS} s of the wave at ${due} s`)
+    }
+  }
+  const events = log.map((e) => `${e.kind} "${e.label}"`)
   const repeated = [...new Set(events.filter((e, i) => events.indexOf(e) !== i))]
   if (repeated.length) problems.push(`wave events fired twice after a pause and Resume: ${repeated.join(', ')}`)
   if (flock.length < minOnScreen) problems.push(`only ${flock.length} ${type}s on screen after the wave flew in (want ≥ ${minOnScreen})`)
@@ -1270,7 +1377,7 @@ async function waveCheck(page) {
   return {
     id: 'wave',
     problems,
-    wave: { level, onScreen: flock.length, largestPx: Math.round(flock[0]?.px ?? 0), nearest: Math.round(nearest), tellLeadS: leadS },
+    wave: { level, onScreen: flock.length, largestPx: Math.round(flock[0]?.px ?? 0), nearest: Math.round(nearest), timing },
   }
 }
 
@@ -1500,12 +1607,6 @@ async function pickupCheck(page) {
   return { id: 'pickup', problems, pickup: { ...result, drawCalls, badge: hud.rects.at(-1) } }
 }
 
-/**
- * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
- * shows over the mounted level, a press during it fires nothing (not even when held on into
- * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
- * that a tap after the 1 s mark skips to GO / playing.
- */
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
 async function levelSelectCheck(page, levels) {
   const problems = []
@@ -1780,7 +1881,12 @@ async function qualityCheck(newPage, levelId) {
   return { id: 'quality', problems, errors: [...high.errors, ...low.errors], quality: { level: levelId, drawCalls: [high.drawCalls, low.drawCalls], dpr: [high.dpr, low.dpr] } }
 }
 
-/** Title (#28): another camera angle 6 s later (`title-2.png`), the start hint, and a key press fading to level select. */
+/** Fetches of Tone.js's chunk so far (`audio/tone.ts`: loaded on the first gesture, never at startup). */
+const toneRequests = (page) =>
+  page.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/tone-[^/]*\.js$/.test(e.name)).length)
+
+/** Title (#28): another camera angle 6 s later (`title-2.png`), the start hint, and a key press fading to level select
+ *  that also loads Tone.js (#187: not before it) and unlocks audio. */
 async function titleFlyBy(page) {
   const problems = []
   const pose = () => page.evaluate(() => window.__SC_TEST__.cameraPose())
@@ -1789,7 +1895,9 @@ async function titleFlyBy(page) {
   await waitFrames(page, 2, { minMs: 6000, maxMs: 30000 })
   const b = await pose()
   const waited = (Date.now() - at) / 1000
-  await page.screenshot({ path: path.join(OUT, 'title-2.png'), timeout: SHOT_TIMEOUT })
+  // Re-shot like title.png: a GPU CI runner can return one black canvas capture (#291 CI), a black scene stays black.
+  const scene2 = await captureTitleScene(page, path.join(OUT, 'title-2.png'), 10000)
+  if (looksBlank(scene2)) problems.push(`title-2.png: the 3D scene behind the UI looks blank (mean ${scene2.mean.toFixed(1)} stddev ${scene2.stddev.toFixed(1)} colours ${scene2.distinctColors})`)
   let turnedDeg = 0
   let moved = 0
   if (!a || !b) problems.push('no title camera')
@@ -1803,6 +1911,8 @@ async function titleFlyBy(page) {
   const hint = await page.locator('.title-hint').textContent({ timeout: 5000 }).catch(() => null)
   if (!hint) problems.push('no start hint on the first title')
 
+  const toneBefore = { requests: await toneRequests(page), loaded: await page.evaluate(() => window.__SC_TEST__.audio().toneLoaded) }
+  if (toneBefore.requests > 0 || toneBefore.loaded) problems.push('Tone.js loaded before the first key press on the title')
   await page.keyboard.press('Enter')
   const veiled = await page
     .waitForSelector('.screen-veil', { state: 'attached', timeout: 10000 })
@@ -1816,9 +1926,19 @@ async function titleFlyBy(page) {
     .waitForSelector('.screen-veil', { state: 'detached', timeout: 30000 })
     .then(() => true, () => false)
   if (!veilGone) problems.push('the fade to black never cleared over level select')
-  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened } }
+  const toneAfter = await page
+    .waitForFunction(() => window.__SC_TEST__.audio().toneLoaded && window.__SC_TEST__.audio().ready, null, { timeout: 30000 })
+    .then(() => true, () => false)
+  if (!toneAfter) problems.push('the key press on the title did not load Tone.js and unlock audio')
+  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter } }
 }
 
+/**
+ * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
+ * shows over the mounted level, a press during it fires nothing (not even when held on into
+ * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
+ * that a tap after the 1 s mark skips to GO / playing, and leaving a level mid-warm-up must throw nothing.
+ */
 async function countdownCheck(page, levelId) {
   const start = () => page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
   // Attached, not faded in: at ~1 fps, waiting on the fade could outlast the countdown.
@@ -1895,19 +2015,46 @@ async function countdownCheck(page, levelId) {
     return { ...before, programsAfter: api.programs(), maxFrameMs: api.maxFrameMs, shots: api.stats().shotsFired }
   }, shotStart)
 
-  // 2. Replay through results (as the UI does) and tap after the 1 s mark: it skips to GO.
+  // 2. Replay through results (as the UI does) and tap after the 1 s mark: it skips to GO (#140).
+  // holdFeedback parks the countdown on Ready, so only the skip can reach playing however slow the frames.
   await page.evaluate(() => window.__SC_TEST__.endLevel())
-  await start()
+  await page.evaluate(([lid, seed]) => {
+    const api = window.__SC_TEST__
+    api.startLevel(lid, seed)
+    api.holdFeedback = true
+  }, [levelId, SEED])
   const shownAgain = await stepShown()
-  await page.waitForTimeout(1200)
+  // Frames too, so the countdown's mount effects (where its 1 s starts) have run.
+  await waitFrames(page, 2, { minMs: 1500, maxMs: 30000 })
   const tappedIn = await page.evaluate((at) => {
     const phase = window.__SC_TEST__.phase()
+    if (phase !== 'countdown') return phase
     const canvas = document.querySelector('canvas')
     canvas.dispatchEvent(new PointerEvent('pointerdown', at))
     canvas.dispatchEvent(new PointerEvent('pointerup', at))
     return phase
   }, pointer)
   const afterTap = await waitPlaying()
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+
+  // 3. Leave a fresh level mid-warm-up (#141); polled in the page so the unmount beats the warm-up's first check.
+  await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
+  await waitFrames(page, 2, { maxMs: 30000 })
+  const leftDuringWarmup = await page.evaluate(([lid, seed]) => new Promise((resolve) => {
+    const api = window.__SC_TEST__
+    api.shaderWarmup = null
+    api.startLevel(lid, seed)
+    const until = performance.now() + 30000
+    const poll = () => {
+      const w = api.shaderWarmup
+      if (w || performance.now() > until) {
+        api.setPhase('levelSelect')
+        resolve(w ? !w.done : null)
+      } else setTimeout(poll, 0)
+    }
+    poll()
+  }), [levelId, SEED])
+  await waitFrames(page, 3, { minMs: 1500, maxMs: 30000 })
   const initTimings = await page.evaluate(() => window.__SC_TEST__.initTimings())
 
   const problems = []
@@ -1926,8 +2073,10 @@ async function countdownCheck(page, levelId) {
   if (firstShot.programsAfter > firstShot.programs)
     problems.push(`the first shot + kill compiled ${firstShot.programsAfter - firstShot.programs} shader program(s) after the warm-up`)
   if (!shownAgain) problems.push('no countdown on replay')
-  if (!afterTap) problems.push(`the replay never reached playing after a tap in "${tappedIn}"`)
+  if (tappedIn !== 'countdown') problems.push(`the replay's countdown was over before the skip tap (phase "${tappedIn}")`)
+  else if (!afterTap) problems.push('the skip tap never reached playing')
   else if (afterTap.shotsFired > 0) problems.push(`the skip tap fired ${afterTap.shotsFired} shot(s)`)
+  if (leftDuringWarmup === null) problems.push('the remounted level never started its shader warm-up')
   return {
     id: 'countdown',
     ok: problems.length === 0,
@@ -1940,10 +2089,56 @@ async function countdownCheck(page, levelId) {
       timerAtGo: atGo.timeRemaining,
       shotsHeldIntoPlay: heldInPlay.stats.shotsFired,
       skipTapIn: tappedIn,
+      leftDuringWarmup,
       warmup,
       firstShot,
     },
   }
+}
+
+/** #168: a `from` -> `to` switch must overlap: the latest `to` fade-in needs a `from` fade-out running under it, and its first note must land before that fade-out reaches 0. */
+function crossfadeGaps(fades, from, to) {
+  const incoming = fades.findLast((f) => f.name === to && f.ramp === 'in')
+  if (!incoming) return []
+  const overlapping = fades.filter(
+    (f) => f !== incoming && f.name === from && f.ramp === 'out' && f.at <= incoming.at + incoming.seconds && f.at + f.seconds >= incoming.at,
+  )
+  if (!overlapping.length) return [`${from} -> ${to}: no ${from} fade-out overlaps the ${to} fade-in (the switch did not crossfade)`]
+  return overlapping
+    .filter((out) => incoming.firstNote == null || incoming.firstNote >= out.at + out.seconds)
+    .map((out) =>
+      incoming.firstNote == null
+        ? `${from} -> ${to}: the fade-in logged no first note`
+        : `${from} -> ${to}: first note ${(incoming.firstNote - out.at).toFixed(2)} s into a ${out.seconds} s fade-out (a gap)`,
+    )
+}
+
+/** Level -> next level and level -> level select (#168), after the phone run's results: each must fade out, fade in, leave one bus and pass `crossfadeGaps`. */
+async function musicSwitches(page) {
+  const problems = []
+  const read = () => page.evaluate(() => window.__SC_TEST__.audio().music)
+  const latest = (m) => Math.max(0, ...m.fades.map((f) => f.at))
+  const switches = []
+  const run = async (label, from, to, act) => {
+    const since = latest(await read())
+    await act()
+    const deadline = Date.now() + 30000
+    let m = await read()
+    const fresh = () => m.fades.filter((f) => f.at > since)
+    const done = () =>
+      fresh().some((f) => f.name === from && f.ramp === 'out') && fresh().some((f) => f.name === to && f.ramp === 'in') && m.buses.length === 1
+    while (!done() && Date.now() < deadline) {
+      await page.waitForTimeout(250)
+      m = await read()
+    }
+    const fades = fresh()
+    switches.push({ label, fades })
+    if (!done()) problems.push(`${label}: no ${from} fade-out + ${to} fade-in leaving one bus (${m.buses.map((b) => b.name).join(',')})`)
+    problems.push(...crossfadeGaps(fades, from, to).map((g) => `${label}: ${g}`))
+  }
+  await run('level -> next level', 'level', 'level', () => page.evaluate((seed) => window.__SC_TEST__.startLevel('level2', seed), SEED))
+  await run('level -> level select', 'level', 'title', () => page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect')))
+  return { problems, switches }
 }
 
 /** Title -> level music (#28) crossfades: read from the ramp log, since at ~1 fps a 1 s fade fits between two polls. */
@@ -1967,6 +2162,7 @@ async function musicCrossfade(page) {
   else if (titleOut.from < 0.5 || titleOut.seconds < 0.5)
     problems.push(`title music fade-out was not a ramp from full (from ${titleOut.from.toFixed(2)} over ${titleOut.seconds} s)`)
   if (!levelIn || levelIn.seconds < 0.5) problems.push('the level music did not fade in')
+  problems.push(...crossfadeGaps(fades, 'title', 'level'))
   if (buses.some((b) => b.name === 'title')) problems.push('the title music bus was never disposed')
   if (!buses.some((b) => b.name === 'level' && !b.fading)) problems.push('no level music playing')
   return { problems, result: { fades, buses } }
@@ -2015,6 +2211,7 @@ async function scrimCheck(page) {
   if (!titleOut || titleOut.seconds < 0.5) problems.push('the title score did not fade out')
   if (!levelIn || levelIn.seconds < 0.5) problems.push('the level score did not fade in')
   if (busNames(a).includes('title')) problems.push('the title score bus was never disposed')
+  problems.push(...crossfadeGaps(a.music.fades, 'title', 'level'))
 
   result.nodes.push(a.scrim.nodes)
   result.position.push(track(a)?.position ?? 0)
@@ -2072,6 +2269,7 @@ async function scrimCheck(page) {
   if (!result.results) problems.push(`no results score after the run (current "${a.scrim?.current}")`)
   if (!levelOut || levelOut.seconds < 0.5 || !resultsIn) problems.push('the level score did not crossfade to the results score')
   if (busNames(a).includes('level')) problems.push('the level score bus was never disposed')
+  problems.push(...crossfadeGaps(a.music.fades, 'level', 'results'))
   result.dropped = a.dropped
   if (a.dropped) problems.push(`${a.dropped} sound(s) dropped by an audio error (${a.lastDrop?.split('\n')[0]})`)
   return { problems, result }
@@ -2320,6 +2518,8 @@ async function runMobile(browser, base) {
 
   const resultsLayout = await mobileResults(page)
   problems.push(...resultsLayout.problems)
+  const switches = await musicSwitches(page)
+  problems.push(...switches.problems)
 
   const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
   const allErrors = [...errors, ...hookErrors]
@@ -2333,7 +2533,7 @@ async function runMobile(browser, base) {
     mobile: {
       taps: 10, tapsOnEnemies, tapShots, tapKills, fallbackKills, crosshairScale,
       portraitTaps: portraitTaps.result, landscapeTaps: landscapeTaps.result,
-      audio: { portrait: audioPortrait, landscape: audioLandscape, music: music.result },
+      audio: { portrait: audioPortrait, landscape: audioLandscape, music: music.result, switches: switches.switches },
       audioBurst: { portrait: burstPortrait.burst, landscape: burstLandscape.burst },
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
       bulletMaxScreenFrac: bullets.maxScreenFrac,
@@ -2371,12 +2571,11 @@ async function run() {
   const t = await newPage()
   const levels = await t.page.evaluate(() => window.__SC_TEST__.levels())
   const titleWait = await waitFrames(t.page, MIN_FRAMES, { maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
-  const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png'), timeout: SHOT_TIMEOUT })
-  const titleImg = await imageStats(t.page, titlePng)
+  const titleImg = await captureTitleScene(t.page, path.join(OUT, 'title.png'), FRAME_DEADLINE_MS)
   const fly = await titleFlyBy(t.page)
   const titleProblems = [...fly.problems, ...(await fontProblems(t.page))]
   if (titleWait.frames < MIN_FRAMES) titleProblems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
-  if (titleImg.stddev <= 4) titleProblems.push('title.png is blank')
+  if (looksBlank(titleImg)) titleProblems.push('title.png: the 3D scene behind the UI looks blank')
   if (t.errors.length) titleProblems.push(`${t.errors.length} error(s)`)
   const titleOk = titleProblems.length === 0
   failed ||= !titleOk
@@ -2435,7 +2634,7 @@ async function run() {
     if (!spawnDigest) problems.push('spawnDigest() never reported the spawns')
 
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${frameSeconds.toFixed(0)}s)`)
-    if (img.stddev < 4 || img.distinctColors < 8) problems.push('frame looks blank')
+    if (looksBlank(img)) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
     if (enemyShot.error) problems.push(`enemy probe failed: ${enemyShot.error}`)
     else if (enemyShot.readable < MIN_READABLE) {
@@ -2518,7 +2717,7 @@ async function run() {
   // 6. Top speed: banking + wind streaks (speed.png)
   if (wanted.length) {
     const sp = await newPage()
-    const r = await speedCheck(sp.page, wanted[0])
+    const r = await speedCheck(sp.page, SPEED_LEVEL && wanted.includes(SPEED_LEVEL) ? SPEED_LEVEL : wanted[0])
     r.errors = [...sp.errors, ...(await sp.page.evaluate(() => window.__SC_TEST__.errors))]
     if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
     r.ok = r.problems.length === 0
@@ -2618,7 +2817,7 @@ async function run() {
           ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})` +
           ` | startup ${startupSummary(r.initTimings)}`
       : r.wave
-        ? ` ${r.wave.level} tell ${r.wave.tellLeadS?.toFixed(1) ?? '-'}s ahead, on screen ${r.wave.onScreen} (largest ${r.wave.largestPx}px, nearest ${r.wave.nearest})`
+        ? ` ${r.wave.level} wave at ${r.wave.timing?.due ?? '-'}s: tell at ${r.wave.timing?.tellAt?.toFixed(2) ?? '-'}s (tick before ${r.wave.timing?.tickBefore?.toFixed(2) ?? '-'}s), on screen ${r.wave.onScreen} (largest ${r.wave.largestPx}px, nearest ${r.wave.nearest})`
       : r.boss
         ? (r.boss.skipped
           ? ` ${r.boss.level} skipped (level timed out)`
@@ -2640,7 +2839,7 @@ async function run() {
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` particles=${r.particles?.points ?? '-'}${r.particles?.boostPoints ? `+${r.particles.boostPoints}` : ''}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° aimJump=${r.combat.freshShot?.aimJump?.aimErrorDeg?.toFixed(0)}°(turn ${r.combat.freshShot?.aimJump?.jumpDeg?.toFixed(0)}°) bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     if (r.perfGate?.knownOver && r.perfGate.over.length) console.log(`     WARN over budget (known, ${r.perfGate.knownOver}): ${r.perfGate.over.join(', ')}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
@@ -2662,7 +2861,6 @@ function resultsSummary(s) {
   return s ? ` results=${s.stars}★ acc=${s.rows.Accuracy} combo=${s.rows['Best combo']}` : ''
 }
 
-/** audioBurst result: "ok", or late-note throws + dropped sounds. */
 /** Largest bullet screen radius (% of canvas height) since load, and the fresh shot's distance from the muzzle tip. */
 function bulletSummary(b) {
   if (!b) return '?'
@@ -2671,9 +2869,11 @@ function bulletSummary(b) {
   return `muzzle ${(b.muzzleFrac * 100).toFixed(2)}% flight ${(b.flightFrac * 100).toFixed(2)}% max ${(b.maxScreenFrac * 100).toFixed(2)}%${tip}`
 }
 
+/** audioBurst result: "ok" or late-note throws + dropped sounds, then the kills that reached the engine. */
 function burstSummary(b) {
   if (!b) return '-'
-  return b.lateScheduleErrors || b.dropped ? `late${b.lateScheduleErrors}+drop${b.dropped}` : 'ok'
+  const kills = `kills${b.killsPlayed}/${BURST[1]}`
+  return b.lateScheduleErrors || b.dropped ? `late${b.lateScheduleErrors}+drop${b.dropped} ${kills}` : `ok ${kills}`
 }
 
 /** SFX node count after the portrait / landscape taps (equal = no per-shot nodes). */

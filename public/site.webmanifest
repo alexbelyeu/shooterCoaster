@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "ShooterCoaster",
+  "short_name": "ShooterCoaster",
+  "description": "Ride a rollercoaster through five worlds and blast everything that moves. Free, no install, plays on your phone.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "background_color": "#000000",
+  "theme_color": "#4f6071",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

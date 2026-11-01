@@ -91,7 +91,7 @@ export const WEAPON_RECOIL_SCALE: Record<WeaponId, number> = { blaster: 1, sprea
 export const TRACER_MS = 90
 /** Tracer length, world units along the shot ray. */
 export const TRACER_RANGE = 160
-/** How long the gun keeps pointing at the last shot before following the pointer again. */
+/** How long (game ms) the gun keeps pointing at the last shot before following the pointer again. */
 export const SHOT_AIM_HOLD_MS = 300
 
 /** Recoil envelope 1 → 0 from the remaining time (smoothstep). */

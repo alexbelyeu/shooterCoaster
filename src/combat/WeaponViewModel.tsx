@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { CAMERA_LAYER_ORDER } from '@/core/cameraLayers'
 import { eventBus } from '@/core/EventBus'
 import { useGameStore } from '@/store/useGameStore'
 import { isInRun } from '@/store/startPhase'
@@ -69,6 +70,7 @@ export default function WeaponViewModel() {
     tracerPending: false,
     tracerX: 0,
     tracerY: 0,
+    aimHoldMs: 0,
     initialized: false,
   })
 
@@ -89,6 +91,7 @@ export default function WeaponViewModel() {
       const weapon = WEAPONS[lastShot.weapon]
       s.recoilMs = WEAPON_RECOIL_MS
       s.recoilScale = WEAPON_RECOIL_SCALE[weapon.id]
+      s.aimHoldMs = SHOT_AIM_HOLD_MS
       s.tracerPending = true
       s.tracerX = lastShot.x
       s.tracerY = lastShot.y
@@ -118,6 +121,7 @@ export default function WeaponViewModel() {
     const s = state.current
 
     const { width, height } = frame.size
+    if (width <= 0 || height <= 0) return // a 0 px side would make the aim NaN for good
     const layout = weaponLayout(width, height, _layout)
     const { depth, scale } = weaponDepth(layout.unitPx, height, cam.fov, _depth)
     const tanHalf = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2))
@@ -125,10 +129,10 @@ export default function WeaponViewModel() {
     const ndcY = 1 - (layout.y / height) * 2
     _pivot.set(ndcX * tanHalf * cam.aspect * depth, ndcY * tanHalf * depth, -depth)
 
-    // Aim at the last shot for a moment after firing, otherwise the pointer.
+    // Aim at the last shot for a moment (game time) after firing, otherwise the pointer.
     let axPx: number
     let ayPx: number
-    if (held || performance.now() - lastShot.at < SHOT_AIM_HOLD_MS) {
+    if (held || s.aimHoldMs > 0) {
       axPx = ((lastShot.x + 1) / 2) * width
       ayPx = ((1 - lastShot.y) / 2) * height
     } else {
@@ -138,14 +142,15 @@ export default function WeaponViewModel() {
     }
     // pivot→aim projects onto the same screen line as pivot→tip, so the tracer leaves along the barrel.
     clampWeaponAim(layout.x, layout.y, axPx, ayPx, WEAPON_MIN_AIM_DIST * Math.min(width, height), _aimPx)
-    const ox = (_aimPx.x / Math.max(1, width)) * 2 - 1
-    const oy = 1 - (_aimPx.y / Math.max(1, height)) * 2
+    const ox = (_aimPx.x / width) * 2 - 1
+    const oy = 1 - (_aimPx.y / height) * 2
     aimPoint(cam, ox, oy, TRACER_RANGE, _aim)
     _m.lookAt(_pivot, _aim, UP) // -Z (the barrel) toward the aim point
     _q.setFromRotationMatrix(_m)
     _qRecoil.setFromAxisAngle(_zAxis, WEAPON_CANT)
     _q.multiply(_qRecoil)
-    if (!s.initialized || held) {
+    // Snap on the shot frame too, so the tracer built below leaves along the barrel.
+    if (!s.initialized || held || s.tracerPending) {
       gun.quaternion.copy(_q)
       s.initialized = true
     } else {
@@ -155,6 +160,7 @@ export default function WeaponViewModel() {
     // Recoil: kick back along the barrel and pitch the muzzle up.
     const env = recoilEnvelope(s.recoilMs) * s.recoilScale
     s.recoilMs = Math.max(0, s.recoilMs - dt * 1000)
+    s.aimHoldMs = Math.max(0, s.aimHoldMs - dt * 1000)
     gun.position.copy(_pivot)
     gun.scale.setScalar(scale)
     if (env > 0) {
@@ -213,7 +219,7 @@ export default function WeaponViewModel() {
         geometry={geometry}
         material={material}
         frustumCulled={false}
-        renderOrder={10}
+        renderOrder={CAMERA_LAYER_ORDER.gun}
         matrixAutoUpdate={false}
       />
       <mesh
@@ -223,7 +229,7 @@ export default function WeaponViewModel() {
         material={tracerMaterial}
         visible={false}
         frustumCulled={false}
-        renderOrder={998}
+        renderOrder={CAMERA_LAYER_ORDER.tracer}
       />
       <MuzzleFlash anchor={anchor} />
     </>

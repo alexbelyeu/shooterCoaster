@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
 import { resetComboRuntime, tickCombo } from '@/combat/comboRuntime'
 import { markStartup } from '@/core/startupMarks'
+import { isE2E } from '@/testing/e2eHook'
 
 interface GameTimerProps {
   seconds: number
@@ -37,8 +38,9 @@ export default function GameTimer({ seconds }: GameTimerProps) {
     markStartup('firstPlayingFrame')
     if (timeScale === 0) return
     if (running.current) {
-      elapsed.current += delta
-      tickCombo(delta)
+      const step = isE2E ? (window.__SC_TEST__?.timerStep ?? delta) : delta
+      elapsed.current += step
+      tickCombo(step)
     } else running.current = true
 
     const remaining = Math.max(0, seconds - elapsed.current)
