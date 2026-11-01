@@ -4,8 +4,7 @@ import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
-import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE } from '@/combat/hitFeedback'
-import { placeSound, sfx } from '@/audio/sfx'
+import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE, type EnemyKilledEvent } from '@/combat/hitFeedback'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { BOSS_PART_DEATH_STYLE, type DeathStyle } from '@/effects/deathStyles'
 import { flashMesh, restoreMesh } from '@/entities/enemies/hitFlash'
@@ -201,14 +200,15 @@ export default function BossBase({
       part.visible = false
       const position = part.getWorldPosition(new THREE.Vector3())
       const { combo } = useGameStore.getState()
-      sfx().bossPart(combo.count, w.id, placeSound(position))
       getExplosionPool()?.explode(position, deathStyle)
-      eventBus.emit('enemy:killed', {
+      const event: EnemyKilledEvent = {
         position,
         combo: combo.count,
         multiplier: combo.multiplier,
         score: Math.round(partFx.points * combo.multiplier),
-      })
+        bossPart: w.id,
+      }
+      eventBus.emit('enemy:killed', event)
       if (isDefeated(stateRef.current) && clock.current.defeatedAt < 0) {
         clock.current.defeatedAt = clock.current.age
         publishHud(stateRef.current, true)

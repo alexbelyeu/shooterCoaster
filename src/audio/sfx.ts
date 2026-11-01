@@ -44,8 +44,12 @@ export interface SfxEngine {
   starChime(index: number): void
   ui(sound: UiSound): void
   countdown(go: boolean): void
-  /** Long-lived nodes: must not grow while playing. */
+  /** The ride wind from the coaster's speed (0–1), every frame; silent without a level's sounds. */
+  wind(speed: number): void
+  /** Long-lived nodes, the wind's included: must not grow while playing. */
   nodeCount(): number
+  /** e2e: kills since load that reached the audio engine (not throttled, not refused a voice). */
+  killsPlayed(): number
   voices(): VoiceStats | null
   /** With `level`: only if no menu has asked for its own sounds since. */
   dispose(level?: string): void
@@ -74,7 +78,9 @@ const toneSfx: SfxEngine = {
   starChime: tone.playStarChime,
   ui: () => {},
   countdown: () => {},
+  wind: tone.setWind,
   nodeCount: tone.sfxNodeCount,
+  killsPlayed: tone.sfxKillsPlayed,
   voices: () => null,
   dispose: () => tone.disposeSFX(),
 }
@@ -97,8 +103,9 @@ export const silentSfx: SfxEngine = {
   prepare: () => Promise.resolve(),
   fire: silent, pickup: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, frenzy: silent, frenzyLift: silent,
   waveIncoming: silent, waveAnnounce: silent, bossArrival: silent, bossHit: silent, bossDefeat: silent,
-  fireworkWhistle: silent, fireworkPop: silent, starChime: silent, ui: silent, countdown: silent,
+  fireworkWhistle: silent, fireworkPop: silent, starChime: silent, ui: silent, countdown: silent, wind: silent,
   nodeCount: () => 0,
+  killsPlayed: () => 0,
   voices: () => null,
   dispose: silent,
 }
