@@ -26,7 +26,6 @@ function route(pathname: string, files: Set<string>): { status: number; serves: 
     const match = pathname.match(sourceRegex(source))
     if (!match) continue
     const target = destination.replace(/\$(\d)/g, (_, i) => match[Number(i)])
-    if (target.startsWith('/api/')) return { status: 200, serves: `function ${target}` }
     if (files.has(target)) return { status: 200, serves: target }
   }
   return { status: 404, serves: '/404.html' }
@@ -74,15 +73,14 @@ function jpegSize(buf: Buffer) {
 describe('vercel.json routing', () => {
   const files = siteFiles()
 
-  it('serves the game at / and the /go/<campaign> paths, and the API as functions', () => {
+  it('serves the game at / and the /go/<campaign> paths', () => {
     expect(route('/', files)).toEqual({ status: 200, serves: '/index.html' })
     expect(route('/go/share', files)).toEqual({ status: 200, serves: '/index.html' })
     expect(route('/go/reddit-launch', files)).toEqual({ status: 200, serves: '/index.html' })
-    expect(route('/api/daily', files)).toEqual({ status: 200, serves: 'function /api/daily' })
   })
 
   it('answers unknown paths with a real 404, not the game', () => {
-    for (const p of ['/nope', '/level1', '/index.php', '/go', '/social/missing.jpg']) {
+    for (const p of ['/nope', '/level1', '/index.php', '/go', '/social/missing.jpg', '/api/daily']) {
       expect(route(p, files)).toEqual({ status: 404, serves: '/404.html' })
     }
     expect(files.has('/404.html')).toBe(true)
@@ -106,8 +104,6 @@ describe('vercel.json routing', () => {
       expect(headersFor(p)['Cache-Control']).toBeUndefined()
     }
     expect(fs.existsSync(path.join(root, 'public/assets'))).toBe(false)
-    expect(headersFor('/api/daily')['X-Robots-Tag']).toBe('noindex')
-    expect(headersFor('/')['X-Robots-Tag']).toBeUndefined()
   })
 })
 

@@ -202,9 +202,9 @@ async function launch() {
   return chromium.launch({ headless: true, executablePath, args: flags })
 }
 
-/** Pixel stats of a PNG screenshot, computed in the page with a 2D canvas (no deps). */
-async function imageStats(page, png) {
-  return page.evaluate(async (b64) => {
+/** Pixel stats of a PNG screenshot, computed in the page with a 2D canvas (no deps), leaving out the `skip` rects [x0, y0, x1, y1] (frame fractions). */
+async function imageStats(page, png, skip = []) {
+  return page.evaluate(async ([b64, skip]) => {
     const img = new Image()
     img.src = `data:image/png;base64,${b64}`
     await img.decode()
@@ -214,18 +214,36 @@ async function imageStats(page, png) {
     const ctx = c.getContext('2d')
     ctx.drawImage(img, 0, 0, c.width, c.height)
     const d = ctx.getImageData(0, 0, c.width, c.height).data
-    let sum = 0, sumSq = 0
+    let sum = 0, sumSq = 0, n = 0
     const colors = new Set()
     for (let i = 0; i < d.length; i += 4) {
+      const x = ((i / 4) % c.width) / c.width
+      const y = Math.floor(i / 4 / c.width) / c.height
+      if (skip.some(([x0, y0, x1, y1]) => x >= x0 && x < x1 && y >= y0 && y < y1)) continue
       const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
       sum += l
       sumSq += l * l
+      n++
       colors.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4))
     }
-    const n = d.length / 4
     const mean = sum / n
     return { mean, stddev: Math.sqrt(sumSq / n - mean * mean), distinctColors: colors.size }
-  }, png.toString('base64'))
+  }, [png.toString('base64'), skip])
+}
+
+const looksBlank = (img) => img.stddev < 4 || img.distinctColors < 8
+
+/** The title UI (logo, PLAY, hint; corner buttons and byline), left out so a black 3D scene behind it can't pass (#136). */
+const TITLE_UI = [[0.25, 0.25, 0.75, 0.75], [0, 0.85, 1, 1]]
+
+/** Re-shoots the title into `file` until its 3D scene has drawn (a cold start can show it black) or `maxMs` runs out. */
+async function captureTitleScene(page, file, maxMs) {
+  const until = Date.now() + maxMs
+  for (;;) {
+    const scene = await imageStats(page, await page.screenshot({ path: file, timeout: SHOT_TIMEOUT }), TITLE_UI)
+    if (!looksBlank(scene) || Date.now() >= until) return scene
+    await page.waitForTimeout(1000)
+  }
 }
 
 /** Px an enemy must reach to count as readable (MIN_ENEMY_PX in enemyReadability.ts). */
@@ -479,6 +497,7 @@ async function playLevel(page, id, { frenzy = false } = {}) {
   const end = await getStats(page)
   const results = await resultsScreenProblems(page, end)
   problems.push(...results.problems)
+  if (frenzy) problems.push(...(await resultsEnterProblems(page, results.screen)))
 
   if (combat.kills === 0) problems.push('no kills (enemies missing or unhittable?)')
   // Only meaningful when something was on screen to aim at.
@@ -626,9 +645,13 @@ async function resultsScreenProblems(page, stats) {
       .map((b) => b.textContent)
     const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
     const s = window.__SC_TEST__
-    const levelName = s.levels().find((l) => l.id === s.stats().currentLevel)?.name ?? null
+    const all = s.levels()
+    const level = all.find((l) => l.id === s.stats().currentLevel)
+    const next = all.find((l) => l.id === level?.nextLevel)
     return {
-      rows, buttons, stars, levelName, shareText: s.shareText(),
+      rows, buttons, stars, levelName: level?.name ?? null, shareText: s.shareText(),
+      nextLevel: next ? { id: next.id, unlocked: next.unlocked } : null,
+      keys: el.querySelector('.results-keys')?.textContent ?? '',
       score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent,
     }
   })
@@ -667,8 +690,31 @@ async function resultsScreenProblems(page, stats) {
   for (const label of ['Levels', 'Replay', 'Share']) {
     if (!screen.buttons.includes(label)) problems.push(`results buttons ${JSON.stringify(screen.buttons)} lack ${label}`)
   }
+  // #162: Next Level only when the unlock rule opens it (a 0★ run on a fresh save leaves it locked); Enter replays instead.
+  const nextOffered = screen.buttons.includes('Next Level')
+  const nextOpen = screen.nextLevel?.unlocked === true
+  if (nextOffered !== nextOpen)
+    problems.push(`results ${nextOffered ? 'offer' : 'hide'} Next Level with ${screen.nextLevel?.id ?? 'no next level'} ${nextOpen ? 'unlocked' : 'locked'}`)
+  if (screen.nextLevel && !nextOpen && !/Enter \/ R: replay/.test(screen.keys)) problems.push(`locked next level, but the keys hint reads "${screen.keys}"`)
   if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
   return { problems, screen: shown }
+}
+
+/** #162: Enter with focus on a button outside the results (the mute toggle) still plays on: the next level if open, else a replay. */
+async function resultsEnterProblems(page, screen) {
+  if (!screen) return []
+  const current = await page.evaluate(() => window.__SC_TEST__.stats().currentLevel)
+  const target = screen.nextLevel?.unlocked ? screen.nextLevel.id : screen.nextLevel ? current : null
+  await page.focus('.mute-button')
+  await page.keyboard.press('Enter')
+  const after = await page
+    .waitForFunction(() => window.__SC_TEST__.phase() !== 'results', null, { timeout: 10000, polling: 100 })
+    .then(() => page.evaluate(() => ({ phase: window.__SC_TEST__.phase(), level: window.__SC_TEST__.stats().currentLevel })), () => null)
+  if (!after) return ['Enter with the mute button focused left the results screen up']
+  const expected = target ? ['playing', target] : ['levelSelect', current]
+  if (after.phase !== expected[0] || (target && after.level !== target))
+    return [`Enter on the results went to ${after.phase} ${after.level}, expected ${expected.join(' ')}`]
+  return []
 }
 
 /** The results-screen share link (#87, src/ui/share.ts). */
@@ -1541,12 +1587,6 @@ async function pickupCheck(page) {
   return { id: 'pickup', problems, pickup: { ...result, drawCalls, badge: hud.rects.at(-1) } }
 }
 
-/**
- * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
- * shows over the mounted level, a press during it fires nothing (not even when held on into
- * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
- * that a tap after the 1 s mark skips to GO / playing.
- */
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
 async function levelSelectCheck(page, levels) {
   const problems = []
@@ -1835,7 +1875,9 @@ async function titleFlyBy(page) {
   await waitFrames(page, 2, { minMs: 6000, maxMs: 30000 })
   const b = await pose()
   const waited = (Date.now() - at) / 1000
-  await page.screenshot({ path: path.join(OUT, 'title-2.png'), timeout: SHOT_TIMEOUT })
+  // Re-shot like title.png: a GPU CI runner can return one black canvas capture (#291 CI), a black scene stays black.
+  const scene2 = await captureTitleScene(page, path.join(OUT, 'title-2.png'), 10000)
+  if (looksBlank(scene2)) problems.push(`title-2.png: the 3D scene behind the UI looks blank (mean ${scene2.mean.toFixed(1)} stddev ${scene2.stddev.toFixed(1)} colours ${scene2.distinctColors})`)
   let turnedDeg = 0
   let moved = 0
   if (!a || !b) problems.push('no title camera')
@@ -1871,6 +1913,12 @@ async function titleFlyBy(page) {
   return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter } }
 }
 
+/**
+ * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
+ * shows over the mounted level, a press during it fires nothing (not even when held on into
+ * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
+ * that a tap after the 1 s mark skips to GO / playing, and leaving a level mid-warm-up must throw nothing.
+ */
 async function countdownCheck(page, levelId) {
   const start = () => page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
   // Attached, not faded in: at ~1 fps, waiting on the fade could outlast the countdown.
@@ -1947,19 +1995,46 @@ async function countdownCheck(page, levelId) {
     return { ...before, programsAfter: api.programs(), maxFrameMs: api.maxFrameMs, shots: api.stats().shotsFired }
   }, shotStart)
 
-  // 2. Replay through results (as the UI does) and tap after the 1 s mark: it skips to GO.
+  // 2. Replay through results (as the UI does) and tap after the 1 s mark: it skips to GO (#140).
+  // holdFeedback parks the countdown on Ready, so only the skip can reach playing however slow the frames.
   await page.evaluate(() => window.__SC_TEST__.endLevel())
-  await start()
+  await page.evaluate(([lid, seed]) => {
+    const api = window.__SC_TEST__
+    api.startLevel(lid, seed)
+    api.holdFeedback = true
+  }, [levelId, SEED])
   const shownAgain = await stepShown()
-  await page.waitForTimeout(1200)
+  // Frames too, so the countdown's mount effects (where its 1 s starts) have run.
+  await waitFrames(page, 2, { minMs: 1500, maxMs: 30000 })
   const tappedIn = await page.evaluate((at) => {
     const phase = window.__SC_TEST__.phase()
+    if (phase !== 'countdown') return phase
     const canvas = document.querySelector('canvas')
     canvas.dispatchEvent(new PointerEvent('pointerdown', at))
     canvas.dispatchEvent(new PointerEvent('pointerup', at))
     return phase
   }, pointer)
   const afterTap = await waitPlaying()
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+
+  // 3. Leave a fresh level mid-warm-up (#141); polled in the page so the unmount beats the warm-up's first check.
+  await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
+  await waitFrames(page, 2, { maxMs: 30000 })
+  const leftDuringWarmup = await page.evaluate(([lid, seed]) => new Promise((resolve) => {
+    const api = window.__SC_TEST__
+    api.shaderWarmup = null
+    api.startLevel(lid, seed)
+    const until = performance.now() + 30000
+    const poll = () => {
+      const w = api.shaderWarmup
+      if (w || performance.now() > until) {
+        api.setPhase('levelSelect')
+        resolve(w ? !w.done : null)
+      } else setTimeout(poll, 0)
+    }
+    poll()
+  }), [levelId, SEED])
+  await waitFrames(page, 3, { minMs: 1500, maxMs: 30000 })
   const initTimings = await page.evaluate(() => window.__SC_TEST__.initTimings())
 
   const problems = []
@@ -1978,8 +2053,10 @@ async function countdownCheck(page, levelId) {
   if (firstShot.programsAfter > firstShot.programs)
     problems.push(`the first shot + kill compiled ${firstShot.programsAfter - firstShot.programs} shader program(s) after the warm-up`)
   if (!shownAgain) problems.push('no countdown on replay')
-  if (!afterTap) problems.push(`the replay never reached playing after a tap in "${tappedIn}"`)
+  if (tappedIn !== 'countdown') problems.push(`the replay's countdown was over before the skip tap (phase "${tappedIn}")`)
+  else if (!afterTap) problems.push('the skip tap never reached playing')
   else if (afterTap.shotsFired > 0) problems.push(`the skip tap fired ${afterTap.shotsFired} shot(s)`)
+  if (leftDuringWarmup === null) problems.push('the remounted level never started its shader warm-up')
   return {
     id: 'countdown',
     ok: problems.length === 0,
@@ -1992,10 +2069,56 @@ async function countdownCheck(page, levelId) {
       timerAtGo: atGo.timeRemaining,
       shotsHeldIntoPlay: heldInPlay.stats.shotsFired,
       skipTapIn: tappedIn,
+      leftDuringWarmup,
       warmup,
       firstShot,
     },
   }
+}
+
+/** #168: a `from` -> `to` switch must overlap: the latest `to` fade-in needs a `from` fade-out running under it, and its first note must land before that fade-out reaches 0. */
+function crossfadeGaps(fades, from, to) {
+  const incoming = fades.findLast((f) => f.name === to && f.ramp === 'in')
+  if (!incoming) return []
+  const overlapping = fades.filter(
+    (f) => f !== incoming && f.name === from && f.ramp === 'out' && f.at <= incoming.at + incoming.seconds && f.at + f.seconds >= incoming.at,
+  )
+  if (!overlapping.length) return [`${from} -> ${to}: no ${from} fade-out overlaps the ${to} fade-in (the switch did not crossfade)`]
+  return overlapping
+    .filter((out) => incoming.firstNote == null || incoming.firstNote >= out.at + out.seconds)
+    .map((out) =>
+      incoming.firstNote == null
+        ? `${from} -> ${to}: the fade-in logged no first note`
+        : `${from} -> ${to}: first note ${(incoming.firstNote - out.at).toFixed(2)} s into a ${out.seconds} s fade-out (a gap)`,
+    )
+}
+
+/** Level -> next level and level -> level select (#168), after the phone run's results: each must fade out, fade in, leave one bus and pass `crossfadeGaps`. */
+async function musicSwitches(page) {
+  const problems = []
+  const read = () => page.evaluate(() => window.__SC_TEST__.audio().music)
+  const latest = (m) => Math.max(0, ...m.fades.map((f) => f.at))
+  const switches = []
+  const run = async (label, from, to, act) => {
+    const since = latest(await read())
+    await act()
+    const deadline = Date.now() + 30000
+    let m = await read()
+    const fresh = () => m.fades.filter((f) => f.at > since)
+    const done = () =>
+      fresh().some((f) => f.name === from && f.ramp === 'out') && fresh().some((f) => f.name === to && f.ramp === 'in') && m.buses.length === 1
+    while (!done() && Date.now() < deadline) {
+      await page.waitForTimeout(250)
+      m = await read()
+    }
+    const fades = fresh()
+    switches.push({ label, fades })
+    if (!done()) problems.push(`${label}: no ${from} fade-out + ${to} fade-in leaving one bus (${m.buses.map((b) => b.name).join(',')})`)
+    problems.push(...crossfadeGaps(fades, from, to).map((g) => `${label}: ${g}`))
+  }
+  await run('level -> next level', 'level', 'level', () => page.evaluate((seed) => window.__SC_TEST__.startLevel('level2', seed), SEED))
+  await run('level -> level select', 'level', 'title', () => page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect')))
+  return { problems, switches }
 }
 
 /** Title -> level music (#28) crossfades: read from the ramp log, since at ~1 fps a 1 s fade fits between two polls. */
@@ -2019,6 +2142,7 @@ async function musicCrossfade(page) {
   else if (titleOut.from < 0.5 || titleOut.seconds < 0.5)
     problems.push(`title music fade-out was not a ramp from full (from ${titleOut.from.toFixed(2)} over ${titleOut.seconds} s)`)
   if (!levelIn || levelIn.seconds < 0.5) problems.push('the level music did not fade in')
+  problems.push(...crossfadeGaps(fades, 'title', 'level'))
   if (buses.some((b) => b.name === 'title')) problems.push('the title music bus was never disposed')
   if (!buses.some((b) => b.name === 'level' && !b.fading)) problems.push('no level music playing')
   return { problems, result: { fades, buses } }
@@ -2067,6 +2191,7 @@ async function scrimCheck(page) {
   if (!titleOut || titleOut.seconds < 0.5) problems.push('the title score did not fade out')
   if (!levelIn || levelIn.seconds < 0.5) problems.push('the level score did not fade in')
   if (busNames(a).includes('title')) problems.push('the title score bus was never disposed')
+  problems.push(...crossfadeGaps(a.music.fades, 'title', 'level'))
 
   result.nodes.push(a.scrim.nodes)
   result.position.push(track(a)?.position ?? 0)
@@ -2124,6 +2249,7 @@ async function scrimCheck(page) {
   if (!result.results) problems.push(`no results score after the run (current "${a.scrim?.current}")`)
   if (!levelOut || levelOut.seconds < 0.5 || !resultsIn) problems.push('the level score did not crossfade to the results score')
   if (busNames(a).includes('level')) problems.push('the level score bus was never disposed')
+  problems.push(...crossfadeGaps(a.music.fades, 'level', 'results'))
   result.dropped = a.dropped
   if (a.dropped) problems.push(`${a.dropped} sound(s) dropped by an audio error (${a.lastDrop?.split('\n')[0]})`)
   return { problems, result }
@@ -2371,6 +2497,8 @@ async function runMobile(browser, base) {
 
   const resultsLayout = await mobileResults(page)
   problems.push(...resultsLayout.problems)
+  const switches = await musicSwitches(page)
+  problems.push(...switches.problems)
 
   const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
   const allErrors = [...errors, ...hookErrors]
@@ -2384,7 +2512,7 @@ async function runMobile(browser, base) {
     mobile: {
       taps: 10, tapsOnEnemies, tapShots, tapKills, fallbackKills, crosshairScale,
       portraitTaps: portraitTaps.result, landscapeTaps: landscapeTaps.result,
-      audio: { portrait: audioPortrait, landscape: audioLandscape, music: music.result },
+      audio: { portrait: audioPortrait, landscape: audioLandscape, music: music.result, switches: switches.switches },
       audioBurst: { portrait: burstPortrait.burst, landscape: burstLandscape.burst },
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
       bulletMaxScreenFrac: bullets.maxScreenFrac,
@@ -2422,12 +2550,11 @@ async function run() {
   const t = await newPage()
   const levels = await t.page.evaluate(() => window.__SC_TEST__.levels())
   const titleWait = await waitFrames(t.page, MIN_FRAMES, { maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
-  const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png'), timeout: SHOT_TIMEOUT })
-  const titleImg = await imageStats(t.page, titlePng)
+  const titleImg = await captureTitleScene(t.page, path.join(OUT, 'title.png'), FRAME_DEADLINE_MS)
   const fly = await titleFlyBy(t.page)
   const titleProblems = [...fly.problems, ...(await fontProblems(t.page))]
   if (titleWait.frames < MIN_FRAMES) titleProblems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
-  if (titleImg.stddev <= 4) titleProblems.push('title.png is blank')
+  if (looksBlank(titleImg)) titleProblems.push('title.png: the 3D scene behind the UI looks blank')
   if (t.errors.length) titleProblems.push(`${t.errors.length} error(s)`)
   const titleOk = titleProblems.length === 0
   failed ||= !titleOk
@@ -2486,7 +2613,7 @@ async function run() {
     if (!spawnDigest) problems.push('spawnDigest() never reported the spawns')
 
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${frameSeconds.toFixed(0)}s)`)
-    if (img.stddev < 4 || img.distinctColors < 8) problems.push('frame looks blank')
+    if (looksBlank(img)) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
     if (enemyShot.error) problems.push(`enemy probe failed: ${enemyShot.error}`)
     else if (enemyShot.readable < MIN_READABLE) {

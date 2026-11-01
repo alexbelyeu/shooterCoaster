@@ -87,9 +87,9 @@ function disposeTrack(track: Track) {
   releaseTimer()
 }
 
-function fadeOut(track: Track) {
+function fadeOut(track: Track, untilNextTrack = false) {
   if (current === track) current = null
-  fadeOutMusicBus(track.bus, [{ dispose: () => disposeTrack(track) }])
+  fadeOutMusicBus(track.bus, [{ dispose: () => disposeTrack(track) }], untilNextTrack)
 }
 
 /** Crossfades to score `id` from the top; nothing if it is already the current track or audio is still locked. */
@@ -97,7 +97,8 @@ export function playScore(id: string): void {
   if (current?.id === id || !isAudioReady()) return
   if (current) fadeOut(current)
   const song = songFor(id)
-  const bus = openMusicBus(busName(id), scoreChannel)
+  const start = now() + SCORE_START_DELAY_S
+  const bus = openMusicBus(busName(id), start, scoreChannel)
   const synth = createSynth(coreFor(rawContext()), bus.gain.input as unknown as AudioNode, { voicing: 'game' })
   const track: Track = {
     id,
@@ -108,7 +109,7 @@ export function playScore(id: string): void {
     pausedAt: null,
     stopWarm: synth.warm(song),
   }
-  track.scheduler.start(now() + SCORE_START_DELAY_S)
+  track.scheduler.start(start)
   live.push(track)
   current = track
   ensureTimer()
@@ -118,6 +119,11 @@ export function playScore(id: string): void {
 /** Fades out the current track if it is one of `ids`. */
 export function stopScore(...ids: string[]): void {
   if (current && ids.includes(current.id)) fadeOut(current)
+}
+
+/** Keeps the current track, if it is one of `ids`, playing until the next score opens, then fades it under that one (`fadeOutMusicBus`). */
+export function handOverScore(...ids: string[]): void {
+  if (current && ids.includes(current.id)) fadeOut(current, true)
 }
 
 /** Holds the current track where it is (a paused run, a hidden tab) and picks it up there again. */

@@ -2,14 +2,14 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { animate, motion } from 'framer-motion'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { computeStars } from '@/levels/scoring'
+import { computeStars, nextStar } from '@/levels/scoring'
 import { sfx } from '@/audio/sfx'
 import { biomeTheme } from '@/ui/theme'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { SHARED_EVENT } from '@/app/analyticsEvents'
 import { eventBus } from '@/core/EventBus'
 import { shareMethod, sharePayload, sharePayloadForRun } from '@/ui/share'
-import { barFill, formatAccuracy, formatTimeLeft, isNewRecord, nextStar } from './resultsStats'
+import { barFill, formatAccuracy, formatTimeLeft, isNewRecord } from './resultsStats'
 
 const fmt = new Intl.NumberFormat('en-US')
 
@@ -59,8 +59,11 @@ export default function ResultsScreen() {
   const daily = run.mode.mode === 'daily'
   /** No Next Level after a daily: it is one run, not a step in the campaign. */
   const nextLevel = daily ? null : (config?.nextLevel ?? null)
+  // Read live: this run's own save (below) can be what unlocks it.
+  const nextOpen = useGameStore((s) => nextLevel !== null && s.isLevelUnlocked(nextLevel))
+  const enterTo = nextLevel === null ? 'levels' : nextOpen ? 'next' : 'replay'
 
-  /** Once only: the screen lingers through its exit fade. */
+  /** Once only, and the reveal stops: the screen lingers through its exit fade, over the next run's countdown. */
   function leave(to: 'levels' | 'replay' | 'next') {
     if (left.current) return
     left.current = true
@@ -88,13 +91,15 @@ export default function ResultsScreen() {
 
   useEffect(() => {
     if (done) return
-    const timer = setTimeout(() => setStage(stage + 1), STAGE_AT_MS[stage + 1] - STAGE_AT_MS[stage])
+    const timer = setTimeout(() => {
+      if (!left.current) setStage(stage + 1)
+    }, STAGE_AT_MS[stage + 1] - STAGE_AT_MS[stage])
     return () => clearTimeout(timer)
   }, [stage, done])
 
   useEffect(() => {
     const i = stage - STAGE.star
-    if (i >= 0 && i < 3 && i < stars) sfx().starChime(i)
+    if (!left.current && i >= 0 && i < 3 && i < stars) sfx().starChime(i)
   }, [stage, stars])
 
   useEffect(() => {
@@ -134,18 +139,19 @@ export default function ResultsScreen() {
     if (!config) return
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
-      // A focused button already turns Enter into its own click.
-      if (e.key === 'Enter' && e.target instanceof HTMLButtonElement) return
-      if (e.key === 'Enter') leave('next')
+      // A focused results button turns Enter into its own click; one outside (the mute toggle) must not swallow it.
+      if (e.key === 'Enter' && e.target instanceof HTMLButtonElement && e.target.closest('.results-screen')) return
+      if (e.key === 'Enter') leave(enterTo)
       else if (e.key === 'r' || e.key === 'R') leave('replay')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [config, nextLevel])
+  }, [config, nextLevel, enterTo])
 
   if (!config) return null
 
   const theme = biomeTheme(config.biome)
+  const nextName = nextLevel ? (getLevelConfig(nextLevel)?.name ?? nextLevel) : null
   const next = nextStar(run.score, config.maxScore, config.starThresholds)
   const instant = { duration: 0 }
   const reveal = (from: number) => (stage >= from ? 'shown' : 'hidden')
@@ -224,7 +230,7 @@ export default function ResultsScreen() {
             {config.starThresholds.map((t, i) => (
               <span
                 key={i}
-                className={`results-bar-marker${run.score >= t * config.maxScore ? ' reached' : ''}`}
+                className={`results-bar-marker${i < stars ? ' reached' : ''}`}
                 style={{ left: `${t * 100}%` }}
               >
                 {'★'.repeat(i + 1)}
@@ -272,13 +278,17 @@ export default function ResultsScreen() {
                 {copied ? 'Copied!' : 'Share'}
               </button>
             )}
-            {nextLevel && (
+            {nextOpen && (
               <button className="play-button" onClick={() => leave('next')}>
                 Next Level
               </button>
             )}
           </motion.div>
-          <p className="results-keys">{nextLevel ? 'Enter: next' : 'Enter: levels'} · R: replay</p>
+          <p className="results-keys">
+            {enterTo === 'next' && 'Enter: next · R: replay'}
+            {enterTo === 'levels' && 'Enter: levels · R: replay'}
+            {enterTo === 'replay' && `★ unlocks ${nextName} · Enter / R: replay`}
+          </p>
         </div>
       </div>
     </div>

@@ -174,3 +174,11 @@ export function getLevelConfig(id: string): LevelConfig | undefined {
 export function getAllLevels(): LevelConfig[] {
   return [...LEVELS].sort((a, b) => a.order - b.order)
 }
+
+/** The level whose `nextLevel` is `id` (its star unlocks `id`); null for the first level or an unknown id. */
+export function previousLevel(
+  id: string,
+  levels: readonly Pick<LevelConfig, 'id' | 'nextLevel'>[] = LEVELS,
+): string | null {
+  return levels.find((l) => l.nextLevel === id)?.id ?? null
+}

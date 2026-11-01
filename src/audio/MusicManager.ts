@@ -147,9 +147,9 @@ let bus: MusicBus | null = null
 let currentIntensity = 0
 let isPlaying = false
 
-function fadeOutMusicState() {
+function fadeOutMusicState(untilNextTrack: boolean) {
   const nodes = [padLoop, bassLoop, percLoop, leadLoop, padSynth, bassSynth, percSynth, leadSynth]
-  if (bus) fadeOutMusicBus(bus, nodes.filter((n) => n !== null))
+  if (bus) fadeOutMusicBus(bus, nodes.filter((n) => n !== null), untilNextTrack)
   bus = null
   padLoop = bassLoop = percLoop = leadLoop = null
   padSynth = bassSynth = percSynth = leadSynth = null
@@ -195,14 +195,15 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   const { Sequence } = tone()
 
   const cfg = CONFIGS[biome]
-  bus = openMusicBus('level')
+  const start = startTransportAt(cfg.tempo)
+  bus = openMusicBus('level', start.time)
   // The loops play these locals, not the module slots: a track fading out keeps its synths after a stop clears them.
   const { pad, bass, perc, lead } = createInstruments(bus.gain)
   padSynth = pad
   bassSynth = bass
   percSynth = perc
   leadSynth = lead
-  const at = `${startTransportAt(cfg.tempo)}i`
+  const at = `${start.ticks}i`
 
   padLoop = new Sequence(
     guarded('music pad', (time, chord) => {
@@ -257,9 +258,10 @@ export function startMusic(biome: BiomeType = 'themePark'): void {
   isPlaying = true
 }
 
-export function stopMusic(): void {
+/** `untilNextTrack`: play on until the next track opens and fade under it (`fadeOutMusicBus`). */
+export function stopMusic(untilNextTrack = false): void {
   if (!isPlaying) return
-  fadeOutMusicState()
+  fadeOutMusicState(untilNextTrack)
 }
 
 export function setMusicIntensity(intensity: number): void {
@@ -277,9 +279,5 @@ export function musicLoop(biome: BiomeType): { barS: number; bars: number } {
 /** The loop's first pad chord: its root is the biome's key, which the wave stinger resolves to (`sfxDesign.test.ts`). */
 export function openingChord(biome: BiomeType): readonly string[] {
   return CONFIGS[biome].padChords[0] ?? []
-}
-
-export function getMusicIntensity(): number {
-  return currentIntensity
 }
 

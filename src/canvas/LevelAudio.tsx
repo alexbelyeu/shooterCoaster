@@ -9,6 +9,7 @@ import { isAudioReady, setMusicDucked, setPauseMix, whenAudioReady } from '@/aud
 import { MUSIC_ENGINE, withScrim } from '@/audio/musicEngine'
 import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
+import { isInRun } from '@/store/startPhase'
 import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks'
 import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
@@ -88,10 +89,12 @@ export default function LevelAudio() {
     return () => {
       cancelStart()
       for (const [event, fn] of SFX_EVENTS) eventBus.off(event, fn)
+      // Still in a run: the next level's track opens once its scene mounts, so fade under it, not before (#168).
+      const nextLevel = isInRun(useGameStore.getState().phase)
       if (unfollow) {
         unfollow()
-        withScrim((p) => p.stopScore(level, 'results'))
-      } else stopMusic()
+        withScrim((p) => (nextLevel ? p.handOverScore(level, 'results') : p.stopScore(level, 'results')))
+      } else stopMusic(nextLevel)
       sfx().dispose(level)
       setMusicDucked(false, true)
     }
