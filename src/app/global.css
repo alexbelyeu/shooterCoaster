@@ -1163,10 +1163,8 @@ canvas {
   }
 }
 
-/* Results screen */
+/* Results screen. --accent / --accent-glow are the level's biome accent, set inline from src/ui/theme.ts. */
 .results-screen {
-  --accent: #ffd23f;
-  --accent-glow: rgba(255, 210, 63, 0.55);
   position: fixed;
   inset: 0;
   display: flex;
@@ -1238,6 +1236,7 @@ canvas {
 .results-star-earned {
   position: absolute;
   inset: 0;
+  /* Gold on purpose, not the biome accent: stars are gold on every screen (.level-card-stars .earned). */
   color: #ffd23f;
   text-shadow: 0 0 16px rgba(255, 210, 63, 0.8);
 }
@@ -1310,6 +1309,7 @@ canvas {
 }
 
 .results-bar-marker.reached {
+  /* Gold like the earned stars above. */
   color: #ffd23f;
 }
 

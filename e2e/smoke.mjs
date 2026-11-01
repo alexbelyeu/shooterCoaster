@@ -479,6 +479,7 @@ async function playLevel(page, id, { frenzy = false } = {}) {
   const end = await getStats(page)
   const results = await resultsScreenProblems(page, end)
   problems.push(...results.problems)
+  if (frenzy) problems.push(...(await resultsEnterProblems(page, results.screen)))
 
   if (combat.kills === 0) problems.push('no kills (enemies missing or unhittable?)')
   // Only meaningful when something was on screen to aim at.
@@ -626,9 +627,13 @@ async function resultsScreenProblems(page, stats) {
       .map((b) => b.textContent)
     const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
     const s = window.__SC_TEST__
-    const levelName = s.levels().find((l) => l.id === s.stats().currentLevel)?.name ?? null
+    const all = s.levels()
+    const level = all.find((l) => l.id === s.stats().currentLevel)
+    const next = all.find((l) => l.id === level?.nextLevel)
     return {
-      rows, buttons, stars, levelName, shareText: s.shareText(),
+      rows, buttons, stars, levelName: level?.name ?? null, shareText: s.shareText(),
+      nextLevel: next ? { id: next.id, unlocked: next.unlocked } : null,
+      keys: el.querySelector('.results-keys')?.textContent ?? '',
       score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent,
     }
   })
@@ -667,8 +672,31 @@ async function resultsScreenProblems(page, stats) {
   for (const label of ['Levels', 'Replay', 'Share']) {
     if (!screen.buttons.includes(label)) problems.push(`results buttons ${JSON.stringify(screen.buttons)} lack ${label}`)
   }
+  // #162: Next Level only when the unlock rule opens it (a 0★ run on a fresh save leaves it locked); Enter replays instead.
+  const nextOffered = screen.buttons.includes('Next Level')
+  const nextOpen = screen.nextLevel?.unlocked === true
+  if (nextOffered !== nextOpen)
+    problems.push(`results ${nextOffered ? 'offer' : 'hide'} Next Level with ${screen.nextLevel?.id ?? 'no next level'} ${nextOpen ? 'unlocked' : 'locked'}`)
+  if (screen.nextLevel && !nextOpen && !/Enter \/ R: replay/.test(screen.keys)) problems.push(`locked next level, but the keys hint reads "${screen.keys}"`)
   if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
   return { problems, screen: shown }
+}
+
+/** #162: Enter with focus on a button outside the results (the mute toggle) still plays on: the next level if open, else a replay. */
+async function resultsEnterProblems(page, screen) {
+  if (!screen) return []
+  const current = await page.evaluate(() => window.__SC_TEST__.stats().currentLevel)
+  const target = screen.nextLevel?.unlocked ? screen.nextLevel.id : screen.nextLevel ? current : null
+  await page.focus('.mute-button')
+  await page.keyboard.press('Enter')
+  const after = await page
+    .waitForFunction(() => window.__SC_TEST__.phase() !== 'results', null, { timeout: 10000, polling: 100 })
+    .then(() => page.evaluate(() => ({ phase: window.__SC_TEST__.phase(), level: window.__SC_TEST__.stats().currentLevel })), () => null)
+  if (!after) return ['Enter with the mute button focused left the results screen up']
+  const expected = target ? ['playing', target] : ['levelSelect', current]
+  if (after.phase !== expected[0] || (target && after.level !== target))
+    return [`Enter on the results went to ${after.phase} ${after.level}, expected ${expected.join(' ')}`]
+  return []
 }
 
 /** The results-screen share link (#87, src/ui/share.ts). */
@@ -1541,12 +1569,6 @@ async function pickupCheck(page) {
   return { id: 'pickup', problems, pickup: { ...result, drawCalls, badge: hud.rects.at(-1) } }
 }
 
-/**
- * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
- * shows over the mounted level, a press during it fires nothing (not even when held on into
- * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
- * that a tap after the 1 s mark skips to GO / playing.
- */
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
 async function levelSelectCheck(page, levels) {
   const problems = []
@@ -1871,6 +1893,12 @@ async function titleFlyBy(page) {
   return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter } }
 }
 
+/**
+ * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
+ * shows over the mounted level, a press during it fires nothing (not even when held on into
+ * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
+ * that a tap after the 1 s mark skips to GO / playing.
+ */
 async function countdownCheck(page, levelId) {
   const start = () => page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
   // Attached, not faded in: at ~1 fps, waiting on the fade could outlast the countdown.

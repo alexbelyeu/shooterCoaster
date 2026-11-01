@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
 import type { ScoreEntry } from '@/types/game'
 import { dailyLevel } from '@/levels/daily'
 import {
@@ -13,9 +13,9 @@ import {
 } from './levelSelectModel'
 
 const levels: LevelSelectSource[] = [
-  { id: 'a', name: 'Alpha', description: '', biome: 'themePark', maxScore: 1000, nextLevel: 'b' },
-  { id: 'b', name: 'Bravo', description: '', biome: 'desert', maxScore: 2000, nextLevel: 'c' },
-  { id: 'c', name: 'Charlie', description: '', biome: 'ocean', maxScore: 3000, nextLevel: null },
+  { id: 'a', name: 'Alpha', description: '', biome: 'themePark', nextLevel: 'b' },
+  { id: 'b', name: 'Bravo', description: '', biome: 'desert', nextLevel: 'c' },
+  { id: 'c', name: 'Charlie', description: '', biome: 'ocean', nextLevel: null },
 ]
 
 const entry = (level: string, score: number, stars: number): ScoreEntry => ({
@@ -48,6 +48,12 @@ describe('buildLevelCards', () => {
     const cards = buildLevelCards(all, {}, (id) => id === all[0].id)
     expect(totalStars(cards)).toEqual({ earned: 0, max: all.length * 3 })
     expect(cards.slice(1).every((c) => c.unlockedBy !== null)).toBe(true)
+  })
+
+  it('a locked card names the level the unlock rule waits on (previousLevel)', () => {
+    const all = getAllLevels()
+    const cards = buildLevelCards(all, {}, (id) => id === all[0].id)
+    for (const c of cards.slice(1)) expect(c.unlockedBy, c.id).toBe(getLevelConfig(previousLevel(c.id)!)!.name)
   })
 })
 

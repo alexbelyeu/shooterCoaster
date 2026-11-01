@@ -8,6 +8,7 @@ import { comboExpired, comboMultiplier } from '@/combat/comboTiers'
 import { startPhaseFor } from './startPhase'
 import { NO_PICKUP, applyPickup, type PickupWeaponId, type WeaponState } from '@/combat/weapons/weaponTypes'
 import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/daily'
+import { getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
 
 /** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
 export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }
@@ -205,12 +206,9 @@ export const useGameStore = create<GameState>()(
         }),
 
       isLevelUnlocked: (levelId) => {
-        const state = get()
-        if (levelId === 'level1') return true
-        const prevNum = parseInt(levelId.replace('level', '')) - 1
-        const prevId = `level${prevNum}`
-        const prevScore = state.savedScores[prevId]
-        return prevScore ? prevScore.stars >= 1 : false
+        if (!getLevelConfig(levelId)) return false
+        const prev = previousLevel(levelId)
+        return prev === null || (get().savedScores[prev]?.stars ?? 0) >= 1
       },
     }),
     {

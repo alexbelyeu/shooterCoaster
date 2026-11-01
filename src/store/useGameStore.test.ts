@@ -313,6 +313,10 @@ describe('isLevelUnlocked', () => {
     for (const l of levels.slice(1)) expect(store().isLevelUnlocked(l.id), l.id).toBe(false)
   })
 
+  it('an unknown level id is never unlocked', () => {
+    expect(store().isLevelUnlocked('level99')).toBe(false)
+  })
+
   it('a 0-star result does not unlock the next level', () => {
     store().saveScore(entry('level1', 10, 0))
     expect(store().isLevelUnlocked('level2')).toBe(false)
