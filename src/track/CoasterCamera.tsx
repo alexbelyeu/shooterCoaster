@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
 import type { ArcTable } from './arcLength'
+import { setRideProgress } from './rideProgress'
 import { useGameStore } from '@/store/useGameStore'
 import { sfx } from '@/audio/sfx'
 import { eventBus } from '@/core/EventBus'
@@ -157,6 +158,7 @@ export default function CoasterCamera({
     progress.current += velocity.current * dtScaleSlow
     progress.current = wrap01(progress.current)
     const t = progress.current
+    setRideProgress(t)
 
     _position.current.copy(curve.getPointAt(t))
     _position.current.y += heightOffset

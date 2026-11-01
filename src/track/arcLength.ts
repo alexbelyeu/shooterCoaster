@@ -69,6 +69,12 @@ export function distanceAtT(table: ArcTable, t: number): number {
   return table.s[i] + (table.s[i + 1] - table.s[i]) * (x - i)
 }
 
+/** Nearest sample index to curve parameter `t` (wrapped to [0, 1)); the table samples t evenly. */
+export function indexAtT(table: ArcTable, t: number): number {
+  const n = table.count - 1
+  return Math.round((((t % 1) + 1) % 1) * n) % n
+}
+
 /** `tAtDistance` on a closed loop: any distance wraps around the seam. */
 export function tAtLoopDistance(table: ArcTable, dist: number): number {
   const len = table.length

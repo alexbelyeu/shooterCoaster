@@ -1,13 +1,12 @@
-export interface ArchConfig {
-  pos: readonly [number, number, number]
-  rotY: number
-  scale: number
-}
+import {
+  ARCH_PILLAR_BASE_RADIUS,
+  ARCH_PILLAR_HEIGHT,
+  ARCH_PILLAR_RADIUS,
+  ARCH_RADIUS,
+  type ArchConfig,
+} from './landmarkDimensions'
 
-/**
- * Natural stone arch formations scattered around the desert.
- * Each arch is two pillars with a torus half-arch on top.
- */
+/** Stone arches: two pillars under a half torus. */
 export default function RockArches({ arches }: { arches: readonly ArchConfig[] }) {
   return (
     <>
@@ -32,31 +31,28 @@ function RockArch({
   rotationY: number
   scale: number
 }) {
-  const pillarHeight = 200 * scale
-  const archRadius = 120 * scale
-  const pillarRadius = 20 * scale
+  const pillarHeight = ARCH_PILLAR_HEIGHT * scale
+  const archRadius = ARCH_RADIUS * scale
+  const pillarRadius = ARCH_PILLAR_RADIUS * scale
+  const pillarBase = ARCH_PILLAR_BASE_RADIUS * scale
 
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
-      {/* Left pillar */}
       <mesh position={[-archRadius, pillarHeight / 2, 0]}>
-        <cylinderGeometry args={[pillarRadius, pillarRadius * 1.3, pillarHeight, 6]} />
+        <cylinderGeometry args={[pillarRadius, pillarBase, pillarHeight, 6]} />
         <meshPhongMaterial color="#8b5a3a" flatShading />
       </mesh>
 
-      {/* Right pillar */}
       <mesh position={[archRadius, pillarHeight / 2, 0]}>
-        <cylinderGeometry args={[pillarRadius, pillarRadius * 1.3, pillarHeight, 6]} />
+        <cylinderGeometry args={[pillarRadius, pillarBase, pillarHeight, 6]} />
         <meshPhongMaterial color="#8b5a3a" flatShading />
       </mesh>
 
-      {/* Arch (top half of a torus) */}
       <mesh position={[0, pillarHeight, 0]} rotation={[0, 0, 0]}>
         <torusGeometry args={[archRadius, pillarRadius * 0.8, 6, 12, Math.PI]} />
         <meshPhongMaterial color="#7a4a2a" flatShading />
       </mesh>
 
-      {/* Some rubble at the base */}
       {[-1, 1].map((side) => (
         <mesh
           key={`rubble-${side}`}

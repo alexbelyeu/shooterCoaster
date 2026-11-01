@@ -75,6 +75,8 @@ export interface PathRow {
 }
 
 export interface Arch extends Placement {
+  /** World XZ of the two posts. */
+  feet: readonly { x: number; z: number }[]
   boardY: number
   /** From the lower post's ground to the board top. */
   postHeight: number

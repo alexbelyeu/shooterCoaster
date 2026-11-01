@@ -25,21 +25,29 @@ export function isInternalBrowser(storage: FlagStorage | null): boolean {
   }
 }
 
+let internalThisLoad = false
+
+/** What `applyInternalParam` decided for this page load; the title's "not tracked" marker shows it. */
+export const isInternalThisLoad = () => internalThisLoad
+
 /**
- * Stores or clears the flag from the URL and returns whether this browser is internal
- * now; the parameter wins even when storage can't be written.
+ * `?internal=1` stores the flag, `?internal=0` clears it, any other value leaves it alone;
+ * the parameter wins for this page load even when storage can't be written.
  */
 export function applyInternalParam(search: string, storage: FlagStorage | null): boolean {
   const value = new URLSearchParams(search).get(INTERNAL_PARAM)
-  if (value === null) return isInternalBrowser(storage)
-  const internal = value !== '0'
+  if (value !== '1' && value !== '0') {
+    internalThisLoad = isInternalBrowser(storage)
+    return internalThisLoad
+  }
+  internalThisLoad = value === '1'
   try {
-    if (internal) storage?.setItem(INTERNAL_STORAGE_KEY, '1')
+    if (internalThisLoad) storage?.setItem(INTERNAL_STORAGE_KEY, '1')
     else storage?.removeItem(INTERNAL_STORAGE_KEY)
   } catch {
     // The flag then lasts only for this page load.
   }
-  return internal
+  return internalThisLoad
 }
 
 /** Null when there is no `internal` parameter to strip from the address bar. */

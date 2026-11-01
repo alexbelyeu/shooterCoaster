@@ -1,4 +1,4 @@
-import type { ArchConfig } from '../../RockArches'
+import { ARCH_REACH, type ArchConfig, PYRAMID_REACH } from '../../landmarkDimensions'
 
 /** Fixed desert landmarks, shared by Features (to draw them) and the layout (to keep clear of them). */
 
@@ -9,14 +9,10 @@ export const ARCHES: readonly ArchConfig[] = [
   { pos: [-1400, 0, -600], rotY: 4.2, scale: 0.9 },
 ]
 
-/** Half-span of an arch at scale 1: arch radius 120 + flared pillar 26. */
-const ARCH_REACH = 146
-
-/** Pyramid.tsx: 800-wide base, 8 layers of 80. */
-export const PYRAMID = { x: 2000, z: -1600, reach: 570, height: 640 }
+export const PYRAMID = { x: 2000, z: -1600 }
 
 /** Circles (XZ) that mesas and dust devils stay out of. */
 export const LANDMARK_FOOTPRINTS: readonly { x: number; z: number; r: number }[] = [
-  { x: PYRAMID.x, z: PYRAMID.z, r: PYRAMID.reach },
+  { x: PYRAMID.x, z: PYRAMID.z, r: PYRAMID_REACH },
   ...ARCHES.map((a) => ({ x: a.pos[0], z: a.pos[2], r: ARCH_REACH * a.scale })),
 ]
