@@ -342,7 +342,8 @@ function planScatter(index: TrackIndex, groundFn: HeightFunction, occupied: Circ
     const x = Math.cos(theta) * 1100
     const z = Math.sin(theta) * 1100
     if (index.near(x, z, 25) || hitsAny(occupied, x, z, 10)) continue
-    hedges.push({ x, y: ground(x, z), z, yaw: -theta })
+    // Long axis (local x) along the ring's tangent.
+    hedges.push({ x, y: ground(x, z), z, yaw: -theta - Math.PI / 2 })
   }
 
   for (let i = 0; i < 30; i++) {
@@ -388,6 +389,7 @@ export function planThemePark(
   const lights = planLights(index, groundFn, stallSides)
   for (const p of lights.poles) occupied.push({ x: p.x, z: p.z, r: 2 })
   const bunting = planBunting(index, groundFn, occupied)
+  for (const p of bunting.poles) occupied.push({ x: p.x, z: p.z, r: 2 })
   const scatter = planScatter(index, groundFn, occupied, rand)
 
   return {

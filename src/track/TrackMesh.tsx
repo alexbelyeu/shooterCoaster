@@ -11,7 +11,7 @@ import {
   getTrackDimensions,
 } from './trackDimensions'
 import { trackViewportHeight, withMinThickness } from './minThickness'
-import { type ArcTable, buildArcTable } from './arcLength'
+import type { ArcTable } from './arcLength'
 import { buildTrackGeometry } from './trackGeometry'
 import {
   type TowerPlan,
@@ -38,8 +38,7 @@ interface TrackMeshProps {
    * this; defaults to the TerrainContext heightFn.
    */
   groundFn?: HeightFunction
-  /** Arc-length table of `curve`, if the caller already built one. */
-  table?: ArcTable
+  table: ArcTable
 }
 
 const DEFAULT_DIMS = getTrackDimensions({ scalar: 20 })
@@ -195,9 +194,8 @@ export default function TrackMesh({
   glow = 0,
   dims = DEFAULT_DIMS,
   groundFn,
-  table: tableProp,
+  table,
 }: TrackMeshProps) {
-  const table = useMemo(() => tableProp ?? buildArcTable(curve), [tableProp, curve])
   const geometry = useMemo(
     () => buildTrackGeometry(curve, table, dims, segments, color1, color2),
     [curve, table, dims, segments, color1, color2],
