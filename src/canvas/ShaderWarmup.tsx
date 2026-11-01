@@ -1,6 +1,6 @@
 /**
  * Compiles every shader a level can draw behind the countdown, so no kill, explosion or late wave stalls on one.
- * The approach (compileAsync, then one warm-up frame) follows slop-newyork's
+ * The approach (compile asynchronously, then one warm-up frame) follows slop-newyork's
  * `precompileShaders` (main.js), Copyright (c) 2026 Mr.doob, MIT License,
  * https://github.com/mrdoob/slop-newyork. Written from its description; no code copied.
  */
@@ -11,6 +11,7 @@ import * as enemyAssets from '@/entities/enemies/SharedEnemyAssets'
 import * as bossAssets from '@/entities/bosses/bossAssets'
 import { useGameStore } from '@/store/useGameStore'
 import { markStartup } from '@/core/startupMarks'
+import { whenProgramsReady } from './programReadiness'
 
 function enemyMaterials(): THREE.Material[] {
   const out: THREE.Material[] = []
@@ -89,11 +90,10 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
 
     const prevTarget = gl.getRenderTarget()
     gl.setRenderTarget(target)
-    const compiled = gl.compileAsync(scene, camera)
+    const materials = gl.compile(scene, camera)
     gl.setRenderTarget(prevTarget)
 
-    compiled.then(() => {
-      if (cleaned) return
+    whenProgramsReady(gl, materials, () => cleaned, () => {
       renderWarmupFrame(gl, scene, camera, target)
       cleanup()
       setSceneReady(true)
