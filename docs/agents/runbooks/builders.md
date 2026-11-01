@@ -6,9 +6,14 @@ Fix (on label) task within minutes, so you only pick those up if they've waited.
 
 Read only what picking and claiming needs: this runbook, the runbooks README rules,
 `builder_parallelism` in STEERING.md, PROTOCOL.md "Labels", "Issue contract" and
-"Claiming work", and each candidate's Scope. The builders read CLAUDE.md, PROTOCOL.md,
+"Claiming work", and each candidate's Scope. The builders read PROTOCOL.md,
 `.claude/agents/builder.md` and the skills themselves.
 
+0. **Daily budget.** Read `builder_runs_per_day` from STEERING.md (default 6). Count the
+   Builders runs in the last 24 hours:
+   `node scripts/run-usage.cjs --summary --since "$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)" | jq '[.roles[] | select(.role == "builders") | .runs] | add // 0'`.
+   If that count has reached the budget, reply "Daily builder budget reached (<count>/<budget>)"
+   and stop: no claims, no ledger entry. Fix (on label) and QA keep working.
 1. Read `builder_parallelism` (N) from STEERING.md (default 2, max 4).
 2. Pick up to N assignments, in this order:
    a. Open, non-draft PRs labelled `agent:changes-requested` with no *live*

@@ -1,0 +1,5 @@
+## 2026-11-01 — Token efficiency: context budget, quiet logs, ledger diagnostics, builder run cap (Alex's session)
+
+**Context:** The ledger's 168 runs (24 Oct – 1 Nov, ~226M weighted tokens) showed Builders at 71% of spend (~6M per run), cache writes at 48% of all spend, and builder runs re-writing their whole context ~15 times each, at ~157k tokens of context per turn. Spend went from ~12M/day to 82M on 31 Oct when Builders were fired back to back, which exhausted the old account.
+**Decision:** The ledger records a `diag` per run (peak context, compactions, cache misses by cause, heaviest tool results). Noisy commands run through `scripts/quiet.sh`. CLAUDE.md gained a "Context budget" section, stopped being re-read by role files, and moved the smoke spec and test hook to `e2e/README.md` (47KB → 30KB). Builders stop once `builder_runs_per_day` (STEERING.md) is reached. QA (on label) no longer polls for the merge.
+**Consequences:** Don't move the smoke spec back into CLAUDE.md or add "Read CLAUDE.md" to role files. Read the `diag` in new ledger entries to find what still drives cache misses before changing models or parallelism.
