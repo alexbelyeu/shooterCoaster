@@ -6,7 +6,7 @@ reviewed within minutes by QA (on label); this run catches anything that slipped
 
 Read only what picking and deciding needs: this runbook, `review-one-pr.md`, the runbooks
 README rules, `qa_parallelism` in STEERING.md and PROTOCOL.md "Labels" and "Merging". The
-playtest reviewers read CLAUDE.md, PROTOCOL.md and `.claude/agents/qa.md` themselves.
+playtest reviewers read PROTOCOL.md and `.claude/agents/qa.md` themselves.
 
 1. Read `qa_parallelism` (P) from STEERING.md (default 1, max 2).
 2. List open, non-draft PRs labelled `agent:needs-qa`, ordered: reverts and
