@@ -279,7 +279,3 @@ export function openingChord(biome: BiomeType): readonly string[] {
   return CONFIGS[biome].padChords[0] ?? []
 }
 
-export function getMusicIntensity(): number {
-  return currentIntensity
-}
-
