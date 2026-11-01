@@ -290,7 +290,3 @@ export function musicLoop(biome: BiomeType): { barS: number; bars: number } {
   return { barS: (4 * 60) / cfg.tempo, bars: cfg.padChords.length }
 }
 
-export function getMusicIntensity(): number {
-  return currentIntensity
-}
-
