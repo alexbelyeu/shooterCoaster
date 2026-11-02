@@ -1,0 +1,117 @@
+title    Steam Calliope
+composer Claude (ShooterCoaster)
+about    Theme Park option "calliope": a whirling steam-calliope riff in B-flat major on pipe organ, organ "pah" chords and a xylophone double over power-chord guitar and a rock beat. The last eight bars lift a tone, to C major.
+tempo    148
+beats    4
+steps    2
+reverb   0.24
+
+voice lead   pipe       vol=0.62 bright=1.2
+voice xylo   xylophone  vol=0.4  oct=1 pan=0.3
+voice pah    organ      vol=0.26 pan=0.35 center=F4 gate=0.55
+voice gtr    distguitar vol=0.34 pan=-0.35 gate=0.5
+voice bass   fmbass     vol=0.52  gate=0.7
+voice hit    orchhit    vol=0.4
+voice rise   riser      vol=0.28
+voice kick   bigkick    vol=0.6
+voice snare  snare      vol=0.62 pan=0.05
+voice hat    hat909     vol=0.26 pan=0.3
+voice crash  crash      vol=0.3  pan=-0.2
+
+pattern intro
+lead  | Bb4 C5 D5 Eb5 F5 G5 A5 Bb5 | F5! . F5! . F5!--- |
+hit   | _ | [F]! . [F]! . [F]!--- |
+kick  | x... x... | x.x. x... |
+snare | .... .... | ..x. xxXX |
+hat   | xxxx xxxx | xxxx .... |
+
+pattern A1
+lead  | F5 D5 Bb4 D5 F5 Bb5 A5 G5 | G5 Eb5 C5 Eb5 G5- F5 Eb5 | F5 C5 A4 C5 F5 A5 G5 F5 | D5--- Bb4- .- |
+pah   | . [Bb] . [Bb] . [Bb] . [Bb] | . [Eb] . [Eb] . [Eb] . [Eb] | . [F] . [F] . [F] . [F] | . [Bb] . [Bb] . [Bb] . [Bb] |
+gtr   | .- Bb2+F3- .- Bb2+F3 Bb2+F3 | .- Eb3+Bb3- .- Eb3+Bb3 Eb3+Bb3 | .- F2+C3- .- F2+C3 F2+C3 | .- Bb2+F3- .- Bb2+F3 Bb2+F3 |
+bass  | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 | Eb2 Eb2 Eb3 Eb2 Eb2 Eb3 Eb2 Eb2 | F2 F2 F3 F2 F2 F3 F2 F2 | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 |
+hit   | [Bb] .------ | _ | _ | _ |
+kick  | x... x.x. | % | % | x... x.xx |
+snare | ..x. ..x. | % | % | % |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern A2
+lead  | F5 D5 Bb4 D5 F5 Bb5 A5 G5 | G5 Eb5 C5 Eb5 G5 C6 Bb5 A5 | G5 Eb5 C5 Eb5 F5 A5 C6 A5 | Bb5--- F5 D5 Bb4 . |
+pah   | . [Bb] . [Bb] . [Bb] . [Bb] | . [Eb] . [Eb] . [Eb] . [Eb] | . [Cm] . [Cm] . [F] . [F] | . [Bb] . [Bb] . [Bb] . [Bb] |
+gtr   | .- Bb2+F3- .- Bb2+F3 Bb2+F3 | .- Eb3+Bb3- .- Eb3+Bb3 Eb3+Bb3 | .- C3+G3- .- F2+C3- | .- Bb2+F3- .- Bb2+F3 Bb2+F3 |
+bass  | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 | Eb2 Eb2 Eb3 Eb2 Eb2 Eb3 Eb2 Eb2 | C2 C2 C3 C2 F2 F2 F3 F2 | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 |
+kick  | x... x.x. | % | % | x... x.xx |
+snare | ..x. ..x. | % | % | ..x. xxXX |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern A1x
+lead  | F5 D5 Bb4 D5 F5 Bb5 A5 G5 | G5 Eb5 C5 Eb5 G5- F5 Eb5 | F5 C5 A4 C5 F5 A5 G5 F5 | D5--- Bb4- .- |
+xylo  | F5 D5 Bb4 D5 F5 Bb5 A5 G5 | G5 Eb5 C5 Eb5 G5- F5 Eb5 | F5 C5 A4 C5 F5 A5 G5 F5 | D5--- Bb4- .- |
+pah   | . [Bb] . [Bb] . [Bb] . [Bb] | . [Eb] . [Eb] . [Eb] . [Eb] | . [F] . [F] . [F] . [F] | . [Bb] . [Bb] . [Bb] . [Bb] |
+gtr   | .- Bb2+F3- .- Bb2+F3 Bb2+F3 | .- Eb3+Bb3- .- Eb3+Bb3 Eb3+Bb3 | .- F2+C3- .- F2+C3 F2+C3 | .- Bb2+F3- .- Bb2+F3 Bb2+F3 |
+bass  | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 | Eb2 Eb2 Eb3 Eb2 Eb2 Eb3 Eb2 Eb2 | F2 F2 F3 F2 F2 F3 F2 F2 | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 |
+hit   | [Bb] .------ | _ | _ | _ |
+kick  | x... x.x. | % | % | x... x.xx |
+snare | ..x. ..x. | % | % | % |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern A2x
+lead  | F5 D5 Bb4 D5 F5 Bb5 A5 G5 | G5 Eb5 C5 Eb5 G5 C6 Bb5 A5 | G5 Eb5 C5 Eb5 F5 A5 C6 A5 | Bb5--- F5 D5 Bb4 . |
+xylo  | F5 D5 Bb4 D5 F5 Bb5 A5 G5 | G5 Eb5 C5 Eb5 G5 C6 Bb5 A5 | G5 Eb5 C5 Eb5 F5 A5 C6 A5 | Bb5--- F5 D5 Bb4 . |
+pah   | . [Bb] . [Bb] . [Bb] . [Bb] | . [Eb] . [Eb] . [Eb] . [Eb] | . [Cm] . [Cm] . [F] . [F] | . [Bb] . [Bb] . [Bb] . [Bb] |
+gtr   | .- Bb2+F3- .- Bb2+F3 Bb2+F3 | .- Eb3+Bb3- .- Eb3+Bb3 Eb3+Bb3 | .- C3+G3- .- F2+C3- | .- Bb2+F3- .- Bb2+F3 Bb2+F3 |
+bass  | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 | Eb2 Eb2 Eb3 Eb2 Eb2 Eb3 Eb2 Eb2 | C2 C2 C3 C2 F2 F2 F3 F2 | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 |
+kick  | x... x.x. | % | % | x... x.xx |
+snare | ..x. ..x. | % | % | ..x. xxXX |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern B1
+lead  | D6--- Bb5--- | G5--- Eb5- G5- | C6--- G5- Eb5- | F5 G5 A5 Bb5 C6--- |
+pah   | . [Gm] . [Gm] . [Gm] . [Gm] | . [Eb] . [Eb] . [Eb] . [Eb] | . [Cm] . [Cm] . [Cm] . [Cm] | . [F] . [F] . [F] . [F] |
+gtr   | .- G2+D3- .- G2+D3 G2+D3 | .- Eb3+Bb3- .- Eb3+Bb3 Eb3+Bb3 | .- C3+G3- .- C3+G3 C3+G3 | .- F2+C3- .- F2+C3 F2+C3 |
+bass  | G2 G2 G3 G2 G2 G3 G2 G2 | Eb2 Eb2 Eb3 Eb2 Eb2 Eb3 Eb2 Eb2 | C2 C2 C3 C2 C2 C3 C2 C2 | F2 F2 F3 F2 F2 F3 F2 F2 |
+kick  | x... x.x. | % | % | x... x.xx |
+snare | ..x. ..x. | % | % | % |
+hat   | .x.x .x.x | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern B2
+lead  | D6--- Bb5--- | Eb6--- Bb5--- | E5 G5 Bb5 C6 E6- D6 C6 | A5 C6 Eb6 C6 A5 F5 G5 A5 |
+pah   | . [Gm] . [Gm] . [Gm] . [Gm] | . [Eb] . [Eb] . [Eb] . [Eb] | . [C7] . [C7] . [C7] . [C7] | . [F7] . [F7] . [F7] . [F7] |
+gtr   | .- G2+D3- .- G2+D3 G2+D3 | .- Eb3+Bb3- .- Eb3+Bb3 Eb3+Bb3 | .- C3+G3- .- C3+G3 C3+G3 | .- F2+C3- .- F2+C3 F2+C3 |
+bass  | G2 G2 G3 G2 G2 G3 G2 G2 | Eb2 Eb2 Eb3 Eb2 Eb2 Eb3 Eb2 Eb2 | C2 C2 C3 C2 C2 C3 C2 C2 | F2 F2 F3 F2 F2 F3 F2 F2 |
+rise  | _ | _ | _ | C5------- |
+kick  | x... x.x. | % | % | x... x.xx |
+snare | ..x. ..x. | % | % | ..x. xxXX |
+hat   | .x.x .x.x | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern L1
+lead  | F5 D5 Bb4 D5 F5 Bb5 A5 G5 | G5 Eb5 C5 Eb5 G5- F5 Eb5 | F5 C5 A4 C5 F5 A5 G5 F5 | D5--- Bb4- .- |
+xylo  | F5 D5 Bb4 D5 F5 Bb5 A5 G5 | G5 Eb5 C5 Eb5 G5- F5 Eb5 | F5 C5 A4 C5 F5 A5 G5 F5 | D5--- Bb4- .- |
+pah   | . [Bb] . [Bb] . [Bb] . [Bb] | . [Eb] . [Eb] . [Eb] . [Eb] | . [F] . [F] . [F] . [F] | . [Bb] . [Bb] . [Bb] . [Bb] |
+gtr   | .- Bb2+F3- .- Bb2+F3 Bb2+F3 | .- Eb3+Bb3- .- Eb3+Bb3 Eb3+Bb3 | .- F2+C3- .- F2+C3 F2+C3 | .- Bb2+F3- .- Bb2+F3 Bb2+F3 |
+bass  | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 | Eb2 Eb2 Eb3 Eb2 Eb2 Eb3 Eb2 Eb2 | F2 F2 F3 F2 F2 F3 F2 F2 | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 |
+hit   | [Bb] .------ | _ | _ | _ |
+kick  | x... x.x. | % | % | x... x.xx |
+snare | ..x. ..x. | % | % | % |
+hat   | .x.x .x.x | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern L2
+lead  | F5 D5 Bb4 D5 F5 Bb5 A5 G5 | G5 Eb5 C5 Eb5 G5 C6 Bb5 A5 | G5 Eb5 C5 Eb5 F5 A5 C6 A5 | Bb5--- F5 D5 Bb4 . |
+xylo  | F5 D5 Bb4 D5 F5 Bb5 A5 G5 | G5 Eb5 C5 Eb5 G5 C6 Bb5 A5 | G5 Eb5 C5 Eb5 F5 A5 C6 A5 | Bb5--- F5 D5 Bb4 . |
+pah   | . [Bb] . [Bb] . [Bb] . [Bb] | . [Eb] . [Eb] . [Eb] . [Eb] | . [Cm] . [Cm] . [F] . [F] | . [Bb] . [Bb] . [Bb] . [Bb] |
+gtr   | .- Bb2+F3- .- Bb2+F3 Bb2+F3 | .- Eb3+Bb3- .- Eb3+Bb3 Eb3+Bb3 | .- C3+G3- .- F2+C3- | .- Bb2+F3- .- Bb2+F3 Bb2+F3 |
+bass  | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 | Eb2 Eb2 Eb3 Eb2 Eb2 Eb3 Eb2 Eb2 | C2 C2 C3 C2 F2 F2 F3 F2 | Bb2 Bb2 Bb3 Bb2 Bb2 Bb3 Bb2 Bb2 |
+kick  | x... x.x. | % | % | x... x.xx |
+snare | ..x. ..x. | % | % | ..x. xxXX |
+hat   | .x.x .x.x | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+play intro
+loop A1 A2 A1x A2x B1 B2 L1+2 L2+2

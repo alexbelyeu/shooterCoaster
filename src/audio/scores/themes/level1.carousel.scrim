@@ -1,0 +1,122 @@
+title    Carousel Gallop
+composer Claude (ShooterCoaster)
+about    Theme Park option "carousel": a galloping 12/8 shuffle in A major, organ lead over accordion off-beats, rolling banjo and a shaker. The last eight bars lift a fourth, to D major, and fall home on a plagal cadence.
+tempo    132
+beats    4
+steps    3
+reverb   0.24
+
+voice lead    organ     vol=0.66 bright=1.3
+voice bells   musicbox  vol=0.22 pan=0.45
+voice squeeze accordion vol=0.26 pan=-0.35 center=E4 gate=0.6
+voice banjo   banjo     vol=0.24 pan=0.35
+voice bass    fmbass    vol=0.52  gate=0.75
+voice rise    riser     vol=0.26
+voice kick    bigkick   vol=0.6
+voice clap    clap909   vol=0.45 pan=0.05
+voice hat     hat909    vol=0.24 pan=0.3
+voice shaker  shaker    vol=0.24 pan=-0.4
+voice tamb    tamb      vol=0.22 pan=0.4
+voice crash   crash     vol=0.3  pan=-0.2
+
+pattern intro
+lead  | A4-- C#5-- E5-- A5-- | G#5----- E5----- |
+squeeze| [A]-----------  | [E7]----------- |
+kick  | x.. ... x.. ... | % |
+clap  | ... ... ... ... | ... x.. x.x xxx |
+
+pattern A1
+lead  | E5- C#5 A4- C#5 E5- A5 C#6-- | B5- A5 F#5- A5 D6-- .-- | B5- G#5 E5- G#5 B5- D6 C#6- B5 | A5----- .-- E5- E5 |
+squeeze| .. [A] .. [A] .. [A] .. [A] | .. [D] .. [D] .. [D] .. [D] | .. [E] .. [E] .. [E] .. [E] | .. [A] .. [A] .. [A] .. [A] |
+banjo | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 | D4 F#4 A4 D5 A4 F#4 D4 F#4 A4 D5 A4 F#4 | E4 G#4 B4 E5 B4 G#4 E4 G#4 B4 E5 B4 G#4 | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 |
+bass  | A2- A2 A3- A2 E3- E3 A3- E3 | D2- D2 D3- D2 A2- A2 D3- A2 | E2- E2 E3- E2 B2- B2 E3- B2 | A2- A2 A3- A2 E3- E3 A3- E3 |
+kick  | x.. ... x.. ... | % | % | x.. ... x.. ..x |
+clap  | ... x.. ... x.. | % | % | % |
+hat   | x.x x.x x.x x.x | % | % | % |
+crash | X.. ... ... ... | _ | _ | _ |
+
+pattern A2
+lead  | E5- C#5 A4- C#5 E5- A5 C#6-- | C#6- B5 A5- F#5 A5----- | F#5- E5 D5- F#5 E5- G#5 B5- D6 | C#6----- A5----- |
+squeeze| .. [A] .. [A] .. [A] .. [A] | .. [F#m] .. [F#m] .. [F#m] .. [F#m] | .. [D] .. [D] .. [E] .. [E] | .. [A] .. [A] .. [A] .. [A] |
+banjo | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 | F#4 A4 C#5 F#5 C#5 A4 F#4 A4 C#5 F#5 C#5 A4 | D4 F#4 A4 D5 A4 F#4 E4 G#4 B4 E5 B4 G#4 | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 |
+bass  | A2- A2 A3- A2 E3- E3 A3- E3 | F#2- F#2 F#3- F#2 C#3- C#3 F#3- C#3 | D2- D2 A2- A2 E2- E2 B2- B2 | A2- A2 A3- A2 E3- E3 A3- E3 |
+kick  | x.. ... x.. ... | % | % | x.. ... x.. ..x |
+clap  | ... x.. ... x.. | % | % | ... x.. x.x xxx |
+hat   | x.x x.x x.x x.x | % | % | % |
+crash | X.. ... ... ... | _ | _ | _ |
+
+pattern A1s
+lead  | E5- C#5 A4- C#5 E5- A5 C#6-- | B5- A5 F#5- A5 D6-- .-- | B5- G#5 E5- G#5 B5- D6 C#6- B5 | A5----- .-- E5- E5 |
+squeeze| .. [A] .. [A] .. [A] .. [A] | .. [D] .. [D] .. [D] .. [D] | .. [E] .. [E] .. [E] .. [E] | .. [A] .. [A] .. [A] .. [A] |
+banjo | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 | D4 F#4 A4 D5 A4 F#4 D4 F#4 A4 D5 A4 F#4 | E4 G#4 B4 E5 B4 G#4 E4 G#4 B4 E5 B4 G#4 | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 |
+bass  | A2- A2 A3- A2 E3- E3 A3- E3 | D2- D2 D3- D2 A2- A2 D3- A2 | E2- E2 E3- E2 B2- B2 E3- B2 | A2- A2 A3- A2 E3- E3 A3- E3 |
+kick  | x.. ... x.. ... | % | % | x.. ... x.. ..x |
+clap  | ... x.. ... x.. | % | % | % |
+hat   | x.x x.x x.x x.x | % | % | % |
+shaker| xox xox xox xox | % | % | % |
+crash | X.. ... ... ... | _ | _ | _ |
+
+pattern A2s
+lead  | E5- C#5 A4- C#5 E5- A5 C#6-- | C#6- B5 A5- F#5 A5----- | F#5- E5 D5- F#5 E5- G#5 B5- D6 | C#6----- A5----- |
+squeeze| .. [A] .. [A] .. [A] .. [A] | .. [F#m] .. [F#m] .. [F#m] .. [F#m] | .. [D] .. [D] .. [E] .. [E] | .. [A] .. [A] .. [A] .. [A] |
+banjo | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 | F#4 A4 C#5 F#5 C#5 A4 F#4 A4 C#5 F#5 C#5 A4 | D4 F#4 A4 D5 A4 F#4 E4 G#4 B4 E5 B4 G#4 | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 |
+bass  | A2- A2 A3- A2 E3- E3 A3- E3 | F#2- F#2 F#3- F#2 C#3- C#3 F#3- C#3 | D2- D2 A2- A2 E2- E2 B2- B2 | A2- A2 A3- A2 E3- E3 A3- E3 |
+kick  | x.. ... x.. ... | % | % | x.. ... x.. ..x |
+clap  | ... x.. ... x.. | % | % | ... x.. x.x xxx |
+hat   | x.x x.x x.x x.x | % | % | % |
+shaker| xox xox xox xox | % | % | % |
+crash | X.. ... ... ... | _ | _ | _ |
+
+pattern B1
+lead  | F#5----- A5- F#5 D5-- | G#5----- B5- G#5 E5-- | E5- C#5 E5- G#5 C#6- B5 G#5-- | A5----------- |
+squeeze| .. [D] .. [D] .. [D] .. [D] | .. [E] .. [E] .. [E] .. [E] | .. [C#m] .. [C#m] .. [C#m] .. [C#m] | .. [F#m] .. [F#m] .. [F#m] .. [F#m] |
+banjo | D4 F#4 A4 D5 A4 F#4 D4 F#4 A4 D5 A4 F#4 | E4 G#4 B4 E5 B4 G#4 E4 G#4 B4 E5 B4 G#4 | C#4 E4 G#4 C#5 G#4 E4 C#4 E4 G#4 C#5 G#4 E4 | F#4 A4 C#5 F#5 C#5 A4 F#4 A4 C#5 F#5 C#5 A4 |
+bass  | D2- D2 D3- D2 A2- A2 D3- A2 | E2- E2 E3- E2 B2- B2 E3- B2 | C#2- C#2 C#3- C#2 G#2- G#2 C#3- G#2 | F#2- F#2 F#3- F#2 C#3- C#3 F#3- C#3 |
+kick  | x.. ... x.. ... | % | % | x.. ... x.. ..x |
+clap  | ... x.. ... x.. | % | % | % |
+hat   | x.x x.x x.x x.x | % | % | % |
+shaker| xox xox xox xox | % | % | % |
+tamb  | ... x.. ... x.. | % | % | % |
+crash | X.. ... ... ... | _ | _ | _ |
+
+pattern B2
+lead  | F#5----- A5- F#5 D6-- | E6----- D6- C#6 B5-- | D6- C#6 B5- F#5 D5- F#5 B5-- | G#5- A5 B5- D6 E6- D6 B5- G#5 |
+squeeze| .. [D] .. [D] .. [D] .. [D] | .. [E] .. [E] .. [E] .. [E] | .. [Bm] .. [Bm] .. [Bm] .. [Bm] | .. [E7] .. [E7] .. [E7] .. [E7] |
+banjo | D4 F#4 A4 D5 A4 F#4 D4 F#4 A4 D5 A4 F#4 | E4 G#4 B4 E5 B4 G#4 E4 G#4 B4 E5 B4 G#4 | B3 D4 F#4 B4 F#4 D4 B3 D4 F#4 B4 F#4 D4 | E4 G#4 B4 E5 B4 G#4 E4 G#4 B4 E5 B4 G#4 |
+bass  | D2- D2 D3- D2 A2- A2 D3- A2 | E2- E2 E3- E2 B2- B2 E3- B2 | B2- B2 B3- B2 F#3- F#3 B3- F#3 | E2- E2 E3- E2 B2- B2 E3- B2 |
+rise  | _ | _ | _ | E5----------- |
+kick  | x.. ... x.. ... | % | % | x.. ... x.. ..x |
+clap  | ... x.. ... x.. | % | % | ... x.. x.x xxx |
+hat   | x.x x.x x.x x.x | % | % | % |
+shaker| xox xox xox xox | % | % | % |
+tamb  | ... x.. ... x.. | % | % | % |
+crash | X.. ... ... ... | _ | _ | _ |
+
+pattern L1
+lead  | E5- C#5 A4- C#5 E5- A5 C#6-- | B5- A5 F#5- A5 D6-- .-- | B5- G#5 E5- G#5 B5- D6 C#6- B5 | A5----- .-- E5- E5 |
+bells | A5 E5 C#5 E5 A5 E5 A5 E5 C#5 E5 A5 E5 | D6 A5 F#5 A5 D6 A5 D6 A5 F#5 A5 D6 A5 | E6 B5 G#5 B5 E6 B5 E6 B5 G#5 B5 E6 B5 | A5 E5 C#5 E5 A5 E5 A5 E5 C#5 E5 A5 E5 |
+squeeze| .. [A] .. [A] .. [A] .. [A] | .. [D] .. [D] .. [D] .. [D] | .. [E] .. [E] .. [E] .. [E] | .. [A] .. [A] .. [A] .. [A] |
+banjo | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 | D4 F#4 A4 D5 A4 F#4 D4 F#4 A4 D5 A4 F#4 | E4 G#4 B4 E5 B4 G#4 E4 G#4 B4 E5 B4 G#4 | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 |
+bass  | A2- A2 A3- A2 E3- E3 A3- E3 | D2- D2 D3- D2 A2- A2 D3- A2 | E2- E2 E3- E2 B2- B2 E3- B2 | A2- A2 A3- A2 E3- E3 A3- E3 |
+kick  | x.. ... x.. ... | % | % | x.. ... x.. ..x |
+clap  | ... x.. ... x.. | % | % | % |
+hat   | x.x x.x x.x x.x | % | % | % |
+shaker| xox xox xox xox | % | % | % |
+tamb  | ... x.. ... x.. | % | % | % |
+crash | X.. ... ... ... | _ | _ | _ |
+
+pattern L2
+lead  | E5- C#5 A4- C#5 E5- A5 C#6-- | C#6- B5 A5- F#5 A5----- | F#5- E5 D5- F#5 E5- G#5 B5- D6 | C#6----- A5----- |
+bells | A5 E5 C#5 E5 A5 E5 A5 E5 C#5 E5 A5 E5 | F#6 C#6 A5 C#6 F#6 C#6 F#6 C#6 A5 C#6 F#6 C#6 | D6 A5 F#5 A5 D6 A5 E6 B5 G#5 B5 E6 B5 | A5 E5 C#5 E5 A5 E5 A5 E5 C#5 E5 A5 E5 |
+squeeze| .. [A] .. [A] .. [A] .. [A] | .. [F#m] .. [F#m] .. [F#m] .. [F#m] | .. [D] .. [D] .. [E] .. [E] | .. [A] .. [A] .. [A] .. [A] |
+banjo | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 | F#4 A4 C#5 F#5 C#5 A4 F#4 A4 C#5 F#5 C#5 A4 | D4 F#4 A4 D5 A4 F#4 E4 G#4 B4 E5 B4 G#4 | A3 C#4 E4 A4 E4 C#4 A3 C#4 E4 A4 E4 C#4 |
+bass  | A2- A2 A3- A2 E3- E3 A3- E3 | F#2- F#2 F#3- F#2 C#3- C#3 F#3- C#3 | D2- D2 A2- A2 E2- E2 B2- B2 | A2- A2 A3- A2 E3- E3 A3- E3 |
+kick  | x.. ... x.. ... | % | % | x.. ... x.. ..x |
+clap  | ... x.. ... x.. | % | % | ... x.. x.x xxx |
+hat   | x.x x.x x.x x.x | % | % | % |
+shaker| xox xox xox xox | % | % | % |
+tamb  | ... x.. ... x.. | % | % | % |
+crash | X.. ... ... ... | _ | _ | _ |
+
+play intro
+loop A1 A2 A1s A2s B1 B2 L1+5 L2+5

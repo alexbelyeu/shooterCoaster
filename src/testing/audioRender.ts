@@ -12,12 +12,15 @@ import type { MusicEngine } from '@/audio/musicEngine'
 import { compile } from '@/audio/scrim/score'
 import { renderOffline as renderScoreOffline, type Voicing } from '@/audio/scrim/synth'
 import { loopSeams } from '@/audio/scrim/scheduler'
-import { SCORES } from '@/audio/scores'
+import { SCORES, scoreIdFor } from '@/audio/scores'
 import { createRng } from '@/utils/rng'
 
 export type AudioRenderRequest =
-  /** `track`: 'title', a level id, or (score engine) 'results'. */
-  | { kind: 'music'; track: string; intensity?: number; seconds?: number; engine?: MusicEngine }
+  /**
+   * `track`: 'title', a level id, or (score engine) 'results' or a theme option (`<slot>.<name>`).
+   * `seam` (score engine): start `SEAM_LEAD_S` before the first loop seam instead of at the top.
+   */
+  | { kind: 'music'; track: string; intensity?: number; seconds?: number; engine?: MusicEngine; seam?: boolean }
   /** `engine: 'scrim'`: the arcade SFX (`audio/arcade/`), plus the sounds only it has. */
   | { kind: 'sfxSheet'; level?: string; engine?: MusicEngine }
   /** `stem: 'music'`: the same mix without SFX or wind, to measure the kills against. */
@@ -26,7 +29,7 @@ export type AudioRenderRequest =
    * Score text through the ported engine alone (`synth.renderOffline`, no game chain): parity with the original page.
    * `chain: 'game'` plays it through the game's music chain instead, exactly like `music` with `engine: 'scrim'`.
    */
-  | { kind: 'score'; text: string; seconds?: number; voicing?: Voicing; chain?: 'game' }
+  | { kind: 'score'; text: string; seconds?: number; voicing?: Voicing; chain?: 'game'; seam?: boolean }
 
 export interface AudioRenderResult {
   sampleRate: number
@@ -82,29 +85,39 @@ function stopAll() {
   }
 }
 
-/** Score-engine music from render time 0, ticked every 50 ms of render time (well inside its 0.3 s look-ahead). */
-function scrimScript(p: ScrimPlayer, id: string, seconds: number) {
+/** A `seam` render starts this long before the first loop seam, so the seam lands in its middle. */
+const SEAM_LEAD_S = 10
+
+/** Score-engine music from song time `from` at render time 0, ticked every 50 ms of render time (well inside its 0.3 s look-ahead). */
+function scrimScript(p: ScrimPlayer, id: string, seconds: number, from = 0) {
   return ({ at }: OfflineRenderScope) => {
     p.driveScoresManually(true)
-    p.playScore(id)
+    p.playScore(id, from)
     for (let t = 0.05; t < seconds; t += 0.05) at(t, p.tickScores)
   }
 }
 
-function scrimMusicPlan(p: ScrimPlayer, track: string, seconds = 30): Plan {
+function scrimMusicPlan(p: ScrimPlayer, track: string, seconds = 30, seam = false): Plan {
   const start = p.SCORE_START_DELAY_S
-  const { seams, introS, barS } = loopSeams(compile(SCORES[track]), seconds - 0.5 - start)
+  const song = compile(SCORES[scoreIdFor(track)])
+  const from = seam ? Math.max(0, song.intro.dur + song.loop.dur - SEAM_LEAD_S) : 0
+  const { seams, introS, barS } = loopSeams(song, from + seconds - 0.5 - start)
+  // Render time of song time s: start + s - from. A seam render's bar grid starts at its first bar line after `start`.
+  const at = (s: number) => start + s - from
+  const firstBar = barS ? at(introS) + Math.max(0, Math.ceil((from - introS) / barS)) * barS : 0
   return {
     seconds,
-    events: [{ t: start, name: `${track} score` }, { t: start + introS, name: 'loop starts' }],
-    seams: seams.map((s) => start + s),
-    bar: barS ? { startS: start + introS, barS } : null,
-    script: scrimScript(p, track, seconds),
+    events: from
+      ? [{ t: start, name: `${track} score from ${from.toFixed(2)} s` }]
+      : [{ t: start, name: `${track} score` }, { t: at(introS), name: 'loop starts' }],
+    seams: seams.filter((s) => s > from).map(at),
+    bar: barS ? { startS: firstBar, barS } : null,
+    script: scrimScript(p, track, seconds, from),
   }
 }
 
-function musicPlan(track: string, intensity = DEFAULT_INTENSITY, seconds = 30, engine: MusicEngine = 'tone'): Plan {
-  if (engine === 'scrim' && scrim) return scrimMusicPlan(scrim, track, seconds)
+function musicPlan(track: string, intensity = DEFAULT_INTENSITY, seconds = 30, engine: MusicEngine = 'tone', seam = false): Plan {
+  if (engine === 'scrim' && scrim) return scrimMusicPlan(scrim, track, seconds, seam)
   const title = track === 'title'
   const biome = title ? null : biomeOf(track)
   const loop = biome ? musicLoop(biome) : TITLE_LOOP
@@ -281,7 +294,7 @@ function mixPlan(level: string, seconds = 20, engine: MusicEngine = 'tone', musi
 type GamePlanRequest = Exclude<AudioRenderRequest, { kind: 'score' }>
 
 const RENDERS: { [K in GamePlanRequest['kind']]: (req: Extract<GamePlanRequest, { kind: K }>) => Plan } = {
-  music: (r) => musicPlan(r.track, r.intensity, r.seconds, r.engine),
+  music: (r) => musicPlan(r.track, r.intensity, r.seconds, r.engine, r.seam),
   sfxSheet: (r) => sfxSheetPlan(r.level, r.engine),
   mix: (r) => mixPlan(r.level, r.seconds, r.engine, r.stem === 'music'),
 }
@@ -331,7 +344,7 @@ async function renderScoreInGame(req: Extract<AudioRenderRequest, { kind: 'score
   const id = `render-${++renderedScores}`
   SCORES[id] = req.text
   try {
-    const plan = scrimMusicPlan(scrim, id, req.seconds ?? 20)
+    const plan = scrimMusicPlan(scrim, id, req.seconds ?? 20, req.seam)
     const buffer = await renderOffline({ seconds: plan.seconds, seed, engine: 'scrim' }, plan.script, stopAll)
     return { sampleRate: buffer.sampleRate, seconds: plan.seconds, pcm: toBase64(buffer), events: plan.events, seams: plan.seams, bar: plan.bar }
   } finally {
