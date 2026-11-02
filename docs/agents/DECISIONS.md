@@ -1279,3 +1279,25 @@ for Vite's hashed bundles in `dist/assets`, not the old folder.
 **Consequences:** An online leaderboard or ghost backend (VISION 24, 26) starts from
 scratch with Alex's backend decision (hard rule 4), not from these stubs. `.git` does not
 shrink (no history rewrite, hard rule 2); fresh clones' working trees do.
+
+## 2026-10-30 — Arctic trees get an unlit fill instead of a brighter scene (Builder, #62)
+
+**Context:** Arctic pine canopies rendered as near-black "umbrellas" that players took for
+enemies. Their colours (sRGB lightness 20–30%) were dark, but the bigger cause was light: the
+low sun backlights the cone sides the rider sees, and ACES plus the arctic grade crush those
+low values while the bright snow beside them stays pale. Even pale canopies (lightness ~60%)
+rendered at about (27, 40, 76).
+**Decision:** `BiomeTreeConfig.fill` adds that fraction of a tree's own lit colour (instance
+tint × crown shade) as emissive light in the shared tree shader (`patchTreeFillFragment`,
+uniform `uTreeFill`, same program for every tree). Arctic uses 0.35 with lighter blue-green
+canopies (lightness 36–46%) and a lighter trunk. Raising the hemi light or exposure was
+rejected: it would wash out the snow that makes the Antarctica frame. Volcanic keeps fill 0
+(its trees are meant to be charred black).
+**Consequences:** A biome whose trees read too dark can set `fill` without touching its
+lighting. Draw calls, triangles and shader program count are unchanged.
+
+## 2026-11-01 — Token efficiency: context budget, quiet logs, ledger diagnostics, builder run cap (Alex's session)
+
+**Context:** The ledger's 168 runs (24 Oct – 1 Nov, ~226M weighted tokens) showed Builders at 71% of spend (~6M per run), cache writes at 48% of all spend, and builder runs re-writing their whole context ~15 times each, at ~157k tokens of context per turn. Spend went from ~12M/day to 82M on 31 Oct when Builders were fired back to back, which exhausted the old account.
+**Decision:** The ledger records a `diag` per run (peak context, compactions, cache misses by cause, heaviest tool results). Noisy commands run through `scripts/quiet.sh`. CLAUDE.md gained a "Context budget" section, stopped being re-read by role files, and moved the smoke spec and test hook to `e2e/README.md` (47KB → 30KB). Builders stop once `builder_runs_per_day` (STEERING.md) is reached. QA (on label) no longer polls for the merge.
+**Consequences:** Don't move the smoke spec back into CLAUDE.md or add "Read CLAUDE.md" to role files. Read the `diag` in new ledger entries to find what still drives cache misses before changing models or parallelism.
