@@ -354,8 +354,20 @@ function formationMotion(formation: ChoreographedFormation, f: FormationFrame): 
   }
 }
 
-/** Scattered over the map, ground enemies were rarely in view (#179); `ahead` spans ~8–25 s at Antarctica's slowest. */
-export const TRACKSIDE = { aheadMin: 700, aheadMax: 2200, sideMin: 60, sideMax: 400 }
+export interface TracksideBand {
+  aheadMin: number
+  aheadMax: number
+  sideMin: number
+  sideMax: number
+}
+
+/** Ground: ~8–25 s ahead at Antarctica's slowest; water: ~1–14 s of Ocean's ~250 units/s ride, about its gap between waves (#316). */
+export const TRACKSIDE: Record<'ground' | 'water', TracksideBand> = {
+  ground: { aheadMin: 700, aheadMax: 2200, sideMin: 60, sideMax: 400 },
+  water: { aheadMin: 300, aheadMax: 3600, sideMin: 60, sideMax: 400 },
+}
+
+export const tracksideBand = (surface: Surface): TracksideBand => TRACKSIDE[surface === 'water' ? 'water' : 'ground']
 
 export interface TracksideSlot {
   /** Arc distance past the rider. */
@@ -364,8 +376,8 @@ export interface TracksideSlot {
   side: number
 }
 
-export function tracksideSlots(count: number, rng: Rng): TracksideSlot[] {
-  const { aheadMin, aheadMax, sideMin, sideMax } = TRACKSIDE
+export function tracksideSlots(count: number, surface: Surface, rng: Rng): TracksideSlot[] {
+  const { aheadMin, aheadMax, sideMin, sideMax } = tracksideBand(surface)
   return Array.from({ length: count }, () => {
     const ahead = rng.range(aheadMin, aheadMax)
     const side = rng.range(sideMin, sideMax) * (rng() < 0.5 ? -1 : 1)
@@ -377,18 +389,36 @@ export interface PlaceTracksideInput {
   table: ArcTable
   riderIndex: number
   camera: Vec3
+  surface: Surface
   groundFn: HeightFunction
   slots: readonly TracksideSlot[]
 }
 
-export function placeTracksideWave({ table, riderIndex, camera, groundFn, slots }: PlaceTracksideInput): Vec3[] {
+export function placeTracksideWave({ table, riderIndex, camera, surface, groundFn, slots }: PlaceTracksideInput): Vec3[] {
   return slots.map((slot) => {
-    const i = indexAhead(table, riderIndex, slot.ahead)
-    const forward = horizontal(trackTangent(table, i))
-    const x = table.x[i] - forward.z * slot.side
-    const z = table.z[i] + forward.x * slot.side
-    return outsideNearField(settle({ x, y: 0, z }, 'ground', groundFn), camera)
+    const p = surface === 'water' ? wetTracksidePoint(table, riderIndex, slot, groundFn) : tracksidePoint(table, riderIndex, slot)
+    return outsideNearField(settle(p, surface, groundFn), camera)
   })
+}
+
+function tracksidePoint(table: ArcTable, riderIndex: number, { ahead, side }: TracksideSlot): Vec3 {
+  const i = indexAhead(table, riderIndex, ahead)
+  const forward = horizontal(trackTangent(table, i))
+  return { x: table.x[i] - forward.z * side, y: 0, z: table.z[i] + forward.x * side }
+}
+
+/** The slot, or across the track, or nearer / further within the band: the first with sea under it, else the slot. */
+function wetTracksidePoint(table: ArcTable, riderIndex: number, slot: TracksideSlot, groundFn: HeightFunction): Vec3 {
+  const { aheadMin, aheadMax } = TRACKSIDE.water
+  for (let k = 0; k < WATER_SEARCH_TRIES; k++) {
+    const step = (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * WATER_SEARCH_STEP
+    const ahead = Math.min(aheadMax, Math.max(aheadMin, slot.ahead + step))
+    for (const side of [slot.side, -slot.side]) {
+      const p = tracksidePoint(table, riderIndex, { ahead, side })
+      if (groundFn(p.x, p.z) < WATER_DEPTH) return p
+    }
+  }
+  return tracksidePoint(table, riderIndex, slot)
 }
 
 /** Point on an entry path at `t` (0–1, eased out); `spin` unwinds the horizontal offset around `from`. */

@@ -103,7 +103,7 @@ function generateEnemies(
     }
     const { surface, scatter } = ENEMY_PLACEMENT[wave.type]
     if (scatter === 'trackside') {
-      for (const trackside of tracksideSlots(wave.count, rng)) {
+      for (const trackside of tracksideSlots(wave.count, surface, rng)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside, ...base })
       }
       continue
@@ -188,7 +188,9 @@ export default function EnemySpawner({
       const wave = waves[waveIdx]
       const members = enemies.filter((e) => e.waveIndex === waveIdx)
       if (members[0]?.trackside) {
-        const placed = placeTracksideWave({ table: trackTable, riderIndex, camera, groundFn, slots: members.map((e) => e.trackside!) })
+        const placed = placeTracksideWave({
+          table: trackTable, riderIndex, camera, surface: ENEMY_PLACEMENT[wave.type].surface, groundFn, slots: members.map((e) => e.trackside!),
+        })
         return members.map((e, i) => [e.id, { position: toVector3(placed[i]) }])
       }
       if (!wave.formation || wave.formation === 'scatter') {

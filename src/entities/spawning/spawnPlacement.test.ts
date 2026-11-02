@@ -7,11 +7,11 @@ import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig } from '@/types/level'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
 import {
-  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, TRACKSIDE, entryPoint, formationFrame, formationSlots, indexAhead, marchHeading,
-  outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint, trackTangent, tracksideSlots,
+  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, entryPoint, formationFrame, formationSlots, indexAhead, marchHeading,
+  outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint, trackTangent, tracksideBand, tracksideSlots,
   type ChoreographedFormation, type Vec3,
 } from './spawnPlacement'
-import { ENEMY_PLACEMENT, WATER_Y, placedBesideTrack } from './enemyPlacement'
+import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, placedBesideTrack } from './enemyPlacement'
 
 const choreographed = (f: Formation | undefined): f is ChoreographedFormation => !!f && f !== 'scatter'
 const besideTrack = (w: EnemyWave) => !choreographed(w.formation) && placedBesideTrack(w.type)
@@ -156,50 +156,69 @@ describe('level3 school', () => {
 
 describe('tracksideSlots', () => {
   it('is deterministic per seed and differs between seeds', () => {
-    expect(tracksideSlots(20, createRng(1337))).toEqual(tracksideSlots(20, createRng(1337)))
-    expect(tracksideSlots(20, createRng(1337))).not.toEqual(tracksideSlots(20, createRng(1338)))
+    expect(tracksideSlots(20, 'ground', createRng(1337))).toEqual(tracksideSlots(20, 'ground', createRng(1337)))
+    expect(tracksideSlots(20, 'ground', createRng(1337))).not.toEqual(tracksideSlots(20, 'ground', createRng(1338)))
   })
 
-  it('puts slots on both sides, inside the ahead and lateral bands', () => {
-    const slots = tracksideSlots(200, createRng(3))
+  it.each(['ground', 'water'] as const)('%s: puts slots on both sides, inside the ahead and lateral bands', (surface) => {
+    const band = tracksideBand(surface)
+    const slots = tracksideSlots(200, surface, createRng(3))
     expect(slots.some((s) => s.side < 0) && slots.some((s) => s.side > 0)).toBe(true)
     for (const s of slots) {
-      expect(s.ahead).toBeGreaterThanOrEqual(TRACKSIDE.aheadMin)
-      expect(s.ahead).toBeLessThanOrEqual(TRACKSIDE.aheadMax)
-      expect(Math.abs(s.side)).toBeGreaterThanOrEqual(TRACKSIDE.sideMin)
-      expect(Math.abs(s.side)).toBeLessThanOrEqual(TRACKSIDE.sideMax)
+      expect(s.ahead).toBeGreaterThanOrEqual(band.aheadMin)
+      expect(s.ahead).toBeLessThanOrEqual(band.aheadMax)
+      expect(Math.abs(s.side)).toBeGreaterThanOrEqual(band.sideMin)
+      expect(Math.abs(s.side)).toBeLessThanOrEqual(band.sideMax)
     }
   })
 })
 
+/** Arc distance before its slot at which a trackside enemy must be in front of the rider. */
+const APPROACH = 600
+
 describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s trackside waves', (_id, { level, table, groundFn }) => {
   const waves = level.enemies.filter(besideTrack)
 
-  it.each(waves.map((w) => [w.type, w] as const))('%s: ahead of the rider along the track and mostly in front in plan, beside the rails, on the ground, outside the near field', (_name, wave) => {
-    const slots = tracksideSlots(wave.count, createRng(1337))
+  it.each(waves.map((w) => [w.type, w] as const))('%s: ahead of the rider along the track, beside the rails, on its surface, outside the near field, in front on the approach', (_name, wave) => {
+    const { surface } = ENEMY_PLACEMENT[wave.type]
+    const band = tracksideBand(surface)
+    const slots = tracksideSlots(wave.count, surface, createRng(1337))
     let inFront = 0
     let total = 0
     for (const fraction of RIDER_FRACTIONS) {
       const riderIndex = Math.round(fraction * (table.count - 1))
       const camera = trackPoint(table, riderIndex)
-      const forward = trackTangent(table, riderIndex)
-      const placed = placeTracksideWave({ table, riderIndex, camera, groundFn, slots })
+      const placed = placeTracksideWave({ table, riderIndex, camera, surface, groundFn, slots })
       expect(placed).toHaveLength(wave.count)
       placed.forEach((p, i) => {
-        const anchor = indexAhead(table, riderIndex, slots[i].ahead)
-        const arc = (table.s[anchor] - table.s[riderIndex] + table.length) % table.length
-        expect(arc).toBeGreaterThan(TRACKSIDE.aheadMin - 10)
-        expect(arc).toBeLessThan(TRACKSIDE.aheadMax + 10)
-        const lateral = Math.hypot(p.x - table.x[anchor], p.z - table.z[anchor])
-        expect(lateral).toBeGreaterThan(TRACKSIDE.sideMin - 1)
-        expect(lateral).toBeLessThan(TRACKSIDE.sideMax + 1)
-        expect(p.y).toBeGreaterThan(groundFn(p.x, p.z))
+        if (surface === 'water') {
+          let lateral = Infinity
+          for (let a = band.aheadMin; a <= band.aheadMax; a += 10) {
+            const j = indexAhead(table, riderIndex, a)
+            lateral = Math.min(lateral, Math.hypot(p.x - table.x[j], p.z - table.z[j]))
+          }
+          expect(lateral).toBeLessThan(band.sideMax + 1)
+          expect(groundFn(p.x, p.z)).toBeLessThan(WATER_DEPTH)
+          expect(p.y).toBe(WATER_Y)
+        } else {
+          const anchor = indexAhead(table, riderIndex, slots[i].ahead)
+          const arc = (table.s[anchor] - table.s[riderIndex] + table.length) % table.length
+          expect(arc).toBeGreaterThan(band.aheadMin - 10)
+          expect(arc).toBeLessThan(band.aheadMax + 10)
+          const lateral = Math.hypot(p.x - table.x[anchor], p.z - table.z[anchor])
+          expect(lateral).toBeGreaterThan(band.sideMin - 1)
+          expect(lateral).toBeLessThan(band.sideMax + 1)
+          expect(p.y).toBeGreaterThan(groundFn(p.x, p.z))
+        }
         expect(dist(p, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
+        const near = indexAhead(table, riderIndex, slots[i].ahead - APPROACH)
+        const nearPoint = trackPoint(table, near)
+        const forward = trackTangent(table, near)
         total++
-        if ((p.x - camera.x) * forward.x + (p.z - camera.z) * forward.z > 0) inFront++
+        if ((p.x - nearPoint.x) * forward.x + (p.z - nearPoint.z) * forward.z > 0) inFront++
       })
     }
-    expect(inFront / total).toBeGreaterThan(0.75)
+    expect(inFront / total).toBeGreaterThan(0.85)
   })
 })
 
