@@ -1991,6 +1991,10 @@ async function titleFlyBy(page) {
   // Re-shot like title.png: a GPU CI runner can return one black canvas capture (#291 CI), a black scene stays black.
   const scene2 = await captureTitleScene(page, path.join(OUT, 'title-2.png'), 10000)
   if (looksBlank(scene2)) problems.push(`title-2.png: the 3D scene behind the UI looks blank (mean ${scene2.mean.toFixed(1)} stddev ${scene2.stddev.toFixed(1)} colours ${scene2.distinctColors})`)
+  // #344: a sparkle's centre on a pixel centre must blend to a colour in [0, 1], not NaN that Bloom spreads to a black frame
+  const sparkle = await page.evaluate(() => window.__SC_TEST__.pointCentreColour('title-sparkles'))
+  if (!sparkle) problems.push('no title-sparkles points in the title scene')
+  else if (!sparkle.every((v) => v >= 0 && v <= 1)) problems.push(`a title sparkle's centre pixel blends to [${sparkle.map((v) => v.toFixed(2)).join(', ')}], not a colour in [0, 1] (NaN blacks out the frame through Bloom)`)
   let turnedDeg = 0
   let moved = 0
   if (!a || !b) problems.push('no title camera')
@@ -2023,7 +2027,7 @@ async function titleFlyBy(page) {
     .waitForFunction(() => window.__SC_TEST__.audio().toneLoaded && window.__SC_TEST__.audio().ready, null, { timeout: 30000 })
     .then(() => true, () => false)
   if (!toneAfter) problems.push('the key press on the title did not load Tone.js and unlock audio')
-  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter } }
+  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter, sparkle } }
 }
 
 const LANDING_PATH = '/go/smoke-check'
