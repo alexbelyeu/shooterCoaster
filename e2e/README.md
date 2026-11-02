@@ -19,7 +19,7 @@ it must boot to the title with no failed request, no analytics request and no pa
 gold hitmarker held on the kill frame via `holdFeedback`; on the first level a primed 14-kill chain makes
 that kill enter the 5× combo tier, and the shot must show the "×5 FRENZY" flash with its slow-mo held and, on the Theme Park,
 the streak-15 firework burst held on screen; the kill's death effect must be live in the shot in its enemy type's style, held mid-spread, `death=<type>` in the summary; the first level then starts over, primes 5× and ends through the level timer mid-FRENZY: its results must be at `timeScale` 1 with the music not ducked, `frenzyEnd` in `results.json`), `<id>-shot.png` (one real shot two 40 ms
-steps into its flight, time frozen) and `<id>-results.png`. A level fails if
+steps into its flight, time frozen), `<id>-results.png` and `<id>-share.png` (the results share menu open). A level fails if
 fewer than 2 enemies are ≥ 12 px on screen right after the ride (`enemiesOnScreen` / `readable` / `largestPx` in the summary), its biome particle field isn't mounted (`particles=` in the summary), it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
 enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
 wall-clock level timer already ran out), the camera translates off the track pose at all
@@ -30,7 +30,7 @@ the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen r
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
 reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left) or the
 Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), offers Next Level while the next level is locked (or hides it while open), shows NaN, or disagrees with `stats()` on score or kills, or (first level) Enter with the mute button focused doesn't play on;
-`shareText()` must match the share format with the shown score, stars, level name and the `/go/share` link, and a real Share click must show "Copied!" and put that text on the clipboard. Every page of a local run fails on a request to another origin
+`shareText()` must match the share format with the shown score, stars, level name and the `/go/share` link (`share_copy` campaign); a real Share click must open the share menu (#271) with Copy link focused and every target in order (Copy link, X, Reddit, Bluesky, Threads, WhatsApp, Facebook, LinkedIn, Email; items 44 px), inside the viewport and covering no other results button, each link carrying its own `utm_campaign=share_<target>`; Copy link must show "Copied!" and put `shareText()` on the clipboard, ArrowDown must move focus to X, and Esc must close the menu with focus back on Share (network links are never clicked). Every page of a local run fails on a request to another origin
 (not with `--url`). `--dist <dir> --base <path>` previews another build folder under a sub-path (`smoke:portal`).
 `npm run smoke` also passes `--mobile`:
 an iPhone 13-like touch context (390x844) taps PLAY and a level (the title music must ramp out from full and be disposed, the level music ramp in), then in portrait and
@@ -56,7 +56,7 @@ name, Resume focused, ArrowDown moves focus, Esc resumes, and Restart starts the
 phone run checks the card after its Pause tap in landscape and portrait (`mobile-pause-landscape.png`, `mobile-pause.png`: inside
 the viewport, no sideways scroll, 44 px buttons), then taps its Settings (`mobile-settings.png`: fits 390 px, 44 px targets)
 and Back to the menu, then ends the level: the results buttons must fit and not overlap in portrait and landscape
-(`mobile-results.png`, `mobile-results-landscape.png`), then starts level2 and goes back to level select: on every music
+(`mobile-results.png`, `mobile-results-landscape.png`) and the share menu must pass the same checks, bar the clipboard, in landscape and at 390 px portrait (`mobile-share-landscape.png`, `mobile-share.png`; headless Chromium has no share sheet, so the phone gets the menu), then starts level2 and goes back to level select: on every music
 switch (there, title → level, and the `scrim` step's) the incoming track's first note must land before the outgoing bus has
 faded to 0 (`audio().music.fades` log each ramp's start and the incoming `firstNote`; tracks start on the next beat, `musicBus.ts`).
 A `settings` step opens Settings from the title (`settings.png`: the card inside 1280×720 with the four quality

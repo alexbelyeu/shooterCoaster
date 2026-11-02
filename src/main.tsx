@@ -4,6 +4,7 @@ import { track } from '@vercel/analytics'
 import { Analytics } from '@vercel/analytics/react'
 import App from './app/App'
 import { analyticsEventFor, SHARED_EVENT, shareEvent } from './app/analyticsEvents'
+import type { ShareMethod } from './ui/share'
 import {
   analyticsEnabled,
   applyInternalParam,
@@ -34,8 +35,8 @@ if (analyticsOn) {
     const event = analyticsEventFor(prev, next)
     if (event) track(event.name, event.props)
   })
-  eventBus.on(SHARED_EVENT, (level, stars) => {
-    const { name, props } = shareEvent(level as string, stars as number)
+  eventBus.on(SHARED_EVENT, (level, method) => {
+    const { name, props } = shareEvent(level as string, method as ShareMethod)
     track(name, props)
   })
 }

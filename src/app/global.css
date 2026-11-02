@@ -1346,9 +1346,72 @@ canvas {
   background: rgba(255, 255, 255, 0.14);
 }
 
-/* Wide enough for "Copied!" so the row doesn't reflow when it swaps in. */
-.results-actions .results-share {
-  min-width: 6.5rem;
+/* Share menu (src/ui/ShareMenu.tsx): placed by popoverPlacement.ts, below the button when it fits beside Next. */
+.share-anchor {
+  position: relative;
+  display: flex;
+}
+
+.results-actions .results-share[aria-expanded='true'] {
+  color: #000;
+  background: var(--accent);
+}
+
+.share-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  width: 17rem;
+  max-width: calc(100vw - 16px);
+  padding: 0.5rem;
+  background: rgba(16, 16, 24, 0.97);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 18px var(--accent-glow);
+}
+
+.share-menu[data-side='above'] {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+.share-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 0.6rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.share-item:hover,
+.share-item:focus-visible {
+  color: #000;
+  background: var(--accent);
+  outline: none;
+}
+
+.share-copy {
+  grid-column: 1 / -1;
+}
+
+/* Phone landscape: three columns keep the menu short enough to open above the buttons. */
+@media (max-height: 520px) {
+  .share-menu {
+    grid-template-columns: repeat(3, 1fr);
+    width: 21rem;
+  }
 }
 
 .results-keys {
