@@ -3,6 +3,7 @@ import { computeStars } from '@/levels/scoring'
 import type { GamePhase } from '@/types/game'
 import { isInRun } from '@/store/startPhase'
 import type { RunMode } from '@/store/useGameStore'
+import type { ShareMethod } from '@/ui/share'
 
 /** At most 2 properties per event (Vercel Pro), no free text; keep docs/marketing/README.md in sync. */
 export type AnalyticsEvent =
@@ -10,13 +11,13 @@ export type AnalyticsEvent =
   | { name: 'level_complete'; props: { level: string; stars: number } }
   /** `progress_pct`: share of the level timer used, floored to tens. */
   | { name: 'level_quit'; props: { level: string; progress_pct: number } }
-  | { name: 'share'; props: { level: string; stars: number } }
+  | { name: 'share'; props: { level: string; method: ShareMethod } }
 
-/** Bus event the results screen emits on a completed share: `(levelId, stars)`. */
+/** Bus event the results screen emits on a completed share: `(levelId, method)`. */
 export const SHARED_EVENT = 'results:shared'
 
-export function shareEvent(level: string, stars: number): AnalyticsEvent {
-  return { name: 'share', props: { level, stars } }
+export function shareEvent(level: string, method: ShareMethod): AnalyticsEvent {
+  return { name: 'share', props: { level, method } }
 }
 
 export interface RunSnapshot {
