@@ -3,10 +3,13 @@
  *
  * Ported from Scrimshaw Jukebox (docs/audio/reference/scrimshaw-jukebox.html, the `ScrimScore`
  * script), simonw/tools commit 5fc8e8b, Apache-2.0 (docs/audio/reference/LICENSE-scrimshaw-apache-2.0.txt).
- * Modified for ShooterCoaster: TypeScript types; the arcade palette's instrument names; the behaviour,
- * including every error message, is otherwise unchanged and pinned by `score.test.ts` against the original.
+ * Modified for ShooterCoaster: TypeScript types; the arcade palette's instrument names; the `layer=` voice option
+ * (`layers.ts`); the behaviour, including every error message, is otherwise unchanged and pinned by `score.test.ts`
+ * against the original.
  * Format: docs/audio/SCORE-FORMAT.md.
  */
+
+import { LAYERS, isLayer, type Layer } from './layers'
 
 export const MELODIC = ['steeldrum', 'marimba', 'vibes', 'celesta', 'glock', 'xylophone', 'musicbox', 'bell',
   'organ', 'pipe', 'strings', 'pad', 'choir', 'voices', 'brass', 'trumpet', 'horn', 'tuba',
@@ -95,6 +98,8 @@ export interface Voice {
   att: number | null
   rel: number | null
   ln: number
+  /** Absent means `base`, as the original compiles every voice. */
+  layer?: Layer
 }
 
 interface PatternOpts {
@@ -184,6 +189,12 @@ function parse(text: string): { song: ParsedSong; errors: ScoreError[] } {
           const m = noteToMidi(val)
           if (m == null) err(ln, `center= needs a note like E4; got "${val}".`)
           else v.center = m
+          break
+        }
+        case 'layer': {
+          const l = val.toLowerCase()
+          if (isLayer(l)) v.layer = l
+          else err(ln, `layer= is one of ${LAYERS.join(', ')}; got "${val}".`)
           break
         }
         default: err(ln, `Unknown voice option "${kv[1]}".`)

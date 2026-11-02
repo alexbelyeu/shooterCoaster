@@ -32,7 +32,7 @@ could hear it across a loud arcade. Every sound tells the player something.
 | level3 | Ocean | Fast, open, surf-rock energy with a sparkling top | spring-reverb guitar, steel drum, sea wash |
 | level4 | Antarctica | Glassy and tense but still driving. Minor key, crystalline | bells, celesta, icy pads with a hard kick |
 | level5 | Inferno | Heaviest level, the boss-rush mood. Low and fast | distorted guitar, choir stabs, timpani, orchestra hits |
-| FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens | same as the level, brighter |
+| FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens (the score's `frenzy` layer: `SCORE-FORMAT.md`, "Intensity layers") | same as the level, brighter |
 | Boss / finale | any | A variation of the level theme, darker and louder | the level's colour + orchestra hits |
 | Results | any | 3–6 s jingle: rising for 3★, flatter for 1★ or 0★, then a calm loop | bells + brass |
 

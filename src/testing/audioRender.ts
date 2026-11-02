@@ -5,7 +5,8 @@ import { musicLoop, setMusicIntensity, startMusic, stopMusic } from '@/audio/Mus
 import { TITLE_LOOP, startTitleMusic, stopTitleMusic } from '@/audio/TitleMusicManager'
 import { sfxEngine, silentSfx, type Placement, type SfxEngine } from '@/audio/sfx'
 import { FIREWORK_BIOMES, type KillSound } from '@/audio/sfxDesign'
-import { COMBO_TIERS, FRENZY, TOP_TIER } from '@/combat/comboTiers'
+import { COMBO_TIERS, FRENZY, TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
+import { intensityForTier } from '@/audio/scrim/layers'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import type { BiomeType } from '@/types/level'
 import type { MusicEngine } from '@/audio/musicEngine'
@@ -16,8 +17,11 @@ import { SCORES } from '@/audio/scores'
 import { createRng } from '@/utils/rng'
 
 export type AudioRenderRequest =
-  /** `track`: 'title', a level id, or (score engine) 'results'. */
-  | { kind: 'music'; track: string; intensity?: number; seconds?: number; engine?: MusicEngine }
+  /**
+   * `track`: 'title', a level id, or (score engine) 'results'. `intensity`: Tone.js 0–1; the score engine's layers 0–3
+   * held from the start, or 'ramp' (`LAYER_RAMP`: up through every layer, then a lost combo winding down).
+   */
+  | { kind: 'music'; track: string; intensity?: number | 'ramp'; seconds?: number; engine?: MusicEngine }
   /** `engine: 'scrim'`: the arcade SFX (`audio/arcade/`), plus the sounds only it has. */
   | { kind: 'sfxSheet'; level?: string; engine?: MusicEngine }
   /** `stem: 'music'`: the same mix without SFX or wind, to measure the kills against. */
@@ -82,29 +86,51 @@ function stopAll() {
   }
 }
 
-/** Score-engine music from render time 0, ticked every 50 ms of render time (well inside its 0.3 s look-ahead). */
-function scrimScript(p: ScrimPlayer, id: string, seconds: number) {
+/** Seconds into the loop and the intensity asked for from then: off the beat on purpose, so the render shows the quantising. */
+const LAYER_RAMP: [number, number][] = [[0, 0], [3.3, 1], [7.1, 2], [11.7, 3], [19.4, 0]]
+
+/** Score-engine music from render time 0, ticked (and asked for `intensity(t)`, like `LevelAudio`) every 50 ms of render time, well inside its 0.3 s look-ahead. */
+function scrimScript(p: ScrimPlayer, id: string, seconds: number, intensity?: (t: number) => number) {
   return ({ at }: OfflineRenderScope) => {
     p.driveScoresManually(true)
     p.playScore(id)
-    for (let t = 0.05; t < seconds; t += 0.05) at(t, p.tickScores)
+    for (let t = 0.05; t < seconds; t += 0.05)
+      at(t, () => {
+        if (intensity) p.setIntensity(intensity(t))
+        p.tickScores()
+      })
   }
 }
 
-function scrimMusicPlan(p: ScrimPlayer, track: string, seconds = 30): Plan {
+function scrimMusicPlan(p: ScrimPlayer, track: string, seconds = 30, intensity?: number | 'ramp'): Plan {
   const start = p.SCORE_START_DELAY_S
   const { seams, introS, barS } = loopSeams(compile(SCORES[track]), seconds - 0.5 - start)
+  const loopAt = start + introS
+  const events = [{ t: start, name: `${track} score` }, { t: loopAt, name: 'loop starts' }]
+  let at: ((t: number) => number) | undefined
+  if (intensity === 'ramp') {
+    for (const [s, i] of LAYER_RAMP) if (s > 0) events.push({ t: loopAt + s, name: `intensity ${i} asked` })
+    at = (t) => {
+      let i = 0
+      for (const [s, n] of LAYER_RAMP) if (t >= loopAt + s) i = n
+      return i
+    }
+  } else if (intensity !== undefined) {
+    events.push({ t: start, name: `intensity ${intensity}` })
+    at = () => intensity
+  }
   return {
     seconds,
-    events: [{ t: start, name: `${track} score` }, { t: start + introS, name: 'loop starts' }],
+    events,
     seams: seams.map((s) => start + s),
-    bar: barS ? { startS: start + introS, barS } : null,
-    script: scrimScript(p, track, seconds),
+    bar: barS ? { startS: loopAt, barS } : null,
+    script: scrimScript(p, track, seconds, at),
   }
 }
 
-function musicPlan(track: string, intensity = DEFAULT_INTENSITY, seconds = 30, engine: MusicEngine = 'tone'): Plan {
-  if (engine === 'scrim' && scrim) return scrimMusicPlan(scrim, track, seconds)
+function musicPlan(track: string, intensity?: number | 'ramp', seconds = 30, engine: MusicEngine = 'tone'): Plan {
+  if (engine === 'scrim' && scrim) return scrimMusicPlan(scrim, track, seconds, intensity)
+  if (intensity === 'ramp') throw new Error('--intensity ramp needs --engine scrim')
   const title = track === 'title'
   const biome = title ? null : biomeOf(track)
   const loop = biome ? musicLoop(biome) : TITLE_LOOP
@@ -116,7 +142,7 @@ function musicPlan(track: string, intensity = DEFAULT_INTENSITY, seconds = 30, e
     script: () => {
       if (!biome) return startTitleMusic()
       startMusic(biome)
-      setMusicIntensity(intensity)
+      setMusicIntensity(intensity ?? DEFAULT_INTENSITY)
     },
   }
 }
@@ -235,7 +261,9 @@ function mixPlan(level: string, seconds = 20, engine: MusicEngine = 'tone', musi
     bar: null,
     script: (scope) => {
       const { at } = scope
-      if (p) scrimScript(p, level, seconds)(scope)
+      // As LevelAudio: the combo lifts the intensity.
+      let kills = 0
+      if (p) scrimScript(p, level, seconds, () => intensityForTier(comboTierIndex(kills)))(scope)
       else startMusic(biome)
       setMusicIntensity(DEFAULT_INTENSITY)
       void s.prepare(level, biome)
@@ -251,13 +279,14 @@ function mixPlan(level: string, seconds = 20, engine: MusicEngine = 'tone', musi
         s.waveIncoming()
         s.waveAnnounce()
       })
-      // As LevelAudio: combo lifts the intensity, the 5× tier's slow-mo ducks the music and holds the FRENZY lift.
+      // The 5× tier's slow-mo ducks the music and holds the FRENZY lift.
       let combo = 0
       for (let t = 1.6; t < seconds - 0.5; t += KILL_EVERY_S) {
         const n = ++combo
         at(t, () => s.hit(n - 1, null))
         events.push({ t: Math.round((t + 0.08) * 1000) / 1000, name: `kill ${n}` })
         at(t + 0.08, () => {
+          kills = n
           s.kill(n, 'pop', killPlacement(n, place))
           setMusicIntensity(DEFAULT_INTENSITY + Math.min(n / 5, 1) * 0.3)
         })

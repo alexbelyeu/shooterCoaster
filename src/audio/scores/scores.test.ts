@@ -24,6 +24,19 @@ describe('game scores', () => {
       expect(song.loop.dur).toBeGreaterThan(0)
     })
   }
+
+  for (const [id, text] of Object.entries(SCORES)) {
+    const song = compile(text)
+    if (!song.voices.some((v) => v.layer)) continue
+    it(`${id}'s loop has every layer it tags, and base plays all through it (a run opens on base alone)`, () => {
+      const bars = song.loop.sections.reduce((n, s) => n + s.bars, 0)
+      const barS = song.loop.dur / bars
+      const playing = new Set(song.loop.events.map((e) => song.voices[e.v].layer ?? 'base'))
+      expect([...playing].sort()).toEqual([...new Set(song.voices.map((v) => v.layer ?? 'base'))].sort())
+      const baseBars = new Set(song.loop.events.filter((e) => !song.voices[e.v].layer).map((e) => Math.floor(e.t / barS)))
+      expect(baseBars.size).toBe(bars)
+    })
+  }
 })
 
 describe('score keys (SCORE_KEYS: the arcade SFX play in them)', () => {

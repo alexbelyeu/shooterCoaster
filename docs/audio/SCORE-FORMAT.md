@@ -55,9 +55,52 @@ voiced around the voice's `center`, `x X o .` a drum lane. Every bar must add up
 | Plucked strings | built on demand, `warm()` in idle slices | the same; a track warms its whole score when it starts (the countdown, for a level) |
 | Randomness | `Math.random` | the same in play; offline renders seed it (`createRng`), so the original page and the port render the same score near bit-identically (`renders/parity-*`) |
 | Instruments | 38 melodic, 27 drums | the same, plus the arcade palette below (7 melodic, 5 drums) |
+| Intensity layers | — | `layer=base\|drums\|lead\|frenzy` on a voice (untagged = `base`): the level's music follows the combo tier (see below) |
 
-Not there yet (later issues): named intensity layers (base / +drums / +lead / FRENZY) and
-beat-quantised stingers. Each one gets a row here when it lands.
+Not there yet (a later issue): beat-quantised stingers. It gets a row here when it lands.
+
+## Intensity layers
+
+A level's score reacts to play. Tag each voice with the layer it belongs to; the game sets
+the intensity from the combo tier, and each voice sounds once its layer is in:
+
+| Intensity | Combo tier | Plays |
+|---|---|---|
+| 0 | 1× (and the run's start) | `base` (every untagged voice) |
+| 1 | 2× | + `drums` |
+| 2 | 3× | + `lead` |
+| 3 | 5× FRENZY | + `frenzy`, and the score's low-pass opens |
+
+```
+voice skank  accordion vol=0.35 center=A4 gate=0.5   # untagged: base
+voice tuba   tuba      vol=0.8  oct=1
+voice kick   kick      vol=0.85 layer=drums
+voice lead   organ     vol=0.75 layer=lead
+voice saw    supersaw  vol=0.42 oct=1 layer=frenzy    # doubles the lead an octave up
+voice fhat   hat909    vol=0.42 pan=0.4 layer=frenzy  # fills the hats out to straight eighths
+```
+
+- **The intro plays every layer**, whatever the combo: it is the countdown's fanfare. The
+  loop opens on the run's intensity.
+- **Changes land on the loop's beat lines.** A voice's level ramps over 50 ms ending on the
+  beat, so nothing clicks and a layer coming in has its downbeat. A rise lands on the next
+  beat; a lost combo drops one layer on the next beat and each further layer a bar later,
+  so a lost FRENZY winds down over three bars instead of cutting to the bare base.
+- **The low-pass ("the filter opens")**: a score with any `layer=` gets a 12 dB/oct
+  low-pass after its voices, at 7 kHz below FRENZY; FRENZY opens it to 20 kHz over about a
+  beat. A score without tags gets no filter and plays exactly as before (the parity tests
+  and `renderOffline` run every layer).
+- Every voice keeps playing its notes when its layer is out (silently), so a layer that comes
+  in mid-phrase picks the phrase up where it is. The layers are each voice's own level gain:
+  no extra nodes; the low-pass is one more per track.
+- **Writing for layers**: `base` must carry the loop alone (bass and a harmonic pulse; it
+  plays in every bar, `scores.test.ts` checks it), `drums` the groove, `lead` the hook, and
+  `frenzy` the lift: double-time hats, an extra lead an octave up or a counter-line, stabs.
+  The compressor holds the music's loudness nearly level as layers come in (level1:
+  −16.6 LUFS on base, −17 at FRENZY), so the layers add density and brightness, not volume.
+- Hear them: `npm run audio:render -- --music level1 --engine scrim --intensity <0..3>`
+  holds one intensity; `--intensity ramp` climbs through every layer and loses the combo
+  (`renders/scrim-music-level1-{base,full,frenzy,layers}`). In the game, `?audio=scrim`.
 
 ## Instruments
 

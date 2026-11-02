@@ -2,7 +2,7 @@
  * Plays `audio/scores/` in the game: one `musicBus` per score into the stereo `scoreChannel`, so a change is the
  * Tone.js music's 1 s crossfade. Built on Scrimshaw Jukebox's player (docs/audio/reference/scrimshaw-jukebox.html),
  * simonw/tools commit 5fc8e8b, Apache-2.0 (docs/audio/reference/LICENSE-scrimshaw-apache-2.0.txt); modified: game
- * integration (crossfades, pause / resume mid-song, dispose) replaces the page's player.
+ * integration (crossfades, pause / resume mid-song, intensity layers, dispose) replaces the page's player.
  */
 
 import * as Tone from 'tone'
@@ -10,6 +10,7 @@ import { isAudioReady, scoreChannel } from '../AudioEngine'
 import { fadeOutMusicBus, openMusicBus, type MusicBus } from '../musicBus'
 import { SCORES } from '../scores'
 import { compile, type CompiledSong } from './score'
+import { MAX_INTENSITY, nextLayerStep, type LayerGrid } from './layers'
 import { ScoreScheduler } from './scheduler'
 import { createCore, createSynth, type Session, type Synth, type SynthCore } from './synth'
 
@@ -27,6 +28,11 @@ interface Track {
   /** Song time where a paused track stopped. */
   pausedAt: number | null
   stopWarm: () => void
+  /** Null for a score without layers. */
+  layers: LayerGrid | null
+  /** The last intensity scheduled, and the song time it lands. */
+  intensity: number
+  intensityAt: number
 }
 
 const songs = new Map<string, CompiledSong>()
@@ -36,6 +42,8 @@ const live: Track[] = []
 let current: Track | null = null
 let timer: number | null = null
 let manualClock = false
+/** The game's last `setIntensity`. */
+let targetIntensity = 0
 
 /** The game's raw context: the page's own AudioContext (`audio/tone.ts`), or an offline render's. */
 const rawContext = () => Tone.getContext().rawContext as unknown as BaseAudioContext
@@ -75,6 +83,12 @@ function releaseTimer() {
   }
 }
 
+function layerGrid(song: CompiledSong): LayerGrid | null {
+  const section = song.loop.sections[0] ?? song.intro.sections[0]
+  if (!section || !song.voices.some((v) => v.layer)) return null
+  return { introS: song.intro.dur, beatS: section.barDur / section.beats, barS: section.barDur }
+}
+
 function busName(id: string) {
   return id === 'title' || id === 'results' ? id : 'level'
 }
@@ -100,14 +114,19 @@ export function playScore(id: string): void {
   const start = now() + SCORE_START_DELAY_S
   const bus = openMusicBus(busName(id), start, scoreChannel)
   const synth = createSynth(coreFor(rawContext()), bus.gain.input as unknown as AudioNode, { voicing: 'game' })
+  // The intro plays every layer; the loop opens on the game's intensity.
+  const intensity = song.intro.dur > 0 ? MAX_INTENSITY : targetIntensity
   const track: Track = {
     id,
     bus,
     synth,
-    session: synth.session(song),
+    session: synth.session(song, intensity),
     scheduler: new ScoreScheduler(song, (ev, t) => track.session?.play(ev, t)),
     pausedAt: null,
     stopWarm: synth.warm(song),
+    layers: layerGrid(song),
+    intensity,
+    intensityAt: 0,
   }
   track.scheduler.start(start)
   live.push(track)
@@ -135,11 +154,25 @@ export function pauseScore(paused: boolean): void {
     track.session?.stop(PAUSE_FADE_S)
     track.session = null
   } else {
-    track.session = track.synth.session(track.scheduler.song)
+    track.session = track.synth.session(track.scheduler.song, track.intensity)
     track.scheduler.start(now() + SCORE_START_DELAY_S, track.pausedAt ?? 0)
     track.pausedAt = null
     track.scheduler.tick(now())
   }
+}
+
+/** Intensity 0–3 (`layers.ts`), from `LevelAudio` every frame; a paused track holds its layers and catches up on resume. */
+export function setIntensity(intensity: number): void {
+  targetIntensity = intensity
+  const track = current
+  if (!track?.layers || !track.session || track.pausedAt !== null) return
+  const t = now()
+  const pos = track.scheduler.position(t)
+  const step = nextLayerStep(track.intensity, track.intensityAt, intensity, pos, track.layers)
+  if (!step) return
+  track.intensity = step.intensity
+  track.intensityAt = step.at
+  track.session.setIntensity(step.intensity, t + step.at - pos)
 }
 
 /** `audioRender.ts`: tick from the offline render's own clock instead of a timer. */
@@ -178,12 +211,19 @@ export function musicGrid(): MusicGrid | null {
   return grid
 }
 
-/** e2e: the tracks (current last), whether each is paused, its song position, and the long-lived nodes. */
+/** e2e: the tracks (current last), whether each is paused, its song position and layer intensity, and the long-lived nodes. */
 export function scrimState() {
   const t = now()
   return {
     current: current?.id ?? null,
-    tracks: live.map((tr) => ({ id: tr.id, paused: tr.pausedAt !== null, position: tr.pausedAt ?? tr.scheduler.position(t) })),
+    tracks: live.map((tr) => ({
+      id: tr.id,
+      paused: tr.pausedAt !== null,
+      position: tr.pausedAt ?? tr.scheduler.position(t),
+      layered: tr.layers !== null,
+      intensity: tr.intensity,
+    })),
+    targetIntensity,
     nodes: live.reduce((n, tr) => n + tr.synth.nodeCount(), 0),
     ticking: timer !== null,
   }
