@@ -77,6 +77,14 @@ describe('weaponLayout', () => {
     expect(out.x).toBeLessThan(500)
   })
 
+  it('portrait: the gun, reaching 0.24 of the short side below its pivot, clears the 94 px bottom HUD row (#223)', () => {
+    const rowTop = 16 + 78
+    for (const [w, h] of [[320, 568], [360, 780], [375, 667], [390, 844], [430, 932]]) {
+      const l = weaponLayout(w, h, layoutOut())
+      expect(l.y + 0.24 * w).toBeLessThan(h - rowTop)
+    }
+  })
+
   it('recoil envelope runs 1 → 0', () => {
     expect(recoilEnvelope(1e6)).toBe(1)
     expect(recoilEnvelope(0)).toBe(0)

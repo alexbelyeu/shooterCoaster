@@ -11,7 +11,7 @@
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots (fires one real shot, then resolves the
  *     hits through the bullet pool's own processHit path), endLevel() to reach
- *     the results screen (shareText() for what its Share button sends), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
+ *     the results screen (shareText() for what its share menu's Copy link copies), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
  *     primeCombo(n) to set up a long chain,
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
@@ -167,7 +167,7 @@ export interface SCTestApi {
   primeCombo: (count: number) => void
   /** Force the results phase. */
   endLevel: () => void
-  /** What the results-screen Share button sends for the current level and score (`text url`, as the clipboard gets it), or null. */
+  /** What the results share menu's Copy link puts on the clipboard for the current level and score (`text url`), or null. */
   shareText: () => string | null
   /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
   setTimeScale: (s: number) => void
@@ -777,7 +777,7 @@ export function installE2EApi() {
     },
     shareText: () => {
       const { currentLevel, score } = useGameStore.getState()
-      const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score)) : null
+      const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score), 'copy') : null
       return payload ? clipboardText(payload) : null
     },
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
