@@ -2568,7 +2568,7 @@ async function run() {
   await t.ctx.close()
 
   // 1a. Campaign landing path; not for portal builds (--base), which portals serve at their own path.
-  if (!args['skip-desktop'] && !args.base) {
+  if (!arg('skip-desktop') && !arg('base')) {
     const r = await landingPathCheck(browser, base)
     failed ||= !r.ok
     results.push(r)
