@@ -6,10 +6,10 @@ beats    4
 steps    2
 reverb   0.2
 
-voice lead   synbrass   vol=0.7  bright=1.2
-voice xylo   xylophone  vol=0.58 oct=1 pan=0.2
-voice brass  brass      vol=0.26 pan=-0.3 center=E4 gate=0.6
-voice gtr    distguitar vol=0.3  pan=0.35 gate=0.45
+voice lead   synbrass   vol=0.8  bright=1.2
+voice xylo   xylophone  vol=0.66 oct=1 pan=0.2
+voice brass  brass      vol=0.3  pan=-0.3 center=E4 gate=0.6
+voice gtr    distguitar vol=0.34 pan=0.35 gate=0.45
 voice bass   fmbass     vol=0.52 gate=0.6
 voice hit    orchhit    vol=0.42
 voice kick   kick       vol=0.62
