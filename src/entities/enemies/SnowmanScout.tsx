@@ -2,6 +2,7 @@ import { useCallback, useContext, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { marchHeading } from '@/entities/spawning/spawnPlacement'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
   SNOWMAN_BOTTOM_GEO, SNOWMAN_MIDDLE_GEO, SNOWMAN_TOP_GEO,
@@ -24,7 +25,7 @@ export default function SnowmanScout(props: EnemyProps) {
   const camera = useThree((s) => s.camera)
   const heightFn = useContext(TerrainContext)
 
-  const heading = props.heading
+  const heading = marchHeading(props.motion)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {

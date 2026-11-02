@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { buildArcTable, distanceAtT, tAtDistance, tAtLoopDistance } from './arcLength'
+import { buildArcTable, distanceAtT, indexAtT, tAtDistance, tAtLoopDistance } from './arcLength'
 import type { TrackCurve } from './curves/TrackCurve'
 
 /** Straight line x = 100·t², so t is very uneven along it. */
@@ -25,5 +25,12 @@ describe('arc table', () => {
   it('wraps distances around the loop seam', () => {
     expect(tAtLoopDistance(table, 125)).toBeCloseTo(tAtDistance(table, 25), 9)
     expect(tAtLoopDistance(table, -19)).toBeCloseTo(tAtDistance(table, 81), 9)
+  })
+
+  it('finds the sample at any t, wrapping the seam', () => {
+    for (const i of [0, 1, 1000, 4095]) expect(indexAtT(table, table.t[i])).toBe(i)
+    expect(indexAtT(table, 0.5 + 0.1 / 4096)).toBe(2048)
+    expect(indexAtT(table, 1)).toBe(0)
+    expect(indexAtT(table, -0.25)).toBe(3072)
   })
 })

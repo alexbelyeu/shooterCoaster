@@ -128,7 +128,6 @@ function LevelScene({ levelId }: { levelId: string }) {
       <EnemySpawner
         waves={enemies}
         goldenBalloonCount={biome === 'themePark' ? 3 : 0}
-        trackSamples={trackSamples}
         trackTable={trackTable}
         groundFn={groundFn}
         boss={boss}

@@ -81,6 +81,7 @@ export default function TreeField({
           key={typeIdx}
           trees={group}
           treeType={treeTypes[typeIdx]}
+          fill={config.fill ?? 0}
         />
       ))}
     </>
@@ -90,9 +91,11 @@ export default function TreeField({
 function TreeTypeInstances({
   trees,
   treeType,
+  fill,
 }: {
   trees: { x: number; y: number; z: number; height: number; color: string }[]
   treeType: TreeTypeConfig
+  fill: number
 }) {
   const trunkGeo = useMemo(() => new THREE.CylinderGeometry(2, 4, 1, 6), [])
   const canopyGeo = useMemo(() => {
@@ -102,12 +105,12 @@ function TreeTypeInstances({
   }, [treeType])
 
   const trunkMat = useMemo(
-    () => withTreeWind(new THREE.MeshPhongMaterial({ color: treeType.trunkColor, flatShading: true }), TRUNK_PART),
-    [treeType],
+    () => withTreeWind(new THREE.MeshPhongMaterial({ color: treeType.trunkColor, flatShading: true }), TRUNK_PART, fill),
+    [treeType, fill],
   )
   const canopyMat = useMemo(
-    () => withTreeWind(new THREE.MeshPhongMaterial({ flatShading: true, vertexColors: true }), CANOPY_PART),
-    [],
+    () => withTreeWind(new THREE.MeshPhongMaterial({ flatShading: true, vertexColors: true }), CANOPY_PART, fill),
+    [fill],
   )
 
   const instanceColorAttr = useMemo(() => {

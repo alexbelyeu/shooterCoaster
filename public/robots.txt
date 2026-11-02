@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+# Campaign landing paths (/go/<campaign>) are the same game as /, only for attribution.
+Disallow: /go/
 
 Sitemap: https://scoaster.com/sitemap.xml

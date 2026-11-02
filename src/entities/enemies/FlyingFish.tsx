@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { WATER_Y } from '@/entities/spawning/enemyPlacement'
+import { marchHeading } from '@/entities/spawning/spawnPlacement'
 import {
   FFISH_BODY_GEO, FFISH_WING_GEO, FFISH_TAIL_UPPER_GEO, FFISH_TAIL_LOWER_GEO,
   FFISH_DORSAL_GEO, FFISH_EYE_GEO,
@@ -9,7 +11,6 @@ import {
 } from './SharedEnemyAssets'
 
 const GRAVITY = 0.08
-const WATER_Y = 0
 
 /**
  * Overhauled flying fish: LatheGeometry body, swept-back wing-fins,
@@ -18,8 +19,9 @@ const WATER_Y = 0
  */
 export default function FlyingFish(props: EnemyProps) {
   // One speed for the whole school, or it strings out.
-  const moveAngle = useMemo(() => props.heading ?? Math.random() * Math.PI * 2, [props.heading])
-  const moveSpeed = useMemo(() => (props.heading === undefined ? 0.8 + Math.random() * 0.5 : 1), [props.heading])
+  const heading = marchHeading(props.motion)
+  const moveAngle = useMemo(() => heading ?? Math.random() * Math.PI * 2, [heading])
+  const moveSpeed = useMemo(() => (heading === undefined ? 0.8 + Math.random() * 0.5 : 1), [heading])
   const launchSpeed = useMemo(() => 1.5 + Math.random() * 1.0, [])
   const leftWingRef = useRef<THREE.Group>(null)
   const rightWingRef = useRef<THREE.Group>(null)

@@ -8,13 +8,11 @@ import { useContactShadows } from '../../shared/ContactShadows'
 
 /** Saguaro, barrel and columnar cacti (rendered first by DesertDecorations). */
 export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
-  // ── Cactus positions (3 types split from 150 budget) ────────────────
   const saguaroPositions = useMemo(() => scatterPositions(createRng(2310), 40, 400, 2800, heightFn), [heightFn])
   const barrelPositions = useMemo(() => scatterPositions(createRng(2311), 50, 300, 2800, heightFn), [heightFn])
   const columnarPositions = useMemo(() => scatterPositions(createRng(2312), 60, 400, 2800, heightFn), [heightFn])
   useContactShadows(useMemo(() => saguaroPositions.map((p) => roundCaster(p.x, p.z, 4, 0.5, 1.5)), [saguaroPositions]))
 
-  // Cactus material — rich green with waxy specular
   const cactusMat = useMemo(() => new THREE.MeshPhongMaterial({
     color: '#2a7d3a',
     specular: '#558844',
@@ -31,7 +29,6 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
 
   const flowerMat2 = useMemo(() => new THREE.MeshPhongMaterial({ color: '#ff4466', flatShading: true }), [])
 
-  // ── Saguaro — LatheGeometry with ribbed profile ──────────────────────
   const saguaroTrunkGeo = useMemo(() => {
     const pts: THREE.Vector2[] = []
     const ribs = 8
@@ -85,7 +82,6 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [saguaroPositions, saguaroConfigs])
 
-  // Saguaro cap InstancedMesh
   const setSaguaroCapRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
     const m = new THREE.Matrix4()
@@ -99,7 +95,6 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
   }, [saguaroPositions, saguaroConfigs])
 
   // Arm InstancedMeshes — horizontal + vertical segments, per side
-  // Left arm horizontal
   const setSaguaroLArmHRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
     const m = new THREE.Matrix4()
@@ -124,7 +119,6 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [saguaroPositions, saguaroConfigs])
 
-  // Left arm vertical
   const setSaguaroLArmVRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
     const m = new THREE.Matrix4()
@@ -142,7 +136,6 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [saguaroPositions, saguaroConfigs])
 
-  // Right arm horizontal
   const setSaguaroRArmHRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
     const m = new THREE.Matrix4()
@@ -167,7 +160,6 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [saguaroPositions, saguaroConfigs])
 
-  // Right arm vertical
   const setSaguaroRArmVRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
     const m = new THREE.Matrix4()
@@ -185,7 +177,6 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [saguaroPositions, saguaroConfigs])
 
-  // ── Barrel cacti — round squat domes ──────────────────────────────────
   const barrelGeo = useMemo(() => new THREE.SphereGeometry(1, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.6), [])
   const barrelFlowerGeo = useMemo(() => new THREE.ConeGeometry(0.4, 1, 5), [])
 
@@ -200,6 +191,9 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
       return { radius, height, yRot, hasFlower }
     })
   }, [barrelPositions])
+  useContactShadows(
+    useMemo(() => barrelPositions.map((p, i) => roundCaster(p.x, p.z, barrelConfigs[i].radius, 0.5, 0.8)), [barrelPositions, barrelConfigs]),
+  )
 
   const setBarrelRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
@@ -238,7 +232,6 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [barrelPositions, barrelConfigs])
 
-  // ── Columnar cacti — thick pillars with hemisphere caps ───────────────
   const columnarGeo = useMemo(() => new THREE.CylinderGeometry(3.5, 4, 30, 10), [])
   const columnarCapGeo = useMemo(() => new THREE.SphereGeometry(3.5, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), [])
 
@@ -247,6 +240,9 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
     const rng = createRng(2315)
     return columnarPositions.map(() => 0.8 + rng() * 1.2)
   }, [columnarPositions])
+  useContactShadows(
+    useMemo(() => columnarPositions.map((p, i) => roundCaster(p.x, p.z, 4 * columnarScales[i], 0.5, 1.2)), [columnarPositions, columnarScales]),
+  )
 
   const setColumnarRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
@@ -287,7 +283,7 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
 
   return (
     <>
-      {/* Saguaro cacti — trunk + cap + up to 4 arm segments */}
+      {/* Saguaro: trunk, cap and up to 4 arm segments */}
       <instancedMesh ref={setSaguaroTrunkRef} args={[saguaroTrunkGeo, cactusMat, saguaroPositions.length]} frustumCulled />
       <instancedMesh ref={setSaguaroCapRef} args={[saguaroCapGeo, cactusMat, saguaroPositions.length]} frustumCulled />
       <instancedMesh ref={setSaguaroLArmHRef} args={[saguaroArmGeo, cactusMat, saguaroPositions.length]} frustumCulled />
@@ -295,11 +291,9 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
       <instancedMesh ref={setSaguaroRArmHRef} args={[saguaroArmGeo, cactusMat, saguaroPositions.length]} frustumCulled />
       <instancedMesh ref={setSaguaroRArmVRef} args={[saguaroArmGeo, cactusMat, saguaroPositions.length]} frustumCulled />
 
-      {/* Barrel cacti */}
       <instancedMesh ref={setBarrelRef} args={[barrelGeo, barrelMat, barrelPositions.length]} frustumCulled />
       <instancedMesh ref={setBarrelFlowerRef} args={[barrelFlowerGeo, flowerMat2, barrelPositions.length]} frustumCulled />
 
-      {/* Columnar cacti */}
       <instancedMesh ref={setColumnarRef} args={[columnarGeo, cactusMat, columnarPositions.length]} frustumCulled />
       <instancedMesh ref={setColumnarCapRef} args={[columnarCapGeo, cactusMat, columnarPositions.length]} frustumCulled />
     </>

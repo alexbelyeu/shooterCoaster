@@ -124,6 +124,7 @@ function planArch(index: TrackIndex, groundFn: HeightFunction, occupied: Circle[
       y: f.y,
       z: f.z,
       yaw: Math.atan2(f.tx, f.tz),
+      feet,
       boardY,
       groundY,
       postHeight: top - groundY + 2,

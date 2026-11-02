@@ -1,7 +1,0 @@
-## 2026-10-31 — Real 404s, site headers, no CSP yet (builder, #193)
-
-**Context:** `vercel.json` rewrote every path to `index.html`, so any URL answered 200 with the game: soft 404s and endless duplicate URLs for Google. Lighthouse also lists CSP and clickjacking checks.
-
-**Decision:** Rewrite only `/api/*` and `/go/(.*)` (campaign landing paths, #171); every other unknown path gets `public/404.html` (`noindex`) with status 404. Campaign links must therefore start with `/go/`. Every response gets `nosniff`, `strict-origin-when-cross-origin`, a deny-all `Permissions-Policy` for unused powerful features and `COOP: same-origin`; only Vite's hashed `/assets/*` get a one-year `immutable` cache, so `public/assets/` must stay empty (the favicon moved to `/favicon.ico`). No CSP: the strict, nonce-based policy Lighthouse recommends needs a per-response nonce that a static Vercel site can't mint, and an allowlist CSP would need `'unsafe-inline'`. No `X-Frame-Options`, so the game stays embeddable. Lighthouse gates SEO 100 and Accessibility / Best Practices ≥ 95 in `verify`; Performance is reported only (software GL).
-
-**Consequences:** A new client-side route (if the game ever gets one) needs its own rewrite in `vercel.json` and a case in `scripts/site.test.ts`. Revisit CSP and framing with a Vercel middleware if the site starts taking user input or accounts. Details and sources: `docs/marketing/SEO.md`.

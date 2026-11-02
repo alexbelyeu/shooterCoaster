@@ -9,39 +9,39 @@ assigned one issue (or one PR labelled `agent:changes-requested`) and already
 claimed it. Nobody will review your code except an independent QA agent, so hold
 yourself to a senior game-engineer bar.
 
-Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, the issue (and all comments),
+Read first (CLAUDE.md is already loaded): `docs/agents/PROTOCOL.md`, the issue (and all comments),
 and the relevant skills in `.claude/skills/` (always `shooter-coaster-level-design`
 for anything visual or level-related).
 
 ## Do the work
 
-1. `npm ci`. Create or check out branch `agent/<issue>-<slug>` from latest `origin/main`
+1. `bash scripts/quiet.sh npm ci`. Create or check out branch `agent/<issue>-<slug>` from latest `origin/main`
    (for a returned PR: check out its branch, merge `origin/main` into it — never rebase a
    pushed branch — then address
    every QA comment).
    If QA's only request is "merge conflict only", merge `origin/main`, resolve keeping
-   both sides' behaviour, run `npm test && npm run build`, push, reply, swap the labels
+   both sides' behaviour, run `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build`, push, reply, swap the labels
    and finish. CI runs the full `verify` and QA does a light re-review, so skip steps
    2–7 unless a conflict touched `src/` or `e2e/` (then do steps 3 and 7).
 2. Plan briefly, then implement. Stay inside the issue's scope; note follow-ups instead
    of expanding scope.
 3. Verify like a player. `export SC_CHROME="$(scripts/ensure-browser.sh)"` once, then
-   iterate with `npm test && npm run build && node e2e/smoke.mjs --levels <levels you touched>`
+   iterate with `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build && bash scripts/quiet.sh node e2e/smoke.mjs --levels <levels you touched>`
    (add `--mobile` for input, UI, HUD, camera, audio or layout changes).
    **Read the screenshots** that show your change, not every PNG. If it doesn't look clearly
    better or the acceptance criteria aren't visibly met, keep iterating. Extend
    `src/testing/e2eHook.tsx` / `e2e/smoke.mjs` if you need to test something new
    (e.g. a new level must appear in `levels()` and pass smoke).
-4. Compare `results.json` draw calls / triangles against `main` for levels you
+4. Compare (with `jq`, not by reading the file) `results.json` draw calls / triangles against `main` for levels you
    touched; explain any big increase in the PR.
 5. Update CLAUDE.md / docs if structure or behaviour changed; record non-obvious
    design choices as a new file in `docs/agents/decisions/inbox/` (never edit
    `DECISIONS.md` itself); add assets to `docs/ASSETS.md`.
 
 6. **Deslop.** Follow `.claude/commands/deslop.md` over every file the branch touches
-   (whole files, not just your lines). Re-run `npm test && npm run build` after cutting.
+   (whole files, not just your lines). Re-run `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build` after cutting.
 
-7. **Full verify, once.** `npm run verify` (all levels + phone run) right before you push
+7. **Full verify, once.** `bash scripts/quiet.sh npm run verify` (all levels + phone run) right before you push
    for review, not after every change. If it fails, fix and re-run.
 
 Run `scripts/pause-check.sh` before `npm run verify` and before shipping. If it prints

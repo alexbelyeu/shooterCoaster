@@ -1092,3 +1092,190 @@ share-card tags); the normal build keeps `base: '/'`.
 outside the latin subset fall back to system fonts, as before for anything our English text
 uses. The smoke fails if either face does not load, or on any request that leaves the
 page's origin in a local run.
+
+## 2026-10-30 — Arcade instrument palette in the score engine (Sound designer, #215)
+
+**Context:** The arcade sound (`SOUND-BIBLE.md`) needs instruments the Scrimshaw port lacks:
+FM bass, supersaw, distorted guitar, orchestra hit, synth brass, a 909 kit, risers. The
+port's original instruments leave every note's nodes to garbage collection, and a power
+chord distorted note by note doesn't sound like one.
+
+**Decision:** The palette lives in `scrim/synth.ts` beside the originals (which stay
+untouched), and its instruments are our own code, not Scrimshaw's. Each arcade note or hit
+collects the nodes it creates and disconnects them all from its last source's `onended`
+(`ownedNote` / `ownedHit`). An instrument may declare a channel `insert`, built once per
+session voice and disconnected with the session; `distguitar` uses it so all of a voice's
+notes go through one amp and cab. The instrument list in `SCORE-FORMAT.md` is the
+contract: `palette.test.ts` checks it against the synth and the compiler both ways.
+`audio:render --score <file> --chain game` measures a score through the game's music
+chain, the same numbers as `--music <id> --engine scrim`.
+
+**Consequences:** A new instrument needs a row in `SCORE-FORMAT.md`, a name in the
+compiler's lists and a lint range, or the test fails. Melodic scores keep the existing
+mix numbers; nothing in the game plays the palette until a theme uses it.
+
+## 2026-10-31 — The ride wind belongs to each SFX engine; kill sounds come off the bus; music loops are `guarded` (sound designer, #109)
+
+**Context:** The wind whoosh built its own Tone nodes on `CoasterCamera` mount, outside the level kit: `sfxNodeCount()` missed
+them, it never started when Tone's chunk landed after the level mounted, it ramped (two Tone automation events) every frame,
+and under `?audio=scrim` it was the only Tone SFX left. Kill sounds were played by `EnemyBase` / `BossBase` while every other
+gameplay sound came from `LevelAudio` (was `MusicController`) bus listeners. The nine music loop callbacks each hand-copied a
+`try/catch` into `soundGuard`.
+**Decision:** `SfxEngine.wind(speed)`. The Tone kit builds the wind chain through `own()` (it runs silent for the kit's
+life) and the arcade engine builds the same chain (looped seeded white noise → band-pass → gain) in its graph, so each
+engine's `nodeCount()` covers it and the scrim path no longer needs a Tone SFX node. Both re-aim the wind only when pure
+`windUpdateDue` says so (speed moved ≥ 0.02, at most every 0.1 s, and always to 0). `enemy:killed` carries the kill timbre
+(`sound`) or the boss weak point (`bossPart`), and `LevelAudio` plays it. Music `Sequence` / `Loop` callbacks are wrapped
+once in `guarded(where, cb)`. `SFXManager.test.ts` fails any bare `new` in `SFXManager.ts`, the limit of the smoke's
+node-count check. `audioBurst` spaces its kill steps 35 ms apart on the audio clock across every combo tier and reports
+`killsPlayed`; the smoke requires all 10.
+**Consequences:** A new Tone kit node must go through `own()`. A new kill source emits `enemy:killed` with its sound
+instead of calling `sfx().kill` (the Kraken's slam splash is a world effect, not a kill, and still calls it directly).
+
+## 2026-10-31 — Which enemy parts reflect the sky env map (Builder, #139)
+
+**Context:** The 2026-10-24 sky env map entry (#121) says "The crows are the exception"
+among enemies picking up `scene.environment`. That was wrong: the level5 `fireImp`
+(`FIRE_IMP_BODY_MAT`) and `infernalDrake` (`DRAKE_BODY_MAT`) bodies are
+`MeshPhysicalMaterial` too, so they reflect the Inferno sky at its `envIntensity` 0.6.
+Most other enemy bodies were `MeshPhongMaterial`, which ignores the env map, so glossy
+parts read flat.
+**Decision:** Glossy parts move to `MeshStandardMaterial` (in `SharedEnemyAssets.ts`): the
+shark skin (body, snout, fins, belly), the scorpion shell and tail, and the snowmen's coal
+eyes, mouth and buttons. Matte or soft parts stay Phong (balloons, jellyfish, flying
+fish, snowman bodies, carrot, scarf and hat, wisps, golem, horns, spikes, wings). The full
+list of enemy materials that reflect the sky: crow feathers, fire imp and drake bodies
+(Physical); the parts above, golden balloons and knots, the scorpion stinger, the
+jellyfish cores, every eye except the flying fish's, and every lit boss material (Standard).
+**Consequences:** Moving a material between Phong and Standard changes how it looks in every
+biome that uses it; Standard has no `specular` colour, so tune `metalness` / `roughness`
+against the level's `envIntensity`. Each Standard fragment samples the env map, so keep
+large or numerous enemies (Theme Park's ~150 balloons) on Phong unless the look needs it.
+
+## 2026-10-31 — Wind streaks draw after the world's transparents, depth-tested just behind the gun (Builder, #144)
+
+**Context:** The 2026-10-25 entry "Sense of speed stays rotation-only; streaks draw in the opaque pass" (#27) put `WindStreaks` in the opaque list with no depth test, so water, particles and explosions drew over it (the sea dimmed the streaks on water levels). The streak / gun order also hung on two magic numbers in two files.
+**Decision:** Supersedes that entry's streak pass (the rotation-only rules stand). The streaks are `transparent` (still additive, no depth write) at `CAMERA_LAYER_ORDER.streaks` (100), so they draw after every world transparent. They are depth-tested at a fixed clip z just behind the gun's depth range (`BEHIND_VIEWMODEL_CLIP_Z`): the gun's vertex shader squeezes it into the front `VIEWMODEL_DEPTH_RANGE` (2%) of the depth buffer, and the world sits behind that, so the streaks pass over the world and fail only on gun pixels. `src/core/cameraLayers.ts` holds the camera-attached render orders (streaks / gun / tracer / muzzle flash) and both depth constants.
+**Consequences:** World objects keep renderOrder below 100. A new camera-attached layer takes its order from `CAMERA_LAYER_ORDER`; one that must sit over the streaks either writes depth inside the gun's range or draws after them.
+
+## 2026-10-31 — The Kraken surfaces at fixed spots in front of the rider and resurfaces, instead of riding along (Builder, #183)
+
+**Context:** The Golden Blimp follows the camera because a fixed boss is behind the rider within seconds. Tentacles sliding across the water with the rider would look wrong, and a moving base would sweep through the rails and towers. The ride also loops over most of the sea in front of it, so few spots are clear, and spots chosen along the track's arc were often off screen in its knots.
+**Decision:** Each tentacle (and later the head) surfaces at a fixed world spot 550–1150 units out within ±0.45 rad of the camera's view, checked against `trackClearance` (base and slam landing), the drawn seabed and the sea stacks / breaching rocks (`seaObstacles`, from the shared `oceanLayout` cache). It slams away from the rider, so its sucker side faces back. It stays up ~6.5 s or until it falls behind the camera, sinks, and surfaces again further on. A weak point not out of the water parks at y −9999, so it cannot be hit or aimed at.
+**Consequences:** Exposure windows come and go (the pacing the issue asks for), and the boss never moves through the track. A spot can fail in a tight knot of the ride; the boss retries (`krakenMotion.test.ts` bounds the head's retries). A future ocean prop that stands out of the water belongs in `seaObstacles`.
+
+## 2026-10-31 — Daily Run: UTC day, levels 1–3, saves kept apart from the campaign (builder, #184)
+
+**Context:** The Daily Run gives everyone the same seeded run each day, offline (no backend until Alex decides).
+
+**Decision:** The day is the UTC date (`levels/daily.ts`: seed `hashString('daily-YYYY-MM-DD')`), so every
+player shares the same run; the card shows the local date and the rollover time in its tooltip. The level
+rotates through levels 1–3 only, so a new visitor can play it without unlocking anything. A run carries a
+`runMode` in the game store; daily results go to `savedDaily` (per UTC day, last 30 days) and `dailyStreak`,
+never to `savedScores`, so dailies cannot change campaign stars, bests or unlocks. Seed precedence is
+`seed` > `?seed=` > daily seed > `Date.now()`, so `?seed=` still pins a daily for testing. `restartRun()`
+(Replay, pause-menu Restart) keeps the mode, and a daily keeps its seed.
+
+**Consequences:** A future online daily leaderboard can key on the same UTC date and seed. Changing the
+seed formula or the level rotation changes every past day's run; bump the key prefix deliberately if ever needed.
+
+## 2026-10-31 — Weapon pickups: accuracy, pacing and targets that aren't enemies (Builder, #185)
+
+**Context:** Spread fires 3 bullets per pull and a piercing bullet can hit 3 enemies, so the results screen's accuracy (`hits / shotsFired`) could pass 100% or stop meaning anything. Pickups are shot like enemies, but they are not enemies.
+**Decision:** Every bullet is a shot (a spread pull counts 3), and a bullet counts as a hit once, on its first target, however many it pierces (`CollisionTarget.firstHitThisFrame` → `processHit(target, countHit)`), so `hits ≤ shotsFired` always. Shooting a pickup counts as a hit too. The fire interval moved from `BulletPool` to `fireAtNDC`, which reads it from the active weapon; the held trigger re-times itself each pull. Pickups are ordinary collision targets with `kind: 'pickup'`: `processHit` skips `enemy:hit` (no hitmarker, hit tick or combo) for them, aim assist weighs them at 0.6, and the e2e hook's enemy counts leave them out. They sit in the track parameter range 0.05–0.33, which every level's run reaches before its timer ends.
+**Consequences:** Anything new that walks `getCollisionTargets()` as "the enemies" must skip `kind === 'pickup'`. Moving pickups past t ≈ 0.38 means some levels never reach them.
+
+## 2026-10-31 — Rails and lattice have a pixel floor, done in the vertex shader (builder, #186)
+
+**Context:** Past a few hundred units the rails and tower lattice thinned to sub-pixel hairlines that broke into
+dashes and shimmered. LOD meshes or thicker steel would change the near view, triangles or draw calls.
+
+**Decision:** `withMinThickness` (`src/track/minThickness.ts`) patches the track and tower steel materials: each
+vertex moves outward along its cross-section direction (`aThick` attribute: unit direction + real radius) until the
+part projects to at least `RAIL_MIN_PIXEL_RADIUS` (1.5 px) or `LATTICE_MIN_PIXEL_RADIUS` (0.5 px) in drawing-buffer
+pixels. The FOV is read from `projectionMatrix[1][1]` in the shader, so portrait, rotation and the speed FOV kick need
+no uniform update; only the drawing-buffer height (`trackViewportHeight`) is set, on resize / dpr change. Ties and
+footings carry a zero `aThick` and keep their size. Up close the real radius is larger and nothing moves.
+
+**Consequences:** Far track reads as a solid line (its rails merge into one ribbon; the tie colour fades out of it).
+Any new track or tower geometry drawn with these materials must set `aThick` (zeros if it should not grow), and tower
+instances must stay unscaled (the push is in instance-local units). Hit tests and the camera use the curve, not the
+mesh, so gameplay is unchanged. The Low preset has no MSAA, so some crawl remains there; FXAA/TAA would be a separate issue.
+
+## 2026-10-31 — Tone.js loads on the first gesture, in its own chunk (builder, #187)
+
+**Context:** Tone.js (~64 KB gz) sat in the main chunk although no sound can play before a user gesture.
+**Decision:** `src/audio/tone.ts` owns it. Every `initAudio()` call creates or resumes the page's own `AudioContext`
+synchronously in its gesture handler (`unlockAudioContext`; iOS Safari starts a context only there, and a touch `pointerdown`
+is not an activation, so the PLAY `click` after it must resume again); the first call also `import('./toneLib')`s Tone and
+hands it that context with `setContext`. `loadTone()` only loads (offline renders use it before any gesture). Main-chunk
+modules import Tone's types only and reach it through `tone()`, guarded by `isAudioReady()`; the master chain is built after
+the load, and code that must start sound once it lands (title music, a level's music + SFX kit) uses `whenAudioReady`. PLAY
+waits at most 300 ms for the chunk. `toneLib.ts` re-exports just the parts the main chunk uses, because a dynamic
+`import('tone')` keeps the whole namespace (+16 KB gz). `vite.config.ts` `manualChunks.tone` holds Tone and `toneLib`.
+Lazy chunks (score player, arcade SFX, offline render) import `tone` statically and gate on `isAudioReady()` / `loadTone()`.
+**Consequences:** The main chunk drops by ~63 KB gz, total unchanged. A new Tone class used from the main chunk needs an export
+in `toneLib.ts` (tsc says so). The smoke's title step fails if `tone-*.js` is fetched before the key press.
+**For the Director:** consider a `jsStartupGzipKB` budget in `budgets.json` (startup JS is printed by `check:bundle`: 470 KB gz
+at merge) so it can't creep back; builders may not add it (hard rule 6). The #187 target "main chunk ≤ 150 KB gz" is not met
+(182 KB gz): the rest needs level / biome code splitting.
+
+## 2026-10-31 — Per-level scene ceilings in budgets.json (builder, #188)
+
+**Context:** The VISION bar (≤ 250 draw calls, ≤ 250k triangles per level) was not enforced. On `main` tonight
+levels 4 and 5 draw 393 and ~290 calls at the ride screenshot, over that bar, and no open issue covers them, so the
+issue's `knownOver` route (ceiling at 250, warn until a fix lands) had nothing to point at. Draw calls also swing
+between runs (level 2 measured 91 and 112 on the same commit).
+
+**Decision:** `budgets.json` `scene` sets each level's ceilings from today's measurements: draw calls +20% over the
+higher of two runs, scene and track objects / triangles +15% (those are camera-independent and exact). Levels 4 and 5
+get plain ceilings above 250 (472, 353) that stop further growth; the smoke fails a level past any ceiling, or one
+with no entry. `knownOver: "#<issue>"` on a level's entry turns its failure into a warning, for use once the
+Director files an issue to bring a level under the VISION bar (the ceiling can then drop to 250).
+
+**Consequences:** A PR that grows a level's scene past its ceiling fails `verify` with the number in the log.
+Raising a ceiling is a budget raise (Director, with a decision entry); a new level adds its own entry. Levels 4 and 5
+stay over the VISION draw-call bar until the Director plans that work.
+
+## 2026-10-31 — Real 404s, site headers, no CSP yet (builder, #193)
+
+**Context:** `vercel.json` rewrote every path to `index.html`, so any URL answered 200 with the game: soft 404s and endless duplicate URLs for Google. Lighthouse also lists CSP and clickjacking checks.
+
+**Decision:** Rewrite only `/api/*` and `/go/(.*)` (campaign landing paths, #171); every other unknown path gets `public/404.html` (`noindex`) with status 404. Campaign links must therefore start with `/go/`. Every response gets `nosniff`, `strict-origin-when-cross-origin`, a deny-all `Permissions-Policy` for unused powerful features and `COOP: same-origin`; only Vite's hashed `/assets/*` get a one-year `immutable` cache, so `public/assets/` must stay empty (the favicon moved to `/favicon.ico`). No CSP: the strict, nonce-based policy Lighthouse recommends needs a per-response nonce that a static Vercel site can't mint, and an allowlist CSP would need `'unsafe-inline'`. No `X-Frame-Options`, so the game stays embeddable. Lighthouse gates SEO 100 and Accessibility / Best Practices ≥ 95 in `verify`; Performance is reported only (software GL).
+
+**Consequences:** A new client-side route (if the game ever gets one) needs its own rewrite in `vercel.json` and a case in `scripts/site.test.ts`. Revisit CSP and framing with a Vercel middleware if the site starts taking user input or accounts. Details and sources: `docs/marketing/SEO.md`.
+
+## 2026-11-01 — Tone.js music tracks start on the next beat, not the next bar (Builder, #168)
+
+**Context:** `startTransportAt` started a new track on the next bar line (2.2 s at 108 bpm, 3.3 s at 72 bpm) while the
+outgoing bus faded to 0 in `MUSIC_FADE_S` (1 s), so a switch was often a fade out, silence, then the new track: a gap.
+**Decision:** a new track starts on the next beat (≤ 0.83 s at the slowest tempo), and the Transport's tempo steps to the
+new bpm on that beat instead of ramping, so the incoming track is in time from its first note (the step lands under the
+outgoing track's last ~fraction of its fade). Both gain ramps still start at the switch, a constant-sum crossfade. The
+fade log records each ramp's start and the incoming track's `firstNote`; the smoke fails a switch whose first note lands
+after the outgoing fade ends.
+Entering a run, the title track is handed over (`fadeOutMusicBus(..., untilNextTrack)`, scrim `handOverScore`): it keeps
+playing until the level's track opens once its scene has mounted, and only then fades out under it (a 20 s fallback fades
+it if no track opens). The smoke requires every checked switch to have an overlapping fade-out / fade-in pair.
+**Consequences:** tracks no longer line up with the old track's bar grid (inaudible: it is fading out). Do not go back to
+bar-aligned starts without also delaying the outgoing fade to the new track's first note.
+
+## 2026-11-01 — Legacy v1 game and the api/ stubs removed from main (builder, #283)
+
+**Context:** Alex asked for the repo to hold only what the game and studio use. The 2015
+game (`js/`, `assets/`, `index.legacy.html`, `package.legacy.json`, `gulpfile.js`,
+`.jshintrc`, `base.css`) was ~100 MB of the working tree that nothing built. The `api/`
+serverless stubs (leaderboard, daily seed, ghost) were in-memory placeholders that only
+the unimported `src/utils/api.ts` called; scores and the Daily Run are local.
+
+**Decision:** Delete both from `main`. The last `main` commit that still has them is
+`e78bd27d9a5b6bd2d776358f50b2c1a0d16a0bf8` (`git show e78bd27:index.legacy.html`,
+`git checkout e78bd27 -- js assets` to get them back). The playable 2015 game stays on
+the `gh-pages` branch (http://alexbelyeu.github.io/shooterCoaster/), which is kept.
+`vercel.json` drops the `/api/*` rewrite and its `noindex` header, so `/api/*` is now a
+plain 404 (the 404 page is `noindex`). The `/assets/*` immutable cache rule stays: it is
+for Vite's hashed bundles in `dist/assets`, not the old folder.
+
+**Consequences:** An online leaderboard or ghost backend (VISION 24, 26) starts from
+scratch with Alex's backend decision (hard rule 4), not from these stubs. `.git` does not
+shrink (no history rewrite, hard rule 2); fresh clones' working trees do.
