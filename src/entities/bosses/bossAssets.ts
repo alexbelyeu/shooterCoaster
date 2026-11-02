@@ -240,7 +240,7 @@ const shell = (rx: number, ry: number, rz: number, at: [number, number, number],
 
 const ABDOMEN = [0, 1, 2, 3, 4].map((k) => ({ rx: 150 - 11 * k, ry: 60 - 3 * k, z: -25 - 58 * k, y: 95 - 3 * k }))
 
-/** Head shield and five overlapping abdomen plates, amber underneath; +z is its head. */
+/** +z is its head. */
 export const SCORPION_BODY_GEO = mergePainted([
   shell(150, 70, 165, [0, 100, 125]),
   ...ABDOMEN.map((p) => shell(p.rx, p.ry, 55, [0, p.y, p.z])),
@@ -248,7 +248,6 @@ export const SCORPION_BODY_GEO = mergePainted([
   ...[-1, 1].map((side) => painted(new THREE.BoxGeometry(30, 34, 56), CHITIN_EDGE, [side * 36, 78, 285], [0.3, side * 0.2, 0])),
 ])
 
-/** Glowing seams between the plates and the eyes: the joints read at a distance. */
 export const SCORPION_GLOW_GEO = mergePainted([
   ...ABDOMEN.map((p) =>
     paintedAt(new THREE.TorusGeometry(1, 0.07, 5, 24), AMBER_HOT, pose([0, p.y, p.z + 29], [0, 0, 0], [p.rx * 0.85, p.ry * 0.85, 60])),
@@ -267,8 +266,7 @@ export const SCORPION_GLOW_MAT = withRim(
   { color: '#ffe0b0', intensity: 0.5, power: 2 },
 )
 
-/** Legs and arms, one instanced draw: a tapered segment from y 0 to 1 (instance scale: radius, length, radius), its joint end glowing. */
-// Dark like the shell: bright legs read as stilts from the ride, which looks down on them.
+/** Unit segment from y 0 to 1 (instance scale: radius, length, radius); dark, as amber legs read as stilts from above. */
 export const SCORPION_LIMB_GEO = twoTone(
   new THREE.CylinderGeometry(0.75, 1, 1, 6, 4).translate(0, 0.5, 0),
   CHITIN_EDGE,
@@ -282,23 +280,22 @@ export const SCORPION_LIMB_MAT = withRim(
   { color: '#ffd9a0', intensity: 0.6, power: 2.2 },
 )
 
-/** A claw along +z around its palm (origin): the fixed finger on +x; the moving one is `SCORPION_FINGER_GEO`. */
+/** Along +z around its palm, the fixed finger on +x. */
 export const SCORPION_CLAW_GEO = mergePainted([
   twoTone(new THREE.SphereGeometry(1, 16, 10), CHITIN_EDGE, AMBER, -0.3, pose([0, 0, 0], [0, 0, 0], [72, 54, 95])),
   painted(new THREE.ConeGeometry(28, 150, 6).rotateX(Math.PI / 2), CHITIN, [32, 0, 140], [0, -0.12, 0]),
   painted(new THREE.SphereGeometry(13, 6, 5), AMBER_HOT, [44, 0, 72]),
 ])
 
-/** Hinged at its origin, pointing along +z; the claw opens it by turning it about y. */
+/** Hinged at its origin; opens by turning about y. */
 export const SCORPION_FINGER_GEO = mergePainted([
   painted(new THREE.ConeGeometry(25, 145, 6).rotateX(Math.PI / 2).translate(0, 0, 72), CHITIN),
   painted(new THREE.SphereGeometry(20, 6, 5), AMBER_HOT),
 ])
 
-/** Placed in the claw group (which mirrors it on the left). */
 export const SCORPION_FINGER_HINGE: [number, number, number] = [-30, 0, 70]
 
-/** One tail segment along +y around its middle, a glowing joint ring at its base. */
+/** Along +y around its middle. */
 export const SCORPION_TAIL_SEGMENT_GEO = mergePainted([
   twoTone(new THREE.SphereGeometry(1, 12, 8), CHITIN, CHITIN_EDGE, -0.9, pose([0, 0, 0], [0, 0, 0], [46, 62, 46])),
   painted(new THREE.TorusGeometry(42, 9, 5, 14), AMBER_HOT, [0, -48, 0], [Math.PI / 2, 0, 0]),
@@ -309,7 +306,7 @@ export const SCORPION_TAIL_MAT = withRim(
   { color: '#ffd9a0', intensity: 0.8, power: 2.2 },
 )
 
-/** Venom bulb and barb along +y from its base (origin), the barb hooking towards +z. */
+/** Along +y from its base, the barb hooking towards +z. */
 export const SCORPION_STINGER_GEO = mergePainted([
   paintedAt(new THREE.SphereGeometry(1, 14, 10), '#8a1a1a', pose([0, 40, 0], [0, 0, 0], [46, 58, 46])),
   painted(new THREE.ConeGeometry(17, 95, 8), '#ff4422', [0, 120, 22], [0.45, 0, 0]),
@@ -320,13 +317,12 @@ export const SCORPION_STINGER_MAT = withRim(
   { color: '#ffc0a0', intensity: 0.6, power: 2.2 },
 )
 
-/** Bare tail: the stinger is the target, pulsing hot. */
 export const SCORPION_STINGER_EXPOSED_MAT = withRim(
   new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.1, emissive: '#ff3300', emissiveIntensity: 2 }),
   { color: '#ffd0a0', intensity: 1, power: 2 },
 )
 
-/** The tell: a low lumpy dome of sand (mesh scale: radius, height, radius) heaving where it will burst out. */
+/** The tell's dune: mesh scale (radius, height, radius). */
 export const SCORPION_MOUND_GEO = (() => {
   const g = new THREE.SphereGeometry(1, 28, 9, 0, Math.PI * 2, 0, Math.PI / 2).toNonIndexed()
   g.deleteAttribute('uv')
@@ -338,7 +334,7 @@ export const SCORPION_MOUND_GEO = (() => {
     pos.setXYZ(i, x * bump, pos.getY(i) * bump, z * bump)
   }
   const colors = new Float32Array(pos.count * 3)
-  // A shade under the terrain ramp's dunes: the dome faces the sun more than the ground does and read pale.
+  // Darker than the terrain ramp: the dome faces the sun more than the ground and read pale.
   const sand = [new THREE.Color('#a8864c'), new THREE.Color('#9a7842'), new THREE.Color('#b08e54')]
   for (let t = 0; t < pos.count; t += 3) {
     const c = sand[Math.abs(Math.floor(pos.getX(t) * 13 + pos.getZ(t) * 7)) % sand.length]

@@ -10,8 +10,10 @@ import { BOSS_SPECS, GIANT_SCORPION } from './bossSpecs'
 import { applyHit, bossMaxScore, createBossState, exposedWeakPoints, isDefeated, type BossState } from './bossModel'
 import {
   LUNGE_IMPACT_S, PERCH, SCORPION_LUNGE, SCORPION_RISE, SCORPION_TAIL, approachAngle, createTailPose, faceYaw, footStep, layTail,
-  lungeAmount, lungeImpactBetween, perchClear, pickPerch, riseOffset, tailTopY, type Perch, type PerchInput,
+  lungeAmount, lungeImpactBetween, perchClear, pickPerch, riseOffset, type Perch, type TailPose, type PerchInput,
 } from './scorpionMotion'
+
+const tailTopY = (pose: TailPose) => pose.y[pose.count]
 
 const hitAll = (state: BossState, ids: string[]) =>
   ids.reduce((s, id) => {

@@ -24,22 +24,19 @@ import {
 
 const B = SCORPION_BODY
 const T = SCORPION_TAIL
-/** Eight legs and two arms, two segments each. */
 const LIMB_COUNT = 20
 const TAIL_IDS = Array.from({ length: T.segments }, (_, i) => `tail-${i}`)
 const HEADING_TAU = 2.5
 const FOLLOW_TAU = 1
 const TURN_TAU = 0.6
-/** Of the way from facing the rider to facing where it rides: a three-quarter view. */
+/** Turned this much from the rider towards its heading: a three-quarter view of claws and tail. */
 const FACE_BLEND = 0.35
 /** How far its middle may sit below a crest under it. */
 const MAX_BELLY_DIP = 90
 const MOUND_RADIUS = 300
 const MOUND_HEIGHT = 90
-/** The mound sinks back this fast once the scorpion is out. */
 const MOUND_SETTLE = 120
 const PUFF_EVERY_S = 0.6
-/** The stinger's tip, along its last piece from the stinger's base. */
 const STINGER_REACH = 150
 const RISE_TRAUMA = [0.35, 500] as const
 const LUNGE_TRAUMA = [0.3, 350] as const
@@ -56,7 +53,7 @@ function sandBurst(x: number, y: number, z: number, trauma: readonly [number, nu
   eventBus.emit(CAMERA_TRAUMA_EVENT, trauma[0], trauma[1])
 }
 
-/** A limb segment from a to b (root-local): the unit limb's y axis along it, scaled to radius r. */
+/** Root-local segment a → b of radius r. */
 function setLimb(limbs: THREE.InstancedMesh, i: number, ax: number, ay: number, az: number, bx: number, by: number, bz: number, r: number) {
   const dx = bx - ax
   const dy = by - ay
@@ -126,7 +123,7 @@ export default function GiantScorpion(props: BossProps) {
     [],
   )
 
-  /** Follows the rider's heading (smoothed through loops) and picks where to ride, clear of the track and landmarks. */
+  /** Heading smoothed through the loops, like the Blimp's. */
   const aim = useCallback(
     (dt: number) => {
       camera.getWorldPosition(_cam)
@@ -148,7 +145,6 @@ export default function GiantScorpion(props: BossProps) {
       input.forwardZ = sim.heading.z
       if (pickPerch(sim.perch, input)) sim.perched = true
       else if (!sim.perched) {
-        // Nowhere clear: its usual slot anyway, so it still shows.
         const [ahead, side] = PERCH.slots[0]
         sim.perch.x = _cam.x + sim.heading.x * ahead - sim.heading.z * side
         sim.perch.z = _cam.z + sim.heading.z * ahead + sim.heading.x * side
@@ -157,7 +153,7 @@ export default function GiantScorpion(props: BossProps) {
     [camera, sim, input],
   )
 
-  // The tell: the dunes heave where it will burst out, puffing sand. Runs on game time, before BossBase starts.
+  // The tell runs before BossBase's frame does: the dune heaves where it will burst out.
   useFrame((_, delta) => {
     const mound = moundRef.current
     if (!mound) return
@@ -211,7 +207,7 @@ export default function GiantScorpion(props: BossProps) {
       sim.lastX = x
       sim.lastZ = z
 
-      // It stands on the sand under its feet, not on whatever crest is under its middle (its belly may brush that).
+      // On the sand under its feet, not on a crest under its middle (its belly may brush that).
       const centre = groundFn(x, z)
       let sum = centre
       for (let s = 0; s < 2; s++) {
@@ -232,7 +228,6 @@ export default function GiantScorpion(props: BossProps) {
         sandBurst(x, centre, z, RISE_TRAUMA)
       }
 
-      // Legs: hips on the body, feet on the sand (local y: the sand under the foot above the ground it stands on).
       let n = 0
       for (let s = 0; s < 2; s++) {
         const side = s === 0 ? 1 : -1
@@ -252,7 +247,6 @@ export default function GiantScorpion(props: BossProps) {
       }
 
       const lunge = fighting ? lungeAmount(age) : 0
-      // Arms: claws sway and lift as the tail strikes; the pincers work, snapping shut on the strike.
       for (let s = 0; s < 2; s++) {
         const side = s === 0 ? 1 : -1
         const id = s === 0 ? 'claw-l' : 'claw-r'
@@ -279,7 +273,6 @@ export default function GiantScorpion(props: BossProps) {
       // Its bounds change every frame; recomputed only when something asks (the e2e box).
       limbs.boundingBox = null
 
-      // Tail: the segments still on it, closed up from the base (a broken one is gone), then the stinger.
       let live = 0
       for (let i = 0; i < T.segments; i++) {
         if (parts.get(TAIL_IDS[i])?.visible) sim.liveTail[live++] = i
@@ -325,7 +318,7 @@ export default function GiantScorpion(props: BossProps) {
       }
       if (w.id.startsWith('claw')) {
         return (
-          // The right claw is the left one mirrored: its fixed finger on the outside too.
+          // Mirrored, so its fixed finger is on the outside too.
           <group scale={w.id === 'claw-r' ? [-1, 1, 1] : [1, 1, 1]}>
             <mesh geometry={SCORPION_CLAW_GEO} material={SCORPION_SHELL_MAT} />
             <mesh
