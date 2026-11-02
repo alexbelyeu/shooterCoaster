@@ -1634,8 +1634,14 @@ canvas {
     margin-top: 0.75rem;
   }
 
+  /* Levels / Replay / Share on one row beside the board, so the share menu opens above them, not over them. */
+  .results-actions .play-button {
+    padding: 0.75rem 0.7rem;
+    font-size: 0.85rem;
+  }
+
   .results-board-slot {
-    flex: 0 0 15rem;
+    flex: 0 0 14rem;
   }
 
   .results-board li {
