@@ -108,9 +108,6 @@ const COMBAT_STEP_MAX = 0.25
 // Seconds of ride per second of level time during the ride (`rideRate`). The game rides at most 3/60 s a frame, so on
 // software GL the ride depended on the frame count; 0.14 is CI's (~2.8 fps × 0.05 s), where the budgets were calibrated.
 const RIDE_RATE = Number(args['ride-rate'] ?? 0.14)
-// The readability probe rides on to this level time, past the 15 s second waves (where CI's probe ran before #305):
-// from this track point level3 has one readable enemy at 10 s (#250), and the perf budgets were set before those waves.
-const READABLE_SECONDS = Number(args['readable-seconds'] ?? 16)
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(args.seed ?? 1337)
 const DIST = args.dist ?? 'dist'
@@ -2749,7 +2746,7 @@ async function run() {
       window.__SC_TEST__.startLevel(lid, seed)
     }, [id, SEED, RIDE_STEP_MAX])
     const ride = await rideToLevelTime(page, SECONDS, MIN_FRAMES)
-    // Frozen at SECONDS of level time: the ride stats, the perf gate and the ride shot share that moment.
+    // Frozen at SECONDS of level time until the enemy probe: the ride stats, perf gate, shot and probe share that moment.
     const stats = await page.evaluate(() => {
       const s = window.__SC_TEST__
       return {
@@ -2759,8 +2756,7 @@ async function run() {
     })
     const png = await page.screenshot({ path: path.join(OUT, `${id}.png`), timeout: SHOT_TIMEOUT })
     const img = await imageStats(page, png)
-    const probeRide = await rideToLevelTime(page, READABLE_SECONDS, 1)
-    const enemyShot = { ...(await captureEnemyCloseup(page, id)), levelTime: probeRide.levelTime }
+    const enemyShot = { ...(await captureEnemyCloseup(page, id)), levelTime: stats.levelTime }
     const { frames } = ride
     const frameSeconds = ride.ms / 1000
     const problems = []

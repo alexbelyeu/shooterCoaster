@@ -10,8 +10,8 @@ readable enemy on slow boxes (#250).
 frames pass through): `--seconds / --min-frames` on the ride, which stops at `--seconds` of *level* time with game
 time frozen for the stats, shot and enemy probe; 0.25 s in combat. During the ride `rideRate` 0.14 rides that share
 of the level time (CI's ~2.8 fps × 0.05 s, where the budgets were set). The perf gate keeps counting enemies and the
-budgets are unchanged. The readability probe rides on to 16 s of level time, past the 15 s second waves: on CI it
-used to run there by accident, and from the smoke's track point level3 shows one readable enemy at 10 s (#250). `hidden-pause`'s wave slack is 1 s (whole-second timer store) + 2 × the longest frame since
+budgets are unchanged. The readability probe samples the same moment; before this it ran a frame or more after the
+stats, past the 15 s second waves on CI, which hid that level3 shows one readable enemy at 10 s from this track point (#250). `hidden-pause`'s wave slack is 1 s (whole-second timer store) + 2 × the longest frame since
 Resume, not a fixed 3 s.
 
 **Consequences:** Don't go back to wall-clock waits for level checks: the budgets and readability gate assume that

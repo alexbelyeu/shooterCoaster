@@ -14,7 +14,7 @@ to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the 3D scene behind 
 the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select; Tone.js's `tone-*.js` chunk must not be fetched before that press, and the press must load it and unlock audio); a `landing` step loads the campaign landing path
 `/go/smoke-check?e2e=1&internal=1` (links we post point at `/go/<campaign>`, attributed by the page view's path; `robots.txt` disallows `/go/`):
 it must boot to the title with no failed request, no analytics request and no page error, keep its path (only `internal` stripped) and show the "internal: not tracked" marker (skipped with `--base`); and per level `<id>.png` (after a ride to `--seconds` 10 of *level time* and at least `--min-frames` 10 frames, then game time frozen for the
-ride stats, the perf gate and the shot; then it rides on to `--readable-seconds` 16, past the 15 s second waves, for the enemy probe; the level steps cap level time per frame (`timerStepMax`: `--seconds` / `--min-frames` on the ride, 0.25 s
+ride stats, the perf gate, the shot and the enemy probe; the level steps cap level time per frame (`timerStepMax`: `--seconds` / `--min-frames` on the ride, 0.25 s
 in combat) and ride `--ride-rate` 0.14 s of track per second of level time (`rideRate`: CI's ride, where the budgets were set; the game rides at most
 3/60 s a frame), so a slow runner samples the same moment of the level from the same track point as a fast one, and combat never runs on into the boss (#305);
 it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
