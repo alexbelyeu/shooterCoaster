@@ -131,200 +131,200 @@
   "bar": null,
   "metrics": {
     "seconds": 20,
-    "integrated": -14.6,
-    "shortTermMax": -13.6,
-    "lra": 2.3,
-    "truePeak": -1.3,
+    "integrated": -14.4,
+    "shortTermMax": -13.4,
+    "lra": 2.5,
+    "truePeak": -1,
     "clipped": 0,
     "silence": 0.8,
-    "correlation": 0.907,
-    "below30Db": -38.4,
+    "correlation": 0.905,
+    "below30Db": -38.2,
     "bands": {
       "sub": {
-        "pct": 21.9,
-        "db": -6.6
+        "pct": 20.6,
+        "db": -6.9
       },
       "low": {
-        "pct": 49.4,
-        "db": -3.1
+        "pct": 54.6,
+        "db": -2.6
       },
       "mid": {
-        "pct": 19.5,
-        "db": -7.1
+        "pct": 16.1,
+        "db": -7.9
       },
       "presence": {
-        "pct": 8.3,
-        "db": -10.8
+        "pct": 7.7,
+        "db": -11.1
       },
       "air": {
         "pct": 0.9,
-        "db": -20.7
+        "db": -20.3
       },
       "below30": {
         "pct": 0,
-        "db": -38.4
+        "db": -38.2
       }
     },
     "seamJumps": [],
     "seamJumpMax": null,
-    "killOverMusicDb": 6.2,
+    "killOverMusicDb": 4.6,
     "kills": [
       {
         "t": 1.68,
-        "killDb": -2.2,
+        "killDb": -2.5,
         "musicDb": -10.7,
-        "overDb": 8.5
+        "overDb": 8.2
       },
       {
         "t": 2.43,
-        "killDb": -2.5,
-        "musicDb": -10.2,
-        "overDb": 7.7
+        "killDb": -2.7,
+        "musicDb": -10,
+        "overDb": 7.3
       },
       {
         "t": 3.18,
-        "killDb": -4.1,
-        "musicDb": -10.2,
-        "overDb": 6.2
+        "killDb": -5.7,
+        "musicDb": -10.4,
+        "overDb": 4.6
       },
       {
         "t": 3.93,
-        "killDb": -1.8,
-        "musicDb": -10.2,
-        "overDb": 8.4
+        "killDb": -2,
+        "musicDb": -10.6,
+        "overDb": 8.6
       },
       {
         "t": 4.68,
-        "killDb": -1.7,
-        "musicDb": -10.4,
-        "overDb": 8.7
+        "killDb": -2.5,
+        "musicDb": -10.6,
+        "overDb": 8.1
       },
       {
         "t": 5.43,
-        "killDb": -2,
-        "musicDb": -10,
-        "overDb": 8
+        "killDb": -4.2,
+        "musicDb": -10.7,
+        "overDb": 6.5
       },
       {
         "t": 6.18,
-        "killDb": -1.7,
-        "musicDb": -10.3,
-        "overDb": 8.7
-      },
-      {
-        "t": 6.93,
-        "killDb": -2.1,
-        "musicDb": -10,
-        "overDb": 8
-      },
-      {
-        "t": 7.68,
-        "killDb": -2.1,
-        "musicDb": -10.3,
-        "overDb": 8.2
-      },
-      {
-        "t": 8.43,
-        "killDb": -1.9,
-        "musicDb": -10.2,
+        "killDb": -2.4,
+        "musicDb": -10.6,
         "overDb": 8.3
       },
       {
-        "t": 9.18,
-        "killDb": -2,
+        "t": 6.93,
+        "killDb": -2.4,
         "musicDb": -10.2,
-        "overDb": 8.2
+        "overDb": 7.8
       },
       {
-        "t": 9.93,
+        "t": 7.68,
+        "killDb": -3.1,
+        "musicDb": -10.3,
+        "overDb": 7.2
+      },
+      {
+        "t": 8.43,
+        "killDb": -1.8,
+        "musicDb": -10.3,
+        "overDb": 8.5
+      },
+      {
+        "t": 9.18,
         "killDb": -2.3,
         "musicDb": -10.2,
         "overDb": 8
       },
       {
-        "t": 10.68,
-        "killDb": -1.7,
-        "musicDb": -10.3,
-        "overDb": 8.6
-      },
-      {
-        "t": 11.43,
-        "killDb": -2.1,
-        "musicDb": -10.1,
-        "overDb": 8
-      },
-      {
-        "t": 12.18,
+        "t": 9.93,
         "killDb": -2.6,
-        "musicDb": -10.4,
-        "overDb": 7.8
+        "musicDb": -10.2,
+        "overDb": 7.6
       },
       {
-        "t": 12.93,
-        "killDb": -1.9,
-        "musicDb": -10.6,
-        "overDb": 8.7
-      },
-      {
-        "t": 13.68,
-        "killDb": -2.1,
-        "musicDb": -9.8,
-        "overDb": 7.7
-      },
-      {
-        "t": 14.43,
-        "killDb": -2.2,
-        "musicDb": -10.3,
-        "overDb": 8.1
-      },
-      {
-        "t": 15.18,
-        "killDb": -2,
-        "musicDb": -9.8,
-        "overDb": 7.8
-      },
-      {
-        "t": 15.93,
-        "killDb": -2.1,
-        "musicDb": -10.3,
-        "overDb": 8.2
-      },
-      {
-        "t": 16.68,
-        "killDb": -2.5,
-        "musicDb": -10.3,
-        "overDb": 7.8
-      },
-      {
-        "t": 17.43,
+        "t": 10.68,
         "killDb": -2,
         "musicDb": -10.2,
         "overDb": 8.2
       },
       {
-        "t": 18.18,
-        "killDb": -1.8,
+        "t": 11.43,
+        "killDb": -2.1,
+        "musicDb": -10.3,
+        "overDb": 8.2
+      },
+      {
+        "t": 12.18,
+        "killDb": -2.4,
+        "musicDb": -10,
+        "overDb": 7.6
+      },
+      {
+        "t": 12.93,
+        "killDb": -2.2,
         "musicDb": -10.4,
-        "overDb": 8.6
+        "overDb": 8.2
+      },
+      {
+        "t": 13.68,
+        "killDb": -2.3,
+        "musicDb": -10.1,
+        "overDb": 7.9
+      },
+      {
+        "t": 14.43,
+        "killDb": -2.7,
+        "musicDb": -10.1,
+        "overDb": 7.5
+      },
+      {
+        "t": 15.18,
+        "killDb": -2.3,
+        "musicDb": -9.3,
+        "overDb": 7
+      },
+      {
+        "t": 15.93,
+        "killDb": -2.2,
+        "musicDb": -10.2,
+        "overDb": 8
+      },
+      {
+        "t": 16.68,
+        "killDb": -2.8,
+        "musicDb": -10.1,
+        "overDb": 7.3
+      },
+      {
+        "t": 17.43,
+        "killDb": -2.1,
+        "musicDb": -10.3,
+        "overDb": 8.2
+      },
+      {
+        "t": 18.18,
+        "killDb": -2.3,
+        "musicDb": -10.4,
+        "overDb": 8.1
       },
       {
         "t": 18.93,
-        "killDb": -2.6,
-        "musicDb": -10.1,
-        "overDb": 7.6
+        "killDb": -2.5,
+        "musicDb": -10.2,
+        "overDb": 7.7
       }
     ]
   },
   "targets": [
     {
       "label": "Integrated loudness",
-      "value": -14.6,
+      "value": -14.4,
       "unit": "LUFS",
       "status": "info"
     },
     {
       "label": "Short-term max",
-      "value": -13.6,
+      "value": -13.4,
       "unit": "LUFS",
       "min": -15,
       "max": -13,
@@ -332,7 +332,7 @@
     },
     {
       "label": "True peak",
-      "value": -1.3,
+      "value": -1,
       "unit": "dBTP",
       "max": -1,
       "status": "pass"
@@ -346,28 +346,28 @@
     },
     {
       "label": "Energy below 30 Hz",
-      "value": -38.4,
+      "value": -38.2,
       "unit": "dB rel",
       "max": -30,
       "status": "pass"
     },
     {
       "label": "Stereo correlation",
-      "value": 0.907,
+      "value": 0.905,
       "unit": "",
       "min": 0,
       "status": "pass"
     },
     {
       "label": "Kill peak over the music around it",
-      "value": 6.2,
+      "value": 4.6,
       "unit": "dB",
       "min": 6,
-      "status": "pass"
+      "status": "fail"
     },
     {
       "label": "Loudness range",
-      "value": 2.3,
+      "value": 2.5,
       "unit": "LU",
       "status": "info"
     },
