@@ -140,6 +140,12 @@ export interface SCTestApi {
   bulletStep: number | null
   /** Seconds the level timer and game clock advance per playing frame instead of the frame time; null is normal play. */
   timerStep: number | null
+  /** Most seconds the level timer and game clock advance per playing frame (a slower frame counts as this much); null
+   *  is normal play. Lets the smoke sample the same moment of a level on any runner; `timerStep` overrides it. */
+  timerStepMax: number | null
+  /** Seconds the coaster rides per second of level time (in steps of at most 3/60 s, the game's per-frame ride cap);
+   *  null rides the frame time. With `timerStepMax` it puts the ride at the same track point for a level time on any runner. */
+  rideRate: number | null
   /** Drawn bullets (#165): count, largest screen radius (fraction of canvas height) now and since load, newest one's CSS px point. */
   bullets: () => E2EBullets
   /** Fire one real shot through NDC (x, y), like a click there. False if not fired (phase, fire delay). */
@@ -391,6 +397,19 @@ export function recordE2ESpawns(positions: readonly { x: number; y: number; z: n
   if (!isE2E) return
   const text = positions.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)}`).join(';')
   spawnDigest = `${positions.length}:${hashString(text).toString(16)}`
+}
+
+/** Level time for a playing frame of `delta` seconds: the frame time, unless a test set `timerStep` / `timerStepMax`. */
+export function levelTimeStep(delta: number): number {
+  const api = isE2E ? window.__SC_TEST__ : undefined
+  if (api?.timerStep != null) return api.timerStep
+  return api?.timerStepMax != null ? Math.min(delta, api.timerStepMax) : delta
+}
+
+/** Seconds the coaster rides on a playing frame of `delta` seconds when a test set `rideRate`, else null. */
+export function e2eRideSeconds(delta: number): number | null {
+  const rate = isE2E ? window.__SC_TEST__?.rideRate : null
+  return rate == null ? null : levelTimeStep(delta) * rate
 }
 
 /** The mounted spawner's wave schedule, set by EnemySpawner. */
@@ -710,6 +729,8 @@ export function installE2EApi() {
     holdFeedback: false,
     bulletStep: null,
     timerStep: null,
+    timerStepMax: null,
+    rideRate: null,
     bullets: readBullets,
     fireShot: (x: number, y: number) => (probeCamera ? fireAtNDC(x, y, probeCamera) : false),
     shaderWarmup: null,

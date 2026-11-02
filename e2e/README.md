@@ -13,16 +13,20 @@ triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/size
 to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the 3D scene behind the title UI must not look blank, polled on a cold start; the fly-by camera must have turned ≥ 8° or moved ≥ 30 units;
 the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select; Tone.js's `tone-*.js` chunk must not be fetched before that press, and the press must load it and unlock audio); a `landing` step loads the campaign landing path
 `/go/smoke-check?e2e=1&internal=1` (links we post point at `/go/<campaign>`, attributed by the page view's path; `robots.txt` disallows `/go/`):
-it must boot to the title with no failed request, no analytics request and no page error, keep its path (only `internal` stripped) and show the "internal: not tracked" marker (skipped with `--base`); and per level `<id>.png` (after a ride of `--seconds` 10, longer until `--min-frames` 10 frames have rendered; it fails as a stalled render loop only if they haven't by 4× `--seconds`, and the summary line prints `frames=N in Xs`; the title waits the same way),
+it must boot to the title with no failed request, no analytics request and no page error, keep its path (only `internal` stripped) and show the "internal: not tracked" marker (skipped with `--base`); and per level `<id>.png` (after a ride to `--seconds` 10 of *level time* and at least `--min-frames` 10 frames, then game time frozen for the
+ride stats, the perf gate and the shot; then it rides on to `--readable-seconds` 16, past the 15 s second waves, for the enemy probe; the level steps cap level time per frame (`timerStepMax`: `--seconds` / `--min-frames` on the ride, 0.25 s
+in combat) and ride `--ride-rate` 0.14 s of track per second of level time (`rideRate`: CI's ride, where the budgets were set; the game rides at most
+3/60 s a frame), so a slow runner samples the same moment of the level from the same track point as a fast one, and combat never runs on into the boss (#305);
+it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
 gold hitmarker held on the kill frame via `holdFeedback`; on the first level a primed 14-kill chain makes
 that kill enter the 5× combo tier, and the shot must show the "×5 FRENZY" flash with its slow-mo held and, on the Theme Park,
 the streak-15 firework burst held on screen; the kill's death effect must be live in the shot in its enemy type's style, held mid-spread, `death=<type>` in the summary; the first level then starts over, primes 5× and ends through the level timer mid-FRENZY: its results must be at `timeScale` 1 with the music not ducked, `frenzyEnd` in `results.json`), `<id>-shot.png` (one real shot two 40 ms
 steps into its flight, time frozen) and `<id>-results.png`. A level fails if
-fewer than 2 enemies are ≥ 12 px on screen right after the ride (`enemiesOnScreen` / `readable` / `largestPx` in the summary), its biome particle field isn't mounted (`particles=` in the summary), it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
+fewer than 2 enemies are ≥ 12 px on screen at that probe (`enemiesOnScreen` / `readable` / `largestPx` in the summary), its biome particle field isn't mounted (`particles=` in the summary), it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
 enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
-wall-clock level timer already ran out), the camera translates off the track pose at all
+level timer already ran out), the level's boss arrives during these checks (they are the boss step's), the camera translates off the track pose at all
 (kill feedback is rotation-only trauma, ≤ 1°, back to 0), the first-person weapon is off
 screen / covers the centre / overlaps the HUD / points > 25° off the tracer of the frozen fixed-point shot or of a second shot on the far side of the screen without `holdFeedback` (`aimJump=`; the gun snaps to every shot) (also
 checked in mobile portrait + landscape, and in portrait at four extreme aims with the combo meter showing),
@@ -50,7 +54,8 @@ held trigger, keep `timeRemaining` still over 5 s hidden, stay paused when shown
 after Resume neither reset nor jump the timer, a combo primed before hiding must survive the pause, and the kills made
 before it must stay (no killed enemy back); the world is frozen while paused (track fraction `rideProgress`, live enemies and
 `nextWave()` unchanged over the 5 s and through Resume's Ready / GO countdown, the pause mix on), then the ride goes on from
-the same spot and the next wave arrives at its original level time; a window `blur` must pause too.
+the same spot and the next wave arrives at its original level time (slack: 1 s for the whole-second timer store plus two of the longest
+frames since Resume, `maxFrameMs`); a window `blur` must pause too.
 A `pause-menu` step on the same page opens the menu through the hook (`pause.png`): the card inside 1280×720 with the level
 name, Resume focused, ArrowDown moves focus, Esc resumes, and Restart starts the level over (kills, score, timer, ride). The
 phone run checks the card after its Pause tap in landscape and portrait (`mobile-pause-landscape.png`, `mobile-pause.png`: inside
@@ -105,7 +110,8 @@ spawned enemies) and vary run to run; for before/after comparisons use the
 camera-independent `scene` totals the smoke also prints (`track objs/tris` = objects
 named `track*`; `env=` is the baked sky env map's intensity and bake time; a level
 without `scene.environment` fails).
-**Perf gate:** `budgets.json` `scene` holds per-level ceilings on the ride screenshot's draw calls (+20% headroom, since they
+**Perf gate:** sampled with the ride stats at `--seconds` of level time (the scene totals count every visible mesh, enemies included,
+so a later moment has more waves on screen). `budgets.json` `scene` holds per-level ceilings on the ride screenshot's draw calls (+20% headroom, since they
 vary) and on the scene / track objects and triangles (+15%); a level past one fails with `over budget: scene objs=560 (budget 551)`
 (`perfGate` in `results.json`). A level whose entry has `knownOver: "#<open issue>"` only prints a WARN line until that issue lands
 (then drop the key). `--no-perf-gate` skips the gate for local experiments. Ceilings are budgets: only the Director raises them.
@@ -114,7 +120,7 @@ vary) and on the scene / track objects and triangles (+15%); a level past one fa
 ## Test hook (`?e2e=1` → `window.__SC_TEST__`)
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
-(`levels()` (each with its `nextLevel` and `unlocked` now), `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time, level time, due wave and the wave tick before it), `nextWave()` → level time now + when the next wave is due + the last wave tick, `waveTellSeconds`, `timerStep` (seconds of level time + game clock per frame; null is the frame time), `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction),
+(`levels()` (each with its `nextLevel` and `unlocked` now), `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time, level time, due wave and the wave tick before it), `nextWave()` → level time now + when the next wave is due + the last wave tick, `waveTellSeconds`, `timerStep` (seconds of level time + game clock per frame; null is the frame time), `timerStepMax` (a cap on that per frame: slower frames count as this much; null is none), `rideRate` (seconds of ride per second of level time; null rides the frame time), `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction),
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/multiplier/timeScale/frenzy/timeRemaining/phase/liveEnemies/
 onScreenEnemies/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `killNearest(n)` (never a boss weak point; fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
