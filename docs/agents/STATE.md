@@ -1,193 +1,206 @@
 # State of the game
 
-_Rewritten by the Director on 2026-10-26 (second Director run, `main` @ 51a5165). The
+_Rewritten by the Director on 2026-11-02 (third Director run, `main` @ 8e66045). The
 Director rewrites this weekly; the Maintainer edits it when fixing things._
 
 ## Summary
 
-Week 1 turned the prototype into a game: 64 PRs merged, M1 ("looks and feels like a
-game") is complete and closed. Every level has its own sky, grade and baked environment
-map, lattice towers, a first-person gun with flash/tracer/hitmarker, a camera that banks
-and looks ahead, a real HUD, a star-reveal results screen, a postcard level select, a
-fly-by title and touch play with aim assist. scoaster.com is live with analytics; the
-first public post is planned for Mon 2 Nov (three.js Showcase, #102), gated on a
-gameplay clip (#100).
+Week 2 gave the run a shape. 50 merges in 8 days: combo tiers with FRENZY slow-mo, waves
+that fly in on formations with a tell, a death style per enemy, the boss framework with the
+Golden Blimp (Theme Park) and the Kraken (Ocean), weapon pickups, the Daily Run, a pause
+that freezes the world, settings with quality presets and adaptive resolution, a Share
+button, fireworks, Antarctica and Inferno readable, rails that stay visible at distance,
+the Scrimshaw score engine and arcade SFX behind `?audio=scrim`, lazy Tone.js, a portal
+build, real 404s and a Lighthouse gate. M2's exit criteria are all on `main` except the
+local leaderboard (finished on a branch, re-landing as #317) and a smoke that is green on
+`main`.
 
-What the game still is **not**: a run has no shape. Waves are random scatters that
-exist from t=0, nothing arrives, nothing threatens, every enemy dies the same way, and
-each level ends when a timer hits zero. Combos are a flat multiplier on wall-clock time.
-That is M2's job (see VISION.md; epics #176 arcade loop, #177 finales & spectacle; 38
-`agent:ready` issues: 9 P1, 18 P2, 11 P3). Three things look wrong in this week's screenshots and
-go first: **Antarctica's enemies are invisible** in the ride (0 of 4 on-screen enemies
-readable, largest 9 px) and its trees are black silhouettes; **levels 4 and 5 show a
-near-vertical rail climbing into the sky** (the `TrigCurve2` loop did not close; fixed by #178);
-**Inferno is a black triangle on dark red** with 15 px enemies. The headless smoke still
-flakes on 2-core sessions (every level failed only the frame-count check this run, all
-functional checks passed), which costs every Maintainer, Reporter and Director run
-confidence and tokens.
+What the game is **not** yet: three of five levels still end on a timer (Desert,
+Antarctica, Inferno have no finale); the Ocean opens on an empty sea and its water reads
+as a khaki bog; far rails draw as bold white cables across every bright level; Inferno has
+a glowing vertical slab beside the track; the music does not react to play. The studio's
+own health this morning: CI red on every PR for a runner-image reason (#311 / PR #313),
+and the smoke's level steps sample wall-clock level time, so slow runners fail the perf
+gate and reach bosses early (#305 / PR #312, which found the Ocean opening problem #250 →
+#316). Week 3 leads with those two, then the finales, the Ocean, and the first slice of
+Level 6.
 
 ## What exists
 
 ### Levels (`src/levels/LevelRegistry.ts`)
 
-| Level | Biome | Timer | Enemies (waves) | Landmarks / features | Director's read of this week's screenshots |
+| Level | Biome | Timer | Waves / finale | Landmarks / features | Director's read of this week's screenshots |
 |---|---|---|---|---|---|
-| 1 Theme Park | themePark | 75 s | 150 balloons (3 waves) + 3 golden | Ferris wheel, carousel, midway stalls, string lights, paths, bunting, entrance arch | Good: bright, busy, balloons readable; the track passes the wheel. Best first impression we have; the clip level |
-| 2 Desert | desert | 60 s | 30 scorpions, 50 crows | Pyramid, rock arches, mesas, cacti, dust devils, occluded sun flare, sand-ripple material | Good mood; crows chunky and readable up close. **268 draw calls** (budget 250): crows aren't batched (#92). Far track reads as hairlines |
-| 3 Ocean | ocean | 65 s | 20 jellyfish, 25 sharks, 30 flying fish | Sunken city, sea stacks, breaching rocks, foam rings, seabirds, coral reef, archipelago terrain | Pleasant; coral and stacks sell it. Shallows read as khaki ground more than water; the mid-ground water lacks reflection/specular. Sharks read as grey blobs head-on |
-| 4 Antarctica | arctic | 75 s | 25 scouts, 20 snowmen, 8 brutes | Ice fortress, mountains, aurora band, ice crystals, snow drifts | Sky and aurora are the best frame in the game, but **no enemy is visible** in the ride or combat shot, trees are flat black umbrellas (#62 not fixed), the fortress isn't in view, and the open track loop stands as a vertical rail in the sky |
-| 5 Inferno | volcanic | 120 s | 75 wisps, 25 imps, 25 golems, 6 drakes; 2 eruption waves | Volcano, lava rivers (shader), ash/ember particle field, smoke column, terrain lava glow, eruption shake + fog pulse | **Too dark to read**: the volcano is a black triangle, lava rivers barely show, track is a dark line, enemies are orange dots (2 of 7 readable). A vertical dotted yellow streak sits beside the track in every shot. Same open-loop rail as level 4 |
+| 1 Theme Park | themePark | 75 s | 3 × 50 balloons (ring formation last), **Golden Blimp at 55 s** (5 golden balloons → gondola) | Ferris wheel, carousel, midway stalls, string lights, bunting, entrance arch, fireworks on streaks, pickups on the start | The best frame and the clip level. FRENZY, fireworks and the blimp all read. The whole track loop shows as thick white cables over the mountains (#327) |
+| 2 Desert | desert | 60 s | 30 scorpions, 2 × 25 crows in V formation; **no finale** (#318) | Pyramid, rock arches, mesas, cacti, dust devils, occluded sun flare, sand ripples, dust particles | Sunset mood is strong; scorpions and crows readable (16 of 28). Draw calls 110 (was 268 before #205) |
+| 3 Ocean | ocean | 65 s | 20 jellyfish, 25 sharks, 30 flying fish (school); **Kraken at 40 s** (5 pads → eye) | Sunken city, sea stacks, breaching rocks, foam rings, seabirds, coral, plankton particles | **Empty for the first 10 s** (jellyfish 15–45 units under water, scattered over a 1,100-unit disc: #316). Water is a flat teal-khaki plane, coral sits on dry-looking ground (#326). Kraken tentacles read as thin pale hooks in the rails' colour (backlog 1) |
+| 4 Antarctica | arctic | 75 s | 25 scouts (line), 20 snowmen, 8 brutes, all trackside; **no finale** (#319) | Ice fortress, mountains, aurora, ice crystals, drifts, blue-green pines, snow particles | Sky, aurora and the snowmen line are good (11 of 11 readable). Heaviest level: 480 scene objects, 202–394 draws (#260); a steep far hill reads as a vertical rail because every far rail is the same 3 px (#327) |
+| 5 Inferno | volcanic | 120 s | wisps (spiral) ×2, imps, golems ×2, drakes; 2 eruptions; **no finale** (#320) | Glowing volcano, lava rivers, ash + ember particles (eruption boost), smoke column, terrain lava glow, emissive rails | Readable now (25 of 41). A bright orange vertical slab stands beside the track in every shot and the rivers are thin lines (#331). 295 draws (#260) |
 
-Common: title (fly-by park, any key / PLAY, fade + whoosh) → level select (postcards,
-stars, `★ x / 15`, keyboard nav; level N needs 1★ on N-1) → Ready/Set/GO (shader
-warm-up behind it) → play → results (score count-up, star pops + chime, threshold bar,
-kills / accuracy / best combo / time left, NEW RECORD; Enter = next, R = replay).
+Common: title (fly-by park, any key / PLAY) → level select (postcards, stars, `★ x / 15`,
+Daily Run card, keyboard nav; level N needs 1★ on N-1) → Ready / Set / GO (shader warm-up
+behind it) → play → results (score count-up, star pops + chime, threshold bar, kills /
+accuracy / best combo / time left, NEW RECORD, Levels / Replay / Share; a daily shows its
+badge and NEW BEST). Pause: Esc / tab hide / blur → styled card, Resume (Ready / GO) /
+Restart / Settings / Quit. Settings: quality (auto / low / medium / high), show FPS,
+music / effects volume, screen shake, reduced motion.
 
 ### Systems
 
-- **Track** (`src/track/`): `TrigCurve` / `TrigCurve2`, extruded rails + ties scaled by
-  `trackDimensions`, lattice support towers on the drawn terrain, arc table, coaster
-  camera (`cameraRig.ts` rotation-only bank / look-ahead / pitch, `cameraFov.ts` portrait
-  FOV + speed/drop kicks, `WindStreaks`). `TrigCurve2` closes its loop since #178.
-- **Environment** (`src/levels/environments/`): per-biome modules behind
-  `biomeRegistry.ts`; shared terrain / water / trees (wind sway) / atmosphere (sky dome,
-  per-biome light, fog, `envIntensity`, colour `grade`) / scatter / `trackClearance` /
-  `paintedParts` / `ringedRock` / `ParticleField` (volcanic preset only) /
-  `ContactShadows` (one merged mesh per level). Sky baked into `scene.environment` once per
-  level (PMREM). Post: one EffectPass (Bloom + colour grade + ACES).
-- **Enemies** (`src/entities/enemies/`): 13 types + golden balloon, one React component
-  + `useFrame` each over `EnemyBase` (sphere target, one hit = kill, hit flash, kill pop,
-  explosion). Shared geometries/materials in `SharedEnemyAssets.ts` (how `ShaderWarmup`
-  finds them). Spawner: time-based waves, seeded polar scatter kept within readable range
-  of the track; all of a wave appears at once. No HP, no weak points, no formations, no
-  bosses, nothing that attacks the player.
-- **Combat** (`src/combat/`): Pointer Events aim (mouse/touch/pen), touch aim assist,
-  hold to auto-fire, time-based swept bullets on the camera ray drawn from the muzzle
-  (screen-size capped), `processHit` (accuracy), first-person weapon view-model (recoil,
-  barrel flash, tracer), rotation-only trauma, hitmarker, score popups, combo
-  (+0.25×/kill to 4×, **2 s `performance.now()` window**), slow-mo via `timeScale`
-  (**not reset by `startRun`**, #108).
-- **UI** (`src/ui/`): HUD (score tween, enemy bar, timer bar, combo meter, wave banner,
-  countdown), title, level select, results, pause (bare overlay: Esc / tab hide / blur),
-  settings (show FPS, screen shake), mute. framer-motion. Google Fonts at runtime.
-- **Audio** (`src/audio/`): Tone.js; `sfxChannel` / `musicChannel` → master limiter;
-  per-level pre-built SFX kit (fire variants, hit tick, kill layers by combo, wave
-  stingers), music + title music on one never-stopped Transport with 1 s crossfades via
-  `musicBus`; every trigger through `nextTriggerTime`, every play guarded by
-  `soundGuard`. Slow-mo ducks the music bus. No positional audio.
-- **State** (`src/store/`): `useGameStore` (phase, `startRun`, run counters, combo, timer,
-  persisted `savedScores` with `bestCombo`), `useSettingsStore` (persisted).
-- **Analytics**: Vercel Web Analytics page views + `level_start` / `level_complete` /
-  `level_quit`; off for `?e2e=1`, CI, smokes and `?internal=1`. UTM dimensions are
-  paywalled on Pro → `/go/<campaign>` landing paths (#171 pins them).
+- **Track** (`src/track/`): `TrigCurve` / `TrigCurve2` (closed loops), rails + ties scaled by
+  `trackDimensions`, lattice towers, arc table, coaster camera sampling by arc distance
+  (`cameraRig.ts`, `cameraFov.ts`, `WindStreaks` after the world's transparents),
+  `minThickness.ts` pixel floor (1.5 px rails / 0.5 px lattice, any distance).
+- **Environment** (`src/levels/environments/`): per-biome modules; shared terrain / water /
+  trees (wind sway, unlit fill per biome) / atmosphere (sky dome, light, fog, `envIntensity`,
+  colour `grade`, PMREM env map) / scatter / `trackClearance` / `paintedParts` /
+  `ringedRock` / `ParticleField` (one preset per biome, boosts on events) /
+  `ContactShadows` / `landmarkDimensions`. Post: one EffectPass (Bloom + grade + ACES).
+- **Enemies** (`src/entities/enemies/`): 13 types + golden balloon over `EnemyBase` (entry
+  fly-in, hit flash, kill pop, death style). Merged vertex-coloured geometries; glossy parts
+  reflect the env map. Spawner: waves on the level timer (pure `waveSchedule.ts`),
+  formations placed ahead of the rider at activation (`spawnPlacement.ts`), ground types
+  trackside (`ENEMY_PLACEMENT`), `wave:incoming` tell 1 s before. Water types still use the
+  old disc scatter (#316).
+- **Bosses** (`src/entities/bosses/`): pure `bossModel.ts` (weak points in phases, `applyHit`,
+  `hpFraction`, `bossMaxScore`), specs, `BossBase` (one target per exposed weak point, kills
+  through the normal path), `BossSpawner` (dormant mount, tell, activation on the level
+  timer), `GoldenBlimp` (rides ahead), `Kraken` (surfaces at fixed spots), `BossConfetti`
+  (a second particle system; #335 folds it into the pool). HUD `BossBar`.
+- **Combat** (`src/combat/`): Pointer Events aim + touch aim assist, swept bullets from the
+  muzzle, piercing hit lists, `comboTiers.ts` (1× / 2× / 3× / 5×, game-time windows,
+  FRENZY envelope) run by `comboRuntime.ts` on `core/gameClock.ts`; weapon pickups
+  (spread / rapid / piercing, 10 s) as instanced collision targets; `WeaponViewModel`;
+  rotation-only trauma; hitmarker; score popups; `timeScale` still has three writers (#334).
+- **Effects** (`src/effects/`): one pooled `ParticleExplosion` with a style per enemy type
+  (`deathStyles.ts`), fireworks (Theme Park), score popups.
+- **UI** (`src/ui/`): HUD (score, timer bar, combo meter with tier colour and ring, FRENZY
+  flash, wave banner, boss bar, weapon badge), title, level select (`levelSelectModel.ts`),
+  results (`resultsStats.ts`, `share.ts`), pause (`pauseMenu.ts`), settings, per-biome
+  `theme.ts`. Self-hosted Lobster / Inter.
+- **Audio** (`src/audio/`): Tone.js is still the default engine (lazy chunk on the first
+  gesture; per-level SFX kit; title / level music crossfading on the beat on one Transport;
+  pause mix). Behind `?audio=scrim`: the Scrimshaw score engine port (`scrim/`: parser +
+  compiler pinned to the original, arcade instrument palette, scheduler, player with
+  1 s crossfades), scores for title / levels 1–5 / results, three title and three Theme
+  Park theme options on `?theme=` (PR #300, waiting on Alex's pick #301), and the arcade SFX
+  engine (`arcade/`: recipes in the level's key, baked once per level, fixed voice pool with
+  priority stealing, per-biome convolver). No adaptive layers yet (#321). Render + measure
+  tooling: `audio:render` / `audio:check`, renders in `docs/audio/renders/`.
+- **State** (`src/store/`): game store (`startRun(levelId, seed?, mode?)`, `runId`,
+  `runMode`, `runSeed`, persisted `savedScores` + `savedDaily` + `dailyStreak`, `weapon`,
+  `boss`), settings store (persisted). Leaderboard store on the #40 branch (#317).
+- **Analytics**: Vercel Web Analytics page views + `level_start` (with `mode`) /
+  `level_complete` / `level_quit` / `share`; off for `?e2e=1`, CI and `?internal=1`;
+  `/go/<campaign>` landing paths pinned by the smoke.
 
 ### Tooling
 
-- CI `verify` on PRs: vitest (36 test files) + `tsc -b` + vite build + bundle budget +
-  headless smoke (title, level select, every level: ride / enemy close-up / combat /
-  shot / results, seed check, hidden-pause, countdown + warm-up, speed, phone portrait +
-  landscape with touch kills and audio stress). Auto-merge on `agent:qa-approved`.
-- Nightly + post-deploy production smoke → `agent:prod-broken`.
-- `?e2e=1` → `window.__SC_TEST__` (see CLAUDE.md for the full surface).
-- Studio: pause switch, runbooks per task, decisions inbox folded nightly, live status
-  issue, token ledger per run, two independent reviewers on PRs ≥ ~300 lines.
+- CI `verify` on PRs and on `main` after every auto-merge: vitest (685 tests) + `tsc -b` +
+  build + bundle budget + Lighthouse (SEO 100, A11y / BP ≥ 95) + the headless smoke (title,
+  landing, level select, daily, settings, five levels with ride / enemy / combat / shot /
+  results shots and the per-level perf gate from `budgets.json`, quality presets, seed check,
+  hidden pause, pause menu, countdown, speed, wave, two bosses, pickups, scrim engine, phone
+  portrait + landscape). `portal` job builds and smokes the portal zip. Nightly + post-deploy
+  production smoke → `agent:prod-broken`.
+- `npm run clip` (level-1 clip in virtual time, re-rendered for the Showcase), `npm run og`,
+  `npm run audio:render` / `audio:check`, `scripts/quiet.sh`, the token ledger with per-run
+  diagnostics (#298), auto-merge sweep every 10 min.
+- Studio: pause switch, runbooks per task, decisions inbox folded nightly, live status issue,
+  two independent reviewers on PRs ≥ ~300 lines, `builder_runs_per_day` cap. Milestones on
+  GitHub from this week (M2 #1, M3 #2).
 
-## Numbers (2026-10-26, `npm run verify` on main @ 51a5165, 2-core SwiftShader)
+## Numbers (2026-11-02, `npm run verify` on main @ 8e66045, 2-core SwiftShader)
 
-| Scene | Draw calls | Triangles (frame) | Scene objs / tris (camera-independent) | Enemies on screen / readable / largest px | avg frame ms (software GL — relative only) |
+| Scene | Draw calls | Triangles (frame) | Scene objs / tris (camera-independent) | Enemies on screen / readable / largest px | avg frame ms (software GL, relative only) |
 |---|---|---|---|---|---|
-| level1 | 94 | 168,755 | 163 / 186,742 | 11 / 11 / 35 | 2529 |
-| level2 | **268** | 187,378 | 1,191 / 208,213 | 6 / 5 / 16 | 2056 |
-| level3 | 73 | 155,145 | 180 / 158,828 | 2 / 2 / 26 | 2108 |
-| level4 | 176 | 182,389 | 487 / 210,766 | **4 / 0 / 9** | 2414 |
-| level5 | 109 | 131,589 | 289 / 137,544 | 7 / **2** / 15 | 2132 |
+| level1 | 84 | 174,311 | 156 / 193,138 | 9 / 9 / 27 | 2714 |
+| level2 | 110 | 201,366 | 164 / 217,041 | 28 / 16 / 19 | 2183 |
+| level3 | 69 | 161,673 | 173 / 165,224 | 6 / 6 / 54 (at ~12 s; 1 at a fixed 10 s per #305) | 2391 |
+| level4 | 202 (394 in the W44 report) | 191,491 | **480** / 216,336 | 11 / 11 / 43 | **10,617** (2 frames in 48 s: "render loop stalled", the run's only failure) |
+| level5 | **295** | 152,309 | 278 / 150,772 | 41 / 25 / 44 | 1917 |
 
-Track alone: ~81–86k triangles per level (10 objects). Env bake 1.6–2.0 s per level
-(software). Shader warm-up 2.3 s, 41 programs, first shot compiles nothing new.
-W42 → W43 trend (draw calls / triangles): L1 213 → 94 / 145k → 169k, L2 294 → 268 /
-166k → 187k, L3 107 → 73 / 152k → 155k, L4 182 → 176 / 141k → 182k, L5 134 → 109 /
-125k → 132k.
+Track alone: ~79–86k triangles per level (10 objects). Env bake 1.6–2.1 s per level
+(software). Shader warm-up 6.5 s, 54 programs; first shot compiles nothing new. Bosses:
+level1 92 draws, level3 178 draws during the fight. Lighthouse performance (report only):
+28 mobile / 59 desktop.
 
-Bundle: 498 KB gz total (three 172, r3f 114, app 211) — budget 700 / 260. One app chunk;
-no code splitting; Tone.js (~64 KB gz) loads up front.
+W43 → W44 trend (draw calls / scene triangles): L1 94 → 84 / 187k → 193k, L2 268 → 110 /
+208k → 217k, L3 73 → 69 / 159k → 165k, L4 176 → 202–394 / 211k → 216k, L5 109 → 295 /
+138k → 151k. Levels 4 and 5 grew past the VISION bar in the week of #208 / #218 / #245
+(#260 owns it; the `budgets.json` ceilings were not lowered to 250 because `knownOver`
+would mute the whole level's gate while #260 is open).
 
-Players (W43, `docs/marketing/metrics/2026-W43.md`): 31 visitors, all direct, mostly
-Alex's circle; 18 starts → 8 completes (44%) from 4 desktop players; levels 1–3 played,
-nobody reached 5; **0 of 9 mobile visitors started a level** (too few to conclude).
+Bundle: 562 KB gz total JS (budget 700), largest chunk 184 KB (budget 260), startup 472 KB
+(app 184, three 172, r3f 115); Tone.js, the score engine, the arcade SFX and the render
+tooling are lazy chunks.
+
+Players (W44, `docs/marketing/metrics/2026-W44.md`): 37 visitors, 43 views, all direct;
+8 starts (7 people) → 3 completes; 19 % of visitors press PLAY (desktop 21 %, mobile 11 %
+on 9 mobile visitors); ≈ 5 visitors and ≈ 1 start a day is the baseline the Showcase post
+(#102, Mon 2 Nov) is measured against.
 
 ## Known bugs and visual problems (ranked)
 
-1. ~~**`TrigCurve2` (levels 4, 5) is not a closed loop.** The `(angle / 2)` altitude ramp
-   leaves the end π·varC·scalar above the start (≈ 440 units on level 4, ≈ 628 on
-   level 5); the seam renders as a near-vertical rail into the sky, visible top-centre of
-   both ride screenshots. `src/track/curves/TrigCurve.test.ts` pins the current shape.~~ Fixed by #178: a `(1 − cos θ)·π/2` envelope closes
-   the loop with matching position and tangent at the seam.
-2. **Antarctica enemies unreadable**: snowmen spawn on the ground far below a track that
-   runs over mountain tops; 0 of 4 readable, largest 9 px (W43 report saw the same).
-   **#179 (P1).**
-3. **Inferno too dark**: volcano silhouette black on black, lava rivers and track barely
-   lit, enemies 15 px dots; a vertical dotted yellow streak beside the track in every
-   shot (a particle or lava column needs a look). **#180 (P1).**
-4. Arctic / theme park tree canopies render as flat black silhouettes (#62; #149's fix
-   covered the wind-sway canopies, the dark umbrellas remain in `level4.png`).
-5. ~~Desert draw calls 268 > 250 budget (crows unbatched, #92).~~ Fixed by #92: level 2 draws
-   ~91 (163 scene objects) on 31 Oct. **Now levels 4 (393 draws, 479 objects) and 5 (~290)
-   are over the 250 bar** on `main` @ 8a97286; no issue covers them yet. #188's perf gate
-   (PR #258) only caps them at +20% until one exists.
-6. ~~`startRun` does not reset `timeScale`: slow-mo can stick at 0.1 into the next run (#108).~~
-   Fixed by #256.
-7. Combo window uses `performance.now()`, so pause and slow-mo affect it (fixed by combo
-   tiers, #34).
-8. ~~Pausing restarts wave timers from zero (#152) and does not freeze the ride (#133).~~
-   Fixed by #233 (pause freezes the world). Its `hidden-pause` smoke step then failed on
-   `main` because golden balloons despawned on wall time (#231); fixed by #239.
-9. Music crossfade can leave a gap when the new track waits for the next bar (#168).
-10. Smoke "render loop stalled" flakes on 2-core sessions: every level failed only the
-    frame-count check in this run (6–9 frames per 10 s window vs `MIN_FRAMES=10`) while
-    every functional check passed; same for the Reporter's run and two Maintainer runs.
-    CI's runner passes. Polling level checks to a frame-count deadline (as the title check
-    does) is the fix (#50, now P1). 31 Oct: the level checks now poll to `--min-frames`;
-    two full Maintainer runs on 2 cores passed every level (`frames=10 in ~10–12 s`).
-11. ~~CI `verify` never runs on `main`: the auto-merge workflow merges with `GITHUB_TOKEN`,
-    whose pushes don't trigger `ci.yml`'s `push: main`.~~ Fixed by #189: `automerge.yml`
-    dispatches `ci.yml` on `main` after each merge; a red `main` opens `agent:prod-broken`.
-12. Results screen offers NEXT LEVEL after a 0★ run even though the next level needs 1★
-    (`previousLevel()` rule, #162).
-13. Ocean water reads as khaki shallows rather than water in the mid-ground; the sharks
-    read as grey blobs head-on. Not filed; candidate for a polish pass after M2's core.
-14. Distant rails and lattice thin to hairlines / shimmer beyond ~400 units on every
-    level (most visible on Desert and Antarctica). **#186 (P2)** (minimum on-screen rail
-    thickness).
-15. The smoke's wall time keeps growing with every new step (boss, crow wave, fireworks):
-    ~18 min for the production smoke and ~21.5 min for CI `verify` by 29 Oct. The prod
-    smoke then hit its old 20 min cap on every deploy from 778cf08 on, and because it ended
-    `cancelled` it reported nothing (#225 raises the caps to 40 min and reports timeouts).
-    New smoke steps should reuse an already-loaded level where they can; if runs pass
-    ~30 min, cut repeated work (e.g. #190, #203) rather than raising the caps again.
+1. **CI red on every PR since 2 Nov 10:43 UTC**: `ubuntu-latest` became Ubuntu 26.04 and
+   Playwright 1.58's `--with-deps` refuses it. #311, PR #313 pins `ubuntu-24.04`.
+2. **Smoke level steps sample wall-clock level time** (#305, PR #312): slow runners sample
+   20–50 s into a level, fail the perf gate on enemy counts, reach the Kraken during
+   `playLevel`, and overshoot `hidden-pause`'s 3 s slack. The production smoke issue #297
+   stays open until `main` is green after it. #312 is blocked on the Ocean opening (#316).
+3. **Ocean opens empty** (#250 → #316): jellyfish scatter 15–45 units under water across
+   the sea; 1 readable at 10 s of level time, every time. Also the player's experience.
+4. **Ocean water is a flat teal-khaki plane** (#326); coral on dry-looking ground; the
+   Kraken's tentacles read as pale hooks (backlog 1).
+5. **Far rails read as bold white cables** on Theme Park, Ocean, Antarctica (#327): the
+   #186 pixel floor has no distance cue, so the whole loop sits on the frame.
+6. **Inferno's vertical glowing slab** beside the track in every shot; lava rivers as thin
+   lines (#331). Known since W43, never filed until now.
+7. **Levels 4 and 5 over the 250 draw-call bar** (#260): 480 scene objects on level 4, 295
+   draws on level 5. Level 4 also stalls the 2-core smoke (10.6 s a frame).
+8. **Auto-merge stalls on a conflict** with the approved label still on (#299, P1): no role
+   picks it up until the nightly Maintainer; #276 stalled twice.
+9. `timeScale` has three writers; `FrenzyFlash` re-times on the wall clock (#334).
+10. Smoke flakes: wave step can skip the tell-to-wave gap on a fast box (#279), phone PLAY
+    tap "not stable" + a 5 s single-frame wait (#248) — bundled as #337; title-2 blank check
+    flaked once on `main` CI (#291 added it).
+11. Small visual bugs: Kraken's last tentacle flashes for a frame when the head surfaces
+    (#264), a reused explosion slot can show frozen particles (#228), the eruption boost
+    carries into a restart (#247) — bundled as #333.
+12. Under `?audio=scrim` only: resume countdown muted, biome swap click, stray level score
+    on leaving a run (#246, #236 → #338).
+13. The combo meter shows "×19" best combo on a 6-kill smoke run (the hook's seeded kills
+    count toward the combo but not the wave strip): cosmetic in tests only; worth a look if
+    it shows in real results.
 
 ## Tech debt / architecture notes
 
-- One React component + `useFrame` per enemy (up to 150 live). Fine today; the boss
-  framework should not copy it (one component with its own parts/weak points is fine, but
-  shared HP / weak-point logic lives in a pure module). A pooled/instanced enemy system is
-  the M3 path if counts grow.
-- `EnemySpawner.tsx` (449 lines) mixes spawn-position rules per type, wave timing and
-  rendering. Choreography (#30) should pull formation/placement into a pure, unit-tested
-  module.
-- Phase inference per system ("a new run started" guessed from phase edges) instead of a
-  `runId` from `startRun` (#142); dead store actions (#106).
-- `SharedEnemyAssets.ts` is 809 lines of geometry + material constants; acceptable while
-  it is the warm-up's source of truth.
-- Audio: Tone.js synths per kit; polyphony limited per node; no voice budget. The
-  slop-newyork baked-buffer approach (VISION backlog 18) is the planned replacement, after
-  launch, with a decisions entry.
-- Runtime third-party call: Google Fonts CSS (DECISIONS). Tone.js in the main chunk.
-- `docs/HEAP-BOTTLENECKS.md` findings (source maps in prod, Tone graph size) not acted on
-  (folded into the lazy-Tone issue #187).
-- Alex's `abelyeu.*` branches are fully merged; `gh-pages` / `master` are legacy.
+- One React component + `useFrame` per enemy (up to 150 live) and per boss part; fine at
+  today's counts. The pooled / instanced enemy path is the M4 answer if Level 6's traffic
+  and drones push level 6 over the bar.
+- `EnemySpawner.tsx` still mixes wave timing, placement and rendering, though placement is
+  pure now (`spawnPlacement.ts`, `enemyPlacement.ts`, `rideProgress.ts`); #294 lists the
+  leftovers.
+- Two particle systems (`ParticleExplosion` pool + `BossConfetti`) and two kill sequences
+  (`EnemyBase`, `BossBase`): #335.
+- The old `EffectComposer`'s render targets leak when MSAA changes (#249 → #334).
+- Audio runs two engines side by side (Tone.js default, Scrimshaw behind the flag) until
+  parity (hard rule 7); every new sound has to be written twice or flagged. The sooner the
+  picked themes and layers land, the sooner Tone.js goes (#321 → #302 → #303 → removal).
+- `SharedEnemyAssets.ts` (~800 lines) and `e2e/smoke.mjs` (~3,000 lines) are the two
+  files every builder touches; the smoke's wall time is ~20 min on CI, ~21 min here.
+- The leaderboard lives on a branch (`agent/40-local-leaderboard`, 1,050 lines, approved
+  twice) until #317 re-lands it.
+- Builder cost: ~6M weighted tokens per builder run, mostly bootstrap and verify, whatever
+  the issue's size; hence the bundled small issues (#333–#339): 29 ready issues for the week
+  instead of 40.
 
 ## Half-done / placeholders
 
-- Settings screen: show FPS + screen shake only.
-- `ParticleField` has one preset (volcanic); the other biomes have no ambient particles (#37).
-- Pause screen is unstyled and does not freeze the ride (#36).
+- Score engine: scores exist for every level but no adaptive layers (#321), no boss or
+  FRENZY variations, Alex's picks pending (#301); Tone.js remains the default.
+- Share: a text share exists (#253); the share menu is in QA (PR #304); the share image
+  (#272) waits behind it.
+- Milestones: M2 and M3 exist on GitHub; the status page and the weekly report don't show
+  them yet (#330).
+- Level 6: filed (#322 epic), nothing built.
