@@ -20,4 +20,7 @@ it (`palette-groove`), scores in `../palette/`, rendered with `--score <file> --
 (`--sfx-sheet --engine scrim`, `--mix <level> --engine scrim`): every sound alone, then 20 s of combat over the
 level score; compare them with `baseline-sfx-sheet-*` / `baseline-mix-*`.
 
+`theme-<slot>-<name>` / `theme-<slot>-<name>-seam` are the theme options waiting on Alex's pick
+(#216): the first 30 s of each, and 20 s across its loop seam (`--music <slot>.<name> --engine scrim [--seam]`).
+
 Revisions overwrite the same names, so this folder always holds the current sound.

@@ -2,15 +2,16 @@
 /**
  * Renders the game's current music / SFX offline in the page (`__SC_TEST__.renderAudio`) and measures it.
  *
- *   npm run build && npm run audio:render -- --music <title|level1..5|results> [--intensity 0.45] [--seconds 30] [--engine scrim]
+ *   npm run build && npm run audio:render -- --music <title|level1..5|results|<slot>.<theme>> [--intensity 0.45] [--seconds 30] [--engine scrim] [--seam]
  *   npm run audio:render -- --sfx-sheet [--level level1] [--engine scrim]
  *   npm run audio:render -- --mix level1 [--seconds 20] [--engine scrim]
  *   npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original] [--voicing jukebox|game] [--seconds 20]
- *   npm run audio:render -- --score <file.scrim> --chain game [--seconds 20]
+ *   npm run audio:render -- --score <file.scrim> --chain game [--seconds 20] [--seam]
  *
  * --engine scrim plays the music through the score engine and the SFX through the arcade engine (`?audio=scrim`). --score renders one score alone: through
  * the port (default) or the original Scrimshaw page (docs/audio/reference/scrimshaw-jukebox.html), both seeded alike;
- * with --chain game it plays through the game's music chain instead, measured like a level's score.
+ * with --chain game it plays through the game's music chain instead, measured like a level's score. --seam (score engine)
+ * starts 10 s before the first loop seam instead of at the top, so the render crosses it (name suffix -seam).
  * Options: --name <file name> (default music-<track> / sfx-sheet-<level> / mix-<level>, scrim-… with the score engine,
  *   score-<engine>-<score>) --out docs/audio/renders  --seed 1  --url <running preview>
  * Writes <out>/<name>.{mp3,json,png}; the float WAV it measured stays in e2e-results/audio/ (a --mix also renders
@@ -44,14 +45,16 @@ function readScore(arg) {
 
 const engine = flag('engine')
 const scrimPrefix = engine === 'scrim' ? 'scrim-' : ''
+const seam = argv.includes('--seam')
+if (seam && engine !== 'scrim' && !flag('score')) throw new Error('--seam renders the score engine: add --engine scrim')
 let request
 let kind
 let defaultName
 let original = false
 if (flag('music')) {
-  request = { kind: 'music', track: flag('music'), intensity: num('intensity'), seconds: num('seconds'), engine }
+  request = { kind: 'music', track: flag('music'), intensity: num('intensity'), seconds: num('seconds'), engine, seam }
   kind = 'music'
-  defaultName = `${scrimPrefix}music-${flag('music')}`
+  defaultName = `${scrimPrefix}music-${flag('music')}${seam ? '-seam' : ''}`
 } else if (argv.includes('--sfx-sheet')) {
   request = { kind: 'sfxSheet', level: flag('level'), engine }
   kind = 'sfx'
@@ -65,11 +68,12 @@ if (flag('music')) {
   original = engine === 'original'
   const chain = flag('chain')
   if (chain && (chain !== 'game' || original)) throw new Error('--chain takes only "game", and not with --engine original')
-  request = { kind: 'score', text, seconds: num('seconds') ?? 20, voicing: flag('voicing'), chain }
+  if (seam && chain !== 'game') throw new Error('--seam needs --chain game')
+  request = { kind: 'score', text, seconds: num('seconds') ?? 20, voicing: flag('voicing'), chain, seam }
   kind = 'music'
-  defaultName = `score-${chain === 'game' ? 'game' : original ? 'original' : 'port'}-${label}`
+  defaultName = `score-${chain === 'game' ? 'game' : original ? 'original' : 'port'}-${label}${seam ? '-seam' : ''}`
 } else {
-  console.error('usage: npm run audio:render -- --music <title|level1..level5|results> | --sfx-sheet [--level <id>] | --mix <level> | --score <file|vendored:N>  [--engine scrim|port|original] [--name n] [--out dir] [--seed n]')
+  console.error('usage: npm run audio:render -- --music <title|level1..level5|results|<slot>.<theme>> [--seam] | --sfx-sheet [--level <id>] | --mix <level> | --score <file|vendored:N>  [--engine scrim|port|original] [--name n] [--out dir] [--seed n]')
   process.exit(2)
 }
 const NAME = flag('name') ?? defaultName

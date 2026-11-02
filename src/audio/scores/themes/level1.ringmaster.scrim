@@ -1,0 +1,113 @@
+title    Ringmaster Rock
+composer Claude (ShooterCoaster)
+about    Theme Park option "ringmaster": a circus-march punk polka in C major, xylophone and synth brass in unison with chromatic leading notes, over off-beat snare, power chords and an oom-pah FM bass. The trio moves to F; the last eight bars lift a semitone, to D-flat.
+tempo    168
+beats    4
+steps    2
+reverb   0.2
+
+voice lead   synbrass   vol=0.7  bright=1.2
+voice xylo   xylophone  vol=0.58 oct=1 pan=0.2
+voice brass  brass      vol=0.26 pan=-0.3 center=E4 gate=0.6
+voice gtr    distguitar vol=0.3  pan=0.35 gate=0.45
+voice bass   fmbass     vol=0.52 gate=0.6
+voice hit    orchhit    vol=0.42
+voice kick   kick       vol=0.62
+voice snare  snare      vol=0.5  pan=0.05
+voice bell   cowbell    vol=0.18 pan=-0.4
+voice crash  crash      vol=0.3  pan=-0.2
+
+pattern intro
+lead  | G4 G#4 A4 A#4 B4 C5 C#5 D5 | G5! . G5! . G5!--- |
+xylo  | G4 G#4 A4 A#4 B4 C5 C#5 D5 | G5! . G5! . G5!--- |
+hit   | _ | [G7]! . [G7]! . [G7]!--- |
+snare | xxxx xxxx | X.X. XXXX |
+
+pattern A1
+lead  | G4 G#4 A4 G4 E5- C5- | G#4 A4 B4 G#4 E5- D5- | A4 B4 C5 A4 E5 A5 G5 E5 | F5--- E5- D5- |
+brass | [C]- .- [C]- .- | [E7]- .- [E7]- .- | [Am]- .- [Am]- .- | [F]- .- [F]- .- |
+gtr   | . C3+G3 . C3+G3 . C3+G3 . C3+G3 | . E2+B2 . E2+B2 . E2+B2 . E2+B2 | . A2+E3 . A2+E3 . A2+E3 . A2+E3 | . F2+C3 . F2+C3 . F2+C3 . F2+C3 |
+bass  | C2 . G2 . C2 . G2 . | E2 . B2 . E2 . B2 . | A2 . E3 . A2 . E3 . | F2 . C3 . F2 . C3 . |
+hit   | [C] .------ | _ | [Am] .------ | _ |
+kick  | x.x. x.x. | % | % | % |
+snare | .x.x .x.x | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern A2
+lead  | G4 G#4 A4 G4 E5- C5- | F#4 G4 A4 F#4 D5- C5- | B4 C5 D5 B4 G5- F5 D5 | F5 E5 D5 B4 G4- .- |
+brass | [C]- .- [C]- .- | [D7]- .- [D7]- .- | [G]- .- [G]- .- | [G7]- .- [G7]- .- |
+gtr   | . C3+G3 . C3+G3 . C3+G3 . C3+G3 | . D3+A3 . D3+A3 . D3+A3 . D3+A3 | . G2+D3 . G2+D3 . G2+D3 . G2+D3 | % |
+bass  | C2 . G2 . C2 . G2 . | D2 . A2 . D2 . A2 . | G2 . D3 . G2 . D3 . | % |
+kick  | x.x. x.x. | % | % | % |
+snare | .x.x .x.x | % | % | .x.x xxXX |
+crash | X... .... | _ | _ | _ |
+
+pattern A1x
+lead  | G4 G#4 A4 G4 E5- C5- | G#4 A4 B4 G#4 E5- D5- | A4 B4 C5 A4 E5 A5 G5 E5 | F5--- E5- D5- |
+xylo  | G4 G#4 A4 G4 E5- C5- | G#4 A4 B4 G#4 E5- D5- | A4 B4 C5 A4 E5 A5 G5 E5 | F5--- E5- D5- |
+brass | [C]- .- [C]- .- | [E7]- .- [E7]- .- | [Am]- .- [Am]- .- | [F]- .- [F]- .- |
+gtr   | . C3+G3 . C3+G3 . C3+G3 . C3+G3 | . E2+B2 . E2+B2 . E2+B2 . E2+B2 | . A2+E3 . A2+E3 . A2+E3 . A2+E3 | . F2+C3 . F2+C3 . F2+C3 . F2+C3 |
+bass  | C2 . G2 . C2 . G2 . | E2 . B2 . E2 . B2 . | A2 . E3 . A2 . E3 . | F2 . C3 . F2 . C3 . |
+hit   | [C] .------ | _ | [Am] .------ | _ |
+kick  | x.x. x.x. | % | % | % |
+snare | .x.x .x.x | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern A2x
+lead  | G4 G#4 A4 G4 E5- C5- | F#4 G4 A4 F#4 D5- C5- | B4 C5 D5 B4 G5- F5 D5 | F5 E5 D5 B4 G4- .- |
+xylo  | G4 G#4 A4 G4 E5- C5- | F#4 G4 A4 F#4 D5- C5- | B4 C5 D5 B4 G5- F5 D5 | F5 E5 D5 B4 G4- .- |
+brass | [C]- .- [C]- .- | [D7]- .- [D7]- .- | [G]- .- [G]- .- | [G7]- .- [G7]- .- |
+gtr   | . C3+G3 . C3+G3 . C3+G3 . C3+G3 | . D3+A3 . D3+A3 . D3+A3 . D3+A3 | . G2+D3 . G2+D3 . G2+D3 . G2+D3 | % |
+bass  | C2 . G2 . C2 . G2 . | D2 . A2 . D2 . A2 . | G2 . D3 . G2 . D3 . | % |
+kick  | x.x. x.x. | % | % | % |
+snare | .x.x .x.x | % | % | .x.x xxXX |
+crash | X... .... | _ | _ | _ |
+
+pattern B1
+lead  | A5--- C6- A5- | F5--- A5- F5- | G5 F5 E5 D5 C5- A#4- | A4- C5- F5- .- |
+xylo  | A5--- C6- A5- | F5--- A5- F5- | G5 F5 E5 D5 C5- A#4- | A4- C5- F5- .- |
+brass | [F]- .- [F]- .- | % | [C7]- .- [C7]- .- | [F]- .- [F]- .- |
+gtr   | . F2+C3 . F2+C3 . F2+C3 . F2+C3 | % | . C3+G3 . C3+G3 . C3+G3 . C3+G3 | . F2+C3 . F2+C3 . F2+C3 . F2+C3 |
+bass  | F2 . C3 . F2 . C3 . | % | C2 . G2 . C2 . G2 . | F2 . C3 . F2 . C3 . |
+kick  | x.x. x.x. | % | % | % |
+snare | .x.x .x.x | % | % | % |
+bell  | x... x... | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern B2
+lead  | A5--- C6- A5- | A#5--- D6- A#5- | G5 A5 A#5 G5 E5- C5- | F5 . F5 . F5! . .- |
+xylo  | A5--- C6- A5- | A#5--- D6- A#5- | G5 A5 A#5 G5 E5- C5- | F5 . F5 . F5! . .- |
+brass | [F]- .- [F]- .- | [Bb]- .- [Bb]- .- | [C7]- .- [C7]- .- | [F]- .- [F]- .- |
+gtr   | . F2+C3 . F2+C3 . F2+C3 . F2+C3 | . A#2+F3 . A#2+F3 . A#2+F3 . A#2+F3 | . C3+G3 . C3+G3 . C3+G3 . C3+G3 | . F2+C3 . F2+C3 . F2+C3 . F2+C3 |
+bass  | F2 . C3 . F2 . C3 . | A#2 . F3 . A#2 . F3 . | C2 . G2 . C2 . G2 . | F2 . C3 . F2 . C3 . |
+kick  | x.x. x.x. | % | % | % |
+snare | .x.x .x.x | % | % | X.X. X... |
+bell  | x... x... | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern L1
+lead  | G4 G#4 A4 G4 E5- C5- | G#4 A4 B4 G#4 E5- D5- | A4 B4 C5 A4 E5 A5 G5 E5 | F5--- E5- D5- |
+xylo  | G4 G#4 A4 G4 E5- C5- | G#4 A4 B4 G#4 E5- D5- | A4 B4 C5 A4 E5 A5 G5 E5 | F5--- E5- D5- |
+brass | [C]- .- [C]- .- | [E7]- .- [E7]- .- | [Am]- .- [Am]- .- | [F]- .- [F]- .- |
+gtr   | . C3+G3 . C3+G3 . C3+G3 . C3+G3 | . E2+B2 . E2+B2 . E2+B2 . E2+B2 | . A2+E3 . A2+E3 . A2+E3 . A2+E3 | . F2+C3 . F2+C3 . F2+C3 . F2+C3 |
+bass  | C2 . G2 . C2 . G2 . | E2 . B2 . E2 . B2 . | A2 . E3 . A2 . E3 . | F2 . C3 . F2 . C3 . |
+hit   | [C] .------ | _ | [Am] .------ | _ |
+kick  | x.x. x.x. | % | % | % |
+snare | .x.x .x.x | % | % | % |
+bell  | x... x... | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern L2
+lead  | G4 G#4 A4 G4 E5- C5- | F#4 G4 A4 F#4 D5- C5- | B4 C5 D5 B4 G5- F5 D5 | F5 E5 D5 B4 G4- .- |
+xylo  | G4 G#4 A4 G4 E5- C5- | F#4 G4 A4 F#4 D5- C5- | B4 C5 D5 B4 G5- F5 D5 | F5 E5 D5 B4 G4- .- |
+brass | [C]- .- [C]- .- | [D7]- .- [D7]- .- | [G]- .- [G]- .- | [G7]- .- [G7]- .- |
+gtr   | . C3+G3 . C3+G3 . C3+G3 . C3+G3 | . D3+A3 . D3+A3 . D3+A3 . D3+A3 | . G2+D3 . G2+D3 . G2+D3 . G2+D3 | % |
+bass  | C2 . G2 . C2 . G2 . | D2 . A2 . D2 . A2 . | G2 . D3 . G2 . D3 . | % |
+hit   | _ | _ | _ | [G7] .------ |
+kick  | x.x. x.x. | % | % | % |
+snare | .x.x .x.x | % | % | .x.x xxXX |
+bell  | x... x... | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+play intro
+loop A1 A2 A1x A2x B1 B2 L1+1 L2+1

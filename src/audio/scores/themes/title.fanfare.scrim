@@ -1,0 +1,124 @@
+title    Insert Coin
+composer Claude (ShooterCoaster)
+about    Title theme option "fanfare": a heroic D major brass fanfare with orchestra hits, timpani and a galloping FM bass over a march beat. Bar 25 lifts a tone, to E major, under a supersaw descant, and the last four bars cadence home.
+tempo    172
+beats    4
+steps    2
+reverb   0.26
+
+voice lead    brass     vol=0.8
+voice counter supersaw  vol=0.3  pan=0.2
+voice pad     strings   vol=0.2  pan=-0.3 center=F#4
+voice bass    fmbass    vol=0.52  gate=0.65
+voice timp    timpani   vol=0.42 pan=-0.15
+voice hit     orchhit   vol=0.45
+voice kick    bigkick   vol=0.6
+voice snare   gatesnare vol=0.55
+voice roll    snare     vol=0.22 pan=0.25
+voice hat     hat909    vol=0.24 pan=0.3
+voice crash   crash     vol=0.3  pan=-0.2
+
+pattern intro
+timp  | D2 . D2 . D2 D2 D2 D2 | C3 C3 B2 B2 A2 A2 A2! A2! |
+hit   | [D]! . [D]! . [D]!--- | [C]!- [G/B]!- [A]!--- |
+snare | .... .... | xxxx XXXX |
+crash | X... .... | .... X... |
+
+pattern A1
+lead  | D5 . A4 D5 F#5- E5 D5 | E5--- C#5- A4- | B4 . F#5 B4 D5- C#5 B4 | G5--- F#5- E5- |
+pad   | [D]?------- | [A/C#]?------- | [Bm]?------- | [G]?------- |
+bass  | D2- D2 D2 A2- A2 A2 | C#2- C#2 C#2 E3- E3 E3 | B2- B2 B2 F#3- F#3 F#3 | G2- G2 G2 D3- D3 D3 |
+timp  | D2 . . . A2 . . . | C#3 . . . E3 . . . | B2 . . . F#3 . . . | G2 . . . D3 . . . |
+hit   | [D] .------ | _ | [Bm] .------ | _ |
+kick  | x... x... | % | % | x... x.x. |
+snare | ..x. ..x. | % | % | % |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern A2
+lead  | E5 . G5 E5 C5- E5 G5 | D5--- B4- G4- | D5 . E5 D5 A4- D5 E5 | C#5----- .- |
+pad   | [C]?------- | [G/B]?------- | [Asus4]?------- | [A]?------- |
+bass  | C2- C2 C2 G2- G2 G2 | B2- B2 B2 D3- D3 D3 | A2- A2 A2 E3- E3 E3 | % |
+timp  | C3 . . . G3 . . . | B2 . . . D3 . . . | A2 . . . E3 . . . | % |
+hit   | [C] .------ | _ | [Asus4] .------ | _ |
+kick  | x... x... | % | % | x... x.x. |
+snare | ..x. ..x. | % | % | ..x. xxXX |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern A1b
+lead  | D5 . A4 D5 F#5- E5 D5 | E5--- C#5- A4- | B4 . F#5 B4 D5- C#5 B4 | G5--- F#5- E5- |
+pad   | [D]?------- | [A/C#]?------- | [Bm]?------- | [G]?------- |
+bass  | D2- D2 D2 A2- A2 A2 | C#2- C#2 C#2 E3- E3 E3 | B2- B2 B2 F#3- F#3 F#3 | G2- G2 G2 D3- D3 D3 |
+timp  | D2 . . . A2 . . . | C#3 . . . E3 . . . | B2 . . . F#3 . . . | G2 . . . D3 . . . |
+hit   | [D] .------ | _ | [Bm] .------ | _ |
+kick  | x... x... | % | % | x... x.x. |
+snare | ..x. ..x. | % | % | % |
+roll  | oxoo oxoo | % | % | % |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern A2b
+lead  | E5 . G5 E5 C5- E5 G5 | D5--- B4- G4- | D5 . E5 D5 A4- D5 E5 | C#5----- .- |
+pad   | [C]?------- | [G/B]?------- | [Asus4]?------- | [A]?------- |
+bass  | C2- C2 C2 G2- G2 G2 | B2- B2 B2 D3- D3 D3 | A2- A2 A2 E3- E3 E3 | % |
+timp  | C3 . . . G3 . . . | B2 . . . D3 . . . | A2 . . . E3 . . . | % |
+hit   | [C] .------ | _ | [Asus4] .------ | _ |
+kick  | x... x... | % | % | x... x.x. |
+snare | ..x. ..x. | % | % | ..x. xxXX |
+roll  | oxoo oxoo | % | % | % |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern B1
+lead  | B5--- A5- G5- | A5--- E5--- | F#5--- A5- C#6- | B5----- .- |
+pad   | [G]?------- | [A]?------- | [F#m]?------- | [Bm]?------- |
+bass  | G2- G2 G2 D3- D3 D3 | A2- A2 A2 E3- E3 E3 | F#2- F#2 F#2 C#3- C#3 C#3 | B2- B2 B2 F#3- F#3 F#3 |
+timp  | G2 . . . D3 . . . | A2 . . . E3 . . . | F#2 . . . C#3 . . . | B2 . . . F#3 . . . |
+hit   | [G] .------ | _ | [F#m] .------ | _ |
+kick  | x... x... | % | % | x... x.x. |
+snare | ..x. ..x. | % | % | % |
+roll  | oxoo oxoo | % | % | % |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern B2
+lead  | B5--- A5- G5- | C#6--- A5- E5- | D6--- F5- Bb5- | E6----- D6 E6 |
+pad   | [G]?------- | [A]?------- | [Bb]?------- | [C]?------- |
+bass  | G2- G2 G2 D3- D3 D3 | A2- A2 A2 E3- E3 E3 | A#2- A#2 A#2 F3- F3 F3 | C2- C2 C2 G2- G2 G2 |
+timp  | G2 . . . D3 . . . | A2 . . . E2 . . . | Bb2 . . . F2 . . . | C3 C3 C3 C3 C3 C3 C3! C3! |
+hit   | [G] .------ | _ | [Bb] .------ | _ |
+kick  | x... x... | % | % | x... x.x. |
+snare | ..x. ..x. | % | % | ..x. xxXX |
+roll  | oxoo oxoo | % | % | % |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern L1
+lead  | D5 . A4 D5 F#5- E5 D5 | E5--- C#5- A4- | B4 . F#5 B4 D5- C#5 B4 | G5--- F#5- E5- |
+counter| A5------- | % | F#5------- | G5------- |
+pad   | [D]?------- | [A/C#]?------- | [Bm]?------- | [G]?------- |
+bass  | D2- D2 D2 A2- A2 A2 | C#2- C#2 C#2 E3- E3 E3 | B2- B2 B2 F#3- F#3 F#3 | G2- G2 G2 D3- D3 D3 |
+timp  | D2 . . . A2 . . . | C#3 . . . E3 . . . | B2 . . . F#3 . . . | G2 . . . D3 . . . |
+hit   | [D] .------ | _ | [Bm] .------ | _ |
+kick  | x... x... | % | % | x... x.x. |
+snare | ..x. ..x. | % | % | % |
+roll  | oxoo oxoo | % | % | % |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+pattern L2
+lead  | E5 . G5 E5 C5- E5 G5 | D5--- B4- G4- | D5 . E5 D5 A4- D5 E5 | C#5----- .- |
+counter| G5------- | % | A5------- | % |
+pad   | [C]?------- | [G/B]?------- | [Asus4]?------- | [A]?------- |
+bass  | C2- C2 C2 G2- G2 G2 | B2- B2 B2 D3- D3 D3 | A2- A2 A2 E3- E3 E3 | % |
+timp  | C3 . . . G3 . . . | B2 . . . D3 . . . | A2 . . . E3 . . . | % |
+hit   | [C] .------ | _ | [Asus4] .------ | _ |
+kick  | x... x... | % | % | x... x.x. |
+snare | ..x. ..x. | % | % | ..x. xxXX |
+roll  | oxoo oxoo | % | % | % |
+hat   | xxxx xxxx | % | % | % |
+crash | X... .... | _ | _ | _ |
+
+play intro
+loop A1 A2 A1b A2b B1 B2 L1+2 L2

@@ -8,7 +8,7 @@
 import * as Tone from 'tone'
 import { isAudioReady, scoreChannel } from '../AudioEngine'
 import { fadeOutMusicBus, openMusicBus, type MusicBus } from '../musicBus'
-import { SCORES } from '../scores'
+import { SCORES, scoreIdFor } from '../scores'
 import { compile, type CompiledSong } from './score'
 import { ScoreScheduler } from './scheduler'
 import { createCore, createSynth, type Session, type Synth, type SynthCore } from './synth'
@@ -45,7 +45,7 @@ const now = () => Tone.getContext().currentTime
 function songFor(id: string): CompiledSong {
   let song = songs.get(id)
   if (!song) {
-    const text = SCORES[id]
+    const text = SCORES[scoreIdFor(id)]
     if (text === undefined) throw new Error(`no score "${id}"`)
     song = compile(text)
     songs.set(id, song)
@@ -92,8 +92,8 @@ function fadeOut(track: Track, untilNextTrack = false) {
   fadeOutMusicBus(track.bus, [{ dispose: () => disposeTrack(track) }], untilNextTrack)
 }
 
-/** Crossfades to score `id` from the top; nothing if it is already the current track or audio is still locked. */
-export function playScore(id: string): void {
+/** Crossfades to score `id` from song time `from` (the top); nothing if it is already the current track or audio is still locked. */
+export function playScore(id: string, from = 0): void {
   if (current?.id === id || !isAudioReady()) return
   if (current) fadeOut(current)
   const song = songFor(id)
@@ -109,7 +109,7 @@ export function playScore(id: string): void {
     pausedAt: null,
     stopWarm: synth.warm(song),
   }
-  track.scheduler.start(start)
+  track.scheduler.start(start, from)
   live.push(track)
   current = track
   ensureTimer()
@@ -178,12 +178,12 @@ export function musicGrid(): MusicGrid | null {
   return grid
 }
 
-/** e2e: the tracks (current last), whether each is paused, its song position, and the long-lived nodes. */
+/** e2e: the tracks (current last) with the score each plays (`scoreIdFor`), whether it is paused, its song position, and the long-lived nodes. */
 export function scrimState() {
   const t = now()
   return {
     current: current?.id ?? null,
-    tracks: live.map((tr) => ({ id: tr.id, paused: tr.pausedAt !== null, position: tr.pausedAt ?? tr.scheduler.position(t) })),
+    tracks: live.map((tr) => ({ id: tr.id, score: scoreIdFor(tr.id), paused: tr.pausedAt !== null, position: tr.pausedAt ?? tr.scheduler.position(t) })),
     nodes: live.reduce((n, tr) => n + tr.synth.nodeCount(), 0),
     ticking: timer !== null,
   }

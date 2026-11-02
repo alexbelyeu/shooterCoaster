@@ -233,6 +233,13 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
   level4: { tonic: 61, minor: true }, // C# minor
   level5: { tonic: 62, minor: true }, // D minor
   results: { tonic: 60, minor: false }, // C major
+  // Theme options (`?theme=`, scores/themes/)
+  'title.neon': { tonic: 69, minor: true }, // A minor
+  'title.highway': { tonic: 63, minor: false }, // E-flat major
+  'title.fanfare': { tonic: 62, minor: false }, // D major
+  'level1.calliope': { tonic: 70, minor: false }, // B-flat major
+  'level1.carousel': { tonic: 69, minor: false }, // A major
+  'level1.ringmaster': { tonic: 60, minor: false }, // C major
 }
 
 const MAJOR = [0, 2, 4, 5, 7, 9, 11]
