@@ -4,14 +4,15 @@ import * as THREE from 'three'
 import type { SeabedProp } from './seaPlacement'
 import { ROCK_RINGS, STACK_RINGS } from './seaDimensions'
 import { profileRadiusAt, type RockRing } from '../../shared/ringedRock'
-import { createBreachingRockGeometry, createSeaStackGeometry, propMatrix } from './seaProps'
+import { createBreachingRockGeometry, createSeaStackGeometry } from './seaProps'
 import { createFoamMaterial, createFoamRingGeometry } from './seaMaterials'
 import StaticInstances from '../../shared/StaticInstances'
+import { yawScaleMatrix } from '../../shared/yawScaleMatrix'
 
 /** Inner edge tucked just inside the rock where it crosses the water. */
 function foamMatrix(p: SeabedProp, rings: readonly RockRing[]): THREE.Matrix4 {
   const inner = profileRadiusAt(rings, -p.y / p.scale) * p.scale * 0.85
-  return propMatrix({ x: p.x, y: 0, z: p.z, yaw: p.yaw, scale: inner })
+  return yawScaleMatrix({ x: p.x, y: 0, z: p.z }, p.yaw, inner)
 }
 
 export default function SeaStacks({
@@ -38,8 +39,6 @@ export default function SeaStacks({
   )
   const foam = useMemo(() => createFoamMaterial(fadeFar * 0.4, fadeFar), [fadeFar])
 
-  const stackMatrices = useMemo(() => stacks.map(propMatrix), [stacks])
-  const rockMatrices = useMemo(() => rocks.map(propMatrix), [rocks])
   const foamMatrices = useMemo(
     () => [...stacks.map((p) => foamMatrix(p, STACK_RINGS)), ...rocks.map((p) => foamMatrix(p, ROCK_RINGS))],
     [stacks, rocks],
@@ -61,8 +60,8 @@ export default function SeaStacks({
 
   return (
     <>
-      <StaticInstances matrices={stackMatrices} geometry={stackGeo} material={rockMat} />
-      <StaticInstances matrices={rockMatrices} geometry={rockGeo} material={rockMat} />
+      <StaticInstances placements={stacks} geometry={stackGeo} material={rockMat} />
+      <StaticInstances placements={rocks} geometry={rockGeo} material={rockMat} />
       {/* After the water (renderOrder 0), which writes no depth. */}
       <StaticInstances matrices={foamMatrices} geometry={foamGeo} material={foam.material} renderOrder={1} />
     </>

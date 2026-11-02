@@ -80,7 +80,7 @@ export default function BiomeEnvironment({
       )}
 
       {/* Biome-specific InstancedMesh decorations */}
-      {Decorations && <Decorations heightFn={heightFn} groundFn={groundFn} track={track} />}
+      {Decorations && <Decorations heightFn={heightFn} groundFn={groundFn} track={track} atmosphere={atmosphere} />}
 
       {/* Biome landmarks, terrain features and events */}
       {Features && <Features heightFn={heightFn} groundFn={groundFn} track={track} atmosphere={atmosphere} fogRef={fogRef} />}

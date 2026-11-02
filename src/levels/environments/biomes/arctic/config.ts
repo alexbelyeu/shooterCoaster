@@ -16,8 +16,9 @@ export const COLOR_RAMP: ColorRamp = {
 export const TREES: BiomeTreeConfig = {
   types: [
     {
-      trunkColor: '#3a2818',
-      canopyColors: (rng) => `hsl(${rng.range(140, 160)}, ${rng.range(20, 35)}%, ${rng.range(20, 30)}%)`,
+      trunkColor: '#5a4232',
+      // hsl is sRGB: under ~35% lightness the canopies render near black next to the snow
+      canopyColors: (rng) => `hsl(${rng.range(150, 170)}, ${rng.range(20, 32)}%, ${rng.range(36, 46)}%)`,
       canopyGeoFactory: () => new THREE.ConeGeometry(1, 1, 6),
       heightRange: [25, 70],
     },
@@ -26,4 +27,5 @@ export const TREES: BiomeTreeConfig = {
   minRadius: 200,
   maxRadius: 4000,
   maxSlope: Math.PI / 6, // mountains: tight slope rejection
+  fill: 0.35,
 }

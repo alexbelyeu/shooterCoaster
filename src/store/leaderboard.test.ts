@@ -6,7 +6,9 @@ import {
   normalizeInitials,
   placement,
   sanitizeLeaderboards,
+  sanitizeSavedDaily,
   sanitizeSavedScores,
+  sanitizeStreak,
 } from './leaderboard'
 
 const row = (score: number, initials = 'AAA', date = score): LeaderboardEntry => ({ initials, score, stars: 1, date })
@@ -97,6 +99,29 @@ describe('sanitize', () => {
     for (const v of [null, undefined, 3, 'x', []]) {
       expect(sanitizeSavedScores(v)).toEqual({})
       expect(sanitizeLeaderboards(v, {})).toEqual({})
+      expect(sanitizeSavedDaily(v)).toEqual({})
+      expect(sanitizeStreak(v)).toEqual({ count: 0, lastKey: null })
     }
+  })
+})
+
+describe('daily record sanitisers', () => {
+  it('keeps day-keyed bests with their own level, drops other keys and bad entries', () => {
+    const daily = sanitizeSavedDaily({
+      '2026-10-31': { level: 'level2', score: 400, maxScore: 1, stars: 7, timestamp: 3 },
+      '2026-11-01': { score: 200, stars: 1 },
+      level1: { level: 'level1', score: 1, stars: 1 },
+      '2026-11-02': { score: 'x', stars: 1 },
+    })
+    expect(Object.keys(daily)).toEqual(['2026-10-31', '2026-11-01'])
+    expect(daily['2026-10-31']).toEqual({ level: 'level2', score: 400, maxScore: 1, stars: 3, timestamp: 3 })
+    expect(daily['2026-11-01'].level).toBe('')
+  })
+
+  it('a streak needs a count and a day key', () => {
+    expect(sanitizeStreak({ count: 4, lastKey: '2026-11-01' })).toEqual({ count: 4, lastKey: '2026-11-01' })
+    expect(sanitizeStreak({ count: -2.4, lastKey: '2026-11-01' })).toEqual({ count: 0, lastKey: '2026-11-01' })
+    expect(sanitizeStreak({ count: 4, lastKey: null })).toEqual({ count: 0, lastKey: null })
+    expect(sanitizeStreak({ count: 4, lastKey: 'yesterday' })).toEqual({ count: 0, lastKey: null })
   })
 })

@@ -99,8 +99,3 @@ export function withRim<T extends LitMaterial>(material: T, options: RimOptions 
   material.customProgramCacheKey = () => RIM_CACHE_KEY
   return material
 }
-
-/** Rim uniforms of a patched material (undefined if not patched). */
-export function getRimUniforms(material: THREE.Material): RimUniforms | undefined {
-  return material.userData.rim as RimUniforms | undefined
-}

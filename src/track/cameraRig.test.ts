@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import * as THREE from 'three'
 import {
-  BANK_RESPONSE, LATERAL_ACCEL_REF, MAX_BANK_DEG, MAX_LOOK_AHEAD_DEG, MAX_PITCH_DEG,
-  bankAngle, createRigState, damp, dropAmount, lookAheadDirection, pitchAngle, resetRig, smoothingFactor, stepRig,
+  BANK_RESPONSE, CURVATURE_SAMPLE_UNITS, LATERAL_ACCEL_REF, LOOK_AHEAD_UNITS, MAX_BANK_DEG, MAX_LOOK_AHEAD_DEG,
+  MAX_PITCH_DEG, bankAngle, createRigState, damp, dropAmount, lateralAcceleration, lookAheadDirection, pitchAngle,
+  resetRig, sampleTrack, smoothingFactor, stepRig, type TrackSamples,
 } from './cameraRig'
+import { buildArcTable, distanceAtT } from './arcLength'
+import type { TrackCurve } from './curves/TrackCurve'
 
 const DEG = Math.PI / 180
 
@@ -130,5 +134,76 @@ describe('lookAheadDirection', () => {
     const v = { x: Math.sin(10 * DEG), y: 0, z: -Math.cos(10 * DEG) }
     lookAheadDirection({ x: 0, y: 0, z: -1 }, v, v)
     expect(angleBetween(v, { x: 0, y: 0, z: -1 })).toBeCloseTo(5, 6)
+  })
+})
+
+/** ds/dt swings ±75% around the loop. */
+const UNEVEN = 0.12
+
+/** Flat circle of radius R, ridden unevenly in t like the trig tracks; `dir` -1 rides it the other way round. */
+function unevenCircle(R: number, dir = 1): TrackCurve {
+  const angle = (t: number) => dir * 2 * Math.PI * (t + UNEVEN * Math.sin(2 * Math.PI * t))
+  return {
+    getPointAt: (t) => new THREE.Vector3(R * Math.cos(angle(t)), 0, R * Math.sin(angle(t))),
+    getTangentAt: (t) => {
+      const a = angle(t)
+      return new THREE.Vector3(-Math.sin(a) * dir, 0, Math.cos(a) * dir)
+    },
+  }
+}
+
+const freshSamples = (): TrackSamples => ({ behindT: 0, aheadT: 0, lookT: 0, span: 0, unitsPerT: 0 })
+
+describe('sampleTrack', () => {
+  const R = 200
+  const table = buildArcTable(unevenCircle(R))
+  const length = 2 * Math.PI * R
+  const arc = (from: number, to: number) =>
+    (((distanceAtT(table, to) - distanceAtT(table, from)) % length) + length) % length
+
+  it('looks a constant arc distance ahead on an uneven curve, across the loop seam', () => {
+    for (const trackScale of [1, 2.5]) {
+      for (const t of [0, 0.1, 0.23, 0.5, 0.74, 0.9, 0.995]) {
+        const s = sampleTrack(table, t, trackScale, freshSamples())
+        expect(arc(t, s.lookT)).toBeCloseTo(LOOK_AHEAD_UNITS * trackScale, 3)
+        expect(arc(s.behindT, t)).toBeCloseTo(CURVATURE_SAMPLE_UNITS * trackScale, 3)
+        expect(arc(t, s.aheadT)).toBeCloseTo(CURVATURE_SAMPLE_UNITS * trackScale, 3)
+        expect(s.span).toBeCloseTo(2 * CURVATURE_SAMPLE_UNITS * trackScale, 9)
+      }
+    }
+  })
+
+  it('gives units per t from the track speed at the car', () => {
+    for (const t of [0, 0.25, 0.5, 0.75]) {
+      const dsdt = length * (1 + UNEVEN * 2 * Math.PI * Math.cos(2 * Math.PI * t))
+      expect(sampleTrack(table, t, 1, freshSamples()).unitsPerT / dsdt).toBeCloseTo(1, 2)
+    }
+  })
+})
+
+describe('lateralAcceleration', () => {
+  const R = 150
+  const speed = 60
+  const accelAt = (dir: number, t: number) => {
+    const curve = unevenCircle(R, dir)
+    const s = sampleTrack(buildArcTable(curve), t, 1, freshSamples())
+    const tangent = curve.getTangentAt(t)
+    return lateralAcceleration(tangent, curve.getTangentAt(s.behindT), curve.getTangentAt(s.aheadT), s.span, speed)
+  }
+
+  it('is v²/R toward the centre of a circle, positive on a right turn', () => {
+    for (const t of [0, 0.3, 0.6, 0.97]) {
+      // dir 1 runs clockwise seen from above (+y), so the centre is on the camera's right (tangent × up).
+      expect(accelAt(1, t) / ((speed * speed) / R)).toBeCloseTo(1, 3)
+      expect(accelAt(-1, t) / (-(speed * speed) / R)).toBeCloseTo(1, 3)
+    }
+  })
+
+  it('is 0 on a straight, a vertical tangent or an empty span', () => {
+    const x = { x: 1, y: 0, z: 0 }
+    const z = { x: 0, y: 0, z: 1 }
+    expect(lateralAcceleration(x, x, x, 8, speed)).toBe(0)
+    expect(lateralAcceleration({ x: 0, y: 1, z: 0 }, x, z, 8, speed)).toBe(0)
+    expect(lateralAcceleration(x, x, z, 0, speed)).toBe(0)
   })
 })

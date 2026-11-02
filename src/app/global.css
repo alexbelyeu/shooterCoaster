@@ -55,21 +55,6 @@ canvas {
   touch-action: none;
 }
 
-/* HUD overlay base */
-.hud-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.hud-overlay > * {
-  pointer-events: auto;
-}
-
 /* Title screen */
 .title-screen {
   position: fixed;
@@ -522,6 +507,74 @@ canvas {
   to { opacity: 1; transform: translateX(-50%) scale(1); }
 }
 
+/* Weapon pickup badge (#185) — left of the combo meter; above the pause button on portrait phones */
+.hud-weapon {
+  position: absolute;
+  right: calc(50% + 120px);
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 64px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px 6px 6px;
+  border-radius: 40px;
+  background: rgba(8, 10, 22, 0.5);
+  border: 1px solid var(--weapon-color);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--weapon-color) 45%, transparent);
+  color: var(--weapon-color);
+  opacity: 0;
+  transform: translateY(16px) scale(0.9);
+  transition: opacity 0.3s ease-in, transform 0.3s ease-in;
+}
+
+.hud-weapon.is-visible {
+  opacity: 1;
+  transform: none;
+  transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+.hud-weapon-ring {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  flex: none;
+}
+
+.hud-weapon-ring svg:first-child {
+  display: block;
+  transform: rotate(-90deg);
+}
+
+.hud-weapon-ring-bg,
+.hud-weapon-ring-fill {
+  fill: none;
+  stroke-width: 4;
+}
+
+.hud-weapon-ring-bg {
+  stroke: rgba(255, 255, 255, 0.15);
+}
+
+.hud-weapon-ring-fill {
+  stroke: var(--weapon-color);
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px var(--weapon-color));
+}
+
+.hud-weapon-icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  filter: drop-shadow(0 0 3px var(--weapon-color));
+}
+
+.hud-weapon-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-shadow: var(--hud-shadow);
+}
+
 @keyframes hud-combo-pop {
   from { transform: scale(1.45); }
   to { transform: scale(1); }
@@ -529,7 +582,15 @@ canvas {
 
 @media (max-width: 480px) {
   .hud-panel { padding: 8px 10px 10px; }
-  .hud-combo { bottom: max(84px, calc(env(safe-area-inset-bottom) + 76px)); }
+  /* bottom row between pause and mute, clear of the first-person gun (#223) */
+  .hud-combo { bottom: calc(1rem + env(safe-area-inset-bottom)); }
+  .hud-weapon {
+    right: auto;
+    left: calc(12px + env(safe-area-inset-left));
+    bottom: max(72px, calc(env(safe-area-inset-bottom) + 72px));
+    padding: 4px;
+  }
+  .hud-weapon-label { display: none; }
   .hud-frenzy { bottom: max(162px, calc(env(safe-area-inset-bottom) + 154px)); }
 }
 
@@ -763,7 +824,7 @@ canvas {
   flex-wrap: wrap;
   justify-content: center;
   gap: clamp(0.75rem, 1.4vw, 1.25rem);
-  width: min(1200px, 100%);
+  width: min(1440px, 100%);
 }
 
 .level-card {
@@ -772,7 +833,8 @@ canvas {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: clamp(180px, 17vw, 224px);
+  /* Five worlds + the Daily card on one row at 1280 px. */
+  width: clamp(160px, 14vw, 224px);
   min-height: 44px;
   padding: 0;
   overflow: hidden;
@@ -851,8 +913,9 @@ canvas {
 .level-card-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.15rem 0.5rem;
   margin-top: 0.35rem;
 }
 
@@ -879,6 +942,34 @@ canvas {
   font-weight: 800;
   letter-spacing: 1.5px;
   color: var(--accent);
+}
+
+.level-card-streak {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #ffb347;
+  white-space: nowrap;
+}
+
+.level-card-daily {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.level-card-daily-badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #1a1206;
+  background: #ffd23f;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
 }
 
 .level-card-locked-hint {
@@ -975,7 +1066,7 @@ canvas {
   }
 
   .level-card {
-    width: clamp(132px, 17.5vw, 180px);
+    width: clamp(112px, 14vw, 180px);
   }
 
   .level-card-desc {
@@ -1054,16 +1145,19 @@ canvas {
     margin-top: 0.15rem;
   }
 
+  /* On top, above the fold: the reason to come back each day. */
+  .level-card-daily {
+    order: -1;
+  }
+
   .level-card:focus-visible,
   .level-card:not(.locked):hover {
     transform: none;
   }
 }
 
-/* Results screen */
+/* Results screen. --accent / --accent-glow are the level's biome accent, set inline from src/ui/theme.ts. */
 .results-screen {
-  --accent: #ffd23f;
-  --accent-glow: rgba(255, 210, 63, 0.55);
   position: fixed;
   inset: 0;
   display: flex;
@@ -1100,6 +1194,18 @@ canvas {
   text-shadow: 0 0 18px var(--accent-glow);
 }
 
+.results-daily-badge {
+  margin-bottom: 0.3rem;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #1a1206;
+  background: #ffd23f;
+  border-radius: 999px;
+}
+
 .results-message {
   margin-top: 0.25rem;
   font-size: 0.9rem;
@@ -1123,6 +1229,7 @@ canvas {
 .results-star-earned {
   position: absolute;
   inset: 0;
+  /* Gold on purpose, not the biome accent: stars are gold on every screen (.level-card-stars .earned). */
   color: #ffd23f;
   text-shadow: 0 0 16px rgba(255, 210, 63, 0.8);
 }
@@ -1195,6 +1302,7 @@ canvas {
 }
 
 .results-bar-marker.reached {
+  /* Gold like the earned stars above. */
   color: #ffd23f;
 }
 
@@ -1244,6 +1352,74 @@ canvas {
 .results-actions .results-secondary {
   color: #fff;
   background: rgba(255, 255, 255, 0.14);
+}
+
+/* Share menu (src/ui/ShareMenu.tsx): placed by popoverPlacement.ts, below the button when it fits beside Next. */
+.share-anchor {
+  position: relative;
+  display: flex;
+}
+
+.results-actions .results-share[aria-expanded='true'] {
+  color: #000;
+  background: var(--accent);
+}
+
+.share-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  width: 17rem;
+  max-width: calc(100vw - 16px);
+  padding: 0.5rem;
+  background: rgba(16, 16, 24, 0.97);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 18px var(--accent-glow);
+}
+
+.share-menu[data-side='above'] {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+.share-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 0.6rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.share-item:hover,
+.share-item:focus-visible {
+  color: #000;
+  background: var(--accent);
+  outline: none;
+}
+
+.share-copy {
+  grid-column: 1 / -1;
+}
+
+/* Phone landscape: three columns keep the menu short enough to open above the buttons. */
+@media (max-height: 520px) {
+  .share-menu {
+    grid-template-columns: repeat(3, 1fr);
+    width: 21rem;
+  }
 }
 
 .results-keys {
@@ -1417,6 +1593,14 @@ canvas {
   .results-board-slot {
     grid-area: board;
     align-self: center;
+  }
+
+  /* A daily run has no board (it never enters the campaign's). */
+  .results-screen[data-mode='daily'] .results-card {
+    grid-template-columns: 26rem;
+    grid-template-areas:
+      'main'
+      'side';
   }
 }
 

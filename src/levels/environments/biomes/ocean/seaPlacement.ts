@@ -3,6 +3,7 @@ import type { HeightFunction } from '@/utils/terrainNoise'
 import { groundedBaseY, scatterNearTrack, trackExtent, type ScatterPoint } from '../../shared/trackScatter'
 import { createRng } from '@/utils/rng'
 import { KELP_HEIGHT, ROCK_FOOTPRINT, ROCK_HEIGHT, STACK_FOOTPRINT, STACK_HEIGHT } from './seaDimensions'
+import { SUNKEN_CITY_POSITION } from './config'
 
 /** Where the ocean props go (pure). The water surface is y = 0. */
 export interface SeabedProp extends ScatterPoint {
@@ -227,4 +228,24 @@ export function layoutOcean(
     rng: createRng(2104),
   }).map((p) => ({ ...p, scale: Math.min(p.scale, (-KELP_TIP_DEPTH - p.y) / KELP_HEIGHT) }))
   return { stacks, rocks, gulls, coral, kelp }
+}
+
+const SUNKEN_CITY_AVOID = [{ x: SUNKEN_CITY_POSITION[0], z: SUNKEN_CITY_POSITION[2], r: 320 }]
+const layoutCache = new WeakMap<ArcTable, { groundFn: HeightFunction; layout: OceanLayout }>()
+
+/** The level's layout (stacks kept off the sunken city), built once per track and ground: the decorations and the Kraken share it. */
+export function oceanLayout(groundFn: HeightFunction, track: ArcTable): OceanLayout {
+  const cached = layoutCache.get(track)
+  if (cached?.groundFn === groundFn) return cached.layout
+  const layout = layoutOcean(groundFn, track, SUNKEN_CITY_AVOID)
+  layoutCache.set(track, { groundFn, layout })
+  return layout
+}
+
+/** Footprints of everything standing out of the water (stacks, breaching rocks), for things rising beside them. */
+export function seaObstacles(layout: OceanLayout): { x: number; z: number; r: number }[] {
+  return [
+    ...layout.stacks.map((p) => ({ x: p.x, z: p.z, r: STACK_FOOTPRINT * p.scale })),
+    ...layout.rocks.map((p) => ({ x: p.x, z: p.z, r: ROCK_FOOTPRINT * p.scale })),
+  ]
 }

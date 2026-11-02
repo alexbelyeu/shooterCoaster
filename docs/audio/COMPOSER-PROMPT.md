@@ -71,14 +71,18 @@ Melodic instruments:
 - Voices and pads: choir voices pad
 - Bass and timpani: fretless synbass timpani
 - Plain synths: chip sine square saw triangle
+- Arcade palette: fmbass supersaw distguitar orchhit synbrass riser downlifter
 
 Drum instruments, one sound per voice:
 
 - Kit: kick snare rim hat ohat ride crash clap
 - Hand percussion: conga tumba bongo bongolo timbale bodhran shaker tamb clave block cowbell guiro tri
 - Toms and effects: tomlo tommid tomhi gong thunder surf
+- Arcade kit: bigkick gatesnare hat909 ohat909 clap909
 
 Some of these names are short: pipe is a pipe organ, pizz is pizzicato strings, upright is an upright bass, chip is a square-wave game console lead, ohat is an open hi-hat, tamb is a tambourine, tri is a triangle, thunder is a long thunder roll and surf is a wave breaking on a beach (both last several seconds).
+
+The arcade palette is the game's own sound, so prefer it for leads, bass and drums: fmbass is a punchy FM slap bass (octaves 2 to 3), supersaw a wide seven-saw lead (octaves 4 to 6), distguitar a distorted guitar whose `+` notes make one power chord (`E3+B3`; use `gate=0.5` for chugs), orchhit a short orchestra stab for accents (play a chord on it), synbrass 90s synth brass for stabs and pads, riser and downlifter are noise sweeps as long as the written note (a riser on the last bar before a new section, a downlifter on the first beat after it; the note sets the pitch, around C5 to C6), bigkick a big electronic kick, gatesnare a snare with a gated-reverb tail, hat909 and ohat909 closed and open electronic hats (an open hat rings about half a second and isn't cut by a closed one), clap909 an electronic hand clap.
 
 ## Patterns
 

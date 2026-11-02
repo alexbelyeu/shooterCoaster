@@ -36,6 +36,32 @@ export const DEFAULT_RAIL_RADIUS = 0.35
 export const DEFAULT_TIE_SPACING = 10
 export const DEFAULT_TOWER_SPACING = 50
 
+/** Projected radius (drawing-buffer px) far rails and spine never thin below. */
+export const RAIL_MIN_PIXEL_RADIUS = 1.5
+/** The same floor for tower legs, braces and cross-beams: about one pixel wide. */
+export const LATTICE_MIN_PIXEL_RADIUS = 0.5
+
+/** World radius that projects to `minPixelRadius` px at view-space `depth`; `projScaleY` = projectionMatrix[1][1]. */
+export function minWorldRadius(
+  depth: number,
+  minPixelRadius: number,
+  projScaleY: number,
+  viewportHeightPx: number,
+): number {
+  return (2 * Math.max(0, depth) * minPixelRadius) / (projScaleY * viewportHeightPx)
+}
+
+/** Outward push for a part `radius` thick; 0 wherever it is already thicker than the floor. */
+export function minThicknessPush(
+  radius: number,
+  depth: number,
+  minPixelRadius: number,
+  projScaleY: number,
+  viewportHeightPx: number,
+): number {
+  return Math.max(0, minWorldRadius(depth, minPixelRadius, projScaleY, viewportHeightPx) - radius)
+}
+
 export function getTrackScale(scalar: number): number {
   return Math.min(2.5, Math.max(1, Math.sqrt(scalar / BASE_SCALAR)))
 }

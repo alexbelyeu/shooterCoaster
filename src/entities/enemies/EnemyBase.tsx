@@ -2,15 +2,14 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
-import { placeSound, sfx } from '@/audio/sfx'
 import { eventBus } from '@/core/EventBus'
 import { gameTime } from '@/core/gameClock'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
-import type { EnemyType, Formation } from '@/types/level'
+import type { EnemyType } from '@/types/level'
 import { registerE2EEnemy, unregisterE2EEnemy } from '@/testing/e2eHook'
 import { flashMesh, restoreMesh } from './hitFlash'
-import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE } from '@/combat/hitFeedback'
-import { entryPoint, type Vec3 } from '@/entities/spawning/spawnPlacement'
+import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE, type EnemyKilledEvent } from '@/combat/hitFeedback'
+import { entryPoint, type FormationMotion, type Vec3 } from '@/entities/spawning/spawnPlacement'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { DEATH_STYLES } from '@/effects/deathStyles'
 
@@ -23,9 +22,8 @@ export interface EnemyProps {
   onKill: (id: string) => void
   /** Fly in from `entry.from` to `spawnPosition` first. */
   entry?: EnemyEntry
-  /** XZ angle (`atan2(dz, dx)`) a formation moves on together. */
-  heading?: number
-  formation?: Formation
+  /** A formation member's motion after its entry. */
+  motion?: FormationMotion
 }
 
 export interface EnemyEntry {
@@ -106,17 +104,17 @@ export default function EnemyBase({
     const combo = useGameStore.getState().combo
     const style = DEATH_STYLES[type]
     const group = meshRef.current
-    sfx().kill(combo.count, style.sound, placeSound(group?.position))
-
     if (group) {
       group.traverse(restoreMesh)
       const pos = group.position.clone()
-      eventBus.emit('enemy:killed', {
+      const event: EnemyKilledEvent = {
         position: pos,
         combo: combo.count,
         multiplier: combo.multiplier,
         score: Math.round(scoreValue * combo.multiplier),
-      })
+        sound: style.sound,
+      }
+      eventBus.emit('enemy:killed', event)
       getExplosionPool()?.explode(pos, style)
       onKill(id)
     }

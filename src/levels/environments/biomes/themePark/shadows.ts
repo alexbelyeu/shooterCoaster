@@ -1,5 +1,5 @@
 import { roundCaster, type ShadowCaster } from '../../shared/contactShadows'
-import { ARCH_HALF_SPAN, RIDES, STALL_DEPTH, STALL_WIDTH, type ThemeParkLayout } from './parkSpec'
+import { RIDES, STALL_DEPTH, STALL_WIDTH, type ThemeParkLayout } from './parkSpec'
 
 export function themeParkShadowCasters(layout: ThemeParkLayout): ShadowCaster[] {
   const out: ShadowCaster[] = []
@@ -10,15 +10,7 @@ export function themeParkShadowCasters(layout: ThemeParkLayout): ShadowCaster[] 
   for (const h of layout.hedges) {
     out.push({ x: h.x, z: h.z, halfX: 9, halfZ: 3, yaw: h.yaw, radius: 2, spread: 6, strength: 0.6 })
   }
-  const { arch } = layout
-  if (arch) {
-    const cos = Math.cos(arch.yaw)
-    const sin = Math.sin(arch.yaw)
-    for (const side of [-1, 1]) {
-      const lx = side * ARCH_HALF_SPAN
-      out.push(roundCaster(arch.x + lx * cos, arch.z - lx * sin, 4, 0.8, 2))
-    }
-  }
+  for (const f of layout.arch?.feet ?? []) out.push(roundCaster(f.x, f.z, 4, 0.8, 2))
   for (const r of RIDES) {
     out.push(
       r.kind === 'ferrisWheel'

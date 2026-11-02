@@ -5,6 +5,8 @@
  * ~10 / 130 / 300 at p50 / p90 / p99 and longitudinal ~20 / 150 / 250.
  */
 
+import { distanceAtT, tAtLoopDistance, type ArcTable } from './arcLength'
+
 export interface Vec3Like {
   x: number
   y: number
@@ -105,6 +107,52 @@ export function stepRig(
   state.speedNorm = damp(state.speedNorm, Math.min(Math.max(speedNorm, 0), 1), SPEED_FOV_RESPONSE, dt)
   state.drop = damp(state.drop, dropAmount(descent), DROP_RESPONSE, dt)
   return state
+}
+
+export interface TrackSamples {
+  /** Curve parameters `CURVATURE_SAMPLE_UNITS` behind and ahead of the car, and `LOOK_AHEAD_UNITS` ahead. */
+  behindT: number
+  aheadT: number
+  lookT: number
+  /** Arc distance from behind to ahead (world units). */
+  span: number
+  /** World units per unit of t at the car, over that span. */
+  unitsPerT: number
+}
+
+const wrap01 = (t: number) => ((t % 1) + 1) % 1
+
+/** Sample points by arc distance (trig curves are uneven in t), wrapping at the loop seam. */
+export function sampleTrack(table: ArcTable, t: number, trackScale: number, out: TrackSamples): TrackSamples {
+  const s = distanceAtT(table, t)
+  const d = CURVATURE_SAMPLE_UNITS * trackScale
+  out.behindT = tAtLoopDistance(table, s - d)
+  out.aheadT = tAtLoopDistance(table, s + d)
+  out.lookT = tAtLoopDistance(table, s + LOOK_AHEAD_UNITS * trackScale)
+  out.span = 2 * d
+  const dt = wrap01(out.aheadT - out.behindT)
+  out.unitsPerT = dt > 0 ? out.span / dt : 0
+  return out
+}
+
+/**
+ * Lateral acceleration (units/s²) along the camera's right axis (tangent × up): curvature × v²,
+ * from the unit tangents `arcSpan` units apart around the car. Positive when the track turns right.
+ */
+export function lateralAcceleration(
+  tangent: Vec3Like,
+  tangentBehind: Vec3Like,
+  tangentAhead: Vec3Like,
+  arcSpan: number,
+  speed: number,
+): number {
+  // right = tangent × (0, 1, 0)
+  const rx = -tangent.z
+  const rz = tangent.x
+  const len = Math.hypot(rx, rz)
+  if (!(arcSpan > 0) || len < 1e-6) return 0
+  const curvatureRight = ((tangentAhead.x - tangentBehind.x) * rx + (tangentAhead.z - tangentBehind.z) * rz) / (len * arcSpan)
+  return curvatureRight * speed * speed
 }
 
 function normalize(v: Vec3Like): Vec3Like {

@@ -18,12 +18,11 @@ export default function Balloon(props: EnemyProps) {
   )
 
   const bobPhase = useMemo(() => Math.random() * Math.PI * 2, [])
-  const holdSlot = props.formation === 'ring'
+  const holdSlot = props.motion?.kind === 'hold'
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number, delta: number) => {
       if (holdSlot) {
-        // Floating up would carry the hoop off before the rider gets there.
         mesh.position.y = spawnPos.y + Math.sin(time * 1.6 + bobPhase) * 6
         return
       }

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { BOSS_SFX, FIREWORK_BIOMES, FIREWORK_SFX, FIRE_VARIANTS, STINGERS, STINGER_VOICES, bossHitHz, fireVelocity, fireworkWhistleS, KILL_TIMBRES, killLayers, killPingHz, killTier } from './sfxDesign'
+import { BOSS_SFX, FIREWORK_BIOMES, FIREWORK_SFX, FIRE_VARIANTS, STINGERS, STINGER_VOICES, bossHitHz, fireVelocity, fireworkWhistleS, KILL_TIMBRES, killLayers, killPingHz, killTier, WIND, windGain, windHz, windUpdateDue } from './sfxDesign'
+import { openingChord } from './MusicManager'
+import type { BiomeType } from '@/types/level'
 
 describe('killTier / killLayers', () => {
   it('maps combo counts to the four tiers', () => {
@@ -38,6 +40,46 @@ describe('wave stingers', () => {
       expect(d.drive).toBeGreaterThanOrEqual(0)
       expect(d.drive).toBeLessThanOrEqual(1)
     }
+  })
+
+  const PITCH: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
+  const pitchClass = (note: string) => {
+    const acc = note[1] === '#' ? 1 : note[1] === 'b' ? -1 : 0
+    return (PITCH[note[0]] + acc + 12) % 12
+  }
+
+  it("resolve to the root of their biome's level music key", () => {
+    for (const [biome, d] of Object.entries(STINGERS) as [BiomeType, (typeof STINGERS)[BiomeType]][]) {
+      expect(pitchClass(d.chords[1][0]), biome).toBe(pitchClass(openingChord(biome)[0]))
+    }
+  })
+})
+
+describe('wind', () => {
+  it('opens and brightens with speed', () => {
+    expect(windGain(0)).toBe(0)
+    expect(windGain(1)).toBeCloseTo(WIND.maxGain)
+    expect(windHz(1)).toBeGreaterThan(windHz(0))
+  })
+
+  it('re-aims at most every minIntervalS and only past minStep, but always reaches silence', () => {
+    const last = { speed: 0, at: -Infinity }
+    expect(windUpdateDue(0, 0, last)).toBe(false)
+    expect(windUpdateDue(0.5, 0, last)).toBe(true)
+    expect(windUpdateDue(0.9, 0.05, last)).toBe(false)
+    expect(windUpdateDue(0.5 + WIND.minStep / 2, 0.2, last)).toBe(false)
+    expect(windUpdateDue(0.6, 0.2, last)).toBe(true)
+    expect(last).toEqual({ speed: 0.6, at: 0.2 })
+    expect(windUpdateDue(0.01, 0.4, last)).toBe(true)
+    expect(windUpdateDue(0, 0.6, last)).toBe(true)
+    expect(windUpdateDue(0, 0.8, last)).toBe(false)
+  })
+
+  it('lets a stop through right after a re-aim (the unmount calls wind(0) once)', () => {
+    const last = { speed: 0, at: -Infinity }
+    expect(windUpdateDue(0.7, 1, last)).toBe(true)
+    expect(windUpdateDue(0, last.at + 0.01, last)).toBe(true)
+    expect(last).toEqual({ speed: 0, at: 1.01 })
   })
 })
 

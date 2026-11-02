@@ -77,14 +77,14 @@ function ToggleRow({ label, note, checked, disabled, onChange }: { label: string
   )
 }
 
-/** Wipes scores, stars and leaderboards; a second tap confirms. */
+/** Wipes scores, stars, leaderboards and the Daily Run record; a second tap confirms. */
 function ClearDataRow() {
   const [step, setStep] = useState<'idle' | 'confirm' | 'cleared'>('idle')
 
   if (step === 'confirm') {
     return (
       <div className="settings-row settings-clear" data-step="confirm">
-        <span>Erase all scores, stars and leaderboards?</span>
+        <span>Erase all scores, stars, leaderboards and daily bests?</span>
         <div className="settings-clear-actions">
           <button type="button" onClick={() => setStep('idle')}>
             Cancel

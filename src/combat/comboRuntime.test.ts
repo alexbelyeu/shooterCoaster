@@ -3,7 +3,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { gameTime } from '@/core/gameClock'
 import { FRENZY } from './comboTiers'
-import { frenzyActive, resetComboRuntime, tickCombo } from './comboRuntime'
+import { endFrenzy, frenzyActive, resetComboRuntime, tickCombo } from './comboRuntime'
 
 // zustand's persist wants window.localStorage; a bare in-memory one is enough here.
 vi.hoisted(() => {
@@ -109,6 +109,30 @@ describe('frenzy', () => {
     store().setTimeScale(0.1)
     tickCombo(0.5)
     expect(frenzyActive()).toBe(false)
+    expect(store().timeScale).toBe(0.1)
+  })
+
+  it('endFrenzy hands back exactly 1 when the level ends mid-frenzy', () => {
+    kills(15)
+    tickCombo(FRENZY.durationS / 2)
+    expect(store().timeScale).toBeLessThan(1)
+    endFrenzy()
+    expect(store().timeScale).toBe(1)
+    expect(frenzyActive()).toBe(false)
+  })
+
+  it('endFrenzy leaves a time scale someone else set', () => {
+    kills(15)
+    tickCombo(0.5)
+    store().setTimeScale(0)
+    endFrenzy()
+    expect(store().timeScale).toBe(0)
+    expect(frenzyActive()).toBe(false)
+  })
+
+  it('endFrenzy does nothing without a frenzy', () => {
+    store().setTimeScale(0.1)
+    endFrenzy()
     expect(store().timeScale).toBe(0.1)
   })
 

@@ -4,25 +4,34 @@ import type { BiomeDecorationsProps } from '../../shared/types'
 import { createRng } from '@/utils/rng'
 import { scatterPositions } from '../../shared/scatter'
 import Cacti from './Cacti'
+import { roundCaster } from '../../shared/contactShadows'
+import { useContactShadows } from '../../shared/ContactShadows'
 
 /** Desert ground clutter: rocks, tumbleweeds, bones, skulls, flowers. */
 function DesertProps({ heightFn }: Pick<BiomeDecorationsProps, 'heightFn'>) {
-  // Rocks
   const rockPositions = useMemo(() => scatterPositions(createRng(2330), 80, 300, 2800, heightFn), [heightFn])
   const rockGeo = useMemo(() => new THREE.DodecahedronGeometry(1, 0), [])
   const rockMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#8b6b4a', flatShading: true }), [])
 
+  const rockConfigs = useMemo(() => {
+    const rng = createRng(2335)
+    return rockPositions.map(() => {
+      const s = 3 + rng() * 10
+      return { s, tilt: new THREE.Euler(rng() * 0.5, rng() * Math.PI * 2, rng() * 0.5) }
+    })
+  }, [rockPositions])
+  useContactShadows(
+    useMemo(() => rockPositions.map((p, i) => roundCaster(p.x, p.z, rockConfigs[i].s * 0.85, 0.45, 0.8)), [rockPositions, rockConfigs]),
+  )
+
   const setRockRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
-    const rng = createRng(2335)
     const mat = new THREE.Matrix4()
     const q = new THREE.Quaternion()
-    const euler = new THREE.Euler()
     for (let i = 0; i < rockPositions.length; i++) {
       const p = rockPositions[i]
-      const s = 3 + rng() * 10
-      euler.set(rng() * 0.5, rng() * Math.PI * 2, rng() * 0.5)
-      q.setFromEuler(euler)
+      const { s, tilt } = rockConfigs[i]
+      q.setFromEuler(tilt)
       mat.compose(
         new THREE.Vector3(p.x, p.y + s * 0.4, p.z),
         q,
@@ -31,9 +40,8 @@ function DesertProps({ heightFn }: Pick<BiomeDecorationsProps, 'heightFn'>) {
       mesh.setMatrixAt(i, mat)
     }
     mesh.instanceMatrix.needsUpdate = true
-  }, [rockPositions])
+  }, [rockPositions, rockConfigs])
 
-  // Tumbleweeds
   const tumbleweedPositions = useMemo(() => scatterPositions(createRng(2331), 30, 200, 2500, heightFn), [heightFn])
   const twGeo = useMemo(() => new THREE.IcosahedronGeometry(1, 0), [])
   const twMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#9a8a5a', flatShading: true }), [])
@@ -52,7 +60,6 @@ function DesertProps({ heightFn }: Pick<BiomeDecorationsProps, 'heightFn'>) {
     mesh.instanceMatrix.needsUpdate = true
   }, [tumbleweedPositions])
 
-  // Bone clusters
   const bonePositions = useMemo(() => scatterPositions(createRng(2332), 15, 500, 2500, heightFn), [heightFn])
   const boneGeo = useMemo(() => new THREE.CylinderGeometry(0.3, 0.5, 1, 4), [])
   const boneMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#e8dcc8', flatShading: true }), [])
@@ -77,7 +84,6 @@ function DesertProps({ heightFn }: Pick<BiomeDecorationsProps, 'heightFn'>) {
     mesh.instanceMatrix.needsUpdate = true
   }, [bonePositions])
 
-  // Skull clusters
   const skullPositions = useMemo(() => scatterPositions(createRng(2333), 20, 400, 2500, heightFn), [heightFn])
   const skullGeo = useMemo(() => new THREE.SphereGeometry(1, 6, 6), [])
   const skullMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#e8dcc8', flatShading: true }), [])
@@ -103,7 +109,6 @@ function DesertProps({ heightFn }: Pick<BiomeDecorationsProps, 'heightFn'>) {
     mesh.instanceMatrix.needsUpdate = true
   }, [skullPositions])
 
-  // Desert flowers
   const flowerPositions = useMemo(() => scatterPositions(createRng(2334), 15, 300, 2200, heightFn), [heightFn])
   const flowerGeo = useMemo(() => new THREE.ConeGeometry(0.6, 1.2, 5), [])
   const flowerMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#ff6644', flatShading: true }), [])
@@ -134,7 +139,6 @@ function DesertProps({ heightFn }: Pick<BiomeDecorationsProps, 'heightFn'>) {
 
   return (
     <>
-      {/* Other desert decorations */}
       <instancedMesh ref={setRockRef} args={[rockGeo, rockMat, rockPositions.length]} frustumCulled />
       <instancedMesh ref={setTwRef} args={[twGeo, twMat, tumbleweedPositions.length]} frustumCulled />
       <instancedMesh ref={setBoneRef} args={[boneGeo, boneMat, bonePositions.length]} frustumCulled />

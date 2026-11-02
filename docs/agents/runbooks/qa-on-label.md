@@ -9,6 +9,7 @@ now), reply "No PR event — nothing to do" and stop.
    `agent/`, and it is labelled `agent:needs-qa`. Otherwise reply "Nothing to review" and
    stop.
 2. Follow `docs/agents/runbooks/review-one-pr.md` for it.
-3. If it was approved, poll for a few minutes until it merges.
+3. Don't wait for the merge: the auto-merge workflow merges an approved PR once `verify` is
+   green, and says so on the PR if it can't. Polling only re-reads your whole context.
 4. `node scripts/run-usage.cjs --role qa-on-label --ref "#<n>" --post`, then reply with one
-   line: PR number, decision, reason, merged yet.
+   line: PR number, decision, reason, `verify` state.

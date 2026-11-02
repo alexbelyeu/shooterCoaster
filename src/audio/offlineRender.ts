@@ -1,5 +1,6 @@
 import * as Tone from 'tone'
 import { swapInOfflineChain } from './AudioEngine'
+import { loadTone } from './tone'
 import { createRng } from '@/utils/rng'
 import type { MusicEngine } from './musicEngine'
 
@@ -26,6 +27,7 @@ export async function renderOffline(
   script: (scope: OfflineRenderScope) => void,
   cleanup: () => void,
 ): Promise<AudioBuffer> {
+  await loadTone()
   const live = Tone.getContext()
   const offline = new LookAheadOfflineContext(2, seconds, sampleRate)
   const random = Math.random

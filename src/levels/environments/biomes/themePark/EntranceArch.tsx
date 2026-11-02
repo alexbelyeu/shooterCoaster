@@ -1,12 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
-import {
-  ARCH_BOARD_DEPTH,
-  ARCH_BOARD_HEIGHT,
-  ARCH_BOARD_WIDTH,
-  ARCH_HALF_SPAN,
-  type Arch,
-} from './parkSpec'
+import { ARCH_BOARD_DEPTH, ARCH_BOARD_HEIGHT, ARCH_BOARD_WIDTH, type Arch } from './parkSpec'
 
 const TITLE = 'SHOOTER COASTER'
 /** Lobster comes from global.css; until it loads (or if it never does) the canvas uses a system face. */
@@ -96,14 +90,16 @@ export default function EntranceArch({ arch }: { arch: Arch }) {
   const topY = arch.groundY - 2 + arch.postHeight - arch.y
 
   return (
-    <group position={[arch.x, arch.y, arch.z]} rotation={[0, arch.yaw, 0]}>
-      <mesh geometry={assets.board} material={assets.boardMats} position={[0, arch.boardY - arch.y + ARCH_BOARD_HEIGHT / 2, 0]} />
-      {[-1, 1].map((side) => (
-        <group key={side} position={[side * ARCH_HALF_SPAN, 0, 0]}>
+    <>
+      <group position={[arch.x, arch.y, arch.z]} rotation={[0, arch.yaw, 0]}>
+        <mesh geometry={assets.board} material={assets.boardMats} position={[0, arch.boardY - arch.y + ARCH_BOARD_HEIGHT / 2, 0]} />
+      </group>
+      {arch.feet.map((f, i) => (
+        <group key={i} position={[f.x, arch.y, f.z]} rotation={[0, arch.yaw, 0]}>
           <mesh geometry={assets.post} material={assets.postMat} position={[0, postY, 0]} />
           <mesh geometry={assets.finial} material={assets.finialMat} position={[0, topY + 6, 0]} />
         </group>
       ))}
-    </group>
+    </>
   )
 }

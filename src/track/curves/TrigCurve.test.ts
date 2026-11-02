@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { createTrigCurve } from './TrigCurve'
 import { createTrigCurve2 } from './TrigCurve2'
 import { getAllLevels } from '@/levels/LevelRegistry'
-import { generateTrackSegment } from '@/track/ProceduralTrackGenerator'
 import type { TrackParams } from '@/types/level'
 
 const SAMPLES = 1000
@@ -126,32 +125,5 @@ describe('TrigCurve2 (curve2)', () => {
       const seamRise = Math.abs(curve.getPointAt(0).y - prevY)
       expect(seamRise).toBeLessThanOrEqual(maxRise)
     })
-  })
-})
-
-describe('ProceduralTrackGenerator', () => {
-  it('is deterministic per seed and segment', () => {
-    const a = generateTrackSegment(1234, 3)
-    const b = generateTrackSegment(1234, 3)
-    expect([a.varA, a.varB, a.varC, a.scalar]).toEqual([b.varA, b.varB, b.varC, b.scalar])
-    expect(pointAt(a.curve, 0.37)).toEqual(pointAt(b.curve, 0.37))
-  })
-
-  it('keeps params in documented ranges and curves finite for many seeds', () => {
-    for (let seed = 0; seed < 50; seed++) {
-      const s = generateTrackSegment(seed, seed % 5)
-      expect(s.varA).toBeGreaterThanOrEqual(2)
-      expect(s.varA).toBeLessThanOrEqual(7)
-      expect(s.varB).toBeGreaterThanOrEqual(10)
-      expect(s.varB).toBeLessThanOrEqual(34)
-      expect(s.varC).toBeGreaterThanOrEqual(2)
-      expect(s.varC).toBeLessThanOrEqual(5)
-      expect(s.scalar).toBeGreaterThanOrEqual(20)
-      expect(s.scalar).toBeLessThanOrEqual(59)
-      for (let i = 0; i <= 100; i++) {
-        const p = s.curve.getPointAt(i / 100)
-        expect(Number.isFinite(p.x + p.y + p.z)).toBe(true)
-      }
-    }
   })
 })

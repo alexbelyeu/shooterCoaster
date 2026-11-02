@@ -35,6 +35,8 @@ export interface BiomeTreeConfig {
   maxRadius: number
   /** Slope rejection angle in radians (PI/6 for mountains, PI/4 for flat biomes). */
   maxSlope: number
+  /** Fraction of a tree's own colour added as unlit light, for biomes whose backlit trees go black next to bright ground (arctic). */
+  fill?: number
 }
 
 /** Props every biome's decorations component receives. */
@@ -44,6 +46,7 @@ export interface BiomeDecorationsProps {
   groundFn: HeightFunction
   /** The level's only track input: use with `shared/trackClearance.ts` and `shared/trackScatter.ts`. */
   track: ArcTable
+  atmosphere: AtmosphereConfig
 }
 
 /** Props every biome's features component (landmarks, terrain features, events) receives. */

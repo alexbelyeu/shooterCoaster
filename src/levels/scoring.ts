@@ -45,3 +45,22 @@ export function computeStars(
   if (pct >= thresholds[0]) return 1
   return 0
 }
+
+export interface NextStar {
+  /** 1-3 */
+  stars: number
+  points: number
+}
+
+/** The star above the one `score` earns (per `computeStars`) and the whole points still needed for it; null with all stars or no maxScore. */
+export function nextStar(
+  score: number,
+  maxScore: number,
+  thresholds: readonly [number, number, number],
+): NextStar | null {
+  const earned = computeStars(score, maxScore, thresholds)
+  if (!(maxScore > 0) || earned === 3) return null
+  // The epsilon keeps a float product like 0.55 × 100 = 55.00000000000001 from asking for a point too many.
+  const needed = thresholds[earned] * maxScore - score
+  return { stars: earned + 1, points: Math.max(1, Math.ceil(needed - 1e-9)) }
+}

@@ -1,0 +1,23 @@
+/** The parts of Tone the main chunk uses: a dynamic `import('tone')` would keep the whole namespace (+16 KB gz). */
+export {
+  Channel,
+  Compressor,
+  Distortion,
+  Filter,
+  Gain,
+  Limiter,
+  Loop,
+  MembraneSynth,
+  Noise,
+  NoiseSynth,
+  PolySynth,
+  Sequence,
+  Synth,
+  dbToGain,
+  gainToDb,
+  getContext,
+  getTransport,
+  now,
+  setContext,
+  start,
+} from 'tone'

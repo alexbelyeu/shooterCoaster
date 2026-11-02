@@ -21,16 +21,6 @@ const BANDS = [
 ]
 const TOP = c(0xc98552)
 
-const UP = new THREE.Vector3(0, 1, 0)
-
-function mesaMatrix(m: Mesa): THREE.Matrix4 {
-  return new THREE.Matrix4().compose(
-    new THREE.Vector3(m.x, m.y, m.z),
-    new THREE.Quaternion().setFromAxisAngle(UP, m.yaw),
-    new THREE.Vector3(m.scale, m.scale, m.scale),
-  )
-}
-
 /** Flat-topped, stepped red-rock mesas: one merged geometry, one draw call. */
 export default function Mesas({ mesas }: { mesas: readonly Mesa[] }) {
   const geometry = useMemo(() => buildRingedRock(MESA_RINGS, 11, MESA_JITTER, 23, BANDS, TOP, 0), [])
@@ -44,7 +34,6 @@ export default function Mesas({ mesas }: { mesas: readonly Mesa[] }) {
       }),
     [],
   )
-  const matrices = useMemo(() => mesas.map(mesaMatrix), [mesas])
 
   useEffect(() => {
     return () => {
@@ -53,5 +42,5 @@ export default function Mesas({ mesas }: { mesas: readonly Mesa[] }) {
     }
   }, [geometry, material])
 
-  return <StaticInstances matrices={matrices} geometry={geometry} material={material} />
+  return <StaticInstances placements={mesas} geometry={geometry} material={material} />
 }

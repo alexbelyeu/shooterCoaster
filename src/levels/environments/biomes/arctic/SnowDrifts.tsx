@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import type { BiomeDecorationsProps } from '../../shared/types'
 import { scatterNearTrack, settleOnGround, trackExtent } from '../../shared/trackScatter'
 import { createRng } from '@/utils/rng'
 import { COLOR_RAMP } from './config'
+import StaticInstances from '../../shared/StaticInstances'
+import { yawScaleMatrix } from '../../shared/yawScaleMatrix'
 import { DRIFT_HALF_LENGTH, DRIFT_HEIGHT, createDriftGeometry } from './iceProps'
 
 /** Prevailing wind (yaw): drifts line up with it. */
@@ -47,27 +49,8 @@ export default function SnowDrifts({ groundFn, track }: BiomeDecorationsProps) {
       maxBury: 0.33,
       rng,
     })
-    const q = new THREE.Quaternion()
-    const up = new THREE.Vector3(0, 1, 0)
-    return drifts.map((d) => {
-      q.setFromAxisAngle(up, WIND_YAW + (rng() - 0.5) * 0.8)
-      return new THREE.Matrix4().compose(
-        new THREE.Vector3(d.x, d.y, d.z),
-        q,
-        new THREE.Vector3(d.scale, d.scale, d.scale),
-      )
-    })
+    return drifts.map((d) => yawScaleMatrix(d, WIND_YAW + (rng() - 0.5) * 0.8, d.scale))
   }, [groundFn, track])
-
-  const setRef = useCallback(
-    (mesh: THREE.InstancedMesh | null) => {
-      if (!mesh) return
-      matrices.forEach((m, i) => mesh.setMatrixAt(i, m))
-      mesh.instanceMatrix.needsUpdate = true
-      mesh.computeBoundingSphere()
-    },
-    [matrices],
-  )
 
   useEffect(() => {
     return () => {
@@ -76,6 +59,5 @@ export default function SnowDrifts({ groundFn, track }: BiomeDecorationsProps) {
     }
   }, [geometry, material])
 
-  if (matrices.length === 0) return null
-  return <instancedMesh ref={setRef} args={[geometry, material, matrices.length]} />
+  return <StaticInstances matrices={matrices} geometry={geometry} material={material} />
 }

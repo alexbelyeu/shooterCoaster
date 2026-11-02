@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { createRng } from '@/utils/rng'
 import type { SeabedProp } from './seaPlacement'
-import { createCoralClusterGeometry, createKelpClumpGeometry, propMatrix } from './seaProps'
+import { createCoralClusterGeometry, createKelpClumpGeometry } from './seaProps'
 import { createCoralMaterial, createKelpMaterial } from './seaMaterials'
 import StaticInstances from '../../shared/StaticInstances'
 
@@ -16,12 +16,10 @@ export default function Reef({ coral, kelp }: { coral: readonly SeabedProp[]; ke
   const coralMat = useMemo(() => createCoralMaterial(0.22), [])
   const kelpMat = useMemo(() => createKelpMaterial(), [])
 
-  const coralMatrices = useMemo(() => coral.map(propMatrix), [coral])
   const coralColors = useMemo(() => {
     const rng = createRng(77)
     return coral.map(() => new THREE.Color(CORAL_TINTS[Math.floor(rng() * CORAL_TINTS.length)]))
   }, [coral])
-  const kelpMatrices = useMemo(() => kelp.map(propMatrix), [kelp])
 
   useEffect(() => {
     return () => {
@@ -38,8 +36,8 @@ export default function Reef({ coral, kelp }: { coral: readonly SeabedProp[]; ke
 
   return (
     <>
-      <StaticInstances matrices={coralMatrices} colors={coralColors} geometry={coralGeo} material={coralMat} />
-      <StaticInstances matrices={kelpMatrices} geometry={kelpGeo} material={kelpMat.material} />
+      <StaticInstances placements={coral} colors={coralColors} geometry={coralGeo} material={coralMat} />
+      <StaticInstances placements={kelp} geometry={kelpGeo} material={kelpMat.material} />
     </>
   )
 }

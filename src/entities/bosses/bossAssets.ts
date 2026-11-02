@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { mergePainted, painted, paintedAt, pose } from '@/levels/environments/shared/paintedParts'
 import { withRim } from '@/entities/enemies/enemyRim'
 import { BLIMP_LAYOUT } from './bossSpecs'
+import { KRAKEN_HEAD } from './krakenMotion'
 
 // Module-level singletons like SharedEnemyAssets; ShaderWarmup walks these exports too.
 
@@ -124,3 +125,86 @@ export const CONFETTI_COUNT = 220
 export const CONFETTI_GEO = new THREE.PlaneGeometry(12, 7)
 export const CONFETTI_MAT = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
 export const CONFETTI_COLORS = ['#ff3355', '#ffd23f', '#33c3ff', '#7cff4f', '#ff7a1a', '#c86bff', '#ffffff']
+
+// ── The Kraken (Ocean) ──
+
+// Dark teal on top, a pale sucker side towards the rider: the pale side carries it against the water.
+const KRAKEN_TEAL = '#1f5c63'
+const KRAKEN_DARK = '#123c42'
+const KRAKEN_UNDERSIDE = '#c4e2d4'
+const KRAKEN_SUCKER = '#f4c8c0'
+const PAD_CYAN = '#5ff8ff'
+
+/** One tapered segment: base at y 0, height 1, radius 1 (instance scale: radius, length, radius); its −x side faces the rider. */
+function tentacleSegmentGeo(): THREE.BufferGeometry {
+  const body = new THREE.CylinderGeometry(0.86, 1, 1, 12, 1, true).translate(0, 0.5, 0).toNonIndexed()
+  body.deleteAttribute('uv')
+  const pos = body.attributes.position
+  const colors = new Float32Array(pos.count * 3)
+  const top = new THREE.Color(KRAKEN_TEAL)
+  const under = new THREE.Color(KRAKEN_UNDERSIDE)
+  const mixed = new THREE.Color()
+  for (let t = 0; t < pos.count; t += 3) {
+    const x = (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3
+    const z = (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3
+    mixed.lerpColors(top, under, THREE.MathUtils.smoothstep(-x / Math.hypot(x, z), 0.35, 0.8))
+    for (let k = 0; k < 3; k++) mixed.toArray(colors, (t + k) * 3)
+  }
+  body.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  const sucker = (y: number, z: number) => painted(new THREE.SphereGeometry(0.2, 8, 4), KRAKEN_SUCKER, [-0.9, y, z])
+  return mergePainted([body, sucker(0.3, 0.22), sucker(0.75, -0.22)])
+}
+
+export const KRAKEN_SEGMENT_GEO = tentacleSegmentGeo()
+
+export const KRAKEN_SKIN_MAT = withRim(
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.08, flatShading: true, emissive: '#06222a' }),
+  { color: '#bff6ff', intensity: 0.6, power: 2.5 },
+)
+
+/** Sucker pad facing −x: a pale rim around a glowing cup. */
+export const KRAKEN_PAD_GEO = mergePainted([
+  painted(new THREE.TorusGeometry(19, 6, 8, 20), KRAKEN_UNDERSIDE, [0, 0, 0], [0, Math.PI / 2, 0]),
+  painted(new THREE.CylinderGeometry(17, 15, 6, 20), PAD_CYAN, [-1, 0, 0], [0, 0, Math.PI / 2]),
+  painted(new THREE.SphereGeometry(7, 10, 6), '#ffffff', [-4, 0, 0]),
+])
+
+export const KRAKEN_PAD_MAT = withRim(
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0, emissive: '#1fe6ff', emissiveIntensity: 1.3 }),
+  { color: '#c8ffff', intensity: 0.9, power: 2 },
+)
+
+/** Wide low dome, +z towards the rider, mottled, with a heavy brow over the eye. */
+function headGeo(): THREE.BufferGeometry {
+  const { rx, ry, rz, eyeRadius, eyeUp, eyeOut } = KRAKEN_HEAD
+  const dome = new THREE.SphereGeometry(1, 30, 16, 0, Math.PI * 2, 0, Math.PI * 0.62).toNonIndexed()
+  dome.deleteAttribute('uv')
+  const pos = dome.attributes.position
+  const colors = new Float32Array(pos.count * 3)
+  const skin = new THREE.Color(KRAKEN_TEAL)
+  const blotch = new THREE.Color(KRAKEN_DARK)
+  for (let t = 0; t < pos.count; t += 3) {
+    const x = (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3
+    const y = (pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3
+    const z = (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3
+    const c = Math.sin(x * 9.1) * Math.sin(y * 7.3 + 1) * Math.sin(z * 8.7 + 2) > 0.3 ? blotch : skin
+    for (let k = 0; k < 3; k++) c.toArray(colors, (t + k) * 3)
+  }
+  dome.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  dome.scale(rx, ry, rz)
+  const brow = painted(new THREE.TorusGeometry(eyeRadius * 1.1, 10, 8, 22, Math.PI), KRAKEN_DARK, [0, eyeUp + 4, eyeOut - 8])
+  return mergePainted([dome, brow])
+}
+
+export const KRAKEN_HEAD_GEO = headGeo()
+
+/** One big eye looking along +z: a gold iris with a slit pupil. */
+export const KRAKEN_EYE_GEO = mergePainted([
+  painted(new THREE.SphereGeometry(KRAKEN_HEAD.eyeRadius, 20, 14), '#ffd23a'),
+  painted(new THREE.BoxGeometry(7, KRAKEN_HEAD.eyeRadius * 1.5, 4), '#0a0a0a', [0, 0, KRAKEN_HEAD.eyeRadius * 0.97]),
+])
+
+export const KRAKEN_EYE_MAT = withRim(
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.25, metalness: 0, emissive: '#ffb000', emissiveIntensity: 0.9 }),
+  { color: '#fff2b0', intensity: 0.8, power: 2 },
+)

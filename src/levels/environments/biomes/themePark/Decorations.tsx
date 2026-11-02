@@ -2,11 +2,11 @@ import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import type { BiomeDecorationsProps } from '../../shared/types'
 import { getThemeParkLayout } from './layout'
-import type { ThemeParkLayout } from './parkSpec'
-import { placeInstances } from './instancing'
+import { type ThemeParkLayout, paletteColors } from './parkSpec'
 import Midway from './Midway'
 import { themeParkShadowCasters } from './shadows'
 import { useContactShadows } from '../../shared/ContactShadows'
+import StaticInstances from '../../shared/StaticInstances'
 
 /** Base `bury` units below y = 0, so props on slopes don't float. */
 function grounded(geo: THREE.BufferGeometry, height: number, bury = 0) {
@@ -31,27 +31,16 @@ function Scatter({ layout }: { layout: ThemeParkLayout }) {
   )
   useEffect(() => () => Object.values(assets).forEach((a) => a.dispose()), [assets])
 
-  const placeTents = useMemo(() => placeInstances(tents), [tents])
-  const placeTentRoofs = useMemo(() => placeInstances(tents, tents.map((t) => t.color)), [tents])
-  const placeHedges = useMemo(() => placeInstances(hedges), [hedges])
-  const placePoles = useMemo(() => placeInstances(flagPoles), [flagPoles])
-  const placeFlags = useMemo(() => placeInstances(flagPoles, flagPoles.map((f) => f.color)), [flagPoles])
+  const tentColors = useMemo(() => paletteColors(tents.map((t) => t.color)), [tents])
+  const flagColors = useMemo(() => paletteColors(flagPoles.map((f) => f.color)), [flagPoles])
 
   return (
     <>
-      {tents.length > 0 && (
-        <>
-          <instancedMesh ref={placeTents} args={[assets.tentBase, assets.white, tents.length]} />
-          <instancedMesh ref={placeTentRoofs} args={[assets.tentRoof, assets.tinted, tents.length]} />
-        </>
-      )}
-      {hedges.length > 0 && <instancedMesh ref={placeHedges} args={[assets.hedge, assets.green, hedges.length]} />}
-      {flagPoles.length > 0 && (
-        <>
-          <instancedMesh ref={placePoles} args={[assets.pole, assets.grey, flagPoles.length]} />
-          <instancedMesh ref={placeFlags} args={[assets.flag, assets.tinted, flagPoles.length]} />
-        </>
-      )}
+      <StaticInstances placements={tents} geometry={assets.tentBase} material={assets.white} />
+      <StaticInstances placements={tents} colors={tentColors} geometry={assets.tentRoof} material={assets.tinted} />
+      <StaticInstances placements={hedges} geometry={assets.hedge} material={assets.green} />
+      <StaticInstances placements={flagPoles} geometry={assets.pole} material={assets.grey} />
+      <StaticInstances placements={flagPoles} colors={flagColors} geometry={assets.flag} material={assets.tinted} />
     </>
   )
 }

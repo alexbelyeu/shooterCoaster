@@ -3,18 +3,22 @@
  *
  * Ported from Scrimshaw Jukebox (docs/audio/reference/scrimshaw-jukebox.html, the `ScrimScore`
  * script), simonw/tools commit 5fc8e8b, Apache-2.0 (docs/audio/reference/LICENSE-scrimshaw-apache-2.0.txt).
- * Modified for ShooterCoaster: TypeScript types; the behaviour, including every error message, is
- * unchanged and pinned by `score.test.ts` against the original. Format: docs/audio/SCORE-FORMAT.md.
+ * Modified for ShooterCoaster: TypeScript types; the arcade palette's instrument names; the behaviour,
+ * including every error message, is otherwise unchanged and pinned by `score.test.ts` against the original.
+ * Format: docs/audio/SCORE-FORMAT.md.
  */
 
-const MELODIC = ['steeldrum', 'marimba', 'vibes', 'celesta', 'glock', 'xylophone', 'musicbox', 'bell',
+export const MELODIC = ['steeldrum', 'marimba', 'vibes', 'celesta', 'glock', 'xylophone', 'musicbox', 'bell',
   'organ', 'pipe', 'strings', 'pad', 'choir', 'voices', 'brass', 'trumpet', 'horn', 'tuba',
   'flute', 'clarinet', 'oboe', 'bassoon', 'accordion', 'fiddle',
   'harp', 'guitar', 'banjo', 'harpsichord', 'pizz', 'upright', 'fretless', 'synbass', 'timpani',
-  'chip', 'sine', 'square', 'saw', 'triangle']
-const DRUMS = ['kick', 'snare', 'rim', 'hat', 'ohat', 'ride', 'crash', 'shaker', 'tamb',
+  'chip', 'sine', 'square', 'saw', 'triangle',
+  // ShooterCoaster's arcade palette (SCORE-FORMAT.md)
+  'fmbass', 'supersaw', 'distguitar', 'orchhit', 'synbrass', 'riser', 'downlifter']
+export const DRUMS = ['kick', 'snare', 'rim', 'hat', 'ohat', 'ride', 'crash', 'shaker', 'tamb',
   'conga', 'tumba', 'bongo', 'bongolo', 'clave', 'block', 'cowbell', 'guiro',
-  'tomlo', 'tommid', 'tomhi', 'bodhran', 'timbale', 'tri', 'clap', 'gong', 'thunder', 'surf']
+  'tomlo', 'tommid', 'tomhi', 'bodhran', 'timbale', 'tri', 'clap', 'gong', 'thunder', 'surf',
+  'bigkick', 'gatesnare', 'hat909', 'ohat909', 'clap909']
 
 const PC: Record<string, number> = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }
 const NOTE_RE = /^([A-Ga-g])(##|bb|#|b)?([0-8])$/

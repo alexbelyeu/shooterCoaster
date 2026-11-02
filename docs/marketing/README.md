@@ -11,29 +11,39 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   Plus add-on` (read 2026-10-26), so `utm_*` parameters on our links are invisible to us.
   Campaign attribution uses the **referrer hostname** and the **request path**: every link we
   hand out points at a campaign landing path `https://scoaster.com/go/<campaign>` (the
-  `vercel.json` catch-all rewrite serves the game at any path and the page view records it as
-  `requestPath`; verified locally 2026-10-26, pinned by a smoke step in #171). One campaign
+  `vercel.json` `/go/(.*)` rewrite serves the game there and the page view records it as
+  `requestPath`). Any other unknown path is a real 404 since #193, so campaign links must start
+  with `/go/`. The smoke `landing` step (#171) pins it: `/go/smoke-check` must boot to the
+  title with no failed request and keep its path, and `robots.txt` keeps `/go/` out of search
+  results. Don't redirect these paths to `/`: the page view would lose them. One campaign
   name per post or placement: `showcase`, `webgames`, `playmygame`, `share` (the results-screen
-  share button, #87), `crazygames` … Keep the `utm_*` parameters on the
+  share menu, #87 / #271), `crazygames` … Keep the `utm_*` parameters on the
   links anyway: they cost nothing and other tools read them. Test traffic (`?e2e=1`) and
   internal browsers are never counted (`src/app/analyticsGate.ts`). Custom events (`src/app/analyticsEvents.ts`; at most
   two per run, at most 2 properties each, the Pro limit):
 
   | Event | Properties | Sent when |
   |---|---|---|
-  | `level_start` | `level` (`level1`…) | A run begins: from level select, Replay or Next Level. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start |
+  | `level_start` | `level` (`level1`…), `mode` (`campaign` / `daily`, from 2026-10-31; earlier starts have none) | A run begins: from level select (a level card, or the Daily card: `mode` `daily`), Replay or Next Level. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start |
   | `level_complete` | `level`, `stars` (0–3) | The timer runs out and the results screen opens |
   | `level_quit` | `level`, `progress_pct` (0, 10 … 100: share of the level timer used) | Quit to Menu from the pause screen |
+  | `share` | `level`, `method` (`native`, `copy`, `x`, `reddit`, `bluesky`, `threads`, `whatsapp`, `facebook`, `linkedin`, `email`; from 2026-11-02, before which it carried `stars` instead) | A share went out from the results screen: the phone share sheet completed (`native`; a dismissed sheet sends nothing), Copy link copied the line (`copy`), or the player opened a network's share link from the desktop menu (the network; whether they then posted is unknown). Rare and player-initiated, so it sits outside the ≤ 2 per run count |
 
-  Completion rate per level = `level_complete` / `level_start`. There is no share button
-  in the game yet, so there is no `share` event. Pausing and resuming send nothing; closing
+  Completion rate per level = `level_complete` / `level_start`. The Share button (#87, #271,
+  copy in `src/ui/share.ts`) opens the phone's share sheet on touch devices that have one, and
+  everywhere else a menu of Copy link plus share links for X, Reddit, Bluesky, Threads,
+  WhatsApp, Facebook, LinkedIn and Email. It shares "I scored 1,240 ★★☆ on Theme Park in
+  ShooterCoaster 🎢 — beat me:" with `https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=share_<method>`
+  (`share_native`, `share_copy`, `share_x` …; `results` before 2026-11-02), so its visits show
+  as `requestPath` `/go/share`. Pausing and resuming send nothing; closing
   the tab mid-run sends no `level_quit` (starts minus completes minus quits ≈ abandons).
 - **Internal traffic (Alex's devices).** Open **https://scoaster.com/?internal=1** once in
   each browser and on each device you play on. The browser remembers it (localStorage), the
   parameter disappears from the address bar, and from then on that browser sends no page
   views and no events, including that first visit. The title screen shows a small
   "internal: not tracked" in the top-right corner while it's on. **https://scoaster.com/?internal=0**
-  turns it off. Clearing site data or a private window forgets it, so open the link again.
+  turns it off; any other value (`?internal=false`) changes nothing. Clearing site data or a
+  private window forgets it, so open the link again.
   Vercel Web Analytics has no IP or user exclusion, so this is the only filter.
 - **2026-10-22 and 2026-10-23 traffic is internal.** Every visitor and every level event on
   those two days was Alex setting up and testing on his own devices. They are not players:
@@ -63,4 +73,5 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
 | `STRATEGY.md` | Positioning, audience, channel ranking, launch stage, experiment queue |
 | `BUDGET.md` | Monthly cap, proposed / approved / spent ledger |
 | `CHANNELS.md` | Every post or campaign and what it did to traffic |
+| `SEO.md` | Search + link-preview checklist with sources, the Lighthouse gate and its baseline |
 | `metrics/<YYYY>-W<ww>.md` | Weekly numbers from Vercel Web Analytics |

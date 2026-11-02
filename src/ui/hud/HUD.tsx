@@ -7,6 +7,7 @@ import TimerBar from './TimerBar'
 import ComboMeter from './ComboMeter'
 import FrenzyFlash from './FrenzyFlash'
 import BossBar from './BossBar'
+import WeaponBadge from './WeaponBadge'
 
 /** Thin segmented kills / total strip under the score. Renders on kills only. */
 function KillStrip() {
@@ -65,6 +66,7 @@ export default function HUD() {
       <BossBar />
       <FrenzyFlash />
       <ComboMeter />
+      <WeaponBadge />
       {/* Touch has no Escape key: an always-available pause button. */}
       <button
         className="hud-pause-button"

@@ -6,16 +6,26 @@ import {
   insertEntry,
   normalizeInitials,
   sanitizeLeaderboards,
+  sanitizeSavedDaily,
   sanitizeSavedScores,
+  sanitizeStreak,
   type Leaderboards,
 } from './leaderboard'
 import { seedFromQuery } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
+import { markStartup } from '@/core/startupMarks'
 import { comboExpired, comboMultiplier } from '@/combat/comboTiers'
 import { startPhaseFor } from './startPhase'
+import { NO_PICKUP, applyPickup, type PickupWeaponId, type WeaponState } from '@/combat/weapons/weaponTypes'
+import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/daily'
+import { getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
+
+/** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
+export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }
+
+const CAMPAIGN: RunMode = { mode: 'campaign' }
 
 interface GameState {
-  // Phase
   phase: GamePhase
   /** Also ends a resume countdown. */
   setPhase: (phase: GamePhase) => void
@@ -23,29 +33,30 @@ interface GameState {
   resuming: boolean
   resume: () => void
 
-  // Current level
   currentLevel: string | null
-  setCurrentLevel: (level: string | null) => void
 
   /** Seeds this run's enemy spawns. */
   runSeed: number
   /** Bumped by every `startRun`: per-run state resets on it, never on a phase change (paused → playing can be a Restart). */
   runId: number
-  /** The one way to start or restart a level (enters `countdown`, `playing` under `?e2e=1`); seed precedence: `seed` > `?seed=` > `Date.now()`. */
-  startRun: (levelId: string, seed?: number) => void
+  runMode: RunMode
+  /**
+   * The one way to start a level (enters `countdown`, `playing` under `?e2e=1`); seed precedence:
+   * `seed` > `?seed=` > the daily seed of `mode.dateKey` (daily runs) > `Date.now()`.
+   */
+  startRun: (levelId: string, seed?: number, mode?: RunMode) => void
+  /** Restarts the current level in the same mode: a daily keeps its seed, a campaign run gets a fresh one. */
+  restartRun: () => void
 
-  // Score
   score: number
   addScore: (points: number) => void
-  resetScore: () => void
 
-  // Per-run counters (reset by resetScore / startRun)
   kills: number
   shotsFired: number
-  /** Bullets that hit an enemy (`processHit`). */
+  /** Bullets that hit a target (`processHit`), each once however many it pierces. */
   hits: number
   bestCombo: number
-  registerShot: () => void
+  registerShot: (bullets?: number) => void
   registerHit: () => void
 
   // Combo (tiers and windows: combat/comboTiers.ts; expiry and slow-mo: combat/comboRuntime.ts)
@@ -54,11 +65,12 @@ interface GameState {
   registerKill: () => void
   resetCombo: () => void
 
-  // Timer
+  weapon: WeaponState
+  pickUpWeapon: (id: PickupWeaponId) => void
+
   timeRemaining: number
   setTimeRemaining: (t: number) => void
 
-  // Enemies
   enemiesRemaining: number
   totalEnemies: number
   setEnemyCounts: (remaining: number, total: number) => void
@@ -67,7 +79,6 @@ interface GameState {
   boss: BossHud | null
   setBoss: (boss: BossHud | null) => void
 
-  // Saved scores (persisted)
   savedScores: Record<string, ScoreEntry>
   /** Keeps the higher score's entry; `bestCombo` is kept at its max across runs either way. */
   saveScore: (entry: ScoreEntry) => void
@@ -78,10 +89,15 @@ interface GameState {
   /** Enters a run under `lastInitials`; returns its 0-based rank, or null when it misses the board. */
   addLeaderboardEntry: (levelId: string, run: { score: number; stars: number; date: number }) => number | null
   setEntryInitials: (levelId: string, date: number, initials: string) => void
-  /** Settings "Clear local data": scores, stars (so unlocks) and leaderboards. */
+  /** Settings "Clear local data": scores, stars (so unlocks), leaderboards and the Daily Run's bests and streak. */
   clearLocalData: () => void
 
-  // Time scale (for slow-mo)
+  /** Best daily run per UTC day (`YYYY-MM-DD`), the last `DAILY_KEEP_DAYS` only; never touches `savedScores`. */
+  savedDaily: Record<string, ScoreEntry>
+  dailyStreak: DailyStreak
+  /** Keeps the higher score of the day and extends the streak. */
+  saveDailyScore: (entry: ScoreEntry, dateKey: string) => void
+
   timeScale: number
   setTimeScale: (s: number) => void
 
@@ -89,12 +105,22 @@ interface GameState {
   sceneReady: boolean
   setSceneReady: (ready: boolean) => void
 
-  // Level unlock
   isLevelUnlocked: (levelId: string) => boolean
 }
 
-const RUN_COUNTERS = { score: 0, kills: 0, shotsFired: 0, hits: 0, bestCombo: 0 } as const
 const NO_COMBO: ComboState = { count: 0, multiplier: 1, lastKillTime: 0 }
+/** The per-run state a fresh store and every `startRun` begin from. */
+const FRESH_RUN = {
+  score: 0,
+  kills: 0,
+  shotsFired: 0,
+  hits: 0,
+  bestCombo: 0,
+  combo: NO_COMBO,
+  timeScale: 1,
+  boss: null,
+  weapon: NO_PICKUP,
+} satisfies Partial<GameState>
 
 const urlSearch = (): string | null =>
   typeof window !== 'undefined' && window.location ? window.location.search : null
@@ -112,36 +138,35 @@ export const useGameStore = create<GameState>()(
       resuming: false,
       resume: () => set((s) => (s.phase === 'paused' ? { resuming: true } : {})),
 
+      ...FRESH_RUN,
       currentLevel: null,
-      setCurrentLevel: (level) => set({ currentLevel: level }),
 
       runSeed: 0,
       runId: 0,
-      startRun: (levelId, seed) =>
+      runMode: CAMPAIGN,
+      startRun: (levelId, seed, mode = CAMPAIGN) => {
+        markStartup('runStart')
+        const fallback = mode.mode === 'daily' ? dailySeed(mode.dateKey) : Date.now()
         set((s) => ({
-          ...RUN_COUNTERS,
-          combo: NO_COMBO,
-          timeScale: 1,
-          boss: null,
+          ...FRESH_RUN,
           currentLevel: levelId,
-          runSeed: (seed ?? urlSeed() ?? Date.now()) >>> 0,
+          runSeed: (seed ?? urlSeed() ?? fallback) >>> 0,
+          runMode: mode,
           runId: s.runId + 1,
           phase: startPhaseFor(urlSearch() ?? ''),
           resuming: false,
-        })),
+        }))
+      },
+      restartRun: () => {
+        const { currentLevel, runMode, runSeed, startRun } = get()
+        if (!currentLevel) return
+        startRun(currentLevel, runMode.mode === 'daily' ? runSeed : undefined, runMode)
+      },
 
-      score: 0,
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
-      resetScore: () => set(RUN_COUNTERS),
-
-      kills: 0,
-      shotsFired: 0,
-      hits: 0,
-      bestCombo: 0,
-      registerShot: () => set((s) => ({ shotsFired: s.shotsFired + 1 })),
+      registerShot: (bullets = 1) => set((s) => ({ shotsFired: s.shotsFired + bullets })),
       registerHit: () => set((s) => ({ hits: s.hits + 1 })),
 
-      combo: NO_COMBO,
       registerKill: () =>
         set((s) => {
           const now = gameTime()
@@ -155,6 +180,8 @@ export const useGameStore = create<GameState>()(
         }),
       resetCombo: () => set({ combo: NO_COMBO }),
 
+      pickUpWeapon: (id) => set({ weapon: applyPickup(id, gameTime()) }),
+
       timeRemaining: 0,
       setTimeRemaining: (t) => set({ timeRemaining: t }),
 
@@ -162,10 +189,8 @@ export const useGameStore = create<GameState>()(
       totalEnemies: 0,
       setEnemyCounts: (remaining, total) => set({ enemiesRemaining: remaining, totalEnemies: total }),
 
-      timeScale: 1,
       setTimeScale: (s) => set({ timeScale: s }),
 
-      boss: null,
       setBoss: (boss) => set({ boss }),
 
       sceneReady: false,
@@ -206,16 +231,31 @@ export const useGameStore = create<GameState>()(
             },
           }
         }),
-      clearLocalData: () => set({ savedScores: {}, leaderboards: {}, lastInitials: DEFAULT_INITIALS }),
+      clearLocalData: () =>
+        set({
+          savedScores: {},
+          leaderboards: {},
+          lastInitials: DEFAULT_INITIALS,
+          savedDaily: {},
+          dailyStreak: { count: 0, lastKey: null },
+        }),
+
+      savedDaily: {},
+      dailyStreak: { count: 0, lastKey: null },
+      saveDailyScore: (entry, dateKey) =>
+        set((s) => {
+          const existing = s.savedDaily[dateKey]
+          const best = existing && existing.score >= entry.score ? existing : entry
+          return {
+            savedDaily: pruneDaily({ ...s.savedDaily, [dateKey]: best }, dateKey),
+            dailyStreak: extendStreak(s.dailyStreak, dateKey),
+          }
+        }),
 
       isLevelUnlocked: (levelId) => {
-        const state = get()
-        if (levelId === 'level1') return true
-        // Level N is unlocked if level N-1 has at least 1 star
-        const prevNum = parseInt(levelId.replace('level', '')) - 1
-        const prevId = `level${prevNum}`
-        const prevScore = state.savedScores[prevId]
-        return prevScore ? prevScore.stars >= 1 : false
+        if (!getLevelConfig(levelId)) return false
+        const prev = previousLevel(levelId)
+        return prev === null || (get().savedScores[prev]?.stars ?? 0) >= 1
       },
     }),
     {
@@ -224,6 +264,8 @@ export const useGameStore = create<GameState>()(
         savedScores: state.savedScores,
         leaderboards: state.leaderboards,
         lastInitials: state.lastInitials,
+        savedDaily: state.savedDaily,
+        dailyStreak: state.dailyStreak,
       }),
       // Hand-edited, older or half-written storage loads as valid data or not at all.
       merge: (persisted, current) => {
@@ -234,6 +276,8 @@ export const useGameStore = create<GameState>()(
           savedScores,
           leaderboards: sanitizeLeaderboards(p.leaderboards, savedScores),
           lastInitials: normalizeInitials(p.lastInitials),
+          savedDaily: sanitizeSavedDaily(p.savedDaily),
+          dailyStreak: sanitizeStreak(p.dailyStreak),
         }
       },
     },

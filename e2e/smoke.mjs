@@ -13,11 +13,13 @@
  * feedback is rotation-only), the kill trauma exceeded 1° or did not decay to 0,
  * the coaster camera's bank / pitch / speed FOV went past their caps (#123),
  * the first-person weapon is missing / off screen / covering the centre / not
- * pointing along the shot's tracer (> 25° on screen), the
+ * pointing along the shot's tracer (> 25° on screen; also after an un-held aim jump, #79), the
  * camera aspect doesn't match the canvas, or the results screen never finishes its
- * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats().
+ * reveal, lacks a stats row or button, or shows NaN / a score or kills that disagree with stats(),
+ * or its Share line (shareText()) or "Copied!" click is wrong (#87).
  * Every level and the phone run (portrait, and after rotating) also run audioBurst():
- * fails on a late note that throws or a sound dropped by an audio error (#115).
+ * fails on a late note that throws or a sound dropped by an audio error (#115), or a kill
+ * that never reached the SFX engine (#109).
  * Bullets (#165): no drawn bullet may exceed 2% of the canvas height on screen (every
  * level and the phone run), and one real shot with time + bullets frozen must be drawn
  * next to the muzzle tip; <id>-shot.png shows it two 40 ms steps into its flight.
@@ -25,6 +27,8 @@
  *
  * Spawns use a fixed --seed (default 1337); the seed check reloads the first level
  * and requires the same spawnDigest() for that seed and a different one for another.
+ * The daily check starts today's Daily Run from its level-select card on two fresh pages
+ * (today's seed, the same spawns) and checks its results, saves and Replay (#184).
  * The hidden-pause check fakes a tab hide on the first level: it must pause, drop a
  * held trigger, keep the timer still (and a primed combo intact), wait for Resume, then
  * neither reset nor jump it, nor bring back killed enemies. On the first level the killNearest kills enter the 5× combo
@@ -33,10 +37,14 @@
  * with `&countdown=1`: the countdown must show (countdown.png), ignore a press (also once
  * held on into play), hold the timer, reach playing on GO, and the shader warm-up must
  * finish; on a replay, a tap after the 1 s mark must skip to playing.
- * The speed check holds the first level at top speed on its most banked sampled point:
+ * Perf gate (#188): a level fails past its `scene` ceilings in budgets.json; see sceneBudgetCheck().
+ * The speed check holds the first level (or `--speed-level <id>`) at top speed on its most banked sampled point:
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
- * The boss check summons level1's Golden Blimp and shoots it down in phase order
- * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png); see bossCheck().
+ * The boss checks summon each finale and shoot it down in phase order: level1's Golden Blimp
+ * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png) and level3's Kraken
+ * (level3-boss.png, level3-boss-head.png, level3-boss-down.png); see bossCheck().
+ * The pickup check shoots level1's first weapon pickup with a real bullet: the spread gun's badge,
+ * a 3-bullet fan with the tinted tracer (level1-pickup.png), pause-safe expiry, reset on restart; see pickupCheck().
  * The scrim check loads level1 with `?audio=scrim` (the score engine, #214, and the arcade SFX, #217); see scrimCheck().
  *
  * All waits are deadline-polled on the hook's frame counter, because software
@@ -95,6 +103,8 @@ const COMBAT_MIN_FRAMES = Number(args['combat-min-frames'] ?? 4)
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(args.seed ?? 1337)
 const DIST = args.dist ?? 'dist'
+// Level the speed check rides (default: the first level in the run), e.g. a water level for the streaks over the sea.
+const SPEED_LEVEL = args['speed-level']
 // Path the build is served under: '/' for the site, a sub-path for the portal zip.
 const BASE_PATH = `/${(args.base ?? '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/$/, '')
 let preview // module scope so the top-level catch can kill it
@@ -192,9 +202,9 @@ async function launch() {
   return chromium.launch({ headless: true, executablePath, args: flags })
 }
 
-/** Pixel stats of a PNG screenshot, computed in the page with a 2D canvas (no deps). */
-async function imageStats(page, png) {
-  return page.evaluate(async (b64) => {
+/** Pixel stats of a PNG screenshot, computed in the page with a 2D canvas (no deps), leaving out the `skip` rects [x0, y0, x1, y1] (frame fractions). */
+async function imageStats(page, png, skip = []) {
+  return page.evaluate(async ([b64, skip]) => {
     const img = new Image()
     img.src = `data:image/png;base64,${b64}`
     await img.decode()
@@ -204,23 +214,69 @@ async function imageStats(page, png) {
     const ctx = c.getContext('2d')
     ctx.drawImage(img, 0, 0, c.width, c.height)
     const d = ctx.getImageData(0, 0, c.width, c.height).data
-    let sum = 0, sumSq = 0
+    let sum = 0, sumSq = 0, n = 0
     const colors = new Set()
     for (let i = 0; i < d.length; i += 4) {
+      const x = ((i / 4) % c.width) / c.width
+      const y = Math.floor(i / 4 / c.width) / c.height
+      if (skip.some(([x0, y0, x1, y1]) => x >= x0 && x < x1 && y >= y0 && y < y1)) continue
       const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
       sum += l
       sumSq += l * l
+      n++
       colors.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4))
     }
-    const n = d.length / 4
     const mean = sum / n
     return { mean, stddev: Math.sqrt(sumSq / n - mean * mean), distinctColors: colors.size }
-  }, png.toString('base64'))
+  }, [png.toString('base64'), skip])
+}
+
+const looksBlank = (img) => img.stddev < 4 || img.distinctColors < 8
+
+/** The title UI (logo, PLAY, hint; corner buttons and byline), left out so a black 3D scene behind it can't pass (#136). */
+const TITLE_UI = [[0.25, 0.25, 0.75, 0.75], [0, 0.85, 1, 1]]
+
+/** Re-shoots the title into `file` until its 3D scene has drawn (a cold start can show it black) or `maxMs` runs out. */
+async function captureTitleScene(page, file, maxMs) {
+  const until = Date.now() + maxMs
+  for (;;) {
+    const scene = await imageStats(page, await page.screenshot({ path: file, timeout: SHOT_TIMEOUT }), TITLE_UI)
+    if (!looksBlank(scene) || Date.now() >= until) return scene
+    await page.waitForTimeout(1000)
+  }
 }
 
 /** Px an enemy must reach to count as readable (MIN_ENEMY_PX in enemyReadability.ts). */
 const READABLE_PX = 12
 const MIN_READABLE = 2
+
+const SCENE_BUDGETS = JSON.parse(fs.readFileSync(new URL('../budgets.json', import.meta.url), 'utf8')).scene
+const PERF_GATE = !args['no-perf-gate']
+const BUDGET_KEYS = [
+  ['drawCalls', 'draws'],
+  ['objects', 'scene objs'],
+  ['triangles', 'scene tris'],
+  ['trackObjects', 'track objs'],
+  ['trackTriangles', 'track tris'],
+]
+
+/** Each ride total past its ceiling; a level whose entry names `knownOver` (an open issue) only warns. */
+function sceneBudgetCheck(id, stats) {
+  const budget = SCENE_BUDGETS[id]
+  if (!budget) return { over: [`no scene budget for ${id} in budgets.json`], knownOver: null }
+  const track = trackTotals(stats.scene)
+  const measured = {
+    drawCalls: stats.drawCalls,
+    objects: stats.scene?.objects,
+    triangles: stats.scene?.triangles,
+    trackObjects: track?.objects,
+    trackTriangles: track?.triangles,
+  }
+  const over = BUDGET_KEYS
+    .filter(([key]) => measured[key] > budget[key])
+    .map(([key, label]) => `${label}=${measured[key]} (budget ${budget[key]})`)
+  return { over, knownOver: budget.knownOver ?? null }
+}
 
 /**
  * Readability probe: freeze game time, list on-screen enemies, and save a 4x
@@ -455,13 +511,14 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false } = {})
   await page.waitForTimeout(1500)
   await page.screenshot({ path: path.join(OUT, `${id}-results.png`), timeout: SHOT_TIMEOUT })
   const end = await getStats(page)
-  const results = await resultsScreenProblems(page, end)
+  const results = await resultsScreenProblems(page, id, end)
   problems.push(...results.problems)
   if (seededRank !== null) {
     const entry = await leaderboardEntryProblems(page, id, seededRank)
     problems.push(...entry.problems)
     results.screen.entry = entry.result
   }
+  if (frenzy) problems.push(...(await resultsEnterProblems(page, results.screen)))
 
   if (combat.kills === 0) problems.push('no kills (enemies missing or unhittable?)')
   // Only meaningful when something was on screen to aim at.
@@ -474,9 +531,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false } = {})
   if (shake.traumaMax > 1 + 1e-6) problems.push(`kill trauma ${shake.traumaMax.toFixed(2)}° > 1°`)
   if (shake.trauma !== 0) problems.push(`kill trauma did not decay to 0 (${shake.trauma}°)`)
   const w = shake.weight
-  if (w.maxRoll > CAMERA_WEIGHT_CAPS.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.roll}°`)
-  if (w.maxPitch > CAMERA_WEIGHT_CAPS.pitch + 1e-6) problems.push(`camera pitch ${w.maxPitch.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.pitch}°`)
-  if (w.maxFovKick > CAMERA_WEIGHT_CAPS.fovKick + 1e-6) problems.push(`speed FOV kick ${w.maxFovKick.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.fovKick}°`)
+  problems.push(...cameraWeightProblems(w))
   return {
     problems,
     combat: {
@@ -541,6 +596,8 @@ async function freshShotProblems(page, id) {
   await waitFrames(page, 1, { maxMs: 8000, pollMs: 40 })
   await page.screenshot({ path: path.join(OUT, `${id}-shot.png`), timeout: SHOT_TIMEOUT })
   const inFlight = await read()
+  const jump = await aimJumpCheck(page, read)
+  problems.push(...jump.problems)
   await page.evaluate(() => {
     const s = window.__SC_TEST__
     s.bulletStep = null
@@ -549,7 +606,10 @@ async function freshShotProblems(page, id) {
   })
 
   const { bullets, weapon } = atMuzzle
-  const result = { fired, muzzleFrac: bullets.screenFrac, flightFrac: inFlight.bullets.screenFrac, maxScreenFrac: inFlight.bullets.maxScreenFrac, tipDistPx: null, aimErrorDeg: null }
+  const result = {
+    fired, muzzleFrac: bullets.screenFrac, flightFrac: inFlight.bullets.screenFrac, maxScreenFrac: inFlight.bullets.maxScreenFrac,
+    tipDistPx: null, aimErrorDeg: null, aimJump: jump.result,
+  }
   // Gun aim (#65) on this shot: fixed aim point, time frozen, recoil held at its peak, so the angle is repeatable (#158).
   if (fired && weapon) {
     const p = weaponAimProblem(weapon, 'desktop')
@@ -568,7 +628,33 @@ async function freshShotProblems(page, id) {
   return { problems, result }
 }
 
-async function resultsScreenProblems(page, stats) {
+/** Far side of the screen from the fixed-point shot (0.25, 0.15): above the muzzle, so the aim check applies. */
+const AIM_JUMP_SHOT = { x: -0.6, y: 0.55 }
+
+/** A far-side shot without `holdFeedback` (#79); game time stays frozen, so only the shot-frame snap can turn the gun. */
+async function aimJumpCheck(page, read) {
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+  await waitFrames(page, 1, { maxMs: 8000, pollMs: 40 })
+  const before = (await read()).weapon
+  await page.waitForTimeout(300) // past every gun's fire interval
+  const fired = await page.evaluate(({ x, y }) => window.__SC_TEST__.fireShot(x, y), AIM_JUMP_SHOT)
+  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  const after = (await read()).weapon
+  const problems = []
+  const result = { fired, jumpDeg: null, aimErrorDeg: null }
+  if (!fired) problems.push('aim jump: fireShot() fired nothing')
+  else if (before && after) {
+    const barrel = (w) => Math.atan2(w.tipY - w.pivotY, w.tipX - w.pivotX)
+    const turn = Math.abs(((barrel(after) - barrel(before) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI)
+    result.jumpDeg = turn * (180 / Math.PI)
+    const p = weaponAimProblem(after, 'aim jump (no holdFeedback)')
+    if (p) problems.push(p)
+    result.aimErrorDeg = after.aimErrorDeg
+  }
+  return { problems, result }
+}
+
+async function resultsScreenProblems(page, id, stats) {
   const screen = await page.evaluate(() => {
     const el = document.querySelector('.results-screen')
     if (!el) return null
@@ -576,7 +662,7 @@ async function resultsScreenProblems(page, stats) {
       [...el.querySelectorAll('.results-stat')].map((r) => [r.children[0].textContent, r.children[1].textContent]),
     )
     const buttons = [...el.querySelectorAll('.results-actions button')]
-      .filter((b) => b.getBoundingClientRect().width > 0)
+      .filter((b) => !b.closest('.share-menu') && b.getBoundingClientRect().width > 0)
       .map((b) => b.textContent)
     const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
     const b = el.querySelector('.results-board')
@@ -587,18 +673,51 @@ async function resultsScreenProblems(page, stats) {
       editing: b.dataset.editing === 'true',
       inView: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
     }
-    return { rows, buttons, stars, board, score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent }
+    const s = window.__SC_TEST__
+    const all = s.levels()
+    const level = all.find((l) => l.id === s.stats().currentLevel)
+    const next = all.find((l) => l.id === level?.nextLevel)
+    return {
+      rows, buttons, stars, board, levelName: level?.name ?? null, shareText: s.shareText(),
+      nextLevel: next ? { id: next.id, unlocked: next.unlocked } : null,
+      keys: el.querySelector('.results-keys')?.textContent ?? '',
+      score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent,
+    }
   })
   const problems = []
   if (!screen) return { problems: ['results screen missing'], screen }
   const { text, ...shown } = screen
+  problems.push(...(await resultsActionsProblems(page, 'desktop')))
+  // #87: the shared line can't drift from the run (score, stars, level) or lose its campaign link.
+  const shareRe = /^I scored ([\d,]+) ([★☆]{3}) on (.+) in ShooterCoaster 🎢 — beat me: (\S+)$/u
+  const share = shareRe.exec(screen.shareText ?? '')
+  if (!share) problems.push(`share text ${JSON.stringify(screen.shareText)} is not in the share format`)
+  else {
+    if (share[1] !== screen.score) problems.push(`share score ${share[1]} != results score ${screen.score}`)
+    if ((share[2].match(/★/g) ?? []).length !== screen.stars) problems.push(`share stars ${share[2]} != ${screen.stars} earned`)
+    if (share[3] !== screen.levelName) problems.push(`share level "${share[3]}" != "${screen.levelName}"`)
+    if (share[4] !== SHARE_URL) problems.push(`share link ${share[4]} != ${SHARE_URL}`)
+  }
+  // #271: desktop Share opens our menu (headless Chromium has no share sheet anyway); Copy link fills the clipboard.
+  const menu = await shareMenuProblems(page, 'desktop', { shot: `${id}-share.png`, expectClipboard: screen.shareText })
+  problems.push(...menu.problems)
+  shown.shareMenu = menu.targets
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
   for (const label of ['Kills', 'Accuracy', 'Best combo', 'Time left']) {
     if (!(label in screen.rows)) problems.push(`results screen has no "${label}" row`)
   }
   if (screen.rows.Kills && !screen.rows.Kills.startsWith(`${stats.kills} /`)) problems.push(`results kills "${screen.rows.Kills}" != ${stats.kills}`)
   if (stats.shotsFired > 0 && !/^\d+%$/.test(screen.rows.Accuracy ?? '')) problems.push(`results accuracy "${screen.rows.Accuracy}" with ${stats.shotsFired} shots`)
-  if (!screen.buttons.includes('Replay') || !screen.buttons.includes('Levels')) problems.push(`results buttons ${JSON.stringify(screen.buttons)}`)
+  for (const label of ['Levels', 'Replay', 'Share']) {
+    if (!screen.buttons.includes(label)) problems.push(`results buttons ${JSON.stringify(screen.buttons)} lack ${label}`)
+  }
+  // #162: Next Level only when the unlock rule opens it (a 0★ run on a fresh save leaves it locked); Enter replays instead.
+  const nextOffered = screen.buttons.includes('Next Level')
+  const nextOpen = screen.nextLevel?.unlocked === true
+  if (nextOffered !== nextOpen)
+    problems.push(`results ${nextOffered ? 'offer' : 'hide'} Next Level with ${screen.nextLevel?.id ?? 'no next level'} ${nextOpen ? 'unlocked' : 'locked'}`)
+  // While the initials entry is open the hint is the entry's own.
+  if (screen.nextLevel && !nextOpen && !screen.board?.editing && !/Enter \/ R: replay/.test(screen.keys)) problems.push(`locked next level, but the keys hint reads "${screen.keys}"`)
   if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
   if (!screen.board) problems.push('results screen has no leaderboard')
   else {
@@ -632,6 +751,8 @@ async function leaderboardEntryProblems(page, id, rank) {
     .waitForFunction((t) => document.querySelector('.results-board li.is-new .results-board-initials')?.textContent === t, text, { timeout: 5000, polling: 50 })
     .then(() => true, () => false)
 
+  // The share check leaves focus on Share, where Enter is that button's click: type as a player who never touched it.
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
   const opened = await read()
   if (opened.rank !== String(rank)) problems.push(`leaderboard: run ranked ${opened.rank}, expected ${rank}`)
   if (opened.rows !== 10) problems.push(`leaderboard shows ${opened.rows} rows, expected 10`)
@@ -658,6 +779,169 @@ async function leaderboardEntryProblems(page, id, rank) {
   return { problems, result: { rank, cycled, initials: confirmed.initials, editing: confirmed.editing, phase: confirmed.phase } }
 }
 
+/** #162: Enter with focus on a button outside the results (the mute toggle) still plays on: the next level if open, else a replay. */
+async function resultsEnterProblems(page, screen) {
+  if (!screen) return []
+  const current = await page.evaluate(() => window.__SC_TEST__.stats().currentLevel)
+  const target = screen.nextLevel?.unlocked ? screen.nextLevel.id : screen.nextLevel ? current : null
+  await page.focus('.mute-button')
+  await page.keyboard.press('Enter')
+  const after = await page
+    .waitForFunction(() => window.__SC_TEST__.phase() !== 'results', null, { timeout: 10000, polling: 100 })
+    .then(() => page.evaluate(() => ({ phase: window.__SC_TEST__.phase(), level: window.__SC_TEST__.stats().currentLevel })), () => null)
+  if (!after) return ['Enter with the mute button focused left the results screen up']
+  const expected = target ? ['playing', target] : ['levelSelect', current]
+  if (after.phase !== expected[0] || (target && after.level !== target))
+    return [`Enter on the results went to ${after.phase} ${after.level}, expected ${expected.join(' ')}`]
+  return []
+}
+
+/** The level timer running out mid-FRENZY (#195): holdFeedback keeps the slow-mo deep while one huge timerStep ends the run. */
+async function frenzyEndProblems(page, id) {
+  // A full board out of reach (#317): this run must miss it and open no initials entry.
+  await page.evaluate(([lid, seed]) => {
+    const s = window.__SC_TEST__
+    s.setLeaderboards({ [lid]: Array.from({ length: 10 }, (_, i) => ({ initials: 'TOP', score: 1e9 - i, stars: 3, date: i })) })
+    s.startLevel(lid, seed)
+  }, [id, SEED])
+  await waitFrames(page, 2, { maxMs: 20000 })
+  await page.evaluate((count) => {
+    const s = window.__SC_TEST__
+    s.holdFeedback = true
+    s.primeCombo(count)
+  }, FRENZY_PRIME + 1)
+  const slowed = await page
+    .waitForFunction(() => window.__SC_TEST__.stats().timeScale < 0.5, null, { timeout: 20000, polling: 50 })
+    .then(() => true, () => false)
+  await page.evaluate(() => { window.__SC_TEST__.timerStep = 1e4 })
+  const ended = await page
+    .waitForFunction(() => window.__SC_TEST__.phase() === 'results', null, { timeout: 20000, polling: 50 })
+    .then(() => true, () => false)
+  await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    s.timerStep = null
+    s.holdFeedback = false
+  })
+  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  const after = await page.evaluate(() => ({ timeScale: window.__SC_TEST__.stats().timeScale, ducked: window.__SC_TEST__.audio().musicDucked }))
+  await page
+    .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 30000, polling: 100 })
+    .catch(() => {})
+  const board = await page.evaluate(() => {
+    const b = document.querySelector('.results-board')
+    return { shown: !!b, rank: b?.dataset.rank ?? null, editing: !!b?.dataset.editing }
+  })
+  const result = { slowed, ended, ...after, board }
+  if (!slowed) return { result, problems: ['frenzy end: a primed 5× chain never slowed time'] }
+  if (!ended) return { result, problems: ['frenzy end: the level timer never ended the run'] }
+  const problems = []
+  if (after.timeScale !== 1) problems.push(`frenzy end: results screen at timeScale ${after.timeScale.toFixed(2)}, not 1`)
+  if (after.ducked) problems.push('frenzy end: music still ducked on the results screen')
+  if (!board.shown) problems.push('frenzy end: no leaderboard on the results screen')
+  if (board.rank !== null || board.editing) problems.push(`a run that misses the board ranked ${board.rank} with initials entry ${board.editing ? 'open' : 'closed'}`)
+  return { result, problems }
+}
+
+/** The results-screen share link (#87, src/ui/share.ts). */
+const SHARE_URL = 'https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=share_copy'
+const SHARE_TARGETS = ['copy', 'x', 'reddit', 'bluesky', 'threads', 'whatsapp', 'facebook', 'linkedin', 'email']
+
+/** #271: the share menu (every target, in the viewport, off the other buttons, keyboard); never clicks a network link,
+ *  since a local run fails on other-origin requests. Pass `expectClipboard` only where clipboard-read is granted. */
+async function shareMenuProblems(page, label, { shot, expectClipboard }) {
+  const problems = []
+  await page.locator('.results-share').click({ timeout: 30000 }).catch((e) => problems.push(`${label}: click Share: ${e.message}`))
+  const opened = await page
+    .waitForFunction(() => document.querySelector('.share-menu')?.getAttribute('data-side'), null, { timeout: 10000, polling: 100 })
+    .then(() => true, () => false)
+  if (!opened) return { problems: [...problems, `${label}: clicking Share did not open the share menu`], targets: null }
+  const m = await page.evaluate(() => {
+    const menu = document.querySelector('.share-menu')
+    const r = menu.getBoundingClientRect()
+    const others = [...document.querySelectorAll('.results-actions button')]
+      .filter((b) => !b.closest('.share-anchor') && b.getBoundingClientRect().width > 0)
+      .map((b) => ({ name: b.textContent, r: b.getBoundingClientRect().toJSON() }))
+    return {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      box: r.toJSON(),
+      others,
+      side: menu.getAttribute('data-side'),
+      focused: document.activeElement?.getAttribute('data-target') ?? null,
+      items: [...menu.querySelectorAll('[role="menuitem"]')].map((i) => ({
+        target: i.getAttribute('data-target'),
+        href: i.getAttribute('href'),
+        tall: i.getBoundingClientRect().height,
+      })),
+    }
+  })
+  const targets = m.items.map((i) => i.target)
+  if (JSON.stringify(targets) !== JSON.stringify(SHARE_TARGETS)) problems.push(`${label}: share menu lists ${JSON.stringify(targets)}, expected ${JSON.stringify(SHARE_TARGETS)}`)
+  if (m.focused !== 'copy') problems.push(`${label}: opening the share menu focused ${m.focused}, not Copy link`)
+  const b = m.box
+  if (b.left < 0 || b.top < 0 || b.right > m.vw || b.bottom > m.vh) problems.push(`${label}: share menu ${JSON.stringify(b)} leaves the ${m.vw}x${m.vh} viewport`)
+  for (const o of m.others) {
+    if (b.left < o.r.right && o.r.left < b.right && b.top < o.r.bottom && o.r.top < b.bottom) problems.push(`${label}: share menu covers ${o.name}`)
+  }
+  for (const i of m.items) {
+    if (i.tall < 44) problems.push(`${label}: share item ${i.target} under the 44 px touch target`)
+    if (i.target === 'copy') continue
+    if (!i.href || !i.href.includes(encodeURIComponent(`utm_campaign=share_${i.target}`))) problems.push(`${label}: ${i.target} link ${i.href} lacks utm_campaign=share_${i.target}`)
+  }
+  if (shot) await page.screenshot({ path: path.join(OUT, shot), timeout: SHOT_TIMEOUT })
+  if (expectClipboard !== undefined) {
+    await page.locator('.share-copy').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Copy link: ${e.message}`))
+    const copied = await page
+      .waitForFunction(() => document.querySelector('.share-copy')?.textContent === 'Copied!', null, { timeout: 10000, polling: 100 })
+      .then(() => true, () => false)
+    const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null)
+    if (!copied) problems.push(`${label}: Copy link did not show "Copied!"`)
+    else if (clip !== expectClipboard) problems.push(`${label}: clipboard ${JSON.stringify(clip)} != ${JSON.stringify(expectClipboard)}`)
+  }
+  await page.keyboard.press('ArrowDown')
+  const moved = await page.evaluate(() => document.activeElement?.getAttribute('data-target'))
+  if (moved !== 'x') problems.push(`${label}: ArrowDown in the share menu moved focus to ${moved}, not X`)
+  await page.keyboard.press('Escape')
+  const closed = await page.evaluate(() => ({
+    open: !!document.querySelector('.share-menu'),
+    focusOnShare: document.activeElement?.classList.contains('results-share') ?? false,
+    phase: window.__SC_TEST__.phase(),
+  }))
+  if (closed.open) problems.push(`${label}: Esc left the share menu open`)
+  if (!closed.focusOnShare) problems.push(`${label}: Esc did not return focus to Share`)
+  if (closed.phase !== 'results') problems.push(`${label}: the share menu keys left the results screen (${closed.phase})`)
+  return { problems, targets: { side: m.side, box: m.box, targets } }
+}
+
+/** Results buttons inside the viewport, none overlapping another, each at least the 44 px touch target. */
+async function resultsActionsProblems(page, label) {
+  const r = await page.evaluate(() => {
+    const boxes = [...document.querySelectorAll('.results-actions button')]
+      .filter((b) => !b.closest('.share-menu'))
+      .map((b) => ({ name: b.textContent, r: b.getBoundingClientRect() }))
+      .filter((b) => b.r.width > 0)
+    const screen = document.querySelector('.results-screen')
+    return {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      hScroll: screen ? screen.scrollWidth > screen.clientWidth : true,
+      boxes: boxes.map((b) => ({ name: b.name, left: b.r.left, top: b.r.top, right: b.r.right, bottom: b.r.bottom })),
+    }
+  })
+  const problems = []
+  if (r.hScroll) problems.push(`${label}: the results screen scrolls sideways`)
+  for (const [i, a] of r.boxes.entries()) {
+    if (a.left < 0 || a.top < 0 || a.right > r.vw || a.bottom > r.vh)
+      problems.push(`${label}: results button ${a.name} leaves the ${r.vw}x${r.vh} viewport`)
+    if (a.bottom - a.top < 44) problems.push(`${label}: results button ${a.name} under the 44 px touch target`)
+    for (const b of r.boxes.slice(i + 1)) {
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom)
+        problems.push(`${label}: results buttons ${a.name} and ${b.name} overlap`)
+    }
+  }
+  return problems
+}
+
 const MOBILE_LEVEL = 'level1'
 /** HUD the first-person weapon must stay clear of (#65). */
 const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-button'
@@ -665,7 +949,16 @@ const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-b
 const WEAPON_MAX_AIM_DEG = 25
 /** Caps on the coaster camera weight (#123): MAX_BANK_DEG / MAX_PITCH_DEG in
  *  src/track/cameraRig.ts and SPEED_FOV_DEG + DROP_FOV_DEG in src/track/cameraFov.ts. */
-const CAMERA_WEIGHT_CAPS = { roll: 8, pitch: 3, fovKick: 8 }
+/** Camera weight maxima past the caps the game publishes from its source constants (cameraRig.ts, cameraFov.ts). */
+function cameraWeightProblems(w) {
+  const caps = w.caps
+  if (!caps) return ['cameraWeight.caps missing from the test hook']
+  const problems = []
+  if (w.maxRoll > caps.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${caps.roll}°`)
+  if (w.maxPitch > caps.pitch + 1e-6) problems.push(`camera pitch ${w.maxPitch.toFixed(2)}° > ${caps.pitch}°`)
+  if (w.maxFovKick > caps.fovKick + 1e-6) problems.push(`FOV kick ${w.maxFovKick.toFixed(2)}° > ${caps.fovKick}°`)
+  return problems
+}
 /** Chain primed before the first level's kills, so the next kill enters the 5× tier (src/combat/comboTiers.ts). */
 const FRENZY_PRIME = 14
 const HUD_SELECTORS = ['.hud-score', '.hud-kills', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
@@ -725,6 +1018,26 @@ async function weaponProblems(page, label, { aim = true } = {}) {
       problems.push(`${label}: weapon overlaps HUD .${String(r.sel).split(' ')[0]}`)
   box.hudOverlaps = problems.filter((p) => p.includes('overlaps HUD')).length
   return { problems, box }
+}
+
+/** Shot points (NDC) that swing the gun furthest: the screen's left edge high, mid and low, and the top right. */
+const WEAPON_SWEEP_AIMS = [[-0.95, 0.9], [-0.95, 0], [-0.95, -0.85], [0.95, 0.9]]
+
+/** The gun's box depends on its aim (#223): weapon checks at each sweep aim, combo meter showing (leaves a live chain). */
+async function weaponAimSweepProblems(page, label) {
+  await page.evaluate(() => window.__SC_TEST__.primeCombo(3))
+  if (!(await waitVisible(page, '.hud-combo', 15000))) return [`${label}: combo meter never showed for the aim sweep`]
+  const problems = []
+  for (const [x, y] of WEAPON_SWEEP_AIMS) {
+    await page.waitForTimeout(100) // past the trigger interval
+    if (!(await page.evaluate(([x, y]) => window.__SC_TEST__.fireShot(x, y), [x, y]))) {
+      problems.push(`${label}: aim sweep shot at (${x}, ${y}) did not fire`)
+      continue
+    }
+    await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+    problems.push(...(await weaponProblems(page, `${label} aiming at (${x}, ${y})`)).problems)
+  }
+  return problems
 }
 
 /**
@@ -869,10 +1182,15 @@ async function offsetTapKills(page, label) {
   return { result, problems }
 }
 
-/** Tone scheduling stress (#115); page errors are counted by the caller. */
+/** audioBurst(shots, kills) of every level and the phone run. */
+const BURST = [20, 10]
+
+/** Tone scheduling stress (#115) + every kill reaching Tone (#109); page errors are counted by the caller. */
 async function audioBurstProblems(page, label) {
-  const burst = await page.evaluate(() => window.__SC_TEST__.audioBurst(20, 10))
+  const burst = await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), BURST)
   const problems = []
+  if (burst.ready && burst.killsPlayed !== BURST[1])
+    problems.push(`${label}: ${burst.killsPlayed}/${BURST[1]} audioBurst kills reached the SFX engine (throttled or dropped)`)
   if (burst.lateScheduleErrors > 0)
     problems.push(`${label}: ${burst.lateScheduleErrors}/10 late music note pairs threw a Tone scheduling error`)
   if (burst.dropped > 0)
@@ -1184,8 +1502,7 @@ async function speedCheck(page, levelId) {
   const problems = []
   if (!(w.streaks > 0.05)) problems.push(`no wind streaks at top speed (opacity ${w.streaks?.toFixed(3)}, speed ${w.speed?.toFixed(2)})`)
   if (!(Math.abs(w.roll) >= 1)) problems.push(`camera barely banks at top speed (${w.roll.toFixed(2)}° at track ${best.fraction})`)
-  if (w.maxRoll > CAMERA_WEIGHT_CAPS.roll + 1e-6) problems.push(`camera bank ${w.maxRoll.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.roll}°`)
-  if (w.maxFovKick > CAMERA_WEIGHT_CAPS.fovKick + 1e-6) problems.push(`FOV kick ${w.maxFovKick.toFixed(2)}° > ${CAMERA_WEIGHT_CAPS.fovKick}°`)
+  problems.push(...cameraWeightProblems(w))
   const translation = await page.evaluate(() => window.__SC_TEST__.cameraTranslation.max)
   if (translation > 1e-6) problems.push(`camera translated ${translation.toFixed(3)} units off the track pose`)
   return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w } }
@@ -1195,6 +1512,9 @@ async function speedCheck(page, levelId) {
 const WAVE_CHECK = { level: 'level2', type: 'crow', label: 'A Murder of Crows!', minOnScreen: 5 }
 
 const WAVE_PAUSE_MS = 2000
+/** From this level time (s) the timer steps a fixed `WAVE_TIMER_STEP` s a frame, so a slow frame can't jump the tell and the wave together. */
+const WAVE_STEP_FROM = 12
+const WAVE_TIMER_STEP = 0.25
 
 /**
  * Spawn choreography (#30): the crow wave's tell must lead it, then its V flies in, frozen for `level2-wave.png`.
@@ -1207,6 +1527,8 @@ async function waveCheck(page) {
   const event = (kind) => page
     .waitForFunction(([k, l]) => window.__SC_TEST__.waveEvents.find((e) => e.kind === k && e.label === l) ?? null, [kind, label], { timeout: 90000, polling: 200 })
     .then((h) => h.jsonValue(), () => null)
+  await page.waitForFunction((t) => (window.__SC_TEST__.nextWave()?.levelTime ?? 0) >= t, WAVE_STEP_FROM, { timeout: 90000, polling: 100 }).catch(() => {})
+  await page.evaluate((s) => { window.__SC_TEST__.timerStep = s }, WAVE_TIMER_STEP)
   const tell = await event('incoming')
   const tellShown = tell
     ? await page.evaluate(() => ({ pulse: !!document.querySelector('.wave-tell'), text: document.querySelector('.wave-banner-text')?.textContent ?? null }))
@@ -1215,6 +1537,7 @@ async function waveCheck(page) {
   await page.waitForTimeout(WAVE_PAUSE_MS)
   await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
   const arrival = await event('announce')
+  await page.evaluate(() => { window.__SC_TEST__.timerStep = null })
   // The entry takes 1.2–1.8 s of game time.
   await waitFrames(page, 3, { minMs: 2500, maxMs: 30000 })
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
@@ -1227,9 +1550,19 @@ async function waveCheck(page) {
   else if (!tellShown?.pulse) problems.push('the tell showed no screen-edge pulse (.wave-tell)')
   if (tell && tellShown?.text !== label) problems.push(`the tell showed "${tellShown?.text}", not "${label}"`)
   if (!arrival) problems.push(`the "${label}" wave never arrived`)
-  const leadS = tell && arrival ? (arrival.ms - tell.ms) / 1000 : null
-  if (leadS !== null && leadS < 0.3) problems.push(`the tell came only ${leadS.toFixed(2)} s before the wave`)
-  const events = await page.evaluate(() => window.__SC_TEST__.waveEvents.map((e) => `${e.kind} "${e.label}"`))
+  // On level time, not wall time (#262): the tell is on time when the wave tick before it was still short of `due - tellS`.
+  const { tellS, log } = await page.evaluate(() => ({ tellS: window.__SC_TEST__.waveTellSeconds, log: window.__SC_TEST__.waveEvents }))
+  const order = (kind) => log.findIndex((e) => e.kind === kind && e.label === label)
+  const timing = tell ? { due: tell.due, tellAt: tell.levelTime, tickBefore: tell.lastTick } : null
+  if (tell && arrival) {
+    const { due, tellAt, tickBefore } = timing
+    if (order('announce') < order('incoming')) problems.push('the wave arrived before its tell')
+    else if (tellAt < due - tellS) problems.push(`the tell came early: at ${tellAt.toFixed(2)} s, ${(due - tellAt).toFixed(2)} s before the wave at ${due} s`)
+    else if (tickBefore !== null && tickBefore >= due - tellS) {
+      problems.push(`the tell came late: the wave tick at ${tickBefore.toFixed(2)} s was already within ${tellS} s of the wave at ${due} s`)
+    }
+  }
+  const events = log.map((e) => `${e.kind} "${e.label}"`)
   const repeated = [...new Set(events.filter((e, i) => events.indexOf(e) !== i))]
   if (repeated.length) problems.push(`wave events fired twice after a pause and Resume: ${repeated.join(', ')}`)
   if (flock.length < minOnScreen) problems.push(`only ${flock.length} ${type}s on screen after the wave flew in (want ≥ ${minOnScreen})`)
@@ -1238,20 +1571,43 @@ async function waveCheck(page) {
   return {
     id: 'wave',
     problems,
-    wave: { level, onScreen: flock.length, largestPx: Math.round(flock[0]?.px ?? 0), nearest: Math.round(nearest), tellLeadS: leadS },
+    wave: { level, onScreen: flock.length, largestPx: Math.round(flock[0]?.px ?? 0), nearest: Math.round(nearest), timing },
   }
 }
 
-/** The finale the boss check summons (#181): Theme Park's Golden Blimp. */
-const BOSS_CHECK = { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'] }
+/**
+ * The finales the boss check summons: Theme Park's Golden Blimp (#181) and Ocean's Kraken (#183).
+ * `minOnScreen` first-phase weak points must be on screen after the boss alone has moved `settleS` s (the
+ * Kraken's tentacles rise out of the water first); `midSettleS` lets the last phase surface before `midShot`.
+ */
+const BOSS_CHECKS = [
+  { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
+  { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
+]
+
+/** Moves the boss alone `seconds` (`bossStep`, game time and the level timer frozen) until `ready()`. */
+async function stepBoss(page, seconds, ready) {
+  if (seconds <= 0) return true
+  const step = 0.25
+  const f0 = await getFrames(page)
+  await page.evaluate((s) => { window.__SC_TEST__.bossStep = s }, step)
+  const ok = await pollUntil(
+    page,
+    async () => (await getFrames(page)) - f0 >= seconds / step && (await ready()),
+    { ms: 30000 + seconds * 8000, frames: Math.ceil(seconds / step) * 3, pollMs: 200 },
+  )
+  await page.evaluate(() => { window.__SC_TEST__.bossStep = null })
+  await waitFrames(page, 1, { maxMs: 20000, pollMs: 100 })
+  return ok
+}
 
 /**
- * Boss (#181), summoned: large with its bar (level1-boss.png), hit in phase order by a real bullet and
- * `bossHit` (level1-boss-gondola.png), then defeated into confetti + the big popup (level1-boss-down.png).
+ * Boss, summoned: large with its bar (<level>-boss.png), hit in phase order by a real bullet and
+ * `bossHit` (<level>-<midShot>.png), then defeated into its burst + the big popup (<level>-boss-down.png).
  * Game time is frozen while it is hit; if the wall-clock level timer still runs out, the step is skipped.
  */
-async function bossCheck(page) {
-  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase } = BOSS_CHECK
+async function bossCheck(page, check) {
+  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS } = check
   const problems = []
   const boss = () => page.evaluate(() => window.__SC_TEST__.boss())
   const events = () => page.evaluate(() => ({ ...window.__SC_TEST__.bossEvents }))
@@ -1265,6 +1621,8 @@ async function bossCheck(page) {
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const onScreen = async (min) => (await boss()).exposed.filter((e) => e.onScreen).length >= min
+  const settled = await stepBoss(page, settleS, () => onScreen(minOnScreen))
   const tell = await page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'incoming').map((e) => e.label))
   const before = await boss()
   const drawCalls = await page.evaluate(() => window.__SC_TEST__.drawCalls)
@@ -1290,7 +1648,8 @@ async function bossCheck(page) {
   const phaseOneHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), firstHp)
   const midway = await boss()
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
-  await page.screenshot({ path: path.join(OUT, `${level}-boss-gondola.png`), timeout: SHOT_TIMEOUT })
+  const surfaced = await stepBoss(page, midSettleS, () => onScreen(1))
+  await page.screenshot({ path: path.join(OUT, `${level}-${midShot}.png`), timeout: SHOT_TIMEOUT })
   const lastHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), midway.exposed.reduce((sum, e) => sum + e.hp, 0))
   const finalHits = await boss()
   // Let the last pop finish (slowly, so the confetti stays near) with its popup held.
@@ -1313,7 +1672,7 @@ async function bossCheck(page) {
   })
 
   const result = {
-    level, spawned, tell, bar, drawCalls, widthFrac: before.box?.widthFrac ?? 0, exposedAtStart: before.exposed.map((e) => e.id),
+    level, spawned, settled, surfaced, onScreenAtStart: before.exposed.filter((e) => e.onScreen).length, tell, bar, drawCalls, widthFrac: before.box?.widthFrac ?? 0, exposedAtStart: before.exposed.map((e) => e.id),
     bulletHit, phaseOneHits, exposedMidway: midway.exposed.map((e) => e.id), lastHits, hpMidway: midway.hpFraction,
     stage: after.stage, kills: end.kills - startStats.kills, score: end.score - startStats.score, popup, skipped: false,
   }
@@ -1326,6 +1685,9 @@ async function bossCheck(page) {
   if (!tell.length) problems.push('no tell (wave:incoming) before the boss')
   if (!bar) problems.push('the boss bar (.hud-boss) never showed')
   if (!(result.widthFrac >= minWidthFrac)) problems.push(`the boss is ${(result.widthFrac * 100).toFixed(0)}% of the frame wide (want ≥ ${minWidthFrac * 100}%)`)
+  if (!settled || result.onScreenAtStart < minOnScreen)
+    problems.push(`${result.onScreenAtStart} first-phase weak points on screen after ${settleS} s (want ≥ ${minOnScreen})`)
+  if (!surfaced) problems.push(`the last phase [${lastPhase}] never came on screen within ${midSettleS} s`)
   if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !id.startsWith(firstPhase)))
     problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPhase}*)`)
   if (!target) problems.push('no exposed weak point on screen to shoot')
@@ -1340,12 +1702,105 @@ async function bossCheck(page) {
   return { id: 'boss', problems, boss: result }
 }
 
-/**
- * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
- * shows over the mounted level, a press during it fires nothing (not even when held on into
- * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
- * that a tap after the 1 s mark skips to GO / playing.
- */
+const PICKUP_CHECK = { level: 'level1', min: 2, max: 4, weapon: 'spread', bullets: 3, pauseMs: 3000 }
+/** Track-parameter leads behind the first pickup to park the coaster at. */
+const PICKUP_LEADS = [0.006, 0.01, 0.015, 0.004, 0.02, 0.03]
+
+/** Weapon pickups (#185): shoot the first, then the spread fan, badge, pause-safe expiry and restart (level1-pickup.png). */
+async function pickupCheck(page) {
+  const { level, min, max, weapon, bullets, pauseMs } = PICKUP_CHECK
+  const problems = []
+  const api = (fn, arg) => page.evaluate(fn, arg)
+  const weaponState = () => api(() => window.__SC_TEST__.weaponState())
+  await api(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
+  await api(() => window.__SC_TEST__.setTimeScale(0))
+
+  let pickups = await api(() => window.__SC_TEST__.pickups())
+  const result = { count: pickups.length, ids: pickups.map((p) => p.id), lead: null, px: null }
+  if (pickups.length < min || pickups.length > max) problems.push(`${pickups.length} pickups (want ${min}–${max})`)
+  const first = pickups[0]
+  let target = null
+  if (first) {
+    for (const lead of PICKUP_LEADS) {
+      await api((t) => { window.__SC_TEST__.rideTo = t }, first.t - lead)
+      await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+      pickups = await api(() => window.__SC_TEST__.pickups())
+      const p = pickups[0]
+      if (p.onScreen && Math.abs(p.ndcX) < 0.8 && Math.abs(p.ndcY) < 0.8) {
+        target = p
+        result.lead = lead
+        break
+      }
+    }
+  }
+  const drawCalls = await api(() => window.__SC_TEST__.drawCalls)
+  if (!target) problems.push(`the first pickup never came on screen from ${PICKUP_LEADS.length} spots behind it`)
+  else {
+    result.px = { x: Math.round(target.x), y: Math.round(target.y), distance: Math.round(target.distance) }
+    await api(({ x, y }) => {
+      window.__SC_TEST__.bulletStep = 0.25
+      window.__SC_TEST__.fireShot(x, y)
+    }, { x: target.ndcX, y: target.ndcY })
+    const got = await pollUntil(page, async () => (await weaponState()).pickup === weapon, { ms: 8000, frames: 8, pollMs: 200 })
+    if (!got) problems.push(`shooting the ${target.id} pickup did not arm it (${JSON.stringify(await weaponState())})`)
+    await api(() => window.__SC_TEST__.setTimeScale(1))
+    const gone = await pollUntil(page, async () => (await api(() => window.__SC_TEST__.pickups()))[0].gone, { ms: 10000, frames: 1, pollMs: 100 })
+    await api(() => window.__SC_TEST__.setTimeScale(0))
+    if (!gone) problems.push('the shot pickup never popped')
+  }
+
+  const before = await getStats(page)
+  await page.waitForTimeout(100) // past the fire interval
+  await api(() => {
+    window.__SC_TEST__.bulletStep = 0
+    window.__SC_TEST__.holdFeedback = true
+    window.__SC_TEST__.fireShot(0.1, 0.35)
+  })
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const after = await getStats(page)
+  const drawn = (await api(() => window.__SC_TEST__.bullets())).drawn
+  result.fan = { shots: after.shotsFired - before.shotsFired, drawn }
+  if (result.fan.shots !== bullets) problems.push(`a spread pull counted ${result.fan.shots} shots (want ${bullets})`)
+  if (drawn < bullets) problems.push(`a spread pull drew ${drawn} bullets (want ${bullets})`)
+  const badge = await waitVisible(page, '.hud-weapon', 10000)
+  if (!badge) problems.push('no weapon badge with a pickup active')
+  const hud = await hudLayoutProblems(page, 'desktop 1280x720 with the weapon badge', [...HUD_SELECTORS, '.hud-weapon'])
+  problems.push(...hud.problems)
+  const label = await api(() => document.querySelector('.hud-weapon-label')?.textContent ?? null)
+  if (label?.toLowerCase() !== weapon) problems.push(`badge reads "${label}" (want ${weapon})`)
+  await page.screenshot({ path: path.join(OUT, `${level}-pickup.png`), timeout: SHOT_TIMEOUT })
+  await api(() => {
+    window.__SC_TEST__.holdFeedback = false
+    window.__SC_TEST__.bulletStep = null
+  })
+
+  const held = await weaponState()
+  await api(() => {
+    window.__SC_TEST__.setTimeScale(1)
+    window.__SC_TEST__.setPhase('paused')
+  })
+  await page.waitForTimeout(pauseMs)
+  const paused = await weaponState()
+  if (Math.abs(paused.remaining - held.remaining) > 1e-6)
+    problems.push(`the pickup ran down while paused (${held.remaining.toFixed(3)} -> ${paused.remaining.toFixed(3)})`)
+  await api(() => {
+    window.__SC_TEST__.setPhase('playing')
+    window.__SC_TEST__.setTimeScale(4)
+  })
+  const expired = await pollUntil(page, async () => (await weaponState()).active === 'blaster', { ms: 60000, frames: 2, pollMs: 500 })
+  if (!expired) problems.push(`the pickup never expired (${JSON.stringify(await weaponState())})`)
+  else if (!(await pollUntil(page, () => api(() => !document.querySelector('.hud-weapon.is-visible')), { ms: 5000, frames: 1, pollMs: 250 })))
+    problems.push('the weapon badge stayed up after the pickup expired')
+
+  await api(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const restarted = { weapon: await weaponState(), collected: (await api(() => window.__SC_TEST__.pickups())).filter((p) => p.collected).length }
+  if (restarted.weapon.pickup !== null) problems.push(`startRun kept the pickup (${restarted.weapon.pickup})`)
+  if (restarted.collected) problems.push(`${restarted.collected} pickup(s) still collected after a restart`)
+  return { id: 'pickup', problems, pickup: { ...result, drawCalls, badge: hud.rects.at(-1) } }
+}
+
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
 async function levelSelectCheck(page, levels) {
   const problems = []
@@ -1391,7 +1846,8 @@ async function levelSelectCheck(page, levels) {
       focused: document.activeElement?.dataset?.level ?? null,
     }
   })
-  if (layout.cards !== levels.length) problems.push(`${layout.cards} level cards for ${levels.length} levels`)
+  // One card per level plus the Daily Run card (#184).
+  if (layout.cards !== levels.length + 1) problems.push(`${layout.cards} cards for ${levels.length} levels + Daily`)
   if (layout.locked !== levels.length - expectOpen) problems.push(`${layout.locked} locked cards, expected ${levels.length - expectOpen}`)
   if (Number(layout.total) !== expectStars || !layout.totalText.includes(`${expectStars} / ${levels.length * 3}`)) {
     problems.push(`star total "${layout.totalText.trim()}", expected ${expectStars} / ${levels.length * 3}`)
@@ -1434,6 +1890,104 @@ async function levelSelectCheck(page, levels) {
     if (after.phase !== 'playing' || after.level !== target) problems.push(`Enter started ${after.level} (${after.phase}), expected ${target}`)
   }
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
+}
+
+/** Click the level select's Daily card (#184) and return the run it started and its spawnDigest(). */
+async function startDailyFromCard(page, savedScores) {
+  await page.evaluate((s) => {
+    window.__SC_TEST__.setSavedScores(s)
+    window.__SC_TEST__.setPhase('levelSelect')
+  }, savedScores)
+  if (!(await waitVisible(page, '.level-card-daily'))) return { run: null, digest: null }
+  await page.locator('.level-card-daily').click({ timeout: 30000 })
+  await page.waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 30000 }).catch(() => {})
+  const run = await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    return { ...s.daily(), phase: s.phase(), runSeed: s.stats().runSeed, currentLevel: s.stats().currentLevel }
+  })
+  return { run, digest: await nextSpawnDigest(page, null) }
+}
+
+/**
+ * Daily Run (#184): the card starts today's level on today's seed in daily mode, two loads spawn the same,
+ * the results say DAILY / NEW BEST with no Next Level, Replay keeps the seed, and campaign saves stay as they were.
+ */
+async function dailyCheck(newPage) {
+  const problems = []
+  const campaign = { level1: { level: 'level1', score: 1000, maxScore: 0, stars: 3, timestamp: 0 } }
+  const first = await newPage()
+  const a = await startDailyFromCard(first.page, campaign)
+  const { run } = a
+  if (!run) problems.push('no Daily card on the level select')
+  else {
+    if (run.phase !== 'playing') problems.push(`the Daily card left the game in "${run.phase}"`)
+    if (run.runMode?.mode !== 'daily' || run.runMode.dateKey !== run.dateKey) problems.push(`run mode ${JSON.stringify(run.runMode)}, expected daily ${run.dateKey}`)
+    if (run.runSeed !== run.seed) problems.push(`daily run seed ${run.runSeed}, expected dailySeed(${run.dateKey}) = ${run.seed}`)
+    if (run.currentLevel !== run.level) problems.push(`daily started ${run.currentLevel}, expected ${run.level}`)
+  }
+  if (!a.digest) problems.push('spawnDigest() never reported the daily spawns')
+
+  // Score something so the day's first result is a NEW BEST, then end the run.
+  await first.page.evaluate(() => window.__SC_TEST__.killNearest(3))
+  await waitFrames(first.page, 2, { maxMs: 20000 })
+  await first.page.evaluate(() => window.__SC_TEST__.endLevel())
+  const resultsShown = await first.page
+    .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 60000, polling: 250 })
+    .then(() => true, () => false)
+  await first.page.waitForTimeout(1500)
+  await first.page.screenshot({ path: path.join(OUT, 'daily-results.png'), timeout: SHOT_TIMEOUT })
+  const results = await first.page.evaluate(() => {
+    const el = document.querySelector('.results-screen')
+    const s = window.__SC_TEST__
+    return {
+      mode: el?.dataset.mode ?? null,
+      badge: el?.querySelector('.results-daily-badge')?.textContent ?? null,
+      record: el?.querySelector('.results-record')?.textContent ?? null,
+      buttons: [...(el?.querySelectorAll('.results-actions button') ?? [])].map((b) => b.textContent),
+      board: !!el?.querySelector('.results-board'),
+      entry: !!el?.querySelector('.results-initials-ok, .results-board[data-editing]'),
+      boards: s.leaderboards().boards,
+      score: s.stats().score,
+      daily: s.daily(),
+      savedScores: JSON.parse(localStorage.getItem('shootercoaster-scores') ?? '{}').state?.savedScores ?? null,
+    }
+  })
+  const savedDay = run ? results.daily.savedDaily[run.dateKey] : undefined
+  if (!resultsShown) problems.push('daily results screen never finished its reveal')
+  if (results.mode !== 'daily' || !results.badge) problems.push(`daily results lack the Daily badge (mode ${results.mode})`)
+  if (results.score > 0 && results.record !== 'NEW BEST') problems.push(`first daily result shows "${results.record}", expected NEW BEST`)
+  if (results.buttons.includes('Next Level')) problems.push('daily results offer Next Level')
+  // #317: a daily never enters the campaign leaderboard, so no board and no initials entry.
+  if (results.board || results.entry) problems.push(`daily results show the leaderboard${results.entry ? ' and an initials entry' : ''}`)
+  if (Object.keys(results.boards).length) problems.push(`a daily run entered the campaign leaderboards: ${JSON.stringify(results.boards)}`)
+  if (!savedDay || savedDay.score !== Math.round(results.score)) problems.push(`today's daily best ${JSON.stringify(savedDay)}, expected score ${Math.round(results.score)}`)
+  if (results.daily.streak.count !== 1 || results.daily.streak.lastKey !== run?.dateKey) problems.push(`daily streak ${JSON.stringify(results.daily.streak)}, expected 1 day`)
+  if (JSON.stringify(results.savedScores) !== JSON.stringify(campaign)) problems.push(`a daily run changed the campaign saves: ${JSON.stringify(results.savedScores)}`)
+
+  // Replay replays the same seed in daily mode.
+  await first.page.locator('.results-actions button', { hasText: 'Replay' }).click({ timeout: 10000 }).catch((e) => problems.push(`click Replay: ${e.message}`))
+  await first.page.waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 30000 }).catch(() => {})
+  const replay = await first.page.evaluate(() => ({ runSeed: window.__SC_TEST__.stats().runSeed, mode: window.__SC_TEST__.daily().runMode.mode }))
+  if (run && (replay.runSeed !== run.seed || replay.mode !== 'daily')) problems.push(`Replay ran seed ${replay.runSeed} (${replay.mode}), expected the daily seed ${run.seed}`)
+  const errors = [...first.errors, ...(await first.page.evaluate(() => window.__SC_TEST__.errors))]
+  await first.ctx.close()
+
+  // A second load on the same date spawns the same enemies.
+  const second = await newPage()
+  const b = await startDailyFromCard(second.page, {})
+  errors.push(...second.errors, ...(await second.page.evaluate(() => window.__SC_TEST__.errors)))
+  await second.ctx.close()
+  if (b.run?.runSeed !== run?.seed) problems.push(`second load ran seed ${b.run?.runSeed}, expected ${run?.seed}`)
+  if (b.digest !== a.digest) problems.push(`two loads of today's daily spawned differently (${a.digest} vs ${b.digest})`)
+  if (errors.length) problems.push(`${errors.length} error(s)`)
+
+  return {
+    id: 'daily',
+    ok: problems.length === 0,
+    problems,
+    errors,
+    daily: { dateKey: run?.dateKey, level: run?.level, seed: run?.seed, digest: a.digest, digestAgain: b.digest, record: results.record, replaySeed: replay.runSeed },
+  }
 }
 
 /** The settings card (#35): inside the viewport, no sideways scroll, every control there and ≥ 44 px tall. */
@@ -1539,7 +2093,12 @@ async function qualityCheck(newPage, levelId) {
   return { id: 'quality', problems, errors: [...high.errors, ...low.errors], quality: { level: levelId, drawCalls: [high.drawCalls, low.drawCalls], dpr: [high.dpr, low.dpr] } }
 }
 
-/** Title (#28): another camera angle 6 s later (`title-2.png`), the start hint, and a key press fading to level select. */
+/** Fetches of Tone.js's chunk so far (`audio/tone.ts`: loaded on the first gesture, never at startup). */
+const toneRequests = (page) =>
+  page.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/tone-[^/]*\.js$/.test(e.name)).length)
+
+/** Title (#28): another camera angle 6 s later (`title-2.png`), the start hint, and a key press fading to level select
+ *  that also loads Tone.js (#187: not before it) and unlocks audio. */
 async function titleFlyBy(page) {
   const problems = []
   const pose = () => page.evaluate(() => window.__SC_TEST__.cameraPose())
@@ -1548,7 +2107,9 @@ async function titleFlyBy(page) {
   await waitFrames(page, 2, { minMs: 6000, maxMs: 30000 })
   const b = await pose()
   const waited = (Date.now() - at) / 1000
-  await page.screenshot({ path: path.join(OUT, 'title-2.png'), timeout: SHOT_TIMEOUT })
+  // Re-shot like title.png: a GPU CI runner can return one black canvas capture (#291 CI), a black scene stays black.
+  const scene2 = await captureTitleScene(page, path.join(OUT, 'title-2.png'), 10000)
+  if (looksBlank(scene2)) problems.push(`title-2.png: the 3D scene behind the UI looks blank (mean ${scene2.mean.toFixed(1)} stddev ${scene2.stddev.toFixed(1)} colours ${scene2.distinctColors})`)
   let turnedDeg = 0
   let moved = 0
   if (!a || !b) problems.push('no title camera')
@@ -1562,6 +2123,8 @@ async function titleFlyBy(page) {
   const hint = await page.locator('.title-hint').textContent({ timeout: 5000 }).catch(() => null)
   if (!hint) problems.push('no start hint on the first title')
 
+  const toneBefore = { requests: await toneRequests(page), loaded: await page.evaluate(() => window.__SC_TEST__.audio().toneLoaded) }
+  if (toneBefore.requests > 0 || toneBefore.loaded) problems.push('Tone.js loaded before the first key press on the title')
   await page.keyboard.press('Enter')
   const veiled = await page
     .waitForSelector('.screen-veil', { state: 'attached', timeout: 10000 })
@@ -1575,9 +2138,57 @@ async function titleFlyBy(page) {
     .waitForSelector('.screen-veil', { state: 'detached', timeout: 30000 })
     .then(() => true, () => false)
   if (!veilGone) problems.push('the fade to black never cleared over level select')
-  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened } }
+  const toneAfter = await page
+    .waitForFunction(() => window.__SC_TEST__.audio().toneLoaded && window.__SC_TEST__.audio().ready, null, { timeout: 30000 })
+    .then(() => true, () => false)
+  if (!toneAfter) problems.push('the key press on the title did not load Tone.js and unlock audio')
+  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter } }
 }
 
+const LANDING_PATH = '/go/smoke-check'
+
+/** Posted links point at `/go/<campaign>` and analytics attributes them by that path, so it must boot and survive (#171). */
+async function landingPathCheck(browser, base) {
+  const problems = []
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+  const page = await ctx.newPage()
+  const errors = []
+  collectErrors(page, errors)
+  const failed = []
+  const analytics = []
+  page.on('response', (r) => r.status() >= 400 && failed.push(`${r.status()} ${r.url()}`))
+  page.on('requestfailed', (r) => failed.push(`${r.failure()?.errorText ?? 'failed'} ${r.url()}`))
+  page.on('request', (r) => /\/_vercel\/insights\//.test(r.url()) && analytics.push(r.url()))
+  const pathname = new URL(`${base}${LANDING_PATH}`).pathname
+  await page.goto(`${base}${LANDING_PATH}?e2e=1&internal=1`, { waitUntil: 'load' })
+  // A wrong asset base serves index.html for the scripts here, so the game never boots.
+  const booted = await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 }).then(() => true, () => false)
+  if (!booted) {
+    await ctx.close()
+    const landing = { requested: pathname, pathname: '-', search: '', phase: 'none', marker: false, failed: failed.length }
+    return { id: 'landing', ok: false, problems: [`the game did not boot on ${LANDING_PATH}`, ...failed.slice(0, 3)], errors, landing }
+  }
+  await waitFrames(page, 2, { minMs: 2000, maxMs: FRAME_DEADLINE_MS })
+  const marker = await page.locator('.internal-marker').isVisible().catch(() => false)
+  const after = await page.evaluate(() => ({ pathname: location.pathname, search: location.search, phase: window.__SC_TEST__.phase() }))
+  errors.push(...(await page.evaluate(() => window.__SC_TEST__.errors)))
+  if (after.phase !== 'title') problems.push(`phase "${after.phase}" on ${LANDING_PATH} (want title)`)
+  if (after.pathname !== pathname) problems.push(`path rewritten on boot: ${pathname} -> ${after.pathname}`)
+  if (after.search !== '?e2e=1') problems.push(`search "${after.search}" after boot (want ?internal stripped, ?e2e=1 kept)`)
+  if (!marker) problems.push('no "internal: not tracked" marker after ?internal=1')
+  if (failed.length) problems.push(`${failed.length} failed request(s): ${failed.slice(0, 3).join(', ')}`)
+  if (analytics.length) problems.push(`analytics request under ?e2e=1: ${analytics[0]}`)
+  if (errors.length) problems.push(`${errors.length} error(s)`)
+  await ctx.close()
+  return { id: 'landing', ok: problems.length === 0, problems, errors, landing: { requested: pathname, ...after, marker, failed: failed.length } }
+}
+
+/**
+ * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
+ * shows over the mounted level, a press during it fires nothing (not even when held on into
+ * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
+ * that a tap after the 1 s mark skips to GO / playing, and leaving a level mid-warm-up must throw nothing.
+ */
 async function countdownCheck(page, levelId) {
   const start = () => page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
   // Attached, not faded in: at ~1 fps, waiting on the fade could outlast the countdown.
@@ -1589,6 +2200,9 @@ async function countdownCheck(page, levelId) {
     .waitForFunction(() => window.__SC_TEST__.phase() === 'playing' && window.__SC_TEST__.stats(), null, { timeout: 30000, polling: 100 })
     .then((h) => h.jsonValue(), () => null)
   const pointer = { clientX: 640, clientY: 360, pointerId: 1, isPrimary: true, pointerType: 'mouse', bubbles: true }
+
+  // Let the title draw first, so the startup timings cover it.
+  await page.waitForFunction(() => window.__SC_TEST__.initTimings().titleFrame !== undefined, null, { timeout: 30000, polling: 100 }).catch(() => {})
 
   // 1. Press during the countdown and hold it on into play.
   await start()
@@ -1651,19 +2265,47 @@ async function countdownCheck(page, levelId) {
     return { ...before, programsAfter: api.programs(), maxFrameMs: api.maxFrameMs, shots: api.stats().shotsFired }
   }, shotStart)
 
-  // 2. Replay through results (as the UI does) and tap after the 1 s mark: it skips to GO.
+  // 2. Replay through results (as the UI does) and tap after the 1 s mark: it skips to GO (#140).
+  // holdFeedback parks the countdown on Ready, so only the skip can reach playing however slow the frames.
   await page.evaluate(() => window.__SC_TEST__.endLevel())
-  await start()
+  await page.evaluate(([lid, seed]) => {
+    const api = window.__SC_TEST__
+    api.startLevel(lid, seed)
+    api.holdFeedback = true
+  }, [levelId, SEED])
   const shownAgain = await stepShown()
-  await page.waitForTimeout(1200)
+  // Frames too, so the countdown's mount effects (where its 1 s starts) have run.
+  await waitFrames(page, 2, { minMs: 1500, maxMs: 30000 })
   const tappedIn = await page.evaluate((at) => {
     const phase = window.__SC_TEST__.phase()
+    if (phase !== 'countdown') return phase
     const canvas = document.querySelector('canvas')
     canvas.dispatchEvent(new PointerEvent('pointerdown', at))
     canvas.dispatchEvent(new PointerEvent('pointerup', at))
     return phase
   }, pointer)
   const afterTap = await waitPlaying()
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+
+  // 3. Leave a fresh level mid-warm-up (#141); polled in the page so the unmount beats the warm-up's first check.
+  await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
+  await waitFrames(page, 2, { maxMs: 30000 })
+  const leftDuringWarmup = await page.evaluate(([lid, seed]) => new Promise((resolve) => {
+    const api = window.__SC_TEST__
+    api.shaderWarmup = null
+    api.startLevel(lid, seed)
+    const until = performance.now() + 30000
+    const poll = () => {
+      const w = api.shaderWarmup
+      if (w || performance.now() > until) {
+        api.setPhase('levelSelect')
+        resolve(w ? !w.done : null)
+      } else setTimeout(poll, 0)
+    }
+    poll()
+  }), [levelId, SEED])
+  await waitFrames(page, 3, { minMs: 1500, maxMs: 30000 })
+  const initTimings = await page.evaluate(() => window.__SC_TEST__.initTimings())
 
   const problems = []
   if (startPhase !== 'countdown') problems.push(`startLevel entered "${startPhase}", not countdown`)
@@ -1681,12 +2323,15 @@ async function countdownCheck(page, levelId) {
   if (firstShot.programsAfter > firstShot.programs)
     problems.push(`the first shot + kill compiled ${firstShot.programsAfter - firstShot.programs} shader program(s) after the warm-up`)
   if (!shownAgain) problems.push('no countdown on replay')
-  if (!afterTap) problems.push(`the replay never reached playing after a tap in "${tappedIn}"`)
+  if (tappedIn !== 'countdown') problems.push(`the replay's countdown was over before the skip tap (phase "${tappedIn}")`)
+  else if (!afterTap) problems.push('the skip tap never reached playing')
   else if (afterTap.shotsFired > 0) problems.push(`the skip tap fired ${afterTap.shotsFired} shot(s)`)
+  if (leftDuringWarmup === null) problems.push('the remounted level never started its shader warm-up')
   return {
     id: 'countdown',
     ok: problems.length === 0,
     problems,
+    initTimings,
     countdown: {
       level: levelId,
       stepText,
@@ -1694,10 +2339,56 @@ async function countdownCheck(page, levelId) {
       timerAtGo: atGo.timeRemaining,
       shotsHeldIntoPlay: heldInPlay.stats.shotsFired,
       skipTapIn: tappedIn,
+      leftDuringWarmup,
       warmup,
       firstShot,
     },
   }
+}
+
+/** #168: a `from` -> `to` switch must overlap: the latest `to` fade-in needs a `from` fade-out running under it, and its first note must land before that fade-out reaches 0. */
+function crossfadeGaps(fades, from, to) {
+  const incoming = fades.findLast((f) => f.name === to && f.ramp === 'in')
+  if (!incoming) return []
+  const overlapping = fades.filter(
+    (f) => f !== incoming && f.name === from && f.ramp === 'out' && f.at <= incoming.at + incoming.seconds && f.at + f.seconds >= incoming.at,
+  )
+  if (!overlapping.length) return [`${from} -> ${to}: no ${from} fade-out overlaps the ${to} fade-in (the switch did not crossfade)`]
+  return overlapping
+    .filter((out) => incoming.firstNote == null || incoming.firstNote >= out.at + out.seconds)
+    .map((out) =>
+      incoming.firstNote == null
+        ? `${from} -> ${to}: the fade-in logged no first note`
+        : `${from} -> ${to}: first note ${(incoming.firstNote - out.at).toFixed(2)} s into a ${out.seconds} s fade-out (a gap)`,
+    )
+}
+
+/** Level -> next level and level -> level select (#168), after the phone run's results: each must fade out, fade in, leave one bus and pass `crossfadeGaps`. */
+async function musicSwitches(page) {
+  const problems = []
+  const read = () => page.evaluate(() => window.__SC_TEST__.audio().music)
+  const latest = (m) => Math.max(0, ...m.fades.map((f) => f.at))
+  const switches = []
+  const run = async (label, from, to, act) => {
+    const since = latest(await read())
+    await act()
+    const deadline = Date.now() + 30000
+    let m = await read()
+    const fresh = () => m.fades.filter((f) => f.at > since)
+    const done = () =>
+      fresh().some((f) => f.name === from && f.ramp === 'out') && fresh().some((f) => f.name === to && f.ramp === 'in') && m.buses.length === 1
+    while (!done() && Date.now() < deadline) {
+      await page.waitForTimeout(250)
+      m = await read()
+    }
+    const fades = fresh()
+    switches.push({ label, fades })
+    if (!done()) problems.push(`${label}: no ${from} fade-out + ${to} fade-in leaving one bus (${m.buses.map((b) => b.name).join(',')})`)
+    problems.push(...crossfadeGaps(fades, from, to).map((g) => `${label}: ${g}`))
+  }
+  await run('level -> next level', 'level', 'level', () => page.evaluate((seed) => window.__SC_TEST__.startLevel('level2', seed), SEED))
+  await run('level -> level select', 'level', 'title', () => page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect')))
+  return { problems, switches }
 }
 
 /** Title -> level music (#28) crossfades: read from the ramp log, since at ~1 fps a 1 s fade fits between two polls. */
@@ -1721,6 +2412,7 @@ async function musicCrossfade(page) {
   else if (titleOut.from < 0.5 || titleOut.seconds < 0.5)
     problems.push(`title music fade-out was not a ramp from full (from ${titleOut.from.toFixed(2)} over ${titleOut.seconds} s)`)
   if (!levelIn || levelIn.seconds < 0.5) problems.push('the level music did not fade in')
+  problems.push(...crossfadeGaps(fades, 'title', 'level'))
   if (buses.some((b) => b.name === 'title')) problems.push('the title music bus was never disposed')
   if (!buses.some((b) => b.name === 'level' && !b.fading)) problems.push('no level music playing')
   return { problems, result: { fades, buses } }
@@ -1769,6 +2461,7 @@ async function scrimCheck(page) {
   if (!titleOut || titleOut.seconds < 0.5) problems.push('the title score did not fade out')
   if (!levelIn || levelIn.seconds < 0.5) problems.push('the level score did not fade in')
   if (busNames(a).includes('title')) problems.push('the title score bus was never disposed')
+  problems.push(...crossfadeGaps(a.music.fades, 'title', 'level'))
 
   result.nodes.push(a.scrim.nodes)
   result.position.push(track(a)?.position ?? 0)
@@ -1826,70 +2519,12 @@ async function scrimCheck(page) {
   if (!result.results) problems.push(`no results score after the run (current "${a.scrim?.current}")`)
   if (!levelOut || levelOut.seconds < 0.5 || !resultsIn) problems.push('the level score did not crossfade to the results score')
   if (busNames(a).includes('level')) problems.push('the level score bus was never disposed')
+  problems.push(...crossfadeGaps(a.music.fades, 'level', 'results'))
   result.dropped = a.dropped
   if (a.dropped) problems.push(`${a.dropped} sound(s) dropped by an audio error (${a.lastDrop?.split('\n')[0]})`)
   return { problems, result }
 }
 
-/** Phone results (#40): initials by tap through 44 px buttons; the board fits portrait and landscape. */
-async function mobileResultsEntry(page) {
-  const problems = []
-  await page.evaluate(() => window.__SC_TEST__.endLevel())
-  if (!(await waitVisible(page, '.results-initials-ok', 60000))) {
-    return { problems: ['phone: no initials entry on the results screen after a scoring run'], result: null }
-  }
-  const layout = () => page.evaluate(() => {
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const small = [...document.querySelectorAll('.results-initials-pad button, .results-board-initials button')]
-      .map((b) => b.getBoundingClientRect())
-      .filter((r) => r.width < 44 - 0.5 || r.height < 44 - 0.5).length
-    const pad = document.querySelector('.results-initials-pad')?.getBoundingClientRect()
-    const board = document.querySelector('.results-board')?.getBoundingClientRect()
-    const screen = document.querySelector('.results-screen')
-    return {
-      small,
-      padInView: !!pad && pad.left >= 0 && pad.right <= vw && pad.top >= 0 && pad.bottom <= vh,
-      boardInView: !!board && board.left >= 0 && board.right <= vw && board.top >= 0 && board.bottom <= vh,
-      hScroll: screen ? screen.scrollWidth > screen.clientWidth : true,
-    }
-  })
-  const portrait = await layout()
-  if (portrait.small) problems.push(`phone: ${portrait.small} initials button(s) under 44 px`)
-  if (!portrait.padInView) problems.push('phone portrait: the initials pad is not scrolled into view')
-  if (portrait.hScroll) problems.push('phone portrait: the results screen scrolls sideways')
-  const initialsShown = (text) => page
-    .waitForFunction((t) => document.querySelector('.results-board li.is-new .results-board-initials')?.textContent === t, text, { timeout: 10000, polling: 100 })
-    .then(() => true, () => false)
-  const tap = (selector) => page.locator(selector).first().tap({ timeout: 30000 }).catch((e) => problems.push(`phone: tap ${selector}: ${e.message}`))
-  await tap('.results-initials-pad button[aria-label="Next letter"]')
-  const first = await initialsShown('BAA')
-  await tap('.results-board-initials button:nth-child(2)')
-  await tap('.results-initials-pad button[aria-label="Next letter"]')
-  const second = await initialsShown('BBA')
-  if (!first || !second) problems.push('phone: tapping ▲ / a letter did not edit the initials (expected BAA then BBA)')
-  await page.screenshot({ path: path.join(OUT, 'mobile-results.png'), timeout: SHOT_TIMEOUT })
-  await tap('.results-initials-ok')
-  await page.waitForFunction(() => !document.querySelector('.results-board[data-editing]'), null, { timeout: 10000, polling: 100 }).catch(() => {})
-  const stored = await page.evaluate(() => ({
-    phase: window.__SC_TEST__.phase(),
-    editing: !!document.querySelector('.results-board[data-editing]'),
-    top: window.__SC_TEST__.leaderboards().boards.level1?.[0]?.initials ?? null,
-  }))
-  if (stored.editing) problems.push('phone: OK did not close the initials entry')
-  if (stored.phase !== 'results' || stored.top !== 'BBA') problems.push(`phone: after OK phase ${stored.phase}, stored initials ${stored.top}`)
-
-  await page.setViewportSize({ width: 844, height: 390 })
-  await page.waitForTimeout(500)
-  const landscape = await layout()
-  if (!landscape.boardInView) problems.push('phone landscape 844x390: the leaderboard is cut off')
-  if (landscape.hScroll) problems.push('phone landscape 844x390: the results screen scrolls sideways')
-  await page.screenshot({ path: path.join(OUT, 'mobile-results-landscape.png'), timeout: SHOT_TIMEOUT })
-  await page.setViewportSize({ width: 390, height: 844 })
-  return { problems, result: { initials: stored.top, portrait, landscape } }
-}
-
-/** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
 /** Boss bar (#181) on the phone, from a paused run: resumed with the boss summoned, it must sit inside the viewport and clear of the HUD in portrait and landscape (mobile-level1-boss.png). */
 async function mobileBossHud(page) {
   const selectors = [...HUD_SELECTORS, '.hud-boss']
@@ -1915,6 +2550,77 @@ async function mobileBossHud(page) {
   return { problems: [...portrait.problems, ...landscape.problems], rects: { portrait: portrait.rects, landscape: landscape.rects } }
 }
 
+/** Phone results (#87, #40): initials by tap through 44 px buttons, then the buttons, board and share menu fit portrait and landscape (mobile-results*.png). */
+async function mobileResults(page) {
+  const problems = []
+  await page.evaluate(() => window.__SC_TEST__.endLevel())
+  const shown = await page
+    .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 60000, polling: 250 })
+    .then(() => true, () => false)
+  if (!shown) return { problems: ['phone: the results screen never finished its reveal'], buttons: null, entry: null }
+  if (!(await waitVisible(page, '.results-initials-ok', 30000))) {
+    return { problems: ['phone: no initials entry on the results screen after a scoring run'], buttons: null, entry: null }
+  }
+  const layout = () => page.evaluate(() => {
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const small = [...document.querySelectorAll('.results-initials-pad button, .results-board-initials button')]
+      .map((b) => b.getBoundingClientRect())
+      .filter((r) => r.width < 44 - 0.5 || r.height < 44 - 0.5).length
+    const pad = document.querySelector('.results-initials-pad')?.getBoundingClientRect()
+    const board = document.querySelector('.results-board')?.getBoundingClientRect()
+    return {
+      small,
+      padInView: !!pad && pad.left >= 0 && pad.right <= vw && pad.top >= 0 && pad.bottom <= vh,
+      boardInView: !!board && board.left >= 0 && board.right <= vw && board.top >= 0 && board.bottom <= vh,
+    }
+  })
+  const portrait = await layout()
+  if (portrait.small) problems.push(`phone: ${portrait.small} initials button(s) under 44 px`)
+  if (!portrait.padInView) problems.push('phone portrait: the initials pad is not scrolled into view')
+  const initialsShown = (text) => page
+    .waitForFunction((t) => document.querySelector('.results-board li.is-new .results-board-initials')?.textContent === t, text, { timeout: 10000, polling: 100 })
+    .then(() => true, () => false)
+  const tap = (selector) => page.locator(selector).first().tap({ timeout: 30000 }).catch((e) => problems.push(`phone: tap ${selector}: ${e.message}`))
+  await tap('.results-initials-pad button[aria-label="Next letter"]')
+  const first = await initialsShown('BAA')
+  await tap('.results-board-initials button:nth-child(2)')
+  await tap('.results-initials-pad button[aria-label="Next letter"]')
+  const second = await initialsShown('BBA')
+  if (!first || !second) problems.push('phone: tapping ▲ / a letter did not edit the initials (expected BAA then BBA)')
+  await page.screenshot({ path: path.join(OUT, 'mobile-results-entry.png'), timeout: SHOT_TIMEOUT })
+  await tap('.results-initials-ok')
+  await page.waitForFunction(() => !document.querySelector('.results-board[data-editing]'), null, { timeout: 10000, polling: 100 }).catch(() => {})
+  const stored = await page.evaluate(() => ({
+    phase: window.__SC_TEST__.phase(),
+    editing: !!document.querySelector('.results-board[data-editing]'),
+    top: window.__SC_TEST__.leaderboards().boards.level1?.[0]?.initials ?? null,
+  }))
+  if (stored.editing) problems.push('phone: OK did not close the initials entry')
+  if (stored.phase !== 'results' || stored.top !== 'BBA') problems.push(`phone: after OK phase ${stored.phase}, stored initials ${stored.top}`)
+
+  // The buttons fade in after the reveal; frames take seconds on the phone run.
+  await waitVisible(page, '.results-actions', 30000)
+  await page.waitForTimeout(1500)
+  const buttons = await page.evaluate(() => [...document.querySelectorAll('.results-actions button')].map((b) => b.textContent))
+  problems.push(...(await resultsActionsProblems(page, 'phone portrait 390x844')))
+  if (!buttons.includes('Share')) problems.push(`phone: results buttons ${JSON.stringify(buttons)} lack Share`)
+  await page.screenshot({ path: path.join(OUT, 'mobile-results.png'), timeout: SHOT_TIMEOUT })
+  await page.setViewportSize({ width: 844, height: 390 })
+  await page.waitForTimeout(1000)
+  problems.push(...(await resultsActionsProblems(page, 'phone landscape 844x390')))
+  const landscape = await layout()
+  if (!landscape.boardInView) problems.push('phone landscape 844x390: the leaderboard is cut off')
+  await page.screenshot({ path: path.join(OUT, 'mobile-results-landscape.png'), timeout: SHOT_TIMEOUT })
+  problems.push(...(await shareMenuProblems(page, 'phone landscape 844x390', { shot: 'mobile-share-landscape.png' })).problems)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(1000)
+  // No share sheet in headless Chromium, so the phone gets the menu too: it must fit 390 px.
+  problems.push(...(await shareMenuProblems(page, 'phone portrait 390x844', { shot: 'mobile-share.png' })).problems)
+  return { problems, buttons, entry: { initials: stored.top, portrait, landscape } }
+}
+
+/** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
 async function runMobile(browser, base) {
   const started = Date.now()
   const { defaultBrowserType: _unused, ...iphone } = devices['iPhone 13']
@@ -2029,6 +2735,7 @@ async function runMobile(browser, base) {
 
   const portrait = await hudLayoutProblems(page, 'portrait 390x844')
   problems.push(...portrait.problems)
+  problems.push(...(await weaponAimSweepProblems(page, 'portrait 390x844')))
 
   await page.setViewportSize({ width: 844, height: 390 })
   await waitFrames(page, 2, { minMs: 500, maxMs: 8000 })
@@ -2107,8 +2814,10 @@ async function runMobile(browser, base) {
   const bossHud = (await phase()) === 'paused' ? await mobileBossHud(page) : { problems: [], rects: null }
   problems.push(...bossHud.problems)
 
-  const resultsEntry = await mobileResultsEntry(page)
-  problems.push(...resultsEntry.problems)
+  const resultsLayout = await mobileResults(page)
+  problems.push(...resultsLayout.problems)
+  const switches = await musicSwitches(page)
+  problems.push(...switches.problems)
 
   const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
   const allErrors = [...errors, ...hookErrors]
@@ -2122,12 +2831,13 @@ async function runMobile(browser, base) {
     mobile: {
       taps: 10, tapsOnEnemies, tapShots, tapKills, fallbackKills, crosshairScale,
       portraitTaps: portraitTaps.result, landscapeTaps: landscapeTaps.result,
-      audio: { portrait: audioPortrait, landscape: audioLandscape, music: music.result },
+      audio: { portrait: audioPortrait, landscape: audioLandscape, music: music.result, switches: switches.switches },
       audioBurst: { portrait: burstPortrait.burst, landscape: burstLandscape.burst },
       views: { portrait: portraitAspect.view, landscape: landscapeAspect.view, portraitAgain: backAspect.view },
       bulletMaxScreenFrac: bullets.maxScreenFrac,
       pauseCards,
-      resultsEntry: resultsEntry.result,
+      resultsButtons: resultsLayout.buttons,
+      resultsEntry: resultsLayout.entry,
     },
     kills: end.kills,
     score: end.score,
@@ -2146,6 +2856,8 @@ async function run() {
 
   const newPage = async (query = 'e2e=1', options = {}) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, ...options })
+    // The results Share check reads back what it copied (#87).
+    await ctx.grantPermissions(['clipboard-read', 'clipboard-write'])
     const page = await ctx.newPage()
     const errors = []
     collectErrors(page, errors)
@@ -2158,17 +2870,23 @@ async function run() {
   const t = await newPage()
   const levels = await t.page.evaluate(() => window.__SC_TEST__.levels())
   const titleWait = await waitFrames(t.page, MIN_FRAMES, { maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
-  const titlePng = await t.page.screenshot({ path: path.join(OUT, 'title.png'), timeout: SHOT_TIMEOUT })
-  const titleImg = await imageStats(t.page, titlePng)
+  const titleImg = await captureTitleScene(t.page, path.join(OUT, 'title.png'), FRAME_DEADLINE_MS)
   const fly = await titleFlyBy(t.page)
   const titleProblems = [...fly.problems, ...(await fontProblems(t.page))]
   if (titleWait.frames < MIN_FRAMES) titleProblems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
-  if (titleImg.stddev <= 4) titleProblems.push('title.png is blank')
+  if (looksBlank(titleImg)) titleProblems.push('title.png: the 3D scene behind the UI looks blank')
   if (t.errors.length) titleProblems.push(`${t.errors.length} error(s)`)
   const titleOk = titleProblems.length === 0
   failed ||= !titleOk
   results.push({ id: 'title', ok: titleOk, problems: titleProblems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg, title: fly.result, errors: t.errors })
   await t.ctx.close()
+
+  // 1a. Campaign landing path; not for portal builds (--base), which portals serve at their own path.
+  if (!args['skip-desktop'] && !args.base) {
+    const r = await landingPathCheck(browser, base)
+    failed ||= !r.ok
+    results.push(r)
+  }
 
   // 1b. Level select with saved progress + keyboard-only start
   if (!args['skip-desktop']) {
@@ -2180,6 +2898,13 @@ async function run() {
     failed ||= !r.ok
     results.push(r)
     await l.ctx.close()
+  }
+
+  // 1b'. Daily Run from its card: today's seed, same spawns on a second load, daily results, campaign saves untouched
+  if (!args['skip-desktop']) {
+    const r = await dailyCheck(newPage)
+    failed ||= !r.ok
+    results.push(r)
   }
 
   // 1c. Settings from the title (settings.png): layout, Esc, persisted across a reload
@@ -2215,7 +2940,7 @@ async function run() {
     if (!spawnDigest) problems.push('spawnDigest() never reported the spawns')
 
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${frameSeconds.toFixed(0)}s)`)
-    if (img.stddev < 4 || img.distinctColors < 8) problems.push('frame looks blank')
+    if (looksBlank(img)) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
     if (enemyShot.error) problems.push(`enemy probe failed: ${enemyShot.error}`)
     else if (enemyShot.readable < MIN_READABLE) {
@@ -2226,8 +2951,12 @@ async function run() {
     const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
     problems.push(...desktopAspect.problems)
     stats.view = desktopAspect.view
+    const perfGate = PERF_GATE ? sceneBudgetCheck(id, stats) : null
+    if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
     const play = await playLevel(page, id, { frenzy: id === wanted[0], leaderboard: id === wanted[0] })
     problems.push(...play.problems)
+    const frenzyEnd = id === wanted[0] ? await frenzyEndProblems(page, id) : null
+    if (frenzyEnd) problems.push(...frenzyEnd.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
     const allErrors = [...errors, ...hookErrors]
     if (allErrors.length) problems.push(`${allErrors.length} error(s)`)
@@ -2235,8 +2964,8 @@ async function run() {
     failed ||= !ok
     delete stats.hookErrors
     results.push({
-      id, ok, problems, frames, frameSeconds, seconds: (Date.now() - started) / 1000, spawnDigest, ...stats,
-      kills: play.kills, score: play.score, combat: play.combat, results: play.results, image: img, enemies: enemyShot, errors: allErrors,
+      id, ok, problems, frames, frameSeconds, seconds: (Date.now() - started) / 1000, spawnDigest, ...stats, perfGate,
+      kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
   }
@@ -2296,7 +3025,7 @@ async function run() {
   // 6. Top speed: banking + wind streaks (speed.png)
   if (wanted.length) {
     const sp = await newPage()
-    const r = await speedCheck(sp.page, wanted[0])
+    const r = await speedCheck(sp.page, SPEED_LEVEL && wanted.includes(SPEED_LEVEL) ? SPEED_LEVEL : wanted[0])
     r.errors = [...sp.errors, ...(await sp.page.evaluate(() => window.__SC_TEST__.errors))]
     if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
     r.ok = r.problems.length === 0
@@ -2317,16 +3046,28 @@ async function run() {
     await w.ctx.close()
   }
 
-  // 6c. The Theme Park finale: summoned, shot down in phase order (level1-boss.png, level1-boss-down.png)
-  if (wanted.includes(BOSS_CHECK.level)) {
+  // 6c. The finales: summoned, shot down in phase order (<level>-boss.png, <level>-boss-down.png)
+  for (const check of BOSS_CHECKS.filter((c) => wanted.includes(c.level))) {
     const b = await newPage()
-    const r = await bossCheck(b.page)
+    const r = await bossCheck(b.page, check)
     r.errors = [...b.errors, ...(await b.page.evaluate(() => window.__SC_TEST__.errors))]
     if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
     r.ok = r.problems.length === 0
     failed ||= !r.ok
     results.push(r)
     await b.ctx.close()
+  }
+
+  // 6e. Weapon pickups: one shot with a real bullet, the fan, the badge, expiry (level1-pickup.png)
+  if (wanted.includes(PICKUP_CHECK.level)) {
+    const pk = await newPage()
+    const r = await pickupCheck(pk.page)
+    r.errors = [...pk.errors, ...(await pk.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    failed ||= !r.ok
+    results.push(r)
+    await pk.ctx.close()
   }
 
   // 6d. The score engine behind ?audio=scrim: title -> level -> pause -> results
@@ -2358,6 +3099,10 @@ async function run() {
       : ''
     const extra = r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '')
+      : r.landing
+        ? ` ${r.landing.requested} -> ${r.landing.pathname}${r.landing.search} phase=${r.landing.phase} internal marker=${r.landing.marker} failed requests=${r.landing.failed}`
+      : r.daily
+        ? ` ${r.daily.dateKey} ${r.daily.level} seed=${r.daily.seed} digest=${r.daily.digest} again=${r.daily.digestAgain} record=${r.daily.record} replaySeed=${r.daily.replaySeed}`
       : r.levelSelect
         ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total} top=${r.levelSelect.initials.filter(Boolean).join(',')}` +
           (r.levelSelect.keyboard ? ` keys: ${r.levelSelect.focused} <- ${r.levelSelect.keyboard.left}, locked ${r.levelSelect.keyboard.locked} Enter -> ${r.levelSelect.keyboard.phaseAfterLocked}, Enter -> ${r.levelSelect.keyboard.level} ${r.levelSelect.keyboard.phase}` : '')
@@ -2379,14 +3124,18 @@ async function run() {
         ? ` ${r.countdown.level} "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
           ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +
           ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'},` +
-          ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})`
+          ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})` +
+          ` | startup ${startupSummary(r.initTimings)}`
       : r.wave
-        ? ` ${r.wave.level} tell ${r.wave.tellLeadS?.toFixed(1) ?? '-'}s ahead, on screen ${r.wave.onScreen} (largest ${r.wave.largestPx}px, nearest ${r.wave.nearest})`
+        ? ` ${r.wave.level} wave at ${r.wave.timing?.due ?? '-'}s: tell at ${r.wave.timing?.tellAt?.toFixed(2) ?? '-'}s (tick before ${r.wave.timing?.tickBefore?.toFixed(2) ?? '-'}s), on screen ${r.wave.onScreen} (largest ${r.wave.largestPx}px, nearest ${r.wave.nearest})`
       : r.boss
         ? (r.boss.skipped
           ? ` ${r.boss.level} skipped (level timed out)`
           : ` ${r.boss.level} tell "${r.boss.tell.at(-1) ?? '-'}" draws=${r.boss.drawCalls} width ${(r.boss.widthFrac * 100).toFixed(0)}% exposed [${r.boss.exposedAtStart.length} ${r.boss.exposedAtStart[0] ?? '-'}…] -> [${r.boss.exposedMidway}]` +
             ` bullet hit ${r.boss.bulletHit} hits ${r.boss.phaseOneHits}+${r.boss.lastHits} kills ${r.boss.kills} score +${r.boss.score} popup ${r.boss.popup[0] ?? '-'} stage ${r.boss.stage}`)
+      : r.pickup
+        ? ` ${r.pickup.count} pickups [${r.pickup.ids.join(',')}] draws=${r.pickup.drawCalls} first at ${r.pickup.px ? `${r.pickup.px.x},${r.pickup.px.y} (${r.pickup.px.distance} units, lead ${r.pickup.lead})` : '-'}` +
+          ` fan shots=${r.pickup.fan?.shots} drawn=${r.pickup.fan?.drawn}`
       : r.scrim
         ? ` engine=${r.scrim.engine} title=${r.scrim.title} nodes ${r.scrim.nodes.join('->')} position ${r.scrim.position.map((p) => p.toFixed(1)).join('->')}s` +
           ` sfxNodes ${r.scrim.sfxNodes.join('->')} voices ${r.scrim.voices ? `peak ${r.scrim.voices.peak}/${r.scrim.voices.budget} stolen ${r.scrim.voices.stolen} dropped ${r.scrim.voices.rejected}` : 'none'}` +
@@ -2400,12 +3149,22 @@ async function run() {
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` particles=${r.particles?.points ?? '-'}${r.particles?.boostPoints ? `+${r.particles.boostPoints}` : ''}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° aimJump=${r.combat.freshShot?.aimJump?.aimErrorDeg?.toFixed(0)}°(turn ${r.combat.freshShot?.aimJump?.jumpDeg?.toFixed(0)}°) bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
+    if (r.perfGate?.knownOver && r.perfGate.over.length) console.log(`     WARN over budget (known, ${r.perfGate.knownOver}): ${r.perfGate.over.join(', ')}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
   console.log(`Screenshots + results.json in ${OUT} (total ${((Date.now() - runStarted) / 1000).toFixed(0)}s)`)
   process.exit(failed ? 1 : 0)
+}
+
+/** Level phases from the run's start: the smoke picks when that is. */
+function startupSummary(t) {
+  const ms = (v) => (v === undefined ? '-' : `${v}`)
+  const sinceRun = (v) => (v === undefined || t.runStart === undefined ? '-' : `+${v - t.runStart}`)
+  return `boot=${ms(t.boot)} titleFrame=${ms(t.titleFrame)} playReady=${ms(t.playReady)} ms;` +
+    ` run at ${ms(t.runStart)}: mounted=${sinceRun(t.levelMounted)} env=${sinceRun(t.envBaked)}` +
+    ` warmup=${sinceRun(t.warmupDone)} playing=${sinceRun(t.firstPlayingFrame)} ms`
 }
 
 function resultsSummary(s) {
@@ -2415,7 +3174,6 @@ function resultsSummary(s) {
   return ` results=${s.stars}★ acc=${s.rows.Accuracy} combo=${s.rows['Best combo']}${board}${entry}`
 }
 
-/** audioBurst result: "ok", or late-note throws + dropped sounds. */
 /** Largest bullet screen radius (% of canvas height) since load, and the fresh shot's distance from the muzzle tip. */
 function bulletSummary(b) {
   if (!b) return '?'
@@ -2424,9 +3182,11 @@ function bulletSummary(b) {
   return `muzzle ${(b.muzzleFrac * 100).toFixed(2)}% flight ${(b.flightFrac * 100).toFixed(2)}% max ${(b.maxScreenFrac * 100).toFixed(2)}%${tip}`
 }
 
+/** audioBurst result: "ok" or late-note throws + dropped sounds, then the kills that reached the engine. */
 function burstSummary(b) {
   if (!b) return '-'
-  return b.lateScheduleErrors || b.dropped ? `late${b.lateScheduleErrors}+drop${b.dropped}` : 'ok'
+  const kills = `kills${b.killsPlayed}/${BURST[1]}`
+  return b.lateScheduleErrors || b.dropped ? `late${b.lateScheduleErrors}+drop${b.dropped} ${kills}` : `ok ${kills}`
 }
 
 /** SFX node count after the portrait / landscape taps (equal = no per-shot nodes). */
@@ -2446,16 +3206,22 @@ function viewSummary(views) {
   return ` buffer portrait=${b(views.portrait)} landscape=${b(views.landscape)} aspect cam/canvas portrait=${f(views.portrait)} landscape=${f(views.landscape)} back=${f(views.portraitAgain)}`
 }
 
+function trackTotals(scene) {
+  if (!scene) return null
+  const total = { objects: 0, triangles: 0 }
+  for (const [name, e] of Object.entries(scene.byName)) {
+    if (name.startsWith('track')) { total.objects += e.objects; total.triangles += e.triangles }
+  }
+  return total
+}
+
 /** Camera-independent totals: whole scene, and objects whose name starts with "track". */
 function sceneSummary(scene) {
   if (!scene) return ''
-  let objs = 0, tris = 0
-  for (const [name, e] of Object.entries(scene.byName)) {
-    if (name.startsWith('track')) { objs += e.objects; tris += e.triangles }
-  }
+  const track = trackTotals(scene)
   const env = scene.environment
   const envText = env ? ` env=${env.intensity} bake=${env.bakeMs?.toFixed(1)}ms` : ' env=none'
-  return ` | scene objs=${scene.objects} tris=${scene.triangles} (track objs=${objs} tris=${tris})${envText}`
+  return ` | scene objs=${scene.objects} tris=${scene.triangles} (track objs=${track.objects} tris=${track.triangles})${envText}`
 }
 
 run().catch((e) => {

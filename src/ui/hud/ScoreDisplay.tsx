@@ -22,7 +22,9 @@ interface ScoreDisplayProps {
  */
 export default function ScoreDisplay({ levelId }: ScoreDisplayProps) {
   const valueRef = useRef<HTMLSpanElement>(null)
-  const best = useGameStore((s) => s.savedScores[levelId]?.score ?? 0)
+  const best = useGameStore((s) =>
+    s.runMode.mode === 'daily' ? (s.savedDaily[s.runMode.dateKey]?.score ?? 0) : (s.savedScores[levelId]?.score ?? 0),
+  )
 
   useEffect(() => {
     const el = valueRef.current

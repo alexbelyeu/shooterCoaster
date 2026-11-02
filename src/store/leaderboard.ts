@@ -1,5 +1,6 @@
 /** The local top-10 per level and the guards on what comes back from localStorage (pure, unit-tested). */
 import type { LeaderboardEntry, ScoreEntry } from '@/types/game'
+import type { DailyStreak } from '@/levels/daily'
 
 export const LEADERBOARD_SIZE = 10
 export const INITIALS_LENGTH = 3
@@ -50,21 +51,46 @@ function sanitizeEntry(value: unknown): LeaderboardEntry | null {
   }
 }
 
+function sanitizeScore(raw: unknown, level: string): ScoreEntry | null {
+  if (!isRecord(raw) || !isFiniteNumber(raw.score) || !isFiniteNumber(raw.stars)) return null
+  return {
+    level,
+    score: raw.score,
+    maxScore: isFiniteNumber(raw.maxScore) ? raw.maxScore : 0,
+    stars: clampStars(raw.stars),
+    timestamp: isFiniteNumber(raw.timestamp) ? raw.timestamp : 0,
+    ...(isFiniteNumber(raw.bestCombo) ? { bestCombo: raw.bestCombo } : {}),
+  }
+}
+
 export function sanitizeSavedScores(value: unknown): Record<string, ScoreEntry> {
   const out: Record<string, ScoreEntry> = {}
   if (!isRecord(value)) return out
   for (const [level, raw] of Object.entries(value)) {
-    if (!isRecord(raw) || !isFiniteNumber(raw.score) || !isFiniteNumber(raw.stars)) continue
-    out[level] = {
-      level,
-      score: raw.score,
-      maxScore: isFiniteNumber(raw.maxScore) ? raw.maxScore : 0,
-      stars: clampStars(raw.stars),
-      timestamp: isFiniteNumber(raw.timestamp) ? raw.timestamp : 0,
-      ...(isFiniteNumber(raw.bestCombo) ? { bestCombo: raw.bestCombo } : {}),
-    }
+    const entry = sanitizeScore(raw, level)
+    if (entry) out[level] = entry
   }
   return out
+}
+
+const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/
+
+/** The Daily Run's bests, keyed by UTC day (`levels/daily.ts`); any other key is dropped. */
+export function sanitizeSavedDaily(value: unknown): Record<string, ScoreEntry> {
+  const out: Record<string, ScoreEntry> = {}
+  if (!isRecord(value)) return out
+  for (const [key, raw] of Object.entries(value)) {
+    if (!DAY_KEY.test(key) || !isRecord(raw)) continue
+    const entry = sanitizeScore(raw, typeof raw.level === 'string' ? raw.level : '')
+    if (entry) out[key] = entry
+  }
+  return out
+}
+
+export function sanitizeStreak(value: unknown): DailyStreak {
+  if (!isRecord(value) || !isFiniteNumber(value.count)) return { count: 0, lastKey: null }
+  if (typeof value.lastKey !== 'string' || !DAY_KEY.test(value.lastKey)) return { count: 0, lastKey: null }
+  return { count: Math.max(0, Math.round(value.count)), lastKey: value.lastKey }
 }
 
 /**

@@ -3,9 +3,10 @@ import * as THREE from 'three'
 import type { BiomeDecorationsProps } from '../../shared/types'
 import { createRng } from '@/utils/rng'
 import { scatterPositions } from '../../shared/scatter'
+import { roundCaster } from '../../shared/contactShadows'
+import { useContactShadows } from '../../shared/ContactShadows'
 
 export default function VolcanicDecorations({ heightFn }: BiomeDecorationsProps) {
-  // Obsidian shards — 4-sided crystalline cones
   const shardPositions = useMemo(() => scatterPositions(createRng(2510), 150, 100, 5000, heightFn), [heightFn])
   const shardGeo = useMemo(() => new THREE.ConeGeometry(2, 15, 4), [])
   const shardMat = useMemo(() => new THREE.MeshPhongMaterial({
@@ -15,28 +16,33 @@ export default function VolcanicDecorations({ heightFn }: BiomeDecorationsProps)
     flatShading: true,
   }), [])
 
+  const shardConfigs = useMemo(() => {
+    const rng = createRng(2514)
+    return shardPositions.map(() => {
+      const h = 8 + rng() * 17
+      const tilt = new THREE.Euler(rng() * 0.3, rng() * Math.PI * 2, rng() * 0.3)
+      return { h, tilt, sx: 1 + rng(), sz: 1 + rng() }
+    })
+  }, [shardPositions])
+
   const setShardRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
-    const rng = createRng(2514)
     const mat = new THREE.Matrix4()
     const q = new THREE.Quaternion()
-    const euler = new THREE.Euler()
     for (let i = 0; i < shardPositions.length; i++) {
       const p = shardPositions[i]
-      const h = 8 + rng() * 17
-      euler.set(rng() * 0.3, rng() * Math.PI * 2, rng() * 0.3)
-      q.setFromEuler(euler)
+      const { h, tilt, sx, sz } = shardConfigs[i]
+      q.setFromEuler(tilt)
       mat.compose(
         new THREE.Vector3(p.x, p.y + h * 0.4, p.z),
         q,
-        new THREE.Vector3(1 + rng(), h / 15, 1 + rng()),
+        new THREE.Vector3(sx, h / 15, sz),
       )
       mesh.setMatrixAt(i, mat)
     }
     mesh.instanceMatrix.needsUpdate = true
-  }, [shardPositions])
+  }, [shardPositions, shardConfigs])
 
-  // Lava pools — flat emissive circles on ground
   const poolPositions = useMemo(() => scatterPositions(createRng(2511), 30, 200, 4000, heightFn, Math.PI / 6), [heightFn])
   const poolGeo = useMemo(() => new THREE.CircleGeometry(1, 24), [])
   const poolMat = useMemo(() => new THREE.MeshPhongMaterial({
@@ -69,7 +75,6 @@ export default function VolcanicDecorations({ heightFn }: BiomeDecorationsProps)
     mesh.instanceMatrix.needsUpdate = true
   }, [poolPositions])
 
-  // Ember patches — small faint glowing circles
   const emberPositions = useMemo(() => scatterPositions(createRng(2512), 80, 50, 4500, heightFn), [heightFn])
   const emberGeo = useMemo(() => new THREE.CircleGeometry(1, 16), [])
   const emberMat = useMemo(() => new THREE.MeshPhongMaterial({
@@ -102,7 +107,6 @@ export default function VolcanicDecorations({ heightFn }: BiomeDecorationsProps)
     mesh.instanceMatrix.needsUpdate = true
   }, [emberPositions])
 
-  // Volcanic boulders — dodecahedron with organic variation
   const boulderPositions = useMemo(() => scatterPositions(createRng(2513), 60, 100, 4500, heightFn), [heightFn])
   const boulderGeo = useMemo(() => new THREE.DodecahedronGeometry(6, 0), [])
   const boulderMat = useMemo(() => new THREE.MeshPhongMaterial({
@@ -112,28 +116,40 @@ export default function VolcanicDecorations({ heightFn }: BiomeDecorationsProps)
     flatShading: true,
   }), [])
 
+  const boulderConfigs = useMemo(() => {
+    const rng = createRng(2517)
+    return boulderPositions.map(() => {
+      const scale = new THREE.Vector3(0.5 + rng() * 1.5, 0.5 + rng() * 1.5, 0.5 + rng() * 1.5)
+      return { scale, tilt: new THREE.Euler(rng() * 0.5, rng() * Math.PI * 2, rng() * 0.5) }
+    })
+  }, [boulderPositions])
+
   const setBoulderRef = useCallback((mesh: THREE.InstancedMesh | null) => {
     if (!mesh) return
-    const rng = createRng(2517)
     const mat = new THREE.Matrix4()
     const q = new THREE.Quaternion()
-    const euler = new THREE.Euler()
     for (let i = 0; i < boulderPositions.length; i++) {
       const p = boulderPositions[i]
-      const sx = 0.5 + rng() * 1.5
-      const sy = 0.5 + rng() * 1.5
-      const sz = 0.5 + rng() * 1.5
-      euler.set(rng() * 0.5, rng() * Math.PI * 2, rng() * 0.5)
-      q.setFromEuler(euler)
-      mat.compose(
-        new THREE.Vector3(p.x, p.y + sy * 3, p.z),
-        q,
-        new THREE.Vector3(sx, sy, sz),
-      )
+      const { scale, tilt } = boulderConfigs[i]
+      q.setFromEuler(tilt)
+      mat.compose(new THREE.Vector3(p.x, p.y + scale.y * 3, p.z), q, scale)
       mesh.setMatrixAt(i, mat)
     }
     mesh.instanceMatrix.needsUpdate = true
-  }, [boulderPositions])
+  }, [boulderPositions, boulderConfigs])
+
+  useContactShadows(
+    useMemo(
+      () => [
+        ...shardPositions.map((p, i) => roundCaster(p.x, p.z, 2 * Math.max(shardConfigs[i].sx, shardConfigs[i].sz), 0.5, 1.2)),
+        ...boulderPositions.map((p, i) => {
+          const { scale } = boulderConfigs[i]
+          return roundCaster(p.x, p.z, 5.5 * Math.max(scale.x, scale.z), 0.5, 0.8)
+        }),
+      ],
+      [shardPositions, shardConfigs, boulderPositions, boulderConfigs],
+    ),
+  )
 
   useEffect(() => {
     return () => {

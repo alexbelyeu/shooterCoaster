@@ -1,8 +1,9 @@
 import type { Color } from 'three'
+import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
 export type CurveType = 'curve1' | 'curve2'
 export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic'
-export type BossType = 'goldenBlimp'
+export type BossType = 'goldenBlimp' | 'kraken'
 export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake'
 
 export interface TrackParams {
@@ -63,6 +64,8 @@ export interface LevelConfig {
   starThresholds: [number, number, number] // 1-star, 2-star, 3-star percentages
   /** Finale: the boss arrives `at` seconds of level time after the start (its tell comes before). Spec in `entities/bosses/bossSpecs.ts`. */
   boss?: { type: BossType; at: number }
+  /** Weapon pickups floating over the track, 2–4 (`combat/pickups/pickupPlacement.ts`); default one of each. */
+  pickups?: PickupWeaponId[]
   /** Per-level bullet look; unset fields fall back to BulletPool's defaults (red, size 10). */
   combat?: {
     bulletColor?: string

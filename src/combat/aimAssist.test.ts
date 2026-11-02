@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { assistRadiusPx, hitScaleFor, pickAssistTarget, TOUCH_ASSIST_RADIUS_PX, TOUCH_HIT_SCALE } from './aimAssist'
+import {
+  PICKUP_ASSIST_WEIGHT, TOUCH_ASSIST_RADIUS_PX, TOUCH_HIT_SCALE, assistRadiusPx, hitScaleFor, pickAssistTarget,
+} from './aimAssist'
 
 describe('aim assist', () => {
   const xs = [100, 200, 130]
@@ -20,6 +22,15 @@ describe('aim assist', () => {
   it('only considers the first `count` candidates', () => {
     expect(pickAssistTarget(120, 125, xs, ys, 3, 44)).toBe(2)
     expect(pickAssistTarget(120, 125, xs, ys, 2, 44)).toBe(0)
+  })
+
+  it('a lighter weight shortens the reach and loses a tie (weapon pickups)', () => {
+    const px = [100, 130]
+    const py = [100, 100]
+    const w = [PICKUP_ASSIST_WEIGHT, 1]
+    expect(pickAssistTarget(115, 100, px, py, 2, 44, w)).toBe(1)
+    expect(pickAssistTarget(100, 100, px, py, 1, 44, w)).toBe(0)
+    expect(pickAssistTarget(100 + 44 * PICKUP_ASSIST_WEIGHT + 1, 100, px, py, 1, 44, w)).toBe(-1)
   })
 
   it('assists touch only; mouse and pen aim stay exact', () => {

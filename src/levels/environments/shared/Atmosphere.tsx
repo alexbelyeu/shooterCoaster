@@ -3,6 +3,7 @@ import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import SkyDome, { createSkyMaterial, setSkyUniforms } from '../SkyDome'
 import type { AtmosphereConfig } from '../atmosphere'
+import { markStartup } from '@/core/startupMarks'
 
 /** Bakes the sky into scene.environment once per mount; Phong materials ignore it, so only Standard/Physical reflect. */
 function SkyEnvironment({ atmosphere }: { atmosphere: AtmosphereConfig }) {
@@ -23,6 +24,7 @@ function SkyEnvironment({ atmosphere }: { atmosphere: AtmosphereConfig }) {
     material.dispose()
     target.texture.name = 'SkyEnvironment'
     target.texture.userData.bakeMs = performance.now() - start
+    markStartup('envBaked')
 
     const prevEnv = scene.environment
     const prevIntensity = scene.environmentIntensity

@@ -2,6 +2,7 @@ import type { EnemyType, Formation, FormationOrigin } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
+import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, type Surface } from './enemyPlacement'
 
 /**
  * Formation placement, pure. Slots are seeded at level load (so `spawnDigest` stays
@@ -38,7 +39,6 @@ export const FORMATIONS: Record<ChoreographedFormation, FormationSpec> = {
 export const NEAR_FIELD = 40
 export const AIR_CLEARANCE = 60
 const GROUND_OFFSET = 5
-export const WATER_Y = 0
 const V_ENTRY_AHEAD = 700
 const V_ENTRY_UP = 200
 const LINE_ENTRY_DEPTH = 90
@@ -52,30 +52,9 @@ const ANCHOR_SEARCH_STEPS = 8
 const ANCHOR_CONE_COS = Math.cos((40 * Math.PI) / 180)
 /** …at least half of `ahead` away in plan, not just over the top of a loop. */
 const ANCHOR_MIN_REACH = 0.5
-const WATER_DEPTH = -5
 const WATER_SEARCH_STEP = 150
 const WATER_SEARCH_TRIES = 12
 const SHORE_PULL_TRIES = 4
-
-type Surface = 'air' | 'ground' | 'water'
-
-export function enemySurface(type: EnemyType): Surface {
-  switch (type) {
-    case 'scorpion':
-    case 'snowman':
-    case 'snowmanScout':
-    case 'snowmanBrute':
-    case 'lavaGolem':
-    case 'fireImp':
-      return 'ground'
-    case 'shark':
-    case 'jellyfish':
-    case 'flyingFish':
-      return 'water'
-    default:
-      return 'air'
-  }
-}
 
 export interface FormationSlot {
   group: number
@@ -132,22 +111,6 @@ export function slotOffset(formation: ChoreographedFormation, i: number, n: numb
       return { x: spacing * Math.cos(a), y: spacing * Math.sin(a), z: 0 }
     }
   }
-}
-
-export function nearestTrackIndex(table: ArcTable, p: Vec3): number {
-  let best = 0
-  let bestSq = Infinity
-  for (let i = 0; i < table.count; i++) {
-    const dx = table.x[i] - p.x
-    const dy = table.y[i] - p.y
-    const dz = table.z[i] - p.z
-    const d = dx * dx + dy * dy + dz * dz
-    if (d < bestSq) {
-      bestSq = d
-      best = i
-    }
-  }
-  return best
 }
 
 /** Sample index `dist` arc units past `index`, wrapping around the closed track. */
@@ -233,8 +196,18 @@ export interface Placement {
   /** Radians the entry unwinds around the vertical axis through `from`. */
   spin: number
   entrySeconds: number
-  /** XZ angle (`atan2(dz, dx)`) the whole group moves on afterwards, so its shape holds. */
-  heading?: number
+  motion?: FormationMotion
+}
+
+/**
+ * How a member moves once it has entered: the whole group on one XZ heading
+ * (`atan2(dz, dx)`) so its shape holds, or bobbing at its slot. Absent: the enemy's own wander.
+ */
+export type FormationMotion = { kind: 'march'; heading: number } | { kind: 'hold' }
+
+/** The group heading of a marching member, else undefined. */
+export function marchHeading(motion: FormationMotion | undefined): number | undefined {
+  return motion?.kind === 'march' ? motion.heading : undefined
 }
 
 export interface PlaceWaveInput {
@@ -251,7 +224,7 @@ export interface PlaceWaveInput {
 /** World placements for a formation wave's slots, in slot order. */
 export function placeFormationWave(input: PlaceWaveInput): Placement[] {
   const { table, riderIndex, camera, formation, type, groundFn, slots } = input
-  const surface = enemySurface(type)
+  const surface = ENEMY_PLACEMENT[type].surface
   const frames = new Map<number, FormationFrame>()
   const frameFor = (group: number) => {
     let f = frames.get(group)
@@ -278,7 +251,7 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
       from: outsideNearField(from, camera),
       spin,
       entrySeconds: 1.2 + (0.6 * slot.index) / Math.max(1, slot.groupSize - 1),
-      heading: formationHeading(formation, f),
+      motion: formationMotion(formation, f),
     }
   })
 }
@@ -367,33 +340,22 @@ function entryStart(
   }
 }
 
-function formationHeading(formation: ChoreographedFormation, f: FormationFrame): number | undefined {
+function formationMotion(formation: ChoreographedFormation, f: FormationFrame): FormationMotion | undefined {
   switch (formation) {
     case 'v':
     case 'line':
-      return Math.atan2(-f.forward.z, -f.forward.x) // at the rider
+      return { kind: 'march', heading: Math.atan2(-f.forward.z, -f.forward.x) } // at the rider
     case 'school':
-      return Math.atan2(f.right.z * -f.sideSign, f.right.x * -f.sideSign) // across the track
-    default:
+      return { kind: 'march', heading: Math.atan2(f.right.z * -f.sideSign, f.right.x * -f.sideSign) } // across the track
+    case 'ring':
+      return { kind: 'hold' } // drifting off would break the hoop before the rider gets there
+    case 'spiral':
       return undefined
   }
 }
 
 /** Scattered over the map, ground enemies were rarely in view (#179); `ahead` spans ~8–25 s at Antarctica's slowest. */
 export const TRACKSIDE = { aheadMin: 700, aheadMax: 2200, sideMin: 60, sideMax: 400 }
-
-export function placedBesideTrack(type: EnemyType): boolean {
-  switch (type) {
-    case 'snowman':
-    case 'snowmanScout':
-    case 'snowmanBrute':
-    case 'lavaGolem':
-    case 'fireImp':
-      return true
-    default:
-      return false
-  }
-}
 
 export interface TracksideSlot {
   /** Arc distance past the rider. */

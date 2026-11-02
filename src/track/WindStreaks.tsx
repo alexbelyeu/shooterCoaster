@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { BEHIND_VIEWMODEL_CLIP_Z, CAMERA_LAYER_ORDER } from '@/core/cameraLayers'
 import { STREAK_COUNT, STREAK_INNER_RADIUS, streakLayout } from './windStreaks'
 
 /** Written by CoasterCamera each frame: opacity (0 hides the mesh) and the streak clock (s). */
@@ -27,7 +28,7 @@ const vertexShader = /* glsl */ `
     vec2 q = dir * r + vec2(-dir.y, dir.x) * aCorner.y * 0.005 * head;
     vCorner = aCorner;
     vLife = life;
-    gl_Position = vec4(q.x / aspect, q.y, 0.0, 1.0);
+    gl_Position = vec4(q.x / aspect, q.y, ${BEHIND_VIEWMODEL_CLIP_Z.toFixed(5)}, 1.0);
   }
 `
 
@@ -60,7 +61,7 @@ function buildGeometry(): THREE.BufferGeometry {
   return geometry
 }
 
-/** Not `transparent`, so it sorts in the opaque list by renderOrder: over the world (0), under the gun (10). */
+/** Transparent, after the world's transparents; depth-tested just behind the gun so the gun stays on top. */
 export default function WindStreaks({ drive }: { drive: StreakDrive }) {
   const meshRef = useRef<THREE.Mesh>(null)
   const geometry = useMemo(buildGeometry, [])
@@ -70,8 +71,8 @@ export default function WindStreaks({ drive }: { drive: StreakDrive }) {
         vertexShader,
         fragmentShader,
         uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 } },
+        transparent: true,
         blending: THREE.AdditiveBlending,
-        depthTest: false,
         depthWrite: false,
         toneMapped: false,
         fog: false,
@@ -105,7 +106,7 @@ export default function WindStreaks({ drive }: { drive: StreakDrive }) {
       material={material}
       visible={false}
       frustumCulled={false}
-      renderOrder={9}
+      renderOrder={CAMERA_LAYER_ORDER.streaks}
     />
   )
 }

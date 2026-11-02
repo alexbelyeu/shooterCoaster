@@ -106,13 +106,22 @@ criteria** (checkable, including what the smoke-test screenshot should show),
 - Body: `Closes #<n>`, what changed and why, **how you verified it** (paste the smoke-test summary lines), screenshots attached or described, risks, follow-ups.
 - Label `agent:needs-qa`. Builders never merge their own PRs.
 - Before opening: `npm run verify` passes locally, you **looked at** the relevant screenshots, CLAUDE.md/docs updated if behaviour or structure changed.
+  Exceptions, where CI's `verify` is the check: the Director's and the Reporter's docs-only
+  PRs (the `verify` they ran on `main` while gathering covers them) and a returned PR whose
+  only change is a merge of `origin/main` that didn't touch `src/` or `e2e/` (`npm test &&
+  npm run build` is enough; `builder.md` step 1).
 
 ## Merging — agents approve, GitHub merges
 
 **No agent ever merges a PR.** Approval is the `agent:qa-approved` label; the
-`Auto-merge approved PRs` workflow (`.github/workflows/automerge.yml`) squash-merges
-an approved PR once the `verify` check is green on its head commit. Pushing new
-commits to an approved PR removes the label automatically.
+`Auto-merge approved PRs` workflow (`.github/workflows/automerge.yml`, logic in
+`scripts/automerge.cjs`) squash-merges an approved PR once the `verify` check is green on
+its head commit. It runs on the PR's label events, after every CI run, and as a sweep of
+every open approved PR every 10 minutes, so an approved PR with a green `verify` merges
+within about 10 minutes even if an event was missed. When it can't merge an approved PR
+for any reason but `verify` still running (red `verify`, conflict, draft…), it says so
+once per head in a PR comment starting `Auto-merge skipped:` or `Auto-merge failed:`.
+Pushing new commits to an approved PR removes the label automatically.
 
 QA applies `agent:qa-approved` only when **all** hold:
 1. GitHub check `verify` is `success` (or still running) on the PR's head SHA (`gh api repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs`).

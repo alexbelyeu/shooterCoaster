@@ -18,11 +18,10 @@ Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, `docs/agents/VISION.md`,
 - On latest `main`: `npm ci`, `export SC_CHROME="$(scripts/ensure-browser.sh)"`,
   `npm run verify`. Keep `results.json` numbers (per-level draw calls, triangles,
   pass/fail) and the bundle size from `npm run check:bundle`.
-- Token ledger: the week's comments on the open `token-ledger` issue
-  (`gh api 'repos/alexbelyeu/shootercoaster/issues/<n>/comments?since=<start ISO>&per_page=100'`),
-  using the JSON in each `<!-- ledger {…} -->` marker; count a `session` once (its latest).
-  Sum `weighted` per `role` (and runs), and per merged PR: every run whose `ref` names the
-  PR or the issue it closes, split evenly when a run lists several refs.
+- Token ledger: `node scripts/run-usage.cjs --summary --since <start ISO> --until <end ISO>`
+  prints the week's runs from the `token-ledger` issue as JSON: `total`, `runs`, `roles`
+  (runs + weighted per role) and `refs` (weighted per `#<n>`; a run listing several refs is
+  split evenly). A merged PR's cost is its own ref plus the issue it closes.
 - Compare with last week's report for trends.
 
 ## Write

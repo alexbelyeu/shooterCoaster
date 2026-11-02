@@ -8,7 +8,8 @@
  * ('jukebox' is the original mix bus, 'game' sits under the SFX) and returns `dispose()`;
  * `session.play` reuses one parameter object instead of allocating per note; the helpers, `makeIR` and one-note
  * access to the instruments and drums are exported for the arcade SFX bake (`audio/arcade/`).
- * The instruments themselves are unchanged.
+ * The original instruments are unchanged. The arcade palette (`fmbass` … `clap909`, marked below) is
+ * ShooterCoaster's own, not from Scrimshaw.
  */
 
 import type { CompiledSong, ScoreEvent, Voice } from './score'
@@ -32,6 +33,8 @@ export interface SynthCore {
   noise: AudioBuffer
   waves: Record<string, PeriodicWave>
   ks: Record<string, { buf: AudioBuffer; f0: number }>
+  /** WaveShaper transfer curves, built once per context. */
+  curves: Record<string, Float32Array<ArrayBuffer>>
 }
 
 /** Per-note options: brightness, attack/release overrides and glide (`from` Hz over `glide` s). */
@@ -43,10 +46,18 @@ interface NoteOpts {
   from: number | null
 }
 
+/** A voice's channel effect between its notes and its level gain, built once per session. */
+interface Insert {
+  input: AudioNode
+  output: AudioNode
+  nodes: AudioNode[]
+}
+
 interface Instrument {
   rev: number
   level: number
   play(S: SynthCore, out: AudioNode, t: number, d: number, f: number, v: number, p: NoteOpts): void
+  insert?(S: SynthCore, bright: number): Insert
 }
 
 interface Drum {
@@ -59,13 +70,19 @@ const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x))
 const mtof = (m: number) => 440 * Math.pow(2, (m - 69) / 12)
 
 /* --------------------------------------------------------------- helpers */
+/** Nodes the arcade note being built has created so far (`ownedNote`); null for the original instruments. */
+let collecting: AudioNode[] | null = null
+function keep<T extends AudioNode>(n: T): T {
+  if (collecting) collecting.push(n)
+  return n
+}
 function G(S: SynthCore, v = 0) {
-  const g = S.ctx.createGain()
+  const g = keep(S.ctx.createGain())
   g.gain.value = v
   return g
 }
 function F(S: SynthCore, type: BiquadFilterType, f: number, q = 0.7, gainDb?: number) {
-  const b = S.ctx.createBiquadFilter()
+  const b = keep(S.ctx.createBiquadFilter())
   b.type = type
   b.frequency.value = clamp(f, 10, S.nyq * 0.95)
   b.Q.value = q
@@ -73,7 +90,7 @@ function F(S: SynthCore, type: BiquadFilterType, f: number, q = 0.7, gainDb?: nu
   return b
 }
 function O(S: SynthCore, type: OscillatorType | PeriodicWave, f: number, t: number, stop: number, p?: NoteOpts | null, ratio = 1, detune = 0) {
-  const o = S.ctx.createOscillator()
+  const o = keep(S.ctx.createOscillator())
   if (typeof type === 'string') o.type = type as OscillatorType
   else o.setPeriodicWave(type)
   const ff = clamp(f * ratio, 1, S.nyq * 0.98)
@@ -142,7 +159,7 @@ interface NoiseOpts {
   peak?: number
 }
 function noise(S: SynthCore, out: AudioNode, t: number, { type = 'bandpass', f = 2000, q = 1, a = 0.001, tau = 0.01, peak = 0.1 }: NoiseOpts) {
-  const src = S.ctx.createBufferSource()
+  const src = keep(S.ctx.createBufferSource())
   src.buffer = S.noise
   src.loop = true
   const fl = F(S, type, f, q)
@@ -155,7 +172,7 @@ function noise(S: SynthCore, out: AudioNode, t: number, { type = 'bandpass', f =
   src.stop(t + a + tau * 7 + 0.01)
 }
 function noiseSrc(S: SynthCore, t: number, stop: number) {
-  const src = S.ctx.createBufferSource()
+  const src = keep(S.ctx.createBufferSource())
   src.buffer = S.noise
   src.loop = true
   src.start(t, Math.random() * (S.noise.duration - 0.5))
@@ -163,7 +180,7 @@ function noiseSrc(S: SynthCore, t: number, stop: number) {
   return src
 }
 function vibrato(S: SynthCore, t: number, stop: number, targets: OscillatorNode[], { rate = 5, depth = 10, delay = 0.2, rise = 0.3 }) {
-  const lfo = S.ctx.createOscillator()
+  const lfo = keep(S.ctx.createOscillator())
   lfo.frequency.value = rate * (0.94 + Math.random() * 0.12)
   const g = G(S)
   g.gain.setValueAtTime(0, t)
@@ -498,6 +515,185 @@ for (const w of ['sine', 'square', 'saw', 'triangle']) {
   } }
 }
 
+/* ------------------------------------------------ arcade palette (ShooterCoaster) */
+/** Each note disconnects every node it made once its last source has ended. */
+function ownedNote(play: Instrument['play']): Instrument['play'] {
+  return (S, out, t, d, f, v, p) => {
+    const nodes: AudioNode[] = (collecting = [])
+    try {
+      play(S, out, t, d, f, v, p)
+    } finally {
+      collecting = null
+      releaseWhenDone(nodes)
+    }
+  }
+}
+function ownedHit(hit: Drum['hit']): Drum['hit'] {
+  return (S, out, t, v) => {
+    const nodes: AudioNode[] = (collecting = [])
+    try {
+      hit(S, out, t, v)
+    } finally {
+      collecting = null
+      releaseWhenDone(nodes)
+    }
+  }
+}
+function releaseWhenDone(nodes: AudioNode[]) {
+  let live = 0
+  const done = () => {
+    if (--live === 0) for (const n of nodes) n.disconnect()
+  }
+  for (const n of nodes) {
+    if (typeof (n as AudioScheduledSourceNode).stop !== 'function') continue
+    live++
+    ;(n as AudioScheduledSourceNode).onended = done
+  }
+}
+
+/** Asymmetric tanh: odd and some even harmonics, like an overdriven amp; the cab's high-pass removes the DC it adds. */
+function driveCurve(S: SynthCore) {
+  let c = S.curves.drive
+  if (!c) {
+    const n = 4096, k = 7, bias = 0.18
+    c = S.curves.drive = new Float32Array(n)
+    const norm = Math.tanh(k + bias) - Math.tanh(bias)
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1
+      c[i] = (Math.tanh(k * x + bias) - Math.tanh(bias)) / norm
+    }
+  }
+  return c
+}
+
+/** Supersaw side voices (cents), JP-8000 style uneven spread; the seventh is the centre voice. */
+const SUPERSAW_CENTS = [-37, -23, -11, 11, 23, 37]
+/** Orchestra hit layers [ratio, cents, gain, wave]: brass saws, string saws an octave up, a square an octave down. */
+const ORCH_LAYERS: [number, number, number, OscillatorType][] = [
+  [1, -6, .32, 'sawtooth'], [1, 6, .32, 'sawtooth'], [2, -10, .2, 'sawtooth'], [2, 9, .2, 'sawtooth'], [.5, 0, .38, 'square'],
+]
+const CLAP909_TAPS = [0, .008, .017, .027]
+
+const ARCADE: Record<string, Instrument> = {
+  /** 2-op FM bass; the modulator runs at 3× because 1:1 and 2:1 put a sideband at 0 Hz (DC). */
+  fmbass: { rev: 0.05, level: 0.86, play: ownedNote((S, out, t, d, f, v, p) => {
+    const amp = G(S); const lp = F(S, 'lowpass', Math.min(4500, 2400 * p.bright), 0.7)
+    lp.connect(amp).connect(out)
+    const end = adsr(amp.gain, t, d, { a: p.att || .002, dc: .3, s: .62, r: p.rel || .05, peak: v * .6 })
+    const car = O(S, 'sine', f, t, end, p); car.connect(lp)
+    const mod = O(S, 'sine', f, t, end, p, 3)
+    const index = G(S) // deviation in Hz = index × 3f: index 0.7–1.7 on the pluck, 0.2 sustained
+    index.gain.setValueAtTime(f * (2 + 3 * v) * p.bright, t)
+    index.gain.setTargetAtTime(f * .6, t, .055)
+    mod.connect(index).connect(car.frequency)
+    noise(S, out, t, { type: 'highpass', f: 1800, q: .5, tau: .003, peak: v * .14 })
+  }) },
+  supersaw: { rev: 0.3, level: 2.72, play: ownedNote((S, out, t, d, f, v, p) => {
+    const amp = G(S); const hp = F(S, 'highpass', 140, .6); const lp = F(S, 'lowpass', f * 1.5, .9)
+    lp.connect(hp).connect(amp).connect(out)
+    const end = adsr(amp.gain, t, d, { a: p.att || .006, dc: .3, s: .85, r: p.rel || .18, peak: v * .32 })
+    const top = Math.min(11000, (f * 7 + 1800) * p.bright * (.6 + .4 * v))
+    lp.frequency.setValueAtTime(Math.min(top, f * 1.5), t)
+    lp.frequency.linearRampToValueAtTime(top, t + .02)
+    lp.frequency.setTargetAtTime(Math.min(top, f * 3 + 1600 * p.bright), t + .02, .22)
+    const centre = G(S, .3); centre.connect(lp)
+    const left = G(S, .17); const right = G(S, .17)
+    const pl = keep(S.ctx.createStereoPanner()); const pr = keep(S.ctx.createStereoPanner())
+    pl.pan.value = -.55; pr.pan.value = .55
+    left.connect(pl).connect(lp); right.connect(pr).connect(lp)
+    const mid = O(S, 'sawtooth', f, t, end, p); mid.connect(centre)
+    const oscs = [mid]
+    for (let i = 0; i < SUPERSAW_CENTS.length; i++) {
+      const o = O(S, 'sawtooth', f, t, end, p, 1, SUPERSAW_CENTS[i])
+      o.connect(i % 2 ? right : left)
+      oscs.push(o)
+    }
+    vibrato(S, t, end, oscs, { rate: 5.6, depth: 9, delay: .35, rise: .3 })
+  }) },
+  /** The amp and cab are a channel `insert`, so a `+` power chord distorts as one. */
+  distguitar: {
+    rev: 0.15, level: 0.43,
+    play: ownedNote((S, out, t, d, f, v, p) => {
+      const amp = G(S); amp.connect(out)
+      const end = adsr(amp.gain, t, d, { a: p.att || .003, dc: .4, s: .9, r: p.rel || .06, peak: v * .5 })
+      O(S, 'sawtooth', f, t, end, p, 1, -7).connect(amp)
+      const sq = G(S, .6); O(S, 'square', f, t, end, p, 1, 7).connect(sq).connect(amp)
+    }),
+    insert(S, bright) {
+      const tight = F(S, 'highpass', 110, .7)
+      const drive = G(S, 1.6)
+      const shaper = S.ctx.createWaveShaper()
+      shaper.curve = driveCurve(S)
+      shaper.oversample = '4x'
+      // 24 dB/oct: the shaper's DC and a power chord's difference tone (E2+B2 → 41 Hz)
+      const lo1 = F(S, 'highpass', 90, .7), lo2 = F(S, 'highpass', 90, .7)
+      const scoop = F(S, 'peaking', 520, .9, -4)
+      const presence = F(S, 'peaking', 1900, 1.1, 3)
+      const cab1 = F(S, 'lowpass', 4600 * bright, .8)
+      const cab2 = F(S, 'lowpass', 6200 * bright, .6)
+      const trim = G(S, .32)
+      tight.connect(drive).connect(shaper).connect(lo1).connect(lo2).connect(scoop).connect(presence).connect(cab1).connect(cab2).connect(trim)
+      return { input: tight, output: trim, nodes: [tight, drive, shaper, lo1, lo2, scoop, presence, cab1, cab2, trim] }
+    },
+  },
+  orchhit: { rev: 0.4, level: 1.86, play: ownedNote((S, out, t, d, f, v, p) => {
+    const amp = G(S); const lp = F(S, 'lowpass', f * 2, .9)
+    lp.connect(amp).connect(out)
+    const end = perc(amp.gain, t, { a: .004, tau: .15, peak: v * .5, damp: t + d + .04, dampTau: .05 })
+    lp.frequency.setValueAtTime(Math.min(10000, (f * 8 + 2500) * p.bright), t)
+    lp.frequency.setTargetAtTime(f * 2 + 500, t + .015, .1)
+    for (const [ratio, cents, gain, type] of ORCH_LAYERS) {
+      const g = G(S, gain); g.connect(lp)
+      O(S, type, f, t, end, p, ratio, cents).connect(g)
+    }
+    noise(S, out, t, { f: 2400, q: .8, a: .001, tau: .018, peak: v * .22 })
+  }) },
+  synbrass: { rev: 0.25, level: 0.79, play: ownedNote((S, out, t, d, f, v, p) => {
+    const amp = G(S); const lp = F(S, 'lowpass', f, 2.2)
+    lp.connect(amp).connect(out)
+    const end = adsr(amp.gain, t, d, { a: p.att || .025, dc: .25, s: .85, r: p.rel || .14, peak: v * .4 })
+    const pk = Math.min(9000, (f * 4 + 900) * p.bright * (.6 + .4 * v))
+    lp.frequency.setValueAtTime(f * 1.2, t)
+    lp.frequency.linearRampToValueAtTime(pk, t + .07)
+    lp.frequency.setTargetAtTime(f * 2.2 + (pk - f) * .35, t + .07, .25)
+    const a = O(S, 'sawtooth', f, t, end, p, 1, -7)
+    const b = O(S, 'sawtooth', f, t, end, p, 1, 7)
+    if (!p.from) {
+      a.frequency.setValueAtTime(f * .97, t); a.frequency.exponentialRampToValueAtTime(f, t + .045)
+      b.frequency.setValueAtTime(f * .97, t); b.frequency.exponentialRampToValueAtTime(f, t + .045)
+    }
+    a.connect(lp); b.connect(lp)
+    const sub = G(S, .3); O(S, 'square', f, t, end, p, .5).connect(sub).connect(lp)
+    vibrato(S, t, end, [a, b], { rate: 5.4, depth: 7, delay: .3, rise: .3 })
+  }) },
+  riser: { rev: 0.45, level: 2.66, play: ownedNote((S, out, t, d, f, v, p) => { sweep(S, out, t, Math.max(d, .1), f, v, p.bright, true) }) },
+  downlifter: { rev: 0.45, level: 2.72, play: ownedNote((S, out, t, d, f, v, p) => { sweep(S, out, t, Math.max(d, .1), f, v, p.bright, false) }) },
+}
+function sweep(S: SynthCore, out: AudioNode, t: number, dur: number, f: number, v: number, bright: number, up: boolean) {
+  const lo = clamp(f / 2, 40, S.nyq * .4), hi = clamp(f * 8 * bright, 200, S.nyq * .45)
+  const amp = G(S); const bp = F(S, 'bandpass', up ? lo : hi, 1.8)
+  bp.connect(amp).connect(out)
+  const end = t + dur + .2
+  bp.frequency.setValueAtTime(up ? lo : hi, t)
+  bp.frequency.exponentialRampToValueAtTime(up ? hi : lo, t + dur)
+  if (up) {
+    amp.gain.setValueAtTime(v * .01, t)
+    amp.gain.exponentialRampToValueAtTime(v * .55, t + dur)
+    amp.gain.setTargetAtTime(0, t + dur, .015)
+  } else {
+    amp.gain.setValueAtTime(0, t)
+    amp.gain.linearRampToValueAtTime(v * .55, t + .01)
+    amp.gain.exponentialRampToValueAtTime(v * .03, t + dur)
+    amp.gain.setTargetAtTime(0, t + dur, .02)
+  }
+  noiseSrc(S, t, end).connect(bp)
+  const tone = G(S, .1); tone.connect(bp)
+  const o = O(S, 'sawtooth', up ? f / 2 : f, t, end)
+  o.frequency.exponentialRampToValueAtTime(up ? f : f / 2, t + dur)
+  o.connect(tone)
+}
+Object.assign(INST, ARCADE)
+
 function choirVoice(S: SynthCore, out: AudioNode, t: number, d: number, f: number, v: number, p: NoteOpts, formants: number[][]) {
   const g = G(S); g.connect(out)
   const end = adsr(g.gain, t, d, { a: p.att || .28, dc: .3, s: .95, r: p.rel || .6, peak: v * 1.6 })
@@ -628,6 +824,52 @@ function tom(S: SynthCore, out: AudioNode, t: number, v: number, f: number) {
   noise(S, out, t, { type: 'lowpass', f: 1600, q: .5, tau: .02, peak: v * .2 })
 }
 
+/* arcade kit (ShooterCoaster): 909-flavoured; each hit disconnects its nodes when its last source ends */
+const ARCADE_DRUMS: Record<string, Drum> = {
+  bigkick: { rev: 0.04, level: 0.95, hit: ownedHit((S, out, t, v) => {
+    const g = G(S); g.connect(out)
+    const end = perc(g.gain, t, { a: .002, tau: .16, peak: v, damp: t + .3, dampTau: .04 })
+    const o = O(S, 'sine', 210, t, end)
+    o.frequency.exponentialRampToValueAtTime(60, t + .045)
+    o.frequency.exponentialRampToValueAtTime(50, t + .3)
+    o.connect(g)
+    partial(S, out, t, 120, { type: 'triangle', a: .001, tau: .022, peak: v * .3, bend: 1.8, bendTau: .01 })
+    noise(S, out, t, { type: 'highpass', f: 2500, q: .5, tau: .004, peak: v * .3 })
+  }) },
+  gatesnare: { rev: 0.08, level: 1.0, hit: ownedHit((S, out, t, v) => {
+    partial(S, out, t, 190, { type: 'triangle', a: .001, tau: .06, peak: v * .6, bend: 1.3, bendTau: .015 })
+    partial(S, out, t, 330, { a: .001, tau: .03, peak: v * .22 })
+    noise(S, out, t, { type: 'highpass', f: 1500, q: .6, tau: .05, peak: v * .5 })
+    const g = G(S); const hp = F(S, 'highpass', 600, .6); const lp = F(S, 'lowpass', 7000, .5)
+    hp.connect(lp).connect(g).connect(out)
+    g.gain.setValueAtTime(0, t)
+    g.gain.linearRampToValueAtTime(v * .3, t + .012)
+    g.gain.setTargetAtTime(v * .2, t + .012, .07)
+    g.gain.setTargetAtTime(0, t + .22, .01)
+    noiseSrc(S, t, t + .32).connect(hp)
+  }) },
+  hat909: { rev: 0.08, level: 0.56, hit: ownedHit((S, out, t, v) => { hat909(S, out, t, v, .028) }) },
+  ohat909: { rev: 0.12, level: 0.43, hit: ownedHit((S, out, t, v) => { hat909(S, out, t, v, .2) }) },
+  clap909: { rev: 0.2, level: 3.0, hit: ownedHit((S, out, t, v) => {
+    for (const o of CLAP909_TAPS) noise(S, out, t + o, { f: 1150, q: 1.4, tau: .005, peak: v * .5 })
+    noise(S, out, t + .027, { f: 1250, q: .9, tau: .1, peak: v * .42 })
+    noise(S, out, t + .027, { type: 'highpass', f: 3000, q: .5, tau: .035, peak: v * .14 })
+  }) },
+}
+/** More noise than ring; the 13.5 kHz roll-off stands in for the 909's 32 kHz samples. */
+function hat909(S: SynthCore, out: AudioNode, t: number, v: number, tau: number) {
+  const g = G(S); const hp = F(S, 'highpass', 6800, .7); const air = F(S, 'peaking', 10000, .9, 3); const top = F(S, 'lowpass', 13500, .7)
+  hp.connect(air).connect(top).connect(g).connect(out)
+  const end = perc(g.gain, t, { a: .0008, tau, peak: v * .55 })
+  noiseSrc(S, t, end).connect(hp)
+  metal(S, hp, t, end, 1.42)
+}
+Object.assign(DRUM, ARCADE_DRUMS)
+
+export const MELODIC_INSTRUMENTS = Object.keys(INST)
+export const DRUM_INSTRUMENTS = Object.keys(DRUM)
+export const ARCADE_INSTRUMENTS = [...Object.keys(ARCADE), ...Object.keys(ARCADE_DRUMS)]
+
 /* ------------------------------------------------------- SFX toolbox (arcade/) */
 const SFX_NOTE: NoteOpts = { bright: 1, att: null, rel: null, glide: 0.07, from: null }
 
@@ -679,7 +921,7 @@ export function createCore(ctx: Ctx): SynthCore {
   const noiseBuf = ctx.createBuffer(1, nlen, ctx.sampleRate)
   const nd = noiseBuf.getChannelData(0)
   for (let i = 0; i < nlen; i++) nd[i] = Math.random() * 2 - 1
-  return { ctx, nyq: ctx.sampleRate / 2, noise: noiseBuf, waves: {}, ks: {} }
+  return { ctx, nyq: ctx.sampleRate / 2, noise: noiseBuf, waves: {}, ks: {}, curves: {} }
 }
 
 /**
@@ -744,7 +986,7 @@ export function createSynth(S: SynthCore, dest: AudioNode, { voicing = 'jukebox'
   verbIn.connect(verb).connect(verbRet).connect(master)
   chain.push(verb, verbIn, verbRet)
 
-  const sessions = new Map<GainNode, { sendBus: GainNode; nodes: number }>()
+  const sessions = new Map<GainNode, { sendBus: GainNode; nodes: number; inserts: AudioNode[] }>()
   const timers = new Set<ReturnType<typeof setTimeout>>()
   const later = (fn: () => void, ms: number) => {
     const id = setTimeout(() => { timers.delete(id); fn() }, ms)
@@ -784,17 +1026,20 @@ export function createSynth(S: SynthCore, dest: AudioNode, { voicing = 'jukebox'
       const bus = G(S, 1); bus.connect(master)
       const sendBus = G(S, 1); sendBus.connect(verbIn)
       verbRet.gain.setValueAtTime(0.25 + 1.6 * (song.reverb != null ? song.reverb : 0.3), ctx.currentTime)
+      const inserts: AudioNode[] = []
       const ch = song.voices.map((v) => {
         const def = v.drum ? DRUM[v.inst] : INST[v.inst]
-        const input = G(S, v.vol * def.level)
+        const level = G(S, v.vol * def.level)
         const pan = ctx.createStereoPanner()
         pan.pan.value = v.pan
-        input.connect(pan).connect(bus)
+        level.connect(pan).connect(bus)
         const send = G(S, v.rev != null ? v.rev : def.rev)
-        input.connect(send).connect(sendBus)
-        return { v, def, input }
+        level.connect(send).connect(sendBus)
+        const fx = !v.drum && (def as Instrument).insert?.(S, v.bright)
+        if (fx) { fx.output.connect(level); inserts.push(...fx.nodes) }
+        return { v, def, input: fx ? fx.input : level }
       })
-      sessions.set(bus, { sendBus, nodes: 2 + 4 * ch.length })
+      sessions.set(bus, { sendBus, nodes: 2 + 4 * ch.length + inserts.length, inserts })
       const p: NoteOpts = { bright: 1, att: null, rel: null, glide: 0.07, from: null }
       return {
         play(ev, t) {
@@ -817,7 +1062,10 @@ export function createSynth(S: SynthCore, dest: AudioNode, { voicing = 'jukebox'
           const now = ctx.currentTime
           bus.gain.cancelScheduledValues(now); bus.gain.setTargetAtTime(0, now, fade)
           sendBus.gain.cancelScheduledValues(now); sendBus.gain.setTargetAtTime(0, now, fade)
-          later(() => { bus.disconnect(); sendBus.disconnect(); sessions.delete(bus) }, 1500)
+          later(() => {
+            bus.disconnect(); sendBus.disconnect(); sessions.delete(bus)
+            for (const n of inserts) n.disconnect()
+          }, 1500)
         },
       }
     },
@@ -829,7 +1077,10 @@ export function createSynth(S: SynthCore, dest: AudioNode, { voicing = 'jukebox'
     dispose() {
       for (const id of timers) clearTimeout(id)
       timers.clear()
-      for (const [bus, s] of sessions) { bus.disconnect(); s.sendBus.disconnect() }
+      for (const [bus, s] of sessions) {
+        bus.disconnect(); s.sendBus.disconnect()
+        for (const n of s.inserts) n.disconnect()
+      }
       sessions.clear()
       for (const n of chain) n.disconnect()
     },

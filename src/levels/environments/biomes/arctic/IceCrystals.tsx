@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import type { BiomeDecorationsProps } from '../../shared/types'
 import { scatterNearTrack, settleOnGround, trackExtent } from '../../shared/trackScatter'
@@ -12,6 +12,8 @@ import {
 } from './iceProps'
 import { roundCaster, type ShadowCaster } from '../../shared/contactShadows'
 import { useContactShadows } from '../../shared/ContactShadows'
+import StaticInstances from '../../shared/StaticInstances'
+import { yawScaleMatrix } from '../../shared/yawScaleMatrix'
 
 interface ClusterSet {
   matrices: THREE.Matrix4[]
@@ -59,45 +61,10 @@ function placeClusters(
     maxBury: 0.2,
     rng,
   })
-  const q = new THREE.Quaternion()
-  const up = new THREE.Vector3(0, 1, 0)
-  const matrices = props.map((p) => {
-    q.setFromAxisAngle(up, rng() * Math.PI * 2)
-    return new THREE.Matrix4().compose(
-      new THREE.Vector3(p.x, p.y, p.z),
-      q,
-      new THREE.Vector3(p.scale, p.scale, p.scale),
-    )
-  })
+  const matrices = props.map((p) => yawScaleMatrix(p, rng() * Math.PI * 2, p.scale))
   const colors = props.map(() => new THREE.Color(TINTS[Math.floor(rng() * TINTS.length)]))
   const shadows = props.map((p) => roundCaster(p.x, p.z, CRYSTAL_FOOTPRINT * p.scale, 0.6, 0.8))
   return { matrices, colors, shadows }
-}
-
-function ClusterMesh({
-  set,
-  geometry,
-  material,
-}: {
-  set: ClusterSet
-  geometry: THREE.BufferGeometry
-  material: THREE.Material
-}) {
-  const setRef = useCallback(
-    (mesh: THREE.InstancedMesh | null) => {
-      if (!mesh) return
-      set.matrices.forEach((m, i) => {
-        mesh.setMatrixAt(i, m)
-        mesh.setColorAt(i, set.colors[i])
-      })
-      mesh.instanceMatrix.needsUpdate = true
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-      mesh.computeBoundingSphere()
-    },
-    [set],
-  )
-  if (set.matrices.length === 0) return null
-  return <instancedMesh ref={setRef} args={[geometry, material, set.matrices.length]} />
 }
 
 /** Glowing cyan crystal clusters around the track. */
@@ -131,8 +98,8 @@ export default function IceCrystals({ groundFn, track }: BiomeDecorationsProps) 
 
   return (
     <>
-      <ClusterMesh set={spires} geometry={spireGeo} material={material} />
-      <ClusterMesh set={splays} geometry={splayGeo} material={material} />
+      <StaticInstances matrices={spires.matrices} colors={spires.colors} geometry={spireGeo} material={material} />
+      <StaticInstances matrices={splays.matrices} colors={splays.colors} geometry={splayGeo} material={material} />
     </>
   )
 }

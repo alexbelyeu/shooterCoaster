@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accuracyPercent, barFill, formatAccuracy, formatTimeLeft, isNewRecord, nextStar } from './resultsStats'
+import { accuracyPercent, barFill, formatAccuracy, formatTimeLeft, isNewRecord } from './resultsStats'
 
 describe('accuracy', () => {
   it('is hits / shots as a whole percent', () => {
@@ -34,21 +34,6 @@ describe('isNewRecord', () => {
     expect(isNewRecord(100, 99)).toBe(true)
     expect(isNewRecord(100, 100)).toBe(false)
     expect(isNewRecord(0, 0)).toBe(false)
-  })
-})
-
-describe('nextStar', () => {
-  const t = [0.3, 0.6, 0.9] as const
-  it('names the next star and the points to it', () => {
-    expect(nextStar(0, 1000, t)).toEqual({ stars: 1, points: 300 })
-    expect(nextStar(299.5, 1000, t)).toEqual({ stars: 1, points: 1 })
-    expect(nextStar(300, 1000, t)).toEqual({ stars: 2, points: 300 })
-    expect(nextStar(899, 1000, t)).toEqual({ stars: 3, points: 1 })
-  })
-
-  it('is null with all stars or no max score', () => {
-    expect(nextStar(900, 1000, t)).toBeNull()
-    expect(nextStar(10, 0, t)).toBeNull()
   })
 })
 

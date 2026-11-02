@@ -42,15 +42,18 @@ const WIND_BEND = /* glsl */ `
 #endif
 `
 
-/** Sways a tree material in the wind (vertex shader only); returns the same material. */
-export function withTreeWind<T extends THREE.Material>(material: T, part: TreePart): T {
+/** Sways a tree material in the wind and adds `fill` × its own colour as unlit light; returns the same material. */
+export function withTreeWind<T extends THREE.Material>(material: T, part: TreePart, fill = 0): T {
   const uTreePart = { value: new THREE.Vector2(part.base, part.span) }
+  const uTreeFill = { value: fill }
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uWindTime = treeWindTime
     shader.uniforms.uTreePart = uTreePart
+    shader.uniforms.uTreeFill = uTreeFill
     shader.vertexShader = patchTreeWindVertex(shader.vertexShader)
+    shader.fragmentShader = patchTreeFillFragment(shader.fragmentShader)
   }
-  // The part lives in a uniform, so trunks and canopies share one shader source.
+  // Part and fill live in uniforms, so every tree material shares one shader source.
   material.customProgramCacheKey = () => 'sc-tree-wind'
   return material
 }
@@ -59,6 +62,16 @@ export function patchTreeWindVertex(vertexShader: string): string {
   return vertexShader
     .replace('#include <common>', `#include <common>\n${WIND_PARS}`)
     .replace('#include <begin_vertex>', `#include <begin_vertex>\n${WIND_BEND}`)
+}
+
+/** Adds the lit colour (instance tint × crown shade) × `uTreeFill` to the emissive light. */
+export function patchTreeFillFragment(fragmentShader: string): string {
+  return fragmentShader
+    .replace('#include <common>', '#include <common>\nuniform float uTreeFill;')
+    .replace(
+      '#include <emissivemap_fragment>',
+      '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * uTreeFill;',
+    )
 }
 
 /** Darkens the crown's underside; also the `color` attribute `vertexColors` needs (without it canopies render black). */

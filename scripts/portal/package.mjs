@@ -7,8 +7,8 @@ import { portalProblems } from './rules.mjs'
 
 const DIR = path.resolve('dist-portal')
 const ZIP = path.resolve('dist-portal.zip')
-// SEO files and the share card for scoaster.com; a portal page has its own.
-const SITE_ONLY = ['robots.txt', 'sitemap.xml', 'social']
+// SEO files, the share card, the web app manifest and its icons, and the 404 page for scoaster.com; a portal page has its own.
+const SITE_ONLY = ['robots.txt', 'sitemap.xml', 'social', 'site.webmanifest', 'icons', '404.html']
 const TEXT = /\.(html|css|js|json|txt|svg)$/
 
 if (!fs.existsSync(path.join(DIR, 'index.html'))) {

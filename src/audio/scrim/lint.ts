@@ -11,7 +11,13 @@ const RANGES: Record<string, [number, number]> = {
   choir: [45, 81], voices: [45, 81], pad: [36, 84],
   fretless: [28, 67], synbass: [28, 67], timpani: [33, 62],
   chip: [24, 108], sine: [24, 108], square: [24, 108], saw: [24, 108], triangle: [24, 108],
+  // arcade palette (SCORE-FORMAT.md, "Instruments")
+  fmbass: [28, 62], supersaw: [48, 96], distguitar: [40, 76], orchhit: [36, 84], synbrass: [40, 88],
+  riser: [48, 96], downlifter: [48, 96],
 }
+
+/** Each melodic instrument's useful range (MIDI, inclusive). */
+export const INSTRUMENT_RANGES: Readonly<Record<string, readonly [number, number]>> = RANGES
 
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const noteName = (m: number) => `${NAMES[m % 12]}${Math.floor(m / 12) - 1}`

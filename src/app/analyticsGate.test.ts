@@ -5,6 +5,7 @@ import {
   dropInternalEvents,
   INTERNAL_STORAGE_KEY,
   isInternalBrowser,
+  isInternalThisLoad,
   searchWithoutInternalParam,
   type FlagStorage,
 } from './analyticsGate'
@@ -71,6 +72,29 @@ describe('applyInternalParam', () => {
     const s = memoryStorage()
     expect(applyInternalParam('?seed=7', s)).toBe(false)
     expect(s.data.size).toBe(0)
+  })
+
+  it('ignores values other than 1 and 0', () => {
+    const s = memoryStorage()
+    for (const value of ['false', 'off', 'true', '']) {
+      expect(applyInternalParam(`?internal=${value}`, s)).toBe(false)
+      expect(s.data.size).toBe(0)
+    }
+    applyInternalParam('?internal=1', s)
+    expect(applyInternalParam('?internal=false', s)).toBe(true)
+    expect(s.data.get(INTERNAL_STORAGE_KEY)).toBe('1')
+  })
+
+  it('remembers its decision for the page load, also when storage cannot be written', () => {
+    expect(applyInternalParam('?internal=1', throwing)).toBe(true)
+    expect(isInternalThisLoad()).toBe(true)
+    expect(isInternalBrowser(throwing)).toBe(false)
+    applyInternalParam('?internal=0', null)
+    expect(isInternalThisLoad()).toBe(false)
+    const s = memoryStorage()
+    s.setItem(INTERNAL_STORAGE_KEY, '1')
+    applyInternalParam('', s)
+    expect(isInternalThisLoad()).toBe(true)
   })
 
   it('still decides this page load when storage throws or is missing', () => {

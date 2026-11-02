@@ -76,13 +76,10 @@ kills / accuracy / best combo / time left, NEW RECORD; Enter = next, R = replay)
   `musicBus`; every trigger through `nextTriggerTime`, every play guarded by
   `soundGuard`. Slow-mo ducks the music bus. No positional audio.
 - **State** (`src/store/`): `useGameStore` (phase, `startRun`, run counters, combo, timer,
-  persisted `savedScores` with `bestCombo`), `usePlayerStore` (barely used),
-  `useSettingsStore` (persisted).
+  persisted `savedScores` with `bestCombo`), `useSettingsStore` (persisted).
 - **Analytics**: Vercel Web Analytics page views + `level_start` / `level_complete` /
   `level_quit`; off for `?e2e=1`, CI, smokes and `?internal=1`. UTM dimensions are
   paywalled on Pro → `/go/<campaign>` landing paths (#171 pins them).
-- **API** (`api/`): in-memory stubs, unused by the client.
-- **Legacy v1** (`js/`, `index.legacy.html`, `assets/`): not built, don't extend.
 
 ### Tooling
 
@@ -133,18 +130,24 @@ nobody reached 5; **0 of 9 mobile visitors started a level** (too few to conclud
    shot (a particle or lava column needs a look). **#180 (P1).**
 4. Arctic / theme park tree canopies render as flat black silhouettes (#62; #149's fix
    covered the wind-sway canopies, the dark umbrellas remain in `level4.png`).
-5. Desert draw calls 268 > 250 budget (crows unbatched, #92; scene has 1,191 objects).
-6. `startRun` does not reset `timeScale`: slow-mo can stick at 0.1 into the next run (#108).
+5. ~~Desert draw calls 268 > 250 budget (crows unbatched, #92).~~ Fixed by #92: level 2 draws
+   ~91 (163 scene objects) on 31 Oct. **Now levels 4 (393 draws, 479 objects) and 5 (~290)
+   are over the 250 bar** on `main` @ 8a97286; no issue covers them yet. #188's perf gate
+   (PR #258) only caps them at +20% until one exists.
+6. ~~`startRun` does not reset `timeScale`: slow-mo can stick at 0.1 into the next run (#108).~~
+   Fixed by #256.
 7. Combo window uses `performance.now()`, so pause and slow-mo affect it (fixed by combo
    tiers, #34).
-8. Pausing restarts wave timers from zero (#152) and does not freeze the ride (#133):
-   both folded into the pause-menu issue #36.
+8. ~~Pausing restarts wave timers from zero (#152) and does not freeze the ride (#133).~~
+   Fixed by #233 (pause freezes the world). Its `hidden-pause` smoke step then failed on
+   `main` because golden balloons despawned on wall time (#231); fixed by #239.
 9. Music crossfade can leave a gap when the new track waits for the next bar (#168).
 10. Smoke "render loop stalled" flakes on 2-core sessions: every level failed only the
     frame-count check in this run (6–9 frames per 10 s window vs `MIN_FRAMES=10`) while
     every functional check passed; same for the Reporter's run and two Maintainer runs.
     CI's runner passes. Polling level checks to a frame-count deadline (as the title check
-    does) is the fix (#50, now P1).
+    does) is the fix (#50, now P1). 31 Oct: the level checks now poll to `--min-frames`;
+    two full Maintainer runs on 2 cores passed every level (`frames=10 in ~10–12 s`).
 11. ~~CI `verify` never runs on `main`: the auto-merge workflow merges with `GITHUB_TOKEN`,
     whose pushes don't trigger `ci.yml`'s `push: main`.~~ Fixed by #189: `automerge.yml`
     dispatches `ci.yml` on `main` after each merge; a red `main` opens `agent:prod-broken`.
@@ -185,8 +188,6 @@ nobody reached 5; **0 of 9 mobile visitors started a level** (too few to conclud
 
 ## Half-done / placeholders
 
-- `api/` serverless stubs (leaderboard, daily, ghost) — in-memory, not wired to UI.
-- `usePlayerStore` exists but gameplay barely uses it.
 - Settings screen: show FPS + screen shake only.
 - `ParticleField` has one preset (volcanic); the other biomes have no ambient particles (#37).
 - Pause screen is unstyled and does not freeze the ride (#36).

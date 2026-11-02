@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import GameCanvas from '@/canvas/GameCanvas'
 import { useGameStore } from '@/store/useGameStore'
+import { isLevelActive } from '@/store/startPhase'
 import TitleScreen from '@/ui/screens/TitleScreen'
 import LevelSelectScreen from '@/ui/screens/LevelSelectScreen'
 import SettingsScreen from '@/ui/screens/SettingsScreen'
@@ -14,7 +15,7 @@ import Crosshair from '@/combat/Crosshair'
 import ScorePopups from '@/effects/ScorePopups'
 import WaveAnnouncement from '@/ui/hud/WaveAnnouncement'
 import { playTitleWhoosh, startTitleMusic, stopTitleMusic } from '@/audio/TitleMusicManager'
-import { isAudioReady } from '@/audio/AudioEngine'
+import { whenAudioReady } from '@/audio/AudioEngine'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { usePauseOnHidden } from './usePauseOnHidden'
 
@@ -36,14 +37,11 @@ export default function App() {
   const veilTimer = useRef<number | undefined>(undefined)
   usePauseOnHidden()
   const reducedMotion = usePrefersReducedMotion()
-  const inPlay = phase === 'countdown' || phase === 'playing'
+  const inPlay = isLevelActive(phase)
 
   useEffect(() => {
-    if (phase === 'title' || phase === 'levelSelect') {
-      if (isAudioReady()) startTitleMusic()
-    } else {
-      stopTitleMusic()
-    }
+    if (phase === 'title' || phase === 'levelSelect') return whenAudioReady(startTitleMusic)
+    stopTitleMusic(true) // the level's music opens once its scene mounts; fade under it, not before (#168)
   }, [phase])
   useEffect(() => () => stopTitleMusic(), [])
 
