@@ -31,7 +31,8 @@ If a GitHub event started this run, its details arrive with this message. Use on
 
 Rules that apply to every runbook:
 
-- Read `CLAUDE.md`, `docs/agents/PROTOCOL.md` and `docs/agents/STEERING.md` first. The
+- `CLAUDE.md` is already in your context (don't Read it again; mind its "Context budget").
+  Read `docs/agents/PROTOCOL.md` and `docs/agents/STEERING.md` first. The
   Builders and QA dispatchers are the exception: they read only what their runbook lists,
   since their subagents read the role files themselves.
 - Use `gh api` (REST) for GitHub; GraphQL is blocked. Headless Chromium:

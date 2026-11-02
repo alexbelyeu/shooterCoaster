@@ -12,6 +12,7 @@ for this file. You can also open an issue labelled `steering`.
 ```yaml
 pause: false              # true = every scheduled run exits immediately (kill switch)
 builder_parallelism: 2    # builder subagents per builder run (1–4). Raise if weekly usage is left over.
+builder_runs_per_day: 6   # Builders runs per rolling 24h (scheduled + hand-fired); more are skipped. ~6M tokens each.
 qa_parallelism: 1         # PRs reviewed in parallel per QA run (1–2)
 ad_budget_usd_per_month: 0  # paid ads cap. Organic first; raise to ~100 after the first organic month. Only Alex spends.
 ```

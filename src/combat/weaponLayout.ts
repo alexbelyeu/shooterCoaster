@@ -11,10 +11,11 @@ export interface WeaponLayout {
 
 /**
  * Fractions of the viewport's short side: pivot distance from the right / bottom
- * edges and one model unit. Portrait sits higher, between the combo meter and mute.
+ * edges and one model unit. Portrait sits high enough that the gun clears the bottom
+ * row (pause, combo meter, mute) at any aim on phones 320 px wide and up (#223).
  */
 export const WEAPON_LANDSCAPE = { right: 0.5, bottom: 0.2, unit: 0.28 }
-export const WEAPON_PORTRAIT = { right: 0.2, bottom: 0.48, unit: 0.28 }
+export const WEAPON_PORTRAIT = { right: 0.2, bottom: 0.54, unit: 0.28 }
 
 /** Min on-screen heading from straight up (rad): pointing straight up, the gun is seen end-on. */
 export const WEAPON_MIN_TILT = 0.15

@@ -31,6 +31,47 @@ describe('run-usage summarize', () => {
     expect(s.weighted).toBe(30 + 30 + 375 + 300)
   })
 
+  it('diagnoses cache misses by cause, compactions, peak context and heavy tool results', () => {
+    const at = (min: number) => `2026-10-24T10:${String(min).padStart(2, '0')}:00Z`
+    const turn = (id: string, min: number, write: number, read: number, tool?: object) =>
+      line({
+        type: 'assistant', requestId: `r${id}`, timestamp: at(min),
+        message: { id, model: 'claude-opus-x', usage: { input_tokens: 5, cache_creation_input_tokens: write, cache_read_input_tokens: read, output_tokens: 10 }, content: tool ? [tool] : [] },
+      })
+    const bash = (id: string, command: string) => ({ type: 'tool_use', id, name: 'Bash', input: { command } })
+    const result = (id: string, content: unknown) =>
+      line({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content }] } })
+    const main = [
+      turn('a', 0, 30_000, 0, bash('t1', 'npm ci')), // start: expected
+      result('t1', 'x'.repeat(5000)),
+      turn('b', 1, 2_000, 30_000, bash('t2', 'npm run verify')), // normal append
+      result('t2', [{ type: 'text', text: 'y'.repeat(9000) }, { type: 'image' }]),
+      turn('c', 20, 40_000, 1_000), // 19 min after the last turn: cache expired
+      line({ type: 'system', subtype: 'compact_boundary' }),
+      line({ type: 'user', isCompactSummary: true }),
+      turn('d', 21, 25_000, 3_000), // first turn after compaction
+      turn('d', 21, 25_000, 3_000), // same message streamed again: counted once
+    ].join('\n')
+    const sub = turn('s', 22, 21_000, 100) // a subagent's first turn: start
+    const d = usage.diagnose([{ text: main, subagent: false }, { text: sub, subagent: true }])
+
+    expect(d.compactions).toBe(1)
+    expect(d.misses).toBe(2)
+    expect(d.causes).toEqual({ idle: 1, compaction: 1 })
+    expect(d.missTokens).toBe(65_000)
+    expect(d.topMisses[0]).toMatchObject({ cause: 'idle', tokens: 40_000, gapMin: 19, after: 'Bash: npm run verify' })
+    expect(d.peakContext).toBe(41_005)
+    expect(d.images).toBe(1)
+    expect(d.resultChars).toBe(14_000)
+    expect(d.heaviest[0]).toMatchObject({ tool: 'Bash: npm run verify', chars: 9000, images: 1 })
+  })
+
+  it('adds the diagnosis to the ledger line when present', () => {
+    const entry = { v: 1, role: 'builders', ref: '#1', weighted: 2_000_000, turns: 10, subagents: 2, minutes: 30,
+      diag: { peakContext: 180_000, compactions: 2, misses: 7, missTokens: 900_000 } }
+    expect(usage.ledgerComment(entry).split('\n')[0]).toContain('peak ctx 180k · 2 compactions · 7 cache misses (~900k)')
+  })
+
   it('normalizes refs', () => {
     expect(usage.normalizeRef('PR #12, #14')).toBe('#12,#14')
     expect(usage.normalizeRef('123')).toBe('#123')

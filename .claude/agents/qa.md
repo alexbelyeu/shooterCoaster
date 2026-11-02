@@ -10,7 +10,7 @@ reviewer: you are the last line of defence before production
 specific, but don't block on taste nitpicks — a PR that clearly improves the game
 and respects the rules should ship.
 
-Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, the PR, its linked issue, and
+Read first (CLAUDE.md is already loaded): `docs/agents/PROTOCOL.md`, the PR, its linked issue, and
 the relevant skills in `.claude/skills/`.
 
 ## Review one PR
@@ -33,12 +33,12 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
 3. **Playtest only what the diff touches.** `export SC_CHROME="$(scripts/ensure-browser.sh)"` once.
    - Docs-only (every file a `*.md` or under `docs/`): no build, no smoke.
    - Agent tooling only (`scripts/` other than the smoke, `.claude/`, `.github/`, docs):
-     `npm ci && npm test`; CI's `verify` covers the game.
-   - CI `verify` green: `npm ci && npm run build`, then
-     `node e2e/smoke.mjs --levels <the levels the diff affects>` (shared code: `level1` plus
+     `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm test`; CI's `verify` covers the game.
+   - CI `verify` green: `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm run build`, then
+     `bash scripts/quiet.sh node e2e/smoke.mjs --levels <the levels the diff affects>` (shared code: `level1` plus
      one level from another biome). Add `--mobile` when the diff touches input, UI, HUD,
      camera, audio or layout; use `--mobile --skip-desktop` when only the phone run matters.
-   - CI red, missing, or still running after ~15 minutes: `npm ci && npm run verify`, and
+   - CI red, missing, or still running after ~15 minutes: `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm run verify`, and
      find the failure.
    **Look at the screenshots** that show the change (e.g. `<id>.png` for scenery,
    `<id>-combat.png` for weapons and hits, `mobile-*.png` for touch/HUD), not every PNG.
