@@ -12,6 +12,10 @@ name: Auto-merge approved PRs
 # Actions tab, optionally as a dry run), so a missed or stale event can't strand an
 # approved PR. GITHUB_TOKEN writes don't trigger workflows, so it can't loop.
 #
+# An approved PR that conflicts with main is handed back to Fix: the label becomes
+# `agent:changes-requested` with a conflict-only change request, which starts the
+# Fix (on label) task.
+#
 # Safety:
 # - Only same-repo PRs from `agent/*` branches into `main`, not drafts.
 # - A new commit pushed after approval removes the label, so the new code
