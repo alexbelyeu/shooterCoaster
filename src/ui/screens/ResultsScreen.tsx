@@ -79,9 +79,7 @@ export default function ResultsScreen() {
     else store.setPhase('levelSelect')
   }
 
-  // previousBest was read before this save, so the record check isn't fooled by it.
-  // A campaign run's leaderboard entry is stored now under the last initials, so leaving early never loses it.
-  // A daily run keeps only its own best: it never enters the campaign board.
+  // Saved on mount, after previousBest was read; the board entry goes in under the last initials so leaving early never loses it.
   useEffect(() => {
     if (!config || saved.current) return
     saved.current = true
@@ -167,7 +165,7 @@ export default function ResultsScreen() {
     // The open share menu's own keys (arrows, Esc) stay its own.
     if (target?.closest('.share-menu')) return
     if (initials) {
-      // The entry owns the keys (R is a letter); Enter before it opens skips the reveal.
+      // The entry owns the keys (R and S are letters); Enter before it opens skips the reveal.
       if (!done) {
         if (e.key === 'Enter' && !e.repeat) setStage(STAGE.done)
       } else if (initialsInput(e.key)) {

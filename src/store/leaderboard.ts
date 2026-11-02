@@ -75,7 +75,7 @@ export function sanitizeSavedScores(value: unknown): Record<string, ScoreEntry> 
 
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/
 
-/** The Daily Run's bests, keyed by UTC day (`levels/daily.ts`); any other key is dropped. */
+/** The Daily Run's bests, keyed by UTC day (`levels/daily.ts`). */
 export function sanitizeSavedDaily(value: unknown): Record<string, ScoreEntry> {
   const out: Record<string, ScoreEntry> = {}
   if (!isRecord(value)) return out
