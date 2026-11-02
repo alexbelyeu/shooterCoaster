@@ -24,7 +24,8 @@ jobs:
     permissions:
       contents: read
       issues: write # report a red main below
-    runs-on: ubuntu-latest
+    # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
+    runs-on: ubuntu-24.04
     timeout-minutes: 40 # verify took 21.5 min on #222; keep headroom as smoke steps grow
     steps:
       - uses: actions/checkout@v4
@@ -93,7 +94,8 @@ jobs:
     name: portal
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+    # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
