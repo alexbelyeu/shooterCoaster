@@ -590,10 +590,21 @@ export const FFISH_EYE_MAT = new THREE.MeshPhongMaterial({
   flatShading: true,
 })
 
+type Vec3 = [number, number, number]
+
+/** Fresh parts sharing one material, placed as their meshes were and merged into one draw call (the parts are disposed). */
+function placedParts(parts: [geo: THREE.BufferGeometry, position: Vec3, rotation?: Vec3, scale?: Vec3][]): THREE.BufferGeometry {
+  const g = mergeGeometries(parts.map(([geo, p, r, s]) => geo.applyMatrix4(pose(p, r, s))))
+  for (const [geo] of parts) geo.dispose()
+  return g
+}
+
 // ── Snowman (shared across normal, scout, brute) ───────────────────
-export const SNOWMAN_BOTTOM_GEO = new THREE.SphereGeometry(20, 12, 12)
-export const SNOWMAN_MIDDLE_GEO = new THREE.SphereGeometry(14, 12, 12)
-export const SNOWMAN_TOP_GEO = new THREE.SphereGeometry(10, 12, 12)
+export const SNOWMAN_BODY_GEO = placedParts([
+  [new THREE.SphereGeometry(20, 12, 12), [0, 0, 0]],
+  [new THREE.SphereGeometry(14, 12, 12), [0, 25, 0]],
+  [new THREE.SphereGeometry(10, 12, 12), [0, 42, 0]],
+])
 // Snow-white by design, so snowmen read by luminance: the blue emissive lift keeps them brighter than the shaded snow.
 const SNOW_RIM = { color: '#dceaff', intensity: 0.55, power: 2.2 }
 export const SNOWMAN_MAT = withRim(new THREE.MeshPhongMaterial({
@@ -607,14 +618,26 @@ export const SNOWMAN_MAT = withRim(new THREE.MeshPhongMaterial({
 
 // Accessories shared across snowman variants — glossy coal (its sky reflection
 // keeps it from reading as a hole), saturated carrot, warm brown sticks.
-export const SNOWMAN_EYE_GEO = new THREE.SphereGeometry(1.5, 6, 6)
-export const SNOWMAN_EYE_MAT = new THREE.MeshStandardMaterial({
+const snowmanFace = (): Parameters<typeof placedParts>[0] => [
+  [new THREE.SphereGeometry(1.5, 6, 6), [-3.5, 45, 8]],
+  [new THREE.SphereGeometry(1.5, 6, 6), [3.5, 45, 8]],
+  ...[-0.6, -0.3, 0, 0.3, 0.6].map((x): [THREE.BufferGeometry, Vec3] =>
+    [new THREE.SphereGeometry(0.8, 6, 6), [x * 4, 39 - Math.abs(x) * 2, 9.5]]),
+]
+/** Coal eyes and smile (the scout has no buttons). */
+export const SNOWMAN_FACE_GEO = placedParts(snowmanFace())
+/** Coal eyes, smile and buttons. */
+export const SNOWMAN_COAL_GEO = placedParts([
+  ...snowmanFace(),
+  ...[[30, 13], [25, 13.5], [20, 13]].map(([y, z]): [THREE.BufferGeometry, Vec3] => [new THREE.SphereGeometry(1, 6, 6), [0, y, z]]),
+])
+export const SNOWMAN_COAL_MAT = new THREE.MeshStandardMaterial({
   color: '#0c0c14',
   metalness: 0.5,
   roughness: 0.2,
   flatShading: true,
 })
-export const SNOWMAN_NOSE_GEO = new THREE.ConeGeometry(1.2, 6, 5)
+export const SNOWMAN_NOSE_GEO = placedParts([[new THREE.ConeGeometry(1.2, 6, 5), [0, 42, 10], [Math.PI / 2, 0, 0]]])
 export const SNOWMAN_NOSE_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#ff6a00',
   emissive: '#802800',
@@ -622,17 +645,18 @@ export const SNOWMAN_NOSE_MAT = withRim(new THREE.MeshPhongMaterial({
   shininess: 30,
   flatShading: true,
 }), { color: '#ffd0a0', intensity: 0.5 })
-export const SNOWMAN_BUTTON_GEO = new THREE.SphereGeometry(1, 6, 6)
-export const SNOWMAN_BUTTON_MAT = SNOWMAN_EYE_MAT
-export const SNOWMAN_MOUTH_GEO = new THREE.SphereGeometry(0.8, 6, 6)
-export const SNOWMAN_MOUTH_MAT = SNOWMAN_EYE_MAT
-export const SNOWMAN_ARM_GEO = new THREE.CylinderGeometry(0.5, 0.3, 14, 4)
+/** Stick arm with two twigs, about its shoulder pivot; `side` -1 is the left arm. */
+const snowmanArm = (side: -1 | 1) => placedParts([
+  [new THREE.CylinderGeometry(0.5, 0.3, 14, 4), [0, 0, 0]],
+  [new THREE.CylinderGeometry(0.15, 0.1, 5, 3), [0, 4, 0], [0.3, 0, -side * 0.4]],
+  [new THREE.CylinderGeometry(0.15, 0.1, 5, 3), [0, -3, 0], [-0.2, 0, side * 0.5]],
+])
+export const SNOWMAN_LEFT_ARM_GEO = snowmanArm(-1)
+export const SNOWMAN_RIGHT_ARM_GEO = snowmanArm(1)
 export const SNOWMAN_ARM_MAT = withRim(
   new THREE.MeshPhongMaterial({ color: '#6a4026', specular: '#a07050', shininess: 20, flatShading: true }),
   { color: '#ffe0c0', intensity: 0.5 },
 )
-export const SNOWMAN_TWIG_GEO = new THREE.CylinderGeometry(0.15, 0.1, 5, 3)
-export const SNOWMAN_TWIG_MAT = SNOWMAN_ARM_MAT
 
 // Scout: near-white body (a strongly blue one sank into the blue-violet snow); the glowing shards carry its identity.
 export const SNOWMAN_SCOUT_MAT = withRim(new THREE.MeshPhongMaterial({
@@ -643,7 +667,13 @@ export const SNOWMAN_SCOUT_MAT = withRim(new THREE.MeshPhongMaterial({
   shininess: 45,
   flatShading: true,
 }), { color: '#e4f0ff', intensity: 0.65, power: 2.2 })
-export const SNOWMAN_SCOUT_SHARD_GEO = new THREE.ConeGeometry(2, 8, 4)
+export const SNOWMAN_SCOUT_CROWN_GEO = placedParts([
+  [new THREE.ConeGeometry(2, 8, 4), [0, 54, 0]],
+  [new THREE.ConeGeometry(2, 8, 4), [-4, 52, 0], [0, 0, 0.3]],
+  [new THREE.ConeGeometry(2, 8, 4), [4, 52, 0], [0, 0, -0.3]],
+  [new THREE.ConeGeometry(2, 8, 4), [-2, 53, 3], [0.2, 0.4, 0.2], [0.75, 0.75, 0.75]],
+  [new THREE.ConeGeometry(2, 8, 4), [2, 53, 3], [-0.2, -0.4, -0.2], [0.75, 0.75, 0.75]],
+])
 export const SNOWMAN_SCOUT_SHARD_MAT = new THREE.MeshPhongMaterial({
   color: '#80d0ff',
   emissive: '#3080cc',
@@ -655,9 +685,10 @@ export const SNOWMAN_SCOUT_SHARD_MAT = new THREE.MeshPhongMaterial({
 })
 
 // Brute — navy top hat with red band, saturated red scarf
-export const SNOWMAN_HAT_BRIM_GEO = new THREE.CylinderGeometry(8, 8, 1.5, 8)
-export const SNOWMAN_HAT_TOP_GEO = new THREE.CylinderGeometry(5.5, 6, 10, 8)
-export const SNOWMAN_HAT_BAND_GEO = new THREE.CylinderGeometry(6.1, 6.1, 1.2, 8)
+export const SNOWMAN_HAT_GEO = placedParts([
+  [new THREE.CylinderGeometry(8, 8, 1.5, 8), [0, 52, 0]],
+  [new THREE.CylinderGeometry(5.5, 6, 10, 8), [0, 58, 0]],
+])
 export const SNOWMAN_HAT_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#16205a',
   emissive: '#0a1450',
@@ -666,8 +697,12 @@ export const SNOWMAN_HAT_MAT = withRim(new THREE.MeshPhongMaterial({
   shininess: 50,
   flatShading: true,
 }), { color: '#a0b8ff', intensity: 0.6 })
-export const SNOWMAN_SCARF_GEO = new THREE.TorusGeometry(11, 2, 6, 12)
-export const SNOWMAN_SCARF_TAIL_GEO = new THREE.BoxGeometry(2, 8, 1)
+/** Scarf, its trailing end and the hat band (same red). */
+export const SNOWMAN_SCARF_GEO = placedParts([
+  [new THREE.TorusGeometry(11, 2, 6, 12), [0, 34, 0], [Math.PI / 2, 0, 0]],
+  [new THREE.BoxGeometry(2, 8, 1), [7, 30, 7], [0.4, 0.3, 0.2]],
+  [new THREE.CylinderGeometry(6.1, 6.1, 1.2, 8), [0, 54, 0]],
+])
 export const SNOWMAN_SCARF_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#e01828',
   emissive: '#a00818',
@@ -676,11 +711,16 @@ export const SNOWMAN_SCARF_MAT = withRim(new THREE.MeshPhongMaterial({
   shininess: 25,
   flatShading: true,
 }), { color: '#ffc0b0', intensity: 0.5 })
-export const SNOWMAN_HAT_BAND_MAT = SNOWMAN_SCARF_MAT
 
 // ── Ember Wisp ────────────────────────────────────────────────
 export const EMBER_WISP_CORE_GEO = new THREE.SphereGeometry(3, 8, 8)
-export const EMBER_WISP_TENDRIL_GEO = new THREE.ConeGeometry(1, 4, 4)
+/** Six upright flame tendrils round the core. */
+export const EMBER_WISP_TENDRILS_GEO = placedParts(
+  Array.from({ length: 6 }, (_, i): [THREE.BufferGeometry, Vec3, Vec3] => {
+    const a = (i / 6) * Math.PI * 2
+    return [new THREE.ConeGeometry(1, 4, 4), [Math.cos(a) * 3.5, Math.sin(a), Math.sin(a) * 3.5], [0, a, 0]]
+  }),
+)
 
 export const EMBER_WISP_CORE_MAT = withRim(new THREE.MeshPhongMaterial({
   color: '#ff6600',
@@ -709,10 +749,16 @@ const lavaGolemProfile = [
   new THREE.Vector2(3.5, 18),
   new THREE.Vector2(0, 20),
 ]
-export const LAVA_GOLEM_BODY_GEO = new THREE.LatheGeometry(lavaGolemProfile, 10)
-export const LAVA_GOLEM_HEAD_GEO = new THREE.SphereGeometry(3, 8, 6)
+export const LAVA_GOLEM_BODY_GEO = placedParts([
+  [new THREE.LatheGeometry(lavaGolemProfile, 10), [0, 0, 0]],
+  [new THREE.SphereGeometry(3, 8, 6), [0, 22, 0]],
+])
+export const LAVA_GOLEM_CRACK_GEO = placedParts([[new THREE.LatheGeometry(lavaGolemProfile, 10), [0, 0, 0], [0, 0, 0], [1.02, 1.01, 1.02]]])
 export const LAVA_GOLEM_ARM_GEO = new THREE.BoxGeometry(2, 8, 2)
-export const LAVA_GOLEM_EYE_GEO = new THREE.SphereGeometry(0.8, 6, 6)
+export const LAVA_GOLEM_EYES_GEO = placedParts([
+  [new THREE.SphereGeometry(0.8, 6, 6), [-1.5, 23, 2.5]],
+  [new THREE.SphereGeometry(0.8, 6, 6), [1.5, 23, 2.5]],
+])
 
 // Ash-grey basalt (brown sat at ΔE≈6 from the terrain); a strong rim, since Inferno enemies read by their edges.
 const VOLCANIC_RIM = { color: '#ffb070', intensity: 1.2, power: 2.0 }
@@ -746,10 +792,16 @@ const fireImpProfile = [
   new THREE.Vector2(0, 8),
 ]
 export const FIRE_IMP_BODY_GEO = new THREE.LatheGeometry(fireImpProfile, 8)
-export const FIRE_IMP_HORN_GEO = new THREE.ConeGeometry(0.6, 3, 4)
+export const FIRE_IMP_HORNS_GEO = placedParts([
+  [new THREE.ConeGeometry(0.6, 3, 4), [-1.5, 9, 1], [0.3, 0, -0.2]],
+  [new THREE.ConeGeometry(0.6, 3, 4), [1.5, 9, 1], [0.3, 0, 0.2]],
+])
 export const FIRE_IMP_TAIL_GEO = new THREE.CylinderGeometry(0.3, 0.15, 6, 4)
 export const FIRE_IMP_TAIL_SPIKE_GEO = new THREE.ConeGeometry(0.5, 1.5, 4)
-export const FIRE_IMP_EYE_GEO = new THREE.SphereGeometry(0.5, 6, 6)
+export const FIRE_IMP_EYES_GEO = placedParts([
+  [new THREE.SphereGeometry(0.5, 6, 6), [-1, 7, 2.8]],
+  [new THREE.SphereGeometry(0.5, 6, 6), [1, 7, 2.8]],
+])
 
 // Orange imp (VISION) with bone horns; the old maroon/near-black read as terrain
 export const FIRE_IMP_BODY_MAT = withRim(new THREE.MeshPhysicalMaterial({
