@@ -41,7 +41,8 @@
  * The speed check holds the first level (or `--speed-level <id>`) at top speed on its most banked sampled point:
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  * The boss checks summon each finale and shoot it down in phase order: level1's Golden Blimp
- * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png) and level3's Kraken
+ * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png), level2's Giant Scorpion
+ * (level2-boss.png, level2-boss-stinger.png, level2-boss-down.png) and level3's Kraken
  * (level3-boss.png, level3-boss-head.png, level3-boss-down.png); see bossCheck().
  * The pickup check shoots level1's first weapon pickup with a real bullet: the spread gun's badge,
  * a 3-bullet fan with the tinted tracer (level1-pickup.png), pause-safe expiry, reset on restart; see pickupCheck().
@@ -1475,12 +1476,14 @@ async function waveCheck(page) {
 }
 
 /**
- * The finales the boss check summons: Theme Park's Golden Blimp (#181) and Ocean's Kraken (#183).
- * `minOnScreen` first-phase weak points must be on screen after the boss alone has moved `settleS` s (the
- * Kraken's tentacles rise out of the water first); `midSettleS` lets the last phase surface before `midShot`.
+ * The finales the boss check summons: Theme Park's Golden Blimp (#181), Desert's Giant Scorpion (#318) and
+ * Ocean's Kraken (#183). `minOnScreen` first-phase weak points must be on screen after the boss alone has moved
+ * `settleS` s (the scorpion bursts out of the sand, the Kraken's tentacles rise out of the water);
+ * `midSettleS` lets the last phase surface before `midShot`. `firstPhase`: the id prefix(es) of the first phase.
  */
 const BOSS_CHECKS = [
   { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
+  { level: 'level2', minWidthFrac: 0.15, weakPoints: 7, firstPhase: ['claw-', 'tail-'], lastPhase: ['stinger'], midShot: 'boss-stinger', minOnScreen: 4, settleS: 2, midSettleS: 1 },
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
 ]
 
@@ -1587,8 +1590,9 @@ async function bossCheck(page, check) {
   if (!settled || result.onScreenAtStart < minOnScreen)
     problems.push(`${result.onScreenAtStart} first-phase weak points on screen after ${settleS} s (want ≥ ${minOnScreen})`)
   if (!surfaced) problems.push(`the last phase [${lastPhase}] never came on screen within ${midSettleS} s`)
-  if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !id.startsWith(firstPhase)))
-    problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPhase}*)`)
+  const firstPrefixes = [firstPhase].flat()
+  if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !firstPrefixes.some((p) => id.startsWith(p))))
+    problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPrefixes.join('* / ')}*)`)
   if (!target) problems.push('no exposed weak point on screen to shoot')
   else if (!bulletHit) problems.push('a real bullet at an exposed weak point never hit it (boss:hit)')
   if (JSON.stringify(result.exposedMidway) !== JSON.stringify(lastPhase))
