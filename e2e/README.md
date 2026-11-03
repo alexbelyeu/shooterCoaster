@@ -29,7 +29,10 @@ checked in mobile portrait + landscape, and in portrait at four extreme aims wit
 the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
 reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left) or the
-Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), offers Next Level while the next level is locked (or hides it while open), shows NaN, or disagrees with `stats()` on score or kills, or (first level) Enter with the mute button focused doesn't play on;
+Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), offers Next Level while the next level is locked (or hides it while open), shows NaN, or disagrees with `stats()` on score or kills, has no local leaderboard fully inside 1280×720, or (first level) Enter with the mute button focused doesn't play on;
+on the first level the leaderboard is seeded so the run places 4th: the row must open for initials at the last ones used (AAA),
+ArrowUp must cycle a letter, typing r e s must give RES without leaving or toggling mute (R and S are letters there), and Enter must confirm, store
+and persist it; its frenzy-end rerun is seeded a full board out of reach and must show the board with no rank and no initials entry;
 `shareText()` must match the share format with the shown score, stars, level name and the `/go/share` link (`share_copy` campaign); a real Share click must open the share menu (#271) with Copy link focused and every target in order (Copy link, X, Reddit, Bluesky, Threads, WhatsApp, Facebook, LinkedIn, Email; items 44 px), inside the viewport and covering no other results button, each link carrying its own `utm_campaign=share_<target>`; Copy link must show "Copied!" and put `shareText()` on the clipboard, ArrowDown must move focus to X, and Esc must close the menu with focus back on Share (network links are never clicked). Every page of a local run fails on a request to another origin
 (not with `--url`). `--dist <dir> --base <path>` previews another build folder under a sub-path (`smoke:portal`).
 `npm run smoke` also passes `--mobile`:
@@ -55,8 +58,8 @@ A `pause-menu` step on the same page opens the menu through the hook (`pause.png
 name, Resume focused, ArrowDown moves focus, Esc resumes, and Restart starts the level over (kills, score, timer, ride). The
 phone run checks the card after its Pause tap in landscape and portrait (`mobile-pause-landscape.png`, `mobile-pause.png`: inside
 the viewport, no sideways scroll, 44 px buttons), then taps its Settings (`mobile-settings.png`: fits 390 px, 44 px targets)
-and Back to the menu, then ends the level: the results buttons must fit and not overlap in portrait and landscape
-(`mobile-results.png`, `mobile-results-landscape.png`) and the share menu must pass the same checks, bar the clipboard, in landscape and at 390 px portrait (`mobile-share-landscape.png`, `mobile-share.png`; headless Chromium has no share sheet, so the phone gets the menu), then starts level2 and goes back to level select: on every music
+and Back to the menu, then ends the level and enters initials by tapping ▲, a letter, ▲ and OK (BBA; 44 px buttons, the pad in view: `mobile-results-entry.png`), then the results buttons must fit and not overlap in portrait and landscape
+(`mobile-results.png`, `mobile-results-landscape.png`, the board inside the viewport in landscape) and the share menu must pass the same checks, bar the clipboard, in landscape and at 390 px portrait (`mobile-share-landscape.png`, `mobile-share.png`; headless Chromium has no share sheet, so the phone gets the menu), then starts level2 and goes back to level select: on every music
 switch (there, title → level, and the `scrim` step's) the incoming track's first note must land before the outgoing bus has
 faded to 0 (`audio().music.fades` log each ramp's start and the incoming `firstNote`; tracks start on the next beat, `musicBus.ts`).
 A `settings` step opens Settings from the title (`settings.png`: the card inside 1280×720 with the four quality
@@ -64,13 +67,13 @@ options, two volume sliders and two switches), picks Low and a music volume, clo
 to survive a reload. A `quality` step loads the first level at device dpr 2 with the default quality and with
 `?quality=low` (any preset name works as a URL override and is saved like the setting) on the same seed and frozen
 track point: low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
-A `levelSelect` step seeds saved progress (3★ + 1★), opens the level select (`levelSelect.png`)
-and requires one card per level plus the Daily card, the right locked count and `★ x / 15` total, every card
+A `levelSelect` step seeds saved progress (3★ + 1★) and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
+and requires one card per level plus the Daily card, each top's initials on its card after the reload, the right locked count and `★ x / 15` total, every card
 inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move focus, Enter on a
 locked card does nothing, Enter on an open one plays the launch transition and starts that level);
 the phone run checks its cards fit 390 px.
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in
-daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, NEW BEST and no Next Level
+daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, NEW BEST, no Next Level and no leaderboard or initials entry (the campaign boards stay empty)
 (`daily-results.png`), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 `?e2e=1` skips the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1`: the countdown must show (`countdown.png`),
@@ -117,7 +120,7 @@ vary) and on the scene / track objects and triangles (+15%); a level past one fa
 ## Test hook (`?e2e=1` → `window.__SC_TEST__`)
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
-(`levels()` (each with its `nextLevel` and `unlocked` now), `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time, level time, due wave and the wave tick before it), `nextWave()` → level time now + when the next wave is due + the last wave tick, `waveTellSeconds`, `timerStep` (seconds of level time + game clock per frame; null is the frame time), `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction), `pointCentreColour(name)` (the linear RGBA a scene `Points`' first point blends to over opaque grey with its centre exactly on a pixel centre, in a 1×1 float target),
+(`levels()` (each with its `nextLevel` and `unlocked` now), `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `setLeaderboards(boards, lastInitials?)` / `leaderboards()` (local top 10s), `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time, level time, due wave and the wave tick before it), `nextWave()` → level time now + when the next wave is due + the last wave tick, `waveTellSeconds`, `timerStep` (seconds of level time + game clock per frame; null is the frame time), `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction), `pointCentreColour(name)` (the linear RGBA a scene `Points`' first point blends to over opaque grey with its centre exactly on a pixel centre, in a 1×1 float target),
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/multiplier/timeScale/frenzy/timeRemaining/phase/liveEnemies/
 onScreenEnemies/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `killNearest(n)` (never a boss weak point; fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
