@@ -9,4 +9,4 @@ parameters are on the links but Vercel Pro cannot break them down (README).
 
 | Date | Channel | Action (issue) | Link / UTM | Result (visitors, notes) |
 |---|---|---|---|---|
-| – | – | No posts or campaigns yet (as of 2026-10-26; first draft #102 is scheduled for Mon 2 Nov, see STRATEGY.md). W43 baseline for comparison: 31 visitors / 47 views, 100 % direct, 18 level starts (metrics/2026-W43.md) | – | – |
+| – | – | No posts or campaigns yet (as of 2026-11-02; #102 three.js Showcase is GO for Mon 2 Nov, #308 Reddit drafted for 7–8 Nov, see STRATEGY.md). **Baseline for every row below: W44 = 37 visitors / 43 views / 8 level starts / 3 completes, 100 % direct, ≈ 5 visitors and 1 start a day** (metrics/2026-W44.md) | – | – |

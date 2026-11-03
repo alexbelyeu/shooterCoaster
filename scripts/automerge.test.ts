@@ -35,6 +35,9 @@ describe('decide', () => {
     expect(skip(pr(1, { head: { ref: 'agent/1', sha: SHA, repo: { full_name: 'alexbelyeu/shooterCoaster' } } })).action).toBe('merge')
     expect(skip(pr(1, { head: { ref: 'feature/x', sha: SHA, repo: { full_name: REPO } } })).reason).toContain('`feature/x`')
     expect(gate.decide(pr(1), undefined, REPO).reason).toContain('no `verify` check')
+    expect(gate.decide(pr(1, { mergeable: false }), undefined, REPO).action).toBe('handback')
+    expect(gate.decide(pr(1, { mergeable: null }), green, REPO).action).toBe('merge')
+    expect(skip(pr(1, { draft: true, mergeable: false })).action).toBe('skip')
     expect(skip(pr(1), verify('completed', 'failure'))).toEqual({ action: 'skip', reason: '`verify` is failure on the head commit' })
   })
 })
@@ -73,8 +76,11 @@ describe('shouldComment', () => {
   })
 })
 
-/** A fake REST API: open PRs, verify per head SHA, comments; records writes. */
-function fakeApi(opts: { prs: ReturnType<typeof pr>[]; verify?: Record<string, object>; comments?: Record<number, object[]>; commitPrs?: object[]; mergeError?: string }) {
+/** A fake REST API: open PRs, verify per head SHA, comments; records writes. `fail` names the error a write throws. */
+function fakeApi(opts: {
+  prs: ReturnType<typeof pr>[]; verify?: Record<string, object>; comments?: Record<number, object[]>; commitPrs?: object[]
+  fail?: (route: string, params: Record<string, any>) => string | undefined
+}) {
   const writes: { route: string; params: Record<string, unknown> }[] = []
   const api = async (route: string, params: Record<string, any> = {}) => {
     if (route.startsWith('GET')) {
@@ -93,7 +99,8 @@ function fakeApi(opts: { prs: ReturnType<typeof pr>[]; verify?: Record<string, o
       throw new Error(`unexpected ${route}`)
     }
     writes.push({ route, params })
-    if (route.includes('/merge') && opts.mergeError) throw new Error(opts.mergeError)
+    const error = opts.fail?.(route, params)
+    if (error) throw new Error(error)
     return {}
   }
   const warnings: string[] = []
@@ -156,20 +163,80 @@ describe('runGate', () => {
     expect(running.writes).toEqual([])
   })
 
-  it('comments a failed merge once and keeps going', async () => {
-    const f = fakeApi({ prs: [pr(7), pr(8)], verify: { [`${SHA}7`]: green, [`${SHA}8`]: green }, mergeError: 'Pull Request is not mergeable' })
+  const MERGE = 'PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge'
+  const ADD_LABEL = 'POST /repos/{owner}/{repo}/issues/{issue_number}/labels'
+  const REMOVE_LABEL = 'DELETE /repos/{owner}/{repo}/issues/{issue_number}/labels/{name}'
+  const COMMENT = 'POST /repos/{owner}/{repo}/issues/{issue_number}/comments'
+  const botSaid = (number: number, body: string) => ({ [number]: [{ body, created_at: '2026-10-30T20:00:00Z', user: { type: 'Bot' } }] })
+
+  it('hands a conflicting PR back to Fix, then says nothing on the next sweep (#299)', async () => {
+    const f = fakeApi({
+      prs: [pr(7), pr(8)], verify: { [`${SHA}7`]: green, [`${SHA}8`]: green },
+      fail: (route, p) => (route === MERGE && p.pull_number === 7 ? 'Pull Request is not mergeable' : undefined),
+    })
+    const res = await run(f, 'schedule')
+    expect(res.merged).toEqual([8])
+    const on7 = f.writes.filter((w) => w.params.issue_number === 7)
+    expect(on7.map((w) => w.route)).toEqual([COMMENT, ADD_LABEL, REMOVE_LABEL])
+    expect(on7[1].params.labels).toEqual(['agent:changes-requested'])
+    expect(on7[2].params.name).toBe('agent:qa-approved')
+    expect(on7[0].params.body).toBe(gate.handbackComment(`${SHA}7`))
+    expect(on7[0].params.body).toMatch(/^Auto-merge failed: this branch conflicts with `main`\.\nHead: `abc1234def7`\. Merge conflict only; full review passed/)
+    expect(res.lines).toContain('#7: handed back to Fix: it conflicts with main (abc1234)')
+
+    const later = fakeApi({
+      prs: [pr(7, { labels: [{ name: 'agent:changes-requested' }], mergeable: false })],
+      verify: { [`${SHA}7`]: green }, comments: botSaid(7, on7[0].params.body),
+    })
+    expect((await run(later, 'schedule')).numbers).toEqual([])
+    await run(later, 'pull_request', { pull_request: { number: 7 } })
+    expect(later.writes).toEqual([])
+  })
+
+  it('hands back a PR GitHub already marks conflicting without waiting for verify', async () => {
+    const f = fakeApi({ prs: [pr(7, { mergeable: false })] })
+    await run(f, 'schedule')
+    expect(f.writes.map((w) => w.route)).toEqual([COMMENT, ADD_LABEL, REMOVE_LABEL])
+  })
+
+  it('when a label call fails the PR stays approved, and the retry swaps labels without a second comment', async () => {
+    const f = fakeApi({ prs: [pr(7, { mergeable: false })], fail: (route) => (route === ADD_LABEL ? 'boom' : undefined) })
+    await run(f, 'schedule')
+    expect(f.writes.map((w) => w.route)).toEqual([COMMENT, ADD_LABEL])
+    const retry = fakeApi({ prs: [pr(7, { mergeable: false })], comments: botSaid(7, f.writes[0].params.body as string) })
+    await run(retry, 'schedule')
+    expect(retry.writes.map((w) => w.route)).toEqual([ADD_LABEL, REMOVE_LABEL])
+  })
+
+  it('any other merge failure keeps the PR approved and comments once', async () => {
+    const f = fakeApi({ prs: [pr(7)], verify: { [`${SHA}7`]: green }, fail: (route) => (route === MERGE ? 'Base branch was modified' : undefined) })
     const res = await run(f, 'schedule')
     expect(res.merged).toEqual([])
-    const comments = f.writes.filter((w) => w.route.endsWith('/comments'))
-    expect(comments.map((c) => c.params.issue_number)).toEqual([7, 8])
-    expect(comments[0].params.body).toMatch(/^Auto-merge failed: Pull Request is not mergeable/)
+    expect(f.writes.map((w) => w.route)).toEqual([MERGE, COMMENT])
+    expect(f.writes[1].params.body).toMatch(/^Auto-merge failed: Base branch was modified\nHead: `abc1234def7`\. Retried/)
     expect(f.writes.some((w) => w.route.includes('dispatches'))).toBe(false)
   })
 
+  it('an API error on one PR is logged, later PRs still run and CI is still dispatched (#241)', async () => {
+    const f = fakeApi({
+      prs: [pr(1), pr(2, { draft: true }), pr(3)], verify: { [`${SHA}1`]: green, [`${SHA}2`]: green, [`${SHA}3`]: green },
+      fail: (route, p) => (route === COMMENT && p.issue_number === 2 ? 'Resource not accessible by integration' : undefined),
+    })
+    const res = await run(f, 'schedule')
+    expect(res.merged).toEqual([1, 3])
+    expect(res.lines).toContain('#2: error: Resource not accessible by integration')
+    expect(f.warnings).toEqual(['#2: error — Resource not accessible by integration'])
+    expect(f.writes.at(-1)).toMatchObject({
+      route: 'POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches',
+      params: { workflow_id: 'ci.yml', ref: 'main', inputs: { merged: '#1, #3 (main000)' } },
+    })
+  })
+
   it('a dry run writes nothing', async () => {
-    const f = fakeApi({ prs: [pr(1), pr(2, { draft: true })], verify: { [`${SHA}1`]: green, [`${SHA}2`]: green } })
+    const f = fakeApi({ prs: [pr(1), pr(2, { draft: true }), pr(3, { mergeable: false })], verify: { [`${SHA}1`]: green, [`${SHA}2`]: green } })
     const res = await run(f, 'workflow_dispatch', { inputs: { dry_run: 'true' } }, true)
     expect(f.writes).toEqual([])
     expect(res.lines[0]).toBe('#1: [dry run] would merge (abc1234)')
+    expect(res.lines[2]).toBe('#3: [dry run] would hand back to Fix: it conflicts with main (abc1234)')
   })
 })

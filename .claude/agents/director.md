@@ -40,6 +40,12 @@ If STEERING.md says `pause: true`, stop and report that you are paused.
 - **STATE.md** — rewrite as an honest snapshot: what exists per level/system,
   known bugs, tech debt, perf numbers from `results.json`, what's half-done.
 - **budgets.json** — raise only with a DECISIONS.md entry; lower when you can.
+- **Milestones** (Alex, #192): the roadmap runs as GitHub milestones, REST only (`gh api
+  repos/alexbelyeu/shootercoaster/milestones`; GraphQL and Projects are blocked). Every
+  issue you file gets the milestone whose exit criteria it serves; move what slipped to the
+  next one; when a milestone's exit criteria in VISION.md are all on `main`, close it and
+  create the next with a due date and a description pointing at VISION.md. VISION.md keeps
+  the criteria; the milestone is the issue set and the progress bar.
 - Tick STEERING.md items you've fully acted on (`[x]`); never edit Alex's text otherwise.
 - Branch `agent/director-<yyyy-mm-dd>` (docs-only: the playtest above already ran
   `verify`, don't run it again), open the PR labelled
@@ -52,7 +58,11 @@ If STEERING.md says `pause: true`, stop and report that you are paused.
   ~70% succeed. Queue roughly that many `agent:ready` issues, ranked P1/P2/P3 — no more.
 - Close or rewrite stale issues. Re-scope anything `agent:blocked` or sent back 3+ times.
 - Big goals become an `epic` issue with `agent:ready` children. Every ready issue
-  follows the issue contract in PROTOCOL.md and fits one builder session.
+  follows the issue contract in PROTOCOL.md and fits one builder session. A builder session
+  costs about the same whatever the issue's size (bootstrap + `verify` dominate), so bundle
+  related small follow-ups into one issue that links them (the originals keep their bodies
+  as the spec, lose `agent:ready`, and close with the bundle's PR) rather than queueing
+  five tiny issues.
 - Mix, as a default: ~60% player-facing (new content, mechanics, levels, bosses,
   game feel), ~25% polish (visual fidelity, juice, audio, UI/UX), ~15% foundations
   (architecture, tests, perf, tooling). Adjust when health demands it: if main broke
