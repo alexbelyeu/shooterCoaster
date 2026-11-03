@@ -40,7 +40,7 @@ const LEVELS: LevelConfig[] = [
     description: 'A murder of Crows',
     order: 2,
     biome: 'desert',
-    maxScore: 30 * 20 + 50 * 15, // 600 + 750 = 1350
+    maxScore: 30 * 20 + 50 * 15 + 2 * 60 + 4 * 40 + 400, // 1350 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2030
     timerSeconds: 60,
     message: 'Ready for this one?',
     nextLevel: 'level3',
@@ -60,6 +60,7 @@ const LEVELS: LevelConfig[] = [
       { type: 'crow', count: 25, spawnDelay: 15, waveLabel: 'A Murder of Crows!', formation: 'v' },
       { type: 'crow', count: 25, spawnDelay: 35, waveLabel: 'More Crows!', formation: 'v' },
     ],
+    boss: { type: 'giantScorpion', at: 42 },
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
     },

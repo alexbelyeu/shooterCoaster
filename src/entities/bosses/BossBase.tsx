@@ -33,13 +33,15 @@ export interface BossProps {
   id: string
   /** False while dormant: mounted hidden with the level so the shader warm-up covers it. */
   active: boolean
+  /** True during its tell (`spec.tell.seconds` before it arrives), while still dormant. */
+  incoming: boolean
   onDone: () => void
   track: ArcTable
   /** Terrain as drawn. */
   groundFn: HeightFunction
 }
 
-interface BossBaseProps extends Omit<BossProps, 'track' | 'groundFn'> {
+interface BossBaseProps extends Omit<BossProps, 'track' | 'groundFn' | 'incoming'> {
   spec: BossSpec
   move: (frame: BossFrame) => void
   /** Its bounds are the boss's on-screen size (e2e `boss().box`). */

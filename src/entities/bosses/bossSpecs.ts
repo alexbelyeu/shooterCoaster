@@ -2,6 +2,7 @@ import { SCORE_VALUES } from '@/levels/scoring'
 import type { BossType } from '@/types/level'
 import type { BossSpec, WeakPointSpec } from './bossModel'
 import { KRAKEN_TENTACLE } from './krakenMotion'
+import { SCORPION_TAIL } from './scorpionMotion'
 
 /** Local frame: +x = nose; the root sits near the middle of hull + tow chain. */
 export const BLIMP_LAYOUT = {
@@ -59,7 +60,32 @@ export const KRAKEN: BossSpec = {
   weakPoints: [...krakenPads, { id: 'eye', radius: 44, offset: [0, 0, 0], hp: 3, score: 0, phase: 1 }],
 }
 
+/** Placed every frame on its arm or along the tail (GiantScorpion.tsx), so no offset. */
+const scorpionTail: WeakPointSpec[] = Array.from({ length: SCORPION_TAIL.segments }, (_, i) => ({
+  id: `tail-${i}`,
+  radius: 58,
+  offset: [0, 0, 0],
+  hp: 1,
+  score: 40,
+  phase: 0,
+}))
+
+const scorpionClaw = (id: string): WeakPointSpec => ({ id, radius: 80, offset: [0, 0, 0], hp: 2, score: 60, phase: 0 })
+
+export const GIANT_SCORPION: BossSpec = {
+  name: 'The Giant Scorpion',
+  tell: { seconds: 2.5, label: 'Something Stirs Beneath!' },
+  reward: 400,
+  weakPoints: [
+    scorpionClaw('claw-l'),
+    scorpionClaw('claw-r'),
+    ...scorpionTail,
+    { id: 'stinger', radius: 62, offset: [0, 0, 0], hp: 3, score: 0, phase: 1 },
+  ],
+}
+
 export const BOSS_SPECS: Record<BossType, BossSpec> = {
   goldenBlimp: GOLDEN_BLIMP,
   kraken: KRAKEN,
+  giantScorpion: GIANT_SCORPION,
 }

@@ -41,7 +41,8 @@
  * The speed check holds the first level (or `--speed-level <id>`) at top speed on its most banked sampled point:
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  * The boss checks summon each finale and shoot it down in phase order: level1's Golden Blimp
- * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png) and level3's Kraken
+ * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png), level2's Giant Scorpion
+ * (level2-boss.png, level2-boss-stinger.png, level2-boss-down.png) and level3's Kraken
  * (level3-boss.png, level3-boss-head.png, level3-boss-down.png); see bossCheck().
  * The pickup check shoots level1's first weapon pickup with a real bullet: the spread gun's badge,
  * a 3-bullet fan with the tinted tracer (level1-pickup.png), pause-safe expiry, reset on restart; see pickupCheck().
@@ -495,7 +496,7 @@ async function playLevel(page, id, { frenzy = false } = {}) {
   await page.waitForTimeout(1500)
   await page.screenshot({ path: path.join(OUT, `${id}-results.png`), timeout: SHOT_TIMEOUT })
   const end = await getStats(page)
-  const results = await resultsScreenProblems(page, end)
+  const results = await resultsScreenProblems(page, id, end)
   problems.push(...results.problems)
   if (frenzy) problems.push(...(await resultsEnterProblems(page, results.screen)))
 
@@ -633,7 +634,7 @@ async function aimJumpCheck(page, read) {
   return { problems, result }
 }
 
-async function resultsScreenProblems(page, stats) {
+async function resultsScreenProblems(page, id, stats) {
   const screen = await page.evaluate(() => {
     const el = document.querySelector('.results-screen')
     if (!el) return null
@@ -641,7 +642,7 @@ async function resultsScreenProblems(page, stats) {
       [...el.querySelectorAll('.results-stat')].map((r) => [r.children[0].textContent, r.children[1].textContent]),
     )
     const buttons = [...el.querySelectorAll('.results-actions button')]
-      .filter((b) => b.getBoundingClientRect().width > 0)
+      .filter((b) => !b.closest('.share-menu') && b.getBoundingClientRect().width > 0)
       .map((b) => b.textContent)
     const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
     const s = window.__SC_TEST__
@@ -669,18 +670,10 @@ async function resultsScreenProblems(page, stats) {
     if (share[3] !== screen.levelName) problems.push(`share level "${share[3]}" != "${screen.levelName}"`)
     if (share[4] !== SHARE_URL) problems.push(`share link ${share[4]} != ${SHARE_URL}`)
   }
-  // Headless Chromium has no share sheet, so a real click takes the clipboard path and confirms it on the button.
-  const shareButton = page.locator('.results-share')
-  if (await shareButton.count()) {
-    await shareButton.click({ timeout: 10000 }).catch((e) => problems.push(`click Share: ${e.message}`))
-    const copied = await page
-      .waitForFunction(() => document.querySelector('.results-share')?.textContent === 'Copied!', null, { timeout: 10000, polling: 100 })
-      .then(() => true, () => false)
-    const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null)
-    if (!copied) problems.push('clicking Share did not show "Copied!"')
-    else if (clip !== null && clip !== screen.shareText) problems.push(`clipboard ${JSON.stringify(clip)} != shareText()`)
-    shown.copied = copied
-  }
+  // #271: desktop Share opens our menu (headless Chromium has no share sheet anyway); Copy link fills the clipboard.
+  const menu = await shareMenuProblems(page, 'desktop', { shot: `${id}-share.png`, expectClipboard: screen.shareText })
+  problems.push(...menu.problems)
+  shown.shareMenu = menu.targets
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
   for (const label of ['Kills', 'Accuracy', 'Best combo', 'Time left']) {
     if (!(label in screen.rows)) problems.push(`results screen has no "${label}" row`)
@@ -750,12 +743,81 @@ async function frenzyEndProblems(page, id) {
 }
 
 /** The results-screen share link (#87, src/ui/share.ts). */
-const SHARE_URL = 'https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=results'
+const SHARE_URL = 'https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=share_copy'
+const SHARE_TARGETS = ['copy', 'x', 'reddit', 'bluesky', 'threads', 'whatsapp', 'facebook', 'linkedin', 'email']
+
+/** #271: the share menu (every target, in the viewport, off the other buttons, keyboard); never clicks a network link,
+ *  since a local run fails on other-origin requests. Pass `expectClipboard` only where clipboard-read is granted. */
+async function shareMenuProblems(page, label, { shot, expectClipboard }) {
+  const problems = []
+  await page.locator('.results-share').click({ timeout: 30000 }).catch((e) => problems.push(`${label}: click Share: ${e.message}`))
+  const opened = await page
+    .waitForFunction(() => document.querySelector('.share-menu')?.getAttribute('data-side'), null, { timeout: 10000, polling: 100 })
+    .then(() => true, () => false)
+  if (!opened) return { problems: [...problems, `${label}: clicking Share did not open the share menu`], targets: null }
+  const m = await page.evaluate(() => {
+    const menu = document.querySelector('.share-menu')
+    const r = menu.getBoundingClientRect()
+    const others = [...document.querySelectorAll('.results-actions button')]
+      .filter((b) => !b.closest('.share-anchor') && b.getBoundingClientRect().width > 0)
+      .map((b) => ({ name: b.textContent, r: b.getBoundingClientRect().toJSON() }))
+    return {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      box: r.toJSON(),
+      others,
+      side: menu.getAttribute('data-side'),
+      focused: document.activeElement?.getAttribute('data-target') ?? null,
+      items: [...menu.querySelectorAll('[role="menuitem"]')].map((i) => ({
+        target: i.getAttribute('data-target'),
+        href: i.getAttribute('href'),
+        tall: i.getBoundingClientRect().height,
+      })),
+    }
+  })
+  const targets = m.items.map((i) => i.target)
+  if (JSON.stringify(targets) !== JSON.stringify(SHARE_TARGETS)) problems.push(`${label}: share menu lists ${JSON.stringify(targets)}, expected ${JSON.stringify(SHARE_TARGETS)}`)
+  if (m.focused !== 'copy') problems.push(`${label}: opening the share menu focused ${m.focused}, not Copy link`)
+  const b = m.box
+  if (b.left < 0 || b.top < 0 || b.right > m.vw || b.bottom > m.vh) problems.push(`${label}: share menu ${JSON.stringify(b)} leaves the ${m.vw}x${m.vh} viewport`)
+  for (const o of m.others) {
+    if (b.left < o.r.right && o.r.left < b.right && b.top < o.r.bottom && o.r.top < b.bottom) problems.push(`${label}: share menu covers ${o.name}`)
+  }
+  for (const i of m.items) {
+    if (i.tall < 44) problems.push(`${label}: share item ${i.target} under the 44 px touch target`)
+    if (i.target === 'copy') continue
+    if (!i.href || !i.href.includes(encodeURIComponent(`utm_campaign=share_${i.target}`))) problems.push(`${label}: ${i.target} link ${i.href} lacks utm_campaign=share_${i.target}`)
+  }
+  if (shot) await page.screenshot({ path: path.join(OUT, shot), timeout: SHOT_TIMEOUT })
+  if (expectClipboard !== undefined) {
+    await page.locator('.share-copy').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Copy link: ${e.message}`))
+    const copied = await page
+      .waitForFunction(() => document.querySelector('.share-copy')?.textContent === 'Copied!', null, { timeout: 10000, polling: 100 })
+      .then(() => true, () => false)
+    const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null)
+    if (!copied) problems.push(`${label}: Copy link did not show "Copied!"`)
+    else if (clip !== expectClipboard) problems.push(`${label}: clipboard ${JSON.stringify(clip)} != ${JSON.stringify(expectClipboard)}`)
+  }
+  await page.keyboard.press('ArrowDown')
+  const moved = await page.evaluate(() => document.activeElement?.getAttribute('data-target'))
+  if (moved !== 'x') problems.push(`${label}: ArrowDown in the share menu moved focus to ${moved}, not X`)
+  await page.keyboard.press('Escape')
+  const closed = await page.evaluate(() => ({
+    open: !!document.querySelector('.share-menu'),
+    focusOnShare: document.activeElement?.classList.contains('results-share') ?? false,
+    phase: window.__SC_TEST__.phase(),
+  }))
+  if (closed.open) problems.push(`${label}: Esc left the share menu open`)
+  if (!closed.focusOnShare) problems.push(`${label}: Esc did not return focus to Share`)
+  if (closed.phase !== 'results') problems.push(`${label}: the share menu keys left the results screen (${closed.phase})`)
+  return { problems, targets: { side: m.side, box: m.box, targets } }
+}
 
 /** Results buttons inside the viewport, none overlapping another, each at least the 44 px touch target. */
 async function resultsActionsProblems(page, label) {
   const r = await page.evaluate(() => {
     const boxes = [...document.querySelectorAll('.results-actions button')]
+      .filter((b) => !b.closest('.share-menu'))
       .map((b) => ({ name: b.textContent, r: b.getBoundingClientRect() }))
       .filter((b) => b.r.width > 0)
     const screen = document.querySelector('.results-screen')
@@ -1414,12 +1476,14 @@ async function waveCheck(page) {
 }
 
 /**
- * The finales the boss check summons: Theme Park's Golden Blimp (#181) and Ocean's Kraken (#183).
- * `minOnScreen` first-phase weak points must be on screen after the boss alone has moved `settleS` s (the
- * Kraken's tentacles rise out of the water first); `midSettleS` lets the last phase surface before `midShot`.
+ * The finales the boss check summons: Theme Park's Golden Blimp (#181), Desert's Giant Scorpion (#318) and
+ * Ocean's Kraken (#183). `minOnScreen` first-phase weak points must be on screen after the boss alone has moved
+ * `settleS` s (the scorpion bursts out of the sand, the Kraken's tentacles rise out of the water);
+ * `midSettleS` lets the last phase surface before `midShot`. `firstPhase`: the id prefix(es) of the first phase.
  */
 const BOSS_CHECKS = [
   { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
+  { level: 'level2', minWidthFrac: 0.15, weakPoints: 7, firstPhase: ['claw-', 'tail-'], lastPhase: ['stinger'], midShot: 'boss-stinger', minOnScreen: 4, settleS: 2, midSettleS: 1 },
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
 ]
 
@@ -1526,8 +1590,9 @@ async function bossCheck(page, check) {
   if (!settled || result.onScreenAtStart < minOnScreen)
     problems.push(`${result.onScreenAtStart} first-phase weak points on screen after ${settleS} s (want ≥ ${minOnScreen})`)
   if (!surfaced) problems.push(`the last phase [${lastPhase}] never came on screen within ${midSettleS} s`)
-  if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !id.startsWith(firstPhase)))
-    problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPhase}*)`)
+  const firstPrefixes = [firstPhase].flat()
+  if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !firstPrefixes.some((p) => id.startsWith(p))))
+    problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPrefixes.join('* / ')}*)`)
   if (!target) problems.push('no exposed weak point on screen to shoot')
   else if (!bulletHit) problems.push('a real bullet at an exposed weak point never hit it (boss:hit)')
   if (JSON.stringify(result.exposedMidway) !== JSON.stringify(lastPhase))
@@ -1930,6 +1995,10 @@ async function titleFlyBy(page) {
   // Re-shot like title.png: a GPU CI runner can return one black canvas capture (#291 CI), a black scene stays black.
   const scene2 = await captureTitleScene(page, path.join(OUT, 'title-2.png'), 10000)
   if (looksBlank(scene2)) problems.push(`title-2.png: the 3D scene behind the UI looks blank (mean ${scene2.mean.toFixed(1)} stddev ${scene2.stddev.toFixed(1)} colours ${scene2.distinctColors})`)
+  // #344: a sparkle's centre on a pixel centre must blend to a colour in [0, 1], not NaN that Bloom spreads to a black frame
+  const sparkle = await page.evaluate(() => window.__SC_TEST__.pointCentreColour('title-sparkles'))
+  if (!sparkle) problems.push('no title-sparkles points in the title scene')
+  else if (!sparkle.every((v) => v >= 0 && v <= 1)) problems.push(`a title sparkle's centre pixel blends to [${sparkle.map((v) => v.toFixed(2)).join(', ')}], not a colour in [0, 1] (NaN blacks out the frame through Bloom)`)
   let turnedDeg = 0
   let moved = 0
   if (!a || !b) problems.push('no title camera')
@@ -1962,7 +2031,7 @@ async function titleFlyBy(page) {
     .waitForFunction(() => window.__SC_TEST__.audio().toneLoaded && window.__SC_TEST__.audio().ready, null, { timeout: 30000 })
     .then(() => true, () => false)
   if (!toneAfter) problems.push('the key press on the title did not load Tone.js and unlock audio')
-  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter } }
+  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter, sparkle } }
 }
 
 const LANDING_PATH = '/go/smoke-check'
@@ -2388,7 +2457,11 @@ async function mobileResults(page) {
   await page.waitForTimeout(1000)
   problems.push(...(await resultsActionsProblems(page, 'phone landscape 844x390')))
   await page.screenshot({ path: path.join(OUT, 'mobile-results-landscape.png'), timeout: SHOT_TIMEOUT })
+  problems.push(...(await shareMenuProblems(page, 'phone landscape 844x390', { shot: 'mobile-share-landscape.png' })).problems)
   await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(1000)
+  // No share sheet in headless Chromium, so the phone gets the menu too: it must fit 390 px.
+  problems.push(...(await shareMenuProblems(page, 'phone portrait 390x844', { shot: 'mobile-share.png' })).problems)
   return { problems, buttons }
 }
 

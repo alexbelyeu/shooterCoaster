@@ -13,7 +13,8 @@ reviewer yourself; the scheduled QA dispatcher spawns one per PR instead.
    about 20 seconds, re-read the comments, and skip it if another live
    `QA run … reviewing` claim is earlier than yours.
 2. **Light re-review?** If an earlier QA comment says the full review passed and only a
-   merge conflict had to be fixed, and every commit since that reviewed head is a merge
+   merge conflict had to be fixed (or the auto-merge workflow handed the approved PR back
+   for a conflict), and every commit since that reviewed head is a merge
    of `origin/main`, do only the light re-review in `qa.md`. In a QA (on label) run you
    do it yourself; the scheduled QA dispatcher spawns the playtest reviewer for it, as in
    step 4. Skip to step 5.
@@ -51,7 +52,8 @@ reviewer yourself; the scheduled QA dispatcher spawns one per PR instead.
      as you just read it: "`verify`: success / running / failed". State that fact only: never
      predict whether or when the PR will merge (the auto-merge workflow decides that, and says
      so on the PR if it can't). Then swap `agent:needs-qa` → `agent:qa-approved`.
-   - **Close** if it has been sent back 3 times already: close the PR, label its issue
+   - **Close** if QA has sent it back 3 times already (auto-merge conflict hand-backs
+     don't count): close the PR, label its issue
      `agent:blocked`, and explain for the Director.
    - Say "merge conflict only; full review passed" in a change request whose only
      required change is resolving a conflict, so the next round can be light.

@@ -51,6 +51,15 @@ describe('LevelRegistry', () => {
     expect(level1.maxScore).toBe(2675)
   })
 
+  it('Desert ends on the Giant Scorpion at 42 s, after the last crows, which raises its maxScore to 2030', () => {
+    const level2 = getLevelConfig('level2')!
+    expect(level2.boss?.type).toBe('giantScorpion')
+    expect(level2.boss!.at).toBe(42)
+    expect(level2.boss!.at).toBeGreaterThan(Math.max(...level2.enemies.map((w) => w.spawnDelay ?? 0)))
+    expect(level2.maxScore).toBe(1350 + bossMaxScore(BOSS_SPECS.giantScorpion))
+    expect(level2.maxScore).toBe(2030)
+  })
+
   it('Ocean ends on the Kraken in its last ~25 s, which raises its maxScore to 2261', () => {
     const level3 = getLevelConfig('level3')!
     expect(level3.boss?.type).toBe('kraken')

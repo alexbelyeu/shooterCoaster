@@ -110,6 +110,25 @@ export const KRAKEN_SPLASH_DEATH_STYLE: DeathStyle = {
   lifetime: 1.8, scale: 2.4, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'splash',
 }
 
+/** The Giant Scorpion's broken claws and tail segments: plum-black chitin and amber joint shards in a puff of sand. */
+export const SCORPION_SHARD_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'chunk', count: 10, colors: ['#2a1626', '#3a1622', '#e0701e'], speed: [30, 85], up: 50, drag: 0.6, gravity: 160, size: 6, spin: 9, hold: 0.7 }),
+    layer({ shape: 'mote', count: 30, colors: ['#e2c58f', '#c9a46a', '#f0d9a8'], glow: 1.2, speed: [10, 60], up: 12, drag: 2.4, gravity: -3, size: 5, hold: 0.2 }),
+    layer({ shape: 'spark', count: 10, colors: ['#ffb347'], glow: 3, speed: [60, 140], drag: 3, size: 1.6 }),
+  ],
+  lifetime: 1.7, scale: 2.2, lift: 0, flash: 3, flashColor: '#ffb060', sound: 'crunch',
+}
+
+/** Sand thrown up where the scorpion bursts out, stabs or goes under: big slow motes and a few clods, no flash. */
+export const SAND_BURST_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'mote', count: 40, colors: ['#e2c58f', '#d4ae74', '#c9a46a', '#f0d9a8'], glow: 1.05, speed: [15, 70], up: 45, drag: 1.8, gravity: 20, size: 7, hold: 0.45 }),
+    layer({ shape: 'chunk', count: 8, colors: ['#c9a46a', '#a98058'], speed: [25, 70], up: 80, drag: 0.5, gravity: 170, size: 5, spin: 5, hold: 0.7 }),
+  ],
+  lifetime: 1.9, scale: 3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'crunch',
+}
+
 const BALLOON_CONFETTI =['#ff3b6b', '#ffd23f', '#3bc9ff', '#7dff6a', '#c86bff']
 
 const SNOW_CRUMBLE = (ice: string): readonly DeathLayer[] => [
