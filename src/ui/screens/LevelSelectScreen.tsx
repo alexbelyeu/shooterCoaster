@@ -42,13 +42,14 @@ export default function LevelSelectScreen() {
   const startRun = useGameStore((s) => s.startRun)
   const setPhase = useGameStore((s) => s.setPhase)
   const savedScores = useGameStore((s) => s.savedScores)
+  const leaderboards = useGameStore((s) => s.leaderboards)
   const isLevelUnlocked = useGameStore((s) => s.isLevelUnlocked)
   const savedDaily = useGameStore((s) => s.savedDaily)
   const dailyStreak = useGameStore((s) => s.dailyStreak)
 
   const cards = useMemo(
-    () => buildLevelCards(getAllLevels(), savedScores, isLevelUnlocked),
-    [savedScores, isLevelUnlocked],
+    () => buildLevelCards(getAllLevels(), savedScores, isLevelUnlocked, leaderboards),
+    [savedScores, isLevelUnlocked, leaderboards],
   )
   const daily = useMemo(
     () => buildDailyCard(new Date(), getAllLevels(), savedDaily, dailyStreak),
@@ -153,7 +154,7 @@ export default function LevelSelectScreen() {
               aria-disabled={!card.unlocked}
               aria-label={
                 card.unlocked
-                  ? `${card.name}: ${card.stars} of ${STARS_PER_LEVEL} stars${card.bestScore > 0 ? `, best ${card.bestScore}` : ''}`
+                  ? `${card.name}: ${card.stars} of ${STARS_PER_LEVEL} stars${card.bestScore > 0 ? `, best ${card.bestScore}${card.bestInitials ? ` by ${card.bestInitials}` : ''}` : ''}`
                   : `${card.name}: locked${card.unlockedBy ? `, earn a star on ${card.unlockedBy}` : ''}`
               }
               onFocus={() => setFocusIndex(i)}
@@ -183,6 +184,9 @@ export default function LevelSelectScreen() {
                     </span>
                     <span className="level-card-best">
                       {card.bestScore > 0 ? `Best ${fmt.format(card.bestScore)}` : 'New'}
+                      {card.bestScore > 0 && card.bestInitials && (
+                        <span className="level-card-initials">{card.bestInitials}</span>
+                      )}
                     </span>
                   </span>
                 ) : (

@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { COMBO_TIERS, comboTierIndex } from '@/combat/comboTiers'
-import { MAX_INTENSITY, intensityForTier, layerSounds, liftHz, nextLayerStep, type LayerGrid } from './layers'
+import {
+  MAX_INTENSITY,
+  intensityForTier,
+  layerSounds,
+  layerState,
+  liftHz,
+  nextLayerStep,
+  recordLayerStep,
+  resumeLayers,
+  type LayerGrid,
+} from './layers'
 import { compile } from './score'
 
 // 120 BPM in 4: a beat is 0.5 s, a bar 2 s; a one-bar intro.
@@ -51,6 +61,28 @@ describe('intensity layers', () => {
 
   it('a rise cuts a wind-down short', () => {
     expect(nextLayerStep(1, 11.5, 3, 10.2, g)).toEqual({ intensity: 3, at: 10.5 })
+  })
+
+  it('a pause in the intro resumes on the full band and still drops to the run at the loop start', () => {
+    const s = layerState(MAX_INTENSITY)
+    recordLayerStep(s, nextLayerStep(s.intensity, s.at, 0, 0.3, g)!, 0.3)
+    expect(resumeLayers(s, 1.2)).toEqual({ open: MAX_INTENSITY, pending: { intensity: 0, at: 2 } })
+    expect(resumeLayers(s, 2.4)).toEqual({ open: 0, pending: null })
+  })
+
+  it('a step scheduled before a pause still lands on its beat after it', () => {
+    const s = layerState(0)
+    recordLayerStep(s, { intensity: 1, at: 6 }, 5)
+    expect(resumeLayers(s, 6)).toEqual({ open: 1, pending: null })
+    recordLayerStep(s, { intensity: 3, at: 7.5 }, 7.3)
+    expect(resumeLayers(s, 7.4)).toEqual({ open: 1, pending: { intensity: 3, at: 7.5 } })
+  })
+
+  it('a rise over a step that has not landed keeps what is still playing', () => {
+    const s = layerState(1)
+    recordLayerStep(s, { intensity: 2, at: 8 }, 7.6)
+    recordLayerStep(s, { intensity: 3, at: 8 }, 7.8)
+    expect(resumeLayers(s, 7.9)).toEqual({ open: 1, pending: { intensity: 3, at: 8 } })
   })
 })
 

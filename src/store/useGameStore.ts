@@ -1,6 +1,16 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { GamePhase, ScoreEntry, ComboState, BossHud } from '@/types/game'
+import {
+  DEFAULT_INITIALS,
+  insertEntry,
+  normalizeInitials,
+  sanitizeLeaderboards,
+  sanitizeSavedDaily,
+  sanitizeSavedScores,
+  sanitizeStreak,
+  type Leaderboards,
+} from './leaderboard'
 import { seedFromQuery } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
 import { markStartup } from '@/core/startupMarks'
@@ -72,7 +82,15 @@ interface GameState {
   savedScores: Record<string, ScoreEntry>
   /** Keeps the higher score's entry; `bestCombo` is kept at its max across runs either way. */
   saveScore: (entry: ScoreEntry) => void
-  resetSavedScores: () => void
+
+  leaderboards: Leaderboards
+  /** The default for the next entry. */
+  lastInitials: string
+  /** Enters a run under `lastInitials`; returns its 0-based rank, or null when it misses the board. */
+  addLeaderboardEntry: (levelId: string, run: { score: number; stars: number; date: number }) => number | null
+  setEntryInitials: (levelId: string, date: number, initials: string) => void
+  /** Settings "Clear local data": scores, stars (so unlocks), leaderboards and the Daily Run's bests and streak. */
+  clearLocalData: () => void
 
   /** Best daily run per UTC day (`YYYY-MM-DD`), the last `DAILY_KEEP_DAYS` only; never touches `savedScores`. */
   savedDaily: Record<string, ScoreEntry>
@@ -191,7 +209,36 @@ export const useGameStore = create<GameState>()(
           }
           return {}
         }),
-      resetSavedScores: () => set({ savedScores: {} }),
+
+      leaderboards: {},
+      lastInitials: DEFAULT_INITIALS,
+      addLeaderboardEntry: (levelId, run) => {
+        const s = get()
+        const { board, rank } = insertEntry(s.leaderboards[levelId] ?? [], { ...run, initials: s.lastInitials })
+        if (rank !== null) set({ leaderboards: { ...s.leaderboards, [levelId]: board } })
+        return rank
+      },
+      setEntryInitials: (levelId, date, initials) =>
+        set((s) => {
+          const letters = normalizeInitials(initials)
+          const board = s.leaderboards[levelId]
+          if (!board?.some((e) => e.date === date)) return { lastInitials: letters }
+          return {
+            lastInitials: letters,
+            leaderboards: {
+              ...s.leaderboards,
+              [levelId]: board.map((e) => (e.date === date ? { ...e, initials: letters } : e)),
+            },
+          }
+        }),
+      clearLocalData: () =>
+        set({
+          savedScores: {},
+          leaderboards: {},
+          lastInitials: DEFAULT_INITIALS,
+          savedDaily: {},
+          dailyStreak: { count: 0, lastKey: null },
+        }),
 
       savedDaily: {},
       dailyStreak: { count: 0, lastKey: null },
@@ -215,9 +262,24 @@ export const useGameStore = create<GameState>()(
       name: 'shootercoaster-scores',
       partialize: (state) => ({
         savedScores: state.savedScores,
+        leaderboards: state.leaderboards,
+        lastInitials: state.lastInitials,
         savedDaily: state.savedDaily,
         dailyStreak: state.dailyStreak,
       }),
+      // Hand-edited, older or half-written storage loads as valid data or not at all.
+      merge: (persisted, current) => {
+        const p = (typeof persisted === 'object' && persisted !== null ? persisted : {}) as Record<string, unknown>
+        const savedScores = sanitizeSavedScores(p.savedScores)
+        return {
+          ...current,
+          savedScores,
+          leaderboards: sanitizeLeaderboards(p.leaderboards, savedScores),
+          lastInitials: normalizeInitials(p.lastInitials),
+          savedDaily: sanitizeSavedDaily(p.savedDaily),
+          dailyStreak: sanitizeStreak(p.dailyStreak),
+        }
+      },
     },
   ),
 )

@@ -8,9 +8,9 @@
 import * as Tone from 'tone'
 import { isAudioReady, scoreChannel } from '../AudioEngine'
 import { fadeOutMusicBus, openMusicBus, type MusicBus } from '../musicBus'
-import { SCORES } from '../scores'
+import { SCORES, scoreIdFor } from '../scores'
 import { compile, type CompiledSong } from './score'
-import { MAX_INTENSITY, nextLayerStep, type LayerGrid } from './layers'
+import { MAX_INTENSITY, layerState, nextLayerStep, recordLayerStep, resumeLayers, type LayerGrid, type LayerState } from './layers'
 import { ScoreScheduler } from './scheduler'
 import { createCore, createSynth, type Session, type Synth, type SynthCore } from './synth'
 
@@ -30,9 +30,7 @@ interface Track {
   stopWarm: () => void
   /** Null for a score without layers. */
   layers: LayerGrid | null
-  /** The last intensity scheduled, and the song time it lands. */
-  intensity: number
-  intensityAt: number
+  layerState: LayerState
 }
 
 const songs = new Map<string, CompiledSong>()
@@ -53,7 +51,7 @@ const now = () => Tone.getContext().currentTime
 function songFor(id: string): CompiledSong {
   let song = songs.get(id)
   if (!song) {
-    const text = SCORES[id]
+    const text = SCORES[scoreIdFor(id)]
     if (text === undefined) throw new Error(`no score "${id}"`)
     song = compile(text)
     songs.set(id, song)
@@ -106,8 +104,8 @@ function fadeOut(track: Track, untilNextTrack = false) {
   fadeOutMusicBus(track.bus, [{ dispose: () => disposeTrack(track) }], untilNextTrack)
 }
 
-/** Crossfades to score `id` from the top; nothing if it is already the current track or audio is still locked. */
-export function playScore(id: string): void {
+/** Crossfades to score `id` from song time `from` (the top); nothing if it is already the current track or audio is still locked. */
+export function playScore(id: string, from = 0): void {
   if (current?.id === id || !isAudioReady()) return
   if (current) fadeOut(current)
   const song = songFor(id)
@@ -115,7 +113,7 @@ export function playScore(id: string): void {
   const bus = openMusicBus(busName(id), start, scoreChannel)
   const synth = createSynth(coreFor(rawContext()), bus.gain.input as unknown as AudioNode, { voicing: 'game' })
   // The intro plays every layer; the loop opens on the game's intensity.
-  const intensity = song.intro.dur > 0 ? MAX_INTENSITY : targetIntensity
+  const intensity = from < song.intro.dur ? MAX_INTENSITY : targetIntensity
   const track: Track = {
     id,
     bus,
@@ -125,10 +123,9 @@ export function playScore(id: string): void {
     pausedAt: null,
     stopWarm: synth.warm(song),
     layers: layerGrid(song),
-    intensity,
-    intensityAt: 0,
+    layerState: layerState(intensity),
   }
-  track.scheduler.start(start)
+  track.scheduler.start(start, from)
   live.push(track)
   current = track
   ensureTimer()
@@ -154,8 +151,12 @@ export function pauseScore(paused: boolean): void {
     track.session?.stop(PAUSE_FADE_S)
     track.session = null
   } else {
-    track.session = track.synth.session(track.scheduler.song, track.intensity)
-    track.scheduler.start(now() + SCORE_START_DELAY_S, track.pausedAt ?? 0)
+    const from = track.pausedAt ?? 0
+    const start = now() + SCORE_START_DELAY_S
+    const { open, pending } = resumeLayers(track.layerState, from)
+    track.session = track.synth.session(track.scheduler.song, open)
+    if (pending) track.session.setIntensity(pending.intensity, start + pending.at - from)
+    track.scheduler.start(start, from)
     track.pausedAt = null
     track.scheduler.tick(now())
   }
@@ -168,10 +169,10 @@ export function setIntensity(intensity: number): void {
   if (!track?.layers || !track.session || track.pausedAt !== null) return
   const t = now()
   const pos = track.scheduler.position(t)
-  const step = nextLayerStep(track.intensity, track.intensityAt, intensity, pos, track.layers)
+  const s = track.layerState
+  const step = nextLayerStep(s.intensity, s.at, intensity, pos, track.layers)
   if (!step) return
-  track.intensity = step.intensity
-  track.intensityAt = step.at
+  recordLayerStep(s, step, pos)
   track.session.setIntensity(step.intensity, t + step.at - pos)
 }
 
@@ -211,17 +212,18 @@ export function musicGrid(): MusicGrid | null {
   return grid
 }
 
-/** e2e: the tracks (current last), whether each is paused, its song position and layer intensity, and the long-lived nodes. */
+/** e2e: the tracks (current last) with the score each plays (`scoreIdFor`), whether it is paused, its song position and layer intensity, and the long-lived nodes. */
 export function scrimState() {
   const t = now()
   return {
     current: current?.id ?? null,
     tracks: live.map((tr) => ({
       id: tr.id,
+      score: scoreIdFor(tr.id),
       paused: tr.pausedAt !== null,
       position: tr.pausedAt ?? tr.scheduler.position(t),
       layered: tr.layers !== null,
-      intensity: tr.intensity,
+      intensity: tr.layerState.intensity,
     })),
     targetIntensity,
     nodes: live.reduce((n, tr) => n + tr.synth.nodeCount(), 0),

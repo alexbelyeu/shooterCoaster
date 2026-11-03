@@ -37,7 +37,7 @@ import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType } from '@/types/level'
-import type { GamePhase, ScoreEntry } from '@/types/game'
+import type { GamePhase, LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
@@ -78,6 +78,8 @@ export interface SCTestApi {
   programs: () => number
   /** Active camera's world position and unit view direction (title fly-by check). */
   cameraPose: () => { position: [number, number, number]; forward: [number, number, number] } | null
+  /** Linear RGBA of the scene's Points `name`'s first point drawn over opaque grey with its centre on a 1x1 float target's pixel centre (#344). */
+  pointCentreColour: (name: string) => [number, number, number, number] | null
   drawCalls: number
   triangles: number
   /** Every level in play order, its `nextLevel` and whether the unlock rule opens it now. */
@@ -97,6 +99,9 @@ export interface SCTestApi {
   setPhase: (phase: GamePhase) => void
   /** Replace the saved best scores / stars (persisted to localStorage like real saves). */
   setSavedScores: (scores: Record<string, ScoreEntry>) => void
+  /** Replace the local leaderboards (and `lastInitials`), persisted like real saves. */
+  setLeaderboards: (boards: Record<string, LeaderboardEntry[]>, lastInitials?: string) => void
+  leaderboards: () => { boards: Record<string, LeaderboardEntry[]>; lastInitials: string }
   /** The Daily Run: today's UTC key, seed and level, the current run's mode, the saved daily bests and the streak. */
   daily: () => {
     dateKey: string
@@ -668,6 +673,7 @@ export function installE2EApi() {
     maxFrameMs: 0,
     programs: () => probeGl?.info.programs?.length ?? 0,
     cameraPose: readCameraPose,
+    pointCentreColour,
     drawCalls: 0,
     triangles: 0,
     levels: () => {
@@ -677,6 +683,12 @@ export function installE2EApi() {
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
     setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
     setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
+    setLeaderboards: (boards, lastInitials) =>
+      useGameStore.setState(lastInitials === undefined ? { leaderboards: boards } : { leaderboards: boards, lastInitials }),
+    leaderboards: () => {
+      const s = useGameStore.getState()
+      return { boards: s.leaderboards, lastInitials: s.lastInitials }
+    },
     daily: () => {
       const dateKey = dailyKey(new Date())
       const s = useGameStore.getState()
@@ -917,9 +929,43 @@ function readCameraPose() {
   return { position: [p.x, p.y, p.z] as [number, number, number], forward: [_poseDir.x, _poseDir.y, _poseDir.z] as [number, number, number] }
 }
 
+function pointCentreColour(name: string): [number, number, number, number] | null {
+  const gl = probeGl
+  const source = probeScene?.getObjectByName(name)
+  if (!gl || !(source instanceof THREE.Points)) return null
+  // The first vertex's attributes, at the origin
+  const geometry = new THREE.BufferGeometry()
+  const attributes = source.geometry.attributes as Record<string, THREE.BufferAttribute>
+  for (const [key, attr] of Object.entries(attributes)) {
+    const values = new Float32Array(attr.itemSize)
+    if (key !== 'position') for (let c = 0; c < attr.itemSize; c++) values[c] = attr.getComponent(0, c)
+    geometry.setAttribute(key, new THREE.BufferAttribute(values, attr.itemSize))
+  }
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Points(geometry, source.material))
+  const camera = new THREE.PerspectiveCamera(60, 1, 1, 100)
+  camera.position.set(0, 0, 10)
+  const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.FloatType })
+  const prevTarget = gl.getRenderTarget()
+  const prevClear = gl.getClearColor(new THREE.Color())
+  const prevAlpha = gl.getClearAlpha()
+  gl.setRenderTarget(target)
+  gl.setClearColor(0x808080, 1)
+  gl.clear()
+  gl.render(scene, camera)
+  const px = new Float32Array(4)
+  gl.readRenderTargetPixels(target, 0, 0, 1, 1, px)
+  gl.setRenderTarget(prevTarget)
+  gl.setClearColor(prevClear, prevAlpha)
+  target.dispose()
+  geometry.dispose()
+  return [px[0], px[1], px[2], px[3]]
+}
+
 /** Canvas element captured by <E2EFrameProbe> for view(). */
 let probeCanvas: HTMLCanvasElement | null = null
 let probeGl: THREE.WebGLRenderer | null = null
+let probeScene: THREE.Scene | null = null
 let probeDpr = 1
 
 function readView(): E2EView | null {
@@ -959,6 +1005,7 @@ export function E2EFrameProbe() {
     probeSize = state.size
     probeCanvas = state.gl.domElement
     probeGl = state.gl
+    probeScene = state.scene
     probeDpr = state.viewport.dpr
     if (autoFireEnabled) autoFireTick(state.camera)
     // Post-processing renders several passes per frame, and three.js resets
