@@ -26,8 +26,8 @@ could hear it across a loud arcade. Every sound tells the player something.
 
 | Level | Biome | Brief | Signature colour |
 |---|---|---|---|
-| Title | Theme park at night | 20–30 s attract-mode theme that loops: the game's main hook, tells you "press start" | supersaw lead + gated snare |
-| level1 | Theme Park | Carnival meets arcade rock. Major key, bouncy, bright | calliope/organ riffs over rock drums |
+| Title | Theme park at night | Attract-mode theme: the game's main hook inside the first 4 bars, a 1–2 bar intro that says "press start", then a 32-bar loop (≈ 45–50 s) with a lift. Gated snare and big electronic drums | supersaw lead + gated snare |
+| level1 | Theme Park | Carnival meets arcade rock. Major key, bouncy, bright: a fairground instrument carries the riff (calliope pipe, drawbar organ, xylophone), rock drums and FM bass drive it, and the loop lifts for its last 8 bars | calliope/organ riffs over rock drums |
 | level2 | Desert | Driving, sun-bleached. Phrygian or harmonic-minor flavour, hand percussion over a straight kick | twangy guitar, darbuka-style percussion |
 | level3 | Ocean | Fast, open, surf-rock energy with a sparkling top | spring-reverb guitar, steel drum, sea wash |
 | level4 | Antarctica | Glassy and tense but still driving. Minor key, crystalline | bells, celesta, icy pads with a hard kick |
@@ -35,6 +35,14 @@ could hear it across a loud arcade. Every sound tells the player something.
 | FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens | same as the level, brighter |
 | Boss / finale | any | A variation of the level theme, darker and louder | the level's colour + orchestra hits |
 | Results | any | 3–6 s jingle: rising for 3★, flatter for 1★ or 0★, then a calm loop | bells + brass |
+
+**Theme options (#216, waiting on Alex's pick):** three each for the title and level1, in
+`src/audio/scores/themes/`, heard with `?audio=scrim&theme=<name>`. Title: `neon` (A minor,
+160, supersaw hook, four-on-the-floor), `highway` (E♭ major, 138, synth-brass cruise, slap bass,
+tom fills), `fanfare` (D major, 172, brass fanfare, orchestra hits, timpani). level1: `calliope`
+(B♭ major, 148, pipe-organ calliope riff over power chords), `carousel` (A major 12/8 shuffle,
+132, organ over accordion and banjo), `ringmaster` (C major, 168, circus-march punk polka,
+xylophone and synth brass). The picked ones replace `title.scrim` / `level1.scrim`.
 
 ## Mix targets (starting numbers: tune with a decision entry)
 

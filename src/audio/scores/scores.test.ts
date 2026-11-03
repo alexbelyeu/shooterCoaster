@@ -3,11 +3,22 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { compile } from '@/audio/scrim/score'
 import { lintRanges } from '@/audio/scrim/lint'
 import { SCORE_KEYS } from '@/audio/sfxDesign'
-import { SCORES } from './index'
+import { SCORES, themesFromQuery } from './index'
 
 describe('game scores', () => {
   it('has a score for the title, every level and the results screen', () => {
-    expect(Object.keys(SCORES).sort()).toEqual(['results', 'title', ...getAllLevels().map((l) => l.id)].sort())
+    const slots = Object.keys(SCORES).filter((id) => !id.includes('.'))
+    expect(slots.sort()).toEqual(['results', 'title', ...getAllLevels().map((l) => l.id)].sort())
+  })
+
+  it('every theme option belongs to a slot that has a score', () => {
+    for (const id of Object.keys(SCORES).filter((id) => id.includes('.'))) expect(SCORES[id.split('.')[0]]).toBeDefined()
+  })
+
+  it('?theme= puts each named option in its slot and ignores unknown names', () => {
+    expect(themesFromQuery('')).toEqual({})
+    expect(themesFromQuery('?audio=scrim&theme=neon')).toEqual({ title: 'title.neon' })
+    expect(themesFromQuery('?theme=carousel,%20highway,nope')).toEqual({ title: 'title.highway', level1: 'level1.carousel' })
   })
 
   it('the range lint flags a note outside its instrument', () => {
