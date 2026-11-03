@@ -93,6 +93,9 @@ bullet must hit one, `bossHit` clears them and must expose only the gondola (`le
 `boss:defeated`, one kill per weak point and the big score popup over the confetti (`level1-boss-down.png`). The phone run
 resumes after its Pause tap with the boss summoned: the bar must sit inside the viewport and clear of the HUD in portrait and
 landscape (`mobile-level1-boss.png`).
+When level2 is in the run, the same `boss` step summons the Giant Scorpion: after 2 s of game time (it bursts out of the sand)
+≥ 4 of its claws and tail segments must be on screen (`level2-boss.png`, only those exposed), and once they are broken only the
+stinger on the bare stub (`level2-boss-stinger.png`) before it collapses into the sand (`level2-boss-down.png`).
 When level3 is in the run, the same `boss` step summons the Kraken: after 3 s of game time ≥ 3 sucker pads must be on screen
 above the water (`level3-boss.png`, only pads exposed), and after the pads go the head must surface with only its eye exposed
 (`level3-boss-head.png`) before the eye is shot and it sinks in a splash (`level3-boss-down.png`).

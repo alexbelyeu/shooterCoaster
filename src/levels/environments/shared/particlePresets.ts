@@ -55,6 +55,8 @@ const desertDust: ParticleFieldPreset = {
     additive: true,
   },
   secondaryShare: 0.15,
+  // The Giant Scorpion's tell: the dunes ahead heave and the air fills with dust.
+  boost: { event: 'scorpion:burrow', count: 500, riseS: 0.5, holdS: 3, fadeS: 1.5 },
 }
 
 /** Ocean: small cyan motes rising off the water, a few brighter ones pulsing. */
