@@ -120,8 +120,12 @@ criteria** (checkable, including what the smoke-test screenshot should show),
 its head commit. It runs on the PR's label events, after every CI run, and as a sweep of
 every open approved PR every 10 minutes, so an approved PR with a green `verify` merges
 within about 10 minutes even if an event was missed. When it can't merge an approved PR
-for any reason but `verify` still running (red `verify`, conflict, draft…), it says so
+for any reason but `verify` still running (red `verify`, draft…), it says so
 once per head in a PR comment starting `Auto-merge skipped:` or `Auto-merge failed:`.
+An approved PR that **conflicts** with `main` is handed back instead: the workflow swaps
+`agent:qa-approved` → `agent:changes-requested` with a conflict-only change request
+("merge conflict only; full review passed"), Fix (on label) merges `origin/main` and
+QA does the light re-review. These hand-backs don't count towards the 3 sends back.
 Pushing new commits to an approved PR removes the label automatically.
 
 QA applies `agent:qa-approved` only when **all** hold:
@@ -167,10 +171,6 @@ Builders run `.claude/commands/deslop.md` over their files before shipping.
 
 QA reviews in this order: (1) revert / `agent:prod-broken` fixes, (2) P1, (3) the rest
 oldest first.
-
-If the workflow comments that the merge failed (usually a conflict), merge `origin/main`
-into the branch, resolve the conflicts, re-verify, and push normally — then QA
-re-approves.
 
 **Updating a pushed branch:** always `git merge origin/main` and push normally. Never
 rebase a branch that is already on GitHub — that needs a force-push, which hard rule 2

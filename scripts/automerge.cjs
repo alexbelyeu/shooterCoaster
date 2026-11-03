@@ -6,11 +6,14 @@
 // strand an approved PR. Each run picks its candidate PRs, puts every one through the
 // same checks, merges what passes and says why it skipped the rest: a PR comment
 // (once per reason and head) for approved PRs, and one line per PR in the job summary.
+// An approved PR that conflicts with main goes back to Fix instead of sitting approved,
+// and an API error on one PR never stops the run (or the CI dispatch after its merges).
 //
 // Local dry run of the sweep through the `gh` CLI (prints what it would do, writes nothing):
 //   node scripts/automerge.cjs --dry-run
 
 const APPROVED = 'agent:qa-approved'
+const CHANGES_REQUESTED = 'agent:changes-requested'
 
 // ---------- pure rules (unit-tested in automerge.test.ts) ----------
 
@@ -33,8 +36,10 @@ function latestVerify(checkRuns) {
 
 /**
  * What to do with one PR: `merge`, `wait` (verify still running), `skip` (approved but
- * blocked: worth telling the PR) or `ignore` (not approved or not open: nothing to say).
+ * blocked: worth telling the PR), `handback` (it conflicts with main: back to Fix) or
+ * `ignore` (not approved or not open: nothing to say).
  * `verify` is the newest `verify` check run on the head commit (undefined when there is none).
+ * The conflict check comes before verify's: CI doesn't run on a conflicting PR.
  */
 function decide(pr, verify, repoFullName) {
   if (pr.state !== 'open') return { action: 'ignore', reason: 'not open' }
@@ -43,6 +48,7 @@ function decide(pr, verify, repoFullName) {
   if (pr.base.ref !== 'main') return { action: 'skip', reason: `its base is \`${pr.base.ref}\`, not \`main\`` }
   if (pr.head.repo?.full_name?.toLowerCase() !== repoFullName.toLowerCase()) return { action: 'skip', reason: 'its head branch is on a fork' }
   if (!pr.head.ref.startsWith('agent/')) return { action: 'skip', reason: `\`${pr.head.ref}\` is not an \`agent/*\` branch` }
+  if (pr.mergeable === false) return { action: 'handback', reason: 'it conflicts with `main`' }
   if (!verify) return { action: 'skip', reason: 'there is no `verify` check on the head commit' }
   if (verify.status !== 'completed') return { action: 'wait', reason: `\`verify\` is ${verify.status.replace('_', ' ')}` }
   if (verify.conclusion !== 'success') return { action: 'skip', reason: `\`verify\` is ${verify.conclusion} on the head commit` }
@@ -53,7 +59,22 @@ const skipComment = (reason, sha) =>
   `Auto-merge skipped: ${reason}.\nHead: \`${sha}\`. Retried every 10 minutes and after every CI run.`
 
 const failComment = (message, sha) =>
-  `Auto-merge failed: ${message}\nHead: \`${sha}\`. The branch probably conflicts with main: merge origin/main into it, resolve, re-verify and push (never force-push).`
+  `Auto-merge failed: ${message}\nHead: \`${sha}\`. Retried every 10 minutes and after every CI run.`
+
+/** GitHub's merge API answers a conflict with "Pull Request is not mergeable". */
+const isConflictError = (message) => /not mergeable/i.test(message)
+
+// builder.md step 1 and qa.md "Light re-review" key their light path on this wording.
+const handbackComment = (sha) =>
+  [
+    'Auto-merge failed: this branch conflicts with `main`.',
+    `Head: \`${sha}\`. Merge conflict only; full review passed: QA's approval of this head stands, and this is not a QA send-back (it doesn't count towards the 3).`,
+    '',
+    `Changes requested (\`${APPROVED}\` → \`${CHANGES_REQUESTED}\`):`,
+    '1. Merge `origin/main` into the branch: no rebase, no force-push.',
+    "2. Resolve each conflict keeping both sides' behaviour. Change nothing else.",
+    '3. Run `npm test` and `npm run build`, push, and swap the label to `agent:needs-qa` for a light re-review.',
+  ].join('\n')
 
 /** False when the newest auto-merge comment on the PR already says exactly this. */
 function shouldComment(body, comments) {
@@ -104,8 +125,20 @@ async function runGate({ api, event, payload, owner, repo, dryRun, log }) {
     else await api('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', { issue_number: number, body })
   }
 
+  // Add before remove: if a label call fails the PR stays approved, so the next sweep retries.
+  const handBack = async (number, sha) => {
+    if (dryRun) {
+      note(number, `[dry run] would hand back to Fix: it conflicts with main (${sha.slice(0, 7)})`)
+      return
+    }
+    await comment(number, handbackComment(sha))
+    await api('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', { issue_number: number, labels: [CHANGES_REQUESTED] })
+    await api('DELETE /repos/{owner}/{repo}/issues/{issue_number}/labels/{name}', { issue_number: number, name: APPROVED })
+    note(number, `handed back to Fix: it conflicts with main (${sha.slice(0, 7)})`)
+  }
+
   const merged = []
-  for (const number of numbers) {
+  const gatePr = async (number) => {
     const pr = await api('GET /repos/{owner}/{repo}/pulls/{pull_number}', { pull_number: number })
     let verify
     if (pr.state === 'open' && hasLabel(pr, APPROVED)) {
@@ -116,27 +149,39 @@ async function runGate({ api, event, payload, owner, repo, dryRun, log }) {
     const sha = pr.head.sha.slice(0, 7)
     if (verdict.action === 'ignore' || verdict.action === 'wait') {
       note(number, `${verdict.action === 'wait' ? 'waiting' : 'not a candidate'}: ${verdict.reason} (${sha})`)
-      continue
+      return
     }
     if (verdict.action === 'skip') {
       note(number, `skipped: ${verdict.reason} (${sha})`)
       await comment(number, skipComment(verdict.reason, pr.head.sha))
-      continue
+      return
     }
+    if (verdict.action === 'handback') return handBack(number, pr.head.sha)
     if (dryRun) {
       note(number, `[dry run] would merge (${sha})`)
-      continue
+      return
     }
     try {
       await api('PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge', {
         pull_number: number, sha: pr.head.sha, merge_method: 'squash', commit_title: `${pr.title} (#${number})`,
       })
-      merged.push(number)
-      note(number, `merged (${sha})`)
     } catch (e) {
       log.warning(`#${number}: merge failed — ${e.message}`)
+      if (isConflictError(e.message)) return handBack(number, pr.head.sha)
       lines.push(`#${number}: merge failed: ${e.message} (${sha})`)
       await comment(number, failComment(e.message, pr.head.sha))
+      return
+    }
+    merged.push(number)
+    note(number, `merged (${sha})`)
+  }
+
+  for (const number of numbers) {
+    try {
+      await gatePr(number)
+    } catch (e) {
+      log.warning(`#${number}: error — ${e.message}`)
+      lines.push(`#${number}: error: ${e.message}`)
     }
   }
 
@@ -144,15 +189,17 @@ async function runGate({ api, event, payload, owner, repo, dryRun, log }) {
   // verify on main explicitly (workflow_dispatch is exempt from that rule). One
   // run covers every merge in this batch: it tests main's head.
   if (merged.length) {
-    const head = await api('GET /repos/{owner}/{repo}/branches/{branch}', { branch: 'main' })
-    const label = `${merged.map((n) => `#${n}`).join(', ')} (${head.commit.sha.slice(0, 7)})`
+    const list = merged.map((n) => `#${n}`).join(', ')
     try {
+      const head = await api('GET /repos/{owner}/{repo}/branches/{branch}', { branch: 'main' })
+      const label = `${list} (${head.commit.sha.slice(0, 7)})`
       await api('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
         workflow_id: 'ci.yml', ref: 'main', inputs: { merged: label },
       })
       log.info(`dispatched CI on main after ${label}`)
     } catch (e) {
-      log.warning(`could not dispatch CI on main: ${e.message}`)
+      log.warning(`could not dispatch CI on main after ${list}: ${e.message}`)
+      lines.push(`could not dispatch CI on main after ${list}: ${e.message}`)
     }
   }
   return { numbers, merged, lines }
@@ -177,6 +224,7 @@ module.exports.latestVerify = latestVerify
 module.exports.shouldComment = shouldComment
 module.exports.skipComment = skipComment
 module.exports.failComment = failComment
+module.exports.handbackComment = handbackComment
 module.exports.runGate = runGate
 
 if (require.main === module) {
