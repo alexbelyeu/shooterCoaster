@@ -20,7 +20,8 @@ jobs:
       github.event_name != 'deployment_status' ||
       (github.event.deployment_status.state == 'success' &&
        github.event.deployment.environment == 'Production')
-    runs-on: ubuntu-latest
+    # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
+    runs-on: ubuntu-24.04
     # The smoke grows with every level step (boss, waves, fireworks): it passed in 18 min
     # on 29 Oct and has hit a 20 min cap on every deploy since. Keep ~2x headroom.
     timeout-minutes: 40
