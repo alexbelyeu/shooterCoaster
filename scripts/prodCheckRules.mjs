@@ -1,17 +1,14 @@
-/**
- * Pure rules of the deploy health check (`e2e/prod-check.mjs`, #352): which files the deployed
- * build must serve, and what each response must look like. Unit-tested in prodCheckRules.test.ts.
- */
+/** Pure rules of the deploy health check (`e2e/prod-check.mjs`, #352). */
 import { headersFor } from './vercelRoutes.mjs'
 
-/** Vite's `[name]-[hash].[ext]` file name without its 8-character hash: `tone-BAgUArOt.js` → `tone.js`. */
+/** `tone-BAgUArOt.js` → `tone.js` (Vite's `[name]-[hash]`). */
 export function assetStem(file) {
   const base = file.split('/').pop()
   const m = base.match(/^(.+)-[\w-]{8}(\.\w+)$/)
   return m ? m[1] + m[2] : base
 }
 
-/** Site paths a page, stylesheet or chunk points at: `/assets/…`, `assets/…` (Vite's dep map) and `/fonts/…`. */
+/** `assets/…` without a leading slash is Vite's dep map. */
 export function assetRefs(text) {
   const refs = new Set()
   for (const m of text.matchAll(/(?<![\w/.-])\/?((?:assets|fonts)\/[\w.-]+\.(?:js|css|woff2?|png|jpe?g|svg|webp|wasm|json))/g)) {
@@ -20,10 +17,7 @@ export function assetRefs(text) {
   return refs
 }
 
-/**
- * Hashed files of the local build that the deployed build lacks, matched by stem (the deployed
- * hashes can differ: Vercel builds with its own env). Counts matter, so two `index.js` stay two.
- */
+/** Matched by stem, since Vercel's build env can change the hashes. */
 export function missingAssets(localAssets, deployedAssets) {
   const have = new Map()
   for (const p of deployedAssets) have.set(assetStem(p), (have.get(assetStem(p)) ?? 0) + 1)
@@ -54,11 +48,7 @@ const CONTENT_TYPES = {
 /** One unhashed file cached for a day or more outlives the deploy that replaces it. */
 const LONG_CACHE_S = 86400
 
-/**
- * What is wrong with one response for `pathname`: its status, its content type (a chunk answered with
- * HTML is the classic broken deploy), the headers vercel.json promises, and no long cache off `/assets/`.
- * `headers` is a lower-cased header map.
- */
+/** `headers` is lower-cased; a chunk answered with HTML (wrong content type) is the classic broken deploy. */
 export function responseProblems(pathname, { status, headers, bytes }, vercel, wantStatus = 200) {
   const problems = []
   if (status !== wantStatus) return [`${pathname}: HTTP ${status} (want ${wantStatus})`]

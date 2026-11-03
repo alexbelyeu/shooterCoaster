@@ -50,7 +50,6 @@ describe('whatHappened', () => {
   })
 })
 
-/** The GitHub API as github-script hands it over, backed by an in-memory issue list. */
 function fakeGitHub() {
   const issues: { number: number; title: string; body: string; state: string; labels: string[] }[] = []
   const comments: { issue: number; body: string }[] = []

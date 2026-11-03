@@ -1,8 +1,4 @@
-/**
- * How Vercel serves this static build from `vercel.json` (#193, #352): which file a path gets
- * and which headers come with it. Pure; `site.test.ts` checks the config against it and
- * `e2e/prod-check.mjs` checks the deployed site against it (and serves a local build by it).
- */
+/** How Vercel serves this static build from `vercel.json` (site.test.ts, e2e/prod-check.mjs). */
 
 /** Vercel `source` patterns as used here: literal paths plus `(.*)` groups (path-to-regexp). */
 export function sourceRegex(source) {
@@ -23,7 +19,6 @@ export function route(pathname, files, vercel) {
   return { status: 404, serves: '/404.html' }
 }
 
-/** The headers vercel.json adds to a path (later rules win). */
 export function headersFor(pathname, vercel) {
   const out = {}
   for (const rule of vercel.headers ?? []) {

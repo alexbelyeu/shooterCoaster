@@ -1,17 +1,8 @@
 name: Production smoke
 
-# Watches the live site (#352). Two suites, each with its own agent:prod-broken issue,
-# which the Maintainer handles first:
-# - deploy: after every production deployment, e2e/prod-check.mjs asks "did this deploy
-#   arrive intact?" (every file of the build served with its headers, routes, title, one
-#   level to a kill, a phone run). ~3 min. The full suite already passed in `verify` on the
-#   same commit.
-# - nightly: the full smoke against the live site, for CDN / runtime drift.
-# Each check runs under `timeout`, so a slow run fails with exit 124 and is reported as a
-# timeout ("no check failed"), not cancelled. scripts/prod-alert.cjs opens the suite's issue
-# only on a green → red transition, stays quiet while it is open, and closes it on the next
-# green run (unit tests: prod-alert.test.ts). A run superseded by a newer deploy is cancelled
-# by its concurrency group and reports nothing.
+# Watches the live site (#352; e2e/README.md "Production"): after every deploy, the deploy health check
+# (e2e/prod-check.mjs, ~3 min); nightly, the full smoke. scripts/prod-alert.cjs reports each on its own
+# agent:prod-broken issue, on green → red and red → green only. `timeout` turns a slow run into a reported timeout.
 
 on:
   deployment_status:
@@ -40,8 +31,7 @@ jobs:
        github.event.deployment_status.state == 'success' &&
        github.event.deployment.environment == 'Production') ||
       (github.event_name == 'workflow_dispatch' && inputs.suite == 'deploy')
-    # Job-level, so the deployment_status events that skip this job (pending, other states)
-    # never cancel a running check. Back-to-back deploys: only the newest one is checked.
+    # Job-level, so deployment_status events that skip the job (pending, other states) never cancel a running check.
     concurrency:
       group: prod-deploy-${{ github.event.deployment.environment || 'Production' }}
       cancel-in-progress: true
@@ -51,18 +41,16 @@ jobs:
     env:
       SITE_URL: https://scoaster.com
       CAP_MINUTES: 8
-      # The runner image's Chrome: no Playwright browser download or apt deps on this path.
+      # The runner image's Chrome: no Playwright download.
       SC_CHROME: /usr/bin/google-chrome
     steps:
-      # The deployed commit (deployment_status runs check out the deployment's sha).
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      # The file list to expect: the same build Vercel ran (VERCEL=1 includes analytics),
-      # matched to the deployed files by name without the hash.
+      # The files to expect: the build Vercel ran (VERCEL=1 includes analytics).
       - run: npx vite build
         env:
           VERCEL: '1'

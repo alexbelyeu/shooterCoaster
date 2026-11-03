@@ -1,15 +1,6 @@
-// Alerting for the production checks (.github/workflows/prod-smoke.yml, #352): one
-// `agent:prod-broken` issue per suite, opened on a green → red transition and closed with a
-// comment when that suite is green again. A red run while the issue is open says nothing, so
-// Alex gets one email per outage, not one per deploy. The issue is the state: no other record.
-//
-// Suites: `deploy` (e2e/prod-check.mjs after every production deploy) and `nightly` (the full
-// smoke against the live site). Each owns the issue carrying its marker; CI's red-main issue
-// carries none and is never touched here.
-//
-// Called from actions/github-script after the check step, with the step's exit code:
-//   0 = green, 124 / 137 = `timeout` stopped it at the cap (TERM, then KILL), anything else = red.
-// A cancelled run (superseded by a newer deploy) never reaches this script.
+// Alerting for the production suites (prod-smoke.yml, #352): one `agent:prod-broken` issue per suite, which is the
+// state. Opened on green → red, silent while open, closed on the next green run; CI's red-main issue is never touched.
+// EXIT_CODE is the check step's: 0 green, 124 / 137 stopped by `timeout` at the cap, anything else red.
 
 const fs = require('node:fs')
 
@@ -24,7 +15,6 @@ const SUITES = {
 
 const marker = (suite) => `<!-- prod-smoke:${suite} -->`
 
-/** The open issue this suite owns, if any. */
 function ownIssue(openIssues, suite) {
   return openIssues.find((i) => (i.body || '').includes(marker(suite)))
 }
@@ -35,16 +25,12 @@ function decide(red, issue) {
   return issue ? 'close' : 'none'
 }
 
-/**
- * The failed checks of a results file: prod-check.json (`{ checks, running }`) or the smoke's
- * results.json (an array). Each `{ id, problems }`.
- */
+/** From prod-check.json (`{ checks, running }`) or the smoke's results.json (an array). */
 function failedChecks(results) {
   const checks = Array.isArray(results) ? results : results?.checks ?? []
   return checks.filter((c) => !c.ok).map((c) => ({ id: c.id, problems: c.problems ?? [] }))
 }
 
-/** One paragraph on what went wrong: the checks that failed, or a timeout / crash with no failed check. */
 function whatHappened({ exitCode, capMinutes, results }) {
   const failed = failedChecks(results)
   const list = failed
@@ -87,7 +73,7 @@ function readResults(dir, suite) {
   }
 }
 
-/** Called from actions/github-script; `env` carries SUITE, EXIT_CODE, CAP_MINUTES, RESULTS_DIR. */
+/** Called from actions/github-script. */
 module.exports = async function run({ github, context, core, env = process.env }) {
   const suite = env.SUITE
   if (!SUITES[suite]) throw new Error(`unknown suite "${suite}"`)

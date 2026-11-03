@@ -1,27 +1,9 @@
 #!/usr/bin/env node
 /**
- * Deploy health check (#352): did this deploy arrive intact? Run after every production deploy
- * (.github/workflows/prod-smoke.yml); the full smoke already passed in `verify` on the same commit
- * and still runs against the live site nightly. Target ≤ 5 min on a CI runner.
- *
- * Checks, in order (each one line, `PASS` / `FAIL`):
- *   assets  every file of the local build (`--dist`, built from the deployed commit) is served: each
- *           file outside `assets/` at its path, each hashed chunk under its deployed name (matched by
- *           name without the hash, found by crawling the deployed page, stylesheets and chunks, lazy
- *           ones included). Each must answer 200 with its content type and the headers vercel.json
- *           sets (hashed `assets/` cached a year `immutable`, nothing else cached long).
- *   routes  `/go/<campaign>` serves the game page; an unknown path a real 404 with the 404 page.
- *   title   the title boots with no page error or failed request and its 3D scene isn't blank.
- *   level   `--level` (level1) rides, a real click fires, and its kills reach `enemy:killed`.
- *   phone   an iPhone-sized touch run: tap PLAY, tap the level card, taps at enemies get a kill.
- *
- * Writes `prod-check.json` to `--out` (e2e-results) after every check: `{ checks, running,
- * finished }`, so a run killed at its time cap still says how far it got (scripts/prod-alert.cjs
- * reads it). Screenshots: prod-title.png, prod-level.png, prod-phone.png.
- *
- * Usage:
+ * Deploy health check (#352): did this deploy arrive intact? Checks `assets`, `routes`, `title`, `level`, `phone`
+ * (what each covers: e2e/README.md "Production") and rewrites `prod-check.json` after each, for scripts/prod-alert.cjs.
  *   npm run build && node e2e/prod-check.mjs --url https://scoaster.com
- *   npm run build && node e2e/prod-check.mjs     # serve dist/ locally as Vercel would (vercel.json)
+ *   npm run build && node e2e/prod-check.mjs     # serves dist/ on localhost the way vercel.json says
  */
 import { devices } from 'playwright'
 import fs from 'node:fs'
@@ -49,7 +31,7 @@ fs.mkdirSync(OUT, { recursive: true })
 const report = { url: null, startedAt: new Date().toISOString(), running: null, finished: false, checks: [] }
 const save = () => fs.writeFileSync(path.join(OUT, 'prod-check.json'), JSON.stringify(report, null, 2))
 
-/** Runs one check, records it (a throw is a failed check, not a crash) and prints its line. */
+/** A throw is a failed check, not a crash. */
 async function check(id, fn) {
   report.running = id
   save()
@@ -68,7 +50,6 @@ async function check(id, fn) {
   console.log(`${problems.length ? 'FAIL' : 'PASS'} ${id.padEnd(7)} ${seconds.toFixed(0)}s${info.summary ? ` ${info.summary}` : ''}${problems.length ? ` — ${problems.slice(0, 8).join('; ')}` : ''}`)
 }
 
-/** Every file of the local build as its site path. */
 function distFiles() {
   return fs
     .readdirSync(DIST, { recursive: true, withFileTypes: true })
@@ -78,7 +59,6 @@ function distFiles() {
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain', '.xml': 'application/xml' }
 
-/** `dist/` served the way vercel.json says Vercel serves it, for a run without `--url`. */
 function serveDist() {
   const files = new Set(distFiles())
   const server = http.createServer((req, res) => {
@@ -112,7 +92,7 @@ async function assetsCheck(base) {
     }
     return todo
   }
-  // Crawl the deployed build from its page: the stylesheet names the fonts, the entry chunk's dep map every lazy chunk.
+  // The entry chunk's dep map names every lazy chunk; the stylesheet names the fonts.
   await fetchAll(['/index.html'])
   let frontier = ['/index.html']
   while (frontier.length) {
@@ -127,7 +107,7 @@ async function assetsCheck(base) {
   const deployedAssets = [...fetched.keys()].filter((p) => p.startsWith('/assets/'))
   for (const p of missingAssets(localAssets, deployedAssets)) problems.push(`${p}: no file of that name in the deployed build`)
   for (const [p, r] of fetched) problems.push(...responseProblems(p, r, vercel))
-  return { problems, summary: `${fetched.size} files (${deployedAssets.length} hashed, ${localAssets.length} in the local build)`, files: fetched.size }
+  return { problems, summary: `${fetched.size} files (${deployedAssets.length} hashed, ${localAssets.length} in the local build)` }
 }
 
 async function routesCheck(base) {
@@ -144,7 +124,6 @@ async function routesCheck(base) {
   return { problems }
 }
 
-/** A page with the hook, collecting page errors, console errors and failed same-origin requests. */
 async function openPage(browser, base, query, options = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, ...options })
   const page = await ctx.newPage()
@@ -162,7 +141,6 @@ async function openPage(browser, base, query, options = {}) {
 const hookErrors = (page) => page.evaluate(() => window.__SC_TEST__.errors)
 const stats = (page) => page.evaluate(() => window.__SC_TEST__.stats())
 
-/** Poll `check()` every 500 ms for up to `ms`. */
 async function pollFor(page, check, ms) {
   const until = Date.now() + ms
   while (!(await check())) {
@@ -190,7 +168,6 @@ async function titleCheck(browser, base) {
   return { problems, summary: `frames=${wait.frames} in ${(wait.ms / 1000).toFixed(0)}s` }
 }
 
-/** killNearest(3) (one real shot, hits through the bullet pool's processHit) must reach `enemy:killed`. */
 async function killProblems(page) {
   const killEvents = () => page.evaluate(() => window.__SC_TEST__.combat.kills)
   const before = await killEvents()
@@ -230,8 +207,7 @@ async function phoneCheck(browser, base) {
   await page.locator(`.level-card[data-level="${LEVEL}"]`).tap({ timeout: 30000 })
   if (!(await phase('playing', 15000))) problems.push('tapping the level card did not start the level')
   if (!(await pollFor(page, async () => (await stats(page)).onScreenEnemies > 0, 40000))) problems.push('no enemy on screen')
-  // Real taps at enemies must fire; whether a tapped bullet lands depends on the software frame rate, and the
-  // nightly full smoke gates touch aim assist, so the kill here comes through the bullet pool's hit path.
+  // Taps must fire; whether a tapped bullet lands depends on the software frame rate (the nightly smoke gates aim assist).
   const before = await stats(page)
   for (let i = 0; i < 3; i++) {
     const [pt] = await page.evaluate(() => window.__SC_TEST__.enemyScreenPoints(1))
