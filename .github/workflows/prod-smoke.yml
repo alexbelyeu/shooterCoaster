@@ -41,8 +41,6 @@ jobs:
     env:
       SITE_URL: https://scoaster.com
       CAP_MINUTES: 8
-      # The runner image's Chrome: no Playwright download.
-      SC_CHROME: /usr/bin/google-chrome
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,6 +48,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       # The files to expect: the build Vercel ran (VERCEL=1 includes analytics).
       - run: npx vite build
         env:

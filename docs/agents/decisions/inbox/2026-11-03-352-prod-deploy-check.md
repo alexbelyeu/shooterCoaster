@@ -9,7 +9,6 @@ is cancelled and says nothing. `scripts/prod-alert.cjs` keeps one `agent:prod-br
 state: it opens on green → red, stays silent while open and closes on the next green run. Choices that look arbitrary:
 - The deploy check's kills go through `killNearest` (the bullet pool's hit path). Whether a tapped bullet lands depends on
   the software frame rate, and the nightly smoke and `verify` already gate touch aim assist.
-- The deploy job uses the runner image's Chrome (`SC_CHROME=/usr/bin/google-chrome`), so there's no Playwright download.
 - The files to expect come from a local `VERCEL=1` build of the deployed commit, matched to the deployed files by name
   without the hash, because Vercel's hashes can differ.
 - CI's red-`main` report never comments on a production suite's issue, because that issue closes itself when prod goes green.
