@@ -19,7 +19,7 @@ What the game is **not** yet: three of five levels still end on a timer (Desert,
 Antarctica, Inferno have no finale); the Ocean opens on an empty sea and its water reads
 as a khaki bog; far rails draw as bold white cables across every bright level; Inferno has
 a glowing vertical slab beside the track; the music does not react to play. The studio's
-own health this morning: CI red on every PR for a runner-image reason (#311 / PR #313),
+own health this morning: CI red on every PR for a runner-image reason (#311; fixed by PR #313 at 18:18 UTC),
 and the smoke's level steps sample wall-clock level time, so slow runners fail the perf
 gate and reach bosses early (#305 / PR #312, which found the Ocean opening problem #250 →
 #316). Week 3 leads with those two, then the finales, the Ocean, and the first slice of
@@ -142,8 +142,8 @@ on 9 mobile visitors); ≈ 5 visitors and ≈ 1 start a day is the baseline the 
 
 ## Known bugs and visual problems (ranked)
 
-1. **CI red on every PR since 2 Nov 10:43 UTC**: `ubuntu-latest` became Ubuntu 26.04 and
-   Playwright 1.58's `--with-deps` refuses it. #311, PR #313 pins `ubuntu-24.04`.
+1. **Fixed: CI was red on every PR 2 Nov 10:43–18:18 UTC**: `ubuntu-latest` became Ubuntu 26.04
+   and Playwright 1.58's `--with-deps` refuses it. #311 (closed); PR #313 pinned `ubuntu-24.04`.
 2. **Smoke level steps sample wall-clock level time** (#305, PR #312): slow runners sample
    20–50 s into a level, fail the perf gate on enemy counts, reach the Kraken during
    `playLevel`, and overshoot `hidden-pause`'s 3 s slack. The production smoke issue #297
