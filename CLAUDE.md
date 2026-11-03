@@ -25,7 +25,7 @@ npm run build             # typecheck (tsc -b) + production build -> dist/
 npm run build:portal      # the web-portal build (itch.io / Newgrounds / CrazyGames): relative paths, no analytics or share card -> dist-portal/ + dist-portal.zip (checked by scripts/portal/rules.mjs; needs the zip CLI)
 npm run check:bundle      # bundle-size budget (budgets.json); also prints the startup JS (what index.html loads)
 npm run smoke             # headless playtest: title + every level + phone touch run (needs a build)
-npm run smoke:portal      # smoke the portal build served under /nested/path/ (title + level1 checks; CI `portal` job; needs build:portal)
+npm run smoke:portal      # smoke the portal build served under /nested/path/ (title + level1 checks; CI `portal` job, which then keeps the zip as the 30-day artifact `dist-portal`; needs build:portal)
 npm run lighthouse        # Lighthouse on dist/ (vite preview), mobile + desktop: fails below SEO 100, Accessibility / Best Practices 95; Performance printed only (needs a build + SC_CHROME; e2e-results/lighthouse.json; docs/marketing/SEO.md)
 npm run verify            # test + build + bundle budget + lighthouse + smoke — run before every PR
 bash scripts/quiet.sh <cmd>    # run any noisy command with its output in a log file: prints status (+ failures and tail on error)
