@@ -1,8 +1,9 @@
 # Vision — ShooterCoaster
 
 _Owned by the Director. v1 written by the first Director run (2026-10-19); v2 on
-2026-10-26 (M1 closed, M2 brought forward, launch-week framing). Rewritten or amended
-weekly; direction changes are logged in DECISIONS.md._
+2026-10-26 (M1 closed, M2 brought forward, launch-week framing); v3 on 2026-11-02 (M2
+closing on two items, M3 opened a week early with the finales and Level 6, milestones on
+GitHub). Rewritten or amended weekly; direction changes are logged in DECISIONS.md._
 
 ## Elevator pitch
 
@@ -78,6 +79,10 @@ highlights; landmarks are 2× the size that feels right on paper
 
 ## Roadmap
 
+The roadmap runs as **GitHub milestones** (Alex, #192): this file keeps each milestone's
+exit criteria; the milestone on GitHub is its issue set and progress bar. The Director
+owns both (PROTOCOL.md "Milestones").
+
 ### M1 — "Looks and feels like a game" — **done 2026-10-26** (one week)
 
 Every exit criterion is met on `main` @ 51a5165: per-biome sky dome, lighting, fog,
@@ -88,11 +93,15 @@ select redesigned; touch end-to-end with aim assist; combat + results + mobile
 screenshots in the smoke; per-biome modules; 36 vitest files. The one leftover,
 death variety (#29), moves into M2.
 
-### M2 — "The arcade loop and the finale" (weeks 2–3, ends ~2026-11-08)
+### M2 — "The arcade loop and the finale" (weeks 2–3, due 2026-11-08; GitHub milestone 1)
 
-**Week 2 (26 Oct – 1 Nov) is launch week**: the first public post (three.js Showcase,
-Mon 2 Nov) goes out at the end of it, so everything that lands must make the *first
-run on Theme Park* better and nothing may make `main` less stable.
+**Status 2026-11-02:** every criterion below is on `main` except two: the local
+leaderboard (#317, the finished branch re-landed on today's `main`) and a smoke that is
+green on `main` (#305 / PR #312 with #316, the Ocean opening). CI is red for a runner-image
+reason (#311 / PR #313). M2 closes when those merge; the Director closes the milestone.
+
+Week 2 (26 Oct – 1 Nov) was launch week: 54 code PRs landed and the first public post
+(three.js Showcase, #102) is in Alex's hands on Mon 2 Nov.
 
 Exit criteria:
 - Combo tiers with break feedback and slow-mo at the top tier; the window runs on
@@ -109,21 +118,38 @@ Exit criteria:
   on `sceneStats()` per level.
 - Launch tooling: `npm run clip`, share button, `/go/` campaign paths, indexable text.
 
-### M3 — "Depth and spectacle" (weeks 4–7)
+### M3 — "Depth and spectacle" (weeks 3–7, 2 Nov – 6 Dec; GitHub milestone 2)
 
-- Level 6 **Neon Metropolis** as a full vertical slice (new biome, enemies, helicopter
-  boss, synthwave music), then levels 7–8 (candidates: Jungle Ruins, Sky Harbour,
-  Haunted Mine).
-- The remaining finales (Giant Scorpion, Yeti, Magma Titan).
-- Track set-pieces: tunnels, loops with camera roll, drops with FOV kick and speed lines.
-- "Night Ride" variants of existing levels (time-of-day lighting + grade presets).
-- Positional audio, per-biome acoustics, a wind/speed bed; gamepad; photo mode; a drone
-  orbit behind the results screen.
-- Weather and ambient particle fields everywhere; fog tinted by the sky in the view
-  direction; spatial chunking + fog-distance cut for whole-level instanced meshes.
-- Portal build (itch.io / Newgrounds / CrazyGames); ghost replays (local) and, if Alex
-  approves a backend, online leaderboards.
-- Lazy-load Tone.js; code-split per-level chunks; loading screen.
+Opened a week early on 2026-11-02 because M2's content was done and the queue needed
+player-facing work. Week 3 (2–8 Nov) is **finales + the Ocean + the first city slice**;
+every merged PR must still leave the game better on its own (the Showcase thread is live
+this week).
+
+Exit criteria:
+- Every one of the five levels ends on a boss: Giant Scorpion (#318), Yeti (#319), Magma
+  Titan (#320) join the Blimp and the Kraken.
+- Level 6 **Neon Metropolis** as a full vertical slice (epic #322: city biome + drones #323,
+  traffic + billboard bots #324, helicopter boss #325, a synthwave score). Levels 7–8
+  (Jungle Ruins, Sky Harbour, Haunted Mine) are M4 candidates.
+- The Ocean looks like water (#326) and opens with enemies in view (#316); Inferno's lava
+  lies in the ground (#331); far rails recede (#327).
+- Track set-pieces: tunnels with interior lights and a loop with camera roll (#332); a swoop
+  intro and a results orbit (#328).
+- Audio (Alex's priority): the score engine has intensity layers driven by the combo
+  (#321), Alex's picked themes are the defaults (#302), levels 2–5 have picked themes
+  (#303), boss / results variations, and Tone.js is gone at parity (epic #212).
+- Levels 4 and 5 under the 250 draw-call bar (#260); the smoke green on `main` three days
+  running.
+- Portal listings live (itch.io first; #307 makes the zip downloadable); the share menu
+  (#271) and a share image (#272).
+- Measured: the Showcase week's start rate against the W44 baseline decides the
+  PLAY-straight-to-ride experiment (#329, held until 9 Nov).
+
+Also in M3 when the above is on track: "Night Ride" variants; positional audio and
+per-biome acoustics on the new engine; gamepad; photo mode; weather pulses (blizzard,
+sandstorm); fog tinted by the sky in the view direction; spatial chunking + fog-distance
+cut for whole-level instanced meshes; ghost replays (local); online leaderboards only if
+Alex approves a backend; a loading screen.
 
 ### M4 — "Ship quality" (ongoing after M3)
 
@@ -136,61 +162,49 @@ Exit criteria:
 ## Idea backlog (pre-approved; builders may pull from the top when `agent:ready` is empty)
 
 Ranked. Each must still be filed as an issue by whoever picks it up, following the
-issue contract in PROTOCOL.md. Items that are already filed as issues this week are
-not repeated here (bosses for Theme Park and Ocean, fireworks, combo tiers,
-choreography, death variety, pickups, leaderboard, daily run, pause, settings, perf
-gate, lazy Tone, rail thickness, the three screenshot bugs).
+issue contract in PROTOCOL.md, with the milestone set. Items filed as issues this week are
+not repeated here (the three finales, Level 6's children, Ocean water, far rails, the
+lava wall, swoop + orbit, tunnels + loop, audio layers, PLAY-to-ride, milestone tooling).
 
-1. **Giant Scorpion finale (Desert)** — rises from the dunes at the last wave;
-   weak point: the tail stinger; segments break off per hit.
-2. **Yeti finale (Antarctica)** — hurls snowballs that must be shot down; weak point
-   the chest when it roars.
-3. **Magma Titan finale (Inferno)** — climbs out of the lava river on the final
-   eruption; cracks glow brighter as HP drops.
-4. **Positional kill and hit sounds** — pan + low-pass from the enemy position at
-   trigger time through one pooled panner per kit (slop `audio-system.js`).
-5. **Drone orbit behind the results screen + a 2–3 s swoop intro per level** — a
-   second camera preset used only outside `playing`; never moves the ride camera.
+1. **Kraken presence pass** — the tentacles read as thin pale hooks in the rails' blue
+   (`level3-boss.png`): thicker, darker tentacles with bright sucker pads, a bigger head,
+   a splash that reaches the camera; same spec and framework, no new mechanics.
+2. **Boss music variations** — on the score engine, each level's theme gets a darker,
+   louder boss section that the player switches to on `boss:spawn` (sound bible "Boss /
+   finale" row); after the layers issue (#321). `type:audio`.
+3. **Whale set-piece (Ocean)** — a huge low-poly whale breaches across the track at
+   ~30 s; camera shake, splash particles. Scenery, not a target.
+4. **Blizzard / sandstorm waves** — a weather pulse (fog near distance + particle burst)
+   tied to one wave per level (Antarctica's brutes, Desert's second crows); readability
+   must survive it.
+5. **Positional kill and hit sounds on the arcade engine** — the engine already pans and
+   low-passes by world position; make every hit / kill / boss cue use it, and add the
+   per-biome acoustics send tuning (desert slapback, open sea, cavernous Inferno).
 6. **Gamepad** — right stick as a virtual cursor, RT fire, Start pause, A/B in menus
    (~60 lines, dead zone + analog triggers + edge suppression).
 7. **Photo mode** — pause, hide the HUD, orbit + zoom, PNG save; feeds the Marketer's
-   share images.
-8. **Whale set-piece (Ocean)** — a huge low-poly whale breaches across the track at
-   ~40 s; camera shake, splash particles.
-9. **Blizzard / sandstorm waves** — a weather pulse (fog near distance + particle
-   burst) tied to one wave per level; readability must survive it.
-10. **Level 6: Neon Metropolis** — street canyons on a procedural grid, instanced
-   traffic as scenery, emissive signage, hover drones and billboard bots, helicopter
-   boss, synthwave music (merges the earlier "Neon Night City" with Alex's city idea).
-11. **Track set-pieces** — tunnel segments (instanced arches with interior lights),
-   loop-the-loop curve type with camera roll.
-12. **Night Ride variants** — the same level with a night lighting/grade preset and
-   emissive props; selectable from the level card once the level has 3★.
-13. **Track-progress radar** — a cached offscreen-canvas minimap of the track with the
+   share images (after #272).
+8. **Night Ride variants** — the same level with a night lighting/grade preset and
+   emissive props; selectable from the level card once the level has 3★. Start from
+   Neon Metropolis's night atmosphere.
+9. **Track-progress radar** — a cached offscreen-canvas minimap of the track with the
    coaster and enemies as dots; hidden in portrait.
-14. **Fog tinted by the sky in the view direction** — GLSL patch applied through one
+10. **Fog tinted by the sky in the view direction** — GLSL patch applied through one
     shared `onBeforeCompile` helper (touches every material; measure first).
-15. **Spatial chunking + fog-distance cut** for whole-level InstancedMeshes; only
-    after `sceneStats()` shows a level over budget.
-16. **Per-biome acoustics** — one procedural impulse response + convolver send
-    (desert slapback, dry open sea, cavernous Inferno).
-17. **Wind/speed bed with gust modulation** replacing the per-frame `rampTo` whoosh.
-18. **Baked one-shot SFX buffers + voice budget** — bake kits to AudioBuffers at
-    `prepareLevelSFX`, play each trigger as a native `AudioBufferSourceNode`; priority
-    stealing, device-aware voice limits. Changes the "no Tone nodes in play functions"
-    rule, so it needs a decisions-inbox entry. After launch.
-19. **Level 7: Jungle Ruins** — mist, temples, vines, toucans and spider swarms.
-20. **Level 8: Sky Harbour** — floating islands, airships, cloud layer below the track.
-21. **Loading screen** — branded progress on boot (the per-level warm-up already runs
+11. **Spatial chunking + fog-distance cut** for whole-level InstancedMeshes; only
+    after #260 shows batching alone can't hold levels 4–5 under 250 draws.
+12. **Level 7: Jungle Ruins** — mist, temples, vines, toucans and spider swarms (M4).
+13. **Level 8: Sky Harbour** — floating islands, airships, cloud layer below the track (M4).
+14. **Loading screen** — branded progress on boot (the per-level warm-up already runs
     behind the countdown).
-22. **Reduced-motion & colour-blind modes** — settings toggles; enemy palettes
-    verified for deuteranopia.
-23. **Share screenshot** — results screen button renders a branded PNG of the final frame.
-24. **Ghost replay (local)** — record aim/fire timeline, replay as a translucent crosshair.
-25. **WebGPU capability event** — one anonymous `webgpu: yes/no` analytics event per
-    visitor after launch, so the renderer decision can be made on real data.
-26. **Online leaderboard** — **needs Alex's decision on a backend** (rule 4: no new paid
+15. **Colour-blind safe enemy palettes** — verified for deuteranopia (reduced motion exists).
+16. **Ghost replay (local)** — record aim/fire timeline, replay as a translucent crosshair.
+17. **WebGPU capability event** — one anonymous `webgpu: yes/no` analytics event per
+    visitor, so the renderer decision can be made on real data.
+18. **Online leaderboard** — **needs Alex's decision on a backend** (rule 4: no new paid
     services). Candidates: Vercel KV / Supabase free tier.
+19. **Remove Tone.js** — once every level, the title and the results play on the score
+    engine within the sound bible's targets (epic #212's last child).
 
 Not doing (from the slop-newyork review, #126): unpinned three.js from a CDN,
 city-scale geodata, SSR / clustered lighting / cascaded shadows, leaf-card trees, FFT

@@ -46,6 +46,7 @@ voiced around the voice's `center`, `x X o .` a drum lane. Every bar must add up
 | What | Original | ShooterCoaster |
 |---|---|---|
 | Where scores live | pasted into the page | `src/audio/scores/<id>.scrim`: `title`, one per level id (`level1`…), `results`; listed in `scores/index.ts` |
+| Theme options | — | `scores/themes/<slot>.<name>.scrim`: candidate themes for a slot, waiting on Alex's pick (sound bible "taste gate"). `?audio=scrim&theme=<name>[,<name>]` plays each named option in its slot's place (`themesFromQuery`, `scoreIdFor`), arcade SFX included (each option has its own `SCORE_KEYS` entry); the default never changes. Render one with `--music <slot>.<name> --engine scrim` |
 | Where it plays | its own `AudioContext`, to the speakers | Tone's context, into its own stereo music channel (`AudioEngine.scoreChannel`): music volume, the slow-mo low-pass duck and the master limiter apply |
 | Mix bus | `jukebox` voicing: master 0.72 → +2 dB low shelf @180 Hz → −2.5 dB high shelf @7.5 kHz → compressor (−15 dB, 3.2:1) → limiter (−3 dB) → out 1.0 (≈ −9.5 LUFS) | `game` voicing (`GAME_VOICING` in `synth.ts`): 24 dB/oct high-pass at 32 Hz first, the same EQ and compressor, then a −6 dB limiter and out 0.53, so a score lands at −18…−16 LUFS through the music channel with true peaks near −9 dBTP |
 | Track changes | stop with a 60 ms fade | 1 s crossfade on a `musicBus` gain, like the Tone.js music |
@@ -111,10 +112,13 @@ These are not enforced by the compiler; `src/audio/scores/scores.test.ts` checks
 ## Hearing and rendering it
 
 - In the game: add `?audio=scrim` to the URL (e.g. `https://scoaster.com/?audio=scrim`).
-  Title, level and results music switch to the score engine; SFX stay as they are.
-- `npm run audio:render -- --music <title|level1..5|results> --engine scrim`: a score
-  through the game's music chain (`docs/audio/renders/scrim-music-*`).
+  Title, level and results music switch to the score engine, and the SFX to the arcade engine.
+  Add `&theme=<name>` for a theme option (e.g. `?audio=scrim&theme=neon,carousel`).
+- `npm run audio:render -- --music <title|level1..5|results|<slot>.<name>> --engine scrim`: a score
+  through the game's music chain (`docs/audio/renders/scrim-music-*`). Add `--seam` to start
+  10 s before the first loop seam, so the render crosses it (a 32-bar loop is longer than a
+  30 s render).
 - `npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original]
   [--voicing jukebox|game]`: one score alone through the port, or through the original
   page for comparison. Add `--chain game` to play a score file through the game's music
-  chain instead, measured like a level's score.
+  chain instead, measured like a level's score (`--seam` works here too).

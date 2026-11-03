@@ -1,11 +1,12 @@
 import { useRef, useMemo, useState, useCallback, useEffect, useLayoutEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Sky, PerspectiveCamera, Sparkles, Float } from '@react-three/drei'
+import { Sky, PerspectiveCamera, Float } from '@react-three/drei'
 import * as THREE from 'three'
 import { createRng } from '@/utils/rng'
 import FerrisWheel from '@/levels/environments/FerrisWheel'
 import Carousel from '@/levels/environments/Carousel'
 import { titleCameraPose, type Vec3 } from './titleCamera'
+import TitleSparkles from './TitleSparkles'
 import { isUiTarget } from '@/input/pointerInput'
 import { markStartup } from '@/core/startupMarks'
 
@@ -397,8 +398,7 @@ export default function TitleScene() {
       <StringLights />
       <Balloons />
 
-      {/* Sparkles for magical atmosphere */}
-      <Sparkles count={80} scale={200} size={4} speed={0.4} color="#ffd700" />
+      <TitleSparkles />
 
       {/* Click-to-pop raycaster */}
       <TitleClickRaycaster />
