@@ -1,32 +1,107 @@
 name: Production smoke
 
-# Runs the headless smoke test against the live site after every production
-# deployment and nightly. On failure, opens (or comments on) an issue labelled
-# agent:prod-broken, which the Maintainer handles first.
+# Watches the live site (#352). Two suites, each with its own agent:prod-broken issue,
+# which the Maintainer handles first:
+# - deploy: after every production deployment, e2e/prod-check.mjs asks "did this deploy
+#   arrive intact?" (every file of the build served with its headers, routes, title, one
+#   level to a kill, a phone run). ~3 min. The full suite already passed in `verify` on the
+#   same commit.
+# - nightly: the full smoke against the live site, for CDN / runtime drift.
+# Each check runs under `timeout`, so a slow run fails with exit 124 and is reported as a
+# timeout ("no check failed"), not cancelled. scripts/prod-alert.cjs opens the suite's issue
+# only on a green → red transition, stays quiet while it is open, and closes it on the next
+# green run (unit tests: prod-alert.test.ts). A run superseded by a newer deploy is cancelled
+# by its concurrency group and reports nothing.
 
 on:
   deployment_status:
   schedule:
     - cron: '0 6 * * *' # 02:00 New York (EDT)
   workflow_dispatch:
+    inputs:
+      suite:
+        description: deploy (the post-deploy health check) or nightly (the full smoke)
+        type: choice
+        options: [deploy, nightly]
+        default: deploy
+      dry_run:
+        description: Run the checks but open or close no issue
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   issues: write
 
 jobs:
-  smoke:
+  deploy:
     if: >
-      github.event_name != 'deployment_status' ||
-      (github.event.deployment_status.state == 'success' &&
-       github.event.deployment.environment == 'Production')
+      (github.event_name == 'deployment_status' &&
+       github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Production') ||
+      (github.event_name == 'workflow_dispatch' && inputs.suite == 'deploy')
+    # Job-level, so the deployment_status events that skip this job (pending, other states)
+    # never cancel a running check. Back-to-back deploys: only the newest one is checked.
+    concurrency:
+      group: prod-deploy-${{ github.event.deployment.environment || 'Production' }}
+      cancel-in-progress: true
     # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
     runs-on: ubuntu-24.04
-    # The smoke grows with every level step (boss, waves, fireworks): it passed in 18 min
-    # on 29 Oct and has hit a 20 min cap on every deploy since. Keep ~2x headroom.
-    timeout-minutes: 40
+    timeout-minutes: 15
     env:
       SITE_URL: https://scoaster.com
+      CAP_MINUTES: 8
+      # The runner image's Chrome: no Playwright browser download or apt deps on this path.
+      SC_CHROME: /usr/bin/google-chrome
+    steps:
+      # The deployed commit (deployment_status runs check out the deployment's sha).
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The file list to expect: the same build Vercel ran (VERCEL=1 includes analytics),
+      # matched to the deployed files by name without the hash.
+      - run: npx vite build
+        env:
+          VERCEL: '1'
+      - name: Deploy health check
+        id: check
+        run: |
+          set +e
+          timeout --kill-after=30s "${CAP_MINUTES}m" node e2e/prod-check.mjs --url "$SITE_URL"
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.check.outcome == 'success' }}
+        with:
+          name: prod-check-results
+          path: e2e-results/
+          retention-days: 14
+      - name: Report
+        if: ${{ !cancelled() && steps.check.outcome == 'success' && !inputs.dry_run }}
+        uses: actions/github-script@v7
+        env:
+          SUITE: deploy
+          EXIT_CODE: ${{ steps.check.outputs.exit_code }}
+        with:
+          script: |
+            const run = require(`${process.env.GITHUB_WORKSPACE}/scripts/prod-alert.cjs`)
+            await run({ github, context, core })
+      - name: Fail a red check
+        if: ${{ steps.check.outputs.exit_code != '0' }}
+        run: exit 1
+
+  nightly:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.suite == 'nightly')
+    concurrency:
+      group: prod-nightly
+      cancel-in-progress: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    env:
+      SITE_URL: https://scoaster.com
+      CAP_MINUTES: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,37 +111,27 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Smoke test production
-        # Step cap below the job cap: a slow smoke then fails this step (so `failure()` reports
-        # it) and the artifact upload still has time to run.
-        timeout-minutes: 32
-        run: npm run smoke -- --url "$SITE_URL" --seconds 10
+        id: check
+        run: |
+          set +e
+          timeout --kill-after=30s "${CAP_MINUTES}m" node e2e/smoke.mjs --mobile --url "$SITE_URL" --seconds 10
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() && steps.check.outcome == 'success' }}
         with:
           name: prod-e2e-results
           path: e2e-results/
           retention-days: 14
-      - name: Report failure
-        # A run that hits timeout-minutes ends `cancelled`, not `failure`: report it too, or
-        # production goes unwatched without anyone noticing (no concurrency group here, so
-        # nothing else cancels this job).
-        if: failure() || cancelled()
+      - name: Report
+        if: ${{ !cancelled() && steps.check.outcome == 'success' && !inputs.dry_run }}
         uses: actions/github-script@v7
+        env:
+          SUITE: nightly
+          EXIT_CODE: ${{ steps.check.outputs.exit_code }}
         with:
           script: |
-            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
-            const open = await github.rest.issues.listForRepo({
-              ...context.repo, state: 'open', labels: 'agent:prod-broken',
-            })
-            const outcome = '${{ job.status }}' === 'cancelled' ? 'timed out or was cancelled' : 'failed'
-            const body = `Production smoke test ${outcome} (${context.eventName}, ${context.sha}).\nRun: ${run}\nArtifacts include screenshots and results.json.`
-            if (open.data.length) {
-              await github.rest.issues.createComment({ ...context.repo, issue_number: open.data[0].number, body })
-            } else {
-              await github.rest.issues.create({
-                ...context.repo,
-                title: 'Production smoke test failing',
-                body,
-                labels: ['agent:prod-broken', 'P1', 'type:bug'],
-              })
-            }
+            const run = require(`${process.env.GITHUB_WORKSPACE}/scripts/prod-alert.cjs`)
+            await run({ github, context, core })
+      - name: Fail a red check
+        if: ${{ steps.check.outputs.exit_code != '0' }}
+        run: exit 1

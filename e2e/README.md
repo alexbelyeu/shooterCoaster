@@ -110,6 +110,31 @@ vary) and on the scene / track objects and triangles (+15%); a level past one fa
 (`perfGate` in `results.json`). A level whose entry has `knownOver: "#<open issue>"` only prints a WARN line until that issue lands
 (then drop the key). `--no-perf-gate` skips the gate for local experiments. Ceilings are budgets: only the Director raises them.
 
+## Production (`.github/workflows/prod-smoke.yml`, #352)
+
+Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it hit its cap):
+
+- **Deploy health check** after every production deploy (`deployment_status`, 8 min cap, ~3 min): `npm run prod-check -- --url <site>`
+  (`e2e/prod-check.mjs`). The full smoke already passed in `verify` on the deployed commit; this asks whether the deploy
+  arrived intact. It needs a local build of that commit (CI: `VERCEL=1 npx vite build`) for the list of files to expect.
+  `assets`: every file of `dist/` outside `assets/` at its path, and every hashed chunk under its deployed name (matched by
+  name without the hash; the deployed names come from crawling the deployed page, stylesheet and chunks, so the lazy Tone /
+  scrim / arcade chunks are found through the entry chunk's dep map), each 200 with its content type and the headers
+  `vercel.json` sets (`scripts/vercelRoutes.mjs`: hashed `assets/` a year `immutable`, nothing else cached a day or more);
+  `routes`: `/go/prod-check` is the game page, an unknown path a real 404 with `404.html`; `title`: boots with no page error
+  or failed same-origin request, the 3D scene not blank (`prod-title.png`); `level`: level1 rides, a real click fires,
+  `killNearest(3)` reaches `enemy:killed` (`prod-level.png`); `phone`: iPhone 13 portrait, tap PLAY, tap the level1 card,
+  3 taps at enemies fire, a kill (`prod-phone.png`). Rules in pure `scripts/prodCheckRules.mjs`. Writes `prod-check.json`
+  (`checks`, `running`, `finished`) after every check, so a run stopped at its cap still says where it was. Without
+  `--url` it serves `--dist` (default `dist/`) on localhost the way `vercel.json` says Vercel would, for local runs.
+  Back-to-back deploys: the job's concurrency group cancels the older run, which reports nothing.
+- **Nightly full smoke** (06:00 UTC, 60 min cap): `node e2e/smoke.mjs --mobile --url <site> --seconds 10`.
+
+`scripts/prod-alert.cjs` reports both: one `agent:prod-broken` issue per suite (marked `<!-- prod-smoke:<suite> -->`),
+opened on a green → red transition with the failed checks (or "timed out after N min, no check failed"), silent while it
+stays open, commented on and closed by the next green run of that suite. CI's red-`main` issue is separate. Manual runs:
+Actions → Production smoke → `suite` (deploy / nightly), `dry_run` to open or close nothing.
+
 
 ## Test hook (`?e2e=1` → `window.__SC_TEST__`)
 
