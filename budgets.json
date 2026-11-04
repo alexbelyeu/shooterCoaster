@@ -3,14 +3,14 @@
   "jsTotalGzipKB": 700,
   "jsLargestChunkGzipKB": 260,
   "smokeSeconds": {
-    "_comment": "Wall time of each CI smoke shard (e2e/shards.mjs), checked by the smoke on CI (#353): ~1.4x its time on #364's CI run (2026-11-04), rounded up to 30 s; mobile, the longest, 1.3x so no shard can push verify far past 10 min unnoticed.",
-    "ui": 180,
-    "level1": 300,
-    "level1-steps": 450,
-    "level2": 480,
-    "level3": 360,
-    "level4": 240,
-    "level5": 180,
+    "_comment": "Wall time of each CI smoke shard (e2e/shards.mjs), checked by the smoke on CI (#353): 1.5x the slower of two CI runs on #364 (2026-11-04; short shards swung ~50%), rounded up to 30 s; mobile, steady and the longest, 1.3x so verify can't drift far past 10 min unnoticed.",
+    "ui": 300,
+    "level1": 480,
+    "level1-steps": 480,
+    "level2": 510,
+    "level3": 390,
+    "level4": 270,
+    "level5": 240,
     "mobile": 600
   },
   "scene": {
