@@ -1,43 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { headersFor as vercelHeaders, route as vercelRoute } from './vercelRoutes.mjs'
 
 // What scoaster.com serves around the game (#193); the limits come from docs/marketing/SEO.md.
 
 const root = path.resolve(__dirname, '..')
 const read = (file: string) => fs.readFileSync(path.join(root, file))
 const html = read('index.html').toString()
-const vercel = JSON.parse(read('vercel.json').toString()) as {
-  rewrites: { source: string; destination: string }[]
-  headers: { source: string; headers: { key: string; value: string }[] }[]
-}
+const vercel = JSON.parse(read('vercel.json').toString())
 
-/** Vercel `source` patterns as used here: literal paths plus `(.*)` groups (path-to-regexp). */
-function sourceRegex(source: string): RegExp {
-  expect(source.replace(/\(\.\*\)/g, '')).toMatch(/^[\w/.-]*$/)
-  return new RegExp(`^${source.replace(/[.]/g, '\\.').replace(/\\\.\*/g, '.*')}$`)
-}
-
-/** Vercel's order for a static build: a file in the output, else the first matching rewrite, else 404.html with a 404. */
-function route(pathname: string, files: Set<string>): { status: number; serves: string } {
-  const file = pathname === '/' ? '/index.html' : pathname
-  if (files.has(file)) return { status: 200, serves: file }
-  for (const { source, destination } of vercel.rewrites) {
-    const match = pathname.match(sourceRegex(source))
-    if (!match) continue
-    const target = destination.replace(/\$(\d)/g, (_, i) => match[Number(i)])
-    if (files.has(target)) return { status: 200, serves: target }
-  }
-  return { status: 404, serves: '/404.html' }
-}
-
-function headersFor(pathname: string): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const rule of vercel.headers) {
-    if (sourceRegex(rule.source).test(pathname)) for (const h of rule.headers) out[h.key] = h.value
-  }
-  return out
-}
+const route = (pathname: string, files: Set<string>) => vercelRoute(pathname, files, vercel) as { status: number; serves: string }
+const headersFor = (pathname: string) => vercelHeaders(pathname, vercel) as Record<string, string>
 
 /** Every file of public/ as it lands in dist/, plus the built page and one hashed bundle. */
 function siteFiles(): Set<string> {
