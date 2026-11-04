@@ -13,7 +13,10 @@ over 300–3600, at most 3 of the 20 opening jellyfish were ever in frame, and C
 failed. A water slot searches across the track, then nearer or further within the band, for a point
 over the sea that is in view on its approach: inside the formation anchors' 40° cone and within the
 type's readable distance (`maxReadableDistance`) from the rider 1100 arc units before it (or at
-activation) and 400 further on; failing that, the first point over the sea. Sharks
+activation) and 400 further on; failing that, the first point over the sea. With ~10 jellyfish in view
+at once, a jellyfish's 7 draw calls (bell, core, five tentacles) took level3 to 131 draws (budget 89),
+so its bell and tentacles are one merged geometry (2 draws with the glowing core; the whole bell rocks
+instead of each tentacle swaying): 81 draws at the smoke's ride sample. Sharks
 circle a 25–60-unit orbit through their spawn point instead of drifting (their old drift had radii up
 to ~2,000 units). Ocean gets a second jellyfish wave (12, at 28 s) so the stretch before the flying
 fish and the Kraken isn't empty; `maxScore` 2045 → 2261.

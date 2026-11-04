@@ -457,23 +457,30 @@ export const SHARK_TOOTH_MAT = new THREE.MeshPhongMaterial({
   flatShading: true,
 })
 
-// ── Jellyfish (~10 primitives) ───────────────────────────────────
-export const JELLY_DOME_GEO = new THREE.SphereGeometry(3, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2)
+// ── Jellyfish: bell + glowing core ───────────────────────────────
+const JELLY_TENTACLES = 5
+/**
+ * Bell + five hanging tentacles as one geometry: a whole Ocean wave floats in view beside
+ * the track (#316), and at 7 draw calls a jellyfish broke level3's draw budget.
+ */
+export const JELLY_BODY_GEO = mergeGeometries([
+  new THREE.SphereGeometry(3, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+  ...Array.from({ length: JELLY_TENTACLES }, (_, i) => {
+    const a = (i / JELLY_TENTACLES) * Math.PI * 2
+    return new THREE.CylinderGeometry(0.15, 0.08, 5, 4).translate(Math.cos(a) * 1.8, -3, Math.sin(a) * 1.8)
+  }),
+])
 export const JELLY_INNER_GEO = new THREE.SphereGeometry(1.5, 6, 6)
-export const JELLY_TENTACLE_GEO = new THREE.CylinderGeometry(0.15, 0.08, 5, 4)
 
 const JELLY_COLORS = ['#ff88cc', '#88ccff', '#cc88ff', '#88ffcc']
-export const JELLY_DOME_MATS = JELLY_COLORS.map(
+export const JELLY_BODY_MATS = JELLY_COLORS.map(
   (c) => withRim(
-    new THREE.MeshPhongMaterial({ color: c, transparent: true, opacity: 0.55, flatShading: true, side: THREE.DoubleSide }),
+    new THREE.MeshPhongMaterial({ color: c, transparent: true, opacity: 0.5, flatShading: true, side: THREE.DoubleSide }),
     { color: c, intensity: 0.8, power: 2 },
   ),
 )
 export const JELLY_INNER_MATS = JELLY_COLORS.map(
   (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.5, toneMapped: false }),
-)
-export const JELLY_TENTACLE_MATS = JELLY_COLORS.map(
-  (c) => withRim(new THREE.MeshPhongMaterial({ color: c, transparent: true, opacity: 0.4, flatShading: true }), { color: c }),
 )
 export const JELLY_COLOR_COUNT = JELLY_COLORS.length
 
