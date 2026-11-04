@@ -11,7 +11,7 @@ Headless browser in Claude cloud sessions: the Playwright CDN is blocked, so run
 The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/sizes, errors)
 to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the 3D scene behind the title UI must not look blank, polled on a cold start; the fly-by camera must have turned ≥ 8° or moved ≥ 30 units;
-the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select; Tone.js's `tone-*.js` chunk must not be fetched before that press, and the press must load it and unlock audio); a `landing` step loads the campaign landing path
+a title sparkle's centre pixel must blend to a colour in [0, 1] (`pointCentreColour('title-sparkles')`: a glow dividing by the distance to the point's centre went NaN there and Bloom spread it to a black frame, #344); the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select; Tone.js's `tone-*.js` chunk must not be fetched before that press, and the press must load it and unlock audio); a `landing` step loads the campaign landing path
 `/go/smoke-check?e2e=1&internal=1` (links we post point at `/go/<campaign>`, attributed by the page view's path; `robots.txt` disallows `/go/`):
 it must boot to the title with no failed request, no analytics request and no page error, keep its path (only `internal` stripped) and show the "internal: not tracked" marker (skipped with `--base`); and per level `<id>.png` (after a ride of `--seconds` 10, longer until `--min-frames` 10 frames have rendered; it fails as a stalled render loop only if they haven't by 4× `--seconds`, and the summary line prints `frames=N in Xs`; the title waits the same way),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
@@ -29,7 +29,10 @@ checked in mobile portrait + landscape, and in portrait at four extreme aims wit
 the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
 reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left) or the
-Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), offers Next Level while the next level is locked (or hides it while open), shows NaN, or disagrees with `stats()` on score or kills, or (first level) Enter with the mute button focused doesn't play on;
+Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), offers Next Level while the next level is locked (or hides it while open), shows NaN, or disagrees with `stats()` on score or kills, has no local leaderboard fully inside 1280×720, or (first level) Enter with the mute button focused doesn't play on;
+on the first level the leaderboard is seeded so the run places 4th: the row must open for initials at the last ones used (AAA),
+ArrowUp must cycle a letter, typing r e s must give RES without leaving or toggling mute (R and S are letters there), and Enter must confirm, store
+and persist it; its frenzy-end rerun is seeded a full board out of reach and must show the board with no rank and no initials entry;
 `shareText()` must match the share format with the shown score, stars, level name and the `/go/share` link (`share_copy` campaign); a real Share click must open the share menu (#271) with Copy link focused and every target in order (Copy link, X, Reddit, Bluesky, Threads, WhatsApp, Facebook, LinkedIn, Email; items 44 px), inside the viewport and covering no other results button, each link carrying its own `utm_campaign=share_<target>`; Copy link must show "Copied!" and put `shareText()` on the clipboard, ArrowDown must move focus to X, and Esc must close the menu with focus back on Share (network links are never clicked). Every page of a local run fails on a request to another origin
 (not with `--url`). `--dist <dir> --base <path>` previews another build folder under a sub-path (`smoke:portal`).
 `npm run smoke` also passes `--mobile`:
@@ -55,8 +58,8 @@ A `pause-menu` step on the same page opens the menu through the hook (`pause.png
 name, Resume focused, ArrowDown moves focus, Esc resumes, and Restart starts the level over (kills, score, timer, ride). The
 phone run checks the card after its Pause tap in landscape and portrait (`mobile-pause-landscape.png`, `mobile-pause.png`: inside
 the viewport, no sideways scroll, 44 px buttons), then taps its Settings (`mobile-settings.png`: fits 390 px, 44 px targets)
-and Back to the menu, then ends the level: the results buttons must fit and not overlap in portrait and landscape
-(`mobile-results.png`, `mobile-results-landscape.png`) and the share menu must pass the same checks, bar the clipboard, in landscape and at 390 px portrait (`mobile-share-landscape.png`, `mobile-share.png`; headless Chromium has no share sheet, so the phone gets the menu), then starts level2 and goes back to level select: on every music
+and Back to the menu, then ends the level and enters initials by tapping ▲, a letter, ▲ and OK (BBA; 44 px buttons, the pad in view: `mobile-results-entry.png`), then the results buttons must fit and not overlap in portrait and landscape
+(`mobile-results.png`, `mobile-results-landscape.png`, the board inside the viewport in landscape) and the share menu must pass the same checks, bar the clipboard, in landscape and at 390 px portrait (`mobile-share-landscape.png`, `mobile-share.png`; headless Chromium has no share sheet, so the phone gets the menu), then starts level2 and goes back to level select: on every music
 switch (there, title → level, and the `scrim` step's) the incoming track's first note must land before the outgoing bus has
 faded to 0 (`audio().music.fades` log each ramp's start and the incoming `firstNote`; tracks start on the next beat, `musicBus.ts`).
 A `settings` step opens Settings from the title (`settings.png`: the card inside 1280×720 with the four quality
@@ -64,13 +67,13 @@ options, two volume sliders and two switches), picks Low and a music volume, clo
 to survive a reload. A `quality` step loads the first level at device dpr 2 with the default quality and with
 `?quality=low` (any preset name works as a URL override and is saved like the setting) on the same seed and frozen
 track point: low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
-A `levelSelect` step seeds saved progress (3★ + 1★), opens the level select (`levelSelect.png`)
-and requires one card per level plus the Daily card, the right locked count and `★ x / 15` total, every card
+A `levelSelect` step seeds saved progress (3★ + 1★) and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
+and requires one card per level plus the Daily card, each top's initials on its card after the reload, the right locked count and `★ x / 15` total, every card
 inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move focus, Enter on a
 locked card does nothing, Enter on an open one plays the launch transition and starts that level);
 the phone run checks its cards fit 390 px.
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in
-daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, NEW BEST and no Next Level
+daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, NEW BEST, no Next Level and no leaderboard or initials entry (the campaign boards stay empty)
 (`daily-results.png`), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 `?e2e=1` skips the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1`: the countdown must show (`countdown.png`),
@@ -86,13 +89,17 @@ around it, `timerStep`, so a slow frame can't land both together), the run is pa
 When level1 is in the run, a `scrim` step loads it with `?audio=scrim` (the score engine): a click must unlock audio and start the
 title score, the level score must crossfade from it, keep its long-lived node count flat (≤ 150) and advance, run `audioBurst(64, 32)`
 on the arcade SFX twice (never more voices than the budget, voices stolen, SFX node count flat, nothing thrown or dropped), duck with time frozen,
-hold its song position while paused and resume there, then crossfade to the results score, with no page errors or dropped sounds.
+follow the combo with its intensity layers (time frozen, `primeCombo(8)` → 2, `primeCombo(15)` → 3, held through the pause, `primeCombo(0)`
+→ back to 0 through 2 or 1, not in one cut), hold its song position while paused and resume there, then crossfade to the results score, with no page errors or dropped sounds.
 When level1 is in the run, a `boss` step summons the Golden Blimp (`summonBoss()`): the tell and `boss:spawn` must fire, the
 hull must be ≥ 15% of the frame wide with the boss bar clear of the HUD (`level1-boss.png`), only the balloons exposed; a real
 bullet must hit one, `bossHit` clears them and must expose only the gondola (`level1-boss-gondola.png`), then defeat it:
 `boss:defeated`, one kill per weak point and the big score popup over the confetti (`level1-boss-down.png`). The phone run
 resumes after its Pause tap with the boss summoned: the bar must sit inside the viewport and clear of the HUD in portrait and
 landscape (`mobile-level1-boss.png`).
+When level2 is in the run, the same `boss` step summons the Giant Scorpion: after 2 s of game time (it bursts out of the sand)
+≥ 4 of its claws and tail segments must be on screen (`level2-boss.png`, only those exposed), and once they are broken only the
+stinger on the bare stub (`level2-boss-stinger.png`) before it collapses into the sand (`level2-boss-down.png`).
 When level3 is in the run, the same `boss` step summons the Kraken: after 3 s of game time ≥ 3 sucker pads must be on screen
 above the water (`level3-boss.png`, only pads exposed), and after the pads go the head must surface with only its eye exposed
 (`level3-boss-head.png`) before the eye is shot and it sinks in a splash (`level3-boss-down.png`).
@@ -114,7 +121,7 @@ vary) and on the scene / track objects and triangles (+15%); a level past one fa
 ## Test hook (`?e2e=1` → `window.__SC_TEST__`)
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
-(`levels()` (each with its `nextLevel` and `unlocked` now), `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time, level time, due wave and the wave tick before it), `nextWave()` → level time now + when the next wave is due + the last wave tick, `waveTellSeconds`, `timerStep` (seconds of level time + game clock per frame; null is the frame time), `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction),
+(`levels()` (each with its `nextLevel` and `unlocked` now), `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `setLeaderboards(boards, lastInitials?)` / `leaderboards()` (local top 10s), `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time, level time, due wave and the wave tick before it), `nextWave()` → level time now + when the next wave is due + the last wave tick, `waveTellSeconds`, `timerStep` (seconds of level time + game clock per frame; null is the frame time), `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction), `pointCentreColour(name)` (the linear RGBA a scene `Points`' first point blends to over opaque grey with its centre exactly on a pixel centre, in a 1×1 float target),
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/multiplier/timeScale/frenzy/timeRemaining/phase/liveEnemies/
 onScreenEnemies/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `killNearest(n)` (never a boss weak point; fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
@@ -122,7 +129,7 @@ then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPo
 screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)`, `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideProgress` (its track fraction on the last frame), `rideSpeed` (set 0–1 to put the coaster at that speed), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
 {current, max} in degrees, `cameraWeight` → bank / pitch / speed + drop FOV kick now and max (degrees), smoothed speed 0–1, wind-streak opacity, the caps the smoke checks (`caps`, from the source constants), `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
-`view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `graphics()` → quality setting, its preset, adaptive steps, reduced motion, `audio()` → unlocked?, Tone.js chunk loaded? (`toneLoaded`), long-lived SFX node count, arcade voice pool (`sfxVoices`: budget / live / peak / stolen / dropped), music ducked?, sounds dropped by a caught audio error, `music` (live music buses with their gain + the last few fade ramps), `engine` ('tone' / 'scrim'), `scrim` (score engine: current score, tracks with paused + song position, long-lived nodes, timer running),
+`view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `graphics()` → quality setting, its preset, adaptive steps, reduced motion, `audio()` → unlocked?, Tone.js chunk loaded? (`toneLoaded`), long-lived SFX node count, arcade voice pool (`sfxVoices`: budget / live / peak / stolen / dropped), music ducked?, sounds dropped by a caught audio error, `music` (live music buses with their gain + the last few fade ramps), `engine` ('tone' / 'scrim'), `scrim` (score engine: current score, tracks with the score each plays (a `?theme=` option or its own), paused + song position + `layered` / `intensity`, the asked-for `targetIntensity`, long-lived nodes, timer running),
 `audioBurst(shots, kills)` → rapid SFX + late music notes in one JS turn while the audio clock ticks (kills spaced 35 ms apart on the audio clock, past the SFX throttles; returns `killsPlayed`, the kills that reached the engine), `renderAudio(req, seed?)` → an offline render as base64 PCM (title screen, before audio unlocks; `npm run audio:render`; kinds music / sfxSheet / mix (`stem: 'music'`: without SFX), `engine: 'scrim'`, and `score` for one score through the port alone), `triggerHeld()` → pointer trigger down?,
 `shaderWarmup` {done, ms, programs} for the current level, `initTimings()` (ms from navigation to each startup phase, the first time: `core/startupMarks.ts`), `summonBoss()` (the level's boss now instead of at its level time),
 `boss()` → stage / hp fraction / exposed weak points on screen (with hp) / the hull's on-screen box, `bossHit(n)` (n hits on exposed

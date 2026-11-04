@@ -1,6 +1,6 @@
 /** Pure data + keyboard navigation behind the level select (no React / DOM, unit-tested). */
 import type { BiomeType } from '@/types/level'
-import type { ScoreEntry } from '@/types/game'
+import type { LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { currentStreak, dailyKey, dailyLevel, type DailyStreak } from '@/levels/daily'
 import { previousLevel } from '@/levels/LevelRegistry'
 
@@ -20,6 +20,8 @@ export interface LevelCard {
   unlocked: boolean
   stars: number
   bestScore: number
+  /** Initials on the top of the level's board (null when locked or empty). */
+  bestInitials: string | null
   /** Name of the level whose star unlocks this one (null when unlocked or first). */
   unlockedBy: string | null
 }
@@ -30,6 +32,7 @@ export function buildLevelCards(
   levels: readonly LevelSelectSource[],
   savedScores: Record<string, ScoreEntry | undefined>,
   isUnlocked: (id: string) => boolean,
+  leaderboards: Record<string, readonly LeaderboardEntry[] | undefined>,
 ): LevelCard[] {
   return levels.map((level) => {
     const unlocked = isUnlocked(level.id)
@@ -43,6 +46,7 @@ export function buildLevelCards(
       unlocked,
       stars: unlocked ? Math.max(0, Math.min(STARS_PER_LEVEL, saved?.stars ?? 0)) : 0,
       bestScore: unlocked ? Math.max(0, saved?.score ?? 0) : 0,
+      bestInitials: unlocked ? (leaderboards[level.id]?.[0]?.initials ?? null) : null,
       unlockedBy: levels.find((l) => l.id === previousId)?.name ?? null,
     }
   })

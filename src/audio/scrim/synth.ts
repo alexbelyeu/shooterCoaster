@@ -7,12 +7,14 @@
  * live in a `SynthCore` shared by every track on one context; `createSynth` takes a `voicing`
  * ('jukebox' is the original mix bus, 'game' sits under the SFX) and returns `dispose()`;
  * `session.play` reuses one parameter object instead of allocating per note; the helpers, `makeIR` and one-note
- * access to the instruments and drums are exported for the arcade SFX bake (`audio/arcade/`).
+ * access to the instruments and drums are exported for the arcade SFX bake (`audio/arcade/`); a session plays a score's
+ * intensity layers (`layers.ts`) by ramping each voice's level gain, plus a low-pass when the score has layers.
  * The original instruments are unchanged. The arcade palette (`fmbass` … `clap909`, marked below) is
  * ShooterCoaster's own, not from Scrimshaw.
  */
 
 import type { CompiledSong, ScoreEvent, Voice } from './score'
+import { LAYER_RAMP_S, LIFT, MAX_INTENSITY, layerSounds, liftHz } from './layers'
 
 type Ctx = BaseAudioContext
 
@@ -940,6 +942,8 @@ const GAME_VOICING = {
 
 export interface Session {
   play(ev: ScoreEvent, t: number): void
+  /** Layers for `intensity` from time `t` (a beat line): each voice's ramp ends there, the low-pass starts opening there. */
+  setIntensity(intensity: number, t: number): void
   stop(fade?: number): void
 }
 
@@ -948,7 +952,8 @@ export interface Synth {
   out: GainNode
   /** Builds the song's plucked-string buffers ahead of time, a few per idle slice; returns a cancel. */
   warm(song: CompiledSong, budgetMs?: number): () => void
-  session(song: CompiledSong): Session
+  /** `intensity` (default: every layer) is where its layers start. */
+  session(song: CompiledSong, intensity?: number): Session
   /** Long-lived nodes: the bus chain plus each session's channels (notes' own nodes end by themselves). */
   nodeCount(): number
   dispose(): void
@@ -1021,15 +1026,19 @@ export function createSynth(S: SynthCore, dest: AudioNode, { voicing = 'jukebox'
       return () => { cancelled = true }
     },
     // a session bus lets "stop" silence everything already scheduled
-    session(song) {
+    session(song, intensity = MAX_INTENSITY) {
       if (Object.keys(S.ks).length > 160) S.ks = {}
-      const bus = G(S, 1); bus.connect(master)
+      const bus = G(S, 1)
+      const lift = song.voices.some((v) => v.layer) ? F(S, 'lowpass', liftHz(intensity), LIFT.q) : null
+      if (lift) bus.connect(lift).connect(master)
+      else bus.connect(master)
       const sendBus = G(S, 1); sendBus.connect(verbIn)
       verbRet.gain.setValueAtTime(0.25 + 1.6 * (song.reverb != null ? song.reverb : 0.3), ctx.currentTime)
       const inserts: AudioNode[] = []
       const ch = song.voices.map((v) => {
         const def = v.drum ? DRUM[v.inst] : INST[v.inst]
-        const level = G(S, v.vol * def.level)
+        const full = v.vol * def.level
+        const level = G(S, layerSounds(v.layer, intensity) ? full : 0)
         const pan = ctx.createStereoPanner()
         pan.pan.value = v.pan
         level.connect(pan).connect(bus)
@@ -1037,8 +1046,9 @@ export function createSynth(S: SynthCore, dest: AudioNode, { voicing = 'jukebox'
         level.connect(send).connect(sendBus)
         const fx = !v.drum && (def as Instrument).insert?.(S, v.bright)
         if (fx) { fx.output.connect(level); inserts.push(...fx.nodes) }
-        return { v, def, input: fx ? fx.input : level }
+        return { v, def, input: fx ? fx.input : level, level: level.gain, full }
       })
+      if (lift) inserts.push(lift)
       sessions.set(bus, { sendBus, nodes: 2 + 4 * ch.length + inserts.length, inserts })
       const p: NoteOpts = { bright: 1, att: null, rel: null, glide: 0.07, from: null }
       return {
@@ -1057,6 +1067,17 @@ export function createSynth(S: SynthCore, dest: AudioNode, { voicing = 'jukebox'
           } catch {
             /* keep the music going if one note fails */
           }
+        },
+        setIntensity(n, t) {
+          const from = Math.max(ctx.currentTime, t - LAYER_RAMP_S)
+          for (const c of ch) {
+            c.level.cancelScheduledValues(from)
+            c.level.setTargetAtTime(layerSounds(c.v.layer, n) ? c.full : 0, from, LAYER_RAMP_S / 4)
+          }
+          if (!lift) return
+          const at = Math.max(ctx.currentTime, t)
+          lift.frequency.cancelScheduledValues(at)
+          lift.frequency.setTargetAtTime(liftHz(n), at, LIFT.timeConstantS)
         },
         stop(fade = 0.06) {
           const now = ctx.currentTime

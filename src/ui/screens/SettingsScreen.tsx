@@ -1,5 +1,6 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSettingsStore } from '@/store/useSettingsStore'
+import { useGameStore } from '@/store/useGameStore'
 import { SCREEN_SHAKE_LEVELS, type ScreenShakeLevel } from '@/combat/screenShake'
 import { GRAPHICS_QUALITIES, type GraphicsQuality } from '@/canvas/graphicsQuality'
 import { usePrefersReducedMotion, useSystemPrefersReducedMotion } from '@/ui/reducedMotion'
@@ -76,6 +77,42 @@ function ToggleRow({ label, note, checked, disabled, onChange }: { label: string
   )
 }
 
+/** Wipes scores, stars, leaderboards and the Daily Run record; a second tap confirms. */
+function ClearDataRow() {
+  const [step, setStep] = useState<'idle' | 'confirm' | 'cleared'>('idle')
+
+  if (step === 'confirm') {
+    return (
+      <div className="settings-row settings-clear" data-step="confirm">
+        <span>Erase all scores, stars, leaderboards and daily bests?</span>
+        <div className="settings-clear-actions">
+          <button type="button" onClick={() => setStep('idle')}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="is-danger"
+            onClick={() => {
+              useGameStore.getState().clearLocalData()
+              setStep('cleared')
+            }}
+          >
+            Erase
+          </button>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="settings-row settings-clear" data-step={step}>
+      <span>{step === 'cleared' ? 'Local data cleared' : 'Scores & leaderboards'}</span>
+      <button type="button" disabled={step === 'cleared'} onClick={() => setStep('confirm')}>
+        Clear local data
+      </button>
+    </div>
+  )
+}
+
 interface SettingsScreenProps {
   onClose: () => void
 }
@@ -146,6 +183,11 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
               disabled={systemReducedMotion}
               onChange={s.setReducedMotion}
             />
+          </section>
+
+          <section className="settings-group">
+            <h3>Data</h3>
+            <ClearDataRow />
           </section>
         </div>
 

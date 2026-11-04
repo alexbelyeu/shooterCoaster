@@ -46,6 +46,7 @@ voiced around the voice's `center`, `x X o .` a drum lane. Every bar must add up
 | What | Original | ShooterCoaster |
 |---|---|---|
 | Where scores live | pasted into the page | `src/audio/scores/<id>.scrim`: `title`, one per level id (`level1`…), `results`; listed in `scores/index.ts` |
+| Theme options | — | `scores/themes/<slot>.<name>.scrim`: candidate themes for a slot, waiting on Alex's pick (sound bible "taste gate"). `?audio=scrim&theme=<name>[,<name>]` plays each named option in its slot's place (`themesFromQuery`, `scoreIdFor`), arcade SFX included (each option has its own `SCORE_KEYS` entry); the default never changes. Render one with `--music <slot>.<name> --engine scrim` |
 | Where it plays | its own `AudioContext`, to the speakers | Tone's context, into its own stereo music channel (`AudioEngine.scoreChannel`): music volume, the slow-mo low-pass duck and the master limiter apply |
 | Mix bus | `jukebox` voicing: master 0.72 → +2 dB low shelf @180 Hz → −2.5 dB high shelf @7.5 kHz → compressor (−15 dB, 3.2:1) → limiter (−3 dB) → out 1.0 (≈ −9.5 LUFS) | `game` voicing (`GAME_VOICING` in `synth.ts`): 24 dB/oct high-pass at 32 Hz first, the same EQ and compressor, then a −6 dB limiter and out 0.53, so a score lands at −18…−16 LUFS through the music channel with true peaks near −9 dBTP |
 | Track changes | stop with a 60 ms fade | 1 s crossfade on a `musicBus` gain, like the Tone.js music |
@@ -55,9 +56,53 @@ voiced around the voice's `center`, `x X o .` a drum lane. Every bar must add up
 | Plucked strings | built on demand, `warm()` in idle slices | the same; a track warms its whole score when it starts (the countdown, for a level) |
 | Randomness | `Math.random` | the same in play; offline renders seed it (`createRng`), so the original page and the port render the same score near bit-identically (`renders/parity-*`) |
 | Instruments | 38 melodic, 27 drums | the same, plus the arcade palette below (7 melodic, 5 drums) |
+| Intensity layers | — | `layer=base\|drums\|lead\|frenzy` on a voice (untagged = `base`): the level's music follows the combo tier (see below) |
 
-Not there yet (later issues): named intensity layers (base / +drums / +lead / FRENZY) and
-beat-quantised stingers. Each one gets a row here when it lands.
+Not there yet (a later issue): beat-quantised stingers. It gets a row here when it lands.
+
+## Intensity layers
+
+A level's score reacts to play. Tag each voice with the layer it belongs to; the game sets
+the intensity from the combo tier, and each voice sounds once its layer is in:
+
+| Intensity | Combo tier | Plays |
+|---|---|---|
+| 0 | 1× (and the run's start) | `base` (every untagged voice) |
+| 1 | 2× | + `drums` |
+| 2 | 3× | + `lead` |
+| 3 | 5× FRENZY | + `frenzy`, and the score's low-pass opens |
+
+```
+voice skank  accordion vol=0.35 center=A4 gate=0.5   # untagged: base
+voice tuba   tuba      vol=0.8  oct=1
+voice kick   kick      vol=0.85 layer=drums
+voice lead   organ     vol=0.75 layer=lead
+voice saw    supersaw  vol=0.42 oct=1 layer=frenzy    # doubles the lead an octave up
+voice fhat   hat909    vol=0.42 pan=0.4 layer=frenzy  # fills the hats out to straight eighths
+```
+
+- **The intro plays every layer**, whatever the combo: it is the countdown's fanfare. The
+  loop opens on the run's intensity.
+- **Changes land on the loop's beat lines.** A voice's level ramps over 50 ms ending on the
+  beat, so nothing clicks and a layer coming in has its downbeat. A rise lands on the next
+  beat; a lost combo drops one layer on the next beat and each further layer a bar later,
+  so a lost FRENZY winds down over three bars instead of cutting to the bare base.
+- **The low-pass ("the filter opens")**: a score with any `layer=` gets a 12 dB/oct
+  low-pass after its voices, at 7 kHz below FRENZY; FRENZY opens it to 20 kHz over about a
+  beat. A score without tags gets no filter and plays exactly as before (the parity tests
+  and `renderOffline` run every layer).
+- Every voice keeps playing its notes when its layer is out (silently), so a layer that comes
+  in mid-phrase picks the phrase up where it is. The layers are each voice's own level gain:
+  no extra nodes; the low-pass is one more per track.
+- **Writing for layers**: `base` must carry the loop alone (bass and a harmonic pulse; it
+  plays in every bar, `scores.test.ts` checks it), `drums` the groove, `lead` the hook, and
+  `frenzy` the lift: double-time hats, an extra lead an octave up or a counter-line, stabs.
+  The compressor holds the music's loudness nearly level as layers come in (level1:
+  −16.6 LUFS on base, −17 at FRENZY), so the layers add density and brightness, not volume.
+- Hear them: `npm run audio:render -- --music level1 --engine scrim --layers <0..3>`
+  holds one intensity; `--layers ramp` climbs through every layer and loses the combo
+  (`renders/scrim-music-level1` is the ramp, `scrim-music-level1-{base,full,frenzy}` hold 0, 2
+  and 3). In the game, `?audio=scrim`.
 
 ## Instruments
 
@@ -111,10 +156,13 @@ These are not enforced by the compiler; `src/audio/scores/scores.test.ts` checks
 ## Hearing and rendering it
 
 - In the game: add `?audio=scrim` to the URL (e.g. `https://scoaster.com/?audio=scrim`).
-  Title, level and results music switch to the score engine; SFX stay as they are.
-- `npm run audio:render -- --music <title|level1..5|results> --engine scrim`: a score
-  through the game's music chain (`docs/audio/renders/scrim-music-*`).
+  Title, level and results music switch to the score engine, and the SFX to the arcade engine.
+  Add `&theme=<name>` for a theme option (e.g. `?audio=scrim&theme=neon,carousel`).
+- `npm run audio:render -- --music <title|level1..5|results|<slot>.<name>> --engine scrim`: a score
+  through the game's music chain (`docs/audio/renders/scrim-music-*`). Add `--seam` to start
+  10 s before the first loop seam, so the render crosses it (a 32-bar loop is longer than a
+  30 s render).
 - `npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original]
   [--voicing jukebox|game]`: one score alone through the port, or through the original
   page for comparison. Add `--chain game` to play a score file through the game's music
-  chain instead, measured like a level's score.
+  chain instead, measured like a level's score (`--seam` works here too).

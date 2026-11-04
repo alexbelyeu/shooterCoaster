@@ -233,6 +233,13 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
   level4: { tonic: 61, minor: true }, // C# minor
   level5: { tonic: 62, minor: true }, // D minor
   results: { tonic: 60, minor: false }, // C major
+  // Theme options (`?theme=`, scores/themes/)
+  'title.neon': { tonic: 69, minor: true }, // A minor
+  'title.highway': { tonic: 63, minor: false }, // E-flat major
+  'title.fanfare': { tonic: 62, minor: false }, // D major
+  'level1.calliope': { tonic: 70, minor: false }, // B-flat major
+  'level1.carousel': { tonic: 69, minor: false }, // A major
+  'level1.ringmaster': { tonic: 60, minor: false }, // C major
 }
 
 const MAJOR = [0, 2, 4, 5, 7, 9, 11]
@@ -291,11 +298,11 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   'fire.piercing': { prio: PRIO.fire, db: -12, send: 0 },
   pickup: { prio: PRIO.event, db: -9, send: 0.3 },
   hit: { prio: PRIO.hit, db: -15, send: 0.05 },
-  'kill.pop': { prio: PRIO.kill, db: -2, send: 0.12 },
-  'kill.flutter': { prio: PRIO.kill, db: -2, send: 0.12 },
-  'kill.crunch': { prio: PRIO.kill, db: -2, send: 0.1 },
-  'kill.splash': { prio: PRIO.kill, db: -2, send: 0.15 },
-  'kill.hiss': { prio: PRIO.kill, db: -3, send: 0.12 },
+  'kill.pop': { prio: PRIO.kill, db: -3, send: 0.12 },
+  'kill.flutter': { prio: PRIO.kill, db: -3, send: 0.12 },
+  'kill.crunch': { prio: PRIO.kill, db: -3, send: 0.1 },
+  'kill.splash': { prio: PRIO.kill, db: -3, send: 0.15 },
+  'kill.hiss': { prio: PRIO.kill, db: -4, send: 0.12 },
   'kill.thump': { prio: PRIO.kill, db: -6, send: 0.05 },
   'kill.ring': { prio: PRIO.kill, db: -16, send: 0.2 },
   'kill.payout': { prio: PRIO.kill, db: -15, send: 0.2 },
@@ -366,6 +373,12 @@ export function spatial(x: number, z: number, tanHalfHFov: number, out: { pan: n
   const f = Math.min(Math.max((dist - SPATIAL.nearM) / (SPATIAL.farM - SPATIAL.nearM), 0), 1)
   out.cutoffHz = SPATIAL.nearHz * Math.pow(SPATIAL.farHz / SPATIAL.nearHz, f)
   return out
+}
+
+/** Keeps a placed sound's louder channel at its level wherever it pans: equal power leaves a kill at the crosshair 3 dB down. */
+export function panGain(pan: number): number {
+  const a = ((Math.min(Math.max(pan, -1), 1) + 1) * Math.PI) / 4
+  return 1 / Math.max(Math.cos(a), Math.sin(a))
 }
 
 /** The first beat at or after `now + leadS`, and its place in the bar. */

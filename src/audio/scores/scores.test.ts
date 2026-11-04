@@ -3,11 +3,22 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { compile } from '@/audio/scrim/score'
 import { lintRanges } from '@/audio/scrim/lint'
 import { SCORE_KEYS } from '@/audio/sfxDesign'
-import { SCORES } from './index'
+import { SCORES, themesFromQuery } from './index'
 
 describe('game scores', () => {
   it('has a score for the title, every level and the results screen', () => {
-    expect(Object.keys(SCORES).sort()).toEqual(['results', 'title', ...getAllLevels().map((l) => l.id)].sort())
+    const slots = Object.keys(SCORES).filter((id) => !id.includes('.'))
+    expect(slots.sort()).toEqual(['results', 'title', ...getAllLevels().map((l) => l.id)].sort())
+  })
+
+  it('every theme option belongs to a slot that has a score', () => {
+    for (const id of Object.keys(SCORES).filter((id) => id.includes('.'))) expect(SCORES[id.split('.')[0]]).toBeDefined()
+  })
+
+  it('?theme= puts each named option in its slot and ignores unknown names', () => {
+    expect(themesFromQuery('')).toEqual({})
+    expect(themesFromQuery('?audio=scrim&theme=neon')).toEqual({ title: 'title.neon' })
+    expect(themesFromQuery('?theme=carousel,%20highway,nope')).toEqual({ title: 'title.highway', level1: 'level1.carousel' })
   })
 
   it('the range lint flags a note outside its instrument', () => {
@@ -22,6 +33,19 @@ describe('game scores', () => {
       expect(lintRanges(song)).toEqual([])
       expect(song.intro.dur).toBeGreaterThan(0)
       expect(song.loop.dur).toBeGreaterThan(0)
+    })
+  }
+
+  for (const [id, text] of Object.entries(SCORES)) {
+    const song = compile(text)
+    if (!song.voices.some((v) => v.layer)) continue
+    it(`${id}'s loop has every layer it tags, and base plays all through it (a run opens on base alone)`, () => {
+      const bars = song.loop.sections.reduce((n, s) => n + s.bars, 0)
+      const barS = song.loop.dur / bars
+      const playing = new Set(song.loop.events.map((e) => song.voices[e.v].layer ?? 'base'))
+      expect([...playing].sort()).toEqual([...new Set(song.voices.map((v) => v.layer ?? 'base'))].sort())
+      const baseBars = new Set(song.loop.events.filter((e) => !song.voices[e.v].layer).map((e) => Math.floor(e.t / barS)))
+      expect(baseBars.size).toBe(bars)
     })
   }
 })

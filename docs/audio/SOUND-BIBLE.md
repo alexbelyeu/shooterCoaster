@@ -26,15 +26,23 @@ could hear it across a loud arcade. Every sound tells the player something.
 
 | Level | Biome | Brief | Signature colour |
 |---|---|---|---|
-| Title | Theme park at night | 20–30 s attract-mode theme that loops: the game's main hook, tells you "press start" | supersaw lead + gated snare |
-| level1 | Theme Park | Carnival meets arcade rock. Major key, bouncy, bright | calliope/organ riffs over rock drums |
+| Title | Theme park at night | Attract-mode theme: the game's main hook inside the first 4 bars, a 1–2 bar intro that says "press start", then a 32-bar loop (≈ 45–50 s) with a lift. Gated snare and big electronic drums | supersaw lead + gated snare |
+| level1 | Theme Park | Carnival meets arcade rock. Major key, bouncy, bright: a fairground instrument carries the riff (calliope pipe, drawbar organ, xylophone), rock drums and FM bass drive it, and the loop lifts for its last 8 bars | calliope/organ riffs over rock drums |
 | level2 | Desert | Driving, sun-bleached. Phrygian or harmonic-minor flavour, hand percussion over a straight kick | twangy guitar, darbuka-style percussion |
 | level3 | Ocean | Fast, open, surf-rock energy with a sparkling top | spring-reverb guitar, steel drum, sea wash |
 | level4 | Antarctica | Glassy and tense but still driving. Minor key, crystalline | bells, celesta, icy pads with a hard kick |
 | level5 | Inferno | Heaviest level, the boss-rush mood. Low and fast | distorted guitar, choir stabs, timpani, orchestra hits |
-| FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens | same as the level, brighter |
+| FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens (the score's `frenzy` layer: `SCORE-FORMAT.md`, "Intensity layers") | same as the level, brighter |
 | Boss / finale | any | A variation of the level theme, darker and louder | the level's colour + orchestra hits |
 | Results | any | 3–6 s jingle: rising for 3★, flatter for 1★ or 0★, then a calm loop | bells + brass |
+
+**Theme options (#216, waiting on Alex's pick):** three each for the title and level1, in
+`src/audio/scores/themes/`, heard with `?audio=scrim&theme=<name>`. Title: `neon` (A minor,
+160, supersaw hook, four-on-the-floor), `highway` (E♭ major, 138, synth-brass cruise, slap bass,
+tom fills), `fanfare` (D major, 172, brass fanfare, orchestra hits, timpani). level1: `calliope`
+(B♭ major, 148, pipe-organ calliope riff over power chords), `carousel` (A major 12/8 shuffle,
+132, organ over accordion and banjo), `ringmaster` (C major, 168, circus-march punk polka,
+xylophone and synth brass). The picked ones replace `title.scrim` / `level1.scrim`.
 
 ## Mix targets (starting numbers: tune with a decision entry)
 
@@ -65,7 +73,8 @@ These are measured on offline renders, at default settings, with nothing else pl
   budget under `audioBurst(64, 32)`.
 - The arcade engine (`?audio=scrim`, `src/audio/arcade/`) bakes every one-shot from the score
   engine's own instruments when a level starts, so SFX and music share one palette and key.
-  Positional: kills and hits pan with the enemy's place on screen and dull with distance; each
+  Positional: kills and hits pan with the enemy's place on screen and dull with distance (their louder channel keeps
+  its level wherever they pan, so a kill at the crosshair is not 3 dB down: `panGain`); each
   biome has its own room on the SFX send. Guns stay dry.
 
 ## How we check sound, since no agent can hear
