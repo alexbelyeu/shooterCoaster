@@ -10,4 +10,7 @@ untagged scores get none. The intro always plays every layer (it is the countdow
 beat; a fall drops one layer on the next beat and one per bar after, each asked for once the previous one has landed.
 **Consequences:** Scores must make `base` stand alone (`scores.test.ts` checks it plays in every loop bar). The music
 bus compressor keeps loudness nearly level across layers (level1: −16.6 → −17 LUFS), so layers read as density and
-brightness, not volume. A FRENZY lost a fraction of a beat after it was asked still sounds for a bar.
+brightness, not volume. A FRENZY lost a fraction of a beat after it was asked still sounds for a bar. A pause keeps the layers: a session resumed before a scheduled step lands (a pause
+during the intro, or just before a beat line) opens on what was playing and still takes the step on its beat line
+(`resumeLayers`). FRENZY keeps both lifts: the arcade's `frenzyLift` loop is the SFX riser, the score's low-pass opening
+is the music's; the slow-mo duck hides the opening for its 1.5 s, and the score stays bright for the rest of FRENZY.

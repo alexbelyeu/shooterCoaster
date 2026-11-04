@@ -12,9 +12,9 @@ Use a file's raw link to play it in the browser. The Sound designer writes these
 `baseline-*` is the game's sound before the audio overhaul; `../BASELINE.md` reads it.
 `scrim-music-*` is the score engine (`?audio=scrim`) playing its placeholder scores through
 the game's music chain (`--music <id> --engine scrim`); level1's has intensity layers, so it
-is rendered per layer: `scrim-music-level1-base` / `-full` / `-frenzy` hold intensity 0 / 2 / 3
-(`--intensity <n>`, 20 s), and `-layers` climbs through every layer and loses the combo
-(`--intensity ramp`, 30 s). `parity-original-*` / `parity-port-*`
+is rendered per layer: `scrim-music-level1` climbs through every layer and loses the combo
+(`--layers ramp`, 30 s), and `scrim-music-level1-base` / `-full` / `-frenzy` hold intensity 0 / 2 / 3
+(`--layers <n>`, 20 s). `parity-original-*` / `parity-port-*`
 render the same vendored score through the original Scrimshaw page and through the port
 (`--score vendored:5 [--engine original]`). `palette-*` is the arcade instrument palette:
 each new instrument alone (`palette-melodic`, `palette-drums`) and an 8-bar groove using only

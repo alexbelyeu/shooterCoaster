@@ -4,9 +4,10 @@
   "request": {
     "kind": "music",
     "track": "level1",
-    "intensity": 2,
+    "layers": 2,
     "seconds": 20,
-    "engine": "scrim"
+    "engine": "scrim",
+    "seam": false
   },
   "seed": 1,
   "sampleRate": 44100,

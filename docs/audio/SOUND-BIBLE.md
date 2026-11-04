@@ -73,7 +73,8 @@ These are measured on offline renders, at default settings, with nothing else pl
   budget under `audioBurst(64, 32)`.
 - The arcade engine (`?audio=scrim`, `src/audio/arcade/`) bakes every one-shot from the score
   engine's own instruments when a level starts, so SFX and music share one palette and key.
-  Positional: kills and hits pan with the enemy's place on screen and dull with distance; each
+  Positional: kills and hits pan with the enemy's place on screen and dull with distance (their louder channel keeps
+  its level wherever they pan, so a kill at the crosshair is not 3 dB down: `panGain`); each
   biome has its own room on the SFX send. Guns stay dry.
 
 ## How we check sound, since no agent can hear

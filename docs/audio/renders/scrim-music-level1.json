@@ -1,12 +1,13 @@
 {
-  "name": "scrim-music-level1-layers",
+  "name": "scrim-music-level1",
   "kind": "music",
   "request": {
     "kind": "music",
     "track": "level1",
-    "intensity": "ramp",
+    "layers": "ramp",
     "seconds": 30,
-    "engine": "scrim"
+    "engine": "scrim",
+    "seam": false
   },
   "seed": 1,
   "sampleRate": 44100,

@@ -78,17 +78,13 @@ export function layerState(intensity: number): LayerState {
   return { before: intensity, intensity, at: 0 }
 }
 
-/** Records `step`, scheduled at song position `pos`. */
 export function recordLayerStep(s: LayerState, step: LayerStep, pos: number): void {
   if (s.at <= pos) s.before = s.intensity
   s.intensity = step.intensity
   s.at = step.at
 }
 
-/**
- * Where a session resumed at song time `from` opens, and the step still to land on its beat line (null when it
- * already has). A pause in the intro resumes on the full band and still drops to the run's layers at the loop start.
- */
+/** Where a session resumed at song time `from` opens, and the step still to land on its beat line (null once it has). */
 export function resumeLayers(s: LayerState, from: number): { open: number; pending: LayerStep | null } {
   if (from < s.at) return { open: s.before, pending: { intensity: s.intensity, at: s.at } }
   return { open: s.intensity, pending: null }
