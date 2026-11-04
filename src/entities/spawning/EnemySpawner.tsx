@@ -189,7 +189,7 @@ export default function EnemySpawner({
       const members = enemies.filter((e) => e.waveIndex === waveIdx)
       if (members[0]?.trackside) {
         const placed = placeTracksideWave({
-          table: trackTable, riderIndex, camera, surface: ENEMY_PLACEMENT[wave.type].surface, groundFn, slots: members.map((e) => e.trackside!),
+          table: trackTable, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!),
         })
         return members.map((e, i) => [e.id, { position: toVector3(placed[i]) }])
       }

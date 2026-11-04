@@ -12,6 +12,7 @@ import {
   type ChoreographedFormation, type Vec3,
 } from './spawnPlacement'
 import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, placedBesideTrack } from './enemyPlacement'
+import { REFERENCE_FOV_DEG, maxReadableDistance } from '../enemies/enemyReadability'
 
 const choreographed = (f: Formation | undefined): f is ChoreographedFormation => !!f && f !== 'scatter'
 const besideTrack = (w: EnemyWave) => !choreographed(w.formation) && placedBesideTrack(w.type)
@@ -170,6 +171,11 @@ describe('tracksideSlots', () => {
       expect(Math.abs(s.side)).toBeGreaterThanOrEqual(band.sideMin)
       expect(Math.abs(s.side)).toBeLessThanOrEqual(band.sideMax)
     }
+    if (band.near) {
+      const nearCount = Math.ceil(slots.length * band.near.share)
+      for (const s of slots.slice(0, nearCount)) expect(s.ahead).toBeLessThanOrEqual(band.near.max)
+      expect(slots.slice(nearCount).some((s) => s.ahead > band.near!.max)).toBe(true)
+    }
   })
 })
 
@@ -188,7 +194,7 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
     for (const fraction of RIDER_FRACTIONS) {
       const riderIndex = Math.round(fraction * (table.count - 1))
       const camera = trackPoint(table, riderIndex)
-      const placed = placeTracksideWave({ table, riderIndex, camera, surface, groundFn, slots })
+      const placed = placeTracksideWave({ table, riderIndex, camera, type: wave.type, groundFn, slots })
       expect(placed).toHaveLength(wave.count)
       placed.forEach((p, i) => {
         if (surface === 'water') {
@@ -219,6 +225,46 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
       })
     }
     expect(inFront / total).toBeGreaterThan(0.85)
+  })
+})
+
+describe('level3 opening jellyfish', () => {
+  const { level, table, groundFn } = tracksideWorlds.find((w) => w.level.id === 'level3')!
+  const wave = level.enemies[0]
+  const tanV = Math.tan((REFERENCE_FOV_DEG * Math.PI) / 360)
+  const tanH = (tanV * 16) / 9
+  const reach = maxReadableDistance(wave.type)
+
+  /** Readable enemies in a 16:9 view along the track tangent, for each rider position over ride t 0–0.025 (the smoke's ride sample at any runner speed). */
+  function readableThroughOpening(seed: number): number[] {
+    const slots = tracksideSlots(wave.count, 'water', createRng(seed))
+    const placed = placeTracksideWave({ table, riderIndex: 0, camera: trackPoint(table, 0), type: wave.type, groundFn, slots })
+    const counts: number[] = []
+    for (let t = 0; t <= 0.025 + 1e-9; t += 0.0025) {
+      const i = Math.round(t * (table.count - 1))
+      const eye = trackPoint(table, i)
+      const f = trackTangent(table, i)
+      const h = Math.hypot(f.x, f.z)
+      const right = { x: -f.z / h, y: 0, z: f.x / h }
+      const up = { x: right.y * f.z - right.z * f.y, y: right.z * f.x - right.x * f.z, z: right.x * f.y - right.y * f.x }
+      counts.push(placed.filter((p) => {
+        const d = { x: p.x - eye.x, y: p.y - eye.y, z: p.z - eye.z }
+        const depth = d.x * f.x + d.y * f.y + d.z * f.z
+        return depth > 0
+          && Math.abs(d.x * right.x + d.z * right.z) <= depth * tanH
+          && Math.abs(d.x * up.x + d.y * up.y + d.z * up.z) <= depth * tanV
+          && Math.hypot(d.x, d.y, d.z) <= reach
+      }).length)
+    }
+    return counts
+  }
+
+  it('keeps at least 4 readable on screen through the opening (seed 1337)', () => {
+    expect(Math.min(...readableThroughOpening(1337))).toBeGreaterThanOrEqual(4)
+  })
+
+  it('keeps the smoke gate (2) through the opening for any seed', () => {
+    for (let seed = 1; seed <= 20; seed++) expect(Math.min(...readableThroughOpening(seed)), `seed ${seed}`).toBeGreaterThanOrEqual(2)
   })
 })
 
