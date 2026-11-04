@@ -881,7 +881,7 @@ async function scoreCardProblems(page, prefix, fileName) {
 
 /** #271: the share menu (every target, in the viewport, off the other buttons, keyboard); never clicks a network link,
  *  since a local run fails on other-origin requests. Pass `expectClipboard` only where clipboard-read is granted (it also
- *  checks Copy image), `download` (the expected file name) to click Download image. */
+ *  checks Copy image), `download` (the expected file name) to click Save image. */
 async function shareMenuProblems(page, label, { shot, expectClipboard, download }) {
   const problems = []
   await page.locator('.results-share').click({ timeout: 30000 }).catch((e) => problems.push(`${label}: click Share: ${e.message}`))
@@ -944,9 +944,12 @@ async function shareMenuProblems(page, label, { shot, expectClipboard, download 
     if (!copied) problems.push(`${label}: Copy link did not show "Copied!"`)
     else if (clip !== expectClipboard) problems.push(`${label}: clipboard ${JSON.stringify(clip)} != ${JSON.stringify(expectClipboard)}`)
   }
+  // The copy clicks leave focus on Copy link.
+  const from = await page.evaluate(() => document.activeElement?.getAttribute('data-target'))
+  const expected = SHARE_TARGETS[SHARE_TARGETS.indexOf(from) + 1]
   await page.keyboard.press('ArrowDown')
   const moved = await page.evaluate(() => document.activeElement?.getAttribute('data-target'))
-  if (moved !== SHARE_TARGETS[1]) problems.push(`${label}: ArrowDown in the share menu moved focus to ${moved}, not ${SHARE_TARGETS[1]}`)
+  if (moved !== expected) problems.push(`${label}: ArrowDown in the share menu moved focus from ${from} to ${moved}, not ${expected}`)
   await page.keyboard.press('Escape')
   const closed = await page.evaluate(() => ({
     open: !!document.querySelector('.share-menu'),
@@ -960,12 +963,12 @@ async function shareMenuProblems(page, label, { shot, expectClipboard, download 
     await page.locator('.results-share').click({ timeout: 30000 }).catch((e) => problems.push(`${label}: reopen Share: ${e.message}`))
     const [file] = await Promise.all([
       page.waitForEvent('download', { timeout: 20000 }).catch(() => null),
-      page.locator('[data-target="image_download"]').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Download image: ${e.message}`)),
+      page.locator('[data-target="image_download"]').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Save image: ${e.message}`)),
     ])
-    if (!file) problems.push(`${label}: Download image started no download`)
-    else if (file.suggestedFilename() !== download) problems.push(`${label}: Download image saved ${file.suggestedFilename()}, not ${download}`)
+    if (!file) problems.push(`${label}: Save image started no download`)
+    else if (file.suggestedFilename() !== download) problems.push(`${label}: Save image saved ${file.suggestedFilename()}, not ${download}`)
     const after = await page.waitForFunction(() => !document.querySelector('.share-menu'), null, { timeout: 5000, polling: 100 }).then(() => true, () => false)
-    if (!after) problems.push(`${label}: the share menu stayed open after Download image`)
+    if (!after) problems.push(`${label}: the share menu stayed open after Save image`)
   }
   return { problems, targets: { side: m.side, box: m.box, targets } }
 }

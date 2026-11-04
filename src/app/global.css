@@ -1414,11 +1414,15 @@ canvas {
   grid-column: 1 / -1;
 }
 
-/* Phone landscape: three columns keep the menu short enough to open above the buttons. */
+/* Phone landscape: three columns, Save / Copy image / Copy link on one row, keep the menu short enough to open above the buttons. */
 @media (max-height: 520px) {
   .share-menu {
     grid-template-columns: repeat(3, 1fr);
-    width: 21rem;
+    width: 23rem;
+  }
+
+  .share-wide {
+    grid-column: auto;
   }
 }
 

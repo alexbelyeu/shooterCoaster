@@ -201,7 +201,7 @@ export default function ShareMenu({ card, onShared, avoid = [] }: Props) {
             data-target="image_download"
             onClick={onDownload}
           >
-            Download image
+            Save image
           </button>
           {imageCopyable && (
             <button type="button" role="menuitem" className="share-item" data-target="image_copy" onClick={onCopyImage}>
