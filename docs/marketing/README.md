@@ -27,14 +27,15 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   | `level_start` | `level` (`level1`…), `mode` (`campaign` / `daily`, from 2026-10-31; earlier starts have none) | A run begins: from level select (a level card, or the Daily card: `mode` `daily`), Replay or Next Level. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start |
   | `level_complete` | `level`, `stars` (0–3) | The timer runs out and the results screen opens |
   | `level_quit` | `level`, `progress_pct` (0, 10 … 100: share of the level timer used) | Quit to Menu from the pause screen |
-  | `share` | `level`, `method` (`native`, `copy`, `x`, `reddit`, `bluesky`, `threads`, `whatsapp`, `facebook`, `linkedin`, `email`; from 2026-11-02, before which it carried `stars` instead) | A share went out from the results screen: the phone share sheet completed (`native`; a dismissed sheet sends nothing), Copy link copied the line (`copy`), or the player opened a network's share link from the desktop menu (the network; whether they then posted is unknown). Rare and player-initiated, so it sits outside the ≤ 2 per run count |
+  | `share` | `level`, `method` (`native`, `copy`, `x`, `reddit`, `bluesky`, `threads`, `whatsapp`, `facebook`, `linkedin`, `email`; from 2026-11-02, before which it carried `stars` instead; `image_native`, `image_download`, `image_copy` from #272) | A share went out from the results screen: the phone share sheet completed (`native`; with the score card picture, `image_native`; a dismissed sheet sends nothing), Copy link copied the line (`copy`), Download image / Copy image saved or copied the score card picture (`image_download`, `image_copy`), or the player opened a network's share link from the desktop menu (the network; whether they then posted is unknown). Rare and player-initiated, so it sits outside the ≤ 2 per run count |
 
   Completion rate per level = `level_complete` / `level_start`. The Share button (#87, #271,
-  copy in `src/ui/share.ts`) opens the phone's share sheet on touch devices that have one, and
-  everywhere else a menu of Copy link plus share links for X, Reddit, Bluesky, Threads,
-  WhatsApp, Facebook, LinkedIn and Email. It shares "I scored 1,240 ★★☆ on Theme Park in
+  copy in `src/ui/share.ts`) opens the phone's share sheet on touch devices that have one (with
+  the 1080×1920 score card picture where the sheet takes files, #272), and everywhere else a menu
+  of Download image / Copy image (the 1200×630 card; 1080×1920 on phones), Copy link plus share
+  links for X, Reddit, Bluesky, Threads, WhatsApp, Facebook, LinkedIn and Email. It shares "I scored 1,240 ★★☆ on Theme Park in
   ShooterCoaster 🎢 — beat me:" with `https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=share_<method>`
-  (`share_native`, `share_copy`, `share_x` …; `results` before 2026-11-02), so its visits show
+  (`share_native`, `share_copy`, `share_x`, `share_image_native` …; `results` before 2026-11-02), so its visits show
   as `requestPath` `/go/share`. Pausing and resuming send nothing; closing
   the tab mid-run sends no `level_quit` (starts minus completes minus quits ≈ abandons).
 - **Internal traffic (Alex's devices).** Open **https://scoaster.com/?internal=1** once in

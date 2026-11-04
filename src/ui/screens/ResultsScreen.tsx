@@ -10,6 +10,7 @@ import { SHARED_EVENT } from '@/app/analyticsEvents'
 import { eventBus } from '@/core/EventBus'
 import ShareMenu from '@/ui/ShareMenu'
 import type { ShareMethod } from '@/ui/share'
+import { scoreCardRun } from '@/ui/scoreCard'
 import type { LeaderboardEntry } from '@/types/game'
 import { barFill, formatAccuracy, formatTimeLeft, isNewRecord } from './resultsStats'
 import { initialsKey, type InitialsState } from './initialsEntry'
@@ -189,6 +190,7 @@ export default function ResultsScreen() {
   if (!config) return null
 
   const theme = biomeTheme(config.biome)
+  const card = scoreCardRun({ ...run, levelId: config.id })
   const nextName = nextLevel ? (getLevelConfig(nextLevel)?.name ?? nextLevel) : null
   const next = nextStar(run.score, config.maxScore, config.starThresholds)
   const instant = { duration: 0 }
@@ -312,7 +314,7 @@ export default function ResultsScreen() {
             <button className="play-button results-secondary" onClick={() => leave('replay')}>
               Replay
             </button>
-            <ShareMenu levelId={config.id} score={run.score} onShared={onShared} avoid={[nextRef]} />
+            {card && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} />}
             {nextOpen && (
               <button ref={nextRef} className="play-button" onClick={() => leave('next')}>
                 Next Level

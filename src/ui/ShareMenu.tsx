@@ -1,6 +1,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
 import {
   canCopy,
+  canCopyImage,
+  canShareImage,
+  copyImage,
   copyShare,
   nativeShare,
   SHARE_TARGETS,
@@ -10,28 +13,52 @@ import {
   type ShareMethod,
 } from '@/ui/share'
 import { placePopover, type Placement } from '@/ui/popoverPlacement'
+import { scoreCardFileName, type CardSize, type ScoreCardRun } from '@/ui/scoreCard'
+import { downloadBlob, renderScoreCard } from '@/ui/scoreCardImage'
 
 const COPIED_MS = 2000
 
 interface Props {
-  levelId: string
-  score: number
+  card: ScoreCardRun
   /** A share went out (the sheet completed, the line was copied, or a network link was opened). */
   onShared: (method: ShareMethod) => void
   /** Buttons the open menu must not cover (Next Level). */
   avoid?: RefObject<HTMLElement | null>[]
 }
 
-/** The results screen's Share button (#271): the native sheet on touch, else a menu of Copy link + share-intent links. */
-export default function ShareMenu({ levelId, score, onShared, avoid = [] }: Props) {
+const isTouch = () => window.matchMedia?.('(pointer: coarse)').matches ?? false
+const cardSize = (): CardSize => (isTouch() ? 'story' : 'feed')
+
+/** The results screen's Share button (#271): the native sheet on touch (with the score card image, #272), else a menu of image, Copy link and share-intent links. */
+export default function ShareMenu({ card, onShared, avoid = [] }: Props) {
+  const { levelId, score } = card
   const [open, setOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<'copy' | 'image_copy' | null>(null)
   const [placement, setPlacement] = useState<Placement | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
   const copyable = canCopy(navigator)
+  const imageCopyable = canCopyImage(navigator)
+  const pngs = useRef(new Map<CardSize, Promise<Blob>>())
+
+  function cardPng(size: CardSize): Promise<Blob> {
+    let png = pngs.current.get(size)
+    if (!png) {
+      png = renderScoreCard(card, size)
+      png.catch(() => pngs.current.delete(size))
+      pngs.current.set(size, png)
+    }
+    return png
+  }
+
+  async function shareImage(): Promise<'shared' | 'cancelled' | 'failed'> {
+    const payload = sharePayloadForRun(levelId, score, 'image_native')
+    const png = await cardPng('story').catch(() => null)
+    if (!payload || !png) return 'failed'
+    return nativeShare(navigator, { ...payload, files: [new File([png], scoreCardFileName(levelId, score), { type: 'image/png' })] })
+  }
 
   function close(refocus: boolean) {
     setOpen(false)
@@ -43,26 +70,46 @@ export default function ShareMenu({ levelId, score, onShared, avoid = [] }: Prop
     if (open) return close(false)
     const native = sharePayloadForRun(levelId, score, 'native')
     if (!native) return
-    const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false
-    if (shareMode(navigator, coarse, native) === 'native') {
+    const touch = isTouch()
+    if (touch && canShareImage(navigator)) {
+      const outcome = await shareImage()
+      if (outcome === 'shared') onShared('image_native')
+      if (outcome !== 'failed') return
+    } else if (shareMode(navigator, touch, native) === 'native') {
       const outcome = await nativeShare(navigator, native)
       if (outcome === 'shared') onShared('native')
       if (outcome !== 'failed') return
     }
     setOpen(true)
+    cardPng(cardSize()).catch(() => {})
   }
 
   async function onCopy() {
     const payload = sharePayloadForRun(levelId, score, 'copy')
     if (payload && (await copyShare(navigator, payload))) {
-      setCopied(true)
+      setCopied('copy')
       onShared('copy')
+    }
+  }
+
+  async function onDownload() {
+    const png = await cardPng(cardSize()).catch(() => null)
+    if (!png) return
+    downloadBlob(png, scoreCardFileName(levelId, score))
+    onShared('image_download')
+    close(true)
+  }
+
+  async function onCopyImage() {
+    if (await copyImage(navigator, cardPng(cardSize()))) {
+      setCopied('image_copy')
+      onShared('image_copy')
     }
   }
 
   useEffect(() => {
     if (!copied) return
-    const timer = setTimeout(() => setCopied(false), COPIED_MS)
+    const timer = setTimeout(() => setCopied(null), COPIED_MS)
     return () => clearTimeout(timer)
   }, [copied])
 
@@ -130,6 +177,8 @@ export default function ShareMenu({ levelId, score, onShared, avoid = [] }: Prop
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
+        // The sheet needs the click's user activation, so the story card starts drawing on the press.
+        onPointerDown={() => !open && isTouch() && canShareImage(navigator) && cardPng('story').catch(() => {})}
         onClick={onButton}
       >
         Share
@@ -145,9 +194,23 @@ export default function ShareMenu({ levelId, score, onShared, avoid = [] }: Prop
           style={{ left: placement?.offsetX ?? 0, visibility: placement ? 'visible' : 'hidden' }}
           onKeyDown={onMenuKey}
         >
+          <button
+            type="button"
+            role="menuitem"
+            className={`share-item${imageCopyable ? '' : ' share-wide'}`}
+            data-target="image_download"
+            onClick={onDownload}
+          >
+            Download image
+          </button>
+          {imageCopyable && (
+            <button type="button" role="menuitem" className="share-item" data-target="image_copy" onClick={onCopyImage}>
+              {copied === 'image_copy' ? 'Copied!' : 'Copy image'}
+            </button>
+          )}
           {copyable && (
-            <button type="button" role="menuitem" className="share-item share-copy" data-target="copy" onClick={onCopy}>
-              {copied ? 'Copied!' : 'Copy link'}
+            <button type="button" role="menuitem" className="share-item share-copy share-wide" data-target="copy" onClick={onCopy}>
+              {copied === 'copy' ? 'Copied!' : 'Copy link'}
             </button>
           )}
           {SHARE_TARGETS.map(({ id, label }) => {

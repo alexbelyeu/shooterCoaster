@@ -11,7 +11,7 @@
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots (fires one real shot, then resolves the
  *     hits through the bullet pool's own processHit path), endLevel() to reach
- *     the results screen (shareText() for what its share menu's Copy link copies), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
+ *     the results screen (shareText() for what its share menu's Copy link copies, scoreCard(size) for its share image), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
  *     primeCombo(n) to set up a long chain,
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
@@ -59,6 +59,8 @@ import { MUSIC_ENGINE, scrimPlayer, type MusicEngine } from '@/audio/musicEngine
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
 import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
 import { clipboardText, sharePayloadForRun } from '@/ui/share'
+import { scoreCardFileName, scoreCardRun, type CardSize } from '@/ui/scoreCard'
+import { renderScoreCard } from '@/ui/scoreCardImage'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
@@ -174,6 +176,9 @@ export interface SCTestApi {
   endLevel: () => void
   /** What the results share menu's Copy link puts on the clipboard for the current level and score (`text url`), or null. */
   shareText: () => string | null
+  /** The results Share image (#272) for the current level and run, drawn as the share menu draws it: its pixel size,
+   *  PNG data URL and download name, or null with no level. */
+  scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string } | null>
   /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
   setTimeScale: (s: number) => void
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
@@ -791,6 +796,22 @@ export function installE2EApi() {
       const { currentLevel, score } = useGameStore.getState()
       const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score), 'copy') : null
       return payload ? clipboardText(payload) : null
+    },
+    scoreCard: async (size: CardSize) => {
+      const s = useGameStore.getState()
+      const card = s.currentLevel ? scoreCardRun({ ...s, levelId: s.currentLevel, mode: s.runMode }) : null
+      if (!card) return null
+      const blob = await renderScoreCard(card, size)
+      const bitmap = await createImageBitmap(blob)
+      const png = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result))
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(blob)
+      })
+      const out = { width: bitmap.width, height: bitmap.height, png, fileName: scoreCardFileName(card.levelId, card.score) }
+      bitmap.close()
+      return out
     },
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
     rideTo: null,

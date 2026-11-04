@@ -700,9 +700,12 @@ async function resultsScreenProblems(page, id, stats) {
     if (share[4] !== SHARE_URL) problems.push(`share link ${share[4]} != ${SHARE_URL}`)
   }
   // #271: desktop Share opens our menu (headless Chromium has no share sheet anyway); Copy link fills the clipboard.
-  const menu = await shareMenuProblems(page, 'desktop', { shot: `${id}-share.png`, expectClipboard: screen.shareText })
+  const menu = await shareMenuProblems(page, 'desktop', { shot: `${id}-share.png`, expectClipboard: screen.shareText, download: `shootercoaster-${id}-${stats.score}.png` })
   problems.push(...menu.problems)
   shown.shareMenu = menu.targets
+  const cards = await scoreCardProblems(page, id, `shootercoaster-${id}-${stats.score}.png`)
+  problems.push(...cards.problems)
+  shown.scoreCards = cards.sizes
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
   for (const label of ['Kills', 'Accuracy', 'Best combo', 'Time left']) {
     if (!(label in screen.rows)) problems.push(`results screen has no "${label}" row`)
@@ -845,11 +848,41 @@ async function frenzyEndProblems(page, id) {
 
 /** The results-screen share link (#87, src/ui/share.ts). */
 const SHARE_URL = 'https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=share_copy'
-const SHARE_TARGETS = ['copy', 'x', 'reddit', 'bluesky', 'threads', 'whatsapp', 'facebook', 'linkedin', 'email']
+/** Menu items in order (#271; the image ones #272). Copy image needs ClipboardItem, which headless Chromium has. */
+const SHARE_TARGETS = ['image_download', 'image_copy', 'copy', 'x', 'reddit', 'bluesky', 'threads', 'whatsapp', 'facebook', 'linkedin', 'email']
+const SHARE_BUTTONS = new Set(['image_download', 'image_copy', 'copy'])
+
+/** #272: the share image at both sizes, drawn through the hook as the menu draws it; saved as `<prefix>-card.png` / `<prefix>-card-story.png`. */
+const CARD_SIZES = { feed: { width: 1200, height: 630, shot: 'card' }, story: { width: 1080, height: 1920, shot: 'card-story' } }
+// A blank or text-only card compresses to a few KB; the art alone is far more.
+const CARD_MIN_BYTES = 20000
+
+async function scoreCardProblems(page, prefix, fileName) {
+  const problems = []
+  const sizes = {}
+  for (const [size, want] of Object.entries(CARD_SIZES)) {
+    const card = await page.evaluate((s) => window.__SC_TEST__.scoreCard(s), size).catch((e) => ({ error: e.message }))
+    if (!card?.png) {
+      problems.push(`score card ${size}: ${card?.error ?? 'none drawn'}`)
+      continue
+    }
+    const png = Buffer.from(card.png.replace(/^data:image\/png;base64,/, ''), 'base64')
+    fs.writeFileSync(path.join(OUT, `${prefix}-${want.shot}.png`), png)
+    // The IHDR chunk: width and height right after the 8-byte signature and the chunk header.
+    const dims = png.toString('ascii', 1, 4) === 'PNG' ? [png.readUInt32BE(16), png.readUInt32BE(20)] : null
+    if (!dims || dims[0] !== want.width || dims[1] !== want.height || card.width !== want.width || card.height !== want.height)
+      problems.push(`score card ${size} is ${dims?.join('x') ?? 'not a PNG'} (bitmap ${card.width}x${card.height}), expected ${want.width}x${want.height}`)
+    if (png.length < CARD_MIN_BYTES) problems.push(`score card ${size} is only ${png.length} bytes: blank?`)
+    if (card.fileName !== fileName) problems.push(`score card ${size} file name ${card.fileName}, expected ${fileName}`)
+    sizes[size] = { bytes: png.length }
+  }
+  return { problems, sizes }
+}
 
 /** #271: the share menu (every target, in the viewport, off the other buttons, keyboard); never clicks a network link,
- *  since a local run fails on other-origin requests. Pass `expectClipboard` only where clipboard-read is granted. */
-async function shareMenuProblems(page, label, { shot, expectClipboard }) {
+ *  since a local run fails on other-origin requests. Pass `expectClipboard` only where clipboard-read is granted (it also
+ *  checks Copy image), `download` (the expected file name) to click Download image. */
+async function shareMenuProblems(page, label, { shot, expectClipboard, download }) {
   const problems = []
   await page.locator('.results-share').click({ timeout: 30000 }).catch((e) => problems.push(`${label}: click Share: ${e.message}`))
   const opened = await page
@@ -878,7 +911,7 @@ async function shareMenuProblems(page, label, { shot, expectClipboard }) {
   })
   const targets = m.items.map((i) => i.target)
   if (JSON.stringify(targets) !== JSON.stringify(SHARE_TARGETS)) problems.push(`${label}: share menu lists ${JSON.stringify(targets)}, expected ${JSON.stringify(SHARE_TARGETS)}`)
-  if (m.focused !== 'copy') problems.push(`${label}: opening the share menu focused ${m.focused}, not Copy link`)
+  if (m.focused !== SHARE_TARGETS[0]) problems.push(`${label}: opening the share menu focused ${m.focused}, not ${SHARE_TARGETS[0]}`)
   const b = m.box
   if (b.left < 0 || b.top < 0 || b.right > m.vw || b.bottom > m.vh) problems.push(`${label}: share menu ${JSON.stringify(b)} leaves the ${m.vw}x${m.vh} viewport`)
   for (const o of m.others) {
@@ -886,11 +919,23 @@ async function shareMenuProblems(page, label, { shot, expectClipboard }) {
   }
   for (const i of m.items) {
     if (i.tall < 44) problems.push(`${label}: share item ${i.target} under the 44 px touch target`)
-    if (i.target === 'copy') continue
+    if (SHARE_BUTTONS.has(i.target)) continue
     if (!i.href || !i.href.includes(encodeURIComponent(`utm_campaign=share_${i.target}`))) problems.push(`${label}: ${i.target} link ${i.href} lacks utm_campaign=share_${i.target}`)
   }
   if (shot) await page.screenshot({ path: path.join(OUT, shot), timeout: SHOT_TIMEOUT })
   if (expectClipboard !== undefined) {
+    await page.locator('[data-target="image_copy"]').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Copy image: ${e.message}`))
+    const imageCopied = await page
+      .waitForFunction(() => document.querySelector('[data-target="image_copy"]')?.textContent === 'Copied!', null, { timeout: 20000, polling: 100 })
+      .then(() => true, () => false)
+    const image = await page.evaluate(async () => {
+      const item = (await navigator.clipboard.read()).find((i) => i.types.includes('image/png'))
+      if (!item) return null
+      const bitmap = await createImageBitmap(await item.getType('image/png'))
+      return `${bitmap.width}x${bitmap.height}`
+    }).catch((e) => `error ${e.message}`)
+    if (!imageCopied) problems.push(`${label}: Copy image did not show "Copied!"`)
+    else if (image !== '1200x630') problems.push(`${label}: Copy image put ${image} on the clipboard, not the 1200x630 card`)
     await page.locator('.share-copy').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Copy link: ${e.message}`))
     const copied = await page
       .waitForFunction(() => document.querySelector('.share-copy')?.textContent === 'Copied!', null, { timeout: 10000, polling: 100 })
@@ -901,7 +946,7 @@ async function shareMenuProblems(page, label, { shot, expectClipboard }) {
   }
   await page.keyboard.press('ArrowDown')
   const moved = await page.evaluate(() => document.activeElement?.getAttribute('data-target'))
-  if (moved !== 'x') problems.push(`${label}: ArrowDown in the share menu moved focus to ${moved}, not X`)
+  if (moved !== SHARE_TARGETS[1]) problems.push(`${label}: ArrowDown in the share menu moved focus to ${moved}, not ${SHARE_TARGETS[1]}`)
   await page.keyboard.press('Escape')
   const closed = await page.evaluate(() => ({
     open: !!document.querySelector('.share-menu'),
@@ -911,6 +956,17 @@ async function shareMenuProblems(page, label, { shot, expectClipboard }) {
   if (closed.open) problems.push(`${label}: Esc left the share menu open`)
   if (!closed.focusOnShare) problems.push(`${label}: Esc did not return focus to Share`)
   if (closed.phase !== 'results') problems.push(`${label}: the share menu keys left the results screen (${closed.phase})`)
+  if (download) {
+    await page.locator('.results-share').click({ timeout: 30000 }).catch((e) => problems.push(`${label}: reopen Share: ${e.message}`))
+    const [file] = await Promise.all([
+      page.waitForEvent('download', { timeout: 20000 }).catch(() => null),
+      page.locator('[data-target="image_download"]').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Download image: ${e.message}`)),
+    ])
+    if (!file) problems.push(`${label}: Download image started no download`)
+    else if (file.suggestedFilename() !== download) problems.push(`${label}: Download image saved ${file.suggestedFilename()}, not ${download}`)
+    const after = await page.waitForFunction(() => !document.querySelector('.share-menu'), null, { timeout: 5000, polling: 100 }).then(() => true, () => false)
+    if (!after) problems.push(`${label}: the share menu stayed open after Download image`)
+  }
   return { problems, targets: { side: m.side, box: m.box, targets } }
 }
 
@@ -1967,6 +2023,8 @@ async function dailyCheck(newPage) {
   if (!savedDay || savedDay.score !== Math.round(results.score)) problems.push(`today's daily best ${JSON.stringify(savedDay)}, expected score ${Math.round(results.score)}`)
   if (results.daily.streak.count !== 1 || results.daily.streak.lastKey !== run?.dateKey) problems.push(`daily streak ${JSON.stringify(results.daily.streak)}, expected 1 day`)
   if (JSON.stringify(results.savedScores) !== JSON.stringify(campaign)) problems.push(`a daily run changed the campaign saves: ${JSON.stringify(results.savedScores)}`)
+  // #272: the daily's share image carries the Daily badge and date (daily-card.png, daily-card-story.png).
+  if (run) problems.push(...(await scoreCardProblems(first.page, 'daily', `shootercoaster-${run.level}-${Math.round(results.score)}.png`)).problems)
 
   // Replay replays the same seed in daily mode.
   await first.page.locator('.results-actions button', { hasText: 'Replay' }).click({ timeout: 10000 }).catch((e) => problems.push(`click Replay: ${e.message}`))
@@ -2652,7 +2710,46 @@ async function mobileResults(page) {
   await page.waitForTimeout(1000)
   // No share sheet in headless Chromium, so the phone gets the menu too: it must fit 390 px.
   problems.push(...(await shareMenuProblems(page, 'phone portrait 390x844', { shot: 'mobile-share.png' })).problems)
+  problems.push(...(await phoneImageShareProblems(page)))
   return { problems, buttons, entry: { initials: stored.top, portrait, landscape } }
+}
+
+/** #272: where the sheet takes files (stubbed `canShare` / `share`: headless Chromium has no sheet), Share sends the story card with the line and link. */
+async function phoneImageShareProblems(page) {
+  const problems = []
+  await page.evaluate(() => {
+    window.__sharedData = null
+    const stub = (name, value) => Object.defineProperty(navigator, name, { value, configurable: true, writable: true })
+    stub('canShare', (data) => Array.isArray(data?.files) && data.files.every((f) => f.type === 'image/png'))
+    stub('share', async (data) => {
+      window.__sharedData = data
+    })
+  })
+  await page.locator('.results-share').tap({ timeout: 30000 }).catch((e) => problems.push(`phone: tap Share: ${e.message}`))
+  const shared = await page
+    .waitForFunction(() => window.__sharedData, null, { timeout: 30000, polling: 100 })
+    .then(() => page.evaluate(async () => {
+      const d = window.__sharedData
+      const file = d.files?.[0]
+      const bitmap = file ? await createImageBitmap(file) : null
+      return {
+        url: d.url, text: d.text, files: d.files?.length ?? 0, name: file?.name, type: file?.type,
+        size: bitmap ? `${bitmap.width}x${bitmap.height}` : null,
+        score: window.__SC_TEST__.stats().score, menu: !!document.querySelector('.share-menu'),
+      }
+    }), () => null)
+  await page.evaluate(() => {
+    delete navigator.canShare
+    delete navigator.share
+  })
+  if (!shared) return [...problems, 'phone: with canShare({ files }) true, Share never called the share sheet']
+  if (shared.files !== 1 || shared.type !== 'image/png') problems.push(`phone: shared ${shared.files} file(s) of type ${shared.type}, expected one PNG`)
+  if (shared.size !== '1080x1920') problems.push(`phone: shared a ${shared.size} image, not the 1080x1920 story card`)
+  if (shared.name !== `shootercoaster-level1-${shared.score}.png`) problems.push(`phone: shared file named ${shared.name}`)
+  if (!shared.url?.includes('utm_campaign=share_image_native')) problems.push(`phone: image share link ${shared.url} lacks utm_campaign=share_image_native`)
+  if (!shared.text?.startsWith('I scored ')) problems.push(`phone: image share line ${JSON.stringify(shared.text)}`)
+  if (shared.menu) problems.push('phone: the share menu opened although the sheet took the image')
+  return problems
 }
 
 /** Touch playtest on a phone-sized viewport: real taps through the whole flow. */

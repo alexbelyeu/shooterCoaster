@@ -1410,7 +1410,7 @@ canvas {
   outline: none;
 }
 
-.share-copy {
+.share-wide {
   grid-column: 1 / -1;
 }
 
