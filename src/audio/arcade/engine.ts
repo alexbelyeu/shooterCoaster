@@ -8,10 +8,10 @@ import { scrimPlayer } from '../musicEngine'
 import { dropSound } from '../soundGuard'
 import { compile } from '../scrim/score'
 import { makeIR } from '../scrim/synth'
-import { SCORES } from '../scores'
+import { SCORES, scoreIdFor } from '../scores'
 import {
   ARCADE_SOUNDS, AUTO_FIRE_DB, BIOME_REVERB, FIREWORK_BIOMES, STEAL_FADE_S, VOICE_BUDGET, WHISTLE_LENGTHS_S, SCORE_KEYS,
-  WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, killTier, nextBeat, pickVoice, windGain, windHz, windUpdateDue,
+  WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, killTier, nextBeat, panGain, pickVoice, windGain, windHz, windUpdateDue,
   type ArcadeSoundId, type VoiceState, type WindRamp,
 } from '../sfxDesign'
 import type { Placement, SfxEngine, VoiceStats } from '../sfx'
@@ -155,11 +155,12 @@ const BUS_NODES = 4
 const WIND_NODES = 3
 
 function bakeSpec(scoreId: string, levelBiome: BiomeType, level: string | null): BakeSpec {
-  const song = compile(SCORES[scoreId])
+  const id = scoreIdFor(scoreId)
+  const song = compile(SCORES[id])
   const section = song.loop.sections[0] ?? song.intro.sections[0]
   const config = level ? getLevelConfig(level) : undefined
   return {
-    key: SCORE_KEYS[scoreId],
+    key: SCORE_KEYS[id],
     beats: section.beats,
     beatS: section.barDur / section.beats,
     biome: levelBiome,
@@ -226,7 +227,7 @@ function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: P
       v.src.stop(t)
     }
     const p = place ?? NO_PLACE
-    v.gain.gain.setValueAtTime(Math.pow(10, (def.db + db) / 20), t)
+    v.gain.gain.setValueAtTime(Math.pow(10, (def.db + db) / 20) * (place ? panGain(p.pan) : 1), t)
     v.lp.frequency.setValueAtTime(p.cutoffHz, t)
     v.pan.pan.setValueAtTime(p.pan, t)
     v.send.gain.setValueAtTime(def.send, t)

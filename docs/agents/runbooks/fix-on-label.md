@@ -1,6 +1,7 @@
 # Fix (on label)
 
-A GitHub event started this run: QA labelled a pull request `agent:changes-requested`.
+A GitHub event started this run: QA, or the auto-merge workflow when an approved PR
+conflicts with `main`, labelled a pull request `agent:changes-requested`.
 Fix **only that PR**, in this session (no builder subagent), then stop. New issues are left
 to the scheduled builder runs. If no pull-request number came with this run (someone
 pressed Run now), reply "No PR event — nothing to do" and stop.
@@ -8,7 +9,9 @@ pressed Run now), reply "No PR event — nothing to do" and stop.
 1. Re-read the PR. Continue only if it is open, not a draft, its head branch starts with
    `agent/`, and it is labelled `agent:changes-requested`. Otherwise reply "Nothing to
    fix" and stop.
-2. If it has been sent back 3 or more times, leave it for the Director: reply so and stop.
+2. If QA has sent it back 3 or more times, leave it for the Director: reply so and stop.
+   The auto-merge workflow's `Auto-merge failed: this branch conflicts with main`
+   hand-backs don't count; they always get fixed.
 3. If the PR has a *live* `Builder run … is on it` claim (see "Live claims" in the
    runbooks README: under 2 hours old, posted after the latest QA change request, with
    no builder reply after it), reply "Already being fixed" and stop. Otherwise comment

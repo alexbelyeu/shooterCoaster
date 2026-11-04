@@ -45,13 +45,12 @@ describe('particle presets', () => {
     expect(Math.hypot(dx, dz)).toBeGreaterThan(4 * Math.abs(dy))
   })
 
-  it('only the volcano erupts', () => {
+  it('only the volcano erupts and the desert stirs (the Giant Scorpion\'s tell)', () => {
+    const boosted: Record<string, string> = { volcanicAsh: 'eruption:start', desertDust: 'scorpion:burrow' }
     for (const [name, p] of presets) {
-      expect(p.boost === undefined, name).toBe(name !== 'volcanicAsh')
+      expect(p.boost?.event, name).toBe(boosted[name])
+      if (p.boost) expect(p.boost.count, name).toBeGreaterThan(0)
     }
-    const boost = PARTICLE_PRESETS.volcanicAsh.boost!
-    expect(boost.event).toBe('eruption:start')
-    expect(boost.count).toBeGreaterThan(0)
   })
 })
 

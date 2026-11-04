@@ -144,6 +144,11 @@ export interface DesertLayout {
   devils: DustDevil[]
 }
 
+/** Landmarks and mesas as XZ circles, for anything that must keep off them. */
+export function desertObstacles(mesas: readonly Mesa[]): { x: number; z: number; r: number }[] {
+  return [...LANDMARK_FOOTPRINTS, ...mesas.map((m) => ({ x: m.x, z: m.z, r: MESA_FOOTPRINT * m.scale }))]
+}
+
 export function layoutDesert(groundFn: HeightFunction, track: ArcTable): DesertLayout {
   const extent = trackExtent(track)
   const mesas = placeMesas(groundFn, track, {
@@ -162,7 +167,7 @@ export function layoutDesert(groundFn: HeightFunction, track: ArcTable): DesertL
     offset: [260, 480],
     drift: 90,
     clearance: 120,
-    avoid: [...LANDMARK_FOOTPRINTS, ...mesas.map((m) => ({ x: m.x, z: m.z, r: MESA_FOOTPRINT * m.scale }))],
+    avoid: desertObstacles(mesas),
     rng: createRng(2301),
   })
   return { mesas, devils }

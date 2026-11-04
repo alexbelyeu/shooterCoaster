@@ -1,0 +1,104 @@
+title    Neon Marquee
+composer Claude (ShooterCoaster)
+about    Title theme option "neon": a supersaw hook in A minor over a four-on-the-floor bigkick, gated snare and a pumping FM bass. The lift replays the hook a tone up before the turnaround.
+tempo    160
+beats    4
+steps    4
+reverb   0.22
+
+voice lead   supersaw  vol=0.82
+voice arp    chip      vol=0.14 pan=0.45 gate=0.6
+voice brass  synbrass  vol=0.36 pan=-0.35 center=E4 gate=0.6
+voice bass   fmbass    vol=0.52 gate=0.7
+voice hit    orchhit   vol=0.42
+voice rise   riser     vol=0.3
+voice fall   downlifter vol=0.3
+voice kick   bigkick   vol=0.5
+voice snare  gatesnare vol=0.6
+voice hat    hat909    vol=0.3  pan=0.3
+voice ohat   ohat909   vol=0.22 pan=-0.3
+voice crash  crash     vol=0.3  pan=-0.2
+
+pattern intro
+hit   | [Am]!-- . [Am]!-- . [Am]!------- | [F]!--- [G]!--- [E]!------- |
+rise  | _ | A5--------------- |
+kick  | X... .... X... .... | X... .... X... X.X. |
+snare | .... .... .... .... | .... .... XxXx XXXX |
+
+pattern H
+lead  | A4- C5- E5- A5--- G5- E5- D5- | E5----- .- C5- D5- E5- G5- | A5--- G5- F5- E5--- C5- F5- | D5------- B4- C5- D5- G5- |
+brass | .- [Am]- .--- [Am]- .- [Am]- .- | % | .- [F]- .--- [F]- .- [F]- .- | .- [G]- .--- [G]- .- [G]- .- |
+bass  | A2- A2- A3- A2- A2- A3- A2- A2- | % | F2- F2- F3- F2- F2- F3- F2- F2- | G2- G2- G3- G2- G2- G3- G2- G2- |
+hit   | [Am] .-------------- | _ | [F] .-------------- | _ |
+kick  | x... x... x... x... | % | % | x... x... x... x.x. |
+snare | .... X... .... X... | % | % | % |
+hat   | x.x. x.x. x.x. x.x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern R
+lead  | A4- C5- E5- A5--- G5- E5- D5- | C5- D5- E5- C5- A4--- .--- | F5--- E5- D5- A5--- F5- D5- | E5------- G#5--- B5--- |
+brass | .- [Am]- .--- [Am]- .- [Am]- .- | % | .- [Dm]- .--- [Dm]- .- [Dm]- .- | .- [E]- .--- [E]- .- [E]- .- |
+bass  | A2- A2- A3- A2- A2- A3- A2- A2- | % | D2- D2- D3- D2- D2- D3- D2- D2- | E2- E2- E3- E2- E2- E3- E2- E2- |
+kick  | x... x... x... x... | % | % | x... x... x... x.x. |
+snare | .... X... .... X... | % | % | .... X... ..x. XxXX |
+hat   | x.x. x.x. x.x. x.x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern H2
+lead  | A4- C5- E5- A5--- G5- E5- D5- | E5----- .- C5- D5- E5- G5- | A5--- G5- F5- E5--- C5- F5- | D5------- B4- C5- D5- G5- |
+arp   | A4 E5 C5 E5 A5 E5 C5 E5 A4 E5 C5 E5 A5 E5 C5 E5 | % | F5 C6 A5 C6 F6 C6 A5 C6 F5 C6 A5 C6 F6 C6 A5 C6 | G5 D6 B5 D6 G6 D6 B5 D6 G5 D6 B5 D6 G6 D6 B5 D6 |
+brass | .- [Am]- .--- [Am]- .- [Am]- .- | % | .- [F]- .--- [F]- .- [F]- .- | .- [G]- .--- [G]- .- [G]- .- |
+bass  | A2- A2- A3- A2- A2- A3- A2- A2- | % | F2- F2- F3- F2- F2- F3- F2- F2- | G2- G2- G3- G2- G2- G3- G2- G2- |
+hit   | [Am] .-------------- | _ | [F] .-------------- | _ |
+kick  | x... x... x... x... | % | % | x... x... x... x.x. |
+snare | .... X... .... X... | % | % | % |
+hat   | x.x. x.x. x.x. x.x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern R2
+lead  | A4- C5- E5- A5--- G5- E5- D5- | C5- D5- E5- C5- A4--- .--- | F5--- E5- D5- A5--- F5- D5- | E5- F5- G#5- A5- B5- C6- D6- E6- |
+arp   | A4 E5 C5 E5 A5 E5 C5 E5 A4 E5 C5 E5 A5 E5 C5 E5 | % | D5 A5 F5 A5 D6 A5 F5 A5 D5 A5 F5 A5 D6 A5 F5 A5 | E5 B5 G#5 B5 E6 B5 G#5 B5 E5 B5 G#5 B5 E6 B5 G#5 B5 |
+brass | .- [Am]- .--- [Am]- .- [Am]- .- | % | .- [Dm]- .--- [Dm]- .- [Dm]- .- | .- [E]- .--- [E]- .- [E]- .- |
+bass  | A2- A2- A3- A2- A2- A3- A2- A2- | % | D2- D2- D3- D2- D2- D3- D2- D2- | E2- E2- E3- E2- E2- E3- E2- E2- |
+rise  | _ | _ | _ | E5--------------- |
+kick  | x... x... x... x... | % | % | x... x... x... x.x. |
+snare | .... X... .... X... | % | % | .... X... ..x. XxXX |
+hat   | x.x. x.x. x.x. x.x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern B1
+lead  | C6------- A5--- C6--- | D6------- B5--- G5--- | B5--- G5--- E5--- G5--- | A5----------- .--- |
+brass | .- [F]- .--- [F]- .- [F]- .- | .- [G]- .--- [G]- .- [G]- .- | .- [Em]- .--- [Em]- .- [Em]- .- | .- [Am]- .--- [Am]- .- [Am]- .- |
+bass  | F2- F2- F3- F2- F2- F3- F2- F2- | G2- G2- G3- G2- G2- G3- G2- G2- | E2- E2- E3- E2- E2- E3- E2- E2- | A2- A2- A3- A2- A2- A3- A2- A2- |
+fall  | A6--------------- | _ | _ | _ |
+kick  | x... x... x... x... | % | % | x... x... x... x.x. |
+snare | .... X... .... X... | % | % | % |
+hat   | xoxo xoxo xoxo xoxo | % | % | % |
+ohat  | ..x. ..x. ..x. ..x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern B2
+lead  | F5--- A5--- D6--- F6--- | E6--- D6- C6- B5--- G5--- | C6--- E6--- G6- E6- C6- G5- | B5------- .- G#5- A5- B5- |
+brass | .- [Dm]- .--- [Dm]- .- [Dm]- .- | .- [G]- .--- [G]- .- [G]- .- | .- [C]- .--- [C]- .- [C]- .- | .- [E]- .--- [E]- .- [E]- .- |
+bass  | D2- D2- D3- D2- D2- D3- D2- D2- | G2- G2- G3- G2- G2- G3- G2- G2- | C2- C2- C3- C2- C2- C3- C2- C2- | E2- E2- E3- E2- E2- E3- E2- E2- |
+rise  | _ | _ | _ | B5--------------- |
+kick  | x... x... x... x... | % | % | x... x... x... x.x. |
+snare | .... X... .... X... | % | % | .... X... ..x. XxXX |
+hat   | xoxo xoxo xoxo xoxo | % | % | % |
+ohat  | ..x. ..x. ..x. ..x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern T
+lead  | A5--- C6--- F6------- | G6--- F6- E6- D6--- B5--- | C6- B5- A5- E5- C6- B5- A5- E5- | G#5- A5- B5- D6- E6------- |
+arp   | F5 C6 A5 C6 F6 C6 A5 C6 F5 C6 A5 C6 F6 C6 A5 C6 | G5 D6 B5 D6 G6 D6 B5 D6 G5 D6 B5 D6 G6 D6 B5 D6 | A4 E5 C5 E5 A5 E5 C5 E5 A4 E5 C5 E5 A5 E5 C5 E5 | E5 B5 G#5 B5 E6 B5 G#5 B5 E5 B5 G#5 B5 E6 B5 G#5 B5 |
+brass | .- [F]- .--- [F]- .- [F]- .- | .- [G]- .--- [G]- .- [G]- .- | .- [Am]- .--- [Am]- .- [Am]- .- | .- [E]- .--- [E]- .- [E]- .- |
+bass  | F2- F2- F3- F2- F2- F3- F2- F2- | G2- G2- G3- G2- G2- G3- G2- G2- | A2- A2- A3- A2- A2- A3- A2- A2- | E2- E2- E3- E2- E2- E3- E2- E2- |
+hit   | [F] .-------------- | [G] .-------------- | [Am] .-------------- | [E]!-- . [E]!-- . [E]!------- |
+kick  | x... x... x... x... | % | % | x... x... x... x.x. |
+snare | .... X... .... X... | % | % | .... X... ..x. XxXX |
+hat   | xoxo xoxo xoxo xoxo | % | % | % |
+ohat  | ..x. ..x. ..x. ..x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+
+play intro
+loop H R H2 R2 B1 B2 H2+2 T

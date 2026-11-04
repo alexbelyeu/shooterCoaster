@@ -69,7 +69,9 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
 
 Use this instead of steps 1–4 only when **all** of these hold: an earlier QA comment on
 this PR says the full review passed and the only change requested was resolving a
-merge conflict; and every commit after the head that review named is a merge of
+merge conflict, or the auto-merge workflow sent an approved PR back with
+`Auto-merge failed: this branch conflicts with main` (the head it names is the reviewed
+head); and every commit after the head that review named is a merge of
 `origin/main` (`git log --first-parent --no-merges <reviewed-head>..HEAD` is empty;
 without `--first-parent` it also lists the commits those merges brought in). Then:
 
@@ -98,7 +100,8 @@ Otherwise:
   (file, what's wrong, what good looks like). Swap `agent:needs-qa` →
   `agent:changes-requested`.
 - If this PR has already been sent back 3 times, close it instead, label the issue
-  `agent:blocked`, and explain for the Director.
+  `agent:blocked`, and explain for the Director. Count QA change requests only: the
+  auto-merge workflow's conflict hand-backs don't count.
 - If you find a bug on `main` unrelated to the PR, open a `type:bug` issue labelled
   `agent:ready` + P1/P2.
 

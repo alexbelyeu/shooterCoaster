@@ -8,11 +8,11 @@ nothing for `docs/ASSETS.md`).
 
 | File | What |
 |---|---|
-| `clip-level1-1280x720.mp4` | 19 s, 1280×720, 30 fps, H.264, silent. Title fly-by (2.5 s) → PLAY → level select → Theme Park ride from track fraction 0.42: under the Ferris wheel, balloons popping with muzzle flash and hitmarkers, combo climbing to ×5 FRENZY. The one to attach to posts |
-| `clip-level1-1280x720.gif` | The first 8 s of that ride, 480 px wide, 15 fps, for forums that only take GIFs. The last GIF committed here: re-renders keep theirs out of git (below) |
+| `clip-level1-1280x720.mp4` | 19 s, 1280×720, 30 fps, H.264, silent, ~3 MB. Title fly-by → PLAY → level select → Theme Park ride from track fraction 0.42: under the Ferris wheel, balloons popping with muzzle flash and hitmarkers, combo climbing to ×5 FRENZY, fireworks bursting over the midway on the kill streaks. The one to attach to posts |
+| `clip-level1-1280x720.gif` | The first 8 s of that ride, 480 px wide, 15 fps, ~7 MB, for forums that only take GIFs (over a 4 MB upload cap, attach the MP4 or a still instead). The last GIF committed here: re-renders keep theirs out of git (below) |
 | `clip-level1-1280x720-{start,mid,end}.jpg` | First, middle and last frame of the MP4, to check the clip without a video player |
 
-How it was made (2026-10-28, #100): `npm run build && npm run clip` with the defaults:
+How it was made (first render 2026-10-28, #100; re-rendered 2026-11-02 on `main` @ 8e66045 by the Marketer after fireworks #222, the Golden Blimp #219, weapon pickups #266 and the HUD changes landed — 17 kills, score 555, seed 1337): `npm run build && npm run clip` with the defaults:
 `--level level1 --from 0.42 --seconds 15 --fps 30 --size 1280x720 --seed 1337`. Autofire
 plays the ride; nothing is staged except the start point. The seed pins enemy spawns and
 `Math.random`, and time is virtual, so re-running renders the same clip (up to a few

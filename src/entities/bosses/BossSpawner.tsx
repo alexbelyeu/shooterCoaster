@@ -6,6 +6,7 @@ import type { BossType, LevelConfig } from '@/types/level'
 import { e2eBoss, isE2E, type E2EBossStage } from '@/testing/e2eHook'
 import { BOSS_SPECS } from './bossSpecs'
 import type { BossProps } from './BossBase'
+import GiantScorpion from './GiantScorpion'
 import GoldenBlimp from './GoldenBlimp'
 import Kraken from './Kraken'
 import type { ArcTable } from '@/track/arcLength'
@@ -14,6 +15,7 @@ import type { HeightFunction } from '@/utils/terrainNoise'
 const BOSS_COMPONENTS: Record<BossType, React.ComponentType<BossProps>> = {
   goldenBlimp: GoldenBlimp,
   kraken: Kraken,
+  giantScorpion: GiantScorpion,
 }
 
 type Stage = Exclude<E2EBossStage, 'none' | 'defeated'>
@@ -68,5 +70,12 @@ export default function BossSpawner({ boss, timerSeconds, track, groundFn }: Bos
 
   if (stage === 'done') return null
   const Boss = BOSS_COMPONENTS[boss.type]
-  return <Boss id={boss.type} active={stage === 'active'} onDone={onDone} track={track} groundFn={groundFn} />
+  return <Boss
+      id={boss.type}
+      active={stage === 'active'}
+      incoming={stage === 'incoming'}
+      onDone={onDone}
+      track={track}
+      groundFn={groundFn}
+    />
 }

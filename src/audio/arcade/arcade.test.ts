@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ARCADE_SOUNDS, KILL_TIMBRES, PRIO, VOICE_BUDGET, bossHitRate, hitRate, keyNote, killRate, nextBeat, pickVoice, spatial,
+  ARCADE_SOUNDS, KILL_TIMBRES, PRIO, VOICE_BUDGET, bossHitRate, hitRate, keyNote, killRate, nextBeat, panGain, pickVoice, spatial,
   type ArcadeSoundId, type VoiceState,
 } from '../sfxDesign'
 import { RECIPES } from './recipes'
@@ -54,6 +54,14 @@ describe('keyNote', () => {
 
 describe('spatial', () => {
   const out = { pan: 0, cutoffHz: 0 }
+  it('keeps the louder channel of a placed sound at its level wherever it pans', () => {
+    for (const pan of [-1, -0.6, 0, 0.3, 0.75, 1]) {
+      const a = ((pan + 1) * Math.PI) / 4
+      expect(Math.max(Math.cos(a), Math.sin(a)) * panGain(pan)).toBeCloseTo(1)
+    }
+    expect(20 * Math.log10(panGain(0))).toBeCloseTo(3.01, 1)
+    expect(panGain(1)).toBeCloseTo(1)
+  })
   it('pans with the screen position and dulls with distance', () => {
     expect(spatial(0, -20, 0.8, out)).toEqual({ pan: 0, cutoffHz: 18000 })
     expect(spatial(80, -100, 0.8, out).pan).toBeCloseTo(0.75)
