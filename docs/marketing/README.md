@@ -67,6 +67,10 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
 - **Spend:** the cap is `ad_budget_usd_per_month` in `docs/agents/STEERING.md`. Agents never
   spend, post or create accounts: the Marketer drafts, Alex approves and places, until an ad
   platform is connected and STEERING.md says the Marketer may run campaigns within the cap.
+- **Portal zip (itch.io / Newgrounds / CrazyGames):** GitHub → Actions → `CI` → the latest
+  green run on `main` → Artifacts → `dist-portal` (kept 30 days; it unzips to
+  `dist-portal.zip`, the file to upload); the run's summary gives its commit, build date,
+  size and file count. Only builds that passed the portal smoke are kept.
 
 | File | What |
 |---|---|

@@ -10,13 +10,17 @@ import { SHARED_EVENT } from '@/app/analyticsEvents'
 import { eventBus } from '@/core/EventBus'
 import ShareMenu from '@/ui/ShareMenu'
 import type { ShareMethod } from '@/ui/share'
+import type { LeaderboardEntry } from '@/types/game'
 import { barFill, formatAccuracy, formatTimeLeft, isNewRecord } from './resultsStats'
+import { initialsKey, type InitialsState } from './initialsEntry'
+import ResultsLeaderboard from './ResultsLeaderboard'
 
 const fmt = new Intl.NumberFormat('en-US')
 
 const STAGE = { title: 0, count: 1, star: 2, stats: 5, done: 6 } as const
 const STAGE_AT_MS = [0, 350, 1700, 2050, 2400, 2800, 3500]
 const COUNT_UP_S = 1.2
+const NO_BOARD: LeaderboardEntry[] = []
 
 /** The finished run, read once on mount so a Replay / Next during the exit fade doesn't repaint it. */
 function snapshotRun() {
@@ -34,6 +38,7 @@ function snapshotRun() {
     bestCombo: s.bestCombo,
     timeRemaining: s.timeRemaining,
     previousBest: previous?.score ?? 0,
+    date: Date.now(),
   }
 }
 
@@ -45,6 +50,9 @@ export default function ResultsScreen() {
   const scoreRef = useRef<HTMLSpanElement>(null)
   const fillRef = useRef<HTMLDivElement>(null)
   const saved = useRef(false)
+  const board = useGameStore((s) => (run.levelId ? s.leaderboards[run.levelId] : undefined)) ?? NO_BOARD
+  const [rank, setRank] = useState<number | null>(null)
+  const [initials, setInitials] = useState<InitialsState | null>(null)
   const left = useRef(false)
   const nextRef = useRef<HTMLButtonElement>(null)
 
@@ -71,20 +79,27 @@ export default function ResultsScreen() {
     else store.setPhase('levelSelect')
   }
 
-  // previousBest was read before this save, so the record check isn't fooled by it.
+  // Saved on mount, after previousBest was read; the board entry goes in under the last initials so leaving early never loses it.
   useEffect(() => {
     if (!config || saved.current) return
     saved.current = true
+    const store = useGameStore.getState()
     const entry = {
       level: config.id,
       score: run.score,
       maxScore: config.maxScore,
       stars,
-      timestamp: Date.now(),
+      timestamp: run.date,
       bestCombo: run.bestCombo,
     }
-    if (run.mode.mode === 'daily') useGameStore.getState().saveDailyScore(entry, run.mode.dateKey)
-    else useGameStore.getState().saveScore(entry)
+    if (run.mode.mode === 'daily') {
+      store.saveDailyScore(entry, run.mode.dateKey)
+      return
+    }
+    const placed = store.addLeaderboardEntry(config.id, { score: run.score, stars, date: run.date })
+    setRank(placed)
+    if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
+    store.saveScore(entry)
   }, [config, run, stars])
 
   useEffect(() => {
@@ -120,22 +135,56 @@ export default function ResultsScreen() {
     return () => controls.stop()
   }, [counting, done, run.score, fill])
 
+  function initialsInput(key: string): boolean {
+    if (!initials || !config) return false
+    const next = initialsKey(initials, key)
+    if (next === null) return false
+    if (next === 'confirm') {
+      setInitials(null)
+      sfx().ui('launch')
+      return true
+    }
+    if (next.letters !== initials.letters) useGameStore.getState().setEntryInitials(config.id, run.date, next.letters)
+    setInitials(next)
+    sfx().ui('select')
+    return true
+  }
+
   function onShared(method: ShareMethod) {
     if (config) eventBus.emit(SHARED_EVENT, config.id, method)
   }
 
-  useEffect(() => {
+  // Read through a ref so the listener sees the live entry state without re-subscribing every render.
+  const keyHandler = useRef<(e: KeyboardEvent) => void>(() => {})
+  keyHandler.current = (e) => {
     if (!config) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
-      // A focused results button or share link turns Enter into its own click; one outside (the mute toggle) must not swallow it.
-      if (e.key === 'Enter' && e.target instanceof Element && e.target.closest('.results-screen button, .results-screen a')) return
-      if (e.key === 'Enter') leave(enterTo)
-      else if (e.key === 'r' || e.key === 'R') leave('replay')
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    const target = e.target instanceof Element ? e.target : null
+    // A focused results button or share link turns Enter into its own click; one outside (the mute toggle) must not swallow it.
+    if (e.key === 'Enter' && target?.closest('.results-screen button, .results-screen a')) return
+    // The open share menu's own keys (arrows, Esc) stay its own.
+    if (target?.closest('.share-menu')) return
+    if (initials) {
+      // The entry owns the keys (R and S are letters); Enter before it opens skips the reveal.
+      if (!done) {
+        if (e.key === 'Enter' && !e.repeat) setStage(STAGE.done)
+      } else if (initialsInput(e.key)) {
+        // Capture phase + stop: no other window listener (MuteButton's S) sees a letter.
+        e.preventDefault()
+        e.stopImmediatePropagation()
+      }
+      return
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [config, nextLevel, enterTo])
+    if (e.repeat) return
+    if (e.key === 'Enter') leave(enterTo)
+    else if (e.key === 'r' || e.key === 'R') leave('replay')
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keyHandler.current(e)
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [])
 
   if (!config) return null
 
@@ -144,6 +193,7 @@ export default function ResultsScreen() {
   const next = nextStar(run.score, config.maxScore, config.starThresholds)
   const instant = { duration: 0 }
   const reveal = (from: number) => (stage >= from ? 'shown' : 'hidden')
+  const entryOpen = done && initials !== null
   const rows: [string, string][] = [
     ['Kills', `${run.kills} / ${run.totalEnemies}`],
     ['Accuracy', formatAccuracy(run.hits, run.shotsFired)],
@@ -270,11 +320,30 @@ export default function ResultsScreen() {
             )}
           </motion.div>
           <p className="results-keys">
-            {enterTo === 'next' && 'Enter: next · R: replay'}
-            {enterTo === 'levels' && 'Enter: levels · R: replay'}
-            {enterTo === 'replay' && `★ unlocks ${nextName} · Enter / R: replay`}
+            {entryOpen && 'Type or ▲▼ letters · ◀▶ move · Enter: OK'}
+            {!entryOpen && enterTo === 'next' && 'Enter: next · R: replay'}
+            {!entryOpen && enterTo === 'levels' && 'Enter: levels · R: replay'}
+            {!entryOpen && enterTo === 'replay' && `★ unlocks ${nextName} · Enter / R: replay`}
           </p>
         </div>
+
+        {!daily && (
+          <motion.div
+            className="results-board-slot"
+            initial={false}
+            variants={{ hidden: { opacity: 0, x: 24 }, shown: { opacity: 1, x: 0 } }}
+            animate={reveal(STAGE.stats)}
+            transition={done ? instant : { duration: 0.3 }}
+          >
+            <ResultsLeaderboard
+              board={board}
+              rank={rank}
+              editing={entryOpen ? initials : null}
+              onKey={initialsInput}
+              onSlot={(slot) => initials && setInitials({ ...initials, slot })}
+            />
+          </motion.div>
+        )}
       </div>
     </div>
   )

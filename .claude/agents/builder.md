@@ -19,7 +19,8 @@ for anything visual or level-related).
    (for a returned PR: check out its branch, merge `origin/main` into it — never rebase a
    pushed branch — then address
    every QA comment).
-   If QA's only request is "merge conflict only", merge `origin/main`, resolve keeping
+   If QA's only request is "merge conflict only" (or the auto-merge workflow handed the
+   approved PR back with `Auto-merge failed: this branch conflicts with main`), merge `origin/main`, resolve keeping
    both sides' behaviour, run `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build`, push, reply, swap the labels
    and finish. CI runs the full `verify` and QA does a light re-review, so skip steps
    2–7 unless a conflict touched `src/` or `e2e/` (then do steps 3 and 7).

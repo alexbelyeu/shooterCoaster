@@ -119,6 +119,31 @@ jobs:
       - name: Smoke level 1 under /nested/path/
         run: npm run smoke:portal -- --out e2e-results-portal
 
+      # Only a zip that booted under /nested/path/ is kept: these steps skip when the smoke fails.
+      - name: Describe the portal zip
+        run: |
+          {
+            echo "### dist-portal.zip"
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Commit | \`${GITHUB_SHA}\` |"
+            echo "| Built | $(date -u +%Y-%m-%dT%H:%MZ) |"
+            echo "| Zip size | $(stat -c %s dist-portal.zip | numfmt --to=si --suffix=B) |"
+            echo "| Files | $(zipinfo -1 dist-portal.zip | grep -vc '/$') |"
+            echo
+            echo "Download: this run's Artifacts → \`dist-portal\` (it unzips to \`dist-portal.zip\`, the file to upload to a portal)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the portal zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-portal
+          path: dist-portal.zip
+          retention-days: 30
+          if-no-files-found: error
+          # Already a zip: storing it again would only cost time.
+          compression-level: 0
+
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4

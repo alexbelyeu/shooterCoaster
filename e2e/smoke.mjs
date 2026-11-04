@@ -41,7 +41,8 @@
  * The speed check holds the first level (or `--speed-level <id>`) at top speed on its most banked sampled point:
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  * The boss checks summon each finale and shoot it down in phase order: level1's Golden Blimp
- * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png) and level3's Kraken
+ * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png), level2's Giant Scorpion
+ * (level2-boss.png, level2-boss-stinger.png, level2-boss-down.png) and level3's Kraken
  * (level3-boss.png, level3-boss-head.png, level3-boss-down.png); see bossCheck().
  * The pickup check shoots level1's first weapon pickup with a real bullet: the spread gun's badge,
  * a 3-bullet fan with the tinted tracer (level1-pickup.png), pause-safe expiry, reset on restart; see pickupCheck().
@@ -316,7 +317,7 @@ async function pollUntil(page, check, { ms, frames = MIN_FRAMES, pollMs = 500 })
  * (Theme Park) the 15+ streak's firework burst, held on screen. The kill's death effect
  * (its enemy type's style, not the default fireball) must be live in the shot.
  */
-async function playLevel(page, id, { frenzy = false } = {}) {
+async function playLevel(page, id, { frenzy = false, leaderboard = false } = {}) {
   const problems = []
   // Desktop mouse: one real click at the screen centre must fire through pointer input.
   const beforeClick = await getStats(page)
@@ -423,7 +424,23 @@ async function playLevel(page, id, { frenzy = false } = {}) {
   const shot = await freshShotProblems(page, id)
   problems.push(...shot.problems)
 
-  await page.evaluate(() => window.__SC_TEST__.endLevel())
+  // With `leaderboard`, seed nine entries so this run places 4th, in the same turn as the end so the score can't move.
+  const seededRank = await page.evaluate(
+    ([lid, seed]) => {
+      const t = window.__SC_TEST__
+      const score = Math.round(t.stats().score)
+      const seeded = seed && score > 0
+      const above = [3000, 2000, 1000].map((d) => score + d)
+      if (seeded) {
+        const below = [0.6, 0.5, 0.4, 0.3, 0.2, 0.1].map((f) => Math.max(1, Math.floor(score * f)))
+        const row = (s, i) => ({ initials: 'CPU', score: s, stars: 1, date: i + 1 })
+        t.setLeaderboards({ [lid]: [...above, ...below].map(row) }, 'AAA')
+      }
+      t.endLevel()
+      return seeded ? above.length : null
+    },
+    [id, leaderboard],
+  )
   // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
   const resultsShown = await page
     .waitForFunction(
@@ -443,6 +460,11 @@ async function playLevel(page, id, { frenzy = false } = {}) {
   const end = await getStats(page)
   const results = await resultsScreenProblems(page, id, end)
   problems.push(...results.problems)
+  if (seededRank !== null) {
+    const entry = await leaderboardEntryProblems(page, id, seededRank)
+    problems.push(...entry.problems)
+    results.screen.entry = entry.result
+  }
   if (frenzy) problems.push(...(await resultsEnterProblems(page, results.screen)))
 
   if (combat.kills === 0) problems.push('no kills (enemies missing or unhittable?)')
@@ -590,12 +612,20 @@ async function resultsScreenProblems(page, id, stats) {
       .filter((b) => !b.closest('.share-menu') && b.getBoundingClientRect().width > 0)
       .map((b) => b.textContent)
     const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
+    const b = el.querySelector('.results-board')
+    const r = b?.getBoundingClientRect()
+    const board = b && {
+      rows: b.querySelectorAll('li').length,
+      rank: b.dataset.rank ?? null,
+      editing: b.dataset.editing === 'true',
+      inView: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
+    }
     const s = window.__SC_TEST__
     const all = s.levels()
     const level = all.find((l) => l.id === s.stats().currentLevel)
     const next = all.find((l) => l.id === level?.nextLevel)
     return {
-      rows, buttons, stars, levelName: level?.name ?? null, shareText: s.shareText(),
+      rows, buttons, stars, board, levelName: level?.name ?? null, shareText: s.shareText(),
       nextLevel: next ? { id: next.id, unlocked: next.unlocked } : null,
       keys: el.querySelector('.results-keys')?.textContent ?? '',
       score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent,
@@ -633,9 +663,67 @@ async function resultsScreenProblems(page, id, stats) {
   const nextOpen = screen.nextLevel?.unlocked === true
   if (nextOffered !== nextOpen)
     problems.push(`results ${nextOffered ? 'offer' : 'hide'} Next Level with ${screen.nextLevel?.id ?? 'no next level'} ${nextOpen ? 'unlocked' : 'locked'}`)
-  if (screen.nextLevel && !nextOpen && !/Enter \/ R: replay/.test(screen.keys)) problems.push(`locked next level, but the keys hint reads "${screen.keys}"`)
+  // While the initials entry is open the hint is the entry's own.
+  if (screen.nextLevel && !nextOpen && !screen.board?.editing && !/Enter \/ R: replay/.test(screen.keys)) problems.push(`locked next level, but the keys hint reads "${screen.keys}"`)
   if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
+  if (!screen.board) problems.push('results screen has no leaderboard')
+  else {
+    if (stats.score > 0 && screen.board.rows === 0) problems.push('leaderboard empty after a scoring run')
+    if (!screen.board.inView) problems.push('leaderboard not fully inside 1280x720')
+  }
   return { problems, screen: shown }
+}
+
+// R is the replay key and S the mute key outside the entry: both must stay letters in it.
+const INITIALS_KEYS = ['ArrowUp', 'r', 'e', 's']
+
+/** Local leaderboard (#40): a run seeded to place at `rank` takes initials by keyboard (R and S are letters there) and persists them. */
+async function leaderboardEntryProblems(page, id, rank) {
+  const problems = []
+  const read = () => page.evaluate((lid) => {
+    const b = document.querySelector('.results-board')
+    return {
+      rank: b?.dataset.rank ?? null,
+      editing: b?.dataset.editing === 'true',
+      rows: b?.querySelectorAll('li').length ?? 0,
+      initials: b?.querySelector('li.is-new .results-board-initials')?.textContent ?? null,
+      phase: window.__SC_TEST__.phase(),
+      stored: window.__SC_TEST__.leaderboards().boards[lid] ?? [],
+      lastInitials: window.__SC_TEST__.leaderboards().lastInitials,
+      persisted: localStorage.getItem('shootercoaster-scores') ?? '',
+      muted: document.querySelector('.mute-button')?.getAttribute('aria-label') ?? null,
+    }
+  }, id)
+  const initialsShown = (text) => page
+    .waitForFunction((t) => document.querySelector('.results-board li.is-new .results-board-initials')?.textContent === t, text, { timeout: 5000, polling: 50 })
+    .then(() => true, () => false)
+
+  // The share check leaves focus on Share, where Enter is that button's click: type as a player who never touched it.
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  const opened = await read()
+  if (opened.rank !== String(rank)) problems.push(`leaderboard: run ranked ${opened.rank}, expected ${rank}`)
+  if (opened.rows !== 10) problems.push(`leaderboard shows ${opened.rows} rows, expected 10`)
+  if (!opened.editing) problems.push('leaderboard: no initials entry on a placing run')
+  if (opened.initials !== 'AAA') problems.push(`initials entry starts at "${opened.initials}", expected the last used (AAA)`)
+  await page.keyboard.press(INITIALS_KEYS[0])
+  const cycled = await initialsShown('BAA')
+  if (!cycled) problems.push('ArrowUp did not cycle the first letter')
+  for (const key of INITIALS_KEYS.slice(1)) await page.keyboard.press(key)
+  const typed = await initialsShown('RES')
+  const afterTyping = await read()
+  if (!typed) problems.push(`typing r, e, s gave "${afterTyping.initials}", expected RES`)
+  if (opened.muted === null) problems.push('no mute button on the results screen to check S against')
+  else if (afterTyping.muted !== opened.muted) problems.push('typing S in the initials toggled mute')
+  if (afterTyping.phase !== 'results') problems.push(`typing initials left the results screen (${afterTyping.phase})`)
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(() => !document.querySelector('.results-board[data-editing]'), null, { timeout: 5000, polling: 50 }).catch(() => {})
+  const confirmed = await read()
+  if (confirmed.editing) problems.push('Enter did not close the initials entry')
+  if (confirmed.phase !== 'results') problems.push(`Enter on the entry left the results screen (${confirmed.phase})`)
+  if (confirmed.stored[rank]?.initials !== 'RES' || confirmed.lastInitials !== 'RES')
+    problems.push(`stored entry ${JSON.stringify(confirmed.stored[rank])}, last initials ${confirmed.lastInitials}`)
+  if (!confirmed.persisted.includes('"RES"')) problems.push('leaderboard entry not persisted to localStorage')
+  return { problems, result: { rank, cycled, initials: confirmed.initials, editing: confirmed.editing, phase: confirmed.phase } }
 }
 
 /** #162: Enter with focus on a button outside the results (the mute toggle) still plays on: the next level if open, else a replay. */
@@ -657,7 +745,12 @@ async function resultsEnterProblems(page, screen) {
 
 /** The level timer running out mid-FRENZY (#195): holdFeedback keeps the slow-mo deep while one huge timerStep ends the run. */
 async function frenzyEndProblems(page, id) {
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [id, SEED])
+  // A full board out of reach (#317): this run must miss it and open no initials entry.
+  await page.evaluate(([lid, seed]) => {
+    const s = window.__SC_TEST__
+    s.setLeaderboards({ [lid]: Array.from({ length: 10 }, (_, i) => ({ initials: 'TOP', score: 1e9 - i, stars: 3, date: i })) })
+    s.startLevel(lid, seed)
+  }, [id, SEED])
   await waitFrames(page, 2, { maxMs: 20000 })
   await page.evaluate((count) => {
     const s = window.__SC_TEST__
@@ -678,12 +771,21 @@ async function frenzyEndProblems(page, id) {
   })
   await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
   const after = await page.evaluate(() => ({ timeScale: window.__SC_TEST__.stats().timeScale, ducked: window.__SC_TEST__.audio().musicDucked }))
-  const result = { slowed, ended, ...after }
+  await page
+    .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 30000, polling: 100 })
+    .catch(() => {})
+  const board = await page.evaluate(() => {
+    const b = document.querySelector('.results-board')
+    return { shown: !!b, rank: b?.dataset.rank ?? null, editing: !!b?.dataset.editing }
+  })
+  const result = { slowed, ended, ...after, board }
   if (!slowed) return { result, problems: ['frenzy end: a primed 5× chain never slowed time'] }
   if (!ended) return { result, problems: ['frenzy end: the level timer never ended the run'] }
   const problems = []
   if (after.timeScale !== 1) problems.push(`frenzy end: results screen at timeScale ${after.timeScale.toFixed(2)}, not 1`)
   if (after.ducked) problems.push('frenzy end: music still ducked on the results screen')
+  if (!board.shown) problems.push('frenzy end: no leaderboard on the results screen')
+  if (board.rank !== null || board.editing) problems.push(`a run that misses the board ranked ${board.rank} with initials entry ${board.editing ? 'open' : 'closed'}`)
   return { result, problems }
 }
 
@@ -1406,12 +1508,14 @@ async function waveCheck(page) {
 }
 
 /**
- * The finales the boss check summons: Theme Park's Golden Blimp (#181) and Ocean's Kraken (#183).
- * `minOnScreen` first-phase weak points must be on screen after the boss alone has moved `settleS` s (the
- * Kraken's tentacles rise out of the water first); `midSettleS` lets the last phase surface before `midShot`.
+ * The finales the boss check summons: Theme Park's Golden Blimp (#181), Desert's Giant Scorpion (#318) and
+ * Ocean's Kraken (#183). `minOnScreen` first-phase weak points must be on screen after the boss alone has moved
+ * `settleS` s (the scorpion bursts out of the sand, the Kraken's tentacles rise out of the water);
+ * `midSettleS` lets the last phase surface before `midShot`. `firstPhase`: the id prefix(es) of the first phase.
  */
 const BOSS_CHECKS = [
   { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
+  { level: 'level2', minWidthFrac: 0.15, weakPoints: 7, firstPhase: ['claw-', 'tail-'], lastPhase: ['stinger'], midShot: 'boss-stinger', minOnScreen: 4, settleS: 2, midSettleS: 1 },
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
 ]
 
@@ -1518,8 +1622,9 @@ async function bossCheck(page, check) {
   if (!settled || result.onScreenAtStart < minOnScreen)
     problems.push(`${result.onScreenAtStart} first-phase weak points on screen after ${settleS} s (want ≥ ${minOnScreen})`)
   if (!surfaced) problems.push(`the last phase [${lastPhase}] never came on screen within ${midSettleS} s`)
-  if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !id.startsWith(firstPhase)))
-    problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPhase}*)`)
+  const firstPrefixes = [firstPhase].flat()
+  if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !firstPrefixes.some((p) => id.startsWith(p))))
+    problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPrefixes.join('* / ')}*)`)
   if (!target) problems.push('no exposed weak point on screen to shoot')
   else if (!bulletHit) problems.push('a real bullet at an exposed weak point never hit it (boss:hit)')
   if (JSON.stringify(result.exposedMidway) !== JSON.stringify(lastPhase))
@@ -1641,10 +1746,18 @@ async function levelSelectCheck(page, levels) {
   })
   const expectStars = earned.slice(0, levels.length).reduce((a, b) => a + b, 0)
   const expectOpen = Math.min(levels.length, 3)
-  await page.evaluate((s) => {
+  const champions = ['ACE', 'BOB']
+  const boards = Object.fromEntries(
+    Object.values(scores).map((e, i) => [e.level, [{ initials: champions[i], score: e.score, stars: e.stars, date: 1 }]]),
+  )
+  // Reloaded so the cards come back from localStorage.
+  await page.evaluate(([s, b]) => {
     window.__SC_TEST__.setSavedScores(s)
-    window.__SC_TEST__.setPhase('levelSelect')
-  }, scores)
+    window.__SC_TEST__.setLeaderboards(b)
+  }, [scores, boards])
+  await page.reload({ waitUntil: 'load' })
+  await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
+  await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
   if (!(await waitVisible(page, '.level-select-back'))) problems.push('level select never appeared')
   await page.waitForTimeout(800) // fade-in
   await waitFrames(page, 2, { maxMs: 10000 })
@@ -1663,6 +1776,7 @@ async function levelSelectCheck(page, levels) {
       total: document.querySelector('.level-select-total')?.dataset.stars ?? null,
       totalText: document.querySelector('.level-select-total')?.textContent ?? '',
       offscreen: off.map((c) => c.dataset.level),
+      initials: cards.filter((c) => !c.classList.contains('level-card-daily')).map((c) => c.querySelector('.level-card-initials')?.textContent ?? null),
       hScroll: root ? root.scrollWidth > root.clientWidth : true,
       focused: document.activeElement?.dataset?.level ?? null,
     }
@@ -1674,6 +1788,9 @@ async function levelSelectCheck(page, levels) {
     problems.push(`star total "${layout.totalText.trim()}", expected ${expectStars} / ${levels.length * 3}`)
   }
   if (layout.offscreen.length) problems.push(`cards off a 1280x720 screen: ${layout.offscreen.join(',')}`)
+  const expectInitials = levels.map((_, i) => champions[i] ?? null)
+  if (JSON.stringify(layout.initials) !== JSON.stringify(expectInitials))
+    problems.push(`card initials ${JSON.stringify(layout.initials)} after a reload, expected ${JSON.stringify(expectInitials)}`)
   if (layout.hScroll) problems.push('level select scrolls sideways')
 
   const focused = () => page.evaluate(() => document.activeElement?.dataset?.level ?? null)
@@ -1762,6 +1879,9 @@ async function dailyCheck(newPage) {
       badge: el?.querySelector('.results-daily-badge')?.textContent ?? null,
       record: el?.querySelector('.results-record')?.textContent ?? null,
       buttons: [...(el?.querySelectorAll('.results-actions button') ?? [])].map((b) => b.textContent),
+      board: !!el?.querySelector('.results-board'),
+      entry: !!el?.querySelector('.results-initials-ok, .results-board[data-editing]'),
+      boards: s.leaderboards().boards,
       score: s.stats().score,
       daily: s.daily(),
       savedScores: JSON.parse(localStorage.getItem('shootercoaster-scores') ?? '{}').state?.savedScores ?? null,
@@ -1772,6 +1892,9 @@ async function dailyCheck(newPage) {
   if (results.mode !== 'daily' || !results.badge) problems.push(`daily results lack the Daily badge (mode ${results.mode})`)
   if (results.score > 0 && results.record !== 'NEW BEST') problems.push(`first daily result shows "${results.record}", expected NEW BEST`)
   if (results.buttons.includes('Next Level')) problems.push('daily results offer Next Level')
+  // #317: a daily never enters the campaign leaderboard, so no board and no initials entry.
+  if (results.board || results.entry) problems.push(`daily results show the leaderboard${results.entry ? ' and an initials entry' : ''}`)
+  if (Object.keys(results.boards).length) problems.push(`a daily run entered the campaign leaderboards: ${JSON.stringify(results.boards)}`)
   if (!savedDay || savedDay.score !== Math.round(results.score)) problems.push(`today's daily best ${JSON.stringify(savedDay)}, expected score ${Math.round(results.score)}`)
   if (results.daily.streak.count !== 1 || results.daily.streak.lastKey !== run?.dateKey) problems.push(`daily streak ${JSON.stringify(results.daily.streak)}, expected 1 day`)
   if (JSON.stringify(results.savedScores) !== JSON.stringify(campaign)) problems.push(`a daily run changed the campaign saves: ${JSON.stringify(results.savedScores)}`)
@@ -2238,8 +2361,9 @@ const SCRIM_CHECK = { level: 'level1', maxNodes: 150, burst: [64, 32] }
 
 /**
  * `?audio=scrim` (#214): a real click unlocks audio and starts the title score; level1 must crossfade from it, keep its
- * long-lived node count flat (≤ maxNodes) while it plays, duck with game time frozen, hold its song position while
- * paused and pick it up again, then crossfade to the results score; nothing dropped, no page errors.
+ * long-lived node count flat (≤ maxNodes) while it plays, duck with game time frozen, follow the combo tier with its
+ * intensity layers (#321: up to 2 at 3×, 3 at 5×, held through a pause, back down to 0 a layer at a time), hold its
+ * song position while paused and pick it up again, then crossfade to the results score; nothing dropped, no page errors.
  * The arcade SFX (#217): `audioBurst(64, 32)` must stay inside the voice budget (stealing, not growing), keep the SFX
  * node count flat across it, and throw or drop nothing.
  */
@@ -2258,7 +2382,7 @@ async function scrimCheck(page) {
   }
   const busNames = (a) => a.music.buses.map((b) => b.name)
   const track = (a) => a.scrim?.tracks.at(-1) ?? null
-  const result = { engine: null, title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, ducked: null, results: false, dropped: 0 }
+  const result = { engine: null, title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, ducked: null, layers: null, results: false, dropped: 0 }
 
   const vp = page.viewportSize()
   await page.mouse.click(8, vp.height - 8) // any pointer press on the title unlocks audio
@@ -2313,8 +2437,22 @@ async function scrimCheck(page) {
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
   if ((await until((x) => !x.musicDucked, 20000)).musicDucked) problems.push('the score stayed ducked at timeScale 1')
 
+  // Combo windows run on game time: frozen, a primed chain holds while the layers move.
+  const layers = { layered: false, rise: [], paused: null, resumed: null, fall: [] }
+  result.layers = layers
+  const intensity = (x) => track(x)?.intensity
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  layers.layered = !!track(await audio())?.layered
+  if (!layers.layered) problems.push(`the ${SCRIM_CHECK.level} score has no intensity layers`)
+  for (const [count, want] of [[8, 2], [15, 3]]) {
+    await page.evaluate((n) => window.__SC_TEST__.primeCombo(n), count)
+    layers.rise.push(intensity(await until((x) => intensity(x) === want, 10000)))
+    if (layers.rise.at(-1) !== want) problems.push(`a ${count}-kill combo left the score at intensity ${layers.rise.at(-1)} (want ${want})`)
+  }
+
   await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
   a = await until((x) => track(x)?.paused)
+  layers.paused = intensity(a)
   const heldAt = track(a)?.position ?? 0
   await page.waitForTimeout(2000)
   const stillAt = track(await audio())?.position ?? 0
@@ -2326,6 +2464,18 @@ async function scrimCheck(page) {
   if (!resumed || resumed.paused) problems.push('resuming the run did not resume the score')
   else if (resumed.position > heldAt + 2 || resumed.position < heldAt - 0.5)
     problems.push(`the score did not resume where it stopped (${heldAt.toFixed(2)} -> ${resumed.position.toFixed(2)} s)`)
+  layers.resumed = resumed?.intensity ?? null
+  if (layers.paused !== 3 || layers.resumed !== 3) problems.push(`the layers moved across the pause (3 -> ${layers.paused} paused -> ${layers.resumed} resumed)`)
+
+  await page.evaluate(() => window.__SC_TEST__.primeCombo(0))
+  await until((x) => {
+    const i = intensity(x)
+    if (layers.fall.at(-1) !== i) layers.fall.push(i)
+    return i === 0
+  }, 15000)
+  if (layers.fall.at(-1) !== 0) problems.push(`a lost combo left the score at intensity ${layers.fall.at(-1)}`)
+  else if (!layers.fall.some((i) => i === 1 || i === 2)) problems.push(`a lost combo cut the layers instead of winding down (${layers.fall.join(' -> ')})`)
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
 
   await page.evaluate(() => window.__SC_TEST__.endLevel())
   a = await until((x) => x.scrim?.current === 'results' && !busNames(x).includes('level'))
@@ -2366,30 +2516,74 @@ async function mobileBossHud(page) {
   return { problems: [...portrait.problems, ...landscape.problems], rects: { portrait: portrait.rects, landscape: landscape.rects } }
 }
 
-/** The results screen on the phone (#87): its four buttons readable in portrait and landscape (mobile-results*.png). */
+/** Phone results (#87, #40): initials by tap through 44 px buttons, then the buttons, board and share menu fit portrait and landscape (mobile-results*.png). */
 async function mobileResults(page) {
+  const problems = []
   await page.evaluate(() => window.__SC_TEST__.endLevel())
   const shown = await page
     .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 60000, polling: 250 })
     .then(() => true, () => false)
-  if (!shown) return { problems: ['phone: the results screen never finished its reveal'], buttons: null }
+  if (!shown) return { problems: ['phone: the results screen never finished its reveal'], buttons: null, entry: null }
+  if (!(await waitVisible(page, '.results-initials-ok', 30000))) {
+    return { problems: ['phone: no initials entry on the results screen after a scoring run'], buttons: null, entry: null }
+  }
+  const layout = () => page.evaluate(() => {
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const small = [...document.querySelectorAll('.results-initials-pad button, .results-board-initials button')]
+      .map((b) => b.getBoundingClientRect())
+      .filter((r) => r.width < 44 - 0.5 || r.height < 44 - 0.5).length
+    const pad = document.querySelector('.results-initials-pad')?.getBoundingClientRect()
+    const board = document.querySelector('.results-board')?.getBoundingClientRect()
+    return {
+      small,
+      padInView: !!pad && pad.left >= 0 && pad.right <= vw && pad.top >= 0 && pad.bottom <= vh,
+      boardInView: !!board && board.left >= 0 && board.right <= vw && board.top >= 0 && board.bottom <= vh,
+    }
+  })
+  const portrait = await layout()
+  if (portrait.small) problems.push(`phone: ${portrait.small} initials button(s) under 44 px`)
+  if (!portrait.padInView) problems.push('phone portrait: the initials pad is not scrolled into view')
+  const initialsShown = (text) => page
+    .waitForFunction((t) => document.querySelector('.results-board li.is-new .results-board-initials')?.textContent === t, text, { timeout: 10000, polling: 100 })
+    .then(() => true, () => false)
+  const tap = (selector) => page.locator(selector).first().tap({ timeout: 30000 }).catch((e) => problems.push(`phone: tap ${selector}: ${e.message}`))
+  await tap('.results-initials-pad button[aria-label="Next letter"]')
+  const first = await initialsShown('BAA')
+  await tap('.results-board-initials button:nth-child(2)')
+  await tap('.results-initials-pad button[aria-label="Next letter"]')
+  const second = await initialsShown('BBA')
+  if (!first || !second) problems.push('phone: tapping ▲ / a letter did not edit the initials (expected BAA then BBA)')
+  await page.screenshot({ path: path.join(OUT, 'mobile-results-entry.png'), timeout: SHOT_TIMEOUT })
+  await tap('.results-initials-ok')
+  await page.waitForFunction(() => !document.querySelector('.results-board[data-editing]'), null, { timeout: 10000, polling: 100 }).catch(() => {})
+  const stored = await page.evaluate(() => ({
+    phase: window.__SC_TEST__.phase(),
+    editing: !!document.querySelector('.results-board[data-editing]'),
+    top: window.__SC_TEST__.leaderboards().boards.level1?.[0]?.initials ?? null,
+  }))
+  if (stored.editing) problems.push('phone: OK did not close the initials entry')
+  if (stored.phase !== 'results' || stored.top !== 'BBA') problems.push(`phone: after OK phase ${stored.phase}, stored initials ${stored.top}`)
+
   // The buttons fade in after the reveal; frames take seconds on the phone run.
   await waitVisible(page, '.results-actions', 30000)
   await page.waitForTimeout(1500)
   const buttons = await page.evaluate(() => [...document.querySelectorAll('.results-actions button')].map((b) => b.textContent))
-  const problems = await resultsActionsProblems(page, 'phone portrait 390x844')
+  problems.push(...(await resultsActionsProblems(page, 'phone portrait 390x844')))
   if (!buttons.includes('Share')) problems.push(`phone: results buttons ${JSON.stringify(buttons)} lack Share`)
   await page.screenshot({ path: path.join(OUT, 'mobile-results.png'), timeout: SHOT_TIMEOUT })
   await page.setViewportSize({ width: 844, height: 390 })
   await page.waitForTimeout(1000)
   problems.push(...(await resultsActionsProblems(page, 'phone landscape 844x390')))
+  const landscape = await layout()
+  if (!landscape.boardInView) problems.push('phone landscape 844x390: the leaderboard is cut off')
   await page.screenshot({ path: path.join(OUT, 'mobile-results-landscape.png'), timeout: SHOT_TIMEOUT })
   problems.push(...(await shareMenuProblems(page, 'phone landscape 844x390', { shot: 'mobile-share-landscape.png' })).problems)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.waitForTimeout(1000)
   // No share sheet in headless Chromium, so the phone gets the menu too: it must fit 390 px.
   problems.push(...(await shareMenuProblems(page, 'phone portrait 390x844', { shot: 'mobile-share.png' })).problems)
-  return { problems, buttons }
+  return { problems, buttons, entry: { initials: stored.top, portrait, landscape } }
 }
 
 /** Touch playtest on a phone-sized viewport: real taps through the whole flow. */
@@ -2609,6 +2803,7 @@ async function runMobile(browser, base) {
       bulletMaxScreenFrac: bullets.maxScreenFrac,
       pauseCards,
       resultsButtons: resultsLayout.buttons,
+      resultsEntry: resultsLayout.entry,
     },
     kills: end.kills,
     score: end.score,
@@ -2724,7 +2919,7 @@ async function run() {
     stats.view = desktopAspect.view
     const perfGate = PERF_GATE ? sceneBudgetCheck(id, stats) : null
     if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
-    const play = await playLevel(page, id, { frenzy: id === wanted[0] })
+    const play = await playLevel(page, id, { frenzy: id === wanted[0], leaderboard: id === wanted[0] })
     problems.push(...play.problems)
     const frenzyEnd = id === wanted[0] ? await frenzyEndProblems(page, id) : null
     if (frenzyEnd) problems.push(...frenzyEnd.problems)
@@ -2875,7 +3070,7 @@ async function run() {
       : r.daily
         ? ` ${r.daily.dateKey} ${r.daily.level} seed=${r.daily.seed} digest=${r.daily.digest} again=${r.daily.digestAgain} record=${r.daily.record} replaySeed=${r.daily.replaySeed}`
       : r.levelSelect
-        ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total}` +
+        ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total} top=${r.levelSelect.initials.filter(Boolean).join(',')}` +
           (r.levelSelect.keyboard ? ` keys: ${r.levelSelect.focused} <- ${r.levelSelect.keyboard.left}, locked ${r.levelSelect.keyboard.locked} Enter -> ${r.levelSelect.keyboard.phaseAfterLocked}, Enter -> ${r.levelSelect.keyboard.level} ${r.levelSelect.keyboard.phase}` : '')
       : r.settings
         ? ` card ${JSON.stringify(r.settings.card)} quality ${r.settings.quality.join(' -> ')} (reload) music ${r.settings.musicVolume}`
@@ -2910,13 +3105,13 @@ async function run() {
       : r.scrim
         ? ` engine=${r.scrim.engine} title=${r.scrim.title} nodes ${r.scrim.nodes.join('->')} position ${r.scrim.position.map((p) => p.toFixed(1)).join('->')}s` +
           ` sfxNodes ${r.scrim.sfxNodes.join('->')} voices ${r.scrim.voices ? `peak ${r.scrim.voices.peak}/${r.scrim.voices.budget} stolen ${r.scrim.voices.stolen} dropped ${r.scrim.voices.rejected}` : 'none'}` +
-          ` ducked=${r.scrim.ducked} paused at ${r.scrim.pausedHeld?.at.toFixed(1)}s (${r.scrim.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.scrim.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.scrim.results}`
+          ` ducked=${r.scrim.ducked} layers ${r.scrim.layers ? `up ${r.scrim.layers.rise.join('->')} paused ${r.scrim.layers.paused} resumed ${r.scrim.layers.resumed} down ${r.scrim.layers.fall.join('->')}` : 'none'} paused at ${r.scrim.pausedHeld?.at.toFixed(1)}s (${r.scrim.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.scrim.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.scrim.results}`
       : r.speed
         ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
-          ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
+          ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score} initials=${r.mobile.resultsEntry?.initials ?? '-'}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
       : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` particles=${r.particles?.points ?? '-'}${r.particles?.boostPoints ? `+${r.particles.boostPoints}` : ''}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
@@ -2939,7 +3134,10 @@ function startupSummary(t) {
 }
 
 function resultsSummary(s) {
-  return s ? ` results=${s.stars}★ acc=${s.rows.Accuracy} combo=${s.rows['Best combo']}` : ''
+  if (!s) return ''
+  const board = s.board ? ` board=${s.board.rows}${s.board.rank !== null ? ` #${Number(s.board.rank) + 1}` : ''}` : ' board=none'
+  const entry = s.entry ? ` initials=${s.entry.initials}${s.entry.editing ? '(open)' : ''}` : ''
+  return ` results=${s.stars}★ acc=${s.rows.Accuracy} combo=${s.rows['Best combo']}${board}${entry}`
 }
 
 /** Largest bullet screen radius (% of canvas height) since load, and the fresh shot's distance from the muzzle tip. */
