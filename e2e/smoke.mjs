@@ -113,7 +113,6 @@ const SPEED_LEVEL = args['speed-level']
 const BASE_PATH = `/${(args.base ?? '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/$/, '')
 let preview // module scope so the top-level catch can kill it
 const results = [] // module scope so the time-budget watchdog can write what ran
-// Which steps run on which levels: --shard <name> (a CI shard, e2e/shards.mjs), or --steps / --levels / --mobile / --skip-desktop.
 let PLAN
 try {
   PLAN = planRun({ shard: args.shard, steps: args.steps, levels: args.levels, mobile: args.mobile !== undefined, skipDesktop: args['skip-desktop'] !== undefined })
@@ -2917,7 +2916,6 @@ async function run() {
     await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
     return { ctx, page, errors }
   }
-  /** One step's results entry, with its wall time (`seconds`) for the shard budget. */
   const step = async (fn) => {
     const started = Date.now()
     const r = await fn()
@@ -2926,7 +2924,6 @@ async function run() {
     results.push(r)
     return r
   }
-  /** A step on a fresh page: `check(page)` returns { problems, … }; page and hook errors fail it. */
   const pageStep = (check, query) => step(async () => {
     const p = await newPage(query)
     const r = await check(p.page)
@@ -3169,11 +3166,7 @@ async function run() {
   process.exit(failed ? 1 : 0)
 }
 
-/**
- * A shard's smokeSeconds budget (budgets.json, #353): its time goes on the summary line and in
- * a GitHub annotation. On CI a shard over budget fails, and one still running at twice its
- * budget writes what it has and exits, before the job's timeout; locally it only warns.
- */
+/** A --shard run's smokeSeconds budget (#353): enforced on CI only, where twice the budget also stops the run before the job timeout. */
 function startTimeBudget(runStarted) {
   if (!args.shard) return null
   const budget = BUDGETS.smokeSeconds?.[args.shard]

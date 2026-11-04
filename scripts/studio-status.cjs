@@ -208,10 +208,18 @@ async function collect(api, now) {
     }),
   )
 
+  // GitHub creates the `verify` check only once the CI jobs it needs end: same stand-in as automerge.cjs.
+  const verifyRun = async (ref) => {
+    const runs = (await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref, per_page: 100 })).check_runs
+    const run = runs.filter((r) => r.name === 'verify').sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0]
+    if (run) return run
+    const need = runs.find((r) => (r.name === 'unit + build' || r.name === 'lighthouse' || r.name.startsWith('smoke (')) && r.status !== 'completed')
+    return need ? { status: 'waiting', head_sha: need.head_sha } : null
+  }
+
   // CI state for PRs that are in review or sent back.
   const verifyOf = async (sha) => {
-    const r = await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref: sha, check_name: 'verify' })
-    const run = r.check_runs.sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0]
+    const run = await verifyRun(sha)
     if (!run) return '⏳ not started'
     if (run.status !== 'completed') return '⏳ running'
     return run.conclusion === 'success' ? '✅ green' : `❌ ${run.conclusion}`
@@ -222,8 +230,7 @@ async function collect(api, now) {
   // verify on main's head: automerge.yml dispatches CI there after every merge.
   let mainVerify = null
   try {
-    const r = await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref: 'main', check_name: 'verify' })
-    mainVerify = r.check_runs.sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0] || null
+    mainVerify = await verifyRun('main')
   } catch {
     mainVerify = null
   }

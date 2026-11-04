@@ -10,8 +10,8 @@ const pr = (number: number, over: Record<string, unknown> = {}) => ({
   head: { ref: `agent/${number}-x`, sha: `${SHA}${number}`, repo: { full_name: REPO } },
   ...over,
 })
-const verify = (status: string, conclusion: string | null = null, started_at = '2026-10-30T20:00:00Z') =>
-  ({ status, conclusion, started_at })
+const verify = (status: string, conclusion: string | null = null, started_at = '2026-10-30T20:00:00Z', name = 'verify') =>
+  ({ name, status, conclusion, started_at })
 const green = verify('completed', 'success')
 
 describe('decide', () => {
@@ -55,6 +55,16 @@ describe('candidate selection', () => {
   it('latestVerify takes the newest run', () => {
     const old = verify('completed', 'failure', '2026-10-30T19:00:00Z')
     expect(gate.latestVerify([old, green])).toBe(green)
+  })
+
+  it('latestVerify waits while the jobs verify needs run, before GitHub creates its check (#353)', () => {
+    const shard = verify('in_progress', null, '2026-10-30T20:00:00Z', 'smoke (level3)')
+    const portal = verify('in_progress', null, '2026-10-30T20:00:00Z', 'portal')
+    const waiting = gate.latestVerify([verify('completed', 'success', '2026-10-30T20:00:00Z', 'unit + build'), shard])
+    expect(gate.decide(pr(1), waiting, REPO)).toEqual({ action: 'wait', reason: '`verify` is waiting' })
+    expect(gate.latestVerify([portal])).toBeUndefined()
+    expect(gate.latestVerify([verify('completed', 'success', '2026-10-30T20:00:00Z', 'smoke (ui)')])).toBeUndefined()
+    expect(gate.latestVerify([shard, green])).toBe(green)
   })
 })
 

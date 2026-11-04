@@ -129,7 +129,7 @@ QA does the light re-review. These hand-backs don't count towards the 3 sends ba
 Pushing new commits to an approved PR removes the label automatically.
 
 QA applies `agent:qa-approved` only when **all** hold:
-1. GitHub check `verify` is `success` (or still running) on the PR's head SHA (`gh api repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs`).
+1. GitHub check `verify` is `success` (or still running: no `verify` yet, its `smoke (…)` / `unit + build` / `lighthouse` jobs in progress) on the PR's head SHA (`gh api repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs`).
 2. QA playtested the branch as `.claude/agents/qa.md` says (a green CI `verify` stands
    for the full run; QA builds and smokes the levels the diff affects and looks at those
    screenshots, or runs the full `npm run verify` when CI is red or missing), or, when the
@@ -188,6 +188,7 @@ QA reviews reverts first — then reopen the original issue with what went wrong
 - Headless Chromium: `export SC_CHROME="$(scripts/ensure-browser.sh)"`. Rendering is software (SwiftShader), so **frame times are much slower than real hardware** — use them only for relative comparisons; draw calls and triangle counts are reliable.
 - GitHub through `gh api` (REST only). GraphQL, repository-settings writes, branch deletion and GitHub Actions API paths are blocked by the proxy. `gh pr create` may work; if not, use `gh api -X POST repos/alexbelyeu/shootercoaster/pulls`.
 - CI `verify` runs on every PR and on `main` after every auto-merge (`automerge.yml` dispatches `ci.yml`, since `GITHUB_TOKEN` pushes don't trigger `push`); read it with `gh api repos/alexbelyeu/shootercoaster/commits/main/check-runs?check_name=verify`. A red `main` run opens or comments on the `agent:prod-broken` issue.
+  `verify` is a gate over parallel jobs (`unit + build`, `lighthouse`, one `smoke (<shard>)` per smoke shard; ~10 min in all), and GitHub creates its check only when they end: while they run, the head's other check runs (no `check_name` filter) show them in progress. A red `verify` names the red job; for a smoke shard, reproduce just that one with `node e2e/smoke.mjs --shard <name>` (`e2e/README.md`).
 - You cannot read CI logs through the API. Reproduce failures locally with `npm run verify`.
 - **Keep logs out of the conversation.** Redirect long output to a file and print only a
   summary: `npm run verify > /tmp/verify.log 2>&1; grep -E '^(PASS|FAIL)|Tests |error' /tmp/verify.log; tail -n 40 /tmp/verify.log`.

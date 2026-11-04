@@ -19,9 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The required check is `verify` (main's ruleset, automerge.cjs, studio-status.cjs): the last
-  # job below, green only when the unit tests, Lighthouse and every smoke shard passed. The jobs
-  # before it run in parallel (#353): run serially, the smoke alone took ~25 min.
+  # The required check `verify` (main's ruleset, automerge.cjs, studio-status.cjs) is the gate job at the end (#353).
   unit:
     name: unit + build
     permissions:
@@ -80,10 +78,8 @@ jobs:
           path: e2e-results/lighthouse.json
           retention-days: 14
 
-  # One job per smoke shard (e2e/shards.mjs): together they run every step `npm run smoke` runs.
-  # Each builds the commit itself (~30 s), quicker than waiting on a shared build job.
-  # A shard over its budgets.json `smokeSeconds` fails with "<shard> shard took X min, budget Y";
-  # one still running at twice its budget stops itself, inside timeout-minutes.
+  # Each shard builds the commit itself (~30 s), quicker than waiting on a shared build job; its
+  # smokeSeconds watchdog (twice the budget) stops it inside timeout-minutes.
   smoke:
     name: smoke (${{ matrix.shard }})
     permissions:
@@ -125,8 +121,7 @@ jobs:
   verify:
     name: verify
     needs: [unit, lighthouse, smoke]
-    # Also runs when a job before it failed or was cancelled, and then fails; a whole run
-    # cancelled by a newer push skips it.
+    # Not always(): a run superseded by a newer push skips this instead of reporting red.
     if: ${{ !cancelled() }}
     permissions:
       contents: read

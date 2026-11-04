@@ -29,9 +29,14 @@ function sweepNumbers(openPrs) {
   return openPrs.filter((p) => p.state === 'open' && hasLabel(p, APPROVED)).map((p) => p.number).sort((a, b) => a - b)
 }
 
-/** The newest `verify` check run of a commit, or undefined. */
+/** CI jobs that `verify` waits on (ci.yml): GitHub creates the `verify` check only once they end. */
+const isVerifyNeed = (name) => name === 'unit + build' || name === 'lighthouse' || name.startsWith('smoke (')
+
+/** The newest `verify` check run of a commit, a `waiting` stand-in while the jobs it needs run, or undefined. */
 function latestVerify(checkRuns) {
-  return [...checkRuns].sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0]
+  const verify = checkRuns.filter((r) => r.name === 'verify').sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0]
+  if (verify) return verify
+  return checkRuns.some((r) => isVerifyNeed(r.name) && r.status !== 'completed') ? { name: 'verify', status: 'waiting' } : undefined
 }
 
 /**
@@ -142,7 +147,7 @@ async function runGate({ api, event, payload, owner, repo, dryRun, log }) {
     const pr = await api('GET /repos/{owner}/{repo}/pulls/{pull_number}', { pull_number: number })
     let verify
     if (pr.state === 'open' && hasLabel(pr, APPROVED)) {
-      const { check_runs } = await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref: pr.head.sha, check_name: 'verify' })
+      const { check_runs } = await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref: pr.head.sha, per_page: 100 })
       verify = latestVerify(check_runs)
     }
     const verdict = decide(pr, verify, `${owner}/${repo}`)

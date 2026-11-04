@@ -3,8 +3,15 @@
   "jsTotalGzipKB": 700,
   "jsLargestChunkGzipKB": 260,
   "smokeSeconds": {
-    "_comment": "PROVISIONAL",
-    "ui": 900, "level1": 900, "level1-steps": 900, "level2": 900, "level3": 900, "level4": 900, "level5": 900, "mobile": 900
+    "_comment": "Wall time of each CI smoke shard (e2e/shards.mjs), checked by the smoke on CI (#353): ~1.4x its time on #364's CI run (2026-11-04), rounded up to 30 s; mobile, the longest, 1.3x so no shard can push verify far past 10 min unnoticed.",
+    "ui": 180,
+    "level1": 300,
+    "level1-steps": 450,
+    "level2": 480,
+    "level3": 360,
+    "level4": 240,
+    "level5": 180,
+    "mobile": 600
   },
   "scene": {
     "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands.",
