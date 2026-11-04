@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { CROW_FEATHER_MAT, CROW_GEO, createCrowFeatherMaterial, patchCrowWingVertex } from './SharedEnemyAssets'
+import {
+  CROW_FEATHER_MAT, CROW_GEO, EMBER_WISP_TENDRILS_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
+  SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, patchCrowWingVertex,
+} from './SharedEnemyAssets'
 
 describe('crow model', () => {
   it('tags body, both inner and both outer wings for the flap shader', () => {
@@ -18,5 +21,31 @@ describe('crow model', () => {
     const material = createCrowFeatherMaterial({ value: new THREE.Vector2() })
     expect(material.customProgramCacheKey()).toBe(CROW_FEATHER_MAT.customProgramCacheKey())
     material.dispose()
+  })
+})
+
+describe('merged enemy parts', () => {
+  const box = (g: THREE.BufferGeometry) => {
+    g.computeBoundingBox()
+    return g.boundingBox!
+  }
+
+  it('stacks the snowman body from the bottom ball to the top of the head', () => {
+    const { min, max } = box(SNOWMAN_BODY_GEO)
+    expect(min.y).toBeCloseTo(-20)
+    expect(max.y).toBeCloseTo(52)
+  })
+
+  it('mirrors the left and right snowman arms', () => {
+    const left = box(SNOWMAN_LEFT_ARM_GEO)
+    const right = box(SNOWMAN_RIGHT_ARM_GEO)
+    expect(left.min.x).toBeCloseTo(-right.max.x)
+    expect(left.max.x).toBeCloseTo(-right.min.x)
+  })
+
+  it('keeps every part: triangles add up', () => {
+    const tris = (g: THREE.BufferGeometry) => g.index!.count / 3
+    expect(tris(SNOWMAN_COAL_GEO)).toBe(tris(SNOWMAN_FACE_GEO) + 3 * tris(new THREE.SphereGeometry(1, 6, 6)))
+    expect(tris(EMBER_WISP_TENDRILS_GEO)).toBe(6 * tris(new THREE.ConeGeometry(1, 4, 4)))
   })
 })
