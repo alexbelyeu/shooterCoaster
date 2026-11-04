@@ -32,7 +32,7 @@ could hear it across a loud arcade. Every sound tells the player something.
 | level3 | Ocean | Fast, open, surf-rock energy with a sparkling top | spring-reverb guitar, steel drum, sea wash |
 | level4 | Antarctica | Glassy and tense but still driving. Minor key, crystalline | bells, celesta, icy pads with a hard kick |
 | level5 | Inferno | Heaviest level, the boss-rush mood. Low and fast | distorted guitar, choir stabs, timpani, orchestra hits |
-| FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens | same as the level, brighter |
+| FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens (the score's `frenzy` layer: `SCORE-FORMAT.md`, "Intensity layers") | same as the level, brighter |
 | Boss / finale | any | A variation of the level theme, darker and louder | the level's colour + orchestra hits |
 | Results | any | 3–6 s jingle: rising for 3★, flatter for 1★ or 0★, then a calm loop | bells + brass |
 
@@ -73,7 +73,8 @@ These are measured on offline renders, at default settings, with nothing else pl
   budget under `audioBurst(64, 32)`.
 - The arcade engine (`?audio=scrim`, `src/audio/arcade/`) bakes every one-shot from the score
   engine's own instruments when a level starts, so SFX and music share one palette and key.
-  Positional: kills and hits pan with the enemy's place on screen and dull with distance; each
+  Positional: kills and hits pan with the enemy's place on screen and dull with distance (their louder channel keeps
+  its level wherever they pan, so a kill at the crosshair is not 3 dB down: `panGain`); each
   biome has its own room on the SFX send. Guns stay dry.
 
 ## How we check sound, since no agent can hear

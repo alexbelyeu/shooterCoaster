@@ -6,12 +6,13 @@ import type { GamePhase } from '@/types/game'
 import { startMusic, stopMusic, setMusicIntensity } from '@/audio/MusicManager'
 import { placeSound, prepareSfx, setSfxListener, sfx } from '@/audio/sfx'
 import { isAudioReady, setMusicDucked, setPauseMix, whenAudioReady } from '@/audio/AudioEngine'
-import { MUSIC_ENGINE, withScrim } from '@/audio/musicEngine'
+import { MUSIC_ENGINE, scrimPlayer, withScrim } from '@/audio/musicEngine'
 import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { isInRun } from '@/store/startPhase'
 import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks'
 import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
+import { intensityForTier } from '@/audio/scrim/layers'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 
 const SCRIM = MUSIC_ENGINE === 'scrim'
@@ -61,7 +62,7 @@ const SFX_EVENTS: [string, (e: unknown) => void][] = [
   [FIREWORK_BURST_EVENT, onFireworkBurst],
 ]
 
-/** Level audio host: biome music + SFX for the level's lifetime, bus-driven hit / kill / wave / combo / boss / firework sounds, slow-mo and pause duck. */
+/** Level audio host: biome music + SFX for the level's lifetime, bus-driven hit / kill / wave / combo / boss / firework sounds, slow-mo and pause duck, music intensity. */
 export default function LevelAudio() {
   const currentLevel = useGameStore((s) => s.currentLevel)
   const camera = useThree((s) => s.camera)
@@ -113,8 +114,13 @@ export default function LevelAudio() {
 
   useFrame(() => {
     const { combo, timeRemaining, timeScale, phase } = useGameStore.getState()
+    const tier = comboTierIndex(combo.count)
     setMusicDucked(timeScale < 1 || phase === 'paused')
-    sfx().frenzyLift(phase === 'playing' && comboTierIndex(combo.count) === TOP_TIER)
+    sfx().frenzyLift(phase === 'playing' && tier === TOP_TIER)
+    if (SCRIM) {
+      scrimPlayer()?.setIntensity(intensityForTier(tier))
+      return
+    }
 
     // Intensity ramps up quickly so the music feels alive from the start
     const comboFactor = Math.min(combo.count / 5, 1) * 0.3

@@ -2430,8 +2430,9 @@ const SCRIM_CHECK = { level: 'level1', maxNodes: 150, burst: [64, 32] }
 
 /**
  * `?audio=scrim` (#214): a real click unlocks audio and starts the title score; level1 must crossfade from it, keep its
- * long-lived node count flat (≤ maxNodes) while it plays, duck with game time frozen, hold its song position while
- * paused and pick it up again, then crossfade to the results score; nothing dropped, no page errors.
+ * long-lived node count flat (≤ maxNodes) while it plays, duck with game time frozen, follow the combo tier with its
+ * intensity layers (#321: up to 2 at 3×, 3 at 5×, held through a pause, back down to 0 a layer at a time), hold its
+ * song position while paused and pick it up again, then crossfade to the results score; nothing dropped, no page errors.
  * The arcade SFX (#217): `audioBurst(64, 32)` must stay inside the voice budget (stealing, not growing), keep the SFX
  * node count flat across it, and throw or drop nothing.
  */
@@ -2450,7 +2451,7 @@ async function scrimCheck(page) {
   }
   const busNames = (a) => a.music.buses.map((b) => b.name)
   const track = (a) => a.scrim?.tracks.at(-1) ?? null
-  const result = { engine: null, title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, ducked: null, results: false, dropped: 0 }
+  const result = { engine: null, title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, ducked: null, layers: null, results: false, dropped: 0 }
 
   const vp = page.viewportSize()
   await page.mouse.click(8, vp.height - 8) // any pointer press on the title unlocks audio
@@ -2505,8 +2506,22 @@ async function scrimCheck(page) {
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
   if ((await until((x) => !x.musicDucked, 20000)).musicDucked) problems.push('the score stayed ducked at timeScale 1')
 
+  // Combo windows run on game time: frozen, a primed chain holds while the layers move.
+  const layers = { layered: false, rise: [], paused: null, resumed: null, fall: [] }
+  result.layers = layers
+  const intensity = (x) => track(x)?.intensity
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  layers.layered = !!track(await audio())?.layered
+  if (!layers.layered) problems.push(`the ${SCRIM_CHECK.level} score has no intensity layers`)
+  for (const [count, want] of [[8, 2], [15, 3]]) {
+    await page.evaluate((n) => window.__SC_TEST__.primeCombo(n), count)
+    layers.rise.push(intensity(await until((x) => intensity(x) === want, 10000)))
+    if (layers.rise.at(-1) !== want) problems.push(`a ${count}-kill combo left the score at intensity ${layers.rise.at(-1)} (want ${want})`)
+  }
+
   await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
   a = await until((x) => track(x)?.paused)
+  layers.paused = intensity(a)
   const heldAt = track(a)?.position ?? 0
   await page.waitForTimeout(2000)
   const stillAt = track(await audio())?.position ?? 0
@@ -2518,6 +2533,18 @@ async function scrimCheck(page) {
   if (!resumed || resumed.paused) problems.push('resuming the run did not resume the score')
   else if (resumed.position > heldAt + 2 || resumed.position < heldAt - 0.5)
     problems.push(`the score did not resume where it stopped (${heldAt.toFixed(2)} -> ${resumed.position.toFixed(2)} s)`)
+  layers.resumed = resumed?.intensity ?? null
+  if (layers.paused !== 3 || layers.resumed !== 3) problems.push(`the layers moved across the pause (3 -> ${layers.paused} paused -> ${layers.resumed} resumed)`)
+
+  await page.evaluate(() => window.__SC_TEST__.primeCombo(0))
+  await until((x) => {
+    const i = intensity(x)
+    if (layers.fall.at(-1) !== i) layers.fall.push(i)
+    return i === 0
+  }, 15000)
+  if (layers.fall.at(-1) !== 0) problems.push(`a lost combo left the score at intensity ${layers.fall.at(-1)}`)
+  else if (!layers.fall.some((i) => i === 1 || i === 2)) problems.push(`a lost combo cut the layers instead of winding down (${layers.fall.join(' -> ')})`)
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
 
   await page.evaluate(() => window.__SC_TEST__.endLevel())
   a = await until((x) => x.scrim?.current === 'results' && !busNames(x).includes('level'))
@@ -3147,7 +3174,7 @@ async function run() {
       : r.scrim
         ? ` engine=${r.scrim.engine} title=${r.scrim.title} nodes ${r.scrim.nodes.join('->')} position ${r.scrim.position.map((p) => p.toFixed(1)).join('->')}s` +
           ` sfxNodes ${r.scrim.sfxNodes.join('->')} voices ${r.scrim.voices ? `peak ${r.scrim.voices.peak}/${r.scrim.voices.budget} stolen ${r.scrim.voices.stolen} dropped ${r.scrim.voices.rejected}` : 'none'}` +
-          ` ducked=${r.scrim.ducked} paused at ${r.scrim.pausedHeld?.at.toFixed(1)}s (${r.scrim.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.scrim.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.scrim.results}`
+          ` ducked=${r.scrim.ducked} layers ${r.scrim.layers ? `up ${r.scrim.layers.rise.join('->')} paused ${r.scrim.layers.paused} resumed ${r.scrim.layers.resumed} down ${r.scrim.layers.fall.join('->')}` : 'none'} paused at ${r.scrim.pausedHeld?.at.toFixed(1)}s (${r.scrim.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.scrim.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.scrim.results}`
       : r.speed
         ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile

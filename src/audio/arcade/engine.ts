@@ -11,7 +11,7 @@ import { makeIR } from '../scrim/synth'
 import { SCORES, scoreIdFor } from '../scores'
 import {
   ARCADE_SOUNDS, AUTO_FIRE_DB, BIOME_REVERB, FIREWORK_BIOMES, STEAL_FADE_S, VOICE_BUDGET, WHISTLE_LENGTHS_S, SCORE_KEYS,
-  WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, killTier, nextBeat, pickVoice, windGain, windHz, windUpdateDue,
+  WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, killTier, nextBeat, panGain, pickVoice, windGain, windHz, windUpdateDue,
   type ArcadeSoundId, type VoiceState, type WindRamp,
 } from '../sfxDesign'
 import type { Placement, SfxEngine, VoiceStats } from '../sfx'
@@ -227,7 +227,7 @@ function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: P
       v.src.stop(t)
     }
     const p = place ?? NO_PLACE
-    v.gain.gain.setValueAtTime(Math.pow(10, (def.db + db) / 20), t)
+    v.gain.gain.setValueAtTime(Math.pow(10, (def.db + db) / 20) * (place ? panGain(p.pan) : 1), t)
     v.lp.frequency.setValueAtTime(p.cutoffHz, t)
     v.pan.pan.setValueAtTime(p.pan, t)
     v.send.gain.setValueAtTime(def.send, t)

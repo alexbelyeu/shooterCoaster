@@ -61,6 +61,7 @@ Voice options:
 - `bright=1.5` tone brightness, 0.1 to 4 (default 1)
 - `att=0.05` attack time in seconds
 - `rel=0.5` release time in seconds
+- `layer=drums` the intensity layer the voice belongs to: `base` (the default), `drums`, `lead` or `frenzy` (see "Writing for the game")
 
 Melodic instruments:
 
@@ -237,5 +238,6 @@ The music plays under gunfire and explosions for a whole level, so:
 - **Ranges.** Bass instruments in octaves 1 to 3 (after `oct`), chords centred in octave 4, melodies in octaves 4 to 6, bells and mallets in octaves 5 to 6.
 - **Levels.** `vol` around 0.7 to 0.9 for the lead, 0.3 to 0.6 for pads and percussion; the game sets the overall loudness.
 - **Originality.** Write in the spirit of the references, never a real game's or song's melody, hook or chord-for-chord progression.
+- **Intensity layers.** The music follows the player's combo, so tag every voice with `layer=`. A run starts on `base` alone; `drums` come in at a 2× combo, `lead` at 3×, `frenzy` at 5×, and losing the combo takes them out again. `base` (bass plus a chord pulse; untagged voices are base) must sound complete on its own and play in every bar of the loop. `drums` is the kit, `lead` the hook and its doublings, and `frenzy` the lift on top: hats filling out to straight eighths or sixteenths, an extra lead an octave up or a counter-melody, stabs. Every layer plays in the intro, so write the intro as a fanfare for the whole band.
 
 Compose the piece I describe below: the level, its mood, and its signature instrument.
