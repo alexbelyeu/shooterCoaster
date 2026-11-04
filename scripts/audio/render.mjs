@@ -3,6 +3,7 @@
  * Renders the game's current music / SFX offline in the page (`__SC_TEST__.renderAudio`) and measures it.
  *
  *   npm run build && npm run audio:render -- --music <title|level1..5|results|<slot>.<theme>> [--intensity 0.45] [--seconds 30] [--engine scrim] [--seam]
+ *     [--layers 0..3|ramp]  (score engine: the score's intensity layers, 0–3 held, or `ramp` up through them and down again)
  *   npm run audio:render -- --sfx-sheet [--level level1] [--engine scrim]
  *   npm run audio:render -- --mix level1 [--seconds 20] [--engine scrim]
  *   npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original] [--voicing jukebox|game] [--seconds 20]
@@ -52,7 +53,8 @@ let kind
 let defaultName
 let original = false
 if (flag('music')) {
-  request = { kind: 'music', track: flag('music'), intensity: num('intensity'), seconds: num('seconds'), engine, seam }
+  const layers = flag('layers') === 'ramp' ? 'ramp' : num('layers')
+  request = { kind: 'music', track: flag('music'), intensity: num('intensity'), layers, seconds: num('seconds'), engine, seam }
   kind = 'music'
   defaultName = `${scrimPrefix}music-${flag('music')}${seam ? '-seam' : ''}`
 } else if (argv.includes('--sfx-sheet')) {
