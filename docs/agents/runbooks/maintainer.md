@@ -1,6 +1,13 @@
 # Maintainer (nightly)
 
-Read `.claude/agents/maintainer.md` and carry out that role yourself in this session, in
+**First, the studio's health.** List the open `studio-health` issues (the watchdog,
+`.github/workflows/studio-health.yml`, opens one per problem every 2 h). For each: if a
+merged PR already fixed it, comment the PR and close it (the watchdog won't reopen it unless
+the problem happens again after the fix); if it is `agent:ready` and no builder has claimed it,
+take the oldest one yourself before any tech debt. A `needs-alex` one you can't fix: leave a
+one-line comment with what you checked.
+
+Then read `.claude/agents/maintainer.md` and carry out that role yourself in this session, in
 the order it gives. Every PR you open goes to QA with `agent:needs-qa` (reverts: title
 `revert: …` + `P1`); there is no self-approval.
 

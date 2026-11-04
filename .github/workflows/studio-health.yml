@@ -1,0 +1,45 @@
+name: Studio health
+
+# The watchdog: every 2 h, reads the last 48 h of workflow runs, open PRs and issues and the token
+# ledger, and keeps one `studio-health` issue per problem: red main, flaky checks, timeouts and runtime
+# creep, a studio that stopped running, stuck PRs, unfixed production alerts. New problems open as
+# `agent:ready` P1 (builders take them first) or `needs-alex` when only Alex can fix them; open over
+# 24 h they are escalated to Alex; cleared ones are closed. A plain Action on purpose: it keeps
+# watching when the agents are what's broken. Logic: scripts/studio-health.cjs (rules in
+# scripts/studioHealthRules.cjs). Dry run: node scripts/studio-health.cjs --dry-run
+
+on:
+  schedule:
+    - cron: '23 */2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  checks: read
+  actions: read
+
+concurrency:
+  group: studio-health
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/studio-health.cjs
+            scripts/studioHealthRules.cjs
+            scripts/studio-status.cjs
+            .github/workflows
+          sparse-checkout-cone-mode: false
+      - uses: actions/github-script@v7
+        with:
+          retries: 3
+          script: |
+            const run = require(`${process.env.GITHUB_WORKSPACE}/scripts/studio-health.cjs`)
+            await run({ github, context, core })

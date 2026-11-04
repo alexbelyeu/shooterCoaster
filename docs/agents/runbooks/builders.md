@@ -18,10 +18,13 @@ Read only what picking and claiming needs: this runbook, the runbooks README rul
 2. Pick up to N assignments, in this order:
    a. Open, non-draft PRs labelled `agent:changes-requested` with no *live*
       `Builder run … is on it` claim (runbooks README, "Live claims"), oldest first.
-   b. Open issues labelled `agent:ready` (never `agent:in-progress`), excluding
+   b. Open issues labelled `studio-health` and `agent:ready` (the watchdog's: a red main,
+      a flaky check, a timeout, runtime creep, a stuck PR), oldest first. The studio's own
+      health comes before any feature.
+   c. Open issues labelled `agent:ready` (never `agent:in-progress`), excluding
       `epic` and `pause`, ordered P1 > P2 > P3; within the same priority, issues
       labelled `steering` (Alex's own requests) first; then oldest first.
-   c. If nothing is left, take the top item of the "Idea backlog" in
+   d. If nothing is left, take the top item of the "Idea backlog" in
       `docs/agents/VISION.md`, create a well-formed issue for it per the issue contract
       in PROTOCOL.md (labels `agent:ready`, `P3`, a `type:*`), and use that.
    If there is still nothing to do, reply "Queue empty" and stop.
