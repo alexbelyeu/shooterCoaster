@@ -2,6 +2,10 @@
   "_comment": "Guardrail budgets enforced by CI. Only the Director may raise these, with a DECISIONS.md entry explaining why.",
   "jsTotalGzipKB": 700,
   "jsLargestChunkGzipKB": 260,
+  "smokeSeconds": {
+    "_comment": "PROVISIONAL",
+    "ui": 900, "level1": 900, "level1-steps": 900, "level2": 900, "level3": 900, "level4": 900, "level5": 900, "mobile": 900
+  },
   "scene": {
     "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands.",
     "level1": {

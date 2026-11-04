@@ -19,14 +19,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: verify
+  # The required check is `verify` (main's ruleset, automerge.cjs, studio-status.cjs): the last
+  # job below, green only when the unit tests, Lighthouse and every smoke shard passed. The jobs
+  # before it run in parallel (#353): run serially, the smoke alone took ~25 min.
+  unit:
+    name: unit + build
     permissions:
       contents: read
-      issues: write # report a red main below
-    # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
     runs-on: ubuntu-24.04
-    timeout-minutes: 40 # verify took 21.5 min on #222; keep headroom as smoke steps grow
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -46,22 +47,100 @@ jobs:
       - name: Bundle budget
         run: npm run check:bundle
 
+  lighthouse:
+    name: lighthouse
+    permissions:
+      contents: read
+    # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Lighthouse (SEO 100, Accessibility + Best Practices ≥ 95)
         run: npm run lighthouse
 
-      - name: Smoke test every level
-        run: npm run smoke -- --seconds 10
+      - name: Upload the Lighthouse report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse
+          path: e2e-results/lighthouse.json
+          retention-days: 14
+
+  # One job per smoke shard (e2e/shards.mjs): together they run every step `npm run smoke` runs.
+  # Each builds the commit itself (~30 s), quicker than waiting on a shared build job.
+  # A shard over its budgets.json `smokeSeconds` fails with "<shard> shard took X min, budget Y";
+  # one still running at twice its budget stops itself, inside timeout-minutes.
+  smoke:
+    name: smoke (${{ matrix.shard }})
+    permissions:
+      contents: read
+    # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        # Exactly the keys of SHARDS in e2e/shards.mjs (e2e/shards.test.ts checks this line).
+        shard: [ui, level1, level1-steps, level2, level3, level4, level5, mobile]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke shard ${{ matrix.shard }}
+        run: node e2e/smoke.mjs --shard ${{ matrix.shard }} --seconds 10
 
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-results
+          name: e2e-results-${{ matrix.shard }}
           path: e2e-results/
           retention-days: 14
+
+  verify:
+    name: verify
+    needs: [unit, lighthouse, smoke]
+    # Also runs when a job before it failed or was cancelled, and then fails; a whole run
+    # cancelled by a newer push skips it.
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+      issues: write # report a red main below
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Unit tests, Lighthouse and every smoke shard passed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          bad=$(echo "$NEEDS" | jq -r '[to_entries[] | select(.value.result != "success") | "\(.key) \(.value.result)"] | join(", ")')
+          if [ -n "$bad" ]; then echo "::error title=verify::not green: $bad"; exit 1; fi
 
       # A red main gets the same agent:prod-broken issue as a failing production smoke, so
       # the Maintainer's revert-first rule applies. One open issue at a time: later
@@ -73,7 +152,7 @@ jobs:
           script: |
             const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             const after = context.payload.inputs?.merged ? `, after ${context.payload.inputs.merged}` : ''
-            const body = `CI \`verify\` failed on main @ ${context.sha} (${context.eventName}${after}).\nRun: ${run}\nArtifacts include screenshots and results.json.`
+            const body = `CI \`verify\` failed on main @ ${context.sha} (${context.eventName}${after}).\nRun: ${run}\nArtifacts: screenshots and results.json per smoke shard (\`e2e-results-<shard>\`), and \`lighthouse\`.`
             const open = await github.rest.issues.listForRepo({
               ...context.repo, state: 'open', labels: 'agent:prod-broken',
             })

@@ -60,6 +60,8 @@
  *   node e2e/smoke.mjs --mobile                         # + touch playtest on a phone viewport
  *   node e2e/smoke.mjs --mobile --skip-desktop          # only the touch playtest
  *   node e2e/smoke.mjs --dist dist-portal --base /nested/path/ --levels level1   # the portal zip under a sub-path
+ *   node e2e/smoke.mjs --shard level3                   # one CI shard (e2e/shards.mjs), with its smokeSeconds budget
+ *   node e2e/smoke.mjs --steps ride,boss --levels level2   # just those steps (names in e2e/shards.mjs)
  *
  * --dist / --base: preview that build folder under that sub-path (`npm run smoke:portal`),
  * proving its relative asset URLs. Every local run fails on a request to another origin,
@@ -84,6 +86,7 @@ import { chromium, devices } from 'playwright'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { planRun, STEP_LEVELS } from './shards.mjs'
 
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((acc, a, i, arr) => {
@@ -109,6 +112,16 @@ const SPEED_LEVEL = args['speed-level']
 // Path the build is served under: '/' for the site, a sub-path for the portal zip.
 const BASE_PATH = `/${(args.base ?? '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/$/, '')
 let preview // module scope so the top-level catch can kill it
+const results = [] // module scope so the time-budget watchdog can write what ran
+// Which steps run on which levels: --shard <name> (a CI shard, e2e/shards.mjs), or --steps / --levels / --mobile / --skip-desktop.
+let PLAN
+try {
+  PLAN = planRun({ shard: args.shard, steps: args.steps, levels: args.levels, mobile: args.mobile !== undefined, skipDesktop: args['skip-desktop'] !== undefined })
+} catch (e) {
+  console.error(`smoke: ${e.message}`)
+  process.exit(2)
+}
+const has = (step) => PLAN.steps.has(step)
 fs.mkdirSync(OUT, { recursive: true })
 
 // Console noise that is expected in headless/sandboxed runs and is not a game bug.
@@ -251,7 +264,8 @@ async function captureTitleScene(page, file, maxMs) {
 const READABLE_PX = 12
 const MIN_READABLE = 2
 
-const SCENE_BUDGETS = JSON.parse(fs.readFileSync(new URL('../budgets.json', import.meta.url), 'utf8')).scene
+const BUDGETS = JSON.parse(fs.readFileSync(new URL('../budgets.json', import.meta.url), 'utf8'))
+const SCENE_BUDGETS = BUDGETS.scene
 const PERF_GATE = !args['no-perf-gate']
 const BUDGET_KEYS = [
   ['drawCalls', 'draws'],
@@ -2884,9 +2898,12 @@ async function runMobile(browser, base) {
 
 async function run() {
   const runStarted = Date.now()
+  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['scrim', [SCRIM_CHECK.level]]]
+    .filter(([s, ls]) => ls.join() !== STEP_LEVELS[s].join())
+  if (drift.length) throw new Error(`STEP_LEVELS in e2e/shards.mjs disagrees with the checks: ${drift.map(([s, ls]) => `${s} runs on ${ls.join(', ')}`).join('; ')}`)
+  const budget = startTimeBudget(runStarted)
   const base = args.url ?? (preview = await startPreview()).url
   const browser = await launch()
-  const results = []
   let failed = false
 
   const newPage = async (query = 'e2e=1', options = {}) => {
@@ -2900,63 +2917,59 @@ async function run() {
     await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
     return { ctx, page, errors }
   }
+  /** One step's results entry, with its wall time (`seconds`) for the shard budget. */
+  const step = async (fn) => {
+    const started = Date.now()
+    const r = await fn()
+    r.seconds ??= (Date.now() - started) / 1000
+    failed ||= !r.ok
+    results.push(r)
+    return r
+  }
+  /** A step on a fresh page: `check(page)` returns { problems, … }; page and hook errors fail it. */
+  const pageStep = (check, query) => step(async () => {
+    const p = await newPage(query)
+    const r = await check(p.page)
+    r.errors = [...p.errors, ...(await p.page.evaluate(() => window.__SC_TEST__.errors))]
+    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    r.ok = r.problems.length === 0
+    await p.ctx.close()
+    return r
+  })
 
   // 1. Title screen
   const t = await newPage()
   const levels = await t.page.evaluate(() => window.__SC_TEST__.levels())
-  const titleWait = await waitFrames(t.page, MIN_FRAMES, { maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
-  const titleImg = await captureTitleScene(t.page, path.join(OUT, 'title.png'), FRAME_DEADLINE_MS)
-  const fly = await titleFlyBy(t.page)
-  const titleProblems = [...fly.problems, ...(await fontProblems(t.page))]
-  if (titleWait.frames < MIN_FRAMES) titleProblems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
-  if (looksBlank(titleImg)) titleProblems.push('title.png: the 3D scene behind the UI looks blank')
-  if (t.errors.length) titleProblems.push(`${t.errors.length} error(s)`)
-  const titleOk = titleProblems.length === 0
-  failed ||= !titleOk
-  results.push({ id: 'title', ok: titleOk, problems: titleProblems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg, title: fly.result, errors: t.errors })
+  if (has('title')) {
+    await step(async () => {
+      const titleWait = await waitFrames(t.page, MIN_FRAMES, { maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
+      const titleImg = await captureTitleScene(t.page, path.join(OUT, 'title.png'), FRAME_DEADLINE_MS)
+      const fly = await titleFlyBy(t.page)
+      const problems = [...fly.problems, ...(await fontProblems(t.page))]
+      if (titleWait.frames < MIN_FRAMES) problems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
+      if (looksBlank(titleImg)) problems.push('title.png: the 3D scene behind the UI looks blank')
+      if (t.errors.length) problems.push(`${t.errors.length} error(s)`)
+      return { id: 'title', ok: problems.length === 0, problems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg, title: fly.result, errors: t.errors }
+    })
+  }
   await t.ctx.close()
 
   // 1a. Campaign landing path; not for portal builds (--base), which portals serve at their own path.
-  if (!args['skip-desktop'] && !args.base) {
-    const r = await landingPathCheck(browser, base)
-    failed ||= !r.ok
-    results.push(r)
-  }
+  if (has('landing') && !args.base) await step(() => landingPathCheck(browser, base))
 
   // 1b. Level select with saved progress + keyboard-only start
-  if (!args['skip-desktop']) {
-    const l = await newPage()
-    const r = await levelSelectCheck(l.page, levels)
-    r.errors = [...l.errors, ...(await l.page.evaluate(() => window.__SC_TEST__.errors))]
-    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
-    r.ok = r.problems.length === 0
-    failed ||= !r.ok
-    results.push(r)
-    await l.ctx.close()
-  }
+  if (has('levelSelect')) await pageStep((page) => levelSelectCheck(page, levels))
 
   // 1b'. Daily Run from its card: today's seed, same spawns on a second load, daily results, campaign saves untouched
-  if (!args['skip-desktop']) {
-    const r = await dailyCheck(newPage)
-    failed ||= !r.ok
-    results.push(r)
-  }
+  if (has('daily')) await step(() => dailyCheck(newPage))
 
   // 1c. Settings from the title (settings.png): layout, Esc, persisted across a reload
-  if (!args['skip-desktop']) {
-    const st = await newPage()
-    const r = await settingsCheck(st.page)
-    r.errors = [...st.errors, ...(await st.page.evaluate(() => window.__SC_TEST__.errors))]
-    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
-    r.ok = r.problems.length === 0
-    failed ||= !r.ok
-    results.push(r)
-    await st.ctx.close()
-  }
+  if (has('settings')) await pageStep(settingsCheck)
 
-  // 2. Every level (or the requested subset)
-  const wanted = args['skip-desktop'] ? [] : args.levels ? args.levels.split(',') : levels.map((l) => l.id)
-  for (const id of wanted) {
+  // 2. Every level (or the requested subset); the first one also plays the FRENZY / leaderboard checks (`frenzy`)
+  const wanted = PLAN.levels ?? levels.map((l) => l.id)
+  const first = wanted[0]
+  for (const id of has('ride') ? wanted : []) {
     const { ctx, page, errors } = await newPage()
     const started = Date.now()
     await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [id, SEED])
@@ -2988,9 +3001,10 @@ async function run() {
     stats.view = desktopAspect.view
     const perfGate = PERF_GATE ? sceneBudgetCheck(id, stats) : null
     if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
-    const play = await playLevel(page, id, { frenzy: id === wanted[0], leaderboard: id === wanted[0] })
+    const frenzy = has('frenzy') && id === first
+    const play = await playLevel(page, id, { frenzy, leaderboard: frenzy })
     problems.push(...play.problems)
-    const frenzyEnd = id === wanted[0] ? await frenzyEndProblems(page, id) : null
+    const frenzyEnd = frenzy ? await frenzyEndProblems(page, id) : null
     if (frenzyEnd) problems.push(...frenzyEnd.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
     const allErrors = [...errors, ...hookErrors]
@@ -3006,133 +3020,95 @@ async function run() {
   }
 
   // 2b. ?quality=low against the default: dpr 1, no contact shadows, fewer draw calls (<id>-low.png)
-  if (wanted.length) {
-    const r = await qualityCheck(newPage, wanted[0])
-    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
-    r.ok = r.problems.length === 0
-    failed ||= !r.ok
-    results.push(r)
+  if (has('quality') && first) {
+    await step(async () => {
+      const r = await qualityCheck(newPage, first)
+      if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+      r.ok = r.problems.length === 0
+      return r
+    })
   }
 
   // 3. Seeded spawns: a fresh page + the same seed gives the same enemies; another seed doesn't
-  const firstLevel = results.find((r) => r.id === wanted[0])
-  if (firstLevel?.spawnDigest) {
-    const s = await newPage()
-    const r = await seedCheck(s.page, firstLevel)
-    r.errors = s.errors
-    failed ||= !r.ok
-    results.push(r)
-    await s.ctx.close()
+  const firstLevel = results.find((r) => r.id === first)
+  if (has('seed') && firstLevel?.spawnDigest) {
+    await step(async () => {
+      const s = await newPage()
+      const r = await seedCheck(s.page, firstLevel)
+      r.errors = s.errors
+      await s.ctx.close()
+      return r
+    })
   }
 
-  // 4. Leaving the tab pauses the run and never drains the timer
-  if (wanted.length) {
+  // 4. Leaving the tab pauses the run and never drains the timer; then 4b. the pause menu on the same page (pause.png)
+  if (has('pause') && first) {
     const h = await newPage()
-    const r = await hiddenPauseCheck(h.page, wanted[0])
-    r.errors = [...h.errors, ...(await h.page.evaluate(() => window.__SC_TEST__.errors))]
-    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
-    r.ok = r.problems.length === 0
-    failed ||= !r.ok
-    results.push(r)
-    // 4b. The pause menu on the same page (pause.png): focus, Esc resume, Restart
-    const errorsBefore = r.errors.length
-    const m = await pauseMenuCheck(h.page, wanted[0])
-    m.errors = [...h.errors, ...(await h.page.evaluate(() => window.__SC_TEST__.errors))].slice(errorsBefore)
-    if (m.errors.length) m.problems.push(`${m.errors.length} error(s)`)
-    m.ok = m.problems.length === 0
-    failed ||= !m.ok
-    results.push(m)
+    const r = await step(async () => {
+      const r = await hiddenPauseCheck(h.page, first)
+      r.errors = [...h.errors, ...(await h.page.evaluate(() => window.__SC_TEST__.errors))]
+      if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+      r.ok = r.problems.length === 0
+      return r
+    })
+    await step(async () => {
+      const m = await pauseMenuCheck(h.page, first)
+      m.errors = [...h.errors, ...(await h.page.evaluate(() => window.__SC_TEST__.errors))].slice(r.errors.length)
+      if (m.errors.length) m.problems.push(`${m.errors.length} error(s)`)
+      m.ok = m.problems.length === 0
+      return m
+    })
     await h.ctx.close()
   }
 
   // 5. A real start: Ready / Set / GO over the warming-up level, then playing
-  if (wanted.length) {
-    const c = await newPage('e2e=1&countdown=1')
-    const r = await countdownCheck(c.page, wanted[0])
-    r.errors = [...c.errors, ...(await c.page.evaluate(() => window.__SC_TEST__.errors))]
-    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
-    r.ok = r.problems.length === 0
-    failed ||= !r.ok
-    results.push(r)
-    await c.ctx.close()
-  }
+  if (has('countdown') && first) await pageStep((page) => countdownCheck(page, first), 'e2e=1&countdown=1')
 
   // 6. Top speed: banking + wind streaks (speed.png)
-  if (wanted.length) {
-    const sp = await newPage()
-    const r = await speedCheck(sp.page, SPEED_LEVEL && wanted.includes(SPEED_LEVEL) ? SPEED_LEVEL : wanted[0])
-    r.errors = [...sp.errors, ...(await sp.page.evaluate(() => window.__SC_TEST__.errors))]
-    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
-    r.ok = r.problems.length === 0
-    failed ||= !r.ok
-    results.push(r)
-    await sp.ctx.close()
-  }
+  if (has('speed') && first) await pageStep((page) => speedCheck(page, SPEED_LEVEL && wanted.includes(SPEED_LEVEL) ? SPEED_LEVEL : first))
 
   // 6b. Spawn choreography: the crow wave's tell, then its V flying in (level2-wave.png)
-  if (wanted.includes(WAVE_CHECK.level)) {
-    const w = await newPage()
-    const r = await waveCheck(w.page)
-    r.errors = [...w.errors, ...(await w.page.evaluate(() => window.__SC_TEST__.errors))]
-    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
-    r.ok = r.problems.length === 0
-    failed ||= !r.ok
-    results.push(r)
-    await w.ctx.close()
-  }
+  if (has('wave') && wanted.includes(WAVE_CHECK.level)) await pageStep(waveCheck)
 
   // 6c. The finales: summoned, shot down in phase order (<level>-boss.png, <level>-boss-down.png)
-  for (const check of BOSS_CHECKS.filter((c) => wanted.includes(c.level))) {
-    const b = await newPage()
-    const r = await bossCheck(b.page, check)
-    r.errors = [...b.errors, ...(await b.page.evaluate(() => window.__SC_TEST__.errors))]
-    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
-    r.ok = r.problems.length === 0
-    failed ||= !r.ok
-    results.push(r)
-    await b.ctx.close()
+  for (const check of has('boss') ? BOSS_CHECKS.filter((c) => wanted.includes(c.level)) : []) {
+    await pageStep((page) => bossCheck(page, check))
   }
 
   // 6e. Weapon pickups: one shot with a real bullet, the fan, the badge, expiry (level1-pickup.png)
-  if (wanted.includes(PICKUP_CHECK.level)) {
-    const pk = await newPage()
-    const r = await pickupCheck(pk.page)
-    r.errors = [...pk.errors, ...(await pk.page.evaluate(() => window.__SC_TEST__.errors))]
-    if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
-    r.ok = r.problems.length === 0
-    failed ||= !r.ok
-    results.push(r)
-    await pk.ctx.close()
-  }
+  if (has('pickup') && wanted.includes(PICKUP_CHECK.level)) await pageStep(pickupCheck)
 
   // 6d. The score engine behind ?audio=scrim: title -> level -> pause -> results
-  if (wanted.includes(SCRIM_CHECK.level)) {
-    const sc = await newPage('e2e=1&audio=scrim')
-    const r = await scrimCheck(sc.page)
-    const errors = [...sc.errors, ...(await sc.page.evaluate(() => window.__SC_TEST__.errors))]
-    if (errors.length) r.problems.push(`${errors.length} error(s)`)
-    const ok = r.problems.length === 0
-    failed ||= !ok
-    results.push({ id: 'scrim', ok, problems: r.problems, scrim: r.result, errors })
-    await sc.ctx.close()
+  if (has('scrim') && wanted.includes(SCRIM_CHECK.level)) {
+    await step(async () => {
+      const sc = await newPage('e2e=1&audio=scrim')
+      const r = await scrimCheck(sc.page)
+      const errors = [...sc.errors, ...(await sc.page.evaluate(() => window.__SC_TEST__.errors))]
+      if (errors.length) r.problems.push(`${errors.length} error(s)`)
+      await sc.ctx.close()
+      return { id: 'scrim', ok: r.problems.length === 0, problems: r.problems, scrim: r.result, errors }
+    })
   }
 
-  // 7. Optional touch playtest on a phone viewport
-  if (args.mobile) {
-    const m = await runMobile(browser, base)
-    failed ||= !m.ok
-    results.push(m)
-  }
+  // 7. Touch playtest on a phone viewport (--mobile)
+  if (has('mobile')) await step(() => runMobile(browser, base))
 
   await browser.close()
   if (preview) stopPreview(preview.proc)
 
+  if (budget) {
+    const r = budget.result((Date.now() - runStarted) / 1000)
+    failed ||= !r.ok
+    results.push(r)
+  }
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
   for (const r of results) {
     const en = r.enemies && !r.enemies.error
       ? ` enemiesOnScreen=${r.enemies.onScreen} readable=${r.enemies.readable} largestPx=${r.enemies.largestPx}`
       : ''
-    const extra = r.id === 'title'
+    const extra = r.id === 'time'
+      ? (r.ok ? ` ${r.text}` : '')
+      : r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '')
       : r.landing
         ? ` ${r.landing.requested} -> ${r.landing.pathname}${r.landing.search} phase=${r.landing.phase} internal marker=${r.landing.marker} failed requests=${r.landing.failed}`
@@ -3191,6 +3167,40 @@ async function run() {
   }
   console.log(`Screenshots + results.json in ${OUT} (total ${((Date.now() - runStarted) / 1000).toFixed(0)}s)`)
   process.exit(failed ? 1 : 0)
+}
+
+/**
+ * A shard's smokeSeconds budget (budgets.json, #353): its time goes on the summary line and in
+ * a GitHub annotation. On CI a shard over budget fails, and one still running at twice its
+ * budget writes what it has and exits, before the job's timeout; locally it only warns.
+ */
+function startTimeBudget(runStarted) {
+  if (!args.shard) return null
+  const budget = BUDGETS.smokeSeconds?.[args.shard]
+  if (!budget) throw new Error(`no smokeSeconds budget for shard ${args.shard} in budgets.json`)
+  const enforced = !!process.env.CI
+  const min = (s) => (s / 60).toFixed(1)
+  const annotate = (level, text) => process.env.GITHUB_ACTIONS && console.log(`::${level} title=smoke ${args.shard}::${text}`)
+  if (enforced) {
+    setTimeout(() => {
+      const text = `${args.shard} shard still running after ${min(2 * budget)} min, budget ${min(budget)}: stopped`
+      annotate('error', text)
+      console.log(`FAIL time       ${text}`)
+      results.push({ id: 'time', ok: false, problems: [text], shard: args.shard, seconds: (Date.now() - runStarted) / 1000, budget, errors: [] })
+      fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
+      if (preview) stopPreview(preview.proc)
+      process.exit(1)
+    }, 2 * budget * 1000).unref()
+  }
+  return {
+    result(seconds) {
+      const over = seconds > budget
+      const text = `${args.shard} shard took ${min(seconds)} min, budget ${min(budget)}`
+      annotate(over ? (enforced ? 'error' : 'warning') : 'notice', text)
+      const ok = !(over && enforced)
+      return { id: 'time', ok, problems: ok ? [] : [text], text: ok && over ? `${text} (over; enforced on CI only)` : text, shard: args.shard, seconds, budget, errors: [] }
+    },
+  }
 }
 
 /** Level phases from the run's start: the smoke picks when that is. */
