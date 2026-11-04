@@ -11,8 +11,9 @@ Read first (CLAUDE.md is already loaded): `docs/agents/PROTOCOL.md`, `docs/agent
 
 Work through these in order; stop early only if something is on fire.
 
-1. **Production**: any open issue labelled `agent:prod-broken` (opened by the nightly
-   prod-smoke workflow)? Find the culprit merge (`git log`, bisect with
+1. **Production**: any open issue labelled `agent:prod-broken` (opened by `prod-smoke.yml`'s
+   post-deploy health check or nightly full smoke, or by a red `main`)? The production ones
+   say which check failed or that it only timed out, and close themselves on the next green run. Find the culprit merge (`git log`, bisect with
    `npm run verify` if needed), open a revert PR titled `revert: …`, verify, label it
    `agent:needs-qa` + `P1` (QA reviews reverts first; no self-approval), comment on the original issue/PR, and reopen the original issue with
    what went wrong. Close the prod-broken issue when fixed.

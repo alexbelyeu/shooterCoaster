@@ -209,6 +209,7 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 | Grounded object floats / sinks on ridged terrain | Placed on `heightFn`, but the drawn mesh is linear between grid vertices (up to ~55 units off on Arctic) | Sample `createTerrainSurface(heightFn, getTerrainMeshSize(biome))` for things that must touch the visible ground (see `src/track/supportTowers.ts`) |
 | Prop or ride intersects the track or a support tower | Placed by radius from the origin, ignoring the track | Plan positions against `buildTrackIndex(track)` (2D clearance) and unit-test them, as `themePark/layout.test.ts` does |
 | Level blows its draw-call budget | One `<mesh>` per prop part (a Ferris wheel was 88 draws) | InstancedMesh per part, or `paintedParts.ts` to merge a multi-coloured prop into one geometry |
+| A wave blows the draw-call budget | One `<mesh>` per enemy part × 25+ enemies on screen (Arctic scouts were 12 draws each, 393 for the level) | Merge the parts that share a material and move together with `placedParts` in `SharedEnemyAssets.ts`; only animated parts stay separate meshes |
 | Terrain holes/spikes | Missing noise config | Add entry to terrainNoise.ts |
 | No music plays | Missing MusicManager entry | Add biome config to CONFIGS record |
 | Enemies don't spawn | Missing spawner registration | Check all 4 spawner touchpoints |

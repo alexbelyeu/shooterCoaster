@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
 import type { ArcTable } from './arcLength'
 import { setRideProgress } from './rideProgress'
+import { e2eRideSeconds } from '@/testing/e2eHook'
 import { useGameStore } from '@/store/useGameStore'
 import { sfx } from '@/audio/sfx'
 import { eventBus } from '@/core/EventBus'
@@ -137,13 +138,12 @@ export default function CoasterCamera({
       velocity.current = 0
       jumped = true
     }
-    const effectiveDelta = countdown || store.phase === 'paused' ? 0 : delta * (store.timeScale ?? 1)
+    const frameDelta = countdown || store.phase === 'paused' ? 0 : delta
+    const effectiveDelta = frameDelta * (store.timeScale ?? 1)
 
     const effectiveRollerSpeed = rollerSpeed * SPEED_FACTOR
     const effectiveMinSpeed = minRollerSpeed * SPEED_FACTOR
     const maxVelocity = minRollerSpeed * MAX_VELOCITY_MULT * SPEED_FACTOR
-
-    const dtScaleSlow = Math.min(effectiveDelta * 60, 3)
 
     const testApi = window.__SC_TEST__
     if (testApi?.rideTo != null) {
@@ -155,19 +155,25 @@ export default function CoasterCamera({
       velocity.current = effectiveMinSpeed + Math.min(Math.max(testApi.rideSpeed, 0), 1) * (maxVelocity - effectiveMinSpeed)
       testApi.rideSpeed = null
     }
-    progress.current += velocity.current * dtScaleSlow
-    progress.current = wrap01(progress.current)
+    // In 60 fps frames. A hitch rides at most 3 of them (it slows the ride, never skips track); the smoke's `rideRate`
+    // instead rides a share of the level time in such steps, so the ride doesn't depend on the frame rate (#305).
+    const e2eRide = e2eRideSeconds(frameDelta)
+    let rideLeft = e2eRide === null ? Math.min(effectiveDelta * 60, 3) : e2eRide * (store.timeScale ?? 1) * 60
+    do {
+      const dtScaleSlow = Math.min(rideLeft, 3)
+      rideLeft -= dtScaleSlow
+      progress.current = wrap01(progress.current + velocity.current * dtScaleSlow)
+      _tangent.current.copy(curve.getTangentAt(progress.current))
+      velocity.current -= _tangent.current.y * effectiveRollerSpeed * dtScaleSlow
+      velocity.current = Math.max(velocity.current, effectiveMinSpeed)
+      velocity.current = Math.min(velocity.current, maxVelocity)
+    } while (rideLeft > 0)
     const t = progress.current
     setRideProgress(t)
 
     _position.current.copy(curve.getPointAt(t))
     _position.current.y += heightOffset
     cam.position.copy(_position.current)
-
-    _tangent.current.copy(curve.getTangentAt(t))
-    velocity.current -= _tangent.current.y * effectiveRollerSpeed * dtScaleSlow
-    velocity.current = Math.max(velocity.current, effectiveMinSpeed)
-    velocity.current = Math.min(velocity.current, maxVelocity)
     const velocityNorm = Math.max(
       0,
       Math.min((velocity.current - effectiveMinSpeed) / (maxVelocity - effectiveMinSpeed), 1),

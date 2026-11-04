@@ -49,9 +49,9 @@
  * The scrim check loads level1 with `?audio=scrim` (the score engine, #214, and the arcade SFX, #217); see scrimCheck().
  *
  * All waits are deadline-polled on the hook's frame counter, because software
- * rendering in CI / cloud sessions can run at ~1 fps. The title and each level ride
- * wait --seconds, longer until --min-frames frames have rendered, and fail as a stalled
- * render loop only if those frames haven't arrived by 4× --seconds.
+ * rendering in CI / cloud sessions can run at ~1 fps. The title waits --seconds and each level
+ * rides to --seconds of level time (capped per frame, `timerStepMax`; ridden at --ride-rate), both until --min-frames
+ * frames have rendered, and fail as a stalled render loop only if those frames haven't arrived by 4× --seconds.
  *
  * Usage:
  *   npm run build && node e2e/smoke.mjs                 # all levels
@@ -84,6 +84,7 @@ import { chromium, devices } from 'playwright'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, waitFrames, waitVisible } from './pageChecks.mjs'
 
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((acc, a, i, arr) => {
@@ -101,6 +102,14 @@ const FRAME_DEADLINE_MS = SECONDS * 4000
 const SHOT_TIMEOUT = Number(args['shot-timeout'] ?? 120000)
 const COMBAT_SECONDS = Number(args['combat-seconds'] ?? 4)
 const COMBAT_MIN_FRAMES = Number(args['combat-min-frames'] ?? 4)
+// The level steps cap level time per frame (`timerStepMax`), so a slow runner samples the same moment of a level as a
+// fast one (#305): the ride reaches SECONDS of level time in MIN_FRAMES frames at most, and combat gains ≤ 0.25 s a
+// frame, so it never runs on into a boss (level3's Kraken is due at 40 s). Faster frames pass through unchanged.
+const RIDE_STEP_MAX = SECONDS / MIN_FRAMES
+const COMBAT_STEP_MAX = 0.25
+// Seconds of ride per second of level time during the ride (`rideRate`). The game rides at most 3/60 s a frame, so on
+// software GL the ride depended on the frame count; 0.14 is CI's (~2.8 fps × 0.05 s), where the budgets were calibrated.
+const RIDE_RATE = Number(args['ride-rate'] ?? 0.14)
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(args.seed ?? 1337)
 const DIST = args.dist ?? 'dist'
@@ -111,16 +120,6 @@ const BASE_PATH = `/${(args.base ?? '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/
 let preview // module scope so the top-level catch can kill it
 fs.mkdirSync(OUT, { recursive: true })
 
-// Console noise that is expected in headless/sandboxed runs and is not a game bug.
-const IGNORED = [
-  /AudioContext/i,
-  /Failed to load resource/i,
-  /net::ERR_/i,
-  /WebGL.*(performance|GPU stall|ReadPixels)/i,
-  /THREE\.WebGLRenderer: .*(extension|precision)/i,
-  /Download the React DevTools/i,
-]
-const ignored = (msg) => IGNORED.some((re) => re.test(msg))
 
 /** Portals forbid requests to other origins (#88); a deployed --url isn't held to it. */
 function collectErrors(page, errors) {
@@ -203,39 +202,7 @@ async function launch() {
   return chromium.launch({ headless: true, executablePath, args: flags })
 }
 
-/** Pixel stats of a PNG screenshot, computed in the page with a 2D canvas (no deps), leaving out the `skip` rects [x0, y0, x1, y1] (frame fractions). */
-async function imageStats(page, png, skip = []) {
-  return page.evaluate(async ([b64, skip]) => {
-    const img = new Image()
-    img.src = `data:image/png;base64,${b64}`
-    await img.decode()
-    const c = document.createElement('canvas')
-    c.width = 160
-    c.height = 90
-    const ctx = c.getContext('2d')
-    ctx.drawImage(img, 0, 0, c.width, c.height)
-    const d = ctx.getImageData(0, 0, c.width, c.height).data
-    let sum = 0, sumSq = 0, n = 0
-    const colors = new Set()
-    for (let i = 0; i < d.length; i += 4) {
-      const x = ((i / 4) % c.width) / c.width
-      const y = Math.floor(i / 4 / c.width) / c.height
-      if (skip.some(([x0, y0, x1, y1]) => x >= x0 && x < x1 && y >= y0 && y < y1)) continue
-      const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
-      sum += l
-      sumSq += l * l
-      n++
-      colors.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4))
-    }
-    const mean = sum / n
-    return { mean, stddev: Math.sqrt(sumSq / n - mean * mean), distinctColors: colors.size }
-  }, [png.toString('base64'), skip])
-}
 
-const looksBlank = (img) => img.stddev < 4 || img.distinctColors < 8
-
-/** The title UI (logo, PLAY, hint; corner buttons and byline), left out so a black 3D scene behind it can't pass (#136). */
-const TITLE_UI = [[0.25, 0.25, 0.75, 0.75], [0, 0.85, 1, 1]]
 
 /** Re-shoots the title into `file` until its 3D scene has drawn (a cold start can show it black) or `maxMs` runs out. */
 async function captureTitleScene(page, file, maxMs) {
@@ -282,7 +249,7 @@ function sceneBudgetCheck(id, stats) {
 /**
  * Readability probe: freeze game time, list on-screen enemies, and save a 4x
  * close-up of the largest one as `<id>-enemy.png` (for eyeballing rim light and
- * contrast). The level loop fails a ride with fewer than MIN_READABLE readable enemies.
+ * contrast). The level loop fails a ride with no enemy on screen, or fewer readable ones than min(MIN_READABLE, on screen).
  */
 async function captureEnemyCloseup(page, id) {
   try {
@@ -329,20 +296,37 @@ async function captureEnemyCloseup(page, id) {
   }
 }
 
-const getFrames = (page) => page.evaluate(() => window.__SC_TEST__.frames)
 const getStats = (page) => page.evaluate(() => window.__SC_TEST__.stats())
 
-/** Poll until `n` more frames have rendered (and at least `minMs` passed), or `maxMs` elapses. */
-async function waitFrames(page, n, { minMs = 0, maxMs = 20000, pollMs = 250 } = {}) {
+
+/**
+ * Ride (game time running, `rideRate` RIDE_RATE) until the level timer reaches `seconds` and `minFrames` have rendered
+ * (a stall past FRAME_DEADLINE_MS stops it), then freeze game time and hand the ride back to the frame time in that
+ * same JS turn. With `timerStepMax` set this is the same moment of the level, from the same track point, on any runner.
+ */
+async function rideToLevelTime(page, seconds, minFrames) {
   const start = Date.now()
-  const f0 = await getFrames(page)
-  let f = f0
-  while (Date.now() - start < maxMs) {
-    await page.waitForTimeout(pollMs)
-    f = await getFrames(page)
-    if (f - f0 >= n && Date.now() - start >= minMs) break
+  const f0 = await page.evaluate((rate) => {
+    const s = window.__SC_TEST__
+    s.rideRate = rate
+    s.setTimeScale(1)
+    return s.frames
+  }, RIDE_RATE)
+  for (;;) {
+    const r = await page.evaluate(([target, f0, minFrames, overdue]) => {
+      const s = window.__SC_TEST__
+      const levelTime = s.nextWave()?.levelTime ?? 0
+      const frames = s.frames - f0
+      const done = overdue || (levelTime >= target && frames >= minFrames)
+      if (done) {
+        s.setTimeScale(0)
+        s.rideRate = null
+      }
+      return { done, frames, levelTime }
+    }, [seconds, f0, minFrames, Date.now() - start >= FRAME_DEADLINE_MS])
+    if (r.done) return { frames: r.frames, ms: Date.now() - start, levelTime: r.levelTime }
+    await page.waitForTimeout(250)
   }
-  return { frames: f - f0, ms: Date.now() - start }
 }
 
 /** Poll `check()` until true; give up once `ms` passed *and* `frames` rendered, or at `ms` + FRAME_DEADLINE_MS. */
@@ -373,6 +357,9 @@ async function pollUntil(page, check, { ms, frames = MIN_FRAMES, pollMs = 500 })
  */
 async function playLevel(page, id, { frenzy = false, leaderboard = false } = {}) {
   const problems = []
+  // Hold the level timer for every check below (the game clock still runs): however long they take on a slow runner,
+  // the run can't time out and no wave or boss comes due under them. Released in the turn that ends the level.
+  await page.evaluate(() => { window.__SC_TEST__.holdLevelTime = true })
   // Desktop mouse: one real click at the screen centre must fire through pointer input.
   const beforeClick = await getStats(page)
   const vp = page.viewportSize()
@@ -410,8 +397,8 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false } = {})
       await page.waitForTimeout(30)
       const c = await page.evaluate(() => ({ kills: window.__SC_TEST__.combat.kills, phase: window.__SC_TEST__.phase() }))
       killEvents = c.kills
-      // The level timer is wall-clock; on a ~1 fps runner it can expire here,
-      // and an ended level never finishes the kill pop. Can't judge it then.
+      // An ended level never finishes the kill pop, so it can't be judged then
+      // (with COMBAT_STEP_MAX capping level time this needs a stalled page).
       if (c.phase !== 'playing') { killCheckSkipped = c.phase; break }
     }
   } else {
@@ -477,11 +464,17 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false } = {})
   problems.push(...audio.problems)
   const shot = await freshShotProblems(page, id)
   problems.push(...shot.problems)
+  // These checks are about the level's waves: its boss (slams, weak points, its own death style) is the boss step's.
+  const played = await page.evaluate(() => ({ levelTime: window.__SC_TEST__.nextWave()?.levelTime ?? null, boss: window.__SC_TEST__.boss().stage }))
+  if (played.boss !== 'none' && played.boss !== 'waiting') problems.push(`the boss arrived during play (stage ${played.boss} at ${played.levelTime?.toFixed(1)} s of level time)`)
 
   // With `leaderboard`, seed nine entries so this run places 4th, in the same turn as the end so the score can't move.
-  const seededRank = await page.evaluate(
+  const seeding = await page.evaluate(
     ([lid, seed]) => {
       const t = window.__SC_TEST__
+      t.holdLevelTime = false
+      const phase = t.phase()
+      if (phase !== 'playing') return { phase, rank: null }
       const score = Math.round(t.stats().score)
       const seeded = seed && score > 0
       const above = [3000, 2000, 1000].map((d) => score + d)
@@ -491,10 +484,13 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false } = {})
         t.setLeaderboards({ [lid]: [...above, ...below].map(row) }, 'AAA')
       }
       t.endLevel()
-      return seeded ? above.length : null
+      return { phase, rank: seeded ? above.length : null }
     },
     [id, leaderboard],
   )
+  // With the level timer held this can't happen; if it does, say so instead of failing the board checks on it.
+  if (seeding.phase !== 'playing') problems.push(`level left play (${seeding.phase}) before the results checks, with the level timer held`)
+  const seededRank = seeding.rank
   // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
   const resultsShown = await page
     .waitForFunction(
@@ -560,6 +556,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false } = {})
       killCheckSkipped,
       audioBurst: audio.burst,
       freshShot: shot.result,
+      endLevelTime: played.levelTime,
     },
     kills: combat.kills,
     score: combat.score,
@@ -825,9 +822,10 @@ async function frenzyEndProblems(page, id) {
   })
   await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
   const after = await page.evaluate(() => ({ timeScale: window.__SC_TEST__.stats().timeScale, ducked: window.__SC_TEST__.audio().musicDucked }))
-  await page
-    .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 30000, polling: 100 })
-    .catch(() => {})
+  // The results fade in behind AnimatePresence and reveal on timers: on a slow runner that can pass 30 s.
+  const revealed = await page
+    .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 90000, polling: 100 })
+    .then(() => true, () => false)
   const board = await page.evaluate(() => {
     const b = document.querySelector('.results-board')
     return { shown: !!b, rank: b?.dataset.rank ?? null, editing: !!b?.dataset.editing }
@@ -838,7 +836,8 @@ async function frenzyEndProblems(page, id) {
   const problems = []
   if (after.timeScale !== 1) problems.push(`frenzy end: results screen at timeScale ${after.timeScale.toFixed(2)}, not 1`)
   if (after.ducked) problems.push('frenzy end: music still ducked on the results screen')
-  if (!board.shown) problems.push('frenzy end: no leaderboard on the results screen')
+  if (!revealed) problems.push('frenzy end: the results screen never finished its reveal (90 s)')
+  else if (!board.shown) problems.push('frenzy end: no leaderboard on the results screen')
   if (board.rank !== null || board.editing) problems.push(`a run that misses the board ranked ${board.rank} with initials entry ${board.editing ? 'open' : 'closed'}`)
   return { result, problems }
 }
@@ -965,21 +964,6 @@ const FRENZY_PRIME = 14
 const HUD_SELECTORS = ['.hud-score', '.hud-kills', '.hud-timer', '.hud-combo', '.hud-pause-button', '.mute-button']
 
 /** Wait until `selector` exists, has a size, and it and its ancestors are fully faded in. */
-function waitVisible(page, selector, timeout = 30000) {
-  return page
-    .waitForFunction(
-      (sel) => {
-        const el = document.querySelector(sel)
-        if (!el) return false
-        for (let n = el; n; n = n.parentElement) if (Number(getComputedStyle(n).opacity) < 0.98) return false
-        const r = el.getBoundingClientRect()
-        return r.width > 0 && r.height > 0
-      },
-      selector,
-      { timeout, polling: 250 },
-    )
-    .then(() => true, () => false)
-}
 
 /**
  * First-person weapon (#65): must be on screen, its muzzle tip inside the
@@ -1289,6 +1273,7 @@ async function hiddenPauseCheck(page, levelId) {
   const shownPhase = await page.evaluate(() => window.__SC_TEST__.phase())
   const pausedStats = await getStats(page)
   const resumedAt = Date.now()
+  await page.evaluate(() => { window.__SC_TEST__.maxFrameMs = 0 })
   const resumeClicked = await page
     .getByRole('button', { name: 'Resume' })
     .click({ timeout: 30000 })
@@ -1317,6 +1302,7 @@ async function hiddenPauseCheck(page, levelId) {
         { timeout: 90000, polling: 100 },
       )
       .then((h) => h.jsonValue(), () => null)
+  const resumedMaxFrameMs = await page.evaluate(() => window.__SC_TEST__.maxFrameMs)
   await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
   const resumed = await getStats(page)
   const resumedFrozen = await frozenState(page)
@@ -1361,10 +1347,11 @@ async function hiddenPauseCheck(page, levelId) {
   if (due === null) problems.push('no wave still due when the tab was hidden (nextWave)')
   else if (!waveArrival) problems.push(`the wave due at ${due} s of level time never arrived after Resume`)
   else if (waveArrival !== 'ended') {
-    // One or two slow software-GL frames of slack; a schedule on wall time would be late by the whole pause (≥ 6 s).
-    const latest = Math.max(due, frozenAt.wave.levelTime) + 3
+    // The spawner reads level time as stored on whole-second crossings (1 s), and may read it a frame late: the crossing
+    // frame plus that one, at the longest frame since Resume. A schedule on wall time would be late by the whole pause (≥ 6 s).
+    const latest = Math.max(due, frozenAt.wave.levelTime) + 1 + (2 * resumedMaxFrameMs) / 1000
     if (!(waveArrival.levelTime >= due && waveArrival.levelTime <= latest))
-      problems.push(`the wave due at ${due} s of level time (paused at ${frozenAt.wave.levelTime.toFixed(2)} s) arrived at ${waveArrival.levelTime.toFixed(2)} s`)
+      problems.push(`the wave due at ${due} s of level time (paused at ${frozenAt.wave.levelTime.toFixed(2)} s) arrived at ${waveArrival.levelTime.toFixed(2)} s (latest ${latest.toFixed(2)} s, longest frame ${resumedMaxFrameMs.toFixed(0)} ms)`)
   }
   if (blurPhase !== 'paused') problems.push(`window blur left the phase "${blurPhase}", not paused`)
   return {
@@ -1377,6 +1364,7 @@ async function hiddenPauseCheck(page, levelId) {
       whileHidden: whileHidden.timeRemaining,
       resumed: resumed.timeRemaining,
       resumedSeconds,
+      resumedMaxFrameMs,
       kills: [before.kills, resumed.kills],
       liveEnemies: [before.liveEnemies, resumed.liveEnemies],
       combo: [before.combo, whileHidden.combo, pausedStats.combo],
@@ -2959,15 +2947,22 @@ async function run() {
   for (const id of wanted) {
     const { ctx, page, errors } = await newPage()
     const started = Date.now()
-    await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [id, SEED])
-    const ride = await waitFrames(page, MIN_FRAMES, { minMs: SECONDS * 1000, maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
+    await page.evaluate(([lid, seed, cap]) => {
+      window.__SC_TEST__.timerStepMax = cap
+      window.__SC_TEST__.startLevel(lid, seed)
+    }, [id, SEED, RIDE_STEP_MAX])
+    const ride = await rideToLevelTime(page, SECONDS, MIN_FRAMES)
+    // Frozen at SECONDS of level time until the enemy probe: the ride stats, perf gate, shot and probe share that moment.
     const stats = await page.evaluate(() => {
       const s = window.__SC_TEST__
-      return { avgFrameMs: s.avgFrameMs, drawCalls: s.drawCalls, triangles: s.triangles, phase: s.phase(), hookErrors: s.errors, scene: s.sceneStats?.() ?? null, particles: s.particles() }
+      return {
+        levelTime: s.nextWave()?.levelTime ?? null, avgFrameMs: s.avgFrameMs, drawCalls: s.drawCalls, triangles: s.triangles,
+        phase: s.phase(), hookErrors: s.errors, scene: s.sceneStats?.() ?? null, particles: s.particles(),
+      }
     })
     const png = await page.screenshot({ path: path.join(OUT, `${id}.png`), timeout: SHOT_TIMEOUT })
     const img = await imageStats(page, png)
-    const enemyShot = await captureEnemyCloseup(page, id)
+    const enemyShot = { ...(await captureEnemyCloseup(page, id)), levelTime: stats.levelTime }
     const { frames } = ride
     const frameSeconds = ride.ms / 1000
     const problems = []
@@ -2978,8 +2973,11 @@ async function run() {
     if (looksBlank(img)) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
     if (enemyShot.error) problems.push(`enemy probe failed: ${enemyShot.error}`)
-    else if (enemyShot.readable < MIN_READABLE) {
-      problems.push(`${enemyShot.readable} readable enemies (≥ ${READABLE_PX} px) of ${enemyShot.onScreen} on screen after the ride (need ${MIN_READABLE})`)
+    else if (enemyShot.onScreen === 0) {
+      problems.push(`no enemies on screen at ${enemyShot.levelTime?.toFixed(1)} s of level time`)
+    } else if (enemyShot.readable < Math.min(MIN_READABLE, enemyShot.onScreen)) {
+      // Every enemy on screen must be readable up to MIN_READABLE of them: one readable enemy of one passes (#250).
+      problems.push(`${enemyShot.readable} readable enemies (≥ ${READABLE_PX} px) of ${enemyShot.onScreen} on screen at ${enemyShot.levelTime?.toFixed(1)} s of level time (need ${Math.min(MIN_READABLE, enemyShot.onScreen)})`)
     }
     if (stats.scene && !stats.scene.environment) problems.push('no scene.environment (sky env map not baked)')
     if (!stats.particles.mounted || stats.particles.points <= 0) problems.push('no ambient particle field (BiomeDefinition.particles)')
@@ -2988,7 +2986,9 @@ async function run() {
     stats.view = desktopAspect.view
     const perfGate = PERF_GATE ? sceneBudgetCheck(id, stats) : null
     if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
+    await page.evaluate((cap) => { window.__SC_TEST__.timerStepMax = cap }, COMBAT_STEP_MAX)
     const play = await playLevel(page, id, { frenzy: id === wanted[0], leaderboard: id === wanted[0] })
+      .finally(() => page.evaluate(() => { window.__SC_TEST__.holdLevelTime = false }).catch(() => {}))
     problems.push(...play.problems)
     const frenzyEnd = id === wanted[0] ? await frenzyEndProblems(page, id) : null
     if (frenzyEnd) problems.push(...frenzyEnd.problems)
@@ -3130,7 +3130,7 @@ async function run() {
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
   for (const r of results) {
     const en = r.enemies && !r.enemies.error
-      ? ` enemiesOnScreen=${r.enemies.onScreen} readable=${r.enemies.readable} largestPx=${r.enemies.largestPx}`
+      ? ` enemiesOnScreen=${r.enemies.onScreen}${r.enemies.levelTime != null ? ` at ${r.enemies.levelTime.toFixed(1)}s` : ''} readable=${r.enemies.readable} largestPx=${r.enemies.largestPx}`
       : ''
     const extra = r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '')
@@ -3181,7 +3181,7 @@ async function run() {
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
           ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score} initials=${r.mobile.resultsEntry?.initials ?? '-'}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
-      : ` draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
+      : ` levelTime=${r.levelTime?.toFixed(1)}s draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` particles=${r.particles?.points ?? '-'}${r.particles?.boostPoints ? `+${r.particles.boostPoints}` : ''}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
         ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° aimJump=${r.combat.freshShot?.aimJump?.aimErrorDeg?.toFixed(0)}°(turn ${r.combat.freshShot?.aimJump?.jumpDeg?.toFixed(0)}°) bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
