@@ -1,0 +1,5 @@
+## 2026-11-04 — Score card image: canvas, story on phones, feed on desktop (Builder, #272)
+
+**Context:** The results Share button should share a picture of the run. Options were a WebGL capture of the scene, a server-rendered Open Graph image, or a 2D canvas drawn in the browser.
+**Decision:** A 2D canvas card (pure layout in `src/ui/scoreCard.ts`, drawing in `scoreCardImage.tsx`) built from the level-select postcard SVG and the self-hosted fonts, drawn only when the player opens Share. Touch devices get the 1080×1920 story card (on the share sheet when `canShare({ files })`, else from the menu); desktops get the 1200×630 feed card (Save image / Copy image). The menu item reads "Save image", not "Download image", so it fits one line in the 2- and 3-column menus; its analytics method is still `image_download`.
+**Consequences:** No WebGL readback, no server, no request. Per-score link previews would still need a server (out of scope). The sheet needs the click's user activation, so the story card starts drawing on the Share button's pointerdown.
