@@ -25,7 +25,6 @@ export interface EnemyPlacementRule {
 }
 
 const band = (radiusMin: number, radiusSpan: number, yMin: number, ySpan = 0): ScatterBand => ({ radiusMin, radiusSpan, yMin, ySpan })
-const SEA = band(100, 1000, 0)
 
 /** The one table of per-enemy placement rules. */
 export const ENEMY_PLACEMENT: Record<EnemyType, EnemyPlacementRule> = {
@@ -33,9 +32,9 @@ export const ENEMY_PLACEMENT: Record<EnemyType, EnemyPlacementRule> = {
   balloon: { surface: 'air', scatter: band(0, 1700, 40, 160) },
   crow: { surface: 'air', scatter: band(100, 1200, 100, 160) },
   scorpion: { surface: 'ground', scatter: band(100, 600, 5) },
-  shark: { surface: 'water', scatter: { ...SEA, yMin: 2 } },
-  jellyfish: { surface: 'water', scatter: { ...SEA, yMin: -15, ySpan: -30 } },
-  flyingFish: { surface: 'water', scatter: SEA },
+  shark: { surface: 'water', scatter: 'trackside' },
+  jellyfish: { surface: 'water', scatter: 'trackside' },
+  flyingFish: { surface: 'water', scatter: band(100, 1000, 0) },
   snowman: { surface: 'ground', scatter: 'trackside' },
   snowmanScout: { surface: 'ground', scatter: 'trackside' },
   snowmanBrute: { surface: 'ground', scatter: 'trackside' },
