@@ -7,11 +7,12 @@ import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig } from '@/types/level'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
 import {
-  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, TRACKSIDE, entryPoint, formationFrame, formationSlots, indexAhead, marchHeading,
-  outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint, trackTangent, tracksideSlots,
+  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, entryPoint, formationFrame, formationSlots, indexAhead, marchHeading,
+  outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint, trackTangent, tracksideBand, tracksideSlots,
   type ChoreographedFormation, type Vec3,
 } from './spawnPlacement'
-import { ENEMY_PLACEMENT, WATER_Y, placedBesideTrack } from './enemyPlacement'
+import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, placedBesideTrack } from './enemyPlacement'
+import { REFERENCE_FOV_DEG, maxReadableDistance } from '../enemies/enemyReadability'
 
 const choreographed = (f: Formation | undefined): f is ChoreographedFormation => !!f && f !== 'scatter'
 const besideTrack = (w: EnemyWave) => !choreographed(w.formation) && placedBesideTrack(w.type)
@@ -156,50 +157,114 @@ describe('level3 school', () => {
 
 describe('tracksideSlots', () => {
   it('is deterministic per seed and differs between seeds', () => {
-    expect(tracksideSlots(20, createRng(1337))).toEqual(tracksideSlots(20, createRng(1337)))
-    expect(tracksideSlots(20, createRng(1337))).not.toEqual(tracksideSlots(20, createRng(1338)))
+    expect(tracksideSlots(20, 'ground', createRng(1337))).toEqual(tracksideSlots(20, 'ground', createRng(1337)))
+    expect(tracksideSlots(20, 'ground', createRng(1337))).not.toEqual(tracksideSlots(20, 'ground', createRng(1338)))
   })
 
-  it('puts slots on both sides, inside the ahead and lateral bands', () => {
-    const slots = tracksideSlots(200, createRng(3))
+  it.each(['ground', 'water'] as const)('%s: puts slots on both sides, inside the ahead and lateral bands', (surface) => {
+    const band = tracksideBand(surface)
+    const slots = tracksideSlots(200, surface, createRng(3))
     expect(slots.some((s) => s.side < 0) && slots.some((s) => s.side > 0)).toBe(true)
     for (const s of slots) {
-      expect(s.ahead).toBeGreaterThanOrEqual(TRACKSIDE.aheadMin)
-      expect(s.ahead).toBeLessThanOrEqual(TRACKSIDE.aheadMax)
-      expect(Math.abs(s.side)).toBeGreaterThanOrEqual(TRACKSIDE.sideMin)
-      expect(Math.abs(s.side)).toBeLessThanOrEqual(TRACKSIDE.sideMax)
+      expect(s.ahead).toBeGreaterThanOrEqual(band.aheadMin)
+      expect(s.ahead).toBeLessThanOrEqual(band.aheadMax)
+      expect(Math.abs(s.side)).toBeGreaterThanOrEqual(band.sideMin)
+      expect(Math.abs(s.side)).toBeLessThanOrEqual(band.sideMax)
+    }
+    if (band.near) {
+      const nearCount = Math.ceil(slots.length * band.near.share)
+      for (const s of slots.slice(0, nearCount)) expect(s.ahead).toBeLessThanOrEqual(band.near.max)
+      expect(slots.slice(nearCount).some((s) => s.ahead > band.near!.max)).toBe(true)
     }
   })
 })
 
+/** Arc distance before its slot at which a trackside enemy must be in front of the rider. */
+const APPROACH = 600
+
 describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s trackside waves', (_id, { level, table, groundFn }) => {
   const waves = level.enemies.filter(besideTrack)
 
-  it.each(waves.map((w) => [w.type, w] as const))('%s: ahead of the rider along the track and mostly in front in plan, beside the rails, on the ground, outside the near field', (_name, wave) => {
-    const slots = tracksideSlots(wave.count, createRng(1337))
+  it.each(waves.map((w) => [w.type, w] as const))('%s: ahead of the rider along the track, beside the rails, on its surface, outside the near field, in front on the approach', (_name, wave) => {
+    const { surface } = ENEMY_PLACEMENT[wave.type]
+    const band = tracksideBand(surface)
+    const slots = tracksideSlots(wave.count, surface, createRng(1337))
     let inFront = 0
     let total = 0
     for (const fraction of RIDER_FRACTIONS) {
       const riderIndex = Math.round(fraction * (table.count - 1))
       const camera = trackPoint(table, riderIndex)
-      const forward = trackTangent(table, riderIndex)
-      const placed = placeTracksideWave({ table, riderIndex, camera, groundFn, slots })
+      const placed = placeTracksideWave({ table, riderIndex, camera, type: wave.type, groundFn, slots })
       expect(placed).toHaveLength(wave.count)
       placed.forEach((p, i) => {
-        const anchor = indexAhead(table, riderIndex, slots[i].ahead)
-        const arc = (table.s[anchor] - table.s[riderIndex] + table.length) % table.length
-        expect(arc).toBeGreaterThan(TRACKSIDE.aheadMin - 10)
-        expect(arc).toBeLessThan(TRACKSIDE.aheadMax + 10)
-        const lateral = Math.hypot(p.x - table.x[anchor], p.z - table.z[anchor])
-        expect(lateral).toBeGreaterThan(TRACKSIDE.sideMin - 1)
-        expect(lateral).toBeLessThan(TRACKSIDE.sideMax + 1)
-        expect(p.y).toBeGreaterThan(groundFn(p.x, p.z))
+        if (surface === 'water') {
+          let lateral = Infinity
+          for (let a = band.aheadMin; a <= band.aheadMax; a += 10) {
+            const j = indexAhead(table, riderIndex, a)
+            lateral = Math.min(lateral, Math.hypot(p.x - table.x[j], p.z - table.z[j]))
+          }
+          expect(lateral).toBeLessThan(band.sideMax + 1)
+          expect(groundFn(p.x, p.z)).toBeLessThan(WATER_DEPTH)
+          expect(p.y).toBe(WATER_Y)
+        } else {
+          const anchor = indexAhead(table, riderIndex, slots[i].ahead)
+          const arc = (table.s[anchor] - table.s[riderIndex] + table.length) % table.length
+          expect(arc).toBeGreaterThan(band.aheadMin - 10)
+          expect(arc).toBeLessThan(band.aheadMax + 10)
+          const lateral = Math.hypot(p.x - table.x[anchor], p.z - table.z[anchor])
+          expect(lateral).toBeGreaterThan(band.sideMin - 1)
+          expect(lateral).toBeLessThan(band.sideMax + 1)
+          expect(p.y).toBeGreaterThan(groundFn(p.x, p.z))
+        }
         expect(dist(p, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
+        const near = indexAhead(table, riderIndex, slots[i].ahead - APPROACH)
+        const nearPoint = trackPoint(table, near)
+        const forward = trackTangent(table, near)
         total++
-        if ((p.x - camera.x) * forward.x + (p.z - camera.z) * forward.z > 0) inFront++
+        if ((p.x - nearPoint.x) * forward.x + (p.z - nearPoint.z) * forward.z > 0) inFront++
       })
     }
-    expect(inFront / total).toBeGreaterThan(0.75)
+    expect(inFront / total).toBeGreaterThan(0.85)
+  })
+})
+
+describe('level3 opening jellyfish', () => {
+  const { level, table, groundFn } = tracksideWorlds.find((w) => w.level.id === 'level3')!
+  const wave = level.enemies[0]
+  const tanV = Math.tan((REFERENCE_FOV_DEG * Math.PI) / 360)
+  const tanH = (tanV * 16) / 9
+  const reach = maxReadableDistance(wave.type)
+
+  /** Readable enemies in a 16:9 view along the track tangent, for each rider position over ride t 0–0.025 (the smoke's ride sample at any runner speed). */
+  function readableThroughOpening(seed: number): number[] {
+    const slots = tracksideSlots(wave.count, 'water', createRng(seed))
+    const placed = placeTracksideWave({ table, riderIndex: 0, camera: trackPoint(table, 0), type: wave.type, groundFn, slots })
+    const counts: number[] = []
+    for (let t = 0; t <= 0.025 + 1e-9; t += 0.0025) {
+      const i = Math.round(t * (table.count - 1))
+      const eye = trackPoint(table, i)
+      const f = trackTangent(table, i)
+      const h = Math.hypot(f.x, f.z)
+      const right = { x: -f.z / h, y: 0, z: f.x / h }
+      const up = { x: right.y * f.z - right.z * f.y, y: right.z * f.x - right.x * f.z, z: right.x * f.y - right.y * f.x }
+      counts.push(placed.filter((p) => {
+        const d = { x: p.x - eye.x, y: p.y - eye.y, z: p.z - eye.z }
+        const depth = d.x * f.x + d.y * f.y + d.z * f.z
+        return depth > 0
+          && Math.abs(d.x * right.x + d.z * right.z) <= depth * tanH
+          && Math.abs(d.x * up.x + d.y * up.y + d.z * up.z) <= depth * tanV
+          && Math.hypot(d.x, d.y, d.z) <= reach
+      }).length)
+    }
+    return counts
+  }
+
+  it('keeps at least 4 readable on screen through the opening (seed 1337)', () => {
+    expect(Math.min(...readableThroughOpening(1337))).toBeGreaterThanOrEqual(4)
+  })
+
+  it('keeps the smoke gate (2) through the opening for any seed', () => {
+    for (let seed = 1; seed <= 20; seed++) expect(Math.min(...readableThroughOpening(seed)), `seed ${seed}`).toBeGreaterThanOrEqual(2)
   })
 })
 
