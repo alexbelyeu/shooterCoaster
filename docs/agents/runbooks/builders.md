@@ -18,9 +18,11 @@ Read only what picking and claiming needs: this runbook, the runbooks README rul
 2. Pick up to N assignments, in this order:
    a. Open, non-draft PRs labelled `agent:changes-requested` with no *live*
       `Builder run … is on it` claim (runbooks README, "Live claims"), oldest first.
-   b. Open issues labelled `studio-health` and `agent:ready` (the watchdog's: a red main,
-      a flaky check, a timeout, runtime creep, a stuck PR), oldest first. The studio's own
-      health comes before any feature.
+   b. Open issues labelled `studio-health` and `agent:ready` (the watchdog's: a red main
+      nothing else alerts on, a flaky check, a timeout, runtime creep, a stuck PR), oldest
+      first. The studio's own health comes before any feature. If a PR merged after the
+      issue's **Last seen** time already fixes it, close it with the PR link instead and
+      take the next candidate.
    c. Open issues labelled `agent:ready` (never `agent:in-progress`), excluding
       `epic` and `pause`, ordered P1 > P2 > P3; within the same priority, issues
       labelled `steering` (Alex's own requests) first; then oldest first.

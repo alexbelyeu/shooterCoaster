@@ -1,24 +1,33 @@
-// Studio-health watchdog: a plain GitHub Action (not an agent), so it keeps watching when the agents are the
-// thing that's broken. Every 2 h it reads the last 48 h of workflow runs plus the open PRs, issues and the token
-// ledger, turns them into findings (rules in scripts/studioHealthRules.cjs) and keeps exactly one issue per
-// problem (label `studio-health`):
-//   - a new problem opens an issue: `agent:ready` + P1 so builders take it first (owner 'agents'), or
-//     `needs-alex` straight away when only Alex can fix it (owner 'alex': the studio itself isn't running);
-//   - while it lasts, the issue body is kept current; after 24 h open it also gets `needs-alex`, once;
-//   - when it clears, the issue is closed with a note.
-// Run by .github/workflows/studio-health.yml. Local dry run (prints the findings, writes nothing):
-//   node scripts/studio-health.cjs --dry-run
+// Studio-health watchdog, run every 2 h by .github/workflows/studio-health.yml: a plain Action, not an agent, so it
+// keeps watching when the agents are what's broken. Keeps one `studio-health` issue per finding of
+// studioHealthRules.cjs (PROTOCOL.md "Labels" has the lifecycle) and escalates stale `agent:prod-broken` alerts.
+// Local dry run (prints the findings, writes nothing): node scripts/studio-health.cjs --dry-run
 
 const fs = require('node:fs')
 const path = require('node:path')
-const { findings: findFindings, parseTimeouts } = require('./studioHealthRules.cjs')
+const { findings: findFindings, staleProdAlerts, parseTimeouts } = require('./studioHealthRules.cjs')
+const { STEERING_PAUSE } = require('./studio-status.cjs')
 
 const LABEL = 'studio-health'
 const HOUR = 3600e3
 const WINDOW = 48 * HOUR
 const ESCALATE_AFTER = 24 * HOUR
 const marker = (key) => `<!-- studio-health:${key} -->`
+const ESCALATED = '<!-- studio-health-escalated -->'
+const keyOf = (issue) => (issue.body || '').match(/<!-- studio-health:(.+?) -->/)?.[1] ?? null
 const labelNames = (x) => (x.labels || []).map((l) => (typeof l === 'string' ? l : l.name))
+const stamp = (ms) => `${new Date(ms).toISOString().slice(0, 16)}Z`
+
+/** Every page of a list endpoint (up to `max` pages of 100). */
+async function pages(api, route, params = {}, max = 10) {
+  const all = []
+  for (let page = 1; page <= max; page++) {
+    const res = await api(route, { ...params, per_page: 100, page })
+    all.push(...res)
+    if (res.length < 100) break
+  }
+  return all
+}
 
 async function collect(api, now, workflowsDir) {
   const since = new Date(now - WINDOW).toISOString()
@@ -74,8 +83,7 @@ async function collect(api, now, workflowsDir) {
 
   const prFiles = {}
   for (const n of new Set(done.filter((r) => r.conclusion === 'failure' && r.prNumber).map((r) => r.prNumber))) {
-    const files = await api('GET /repos/{owner}/{repo}/pulls/{pull_number}/files', { pull_number: n, per_page: 100 })
-    prFiles[n] = files.map((f) => f.filename)
+    prFiles[n] = (await pages(api, 'GET /repos/{owner}/{repo}/pulls/{pull_number}/files', { pull_number: n }, 30)).map((f) => f.filename)
   }
 
   const timeouts = {}
@@ -83,72 +91,103 @@ async function collect(api, now, workflowsDir) {
     timeouts[`.github/workflows/${file}`] = parseTimeouts(fs.readFileSync(path.join(workflowsDir, file), 'utf8'))
   }
 
-  const [openPrs, openItems, ledger, pauses] = await Promise.all([
-    api('GET /repos/{owner}/{repo}/pulls', { state: 'open', per_page: 100 }),
-    api('GET /repos/{owner}/{repo}/issues', { state: 'open', per_page: 100 }),
+  const [openPrs, openItems, ledger, pauses, watchdogOpen, watchdogClosed] = await Promise.all([
+    pages(api, 'GET /repos/{owner}/{repo}/pulls', { state: 'open' }),
+    pages(api, 'GET /repos/{owner}/{repo}/issues', { state: 'open' }),
     api('GET /repos/{owner}/{repo}/issues', { state: 'open', labels: 'token-ledger', per_page: 5 }),
     api('GET /repos/{owner}/{repo}/issues', { state: 'open', labels: 'pause', per_page: 5 }),
+    pages(api, 'GET /repos/{owner}/{repo}/issues', { state: 'open', labels: LABEL }),
+    pages(api, 'GET /repos/{owner}/{repo}/issues', { state: 'closed', labels: LABEL, sort: 'updated', direction: 'desc' }, 2),
   ])
+  let steeringPaused = false
+  try {
+    const f = await api('GET /repos/{owner}/{repo}/contents/{path}', { path: 'docs/agents/STEERING.md' })
+    steeringPaused = STEERING_PAUSE.test(Buffer.from(f.content, 'base64').toString('utf8'))
+  } catch {
+    steeringPaused = false
+  }
+
+  // Stuck / waiting PRs are timed from their queue label, not their last activity.
+  const queueLabels = ['agent:qa-approved', 'agent:needs-qa']
+  const prs = openPrs.filter((p) => !p.draft)
+  for (const p of prs) {
+    p.labelledAt = {}
+    const mine = labelNames(p).filter((l) => queueLabels.includes(l))
+    if (!mine.length) continue
+    const events = await pages(api, 'GET /repos/{owner}/{repo}/issues/{issue_number}/events', { issue_number: p.number }, 5)
+    for (const e of events) if (e.event === 'labeled' && mine.includes(e.label?.name)) p.labelledAt[e.label.name] = e.created_at
+  }
+
+  const closedAt = {}
+  for (const i of watchdogClosed) {
+    const key = keyOf(i)
+    if (key && i.closed_at) closedAt[key] = Math.max(closedAt[key] || 0, Date.parse(i.closed_at))
+  }
+
   return {
     now,
     runs: done,
     prFiles,
     timeouts,
-    openPrs: openPrs.filter((p) => !p.draft).map((p) => ({
-      number: p.number, title: p.title, labels: labelNames(p), created_at: p.created_at, updated_at: p.updated_at,
+    openPrs: prs.map((p) => ({
+      number: p.number, title: p.title, labels: labelNames(p), created_at: p.created_at, updated_at: p.updated_at, labelledAt: p.labelledAt,
     })),
     openIssues: openItems.filter((i) => !i.pull_request).map((i) => ({
       number: i.number, title: i.title, labels: labelNames(i), created_at: i.created_at,
     })),
+    closedAt,
+    watchdogOpen,
     lastAgentActivity: ledger.length ? Math.max(...ledger.map((i) => Date.parse(i.updated_at))) : null,
-    paused: pauses.some((i) => !i.pull_request),
+    paused: steeringPaused || pauses.some((i) => !i.pull_request),
   }
 }
 
 const FOOTER = '\n\n---\n_Kept current by the studio-health watchdog (`.github/workflows/studio-health.yml`, every 2 h). ' +
-  'It closes this issue when the problem clears. Open more than 24 h, it is escalated to Alex (`needs-alex`)._'
+  'It closes this issue when the problem clears. Open over 24 h and still seen in the last 24 h, it is escalated to Alex (`needs-alex`), once._'
 
-async function reconcile(api, found, now, log) {
+function issueBody(f, escalated) {
+  const seen = f.state
+    ? '_This is the current state, checked every 2 h. Closed while it still holds, it is filed again._'
+    : `**Last seen:** ${stamp(f.lastSeen)} (the newest run showing it). If a PR merged after that already fixes it, ` +
+      'close this issue with a link to the PR: only a run newer than the close files it again.'
+  return `${marker(f.key)}${escalated ? `\n${ESCALATED}` : ''}\n${f.body}\n\n${seen}${FOOTER}`
+}
+
+/** Opens, updates, escalates and closes the watchdog's issues (`open`: its open issues) to match `found`. */
+async function reconcile(api, found, open, now, log) {
   try {
     await api('POST /repos/{owner}/{repo}/labels', { name: LABEL, color: 'b60205', description: 'Opened and closed by the studio-health watchdog' })
   } catch {
     // already exists
   }
-  const open = await api('GET /repos/{owner}/{repo}/issues', { state: 'open', labels: LABEL, per_page: 100 })
-  // Closed after the problem was last seen = fixed (by an agent or by the watchdog clearing it): don't reopen on old runs.
-  const closed = await api('GET /repos/{owner}/{repo}/issues', { state: 'closed', labels: LABEL, sort: 'updated', direction: 'desc', per_page: 100 })
-  const closedAt = new Map()
-  for (const i of closed) {
-    const m = (i.body || '').match(/<!-- studio-health:(.+?) -->/)
-    if (m && i.closed_at) closedAt.set(m[1], Math.max(closedAt.get(m[1]) || 0, Date.parse(i.closed_at)))
-  }
   const byKey = new Map()
   for (const i of open) {
-    const m = (i.body || '').match(/<!-- studio-health:(.+?) -->/)
-    if (m) byKey.set(m[1], i)
+    const key = keyOf(i)
+    if (key) byKey.set(key, i)
   }
   const seen = new Set()
   for (const f of found) {
     seen.add(f.key)
-    const body = `${marker(f.key)}\n${f.body}${FOOTER}`
     const issue = byKey.get(f.key)
-    if (!issue && f.lastSeen && (closedAt.get(f.key) || 0) > f.lastSeen) continue
     if (!issue) {
-      const labels = [LABEL, 'P1', 'type:tech', f.owner === 'alex' ? 'needs-alex' : 'agent:ready']
-      const created = await api('POST /repos/{owner}/{repo}/issues', { title: f.title, body, labels })
+      const alex = f.owner === 'alex'
+      const labels = [LABEL, 'P1', 'type:tech', alex ? 'needs-alex' : 'agent:ready']
+      const created = await api('POST /repos/{owner}/{repo}/issues', { title: f.title, body: issueBody(f, alex), labels })
       log(`opened #${created.number}: ${f.title}`)
       continue
     }
+    const wasEscalated = (issue.body || '').includes(ESCALATED)
+    const escalate = !wasEscalated && now - Date.parse(issue.created_at) > ESCALATE_AFTER && now - f.lastSeen < ESCALATE_AFTER
+    const body = issueBody(f, wasEscalated || escalate)
     if (issue.body !== body || issue.title !== f.title) {
       await api('PATCH /repos/{owner}/{repo}/issues/{issue_number}', { issue_number: issue.number, title: f.title, body })
       log(`updated #${issue.number}: ${f.title}`)
     }
-    const labels = labelNames(issue)
-    if (!labels.includes('needs-alex') && now - Date.parse(issue.created_at) > ESCALATE_AFTER) {
+    if (escalate) {
       await api('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', { issue_number: issue.number, labels: ['needs-alex'] })
       await api('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
         issue_number: issue.number,
-        body: 'Escalating to Alex: this has been open for over 24 h without clearing. Agents: this stays P1 and ahead of feature work until it does.',
+        body: 'Escalating to Alex: open for over 24 h and still happening. Agents: this stays P1 and ahead of feature work until it clears.',
       })
       log(`escalated #${issue.number}`)
     }
@@ -157,10 +196,25 @@ async function reconcile(api, found, now, log) {
     if (seen.has(key)) continue
     await api('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
       issue_number: issue.number,
-      body: `Cleared ${new Date(now).toISOString().slice(0, 16)}Z: the watchdog no longer sees this problem.`,
+      body: `Cleared ${stamp(now)}: the watchdog no longer sees this problem.`,
     })
     await api('PATCH /repos/{owner}/{repo}/issues/{issue_number}', { issue_number: issue.number, state: 'closed', state_reason: 'completed' })
     log(`closed #${issue.number} (cleared)`)
+  }
+}
+
+/** `agent:prod-broken` issues open over 12 h get `needs-alex` and one comment (marked, so only once). */
+async function escalateProdAlerts(api, stale, now, log) {
+  for (const i of stale) {
+    const comments = await pages(api, 'GET /repos/{owner}/{repo}/issues/{issue_number}/comments', { issue_number: i.number })
+    if (comments.some((c) => (c.body || '').includes(ESCALATED))) continue
+    await api('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', { issue_number: i.number, labels: ['needs-alex'] })
+    await api('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+      issue_number: i.number,
+      body: `${ESCALATED}\nEscalating to Alex (studio-health watchdog): this alert has been open for ${Math.floor((now - Date.parse(i.created_at)) / HOUR)} h. ` +
+        'Either production or main is broken for players, or the check is wrong; both need fixing today (PROTOCOL.md "When main breaks").',
+    })
+    log(`escalated prod alert #${i.number}`)
   }
 }
 
@@ -172,10 +226,13 @@ module.exports = async function run({ github, context, core }) {
   const snap = await collect(api, now, path.join(process.env.GITHUB_WORKSPACE, '.github/workflows'))
   const found = findFindings(snap)
   core.info(`${found.length} finding(s): ${found.map((f) => f.key).join(', ') || 'none'}`)
-  await reconcile(api, found, now, (m) => core.info(m))
+  await reconcile(api, found, snap.watchdogOpen, now, (m) => core.info(m))
+  await escalateProdAlerts(api, staleProdAlerts(snap), now, (m) => core.info(m))
 }
 
 module.exports.collect = collect
+module.exports.reconcile = reconcile
+module.exports.escalateProdAlerts = escalateProdAlerts
 
 if (require.main === module) {
   const { ghReadApi } = require('./studio-status.cjs')
@@ -183,7 +240,8 @@ if (require.main === module) {
   const now = Date.now()
   collect(api, now, path.join(__dirname, '..', '.github/workflows'))
     .then((snap) => {
-      for (const f of findFindings(snap)) console.log(`[${f.owner}] ${f.key}\n  ${f.title}\n`)
+      for (const f of findFindings(snap)) console.log(`[${f.owner}] ${f.key}\n  ${f.title}\n  last seen ${stamp(f.lastSeen)}\n`)
+      for (const i of staleProdAlerts(snap)) console.log(`[escalate] agent:prod-broken #${i.number}: ${i.title}`)
     })
     .catch((e) => {
       console.error(e)

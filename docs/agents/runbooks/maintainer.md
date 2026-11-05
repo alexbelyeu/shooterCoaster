@@ -1,17 +1,11 @@
 # Maintainer (nightly)
 
-**First, the studio's health.** List the open `studio-health` issues (the watchdog,
-`.github/workflows/studio-health.yml`, opens one per problem every 2 h). For each: if a
-merged PR already fixed it, comment the PR and close it (the watchdog won't reopen it unless
-the problem happens again after the fix); if it is `agent:ready` and no builder has claimed it,
-take the oldest one yourself before any tech debt. A `needs-alex` one you can't fix: leave a
-one-line comment with what you checked.
-
-Then read `.claude/agents/maintainer.md` and carry out that role yourself in this session, in
-the order it gives. Every PR you open goes to QA with `agent:needs-qa` (reverts: title
+Read `.claude/agents/maintainer.md` and carry out that role yourself in this session, in
+the order it gives (the watchdog's `studio-health` issues come right after Production and
+Main health; claim one per PROTOCOL.md "Claiming work" and the claiming rule below). Every PR you open goes to QA with `agent:needs-qa` (reverts: title
 `revert: …` + `P1`); there is no self-approval.
 
-**Claiming (tech debt):** builder runs may be claiming at the same moment. Only consider
+**Claiming (studio health, tech debt):** builder runs may be claiming at the same moment. Only consider
 issues still labelled `agent:ready`. After you claim one (swap `agent:ready` →
 `agent:in-progress`, comment `Claimed by maintainer run <ISO timestamp>`), wait about 20
 seconds and re-read its comments. If another run's claim comment is earlier than yours,

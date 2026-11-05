@@ -1,9 +1,9 @@
 // Live "Studio status" page for Alex: rewrites the body of one GitHub issue
 // (label `studio-status`) with what the autonomous studio is doing right now.
 //
-// Run by .github/workflows/studio-status.yml (actions/github-script) on every
-// issue / PR / label change and every 15 minutes. Read-only except for that one
-// issue (and creating it + its label the first time).
+// Run by .github/workflows/studio-status.yml (actions/github-script) on every issue / label
+// change, issue comment, finished CI / prod-smoke / auto-merge run, and every 15 minutes.
+// Read-only except for that one issue (and creating it + its label the first time).
 //
 // Local dry run (prints the markdown, writes nothing):
 //   node scripts/studio-status.cjs --dry-run
@@ -14,6 +14,8 @@ const STATUS_TITLE = '📊 Studio status (live)'
 const SITE = 'https://scoaster.com'
 const REPO = 'alexbelyeu/shooterCoaster'
 const LEDGER_LABEL = 'token-ledger'
+/** Alex's other pause switch (besides an open `pause` issue); the watchdog reads it too. */
+const STEERING_PAUSE = /^pause:\s*true/m
 
 // Keep in sync with the scheduled tasks (times are New York wall-clock).
 // days: 0 = Sunday … 6 = Saturday; omitted = every day.
@@ -291,7 +293,7 @@ async function collect(api, now) {
   let steeringPaused = false
   try {
     const f = await api('GET /repos/{owner}/{repo}/contents/{path}', { path: 'docs/agents/STEERING.md' })
-    steeringPaused = /^pause:\s*true/m.test(Buffer.from(f.content, 'base64').toString('utf8'))
+    steeringPaused = STEERING_PAUSE.test(Buffer.from(f.content, 'base64').toString('utf8'))
   } catch {
     steeringPaused = false
   }
@@ -476,6 +478,7 @@ module.exports.milestoneSection = milestoneSection
 module.exports.ghReadApi = ghReadApi
 module.exports.nextRun = nextRun
 module.exports.SCHEDULE = SCHEDULE
+module.exports.STEERING_PAUSE = STEERING_PAUSE
 
 // Local dry run through the `gh` CLI: node scripts/studio-status.cjs --dry-run
 if (require.main === module) {
