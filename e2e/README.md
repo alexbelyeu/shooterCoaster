@@ -123,6 +123,31 @@ vary) and on the scene / track objects and triangles (+15%); a level past one fa
 (`perfGate` in `results.json`). A level whose entry has `knownOver: "#<open issue>"` only prints a WARN line until that issue lands
 (then drop the key). `--no-perf-gate` skips the gate for local experiments. Ceilings are budgets: only the Director raises them.
 
+## Steps, shards and the time budget (`e2e/shards.mjs`, #353)
+
+Every check above belongs to a named step: `title`, `landing`, `levelSelect`, `daily`, `settings`, `mobile` (no level);
+`frenzy` (the first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ride), `seed`, `quality`,
+`pause` (hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level) and `wave`,
+`boss`, `pickup`, `scrim` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its checks
+disagree). `--steps ride,boss --levels level2` runs just those. Without `--steps` every desktop step runs, plus `mobile`
+with `--mobile`; `--skip-desktop` leaves `title` and `mobile`.
+
+CI runs the smoke as the shards in `SHARDS`, one `smoke (<name>)` job each (`ci.yml` matrix): `ui`, `level1` (ride, frenzy,
+seed, boss, pickup), `level1-steps` (quality, pause, countdown, speed, scrim), `level2`…`level5` (every per-level step on
+that level) and `mobile`. `node e2e/smoke.mjs --shard <name>` runs one exactly as CI does. `shards.test.ts` checks that the
+shards together run every step on every level the full run does, each once, that every registry level is ridden, and that
+the shards, the `ci.yml` matrix and `budgets.json` `smokeSeconds` list the same names.
+
+Each results entry records its wall time (`seconds`). A `--shard` run ends with a `time` line and entry (`level3 shard
+took 4.2 min, budget 7.0`) and a GitHub annotation of the same text. On CI (`CI` set) a shard over its `smokeSeconds`
+budget fails, and one still running at twice its budget writes `results.json` with what ran and exits (`still running
+after …: stopped`), inside the job's timeout; locally it only warns, since a 2-core session is slower than a CI runner.
+Budgets: only the Director raises them.
+
+CI's required `verify` check is a gate job that needs `unit + build`, `lighthouse` and every shard, and passes only if
+all of them passed. GitHub creates its check run only when those end, so `scripts/automerge.cjs` and
+`scripts/studio-status.cjs` read the running jobs before it as "verify waiting".
+
 ## Production (`.github/workflows/prod-smoke.yml`, #352)
 
 Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it hit its cap):

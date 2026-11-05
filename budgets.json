@@ -2,6 +2,17 @@
   "_comment": "Guardrail budgets enforced by CI. Only the Director may raise these, with a DECISIONS.md entry explaining why.",
   "jsTotalGzipKB": 700,
   "jsLargestChunkGzipKB": 260,
+  "smokeSeconds": {
+    "_comment": "Wall time of each CI smoke shard (e2e/shards.mjs), checked by the smoke on CI (#353): 1.5x the slower of two CI runs on #364 (2026-11-04; short shards swung ~50%), rounded up to 30 s; mobile, steady and the longest, 1.3x so verify can't drift far past 10 min unnoticed.",
+    "ui": 300,
+    "level1": 480,
+    "level1-steps": 480,
+    "level2": 510,
+    "level3": 390,
+    "level4": 270,
+    "level5": 240,
+    "mobile": 600
+  },
   "scene": {
     "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31; level4 and level5 hold the VISION bar of 250, #260), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands.",
     "level1": {

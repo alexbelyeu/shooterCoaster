@@ -38,8 +38,10 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
      `bash scripts/quiet.sh node e2e/smoke.mjs --levels <the levels the diff affects>` (shared code: `level1` plus
      one level from another biome). Add `--mobile` when the diff touches input, UI, HUD,
      camera, audio or layout; use `--mobile --skip-desktop` when only the phone run matters.
-   - CI red, missing, or still running after ~15 minutes: `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm run verify`, and
-     find the failure.
+   - CI red: the red check names the job. A red `smoke (<shard>)`: build and run that shard,
+     `bash scripts/quiet.sh node e2e/smoke.mjs --shard <shard>`; anything else, or CI missing, or still running after
+     ~20 minutes (it takes ~10; `verify` itself only appears once the shards end):
+     `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm run verify`. Find the failure.
    **Look at the screenshots** that show the change (e.g. `<id>.png` for scenery,
    `<id>-combat.png` for weapons and hits, `mobile-*.png` for touch/HUD), not every PNG.
    Compare against `main` when it matters (check out `main`, rebuild, re-run smoke for that level).
