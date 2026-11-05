@@ -4,13 +4,12 @@ import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
-  SNOWMAN_BOTTOM_GEO, SNOWMAN_MIDDLE_GEO, SNOWMAN_TOP_GEO, SNOWMAN_MAT,
-  SNOWMAN_EYE_GEO, SNOWMAN_EYE_MAT,
+  SNOWMAN_BODY_GEO, SNOWMAN_MAT,
+  SNOWMAN_COAL_GEO, SNOWMAN_COAL_MAT,
   SNOWMAN_NOSE_GEO, SNOWMAN_NOSE_MAT,
-  SNOWMAN_BUTTON_GEO, SNOWMAN_BUTTON_MAT, SNOWMAN_MOUTH_GEO, SNOWMAN_MOUTH_MAT,
-  SNOWMAN_ARM_GEO, SNOWMAN_ARM_MAT, SNOWMAN_TWIG_GEO, SNOWMAN_TWIG_MAT,
-  SNOWMAN_HAT_BRIM_GEO, SNOWMAN_HAT_TOP_GEO, SNOWMAN_HAT_BAND_GEO, SNOWMAN_HAT_MAT, SNOWMAN_HAT_BAND_MAT,
-  SNOWMAN_SCARF_GEO, SNOWMAN_SCARF_MAT, SNOWMAN_SCARF_TAIL_GEO,
+  SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, SNOWMAN_ARM_MAT,
+  SNOWMAN_HAT_GEO, SNOWMAN_HAT_MAT,
+  SNOWMAN_SCARF_GEO, SNOWMAN_SCARF_MAT,
 } from './SharedEnemyAssets'
 
 /**
@@ -53,53 +52,19 @@ export default function SnowmanBrute(props: EnemyProps) {
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group ref={modelRef} scale={[1.8, 1.8, 1.8]}>
         <group ref={bodyRef}>
-          {/* Body */}
-          <mesh position={[0, 0, 0]} geometry={SNOWMAN_BOTTOM_GEO} material={SNOWMAN_MAT} />
-          <mesh position={[0, 25, 0]} geometry={SNOWMAN_MIDDLE_GEO} material={SNOWMAN_MAT} />
-          <mesh position={[0, 42, 0]} geometry={SNOWMAN_TOP_GEO} material={SNOWMAN_MAT} />
-
-          {/* Top hat */}
-          <mesh position={[0, 52, 0]} geometry={SNOWMAN_HAT_BRIM_GEO} material={SNOWMAN_HAT_MAT} />
-          <mesh position={[0, 58, 0]} geometry={SNOWMAN_HAT_TOP_GEO} material={SNOWMAN_HAT_MAT} />
-          <mesh position={[0, 54, 0]} geometry={SNOWMAN_HAT_BAND_GEO} material={SNOWMAN_HAT_BAND_MAT} />
-
-          {/* Scarf around neck + trailing end */}
-          <mesh position={[0, 34, 0]} rotation={[Math.PI / 2, 0, 0]} geometry={SNOWMAN_SCARF_GEO} material={SNOWMAN_SCARF_MAT} />
-          <mesh position={[7, 30, 7]} rotation={[0.4, 0.3, 0.2]} geometry={SNOWMAN_SCARF_TAIL_GEO} material={SNOWMAN_SCARF_MAT} />
-
-          {/* Coal eyes */}
-          <mesh position={[-3.5, 45, 8]} geometry={SNOWMAN_EYE_GEO} material={SNOWMAN_EYE_MAT} />
-          <mesh position={[3.5, 45, 8]} geometry={SNOWMAN_EYE_GEO} material={SNOWMAN_EYE_MAT} />
-
-          {/* Carrot nose */}
-          <mesh position={[0, 42, 10]} rotation={[Math.PI / 2, 0, 0]} geometry={SNOWMAN_NOSE_GEO} material={SNOWMAN_NOSE_MAT} />
-
-          {/* Coal smile */}
-          {[-0.6, -0.3, 0, 0.3, 0.6].map((xOff, i) => (
-            <mesh
-              key={`mouth-${i}`}
-              position={[xOff * 4, 39 - Math.abs(xOff) * 2, 9.5]}
-              geometry={SNOWMAN_MOUTH_GEO}
-              material={SNOWMAN_MOUTH_MAT}
-            />
-          ))}
-
-          {/* Buttons */}
-          <mesh position={[0, 30, 13]} geometry={SNOWMAN_BUTTON_GEO} material={SNOWMAN_BUTTON_MAT} />
-          <mesh position={[0, 25, 13.5]} geometry={SNOWMAN_BUTTON_GEO} material={SNOWMAN_BUTTON_MAT} />
-          <mesh position={[0, 20, 13]} geometry={SNOWMAN_BUTTON_GEO} material={SNOWMAN_BUTTON_MAT} />
+          <mesh geometry={SNOWMAN_BODY_GEO} material={SNOWMAN_MAT} />
+          <mesh geometry={SNOWMAN_HAT_GEO} material={SNOWMAN_HAT_MAT} />
+          <mesh geometry={SNOWMAN_SCARF_GEO} material={SNOWMAN_SCARF_MAT} />
+          <mesh geometry={SNOWMAN_COAL_GEO} material={SNOWMAN_COAL_MAT} />
+          <mesh geometry={SNOWMAN_NOSE_GEO} material={SNOWMAN_NOSE_MAT} />
         </group>
 
         {/* Thick stick arms with branches */}
         <group ref={leftArmRef} position={[-18, 26, 0]} rotation={[0, 0, -0.5]}>
-          <mesh geometry={SNOWMAN_ARM_GEO} material={SNOWMAN_ARM_MAT} />
-          <mesh position={[0, 4, 0]} rotation={[0.3, 0, 0.4]} geometry={SNOWMAN_TWIG_GEO} material={SNOWMAN_TWIG_MAT} />
-          <mesh position={[0, -3, 0]} rotation={[-0.2, 0, -0.5]} geometry={SNOWMAN_TWIG_GEO} material={SNOWMAN_TWIG_MAT} />
+          <mesh geometry={SNOWMAN_LEFT_ARM_GEO} material={SNOWMAN_ARM_MAT} />
         </group>
         <group ref={rightArmRef} position={[18, 26, 0]} rotation={[0, 0, 0.5]}>
-          <mesh geometry={SNOWMAN_ARM_GEO} material={SNOWMAN_ARM_MAT} />
-          <mesh position={[0, 4, 0]} rotation={[0.3, 0, -0.4]} geometry={SNOWMAN_TWIG_GEO} material={SNOWMAN_TWIG_MAT} />
-          <mesh position={[0, -3, 0]} rotation={[-0.2, 0, 0.5]} geometry={SNOWMAN_TWIG_GEO} material={SNOWMAN_TWIG_MAT} />
+          <mesh geometry={SNOWMAN_RIGHT_ARM_GEO} material={SNOWMAN_ARM_MAT} />
         </group>
       </group>
     </EnemyBase>

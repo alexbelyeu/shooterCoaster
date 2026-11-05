@@ -49,6 +49,14 @@ jobs:
           sparse-checkout-cone-mode: false
       - uses: actions/github-script@v7
         with:
+          # GitHub's API sometimes answers 5xx: retry those (octokit's retry plugin), and if they persist, skip this
+          # refresh with a warning instead of failing the run. The next event or the 15-minute schedule redraws it.
+          retries: 3
           script: |
             const run = require(`${process.env.GITHUB_WORKSPACE}/scripts/studio-status.cjs`)
-            await run({ github, context, core })
+            try {
+              await run({ github, context, core })
+            } catch (e) {
+              if (e && e.status >= 500) core.warning(`Studio status skipped: GitHub API ${e.status} after retries (${e.message})`)
+              else throw e
+            }
