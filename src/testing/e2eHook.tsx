@@ -11,7 +11,7 @@
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots (fires one real shot, then resolves the
  *     hits through the bullet pool's own processHit path), endLevel() to reach
- *     the results screen (shareText() for what its share menu's Copy link copies), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
+ *     the results screen (shareText() for what its share menu's Copy link copies, scoreCard(size) for its share image), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
  *     primeCombo(n) to set up a long chain,
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
@@ -59,6 +59,8 @@ import { MUSIC_ENGINE, scrimPlayer, type MusicEngine } from '@/audio/musicEngine
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
 import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
 import { clipboardText, sharePayloadForRun } from '@/ui/share'
+import { scoreCardFileName, scoreCardRun, type CardSize } from '@/ui/scoreCard'
+import { renderScoreCard } from '@/ui/scoreCardImage'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
@@ -83,7 +85,7 @@ export interface SCTestApi {
   drawCalls: number
   triangles: number
   /** Every level in play order, its `nextLevel` and whether the unlock rule opens it now. */
-  levels: () => { id: string; name: string; nextLevel: string | null; unlocked: boolean }[]
+  levels: () => { id: string; name: string; maxScore: number; nextLevel: string | null; unlocked: boolean }[]
   /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one. */
   startLevel: (id: string, seed?: number) => void
   /** `<count>:<hash>` of the latest run's spawn positions (formation members: their seeded slots); null until a spawner has generated them. */
@@ -145,6 +147,15 @@ export interface SCTestApi {
   bulletStep: number | null
   /** Seconds the level timer and game clock advance per playing frame instead of the frame time; null is normal play. */
   timerStep: number | null
+  /** Most seconds the level timer and game clock advance per playing frame (a slower frame counts as this much); null
+   *  is normal play. Lets the smoke sample the same moment of a level on any runner; `timerStep` overrides it. */
+  timerStepMax: number | null
+  /** True holds the level timer (no time runs out, no wave or boss comes due) while the game clock, enemies, effects and
+   *  combo keep running: the smoke's checks then see one moment of the level however long they take on a slow runner. */
+  holdLevelTime: boolean
+  /** Seconds the coaster rides per second of level time (in steps of at most 3/60 s, the game's per-frame ride cap);
+   *  null rides the frame time. With `timerStepMax` it puts the ride at the same track point for a level time on any runner. */
+  rideRate: number | null
   /** Drawn bullets (#165): count, largest screen radius (fraction of canvas height) now and since load, newest one's CSS px point. */
   bullets: () => E2EBullets
   /** Fire one real shot through NDC (x, y), like a click there. False if not fired (phase, fire delay). */
@@ -174,6 +185,9 @@ export interface SCTestApi {
   endLevel: () => void
   /** What the results share menu's Copy link puts on the clipboard for the current level and score (`text url`), or null. */
   shareText: () => string | null
+  /** The results Share image (#272) for the current level and run, drawn as the share menu draws it: its pixel size,
+   *  PNG data URL and download name, or null with no level. */
+  scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string } | null>
   /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
   setTimeScale: (s: number) => void
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
@@ -396,6 +410,24 @@ export function recordE2ESpawns(positions: readonly { x: number; y: number; z: n
   if (!isE2E) return
   const text = positions.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)}`).join(';')
   spawnDigest = `${positions.length}:${hashString(text).toString(16)}`
+}
+
+/** Level time for a playing frame of `delta` seconds: the frame time, unless a test set `timerStep` / `timerStepMax`. */
+export function levelTimeStep(delta: number): number {
+  const api = isE2E ? window.__SC_TEST__ : undefined
+  if (api?.timerStep != null) return api.timerStep
+  return api?.timerStepMax != null ? Math.min(delta, api.timerStepMax) : delta
+}
+
+/** True while a test holds the level timer (`holdLevelTime`); never in normal play. */
+export function levelTimeHeld(): boolean {
+  return isE2E && window.__SC_TEST__?.holdLevelTime === true
+}
+
+/** Seconds the coaster rides on a playing frame of `delta` seconds when a test set `rideRate`, else null. */
+export function e2eRideSeconds(delta: number): number | null {
+  const rate = isE2E ? window.__SC_TEST__?.rideRate : null
+  return rate == null ? null : levelTimeStep(delta) * rate
 }
 
 /** The mounted spawner's wave schedule, set by EnemySpawner. */
@@ -678,7 +710,7 @@ export function installE2EApi() {
     triangles: 0,
     levels: () => {
       const { isLevelUnlocked } = useGameStore.getState()
-      return getAllLevels().map((l) => ({ id: l.id, name: l.name, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id) }))
+      return getAllLevels().map((l) => ({ id: l.id, name: l.name, maxScore: l.maxScore, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id) }))
     },
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
     setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
@@ -722,6 +754,9 @@ export function installE2EApi() {
     holdFeedback: false,
     bulletStep: null,
     timerStep: null,
+    timerStepMax: null,
+    holdLevelTime: false,
+    rideRate: null,
     bullets: readBullets,
     fireShot: (x: number, y: number) => (probeCamera ? fireAtNDC(x, y, probeCamera) : false),
     shaderWarmup: null,
@@ -791,6 +826,22 @@ export function installE2EApi() {
       const { currentLevel, score } = useGameStore.getState()
       const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score), 'copy') : null
       return payload ? clipboardText(payload) : null
+    },
+    scoreCard: async (size: CardSize) => {
+      const s = useGameStore.getState()
+      const card = s.currentLevel ? scoreCardRun({ ...s, levelId: s.currentLevel, mode: s.runMode }) : null
+      if (!card) return null
+      const blob = await renderScoreCard(card, size)
+      const bitmap = await createImageBitmap(blob)
+      const png = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result))
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(blob)
+      })
+      const out = { width: bitmap.width, height: bitmap.height, png, fileName: scoreCardFileName(card.levelId, card.score) }
+      bitmap.close()
+      return out
     },
     setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
     rideTo: null,

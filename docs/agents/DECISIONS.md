@@ -1301,3 +1301,234 @@ lighting. Draw calls, triangles and shader program count are unchanged.
 **Context:** The ledger's 168 runs (24 Oct – 1 Nov, ~226M weighted tokens) showed Builders at 71% of spend (~6M per run), cache writes at 48% of all spend, and builder runs re-writing their whole context ~15 times each, at ~157k tokens of context per turn. Spend went from ~12M/day to 82M on 31 Oct when Builders were fired back to back, which exhausted the old account.
 **Decision:** The ledger records a `diag` per run (peak context, compactions, cache misses by cause, heaviest tool results). Noisy commands run through `scripts/quiet.sh`. CLAUDE.md gained a "Context budget" section, stopped being re-read by role files, and moved the smoke spec and test hook to `e2e/README.md` (47KB → 30KB). Builders stop once `builder_runs_per_day` (STEERING.md) is reached. QA (on label) no longer polls for the merge.
 **Consequences:** Don't move the smoke spec back into CLAUDE.md or add "Read CLAUDE.md" to role files. Read the `diag` in new ledger entries to find what still drives cache misses before changing models or parallelism.
+
+## 2026-10-31 — Local leaderboard: saved at once, renamed in place; persisted data is sanitised on load (Builder, #40, landed by #317)
+
+**Context:** The results screen asks a placing run for arcade initials. A player can leave
+(Levels / Replay / tab close) before confirming, and localStorage can hold anything: an older
+build's shape, a hand edit, a half-written value.
+**Decision:** `leaderboards` (top 10 per level, `store/leaderboard.ts`) and `lastInitials`
+persist beside `savedScores` under the same `shootercoaster-scores` key; `ScoreEntry` is
+unchanged. The run's entry is stored the moment the results screen mounts, under the last
+initials used, and every letter change renames it in place (`setEntryInitials`), so no exit path
+loses it; confirming only closes the entry. A tie ranks below the entries already there. The
+persist `merge` runs everything loaded through `sanitizeSavedScores` / `sanitizeLeaderboards` /
+`normalizeInitials`, and the Daily Run's `savedDaily` / `dailyStreak` through
+`sanitizeSavedDaily` / `sanitizeStreak` (a custom `merge` drops any key it doesn't return), so bad
+data loads as valid or empty, never as a crash; a level with a saved best but no board (saves
+from before this) starts its board with that best under `---`.
+While the entry is open it owns the keyboard (R and S are letters, Enter confirms) through a
+window capture listener, except inside the open share menu; the screen's Enter = next / R =
+replay return once it is confirmed. Settings "Clear local data" wipes scores, stars (so
+unlocks), boards and the daily bests and streak, not settings. A daily run keeps its own best
+(decision `2026-10-31 — Daily Run`) and never enters these boards: its results show no board.
+**Consequences:** Anything new in the persisted game store needs its own sanitiser in that
+`merge`, or it bypasses the guard.
+
+## 2026-11-02 — Theme options live beside the scores, behind `?theme=` (Sound designer, #216)
+
+**Context:** The taste gate needs two or three candidate themes per slot playable in the game before Alex picks one, without changing what anyone hears by default.
+**Decision:** Candidates are ordinary scores named `<slot>.<name>` in `src/audio/scores/themes/`, listed in `SCORES` with their own `SCORE_KEYS` entry. `?audio=scrim&theme=<name>[,<name>]` swaps them in through `scoreIdFor(slot)`, read by the score player and the arcade SFX bake only; tracks keep their slot id, so crossfades, hand-overs and the e2e checks are unchanged. Once Alex picks, the winner's text replaces `<slot>.scrim` and the losing options are deleted with their `SCORE_KEYS` rows.
+The title brief changes from a 20–30 s attract-mode theme to the same form as the level themes, a 1–2 bar intro then a 32-bar loop (about 45–50 s), so the title can hold someone browsing the menus for minutes without the loop wearing thin; Alex's pick in #301 confirms or reverses that.
+**Consequences:** The lazy score-engine chunk carries the options until the pick (about 5 KB gzipped); default players never download it. Any later listening round (levels 2–5) reuses the same flag and folder.
+
+## 2026-11-02 — Results share menu: own menu on desktop, `share` event carries `method` instead of `stars` (Builder, #271)
+
+**Context:** The desktop system share sheet (macOS Safari: the page and Notes) read as broken. Vercel Pro records at
+most 2 properties per custom event, and the `share` event already used both (`level`, `stars`).
+**Decision:** The Web Share sheet is used only on a coarse pointer (phones, tablets) and when it works; everywhere
+else Share opens our own menu of Copy link + plain share-intent links (no SDKs, scripts or runtime requests; a link
+the player clicks is not a runtime call by the game). The `share` event now sends `level` + `method` (`native`,
+`copy` or the network), dropping `stars`: which network brings players is the question the Marketer asked. Each
+method gets its own `utm_campaign=share_<method>` (the native sheet moved from `results` to `share_native`).
+**Consequences:** `share` events before 2026-11-02 have `stars`, later ones `method`. A network link's event means
+the player opened that network's composer, not that they posted. Adding a network = one `SHARE_TARGETS` entry and
+one `shareTargetHref` case, plus the smoke's `SHARE_TARGETS` list.
+
+## 2026-11-02 — Auto-merge hands conflicting approved PRs back to Fix (Builder, #299 / #241)
+
+**Context:** When an approved PR conflicted with `main`, `scripts/automerge.cjs` commented
+`Auto-merge failed:` and left `agent:qa-approved` on it. No role watches that label, so the
+PR waited for the nightly Maintainer (#276 stalled twice this way).
+
+**Decision:** A conflict is detected from the PR's `mergeable === false` (checked before
+`verify`, since CI doesn't run on a conflicting PR) or a merge answered "not mergeable".
+The workflow then comments a conflict-only change request ("merge conflict only; full
+review passed") and swaps `agent:qa-approved` → `agent:changes-requested`, which starts Fix
+(on label); QA follows with the light re-review. Other merge failures (for example "Base
+branch was modified") keep the label and are retried by the sweep. Conflict hand-backs
+don't count towards the 3 sends back: nothing was wrong with the change. Each PR in a run
+is handled in its own `try/catch`, so one API error can't skip the CI dispatch on `main`
+after an earlier merge.
+
+**Consequences:** Conflicts cost one light Fix + QA round instead of a stall. A PR that
+keeps conflicting can loop Fix ↔ auto-merge without hitting the bounce limit; each loop
+needs `main` to move again, so it ends once the queue drains.
+
+## 2026-11-02 — The Giant Scorpion rides along on the sand; a broken tail segment closes up (Builder, #318)
+
+**Context:** Desert's finale. The Kraken surfaces at fixed spots because it needs water; the scorpion can walk, and
+the desert track loops over most of the ground ahead of the rider, so a fixed offset (the Blimp's) would often
+stand it on the rails or a tower.
+**Decision:** It rides like the Blimp (smoothed heading, a fixed distance ahead and to one side) but picks its spot
+from a ranked list of [ahead, side] slots on either side (`scorpionMotion.ts` `PERCH`), keeping its current slot
+while it stays clear of `trackClearance` (2D, towers included), the landmarks and mesas (`desertObstacles`); it
+scuttles to the next clear slot when blocked. Its tail is laid from the live segments only, so breaking any segment
+(not just the tip) shortens the tail and the stinger stays on the end, sitting on a bare stub for phase 1. Bosses
+now get `incoming` (their tell) as a prop: the scorpion's dune heaves and the desert dust boosts
+(`scorpion:burrow`) during it.
+**Consequences:** At the highest points of the ride (~480 above the sand) the tail top (~480) is level with the
+horizon rather than above it. Any new ground boss should reuse `pickPerch`'s slot approach rather than a fixed offset.
+
+## 2026-11-02 — Score intensity layers: per-voice level gains, intro plays everything, wind-down a layer a bar (Sound designer, #321)
+
+**Context:** The score engine's level music should follow the combo (base / +drums / +lead / FRENZY), for any score,
+without breaking parity with the original Scrimshaw compiler or growing the node count.
+**Decision:** A voice joins a layer with `layer=` (untagged = `base`; the field is absent otherwise, so parity
+`toEqual` holds). Intensity is the combo tier index, sent by `LevelAudio` every frame. A layer is each voice's own level
+gain ramped over 50 ms ending on a loop beat line, so no new nodes; silent voices keep playing their notes so a layer
+comes in mid-phrase. A layered score gets one low-pass per track, 7 kHz below FRENZY, opened to 20 kHz at FRENZY;
+untagged scores get none. The intro always plays every layer (it is the countdown fanfare). A rise lands on the next
+beat; a fall drops one layer on the next beat and one per bar after, each asked for once the previous one has landed.
+**Consequences:** Scores must make `base` stand alone (`scores.test.ts` checks it plays in every loop bar). The music
+bus compressor keeps loudness nearly level across layers (level1: −16.6 → −17 LUFS), so layers read as density and
+brightness, not volume. A FRENZY lost a fraction of a beat after it was asked still sounds for a bar. A pause keeps the layers: a session resumed before a scheduled step lands (a pause
+during the intro, or just before a beat line) opens on what was playing and still takes the step on its beat line
+(`resumeLayers`). FRENZY keeps both lifts: the arcade's `frenzyLift` loop is the SFX riser, the score's low-pass opening
+is the music's; the slow-mo duck hides the opening for its 1.5 s, and the score stays bright for the rest of FRENZY.
+
+## 2026-11-02 — Shaders feeding the composer must output finite, in-range values (Builder, #344)
+
+**Context:** The title went fully black for a frame whenever a pixel centre landed exactly on one of drei `Sparkles`' point centres: its glow is `0.05 / distance - 0.1`, so alpha was Inf, blending made the pixel NaN, and Bloom's `mipmapBlur` carried that one pixel into every mip and back over the whole frame. Only with Bloom on, and only on frames where the alignment happened (random sparkle positions), so it read as an intermittent smoke failure blamed on the sun.
+**Decision:** The title glints are our own `src/canvas/TitleSparkles.tsx` (seeded layout, glow clamped to [0, 1], negative corners discarded) instead of drei `Sparkles`. Any point/sprite shader that divides by a distance must floor the divisor and clamp alpha. The title smoke draws a sparkle centred on a pixel (`pointCentreColour`) and fails on anything outside [0, 1].
+**Consequences:** Don't bring drei `Sparkles` back (or any third-party shader with an unbounded falloff) without the same check. A composer-wide NaN guard ahead of Bloom was left out: the source fix plus the check cover the one producer found; the five level scenes render no non-finite pixel along the ride.
+
+## 2026-11-02 — Week 3: M3 opens early with the finales and Level 6; milestones on GitHub; small issues are bundled (Director)
+
+**Context:** M2's content landed in week 2 (combo tiers, formations, death variety, two
+bosses, pickups, daily run, pause, settings, share, launch tooling); only the leaderboard
+(finished on a branch, lost to a conflict) and a green smoke on `main` remain. The queue
+held 27 `agent:ready` issues, almost all P3 review follow-ups, and no player-facing work.
+Alex asked for the roadmap to run as GitHub milestones (#192) and for sound to keep pace
+(#212), whose next steps all waited on his theme pick (#301). Builder runs cost ~6M tokens
+each regardless of issue size (ledger diag, #298).
+
+**Decision:**
+- M2 closes on #317 (re-land the leaderboard branch) and #316 + #305 (Ocean opening, fixed
+  level-time sampling in the smoke). M3 ("Depth and spectacle", milestone #2, due 6 Dec)
+  opens this week rather than next: the three remaining finales (#318 Scorpion P1, #319
+  Yeti, #320 Magma Titan), the Level 6 Neon Metropolis epic (#322) as three vertical slices,
+  the Ocean's water (#326), far-rail depth (#327), Inferno's lava (#331), a swoop intro and
+  results orbit (#328), tunnels and a loop (#332).
+- Audio engine work is decoupled from Alex's picks: intensity layers + FRENZY lift (#321,
+  P1, any score) come first; #302 shrinks to swapping in the picked themes.
+- The PLAY-straight-to-ride funnel change (#329) is filed but held until the Showcase
+  week has been measured against the W44 baseline (Marketer, 9 Nov).
+- Milestones: the Director owns them (REST only), sets one on every issue, closes and
+  creates them against VISION.md's exit criteria (`.claude/agents/director.md`,
+  PROTOCOL.md). #330 makes them visible on the status page and in the weekly report.
+- Related small follow-ups are bundled into one issue per session (#333–#339 cover 16
+  P3 issues, which lose `agent:ready` and close with the bundle's PR). #241 folded into
+  #299; #187 closed as done; #40 superseded by #317.
+- `budgets.json` was not lowered to the VISION 250-draw bar on levels 4–5: `knownOver`
+  would silence the whole level's gate while #260 is open. #260 lands the ceiling itself.
+
+**Consequences:** 29 `agent:ready` issues for the week (6 P1, 11 P2, 12 P3 of which 7 are
+bundles) plus 7 blocked ones with named unblockers, against ~29 expected builder
+completions (21 runs × parallelism 2 × ~70 %). If the Showcase week shows the
+mobile start rate under half of desktop's on ≥ 20 mobile visitors, the next Director
+run puts a phone title → PLAY → ride issue at P1 ahead of the finales.
+
+## 2026-11-03 — Arcade SFX: a placed sound keeps its louder channel at its level (Sound designer, #321)
+
+**Context:** The arcade engine pans each mono one-shot with a StereoPannerNode (equal power), so a sound at the centre
+of the screen plays 3 dB down in both channels, while one at the side is up to 3 dB hotter in its near channel. The
+enemy just shot is usually near the crosshair, so the most common kill was the quietest: in the level1 combat mix a
+centred 1× kill read 4.6 dB over the music (target ≥ 6), against 7–8.7 dB for kills off to the side.
+**Decision:** A placed sound (kills, hits) gets `panGain(pan)` (`sfxDesign.ts`): the louder channel stays at the sound's
+level wherever it pans (+3 dB at the centre, 0 dB at the edges). Unplaced sounds (gun, cues, UI) stay as they were. The
+kill bodies come down 1 dB (−3 dB, the hiss −4 dB), so the edges, which already met the master limiter, sit under it.
+**Consequences:** Every kill clears the music by ≥ 6.7 dB in the level1 mix (seeds 1–3: 6.7 / 6.8 / 6.9), true peak
+stays at −1.0 dBTP and short-term max at −13.0 LUFS, the top of its −15…−13 range. Centred hits are up to 3 dB louder
+than before. The SFX sheet renders sounds unplaced, so it shows each sound 1 dB under the mix's centred kills.
+
+## 2026-11-02 — Enemies: one mesh per material and moving part (Builder, #260)
+
+**Context:** Formation and ground-scatter waves put 25–40 enemies of one type on screen at once. With one `<mesh>` per part (eyes, smile dots, buttons, shards, tendrils), Arctic drew 393 calls and Inferno ~290, over the VISION bar of 250.
+**Decision:** In `SharedEnemyAssets.ts`, parts that share a material and move together are baked into one module-level geometry with `placedParts` (positions, rotations and scales as the meshes had them). Only parts with their own animation stay separate meshes (snowman arms, imp tail, golem arms, wisp core pulse). The ember wisp's six tendrils now flicker as one crown instead of each on its own. `budgets.json` holds level4 / level5 at 250 draw calls.
+**Consequences:** New enemy models should follow the same rule; a new per-part animation means splitting that part back out deliberately. Hit flash and the warm-up are unaffected (they walk meshes and module exports).
+
+## 2026-11-02 — The smoke's level steps run on capped level time and a paced ride (builder, #305)
+
+**Context:** The level steps sampled the ride stats and the perf gate after 10 s of wall time, while the level timer
+advanced by the raw frame delta and the coaster by at most 3/60 s a frame. On a 2-core runner (~2.8 s frames) the
+level was ~20 s in when sampled, later waves were on screen (`scene objs` over budget), and level3 reached its Kraken
+during combat; main went red without a code change. The ride, bound to the frame count, also left level3 with one
+readable enemy on slow boxes (#250).
+
+**Decision:** The level steps set `__SC_TEST__.timerStepMax` (a per-frame cap on level time + game clock; faster
+frames pass through): `--seconds / --min-frames` on the ride, which stops at `--seconds` of *level* time with game
+time frozen for the stats, shot and enemy probe; 0.25 s in combat. During the ride `rideRate` 0.14 rides that share
+of the level time (CI's ~2.8 fps × 0.05 s, where the budgets were set). The perf gate keeps counting enemies and the
+budgets are unchanged. The readability probe samples the same moment; before this it ran a frame or more after the
+stats, past the 15 s second waves on CI, which hid that level3 shows one readable enemy at 10 s from this track point (#250). `hidden-pause`'s wave slack is 1 s (whole-second timer store) + 2 × the longest frame since
+Resume, not a fixed 3 s.
+
+**Consequences:** Don't go back to wall-clock waits for level checks: the budgets and readability gate assume that
+moment and track point. Players keep the frame-delta timer and ride (`levelTimeStep` / `e2eRideSeconds` only act
+under `?e2e=1` with the knobs set). If CI's runners get much faster, its natural ride no longer matches 0.14, which
+is fine: the smoke now sets it.
+
+**Addendum (2026-11-04, Alex's chat):** The cap alone still let level time advance through the combat checks, so on
+a slow runner a level could time out (or its boss surface) before the leaderboard and kill checks, which failed
+docs-only PRs (`leaderboard: run ranked 0`, `kill used the bossPart death effect`, `fireShot() fired nothing`). The
+level steps now also set `holdLevelTime` for the combat checks: the level timer stops while the game clock, enemies,
+effects and combo run on, and the step releases it in the turn it ends the level. The readability gate needs an enemy
+on screen and min(2, on screen) of them readable, so one readable enemy of one passes (#250).
+
+## 2026-11-02 — Sea enemies float beside the track, in a band sized to the ride (Builder, #316)
+
+**Context:** Ocean's jellyfish and sharks were scattered over a 1,100-unit disc around the origin, so the
+first 10–15 s of the level showed an empty sea (#250). The ground trackside band (700–2200 arc units
+ahead, #179) does not fit the Ocean: its ride averages ~250 units/s, so a wave placed 700–2200 ahead is
+behind the rider within ~9 s, and its tight turns put much of that band behind the rider in plan.
+
+**Decision:** `jellyfish` and `shark` use `'trackside'` placement on the water. `TRACKSIDE` has a band per
+surface: ground stays 700–2200 ahead, water is 300–3600 ahead (60–400 to the side for both), about the
+ride between Ocean's waves, so a wave stays in view until the next one lands. Half of each water wave
+is drawn within 1500 ahead (`near` in the band), so the wave is on screen as it arrives: spread evenly
+over 300–3600, at most 3 of the 20 opening jellyfish were ever in frame, and CI's readability gate
+failed. A water slot searches across the track, then nearer or further within the band, for a point
+over the sea that is in view on its approach: inside the formation anchors' 40° cone and within the
+type's readable distance (`maxReadableDistance`) from the rider 1100 arc units before it (or at
+activation) and 400 further on; failing that, the first point over the sea. With ~10 jellyfish in view
+at once, a jellyfish's 7 draw calls (bell, core, five tentacles) took level3 to 131 draws (budget 89),
+so its bell and tentacles are one merged geometry (2 draws with the glowing core; the whole bell rocks
+instead of each tentacle swaying): 81 draws at the smoke's ride sample. Sharks
+circle a 25–60-unit orbit through their spawn point instead of drifting (their old drift had radii up
+to ~2,000 units). Ocean gets a second jellyfish wave (12, at 28 s) so the stretch before the flying
+fish and the Kraken isn't empty; `maxScore` 2045 → 2261.
+
+**Consequences:** A trackside band is about how far the rider travels while the wave is live, not just
+view distance: re-check it when a level's speed or wave gaps change. Water slots are always over the
+sea when there is sea within the band. `spawnPlacement.test.ts` checks level3's opening (ride t
+0–0.025, the smoke's ride sample at any runner speed) keeps ≥ 4 readable jellyfish in view at seed 1337
+and ≥ 2 (the smoke gate) at seeds 1–20. The trackside unit test now checks each enemy is in front of
+the rider on the approach (600 arc units before it), not at placement time.
+
+## 2026-11-03 — Production: a deploy health check, the full smoke nightly, alerts on transitions (Builder, #352)
+
+**Context:** The post-deploy production run replayed the whole smoke against scoaster.com. Its runtime crept past its cap
+(1465 → 1932 s), so every deploy "failed" with no failed check and emailed Alex through #297.
+**Decision:** After a deploy, `e2e/prod-check.mjs` checks only that the deploy arrived intact (every built file served with
+its headers, routes, title, one level to a kill, a phone run; ~3 min, 8 min cap). The full smoke runs against prod nightly
+(60 min cap). Both run under `timeout`, so a slow run is a reported timeout, and a deploy run superseded by a newer deploy
+is cancelled and says nothing. `scripts/prod-alert.cjs` keeps one `agent:prod-broken` issue per suite and uses it as the
+state: it opens on green → red, stays silent while open and closes on the next green run. Choices that look arbitrary:
+- The deploy check's kills go through `killNearest` (the bullet pool's hit path). Whether a tapped bullet lands depends on
+  the software frame rate, and the nightly smoke and `verify` already gate touch aim assist.
+- The files to expect come from a local `VERCEL=1` build of the deployed commit, matched to the deployed files by name
+  without the hash, because Vercel's hashes can differ.
+- CI's red-`main` report never comments on a production suite's issue, because that issue closes itself when prod goes green.
+**Consequences:** A green → red change sends one email per outage. A timeout says "no check failed". The full suite still
+catches CDN / runtime drift within a day. Don't move the full smoke back onto `deployment_status`, and don't just raise the cap.

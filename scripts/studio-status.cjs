@@ -173,6 +173,50 @@ async function collectLedger(api, since, until = Infinity) {
   return { number: issue.number, ...ledgerSummary(comments, since, until) }
 }
 
+// ---------- milestones ----------
+// The Director's roadmap milestones (PROTOCOL.md "Source of truth"). GitHub stores a
+// due date as midnight UTC, so it is shown in UTC.
+
+const fmtDue = (ms) => new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }).format(new Date(ms))
+
+/**
+ * Pure: the Milestones section, or '' when no milestone is open. Each milestone is the
+ * REST shape (`title`, `html_url`, `due_on`, `open_issues`, `closed_issues`) plus `p1`,
+ * its open P1 issues.
+ */
+function milestoneSection(milestones, now) {
+  if (!milestones || !milestones.length) return ''
+  const lines = milestones.map((m) => {
+    const total = m.open_issues + m.closed_issues
+    const frac = total ? m.closed_issues / total : 0
+    const filled = Math.floor(frac * 10)
+    const bar = '█'.repeat(filled) + '░'.repeat(10 - filled)
+    let due = 'no due date'
+    if (m.due_on) {
+      const at = Date.parse(m.due_on)
+      const days = Math.ceil((at - now) / DAY)
+      const left = days > 0 ? `${days} day${days === 1 ? '' : 's'} left` : days === 0 ? 'due today' : `⚠️ ${-days} day${days === -1 ? '' : 's'} overdue`
+      due = `due ${fmtDue(at)} (${left})`
+    }
+    const p1 = m.p1.length
+      ? `Open P1: ${m.p1.map((i) => `#${i.number} ${short(i.title, 50)}`).join(' · ')}`
+      : 'No open P1.'
+    return `**[${m.title}](${m.html_url})** · ${due}\n\`${bar}\` ${m.closed_issues} / ${total} closed (${Math.floor(frac * 100)} %) · ${p1}`
+  })
+  return `### 🎯 Milestones\n${lines.join('\n\n')}\n`
+}
+
+/** Open milestones, soonest due first (no due date last), each with its open P1 issues. */
+async function collectMilestones(api) {
+  const open = await api('GET /repos/{owner}/{repo}/milestones', { state: 'open', per_page: 30 })
+  const dueAt = (m) => (m.due_on ? Date.parse(m.due_on) : Infinity)
+  open.sort((a, b) => dueAt(a) - dueAt(b) || a.number - b.number)
+  return Promise.all(open.map(async (m) => {
+    const p1 = await api('GET /repos/{owner}/{repo}/issues', { state: 'open', milestone: m.number, labels: 'P1', per_page: 100 })
+    return { ...m, p1: p1.filter((i) => !i.pull_request).sort((a, b) => a.number - b.number) }
+  }))
+}
+
 // ---------- data ----------
 
 async function collect(api, now) {
@@ -208,10 +252,18 @@ async function collect(api, now) {
     }),
   )
 
+  // GitHub creates the `verify` check only once the CI jobs it needs end: same stand-in as automerge.cjs.
+  const verifyRun = async (ref) => {
+    const runs = (await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref, per_page: 100 })).check_runs
+    const run = runs.filter((r) => r.name === 'verify').sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0]
+    if (run) return run
+    const need = runs.find((r) => (r.name === 'unit + build' || r.name === 'lighthouse' || r.name.startsWith('smoke (')) && r.status !== 'completed')
+    return need ? { status: 'waiting', head_sha: need.head_sha } : null
+  }
+
   // CI state for PRs that are in review or sent back.
   const verifyOf = async (sha) => {
-    const r = await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref: sha, check_name: 'verify' })
-    const run = r.check_runs.sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0]
+    const run = await verifyRun(sha)
     if (!run) return '⏳ not started'
     if (run.status !== 'completed') return '⏳ running'
     return run.conclusion === 'success' ? '✅ green' : `❌ ${run.conclusion}`
@@ -222,8 +274,7 @@ async function collect(api, now) {
   // verify on main's head: automerge.yml dispatches CI there after every merge.
   let mainVerify = null
   try {
-    const r = await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref: 'main', check_name: 'verify' })
-    mainVerify = r.check_runs.sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0] || null
+    mainVerify = await verifyRun('main')
   } catch {
     mainVerify = null
   }
@@ -246,14 +297,15 @@ async function collect(api, now) {
   }
 
   const ledger = await collectLedger(api, now - 7 * DAY).catch(() => null)
+  const milestones = await collectMilestones(api).catch(() => [])
 
-  return { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger }
+  return { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger, milestones }
 }
 
 // ---------- render ----------
 
 function render(data, now) {
-  const { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger } = data
+  const { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger, milestones } = data
   const pauses = issues.filter((i) => hasLabel(i, 'pause'))
   const inQa = prs.filter((p) => hasLabel(p, 'agent:needs-qa'))
     .sort((a, b) => prio(a) - prio(b) || Date.parse(a.created_at) - Date.parse(b.created_at))
@@ -294,6 +346,8 @@ function render(data, now) {
   out.push('')
   out.push(`<sub>Updated ${fmtTime(now, now)} ET. Refreshes on every agent action and every 15 min. Work only moves when a scheduled run fires, so quiet gaps between runs are normal.</sub>`)
   out.push('')
+  const roadmap = milestoneSection(milestones, now)
+  if (roadmap) out.push(roadmap)
 
   out.push('### 🔨 Being built now')
   out.push(table(['Issue', 'Claimed', 'Last push', 'Status'], building
@@ -418,6 +472,7 @@ function ghReadApi(repo = process.env.GITHUB_REPOSITORY || REPO) {
 module.exports.render = render
 module.exports.ledgerSummary = ledgerSummary
 module.exports.collectLedger = collectLedger
+module.exports.milestoneSection = milestoneSection
 module.exports.ghReadApi = ghReadApi
 module.exports.nextRun = nextRun
 module.exports.SCHEDULE = SCHEDULE

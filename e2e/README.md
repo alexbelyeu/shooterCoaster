@@ -13,16 +13,20 @@ triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/size
 to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the 3D scene behind the title UI must not look blank, polled on a cold start; the fly-by camera must have turned ≥ 8° or moved ≥ 30 units;
 a title sparkle's centre pixel must blend to a colour in [0, 1] (`pointCentreColour('title-sparkles')`: a glow dividing by the distance to the point's centre went NaN there and Bloom spread it to a black frame, #344); the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select; Tone.js's `tone-*.js` chunk must not be fetched before that press, and the press must load it and unlock audio); a `landing` step loads the campaign landing path
 `/go/smoke-check?e2e=1&internal=1` (links we post point at `/go/<campaign>`, attributed by the page view's path; `robots.txt` disallows `/go/`):
-it must boot to the title with no failed request, no analytics request and no page error, keep its path (only `internal` stripped) and show the "internal: not tracked" marker (skipped with `--base`); and per level `<id>.png` (after a ride of `--seconds` 10, longer until `--min-frames` 10 frames have rendered; it fails as a stalled render loop only if they haven't by 4× `--seconds`, and the summary line prints `frames=N in Xs`; the title waits the same way),
+it must boot to the title with no failed request, no analytics request and no page error, keep its path (only `internal` stripped) and show the "internal: not tracked" marker (skipped with `--base`); and per level `<id>.png` (after a ride to `--seconds` 10 of *level time* and at least `--min-frames` 10 frames, then game time frozen for the
+ride stats, the perf gate, the shot and the enemy probe; the level steps cap level time per frame (`timerStepMax`: `--seconds` / `--min-frames` on the ride, 0.25 s
+in combat) and ride `--ride-rate` 0.14 s of track per second of level time (`rideRate`: CI's ride, where the budgets were set; the game rides at most
+3/60 s a frame), so a slow runner samples the same moment of the level from the same track point as a fast one; through the combat checks the level timer is then held (`holdLevelTime`: the game clock runs on, the run can't time out and no wave or boss comes due) until the step ends the level itself, so however long the checks take they never run into the boss or the end of the run (#305);
+it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
 gold hitmarker held on the kill frame via `holdFeedback`; on the first level a primed 14-kill chain makes
 that kill enter the 5× combo tier, and the shot must show the "×5 FRENZY" flash with its slow-mo held and, on the Theme Park,
 the streak-15 firework burst held on screen; the kill's death effect must be live in the shot in its enemy type's style, held mid-spread, `death=<type>` in the summary; the first level then starts over, primes 5× and ends through the level timer mid-FRENZY: its results must be at `timeScale` 1 with the music not ducked, `frenzyEnd` in `results.json`), `<id>-shot.png` (one real shot two 40 ms
-steps into its flight, time frozen), `<id>-results.png` and `<id>-share.png` (the results share menu open). A level fails if
-fewer than 2 enemies are ≥ 12 px on screen right after the ride (`enemiesOnScreen` / `readable` / `largestPx` in the summary), its biome particle field isn't mounted (`particles=` in the summary), it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
+steps into its flight, time frozen), `<id>-results.png`, `<id>-share.png` (the results share menu open) and `<id>-card.png` / `<id>-card-story.png` (the score card share image, #272). A level fails if
+no enemy is on screen at that probe, or fewer than min(2, on screen) are ≥ 12 px (`enemiesOnScreen` / `readable` / `largestPx` in the summary), its biome particle field isn't mounted (`particles=` in the summary), it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
 enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
-wall-clock level timer already ran out), the camera translates off the track pose at all
+level timer already ran out), the level's boss arrives during these checks (they are the boss step's), the camera translates off the track pose at all
 (kill feedback is rotation-only trauma, ≤ 1°, back to 0), the first-person weapon is off
 screen / covers the centre / overlaps the HUD / points > 25° off the tracer of the frozen fixed-point shot or of a second shot on the far side of the screen without `holdFeedback` (`aimJump=`; the gun snaps to every shot) (also
 checked in mobile portrait + landscape, and in portrait at four extreme aims with the combo meter showing),
@@ -33,7 +37,7 @@ Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), 
 on the first level the leaderboard is seeded so the run places 4th: the row must open for initials at the last ones used (AAA),
 ArrowUp must cycle a letter, typing r e s must give RES without leaving or toggling mute (R and S are letters there), and Enter must confirm, store
 and persist it; its frenzy-end rerun is seeded a full board out of reach and must show the board with no rank and no initials entry;
-`shareText()` must match the share format with the shown score, stars, level name and the `/go/share` link (`share_copy` campaign); a real Share click must open the share menu (#271) with Copy link focused and every target in order (Copy link, X, Reddit, Bluesky, Threads, WhatsApp, Facebook, LinkedIn, Email; items 44 px), inside the viewport and covering no other results button, each link carrying its own `utm_campaign=share_<target>`; Copy link must show "Copied!" and put `shareText()` on the clipboard, ArrowDown must move focus to X, and Esc must close the menu with focus back on Share (network links are never clicked). Every page of a local run fails on a request to another origin
+`shareText()` must match the share format with the shown score, stars, level name and the `/go/share` link (`share_copy` campaign); a real Share click must open the share menu (#271) with Save image focused and every target in order (Save image, Copy image, Copy link, X, Reddit, Bluesky, Threads, WhatsApp, Facebook, LinkedIn, Email; items 44 px), inside the viewport and covering no other results button, each link carrying its own `utm_campaign=share_<target>`; Copy image must show "Copied!" and put the 1200×630 PNG on the clipboard, Copy link must show "Copied!" and put `shareText()` on the clipboard, ArrowDown must move focus to Copy image, Esc must close the menu with focus back on Share (network links are never clicked), and Save image must download `shootercoaster-<id>-<score>.png` and close the menu. `scoreCard('feed' | 'story')` must draw a 1200×630 and a 1080×1920 PNG (not blank: ≥ 20 KB) named after the level and score. Every page of a local run fails on a request to another origin
 (not with `--url`). `--dist <dir> --base <path>` previews another build folder under a sub-path (`smoke:portal`).
 `npm run smoke` also passes `--mobile`:
 an iPhone 13-like touch context (390x844) taps PLAY and a level (the title music must ramp out from full and be disposed, the level music ramp in), then in portrait and
@@ -53,13 +57,14 @@ held trigger, keep `timeRemaining` still over 5 s hidden, stay paused when shown
 after Resume neither reset nor jump the timer, a combo primed before hiding must survive the pause, and the kills made
 before it must stay (no killed enemy back); the world is frozen while paused (track fraction `rideProgress`, live enemies and
 `nextWave()` unchanged over the 5 s and through Resume's Ready / GO countdown, the pause mix on), then the ride goes on from
-the same spot and the next wave arrives at its original level time; a window `blur` must pause too.
+the same spot and the next wave arrives at its original level time (slack: 1 s for the whole-second timer store plus two of the longest
+frames since Resume, `maxFrameMs`); a window `blur` must pause too.
 A `pause-menu` step on the same page opens the menu through the hook (`pause.png`): the card inside 1280×720 with the level
 name, Resume focused, ArrowDown moves focus, Esc resumes, and Restart starts the level over (kills, score, timer, ride). The
 phone run checks the card after its Pause tap in landscape and portrait (`mobile-pause-landscape.png`, `mobile-pause.png`: inside
 the viewport, no sideways scroll, 44 px buttons), then taps its Settings (`mobile-settings.png`: fits 390 px, 44 px targets)
 and Back to the menu, then ends the level and enters initials by tapping ▲, a letter, ▲ and OK (BBA; 44 px buttons, the pad in view: `mobile-results-entry.png`), then the results buttons must fit and not overlap in portrait and landscape
-(`mobile-results.png`, `mobile-results-landscape.png`, the board inside the viewport in landscape) and the share menu must pass the same checks, bar the clipboard, in landscape and at 390 px portrait (`mobile-share-landscape.png`, `mobile-share.png`; headless Chromium has no share sheet, so the phone gets the menu), then starts level2 and goes back to level select: on every music
+(`mobile-results.png`, `mobile-results-landscape.png`, the board inside the viewport in landscape) and the share menu must pass the same checks, bar the clipboard, in landscape and at 390 px portrait (`mobile-share-landscape.png`, `mobile-share.png`; headless Chromium has no share sheet, so the phone gets the menu); with `navigator.canShare` / `share` stubbed to take files, Share must send the sheet one 1080×1920 PNG named after the level and score with the line and the `share_image_native` link, and open no menu (#272); then starts level2 and goes back to level select: on every music
 switch (there, title → level, and the `scrim` step's) the incoming track's first note must land before the outgoing bus has
 faded to 0 (`audio().music.fades` log each ramp's start and the incoming `firstNote`; tracks start on the next beat, `musicBus.ts`).
 A `settings` step opens Settings from the title (`settings.png`: the card inside 1280×720 with the four quality
@@ -74,7 +79,7 @@ locked card does nothing, Enter on an open one plays the launch transition and s
 the phone run checks its cards fit 390 px.
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in
 daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, NEW BEST, no Next Level and no leaderboard or initials entry (the campaign boards stay empty)
-(`daily-results.png`), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
+(`daily-results.png`; its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 `?e2e=1` skips the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1`: the countdown must show (`countdown.png`),
 a press during it must fire nothing (also when held on into `playing`), the timer must hold, a replay tap after 1 s (Ready held by `holdFeedback`) skips to `playing`,
@@ -112,10 +117,36 @@ spawned enemies) and vary run to run; for before/after comparisons use the
 camera-independent `scene` totals the smoke also prints (`track objs/tris` = objects
 named `track*`; `env=` is the baked sky env map's intensity and bake time; a level
 without `scene.environment` fails).
-**Perf gate:** `budgets.json` `scene` holds per-level ceilings on the ride screenshot's draw calls (+20% headroom, since they
+**Perf gate:** sampled with the ride stats at `--seconds` of level time (the scene totals count every visible mesh, enemies included,
+so a later moment has more waves on screen). `budgets.json` `scene` holds per-level ceilings on the ride screenshot's draw calls (+20% headroom, since they
 vary) and on the scene / track objects and triangles (+15%); a level past one fails with `over budget: scene objs=560 (budget 551)`
 (`perfGate` in `results.json`). A level whose entry has `knownOver: "#<open issue>"` only prints a WARN line until that issue lands
 (then drop the key). `--no-perf-gate` skips the gate for local experiments. Ceilings are budgets: only the Director raises them.
+
+## Steps, shards and the time budget (`e2e/shards.mjs`, #353)
+
+Every check above belongs to a named step: `title`, `landing`, `levelSelect`, `daily`, `settings`, `mobile` (no level);
+`frenzy` (the first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ride), `seed`, `quality`,
+`pause` (hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level) and `wave`,
+`boss`, `pickup`, `scrim` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its checks
+disagree). `--steps ride,boss --levels level2` runs just those. Without `--steps` every desktop step runs, plus `mobile`
+with `--mobile`; `--skip-desktop` leaves `title` and `mobile`.
+
+CI runs the smoke as the shards in `SHARDS`, one `smoke (<name>)` job each (`ci.yml` matrix): `ui`, `level1` (ride, frenzy,
+seed, boss, pickup), `level1-steps` (quality, pause, countdown, speed, scrim), `level2`…`level5` (every per-level step on
+that level) and `mobile`. `node e2e/smoke.mjs --shard <name>` runs one exactly as CI does. `shards.test.ts` checks that the
+shards together run every step on every level the full run does, each once, that every registry level is ridden, and that
+the shards, the `ci.yml` matrix and `budgets.json` `smokeSeconds` list the same names.
+
+Each results entry records its wall time (`seconds`). A `--shard` run ends with a `time` line and entry (`level3 shard
+took 4.2 min, budget 7.0`) and a GitHub annotation of the same text. On CI (`CI` set) a shard over its `smokeSeconds`
+budget fails, and one still running at twice its budget writes `results.json` with what ran and exits (`still running
+after …: stopped`), inside the job's timeout; locally it only warns, since a 2-core session is slower than a CI runner.
+Budgets: only the Director raises them.
+
+CI's required `verify` check is a gate job that needs `unit + build`, `lighthouse` and every shard, and passes only if
+all of them passed. GitHub creates its check run only when those end, so `scripts/automerge.cjs` and
+`scripts/studio-status.cjs` read the running jobs before it as "verify waiting".
 
 ## Production (`.github/workflows/prod-smoke.yml`, #352)
 
@@ -146,7 +177,7 @@ Actions → Production smoke → `suite` (deploy / nightly), `dry_run` to open o
 ## Test hook (`?e2e=1` → `window.__SC_TEST__`)
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
-(`levels()` (each with its `nextLevel` and `unlocked` now), `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `setLeaderboards(boards, lastInitials?)` / `leaderboards()` (local top 10s), `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time, level time, due wave and the wave tick before it), `nextWave()` → level time now + when the next wave is due + the last wave tick, `waveTellSeconds`, `timerStep` (seconds of level time + game clock per frame; null is the frame time), `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction), `pointCentreColour(name)` (the linear RGBA a scene `Points`' first point blends to over opaque grey with its centre exactly on a pixel centre, in a 1×1 float target),
+(`levels()` (each with its `maxScore`, `nextLevel` and `unlocked` now), `startLevel(id, seed?)`, `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `setLeaderboards(boards, lastInitials?)` / `leaderboards()` (local top 10s), `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `scoreCard(size)` (the results share image for the current run, `feed` or `story`: pixel size, PNG data URL, file name), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time, level time, due wave and the wave tick before it), `nextWave()` → level time now + when the next wave is due + the last wave tick, `waveTellSeconds`, `timerStep` (seconds of level time + game clock per frame; null is the frame time), `timerStepMax` (a cap on that per frame: slower frames count as this much; null is none), `rideRate` (seconds of ride per second of level time; null rides the frame time), `holdLevelTime` (true holds the level timer, so no time runs out and no wave or boss comes due, while the game clock, enemies, effects and combo keep running), `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `programs()` (compiled shader programs), `cameraPose()` (position + view direction), `pointCentreColour(name)` (the linear RGBA a scene `Points`' first point blends to over opaque grey with its centre exactly on a pixel centre, in a 1×1 float target),
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/multiplier/timeScale/frenzy/timeRemaining/phase/liveEnemies/
 onScreenEnemies/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `killNearest(n)` (never a boss weak point; fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,

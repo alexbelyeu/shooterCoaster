@@ -1,6 +1,14 @@
-/** vite preview of `dist/` + headless SwiftShader Chromium (SC_CHROME), for the render scripts. */
+/** vite preview of a build + headless SwiftShader Chromium (SC_CHROME), for the smoke and the render scripts. */
 import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
+
+/** `--name value` on the command line; a bare `--name` (last, or before another flag) is 'true'; `fallback` when absent. */
+export function arg(name, fallback) {
+  const i = process.argv.indexOf(`--${name}`)
+  if (i < 0) return fallback
+  const value = process.argv[i + 1]
+  return value === undefined || value.startsWith('--') ? 'true' : value
+}
 
 const portInUse = async (url) => {
   try {
@@ -20,15 +28,18 @@ export function stopPreview(proc) {
   }
 }
 
-export async function startPreview() {
+/** Serves `dist` under `base` ('' for the site root, '/nested/path' for the portal build); `url` has no trailing slash. */
+export async function startPreview({ dist = 'dist', base = '' } = {}) {
   // Another worktree's preview on the same port would silently serve the wrong build.
-  let port, url
+  let port, origin
   for (let i = 0; i < 20; i++) {
-    port = 4900 + Math.floor(Math.random() * 500)
-    url = `http://localhost:${port}`
-    if (!(await portInUse(url))) break
+    port = 4173 + Math.floor(Math.random() * 1000)
+    origin = `http://localhost:${port}`
+    if (!(await portInUse(origin))) break
   }
-  const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], {
+  const url = `${origin}${base}`
+  // Nothing reads vite's output; an unread pipe can fill up and stall the server.
+  const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort', '--outDir', dist, '--base', `${base}/`], {
     stdio: 'ignore',
     detached: true, // own process group, for stopPreview()
   })
@@ -36,12 +47,12 @@ export async function startPreview() {
   proc.on('exit', () => (exited = true))
   for (let i = 0; i < 60 && !exited; i++) {
     try {
-      if ((await fetch(url)).ok && !exited) return { url, proc }
+      if ((await fetch(`${url}/`)).ok && !exited) return { url, proc }
     } catch {}
     await new Promise((r) => setTimeout(r, 500))
   }
   stopPreview(proc)
-  throw new Error('vite preview did not start (did you run `npm run build`?)')
+  throw new Error(`vite preview did not start (did you build ${dist}/?)`)
 }
 
 export function launchBrowser(extraArgs = []) {
