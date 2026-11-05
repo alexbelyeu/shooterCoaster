@@ -82,29 +82,23 @@
  * Browser: uses Playwright's bundled Chromium if installed; otherwise set
  * SC_CHROME=/path/to/chromium (see scripts/ensure-browser.sh for cloud sessions).
  */
-import { chromium, devices } from 'playwright'
-import { spawn } from 'node:child_process'
+import { devices } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
+import { arg, launchBrowser, startPreview, stopPreview } from '../scripts/headless.mjs'
 import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, waitFrames, waitVisible } from './pageChecks.mjs'
 import { planRun, STEP_LEVELS } from './shards.mjs'
 
-const args = Object.fromEntries(
-  process.argv.slice(2).reduce((acc, a, i, arr) => {
-    if (a.startsWith('--')) acc.push([a.slice(2), arr[i + 1]?.startsWith('--') ? 'true' : arr[i + 1] ?? 'true'])
-    return acc
-  }, []),
-)
-const SECONDS = Number(args.seconds ?? 10)
-const OUT = path.resolve(args.out ?? 'e2e-results')
-const MIN_FRAMES = Number(args['min-frames'] ?? 10)
+const SECONDS = Number(arg('seconds', 10))
+const OUT = path.resolve(arg('out', 'e2e-results'))
+const MIN_FRAMES = Number(arg('min-frames', 10))
 // 2-core SwiftShader can drop under 1 fps: a loop is stalled only if MIN_FRAMES miss this deadline.
 const FRAME_DEADLINE_MS = SECONDS * 4000
 // SwiftShader on a shared 2-core box can take >30s (Playwright's default) to produce
 // a frame for the heavier biomes; a slow screenshot is not a game bug.
-const SHOT_TIMEOUT = Number(args['shot-timeout'] ?? 120000)
-const COMBAT_SECONDS = Number(args['combat-seconds'] ?? 4)
-const COMBAT_MIN_FRAMES = Number(args['combat-min-frames'] ?? 4)
+const SHOT_TIMEOUT = Number(arg('shot-timeout', 120000))
+const COMBAT_SECONDS = Number(arg('combat-seconds', 4))
+const COMBAT_MIN_FRAMES = Number(arg('combat-min-frames', 4))
 // The level steps cap level time per frame (`timerStepMax`), so a slow runner samples the same moment of a level as a
 // fast one (#305): the ride reaches SECONDS of level time in MIN_FRAMES frames at most, and combat gains ≤ 0.25 s a
 // frame, so it never runs on into a boss (level3's Kraken is due at 40 s). Faster frames pass through unchanged.
@@ -112,19 +106,19 @@ const RIDE_STEP_MAX = SECONDS / MIN_FRAMES
 const COMBAT_STEP_MAX = 0.25
 // Seconds of ride per second of level time during the ride (`rideRate`). The game rides at most 3/60 s a frame, so on
 // software GL the ride depended on the frame count; 0.14 is CI's (~2.8 fps × 0.05 s), where the budgets were calibrated.
-const RIDE_RATE = Number(args['ride-rate'] ?? 0.14)
+const RIDE_RATE = Number(arg('ride-rate', 0.14))
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
-const SEED = Number(args.seed ?? 1337)
-const DIST = args.dist ?? 'dist'
+const SEED = Number(arg('seed', 1337))
+const DIST = arg('dist', 'dist')
 // Level the speed check rides (default: the first level in the run), e.g. a water level for the streaks over the sea.
-const SPEED_LEVEL = args['speed-level']
+const SPEED_LEVEL = arg('speed-level')
 // Path the build is served under: '/' for the site, a sub-path for the portal zip.
-const BASE_PATH = `/${(args.base ?? '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/$/, '')
+const BASE_PATH = `/${arg('base', '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/$/, '')
 let preview // module scope so the top-level catch can kill it
 const results = [] // module scope so the time-budget watchdog can write what ran
 let PLAN
 try {
-  PLAN = planRun({ shard: args.shard, steps: args.steps, levels: args.levels, mobile: args.mobile !== undefined, skipDesktop: args['skip-desktop'] !== undefined })
+  PLAN = planRun({ shard: arg('shard'), steps: arg('steps'), levels: arg('levels'), mobile: arg('mobile') !== undefined, skipDesktop: arg('skip-desktop') !== undefined })
 } catch (e) {
   console.error(`smoke: ${e.message}`)
   process.exit(2)
@@ -139,7 +133,7 @@ function collectErrors(page, errors) {
   page.on('console', (m) => {
     if (m.type() === 'error' && !ignored(m.text())) errors.push(`console: ${m.text()}`)
   })
-  if (args.url) return
+  if (arg('url')) return
   page.on('request', (r) => {
     const url = new URL(r.url())
     if (/^(https?|wss?):$/.test(url.protocol) && url.hostname !== 'localhost') errors.push(`other-origin request: ${r.url()}`)
@@ -155,65 +149,6 @@ async function fontProblems(page) {
     .filter((family) => !faces.some((f) => f.family === family && f.status === 'loaded'))
     .map((family) => `${family} font not loaded (${JSON.stringify(faces.filter((f) => f.family === family))})`)
 }
-
-const portInUse = async (url) => {
-  try {
-    await fetch(url)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/** Kill the whole `npx → sh → vite` process group (killing npx alone leaks vite). */
-function stopPreview(proc) {
-  try {
-    process.kill(-proc.pid, 'SIGTERM')
-  } catch {
-    proc.kill()
-  }
-}
-
-async function startPreview() {
-  // Never reuse a port something is already serving on: another worktree's
-  // preview would make us silently test the wrong build.
-  let port, url
-  for (let i = 0; i < 20; i++) {
-    port = 4173 + Math.floor(Math.random() * 500)
-    url = `http://localhost:${port}${BASE_PATH}`
-    if (!(await portInUse(`http://localhost:${port}`))) break
-  }
-  const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort', '--outDir', DIST, '--base', `${BASE_PATH}/`], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    // Own process group, so stopPreview() also kills the vite grandchild that
-    // npx spawns (proc.kill() alone only stops npx and leaks the server).
-    detached: true,
-  })
-  let exited = false
-  proc.on('exit', () => (exited = true))
-  for (let i = 0; i < 60 && !exited; i++) {
-    try {
-      const r = await fetch(`${url}/`)
-      if (r.ok && !exited) return { url, proc }
-    } catch {}
-    await new Promise((r) => setTimeout(r, 500))
-  }
-  stopPreview(proc)
-  throw new Error(`vite preview did not start (did you build ${DIST}/?)`)
-}
-
-async function launch() {
-  const flags = [
-    '--use-angle=swiftshader',
-    '--enable-unsafe-swiftshader',
-    '--ignore-gpu-blocklist',
-    '--autoplay-policy=no-user-gesture-required',
-    '--no-sandbox',
-  ]
-  const executablePath = process.env.SC_CHROME || undefined
-  return chromium.launch({ headless: true, executablePath, args: flags })
-}
-
 
 
 /** Re-shoots the title into `file` until its 3D scene has drawn (a cold start can show it black) or `maxMs` runs out. */
@@ -232,7 +167,7 @@ const MIN_READABLE = 2
 
 const BUDGETS = JSON.parse(fs.readFileSync(new URL('../budgets.json', import.meta.url), 'utf8'))
 const SCENE_BUDGETS = BUDGETS.scene
-const PERF_GATE = !args['no-perf-gate']
+const PERF_GATE = !arg('no-perf-gate')
 const BUDGET_KEYS = [
   ['drawCalls', 'draws'],
   ['objects', 'scene objs'],
@@ -2889,8 +2824,8 @@ async function run() {
     .filter(([s, ls]) => ls.join() !== STEP_LEVELS[s].join())
   if (drift.length) throw new Error(`STEP_LEVELS in e2e/shards.mjs disagrees with the checks: ${drift.map(([s, ls]) => `${s} runs on ${ls.join(', ')}`).join('; ')}`)
   const budget = startTimeBudget(runStarted)
-  const base = args.url ?? (preview = await startPreview()).url
-  const browser = await launch()
+  const base = arg('url') ?? (preview = await startPreview({ dist: DIST, base: BASE_PATH })).url
+  const browser = await launchBrowser(['--autoplay-policy=no-user-gesture-required'])
   let failed = false
 
   const newPage = async (query = 'e2e=1', options = {}) => {
@@ -2940,7 +2875,7 @@ async function run() {
   await t.ctx.close()
 
   // 1a. Campaign landing path; not for portal builds (--base), which portals serve at their own path.
-  if (has('landing') && !args.base) await step(() => landingPathCheck(browser, base))
+  if (has('landing') && !arg('base')) await step(() => landingPathCheck(browser, base))
 
   // 1b. Level select with saved progress + keyboard-only start
   if (has('levelSelect')) await pageStep((page) => levelSelectCheck(page, levels))
@@ -3168,18 +3103,18 @@ async function run() {
 
 /** A --shard run's smokeSeconds budget (#353): enforced on CI only, where twice the budget also stops the run before the job timeout. */
 function startTimeBudget(runStarted) {
-  if (!args.shard) return null
-  const budget = BUDGETS.smokeSeconds?.[args.shard]
-  if (!budget) throw new Error(`no smokeSeconds budget for shard ${args.shard} in budgets.json`)
+  if (!arg('shard')) return null
+  const budget = BUDGETS.smokeSeconds?.[arg('shard')]
+  if (!budget) throw new Error(`no smokeSeconds budget for shard ${arg('shard')} in budgets.json`)
   const enforced = !!process.env.CI
   const min = (s) => (s / 60).toFixed(1)
-  const annotate = (level, text) => process.env.GITHUB_ACTIONS && console.log(`::${level} title=smoke ${args.shard}::${text}`)
+  const annotate = (level, text) => process.env.GITHUB_ACTIONS && console.log(`::${level} title=smoke ${arg('shard')}::${text}`)
   if (enforced) {
     setTimeout(() => {
-      const text = `${args.shard} shard still running after ${min(2 * budget)} min, budget ${min(budget)}: stopped`
+      const text = `${arg('shard')} shard still running after ${min(2 * budget)} min, budget ${min(budget)}: stopped`
       annotate('error', text)
       console.log(`FAIL time       ${text}`)
-      results.push({ id: 'time', ok: false, problems: [text], shard: args.shard, seconds: (Date.now() - runStarted) / 1000, budget, errors: [] })
+      results.push({ id: 'time', ok: false, problems: [text], shard: arg('shard'), seconds: (Date.now() - runStarted) / 1000, budget, errors: [] })
       fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
       if (preview) stopPreview(preview.proc)
       process.exit(1)
@@ -3188,10 +3123,10 @@ function startTimeBudget(runStarted) {
   return {
     result(seconds) {
       const over = seconds > budget
-      const text = `${args.shard} shard took ${min(seconds)} min, budget ${min(budget)}`
+      const text = `${arg('shard')} shard took ${min(seconds)} min, budget ${min(budget)}`
       annotate(over ? (enforced ? 'error' : 'warning') : 'notice', text)
       const ok = !(over && enforced)
-      return { id: 'time', ok, problems: ok ? [] : [text], text: ok && over ? `${text} (over; enforced on CI only)` : text, shard: args.shard, seconds, budget, errors: [] }
+      return { id: 'time', ok, problems: ok ? [] : [text], text: ok && over ? `${text} (over; enforced on CI only)` : text, shard: arg('shard'), seconds, budget, errors: [] }
     },
   }
 }
