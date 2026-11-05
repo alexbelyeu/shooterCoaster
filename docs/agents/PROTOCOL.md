@@ -69,7 +69,7 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 | `docs/agents/decisions/inbox/` | Anyone, one new file per decision | Where every new decision entry goes. Never edit `DECISIONS.md` directly. |
 | `docs/reports/` | Reporter | Weekly reports |
 | GitHub Issues | Director creates, builders consume | The work queue |
-| GitHub Milestones | Director | The roadmap's progress bar: one milestone per VISION.md milestone (M2 = #1, M3 = #2), its issue set is what counts toward the exit criteria. REST only (`gh api repos/alexbelyeu/shootercoaster/milestones`). The Director sets the milestone on every issue it files and closes / creates milestones; builders may set it on follow-ups they file; nobody else touches it |
+| GitHub Milestones | Director | The roadmap's progress bar: one milestone per VISION.md milestone (M2 = #1, M3 = #2), its issue set is what counts toward the exit criteria. REST only (`gh api repos/alexbelyeu/shootercoaster/milestones`). The Director sets the milestone on every issue it files and closes / creates milestones; builders may set it on follow-ups they file; nobody else touches it. Progress (closed / total, due date, open P1s) shows in the status page's 🎯 Milestones section and opens the weekly report's "Next up" |
 | `budgets.json` | Director | CI-enforced budgets |
 
 ## Labels
