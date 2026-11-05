@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
-  LAVA_GOLEM_BODY_GEO, LAVA_GOLEM_HEAD_GEO, LAVA_GOLEM_ARM_GEO, LAVA_GOLEM_EYE_GEO,
+  LAVA_GOLEM_BODY_GEO, LAVA_GOLEM_CRACK_GEO, LAVA_GOLEM_ARM_GEO, LAVA_GOLEM_EYES_GEO,
   LAVA_GOLEM_BODY_MAT, LAVA_GOLEM_CRACK_MAT, LAVA_GOLEM_EYE_MAT,
 } from './SharedEnemyAssets'
 
@@ -51,18 +51,9 @@ export default function LavaGolem(props: EnemyProps) {
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group ref={modelRef} scale={[9, 9, 9]}>
         <group ref={bodyRef}>
-          {/* Main body — dark rock */}
           <mesh geometry={LAVA_GOLEM_BODY_GEO} material={LAVA_GOLEM_BODY_MAT} />
-
-          {/* Lava crack overlay — slightly larger */}
-          <mesh geometry={LAVA_GOLEM_BODY_GEO} material={LAVA_GOLEM_CRACK_MAT} scale={[1.02, 1.01, 1.02]} />
-
-          {/* Head */}
-          <mesh position={[0, 22, 0]} geometry={LAVA_GOLEM_HEAD_GEO} material={LAVA_GOLEM_BODY_MAT} />
-
-          {/* Glowing eyes */}
-          <mesh position={[-1.5, 23, 2.5]} geometry={LAVA_GOLEM_EYE_GEO} material={LAVA_GOLEM_EYE_MAT} />
-          <mesh position={[1.5, 23, 2.5]} geometry={LAVA_GOLEM_EYE_GEO} material={LAVA_GOLEM_EYE_MAT} />
+          <mesh geometry={LAVA_GOLEM_CRACK_GEO} material={LAVA_GOLEM_CRACK_MAT} />
+          <mesh geometry={LAVA_GOLEM_EYES_GEO} material={LAVA_GOLEM_EYE_MAT} />
         </group>
 
         {/* Arms */}

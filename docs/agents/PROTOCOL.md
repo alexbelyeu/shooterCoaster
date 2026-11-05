@@ -76,7 +76,7 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 
 - Queue: `agent:ready` → `agent:in-progress` → (PR) `agent:needs-qa` → `agent:qa-approved` (auto-merged by GitHub when `verify` is green), or `agent:changes-requested` → back to the builder.
 - `agent:blocked` — can't proceed; the comment says why. Director re-plans it.
-- `agent:prod-broken` — production smoke test failed (opened by the nightly workflow). Maintainer drops everything for it.
+- `agent:prod-broken` — production went red (`prod-smoke.yml`: the post-deploy health check or the nightly full smoke, one issue each, opened on the green → red transition and closed by the next green run) or `main` did (CI). Maintainer drops everything for it.
 - `steering` — an issue from Alex. Director treats it like STEERING.md.
 - Priority: `P1` (this week, do first), `P2` (this week), `P3` (if time).
 - Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`, `type:growth`.

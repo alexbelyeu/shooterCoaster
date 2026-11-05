@@ -31,7 +31,7 @@ describe('scatterSpawn', () => {
 
   it('puts water enemies over the sea when there is some', () => {
     const shore = (x: number) => (x < 0 ? -20 : 10)
-    const { surface, scatter } = ENEMY_PLACEMENT.shark
+    const { surface, scatter } = ENEMY_PLACEMENT.flyingFish
     const rng = createRng(9)
     for (let i = 0; i < 100; i++) expect(shore(scatterSpawn(scatter as ScatterBand, surface, shore, rng).x)).toBeLessThan(WATER_DEPTH)
   })

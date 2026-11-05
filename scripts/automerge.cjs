@@ -61,8 +61,12 @@ const skipComment = (reason, sha) =>
 const failComment = (message, sha) =>
   `Auto-merge failed: ${message}\nHead: \`${sha}\`. Retried every 10 minutes and after every CI run.`
 
-/** GitHub's merge API answers a conflict with "Pull Request is not mergeable". */
-const isConflictError = (message) => /not mergeable/i.test(message)
+/**
+ * GitHub's merge API answers a conflict with "Pull Request is not mergeable" or, when the
+ * PR's `mergeable` was still being computed, "Pull Request has merge conflicts" (#296 sat
+ * approved and conflicting for a day on that wording).
+ */
+const isConflictError = (message) => /not mergeable|merge conflicts?/i.test(message)
 
 // builder.md step 1 and qa.md "Light re-review" key their light path on this wording.
 const handbackComment = (sha) =>
@@ -222,6 +226,7 @@ module.exports.unionNumbers = unionNumbers
 module.exports.sweepNumbers = sweepNumbers
 module.exports.latestVerify = latestVerify
 module.exports.shouldComment = shouldComment
+module.exports.isConflictError = isConflictError
 module.exports.skipComment = skipComment
 module.exports.failComment = failComment
 module.exports.handbackComment = handbackComment

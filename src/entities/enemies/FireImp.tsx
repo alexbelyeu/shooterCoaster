@@ -4,8 +4,8 @@ import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
-  FIRE_IMP_BODY_GEO, FIRE_IMP_HORN_GEO, FIRE_IMP_TAIL_GEO,
-  FIRE_IMP_TAIL_SPIKE_GEO, FIRE_IMP_EYE_GEO,
+  FIRE_IMP_BODY_GEO, FIRE_IMP_HORNS_GEO, FIRE_IMP_TAIL_GEO,
+  FIRE_IMP_TAIL_SPIKE_GEO, FIRE_IMP_EYES_GEO,
   FIRE_IMP_BODY_MAT, FIRE_IMP_HORN_MAT, FIRE_IMP_EYE_MAT,
 } from './SharedEnemyAssets'
 
@@ -66,13 +66,8 @@ export default function FireImp(props: EnemyProps) {
           {/* Body */}
           <mesh geometry={FIRE_IMP_BODY_GEO} material={FIRE_IMP_BODY_MAT} />
 
-          {/* Horns */}
-          <mesh position={[-1.5, 9, 1]} rotation={[0.3, 0, -0.2]} geometry={FIRE_IMP_HORN_GEO} material={FIRE_IMP_HORN_MAT} />
-          <mesh position={[1.5, 9, 1]} rotation={[0.3, 0, 0.2]} geometry={FIRE_IMP_HORN_GEO} material={FIRE_IMP_HORN_MAT} />
-
-          {/* Eyes */}
-          <mesh position={[-1, 7, 2.8]} geometry={FIRE_IMP_EYE_GEO} material={FIRE_IMP_EYE_MAT} />
-          <mesh position={[1, 7, 2.8]} geometry={FIRE_IMP_EYE_GEO} material={FIRE_IMP_EYE_MAT} />
+          <mesh geometry={FIRE_IMP_HORNS_GEO} material={FIRE_IMP_HORN_MAT} />
+          <mesh geometry={FIRE_IMP_EYES_GEO} material={FIRE_IMP_EYE_MAT} />
         </group>
 
         {/* Tail with spike */}
