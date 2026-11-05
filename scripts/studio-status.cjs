@@ -237,8 +237,9 @@ async function collect(api, now) {
 
   let prodSmoke = null
   try {
-    const r = await api('GET /repos/{owner}/{repo}/actions/workflows/{workflow}/runs', { workflow: 'prod-smoke.yml', per_page: 5 })
-    prodSmoke = r.workflow_runs.find((w) => w.status === 'completed') || null
+    // Skip the runs that checked nothing: deployment_status events that skip the job, and runs superseded by a newer deploy.
+    const r = await api('GET /repos/{owner}/{repo}/actions/workflows/{workflow}/runs', { workflow: 'prod-smoke.yml', per_page: 30 })
+    prodSmoke = r.workflow_runs.find((w) => w.status === 'completed' && !['skipped', 'cancelled'].includes(w.conclusion)) || null
   } catch {
     prodSmoke = null
   }

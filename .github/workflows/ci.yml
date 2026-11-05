@@ -137,9 +137,11 @@ jobs:
           bad=$(echo "$NEEDS" | jq -r '[to_entries[] | select(.value.result != "success") | "\(.key) \(.value.result)"] | join(", ")')
           if [ -n "$bad" ]; then echo "::error title=verify::not green: $bad"; exit 1; fi
 
-      # A red main gets the same agent:prod-broken issue as a failing production smoke, so
-      # the Maintainer's revert-first rule applies. One open issue at a time: later
-      # failures comment on it. Superseded runs end `cancelled` and are not reported.
+      # A red main gets an agent:prod-broken issue like a failing production check, so the
+      # Maintainer's revert-first rule applies. One open red-main issue at a time: later
+      # failures comment on it. The production suites' issues (marked `prod-smoke:<suite>`,
+      # scripts/prod-alert.cjs) are left alone: they close themselves when prod is green.
+      # Superseded runs end `cancelled` and are not reported.
       - name: Report a red main
         if: failure() && github.ref == 'refs/heads/main'
         uses: actions/github-script@v7
@@ -151,8 +153,9 @@ jobs:
             const open = await github.rest.issues.listForRepo({
               ...context.repo, state: 'open', labels: 'agent:prod-broken',
             })
-            if (open.data.length) {
-              await github.rest.issues.createComment({ ...context.repo, issue_number: open.data[0].number, body })
+            const redMain = open.data.find((i) => !/<!-- prod-smoke:\w+ -->/.test(i.body || ''))
+            if (redMain) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: redMain.number, body })
             } else {
               await github.rest.issues.create({
                 ...context.repo,

@@ -11,33 +11,35 @@ import {
   SHARK_BELLY_MAT, SHARK_EYE_MAT, SHARK_MOUTH_MAT, SHARK_TOOTH_MAT,
 } from './SharedEnemyAssets'
 
-/**
- * Overhauled shark: LatheGeometry torpedo body, custom swept-back fins,
- * crescent tail with sway animation, teeth, gill slits.
- * Always faces the camera for menacing presence.
- */
+/** Lathe torpedo body, swept-back fins, crescent tail, teeth and gills; always faces the camera. */
 export default function Shark(props: EnemyProps) {
-  const theta = useMemo(() => Math.random() * Math.PI + 0.3, [])
+  // A circle through the spawn point, small enough to stay beside the track it was placed by (#316).
+  const orbit = useMemo(() => ({
+    radius: 25 + Math.random() * 35,
+    rate: (0.4 + Math.random() * 0.4) * (Math.random() < 0.5 ? -1 : 1),
+    phase: Math.random() * Math.PI * 2,
+  }), [])
+  const startTime = useRef<number | null>(null)
   const tailRef = useRef<THREE.Group>(null)
   const modelRef = useRef<THREE.Group>(null)
   const camera = useThree((s) => s.camera)
 
   const updatePosition = useCallback(
-    (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
-      const dt = delta * 60
-      mesh.position.z += ((3 * Math.cos(time * theta)) / theta) * dt
-      mesh.position.x += ((3 * Math.sin(time * theta)) / theta) * dt
+    (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
+      startTime.current ??= time
+      const { radius, rate, phase } = orbit
+      const a = phase + rate * (time - startTime.current)
+      mesh.position.x = spawnPos.x + radius * (Math.cos(a) - Math.cos(phase))
+      mesh.position.z = spawnPos.z + radius * (Math.sin(a) - Math.sin(phase))
       mesh.position.y = 2
 
-      // Tail sway
       if (tailRef.current) {
         tailRef.current.rotation.y = Math.sin(time * 4) * 0.3
       }
     },
-    [theta],
+    [orbit],
   )
 
-  // Face the camera each frame
   useFrame(() => {
     if (!modelRef.current?.parent) return
     const parent = modelRef.current.parent
@@ -66,7 +68,6 @@ export default function Shark(props: EnemyProps) {
           scale={[0.85, 0.85, 0.55]}
         />
 
-        {/* Snout */}
         <mesh
           position={[0, -0.3, 5.5]}
           geometry={SHARK_SNOUT_GEO}
@@ -87,7 +88,6 @@ export default function Shark(props: EnemyProps) {
           <mesh geometry={SHARK_TAIL_LOWER_GEO} material={SHARK_FIN_MAT} scale={[1, 1, 1]} />
         </group>
 
-        {/* Left pectoral fin */}
         <mesh
           position={[-2.5, -0.8, 2]}
           geometry={SHARK_PECTORAL_GEO}
@@ -95,7 +95,6 @@ export default function Shark(props: EnemyProps) {
           rotation={[0.1, 0.2, -0.3]}
           scale={[-1, 1, 1]}
         />
-        {/* Right pectoral fin */}
         <mesh
           position={[2.5, -0.8, 2]}
           geometry={SHARK_PECTORAL_GEO}
@@ -107,7 +106,6 @@ export default function Shark(props: EnemyProps) {
         <mesh position={[-1.8, 0.8, 4.5]} geometry={SHARK_EYE_GEO} material={SHARK_EYE_MAT} />
         <mesh position={[1.8, 0.8, 4.5]} geometry={SHARK_EYE_GEO} material={SHARK_EYE_MAT} />
 
-        {/* Mouth line */}
         <mesh position={[0, -1.2, 5]} geometry={SHARK_MOUTH_GEO} material={SHARK_MOUTH_MAT} />
 
         {/* Teeth — row of small cones along the mouth */}

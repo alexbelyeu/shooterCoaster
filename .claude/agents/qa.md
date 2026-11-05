@@ -29,7 +29,7 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
    `git diff --name-only origin/main...HEAD`. Only if they overlap, merge `origin/main`
    into it **locally** (don't push: GitHub merges approved PRs that are behind as long as
    they don't conflict) and test that result. A conflict means request changes. No overlap:
-   CI plus the production smoke after the merge cover it.
+   CI plus the production checks after the merge cover it.
 3. **Playtest only what the diff touches.** `export SC_CHROME="$(scripts/ensure-browser.sh)"` once.
    - Docs-only (every file a `*.md` or under `docs/`): no build, no smoke.
    - Agent tooling only (`scripts/` other than the smoke, `.claude/`, `.github/`, docs):

@@ -177,7 +177,7 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 2. `src/entities/enemies/SharedEnemyAssets.ts` — geometry + material singletons (with specular/iridescence)
 3. `src/entities/enemies/NewEnemy.tsx` — R3F component using `<EnemyBase>` wrapper
 4. `src/entities/enemies/enemyReadability.ts` — add `ENEMY_SILHOUETTE` (world-unit size after scale; drives the ≥12 px readable-spawn rule)
-5. `src/entities/spawning/enemyPlacement.ts` — add its `ENEMY_PLACEMENT` rule, the one table of per-enemy placement: `surface` (`air` / `ground` / `water`, what formations settle it on; water uses `WATER_Y`) and `scatter`: a band (radius from the origin, height above the terrain or the water) for scatter waves, or `'trackside'` for a ground enemy that should stand beside the ride (seeded slots 700–2200 arc units ahead of the rider, 60–400 to the side, placed on `groundFn` when the wave activates)
+5. `src/entities/spawning/enemyPlacement.ts` — add its `ENEMY_PLACEMENT` rule, the one table of per-enemy placement: `surface` (`air` / `ground` / `water`, what formations settle it on; water uses `WATER_Y`) and `scatter`: a band (radius from the origin, height above the terrain or the water) for scatter waves, or `'trackside'` for a ground or sea enemy that should stand (or float) beside the ride (seeded slots 60–400 to the side, 700–2200 arc units ahead of the rider on the ground, 300–3600 on water: `TRACKSIDE` in `spawnPlacement.ts`; placed when the wave activates, on `groundFn`, or at `WATER_Y` on the nearest sea within the band that is in view on its approach; half of a water wave lands within 1500 ahead so it is on screen as it arrives). A trackside wave covers the ride until its next wave, so size the band to the level's ride speed (Ocean ~250 units/s) and wave gaps, not to the view distance alone
 6. `src/levels/scoring.ts` — add its score to `SCORE_VALUES`
 7. `src/entities/spawning/EnemySpawner.tsx` — ALL of:
    - Import the component
@@ -209,6 +209,7 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 | Grounded object floats / sinks on ridged terrain | Placed on `heightFn`, but the drawn mesh is linear between grid vertices (up to ~55 units off on Arctic) | Sample `createTerrainSurface(heightFn, getTerrainMeshSize(biome))` for things that must touch the visible ground (see `src/track/supportTowers.ts`) |
 | Prop or ride intersects the track or a support tower | Placed by radius from the origin, ignoring the track | Plan positions against `buildTrackIndex(track)` (2D clearance) and unit-test them, as `themePark/layout.test.ts` does |
 | Level blows its draw-call budget | One `<mesh>` per prop part (a Ferris wheel was 88 draws) | InstancedMesh per part, or `paintedParts.ts` to merge a multi-coloured prop into one geometry |
+| A wave blows the draw-call budget | One `<mesh>` per enemy part × 25+ enemies on screen (Arctic scouts were 12 draws each, 393 for the level) | Merge the parts that share a material and move together with `placedParts` in `SharedEnemyAssets.ts`; only animated parts stay separate meshes |
 | Terrain holes/spikes | Missing noise config | Add entry to terrainNoise.ts |
 | No music plays | Missing MusicManager entry | Add biome config to CONFIGS record |
 | Enemies don't spawn | Missing spawner registration | Check all 4 spawner touchpoints |

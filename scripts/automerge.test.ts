@@ -203,6 +203,18 @@ describe('runGate', () => {
     expect(later.writes).toEqual([])
   })
 
+  it('hands back on either wording of the merge API\'s conflict answer', async () => {
+    expect(gate.isConflictError('Pull Request is not mergeable')).toBe(true)
+    expect(gate.isConflictError('Pull Request has merge conflicts')).toBe(true)
+    expect(gate.isConflictError('Head branch was modified. Review and try the merge again.')).toBe(false)
+    const f = fakeApi({
+      prs: [pr(7)], verify: { [`${SHA}7`]: green },
+      fail: (route) => (route === MERGE ? 'Pull Request has merge conflicts' : undefined),
+    })
+    await run(f, 'schedule')
+    expect(f.writes.map((w) => w.route)).toEqual([MERGE, COMMENT, ADD_LABEL, REMOVE_LABEL])
+  })
+
   it('hands back a PR GitHub already marks conflicting without waiting for verify', async () => {
     const f = fakeApi({ prs: [pr(7, { mergeable: false })] })
     await run(f, 'schedule')

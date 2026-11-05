@@ -14,7 +14,7 @@
     "mobile": 600
   },
   "scene": {
-    "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands.",
+    "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31; level4 and level5 hold the VISION bar of 250, #260), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands.",
     "level1": {
       "drawCalls": 101,
       "objects": 179,
@@ -37,14 +37,14 @@
       "trackTriangles": 98353
     },
     "level4": {
-      "drawCalls": 472,
+      "drawCalls": 250,
       "objects": 551,
       "triangles": 246321,
       "trackObjects": 12,
       "trackTriangles": 90952
     },
     "level5": {
-      "drawCalls": 353,
+      "drawCalls": 250,
       "objects": 319,
       "triangles": 170739,
       "trackObjects": 12,
