@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import {
   buildShareText,
   buildShareUrl,
   canCopy,
+  canCopyImage,
+  canShareImage,
   clipboardText,
+  copyImage,
   copyShare,
   nativeShare,
   SHARE_TARGETS,
@@ -143,5 +146,52 @@ describe('sharing', () => {
     expect(await nativeShare({}, payload)).toBe('failed')
     expect(await copyShare({ clipboard: { writeText: rejecting('no focus') } }, payload)).toBe(false)
     expect(await copyShare({}, payload)).toBe(false)
+  })
+})
+
+describe('sharing the score card image', () => {
+  const share = async () => {}
+
+  it('offers the image to the share sheet only where canShare takes a PNG', () => {
+    let asked: ShareData | undefined
+    expect(canShareImage({ share, canShare: (d) => ((asked = d), true) })).toBe(true)
+    expect(asked?.files?.[0]).toMatchObject({ name: 'card.png', type: 'image/png' })
+    expect(canShareImage({ share, canShare: () => false })).toBe(false)
+    expect(canShareImage({ share })).toBe(false)
+    expect(canShareImage({ canShare: () => true })).toBe(false)
+    const throwing = () => {
+      throw new TypeError('files')
+    }
+    expect(canShareImage({ share, canShare: throwing })).toBe(false)
+    expect(canShareImage(undefined)).toBe(false)
+  })
+
+  it('offers Copy image only with ClipboardItem and clipboard.write', () => {
+    const write = async () => {}
+    expect(canCopyImage({ clipboard: { write } }, true)).toBe(true)
+    expect(canCopyImage({ clipboard: { write } }, false)).toBe(false)
+    expect(canCopyImage({ clipboard: {} }, true)).toBe(false)
+  })
+
+  it('writes the PNG as one clipboard item, never throwing', async () => {
+    class FakeItem {
+      constructor(readonly items: Record<string, Promise<Blob>>) {}
+    }
+    vi.stubGlobal('ClipboardItem', FakeItem)
+    try {
+      let written: unknown[] = []
+      const png = Promise.resolve(new Blob(['x'], { type: 'image/png' }))
+      expect(await copyImage({ clipboard: { write: async (items) => void (written = items) } }, png)).toBe(true)
+      expect(written).toHaveLength(1)
+      expect((written[0] as FakeItem).items['image/png']).toBe(png)
+      expect(await copyImage({ clipboard: { write: () => Promise.reject(new Error('denied')) } }, png)).toBe(false)
+      expect(await copyImage({}, png)).toBe(false)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('tags each image share with its own campaign', () => {
+    expect(sharePayloadForRun('level1', 1240, 'image_native')!.url).toBe(buildShareUrl('share_image_native'))
   })
 })

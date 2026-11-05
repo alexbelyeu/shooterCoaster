@@ -99,14 +99,20 @@ const SCENES: Record<BiomeType, Scene> = {
   ),
 }
 
+/** The landmark art alone, on a transparent ground; the score card (#272) draws it as an image at `width` × `height`. */
+export function PostcardArt({ biome, width, height }: { biome: BiomeType; width?: number; height?: number }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" width={width} height={height} preserveAspectRatio="xMidYMax slice">
+      {SCENES[biome](biomeTheme(biome))}
+    </svg>
+  )
+}
+
 /** Tiny inline-SVG "postcard" of a biome's hero landmark on its sky gradient. */
 export default function LevelPostcard({ biome }: { biome: BiomeType }) {
-  const theme = biomeTheme(biome)
   return (
-    <div className="level-postcard" style={{ background: theme.bg }} aria-hidden="true">
-      <svg viewBox="0 0 200 100" preserveAspectRatio="xMidYMax slice">
-        {SCENES[biome](theme)}
-      </svg>
+    <div className="level-postcard" style={{ background: biomeTheme(biome).bg }} aria-hidden="true">
+      <PostcardArt biome={biome} />
     </div>
   )
 }

@@ -31,8 +31,9 @@ export const SHARE_TARGETS = [
 ] as const
 
 export type ShareTargetId = (typeof SHARE_TARGETS)[number]['id']
-/** How a share went out: the phone's share sheet, Copy link, or a network link. The analytics `share` event's `method`. */
-export type ShareMethod = 'native' | 'copy' | ShareTargetId
+export type ImageShareMethod = 'image_native' | 'image_download' | 'image_copy'
+/** How a share went out: the phone's share sheet, Copy link, a network link, or the score card image (#272). The analytics `share` event's `method`. */
+export type ShareMethod = 'native' | 'copy' | ShareTargetId | ImageShareMethod
 
 export function buildShareUrl(campaign: string): string {
   const query = new URLSearchParams({ utm_source: 'share', utm_medium: 'organic', utm_campaign: campaign })
@@ -125,7 +126,32 @@ export function xPostLength(text: string): number {
 export interface ShareNavigator {
   share?: (data: ShareData) => Promise<void>
   canShare?: (data: ShareData) => boolean
-  clipboard?: { writeText?: (text: string) => Promise<void> }
+  clipboard?: { writeText?: (text: string) => Promise<void>; write?: (items: ClipboardItem[]) => Promise<void> }
+}
+
+/** Whether the share sheet takes a PNG (`canShare({ files })`): asked with an empty stand-in, before the card is drawn. */
+export function canShareImage(nav: ShareNavigator | undefined): boolean {
+  if (typeof nav?.share !== 'function' || typeof nav.canShare !== 'function') return false
+  try {
+    return nav.canShare({ files: [new File([], 'card.png', { type: 'image/png' })] })
+  } catch {
+    return false
+  }
+}
+
+export function canCopyImage(nav: ShareNavigator | undefined, hasClipboardItem = typeof ClipboardItem === 'function'): boolean {
+  return hasClipboardItem && typeof nav?.clipboard?.write === 'function'
+}
+
+/** Takes the PNG promise, not the blob, so the write starts inside the click (Safari refuses it after the gesture). Never throws. */
+export async function copyImage(nav: ShareNavigator | undefined, png: Promise<Blob>): Promise<boolean> {
+  try {
+    if (!nav?.clipboard?.write) return false
+    await nav.clipboard.write([new ClipboardItem({ 'image/png': png })])
+    return true
+  } catch {
+    return false
+  }
 }
 
 function canNativeShare(nav: ShareNavigator | undefined, payload: SharePayload): boolean {
@@ -142,7 +168,7 @@ export function shareMode(nav: ShareNavigator | undefined, coarsePointer: boolea
 }
 
 /** `failed` means the menu should open instead; a dismissed sheet is `cancelled`. Never throws. */
-export async function nativeShare(nav: ShareNavigator | undefined, payload: SharePayload): Promise<'shared' | 'cancelled' | 'failed'> {
+export async function nativeShare(nav: ShareNavigator | undefined, payload: SharePayload & { files?: File[] }): Promise<'shared' | 'cancelled' | 'failed'> {
   try {
     if (!nav?.share) return 'failed'
     await nav.share(payload)
