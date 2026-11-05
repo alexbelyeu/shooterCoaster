@@ -1451,3 +1451,84 @@ kill bodies come down 1 dB (−3 dB, the hiss −4 dB), so the edges, which alre
 **Consequences:** Every kill clears the music by ≥ 6.7 dB in the level1 mix (seeds 1–3: 6.7 / 6.8 / 6.9), true peak
 stays at −1.0 dBTP and short-term max at −13.0 LUFS, the top of its −15…−13 range. Centred hits are up to 3 dB louder
 than before. The SFX sheet renders sounds unplaced, so it shows each sound 1 dB under the mix's centred kills.
+
+## 2026-11-02 — Enemies: one mesh per material and moving part (Builder, #260)
+
+**Context:** Formation and ground-scatter waves put 25–40 enemies of one type on screen at once. With one `<mesh>` per part (eyes, smile dots, buttons, shards, tendrils), Arctic drew 393 calls and Inferno ~290, over the VISION bar of 250.
+**Decision:** In `SharedEnemyAssets.ts`, parts that share a material and move together are baked into one module-level geometry with `placedParts` (positions, rotations and scales as the meshes had them). Only parts with their own animation stay separate meshes (snowman arms, imp tail, golem arms, wisp core pulse). The ember wisp's six tendrils now flicker as one crown instead of each on its own. `budgets.json` holds level4 / level5 at 250 draw calls.
+**Consequences:** New enemy models should follow the same rule; a new per-part animation means splitting that part back out deliberately. Hit flash and the warm-up are unaffected (they walk meshes and module exports).
+
+## 2026-11-02 — The smoke's level steps run on capped level time and a paced ride (builder, #305)
+
+**Context:** The level steps sampled the ride stats and the perf gate after 10 s of wall time, while the level timer
+advanced by the raw frame delta and the coaster by at most 3/60 s a frame. On a 2-core runner (~2.8 s frames) the
+level was ~20 s in when sampled, later waves were on screen (`scene objs` over budget), and level3 reached its Kraken
+during combat; main went red without a code change. The ride, bound to the frame count, also left level3 with one
+readable enemy on slow boxes (#250).
+
+**Decision:** The level steps set `__SC_TEST__.timerStepMax` (a per-frame cap on level time + game clock; faster
+frames pass through): `--seconds / --min-frames` on the ride, which stops at `--seconds` of *level* time with game
+time frozen for the stats, shot and enemy probe; 0.25 s in combat. During the ride `rideRate` 0.14 rides that share
+of the level time (CI's ~2.8 fps × 0.05 s, where the budgets were set). The perf gate keeps counting enemies and the
+budgets are unchanged. The readability probe samples the same moment; before this it ran a frame or more after the
+stats, past the 15 s second waves on CI, which hid that level3 shows one readable enemy at 10 s from this track point (#250). `hidden-pause`'s wave slack is 1 s (whole-second timer store) + 2 × the longest frame since
+Resume, not a fixed 3 s.
+
+**Consequences:** Don't go back to wall-clock waits for level checks: the budgets and readability gate assume that
+moment and track point. Players keep the frame-delta timer and ride (`levelTimeStep` / `e2eRideSeconds` only act
+under `?e2e=1` with the knobs set). If CI's runners get much faster, its natural ride no longer matches 0.14, which
+is fine: the smoke now sets it.
+
+**Addendum (2026-11-04, Alex's chat):** The cap alone still let level time advance through the combat checks, so on
+a slow runner a level could time out (or its boss surface) before the leaderboard and kill checks, which failed
+docs-only PRs (`leaderboard: run ranked 0`, `kill used the bossPart death effect`, `fireShot() fired nothing`). The
+level steps now also set `holdLevelTime` for the combat checks: the level timer stops while the game clock, enemies,
+effects and combo run on, and the step releases it in the turn it ends the level. The readability gate needs an enemy
+on screen and min(2, on screen) of them readable, so one readable enemy of one passes (#250).
+
+## 2026-11-02 — Sea enemies float beside the track, in a band sized to the ride (Builder, #316)
+
+**Context:** Ocean's jellyfish and sharks were scattered over a 1,100-unit disc around the origin, so the
+first 10–15 s of the level showed an empty sea (#250). The ground trackside band (700–2200 arc units
+ahead, #179) does not fit the Ocean: its ride averages ~250 units/s, so a wave placed 700–2200 ahead is
+behind the rider within ~9 s, and its tight turns put much of that band behind the rider in plan.
+
+**Decision:** `jellyfish` and `shark` use `'trackside'` placement on the water. `TRACKSIDE` has a band per
+surface: ground stays 700–2200 ahead, water is 300–3600 ahead (60–400 to the side for both), about the
+ride between Ocean's waves, so a wave stays in view until the next one lands. Half of each water wave
+is drawn within 1500 ahead (`near` in the band), so the wave is on screen as it arrives: spread evenly
+over 300–3600, at most 3 of the 20 opening jellyfish were ever in frame, and CI's readability gate
+failed. A water slot searches across the track, then nearer or further within the band, for a point
+over the sea that is in view on its approach: inside the formation anchors' 40° cone and within the
+type's readable distance (`maxReadableDistance`) from the rider 1100 arc units before it (or at
+activation) and 400 further on; failing that, the first point over the sea. With ~10 jellyfish in view
+at once, a jellyfish's 7 draw calls (bell, core, five tentacles) took level3 to 131 draws (budget 89),
+so its bell and tentacles are one merged geometry (2 draws with the glowing core; the whole bell rocks
+instead of each tentacle swaying): 81 draws at the smoke's ride sample. Sharks
+circle a 25–60-unit orbit through their spawn point instead of drifting (their old drift had radii up
+to ~2,000 units). Ocean gets a second jellyfish wave (12, at 28 s) so the stretch before the flying
+fish and the Kraken isn't empty; `maxScore` 2045 → 2261.
+
+**Consequences:** A trackside band is about how far the rider travels while the wave is live, not just
+view distance: re-check it when a level's speed or wave gaps change. Water slots are always over the
+sea when there is sea within the band. `spawnPlacement.test.ts` checks level3's opening (ride t
+0–0.025, the smoke's ride sample at any runner speed) keeps ≥ 4 readable jellyfish in view at seed 1337
+and ≥ 2 (the smoke gate) at seeds 1–20. The trackside unit test now checks each enemy is in front of
+the rider on the approach (600 arc units before it), not at placement time.
+
+## 2026-11-03 — Production: a deploy health check, the full smoke nightly, alerts on transitions (Builder, #352)
+
+**Context:** The post-deploy production run replayed the whole smoke against scoaster.com. Its runtime crept past its cap
+(1465 → 1932 s), so every deploy "failed" with no failed check and emailed Alex through #297.
+**Decision:** After a deploy, `e2e/prod-check.mjs` checks only that the deploy arrived intact (every built file served with
+its headers, routes, title, one level to a kill, a phone run; ~3 min, 8 min cap). The full smoke runs against prod nightly
+(60 min cap). Both run under `timeout`, so a slow run is a reported timeout, and a deploy run superseded by a newer deploy
+is cancelled and says nothing. `scripts/prod-alert.cjs` keeps one `agent:prod-broken` issue per suite and uses it as the
+state: it opens on green → red, stays silent while open and closes on the next green run. Choices that look arbitrary:
+- The deploy check's kills go through `killNearest` (the bullet pool's hit path). Whether a tapped bullet lands depends on
+  the software frame rate, and the nightly smoke and `verify` already gate touch aim assist.
+- The files to expect come from a local `VERCEL=1` build of the deployed commit, matched to the deployed files by name
+  without the hash, because Vercel's hashes can differ.
+- CI's red-`main` report never comments on a production suite's issue, because that issue closes itself when prod goes green.
+**Consequences:** A green → red change sends one email per outage. A timeout says "no check failed". The full suite still
+catches CDN / runtime drift within a day. Don't move the full smoke back onto `deployment_status`, and don't just raise the cap.
