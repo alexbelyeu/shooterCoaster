@@ -44,7 +44,13 @@ Read first: `CLAUDE.md`, `docs/agents/PROTOCOL.md`, `docs/agents/VISION.md`,
 9. **Token use** — approximate weighted tokens: per role (runs, total) and per merged PR
    (table, most expensive first). Flag the top 3 PRs and say why they cost what they
    did (rounds sent back, size, long verify loops), plus the week-over-week trend.
-10. **Next up** — the top `agent:ready` issues and roadmap milestone in progress.
+10. **Next up** — opens with one line per open milestone, the same numbers as the status
+   page's 🎯 Milestones section: title, `closed / (open + closed)` issues with the percentage,
+   due date and days left, and its open P1 issues as links. Read them over REST:
+   `gh api 'repos/alexbelyeu/shootercoaster/milestones?state=open'` (`open_issues`,
+   `closed_issues`, `due_on`; soonest due first) and, per milestone,
+   `gh api 'repos/alexbelyeu/shootercoaster/issues?state=open&milestone=<number>&labels=P1'`
+   (skip entries with `pull_request`). Then the top `agent:ready` issues.
 11. **Steer me** — remind Alex he can edit `docs/agents/STEERING.md` or open an issue
    labelled `steering`, and that `pause: true` stops everything.
 
@@ -67,7 +73,7 @@ Write the body for a phone screen:
    (and any open `Listen:` issues: links to the renders waiting for his pick)
 4. Health in one line (PRs merged / sent back / reverted, bundle KB vs budget, smoke status)
    and tokens in one line (week total, most expensive PR)
-5. Next up (top 3 issues)
+5. Next up (the milestone line(s), then the top 3 issues)
 6. Link to the report PR — screenshots are in its "Files changed" tab; once QA merges it
    the full report lives at `docs/reports/<YYYY>-W<ww>.md`
 
