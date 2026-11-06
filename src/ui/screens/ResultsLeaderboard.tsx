@@ -9,13 +9,15 @@ const fmt = new Intl.NumberFormat('en-US')
 interface Props {
   board: readonly LeaderboardEntry[]
   rank: number | null
+  /** The online top 10 or this browser's own. */
+  source: 'world' | 'device'
   editing: InitialsState | null
   onKey: (key: string) => void
   onSlot: (slot: number) => void
 }
 
-/** Local top 10 on the results screen; the run's row takes arcade initials (keys from ResultsScreen, buttons here for touch). */
-export default function ResultsLeaderboard({ board, rank, editing, onKey, onSlot }: Props) {
+/** The level's top 10 on the results screen, online or local; the run's local row takes arcade initials (keys from ResultsScreen, buttons here for touch). */
+export default function ResultsLeaderboard({ board, rank, source, editing, onKey, onSlot }: Props) {
   const rootRef = useRef<HTMLDivElement>(null)
   const isEditing = editing !== null
 
@@ -33,8 +35,17 @@ export default function ResultsLeaderboard({ board, rank, editing, onKey, onSlot
   )
 
   return (
-    <div ref={rootRef} className="results-board" data-rank={rank ?? undefined} data-editing={isEditing || undefined}>
-      <h3>{rank !== null ? `New high score · #${rank + 1}` : 'Top 10'}</h3>
+    <div
+      ref={rootRef}
+      className="results-board"
+      data-rank={rank ?? undefined}
+      data-source={source}
+      data-editing={isEditing || undefined}
+    >
+      <h3>
+        {rank !== null ? `New high score · #${rank + 1}` : 'Top 10'}
+        <span className="results-board-source">{source === 'world' ? 'World' : 'This device'}</span>
+      </h3>
       {board.length === 0 ? (
         <p className="results-board-empty">No scores yet</p>
       ) : (

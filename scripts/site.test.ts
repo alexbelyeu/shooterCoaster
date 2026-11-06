@@ -60,6 +60,19 @@ describe('vercel.json routing', () => {
     expect(files.has('/404.html')).toBe(true)
   })
 
+  it('sends /api/leaderboard to its function, and every api/ entry is listed in vercel.json', () => {
+    expect(route('/api/leaderboard', files)).toEqual({ fn: 'api/leaderboard.ts' })
+    for (const p of ['/api/leaderboard/x', '/api/_lib/rules', '/api/leaderboard.ts']) expect(route(p, files).status).toBe(404)
+    const entries = fs
+      .readdirSync(path.join(root, 'api'))
+      .filter((f) => /\.ts$/.test(f) && !f.startsWith('_'))
+      .map((f) => `api/${f}`)
+    expect(Object.keys(vercel.functions).sort()).toEqual(entries.sort())
+    const h = headersFor('/api/leaderboard')
+    expect(h['X-Content-Type-Options']).toBe('nosniff')
+    expect(h['Cache-Control']).toBeUndefined()
+  })
+
   it('serves the crawl and share files as themselves', () => {
     for (const p of ['/robots.txt', '/sitemap.xml', '/site.webmanifest', '/favicon.ico', '/social/og-1200x630.jpg']) {
       expect(route(p, files).serves).toBe(p)

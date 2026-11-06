@@ -50,3 +50,7 @@ tsconfig.tsbuildinfo
 
 # Agent / test output
 e2e-results/
+
+# Local secrets (names only in .env.example)
+.env
+.env*.local

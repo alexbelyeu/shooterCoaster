@@ -1454,6 +1454,25 @@ canvas {
   color: rgba(255, 255, 255, 0.6);
 }
 
+/* "World" / "This device": beside the title, or whole on the next line when they don't fit. */
+.results-board h3 {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.2em 0.5em;
+}
+
+.results-board-source {
+  padding: 0.05em 0.45em;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.8em;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
 .results-board[data-rank] h3 {
   color: var(--accent);
   text-shadow: 0 0 10px var(--accent-glow);

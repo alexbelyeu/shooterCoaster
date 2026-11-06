@@ -303,7 +303,7 @@ async function pollUntil(page, check, { ms, frames = MIN_FRAMES, pollMs = 500 })
  * (Theme Park) the 15+ streak's firework burst, held on screen. The kill's death effect
  * (its enemy type's style, not the default fireball) must be live in the shot.
  */
-async function playLevel(page, id, { frenzy = false, leaderboard = false } = {}) {
+async function playLevel(page, id, { frenzy = false, leaderboard = false, online = null } = {}) {
   const problems = []
   // Hold the level timer for every check below (the game clock still runs): however long they take on a slow runner,
   // the run can't time out and no wave or boss comes due under them. Released in the turn that ends the level.
@@ -418,7 +418,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false } = {})
 
   // With `leaderboard`, seed nine entries so this run places 4th, in the same turn as the end so the score can't move.
   const seeding = await page.evaluate(
-    ([lid, seed]) => {
+    ([lid, seed, endpoint]) => {
       const t = window.__SC_TEST__
       t.holdLevelTime = false
       const phase = t.phase()
@@ -427,6 +427,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false } = {})
       const seeded = seed && score > 0
       const above = [3000, 2000, 1000].map((d) => score + d)
       if (seeded) {
+        if (endpoint) t.onlineBoard(endpoint)
         const below = [0.6, 0.5, 0.4, 0.3, 0.2, 0.1].map((f) => Math.max(1, Math.floor(score * f)))
         const row = (s, i) => ({ initials: 'CPU', score: s, stars: 1, date: i + 1 })
         t.setLeaderboards({ [lid]: [...above, ...below].map(row) }, 'AAA')
@@ -434,7 +435,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false } = {})
       t.endLevel()
       return { phase, rank: seeded ? above.length : null }
     },
-    [id, leaderboard],
+    [id, leaderboard, online ? ONLINE_ENDPOINT : null],
   )
   // With the level timer held this can't happen; if it does, say so instead of failing the board checks on it.
   if (seeding.phase !== 'playing') problems.push(`level left play (${seeding.phase}) before the results checks, with the level timer held`)
@@ -459,7 +460,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false } = {})
   const results = await resultsScreenProblems(page, id, end)
   problems.push(...results.problems)
   if (seededRank !== null) {
-    const entry = await leaderboardEntryProblems(page, id, seededRank)
+    const entry = await leaderboardEntryProblems(page, id, seededRank, online, Math.round(end.score))
     problems.push(...entry.problems)
     results.screen.entry = entry.result
   }
@@ -679,8 +680,65 @@ async function resultsScreenProblems(page, id, stats) {
 // R is the replay key and S the mute key outside the entry: both must stay letters in it.
 const INITIALS_KEYS = ['ArrowUp', 'r', 'e', 's']
 
+const ONLINE_ENDPOINT = '/api/leaderboard'
+const ONLINE_TOP = Array.from({ length: 10 }, (_, i) => ({ initials: 'WEB', score: 90000 - i * 1000, at: '2026-11-05T12:00:00.000Z' }))
+
+/**
+ * The online board's API (#365), stubbed: the smoke never calls the real one. GET answers ONLINE_TOP; POST records the
+ * run and places it 2nd. The results screen uses it only while `__SC_TEST__.onlineBoard(ONLINE_ENDPOINT)` is set.
+ */
+async function stubOnlineBoard(page) {
+  const posts = []
+  const gets = []
+  await page.route((url) => url.pathname === ONLINE_ENDPOINT, (route) => {
+    const req = route.request()
+    if (req.method() !== 'POST') {
+      gets.push(new URL(req.url()).searchParams.get('level'))
+      return route.fulfill({ json: { top: ONLINE_TOP } })
+    }
+    const run = req.postDataJSON()
+    posts.push(run)
+    const mine = { initials: run.initials, score: run.score, at: new Date().toISOString() }
+    return route.fulfill({ json: { rank: 2, top: [ONLINE_TOP[0], mine, ...ONLINE_TOP.slice(1, 9)] } })
+  })
+  return { posts, gets }
+}
+
+const readBoard = (page) => page.evaluate(() => {
+  const b = document.querySelector('.results-board')
+  return {
+    source: b?.dataset.source ?? null,
+    label: b?.querySelector('.results-board-source')?.textContent ?? null,
+    rank: b?.dataset.rank ?? null,
+    rows: b?.querySelectorAll('li').length ?? 0,
+    mine: b?.querySelector('li.is-new .results-board-initials')?.textContent ?? null,
+  }
+})
+
+/** After the entry closes the run goes online once, and the board turns to the World top 10 with it 2nd (the stub's rank). */
+async function onlineSubmitProblems(page, id, online, score) {
+  const problems = []
+  const world = await page
+    .waitForFunction(() => document.querySelector('.results-board')?.dataset.source === 'world', null, { timeout: 8000, polling: 50 })
+    .then(() => true, () => false)
+  const board = await readBoard(page)
+  await page.screenshot({ path: path.join(OUT, `${id}-results-world.png`), timeout: SHOT_TIMEOUT })
+  await page.evaluate(() => window.__SC_TEST__.onlineBoard(null))
+  const [run, ...extra] = online.posts
+  if (!run) return { problems: ['online board: the placing run was never submitted'], result: { board } }
+  if (extra.length) problems.push(`online board: ${online.posts.length} submissions, expected 1`)
+  if (run.level !== id || run.initials !== 'RES' || run.score !== score) problems.push(`online board: submitted ${JSON.stringify(run)}, expected ${id} RES ${score}`)
+  if (!(run.kills > 0) || !(run.accuracy >= 0 && run.accuracy <= 1) || !Number.isInteger(run.seed) || typeof run.version !== 'string')
+    problems.push(`online board: submission fields ${JSON.stringify(run)}`)
+  if (online.gets.length) problems.push(`online board: a placing run fetched the board (${online.gets.length}×) instead of only submitting`)
+  if (!world) problems.push('online board: never switched to the World board after the submission')
+  else if (board.label !== 'World' || board.rank !== '1' || board.mine !== 'RES' || board.rows !== 10)
+    problems.push(`online board: shows ${JSON.stringify(board)}, expected World with RES 2nd of 10`)
+  return { problems, result: { submitted: run, board } }
+}
+
 /** Local leaderboard (#40): a run seeded to place at `rank` takes initials by keyboard (R and S are letters there) and persists them. */
-async function leaderboardEntryProblems(page, id, rank) {
+async function leaderboardEntryProblems(page, id, rank, online, score) {
   const problems = []
   const read = () => page.evaluate((lid) => {
     const b = document.querySelector('.results-board')
@@ -703,6 +761,8 @@ async function leaderboardEntryProblems(page, id, rank) {
   // The share check leaves focus on Share, where Enter is that button's click: type as a player who never touched it.
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
   const opened = await read()
+  const openedBoard = await readBoard(page)
+  if (openedBoard.source !== 'device' || openedBoard.label !== 'This device') problems.push(`leaderboard during the entry: ${openedBoard.source} "${openedBoard.label}", expected this device's`)
   if (opened.rank !== String(rank)) problems.push(`leaderboard: run ranked ${opened.rank}, expected ${rank}`)
   if (opened.rows !== 10) problems.push(`leaderboard shows ${opened.rows} rows, expected 10`)
   if (!opened.editing) problems.push('leaderboard: no initials entry on a placing run')
@@ -725,7 +785,13 @@ async function leaderboardEntryProblems(page, id, rank) {
   if (confirmed.stored[rank]?.initials !== 'RES' || confirmed.lastInitials !== 'RES')
     problems.push(`stored entry ${JSON.stringify(confirmed.stored[rank])}, last initials ${confirmed.lastInitials}`)
   if (!confirmed.persisted.includes('"RES"')) problems.push('leaderboard entry not persisted to localStorage')
-  return { problems, result: { rank, cycled, initials: confirmed.initials, editing: confirmed.editing, phase: confirmed.phase } }
+  const result = { rank, cycled, initials: confirmed.initials, editing: confirmed.editing, phase: confirmed.phase }
+  if (online) {
+    const sent = await onlineSubmitProblems(page, id, online, score)
+    problems.push(...sent.problems)
+    result.online = sent.result
+  }
+  return { problems, result }
 }
 
 /** #162: Enter with focus on a button outside the results (the mute toggle) still plays on: the next level if open, else a replay. */
@@ -746,13 +812,14 @@ async function resultsEnterProblems(page, screen) {
 }
 
 /** The level timer running out mid-FRENZY (#195): holdFeedback keeps the slow-mo deep while one huge timerStep ends the run. */
-async function frenzyEndProblems(page, id) {
-  // A full board out of reach (#317): this run must miss it and open no initials entry.
-  await page.evaluate(([lid, seed]) => {
+async function frenzyEndProblems(page, id, online) {
+  // A full board out of reach (#317): this run must miss it and open no initials entry. It shows the (stubbed) World board.
+  await page.evaluate(([lid, seed, endpoint]) => {
     const s = window.__SC_TEST__
+    if (endpoint) s.onlineBoard(endpoint)
     s.setLeaderboards({ [lid]: Array.from({ length: 10 }, (_, i) => ({ initials: 'TOP', score: 1e9 - i, stars: 3, date: i })) })
     s.startLevel(lid, seed)
-  }, [id, SEED])
+  }, [id, SEED, online ? ONLINE_ENDPOINT : null])
   await waitFrames(page, 2, { maxMs: 20000 })
   await page.evaluate((count) => {
     const s = window.__SC_TEST__
@@ -777,10 +844,12 @@ async function frenzyEndProblems(page, id) {
   const revealed = await page
     .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 90000, polling: 100 })
     .then(() => true, () => false)
+  if (online) await page.waitForFunction(() => document.querySelector('.results-board')?.dataset.source === 'world', null, { timeout: 8000, polling: 50 }).catch(() => {})
   const board = await page.evaluate(() => {
     const b = document.querySelector('.results-board')
-    return { shown: !!b, rank: b?.dataset.rank ?? null, editing: !!b?.dataset.editing }
+    return { shown: !!b, rank: b?.dataset.rank ?? null, editing: !!b?.dataset.editing, source: b?.dataset.source ?? null, top: b?.querySelector('li .results-board-initials')?.textContent ?? null }
   })
+  if (online) await page.evaluate(() => window.__SC_TEST__.onlineBoard(null))
   const result = { slowed, ended, ...after, board }
   if (!slowed) return { result, problems: ['frenzy end: a primed 5× chain never slowed time'] }
   if (!ended) return { result, problems: ['frenzy end: the level timer never ended the run'] }
@@ -790,6 +859,8 @@ async function frenzyEndProblems(page, id) {
   if (!revealed) problems.push('frenzy end: the results screen never finished its reveal (90 s)')
   else if (!board.shown) problems.push('frenzy end: no leaderboard on the results screen')
   if (board.rank !== null || board.editing) problems.push(`a run that misses the board ranked ${board.rank} with initials entry ${board.editing ? 'open' : 'closed'}`)
+  if (online && (board.source !== 'world' || board.top !== 'WEB' || online.gets.at(-1) !== id || online.posts.length !== 1))
+    problems.push(`frenzy end: a run off the local board should show the World board (${board.source}, top ${board.top}, fetched ${online.gets.join(',') || 'nothing'}) and submit nothing (${online.posts.length} submissions in all)`)
   return { result, problems }
 }
 
@@ -3033,10 +3104,11 @@ async function run() {
     if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
     const frenzy = has('frenzy') && id === first
     await page.evaluate((cap) => { window.__SC_TEST__.timerStepMax = cap }, COMBAT_STEP_MAX)
-    const play = await playLevel(page, id, { frenzy, leaderboard: frenzy })
+    const online = frenzy ? await stubOnlineBoard(page) : null
+    const play = await playLevel(page, id, { frenzy, leaderboard: frenzy, online })
       .finally(() => page.evaluate(() => { window.__SC_TEST__.holdLevelTime = false }).catch(() => {}))
     problems.push(...play.problems)
-    const frenzyEnd = frenzy ? await frenzyEndProblems(page, id) : null
+    const frenzyEnd = frenzy ? await frenzyEndProblems(page, id, online) : null
     if (frenzyEnd) problems.push(...frenzyEnd.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
     const allErrors = [...errors, ...hookErrors]
