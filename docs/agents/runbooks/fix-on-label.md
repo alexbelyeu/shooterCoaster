@@ -6,6 +6,10 @@ Fix **only that PR**, in this session (no builder subagent), then stop. New issu
 to the scheduled builder runs. If no pull-request number came with this run (someone
 pressed Run now), reply "No PR event — nothing to do" and stop.
 
+0. **One run per fix.** The trigger fires on *every* label added while `agent:changes-requested` is on.
+   If the event says which label was added (`label.name`) and it isn't `agent:changes-requested`,
+   reply "Not the changes-requested label — nothing to do" and stop, before reading anything else.
+
 1. Re-read the PR. Continue only if it is open, not a draft, its head branch starts with
    `agent/`, and it is labelled `agent:changes-requested`. Otherwise reply "Nothing to
    fix" and stop.

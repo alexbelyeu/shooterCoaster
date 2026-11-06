@@ -15,6 +15,11 @@ describe('game scores', () => {
     for (const id of Object.keys(SCORES).filter((id) => id.includes('.'))) expect(SCORES[id.split('.')[0]]).toBeDefined()
   })
 
+  it('theme option names are unique across slots (`?theme=` matches by name)', () => {
+    const names = Object.keys(SCORES).filter((id) => id.includes('.')).map((id) => id.split('.')[1])
+    expect(new Set(names).size).toBe(names.length)
+  })
+
   it('?theme= puts each named option in its slot and ignores unknown names', () => {
     const options = ['title.neon', 'title.highway', 'level1.carousel']
     expect(themesFromQuery('', options)).toEqual({})

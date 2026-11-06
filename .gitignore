@@ -45,6 +45,7 @@ node_modules
 dist/
 dist-portal/
 dist-portal.zip
+dist-turntable/
 tsconfig.tsbuildinfo
 .claude/settings.local.json
 

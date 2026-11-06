@@ -161,7 +161,8 @@ These are not enforced by the compiler; `src/audio/scores/scores.test.ts` checks
 - `npm run audio:render -- --music <title|level1..5|results|<slot>.<name>> --engine scrim`: a score
   through the game's music chain (`docs/audio/renders/scrim-music-*`). Add `--seam` to start
   10 s before the first loop seam, so the render crosses it (a 32-bar loop is longer than a
-  30 s render).
+  30 s render). A seam render starts inside the loop, which opens on intensity 0, so a score
+  with `layer=` tags plays its base alone there: add `--layers 3` to hear every layer cross the seam.
 - `npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original]
   [--voicing jukebox|game]`: one score alone through the port, or through the original
   page for comparison. Add `--chain game` to play a score file through the game's music

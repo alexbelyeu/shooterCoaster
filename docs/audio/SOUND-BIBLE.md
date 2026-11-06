@@ -24,14 +24,33 @@ could hear it across a loud arcade. Every sound tells the player something.
 
 ## Per level (starting briefs: the sound designer turns these into demos for Alex)
 
+**What the first round (#301) taught us.** Alex picked the most direct option in each slot: "Neon
+Marquee" for the title (a supersaw hook in bar 1 over four-on-the-floor electronic drums), and he
+kept "Midway Rush" for level1 (one fairground instrument on the riff, a skank and a bass that each
+do one job, a rock beat). He passed on the grander fanfare and the gentler shuffle. So every level
+option leads with its hook in the first bars of the loop, keeps one signature instrument on it,
+drives at 134–176 BPM and lifts for its last 8 bars. The variety goes into the idea, not the polish.
+Every option is also written in intensity layers, so the pick drops in as the level's score as it is.
+
+**Level 2–5 options (#303, waiting on Alex's pick)**, in `src/audio/scores/themes/`, heard with
+`?audio=scrim&theme=<name>`. level2: `sidewinder` (D harmonic minor, 152, baritone twang guitar,
+maqsum), `caravan` (E harmonic minor, 138, oboe over a saidi), `dunerider` (F minor, 168, desert
+trance: harpsichord ostinato through the Phrygian ♭II, supersaw hook). level3: `breakwater` (A minor,
+176, tremolo surf guitar, tom beat), `lagoon` (G major, 150, steel-drum calypso), `riptide` (E major,
+164, synth brass and glockenspiel, a semitone lift). level4: `glacier` (F♯ minor, 140, celesta and
+bell over a high pad), `whiteout` (B minor, 172, glockenspiel ostinato over a breakbeat), `aurora`
+(D minor, 134, vibraphone, pizzicato and choir, timpani). level5: `brimstone` (E minor, 176, chug
+metal with choir and timpani), `hellgate` (C minor, 150, string ostinato, brass and horns, gong),
+`magma` (G minor, 160, saw lead over sixteenth FM bass and choir stabs).
+
 | Level | Biome | Brief | Signature colour |
 |---|---|---|---|
 | Title | Theme park at night | Attract-mode theme: the game's main hook inside the first 4 bars, a 1–2 bar intro that says "press start", then a 32-bar loop (≈ 45–50 s) with a lift. Gated snare and big electronic drums | supersaw lead + gated snare |
 | level1 | Theme Park | Carnival meets arcade rock. Major key, bouncy, bright: a fairground instrument carries the riff (calliope pipe, drawbar organ, xylophone), rock drums and FM bass drive it, and the loop lifts for its last 8 bars | calliope/organ riffs over rock drums |
-| level2 | Desert | Driving, sun-bleached. Phrygian or harmonic-minor flavour, hand percussion over a straight kick | twangy guitar, darbuka-style percussion |
-| level3 | Ocean | Fast, open, surf-rock energy with a sparkling top | spring-reverb guitar, steel drum, sea wash |
-| level4 | Antarctica | Glassy and tense but still driving. Minor key, crystalline | bells, celesta, icy pads with a hard kick |
-| level5 | Inferno | Heaviest level, the boss-rush mood. Low and fast | distorted guitar, choir stabs, timpani, orchestra hits |
+| level2 | Desert | Driving, sun-bleached. Harmonic minor (the ♭6 to leading-tone step, a major V) or a Phrygian ♭II. A darbuka rhythm (maqsum, saidi) on tumba doum and bongo tek sits in the base layer, over a straight kick | twangy guitar or a reed (oboe), darbuka-style percussion |
+| level3 | Ocean | Fast, open, surf-rock energy with a sparkling top. Wet guitars (high `rev`), a `surf` wave every 4–8 bars in the base layer, offbeat strums, and a bright top line (tremolo picking, steel drum, glockenspiel) | spring-reverb guitar, steel drum, sea wash |
+| level4 | Antarctica | Glassy and tense but still driving. Minor key, crystalline: mallets an octave or two up, pads quiet and high (they fill the SFX mids fast), and a hard bigkick so it never floats | bells, celesta, icy pads with a hard kick |
+| level5 | Inferno | Heaviest level, the boss-rush mood. Low and fast, but with gaps in the low end: the bass follows the guitar's chug rhythm instead of droning, and double-kick sixteenths stay in fills, or kick, bass and chug blur into one wall below 250 Hz | distorted guitar, choir stabs, timpani, orchestra hits |
 | FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens (the score's `frenzy` layer: `SCORE-FORMAT.md`, "Intensity layers") | same as the level, brighter |
 | Boss / finale | any | A variation of the level theme, darker and louder | the level's colour + orchestra hits |
 | Results | any | 3–6 s jingle: rising for 3★, flatter for 1★ or 0★, then a calm loop | bells + brass |

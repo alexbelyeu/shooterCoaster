@@ -1,0 +1,60 @@
+title    Glacier Line
+composer Claude (ShooterCoaster)
+about    Antarctica option "glacier": glassy and tense in F-sharp minor at 140. Celesta and tubular bell play the hook in octaves over a high icy pad, a hard bigkick and a gated snare. The last eight bars lift a tone. Layers: pad and FM bass, then the kit at 2x, celesta and bell at 3x, a glockenspiel arpeggio and straight hats at FRENZY.
+tempo    140
+beats    4
+steps    2
+reverb   0.36
+
+# untagged voices are the base layer; the intro plays every layer
+voice pad    pad       vol=0.2  pan=-0.2 center=C#5
+voice bass   fmbass    vol=0.68 gate=0.7
+voice kick   bigkick   vol=0.62 layer=drums
+voice snare  gatesnare vol=0.52 pan=0.05 layer=drums
+voice hat    hat909    vol=0.3  pan=0.3 layer=drums
+voice crash  crash     vol=0.32 pan=-0.2 layer=drums
+voice fall   downlifter vol=0.24 layer=drums
+voice cel    celesta   vol=0.8  pan=0.1 layer=lead
+voice bell   bell      vol=0.24 pan=-0.1 oct=-1 layer=lead
+voice glock  glock     vol=0.3  pan=0.4 layer=frenzy
+voice fhat   hat909    vol=0.3  pan=-0.4 layer=frenzy
+
+pattern intro
+cel   | C#6 F#6 A6 C#7 A6 F#6 C#6 A5 | G#5--- F5- C#5- |
+bell  | C#6 F#6 A6 C#7 A6 F#6 C#6 A5 | G#5--- F5- C#5- |
+pad   | [F#m]------- | [C#7]------- |
+fall  | C6------- | _ |
+kick  | ........ | x.x.x.xx |
+
+pattern A
+cel   | C#6- A5 F#5 C#6- E6 C#6 | D6- A5 F#5 D6- F#6 E6 | D6- B5 F#5 D6 C#6 B5 A5 | G#5--- F5- C#5- |
+bell  | C#6- A5 F#5 C#6- E6 C#6 | D6- A5 F#5 D6- F#6 E6 | D6- B5 F#5 D6 C#6 B5 A5 | G#5--- F5- C#5- |
+pad   | [F#m]------- | [Dmaj7]------- | [Bm]------- | [C#7]------- |
+bass  | F#2- F#2 F#3 F#2- F#2 C#3 | D2- D2 D3 D2- D2 A2 | B2- B2 B3 B2- B2 F#2 | C#3- C#3 C#3 C#3- G#2 C#3 |
+kick  | x.x.x.x. | % | % | % |
+snare | ..x...x. | % | % | ..x...xx |
+hat   | .x.x.x.x | % | % | % |
+crash | X....... | _ | _ | _ |
+glock | F#6 A6 C#7 A6 F#6 A6 C#7 A6 | F#6 A6 D7 A6 F#6 A6 D7 A6 | F#6 B6 D7 B6 F#6 B6 D7 B6 | G#6 C#7 F7 C#7 G#6 C#7 F7 C#7 |
+fhat  | xxxxxxxx | % | % | % |
+
+pattern A2 from A
+cel   | C#6- A5 F#5 C#6- E6 C#6 | D6- A5 F#5 D6- F#6 E6 | D6- B5 F#5 B5 C#6 D6 E6 | F6- G#6 F6 C#6--- |
+bell  | C#6- A5 F#5 C#6- E6 C#6 | D6- A5 F#5 D6- F#6 E6 | D6- B5 F#5 B5 C#6 D6 E6 | F6- G#6 F6 C#6--- |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+cel   | F#6--- E6- D6- | G#6--- F#6- E6- | A6- G#6 F#6 E6- C#6- | F6------- |
+bell  | F#6--- E6- D6- | G#6--- F#6- E6- | A6- G#6 F#6 E6- C#6- | F6------- |
+pad   | [D]------- | [E]------- | [F#m]------- | [C#]------- |
+bass  | D2- D2 D3 D2- D2 A2 | E2- E2 E3 E2- E2 B2 | F#2- F#2 F#3 F#2- F#2 C#3 | C#3- C#3 C#3 C#3- G#2 C#3 |
+glock | F#6 A6 D7 A6 F#6 A6 D7 A6 | G#6 B6 E7 B6 G#6 B6 E7 B6 | F#6 A6 C#7 A6 F#6 A6 C#7 A6 | G#6 C#7 F7 C#7 G#6 C#7 F7 C#7 |
+crash | X....... | _ | _ | _ |
+
+pattern B2 from B
+cel   | F#6--- E6- D6- | G#6--- F#6- E6- | A6- G#6 F#6 E6- C#6- | C#6 F6 G#6 C#7 G#6 F6 C#6 G#5 |
+bell  | F#6--- E6- D6- | G#6--- F#6- E6- | A6- G#6 F#6 E6- C#6- | C#6 F6 G#6 C#7 G#6 F6 C#6 G#5 |
+snare | ..x...x. | % | % | x.x.XXXX |
+
+play intro
+loop A A2 B B2 A A2 A+2 A2+2

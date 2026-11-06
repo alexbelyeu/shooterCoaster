@@ -5,6 +5,9 @@ name: Studio status
 # waiting for QA, what shipped, production health and when each role runs next.
 # All logic lives in scripts/studio-status.cjs (dry run: node scripts/studio-status.cjs --dry-run).
 #
+# Not on pull_request: a run cancelled by a newer one (concurrency below) showed on every PR as a failed
+# check. PR changes reach the page through CI's workflow_run, issue events and the 15-minute schedule.
+#
 # Changes made with GITHUB_TOKEN (including this workflow's own edit) don't
 # trigger workflows, so there is no loop; the schedule catches merges done by
 # the auto-merge workflow.
@@ -12,8 +15,6 @@ name: Studio status
 on:
   issues:
     types: [opened, closed, reopened, labeled, unlabeled]
-  pull_request:
-    types: [opened, closed, reopened, labeled, unlabeled, synchronize, ready_for_review, converted_to_draft]
   issue_comment:
     types: [created]
   workflow_run:
