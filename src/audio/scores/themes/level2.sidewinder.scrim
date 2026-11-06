@@ -1,0 +1,60 @@
+title    Sidewinder
+composer Claude (ShooterCoaster)
+about    Desert option "sidewinder": a baritone twang-guitar hook in D harmonic minor over a darbuka maqsum (tumba doum, bongo tek) and a four-on-the-floor bigkick. The B section leans on the B-flat to C-sharp step; the last eight bars lift the hook a tone. Layers: strum, FM bass and darbuka, then the kit at 2x, the twang hook at 3x, distorted power chords and a shaker at FRENZY.
+tempo    152
+beats    4
+steps    4
+reverb   0.26
+
+# untagged voices are the base layer; the intro plays every layer
+voice strum  guitar     vol=0.48 pan=0.35 center=D4 gate=0.4
+voice bass   fmbass     vol=0.52 gate=0.7
+voice doum   tumba      vol=0.52 pan=-0.15
+voice tek    bongo      vol=0.56 pan=0.3
+voice kick   bigkick    vol=0.52 layer=drums
+voice snare  snare      vol=0.6  pan=0.05 layer=drums
+voice hat    hat909     vol=0.3  pan=-0.3 layer=drums
+voice crash  crash      vol=0.34 pan=-0.2 layer=drums
+voice rise   riser      vol=0.28 layer=drums
+voice twang  guitar     vol=1.15 pan=-0.08 bright=1.4 rev=0.35 glide=0.09 layer=lead
+voice dist   distguitar vol=0.32 pan=0.4  gate=0.5 layer=frenzy
+voice shake  shaker     vol=0.36 pan=-0.45 layer=frenzy
+
+pattern intro
+twang | D3------- ~A3------- | C#4--- D4--- ~A4------- |
+doum  | X... .... X... .... | X..x ..x. XxXx XXXX |
+tek   | ..xo ..xo .... xoxo | ..xo ..xo .... .... |
+kick  | _ | x... x... x... x.x. |
+
+pattern A
+twang | D4- D4- F4 E4 D4- A3--- C#4- D4- | F4- E4- D4- E4- F4- G4- A4--- | Bb4- A4- G4- F4- G4--- F4- E4- | C#4--- E4--- A3------- |
+strum | .- [Dm]- .- [Dm]- .- [Dm]- .- [Dm]- | % | .- [Bb]- .- [Bb]- .- [Bb]- .- [Bb]- | .- [A]- .- [A]- .- [A]- .- [A7]- |
+bass  | D2- D2- D3- D2- A2- D2- D3- D2- | % | Bb2- Bb2- Bb3- Bb2- F2- Bb2- Bb3- Bb2- | A2- A2- A3- A2- E2- A2- A3- C#3- |
+doum  | X... .... x... .... | % | % | X... .... x... x.x. |
+tek   | ..xo ..xo .... xoxo | % | % | ..xo ..xo xxxx xxxx |
+kick  | x... x... x... x... | % | % | % |
+snare | .... x... .... x... | % | % | .... x... .... x.xx |
+hat   | ..x. ..x. ..x. ..x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+dist  | D3+A3- D3+A3- .- D3+A3- .- D3+A3- D3+A3- .- | % | Bb2+F3- Bb2+F3- .- Bb2+F3- .- Bb2+F3- Bb2+F3- .- | A2+E3- A2+E3- .- A2+E3- .- A2+E3- A2+E3- .- |
+shake | xoxo xoxo xoxo xoxo | % | % | % |
+
+pattern A2 from A
+twang | D4- D4- F4 E4 D4- A3--- C#4- D4- | F4- E4- D4- E4- F4- G4- A4--- | Bb4- A4- G4- A4- Bb4- C#5- D5--- | C#5- A4- G4- E4- F4- E4- D4- C#4- |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+twang | G4------- ~Bb4--- A4- G4- | F4------- ~A4--- F4- D4- | F4- G4- A4- Bb4- D5--- C#5- Bb4- | A4----------- E4- C#4- |
+strum | .- [Gm]- .- [Gm]- .- [Gm]- .- [Gm]- | .- [Dm]- .- [Dm]- .- [Dm]- .- [Dm]- | .- [Bb]- .- [Bb]- .- [Bb]- .- [Bb]- | .- [A]- .- [A]- .- [A]- .- [A7]- |
+bass  | G2- G2- G3- G2- D2- G2- G3- G2- | D2- D2- D3- D2- A2- D2- D3- D2- | Bb2- Bb2- Bb3- Bb2- F2- Bb2- Bb3- Bb2- | A2- A2- A3- A2- E2- A2- A3- C#3- |
+hat   | x.x. x.x. x.x. x.x. | % | % | % |
+dist  | G2+D3------- G2+D3------- | D3+A3------- D3+A3------- | Bb2+F3------- Bb2+F3------- | A2+E3------- A2+E3--- A2+E3--- |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern B2 from B
+twang | G4------- ~Bb4--- A4- G4- | F4------- ~A4--- F4- D4- | Bb4- C#5- D5- E5- F5--- E5- D5- | C#5----------- .--- |
+rise  | _ | _ | _ | C5--------------- |
+snare | .... x... .... x... | % | % | ..x. x.x. xxxx XXXX |
+
+play intro
+loop A A2 B B2 A A2 A+2 A2+2
