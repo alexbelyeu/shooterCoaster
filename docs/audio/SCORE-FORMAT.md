@@ -157,7 +157,9 @@ These are not enforced by the compiler; `src/audio/scores/scores.test.ts` checks
 
 - In the game: add `?audio=scrim` to the URL (e.g. `https://scoaster.com/?audio=scrim`).
   Title, level and results music switch to the score engine, and the SFX to the arcade engine.
-  Add `&theme=<name>` for a theme option during a listening round (e.g. `?audio=scrim&theme=neon,carousel`).
+  Add `&theme=<name>` for a theme option during a listening round, comma-separated for
+  options in different slots (`?audio=scrim&theme=<name>,<name>`); with no options in
+  `scores/themes/`, it does nothing.
 - `npm run audio:render -- --music <title|level1..5|results|<slot>.<name>> --engine scrim`: a score
   through the game's music chain (`docs/audio/renders/scrim-music-*`). Add `--seam` to start
   10 s before the first loop seam, so the render crosses it (a 32-bar loop is longer than a
