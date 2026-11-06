@@ -20,7 +20,7 @@ import {
 } from './bossAssets'
 import {
   KRAKEN_HEAD, KRAKEN_TENTACLE, behind, createChain, headFrame, layChain, pickSpot, segmentRadius, slamImpactBetween,
-  tentacleFrame, type HeadFrame, type Spot, type TentacleFrame,
+  tentacleFrame, type Chain, type HeadFrame, type Spot, type TentacleFrame,
 } from './krakenMotion'
 
 const T = KRAKEN_TENTACLE
@@ -60,6 +60,53 @@ const _cam = new THREE.Vector3()
 const _fwd = new THREE.Vector3()
 const _p = new THREE.Vector3()
 const _camXZ = { x: 0, y: 0, z: 0 }
+
+/**
+ * Lays tentacle `i`'s segments root-local, rising at (px, pz) and leaning along (dx, dz), and sets its pad on the
+ * pad segment's rider-facing side. Returns its radius at the waterline (0 when no segment crosses it).
+ */
+export function layTentacle(
+  segments: THREE.InstancedMesh, i: number, chain: Chain, dx: number, dz: number, px: number, pz: number, pad: THREE.Object3D | undefined,
+): number {
+  const base = i * T.segments
+  let foamR = 0
+  for (let k = 0; k < T.segments; k++) {
+    const y0 = chain.y[k]
+    const y1 = chain.y[k + 1]
+    if (y0 <= 0 && y1 > 0) foamR = segmentRadius(k + -y0 / (y1 - y0))
+    if (Math.max(y0, y1) < HIDDEN_BELOW) {
+      segments.setMatrixAt(base + k, ZERO)
+      continue
+    }
+    const c = Math.cos(chain.theta[k])
+    const s = Math.sin(chain.theta[k])
+    const r = segmentRadius(k)
+    const len = T.segLen * 1.06
+    // Columns: x' = cosθ·d − sinθ·up (the pale side is −x'), y' = along the segment, z' = d × up.
+    _m.set(
+      c * dx * r, s * dx * len, -dz * r, px + dx * chain.u[k],
+      -s * r, c * len, 0, y0,
+      c * dz * r, s * dz * len, dx * r, pz + dz * chain.u[k],
+      0, 0, 0, 1,
+    )
+    segments.setMatrixAt(base + k, _m)
+  }
+  if (pad) {
+    const k = T.padSegment
+    const c = Math.cos(chain.theta[k])
+    const s = Math.sin(chain.theta[k])
+    const along = T.segLen * 0.55
+    const inset = segmentRadius(k + 0.55) * 0.92
+    pad.position.set(
+      px + dx * chain.u[k] + s * dx * along - c * dx * inset,
+      chain.y[k] + c * along + s * inset,
+      pz + dz * chain.u[k] + s * dz * along - c * dz * inset,
+    )
+    _m.set(c * dx, s * dx, -dz, 0, -s, c, 0, 0, c * dz, s * dz, dx, 0, 0, 0, 0, 1)
+    pad.quaternion.setFromRotationMatrix(_m)
+  }
+  return foamR
+}
 
 function renderWeakPoint(w: WeakPointSpec) {
   return w.id === 'eye'
@@ -203,46 +250,11 @@ export default function Kraken(props: BossProps) {
         const dz = run.spot.outX * sy + run.spot.outZ * cy
         const px = run.spot.x - ox
         const pz = run.spot.z - oz
-        let foamR = 0
-        for (let k = 0; k < T.segments; k++) {
-          const y0 = chain.y[k]
-          const y1 = chain.y[k + 1]
-          if (y0 <= 0 && y1 > 0) foamR = segmentRadius(k + -y0 / (y1 - y0))
-          if (Math.max(y0, y1) < HIDDEN_BELOW) {
-            segments.setMatrixAt(base + k, ZERO)
-            continue
-          }
-          const c = Math.cos(chain.theta[k])
-          const s = Math.sin(chain.theta[k])
-          const r = segmentRadius(k)
-          const len = T.segLen * 1.06
-          // Columns: x' = cosθ·d − sinθ·up (the pale side is −x'), y' = along the segment, z' = d × up.
-          _m.set(
-            c * dx * r, s * dx * len, -dz * r, px + dx * chain.u[k],
-            -s * r, c * len, 0, y0,
-            c * dz * r, s * dz * len, dx * r, pz + dz * chain.u[k],
-            0, 0, 0, 1,
-          )
-          segments.setMatrixAt(base + k, _m)
-        }
-        if (pad) {
-          const k = T.padSegment
-          const c = Math.cos(chain.theta[k])
-          const s = Math.sin(chain.theta[k])
-          const along = T.segLen * 0.55
-          const inset = segmentRadius(k + 0.55) * 0.92
-          pad.position.set(
-            px + dx * chain.u[k] + s * dx * along - c * dx * inset,
-            chain.y[k] + c * along + s * inset,
-            pz + dz * chain.u[k] + s * dz * along - c * dz * inset,
-          )
-          _m.set(c * dx, s * dx, -dz, 0, -s, c, 0, 0, c * dz, s * dz, dx, 0, 0, 0, 0, 1)
-          pad.quaternion.setFromRotationMatrix(_m)
-          if (alive) {
-            const out = pad.position.y > 0 && f.emerge > 0.25
-            pad.visible = out
-            if (!out) pad.position.y = PARKED_Y
-          }
+        const foamR = layTentacle(segments, i, chain, dx, dz, px, pz, pad)
+        if (pad && alive) {
+          const out = pad.position.y > 0 && f.emerge > 0.25
+          pad.visible = out
+          if (!out) pad.position.y = PARKED_Y
         }
         if (impact) {
           const reach = chain.u[T.segments]

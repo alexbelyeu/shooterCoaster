@@ -19,8 +19,10 @@ function portalHtml(): Plugin {
 }
 
 // `vite build --mode portal` (`npm run build:portal`): relative asset URLs, so the zip plays from any sub-path.
+// `vite build --mode turntable` (`npm run turntable`): only the dev enemy turntable page, into dist-turntable/.
 export default defineConfig(({ mode }) => {
   const portal = mode === 'portal'
+  const turntable = mode === 'turntable'
   const { version } = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8'))
   const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)
   return {
@@ -38,9 +40,10 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      outDir: portal ? 'dist-portal' : 'dist',
+      outDir: portal ? 'dist-portal' : turntable ? 'dist-turntable' : 'dist',
       sourcemap: false,
       rollupOptions: {
+        ...(turntable && { input: path.resolve(__dirname, 'turntable.html') }),
         output: {
           manualChunks: {
             three: ['three'],

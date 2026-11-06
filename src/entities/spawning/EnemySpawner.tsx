@@ -8,19 +8,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import type { HeightFunction } from '@/utils/terrainNoise'
-import Balloon from '../enemies/Balloon'
-import Crow from '../enemies/Crow'
-import Scorpion from '../enemies/Scorpion'
-import Shark from '../enemies/Shark'
-import Jellyfish from '../enemies/Jellyfish'
-import FlyingFish from '../enemies/FlyingFish'
-import Snowman from '../enemies/Snowman'
-import SnowmanScout from '../enemies/SnowmanScout'
-import SnowmanBrute from '../enemies/SnowmanBrute'
-import EmberWisp from '../enemies/EmberWisp'
-import LavaGolem from '../enemies/LavaGolem'
-import FireImp from '../enemies/FireImp'
-import InfernalDrake from '../enemies/InfernalDrake'
+import { ENEMY_COMPONENTS } from '../enemies/enemyComponents'
 import GoldenBalloon from '../enemies/GoldenBalloon'
 import BossSpawner from '../bosses/BossSpawner'
 import { GOLDEN_BALLOON, SCORE_VALUES } from '@/levels/scoring'
@@ -140,23 +128,6 @@ function generateGoldenBalloons(
   }
   return goldens
 }
-
-const ENEMY_COMPONENTS: Record<EnemyType, React.ComponentType<any>> = {
-  balloon: Balloon,
-  crow: Crow,
-  scorpion: Scorpion,
-  shark: Shark,
-  jellyfish: Jellyfish,
-  flyingFish: FlyingFish,
-  snowman: Snowman,
-  snowmanScout: SnowmanScout,
-  snowmanBrute: SnowmanBrute,
-  emberWisp: EmberWisp,
-  lavaGolem: LavaGolem,
-  fireImp: FireImp,
-  infernalDrake: InfernalDrake,
-}
-
 
 export default function EnemySpawner({
   waves,
@@ -367,13 +338,14 @@ export default function EnemySpawner({
     <>
       {enemies.map((enemy) => {
         const placed = enemy.waveIndex <= activeWaveIndex ? placements.get(enemy.id) : undefined
-        const Component = ENEMY_COMPONENTS[enemy.type as EnemyType]
+        const type = enemy.type as EnemyType
+        const Component = ENEMY_COMPONENTS[type]
         if (!placed || !Component) return null
         return (
           <Component
             key={`${enemy.id}-${generation}-${runSeed}`}
             id={enemy.id}
-            type={enemy.type}
+            type={type}
             spawnPosition={placed.position}
             entry={placed.entry}
             motion={placed.motion}

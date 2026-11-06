@@ -28,8 +28,8 @@ export function stopPreview(proc) {
   }
 }
 
-/** Serves `dist` under `base` ('' for the site root, '/nested/path' for the portal build); `url` has no trailing slash. */
-export async function startPreview({ dist = 'dist', base = '' } = {}) {
+/** Serves `dist` under `base` ('' for the site root, '/nested/path' for the portal build); `url` has no trailing slash. Ready once `page` answers. */
+export async function startPreview({ dist = 'dist', base = '', page = '/' } = {}) {
   // Another worktree's preview on the same port would silently serve the wrong build.
   let port, origin
   for (let i = 0; i < 20; i++) {
@@ -47,7 +47,7 @@ export async function startPreview({ dist = 'dist', base = '' } = {}) {
   proc.on('exit', () => (exited = true))
   for (let i = 0; i < 60 && !exited; i++) {
     try {
-      if ((await fetch(`${url}/`)).ok && !exited) return { url, proc }
+      if ((await fetch(`${url}${page}`)).ok && !exited) return { url, proc }
     } catch {}
     await new Promise((r) => setTimeout(r, 500))
   }
