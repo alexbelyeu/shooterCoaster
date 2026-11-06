@@ -9,7 +9,11 @@ plain Action, not an agent task, so it still runs when the agents are what's bro
 `scripts/studioHealthRules.cjs` keep one `studio-health` issue per problem (body marker), `agent:ready`
 + P1, ahead of feature work. Thresholds: runtime creep at a median of ≥ 75 % of a job's limit over ≥ 3
 green runs; stalled when ≥ 2 scheduled Builders / QA slots (studio-status.cjs `SCHEDULE`, 2 h grace
-each) with work queued for that role pass without a token-ledger post; approved PRs unmerged 3 h after
+each) pass without a token-ledger post, counting only slots after that role's work was queued (its
+oldest queue label), after the last pause ended (pause state read once, `readPauseState` in
+studio-status.cjs, honouring `PAUSE until`) and, for Builders, while `builder_runs_per_day` wasn't spent;
+a flake is a failed job whose *same job* passed on the same commit (one workflow can run different jobs
+on one commit), or one failing on a docs-only PR; approved PRs unmerged 3 h after
 the label, `needs-qa` waiting 24 h; escalation to Alex once, when open 24 h and still seen in the last
 24 h. It never duplicates the existing alerts: red `main` in ci.yml's `verify` and every prod-smoke
 failure already open `agent:prod-broken` (revert first, PROTOCOL "When main breaks"), so the watchdog

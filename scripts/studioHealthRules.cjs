@@ -22,7 +22,10 @@ const STALL_SLOTS = 2
 
 const isDocsOnly = (files) => files.length > 0 && files.every((f) => NO_GAME_EFFECT.test(f))
 
-/** Job- and step-level `timeout-minutes` from a workflow file, keyed by job name (or id) and "job / step". */
+/** A matrix job's name without its matrix part: "smoke (${{ matrix.shard }})" in YAML, "smoke (level1)" from the API. */
+const baseJob = (name) => name.replace(/\s*\(.*\)$/, '')
+
+/** Job- and step-level `timeout-minutes` from a workflow file, keyed by job name (or id; a matrix job by its base name) and "job / step". */
 function parseTimeouts(yamlText) {
   const out = {}
   const lines = yamlText.split('\n')
@@ -38,7 +41,7 @@ function parseTimeouts(yamlText) {
     if ((m = line.match(/^ {2}([\w-]+):\s*$/))) { job = { id: m[1], name: m[1] }; step = null; continue }
     if (!job) continue
     if ((m = line.match(/^ {4}name:\s*(.+)$/))) {
-      const name = m[1].trim().replace(/^['"]|['"]$/g, '')
+      const name = baseJob(m[1].trim().replace(/^['"]|['"]$/g, ''))
       if (out[job.name] !== undefined) { out[name] = out[job.name]; delete out[job.name] }
       job.name = name
       continue
@@ -51,11 +54,10 @@ function parseTimeouts(yamlText) {
   return out
 }
 
-/** The timeout for a job as the API names it ("smoke (level1)" matches a "smoke" job), or null. */
-function timeoutFor(timeouts, jobName) {
-  if (timeouts[jobName] !== undefined) return timeouts[jobName]
-  const base = jobName.replace(/\s*\(.*\)$/, '')
-  return timeouts[base] ?? null
+/** The limit of a job (or one of its steps) as the API names it ("smoke (level1)" is a "smoke" job), or null. */
+function timeoutFor(timeouts, jobName, stepName) {
+  const key = (job) => (stepName ? `${job} / ${stepName}` : job)
+  return timeouts[key(jobName)] ?? timeouts[key(baseJob(jobName))] ?? null
 }
 
 /** Scheduled times of `who` (studio-status.cjs SCHEDULE) after `from` that are over SLOT_GRACE old at `now`. */
@@ -71,7 +73,6 @@ const applies = (limit, mins) => Boolean(limit) && mins <= limit + 2
 const minutes = (job) => (Date.parse(job.completed_at) - Date.parse(job.started_at)) / 60e3
 const failedStep = (job) => (job.steps || []).find((s) => s.conclusion === 'failure')?.name || null
 const runLink = (r) => `[${r.name} ${r.head_sha.slice(0, 7)}](${r.html_url})`
-const baseJob = (name) => name.replace(/\s*\(.*\)$/, '')
 const isMainRun = (r) => r.head_branch === 'main' && r.event !== 'pull_request'
 const median = (xs) => {
   const s = [...xs].sort((a, b) => a - b)
@@ -124,13 +125,10 @@ function findings(snap) {
     })
   }
 
-  // 2. Flaky checks: a game job failed where the change can't have caused it.
-  const shaOutcome = {}
-  for (const r of runs) {
-    const k = `${r.path}@${r.head_sha}`
-    shaOutcome[k] = shaOutcome[k] || new Set()
-    shaOutcome[k].add(r.conclusion)
-  }
+  // 2. Flaky checks: a game job failed where the change can't have caused it. "Passed on the same commit" means the
+  // same job: one workflow can run different jobs on one commit (prod-smoke.yml's `deploy` and `nightly`).
+  const jobPassed = new Set()
+  for (const r of runs) for (const j of r.jobs || []) if (j.conclusion === 'success') jobPassed.add(`${r.path}@${r.head_sha}@${j.name}`)
   const mainRuns = runs.filter(isMainRun).sort(byTime)
   /** Was the newest run of this workflow on main, before `r`, a failure? Then a docs-only PR inherits it. */
   const mainRedAt = (r) => {
@@ -141,11 +139,10 @@ function findings(snap) {
   for (const r of runs) {
     if (r.conclusion !== 'failure') continue
     const docsOnly = r.prNumber && snap.prFiles[r.prNumber] && isDocsOnly(snap.prFiles[r.prNumber]) && !mainRedAt(r)
-    const passedSameSha = shaOutcome[`${r.path}@${r.head_sha}`]?.has('success')
-    if (!docsOnly && !passedSameSha) continue
     for (const job of r.jobs || []) {
       // A timed-out job is filed as a timeout below, not as a flake.
       if (job.conclusion !== 'failure' || job.timedOut || !GAME_JOB.test(job.name)) continue
+      if (!docsOnly && !jobPassed.has(`${r.path}@${r.head_sha}@${job.name}`)) continue
       const step = failedStep(job) || 'unknown step'
       const name = `${baseJob(job.name)} / ${step}`
       if (!fresh(`flaky:${name}`, r)) continue
@@ -173,18 +170,21 @@ function findings(snap) {
     const limits = snap.timeouts[r.path] || {}
     for (const job of r.jobs || []) {
       if (!job.started_at || !job.completed_at) continue
-      const limit = applies(timeoutFor(limits, job.name), minutes(job)) ? timeoutFor(limits, job.name) : null
+      const jobLimit = timeoutFor(limits, job.name)
+      const limit = applies(jobLimit, minutes(job)) ? jobLimit : null
+      // Past main's limit, GitHub's timed-out mark is an older workflow file's limit too.
+      const timedOut = Boolean(job.timedOut && (!jobLimit || limit))
       // A step with its own limit that ran out (the job then still has time to report).
       const step = (job.steps || []).find((s) => {
-        const stepLimit = limits[`${job.name} / ${s.name}`]
+        const stepLimit = timeoutFor(limits, job.name, s.name)
         return s.started_at && s.completed_at && applies(stepLimit, minutes(s)) && minutes(s) >= stepLimit - 0.5
       })
-      const timedOutStep = job.timedOut ? (job.steps || []).find((s) => s.conclusion === 'failure' || s.conclusion === 'cancelled') : null
+      const timedOutStep = timedOut ? (job.steps || []).find((s) => s.conclusion === 'failure' || s.conclusion === 'cancelled') : null
       const stopped = step || timedOutStep
       const where = stopped ? `${job.name} / ${stopped.name}` : job.name
       const key = `timeout:${r.path}:${where}`
-      if ((step || job.timedOut || (limit && minutes(job) >= limit - 0.5)) && fresh(key, r)) {
-        const stepLimit = step ? limits[`${job.name} / ${step.name}`] : timedOutStep && minutes(timedOutStep) < (limit ?? Infinity) - 0.5 ? Math.round(minutes(timedOutStep)) : limit ?? Math.round(minutes(job))
+      if ((step || timedOut || (limit && minutes(job) >= limit - 0.5)) && fresh(key, r)) {
+        const stepLimit = step ? timeoutFor(limits, job.name, step.name) : timedOutStep && minutes(timedOutStep) < (limit ?? Infinity) - 0.5 ? Math.round(minutes(timedOutStep)) : limit ?? Math.round(minutes(job))
         const seen = out.find((f) => f.key === key)
         if (seen) seen.lastSeen = Math.max(seen.lastSeen, at(r))
         else {
@@ -224,13 +224,22 @@ function findings(snap) {
 
   // 4. The studio stopped. Runs with nothing to do don't post by design, so only slots with work queued count.
   if (!snap.paused) {
-    const builderWork = snap.openIssues.filter((i) => i.labels.includes('agent:ready') && !i.labels.includes('epic')).length +
-      snap.openPrs.filter((p) => p.labels.includes('agent:changes-requested')).length
-    const qaWork = snap.openPrs.filter((p) => p.labels.includes('agent:needs-qa')).length
-    const from = snap.lastAgentActivity ?? now - 48 * HOUR
+    // A slot counts only once its role had work queued (the oldest queued item's label; unknown = before the window),
+    // after the last pause ended, and (Builders) while the day's `builder_runs_per_day` was not yet spent.
+    const labelled = (x, label) => (x.labelledAt?.[label] ? Date.parse(x.labelledAt[label]) : -Infinity)
+    const builderQueue = [
+      ...snap.openIssues.filter((i) => i.labels.includes('agent:ready') && !i.labels.includes('epic')).map((i) => labelled(i, 'agent:ready')),
+      ...snap.openPrs.filter((p) => p.labels.includes('agent:changes-requested')).map((p) => labelled(p, 'agent:changes-requested')),
+    ]
+    const qaQueue = snap.openPrs.filter((p) => p.labels.includes('agent:needs-qa')).map((p) => labelled(p, 'agent:needs-qa'))
+    const builderWork = builderQueue.length
+    const qaWork = qaQueue.length
+    const from = (queue) => Math.max(snap.lastAgentActivity ?? now - 48 * HOUR, snap.pauseEndedAt ?? -Infinity, Math.min(...queue))
+    const budget = snap.builderBudget ?? Infinity
+    const budgetSpent = (t) => (snap.builderRuns || []).filter((b) => b <= t && b > t - 24 * HOUR).length >= budget
     const missed = [
-      ...(builderWork ? missedSlots('Builders', from, now) : []),
-      ...(qaWork ? missedSlots('QA', from, now) : []),
+      ...(builderWork ? missedSlots('Builders', from(builderQueue), now).filter((t) => !budgetSpent(t)) : []),
+      ...(qaWork ? missedSlots('QA', from(qaQueue), now) : []),
     ]
     if (missed.length >= STALL_SLOTS) {
       const last = snap.lastAgentActivity == null ? 'none in 48 h' : new Date(snap.lastAgentActivity).toISOString().slice(0, 16) + 'Z'
@@ -283,4 +292,4 @@ function findings(snap) {
 const staleProdAlerts = (snap) =>
   snap.openIssues.filter((i) => i.labels.includes('agent:prod-broken') && snap.now - Date.parse(i.created_at) > 12 * HOUR)
 
-module.exports = { findings, staleProdAlerts, parseTimeouts, isDocsOnly }
+module.exports = { findings, staleProdAlerts, parseTimeouts, isDocsOnly, ALERTED_ON_MAIN }

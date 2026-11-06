@@ -94,13 +94,15 @@ function shouldComment(body, comments) {
 
 // ---------- the run ----------
 
-async function getAll(api, route, params) {
+/** Every page of a GET list endpoint (at most `maxPages` of 100). Shared with studio-health.cjs. */
+async function getAll(api, route, params, maxPages = Infinity) {
   const out = []
-  for (let page = 1; ; page++) {
+  for (let page = 1; page <= maxPages; page++) {
     const batch = await api(`GET ${route}`, { ...params, per_page: 100, page })
     out.push(...batch)
-    if (batch.length < 100) return out
+    if (batch.length < 100) break
   }
+  return out
 }
 
 async function candidates(api, event, payload, owner, log) {
@@ -236,6 +238,7 @@ module.exports.skipComment = skipComment
 module.exports.failComment = failComment
 module.exports.handbackComment = handbackComment
 module.exports.runGate = runGate
+module.exports.getAll = getAll
 
 if (require.main === module) {
   const { execFileSync } = require('node:child_process')

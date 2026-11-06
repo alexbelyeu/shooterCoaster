@@ -6,7 +6,8 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { findings: findFindings, staleProdAlerts, parseTimeouts } = require('./studioHealthRules.cjs')
-const { STEERING_PAUSE } = require('./studio-status.cjs')
+const { readPauseState } = require('./studio-status.cjs')
+const { getAll } = require('./automerge.cjs')
 
 const LABEL = 'studio-health'
 const HOUR = 3600e3
@@ -18,16 +19,8 @@ const keyOf = (issue) => (issue.body || '').match(/<!-- studio-health:(.+?) -->/
 const labelNames = (x) => (x.labels || []).map((l) => (typeof l === 'string' ? l : l.name))
 const stamp = (ms) => `${new Date(ms).toISOString().slice(0, 16)}Z`
 
-/** Every page of a list endpoint (up to `max` pages of 100). */
-async function pages(api, route, params = {}, max = 10) {
-  const all = []
-  for (let page = 1; page <= max; page++) {
-    const res = await api(route, { ...params, per_page: 100, page })
-    all.push(...res)
-    if (res.length < 100) break
-  }
-  return all
-}
+/** `builder_runs_per_day` in STEERING.md (the Builders runbook's default: 6). */
+const builderBudget = (steering) => Number(/^builder_runs_per_day:\s*(\d+)/m.exec(steering)?.[1] ?? 6)
 
 async function collect(api, now, workflowsDir) {
   const since = new Date(now - WINDOW).toISOString()
@@ -49,8 +42,12 @@ async function collect(api, now, workflowsDir) {
       prNumber: r.pull_requests?.[0]?.number ?? null,
     }))
 
-  // Jobs for every failure, and for the newest 12 successes per workflow (runtime creep).
-  const want = new Set(done.filter((r) => r.conclusion !== 'success').map((r) => r.id))
+  // Jobs for every failure, for successes of the same workflow and commit (a flake is a job that also passed), and for
+  // the newest 12 successes per workflow (runtime creep).
+  const failed = done.filter((r) => r.conclusion !== 'success')
+  const want = new Set(failed.map((r) => r.id))
+  const failedShas = new Set(failed.map((r) => `${r.path}@${r.head_sha}`))
+  for (const r of done) if (failedShas.has(`${r.path}@${r.head_sha}`)) want.add(r.id)
   const perWorkflow = {}
   for (const r of done.filter((r) => r.conclusion === 'success').sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))) {
     perWorkflow[r.path] = (perWorkflow[r.path] || 0) + 1
@@ -67,7 +64,8 @@ async function collect(api, now, workflowsDir) {
 
   // A run's PR link is dropped once the PR merges: match by head branch instead.
   const recentPrs = await api('GET /repos/{owner}/{repo}/pulls', { state: 'all', sort: 'updated', direction: 'desc', per_page: 100 })
-  const prByBranch = new Map(recentPrs.map((p) => [p.head.ref, p.number]))
+  const prByBranch = new Map()
+  for (const p of recentPrs) if (!prByBranch.has(p.head.ref)) prByBranch.set(p.head.ref, p.number) // newest first: a reused branch keeps its latest PR
   for (const r of done) if (!r.prNumber && r.event === 'pull_request') r.prNumber = prByBranch.get(r.head_branch) ?? null
 
   // Failed jobs: GitHub's own annotations say whether a job or step timed out, and give the error.
@@ -76,14 +74,14 @@ async function collect(api, now, workflowsDir) {
       if (j.conclusion !== 'failure' && j.conclusion !== 'timed_out') continue
       const notes = await api('GET /repos/{owner}/{repo}/check-runs/{check_run_id}/annotations', { check_run_id: j.id }).catch(() => [])
       const failures = notes.filter((a) => a.annotation_level === 'failure').map((a) => a.message.split('\n')[0])
-      j.timedOut = j.conclusion === 'timed_out' || failures.some((m) => /timed out/i.test(m))
+      j.timedOut = j.conclusion === 'timed_out' || failures.some((m) => /timed out|exceeded the maximum execution time/i.test(m))
       j.errors = failures.filter((m) => !/^Process completed with exit code/.test(m)).slice(0, 3)
     }
   }
 
   const prFiles = {}
   for (const n of new Set(done.filter((r) => r.conclusion === 'failure' && r.prNumber).map((r) => r.prNumber))) {
-    prFiles[n] = (await pages(api, 'GET /repos/{owner}/{repo}/pulls/{pull_number}/files', { pull_number: n }, 30)).map((f) => f.filename)
+    prFiles[n] = (await getAll(api, '/repos/{owner}/{repo}/pulls/{pull_number}/files', { pull_number: n }, 30)).map((f) => f.filename)
   }
 
   const timeouts = {}
@@ -91,32 +89,55 @@ async function collect(api, now, workflowsDir) {
     timeouts[`.github/workflows/${file}`] = parseTimeouts(fs.readFileSync(path.join(workflowsDir, file), 'utf8'))
   }
 
-  const [openPrs, openItems, ledger, pauses, watchdogOpen, watchdogClosed] = await Promise.all([
-    pages(api, 'GET /repos/{owner}/{repo}/pulls', { state: 'open' }),
-    pages(api, 'GET /repos/{owner}/{repo}/issues', { state: 'open' }),
+  const [openPrs, openItems, ledger, pause, watchdogOpen, watchdogClosed, repoEvents, steering] = await Promise.all([
+    getAll(api, '/repos/{owner}/{repo}/pulls', { state: 'open' }, 10),
+    getAll(api, '/repos/{owner}/{repo}/issues', { state: 'open' }, 10),
     api('GET /repos/{owner}/{repo}/issues', { state: 'open', labels: 'token-ledger', per_page: 5 }),
-    api('GET /repos/{owner}/{repo}/issues', { state: 'open', labels: 'pause', per_page: 5 }),
-    pages(api, 'GET /repos/{owner}/{repo}/issues', { state: 'open', labels: LABEL }),
-    pages(api, 'GET /repos/{owner}/{repo}/issues', { state: 'closed', labels: LABEL, sort: 'updated', direction: 'desc' }, 2),
+    readPauseState(api, now),
+    getAll(api, '/repos/{owner}/{repo}/issues', { state: 'open', labels: LABEL }, 10),
+    getAll(api, '/repos/{owner}/{repo}/issues', { state: 'closed', labels: LABEL, sort: 'updated', direction: 'desc' }, 2),
+    getAll(api, '/repos/{owner}/{repo}/issues/events', {}, 5),
+    api('GET /repos/{owner}/{repo}/contents/{path}', { path: 'docs/agents/STEERING.md' })
+      .then((f) => Buffer.from(f.content, 'base64').toString('utf8'), () => ''),
   ])
-  let steeringPaused = false
-  try {
-    const f = await api('GET /repos/{owner}/{repo}/contents/{path}', { path: 'docs/agents/STEERING.md' })
-    steeringPaused = STEERING_PAUSE.test(Buffer.from(f.content, 'base64').toString('utf8'))
-  } catch {
-    steeringPaused = false
+
+  // Builders runs logged per session (the daily budget counts them), from the ledger's `<!-- ledger {json} -->` comments.
+  const ledgerIssue = ledger.sort((a, b) => a.number - b.number)[0]
+  const builderRuns = new Map()
+  if (ledgerIssue) {
+    const comments = await getAll(api, '/repos/{owner}/{repo}/issues/{issue_number}/comments', {
+      issue_number: ledgerIssue.number, since: new Date(now - WINDOW - 24 * HOUR).toISOString(),
+    }, 20)
+    for (const c of comments) {
+      let e = null
+      try {
+        e = JSON.parse(/<!-- ledger (\{.*\}) -->/.exec(c.body || '')?.[1] ?? 'null')
+      } catch {
+        e = null
+      }
+      if (e?.role === 'builders') builderRuns.set(e.session || c.id, Date.parse(e.at || c.created_at))
+    }
   }
 
-  // Stuck / waiting PRs are timed from their queue label, not their last activity.
-  const queueLabels = ['agent:qa-approved', 'agent:needs-qa']
+  // Queued work is timed from its queue label, not its last activity: stuck / waiting PRs, and when the work a
+  // scheduled run would pick up appeared (a stall counts only the slots after that).
+  const labelledAt = (events, labels) => {
+    const out = {}
+    for (const e of events) if (e.event === 'labeled' && labels.includes(e.label?.name)) {
+      if (!out[e.label.name] || e.created_at > out[e.label.name]) out[e.label.name] = e.created_at
+    }
+    return out
+  }
+  const queueLabels = ['agent:qa-approved', 'agent:needs-qa', 'agent:changes-requested']
   const prs = openPrs.filter((p) => !p.draft)
   for (const p of prs) {
     p.labelledAt = {}
     const mine = labelNames(p).filter((l) => queueLabels.includes(l))
     if (!mine.length) continue
-    const events = await pages(api, 'GET /repos/{owner}/{repo}/issues/{issue_number}/events', { issue_number: p.number }, 5)
-    for (const e of events) if (e.event === 'labeled' && mine.includes(e.label?.name)) p.labelledAt[e.label.name] = e.created_at
+    p.labelledAt = labelledAt(await getAll(api, '/repos/{owner}/{repo}/issues/{issue_number}/events', { issue_number: p.number }, 5), mine)
   }
+  // Ready issues: the repo's recent events (an issue labelled before them has been ready all along).
+  const readyEvents = repoEvents.filter((e) => e.issue && !e.issue.pull_request)
 
   const closedAt = {}
   for (const i of watchdogClosed) {
@@ -134,11 +155,15 @@ async function collect(api, now, workflowsDir) {
     })),
     openIssues: openItems.filter((i) => !i.pull_request).map((i) => ({
       number: i.number, title: i.title, labels: labelNames(i), created_at: i.created_at,
+      labelledAt: labelledAt(readyEvents.filter((e) => e.issue.number === i.number), ['agent:ready']),
     })),
     closedAt,
     watchdogOpen,
     lastAgentActivity: ledger.length ? Math.max(...ledger.map((i) => Date.parse(i.updated_at))) : null,
-    paused: steeringPaused || pauses.some((i) => !i.pull_request),
+    paused: pause.paused,
+    pauseEndedAt: pause.endedAt,
+    builderRuns: [...builderRuns.values()],
+    builderBudget: builderBudget(steering),
   }
 }
 
@@ -206,7 +231,7 @@ async function reconcile(api, found, open, now, log) {
 /** `agent:prod-broken` issues open over 12 h get `needs-alex` and one comment (marked, so only once). */
 async function escalateProdAlerts(api, stale, now, log) {
   for (const i of stale) {
-    const comments = await pages(api, 'GET /repos/{owner}/{repo}/issues/{issue_number}/comments', { issue_number: i.number })
+    const comments = await getAll(api, '/repos/{owner}/{repo}/issues/{issue_number}/comments', { issue_number: i.number }, 10)
     if (comments.some((c) => (c.body || '').includes(ESCALATED))) continue
     await api('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', { issue_number: i.number, labels: ['needs-alex'] })
     await api('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {

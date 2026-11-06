@@ -36,6 +36,7 @@ jobs:
             scripts/studio-health.cjs
             scripts/studioHealthRules.cjs
             scripts/studio-status.cjs
+            scripts/automerge.cjs
             .github/workflows
           sparse-checkout-cone-mode: false
       - uses: actions/github-script@v7

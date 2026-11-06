@@ -1,8 +1,12 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import rules from './studioHealthRules.cjs'
 import watchdog from './studio-health.cjs'
+import status from './studio-status.cjs'
 
-const { findings, staleProdAlerts, parseTimeouts, isDocsOnly } = rules
+const { findings, staleProdAlerts, parseTimeouts, isDocsOnly, ALERTED_ON_MAIN } = rules
+const { pauseUntil } = status
+const ciYaml = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
 const { reconcile, escalateProdAlerts } = watchdog
 
 const H = 3600e3
@@ -34,6 +38,30 @@ describe('parseTimeouts', () => {
     ].join('\n')
     expect(parseTimeouts(yaml)).toEqual({ verify: 40, 'verify / Smoke test': 32, portal: 20 })
   })
+
+  it('the real ci.yml: every job has a limit, a matrix job under its base name', () => {
+    expect(parseTimeouts(ciYaml)).toMatchObject({ 'unit + build': expect.any(Number), lighthouse: expect.any(Number), smoke: expect.any(Number), verify: expect.any(Number), portal: expect.any(Number) })
+  })
+})
+
+describe('ALERTED_ON_MAIN', () => {
+  it('covers ci.yml\'s verify gate and every job it needs (they open agent:prod-broken on main), not portal', () => {
+    const job = (id: string) => ciYaml.split('\n').slice(ciYaml.split('\n').indexOf(`  ${id}:`))
+    const nameOf = (id: string) => job(id).find((l) => /^ {4}name:/.test(l))!.replace(/^ {4}name:\s*/, '').replace(/\s*\(.*\)$/, '')
+    const needs = job('verify').find((l) => /^ {4}needs:/.test(l))!.match(/\[(.*)\]/)![1].split(',').map((s) => s.trim())
+    expect(needs.length).toBeGreaterThan(0)
+    const alerted = ALERTED_ON_MAIN['.github/workflows/ci.yml']
+    for (const id of ['verify', ...needs]) expect(alerted.test(nameOf(id)), id).toBe(true)
+    expect(alerted.test(nameOf('portal'))).toBe(false)
+  })
+})
+
+describe('pauseUntil', () => {
+  it('reads a PAUSE until title in New York time, like pause-check.sh', () => {
+    expect(pauseUntil('PAUSE until 2026-11-04 08:00')).toBe(Date.parse('2026-11-04T13:00:00Z'))
+    expect(pauseUntil('PAUSE until 2026-10-21')).toBe(Date.parse('2026-10-21T04:00:00Z'))
+    expect(pauseUntil('PAUSE')).toBe(null)
+  })
 })
 
 describe('isDocsOnly', () => {
@@ -60,8 +88,17 @@ describe('findings', () => {
   it('a failure on a code PR is the PR\'s, unless the same commit passed elsewhere', () => {
     const failed = smokeFail()
     expect(keys(snap({ runs: [failed], prFiles: { 10: ['src/x.ts'] } }))).toEqual([])
-    const passed = run({ id: 2, conclusion: 'success', jobs: [] })
+    const passed = run({ id: 2, conclusion: 'success', jobs: [job('verify', 'success', 20)] })
     expect(keys(snap({ runs: [failed, passed], prFiles: { 10: ['src/x.ts'] } }))).toEqual(['flaky:verify / Smoke'])
+  })
+
+  it('only the same job passing on that commit makes a flake: prod-smoke\'s deploy passing says nothing about nightly', () => {
+    const prod = (over: object) => onMain({ path: '.github/workflows/prod-smoke.yml', name: 'Production smoke', head_sha: 'm1', ...over })
+    const deploy = prod({ id: 1, event: 'deployment_status', conclusion: 'success', created_at: iso(5 * H), jobs: [job('deploy', 'success', 3)] })
+    const nightly = prod({ id: 2, event: 'schedule', created_at: iso(2 * H), jobs: [job('nightly', 'failure', 20, [{ name: 'Smoke', conclusion: 'failure' }])] })
+    expect(keys(snap({ runs: [deploy, nightly] }))).toEqual([])
+    const nightlyOk = prod({ id: 3, event: 'schedule', conclusion: 'success', created_at: iso(H), jobs: [job('nightly', 'success', 20)] })
+    expect(keys(snap({ runs: [deploy, nightly, nightlyOk] }))).toEqual(['flaky:nightly / Smoke'])
   })
 
   it('a docs-only PR failing while main is red is not a flake', () => {
@@ -113,6 +150,17 @@ describe('findings', () => {
     const timeouts = { '.github/workflows/ci.yml': { verify: 5 } }
     const ok = (mins: number, id: number) => run({ id, conclusion: 'success', head_sha: `s${id}`, jobs: [job('verify', 'success', mins)] })
     expect(keys(snap({ runs: [ok(34, 1), ok(33, 2), ok(35, 3)], timeouts }))).toEqual([])
+    const marked = run({ jobs: [job('verify', 'failure', 30, [{ name: 'Smoke', conclusion: 'failure' }], { timedOut: true })] })
+    expect(keys(snap({ runs: [marked], timeouts, prFiles: { 10: ['src/a.ts'] } }))).toEqual([])
+  })
+
+  it('smoke shards get the matrix job\'s limit from the real ci.yml (creep and timeouts see them)', () => {
+    const timeouts = { '.github/workflows/ci.yml': parseTimeouts(ciYaml) }
+    const limit = timeouts['.github/workflows/ci.yml'].smoke
+    const ok = (id: number) => run({ id, conclusion: 'success', head_sha: `s${id}`, jobs: [job('smoke (level3)', 'success', limit - 1)] })
+    expect(keys(snap({ runs: [ok(1), ok(2), ok(3)], timeouts }))).toEqual(['creep:.github/workflows/ci.yml::smoke'])
+    const cutOff = run({ jobs: [job('smoke (level3)', 'failure', limit)] })
+    expect(keys(snap({ runs: [cutOff], timeouts, prFiles: { 10: ['src/a.ts'] } }))).toEqual(['timeout:.github/workflows/ci.yml:smoke (level3)'])
   })
 
   it('closed after a fix, the old runs still in the window file nothing; a newer run files it again', () => {
@@ -149,6 +197,21 @@ describe('findings', () => {
       expect(keys(at('2026-11-04T19:00:00Z', { openPrs: [] }))).toEqual([])
       expect(keys(at('2026-11-04T19:00:00Z', { paused: true }))).toEqual([])
       expect(keys(at('2026-11-04T19:00:00Z', { openIssues: [], openPrs: [] }))).toEqual([])
+    })
+
+    it('slots before the work was queued, or before the last pause ended, don\'t count', () => {
+      // Ready at 12:00 and in QA at 12:30 EST: by 19:00 only the 13:47 Builders and 15:17 QA slots are 2 h old.
+      const late = { openIssues: [{ ...ready[0], labelledAt: { 'agent:ready': '2026-11-04T17:00:00Z' } }], openPrs: [{ ...inQa[0], labelledAt: { 'agent:needs-qa': '2026-11-04T17:30:00Z' } }] }
+      expect(keys(at('2026-11-04T19:00:00Z', late))).toEqual([])
+      expect(keys(at('2026-11-05T00:00:00Z', late))).toEqual(['stalled'])
+      expect(keys(at('2026-11-04T19:00:00Z', { pauseEndedAt: Date.parse('2026-11-04T17:00:00Z') }))).toEqual([])
+    })
+
+    it('Builders slots after the day\'s builder_runs_per_day was spent don\'t count', () => {
+      const builderRuns = [1, 2, 3].map((h) => lastNight - h * H)
+      const f = (budget: number) => keys(at('2026-11-04T23:00:00Z', { openPrs: [], builderRuns, builderBudget: budget }))
+      expect(f(6)).toEqual(['stalled'])
+      expect(f(3)).toEqual([])
     })
   })
 
