@@ -12,7 +12,7 @@ import Kraken from './Kraken'
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
 
-const BOSS_COMPONENTS: Record<BossType, React.ComponentType<BossProps>> = {
+export const BOSS_COMPONENTS: Record<BossType, React.ComponentType<BossProps>> = {
   goldenBlimp: GoldenBlimp,
   kraken: Kraken,
   giantScorpion: GiantScorpion,
