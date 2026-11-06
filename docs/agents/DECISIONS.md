@@ -1532,3 +1532,134 @@ state: it opens on green → red, stays silent while open and closes on the next
 - CI's red-`main` report never comments on a production suite's issue, because that issue closes itself when prod goes green.
 **Consequences:** A green → red change sends one email per outage. A timeout says "no check failed". The full suite still
 catches CDN / runtime drift within a day. Don't move the full smoke back onto `deployment_status`, and don't just raise the cap.
+
+## 2026-11-01 — Marketing clip: re-render for pushes only, no GIF in git (builder, #203)
+
+**Context:** every `npm run clip` re-render committed to `docs/marketing/media/` adds its files
+to git history for good; the GIF alone is ~7 MB, twice the MP4, and is made from the same frames.
+**Decision:** re-render only for a launch or marketing push, committing the MP4 and stills.
+`scripts/clip.mjs` writes the GIF next to the frames in `e2e-results/clip/<size>/` (gitignored);
+the README has an ffmpeg line to make one from the committed MP4. The 2026-10-28 GIF already
+committed stays (deleting it would not shrink history).
+**Consequences:** ~3.4 MB of history per re-render instead of ~10 MB. Whether `docs/marketing/media/`
+gets a size budget line is left to the Director.
+
+## 2026-11-04 — Score card image: canvas, story on phones, feed on desktop (Builder, #272)
+
+**Context:** The results Share button should share a picture of the run. Options were a WebGL capture of the scene, a server-rendered Open Graph image, or a 2D canvas drawn in the browser.
+**Decision:** A 2D canvas card (pure layout in `src/ui/scoreCard.ts`, drawing in `scoreCardImage.tsx`) built from the level-select postcard SVG and the self-hosted fonts, drawn only when the player opens Share. Touch devices get the 1080×1920 story card (on the share sheet when `canShare({ files })`, else from the menu); desktops get the 1200×630 feed card (Save image / Copy image). The menu item reads "Save image", not "Download image", so it fits one line in the 2- and 3-column menus; its analytics method is still `image_download`.
+**Consequences:** No WebGL readback, no server, no request. Per-score link previews would still need a server (out of scope). The sheet needs the click's user activation, so the story card starts drawing on the Share button's pointerdown.
+
+## 2026-11-04 — CI smoke runs as parallel shards behind a `verify` gate, with a `smokeSeconds` budget (builder, #353)
+
+**Context:** The smoke ran serially inside the one `verify` job: ~25 min of a 40-min cap, growing with every level,
+boss and step, and every PR waited ~30 min for CI. The `main` ruleset requires a check named exactly `verify`.
+
+**Decision:** `ci.yml` runs `unit + build`, `lighthouse` and one `smoke (<shard>)` job per shard in parallel, then a
+`verify` job that needs them all and passes only if every one succeeded (it runs when one failed or was cancelled,
+and then fails). The shard table is `SHARDS` in pure `e2e/shards.mjs` and the shards are named steps of the one
+smoke, not a second runner (`--shard`, `--steps`). `shards.test.ts` holds them to running exactly what the full
+`npm run smoke` runs:
+`ui` (title, landing, levelSelect, daily, settings), `level1` (ride, frenzy, seed, boss, pickup), `level1-steps` (quality,
+pause, countdown, speed, scrim), `level2`…`level5` (every per-level step on that level) and `mobile` (the phone run). Each
+shard job builds the commit itself (~30 s), which is quicker than waiting on a shared build job.
+New budget `budgets.json` `smokeSeconds`, per shard, checked on CI only (a 2-core session is slower): over budget fails
+with `<shard> shard took X min, budget Y`, and a shard still running at twice its budget writes its results and exits
+before the 25-min job timeout. The numbers are 1.5x the slower of each shard's smoke time on two CI runs of #364,
+rounded up to 30 s (the short shards swung by up to ~50% between runs; budgets at 1.4x one run failed ui and level1):
+
+| shard | run 1 / run 2 (smoke only) | budget |
+|---|---|---|
+| ui | 2.1 / 3.2 min | 300 s |
+| level1 | 3.3 / 5.3 min | 480 s |
+| level1-steps | 5.3 / 4.7 min | 480 s |
+| level2 | 5.6 / 5.6 min | 510 s |
+| level3 | 4.1 / 2.8 min | 390 s |
+| level4 | 2.7 / 2.5 min | 270 s |
+| level5 | 1.8 / 2.6 min | 240 s |
+| mobile | 7.7 / 7.7 min | 600 s (1.3x: steady, and it sets the wall time) |
+
+GitHub creates the `verify` check only when its needs end, so `automerge.cjs` and `studio-status.cjs` treat a head
+with CI jobs still running and no `verify` yet as "verify waiting", not "no verify".
+
+**Consequences:** `verify` took 8 min 46 s and 8 min 50 s wall on #364 instead of ~30. A new level needs a shard, a matrix entry in
+`ci.yml` and a `smokeSeconds` entry (the unit test fails until all three exist). The phone run (`runMobile`, one
+continuous session) is the long pole: the next big addition to it should split it into two shards instead of
+raising its budget. Only the Director raises these budgets.
+
+## 2026-11-06 — Online leaderboard: Supabase behind Vercel Functions (Builder, #365)
+
+**Context:** Alex decided on 4 Nov 2026 (#365) to add an online leaderboard. This supersedes the
+2026-10-19 decision "No online backend until Alex decides". He owns the account side: a dedicated
+Supabase project on his free plan, its env vars in Vercel, and running the migration.
+
+**Decision:**
+- The browser only ever calls same-origin `/api/leaderboard`; `api/leaderboard.ts` (Vercel Function,
+  Node runtime) is the only code with the Supabase secret key. It talks to PostgREST with plain fetch,
+  no supabase-js. `check:bundle` fails if Supabase's URL, key names or REST path reach the browser.
+- Only the production build calls it (`__BUILT_ON_VERCEL__`, not `?e2e=1`); dev, preview, CI, the
+  smoke (stubbed with `page.route`) and the portal build never do. Every failure (no env vars, a
+  paused project, timeout after 3 s) falls back silently to the local board; the API answers 503,
+  never a 500 or details.
+- Score ceiling = every kill at the top 5× combo multiplier, golden balloons included
+  (`src/levels/scoreLimits.ts`), not the level's `maxScore`: `maxScore` is the no-combo score, so real
+  runs pass it. api/ can't import `src/` at runtime (Vercel builds functions without the `@/` alias),
+  so `scripts/gen-level-limits.mjs` generates `api/_lib/levelLimits.ts` and a unit test fails when it
+  is stale.
+- Rate limit (5 accepted POSTs per IP per 10 min) is a count over the `scores` table by `ip_hash`, an
+  HMAC-SHA256 of the IP keyed by the secret key: no extra table, no raw IP stored.
+- Only runs that place on the local board go online, once, after initials entry (or as the results
+  screen closes). A run that misses the local board fetches and shows the World board.
+
+**Consequences:** The game has one backend dependency, optional by design. New levels or score
+changes need `node scripts/gen-level-limits.mjs`. Schema changes need Alex to run SQL by hand.
+Scores are only plausibility-checked (no replay validation): a determined cheater can still post a
+high but possible score; Alex can delete rows (docs/LEADERBOARD.md).
+
+## 2026-11-04 — Studio-health watchdog: a plain Action that files the studio's own problems (builder, #370)
+
+**Context:** Every flake, timeout and stuck PR in the week of 2 Nov was found by Alex reading GitHub
+emails. Agents waved red checks through as "known flakes", and nothing noticed when scheduled runs
+stopped.
+
+**Decision:** `.github/workflows/studio-health.yml` runs `scripts/studio-health.cjs` every 2 h as a
+plain Action, not an agent task, so it still runs when the agents are what's broken. Pure rules in
+`scripts/studioHealthRules.cjs` keep one `studio-health` issue per problem (body marker), `agent:ready`
++ P1, ahead of feature work. Thresholds: runtime creep at a median of ≥ 75 % of a job's limit over ≥ 3
+green runs; stalled when ≥ 2 scheduled Builders / QA slots (studio-status.cjs `SCHEDULE`, 2 h grace
+each) pass without a token-ledger post, counting only slots after that role's work was queued (its
+oldest queue label), after the last pause ended (pause state read once, `readPauseState` in
+studio-status.cjs, honouring `PAUSE until`) and, for Builders, while `builder_runs_per_day` wasn't spent;
+a flake is a failed job whose *same job* passed on the same commit (one workflow can run different jobs
+on one commit), or one failing on a docs-only PR; approved PRs unmerged 3 h after
+the label, `needs-qa` waiting 24 h; escalation to Alex once, when open 24 h and still seen in the last
+24 h. It never duplicates the existing alerts: red `main` in ci.yml's `verify` and every prod-smoke
+failure already open `agent:prod-broken` (revert first, PROTOCOL "When main breaks"), so the watchdog
+only escalates those in place after 12 h. Runs older than a key's last close don't count, so closing an
+issue after its fix sticks. PROTOCOL "No known flakes": a check failing without the change causing it is
+a P1 bug in the check; QA never approves past it.
+
+**Consequences:** Builders and the Maintainer spend runs on CI health before features. Findings about
+the current state (stalled, stuck PRs, QA backlog) refile while the state holds even if closed by hand.
+Workflow limits are read from main, so a job that ran well past one (an unmerged PR on an older
+workflow file) is ignored for timeouts and creep.
+
+## 2026-11-06 — Theme options are written in intensity layers; the registry reads `themes/` by glob (Sound designer, #303)
+
+**Context:** The first listening round (#216) wrote its options without `layer=` tags, so a pick
+needs rewriting before it can follow the combo. #303 adds twelve options for levels 2–5 while
+PR #386 (the #301 picks) also edits `scores/index.ts`.
+**Decision:** Every level option tags its voices base / drums / lead / frenzy, so Alex's pick
+replaces `<level>.scrim` unchanged. Its seam render holds every layer (`--layers 3`), since a
+seam render opens inside the loop at intensity 0. `scores/index.ts` reads `themes/*.scrim` with
+`import.meta.glob`, the same change as #386, so a listening round adds only score files and their
+`SCORE_KEYS` rows.
+**Consequences:** The scores add ~43 kB (~7.5 kB gzip) to the lazy `?audio=scrim` synth chunk
+until the losing options are deleted. A theme option's file name is its `?theme=` id, so names
+must stay unique across slots.
+
+## 2026-11-06 — Enemy turntable: real components, own build, own workflow (Builder, #380)
+
+**Context:** Art review of enemies needs close-ups from every side and in motion, on every PR that touches them, without slowing the other PRs (#371/#372) or reaching the game's bundle.
+**Decision:** `turntable.html` + `src/dev/turntable/` mount the shipped enemy and boss components (not copies) and are built only by `vite build --mode turntable` into `dist-turntable/`. Motion is real game-time animation with each subject's travel cancelled every frame; the Kraken alone is shown as `KrakenPose` (its parts around its head, posed by its real motion code) because the fight scatters its tentacles around the rider. `Math.random` is seeded per subject so images are byte-identical between runs. CI runs it in its own `turntable` workflow, path-filtered to `src/entities/**` and death styles, outside the required `verify`.
+**Consequences:** A new enemy type must be added to `src/dev/turntable/subjects.ts` (its test fails otherwise), with its `front` yaw and motion window. The turntable never gates a merge: QA reads its artifact. Bloom and the biome colour grade aren't applied (no post-processing), so emissive enemies look flatter than in play; `?biome=` / `--biome` gives the biome's sky, lights and fog.
