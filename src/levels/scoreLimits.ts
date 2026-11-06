@@ -1,8 +1,4 @@
-/**
- * The most a run can score on each level, for the online leaderboard's server checks (`api/`).
- * Pure: `scripts/gen-level-limits.mjs` bundles it into `api/_lib/levelLimits.ts`, and
- * `api/_lib/levelLimits.test.ts` fails when that file falls behind the levels.
- */
+/** The most a run can score on each level, for the online leaderboard's server checks: generated into `api/_lib/levelLimits.ts`. */
 import type { LevelConfig } from '@/types/level'
 import { BOSS_SPECS } from '@/entities/bosses/bossSpecs'
 import { COMBO_TIERS, TOP_TIER } from '@/combat/comboTiers'
@@ -12,7 +8,6 @@ import { GOLDEN_BALLOON, SCORE_VALUES, goldenBalloonCount } from './scoring'
 export interface ScoreLimits {
   /** Every kill at the top combo multiplier, golden balloons included (`maxScore` leaves them out). */
   maxScore: number
-  /** Wave enemies + golden balloons + boss weak points. */
   maxKills: number
   /** The most one kill can score at the top multiplier: the best enemy, or the boss's last weak point with its reward. */
   maxKillPoints: number

@@ -1,8 +1,4 @@
-/**
- * The online top 10 (`api/leaderboard.ts`, #365) from the game's side. Every call resolves, never
- * throws: no answer within the timeout, an error status (no env vars, a paused project) or a
- * malformed body all give null, and the results screen keeps the local board.
- */
+/** The online top 10 (`api/leaderboard.ts`, #365): every call resolves to null on any failure, and the results screen keeps the local board. */
 
 export const ONLINE_ENDPOINT = '/api/leaderboard'
 export const ONLINE_TIMEOUT_MS = 3000
@@ -10,7 +6,6 @@ export const ONLINE_TIMEOUT_MS = 3000
 export interface OnlineEntry {
   initials: string
   score: number
-  /** ISO time the score was saved. */
   at: string
 }
 
@@ -53,7 +48,9 @@ export function parseTop(value: unknown): OnlineEntry[] | null {
   return Array.isArray(value) && value.every(isEntry) ? value.slice(0, 10) : null
 }
 
-async function request(fetchImpl: typeof fetch, url: string, init: RequestInit, timeoutMs: number): Promise<unknown> {
+type Fetch = (url: string, init: RequestInit) => Promise<Response>
+
+async function request(fetchImpl: Fetch, url: string, init: RequestInit, timeoutMs: number): Promise<unknown> {
   const abort = new AbortController()
   const timer = setTimeout(() => abort.abort(), timeoutMs)
   try {
@@ -66,7 +63,7 @@ async function request(fetchImpl: typeof fetch, url: string, init: RequestInit, 
   }
 }
 
-export function onlineLeaderboard(endpoint: string, fetchImpl: typeof fetch = fetch, timeoutMs = ONLINE_TIMEOUT_MS) {
+export function onlineLeaderboard(endpoint: string, fetchImpl: Fetch = (url, init) => fetch(url, init), timeoutMs = ONLINE_TIMEOUT_MS) {
   return {
     async top(level: string): Promise<OnlineEntry[] | null> {
       const body = await request(fetchImpl, `${endpoint}?level=${encodeURIComponent(level)}`, { method: 'GET' }, timeoutMs)
@@ -77,13 +74,12 @@ export function onlineLeaderboard(endpoint: string, fetchImpl: typeof fetch = fe
       const body = (await request(fetchImpl, endpoint, init, timeoutMs)) as { rank?: unknown; top?: unknown } | null
       const top = parseTop(body?.top)
       if (!top) return null
-      const rank = Number.isSafeInteger(body?.rank) && (body!.rank as number) >= 1 && (body!.rank as number) <= top.length ? (body!.rank as number) - 1 : null
-      return { rank, top }
+      const rank = body?.rank
+      return { rank: typeof rank === 'number' && Number.isInteger(rank) && rank >= 1 && rank <= top.length ? rank - 1 : null, top }
     },
   }
 }
 
-/** Hits per bullet fired, 0..1, as the API takes it. */
 export function runAccuracy(hits: number, shotsFired: number): number {
   return shotsFired > 0 ? Math.min(1, Math.max(0, hits / shotsFired)) : 0
 }

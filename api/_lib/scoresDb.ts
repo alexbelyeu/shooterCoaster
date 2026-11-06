@@ -1,8 +1,4 @@
-/**
- * The `scores` table through Supabase's REST API (PostgREST), with the server-side secret key.
- * Plain fetch, no supabase-js: nothing here can reach the browser bundle. Any failure throws
- * `DbError`; the handler turns it into a bare 503.
- */
+/** The `scores` table over Supabase's REST API: plain fetch rather than supabase-js, one less client to keep out of the browser. */
 import type { PublicEntry, Submission } from './rules.js'
 import { BOARD_SIZE } from './rules.js'
 
@@ -10,15 +6,14 @@ export class DbError extends Error {}
 
 export interface ScoresDb {
   top(level: string): Promise<PublicEntry[]>
-  /** Rows matching every `column=op.value` filter. */
+  /** PostgREST filters: `{ column: 'op.value' }`. */
   count(filters: Record<string, string>): Promise<number>
   insert(row: Submission & { ipHash: string }): Promise<void>
 }
 
 const TIMEOUT_MS = 4000
 
-/** Null without both env vars: the board is then simply unavailable. */
-export function scoresDb(env: Record<string, string | undefined>, fetchImpl: typeof fetch = fetch): ScoresDb | null {
+export function scoresDb(env: Record<string, string | undefined>, fetchImpl: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init)): ScoresDb | null {
   const url = env.SUPABASE_URL?.trim().replace(/\/+$/, '')
   const key = env.SUPABASE_SECRET_KEY?.trim()
   if (!url || !key) return null

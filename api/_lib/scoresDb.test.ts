@@ -5,10 +5,10 @@ const env = { SUPABASE_URL: 'https://abc.supabase.co/', SUPABASE_SECRET_KEY: 'sb
 
 function recorder(respond: (url: string, init: RequestInit) => Response | Promise<Response>) {
   const calls: { url: string; init: RequestInit }[] = []
-  const fetchImpl = (async (url: string, init: RequestInit) => {
+  const fetchImpl = async (url: string, init: RequestInit) => {
     calls.push({ url, init })
     return respond(url, init)
-  }) as unknown as typeof fetch
+  }
   return { calls, fetchImpl }
 }
 

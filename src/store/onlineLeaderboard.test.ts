@@ -7,7 +7,8 @@ const top = [
 ]
 const run = { level: 'level1', initials: 'ABC', score: 900, seed: 1, kills: 50, accuracy: 0.5, version: '2.0.0' }
 
-const respond = (status: number, body: unknown) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch
+type Fetch = (url: string, init: RequestInit) => Promise<Response>
+const respond = (status: number, body: unknown): Fetch => async () => new Response(JSON.stringify(body), { status })
 
 describe('onlineEndpoint', () => {
   afterEach(() => setOnlineEndpointOverride(undefined))
@@ -33,10 +34,10 @@ describe('onlineLeaderboard', () => {
 
   it('submits and turns the 1-based rank into the board index', async () => {
     let sent: RequestInit | undefined
-    const fetchImpl = (async (_url: string, init: RequestInit) => {
+    const fetchImpl: Fetch = async (_url, init) => {
       sent = init
       return new Response(JSON.stringify({ rank: 2, top }), { status: 200 })
-    }) as unknown as typeof fetch
+    }
     expect(await onlineLeaderboard('/api', fetchImpl).submit(run)).toEqual({ rank: 1, top })
     expect(JSON.parse(sent!.body as string)).toEqual(run)
     expect(await onlineLeaderboard('/api', respond(200, { rank: null, top })).submit(run)).toEqual({ rank: null, top })
@@ -47,16 +48,11 @@ describe('onlineLeaderboard', () => {
       onlineLeaderboard('/api', respond(503, { error: 'unavailable' })),
       onlineLeaderboard('/api', respond(429, { error: 'too many submissions' })),
       onlineLeaderboard('/api', respond(200, { top: [{ initials: '<b>', score: 1, at: 'x' }] })),
-      onlineLeaderboard('/api', (async () => new Response('<html>', { status: 200 })) as unknown as typeof fetch),
-      onlineLeaderboard('/api', (async () => {
+      onlineLeaderboard('/api', async () => new Response('<html>', { status: 200 })),
+      onlineLeaderboard('/api', async () => {
         throw new TypeError('offline')
-      }) as unknown as typeof fetch),
-      onlineLeaderboard(
-        '/api',
-        ((_: string, init: RequestInit) =>
-          new Promise((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))))) as unknown as typeof fetch,
-        20,
-      ),
+      }),
+      onlineLeaderboard('/api', (_url, init) => new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))), 20),
     ]
     for (const board of boards) {
       expect(await board.top('level1')).toBeNull()

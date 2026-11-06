@@ -1,7 +1,4 @@
-// Writes api/_lib/levelLimits.ts from the game's own scoring code (src/levels/scoreLimits.ts).
-// The API can't import src/ (Vercel builds each function without the `@/` alias), so it reads
-// this generated table; api/_lib/levelLimits.test.ts fails until it is regenerated.
-// Usage: node scripts/gen-level-limits.mjs
+// node scripts/gen-level-limits.mjs: api/_lib/levelLimits.ts from src/levels/scoreLimits.ts (api/ can't import src/ on Vercel).
 import { build } from 'esbuild'
 import fs from 'node:fs'
 import path from 'node:path'

@@ -1,13 +1,8 @@
-/**
- * The online leaderboard's server rules (pure, unit-tested): what a submission must look like,
- * the per-IP rate limit and the IP hash. No imports from src/ at runtime: Vercel builds each
- * function on its own, without the game's `@/` alias.
- */
+/** No imports from src/: Vercel builds each function without the game's `@/` alias. */
 import { LEVEL_LIMITS } from './levelLimits.js'
 
 export const BOARD_SIZE = 10
 export const RATE_LIMIT = { max: 5, windowMs: 10 * 60 * 1000 } as const
-/** A real body is ~150 bytes. */
 export const MAX_BODY_BYTES = 2048
 
 /** Three letters A-Z: what `normalizeInitials` (src/store/leaderboard.ts) always produces. */
@@ -38,7 +33,6 @@ export function isCampaignLevel(level: unknown): level is string {
 
 const isInt = (v: unknown, min: number, max: number): v is number => Number.isSafeInteger(v) && (v as number) >= min && (v as number) <= max
 
-/** The POST body, checked against the level's limits (`src/levels/scoreLimits.ts`). */
 export function checkSubmission(body: unknown): Checked<Submission> {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) return { ok: false, error: 'bad body' }
   const { level, initials, score, seed, kills, accuracy, version } = body as Record<string, unknown>
@@ -54,7 +48,6 @@ export function checkSubmission(body: unknown): Checked<Submission> {
   return { ok: true, value: { level, initials, score, seed, kills, accuracy, version } }
 }
 
-/** True once `recent` accepted submissions from this IP fall inside the window. */
 export function rateLimited(recent: number): boolean {
   return recent >= RATE_LIMIT.max
 }
@@ -70,7 +63,7 @@ export function clientIp(headers: Headers): string {
   return headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
 }
 
-/** HMAC-SHA256 of the IP, hex: rate limiting works on this, and no raw IP is ever stored. */
+/** No raw IP is ever stored: the rate limit counts rows by this. */
 export async function hashIp(ip: string, salt: string): Promise<string> {
   const enc = new TextEncoder()
   const key = await crypto.subtle.importKey('raw', enc.encode(salt), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])

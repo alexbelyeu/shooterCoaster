@@ -47,12 +47,11 @@ function snapshotRun() {
 
 type Run = ReturnType<typeof snapshotRun>
 
-/** The online top 10 as board rows; stars from the level's thresholds, as the local board stores them. */
 function worldRows(top: readonly OnlineEntry[], maxScore: number, thresholds: readonly [number, number, number]): LeaderboardEntry[] {
   return top.map((e) => ({ initials: e.initials, score: e.score, stars: computeStars(e.score, maxScore, thresholds), date: Date.parse(e.at) || 0 }))
 }
 
-/** The world board, or null for this campaign run (dailies, and builds that never call the API: dev, preview, CI, portals, `?e2e=1`). */
+/** Null for dailies and every build but scoaster.com's own. */
 function worldBoard(run: Run) {
   const endpoint = run.mode.mode === 'campaign' ? onlineEndpoint(__BUILT_ON_VERCEL__, window.location.search) : null
   return endpoint ? onlineLeaderboard(endpoint) : null
@@ -70,9 +69,8 @@ export default function ResultsScreen() {
   const [rank, setRank] = useState<number | null>(null)
   const [initials, setInitials] = useState<InitialsState | null>(null)
   const [online] = useState(() => worldBoard(run))
-  /** The online top 10 once it answers, with this run's place on it; until then (or if it never does) the local board. */
   const [world, setWorld] = useState<{ board: LeaderboardEntry[]; rank: number | null } | null>(null)
-  /** The run goes online once, after its initials (or as the screen closes, under the initials it has then). */
+  /** Once: on OK, or as the screen closes with the entry still open. */
   const submitOnline = useRef<((letters: string) => void) | null>(null)
   const lettersRef = useRef('')
   const left = useRef(false)
@@ -128,7 +126,6 @@ export default function ResultsScreen() {
       if (!left.current) setWorld({ board: worldRows(top, config.maxScore, config.starThresholds), rank })
     }
     if (placed === null) {
-      // Missed the local board, so never goes online: just show the world's.
       void online.top(config.id).then((top) => top && show(top, null))
       return
     }
@@ -149,7 +146,6 @@ export default function ResultsScreen() {
     }
   }, [config, run, stars, online])
 
-  // Leaving with the entry still open keeps the local row under the letters it had: send those.
   useEffect(() => () => submitOnline.current?.(lettersRef.current), [])
 
   useEffect(() => {

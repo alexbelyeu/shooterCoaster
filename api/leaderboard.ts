@@ -1,9 +1,4 @@
-/**
- * The online leaderboard (#365), a Vercel Function on the Node.js runtime.
- * GET  /api/leaderboard?level=<id> → { top: [{ initials, score, at }] } (CDN-cached 30 s)
- * POST /api/leaderboard { level, initials, score, seed, kills, accuracy, version } → { rank, top }
- * Setup and the table: docs/LEADERBOARD.md, supabase/migrations/.
- */
+/** The online leaderboard (#365); the API and its setup: docs/LEADERBOARD.md. */
 import { getBoard, postScore, type Deps } from './_lib/handler.js'
 import { scoresDb } from './_lib/scoresDb.js'
 

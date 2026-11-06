@@ -1,20 +1,14 @@
-/**
- * GET / POST /api/leaderboard (`api/leaderboard.ts`), with the database passed in so the unit
- * tests run it against a fake. No env vars, a paused project or any database error answer a
- * bare 503: never a 500, a stack trace or a secret.
- */
+/** No env vars, a paused project or any database error answer a bare 503: never a 500, a stack trace or a secret. */
 import { checkSubmission, clientIp, hashIp, isCampaignLevel, MAX_BODY_BYTES, rankFrom, rateLimited, windowStart } from './rules.js'
 import type { ScoresDb } from './scoresDb.js'
 
 export interface Deps {
-  /** Null when the env vars aren't set. */
   db: ScoresDb | null
-  /** Keys the IP hash; the server secret, so the hashes can't be reversed by brute force over IPs. */
+  /** The server secret, so the IP hashes can't be reversed by brute force over the IPv4 space. */
   salt: string
   now: () => number
 }
 
-/** CDN-cached for 30 s: most reads never reach the function. */
 const BOARD_CACHE = 'public, s-maxage=30, stale-while-revalidate=300'
 
 function json(status: number, body: unknown, cache = 'no-store'): Response {
