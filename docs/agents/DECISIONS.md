@@ -1532,3 +1532,86 @@ state: it opens on green → red, stays silent while open and closes on the next
 - CI's red-`main` report never comments on a production suite's issue, because that issue closes itself when prod goes green.
 **Consequences:** A green → red change sends one email per outage. A timeout says "no check failed". The full suite still
 catches CDN / runtime drift within a day. Don't move the full smoke back onto `deployment_status`, and don't just raise the cap.
+
+## 2026-11-01 — Marketing clip: re-render for pushes only, no GIF in git (builder, #203)
+
+**Context:** every `npm run clip` re-render committed to `docs/marketing/media/` adds its files
+to git history for good; the GIF alone is ~7 MB, twice the MP4, and is made from the same frames.
+**Decision:** re-render only for a launch or marketing push, committing the MP4 and stills.
+`scripts/clip.mjs` writes the GIF next to the frames in `e2e-results/clip/<size>/` (gitignored);
+the README has an ffmpeg line to make one from the committed MP4. The 2026-10-28 GIF already
+committed stays (deleting it would not shrink history).
+**Consequences:** ~3.4 MB of history per re-render instead of ~10 MB. Whether `docs/marketing/media/`
+gets a size budget line is left to the Director.
+
+## 2026-11-04 — Score card image: canvas, story on phones, feed on desktop (Builder, #272)
+
+**Context:** The results Share button should share a picture of the run. Options were a WebGL capture of the scene, a server-rendered Open Graph image, or a 2D canvas drawn in the browser.
+**Decision:** A 2D canvas card (pure layout in `src/ui/scoreCard.ts`, drawing in `scoreCardImage.tsx`) built from the level-select postcard SVG and the self-hosted fonts, drawn only when the player opens Share. Touch devices get the 1080×1920 story card (on the share sheet when `canShare({ files })`, else from the menu); desktops get the 1200×630 feed card (Save image / Copy image). The menu item reads "Save image", not "Download image", so it fits one line in the 2- and 3-column menus; its analytics method is still `image_download`.
+**Consequences:** No WebGL readback, no server, no request. Per-score link previews would still need a server (out of scope). The sheet needs the click's user activation, so the story card starts drawing on the Share button's pointerdown.
+
+## 2026-11-04 — CI smoke runs as parallel shards behind a `verify` gate, with a `smokeSeconds` budget (builder, #353)
+
+**Context:** The smoke ran serially inside the one `verify` job: ~25 min of a 40-min cap, growing with every level,
+boss and step, and every PR waited ~30 min for CI. The `main` ruleset requires a check named exactly `verify`.
+
+**Decision:** `ci.yml` runs `unit + build`, `lighthouse` and one `smoke (<shard>)` job per shard in parallel, then a
+`verify` job that needs them all and passes only if every one succeeded (it runs when one failed or was cancelled,
+and then fails). The shard table is `SHARDS` in pure `e2e/shards.mjs` and the shards are named steps of the one
+smoke, not a second runner (`--shard`, `--steps`). `shards.test.ts` holds them to running exactly what the full
+`npm run smoke` runs:
+`ui` (title, landing, levelSelect, daily, settings), `level1` (ride, frenzy, seed, boss, pickup), `level1-steps` (quality,
+pause, countdown, speed, scrim), `level2`…`level5` (every per-level step on that level) and `mobile` (the phone run). Each
+shard job builds the commit itself (~30 s), which is quicker than waiting on a shared build job.
+New budget `budgets.json` `smokeSeconds`, per shard, checked on CI only (a 2-core session is slower): over budget fails
+with `<shard> shard took X min, budget Y`, and a shard still running at twice its budget writes its results and exits
+before the 25-min job timeout. The numbers are 1.5x the slower of each shard's smoke time on two CI runs of #364,
+rounded up to 30 s (the short shards swung by up to ~50% between runs; budgets at 1.4x one run failed ui and level1):
+
+| shard | run 1 / run 2 (smoke only) | budget |
+|---|---|---|
+| ui | 2.1 / 3.2 min | 300 s |
+| level1 | 3.3 / 5.3 min | 480 s |
+| level1-steps | 5.3 / 4.7 min | 480 s |
+| level2 | 5.6 / 5.6 min | 510 s |
+| level3 | 4.1 / 2.8 min | 390 s |
+| level4 | 2.7 / 2.5 min | 270 s |
+| level5 | 1.8 / 2.6 min | 240 s |
+| mobile | 7.7 / 7.7 min | 600 s (1.3x: steady, and it sets the wall time) |
+
+GitHub creates the `verify` check only when its needs end, so `automerge.cjs` and `studio-status.cjs` treat a head
+with CI jobs still running and no `verify` yet as "verify waiting", not "no verify".
+
+**Consequences:** `verify` took 8 min 46 s and 8 min 50 s wall on #364 instead of ~30. A new level needs a shard, a matrix entry in
+`ci.yml` and a `smokeSeconds` entry (the unit test fails until all three exist). The phone run (`runMobile`, one
+continuous session) is the long pole: the next big addition to it should split it into two shards instead of
+raising its budget. Only the Director raises these budgets.
+
+## 2026-11-06 — Online leaderboard: Supabase behind Vercel Functions (Builder, #365)
+
+**Context:** Alex decided on 4 Nov 2026 (#365) to add an online leaderboard. This supersedes the
+2026-10-19 decision "No online backend until Alex decides". He owns the account side: a dedicated
+Supabase project on his free plan, its env vars in Vercel, and running the migration.
+
+**Decision:**
+- The browser only ever calls same-origin `/api/leaderboard`; `api/leaderboard.ts` (Vercel Function,
+  Node runtime) is the only code with the Supabase secret key. It talks to PostgREST with plain fetch,
+  no supabase-js. `check:bundle` fails if Supabase's URL, key names or REST path reach the browser.
+- Only the production build calls it (`__BUILT_ON_VERCEL__`, not `?e2e=1`); dev, preview, CI, the
+  smoke (stubbed with `page.route`) and the portal build never do. Every failure (no env vars, a
+  paused project, timeout after 3 s) falls back silently to the local board; the API answers 503,
+  never a 500 or details.
+- Score ceiling = every kill at the top 5× combo multiplier, golden balloons included
+  (`src/levels/scoreLimits.ts`), not the level's `maxScore`: `maxScore` is the no-combo score, so real
+  runs pass it. api/ can't import `src/` at runtime (Vercel builds functions without the `@/` alias),
+  so `scripts/gen-level-limits.mjs` generates `api/_lib/levelLimits.ts` and a unit test fails when it
+  is stale.
+- Rate limit (5 accepted POSTs per IP per 10 min) is a count over the `scores` table by `ip_hash`, an
+  HMAC-SHA256 of the IP keyed by the secret key: no extra table, no raw IP stored.
+- Only runs that place on the local board go online, once, after initials entry (or as the results
+  screen closes). A run that misses the local board fetches and shows the World board.
+
+**Consequences:** The game has one backend dependency, optional by design. New levels or score
+changes need `node scripts/gen-level-limits.mjs`. Schema changes need Alex to run SQL by hand.
+Scores are only plausibility-checked (no replay validation): a determined cheater can still post a
+high but possible score; Alex can delete rows (docs/LEADERBOARD.md).
