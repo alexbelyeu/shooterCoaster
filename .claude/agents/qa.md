@@ -23,6 +23,8 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
    (`gh api 'repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs?check_name=verify'`).
    If it is still running, poll for a few minutes. CI ran the full `verify` on the PR
    merged with `main` as of its last push, so a `success` is your pass/fail; you don't re-run it.
+   A red `verify` you're sure the diff didn't cause is never "a known flake": don't approve,
+   name the failing check and run, and link its `studio-health` issue (PROTOCOL.md, "No known flakes").
 2. Check out the branch. **Behind `main`?** Compare the files `main` changed since the
    branch point with the PR's files:
    `git diff --name-only $(git merge-base HEAD origin/main) origin/main` vs

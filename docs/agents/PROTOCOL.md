@@ -53,8 +53,8 @@ If the check itself fails, agents treat it as paused.
 
 **Studio status page.** The open issue labelled `studio-status` ("📊 Studio status
 (live)") is Alex's live view of the studio. `.github/workflows/studio-status.yml`
-rewrites its body from `scripts/studio-status.cjs` on every issue/PR/label change and
-every 15 minutes. Agents never edit, comment on or close it, and never claim it. If a
+rewrites its body from `scripts/studio-status.cjs` on every issue / label change and issue
+comment, after every CI, production-smoke and auto-merge run, and every 15 minutes. Agents never edit, comment on or close it, and never claim it. If a
 role's schedule changes, update `SCHEDULE` in that script (and the table above) in
 the same PR. Keep claim comments in the `Claimed by …` form, since the page reads them.
 
@@ -82,6 +82,7 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 - Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`, `type:growth`.
 - `epic` — umbrella issue the Director breaks into `agent:ready` children. Never claimed by builders.
 - `studio-status` — the live status page issue (see above). Not work; never touch it.
+- `studio-health` — opened, kept current and closed by the watchdog (`.github/workflows/studio-health.yml`, `scripts/studio-health.cjs`, every 2 h): one issue per problem with the studio itself (a red `main` that nothing else alerts on, a flaky check, a timeout or runtime creep, stuck PRs, agents not running). It doesn't duplicate `agent:prod-broken`: one open over 12 h gets `needs-alex` and a comment instead. `agent:ready` + `P1`: builders take them before any other issue, the Maintainer right after Production and Main health. Open over 24 h and still seen in the last 24 h, or only fixable by Alex, they get `needs-alex`, once. Each says when it was **last seen**: if a PR merged after that fixes it, close it with the PR link; only a newer run files it again. Exempt from the Issue contract. Fix the problem and say so in the issue; don't edit the watchdog's text.
 - `token-ledger` — the "🧮 Token ledger" issue: one comment per run from `scripts/run-usage.cjs` (runbooks README, "Token ledger"). Not work: agents only append comments; builders ignore it; nobody edits or closes it.
 - `needs-alex` + `type:audio`, titled `Listen: …` — renders waiting for Alex's ear; he closes it with his pick. Builders never claim it.
 - `marketing` + `needs-alex` — a draft post or campaign from the Marketer that only Alex can carry out (agents never post, spend or create accounts). Builders ignore these. `type:growth` — discoverability or growth work for builders, filed by the Marketer.
@@ -97,7 +98,9 @@ criteria** (checkable, including what the smoke-test screenshot should show),
 ## Claiming work (Builders)
 
 1. First: your own open PRs labelled `agent:changes-requested` (oldest first). Fix and push to the same branch.
-2. Otherwise: the highest-priority `agent:ready` issue (P1 > P2 > P3, then oldest), skipping `epic`.
+2. Otherwise: the oldest open `studio-health` issue labelled `agent:ready` (the watchdog's;
+   close it with the PR link instead if a PR merged after its **Last seen** time fixes it),
+   then the highest-priority `agent:ready` issue (P1 > P2 > P3, then oldest), skipping `epic`.
 3. Claim it immediately: swap `agent:ready` → `agent:in-progress` and comment `Claimed by builder run <date time>`. When dispatching several builders, the dispatcher claims all issues **before** spawning them so two builders never take the same one.
 4. Branch: `agent/<issue-number>-<short-slug>`. One issue per PR.
 
@@ -175,6 +178,14 @@ oldest first.
 **Updating a pushed branch:** always `git merge origin/main` and push normally. Never
 rebase a branch that is already on GitHub — that needs a force-push, which hard rule 2
 forbids.
+
+## No known flakes
+
+A check that fails without the change under test causing it is a P1 bug in the check, never
+"a known flake". QA doesn't approve past it and doesn't wave it through in a comment: it names
+the check and the run, and links the watchdog's `studio-health` issue for it (or says there is
+none yet; the watchdog opens one within 2 h). Builders fix flaky checks by making them
+deterministic, never by retrying, raising a timeout or loosening the check.
 
 ## When main breaks
 

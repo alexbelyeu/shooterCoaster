@@ -1,9 +1,9 @@
 // Live "Studio status" page for Alex: rewrites the body of one GitHub issue
 // (label `studio-status`) with what the autonomous studio is doing right now.
 //
-// Run by .github/workflows/studio-status.yml (actions/github-script) on every
-// issue / PR / label change and every 15 minutes. Read-only except for that one
-// issue (and creating it + its label the first time).
+// Run by .github/workflows/studio-status.yml (actions/github-script) on every issue / label
+// change, issue comment, finished CI / prod-smoke / auto-merge run, and every 15 minutes.
+// Read-only except for that one issue (and creating it + its label the first time).
 //
 // Local dry run (prints the markdown, writes nothing):
 //   node scripts/studio-status.cjs --dry-run
@@ -14,6 +14,8 @@ const STATUS_TITLE = '📊 Studio status (live)'
 const SITE = 'https://scoaster.com'
 const REPO = 'alexbelyeu/shooterCoaster'
 const LEDGER_LABEL = 'token-ledger'
+/** Alex's other pause switch (besides an open `pause` issue). */
+const STEERING_PAUSE = /^pause:\s*true/m
 
 // Keep in sync with the scheduled tasks (times are New York wall-clock).
 // days: 0 = Sunday … 6 = Saturday; omitted = every day.
@@ -47,6 +49,43 @@ function zonedToUtc(y, m, d, h, mi) {
   const p = zonedParts(guess)
   const offset = Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi) - guess
   return guess - offset
+}
+
+// ---------- pause ----------
+// Alex pauses with an open `pause` issue (a `PAUSE until 2026-10-21 08:00` title, New York time,
+// ends by itself) or `pause: true` in STEERING.md. scripts/pause-check.sh reads the same switches.
+
+/** When a pause issue's `until <date>[ <time>]` (New York time) ends, or null for "until closed". */
+function pauseUntil(title) {
+  const m = /until\s+(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?/i.exec(title || '')
+  return m ? zonedToUtc(+m[1], +m[2], +m[3], +(m[4] || 0), +(m[5] || 0)) : null
+}
+
+const isLivePause = (issue, now) => {
+  const until = pauseUntil(issue.title)
+  return until === null || now < until
+}
+
+/** { paused, steering, issues: the live pause issues, endedAt: when the latest pause ended (ms) or null }. */
+async function readPauseState(api, now) {
+  let steering = false
+  try {
+    const f = await api('GET /repos/{owner}/{repo}/contents/{path}', { path: 'docs/agents/STEERING.md' })
+    steering = STEERING_PAUSE.test(Buffer.from(f.content, 'base64').toString('utf8'))
+  } catch {
+    steering = false
+  }
+  const [open, closed] = await Promise.all([
+    api('GET /repos/{owner}/{repo}/issues', { state: 'open', labels: 'pause', per_page: 20 }),
+    api('GET /repos/{owner}/{repo}/issues', { state: 'closed', labels: 'pause', sort: 'updated', direction: 'desc', per_page: 10 }),
+  ])
+  const openIssues = open.filter((i) => !i.pull_request)
+  const issues = openIssues.filter((i) => isLivePause(i, now))
+  const ends = [
+    ...closed.filter((i) => !i.pull_request && i.closed_at).map((i) => Date.parse(i.closed_at)),
+    ...openIssues.map((i) => pauseUntil(i.title)).filter((u) => u !== null && u <= now),
+  ]
+  return { paused: steering || issues.length > 0, steering, issues, endedAt: ends.length ? Math.max(...ends) : null }
 }
 
 function fmtTime(ms, now) {
@@ -288,13 +327,7 @@ async function collect(api, now) {
     prodSmoke = null
   }
 
-  let steeringPaused = false
-  try {
-    const f = await api('GET /repos/{owner}/{repo}/contents/{path}', { path: 'docs/agents/STEERING.md' })
-    steeringPaused = /^pause:\s*true/m.test(Buffer.from(f.content, 'base64').toString('utf8'))
-  } catch {
-    steeringPaused = false
-  }
+  const { steering: steeringPaused } = await readPauseState(api, now).catch(() => ({ steering: false }))
 
   const ledger = await collectLedger(api, now - 7 * DAY).catch(() => null)
   const milestones = await collectMilestones(api).catch(() => [])
@@ -306,7 +339,7 @@ async function collect(api, now) {
 
 function render(data, now) {
   const { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger, milestones } = data
-  const pauses = issues.filter((i) => hasLabel(i, 'pause'))
+  const pauses = issues.filter((i) => hasLabel(i, 'pause') && isLivePause(i, now))
   const inQa = prs.filter((p) => hasLabel(p, 'agent:needs-qa'))
     .sort((a, b) => prio(a) - prio(b) || Date.parse(a.created_at) - Date.parse(b.created_at))
   const approved = prs.filter((p) => hasLabel(p, 'agent:qa-approved'))
@@ -476,6 +509,8 @@ module.exports.milestoneSection = milestoneSection
 module.exports.ghReadApi = ghReadApi
 module.exports.nextRun = nextRun
 module.exports.SCHEDULE = SCHEDULE
+module.exports.readPauseState = readPauseState
+module.exports.pauseUntil = pauseUntil
 
 // Local dry run through the `gh` CLI: node scripts/studio-status.cjs --dry-run
 if (require.main === module) {
