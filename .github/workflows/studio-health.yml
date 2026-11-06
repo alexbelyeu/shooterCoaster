@@ -12,6 +12,11 @@ name: Studio health
 on:
   schedule:
     - cron: '23 */2 * * *'
+  # GitHub's cron is best-effort (it skipped this one's first three slots on 2026-11-06): also run after every
+  # production check (each deploy and the nightly smoke), so the watchdog never goes a day without looking.
+  workflow_run:
+    workflows: ['Production smoke']
+    types: [completed]
   workflow_dispatch:
 
 permissions:

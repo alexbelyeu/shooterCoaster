@@ -28,7 +28,7 @@ npm run smoke             # headless playtest: title + every level + phone touch
 npm run smoke:portal      # smoke the portal build served under /nested/path/ (title + level1 checks; CI `portal` job, which then keeps the zip as the 30-day artifact `dist-portal`; needs build:portal)
 npm run prod-check -- --url https://scoaster.com   # deploy health check (#352; run after every production deploy by prod-smoke.yml): every built file served with its headers, /go + 404 routes, title, level1 to a kill, a phone run; needs a build (its file list), no --url serves dist/ the way vercel.json says
 npm run lighthouse        # Lighthouse on dist/ (vite preview), mobile + desktop: fails below SEO 100, Accessibility / Best Practices 95; Performance printed only (needs a build + SC_CHROME; e2e-results/lighthouse.json; docs/marketing/SEO.md)
-npm run verify            # test + build + bundle budget + lighthouse + smoke — run before every PR (CI runs it as parallel jobs, `unit + build`, `lighthouse` and one `smoke (<shard>)` each, then the required `verify` gate: ~10 min)
+npm run verify            # test + build + bundle budget + lighthouse + smoke — CI's gate on every PR; agents don't run it before pushing (builder.md step 7: test + build + check:bundle + a narrow smoke) (CI runs it as parallel jobs, `unit + build`, `lighthouse` and one `smoke (<shard>)` each, then the required `verify` gate: ~10 min)
 bash scripts/quiet.sh <cmd>    # run any noisy command with its output in a log file: prints status (+ failures and tail on error)
 npm run og                # re-render the share card public/social/og-1200x630.jpg (needs a build) + the icons from public/favicon.svg (favicon.ico, apple-touch-icon, manifest icons/; `-- --icons` for just those, no build)
 npm run clip              # render the level-1 gameplay clip (MP4 + stills) to docs/marketing/media/ in virtual time, the GIF to e2e-results/clip/ (needs a build + ffmpeg, ~15 min; `-- --level <id>` for another level; re-render policy in docs/marketing/media/README.md)
@@ -146,9 +146,10 @@ each run's peak context, compactions, cache misses and heaviest tool results).
 - Don't `cat` large files, logs or `results.json`: `grep -n` first, then Read with
   offset/limit; `jq` only the fields you need from JSON.
 - Look only at the screenshots that answer your question (usually one or two), not every PNG.
-- Don't poll or `sleep` waiting for CI or merges unless your runbook says to: a gap of over
+- Don't poll or `sleep` waiting for CI, merges or a backgrounded smoke: a gap of over
   ~5 minutes between turns expires the prompt cache, and the next turn pays for the whole
-  context again.
+  context again. Run long commands in the foreground through `quiet.sh`; don't wait for CI at all.
+  The watchdog files any run over 5M weighted tokens as a `studio-health` issue.
 
 ## Hard rules (all agents, always)
 

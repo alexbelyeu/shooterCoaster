@@ -29,6 +29,11 @@ for anything visual or level-related).
 3. Verify like a player. `export SC_CHROME="$(scripts/ensure-browser.sh)"` once, then
    iterate with `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build && bash scripts/quiet.sh node e2e/smoke.mjs --levels <levels you touched>`
    (add `--mobile` for input, UI, HUD, camera, audio or layout changes).
+   Keep local smoke narrow: the levels or steps you touched (`--levels`, `--steps`, `--shard`),
+   run in the foreground through `quiet.sh`. **Never background a run and `sleep` or poll for
+   it**, and never wait more than ~4 minutes between turns: each gap past 5 minutes expires the
+   prompt cache and the next turn re-reads your whole context (one builder run lost 2.8M of its
+   7.0M tokens to thirteen `sleep 590` waits).
    **Read the screenshots** that show your change, not every PNG. If it doesn't look clearly
    better or the acceptance criteria aren't visibly met, keep iterating. Extend
    `src/testing/e2eHook.tsx` / `e2e/smoke.mjs` if you need to test something new
@@ -42,10 +47,13 @@ for anything visual or level-related).
 6. **Deslop.** Follow `.claude/commands/deslop.md` over every file the branch touches
    (whole files, not just your lines). Re-run `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build` after cutting.
 
-7. **Full verify, once.** `bash scripts/quiet.sh npm run verify` (all levels + phone run) right before you push
-   for review, not after every change. If it fails, fix and re-run.
+7. **Pre-push checks, not the full verify.** `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build && bash scripts/quiet.sh npm run check:bundle`,
+   plus the narrow smoke from step 3 for what you touched. Don't run `npm run verify`, the
+   full smoke or Lighthouse locally: CI runs them on the PR in parallel shards (~10 min), and
+   that `verify` is the gate QA reads. Push, open the PR, label it and finish; don't wait for CI.
+   If it goes red, QA sends the PR back with the failing shard and Fix reproduces just that one.
 
-Run `scripts/pause-check.sh` before `npm run verify` and before shipping. If it prints
+Run `scripts/pause-check.sh` before shipping. If it prints
 PAUSED: commit and push what you have, open (or keep) the PR as a **draft** with a
 comment saying where you stopped, leave the issue `agent:in-progress`, and end with the
 PAUSED line.

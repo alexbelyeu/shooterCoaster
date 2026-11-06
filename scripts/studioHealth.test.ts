@@ -252,6 +252,27 @@ const COMMENT = 'POST /repos/{owner}/{repo}/issues/{issue_number}/comments'
 const ADD_LABELS = 'POST /repos/{owner}/{repo}/issues/{issue_number}/labels'
 const PATCH = 'PATCH /repos/{owner}/{repo}/issues/{issue_number}'
 
+describe('heavy runs', () => {
+  const run = (role: string, weighted: number, hoursAgo: number, extra = {}) => ({
+    role, ref: '#1', weighted, at: NOW - hoursAgo * H, minutes: 100, url: 'https://c', missTokens: 0, misses: 0, peakContext: null, missesAfter: [], heaviest: [], ...extra,
+  })
+  it('files one issue per role for runs over 5M in 48 h, with where the tokens went', () => {
+    const f = findings(snap({
+      ledgerRuns: [
+        run('builders', 7e6, 2, { missTokens: 2.8e6, misses: 13, missesAfter: ['Bash: sleep 590; tail -12 log'] }),
+        run('builders', 6e6, 10),
+        run('qa', 1e6, 1),
+        run('maintainer', 9e6, 60),
+      ],
+    }))
+    expect(f.map((x: { key: string }) => x.key)).toEqual(['heavy:builders'])
+    expect(f[0].title).toBe('Token-heavy builders runs: 2 over 5M in 48 h')
+    expect(f[0].body).toContain('2.8M of it 13 cache misses')
+    expect(f[0].body).toContain('sleep 590')
+    expect(f[0].lastSeen).toBe(NOW - 2 * H)
+  })
+})
+
 describe('reconcile', () => {
   const finding = (over: object = {}) => ({ key: 'flaky:verify / Smoke', title: 'Flaky', owner: 'agents', body: 'b', lastSeen: NOW - H, ...over })
   const issue = (over: object = {}) => ({ number: 3, title: 'Flaky', created_at: iso(2 * H), labels: [], body: '<!-- studio-health:flaky:verify / Smoke -->\nb', ...over })
