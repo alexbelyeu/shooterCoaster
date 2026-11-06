@@ -818,7 +818,7 @@ async function revealStall(page) {
     const screens = [...document.querySelectorAll('.results-screen')].map((e) => `${e.getAttribute('data-sequence')}/${e.getAttribute('data-mode')}`)
     const board = document.querySelector('.results-board') ? 'shown' : 'none'
     return `phase ${s.phase()}, level ${s.stats().currentLevel}, results screens [${screens.join(', ') || 'none'}], board ${board}, page ${document.visibilityState}`
-  })
+  }).catch((e) => `state unreadable: ${e.message}`)
 }
 
 /** The level timer running out mid-FRENZY (#195): holdFeedback keeps the slow-mo deep while one huge timerStep ends the run. */
@@ -2035,7 +2035,7 @@ async function dailyCheck(newPage) {
     }
   })
   const savedDay = run ? results.daily.savedDaily[run.dateKey] : undefined
-  if (!resultsShown) problems.push(`daily results screen never finished its reveal (${await revealStall(page)})`)
+  if (!resultsShown) problems.push(`daily results screen never finished its reveal (${await revealStall(first.page)})`)
   if (results.mode !== 'daily' || !results.badge) problems.push(`daily results lack the Daily badge (mode ${results.mode})`)
   if (results.score > 0 && results.record !== 'NEW BEST') problems.push(`first daily result shows "${results.record}", expected NEW BEST`)
   if (results.buttons.includes('Next Level')) problems.push('daily results offer Next Level')
