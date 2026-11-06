@@ -1,0 +1,49 @@
+name: Turntable
+# Enemy turntable (#380): close-ups of every enemy and boss, uploaded as the `turntable` artifact on PRs that can
+# change how one looks. Not part of `verify`, so it never holds up a merge, and other PRs never run it.
+
+on:
+  pull_request:
+    paths:
+      - 'src/entities/**'
+      - 'src/effects/deathStyles*'
+      - 'src/dev/turntable/**'
+      - 'turntable.html'
+      - 'scripts/turntable.mjs'
+      - '.github/workflows/turntable.yml'
+
+concurrency:
+  group: turntable-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  turntable:
+    name: turntable
+    permissions:
+      contents: read
+    # Pinned like ci.yml's browser jobs: `playwright install --with-deps` fails on ubuntu-latest.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Render the turntable
+        run: npm run turntable
+
+      - name: Upload turntable
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: turntable
+          path: e2e-results/turntable/
+          retention-days: 30
