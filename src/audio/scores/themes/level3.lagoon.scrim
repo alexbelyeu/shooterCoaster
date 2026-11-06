@@ -1,0 +1,60 @@
+title    Lagoon Run
+composer Claude (ShooterCoaster)
+about    Ocean option "lagoon": calypso meets arcade in G major. A steel drum carries a 3+3+2 hook over a marimba ostinato, a tumbao FM bass, clave and timbales, with the sea washing in every eight bars. The last eight bars lift a tone. Layers: marimba, bass, clave and the sea wash, then the kit at 2x, the steel drum at 3x, horn-section stabs and straight hats at FRENZY.
+tempo    150
+beats    4
+steps    2
+reverb   0.3
+
+# untagged voices are the base layer; the intro plays every layer
+voice mar    marimba   vol=0.36 pan=0.35
+voice bass   fmbass    vol=0.64 gate=0.8
+voice clave  clave     vol=0.34 pan=-0.4
+voice wash   surf      vol=0.3  pan=0.2
+voice kick   kick      vol=0.85 layer=drums
+voice rim    rim       vol=0.42 pan=0.1 layer=drums
+voice shake  shaker    vol=0.36 pan=-0.35 layer=drums
+voice timb   timbale   vol=0.4  pan=0.3 layer=drums
+voice crash  crash     vol=0.32 pan=-0.2 layer=drums
+voice steel  steeldrum vol=0.9  pan=-0.05 layer=lead
+voice horns  brass     vol=0.32 pan=-0.35 center=B4 gate=0.5 layer=frenzy
+voice hat    hat909    vol=0.3  pan=0.4 layer=frenzy
+
+pattern intro
+steel | D5 E5 F#5 A5 B5-- A5 | G5--- . . D5 . |
+wash  | x....... | ........ |
+timb  | ........ | x.x.xxXX |
+kick  | ........ | x...x.x. |
+
+pattern A
+steel | G5-- D5-- B4- | C5 E5 G5 E5- C5 E5- | F#5-- A5-- F#5 E5 | D5 B4 G4 B4 D5--- |
+mar   | G4 B4 D5 B4 G4 B4 D5 B4 | C5 E5 G5 E5 C5 E5 G5 E5 | D5 F#5 A5 F#5 D5 F#5 A5 F#5 | G4 B4 D5 B4 G4 B4 D5 B4 |
+bass  | G2-- G2-- D2- | C3-- C3-- G2- | D2-- D2-- A2- | G2-- G2-- D2- |
+clave | x..x..x. | ..x.x... | x..x..x. | ..x.x... |
+wash  | _ | _ | _ | _ |
+kick  | x...x... | % | % | % |
+rim   | ..x...x. | % | % | % |
+shake | xoxoxoxo | % | % | % |
+timb  | ........ | % | % | ....x.xx |
+crash | X....... | _ | _ | _ |
+horns | [G]-- [G]-- [G]- | [C]-- [C]-- [C]- | [D]-- [D]-- [D]- | [G]-- [G]-- [G]- |
+hat   | xxxxxxxx | % | % | % |
+
+pattern A2 from A
+steel | G5-- D5-- B4- | C5 E5 G5 E5- C5 E5- | F#5-- A5-- C6 B5 | G5--- . D5 E5 F#5 |
+wash  | x....... | _ | _ | _ |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+steel | B5-- G5-- E5- | C6-- G5-- E5 G5 | C#6-- A5-- G5- | F#5 E5 D5 C5 A4- F#4- |
+mar   | E5 G5 B5 G5 E5 G5 B5 G5 | C5 E5 G5 E5 C5 E5 G5 E5 | C#5 E5 A5 E5 C#5 E5 G5 E5 | D5 F#5 A5 F#5 C5 F#5 A5 F#5 |
+bass  | E2-- E2-- B2- | C3-- C3-- G2- | A2-- A2-- E2- | D2-- D2-- F#2- |
+horns | [Em]--- . [Em]-- | [C]--- . [C]-- | [A7]--- . [A7]-- | [D7]--- . [D7]-- |
+crash | X....... | _ | _ | _ |
+
+pattern B2 from B
+steel | B5-- G5-- E5- | C6-- G5-- E5 G5 | C#6-- A5-- G5- | A5 F#5 D5 F#5 A5 B5 C6 A5 |
+timb  | ........ | % | % | x.x.xxXX |
+
+play intro
+loop A A2 B B2 A A2 A+2 A2+2

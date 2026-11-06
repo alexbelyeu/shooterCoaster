@@ -22,7 +22,14 @@ Work through these in order; stop early only if something is on fire.
    `ci.yml`, and a red run opens an `agent:prod-broken` issue). Only if it is red or missing, run
    `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm run verify` there (with `SC_CHROME` set via
    `scripts/ensure-browser.sh`). If red, revert the culprit the same way.
-3. **Queue hygiene**:
+3. **Studio health**: the open `studio-health` issues (the watchdog,
+   `.github/workflows/studio-health.yml`, keeps one per problem, every 2 h). For each: if a PR
+   merged after its **Last seen** time already fixes it, close it with the PR link (only a newer
+   run files it again; state findings like `stalled` or `qa-backlog` refile while they still
+   hold). If one is `agent:ready` and unclaimed, claim the oldest per PROTOCOL.md "Claiming
+   work" and work it like a Builder before any tech debt. A `needs-alex` one you can't fix:
+   leave a one-line comment with what you checked.
+4. **Queue hygiene**:
    - Issues `agent:in-progress` for >20h with no open PR → back to `agent:ready` with a comment.
    - Open PRs labelled `agent:needs-qa` that conflict with `main` → merge `origin/main` into the branch, resolve, re-verify,
      push normally (never rebase/force-push).
@@ -31,7 +38,7 @@ Work through these in order; stop early only if something is on fire.
      if every issue or PR they wait on is closed (merged, or a `Listen:` issue Alex has
      closed with his pick), swap `agent:blocked` → `agent:ready` and comment
      `Unblocked: #<n> is done` (quote Alex's closing comment if it has one).
-4. **Fold the decisions inbox** (skip if `docs/agents/decisions/inbox/` holds only its
+5. **Fold the decisions inbox** (skip if `docs/agents/decisions/inbox/` holds only its
    README, or if an earlier fold PR is still open): append every inbox entry
    to the bottom of `docs/agents/DECISIONS.md` in date order (filename order), as
    `## YYYY-MM-DD — Title (role, #PR)` sections with the entry body unchanged, then
@@ -39,11 +46,11 @@ Work through these in order; stop early only if something is on fire.
    move whole past years to `docs/agents/decisions/<year>.md`. One docs-only PR
    titled `docs(decisions): fold inbox <date>`, labelled `agent:needs-qa`. You are the
    only role that edits `DECISIONS.md`.
-5. **Tech debt** (if time remains): claim the highest-priority `agent:ready` issue
+6. **Tech debt** (if time remains): claim the highest-priority `agent:ready` issue
    labelled `type:tech` or `type:perf` and work it exactly like a Builder (branch,
    verify, PR labelled `agent:needs-qa`). If none exist, improve the test harness
    (`e2e/`, `src/testing/`) — e.g. better playtest coverage — via a PR.
-6. Update the "Known issues" section of `docs/agents/STATE.md` if you learned
+7. Update the "Known issues" section of `docs/agents/STATE.md` if you learned
    something (docs-only PR labelled `agent:needs-qa`).
 
 Finish with a short health summary: main status, reverts done, queue changes, PRs opened.

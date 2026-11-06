@@ -1,0 +1,66 @@
+title    Riptide
+composer Claude (ShooterCoaster)
+about    Ocean option "riptide": a sunlit coast-road sprint in E major at 164. Synth brass carries the hook with a glockenspiel sparkling two octaves up, over octave-slap FM bass, vibraphone chords, a gated snare and the sea washing in. The last eight bars lift a semitone, to F major. Layers: vibes, bass and the sea wash, then the kit at 2x, synth brass and glockenspiel at 3x, a supersaw double and straight hats at FRENZY.
+tempo    164
+beats    4
+steps    2
+reverb   0.28
+
+# untagged voices are the base layer; the intro plays every layer
+voice vibes  vibes     vol=0.38 pan=0.35 center=E4 gate=0.6
+voice bass   fmbass    vol=0.62 gate=0.6
+voice wash   surf      vol=0.28 pan=-0.25
+voice kick   bigkick   vol=0.58 layer=drums
+voice snare  gatesnare vol=0.52 pan=0.05 layer=drums
+voice ohat   ohat909   vol=0.24 pan=-0.3 layer=drums
+voice crash  crash     vol=0.3  pan=-0.2 layer=drums
+voice rise   riser     vol=0.26 layer=drums
+voice brass  synbrass  vol=0.72 pan=-0.05 layer=lead
+voice glock  glock     vol=0.34 pan=0.3 oct=1 layer=lead
+voice saw    supersaw  vol=0.4  layer=frenzy
+voice hat    hat909    vol=0.3  pan=0.4 layer=frenzy
+
+pattern intro
+brass | E4 G#4 B4 E5 G#4 B4 E5 G#5 | B5----- .- |
+glock | . . . . G#4 B4 E5 G#5 | B5----- .- |
+wash  | x....... | ........ |
+kick  | ........ | x.x.x.xx |
+snare | ........ | ....X.XX |
+
+pattern A
+brass | E5- B4 E5 G#5- F#5 E5 | G#5- E5 C#5- E5 G#5 B5 | A5- G#5 E5- C#5 E5 F#5 | F#5--- D#5- B4- |
+glock | E5- B4 E5 G#5- F#5 E5 | G#5- E5 C#5- E5 G#5 B5 | A5- G#5 E5- C#5 E5 F#5 | F#5--- D#5- B4- |
+vibes | . [E] . [E] . [E] . [E] | . [C#m] . [C#m] . [C#m] . [C#m] | . [A] . [A] . [A] . [A] | . [B] . [B] . [B] . [B7] |
+bass  | E2 E3 E2 E3 E2 E3 E2 E3 | C#2 C#3 C#2 C#3 C#2 C#3 C#2 C#3 | A2 A3 A2 A3 A2 A3 A2 A3 | B2 B3 B2 B3 B2 B3 B2 B3 |
+wash  | x....... | _ | _ | _ |
+kick  | x.x.x.x. | % | % | % |
+snare | ..x...x. | % | % | ..x...xx |
+ohat  | .x.x.x.x | % | % | % |
+crash | X....... | _ | _ | _ |
+saw   | E5- B4 E5 G#5- F#5 E5 | G#5- E5 C#5- E5 G#5 B5 | A5- G#5 E5- C#5 E5 F#5 | F#5--- D#5- B4- |
+hat   | xxxxxxxx | % | % | % |
+
+pattern A2 from A
+brass | E5- B4 E5 G#5- F#5 E5 | G#5- E5 C#5- E5 G#5 B5 | A5- G#5 E5- C#5 E5 F#5 | B5--- A5 G#5 F#5 D#5 |
+glock | E5- B4 E5 G#5- F#5 E5 | G#5- E5 C#5- E5 G#5 B5 | A5- G#5 E5- C#5 E5 F#5 | B5--- A5 G#5 F#5 D#5 |
+saw   | E5- B4 E5 G#5- F#5 E5 | G#5- E5 C#5- E5 G#5 B5 | A5- G#5 E5- C#5 E5 F#5 | B5--- A5 G#5 F#5 D#5 |
+wash  | _ | _ | _ | _ |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+brass | C#6--- B5- A5- | D#6--- C#6- B5- | B5- G#5 E5 D#5- E5 F#5 | G#5--- F#5--- |
+glock | C#6--- B5- A5- | D#6--- C#6- B5- | B5- G#5 E5 D#5- E5 F#5 | G#5--- F#5--- |
+saw   | C#6--- B5- A5- | D#6--- C#6- B5- | B5- G#5 E5 D#5- E5 F#5 | G#5--- F#5--- |
+vibes | . [A] . [A] . [A] . [A] | . [B] . [B] . [B] . [B] | . [G#m] . [G#m] . [G#m] . [G#m] | . [C#m] . [C#m] . [B] . [B] |
+bass  | A2 A3 A2 A3 A2 A3 A2 A3 | B2 B3 B2 B3 B2 B3 B2 B3 | G#2 G#3 G#2 G#3 G#2 G#3 G#2 G#3 | C#2 C#3 C#2 C#3 B2 B3 B2 B3 |
+crash | X....... | _ | _ | _ |
+
+pattern B2 from B
+brass | C#6--- B5- A5- | D#6--- C#6- B5- | B5- G#5 E5 D#5- E5 F#5 | F#5- G#5- A#5- B5- |
+glock | C#6--- B5- A5- | D#6--- C#6- B5- | B5- G#5 E5 D#5- E5 F#5 | F#5- G#5- A#5- B5- |
+saw   | C#6--- B5- A5- | D#6--- C#6- B5- | B5- G#5 E5 D#5- E5 F#5 | F#5- G#5- A#5- B5- |
+rise  | _ | _ | _ | E5------- |
+snare | ..x...x. | % | % | x.x.XXXX |
+
+play intro
+loop A A2 B B2 A A2 A+1 A2+1

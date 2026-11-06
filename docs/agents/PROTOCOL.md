@@ -53,8 +53,8 @@ If the check itself fails, agents treat it as paused.
 
 **Studio status page.** The open issue labelled `studio-status` ("📊 Studio status
 (live)") is Alex's live view of the studio. `.github/workflows/studio-status.yml`
-rewrites its body from `scripts/studio-status.cjs` on every issue/PR/label change and
-every 15 minutes. Agents never edit, comment on or close it, and never claim it. If a
+rewrites its body from `scripts/studio-status.cjs` on every issue / label change and issue
+comment, after every CI, production-smoke and auto-merge run, and every 15 minutes. Agents never edit, comment on or close it, and never claim it. If a
 role's schedule changes, update `SCHEDULE` in that script (and the table above) in
 the same PR. Keep claim comments in the `Claimed by …` form, since the page reads them.
 
@@ -82,6 +82,7 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 - Type: `type:feature`, `type:level`, `type:content`, `type:polish`, `type:perf`, `type:tech`, `type:bug`, `type:audio`, `type:growth`.
 - `epic` — umbrella issue the Director breaks into `agent:ready` children. Never claimed by builders.
 - `studio-status` — the live status page issue (see above). Not work; never touch it.
+- `studio-health` — opened, kept current and closed by the watchdog (`.github/workflows/studio-health.yml`, `scripts/studio-health.cjs`, every 2 h): one issue per problem with the studio itself (a red `main` that nothing else alerts on, a flaky check, a timeout or runtime creep, stuck PRs, agents not running). It doesn't duplicate `agent:prod-broken`: one open over 12 h gets `needs-alex` and a comment instead. `agent:ready` + `P1`: builders take them before any other issue, the Maintainer right after Production and Main health. Open over 24 h and still seen in the last 24 h, or only fixable by Alex, they get `needs-alex`, once. Each says when it was **last seen**: if a PR merged after that fixes it, close it with the PR link; only a newer run files it again. Exempt from the Issue contract. Fix the problem and say so in the issue; don't edit the watchdog's text.
 - `token-ledger` — the "🧮 Token ledger" issue: one comment per run from `scripts/run-usage.cjs` (runbooks README, "Token ledger"). Not work: agents only append comments; builders ignore it; nobody edits or closes it.
 - `needs-alex` + `type:audio`, titled `Listen: …` — renders waiting for Alex's ear; he closes it with his pick. Builders never claim it.
 - `marketing` + `needs-alex` — a draft post or campaign from the Marketer that only Alex can carry out (agents never post, spend or create accounts). Builders ignore these. `type:growth` — discoverability or growth work for builders, filed by the Marketer.
@@ -97,7 +98,9 @@ criteria** (checkable, including what the smoke-test screenshot should show),
 ## Claiming work (Builders)
 
 1. First: your own open PRs labelled `agent:changes-requested` (oldest first). Fix and push to the same branch.
-2. Otherwise: the highest-priority `agent:ready` issue (P1 > P2 > P3, then oldest), skipping `epic`.
+2. Otherwise: the oldest open `studio-health` issue labelled `agent:ready` (the watchdog's;
+   close it with the PR link instead if a PR merged after its **Last seen** time fixes it),
+   then the highest-priority `agent:ready` issue (P1 > P2 > P3, then oldest), skipping `epic`.
 3. Claim it immediately: swap `agent:ready` → `agent:in-progress` and comment `Claimed by builder run <date time>`. When dispatching several builders, the dispatcher claims all issues **before** spawning them so two builders never take the same one.
 4. Branch: `agent/<issue-number>-<short-slug>`. One issue per PR.
 
@@ -106,7 +109,7 @@ criteria** (checkable, including what the smoke-test screenshot should show),
 - Title: conventional style (`feat(level6): …`, `fix(combat): …`, `perf(terrain): …`).
 - Body: `Closes #<n>`, what changed and why, **how you verified it** (paste the smoke-test summary lines), screenshots attached or described, risks, follow-ups.
 - Label `agent:needs-qa`. Builders never merge their own PRs.
-- Before opening: `npm run verify` passes locally, you **looked at** the relevant screenshots, CLAUDE.md/docs updated if behaviour or structure changed.
+- Before opening: unit tests, build and bundle budget pass locally, the smoke for what you touched passes (builder.md step 3; never the full `npm run verify`: CI runs it and its `verify` is the gate), you **looked at** the relevant screenshots, CLAUDE.md/docs updated if behaviour or structure changed.
   Exceptions, where CI's `verify` is the check: the Director's and the Reporter's docs-only
   PRs (the `verify` they ran on `main` while gathering covers them) and a returned PR whose
   only change is a merge of `origin/main` that didn't touch `src/` or `e2e/` (`npm test &&
@@ -176,6 +179,14 @@ oldest first.
 rebase a branch that is already on GitHub — that needs a force-push, which hard rule 2
 forbids.
 
+## No known flakes
+
+A check that fails without the change under test causing it is a P1 bug in the check, never
+"a known flake". QA doesn't approve past it and doesn't wave it through in a comment: it names
+the check and the run, and links the watchdog's `studio-health` issue for it (or says there is
+none yet; the watchdog opens one within 2 h). Builders fix flaky checks by making them
+deterministic, never by retrying, raising a timeout or loosening the check.
+
 ## When main breaks
 
 Revert first, investigate second. Open a PR that `git revert`s the offending merge
@@ -189,7 +200,7 @@ QA reviews reverts first — then reopen the original issue with what went wrong
 - GitHub through `gh api` (REST only). GraphQL, repository-settings writes, branch deletion and GitHub Actions API paths are blocked by the proxy. `gh pr create` may work; if not, use `gh api -X POST repos/alexbelyeu/shootercoaster/pulls`.
 - CI `verify` runs on every PR and on `main` after every auto-merge (`automerge.yml` dispatches `ci.yml`, since `GITHUB_TOKEN` pushes don't trigger `push`); read it with `gh api repos/alexbelyeu/shootercoaster/commits/main/check-runs?check_name=verify`. A red `main` run opens or comments on the `agent:prod-broken` issue.
   `verify` is a gate over parallel jobs (`unit + build`, `lighthouse`, one `smoke (<shard>)` per smoke shard; ~10 min in all), and GitHub creates its check only when they end: while they run, the head's other check runs (no `check_name` filter) show them in progress. A red `verify` names the red job; for a smoke shard, reproduce just that one with `node e2e/smoke.mjs --shard <name>` (`e2e/README.md`).
-- You cannot read CI logs through the API. Reproduce failures locally with `npm run verify`.
+- To see why CI failed, read the failing job's log: `gh api repos/alexbelyeu/shootercoaster/actions/jobs/<job id>/logs | grep -E 'FAIL|##\[error\]'` (job ids from `.../actions/runs/<run id>/jobs`). If that's blocked in your session, reproduce only the failing shard (`node e2e/smoke.mjs --shard <name>`); run the full `npm run verify` only when the failure isn't in one shard.
 - **Keep logs out of the conversation.** Redirect long output to a file and print only a
   summary: `npm run verify > /tmp/verify.log 2>&1; grep -E '^(PASS|FAIL)|Tests |error' /tmp/verify.log; tail -n 40 /tmp/verify.log`.
   Never dump full logs, `results.json` (query it with `node -e` / `jq`) or long diffs

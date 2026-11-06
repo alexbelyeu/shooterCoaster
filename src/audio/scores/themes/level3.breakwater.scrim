@@ -1,0 +1,60 @@
+title    Breakwater
+composer Claude (ShooterCoaster)
+about    Ocean option "breakwater": full-tilt surf rock in A minor at 176. A tremolo-picked guitar carries the hook in sixteenths, a drenched twang guitar answers it low in the B section, and a tom-heavy surf beat drives it, with a wave washing in every four bars. The last eight bars lift a tone. Layers: offbeat strums, FM bass and the sea wash, then the kit at 2x, the tremolo guitar at 3x, a combo organ and tambourine at FRENZY.
+tempo    176
+beats    4
+steps    4
+reverb   0.34
+
+# untagged voices are the base layer; the intro plays every layer
+voice strum  guitar     vol=0.42 pan=0.4  center=A4 gate=0.35 rev=0.45
+voice bass   fmbass     vol=0.46 gate=0.6
+voice wash   surf       vol=0.3  pan=-0.2
+voice kick   kick       vol=0.75 layer=drums
+voice snare  snare      vol=0.6  pan=0.05 layer=drums
+voice ride   ride       vol=0.28 pan=0.3  layer=drums
+voice tom    tomlo      vol=0.38 pan=-0.25 layer=drums
+voice crash  crash      vol=0.32 pan=-0.2 layer=drums
+voice trem   guitar     vol=1.0  pan=-0.1 bright=1.5 rev=0.5 gate=0.8 layer=lead
+voice twang  guitar     vol=0.85 pan=-0.1 bright=1.3 rev=0.6 glide=0.1 layer=lead
+voice organ  organ      vol=0.32 pan=0.35 center=A4 gate=0.5 layer=frenzy
+voice tamb   tamb       vol=0.32 pan=0.45 layer=frenzy
+
+pattern intro
+twang | E2------- ~E3------- | _ |
+trem  | _ | E5 E5 E5 E5 D5 D5 D5 D5 C5 C5 C5 C5 B4 B4 G#4 G#4 |
+wash  | x... .... .... .... | _ |
+tom   | .... .... .... .... | x.x. x.x. xxxx XXXX |
+kick  | _ | x... .... x... x.x. |
+
+pattern A
+trem  | A4 A4 A4 A4 C5 C5 C5 C5 E5 E5 E5 E5 A5 A5 G5 G5 | F5 F5 F5 F5 E5 E5 E5 E5 C5 C5 C5 C5 A4 A4 C5 C5 | D5 D5 D5 D5 B4 B4 B4 B4 G4 G4 B4 B4 D5 D5 F5 F5 | E5 E5 E5 E5 E5 E5 E5 E5 G#4 G#4 G#4 G#4 B4 B4 D5 D5 |
+strum | .- [Am]- .- [Am]- .- [Am]- .- [Am]- | .- [F]- .- [F]- .- [F]- .- [F]- | .- [G]- .- [G]- .- [G]- .- [G]- | .- [E]- .- [E]- .- [E]- .- [E7]- |
+bass  | A2- A2- A3- A2- E2- A2- A3- E2- | F2- F2- F3- F2- C3- F2- F3- C3- | G2- G2- G3- G2- D3- G2- G3- D3- | E2- E2- E3- E2- B2- E2- G#2- B2- |
+wash  | x... .... .... .... | _ | _ | _ |
+kick  | x... ..x. x... ..x. | % | % | % |
+snare | .... x... .... x... | % | % | .... x... ..x. x.xx |
+ride  | x.x. x.x. x.x. x.x. | % | % | % |
+tom   | ..x. ..x. ..x. ..x. | % | % | ..x. ..x. xxxx xxxx |
+crash | X... .... .... .... | _ | _ | _ |
+organ | .- [Am]- .- [Am]- .- [Am]- .- [Am]- | .- [F]- .- [F]- .- [F]- .- [F]- | .- [G]- .- [G]- .- [G]- .- [G]- | .- [E]- .- [E]- .- [E]- .- [E7]- |
+tamb  | xoxo xoxo xoxo xoxo | % | % | % |
+
+pattern A2 from A
+trem  | A4 A4 A4 A4 C5 C5 C5 C5 E5 E5 E5 E5 A5 A5 G5 G5 | F5 F5 F5 F5 E5 E5 E5 E5 C5 C5 C5 C5 A4 A4 C5 C5 | D5 D5 D5 D5 E5 E5 E5 E5 F5 F5 F5 F5 G5 G5 G5 G5 | G#5 G#5 G#5 G#5 G#5 G#5 G#5 G#5 E5 E5 E5 E5 A5 A5 A5 A5 |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+mute  trem
+twang | D4--- F4--- A4--- D5--- | C5--- A4--- E4--- A4--- | F4- G4- A4- C5- F5--- E5- C5- | B4------- G#4------- |
+strum | .- [Dm]- .- [Dm]- .- [Dm]- .- [Dm]- | .- [Am]- .- [Am]- .- [Am]- .- [Am]- | .- [F]- .- [F]- .- [F]- .- [F]- | .- [E]- .- [E]- .- [E]- .- [E7]- |
+bass  | D2- D2- D3- D2- A2- D2- D3- A2- | A2- A2- A3- A2- E2- A2- A3- E2- | F2- F2- F3- F2- C3- F2- F3- C3- | E2- E2- E3- E2- B2- E2- G#2- B2- |
+organ | [Dm]------- [Dm]------- | [Am]------- [Am]------- | [F]------- [F]------- | [E]------- [E7]------- |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern B2 from B
+twang | D4--- F4--- A4--- D5--- | C5--- A4--- E4--- A4--- | F4- G4- A4- C5- F5--- E5- C5- | E5- D5- C5- B4- G#4- B4- D5- E5- |
+snare | .... x... .... x... | % | % | ..x. x.x. xxxx XXXX |
+
+play intro
+loop A A2 B B2 A A2 A+2 A2+2
