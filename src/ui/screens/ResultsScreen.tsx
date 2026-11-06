@@ -12,6 +12,7 @@ import ShareMenu from '@/ui/ShareMenu'
 import type { ShareMethod } from '@/ui/share'
 import { scoreCardRun } from '@/ui/scoreCard'
 import type { LeaderboardEntry } from '@/types/game'
+import { onlineEndpoint, onlineLeaderboard, runAccuracy, type OnlineEntry } from '@/store/onlineLeaderboard'
 import { barFill, formatAccuracy, formatTimeLeft, isNewRecord } from './resultsStats'
 import { initialsKey, type InitialsState } from './initialsEntry'
 import ResultsLeaderboard from './ResultsLeaderboard'
@@ -39,8 +40,22 @@ function snapshotRun() {
     bestCombo: s.bestCombo,
     timeRemaining: s.timeRemaining,
     previousBest: previous?.score ?? 0,
+    seed: s.runSeed,
     date: Date.now(),
   }
+}
+
+type Run = ReturnType<typeof snapshotRun>
+
+/** The online top 10 as board rows; stars from the level's thresholds, as the local board stores them. */
+function worldRows(top: readonly OnlineEntry[], maxScore: number, thresholds: readonly [number, number, number]): LeaderboardEntry[] {
+  return top.map((e) => ({ initials: e.initials, score: e.score, stars: computeStars(e.score, maxScore, thresholds), date: Date.parse(e.at) || 0 }))
+}
+
+/** The world board, or null for this campaign run (dailies, and builds that never call the API: dev, preview, CI, portals, `?e2e=1`). */
+function worldBoard(run: Run) {
+  const endpoint = run.mode.mode === 'campaign' ? onlineEndpoint(__BUILT_ON_VERCEL__, window.location.search) : null
+  return endpoint ? onlineLeaderboard(endpoint) : null
 }
 
 export default function ResultsScreen() {
@@ -54,6 +69,12 @@ export default function ResultsScreen() {
   const board = useGameStore((s) => (run.levelId ? s.leaderboards[run.levelId] : undefined)) ?? NO_BOARD
   const [rank, setRank] = useState<number | null>(null)
   const [initials, setInitials] = useState<InitialsState | null>(null)
+  const [online] = useState(() => worldBoard(run))
+  /** The online top 10 once it answers, with this run's place on it; until then (or if it never does) the local board. */
+  const [world, setWorld] = useState<{ board: LeaderboardEntry[]; rank: number | null } | null>(null)
+  /** The run goes online once, after its initials (or as the screen closes, under the initials it has then). */
+  const submitOnline = useRef<((letters: string) => void) | null>(null)
+  const lettersRef = useRef('')
   const left = useRef(false)
   const nextRef = useRef<HTMLButtonElement>(null)
 
@@ -101,7 +122,35 @@ export default function ResultsScreen() {
     setRank(placed)
     if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
     store.saveScore(entry)
-  }, [config, run, stars])
+
+    if (!online) return
+    const show = (top: OnlineEntry[], rank: number | null) => {
+      if (!left.current) setWorld({ board: worldRows(top, config.maxScore, config.starThresholds), rank })
+    }
+    if (placed === null) {
+      // Missed the local board, so never goes online: just show the world's.
+      void online.top(config.id).then((top) => top && show(top, null))
+      return
+    }
+    lettersRef.current = store.lastInitials
+    submitOnline.current = (letters) => {
+      submitOnline.current = null
+      void online
+        .submit({
+          level: config.id,
+          initials: letters,
+          score: run.score,
+          seed: run.seed,
+          kills: run.kills,
+          accuracy: runAccuracy(run.hits, run.shotsFired),
+          version: __APP_VERSION__,
+        })
+        .then((result) => result && show(result.top, result.rank))
+    }
+  }, [config, run, stars, online])
+
+  // Leaving with the entry still open keeps the local row under the letters it had: send those.
+  useEffect(() => () => submitOnline.current?.(lettersRef.current), [])
 
   useEffect(() => {
     if (done) return
@@ -143,8 +192,10 @@ export default function ResultsScreen() {
     if (next === 'confirm') {
       setInitials(null)
       sfx().ui('launch')
+      submitOnline.current?.(initials.letters)
       return true
     }
+    lettersRef.current = next.letters
     if (next.letters !== initials.letters) useGameStore.getState().setEntryInitials(config.id, run.date, next.letters)
     setInitials(next)
     sfx().ui('select')
@@ -338,8 +389,9 @@ export default function ResultsScreen() {
             transition={done ? instant : { duration: 0.3 }}
           >
             <ResultsLeaderboard
-              board={board}
-              rank={rank}
+              board={world?.board ?? board}
+              rank={world ? world.rank : rank}
+              source={world ? 'world' : 'device'}
               editing={entryOpen ? initials : null}
               onKey={initialsInput}
               onSlot={(slot) => initials && setInitials({ ...initials, slot })}

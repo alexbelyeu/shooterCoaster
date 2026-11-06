@@ -1,0 +1,16 @@
+{
+  "//": "For Vercel's build of the functions here (the nearest tsconfig to them): plain ESM, no `@/` alias, no DOM. `tsc -b` typechecks api/ with the root tsconfig.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "esModuleInterop": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts"]
+}

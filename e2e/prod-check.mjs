@@ -10,7 +10,7 @@ import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import { launchBrowser } from '../scripts/headless.mjs'
-import { assetRefs, missingAssets, responseProblems } from '../scripts/prodCheckRules.mjs'
+import { assetRefs, leaderboardApiProblems, missingAssets, responseProblems } from '../scripts/prodCheckRules.mjs'
 import { headersFor, route } from '../scripts/vercelRoutes.mjs'
 import { TITLE_UI, ignored, imageStats, looksBlank, waitFrames, waitVisible } from './pageChecks.mjs'
 
@@ -63,7 +63,13 @@ function serveDist() {
   const files = new Set(distFiles())
   const server = http.createServer((req, res) => {
     const pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname)
-    const { status, serves } = route(pathname, files, vercel)
+    const { status, serves, fn } = route(pathname, files, vercel)
+    if (fn) {
+      // No functions here: answer as the board does without its env vars.
+      res.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headersFor(pathname, vercel) })
+      res.end(JSON.stringify({ error: 'unavailable' }))
+      return
+    }
     res.writeHead(status, {
       'Content-Type': MIME[path.extname(serves)] ?? 'application/octet-stream',
       'Cache-Control': 'public, max-age=0, must-revalidate',
@@ -121,7 +127,9 @@ async function routesCheck(base) {
   problems.push(...responseProblems(missing, notFound, vercel, 404).map((p) => p.replace(missing, '/<unknown path>')))
   const title404 = fs.readFileSync(path.join(DIST, '404.html'), 'utf8').match(/<title>[^<]*<\/title>/)?.[0]
   if (notFound.status === 404 && !notFound.body.toString().includes(title404)) problems.push('an unknown path does not get the 404 page')
-  return { problems }
+  const board = await get(base, '/api/leaderboard?level=level1')
+  problems.push(...leaderboardApiProblems(board, vercel))
+  return { problems, summary: `/api/leaderboard ${board.status === 200 ? 'online' : `${board.status} (board unavailable)`}` }
 }
 
 async function openPage(browser, base, query, options = {}) {

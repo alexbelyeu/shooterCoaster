@@ -45,6 +45,37 @@ const CONTENT_TYPES = {
   '.xml': /xml/,
 }
 
+/**
+ * GET /api/leaderboard (#365): the top 10 (CDN-cached), or a bare uncached 503 while the board is
+ * unavailable (no env vars yet, a paused Supabase project). Never a 500, a 404 or anything that leaks.
+ */
+export function leaderboardApiProblems({ status, headers, body }, vercel) {
+  const where = '/api/leaderboard'
+  if (status !== 200 && status !== 503) return [`${where}: HTTP ${status} (want 200, or 503 while the board is unavailable)`]
+  const problems = []
+  if (!/application\/json/.test(headers['content-type'] ?? '')) problems.push(`${where}: content-type "${headers['content-type'] ?? ''}"`)
+  for (const [key, value] of Object.entries(headersFor(where, vercel))) {
+    if (headers[key.toLowerCase()] !== value) problems.push(`${where}: ${key} "${headers[key.toLowerCase()] ?? ''}" (want "${value}")`)
+  }
+  const text = body.toString()
+  if (/supabase|sb_secret|postgres|\bat \S+:\d+/i.test(text)) problems.push(`${where}: the response leaks server details`)
+  let json = null
+  try {
+    json = JSON.parse(text)
+  } catch {
+    return [...problems, `${where}: not JSON`]
+  }
+  const cache = headers['cache-control'] ?? ''
+  if (status === 200) {
+    if (!Array.isArray(json?.top)) problems.push(`${where}: no top list`)
+    if (!/s-maxage=\d+/.test(cache)) problems.push(`${where}: not CDN-cached ("${cache}")`)
+  } else {
+    if (json?.error !== 'unavailable') problems.push(`${where}: 503 body ${text.slice(0, 80)}`)
+    if (/s-maxage|immutable/.test(cache)) problems.push(`${where}: 503 cached ("${cache}")`)
+  }
+  return problems
+}
+
 /** One unhashed file cached for a day or more outlives the deploy that replaces it. */
 const LONG_CACHE_S = 86400
 

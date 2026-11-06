@@ -8,6 +8,9 @@
       "main": true
     }
   },
+  "functions": {
+    "api/leaderboard.ts": { "maxDuration": 10 }
+  },
   "rewrites": [
     { "source": "/go/(.*)", "destination": "/index.html" }
   ],

@@ -59,6 +59,7 @@ import { MUSIC_ENGINE, scrimPlayer, type MusicEngine } from '@/audio/musicEngine
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
 import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
 import { clipboardText, sharePayloadForRun } from '@/ui/share'
+import { setOnlineEndpointOverride } from '@/store/onlineLeaderboard'
 import { scoreCardFileName, scoreCardRun, type CardSize } from '@/ui/scoreCard'
 import { renderScoreCard } from '@/ui/scoreCardImage'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
@@ -104,6 +105,8 @@ export interface SCTestApi {
   /** Replace the local leaderboards (and `lastInitials`), persisted like real saves. */
   setLeaderboards: (boards: Record<string, LeaderboardEntry[]>, lastInitials?: string) => void
   leaderboards: () => { boards: Record<string, LeaderboardEntry[]>; lastInitials: string }
+  /** Point the results screen's online board at `endpoint` (the smoke stubs it with `page.route`); null turns it off again. */
+  onlineBoard: (endpoint: string | null) => void
   /** The Daily Run: today's UTC key, seed and level, the current run's mode, the saved daily bests and the streak. */
   daily: () => {
     dateKey: string
@@ -721,6 +724,7 @@ export function installE2EApi() {
       const s = useGameStore.getState()
       return { boards: s.leaderboards, lastInitials: s.lastInitials }
     },
+    onlineBoard: (endpoint) => setOnlineEndpointOverride(endpoint),
     daily: () => {
       const dateKey = dailyKey(new Date())
       const s = useGameStore.getState()

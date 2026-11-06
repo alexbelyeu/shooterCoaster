@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import fs from 'fs'
 
 /**
  * Portal pages carry their own share card, canonical URL and structured data, and the zip may
@@ -20,12 +21,16 @@ function portalHtml(): Plugin {
 // `vite build --mode portal` (`npm run build:portal`): relative asset URLs, so the zip plays from any sub-path.
 export default defineConfig(({ mode }) => {
   const portal = mode === 'portal'
+  const { version } = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8'))
+  const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)
   return {
     base: portal ? './' : '/',
     plugins: portal ? [react(), portalHtml()] : [react()],
     define: {
       // Vercel sets VERCEL=1 during its builds; gates Web Analytics (src/app/analyticsGate.ts). Portal builds never send it.
       __BUILT_ON_VERCEL__: JSON.stringify(process.env.VERCEL === '1' && !portal),
+      // Sent with online leaderboard scores (`client_version`, #365).
+      __APP_VERSION__: JSON.stringify(commit ? `${version}+${commit}` : version),
     },
     resolve: {
       alias: {

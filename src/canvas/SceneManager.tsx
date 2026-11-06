@@ -20,6 +20,7 @@ import BulletPool from '@/combat/projectiles/BulletPool'
 import Pickups from '@/combat/pickups/Pickups'
 import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
+import { goldenBalloonCount } from '@/levels/scoring'
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
@@ -127,7 +128,7 @@ function LevelScene({ levelId }: { levelId: string }) {
       <LevelAudio />
       <EnemySpawner
         waves={enemies}
-        goldenBalloonCount={biome === 'themePark' ? 3 : 0}
+        goldenBalloonCount={goldenBalloonCount(biome)}
         trackTable={trackTable}
         groundFn={groundFn}
         boss={boss}

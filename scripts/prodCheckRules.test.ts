@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
-import { assetRefs, assetStem, missingAssets, responseProblems } from './prodCheckRules.mjs'
+import { assetRefs, assetStem, leaderboardApiProblems, missingAssets, responseProblems } from './prodCheckRules.mjs'
 
 const vercel = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../vercel.json'), 'utf8'))
 const OK_HEADERS = {
@@ -60,5 +60,28 @@ describe('responseProblems', () => {
   it('checks the status first, and a 404 page against its own status', () => {
     expect(responseProblems('/assets/gone-AAAAAAAA.js', res({}, 404), vercel)).toEqual(['/assets/gone-AAAAAAAA.js: HTTP 404 (want 200)'])
     expect(responseProblems('/nope', res({ 'content-type': 'text/html' }, 404), vercel, 404)).toEqual([])
+  })
+})
+
+describe('leaderboardApiProblems', () => {
+  const api = (status: number, body: unknown, headers: Record<string, string>) => ({
+    status,
+    headers: { ...OK_HEADERS, 'content-type': 'application/json', ...headers },
+    body: Buffer.from(typeof body === 'string' ? body : JSON.stringify(body)),
+  })
+  const cached = { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=300' }
+
+  it('passes the cached top 10 and the uncached 503 of a board not set up yet', () => {
+    expect(leaderboardApiProblems(api(200, { top: [] }, cached), vercel)).toEqual([])
+    expect(leaderboardApiProblems(api(503, { error: 'unavailable' }, { 'cache-control': 'no-store' }), vercel)).toEqual([])
+  })
+
+  it('fails a 500, a 404, a leak, a cached 503 and an uncached board', () => {
+    expect(leaderboardApiProblems(api(500, { error: 'x' }, {}), vercel)).toHaveLength(1)
+    expect(leaderboardApiProblems(api(404, '<html>', {}), vercel)).toHaveLength(1)
+    expect(leaderboardApiProblems(api(503, { error: 'unavailable', detail: 'supabase down' }, {}), vercel).join()).toContain('leaks')
+    expect(leaderboardApiProblems(api(503, { error: 'unavailable' }, cached), vercel).join()).toContain('cached')
+    expect(leaderboardApiProblems(api(200, { top: [] }, { 'cache-control': 'no-store' }), vercel).join()).toContain('CDN')
+    expect(leaderboardApiProblems(api(200, '<html>', cached), vercel).join()).toContain('not JSON')
   })
 })

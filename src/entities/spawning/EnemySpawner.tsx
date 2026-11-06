@@ -23,7 +23,7 @@ import FireImp from '../enemies/FireImp'
 import InfernalDrake from '../enemies/InfernalDrake'
 import GoldenBalloon from '../enemies/GoldenBalloon'
 import BossSpawner from '../bosses/BossSpawner'
-import { SCORE_VALUES } from '@/levels/scoring'
+import { GOLDEN_BALLOON, SCORE_VALUES } from '@/levels/scoring'
 import { createRng, type Rng } from '@/utils/rng'
 import { recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
 import type { EnemyEntry } from '../enemies/EnemyBase'
@@ -133,7 +133,7 @@ function generateGoldenBalloons(
       position: toVector3(readableScatterSpawn('goldenBalloon', GOLDEN_BALLOON_SCATTER, 'air', table, heightFn, rng)),
       slot: null,
       trackside: null,
-      scoreValue: 13 * 5, // 5x points
+      scoreValue: GOLDEN_BALLOON.score,
       radius: 45,
       waveIndex: -1, // always visible
     })

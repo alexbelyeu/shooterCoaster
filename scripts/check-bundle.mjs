@@ -3,6 +3,7 @@
  * Bundle-size guardrail. Run after `npm run build`.
  * Fails if total gzipped JS in dist/ exceeds the budget in budgets.json.
  * Raising a budget is a Director decision and must be logged in docs/agents/DECISIONS.md.
+ * Also fails if the online leaderboard's server side (api/: Supabase's REST API and its key) reaches the browser.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -19,6 +20,10 @@ if (!fs.existsSync(dir)) {
 const html = fs.readFileSync('dist/index.html', 'utf8')
 const startup = new Set([...html.matchAll(/(?:src|href)="[^"]*\/assets\/([^"]+\.js)"/g)].map((m) => m[1]))
 
+/** Only api/ may know these: the browser talks to /api/leaderboard and nothing else (#365). */
+const SERVER_ONLY = /SUPABASE_SECRET_KEY|SUPABASE_URL|\/rest\/v1\/|supabase\.co/
+const leaks = []
+
 let totalGz = 0
 let largestGz = 0
 let startupGz = 0
@@ -30,6 +35,7 @@ for (const f of fs.readdirSync(dir)) {
   totalGz += gz
   largestGz = Math.max(largestGz, gz)
   if (startup.has(f)) startupGz += gz
+  if (SERVER_ONLY.test(buf.toString('utf8'))) leaks.push(f)
   rows.push([f, (buf.length / 1024).toFixed(0), (gz / 1024).toFixed(0)])
 }
 rows.sort((a, b) => Number(b[2]) - Number(a[2]))
@@ -47,6 +53,10 @@ if (totalKb > budgets.jsTotalGzipKB) {
 }
 if (largestKb > budgets.jsLargestChunkGzipKB) {
   console.error(`FAIL: largest chunk over budget by ${(largestKb - budgets.jsLargestChunkGzipKB).toFixed(0)} KB`)
+  ok = false
+}
+if (leaks.length) {
+  console.error(`FAIL: server-only leaderboard code in the browser bundle: ${leaks.join(', ')}`)
   ok = false
 }
 process.exit(ok ? 0 : 1)
