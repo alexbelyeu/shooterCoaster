@@ -4,7 +4,8 @@
   "request": {
     "kind": "music",
     "track": "title",
-    "engine": "scrim"
+    "engine": "scrim",
+    "seam": false
   },
   "seed": 1,
   "sampleRate": 44100,
@@ -15,72 +16,58 @@
       "name": "title score"
     },
     {
-      "t": 3.35,
+      "t": 3.15,
       "name": "loop starts"
     }
   ],
-  "seams": [
-    16.15,
-    28.95
-  ],
+  "seams": [],
   "bar": {
-    "startS": 3.35,
-    "barS": 1.6
+    "startS": 3.15,
+    "barS": 1.5
   },
   "metrics": {
     "seconds": 30,
-    "integrated": -17.3,
-    "shortTermMax": -16.8,
-    "lra": 1,
-    "truePeak": -9.2,
+    "integrated": -17.8,
+    "shortTermMax": -17.3,
+    "lra": 0.4,
+    "truePeak": -9.7,
     "clipped": 0,
     "silence": 0.5,
-    "correlation": 0.992,
-    "below30Db": -34,
+    "correlation": 0.892,
+    "below30Db": -34.9,
     "bands": {
       "sub": {
-        "pct": 25.6,
-        "db": -5.9
+        "pct": 32.1,
+        "db": -4.9
       },
       "low": {
-        "pct": 41.3,
-        "db": -3.8
+        "pct": 35.6,
+        "db": -4.5
       },
       "mid": {
-        "pct": 28.6,
-        "db": -5.4
+        "pct": 24.9,
+        "db": -6
       },
       "presence": {
-        "pct": 3,
-        "db": -15.2
+        "pct": 6.4,
+        "db": -11.9
       },
       "air": {
-        "pct": 1.5,
-        "db": -18.4
+        "pct": 1,
+        "db": -19.9
       },
       "below30": {
         "pct": 0,
-        "db": -34
+        "db": -34.9
       }
     },
-    "seamJumps": [
-      {
-        "at": 16.15,
-        "db": -0.06,
-        "vsBars": 0.09
-      },
-      {
-        "at": 28.95,
-        "db": -0.16,
-        "vsBars": 0.01
-      }
-    ],
-    "seamJumpMax": 0.09
+    "seamJumps": [],
+    "seamJumpMax": null
   },
   "targets": [
     {
       "label": "Integrated loudness",
-      "value": -17.3,
+      "value": -17.8,
       "unit": "LUFS",
       "min": -18,
       "max": -16,
@@ -88,13 +75,13 @@
     },
     {
       "label": "Short-term max",
-      "value": -16.8,
+      "value": -17.3,
       "unit": "LUFS",
       "status": "info"
     },
     {
       "label": "True peak",
-      "value": -9.2,
+      "value": -9.7,
       "unit": "dBTP",
       "max": -1,
       "status": "pass"
@@ -108,28 +95,21 @@
     },
     {
       "label": "Energy below 30 Hz",
-      "value": -34,
+      "value": -34.9,
       "unit": "dB rel",
       "max": -30,
       "status": "pass"
     },
     {
       "label": "Stereo correlation",
-      "value": 0.992,
+      "value": 0.892,
       "unit": "",
       "min": 0,
       "status": "pass"
     },
     {
-      "label": "Loop-seam jump vs bar lines",
-      "value": 0.09,
-      "unit": "dB",
-      "max": 1,
-      "status": "pass"
-    },
-    {
       "label": "Loudness range",
-      "value": 1,
+      "value": 0.4,
       "unit": "LU",
       "status": "info"
     },
