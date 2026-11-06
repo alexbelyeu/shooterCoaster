@@ -42,6 +42,11 @@ Rules that apply to every runbook:
   was posted after it: a QA decision comment (`QA: approved`, `QA: changes requested`,
   a close) ends a QA claim; a builder's reply or a label change to `agent:needs-qa` ends
   a builder claim. Ignore claims that aren't live: they belong to a finished round.
+  Order and age claims by the comment's own GitHub `created_at`, never by the timestamp written in
+  its text: sessions don't know the exact time (claims have said 16:50 when posted at 16:44).
+- **Queue labels go on last, alone.** The on-label tasks start on any label added while their queue
+  label is on, so add `P1` / `type:…` first, then `agent:needs-qa` or `agent:changes-requested` in a
+  call of its own (one event, one run). Swapping queue labels: remove the old one first.
 - **No check-ins.** Don't schedule reminders or "safety-net check-ins" on your PRs, and never create, fire, change or delete scheduled tasks (CLAUDE.md hard rule 10). When your PR is labelled `agent:needs-qa`, your part is done: the on-label tasks and the Maintainer take it from there.
 - **Token ledger.** The last step of every runbook is
   `node scripts/run-usage.cjs --role <role> --ref <PR/issue numbers worked on, e.g. "#12,#14", or none> --post`:

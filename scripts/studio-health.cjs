@@ -104,6 +104,7 @@ async function collect(api, now, workflowsDir) {
   // Builders runs logged per session (the daily budget counts them), from the ledger's `<!-- ledger {json} -->` comments.
   const ledgerIssue = ledger.sort((a, b) => a.number - b.number)[0]
   const builderRuns = new Map()
+  const ledgerRuns = []
   if (ledgerIssue) {
     const comments = await getAll(api, '/repos/{owner}/{repo}/issues/{issue_number}/comments', {
       issue_number: ledgerIssue.number, since: new Date(now - WINDOW - 24 * HOUR).toISOString(),
@@ -116,6 +117,14 @@ async function collect(api, now, workflowsDir) {
         e = null
       }
       if (e?.role === 'builders') builderRuns.set(e.session || c.id, Date.parse(e.at || c.created_at))
+      if (e?.weighted) {
+        ledgerRuns.push({
+          role: e.role, ref: e.ref || null, weighted: e.weighted, at: Date.parse(e.at || c.created_at), minutes: e.minutes ?? null,
+          url: c.html_url, missTokens: e.diag?.missTokens ?? 0, misses: e.diag?.misses ?? 0, peakContext: e.diag?.peakContext ?? null,
+          missesAfter: (e.diag?.topMisses || []).slice(0, 2).map((m) => m.after),
+          heaviest: (e.diag?.heaviest || []).slice(0, 3).map((h) => `${h.tool} (${h.chars} chars)`),
+        })
+      }
     }
   }
 
@@ -163,6 +172,7 @@ async function collect(api, now, workflowsDir) {
     paused: pause.paused,
     pauseEndedAt: pause.endedAt,
     builderRuns: [...builderRuns.values()],
+    ledgerRuns,
     builderBudget: builderBudget(steering),
   }
 }

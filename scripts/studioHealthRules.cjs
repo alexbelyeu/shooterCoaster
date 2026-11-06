@@ -19,6 +19,8 @@ const ALERTED_ON_MAIN = {
 /** How long a scheduled run gets to finish and post to the token ledger before it counts as missed. */
 const SLOT_GRACE = 2 * HOUR
 const STALL_SLOTS = 2
+/** A run over this many weighted tokens is filed (`heavy:<role>`): a typical run is 0.1–2.5M. */
+const HEAVY_RUN = 5e6
 
 const isDocsOnly = (files) => files.length > 0 && files.every((f) => NO_GAME_EFFECT.test(f))
 
@@ -282,6 +284,31 @@ function findings(snap) {
       owner: 'agents',
       body: `Waiting for review for over a day: ${waiting.map((p) => `#${p.number}`).join(', ')}. ` +
         'Find why QA isn\'t keeping up (runs failing or exiting early, reviews too slow, runs spent on other work) and fix the cause, not just these PRs.',
+    })
+  }
+
+  // Token-heavy runs, one issue per role (from the token ledger's JSON lines).
+  const heavy = {}
+  for (const r of snap.ledgerRuns || []) {
+    if (r.weighted <= HEAVY_RUN || now - r.at > 48 * HOUR) continue
+    ;(heavy[r.role] = heavy[r.role] || []).push(r)
+  }
+  for (const [role, runs] of Object.entries(heavy)) {
+    const M = (n) => `${(n / 1e6).toFixed(1)}M`
+    const lines = runs.map((r) => {
+      const waste = r.missTokens ? `, ${M(r.missTokens)} of it ${r.misses} cache misses${r.missesAfter.length ? ` (after: ${r.missesAfter.map((a) => `\`${a.slice(0, 80)}\``).join(', ')})` : ''}` : ''
+      const big = r.heaviest.length ? `; heaviest results: ${r.heaviest.join(', ')}` : ''
+      return `- [${r.ref || 'no ref'}](${r.url}): ${M(r.weighted)} weighted tokens in ${r.minutes ?? '?'} min${waste}${big}`
+    })
+    out.push({
+      key: `heavy:${role}`,
+      title: `Token-heavy ${role} runs: ${runs.length} over ${HEAVY_RUN / 1e6}M in 48 h`,
+      owner: 'agents',
+      lastSeen: Math.max(...runs.map((r) => r.at)),
+      body: `${role} runs over ${HEAVY_RUN / 1e6}M weighted tokens (a typical run is 0.1–2.5M):\n\n${lines.join('\n')}\n\n` +
+        'Find where the tokens went (the ledger line\'s `diag`: cache misses after idle waits, re-read files, large tool results) ' +
+        'and fix the cause in the role or runbook (`.claude/agents/`, `docs/agents/runbooks/`), not just the run. ' +
+        'Usual causes: sleeping or polling past 5 minutes (each wake re-reads the whole context), running the full smoke or `verify` locally, `cat` of big files or logs.',
     })
   }
 

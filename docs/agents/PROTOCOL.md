@@ -109,7 +109,7 @@ criteria** (checkable, including what the smoke-test screenshot should show),
 - Title: conventional style (`feat(level6): …`, `fix(combat): …`, `perf(terrain): …`).
 - Body: `Closes #<n>`, what changed and why, **how you verified it** (paste the smoke-test summary lines), screenshots attached or described, risks, follow-ups.
 - Label `agent:needs-qa`. Builders never merge their own PRs.
-- Before opening: `npm run verify` passes locally, you **looked at** the relevant screenshots, CLAUDE.md/docs updated if behaviour or structure changed.
+- Before opening: unit tests, build and bundle budget pass locally, the smoke for what you touched passes (builder.md step 3; never the full `npm run verify`: CI runs it and its `verify` is the gate), you **looked at** the relevant screenshots, CLAUDE.md/docs updated if behaviour or structure changed.
   Exceptions, where CI's `verify` is the check: the Director's and the Reporter's docs-only
   PRs (the `verify` they ran on `main` while gathering covers them) and a returned PR whose
   only change is a merge of `origin/main` that didn't touch `src/` or `e2e/` (`npm test &&
@@ -200,7 +200,7 @@ QA reviews reverts first — then reopen the original issue with what went wrong
 - GitHub through `gh api` (REST only). GraphQL, repository-settings writes, branch deletion and GitHub Actions API paths are blocked by the proxy. `gh pr create` may work; if not, use `gh api -X POST repos/alexbelyeu/shootercoaster/pulls`.
 - CI `verify` runs on every PR and on `main` after every auto-merge (`automerge.yml` dispatches `ci.yml`, since `GITHUB_TOKEN` pushes don't trigger `push`); read it with `gh api repos/alexbelyeu/shootercoaster/commits/main/check-runs?check_name=verify`. A red `main` run opens or comments on the `agent:prod-broken` issue.
   `verify` is a gate over parallel jobs (`unit + build`, `lighthouse`, one `smoke (<shard>)` per smoke shard; ~10 min in all), and GitHub creates its check only when they end: while they run, the head's other check runs (no `check_name` filter) show them in progress. A red `verify` names the red job; for a smoke shard, reproduce just that one with `node e2e/smoke.mjs --shard <name>` (`e2e/README.md`).
-- You cannot read CI logs through the API. Reproduce failures locally with `npm run verify`.
+- To see why CI failed, read the failing job's log: `gh api repos/alexbelyeu/shootercoaster/actions/jobs/<job id>/logs | grep -E 'FAIL|##\[error\]'` (job ids from `.../actions/runs/<run id>/jobs`). If that's blocked in your session, reproduce only the failing shard (`node e2e/smoke.mjs --shard <name>`); run the full `npm run verify` only when the failure isn't in one shard.
 - **Keep logs out of the conversation.** Redirect long output to a file and print only a
   summary: `npm run verify > /tmp/verify.log 2>&1; grep -E '^(PASS|FAIL)|Tests |error' /tmp/verify.log; tail -n 40 /tmp/verify.log`.
   Never dump full logs, `results.json` (query it with `node -e` / `jq`) or long diffs

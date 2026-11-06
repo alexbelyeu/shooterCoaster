@@ -47,6 +47,10 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
    **Look at the screenshots** that show the change (e.g. `<id>.png` for scenery,
    `<id>-combat.png` for weapons and hits, `mobile-*.png` for touch/HUD), not every PNG.
    Compare against `main` when it matters (check out `main`, rebuild, re-run smoke for that level).
+   A PR that changes an enemy or boss (`src/entities/**`, death styles, enemy materials / rim) has a `turntable`
+   artifact from CI (or run `bash scripts/quiet.sh npm run turntable -- --only <ids>`): look at its
+   `<id>-angles.png` and `<id>-motion.png` against the PR's before/after, and judge the look against the enemy's
+   brief in `docs/art/ENEMIES.md` once it exists.
 4. Read the full diff. Check:
    - Acceptance criteria are actually met (in the screenshots, not just in the description).
    - CLAUDE.md hard rules: no removed features, no secrets, no new paid services or
