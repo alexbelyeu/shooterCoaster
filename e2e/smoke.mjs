@@ -811,6 +811,16 @@ async function resultsEnterProblems(page, screen) {
   return []
 }
 
+/** Why a results reveal didn't finish (#367): every mounted results screen and its state, so a CI-only stall says what it was. */
+async function revealStall(page) {
+  return page.evaluate(() => {
+    const s = window.__SC_TEST__
+    const screens = [...document.querySelectorAll('.results-screen')].map((e) => `${e.getAttribute('data-sequence')}/${e.getAttribute('data-mode')}`)
+    const board = document.querySelector('.results-board') ? 'shown' : 'none'
+    return `phase ${s.phase()}, level ${s.stats().currentLevel}, results screens [${screens.join(', ') || 'none'}], board ${board}, page ${document.visibilityState}`
+  })
+}
+
 /** The level timer running out mid-FRENZY (#195): holdFeedback keeps the slow-mo deep while one huge timerStep ends the run. */
 async function frenzyEndProblems(page, id, online) {
   // A full board out of reach (#317): this run must miss it and open no initials entry. It shows the (stubbed) World board.
@@ -856,8 +866,10 @@ async function frenzyEndProblems(page, id, online) {
   const problems = []
   if (after.timeScale !== 1) problems.push(`frenzy end: results screen at timeScale ${after.timeScale.toFixed(2)}, not 1`)
   if (after.ducked) problems.push('frenzy end: music still ducked on the results screen')
-  if (!revealed) problems.push('frenzy end: the results screen never finished its reveal (90 s)')
-  else if (!board.shown) problems.push('frenzy end: no leaderboard on the results screen')
+  if (!revealed) {
+    problems.push(`frenzy end: the results screen never finished its reveal (90 s; ${await revealStall(page)})`)
+    await page.screenshot({ path: path.join(OUT, `${id}-frenzy-end.png`), timeout: SHOT_TIMEOUT }).catch(() => {})
+  } else if (!board.shown) problems.push('frenzy end: no leaderboard on the results screen')
   if (board.rank !== null || board.editing) problems.push(`a run that misses the board ranked ${board.rank} with initials entry ${board.editing ? 'open' : 'closed'}`)
   if (online && (board.source !== 'world' || board.top !== 'WEB' || online.gets.at(-1) !== id || online.posts.length !== 1))
     problems.push(`frenzy end: a run off the local board should show the World board (${board.source}, top ${board.top}, fetched ${online.gets.join(',') || 'nothing'}) and submit nothing (${online.posts.length} submissions in all)`)
@@ -2023,7 +2035,7 @@ async function dailyCheck(newPage) {
     }
   })
   const savedDay = run ? results.daily.savedDaily[run.dateKey] : undefined
-  if (!resultsShown) problems.push('daily results screen never finished its reveal')
+  if (!resultsShown) problems.push(`daily results screen never finished its reveal (${await revealStall(page)})`)
   if (results.mode !== 'daily' || !results.badge) problems.push(`daily results lack the Daily badge (mode ${results.mode})`)
   if (results.score > 0 && results.record !== 'NEW BEST') problems.push(`first daily result shows "${results.record}", expected NEW BEST`)
   if (results.buttons.includes('Next Level')) problems.push('daily results offer Next Level')
@@ -2660,7 +2672,7 @@ async function mobileResults(page) {
   const shown = await page
     .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 60000, polling: 250 })
     .then(() => true, () => false)
-  if (!shown) return { problems: ['phone: the results screen never finished its reveal'], buttons: null, entry: null }
+  if (!shown) return { problems: [`phone: the results screen never finished its reveal (${await revealStall(page)})`], buttons: null, entry: null }
   if (!(await waitVisible(page, '.results-initials-ok', 30000))) {
     return { problems: ['phone: no initials entry on the results screen after a scoring run'], buttons: null, entry: null }
   }
