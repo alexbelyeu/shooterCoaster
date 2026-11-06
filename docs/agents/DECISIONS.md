@@ -1615,3 +1615,51 @@ Supabase project on his free plan, its env vars in Vercel, and running the migra
 changes need `node scripts/gen-level-limits.mjs`. Schema changes need Alex to run SQL by hand.
 Scores are only plausibility-checked (no replay validation): a determined cheater can still post a
 high but possible score; Alex can delete rows (docs/LEADERBOARD.md).
+
+## 2026-11-04 — Studio-health watchdog: a plain Action that files the studio's own problems (builder, #370)
+
+**Context:** Every flake, timeout and stuck PR in the week of 2 Nov was found by Alex reading GitHub
+emails. Agents waved red checks through as "known flakes", and nothing noticed when scheduled runs
+stopped.
+
+**Decision:** `.github/workflows/studio-health.yml` runs `scripts/studio-health.cjs` every 2 h as a
+plain Action, not an agent task, so it still runs when the agents are what's broken. Pure rules in
+`scripts/studioHealthRules.cjs` keep one `studio-health` issue per problem (body marker), `agent:ready`
++ P1, ahead of feature work. Thresholds: runtime creep at a median of ≥ 75 % of a job's limit over ≥ 3
+green runs; stalled when ≥ 2 scheduled Builders / QA slots (studio-status.cjs `SCHEDULE`, 2 h grace
+each) pass without a token-ledger post, counting only slots after that role's work was queued (its
+oldest queue label), after the last pause ended (pause state read once, `readPauseState` in
+studio-status.cjs, honouring `PAUSE until`) and, for Builders, while `builder_runs_per_day` wasn't spent;
+a flake is a failed job whose *same job* passed on the same commit (one workflow can run different jobs
+on one commit), or one failing on a docs-only PR; approved PRs unmerged 3 h after
+the label, `needs-qa` waiting 24 h; escalation to Alex once, when open 24 h and still seen in the last
+24 h. It never duplicates the existing alerts: red `main` in ci.yml's `verify` and every prod-smoke
+failure already open `agent:prod-broken` (revert first, PROTOCOL "When main breaks"), so the watchdog
+only escalates those in place after 12 h. Runs older than a key's last close don't count, so closing an
+issue after its fix sticks. PROTOCOL "No known flakes": a check failing without the change causing it is
+a P1 bug in the check; QA never approves past it.
+
+**Consequences:** Builders and the Maintainer spend runs on CI health before features. Findings about
+the current state (stalled, stuck PRs, QA backlog) refile while the state holds even if closed by hand.
+Workflow limits are read from main, so a job that ran well past one (an unmerged PR on an older
+workflow file) is ignored for timeouts and creep.
+
+## 2026-11-06 — Theme options are written in intensity layers; the registry reads `themes/` by glob (Sound designer, #303)
+
+**Context:** The first listening round (#216) wrote its options without `layer=` tags, so a pick
+needs rewriting before it can follow the combo. #303 adds twelve options for levels 2–5 while
+PR #386 (the #301 picks) also edits `scores/index.ts`.
+**Decision:** Every level option tags its voices base / drums / lead / frenzy, so Alex's pick
+replaces `<level>.scrim` unchanged. Its seam render holds every layer (`--layers 3`), since a
+seam render opens inside the loop at intensity 0. `scores/index.ts` reads `themes/*.scrim` with
+`import.meta.glob`, the same change as #386, so a listening round adds only score files and their
+`SCORE_KEYS` rows.
+**Consequences:** The scores add ~43 kB (~7.5 kB gzip) to the lazy `?audio=scrim` synth chunk
+until the losing options are deleted. A theme option's file name is its `?theme=` id, so names
+must stay unique across slots.
+
+## 2026-11-06 — Enemy turntable: real components, own build, own workflow (Builder, #380)
+
+**Context:** Art review of enemies needs close-ups from every side and in motion, on every PR that touches them, without slowing the other PRs (#371/#372) or reaching the game's bundle.
+**Decision:** `turntable.html` + `src/dev/turntable/` mount the shipped enemy and boss components (not copies) and are built only by `vite build --mode turntable` into `dist-turntable/`. Motion is real game-time animation with each subject's travel cancelled every frame; the Kraken alone is shown as `KrakenPose` (its parts around its head, posed by its real motion code) because the fight scatters its tentacles around the rider. `Math.random` is seeded per subject so images are byte-identical between runs. CI runs it in its own `turntable` workflow, path-filtered to `src/entities/**` and death styles, outside the required `verify`.
+**Consequences:** A new enemy type must be added to `src/dev/turntable/subjects.ts` (its test fails otherwise), with its `front` yaw and motion window. The turntable never gates a merge: QA reads its artifact. Bloom and the biome colour grade aren't applied (no post-processing), so emissive enemies look flatter than in play; `?biome=` / `--biome` gives the biome's sky, lights and fog.
