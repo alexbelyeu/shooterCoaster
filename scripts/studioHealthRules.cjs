@@ -315,7 +315,7 @@ function findings(snap) {
       body: `${role} runs over ${HEAVY_RUN / 1e6}M weighted tokens (a typical run is 0.1–2.5M):\n\n${lines.join('\n')}\n\n` +
         'Find where the tokens went (the ledger line\'s `diag`: cache misses after idle waits, re-read files, large tool results) ' +
         'and fix the cause in the role or runbook (`.claude/agents/`, `docs/agents/runbooks/`), not just the run. ' +
-        'Usual causes: sleeping or polling past 5 minutes (each wake re-reads the whole context), running the full smoke or `verify` locally, `cat` of big files or logs.',
+        'Usual causes: sleeping or polling past 5 minutes (each wake re-reads the whole context), a foreground command over ~4.5 minutes (the same idle gap: a whole smoke shard chained after test + build), running the full smoke or `verify` locally, `cat` of big files or logs, hundreds of turns at a 200k+ context.',
     })
   }
 

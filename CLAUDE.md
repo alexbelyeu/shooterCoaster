@@ -158,7 +158,8 @@ each run's peak context, compactions, cache misses and heaviest tool results).
 - Look only at the screenshots that answer your question (usually one or two), not every PNG.
 - Don't poll or `sleep` waiting for CI, merges or a backgrounded smoke: a gap of over
   ~5 minutes between turns expires the prompt cache, and the next turn pays for the whole
-  context again. Run long commands in the foreground through `quiet.sh`; don't wait for CI at all.
+  context again. Run long commands in the foreground through `quiet.sh`, capped under the cache's
+  5 minutes (`bash scripts/quiet.sh timeout 270 …`: a longer command is the same idle gap); don't wait for CI at all.
   The watchdog files any run over 5M weighted tokens as a `studio-health` issue.
 
 ## Hard rules (all agents, always)
