@@ -201,7 +201,7 @@ function sceneBudgetCheck(id, stats) {
  * close-up of the largest one as `<id>-enemy.png` (for eyeballing rim light and
  * contrast). The level loop fails a ride with no enemy on screen, or fewer readable ones than min(MIN_READABLE, on screen).
  */
-async function captureEnemyCloseup(page, id) {
+async function captureEnemyCloseup(page, id, ridePng) {
   try {
     await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
     const f = await page.evaluate(() => window.__SC_TEST__.frames)
@@ -220,20 +220,19 @@ async function captureEnemyCloseup(page, id) {
       const x = Math.max(0, Math.min(1280 - 2 * half, Math.round(target.x - half)))
       const y = Math.max(0, Math.min(720 - 2 * half, Math.round(target.y - half)))
       const file = `${id}-enemy.png`
-      // Upscale the crop 4x (nearest) via a 2D canvas so small enemies are inspectable.
-      const crop = await page.screenshot({ clip: { x, y, width: 2 * half, height: 2 * half }, timeout: SHOT_TIMEOUT })
-      const big = await page.evaluate(async (b64) => {
+      // Crop the ride screenshot (the same frozen moment; another screenshot costs ~20 s on CI) and upscale it 4x (nearest).
+      const big = await page.evaluate(async ([b64, x, y, size]) => {
         const img = new Image()
         img.src = `data:image/png;base64,${b64}`
         await img.decode()
         const c = document.createElement('canvas')
-        c.width = img.width * 4
-        c.height = img.height * 4
+        c.width = size * 4
+        c.height = size * 4
         const ctx = c.getContext('2d')
         ctx.imageSmoothingEnabled = false
-        ctx.drawImage(img, 0, 0, c.width, c.height)
+        ctx.drawImage(img, x, y, size, size, 0, 0, c.width, c.height)
         return c.toDataURL('image/png').split(',')[1]
-      }, crop.toString('base64'))
+      }, [ridePng.toString('base64'), x, y, 2 * half])
       fs.writeFileSync(path.join(OUT, file), Buffer.from(big, 'base64'))
       summary.closeup = { file, type: target.type, px: Math.round(target.px), distance: Math.round(target.distance) }
     }
@@ -3102,7 +3101,7 @@ async function run() {
     })
     const png = await page.screenshot({ path: path.join(OUT, `${id}.png`), timeout: SHOT_TIMEOUT })
     const img = await imageStats(page, png)
-    const enemyShot = { ...(await captureEnemyCloseup(page, id)), levelTime: stats.levelTime }
+    const enemyShot = { ...(await captureEnemyCloseup(page, id, png)), levelTime: stats.levelTime }
     const { frames } = ride
     const frameSeconds = ride.ms / 1000
     const problems = []

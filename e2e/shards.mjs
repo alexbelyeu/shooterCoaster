@@ -32,7 +32,8 @@ const PHONE_STEPS = ['mobile', 'mobileMenus']
 
 /** One `smoke (<name>)` CI job each (ci.yml matrix, budgets.json `smokeSeconds`); `shot` and `results` don't depend on the level. */
 export const SHARDS = {
-  ui: { steps: ['title', 'landing', 'levelSelect', 'settings'] },
+  ui: { steps: ['title', 'landing'] },
+  menus: { steps: ['levelSelect', 'settings'] },
   level1: { levels: ['level1'], steps: ['ride', 'shot', 'results'] },
   'level1-steps': { levels: ['level1'], steps: ['quality', 'speed'] },
   level2: { levels: ['level2'], steps: ['ride'] },

@@ -39,7 +39,7 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
    - CI `verify` green: CI already ran the PR smoke on every level; you run it again only for the screenshots
      of what changed, or to reproduce something specific. `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm run build`, then
      `bash scripts/quiet.sh node e2e/smoke.mjs --shard <the level the diff affects>` (shared code: `level1` plus
-     one level from another biome; `--shard ui` for menus, `--shard mobile` when the diff touches input, UI, HUD,
+     one level from another biome; `--shard ui` for the title, `--shard menus` for level select and settings, `--shard mobile` when the diff touches input, UI, HUD,
      camera, audio or layout). When the diff touches what only the nightly full smoke checks (a boss, a wave,
      pickups, the daily, pause, share, the phone menus: `e2e/README.md` "Two depths"), run that step alone too,
      e.g. `--steps boss --levels level2`, `--mobile --skip-desktop`.

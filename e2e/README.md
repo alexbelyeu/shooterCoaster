@@ -141,7 +141,7 @@ checks disagree). A step that runs on another's page needs it in the same run (`
 desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desktop` leaves `title` and the phone run.
 
 **Two depths (#372).** The PR smoke is rendering and integration: CI runs the shards in `SHARDS`, one `smoke (<name>)`
-job each (`ci.yml` matrix): `ui` (title, landing, levelSelect, settings), `level1` (ride, shot, results), `level1-steps`
+job each (`ci.yml` matrix): `ui` (title, landing), `menus` (levelSelect, settings), `level1` (ride, shot, results), `level1-steps`
 (quality, speed), `level2`…`level5` (ride) and `mobile`. The **deep** checks, everything else (`nightlyOnly()` in
 `shards.mjs`: daily, frenzy, seed, pause, countdown, wave, boss, pickup, scrim, share, `mobileMenus`, and shot / results
 on levels 2–5), run in the full smoke, which the nightly production run makes (`prod-smoke.yml`, below): they are either

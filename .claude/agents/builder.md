@@ -28,7 +28,7 @@ for anything visual or level-related).
    of expanding scope.
 3. Verify like a player. `export SC_CHROME="$(scripts/ensure-browser.sh)"` once, then
    iterate with `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build && bash scripts/quiet.sh node e2e/smoke.mjs --shard <level you touched>`
-   (the PR smoke for that level, as CI runs it; `--shard ui` for title / menus, `--shard mobile` for input, UI, HUD,
+   (the PR smoke for that level, as CI runs it; `--shard ui` for the title, `--shard menus` for level select and settings, `--shard mobile` for input, UI, HUD,
    camera, audio or layout changes). Touched what a nightly-only step checks (a boss, a wave, pickups, the daily,
    pause, share, the phone menus: `e2e/README.md` "Two depths")? Add that step alone, e.g.
    `--steps boss --levels level3` or `--steps ride,results,share --levels level1`.
