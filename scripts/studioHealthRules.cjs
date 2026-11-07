@@ -13,7 +13,7 @@ const NO_GAME_EFFECT = /^(?!docs\/audio\/)(docs\/|\.claude\/(agents|commands)\/|
 const GAME_JOB = /^(verify|portal|smoke\b|deploy|nightly)/
 /** Jobs on main whose failure already opens `agent:prod-broken` (ci.yml's `verify` gate and what it needs; prod-alert.cjs). */
 const ALERTED_ON_MAIN = {
-  '.github/workflows/ci.yml': /^(verify|unit|lighthouse|smoke)\b/,
+  '.github/workflows/ci.yml': /^(verify|changes|unit|lighthouse|smoke)\b/,
   '.github/workflows/prod-smoke.yml': /./,
 }
 /** How long a scheduled run gets to finish and post to the token ledger before it counts as missed. */

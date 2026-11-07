@@ -7,6 +7,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Nightly on main: the whole gate plus portal, which merges to main don't run (#371).
+  schedule:
+    - cron: '17 7 * * *' # 03:17 New York (EDT)
   workflow_dispatch:
     inputs:
       merged:
@@ -15,13 +18,50 @@ on:
         default: ''
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # The nightly run has its own group: it never cancels, or is cancelled by, the run of a merge.
+  group: ci-${{ github.ref }}${{ github.event_name == 'schedule' && '-nightly' || '' }}
   cancel-in-progress: true
 
 jobs:
   # The required check `verify` (main's ruleset, automerge.cjs, studio-status.cjs) is the gate job at the end (#353).
+  # This job decides which jobs the run needs (scripts/ciPlan.cjs, #371): a docs-only PR (studioHealthRules.cjs
+  # `isDocsOnly`) skips the game jobs, `unit` too unless it touched scripts/, and `portal` runs only on a PR
+  # touching its inputs, nightly, or a hand-started run.
+  changes:
+    name: changes
+    permissions:
+      contents: read
+      pull-requests: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      game: ${{ steps.plan.outputs.game }}
+      unit: ${{ steps.plan.outputs.unit }}
+      portal: ${{ steps.plan.outputs.portal }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
+      - id: plan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { ciPlan } = require(`${process.env.GITHUB_WORKSPACE}/scripts/ciPlan.cjs`)
+            const pr = context.payload.pull_request
+            // A renamed file counts at both paths: moving code into docs/ still changes the game.
+            const files = pr
+              ? (await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: pr.number, per_page: 100 }))
+                  .flatMap((f) => [f.filename, f.previous_filename].filter(Boolean))
+              : []
+            const plan = ciPlan({ event: context.eventName, files, merged: context.payload.inputs?.merged || '' })
+            core.info(`${files.length} changed files → ${JSON.stringify(plan)}`)
+            for (const [job, run] of Object.entries(plan)) core.setOutput(job, String(run))
+
   unit:
     name: unit + build
+    needs: changes
+    if: ${{ needs.changes.outputs.unit == 'true' }}
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -47,6 +87,8 @@ jobs:
 
   lighthouse:
     name: lighthouse
+    needs: changes
+    if: ${{ needs.changes.outputs.game == 'true' }}
     permissions:
       contents: read
     # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
@@ -82,6 +124,8 @@ jobs:
   # smokeSeconds watchdog (twice the budget) stops it inside timeout-minutes.
   smoke:
     name: smoke (${{ matrix.shard }})
+    needs: changes
+    if: ${{ needs.changes.outputs.game == 'true' }}
     permissions:
       contents: read
     # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
@@ -120,8 +164,9 @@ jobs:
 
   verify:
     name: verify
-    needs: [unit, lighthouse, smoke]
-    # Not always(): a run superseded by a newer push skips this instead of reporting red.
+    needs: [changes, unit, lighthouse, smoke]
+    # Not always(): a run superseded by a newer push skips this instead of reporting red. It runs when the jobs
+    # it needs were skipped too: a skipped required check never reports, so a docs-only PR gets its green here.
     if: ${{ !cancelled() }}
     permissions:
       contents: read
@@ -129,12 +174,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Unit tests, Lighthouse and every smoke shard passed
+      # Skipped passes only where `changes` planned it; if `changes` failed, everything it gates counts as red.
+      - name: Unit tests, Lighthouse and every smoke shard passed (or the plan skipped them)
         env:
           NEEDS: ${{ toJSON(needs) }}
         run: |
           echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          bad=$(echo "$NEEDS" | jq -r '[to_entries[] | select(.value.result != "success") | "\(.key) \(.value.result)"] | join(", ")')
+          bad=$(echo "$NEEDS" | jq -r '
+            (.changes.outputs // {}) as $plan
+            | {unit: $plan.unit, lighthouse: $plan.game, smoke: $plan.game} as $planned
+            | [to_entries[] | select(.value.result != "success" and (.value.result != "skipped" or $planned[.key] != "false"))
+               | "\(.key) \(.value.result)"] | join(", ")')
           if [ -n "$bad" ]; then echo "::error title=verify::not green: $bad"; exit 1; fi
 
       # A red main gets an agent:prod-broken issue like a failing production check, so the
@@ -167,8 +217,11 @@ jobs:
 
   # The itch.io / Newgrounds / CrazyGames zip (#88): relative paths, no other origin,
   # level 1 played from a sub-path. A job of its own, beside verify: its smoke takes ~5 min.
+  # Only where it can break (scripts/ciPlan.cjs): a PR touching its inputs, nightly on main, a hand-started run.
   portal:
     name: portal
+    needs: changes
+    if: ${{ needs.changes.outputs.portal == 'true' }}
     permissions:
       contents: read
     # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
