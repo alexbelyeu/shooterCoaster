@@ -36,13 +36,16 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
    - Docs-only (every file a `*.md` or under `docs/`): no build, no smoke.
    - Agent tooling only (`scripts/` other than the smoke, `.claude/`, `.github/`, docs):
      `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm test`; CI's `verify` covers the game.
-   - CI `verify` green: `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm run build`, then
-     `bash scripts/quiet.sh node e2e/smoke.mjs --levels <the levels the diff affects>` (shared code: `level1` plus
-     one level from another biome). Add `--mobile` when the diff touches input, UI, HUD,
-     camera, audio or layout; use `--mobile --skip-desktop` when only the phone run matters.
+   - CI `verify` green: CI already ran the PR smoke on every level; you run it again only for the screenshots
+     of what changed, or to reproduce something specific. `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm run build`, then
+     `bash scripts/quiet.sh node e2e/smoke.mjs --shard <the level the diff affects>` (shared code: `level1` plus
+     one level from another biome; `--shard ui` for the title, `--shard menus` for level select and settings, `--shard mobile` when the diff touches input, UI, HUD,
+     camera, audio or layout). When the diff touches what only the nightly full smoke checks (a boss, a wave,
+     pickups, the daily, pause, share, the phone menus: `e2e/README.md` "Two depths"), run that step alone too,
+     e.g. `--steps boss --levels level2`, `--mobile --skip-desktop`.
    - CI red: the red check names the job. A red `smoke (<shard>)`: build and run that shard,
      `bash scripts/quiet.sh node e2e/smoke.mjs --shard <shard>`; anything else, or CI missing, or still running after
-     ~20 minutes (it takes ~10; `verify` itself only appears once the shards end):
+     ~15 minutes (it takes ~5; `verify` itself only appears once the shards end):
      `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm run verify`. Find the failure.
    **Look at the screenshots** that show the change (e.g. `<id>.png` for scenery,
    `<id>-combat.png` for weapons and hits, `mobile-*.png` for touch/HUD), not every PNG.

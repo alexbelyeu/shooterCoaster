@@ -63,6 +63,8 @@
  *   node e2e/smoke.mjs --shard level3                   # one CI shard (e2e/shards.mjs), with its smokeSeconds budget
  *   node e2e/smoke.mjs --steps ride,boss --levels level2   # just those steps (names in e2e/shards.mjs)
  *
+ * Without --shard / --steps this is the full run (the nightly's depth); CI's PR shards run part of it (#372).
+ *
  * --dist / --base: preview that build folder under that sub-path (`npm run smoke:portal`),
  * proving its relative asset URLs. Every local run fails on a request to another origin,
  * and the title fails unless Lobster and Inter (self-hosted, global.css) loaded.
@@ -199,7 +201,7 @@ function sceneBudgetCheck(id, stats) {
  * close-up of the largest one as `<id>-enemy.png` (for eyeballing rim light and
  * contrast). The level loop fails a ride with no enemy on screen, or fewer readable ones than min(MIN_READABLE, on screen).
  */
-async function captureEnemyCloseup(page, id) {
+async function captureEnemyCloseup(page, id, ridePng) {
   try {
     await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
     const f = await page.evaluate(() => window.__SC_TEST__.frames)
@@ -218,20 +220,19 @@ async function captureEnemyCloseup(page, id) {
       const x = Math.max(0, Math.min(1280 - 2 * half, Math.round(target.x - half)))
       const y = Math.max(0, Math.min(720 - 2 * half, Math.round(target.y - half)))
       const file = `${id}-enemy.png`
-      // Upscale the crop 4x (nearest) via a 2D canvas so small enemies are inspectable.
-      const crop = await page.screenshot({ clip: { x, y, width: 2 * half, height: 2 * half }, timeout: SHOT_TIMEOUT })
-      const big = await page.evaluate(async (b64) => {
+      // Crop the ride screenshot (the same frozen moment; another screenshot costs ~20 s on CI) and upscale it 4x (nearest).
+      const big = await page.evaluate(async ([b64, x, y, size]) => {
         const img = new Image()
         img.src = `data:image/png;base64,${b64}`
         await img.decode()
         const c = document.createElement('canvas')
-        c.width = img.width * 4
-        c.height = img.height * 4
+        c.width = size * 4
+        c.height = size * 4
         const ctx = c.getContext('2d')
         ctx.imageSmoothingEnabled = false
-        ctx.drawImage(img, 0, 0, c.width, c.height)
+        ctx.drawImage(img, x, y, size, size, 0, 0, c.width, c.height)
         return c.toDataURL('image/png').split(',')[1]
-      }, crop.toString('base64'))
+      }, [ridePng.toString('base64'), x, y, 2 * half])
       fs.writeFileSync(path.join(OUT, file), Buffer.from(big, 'base64'))
       summary.closeup = { file, type: target.type, px: Math.round(target.px), distance: Math.round(target.distance) }
     }
@@ -302,8 +303,9 @@ async function pollUntil(page, check, { ms, frames = MIN_FRAMES, pollMs = 500 })
  * must show the "×5 FRENZY" flash during its slow-mo, and on a level with fireworks
  * (Theme Park) the 15+ streak's firework burst, held on screen. The kill's death effect
  * (its enemy type's style, not the default fireball) must be live in the shot.
+ * `shot`, `results` and `share` run the steps of those names on this page (#372).
  */
-async function playLevel(page, id, { frenzy = false, leaderboard = false, online = null } = {}) {
+async function playLevel(page, id, { frenzy = false, leaderboard = false, online = null, shot: freshShot = false, results: resultsScreen = false, share = false } = {}) {
   const problems = []
   // Hold the level timer for every check below (the game clock still runs): however long they take on a slow runner,
   // the run can't time out and no wave or boss comes due under them. Released in the turn that ends the level.
@@ -410,7 +412,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   const counts = await page.evaluate(() => window.__SC_TEST__.combat)
   const audio = await audioBurstProblems(page, 'desktop')
   problems.push(...audio.problems)
-  const shot = await freshShotProblems(page, id)
+  const shot = await freshShotProblems(page, id, { fresh: freshShot })
   problems.push(...shot.problems)
   // These checks are about the level's waves: its boss (slams, weak points, its own death style) is the boss step's.
   const played = await page.evaluate(() => ({ levelTime: window.__SC_TEST__.nextWave()?.levelTime ?? null, boss: window.__SC_TEST__.boss().stage }))
@@ -443,21 +445,24 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
   const resultsShown = await page
     .waitForFunction(
-      () => {
+      (reveal) => {
+        if (!reveal) return window.__SC_TEST__.phase() === 'results'
         const el = document.querySelector('.results-screen')
         if (!el || el.getAttribute('data-sequence') !== 'done') return false
         for (let n = el; n; n = n.parentElement) if (Number(getComputedStyle(n).opacity) < 0.98) return false
         return true
       },
-      null,
+      resultsScreen,
       { timeout: 30000, polling: 250 },
     )
     .then(() => true, () => false)
-  // Let the buttons' fade-in settle (a frame can take ~1 s headless) before the screenshot.
-  await page.waitForTimeout(1500)
-  await page.screenshot({ path: path.join(OUT, `${id}-results.png`), timeout: SHOT_TIMEOUT })
+  if (resultsScreen) {
+    // Let the buttons' fade-in settle (a frame can take ~1 s headless) before the screenshot.
+    await page.waitForTimeout(1500)
+    await page.screenshot({ path: path.join(OUT, `${id}-results.png`), timeout: SHOT_TIMEOUT })
+  }
   const end = await getStats(page)
-  const results = await resultsScreenProblems(page, id, end)
+  const results = resultsScreen ? await resultsScreenProblems(page, id, end, { share }) : { problems: [], screen: null }
   problems.push(...results.problems)
   if (seededRank !== null) {
     const entry = await leaderboardEntryProblems(page, id, seededRank, online, Math.round(end.score))
@@ -516,14 +521,15 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
 /** Largest screen radius a drawn bullet may have, as a fraction of the canvas height (#165). */
 const BULLET_SCREEN_CAP = 0.02
 
-/** Bullets under the cap since load (#165); one frozen real shot must be drawn at the muzzle tip, then <id>-shot.png mid-flight. */
-async function freshShotProblems(page, id) {
+/** Bullets under the cap since load (#165); with `fresh` (the `shot` step) one frozen real shot drawn at the muzzle tip, then <id>-shot.png mid-flight. */
+async function freshShotProblems(page, id, { fresh }) {
   const problems = []
   const read = () => page.evaluate(() => ({ bullets: window.__SC_TEST__.bullets(), weapon: window.__SC_TEST__.weapon }))
   const capProblem = (frac, what) => {
     if (frac > BULLET_SCREEN_CAP) problems.push(`${what} covered ${(frac * 100).toFixed(1)}% of the canvas height (cap ${BULLET_SCREEN_CAP * 100}%)`)
   }
   capProblem((await read()).bullets.maxScreenFrac, 'a bullet')
+  if (!fresh) return { problems, result: null }
   if ((await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return { problems, result: { skipped: true } }
 
   await page.evaluate(() => {
@@ -601,7 +607,7 @@ async function aimJumpCheck(page, read) {
   return { problems, result }
 }
 
-async function resultsScreenProblems(page, id, stats) {
+async function resultsScreenProblems(page, id, stats, { share }) {
   const screen = await page.evaluate(() => {
     const el = document.querySelector('.results-screen')
     if (!el) return null
@@ -635,23 +641,25 @@ async function resultsScreenProblems(page, id, stats) {
   if (!screen) return { problems: ['results screen missing'], screen }
   const { text, ...shown } = screen
   problems.push(...(await resultsActionsProblems(page, 'desktop')))
-  // #87: the shared line can't drift from the run (score, stars, level) or lose its campaign link.
-  const shareRe = /^I scored ([\d,]+) ([★☆]{3}) on (.+) in ShooterCoaster 🎢 — beat me: (\S+)$/u
-  const share = shareRe.exec(screen.shareText ?? '')
-  if (!share) problems.push(`share text ${JSON.stringify(screen.shareText)} is not in the share format`)
-  else {
-    if (share[1] !== screen.score) problems.push(`share score ${share[1]} != results score ${screen.score}`)
-    if ((share[2].match(/★/g) ?? []).length !== screen.stars) problems.push(`share stars ${share[2]} != ${screen.stars} earned`)
-    if (share[3] !== screen.levelName) problems.push(`share level "${share[3]}" != "${screen.levelName}"`)
-    if (share[4] !== SHARE_URL) problems.push(`share link ${share[4]} != ${SHARE_URL}`)
+  if (share) {
+    // #87: the shared line can't drift from the run (score, stars, level) or lose its campaign link.
+    const shareRe = /^I scored ([\d,]+) ([★☆]{3}) on (.+) in ShooterCoaster 🎢 — beat me: (\S+)$/u
+    const line = shareRe.exec(screen.shareText ?? '')
+    if (!line) problems.push(`share text ${JSON.stringify(screen.shareText)} is not in the share format`)
+    else {
+      if (line[1] !== screen.score) problems.push(`share score ${line[1]} != results score ${screen.score}`)
+      if ((line[2].match(/★/g) ?? []).length !== screen.stars) problems.push(`share stars ${line[2]} != ${screen.stars} earned`)
+      if (line[3] !== screen.levelName) problems.push(`share level "${line[3]}" != "${screen.levelName}"`)
+      if (line[4] !== SHARE_URL) problems.push(`share link ${line[4]} != ${SHARE_URL}`)
+    }
+    // #271: desktop Share opens our menu (headless Chromium has no share sheet anyway); Copy link fills the clipboard.
+    const menu = await shareMenuProblems(page, 'desktop', { shot: `${id}-share.png`, expectClipboard: screen.shareText, download: `shootercoaster-${id}-${stats.score}.png` })
+    problems.push(...menu.problems)
+    shown.shareMenu = menu.targets
+    const cards = await scoreCardProblems(page, id, `shootercoaster-${id}-${stats.score}.png`)
+    problems.push(...cards.problems)
+    shown.scoreCards = cards.sizes
   }
-  // #271: desktop Share opens our menu (headless Chromium has no share sheet anyway); Copy link fills the clipboard.
-  const menu = await shareMenuProblems(page, 'desktop', { shot: `${id}-share.png`, expectClipboard: screen.shareText, download: `shootercoaster-${id}-${stats.score}.png` })
-  problems.push(...menu.problems)
-  shown.shareMenu = menu.targets
-  const cards = await scoreCardProblems(page, id, `shootercoaster-${id}-${stats.score}.png`)
-  problems.push(...cards.problems)
-  shown.scoreCards = cards.sizes
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
   for (const label of ['Kills', 'Accuracy', 'Best combo', 'Time left']) {
     if (!(label in screen.rows)) problems.push(`results screen has no "${label}" row`)
@@ -2933,14 +2941,17 @@ async function runMobile(browser, base) {
   await page.locator('.hud-pause-button').tap({ timeout: 30000 }).catch((e) => problems.push(`tap pause: ${e.message}`))
   await waitPhase('paused', 15000)
   if ((await phase()) !== 'paused') problems.push('tapping Pause did not pause')
+  const menus = has('mobileMenus')
   let pauseCards = null
   // Phone frames take seconds under software GL: the HUD fades out before the menu fades in.
-  if (await waitVisible(page, '.pause-card', 60000)) {
-    const landscapeCard = await pauseCardLayout(page)
-    problems.push(...landscapeCard.problems.map((p) => `phone landscape 844x390: ${p}`))
-    await page.screenshot({ path: path.join(OUT, 'mobile-pause-landscape.png'), timeout: SHOT_TIMEOUT })
-    pauseCards = { landscape: landscapeCard.rect }
-  } else problems.push('phone: the pause card never showed')
+  if (menus) {
+    if (await waitVisible(page, '.pause-card', 60000)) {
+      const landscapeCard = await pauseCardLayout(page)
+      problems.push(...landscapeCard.problems.map((p) => `phone landscape 844x390: ${p}`))
+      await page.screenshot({ path: path.join(OUT, 'mobile-pause-landscape.png'), timeout: SHOT_TIMEOUT })
+      pauseCards = { landscape: landscapeCard.rect }
+    } else problems.push('phone: the pause card never showed')
+  }
 
   // Rotate back to portrait: the camera must follow again.
   await page.setViewportSize({ width: 390, height: 844 })
@@ -2965,12 +2976,12 @@ async function runMobile(browser, base) {
     } else problems.push('phone: Settings in the pause menu never opened')
   }
 
-  const bossHud = (await phase()) === 'paused' ? await mobileBossHud(page) : { problems: [], rects: null }
+  const bossHud = menus && (await phase()) === 'paused' ? await mobileBossHud(page) : { problems: [], rects: null }
   problems.push(...bossHud.problems)
 
-  const resultsLayout = await mobileResults(page)
+  const resultsLayout = menus ? await mobileResults(page) : { problems: [], buttons: null, entry: null }
   problems.push(...resultsLayout.problems)
-  const switches = await musicSwitches(page)
+  const switches = menus ? await musicSwitches(page) : { problems: [], switches: null }
   problems.push(...switches.problems)
 
   const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
@@ -3090,7 +3101,7 @@ async function run() {
     })
     const png = await page.screenshot({ path: path.join(OUT, `${id}.png`), timeout: SHOT_TIMEOUT })
     const img = await imageStats(page, png)
-    const enemyShot = { ...(await captureEnemyCloseup(page, id)), levelTime: stats.levelTime }
+    const enemyShot = { ...(await captureEnemyCloseup(page, id, png)), levelTime: stats.levelTime }
     const { frames } = ride
     const frameSeconds = ride.ms / 1000
     const problems = []
@@ -3117,7 +3128,7 @@ async function run() {
     const frenzy = has('frenzy') && id === first
     await page.evaluate((cap) => { window.__SC_TEST__.timerStepMax = cap }, COMBAT_STEP_MAX)
     const online = frenzy ? await stubOnlineBoard(page) : null
-    const play = await playLevel(page, id, { frenzy, leaderboard: frenzy, online })
+    const play = await playLevel(page, id, { frenzy, leaderboard: frenzy, online, shot: has('shot'), results: has('results'), share: has('share') })
       .finally(() => page.evaluate(() => { window.__SC_TEST__.holdLevelTime = false }).catch(() => {}))
     problems.push(...play.problems)
     const frenzyEnd = frenzy ? await frenzyEndProblems(page, id, online) : null
@@ -3272,12 +3283,12 @@ async function run() {
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
-          ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score} initials=${r.mobile.resultsEntry?.initials ?? '-'}${viewSummary(r.mobile.views)} ${r.seconds.toFixed(0)}s`
+          ` fallbackKills=${r.mobile.fallbackKills} sfxNodes=${audioSummary(r.mobile.audio)} audioBurst=${burstSummary(r.mobile.audioBurst.portrait)}/${burstSummary(r.mobile.audioBurst.landscape)} gunAimErr=${r.weapon?.portrait?.aimErrorDeg?.toFixed(0)}°/${r.weapon?.landscape?.aimErrorDeg?.toFixed(0)}° kills=${r.kills} score=${r.score} initials=${r.mobile.resultsEntry?.initials ?? '-'}${viewSummary(r.mobile.views)}`
       : ` levelTime=${r.levelTime?.toFixed(1)}s draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` particles=${r.particles?.points ?? '-'}${r.particles?.boostPoints ? `+${r.particles.boostPoints}` : ''}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° aimJump=${r.combat.freshShot?.aimJump?.aimErrorDeg?.toFixed(0)}°(turn ${r.combat.freshShot?.aimJump?.jumpDeg?.toFixed(0)}°) bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''} ${r.seconds.toFixed(0)}s`
-    console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° aimJump=${r.combat.freshShot?.aimJump?.aimErrorDeg?.toFixed(0)}°(turn ${r.combat.freshShot?.aimJump?.jumpDeg?.toFixed(0)}°) bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''}`
+    console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${r.id === 'time' ? '' : ` ${r.seconds.toFixed(0)}s`}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     if (r.perfGate?.knownOver && r.perfGate.over.length) console.log(`     WARN over budget (known, ${r.perfGate.knownOver}): ${r.perfGate.over.join(', ')}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }

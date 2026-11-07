@@ -135,7 +135,7 @@ jobs:
       fail-fast: false
       matrix:
         # Exactly the keys of SHARDS in e2e/shards.mjs (e2e/shards.test.ts checks this line).
-        shard: [ui, level1, level1-steps, level2, level3, level4, level5, mobile]
+        shard: [ui, menus, level1, level1-steps, level2, level3, level4, level5, mobile]
     steps:
       - uses: actions/checkout@v4
 

@@ -27,10 +27,13 @@ for anything visual or level-related).
 2. Plan briefly, then implement. Stay inside the issue's scope; note follow-ups instead
    of expanding scope.
 3. Verify like a player. `export SC_CHROME="$(scripts/ensure-browser.sh)"` once, then
-   iterate with `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build && bash scripts/quiet.sh node e2e/smoke.mjs --levels <levels you touched>`
-   (add `--mobile` for input, UI, HUD, camera, audio or layout changes).
-   Keep local smoke narrow: the levels or steps you touched (`--levels`, `--steps`, `--shard`),
-   run in the foreground through `quiet.sh`. **Never background a run and `sleep` or poll for
+   iterate with `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build && bash scripts/quiet.sh node e2e/smoke.mjs --shard <level you touched>`
+   (the PR smoke for that level, as CI runs it; `--shard ui` for the title, `--shard menus` for level select and settings, `--shard mobile` for input, UI, HUD,
+   camera, audio or layout changes). Touched what a nightly-only step checks (a boss, a wave, pickups, the daily,
+   pause, share, the phone menus: `e2e/README.md` "Two depths")? Add that step alone, e.g.
+   `--steps boss --levels level3` or `--steps ride,results,share --levels level1`.
+   Keep local smoke narrow: the shards or steps you touched, never a bare `--levels` (that is every step, the
+   nightly's depth), run in the foreground through `quiet.sh`. **Never background a run and `sleep` or poll for
    it**, and never wait more than ~4 minutes between turns: each gap past 5 minutes expires the
    prompt cache and the next turn re-reads your whole context (one builder run lost 2.8M of its
    7.0M tokens to thirteen `sleep 590` waits).
@@ -53,8 +56,8 @@ for anything visual or level-related).
 
 7. **Pre-push checks, not the full verify.** `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build && bash scripts/quiet.sh npm run check:bundle`,
    plus the narrow smoke from step 3 for what you touched. Don't run `npm run verify`, the
-   full smoke or Lighthouse locally: CI runs them on the PR in parallel shards (~10 min), and
-   that `verify` is the gate QA reads. Push, open the PR, label it and finish; don't wait for CI.
+   full smoke or Lighthouse locally: CI runs them on the PR in parallel shards (~5 min), and
+   that `verify` is the gate QA reads; the deep checks run in the nightly full smoke. Push, open the PR, label it and finish; don't wait for CI.
    If it goes red, QA sends the PR back with the failing shard and Fix reproduces just that one.
 
 Run `scripts/pause-check.sh` before shipping. If it prints

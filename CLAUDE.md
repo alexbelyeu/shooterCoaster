@@ -24,11 +24,11 @@ npm test                  # vitest unit tests for pure modules (~1s; `npm run te
 npm run build             # typecheck (tsc -b) + production build -> dist/
 npm run build:portal      # the web-portal build (itch.io / Newgrounds / CrazyGames): relative paths, no analytics or share card -> dist-portal/ + dist-portal.zip (checked by scripts/portal/rules.mjs; needs the zip CLI)
 npm run check:bundle      # bundle-size budget (budgets.json); also prints the startup JS (what index.html loads)
-npm run smoke             # headless playtest: title + every level + phone touch run (needs a build); `-- --shard <name>` runs one CI shard (e2e/shards.mjs)
+npm run smoke             # headless playtest, the full run (the nightly's depth): title + every step on every level + the phone run (needs a build); `-- --shard <name>` runs one CI shard, the PR depth (e2e/shards.mjs)
 npm run smoke:portal      # smoke the portal build served under /nested/path/ (title + level1 checks; CI `portal` job, only on PRs touching the portal's inputs (`vite.config.ts`, `index.html`, `public/`, `scripts/portal/`, `package*.json`, `ci.yml`) and nightly on main, which then keeps the zip as the 30-day artifact `dist-portal`; needs build:portal)
 npm run prod-check -- --url https://scoaster.com   # deploy health check (#352; run after every production deploy by prod-smoke.yml): every built file served with its headers, /go + 404 routes, title, level1 to a kill, a phone run; needs a build (its file list), no --url serves dist/ the way vercel.json says
 npm run lighthouse        # Lighthouse on dist/ (vite preview), mobile + desktop: fails below SEO 100, Accessibility / Best Practices 95; Performance printed only (needs a build + SC_CHROME; e2e-results/lighthouse.json; docs/marketing/SEO.md)
-npm run verify            # test + build + bundle budget + lighthouse + smoke — CI's gate on every PR; agents don't run it before pushing (builder.md step 7: test + build + check:bundle + a narrow smoke) (CI runs it as parallel jobs, `unit + build`, `lighthouse` and one `smoke (<shard>)` each, then the required `verify` gate: ~10 min; a first `changes` job plans the run with `scripts/ciPlan.cjs`: a docs-only PR (`isDocsOnly`) skips the smoke and Lighthouse, and `unit + build` unless it touched `scripts/`, and still gets a green `verify`; e2e/README.md)
+npm run verify            # test + build + bundle budget + lighthouse + the full smoke; agents don't run it before pushing (builder.md step 7: test + build + check:bundle + a narrow smoke) (CI's gate on every PR is its PR depth: parallel jobs, `unit + build`, `lighthouse` and one `smoke (<shard>)` each, then the required `verify` gate; a first `changes` job plans the run with `scripts/ciPlan.cjs`: a docs-only PR (`isDocsOnly`) skips the smoke and Lighthouse, and `unit + build` unless it touched `scripts/`, and still gets a green `verify`; e2e/README.md)
 bash scripts/quiet.sh <cmd>    # run any noisy command with its output in a log file: prints status (+ failures and tail on error)
 npm run og                # re-render the share card public/social/og-1200x630.jpg (needs a build) + the icons from public/favicon.svg (favicon.ico, apple-touch-icon, manifest icons/; `-- --icons` for just those, no build)
 npm run clip              # render the level-1 gameplay clip (MP4 + stills) to docs/marketing/media/ in virtual time, the GIF to e2e-results/clip/ (needs a build + ffmpeg, ~15 min; `-- --level <id>` for another level; the vertical cut: `-- --size 720x1280 --ride-only --seconds 16.4`; re-render policy in docs/marketing/media/README.md)
@@ -55,10 +55,14 @@ avg frame ms, kills, score, combat stats, on-screen enemies, errors) to `e2e-res
 and `mobile-*.png` with `--mobile`. Each level prints one summary line; a level fails on
 blank or stalled rendering, unreadable enemies, missing kills or effects, page errors, or
 the **perf gate** (`budgets.json` `scene` ceilings; only the Director raises them).
-CI runs the smoke as parallel shards (`e2e/shards.mjs`: the UI steps, one per level, level1's extra steps, the
-phone run), each under a `smokeSeconds` budget in `budgets.json` (over it on CI the shard fails: `level3 shard
-took 9.4 min, budget 7.0`). A red `smoke (<shard>)` check names the shard: reproduce it with
-`node e2e/smoke.mjs --shard <name>` (`--steps` / `--levels` pick any subset); its screenshots are the run's
+The smoke has two depths (#372). On a PR, CI runs the rendering and integration checks as parallel shards
+(`e2e/shards.mjs`: the UI steps, the ride and combat on every level, level1's frozen shot, results screen, quality
+and speed, the phone run's touch play), each under a `smokeSeconds` budget in `budgets.json` (over it on CI the shard
+fails: `level3 shard took 9.4 min, budget 7.0`). The deep checks (full boss fights, waves, FRENZY end, initials entry,
+share, daily, pause, countdown, pickups, scrim, the phone menus; game logic among them has unit tests next to its
+pure module) run in the full smoke, nightly on production (`prod-smoke.yml`; a red one opens `agent:prod-broken`).
+A red `smoke (<shard>)` check names the shard: reproduce it with
+`node e2e/smoke.mjs --shard <name>`, a nightly failure with its step (`--steps` / `--levels` pick any subset); its screenshots are the run's
 `e2e-results-<shard>` artifact. A new level needs a shard and a budget (`e2e/shards.test.ts` fails until then).
 `drawCalls`/`triangles` vary with the camera: compare levels with the `scene` totals the
 smoke prints. **The full list of what each step checks, its flags and the test hook
