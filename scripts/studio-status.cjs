@@ -8,6 +8,8 @@
 // Local dry run (prints the markdown, writes nothing):
 //   node scripts/studio-status.cjs --dry-run
 
+const { fetchTelemetry, phoneFrameBudget, telemetrySection } = require('./playerTelemetry.cjs')
+
 const TZ = 'America/New_York'
 const STATUS_LABEL = 'studio-status'
 const STATUS_TITLE = '📊 Studio status (live)'
@@ -331,14 +333,15 @@ async function collect(api, now) {
 
   const ledger = await collectLedger(api, now - 7 * DAY).catch(() => null)
   const milestones = await collectMilestones(api).catch(() => [])
+  const telemetry = await fetchTelemetry()
 
-  return { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger, milestones }
+  return { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger, milestones, telemetry, phoneBudget: phoneFrameBudget() }
 }
 
 // ---------- render ----------
 
 function render(data, now) {
-  const { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger, milestones } = data
+  const { issues, prs, drafts, merged, building, ci, mainVerify, prodSmoke, steeringPaused, ledger, milestones, telemetry, phoneBudget } = data
   const pauses = issues.filter((i) => hasLabel(i, 'pause') && isLivePause(i, now))
   const inQa = prs.filter((p) => hasLabel(p, 'agent:needs-qa'))
     .sort((a, b) => prio(a) - prio(b) || Date.parse(a.created_at) - Date.parse(b.created_at))
@@ -428,6 +431,9 @@ function render(data, now) {
       : `${mainVerify.conclusion === 'success' ? '✅ green' : `❌ ${mainVerify.conclusion}`} on ${mainVerify.head_sha.slice(0, 7)} ${ago(Date.parse(mainVerify.completed_at), now)} ([run](${mainVerify.html_url}))`
   out.push(`\`main\` verify: ${mainCi}. Live-site smoke test: ${smoke}. Open prod-broken issues: ${prodBroken.length ? prodBroken.map((i) => `#${i.number}`).join(', ') : 'none'}.`)
   out.push('')
+
+  // null: /api/telemetry didn't answer (the section says so); undefined: not collected (tests).
+  if (telemetry !== undefined) out.push(...telemetrySection(telemetry, phoneBudget))
 
   if (ledger) {
     out.push('### 🧮 Token use (last 7 days)')

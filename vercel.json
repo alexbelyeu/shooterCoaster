@@ -9,7 +9,8 @@
     }
   },
   "functions": {
-    "api/leaderboard.ts": { "maxDuration": 10 }
+    "api/leaderboard.ts": { "maxDuration": 10 },
+    "api/telemetry.ts": { "maxDuration": 10 }
   },
   "rewrites": [
     { "source": "/go/(.*)", "destination": "/index.html" }
