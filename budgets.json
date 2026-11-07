@@ -3,10 +3,10 @@
   "jsTotalGzipKB": 700,
   "jsLargestChunkGzipKB": 260,
   "smokeSeconds": {
-    "_comment": "Wall time of each CI smoke shard (e2e/shards.mjs), checked by the smoke on CI (#353): 1.5x the slowest of three CI runs on #411 (2026-11-07, the PR depth of #372; ui and menus from their steps' times there; runs swung up to ~60%), rounded up to 30 s; mobile 1.3x.",
+    "_comment": "Wall time of each CI smoke shard (e2e/shards.mjs), checked by the smoke on CI (#353): 1.5x the slowest CI run on #411 (2026-11-07, the PR depth of #372: four runs, ui and menus one; runs swung up to ~60%), rounded up to 30 s, ui and menus to 120 s; mobile 1.3x.",
     "ui": 120,
-    "menus": 150,
-    "level1": 150,
+    "menus": 120,
+    "level1": 240,
     "level1-steps": 210,
     "level2": 210,
     "level3": 180,
