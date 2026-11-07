@@ -55,13 +55,10 @@ metal with choir and timpani), `hellgate` (C minor, 150, string ostinato, brass 
 | Boss / finale | any | A variation of the level theme, darker and louder | the level's colour + orchestra hits |
 | Results | any | 3–6 s jingle: rising for 3★, flatter for 1★ or 0★, then a calm loop | bells + brass |
 
-**Theme options (#216, waiting on Alex's pick):** three each for the title and level1, in
-`src/audio/scores/themes/`, heard with `?audio=scrim&theme=<name>`. Title: `neon` (A minor,
-160, supersaw hook, four-on-the-floor), `highway` (E♭ major, 138, synth-brass cruise, slap bass,
-tom fills), `fanfare` (D major, 172, brass fanfare, orchestra hits, timpani). level1: `calliope`
-(B♭ major, 148, pipe-organ calliope riff over power chords), `carousel` (A major 12/8 shuffle,
-132, organ over accordion and banjo), `ringmaster` (C major, 168, circus-march punk polka,
-xylophone and synth brass). The picked ones replace `title.scrim` / `level1.scrim`.
+**Picked themes (#301):** the title is "Neon Marquee" (A minor, 160, supersaw hook over a
+four-on-the-floor bigkick, gated snare and FM bass; the lift replays the hook a tone up). level1
+stays "Midway Rush" (F major, 156): keep its character (organ riff, accordion skank, oom-pah tuba
+over a rock beat) in any polish. Levels 2–5 get their own listening round.
 
 ## Mix targets (starting numbers: tune with a decision entry)
 

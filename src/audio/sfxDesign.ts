@@ -226,7 +226,7 @@ export interface MusicKey {
 
 /** The keys `audio/scores/*.scrim` are written in, pinned by `scores.test.ts`. */
 export const SCORE_KEYS: Record<string, MusicKey> = {
-  title: { tonic: 67, minor: false }, // G major
+  title: { tonic: 69, minor: true }, // A minor
   level1: { tonic: 65, minor: false }, // F major
   level2: { tonic: 69, minor: true }, // A harmonic minor
   level3: { tonic: 62, minor: false }, // D major
@@ -246,13 +246,7 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
   'level5.hellgate': { tonic: 60, minor: true }, // C minor
   'level5.magma': { tonic: 67, minor: true }, // G minor
   results: { tonic: 60, minor: false }, // C major
-  // Theme options (`?theme=`, scores/themes/)
-  'title.neon': { tonic: 69, minor: true }, // A minor
-  'title.highway': { tonic: 63, minor: false }, // E-flat major
-  'title.fanfare': { tonic: 62, minor: false }, // D major
-  'level1.calliope': { tonic: 70, minor: false }, // B-flat major
-  'level1.carousel': { tonic: 69, minor: false }, // A major
-  'level1.ringmaster': { tonic: 60, minor: false }, // C major
+  // Theme options waiting on Alex's pick (`?theme=`, scores/themes/) get a row each: `'<slot>.<name>': key`
 }
 
 const MAJOR = [0, 2, 4, 5, 7, 9, 11]

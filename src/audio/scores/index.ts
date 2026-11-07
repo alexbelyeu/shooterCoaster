@@ -8,8 +8,9 @@ import level5 from './level5.scrim?raw'
 import results from './results.scrim?raw'
 
 /**
- * Theme options waiting on Alex's pick (`Listen:` issue, sound bible "taste gate"), as `<slot>.<name>`. They never
- * play by default: `?audio=scrim&theme=<name>` puts one in its slot's place (`themesFromQuery`).
+ * Theme options waiting on Alex's pick (`Listen:` issue, sound bible "taste gate"): `themes/<slot>.<name>.scrim`, keyed
+ * `<slot>.<name>`. None right now. They never play by default: `?audio=scrim&theme=<name>` puts one in its slot's place
+ * (`themesFromQuery`). Once Alex picks, the winner replaces `<slot>.scrim` and the options are deleted.
  */
 const THEME_OPTIONS: Record<string, string> = Object.fromEntries(
   Object.entries(import.meta.glob<string>('./themes/*.scrim', { query: '?raw', import: 'default', eager: true })).map(
