@@ -85,6 +85,17 @@ describe('findings', () => {
     expect(f[0].lastSeen).toBe(Date.parse(r.created_at))
   })
 
+  it('a smoke shard failing fails the verify gate too: one finding, the shard\'s (#401)', () => {
+    const r = run({ jobs: [
+      job('smoke (mobile)', 'failure', 5, [{ name: 'Smoke shard mobile', conclusion: 'failure' }]),
+      job('verify', 'failure', 1, [{ name: 'Unit tests, Lighthouse and every smoke shard passed', conclusion: 'failure' }]),
+    ] })
+    expect(keys(snap({ runs: [r], prFiles: docsPr }))).toEqual(['flaky:smoke / Smoke shard mobile'])
+    // The gate failing alone (nothing it needs failed) is still filed.
+    const alone = run({ jobs: [job('verify', 'failure', 1, [{ name: 'Report a red main', conclusion: 'failure' }])] })
+    expect(keys(snap({ runs: [alone], prFiles: docsPr }))).toEqual(['flaky:verify / Report a red main'])
+  })
+
   it('a failure on a code PR is the PR\'s, unless the same commit passed elsewhere', () => {
     const failed = smokeFail()
     expect(keys(snap({ runs: [failed], prFiles: { 10: ['src/x.ts'] } }))).toEqual([])

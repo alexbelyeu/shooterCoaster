@@ -22,6 +22,11 @@ const STALL_SLOTS = 2
 /** A run over this many weighted tokens is filed (`heavy:<role>`): a typical run is 0.1–2.5M. */
 const HEAVY_RUN = 5e6
 
+/** ci.yml's `verify` gate fails whenever a job it needs fails: that failure is filed once, under the job (#401). */
+const isGateEcho = (r, job) =>
+  r.path === '.github/workflows/ci.yml' && job.name === 'verify' &&
+  (r.jobs || []).some((j) => j !== job && (j.conclusion === 'failure' || j.conclusion === 'timed_out' || j.timedOut))
+
 const isDocsOnly = (files) => files.length > 0 && files.every((f) => NO_GAME_EFFECT.test(f))
 
 /** A matrix job's name without its matrix part: "smoke (${{ matrix.shard }})" in YAML, "smoke (level1)" from the API. */
@@ -144,6 +149,7 @@ function findings(snap) {
     for (const job of r.jobs || []) {
       // A timed-out job is filed as a timeout below, not as a flake.
       if (job.conclusion !== 'failure' || job.timedOut || !GAME_JOB.test(job.name)) continue
+      if (isGateEcho(r, job)) continue
       if (!docsOnly && !jobPassed.has(`${r.path}@${r.head_sha}@${job.name}`)) continue
       const step = failedStep(job) || 'unknown step'
       const name = `${baseJob(job.name)} / ${step}`
