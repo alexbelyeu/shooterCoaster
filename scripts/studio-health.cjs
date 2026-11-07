@@ -192,7 +192,7 @@ function issueBody(f, escalated) {
 }
 
 /** Opens, updates, escalates and closes the watchdog's issues (`open`: its open issues) to match `found`. */
-async function reconcile(api, found, open, now, log) {
+async function reconcile(api, found, open, now, log, { telemetryDown = false } = {}) {
   try {
     await api('POST /repos/{owner}/{repo}/labels', { name: LABEL, color: 'b60205', description: 'Opened and closed by the studio-health watchdog' })
   } catch {
@@ -232,6 +232,8 @@ async function reconcile(api, found, open, now, log) {
   }
   for (const [key, issue] of byKey) {
     if (seen.has(key)) continue
+    // No telemetry answer (503, timeout) says nothing about player problems: leave them open.
+    if (telemetryDown && key.startsWith('player-')) continue
     await api('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
       issue_number: issue.number,
       body: `Cleared ${stamp(now)}: the watchdog no longer sees this problem.`,
@@ -264,7 +266,7 @@ module.exports = async function run({ github, context, core }) {
   const snap = await collect(api, now, path.join(process.env.GITHUB_WORKSPACE, '.github/workflows'))
   const found = findFindings(snap)
   core.info(`${found.length} finding(s): ${found.map((f) => f.key).join(', ') || 'none'}`)
-  await reconcile(api, found, snap.watchdogOpen, now, (m) => core.info(m))
+  await reconcile(api, found, snap.watchdogOpen, now, (m) => core.info(m), { telemetryDown: !snap.telemetry })
   await escalateProdAlerts(api, staleProdAlerts(snap), now, (m) => core.info(m))
 }
 

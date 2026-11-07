@@ -307,6 +307,17 @@ describe('reconcile', () => {
     expect(routes()).toEqual(['POST /repos/{owner}/{repo}/labels', PATCH])
   })
 
+  it('keeps player-* issues open while telemetry is unreachable, still closes the rest', async () => {
+    const player = issue({ number: 4, body: '<!-- studio-health:player-error:abc -->\nb' })
+    const down = fakeApi()
+    await reconcile(down.api, [], [player, issue()], NOW, log, { telemetryDown: true })
+    const closed = (c: [string, any][]) => c.filter(([r, p]) => r.startsWith('PATCH') && p.state === 'closed').map(([, p]) => p.issue_number)
+    expect(closed(down.calls)).toEqual([3])
+    const up = fakeApi()
+    await reconcile(up.api, [], [player], NOW, log)
+    expect(closed(up.calls)).toEqual([4])
+  })
+
   it('escalates once: open over 24 h and seen in the last 24 h; the body marker, not the label, remembers it', async () => {
     const first = fakeApi()
     await reconcile(first.api, [finding()], [issue({ created_at: iso(30 * H) })], NOW, log)
