@@ -146,9 +146,18 @@ budget fails, and one still running at twice its budget writes `results.json` wi
 after …: stopped`), inside the job's timeout; locally it only warns, since a 2-core session is slower than a CI runner.
 Budgets: only the Director raises them.
 
-CI's required `verify` check is a gate job that needs `unit + build`, `lighthouse` and every shard, and passes only if
-all of them passed. GitHub creates its check run only when those end, so `scripts/automerge.cjs` and
+CI's required `verify` check is a gate job that needs `changes`, `unit + build`, `lighthouse` and every shard, and passes only if
+all of them passed or were skipped by the plan. GitHub creates its check run only when those end, so `scripts/automerge.cjs` and
 `scripts/studio-status.cjs` read the running jobs before it as "verify waiting".
+
+Only what a PR can break runs (#371). The first job, `changes`, plans the run from the PR's files with pure
+`scripts/ciPlan.cjs` (its rules, unit-tested in `ciPlan.test.ts`): a docs-only PR (the watchdog's `isDocsOnly` in
+`scripts/studioHealthRules.cjs`: `docs/` but `docs/audio/`, `.claude/agents|commands/`, any `*.md`) skips `lighthouse` and
+every `smoke (<shard>)`, and `unit + build` too unless it touched `scripts/`; `verify` still runs and passes in a minute or two.
+Any other PR runs the full gate. `portal` (the portal build smoked under `/nested/path/`) runs only on a PR touching
+`vite.config.ts`, `index.html`, `public/`, `scripts/portal/`, `package*.json` or `ci.yml`, on a hand-started run, and in the
+nightly run on `main` (`schedule`, the full gate plus `portal`, its own concurrency group). Merges to `main` run the full gate
+without `portal`.
 
 ## Production (`.github/workflows/prod-smoke.yml`, #352)
 

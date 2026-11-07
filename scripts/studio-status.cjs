@@ -296,7 +296,7 @@ async function collect(api, now) {
     const runs = (await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref, per_page: 100 })).check_runs
     const run = runs.filter((r) => r.name === 'verify').sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0]
     if (run) return run
-    const need = runs.find((r) => (r.name === 'unit + build' || r.name === 'lighthouse' || r.name.startsWith('smoke (')) && r.status !== 'completed')
+    const need = runs.find((r) => (r.name === 'changes' || r.name === 'unit + build' || r.name === 'lighthouse' || r.name.startsWith('smoke (')) && r.status !== 'completed')
     return need ? { status: 'waiting', head_sha: need.head_sha } : null
   }
 
