@@ -11,6 +11,8 @@ nothing for `docs/ASSETS.md`).
 | `clip-level1-1280x720.mp4` | 19 s, 1280×720, 30 fps, H.264, silent, ~3 MB. Title fly-by → PLAY → level select → Theme Park ride from track fraction 0.42: under the Ferris wheel, balloons popping with muzzle flash and hitmarkers, combo climbing to ×5 FRENZY, fireworks bursting over the midway on the kill streaks. The one to attach to posts |
 | `clip-level1-1280x720.gif` | The first 8 s of that ride, 480 px wide, 15 fps, ~7 MB, for forums that only take GIFs (over a 4 MB upload cap, attach the MP4 or a still instead). The last GIF committed here: re-renders keep theirs out of git (below) |
 | `clip-level1-1280x720-{start,mid,end}.jpg` | First, middle and last frame of the MP4, to check the clip without a video player |
+| `clip-level1-720x1280.mp4` | The vertical cut for TikTok / Shorts / Reels: 16.4 s, 720×1280 (9:16), 30 fps, H.264, silent, ~2.9 MB. The phone view (touch layout, portrait FOV, gun low right), opening on the ride already moving at track fraction 0.42, balloons popping, combo climbing to ×5 FRENZY, ending on fireworks over the midway at ×5. No intro or level select, no GIF |
+| `clip-level1-720x1280-{start,mid,end}.jpg` | Its first (ride moving), middle (×3 combo, kill confetti) and last (×5 FRENZY, fireworks) frames |
 
 How it was made (first render 2026-10-28, #100; re-rendered 2026-11-02 on `main` @ 8e66045 by the Marketer after fireworks #222, the Golden Blimp #219, weapon pickups #266 and the HUD changes landed — 17 kills, score 555, seed 1337): `npm run build && npm run clip` with the defaults:
 `--level level1 --from 0.42 --seconds 15 --fps 30 --size 1280x720 --seed 1337`. Autofire
@@ -32,6 +34,11 @@ the frames, make one from the committed MP4 (`-ss` is where the ride starts, ~4.
 default intro and level select):
 `ffmpeg -ss 4.4 -t 8 -i clip-level1-1280x720.mp4 -vf "fps=15,scale=480:-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5" clip.gif`
 
-A vertical cut for Shorts / Reels: `npm run clip -- --size 720x1280` (not committed yet).
+The vertical cut (first render 2026-11-06, #309, 17 kills, score 611, seed 1337):
+`npm run build && npm run clip -- --size 720x1280 --ride-only --seconds 16.4`, the other options at their defaults.
+A portrait `--size` emulates touch, so the page shows the phone layout (no keyboard hints), and makes no GIF;
+`--ride-only` plays the title and level select uncaptured, so the clip opens on the ride. `--seconds 16.4` ends on the
+fireworks at ×5, before the combo lapses at ~17.5 s. Platform captions and buttons cover the bottom ~20 % and the right
+~15 % of a vertical video: there the combo meter (bottom centre) and the gun's stock sit; score and timer are clear.
 Other levels: `--level <id> --from <0–1>`, e.g. `npm run clip -- --level level2 --from 0.3`;
 the clip stars every level before it, so the level select opens with it unlocked and focused.
