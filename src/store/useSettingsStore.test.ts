@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSettingsStore } from './useSettingsStore'
 
-// A bare `window` with an in-memory localStorage, as useGameStore.test.ts does: zustand's persist reads it when the
-// store is created (vi.hoisted runs before the import).
+// persist reads `window.localStorage` when the store is created: a bare window with a Map, as in useGameStore.test.ts.
 const memoryStorage = vi.hoisted(() => {
   const data = new Map<string, string>()
   const storage = {
@@ -28,12 +27,11 @@ beforeEach(() => {
   useSettingsStore.setState(initial, true)
 })
 
-describe('settings persistence (the smoke settings step reloads the page for the same)', () => {
-  it('a quality and a music volume survive a reload', async () => {
+describe('settings persistence', () => {
+  it('a quality and a music volume survive a reload (defaults, then the save rehydrated)', async () => {
     settings().setQuality('low')
     settings().setMusicVolume(0.25)
     const saved = memoryStorage.getItem(STORAGE_KEY)!
-    // A reload: the store starts from its defaults (resetting writes them, so put the save back), then rehydrates.
     useSettingsStore.setState(initial, true)
     memoryStorage.setItem(STORAGE_KEY, saved)
     expect(settings().quality).toBe('auto')

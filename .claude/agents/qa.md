@@ -45,7 +45,7 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
      e.g. `--steps boss --levels level2`, `--mobile --skip-desktop`.
    - CI red: the red check names the job. A red `smoke (<shard>)`: build and run that shard,
      `bash scripts/quiet.sh node e2e/smoke.mjs --shard <shard>`; anything else, or CI missing, or still running after
-     ~20 minutes (it takes ~10; `verify` itself only appears once the shards end):
+     ~15 minutes (it takes ~5; `verify` itself only appears once the shards end):
      `bash scripts/quiet.sh npm ci && bash scripts/quiet.sh npm run verify`. Find the failure.
    **Look at the screenshots** that show the change (e.g. `<id>.png` for scenery,
    `<id>-combat.png` for weapons and hits, `mobile-*.png` for touch/HUD), not every PNG.

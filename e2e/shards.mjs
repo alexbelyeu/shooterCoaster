@@ -1,8 +1,6 @@
 /**
- * The smoke's named steps and the CI shards that split them (#353). The shards are the PR smoke: rendering and
- * integration, per level (#372). The nightly production run (prod-smoke.yml) is the full run, every step on every
- * level, so the deep checks the shards leave out (`nightlyOnly()`: full boss fights, FRENZY end, initials entry, the
- * phone run's menus, logic a unit test covers) still run once a day. shards.test.ts holds the two together.
+ * The smoke's named steps and the CI shards that split them (#353): the shards are the PR depth, rendering and
+ * integration; the rest (`nightlyOnly()`) runs in the nightly production run of the full smoke (#372).
  */
 
 export const UI_STEPS = ['title', 'landing', 'levelSelect', 'daily', 'settings', 'mobile', 'mobileMenus']
@@ -32,10 +30,7 @@ const NEEDS = {
 
 const PHONE_STEPS = ['mobile', 'mobileMenus']
 
-/**
- * The PR smoke: one `smoke (<name>)` CI job per shard (ci.yml matrix), each under its budgets.json `smokeSeconds`.
- * The ride's level-independent checks (the frozen shot, the results screen) run on level1 only.
- */
+/** One `smoke (<name>)` CI job each (ci.yml matrix, budgets.json `smokeSeconds`); `shot` and `results` don't depend on the level. */
 export const SHARDS = {
   ui: { steps: ['title', 'landing', 'levelSelect', 'settings'] },
   level1: { levels: ['level1'], steps: ['ride', 'shot', 'results'] },

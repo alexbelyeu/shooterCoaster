@@ -63,8 +63,7 @@
  *   node e2e/smoke.mjs --shard level3                   # one CI shard (e2e/shards.mjs), with its smokeSeconds budget
  *   node e2e/smoke.mjs --steps ride,boss --levels level2   # just those steps (names in e2e/shards.mjs)
  *
- * Without --shard / --steps this is the full run, every check above: the nightly production smoke. A PR's CI shards
- * run the rendering + integration steps only (#372; e2e/README.md "Two depths").
+ * Without --shard / --steps this is the full run (the nightly's depth); CI's PR shards run part of it (#372).
  *
  * --dist / --base: preview that build folder under that sub-path (`npm run smoke:portal`),
  * proving its relative asset URLs. Every local run fails on a request to another origin,
@@ -305,10 +304,7 @@ async function pollUntil(page, check, { ms, frames = MIN_FRAMES, pollMs = 500 })
  * must show the "×5 FRENZY" flash during its slow-mo, and on a level with fireworks
  * (Theme Park) the 15+ streak's firework burst, held on screen. The kill's death effect
  * (its enemy type's style, not the default fireball) must be live in the shot.
- */
-/**
- * The ride step's combat, then the level's end. `shot` adds the frozen fresh shot (freshShotProblems), `results` the
- * results screen's reveal and contents, `share` its Share line, menu and score cards (steps of the same names, #372).
+ * `shot`, `results` and `share` run the steps of those names on this page (#372).
  */
 async function playLevel(page, id, { frenzy = false, leaderboard = false, online = null, shot: freshShot = false, results: resultsScreen = false, share = false } = {}) {
   const problems = []
@@ -448,7 +444,6 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   if (seeding.phase !== 'playing') problems.push(`level left play (${seeding.phase}) before the results checks, with the level timer held`)
   const seededRank = seeding.rank
   // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
-  // Without the `results` step only the phase change is checked.
   const resultsShown = await page
     .waitForFunction(
       (reveal) => {
@@ -527,10 +522,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
 /** Largest screen radius a drawn bullet may have, as a fraction of the canvas height (#165). */
 const BULLET_SCREEN_CAP = 0.02
 
-/**
- * Bullets under the cap since load (#165); with `fresh` (the `shot` step), one frozen real shot must be drawn at the
- * muzzle tip, then <id>-shot.png mid-flight.
- */
+/** Bullets under the cap since load (#165); with `fresh` (the `shot` step) one frozen real shot drawn at the muzzle tip, then <id>-shot.png mid-flight. */
 async function freshShotProblems(page, id, { fresh }) {
   const problems = []
   const read = () => page.evaluate(() => ({ bullets: window.__SC_TEST__.bullets(), weapon: window.__SC_TEST__.weapon }))
@@ -2950,7 +2942,6 @@ async function runMobile(browser, base) {
   await page.locator('.hud-pause-button').tap({ timeout: 30000 }).catch((e) => problems.push(`tap pause: ${e.message}`))
   await waitPhase('paused', 15000)
   if ((await phase()) !== 'paused') problems.push('tapping Pause did not pause')
-  // The rest of the phone run (the menus: pause card, settings, boss bar, results, share, music switches) is `mobileMenus`.
   const menus = has('mobileMenus')
   let pauseCards = null
   // Phone frames take seconds under software GL: the HUD fades out before the menu fades in.
