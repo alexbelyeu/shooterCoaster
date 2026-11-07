@@ -159,6 +159,8 @@ export interface SCTestApi {
   /** Seconds the coaster rides per second of level time (in steps of at most 3/60 s, the game's per-frame ride cap);
    *  null rides the frame time. With `timerStepMax` it puts the ride at the same track point for a level time on any runner. */
   rideRate: number | null
+  /** Seconds since the title appeared, held: the title camera's pose stays there (the poster render, `npm run og -- --poster`). null runs it. */
+  titleTime: number | null
   /** Drawn bullets (#165): count, largest screen radius (fraction of canvas height) now and since load, newest one's CSS px point. */
   bullets: () => E2EBullets
   /** Fire one real shot through NDC (x, y), like a click there. False if not fired (phase, fire delay). */
@@ -431,6 +433,11 @@ export function levelTimeHeld(): boolean {
 export function e2eRideSeconds(delta: number): number | null {
   const rate = isE2E ? window.__SC_TEST__?.rideRate : null
   return rate == null ? null : levelTimeStep(delta) * rate
+}
+
+/** The title camera's time when a test holds it (`titleTime`), else null. */
+export function e2eTitleTime(): number | null {
+  return isE2E ? (window.__SC_TEST__?.titleTime ?? null) : null
 }
 
 /** The mounted spawner's wave schedule, set by EnemySpawner. */
@@ -761,6 +768,7 @@ export function installE2EApi() {
     timerStepMax: null,
     holdLevelTime: false,
     rideRate: null,
+    titleTime: null,
     bullets: readBullets,
     fireShot: (x: number, y: number) => (probeCamera ? fireAtNDC(x, y, probeCamera) : false),
     shaderWarmup: null,

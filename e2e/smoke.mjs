@@ -2189,15 +2189,16 @@ async function qualityCheck(newPage, levelId) {
 const toneRequests = (page) =>
   page.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/tone-[^/]*\.js$/.test(e.name)).length)
 
-/** Title (#28): another camera angle 6 s later (`title-2.png`), the start hint, and a key press fading to level select
+/** Title (#28): another camera angle 6 s later (`title-2.png`; its draw calls go on `drawCalls`), the start hint, and a key press fading to level select
  *  that also loads Tone.js (#187: not before it) and unlocks audio. */
-async function titleFlyBy(page) {
+async function titleFlyBy(page, drawCalls) {
   const problems = []
   const pose = () => page.evaluate(() => window.__SC_TEST__.cameraPose())
   const a = await pose()
   const at = Date.now()
   await waitFrames(page, 2, { minMs: 6000, maxMs: 30000 })
   const b = await pose()
+  drawCalls.push(await page.evaluate(() => window.__SC_TEST__.drawCalls))
   const waited = (Date.now() - at) / 1000
   // Re-shot like title.png: a GPU CI runner can return one black canvas capture (#291 CI), a black scene stays black.
   const scene2 = await captureTitleScene(page, path.join(OUT, 'title-2.png'), 10000)
@@ -2239,6 +2240,70 @@ async function titleFlyBy(page) {
     .then(() => true, () => false)
   if (!toneAfter) problems.push('the key press on the title did not load Tone.js and unlock audio')
   return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter, sparkle } }
+}
+
+/** Longest the cold load may take to hand the poster over to the live scene before the poster check gives up. */
+const POSTER_HANDOFF_MS = 60000
+
+/** The poster (#376), before any JS: with JS off, index.html alone must paint the title's still and logo (`poster.png`). */
+async function posterWithoutJs(browser, base, stats) {
+  const problems = []
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, javaScriptEnabled: false })
+  const still = []
+  const page = await ctx.newPage()
+  page.on('response', (r) => r.url().includes('/poster/') && still.push(r.status()))
+  await page.goto(`${base}/`, { waitUntil: 'load' })
+  const logo = await page.locator('#poster .poster-logo').isVisible()
+  await page.waitForLoadState('networkidle').catch(() => {})
+  // A JS-off page can't be asked whether the still has decoded: retry the shot once, and report a failure as a problem.
+  let shot = null
+  for (let attempt = 0; attempt < 2 && !shot; attempt++) {
+    shot = await page.screenshot({ path: path.join(OUT, 'poster.png'), timeout: SHOT_TIMEOUT }).catch(() => null)
+    if (!shot) await page.waitForTimeout(500)
+  }
+  await ctx.close()
+  if (!shot) {
+    problems.push('with JS off, the poster page could not be screenshotted')
+    return problems
+  }
+  if (!logo) problems.push('with JS off, index.html shows no poster logo')
+  if (!still.includes(200)) problems.push(`with JS off, the poster still did not load (${still.join(', ') || 'never requested'})`)
+  if (looksBlank(await imageStats(stats, shot, TITLE_UI))) problems.push('poster.png: the poster behind the logo looks blank')
+  return problems
+}
+
+/**
+ * The poster's handoff (#376), on the title page as it loads: shot over and over from the first paint until the poster
+ * has gone and the live scene shows. No shot may be blank outside the title UI (`poster-blank-<n>.png` keeps any that is).
+ */
+async function posterHandoff(page) {
+  await page.waitForFunction(() => performance.getEntriesByType('paint').length > 0, null, { timeout: 30000, polling: 20 })
+  const blank = []
+  let shots = 0
+  let afterPoster = 0
+  const until = Date.now() + POSTER_HANDOFF_MS
+  // Two shots once the poster is gone: the live scene alone.
+  while (afterPoster < 2 && Date.now() < until) {
+    const gone = await page.evaluate(() => !document.getElementById('poster'))
+    const png = await page.screenshot({ timeout: SHOT_TIMEOUT })
+    shots++
+    if (gone) afterPoster++
+    if (looksBlank(await imageStats(page, png, TITLE_UI))) {
+      blank.push(shots)
+      fs.writeFileSync(path.join(OUT, `poster-blank-${shots}.png`), png)
+    }
+  }
+  const problems = []
+  if (afterPoster === 0) problems.push(`the poster was still up ${POSTER_HANDOFF_MS / 1000} s into a cold load`)
+  if (blank.length) problems.push(`a cold load showed a blank frame: shot(s) ${blank.join(', ')} of ${shots} (poster-blank-<n>.png)`)
+  return { problems, shots }
+}
+
+/** The title scene against its `scene` budget: draw calls are the most of the given readings (they vary with the shot). */
+async function titleBudget(page, drawCalls) {
+  const scene = await page.evaluate(() => window.__SC_TEST__.sceneStats())
+  const stats = { drawCalls: Math.max(...drawCalls), scene }
+  return { ...stats, over: sceneBudgetCheck('title', stats).over }
 }
 
 const LANDING_PATH = '/go/smoke-check'
@@ -3022,16 +3087,19 @@ async function run() {
   const browser = await launchBrowser(['--autoplay-policy=no-user-gesture-required'])
   let failed = false
 
-  const newPage = async (query = 'e2e=1', options = {}) => {
+  /** `whileLoading(page)` runs from the navigation's commit, before the page has loaded; its result comes back as `loading`. */
+  const newPage = async (query = 'e2e=1', options = {}, whileLoading = null) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, ...options })
     // The results Share check reads back what it copied (#87).
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write'])
     const page = await ctx.newPage()
     const errors = []
     collectErrors(page, errors)
-    await page.goto(`${base}/?${query}`, { waitUntil: 'load' })
+    await page.goto(`${base}/?${query}`, { waitUntil: whileLoading ? 'commit' : 'load' })
+    const loading = whileLoading ? await whileLoading(page) : null
+    await page.waitForLoadState('load')
     await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
-    return { ctx, page, errors }
+    return { ctx, page, errors, loading }
   }
   const step = async (fn) => {
     const started = Date.now()
@@ -3052,18 +3120,25 @@ async function run() {
   })
 
   // 1. Title screen
-  const t = await newPage()
+  const t = await newPage('e2e=1', {}, has('title') ? posterHandoff : null)
   const levels = await t.page.evaluate(() => window.__SC_TEST__.levels())
   if (has('title')) {
     await step(async () => {
       const titleWait = await waitFrames(t.page, MIN_FRAMES, { maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
       const titleImg = await captureTitleScene(t.page, path.join(OUT, 'title.png'), FRAME_DEADLINE_MS)
-      const fly = await titleFlyBy(t.page)
-      const problems = [...fly.problems, ...(await fontProblems(t.page))]
+      const drawCalls = [await t.page.evaluate(() => window.__SC_TEST__.drawCalls)]
+      const fly = await titleFlyBy(t.page, drawCalls)
+      const budget = await titleBudget(t.page, drawCalls)
+      const poster = t.loading
+      const problems = [...fly.problems, ...poster.problems, ...(await posterWithoutJs(browser, base, t.page)), ...(await fontProblems(t.page))]
       if (titleWait.frames < MIN_FRAMES) problems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
       if (looksBlank(titleImg)) problems.push('title.png: the 3D scene behind the UI looks blank')
+      if (budget.over.length && PERF_GATE) problems.push(`title scene over budget: ${budget.over.join(', ')}`)
       if (t.errors.length) problems.push(`${t.errors.length} error(s)`)
-      return { id: 'title', ok: problems.length === 0, problems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg, title: fly.result, errors: t.errors }
+      return {
+        id: 'title', ok: problems.length === 0, problems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg,
+        title: fly.result, drawCalls: budget.drawCalls, scene: budget.scene, posterShots: poster.shots, errors: t.errors,
+      }
     })
   }
   await t.ctx.close()
@@ -3236,7 +3311,8 @@ async function run() {
     const extra = r.id === 'time'
       ? (r.ok ? ` ${r.text}` : '')
       : r.id === 'title'
-      ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '')
+      ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '') +
+        ` draws=${r.drawCalls} scene objs=${r.scene?.objects} tris=${r.scene?.triangles}; poster: ${r.posterShots} load shots`
       : r.landing
         ? ` ${r.landing.requested} -> ${r.landing.pathname}${r.landing.search} phase=${r.landing.phase} internal marker=${r.landing.marker} failed requests=${r.landing.failed}`
       : r.daily

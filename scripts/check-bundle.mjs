@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Bundle-size guardrail. Run after `npm run build`.
- * Fails if total gzipped JS in dist/ exceeds the budget in budgets.json.
+ * Fails if total gzipped JS in dist/, the largest chunk, or the startup JS (what index.html loads before the title, #376)
+ * exceeds its budget in budgets.json.
  * Raising a budget is a Director decision and must be logged in docs/agents/DECISIONS.md.
  * Also fails if the online leaderboard's server side (api/: Supabase's REST API and its key) reaches the browser.
  */
@@ -43,7 +44,8 @@ for (const [f, raw, gz] of rows) console.log(`${gz.padStart(6)} KB gz  ${raw.pad
 
 const totalKb = totalGz / 1024
 const largestKb = largestGz / 1024
-console.log(`Startup JS: ${(startupGz / 1024).toFixed(0)} KB gz (${startup.size} files from index.html; the rest loads on demand)`)
+const startupKb = startupGz / 1024
+console.log(`Startup JS: ${startupKb.toFixed(0)} KB gz (budget ${budgets.startupJsGzipKB} KB; ${startup.size} files from index.html, the rest loads on demand)`)
 console.log(`Total JS: ${totalKb.toFixed(0)} KB gz (budget ${budgets.jsTotalGzipKB} KB); largest chunk ${largestKb.toFixed(0)} KB gz (budget ${budgets.jsLargestChunkGzipKB} KB)`)
 
 let ok = true
@@ -53,6 +55,10 @@ if (totalKb > budgets.jsTotalGzipKB) {
 }
 if (largestKb > budgets.jsLargestChunkGzipKB) {
   console.error(`FAIL: largest chunk over budget by ${(largestKb - budgets.jsLargestChunkGzipKB).toFixed(0)} KB`)
+  ok = false
+}
+if (startupKb > budgets.startupJsGzipKB) {
+  console.error(`FAIL: startup JS over budget by ${(startupKb - budgets.startupJsGzipKB).toFixed(0)} KB (index.html loads it before the title; lazy-load what the title doesn't need)`)
   ok = false
 }
 if (leaks.length) {

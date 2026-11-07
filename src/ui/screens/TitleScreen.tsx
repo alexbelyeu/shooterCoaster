@@ -7,11 +7,14 @@ import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { motion } from 'framer-motion'
 import { markStartup } from '@/core/startupMarks'
 import { startsGame } from './titleKeys'
+import { handPosterToUi, posterShown } from '@/app/poster'
 
 const TITLE = 'ShooterCoaster'
 const SUBTITLE_WORDS = ['Ride.', 'Aim.', 'Shoot.']
 /** The title has landed by here; PLAY and the rest follow. */
 const PLAY_IN_S = 1.3
+/** Over the poster the logo is already there: PLAY replaces the poster's placeholder as that fades. */
+const PLAY_OVER_POSTER_S = 0.15
 
 let hintShownThisLoad = false
 
@@ -39,11 +42,15 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
   const [showHint] = useState(() => !hintShownThisLoad)
   const [hint] = useState(() => (touchFirst() ? 'Tap PLAY to start' : 'Press any key to start'))
   const reduced = usePrefersReducedMotion()
+  // Over index.html's poster, the logo and tagline are already on screen: they stay put instead of flying in.
+  const [overPoster] = useState(posterShown)
+  const playIn = overPoster ? PLAY_OVER_POSTER_S : PLAY_IN_S
   const started = useRef(false)
 
   useEffect(() => {
     hintShownThisLoad = true
     markStartup('playReady')
+    handPosterToUi()
   }, [])
 
   async function play() {
@@ -78,7 +85,7 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
     <div className="title-screen">
       <motion.h1
         aria-label={TITLE}
-        initial={reduced ? { opacity: 0 } : { opacity: 0, y: -120, scale: 1.25, filter: 'blur(14px)' }}
+        initial={overPoster ? false : reduced ? { opacity: 0 } : { opacity: 0, y: -120, scale: 1.25, filter: 'blur(14px)' }}
         animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
         transition={{
           opacity: { duration: 0.6, ease: 'easeOut' },
@@ -94,7 +101,7 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
         {SUBTITLE_WORDS.map((word, i) => (
           <motion.span
             key={word}
-            initial={{ opacity: 0, y: reduced ? 0 : 10 }}
+            initial={overPoster ? false : { opacity: 0, y: reduced ? 0 : 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.6 + i * 0.2 }}
             style={{ display: 'inline-block', marginRight: '0.4em' }}
@@ -118,11 +125,11 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
           ],
         }}
         transition={{
-          opacity: { duration: 0.4, delay: PLAY_IN_S },
+          opacity: { duration: 0.4, delay: playIn },
           scale: reduced
-            ? { duration: 0.4, delay: PLAY_IN_S }
-            : { duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: PLAY_IN_S },
-          boxShadow: { duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: PLAY_IN_S },
+            ? { duration: 0.4, delay: playIn }
+            : { duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: playIn },
+          boxShadow: { duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: playIn },
         }}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
@@ -135,7 +142,7 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
           className="title-hint"
           initial={{ opacity: 0 }}
           animate={{ opacity: reduced ? 0.8 : [0.45, 0.9, 0.45] }}
-          transition={reduced ? { delay: PLAY_IN_S + 0.6 } : { duration: 2.4, repeat: Infinity, ease: 'easeInOut', delay: PLAY_IN_S + 0.6 }}
+          transition={reduced ? { delay: playIn + 0.6 } : { duration: 2.4, repeat: Infinity, ease: 'easeInOut', delay: playIn + 0.6 }}
         >
           {hint}
         </motion.p>
@@ -147,7 +154,7 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
           onClick={onSettings}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: PLAY_IN_S + 0.5 }}
+          transition={{ duration: 0.5, delay: playIn + 0.5 }}
           aria-label="Settings"
         >
           &#x2699;
@@ -158,7 +165,7 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
         className="credits"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: PLAY_IN_S + 0.5 }}
+        transition={{ duration: 0.5, delay: playIn + 0.5 }}
       >
         A Three.js game by{' '}
         <a href="https://github.com/alexbelyeu/shooterCoaster" target="_blank" rel="noreferrer">

@@ -9,15 +9,22 @@ import { titleCameraPose, type Vec3 } from './titleCamera'
 import TitleSparkles from './TitleSparkles'
 import { isUiTarget } from '@/input/pointerInput'
 import { markStartup } from '@/core/startupMarks'
+import { e2eTitleTime } from '@/testing/e2eHook'
+import { prefetchLevelScene } from './loadLevelScene'
 
 const TENT_COLORS = ['#ff4444', '#ff8800', '#4488ff', '#44cc44', '#ff44ff', '#ffffff']
 const BALLOON_DRIFT_RAD_S = 0.04
 const BALLOON_COLORS = ['#ff4444', '#ff8800', '#ffcc00', '#44cc44', '#4488ff', '#ff44ff', '#ffffff', '#cc33ff', '#ff6688', '#44dddd']
 
+/** Caps the first frames' camera step: their shader compiles (seconds on a phone) must not jump the fly-by off the poster's still. */
+const FIRST_FRAMES = 5
+const FIRST_FRAME_STEP_S = 0.1
+
 /** Fly-by camera: the orbit and the low dolly of `titleCamera.ts`, taking turns. */
 function FlyByCamera() {
   const camRef = useRef<THREE.PerspectiveCamera>(null)
   const elapsed = useRef(0)
+  const frames = useRef(0)
   const pos = useRef<Vec3>([0, 0, 0]).current
   const target = useRef<Vec3>([0, 0, 0]).current
 
@@ -25,7 +32,8 @@ function FlyByCamera() {
     const cam = camRef.current
     if (!cam) return
     markStartup('titleFrame')
-    elapsed.current += delta
+    const step = ++frames.current <= FIRST_FRAMES ? Math.min(delta, FIRST_FRAME_STEP_S) : delta
+    elapsed.current = e2eTitleTime() ?? elapsed.current + step
     titleCameraPose(elapsed.current, pos, target)
     cam.position.set(pos[0], pos[1], pos[2])
     cam.lookAt(target[0], target[1], target[2])
@@ -369,6 +377,8 @@ function TitleClickRaycaster() {
 
 /** Living theme-park panorama for the title screen */
 export default function TitleScene() {
+  useEffect(prefetchLevelScene, [])
+
   return (
     <>
       <FlyByCamera />
