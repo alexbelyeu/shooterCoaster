@@ -2254,8 +2254,18 @@ async function posterWithoutJs(browser, base, stats) {
   page.on('response', (r) => r.url().includes('/poster/') && still.push(r.status()))
   await page.goto(`${base}/`, { waitUntil: 'load' })
   const logo = await page.locator('#poster .poster-logo').isVisible()
-  const shot = await page.screenshot({ path: path.join(OUT, 'poster.png'), timeout: SHOT_TIMEOUT })
+  await page.waitForLoadState('networkidle').catch(() => {})
+  // A JS-off page can't be asked whether the still has decoded: retry the shot once, and report a failure as a problem.
+  let shot = null
+  for (let attempt = 0; attempt < 2 && !shot; attempt++) {
+    shot = await page.screenshot({ path: path.join(OUT, 'poster.png'), timeout: SHOT_TIMEOUT }).catch(() => null)
+    if (!shot) await page.waitForTimeout(500)
+  }
   await ctx.close()
+  if (!shot) {
+    problems.push('with JS off, the poster page could not be screenshotted')
+    return problems
+  }
   if (!logo) problems.push('with JS off, index.html shows no poster logo')
   if (!still.includes(200)) problems.push(`with JS off, the poster still did not load (${still.join(', ') || 'never requested'})`)
   if (looksBlank(await imageStats(stats, shot, TITLE_UI))) problems.push('poster.png: the poster behind the logo looks blank')

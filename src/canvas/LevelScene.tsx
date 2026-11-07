@@ -28,7 +28,6 @@ import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
 import LevelAudio from './LevelAudio'
 
-/** A level's whole scene, in its own lazy chunk (#376) so the title's startup JS carries no level code. */
 /** Projects 'enemy:killed' 3D events to screen coords for HTML score popups */
 function KillProjector() {
   const { camera, size } = useThree()
@@ -62,6 +61,7 @@ function hexToRgb(hex: number): [number, number, number] {
   ]
 }
 
+/** A level's whole scene, in its own lazy chunk (#376) so the title's startup JS carries no level code. */
 export default function LevelScene({ levelId }: { levelId: string }) {
   const config = getLevelConfig(levelId)
   if (!config) return null

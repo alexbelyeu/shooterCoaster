@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { Component, lazy, Suspense, type ReactNode } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import TitleScene from './TitleScene'
@@ -7,7 +7,23 @@ import { TITLE_GRADE } from './post/colourGrade'
 import { ATMOSPHERES } from '@/levels/environments/atmosphere'
 import { loadLevelScene } from './loadLevelScene'
 
-const LevelScene = lazy(loadLevelScene)
+let LevelScene = lazy(loadLevelScene)
+
+/** A level chunk that failed to load (after its retries): back to the title, and a fresh `lazy` so the next start fetches again. */
+class LevelSceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  componentDidCatch() {
+    LevelScene = lazy(loadLevelScene)
+    useGameStore.getState().setPhase('title')
+    this.setState({ failed: false })
+  }
+  render() {
+    return this.state.failed ? null : this.props.children
+  }
+}
 
 const LEVEL_BLOOM: BloomSettings = { threshold: 0.9, intensity: 0.6 }
 const TITLE_BLOOM: BloomSettings = { threshold: 0.8, intensity: 0.8 }
@@ -22,9 +38,11 @@ export default function SceneManager() {
   return (
     <>
       {level ? (
-        <Suspense fallback={null}>
-          <LevelScene levelId={level} />
-        </Suspense>
+        <LevelSceneBoundary>
+          <Suspense fallback={null}>
+            <LevelScene levelId={level} />
+          </Suspense>
+        </LevelSceneBoundary>
       ) : (
         <TitleScene />
       )}
