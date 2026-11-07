@@ -324,6 +324,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   await page.evaluate(() => window.__SC_TEST__.autoFire(true))
   const fire = await waitFrames(page, COMBAT_MIN_FRAMES, { minMs: COMBAT_SECONDS * 1000, maxMs: COMBAT_SECONDS * 6000 })
   const afterFire = await getStats(page)
+console.log("LAP autofired", process.uptime().toFixed(1))
   // Hit feedback: stop autofire (so its kicks don't mask the settle check), hold
   // the muzzle flash / hitmarker, then killNearest fires one real shot and
   // resolves the hits. enemy:killed (gold hitmarker, explosion) follows the
@@ -387,6 +388,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
     else if (deaths.lastStyle === 'bossPart' || deaths.lastStyle === 'custom') problems.push(`kill used the ${deaths.lastStyle} death effect, not its enemy type's`)
   }
   await page.screenshot({ path: path.join(OUT, `${id}-combat.png`), timeout: SHOT_TIMEOUT })
+console.log("LAP combat-png", process.uptime().toFixed(1))
   const combat = await getStats(page)
   if (frenzyShown === false) {
     problems.push(`a kill entering 5× showed no FRENZY flash + slow-mo (combo ${combat.combo}, ×${combat.multiplier}, timeScale ${combat.timeScale.toFixed(2)})`)
@@ -411,6 +413,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
     if (now.frames - settleStart >= 5 && now.current === 0 && now.trauma === 0) break
   }
   const counts = await page.evaluate(() => window.__SC_TEST__.combat)
+console.log("LAP settled", process.uptime().toFixed(1))
   const audio = await audioBurstProblems(page, 'desktop')
   problems.push(...audio.problems)
   const shot = await freshShotProblems(page, id, { fresh: freshShot })
@@ -420,6 +423,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   if (played.boss !== 'none' && played.boss !== 'waiting') problems.push(`the boss arrived during play (stage ${played.boss} at ${played.levelTime?.toFixed(1)} s of level time)`)
 
   // With `leaderboard`, seed nine entries so this run places 4th, in the same turn as the end so the score can't move.
+console.log("LAP pre-end", process.uptime().toFixed(1))
   const seeding = await page.evaluate(
     ([lid, seed, endpoint]) => {
       const t = window.__SC_TEST__
@@ -463,6 +467,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
     await page.screenshot({ path: path.join(OUT, `${id}-results.png`), timeout: SHOT_TIMEOUT })
   }
   const end = await getStats(page)
+console.log("LAP results-phase", process.uptime().toFixed(1))
   const results = resultsScreen ? await resultsScreenProblems(page, id, end, { share }) : { problems: [], screen: null }
   problems.push(...results.problems)
   if (seededRank !== null) {
@@ -3086,12 +3091,14 @@ async function run() {
   const first = wanted[0]
   for (const id of has('ride') ? wanted : []) {
     const { ctx, page, errors } = await newPage()
+console.log("LAP page", process.uptime().toFixed(1))
     const started = Date.now()
     await page.evaluate(([lid, seed, cap]) => {
       window.__SC_TEST__.timerStepMax = cap
       window.__SC_TEST__.startLevel(lid, seed)
     }, [id, SEED, RIDE_STEP_MAX])
     const ride = await rideToLevelTime(page, SECONDS, MIN_FRAMES)
+console.log("LAP ridden", process.uptime().toFixed(1))
     // Frozen at SECONDS of level time until the enemy probe: the ride stats, perf gate, shot and probe share that moment.
     const stats = await page.evaluate(() => {
       const s = window.__SC_TEST__
@@ -3101,12 +3108,15 @@ async function run() {
       }
     })
     const png = await page.screenshot({ path: path.join(OUT, `${id}.png`), timeout: SHOT_TIMEOUT })
+console.log("LAP shot-ride-png", process.uptime().toFixed(1))
     const img = await imageStats(page, png)
     const enemyShot = { ...(await captureEnemyCloseup(page, id)), levelTime: stats.levelTime }
+console.log("LAP closeup", process.uptime().toFixed(1))
     const { frames } = ride
     const frameSeconds = ride.ms / 1000
     const problems = []
     const spawnDigest = await nextSpawnDigest(page, null)
+console.log("LAP digest", process.uptime().toFixed(1))
     if (!spawnDigest) problems.push('spawnDigest() never reported the spawns')
 
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${frameSeconds.toFixed(0)}s)`)
@@ -3127,6 +3137,7 @@ async function run() {
     const perfGate = PERF_GATE ? sceneBudgetCheck(id, stats) : null
     if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
     const frenzy = has('frenzy') && id === first
+console.log("LAP probes-done", process.uptime().toFixed(1))
     await page.evaluate((cap) => { window.__SC_TEST__.timerStepMax = cap }, COMBAT_STEP_MAX)
     const online = frenzy ? await stubOnlineBoard(page) : null
     const play = await playLevel(page, id, { frenzy, leaderboard: frenzy, online, shot: has('shot'), results: has('results'), share: has('share') })
@@ -3145,6 +3156,7 @@ async function run() {
       kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
+console.log("LAP closed", process.uptime().toFixed(1))
   }
 
   // 2b. ?quality=low against the default: dpr 1, no contact shadows, fewer draw calls (<id>-low.png)
