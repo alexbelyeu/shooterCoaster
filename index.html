@@ -30,6 +30,11 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
+    <!-- The poster's fonts and still (#376), fetched alongside the JS rather than after it. -->
+    <link rel="preload" href="/fonts/lobster-latin-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/poster/title-portrait.webp" as="image" type="image/webp" media="(orientation: portrait)" />
+    <link rel="preload" href="/poster/title-landscape.webp" as="image" type="image/webp" media="(orientation: landscape)" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -63,6 +68,81 @@
         white-space: nowrap;
         border: 0;
       }
+
+      /*
+       * The poster (#376, src/app/poster.ts): the title's still (`npm run og -- --poster`) and logo before any JS, over the
+       * canvas and under the UI. Its text mirrors .title-screen in global.css, so the live logo lands exactly on it.
+       */
+      #poster {
+        position: fixed;
+        inset: 0;
+        z-index: 5;
+        background: url('/poster/title-landscape.webp') center / cover no-repeat, linear-gradient(#56718f, #c4cfd8 46%, #21401a 46%, #172e10);
+        transition: opacity 0.6s ease-out;
+      }
+      @media (orientation: portrait) {
+        #poster { background-image: url('/poster/title-portrait.webp'), linear-gradient(#56718f, #c4cfd8 46%, #21401a 46%, #172e10); }
+      }
+      #poster.is-leaving { opacity: 0; pointer-events: none; }
+      .poster-title {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.35);
+        color: #fff;
+        font-family: 'Inter', sans-serif;
+        transition: opacity 0.3s ease-out;
+      }
+      #poster.has-ui .poster-title { opacity: 0; }
+      .poster-title p { margin: 0; }
+      .poster-title .poster-logo {
+        font-family: 'Lobster', cursive;
+        font-weight: bold;
+        font-size: clamp(2.5rem, 8vw, 5rem);
+        text-shadow: 0 0 10px rgba(255, 200, 0, 0.9), 0 0 30px rgba(255, 200, 0, 0.6), 0 0 60px rgba(255, 200, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.5);
+        margin-bottom: 0.5rem;
+      }
+      .poster-title .poster-tag {
+        font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+        color: rgba(255, 255, 255, 0.7);
+        margin-bottom: 2rem;
+      }
+      .poster-tag span { display: inline-block; margin-right: 0.4em; }
+      /* PLAY's place while the game loads: the button's size, with a light sweep. */
+      .poster-title .poster-play {
+        box-sizing: border-box;
+        min-height: 44px;
+        padding: 1rem clamp(1.5rem, 6vw, 3rem);
+        font: 700 1.2rem Arial, sans-serif;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: transparent;
+        border-radius: 50px;
+        background:
+          linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%) 0 0 / 300% 100%,
+          linear-gradient(135deg, #ffd700, #ff8c00);
+        opacity: 0.5;
+        animation: poster-sweep 1.6s ease-in-out infinite;
+      }
+      .poster-title .poster-hint {
+        margin-top: 1.25rem;
+        font-size: 0.85rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        opacity: 0.7;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+      }
+      @keyframes poster-sweep {
+        from { background-position: 100% 0, 0 0; }
+        to { background-position: 0 0, 0 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #poster, .poster-title { transition: none; }
+        .poster-title .poster-play { animation: none; }
+      }
     </style>
   </head>
   <body>
@@ -94,6 +174,14 @@
         Tone.js, and its worlds, enemies and music are all generated in code.
       </p>
     </main>
+    <div id="poster" aria-hidden="true">
+      <div class="poster-title">
+        <p class="poster-logo">ShooterCoaster</p>
+        <p class="poster-tag"><span>Ride.</span><span>Aim.</span><span>Shoot.</span></p>
+        <p class="poster-play">Play</p>
+        <p class="poster-hint">Loading</p>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

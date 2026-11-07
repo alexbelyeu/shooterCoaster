@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Renders the social preview card from the built game, and the site icons from public/favicon.svg.
+ * Renders the social preview card and the title posters from the built game, and the site icons from public/favicon.svg.
  *
  *   npm run build && npm run og        (cloud sessions: export SC_CHROME first, see CLAUDE.md)
  *   npm run og -- --icons              (only the icons: no build needed)
+ *   npm run og -- --poster             (only the posters)
  *
  * public/social/og-1200x630.jpg: a real level-1 gameplay frame, shot at a 1200x630
  * viewport after a short ride, with the muzzle flash, tracer and hitmarker held on a
@@ -13,7 +14,10 @@
  * favicon.ico (16/32/48), apple-touch-icon.png (180) and the web app manifest's
  * icons/icon-192.png, icon-512.png and icon-maskable-512.png.
  *
- * Options: --icons, --level level1 --seconds 8 --url http://localhost:4173 (skip vite preview)
+ * public/poster/title-{landscape,portrait}.webp (#376): the title scene with no UI, its camera held at the
+ * first moments of the fly-by, which index.html's #poster shows before any JS runs and crossfades into the live scene.
+ *
+ * Options: --icons, --poster (only the posters), --level level1 --seconds 8 --url http://localhost:4173 (skip vite preview)
  */
 import { arg, launchBrowser, startPreview, stopPreview } from './headless.mjs'
 import fs from 'node:fs'
@@ -22,6 +26,14 @@ import path from 'node:path'
 const LEVEL = arg('level', 'level1')
 const RIDE_SECONDS = Number(arg('seconds', 8))
 const ICONS_ONLY = process.argv.includes('--icons')
+const POSTER_ONLY = process.argv.includes('--poster')
+/** Phones get the portrait still, everything else the landscape one (index.html's media queries). Small: under the startup JS. */
+const POSTERS = [
+  { file: 'public/poster/title-landscape.webp', width: 960, height: 540, maxBytes: 60 * 1024 },
+  { file: 'public/poster/title-portrait.webp', width: 540, height: 1080, maxBytes: 60 * 1024 },
+]
+/** The title camera's time in the still: where the live fly-by is as the poster fades into it. */
+const POSTER_TITLE_TIME_S = 0.3
 const OG_FILE = path.resolve('public/social/og-1200x630.jpg')
 const SVG_FILE = path.resolve('public/favicon.svg')
 const ICO_FILE = path.resolve('public/favicon.ico')
@@ -65,6 +77,47 @@ async function shootCard(page, url) {
     if (jpg.length <= MAX_OG_BYTES) return { jpg, quality }
   }
   throw new Error('og image is over 300 KB even at quality 60')
+}
+
+/** The title scene alone (no UI, no poster) at the poster's size, as WebP under its byte cap. */
+async function shootPoster(browser, url, { width, height, maxBytes }) {
+  const page = await browser.newPage({ viewport: { width, height } })
+  await page.goto(`${url}/?e2e=1`)
+  await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: TIMEOUT })
+  await page.evaluate((t) => (window.__SC_TEST__.titleTime = t), POSTER_TITLE_TIME_S)
+  await page.addStyleTag({ content: 'body > :not(#root), #root > :not(:has(canvas)) { visibility: hidden !important; }' })
+  await page.waitForFunction(() => window.__SC_TEST__.initTimings().titleFrame !== undefined, null, { timeout: TIMEOUT })
+  await waitFrames(page, 6, 1000)
+  const png = (await page.locator('canvas').screenshot({ timeout: TIMEOUT })).toString('base64')
+  const out = await page.evaluate(
+    async ([b64, cap]) => {
+      const img = new Image()
+      img.src = `data:image/png;base64,${b64}`
+      await img.decode()
+      const c = document.createElement('canvas')
+      c.width = img.width
+      c.height = img.height
+      c.getContext('2d').drawImage(img, 0, 0)
+      for (const quality of [0.8, 0.72, 0.64, 0.56, 0.48]) {
+        const data = c.toDataURL('image/webp', quality).split(',')[1]
+        if (data.length * 0.75 <= cap) return { data, quality }
+      }
+      return null
+    },
+    [png, maxBytes],
+  )
+  await page.close()
+  if (!out) throw new Error(`poster ${width}x${height} is over ${maxBytes / 1024} KB even at WebP quality 0.48`)
+  return { webp: Buffer.from(out.data, 'base64'), quality: out.quality }
+}
+
+async function writePosters(browser, url) {
+  for (const poster of POSTERS) {
+    const { webp, quality } = await shootPoster(browser, url, poster)
+    fs.mkdirSync(path.dirname(poster.file), { recursive: true })
+    fs.writeFileSync(poster.file, webp)
+    console.log(`og: ${poster.file} ${poster.width}x${poster.height} q${quality} ${Math.round(webp.length / 1024)} KB`)
+  }
 }
 
 /** Rasterise favicon.svg at `size` px; `inset` < 1 shrinks the crosshair into a maskable icon's safe zone. */
@@ -133,12 +186,16 @@ try {
   if (!ICONS_ONLY) {
     const given = arg('url')
     if (!given) preview = await startPreview()
-    const { jpg, quality } = await shootCard(page, given ?? preview.url)
-    fs.mkdirSync(path.dirname(OG_FILE), { recursive: true })
-    fs.writeFileSync(OG_FILE, jpg)
-    console.log(`og: ${path.relative('.', OG_FILE)} 1200x630 q${quality} ${Math.round(jpg.length / 1024)} KB`)
+    const url = given ?? preview.url
+    if (!POSTER_ONLY) {
+      const { jpg, quality } = await shootCard(page, url)
+      fs.mkdirSync(path.dirname(OG_FILE), { recursive: true })
+      fs.writeFileSync(OG_FILE, jpg)
+      console.log(`og: ${path.relative('.', OG_FILE)} 1200x630 q${quality} ${Math.round(jpg.length / 1024)} KB`)
+    }
+    await writePosters(browser, url)
   }
-  await writeIcons(page)
+  if (!POSTER_ONLY) await writeIcons(page)
   await browser.close()
 } finally {
   if (preview) stopPreview(preview.proc)
