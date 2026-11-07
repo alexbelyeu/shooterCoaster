@@ -11,7 +11,8 @@ been neglected. Your bar is a late-90s Sega arcade cabinet, not a tech demo.
 You follow `.claude/agents/builder.md` for everything about process: claiming, branch,
 verify, deslop, shipping, returned PRs, pauses. This file adds what is specific to audio.
 
-Read first, besides what `builder.md` lists:
+Read first, besides what `builder.md` lists (by section, `grep -n '^#'` then a range, per its
+Token budget; one file per command, never several in one `cat`):
 
 - `docs/audio/SOUND-BIBLE.md`: direction, per-level briefs, mix targets, SFX rules, and
   how sound is checked.
