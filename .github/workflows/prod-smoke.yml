@@ -1,7 +1,8 @@
 name: Production smoke
 
 # Watches the live site (#352; e2e/README.md "Production"): after every deploy, the deploy health check
-# (e2e/prod-check.mjs, ~3 min); nightly, the full smoke. scripts/prod-alert.cjs reports each on its own
+# (e2e/prod-check.mjs, ~3 min); nightly, the full smoke: every step, so also the deep checks the PR shards leave
+# out (#372; e2e/shards.test.ts holds this command to the full run). scripts/prod-alert.cjs reports each on its own
 # agent:prod-broken issue, on green → red and red → green only. `timeout` turns a slow run into a reported timeout.
 
 on:

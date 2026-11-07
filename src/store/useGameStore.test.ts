@@ -148,8 +148,10 @@ describe('startRun', () => {
     store().addScore(50)
     store().registerKill()
     store().setTimeScale(0.5)
+    store().pickUpWeapon('spread')
+    expect(store().weapon).not.toEqual(fresh.weapon)
     store().startRun('level1', 1)
-    for (const key of ['score', 'kills', 'shotsFired', 'hits', 'bestCombo', 'combo', 'timeScale', 'boss'] as const)
+    for (const key of ['score', 'kills', 'shotsFired', 'hits', 'bestCombo', 'combo', 'timeScale', 'boss', 'weapon'] as const)
       expect(store()[key], key).toEqual(fresh[key])
   })
 

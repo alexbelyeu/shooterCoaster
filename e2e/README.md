@@ -8,7 +8,8 @@ checks, and when a smoke failure needs more than its summary line.
 
 Headless browser in Claude cloud sessions: the Playwright CDN is blocked, so run
 `export SC_CHROME="$(scripts/ensure-browser.sh)"` once per session before `npm run smoke`.
-The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
+This section is the full run (`npm run smoke`, and the nightly production smoke); a PR's CI shards run only part of it
+("Two depths" below says which). The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/sizes, errors)
 to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the 3D scene behind the title UI must not look blank, polled on a cold start; the fly-by camera must have turned ≥ 8° or moved ≥ 30 units;
 a title sparkle's centre pixel must blend to a colour in [0, 1] (`pointCentreColour('title-sparkles')`: a glow dividing by the distance to the point's centre went NaN there and Bloom spread it to a black frame, #344); the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select; Tone.js's `tone-*.js` chunk must not be fetched before that press, and the press must load it and unlock audio); a `landing` step loads the campaign landing path
@@ -127,18 +128,44 @@ vary) and on the scene / track objects and triangles (+15%); a level past one fa
 
 ## Steps, shards and the time budget (`e2e/shards.mjs`, #353)
 
-Every check above belongs to a named step: `title`, `landing`, `levelSelect`, `daily`, `settings`, `mobile` (no level);
-`frenzy` (the first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ride), `seed`, `quality`,
-`pause` (hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level) and `wave`,
-`boss`, `pickup`, `scrim` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its checks
-disagree). `--steps ride,boss --levels level2` runs just those. Without `--steps` every desktop step runs, plus `mobile`
-with `--mobile`; `--skip-desktop` leaves `title` and `mobile`.
+Every check above belongs to a named step: `title`, `landing`, `levelSelect`, `daily`, `settings`, `mobile` (the phone
+run's touch play: taps, aim assist, aspect, HUD, audio, up to the Pause tap) and `mobileMenus` (the rest of the phone run on
+the same page: pause card, settings, boss bar, initials entry, results, share, music switches) (no level); `frenzy` (the
+first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ride), `seed`, `quality`, `pause`
+(hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: the ride, the perf
+gate, the enemy probe, combat, the level's end), on the ride's own page `shot` (the frozen fresh shot and aim jump),
+`results` (the results screen's reveal, stats, buttons, board) and `share` (its Share line, menu and score cards); and
+`wave`, `boss`, `pickup`, `scrim` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its
+checks disagree). A step that runs on another's page needs it in the same run (`share` and `frenzy` need `ride` and
+`results`, `mobileMenus` needs `mobile`). `--steps ride,boss --levels level2` runs just those. Without `--steps` every
+desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desktop` leaves `title` and the phone run.
 
-CI runs the smoke as the shards in `SHARDS`, one `smoke (<name>)` job each (`ci.yml` matrix): `ui`, `level1` (ride, frenzy,
-seed, boss, pickup), `level1-steps` (quality, pause, countdown, speed, scrim), `level2`…`level5` (every per-level step on
-that level) and `mobile`. `node e2e/smoke.mjs --shard <name>` runs one exactly as CI does. `shards.test.ts` checks that the
-shards together run every step on every level the full run does, each once, that every registry level is ridden, and that
-the shards, the `ci.yml` matrix and `budgets.json` `smokeSeconds` list the same names.
+**Two depths (#372).** The PR smoke is rendering and integration: CI runs the shards in `SHARDS`, one `smoke (<name>)`
+job each (`ci.yml` matrix): `ui` (title, landing, levelSelect, settings), `level1` (ride, shot, results), `level1-steps`
+(quality, speed), `level2`…`level5` (ride) and `mobile`. The **deep** checks, everything else (`nightlyOnly()` in
+`shards.mjs`: daily, frenzy, seed, pause, countdown, wave, boss, pickup, scrim, share, `mobileMenus`, and shot / results
+on levels 2–5), run in the full smoke, which the nightly production run makes (`prod-smoke.yml`, below): they are either
+game logic a unit test covers next to its pure module (the table below), or a browser check too slow for every PR. A red
+nightly opens the `agent:prod-broken` P1 issue the Maintainer takes first. To reproduce one, run its step:
+`node e2e/smoke.mjs --steps ride,results,frenzy --levels level1`, `--steps boss --levels level2`, `--mobile --skip-desktop`.
+`node e2e/smoke.mjs --shard <name>` runs one PR shard exactly as CI does. `shards.test.ts` checks that the shards run part
+of the full run, each step once, that they and `nightlyOnly()` together make all of it, that every registry level is
+ridden on the PR, that the nightly job runs the full smoke, and that the shards, the `ci.yml` matrix and `budgets.json`
+`smokeSeconds` list the same names.
+
+| Nightly-only step | Logic a unit test covers | Browser-only part (nightly) |
+|---|---|---|
+| `daily` | `levels/daily.test.ts` (key, seed, level, streak), `useGameStore.test.ts` "daily runs" (date seed, Replay keeps it, saves apart from the campaign) | the Daily card flow and results badge |
+| `frenzy` | `comboTiers.test.ts`, `comboRuntime.test.ts` (5×, slow-mo, `endFrenzy` → 1), `fireworks.test.ts`, `leaderboard.test.ts`, `initialsEntry.test.ts`, `onlineLeaderboard.test.ts`, `api/_lib/handler.test.ts` | the FRENZY flash and firework on screen, initials typed into the board |
+| `seed` | `spawnPlacement.test.ts` (deterministic per seed, differs between seeds), `utils/rng.test.ts` | the same digest after a reload |
+| `pause` | `waveSchedule.test.ts` (#152, #198), `useGameStore.test.ts` "pause and resume", "combo" (ignores the wall clock), `pauseMenu.test.ts` | tab hide / blur, the pause card |
+| `countdown` | `startPhase.test.ts`, `programReadiness.test.ts`, `startupMarks.test.ts` | Ready / Set / GO over the warm-up, no new shader on the first shot |
+| `wave` | `waveSchedule.test.ts` (tell 1 s early, on time, no replay after a pause), `spawnPlacement.test.ts` (the V) | the V of crows on screen |
+| `boss` | `bossModel.test.ts`, `krakenMotion.test.ts`, `scorpionMotion.test.ts` (the `turntable` workflow draws every boss on PRs touching `src/entities/`) | the full fights |
+| `pickup` | `weaponTypes.test.ts`, `pickupPlacement.test.ts`, `useGameStore.test.ts` (a run starts with the blaster) | the shot pickup, fan and badge |
+| `scrim` | `src/audio/scrim/*.test.ts` (layers, scheduler, score), `arcade.test.ts` | the score engine in a page |
+| `share` | `share.test.ts`, `scoreCard.test.ts`, `popoverPlacement.test.ts` | the menu, clipboard, download |
+| `mobileMenus` | `pauseMenu.test.ts`, `initialsEntry.test.ts`, `share.test.ts` | phone layouts of the menus |
 
 Each results entry records its wall time (`seconds`). A `--shard` run ends with a `time` line and entry (`level3 shard
 took 4.2 min, budget 7.0`) and a GitHub annotation of the same text. On CI (`CI` set) a shard over its `smokeSeconds`
@@ -177,7 +204,8 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   (`checks`, `running`, `finished`) after every check, so a run stopped at its cap still says where it was. Without
   `--url` it serves `--dist` (default `dist/`) on localhost the way `vercel.json` says Vercel would, for local runs.
   Back-to-back deploys: the job's concurrency group cancels the older run, which reports nothing.
-- **Nightly full smoke** (06:00 UTC, 60 min cap): `node e2e/smoke.mjs --mobile --url <site> --seconds 10`.
+- **Nightly full smoke** (06:00 UTC, 60 min cap): `node e2e/smoke.mjs --mobile --url <site> --seconds 10`: every step on
+  every level, so it is also where the deep checks the PR shards leave out run (#372, "Two depths" above).
 
 `scripts/prod-alert.cjs` reports both: one `agent:prod-broken` issue per suite (marked `<!-- prod-smoke:<suite> -->`),
 opened on a green → red transition with the failed checks (or "timed out after N min, no check failed"), silent while it
