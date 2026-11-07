@@ -45,11 +45,18 @@ const CONTENT_TYPES = {
   '.xml': /xml/,
 }
 
+/** Vercel's CDN answered from its cache (`x-vercel-cache`). */
+const CDN_SERVED = /^(HIT|STALE)$/i
+
 /**
  * GET /api/leaderboard (#365): the top 10 (CDN-cached), or a bare uncached 503 while the board is
  * unavailable (no env vars yet, a paused Supabase project). Never a 500, a 404 or anything that leaks.
+ *
+ * Vercel's CDN consumes `s-maxage` / `stale-while-revalidate` and forwards only `public` to the
+ * client (#397), so on production a 200 proves it is CDN-cached by `again`, the same GET a few
+ * seconds later, coming from the cache. Served from dist/ (no CDN), the `s-maxage` header is the proof.
  */
-export function leaderboardApiProblems({ status, headers, body }, vercel) {
+export function leaderboardApiProblems({ status, headers, body }, vercel, again) {
   const where = '/api/leaderboard'
   if (status !== 200 && status !== 503) return [`${where}: HTTP ${status} (want 200, or 503 while the board is unavailable)`]
   const problems = []
@@ -68,7 +75,11 @@ export function leaderboardApiProblems({ status, headers, body }, vercel) {
   const cache = headers['cache-control'] ?? ''
   if (status === 200) {
     if (!Array.isArray(json?.top)) problems.push(`${where}: no top list`)
-    if (!/s-maxage=\d+/.test(cache)) problems.push(`${where}: not CDN-cached ("${cache}")`)
+    const hit = [headers, again?.headers].some((h) => CDN_SERVED.test(h?.['x-vercel-cache'] ?? ''))
+    if (!hit && !/s-maxage=\d+/.test(cache)) {
+      const seen = again ? again.headers['x-vercel-cache'] ?? 'none' : 'not fetched again'
+      problems.push(`${where}: not CDN-cached ("${cache}", second GET x-vercel-cache: ${seen})`)
+    }
   } else {
     if (json?.error !== 'unavailable') problems.push(`${where}: 503 body ${text.slice(0, 80)}`)
     if (/s-maxage|immutable/.test(cache)) problems.push(`${where}: 503 cached ("${cache}")`)

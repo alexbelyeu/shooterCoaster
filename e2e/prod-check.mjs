@@ -128,7 +128,13 @@ async function routesCheck(base) {
   const title404 = fs.readFileSync(path.join(DIST, '404.html'), 'utf8').match(/<title>[^<]*<\/title>/)?.[0]
   if (notFound.status === 404 && !notFound.body.toString().includes(title404)) problems.push('an unknown path does not get the 404 page')
   const board = await get(base, '/api/leaderboard?level=level1')
-  problems.push(...leaderboardApiProblems(board, vercel))
+  // On Vercel the CDN hides s-maxage from clients: a second GET served from its cache is the proof (#397).
+  let again
+  if (board.status === 200) {
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+    again = await get(base, '/api/leaderboard?level=level1')
+  }
+  problems.push(...leaderboardApiProblems(board, vercel, again))
   return { problems, summary: `/api/leaderboard ${board.status === 200 ? 'online' : `${board.status} (board unavailable)`}` }
 }
 

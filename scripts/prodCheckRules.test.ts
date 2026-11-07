@@ -84,4 +84,16 @@ describe('leaderboardApiProblems', () => {
     expect(leaderboardApiProblems(api(200, { top: [] }, { 'cache-control': 'no-store' }), vercel).join()).toContain('CDN')
     expect(leaderboardApiProblems(api(200, '<html>', cached), vercel).join()).toContain('not JSON')
   })
+
+  it('on Vercel (s-maxage consumed by the CDN), passes a board whose second GET is a cache HIT or STALE (#397)', () => {
+    const edge = { 'cache-control': 'public' }
+    const first = api(200, { top: [] }, { ...edge, 'x-vercel-cache': 'MISS' })
+    for (const status of ['HIT', 'STALE']) {
+      expect(leaderboardApiProblems(first, vercel, api(200, { top: [] }, { ...edge, 'x-vercel-cache': status }))).toEqual([])
+    }
+    expect(leaderboardApiProblems(api(200, { top: [] }, { ...edge, 'x-vercel-cache': 'HIT' }), vercel)).toEqual([])
+    const miss = leaderboardApiProblems(first, vercel, api(200, { top: [] }, { ...edge, 'x-vercel-cache': 'MISS' }))
+    expect(miss.join()).toContain('not CDN-cached')
+    expect(leaderboardApiProblems(first, vercel).join()).toContain('not CDN-cached')
+  })
 })

@@ -161,7 +161,7 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   name without the hash; the deployed names come from crawling the deployed page, stylesheet and chunks, so the lazy Tone /
   scrim / arcade chunks are found through the entry chunk's dep map), each 200 with its content type and the headers
   `vercel.json` sets (`scripts/vercelRoutes.mjs`: hashed `assets/` a year `immutable`, nothing else cached a day or more);
-  `routes`: `/go/prod-check` is the game page, an unknown path a real 404 with `404.html`, `GET /api/leaderboard?level=level1` the CDN-cached top 10 or, while the board is unavailable (no env vars, a paused project; always when serving dist/ locally), a bare uncached 503, never a 500, a 404 or a leak; `title`: boots with no page error
+  `routes`: `/go/prod-check` is the game page, an unknown path a real 404 with `404.html`, `GET /api/leaderboard?level=level1` the CDN-cached top 10 (on a 200 it GETs again 3 s later and wants `x-vercel-cache: HIT` / `STALE`, since Vercel's CDN strips `s-maxage` from what clients see, #397) or, while the board is unavailable (no env vars, a paused project; always when serving dist/ locally), a bare uncached 503, never a 500, a 404 or a leak; `title`: boots with no page error
   or failed same-origin request, the 3D scene not blank (`prod-title.png`); `level`: level1 rides, a real click fires,
   `killNearest(3)` reaches `enemy:killed` (`prod-level.png`); `phone`: iPhone 13 portrait, tap PLAY, tap the level1 card,
   3 taps at enemies fire, a kill (`prod-phone.png`). Rules in pure `scripts/prodCheckRules.mjs`. Writes `prod-check.json`
