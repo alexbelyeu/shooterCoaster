@@ -1,8 +1,4 @@
-/**
- * Real-player telemetry (#373), pure: what one page load reports to `/api/telemetry`. Frame times per
- * level, a few deduped errors, WebGL context losses and the device class; no ids, no cookies.
- * `api/_lib/telemetryRules.ts` checks the same limits on the server.
- */
+/** What one page load reports to `/api/telemetry` (#373); `api/_lib/telemetryRules.ts` checks the same limits on the server. */
 
 export const BIN_MS = 0.5
 /** 0.5 ms bins up to 100 ms; the last bin holds every frame of 100 ms or more. */
@@ -56,14 +52,13 @@ export function createLevelFrames(level: string): LevelFrames {
   return { level, hist: new Uint32Array(HIST_BINS), frames: 0, quality: '', dpr: 0 }
 }
 
-/** Allocation-free: called every frame of play. */
 export function addFrame(lf: LevelFrames, ms: number): void {
   if (!(ms > 0) || ms > MAX_FRAME_MS) return
   lf.hist[Math.min(HIST_BINS - 1, Math.floor(ms / BIN_MS))]++
   lf.frames++
 }
 
-/** The bin's midpoint (100 for the open last bin), so it is within 0.25 ms of the real percentile below 100 ms. */
+/** The bin's midpoint (100 for the open last bin). */
 export function percentileMs(hist: Uint32Array, total: number, p: number): number {
   if (total <= 0) return 0
   const rank = Math.ceil(total * p)
@@ -99,17 +94,13 @@ export function firstStackFrame(stack: unknown): string {
   return ''
 }
 
-/**
- * Errors from browser extensions, injected scripts or other origins aren't the game's: their file isn't on
- * this origin, or the browser hid the details ("Script error.").
- */
+/** Errors from extensions, injected scripts or other origins (or hidden as "Script error.") aren't the game's. */
 export function isGameError(filename: string | undefined, message: string, stack: unknown, origin: string): boolean {
   if (/^Script error\.?$/i.test(message.trim())) return false
   if (filename && !filename.startsWith(origin)) return false
   return !(typeof stack === 'string' && /\b(chrome|moz|safari(-web)?)-extension:\/\//.test(stack))
 }
 
-/** Deduped by message + frame; the first `MAX_ERRORS` distinct errors are kept, later repeats only counted. */
 export function recordError(errors: ErrorEntry[], message: string, frame: string): void {
   const seen = errors.find((e) => e.message === message && e.frame === frame)
   if (seen) seen.count = Math.min(MAX_ERROR_COUNT, seen.count + 1)
@@ -125,7 +116,7 @@ export interface Device {
 
 const round1 = (n: number) => Math.round(n * 10) / 10
 
-/** Null when there is nothing worth sending: no error, no context loss and no level played long enough. */
+/** Null when there is nothing worth sending. */
 export function buildReport(device: Device, errors: ErrorEntry[], contextLost: number, levels: Iterable<LevelFrames>): TelemetryReport | null {
   const played: LevelReport[] = []
   for (const lf of levels) {
@@ -140,7 +131,8 @@ export function buildReport(device: Device, errors: ErrorEntry[], contextLost: n
     })
   }
   if (!played.length && !errors.length && !contextLost) return null
-  const cores = Number.isSafeInteger(device.cores) && device.cores! > 0 ? Math.min(256, device.cores!) : null
+  const { cores: c } = device
+  const cores = c !== null && Number.isSafeInteger(c) && c > 0 ? Math.min(256, c) : null
   const gpu = device.gpu ? cut(device.gpu.replace(/\s+/g, ' ').trim(), MAX_GPU) || null : null
   return { version: device.version, touch: device.touch, cores, gpu, contextLost: Math.min(100, contextLost), errors: errors.slice(0, MAX_ERRORS), levels: played }
 }

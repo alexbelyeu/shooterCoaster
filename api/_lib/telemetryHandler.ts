@@ -15,7 +15,6 @@ import {
 
 export interface TelemetryDeps {
   db: TelemetryDb | null
-  /** The server secret: keys the IP hashes. */
   salt: string
   now: () => number
   /** One POST in `PRUNE_ONE_IN` deletes the rows past retention. */
@@ -26,7 +25,7 @@ const SUMMARY_CACHE = 'public, s-maxage=300, stale-while-revalidate=600'
 const PRUNE_ONE_IN = 50
 const DAY_MS = 24 * 3600 * 1000
 
-/** The last 24 hours, aggregated: what `scripts/playerTelemetry.cjs` reads for the status page and the watchdog. No row is ever returned as stored. */
+/** The last 24 hours aggregated (`scripts/playerTelemetry.cjs` reads it); never a stored row. */
 export async function getSummary(_request: Request, { db, now }: TelemetryDeps): Promise<Response> {
   if (!db) return unavailable()
   try {
@@ -38,7 +37,6 @@ export async function getSummary(_request: Request, { db, now }: TelemetryDeps):
   }
 }
 
-/** A page load's beacon. `sendBeacon` ignores the answer; the status codes are for tests and curl. */
 export async function postReport(request: Request, { db, salt, now, random }: TelemetryDeps): Promise<Response> {
   if (!db) return unavailable()
   const read = await readJson(request, MAX_TELEMETRY_BYTES)

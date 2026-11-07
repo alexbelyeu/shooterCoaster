@@ -1,8 +1,4 @@
-/**
- * Real-player telemetry (#373): collects errors, WebGL context losses and frame times through the page load
- * and sends them as one beacon to `/api/telemetry` when the page is first hidden or closed. Installed by
- * `main.tsx` behind the same gate as Web Analytics (Vercel builds only; never `?e2e=1`, `?internal=1` or the portal).
- */
+/** Player telemetry (#373): one beacon per page load; `main.tsx` installs it behind the Web Analytics gate. */
 import { isInternalBrowser, type FlagStorage } from '@/app/analyticsGate'
 import {
   addFrame,
@@ -27,7 +23,6 @@ let active = false
 
 export const telemetryActive = () => active
 
-/** Every frame of play (`TelemetryFrameProbe`). */
 export function recordFrame(level: string, ms: number, quality: string, dpr: number): void {
   let lf = levels.get(level)
   if (!lf) {
@@ -54,7 +49,7 @@ export function noteRenderer(gl: WebGLRenderingContext | WebGL2RenderingContext)
 export function installTelemetry(version: string, storage: FlagStorage | null): void {
   if (active) return
   active = true
-  // The device class: phones and tablets (as `useRenderBudget`'s `isCoarsePointer`) or desktops.
+  // Phones and tablets, as `useRenderBudget`'s `isCoarsePointer`.
   const touch = window.matchMedia?.('(pointer: coarse)').matches ?? false
   const origin = window.location.origin
   const note = (message: unknown, stack: unknown, filename?: string) => {
@@ -76,7 +71,7 @@ export function installTelemetry(version: string, storage: FlagStorage | null): 
     try {
       navigator.sendBeacon?.(TELEMETRY_ENDPOINT, new Blob([JSON.stringify(report)], { type: 'application/json' }))
     } catch {
-      // Nothing to do: telemetry never disturbs the game.
+      // Telemetry never disturbs the game.
     }
   }
   // Phones often never fire `pagehide` when the app is swiped away: hiding the tab is the last reliable moment.

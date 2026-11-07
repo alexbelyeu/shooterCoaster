@@ -1,13 +1,9 @@
-/**
- * Real-player telemetry (#373): the server's checks on a report (the limits of src/telemetry/telemetryReport.ts,
- * which api/ can't import) and the last-24-hours summary the studio reads (`GET /api/telemetry`).
- */
+/** Telemetry (#373): the checks on a report (src/telemetry/telemetryReport.ts's limits; api/ can't import it) and the 24 h summary. */
 import { isCampaignLevel } from './rules.js'
 
 export const MAX_TELEMETRY_BYTES = 6144
 export const TELEMETRY_RATE_LIMIT = { max: 10, windowMs: 10 * 60 * 1000 } as const
 export const SUMMARY_WINDOW_MS = 24 * 3600 * 1000
-/** Rows older than this are deleted (now and then, on a POST). */
 export const RETENTION_DAYS = 30
 export const SUMMARY_ROW_LIMIT = 3000
 
@@ -62,7 +58,6 @@ function checkLevel(v: unknown): ReportLevel | null {
   return { level, quality, dpr, frames, p50Ms, p95Ms }
 }
 
-/** All or nothing: one malformed field drops the report. */
 export function checkReport(body: unknown): Checked<Report> {
   if (!isRecord(body)) return { ok: false, error: 'bad body' }
   const { version, touch, cores, gpu, contextLost, errors, levels } = body
@@ -82,9 +77,6 @@ export function checkReport(body: unknown): Checked<Report> {
 /** The rate limit's key: an HMAC of the IP under a salt that changes every UTC day, so no row links to another day's. */
 export const dailySalt = (secret: string, now: number) => `${secret}:telemetry:${new Date(now).toISOString().slice(0, 10)}`
 
-// ---------- the summary ----------
-
-/** A stored report, as `telemetryDb.recent` reads it. */
 export interface ReportRow {
   created_at: string
   client_version: string
@@ -117,7 +109,6 @@ export interface FrameSummary {
   /** Medians over sessions of each session's own p50 / p95: the typical player's, not one slow device's. */
   p50Ms: number
   p95Ms: number
-  /** The slowest session's p95. */
   worstP95Ms: number
 }
 
@@ -135,8 +126,9 @@ export interface TelemetrySummary {
 /** FNV-1a, 32-bit, hex. */
 export function errorKey(message: string, frame: string): string {
   let h = 0x811c9dc5
-  for (const ch of `${message}\n${frame}`) {
-    h ^= ch.codePointAt(0)!
+  const text = `${message}\n${frame}`
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i)
     h = Math.imul(h, 0x01000193) >>> 0
   }
   return h.toString(16).padStart(8, '0')

@@ -4,9 +4,7 @@ import { countOf, DbError, filterQuery, restTable, type FetchImpl } from './supa
 
 export interface TelemetryDb {
   insert(report: Report & { ipHash: string }): Promise<void>
-  /** PostgREST filters: `{ column: 'op.value' }`. */
   count(filters: Record<string, string>): Promise<number>
-  /** The newest reports since `sinceIso`, at most `limit`. */
   recent(sinceIso: string, limit: number): Promise<ReportRow[]>
   deleteBefore(iso: string): Promise<void>
 }

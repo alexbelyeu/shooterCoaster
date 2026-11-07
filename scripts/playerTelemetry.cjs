@@ -1,6 +1,4 @@
-// Real-player telemetry (#373), read side: the last 24 h summary from GET /api/telemetry (api/_lib/telemetryRules.ts
-// `summarize`), rendered on the studio status page (studio-status.cjs) and turned into studio-health findings
-// (studioHealthRules.cjs). Pure apart from fetchTelemetry and phoneFrameBudget.
+// Player telemetry's read side (#373): GET /api/telemetry's 24 h summary for the status page and the studio-health findings.
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -38,7 +36,7 @@ const cell = (s) => String(s).replace(/\|/g, '\\|').replace(/\n/g, ' ')
 const short = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
 const code = (s) => (s ? `\`${s.replace(/`/g, "'")}\`` : '')
 
-/** The status page's "Players" section: markdown lines. `summary` null = unavailable. */
+/** The status page's "Players" section, as markdown lines. */
 function telemetrySection(summary, budget) {
   const out = ['### 📡 Players (last 24 h)']
   if (!summary) {
