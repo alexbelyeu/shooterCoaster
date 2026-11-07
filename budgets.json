@@ -2,6 +2,7 @@
   "_comment": "Guardrail budgets enforced by CI. Only the Director may raise these, with a DECISIONS.md entry explaining why.",
   "jsTotalGzipKB": 700,
   "jsLargestChunkGzipKB": 260,
+  "startupJsGzipKB": 440,
   "playerFrameMs": {
     "_comment": "Real players' frame times from telemetry (#373), held by the studio-health watchdog (scripts/playerTelemetry.cjs): a level whose median phone-session p95 frame time over 24 h (3+ sessions) is above touchP95 gets a studio-health issue. 33.4 ms: the VISION bar is 60 fps on a mid-range phone, and a p95 past two vsyncs means visible stutter.",
     "touchP95": 33.4
@@ -19,7 +20,12 @@
     "mobile": 240
   },
   "scene": {
-    "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31; level4 and level5 hold the VISION bar of 250, #260), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands.",
+    "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31; level4 and level5 hold the VISION bar of 250, #260), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands. title (#376): the title scene, its drawCalls at the two title screenshots (+20% over the most of the fly-by, 95 at its first second, 2026-11-07), objects and triangles +15%.",
+    "title": {
+      "drawCalls": 114,
+      "objects": 89,
+      "triangles": 11356
+    },
     "level1": {
       "drawCalls": 101,
       "objects": 179,

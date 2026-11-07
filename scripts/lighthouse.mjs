@@ -14,6 +14,13 @@ import { gateProblems, THRESHOLDS } from './lighthouseGate.mjs'
 const FORMS = arg('form') ? [arg('form')] : ['mobile', 'desktop']
 const OUT = path.resolve('e2e-results/lighthouse.json')
 const CATEGORIES = ['seo', 'accessibility', 'best-practices', 'performance']
+/** Load metrics printed with the scores (ms), for before / after comparisons in a PR. */
+const METRICS = [
+  ['fcp', 'first-contentful-paint'],
+  ['lcp', 'largest-contentful-paint'],
+  ['tbt', 'total-blocking-time'],
+  ['si', 'speed-index'],
+]
 
 function summarise(lhr) {
   const scores = Object.fromEntries(CATEGORIES.map((c) => [c, Math.round((lhr.categories[c]?.score ?? 0) * 100)]))
@@ -25,7 +32,8 @@ function summarise(lhr) {
       if (ref.weight > 0 && audit.score !== null && audit.score < 1) failing.push(`${c}/${ref.id}: ${audit.title}`)
     }
   }
-  return { scores, failing, lighthouse: lhr.lighthouseVersion, finalUrl: lhr.finalDisplayedUrl }
+  const metrics = Object.fromEntries(METRICS.map(([key, id]) => [key, Math.round(lhr.audits[id]?.numericValue ?? NaN)]))
+  return { scores, metrics, failing, lighthouse: lhr.lighthouseVersion, finalUrl: lhr.finalDisplayedUrl }
 }
 
 let preview, browser
@@ -46,10 +54,11 @@ try {
     if (!runner) throw new Error(`lighthouse returned no result for ${form}`)
     if (runner.lhr.runtimeError) throw new Error(`lighthouse ${form}: ${runner.lhr.runtimeError.message}`)
     results[form] = { ...summarise(runner.lhr), seconds: Math.round((Date.now() - started) / 1000) }
-    const { scores, seconds } = results[form]
+    const { scores, metrics, seconds } = results[form]
     console.log(
       `lighthouse ${form}: seo=${scores.seo} accessibility=${scores.accessibility} ` +
-        `best-practices=${scores['best-practices']} performance=${scores.performance} (report only) in ${seconds}s`,
+        `best-practices=${scores['best-practices']} performance=${scores.performance} (report only) in ${seconds}s; ` +
+        Object.entries(metrics).map(([k, v]) => `${k}=${v}`).join(' ') + ' ms',
     )
     for (const f of results[form].failing) console.log(`  - ${f}`)
   }
