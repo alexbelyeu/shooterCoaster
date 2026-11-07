@@ -12,6 +12,8 @@
  * Options: --level level1 --from 0.42 (track fraction; level 1's Ferris wheel pass) --seconds 15
  *   --fps 30 --size 1280x720 (or 720x1280) --seed 1337 --intro 2.5 --select 1.5 --kill-every 1.5
  *   --gif-seconds 8 --out docs/marketing/media --url <running preview> --frames-only --encode-only
+ *   --ride-only (title and level select still play, uncaptured: the clip opens on the ride)
+ * A portrait --size renders as a phone (touch emulated, so the page takes its touch-only layout) and makes no GIF.
  */
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -31,7 +33,9 @@ const GIF_S = Number(arg('gif-seconds', 8))
 const OUT_DIR = path.resolve(arg('out', 'docs/marketing/media'))
 const FRAMES_ONLY = process.argv.includes('--frames-only')
 const ENCODE_ONLY = process.argv.includes('--encode-only')
+const RIDE_ONLY = process.argv.includes('--ride-only')
 const [WIDTH, HEIGHT] = SIZE.split('x').map(Number)
+const PORTRAIT = HEIGHT > WIDTH
 const FRAME_DIR = path.resolve('e2e-results/clip', SIZE)
 const NAME = `clip-${LEVEL}-${SIZE}`
 /** The fake clock ticks whole ms; a constant step keeps motion even (30 fps → 33 ms, 1% slow). */
@@ -99,7 +103,7 @@ const frameFile = (n) => path.join(FRAME_DIR, `${String(n).padStart(5, '0')}.jpg
 async function render(browser, url) {
   fs.rmSync(FRAME_DIR, { recursive: true, force: true })
   fs.mkdirSync(FRAME_DIR, { recursive: true })
-  const page = await browser.newPage({ viewport: { width: WIDTH, height: HEIGHT } })
+  const page = await browser.newPage({ viewport: { width: WIDTH, height: HEIGHT }, hasTouch: PORTRAIT })
   const pageErrors = []
   page.on('pageerror', (e) => pageErrors.push(String(e)))
   await page.clock.install({ time: EPOCH })
@@ -124,13 +128,14 @@ async function render(browser, url) {
     }
   }
   let captured = 0
-  /** `onFrame(i)` runs before each step; returning false stops early. */
-  const capture = async (count, onFrame) => {
+  /** `onFrame(i)` runs before each step; returning false stops early. `keep` false steps without capturing. */
+  const capture = async (count, onFrame, keep = true) => {
     for (let i = 0; i < count; i++) {
       if (onFrame && (await onFrame(i)) === false) return
       await frame(STEP_MS)
       // A separate call, so the React commit the frame scheduled has started its transitions.
       await page.evaluate((ms) => window.__clipAnimations(ms), STEP_MS)
+      if (!keep) continue
       const shot = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 92 })
       captured++
       fs.writeFileSync(frameFile(captured), Buffer.from(shot.data, 'base64'))
@@ -153,14 +158,15 @@ async function render(browser, url) {
   }, LEVEL)
   if (!unlocked) throw new Error(`clip: unknown level ${LEVEL}, or still locked after starring the levels before it`)
 
-  await capture(Math.round(INTRO_S * FPS))
+  const menus = !RIDE_ONLY
+  await capture(Math.round(INTRO_S * FPS), undefined, menus)
   await page.keyboard.press('Enter')
-  await capture(Math.round(SELECT_S * FPS))
+  await capture(Math.round(SELECT_S * FPS), undefined, menus)
   const focused = await hook(() => document.activeElement?.textContent ?? '')
   const levelName = await hook((id) => window.__SC_TEST__.levels().find((l) => l.id === id).name, LEVEL)
   if (!focused.includes(levelName)) throw new Error(`clip: level select focus is not on ${levelName} (got "${focused.slice(0, 60)}")`)
   await page.keyboard.press('Enter')
-  await capture(FPS * 2, async () => (await hook(() => window.__SC_TEST__.phase())) !== 'playing')
+  await capture(FPS * 2, async () => (await hook(() => window.__SC_TEST__.phase())) !== 'playing', menus)
   await hook((f) => { window.__SC_TEST__.rideTo = f }, FROM)
   // No time passes while the level mounts, so the ride starts at --from with the full timer.
   await settle('the level to load', 0, () => {
@@ -255,11 +261,14 @@ function writeStills(frames) {
 function encode(run) {
   fs.mkdirSync(OUT_DIR, { recursive: true })
   const mp4 = path.join(OUT_DIR, `${NAME}.mp4`)
-  const gif = path.join(FRAME_DIR, `${NAME}.gif`)
   const m = encodeMp4(mp4, run.frames)
   console.log(`clip: ${path.relative('.', mp4)} ${m.kbps} kb/s ${kb(m.bytes)}`)
-  const g = encodeGif(gif, run.rideStart + 1)
-  console.log(`clip: ${path.relative('.', gif)} ${g.colors} colours ${kb(g.bytes)}`)
+  // Portrait clips go to Shorts / Reels / TikTok, which take the MP4; a 480 px-wide portrait GIF is over 8 MB anyway.
+  if (!PORTRAIT) {
+    const gif = path.join(FRAME_DIR, `${NAME}.gif`)
+    const g = encodeGif(gif, run.rideStart + 1)
+    console.log(`clip: ${path.relative('.', gif)} ${g.colors} colours ${kb(g.bytes)}`)
+  }
   for (const still of writeStills(run.frames)) console.log(`clip: ${path.relative('.', still)} ${kb(fs.statSync(still).size)}`)
 }
 

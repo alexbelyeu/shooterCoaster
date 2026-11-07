@@ -205,3 +205,5 @@ one draw call, hidden when slow, also scaled by Screen shake); touch shots get a
 `npm run clip` drives the same hook in virtual time (`scripts/clip.mjs`: Playwright's fake clock plus a page
 `requestAnimationFrame` that runs only when the script asks), so each captured frame is exactly 1/30 s of
 game time for every consumer (R3F, timers, framer-motion) however slowly software GL draws it; no game code is involved.
+A portrait `--size` (e.g. `720x1280`) emulates touch, so the clip shows the phone layout; `--ride-only` plays the title
+and level select uncaptured, so the clip opens on the ride.
