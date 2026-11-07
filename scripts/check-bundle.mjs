@@ -20,7 +20,7 @@ if (!fs.existsSync(dir)) {
 const html = fs.readFileSync('dist/index.html', 'utf8')
 const startup = new Set([...html.matchAll(/(?:src|href)="[^"]*\/assets\/([^"]+\.js)"/g)].map((m) => m[1]))
 
-/** Only api/ may know these: the browser talks to /api/leaderboard and nothing else (#365). */
+/** Only api/ may know these: the browser talks to /api/leaderboard and /api/telemetry and nothing else (#365, #373). */
 const SERVER_ONLY = /SUPABASE_SECRET_KEY|SUPABASE_URL|\/rest\/v1\/|supabase\.co/
 const leaks = []
 

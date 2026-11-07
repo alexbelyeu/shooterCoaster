@@ -2,6 +2,10 @@
   "_comment": "Guardrail budgets enforced by CI. Only the Director may raise these, with a DECISIONS.md entry explaining why.",
   "jsTotalGzipKB": 700,
   "jsLargestChunkGzipKB": 260,
+  "playerFrameMs": {
+    "_comment": "Real players' frame times from telemetry (#373), held by the studio-health watchdog (scripts/playerTelemetry.cjs): a level whose median phone-session p95 frame time over 24 h (3+ sessions) is above touchP95 gets a studio-health issue. 33.4 ms: the VISION bar is 60 fps on a mid-range phone, and a p95 past two vsyncs means visible stutter.",
+    "touchP95": 33.4
+  },
   "smokeSeconds": {
     "_comment": "Wall time of each CI smoke shard (e2e/shards.mjs), checked by the smoke on CI (#353): 1.5x the slower of two CI runs on #364 (2026-11-04; short shards swung ~50%), rounded up to 30 s; mobile, steady and the longest, 1.3x so verify can't drift far past 10 min unnoticed.",
     "ui": 300,

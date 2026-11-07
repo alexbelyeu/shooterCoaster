@@ -4,6 +4,7 @@
 // for as long as they hold.
 
 const { SCHEDULE, nextRun } = require('./studio-status.cjs')
+const { telemetryFindings } = require('./playerTelemetry.cjs')
 
 const HOUR = 3600e3
 
@@ -317,6 +318,9 @@ function findings(snap) {
         'Usual causes: sleeping or polling past 5 minutes (each wake re-reads the whole context), running the full smoke or `verify` locally, `cat` of big files or logs.',
     })
   }
+
+  // Real players (#373): errors in several sessions, levels slow on phones.
+  out.push(...telemetryFindings(snap.telemetry, { closedAt: snap.closedAt, budget: snap.phoneFrameBudget }))
 
   return out
 }

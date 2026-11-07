@@ -8,6 +8,8 @@ import { useGameStore } from '@/store/useGameStore'
 import { isE2E, E2EFrameProbe } from '@/testing/e2eHook'
 import { adaptiveDprTick, createAdaptiveDpr } from './adaptiveDpr'
 import { getAdaptiveSteps, setAdaptiveSteps, useCanvasDpr } from './useRenderBudget'
+import TelemetryFrameProbe from '@/telemetry/TelemetryFrameProbe'
+import { telemetryActive } from '@/telemetry/playerTelemetry'
 
 /**
  * `auto` quality: times the frames of play (not the countdown's shader warm-up, not a pause)
@@ -39,6 +41,7 @@ export default function GameCanvas() {
       {adaptive && <AdaptiveDpr />}
       {showFPS && <Stats />}
       {isE2E && <E2EFrameProbe />}
+      {telemetryActive() && <TelemetryFrameProbe />}
     </Canvas>
   )
 }

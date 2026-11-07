@@ -8,6 +8,7 @@ const path = require('node:path')
 const { findings: findFindings, staleProdAlerts, parseTimeouts } = require('./studioHealthRules.cjs')
 const { readPauseState } = require('./studio-status.cjs')
 const { getAll } = require('./automerge.cjs')
+const { fetchTelemetry, phoneFrameBudget } = require('./playerTelemetry.cjs')
 
 const LABEL = 'studio-health'
 const HOUR = 3600e3
@@ -174,6 +175,8 @@ async function collect(api, now, workflowsDir) {
     builderRuns: [...builderRuns.values()],
     ledgerRuns,
     builderBudget: builderBudget(steering),
+    telemetry: await fetchTelemetry(),
+    phoneFrameBudget: phoneFrameBudget(),
   }
 }
 

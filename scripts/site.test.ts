@@ -60,8 +60,9 @@ describe('vercel.json routing', () => {
     expect(files.has('/404.html')).toBe(true)
   })
 
-  it('sends /api/leaderboard to its function, and every api/ entry is listed in vercel.json', () => {
+  it('sends /api/leaderboard and /api/telemetry to their functions, and every api/ entry is listed in vercel.json', () => {
     expect(route('/api/leaderboard', files)).toEqual({ fn: 'api/leaderboard.ts' })
+    expect(route('/api/telemetry', files)).toEqual({ fn: 'api/telemetry.ts' })
     for (const p of ['/api/leaderboard/x', '/api/_lib/rules', '/api/leaderboard.ts']) expect(route(p, files).status).toBe(404)
     const entries = fs
       .readdirSync(path.join(root, 'api'))

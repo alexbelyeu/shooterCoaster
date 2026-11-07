@@ -1,8 +1,9 @@
-/** The `scores` table over Supabase's REST API: plain fetch rather than supabase-js, one less client to keep out of the browser. */
+/** The `scores` table of the online leaderboard (#365). */
 import type { PublicEntry, Submission } from './rules.js'
 import { BOARD_SIZE } from './rules.js'
+import { countOf, DbError, filterQuery, restTable, type FetchImpl } from './supabaseRest.js'
 
-export class DbError extends Error {}
+export { DbError }
 
 export interface ScoresDb {
   top(level: string): Promise<PublicEntry[]>
@@ -11,32 +12,9 @@ export interface ScoresDb {
   insert(row: Submission & { ipHash: string }): Promise<void>
 }
 
-const TIMEOUT_MS = 4000
-
-export function scoresDb(env: Record<string, string | undefined>, fetchImpl: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init)): ScoresDb | null {
-  const url = env.SUPABASE_URL?.trim().replace(/\/+$/, '')
-  const key = env.SUPABASE_SECRET_KEY?.trim()
-  if (!url || !key) return null
-  const table = `${url}/rest/v1/scores`
-  // A secret key goes in `apikey` alone: the gateway turns it into the service_role JWT.
-  const headers = { apikey: key }
-
-  async function call(query: string, init: RequestInit): Promise<Response> {
-    let res: Response
-    try {
-      res = await fetchImpl(`${table}${query}`, { ...init, headers: { ...headers, ...init.headers }, signal: AbortSignal.timeout(TIMEOUT_MS) })
-    } catch {
-      throw new DbError('unreachable')
-    }
-    if (!res.ok) throw new DbError(`status ${res.status}`)
-    return res
-  }
-
-  const filterQuery = (filters: Record<string, string>) =>
-    Object.entries(filters)
-      .map(([col, f]) => `${col}=${encodeURIComponent(f)}`)
-      .join('&')
-
+export function scoresDb(env: Record<string, string | undefined>, fetchImpl?: FetchImpl): ScoresDb | null {
+  const call = restTable(env, 'scores', fetchImpl)
+  if (!call) return null
   return {
     async top(level) {
       const res = await call(`?select=initials,score,created_at&level_id=eq.${encodeURIComponent(level)}&order=score.desc,created_at.asc&limit=${BOARD_SIZE}`, { method: 'GET' })
@@ -45,10 +23,7 @@ export function scoresDb(env: Record<string, string | undefined>, fetchImpl: (ur
       return rows.map((r: { initials: string; score: number; created_at: string }) => ({ initials: r.initials, score: r.score, at: r.created_at }))
     },
     async count(filters) {
-      const res = await call(`?select=id&${filterQuery(filters)}`, { method: 'HEAD', headers: { Prefer: 'count=exact' } })
-      const total = Number(res.headers.get('content-range')?.split('/')[1])
-      if (!Number.isInteger(total)) throw new DbError('no count')
-      return total
+      return countOf(await call(`?select=id&${filterQuery(filters)}`, { method: 'HEAD', headers: { Prefer: 'count=exact' } }))
     },
     async insert(row) {
       await call('', {

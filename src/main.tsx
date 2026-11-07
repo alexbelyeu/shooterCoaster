@@ -16,6 +16,7 @@ import './app/global.css'
 import { eventBus } from './core/EventBus'
 import { markStartup } from './core/startupMarks'
 import { useGameStore } from './store/useGameStore'
+import { installTelemetry } from './telemetry/playerTelemetry'
 import { installE2EApi } from './testing/e2eHook'
 
 markStartup('boot')
@@ -39,6 +40,7 @@ if (analyticsOn) {
     const { name, props } = shareEvent(level as string, method as ShareMethod)
     track(name, props)
   })
+  installTelemetry(__APP_VERSION__, storage)
 }
 
 createRoot(document.getElementById('root')!).render(
