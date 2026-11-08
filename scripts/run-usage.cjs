@@ -134,6 +134,8 @@ function resultSize(content) {
  * it paid again for context it had already seen. Its cause: "compaction" (first turn after
  * a compact boundary), "idle" (≥ 5 min since the agent's previous turn, so the cache
  * expired), "start" (an agent's first turn: expected, not counted as waste) or "other".
+ * `agents` splits the run by transcript (0 = the main session, then each subagent): weighted
+ * tokens, turns and peak context, so a multi-agent run shows which agent was heavy.
  */
 function diagnose(files) {
   let peakContext = 0
@@ -142,8 +144,10 @@ function diagnose(files) {
   let resultChars = 0
   const misses = []
   const heavy = []
+  const agents = []
   files.forEach(({ text }, agent) => {
     const seen = new Set()
+    const own = { ...emptyTokens(), peakContext: 0 }
     const tools = new Map() // tool_use id → description
     let lastTs = NaN
     let lastTool = null
@@ -186,6 +190,12 @@ function diagnose(files) {
         const read = u.cache_read_input_tokens || 0
         const context = (u.input_tokens || 0) + write + read
         peakContext = Math.max(peakContext, context)
+        own.input += u.input_tokens || 0
+        own.cacheCreation += write
+        own.cacheRead += read
+        own.output += u.output_tokens || 0
+        own.turns += 1
+        own.peakContext = Math.max(own.peakContext, context)
         if (write >= MISS_MIN_TOKENS && write > read) {
           const gapMin = Number.isNaN(ts) || Number.isNaN(lastTs) ? null : Math.round((ts - lastTs) / 6e4)
           const cause = first ? 'start' : afterCompaction ? 'compaction' : gapMin !== null && gapMin >= IDLE_MINUTES ? 'idle' : 'other'
@@ -200,6 +210,7 @@ function diagnose(files) {
       }
       if (!Number.isNaN(ts)) lastTs = ts
     }
+    agents.push({ agent, weighted: weighted(own), turns: own.turns, peakContext: own.peakContext })
   })
   const wasted = misses.filter((x) => x.cause !== 'start')
   const causes = {}
@@ -214,6 +225,7 @@ function diagnose(files) {
     resultChars,
     images,
     heaviest: heavy.sort((a, b) => b.chars - a.chars).slice(0, 5),
+    agents,
   }
 }
 

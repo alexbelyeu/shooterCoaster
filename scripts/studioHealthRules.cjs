@@ -305,7 +305,11 @@ function findings(snap) {
     const lines = runs.map((r) => {
       const waste = r.missTokens ? `, ${M(r.missTokens)} of it ${r.misses} cache misses${r.missesAfter.length ? ` (after: ${r.missesAfter.map((a) => `\`${a.slice(0, 80)}\``).join(', ')})` : ''}` : ''
       const big = r.heaviest.length ? `; heaviest results: ${r.heaviest.join(', ')}` : ''
-      return `- [${r.ref || 'no ref'}](${r.url}): ${M(r.weighted)} weighted tokens in ${r.minutes ?? '?'} min${waste}${big}`
+      const K = (n) => `${Math.round(n / 1e3)}k`
+      const byAgent = (r.agents || []).length > 1
+        ? `; by agent: ${r.agents.map((a) => `${a.agent === 0 ? 'main' : `#${a.agent}`} ${M(a.weighted)} / ${a.turns} turns / peak ${K(a.peakContext)}`).join(', ')}`
+        : ''
+      return `- [${r.ref || 'no ref'}](${r.url}): ${M(r.weighted)} weighted tokens in ${r.minutes ?? '?'} min${waste}${byAgent}${big}`
     })
     out.push({
       key: `heavy:${role}`,
