@@ -58,7 +58,7 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
    - Acceptance criteria are actually met (in the screenshots, not just in the description).
    - CLAUDE.md hard rules: no removed features, no secrets, no new paid services or
      runtime third-party calls, assets licensed and recorded, budgets respected.
-   - Correctness and robustness: disposal of three.js/Tone.js resources, no per-frame
+   - Correctness and robustness: disposal of three.js resources and Web Audio nodes, no per-frame
      allocations, no stale closures in `useFrame`, state resets between levels.
    - Perf: draw calls / triangles vs `main` in `results.json`; instancing used for repeats.
    - Architecture: fits existing patterns, no dead code, no duplicated systems, types sound.
@@ -68,7 +68,7 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
      measurements are inside the targets in `docs/audio/SOUND-BIBLE.md` (or the gap is
      explained). Read the spectrograms it changed. Every score compiles with no bar-count
      errors. A level's first new theme is not wired in as the default without Alex's pick
-     (a closed `Listen:` issue). Tone.js removal happens only at parity (hard rule 7).
+     (a closed `Listen:` issue). Audio has one engine (the score engine + arcade SFX, #416): no audio library comes back.
    - Tests: for each test the PR adds, is there a plausible wrong version of the change
      it would catch? Tests that only cover untouched or happy-path behaviour should be
      cut; pure logic the PR adds (scoring, curves, timing) should be tested.

@@ -1,153 +1,16 @@
-/** Sound design data for SFXManager; no Tone import so it stays unit-testable. */
+/** Sound design data for the arcade SFX (`audio/arcade/`); no Web Audio, so it stays unit-testable. */
 import type { BiomeType } from '@/types/level'
 import { comboTierIndex } from '@/combat/comboTiers'
 import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
-export interface KillLayers {
-  thump: boolean
-  ring: boolean
-  swell: boolean
-}
-
-const KILL_LAYERS: readonly KillLayers[] = [
-  { thump: false, ring: false, swell: false },
-  { thump: true, ring: false, swell: false },
-  { thump: true, ring: true, swell: false },
-  { thump: true, ring: true, swell: true },
-]
-
-/** The combo tier (`combat/comboTiers.ts`): 0 = pop (1×), 1 = + thump (2×), 2 = + ring (3×), 3 = + swell (5×). */
+/** The combo tier (`combat/comboTiers.ts`): 0 = the body (1×), 1 = + thump (2×), 2 = + ring (3×), 3 = + payout (5×). */
 export function killTier(combo: number): number {
   return comboTierIndex(combo)
 }
 
-/** Shared objects: don't mutate. */
-export function killLayers(combo: number): KillLayers {
-  return KILL_LAYERS[killTier(combo)]
-}
-
-export type KillSound = 'pop' | 'flutter' | 'crunch' | 'splash' | 'hiss'
-
-export interface KillTimbre {
-  /** White-noise snap length and envelope decay, s. */
-  snapS: number
-  snapDecay: number
-  /** Sine ping base pitch and length. */
-  pingHz: number
-  pingS: number
-}
-
-/** Same two voices, reshaped: a short bright pop, a soft brushy flutter, a tight low crunch, a long wash, a thin hiss. */
-export const KILL_TIMBRES: Record<KillSound, KillTimbre> = {
-  pop: { snapS: 0.05, snapDecay: 0.06, pingHz: 1400, pingS: 0.04 },
-  flutter: { snapS: 0.09, snapDecay: 0.12, pingHz: 760, pingS: 0.03 },
-  crunch: { snapS: 0.035, snapDecay: 0.035, pingHz: 230, pingS: 0.08 },
-  splash: { snapS: 0.16, snapDecay: 0.22, pingHz: 520, pingS: 0.06 },
-  hiss: { snapS: 0.22, snapDecay: 0.26, pingHz: 2600, pingS: 0.025 },
-}
-
-/** `jitter` 0–1 of random spread; the combo counts up to 10. */
-export function killPingHz(sound: KillSound, combo: number, jitter: number): number {
-  const { pingHz } = KILL_TIMBRES[sound]
-  const c = Math.min(Math.max(combo, 0), 10)
-  return pingHz * (1 + c * 0.057 + jitter * 0.21)
-}
-
-export interface FireVariant {
-  startHz: number
-  endHz: number
-  sweepS: number
-}
-
-export const FIRE_VARIANTS: readonly FireVariant[] = [
-  { startHz: 1150, endHz: 260, sweepS: 0.1 },
-  { startHz: 980, endHz: 220, sweepS: 0.085 },
-  { startHz: 1320, endHz: 300, sweepS: 0.115 },
-]
-
-/** Pickup guns (#185): each its own timbre, so the swap is heard; rapid fires twice as often, so it sits lower. */
-export interface WeaponFireDesign extends FireVariant {
-  oscillator: 'sawtooth' | 'square' | 'triangle'
-  volume: number
-}
-
-export const WEAPON_FIRE_SFX: Record<PickupWeaponId, WeaponFireDesign> = {
-  spread: { oscillator: 'sawtooth', startHz: 760, endHz: 130, sweepS: 0.12, volume: -24 },
-  rapid: { oscillator: 'square', startHz: 1900, endHz: 820, sweepS: 0.035, volume: -30 },
-  piercing: { oscillator: 'triangle', startHz: 2600, endHz: 380, sweepS: 0.17, volume: -19 },
-}
-
-export const PICKUP_CHIME = { notes: ['C5', 'E5', 'G5', 'C6'], stepS: 0.055, noteS: 0.14 } as const
-
-/** Held-trigger auto-fire sits 6 dB lower. */
-export function fireVelocity(auto: boolean): number {
-  return auto ? 0.5 : 1
-}
-
-export interface StingerDesign {
-  chords: readonly [readonly string[], readonly string[]]
-  oscillator: 'fatsawtooth' | 'triangle' | 'fmsine' | 'sawtooth'
-  /** FM ratio / depth, 'fmsine' only. */
-  harmonicity?: number
-  modulationIndex?: number
-  attack: number
-  decay: number
-  sustain: number
-  release: number
-  cutoffHz: number
-  /** dB */
-  volume: number
-  /** Sub-thump note under each chord. */
-  drum: readonly [string, string] | null
-  /** 0–1; 0 creates no Distortion node. */
-  drive: number
-}
-
-/** Combo-break down-tick: a soft falling triangle blip. */
-export const COMBO_BREAK = { startHz: 660, endHz: 300, sweepS: 0.18, volume: -20 } as const
-
-export const STINGER_CHORD_GAP_S = 0.14
-
-/** Each resolves to the root of MusicManager's per-biome key (C major, A minor, Eb major, D sus, D minor; checked by the test). */
-export const STINGERS: Record<BiomeType, StingerDesign> = {
-  // Carnival brass: detuned saws, a V → I fanfare.
-  themePark: {
-    chords: [['G3', 'B3', 'D4'], ['C4', 'E4', 'G4']],
-    oscillator: 'fatsawtooth',
-    attack: 0.02, decay: 0.25, sustain: 0.3, release: 0.25,
-    cutoffHz: 2200, volume: -24, drum: null, drive: 0,
-  },
-  // Low drum: muted triangles over membrane hits, E → Am.
-  desert: {
-    chords: [['E2', 'G#2', 'B2'], ['A2', 'C3', 'E3']],
-    oscillator: 'triangle',
-    attack: 0.005, decay: 0.35, sustain: 0, release: 0.2,
-    cutoffHz: 900, volume: -18, drum: ['E1', 'A1'], drive: 0,
-  },
-  // Bell: FM sines with a long ring, Bb → Eb.
-  ocean: {
-    chords: [['Bb3', 'D4', 'F4'], ['Eb4', 'G4', 'Bb4']],
-    oscillator: 'fmsine', harmonicity: 3.01, modulationIndex: 4,
-    attack: 0.002, decay: 1.1, sustain: 0, release: 0.6,
-    cutoffHz: 6000, volume: -22, drum: null, drive: 0,
-  },
-  // Glass: high, bright FM with an inharmonic ratio, open fifths.
-  arctic: {
-    chords: [['A4', 'D5', 'E5'], ['D5', 'A5', 'E6']],
-    oscillator: 'fmsine', harmonicity: 7.1, modulationIndex: 2,
-    attack: 0.001, decay: 0.8, sustain: 0, release: 0.5,
-    cutoffHz: 9000, volume: -26, drum: null, drive: 0,
-  },
-  // Distorted saws with a drum, A → Dm.
-  volcanic: {
-    chords: [['A2', 'C#3', 'E3'], ['D3', 'F3', 'A3']],
-    oscillator: 'sawtooth',
-    attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.25,
-    cutoffHz: 1800, volume: -26, drum: ['A1', 'D2'], drive: 0.6,
-  },
-}
-
-export const STINGER_VOICES = 3
+/** What a kill sounds like, by death style (`effects/deathStyles.ts`): a bright pop, wing flutter, a low crunch, a wash, a hiss. */
+export const KILL_SOUNDS = ['pop', 'flutter', 'crunch', 'splash', 'hiss'] as const
+export type KillSound = (typeof KILL_SOUNDS)[number]
 
 /** Ride wind: band-passed white noise that opens and brightens with speed (gain 0–0.12, an ambient bed). */
 export const WIND = {
@@ -181,32 +44,12 @@ export function windUpdateDue(speed: number, now: number, last: WindRamp): boole
   return true
 }
 
-export const STAR_CHIME_NOTES = ['E5', 'G5', 'C6'] as const
-
-/** Boss cues: arrival chords on the biome's stinger voices + thump, a hit thud, a defeat boom under a major chord. */
-export const BOSS_SFX = {
-  arrival: {
-    chords: [['C3', 'Eb3', 'G3'], ['Ab2', 'C3', 'Eb3'], ['G2', 'B2', 'D3']],
-    drum: ['C1', 'Ab0', 'G0'],
-    gapS: 0.24,
-  },
-  hit: { baseHz: 44, topHz: 70, volume: -12 },
-  defeat: { boomS: 1.6, boomCutoffHz: 700, boomVolume: -10, chord: ['C4', 'E4', 'G4'], chordDelayS: 0.18 },
-} as const
-
-/** Thud pitch for a hit that left the boss at `hpFraction` (0–1). */
-export function bossHitHz(hpFraction: number): number {
-  const f = Math.min(Math.max(hpFraction, 0), 1)
-  return BOSS_SFX.hit.topHz + (BOSS_SFX.hit.baseHz - BOSS_SFX.hit.topHz) * f
-}
-
-/** Biomes whose kit has the combo-streak firework voices (#182). */
+/** Biomes whose sounds have the combo-streak fireworks (#182). */
 export const FIREWORK_BIOMES: readonly BiomeType[] = ['themePark']
 
-/** Firework (#182): pink noise through a rising narrow band-pass for the whistle; a low-passed white crack on the kill thump for the pop. */
+/** Firework whistle (#182): noise through a rising narrow band-pass, as long as the rocket's flight. */
 export const FIREWORK_SFX = {
-  whistle: { startHz: 900, endHz: 3400, q: 14, volume: -22, minS: 0.4, maxS: 3 },
-  pop: { crackS: 0.45, cutoffHz: 3200, volume: -16, drum: 'G1', drumVelocity: 0.7 },
+  whistle: { startHz: 900, endHz: 3400, q: 14, minS: 0.4, maxS: 3 },
 } as const
 
 /** Whistle length for a flight of `flightS` game seconds at `timeScale` (slow-mo stretches it). */
@@ -215,8 +58,6 @@ export function fireworkWhistleS(flightS: number, timeScale: number): number {
   const s = timeScale > 0 ? flightS / timeScale : maxS
   return Math.min(Math.max(s, minS), maxS)
 }
-
-/* Arcade SFX (`?audio=scrim`, `audio/arcade/`) from here on. */
 
 /** Tonic as a MIDI note in octave 4 (C4 = 60). */
 export interface MusicKey {
@@ -271,6 +112,7 @@ export type ArcadeSoundId =
   | 'uiSelect'
   | 'uiBack'
   | 'uiLaunch'
+  | 'uiWhoosh'
   | 'countReady'
   | 'countGo'
 
@@ -316,6 +158,7 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   uiSelect: { prio: PRIO.ui, db: -18, send: 0.1 },
   uiBack: { prio: PRIO.ui, db: -18, send: 0.1 },
   uiLaunch: { prio: PRIO.ui, db: -13, send: 0.2 },
+  uiWhoosh: { prio: PRIO.ui, db: -16, send: 0.2 },
   countReady: { prio: PRIO.ui, db: -14, send: 0.15 },
   countGo: { prio: PRIO.ui, db: -11, send: 0.2 },
 }

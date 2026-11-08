@@ -46,7 +46,7 @@
  * (level3-boss.png, level3-boss-head.png, level3-boss-down.png); see bossCheck().
  * The pickup check shoots level1's first weapon pickup with a real bullet: the spread gun's badge,
  * a 3-bullet fan with the tinted tracer (level1-pickup.png), pause-safe expiry, reset on restart; see pickupCheck().
- * The scrim check loads level1 with `?audio=scrim` (the score engine, #214, and the arcade SFX, #217); see scrimCheck().
+ * The audio check plays level1's sound from the title to its results: the score engine (#214, #416) and the arcade SFX (#217); see audioCheck().
  *
  * All waits are deadline-polled on the hook's frame counter, because software
  * rendering in CI / cloud sessions can run at ~1 fps. The title waits --seconds and each level
@@ -1268,14 +1268,12 @@ async function offsetTapKills(page, label) {
 /** audioBurst(shots, kills) of every level and the phone run. */
 const BURST = [20, 10]
 
-/** Tone scheduling stress (#115) + every kill reaching Tone (#109); page errors are counted by the caller. */
+/** SFX stress (#115) + every kill reaching the SFX engine (#109); page errors are counted by the caller. */
 async function audioBurstProblems(page, label) {
   const burst = await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), BURST)
   const problems = []
   if (burst.ready && burst.killsPlayed !== BURST[1])
     problems.push(`${label}: ${burst.killsPlayed}/${BURST[1]} audioBurst kills reached the SFX engine (throttled or dropped)`)
-  if (burst.lateScheduleErrors > 0)
-    problems.push(`${label}: ${burst.lateScheduleErrors}/10 late music note pairs threw a Tone scheduling error`)
   if (burst.dropped > 0)
     problems.push(`${label}: ${burst.dropped} sound(s) dropped by an audio error (${burst.lastDrop?.split('\n')[0]})`)
   return { burst, problems }
@@ -2185,12 +2183,12 @@ async function qualityCheck(newPage, levelId) {
   return { id: 'quality', problems, errors: [...high.errors, ...low.errors], quality: { level: levelId, drawCalls: [high.drawCalls, low.drawCalls], dpr: [high.dpr, low.dpr] } }
 }
 
-/** Fetches of Tone.js's chunk so far (`audio/tone.ts`: loaded on the first gesture, never at startup). */
-const toneRequests = (page) =>
-  page.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/tone-[^/]*\.js$/.test(e.name)).length)
+/** Fetches of the score engine's chunks so far (`audio/musicEngine.ts`, `scrim/synth.ts`: loaded on the first gesture, never at startup). */
+const engineRequests = (page) =>
+  page.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/(player|synth)-[^/]*\.js$/.test(e.name)).length)
 
 /** Title (#28): another camera angle 6 s later (`title-2.png`; its draw calls go on `drawCalls`), the start hint, and a key press fading to level select
- *  that also loads Tone.js (#187: not before it) and unlocks audio. */
+ *  that also loads the score engine (#187: not before it), unlocks audio and starts the title score. */
 async function titleFlyBy(page, drawCalls) {
   const problems = []
   const pose = () => page.evaluate(() => window.__SC_TEST__.cameraPose())
@@ -2220,8 +2218,8 @@ async function titleFlyBy(page, drawCalls) {
   const hint = await page.locator('.title-hint').textContent({ timeout: 5000 }).catch(() => null)
   if (!hint) problems.push('no start hint on the first title')
 
-  const toneBefore = { requests: await toneRequests(page), loaded: await page.evaluate(() => window.__SC_TEST__.audio().toneLoaded) }
-  if (toneBefore.requests > 0 || toneBefore.loaded) problems.push('Tone.js loaded before the first key press on the title')
+  const engineBefore = { requests: await engineRequests(page), loaded: await page.evaluate(() => window.__SC_TEST__.audio().engineLoaded) }
+  if (engineBefore.requests > 0 || engineBefore.loaded) problems.push('the score engine loaded before the first key press on the title')
   await page.keyboard.press('Enter')
   const veiled = await page
     .waitForSelector('.screen-veil', { state: 'attached', timeout: 10000 })
@@ -2235,11 +2233,14 @@ async function titleFlyBy(page, drawCalls) {
     .waitForSelector('.screen-veil', { state: 'detached', timeout: 30000 })
     .then(() => true, () => false)
   if (!veilGone) problems.push('the fade to black never cleared over level select')
-  const toneAfter = await page
-    .waitForFunction(() => window.__SC_TEST__.audio().toneLoaded && window.__SC_TEST__.audio().ready, null, { timeout: 30000 })
+  const engineAfter = await page
+    .waitForFunction(() => {
+      const a = window.__SC_TEST__.audio()
+      return a.engineLoaded && a.ready && a.scrim?.current === 'title'
+    }, null, { timeout: 30000 })
     .then(() => true, () => false)
-  if (!toneAfter) problems.push('the key press on the title did not load Tone.js and unlock audio')
-  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, toneBefore, toneAfter, sparkle } }
+  if (!engineAfter) problems.push('the key press on the title did not load the score engine, unlock audio and start the title score')
+  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, engineBefore, engineAfter, sparkle } }
 }
 
 /** Longest the cold load may take to hand the poster over to the live scene before the poster check gives up. */
@@ -2579,17 +2580,17 @@ async function musicCrossfade(page) {
   return { problems, result: { fades, buses } }
 }
 
-const SCRIM_CHECK = { level: 'level1', maxNodes: 150, burst: [64, 32] }
+const AUDIO_CHECK = { level: 'level1', maxNodes: 150, burst: [64, 32] }
 
 /**
- * `?audio=scrim` (#214): a real click unlocks audio and starts the title score; level1 must crossfade from it, keep its
+ * The score engine (#214, the only engine since #416): a real click unlocks audio and starts the title score; level1 must crossfade from it, keep its
  * long-lived node count flat (≤ maxNodes) while it plays, duck with game time frozen, follow the combo tier with its
  * intensity layers (#321: up to 2 at 3×, 3 at 5×, held through a pause, back down to 0 a layer at a time), hold its
  * song position while paused and pick it up again, then crossfade to the results score; nothing dropped, no page errors.
  * The arcade SFX (#217): `audioBurst(64, 32)` must stay inside the voice budget (stealing, not growing), keep the SFX
  * node count flat across it, and throw or drop nothing.
  */
-async function scrimCheck(page) {
+async function audioCheck(page) {
   const problems = []
   const audio = () => page.evaluate(() => window.__SC_TEST__.audio())
   /** Polls `audio()` until `check` holds; returns the last reading. */
@@ -2604,22 +2605,20 @@ async function scrimCheck(page) {
   }
   const busNames = (a) => a.music.buses.map((b) => b.name)
   const track = (a) => a.scrim?.tracks.at(-1) ?? null
-  const result = { engine: null, title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, ducked: null, layers: null, results: false, dropped: 0 }
+  const result = { title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, ducked: null, layers: null, results: false, dropped: 0 }
 
   const vp = page.viewportSize()
   await page.mouse.click(8, vp.height - 8) // any pointer press on the title unlocks audio
   let a = await until((x) => x.scrim?.current === 'title')
-  result.engine = a.engine
-  if (a.engine !== 'scrim') return { problems: [`?audio=scrim reports engine "${a.engine}"`], result }
   if (!a.ready) return { problems: ['a click did not unlock audio'], result }
   result.title = a.scrim?.current === 'title'
   if (!result.title) problems.push('the title score never started')
 
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [SCRIM_CHECK.level, SEED])
-  a = await until((x) => x.scrim?.current === SCRIM_CHECK.level && !busNames(x).includes('title'))
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [AUDIO_CHECK.level, SEED])
+  a = await until((x) => x.scrim?.current === AUDIO_CHECK.level && !busNames(x).includes('title'))
   const titleOut = a.music.fades.findLast((f) => f.name === 'title' && f.ramp === 'out')
   const levelIn = a.music.fades.findLast((f) => f.name === 'level' && f.ramp === 'in')
-  if (a.scrim?.current !== SCRIM_CHECK.level) problems.push(`the ${SCRIM_CHECK.level} score never started (current "${a.scrim?.current}")`)
+  if (a.scrim?.current !== AUDIO_CHECK.level) problems.push(`the ${AUDIO_CHECK.level} score never started (current "${a.scrim?.current}")`)
   if (!titleOut || titleOut.seconds < 0.5) problems.push('the title score did not fade out')
   if (!levelIn || levelIn.seconds < 0.5) problems.push('the level score did not fade in')
   if (busNames(a).includes('title')) problems.push('the title score bus was never disposed')
@@ -2632,23 +2631,22 @@ async function scrimCheck(page) {
   result.nodes.push(a.scrim.nodes)
   result.position.push(track(a)?.position ?? 0)
   if (result.nodes[1] !== result.nodes[0]) problems.push(`score engine nodes grew while playing: ${result.nodes.join(' -> ')}`)
-  if (result.nodes[1] > SCRIM_CHECK.maxNodes) problems.push(`score engine holds ${result.nodes[1]} nodes (≤ ${SCRIM_CHECK.maxNodes})`)
+  if (result.nodes[1] > AUDIO_CHECK.maxNodes) problems.push(`score engine holds ${result.nodes[1]} nodes (≤ ${AUDIO_CHECK.maxNodes})`)
   if (!(result.position[1] > result.position[0] + 1)) problems.push(`the level score is not advancing (${result.position.map((p) => p.toFixed(2)).join(' -> ')} s)`)
   if (!a.scrim.ticking) problems.push('the score scheduler is not ticking')
 
-  const burst = await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), SCRIM_CHECK.burst)
+  const burst = await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), AUDIO_CHECK.burst)
   const v = burst.sfxVoices
   result.voices = v
   result.sfxNodes.push(burst.sfxNodes)
-  if (!v) problems.push('no arcade SFX voice pool under ?audio=scrim')
+  if (!v) problems.push('no arcade SFX voice pool')
   else {
-    if (v.peak > v.budget) problems.push(`audioBurst(${SCRIM_CHECK.burst}) took ${v.peak} voices (budget ${v.budget})`)
-    if (v.played === 0) problems.push(`audioBurst(${SCRIM_CHECK.burst}) played no arcade SFX (bank never baked?)`)
-    if (v.stolen + v.rejected === 0) problems.push(`audioBurst(${SCRIM_CHECK.burst}) never stole a voice: the budget is not being exercised`)
+    if (v.peak > v.budget) problems.push(`audioBurst(${AUDIO_CHECK.burst}) took ${v.peak} voices (budget ${v.budget})`)
+    if (v.played === 0) problems.push(`audioBurst(${AUDIO_CHECK.burst}) played no arcade SFX (bank never baked?)`)
+    if (v.stolen + v.rejected === 0) problems.push(`audioBurst(${AUDIO_CHECK.burst}) never stole a voice: the budget is not being exercised`)
   }
-  if (burst.lateScheduleErrors) problems.push(`audioBurst: ${burst.lateScheduleErrors}/10 late note pairs threw`)
   if (burst.dropped) problems.push(`audioBurst: ${burst.dropped} sound(s) dropped by an audio error (${burst.lastDrop?.split('\n')[0]})`)
-  await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), SCRIM_CHECK.burst)
+  await page.evaluate(([shots, kills]) => window.__SC_TEST__.audioBurst(shots, kills), AUDIO_CHECK.burst)
   result.sfxNodes.push((await audio()).sfxNodes)
   if (result.sfxNodes[1] !== result.sfxNodes[0] || !(result.sfxNodes[0] > 0))
     problems.push(`arcade SFX nodes not flat across two bursts: ${result.sfxNodes.join(' -> ')}`)
@@ -2665,7 +2663,7 @@ async function scrimCheck(page) {
   const intensity = (x) => track(x)?.intensity
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   layers.layered = !!track(await audio())?.layered
-  if (!layers.layered) problems.push(`the ${SCRIM_CHECK.level} score has no intensity layers`)
+  if (!layers.layered) problems.push(`the ${AUDIO_CHECK.level} score has no intensity layers`)
   for (const [count, want] of [[8, 2], [15, 3]]) {
     await page.evaluate((n) => window.__SC_TEST__.primeCombo(n), count)
     layers.rise.push(intensity(await until((x) => intensity(x) === want, 10000)))
@@ -3079,7 +3077,7 @@ async function runMobile(browser, base) {
 
 async function run() {
   const runStarted = Date.now()
-  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['scrim', [SCRIM_CHECK.level]]]
+  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['audio', [AUDIO_CHECK.level]]]
     .filter(([s, ls]) => ls.join() !== STEP_LEVELS[s].join())
   if (drift.length) throw new Error(`STEP_LEVELS in e2e/shards.mjs disagrees with the checks: ${drift.map(([s, ls]) => `${s} runs on ${ls.join(', ')}`).join('; ')}`)
   const budget = startTimeBudget(runStarted)
@@ -3280,15 +3278,15 @@ async function run() {
   // 6e. Weapon pickups: one shot with a real bullet, the fan, the badge, expiry (level1-pickup.png)
   if (has('pickup') && wanted.includes(PICKUP_CHECK.level)) await pageStep(pickupCheck)
 
-  // 6d. The score engine behind ?audio=scrim: title -> level -> pause -> results
-  if (has('scrim') && wanted.includes(SCRIM_CHECK.level)) {
+  // 6d. The score engine and arcade SFX: title -> level -> pause -> results
+  if (has('audio') && wanted.includes(AUDIO_CHECK.level)) {
     await step(async () => {
-      const sc = await newPage('e2e=1&audio=scrim')
-      const r = await scrimCheck(sc.page)
+      const sc = await newPage('e2e=1')
+      const r = await audioCheck(sc.page)
       const errors = [...sc.errors, ...(await sc.page.evaluate(() => window.__SC_TEST__.errors))]
       if (errors.length) r.problems.push(`${errors.length} error(s)`)
       await sc.ctx.close()
-      return { id: 'scrim', ok: r.problems.length === 0, problems: r.problems, scrim: r.result, errors }
+      return { id: 'audio', ok: r.problems.length === 0, problems: r.problems, engine: r.result, errors }
     })
   }
 
@@ -3350,10 +3348,10 @@ async function run() {
       : r.pickup
         ? ` ${r.pickup.count} pickups [${r.pickup.ids.join(',')}] draws=${r.pickup.drawCalls} first at ${r.pickup.px ? `${r.pickup.px.x},${r.pickup.px.y} (${r.pickup.px.distance} units, lead ${r.pickup.lead})` : '-'}` +
           ` fan shots=${r.pickup.fan?.shots} drawn=${r.pickup.fan?.drawn}`
-      : r.scrim
-        ? ` engine=${r.scrim.engine} title=${r.scrim.title} nodes ${r.scrim.nodes.join('->')} position ${r.scrim.position.map((p) => p.toFixed(1)).join('->')}s` +
-          ` sfxNodes ${r.scrim.sfxNodes.join('->')} voices ${r.scrim.voices ? `peak ${r.scrim.voices.peak}/${r.scrim.voices.budget} stolen ${r.scrim.voices.stolen} dropped ${r.scrim.voices.rejected}` : 'none'}` +
-          ` ducked=${r.scrim.ducked} layers ${r.scrim.layers ? `up ${r.scrim.layers.rise.join('->')} paused ${r.scrim.layers.paused} resumed ${r.scrim.layers.resumed} down ${r.scrim.layers.fall.join('->')}` : 'none'} paused at ${r.scrim.pausedHeld?.at.toFixed(1)}s (${r.scrim.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.scrim.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.scrim.results}`
+      : r.engine
+        ? ` title=${r.engine.title} nodes ${r.engine.nodes.join('->')} position ${r.engine.position.map((p) => p.toFixed(1)).join('->')}s` +
+          ` sfxNodes ${r.engine.sfxNodes.join('->')} voices ${r.engine.voices ? `peak ${r.engine.voices.peak}/${r.engine.voices.budget} stolen ${r.engine.voices.stolen} dropped ${r.engine.voices.rejected}` : 'none'}` +
+          ` ducked=${r.engine.ducked} layers ${r.engine.layers ? `up ${r.engine.layers.rise.join('->')} paused ${r.engine.layers.paused} resumed ${r.engine.layers.resumed} down ${r.engine.layers.fall.join('->')}` : 'none'} paused at ${r.engine.pausedHeld?.at.toFixed(1)}s (${r.engine.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.engine.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.engine.results}`
       : r.speed
         ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile
@@ -3426,11 +3424,11 @@ function bulletSummary(b) {
   return `muzzle ${(b.muzzleFrac * 100).toFixed(2)}% flight ${(b.flightFrac * 100).toFixed(2)}% max ${(b.maxScreenFrac * 100).toFixed(2)}%${tip}`
 }
 
-/** audioBurst result: "ok" or late-note throws + dropped sounds, then the kills that reached the engine. */
+/** audioBurst result: "ok" or dropped sounds, then the kills that reached the engine. */
 function burstSummary(b) {
   if (!b) return '-'
   const kills = `kills${b.killsPlayed}/${BURST[1]}`
-  return b.lateScheduleErrors || b.dropped ? `late${b.lateScheduleErrors}+drop${b.dropped} ${kills}` : `ok ${kills}`
+  return b.dropped ? `drop${b.dropped} ${kills}` : `ok ${kills}`
 }
 
 /** SFX node count after the portrait / landscape taps (equal = no per-shot nodes). */

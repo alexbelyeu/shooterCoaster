@@ -1,15 +1,13 @@
-import type * as Tone from 'tone'
-import { tone } from './tone'
-import { musicChannel } from './AudioEngine'
+import { audioContext, audioNow, rampParam, scoreChannel } from './AudioEngine'
 import { dropSound } from './soundGuard'
 
-/** Each music track plays into its own gain stage, so a track change is a crossfade. Never stop or cancel the Transport: it would cut the other track mid-fade. */
+/** Each score plays into its own gain stage, so a track change is a crossfade. */
 
 export const MUSIC_FADE_S = 1
 
 export interface MusicBus {
   name: string
-  gain: Tone.Gain
+  gain: GainNode
   fading: boolean
 }
 
@@ -38,13 +36,14 @@ function logFade(fade: MusicFade) {
   if (fades.length > 8) fades.shift()
 }
 
-/** `firstNote`: context time the track's first note plays. `channel`: the score engine passes its stereo channel. */
-export function openMusicBus(name: string, firstNote: number, channel: Tone.Channel = musicChannel): MusicBus {
-  const { Gain } = tone()
-  const gain = new Gain(0).connect(channel)
+/** `firstNote`: context time the track's first note plays. */
+export function openMusicBus(name: string, firstNote: number): MusicBus {
+  const gain = new GainNode(audioContext(), { gain: 0 })
+  gain.connect(scoreChannel)
   for (const held of [...handovers.keys()]) releaseHandover(held)
-  const at = tone().now()
-  gain.gain.rampTo(1, MUSIC_FADE_S, at)
+  const at = audioNow()
+  gain.gain.setValueAtTime(0, at)
+  gain.gain.linearRampToValueAtTime(1, at + MUSIC_FADE_S)
   const bus = { name, gain, fading: false }
   live.add(bus)
   logFade({ name, ramp: 'in', from: 0, at, seconds: MUSIC_FADE_S, firstNote })
@@ -52,7 +51,7 @@ export function openMusicBus(name: string, firstNote: number, channel: Tone.Chan
 }
 
 /**
- * Disposes `nodes` (loops before instruments) and the bus once the ramp is over.
+ * Disposes `nodes` and the bus once the ramp is over.
  * `untilNextTrack`: keep playing until the next `openMusicBus` and fade under it, so a switch that waits on a scene
  * mount (title -> level) still overlaps.
  */
@@ -68,16 +67,18 @@ export function fadeOutMusicBus(bus: MusicBus, nodes: { dispose(): unknown }[], 
     return
   }
   bus.fading = true
-  const at = tone().now()
-  logFade({ name: bus.name, ramp: 'out', from: bus.gain.gain.getValueAtTime(at), at, seconds: MUSIC_FADE_S })
+  const at = audioNow()
+  const level = bus.gain.gain
+  const from = level.value
+  logFade({ name: bus.name, ramp: 'out', from, at, seconds: MUSIC_FADE_S })
   try {
-    bus.gain.gain.rampTo(0, MUSIC_FADE_S, at)
+    rampParam(level, 0, MUSIC_FADE_S)
   } catch (e) {
     dropSound(`${bus.name} music fade`, e)
   }
   window.setTimeout(() => {
     for (const n of nodes) n.dispose()
-    bus.gain.dispose()
+    bus.gain.disconnect()
     live.delete(bus)
   }, MUSIC_FADE_S * 1000 + 100)
 }
@@ -87,25 +88,9 @@ function releaseHandover(bus: MusicBus) {
   if (held) fadeOutMusicBus(bus, held.nodes)
 }
 
-/** The next beat, not bar (up to 3.3 s), so the first note lands inside the outgoing fade (#168); the tempo steps to `bpm` on it. */
-export function startTransportAt(bpm: number): { ticks: number; time: number } {
-  const transport = tone().getTransport()
-  if (transport.state !== 'started') {
-    transport.bpm.value = bpm
-    const time = tone().now()
-    transport.start(time)
-    return { ticks: 0, time }
-  }
-  const time = transport.nextSubdivision('4n')
-  transport.bpm.cancelScheduledValues(time)
-  transport.bpm.setValueAtTime(bpm, time)
-  return { ticks: Math.round(transport.getTicksAtTime(time)), time }
-}
-
 export function musicState() {
-  const now = tone().now()
   return {
-    buses: [...live].map((b) => ({ name: b.name, gain: b.gain.gain.getValueAtTime(now), fading: b.fading })),
+    buses: [...live].map((b) => ({ name: b.name, gain: b.gain.gain.value, fading: b.fading })),
     fades: [...fades],
   }
 }

@@ -14,7 +14,8 @@ import MuteButton from '@/ui/MuteButton'
 import Crosshair from '@/combat/Crosshair'
 import ScorePopups from '@/effects/ScorePopups'
 import WaveAnnouncement from '@/ui/hud/WaveAnnouncement'
-import { playTitleWhoosh, startTitleMusic, stopTitleMusic } from '@/audio/TitleMusicManager'
+import { startTitleMusic, stopTitleMusic } from '@/audio/titleMusic'
+import { sfx } from '@/audio/sfx'
 import { whenAudioReady } from '@/audio/AudioEngine'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { usePauseOnHidden } from './usePauseOnHidden'
@@ -57,7 +58,7 @@ export default function App() {
 
   function playFromTitle() {
     setVeiled(true)
-    playTitleWhoosh()
+    sfx().ui('whoosh')
     veilTimer.current = window.setTimeout(() => setPhase('levelSelect'), TITLE_FADE_S * 1000)
   }
 

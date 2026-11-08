@@ -3,10 +3,9 @@ import { useFrame, useThree } from '@react-three/fiber'
 import type * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import type { GamePhase } from '@/types/game'
-import { startMusic, stopMusic, setMusicIntensity } from '@/audio/MusicManager'
 import { placeSound, prepareSfx, setSfxListener, sfx } from '@/audio/sfx'
 import { isAudioReady, setMusicDucked, setPauseMix, whenAudioReady } from '@/audio/AudioEngine'
-import { MUSIC_ENGINE, scrimPlayer, withScrim } from '@/audio/musicEngine'
+import { scrimPlayer, withScrim } from '@/audio/musicEngine'
 import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { isInRun } from '@/store/startPhase'
@@ -15,9 +14,7 @@ import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 import { intensityForTier } from '@/audio/scrim/layers'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 
-const SCRIM = MUSIC_ENGINE === 'scrim'
-
-/** `?audio=scrim`: the level's score while it runs (held while paused, through the resume Ready / GO), the results score after it. */
+/** The level's score while it runs (held while paused, through the resume Ready / GO), the results score after it. */
 function followPhase(phase: GamePhase, level: string) {
   withScrim((p) => {
     if (phase === 'results') p.playScore('results')
@@ -36,7 +33,6 @@ const onKilled = (e: unknown) => {
   else sfx().kill(combo, sound, placeSound(position))
 }
 const onWaveIncoming = () => sfx().waveIncoming()
-const onWaveAnnounce = () => sfx().waveAnnounce()
 const onComboBreak = () => sfx().comboBreak()
 const onFrenzy = () => sfx().frenzy()
 const onBossSpawn = () => sfx().bossArrival()
@@ -52,7 +48,6 @@ const SFX_EVENTS: [string, (e: unknown) => void][] = [
   ['enemy:hit', onHit],
   ['enemy:killed', onKilled],
   ['wave:incoming', onWaveIncoming],
-  ['wave:announce', onWaveAnnounce],
   ['combo:broken', onComboBreak],
   ['combo:frenzy', onFrenzy],
   ['boss:spawn', onBossSpawn],
@@ -62,7 +57,7 @@ const SFX_EVENTS: [string, (e: unknown) => void][] = [
   [FIREWORK_BURST_EVENT, onFireworkBurst],
 ]
 
-/** Level audio host: biome music + SFX for the level's lifetime, bus-driven hit / kill / wave / combo / boss / firework sounds, slow-mo and pause duck, music intensity. */
+/** Level audio host: the level's score + SFX for the level's lifetime, bus-driven hit / kill / wave / combo / boss / firework sounds, slow-mo and pause duck, music intensity. */
 export default function LevelAudio() {
   const currentLevel = useGameStore((s) => s.currentLevel)
   const camera = useThree((s) => s.camera)
@@ -75,16 +70,13 @@ export default function LevelAudio() {
   useEffect(() => {
     const biome = (currentLevel ? getLevelConfig(currentLevel)?.biome : undefined) ?? 'themePark'
     const level = currentLevel ?? 'level1'
-    const unfollow = SCRIM
-      ? useGameStore.subscribe((s, prev) => {
-          if (s.phase !== prev.phase && isAudioReady()) followPhase(s.phase, level)
-        })
-      : null
-    // Tone's chunk can land after the level mounts (PLAY waits for it only briefly).
+    const unfollow = useGameStore.subscribe((s, prev) => {
+      if (s.phase !== prev.phase && isAudioReady()) followPhase(s.phase, level)
+    })
+    // Audio can unlock after the level mounts (PLAY waits for it only briefly).
     const cancelStart = whenAudioReady(() => {
-      if (SCRIM) followPhase(useGameStore.getState().phase, level)
-      else startMusic(biome)
-      prepareSfx(level, biome)
+      followPhase(useGameStore.getState().phase, level)
+      void prepareSfx(level, biome)
     })
     for (const [event, fn] of SFX_EVENTS) eventBus.on(event, fn)
     return () => {
@@ -92,10 +84,8 @@ export default function LevelAudio() {
       for (const [event, fn] of SFX_EVENTS) eventBus.off(event, fn)
       // Still in a run: the next level's track opens once its scene mounts, so fade under it, not before (#168).
       const nextLevel = isInRun(useGameStore.getState().phase)
-      if (unfollow) {
-        unfollow()
-        withScrim((p) => (nextLevel ? p.handOverScore(level, 'results') : p.stopScore(level, 'results')))
-      } else stopMusic(nextLevel)
+      unfollow()
+      withScrim((p) => (nextLevel ? p.handOverScore(level, 'results') : p.stopScore(level, 'results')))
       sfx().dispose(level)
       setMusicDucked(false, true)
     }
@@ -113,22 +103,11 @@ export default function LevelAudio() {
   }, [])
 
   useFrame(() => {
-    const { combo, timeRemaining, timeScale, phase } = useGameStore.getState()
+    const { combo, timeScale, phase } = useGameStore.getState()
     const tier = comboTierIndex(combo.count)
     setMusicDucked(timeScale < 1 || phase === 'paused')
     sfx().frenzyLift(phase === 'playing' && tier === TOP_TIER)
-    if (SCRIM) {
-      scrimPlayer()?.setIntensity(intensityForTier(tier))
-      return
-    }
-
-    // Intensity ramps up quickly so the music feels alive from the start
-    const comboFactor = Math.min(combo.count / 5, 1) * 0.3
-    const timePressure = timeRemaining < 20 ? (1 - timeRemaining / 20) * 0.3 : 0
-    const baseline = 0.45 // Start with pad + bass already playing
-    const intensity = Math.min(1, baseline + comboFactor + timePressure)
-
-    setMusicIntensity(intensity)
+    scrimPlayer()?.setIntensity(intensityForTier(tier))
   })
 
   return null

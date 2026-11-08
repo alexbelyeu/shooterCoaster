@@ -66,7 +66,7 @@ export default function LevelSelectScreen() {
   // Mount only: start keyboard players on the next level to play.
   useEffect(() => {
     cardRefs.current[focusIndex]?.focus({ preventScroll: true })
-    prepareSfx(null, 'themePark')
+    void prepareSfx(null, 'themePark')
   }, [])
 
   function back() {

@@ -1,20 +1,19 @@
-/** Arcade SFX (`?audio=scrim`): baked one-shots, each a fresh buffer source on a fixed, priority-stolen voice pool (decision 2026-10-31-217). */
-import * as Tone from 'tone'
+/** Arcade SFX: baked one-shots, each a fresh buffer source on a fixed, priority-stolen voice pool (decision 2026-10-31-217). */
 import type { BiomeType } from '@/types/level'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { createRng, hashString } from '@/utils/rng'
-import { arcadeChannel, isAudioReady } from '../AudioEngine'
+import { arcadeChannel, audioContext, audioNow as clock, isAudioReady } from '../AudioEngine'
 import { scrimPlayer } from '../musicEngine'
 import { dropSound } from '../soundGuard'
 import { compile } from '../scrim/score'
-import { makeIR } from '../scrim/synth'
+import { makeIR, upmixPanner } from '../scrim/synth'
 import { SCORES, scoreIdFor } from '../scores'
 import {
   ARCADE_SOUNDS, AUTO_FIRE_DB, BIOME_REVERB, FIREWORK_BIOMES, STEAL_FADE_S, VOICE_BUDGET, WHISTLE_LENGTHS_S, SCORE_KEYS,
   WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, killTier, nextBeat, panGain, pickVoice, windGain, windHz, windUpdateDue,
   type ArcadeSoundId, type VoiceState, type WindRamp,
 } from '../sfxDesign'
-import type { Placement, SfxEngine, VoiceStats } from '../sfx'
+import type { Placement, SfxEngine, UiSound, VoiceStats } from '../sfx'
 import { bakeBank, type Bank } from './bake'
 import type { BakeSpec } from './recipes'
 
@@ -28,7 +27,7 @@ interface Voice extends VoiceState {
 
 interface Graph {
   ctx: BaseAudioContext
-  channel: Tone.Channel
+  channel: AudioNode
   biome: BiomeType
   out: GainNode
   verb: ConvolverNode
@@ -37,13 +36,15 @@ interface Graph {
   voices: Voice[]
   /** The FRENZY lift's own voice: a loop, never stolen. */
   lift: Voice
-  /** The ride wind, as in the Tone kit: looped noise → band-pass → gain, silent until `wind` opens it. */
+  /** The ride wind: looped noise → band-pass → gain, silent until `wind` opens it. */
   windSrc: AudioBufferSourceNode
   windBand: BiquadFilterNode
   windAmp: GainNode
 }
 
 const LIFT_FADE_S = 0.12
+/** A bake before audio unlocks (a menu's prepare): buffer sources resample it to the context's rate. */
+const BAKE_RATE = 48000
 const BEAT_LEAD_S = 0.02
 
 let graph: Graph | null = null
@@ -58,16 +59,12 @@ let liftOn = false
 
 const stats: VoiceStats = { budget: VOICE_BUDGET, live: 0, peak: 0, played: 0, stolen: 0, rejected: 0 }
 
-const rawContext = () => Tone.getContext().rawContext as unknown as BaseAudioContext
-/** The live clock, or an offline render's scripted time (its context runs ahead by a look-ahead). */
-const clock = () => Tone.now() - Tone.getContext().lookAhead
-
 function createVoice(ctx: BaseAudioContext, out: AudioNode, verbIn: AudioNode): Voice {
   const gain = ctx.createGain()
   const lp = ctx.createBiquadFilter()
   lp.type = 'lowpass'
   lp.Q.value = 0.5
-  const pan = ctx.createStereoPanner()
+  const pan = upmixPanner(ctx)
   const send = ctx.createGain()
   send.gain.value = 0
   gain.connect(lp).connect(pan).connect(out)
@@ -75,14 +72,14 @@ function createVoice(ctx: BaseAudioContext, out: AudioNode, verbIn: AudioNode): 
   return { gain, lp, pan, send, src: null, prio: 0, startedAt: 0, endsAt: 0 }
 }
 
-/** Rebuilt when Tone's context or channel changes (an offline render) or the biome does. */
+/** Rebuilt when the context or channel changes (an offline render) or the biome does. */
 function ensureGraph(): Graph {
-  const ctx = rawContext()
+  const ctx = audioContext()
   if (graph && graph.ctx === ctx && graph.channel === arcadeChannel && graph.biome === biome) return graph
   disposeGraph()
   const room = BIOME_REVERB[biome]
   const out = ctx.createGain()
-  Tone.connect(out, arcadeChannel)
+  out.connect(arcadeChannel)
   const verb = ctx.createConvolver()
   verb.buffer = makeIR(ctx, room.seconds, room.decayPow)
   const verbTone = ctx.createBiquadFilter()
@@ -182,7 +179,7 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
   }
   if (baking?.key === key) return baking.promise
   const spec = bakeSpec(scoreIdOf(level), levelBiome, level)
-  const promise = bakeBank(spec, rawContext().sampleRate, hashString(key))
+  const promise = bakeBank(spec, isAudioReady() ? audioContext().sampleRate : BAKE_RATE, hashString(key))
     .then((baked) => {
       if (wanted !== key) return
       bank = baked
@@ -311,6 +308,8 @@ function playKill(body: ArcadeSoundId, combo: number, at: Placement | null) {
 
 let fireVariant = 0
 
+const UI_SOUNDS: Record<UiSound, ArcadeSoundId> = { select: 'uiSelect', back: 'uiBack', launch: 'uiLaunch', whoosh: 'uiWhoosh' }
+
 export const arcadeSfx: SfxEngine = {
   prepare,
   fire(auto, weapon = 'blaster') {
@@ -333,7 +332,6 @@ export const arcadeSfx: SfxEngine = {
   frenzy: () => playOnBeat('frenzy'),
   frenzyLift: setLift,
   waveIncoming: () => playOnBeat('waveTell'),
-  waveAnnounce: () => {},
   bossArrival: () => playOnBeat('bossArrival'),
   bossHit: (hpFraction) => void play('bossHit', 0, 0, bossHitRate(hpFraction)),
   bossDefeat: () => void play('bossDefeat'),
@@ -345,7 +343,7 @@ export const arcadeSfx: SfxEngine = {
   },
   fireworkPop: () => void play('fireworkPop'),
   starChime: (index) => void play(index <= 0 ? 'star1' : index === 1 ? 'star2' : 'star3'),
-  ui: (sound) => void play(sound === 'select' ? 'uiSelect' : sound === 'back' ? 'uiBack' : 'uiLaunch'),
+  ui: (sound) => void play(UI_SOUNDS[sound]),
   countdown: (go) => void play(go ? 'countGo' : 'countReady'),
   wind: setWind,
   nodeCount: () => (graph ? BUS_NODES + WIND_NODES + VOICE_NODES * (graph.voices.length + 1) : 0),

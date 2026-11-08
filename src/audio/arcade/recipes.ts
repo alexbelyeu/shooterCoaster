@@ -248,7 +248,7 @@ export const RECIPES: readonly Recipe[] = [
     playInstrument(S, out, 'bell', t, 0.4, keyNote(b.key, deg, 1), 0.9)
     playInstrument(S, out, 'glock', t, 0.2, keyNote(b.key, deg, 2), 0.6)
   } })),
-  // Menus: a chip blip, a two-note back, a rising launch over a whoosh.
+  // Menus: a chip blip, a two-note back, a rising launch over a whoosh, and the title's PLAY whoosh alone.
   { id: 'uiSelect', lengthS: fixed(0.12), render(S, out, t, b) {
     playInstrument(S, out, 'chip', t, 0.03, keyNote(b.key, 4, 1), 0.9)
   } },
@@ -259,6 +259,9 @@ export const RECIPES: readonly Recipe[] = [
   { id: 'uiLaunch', lengthS: fixed(0.7), render(S, out, t, b) {
     run(S, out, 'chip', t, 0.045, 0.04, b, [0, 2, 4, 7], 1, 0.9)
     sweep(S, out, t, 0.35, 400, 4000, 1.2, 0.5)
+  } },
+  { id: 'uiWhoosh', lengthS: fixed(0.6), render(S, out, t) {
+    sweep(S, out, t, 0.4, 300, 3200, 1.2, 1)
   } },
   // Countdown: Ready / Set on the tonic, GO an octave up with the fifth and a crash.
   { id: 'countReady', lengthS: fixed(0.35), render(S, out, t, b) {

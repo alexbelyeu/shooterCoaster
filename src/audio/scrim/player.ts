@@ -1,12 +1,11 @@
 /*
- * Plays `audio/scores/` in the game: one `musicBus` per score into the stereo `scoreChannel`, so a change is the
- * Tone.js music's 1 s crossfade. Built on Scrimshaw Jukebox's player (docs/audio/reference/scrimshaw-jukebox.html),
+ * Plays `audio/scores/` in the game: one `musicBus` per score into the stereo `scoreChannel`, so a change is a
+ * 1 s crossfade. Built on Scrimshaw Jukebox's player (docs/audio/reference/scrimshaw-jukebox.html),
  * simonw/tools commit 5fc8e8b, Apache-2.0 (docs/audio/reference/LICENSE-scrimshaw-apache-2.0.txt); modified: game
  * integration (crossfades, pause / resume mid-song, intensity layers, dispose) replaces the page's player.
  */
 
-import * as Tone from 'tone'
-import { isAudioReady, scoreChannel } from '../AudioEngine'
+import { audioContext, audioNow as now, isAudioReady } from '../AudioEngine'
 import { fadeOutMusicBus, openMusicBus, type MusicBus } from '../musicBus'
 import { SCORES, scoreIdFor } from '../scores'
 import { compile, type CompiledSong } from './score'
@@ -15,7 +14,7 @@ import { ScoreScheduler } from './scheduler'
 import { createCore, createSynth, type Session, type Synth, type SynthCore } from './synth'
 
 const TICK_MS = 25
-/** First note this far after the call, past Tone's own look-ahead. */
+/** First note this far after the call. */
 export const SCORE_START_DELAY_S = 0.15
 const PAUSE_FADE_S = 0.05
 
@@ -42,11 +41,6 @@ let timer: number | null = null
 let manualClock = false
 /** The game's last `setIntensity`. */
 let targetIntensity = 0
-
-/** The game's raw context: the page's own AudioContext (`audio/tone.ts`), or an offline render's. */
-const rawContext = () => Tone.getContext().rawContext as unknown as BaseAudioContext
-/** Tone's clock: in an offline render it runs ahead of the raw context's. */
-const now = () => Tone.getContext().currentTime
 
 function songFor(id: string): CompiledSong {
   let song = songs.get(id)
@@ -110,8 +104,8 @@ export function playScore(id: string, from = 0): void {
   if (current) fadeOut(current)
   const song = songFor(id)
   const start = now() + SCORE_START_DELAY_S
-  const bus = openMusicBus(busName(id), start, scoreChannel)
-  const synth = createSynth(coreFor(rawContext()), bus.gain.input as unknown as AudioNode, { voicing: 'game' })
+  const bus = openMusicBus(busName(id), start)
+  const synth = createSynth(coreFor(audioContext()), bus.gain, { voicing: 'game' })
   // The intro plays every layer; the loop opens on the game's intensity.
   const intensity = from < song.intro.dur ? MAX_INTENSITY : targetIntensity
   const track: Track = {

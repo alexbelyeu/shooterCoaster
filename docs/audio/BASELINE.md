@@ -2,9 +2,9 @@
 
 Rendered 30 Oct 2026 (#213) from the Tone.js engine on `main`, with `npm run audio:render`
 at default settings (music volume 0.7, SFX 0.8). Every file is in `renders/` as
-`baseline-*.{mp3,json,png}`; the JSON has every number below and more. Re-render any of
-them with the command in its row and compare: the renders are deterministic (two runs
-gave identical metrics).
+`baseline-*.{mp3,json,png}`; the JSON has every number below and more. Tone.js was removed in
+#416, so these can no longer be re-rendered: they stay as the record of the old sound (the
+commands in the rows below now render the score engine and arcade SFX).
 
 Level music is rendered at intensity 0.45, which is where `LevelAudio` starts a run:
 pad + bass (+ the offbeat noise tick on the Theme Park). The lead only joins above 0.5,

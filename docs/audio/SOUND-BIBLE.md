@@ -91,7 +91,7 @@ These are measured on offline renders, at default settings, with nothing else pl
 - Keep a voice budget with priority stealing; no sound may grow the node count without
   bound. The smoke test checks the node count on the phone run, and the arcade engine's
   budget under `audioBurst(64, 32)`.
-- The arcade engine (`?audio=scrim`, `src/audio/arcade/`) bakes every one-shot from the score
+- The arcade engine (`src/audio/arcade/`, the only SFX engine since #416) bakes every one-shot from the score
   engine's own instruments when a level starts, so SFX and music share one palette and key.
   Positional: kills and hits pan with the enemy's place on screen and dull with distance (their louder channel keeps
   its level wherever they pan, so a kill at the crosshair is not 3 dB down: `panGain`); each
