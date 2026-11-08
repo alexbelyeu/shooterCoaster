@@ -1,0 +1,129 @@
+{
+  "name": "music-level5-base",
+  "kind": "music",
+  "request": {
+    "kind": "music",
+    "track": "level5",
+    "layers": 0,
+    "seconds": 20,
+    "engine": "scrim",
+    "seam": false
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.15,
+      "name": "level5 score"
+    },
+    {
+      "t": 3.35,
+      "name": "loop starts"
+    },
+    {
+      "t": 0.15,
+      "name": "intensity 0"
+    }
+  ],
+  "seams": [],
+  "bar": {
+    "startS": 3.35,
+    "barS": 1.6
+  },
+  "metrics": {
+    "seconds": 20,
+    "integrated": -17.1,
+    "shortTermMax": -16.7,
+    "lra": 0.6,
+    "truePeak": -10.3,
+    "clipped": 0,
+    "silence": 0.8,
+    "correlation": 0.969,
+    "below30Db": -40.5,
+    "bands": {
+      "sub": {
+        "pct": 1.8,
+        "db": -17.5
+      },
+      "low": {
+        "pct": 42.9,
+        "db": -3.7
+      },
+      "mid": {
+        "pct": 49.5,
+        "db": -3.1
+      },
+      "presence": {
+        "pct": 5.8,
+        "db": -12.3
+      },
+      "air": {
+        "pct": 0,
+        "db": -34.5
+      },
+      "below30": {
+        "pct": 0,
+        "db": -40.5
+      }
+    },
+    "seamJumps": [],
+    "seamJumpMax": null
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -17.1,
+      "unit": "LUFS",
+      "min": -18,
+      "max": -16,
+      "status": "pass"
+    },
+    {
+      "label": "Short-term max",
+      "value": -16.7,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -10.3,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -40.5,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 0.969,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 0.6,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 0.8,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}
