@@ -2,8 +2,9 @@
 // `agent:qa-approved` once the `verify` check is green on their head commit.
 //
 // Run by .github/workflows/automerge.yml (actions/github-script) on PR events, after
-// every CI run, and as a sweep every 10 minutes, so a missed or stale event can't
-// strand an approved PR. Each run picks its candidate PRs, puts every one through the
+// every CI run whatever its conclusion, and as a best-effort scheduled sweep (GitHub
+// runs it every few hours, not every 10 minutes), so a missed or stale event can't
+// strand an approved PR for good. Each run picks its candidate PRs, puts every one through the
 // same checks, merges what passes and says why it skipped the rest: a PR comment
 // (once per reason and head) for approved PRs, and one line per PR in the job summary.
 // An approved PR that conflicts with main goes back to Fix instead of sitting approved,
@@ -61,10 +62,10 @@ function decide(pr, verify, repoFullName) {
 }
 
 const skipComment = (reason, sha) =>
-  `Auto-merge skipped: ${reason}.\nHead: \`${sha}\`. Retried every 10 minutes and after every CI run.`
+  `Auto-merge skipped: ${reason}.\nHead: \`${sha}\`. Retried after every CI run and on the scheduled sweep.`
 
 const failComment = (message, sha) =>
-  `Auto-merge failed: ${message}\nHead: \`${sha}\`. Retried every 10 minutes and after every CI run.`
+  `Auto-merge failed: ${message}\nHead: \`${sha}\`. Retried after every CI run and on the scheduled sweep.`
 
 /**
  * GitHub's merge API answers a conflict with "Pull Request is not mergeable" or, when the
@@ -117,7 +118,7 @@ async function candidates(api, event, payload, owner, log) {
   ])
   const numbers = unionNumbers(run.pull_requests || [], byBranch, byCommit.filter((p) => p.state === 'open'))
   if (!numbers.length && run.head_branch?.startsWith('agent/')) {
-    log.warning(`CI run ${run.id} on ${run.head_branch} (${run.head_sha.slice(0, 7)}): no open PR found; the 10-minute sweep will pick it up if it is approved`)
+    log.warning(`CI run ${run.id} on ${run.head_branch} (${run.head_sha.slice(0, 7)}): no open PR found; the scheduled sweep will pick it up if it is approved`)
   }
   return numbers
 }
