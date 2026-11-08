@@ -72,7 +72,7 @@ export default function BiomeEnvironment({
       <mesh geometry={groundGeo} material={groundMat} />
 
       {/* Water (ocean level) */}
-      {hasWater && <OceanWater atmosphere={atmosphere} />}
+      {hasWater && <OceanWater atmosphere={atmosphere} groundFn={groundFn} terrainSize={getTerrainMeshSize(biome)} />}
 
       {/* Trees */}
       {hasTrees && treeCount > 0 && def.trees && (
