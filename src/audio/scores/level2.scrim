@@ -1,40 +1,59 @@
-title    Sunbleached
-composer Claude (ShooterCoaster placeholder)
-about    Placeholder Desert score that proves the score engine. Harmonic-minor oboe over guitar arpeggios and hand drums on a straight kick.
-tempo    140
+title    Dune Rider
+composer Claude (ShooterCoaster)
+about    Desert (level2), Alex's pick (#391): fast desert trance in F minor. A plucked harpsichord ostinato (a qanun stand-in) runs sixteenths through the Phrygian G-flat chord, congas and bongos ride a four-on-the-floor bigkick, and a supersaw carries the hook. The last eight bars lift a tone. Layers: the supersaw hook, ostinato, rolling FM bass and hand drums from the start, then the kit at 2x, a twang guitar doubling the hook an octave down at 3x, sixteenth hats at FRENZY.
+tempo    168
 beats    4
-steps    2
-reverb   0.3
+steps    4
+reverb   0.24
 
-voice lead   oboe     vol=0.75 pan=-0.1
-voice gtr    guitar   vol=0.6  pan=0.3
-voice bass   fretless vol=0.8  oct=1
-voice kick   kick     vol=0.8
-voice conga  conga    vol=0.5  pan=-0.35
-voice bongo  bongo    vol=0.45 pan=0.35
-voice tamb   tamb     vol=0.4  pan=0.45
+# untagged voices are the base layer, the hook among them (layers only add); the intro plays every layer
+voice ost    harpsichord vol=0.3  pan=0.3
+voice bass   fmbass      vol=0.6  gate=0.6
+voice conga  conga       vol=0.5  pan=-0.35
+voice bongo  bongo       vol=0.44 pan=0.4
+voice kick   bigkick     vol=0.52 layer=drums
+voice clap   clap909     vol=0.42 pan=0.05 layer=drums
+voice ohat   ohat909     vol=0.24 pan=-0.25 layer=drums
+voice crash  crash       vol=0.32 pan=-0.2 layer=drums
+voice rise   riser       vol=0.28 layer=drums
+voice lead   supersaw    vol=0.8
+voice twang  guitar      vol=0.55 pan=-0.3 oct=-1 bright=1.4 layer=lead
+voice hat    hat909      vol=0.3  pan=0.3 layer=frenzy
 
 pattern intro
-gtr   | A3 E4 A4 C5 A4 E4 A3 E4 | E3 B3 E4 G#4 E4 B3 E3 B3 |
-conga | ..x. x.xx | ..x. xxxx |
+ost   | F4 C5 Ab4 C5 F4 C5 Ab4 C5 F4 C5 Ab4 C5 F4 C5 Ab4 C5 | E4 C5 G4 Bb4 E4 C5 G4 Bb4 E4 C5 G4 Bb4 E4 C5 G4 Bb4 |
+rise  | _ | F5--------------- |
+conga | ..x. x..x ..x. x.x. | ..x. x..x xxxx XXXX |
+kick  | x... .... x... .... | x... x... x... x.x. |
 
 pattern A
-lead  | A4- C5 B4 A4- E5- | D5 C5 B4 C5 D5--- | C5 B4 A4 G#4 A4- C5- | B4--- G#4- E4- |
-gtr   | A3 E4 A4 C5 A4 E4 A3 E4 | G3 D4 G4 B4 G4 D4 G3 D4 | F3 C4 F4 A4 F4 C4 F3 C4 | E3 B3 E4 G#4 E4 B3 E3 B3 |
-bass  | A1--- A1- E2- | G1--- G1- D2- | F1--- F1- C2- | E1--- E1- B1- |
-kick  | x... x... | % | % | % |
-conga | ..x. x.xx | % | % | % |
-bongo | .x.. .x.x | % | % | % |
-tamb  | .x.x .x.x | % | % | % |
+lead  | C5--- Ab4- C5- F5--- Eb5- C5- | Db5--- C5- Bb4- Ab4--- Gb4- F4- | C5--- Ab4- C5- F5- G5- Ab5- G5- | E5------- C5------- |
+ost   | F4 C5 Ab4 C5 F4 C5 Ab4 C5 F4 C5 Ab4 C5 F4 C5 Ab4 C5 | Gb4 Db5 Bb4 Db5 Gb4 Db5 Bb4 Db5 Gb4 Db5 Bb4 Db5 Gb4 Db5 Bb4 Db5 | F4 C5 Ab4 C5 F4 C5 Ab4 C5 F4 C5 Ab4 C5 F4 C5 Ab4 C5 | E4 C5 G4 Bb4 E4 C5 G4 Bb4 E4 C5 G4 Bb4 E4 C5 G4 Bb4 |
+bass  | .- F2- .- F2- .- F2- .- F3- | .- Gb2- .- Gb2- .- Gb2- .- Gb3- | .- F2- .- F2- .- F2- .- F3- | .- C3- .- C3- .- C3- .- E2- |
+conga | ..x. x..x ..x. x.x. | % | % | % |
+bongo | x.o. .xo. x.o. .xo. | % | % | % |
+kick  | x... x... x... x... | % | % | % |
+clap  | .... x... .... x... | % | % | .... x... .... x.xx |
+ohat  | ..x. ..x. ..x. ..x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+twang | C5--- Ab4- C5- F5--- Eb5- C5- | Db5--- C5- Bb4- Ab4--- Gb4- F4- | C5--- Ab4- C5- F5- G5- Ab5- G5- | E5------- C5------- |
+hat   | xxxx xxxx xxxx xxxx | % | % | % |
 
-pattern B
-lead  | F5- E5 D5 F5- A5- | E5- C5 B4 A4--- | G#4 A4 B4 C5 D5 C5 B4 G#4 | A4------- |
-gtr   | D3 A3 D4 F4 D4 A3 D3 A3 | A3 E4 A4 C5 A4 E4 A3 E4 | E3 B3 E4 G#4 E4 B3 E3 B3 | A3 E4 A4 C5 E5--- |
-bass  | D2--- D2- A1- | A1--- A1- E2- | E1--- E1- B1- | A1--- A1- E2- |
-kick  | x... x... | % | % | % |
-conga | ..x. x.xx | % | % | ..x. xxXX |
-bongo | .x.. .x.x | % | % | % |
-tamb  | .x.x .x.x | % | % | % |
+pattern A2 from A
+lead  | C5--- Ab4- C5- F5--- Eb5- C5- | Db5--- C5- Bb4- Ab4--- Gb4- F4- | C5--- Ab4- C5- F5- G5- Ab5- Bb5- | C6------- G5--- E5--- |
+twang | C5--- Ab4- C5- F5--- Eb5- C5- | Db5--- C5- Bb4- Ab4--- Gb4- F4- | C5--- Ab4- C5- F5- G5- Ab5- Bb5- | C6------- G5--- E5--- |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+lead  | F5------- Ab5--- F5--- | G5------- Bb5--- G5--- | E5--- G5--- C6--- Bb5--- | Ab5- G5- F5- E5- C5------- |
+ost   | F4 Db5 Ab4 Db5 F4 Db5 Ab4 Db5 F4 Db5 Ab4 Db5 F4 Db5 Ab4 Db5 | G4 Eb5 Bb4 Eb5 G4 Eb5 Bb4 Eb5 G4 Eb5 Bb4 Eb5 G4 Eb5 Bb4 Eb5 | E4 C5 G4 C5 E4 C5 G4 C5 E4 C5 G4 C5 E4 C5 G4 C5 | E4 C5 G4 Bb4 E4 C5 G4 Bb4 E4 C5 G4 Bb4 E4 C5 G4 Bb4 |
+bass  | .- Db2- .- Db2- .- Db2- .- Db3- | .- Eb2- .- Eb2- .- Eb2- .- Eb3- | .- C3- .- C3- .- C3- .- C2- | .- C3- .- C3- .- C3- .- E2- |
+twang | F5------- Ab5--- F5--- | G5------- Bb5--- G5--- | E5--- G5--- C6--- Bb5--- | Ab5- G5- F5- E5- C5------- |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern B2 from B
+rise  | _ | _ | _ | F5--------------- |
+clap  | .... x... .... x... | % | % | ..x. x.x. xxxx XXXX |
 
 play intro
-loop A B
+loop A A2 B B2 A A2 A+2 A2+2
