@@ -33,6 +33,12 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
   transcript (`~/.claude/projects/**`). Don't re-read a file you edited: Edit fails if it didn't apply.
 - **Fewer, fuller turns.** Make independent tool calls in one message, chain related short commands
   with `&&`, and make a file's changes in as few Edits as they need.
+- **Context × turns is the bill.** Every turn re-reads the whole context at 0.1 per token, so 260 turns
+  at 300–400k is ~6M on its own with no cache miss at all (#429: the 8 Nov audio run, 7.1M, 85% of it
+  cache reads). Learn a module from `grep -n '^export\|^function\|^const'` and read only the functions
+  you will change; never pull several modules into one command to get the picture (that run's heaviest
+  results were `cat a.ts b.ts c.ts`, 13–20k characters each). Past ~200k context, stop reading for
+  understanding and finish with what you have.
 
 ## Do the work
 
@@ -46,7 +52,10 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
    and finish. CI runs the full `verify` and QA does a light re-review, so skip steps
    2–7 unless a conflict touched `src/` or `e2e/` (then do steps 3 and 7).
 2. Plan briefly, then implement. Stay inside the issue's scope; note follow-ups instead
-   of expanding scope.
+   of expanding scope. **Size it first:** if doing it properly means reading more than ~10 modules
+   or well over ~150 turns (an engine swap, a rewrite across a whole system), ship the first
+   self-contained slice that leaves `main` playable and file the rest as a follow-up issue with its
+   own Scope (hard rule 7), rather than carrying the whole rewrite in one context.
 3. Verify like a player. Run `scripts/ensure-browser.sh` once for the Chromium path (shell
    variables don't carry between commands, so prefix each smoke with `SC_CHROME=<that path>`). Iterate with
    `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build`, then the smoke as its own command:

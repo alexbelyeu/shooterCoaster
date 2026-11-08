@@ -147,7 +147,8 @@ on a PR; QA runs it on every sizeable PR.
 
 Everything you read stays in your context and is paid for again on every later turn
 (cache writes were half of all studio spend in late Oct 2026; the token ledger now logs
-each run's peak context, compactions, cache misses and heaviest tool results).
+each run's peak context, compactions, cache misses, heaviest tool results and, for a run with
+subagents, weighted tokens / turns / peak context per agent).
 
 - This file is already in your context: don't Read it again.
 - Run noisy commands through `bash scripts/quiet.sh` (`npm ci`, `npm test`, `npm run build`,

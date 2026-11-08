@@ -270,7 +270,10 @@ describe('heavy runs', () => {
   it('files one issue per role for runs over 5M in 48 h, with where the tokens went', () => {
     const f = findings(snap({
       ledgerRuns: [
-        run('builders', 7e6, 2, { missTokens: 2.8e6, misses: 13, missesAfter: ['Bash: sleep 590; tail -12 log'] }),
+        run('builders', 7e6, 2, {
+          missTokens: 2.8e6, misses: 13, missesAfter: ['Bash: sleep 590; tail -12 log'],
+          agents: [{ agent: 0, weighted: 0.3e6, turns: 20, peakContext: 90_000 }, { agent: 1, weighted: 6.7e6, turns: 240, peakContext: 399_000 }],
+        }),
         run('builders', 6e6, 10),
         run('qa', 1e6, 1),
         run('maintainer', 9e6, 60),
@@ -280,6 +283,7 @@ describe('heavy runs', () => {
     expect(f[0].title).toBe('Token-heavy builders runs: 2 over 5M in 48 h')
     expect(f[0].body).toContain('2.8M of it 13 cache misses')
     expect(f[0].body).toContain('sleep 590')
+    expect(f[0].body).toContain('by agent: main 0.3M / 20 turns / peak 90k, #1 6.7M / 240 turns / peak 399k')
     expect(f[0].lastSeen).toBe(NOW - 2 * H)
   })
 })
