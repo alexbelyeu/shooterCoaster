@@ -161,6 +161,8 @@ export interface SCTestApi {
   rideRate: number | null
   /** Seconds since the title appeared, held: the title camera's pose stays there (the poster render, `npm run og -- --poster`). null runs it. */
   titleTime: number | null
+  /** Idle ms before the title's attract mode (#419); null (every `?e2e=1` page starts so) never enters it. */
+  titleAttractIdleMs: number | null
   /** Drawn bullets (#165): count, largest screen radius (fraction of canvas height) now and since load, newest one's CSS px point. */
   bullets: () => E2EBullets
   /** Fire one real shot through NDC (x, y), like a click there. False if not fired (phase, fire delay). */
@@ -433,6 +435,11 @@ export function levelTimeHeld(): boolean {
 export function e2eRideSeconds(delta: number): number | null {
   const rate = isE2E ? window.__SC_TEST__?.rideRate : null
   return rate == null ? null : levelTimeStep(delta) * rate
+}
+
+/** Idle ms before the title's attract mode: `idleMs` in the game, the test's `titleAttractIdleMs` under e2e (null: never). */
+export function e2eAttractIdleMs(idleMs: number): number | null {
+  return isE2E ? (window.__SC_TEST__?.titleAttractIdleMs ?? null) : idleMs
 }
 
 /** The title camera's time when a test holds it (`titleTime`), else null. */
@@ -769,6 +776,7 @@ export function installE2EApi() {
     holdLevelTime: false,
     rideRate: null,
     titleTime: null,
+    titleAttractIdleMs: null,
     bullets: readBullets,
     fireShot: (x: number, y: number) => (probeCamera ? fireAtNDC(x, y, probeCamera) : false),
     shaderWarmup: null,

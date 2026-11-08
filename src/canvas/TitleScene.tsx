@@ -5,8 +5,12 @@ import * as THREE from 'three'
 import { createRng } from '@/utils/rng'
 import FerrisWheel from '@/levels/environments/FerrisWheel'
 import Carousel from '@/levels/environments/Carousel'
-import { titleCameraPose, type Vec3 } from './titleCamera'
+import { BLEND_S, beatLockedRate, blendPose, titleCameraPose, titleShotS, type TitleCameraMode, type Vec3 } from './titleCamera'
+import { createTitleRide, type TitleRide } from './titleCoaster'
+import TitleCoaster, { type TitleClock } from './TitleCoaster'
+import { consumeClickSwallow, isTitleAttract } from './titleAttract'
 import TitleSparkles from './TitleSparkles'
+import { audioClockNow, titleBeatGrid } from '@/audio/TitleMusicManager'
 import { isUiTarget } from '@/input/pointerInput'
 import { markStartup } from '@/core/startupMarks'
 import { e2eTitleTime } from '@/testing/e2eHook'
@@ -20,21 +24,50 @@ const BALLOON_COLORS = ['#ff4444', '#ff8800', '#ffcc00', '#44cc44', '#4488ff', '
 const FIRST_FRAMES = 5
 const FIRST_FRAME_STEP_S = 0.1
 
-/** Fly-by camera: the orbit and the low dolly of `titleCamera.ts`, taking turns. */
-function FlyByCamera() {
+/** Fly-by camera over `titleCamera.ts`'s menu or attract sequence, blending when the mode changes; advances `clock`. */
+function FlyByCamera({ ride, clock }: { ride: TitleRide; clock: TitleClock }) {
   const camRef = useRef<THREE.PerspectiveCamera>(null)
-  const elapsed = useRef(0)
   const frames = useRef(0)
+  const st = useRef({ menu: 0, attract: 0, mode: 'menu' as TitleCameraMode, switchedAt: -Infinity }).current
   const pos = useRef<Vec3>([0, 0, 0]).current
   const target = useRef<Vec3>([0, 0, 0]).current
+  const toPos = useRef<Vec3>([0, 0, 0]).current
+  const toTarget = useRef<Vec3>([0, 0, 0]).current
+  const ctx = useMemo(() => ({ ride, rideTime: 0 }), [ride])
 
   useFrame((_, delta) => {
     const cam = camRef.current
     if (!cam) return
     markStartup('titleFrame')
     const step = ++frames.current <= FIRST_FRAMES ? Math.min(delta, FIRST_FRAME_STEP_S) : delta
-    elapsed.current = e2eTitleTime() ?? elapsed.current + step
-    titleCameraPose(elapsed.current, pos, target)
+    const held = e2eTitleTime()
+    if (held !== null) {
+      clock.scene = ctx.rideTime = held
+      titleCameraPose(held, ctx, pos, target, isTitleAttract() ? 'attract' : 'menu')
+    } else {
+      clock.scene += step
+      ctx.rideTime = clock.scene
+      const mode: TitleCameraMode = isTitleAttract() ? 'attract' : 'menu'
+      if (mode !== st.mode) {
+        // Switching mid-blend keeps the pose continuous: pick the blend up where it stands.
+        const since = clock.scene - st.switchedAt
+        st.switchedAt = since < BLEND_S ? clock.scene - (BLEND_S - since) : clock.scene
+        st.mode = mode
+        if (mode === 'attract') st.attract = 0
+      }
+      const grid = titleBeatGrid()
+      const rate = beatLockedRate(st[mode], titleShotS(mode), grid, grid ? audioClockNow() : 0)
+      st[mode] += step * rate
+      const sinceSwitch = clock.scene - st.switchedAt
+      if (sinceSwitch < BLEND_S) {
+        const from: TitleCameraMode = mode === 'menu' ? 'attract' : 'menu'
+        titleCameraPose(st[from], ctx, pos, target, from)
+        titleCameraPose(st[mode], ctx, toPos, toTarget, mode)
+        blendPose(pos, target, toPos, toTarget, sinceSwitch / BLEND_S)
+      } else {
+        titleCameraPose(st[mode], ctx, pos, target, mode)
+      }
+    }
     cam.position.set(pos[0], pos[1], pos[2])
     cam.lookAt(target[0], target[1], target[2])
   })
@@ -79,7 +112,7 @@ function FlagPoles() {
     const items: { pos: [number, number, number]; color: string }[] = []
     for (let i = 0; i < 12; i++) {
       const angle = (i / 12) * Math.PI * 2 + 0.26
-      const r = 80 + (i % 3) * 30
+      const r = 80 + (i % 3) * 18
       items.push({
         pos: [Math.cos(angle) * r, 0, Math.sin(angle) * r],
         color: TENT_COLORS[i % TENT_COLORS.length],
@@ -148,7 +181,7 @@ function StringLights() {
 
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
-      <sphereGeometry args={[1, 8, 8]} />
+      <sphereGeometry args={[1, 6, 4]} />
       <meshStandardMaterial color="#ffffff" emissive="#ffcc44" emissiveIntensity={3} />
     </instancedMesh>
   )
@@ -253,7 +286,7 @@ function ShootableBalloon({
       <group ref={groupRef} position={position} onClick={handleClick}>
         {/* Balloon body — larger hitbox sphere */}
         <mesh>
-          <sphereGeometry args={[3, 12, 12]} />
+          <sphereGeometry args={[3, 10, 8]} />
           <meshStandardMaterial color={color} roughness={0.2} metalness={0.1} />
         </mesh>
         {/* Knot */}
@@ -339,6 +372,12 @@ function TitleClickRaycaster() {
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
+      // The tap that ended attract mode only brings the menu back: not PLAY, not a balloon.
+      if (consumeClickSwallow()) {
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
       // A click on a button or a dialog (Settings over the title) is the UI's; stopping it here would swallow it.
       if (isUiTarget(e.target) || (e.target instanceof Element && e.target.closest('[role="dialog"]'))) return
       ndc.set(
@@ -378,10 +417,12 @@ function TitleClickRaycaster() {
 /** Living theme-park panorama for the title screen */
 export default function TitleScene() {
   useEffect(prefetchLevelScene, [])
+  const ride = useMemo(createTitleRide, [])
+  const clock = useRef<TitleClock>({ scene: 0 }).current
 
   return (
     <>
-      <FlyByCamera />
+      <FlyByCamera ride={ride} clock={clock} />
 
       {/* Golden-hour sunset sky */}
       <Sky distance={4500} sunPosition={[50, 10, -100]} />
@@ -391,16 +432,19 @@ export default function TitleScene() {
       <directionalLight position={[50, 80, -40]} color="#ffd4a0" intensity={1.5} castShadow={false} />
       <ambientLight intensity={0.3} />
 
-      {/* Green ground */}
+      {/* Green ground, wide enough that the chase shots, looking along the loop, never see its edge */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
-        <planeGeometry args={[600, 600]} />
+        <planeGeometry args={[2400, 2400]} />
         <meshStandardMaterial color="#2d5a1e" />
       </mesh>
 
       {/* Rides */}
-      <FerrisWheel position={[80, 0, -60]} radius={80} />
+      {/* The coaster runs under the wheel's rim, outside its legs (titleCoaster.test.ts). */}
+      <FerrisWheel position={[50, 0, -75]} radius={80} />
       <Carousel position={[-60, 0, -40]} radius={25} />
       <Carousel position={[20, 0, 60]} radius={20} />
+
+      <TitleCoaster ride={ride} clock={clock} />
 
       {/* Decorations */}
       <Tents />

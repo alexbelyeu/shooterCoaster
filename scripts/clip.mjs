@@ -13,6 +13,8 @@
  *   --fps 30 --size 1280x720 (or 720x1280) --seed 1337 --intro 2.5 --select 1.5 --kill-every 1.5
  *   --gif-seconds 8 --out docs/marketing/media --url <running preview> --frames-only --encode-only
  *   --ride-only (title and level select still play, uncaptured: the clip opens on the ride)
+ *   --title (#419: the title screen alone for --seconds from its first frame, no PLAY: clip-title-<size>.mp4; --attract
+ *   starts it in attract mode, clip-title-attract-<size>.mp4)
  * A portrait --size renders as a phone (touch emulated, so the page takes its touch-only layout) and makes no GIF.
  */
 import { execFileSync } from 'node:child_process'
@@ -34,10 +36,12 @@ const OUT_DIR = path.resolve(arg('out', 'docs/marketing/media'))
 const FRAMES_ONLY = process.argv.includes('--frames-only')
 const ENCODE_ONLY = process.argv.includes('--encode-only')
 const RIDE_ONLY = process.argv.includes('--ride-only')
+const TITLE = process.argv.includes('--title')
+const ATTRACT = TITLE && process.argv.includes('--attract')
 const [WIDTH, HEIGHT] = SIZE.split('x').map(Number)
 const PORTRAIT = HEIGHT > WIDTH
 const FRAME_DIR = path.resolve('e2e-results/clip', SIZE)
-const NAME = `clip-${LEVEL}-${SIZE}`
+const NAME = TITLE ? `clip-title${ATTRACT ? '-attract' : ''}-${SIZE}` : `clip-${LEVEL}-${SIZE}`
 /** The fake clock ticks whole ms; a constant step keeps motion even (30 fps → 33 ms, 1% slow). */
 const STEP_MS = Math.round(1000 / FPS)
 const MAX_MP4_BYTES = 3 * 1024 * 1024
@@ -146,6 +150,7 @@ async function render(browser, url) {
   await page.goto(`${url}/?e2e=1&seed=${SEED}`)
   // Boot needs timers to run (canvas measure debounce); nothing is captured yet.
   await settle('the game to boot', 50, () => window.__SC_TEST__?.levels().length > 0 && window.__SC_TEST__.frames >= 3)
+  if (TITLE) return renderTitle()
   // Starring every level before LEVEL unlocks it and puts the level select's first focus on it.
   const unlocked = await hook((id) => {
     const t = window.__SC_TEST__
@@ -157,6 +162,13 @@ async function render(browser, url) {
     return t.levels().find((l) => l.id === id).unlocked
   }, LEVEL)
   if (!unlocked) throw new Error(`clip: unknown level ${LEVEL}, or still locked after starring the levels before it`)
+
+  async function renderTitle() {
+    if (ATTRACT) await hook(() => (window.__SC_TEST__.titleAttractIdleMs = 0))
+    await capture(Math.round(RIDE_S * FPS))
+    const errors = await hook(() => window.__SC_TEST__.errors)
+    return { frames: captured, rideStart: 0, renderSeconds: Math.round((Date.now() - started) / 1000), errors: [...errors, ...pageErrors] }
+  }
 
   const menus = !RIDE_ONLY
   await capture(Math.round(INTRO_S * FPS), undefined, menus)
@@ -283,8 +295,9 @@ if (ENCODE_ONLY) {
     if (!given) preview = await startPreview()
     browser = await launchBrowser()
     const run = await render(browser, given ?? preview.url)
-    fs.writeFileSync(RUN_FILE, JSON.stringify({ level: LEVEL, size: SIZE, fps: FPS, from: FROM, seed: SEED, ...run }, null, 2))
-    console.log(
+    fs.writeFileSync(RUN_FILE, JSON.stringify({ level: TITLE ? 'title' : LEVEL, size: SIZE, fps: FPS, from: FROM, seed: SEED, ...run }, null, 2))
+    if (TITLE) console.log(`clip: ${run.frames} title frames in ${run.renderSeconds} s`)
+    else console.log(
       `clip: ${run.frames} frames (ride from frame ${run.rideStart + 1}) in ${run.renderSeconds} s; ` +
         `ride kills ${run.kills} (${run.assistedKills} via killNearest), shots ${run.shots}, score ${run.score}, ` +
         `seed ${run.runSeed}, spawns ${run.spawnDigest}`,

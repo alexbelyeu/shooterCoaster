@@ -4,7 +4,8 @@ import { nextTriggerTime } from './triggerTime'
 import { dropSound, guarded } from './soundGuard'
 import { sfxChannel, isAudioReady } from './AudioEngine'
 import { MUSIC_FADE_S, fadeOutMusicBus, openMusicBus, startTransportAt, type MusicBus } from './musicBus'
-import { MUSIC_ENGINE, withScrim } from './musicEngine'
+import { MUSIC_ENGINE, scrimPlayer, withScrim } from './musicEngine'
+import type { MusicGrid } from './scrim/player'
 
 /**
  * Whimsical carnival title-screen music.
@@ -35,6 +36,17 @@ let track: TitleTrack | null = null
 const TITLE_BPM = 108
 /** Offline renders: melody, pad and bass all repeat every 4 bars (the sparkle chimes are random). */
 export const TITLE_LOOP = { barS: (4 * 60) / TITLE_BPM, bars: 4 }
+const toneGrid: MusicGrid = { origin: 0, beatS: 60 / TITLE_BPM, beats: 4 }
+
+/** The title music's beat grid on the audio clock (`audioClockNow`), for the title's cuts and logo hits (#419); null without music. */
+export function titleBeatGrid(): MusicGrid | null {
+  if (!track || !isAudioReady()) return null
+  return track.music ? toneGrid : (scrimPlayer()?.musicGrid() ?? null)
+}
+
+export function audioClockNow(): number {
+  return tone().getContext().currentTime
+}
 
 // — Melody: music-box calliope feel, 2-bar phrase ————————————
 const melodyNotes = [
@@ -154,6 +166,7 @@ export function startTitleMusic(): void {
     return
   }
   const start = startTransportAt(TITLE_BPM)
+  toneGrid.origin = start.time
   const t = createMusic(start.time)
   const { melodyBox, padSynth, bassSynth, chimeSynth, tamb } = t
   track = { ...createWhoosh(), music: t }
