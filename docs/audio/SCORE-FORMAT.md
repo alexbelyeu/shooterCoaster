@@ -63,21 +63,25 @@ Not there yet (a later issue): beat-quantised stingers. It gets a row here when 
 ## Intensity layers
 
 A level's score reacts to play. Tag each voice with the layer it belongs to; the game sets
-the intensity from the combo tier, and each voice sounds once its layer is in:
+the intensity from the combo tier, and each voice sounds once its layer is in. **`base` is the
+whole song as it renders, tune included; the layers only add energy on top of it** (#415): a run
+opens on `base` alone, and a lost combo takes the layers away again, so a tune in a higher layer
+goes missing for most of a run.
 
 | Intensity | Combo tier | Plays |
 |---|---|---|
-| 0 | 1× (and the run's start) | `base` (every untagged voice) |
+| 0 | 1× (and the run's start) | `base` (every untagged voice): the whole song, melody included |
 | 1 | 2× | + `drums` |
-| 2 | 3× | + `lead` |
+| 2 | 3× | + `lead`: an added line (a doubling, harmony or counter-melody), never the tune itself |
 | 3 | 5× FRENZY | + `frenzy`, and the score's low-pass opens |
 
 ```
 voice skank  accordion vol=0.35 center=A4 gate=0.5   # untagged: base
 voice tuba   tuba      vol=0.8  oct=1
+voice lead   organ     vol=0.75                       # the riff: base
 voice kick   kick      vol=0.85 layer=drums
-voice lead   organ     vol=0.75 layer=lead
-voice saw    supersaw  vol=0.42 oct=1 layer=frenzy    # doubles the lead an octave up
+voice xylo   xylophone vol=0.45 layer=lead            # doubles the riff two octaves up
+voice saw    supersaw  vol=0.42 oct=1 layer=frenzy    # doubles the riff an octave up
 voice fhat   hat909    vol=0.42 pan=0.4 layer=frenzy  # fills the hats out to straight eighths
 ```
 
@@ -94,15 +98,19 @@ voice fhat   hat909    vol=0.42 pan=0.4 layer=frenzy  # fills the hats out to st
 - Every voice keeps playing its notes when its layer is out (silently), so a layer that comes
   in mid-phrase picks the phrase up where it is. The layers are each voice's own level gain:
   no extra nodes; the low-pass is one more per track.
-- **Writing for layers**: `base` must carry the loop alone (bass and a harmonic pulse; it
-  plays in every bar, `scores.test.ts` checks it), `drums` the groove, `lead` the hook, and
-  `frenzy` the lift: double-time hats, an extra lead an octave up or a counter-line, stabs.
+- **Writing for layers**: `base` must carry the loop alone: the tune, bass and a harmonic
+  pulse (it plays in every bar, `scores.test.ts` checks it), `drums` the groove, `lead` what
+  joins the tune at 3× (an octave doubling, a harmony, a counter-melody, stabs), and `frenzy`
+  the lift: double-time hats, an extra lead an octave up or a counter-line. `lintLayers`
+  (`scrim/lint.ts`, run on every score by `scores.test.ts`) fails a pitched voice in a higher
+  layer that plays higher than every base voice (by its loop's mean top note) without doubling
+  one base voice note for note.
   The compressor holds the music's loudness nearly level as layers come in (level1:
   −16.6 LUFS on base, −17 at FRENZY), so the layers add density and brightness, not volume.
 - Hear them: `npm run audio:render -- --music level1 --engine scrim --layers <0..3>`
   holds one intensity; `--layers ramp` climbs through every layer and loses the combo
-  (`renders/scrim-music-level1` is the ramp, `scrim-music-level1-{base,full,frenzy}` hold 0, 2
-  and 3). In the game, `?audio=scrim`.
+  (`renders/scrim-music-level1` is the ramp, `scrim-music-<id>-base` holds 0 for each level,
+  `scrim-music-level1-{full,frenzy}` hold 2 and 3). In the game, `?audio=scrim`.
 
 ## Instruments
 
