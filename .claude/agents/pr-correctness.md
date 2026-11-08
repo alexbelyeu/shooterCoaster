@@ -34,7 +34,7 @@ Work hunk by hunk and ask what input, frame or sequence makes this wrong:
 - **Frame-rate dependence**: motion, timers or decay that ignore `delta`, so a
   20 fps phone plays differently from a 120 Hz monitor; huge `delta` after a tab
   switch or the pause screen.
-- **Lifetimes**: three.js geometries/materials/textures and Tone.js nodes created
+- **Lifetimes**: three.js geometries/materials/textures and Web Audio nodes created
   but never disposed; `eventBus.on` / `addEventListener` without the matching
   off in cleanup; pooled objects returned twice or never.
 - **Level and phase transitions**: state, pools, timers, combo and score that

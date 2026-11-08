@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ARCADE_SOUNDS, KILL_TIMBRES, PRIO, VOICE_BUDGET, bossHitRate, hitRate, keyNote, killRate, nextBeat, panGain, pickVoice, spatial,
+  ARCADE_SOUNDS, KILL_SOUNDS, PRIO, VOICE_BUDGET, bossHitRate, hitRate, keyNote, killRate, nextBeat, panGain, pickVoice, spatial,
   type ArcadeSoundId, type VoiceState,
 } from '../sfxDesign'
 import { RECIPES } from './recipes'
@@ -106,7 +106,7 @@ describe('recipes', () => {
   it('every arcade sound has exactly one recipe, and every kill timbre a body', () => {
     const ids = RECIPES.map((r) => r.id).sort()
     expect(ids).toEqual((Object.keys(ARCADE_SOUNDS) as ArcadeSoundId[]).sort())
-    for (const sound of Object.keys(KILL_TIMBRES)) expect(ids).toContain(`kill.${sound}`)
+    for (const sound of KILL_SOUNDS) expect(ids).toContain(`kill.${sound}`)
   })
 
   it('guns stay dry and short, so they are silent within 150 ms', () => {

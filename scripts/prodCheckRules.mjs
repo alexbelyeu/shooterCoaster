@@ -1,7 +1,7 @@
 /** Pure rules of the deploy health check (`e2e/prod-check.mjs`, #352). */
 import { headersFor } from './vercelRoutes.mjs'
 
-/** `tone-BAgUArOt.js` → `tone.js` (Vite's `[name]-[hash]`). */
+/** `synth-B7_magx8.js` → `synth.js` (Vite's `[name]-[hash]`). */
 export function assetStem(file) {
   const base = file.split('/').pop()
   const m = base.match(/^(.+)-[\w-]{8}(\.\w+)$/)

@@ -1,4 +1,4 @@
-/** Score texts the `?audio=scrim` engine plays (docs/audio/SCORE-FORMAT.md): the title, one per level id, and the results screen. */
+/** Score texts the score engine plays (docs/audio/SCORE-FORMAT.md): the title, one per level id, and the results screen. */
 import title from './title.scrim?raw'
 import level1 from './level1.scrim?raw'
 import level2 from './level2.scrim?raw'
@@ -9,7 +9,7 @@ import results from './results.scrim?raw'
 
 /**
  * Theme options waiting on Alex's pick (`Listen:` issue, sound bible "taste gate"): `themes/<slot>.<name>.scrim`, keyed
- * `<slot>.<name>`. None right now. They never play by default: `?audio=scrim&theme=<name>` puts one in its slot's place
+ * `<slot>.<name>`. None right now. They never play by default: `?theme=<name>` puts one in its slot's place
  * (`themesFromQuery`). Once Alex picks, the winner replaces `<slot>.scrim` and the options are deleted.
  */
 const THEME_OPTIONS: Record<string, string> = Object.fromEntries(

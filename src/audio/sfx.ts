@@ -1,9 +1,7 @@
-/** Every SFX goes through here: the Tone.js kit, or the arcade engine under `?audio=scrim` until parity (hard rule 7). */
+/** Every SFX goes through here: the arcade engine (`arcade/`), a lazy chunk loaded by the first `prepare`. */
 import * as THREE from 'three'
 import type { BiomeType } from '@/types/level'
 import type { WeaponId } from '@/combat/weapons/weaponTypes'
-import * as tone from './SFXManager'
-import { MUSIC_ENGINE, type MusicEngine } from './musicEngine'
 import { dropSound } from './soundGuard'
 import { spatial, type KillSound } from './sfxDesign'
 
@@ -21,7 +19,8 @@ export interface VoiceStats {
   rejected: number
 }
 
-export type UiSound = 'select' | 'back' | 'launch'
+/** `whoosh`: PLAY on the title, under its fade to black. */
+export type UiSound = 'select' | 'back' | 'launch' | 'whoosh'
 
 export interface SfxEngine {
   /** `level` null: the menus' sounds. */
@@ -35,7 +34,6 @@ export interface SfxEngine {
   frenzy(): void
   frenzyLift(on: boolean): void
   waveIncoming(): void
-  waveAnnounce(): void
   bossArrival(): void
   bossHit(hpFraction: number): void
   bossDefeat(): void
@@ -55,40 +53,10 @@ export interface SfxEngine {
   dispose(level?: string): void
 }
 
-const toneSfx: SfxEngine = {
-  prepare: (level, biome) => {
-    if (level) tone.prepareLevelSFX(biome)
-    return Promise.resolve()
-  },
-  fire: (auto, weapon) => tone.playFireSound(auto, weapon),
-  pickup: tone.playPickupChime,
-  hit: () => tone.playHitTick(),
-  kill: (combo, sound) => tone.playExplosionSound(combo, sound),
-  bossPart: (combo) => tone.playExplosionSound(combo),
-  comboBreak: tone.playComboBreak,
-  frenzy: () => {},
-  frenzyLift: () => {},
-  waveIncoming: () => {},
-  waveAnnounce: tone.playWaveStinger,
-  bossArrival: tone.playBossStinger,
-  bossHit: (hpFraction) => tone.playBossHit({ hpFraction }),
-  bossDefeat: tone.playBossDefeat,
-  fireworkWhistle: (flightS, timeScale) => tone.playFireworkWhistle({ flightS, timeScale }),
-  fireworkPop: tone.playFireworkPop,
-  starChime: tone.playStarChime,
-  ui: () => {},
-  countdown: () => {},
-  wind: tone.setWind,
-  nodeCount: tone.sfxNodeCount,
-  killsPlayed: tone.sfxKillsPlayed,
-  voices: () => null,
-  dispose: () => tone.disposeSFX(),
-}
-
 type ArcadeModule = typeof import('./arcade/engine')
 let arcadeModule: Promise<ArcadeModule> | null = null
 
-/** Loaded on first use, so default players never download it. */
+/** Loaded on first use, after the first gesture. */
 export function loadArcade(): Promise<ArcadeModule> {
   arcadeModule ??= import('./arcade/engine').then((m) => {
     if (active === pendingArcade) active = m.arcadeSfx
@@ -102,7 +70,7 @@ const silent = () => {}
 export const silentSfx: SfxEngine = {
   prepare: () => Promise.resolve(),
   fire: silent, pickup: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, frenzy: silent, frenzyLift: silent,
-  waveIncoming: silent, waveAnnounce: silent, bossArrival: silent, bossHit: silent, bossDefeat: silent,
+  waveIncoming: silent, bossArrival: silent, bossHit: silent, bossDefeat: silent,
   fireworkWhistle: silent, fireworkPop: silent, starChime: silent, ui: silent, countdown: silent, wind: silent,
   nodeCount: () => 0,
   killsPlayed: () => 0,
@@ -116,20 +84,15 @@ const pendingArcade: SfxEngine = {
   prepare: (level, biome) => loadArcade().then((m) => m.arcadeSfx.prepare(level, biome)),
 }
 
-let active: SfxEngine = MUSIC_ENGINE === 'scrim' ? pendingArcade : toneSfx
+let active: SfxEngine = pendingArcade
 
 export function sfx(): SfxEngine {
   return active
 }
 
-/** `audioRender.ts`: a render's engine, whatever this page plays. */
-export async function sfxEngine(engine: MusicEngine): Promise<SfxEngine> {
-  return engine === 'scrim' ? (await loadArcade()).arcadeSfx : toneSfx
-}
-
-/** A failed bake drops the level's sounds, never the page. */
-export function prepareSfx(level: string | null, biome: BiomeType): void {
-  active.prepare(level, biome).catch((e) => dropSound('sfx prepare', e))
+/** A failed bake drops the level's sounds, never the page; the promise never rejects. */
+export function prepareSfx(level: string | null, biome: BiomeType): Promise<void> {
+  return active.prepare(level, biome).catch((e) => dropSound('sfx prepare', e))
 }
 
 let listener: THREE.Camera | null = null

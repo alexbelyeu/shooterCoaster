@@ -208,7 +208,7 @@ QA reviews reverts first — then reopen the original issue with what went wrong
   summary: `npm run verify > /tmp/verify.log 2>&1; grep -E '^(PASS|FAIL)|Tests |error' /tmp/verify.log; tail -n 40 /tmp/verify.log`.
   Never dump full logs, `results.json` (query it with `node -e` / `jq`) or long diffs
   into the conversation; every line you print is re-read on every later turn.
-- No image, model or audio generation tools. Visuals come from code: procedural geometry, shaders, instancing, post-processing. Audio is synthesised in code: Tone.js today, and the Scrimshaw-based engine replacing it (`docs/audio/`). You can't hear audio, but you can render it offline in headless Chromium and measure it (ffmpeg `ebur128`, spectrogram PNGs you read with the Read tool): see `docs/audio/reference/README.md`.
+- No image, model or audio generation tools. Visuals come from code: procedural geometry, shaders, instancing, post-processing. Audio is synthesised in code, in plain Web Audio: the Scrimshaw-based score engine and the arcade SFX (`docs/audio/`). You can't hear audio, but you can render it offline in headless Chromium and measure it (ffmpeg `ebur128`, spectrogram PNGs you read with the Read tool): see `docs/audio/reference/README.md`.
 
 ## Commits
 

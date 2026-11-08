@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { isInternalThisLoad } from '@/app/analyticsGate'
-import { initAudio } from '@/audio/AudioEngine'
+import { audioNow, initAudio } from '@/audio/AudioEngine'
 import { prepareSfx } from '@/audio/sfx'
 import { useGameStore } from '@/store/useGameStore'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
@@ -8,7 +8,7 @@ import { motion } from 'framer-motion'
 import { markStartup } from '@/core/startupMarks'
 import { startsGame } from './titleKeys'
 import { handPosterToUi, posterShown } from '@/app/poster'
-import { audioClockNow, titleBeatGrid } from '@/audio/TitleMusicManager'
+import { titleBeatGrid } from '@/audio/titleMusic'
 import { ATTRACT_IDLE_MS, armClickSwallow, setTitleAttract } from '@/canvas/titleAttract'
 import { e2eAttractIdleMs } from '@/testing/e2eHook'
 import { logoBeat } from './titleBeat'
@@ -31,15 +31,15 @@ interface TitleScreenProps {
   onSettings?: () => void
 }
 
-/** PLAY waits this long at most for Tone's chunk: the title music starts from App's `whenAudioReady` when it lands. */
+/** PLAY waits this long at most for audio and the menu sounds (its whoosh): the title music starts from App's `whenAudioReady`. */
 const PLAY_AUDIO_WAIT_MS = 300
 
 /** Every call resumes the context inside its gesture (`initAudio`), so the PLAY click retries what a touch pointerdown couldn't. */
 function startAudio(): Promise<void> {
   return initAudio().then(() => {
-    // A level that mounted before Tone landed has prepared its own kit already.
+    // A level that mounted before audio unlocked has prepared its own sounds already.
     const { phase } = useGameStore.getState()
-    if (phase === 'title' || phase === 'levelSelect') prepareSfx(null, 'themePark')
+    if (phase === 'title' || phase === 'levelSelect') return prepareSfx(null, 'themePark')
   })
 }
 
@@ -101,7 +101,7 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
     const tick = () => {
       raf = requestAnimationFrame(tick)
       const grid = titleBeatGrid()
-      const v = grid ? logoBeat(audioClockNow(), grid) : 0
+      const v = grid ? logoBeat(audioNow(), grid) : 0
       if (Math.abs(v - last) < 0.005) return
       last = v
       logoRef.current?.style.setProperty('--logo-beat', v.toFixed(3))

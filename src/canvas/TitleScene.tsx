@@ -10,7 +10,8 @@ import { createTitleRide, type TitleRide } from './titleCoaster'
 import TitleCoaster, { type TitleClock } from './TitleCoaster'
 import { consumeClickSwallow, isTitleAttract } from './titleAttract'
 import TitleSparkles from './TitleSparkles'
-import { audioClockNow, titleBeatGrid } from '@/audio/TitleMusicManager'
+import { audioNow } from '@/audio/AudioEngine'
+import { titleBeatGrid } from '@/audio/titleMusic'
 import { isUiTarget } from '@/input/pointerInput'
 import { markStartup } from '@/core/startupMarks'
 import { e2eTitleTime } from '@/testing/e2eHook'
@@ -56,7 +57,7 @@ function FlyByCamera({ ride, clock }: { ride: TitleRide; clock: TitleClock }) {
         if (mode === 'attract') st.attract = 0
       }
       const grid = titleBeatGrid()
-      const rate = beatLockedRate(st[mode], titleShotS(mode), grid, grid ? audioClockNow() : 0)
+      const rate = beatLockedRate(st[mode], titleShotS(mode), grid, grid ? audioNow() : 0)
       st[mode] += step * rate
       const sinceSwitch = clock.scene - st.switchedAt
       if (sinceSwitch < BLEND_S) {

@@ -17,7 +17,7 @@ if (!fs.existsSync(dir)) {
   process.exit(1)
 }
 
-// What index.html loads before the title: its entry script and modulepreloads. The rest (Tone.js, the score engine…) is lazy.
+// What index.html loads before the title: its entry script and modulepreloads. The rest (the level scene, the score engine…) is lazy.
 const html = fs.readFileSync('dist/index.html', 'utf8')
 const startup = new Set([...html.matchAll(/(?:src|href)="[^"]*\/assets\/([^"]+\.js)"/g)].map((m) => m[1]))
 

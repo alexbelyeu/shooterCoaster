@@ -1,0 +1,122 @@
+{
+  "name": "music-level2",
+  "kind": "music",
+  "request": {
+    "kind": "music",
+    "track": "level2",
+    "seam": false
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.15,
+      "name": "level2 score"
+    },
+    {
+      "t": 3.007142857142857,
+      "name": "loop starts"
+    }
+  ],
+  "seams": [],
+  "bar": {
+    "startS": 3.007142857142857,
+    "barS": 1.4285714285714286
+  },
+  "metrics": {
+    "seconds": 30,
+    "integrated": -17.7,
+    "shortTermMax": -17.5,
+    "lra": 0.3,
+    "truePeak": -9.4,
+    "clipped": 0,
+    "silence": 0.5,
+    "correlation": 0.886,
+    "below30Db": -35,
+    "bands": {
+      "sub": {
+        "pct": 28.8,
+        "db": -5.4
+      },
+      "low": {
+        "pct": 22.2,
+        "db": -6.5
+      },
+      "mid": {
+        "pct": 40.8,
+        "db": -3.9
+      },
+      "presence": {
+        "pct": 7,
+        "db": -11.6
+      },
+      "air": {
+        "pct": 1.2,
+        "db": -19.2
+      },
+      "below30": {
+        "pct": 0,
+        "db": -35
+      }
+    },
+    "seamJumps": [],
+    "seamJumpMax": null
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -17.7,
+      "unit": "LUFS",
+      "min": -18,
+      "max": -16,
+      "status": "pass"
+    },
+    {
+      "label": "Short-term max",
+      "value": -17.5,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -9.4,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -35,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 0.886,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 0.3,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 0.5,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

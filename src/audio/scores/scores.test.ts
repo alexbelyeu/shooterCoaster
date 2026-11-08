@@ -23,7 +23,7 @@ describe('game scores', () => {
   it('?theme= puts each named option in its slot and ignores unknown names', () => {
     const options = ['title.neon', 'title.highway', 'level1.carousel']
     expect(themesFromQuery('', options)).toEqual({})
-    expect(themesFromQuery('?audio=scrim&theme=neon', options)).toEqual({ title: 'title.neon' })
+    expect(themesFromQuery('?theme=neon', options)).toEqual({ title: 'title.neon' })
     expect(themesFromQuery('?theme=carousel,%20highway,nope', options)).toEqual({ title: 'title.highway', level1: 'level1.carousel' })
     expect(themesFromQuery('?theme=neon')).toEqual({})
   })

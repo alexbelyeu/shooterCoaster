@@ -46,13 +46,13 @@ voiced around the voice's `center`, `x X o .` a drum lane. Every bar must add up
 | What | Original | ShooterCoaster |
 |---|---|---|
 | Where scores live | pasted into the page | `src/audio/scores/<id>.scrim`: `title`, one per level id (`level1`…), `results`; listed in `scores/index.ts` |
-| Theme options | — | `scores/themes/<slot>.<name>.scrim`: candidate themes for a slot, waiting on Alex's pick (sound bible "taste gate"; none right now: the folder is read by glob, so a listening round only adds files and their `SCORE_KEYS` rows). `?audio=scrim&theme=<name>[,<name>]` plays each named option in its slot's place (`themesFromQuery`, `scoreIdFor`), arcade SFX included (each option has its own `SCORE_KEYS` entry); the default never changes. Render one with `--music <slot>.<name> --engine scrim` |
-| Where it plays | its own `AudioContext`, to the speakers | Tone's context, into its own stereo music channel (`AudioEngine.scoreChannel`): music volume, the slow-mo low-pass duck and the master limiter apply |
-| Mix bus | `jukebox` voicing: master 0.72 → +2 dB low shelf @180 Hz → −2.5 dB high shelf @7.5 kHz → compressor (−15 dB, 3.2:1) → limiter (−3 dB) → out 1.0 (≈ −9.5 LUFS) | `game` voicing (`GAME_VOICING` in `synth.ts`): 24 dB/oct high-pass at 32 Hz first, the same EQ and compressor, then a −6 dB limiter and out 0.53, so a score lands at −18…−16 LUFS through the music channel with true peaks near −9 dBTP |
-| Track changes | stop with a 60 ms fade | 1 s crossfade on a `musicBus` gain, like the Tone.js music |
+| Theme options | — | `scores/themes/<slot>.<name>.scrim`: candidate themes for a slot, waiting on Alex's pick (sound bible "taste gate"; none right now: the folder is read by glob, so a listening round only adds files and their `SCORE_KEYS` rows). `?theme=<name>[,<name>]` plays each named option in its slot's place (`themesFromQuery`, `scoreIdFor`), arcade SFX included (each option has its own `SCORE_KEYS` entry); the default never changes. Render one with `--music <slot>.<name>` |
+| Where it plays | its own `AudioContext`, to the speakers | the game's one `AudioContext` (`AudioEngine.ts`), into its own stereo music channel (`scoreChannel`): music volume, the slow-mo low-pass duck, the pause mix and the master limiter apply |
+| Mix bus | `jukebox` voicing: master 0.72 → +2 dB low shelf @180 Hz → −2.5 dB high shelf @7.5 kHz → compressor (−15 dB, 3.2:1) → limiter (−3 dB) → out 1.0 (≈ −9.5 LUFS) | `game` voicing (`GAME_VOICING` in `synth.ts`): 24 dB/oct high-pass at 32 Hz first, the same EQ and compressor, then a −6 dB limiter and out 0.53, so a score lands at −18…−16 LUFS through the music channel with true peaks near −9 dBTP. Each voice's panner takes a mono voice up to stereo before panning (`upmixPanner`: no 3 dB centre dip), as the scores were mixed (#416) |
+| Track changes | stop with a 60 ms fade | 1 s crossfade on a `musicBus` gain |
 | Pause | — | a paused run holds its score where it is (`pauseScore`) and resumes from that song position |
 | Results | — | the results screen crossfades to the `results` score; Replay crossfades back to the level's |
-| Loading | — | the engine and scores are a separate chunk, loaded only under `?audio=scrim` |
+| Loading | — | the engine and scores are a separate chunk, loaded after the first gesture unlocks audio |
 | Plucked strings | built on demand, `warm()` in idle slices | the same; a track warms its whole score when it starts (the countdown, for a level) |
 | Randomness | `Math.random` | the same in play; offline renders seed it (`createRng`), so the original page and the port render the same score near bit-identically (`renders/parity-*`) |
 | Instruments | 38 melodic, 27 drums | the same, plus the arcade palette below (7 melodic, 5 drums) |
@@ -107,10 +107,10 @@ voice fhat   hat909    vol=0.42 pan=0.4 layer=frenzy  # fills the hats out to st
   one base voice note for note.
   The compressor holds the music's loudness nearly level as layers come in (level1:
   −16.6 LUFS on base, −17 at FRENZY), so the layers add density and brightness, not volume.
-- Hear them: `npm run audio:render -- --music level1 --engine scrim --layers <0..3>`
+- Hear them: `npm run audio:render -- --music level1 --layers <0..3>`
   holds one intensity; `--layers ramp` climbs through every layer and loses the combo
-  (`renders/scrim-music-level1` is the ramp, `scrim-music-<id>-base` holds 0 for each level,
-  `scrim-music-level1-{full,frenzy}` hold 2 and 3). In the game, `?audio=scrim`.
+  (`renders/music-level1` is the ramp, `music-<id>-base` holds 0 for each level,
+  `music-level1-{full,frenzy}` hold 2 and 3).
 
 ## Instruments
 
@@ -158,18 +158,17 @@ These are not enforced by the compiler; `src/audio/scores/scores.test.ts` checks
   write it an octave up. Anything under ~45 Hz costs headroom and reads as mud under the
   SFX; the game voicing cuts below 32 Hz anyway.
 - **Leave the mids for SFX.** The gun and kill sounds live at 300 Hz–3 kHz.
-- **Measure, don't guess:** `npm run audio:render -- --music <id> --engine scrim`
+- **Measure, don't guess:** `npm run audio:render -- --music <id>`
   renders a score through the game's chain and checks it against the sound bible's targets.
 
 ## Hearing and rendering it
 
-- In the game: add `?audio=scrim` to the URL (e.g. `https://scoaster.com/?audio=scrim`).
-  Title, level and results music switch to the score engine, and the SFX to the arcade engine.
-  Add `&theme=<name>` for a theme option during a listening round, comma-separated for
-  options in different slots (`?audio=scrim&theme=<name>,<name>`); with no options in
+- In the game: every score plays by default (title, levels, results), with the arcade SFX.
+  Add `?theme=<name>` for a theme option during a listening round, comma-separated for
+  options in different slots (`?theme=<name>,<name>`); with no options in
   `scores/themes/`, it does nothing.
-- `npm run audio:render -- --music <title|level1..5|results|<slot>.<name>> --engine scrim`: a score
-  through the game's music chain (`docs/audio/renders/scrim-music-*`). Add `--seam` to start
+- `npm run audio:render -- --music <title|level1..5|results|<slot>.<name>>`: a score
+  through the game's music chain (`docs/audio/renders/music-*`). Add `--seam` to start
   10 s before the first loop seam, so the render crosses it (a 32-bar loop is longer than a
   30 s render). A seam render starts inside the loop, which opens on intensity 0, so a score
   with `layer=` tags plays its base alone there: add `--layers 3` to hear every layer cross the seam.

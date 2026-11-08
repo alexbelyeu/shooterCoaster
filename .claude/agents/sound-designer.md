@@ -46,7 +46,7 @@ Never claim something "sounds good". Show it:
   form first: intro (plays once), then a loop of 32–64 bars with an A/B structure and a
   lift. Then the hook, then the parts.
 - Write the score in the score format. It stays the source of truth: no hand-coded note
-  arrays, and no Tone.js for new music.
+  arrays, and no audio library.
 - Arrange for a game: the loop must hold up for the whole level. Leave space in the mids
   for SFX. Mark which voices belong to which intensity layer (base / +drums / +lead /
   FRENZY) so the adaptive system can bring them in.
@@ -69,7 +69,7 @@ Never claim something "sounds good". Show it:
   `Waiting on #<listening issue>`. The Maintainer re-opens it once Alex closes the
   listening issue.
 - Engine work follows hard rule 7: the new engine runs in parallel, behind a flag, until
-  it reaches parity. Remove Tone.js only once nothing uses it. Every node you create is
+  it reaches parity. Every node you create is
   disposed (hard rule 8).
 
 Finish with one paragraph: issue, PR number, what changed, the measurements against the

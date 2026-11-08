@@ -8,7 +8,8 @@
  * ('jukebox' is the original mix bus, 'game' sits under the SFX) and returns `dispose()`;
  * `session.play` reuses one parameter object instead of allocating per note; the helpers, `makeIR` and one-note
  * access to the instruments and drums are exported for the arcade SFX bake (`audio/arcade/`); a session plays a score's
- * intensity layers (`layers.ts`) by ramping each voice's level gain, plus a low-pass when the score has layers.
+ * intensity layers (`layers.ts`) by ramping each voice's level gain, plus a low-pass when the score has layers; the game
+ * voicing's panners take a mono voice up to stereo first (`upmixPanner`).
  * The original instruments are unchanged. The arcade palette (`fmbass` … `clap909`, marked below) is
  * ShooterCoaster's own, not from Scrimshaw.
  */
@@ -72,6 +73,17 @@ const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x))
 const mtof = (m: number) => 440 * Math.pow(2, (m - 69) / 12)
 
 /* --------------------------------------------------------------- helpers */
+/**
+ * A panner that copies a mono voice to both channels first, so centred it keeps its level (the spec's 'clamped-max' dips
+ * it 3 dB): every game score and SFX was mixed through panners like this (standardized-audio-context's, #416).
+ */
+export function upmixPanner(ctx: BaseAudioContext, pan = 0): StereoPannerNode {
+  const p = ctx.createStereoPanner()
+  p.channelCount = 2
+  p.channelCountMode = 'explicit'
+  p.pan.value = pan
+  return p
+}
 /** Nodes the arcade note being built has created so far (`ownedNote`); null for the original instruments. */
 let collecting: AudioNode[] | null = null
 function keep<T extends AudioNode>(n: T): T {
@@ -600,8 +612,7 @@ const ARCADE: Record<string, Instrument> = {
     lp.frequency.setTargetAtTime(Math.min(top, f * 3 + 1600 * p.bright), t + .02, .22)
     const centre = G(S, .3); centre.connect(lp)
     const left = G(S, .17); const right = G(S, .17)
-    const pl = keep(S.ctx.createStereoPanner()); const pr = keep(S.ctx.createStereoPanner())
-    pl.pan.value = -.55; pr.pan.value = .55
+    const pl = keep(upmixPanner(S.ctx, -.55)); const pr = keep(upmixPanner(S.ctx, .55))
     left.connect(pl).connect(lp); right.connect(pr).connect(lp)
     const mid = O(S, 'sawtooth', f, t, end, p); mid.connect(centre)
     const oscs = [mid]
@@ -1039,7 +1050,7 @@ export function createSynth(S: SynthCore, dest: AudioNode, { voicing = 'jukebox'
         const def = v.drum ? DRUM[v.inst] : INST[v.inst]
         const full = v.vol * def.level
         const level = G(S, layerSounds(v.layer, intensity) ? full : 0)
-        const pan = ctx.createStereoPanner()
+        const pan = game ? upmixPanner(ctx, v.pan) : ctx.createStereoPanner()
         pan.pan.value = v.pan
         level.connect(pan).connect(bus)
         const send = G(S, v.rev != null ? v.rev : def.rev)

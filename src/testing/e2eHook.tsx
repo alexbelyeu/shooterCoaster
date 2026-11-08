@@ -49,13 +49,11 @@ import { getAdaptiveSteps } from '@/canvas/useRenderBudget'
 import { COMBO_TIERS, TOP_TIER, comboMultiplier } from '@/combat/comboTiers'
 import { frenzyActive } from '@/combat/comboRuntime'
 import { getPointerState } from '@/input/pointerInput'
-import { initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
+import { audioContext, initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
 import { loadArcade, sfx, type VoiceStats } from '@/audio/sfx'
 import { droppedSounds } from '@/audio/soundGuard'
-import { tone, toneLoaded } from '@/audio/tone'
-import { nextTriggerTime } from '@/audio/triggerTime'
 import { musicState, type MusicFade } from '@/audio/musicBus'
-import { MUSIC_ENGINE, scrimPlayer, type MusicEngine } from '@/audio/musicEngine'
+import { scrimPlayer } from '@/audio/musicEngine'
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
 import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
 import { clipboardText, sharePayloadForRun } from '@/ui/share'
@@ -211,15 +209,15 @@ export interface SCTestApi {
   /** Audio state: unlocked yet, live gameplay SFX nodes (must stay flat while
    *  shooting / killing, 0 after level exit), music low-pass ducked (slow-mo). */
   audio: () => E2EAudio
-  /** Tone scheduling stress (#115), in one JS turn while the audio clock ticks: rapid
+  /** SFX stress (#115), in one JS turn while the audio clock ticks: rapid
    *  shots + layered kills + a stinger, then 10 pairs of late music-loop notes
    *  (`lateScheduleErrors` counts their throws). Kills step down through every combo tier, spaced past the SFX
    *  throttles, so `killsPlayed` should equal `kills`. Unlocks audio if needed. */
-  audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { lateScheduleErrors: number; killsPlayed: number }>
+  audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { killsPlayed: number }>
   /** Whether pointer input has the trigger held (released on blur / tab hide). */
   triggerHeld: () => boolean
   /** Offline render of the game's own music / SFX code (`npm run audio:render`, `testing/audioRender.ts`).
-   *  Only on the title screen before audio unlocks: Tone's global context is offline while it runs. */
+   *  Only on the title screen before audio unlocks: the engines build in the offline context while it runs. */
   renderAudio: (req: AudioRenderRequest, seed?: number) => Promise<AudioRenderResult>
   /** The current level's shader warm-up (`canvas/ShaderWarmup.tsx`): finished?, how long it took
    *  from level mount, and the renderer's program count after it. null before the first level. */
@@ -301,11 +299,11 @@ type ScrimState = ReturnType<typeof import('@/audio/scrim/player').scrimState>
 
 export interface E2EAudio {
   ready: boolean
-  /** Tone.js's chunk has loaded (`audio/tone.ts`): only after the first gesture, or a hook call that unlocks audio. */
-  toneLoaded: boolean
-  /** Long-lived SFX nodes (the Tone kit, or the arcade engine's voice pool): must not grow while playing. */
+  /** The score player's chunk has loaded (`audio/musicEngine.ts`): only after the first gesture starts the music. */
+  engineLoaded: boolean
+  /** Long-lived SFX nodes (the arcade engine's voice pool, buses and wind): must not grow while playing. */
   sfxNodes: number
-  /** The arcade engine's voice pool (`?audio=scrim`): budget, live now, the most at once, stolen / dropped by priority. */
+  /** The arcade engine's voice pool: budget, live now, the most at once, stolen / dropped by priority. */
   sfxVoices: VoiceStats | null
   musicDucked: boolean
   /** The pause mix is on: music −12 dB, SFX silent. */
@@ -315,8 +313,6 @@ export interface E2EAudio {
   lastDrop: string | null
   /** Music buses still connected (`audio/musicBus.ts`) with their gain now, and the last few gain ramps. */
   music: { buses: { name: string; gain: number; fading: boolean }[]; fades: MusicFade[] }
-  /** Which engine plays the music (`?audio=scrim` → 'scrim'). */
-  engine: MusicEngine
   /** The score engine's tracks (current last), each paused or not with its song position, its long-lived node count,
    *  and whether its scheduler timer runs; null until it has loaded. */
   scrim: ScrimState | null
@@ -907,7 +903,7 @@ export function installE2EApi() {
 
 /** Spin (max 20 ms) until AudioContext.currentTime moves, which it does mid-task. */
 function waitForAudioTick() {
-  const ctx = tone().getContext()
+  const ctx = audioContext()
   const t0 = ctx.currentTime
   const deadline = performance.now() + 20
   while (ctx.currentTime === t0 && performance.now() < deadline) { /* spin */ }
@@ -915,25 +911,23 @@ function waitForAudioTick() {
 
 /** Spin (max 100 ms) until AudioContext.currentTime has moved `seconds`. */
 function waitForAudioTime(seconds: number) {
-  const ctx = tone().getContext()
+  const ctx = audioContext()
   const t0 = ctx.currentTime
   const deadline = performance.now() + 500
   while (ctx.currentTime - t0 < seconds && performance.now() < deadline) { /* spin */ }
 }
 
 const BURST_WEAPONS = ['blaster', 'spread', 'rapid', 'piercing'] as const
-/** Past SFXManager's kill (30 ms) and hit-tick (25 ms) throttles. */
+/** Kills a little apart on the audio clock, as a real fight's are. */
 const BURST_KILL_SPACING_S = 0.035
 /** The first kill's chain: a step above the top tier, falling to the 1× tier by the last. */
 const BURST_TOP_COMBO = COMBO_TIERS[TOP_TIER].minCount + 1
 
 async function audioBurst(shots: number, kills: number) {
   if (!isAudioReady()) await initAudio()
-  if (MUSIC_ENGINE === 'scrim') {
-    const { currentLevel } = useGameStore.getState()
-    await sfx().prepare(currentLevel, (currentLevel ? getLevelConfig(currentLevel)?.biome : undefined) ?? 'themePark')
-    ;(await loadArcade()).resetVoiceStats()
-  }
+  const { currentLevel } = useGameStore.getState()
+  await sfx().prepare(currentLevel, (currentLevel ? getLevelConfig(currentLevel)?.biome : undefined) ?? 'themePark')
+  ;(await loadArcade()).resetVoiceStats()
   const s = sfx()
   const killsBefore = s.killsPlayed()
   for (let i = 0; i < shots; i++) {
@@ -947,36 +941,15 @@ async function audioBurst(shots: number, kills: number) {
     waitForAudioTick()
   }
   const killsPlayed = s.killsPlayed() - killsBefore
-  s.waveAnnounce()
   s.waveIncoming()
-
-  // Tone clamps the first late note to the ticked clock; before #115 the second landed on it.
-  // A fresh synth per pair: only a start from silence records a new start time.
-  const { Synth, getContext } = tone()
-  const ctx = getContext()
-  let lateScheduleErrors = 0
-  for (let pair = 0; pair < 10; pair++) {
-    const synth = new Synth({ envelope: { attack: 0.03, decay: 0.2, sustain: 0.25, release: 0.3 } })
-    for (let i = 0; i < 2; i++) {
-      const now = ctx.currentTime
-      const t = nextTriggerTime(synth, now - 0.5, now)
-      if (i === 0) waitForAudioTick()
-      try {
-        synth.triggerAttackRelease('C3', 0.2, t)
-      } catch {
-        lateScheduleErrors++
-      }
-    }
-    synth.dispose()
-  }
-  return { ...readAudio(), lateScheduleErrors, killsPlayed }
+  return { ...readAudio(), killsPlayed }
 }
 
 function readAudio(): E2EAudio {
   const d = droppedSounds()
   return {
     ready: isAudioReady(),
-    toneLoaded: toneLoaded(),
+    engineLoaded: scrimPlayer() !== null,
     sfxNodes: sfx().nodeCount(),
     sfxVoices: sfx().voices(),
     musicDucked: isMusicDucked(),
@@ -984,7 +957,6 @@ function readAudio(): E2EAudio {
     dropped: d.count,
     lastDrop: d.last,
     music: isAudioReady() ? musicState() : { buses: [], fades: [] },
-    engine: MUSIC_ENGINE,
     scrim: scrimPlayer()?.scrimState() ?? null,
   }
 }
