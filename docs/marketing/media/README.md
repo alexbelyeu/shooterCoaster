@@ -46,6 +46,6 @@ fireworks at ×5, before the combo lapses at ~17.5 s. Platform captions and butt
 ~15 % of a vertical video: there the combo meter (bottom centre) and the gun's stock sit; score and timer are clear.
 The title clips (first render 2026-11-08, #419): `npm run build && npm run clip -- --title --seconds 9` (add `--attract`
 for attract mode, `--size 720x1280` for the phone). `--title` captures the title alone from its first frame; 9 s keeps one
-render under ~4.5 min on a 2-core session. Only the middle stills are committed.
+render under ~4.5 min on a 2-core session. Of their stills, only the middle frames are committed.
 Other levels: `--level <id> --from <0–1>`, e.g. `npm run clip -- --level level2 --from 0.3`;
 the clip stars every level before it, so the level select opens with it unlocked and focused.
