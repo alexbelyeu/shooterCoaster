@@ -8,6 +8,10 @@ import { motion } from 'framer-motion'
 import { markStartup } from '@/core/startupMarks'
 import { startsGame } from './titleKeys'
 import { handPosterToUi, posterShown } from '@/app/poster'
+import { audioClockNow, titleBeatGrid } from '@/audio/TitleMusicManager'
+import { ATTRACT_IDLE_MS, setTitleAttract } from '@/canvas/titleAttract'
+import { e2eAttractIdleMs } from '@/testing/e2eHook'
+import { logoBeat } from './titleBeat'
 
 const TITLE = 'ShooterCoaster'
 const SUBTITLE_WORDS = ['Ride.', 'Aim.', 'Shoot.']
@@ -17,6 +21,8 @@ const PLAY_IN_S = 1.3
 const PLAY_OVER_POSTER_S = 0.15
 
 let hintShownThisLoad = false
+
+const WAKE_EVENTS = ['pointerdown', 'pointermove', 'wheel'] as const
 
 const touchFirst = () => typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches
 
@@ -46,12 +52,61 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
   const [overPoster] = useState(posterShown)
   const playIn = overPoster ? PLAY_OVER_POSTER_S : PLAY_IN_S
   const started = useRef(false)
+  const logoRef = useRef<HTMLHeadingElement>(null)
+  const [attract, setAttract] = useState(false)
+  const attractRef = useRef(false)
+  const lastInput = useRef(performance.now())
 
   useEffect(() => {
     hintShownThisLoad = true
     markStartup('playReady')
     handPosterToUi()
   }, [])
+
+  /** Any input counts as activity; out of attract mode it returns to the menu and says it did. */
+  function wake(): boolean {
+    lastInput.current = performance.now()
+    if (!attractRef.current) return false
+    attractRef.current = false
+    setTitleAttract(false)
+    setAttract(false)
+    return true
+  }
+
+  // Attract mode (#419): after ATTRACT_IDLE_MS without input the menu steps aside and the camera cuts close on the ride.
+  useEffect(() => {
+    const idle = window.setInterval(() => {
+      const idleMs = e2eAttractIdleMs(ATTRACT_IDLE_MS)
+      if (attractRef.current || idleMs === null || performance.now() - lastInput.current < idleMs) return
+      attractRef.current = true
+      setTitleAttract(true)
+      setAttract(true)
+    }, 250)
+    const onInput = () => void wake()
+    for (const e of WAKE_EVENTS) window.addEventListener(e, onInput, { capture: true, passive: true })
+    return () => {
+      window.clearInterval(idle)
+      for (const e of WAKE_EVENTS) window.removeEventListener(e, onInput, { capture: true })
+      setTitleAttract(false)
+    }
+  }, [])
+
+  // The logo hits on the title music's bars (and lightly on its beats): `--logo-beat` drives its scale and glow.
+  useEffect(() => {
+    if (reduced) return
+    let raf = 0
+    let last = -1
+    const tick = () => {
+      raf = requestAnimationFrame(tick)
+      const grid = titleBeatGrid()
+      const v = grid ? logoBeat(audioClockNow(), grid) : 0
+      if (Math.abs(v - last) < 0.005) return
+      last = v
+      logoRef.current?.style.setProperty('--logo-beat', v.toFixed(3))
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [reduced])
 
   async function play() {
     if (started.current) return
@@ -66,6 +121,11 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
     const kickstart = () => void startAudio().catch(() => {})
     const onKey = (e: KeyboardEvent) => {
       kickstart()
+      // The key that ends attract mode only brings the menu back.
+      if (wake()) {
+        e.preventDefault()
+        return
+      }
       // Enter / Space on a focused button already click it.
       const onControl = e.target instanceof HTMLElement && e.target.closest('button, a, input') !== null
       if (!onControl && startsGame(e)) {
@@ -82,8 +142,9 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
   })
 
   return (
-    <div className="title-screen">
+    <div className={attract ? 'title-screen is-attract' : 'title-screen'}>
       <motion.h1
+        ref={logoRef}
         aria-label={TITLE}
         initial={overPoster ? false : reduced ? { opacity: 0 } : { opacity: 0, y: -120, scale: 1.25, filter: 'blur(14px)' }}
         animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
@@ -95,6 +156,9 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
         }}
       >
         {TITLE}
+        <span className="title-logo-sweep" aria-hidden="true">
+          {TITLE}
+        </span>
       </motion.h1>
 
       <p className="subtitle">
@@ -152,9 +216,10 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
         <motion.button
           className="settings-button"
           onClick={onSettings}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: playIn + 0.5 }}
+          initial={{ opacity: 0, x: reduced ? 0 : -16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: playIn + 0.35, ease: 'easeOut' }}
+          whileTap={{ scale: 0.9 }}
           aria-label="Settings"
         >
           &#x2699;
@@ -163,8 +228,8 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
 
       <motion.div
         className="credits"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        initial={{ opacity: 0, y: reduced ? 0 : 12 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: playIn + 0.5 }}
       >
         A Three.js game by{' '}
@@ -174,6 +239,12 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
       </motion.div>
 
       {internal && <div className="internal-marker">internal: not tracked</div>}
+
+      {attract && (
+        <div className="title-attract" aria-hidden="true">
+          <p className="title-attract-prompt">{touchFirst() ? 'Tap anywhere' : 'Press any key'}</p>
+        </div>
+      )}
     </div>
   )
 }

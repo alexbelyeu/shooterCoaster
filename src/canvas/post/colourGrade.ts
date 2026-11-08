@@ -36,8 +36,17 @@ export const NEUTRAL_GRADE: GradeConfig = {
   vignette: 0,
 }
 
-/** Title / level-select orbit: the old stock vignette (darkness 0.5) and no other grade. */
-export const TITLE_GRADE: GradeConfig = { ...NEUTRAL_GRADE, vignette: 0.45 }
+/** Title / level-select park (#419): golden hour, warm highlights over cool shadows, a little punch for the coaster's colours. */
+export const TITLE_GRADE: GradeConfig = {
+  ...NEUTRAL_GRADE,
+  temperature: 0.12,
+  shadowTint: 0x3c5a8c,
+  highlightTint: 0xffb46e,
+  splitTone: 0.18,
+  contrast: 1.06,
+  vibrance: 0.2,
+  vignette: 0.45,
+}
 
 /** Rec. 709 luminance weights for linear RGB, shared with the shader. */
 export const LUMA: readonly [number, number, number] = [0.2126, 0.7152, 0.0722]

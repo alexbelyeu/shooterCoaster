@@ -65,19 +65,113 @@ canvas {
   justify-content: center;
   z-index: 100;
   background: rgba(0, 0, 0, 0.35);
+  transition: background-color 0.8s ease;
 }
 
+/* The logo (#419): framer-motion owns its transform (the build-in); the idle float and the music's hit
+   (--logo-beat, set per frame by TitleScreen) ride on the separate translate / scale properties. */
 .title-screen h1 {
+  position: relative;
   font-family: 'Lobster', cursive;
   font-size: clamp(2.5rem, 8vw, 5rem);
   color: #fff;
   text-shadow:
-    0 0 10px rgba(255, 200, 0, 0.9),
-    0 0 30px rgba(255, 200, 0, 0.6),
+    0 0 calc(10px + var(--logo-beat, 0) * 12px) rgba(255, 200, 0, 0.9),
+    0 0 calc(30px + var(--logo-beat, 0) * 20px) rgba(255, 200, 0, 0.6),
     0 0 60px rgba(255, 200, 0, 0.3),
     0 4px 8px rgba(0, 0, 0, 0.5);
   margin-bottom: 0.5rem;
+  scale: calc(1 + var(--logo-beat, 0) * 0.035);
+  animation: title-logo-float 6s ease-in-out 2s infinite;
 }
+
+@keyframes title-logo-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -5px; }
+}
+
+/* A light sweep across the wordmark: the same text, clipped to a moving gold highlight. */
+.title-logo-sweep {
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  text-shadow: none;
+  background: linear-gradient(110deg, transparent 42%, rgba(255, 226, 122, 0.95) 50%, transparent 58%) no-repeat;
+  background-size: 300% 100%;
+  background-position: 150% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  pointer-events: none;
+  animation: title-logo-sweep 7s ease-in-out 1.6s infinite;
+}
+
+@keyframes title-logo-sweep {
+  0% { background-position: 150% 0; }
+  28%, 100% { background-position: -50% 0; }
+}
+
+/* Attract mode (#419): the menu steps aside for the cinematic loop; letterbox bars and a prompt come in. */
+.title-screen > * { transition: opacity 0.8s ease; }
+.title-screen.is-attract { background-color: transparent; }
+.title-screen.is-attract > :not(.title-attract) {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+.title-attract {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.title-attract::before,
+.title-attract::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9vh;
+  background: #000;
+  animation: title-attract-bar 0.9s ease-out both;
+}
+.title-attract::before { top: 0; --bar-from: -100%; }
+.title-attract::after { bottom: 0; --bar-from: 100%; }
+
+@keyframes title-attract-bar {
+  from { transform: translateY(var(--bar-from)); }
+  to { transform: none; }
+}
+
+.title-attract-prompt {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(9vh + 1rem + env(safe-area-inset-bottom));
+  margin: 0;
+  text-align: center;
+  font-size: 0.85rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  animation: title-attract-prompt 2.4s ease-in-out 0.9s infinite both;
+}
+
+@keyframes title-attract-prompt {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.95; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-screen h1, .title-logo-sweep, .title-attract::before, .title-attract::after { animation: none; }
+  .title-screen h1 { scale: none; }
+  .title-attract-prompt { animation: none; opacity: 0.8; }
+}
+.reduce-motion :is(.title-screen h1, .title-logo-sweep),
+.reduce-motion .title-attract::before,
+.reduce-motion .title-attract::after { animation: none; }
+.reduce-motion .title-screen h1 { scale: none; }
+.reduce-motion .title-attract-prompt { animation: none; opacity: 0.8; }
 
 .title-screen .subtitle {
   font-size: clamp(0.9rem, 2.5vw, 1.1rem);
@@ -110,6 +204,11 @@ canvas {
 
 .play-button:active {
   transform: scale(0.96);
+}
+
+.title-screen :is(.play-button, .settings-button):focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 4px;
 }
 
 .title-screen .title-hint {

@@ -26,7 +26,8 @@ class LevelSceneBoundary extends Component<{ children: ReactNode }, { failed: bo
 }
 
 const LEVEL_BLOOM: BloomSettings = { threshold: 0.9, intensity: 0.6 }
-const TITLE_BLOOM: BloomSettings = { threshold: 0.8, intensity: 0.8 }
+/** The title's sunset dolly looks into the sun: a higher threshold keeps the sky from blooming over the wheel. */
+const TITLE_BLOOM: BloomSettings = { threshold: 0.85, intensity: 0.75 }
 
 export default function SceneManager() {
   const phase = useGameStore((s) => s.phase)
