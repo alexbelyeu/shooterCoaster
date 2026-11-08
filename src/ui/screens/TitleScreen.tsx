@@ -9,7 +9,7 @@ import { markStartup } from '@/core/startupMarks'
 import { startsGame } from './titleKeys'
 import { handPosterToUi, posterShown } from '@/app/poster'
 import { audioClockNow, titleBeatGrid } from '@/audio/TitleMusicManager'
-import { ATTRACT_IDLE_MS, setTitleAttract } from '@/canvas/titleAttract'
+import { ATTRACT_IDLE_MS, armClickSwallow, setTitleAttract } from '@/canvas/titleAttract'
 import { e2eAttractIdleMs } from '@/testing/e2eHook'
 import { logoBeat } from './titleBeat'
 
@@ -82,7 +82,9 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
       setTitleAttract(true)
       setAttract(true)
     }, 250)
-    const onInput = () => void wake()
+    const onInput = (e: Event) => {
+      if (wake() && e.type === 'pointerdown') armClickSwallow()
+    }
     for (const e of WAKE_EVENTS) window.addEventListener(e, onInput, { capture: true, passive: true })
     return () => {
       window.clearInterval(idle)

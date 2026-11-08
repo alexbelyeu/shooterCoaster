@@ -8,7 +8,7 @@ import Carousel from '@/levels/environments/Carousel'
 import { BLEND_S, beatLockedRate, blendPose, titleCameraPose, titleShotS, type TitleCameraMode, type Vec3 } from './titleCamera'
 import { createTitleRide, type TitleRide } from './titleCoaster'
 import TitleCoaster, { type TitleClock } from './TitleCoaster'
-import { isTitleAttract } from './titleAttract'
+import { consumeClickSwallow, isTitleAttract } from './titleAttract'
 import TitleSparkles from './TitleSparkles'
 import { audioClockNow, titleBeatGrid } from '@/audio/TitleMusicManager'
 import { isUiTarget } from '@/input/pointerInput'
@@ -33,6 +33,7 @@ function FlyByCamera({ ride, clock }: { ride: TitleRide; clock: TitleClock }) {
   const target = useRef<Vec3>([0, 0, 0]).current
   const toPos = useRef<Vec3>([0, 0, 0]).current
   const toTarget = useRef<Vec3>([0, 0, 0]).current
+  const ctx = useMemo(() => ({ ride, rideTime: 0 }), [ride])
 
   useFrame((_, delta) => {
     const cam = camRef.current
@@ -40,7 +41,6 @@ function FlyByCamera({ ride, clock }: { ride: TitleRide; clock: TitleClock }) {
     markStartup('titleFrame')
     const step = ++frames.current <= FIRST_FRAMES ? Math.min(delta, FIRST_FRAME_STEP_S) : delta
     const held = e2eTitleTime()
-    const ctx = { ride, rideTime: 0 }
     if (held !== null) {
       clock.scene = ctx.rideTime = held
       titleCameraPose(held, ctx, pos, target, isTitleAttract() ? 'attract' : 'menu')
@@ -49,8 +49,10 @@ function FlyByCamera({ ride, clock }: { ride: TitleRide; clock: TitleClock }) {
       ctx.rideTime = clock.scene
       const mode: TitleCameraMode = isTitleAttract() ? 'attract' : 'menu'
       if (mode !== st.mode) {
+        // Switching mid-blend keeps the pose continuous: pick the blend up where it stands.
+        const since = clock.scene - st.switchedAt
+        st.switchedAt = since < BLEND_S ? clock.scene - (BLEND_S - since) : clock.scene
         st.mode = mode
-        st.switchedAt = clock.scene
         if (mode === 'attract') st.attract = 0
       }
       const grid = titleBeatGrid()
@@ -370,6 +372,12 @@ function TitleClickRaycaster() {
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
+      // The tap that ended attract mode only brings the menu back: not PLAY, not a balloon.
+      if (consumeClickSwallow()) {
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
       // A click on a button or a dialog (Settings over the title) is the UI's; stopping it here would swallow it.
       if (isUiTarget(e.target) || (e.target instanceof Element && e.target.closest('[role="dialog"]'))) return
       ndc.set(
