@@ -105,7 +105,7 @@ music / effects volume, screen shake, reduced motion.
   production smoke → `agent:prod-broken`.
 - `npm run clip` (level-1 clip in virtual time, re-rendered for the Showcase), `npm run og`,
   `npm run audio:render` / `audio:check`, `scripts/quiet.sh`, the token ledger with per-run
-  diagnostics (#298), auto-merge sweep every 10 min.
+  diagnostics (#298), auto-merge after every CI run (#390; the scheduled sweep is best effort).
 - Studio: pause switch, runbooks per task, decisions inbox folded nightly, live status issue,
   two independent reviewers on PRs ≥ ~300 lines, `builder_runs_per_day` cap. Milestones on
   GitHub from this week (M2 #1, M3 #2).
