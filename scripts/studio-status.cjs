@@ -403,7 +403,7 @@ function render(data, now) {
   ])))
 
   if (approved.length) {
-    out.push('### ✅ Approved — merged once CI is green (checked after every CI run and every 10 min)')
+    out.push('### ✅ Approved — merged once CI is green (checked after every CI run)')
     out.push(table(['PR', 'CI'], approved.map((p) => [`#${p.number} ${short(p.title)}`, ci[p.number] || '—'])))
   }
 

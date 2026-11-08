@@ -32,16 +32,15 @@ option leads with its hook in the first bars of the loop, keeps one signature in
 drives at 134–176 BPM and lifts for its last 8 bars. The variety goes into the idea, not the polish.
 Every option is also written in intensity layers, so the pick drops in as the level's score as it is.
 
-**Level 2–5 options (#303, waiting on Alex's pick)**, in `src/audio/scores/themes/`, heard with
-`?audio=scrim&theme=<name>`. level2: `sidewinder` (D harmonic minor, 152, baritone twang guitar,
-maqsum), `caravan` (E harmonic minor, 138, oboe over a saidi), `dunerider` (F minor, 168, desert
-trance: harpsichord ostinato through the Phrygian ♭II, supersaw hook). level3: `breakwater` (A minor,
-176, tremolo surf guitar, tom beat), `lagoon` (G major, 150, steel-drum calypso), `riptide` (E major,
-164, synth brass and glockenspiel, a semitone lift). level4: `glacier` (F♯ minor, 140, celesta and
-bell over a high pad), `whiteout` (B minor, 172, glockenspiel ostinato over a breakbeat), `aurora`
-(D minor, 134, vibraphone, pizzicato and choir, timpani). level5: `brimstone` (E minor, 176, chug
-metal with choir and timpani), `hellgate` (C minor, 150, string ostinato, brass and horns, gong),
-`magma` (G minor, 160, saw lead over sixteenth FM bass and choir stabs).
+**Level 2–5 picks (#391).** Alex picked one of three options per world, and they are now
+`src/audio/scores/level2…5.scrim`: level2 "Dune Rider" (F minor, 168, desert trance: harpsichord
+ostinato through the Phrygian ♭II, supersaw hook), level3 "Lagoon Run" (G major, 150, steel-drum
+calypso over marimba and a tumbao bass), level4 "Aurora" (D minor, 134, vibraphone over pizzicato and
+choir, timpani), level5 "Hellgate" (C minor, 150, string ostinato, brass and horns in octaves, gong).
+He took the most Neon-like, the sunniest, the calmest and the most "final boss" option, and passed
+on both options marked closest to their brief (`sidewinder`, `glacier`): a level's theme can lean on
+mood as much as on its biome's instruments.
+Each keeps its hook in `base` (layers only add, #415): the doubling or stabs come in at 3×.
 
 | Level | Biome | Brief | Signature colour |
 |---|---|---|---|

@@ -120,9 +120,12 @@ criteria** (checkable, including what the smoke-test screenshot should show),
 **No agent ever merges a PR.** Approval is the `agent:qa-approved` label; the
 `Auto-merge approved PRs` workflow (`.github/workflows/automerge.yml`, logic in
 `scripts/automerge.cjs`) squash-merges an approved PR once the `verify` check is green on
-its head commit. It runs on the PR's label events, after every CI run, and as a sweep of
-every open approved PR every 10 minutes, so an approved PR with a green `verify` merges
-within about 10 minutes even if an event was missed. When it can't merge an approved PR
+its head commit. It runs on the PR's label events and after every completed CI run,
+whatever that run's conclusion (it gates on the head's `verify` check alone, so a red
+job outside `verify` such as `portal` doesn't hold it back): an approved PR merges within
+minutes of its `verify` going green. A scheduled sweep of every open approved PR is only a
+best-effort safety net for missed events: its cron says every 10 minutes, but GitHub runs it
+every few hours on this repo. When it can't merge an approved PR
 for any reason but `verify` still running (red `verify`, draft…), it says so
 once per head in a PR comment starting `Auto-merge skipped:` or `Auto-merge failed:`.
 An approved PR that **conflicts** with `main` is handed back instead: the workflow swaps

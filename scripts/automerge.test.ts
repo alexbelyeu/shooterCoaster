@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import gate from './automerge.cjs'
 
@@ -260,5 +261,17 @@ describe('runGate', () => {
     expect(f.writes).toEqual([])
     expect(res.lines[0]).toBe('#1: [dry run] would merge (abc1234)')
     expect(res.lines[2]).toBe('#3: [dry run] would hand back to Fix: it conflicts with main (abc1234)')
+  })
+})
+
+describe('automerge.yml', () => {
+  const yml = readFileSync(new URL('../.github/workflows/automerge.yml', import.meta.url), 'utf8')
+  const mergeIf = yml.slice(yml.indexOf('\n  merge:'), yml.indexOf('concurrency:', yml.indexOf('\n  merge:')))
+
+  it('runs the merge job after every completed CI run, whatever its conclusion (#390)', () => {
+    // decide() gates on the head's `verify` alone: a red `portal` must not skip the run.
+    expect(yml).toMatch(/workflow_run:\s*\n\s*workflows: \[CI\]\s*\n\s*types: \[completed\]/)
+    expect(mergeIf).toMatch(/github\.event_name == 'workflow_run' \|\|/)
+    expect(mergeIf).not.toMatch(/conclusion/)
   })
 })
