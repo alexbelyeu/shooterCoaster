@@ -1663,3 +1663,70 @@ must stay unique across slots.
 **Context:** Art review of enemies needs close-ups from every side and in motion, on every PR that touches them, without slowing the other PRs (#371/#372) or reaching the game's bundle.
 **Decision:** `turntable.html` + `src/dev/turntable/` mount the shipped enemy and boss components (not copies) and are built only by `vite build --mode turntable` into `dist-turntable/`. Motion is real game-time animation with each subject's travel cancelled every frame; the Kraken alone is shown as `KrakenPose` (its parts around its head, posed by its real motion code) because the fight scatters its tentacles around the rider. `Math.random` is seeded per subject so images are byte-identical between runs. CI runs it in its own `turntable` workflow, path-filtered to `src/entities/**` and death styles, outside the required `verify`.
 **Consequences:** A new enemy type must be added to `src/dev/turntable/subjects.ts` (its test fails otherwise), with its `front` yaw and motion window. The turntable never gates a merge: QA reads its artifact. Bloom and the biome colour grade aren't applied (no post-processing), so emissive enemies look flatter than in play; `?biome=` / `--biome` gives the biome's sky, lights and fog.
+
+## 2026-11-06 — Picked title + level1 themes are the default; `?theme=` stays for later rounds; the title has no layers (Sound designer, #302)
+
+**Context:** Alex picked "Neon Marquee" for the title and kept "Midway Rush" for level1 (#301). Decision
+`2026-11-02 — Theme options live beside the scores` says later listening rounds (levels 2–5) reuse the flag and folder.
+**Decision:** `title.neon` replaced `title.scrim` (A minor in `SCORE_KEYS`); every option file, its `SCORE_KEYS` row
+and its renders are deleted. `scores/index.ts` reads `scores/themes/*.scrim` by `import.meta.glob`, so the `?theme=`
+mechanism stays with an empty folder and a new round only adds files plus their `SCORE_KEYS` rows. The title score is
+not tagged with `layer=`: nothing sets an intensity on the title, so a layered title's loop would open on whatever
+intensity the last run left (the player's intensity is global), often base alone. Only level scores carry layers.
+**Consequences:** `?theme=<name>` does nothing until a round adds options. Tagging the title would need the player
+to hold the title at full intensity first.
+
+## 2026-11-07 — Two smoke depths: PR shards render, the nightly runs everything (builder, #372)
+
+**Context:** every PR ran the whole smoke (~400 checks on SwiftShader, ~10 min of CI), and its game-logic checks
+rode on wall-clock timing: they caused the week's flakes (#305, #250, #367).
+**Decision:** the CI shards (`e2e/shards.mjs` `SHARDS`) are the PR depth: rendering and integration, the ride and combat
+on every level, the level-independent ride checks (`shot`, `results`) on level1 only, the title / level select /
+settings UI, quality, speed and the phone run's touch play. Everything else (`nightlyOnly()`: daily, frenzy, seed,
+pause, countdown, wave, boss, pickup, scrim, share, the phone menus) runs only in the full smoke, which the nightly
+production run makes; game logic among it is covered by unit tests next to its pure module (e2e/README.md table).
+The full run stays the default of `node e2e/smoke.mjs`; `shards.test.ts` holds the shards and `nightlyOnly()` to it.
+**Consequences:** a PR that breaks only a deep check goes green and is caught by the next nightly (`agent:prod-broken`,
+P1), up to a day later; builders and QA run the deep step their diff touches by hand (`--steps`). Don't add a check to
+a PR shard unless it is about what the frame shows or how the pieces connect; put new logic in a unit test.
+
+## 2026-11-07 — Real-player telemetry is first-party: one beacon per page load to `/api/telemetry`, read back as a public 24 h summary (Builder, #373)
+
+**Context:** Nothing told the studio how the game runs for real players (CI renders on SwiftShader; Web Analytics
+counts pages and level events). Hard rule 4 allows a new runtime network call only with an entry here; the issue rules
+out third-party SDKs and anything identifying.
+**Decision:** The game sends at most one `navigator.sendBeacon` per page load to its own `/api/telemetry` (a Vercel
+Function next to the leaderboard, same Supabase project and env vars, table `telemetry_reports`), when the page is
+first hidden or closed and only if it has something to say: up to 5 deduped errors (message + first stack frame, URLs
+cut to their path), WebGL context losses, and per level played its median / p95 frame time with the quality and dpr,
+plus touch / desktop, `hardwareConcurrency` and the GPU renderer string. Same gate as Web Analytics (Vercel builds
+only; never `?e2e=1`, `?internal=1` or the portal build). No ids or cookies; the rate limit (10 reports per IP per 10
+min) keys rows by an HMAC of the IP under a salt that changes every UTC day, so rows can't be linked across days, and
+rows older than 30 days are deleted. `GET /api/telemetry` serves only an aggregate of the last 24 h (CDN-cached 5
+min), and the status page and the watchdog read that over HTTPS: no Supabase secret in GitHub. Errors from other
+origins and extensions are dropped. A level's phone budget is the new `budgets.json` `playerFrameMs.touchP95` (33.4
+ms: past two vsyncs at 60 Hz), judged on the median of phone sessions' p95 once 3 sessions played it in 24 h; an error
+is filed once seen in 3 sessions.
+**Consequences:** The summary is public: it shows the game's own error messages and GPU names, nothing about a
+player. Errors after the beacon has gone (the tab came back) are not reported. Alex runs
+`supabase/migrations/0002_telemetry.sql` once; until then the endpoint answers 503 and the status page says
+telemetry is unavailable. Only the Director changes `playerFrameMs`.
+
+## 2026-11-07 — Title poster, lazy level scene, title and startup budgets (Builder, #376)
+
+**Context:** On a cold load the page was black until ~485 KB gz of startup JS had run and the title scene had drawn (4.4 s on a throttled phone profile; Lighthouse mobile FCP 4.2 s, LCP 6.1 s). Alex asked for no empty or black frame ever, and for the title's cost to be budgeted.
+**Decision:** index.html paints a poster before any JS: the title scene's still (`public/poster/*.webp`, rendered by `npm run og` with the title camera held at 0.3 s) under a copy of the title's logo laid out like `.title-screen`, so the live logo lands exactly on it; it fades once the canvas has drawn two frames. The level scene (`LevelScene.tsx`) is its own lazy chunk, prefetched when the title is idle. New budgets: `startupJsGzipKB` 440 (398 measured, enforced by `check:bundle`) and `scene.title` (drawCalls 114 = 95 × 1.2, objects 89, triangles 11356 = measured × 1.15, enforced by the smoke's title step), set like the level entries.
+**Consequences:** Anything new on the title (the riding coaster of #376's second part) must fit `scene.title` or have the Director raise it. Anything imported by the title's modules is startup JS: level-only code goes through `LevelScene.tsx`. If the title's look changes, re-render the posters (`npm run og -- --poster`) so the crossfade still matches; the poster's text mirrors `.title-screen` in global.css, so changing one means changing the other.
+
+## 2026-11-08 — Picked level 2–5 themes are the default, with the hook in `base` (Sound designer, #392)
+
+**Context:** Alex picked `dunerider`, `lagoon`, `aurora` and `hellgate` (#391). The options were written with the
+hook on `layer=lead` (heard only from a 3× combo), which #415 rules out: level scores keep their melody in `base`,
+layers only add. #415 had not merged yet.
+**Decision:** each pick replaced `level2…5.scrim` with its hook voice untagged (`base`), and the voice that doubled or
+answered it moved down one layer to `lead` (Dune Rider's octave-down twang, Lagoon Run's horn stabs, Aurora's bell;
+Hellgate's horns were already `lead`), so 3× still adds a line. FRENZY keeps its hats (and Hellgate's choir) plus the
+filter opening. The full-mix renders are unchanged by the retagging. Every option file, its `SCORE_KEYS` row and its
+renders are deleted; `SCORE_KEYS` holds each pick's key.
+**Consequences:** at FRENZY, Dune Rider, Lagoon Run and Aurora add only hats and the open filter. A follow-up can
+write a FRENZY counter-line for them if it feels thin in play.
