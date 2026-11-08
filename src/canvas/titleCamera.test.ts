@@ -35,17 +35,14 @@ describe('title camera', () => {
     expect(titleShotIndex(0)).toBe(0)
     expect(titleShotIndex(SHOT_S - 0.01)).toBe(0)
     expect(titleShotIndex(SHOT_S + 0.01)).toBe(1)
-    // Mid-shot, the orbit and the dolly are far apart.
     expect(dist(pose(SHOT_S * 0.5).pos, pose(SHOT_S * 2.5).pos)).toBeGreaterThan(100)
   })
 
   it.each(['menu', 'attract'] as const)('moves continuously in %s mode, across every blend and shot boundary', (mode) => {
     const dt = 1 / 60
     let prev = pose(0, mode)
-    // 400 s covers several full orbits and laps, so every orbit angle and train place a blend can start from.
     for (let t = dt; t < 400; t += dt) {
       const cur = pose(t, mode)
-      // The longest blend (orbit far side to the dolly, ~350 units over BLEND_S) stays under 2.5 units a frame.
       expect(dist(cur.pos, prev.pos)).toBeLessThan(2.5)
       expect(dist(cur.target, prev.target)).toBeLessThan(2.5)
       prev = cur
@@ -117,7 +114,6 @@ describe('beat-locked cuts', () => {
       let cam = start
       let now = 10 + start * 1.3
       const dt = 1 / 60
-      // The first cut may come too soon to move onto a bar; a whole shot is long enough.
       const shot = titleShotIndex(cam) + 1
       while (titleShotIndex(cam) <= shot) {
         cam += beatLockedRate(cam, SHOT_S, grid, now) * dt

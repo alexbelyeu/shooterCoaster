@@ -1,8 +1,4 @@
-/**
- * Title fly-by (#376, #419): a sequence of camera shots taking turns, each blended into the next with a lift that
- * clears the tents and flags. The menu sequence orbits the park, chases the coaster and dollies to the Ferris wheel;
- * attract mode cuts closer on the ride. Shot cuts lock to the title score's bars (`beatLockedRate`).
- */
+/** Title fly-by (#376, #419): camera shots taking turns, each blended into the next with a lift that clears the tents and flags. */
 import { CAR_SPACING, CARS, type TitleRide } from './titleCoaster'
 
 export type Vec3 = [number, number, number]
@@ -135,10 +131,7 @@ export interface BeatGrid {
 /** How far the camera clock may run fast or slow to land its cuts on the music's bar lines. */
 export const BEAT_LOCK_MAX = 0.1
 
-/**
- * Camera clock rate that lands the next shot cut on a bar line: the cut is `dc` camera seconds away; at rate
- * `dc / target` it arrives in `target` real seconds, the bar line nearest to it. 1 while there is no music.
- */
+/** Camera clock rate that lands the next cut on the nearest bar line; nudging the clock, not jumping it, keeps the cut a blend. */
 export function beatLockedRate(camTime: number, shotS: number, grid: BeatGrid | null, audioNow: number): number {
   if (!grid || grid.beatS <= 0) return 1
   const dc = (Math.floor(camTime / shotS) + 1) * shotS - camTime

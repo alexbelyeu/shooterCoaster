@@ -24,10 +24,7 @@ const BALLOON_COLORS = ['#ff4444', '#ff8800', '#ffcc00', '#44cc44', '#4488ff', '
 const FIRST_FRAMES = 5
 const FIRST_FRAME_STEP_S = 0.1
 
-/**
- * Fly-by camera: the shot sequences of `titleCamera.ts`, the menu's or attract mode's, a blend between them when the
- * mode changes. Each mode's clock runs a little fast or slow to cut on the title music's bars. Advances `clock`.
- */
+/** Fly-by camera over `titleCamera.ts`'s menu or attract sequence, blending when the mode changes; advances `clock`. */
 function FlyByCamera({ ride, clock }: { ride: TitleRide; clock: TitleClock }) {
   const camRef = useRef<THREE.PerspectiveCamera>(null)
   const frames = useRef(0)

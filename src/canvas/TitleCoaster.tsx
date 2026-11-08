@@ -8,10 +8,7 @@ import { tAtLoopDistance } from '@/track/arcLength'
 import { mergePainted, painted } from '@/levels/environments/shared/paintedParts'
 import { CAR_SPACING, CARS, TITLE_TRACK_SCALAR, type TitleRide } from './titleCoaster'
 
-/**
- * The title park's coaster (#419): the game's own rails (`buildTrackGeometry`) on a light loop, single steel columns
- * and a four-car train, three draw calls in all. Kept light for budgets.json `scene.title`: few rings, wide-set ties.
- */
+/** The title's coaster in three draw calls; few rings, wide-set ties and plain columns keep it inside budgets.json `scene.title`. */
 
 const DIMS = { ...getTrackDimensions({ scalar: TITLE_TRACK_SCALAR }), tieSpacing: 22 }
 /** Rings along the rails: ~11 units apart on the ~1000-unit loop, smooth at the title's distances. */

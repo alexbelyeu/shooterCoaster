@@ -1,13 +1,9 @@
+/** The title park's coaster (#419): the train's place is a pure function of time, so the camera can frame it and the posters hold it. */
+
 import * as THREE from 'three'
 import type { TrackCurve } from '@/track/curves/TrackCurve'
 import { buildArcTable, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
 import type { Vec3 } from './titleCamera'
-
-/**
- * The title park's coaster (#419): a closed loop of hills around the tent ring, and a train
- * whose speed follows the hills (slow over the crests, fast through the dips). Pure: the
- * train's place is a function of time, so the camera can frame it and the posters can hold it.
- */
 
 /** Loop radius: outside the tents (r 120, 18 wide) and inside the orbit camera (r 180). */
 export const TRACK_RADIUS = 152
@@ -34,8 +30,7 @@ function trackPoint(t: number, out: THREE.Vector3): THREE.Vector3 {
   return out.set(Math.cos(a) * r, y, Math.sin(a) * r)
 }
 
-/** The loop as a `TrackCurve`, t in [0, 1] wrapping at the seam. */
-export function createTitleCurve(): TrackCurve {
+function createTitleCurve(): TrackCurve {
   const point = new THREE.Vector3()
   const tangent = new THREE.Vector3()
   const p1 = new THREE.Vector3()
@@ -72,7 +67,6 @@ export function createTitleRide(): TitleRide {
   let crestY = -Infinity
   for (let i = 0; i < table.count; i++) crestY = Math.max(crestY, table.y[i])
 
-  // Time at each of TIME_SAMPLES even arc steps: dt = ds / v(y).
   const ds = table.length / TIME_SAMPLES
   const times = new Float64Array(TIME_SAMPLES + 1)
   const p = new THREE.Vector3()
