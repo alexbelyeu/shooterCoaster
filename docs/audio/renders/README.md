@@ -12,7 +12,10 @@ Use a file's raw link to play it in the browser. The Sound designer writes these
 `baseline-*` is the game's sound before the audio overhaul; `../BASELINE.md` reads it.
 `scrim-music-*` is the score engine (`?audio=scrim`) playing its scores through
 the game's music chain (`--music <id> --engine scrim`; `-seam` renders start 10 s before the first loop seam, `--seam`). The
-title ("Neon Marquee") and level1 ("Midway Rush") are Alex's picks (#301); levels 2–5 are still placeholders. level1's has intensity layers, so it
+title ("Neon Marquee") and level1 ("Midway Rush") are Alex's picks (#301), levels 2–5 ("Dune Rider", "Lagoon Run",
+"Aurora", "Hellgate") his picks from #391: `scrim-music-level2…5` are their first 30 s with every layer,
+`-seam` crosses the loop seam with every layer (`--seam --layers 3`) and `-base` is 20 s of the base layer alone
+(`--layers 0 --seconds 20`), where the hook already plays. level1's has intensity layers, so it
 is rendered per layer: `scrim-music-level1` climbs through every layer and loses the combo
 (`--layers ramp`, 30 s), and `scrim-music-level1-base` / `-full` / `-frenzy` hold intensity 0 / 2 / 3
 (`--layers <n>`, 20 s). `parity-original-*` / `parity-port-*`

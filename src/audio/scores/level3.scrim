@@ -1,43 +1,60 @@
-title    Breakwater
-composer Claude (ShooterCoaster placeholder)
-about    Placeholder Ocean score that proves the score engine. Steel drum over surf-strum guitar, a pumping upright and a wave rolling in.
-tempo    168
+title    Lagoon Run
+composer Claude (ShooterCoaster)
+about    Ocean (level3), Alex's pick (#391): calypso meets arcade in G major. A steel drum carries a 3+3+2 hook over a marimba ostinato, a tumbao FM bass, clave and timbales, with the sea washing in every eight bars. The last eight bars lift a tone. Layers: the steel-drum hook, marimba, bass, clave and the sea wash from the start, then the kit at 2x, horn-section stabs at 3x, straight hats at FRENZY.
+tempo    150
 beats    4
 steps    2
-reverb   0.35
+reverb   0.3
 
-voice lead   steeldrum vol=0.9  pan=-0.15
-voice gtr    guitar    vol=0.55 pan=0.3  center=A4 gate=0.6
-voice bass   upright   vol=0.9  oct=1
-voice kick   kick      vol=0.8
-voice snare  snare     vol=0.55
-voice ride   ride      vol=0.3  pan=0.35
-voice crash  crash     vol=0.35 pan=-0.25
-voice surf   surf      vol=0.5
+# untagged voices are the base layer, the hook among them (layers only add); the intro plays every layer
+voice mar    marimba   vol=0.36 pan=0.35
+voice bass   fmbass    vol=0.64 gate=0.8
+voice clave  clave     vol=0.34 pan=-0.4
+voice wash   surf      vol=0.3  pan=0.2
+voice kick   kick      vol=0.85 layer=drums
+voice rim    rim       vol=0.42 pan=0.1 layer=drums
+voice shake  shaker    vol=0.36 pan=-0.35 layer=drums
+voice timb   timbale   vol=0.4  pan=0.3 layer=drums
+voice crash  crash     vol=0.32 pan=-0.2 layer=drums
+voice steel  steeldrum vol=0.9  pan=-0.05
+voice horns  brass     vol=0.32 pan=-0.35 center=B4 gate=0.5 layer=lead
+voice hat    hat909    vol=0.3  pan=0.4 layer=frenzy
 
 pattern intro
-surf  | x... .... | .... .... |
-gtr   | [D]- . [D] . [D] [D]- | [A]- . [A] . [A] [A]- |
-snare | .... .... | .... xxXX |
+steel | D5 E5 F#5 A5 B5-- A5 | G5--- . . D5 . |
+wash  | x....... | ........ |
+timb  | ........ | x.x.xxXX |
+kick  | ........ | x...x.x. |
 
 pattern A
-lead  | F#5 A5 F#5 D5- E5 F#5 A5 | B5- A5 F#5- D5 B4- | D5 G5 B5 G5 D5- B4- | C#5 E5 A5- G5 F#5 E5- |
-gtr   | [D]- . [D] . [D] [D]- | [Bm]- . [Bm] . [Bm] [Bm]- | [G]- . [G] . [G] [G]- | [A]- . [A] . [A] [A]- |
-bass  | D2 D2 D2 D2 A1 A1 A1 A1 | B1 B1 B1 B1 F#2 F#2 F#2 F#2 | G1 G1 G1 G1 D2 D2 D2 D2 | A1 A1 A1 A1 E2 E2 E2 E2 |
-kick  | x..x x... | % | % | % |
-snare | ..x. ..x. | % | % | ..x. .xXX |
-ride  | xxxx xxxx | % | % | % |
-crash | X... .... | _ | _ | _ |
-surf  | x... .... | _ | _ | _ |
+steel | G5-- D5-- B4- | C5 E5 G5 E5- C5 E5- | F#5-- A5-- F#5 E5 | D5 B4 G4 B4 D5--- |
+mar   | G4 B4 D5 B4 G4 B4 D5 B4 | C5 E5 G5 E5 C5 E5 G5 E5 | D5 F#5 A5 F#5 D5 F#5 A5 F#5 | G4 B4 D5 B4 G4 B4 D5 B4 |
+bass  | G2-- G2-- D2- | C3-- C3-- G2- | D2-- D2-- A2- | G2-- G2-- D2- |
+clave | x..x..x. | ..x.x... | x..x..x. | ..x.x... |
+wash  | _ | _ | _ | _ |
+kick  | x...x... | % | % | % |
+rim   | ..x...x. | % | % | % |
+shake | xoxoxoxo | % | % | % |
+timb  | ........ | % | % | ....x.xx |
+crash | X....... | _ | _ | _ |
+horns | [G]-- [G]-- [G]- | [C]-- [C]-- [C]- | [D]-- [D]-- [D]- | [G]-- [G]-- [G]- |
+hat   | xxxxxxxx | % | % | % |
 
-pattern B
-lead  | B5--- A5- G5- | A5--- G5- E5- | F#5 E5 C#5 E5 F#5- A5- | E5 F#5 E5 C#5 A4--- |
-gtr   | [G]- . [G] . [G] [G]- | [A]- . [A] . [A] [A]- | [F#m]- . [F#m] . [F#m] [F#m]- | [A]- . [A] . [A7] [A7]- |
-bass  | G1 G1 G1 G1 D2 D2 D2 D2 | A1 A1 A1 A1 E2 E2 E2 E2 | F#1 F#1 F#1 F#1 C#2 C#2 C#2 C#2 | A1 A1 A1 A1 E2 E2 C#2 E2 |
-kick  | x..x x... | % | % | % |
-snare | ..x. ..x. | % | % | .xx. XXXX |
-ride  | xxxx xxxx | % | % | % |
-crash | X... .... | _ | _ | _ |
+pattern A2 from A
+steel | G5-- D5-- B4- | C5 E5 G5 E5- C5 E5- | F#5-- A5-- C6 B5 | G5--- . D5 E5 F#5 |
+wash  | x....... | _ | _ | _ |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+steel | B5-- G5-- E5- | C6-- G5-- E5 G5 | C#6-- A5-- G5- | F#5 E5 D5 C5 A4- F#4- |
+mar   | E5 G5 B5 G5 E5 G5 B5 G5 | C5 E5 G5 E5 C5 E5 G5 E5 | C#5 E5 A5 E5 C#5 E5 G5 E5 | D5 F#5 A5 F#5 C5 F#5 A5 F#5 |
+bass  | E2-- E2-- B2- | C3-- C3-- G2- | A2-- A2-- E2- | D2-- D2-- F#2- |
+horns | [Em]--- . [Em]-- | [C]--- . [C]-- | [A7]--- . [A7]-- | [D7]--- . [D7]-- |
+crash | X....... | _ | _ | _ |
+
+pattern B2 from B
+steel | B5-- G5-- E5- | C6-- G5-- E5 G5 | C#6-- A5-- G5- | A5 F#5 D5 F#5 A5 B5 C6 A5 |
+timb  | ........ | % | % | x.x.xxXX |
 
 play intro
-loop A B
+loop A A2 B B2 A A2 A+2 A2+2

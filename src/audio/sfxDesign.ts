@@ -228,23 +228,10 @@ export interface MusicKey {
 export const SCORE_KEYS: Record<string, MusicKey> = {
   title: { tonic: 69, minor: true }, // A minor
   level1: { tonic: 65, minor: false }, // F major
-  level2: { tonic: 69, minor: true }, // A harmonic minor
-  level3: { tonic: 62, minor: false }, // D major
-  level4: { tonic: 61, minor: true }, // C# minor
-  level5: { tonic: 62, minor: true }, // D minor
-  // Level 2–5 theme options waiting on Alex's pick (#303, `?theme=`, scores/themes/)
-  'level2.sidewinder': { tonic: 62, minor: true }, // D harmonic minor
-  'level2.caravan': { tonic: 64, minor: true }, // E harmonic minor
-  'level2.dunerider': { tonic: 65, minor: true }, // F minor
-  'level3.breakwater': { tonic: 69, minor: true }, // A minor
-  'level3.lagoon': { tonic: 67, minor: false }, // G major
-  'level3.riptide': { tonic: 64, minor: false }, // E major
-  'level4.glacier': { tonic: 66, minor: true }, // F-sharp minor
-  'level4.whiteout': { tonic: 71, minor: true }, // B minor
-  'level4.aurora': { tonic: 62, minor: true }, // D minor
-  'level5.brimstone': { tonic: 64, minor: true }, // E minor
-  'level5.hellgate': { tonic: 60, minor: true }, // C minor
-  'level5.magma': { tonic: 67, minor: true }, // G minor
+  level2: { tonic: 65, minor: true }, // F minor
+  level3: { tonic: 67, minor: false }, // G major
+  level4: { tonic: 62, minor: true }, // D minor
+  level5: { tonic: 60, minor: true }, // C minor
   results: { tonic: 60, minor: false }, // C major
   // Theme options waiting on Alex's pick (`?theme=`, scores/themes/) get a row each: `'<slot>.<name>': key`
 }
