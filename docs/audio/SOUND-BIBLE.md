@@ -31,6 +31,11 @@ do one job, a rock beat). He passed on the grander fanfare and the gentler shuff
 option leads with its hook in the first bars of the loop, keeps one signature instrument on it,
 drives at 134–176 BPM and lifts for its last 8 bars. The variety goes into the idea, not the polish.
 Every option is also written in intensity layers, so the pick drops in as the level's score as it is.
+**Layers only add (#415).** A level's `base` layer is the whole song as it renders, melody
+included; `drums`, `lead` and `frenzy` add energy on top (the kit, a doubling or counter-line at
+3×, the FRENZY lift) and never take the tune away. A run opens on `base` alone and a lost combo
+falls back to it, so a melody tagged `lead` is silent for most of a run (level1's organ riff was,
+until #415). `lintLayers` in `scores.test.ts` holds every score to it.
 
 **Level 2–5 picks (#391).** Alex picked one of three options per world, and they are now
 `src/audio/scores/level2…5.scrim`: level2 "Dune Rider" (F minor, 168, desert trance: harpsichord
@@ -40,7 +45,7 @@ choir, timpani), level5 "Hellgate" (C minor, 150, string ostinato, brass and hor
 He took the most Neon-like, the sunniest, the calmest and the most "final boss" option, and passed
 on both options marked closest to their brief (`sidewinder`, `glacier`): a level's theme can lean on
 mood as much as on its biome's instruments.
-Each keeps its hook in `base` (layers only add, #415): the doubling or stabs come in at 3×.
+Each keeps its hook in `base`: the doubling or stabs come in at 3×.
 
 | Level | Biome | Brief | Signature colour |
 |---|---|---|---|

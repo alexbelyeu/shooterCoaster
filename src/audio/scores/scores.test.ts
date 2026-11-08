@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { compile } from '@/audio/scrim/score'
-import { lintRanges } from '@/audio/scrim/lint'
+import { lintLayers, lintRanges } from '@/audio/scrim/lint'
 import { SCORE_KEYS } from '@/audio/sfxDesign'
 import { SCORES, themesFromQuery } from './index'
 
@@ -33,11 +33,28 @@ describe('game scores', () => {
     expect(lintRanges(song)).toEqual(['"low" (tuba) plays C6–C6; its range is E1–A#3.'])
   })
 
+  it('the layer lint wants the tune in base: a higher layer may only double it or play under it (#415)', () => {
+    const score = (leadLayer: string, extra: string) =>
+      compile(`steps 1\nvoice pad strings\nvoice lead organ ${leadLayer}\nvoice top xylophone layer=lead\nvoice low brass layer=lead
+pattern A
+pad  | [C]--- |
+lead | C5 E5 G5 E5 |
+${extra}
+loop A`)
+    expect(lintLayers(score('', 'top  | C7 E7 G7 E7 |\nlow  | E4 G4 B4 G4 |'))).toEqual([])
+    expect(lintLayers(score('layer=lead', 'top  | C7 E7 G7 E7 |'))).toEqual([
+      '"lead" (layer=lead) plays above the base layer\'s top line without doubling a base voice: the tune belongs in base, layers only add.',
+      '"top" (layer=lead) plays above the base layer\'s top line without doubling a base voice: the tune belongs in base, layers only add.',
+    ])
+    expect(lintLayers(score('', 'top  | C7 D7 G7 E7 |'))).toHaveLength(1)
+  })
+
   for (const [id, text] of Object.entries(SCORES)) {
-    it(`${id} compiles cleanly, loops, and keeps every note in range`, () => {
+    it(`${id} compiles cleanly, loops, keeps every note in range and its tune in base`, () => {
       const song = compile(text)
       expect(song.errors).toEqual([])
       expect(lintRanges(song)).toEqual([])
+      expect(lintLayers(song)).toEqual([])
       expect(song.intro.dur).toBeGreaterThan(0)
       expect(song.loop.dur).toBeGreaterThan(0)
     })

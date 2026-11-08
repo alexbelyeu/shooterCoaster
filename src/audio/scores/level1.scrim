@@ -1,19 +1,19 @@
 title    Midway Rush
 composer Claude (ShooterCoaster)
-about    Theme Park theme. Organ riff, accordion skank and an oom-pah tuba over a rock beat. Layers follow the combo: skank + tuba, then drums at 2x, the organ and xylophone at 3x, a supersaw and straight hats at FRENZY.
+about    Theme Park theme. Organ riff, accordion skank and an oom-pah tuba over a rock beat. Layers follow the combo: the organ riff, skank and tuba, then drums at 2x, the xylophone doubling at 3x, a supersaw and straight hats at FRENZY.
 tempo    156
 beats    4
 steps    2
 reverb   0.22
 
-# untagged voices are the base layer; the intro plays every layer
+# untagged voices are the base layer, the riff among them (layers only add); the intro plays every layer
 voice skank  accordion vol=0.35 pan=0.3  center=A4 gate=0.5
 voice tuba   tuba      vol=0.8  oct=1
+voice lead   organ     vol=0.75 pan=-0.1
 voice kick   kick      vol=0.85          layer=drums
 voice snare  snare     vol=0.55 pan=0.05 layer=drums
 voice hat    hat       vol=0.35 pan=-0.3 layer=drums
 voice crash  crash     vol=0.35 pan=0.2  layer=drums
-voice lead   organ     vol=0.75 pan=-0.1 layer=lead
 voice xylo   xylophone vol=0.45 pan=0.35 layer=lead
 voice saw    supersaw  vol=0.42          oct=1 layer=frenzy
 voice fhat   hat909    vol=0.42 pan=0.4  layer=frenzy
