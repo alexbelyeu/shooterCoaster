@@ -1,9 +1,10 @@
-import { useRef, useEffect, useLayoutEffect } from 'react'
+import { useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
 import type { ArcTable } from './arcLength'
 import { setRideProgress } from './rideProgress'
+import { nextVelocity, rideSpeeds } from './ridePhysics'
 import { e2eRideSeconds } from '@/testing/e2eHook'
 import { useGameStore } from '@/store/useGameStore'
 import { sfx } from '@/audio/sfx'
@@ -38,10 +39,6 @@ interface CoasterCameraProps {
   enabled?: boolean
 }
 
-// The 2015 game ran frame-dependent physics at ~30-45 fps: slow the 60 fps port to match, and cap runaway downhill speed.
-const SPEED_FACTOR = 0.7
-const MAX_VELOCITY_MULT = 5 // max velocity = minRollerSpeed * this
-
 const BASE_FOV = 80
 
 const RAD_TO_DEG = 180 / Math.PI
@@ -64,6 +61,7 @@ export default function CoasterCamera({
   const { set } = useThree()
   const cameraRef = useRef<THREE.PerspectiveCamera>(null)
 
+  const speeds = useMemo(() => rideSpeeds({ rollerSpeed, minRollerSpeed }), [rollerSpeed, minRollerSpeed])
   const progress = useRef(0)
   const velocity = useRef(0)
   const _position = useRef(new THREE.Vector3())
@@ -141,9 +139,7 @@ export default function CoasterCamera({
     const frameDelta = countdown || store.phase === 'paused' ? 0 : delta
     const effectiveDelta = frameDelta * (store.timeScale ?? 1)
 
-    const effectiveRollerSpeed = rollerSpeed * SPEED_FACTOR
-    const effectiveMinSpeed = minRollerSpeed * SPEED_FACTOR
-    const maxVelocity = minRollerSpeed * MAX_VELOCITY_MULT * SPEED_FACTOR
+    const { min: effectiveMinSpeed, max: maxVelocity } = speeds
 
     const testApi = window.__SC_TEST__
     if (testApi?.rideTo != null) {
@@ -164,9 +160,7 @@ export default function CoasterCamera({
       rideLeft -= dtScaleSlow
       progress.current = wrap01(progress.current + velocity.current * dtScaleSlow)
       _tangent.current.copy(curve.getTangentAt(progress.current))
-      velocity.current -= _tangent.current.y * effectiveRollerSpeed * dtScaleSlow
-      velocity.current = Math.max(velocity.current, effectiveMinSpeed)
-      velocity.current = Math.min(velocity.current, maxVelocity)
+      velocity.current = nextVelocity(velocity.current, _tangent.current.y, dtScaleSlow, speeds)
     } while (rideLeft > 0)
     const t = progress.current
     setRideProgress(t)

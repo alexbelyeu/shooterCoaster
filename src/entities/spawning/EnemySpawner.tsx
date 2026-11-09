@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import type { EnemyType, EnemyWave, LevelConfig } from '@/types/level'
 import { indexAtT, type ArcTable } from '@/track/arcLength'
 import { rideProgress } from '@/track/rideProgress'
+import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -16,11 +17,11 @@ import { createRng, type Rng } from '@/utils/rng'
 import { recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
 import type { EnemyEntry } from '../enemies/EnemyBase'
 import {
-  formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, trackPoint, tracksideSlots,
-  type FormationMotion, type FormationSlot, type TracksideSlot, type Vec3,
+  ENTRY_SECONDS, ENTRY_STAGGER, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, trackPoint, tracksideSlots,
+  type FormationMotion, type FormationSlot, type RideAhead, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
 import { ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, readableScatterSpawn } from './enemyPlacement'
-import { newWaveProgress, nextWaveDue, tickWaves } from './waveSchedule'
+import { newWaveProgress, nextWaveDue, tickWaves, waveWindows } from './waveSchedule'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -32,6 +33,9 @@ interface EnemySpawnerProps {
   boss?: LevelConfig['boss']
   /** The level timer, which waves and the boss run on. */
   timerSeconds: number
+  /** The ride's speeds and structure scale: waves are placed where the rider will be looking (`RideAhead`). */
+  rideSpeeds: RideSpeeds
+  trackScale: number
 }
 
 interface SpawnedEnemy {
@@ -136,6 +140,8 @@ export default function EnemySpawner({
   groundFn,
   boss,
   timerSeconds,
+  rideSpeeds,
+  trackScale,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
   const getThree = useThree((s) => s.get)
@@ -154,13 +160,25 @@ export default function EnemySpawner({
   }, [enemies, goldenBalloons])
   const phase = useGameStore((s) => s.phase)
 
+  const waveDelays = useMemo(() => waves.map((w) => w.spawnDelay ?? 0), [waves])
+  // The ride a run takes from GO, so each wave knows how far the rider goes while it flies in and before the next one.
+  const rideAhead = useMemo((): RideAhead[] => {
+    const profile = rideProfile(trackTable, rideSpeeds, timerSeconds)
+    return waveWindows(waveDelays, boss?.at, timerSeconds).map(([from, to]) => ({
+      entry: riddenBetween(profile, from, from + ENTRY_SECONDS + ENTRY_STAGGER),
+      window: riddenBetween(profile, from, to),
+      trackScale,
+    }))
+  }, [trackTable, rideSpeeds, timerSeconds, waveDelays, boss?.at, trackScale])
+
   const placeWave = useCallback(
     (waveIdx: number, riderIndex: number, camera: Vec3): [string, Placed][] => {
       const wave = waves[waveIdx]
+      const ride = rideAhead[waveIdx]
       const members = enemies.filter((e) => e.waveIndex === waveIdx)
       if (members[0]?.trackside) {
         const placed = placeTracksideWave({
-          table: trackTable, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!),
+          table: trackTable, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride,
         })
         return members.map((e, i) => [e.id, { position: toVector3(placed[i]) }])
       }
@@ -176,13 +194,14 @@ export default function EnemySpawner({
         type: wave.type,
         groundFn,
         slots: members.map((e) => e.slot!),
+        ride,
       })
       return members.map((e, i) => {
         const p = placed[i]
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [waves, enemies, trackTable, groundFn],
+    [waves, enemies, trackTable, groundFn, rideAhead],
   )
 
   const initialActiveWave = useMemo(
@@ -286,7 +305,6 @@ export default function EnemySpawner({
     [getThree, trackTable, enemies, placeWave, waves],
   )
 
-  const waveDelays = useMemo(() => waves.map((w) => w.spawnDelay ?? 0), [waves])
   useEffect(() => {
     registerE2EWaves(() => ({
       levelTime: timerSeconds - useGameStore.getState().timeRemaining,
