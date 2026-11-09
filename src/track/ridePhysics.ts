@@ -1,16 +1,13 @@
 import type { TrackParams } from '@/types/level'
 import type { TrackCurve } from './curves/TrackCurve'
 
-/** The coaster's speed along the track (port of Camera.js updateCamGame), pure so a lap can be timed in a unit test. */
-
 // The 2015 game ran frame-dependent physics at ~30-45 fps: slow the 60 fps port to match, and cap runaway downhill speed.
 const SPEED_FACTOR = 0.7
-const MAX_VELOCITY_MULT = 5 // max velocity = minRollerSpeed * this
-/** Track parameter steps are taken in 60 fps frames, at most this many at once (a hitch slows the ride, never skips track). */
+const MAX_VELOCITY_MULT = 5
+/** A hitch rides at most this many 60 fps frames at once: it slows the ride, never skips track. */
 export const MAX_RIDE_STEP_FRAMES = 3
 
 export interface RideSpeeds {
-  /** Downhill pull per frame, per unit of tangent drop. */
   gravity: number
   min: number
   max: number
@@ -24,16 +21,15 @@ export function rideSpeeds(track: Pick<TrackParams, 'rollerSpeed' | 'minRollerSp
   }
 }
 
+/** `progress` is the track parameter (0..1, wrapping), `velocity` that per 60 fps frame. */
 export interface RideState {
-  /** Track parameter, 0..1, wrapping. */
   progress: number
-  /** Track parameter per 60 fps frame. */
   velocity: number
 }
 
 const wrap01 = (t: number) => ((t % 1) + 1) % 1
 
-/** Rides `frames` 60 fps frames in steps of at most `MAX_RIDE_STEP_FRAMES`. */
+/** Port of Camera.js updateCamGame. */
 export function advanceRide(state: RideState, curve: TrackCurve, speeds: RideSpeeds, frames: number): RideState {
   let left = frames
   do {
@@ -46,7 +42,7 @@ export function advanceRide(state: RideState, curve: TrackCurve, speeds: RideSpe
   return state
 }
 
-/** Seconds one lap takes from a standing start, ridden at 60 fps; Infinity past `maxSeconds`. */
+/** From a standing start at 60 fps; Infinity past `maxSeconds`. */
 export function lapSeconds(curve: TrackCurve, speeds: RideSpeeds, maxSeconds = 600): number {
   const state: RideState = { progress: 0, velocity: 0 }
   let travelled = 0

@@ -146,8 +146,7 @@ export default function CoasterCamera({
       ride.current.velocity = speeds.min + Math.min(Math.max(testApi.rideSpeed, 0), 1) * (speeds.max - speeds.min)
       testApi.rideSpeed = null
     }
-    // In 60 fps frames. A hitch rides at most 3 of them (it slows the ride, never skips track); the smoke's `rideRate`
-    // instead rides a share of the level time in such steps, so the ride doesn't depend on the frame rate (#305).
+    // The smoke's `rideRate` rides a share of the level time instead, so its ride doesn't depend on the frame rate (#305).
     const e2eRide = e2eRideSeconds(frameDelta)
     const rideFrames = e2eRide === null ? Math.min(effectiveDelta * 60, MAX_RIDE_STEP_FRAMES) : e2eRide * (store.timeScale ?? 1) * 60
     advanceRide(ride.current, curve, speeds, rideFrames)

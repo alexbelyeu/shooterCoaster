@@ -45,19 +45,18 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2129, Giant Scorpion 2480, Kraken 2624, Yeti 3180; Inferno ends on its drakes, 2234', () => {
+  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2450, Kraken 2624, Yeti 3180; Inferno ends on its drakes, 2234', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
-      ['level1', 'goldenBlimp', 2129],
-      ['level2', 'giantScorpion', 2480],
+      ['level1', 'goldenBlimp', 2675],
+      ['level2', 'giantScorpion', 2450],
       ['level3', 'kraken', 2624],
       ['level4', 'yeti', 3180],
       ['level5', 'infernalDrake', 2234],
     ])
-    expect(getLevelConfig('level1')!.maxScore).toBe(108 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
+    expect(getLevelConfig('level1')!.maxScore).toBe(150 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
   })
 
-  // #452: every run is RUN_SECONDS long (the level timer has no other source) and paced by `pacing.ts`.
   it.each(levels.map((l) => [l.id, l] as const))(
     '%s: waves from 0 s, the last one shootable by 35 s, then a 18–22 s boss fight (or a finale wave) ending the run',
     (_id, level) => {
@@ -82,12 +81,12 @@ describe('LevelRegistry', () => {
     expect(eruptions[0].spawnDelay!).toBeLessThan(pacingTimes().bossAt)
   })
 
-  it('every level has about as many enemies a second as Theme Park, 2–3 a second of the waves before the finale', () => {
+  it('every level comes at 2–4 enemies a second of the waves before the finale; Theme Park, the bar, keeps its 50-balloon waves', () => {
     for (const l of levels) {
       const waves = l.boss ? l.enemies : l.enemies.slice(0, -1)
       const perSecond = waves.reduce((n, w) => n + w.count, 0) / pacingTimes().bossAt
       expect(perSecond, l.id).toBeGreaterThanOrEqual(2)
-      expect(perSecond, l.id).toBeLessThanOrEqual(3)
+      expect(perSecond, l.id).toBeLessThanOrEqual(4)
     }
   })
 

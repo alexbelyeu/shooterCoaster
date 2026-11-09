@@ -9,7 +9,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Fun at the fair',
     order: 1,
     biome: 'themePark',
-    maxScore: 108 * 13 + 5 * 65 + 400, // 1404 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 2129
+    maxScore: 150 * 13 + 5 * 65 + 400, // 1950 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 2675
     message: 'Well, that was easy...',
     nextLevel: 'level2',
     track: {
@@ -25,9 +25,9 @@ const LEVELS: LevelConfig[] = [
     },
     ...paceLevel({
       waves: [
-        { type: 'balloon', count: 36, waveLabel: 'Pop em!' },
-        { type: 'balloon', count: 36, waveLabel: 'More Balloons!' },
-        { type: 'balloon', count: 36, waveLabel: 'Final Wave!', formation: 'ring' },
+        { type: 'balloon', count: 50, waveLabel: 'Pop em!' },
+        { type: 'balloon', count: 50, waveLabel: 'More Balloons!' },
+        { type: 'balloon', count: 50, waveLabel: 'Final Wave!', formation: 'ring' },
       ],
       boss: 'goldenBlimp',
     }),
@@ -43,7 +43,7 @@ const LEVELS: LevelConfig[] = [
     description: 'A murder of Crows',
     order: 2,
     biome: 'desert',
-    maxScore: 36 * 20 + 72 * 15 + 2 * 60 + 4 * 40 + 400, // 1800 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2480
+    maxScore: 30 * 20 + 78 * 15 + 2 * 60 + 4 * 40 + 400, // 1770 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2450
     message: 'Ready for this one?',
     nextLevel: 'level3',
     track: {
@@ -59,9 +59,9 @@ const LEVELS: LevelConfig[] = [
     },
     ...paceLevel({
       waves: [
-        { type: 'scorpion', count: 36, waveLabel: 'Incoming!' },
-        { type: 'crow', count: 36, waveLabel: 'A Murder of Crows!', formation: 'v' },
-        { type: 'crow', count: 36, waveLabel: 'More Crows!', formation: 'v' },
+        { type: 'scorpion', count: 30, waveLabel: 'Incoming!' },
+        { type: 'crow', count: 39, waveLabel: 'A Murder of Crows!', formation: 'v' },
+        { type: 'crow', count: 39, waveLabel: 'More Crows!', formation: 'v' },
       ],
       boss: 'giantScorpion',
     }),
@@ -91,9 +91,9 @@ const LEVELS: LevelConfig[] = [
     },
     ...paceLevel({
       waves: [
-        { type: 'jellyfish', count: 24, waveLabel: 'Into the Deep!', weight: 3 },
+        { type: 'jellyfish', count: 20, waveLabel: 'Into the Deep!', weight: 3 },
         { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 2 },
-        { type: 'jellyfish', count: 20, waveLabel: 'Jellyfish Bloom!', weight: 2 },
+        { type: 'jellyfish', count: 24, waveLabel: 'Jellyfish Bloom!', weight: 2 },
         { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 3 },
       ],
       boss: 'kraken',

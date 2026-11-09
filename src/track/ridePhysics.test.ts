@@ -6,7 +6,6 @@ import { RUN_SECONDS } from '@/levels/pacing'
 import { advanceRide, lapSeconds, rideSpeeds } from './ridePhysics'
 import type { TrackCurve } from './curves/TrackCurve'
 
-/** A flat curve: tangent y is 0 everywhere. */
 const flat: TrackCurve = {
   getPointAt: () => ({ x: 0, y: 0, z: 0 }) as never,
   getTangentAt: () => ({ x: 1, y: 0, z: 0 }) as never,
@@ -30,11 +29,7 @@ describe('advanceRide', () => {
   })
 })
 
-/**
- * Seconds one lap takes today, from a standing start (#452). The runs are 60 s now, but a 60 s lap would ride 2.2–3.8×
- * faster on average than these (Theme Park 2.4×, Inferno 3.8×), a different and worse ride, so the speeds stay: a
- * run rides 0.25–0.6 of a lap. Pinned so a change to the ride is deliberate.
- */
+/** Pinned (#452): a 60 s lap would ride 2.2–3.8× faster than today, a different ride, so a run rides 0.25–0.6 of a lap. */
 const LAPS: Record<string, number> = { level1: 147, level2: 165, level3: 99, level4: 193, level5: 228 }
 
 describe.each(getAllLevels().map((l) => [l.id, l.track] as const))('the ride on %s', (id, track) => {

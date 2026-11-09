@@ -9,12 +9,12 @@ export interface ScoreLimits {
 
 export const LEVEL_LIMITS: Readonly<Record<string, ScoreLimits>> = {
   "level1": {
-    "maxScore": 11620,
-    "maxKills": 117,
+    "maxScore": 14350,
+    "maxKills": 159,
     "maxKillPoints": 2325
   },
   "level2": {
-    "maxScore": 12400,
+    "maxScore": 12250,
     "maxKills": 115,
     "maxKillPoints": 2300
   },
