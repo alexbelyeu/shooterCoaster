@@ -70,8 +70,15 @@ export const SCORPION_RISE = {
   sinkS: 1.5,
 } as const
 
+/** Where a ground boss may stand: [ahead, side] of the rider in preference order, on either side, and its footprint. */
+export interface PerchConfig {
+  slots: readonly (readonly [number, number])[]
+  footprint: number
+  clearance: number
+}
+
 /** [ahead, side] of the rider in preference order, on either side: the track loops over most of the sand ahead. */
-export const PERCH = {
+export const PERCH: PerchConfig = {
   slots: [
     [900, 420],
     [1020, 360],
@@ -83,11 +90,11 @@ export const PERCH = {
     [860, 760],
     [1300, 680],
     [740, 600],
-  ] as const,
+  ],
   /** Body and legs; the claws and tail may reach past a tower. */
   footprint: 260,
   clearance: 45,
-} as const
+}
 
 interface Circle {
   x: number
@@ -110,14 +117,14 @@ export interface PerchInput {
   avoid: readonly Circle[]
 }
 
-export function perchClear(input: PerchInput, x: number, z: number): boolean {
-  if (input.index.near(x, z, PERCH.clearance + PERCH.footprint)) return false
-  for (const a of input.avoid) if (Math.hypot(a.x - x, a.z - z) < a.r + PERCH.footprint) return false
+export function perchClear(input: PerchInput, x: number, z: number, config: PerchConfig = PERCH): boolean {
+  if (input.index.near(x, z, config.clearance + config.footprint)) return false
+  for (const a of input.avoid) if (Math.hypot(a.x - x, a.z - z) < a.r + config.footprint) return false
   return true
 }
 
-function slotAt(input: PerchInput, slot: number, sign: number, out: { x: number; z: number }): void {
-  const [ahead, side] = PERCH.slots[slot]
+function slotAt(input: PerchInput, config: PerchConfig, slot: number, sign: number, out: { x: number; z: number }): void {
+  const [ahead, side] = config.slots[slot]
   // Right of the heading is (−fz, fx).
   out.x = input.camera.x + input.forwardX * ahead - input.forwardZ * side * sign
   out.z = input.camera.z + input.forwardZ * ahead + input.forwardX * side * sign
@@ -126,14 +133,14 @@ function slotAt(input: PerchInput, slot: number, sign: number, out: { x: number;
 const _at = { x: 0, z: 0 }
 
 /** Keeps `out`'s slot and side while clear, so it doesn't hop about; false (and `out` unchanged) if all are blocked. */
-export function pickPerch(out: Perch, input: PerchInput): boolean {
-  const n = PERCH.slots.length
+export function pickPerch(out: Perch, input: PerchInput, config: PerchConfig = PERCH): boolean {
+  const n = config.slots.length
   for (let s = 0; s < 2; s++) {
     const sign = s === 0 ? out.sign : (-out.sign as 1 | -1)
     for (let k = 0; k < n; k++) {
       const slot = s === 0 ? (out.slot + k) % n : k
-      slotAt(input, slot, sign, _at)
-      if (!perchClear(input, _at.x, _at.z)) continue
+      slotAt(input, config, slot, sign, _at)
+      if (!perchClear(input, _at.x, _at.z, config)) continue
       out.x = _at.x
       out.z = _at.z
       out.slot = slot

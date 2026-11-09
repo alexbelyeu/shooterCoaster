@@ -6,6 +6,7 @@ import ScoreDisplay from './ScoreDisplay'
 import TimerBar from './TimerBar'
 import ComboMeter from './ComboMeter'
 import FrenzyFlash from './FrenzyFlash'
+import SnowSplat from './SnowSplat'
 import BossBar from './BossBar'
 import WeaponBadge from './WeaponBadge'
 
@@ -65,6 +66,7 @@ export default function HUD() {
       </div>
       <BossBar />
       <FrenzyFlash />
+      <SnowSplat />
       <ComboMeter />
       <WeaponBadge />
       {/* Touch has no Escape key: an always-available pause button. */}

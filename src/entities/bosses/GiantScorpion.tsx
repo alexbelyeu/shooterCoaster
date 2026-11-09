@@ -9,6 +9,7 @@ import { SAND_BURST_DEATH_STYLE, SCORPION_SHARD_DEATH_STYLE } from '@/effects/de
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { desertObstacles, layoutDesert } from '@/levels/environments/biomes/desert/desertLayout'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
+import { setLimb } from './bossLimbs'
 import BossConfetti from './BossConfetti'
 import { isExposed, type WeakPointSpec } from './bossModel'
 import { GIANT_SCORPION } from './bossSpecs'
@@ -43,7 +44,6 @@ const LUNGE_TRAUMA = [0.3, 350] as const
 const DEFEAT_TRAUMA = [0.7, 900] as const
 const EXIT_SECONDS = SCORPION_RISE.sinkS + 0.6
 
-const _m = new THREE.Matrix4()
 const _cam = new THREE.Vector3()
 const _fwd = new THREE.Vector3()
 const _p = new THREE.Vector3()
@@ -51,33 +51,6 @@ const _p = new THREE.Vector3()
 function sandBurst(x: number, y: number, z: number, trauma: readonly [number, number]) {
   getExplosionPool()?.explode(_p.set(x, y, z), SAND_BURST_DEATH_STYLE)
   eventBus.emit(CAMERA_TRAUMA_EVENT, trauma[0], trauma[1])
-}
-
-/** Root-local segment a → b of radius r. */
-function setLimb(limbs: THREE.InstancedMesh, i: number, ax: number, ay: number, az: number, bx: number, by: number, bz: number, r: number) {
-  const dx = bx - ax
-  const dy = by - ay
-  const dz = bz - az
-  const len = Math.hypot(dx, dy, dz) || 1
-  const ux = dx / len
-  const uy = dy / len
-  const uz = dz / len
-  // x' = u × up, or +x when the limb is vertical; z' = x' × u.
-  let px = -uz
-  let pz = ux
-  const pl = Math.hypot(px, pz)
-  if (pl < 1e-4) {
-    px = 1
-    pz = 0
-  } else {
-    px /= pl
-    pz /= pl
-  }
-  const qx = -pz * uy
-  const qy = pz * ux - px * uz
-  const qz = px * uy
-  _m.set(px * r, ux * len, qx * r, ax, 0, uy * len, qy * r, ay, pz * r, uz * len, qz * r, az, 0, 0, 0, 1)
-  limbs.setMatrixAt(i, _m)
 }
 
 /** Desert finale: break both claws and the four tail segments, then the stinger on the bare stub. */

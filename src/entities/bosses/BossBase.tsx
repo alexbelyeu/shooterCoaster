@@ -12,7 +12,7 @@ import { e2eBoss, isE2E } from '@/testing/e2eHook'
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import {
-  applyHit, createBossState, destroyScore, hpFraction, isDefeated, isExposed, weakPointHp,
+  applyHit, createBossState, destroyScore, hpFraction, isDefeated, isExposed, setRetracted, weakPointHp,
   type BossSpec, type BossState, type WeakPointSpec,
 } from './bossModel'
 
@@ -27,6 +27,8 @@ export interface BossFrame {
   age: number
   /** -1 while it fights. */
   sinceDefeat: number
+  /** Hide a weak point for now or show it again (`BossState.retracted`); its target follows at once. */
+  retract: (weakPoint: string, retracted: boolean) => void
 }
 
 export interface BossProps {
@@ -168,6 +170,19 @@ export default function BossBase({
     })
   }
 
+  const retract = useCallback((wpId: string, retracted: boolean) => {
+    const before = stateRef.current
+    const after = setRetracted(before, wpId, retracted)
+    if (after === before) return
+    stateRef.current = after
+    syncRef.current(after)
+    // A flash in flight would restore the old (exposed) material over the new one.
+    const i = spec.weakPoints.findIndex((w) => w.id === wpId)
+    if (i >= 0) fx[i].flashMs = 0
+    parts.get(wpId)?.traverse(restoreMesh)
+    setPhaseVersion((v) => v + 1)
+  }, [])
+
   useEffect(() => {
     if (!active) return
     syncRef.current(stateRef.current)
@@ -246,7 +261,7 @@ export default function BossBase({
     }
 
     const sinceDefeat = c.defeatedAt < 0 ? -1 : c.age - c.defeatedAt
-    move({ root, parts, camera, state: stateRef.current, dt, age: c.age, sinceDefeat })
+    move({ root, parts, camera, state: stateRef.current, dt, age: c.age, sinceDefeat, retract })
     c.age += dt
     if (sinceDefeat >= exitSeconds) onDone()
   })

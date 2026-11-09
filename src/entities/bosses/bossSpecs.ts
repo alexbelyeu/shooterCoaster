@@ -3,6 +3,7 @@ import type { BossType } from '@/types/level'
 import type { BossSpec, WeakPointSpec } from './bossModel'
 import { KRAKEN_TENTACLE } from './krakenMotion'
 import { SCORPION_TAIL } from './scorpionMotion'
+import { YETI_BODY } from './yetiMotion'
 
 /** Local frame: +x = nose; the root sits near the middle of hull + tow chain. */
 export const BLIMP_LAYOUT = {
@@ -84,8 +85,27 @@ export const GIANT_SCORPION: BossSpec = {
   ],
 }
 
+/** Placed every frame at the ends of its arms (Yeti.tsx); the chest on its body. */
+const yetiFist = (id: string): WeakPointSpec => ({ id, radius: 85, offset: [0, 0, 0], hp: 2, score: 60, phase: 0 })
+
+/** Snowballs: a 20-point kill each; ~11 fit in its 20 s fight, the cap is what the server allows. */
+export const YETI_SNOWBALL = { score: 20, max: 16, radius: 65 } as const
+
+export const YETI: BossSpec = {
+  name: 'The Yeti',
+  tell: { seconds: 2.5, label: 'A Roar From The Ridge!' },
+  reward: 400,
+  weakPoints: [
+    yetiFist('fist-l'),
+    yetiFist('fist-r'),
+    { id: 'chest', radius: 95, offset: [...YETI_BODY.chest], hp: 4, score: 0, phase: 1 },
+  ],
+  projectiles: { score: YETI_SNOWBALL.score, max: YETI_SNOWBALL.max },
+}
+
 export const BOSS_SPECS: Record<BossType, BossSpec> = {
   goldenBlimp: GOLDEN_BLIMP,
   kraken: KRAKEN,
   giantScorpion: GIANT_SCORPION,
+  yeti: YETI,
 }

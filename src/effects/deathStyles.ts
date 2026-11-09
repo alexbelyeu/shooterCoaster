@@ -136,6 +136,30 @@ const SNOW_CRUMBLE = (ice: string): readonly DeathLayer[] => [
   layer({ shape: 'mote', count: 28, colors: ['#ffffff', '#dbe9ff'], glow: 1.3, speed: [10, 60], drag: 2.2, gravity: -6, size: 3, hold: 0.2 }),
 ]
 
+/** A shot snowball: a snowman's crumble, a little smaller, from its centre. */
+export const SNOWBALL_DEATH_STYLE: DeathStyle = {
+  layers: SNOW_CRUMBLE('#9fd8ff'), lifetime: 1.5, scale: 1.4, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'crunch',
+}
+
+/** The Yeti's broken fists: navy knuckle chunks and fur in a burst of snow, with an ice-blue glint. */
+export const YETI_PART_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'chunk', count: 10, colors: ['#1d2a4a', '#2c3c62', '#e8eef7'], speed: [30, 85], up: 50, drag: 0.6, gravity: 160, size: 6, spin: 8, hold: 0.7 }),
+    layer({ shape: 'mote', count: 30, colors: ['#ffffff', '#dbe9ff', '#b8cce4'], glow: 1.3, speed: [10, 65], up: 12, drag: 2.2, gravity: -4, size: 5, hold: 0.25 }),
+    layer({ shape: 'spark', count: 10, colors: ['#8fe0ff'], glow: 3, speed: [60, 140], drag: 3, size: 1.6 }),
+  ],
+  lifetime: 1.7, scale: 2.2, lift: 0, flash: 3, flashColor: '#a8e4ff', sound: 'crunch',
+}
+
+/** Snow kicked up where the Yeti climbs out, lands from a lope or falls: big slow motes and clods, no flash. */
+export const SNOW_BURST_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'mote', count: 40, colors: ['#ffffff', '#eef4ff', '#dbe7f6'], glow: 1.1, speed: [15, 70], up: 45, drag: 1.8, gravity: 20, size: 7, hold: 0.45 }),
+    layer({ shape: 'chunk', count: 8, colors: ['#e8eef7', '#c9d6e8'], speed: [25, 70], up: 80, drag: 0.5, gravity: 170, size: 5, spin: 5, hold: 0.7 }),
+  ],
+  lifetime: 1.9, scale: 3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'crunch',
+}
+
 export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
   balloon: {
     layers: [

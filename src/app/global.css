@@ -596,6 +596,21 @@ canvas {
   transition: opacity 0.35s ease-in;
 }
 
+/* A snowball flew past: a white flash on that edge, fading out (an opacity fade, kept under reduced motion). */
+.hud-snow-splat {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: hud-snow-splat 0.45s ease-out forwards;
+}
+.hud-snow-splat.is-left { box-shadow: inset 120px 0 90px -40px rgba(255, 255, 255, 0.8); }
+.hud-snow-splat.is-right { box-shadow: inset -120px 0 90px -40px rgba(255, 255, 255, 0.8); }
+
+@keyframes hud-snow-splat {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 @keyframes hud-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

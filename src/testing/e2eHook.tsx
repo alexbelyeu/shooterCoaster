@@ -231,6 +231,8 @@ export interface SCTestApi {
   boss: () => E2EBoss
   /** n hits on the boss's exposed weak points (nearest first), each through processHit. Returns how many landed. */
   bossHit: (n: number) => number
+  /** One hit on each of the boss's live projectiles (the Yeti's snowballs), through processHit. Returns how many landed. */
+  projectileHit: () => number
   /** Seconds the boss moves per frame instead of the frame's game time, also with game time frozen (the level timer
    *  holds while it rises into place); null is normal play. */
   bossStep: number | null
@@ -293,6 +295,8 @@ export interface E2EBoss {
   exposed: { id: string; hp: number; x: number; y: number; ndcX: number; ndcY: number; onScreen: boolean }[]
   /** Projected bounds of the body (CSS px) and its width / height as fractions of the canvas. */
   box: { minX: number; minY: number; maxX: number; maxY: number; widthFrac: number; heightFrac: number } | null
+  /** Its live projectiles (the Yeti's snowballs): NDC and whether inside the viewport. */
+  projectiles: { ndcX: number; ndcY: number; onScreen: boolean }[]
 }
 
 type ScrimState = ReturnType<typeof import('@/audio/scrim/player').scrimState>
@@ -559,14 +563,16 @@ export const e2eBoss: {
   summon: boolean
   stage: E2EBossStage
   handle: { body: THREE.Object3D; parts: ReadonlyMap<string, THREE.Object3D>; state: () => BossState } | null
-} = { summon: false, stage: 'none', handle: null }
+  /** World positions of its live projectiles, set by a boss that throws them. */
+  projectiles: (() => readonly THREE.Vector3[]) | null
+} = { summon: false, stage: 'none', handle: null, projectiles: null }
 
 const _box = new THREE.Box3()
 const _corner = new THREE.Vector3()
 
 function readBoss(): E2EBoss {
   const h = e2eBoss.handle
-  const out: E2EBoss = { stage: e2eBoss.stage, hpFraction: null, weakPointsLeft: 0, exposed: [], box: null }
+  const out: E2EBoss = { stage: e2eBoss.stage, hpFraction: null, weakPointsLeft: 0, exposed: [], box: null, projectiles: [] }
   if (!h) return out
   const state = h.state()
   out.hpFraction = hpFraction(state)
@@ -587,6 +593,10 @@ function readBoss(): E2EBoss {
       ndcY: _v.y,
       onScreen: _v.z < 1 && Math.abs(_v.x) <= 1 && Math.abs(_v.y) <= 1,
     })
+  }
+  for (const p of e2eBoss.projectiles?.() ?? []) {
+    _v.copy(p).project(cam)
+    out.projectiles.push({ ndcX: _v.x, ndcY: _v.y, onScreen: _v.z < 1 && Math.abs(_v.x) <= 1 && Math.abs(_v.y) <= 1 })
   }
   _box.setFromObject(h.body)
   if (_box.isEmpty()) return out
@@ -623,6 +633,15 @@ function bossHit(n: number): number {
     landed++
   }
   return landed
+}
+
+/** Target id prefix of a boss's projectiles: not `boss:`, so `bossHit` leaves them and they are shot like enemies. */
+export const BOSS_PROJECTILE_PREFIX = 'boss-projectile:'
+
+function projectileHit(): number {
+  const live = [...getCollisionTargets().values()].filter((t) => t.id.startsWith(BOSS_PROJECTILE_PREFIX))
+  for (const t of live) processHit(t)
+  return live.length
 }
 
 function enemiesOnScreen(): E2EEnemyOnScreen[] {
@@ -872,6 +891,7 @@ export function installE2EApi() {
     summonBoss: () => { e2eBoss.summon = true },
     boss: readBoss,
     bossHit,
+    projectileHit,
     bossStep: null,
     bossEvents: { spawn: 0, hit: 0, defeated: 0 },
     fireworks: readFireworks,

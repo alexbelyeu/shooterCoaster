@@ -49,6 +49,8 @@ export const SUBJECTS: readonly Subject[] = [
   { id: 'kraken', kind: 'boss', front: 0, motion: at(1.6, 2.3), animated: true },
   // Through its first lunge (2.2 s): wound up, struck, recovering.
   { id: 'giantScorpion', kind: 'boss', front: 0, holdHeading: 'root', motion: at(2, 2.3), animated: true },
+  // Roaring at rest (its arrival roar, 0.6–2.8 s); the strip is its first throw: wound up, released, following through.
+  { id: 'yeti', kind: 'boss', front: 0, holdHeading: 'root', motion: at(1.2, 2.8), animated: true },
 ]
 
 export const subjectById = (id: string): Subject | undefined => SUBJECTS.find((s) => s.id === id)
