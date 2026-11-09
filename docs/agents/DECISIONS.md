@@ -1730,3 +1730,66 @@ filter opening. The full-mix renders are unchanged by the retagging. Every optio
 renders are deleted; `SCORE_KEYS` holds each pick's key.
 **Consequences:** at FRENZY, Dune Rider, Lagoon Run and Aurora add only hats and the open filter. A follow-up can
 write a FRENZY counter-line for them if it feels thin in play.
+
+## 2026-11-08 — The Ocean's water: a patched Standard material over a seabed height texture (Builder, #326)
+
+**Context:** The sea was a transparent `ShaderMaterial` with no fog and no knowledge of the ground under it, so it read as a flat teal swamp the colour of the seabed showing through it.
+**Decision:** `OceanWater` is a `MeshStandardMaterial` (so it reflects the baked sky env map) patched through `onBeforeCompile`: swell ripples plus two scrolling `vnoise` normal layers, each faded by its on-screen size (`fwidth`) so nothing shimmers without MSAA; a Schlick Fresnel that raises the alpha at grazing angles; a tight sun glint capped so the sun path doesn't out-shine a target; colour by the depth of the drawn seabed, read from a 129² R8 `DataTexture` of the terrain grid's vertex heights (`waterSurface.ts`), so shallows go turquoise with a foam lace at the shore and deep water goes blue. The plane reaches past the camera's far plane (even 75-unit cells over the terrain, ten growing cells each side beyond: +7 200 triangles) and caps its own fog at 0.6, so a darker sea meets the sky in a horizon line. The scene fog stays `sky.horizon` (fogging every far island to a bluer colour than the dome would open a seam).
+**Consequences:** Still one draw call. Anything floating on the sea must keep using `WATER_WAVE_GLSL` with `clock.elapsedTime`. The depth colours assume the seabed sits within `SEABED_MIN_Y`..`SEABED_MAX_Y` (-60..20); a deeper biome would read as uniformly deep.
+
+## 2026-11-08 — One audio engine: the score engine + arcade SFX; Tone.js removed (Sound designer, #416)
+
+**Context:** Alex, 2026-11-07: once the melody fix (#415) and the level 2–5 themes (#392) were in, the score engine
+becomes the only engine, "no need for fallback ?audio=tone. this can be fully removed". The score engine and the
+arcade SFX already drew everything in plain Web Audio; Tone.js was left supplying only the context, the master
+chain and the offline renders.
+
+**Decision:**
+- No `?audio=` flag: every visitor gets the score engine and the arcade SFX. `tone` is out of `package.json`; the
+  context and master chain are plain Web Audio in `src/audio/AudioEngine.ts` (main chunk, tiny), and both engines
+  stay lazy chunks loaded after the first gesture. `?theme=` stays for listening rounds.
+- Offline renders (`npm run audio:render`) use an OfflineAudioContext on a scripted clock (`offlineRender.ts`).
+  `--engine scrim` is gone; `--engine port|original` stays for `--score` parity renders. Renders lose the
+  `scrim-` prefix.
+- Every game stereo panner is an `upmixPanner` (`channelCountMode: 'explicit'`: a mono voice is copied to both
+  channels before panning, no 3 dB centre dip). Every score and SFX level was mixed and measured on renders
+  through Tone's offline context, i.e. standardized-audio-context, whose StereoPannerNode is always 'explicit'.
+  On the spec's 'clamped-max' the SFX came out 3 dB quieter, kills under the 6 dB-over-music target, and the
+  scores 0.7 LU quieter and narrower. With it, the re-renders match the old ones within 0.1 LU. The jukebox
+  voicing (parity with the original page) keeps the spec's panner.
+- Parameter ramps that start mid-ramp use `cancelAndHoldAtTime` (`AudioEngine.rampParam`): an offline context's
+  `AudioParam.value` is still the start value, so reading it there jumped the slow-mo duck open with a click.
+- Budgets lowered to lock in Tone's size: `jsTotalGzipKB` 700 → 630, `startupJsGzipKB` 440 → 435.
+
+**Consequences:** One engine to maintain and measure; renders hear exactly what players hear. Switching a panner
+back to the spec's mode changes the whole mix by 3 dB: don't, without re-measuring every level's `--mix`. The
+`baseline-*` renders (the Tone.js sound) can no longer be re-rendered and stay as a record.
+
+## 2026-11-08 — The title's coaster, beat-locked cuts and attract mode (Builder, #419)
+
+**Context:** #376 part 2 asked for a coaster riding the title park inside budgets.json `scene.title` (114 draw calls, 89 objects, 11 356 triangles, ~1 500 triangles free), camera cuts and the logo on the music's beats, and an attract mode.
+**Decision:** The coaster reuses the game's rails (`buildTrackGeometry`, 90 rings, ties 22 apart) on a light loop of sine hills outside the tent ring, with single steel columns instead of lattice towers and a four-car train: three draw calls, ~4 900 triangles. The room came from cheaper string-light bulbs and balloons (same look at title distances). The Ferris wheel moved 30 units in x and 15 in z so the track passes under its gondolas and outside its legs (`titleCoaster.test.ts`); the flag poles moved inside the loop. Camera cuts land on bar lines by running the camera's clock up to ±10% fast or slow (`beatLockedRate`), never by jumping it, so a cut still blends. Attract mode is a camera sequence and a CSS state on the same title scene (no level load); under `?e2e=1` it never starts unless a test sets `titleAttractIdleMs`.
+**Consequences:** The title scene now sits at ~11 200 of its 11 356 triangles: anything more on the title needs triangles found elsewhere or a Director raise. The title clips are 9 s because a 1280×720 title frame takes ~0.8 s under SwiftShader and a builder's command stays under 4.5 min.
+
+## 2026-11-09 — Bosses: retracted weak points and thrown projectiles (Builder, #319)
+
+**Context:** The Yeti (Antarctica's finale) exposes its chest only while it roars, and throws snowballs the player
+can shoot. The boss framework (2026-10-29) had phases but no way to hide a live weak point, and no notion of
+anything a boss throws.
+
+**Decision:**
+- `BossState.retracted` (a set of weak point ids) hides a weak point without changing its phase: `exposedWeakPoints`
+  filters it out, `applyHit` ignores it, `setRetracted` returns the same state when nothing changes. A boss toggles it
+  from `move` through `BossFrame.retract(id, on)`, which re-syncs the collision targets at once, like a hit does.
+  The Yeti keeps its chest un-retracted during phase 0 (its phase hides it anyway), so the hit that breaks the last fist
+  exposes the chest in the same JS turn, and the next frame starts a roar at once (`roarNowEpoch`).
+- Projectiles are not weak points: they never move `hpFraction` or the boss bar. Each is its own collision target with
+  an id prefixed `boss-projectile:` (not `boss:`, so e2e `bossHit` skips them and they are shot like enemies), and a
+  hit is a normal kill (`registerKill` + `addScore`, explosion, `enemy:killed`). They are bonus kills, so the level's
+  `maxScore` (and stars) leave them out, but `BossSpec.projectiles` (`score`, `max`) adds them to the leaderboard's
+  server limits (`scoreLimits.ts`), and the boss never throws more than `max` in a fight.
+- A snowball homes on a point beside the camera as it moves (its arc is laid between its release point and that point
+  each frame), so it always passes the rider instead of landing where the camera was.
+
+**Consequences:** A boss that hides a part (a shell, a dive) or throws things reuses these two pieces. Raising a
+projectile's score or `max` changes `api/_lib/levelLimits.ts` (`node scripts/gen-level-limits.mjs`).
