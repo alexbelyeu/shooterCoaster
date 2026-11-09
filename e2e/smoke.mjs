@@ -1731,9 +1731,17 @@ const BOSS_CHECKS = [
   { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1 },
 ]
 
-/** Moves the boss alone `seconds` (`bossStep`, game time and the level timer frozen) until `ready()`. */
+/**
+ * #452: a boss fight lasts from its arrival to the end of the run (`pacing.ts`: 20 s of 60). The boss step proves a
+ * player hitting `BOSS_HITS_PER_SECOND` (a 60 ms blaster fires ~16 shots a second) clears it in that window: the game
+ * seconds the boss moved before each phase was on screen, plus every weak point's hp at that rate.
+ */
+const BOSS_FIGHT_SECONDS = 20
+const BOSS_HITS_PER_SECOND = 2
+
+/** Moves the boss alone `seconds` (`bossStep`, game time and the level timer frozen) until `ready()`: the game seconds it moved, or null if never ready. */
 async function stepBoss(page, seconds, ready) {
-  if (seconds <= 0) return true
+  if (seconds <= 0) return 0
   const step = 0.25
   const f0 = await getFrames(page)
   await page.evaluate((s) => { window.__SC_TEST__.bossStep = s }, step)
@@ -1743,8 +1751,9 @@ async function stepBoss(page, seconds, ready) {
     { ms: 30000 + seconds * 8000, frames: Math.ceil(seconds / step) * 3, pollMs: 200 },
   )
   await page.evaluate(() => { window.__SC_TEST__.bossStep = null })
+  const moved = ((await getFrames(page)) - f0) * step
   await waitFrames(page, 1, { maxMs: 20000, pollMs: 100 })
-  return ok
+  return ok ? moved : null
 }
 
 /**
@@ -1834,6 +1843,8 @@ async function bossCheck(page, check) {
     bulletHit, phaseOneHits, exposedMidway: midway.exposed.map((e) => e.id), lastHits, hpMidway: midway.hpFraction,
     stage: after.stage, kills: end.kills - startStats.kills, score: end.score - startStats.score, popup, skipped: false, projectiles,
   }
+  const hits = [...before.exposed, ...midway.exposed].reduce((sum, e) => sum + e.hp, 0)
+  result.fightSeconds = (settled ?? settleS) + (surfaced ?? midSettleS) + hits / BOSS_HITS_PER_SECOND
   if (!stillPlaying && !defeated) {
     result.skipped = true
     return { id: 'boss', problems, boss: result }
@@ -1843,9 +1854,11 @@ async function bossCheck(page, check) {
   if (!tell.length) problems.push('no tell (wave:incoming) before the boss')
   if (!bar) problems.push('the boss bar (.hud-boss) never showed')
   if (!(result.widthFrac >= minWidthFrac)) problems.push(`the boss is ${(result.widthFrac * 100).toFixed(0)}% of the frame wide (want ≥ ${minWidthFrac * 100}%)`)
-  if (!settled || result.onScreenAtStart < minOnScreen)
+  if (settled === null || result.onScreenAtStart < minOnScreen)
     problems.push(`${result.onScreenAtStart} first-phase weak points on screen after ${settleS} s (want ≥ ${minOnScreen})`)
-  if (!surfaced) problems.push(`the last phase [${lastPhase}] never came on screen within ${midSettleS} s`)
+  if (surfaced === null) problems.push(`the last phase [${lastPhase}] never came on screen within ${midSettleS} s`)
+  if (!(result.fightSeconds <= BOSS_FIGHT_SECONDS))
+    problems.push(`the fight takes ${result.fightSeconds.toFixed(1)} s at ${BOSS_HITS_PER_SECOND} hits a second (${hits} hp, on screen after ${settled} + ${surfaced} s): over its ${BOSS_FIGHT_SECONDS} s window`)
   const firstPrefixes = [firstPhase].flat()
   if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !firstPrefixes.some((p) => id.startsWith(p))))
     problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPrefixes.join('* / ')}*)`)
@@ -3432,7 +3445,7 @@ async function run() {
         ? (r.boss.skipped
           ? ` ${r.boss.level} skipped (level timed out)`
           : ` ${r.boss.level} tell "${r.boss.tell.at(-1) ?? '-'}" draws=${r.boss.drawCalls} width ${(r.boss.widthFrac * 100).toFixed(0)}% exposed [${r.boss.exposedAtStart.length} ${r.boss.exposedAtStart[0] ?? '-'}…] -> [${r.boss.exposedMidway}]` +
-            ` bullet hit ${r.boss.bulletHit} hits ${r.boss.phaseOneHits}+${r.boss.lastHits} kills ${r.boss.kills} score +${r.boss.score} popup ${r.boss.popup[0] ?? '-'} stage ${r.boss.stage}`)
+            ` bullet hit ${r.boss.bulletHit} hits ${r.boss.phaseOneHits}+${r.boss.lastHits} kills ${r.boss.kills} score +${r.boss.score} popup ${r.boss.popup[0] ?? '-'} stage ${r.boss.stage} fight ${r.boss.fightSeconds?.toFixed(1)} s`)
       : r.pickup
         ? ` ${r.pickup.count} pickups [${r.pickup.ids.join(',')}] draws=${r.pickup.drawCalls} first at ${r.pickup.px ? `${r.pickup.px.x},${r.pickup.px.y} (${r.pickup.px.distance} units, lead ${r.pickup.lead})` : '-'}` +
           ` fan shots=${r.pickup.fan?.shots} drawn=${r.pickup.fan?.drawn}`

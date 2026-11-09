@@ -20,8 +20,7 @@ Complete reference for building levels in the Three.js on-rails shooter coaster 
   id: 'level2',
   name: 'Desert',
   biome: 'desert',
-  maxScore: 25 * 15 + 20 * 30 + 8 * 50,  // sum of (count * score) per wave
-  timerSeconds: 75,
+  maxScore: 36 * 20 + 72 * 15 + 680,  // sum of (count * score) per wave + bossMaxScore (LevelRegistry.test checks it)
   nextLevel: 'level3',
   track: {
     varA: 5, varB: 27, varC: 2, scalar: 60,  // curve shape + scale
@@ -29,10 +28,15 @@ Complete reference for building levels in the Three.js on-rails shooter coaster 
     curve: 'curve1',
     color1: 0xb8860b, color2: 0xdaa520,
   },
-  enemies: [
-    { type: 'scorpion', count: 30, spawnDelay: 0, waveLabel: 'Scorpions!' },
-    { type: 'crow', count: 50, spawnDelay: 15, waveLabel: 'Crows!' },
-  ],
+  // The roster only: pacing.ts times it for the 60 s run (waves over the first 45 s, the boss at 40 s).
+  ...paceLevel({
+    waves: [
+      { type: 'scorpion', count: 36, waveLabel: 'Scorpions!' },
+      { type: 'crow', count: 36, waveLabel: 'Crows!', formation: 'v' },
+      { type: 'crow', count: 36, waveLabel: 'More Crows!', formation: 'v' },  // weight: n gives a wave a longer share
+    ],
+    boss: 'giantScorpion',  // or finale: { type, count } for a level without a boss yet
+  }),
   starThresholds: [0.2, 0.5, 0.8],
   combat: { bulletColor: '#ff0000', bulletSize: 10 }, // optional; these are the defaults
   environment: {

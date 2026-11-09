@@ -116,6 +116,8 @@ throws) both fists must be on screen and ≥ 1 snowball in flight (`level4-boss.
 `projectileHit()` then shoots every live snowball: one kill and one combo step each, the boss's hp unchanged (they are left out
 of the per-weak-point kill count). Once the fists are broken it roars at once and only its chest is exposed
 (`level4-boss-chest.png`; between roars the chest is retracted) before it topples backwards into the snow (`level4-boss-down.png`).
+Every boss must fit its fight window (#452: the boss arrives at 40 s of the 60 s run): the game seconds it moved before
+each phase was on screen plus every weak point's hp at 2 hits a second must be ≤ 20 s (`fight` on the summary line).
 When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pickups()`), parks the coaster behind the first
 (spread) with time frozen and shoots it with a real bullet: `weaponState()` must report the spread gun, the next pull must
 count 3 shots and draw 3 bullets, and `level1-pickup.png` holds the tinted tracer with the `.hud-weapon` badge clear of the HUD;

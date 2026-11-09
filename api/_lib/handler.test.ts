@@ -38,7 +38,7 @@ function fakeDb(now: () => number, failing = false): ScoresDb & { rows: Row[] } 
   }
 }
 
-const run = { level: 'level1', initials: 'ABC', score: 2400, seed: 1, kills: 120, accuracy: 0.8, version: '2.0.0' }
+const run = { level: 'level1', initials: 'ABC', score: 2400, seed: 1, kills: 100, accuracy: 0.8, version: '2.0.0' }
 const post = (body: unknown, ip = '1.2.3.4') =>
   new Request('https://scoaster.com/api/leaderboard', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body), headers: { 'x-forwarded-for': ip } })
 const get = (level: string) => new Request(`https://scoaster.com/api/leaderboard?level=${level}`)

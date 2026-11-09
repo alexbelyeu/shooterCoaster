@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
+import { RUN_SECONDS } from '@/levels/pacing'
 import { createTrigCurve } from '@/track/curves/TrigCurve'
 import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
@@ -29,9 +30,9 @@ function world(level: LevelConfig) {
   const heightFn = createHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
   const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize(level.biome))
   // What EnemySpawner hands each wave: the ride from GO over its entry and its window.
-  const profile = rideProfile(table, rideSpeeds(level.track), level.timerSeconds)
+  const profile = rideProfile(table, rideSpeeds(level.track), RUN_SECONDS)
   const { trackScale } = getTrackDimensions(level.track)
-  const windows = waveWindows(level.enemies.map((w) => w.spawnDelay ?? 0), level.boss?.at, level.timerSeconds)
+  const windows = waveWindows(level.enemies.map((w) => w.spawnDelay ?? 0), level.boss?.at, RUN_SECONDS)
   const rides: RideAhead[] = windows.map(([from, to]) => ({
     entry: riddenBetween(profile, from, from + ENTRY_SECONDS + ENTRY_STAGGER),
     window: riddenBetween(profile, from, to),

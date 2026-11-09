@@ -1,6 +1,7 @@
 import { useEffect, useMemo, type CSSProperties } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
+import { RUN_SECONDS } from '@/levels/pacing'
 import { biomeTheme } from '@/ui/theme'
 import ScoreDisplay from './ScoreDisplay'
 import TimerBar from './TimerBar'
@@ -62,7 +63,7 @@ export default function HUD() {
         <KillStrip />
       </div>
       <div className="hud-panel hud-panel--right">
-        <TimerBar totalSeconds={config.timerSeconds} />
+        <TimerBar totalSeconds={RUN_SECONDS} />
       </div>
       <BossBar />
       <FrenzyFlash />

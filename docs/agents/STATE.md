@@ -29,11 +29,11 @@ has been posted anywhere yet (#102 waits on Alex); 23 of W45's 28 visitors start
 
 | Level | Biome | Timer | Waves / finale | Landmarks / features | Director's read of this week's screenshots |
 |---|---|---|---|---|---|
-| 1 Theme Park | themePark | 75 s (→ 60, #452) | 3 × 50 balloons (ring last), **Golden Blimp at 55 s** | Ferris wheel, carousel, midway, string lights, bunting, arch, fireworks on streaks, pickups | Still the best frame and Alex's density bar. The track loop shows as white cables over the hills (#327) |
-| 2 Desert | desert | 60 s | 30 scorpions (trackside), 2 × 25 crows in V; **Giant Scorpion at 42 s** (claws, tail, stinger) | Pyramid, arches, mesas, cacti, dust devils, sun flare, sand ripples, dust | Sunset mood is strong, the Scorpion lands. Alex: stretches with no enemies in view (#451). Crows are "a ball with sticks" up close (#462) |
-| 3 Ocean | ocean | 65 s (→ 60) | 20 jellyfish, 25 sharks (trackside, floating), 30 flying fish; **Kraken at 40 s** | Sunken city, sea stacks, water with glitter / swell / shallows / horizon (#430), seabirds, coral, plankton | Reads as an ocean now; jellyfish in view from the start. The whole rail loop sits on the frame as blue cables (#327). Kraken still pale hooks (backlog) |
-| 4 Antarctica | arctic | 75 s (→ 60) | 25 scouts (line), 20 snowmen, 8 brutes; **Yeti at 55 s** (fists, then the chest while it roars; snowballs are bonus kills) | Ice fortress, mountains, aurora (flares in the tell), crystals, drifts, pines, snow | Sky and snowmen good; the Yeti's snowball splat reads. 178 draws (was 394) |
-| 5 Inferno | volcanic | 120 s (→ 60) | wisps ×2, imps, golems ×2, drakes; 2 eruptions; **no finale** (#320) | Volcano, lava rivers, ash + embers, smoke column, emissive rails | Readable in the dark. The bright vertical slab beside the track remains (#331); wisp / imp / golem are the weakest enemies (#463). 116 draws (was 295) |
+| 1 Theme Park | themePark | 60 s | 3 × 50 balloons at 0 / 15 / 30 s (ring last), **Golden Blimp at 40 s** | Ferris wheel, carousel, midway, string lights, bunting, arch, fireworks on streaks, pickups | Still the best frame and Alex's density bar. The track loop shows as white cables over the hills (#327) |
+| 2 Desert | desert | 60 s | 30 scorpions (trackside), 2 × 39 crows in V at 15 / 30 s; **Giant Scorpion at 40 s** (claws, tail, stinger) | Pyramid, arches, mesas, cacti, dust devils, sun flare, sand ripples, dust | Sunset mood is strong, the Scorpion lands. Alex: stretches with no enemies in view (#451). Crows are "a ball with sticks" up close (#462) |
+| 3 Ocean | ocean | 60 s | 20 + 24 jellyfish, 28 sharks (trackside, floating), 36 flying fish at 0 / 14 / 23 / 32 s; **Kraken at 40 s** | Sunken city, sea stacks, water with glitter / swell / shallows / horizon (#430), seabirds, coral, plankton | Reads as an ocean now; jellyfish in view from the start. The whole rail loop sits on the frame as blue cables (#327). Kraken still pale hooks (backlog) |
+| 4 Antarctica | arctic | 60 s | 44 scouts (line), 40 snowmen, 16 brutes at 0 / 15 / 30 s; **Yeti at 40 s** (fists, then the chest while it roars; snowballs are bonus kills) | Ice fortress, mountains, aurora (flares in the tell), crystals, drifts, pines, snow | Sky and snowmen good; the Yeti's snowball splat reads. 178 draws (was 394) |
+| 5 Inferno | volcanic | 60 s | wisps ×2, imps, golems ×2 at 0 / 8 / 16 / 25 / 33 s, one eruption (25 s); **8 drakes at 40 s stand in for the boss** (#320) | Volcano, lava rivers, ash + embers, smoke column, emissive rails | Readable in the dark. The bright vertical slab beside the track remains (#331); wisp / imp / golem are the weakest enemies (#463). 116 draws (was 295) |
 | 6 Climbing Gym | gym (interior) | — | planned: climbers on walls, last-wave sprint, boss TBD | planned: huge walls, bouldering zone, skylights, catwalks | #453 (Climber, ready) → #457 (the level, blocked on it) → #456 (theme round) |
 
 Common: title (poster → fly-by park with a riding coaster, beat-locked cuts, animated logo
@@ -66,7 +66,7 @@ reduced motion (+ an internal-browser toggle coming, #446).
   `applyHit`, `hpFraction`), specs, `BossBase`, `BossSpawner`; Golden Blimp, Kraken
   (`krakenMotion.ts`), Giant Scorpion (`scorpionMotion.ts`, `pickPerch`), Yeti (`yetiMotion.ts`,
   `boss-projectile:` snowballs as bonus kills, `BossSpec.projectiles` in the server limits).
-  Every fight was tuned for today's timers; #452 re-tunes them for a 20 s window.
+  Every boss arrives at 40 s of a 60 s run (#452, `levels/pacing.ts`); the smoke's boss step times each fight under 20 s at 2 hits a second.
 - **Combat / effects / UI**: unchanged in shape from last week (combo tiers on game time,
   pickups, pooled explosions with a style per enemy, fireworks, HUD, `BossBar`, `SnowSplat`,
   `WeaponBadge`); the results screen gained `ResultsLeaderboard` (World / This device,

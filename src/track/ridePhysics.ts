@@ -1,4 +1,5 @@
 import { indexAtT, type ArcTable } from './arcLength'
+import type { TrackCurve } from './curves/TrackCurve'
 
 /**
  * The coaster's speed rule (port of Camera.js updateCamGame), pure: `CoasterCamera` rides it and
@@ -8,6 +9,8 @@ import { indexAtT, type ArcTable } from './arcLength'
 // The 2015 game ran frame-dependent physics at ~30-45 fps: slow the 60 fps port to match, and cap runaway downhill speed.
 const SPEED_FACTOR = 0.7
 const MAX_VELOCITY_MULT = 5 // max velocity = minRollerSpeed * this
+/** A hitch rides at most this many 60 fps frames at once: it slows the ride, never skips track. */
+export const MAX_RIDE_STEP_FRAMES = 3
 
 export interface RideSpeeds {
   /** Speed gained per frame per unit of descent (the tangent's -y). */
@@ -27,6 +30,39 @@ export function rideSpeeds({ rollerSpeed, minRollerSpeed }: { rollerSpeed: numbe
 /** Velocity after `frames` on track whose unit tangent rises by `tangentY`, clamped to the ride's speeds. */
 export function nextVelocity(velocity: number, tangentY: number, frames: number, speeds: RideSpeeds): number {
   return Math.min(Math.max(velocity - tangentY * speeds.roll * frames, speeds.min), speeds.max)
+}
+
+/** `progress` is the track parameter (0..1, wrapping), `velocity` that per 60 fps frame. */
+export interface RideState {
+  progress: number
+  velocity: number
+}
+
+const wrap01 = (t: number) => ((t % 1) + 1) % 1
+
+/** Port of Camera.js updateCamGame: rides `frames` 60 fps frames in steps of at most `MAX_RIDE_STEP_FRAMES`. */
+export function advanceRide(state: RideState, curve: TrackCurve, speeds: RideSpeeds, frames: number): RideState {
+  let left = frames
+  do {
+    const step = Math.min(left, MAX_RIDE_STEP_FRAMES)
+    left -= step
+    state.progress = wrap01(state.progress + state.velocity * step)
+    state.velocity = nextVelocity(state.velocity, curve.getTangentAt(state.progress).y, step, speeds)
+  } while (left > 0)
+  return state
+}
+
+/** From a standing start at 60 fps; Infinity past `maxSeconds`. */
+export function lapSeconds(curve: TrackCurve, speeds: RideSpeeds, maxSeconds = 600): number {
+  const state: RideState = { progress: 0, velocity: 0 }
+  let travelled = 0
+  for (let frame = 1; frame <= maxSeconds * 60; frame++) {
+    const before = state.progress
+    advanceRide(state, curve, speeds, 1)
+    travelled += wrap01(state.progress - before)
+    if (travelled >= 1) return frame / 60
+  }
+  return Infinity
 }
 
 /** Profile samples per second of level time. */

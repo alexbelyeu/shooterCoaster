@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { getLevelConfig } from '@/levels/LevelRegistry'
+import { RUN_SECONDS } from '@/levels/pacing'
 import type { GamePhase } from '@/types/game'
 import { analyticsEventFor, tensPercent, type RunSnapshot } from './analyticsEvents'
 
 const level1 = getLevelConfig('level1')!
 
 function snap(phase: GamePhase, extra: Partial<RunSnapshot> = {}): RunSnapshot {
-  return { phase, currentLevel: 'level1', runMode: { mode: 'campaign' }, score: 0, timeRemaining: level1.timerSeconds, ...extra }
+  return { phase, currentLevel: 'level1', runMode: { mode: 'campaign' }, score: 0, timeRemaining: RUN_SECONDS, ...extra }
 }
 
 describe('analyticsEventFor', () => {
@@ -45,7 +46,7 @@ describe('analyticsEventFor', () => {
   })
 
   it('sends level_quit with the share of the timer used', () => {
-    const timeRemaining = level1.timerSeconds * 0.75
+    const timeRemaining = RUN_SECONDS * 0.75
     const quit = { name: 'level_quit', props: { level: 'level1', progress_pct: 20 } }
     expect(analyticsEventFor(snap('paused'), snap('levelSelect', { timeRemaining }))).toEqual(quit)
     expect(analyticsEventFor(snap('playing'), snap('title', { timeRemaining }))).toEqual(quit)
