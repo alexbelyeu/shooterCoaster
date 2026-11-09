@@ -286,6 +286,14 @@ describe('heavy runs', () => {
     expect(f[0].body).toContain('by agent: main 0.3M / 20 turns / peak 90k, #1 6.7M / 240 turns / peak 399k')
     expect(f[0].lastSeen).toBe(NOW - 2 * H)
   })
+
+  it('does not refile runs its closed issue already listed, only newer ones (#444)', () => {
+    const ledgerRuns = [run('builders', 7e6, 30), run('builders', 7e6, 10)]
+    expect(keys(snap({ ledgerRuns, closedAt: { 'heavy:builders': NOW - 5 * H } }))).toEqual([])
+    const f = findings(snap({ ledgerRuns: [...ledgerRuns, run('builders', 6e6, 1)], closedAt: { 'heavy:builders': NOW - 5 * H } }))
+    expect(f[0].title).toBe('Token-heavy builders runs: 1 over 5M in 48 h')
+    expect(f[0].body).not.toContain('7.0M')
+  })
 })
 
 describe('reconcile', () => {

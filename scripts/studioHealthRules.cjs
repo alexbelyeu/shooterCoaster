@@ -294,10 +294,11 @@ function findings(snap) {
     })
   }
 
-  // Token-heavy runs, one issue per role (from the token ledger's JSON lines).
+  // Token-heavy runs, one issue per role (from the token ledger's JSON lines). Closing the issue
+  // settles the runs it listed: only a run newer than the close files it again.
   const heavy = {}
   for (const r of snap.ledgerRuns || []) {
-    if (r.weighted <= HEAVY_RUN || now - r.at > 48 * HOUR) continue
+    if (r.weighted <= HEAVY_RUN || now - r.at > 48 * HOUR || r.at <= (closedAt[`heavy:${r.role}`] || 0)) continue
     ;(heavy[r.role] = heavy[r.role] || []).push(r)
   }
   for (const [role, runs] of Object.entries(heavy)) {
