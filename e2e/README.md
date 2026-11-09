@@ -174,9 +174,14 @@ ridden on the PR, that the nightly job runs the full smoke, and that the shards,
 
 Each results entry records its wall time (`seconds`). A `--shard` run ends with a `time` line and entry (`level3 shard
 took 4.2 min, budget 7.0`) and a GitHub annotation of the same text. On CI (`CI` set) a shard over its `smokeSeconds`
-budget fails, and one still running at twice its budget writes `results.json` with what ran and exits (`still running
+budget fails, unless the runner was slow (#394, pure rules in `shardTime.mjs`): CI runners differ ~2x in speed and a
+level shard's time follows how fast its ride rendered, so the budget is scaled by the ride's wall ms per frame
+(`rideMsPerFrame` in its results entry) over a normal runner's 300 ms, capped at 2x. Over the budget but within that
+allowance passes with a warning (`… budget 3.0: over, within what a slow runner (ride 525 ms/frame, 1.8x normal) allows
+5.3`); a shard on a normal-speed runner, or with no ride (`ui`, `menus`, `mobile`, `level1-steps`), keeps its plain
+budget. One still running at 2.5x its budget writes `results.json` with what ran and exits (`still running
 after …: stopped`), inside the job's timeout; locally it only warns, since a 2-core session is slower than a CI runner.
-Budgets: only the Director raises them.
+Budgets, the normal runner's ms per frame and the 2x cap: only the Director changes them.
 
 CI's required `verify` check is a gate job that needs `changes`, `unit + build`, `lighthouse` and every shard, and passes only if
 all of them passed or were skipped by the plan. GitHub creates its check run only when those end, so `scripts/automerge.cjs` and

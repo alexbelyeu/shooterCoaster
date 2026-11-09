@@ -91,6 +91,7 @@ import path from 'node:path'
 import { arg, launchBrowser, startPreview, stopPreview } from '../scripts/headless.mjs'
 import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, waitFrames, waitVisible } from './pageChecks.mjs'
 import { planRun, STEP_LEVELS } from './shards.mjs'
+import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
 
 const SECONDS = Number(arg('seconds', 10))
 const OUT = path.resolve(arg('out', 'e2e-results'))
@@ -3236,7 +3237,8 @@ async function run() {
     failed ||= !ok
     delete stats.hookErrors
     results.push({
-      id, ok, problems, frames, frameSeconds, seconds: (Date.now() - started) / 1000, spawnDigest, ...stats, perfGate,
+      id, ok, problems, frames, frameSeconds, rideMsPerFrame: frames > 0 ? ride.ms / frames : null,
+      seconds: (Date.now() - started) / 1000, spawnDigest, ...stats, perfGate,
       kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
@@ -3393,32 +3395,35 @@ async function run() {
   process.exit(failed ? 1 : 0)
 }
 
-/** A --shard run's smokeSeconds budget (#353): enforced on CI only, where twice the budget also stops the run before the job timeout. */
+/**
+ * A --shard run's smokeSeconds budget (#353), judged by `shardTime.mjs` (#394: scaled up on a runner whose ride rendered
+ * slowly): enforced on CI only, where WATCHDOG_FACTOR times the budget also stops the run before the job timeout.
+ */
 function startTimeBudget(runStarted) {
   if (!arg('shard')) return null
-  const budget = BUDGETS.smokeSeconds?.[arg('shard')]
-  if (!budget) throw new Error(`no smokeSeconds budget for shard ${arg('shard')} in budgets.json`)
+  const shard = arg('shard')
+  const budget = BUDGETS.smokeSeconds?.[shard]
+  if (!budget) throw new Error(`no smokeSeconds budget for shard ${shard} in budgets.json`)
   const enforced = !!process.env.CI
-  const min = (s) => (s / 60).toFixed(1)
-  const annotate = (level, text) => process.env.GITHUB_ACTIONS && console.log(`::${level} title=smoke ${arg('shard')}::${text}`)
+  const annotate = (level, text) => process.env.GITHUB_ACTIONS && console.log(`::${level} title=smoke ${shard}::${text}`)
   if (enforced) {
+    const limit = WATCHDOG_FACTOR * budget
     setTimeout(() => {
-      const text = `${arg('shard')} shard still running after ${min(2 * budget)} min, budget ${min(budget)}: stopped`
+      const text = `${shard} shard still running after ${(limit / 60).toFixed(1)} min, budget ${(budget / 60).toFixed(1)}: stopped`
       annotate('error', text)
       console.log(`FAIL time       ${text}`)
-      results.push({ id: 'time', ok: false, problems: [text], shard: arg('shard'), seconds: (Date.now() - runStarted) / 1000, budget, errors: [] })
+      results.push({ id: 'time', ok: false, problems: [text], shard, seconds: (Date.now() - runStarted) / 1000, budget, errors: [] })
       fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
       if (preview) stopPreview(preview.proc)
       process.exit(1)
-    }, 2 * budget * 1000).unref()
+    }, limit * 1000).unref()
   }
   return {
     result(seconds) {
-      const over = seconds > budget
-      const text = `${arg('shard')} shard took ${min(seconds)} min, budget ${min(budget)}`
-      annotate(over ? (enforced ? 'error' : 'warning') : 'notice', text)
-      const ok = !(over && enforced)
-      return { id: 'time', ok, problems: ok ? [] : [text], text: ok && over ? `${text} (over; enforced on CI only)` : text, shard: arg('shard'), seconds, budget, errors: [] }
+      const msPerFrame = rideMsPerFrame(results)
+      const { ok, level, text, slowness, allowed } = judgeShardTime({ shard, seconds, budget, msPerFrame, enforced })
+      annotate(level, text)
+      return { id: 'time', ok, problems: ok ? [] : [text], text, shard, seconds, budget, msPerFrame, slowness, allowed, errors: [] }
     },
   }
 }
