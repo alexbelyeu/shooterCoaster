@@ -9,4 +9,4 @@ parameters are on the links but Vercel Pro cannot break them down (README).
 
 | Date | Channel | Action (issue) | Link / UTM | Result (visitors, notes) |
 |---|---|---|---|---|
-| – | – | No posts or campaigns yet (as of 2026-11-02; #102 three.js Showcase is GO for Mon 2 Nov, #308 Reddit drafted for 7–8 Nov, see STRATEGY.md). **Baseline for every row below: W44 = 37 visitors / 43 views / 8 level starts / 3 completes, 100 % direct, ≈ 5 visitors and 1 start a day** (metrics/2026-W44.md) | – | – |
+| – | – | No posts or campaigns yet (as of 2026-11-09). #102 three.js Showcase was GO for Mon 2 Nov and #308 Reddit for 7–8 Nov; neither went out (no `/go/*` visit, no forum or Reddit referrer in W45), so both were rewritten and re-dated on 9 Nov: #102 to 9–13 Nov, #308 to the first weekend after Alex's playtest bar (#434 / #435 / #436), see STRATEGY.md. **Baseline for every row below: W44 = 37 visitors / 43 views / 8 level starts / 3 completes, 100 % direct, ≈ 5 visitors and 1 start a day** (metrics/2026-W44.md) | – | – |
