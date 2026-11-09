@@ -346,3 +346,104 @@ export const SCORPION_MOUND_GEO = (() => {
 })()
 
 export const SCORPION_MOUND_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true })
+
+// ── The Yeti (Antarctica) ──
+// Blue-grey fur, never white on the snow; navy face, palms, claws and feet so it reads from the ridge.
+
+const FUR_LIGHT = ['#dbe4f0', '#cdd8e8', '#e6edf6']
+const FUR_SHADE = ['#8ea2bf', '#7f94b3', '#9aaecb']
+const NAVY = '#1d2a4a'
+const NAVY_DEEP = '#121a30'
+const ICE = '#8fe0ff'
+
+/** `geo` painted per triangle in shaggy light fur above `split` (its own y) and shaded fur below, then placed. */
+function fur(geo: THREE.BufferGeometry, matrix: THREE.Matrix4, split = -0.2): THREE.BufferGeometry {
+  const g = geo.toNonIndexed()
+  geo.dispose()
+  g.deleteAttribute('uv')
+  const pos = g.attributes.position
+  const colors = new Float32Array(pos.count * 3)
+  const light = FUR_LIGHT.map((c) => new THREE.Color(c))
+  const shade = FUR_SHADE.map((c) => new THREE.Color(c))
+  for (let t = 0; t < pos.count; t += 3) {
+    const y = (pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3
+    const pick = Math.abs(Math.floor(pos.getX(t) * 37 + pos.getZ(t) * 23 + y * 11)) % 3
+    const c = (y < split ? shade : light)[pick]
+    for (let k = 0; k < 3; k++) c.toArray(colors, (t + k) * 3)
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  return g.applyMatrix4(matrix)
+}
+
+const furBall = (at: [number, number, number], scale: [number, number, number], split?: number, detail = 1) =>
+  fur(new THREE.IcosahedronGeometry(1, detail), pose(at, [0, 0, 0], scale), split)
+
+/** Feet at y 0, +z towards the rider; the head, arms, fists and chest are separate. */
+export const YETI_BODY_GEO = mergePainted([
+  furBall([0, 540, 0], [235, 250, 165], -0.35, 2),
+  furBall([0, 330, -10], [175, 120, 135], 0.2),
+  ...[-1, 1].flatMap((side) => [
+    furBall([side * 215, 680, 0], [100, 95, 100]),
+    fur(new THREE.CylinderGeometry(78, 66, 290, 8, 3), pose([side * 110, 170, 0]), 0.3),
+    painted(new THREE.BoxGeometry(130, 50, 190), NAVY, [side * 112, 25, 25]),
+    ...[-1, 0, 1].map((k) => painted(new THREE.ConeGeometry(14, 40, 5).rotateX(Math.PI / 2), NAVY_DEEP, [side * 112 + k * 40, 22, 135])),
+  ]),
+  // A shelf of fur over the chest, so the chest plate sits in a hollow.
+  furBall([0, 645, 110], [150, 50, 60], 0.5),
+])
+
+export const YETI_FUR_MAT = withRim(
+  new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9, flatShading: true }),
+  { color: '#bfe6ff', intensity: 0.7, power: 2.4 },
+)
+
+/** Head about its neck; +z its face. */
+export const YETI_HEAD_GEO = mergePainted([
+  furBall([0, 30, -10], [125, 120, 120], -0.5),
+  furBall([0, 140, -30], [70, 45, 70], 0),
+  paintedAt(new THREE.SphereGeometry(1, 12, 8), NAVY, pose([0, 10, 82], [0, 0, 0], [80, 72, 42])),
+  painted(new THREE.BoxGeometry(110, 24, 30), NAVY_DEEP, [0, 48, 108], [0.25, 0, 0]),
+  ...[-1, 1].map((side) => painted(new THREE.SphereGeometry(13, 8, 6), ICE, [side * 30, 30, 118])),
+])
+
+/** Its mouth, scaled open on y by the roar. */
+export const YETI_MOUTH_GEO = mergePainted([
+  paintedAt(new THREE.SphereGeometry(1, 10, 6), '#5a1424', pose([0, 0, 0], [0, 0, 0], [40, 22, 14])),
+  ...[-1, 1].map((side) => painted(new THREE.ConeGeometry(6, 18, 4), '#f2f6ff', [side * 22, 14, 6], [Math.PI, 0, 0])),
+])
+
+export const YETI_MOUTH_OFFSET: [number, number, number] = [0, -32, 112]
+
+/** Unit limb from y 0 to 1 (instance scale: radius, length, radius): shaggy fur, shaded underneath. */
+export const YETI_LIMB_GEO = fur(new THREE.CylinderGeometry(0.85, 1, 1, 8, 3).translate(0, 0.5, 0), new THREE.Matrix4(), 0.35)
+
+/** Fist about its centre: fur cuff, navy palm and knuckles, navy claws pointing at the rider (+z). */
+export const YETI_FIST_GEO = mergePainted([
+  furBall([0, 55, -10], [70, 50, 70], -0.3),
+  paintedAt(new THREE.IcosahedronGeometry(1, 1), NAVY, pose([0, 0, 10], [0, 0, 0], [66, 62, 72])),
+  ...[-1, 0, 1].map((k) => painted(new THREE.ConeGeometry(11, 46, 5).rotateX(Math.PI / 2), NAVY_DEEP, [k * 30, -20, 82], [0.4, 0, 0])),
+])
+
+/** An ice heart in a navy plate: dim while it hides, blazing while it roars. */
+export const YETI_CHEST_GEO = mergePainted([
+  paintedAt(new THREE.SphereGeometry(1, 14, 8), NAVY, pose([0, 0, -12], [0, 0, 0], [92, 100, 30])),
+  paintedAt(new THREE.OctahedronGeometry(1, 0), ICE, pose([0, 0, 14], [0, 0, 0], [46, 60, 22])),
+])
+
+export const YETI_CHEST_MAT = withRim(
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0, emissive: '#1a5a88', emissiveIntensity: 0.4 }),
+  { color: '#bfe6ff', intensity: 0.5, power: 2.2 },
+)
+
+export const YETI_CHEST_EXPOSED_MAT = withRim(
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0, emissive: '#5fd8ff', emissiveIntensity: 2 }),
+  { color: '#e0f6ff', intensity: 1, power: 2 },
+)
+
+export const SNOWBALL_GEO = new THREE.IcosahedronGeometry(44, 1).deleteAttribute('uv')
+
+// Faintly ice-lit so it reads against the pale sky and the snow.
+export const SNOWBALL_MAT = withRim(
+  new THREE.MeshStandardMaterial({ color: '#f4f8ff', roughness: 0.8, metalness: 0, flatShading: true, emissive: '#3a8ad0', emissiveIntensity: 0.35 }),
+  { color: '#8fe0ff', intensity: 1.1, power: 1.8 },
+)

@@ -8,6 +8,9 @@ import {
   HOLD_LIFE,
   KRAKEN_SPLASH_DEATH_STYLE,
   SAND_BURST_DEATH_STYLE,
+  SNOW_BURST_DEATH_STYLE,
+  SNOWBALL_DEATH_STYLE,
+  YETI_PART_DEATH_STYLE,
   SCORPION_SHARD_DEATH_STYLE,
   nextAge,
   particleOffset,
@@ -22,6 +25,9 @@ const ALL: [string, DeathStyle][] = [
   ['krakenSplash', KRAKEN_SPLASH_DEATH_STYLE],
   ['scorpionShard', SCORPION_SHARD_DEATH_STYLE],
   ['sandBurst', SAND_BURST_DEATH_STYLE],
+  ['yetiPart', YETI_PART_DEATH_STYLE],
+  ['snowBurst', SNOW_BURST_DEATH_STYLE],
+  ['snowball', SNOWBALL_DEATH_STYLE],
 ]
 
 describe('death styles', () => {

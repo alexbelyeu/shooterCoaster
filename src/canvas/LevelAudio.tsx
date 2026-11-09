@@ -13,6 +13,7 @@ import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks
 import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 import { intensityForTier } from '@/audio/scrim/layers'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
+import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
 
 /** The level's score while it runs (held while paused, through the resume Ready / GO), the results score after it. */
 function followPhase(phase: GamePhase, level: string) {
@@ -43,6 +44,8 @@ const onFireworkLaunch = (e: unknown) => {
   sfx().fireworkWhistle(flightS, timeScale)
 }
 const onFireworkBurst = () => sfx().fireworkPop()
+/** An unshot snowball thumps past: the snow crunch, unplaced (it is at the camera). */
+const onSnowSplat = () => sfx().kill(0, 'crunch', null)
 
 const SFX_EVENTS: [string, (e: unknown) => void][] = [
   ['enemy:hit', onHit],
@@ -53,6 +56,7 @@ const SFX_EVENTS: [string, (e: unknown) => void][] = [
   ['boss:spawn', onBossSpawn],
   ['boss:hit', onBossHit],
   ['boss:defeated', onBossDefeated],
+  [SNOWBALL_SPLAT_EVENT, onSnowSplat],
   [FIREWORK_LAUNCH_EVENT, onFireworkLaunch],
   [FIREWORK_BURST_EVENT, onFireworkBurst],
 ]

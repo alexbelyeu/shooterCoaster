@@ -104,7 +104,7 @@ const LEVELS: LevelConfig[] = [
     description: 'The living snowmen',
     order: 4,
     biome: 'arctic',
-    maxScore: 25 * 15 + 20 * 30 + 8 * 50, // 375 + 600 + 400 = 1375
+    maxScore: 25 * 15 + 20 * 30 + 8 * 50 + 2 * 60 + 400, // 1375 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 1895
     timerSeconds: 75,
     message: "You've made it! Congrats!",
     nextLevel: 'level5',
@@ -124,6 +124,7 @@ const LEVELS: LevelConfig[] = [
       { type: 'snowman', count: 20, spawnDelay: 20, waveLabel: 'Snowmen Incoming!' },
       { type: 'snowmanBrute', count: 8, spawnDelay: 45, waveLabel: 'Brutes!' },
     ],
+    boss: { type: 'yeti', at: 55 },
     starThresholds: [0.2, 0.5, 0.8],
     combat: { bulletColor: '#000000', bulletSize: 40 }, // big dark snowballs against the snow
     environment: {

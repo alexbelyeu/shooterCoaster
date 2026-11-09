@@ -42,8 +42,9 @@
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
  * The boss checks summon each finale and shoot it down in phase order: level1's Golden Blimp
  * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png), level2's Giant Scorpion
- * (level2-boss.png, level2-boss-stinger.png, level2-boss-down.png) and level3's Kraken
- * (level3-boss.png, level3-boss-head.png, level3-boss-down.png); see bossCheck().
+ * (level2-boss.png, level2-boss-stinger.png, level2-boss-down.png), level3's Kraken
+ * (level3-boss.png, level3-boss-head.png, level3-boss-down.png) and level4's Yeti
+ * (level4-boss.png, level4-boss-chest.png, level4-boss-down.png); see bossCheck().
  * The pickup check shoots level1's first weapon pickup with a real bullet: the spread gun's badge,
  * a 3-bullet fan with the tinted tracer (level1-pickup.png), pause-safe expiry, reset on restart; see pickupCheck().
  * The audio check plays level1's sound from the title to its results: the score engine (#214, #416) and the arcade SFX (#217); see audioCheck().
@@ -1661,15 +1662,18 @@ async function waveCheck(page) {
 }
 
 /**
- * The finales the boss check summons: Theme Park's Golden Blimp (#181), Desert's Giant Scorpion (#318) and
- * Ocean's Kraken (#183). `minOnScreen` first-phase weak points must be on screen after the boss alone has moved
- * `settleS` s (the scorpion bursts out of the sand, the Kraken's tentacles rise out of the water);
- * `midSettleS` lets the last phase surface before `midShot`. `firstPhase`: the id prefix(es) of the first phase.
+ * The finales the boss check summons: Theme Park's Golden Blimp (#181), Desert's Giant Scorpion (#318),
+ * Ocean's Kraken (#183) and Antarctica's Yeti (#319). `minOnScreen` first-phase weak points must be on screen after
+ * the boss alone has moved `settleS` s (the scorpion bursts out of the sand, the Kraken's tentacles rise out of the
+ * water, the Yeti has climbed its ridge and thrown); `midSettleS` lets the last phase surface before `midShot`.
+ * `firstPhase`: the id prefix(es) of the first phase. `minProjectiles`: thrown things (the Yeti's snowballs) on screen
+ * in <level>-boss.png, each then shot through processHit as a normal kill that leaves the boss's hp alone.
  */
 const BOSS_CHECKS = [
   { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
   { level: 'level2', minWidthFrac: 0.15, weakPoints: 7, firstPhase: ['claw-', 'tail-'], lastPhase: ['stinger'], midShot: 'boss-stinger', minOnScreen: 4, settleS: 2, midSettleS: 1 },
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
+  { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1 },
 ]
 
 /** Moves the boss alone `seconds` (`bossStep`, game time and the level timer frozen) until `ready()`. */
@@ -1694,7 +1698,7 @@ async function stepBoss(page, seconds, ready) {
  * Game time is frozen while it is hit; if the wall-clock level timer still runs out, the step is skipped.
  */
 async function bossCheck(page, check) {
-  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS } = check
+  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS, minProjectiles = 0 } = check
   const problems = []
   const boss = () => page.evaluate(() => window.__SC_TEST__.boss())
   const events = () => page.evaluate(() => ({ ...window.__SC_TEST__.bossEvents }))
@@ -1709,13 +1713,25 @@ async function bossCheck(page, check) {
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const onScreen = async (min) => (await boss()).exposed.filter((e) => e.onScreen).length >= min
-  const settled = await stepBoss(page, settleS, () => onScreen(minOnScreen))
+  const thrown = async () => (await boss()).projectiles.filter((p) => p.onScreen).length >= minProjectiles
+  const settled = await stepBoss(page, settleS, async () => (await onScreen(minOnScreen)) && (await thrown()))
   const tell = await page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'incoming').map((e) => e.label))
   const before = await boss()
   const drawCalls = await page.evaluate(() => window.__SC_TEST__.drawCalls)
   const bar = await waitVisible(page, '.hud-boss', 10000)
   const hud = await hudLayoutProblems(page, 'desktop 1280x720 with the boss bar', [...HUD_SELECTORS, '.hud-boss'])
   await page.screenshot({ path: path.join(OUT, `${level}-boss.png`), timeout: SHOT_TIMEOUT })
+
+  // Its projectiles: each shot is a kill on the combo; the boss's hp doesn't move. Before the real bullet, so none is in its way.
+  const projectiles = { onScreen: before.projectiles.filter((p) => p.onScreen).length, shot: 0, kills: 0, combo: 0, hpMoved: false }
+  if (minProjectiles) {
+    const s0 = await getStats(page)
+    projectiles.shot = await page.evaluate(() => window.__SC_TEST__.projectileHit())
+    const s1 = await getStats(page)
+    projectiles.kills = s1.kills - s0.kills
+    projectiles.combo = s1.combo - s0.combo
+    projectiles.hpMoved = (await boss()).hpFraction !== before.hpFraction
+  }
 
   // One real bullet at an exposed weak point: time frozen, bullets stepping 0.25 s a frame.
   const target = before.exposed.find((e) => e.onScreen)
@@ -1761,7 +1777,7 @@ async function bossCheck(page, check) {
   const result = {
     level, spawned, settled, surfaced, onScreenAtStart: before.exposed.filter((e) => e.onScreen).length, tell, bar, drawCalls, widthFrac: before.box?.widthFrac ?? 0, exposedAtStart: before.exposed.map((e) => e.id),
     bulletHit, phaseOneHits, exposedMidway: midway.exposed.map((e) => e.id), lastHits, hpMidway: midway.hpFraction,
-    stage: after.stage, kills: end.kills - startStats.kills, score: end.score - startStats.score, popup, skipped: false,
+    stage: after.stage, kills: end.kills - startStats.kills, score: end.score - startStats.score, popup, skipped: false, projectiles,
   }
   if (!stillPlaying && !defeated) {
     result.skipped = true
@@ -1785,7 +1801,14 @@ async function bossCheck(page, check) {
   if (!(midway.hpFraction < before.hpFraction)) problems.push(`hp did not drop (${before.hpFraction} -> ${midway.hpFraction})`)
   if (finalHits.hpFraction !== 0) problems.push(`hp ${finalHits.hpFraction} after hitting the last phase`)
   if (!defeated) problems.push('boss:defeated never fired')
-  if (result.kills !== weakPoints) problems.push(`${result.kills} kills from the boss (want one per weak point, ${weakPoints})`)
+  if (result.kills - projectiles.kills !== weakPoints)
+    problems.push(`${result.kills - projectiles.kills} kills from the boss (want one per weak point, ${weakPoints})`)
+  if (minProjectiles) {
+    if (projectiles.onScreen < minProjectiles) problems.push(`${projectiles.onScreen} projectiles on screen in ${level}-boss.png (want ≥ ${minProjectiles})`)
+    if (projectiles.kills !== projectiles.shot || projectiles.combo !== projectiles.shot)
+      problems.push(`${projectiles.shot} projectiles shot gave ${projectiles.kills} kills and +${projectiles.combo} combo (want one each)`)
+    if (projectiles.hpMoved) problems.push('shooting its projectiles moved the boss hp')
+  }
   if (!popup.length) problems.push('no big score popup for the defeat')
   return { id: 'boss', problems, boss: result }
 }
