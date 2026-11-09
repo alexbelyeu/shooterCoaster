@@ -45,7 +45,8 @@ Work through these in order; stop early only if something is on fire.
    `## YYYY-MM-DD — Title (role, #PR)` sections with the entry body unchanged, then
    `git rm` exactly those inbox files. If `DECISIONS.md` passes ~1500 lines, first
    move whole past years to `docs/agents/decisions/<year>.md`. One docs-only PR
-   titled `docs(decisions): fold inbox <date>`, labelled `agent:needs-qa`. You are the
+   titled `docs(decisions): fold inbox <date>` on branch `agent/fold-decisions-<date>` (auto-merge
+   only takes `agent/*` branches), labelled `agent:needs-qa`. You are the
    only role that edits `DECISIONS.md`.
 6. **Tech debt** (if time remains): claim the highest-priority `agent:ready` issue
    labelled `type:tech` or `type:perf` and work it exactly like a Builder (branch,
