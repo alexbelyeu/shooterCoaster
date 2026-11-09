@@ -22,6 +22,7 @@ import Pickups from '@/combat/pickups/Pickups'
 import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
 import { goldenBalloonCount } from '@/levels/scoring'
+import { RUN_SECONDS } from '@/levels/pacing'
 import { eventBus } from '@/core/EventBus'
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
@@ -66,7 +67,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
   const config = getLevelConfig(levelId)
   if (!config) return null
 
-  const { track, environment, biome, enemies, timerSeconds, combat, boss, pickups } = config
+  const { track, environment, biome, enemies, combat, boss, pickups } = config
 
   const curve = useMemo(() => {
     const factory = track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve
@@ -127,10 +128,10 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         trackTable={trackTable}
         groundFn={groundFn}
         boss={boss}
-        timerSeconds={timerSeconds}
+        timerSeconds={RUN_SECONDS}
       />
       <ShootingController />
-      <GameTimer seconds={timerSeconds} />
+      <GameTimer seconds={RUN_SECONDS} />
       <KillProjector />
       <ShaderWarmup levelId={levelId} />
     </TerrainContext.Provider>

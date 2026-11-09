@@ -1,4 +1,5 @@
 import { getLevelConfig } from '@/levels/LevelRegistry'
+import { RUN_SECONDS } from '@/levels/pacing'
 import { computeStars } from '@/levels/scoring'
 import type { GamePhase } from '@/types/game'
 import { isInRun } from '@/store/startPhase'
@@ -50,7 +51,7 @@ export function analyticsEventFor(prev: RunSnapshot, next: RunSnapshot): Analyti
   if (isInRun(prev.phase) && (next.phase === 'levelSelect' || next.phase === 'title')) {
     return {
       name: 'level_quit',
-      props: { level, progress_pct: tensPercent(1 - next.timeRemaining / config.timerSeconds) },
+      props: { level, progress_pct: tensPercent(1 - next.timeRemaining / RUN_SECONDS) },
     }
   }
   return null

@@ -1,9 +1,10 @@
-import { useRef, useEffect, useLayoutEffect } from 'react'
+import { useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
 import type { ArcTable } from './arcLength'
 import { setRideProgress } from './rideProgress'
+import { MAX_RIDE_STEP_FRAMES, advanceRide, rideSpeeds, type RideState } from './ridePhysics'
 import { e2eRideSeconds } from '@/testing/e2eHook'
 import { useGameStore } from '@/store/useGameStore'
 import { sfx } from '@/audio/sfx'
@@ -38,15 +39,9 @@ interface CoasterCameraProps {
   enabled?: boolean
 }
 
-// The 2015 game ran frame-dependent physics at ~30-45 fps: slow the 60 fps port to match, and cap runaway downhill speed.
-const SPEED_FACTOR = 0.7
-const MAX_VELOCITY_MULT = 5 // max velocity = minRollerSpeed * this
-
 const BASE_FOV = 80
 
 const RAD_TO_DEG = 180 / Math.PI
-
-const wrap01 = (t: number) => ((t % 1) + 1) % 1
 
 /** Rides the track (port of Camera.js updateCamGame) with rotation-only weight from cameraRig.ts; the mouse only aims. */
 export default function CoasterCamera({
@@ -64,8 +59,8 @@ export default function CoasterCamera({
   const { set } = useThree()
   const cameraRef = useRef<THREE.PerspectiveCamera>(null)
 
-  const progress = useRef(0)
-  const velocity = useRef(0)
+  const ride = useRef<RideState>({ progress: 0, velocity: 0 })
+  const speeds = useMemo(() => rideSpeeds({ rollerSpeed, minRollerSpeed }), [rollerSpeed, minRollerSpeed])
   const _position = useRef(new THREE.Vector3())
   const _tangent = useRef(new THREE.Vector3())
   const _lookAt = useRef(new THREE.Vector3())
@@ -134,41 +129,30 @@ export default function CoasterCamera({
     let jumped = countdown || !lookSnapped.current
     if (countdown || store.runId !== runId.current) {
       runId.current = store.runId
-      progress.current = 0
-      velocity.current = 0
+      ride.current.progress = 0
+      ride.current.velocity = 0
       jumped = true
     }
     const frameDelta = countdown || store.phase === 'paused' ? 0 : delta
     const effectiveDelta = frameDelta * (store.timeScale ?? 1)
 
-    const effectiveRollerSpeed = rollerSpeed * SPEED_FACTOR
-    const effectiveMinSpeed = minRollerSpeed * SPEED_FACTOR
-    const maxVelocity = minRollerSpeed * MAX_VELOCITY_MULT * SPEED_FACTOR
-
     const testApi = window.__SC_TEST__
     if (testApi?.rideTo != null) {
-      progress.current = testApi.rideTo
+      ride.current.progress = testApi.rideTo
       testApi.rideTo = null
       jumped = true
     }
     if (testApi?.rideSpeed != null) {
-      velocity.current = effectiveMinSpeed + Math.min(Math.max(testApi.rideSpeed, 0), 1) * (maxVelocity - effectiveMinSpeed)
+      ride.current.velocity = speeds.min + Math.min(Math.max(testApi.rideSpeed, 0), 1) * (speeds.max - speeds.min)
       testApi.rideSpeed = null
     }
     // In 60 fps frames. A hitch rides at most 3 of them (it slows the ride, never skips track); the smoke's `rideRate`
     // instead rides a share of the level time in such steps, so the ride doesn't depend on the frame rate (#305).
     const e2eRide = e2eRideSeconds(frameDelta)
-    let rideLeft = e2eRide === null ? Math.min(effectiveDelta * 60, 3) : e2eRide * (store.timeScale ?? 1) * 60
-    do {
-      const dtScaleSlow = Math.min(rideLeft, 3)
-      rideLeft -= dtScaleSlow
-      progress.current = wrap01(progress.current + velocity.current * dtScaleSlow)
-      _tangent.current.copy(curve.getTangentAt(progress.current))
-      velocity.current -= _tangent.current.y * effectiveRollerSpeed * dtScaleSlow
-      velocity.current = Math.max(velocity.current, effectiveMinSpeed)
-      velocity.current = Math.min(velocity.current, maxVelocity)
-    } while (rideLeft > 0)
-    const t = progress.current
+    const rideFrames = e2eRide === null ? Math.min(effectiveDelta * 60, MAX_RIDE_STEP_FRAMES) : e2eRide * (store.timeScale ?? 1) * 60
+    advanceRide(ride.current, curve, speeds, rideFrames)
+    const t = ride.current.progress
+    _tangent.current.copy(curve.getTangentAt(t))
     setRideProgress(t)
 
     _position.current.copy(curve.getPointAt(t))
@@ -176,13 +160,13 @@ export default function CoasterCamera({
     cam.position.copy(_position.current)
     const velocityNorm = Math.max(
       0,
-      Math.min((velocity.current - effectiveMinSpeed) / (maxVelocity - effectiveMinSpeed), 1),
+      Math.min((ride.current.velocity - speeds.min) / (speeds.max - speeds.min), 1),
     )
 
     // Lateral acceleration from the tangents a few units either side of the car, measured along the track.
     const s = scratch.current
     const at = sampleTrack(table, t, trackScale, s.samples)
-    const speed = velocity.current * 60 * at.unitsPerT
+    const speed = ride.current.velocity * 60 * at.unitsPerT
     s.tangentBehind.copy(curve.getTangentAt(at.behindT))
     const lateral = lateralAcceleration(_tangent.current, s.tangentBehind, curve.getTangentAt(at.aheadT), at.span, speed)
 

@@ -3,7 +3,7 @@ import { normalizeInitials } from '@/store/leaderboard'
 import { checkSubmission, clientIp, hashIp, rankFrom, rateLimited, RATE_LIMIT, windowStart } from './rules'
 import { LEVEL_LIMITS } from './levelLimits'
 
-const good = { level: 'level1', initials: 'ABC', score: 2400, seed: 123456, kills: 120, accuracy: 0.8, version: '2.0.0+abc1234' }
+const good = { level: 'level1', initials: 'ABC', score: 2400, seed: 123456, kills: 100, accuracy: 0.8, version: '2.0.0+abc1234' }
 
 describe('checkSubmission', () => {
   it('accepts a real run', () => {

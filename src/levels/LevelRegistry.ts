@@ -1,5 +1,7 @@
 import type { LevelConfig } from '@/types/level'
+import { paceLevel } from './pacing'
 
+/** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
 const LEVELS: LevelConfig[] = [
   {
     id: 'level1',
@@ -7,8 +9,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Fun at the fair',
     order: 1,
     biome: 'themePark',
-    maxScore: 13 * 150 + 5 * 65 + 400, // 1950 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 2675
-    timerSeconds: 75,
+    maxScore: 108 * 13 + 5 * 65 + 400, // 1404 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 2129
     message: 'Well, that was easy...',
     nextLevel: 'level2',
     track: {
@@ -22,12 +23,14 @@ const LEVELS: LevelConfig[] = [
       color1: 0xffffff,
       color2: 0xffff00,
     },
-    enemies: [
-      { type: 'balloon', count: 50, spawnDelay: 0, waveLabel: 'Pop em!' },
-      { type: 'balloon', count: 50, spawnDelay: 20, waveLabel: 'More Balloons!' },
-      { type: 'balloon', count: 50, spawnDelay: 45, waveLabel: 'Final Wave!', formation: 'ring' },
-    ],
-    boss: { type: 'goldenBlimp', at: 55 },
+    ...paceLevel({
+      waves: [
+        { type: 'balloon', count: 36, waveLabel: 'Pop em!' },
+        { type: 'balloon', count: 36, waveLabel: 'More Balloons!' },
+        { type: 'balloon', count: 36, waveLabel: 'Final Wave!', formation: 'ring' },
+      ],
+      boss: 'goldenBlimp',
+    }),
     starThresholds: [0.3, 0.6, 0.9],
     environment: {
       hasTrees: true,
@@ -40,8 +43,7 @@ const LEVELS: LevelConfig[] = [
     description: 'A murder of Crows',
     order: 2,
     biome: 'desert',
-    maxScore: 30 * 20 + 50 * 15 + 2 * 60 + 4 * 40 + 400, // 1350 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2030
-    timerSeconds: 60,
+    maxScore: 36 * 20 + 72 * 15 + 2 * 60 + 4 * 40 + 400, // 1800 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2480
     message: 'Ready for this one?',
     nextLevel: 'level3',
     track: {
@@ -55,12 +57,14 @@ const LEVELS: LevelConfig[] = [
       color1: 0x51411a,
       color2: 0x812a2a,
     },
-    enemies: [
-      { type: 'scorpion', count: 30, spawnDelay: 0, waveLabel: 'Incoming!' },
-      { type: 'crow', count: 25, spawnDelay: 15, waveLabel: 'A Murder of Crows!', formation: 'v' },
-      { type: 'crow', count: 25, spawnDelay: 35, waveLabel: 'More Crows!', formation: 'v' },
-    ],
-    boss: { type: 'giantScorpion', at: 42 },
+    ...paceLevel({
+      waves: [
+        { type: 'scorpion', count: 36, waveLabel: 'Incoming!' },
+        { type: 'crow', count: 36, waveLabel: 'A Murder of Crows!', formation: 'v' },
+        { type: 'crow', count: 36, waveLabel: 'More Crows!', formation: 'v' },
+      ],
+      boss: 'giantScorpion',
+    }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
     },
@@ -71,8 +75,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Aim for the snout!',
     order: 3,
     biome: 'ocean',
-    maxScore: 32 * 18 + 25 * 25 + 30 * 12 + 5 * 60 + 400, // 1561 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 2261
-    timerSeconds: 65,
+    maxScore: 44 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 1924 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 2624
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
     track: {
@@ -86,13 +89,15 @@ const LEVELS: LevelConfig[] = [
       color1: 0x416fa0,
       color2: 0x31ffd5,
     },
-    enemies: [
-      { type: 'jellyfish', count: 20, spawnDelay: 0, waveLabel: 'Into the Deep!' },
-      { type: 'shark', count: 25, spawnDelay: 15, waveLabel: 'Sharks!' },
-      { type: 'jellyfish', count: 12, spawnDelay: 28, waveLabel: 'Jellyfish Bloom!' },
-      { type: 'flyingFish', count: 30, spawnDelay: 35, waveLabel: 'Flying Fish!', formation: 'school' },
-    ],
-    boss: { type: 'kraken', at: 40 },
+    ...paceLevel({
+      waves: [
+        { type: 'jellyfish', count: 24, waveLabel: 'Into the Deep!', weight: 3 },
+        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 2 },
+        { type: 'jellyfish', count: 20, waveLabel: 'Jellyfish Bloom!', weight: 2 },
+        { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 3 },
+      ],
+      boss: 'kraken',
+    }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
       hasWater: true,
@@ -104,8 +109,7 @@ const LEVELS: LevelConfig[] = [
     description: 'The living snowmen',
     order: 4,
     biome: 'arctic',
-    maxScore: 25 * 15 + 20 * 30 + 8 * 50 + 2 * 60 + 400, // 1375 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 1895
-    timerSeconds: 75,
+    maxScore: 44 * 15 + 40 * 30 + 16 * 50 + 2 * 60 + 400, // 2660 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 3180
     message: "You've made it! Congrats!",
     nextLevel: 'level5',
     track: {
@@ -119,12 +123,14 @@ const LEVELS: LevelConfig[] = [
       color1: 0x909090,
       color2: 0xffffff,
     },
-    enemies: [
-      { type: 'snowmanScout', count: 25, spawnDelay: 0, waveLabel: 'Scout Party', formation: 'line' },
-      { type: 'snowman', count: 20, spawnDelay: 20, waveLabel: 'Snowmen Incoming!' },
-      { type: 'snowmanBrute', count: 8, spawnDelay: 45, waveLabel: 'Brutes!' },
-    ],
-    boss: { type: 'yeti', at: 55 },
+    ...paceLevel({
+      waves: [
+        { type: 'snowmanScout', count: 44, waveLabel: 'Scout Party', formation: 'line' },
+        { type: 'snowman', count: 40, waveLabel: 'Snowmen Incoming!' },
+        { type: 'snowmanBrute', count: 16, waveLabel: 'Brutes!' },
+      ],
+      boss: 'yeti',
+    }),
     starThresholds: [0.2, 0.5, 0.8],
     combat: { bulletColor: '#000000', bulletSize: 40 }, // big dark snowballs against the snow
     environment: {
@@ -138,8 +144,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Descend into the volcanic depths',
     order: 5,
     biome: 'volcanic',
-    maxScore: 2585,
-    timerSeconds: 120,
+    maxScore: 52 * 12 + 20 * 18 + 22 * 35 + 8 * 60, // 2234: no boss yet (the Magma Titan, #320), so the drakes are the finale
     message: 'You conquered the Inferno!',
     nextLevel: null,
     track: {
@@ -154,14 +159,16 @@ const LEVELS: LevelConfig[] = [
       color2: 0xff4400,
       glow: 1.0,
     },
-    enemies: [
-      { type: 'emberWisp', count: 35, spawnDelay: 0, waveLabel: 'Embers Rise!', formation: 'spiral' },
-      { type: 'fireImp', count: 25, spawnDelay: 15, waveLabel: 'Imps Attack!' },
-      { type: 'lavaGolem', count: 15, spawnDelay: 30, waveLabel: 'Golems Awaken!' },
-      { type: 'emberWisp', count: 40, spawnDelay: 50, waveLabel: 'Swarm!', isEruption: true, formation: 'spiral' },
-      { type: 'infernalDrake', count: 6, spawnDelay: 70, waveLabel: 'Drakes Descend!' },
-      { type: 'lavaGolem', count: 10, spawnDelay: 85, waveLabel: 'Final Eruption!', isEruption: true },
-    ],
+    ...paceLevel({
+      waves: [
+        { type: 'emberWisp', count: 26, waveLabel: 'Embers Rise!', formation: 'spiral', weight: 2 },
+        { type: 'fireImp', count: 20, waveLabel: 'Imps Attack!', weight: 2 },
+        { type: 'lavaGolem', count: 12, waveLabel: 'Golems Awaken!', weight: 2 },
+        { type: 'emberWisp', count: 26, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', weight: 2 },
+        { type: 'lavaGolem', count: 10, waveLabel: 'Golems Return!', weight: 3 },
+      ],
+      finale: { type: 'infernalDrake', count: 8, waveLabel: 'Drakes Descend!' },
+    }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
       hasTrees: true,

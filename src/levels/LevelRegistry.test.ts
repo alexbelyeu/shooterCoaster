@@ -4,6 +4,7 @@ import { SCORE_VALUES, computeMaxScore, computeStars, nextStar } from './scoring
 import type { EnemyType } from '@/types/level'
 import { BOSS_SPECS } from '@/entities/bosses/bossSpecs'
 import { bossMaxScore } from '@/entities/bosses/bossModel'
+import { ENTRY_SECONDS_MAX, RUN_SECONDS, pacingTimes } from './pacing'
 
 const levels = getAllLevels()
 
@@ -44,36 +45,49 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('Theme Park ends on the Golden Blimp, which raises its maxScore to 2675', () => {
-    const level1 = getLevelConfig('level1')!
-    expect(level1.boss?.type).toBe('goldenBlimp')
-    expect(level1.maxScore).toBe(13 * 150 + bossMaxScore(BOSS_SPECS.goldenBlimp))
-    expect(level1.maxScore).toBe(2675)
+  it('the finales and maxScores: Blimp 2129, Giant Scorpion 2480, Kraken 2624, Yeti 3180; Inferno ends on its drakes, 2234', () => {
+    const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
+    expect(finales).toEqual([
+      ['level1', 'goldenBlimp', 2129],
+      ['level2', 'giantScorpion', 2480],
+      ['level3', 'kraken', 2624],
+      ['level4', 'yeti', 3180],
+      ['level5', 'infernalDrake', 2234],
+    ])
+    expect(getLevelConfig('level1')!.maxScore).toBe(108 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
   })
 
-  it('Desert ends on the Giant Scorpion at 42 s, after the last crows, which raises its maxScore to 2030', () => {
-    const level2 = getLevelConfig('level2')!
-    expect(level2.boss?.type).toBe('giantScorpion')
-    expect(level2.boss!.at).toBe(42)
-    expect(level2.boss!.at).toBeGreaterThan(Math.max(...level2.enemies.map((w) => w.spawnDelay ?? 0)))
-    expect(level2.maxScore).toBe(1350 + bossMaxScore(BOSS_SPECS.giantScorpion))
-    expect(level2.maxScore).toBe(2030)
+  // #452: every run is RUN_SECONDS long (the level timer has no other source) and paced by `pacing.ts`.
+  it.each(levels.map((l) => [l.id, l] as const))(
+    '%s: waves from 0 s, the last one shootable by 35 s, then a 18–22 s boss fight (or a finale wave) ending the run',
+    (_id, level) => {
+      expect(RUN_SECONDS).toBe(60)
+      const delays = level.enemies.map((w) => w.spawnDelay ?? 0)
+      expect(delays[0]).toBe(0)
+      expect([...delays].sort((a, b) => a - b)).toEqual(delays)
+      const finaleAt = level.boss ? level.boss.at : delays[delays.length - 1]
+      const waves = level.boss ? delays : delays.slice(0, -1)
+      expect(Math.max(...waves) + ENTRY_SECONDS_MAX).toBeLessThanOrEqual(35)
+      expect(finaleAt).toBe(pacingTimes().bossAt)
+      expect(RUN_SECONDS - finaleAt).toBeGreaterThanOrEqual(18)
+      expect(RUN_SECONDS - finaleAt).toBeLessThanOrEqual(22)
+      if (level.boss) expect(level.boss.at - BOSS_SPECS[level.boss.type].tell.seconds).toBeGreaterThan(Math.max(...waves))
+    },
+  )
+
+  it('one eruption in the Inferno, before the drakes', () => {
+    const level5 = getLevelConfig('level5')!
+    const eruptions = level5.enemies.filter((w) => w.isEruption)
+    expect(eruptions).toHaveLength(1)
+    expect(eruptions[0].spawnDelay!).toBeLessThan(pacingTimes().bossAt)
   })
 
-  it('Ocean ends on the Kraken in its last ~25 s, which raises its maxScore to 2261', () => {
-    const level3 = getLevelConfig('level3')!
-    expect(level3.boss?.type).toBe('kraken')
-    expect(level3.timerSeconds - level3.boss!.at).toBe(25)
-    expect(level3.maxScore).toBe(1561 + bossMaxScore(BOSS_SPECS.kraken))
-    expect(level3.maxScore).toBe(2261)
-  })
-
-  it('a boss arrives after its tell and before the timer runs out', () => {
+  it('every level has about as many enemies a second as Theme Park, 2–3 a second of the waves before the finale', () => {
     for (const l of levels) {
-      if (!l.boss) continue
-      const { tell } = BOSS_SPECS[l.boss.type]
-      expect(l.boss.at - tell.seconds, l.id).toBeGreaterThan(0)
-      expect(l.boss.at, l.id).toBeLessThan(l.timerSeconds)
+      const waves = l.boss ? l.enemies : l.enemies.slice(0, -1)
+      const perSecond = waves.reduce((n, w) => n + w.count, 0) / pacingTimes().bossAt
+      expect(perSecond, l.id).toBeGreaterThanOrEqual(2)
+      expect(perSecond, l.id).toBeLessThanOrEqual(3)
     }
   })
 
@@ -110,9 +124,8 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('every level has a positive timer and at least one wave', () => {
+  it('every level has at least one wave', () => {
     for (const l of levels) {
-      expect(l.timerSeconds).toBeGreaterThan(0)
       expect(l.enemies.length).toBeGreaterThan(0)
     }
   })

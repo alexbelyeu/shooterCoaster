@@ -56,7 +56,6 @@ export interface LevelConfig {
   order: number
   biome: BiomeType
   maxScore: number
-  timerSeconds: number
   message: string
   nextLevel: string | null
   track: TrackParams

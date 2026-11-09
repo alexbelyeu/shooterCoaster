@@ -172,6 +172,16 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
    and, optionally, `combat` (`bulletColor` / `bulletSize`, read by `SceneManager`; never
    special-case a level id in scene code)
 
+### Pacing (every level, #452)
+Every run is `RUN_SECONDS` (60) long. A level lists its roster in `paceLevel({ waves, boss })` and
+`src/levels/pacing.ts` times it: the waves spread over the first 45 s by `weight` (default 1; the
+first at 0 s, the last in by 33 s so it has flown in by 35 s), the boss at 40 s, so its fight
+(~20 s) ends the run. A level without a boss names a `finale` wave instead, which arrives at the
+boss's time. Never type seconds per wave. Density: 2–3 enemies a second of the 40 s before the
+finale (~100 enemies), Theme Park's feel (`LevelRegistry.test.ts` checks it). A boss must be
+beatable in its window at 2 hits a second (the smoke's `boss` step measures it). The ride is not
+timed by the run: a lap takes 99–228 s (`track/ridePhysics.ts`, pinned in its test).
+
 ### Enemy Registration (all required)
 1. `src/types/level.ts` — add to `EnemyType` union
 2. `src/entities/enemies/SharedEnemyAssets.ts` — geometry + material singletons (with specular/iridescence)

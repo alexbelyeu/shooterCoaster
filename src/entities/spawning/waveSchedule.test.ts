@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
+import { RUN_SECONDS } from '@/levels/pacing'
 import { WAVE_TELL_SECONDS, newWaveProgress, nextWaveDue, tickWaves } from './waveSchedule'
 
 /** Ticks the schedule at each elapsed time; returns the events in order. */
@@ -58,7 +59,7 @@ describe('tickWaves', () => {
   it('every level wave is on a whole second and arrives on time within its level timer', () => {
     for (const level of getAllLevels()) {
       const delays = level.enemies.map((w) => w.spawnDelay ?? 0)
-      const times = Array.from({ length: level.timerSeconds + 1 }, (_, i) => i)
+      const times = Array.from({ length: RUN_SECONDS + 1 }, (_, i) => i)
       const expected = delays.flatMap((d, i) => (d > 0 ? [`tell ${i} @${d - WAVE_TELL_SECONDS}`, `arrive ${i} @${d}`] : []))
       for (const d of delays) expect(Number.isInteger(d), `${level.id} delay ${d}`).toBe(true)
       expect(run(delays, times).sort(), level.id).toEqual(expected.sort())
