@@ -32,7 +32,7 @@ describe('smoke shards (#353, #372)', () => {
   })
 
   it('leave the deep checks to the nightly run', () => {
-    for (const k of ['boss@level2', 'wave@level2', 'frenzy@level1', 'share@level1', 'pause@level1', 'daily@-', 'mobileMenus@-'])
+    for (const k of ['boss@level2', 'wave@level2', 'pacing@level2', 'frenzy@level1', 'share@level1', 'pause@level1', 'daily@-', 'mobileMenus@-'])
       expect(nightly).toContain(k)
   })
 

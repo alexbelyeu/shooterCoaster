@@ -7,7 +7,7 @@ export const UI_STEPS = ['title', 'landing', 'levelSelect', 'daily', 'settings',
 /** On the run's first level; `frenzy` happens inside its ride and `seed` compares against that ride's spawns. */
 export const FIRST_LEVEL_STEPS = ['frenzy', 'seed', 'quality', 'pause', 'countdown', 'speed']
 /** `shot`, `results` and `share` check the ride's own page after its combat. */
-export const LEVEL_STEPS = ['ride', 'shot', 'results', 'share', 'wave', 'boss', 'pickup', 'audio']
+export const LEVEL_STEPS = ['ride', 'shot', 'results', 'share', 'wave', 'boss', 'pickup', 'audio', 'pacing']
 export const STEPS = [...UI_STEPS, ...FIRST_LEVEL_STEPS, ...LEVEL_STEPS]
 
 /** Mirrors the smoke's check constants (WAVE_CHECK, BOSS_CHECKS…), which fail the run at start if they drift. */

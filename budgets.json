@@ -61,5 +61,28 @@
       "trackObjects": 12,
       "trackTriangles": 99742
     }
+  },
+  "pacing": {
+    "_comment": "Time with nothing to shoot over a whole run, per level (#450): the smoke's nightly `pacing` step (e2e/pacingMetric.mjs) fails a level whose longest gap with no shootable target on screen (seconds of level time; the first 2 s after GO and the boss tell left out) or share of the run with none is over these. Set on 2026-11-09 from the higher of two local runs per level (seed 1337, 0.5 s steps; a level's longest gap moved up to 2 s between runs, its share up to 5 points): the longest gap +1 s, the share +2 points rounded up to the next 5%, so today's levels pass and nothing gets worse. The Director lowers them (the bar is 3 s once the wave placement fix lands).",
+    "level1": {
+      "longestGapSeconds": 4,
+      "noTargetShare": 0.15
+    },
+    "level2": {
+      "longestGapSeconds": 5,
+      "noTargetShare": 0.15
+    },
+    "level3": {
+      "longestGapSeconds": 3,
+      "noTargetShare": 0.1
+    },
+    "level4": {
+      "longestGapSeconds": 10,
+      "noTargetShare": 0.35
+    },
+    "level5": {
+      "longestGapSeconds": 9,
+      "noTargetShare": 0.2
+    }
   }
 }

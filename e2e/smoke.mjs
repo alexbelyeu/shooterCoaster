@@ -63,6 +63,7 @@
  *   node e2e/smoke.mjs --dist dist-portal --base /nested/path/ --levels level1   # the portal zip under a sub-path
  *   node e2e/smoke.mjs --shard level3                   # one CI shard (e2e/shards.mjs), with its smokeSeconds budget
  *   node e2e/smoke.mjs --steps ride,boss --levels level2   # just those steps (names in e2e/shards.mjs)
+ *   node e2e/smoke.mjs --steps pacing --levels level2   # time with nothing to shoot over a whole run (pacing.json)
  *
  * Without --shard / --steps this is the full run (the nightly's depth); CI's PR shards run part of it (#372).
  *
@@ -92,6 +93,7 @@ import { arg, launchBrowser, startPreview, stopPreview } from '../scripts/headle
 import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, waitFrames, waitVisible } from './pageChecks.mjs'
 import { planRun, STEP_LEVELS } from './shards.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
+import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
 
 const SECONDS = Number(arg('seconds', 10))
 const OUT = path.resolve(arg('out', 'e2e-results'))
@@ -1660,6 +1662,58 @@ async function waveCheck(page) {
     problems,
     wave: { level, onScreen: flock.length, largestPx: Math.round(flock[0]?.px ?? 0), nearest: Math.round(nearest), timing },
   }
+}
+
+/** Fixed level seconds a pacing frame (`timerStep`, the same run on any runner): 0.5 keeps all five runs near 800 frames of the nightly's 60 minutes. */
+const PACING_STEP = Number(arg('pacing-step', 0.5))
+
+/** Pacing (#450): the whole run unfired, sampled every frame in the page; `rideRate` 1 rides as at 60 fps, so the rider meets each wave where a player would. */
+async function pacingCheck(page, id) {
+  const problems = []
+  const started = await page.evaluate(([lid, seed, step]) => {
+    const s = window.__SC_TEST__
+    s.timerStep = step
+    s.rideRate = 1
+    s.holdLevelTime = false
+    s.autoFire(false)
+    s.startLevel(lid, seed)
+    const run = { samples: [], end: null, done: false }
+    s.pacingRun = run
+    const sample = () => {
+      const w = s.nextWave()
+      const st = s.stats()
+      if (st.phase === 'playing' && w) {
+        run.end ??= w.levelTime + st.timeRemaining
+        run.samples.push({
+          t: w.levelTime, targets: st.onScreenEnemies, track: s.rideProgress,
+          waveTell: w.due != null && w.levelTime >= w.due - s.waveTellSeconds, bossTell: s.boss().stage === 'incoming',
+        })
+      } else if (run.samples.length) {
+        run.done = true
+        return
+      }
+      requestAnimationFrame(sample)
+    }
+    requestAnimationFrame(sample)
+    return s.frames
+  }, [id, SEED, PACING_STEP])
+  let last = { frames: started, at: Date.now() }
+  for (;;) {
+    await page.waitForTimeout(2000)
+    const now = await page.evaluate(() => ({ done: window.__SC_TEST__.pacingRun.done, frames: window.__SC_TEST__.frames }))
+    if (now.done) break
+    if (now.frames !== last.frames) last = { frames: now.frames, at: Date.now() }
+    else if (Date.now() - last.at > FRAME_DEADLINE_MS) {
+      problems.push(`render loop stalled (no frame in ${(FRAME_DEADLINE_MS / 1000).toFixed(0)} s)`)
+      break
+    }
+  }
+  const { samples, end } = await page.evaluate(() => window.__SC_TEST__.pacingRun)
+  if (!samples.length) return { id: 'pacing', level: id, problems: [...problems, 'no playing frame sampled'], pacing: null, timeline: [] }
+  const pacing = pacingMetrics(samples, end)
+  if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
+  problems.push(...pacingBudgetProblems(id, pacing, BUDGETS.pacing?.[id]))
+  return { id: 'pacing', level: id, problems, samples: samples.length, pacing, timeline: pacingTimeline(samples) }
 }
 
 /**
@@ -3315,6 +3369,15 @@ async function run() {
     })
   }
 
+  // 6f. Pacing: every level's whole run, unfired, against budgets.json `pacing` (pacing.json)
+  const pacing = {}
+  for (const id of has('pacing') ? wanted : []) {
+    const r = await pageStep((page) => pacingCheck(page, id))
+    pacing[id] = { ...r.pacing, timeline: r.timeline }
+    delete r.timeline
+  }
+  if (Object.keys(pacing).length) fs.writeFileSync(path.join(OUT, 'pacing.json'), JSON.stringify({ step: PACING_STEP, seed: SEED, levels: pacing }))
+
   // 7. Touch playtest on a phone viewport (--mobile)
   if (has('mobile')) await step(() => runMobile(browser, base))
 
@@ -3373,6 +3436,8 @@ async function run() {
       : r.pickup
         ? ` ${r.pickup.count} pickups [${r.pickup.ids.join(',')}] draws=${r.pickup.drawCalls} first at ${r.pickup.px ? `${r.pickup.px.x},${r.pickup.px.y} (${r.pickup.px.distance} units, lead ${r.pickup.lead})` : '-'}` +
           ` fan shots=${r.pickup.fan?.shots} drawn=${r.pickup.fan?.drawn}`
+      : r.id === 'pacing'
+        ? ` ${r.pacing ? pacingSummary(r.level, r.pacing) : r.level} (${r.samples ?? 0} frames)`
       : r.engine
         ? ` title=${r.engine.title} nodes ${r.engine.nodes.join('->')} position ${r.engine.position.map((p) => p.toFixed(1)).join('->')}s` +
           ` sfxNodes ${r.engine.sfxNodes.join('->')} voices ${r.engine.voices ? `peak ${r.engine.voices.peak}/${r.engine.voices.budget} stolen ${r.engine.voices.stolen} dropped ${r.engine.voices.rejected}` : 'none'}` +
