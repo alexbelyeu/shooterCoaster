@@ -41,3 +41,16 @@ export function nextWaveDue(delays: readonly number[], progress: WaveProgress): 
   }
   return due
 }
+
+/**
+ * Each wave's window of level time: from its arrival until the next wave arrives, the boss tell
+ * starts (`bossAt`) or the run ends.
+ */
+export function waveWindows(delays: readonly number[], bossAt: number | undefined, timerSeconds: number): [number, number][] {
+  return delays.map((delay) => {
+    const from = Math.max(0, delay)
+    let to = timerSeconds
+    for (const later of [...delays, bossAt ?? Infinity]) if (later > from && later < to) to = later
+    return [from, Math.max(from, to)]
+  })
+}
