@@ -120,6 +120,19 @@ When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pic
 (spread) with time frozen and shoots it with a real bullet: `weaponState()` must report the spread gun, the next pull must
 count 3 shots and draw 3 bullets, and `level1-pickup.png` holds the tinted tracer with the `.hud-weapon` badge clear of the HUD;
 the pickup must hold through a pause, expire on game time, and a restart must bring back the blaster and every pickup.
+A `pacing` step (#450) rides every level's whole run, GO to the end, on a fixed `timerStep` of `--pacing-step` level seconds a
+frame (default 0.5, so the run is the same on any runner; `rideRate` 1, the ride a 60 fps player gets), with no firing and the
+level time never held. Every frame the page records level time, `stats().onScreenEnemies` (shootable targets inside the
+viewport: enemies, boss weak points, projectiles; never pickups), `rideProgress` and whether a wave tell (the 1 s before a
+wave) or the boss tell is on. Pure `pacingMetric.mjs` (`pacingMetric.test.ts`) turns that into `noTargetShare` (share of
+the run with nothing on screen) and the gaps (`longestGapSeconds`, `longestGap` with its start time and track fraction,
+`gaps` of 1 s or more); the first 2 s after GO and the boss tell are meant to be empty, so they count neither way and end a
+gap. It prints one line per level (`level2 pacing: no target 7% of 60 s, longest gap 2.0 s at 4 s (track 0.03)`) and
+writes `e2e-results/pacing.json`: those metrics per level plus a `timeline`, one row a level second (`t`, fewest and most
+targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`), which is where to look for where a gap is. A level over
+its `budgets.json` `pacing` ceilings (`longestGapSeconds`, `noTargetShare`) fails with the gap named (`longest gap 9.0 s at
+7.0 s (track 0.03) over budget 3 s`); only the Director lowers or raises them. A level takes its run length in frames
+(150 frames for 75 s; ~2.5 min in a 2-core session), so run one at a time: `--steps pacing --levels level4`.
 `drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
 spawned enemies) and vary run to run; for before/after comparisons use the
 camera-independent `scene` totals the smoke also prints (`track objs/tris` = objects
@@ -140,7 +153,7 @@ first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ri
 (hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: the ride, the perf
 gate, the enemy probe, combat, the level's end), on the ride's own page `shot` (the frozen fresh shot and aim jump),
 `results` (the results screen's reveal, stats, buttons, board) and `share` (its Share line, menu and score cards); and
-`wave`, `boss`, `pickup`, `audio` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its
+`pacing` (every level, a whole run on its own page) and `wave`, `boss`, `pickup`, `audio` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its
 checks disagree). A step that runs on another's page needs it in the same run (`share` and `frenzy` need `ride` and
 `results`, `mobileMenus` needs `mobile`). `--steps ride,boss --levels level2` runs just those. Without `--steps` every
 desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desktop` leaves `title` and the phone run.
@@ -148,7 +161,7 @@ desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desk
 **Two depths (#372).** The PR smoke is rendering and integration: CI runs the shards in `SHARDS`, one `smoke (<name>)`
 job each (`ci.yml` matrix): `ui` (title, landing), `menus` (levelSelect, settings), `level1` (ride, shot, results), `level1-steps`
 (quality, speed), `level2`…`level5` (ride) and `mobile`. The **deep** checks, everything else (`nightlyOnly()` in
-`shards.mjs`: daily, frenzy, seed, pause, countdown, wave, boss, pickup, audio, share, `mobileMenus`, and shot / results
+`shards.mjs`: daily, frenzy, seed, pause, countdown, wave, boss, pickup, audio, share, pacing, `mobileMenus`, and shot / results
 on levels 2–5), run in the full smoke, which the nightly production run makes (`prod-smoke.yml`, below): they are either
 game logic a unit test covers next to its pure module (the table below), or a browser check too slow for every PR. A red
 nightly opens the `agent:prod-broken` P1 issue the Maintainer takes first. To reproduce one, run its step:
@@ -169,6 +182,7 @@ ridden on the PR, that the nightly job runs the full smoke, and that the shards,
 | `boss` | `bossModel.test.ts`, `krakenMotion.test.ts`, `scorpionMotion.test.ts` (the `turntable` workflow draws every boss on PRs touching `src/entities/`) | the full fights |
 | `pickup` | `weaponTypes.test.ts`, `pickupPlacement.test.ts`, `useGameStore.test.ts` (a run starts with the blaster) | the shot pickup, fan and badge |
 | `audio` | `src/audio/scrim/*.test.ts` (layers, scheduler, score), `arcade.test.ts`, `AudioEngine.test.ts` | the score engine and arcade SFX in a page |
+| `pacing` | `pacingMetric.test.ts` (share, longest gap, the GO grace and boss tell left out, the budget lines) | the whole run of every level, sampled |
 | `share` | `share.test.ts`, `scoreCard.test.ts`, `popoverPlacement.test.ts` | the menu, clipboard, download |
 | `mobileMenus` | `pauseMenu.test.ts`, `initialsEntry.test.ts`, `share.test.ts` | phone layouts of the menus |
 
