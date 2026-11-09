@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyHit, bossMaxScore, createBossState, currentPhase, destroyScore, exposedWeakPoints, hpFraction,
-  isDefeated, isExposed, maxHp, weakPointHp, type BossSpec, type BossState,
+  isDefeated, isExposed, maxHp, setRetracted, weakPointHp, type BossSpec, type BossState,
 } from './bossModel'
 import { BOSS_SPECS, GOLDEN_BLIMP } from './bossSpecs'
 
@@ -99,6 +99,19 @@ describe('bossSpecs', () => {
     expect(Math.min(...wps.map((w) => w.phase))).toBe(0)
     expect(boss.reward).toBeGreaterThan(0)
     expect(boss.tell.seconds).toBeGreaterThan(0)
+  })
+
+  it('a retracted weak point is not exposed, keeps its phase and takes no hits until shown again', () => {
+    const cleared = hitAll(hitAll(createBossState(spec), 'a', 2), 'b', 1)
+    const hidden = setRetracted(cleared, 'core', true)
+    expect(ids(hidden)).toEqual([])
+    expect(currentPhase(hidden)).toBe(1)
+    expect(applyHit(hidden, 'core')).toBe(hidden)
+    expect(setRetracted(hidden, 'core', true)).toBe(hidden)
+    const shown = setRetracted(hidden, 'core', false)
+    expect(ids(shown)).toEqual(['core'])
+    expect(weakPointHp(applyHit(shown, 'core'), 'core')).toBe(2)
+    expect(applyHit(setRetracted(createBossState(spec), 'core', true), 'a').retracted.has('core')).toBe(true)
   })
 
   it('the Golden Blimp: 5 golden balloons, then a 3-hit gondola', () => {

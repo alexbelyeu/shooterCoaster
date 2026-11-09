@@ -15,16 +15,22 @@ export interface BossSpec {
   tell: { seconds: number; label: string }
   reward: number
   weakPoints: readonly WeakPointSpec[]
+  /** Optional bonus kills it throws (the Yeti's snowballs): left out of `maxScore`, counted in the server's score limits. */
+  projectiles?: { score: number; max: number }
 }
 
 export interface BossState {
   spec: BossSpec
   /** Per weak point, in `spec.weakPoints` order. */
   hp: readonly number[]
+  /** Weak points hidden for now (the Yeti's chest between roars): their phase holds, but they are not exposed. */
+  retracted: ReadonlySet<string>
 }
 
+const NONE_RETRACTED: ReadonlySet<string> = new Set()
+
 export function createBossState(spec: BossSpec): BossState {
-  return { spec, hp: spec.weakPoints.map((w) => w.hp) }
+  return { spec, hp: spec.weakPoints.map((w) => w.hp), retracted: NONE_RETRACTED }
 }
 
 export function isDefeated(state: BossState): boolean {
@@ -42,7 +48,16 @@ export function currentPhase(state: BossState): number {
 
 export function exposedWeakPoints(state: BossState): WeakPointSpec[] {
   const phase = currentPhase(state)
-  return state.spec.weakPoints.filter((w, i) => w.phase === phase && state.hp[i] > 0)
+  return state.spec.weakPoints.filter((w, i) => w.phase === phase && state.hp[i] > 0 && !state.retracted.has(w.id))
+}
+
+/** `id` hidden (`retracted`) or shown again; the same state back if that changes nothing. */
+export function setRetracted(state: BossState, id: string, retracted: boolean): BossState {
+  if (state.retracted.has(id) === retracted) return state
+  const next = new Set(state.retracted)
+  if (retracted) next.add(id)
+  else next.delete(id)
+  return { ...state, retracted: next }
 }
 
 export function isExposed(state: BossState, id: string): boolean {
@@ -60,7 +75,7 @@ export function applyHit(state: BossState, id: string): BossState {
   const i = state.spec.weakPoints.findIndex((w) => w.id === id)
   const hp = state.hp.slice()
   hp[i] -= 1
-  return { spec: state.spec, hp }
+  return { ...state, hp }
 }
 
 export function maxHp(spec: BossSpec): number {
