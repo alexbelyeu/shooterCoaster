@@ -176,6 +176,10 @@ export default function BossBase({
     if (after === before) return
     stateRef.current = after
     syncRef.current(after)
+    // A flash in flight would restore the old (exposed) material over the new one.
+    const i = spec.weakPoints.findIndex((w) => w.id === wpId)
+    if (i >= 0) fx[i].flashMs = 0
+    parts.get(wpId)?.traverse(restoreMesh)
     setPhaseVersion((v) => v + 1)
   }, [])
 
