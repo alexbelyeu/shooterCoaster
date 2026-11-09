@@ -64,6 +64,11 @@ describe('run-usage summarize', () => {
     expect(d.images).toBe(1)
     expect(d.resultChars).toBe(14_000)
     expect(d.heaviest[0]).toMatchObject({ tool: 'Bash: npm run verify', chars: 9000, images: 1 })
+    // main: 4 distinct turns (the streamed repeat counted once); 5 + 10 + 1.25 × writes + 0.1 × reads each
+    expect(d.agents).toEqual([
+      { agent: 0, weighted: Math.round(4 * 15 + 1.25 * 97_000 + 0.1 * 34_000), turns: 4, peakContext: 41_005 },
+      { agent: 1, weighted: Math.round(15 + 1.25 * 21_000 + 0.1 * 100), turns: 1, peakContext: 21_105 },
+    ])
   })
 
   it('adds the diagnosis to the ledger line when present', () => {

@@ -124,6 +124,7 @@ async function collect(api, now, workflowsDir) {
           url: c.html_url, missTokens: e.diag?.missTokens ?? 0, misses: e.diag?.misses ?? 0, peakContext: e.diag?.peakContext ?? null,
           missesAfter: (e.diag?.topMisses || []).slice(0, 2).map((m) => m.after),
           heaviest: (e.diag?.heaviest || []).slice(0, 3).map((h) => `${h.tool} (${h.chars} chars)`),
+          agents: e.diag?.agents || [],
         })
       }
     }
