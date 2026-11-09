@@ -32,6 +32,10 @@ Read only what picking and claiming needs: this runbook, the runbooks README rul
    If there is still nothing to do, reply "Queue empty" and stop.
    Don't pair two assignments that will clearly edit the same functions in the same
    files (their issues' Scope sections say so); take the next candidate instead.
+   Rank from the listing's numbers, titles and labels; to compare Scopes, print just that
+   section of each finalist's body, never whole bodies of several issues in one command
+   (#475: one such read was 10.8k characters). Your context waits through the builders'
+   whole run and is read again in full when they return, so keep it small.
 3. Claim every assignment before spawning anyone: for issues swap `agent:ready` →
    `agent:in-progress` and comment `Claimed by builder run <ISO timestamp>`; for
    returned PRs comment `Builder run <ISO timestamp> is on it`.

@@ -26,11 +26,15 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
   the turn after it misses the cache. Put `timeout 270` inside `quiet.sh` on anything that can run long
   (`bash scripts/quiet.sh timeout 270 node e2e/smoke.mjs …`, the turntable, audio renders). Exit 124
   means it hit the cap: split the work into smaller runs, never raise the cap. Never chain test + build
-  + smoke into one command.
+  + smoke into one command. A capped command that still returns after more than ~4.5 minutes is a
+  bug in the script's signal handling (#475: Playwright swallowed SIGTERM, `scripts/headless.mjs` now exits
+  on it): file it rather than live with it.
 - **Read big files by range.** `grep -n` first, then Read with `offset`/`limit`. Never Read or `cat` a
   whole file over ~300 lines (`e2e/smoke.mjs` is 200k characters; `PROTOCOL.md`, `e2e/README.md`,
   `docs/audio/*.md`, the bosses' `.tsx`), never several files in one `cat`, and never a session
-  transcript (`~/.claude/projects/**`). Don't re-read a file you edited: Edit fails if it didn't apply.
+  transcript (`~/.claude/projects/**`). Keep ranges small: 150 lines of `e2e/smoke.mjs` or a boss `.tsx`
+  is already ~12k characters (#475's heaviest reads), so read the 20–60 lines around your `grep -n` hit.
+  Don't re-read a file you edited: Edit fails if it didn't apply.
 - **Fewer, fuller turns.** Make independent tool calls in one message, chain related short commands
   with `&&`, and make a file's changes in as few Edits as they need.
 - **Context × turns is the bill.** Every turn re-reads the whole context at 0.1 per token, so 260 turns
