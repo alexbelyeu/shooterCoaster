@@ -8,6 +8,7 @@ import TrackMesh from '@/track/TrackMesh'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { buildArcTable } from '@/track/arcLength'
 import CoasterCamera from '@/track/CoasterCamera'
+import { rideSpeeds } from '@/track/ridePhysics'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import ContactShadows from '@/levels/environments/shared/ContactShadows'
@@ -84,6 +85,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
   )
 
   const trackDims = useMemo(() => getTrackDimensions(track), [track])
+  const speeds = useMemo(() => rideSpeeds(track), [track])
   const color1 = useMemo(() => hexToRgb(track.color1), [track.color1])
   const color2 = useMemo(() => hexToRgb(track.color2), [track.color2])
 
@@ -129,6 +131,8 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         groundFn={groundFn}
         boss={boss}
         timerSeconds={RUN_SECONDS}
+        rideSpeeds={speeds}
+        trackScale={trackDims.trackScale}
       />
       <ShootingController />
       <GameTimer seconds={RUN_SECONDS} />

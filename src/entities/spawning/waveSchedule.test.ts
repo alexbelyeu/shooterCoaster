@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { RUN_SECONDS } from '@/levels/pacing'
-import { WAVE_TELL_SECONDS, newWaveProgress, nextWaveDue, tickWaves } from './waveSchedule'
+import { WAVE_TELL_SECONDS, newWaveProgress, nextWaveDue, tickWaves, waveWindows } from './waveSchedule'
 
 /** Ticks the schedule at each elapsed time; returns the events in order. */
 function run(delays: number[], times: number[], progress = newWaveProgress(delays.length)) {
@@ -64,5 +64,13 @@ describe('tickWaves', () => {
       for (const d of delays) expect(Number.isInteger(d), `${level.id} delay ${d}`).toBe(true)
       expect(run(delays, times).sort(), level.id).toEqual(expected.sort())
     }
+  })
+})
+
+describe('waveWindows', () => {
+  it('runs each wave until the next one, the boss or the end of the run', () => {
+    expect(waveWindows([0, 20, 45], 55, 75)).toEqual([[0, 20], [20, 45], [45, 55]])
+    expect(waveWindows([30, 0, 15], undefined, 60)).toEqual([[30, 60], [0, 15], [15, 30]])
+    expect(waveWindows([0, 0], 10, 60)).toEqual([[0, 10], [0, 10]])
   })
 })

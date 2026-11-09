@@ -4,6 +4,8 @@ import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import { maxReadableDistance } from '../enemies/enemyReadability'
 import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, type Surface } from './enemyPlacement'
+import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig'
+import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov'
 
 /**
  * Formation placement, pure. Slots are seeded at level load (so `spawnDigest` stays
@@ -47,12 +49,13 @@ const SPIRAL_ENTRY_DEPTH = 30
 const SPIRAL_SPIN = Math.PI * 3
 const SCHOOL_ENTRY_BACK = 260
 const SCHOOL_ENTRY_DEPTH = 40
-/** Anchor search: from `ahead` to 1.6 × `ahead` along the track, for a point in a 40° forward cone… */
+/** Anchor search: from `ahead` to 1.6 × `ahead` along the track, for a group centre in view (`inView`)… */
 const ANCHOR_SEARCH = 1.6
 const ANCHOR_SEARCH_STEPS = 8
-const ANCHOR_CONE_COS = Math.cos((40 * Math.PI) / 180)
 /** …at least half of `ahead` away in plan, not just over the top of a loop. */
 const ANCHOR_MIN_REACH = 0.5
+/** A trackside slot's approach cone around the rig's look direction (`inViewOnApproach`). */
+const APPROACH_CONE_COS = Math.cos((40 * Math.PI) / 180)
 const WATER_SEARCH_STEP = 150
 const WATER_SEARCH_TRIES = 12
 const SHORE_PULL_TRIES = 4
@@ -149,44 +152,99 @@ export interface FormationFrame {
   right: Vec3
   tangent: Vec3
   sideSign: number
+  /** The group's centre is in view where it lands (false: the straight-ahead fallback). */
+  seen: boolean
 }
 
-/**
- * Anchor for one group, ahead of the rider at `riderIndex` and in view when it
- * arrives; later groups sit further on and alternate sides.
- */
+/** What the ride does after a wave activates, from the level's ride profile (`track/ridePhysics.ts`). */
+export interface RideAhead {
+  /** Arc distance the rider covers while the wave flies in (`ENTRY_SECONDS` + `ENTRY_STAGGER`). */
+  entry: number
+  /** Arc distance the rider covers over the wave's window: until the next wave, the boss or the end of the run. */
+  window: number
+  /** The level's structure scale: the rig looks `LOOK_AHEAD_UNITS` × this ahead. */
+  trackScale: number
+}
+
+/** A formation member flies in over `ENTRY_SECONDS`, the last of its group `ENTRY_STAGGER` later. */
+export const ENTRY_SECONDS = 1.2
+export const ENTRY_STAGGER = 0.6
+
+/** A group's centre lands this far inside the narrowest screen's half fov (`MIN_HORIZONTAL_FOV`), so the group's width fits. */
+const VIEW_HALF_ANGLE_COS = Math.cos((MIN_HORIZONTAL_FOV * 0.4 * Math.PI) / 180)
+/** No group or trackside slot leads the rider by more than this share of a lap. */
+const MAX_LEAD_SHARE = 0.75
+
+/** Where the rig looks from track sample `index`: its eye and unit look direction (cameraRig's look-ahead blend, unsmoothed). */
+export interface TrackView {
+  index: number
+  eye: Vec3
+  dir: Vec3
+}
+
+export function trackView(table: ArcTable, index: number, trackScale: number): TrackView {
+  const eye = trackPoint(table, index)
+  const toAhead = normalize(sub(trackPoint(table, indexAhead(table, index, LOOK_AHEAD_UNITS * trackScale)), eye))
+  return { index, eye, dir: lookAheadDirection(trackTangent(table, index), toAhead, { x: 0, y: 0, z: 0 }) }
+}
+
+export function inView(view: TrackView, p: Vec3, reach: number): boolean {
+  const d = sub(p, view.eye)
+  const plan = Math.hypot(d.x, d.z)
+  if (plan < 1e-6 || Math.hypot(d.x, d.y, d.z) > reach) return false
+  const f = horizontal(view.dir)
+  return (d.x * f.x + d.z * f.z) / plan >= VIEW_HALF_ANGLE_COS
+}
+
+/** Arc distance between neighbouring groups: the wave's window shared out, so the rider meets one every `window / groups`. */
+export function groupStep(table: ArcTable, formation: ChoreographedFormation, groups: number, ride: RideAhead): number {
+  const { groupGap } = FORMATIONS[formation]
+  return Math.max(groupGap, Math.min(ride.window, MAX_LEAD_SHARE * table.length) / Math.max(1, groups))
+}
+
+/** Anchor for one group: `centre` (its mean slot offset) in view from where the rider is once the group has flown in; sides alternate per group unless only the other is in view. */
 export function formationFrame(
   table: ArcTable,
   riderIndex: number,
   formation: ChoreographedFormation,
   group: number,
+  ride: RideAhead,
+  reach: number,
+  step: number = FORMATIONS[formation].groupGap,
   origin: FormationOrigin = FORMATIONS[formation].origin,
+  centre: Vec3 = { x: 0, y: 0, z: 0 },
 ): FormationFrame {
-  const ahead = origin.ahead + group * FORMATIONS[formation].groupGap
-  const rider = trackPoint(table, riderIndex)
-  const riderTangent = trackTangent(table, riderIndex)
-  const riderFwd = horizontal(riderTangent)
-  let index = -1
-  for (let k = 0; k <= ANCHOR_SEARCH_STEPS && index < 0; k++) {
-    const i = indexAhead(table, riderIndex, ahead * (1 + ((ANCHOR_SEARCH - 1) * k) / ANCHOR_SEARCH_STEPS))
-    const d = sub(trackPoint(table, i), rider)
-    if (Math.hypot(d.x, d.z) >= ahead * ANCHOR_MIN_REACH && dot(horizontal(d), riderFwd) >= ANCHOR_CONE_COS) index = i
+  const view = trackView(table, indexAhead(table, riderIndex, group * step + ride.entry), ride.trackScale)
+  const { ahead, up } = origin
+  const preferred = origin.side * (group % 2 === 0 ? 1 : -1)
+  const sides = preferred === 0 ? [0] : [preferred, -preferred]
+  for (let k = 0; k <= ANCHOR_SEARCH_STEPS; k++) {
+    const i = indexAhead(table, view.index, ahead * (1 + ((ANCHOR_SEARCH - 1) * k) / ANCHOR_SEARCH_STEPS))
+    const track = trackPoint(table, i)
+    const d = sub(track, view.eye)
+    if (Math.hypot(d.x, d.z) < ahead * ANCHOR_MIN_REACH) continue // over the top of a loop
+    for (const side of sides) {
+      const f = frameAt(track, trackTangent(table, i), side, up, true)
+      if (inView(view, slotWorld(formation, f, centre), reach)) return f
+    }
   }
-  // The track doubles back (hairpin, loop): anchor straight ahead of the rider, where the player looks.
-  const track = index >= 0
-    ? trackPoint(table, index)
-    : { x: rider.x + riderFwd.x * ahead, y: rider.y, z: rider.z + riderFwd.z * ahead }
-  const tangent = index >= 0 ? trackTangent(table, index) : riderTangent
+  // The track doubles back (hairpin, loop): anchor straight ahead of where the rider looks.
+  const look = horizontal(view.dir)
+  const track = { x: view.eye.x + look.x * ahead, y: view.eye.y, z: view.eye.z + look.z * ahead }
+  return frameAt(track, look, preferred, up, false)
+}
+
+function frameAt(track: Vec3, tangent: Vec3, side: number, up: number, seen: boolean): FormationFrame {
   const forward = horizontal(tangent)
   const right = { x: -forward.z, y: 0, z: forward.x }
-  const side = origin.side * (group % 2 === 0 ? 1 : -1)
   return {
-    origin: { x: track.x + right.x * side, y: track.y + origin.up, z: track.z + right.z * side },
+    origin: { x: track.x + right.x * side, y: track.y + up, z: track.z + right.z * side },
     track,
     forward,
     right,
     tangent,
     sideSign: side < 0 ? -1 : 1,
+    seen,
   }
 }
 
@@ -220,18 +278,28 @@ export interface PlaceWaveInput {
   type: EnemyType
   groundFn: HeightFunction
   slots: readonly FormationSlot[]
+  ride: RideAhead
 }
 
 /** World placements for a formation wave's slots, in slot order. */
 export function placeFormationWave(input: PlaceWaveInput): Placement[] {
-  const { table, riderIndex, camera, formation, type, groundFn, slots } = input
+  const { table, riderIndex, camera, formation, type, groundFn, slots, ride } = input
   const surface = ENEMY_PLACEMENT[type].surface
+  const reach = maxReadableDistance(type)
+  const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
+  const step = groupStep(table, formation, groups, ride)
   const frames = new Map<number, FormationFrame>()
   const frameFor = (group: number) => {
     let f = frames.get(group)
     if (!f) {
-      f = formationFrame(table, riderIndex, formation, group, input.origin)
-      if (surface === 'water') f = findWater(table, riderIndex, formation, group, input.origin, groundFn, f)
+      const members = slots.filter((s) => s.group === group)
+      const centre = members.reduce(
+        (c, s) => ({ x: c.x + s.local.x / members.length, y: c.y + s.local.y / members.length, z: c.z + s.local.z / members.length }),
+        { x: 0, y: 0, z: 0 },
+      )
+      const at = (origin?: FormationOrigin) => formationFrame(table, riderIndex, formation, group, ride, reach, step, origin, centre)
+      f = at(input.origin)
+      if (surface === 'water') f = findWater(at, input.origin ?? FORMATIONS[formation].origin, groundFn, f)
       frames.set(group, f)
     }
     return f
@@ -251,32 +319,31 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
       position: outsideNearField(position, camera),
       from: outsideNearField(from, camera),
       spin,
-      entrySeconds: 1.2 + (0.6 * slot.index) / Math.max(1, slot.groupSize - 1),
+      entrySeconds: ENTRY_SECONDS + (ENTRY_STAGGER * slot.index) / Math.max(1, slot.groupSize - 1),
       motion: formationMotion(formation, f),
     }
   })
 }
 
-/** Move a water group's anchor further ahead, or across the track, until there is water under it. */
+/** Move a water group's anchor further ahead, or across the track: the first with water under it in view, else the first with water under it. */
 function findWater(
-  table: ArcTable,
-  riderIndex: number,
-  formation: ChoreographedFormation,
-  group: number,
-  origin: FormationOrigin | undefined,
+  frameFor: (origin: FormationOrigin) => FormationFrame,
+  base: FormationOrigin,
   groundFn: HeightFunction,
   first: FormationFrame,
 ): FormationFrame {
-  const base = origin ?? FORMATIONS[formation].origin
+  let wet: FormationFrame | null = null
   for (let k = 0; k < WATER_SEARCH_TRIES; k++) {
     for (const side of [base.side, -base.side]) {
       const f = k === 0 && side === base.side
         ? first
-        : formationFrame(table, riderIndex, formation, group, { ...base, side, ahead: base.ahead + k * WATER_SEARCH_STEP })
-      if (groundFn(f.origin.x, f.origin.z) < WATER_DEPTH) return f
+        : frameFor({ ...base, side, ahead: base.ahead + k * WATER_SEARCH_STEP })
+      if (groundFn(f.origin.x, f.origin.z) >= WATER_DEPTH) continue
+      if (f.seen) return f
+      wet ??= f
     }
   }
-  return first
+  return wet ?? first
 }
 
 function slotWorld(formation: ChoreographedFormation, f: FormationFrame, local: Vec3): Vec3 {
@@ -362,38 +429,54 @@ export interface TracksideBand {
   sideMax: number
   /** The first `share` of a wave's slots lands no further than `max` ahead, so the wave is in view as it arrives. */
   near?: { share: number; max: number }
+  /** Ground: the band is stretched over the arc the rider covers in the wave's window (`placeTracksideWave`). */
+  spread?: boolean
 }
 
-/** Ground: ~8–25 s ahead at Antarctica's slowest; water: ~1–14 s of Ocean's ~250 units/s ride, about its gap between waves (#316). */
+/**
+ * Ground: spread evenly from 700 ahead over the wave's window, at least to 2200; water: ~1–14 s of
+ * Ocean's ~250 units/s ride, about its gap between waves (#316).
+ */
 export const TRACKSIDE: Record<'ground' | 'water', TracksideBand> = {
-  ground: { aheadMin: 700, aheadMax: 2200, sideMin: 60, sideMax: 400 },
+  ground: { aheadMin: 700, aheadMax: 2200, sideMin: 60, sideMax: 400, spread: true },
   water: { aheadMin: 300, aheadMax: 3600, sideMin: 60, sideMax: 400, near: { share: 0.5, max: 1500 } },
 }
 
 export const tracksideBand = (surface: Surface): TracksideBand => TRACKSIDE[surface === 'water' ? 'water' : 'ground']
 
 /**
- * A water slot must be in view on its approach: inside the anchor cone and readable from the rider
+ * A slot must be in view on its approach: inside the rig's look cone and readable from the rider
  * `VIEW_LEAD` before it (or at activation, if nearer) and still `VIEW_HOLD` further on.
  */
 const VIEW_LEAD = 1100
 const VIEW_HOLD = 400
 
 export interface TracksideSlot {
-  /** Arc distance past the rider. */
+  /** Arc distance past the rider, in the band; a spread band stretches it over the wave's window. */
   ahead: number
   /** Signed horizontal offset to the right of the track. */
   side: number
 }
 
+/** A spread band's slots are one per even step of it (jittered within the step), so the stretch has no empty run. */
 export function tracksideSlots(count: number, surface: Surface, rng: Rng): TracksideSlot[] {
-  const { aheadMin, aheadMax, sideMin, sideMax, near } = tracksideBand(surface)
+  const { aheadMin, aheadMax, sideMin, sideMax, near, spread } = tracksideBand(surface)
   const nearCount = near ? Math.ceil(count * near.share) : 0
   return Array.from({ length: count }, (_, i) => {
-    const ahead = rng.range(aheadMin, i < nearCount ? near!.max : aheadMax)
+    const ahead = spread
+      ? aheadMin + ((i + rng()) / count) * (aheadMax - aheadMin)
+      : rng.range(aheadMin, i < nearCount ? near!.max : aheadMax)
     const side = rng.range(sideMin, sideMax) * (rng() < 0.5 ? -1 : 1)
     return { ahead, side }
   })
+}
+
+/** Arc distance past the rider of a slot: a spread band stretched over the window, never past `MAX_LEAD_SHARE` of a lap. */
+export function tracksideAhead(table: ArcTable, surface: Surface, slot: TracksideSlot, ride: RideAhead): number {
+  const { aheadMin, aheadMax, spread } = tracksideBand(surface)
+  if (!spread) return slot.ahead
+  const span = Math.max(aheadMax - aheadMin, Math.min(ride.window, MAX_LEAD_SHARE * table.length - aheadMin))
+  return aheadMin + ((slot.ahead - aheadMin) / (aheadMax - aheadMin)) * span
 }
 
 export interface PlaceTracksideInput {
@@ -403,13 +486,17 @@ export interface PlaceTracksideInput {
   type: EnemyType
   groundFn: HeightFunction
   slots: readonly TracksideSlot[]
+  ride: RideAhead
 }
 
-export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots }: PlaceTracksideInput): Vec3[] {
+export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride }: PlaceTracksideInput): Vec3[] {
   const { surface } = ENEMY_PLACEMENT[type]
   const reach = maxReadableDistance(type)
   return slots.map((slot) => {
-    const p = surface === 'water' ? wetTracksidePoint(table, riderIndex, slot, groundFn, reach) : tracksidePoint(table, riderIndex, slot)
+    const at = { ahead: tracksideAhead(table, surface, slot, ride), side: slot.side }
+    const p = surface === 'water'
+      ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale)
+      : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale)
     return outsideNearField(settle(p, surface, groundFn), camera)
   })
 }
@@ -420,11 +507,23 @@ function tracksidePoint(table: ArcTable, riderIndex: number, { ahead, side }: Tr
   return { x: table.x[i] - forward.z * side, y: 0, z: table.z[i] + forward.x * side }
 }
 
+/** The slot, or the same spot across the track when only that side is in view on the approach (the inside of a turn). */
+function dryTracksidePoint(
+  table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
+): Vec3 {
+  const p = tracksidePoint(table, riderIndex, slot)
+  if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)) return p
+  const across = tracksidePoint(table, riderIndex, { ahead: slot.ahead, side: -slot.side })
+  return inViewOnApproach(table, riderIndex, slot.ahead, settle(across, surface, groundFn), reach, trackScale) ? across : p
+}
+
 /**
  * The slot, or across the track, or nearer / further within the band: the first with sea under it
  * that is in view on its approach, else the first with sea under it, else the slot.
  */
-function wetTracksidePoint(table: ArcTable, riderIndex: number, slot: TracksideSlot, groundFn: HeightFunction, reach: number): Vec3 {
+function wetTracksidePoint(
+  table: ArcTable, riderIndex: number, slot: TracksideSlot, groundFn: HeightFunction, reach: number, trackScale: number,
+): Vec3 {
   const { aheadMin, aheadMax } = TRACKSIDE.water
   let wet: Vec3 | null = null
   for (let k = 0; k < WATER_SEARCH_TRIES; k++) {
@@ -433,20 +532,20 @@ function wetTracksidePoint(table: ArcTable, riderIndex: number, slot: TracksideS
     for (const side of [slot.side, -slot.side]) {
       const p = tracksidePoint(table, riderIndex, { ahead, side })
       if (groundFn(p.x, p.z) >= WATER_DEPTH) continue
-      if (inViewOnApproach(table, riderIndex, ahead, p, reach)) return p
+      if (inViewOnApproach(table, riderIndex, ahead, { x: p.x, y: WATER_Y, z: p.z }, reach, trackScale)) return p
       wet ??= p
     }
   }
   return wet ?? tracksidePoint(table, riderIndex, slot)
 }
 
-function inViewOnApproach(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number): boolean {
+function inViewOnApproach(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): boolean {
   const from = Math.max(0, ahead - VIEW_LEAD)
   for (const at of [from, from + VIEW_HOLD]) {
-    const i = indexAhead(table, riderIndex, at)
-    const d = sub({ x: p.x, y: WATER_Y, z: p.z }, trackPoint(table, i))
+    const { eye, dir } = trackView(table, indexAhead(table, riderIndex, at), trackScale)
+    const d = sub(p, eye)
     const len = Math.hypot(d.x, d.y, d.z)
-    if (len > reach || dot(d, trackTangent(table, i)) < len * ANCHOR_CONE_COS) return false
+    if (len > reach || dot(d, dir) < len * APPROACH_CONE_COS) return false
   }
   return true
 }

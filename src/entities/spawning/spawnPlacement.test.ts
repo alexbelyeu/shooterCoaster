@@ -1,17 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
+import { RUN_SECONDS } from '@/levels/pacing'
 import { createTrigCurve } from '@/track/curves/TrigCurve'
 import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig } from '@/types/level'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
+import { rideProfile, rideSpeeds, riddenBetween } from '@/track/ridePhysics'
+import { getTrackDimensions } from '@/track/trackDimensions'
+import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov'
 import {
-  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, entryPoint, formationFrame, formationSlots, indexAhead, marchHeading,
-  outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint, trackTangent, tracksideBand, tracksideSlots,
-  type ChoreographedFormation, type Vec3,
+  AIR_CLEARANCE, ENTRY_SECONDS, ENTRY_STAGGER, FORMATIONS, NEAR_FIELD, entryPoint, formationFrame, formationSlots, groupStep,
+  inView, indexAhead, marchHeading, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
+  trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
+  type ChoreographedFormation, type RideAhead, type Vec3,
 } from './spawnPlacement'
 import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, placedBesideTrack } from './enemyPlacement'
+import { waveWindows } from './waveSchedule'
 import { REFERENCE_FOV_DEG, maxReadableDistance } from '../enemies/enemyReadability'
 
 const choreographed = (f: Formation | undefined): f is ChoreographedFormation => !!f && f !== 'scatter'
@@ -23,8 +29,20 @@ function world(level: LevelConfig) {
   const table = buildArcTable(curve)
   const heightFn = createHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
   const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize(level.biome))
-  return { level, table, groundFn }
+  // What EnemySpawner hands each wave: the ride from GO over its entry and its window.
+  const profile = rideProfile(table, rideSpeeds(level.track), RUN_SECONDS)
+  const { trackScale } = getTrackDimensions(level.track)
+  const windows = waveWindows(level.enemies.map((w) => w.spawnDelay ?? 0), level.boss?.at, RUN_SECONDS)
+  const rides: RideAhead[] = windows.map(([from, to]) => ({
+    entry: riddenBetween(profile, from, from + ENTRY_SECONDS + ENTRY_STAGGER),
+    window: riddenBetween(profile, from, to),
+    trackScale,
+  }))
+  const rideFor = (wave: EnemyWave) => rides[level.enemies.indexOf(wave)]
+  return { level, table, groundFn, rideFor, trackScale }
 }
+
+const STILL: RideAhead = { entry: 0, window: 0, trackScale: 1 }
 
 const worlds = getAllLevels().filter((l) => l.enemies.some((w) => choreographed(w.formation))).map(world)
 const tracksideWorlds = getAllLevels().filter((l) => l.enemies.some(besideTrack)).map(world)
@@ -84,8 +102,8 @@ describe('track frame', () => {
   })
 
   it('anchors later groups further ahead, alternating sides', () => {
-    const a = formationFrame(table, 0, 'line', 0)
-    const b = formationFrame(table, 0, 'line', 1)
+    const a = formationFrame(table, 0, 'line', 0, STILL, Infinity)
+    const b = formationFrame(table, 0, 'line', 1, STILL, Infinity)
     expect(a.sideSign).toBe(1)
     expect(b.sideSign).toBe(-1)
     expect(nearestIndex(table, b.track)).toBeGreaterThan(nearestIndex(table, a.track))
@@ -94,18 +112,27 @@ describe('track frame', () => {
   })
 })
 
-describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves', (_id, { level, table, groundFn }) => {
+/** Cosine of the bearing of `p` off the view's horizontal look direction. */
+function bearingCos(view: { eye: Vec3; dir: Vec3 }, p: Vec3): number {
+  const d = { x: p.x - view.eye.x, z: p.z - view.eye.z }
+  return (d.x * view.dir.x + d.z * view.dir.z) / (Math.hypot(d.x, d.z) * Math.hypot(view.dir.x, view.dir.z))
+}
+
+const HALF_FOV_COS = Math.cos((MIN_HORIZONTAL_FOV * Math.PI) / 360)
+
+describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves', (_id, { level, table, groundFn, rideFor, trackScale }) => {
   const waves = level.enemies.filter((w) => choreographed(w.formation))
 
-  it.each(waves.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: first group ahead of the rider, nothing in the near field or under the ground', (_name, wave) => {
+  it.each(waves.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: first group ahead of the rider once it has flown in, nothing in the near field or under the ground', (_name, wave) => {
     const formation = wave.formation as ChoreographedFormation
     const slots = formationSlots(formation, wave.count, createRng(1337))
     const surface = ENEMY_PLACEMENT[wave.type].surface
+    const ride = rideFor(wave)
     for (const fraction of RIDER_FRACTIONS) {
       const riderIndex = Math.round(fraction * (table.count - 1))
       const camera = trackPoint(table, riderIndex)
-      const forward = trackTangent(table, riderIndex)
-      const placed = placeFormationWave({ table, riderIndex, camera, formation, origin: wave.formationOrigin, type: wave.type, groundFn, slots })
+      const landed = trackView(table, indexAhead(table, riderIndex, ride.entry), trackScale)
+      const placed = placeFormationWave({ table, riderIndex, camera, formation, origin: wave.formationOrigin, type: wave.type, groundFn, slots, ride })
       expect(placed).toHaveLength(wave.count)
       let ahead = 0
       placed.forEach((p, i) => {
@@ -125,27 +152,60 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
           expect(marchHeading(p.motion)).toBeTypeOf('number')
           expect(marchHeading(p.motion)).toBe(marchHeading(leader.motion))
         }
-        if (slots[i].group === 0) {
-          const d = { x: p.position.x - camera.x, z: p.position.z - camera.z }
-          if (d.x * forward.x + d.z * forward.z > 0) ahead++
-        }
+        if (slots[i].group === 0 && bearingCos(landed, p.position) > 0) ahead++
       })
       const firstGroup = slots.filter((s) => s.group === 0).length
       expect(ahead).toBeGreaterThanOrEqual(Math.ceil(firstGroup * 0.8))
     }
   })
+
+  it.each(waves.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: activated on a turn, each group lands inside the view the rider has when it gets there', (_name, wave) => {
+    const formation = wave.formation as ChoreographedFormation
+    const slots = formationSlots(formation, wave.count, createRng(1337))
+    const ride = rideFor(wave)
+    const reach = maxReadableDistance(wave.type)
+    const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
+    const step = groupStep(table, formation, groups, ride)
+    let turns = 0
+    for (let k = 0; k < 200; k++) {
+      const riderIndex = Math.round((k / 200) * (table.count - 1))
+      const now = trackView(table, riderIndex, trackScale)
+      const landed = trackView(table, indexAhead(table, riderIndex, ride.entry), trackScale)
+      if (bearingCos(now, { x: now.eye.x + landed.dir.x, y: 0, z: now.eye.z + landed.dir.z }) > Math.cos((15 * Math.PI) / 180)) continue
+      turns++
+      const placed = placeFormationWave({ table, riderIndex, camera: now.eye, formation, origin: wave.formationOrigin, type: wave.type, groundFn, slots, ride })
+      for (let g = 0; g < groups; g++) {
+        const view = trackView(table, indexAhead(table, riderIndex, g * step + ride.entry), trackScale)
+        const members = placed.filter((_, i) => slots[i].group === g).map((p) => p.position)
+        const centre = members.reduce((c, p) => ({ x: c.x + p.x / members.length, y: c.y + p.y / members.length, z: c.z + p.z / members.length }), { x: 0, y: 0, z: 0 })
+        expect(bearingCos(view, centre), `rider ${k / 200} group ${g}`).toBeGreaterThan(HALF_FOV_COS)
+        if (ENEMY_PLACEMENT[wave.type].surface !== 'water') expect(dist(centre, view.eye)).toBeLessThan(reach)
+      }
+    }
+    expect(turns).toBeGreaterThan(0)
+  })
+
+  it.each(waves.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: groups spread over the window the rider covers', (_name, wave) => {
+    const formation = wave.formation as ChoreographedFormation
+    const ride = rideFor(wave)
+    const groups = Math.ceil(wave.count / FORMATIONS[formation].groupSize)
+    const step = groupStep(table, formation, groups, ride)
+    expect(step).toBeGreaterThanOrEqual(FORMATIONS[formation].groupGap)
+    expect((groups - 1) * step).toBeGreaterThanOrEqual(Math.min(ride.window * ((groups - 1) / groups), 0.75 * table.length * ((groups - 1) / groups)) - 1e-6)
+    expect((groups - 1) * step).toBeLessThan(0.75 * table.length + FORMATIONS[formation].groupGap * groups)
+  })
 })
 
 describe('level3 school', () => {
   it('lands on water', () => {
-    const { level, table, groundFn } = worlds.find((w) => w.level.id === 'level3')!
+    const { level, table, groundFn, rideFor } = worlds.find((w) => w.level.id === 'level3')!
     const wave = level.enemies.find((w) => w.formation === 'school')!
     const slots = formationSlots('school', wave.count, createRng(7))
     let wet = 0
     let total = 0
     for (const fraction of RIDER_FRACTIONS) {
       const riderIndex = Math.round(fraction * (table.count - 1))
-      const placed = placeFormationWave({ table, riderIndex, camera: trackPoint(table, riderIndex), formation: 'school', type: wave.type, groundFn, slots })
+      const placed = placeFormationWave({ table, riderIndex, camera: trackPoint(table, riderIndex), formation: 'school', type: wave.type, groundFn, slots, ride: rideFor(wave) })
       for (const p of placed) {
         total++
         if (groundFn(p.position.x, p.position.z) < WATER_Y) wet++
@@ -182,19 +242,41 @@ describe('tracksideSlots', () => {
 /** Arc distance before its slot at which a trackside enemy must be in front of the rider. */
 const APPROACH = 600
 
-describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s trackside waves', (_id, { level, table, groundFn }) => {
+const groundWorlds = tracksideWorlds.filter((w) => w.level.enemies.some((e) => besideTrack(e) && ENEMY_PLACEMENT[e.type].surface === 'ground'))
+
+describe.each(groundWorlds.map((w) => [w.level.id, w] as const))('%s ground trackside spread', (_id, { level, table, rideFor }) => {
+  const waves = level.enemies.filter((w) => besideTrack(w) && ENEMY_PLACEMENT[w.type].surface === 'ground')
+
+  it.each(waves.map((w) => [w.type, w] as const))('%s: slots spread evenly along the stretch the rider covers in the window', (_name, wave) => {
+    const band = tracksideBand('ground')
+    const ride = rideFor(wave)
+    const aheads = tracksideSlots(wave.count, 'ground', createRng(1337))
+      .map((s) => tracksideAhead(table, 'ground', s, ride))
+      .sort((a, b) => a - b)
+    const end = band.aheadMin + Math.min(ride.window, 0.75 * table.length - band.aheadMin)
+    const step = (Math.max(end, band.aheadMax) - band.aheadMin) / wave.count
+    expect(aheads[0]).toBeGreaterThanOrEqual(band.aheadMin)
+    expect(aheads[0]).toBeLessThanOrEqual(band.aheadMin + step)
+    expect(aheads[aheads.length - 1]).toBeGreaterThanOrEqual(end - step)
+    expect(aheads[aheads.length - 1]).toBeLessThanOrEqual(0.75 * table.length)
+    for (let i = 1; i < aheads.length; i++) expect(aheads[i] - aheads[i - 1]).toBeLessThanOrEqual(2 * step)
+  })
+})
+
+describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s trackside waves', (_id, { level, table, groundFn, rideFor }) => {
   const waves = level.enemies.filter(besideTrack)
 
   it.each(waves.map((w) => [w.type, w] as const))('%s: ahead of the rider along the track, beside the rails, on its surface, outside the near field, in front on the approach', (_name, wave) => {
     const { surface } = ENEMY_PLACEMENT[wave.type]
     const band = tracksideBand(surface)
     const slots = tracksideSlots(wave.count, surface, createRng(1337))
+    const ride = rideFor(wave)
     let inFront = 0
     let total = 0
     for (const fraction of RIDER_FRACTIONS) {
       const riderIndex = Math.round(fraction * (table.count - 1))
       const camera = trackPoint(table, riderIndex)
-      const placed = placeTracksideWave({ table, riderIndex, camera, type: wave.type, groundFn, slots })
+      const placed = placeTracksideWave({ table, riderIndex, camera, type: wave.type, groundFn, slots, ride })
       expect(placed).toHaveLength(wave.count)
       placed.forEach((p, i) => {
         if (surface === 'water') {
@@ -207,17 +289,17 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
           expect(groundFn(p.x, p.z)).toBeLessThan(WATER_DEPTH)
           expect(p.y).toBe(WATER_Y)
         } else {
-          const anchor = indexAhead(table, riderIndex, slots[i].ahead)
+          const anchor = indexAhead(table, riderIndex, tracksideAhead(table, surface, slots[i], ride))
           const arc = (table.s[anchor] - table.s[riderIndex] + table.length) % table.length
           expect(arc).toBeGreaterThan(band.aheadMin - 10)
-          expect(arc).toBeLessThan(band.aheadMax + 10)
+          expect(arc).toBeLessThan(Math.max(band.aheadMax, band.aheadMin + ride.window) + 10)
           const lateral = Math.hypot(p.x - table.x[anchor], p.z - table.z[anchor])
           expect(lateral).toBeGreaterThan(band.sideMin - 1)
           expect(lateral).toBeLessThan(band.sideMax + 1)
           expect(p.y).toBeGreaterThan(groundFn(p.x, p.z))
         }
         expect(dist(p, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
-        const near = indexAhead(table, riderIndex, slots[i].ahead - APPROACH)
+        const near = indexAhead(table, riderIndex, tracksideAhead(table, surface, slots[i], ride) - APPROACH)
         const nearPoint = trackPoint(table, near)
         const forward = trackTangent(table, near)
         total++
@@ -229,7 +311,7 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
 })
 
 describe('level3 opening jellyfish', () => {
-  const { level, table, groundFn } = tracksideWorlds.find((w) => w.level.id === 'level3')!
+  const { level, table, groundFn, rideFor } = tracksideWorlds.find((w) => w.level.id === 'level3')!
   const wave = level.enemies[0]
   const tanV = Math.tan((REFERENCE_FOV_DEG * Math.PI) / 360)
   const tanH = (tanV * 16) / 9
@@ -238,7 +320,7 @@ describe('level3 opening jellyfish', () => {
   /** Readable enemies in a 16:9 view along the track tangent, for each rider position over ride t 0–0.025 (the smoke's ride sample at any runner speed). */
   function readableThroughOpening(seed: number): number[] {
     const slots = tracksideSlots(wave.count, 'water', createRng(seed))
-    const placed = placeTracksideWave({ table, riderIndex: 0, camera: trackPoint(table, 0), type: wave.type, groundFn, slots })
+    const placed = placeTracksideWave({ table, riderIndex: 0, camera: trackPoint(table, 0), type: wave.type, groundFn, slots, ride: rideFor(wave) })
     const counts: number[] = []
     for (let t = 0; t <= 0.025 + 1e-9; t += 0.0025) {
       const i = Math.round(t * (table.count - 1))
