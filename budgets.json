@@ -20,11 +20,11 @@
     "mobile": 240
   },
   "scene": {
-    "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31; level4 and level5 hold the VISION bar of 250, #260), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands. title (#376): the title scene, its drawCalls at the two title screenshots (+20% over the most of the fly-by, 95 at its first second, 2026-11-07), objects and triangles +15%.",
+    "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31; level4 and level5 hold the VISION bar of 250, #260), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands. title (#376): the title scene, its drawCalls at the two title screenshots, objects and triangles; raised by the Director on 2026-11-09 for the title world (#436 → #454 / #459, DECISIONS \"Week 4\"): 140 / 130 / 60 000 are ceilings for a dense instanced park, not targets (was 114 / 89 / 11 356 = the 7 Nov scene +20% / +15%).",
     "title": {
-      "drawCalls": 114,
-      "objects": 89,
-      "triangles": 11356
+      "drawCalls": 140,
+      "objects": 130,
+      "triangles": 60000
     },
     "level1": {
       "drawCalls": 101,
