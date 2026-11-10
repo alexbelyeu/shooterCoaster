@@ -2315,9 +2315,18 @@ async function titleFlyBy(page, drawCalls) {
 
   const engineBefore = { requests: await engineRequests(page), loaded: await page.evaluate(() => window.__SC_TEST__.audio().engineLoaded) }
   if (engineBefore.requests > 0 || engineBefore.loaded) problems.push('the score engine loaded before the first key press on the title')
+  // The veil lives ~1 s; on a slow software renderer rAF-polled waits can fall between its frames, so a MutationObserver records it.
+  await page.evaluate(() => {
+    window.__veilSeen = false
+    const seen = () => !!document.querySelector('.screen-veil')
+    const observer = new MutationObserver(() => {
+      if (seen()) (window.__veilSeen = true), observer.disconnect()
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+  })
   await page.keyboard.press('Enter')
   const veiled = await page
-    .waitForSelector('.screen-veil', { state: 'attached', timeout: 10000 })
+    .waitForFunction(() => window.__veilSeen, null, { timeout: 10000, polling: 100 })
     .then(() => true, () => false)
   if (!veiled) problems.push('a key press on the title did not fade to black')
   const opened = await page
