@@ -124,7 +124,7 @@ jobs:
           retention-days: 14
 
   # Each shard builds the commit itself (~30 s), quicker than waiting on a shared build job; its
-  # smokeSeconds watchdog (2.5x the budget, e2e/shardTime.mjs) stops it inside timeout-minutes.
+  # smokeSeconds watchdog (3.45x the budget, e2e/shardTime.mjs) stops it inside timeout-minutes.
   smoke:
     name: smoke (${{ matrix.shard }})
     needs: changes
