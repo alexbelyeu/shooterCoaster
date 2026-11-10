@@ -1793,3 +1793,97 @@ anything a boss throws.
 
 **Consequences:** A boss that hides a part (a shell, a dive) or throws things reuses these two pieces. Raising a
 projectile's score or `max` changes `api/_lib/levelLimits.ts` (`node scripts/gen-level-limits.mjs`).
+
+## 2026-11-09 — Smoke shard time budgets scale with the runner's measured speed (Builder, #394)
+
+**Context:** `smoke (level5)` failed `verify` on its `smokeSeconds` budget alone (4.2 vs 4.0 min, every check passing) on
+a slow CI runner. Over ~35 CI runs per level shard (7-9 Nov) the same commit's shard took 1.0 min on one runner and
+1.9 min on another (level3 up to 2.8 of 3.0), and the time follows the ride's wall ms per rendered frame: ~265-320 on
+normal runners, ~440-545 on slow ones. A fixed budget either fails passing PRs on slow runners or is too loose to
+catch a real slowdown on a normal one.
+
+**Decision:** The smoke judges a shard's time in pure `e2e/shardTime.mjs`: the budget is multiplied by the ride's ms per
+frame over a normal runner's 300 (`NORMAL_RUNNER_MS_PER_FRAME`), clamped to 1..2 (`MAX_RUNNER_SLOWNESS`). Over the
+budget but within that allowance passes with a warning annotation; past it, or over budget on a normal-speed runner,
+fails as before. Shards with no ride (ui, menus, mobile, level1-steps) keep their plain budget. The watchdog that
+stops a stuck shard moved from 2x to 2.5x the budget so it never cuts off a run a slow runner is allowed to finish.
+`budgets.json` is unchanged.
+
+**Consequences:** The reference ms per frame and the cap loosen every level shard's budget when changed, so they are
+the Director's, like the budgets. A PR that makes the ride render slower on SwiftShader also earns up to 2x time; CI
+frame times swing ~2x between runners anyway, so the time budget never could catch that, and real-device frame time
+is watched by player telemetry (`playerFrameMs`). Steps, waits and load time a PR adds still fail on a normal runner.
+
+## 2026-11-09 — Week 4: Alex's bar before the player posts; the Climbing Gym is Level 6 through a world kit; M2 closed (Director)
+
+**Context:** Week 3 landed 50 PRs: the Scorpion and the Yeti, the Ocean's water, the title coaster, the online board, the score card, Alex's picked themes on one engine. Alex then played every level (#439, 8 Nov) and set a bar of his own: runs of 60 s, no stretches with nothing to shoot (the Desert), a title world that looks big, and after that many more worlds made procedurally, the first a massive climbing gym. Nothing was posted in week 3 (the Showcase draft #102 waits on him); the Marketer's strategy v1.4 holds the player posts (#308) to that bar and keeps the dev post (#102) unblocked. M2's exit criteria are all on `main` (the leaderboard #346, the smoke green on `main` since #305 / #364).
+
+**Decision:**
+- **M2 closed** (milestone 1, one day over); its two flake bundles moved to M3. The epics #176 / #177 closed.
+- **M3's exit criteria rewritten** (VISION.md): every level ends on a boss (the Titan #320 remains), every run is 60 s on one pacing template (#452), no level has a no-target gap over 3 s with a smoke metric and budget guarding it (#450, #451), the title park fills the frame (#454, #459), **Level 6 is the Climbing Gym** built through the world kit (#453 → #457, theme round #456), the enemy-art briefs exist and the three worst enemies are upgraded (#462, #463), lint runs in CI (#455, #461). Due date unchanged (5 Dec).
+- **Neon Metropolis is deferred** (#322–#325 leave M3 and the ready queue): Alex's ask is a system that makes worlds, not the next hand-built one, and the world he wants first is the gym. The city comes back as a kit-built world (M4 candidate). `docs/LEVEL-KIT.md` is the design doc for #437: landmarks, bosses, the look and music stay hand-authored; pacing, placement, the biome scaffold and every registration are templated or generated.
+- **Leaderboards under the 60 s rules** (#458): filter, don't wipe. Old long-run scores above a level's new limit drop off both boards on load / GET; comparable ones stay; Alex may truncate later. No database action needed for the switch.
+- **`scene.title` raised** to 140 draw calls / 130 objects / 60 000 triangles (was 114 / 89 / 11 356) so #454 / #459 can fill the title world with instanced rides, crowds and silhouettes; the first-paint rules of #376 (poster, lazy level chunk, `startupJsGzipKB`) are untouched and the phone must still hold 30 fps on the title.
+- **Queue:** 28 `agent:ready` issues (6 P1, 9 P2, 13 P3) plus 6 blocked with named unblockers (`Waiting on #n`, the Maintainer swaps them to ready), against ~29 expected completions. 16 P3 refactor / follow-up issues that touch the code the P1 work changes are parked without `agent:ready` until 16 Nov; #414 folded into #432; #338 re-scoped (no `?audio=scrim`); #328 to P3.
+- STEERING.md's sound item is ticked: the engine is ported, Tone.js is gone (#431), every level and the title play Alex's picked themes (#386, #421). The sound epic #212 stays open for boss / results variations and acoustics.
+
+**Consequences:** This week's builders' work is spread over `LevelRegistry.ts`, `spawnPlacement.ts`, the smoke and `TitleScene.tsx`, so conflicts between #451 / #452 and between #454 / #459 are expected: the title pair and the gym chain are serialised with `Waiting on`; #451 and #452 are not, and whichever lands second merges `origin/main`. If the Showcase post goes out this week, next Monday's Director reads its funnel before anything else and may put the phone title → PLAY → ride path at P1.
+
+## 2026-11-09 — Pacing is measured on a fixed 0.5 s step, by targets inside the viewport (Builder, #450)
+
+**Context:** Alex's playtest (#435, #439): some levels have stretches with nothing to shoot. The smoke's new nightly `pacing` step rides each level's whole run and fails a level over its `budgets.json` `pacing` ceilings.
+**Decision:** The run advances a fixed `timerStep` of 0.5 level seconds a frame (`rideRate` 1), not the `timerStepMax` cap the other level steps use: a cap gives a different run on a faster runner, and between two capped local runs level2's longest gap moved from 4 s to 2 s. 0.5 s instead of 0.25 keeps the five runs (~800 frames) inside the nightly's 60-minute cap. "Nothing to shoot" is `stats().onScreenEnemies == 0`: any live target inside the viewport, however far away or small. The first 2 s after GO and the boss tell count neither way and end a gap. The ceilings are today's measured numbers plus headroom (enemy motion isn't seeded, so counts move a little between runs); the Director lowers them, to 3 s once the wave placement fix lands.
+**Consequences:** Gaps are resolved to half a second. A level can pass while its targets are specks on the horizon: if the Director wants "readable" targets only, that is a change to what counts, made in one place (the sample in `pacingCheck`).
+
+## 2026-11-09 — Waves are placed for the view the rider will have, spread over the wave's window (Builder, #451)
+
+**Context:** The `pacing` step (#450) showed 8 s stretches with nothing on screen in Antarctica and Inferno (25% and 14% of the run): every group of a formation and every trackside slot sat within ~2 km ahead of the rider at activation, so on the bigger tracks the rider rode past a whole wave long before the next one. Formation anchors were also checked against the rider's heading at activation, which on a turn is not where the camera looks once the group has flown in.
+
+**Decision:** Placement predicts the ride. Pure `track/ridePhysics.ts` holds the coaster's speed rule (`CoasterCamera` rides it) and `rideProfile` rides it from GO over the level time; `EnemySpawner` hands each wave a `RideAhead`: the arc the rider covers during the entry (1.8 s) and over its window (until the next wave, the boss or the end). A formation group's centre must be inside the rig's look direction (`cameraRig` look-ahead, 0.8 × half of `MIN_HORIZONTAL_FOV`) from where the rider is once it has flown in, else the other side, else straight ahead of that view; groups are `max(groupGap, window / groups)` apart. Ground trackside slots are stratified over the band and the band is stretched over the window (never under 700–2200, never past 3/4 of a lap), each on the side of the track in view on its approach. Water trackside bands and world-scatter waves are unchanged.
+
+**Consequences:** Pacing (seed 1337): Antarctica 25% / 8 s → 4% / 2 s, Inferno 14% / 8 s → 3% / 3 s, Desert 4% / 2 s → 0% locally; Antarctica's and Inferno's `pacing` budgets ratchet down (Desert's stays: the nightly on CI measured an 8 s gap in its untouched scatter opening, so local and CI runs disagree). A change to the coaster's speed rule changes placement too (that is the point: keep it in `ridePhysics.ts`). Theme Park's first two waves are world scatter and keep their gaps.
+
+## 2026-11-09 — Every run is 60 s, timed by one pacing template (Builder, #452)
+
+**Context:** Alex (#434): every run should last 60 s. Levels ran 60 / 65 / 75 / 75 / 120 s with
+hand-typed wave seconds and bosses at 40–55 s, so some ended in a long tail with nothing to shoot.
+
+**Decision:** `RUN_SECONDS = 60` in `src/levels/pacing.ts` is the level timer's one source
+(`LevelConfig.timerSeconds` is gone). A level lists a roster; `paceLevel` times it: waves spread
+over the first 45 s by `weight` (default 1), the first at 0 s, the last in by 33 s (shootable by
+35 s after its ≤ 2 s fly-in), and the boss at 40 s. 40 s = two thirds in: the bosses were already
+built for ~20 s fights (Blimp and Yeti 20 s, Scorpion 18 s, Kraken 25 s), and the smoke's boss step
+now times each fight at 2 hits a second (Blimp 6.5 s, Scorpion 10.3 s, Yeti 11.5 s, Kraken 14.3 s),
+so 20 s leaves room for a player who misses; a later boss would cut it, an earlier one would thin
+the waves. A level without a boss names a `finale` wave in the boss's place (Inferno's drakes until
+the Magma Titan, #320). Hand-timed `enemies` are still accepted as an escape hatch; no level uses it.
+Density: Theme Park, the bar, keeps its 3 × 50 balloons (on-screen density is the feel Alex likes;
+fewer balloons left 4 on screen at 10 s and failed the smoke); the others come up to 2–3 enemies a
+second, held where the draw-call ceilings bind (Ocean 82 / 89, Antarctica 226 / 250 at the ride
+shot). Star thresholds stay fractions of the new `maxScore`s.
+
+**Consequences:** No per-wave seconds in `LevelRegistry.ts`; a new world gets the shape for free
+(epic #437). The ride is *not* timed by the run: a 60 s lap would mean 2.2–3.8× today's average
+speed, a different ride, so laps stay 99–228 s (pinned in `track/ridePhysics.test.ts`); any change
+there is a deliberate design call. Leaderboard scores from before this change are on other rosters
+(the reset is its own issue).
+
+## 2026-11-10 — The Climber: a `wall` surface, the escape rule, the chalk puff (Builder, #453)
+
+**Context:** The Climbing Gym (#438) needs enemies that climb walls, a fourth placement surface beside air, ground and water.
+
+**Decision:**
+- **Wall surface.** A level lists its climbable walls as `LevelConfig.walls` (`WallSurface`: id, `origin` = bottom-left
+  corner, unit `right` and `up`, `width`, `height`; the face points along `right × up`, towards the ride). `ENEMY_PLACEMENT`
+  gives wall enemies `surface: 'wall', scatter: 'wall'`: the spawner starts each at the foot of a seeded wall
+  (`wallSlots`, the run's rng), `WALL_STANDOFF` off its face, never pushed out of the near field and never flown in. A
+  level with wall enemies and no walls, or a wall wave with a formation, throws.
+- **Escape rule.** A climber that tops out escapes: it despawns unscored, with no penalty. `maxScore` still counts it, so
+  letting one go costs only its points. `EnemyBase` supports this generally: `updatePosition` returning `'escaped'`
+  unmounts the enemy through `onEscape`; the spawner takes it off the remaining count without the last-kill slow-mo.
+- **Chalk puff.** Its death style is pale motes that drift slowly down plus a few helmet / harness flecks, no lit chunks
+  and no flash; its kill sound is the new `KillSound` `'chalk'` (a dry pop, then a dust hiss). Nothing falls off the wall:
+  the brief is friendly, no falls and no ragdoll.
+
+**Consequences:** A gym level only adds walls and climber waves. The climb's pace (~1 m/s, `climbMotion.ts` `METRE` = 33
+units) and the wall's height set how long a climber stays shootable: a level tunes its walls' heights, not the motion.
