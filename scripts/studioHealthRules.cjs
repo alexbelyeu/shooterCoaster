@@ -37,6 +37,13 @@ const isDocsOnly = (files) => files.length > 0 && files.every((f) => NO_GAME_EFF
 /** A matrix job's name without its matrix part: "smoke (${{ matrix.shard }})" in YAML, "smoke (level1)" from the API. */
 const baseJob = (name) => name.replace(/\s*\(.*\)$/, '')
 
+/**
+ * Did the runner stop this job or a step at its `timeout-minutes`? Only GitHub's own wording counts: a test's
+ * failure message may say "timed out" too (vitest's "Test timed out in 5000ms", #495), and that is a failed test.
+ */
+const RUNNER_TIMEOUT = /^The job running on runner .* has exceeded the maximum execution time of|^The action '.*' has timed out after \d+ minutes/
+const runnerTimedOut = (failureMessages) => failureMessages.some((m) => RUNNER_TIMEOUT.test(m))
+
 /** Job- and step-level `timeout-minutes` from a workflow file, keyed by job name (or id; a matrix job by its base name) and "job / step". */
 function parseTimeouts(yamlText) {
   const out = {}
@@ -377,4 +384,4 @@ const waitingProdAlerts = (snap) => oldProdAlerts(snap).filter((i) => awaitsNigh
 /** The newest nightly started over NIGHTLY_OVERDUE ago (or none in the window): the watchdog dispatches one (#487). */
 const nightlyOverdue = (snap) => !snap.prod?.nightly || snap.now - snap.prod.nightly.at > NIGHTLY_OVERDUE
 
-module.exports = { findings, staleProdAlerts, waitingProdAlerts, nightlyOverdue, parseTimeouts, isDocsOnly, ALERTED_ON_MAIN }
+module.exports = { findings, staleProdAlerts, waitingProdAlerts, nightlyOverdue, parseTimeouts, runnerTimedOut, isDocsOnly, ALERTED_ON_MAIN }

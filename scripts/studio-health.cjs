@@ -5,7 +5,7 @@
 
 const fs = require('node:fs')
 const path = require('node:path')
-const { findings: findFindings, staleProdAlerts, waitingProdAlerts, nightlyOverdue, parseTimeouts } = require('./studioHealthRules.cjs')
+const { findings: findFindings, staleProdAlerts, waitingProdAlerts, nightlyOverdue, parseTimeouts, runnerTimedOut } = require('./studioHealthRules.cjs')
 const { readPauseState } = require('./studio-status.cjs')
 const { getAll } = require('./automerge.cjs')
 const { marker: prodAlertMarker } = require('./prod-alert.cjs')
@@ -81,7 +81,7 @@ async function collect(api, now, workflowsDir) {
       if (j.conclusion !== 'failure' && j.conclusion !== 'timed_out') continue
       const notes = await api('GET /repos/{owner}/{repo}/check-runs/{check_run_id}/annotations', { check_run_id: j.id }).catch(() => [])
       const failures = notes.filter((a) => a.annotation_level === 'failure').map((a) => a.message.split('\n')[0])
-      j.timedOut = j.conclusion === 'timed_out' || failures.some((m) => /timed out|exceeded the maximum execution time/i.test(m))
+      j.timedOut = j.conclusion === 'timed_out' || runnerTimedOut(failures)
       j.errors = failures.filter((m) => !/^Process completed with exit code/.test(m)).slice(0, 3)
     }
   }
