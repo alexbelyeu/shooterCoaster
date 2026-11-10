@@ -920,6 +920,82 @@ export const DRAKE_EYE_MAT = new THREE.MeshStandardMaterial({
   toneMapped: false,
 })
 
+// ── Climber (#453): a vinyl-toy figurine, built to docs/art/ENEMIES.md ──
+// Faces +z (the wall); the ride sees its back: helmet, chalk bag, harness. One vertex-coloured material, four moving
+// parts (body, two arms, legs), each parted at its pivot: the shoulders and the hips.
+
+const CLIMBER_SHIRT = '#3a3f8f'
+const CLIMBER_TROUSERS = '#2c2f3a'
+const CLIMBER_SKIN = '#e2b48c'
+const CLIMBER_HELMET = '#ff7a1a'
+const CLIMBER_HARNESS = '#19c8e0'
+const CLIMBER_CHALK = '#f4f4f0'
+const CLIMBER_DARK = '#1c1d24'
+const CLIMBER_METAL = '#b8bcc8'
+
+export const CLIMBER_SHOULDER: [number, number, number] = [0.95, 1.05, 0]
+export const CLIMBER_HIP: [number, number, number] = [0, -1.05, 0]
+
+/** Lighter on top, darker underneath: the brief's gradient, from each vertex's normal. */
+function sunShaded(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const n = g.attributes.normal
+  const c = g.attributes.color
+  for (let i = 0; i < c.count; i++) {
+    const k = 0.8 + 0.22 * n.getY(i)
+    c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k)
+  }
+  return g
+}
+
+// Low-poly by budget: 700 triangles in all (the brief's cap), so bands are open cylinders and hands, eyes few-sided.
+const capsule = (r: number, length: number, sides = 5) => new THREE.CapsuleGeometry(r, length, 1, sides)
+/** An open ring: a belt, a leg loop, a drawcord. */
+const band = (r: number, height: number, sides = 8) => new THREE.CylinderGeometry(r, r, height, sides, 1, true)
+
+export const CLIMBER_BODY_GEO = sunShaded(mergePainted([
+  paintedAt(capsule(0.82, 0.9, 6), CLIMBER_SHIRT, pose([0, 0.2, 0], [0, 0, 0], [1, 1, 0.8])),
+  paintedAt(new THREE.SphereGeometry(0.8, 6, 3), CLIMBER_TROUSERS, pose([0, -0.85, 0], [0, 0, 0], [1.05, 0.7, 0.85])),
+  // Harness: waist belt, quickdraws racked on the hips
+  paintedAt(band(0.86, 0.32), CLIMBER_HARNESS, pose([0, -0.62, 0], [0, 0, 0], [1, 1, 0.82])),
+  ...[-1, 1].map((s) => painted(new THREE.BoxGeometry(0.16, 0.5, 0.12), CLIMBER_METAL, [s * 0.86, -0.95, 0.12], [0, 0, s * 0.2])),
+  // Oversized head, two-dot eyes, helmet with a vent stripe
+  painted(new THREE.SphereGeometry(1.1, 8, 5), CLIMBER_SKIN, [0, 2.1, 0]),
+  ...[-1, 1].map((s) => painted(new THREE.SphereGeometry(0.14, 4, 2), CLIMBER_DARK, [s * 0.38, 2.05, 1.03])),
+  paintedAt(new THREE.SphereGeometry(1.24, 8, 3, 0, Math.PI * 2, 0, Math.PI * 0.52), CLIMBER_HELMET, pose([0, 2.25, -0.06])),
+  painted(new THREE.BoxGeometry(0.3, 0.1, 1.2), CLIMBER_DARK, [0, 3.45, -0.15], [0.1, 0, 0]),
+  // Chalk bag on the small of the back, with its cyan drawcord
+  painted(new THREE.CylinderGeometry(0.5, 0.42, 0.72, 6), CLIMBER_CHALK, [0, -0.42, -0.8]),
+  painted(band(0.52, 0.12, 6), CLIMBER_HARNESS, [0, -0.1, -0.8]),
+]))
+
+/** Hangs from the shoulder (its origin) along -y; the same arm on either side. */
+export const CLIMBER_ARM_GEO = sunShaded(mergePainted([
+  painted(band(0.38, 0.7, 6), CLIMBER_SHIRT, [0, -0.25, 0]),
+  painted(capsule(0.3, 1.2), CLIMBER_SKIN, [0, -1.05, 0]),
+  painted(new THREE.SphereGeometry(0.42, 5, 3), CLIMBER_SKIN, [0, -1.95, 0]),
+]))
+
+/** Both legs from the hips (its origin), frogged out, harness leg loops on the thighs. */
+export const CLIMBER_LEGS_GEO = sunShaded(mergePainted(
+  [-1, 1].flatMap((s) => {
+    const hip = pose([s * 0.42, 0, 0], [0, 0, s * 0.55])
+    const knee = new THREE.Vector3(0, -1.3, 0).applyMatrix4(hip)
+    return [
+      paintedAt(capsule(0.36, 0.9), CLIMBER_TROUSERS, hip.clone().multiply(pose([0, -0.65, 0]))),
+      paintedAt(band(0.4, 0.16, 6), CLIMBER_HARNESS, hip.clone().multiply(pose([0, -0.3, 0]))),
+      painted(new THREE.CapsuleGeometry(0.32, 0.8, 1, 4), CLIMBER_TROUSERS, [knee.x, knee.y - 0.55, knee.z]),
+      painted(new THREE.BoxGeometry(0.55, 0.38, 0.85), CLIMBER_DARK, [knee.x, knee.y - 1.25, knee.z + 0.15]),
+    ]
+  }),
+))
+
+export const CLIMBER_MAT = withRim(new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.5,
+  metalness: 0.05,
+  flatShading: true,
+}), { color: '#fff4e6', intensity: 0.5, power: 2.5 })
+
 // ── Hit flash (shared by every enemy) ───────────────────────────────
 // On hit, EnemyBase swaps each mesh's material to this one for the kill-pop
 // window instead of cloning materials per enemy. Colour > 1 so it blooms.

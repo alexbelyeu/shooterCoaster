@@ -14,6 +14,7 @@ import EmberWisp from './EmberWisp'
 import LavaGolem from './LavaGolem'
 import FireImp from './FireImp'
 import InfernalDrake from './InfernalDrake'
+import Climber from './Climber'
 
 /** Every wave enemy's component: what `EnemySpawner` mounts and the turntable (`src/dev/turntable/`) shows. */
 export const ENEMY_COMPONENTS: Record<EnemyType, ComponentType<EnemyProps>> = {
@@ -30,4 +31,5 @@ export const ENEMY_COMPONENTS: Record<EnemyType, ComponentType<EnemyProps>> = {
   lavaGolem: LavaGolem,
   fireImp: FireImp,
   infernalDrake: InfernalDrake,
+  climber: Climber,
 }

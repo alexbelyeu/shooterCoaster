@@ -8,8 +8,8 @@ export function killTier(combo: number): number {
   return comboTierIndex(combo)
 }
 
-/** What a kill sounds like, by death style (`effects/deathStyles.ts`): a bright pop, wing flutter, a low crunch, a wash, a hiss. */
-export const KILL_SOUNDS = ['pop', 'flutter', 'crunch', 'splash', 'hiss'] as const
+/** What a kill sounds like, by death style (`effects/deathStyles.ts`): a bright pop, wing flutter, a low crunch, a wash, a hiss, a chalk puff. */
+export const KILL_SOUNDS = ['pop', 'flutter', 'crunch', 'splash', 'hiss', 'chalk'] as const
 export type KillSound = (typeof KILL_SOUNDS)[number]
 
 /** Ride wind: band-passed white noise that opens and brightens with speed (gain 0–0.12, an ambient bed). */
@@ -139,6 +139,7 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   'kill.crunch': { prio: PRIO.kill, db: -3, send: 0.1 },
   'kill.splash': { prio: PRIO.kill, db: -3, send: 0.15 },
   'kill.hiss': { prio: PRIO.kill, db: -4, send: 0.12 },
+  'kill.chalk': { prio: PRIO.kill, db: -4, send: 0.12 },
   'kill.thump': { prio: PRIO.kill, db: -6, send: 0.05 },
   'kill.ring': { prio: PRIO.kill, db: -16, send: 0.2 },
   'kill.payout': { prio: PRIO.kill, db: -15, send: 0.2 },

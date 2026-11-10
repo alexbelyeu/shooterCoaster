@@ -1,14 +1,15 @@
-import type { EnemyType } from '@/types/level'
+import type { EnemyType, WallSurface } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import { maxReadableDistance } from '../enemies/enemyReadability'
+import { CLIMB } from '../enemies/climbMotion'
 
 export const WATER_Y = 0
 /** Ground below this is sea deep enough to spawn in. */
 export const WATER_DEPTH = -5
 
-export type Surface = 'air' | 'ground' | 'water'
+export type Surface = 'air' | 'ground' | 'water' | 'wall'
 
 /** Uniform over a disc around the origin; `y` is above the terrain, or above `WATER_Y` on water. */
 export interface ScatterBand {
@@ -20,8 +21,11 @@ export interface ScatterBand {
 
 export interface EnemyPlacementRule {
   surface: Surface
-  /** `'trackside'`: beside the track ahead of the rider (`placeTracksideWave`, #179). */
-  scatter: ScatterBand | 'trackside'
+  /**
+   * `'trackside'`: beside the track ahead of the rider (`placeTracksideWave`, #179). `'wall'`: at the foot of one of the
+   * level's walls (`wallSlots`), which it climbs (#453).
+   */
+  scatter: ScatterBand | 'trackside' | 'wall'
 }
 
 const band = (radiusMin: number, radiusSpan: number, yMin: number, ySpan = 0): ScatterBand => ({ radiusMin, radiusSpan, yMin, ySpan })
@@ -42,6 +46,7 @@ export const ENEMY_PLACEMENT: Record<EnemyType, EnemyPlacementRule> = {
   lavaGolem: { surface: 'ground', scatter: 'trackside' },
   fireImp: { surface: 'ground', scatter: 'trackside' },
   infernalDrake: { surface: 'air', scatter: band(300, 2600, 150, 100) },
+  climber: { surface: 'wall', scatter: 'wall' },
 }
 
 export const GOLDEN_BALLOON_SCATTER = band(0, 3000, 50, 100)
@@ -106,4 +111,52 @@ export function readableScatterSpawn(
     }
   }
   return best
+}
+
+/** A wall enemy's start: on `wall`, `u` across and `v` up from its bottom-left corner; `seed` picks its route. */
+export interface WallSlot {
+  wall: WallSurface
+  u: number
+  v: number
+  seed: number
+}
+
+/** A wall enemy's origin off the wall's face, world units: its hands and feet on the wall. */
+export const WALL_STANDOFF = 11
+/** Starts within this fraction of the wall's height from its foot, so a wave doesn't climb in lockstep. */
+export const WALL_START_SPREAD = 0.12
+
+/** Seeded starts at the foot of the level's walls, spread over all of them, off their side edges. */
+export function wallSlots(count: number, walls: readonly WallSurface[], rng: Rng): WallSlot[] {
+  if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+  return Array.from({ length: count }, () => {
+    const wall = walls[Math.floor(rng() * walls.length)]
+    const margin = Math.min(CLIMB.margin, wall.width / 2)
+    return {
+      wall,
+      u: margin + rng() * (wall.width - 2 * margin),
+      v: rng() * WALL_START_SPREAD * wall.height,
+      seed: Math.floor(rng() * 0x7fffffff),
+    }
+  })
+}
+
+type XYZ = { x: number; y: number; z: number }
+
+/** The wall's face direction, `right × up`, into `out`. */
+export function wallNormal(wall: WallSurface, out: XYZ = { x: 0, y: 0, z: 0 }): XYZ {
+  const { right: r, up: u } = wall
+  out.x = r.y * u.z - r.z * u.y
+  out.y = r.z * u.x - r.x * u.z
+  out.z = r.x * u.y - r.y * u.x
+  return out
+}
+
+/** The world point `u` across, `v` up and `off` out from the face of `wall`, into `target`. */
+export function wallPoint(wall: WallSurface, u: number, v: number, off: number, target: XYZ, normal: XYZ = wallNormal(wall)): XYZ {
+  const { origin: o, right: r, up: w } = wall
+  target.x = o.x + r.x * u + w.x * v + normal.x * off
+  target.y = o.y + r.y * u + w.y * v + normal.y * off
+  target.z = o.z + r.z * u + w.z * v + normal.z * off
+  return target
 }

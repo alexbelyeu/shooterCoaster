@@ -16,6 +16,7 @@ export const ENEMY_SILHOUETTE: Record<EnemyType | 'goldenBalloon', number> = {
   lavaGolem: 108, // 12 wide x9, 180 tall
   fireImp: 52, // 6.4 wide x8, 64 tall
   infernalDrake: 140, // body ~7 x20, wings far wider
+  climber: 40, // ~25 wide x58 tall, arms up; its back and helmet face the ride
 }
 
 /** Px at 1280x720 an enemy must reach during the ride; `READABLE_PX` in e2e/smoke.mjs mirrors it. */
