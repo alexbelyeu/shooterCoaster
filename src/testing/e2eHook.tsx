@@ -151,6 +151,9 @@ export interface SCTestApi {
   /** Most seconds the level timer and game clock advance per playing frame (a slower frame counts as this much); null
    *  is normal play. Lets the smoke sample the same moment of a level on any runner; `timerStep` overrides it. */
   timerStepMax: number | null
+  /** Level time the timer, game clock and ride stop at, exactly, on the frame that reaches it (#487): the smoke's ride
+   *  stops there on any runner, not wherever its poll catches it (10.2-10.7 s on CI). null is normal play. */
+  stopAtLevelTime: number | null
   /** True holds the level timer (no time runs out, no wave or boss comes due) while the game clock, enemies, effects and
    *  combo keep running: the smoke's checks then see one moment of the level however long they take on a slow runner. */
   holdLevelTime: boolean
@@ -419,11 +422,30 @@ export function recordE2ESpawns(positions: readonly { x: number; y: number; z: n
   spawnDigest = `${positions.length}:${hashString(text).toString(16)}`
 }
 
-/** Level time for a playing frame of `delta` seconds: the frame time, unless a test set `timerStep` / `timerStepMax`. */
+/** The level timer's elapsed seconds, reported by GameTimer every playing frame (for `stopAtLevelTime`). */
+let e2eLevelTime = 0
+export function noteE2ELevelTime(seconds: number) {
+  if (isE2E) e2eLevelTime = seconds
+}
+/** This frame's step under `stopAtLevelTime`, worked out once: the timer and the ride read the same one whichever runs first. */
+const stopStep = { frame: NaN, delta: NaN, step: 0 }
+// A hair past the stop, so the timer's remaining seconds round down to the stop's whole second.
+const STOP_EPSILON = 1e-6
+
+/** Level time for a playing frame of `delta` seconds: the frame time, unless a test set `timerStep` / `timerStepMax` / `stopAtLevelTime`. */
 export function levelTimeStep(delta: number): number {
   const api = isE2E ? window.__SC_TEST__ : undefined
-  if (api?.timerStep != null) return api.timerStep
-  return api?.timerStepMax != null ? Math.min(delta, api.timerStepMax) : delta
+  const step = api?.timerStep ?? (api?.timerStepMax != null ? Math.min(delta, api.timerStepMax) : delta)
+  if (api?.stopAtLevelTime == null) return step
+  // The animation frame's timestamp is the same for every useFrame callback of one frame.
+  const frame = Number(document.timeline.currentTime)
+  if (frame !== stopStep.frame || delta !== stopStep.delta) {
+    const left = api.stopAtLevelTime - e2eLevelTime
+    stopStep.frame = frame
+    stopStep.delta = delta
+    stopStep.step = left <= 0 ? 0 : Math.min(step, left + STOP_EPSILON)
+  }
+  return stopStep.step
 }
 
 /** True while a test holds the level timer (`holdLevelTime`); never in normal play. */
@@ -788,6 +810,7 @@ export function installE2EApi() {
     bulletStep: null,
     timerStep: null,
     timerStepMax: null,
+    stopAtLevelTime: null,
     holdLevelTime: false,
     rideRate: null,
     titleTime: null,

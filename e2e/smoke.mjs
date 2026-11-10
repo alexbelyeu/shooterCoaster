@@ -255,16 +255,19 @@ const getStats = (page) => page.evaluate(() => window.__SC_TEST__.stats())
 /**
  * Ride (game time running, `rideRate` RIDE_RATE) until the level timer reaches `seconds` and `minFrames` have rendered
  * (a stall past FRAME_DEADLINE_MS stops it), then freeze game time and hand the ride back to the frame time in that
- * same JS turn. With `timerStepMax` set this is the same moment of the level, from the same track point, on any runner.
+ * same JS turn. `stopAtLevelTime` stops the level timer, game clock and ride exactly at `seconds` on the frame that gets
+ * there (#487: the poll used to catch it anywhere from 10.2 to 10.7 s), and `timerStepMax` makes it the same track point:
+ * the same moment of the level on any runner.
  */
 async function rideToLevelTime(page, seconds, minFrames) {
   const start = Date.now()
-  const f0 = await page.evaluate((rate) => {
+  const f0 = await page.evaluate(([rate, seconds]) => {
     const s = window.__SC_TEST__
     s.rideRate = rate
+    s.stopAtLevelTime = seconds
     s.setTimeScale(1)
     return s.frames
-  }, RIDE_RATE)
+  }, [RIDE_RATE, seconds])
   for (;;) {
     const r = await page.evaluate(([target, f0, minFrames, overdue]) => {
       const s = window.__SC_TEST__
@@ -274,6 +277,7 @@ async function rideToLevelTime(page, seconds, minFrames) {
       if (done) {
         s.setTimeScale(0)
         s.rideRate = null
+        s.stopAtLevelTime = null
       }
       return { done, frames, levelTime }
     }, [seconds, f0, minFrames, Date.now() - start >= FRAME_DEADLINE_MS])
@@ -3475,7 +3479,8 @@ async function run() {
 
 /**
  * A --shard run's smokeSeconds budget (#353), judged by `shardTime.mjs` (#394: scaled up on a runner whose ride rendered
- * slowly): enforced on CI only, where WATCHDOG_FACTOR times the budget also stops the run before the job timeout.
+ * slowly; #487: over it warns, past FAIL_FACTOR times it fails): enforced on CI only, where WATCHDOG_FACTOR times the
+ * budget also stops the run before the job timeout.
  */
 function startTimeBudget(runStarted) {
   if (!arg('shard')) return null
@@ -3499,9 +3504,9 @@ function startTimeBudget(runStarted) {
   return {
     result(seconds) {
       const msPerFrame = rideMsPerFrame(results)
-      const { ok, level, text, slowness, allowed } = judgeShardTime({ shard, seconds, budget, msPerFrame, enforced })
+      const { ok, level, text, slowness, allowed, failsAt } = judgeShardTime({ shard, seconds, budget, msPerFrame, enforced })
       annotate(level, text)
-      return { id: 'time', ok, problems: ok ? [] : [text], text, shard, seconds, budget, msPerFrame, slowness, allowed, errors: [] }
+      return { id: 'time', ok, level, problems: ok ? [] : [text], text, shard, seconds, budget, msPerFrame, slowness, allowed, failsAt, errors: [] }
     },
   }
 }
