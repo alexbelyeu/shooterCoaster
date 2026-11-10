@@ -43,6 +43,12 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
   you will change; never pull several modules into one command to get the picture (that run's heaviest
   results were `cat a.ts b.ts c.ts`, 13–20k characters each). Past ~200k context, stop reading for
   understanding and finish with what you have.
+- **Measure, don't guess.** You can't see your own context, so check it:
+  `node scripts/run-usage.cjs --self` prints your context, turns and weighted tokens so far. Run it after
+  your plan, after each build or smoke, and every ~30 turns. When it says `OVER BUDGET` (context over 200k
+  or over 2.5M weighted), stop reading and iterating: commit the parts that already work and pass, ship them,
+  and file what is left as a follow-up issue with its own Scope. A second pass on a fresh context is cheaper
+  than finishing at 300k+ (#496: the #454 title-park builder went on to 175 turns, peak 353k, 4.8M).
 
 ## Do the work
 
@@ -60,6 +66,9 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
    or well over ~150 turns (an engine swap, a rewrite across a whole system), ship the first
    self-contained slice that leaves `main` playable and file the rest as a follow-up issue with its
    own Scope (hard rule 7), rather than carrying the whole rewrite in one context.
+   The same goes for an issue that asks for **several separate features** (#454 asked for more rides,
+   a second coaster, midway rows, crowds, paths and a lake: one 1,190-line PR, #496): build the one or two
+   that matter most, ship them, and file the rest as follow-up issues, each with its own Scope.
 3. Verify like a player. Run `scripts/ensure-browser.sh` once for the Chromium path (shell
    variables don't carry between commands, so prefix each smoke with `SC_CHROME=<that path>`). Iterate with
    `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build`, then the smoke as its own command:

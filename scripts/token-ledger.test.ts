@@ -77,6 +77,19 @@ describe('run-usage summarize', () => {
     expect(usage.ledgerComment(entry).split('\n')[0]).toContain('peak ctx 180k · 2 compactions · 7 cache misses (~900k)')
   })
 
+  it('--self reports the last turn\'s context and says when a run is over the builder budget', () => {
+    const turn = (id: string, read: number) =>
+      assistant(id, id, { input_tokens: 1, cache_creation_input_tokens: 999, cache_read_input_tokens: read, output_tokens: 0 })
+    const small = usage.selfCheck([turn('a', 50_000), turn('b', 120_000)].join('\n'))
+    expect(small).toMatchObject({ context: 121_000, turns: 2, over: false })
+    expect(small.line).toBe('context 121k · 2 turns · ~20k weighted so far · within budget')
+
+    const big = usage.selfCheck([turn('a', 120_000), turn('b', 240_000)].join('\n'))
+    expect(big.over).toBe(true)
+    expect(big.line).toContain('OVER BUDGET (context over 200k)')
+    expect(usage.selfCheck(turn('a', 1_000), { context: 200_000, weighted: 100 }).line).toContain('over 100 weighted')
+  })
+
   it('normalizes refs', () => {
     expect(usage.normalizeRef('PR #12, #14')).toBe('#12,#14')
     expect(usage.normalizeRef('123')).toBe('#123')
