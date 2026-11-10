@@ -60,7 +60,7 @@
  *   node e2e/smoke.mjs --url https://example.com        # test a deployed site
  *   node e2e/smoke.mjs --mobile                         # + touch playtest on a phone viewport
  *   node e2e/smoke.mjs --mobile --skip-desktop          # only the touch playtest
- *   node e2e/smoke.mjs --dist dist-portal --base /nested/path/ --levels level1   # the portal zip under a sub-path
+ *   node e2e/smoke.mjs --dist dist-portal --base /nested/path/ --steps title,ride,shot,results --levels level1   # the portal zip under a sub-path
  *   node e2e/smoke.mjs --shard level3                   # one CI shard (e2e/shards.mjs), with its smokeSeconds budget
  *   node e2e/smoke.mjs --steps ride,boss --levels level2   # just those steps (names in e2e/shards.mjs)
  *   node e2e/smoke.mjs --steps pacing --levels level2   # time with nothing to shoot over a whole run (pacing.json)
