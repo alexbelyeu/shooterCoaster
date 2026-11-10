@@ -109,7 +109,7 @@ function nextMainPass(snap, mainRuns, r, jobName) {
  *                 jobs?: [{ name, conclusion, started_at, completed_at, steps, html_url, timedOut?, errors? }] }],
  *   prFiles: { [prNumber]: string[] }, mainDiffs: { ['<sha>...<sha>']: string[] }, timeouts: { [workflowPath]: { [jobOrStep]: minutes } },
  *   openPrs: [{ number, title, labels: string[], created_at, updated_at, labelledAt?: { [label]: iso } }],
- *   openIssues: [{ number, title, labels: string[], created_at, fixMergedAt?: ms | null }],
+ *   openIssues: [{ number, title, labels: string[], created_at, fixMergedAt?: ms | null, nightlyAlert?: boolean }],
  *   prod: { nightly: { at, conclusion } | null, deploy: { at, conclusion } | null } (the newest of each prod-smoke.yml suite),
  *   closedAt: { [key]: ms }, lastAgentActivity: ms | null, paused: boolean,
  * }
@@ -361,6 +361,8 @@ const oldProdAlerts = (snap) =>
  * after that, and no nightly has gone red since.
  */
 function awaitsNightly(snap, issue) {
+  // Only the nightly suite's own alert (prod-alert.cjs marker) is closed by a green nightly; a red-main alert from ci.yml is not.
+  if (!issue.nightlyAlert) return false
   const fixed = issue.fixMergedAt
   const { deploy, nightly } = snap.prod || {}
   if (!fixed || !deploy || deploy.conclusion !== 'success' || deploy.at < fixed) return false

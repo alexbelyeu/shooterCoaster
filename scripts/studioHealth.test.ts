@@ -265,7 +265,7 @@ describe('findings', () => {
   })
 
   describe('an alert whose fix shipped waits for the nightly instead of escalating (#487)', () => {
-    const alert = { number: 9, title: 'Production nightly smoke failing', labels: ['agent:prod-broken'], created_at: iso(30 * H), fixMergedAt: NOW - 20 * H }
+    const alert = { number: 9, title: 'Production nightly smoke failing', labels: ['agent:prod-broken'], created_at: iso(30 * H), fixMergedAt: NOW - 20 * H, nightlyAlert: true }
     const with_ = (prod: object, over: object = {}) => snap({ openIssues: [{ ...alert, ...over }], prod })
     const nums = (xs: { number: number }[]) => xs.map((i) => i.number)
     const greenDeploy = { at: NOW - 19 * H, conclusion: 'success' }
@@ -276,6 +276,12 @@ describe('findings', () => {
         expect(nums(staleProdAlerts(s))).toEqual([])
         expect(nums(waitingProdAlerts(s))).toEqual([9])
       }
+    })
+
+    it('a red-main alert (no nightly marker) with a shipped fix still escalates', () => {
+      const s = with_({ deploy: greenDeploy, nightly: null }, { nightlyAlert: false })
+      expect(nums(staleProdAlerts(s))).toEqual([9])
+      expect(nums(waitingProdAlerts(s))).toEqual([])
     })
 
     it('escalates without a linked fix, with the deploy check red or older than the fix, or a red nightly since', () => {
@@ -434,6 +440,15 @@ describe('the nightly (#487)', () => {
     const api = async (route: string, params: Params = {}) => (route === JOBS ? { jobs: jobsOf[params.run_id as number] } : [])
     const prod = await prodSuites(api, [prodRun(3, 'deployment_status', 5), prodRun(2, 'schedule', 2), prodRun(1, 'workflow_dispatch', 1)])
     expect(prod).toEqual({ deploy: { at: NOW - H, conclusion: 'success' }, nightly: { at: NOW - 2 * H, conclusion: null } })
+  })
+
+  it('prodSuites still finds the scheduled nightly behind many skipped deploy runs', async () => {
+    const run = (id: number, event: string, hAgo: number) => ({ id, path: '.github/workflows/prod-smoke.yml', event, created_at: iso(hAgo * H) })
+    const skipped = [{ name: 'deploy', status: 'completed', conclusion: 'skipped' }, { name: 'nightly', status: 'completed', conclusion: 'skipped' }]
+    const runs = [...Array.from({ length: 30 }, (_, k) => run(100 + k, 'deployment_status', 0.1 + k / 100)), run(1, 'schedule', 5)]
+    const api = async (route: string, params: Params = {}) => (route === JOBS ? { jobs: params.run_id === 1 ? [] : skipped } : [])
+    const prod = await prodSuites(api, runs)
+    expect(prod.nightly).toEqual({ at: NOW - 5 * H, conclusion: null })
   })
 
   it('dispatches an overdue nightly on main, and nothing when it is on time', async () => {

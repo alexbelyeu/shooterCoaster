@@ -8,6 +8,7 @@ const path = require('node:path')
 const { findings: findFindings, staleProdAlerts, waitingProdAlerts, nightlyOverdue, parseTimeouts } = require('./studioHealthRules.cjs')
 const { readPauseState } = require('./studio-status.cjs')
 const { getAll } = require('./automerge.cjs')
+const { marker: prodAlertMarker } = require('./prod-alert.cjs')
 const { fetchTelemetry, phoneFrameBudget } = require('./playerTelemetry.cjs')
 
 const LABEL = 'studio-health'
@@ -191,6 +192,7 @@ async function collect(api, now, workflowsDir) {
     })),
     openIssues: openItems.filter((i) => !i.pull_request).map((i) => ({
       number: i.number, title: i.title, labels: labelNames(i), created_at: i.created_at, fixMergedAt: i.fixMergedAt ?? null,
+      nightlyAlert: (i.body || '').includes(prodAlertMarker('nightly')),
       labelledAt: labelledAt(readyEvents.filter((e) => e.issue.number === i.number), ['agent:ready']),
     })),
     closedAt,
@@ -277,7 +279,9 @@ async function reconcile(api, found, open, now, log, { telemetryDown = false } =
 async function prodSuites(api, runs) {
   const prod = { nightly: null, deploy: null }
   const newest = runs.filter((r) => r.path === PROD_SMOKE).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
-  for (const r of newest.slice(0, 20)) {
+  // The whole window, not the newest few: every deploy adds runs with both jobs skipped, which would push the
+  // scheduled nightly out of a short scan and make it look overdue. The loop stops once both suites are found.
+  for (const r of newest) {
     if (prod.nightly && prod.deploy) break
     const jobs = (await api('GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs', { run_id: r.id, per_page: 100 }).catch(() => ({ jobs: [] }))).jobs
     for (const suite of ['nightly', 'deploy']) {
