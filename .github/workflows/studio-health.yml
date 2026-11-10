@@ -45,6 +45,7 @@ jobs:
             scripts/studioHealthRules.cjs
             scripts/studio-status.cjs
             scripts/automerge.cjs
+            scripts/prod-alert.cjs
             scripts/playerTelemetry.cjs
             budgets.json
             .github/workflows
