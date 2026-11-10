@@ -130,10 +130,14 @@ a level in three weeks.
 
 ## Known bugs and visual problems (ranked)
 
-1. **Runs are not 60 s and have no shared shape** (#434 → #452): 60–120 s timers, bosses
-   at 40–55 s, Inferno twice as long as the Desert.
-2. **Nothing to shoot for stretches of the Desert** (#435 → #450 metric, #451 fix); no level
-   is measured for it today.
+1. **Fixed 9–10 Nov:** every run is 60 s with the boss at 40 s (#473, closes #452), and waves
+   are placed where the camera will look (#470, closes #451). The nightly `pacing` step
+   (#467) failed level2 / level4 on 9 Nov (#469, before those merged); on 069adc6 the Maintainer's
+   local pacing run passes level2 (longest gap 2 s), level4 (2 s) and level5 (no gap).
+2. **The smoke's enemy counts depend on the runner** (#471, P1): the same seed gives different
+   pacing gaps and on-screen counts locally and on CI. It turned `main` red once on 10 Nov
+   (#478: `smoke (level2)` readability, 1 readable of 2 on screen). #482 seeds enemy
+   motion from the run seed, and frame-rate-dependent drift remains.
 3. **The title world is a green plain** around the park (#436 → #454, #459).
 4. **Far rails read as bold cables** across Theme Park, Ocean, Antarctica (#327): the pixel
    floor has no distance cue.
