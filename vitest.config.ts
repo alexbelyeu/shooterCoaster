@@ -11,6 +11,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Fails a test that calls expect() too many times to stay fast on CI.
+    setupFiles: ['scripts/vitestAssertionBudget.ts'],
     include: ['src/**/*.test.ts', 'api/**/*.test.ts', 'scripts/**/*.test.ts', 'e2e/**/*.test.ts'],
   },
 })

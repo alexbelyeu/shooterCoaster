@@ -106,12 +106,25 @@ describe('title rides', () => {
     const pos: Vec3 = [0, 0, 0]
     const target: Vec3 = [0, 0, 0]
     for (const mode of ['menu', 'attract'] as const) {
+      // One expect per pose and sample is ~960 000 of them, 8 s on CI: keep the closest pass, assert once.
+      const tower = { distance: Infinity, t: 0 }
+      const swing = { distance: Infinity, t: 0 }
+      const coaster = { distance: Infinity, t: 0 }
+      const closest = (worst: { distance: number; t: number }, distance: number, t: number) => {
+        if (distance < worst.distance) {
+          worst.distance = distance
+          worst.t = t
+        }
+      }
       for (let t = 0; t < 80; t += 0.05) {
         titleCameraPose(t, { ride, rideTime: t }, pos, target, mode)
-        expect(Math.hypot(pos[0] - DROP_TOWER.x, pos[2] - DROP_TOWER.z)).toBeGreaterThan(20)
-        if (pos[1] < 40) expect(Math.hypot(pos[0] - SWING_RIDE.x, pos[2] - SWING_RIDE.z)).toBeGreaterThan(40)
-        for (const c of crossing) expect(Math.hypot(pos[0] - c.x, pos[1] - c.y, pos[2] - c.z)).toBeGreaterThan(12)
+        closest(tower, Math.hypot(pos[0] - DROP_TOWER.x, pos[2] - DROP_TOWER.z), t)
+        if (pos[1] < 40) closest(swing, Math.hypot(pos[0] - SWING_RIDE.x, pos[2] - SWING_RIDE.z), t)
+        for (const c of crossing) closest(coaster, Math.hypot(pos[0] - c.x, pos[1] - c.y, pos[2] - c.z), t)
       }
+      expect(tower.distance, `${mode}: drop tower at t=${tower.t.toFixed(2)}`).toBeGreaterThan(20)
+      expect(swing.distance, `${mode}: swing ride at t=${swing.t.toFixed(2)}`).toBeGreaterThan(40)
+      expect(coaster.distance, `${mode}: second coaster at t=${coaster.t.toFixed(2)}`).toBeGreaterThan(12)
     }
   })
 

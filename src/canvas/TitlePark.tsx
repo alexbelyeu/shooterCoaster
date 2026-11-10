@@ -67,7 +67,7 @@ export default function TitlePark({ water }: { water: THREE.Material }) {
       groundMat: createGroundMaterial(),
       body: person.body,
       head: person.head,
-      personMat: new THREE.MeshLambertMaterial(),
+      tintedMat: new THREE.MeshLambertMaterial(),
       tree: buildTreeGeometry(),
       // Seen from 400+ units: an 8-triangle crown on its stump.
       forestTree: new THREE.OctahedronGeometry(7, 0).scale(1, 1.3, 1).translate(0, 9, 0),
@@ -90,12 +90,12 @@ export default function TitlePark({ water }: { water: THREE.Material }) {
     <>
       <mesh name="title-ground" geometry={assets.ground} material={assets.groundMat} position={[0, GROUND_Y, 0]} />
       <Midway layout={layout} />
-      <StaticInstances placements={layout.people} colors={shirts} geometry={assets.body} material={assets.personMat} />
-      <StaticInstances placements={layout.people} colors={skins} geometry={assets.head} material={assets.personMat} />
+      <StaticInstances placements={layout.people} colors={shirts} geometry={assets.body} material={assets.tintedMat} />
+      <StaticInstances placements={layout.people} colors={skins} geometry={assets.head} material={assets.tintedMat} />
       <StaticInstances placements={layout.trees} colors={treeTints} geometry={assets.tree} material={assets.treeMat} />
-      <StaticInstances placements={layout.forest} colors={forestTints} geometry={assets.forestTree} material={assets.personMat} />
+      <StaticInstances placements={layout.forest} colors={forestTints} geometry={assets.forestTree} material={assets.tintedMat} />
       <StaticInstances placements={layout.hedges} geometry={assets.hedge} material={assets.hedgeMat} />
-      <StaticInstances placements={layout.planters} colors={flowers} geometry={assets.planter} material={assets.personMat} />
+      <StaticInstances placements={layout.planters} colors={flowers} geometry={assets.planter} material={assets.tintedMat} />
       <group position={[0, GROUND_Y, 0]}>
         <mesh name="title-fountain" geometry={assets.fountainStone} material={assets.treeMat} />
         <mesh geometry={assets.fountainWater} material={water} />

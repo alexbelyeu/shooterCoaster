@@ -40,7 +40,7 @@ npm run audio:check -- <file.wav|mp3> [--kind music|mix|sfx] [--seam s] [--music
 ```
 
 Unit tests live next to the code as `src/**/*.test.ts` (and `scripts/**/*.test.ts` / `e2e/**/*.test.ts` for agent tooling and the smoke) and run in plain Node
-(`vitest.config.ts`): no DOM, no WebGL. Test pure logic (track curves, terrain
+(`vitest.config.ts`): no DOM, no WebGL. A test may call `expect()` at most 50 000 times (`scripts/vitestAssertionBudget.ts`: assert once after a sampling loop, not inside it). Test pure logic (track curves, terrain
 noise, scoring/stars in `src/levels/scoring.ts`, store actions, level configs);
 keep pure helpers free of React/three imports so they stay testable. Adding a
 level? `src/levels/LevelRegistry.test.ts` checks its `maxScore`, star thresholds

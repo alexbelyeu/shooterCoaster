@@ -24,9 +24,9 @@ export const POND = { x: -280, z: 80, rx: 56, rz: 36 }
 const FLUME_RADII = { x: 74, z: 52 }
 
 /** The plaza round the fountain, the inner promenade, the promenade inside the loop, the midway boulevard, the outer ring. */
-export const RING_PATHS = [15, 92, 177, 205, 330]
+const RING_PATHS = [15, 92, 177, 205, 330]
 export const FOUNTAIN_RADIUS = 9
-export const AVENUE_ANGLES = [30, 90, 150, 210, 270, 330].map((d) => (d * Math.PI) / 180)
+const AVENUE_ANGLES = [30, 90, 150, 210, 270, 330].map((d) => (d * Math.PI) / 180)
 const AVENUE_FROM = RING_PATHS[0] + PATH_HALF_WIDTH
 const AVENUE_TO = 480
 /** Ring paths with a midway: stalls on both sides of the boulevard, and the inner side of the outer ring. */
