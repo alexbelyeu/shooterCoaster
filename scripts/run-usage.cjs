@@ -6,6 +6,12 @@
 //
 //   node scripts/run-usage.cjs --role qa --ref "#123" [--note "..."] [--json] [--post]
 //   node scripts/run-usage.cjs --summary --since <ISO> [--until <ISO>]
+//   node scripts/run-usage.cjs --self
+//
+// --self prints the calling agent's own context, turns and weighted tokens so far, and
+// what to do when it is past the builder budget (builder.md "Token budget"). A builder
+// subagent's transcript is subagents/agent-<worktree>.jsonl, named after its worktree
+// directory; any other cwd reads the session's own transcript (Fix runs directly).
 //
 // --summary prints the ledger's runs logged in [since, until) as JSON (total, runs,
 // per-role and per-ref weighted tokens, a session counted once), through the same
@@ -229,6 +235,39 @@ function diagnose(files) {
   }
 }
 
+/** builder.md "Token budget": past these, a run stops reading and ships what it has. */
+const SELF_LIMITS = { context: 200_000, weighted: 2_500_000 }
+
+/** Pure: one agent's transcript so far → its last turn's context, turns, weighted tokens and verdict. */
+function selfCheck(text, limits = SELF_LIMITS) {
+  const s = summarize([{ text, subagent: false }])
+  let context = 0
+  for (const line of text.split('\n')) {
+    if (!line.includes('"usage"')) continue
+    try {
+      const u = JSON.parse(line).message.usage
+      context = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0)
+    } catch {
+      // not an assistant turn
+    }
+  }
+  const over = []
+  if (context > limits.context) over.push(`context over ${fmtTokens(limits.context)}`)
+  if (s.weighted > limits.weighted) over.push(`over ${fmtTokens(limits.weighted)} weighted`)
+  const head = `context ${fmtTokens(context)} · ${s.turns} turns · ~${fmtTokens(s.weighted)} weighted so far`
+  const verdict = over.length
+    ? `OVER BUDGET (${over.join(', ')}): stop reading, ship the slice that works, file the rest as a follow-up issue`
+    : 'within budget'
+  return { context, turns: s.turns, weighted: s.weighted, over: over.length > 0, line: `${head} · ${verdict}` }
+}
+
+/** The calling agent's own transcript: the worktree builder's subagent file, else the session's. */
+function findSelf(cwd = process.cwd()) {
+  const session = findSession()
+  const own = session.subagents.find((f) => path.basename(f) === `${path.basename(cwd)}.jsonl`)
+  return own || session.main
+}
+
 function fmtTokens(n) {
   if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`
   if (n >= 1e3) return `${Math.round(n / 1e3)}k`
@@ -313,12 +352,13 @@ function ledgerIssue(repo) {
 // ---------- CLI ----------
 
 function parseArgs(argv) {
-  const a = { role: 'unknown', ref: 'none', note: '', since: '', until: '', json: false, post: false, summary: false }
+  const a = { role: 'unknown', ref: 'none', note: '', since: '', until: '', json: false, post: false, summary: false, self: false }
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i]
     if (k === '--json') a.json = true
     else if (k === '--post') a.post = true
     else if (k === '--summary') a.summary = true
+    else if (k === '--self') a.self = true
     else if (['--role', '--ref', '--note', '--since', '--until'].includes(k)) a[k.slice(2)] = argv[++i] || ''
   }
   return a
@@ -337,6 +377,7 @@ async function printSummary(args) {
 function main() {
   const args = parseArgs(process.argv.slice(2))
   if (args.summary) return printSummary(args)
+  if (args.self) return console.log(selfCheck(fs.readFileSync(findSelf(), 'utf8')).line)
   const session = findSession()
   const files = [
     { text: fs.readFileSync(session.main, 'utf8'), subagent: false },
@@ -371,7 +412,7 @@ function main() {
   }
 }
 
-module.exports = { summarize, diagnose, weighted, ledgerComment, normalizeRef, fmtTokens }
+module.exports = { summarize, diagnose, selfCheck, weighted, ledgerComment, normalizeRef, fmtTokens }
 
 if (require.main === module) {
   Promise.resolve()
