@@ -8,7 +8,7 @@
     "touchP95": 33.4
   },
   "smokeSeconds": {
-    "_comment": "Wall time of each CI smoke shard (e2e/shards.mjs), checked by the smoke on CI (#353): 1.5x the slowest CI run on #411 (2026-11-07, the PR depth of #372: four runs, ui and menus one; runs swung up to ~60%), rounded up to 30 s, ui and menus to 120 s; mobile 1.3x.",
+    "_comment": "Wall time of each CI smoke shard (e2e/shards.mjs), checked by the smoke on CI (#353): 1.5x the slowest CI run on #411 (2026-11-07, the PR depth of #372: four runs, ui and menus one; runs swung up to ~60%), rounded up to 30 s, ui and menus to 120 s; mobile 1.3x. Over budget is a warning; a shard fails only past 1.5x it (scaled up for a slow runner, e2e/shardTime.mjs, #487).",
     "ui": 120,
     "menus": 120,
     "level1": 240,

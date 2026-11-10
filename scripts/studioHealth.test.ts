@@ -4,10 +4,10 @@ import rules from './studioHealthRules.cjs'
 import watchdog from './studio-health.cjs'
 import status from './studio-status.cjs'
 
-const { findings, staleProdAlerts, parseTimeouts, isDocsOnly, ALERTED_ON_MAIN } = rules
+const { findings, staleProdAlerts, waitingProdAlerts, nightlyOverdue, parseTimeouts, isDocsOnly, ALERTED_ON_MAIN } = rules
 const { pauseUntil } = status
 const ciYaml = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
-const { reconcile, escalateProdAlerts } = watchdog
+const { reconcile, escalateProdAlerts, noteWaitingProdAlerts, dispatchOverdueNightly, prodSuites } = watchdog
 
 const H = 3600e3
 const NOW = Date.parse('2026-11-04T16:00:00Z')
@@ -110,6 +110,22 @@ describe('findings', () => {
     expect(keys(snap({ runs: [deploy, nightly] }))).toEqual([])
     const nightlyOk = prod({ id: 3, event: 'schedule', conclusion: 'success', created_at: iso(H), jobs: [job('nightly', 'success', 20)] })
     expect(keys(snap({ runs: [deploy, nightly, nightlyOk] }))).toEqual(['flaky:nightly / Smoke'])
+  })
+
+  it('a job red on main and green on the next main commit is flaky when that commit touched nothing a check depends on (#487)', () => {
+    const shard = (conclusion: string) => job('smoke (level2)', conclusion, 6, conclusion === 'failure' ? [{ name: 'Smoke shard level2', conclusion: 'failure' }] : [])
+    const red = onMain({ id: 1, event: 'workflow_dispatch', head_sha: 'm1', created_at: iso(5 * H), jobs: [shard('failure')] })
+    const green = onMain({ id: 2, event: 'workflow_dispatch', head_sha: 'm2', conclusion: 'success', created_at: iso(3 * H), jobs: [shard('success')] })
+    const withDiff = (files: string[]) => snap({ runs: [red, green], mainDiffs: { 'm1...m2': files } })
+    const f = findings(withDiff(['docs/agents/STATE.md', '.claude/agents/qa.md']))
+    expect(f.map((x: { key: string }) => x.key)).toEqual(['flaky:smoke / Smoke shard level2'])
+    expect(f[0].body).toContain('passed on the next main commit')
+    expect(keys(withDiff(['src/levels/LevelRegistry.ts']))).toEqual([])
+    expect(keys(withDiff(['e2e/smoke.mjs']))).toEqual([])
+    expect(keys(withDiff(['budgets.json']))).toEqual([])
+    expect(keys(snap({ runs: [red, green] }))).toEqual([]) // no diff fetched
+    const stillRed = { ...green, conclusion: 'failure', jobs: [shard('failure')] }
+    expect(keys(snap({ runs: [red, stillRed], mainDiffs: { 'm1...m2': ['docs/a.md'] } }))).toEqual([])
   })
 
   it('a docs-only PR failing while main is red is not a flake', () => {
@@ -247,6 +263,41 @@ describe('findings', () => {
     expect(keys(s)).toEqual([])
     expect(staleProdAlerts(s).map((i: { number: number }) => i.number)).toEqual([9])
   })
+
+  describe('an alert whose fix shipped waits for the nightly instead of escalating (#487)', () => {
+    const alert = { number: 9, title: 'Production nightly smoke failing', labels: ['agent:prod-broken'], created_at: iso(30 * H), fixMergedAt: NOW - 20 * H, nightlyAlert: true }
+    const with_ = (prod: object, over: object = {}) => snap({ openIssues: [{ ...alert, ...over }], prod })
+    const nums = (xs: { number: number }[]) => xs.map((i) => i.number)
+    const greenDeploy = { at: NOW - 19 * H, conclusion: 'success' }
+
+    it('waits while the deploy check is green after the fix and no nightly went red since', () => {
+      for (const nightly of [null, { at: NOW - 40 * H, conclusion: 'failure' }, { at: NOW - H, conclusion: null }, { at: NOW - H, conclusion: 'success' }]) {
+        const s = with_({ deploy: greenDeploy, nightly })
+        expect(nums(staleProdAlerts(s))).toEqual([])
+        expect(nums(waitingProdAlerts(s))).toEqual([9])
+      }
+    })
+
+    it('a red-main alert (no nightly marker) with a shipped fix still escalates', () => {
+      const s = with_({ deploy: greenDeploy, nightly: null }, { nightlyAlert: false })
+      expect(nums(staleProdAlerts(s))).toEqual([9])
+      expect(nums(waitingProdAlerts(s))).toEqual([])
+    })
+
+    it('escalates without a linked fix, with the deploy check red or older than the fix, or a red nightly since', () => {
+      expect(nums(staleProdAlerts(with_({ deploy: greenDeploy, nightly: null }, { fixMergedAt: null })))).toEqual([9])
+      expect(nums(staleProdAlerts(with_({ deploy: { ...greenDeploy, conclusion: 'failure' }, nightly: null })))).toEqual([9])
+      expect(nums(staleProdAlerts(with_({ deploy: { at: NOW - 21 * H, conclusion: 'success' }, nightly: null })))).toEqual([9])
+      expect(nums(staleProdAlerts(with_({ deploy: greenDeploy, nightly: { at: NOW - H, conclusion: 'failure' } })))).toEqual([9])
+      expect(nums(waitingProdAlerts(with_({ deploy: greenDeploy, nightly: { at: NOW - H, conclusion: 'failure' } })))).toEqual([])
+    })
+  })
+
+  it('a nightly is overdue over 26 h after the last one started, or with none in the window', () => {
+    expect(nightlyOverdue(snap({ prod: { nightly: { at: NOW - 25 * H, conclusion: 'success' }, deploy: null } }))).toBe(false)
+    expect(nightlyOverdue(snap({ prod: { nightly: { at: NOW - 27 * H, conclusion: 'success' }, deploy: null } }))).toBe(true)
+    expect(nightlyOverdue(snap({ prod: { nightly: null, deploy: null } }))).toBe(true)
+  })
 })
 
 type Params = Record<string, unknown>
@@ -371,5 +422,52 @@ describe('escalateProdAlerts', () => {
     const { api, routes } = fakeApi({ [LIST]: [{ body: '<!-- studio-health-escalated -->\nEscalating' }] })
     await escalateProdAlerts(api, [alert], NOW, () => {})
     expect(routes()).toEqual([LIST])
+  })
+})
+
+describe('the nightly (#487)', () => {
+  const JOBS = 'GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs'
+  const DISPATCH = 'POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches'
+  const LIST = 'GET /repos/{owner}/{repo}/issues/{issue_number}/comments'
+
+  it('prodSuites takes the newest run of each suite from the job that did not skip', async () => {
+    const prodRun = (id: number, event: string, hAgo: number) => ({ id, path: '.github/workflows/prod-smoke.yml', event, created_at: iso(hAgo * H) })
+    const jobsOf: Record<number, object[]> = {
+      1: [{ name: 'deploy', status: 'completed', conclusion: 'success' }, { name: 'nightly', status: 'completed', conclusion: 'skipped' }],
+      2: [],
+      3: [{ name: 'deploy', status: 'completed', conclusion: 'failure' }, { name: 'nightly', status: 'completed', conclusion: 'skipped' }],
+    }
+    const api = async (route: string, params: Params = {}) => (route === JOBS ? { jobs: jobsOf[params.run_id as number] } : [])
+    const prod = await prodSuites(api, [prodRun(3, 'deployment_status', 5), prodRun(2, 'schedule', 2), prodRun(1, 'workflow_dispatch', 1)])
+    expect(prod).toEqual({ deploy: { at: NOW - H, conclusion: 'success' }, nightly: { at: NOW - 2 * H, conclusion: null } })
+  })
+
+  it('prodSuites still finds the scheduled nightly behind many skipped deploy runs', async () => {
+    const run = (id: number, event: string, hAgo: number) => ({ id, path: '.github/workflows/prod-smoke.yml', event, created_at: iso(hAgo * H) })
+    const skipped = [{ name: 'deploy', status: 'completed', conclusion: 'skipped' }, { name: 'nightly', status: 'completed', conclusion: 'skipped' }]
+    const runs = [...Array.from({ length: 30 }, (_, k) => run(100 + k, 'deployment_status', 0.1 + k / 100)), run(1, 'schedule', 5)]
+    const api = async (route: string, params: Params = {}) => (route === JOBS ? { jobs: params.run_id === 1 ? [] : skipped } : [])
+    const prod = await prodSuites(api, runs)
+    expect(prod.nightly).toEqual({ at: NOW - 5 * H, conclusion: null })
+  })
+
+  it('dispatches an overdue nightly on main, and nothing when it is on time', async () => {
+    const late = fakeApi()
+    await dispatchOverdueNightly(late.api, snap({ prod: { nightly: { at: NOW - 30 * H, conclusion: 'success' }, deploy: null } }), () => {})
+    expect(late.calls).toEqual([[DISPATCH, { workflow_id: 'prod-smoke.yml', ref: 'main', inputs: { suite: 'nightly' } }]])
+    const onTime = fakeApi()
+    await dispatchOverdueNightly(onTime.api, snap({ prod: { nightly: { at: NOW - 10 * H, conclusion: 'success' }, deploy: null } }), () => {})
+    expect(onTime.calls).toEqual([])
+  })
+
+  it('says once that a waiting alert waits for the nightly, and never escalates it', async () => {
+    const alert = { number: 9, title: 'p', labels: ['agent:prod-broken'], created_at: iso(30 * H), fixMergedAt: NOW - 20 * H }
+    const first = fakeApi()
+    await noteWaitingProdAlerts(first.api, [alert], () => {})
+    expect(first.routes()).toEqual([LIST, COMMENT])
+    expect(first.calls[1][1].body).toContain('Waiting for the nightly to confirm')
+    const again = fakeApi({ [LIST]: [{ body: first.calls[1][1].body }] })
+    await noteWaitingProdAlerts(again.api, [alert], () => {})
+    expect(again.routes()).toEqual([LIST])
   })
 })

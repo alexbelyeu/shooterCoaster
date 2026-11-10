@@ -10,6 +10,8 @@ const HOUR = 3600e3
 
 /** Files that can't change what the game does or how CI tests it (docs/audio/ is read by unit tests). */
 const NO_GAME_EFFECT = /^(?!docs\/audio\/)(docs\/|\.claude\/(agents|commands)\/|[^/]+\.md$|.*\/[^/]+\.md$)/
+/** Files that can change how the game builds or what its checks see: a main commit touching none of them can't fix a red check. */
+const CAN_FIX_A_CHECK = /^(src|e2e|public|api|scripts)\/|^\.github\/workflows\/|^(budgets\.json|package(-lock)?\.json|vite\.config\.ts|index\.html|tsconfig[^/]*\.json)$/
 /** Jobs that play the game; a failure there on a PR that touched no game code is not the PR's fault. */
 const GAME_JOB = /^(verify|portal|smoke\b|deploy|nightly)/
 /** Jobs on main whose failure already opens `agent:prod-broken` (ci.yml's `verify` gate and what it needs; prod-alert.cjs). */
@@ -17,6 +19,8 @@ const ALERTED_ON_MAIN = {
   '.github/workflows/ci.yml': /^(verify|changes|unit|lighthouse|smoke)\b/,
   '.github/workflows/prod-smoke.yml': /./,
 }
+/** prod-smoke.yml's nightly runs at 06:00 UTC: older than this, GitHub's cron ran late or skipped it (#487). */
+const NIGHTLY_OVERDUE = 26 * HOUR
 /** How long a scheduled run gets to finish and post to the token ledger before it counts as missed. */
 const SLOT_GRACE = 2 * HOUR
 const STALL_SLOTS = 2
@@ -88,12 +92,25 @@ const median = (xs) => {
 }
 
 /**
+ * The next run of `r`'s workflow on a later main commit, if `jobName` passed there and the commits between touched no
+ * file that could fix a check (#487: `smoke (level2)` red on main, green on the next commit, nothing relevant changed).
+ */
+function nextMainPass(snap, mainRuns, r, jobName) {
+  const next = mainRuns.find((m) => m.path === r.path && m.head_sha !== r.head_sha && Date.parse(m.created_at) > Date.parse(r.created_at) &&
+    (m.jobs || []).some((j) => j.name === jobName))
+  if (!next || !next.jobs.some((j) => j.name === jobName && j.conclusion === 'success')) return null
+  const files = snap.mainDiffs?.[`${r.head_sha}...${next.head_sha}`]
+  return files && !files.some((f) => CAN_FIX_A_CHECK.test(f)) ? next : null
+}
+
+/**
  * snapshot: {
  *   now, runs: [{ id, name, path, event, conclusion, head_branch, head_sha, created_at, html_url, prNumber,
  *                 jobs?: [{ name, conclusion, started_at, completed_at, steps, html_url, timedOut?, errors? }] }],
- *   prFiles: { [prNumber]: string[] }, timeouts: { [workflowPath]: { [jobOrStep]: minutes } },
+ *   prFiles: { [prNumber]: string[] }, mainDiffs: { ['<sha>...<sha>']: string[] }, timeouts: { [workflowPath]: { [jobOrStep]: minutes } },
  *   openPrs: [{ number, title, labels: string[], created_at, updated_at, labelledAt?: { [label]: iso } }],
- *   openIssues: [{ number, title, labels: string[], created_at }],
+ *   openIssues: [{ number, title, labels: string[], created_at, fixMergedAt?: ms | null, nightlyAlert?: boolean }],
+ *   prod: { nightly: { at, conclusion } | null, deploy: { at, conclusion } | null } (the newest of each prod-smoke.yml suite),
  *   closedAt: { [key]: ms }, lastAgentActivity: ms | null, paused: boolean,
  * }
  */
@@ -151,14 +168,19 @@ function findings(snap) {
       // A timed-out job is filed as a timeout below, not as a flake.
       if (job.conclusion !== 'failure' || job.timedOut || !GAME_JOB.test(job.name)) continue
       if (isGateEcho(r, job)) continue
-      if (!docsOnly && !jobPassed.has(`${r.path}@${r.head_sha}@${job.name}`)) continue
+      const next = isMainRun(r) && nextMainPass(snap, mainRuns, r, job.name)
+      const why = docsOnly ? `PR #${r.prNumber} touches docs only`
+        : jobPassed.has(`${r.path}@${r.head_sha}@${job.name}`) ? 'the same commit passed on another run'
+        : next ? `passed on the next main commit (${runLink(next)}), which touched nothing a check depends on`
+        : null
+      if (!why) continue
       const step = failedStep(job) || 'unknown step'
       const name = `${baseJob(job.name)} / ${step}`
       if (!fresh(`flaky:${name}`, r)) continue
       flaky[name] = flaky[name] || []
       flaky[name].lastSeen = Math.max(flaky[name].lastSeen || 0, at(r))
       const err = job.errors?.length ? `: \`${job.errors[0].slice(0, 160)}\`` : ''
-      flaky[name].push(`- ${runLink(r)}: ${docsOnly ? `PR #${r.prNumber} touches docs only` : 'the same commit passed on another run'} ([job](${job.html_url}))${err}`)
+      flaky[name].push(`- ${runLink(r)}: ${why} ([job](${job.html_url}))${err}`)
     }
   }
   for (const [name, lines] of Object.entries(flaky)) {
@@ -330,8 +352,29 @@ function findings(snap) {
   return out
 }
 
-/** Open `agent:prod-broken` issues (prod-alert.cjs or a red main in ci.yml) older than 12 h: escalated to Alex in place. */
-const staleProdAlerts = (snap) =>
+const oldProdAlerts = (snap) =>
   snap.openIssues.filter((i) => i.labels.includes('agent:prod-broken') && snap.now - Date.parse(i.created_at) > 12 * HOUR)
 
-module.exports = { findings, staleProdAlerts, parseTimeouts, isDocsOnly, ALERTED_ON_MAIN }
+/**
+ * An old alert whose fix has merged and shipped, waiting only on the nightly to run green and close it (#487: #469 sat
+ * open behind a late cron and was escalated though fixed): a fix PR linked to it merged, the deploy check went green
+ * after that, and no nightly has gone red since.
+ */
+function awaitsNightly(snap, issue) {
+  // Only the nightly suite's own alert (prod-alert.cjs marker) is closed by a green nightly; a red-main alert from ci.yml is not.
+  if (!issue.nightlyAlert) return false
+  const fixed = issue.fixMergedAt
+  const { deploy, nightly } = snap.prod || {}
+  if (!fixed || !deploy || deploy.conclusion !== 'success' || deploy.at < fixed) return false
+  return !(nightly && nightly.at > fixed && nightly.conclusion && nightly.conclusion !== 'success')
+}
+
+/** Open `agent:prod-broken` issues (prod-alert.cjs or a red main in ci.yml) older than 12 h: escalated to Alex in place. */
+const staleProdAlerts = (snap) => oldProdAlerts(snap).filter((i) => !awaitsNightly(snap, i))
+/** Old alerts not escalated because they only wait for the nightly to confirm the fix. */
+const waitingProdAlerts = (snap) => oldProdAlerts(snap).filter((i) => awaitsNightly(snap, i))
+
+/** The newest nightly started over NIGHTLY_OVERDUE ago (or none in the window): the watchdog dispatches one (#487). */
+const nightlyOverdue = (snap) => !snap.prod?.nightly || snap.now - snap.prod.nightly.at > NIGHTLY_OVERDUE
+
+module.exports = { findings, staleProdAlerts, waitingProdAlerts, nightlyOverdue, parseTimeouts, isDocsOnly, ALERTED_ON_MAIN }

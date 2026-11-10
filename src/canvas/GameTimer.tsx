@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
 import { endFrenzy, resetComboRuntime, tickCombo } from '@/combat/comboRuntime'
 import { markStartup } from '@/core/startupMarks'
-import { levelTimeHeld, levelTimeStep } from '@/testing/e2eHook'
+import { levelTimeHeld, levelTimeStep, noteE2ELevelTime } from '@/testing/e2eHook'
 
 interface GameTimerProps {
   seconds: number
@@ -47,6 +47,7 @@ export default function GameTimer({ seconds }: GameTimerProps) {
       if (!levelTimeHeld()) elapsed.current += step
       tickCombo(step)
     } else running.current = true
+    noteE2ELevelTime(elapsed.current)
 
     const remaining = Math.max(0, seconds - elapsed.current)
     const ceiled = Math.ceil(remaining)

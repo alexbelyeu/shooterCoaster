@@ -5,7 +5,9 @@ name: Studio health
 # checks, timeouts and runtime creep, a studio that missed its scheduled runs, stuck PRs. New problems
 # open as `agent:ready` P1 (builders take them first) or `needs-alex` when only Alex can fix them; open
 # over 24 h and still happening they are escalated to Alex, once; cleared ones are closed. An
-# `agent:prod-broken` issue open over 12 h is escalated in place. A plain Action on purpose: it keeps
+# `agent:prod-broken` issue open over 12 h is escalated in place, unless its linked fix merged and the deploy check is
+# green since (it then waits for the nightly to confirm). A nightly over 26 h old (GitHub's cron ran late or skipped it)
+# is dispatched, so its alert can close (#487). A plain Action on purpose: it keeps
 # watching when the agents are what's broken. Logic: scripts/studio-health.cjs (rules in
 # scripts/studioHealthRules.cjs). Dry run: node scripts/studio-health.cjs --dry-run
 
@@ -24,7 +26,8 @@ permissions:
   issues: write
   pull-requests: read
   checks: read
-  actions: read
+  # write: dispatching an overdue nightly (prod-smoke.yml suite=nightly).
+  actions: write
 
 concurrency:
   group: studio-health

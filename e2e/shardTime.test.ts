@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_RUNNER_SLOWNESS, NORMAL_RUNNER_MS_PER_FRAME, WATCHDOG_FACTOR, judgeShardTime, rideMsPerFrame, runnerSlowness } from './shardTime.mjs'
+import { FAIL_FACTOR, MAX_RUNNER_SLOWNESS, NORMAL_RUNNER_MS_PER_FRAME, WATCHDOG_FACTOR, judgeShardTime, rideMsPerFrame, runnerSlowness } from './shardTime.mjs'
 
 const judge = (seconds: number, msPerFrame: number | null, enforced = true) =>
   judgeShardTime({ shard: 'level5', seconds, budget: 180, msPerFrame, enforced })
@@ -36,22 +36,28 @@ describe('judgeShardTime', () => {
     expect(r.text).toBe('level5 shard took 4.2 min, budget 3.0: over, within what a slow runner (ride 525 ms/frame, 1.8x normal) allows 5.3')
   })
 
-  it('fails a real slowdown on a normal-speed runner', () => {
-    expect(judge(200, 290)).toMatchObject({ ok: false, level: 'error', text: 'level5 shard took 3.3 min, budget 3.0' })
+  it('passes a shard a little over its budget with a warning (#487)', () => {
+    expect(judge(189, null)).toMatchObject({ ok: true, level: 'warning', text: 'level5 shard took 3.1 min, budget 3.0: over, fails past 4.5' })
+    expect(judge(200, 290)).toMatchObject({ ok: true, level: 'warning', failsAt: 270 })
   })
 
-  it('fails a slow runner past its allowance, and a shard with no ride over its plain budget', () => {
-    const slow = judge(400, 450)
+  it('fails past FAIL_FACTOR times the allowance on a normal runner, or with no ride', () => {
+    expect(judge(271, 290)).toMatchObject({ ok: false, level: 'error', text: 'level5 shard took 4.5 min, budget 3.0, fails past 4.5' })
+    expect(judge(271, null)).toMatchObject({ ok: false, failsAt: 180 * FAIL_FACTOR })
+  })
+
+  it('fails a slow runner past FAIL_FACTOR times its allowance, and warns between', () => {
+    expect(judge(400, 450)).toMatchObject({ ok: true, level: 'warning', text: 'level5 shard took 6.7 min, budget 3.0, and a slow runner (ride 450 ms/frame, 1.5x normal) allows 4.5: over, fails past 6.8' })
+    const slow = judge(410, 450)
     expect(slow).toMatchObject({ ok: false, level: 'error' })
-    expect(slow.text).toBe('level5 shard took 6.7 min, budget 3.0, and a slow runner (ride 450 ms/frame, 1.5x normal) allows 4.5')
-    expect(judge(181, null)).toMatchObject({ ok: false, allowed: 180 })
+    expect(slow.text).toBe('level5 shard took 6.8 min, budget 3.0, and a slow runner (ride 450 ms/frame, 1.5x normal) allows 4.5, fails past 6.8')
   })
 
   it('only warns off CI', () => {
     expect(judge(400, 290, false)).toMatchObject({ ok: true, level: 'warning', text: 'level5 shard took 6.7 min, budget 3.0 (over; enforced on CI only)' })
   })
 
-  it('stops a run only after the most a slow runner is allowed', () => {
-    expect(WATCHDOG_FACTOR).toBeGreaterThan(MAX_RUNNER_SLOWNESS)
+  it('stops a run only after the latest a slow runner may pass', () => {
+    expect(WATCHDOG_FACTOR).toBeGreaterThan(MAX_RUNNER_SLOWNESS * FAIL_FACTOR)
   })
 })
