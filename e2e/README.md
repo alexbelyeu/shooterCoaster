@@ -15,7 +15,7 @@ to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the 3D scene behind 
 a title sparkle's centre pixel must blend to a colour in [0, 1] (`pointCentreColour('title-sparkles')`: a glow dividing by the distance to the point's centre went NaN there and Bloom spread it to a black frame, #344); the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select; the score engine's chunks (`player-*.js`, `synth-*.js`) must not be fetched before that press, and the press must load them, unlock audio and start the title score; the poster (#376): with JS off, index.html alone must show the poster's logo and load its still, and `poster.png` must not look blank behind the logo, and the title page itself is shot over and over from its first paint until the poster has gone (two shots after): no shot may look blank outside the title UI (any that does is kept as `poster-blank-<n>.png`); the title scene must fit budgets.json `scene.title`: its draw calls, the more of the two screenshots' readings, its objects and triangles; the summary line prints them and the load shots); a `landing` step loads the campaign landing path
 `/go/smoke-check?e2e=1&internal=1` (links we post point at `/go/<campaign>`, attributed by the page view's path; `robots.txt` disallows `/go/`):
 it must boot to the title with no failed request, no analytics request and no page error, keep its path (only `internal` stripped) and show the "internal: not tracked" marker (skipped with `--base`); and per level `<id>.png` (after a ride to `--seconds` 10 of *level time* and at least `--min-frames` 10 frames, then game time frozen for the
-ride stats, the perf gate, the shot and the enemy probe; the level steps cap level time per frame (`timerStepMax`: `--seconds` / `--min-frames` on the ride, 0.25 s
+ride stats, the perf gate, the shot and the enemy probe; the ride stops at exactly `--seconds` of level time, timer, game clock and ride together on the frame that gets there (`stopAtLevelTime`, #487: a poll used to catch it anywhere from 10.2 to 10.7 s, and level2's enemy probe failed at 10.7); the level steps cap level time per frame (`timerStepMax`: `--seconds` / `--min-frames` on the ride, 0.25 s
 in combat) and ride `--ride-rate` 0.14 s of track per second of level time (`rideRate`: CI's ride, where the budgets were set; the game rides at most
 3/60 s a frame), so a slow runner samples the same moment of the level from the same track point as a fast one; through the combat checks the level timer is then held (`holdLevelTime`: the game clock runs on, the run can't time out and no wave or boss comes due) until the step ends the level itself, so however long the checks take they never run into the boss or the end of the run (#305);
 it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
@@ -189,15 +189,18 @@ ridden on the PR, that the nightly job runs the full smoke, and that the shards,
 | `mobileMenus` | `pauseMenu.test.ts`, `initialsEntry.test.ts`, `share.test.ts` | phone layouts of the menus |
 
 Each results entry records its wall time (`seconds`). A `--shard` run ends with a `time` line and entry (`level3 shard
-took 4.2 min, budget 7.0`) and a GitHub annotation of the same text. On CI (`CI` set) a shard over its `smokeSeconds`
-budget fails, unless the runner was slow (#394, pure rules in `shardTime.mjs`): CI runners differ ~2x in speed and a
-level shard's time follows how fast its ride rendered, so the budget is scaled by the ride's wall ms per frame
-(`rideMsPerFrame` in its results entry) over a normal runner's 300 ms, capped at 2x. Over the budget but within that
-allowance passes with a warning (`… budget 3.0: over, within what a slow runner (ride 525 ms/frame, 1.8x normal) allows
-5.3`); a shard on a normal-speed runner, or with no ride (`ui`, `menus`, `mobile`, `level1-steps`), keeps its plain
-budget. One still running at 2.5x its budget writes `results.json` with what ran and exits (`still running
-after …: stopped`), inside the job's timeout; locally it only warns, since a 2-core session is slower than a CI runner.
-Budgets, the normal runner's ms per frame and the 2x cap: only the Director changes them.
+took 4.2 min, budget 7.0`) and a GitHub annotation of the same text (pure rules in `shardTime.mjs`). A shard's
+allowance is its `smokeSeconds` budget, scaled up on a slow runner (#394): CI runners differ ~2x in speed and a level
+shard's time follows how fast its ride rendered, so the budget is multiplied by the ride's wall ms per frame
+(`rideMsPerFrame` in its results entry) over a normal runner's 300 ms, capped at 2x; a shard on a normal-speed runner,
+or with no ride (`ui`, `menus`, `mobile`, `level1-steps`), keeps its plain budget. Over the budget is a **warning**, not a
+failure (#487: shared runners swing ±60%, and runs failed by seconds with every check green): a warning annotation and
+the time entry's `level: 'warning'` in `results.json` (`… budget 3.0: over, within what a slow runner (ride 525 ms/frame,
+1.8x normal) allows 5.3`, or `… budget 2.0: over, fails past 3.0`). On CI (`CI` set) a shard fails only past 1.5x its
+allowance (`FAIL_FACTOR`, `failsAt` in the entry); a slow creep under that is the watchdog's `creep:` finding. One still
+running at 3.45x its budget writes `results.json` with what ran and exits (`still running after …: stopped`), inside
+the job's timeout; locally it only warns, since a 2-core session is slower than a CI runner. Budgets, the normal
+runner's ms per frame, the 2x cap and the 1.5x fail line: only the Director changes them.
 
 CI's required `verify` check is a gate job that needs `changes`, `unit + build`, `lighthouse` and every shard, and passes only if
 all of them passed or were skipped by the plan. GitHub creates its check run only when those end, so `scripts/automerge.cjs` and
