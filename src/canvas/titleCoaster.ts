@@ -18,19 +18,48 @@ const GRAVITY = 12
 export const CARS = 4
 /** Arc distance between car centres. */
 export const CAR_SPACING = 10
-/** The lead car starts on the far side of the orbit camera's first view (t = 0 looks from +x), coming round. */
-const START_ANGLE = 2.3
-
 const TIME_SAMPLES = 2048
 
-function trackPoint(t: number, out: THREE.Vector3): THREE.Vector3 {
-  const a = t * Math.PI * 2
-  const r = TRACK_RADIUS + RADIUS_WOBBLE * Math.sin(3 * a + 0.4)
-  const y = BASE_HEIGHT + 12 * Math.sin(2 * a + 0.6) + 6 * Math.sin(5 * a + 1)
-  return out.set(Math.cos(a) * r, y, Math.sin(a) * r)
+/** A closed light loop: its centreline at t in [0, 1], and where its lead car starts. */
+export interface TitleLoop {
+  point(t: number, out: THREE.Vector3): THREE.Vector3
+  start: number
 }
 
-function createTitleCurve(): TrackCurve {
+/** The hero loop round the park; its lead car starts on the far side of the orbit camera's first view (t = 0 looks from +x), coming round. */
+export const MAIN_LOOP: TitleLoop = {
+  point(t, out) {
+    const a = t * Math.PI * 2
+    const r = TRACK_RADIUS + RADIUS_WOBBLE * Math.sin(3 * a + 0.4)
+    const y = BASE_HEIGHT + 12 * Math.sin(2 * a + 0.6) + 6 * Math.sin(5 * a + 1)
+    return out.set(Math.cos(a) * r, y, Math.sin(a) * r)
+  },
+  start: 2.3 / (Math.PI * 2),
+}
+
+const CROSSING_CENTRE = { x: -190, z: -170 }
+const CROSSING_RADII = { x: 115, z: 95 }
+/**
+ * Low (y 13) wherever it runs inside r 215: under the hero loop's hill, the orbit camera and the
+ * tracking shot over the boulevard (r 205); its hills rise out past the midway (titlePark.test.ts).
+ */
+const CROSSING_LOW_Y = 13
+const CROSSING_HILLS_FROM_R = 215
+const CROSSING_HILLS_TO_R = 265
+
+export const CROSSING_LOOP: TitleLoop = {
+  point(t, out) {
+    const a = t * Math.PI * 2
+    const x = CROSSING_CENTRE.x + Math.cos(a) * CROSSING_RADII.x
+    const z = CROSSING_CENTRE.z + Math.sin(a) * CROSSING_RADII.z
+    const u = Math.min(1, Math.max(0, (Math.hypot(x, z) - CROSSING_HILLS_FROM_R) / (CROSSING_HILLS_TO_R - CROSSING_HILLS_FROM_R)))
+    const hills = 18 + 8 * Math.sin(3 * a + 1)
+    return out.set(x, CROSSING_LOW_Y + hills * u * u * (3 - 2 * u), z)
+  },
+  start: 0.55,
+}
+
+function createTitleCurve(trackPoint: TitleLoop['point']): TrackCurve {
   const point = new THREE.Vector3()
   const tangent = new THREE.Vector3()
   const p1 = new THREE.Vector3()
@@ -61,8 +90,9 @@ export function trainSpeed(y: number, crestY: number): number {
   return Math.sqrt(CREST_SPEED * CREST_SPEED + 2 * GRAVITY * Math.max(0, crestY - y))
 }
 
-export function createTitleRide(): TitleRide {
-  const curve = createTitleCurve()
+export function createTitleRide(loop: TitleLoop = MAIN_LOOP): TitleRide {
+  const trackPoint = loop.point
+  const curve = createTitleCurve(trackPoint)
   const table = buildArcTable(curve, 4096)
   let crestY = -Infinity
   for (let i = 0; i < table.count; i++) crestY = Math.max(crestY, table.y[i])
@@ -75,7 +105,7 @@ export function createTitleRide(): TitleRide {
     times[i] = times[i - 1] + ds / trainSpeed(curve.getPointAt(t).y, crestY)
   }
   const lapS = times[TIME_SAMPLES]
-  const startDist = (START_ANGLE / (Math.PI * 2)) * table.length
+  const startDist = loop.start * table.length
 
   function lapDistance(time: number): number {
     const lt = ((time % lapS) + lapS) % lapS

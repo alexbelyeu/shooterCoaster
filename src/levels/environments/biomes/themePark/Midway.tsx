@@ -125,8 +125,13 @@ function buildFlagGeometry(): THREE.BufferGeometry {
   return g
 }
 
-/** Stalls, string lights, bunting and paths: static, one draw call per kind of piece. */
-export default function Midway({ layout }: { layout: ThemeParkLayout }) {
+type MidwayLayout = Pick<
+  ThemeParkLayout,
+  'stalls' | 'lightPoles' | 'buntingPoles' | 'lightWires' | 'buntingWires' | 'bulbs' | 'flags' | 'path'
+>
+
+/** Stalls, string lights, bunting and paths: static, one draw call per kind of piece (level 1's park and the title's, #454). */
+export default function Midway({ layout }: { layout: MidwayLayout }) {
   const { stalls, lightPoles, buntingPoles, lightWires, buntingWires, bulbs, flags, path } = layout
 
   const stallGeometries = useMemo(() => buildStallGeometries(), [])

@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState, useCallback, useEffect, useLayoutEffect } from 'react'
+import { useRef, useMemo, useState, useCallback, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Sky, PerspectiveCamera, Float } from '@react-three/drei'
 import * as THREE from 'three'
@@ -6,8 +6,13 @@ import { createRng } from '@/utils/rng'
 import FerrisWheel from '@/levels/environments/FerrisWheel'
 import Carousel from '@/levels/environments/Carousel'
 import { BLEND_S, beatLockedRate, blendPose, titleCameraPose, titleShotS, type TitleCameraMode, type Vec3 } from './titleCamera'
-import { createTitleRide, type TitleRide } from './titleCoaster'
-import TitleCoaster, { type TitleClock } from './TitleCoaster'
+import { CROSSING_LOOP, createTitleRide, type TitleRide } from './titleCoaster'
+import TitleCoaster, { type CoasterLivery, type TitleClock } from './TitleCoaster'
+import TitlePark from './TitlePark'
+import TitleRides, { createTitleWaterMaterial } from './TitleRides'
+import { CAROUSELS, FERRIS_WHEEL, TENT_RING, clearOfCrossing } from './titlePark'
+import StaticInstances from '@/levels/environments/shared/StaticInstances'
+import type { YawPlacement } from '@/levels/environments/shared/yawScaleMatrix'
 import { consumeClickSwallow, isTitleAttract } from './titleAttract'
 import TitleSparkles from './TitleSparkles'
 import { audioNow } from '@/audio/AudioEngine'
@@ -19,6 +24,7 @@ import { prefetchLevelScene } from './loadLevelScene'
 
 const TENT_COLORS = ['#ff4444', '#ff8800', '#4488ff', '#44cc44', '#ff44ff', '#ffffff']
 const BALLOON_DRIFT_RAD_S = 0.04
+const CROSSING_LIVERY: CoasterLivery = { rail: [0.92, 0.95, 1], spine: [0.15, 0.55, 1], body: '#2f6fd6', seat: '#1d4a9a' }
 const BALLOON_COLORS = ['#ff4444', '#ff8800', '#ffcc00', '#44cc44', '#4488ff', '#ff44ff', '#ffffff', '#cc33ff', '#ff6688', '#44dddd']
 
 /** Caps the first frames' camera step: their shader compiles (seconds on a phone) must not jump the fly-by off the poster's still. */
@@ -76,115 +82,41 @@ function FlyByCamera({ ride, clock }: { ride: TitleRide; clock: TitleClock }) {
   return <PerspectiveCamera ref={camRef} makeDefault fov={55} near={1} far={2000} />
 }
 
-function Tents() {
-  const tents = useMemo(() => {
-    const items: { pos: [number, number, number]; color: string }[] = []
-    for (let i = 0; i < 6; i++) {
-      const angle = (i / 6) * Math.PI * 2
-      const r = 120
-      items.push({
-        pos: [Math.cos(angle) * r, 0, Math.sin(angle) * r],
-        color: TENT_COLORS[i % TENT_COLORS.length],
-      })
-    }
-    return items
-  }, [])
+const TENTS: YawPlacement[] = Array.from({ length: TENT_RING.count }, (_, i) => {
+  const a = (i / TENT_RING.count) * Math.PI * 2
+  return { x: Math.cos(a) * TENT_RING.r, y: 0, z: Math.sin(a) * TENT_RING.r, yaw: 0 }
+})
 
-  return (
-    <group>
-      {tents.map((t, i) => (
-        <group key={i} position={t.pos}>
-          <mesh position={[0, 20, 0]}>
-            <coneGeometry args={[18, 28, 6]} />
-            <meshStandardMaterial color={t.color} />
-          </mesh>
-          <mesh position={[0, 6, 0]}>
-            <cylinderGeometry args={[17, 17, 12, 6]} />
-            <meshStandardMaterial color="#eeeeee" />
-          </mesh>
-        </group>
-      ))}
-    </group>
+const FLAG_POLES: YawPlacement[] = Array.from({ length: 12 }, (_, i) => {
+  const a = (i / 12) * Math.PI * 2 + 0.26
+  const r = 80 + (i % 3) * 18
+  return { x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r, yaw: 0 }
+})
+
+/** The tent ring and the flag poles: four draw calls. */
+function TentsAndFlags() {
+  const assets = useMemo(
+    () => ({
+      tentRoof: new THREE.ConeGeometry(18, 28, 6).translate(0, 20, 0),
+      tentBase: new THREE.CylinderGeometry(17, 17, 12, 6).translate(0, 6, 0),
+      pole: new THREE.CylinderGeometry(0.5, 0.5, 40, 4).translate(0, 20, 0),
+      flag: new THREE.BoxGeometry(5, 3.5, 0.3).translate(3, 37, 0),
+      white: new THREE.MeshStandardMaterial({ color: '#eeeeee' }),
+      grey: new THREE.MeshStandardMaterial({ color: '#999999' }),
+      tinted: new THREE.MeshStandardMaterial(),
+    }),
+    [],
   )
-}
-
-function FlagPoles() {
-  const poles = useMemo(() => {
-    const items: { pos: [number, number, number]; color: string }[] = []
-    for (let i = 0; i < 12; i++) {
-      const angle = (i / 12) * Math.PI * 2 + 0.26
-      const r = 80 + (i % 3) * 18
-      items.push({
-        pos: [Math.cos(angle) * r, 0, Math.sin(angle) * r],
-        color: TENT_COLORS[i % TENT_COLORS.length],
-      })
-    }
-    return items
-  }, [])
-
+  useEffect(() => () => Object.values(assets).forEach((a) => a.dispose()), [assets])
+  const tentColors = useMemo(() => TENTS.map((_, i) => new THREE.Color(TENT_COLORS[i % TENT_COLORS.length])), [])
+  const flagColors = useMemo(() => FLAG_POLES.map((_, i) => new THREE.Color(TENT_COLORS[i % TENT_COLORS.length])), [])
   return (
-    <group>
-      {poles.map((p, i) => (
-        <group key={i} position={p.pos}>
-          <mesh position={[0, 20, 0]}>
-            <cylinderGeometry args={[0.5, 0.5, 40, 4]} />
-            <meshStandardMaterial color="#999999" />
-          </mesh>
-          <mesh position={[3, 37, 0]}>
-            <boxGeometry args={[5, 3.5, 0.3]} />
-            <meshStandardMaterial color={p.color} />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  )
-}
-
-/** ~30 emissive bulbs in catenary arcs between tent positions */
-function StringLights() {
-  const meshRef = useRef<THREE.InstancedMesh>(null)
-  const count = 30
-
-  const positions = useMemo(() => {
-    const pts: [number, number, number][] = []
-    for (let arc = 0; arc < 5; arc++) {
-      const a1 = (arc / 6) * Math.PI * 2
-      const a2 = ((arc + 1) / 6) * Math.PI * 2
-      const r = 120
-      const x1 = Math.cos(a1) * r
-      const z1 = Math.sin(a1) * r
-      const x2 = Math.cos(a2) * r
-      const z2 = Math.sin(a2) * r
-
-      for (let j = 0; j < 6; j++) {
-        const t = (j + 1) / 7
-        const x = x1 + (x2 - x1) * t
-        const z = z1 + (z2 - z1) * t
-        const sag = Math.sin(t * Math.PI) * 8
-        const y = 36 - sag
-        pts.push([x, y, z])
-      }
-    }
-    return pts
-  }, [])
-
-  useLayoutEffect(() => {
-    if (!meshRef.current) return
-    const dummy = new THREE.Object3D()
-    for (let i = 0; i < count; i++) {
-      const [x, y, z] = positions[i] || [0, 0, 0]
-      dummy.position.set(x, y, z)
-      dummy.updateMatrix()
-      meshRef.current.setMatrixAt(i, dummy.matrix)
-    }
-    meshRef.current.instanceMatrix.needsUpdate = true
-  }, [positions])
-
-  return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
-      <sphereGeometry args={[1, 6, 4]} />
-      <meshStandardMaterial color="#ffffff" emissive="#ffcc44" emissiveIntensity={3} />
-    </instancedMesh>
+    <>
+      <StaticInstances placements={TENTS} colors={tentColors} geometry={assets.tentRoof} material={assets.tinted} />
+      <StaticInstances placements={TENTS} geometry={assets.tentBase} material={assets.white} />
+      <StaticInstances placements={FLAG_POLES} geometry={assets.pole} material={assets.grey} />
+      <StaticInstances placements={FLAG_POLES} colors={flagColors} geometry={assets.flag} material={assets.tinted} />
+    </>
   )
 }
 
@@ -420,8 +352,14 @@ function TitleClickRaycaster() {
 /** Living theme-park panorama for the title screen */
 export default function TitleScene() {
   useEffect(prefetchLevelScene, [])
-  const ride = useMemo(createTitleRide, [])
+  const ride = useMemo(() => createTitleRide(), [])
+  const crossingRide = useMemo(() => createTitleRide(CROSSING_LOOP), [])
   const clock = useRef<TitleClock>({ scene: 0 }).current
+  const water = useMemo(createTitleWaterMaterial, [])
+  useEffect(() => () => water.dispose(), [water])
+  useFrame(() => {
+    water.uniforms.uTime.value = clock.scene
+  })
 
   return (
     <>
@@ -435,24 +373,22 @@ export default function TitleScene() {
       <directionalLight position={[50, 80, -40]} color="#ffd4a0" intensity={1.5} castShadow={false} />
       <ambientLight intensity={0.3} />
 
-      {/* Green ground, wide enough that the chase shots, looking along the loop, never see its edge */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
-        <planeGeometry args={[2400, 2400]} />
-        <meshStandardMaterial color="#2d5a1e" />
-      </mesh>
+      {/* Ground, paths, midway, crowds, trees and the lake; wide enough that the chase shots never see the ground's edge */}
+      <TitlePark water={water} />
 
       {/* Rides */}
       {/* The coaster runs under the wheel's rim, outside its legs (titleCoaster.test.ts). */}
-      <FerrisWheel position={[50, 0, -75]} radius={80} />
-      <Carousel position={[-60, 0, -40]} radius={25} />
-      <Carousel position={[20, 0, 60]} radius={20} />
+      <FerrisWheel position={[FERRIS_WHEEL.x, 0, FERRIS_WHEEL.z]} radius={FERRIS_WHEEL.radius} />
+      {CAROUSELS.map((c) => (
+        <Carousel key={c.x} position={[c.x, 0, c.z]} radius={c.radius} />
+      ))}
+      <TitleRides clock={clock} water={water} />
 
-      <TitleCoaster ride={ride} clock={clock} />
+      <TitleCoaster ride={ride} clock={clock} keepColumn={clearOfCrossing} />
+      <TitleCoaster ride={crossingRide} clock={clock} livery={CROSSING_LIVERY} name="title-crossing" />
 
       {/* Decorations */}
-      <Tents />
-      <FlagPoles />
-      <StringLights />
+      <TentsAndFlags />
       <Balloons />
 
       <TitleSparkles />

@@ -30,7 +30,7 @@ function orbitShot(t: number, _u: number, _ctx: ShotContext, pos: Vec3, target: 
 }
 
 /** Low dolly outside the tent ring, panning from the big carousel up to the Ferris wheel against the sunset. */
-const DOLLY_FROM: Vec3 = [-170, 18, 120]
+const DOLLY_FROM: Vec3 = [-170, 26, 120]
 const DOLLY_TO: Vec3 = [-20, 32, 175]
 const LOOK_FROM: Vec3 = [-60, 18, -40]
 const LOOK_TO: Vec3 = [50, 75, -75]
@@ -62,13 +62,14 @@ function chaseShot(_t: number, _u: number, { ride, rideTime }: ShotContext, pos:
   target[1] += 2
 }
 
-/** Trackside crane outside the loop, keeping pace a little ahead of the train and looking back at it. */
+/** Over the midway boulevard (r 205, between the stall rows), keeping pace a little ahead of the train and looking back at it. */
+const TRACKING_R = 205
 function trackingShot(_t: number, u: number, { ride, rideTime }: ShotContext, pos: Vec3, target: Vec3) {
   ride.pointAt(ride.leadDistance(rideTime) - (CARS * CAR_SPACING) / 2, target)
   const a = Math.atan2(target[2], target[0]) + 0.3
-  pos[0] = Math.cos(a) * 196
-  pos[1] = 20 + 10 * u
-  pos[2] = Math.sin(a) * 196
+  pos[0] = Math.cos(a) * TRACKING_R
+  pos[1] = 22 + 10 * u
+  pos[2] = Math.sin(a) * TRACKING_R
 }
 
 const MENU_SHOTS: Shot[] = [orbitShot, chaseShot, dollyShot]

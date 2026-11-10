@@ -13,7 +13,7 @@ nothing for `docs/ASSETS.md`).
 | `clip-level1-1280x720-{start,mid,end}.jpg` | First, middle and last frame of the MP4, to check the clip without a video player |
 | `clip-level1-720x1280.mp4` | The vertical cut for TikTok / Shorts / Reels: 16.4 s, 720×1280 (9:16), 30 fps, H.264, silent, ~2.9 MB. The phone view (touch layout, portrait FOV, gun low right), opening on the ride already moving at track fraction 0.42, balloons popping, combo climbing to ×5 FRENZY, ending on fireworks over the midway at ×5. No intro or level select, no GIF |
 | `clip-level1-720x1280-{start,mid,end}.jpg` | Its first (ride moving), middle (×3 combo, kill confetti) and last (×5 FRENZY, fireworks) frames |
-| `clip-title-1280x720.mp4` | The title screen (#419): 9 s, 1280×720, 30 fps, silent. The cold load's first 9 s: the park orbit with the coaster running round it, then the swoop down to the chase shot |
+| `clip-title-1280x720.mp4` | The title screen (#419): 9 s, 1280×720, 30 fps, silent. The cold load's first 9 s: the park orbit with the coaster running round it, then the swoop down to the chase shot. Re-rendered 2026-11-10 for #454 (the fuller park: midway, crowds, second coaster, drop tower, lake); the attract and phone clips still show the park before it |
 | `clip-title-attract-1280x720.mp4` | Attract mode (#419, after 30 s idle): 9 s, letterboxed, the camera blends from the menu to the chase behind the train and the trackside crane |
 | `clip-title-720x1280.mp4` | The title on a phone (portrait, touch layout), 9 s from the cold load |
 | `clip-title-*-mid.jpg` | The middle frame of each title clip |
