@@ -79,6 +79,9 @@ jobs:
       - name: Unit tests (vitest)
         run: npm test
 
+      - name: Lint (eslint)
+        run: npm run lint
+
       - name: Typecheck + build
         run: npm run build
 

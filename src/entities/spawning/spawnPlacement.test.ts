@@ -12,7 +12,7 @@ import { getTrackDimensions } from '@/track/trackDimensions'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov'
 import {
   AIR_CLEARANCE, ENTRY_SECONDS, ENTRY_STAGGER, FORMATIONS, NEAR_FIELD, entryPoint, formationFrame, formationSlots, groupStep,
-  inView, indexAhead, marchHeading, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
+  indexAhead, marchHeading, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
   trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
   type ChoreographedFormation, type RideAhead, type Vec3,
 } from './spawnPlacement'

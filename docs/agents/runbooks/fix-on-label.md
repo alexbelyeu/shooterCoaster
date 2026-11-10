@@ -26,6 +26,7 @@ pressed Run now), reply "No PR event — nothing to do" and stop.
    returned by QA — address every QA comment. Your claim above is the builder claim.
    If the issue the PR closes is labelled `type:audio`, read
    `.claude/agents/sound-designer.md` too and work as the Sound designer.
+   When you fix a class of bug, add the lint rule (`scripts/eslint/`) or test that would have caught it, in the same PR.
 5. Finish with the PR labelled `agent:needs-qa` (that label starts a QA review
    automatically). If you can't, comment on the PR what's blocking and leave it
    labelled `agent:changes-requested` for the next scheduled builder run.

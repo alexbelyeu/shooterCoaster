@@ -1,4 +1,3 @@
-import type { Color } from 'three'
 import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
 export type CurveType = 'curve1' | 'curve2'

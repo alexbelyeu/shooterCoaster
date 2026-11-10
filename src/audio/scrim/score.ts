@@ -568,7 +568,8 @@ export function compile(text: string): CompiledSong {
     return { events, sections, dur: t }
   }
 
-  let playRefs = song.play, loopRefs = song.loop
+  const playRefs = song.play
+  let loopRefs = song.loop
   if (!playRefs.length && !loopRefs.length) {
     loopRefs = song.patternOrder.map((n) => ({ name: n, trans: 0, times: 1, ln: song.patterns[n].ln }))
   }
