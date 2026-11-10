@@ -1,6 +1,7 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { useEnemyRandom } from './enemyRandom'
 import {
   BALLOON_GEO, BALLOON_STRING_GEO,
   BALLOON_BODY_MATS, BALLOON_STRING_MAT,
@@ -12,12 +13,9 @@ import {
  * varied bright colors, slight specular shine. Floats upward.
  */
 export default function Balloon(props: EnemyProps) {
-  const colorIndex = useMemo(
-    () => Math.floor(Math.random() * BALLOON_COLOR_COUNT),
-    [],
-  )
-
-  const bobPhase = useMemo(() => Math.random() * Math.PI * 2, [])
+  const { colorIndex, bobPhase } = useEnemyRandom(props.id, (rng) => ({
+    colorIndex: Math.floor(rng() * BALLOON_COLOR_COUNT), bobPhase: rng() * Math.PI * 2,
+  }))
   const holdSlot = props.motion?.kind === 'hold'
 
   const updatePosition = useCallback(

@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { useEnemyRandom } from './enemyRandom'
 import { WATER_Y } from '@/entities/spawning/enemyPlacement'
 import { marchHeading } from '@/entities/spawning/spawnPlacement'
 import {
@@ -20,9 +21,12 @@ const GRAVITY = 0.08
 export default function FlyingFish(props: EnemyProps) {
   // One speed for the whole school, or it strings out.
   const heading = marchHeading(props.motion)
-  const moveAngle = useMemo(() => heading ?? Math.random() * Math.PI * 2, [heading])
-  const moveSpeed = useMemo(() => (heading === undefined ? 0.8 + Math.random() * 0.5 : 1), [heading])
-  const launchSpeed = useMemo(() => 1.5 + Math.random() * 1.0, [])
+  const own = useEnemyRandom(props.id, (rng) => ({
+    angle: rng() * Math.PI * 2, speed: 0.8 + rng() * 0.5, launchSpeed: 1.5 + rng() * 1.0, rng,
+  }))
+  const moveAngle = heading ?? own.angle
+  const moveSpeed = heading === undefined ? own.speed : 1
+  const { launchSpeed, rng } = own
   const leftWingRef = useRef<THREE.Group>(null)
   const rightWingRef = useRef<THREE.Group>(null)
   const bodyRef = useRef<THREE.Group>(null)
@@ -43,8 +47,8 @@ export default function FlyingFish(props: EnemyProps) {
       if (inWater) {
         mesh.position.y = WATER_Y
         submergedTime.current += delta
-        if (submergedTime.current > 0.3 + Math.random() * 0.4) {
-          vyRef.current = launchSpeed * (0.8 + Math.random() * 0.4)
+        if (submergedTime.current > 0.3 + rng() * 0.4) {
+          vyRef.current = launchSpeed * (0.8 + rng() * 0.4)
           submergedTime.current = 0
         } else {
           vyRef.current = 0

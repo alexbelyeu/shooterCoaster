@@ -1,7 +1,8 @@
-import { useCallback, useContext, useMemo, useRef } from 'react'
+import { useCallback, useContext, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { useEnemyRandom } from './enemyRandom'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
   LAVA_GOLEM_BODY_GEO, LAVA_GOLEM_CRACK_GEO, LAVA_GOLEM_ARM_GEO, LAVA_GOLEM_EYES_GEO,
@@ -13,8 +14,7 @@ import {
  * Dark rock body with glowing lava cracks, arm sway animation.
  */
 export default function LavaGolem(props: EnemyProps) {
-  const theta = useMemo(() => 0.3 + Math.random() * 0.8, [])
-  const moveSpeed = useMemo(() => 0.8 + Math.random() * 1.0, [])
+  const { theta, moveSpeed } = useEnemyRandom(props.id, (rng) => ({ theta: 0.3 + rng() * 0.8, moveSpeed: 0.8 + rng() * 1.0 }))
   const modelRef = useRef<THREE.Group>(null)
   const bodyRef = useRef<THREE.Group>(null)
   const leftArmRef = useRef<THREE.Group>(null)

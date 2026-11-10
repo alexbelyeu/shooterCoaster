@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { useEnemyRandom } from './enemyRandom'
 import {
   SHARK_BODY_GEO, SHARK_SNOUT_GEO, SHARK_DORSAL_GEO,
   SHARK_TAIL_UPPER_GEO, SHARK_TAIL_LOWER_GEO,
@@ -14,11 +15,11 @@ import {
 /** Lathe torpedo body, swept-back fins, crescent tail, teeth and gills; always faces the camera. */
 export default function Shark(props: EnemyProps) {
   // A circle through the spawn point, small enough to stay beside the track it was placed by (#316).
-  const orbit = useMemo(() => ({
-    radius: 25 + Math.random() * 35,
-    rate: (0.4 + Math.random() * 0.4) * (Math.random() < 0.5 ? -1 : 1),
-    phase: Math.random() * Math.PI * 2,
-  }), [])
+  const orbit = useEnemyRandom(props.id, (rng) => ({
+    radius: 25 + rng() * 35,
+    rate: (0.4 + rng() * 0.4) * (rng() < 0.5 ? -1 : 1),
+    phase: rng() * Math.PI * 2,
+  }))
   const startTime = useRef<number | null>(null)
   const tailRef = useRef<THREE.Group>(null)
   const modelRef = useRef<THREE.Group>(null)

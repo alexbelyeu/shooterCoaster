@@ -1,7 +1,8 @@
-import { useCallback, useContext, useMemo, useRef } from 'react'
+import { useCallback, useContext, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { useEnemyRandom } from './enemyRandom'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
   FIRE_IMP_BODY_GEO, FIRE_IMP_HORNS_GEO, FIRE_IMP_TAIL_GEO,
@@ -14,9 +15,10 @@ import {
  * changes. Dark red with iridescent sheen, dual horns, spiked tail.
  */
 export default function FireImp(props: EnemyProps) {
-  const moveSpeed = useMemo(() => 3 + Math.random() * 2, [])
-  const dirChangeInterval = useMemo(() => 2 + Math.random() * 1, [])
-  const dirRef = useRef(Math.random() * Math.PI * 2)
+  const { moveSpeed, dirChangeInterval, heading, rng } = useEnemyRandom(props.id, (rng) => ({
+    moveSpeed: 3 + rng() * 2, dirChangeInterval: 2 + rng() * 1, heading: rng() * Math.PI * 2, rng,
+  }))
+  const dirRef = useRef(heading)
   const lastDirChange = useRef(0)
   const modelRef = useRef<THREE.Group>(null)
   const bodyRef = useRef<THREE.Group>(null)
@@ -30,7 +32,7 @@ export default function FireImp(props: EnemyProps) {
 
       // Sudden direction changes
       if (time - lastDirChange.current > dirChangeInterval) {
-        dirRef.current += (Math.random() - 0.5) * Math.PI
+        dirRef.current += (rng() - 0.5) * Math.PI
         lastDirChange.current = time
       }
 

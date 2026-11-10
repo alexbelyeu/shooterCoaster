@@ -1,7 +1,8 @@
-import { useCallback, useContext, useMemo, useRef } from 'react'
+import { useCallback, useContext, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { useEnemyRandom } from './enemyRandom'
 import { marchHeading } from '@/entities/spawning/spawnPlacement'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
@@ -16,8 +17,7 @@ const MARCH_SPEED = 0.6
 
 /** Smaller, faster scout snowman (0.9× the base model) with an icy tint and ice-shard crown. */
 export default function SnowmanScout(props: EnemyProps) {
-  const theta = useMemo(() => 1 + Math.random() * 2, [])
-  const moveSpeed = useMemo(() => 3 + Math.random() * 2, [])
+  const { theta, moveSpeed } = useEnemyRandom(props.id, (rng) => ({ theta: 1 + rng() * 2, moveSpeed: 3 + rng() * 2 }))
   const modelRef = useRef<THREE.Group>(null)
   const bodyRef = useRef<THREE.Group>(null)
   const camera = useThree((s) => s.camera)

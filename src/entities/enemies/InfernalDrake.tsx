@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { useEnemyRandom } from './enemyRandom'
 import {
   DRAKE_BODY_GEO, DRAKE_HEAD_GEO, DRAKE_SPIKE_GEO,
   DRAKE_TAIL_GEO, DRAKE_WING_GEO, DRAKE_EYE_GEO, DRAKE_JAW_GEO,
@@ -12,10 +13,12 @@ import {
  * Multi-joint wing flap, tail undulation, jaw open/close.
  */
 export default function InfernalDrake(props: EnemyProps) {
-  const orbitSpeed = useMemo(() => 0.15 + Math.random() * 0.15, [])
-  const orbitRadius = useMemo(() => 200 + Math.random() * 300, [])
-  const orbitOffset = useMemo(() => Math.random() * Math.PI * 2, [])
-  const flapOffset = useMemo(() => Math.random() * Math.PI * 2, [])
+  const { orbitSpeed, orbitRadius, orbitOffset, flapOffset } = useEnemyRandom(props.id, (rng) => ({
+    orbitSpeed: 0.15 + rng() * 0.15,
+    orbitRadius: 200 + rng() * 300,
+    orbitOffset: rng() * Math.PI * 2,
+    flapOffset: rng() * Math.PI * 2,
+  }))
 
   const leftWingInnerRef = useRef<THREE.Group>(null)
   const leftWingOuterRef = useRef<THREE.Group>(null)

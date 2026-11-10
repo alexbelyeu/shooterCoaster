@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { useEnemyRandom } from './enemyRandom'
 import {
   EMBER_WISP_CORE_GEO, EMBER_WISP_TENDRILS_GEO,
   EMBER_WISP_CORE_MAT, EMBER_WISP_TENDRIL_MAT,
@@ -11,9 +12,9 @@ import {
  * flickering flame tendrils. Appears in large swarms.
  */
 export default function EmberWisp(props: EnemyProps) {
-  const driftAngle = useMemo(() => Math.random() * Math.PI * 2, [])
-  const driftSpeed = useMemo(() => 0.3 + Math.random() * 0.5, [])
-  const bobOffset = useMemo(() => Math.random() * Math.PI * 2, [])
+  const { driftAngle, driftSpeed, bobOffset } = useEnemyRandom(props.id, (rng) => ({
+    driftAngle: rng() * Math.PI * 2, driftSpeed: 0.3 + rng() * 0.5, bobOffset: rng() * Math.PI * 2,
+  }))
   const coreRef = useRef<THREE.Mesh>(null)
   const tendrilsRef = useRef<THREE.Mesh>(null)
 
