@@ -228,7 +228,10 @@ export interface SCTestApi {
   /** ms from navigation to each startup phase (`core/startupMarks.ts`). */
   initTimings: () => Partial<Record<StartupPhase, number>>
   // ── Boss (issue #181) ──
-  /** Bring the level's boss in now (tell, then arrival on the next frames) instead of at its level time. */
+  /**
+   * Bring the level's boss in now (tell, then arrival on the next frames) instead of at its level time.
+   * Held for this run until its BossSpawner mounts (the level scene is a lazy chunk), never taken by the last run's.
+   */
   summonBoss: () => void
   /** The level's boss: stage, hp, exposed weak points on screen, the body's on-screen box. */
   boss: () => E2EBoss
@@ -582,12 +585,13 @@ function readBullets(): E2EBullets {
 
 /** Written by BossSpawner / BossBase when the e2e flag is on; read through `boss()`. */
 export const e2eBoss: {
-  summon: boolean
+  /** The run `summonBoss()` was called in, until that run's BossSpawner takes it. */
+  summon: number | null
   stage: E2EBossStage
   handle: { body: THREE.Object3D; parts: ReadonlyMap<string, THREE.Object3D>; state: () => BossState } | null
   /** World positions of its live projectiles, set by a boss that throws them. */
   projectiles: (() => readonly THREE.Vector3[]) | null
-} = { summon: false, stage: 'none', handle: null, projectiles: null }
+} = { summon: null, stage: 'none', handle: null, projectiles: null }
 
 const _box = new THREE.Box3()
 const _corner = new THREE.Vector3()
@@ -911,7 +915,7 @@ export function installE2EApi() {
       return { quality, profile: qualityProfile(quality), adaptiveSteps: getAdaptiveSteps(), reducedMotion }
     },
     triggerHeld: () => getPointerState().down,
-    summonBoss: () => { e2eBoss.summon = true },
+    summonBoss: () => { e2eBoss.summon = useGameStore.getState().runId },
     boss: readBoss,
     bossHit,
     projectileHit,
