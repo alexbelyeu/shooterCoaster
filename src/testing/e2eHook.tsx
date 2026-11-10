@@ -158,7 +158,8 @@ export interface SCTestApi {
    *  combo keep running: the smoke's checks then see one moment of the level however long they take on a slow runner. */
   holdLevelTime: boolean
   /** Seconds the coaster rides per second of level time (in steps of at most 3/60 s, the game's per-frame ride cap);
-   *  null rides the frame time. With `timerStepMax` it puts the ride at the same track point for a level time on any runner. */
+   *  null rides the frame time. With `timerStepMax` it puts the ride at the same track point for a level time on any runner;
+   *  the camera's look, rig and shake run on the level time with it. */
   rideRate: number | null
   /** Seconds since the title appeared, held: the title camera's pose stays there (the poster render, `npm run og -- --poster`). null runs it. */
   titleTime: number | null

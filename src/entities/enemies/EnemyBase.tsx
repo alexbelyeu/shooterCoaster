@@ -75,6 +75,7 @@ export default function EnemyBase({
   const addScore = useGameStore((s) => s.addScore)
   const registerKill = useGameStore((s) => s.registerKill)
   const entryT = useRef(entry ? 0 : 1)
+  const clockAt = useRef<number | null>(null)
   const [entered, setEntered] = useState(!entry)
   // Mount-time only: a re-render (e.g. `entered` flipping) must not move the enemy back.
   const [startPosition] = useState((): [number, number, number] => {
@@ -159,14 +160,19 @@ export default function EnemyBase({
     const { phase, timeScale } = useGameStore.getState()
     if (!meshRef.current || phase !== 'playing') return
     if (timeScale === 0) return
+    // The fly-in and the motion run on the game clock, the one the waves are timed on (#469: on the frame's own
+    // delta, a smoke run stepping level time had its enemies arrive seconds of level time late on a fast runner).
+    const now = gameTime()
+    const moved = Math.max(0, now - (clockAt.current ?? now))
+    clockAt.current = now
 
     if (entry && entryT.current < 1) {
-      entryT.current = Math.min(1, entryT.current + (delta * timeScale) / entry.seconds)
+      entryT.current = Math.min(1, entryT.current + moved / entry.seconds)
       entryPoint(meshRef.current.position, entry.from, spawnPosition, entryT.current, entry.spin)
       if (entryT.current === 1) setEntered(true)
     } else if (aliveRef.current) {
       // Game time, not the render clock, so a pause never jumps an orbiting enemy.
-      if (updatePosition(meshRef.current, spawnPosition, gameTime(), delta * timeScale) === 'escaped') {
+      if (updatePosition(meshRef.current, spawnPosition, now, moved) === 'escaped') {
         aliveRef.current = false
         unregisterCollisionTarget(id)
         setAlive(false)
