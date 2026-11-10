@@ -5,7 +5,7 @@ import type { TrackCurve } from './curves/TrackCurve'
 import type { ArcTable } from './arcLength'
 import { setRideProgress } from './rideProgress'
 import { MAX_RIDE_STEP_FRAMES, advanceRide, rideSpeeds, type RideState } from './ridePhysics'
-import { e2eRideSeconds } from '@/testing/e2eHook'
+import { e2eRideSeconds, levelTimeStep } from '@/testing/e2eHook'
 import { useGameStore } from '@/store/useGameStore'
 import { sfx } from '@/audio/sfx'
 import { eventBus } from '@/core/EventBus'
@@ -135,7 +135,6 @@ export default function CoasterCamera({
       jumped = true
     }
     const frameDelta = countdown || store.phase === 'paused' ? 0 : delta
-    const effectiveDelta = frameDelta * (store.timeScale ?? 1)
 
     const testApi = window.__SC_TEST__
     if (testApi?.rideTo != null) {
@@ -149,6 +148,9 @@ export default function CoasterCamera({
     }
     // The smoke's `rideRate` rides a share of the level time instead, so its ride doesn't depend on the frame rate (#305).
     const e2eRide = e2eRideSeconds(frameDelta)
+    // Under it the look, the rig and the shake follow the level time too: on the frame's own time the camera
+    // turned into a bend late on a fast runner, and saw different enemies there than on a slow one (#469).
+    const effectiveDelta = (e2eRide === null ? frameDelta : levelTimeStep(frameDelta)) * (store.timeScale ?? 1)
     const rideFrames = e2eRide === null ? Math.min(effectiveDelta * 60, MAX_RIDE_STEP_FRAMES) : e2eRide * (store.timeScale ?? 1) * 60
     advanceRide(ride.current, curve, speeds, rideFrames)
     const t = ride.current.progress

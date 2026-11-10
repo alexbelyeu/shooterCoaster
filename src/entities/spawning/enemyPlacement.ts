@@ -35,7 +35,7 @@ export const ENEMY_PLACEMENT: Record<EnemyType, EnemyPlacementRule> = {
   // Over the park, a little beyond the track (~±1100), so they float close to the ride (#20).
   balloon: { surface: 'air', scatter: band(0, 1700, 40, 160) },
   crow: { surface: 'air', scatter: band(100, 1200, 100, 160) },
-  scorpion: { surface: 'ground', scatter: band(100, 600, 5) },
+  scorpion: { surface: 'ground', scatter: 'trackside' },
   shark: { surface: 'water', scatter: 'trackside' },
   jellyfish: { surface: 'water', scatter: 'trackside' },
   flyingFish: { surface: 'water', scatter: band(100, 1000, 0) },

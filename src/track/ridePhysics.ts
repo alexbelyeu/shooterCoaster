@@ -1,4 +1,4 @@
-import { indexAtT, type ArcTable } from './arcLength'
+import { distanceAtT, indexAtT, type ArcTable } from './arcLength'
 import type { TrackCurve } from './curves/TrackCurve'
 
 /**
@@ -81,8 +81,11 @@ export function rideProfile(table: ArcTable, speeds: RideSpeeds, seconds: number
   let ridden = 0
   for (let k = 1; k < profile.length; k++) {
     for (let f = 0; f < framesPerSample; f++) {
+      // The track parameter isn't arc length (`TrigCurve`): measure the arc it moves through.
+      const from = distanceAtT(table, t)
       t = (t + velocity) % 1
-      ridden += velocity * table.length
+      const step = distanceAtT(table, t) - from
+      ridden += step < 0 ? step + table.length : step
       const i = indexAtT(table, t)
       const a = (i - 1 + n) % n
       const b = (i + 1) % n

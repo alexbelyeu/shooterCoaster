@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { createTrigCurve } from './curves/TrigCurve'
 import { createTrigCurve2 } from './curves/TrigCurve2'
-import { buildArcTable } from './arcLength'
+import { buildArcTable, distanceAtT } from './arcLength'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { advanceRide, lapSeconds, nextVelocity, rideProfile, rideSpeeds, riddenBetween } from './ridePhysics'
 import type { TrackCurve } from './curves/TrackCurve'
@@ -24,13 +24,21 @@ describe.each(getAllLevels().map((l) => [l.id, l] as const))('%s rideProfile', (
   const speeds = rideSpeeds(level.track)
   const profile = rideProfile(table, speeds, RUN_SECONDS)
 
-  it('rides forward every tenth of a second, between the min and max speed', () => {
-    const minStep = (speeds.min * 60 * table.length) / 10
-    const maxStep = (speeds.max * 60 * table.length) / 10
-    for (let k = 2; k < profile.length; k++) {
-      const step = profile[k] - profile[k - 1]
-      expect(step).toBeGreaterThanOrEqual(minStep - 1e-6)
-      expect(step).toBeLessThanOrEqual(maxStep + 1e-6)
+  it('rides forward every tenth of a second', () => {
+    for (let k = 2; k < profile.length; k++) expect(profile[k]).toBeGreaterThan(profile[k - 1])
+  })
+
+  it('is the arc the coaster rides, not track fraction × length (the curve parameter is not arc length)', () => {
+    const curve = factory(level.track.varA, level.track.varB, level.track.varC, level.track.scalar)
+    const state = { progress: 0, velocity: 0 }
+    let arc = 0
+    for (let k = 1; k <= 10 * 10; k++) {
+      for (let f = 0; f < 6; f++) {
+        const from = distanceAtT(table, state.progress)
+        advanceRide(state, curve, speeds, 1)
+        arc += (distanceAtT(table, state.progress) - from + table.length) % table.length
+      }
+      if (k % 10 === 0) expect(Math.abs(profile[k] - arc)).toBeLessThan(0.02 * arc + 1)
     }
   })
 

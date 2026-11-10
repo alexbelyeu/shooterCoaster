@@ -66,6 +66,13 @@ describe('readableScatterSpawn', () => {
   })
 })
 
+describe('ground enemies', () => {
+  // #469: a disc of scorpions round the origin sat far under Desert's opening drop, then behind the rider: 6 s with nothing to shoot.
+  it.each(types.filter((t) => ENEMY_PLACEMENT[t].surface === 'ground'))('%s stands beside the track ahead of the rider', (type) => {
+    expect(ENEMY_PLACEMENT[type].scatter).toBe('trackside')
+  })
+})
+
 describe('wall enemies', () => {
   const walls: WallSurface[] = [
     { id: 'north', origin: { x: -100, y: 0, z: -400 }, right: { x: 1, y: 0, z: 0 }, up: { x: 0, y: 1, z: 0 }, width: 300, height: 500 },

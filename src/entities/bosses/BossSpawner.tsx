@@ -34,6 +34,8 @@ export default function BossSpawner({ boss, timerSeconds, track, groundFn }: Bos
   const spec = BOSS_SPECS[boss.type]
   const [stage, setStage] = useState<Stage>('waiting')
   const stageRef = useRef<Stage>('waiting')
+  // EnemySpawner remounts this per run, a frame or more after the run starts: only this run's summon is ours.
+  const [runId] = useState(() => useGameStore.getState().runId)
 
   const advance = useCallback((next: Stage) => {
     stageRef.current = next
@@ -42,10 +44,7 @@ export default function BossSpawner({ boss, timerSeconds, track, groundFn }: Bos
   }, [])
 
   useEffect(() => {
-    if (isE2E) {
-      e2eBoss.stage = 'waiting'
-      e2eBoss.summon = false
-    }
+    if (isE2E) e2eBoss.stage = 'waiting'
     return () => {
       if (isE2E) e2eBoss.stage = 'none'
     }
@@ -54,8 +53,8 @@ export default function BossSpawner({ boss, timerSeconds, track, groundFn }: Bos
   useFrame(() => {
     const s = useGameStore.getState()
     if (s.phase !== 'playing') return
-    const summoned = isE2E && e2eBoss.summon
-    if (summoned) e2eBoss.summon = false
+    const summoned = isE2E && e2eBoss.summon === runId
+    if (summoned) e2eBoss.summon = null
     // Read live: the first playing frame already has this run's reset timer (GameTimer's layout effect).
     const elapsed = timerSeconds - s.timeRemaining
     if (stageRef.current === 'waiting' && (summoned || elapsed >= boss.at - spec.tell.seconds)) {
