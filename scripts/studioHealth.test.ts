@@ -4,7 +4,7 @@ import rules from './studioHealthRules.cjs'
 import watchdog from './studio-health.cjs'
 import status from './studio-status.cjs'
 
-const { findings, staleProdAlerts, waitingProdAlerts, nightlyOverdue, parseTimeouts, isDocsOnly, ALERTED_ON_MAIN } = rules
+const { findings, staleProdAlerts, waitingProdAlerts, nightlyOverdue, parseTimeouts, runnerTimedOut, isDocsOnly, ALERTED_ON_MAIN } = rules
 const { pauseUntil } = status
 const ciYaml = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
 const { reconcile, escalateProdAlerts, noteWaitingProdAlerts, dispatchOverdueNightly, prodSuites } = watchdog
@@ -41,6 +41,18 @@ describe('parseTimeouts', () => {
 
   it('the real ci.yml: every job has a limit, a matrix job under its base name', () => {
     expect(parseTimeouts(ciYaml)).toMatchObject({ 'unit + build': expect.any(Number), lighthouse: expect.any(Number), smoke: expect.any(Number), verify: expect.any(Number), portal: expect.any(Number) })
+  })
+})
+
+describe('runnerTimedOut', () => {
+  it('reads only the runner\'s own job and step timeout annotations', () => {
+    expect(runnerTimedOut(['The job running on runner GitHub Actions 12 has exceeded the maximum execution time of 10 minutes.'])).toBe(true)
+    expect(runnerTimedOut(["The action 'Smoke shard level1' has timed out after 32 minutes."])).toBe(true)
+  })
+
+  it('leaves a test that timed out a failed test (#495)', () => {
+    expect(runnerTimedOut(['Error: Test timed out in 5000ms.', 'Process completed with exit code 1.'])).toBe(false)
+    expect(runnerTimedOut(['level3: page timed out waiting for the boss'])).toBe(false)
   })
 })
 
