@@ -13,7 +13,7 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "smoke": "node e2e/smoke.mjs --mobile",
-    "smoke:portal": "node e2e/smoke.mjs --dist dist-portal --base /nested/path/ --levels level1",
+    "smoke:portal": "node e2e/smoke.mjs --dist dist-portal --base /nested/path/ --steps title,ride,shot,results --levels level1",
     "prod-check": "node e2e/prod-check.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
     "og": "node scripts/og-image.mjs",
