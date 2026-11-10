@@ -5,7 +5,7 @@
 
 const fs = require('node:fs')
 const path = require('node:path')
-const { findings: findFindings, staleProdAlerts, parseTimeouts } = require('./studioHealthRules.cjs')
+const { findings: findFindings, staleProdAlerts, waitingProdAlerts, nightlyOverdue, parseTimeouts } = require('./studioHealthRules.cjs')
 const { readPauseState } = require('./studio-status.cjs')
 const { getAll } = require('./automerge.cjs')
 const { fetchTelemetry, phoneFrameBudget } = require('./playerTelemetry.cjs')
@@ -16,6 +16,8 @@ const WINDOW = 48 * HOUR
 const ESCALATE_AFTER = 24 * HOUR
 const marker = (key) => `<!-- studio-health:${key} -->`
 const ESCALATED = '<!-- studio-health-escalated -->'
+const WAITING = '<!-- studio-health-awaits-nightly -->'
+const PROD_SMOKE = '.github/workflows/prod-smoke.yml'
 const keyOf = (issue) => (issue.body || '').match(/<!-- studio-health:(.+?) -->/)?.[1] ?? null
 const labelNames = (x) => (x.labels || []).map((l) => (typeof l === 'string' ? l : l.name))
 const stamp = (ms) => `${new Date(ms).toISOString().slice(0, 16)}Z`
@@ -43,12 +45,15 @@ async function collect(api, now, workflowsDir) {
       prNumber: r.pull_requests?.[0]?.number ?? null,
     }))
 
-  // Jobs for every failure, for successes of the same workflow and commit (a flake is a job that also passed), and for
-  // the newest 12 successes per workflow (runtime creep).
+  // Jobs for every failure, for successes of the same workflow and commit or the next main commit (a flake is a job that
+  // also passed), and for the newest 12 successes per workflow (runtime creep).
   const failed = done.filter((r) => r.conclusion !== 'success')
   const want = new Set(failed.map((r) => r.id))
   const failedShas = new Set(failed.map((r) => `${r.path}@${r.head_sha}`))
   for (const r of done) if (failedShas.has(`${r.path}@${r.head_sha}`)) want.add(r.id)
+  const onMain = done.filter((r) => r.head_branch === 'main' && r.event !== 'pull_request').sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
+  const laterOnMain = (r) => onMain.filter((m) => m.path === r.path && m.head_sha !== r.head_sha && Date.parse(m.created_at) > Date.parse(r.created_at)).slice(0, 3)
+  for (const r of onMain.filter((m) => m.conclusion === 'failure')) for (const m of laterOnMain(r)) want.add(m.id)
   const perWorkflow = {}
   for (const r of done.filter((r) => r.conclusion === 'success').sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))) {
     perWorkflow[r.path] = (perWorkflow[r.path] || 0) + 1
@@ -83,6 +88,18 @@ async function collect(api, now, workflowsDir) {
   const prFiles = {}
   for (const n of new Set(done.filter((r) => r.conclusion === 'failure' && r.prNumber).map((r) => r.prNumber))) {
     prFiles[n] = (await getAll(api, '/repos/{owner}/{repo}/pulls/{pull_number}/files', { pull_number: n }, 30)).map((f) => f.filename)
+  }
+
+  // What changed between a failed main run and the next main runs of its workflow: nothing a check depends on makes a
+  // pass there a flake (studioHealthRules.cjs `nextMainPass`).
+  const mainDiffs = {}
+  for (const r of onMain.filter((m) => m.conclusion === 'failure')) {
+    for (const m of laterOnMain(r)) {
+      const key = `${r.head_sha}...${m.head_sha}`
+      if (key in mainDiffs) continue
+      mainDiffs[key] = await api('GET /repos/{owner}/{repo}/compare/{basehead}', { basehead: key })
+        .then((c) => (c.files || []).map((f) => f.filename), () => null)
+    }
   }
 
   const timeouts = {}
@@ -156,16 +173,24 @@ async function collect(api, now, workflowsDir) {
     if (key && i.closed_at) closedAt[key] = Math.max(closedAt[key] || 0, Date.parse(i.closed_at))
   }
 
+  const prod = await prodSuites(api, runs)
+  for (const i of openItems) {
+    if (i.pull_request || !labelNames(i).includes('agent:prod-broken') || now - Date.parse(i.created_at) <= 12 * HOUR) continue
+    i.fixMergedAt = await fixMergedAt(api, i)
+  }
+
   return {
     now,
     runs: done,
     prFiles,
+    mainDiffs,
+    prod,
     timeouts,
     openPrs: prs.map((p) => ({
       number: p.number, title: p.title, labels: labelNames(p), created_at: p.created_at, updated_at: p.updated_at, labelledAt: p.labelledAt,
     })),
     openIssues: openItems.filter((i) => !i.pull_request).map((i) => ({
-      number: i.number, title: i.title, labels: labelNames(i), created_at: i.created_at,
+      number: i.number, title: i.title, labels: labelNames(i), created_at: i.created_at, fixMergedAt: i.fixMergedAt ?? null,
       labelledAt: labelledAt(readyEvents.filter((e) => e.issue.number === i.number), ['agent:ready']),
     })),
     closedAt,
@@ -244,6 +269,63 @@ async function reconcile(api, found, open, now, log, { telemetryDown = false } =
   }
 }
 
+/**
+ * The newest run of each production suite, queued and running ones included: { at, conclusion } (conclusion
+ * null while it runs). One workflow runs both, so a run's suite is the job that didn't skip; a scheduled run is the
+ * nightly even before its jobs are listed.
+ */
+async function prodSuites(api, runs) {
+  const prod = { nightly: null, deploy: null }
+  const newest = runs.filter((r) => r.path === PROD_SMOKE).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+  for (const r of newest.slice(0, 20)) {
+    if (prod.nightly && prod.deploy) break
+    const jobs = (await api('GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs', { run_id: r.id, per_page: 100 }).catch(() => ({ jobs: [] }))).jobs
+    for (const suite of ['nightly', 'deploy']) {
+      const job = jobs.find((j) => j.name === suite && j.conclusion !== 'skipped')
+      if (prod[suite] || !(job || (suite === 'nightly' && r.event === 'schedule' && !jobs.length))) continue
+      prod[suite] = { at: Date.parse(r.created_at), conclusion: job?.status === 'completed' ? job.conclusion : null }
+    }
+  }
+  return prod
+}
+
+/** When the newest PR that references this issue merged, if one did after the issue opened (ms, or null). */
+async function fixMergedAt(api, issue) {
+  const events = await getAll(api, '/repos/{owner}/{repo}/issues/{issue_number}/timeline', { issue_number: issue.number }, 5).catch(() => [])
+  const merged = events
+    .filter((e) => e.event === 'cross-referenced' && e.source?.issue?.pull_request?.merged_at)
+    .map((e) => Date.parse(e.source.issue.pull_request.merged_at))
+    .filter((t) => t > Date.parse(issue.created_at))
+  return merged.length ? Math.max(...merged) : null
+}
+
+/** Dispatches the nightly full smoke when GitHub's cron ran it late or not at all (#487), so its alert can close. */
+async function dispatchOverdueNightly(api, snap, log) {
+  if (!nightlyOverdue(snap)) return
+  const last = snap.prod.nightly ? stamp(snap.prod.nightly.at) : 'none in 48 h'
+  try {
+    await api('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', { workflow_id: 'prod-smoke.yml', ref: 'main', inputs: { suite: 'nightly' } })
+    log(`dispatched the nightly smoke (last nightly: ${last})`)
+  } catch (e) {
+    log(`could not dispatch the nightly smoke (last nightly: ${last}): ${e.message}`)
+  }
+}
+
+/** Old alerts waiting only on the nightly get one marked comment saying so instead of an escalation. */
+async function noteWaitingProdAlerts(api, waiting, log) {
+  for (const i of waiting) {
+    const comments = await getAll(api, '/repos/{owner}/{repo}/issues/{issue_number}/comments', { issue_number: i.number }, 10)
+    if (comments.some((c) => (c.body || '').includes(WAITING) || (c.body || '').includes(ESCALATED))) continue
+    await api('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+      issue_number: i.number,
+      body: `${WAITING}\nWaiting for the nightly to confirm (studio-health watchdog): a fix linked here merged at ${stamp(i.fixMergedAt)} and the ` +
+        'production deploy check is green since. Not escalating; this closes on the next green nightly full smoke, which the watchdog ' +
+        'dispatches itself when GitHub\'s cron is over 26 h late. A red nightly after the fix escalates it as usual.',
+    })
+    log(`prod alert #${i.number} waits for the nightly`)
+  }
+}
+
 /** `agent:prod-broken` issues open over 12 h get `needs-alex` and one comment (marked, so only once). */
 async function escalateProdAlerts(api, stale, now, log) {
   for (const i of stale) {
@@ -269,11 +351,16 @@ module.exports = async function run({ github, context, core }) {
   core.info(`${found.length} finding(s): ${found.map((f) => f.key).join(', ') || 'none'}`)
   await reconcile(api, found, snap.watchdogOpen, now, (m) => core.info(m), { telemetryDown: !snap.telemetry })
   await escalateProdAlerts(api, staleProdAlerts(snap), now, (m) => core.info(m))
+  await noteWaitingProdAlerts(api, waitingProdAlerts(snap), (m) => core.info(m))
+  await dispatchOverdueNightly(api, snap, (m) => core.info(m))
 }
 
 module.exports.collect = collect
 module.exports.reconcile = reconcile
 module.exports.escalateProdAlerts = escalateProdAlerts
+module.exports.noteWaitingProdAlerts = noteWaitingProdAlerts
+module.exports.dispatchOverdueNightly = dispatchOverdueNightly
+module.exports.prodSuites = prodSuites
 
 if (require.main === module) {
   const { ghReadApi } = require('./studio-status.cjs')
@@ -283,6 +370,8 @@ if (require.main === module) {
     .then((snap) => {
       for (const f of findFindings(snap)) console.log(`[${f.owner}] ${f.key}\n  ${f.title}\n  last seen ${stamp(f.lastSeen)}\n`)
       for (const i of staleProdAlerts(snap)) console.log(`[escalate] agent:prod-broken #${i.number}: ${i.title}`)
+      for (const i of waitingProdAlerts(snap)) console.log(`[awaits nightly] agent:prod-broken #${i.number}: ${i.title}`)
+      if (nightlyOverdue(snap)) console.log('[dispatch] prod-smoke.yml suite=nightly: the last nightly is over 26 h old')
     })
     .catch((e) => {
       console.error(e)
