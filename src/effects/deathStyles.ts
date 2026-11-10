@@ -233,7 +233,7 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
     ],
     lifetime: 2.2, scale: 2.5, lift: 0, flash: 9, flashColor: '#ff6a20', sound: 'hiss',
   },
-  // A chalk puff (#453): a toy popping off the wall, nothing falls. Pale motes that drift slowly down, a few flecks of its colours.
+  // A chalk puff (#453): no lit chunks, nothing falls off the wall.
   climber: {
     layers: [
       layer({ shape: 'mote', count: 38, colors: ['#ffffff', '#efeee8', '#dcdad2'], glow: 1.15, speed: [12, 60], up: 12, drag: 2.6, gravity: 6, size: 6, hold: 0.5 }),

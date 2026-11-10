@@ -126,7 +126,6 @@ export const WALL_STANDOFF = 11
 /** Starts within this fraction of the wall's height from its foot, so a wave doesn't climb in lockstep. */
 export const WALL_START_SPREAD = 0.12
 
-/** Seeded starts at the foot of the level's walls, spread over all of them, off their side edges. */
 export function wallSlots(count: number, walls: readonly WallSurface[], rng: Rng): WallSlot[] {
   if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
   return Array.from({ length: count }, () => {

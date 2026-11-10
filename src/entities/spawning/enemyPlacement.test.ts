@@ -69,7 +69,6 @@ describe('readableScatterSpawn', () => {
 describe('wall enemies', () => {
   const walls: WallSurface[] = [
     { id: 'north', origin: { x: -100, y: 0, z: -400 }, right: { x: 1, y: 0, z: 0 }, up: { x: 0, y: 1, z: 0 }, width: 300, height: 500 },
-    // Leaning back 30° and facing -x.
     {
       id: 'slab',
       origin: { x: 400, y: 10, z: 200 },

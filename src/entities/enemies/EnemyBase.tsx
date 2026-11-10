@@ -25,7 +25,6 @@ export interface EnemyProps {
   entry?: EnemyEntry
   /** A formation member's motion after its entry. */
   motion?: FormationMotion
-  /** A wall enemy's start on its wall (`enemyPlacement.ts` `wallSlots`). */
   wall?: WallSlot
   /** It got away unshot (a climber topped out): gone, unscored. */
   onEscape?: (id: string) => void

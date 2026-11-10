@@ -6,10 +6,7 @@ export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic'
 export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti'
 export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber'
 
-/**
- * A climbable wall (#453): a rectangle from `origin` (its bottom-left corner as the ride sees it) along the unit,
- * perpendicular `right` and `up`; its face points along `right × up`, towards the ride. Wall enemies (`climber`) climb it.
- */
+/** A climbable wall (#453): from `origin`, its bottom-left corner, along unit `right` and `up`; it faces `right × up`. */
 export interface WallSurface {
   id: string
   origin: { x: number; y: number; z: number }

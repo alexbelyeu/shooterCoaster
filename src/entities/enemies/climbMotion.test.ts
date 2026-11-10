@@ -6,7 +6,6 @@ import { CLIMB, METRE, climbPose, climbRoute, newClimbPose } from './climbMotion
 const wall: WallSurface = {
   id: 'w',
   origin: { x: 100, y: 20, z: -50 },
-  // Facing +x: right along -z, up along y.
   right: { x: 0, y: 0, z: -1 },
   up: { x: 0, y: 1, z: 0 },
   width: 240,

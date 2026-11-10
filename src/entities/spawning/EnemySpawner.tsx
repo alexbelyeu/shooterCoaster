@@ -38,7 +38,6 @@ interface EnemySpawnerProps {
   /** The ride's speeds and structure scale: waves are placed where the rider will be looking (`RideAhead`). */
   rideSpeeds: RideSpeeds
   trackScale: number
-  /** The level's walls, for its wall enemies. */
   walls?: readonly WallSurface[]
 }
 
@@ -262,7 +261,6 @@ export default function EnemySpawner({
     useGameStore.getState().setTimeScale(1)
   }, [])
 
-  // Killed or escaped.
   const goneEnemies = useRef(new Set<string>())
 
   const [generation, setGeneration] = useState(0)

@@ -1,7 +1,4 @@
-/**
- * The Climber's route up its wall and its climb cycle (#453), pure. Positions are wall coordinates: `u` across from the
- * wall's left edge, `v` up from its foot, in world units (`enemyPlacement.ts` `wallPoint` puts them in the world).
- */
+/** The Climber's route up its wall and climb cycle (#453), in wall coordinates: `u` across, `v` up, world units. */
 import { createRng } from '@/utils/rng'
 
 /** World units per metre at the figurine's scale (it stands ~1.75 m, `CLIMBER_SCALE` × its model). */
@@ -10,9 +7,7 @@ export const METRE = 33
 export const CLIMB = {
   /** Rise per move, one hand to the next hold (±15 %). */
   step: 26,
-  /** Sideways drift per move at most, either way. */
   drift: 8,
-  /** Kept off the wall's side edges. */
   margin: 30,
   /** Its origin stops this far under the top: hands on the lip, it tops out. */
   topOut: 30,
@@ -35,7 +30,6 @@ export interface ClimbRoute {
   v: number[]
   /** Game seconds each move starts, after the start; a move goes from hold `k` to `k + 1`. */
   moveStart: number[]
-  /** Seconds from the start to topping out. */
   duration: number
 }
 
@@ -45,7 +39,7 @@ export interface ClimbPose {
   u: number
   v: number
   phase: ClimbPhase
-  /** The arm that leads the current move: 0 left, 1 right. Alternates move by move. */
+  /** 0 left, 1 right; alternates move by move. */
   lead: 0 | 1
   /** Left and right arm, 0 (hand low on the wall) to 1 (at full reach overhead). */
   arms: [number, number]
@@ -57,7 +51,6 @@ export interface ClimbPose {
 
 export const newClimbPose = (): ClimbPose => ({ u: 0, v: 0, phase: 'rest', lead: 0, arms: [0, CLIMB.bent], legs: 1, escaped: false })
 
-/** A seeded route from `(u, v)` to the top of a `width` × `height` wall. */
 export function climbRoute(start: { u: number; v: number }, wall: { width: number; height: number }, seed: number): ClimbRoute {
   const rng = createRng(seed)
   const top = Math.max(start.v, wall.height - CLIMB.topOut)
@@ -83,7 +76,7 @@ export function climbRoute(start: { u: number; v: number }, wall: { width: numbe
 
 const ease = (x: number) => x * x * (3 - 2 * x)
 
-/** Where the climber is `t` seconds after it started, into `out` (no allocation). */
+/** Into `out`: no allocation per frame. */
 export function climbPose(route: ClimbRoute, t: number, out: ClimbPose): ClimbPose {
   const moves = route.moveStart.length
   const last = route.v.length - 1

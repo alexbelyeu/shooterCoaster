@@ -920,9 +920,8 @@ export const DRAKE_EYE_MAT = new THREE.MeshStandardMaterial({
   toneMapped: false,
 })
 
-// ── Climber (#453): a vinyl-toy figurine, built to docs/art/ENEMIES.md ──
-// Faces +z (the wall); the ride sees its back: helmet, chalk bag, harness. One vertex-coloured material, four moving
-// parts (body, two arms, legs), each parted at its pivot: the shoulders and the hips.
+// ── Climber (#453), built to docs/art/ENEMIES.md ──
+// Faces +z (the wall), so the ride sees its back; one material, four moving parts parted at the shoulders and hips.
 
 const CLIMBER_SHIRT = '#3a3f8f'
 const CLIMBER_TROUSERS = '#2c2f3a'
@@ -949,21 +948,17 @@ function sunShaded(g: THREE.BufferGeometry): THREE.BufferGeometry {
 
 // Low-poly by budget: 700 triangles in all (the brief's cap), so bands are open cylinders and hands, eyes few-sided.
 const capsule = (r: number, length: number, sides = 5) => new THREE.CapsuleGeometry(r, length, 1, sides)
-/** An open ring: a belt, a leg loop, a drawcord. */
 const band = (r: number, height: number, sides = 8) => new THREE.CylinderGeometry(r, r, height, sides, 1, true)
 
 export const CLIMBER_BODY_GEO = sunShaded(mergePainted([
   paintedAt(capsule(0.82, 0.9, 6), CLIMBER_SHIRT, pose([0, 0.2, 0], [0, 0, 0], [1, 1, 0.8])),
   paintedAt(new THREE.SphereGeometry(0.8, 6, 3), CLIMBER_TROUSERS, pose([0, -0.85, 0], [0, 0, 0], [1.05, 0.7, 0.85])),
-  // Harness: waist belt, quickdraws racked on the hips
   paintedAt(band(0.86, 0.32), CLIMBER_HARNESS, pose([0, -0.62, 0], [0, 0, 0], [1, 1, 0.82])),
   ...[-1, 1].map((s) => painted(new THREE.BoxGeometry(0.16, 0.5, 0.12), CLIMBER_METAL, [s * 0.86, -0.95, 0.12], [0, 0, s * 0.2])),
-  // Oversized head, two-dot eyes, helmet with a vent stripe
   painted(new THREE.SphereGeometry(1.1, 8, 5), CLIMBER_SKIN, [0, 2.1, 0]),
   ...[-1, 1].map((s) => painted(new THREE.SphereGeometry(0.14, 4, 2), CLIMBER_DARK, [s * 0.38, 2.05, 1.03])),
   paintedAt(new THREE.SphereGeometry(1.24, 8, 3, 0, Math.PI * 2, 0, Math.PI * 0.52), CLIMBER_HELMET, pose([0, 2.25, -0.06])),
   painted(new THREE.BoxGeometry(0.3, 0.1, 1.2), CLIMBER_DARK, [0, 3.45, -0.15], [0.1, 0, 0]),
-  // Chalk bag on the small of the back, with its cyan drawcord
   painted(new THREE.CylinderGeometry(0.5, 0.42, 0.72, 6), CLIMBER_CHALK, [0, -0.42, -0.8]),
   painted(band(0.52, 0.12, 6), CLIMBER_HARNESS, [0, -0.1, -0.8]),
 ]))
@@ -975,7 +970,7 @@ export const CLIMBER_ARM_GEO = sunShaded(mergePainted([
   painted(new THREE.SphereGeometry(0.42, 5, 3), CLIMBER_SKIN, [0, -1.95, 0]),
 ]))
 
-/** Both legs from the hips (its origin), frogged out, harness leg loops on the thighs. */
+/** Both legs from the hips (its origin). */
 export const CLIMBER_LEGS_GEO = sunShaded(mergePainted(
   [-1, 1].flatMap((s) => {
     const hip = pose([s * 0.42, 0, 0], [0, 0, s * 0.55])

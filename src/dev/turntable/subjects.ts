@@ -10,7 +10,7 @@ export type SubjectId = EnemyType | 'goldenBalloon' | BossType
 export interface Subject {
   id: SubjectId
   kind: 'enemy' | 'boss'
-  /** Turntable yaw (radians) that shows its face to the camera (a climber's back). */
+  /** Turntable yaw (radians) that shows its face to the camera. */
   front: number
   /**
    * Its heading is cleared every frame, so it keeps facing `front`: 'model' is the first group inside the enemy
@@ -21,7 +21,7 @@ export interface Subject {
   motion: { from: number; span: number }
   /** False when nothing in it moves once its travel is cancelled (the strip's frames are then identical). */
   animated: boolean
-  /** Drawn on a pale climbing wall (seen from the front only): a wall enemy, its back to the rider. */
+  /** Drawn on a patch of climbing wall. */
   stage?: 'wall'
 }
 

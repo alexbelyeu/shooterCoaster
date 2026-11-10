@@ -12,7 +12,6 @@ const CLIMBER_SCALE = 8
 const ARM_LOW = { pitch: -1.3, splay: 0.7 }
 const ARM_HIGH = { pitch: -2.95, splay: 0.35 }
 
-/** Its pose at `reach` (0–1), on the left (+x, `side` 1) or right. */
 function setArm(arm: THREE.Object3D | null, reach: number, side: 1 | -1) {
   if (!arm) return
   arm.rotation.x = ARM_LOW.pitch + (ARM_HIGH.pitch - ARM_LOW.pitch) * reach
@@ -35,10 +34,7 @@ function wallAt(p: THREE.Vector3): WallSlot {
   return { wall, u: width / 2, v: 0, seed: 0 }
 }
 
-/**
- * A toy climber figurine on a wall (#453): climbs hand over hand up a seeded route, stops to clip a quickdraw, and
- * escapes unscored if it tops out (`climbMotion.ts`). Enters already on the wall, at its foot: no fly-in.
- */
+/** A toy climber figurine (#453): enters at the foot of its wall (no fly-in) and climbs `climbMotion.ts`'s route. */
 export default function Climber(props: EnemyProps) {
   const { id, spawnPosition } = props
   // Mount-time only, like EnemyBase's start.

@@ -60,7 +60,6 @@ describe('climber model', () => {
   it('is lighter on top than underneath', () => {
     const { normal, color } = CLIMBER_BODY_GEO.attributes
     for (let i = 0; i < normal.count; i++) {
-      // The head's skin: one colour, shaded by its normal.
       if (normal.getY(i) > 0.9 && color.getX(i) > 0.8) expect(color.getX(i)).toBeGreaterThan(0.85)
     }
   })
