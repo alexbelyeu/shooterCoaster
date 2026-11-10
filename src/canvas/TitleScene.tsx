@@ -197,15 +197,17 @@ function PopBurst({ position, color }: { position: THREE.Vector3; color: string 
   const elapsed = useRef(0)
 
   useMemo(() => {
+    // eslint-disable-next-line sc/no-math-random -- cosmetic: a pop's spark directions
+    const jitter = Math.random
     const pts: THREE.Vector3[] = []
     const vels: THREE.Vector3[] = []
     for (let i = 0; i < 8; i++) {
       pts.push(new THREE.Vector3())
       vels.push(
         new THREE.Vector3(
-          (Math.random() - 0.5) * 40,
-          Math.random() * 30 + 10,
-          (Math.random() - 0.5) * 40,
+          (jitter() - 0.5) * 40,
+          jitter() * 30 + 10,
+          (jitter() - 0.5) * 40,
         ),
       )
     }

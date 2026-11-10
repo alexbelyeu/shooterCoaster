@@ -11,6 +11,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
+    "lint": "eslint .",
     "smoke": "node e2e/smoke.mjs --mobile",
     "smoke:portal": "node e2e/smoke.mjs --dist dist-portal --base /nested/path/ --levels level1",
     "prod-check": "node e2e/prod-check.mjs",
@@ -20,7 +21,7 @@
     "turntable": "node scripts/turntable.mjs",
     "audio:render": "node scripts/audio/render.mjs",
     "audio:check": "node scripts/audio/check.mjs",
-    "verify": "npm test && npm run build && npm run check:bundle && npm run lighthouse && npm run smoke",
+    "verify": "npm test && npm run lint && npm run build && npm run check:bundle && npm run lighthouse && npm run smoke",
     "lighthouse": "node scripts/lighthouse.mjs"
   },
   "dependencies": {
@@ -39,9 +40,11 @@
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.172.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "eslint": "^9.39.5",
     "lighthouse": "13.5.0",
     "playwright": "^1.58.2",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.72.2",
     "vite": "^6.0.0",
     "vitest": "^5.0.5"
   }

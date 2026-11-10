@@ -1,16 +1,18 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import type * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { useEnemyRandom } from './enemyRandom'
 import { JELLY_BODY_GEO, JELLY_BODY_MATS, JELLY_COLOR_COUNT, JELLY_INNER_GEO, JELLY_INNER_MATS } from './SharedEnemyAssets'
 
 /** Translucent jellyfish on the water beside the track: rises until its bell is clear of the surface, then bobs there. */
 export default function Jellyfish(props: EnemyProps) {
-  const colorIdx = useMemo(() => Math.floor(Math.random() * JELLY_COLOR_COUNT), [])
-  const wobbleOffset = useMemo(() => Math.random() * Math.PI * 2, [])
-  const riseSpeed = useMemo(() => 0.3 + Math.random() * 0.3, [])
+  const { colorIdx, wobbleOffset, riseSpeed, maxY } = useEnemyRandom(props.id, (rng) => ({
+    colorIdx: Math.floor(rng() * JELLY_COLOR_COUNT),
+    wobbleOffset: rng() * Math.PI * 2,
+    riseSpeed: 0.3 + rng() * 0.3,
+    maxY: 3 + rng() * 5,
+  }))
   const bodyRef = useRef<THREE.Group>(null)
-
-  const maxY = useMemo(() => 3 + Math.random() * 5, [])
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {

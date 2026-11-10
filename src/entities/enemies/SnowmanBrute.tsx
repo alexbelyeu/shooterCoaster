@@ -1,7 +1,8 @@
-import { useCallback, useContext, useMemo, useRef } from 'react'
+import { useCallback, useContext, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { useEnemyRandom } from './enemyRandom'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
   SNOWMAN_BODY_GEO, SNOWMAN_MAT,
@@ -17,8 +18,7 @@ import {
  * Lumbering orbit with heavy Y bobbing.
  */
 export default function SnowmanBrute(props: EnemyProps) {
-  const theta = useMemo(() => 0.3 + Math.random() * 0.7, [])
-  const moveSpeed = useMemo(() => 0.8 + Math.random() * 0.6, [])
+  const { theta, moveSpeed } = useEnemyRandom(props.id, (rng) => ({ theta: 0.3 + rng() * 0.7, moveSpeed: 0.8 + rng() * 0.6 }))
   const modelRef = useRef<THREE.Group>(null)
   const bodyRef = useRef<THREE.Group>(null)
   const leftArmRef = useRef<THREE.Group>(null)

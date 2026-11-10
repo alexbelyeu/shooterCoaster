@@ -82,6 +82,7 @@ export default function CoasterCamera({
   useEffect(() => {
     const add = (amount: number, durationMs?: number) => {
       const k = shake.current
+      // eslint-disable-next-line sc/no-math-random -- cosmetic: each shake's wobble pattern
       if (k.trauma === 0) k.seed = (Math.random() * 1000) | 0
       addTrauma(k, amount, durationMs)
     }

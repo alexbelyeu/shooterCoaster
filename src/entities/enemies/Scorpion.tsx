@@ -1,6 +1,7 @@
-import { useCallback, useContext, useMemo, useRef } from 'react'
+import { useCallback, useContext, useRef } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
+import { useEnemyRandom } from './enemyRandom'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
   SCORPION_GEO, SCORPION_TAIL_GEO, SCORPION_STINGER_GEO, SCORPION_TAIL_PIVOT,
@@ -12,8 +13,7 @@ import {
  * calls (merged shell, swaying tail, glowing stinger). Follows terrain height as it moves.
  */
 export default function Scorpion(props: EnemyProps) {
-  const moveAngle = useMemo(() => Math.random() * Math.PI * 2, [])
-  const moveSpeed = useMemo(() => 0.8 + Math.random() * 1.2, [])
+  const { moveAngle, moveSpeed } = useEnemyRandom(props.id, (rng) => ({ moveAngle: rng() * Math.PI * 2, moveSpeed: 0.8 + rng() * 1.2 }))
   const tailRef = useRef<THREE.Group>(null)
   const heightFn = useContext(TerrainContext)
 

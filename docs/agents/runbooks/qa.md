@@ -16,6 +16,7 @@ playtest reviewers read PROTOCOL.md and `.claude/agents/qa.md` themselves.
 3. Review them in waves of up to P PRs, up to 6 PRs this run, each following
    `docs/agents/runbooks/review-one-pr.md`. Pause checkpoint before each wave. Start the
    next wave only after the previous one is decided and its approved PRs have merged
-   (poll for a few minutes), because merges change `main`.
+   (poll for a few minutes), because merges change `main`. When a PR fixes a class of bug,
+   ask for the lint rule (`scripts/eslint/`) or test that would have caught it, in the same PR.
 4. `node scripts/run-usage.cjs --role qa --ref "<the PRs reviewed, e.g. #12,#14>" --post`,
    then reply with one line per PR: number, decision, reason, merged yet.

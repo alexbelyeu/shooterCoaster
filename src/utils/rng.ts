@@ -1,4 +1,4 @@
-/** mulberry32 for layouts (fixed seeds) and spawns (run seed); `Math.random` stays for per-frame cosmetic jitter. */
+/** mulberry32 for layouts (fixed seeds) and spawns (run seed); `Math.random` stays for cosmetic jitter (`sc/no-math-random`). */
 
 /** Callable like `Math.random`, so it drops into any `() => number` parameter. */
 export interface Rng {
