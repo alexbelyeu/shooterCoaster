@@ -97,6 +97,14 @@ const KILL_BODIES: Record<KillSound, { lengthS: number; render: (S: SynthCore, o
     partial(S, out, t, 2600, { a: 0.001, tau: 0.02, peak: 0.25 })
     partial(S, out, t, 80, { a: 0.002, tau: 0.06, peak: 0.8, bend: 2.4, bendTau: 0.012 })
   } },
+  // Climber: a dry toy pop off the wall, then a soft puff of chalk dust.
+  chalk: { lengthS: 0.5, render(S, out, t) {
+    noise(S, out, t, { type: 'bandpass', f: 2100, q: 0.9, a: 0.0005, tau: 0.018, peak: 0.9 })
+    partial(S, out, t, 880, { type: 'triangle', a: 0.001, tau: 0.03, peak: 0.4, bend: 1.4, bendTau: 0.012 })
+    partial(S, out, t, 120, { a: 0.001, tau: 0.04, peak: 0.7, bend: 2, bendTau: 0.01 })
+    noise(S, out, t + 0.012, { type: 'highpass', f: 4500, q: 0.4, a: 0.02, tau: 0.12, peak: 0.5 })
+    noise(S, out, t + 0.012, { type: 'bandpass', f: 900, q: 0.5, a: 0.015, tau: 0.08, peak: 0.3 })
+  } },
 }
 
 function killBody(sound: KillSound): Recipe {
@@ -147,6 +155,7 @@ export const RECIPES: readonly Recipe[] = [
   killBody('crunch'),
   killBody('splash'),
   killBody('hiss'),
+  killBody('chalk'),
   // 2×: a kick under the body.
   { id: 'kill.thump', lengthS: fixed(0.4), render(S, out, t) {
     hitDrum(S, out, 'kick', t, 1)

@@ -1,4 +1,5 @@
 import type { BiomeType, BossType, EnemyType } from '@/types/level'
+import { CLIMB } from '@/entities/enemies/climbMotion'
 
 /**
  * What the enemy turntable (`turntable.html`, `npm run turntable`) shows and how: pure, so a test can hold it to
@@ -20,6 +21,8 @@ export interface Subject {
   motion: { from: number; span: number }
   /** False when nothing in it moves once its travel is cancelled (the strip's frames are then identical). */
   animated: boolean
+  /** Drawn on a patch of climbing wall. */
+  stage?: 'wall'
 }
 
 /** Game seconds of the rest pose on the sheet and the angle strips: every boss has risen, no golden balloon has expired (5 s). */
@@ -43,6 +46,8 @@ export const SUBJECTS: readonly Subject[] = [
   { id: 'lavaGolem', kind: 'enemy', front: 0, motion: at(cycle(2)), animated: true },
   { id: 'fireImp', kind: 'enemy', front: 0, motion: at(cycle(4)), animated: true },
   { id: 'infernalDrake', kind: 'enemy', front: 0, holdHeading: 'model', motion: at(cycle(3)), animated: true },
+  // Its face is to the wall: `front` shows what the rider sees, its back. The strip is two moves, left hand then right.
+  { id: 'climber', kind: 'enemy', front: 0, motion: at(2 * (CLIMB.reach + CLIMB.pull + CLIMB.rest)), animated: true, stage: 'wall' },
   // Its nose points along +x.
   { id: 'goldenBlimp', kind: 'boss', front: Math.PI / 2, motion: at(cycle(1.7)), animated: true },
   // From just before the first tentacle's slam (2.4 s) through its strike and hold.

@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef, useContext } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { EnemyType, EnemyWave, LevelConfig } from '@/types/level'
+import type { EnemyType, EnemyWave, LevelConfig, WallSurface } from '@/types/level'
 import { indexAtT, type ArcTable } from '@/track/arcLength'
 import { rideProgress } from '@/track/rideProgress'
 import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
@@ -20,7 +20,9 @@ import {
   ENTRY_SECONDS, ENTRY_STAGGER, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, trackPoint, tracksideSlots,
   type FormationMotion, type FormationSlot, type RideAhead, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
-import { ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, readableScatterSpawn } from './enemyPlacement'
+import {
+  ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, readableScatterSpawn, wallPoint, wallSlots, type WallSlot,
+} from './enemyPlacement'
 import { newWaveProgress, nextWaveDue, tickWaves, waveWindows } from './waveSchedule'
 
 interface EnemySpawnerProps {
@@ -36,15 +38,17 @@ interface EnemySpawnerProps {
   /** The ride's speeds and structure scale: waves are placed where the rider will be looking (`RideAhead`). */
   rideSpeeds: RideSpeeds
   trackScale: number
+  walls?: readonly WallSurface[]
 }
 
 interface SpawnedEnemy {
   id: string
   type: EnemyType | 'goldenBalloon'
-  /** Scatter waves only: formation and trackside members are placed from their slot when the wave activates. */
+  /** Scatter and wall waves only: formation and trackside members are placed from their slot when the wave activates. */
   position: THREE.Vector3 | null
   slot: FormationSlot | null
   trackside: TracksideSlot | null
+  wall?: WallSlot
   scoreValue: number
   radius: number
   waveIndex: number
@@ -70,7 +74,10 @@ const RADII: Record<EnemyType, number> = {
   lavaGolem: 130,
   fireImp: 55,
   infernalDrake: 200,
+  climber: 50,
 }
+
+const NO_WALLS: readonly WallSurface[] = []
 
 const toVector3 = (p: Vec3) => new THREE.Vector3(p.x, p.y, p.z)
 
@@ -80,6 +87,7 @@ function generateEnemies(
   heightFn: HeightFunction,
   rng: Rng,
   table: ArcTable,
+  walls: readonly WallSurface[],
 ): SpawnedEnemy[] {
   const enemies: SpawnedEnemy[] = []
   let id = 0
@@ -87,13 +95,21 @@ function generateEnemies(
   for (let waveIdx = 0; waveIdx < waves.length; waveIdx++) {
     const wave = waves[waveIdx]
     const base = { type: wave.type, scoreValue: SCORE_VALUES[wave.type], radius: RADII[wave.type], waveIndex: waveIdx }
+    const { surface, scatter } = ENEMY_PLACEMENT[wave.type]
+    if (scatter === 'wall') {
+      if (wave.formation && wave.formation !== 'scatter') throw new Error(`${wave.type} climbs a wall: no formation`)
+      for (const wall of wallSlots(wave.count, walls, rng)) {
+        const position = toVector3(wallPoint(wall.wall, wall.u, wall.v, WALL_STANDOFF, { x: 0, y: 0, z: 0 }))
+        enemies.push({ id: `enemy-${id++}`, position, slot: null, trackside: null, wall, ...base })
+      }
+      continue
+    }
     if (wave.formation && wave.formation !== 'scatter') {
       for (const slot of formationSlots(wave.formation, wave.count, rng)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot, trackside: null, ...base })
       }
       continue
     }
-    const { surface, scatter } = ENEMY_PLACEMENT[wave.type]
     if (scatter === 'trackside') {
       for (const trackside of tracksideSlots(wave.count, surface, rng)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside, ...base })
@@ -142,6 +158,7 @@ export default function EnemySpawner({
   timerSeconds,
   rideSpeeds,
   trackScale,
+  walls = NO_WALLS,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
   const getThree = useThree((s) => s.get)
@@ -150,10 +167,10 @@ export default function EnemySpawner({
   const { enemies, goldenBalloons } = useMemo(() => {
     const rng = createRng(runSeed)
     return {
-      enemies: generateEnemies(waves, heightFn, rng, trackTable),
+      enemies: generateEnemies(waves, heightFn, rng, trackTable, walls),
       goldenBalloons: generateGoldenBalloons(goldenBalloonCount, heightFn, rng, trackTable),
     }
-  }, [runSeed, waves, goldenBalloonCount, heightFn, trackTable])
+  }, [runSeed, waves, goldenBalloonCount, heightFn, trackTable, walls])
   useEffect(() => {
     // Formation and trackside members digest their seeded slots: their world positions depend on where the rider is at activation.
     recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position ?? e.slot?.local ?? { x: e.trackside!.ahead, y: 0, z: e.trackside!.side }))
@@ -182,6 +199,8 @@ export default function EnemySpawner({
         })
         return members.map((e, i) => [e.id, { position: toVector3(placed[i]) }])
       }
+      // On their walls already, where they enter: never pushed out of the near field.
+      if (members[0]?.wall) return members.map((e) => [e.id, { position: e.position! }])
       if (!wave.formation || wave.formation === 'scatter') {
         return members.map((e) => [e.id, { position: toVector3(outsideNearField(e.position!, camera)) }])
       }
@@ -242,7 +261,7 @@ export default function EnemySpawner({
     useGameStore.getState().setTimeScale(1)
   }, [])
 
-  const killedEnemies = useRef(new Set<string>())
+  const goneEnemies = useRef(new Set<string>())
 
   const [generation, setGeneration] = useState(0)
   const runRef = useRef(runId)
@@ -258,7 +277,7 @@ export default function EnemySpawner({
     firstWaveAnnounced.current = false
     waveProgress.current = newWaveProgress(waves.length)
     lastWaveTick.current = null
-    killedEnemies.current.clear()
+    goneEnemies.current.clear()
     setGeneration((g) => g + 1)
   }, [runId, initialActiveWave, waves, endSlowMo])
 
@@ -326,24 +345,33 @@ export default function EnemySpawner({
   useEffect(() => {
     return () => {
       endSlowMo()
-      killedEnemies.current.clear()
+      goneEnemies.current.clear()
     }
   }, [endSlowMo])
 
   const onKill = useCallback(
     (id: string) => {
-      killedEnemies.current.add(id)
+      goneEnemies.current.add(id)
 
-      const remaining = totalEnemyCount - killedEnemies.current.size
+      const remaining = totalEnemyCount - goneEnemies.current.size
       useGameStore.getState().setEnemyCounts(Math.max(0, remaining), totalEnemyCount)
 
-      if (killedEnemies.current.size >= totalEnemyCount) {
+      if (goneEnemies.current.size >= totalEnemyCount) {
         useGameStore.getState().setTimeScale(0.1)
         if (slowMoResetTimer.current) clearTimeout(slowMoResetTimer.current)
         slowMoResetTimer.current = setTimeout(endSlowMo, 1500)
       }
     },
     [totalEnemyCount, endSlowMo],
+  )
+
+  // Gone without a kill (a climber topped out): off the count, no last-kill slow-mo.
+  const onEscape = useCallback(
+    (id: string) => {
+      goneEnemies.current.add(id)
+      useGameStore.getState().setEnemyCounts(Math.max(0, totalEnemyCount - goneEnemies.current.size), totalEnemyCount)
+    },
+    [totalEnemyCount],
   )
 
   useEffect(() => {
@@ -370,6 +398,8 @@ export default function EnemySpawner({
             scoreValue={enemy.scoreValue}
             radius={enemy.radius}
             onKill={onKill}
+            wall={enemy.wall}
+            onEscape={onEscape}
           />
         )
       })}

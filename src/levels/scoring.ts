@@ -21,6 +21,7 @@ export const SCORE_VALUES: Record<EnemyType, number> = {
   lavaGolem: 35,
   fireImp: 18,
   infernalDrake: 60,
+  climber: 20,
 }
 
 /** Theme Park's bonus golden balloons: always out, outside the waves and `maxScore` (EnemySpawner). */

@@ -68,7 +68,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
   const config = getLevelConfig(levelId)
   if (!config) return null
 
-  const { track, environment, biome, enemies, combat, boss, pickups } = config
+  const { track, environment, biome, enemies, combat, boss, pickups, walls } = config
 
   const curve = useMemo(() => {
     const factory = track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve
@@ -133,6 +133,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         timerSeconds={RUN_SECONDS}
         rideSpeeds={speeds}
         trackScale={trackDims.trackScale}
+        walls={walls}
       />
       <ShootingController />
       <GameTimer seconds={RUN_SECONDS} />

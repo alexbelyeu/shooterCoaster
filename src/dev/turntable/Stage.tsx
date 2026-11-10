@@ -5,6 +5,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { advanceGameTime, resetGameTime } from '@/core/gameClock'
 import { useGameStore } from '@/store/useGameStore'
 import { ENEMY_COMPONENTS } from '@/entities/enemies/enemyComponents'
+import { WALL_STANDOFF } from '@/entities/spawning/enemyPlacement'
 import GoldenBalloon from '@/entities/enemies/GoldenBalloon'
 import { BOSS_COMPONENTS } from '@/entities/bosses/BossSpawner'
 import { getAllLevels } from '@/levels/LevelRegistry'
@@ -69,11 +70,32 @@ function Model({ subject }: { subject: Subject }) {
     const Enemy = id === 'goldenBalloon' ? GoldenBalloon : ENEMY_COMPONENTS[id as EnemyType]
     // The spawner mounts golden balloons as type 'balloon' too.
     const type = id === 'goldenBalloon' ? 'balloon' : (id as EnemyType)
-    return <Enemy id={id} type={type} spawnPosition={ORIGIN} scoreValue={0} radius={1} onKill={noop} />
+    const enemy = <Enemy id={id} type={type} spawnPosition={ORIGIN} scoreValue={0} radius={1} onKill={noop} />
+    return subject.stage === 'wall' ? <>{enemy}<ClimbingWall /></> : enemy
   }
   if (id === 'kraken') return <KrakenPose />
   const Boss = BOSS_COMPONENTS[id as BossType]
   return <Boss id={id} active incoming={false} onDone={noop} track={bossTrack(id as BossType)} groundFn={flatGround} />
+}
+
+const WALL_HOLDS: readonly [number, number][] = [[-28, 40], [22, 30], [-14, -10], [30, -24], [-30, -40], [8, 52]]
+
+/** A patch of pale gym wall behind a wall enemy, with dark holds: front face only, so the back view sees the climber. */
+function ClimbingWall() {
+  return (
+    <group position={[0, 6, -WALL_STANDOFF]}>
+      <mesh>
+        <planeGeometry args={[90, 120]} />
+        <meshStandardMaterial color="#ddd8cc" roughness={0.9} />
+      </mesh>
+      {WALL_HOLDS.map(([x, y]) => (
+        <mesh key={`${x},${y}`} position={[x, y, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 0.5, 0.8]}>
+          <sphereGeometry args={[4, 7, 3, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color="#2e2a3a" roughness={0.6} />
+        </mesh>
+      ))}
+    </group>
+  )
 }
 
 function StudioLight() {

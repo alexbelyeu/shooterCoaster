@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
-  CROW_FEATHER_MAT, CROW_GEO, EMBER_WISP_TENDRILS_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
+  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_FEATHER_MAT, CROW_GEO, EMBER_WISP_TENDRILS_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
   SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, patchCrowWingVertex,
 } from './SharedEnemyAssets'
 
@@ -47,5 +47,20 @@ describe('merged enemy parts', () => {
     const tris = (g: THREE.BufferGeometry) => g.index!.count / 3
     expect(tris(SNOWMAN_COAL_GEO)).toBe(tris(SNOWMAN_FACE_GEO) + 3 * tris(new THREE.SphereGeometry(1, 6, 6)))
     expect(tris(EMBER_WISP_TENDRILS_GEO)).toBe(6 * tris(new THREE.ConeGeometry(1, 4, 4)))
+  })
+})
+
+describe('climber model', () => {
+  const tris = (g: THREE.BufferGeometry) => g.attributes.position.count / 3
+
+  it("stays under the brief's 700-triangle cap: body, two arms, legs", () => {
+    expect(tris(CLIMBER_BODY_GEO) + 2 * tris(CLIMBER_ARM_GEO) + tris(CLIMBER_LEGS_GEO)).toBeLessThanOrEqual(700)
+  })
+
+  it('is lighter on top than underneath', () => {
+    const { normal, color } = CLIMBER_BODY_GEO.attributes
+    for (let i = 0; i < normal.count; i++) {
+      if (normal.getY(i) > 0.9 && color.getX(i) > 0.8) expect(color.getX(i)).toBeGreaterThan(0.85)
+    }
   })
 })

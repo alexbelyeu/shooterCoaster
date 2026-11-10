@@ -5,11 +5,15 @@ import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
 import { buildArcTable } from '@/track/arcLength'
 import { createHeightFunction, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
-import type { EnemyType } from '@/types/level'
+import type { EnemyType, WallSurface } from '@/types/level'
 import { maxReadableDistance } from '../enemies/enemyReadability'
-import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, readableScatterSpawn, scatterSpawn, type ScatterBand } from './enemyPlacement'
+import {
+  ENEMY_PLACEMENT, WALL_START_SPREAD, WATER_DEPTH, WATER_Y, readableScatterSpawn, scatterSpawn, wallNormal, wallPoint, wallSlots,
+  type ScatterBand,
+} from './enemyPlacement'
 
-const scattered = (Object.keys(ENEMY_PLACEMENT) as EnemyType[]).filter((t) => ENEMY_PLACEMENT[t].scatter !== 'trackside')
+const types = Object.keys(ENEMY_PLACEMENT) as EnemyType[]
+const scattered = types.filter((t) => typeof ENEMY_PLACEMENT[t].scatter === 'object')
 
 describe('scatterSpawn', () => {
   const flat = () => 10
@@ -59,5 +63,54 @@ describe('readableScatterSpawn', () => {
       }
     }
     if (total > 0) expect(readable / total).toBeGreaterThan(0.9)
+  })
+})
+
+describe('wall enemies', () => {
+  const walls: WallSurface[] = [
+    { id: 'north', origin: { x: -100, y: 0, z: -400 }, right: { x: 1, y: 0, z: 0 }, up: { x: 0, y: 1, z: 0 }, width: 300, height: 500 },
+    {
+      id: 'slab',
+      origin: { x: 400, y: 10, z: 200 },
+      right: { x: 0, y: 0, z: 1 },
+      up: { x: Math.sin(Math.PI / 6), y: Math.cos(Math.PI / 6), z: 0 },
+      width: 80,
+      height: 300,
+    },
+  ]
+
+  it('climbers climb walls, and only wall enemies do', () => {
+    expect(ENEMY_PLACEMENT.climber).toEqual({ surface: 'wall', scatter: 'wall' })
+    for (const t of types) expect(ENEMY_PLACEMENT[t].surface === 'wall', t).toBe(ENEMY_PLACEMENT[t].scatter === 'wall')
+  })
+
+  it('starts each at the foot of one of the walls, off its edges, using every wall', () => {
+    const slots = wallSlots(60, walls, createRng(3))
+    expect(new Set(slots.map((s) => s.wall.id))).toEqual(new Set(['north', 'slab']))
+    for (const s of slots) {
+      expect(s.u).toBeGreaterThanOrEqual(Math.min(30, s.wall.width / 2))
+      expect(s.u).toBeLessThanOrEqual(s.wall.width - Math.min(30, s.wall.width / 2))
+      expect(s.v).toBeGreaterThanOrEqual(0)
+      expect(s.v).toBeLessThanOrEqual(WALL_START_SPREAD * s.wall.height)
+    }
+    expect(wallSlots(5, walls, createRng(3))).toEqual(wallSlots(5, walls, createRng(3)))
+  })
+
+  it('needs the level to have walls', () => {
+    expect(() => wallSlots(1, [], createRng(1))).toThrow(/walls/)
+  })
+
+  it('puts wall points on the face, off it along right × up', () => {
+    const slab = walls[1]
+    const n = wallNormal(slab)
+    expect(n.x).toBeCloseTo(-Math.cos(Math.PI / 6))
+    expect(Math.hypot(n.x, n.y, n.z)).toBeCloseTo(1)
+    const p = wallPoint(slab, 40, 100, 8, { x: 0, y: 0, z: 0 })
+    expect(p.z).toBeCloseTo(slab.origin.z + 40)
+    expect(p.y).toBeCloseTo(slab.origin.y + 100 * Math.cos(Math.PI / 6) + 8 * n.y)
+  })
+
+  it.each(getAllLevels().map((l) => [l.id, l] as const))('%s: has walls if it has wall enemies', (_id, level) => {
+    if (level.enemies.some((w) => ENEMY_PLACEMENT[w.type].surface === 'wall')) expect(level.walls?.length).toBeGreaterThan(0)
   })
 })

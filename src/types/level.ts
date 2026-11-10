@@ -4,7 +4,17 @@ import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 export type CurveType = 'curve1' | 'curve2'
 export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic'
 export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti'
-export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake'
+export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber'
+
+/** A climbable wall (#453): from `origin`, its bottom-left corner, along unit `right` and `up`; it faces `right × up`. */
+export interface WallSurface {
+  id: string
+  origin: { x: number; y: number; z: number }
+  right: { x: number; y: number; z: number }
+  up: { x: number; y: number; z: number }
+  width: number
+  height: number
+}
 
 export interface TrackParams {
   varA: number
@@ -65,6 +75,8 @@ export interface LevelConfig {
   boss?: { type: BossType; at: number }
   /** Weapon pickups floating over the track, 2–4 (`combat/pickups/pickupPlacement.ts`); default one of each. */
   pickups?: PickupWeaponId[]
+  /** Walls its wall enemies (`ENEMY_PLACEMENT` surface `'wall'`) climb; required when it has any. */
+  walls?: WallSurface[]
   /** Per-level bullet look; unset fields fall back to BulletPool's defaults (red, size 10). */
   combat?: {
     bulletColor?: string

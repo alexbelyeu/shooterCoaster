@@ -10,6 +10,7 @@ import { registerE2EEnemy, unregisterE2EEnemy } from '@/testing/e2eHook'
 import { flashMesh, restoreMesh } from './hitFlash'
 import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE, type EnemyKilledEvent } from '@/combat/hitFeedback'
 import { entryPoint, type FormationMotion, type Vec3 } from '@/entities/spawning/spawnPlacement'
+import type { WallSlot } from '@/entities/spawning/enemyPlacement'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { DEATH_STYLES } from '@/effects/deathStyles'
 
@@ -24,6 +25,9 @@ export interface EnemyProps {
   entry?: EnemyEntry
   /** A formation member's motion after its entry. */
   motion?: FormationMotion
+  wall?: WallSlot
+  /** It got away unshot (a climber topped out): gone, unscored. */
+  onEscape?: (id: string) => void
 }
 
 export interface EnemyEntry {
@@ -40,7 +44,7 @@ interface EnemyBaseProps extends EnemyProps {
     spawnPos: THREE.Vector3,
     time: number,
     delta: number,
-  ) => void
+  ) => void | 'escaped'
 }
 
 /**
@@ -51,6 +55,7 @@ interface EnemyBaseProps extends EnemyProps {
  * Death is two-step: on hit the enemy is scored immediately, stops moving and
  * flashes white at 1.2x scale for ENEMY_HIT_FLASH_MS (game time); then it emits
  * 'enemy:killed', plays its type's death effect (`effects/deathStyles.ts`) and unmounts.
+ * An enemy whose `updatePosition` returns 'escaped' unmounts at once, unscored, through `onEscape`.
  */
 export default function EnemyBase({
   id,
@@ -59,6 +64,7 @@ export default function EnemyBase({
   scoreValue,
   radius,
   onKill,
+  onEscape,
   entry,
   children,
   updatePosition,
@@ -160,7 +166,12 @@ export default function EnemyBase({
       if (entryT.current === 1) setEntered(true)
     } else if (aliveRef.current) {
       // Game time, not the render clock, so a pause never jumps an orbiting enemy.
-      updatePosition(meshRef.current, spawnPosition, gameTime(), delta * timeScale)
+      if (updatePosition(meshRef.current, spawnPosition, gameTime(), delta * timeScale) === 'escaped') {
+        aliveRef.current = false
+        unregisterCollisionTarget(id)
+        setAlive(false)
+        onEscape?.(id)
+      }
     } else if (dying.current) {
       // Frozen in the white pop. The hit may land earlier in this same frame
       // (bullet pool runs first), so require a 2nd tick: the pop is always

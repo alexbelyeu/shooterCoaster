@@ -147,7 +147,7 @@ describe('computeMaxScore', () => {
   it('has a score value for every enemy type', () => {
     const types: EnemyType[] = [
       'balloon', 'crow', 'scorpion', 'shark', 'jellyfish', 'flyingFish', 'snowman',
-      'snowmanScout', 'snowmanBrute', 'emberWisp', 'lavaGolem', 'fireImp', 'infernalDrake',
+      'snowmanScout', 'snowmanBrute', 'emberWisp', 'lavaGolem', 'fireImp', 'infernalDrake', 'climber',
     ]
     for (const t of types) expect(Number.isInteger(SCORE_VALUES[t])).toBe(true)
   })
