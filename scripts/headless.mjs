@@ -51,10 +51,21 @@ export async function startPreview({ dist = 'dist', base = '', page = '/' } = {}
   return { url, proc }
 }
 
-export function launchBrowser(extraArgs = []) {
-  return chromium.launch({
+/**
+ * Playwright's own SIGTERM handler closes the browser but leaves the script running: a smoke poll that
+ * swallows "browser has been closed" then runs to its own deadline, so `timeout 270` overran by minutes
+ * (#475). Ours closes the browser and exits 143; a stuck close gets 5 s.
+ */
+export async function launchBrowser(extraArgs = []) {
+  const browser = await chromium.launch({
     headless: true,
+    handleSIGTERM: false,
     executablePath: process.env.SC_CHROME || undefined,
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox', ...extraArgs],
   })
+  process.once('SIGTERM', () => {
+    setTimeout(() => process.exit(143), 5000).unref()
+    browser.close().finally(() => process.exit(143))
+  })
+  return browser
 }
