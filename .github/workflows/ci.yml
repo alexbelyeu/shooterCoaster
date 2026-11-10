@@ -219,7 +219,8 @@ jobs:
             }
 
   # The itch.io / Newgrounds / CrazyGames zip (#88): relative paths, no other origin,
-  # level 1 played from a sub-path. A job of its own, beside verify: its smoke takes ~5 min.
+  # level 1 played from a sub-path. A job of its own, beside verify: its smoke (title + level 1's ride, shot,
+  # results; not every step, which took 15 of the job's 20 min, #486) takes ~5 min.
   # Only where it can break (scripts/ciPlan.cjs): a PR touching its inputs, nightly on main, a hand-started run.
   portal:
     name: portal
