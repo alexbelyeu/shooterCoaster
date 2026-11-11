@@ -1,7 +1,8 @@
 import { useEffect, useRef, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
-import { endFrenzy, resetComboRuntime, tickCombo } from '@/combat/comboRuntime'
+import { resetComboRuntime, tickCombo } from '@/combat/comboRuntime'
+import { endSlowMo, resetSlowMo, tickSlowMo } from '@/combat/slowMo'
 import { markStartup } from '@/core/startupMarks'
 import { levelTimeHeld, levelTimeStep, noteE2ELevelTime } from '@/testing/e2eHook'
 
@@ -11,7 +12,7 @@ interface GameTimerProps {
 
 /**
  * Counts down the level; reset when a run starts (`runId`), kept through GO, pause and resume.
- * Also the frame that owns the combo game clock (`tickCombo`).
+ * Also the frame that owns the combo game clock (`tickCombo`) and the slow-mo (`tickSlowMo`).
  */
 export default function GameTimer({ seconds }: GameTimerProps) {
   const phase = useGameStore((s) => s.phase)
@@ -28,13 +29,16 @@ export default function GameTimer({ seconds }: GameTimerProps) {
     running.current = false
     lastCeiled.current = -1
     resetComboRuntime()
+    resetSlowMo()
     useGameStore.getState().setTimeRemaining(seconds)
   }, [runId, seconds])
 
   // However the run reached results (timer, `endLevel`), the slow-mo must not follow it there.
   useEffect(() => {
-    if (phase === 'results') endFrenzy()
+    if (phase === 'results') endSlowMo()
   }, [phase])
+  // Nor out of the level (Quit to the title).
+  useEffect(() => () => endSlowMo(true), [])
 
   useFrame((_, delta) => {
     // The rendered `phase` lags a store change by a render, so a pause from a DOM event (tab hide) is read live.
@@ -46,6 +50,7 @@ export default function GameTimer({ seconds }: GameTimerProps) {
       const step = levelTimeStep(delta)
       if (!levelTimeHeld()) elapsed.current += step
       tickCombo(step)
+      tickSlowMo(step)
     } else running.current = true
     noteE2ELevelTime(elapsed.current)
 
@@ -57,7 +62,7 @@ export default function GameTimer({ seconds }: GameTimerProps) {
     }
 
     if (remaining <= 0) {
-      endFrenzy()
+      endSlowMo()
       setPhase('results')
     }
   })

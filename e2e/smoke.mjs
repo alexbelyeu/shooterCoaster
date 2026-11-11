@@ -2226,6 +2226,20 @@ async function settingsCheck(page) {
   const picked = await page.evaluate(() => window.__SC_TEST__.graphics().quality)
   await page.locator('.settings-card input[type="range"]').first().fill('0.3')
   if (picked !== 'low') problems.push(`clicking Low set the quality to "${picked}"`)
+  // Every preset change rebuilds the post composer (its MSAA): the old one's render targets must be freed (#249).
+  const cycleQuality = async (rounds) => {
+    for (let i = 0; i < rounds; i++) {
+      for (const name of ['Med', 'High', 'Low']) {
+        await page.getByRole('radio', { name, exact: true }).click({ timeout: 30000 })
+        await waitFrames(page, 2, { maxMs: 8000 })
+      }
+    }
+    return page.evaluate(() => window.__SC_TEST__.gpuMemory().textures)
+  }
+  const texturesAfterOne = await cycleQuality(1)
+  const texturesAfterFour = await cycleQuality(3)
+  if (texturesAfterFour > texturesAfterOne)
+    problems.push(`GPU textures grew ${texturesAfterOne} -> ${texturesAfterFour} over 9 more quality changes (old composer render targets not freed?)`)
   await page.keyboard.press('Escape')
   const closed = await page
     .waitForSelector('.settings-card', { state: 'detached', timeout: 10000 })
@@ -2241,7 +2255,11 @@ async function settingsCheck(page) {
   })
   if (reloaded.quality !== 'low') problems.push(`quality "${reloaded.quality}" after a reload, expected low`)
   if (reloaded.musicVolume !== 0.3) problems.push(`music volume ${reloaded.musicVolume} after a reload, expected 0.3`)
-  return { id: 'settings', problems, settings: { card: layout.rect, quality: [before, picked, reloaded.quality], musicVolume: reloaded.musicVolume } }
+  return {
+    id: 'settings',
+    problems,
+    settings: { card: layout.rect, quality: [before, picked, reloaded.quality], musicVolume: reloaded.musicVolume, textures: [texturesAfterOne, texturesAfterFour] },
+  }
 }
 
 /**
@@ -3433,7 +3451,7 @@ async function run() {
         ? ` cards=${r.levelSelect.cards} locked=${r.levelSelect.locked} stars=${r.levelSelect.total} top=${r.levelSelect.initials.filter(Boolean).join(',')}` +
           (r.levelSelect.keyboard ? ` keys: ${r.levelSelect.focused} <- ${r.levelSelect.keyboard.left}, locked ${r.levelSelect.keyboard.locked} Enter -> ${r.levelSelect.keyboard.phaseAfterLocked}, Enter -> ${r.levelSelect.keyboard.level} ${r.levelSelect.keyboard.phase}` : '')
       : r.settings
-        ? ` card ${JSON.stringify(r.settings.card)} quality ${r.settings.quality.join(' -> ')} (reload) music ${r.settings.musicVolume}`
+        ? ` card ${JSON.stringify(r.settings.card)} quality ${r.settings.quality.join(' -> ')} (reload) music ${r.settings.musicVolume} textures ${r.settings.textures.join(' -> ')}`
       : r.quality
         ? ` ${r.quality.level} draws default=${r.quality.drawCalls[0]} low=${r.quality.drawCalls[1]} dpr ${r.quality.dpr.join(' -> ')}`
       : r.seedCheck

@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { FIREWORK_BIOMES, FIREWORK_SFX, fireworkWhistleS, killTier, WIND, windGain, windHz, windUpdateDue } from './sfxDesign'
-
-describe('killTier', () => {
-  it('maps combo counts to the four tiers', () => {
-    expect([0, 1, 3, 4, 7, 8, 14, 15, 40].map(killTier)).toEqual([0, 0, 0, 1, 1, 2, 2, 3, 3])
-  })
-})
+import { FIREWORK_BIOMES, FIREWORK_SFX, fireworkWhistleS, WIND, windGain, windHz, windUpdateDue } from './sfxDesign'
 
 describe('wind', () => {
   it('opens and brightens with speed', () => {

@@ -8,15 +8,16 @@ import {
 const DEG = Math.PI / 180
 
 describe('screenShake', () => {
-  it('kill trauma scales with combo and is clamped to 0..1', () => {
+  it('kill trauma steps with the combo tier and is clamped to 0..1', () => {
     expect(killTrauma(1)).toBeCloseTo(0.55)
-    expect(killTrauma(10)).toBe(1)
+    expect(killTrauma(3)).toBeCloseTo(0.55)
+    expect(killTrauma(15)).toBe(1)
     expect(killTrauma(99)).toBe(1)
     expect(killTrauma(0)).toBeCloseTo(0.55)
     expect(killTrauma(NaN)).toBeCloseTo(0.55)
-    expect(killTrauma(5)).toBeGreaterThan(killTrauma(2))
+    expect([4, 8, 15].map(killTrauma)).toEqual([0.7, 0.85, 1].map((v) => expect.closeTo(v)))
     expect(addTrauma({ trauma: 0.9, decayMs: KILL_TRAUMA_MS }, killTrauma(1)).trauma).toBe(0.9)
-    expect(addTrauma({ trauma: 0.1, decayMs: KILL_TRAUMA_MS }, killTrauma(10)).trauma).toBe(1)
+    expect(addTrauma({ trauma: 0.1, decayMs: KILL_TRAUMA_MS }, killTrauma(15)).trauma).toBe(1)
     expect(addTrauma({ trauma: 0, decayMs: KILL_TRAUMA_MS }, 5).trauma).toBe(1)
   })
 
@@ -26,7 +27,7 @@ describe('screenShake', () => {
     expect(s.trauma).toBe(0.8)
     expect(s.trauma * s.decayMs).toBeCloseTo(2400)
     decayTrauma(s, 1000)
-    addTrauma(s, killTrauma(10))
+    addTrauma(s, killTrauma(15))
     expect(s.trauma).toBe(1)
     expect(s.trauma * s.decayMs).toBeCloseTo(2400 - 1000)
     let elapsed = 0

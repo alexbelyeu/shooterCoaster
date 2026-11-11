@@ -3,11 +3,6 @@ import type { BiomeType } from '@/types/level'
 import { comboTierIndex } from '@/combat/comboTiers'
 import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
-/** The combo tier (`combat/comboTiers.ts`): 0 = the body (1×), 1 = + thump (2×), 2 = + ring (3×), 3 = + payout (5×). */
-export function killTier(combo: number): number {
-  return comboTierIndex(combo)
-}
-
 /** What a kill sounds like, by death style (`effects/deathStyles.ts`): a bright pop, wing flutter, a low crunch, a wash, a hiss, a chalk puff. */
 export const KILL_SOUNDS = ['pop', 'flutter', 'crunch', 'splash', 'hiss', 'chalk'] as const
 export type KillSound = (typeof KILL_SOUNDS)[number]
@@ -188,12 +183,13 @@ export function pickVoice(voices: readonly VoiceState[], prio: number, now: numb
   return best
 }
 
+/** Steps with the combo tier (`combat/comboTiers.ts`), like every combo feedback. */
 export function killRate(combo: number): number {
-  return 1 + Math.min(Math.max(combo, 0), 12) * 0.025
+  return 1 + comboTierIndex(combo) * 0.1
 }
 
 export function hitRate(combo: number): number {
-  return Math.pow(2, (2 * killTier(combo)) / 12)
+  return Math.pow(2, (2 * comboTierIndex(combo)) / 12)
 }
 
 export function bossHitRate(hpFraction: number): number {

@@ -14,7 +14,7 @@ import {
 import { seedFromQuery } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
 import { markStartup } from '@/core/startupMarks'
-import { comboExpired, comboMultiplier } from '@/combat/comboTiers'
+import { comboExpired, comboMultiplier, type FrenzyStage } from '@/combat/comboTiers'
 import { startPhaseFor } from './startPhase'
 import { NO_PICKUP, applyPickup, type PickupWeaponId, type WeaponState } from '@/combat/weapons/weaponTypes'
 import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/daily'
@@ -59,7 +59,7 @@ interface GameState {
   registerShot: (bullets?: number) => void
   registerHit: () => void
 
-  // Combo (tiers and windows: combat/comboTiers.ts; expiry and slow-mo: combat/comboRuntime.ts)
+  // Combo (tiers and windows: combat/comboTiers.ts; expiry: combat/comboRuntime.ts)
   combo: ComboState
   /** Call before `addScore`, so the kill scores at the tier it reaches. */
   registerKill: () => void
@@ -99,7 +99,9 @@ interface GameState {
   saveDailyScore: (entry: ScoreEntry, dateKey: string) => void
 
   timeScale: number
-  setTimeScale: (s: number) => void
+  frenzy: FrenzyStage
+  /** Only `combat/slowMo.ts` calls this (its test checks); everyone else requests a slow-mo there. */
+  setSlowMo: (timeScale: number, frenzy: FrenzyStage) => void
 
   /** The mounted level's shader warm-up is done (`canvas/ShaderWarmup.tsx`); the countdown holds Ready until then. */
   sceneReady: boolean
@@ -118,6 +120,7 @@ const FRESH_RUN = {
   bestCombo: 0,
   combo: NO_COMBO,
   timeScale: 1,
+  frenzy: 'off',
   boss: null,
   weapon: NO_PICKUP,
 } satisfies Partial<GameState>
@@ -189,7 +192,7 @@ export const useGameStore = create<GameState>()(
       totalEnemies: 0,
       setEnemyCounts: (remaining, total) => set({ enemiesRemaining: remaining, totalEnemies: total }),
 
-      setTimeScale: (s) => set({ timeScale: s }),
+      setSlowMo: (timeScale, frenzy) => set({ timeScale, frenzy }),
 
       setBoss: (boss) => set({ boss }),
 

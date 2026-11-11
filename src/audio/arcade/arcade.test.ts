@@ -95,7 +95,8 @@ describe('rates', () => {
   it('pitch climbs with the combo and the boss damage, within an octave', () => {
     expect(killRate(0)).toBe(1)
     expect(killRate(12)).toBeGreaterThan(killRate(4))
-    expect(killRate(99)).toBe(killRate(12))
+    expect(killRate(7)).toBe(killRate(4))
+    expect(killRate(99)).toBe(killRate(15))
     expect(hitRate(15)).toBeGreaterThan(hitRate(0))
     expect(bossHitRate(0.2)).toBeGreaterThan(bossHitRate(1))
     expect(bossHitRate(0)).toBeLessThan(2)

@@ -2,6 +2,7 @@
  * Rotation-only camera trauma (#65). Never translate the camera for feedback: the
  * rails sit right under it, so any offset makes the world jump. Pure, for Node tests.
  */
+import { TOP_TIER, comboTierIndex } from './comboTiers'
 
 export type ScreenShakeLevel = 'off' | 'reduced' | 'full'
 
@@ -15,8 +16,6 @@ export const SCREEN_SHAKE_SCALE: Record<ScreenShakeLevel, number> = {
 
 /** Game-ms for a kill's trauma of 1 to decay to 0. */
 export const KILL_TRAUMA_MS = 240
-/** Kills at this combo or above give full trauma. */
-export const KILL_TRAUMA_COMBO_CAP = 10
 /** Peak angles at trauma 1 on 'full' (degrees). */
 export const MAX_PITCH_YAW_DEG = 0.6
 export const MAX_ROLL_DEG = 1
@@ -25,10 +24,9 @@ export const SHAKE_NOISE_HZ = 14
 
 const DEG = Math.PI / 180
 
-/** 0.55 at combo 1 up to 1 at the cap. */
+/** 0.55 at the 1× tier up to 1 at 5×, a step per combo tier. */
 export function killTrauma(combo: number): number {
-  const c = Math.min(Math.max(Number.isFinite(combo) ? combo : 1, 1), KILL_TRAUMA_COMBO_CAP)
-  return 0.55 + 0.45 * ((c - 1) / (KILL_TRAUMA_COMBO_CAP - 1))
+  return 0.55 + 0.45 * (comboTierIndex(combo) / TOP_TIER)
 }
 
 /** Bus event for world-event shake: `eventBus.emit(CAMERA_TRAUMA_EVENT, amount, durationMs)`. */

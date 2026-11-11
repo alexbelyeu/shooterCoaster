@@ -1,4 +1,4 @@
-/** Combo tiers and the 5× slow-mo envelope; pure, so keep React / three / store imports out. */
+/** Combo tiers and the slow-mo rules (the 5× frenzy, the last kill); pure, so keep React / three / store imports out. */
 
 export interface ComboTier {
   minCount: number
@@ -49,4 +49,29 @@ export function frenzyTimeScale(t: number): number {
   if (!(t > 0) || t >= durationS) return 1
   const depth = smoothstep(Math.min(1, t / easeS, (durationS - t) / easeS))
   return 1 - (1 - timeScale) * depth
+}
+
+/** The FRENZY flash's stage (`ui/hud/FrenzyFlash`): on for the envelope, fading out over its ease back to 1. */
+export type FrenzyStage = 'off' | 'on' | 'out'
+
+export function frenzyStage(t: number): FrenzyStage {
+  if (!(t >= 0) || t >= FRENZY.durationS) return 'off'
+  return t > FRENZY.durationS - FRENZY.easeS ? 'out' : 'on'
+}
+
+/** Slow-mo on the level's last enemy going down. Seconds are real (playing) time. */
+export const LAST_KILL = {
+  durationS: 1.5,
+  timeScale: 0.1,
+} as const
+
+/**
+ * The time scale the slow-mo owner (`combat/slowMo.ts`) writes. An override (the debug freeze, an e2e
+ * `setTimeScale`) wins outright; otherwise the slowest running envelope does. Envelope times are seconds
+ * since it started, Infinity when it isn't running.
+ */
+export function slowMoScale(override: number | null, frenzyT: number, lastKillT: number): number {
+  if (override !== null) return override
+  const frenzy = frenzyTimeScale(frenzyT)
+  return lastKillT >= 0 && lastKillT < LAST_KILL.durationS ? Math.min(frenzy, LAST_KILL.timeScale) : frenzy
 }

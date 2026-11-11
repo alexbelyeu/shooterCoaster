@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { COMBO_TIERS, FRENZY, comboExpired, comboMultiplier, comboTierIndex, comboWindowS, frenzyTimeScale } from './comboTiers'
+import {
+  COMBO_TIERS, FRENZY, LAST_KILL, comboExpired, comboMultiplier, comboTierIndex, comboWindowS, frenzyStage, frenzyTimeScale, slowMoScale,
+} from './comboTiers'
 
 describe('combo tiers', () => {
   it('maps kill counts to 1× (1–3), 2× (4–7), 3× (8–14), 5× (15+)', () => {
@@ -45,5 +47,34 @@ describe('frenzyTimeScale', () => {
     expect(frenzyTimeScale(FRENZY.durationS / 2)).toBeCloseTo(FRENZY.timeScale)
     expect(frenzyTimeScale(FRENZY.durationS - FRENZY.easeS)).toBeCloseTo(FRENZY.timeScale)
     expect(frenzyTimeScale(FRENZY.durationS - 0.01)).toBeGreaterThan(0.95)
+  })
+})
+
+describe('frenzyStage', () => {
+  it('is on through the hold, out over the ease back, off outside the envelope', () => {
+    expect(frenzyStage(Infinity)).toBe('off')
+    expect(frenzyStage(Number.NaN)).toBe('off')
+    expect(frenzyStage(-1)).toBe('off')
+    expect(frenzyStage(0)).toBe('on')
+    expect(frenzyStage(FRENZY.durationS - FRENZY.easeS)).toBe('on')
+    expect(frenzyStage(FRENZY.durationS - FRENZY.easeS / 2)).toBe('out')
+    expect(frenzyStage(FRENZY.durationS)).toBe('off')
+  })
+})
+
+describe('slowMoScale', () => {
+  const mid = FRENZY.durationS / 2
+  it('is 1 with nothing running', () => {
+    expect(slowMoScale(null, Infinity, Infinity)).toBe(1)
+  })
+  it('follows a lone frenzy or last kill', () => {
+    expect(slowMoScale(null, mid, Infinity)).toBeCloseTo(FRENZY.timeScale)
+    expect(slowMoScale(null, Infinity, 0)).toBe(LAST_KILL.timeScale)
+    expect(slowMoScale(null, Infinity, LAST_KILL.durationS)).toBe(1)
+  })
+  it('the slowest envelope wins, an override beats both', () => {
+    expect(slowMoScale(null, mid, 0.5)).toBe(LAST_KILL.timeScale)
+    expect(slowMoScale(0, mid, 0.5)).toBe(0)
+    expect(slowMoScale(4, mid, 0.5)).toBe(4)
   })
 })

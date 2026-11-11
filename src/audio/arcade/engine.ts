@@ -2,6 +2,7 @@
 import type { BiomeType } from '@/types/level'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { createRng, hashString } from '@/utils/rng'
+import { comboTierIndex } from '@/combat/comboTiers'
 import { arcadeChannel, audioContext, audioNow as clock, isAudioReady } from '../AudioEngine'
 import { scrimPlayer } from '../musicEngine'
 import { dropSound } from '../soundGuard'
@@ -10,7 +11,7 @@ import { makeIR, upmixPanner } from '../scrim/synth'
 import { SCORES, scoreIdFor } from '../scores'
 import {
   ARCADE_SOUNDS, AUTO_FIRE_DB, BIOME_REVERB, FIREWORK_BIOMES, STEAL_FADE_S, VOICE_BUDGET, WHISTLE_LENGTHS_S, SCORE_KEYS,
-  WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, killTier, nextBeat, panGain, pickVoice, windGain, windHz, windUpdateDue,
+  WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, nextBeat, panGain, pickVoice, windGain, windHz, windUpdateDue,
   type ArcadeSoundId, type VoiceState, type WindRamp,
 } from '../sfxDesign'
 import type { Placement, SfxEngine, UiSound, VoiceStats } from '../sfx'
@@ -300,7 +301,8 @@ let killsPlayed = 0
 
 function playKill(body: ArcadeSoundId, combo: number, at: Placement | null) {
   if (play(body, 0, 0, killRate(combo), 0, at)) killsPlayed++
-  const tier = killTier(combo)
+  // The combo tier: 0 = the body (1×), 1 = + thump (2×), 2 = + ring (3×), 3 = + payout (5×).
+  const tier = comboTierIndex(combo)
   if (tier >= 1) play('kill.thump', 0, 0, 1, 0, at)
   if (tier >= 2) play('kill.ring', 0, 0, 1, 0, at)
   if (tier >= 3) play('kill.payout', 0, 0, 1, 0, at)
