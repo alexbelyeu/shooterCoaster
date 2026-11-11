@@ -17,12 +17,12 @@ vi.hoisted(() => {
 
 const initial = useGameStore.getState()
 const store = () => useGameStore.getState()
-const testHook = window as unknown as { __SC_TEST__?: { holdFeedback?: boolean } }
+const holdFeedback = (on: boolean) => Object.assign(window, { __SC_TEST__: { holdFeedback: on } })
 
 beforeEach(() => {
   useGameStore.setState(initial, true)
   resetSlowMo()
-  delete testHook.__SC_TEST__
+  Reflect.deleteProperty(window, '__SC_TEST__')
 })
 
 describe('frenzy envelope', () => {
@@ -39,11 +39,11 @@ describe('frenzy envelope', () => {
   })
 
   it('holds deep, flash on, under e2e holdFeedback', () => {
-    testHook.__SC_TEST__ = { holdFeedback: true }
+    holdFeedback(true)
     requestSlowMo('frenzy')
     for (let i = 0; i < 10; i++) tickSlowMo(1)
     expect(store()).toMatchObject({ timeScale: FRENZY.timeScale, frenzy: 'on' })
-    testHook.__SC_TEST__.holdFeedback = false
+    holdFeedback(false)
     tickSlowMo(FRENZY.durationS)
     expect(store()).toMatchObject({ timeScale: 1, frenzy: 'off' })
   })

@@ -1,14 +1,12 @@
-import type { EffectComposer } from 'postprocessing'
+interface Disposable {
+  dispose(): void
+}
 
 /**
- * Callback ref for `<EffectComposer>`: @react-three/postprocessing builds a new composer whenever `multisampling`
- * changes (the quality setting) and never disposes the old one, so its cleanup frees the old composer's two
- * render targets. Not `composer.dispose()`: that also disposes the passes (the shared grade effect among them)
- * and postprocessing's static fullscreen triangle every pass draws with.
+ * `<EffectComposer>` callback ref: the library rebuilds the composer on a `multisampling` change and never frees
+ * the old one's render targets. Not `composer.dispose()`, which also disposes the shared grade effect.
  */
-export function freeComposerTargets(
-  composer: Pick<EffectComposer, 'inputBuffer' | 'outputBuffer'> | null,
-): (() => void) | undefined {
+export function freeComposerTargets(composer: { inputBuffer: Disposable; outputBuffer: Disposable } | null) {
   if (!composer) return undefined
   return () => {
     composer.inputBuffer.dispose()

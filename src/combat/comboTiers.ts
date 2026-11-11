@@ -51,7 +51,7 @@ export function frenzyTimeScale(t: number): number {
   return 1 - (1 - timeScale) * depth
 }
 
-/** The FRENZY flash's stage (`ui/hud/FrenzyFlash`): on for the envelope, fading out over its ease back to 1. */
+/** The FRENZY flash fades out over the envelope's ease back to 1. */
 export type FrenzyStage = 'off' | 'on' | 'out'
 
 export function frenzyStage(t: number): FrenzyStage {
@@ -65,11 +65,7 @@ export const LAST_KILL = {
   timeScale: 0.1,
 } as const
 
-/**
- * The time scale the slow-mo owner (`combat/slowMo.ts`) writes. An override (the debug freeze, an e2e
- * `setTimeScale`) wins outright; otherwise the slowest running envelope does. Envelope times are seconds
- * since it started, Infinity when it isn't running.
- */
+/** An override (debug freeze, e2e `setTimeScale`) wins outright, else the slowest running envelope (t = Infinity: not running). */
 export function slowMoScale(override: number | null, frenzyT: number, lastKillT: number): number {
   if (override !== null) return override
   const frenzy = frenzyTimeScale(frenzyT)

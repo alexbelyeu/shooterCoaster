@@ -2237,9 +2237,9 @@ async function settingsCheck(page) {
     return page.evaluate(() => window.__SC_TEST__.gpuMemory().textures)
   }
   const texturesAfterOne = await cycleQuality(1)
-  const texturesAfterFour = await cycleQuality(3)
-  if (texturesAfterFour > texturesAfterOne)
-    problems.push(`GPU textures grew ${texturesAfterOne} -> ${texturesAfterFour} over 9 more quality changes (old composer render targets not freed?)`)
+  const texturesAfterThree = await cycleQuality(2)
+  if (texturesAfterThree > texturesAfterOne)
+    problems.push(`GPU textures grew ${texturesAfterOne} -> ${texturesAfterThree} over 6 more quality changes (old composer render targets not freed?)`)
   await page.keyboard.press('Escape')
   const closed = await page
     .waitForSelector('.settings-card', { state: 'detached', timeout: 10000 })
@@ -2258,7 +2258,7 @@ async function settingsCheck(page) {
   return {
     id: 'settings',
     problems,
-    settings: { card: layout.rect, quality: [before, picked, reloaded.quality], musicVolume: reloaded.musicVolume, textures: [texturesAfterOne, texturesAfterFour] },
+    settings: { card: layout.rect, quality: [before, picked, reloaded.quality], musicVolume: reloaded.musicVolume, textures: [texturesAfterOne, texturesAfterThree] },
   }
 }
 

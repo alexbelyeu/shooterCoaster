@@ -1,8 +1,4 @@
-/**
- * The one writer of the store's `timeScale` and `frenzy` stage. Callers request a slow-mo (the 5× frenzy from
- * `comboRuntime`, the last kill from `EnemySpawner`) or set the override (the debug freeze, e2e `setTimeScale`);
- * `slowMoScale` picks the winner. `GameTimer` ticks it on playing frames, so a pause holds every envelope.
- */
+/** The one writer of the store's `timeScale` and `frenzy` stage; ticked by `GameTimer` on playing frames, so a pause holds it. */
 import { useGameStore } from '@/store/useGameStore'
 import { FRENZY, frenzyStage, slowMoScale } from './comboTiers'
 import { isFeedbackHeld } from './hitFeedback'
@@ -25,7 +21,7 @@ export function requestSlowMo(kind: 'frenzy' | 'lastKill'): void {
   apply()
 }
 
-/** Beats every envelope until cleared with null. */
+/** The debug freeze and e2e `setTimeScale`; null hands time back to the envelopes. */
 export function setTimeScaleOverride(scale: number | null): void {
   override = scale
   apply()
@@ -36,7 +32,7 @@ export function timeScaleOverride(): number | null {
 }
 
 export function tickSlowMo(delta: number): void {
-  // e2e holdFeedback: hold the frenzy's full slow-down and its flash for the screenshot.
+  // e2e holdFeedback holds the frenzy deep, flash on, for the screenshot.
   if (frenzyT < FRENZY.durationS && isFeedbackHeld())
     frenzyT = Math.min(Math.max(frenzyT, FRENZY.easeS), FRENZY.durationS - FRENZY.easeS)
   else frenzyT += delta
@@ -44,10 +40,7 @@ export function tickSlowMo(delta: number): void {
   apply()
 }
 
-/**
- * `tickSlowMo` runs only on playing frames, so a run that ends mid-envelope hands the time scale back here.
- * An override stays unless `dropOverride` (the level unmounting).
- */
+/** A run ending mid-envelope never reaches another tick; the override survives unless the level unmounts. */
 export function endSlowMo(dropOverride = false): void {
   frenzyT = Infinity
   lastKillT = Infinity
@@ -55,7 +48,7 @@ export function endSlowMo(dropOverride = false): void {
   apply()
 }
 
-/** A new run (`runId`): nothing running, no override. Writes nothing, `startRun` already reset the store. */
+/** Writes nothing: `startRun` already reset the store. */
 export function resetSlowMo(): void {
   frenzyT = Infinity
   lastKillT = Infinity
