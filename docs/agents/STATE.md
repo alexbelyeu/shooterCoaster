@@ -34,6 +34,7 @@ has been posted anywhere yet (#102 waits on Alex); 23 of W45's 28 visitors start
 | 3 Ocean | ocean | 60 s | 20 + 24 jellyfish, 28 sharks (trackside, floating), 36 flying fish at 0 / 14 / 23 / 32 s; **Kraken at 40 s** | Sunken city, sea stacks, water with glitter / swell / shallows / horizon (#430), seabirds, coral, plankton | Reads as an ocean now; jellyfish in view from the start. The whole rail loop sits on the frame as blue cables (#327). Kraken still pale hooks (backlog) |
 | 4 Antarctica | arctic | 60 s | 44 scouts (line), 40 snowmen, 16 brutes at 0 / 15 / 30 s; **Yeti at 40 s** (fists, then the chest while it roars; snowballs are bonus kills) | Ice fortress, mountains, aurora (flares in the tell), crystals, drifts, pines, snow | Sky and snowmen good; the Yeti's snowball splat reads. 178 draws (was 394) |
 | 5 Inferno | volcanic | 60 s | wisps ×2, imps, golems ×2 at 0 / 8 / 16 / 25 / 33 s, one eruption (25 s); **8 drakes at 40 s stand in for the boss** (#320) | Volcano, lava rivers, ash + embers, smoke column, emissive rails | Readable in the dark. The bright vertical slab beside the track remains (#331); wisp / imp / golem are the weakest enemies (#463). 116 draws (was 295) |
+| 6 Climbing Gym | gym (interior) | 60 s | climbers ×24 / 28 / 32 at 0 / 15 / 30 s; **20 climbers starting a third of the way up at 40 s ("Top-out!") stand in for a boss** (#457) | The hall: four walls of sport lanes between arêtes, holds in coloured routes, volumes, catwalk, overhanging upper walls, skylit ceiling, boulders on mats, chalk dust | First interior, built through the level kit. Placeholder score (level4's). 86 draws at 7 s (local) |
 | 6 Climbing Gym | gym (interior) | — | planned: climbers on walls, last-wave sprint, boss TBD | planned: huge walls, bouldering zone, skylights, catwalks | #453 (Climber, ready) → #457 (the level, blocked on it) → #456 (theme round) |
 
 Common: title (poster → fly-by park with a riding coaster, beat-locked cuts, animated logo
@@ -113,6 +114,7 @@ reduced motion (+ an internal-browser toggle coming, #446).
 | level3 | 82 | 192,069 | 73 / 172,424 | 10 / 10 / 78 | 521 |
 | level4 | 178 | 206,635 | 180 / 216,336 | 18 / 12 / 27 | 520 |
 | level5 | 112 | 151,669 | 103 / 150,772 | 30 / 18 / 48 | 456 |
+| level6 | 86 | 164,197 | 121 / 173,072 | 11 / 11 / 18 | 1267 (7 s, `--shard level6`, #457) |
 
 Title: 90 draw calls, 80 scene objects, 11,202 triangles (ceilings before today 114 / 89 / 11,356). Budgets: `scene.title` raised today to 140 / 130 / 60 000 for the title
 world (#454 / #459). Bundle: 519 KB gz total JS (budget 630), largest chunk 172 KB (260),

@@ -11,7 +11,7 @@ import { createTrigCurve } from '@/track/curves/TrigCurve'
 import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
 import type { BiomeType, LevelConfig } from '@/types/level'
 
-const ALL_BIOMES: BiomeType[] = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic']
+const ALL_BIOMES: BiomeType[] = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic', 'gym']
 const levels = getAllLevels()
 
 function trackSamplesFor(level: LevelConfig) {
@@ -33,7 +33,8 @@ describe('BIOME_TERRAIN_CONFIGS', () => {
       const c = BIOME_TERRAIN_CONFIGS[level.biome]
       expect(c, level.id).toBeDefined()
       expect(c.octaves).toBeGreaterThanOrEqual(1)
-      expect(c.amplitude).toBeGreaterThan(0)
+      // The gym is an interior: its floor is flat.
+      expect(c.amplitude > 0, level.id).toBe(level.biome !== 'gym')
       expect(c.persistence).toBeGreaterThan(0)
       expect(c.persistence).toBeLessThan(1)
       expect(c.flatRadius).toBeGreaterThan(0)
@@ -68,8 +69,13 @@ describe('createHeightFunction', () => {
     }
   })
 
+  it('keeps the gym hall floor flat', () => {
+    const h = createHeightFunction('gym')
+    for (let a = 0; a < Math.PI * 2; a += 0.5) expect(h(Math.cos(a) * 3000, Math.sin(a) * 3000)).toBe(0)
+  })
+
   it('produces actual relief outside the flat valley', () => {
-    for (const biome of ALL_BIOMES) {
+    for (const biome of ALL_BIOMES.filter((b) => b !== 'gym')) {
       const h = createHeightFunction(biome)
       const { baseY } = BIOME_TERRAIN_CONFIGS[biome]
       let maxRise = 0

@@ -252,4 +252,44 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
       vignette: 0.36,
     },
   },
+  // Climbing Gym (#457), an interior: the dome is never seen (the hall's ceiling covers it) but bakes the walls'
+  // reflections; the "sun" is the skylights straight above, the hemisphere the bounce off the pale walls. Fog is the
+  // hall's chalky air, so the far wall settles back without vanishing.
+  gym: {
+    sky: {
+      zenith: 0xdfe9f2,
+      horizon: 0xc9d1d9,
+      ground: 0x9aa2aa,
+      horizonFalloff: 0.6,
+      sunColor: 0xffffff,
+      sunSize: 0,
+      sunGlow: 0,
+      cloudiness: 0,
+      cloudColor: 0xffffff,
+      cloudSpeed: 0,
+      cloudStretch: 1,
+    },
+    sunDirection: [0.3, 1, 0.45],
+    sunLightColor: 0xfff1dc,
+    sunLightIntensity: 1.6,
+    hemiSkyColor: 0xe4eefa,
+    hemiGroundColor: 0x8a8f96,
+    hemiIntensity: 1.35,
+    fogNear: 900,
+    fogFar: 6500,
+    envIntensity: 0.45,
+    // Bright and clean: neutral-cool shadows, warm skylight highlights, holds kept vivid
+    grade: {
+      exposure: 1.05,
+      temperature: 0.03,
+      tint: 0,
+      shadowTint: 0x5a7aa8,
+      highlightTint: 0xffe2b8,
+      splitTone: 0.15,
+      contrast: 1.08,
+      saturation: 1.1,
+      vibrance: 0.3,
+      vignette: 0.25,
+    },
+  },
 }

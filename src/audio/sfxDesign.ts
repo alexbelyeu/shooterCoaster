@@ -73,6 +73,7 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
   level3: { tonic: 67, minor: false }, // G major
   level4: { tonic: 62, minor: true }, // D minor
   level5: { tonic: 60, minor: true }, // C minor
+  level6: { tonic: 62, minor: true }, // D minor: level4's score, its placeholder
   results: { tonic: 60, minor: false }, // C major
   // Theme options waiting on Alex's pick (`?theme=`, scores/themes/) get a row each: `'<slot>.<name>': key`
 }
@@ -234,6 +235,7 @@ export const BIOME_REVERB: Record<BiomeType, { seconds: number; decayPow: number
   ocean: { seconds: 2.4, decayPow: 3, toneHz: 6000, level: 0.9 },
   arctic: { seconds: 3, decayPow: 2.6, toneHz: 9000, level: 0.9 },
   volcanic: { seconds: 2, decayPow: 3.4, toneHz: 2600, level: 0.85 },
+  gym: { seconds: 2.6, decayPow: 2.8, toneHz: 5000, level: 0.9 }, // a big hard-walled hall
 }
 
 /** Whistle bakes (s); a launch plays the nearest, rate-matched to its flight. */

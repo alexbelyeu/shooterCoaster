@@ -122,7 +122,7 @@ export function boardSize(board: Board): { width: number; height: number } {
   }
 }
 
-const BIOMES: readonly BiomeType[] = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic']
+const BIOMES: readonly BiomeType[] = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic', 'gym']
 
 export interface TurntableQuery {
   board: Board

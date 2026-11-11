@@ -1,7 +1,7 @@
 import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
 export type CurveType = 'curve1' | 'curve2'
-export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic'
+export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic' | 'gym'
 export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti'
 export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber'
 
@@ -56,6 +56,8 @@ export interface EnemyWave {
   formation?: Formation
   /** Overrides the formation's default anchor. */
   formationOrigin?: FormationOrigin
+  /** Wall enemies: the lowest start, as a fraction of the wall's height (default 0, the foot); a wave starting higher tops out sooner. */
+  wallStart?: number
 }
 
 export interface LevelConfig {

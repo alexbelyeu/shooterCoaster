@@ -18,7 +18,8 @@ const THEME_OPTIONS: Record<string, string> = Object.fromEntries(
   ),
 )
 
-export const SCORES: Record<string, string> = { title, level1, level2, level3, level4, level5, results, ...THEME_OPTIONS }
+// level6 (the Climbing Gym, #457) plays Antarctica's score until its own theme round.
+export const SCORES: Record<string, string> = { title, level1, level2, level3, level4, level5, level6: level4, results, ...THEME_OPTIONS }
 
 /** `?theme=neon,carousel` → `{ title: 'title.neon', level1: 'level1.carousel' }`: each named option replaces its slot's score; unknown names are ignored. */
 export function themesFromQuery(search: string, options: readonly string[] = Object.keys(THEME_OPTIONS)): Record<string, string> {

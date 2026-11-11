@@ -98,7 +98,7 @@ function generateEnemies(
     const { surface, scatter } = ENEMY_PLACEMENT[wave.type]
     if (scatter === 'wall') {
       if (wave.formation && wave.formation !== 'scatter') throw new Error(`${wave.type} climbs a wall: no formation`)
-      for (const wall of wallSlots(wave.count, walls, rng)) {
+      for (const wall of wallSlots(wave.count, walls, rng, wave.wallStart)) {
         const position = toVector3(wallPoint(wall.wall, wall.u, wall.v, WALL_STANDOFF, { x: 0, y: 0, z: 0 }))
         enemies.push({ id: `enemy-${id++}`, position, slot: null, trackside: null, wall, ...base })
       }

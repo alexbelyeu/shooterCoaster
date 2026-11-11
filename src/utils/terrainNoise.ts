@@ -176,6 +176,19 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     flatRadius: 600,
     transitionWidth: 900,
   },
+  // The Climbing Gym's hall floor (#457): flat everywhere, under the lowest track by more than TRACK_CLEARANCE.
+  gym: {
+    frequency: 0.001,
+    amplitude: 0,
+    octaves: 1,
+    persistence: 0.5,
+    lacunarity: 2,
+    exponent: 1,
+    ridgeMode: false,
+    baseY: 0,
+    flatRadius: 100_000,
+    transitionWidth: 1,
+  },
 }
 
 /** Desert gets an extra macro-scale mesa layer */

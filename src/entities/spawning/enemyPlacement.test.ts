@@ -103,6 +103,12 @@ describe('wall enemies', () => {
     expect(wallSlots(5, walls, createRng(3))).toEqual(wallSlots(5, walls, createRng(3)))
   })
 
+  it('starts a wave higher up its walls with a start fraction (a finale that threatens to top out)', () => {
+    const slots = wallSlots(40, walls, createRng(5), 0.3)
+    expect(Math.min(...slots.map((s) => s.v / s.wall.height))).toBeGreaterThanOrEqual(0.3)
+    expect(Math.max(...slots.map((s) => s.v / s.wall.height))).toBeLessThanOrEqual(0.3 + WALL_START_SPREAD)
+  })
+
   it('needs the level to have walls', () => {
     expect(() => wallSlots(1, [], createRng(1))).toThrow(/walls/)
   })

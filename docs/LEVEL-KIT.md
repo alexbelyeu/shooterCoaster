@@ -36,10 +36,11 @@ A world is `src/levels/environments/biomes/<biome>/` (`config.ts`, `Decorations.
 - **Outdoor** (all five today): terrain from the shared noise with the biome's colour ramp,
   sky dome, optional water, trees, scatter props, landmarks placed by a pure `layout.ts`
   against the track's arc table.
-- **Interior** (the gym, #457): no terrain or sky dome; a hall (floor, walls, ceiling with
-  openings for light), light from the openings, fog for depth, props on the walls. The
-  `BiomeDefinition` gains whatever an interior needs in #457 (flat `heightFn`, a ceiling,
-  no trees), with the outdoor biomes unchanged.
+- **Interior** (the gym, #457, `biomes/gym/`): a flat floor (the shared terrain with a zero-amplitude
+  `terrainNoise.ts` config) and a hall (walls, ceiling with skylights as the light) as the biome's
+  `Features`, props on the walls as its `Decorations`. The sky dome stays, hidden by the ceiling (its env
+  bake still lights reflections); `BiomeDefinition` needed nothing new. The hall is sized round the track
+  (`hall.ts`, held by `hall.test.ts`) and its lanes are the level's climbable `walls`.
 
 A **level** is a roster, not a schedule: which enemies, how many per wave, in what formation,
 which boss; the pacing template gives the seconds. The ride is one lap ≈ one run.
@@ -57,15 +58,18 @@ models only where the world needs a character nothing else gives.
 2. `biomes/<biome>/`: `config.ts` (colour ramp, trees or null, particles preset),
    `Decorations.tsx` (instanced props, seeded, off the track), `Features.tsx` (landmarks,
    set-pieces, contact-shadow footprints), `index.ts`; register in `biomeRegistry.ts`;
-   `atmosphere.ts` preset; `theme.ts` accent + `LevelPostcard` art.
+   `atmosphere.ts` preset; `theme.ts` accent + `LevelPostcard` art. A new `BiomeType` also needs a
+   `terrainNoise.ts` config (and the biome lists in `terrainNoise.test.ts` and the turntable's
+   `subjects.ts`), a `particlePresets.ts` preset (and its test's list), and `sfxDesign.ts` `BIOME_REVERB`.
 3. `LevelRegistry.ts`: the level with its roster and template; `previousLevel` /
    `nextLevel` chain; `maxScore` + stars (`LevelRegistry.test.ts`); `scoreLimits.ts` +
-   `node scripts/gen-level-limits.mjs`.
+   `node scripts/gen-level-limits.mjs`; its lap time in `ridePhysics.test.ts` `LAPS` and its finale in
+   `LevelRegistry.test.ts`'s finales list.
 4. Enemies: anything new in `SharedEnemyAssets.ts` (warm-up finds it), `enemyComponents.ts`,
    `ENEMY_PLACEMENT`, `SCORE_VALUES`, `deathStyles.ts`, `sfxDesign.ts`, `subjects.ts`.
 5. Music: a slot in `scores/index.ts` + `SCORE_KEYS`; a theme round for Alex (`Listen:`).
 6. Gates: `budgets.json` `scene.<id>` + `smokeSeconds.<id>` (+ `pacing.<id>`), a shard in
-   `e2e/shards.mjs`, `#about` copy in `index.html` (`indexHtml.test.ts`), the level-select
+   `e2e/shards.mjs` and the `smoke` matrix in `.github/workflows/ci.yml`, `#about` copy in `index.html` (`indexHtml.test.ts`), the level-select
    card, `docs/agents/STATE.md` row.
 7. Prove it: `node e2e/smoke.mjs --shard <id>` and `--steps pacing --levels <id>`; look at
    the ride, enemy and combat shots; the turntable sheet for new enemies.

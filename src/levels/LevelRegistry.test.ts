@@ -45,7 +45,7 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2450, Kraken 2624, Yeti 3180; Inferno ends on its drakes, 2234', () => {
+  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2450, Kraken 2624, Yeti 3180; Inferno ends on its drakes, 2234; the Climbing Gym on its top-out sprint, 2080', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
       ['level1', 'goldenBlimp', 2675],
@@ -53,6 +53,7 @@ describe('LevelRegistry', () => {
       ['level3', 'kraken', 2624],
       ['level4', 'yeti', 3180],
       ['level5', 'infernalDrake', 2234],
+      ['level6', 'climber', 2080],
     ])
     expect(getLevelConfig('level1')!.maxScore).toBe(150 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
   })

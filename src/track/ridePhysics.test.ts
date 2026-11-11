@@ -75,7 +75,7 @@ describe('advanceRide', () => {
 })
 
 /** Pinned (#452): a 60 s lap would ride 2.2–3.8× faster than today, a different ride, so a run rides 0.25–0.6 of a lap. */
-const LAPS: Record<string, number> = { level1: 147, level2: 165, level3: 99, level4: 193, level5: 228 }
+const LAPS: Record<string, number> = { level1: 147, level2: 165, level3: 99, level4: 193, level5: 228, level6: 142 }
 
 describe.each(getAllLevels().map((l) => [l.id, l.track] as const))('the ride on %s', (id, track) => {
   it('laps in its pinned time, longer than a run', () => {

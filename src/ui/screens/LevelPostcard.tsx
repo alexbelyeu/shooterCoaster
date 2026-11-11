@@ -17,6 +17,12 @@ const STARS: [number, number][] = [
   [14, 10], [38, 22], [70, 8], [104, 16], [128, 6], [150, 24], [186, 12], [174, 34],
 ]
 
+const HOLD_COLORS = ['#ff3355', '#ffb300', '#22c55e', '#1e88ff', '#a855f7']
+/** Five routes of holds up the wall, one colour each. */
+const HOLDS: [number, number, string][] = [40, 66, 104, 146, 160].flatMap((x, r) =>
+  [88, 76, 64, 52, 40, 30].map((y, k): [number, number, string] => [x + ((k * 7 + r * 3) % 9) - 4, y, HOLD_COLORS[r]]),
+)
+
 type Scene = (t: BiomeUITheme) => ReactElement
 
 const SCENES: Record<BiomeType, Scene> = {
@@ -95,6 +101,22 @@ const SCENES: Record<BiomeType, Scene> = {
       ))}
       <path d="M0 90 Q50 84 100 92 T200 88 V100 H0Z" fill="#0b0606" />
       <path d="M0 96 Q40 92 80 96 T160 95 T200 94" stroke={t.accent} strokeWidth="2" fill="none" opacity="0.9" />
+    </>
+  ),
+  gym: (t) => (
+    <>
+      <rect x="62" y="4" width="24" height="5" fill="#eaf6ff" opacity="0.9" />
+      <rect x="112" y="4" width="24" height="5" fill="#eaf6ff" opacity="0.9" />
+      <path d="M30 96 L30 22 L170 22 L170 96Z" fill="#e3e8ee" />
+      <path d="M30 22 L170 22 L178 14 L22 14Z" fill="#9aa4b0" />
+      <path d="M78 96 L84 22 L90 96Z M120 96 L126 22 L132 96Z" fill="#56606e" />
+      <path d="M44 58 L64 48 L60 70Z" fill={t.accent} opacity="0.85" />
+      <path d="M140 40 L156 46 L150 62 L136 58Z" fill={t.accent2} opacity="0.85" />
+      {HOLDS.map(([x, y, c], i) => (
+        <circle key={i} cx={x} cy={y} r="2.2" fill={c} />
+      ))}
+      <rect x="22" y="20" width="156" height="3" fill="#353d48" />
+      <path d="M0 96 H200 V100 H0Z" fill="#2456a8" />
     </>
   ),
 }

@@ -126,7 +126,8 @@ export const WALL_STANDOFF = 11
 /** Starts within this fraction of the wall's height from its foot, so a wave doesn't climb in lockstep. */
 export const WALL_START_SPREAD = 0.12
 
-export function wallSlots(count: number, walls: readonly WallSurface[], rng: Rng): WallSlot[] {
+/** `start` (0..1): the lowest start as a fraction of the wall's height (`EnemyWave.wallStart`). */
+export function wallSlots(count: number, walls: readonly WallSurface[], rng: Rng, start = 0): WallSlot[] {
   if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
   return Array.from({ length: count }, () => {
     const wall = walls[Math.floor(rng() * walls.length)]
@@ -134,7 +135,7 @@ export function wallSlots(count: number, walls: readonly WallSurface[], rng: Rng
     return {
       wall,
       u: margin + rng() * (wall.width - 2 * margin),
-      v: rng() * WALL_START_SPREAD * wall.height,
+      v: (start + rng() * WALL_START_SPREAD) * wall.height,
       seed: Math.floor(rng() * 0x7fffffff),
     }
   })

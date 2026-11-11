@@ -1,5 +1,6 @@
 import type { LevelConfig } from '@/types/level'
 import { paceLevel } from './pacing'
+import { GYM_WALLS } from './environments/biomes/gym/hall'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
 const LEVELS: LevelConfig[] = [
@@ -146,7 +147,7 @@ const LEVELS: LevelConfig[] = [
     biome: 'volcanic',
     maxScore: 52 * 12 + 20 * 18 + 22 * 35 + 8 * 60, // 2234: no boss yet (the Magma Titan, #320), so the drakes are the finale
     message: 'You conquered the Inferno!',
-    nextLevel: null,
+    nextLevel: 'level6',
     track: {
       varA: 3,
       varB: 40,
@@ -174,6 +175,41 @@ const LEVELS: LevelConfig[] = [
       hasTrees: true,
       treeCount: 60,
     },
+  },
+  {
+    id: 'level6',
+    name: 'Climbing Gym',
+    description: 'Shoot them off the wall',
+    order: 6,
+    biome: 'gym',
+    maxScore: (24 + 28 + 32 + 20) * 20, // 2080: no boss yet, so the last wave's sprint to the top is the finale
+    message: 'Sent it!',
+    nextLevel: null,
+    // curve2 climbs: from the middle of the hall up along the walls to catwalk height and back down
+    // (y 134..636); the hall is sized round it (`biomes/gym/hall.ts`, `hall.test.ts`).
+    track: {
+      varA: 2,
+      varB: 20,
+      varC: 3,
+      scalar: 25,
+      rollerSpeed: 0.00001,
+      minRollerSpeed: 0.00008,
+      curve: 'curve2',
+      color1: 0x353d48,
+      color2: 0x22d3c5,
+    },
+    walls: GYM_WALLS,
+    ...paceLevel({
+      waves: [
+        { type: 'climber', count: 24, waveLabel: 'On Belay!' },
+        { type: 'climber', count: 28, waveLabel: 'Climbing!' },
+        { type: 'climber', count: 32, waveLabel: 'The Crux!' },
+      ],
+      // Starting a third of the way up: they reach the catwalk just before the run ends.
+      finale: { type: 'climber', count: 20, waveLabel: 'Top-out!', wallStart: 0.3 },
+    }),
+    starThresholds: [0.25, 0.55, 0.85],
+    environment: {},
   },
 ]
 

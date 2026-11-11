@@ -17,7 +17,8 @@
     "level3": 180,
     "level4": 180,
     "level5": 180,
-    "mobile": 240
+    "mobile": 240,
+    "level6": 180
   },
   "scene": {
     "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31; level4 and level5 hold the VISION bar of 250, #260), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands. title (#376): the title scene, its drawCalls at the two title screenshots, objects and triangles; raised by the Director on 2026-11-09 for the title world (#436 → #454 / #459, DECISIONS \"Week 4\"): 140 / 130 / 60 000 are ceilings for a dense instanced park, not targets (was 114 / 89 / 11 356 = the 7 Nov scene +20% / +15%).",
@@ -60,6 +61,13 @@
       "triangles": 170739,
       "trackObjects": 12,
       "trackTriangles": 99742
+    },
+    "level6": {
+      "drawCalls": 130,
+      "objects": 150,
+      "triangles": 200000,
+      "trackObjects": 12,
+      "trackTriangles": 98000
     }
   },
   "pacing": {
@@ -82,6 +90,10 @@
     },
     "level5": {
       "longestGapSeconds": 4,
+      "noTargetShare": 0.1
+    },
+    "level6": {
+      "longestGapSeconds": 3,
       "noTargetShare": 0.1
     }
   }
