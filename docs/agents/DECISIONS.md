@@ -1887,3 +1887,41 @@ there is a deliberate design call. Leaderboard scores from before this change ar
 
 **Consequences:** A gym level only adds walls and climber waves. The climb's pace (~1 m/s, `climbMotion.ts` `METRE` = 33
 units) and the wall's height set how long a climber stays shootable: a level tunes its walls' heights, not the motion.
+
+## 2026-11-10 — The title park fills the frame (Builder, #454)
+
+**Context:** Alex (#436): the title's world read as "a weird green plain and the theme park". The scene had ~94 draw calls and 11k triangles of the 140 / 60 000 the Director allowed it.
+**Decision:** The park is one seeded layout (`src/canvas/titlePark.ts`): ring paths (plaza r 15, 92, 177, the midway boulevard r 205, 330) and six avenues between the tents; level 1's `Midway` draws the stalls (all facing the park centre, where every camera shot stands), lights, bunting and paths; crowds, trees, woods, hedges and flower beds are one `StaticInstances` draw call each. A second coaster (`CROSSING_LOOP`) stays at y 13 wherever it runs inside r 215, so it ducks under the hero loop's hill, the orbit camera and the tracking shot (moved to r 205, over the boulevard), and climbs its hills outside. The drop tower stands out at (250, -90): every spot inside the loop sat in a camera blend's path or across the Ferris wheel in the dolly shot. The grass is a baked 512² texture, not shader noise: three noise calls a pixel cost ~25% of the phone's frame under SwiftShader. Tents and flag poles became `StaticInstances` (36 draw calls to 4), which paid for most of the new pieces: the title now draws ~94 calls and ~55k triangles at most.
+**Consequences:** Triangles, not draw calls, are the title's limit now (~8% headroom): add detail as instances of few-triangle shapes, or drop elsewhere. `titlePark.test.ts` holds the camera clear of the tower, the swing ride and the second coaster over every shot; moving a ride or a shot means re-running it.
+
+## 2026-11-10 — Conventions move into ESLint; enemies draw from a run-seeded stream (builder, #455)
+
+**Context:** Steering #351: rules that live only in CLAUDE.md are enforced by nothing. Thirteen enemy
+components drew their speeds, headings, phases and colours from `Math.random`, so the same run seed
+moved enemies differently on every machine.
+**Decision:** `npm run lint` (ESLint 9, typescript-eslint recommended, not type-aware) runs in `verify`
+and CI's `unit + build`, with the repo's own rules in `scripts/eslint/`: `sc/no-math-random` (allow-list
+of whole cosmetic files in `eslint.config.js`, single lines by a `-- cosmetic:` disable comment) and
+`sc/no-src-in-api`. Enemies draw once per mount from `useEnemyRandom` (`createRng(runSeed ^ hash(id))`).
+Audio keeps the global `Math.random` on purpose: offline renders swap it for a seeded one.
+**Consequences:** A new convention that a check can enforce lands as a lint rule or test with its fix.
+Seeding the audio or particles per call site would break that swap; extend the allow-list instead.
+
+## 2026-11-10 — Shard time over budget warns; the watchdog dispatches a late nightly (Builder, #487)
+
+**Context:** On 9-10 Nov every red run and escalation was noise: `ui shard took 2.1 min, budget 2.0` and `mobile 4.0 / 4.0`
+failed runs with every check green (shared runners swing ±60%); #469 stayed open after its fix because GitHub's 06:00 cron
+ran 9.5 h late and then not at all, and the watchdog escalated it; `smoke (level2)` failed its enemy probe at 10.7 s of
+level time where other runs probed at 10.2.
+
+**Decision:** Asked for by Alex (#487). A shard over its `smokeSeconds` allowance (scaled for a slow runner, #394) is a
+warning; it fails only past `FAIL_FACTOR` 1.5x (`e2e/shardTime.mjs`), and the stuck-shard watchdog moved to 3.45x the
+budget to stay past that, inside the 25 min job timeout. Trends stay the watchdog's `creep:` findings. The studio-health
+watchdog (now `actions: write`) dispatches `prod-smoke.yml` `suite=nightly` when the newest nightly started over 26 h
+ago, and doesn't escalate an `agent:prod-broken` issue whose linked PR merged with a green deploy check since (unless a
+nightly went red after the fix). A job red on main and green on the next main commit that touched nothing a check
+depends on is a `flaky:` finding. The smoke's ride stops at exactly `--seconds` of level time (`stopAtLevelTime`), so
+the enemy probe sees the same moment on any runner.
+
+**Consequences:** A shard getting slower shows as a warning annotation and a `creep:` issue, not a red PR. Changing
+`FAIL_FACTOR` loosens or tightens every budget at once: the Director's call, like the budgets.
