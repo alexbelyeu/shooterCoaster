@@ -1242,6 +1242,8 @@ async function offsetTapKills(page, label) {
     await waitFrames(page, 1, { minMs: 80, maxMs: 4000, pollMs: 40 })
   }
   const afterTaps = await getStats(page)
+  // The freeze must hold through the taps: a slow-mo writer that undid it would let targets move off the bullets (#500).
+  const frozenTimeScale = afterTaps.timeScale
   // Bullets need a few frames to reach the (frozen) targets.
   const hitDeadline = Date.now() + 15000
   let hits = hitsBefore
@@ -1265,8 +1267,10 @@ async function offsetTapKills(page, label) {
     tapShots: afterTaps.shotsFired - before.shotsFired,
     tapHits: hits - hitsBefore,
     tapKills: s.kills - before.kills,
+    frozenTimeScale,
   }
   const problems = []
+  if (frozenTimeScale !== 0) problems.push(`${label}: game time not frozen during the taps (timeScale ${frozenTimeScale})`)
   if (result.tapShots === 0) problems.push(`${label}: ${TAP_COUNT} taps fired no shots (touch input broken?)`)
   else if (tapsOnEnemies > 0 && result.tapKills === 0)
     problems.push(`${label}: ${TAP_COUNT} taps up to ${TAP_MAX_OFFSET} px off enemies got no kills (${result.tapHits} hits)`)

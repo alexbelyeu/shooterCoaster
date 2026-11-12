@@ -45,7 +45,7 @@ its frenzy-end rerun is seeded a full board out of reach and must show the board
 `npm run smoke` also passes `--mobile`:
 an iPhone 13-like touch context (390x844) taps PLAY and a level (the title music must ramp out from full and be disposed, the level music ramp in), then in portrait and
 again in 844x390 landscape taps the canvas 10x, each tap 15–30 px off an on-screen
-enemy (game time frozen while tapping), and requires kills (touch aim assist); checks
+enemy (game time frozen while tapping, and it fails if the freeze did not hold: `timeScale` must still be 0 after the taps), and requires kills (touch aim assist); checks
 camera aspect == canvas aspect in portrait, landscape and after rotating back, that the
 HUD is inside the viewport with no overlap in both orientations, that the SFX node count doesn't grow across the taps and the music ducks while time is frozen, runs the `audioBurst` SFX stress in portrait and after rotating (every desktop level runs it too: any page error or dropped sound fails, and so do fewer than 10 of its 10 spaced kills reaching the engine, `killsPlayed`, summary `audioBurst=ok kills10/10`), and taps Pause (`mobile-level-select.png`, `mobile-level1.png`,
 `mobile-level1-landscape.png`; `--skip-desktop` runs only that). **Look at the screenshots** with the Read tool — that is how you
