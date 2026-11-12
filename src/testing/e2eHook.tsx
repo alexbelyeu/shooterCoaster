@@ -47,7 +47,7 @@ import { useSettingsStore } from '@/store/useSettingsStore'
 import { qualityProfile, type GraphicsQuality, type QualityProfile } from '@/canvas/graphicsQuality'
 import { getAdaptiveSteps } from '@/canvas/useRenderBudget'
 import { COMBO_TIERS, TOP_TIER, comboMultiplier } from '@/combat/comboTiers'
-import { frenzyActive } from '@/combat/comboRuntime'
+import { setTimeScaleOverride } from '@/combat/slowMo'
 import { getPointerState } from '@/input/pointerInput'
 import { audioContext, initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
 import { loadArcade, sfx, type VoiceStats } from '@/audio/sfx'
@@ -77,6 +77,8 @@ export interface SCTestApi {
   maxFrameMs: number
   /** Shader programs the renderer has compiled so far (a rise mid-play is a compile hitch). */
   programs: () => number
+  /** The renderer's live GPU textures (render targets included) and geometries (`renderer.info.memory`). */
+  gpuMemory: () => { textures: number; geometries: number }
   /** Active camera's world position and unit view direction (title fly-by check). */
   cameraPose: () => { position: [number, number, number]; forward: [number, number, number] } | null
   /** Linear RGBA of the scene's Points `name`'s first point drawn over opaque grey with its centre on a 1x1 float target's pixel centre (#344). */
@@ -197,7 +199,7 @@ export interface SCTestApi {
   /** The results Share image (#272) for the current level and run, drawn as the share menu draws it: its pixel size,
    *  PNG data URL and download name, or null with no level. */
   scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string } | null>
-  /** Set game time scale (0 freezes camera + enemies, 1 resumes). */
+  /** Override the game time scale (0 freezes camera + enemies; 1 hands it back to the slow-mo envelopes, `combat/slowMo.ts`). */
   setTimeScale: (s: number) => void
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null
@@ -368,7 +370,7 @@ export interface SCTestStats {
   /** Current combo tier multiplier (1, 2, 3, 5). */
   multiplier: number
   timeScale: number
-  /** The top-tier slow-mo owns timeScale. */
+  /** The top-tier slow-mo is running. */
   frenzy: boolean
   runSeed: number
   currentLevel: string | null
@@ -763,6 +765,7 @@ export function installE2EApi() {
     avgFrameMs: 0,
     maxFrameMs: 0,
     programs: () => probeGl?.info.programs?.length ?? 0,
+    gpuMemory: () => ({ textures: probeGl?.info.memory.textures ?? 0, geometries: probeGl?.info.memory.geometries ?? 0 }),
     cameraPose: readCameraPose,
     pointCentreColour,
     drawCalls: 0,
@@ -860,7 +863,7 @@ export function installE2EApi() {
         bestCombo: s.bestCombo,
         multiplier: s.combo.multiplier,
         timeScale: s.timeScale,
-        frenzy: frenzyActive(),
+        frenzy: s.frenzy !== 'off',
         runSeed: s.runSeed,
         currentLevel: s.currentLevel,
       }
@@ -906,7 +909,7 @@ export function installE2EApi() {
       bitmap.close()
       return out
     },
-    setTimeScale: (s: number) => useGameStore.getState().setTimeScale(s),
+    setTimeScale: (s: number) => setTimeScaleOverride(s === 1 ? null : s),
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,

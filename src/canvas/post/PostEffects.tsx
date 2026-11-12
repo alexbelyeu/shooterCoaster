@@ -3,6 +3,7 @@ import { EffectComposer, Bloom, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { useComposerMultisampling, useQualityProfile } from '../useRenderBudget'
 import { ColourGradeEffect } from './ColourGradeEffect'
+import { freeComposerTargets } from './composerTargets'
 import type { GradeConfig } from './colourGrade'
 
 export interface BloomSettings {
@@ -20,7 +21,7 @@ export default function PostEffects({ bloom, grade }: { bloom: BloomSettings; gr
   useLayoutEffect(() => gradeEffect.setGrade(grade), [gradeEffect, grade])
 
   return (
-    <EffectComposer multisampling={multisampling}>
+    <EffectComposer ref={freeComposerTargets} multisampling={multisampling}>
       {bloomOn ? (
         <Bloom
           luminanceThreshold={bloom.threshold}

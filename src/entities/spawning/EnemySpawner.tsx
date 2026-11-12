@@ -15,6 +15,7 @@ import BossSpawner from '../bosses/BossSpawner'
 import { GOLDEN_BALLOON, SCORE_VALUES } from '@/levels/scoring'
 import { createRng, type Rng } from '@/utils/rng'
 import { recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
+import { requestSlowMo } from '@/combat/slowMo'
 import type { EnemyEntry } from '../enemies/EnemyBase'
 import {
   ENTRY_SECONDS, ENTRY_STAGGER, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, trackPoint, tracksideSlots,
@@ -252,15 +253,6 @@ export default function EnemySpawner({
   const waveProgress = useRef(newWaveProgress(waves.length))
   /** Level time of the last wave tick, for the e2e probe. */
   const lastWaveTick = useRef<number | null>(null)
-  const slowMoResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  /** Ends a pending last-kill slow-mo now, so it never outlives its run. */
-  const endSlowMo = useCallback(() => {
-    if (!slowMoResetTimer.current) return
-    clearTimeout(slowMoResetTimer.current)
-    slowMoResetTimer.current = null
-    useGameStore.getState().setTimeScale(1)
-  }, [])
-
   const goneEnemies = useRef(new Set<string>())
 
   const [generation, setGeneration] = useState(0)
@@ -271,7 +263,6 @@ export default function EnemySpawner({
   useEffect(() => {
     if (runRef.current === runId) return
     runRef.current = runId
-    endSlowMo()
     setActiveWaveIndex(initialActiveWave)
     setWaveAnnouncement(null)
     firstWaveAnnounced.current = false
@@ -279,7 +270,7 @@ export default function EnemySpawner({
     lastWaveTick.current = null
     goneEnemies.current.clear()
     setGeneration((g) => g + 1)
-  }, [runId, initialActiveWave, waves, endSlowMo])
+  }, [runId, initialActiveWave, waves])
 
   // Also after a resume, when the run was paused during its countdown.
   useEffect(() => {
@@ -343,11 +334,9 @@ export default function EnemySpawner({
   })
 
   useEffect(() => {
-    return () => {
-      endSlowMo()
-      goneEnemies.current.clear()
-    }
-  }, [endSlowMo])
+    const gone = goneEnemies.current
+    return () => gone.clear()
+  }, [])
 
   const onKill = useCallback(
     (id: string) => {
@@ -356,13 +345,9 @@ export default function EnemySpawner({
       const remaining = totalEnemyCount - goneEnemies.current.size
       useGameStore.getState().setEnemyCounts(Math.max(0, remaining), totalEnemyCount)
 
-      if (goneEnemies.current.size >= totalEnemyCount) {
-        useGameStore.getState().setTimeScale(0.1)
-        if (slowMoResetTimer.current) clearTimeout(slowMoResetTimer.current)
-        slowMoResetTimer.current = setTimeout(endSlowMo, 1500)
-      }
+      if (goneEnemies.current.size >= totalEnemyCount) requestSlowMo('lastKill')
     },
-    [totalEnemyCount, endSlowMo],
+    [totalEnemyCount],
   )
 
   // Gone without a kill (a climber topped out): off the count, no last-kill slow-mo.

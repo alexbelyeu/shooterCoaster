@@ -137,21 +137,22 @@ describe('startRun', () => {
 
   it('starts at normal time when the last run ended in slow-mo (quit or restart during the last-kill slow-mo)', () => {
     store().startRun('level1', 1)
-    store().setTimeScale(0.1)
+    store().setSlowMo(0.1, 'on')
     store().setPhase('paused')
     store().startRun('level1', 1)
     expect(store().timeScale).toBe(1)
+    expect(store().frenzy).toBe('off')
   })
 
   it('starts from the same state as a fresh store', () => {
     const fresh = store()
     store().addScore(50)
     store().registerKill()
-    store().setTimeScale(0.5)
+    store().setSlowMo(0.5, 'out')
     store().pickUpWeapon('spread')
     expect(store().weapon).not.toEqual(fresh.weapon)
     store().startRun('level1', 1)
-    for (const key of ['score', 'kills', 'shotsFired', 'hits', 'bestCombo', 'combo', 'timeScale', 'boss', 'weapon'] as const)
+    for (const key of ['score', 'kills', 'shotsFired', 'hits', 'bestCombo', 'combo', 'timeScale', 'frenzy', 'boss', 'weapon'] as const)
       expect(store()[key], key).toEqual(fresh[key])
   })
 

@@ -1,12 +1,12 @@
 /**
- * Combo upkeep ticked by `GameTimer` on playing frames: the game clock, lapsed chains and the 5× slow-mo.
+ * Combo upkeep ticked by `GameTimer` on playing frames: the game clock, lapsed chains and starting the 5× slow-mo.
  * Emits 'combo:broken' { count, tier } when a 2×+ chain lapses and 'combo:frenzy' { count } on entering 5×.
  */
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { advanceGameTime, gameTime, resetGameTime } from '@/core/gameClock'
-import { FRENZY, TOP_TIER, comboExpired, comboTierIndex, frenzyTimeScale } from './comboTiers'
-import { isFeedbackHeld } from './hitFeedback'
+import { FRENZY, TOP_TIER, comboExpired, comboTierIndex } from './comboTiers'
+import { requestSlowMo } from './slowMo'
 
 export interface ComboBrokenEvent {
   count: number
@@ -16,8 +16,6 @@ export interface ComboBrokenEvent {
 let prevTier = 0
 /** Real playing seconds since this run's last frenzy started. */
 let sinceFrenzy = Infinity
-/** The time scale the frenzy last wrote, or null when it isn't running. */
-let written: number | null = null
 
 const brokenEvent: ComboBrokenEvent = { count: 0, tier: 0 }
 const frenzyEvent = { count: 0 }
@@ -26,19 +24,6 @@ export function resetComboRuntime(): void {
   resetGameTime()
   prevTier = 0
   sinceFrenzy = Infinity
-  written = null
-}
-
-export function frenzyActive(): boolean {
-  return written !== null
-}
-
-/** `tickCombo` runs only on playing frames, so a run that ends mid-frenzy must hand the time scale back here. */
-export function endFrenzy(): void {
-  if (written === null) return
-  const store = useGameStore.getState()
-  if (store.timeScale === written) store.setTimeScale(1)
-  written = null
 }
 
 export function tickCombo(delta: number): void {
@@ -49,10 +34,10 @@ export function tickCombo(delta: number): void {
   const tier = comboTierIndex(count)
   if (tier === TOP_TIER && prevTier < TOP_TIER && sinceFrenzy >= FRENZY.cooldownS) {
     sinceFrenzy = 0
-    written = 1
+    requestSlowMo('frenzy')
     frenzyEvent.count = count
     eventBus.emit('combo:frenzy', frenzyEvent)
-  }
+  } else sinceFrenzy += delta
   prevTier = tier
 
   advanceGameTime(delta * store.timeScale)
@@ -64,21 +49,4 @@ export function tickCombo(delta: number): void {
       eventBus.emit('combo:broken', brokenEvent)
     }
   }
-
-  if (written === null) {
-    sinceFrenzy += delta
-    return
-  }
-  // Someone else set the time scale (the last-kill slow-mo, a test freeze): theirs wins.
-  if (store.timeScale !== written) {
-    written = null
-    sinceFrenzy += delta
-    return
-  }
-  // e2e holdFeedback: hold the full slow-down for the screenshot.
-  if (isFeedbackHeld()) sinceFrenzy = Math.min(Math.max(sinceFrenzy, FRENZY.easeS), FRENZY.durationS - FRENZY.easeS)
-  else sinceFrenzy += delta
-  const scale = frenzyTimeScale(sinceFrenzy)
-  written = sinceFrenzy >= FRENZY.durationS ? null : scale
-  if (store.timeScale !== scale) store.setTimeScale(scale)
 }

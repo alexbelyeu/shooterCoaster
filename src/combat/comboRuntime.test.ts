@@ -3,7 +3,8 @@ import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { gameTime } from '@/core/gameClock'
 import { FRENZY } from './comboTiers'
-import { endFrenzy, frenzyActive, resetComboRuntime, tickCombo } from './comboRuntime'
+import { resetComboRuntime, tickCombo } from './comboRuntime'
+import { resetSlowMo, setTimeScaleOverride, tickSlowMo } from './slowMo'
 
 // zustand's persist wants window.localStorage; a bare in-memory one is enough here.
 vi.hoisted(() => {
@@ -22,16 +23,23 @@ const store = () => useGameStore.getState()
 const broken = vi.fn()
 const frenzy = vi.fn()
 
+/** One playing frame, as `GameTimer` runs it. */
+function tick(delta: number) {
+  tickCombo(delta)
+  tickSlowMo(delta)
+}
+
 function kills(n: number, gapS = 0.1) {
   for (let i = 0; i < n; i++) {
     store().registerKill()
-    tickCombo(gapS)
+    tick(gapS)
   }
 }
 
 beforeEach(() => {
   useGameStore.setState(initial, true)
   resetComboRuntime()
+  resetSlowMo()
   eventBus.on('combo:broken', broken)
   eventBus.on('combo:frenzy', frenzy)
 })
@@ -44,16 +52,16 @@ afterEach(() => {
 
 describe('game clock', () => {
   it('advances by delta × timeScale', () => {
-    tickCombo(1)
-    store().setTimeScale(0.5)
-    tickCombo(1)
+    tick(1)
+    setTimeScaleOverride(0.5)
+    tick(1)
     expect(gameTime()).toBeCloseTo(1.5)
   })
 
   it('slow-mo stretches the window in real time', () => {
     kills(1)
-    store().setTimeScale(0.35)
-    tickCombo(3)
+    setTimeScaleOverride(0.35)
+    tick(3)
     store().registerKill()
     expect(store().combo.count).toBe(2)
   })
@@ -62,9 +70,9 @@ describe('game clock', () => {
 describe('combo break', () => {
   it('lapses the chain once its window passes, and reports a 2×+ chain', () => {
     kills(5)
-    tickCombo(1.0)
+    tick(1.0)
     expect(store().combo.count).toBe(5)
-    tickCombo(1.0)
+    tick(1.0)
     expect(store().combo).toEqual({ count: 0, multiplier: 1, lastKillTime: 0 })
     expect(broken).toHaveBeenCalledOnce()
     expect(broken.mock.calls[0][0]).toMatchObject({ count: 5, tier: 1 })
@@ -72,7 +80,7 @@ describe('combo break', () => {
 
   it('a 1× chain lapses quietly', () => {
     kills(3)
-    tickCombo(3)
+    tick(3)
     expect(store().combo.count).toBe(0)
     expect(broken).not.toHaveBeenCalled()
   })
@@ -84,70 +92,31 @@ describe('frenzy', () => {
     expect(frenzy).not.toHaveBeenCalled()
     kills(1, 0)
     expect(frenzy).toHaveBeenCalledOnce()
-    expect(frenzyActive()).toBe(true)
-    tickCombo(FRENZY.durationS / 2)
+    expect(store().frenzy).toBe('on')
+    tick(FRENZY.durationS / 2)
     expect(store().timeScale).toBeCloseTo(FRENZY.timeScale)
-    tickCombo(FRENZY.durationS)
+    tick(FRENZY.durationS)
     expect(store().timeScale).toBe(1)
-    expect(frenzyActive()).toBe(false)
+    expect(store().frenzy).toBe('off')
   })
 
   it('waits out the cooldown before the next one', () => {
     kills(15)
-    tickCombo(5)
+    tick(5)
     kills(15)
     expect(frenzy).toHaveBeenCalledOnce()
-    tickCombo(3)
-    tickCombo(FRENZY.cooldownS)
+    tick(3)
+    tick(FRENZY.cooldownS)
     kills(15)
     expect(frenzy).toHaveBeenCalledTimes(2)
   })
 
-  it('yields to anyone else who sets the time scale', () => {
-    kills(15)
-    tickCombo(0.5)
-    store().setTimeScale(0.1)
-    tickCombo(0.5)
-    expect(frenzyActive()).toBe(false)
-    expect(store().timeScale).toBe(0.1)
-  })
-
-  it('endFrenzy hands back exactly 1 when the level ends mid-frenzy', () => {
-    kills(15)
-    tickCombo(FRENZY.durationS / 2)
-    expect(store().timeScale).toBeLessThan(1)
-    endFrenzy()
-    expect(store().timeScale).toBe(1)
-    expect(frenzyActive()).toBe(false)
-  })
-
-  it('endFrenzy leaves a time scale someone else set', () => {
-    kills(15)
-    tickCombo(0.5)
-    store().setTimeScale(0)
-    endFrenzy()
-    expect(store().timeScale).toBe(0)
-    expect(frenzyActive()).toBe(false)
-  })
-
-  it('endFrenzy does nothing without a frenzy', () => {
-    store().setTimeScale(0.1)
-    endFrenzy()
-    expect(store().timeScale).toBe(0.1)
-  })
-
-  it('resetComboRuntime ends it and clears the clock', () => {
+  it('resetComboRuntime clears the clock and the cooldown', () => {
     kills(15)
     resetComboRuntime()
-    expect(frenzyActive()).toBe(false)
     expect(gameTime()).toBe(0)
-  })
-})
-
-describe('startRun', () => {
-  it('resets the time scale', () => {
-    store().setTimeScale(0.35)
-    store().startRun('level1', 1)
-    expect(store().timeScale).toBe(1)
+    store().resetCombo()
+    kills(15)
+    expect(frenzy).toHaveBeenCalledTimes(2)
   })
 })

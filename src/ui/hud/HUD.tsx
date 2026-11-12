@@ -10,6 +10,7 @@ import FrenzyFlash from './FrenzyFlash'
 import SnowSplat from './SnowSplat'
 import BossBar from './BossBar'
 import WeaponBadge from './WeaponBadge'
+import { setTimeScaleOverride, timeScaleOverride } from '@/combat/slowMo'
 
 /** Thin segmented kills / total strip under the score. Renders on kills only. */
 function KillStrip() {
@@ -46,9 +47,8 @@ export default function HUD() {
   // Escape key to pause, backtick (`) to freeze/unfreeze for screenshots
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const store = useGameStore.getState()
-      if (e.key === 'Escape') store.setPhase('paused')
-      if (e.key === '`') store.setTimeScale(store.timeScale === 0 ? 1 : 0)
+      if (e.key === 'Escape') useGameStore.getState().setPhase('paused')
+      if (e.key === '`') setTimeScaleOverride(timeScaleOverride() === 0 ? null : 0)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)

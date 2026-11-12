@@ -45,7 +45,7 @@ its frenzy-end rerun is seeded a full board out of reach and must show the board
 `npm run smoke` also passes `--mobile`:
 an iPhone 13-like touch context (390x844) taps PLAY and a level (the title music must ramp out from full and be disposed, the level music ramp in), then in portrait and
 again in 844x390 landscape taps the canvas 10x, each tap 15–30 px off an on-screen
-enemy (game time frozen while tapping), and requires kills (touch aim assist); checks
+enemy (game time frozen while tapping, and it fails if the freeze did not hold: `timeScale` must still be 0 after the taps), and requires kills (touch aim assist); checks
 camera aspect == canvas aspect in portrait, landscape and after rotating back, that the
 HUD is inside the viewport with no overlap in both orientations, that the SFX node count doesn't grow across the taps and the music ducks while time is frozen, runs the `audioBurst` SFX stress in portrait and after rotating (every desktop level runs it too: any page error or dropped sound fails, and so do fewer than 10 of its 10 spaced kills reaching the engine, `killsPlayed`, summary `audioBurst=ok kills10/10`), and taps Pause (`mobile-level-select.png`, `mobile-level1.png`,
 `mobile-level1-landscape.png`; `--skip-desktop` runs only that). **Look at the screenshots** with the Read tool — that is how you
@@ -71,8 +71,9 @@ and Back to the menu, then ends the level and enters initials by tapping ▲, a 
 switch (there, title → level, and the `audio` step's) the incoming track's first note must land before the outgoing bus has
 faded to 0 (`audio().music.fades` log each ramp's start and the incoming `firstNote`; tracks start on the next beat, `musicBus.ts`).
 A `settings` step opens Settings from the title (`settings.png`: the card inside 1280×720 with the four quality
-options, two volume sliders and two switches), picks Low and a music volume, closes with Esc, and requires both
-to survive a reload. A `quality` step loads the first level at device dpr 2 with the default quality and with
+options, two volume sliders and two switches), picks Low and a music volume, cycles Med / High / Low three times
+and fails if the renderer's GPU textures grew over the last two cycles (each change rebuilds the post composer, #249),
+closes with Esc, and requires both to survive a reload. A `quality` step loads the first level at device dpr 2 with the default quality and with
 `?quality=low` (any preset name works as a URL override and is saved like the setting) on the same seed and frozen
 track point: low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
 A `levelSelect` step seeds saved progress (3★ + 1★) and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
@@ -250,7 +251,7 @@ Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
 onScreenEnemies/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `killNearest(n)` (never a boss weak point; fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
 `fireShot(x, y)` (one real shot through NDC), `bullets()` → drawn count, largest screen radius now / since load, newest bullet's
-screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)`, `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideProgress` (its track fraction on the last frame), `rideSpeed` (set 0–1 to put the coaster at that speed), `sceneStats()`, `combat` fire/hit/kill event counters,
+screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)` (an override over the slow-mo envelopes; 1 clears it), `gpuMemory()` (`renderer.info.memory` textures / geometries), `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideProgress` (its track fraction on the last frame), `rideSpeed` (set 0–1 to put the coaster at that speed), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
 {current, max} in degrees, `cameraWeight` → bank / pitch / speed + drop FOV kick now and max (degrees), smoothed speed 0–1, wind-streak opacity, the caps the smoke checks (`caps`, from the source constants), `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
 `view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `graphics()` → quality setting, its preset, adaptive steps, reduced motion, `audio()` → unlocked?, score engine chunk loaded? (`engineLoaded`; the title step fails it before the first key press), long-lived SFX node count, arcade voice pool (`sfxVoices`: budget / live / peak / stolen / dropped), music ducked?, sounds dropped by a caught audio error, `music` (live music buses with their gain + the last few fade ramps), `scrim` (score engine: current score, tracks with the score each plays (a `?theme=` option or its own), paused + song position + `layered` / `intensity`, the asked-for `targetIntensity`, long-lived nodes, timer running),
