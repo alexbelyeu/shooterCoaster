@@ -21,7 +21,7 @@ jobs:
     name: turntable
     permissions:
       contents: read
-    # Pinned like ci.yml's browser jobs: `playwright install --with-deps` fails on ubuntu-latest.
+    # Pinned like ci.yml's browser jobs: Playwright's system dependencies fail to install on ubuntu-latest.
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -35,7 +35,7 @@ jobs:
       - run: npm ci
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: bash scripts/install-chromium.sh
 
       - name: Render the turntable
         run: npm run turntable

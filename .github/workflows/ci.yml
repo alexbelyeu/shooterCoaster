@@ -94,7 +94,7 @@ jobs:
     if: ${{ needs.changes.outputs.game == 'true' }}
     permissions:
       contents: read
-    # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
+    # Pinned: Playwright's system dependencies failed to install on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -110,7 +110,7 @@ jobs:
       - run: npm run build
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: bash scripts/install-chromium.sh
 
       - name: Lighthouse (SEO 100, Accessibility + Best Practices ≥ 95)
         run: npm run lighthouse
@@ -131,7 +131,7 @@ jobs:
     if: ${{ needs.changes.outputs.game == 'true' }}
     permissions:
       contents: read
-    # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
+    # Pinned: Playwright's system dependencies failed to install on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
@@ -152,7 +152,7 @@ jobs:
       - run: npm run build
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: bash scripts/install-chromium.sh
 
       - name: Smoke shard ${{ matrix.shard }}
         run: node e2e/smoke.mjs --shard ${{ matrix.shard }} --seconds 10
@@ -228,7 +228,7 @@ jobs:
     if: ${{ needs.changes.outputs.portal == 'true' }}
     permissions:
       contents: read
-    # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
+    # Pinned: Playwright's system dependencies failed to install on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -245,7 +245,7 @@ jobs:
         run: npm run build:portal
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: bash scripts/install-chromium.sh
 
       - name: Smoke level 1 under /nested/path/
         run: npm run smoke:portal -- --out e2e-results-portal

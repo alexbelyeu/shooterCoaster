@@ -36,7 +36,7 @@ jobs:
     concurrency:
       group: prod-deploy-${{ github.event.deployment.environment || 'Production' }}
       cancel-in-progress: true
-    # Pinned: `playwright install --with-deps` started failing on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
+    # Pinned: Playwright's system dependencies failed to install on ubuntu-latest on 2 Nov 2026 (likely its move to Ubuntu 26).
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -49,7 +49,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: bash scripts/install-chromium.sh
       # The files to expect: the build Vercel ran (VERCEL=1 includes analytics).
       - run: npx vite build
         env:
@@ -97,7 +97,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: bash scripts/install-chromium.sh
       - name: Smoke test production
         id: check
         run: |
