@@ -75,3 +75,22 @@ export function waitVisible(page, selector, timeout = 30000) {
     )
     .then(() => true, () => false)
 }
+
+/**
+ * Tap the centre of `selector` (#248). Playwright's `tap()` waits for the element to stop moving, and the title's PLAY
+ * pulses forever (a scale about its centre, so the centre holds still): its "element is not stable" wait could time
+ * out on a slow runner. Throws if the element is missing or something else is on top at its centre.
+ */
+export async function tapCentre(page, selector) {
+  const hit = await page.evaluate((sel) => {
+    const el = document.querySelector(sel)
+    if (!el) return { error: `${sel} not found` }
+    const r = el.getBoundingClientRect()
+    const x = r.left + r.width / 2
+    const y = r.top + r.height / 2
+    const top = document.elementFromPoint(x, y)
+    return el.contains(top) ? { x, y } : { error: `${sel} is covered at its centre by <${top?.tagName.toLowerCase()} class="${top?.className}">` }
+  }, selector)
+  if (hit.error) throw new Error(hit.error)
+  await page.touchscreen.tap(hit.x, hit.y)
+}

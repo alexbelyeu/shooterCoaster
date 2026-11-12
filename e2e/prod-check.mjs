@@ -12,7 +12,7 @@ import path from 'node:path'
 import { launchBrowser } from '../scripts/headless.mjs'
 import { assetRefs, leaderboardApiProblems, missingAssets, responseProblems } from '../scripts/prodCheckRules.mjs'
 import { headersFor, route } from '../scripts/vercelRoutes.mjs'
-import { TITLE_UI, ignored, imageStats, looksBlank, waitFrames, waitVisible } from './pageChecks.mjs'
+import { TITLE_UI, ignored, imageStats, looksBlank, tapCentre, waitFrames, waitVisible } from './pageChecks.mjs'
 
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((acc, a, i, arr) => {
@@ -216,7 +216,7 @@ async function phoneCheck(browser, base) {
   const problems = []
   const phase = (want, ms) => pollFor(page, async () => (await page.evaluate(() => window.__SC_TEST__.phase())) === want, ms)
   if (!(await waitVisible(page, '.title-screen .play-button'))) problems.push('no PLAY button')
-  await page.locator('.title-screen .play-button').tap({ timeout: 30000 })
+  await tapCentre(page, '.title-screen .play-button')
   if (!(await phase('levelSelect', 15000))) problems.push('tapping PLAY did not open level select')
   await page.locator(`.level-card[data-level="${LEVEL}"]`).tap({ timeout: 30000 })
   if (!(await phase('playing', 15000))) problems.push('tapping the level card did not start the level')

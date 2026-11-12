@@ -90,7 +90,7 @@ import { devices } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
 import { arg, launchBrowser, startPreview, stopPreview } from '../scripts/headless.mjs'
-import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, waitFrames, waitVisible } from './pageChecks.mjs'
+import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitFrames, waitVisible } from './pageChecks.mjs'
 import { planRun, STEP_LEVELS } from './shards.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
 import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
@@ -1612,11 +1612,20 @@ const WAVE_TIMER_STEP = 0.25
 /**
  * Spawn choreography (#30): the crow wave's tell must lead it, then its V flies in, frozen for `level2-wave.png`.
  * The run is paused and resumed between the tell and the wave: the wave must still come, and no tell or wave twice (#198).
+ * The level timer is held on the tick the tell fires, so the pause lands in that gap on any runner, however fast (#279).
  */
 async function waveCheck(page) {
   const { level, type, label, minOnScreen } = WAVE_CHECK
   const problems = []
   await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  await page.evaluate((l) => {
+    const s = window.__SC_TEST__
+    const push = s.waveEvents.push.bind(s.waveEvents)
+    s.waveEvents.push = (...entries) => {
+      if (entries.some((e) => e.kind === 'incoming' && e.label === l)) s.holdLevelTime = true
+      return push(...entries)
+    }
+  }, label)
   const event = (kind) => page
     .waitForFunction(([k, l]) => window.__SC_TEST__.waveEvents.find((e) => e.kind === k && e.label === l) ?? null, [kind, label], { timeout: 90000, polling: 200 })
     .then((h) => h.jsonValue(), () => null)
@@ -1626,7 +1635,15 @@ async function waveCheck(page) {
   const tellShown = tell
     ? await page.evaluate(() => ({ pulse: !!document.querySelector('.wave-tell'), text: document.querySelector('.wave-banner-text')?.textContent ?? null }))
     : null
-  await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
+  // The pause holds the timer from here; the test's own hold is released inside it.
+  const atPause = await page.evaluate((l) => {
+    const s = window.__SC_TEST__
+    s.setPhase('paused')
+    s.holdLevelTime = false
+    return { levelTime: s.nextWave()?.levelTime ?? null, arrived: s.waveEvents.find((e) => e.kind === 'announce' && e.label === l) ?? null }
+  }, label)
+  if (atPause.arrived)
+    problems.push(`the wave arrived at ${atPause.arrived.levelTime?.toFixed(2)} s, before the pause at ${atPause.levelTime?.toFixed(2)} s: the pause between tell and wave was skipped`)
   await page.waitForTimeout(WAVE_PAUSE_MS)
   await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
   const arrival = await event('announce')
@@ -2969,7 +2986,7 @@ async function runMobile(browser, base) {
 
   // Title -> PLAY (tap)
   if (!(await waitVisible(page, '.title-screen .play-button'))) problems.push('PLAY button never appeared')
-  await page.locator('.title-screen .play-button').tap({ timeout: 30000 }).catch((e) => problems.push(`tap PLAY: ${e.message}`))
+  await tapCentre(page, '.title-screen .play-button').catch((e) => problems.push(`tap PLAY: ${e.message}`))
   await waitPhase('levelSelect', 15000)
   if ((await phase()) !== 'levelSelect') problems.push('tapping PLAY did not open level select')
 
@@ -3098,9 +3115,11 @@ async function runMobile(browser, base) {
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
 
   // Back to normal speed: the music low-pass must open again.
+  // LevelAudio sets the duck every frame: decided on two rendered frames, not on wall time (#248).
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
-  await waitFrames(page, 1, { maxMs: 5000, pollMs: 40 })
-  if (audioPortrait.ready && (await page.evaluate(() => window.__SC_TEST__.audio().musicDucked)))
+  const unducked = await waitFrames(page, 2, { pollMs: 40 })
+  if (unducked.frames < 2) problems.push(`only ${unducked.frames} frame(s) in ${unducked.ms} ms after timeScale 1: the music duck went unchecked`)
+  else if (audioPortrait.ready && (await page.evaluate(() => window.__SC_TEST__.audio().musicDucked)))
     problems.push('music still ducked at timeScale 1')
 
   // Pause is a button (touch has no Escape key).
