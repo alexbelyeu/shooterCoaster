@@ -65,15 +65,17 @@ export interface MusicKey {
   minor: boolean
 }
 
+const LEVEL4_KEY: MusicKey = { tonic: 62, minor: true } // D minor
+
 /** The keys `audio/scores/*.scrim` are written in, pinned by `scores.test.ts`. */
 export const SCORE_KEYS: Record<string, MusicKey> = {
   title: { tonic: 69, minor: true }, // A minor
   level1: { tonic: 65, minor: false }, // F major
   level2: { tonic: 65, minor: true }, // F minor
   level3: { tonic: 67, minor: false }, // G major
-  level4: { tonic: 62, minor: true }, // D minor
+  level4: LEVEL4_KEY,
   level5: { tonic: 60, minor: true }, // C minor
-  level6: { tonic: 62, minor: true }, // D minor: level4's score, its placeholder
+  level6: LEVEL4_KEY, // plays level4's score until its own theme (#456)
   results: { tonic: 60, minor: false }, // C major
   // Theme options waiting on Alex's pick (`?theme=`, scores/themes/) get a row each: `'<slot>.<name>': key`
 }
