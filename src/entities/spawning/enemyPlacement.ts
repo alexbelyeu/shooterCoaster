@@ -47,6 +47,8 @@ export const ENEMY_PLACEMENT: Record<EnemyType, EnemyPlacementRule> = {
   fireImp: { surface: 'ground', scatter: 'trackside' },
   infernalDrake: { surface: 'air', scatter: band(300, 2600, 150, 100) },
   climber: { surface: 'wall', scatter: 'wall' },
+  rat: { surface: 'ground', scatter: 'trackside' },
+  dustBunny: { surface: 'ground', scatter: 'trackside' },
 }
 
 export const GOLDEN_BALLOON_SCATTER = band(0, 3000, 50, 100)

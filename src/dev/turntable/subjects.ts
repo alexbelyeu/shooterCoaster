@@ -1,5 +1,7 @@
 import type { BiomeType, BossType, EnemyType } from '@/types/level'
 import { CLIMB } from '@/entities/enemies/climbMotion'
+import { RAT_CYCLE } from '@/entities/enemies/ratMotion'
+import { DUST_BUNNY_BOUNCE } from '@/entities/enemies/dustBunnyMotion'
 
 /**
  * What the enemy turntable (`turntable.html`, `npm run turntable`) shows and how: pure, so a test can hold it to
@@ -48,6 +50,9 @@ export const SUBJECTS: readonly Subject[] = [
   { id: 'infernalDrake', kind: 'enemy', front: 0, holdHeading: 'model', motion: at(cycle(3)), animated: true },
   // Its face is to the wall: `front` shows what the rider sees, its back. The strip is two moves, left hand then right.
   { id: 'climber', kind: 'enemy', front: 0, motion: at(2 * (CLIMB.reach + CLIMB.pull + CLIMB.rest)), animated: true, stage: 'wall' },
+  // One dash and the stop after it: dart, stop dead, nose twitching.
+  { id: 'rat', kind: 'enemy', front: 0, holdHeading: 'model', motion: at(RAT_CYCLE), animated: true },
+  { id: 'dustBunny', kind: 'enemy', front: 0, holdHeading: 'model', motion: at(DUST_BUNNY_BOUNCE), animated: true },
   // Its nose points along +x.
   { id: 'goldenBlimp', kind: 'boss', front: Math.PI / 2, motion: at(cycle(1.7)), animated: true },
   // From just before the first tentacle's slam (2.4 s) through its strike and hold.

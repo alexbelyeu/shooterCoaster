@@ -71,6 +71,10 @@ describe('ground enemies', () => {
   it.each(types.filter((t) => ENEMY_PLACEMENT[t].surface === 'ground'))('%s stands beside the track ahead of the rider', (type) => {
     expect(ENEMY_PLACEMENT[type].scatter).toBe('trackside')
   })
+
+  it("puts the gym's pests (#515) on the floor beside the track", () => {
+    for (const type of ['rat', 'dustBunny'] as const) expect(ENEMY_PLACEMENT[type]).toEqual({ surface: 'ground', scatter: 'trackside' })
+  })
 })
 
 describe('wall enemies', () => {
