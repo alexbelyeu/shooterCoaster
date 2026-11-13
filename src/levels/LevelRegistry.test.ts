@@ -148,8 +148,15 @@ describe('computeMaxScore', () => {
     const types: EnemyType[] = [
       'balloon', 'crow', 'scorpion', 'shark', 'jellyfish', 'flyingFish', 'snowman',
       'snowmanScout', 'snowmanBrute', 'emberWisp', 'lavaGolem', 'fireImp', 'infernalDrake', 'climber',
+      'rat', 'dustBunny',
     ]
     for (const t of types) expect(Number.isInteger(SCORE_VALUES[t])).toBe(true)
+  })
+
+  it("scores the gym's pests (#515): a darting rat above a slow dust bunny, both small fry", () => {
+    expect(SCORE_VALUES.rat).toBe(18)
+    expect(SCORE_VALUES.dustBunny).toBe(12)
+    expect(SCORE_VALUES.rat).toBeGreaterThan(SCORE_VALUES.dustBunny)
   })
 })
 
