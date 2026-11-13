@@ -1,0 +1,924 @@
+{
+  "version": 1,
+  "example": false,
+  "units": "m",
+  "hall": {
+    "w": 80,
+    "d": 40,
+    "h": 27
+  },
+  "notes": "Built from the Setter's Map + photos (12 Nov). Axes: x = the long way, 0 at the Starr end (top of the Setter's Map) to 80 at the auto-belay end; z = across, 0 on the east side (Tree, Training Area, Lagoon), 40 on the west side (Shield, Alaska, Slab).\nRopes: Starr, Shield, the Tree, Alaska, the Lagoon (east wall and round the corner onto the south wall, with the auto belays). Boulders: the Flame (one structure, \"Left\" and \"Right\" halves), the Slab (from Alaska to near the entrance), the Training Area, and the Wave joined to the Arch.\nWall heights: Shield, Tree, Alaska and the Lagoon (both sides) are the tall walls. Starr and the Training Area are lower, with a row of tall windows above each that must stay visible; windows also run above the Arch wall.\nEast side going south: the Tree (in the pit), the Training Area (a low, cave-like annex outside the hall), a hang board, a big cubby area, the bathrooms (outside the hall), then the Lagoon.\nSouth-west corner: the gym entrance (glass doors in the west wall) and, right next to it on the south wall, the door to the stairs that climb round the outside of the hall (not visible inside) to the upstairs gym. That gym is a glass-walled room the size of the Training Area above the Slab, outside the hall's west wall at about 7 m, looking in.\nLook: white/grey walls with painted bands (blue/purple waves at the south end, green outlines on the Trees, yellow/black at Starr). Grey mats with black seams under boulders; black floor with a red edge stripe in rope zones. Holds in every colour, big black and blue volumes on the boulders.\nBuilding: tall white hall, exposed steel roof trusses, silver ducts and long strip lights; maroon steel beams; big climbing-photo murals and an eagle mural low on the walls.\nRopes: numbered 1–6 along the Lagoon's east side, 7–9 auto belays on its south side.",
+  "items": [
+    {
+      "id": "pit-starr",
+      "kind": "pit",
+      "name": "Starr pit",
+      "x": 10,
+      "z": 20,
+      "rot": 0,
+      "w": 20,
+      "d": 40,
+      "depth": 2.45,
+      "note": "Lower level at the north end, reached by the stairs from the main floor (photo from the top of the stairs). Grey mats. Rope walls on three sides: Starr (end), the Shield (west), the Left Tree (east)."
+    },
+    {
+      "id": "stairs-starr",
+      "kind": "stairs",
+      "name": "Stairs down to Starr",
+      "x": 20,
+      "z": 20,
+      "rot": 270,
+      "base": 0,
+      "w": 3,
+      "steps": 14,
+      "rise": 0.175,
+      "run": 0.3,
+      "note": "Straight flight from the main floor down toward the star wall, red railings both sides. The Setter's Map hangs near here, by the Stair B sign."
+    },
+    {
+      "id": "w-starr",
+      "kind": "sport",
+      "name": "Starr",
+      "x": 0.5,
+      "z": 20,
+      "rot": 90,
+      "base": -2.45,
+      "length": 38.5,
+      "profile": [
+        {
+          "len": 5,
+          "angle": 0
+        },
+        {
+          "len": 7,
+          "angle": 8
+        },
+        {
+          "len": 3,
+          "angle": 0
+        }
+      ],
+      "color": "#e8eae5",
+      "note": "End wall of the pit, lower than the side walls, with the window row above it. White panels with big black and yellow diagonal bands radiating from the star; green trim along the top.",
+      "ropes": 9
+    },
+    {
+      "id": "u2g52up",
+      "kind": "star",
+      "name": "Star",
+      "x": 1.063,
+      "z": 20,
+      "rot": 90,
+      "base": 6.2,
+      "points": 8,
+      "radius": 5.2,
+      "inner": 1.4,
+      "depth": 1.57,
+      "colorA": "#f2c230",
+      "colorB": "#1d2320",
+      "note": "The Starr: yellow and black faceted star with a dark hub, centred on the end wall."
+    },
+    {
+      "id": "w-shield",
+      "kind": "sport",
+      "name": "The Shield",
+      "x": 10.8,
+      "z": 39.5,
+      "rot": 180,
+      "base": -2.45,
+      "length": 18.4,
+      "profile": [
+        {
+          "len": 5,
+          "angle": 0
+        },
+        {
+          "len": 5,
+          "angle": 15
+        },
+        {
+          "len": 5,
+          "angle": -10
+        },
+        {
+          "len": 5.5,
+          "angle": 0
+        }
+      ],
+      "color": "#dfe3dc",
+      "note": "West wall of the pit: a big shield-shaped bulge mid-height. Yellow and black triangle panels, green stripes. Has an auto belay (map).",
+      "ropes": 5
+    },
+    {
+      "id": "ab-autobelayshield",
+      "kind": "autobelay",
+      "name": "Auto belay · Shield",
+      "x": 17.3,
+      "z": 37.856,
+      "rot": 180,
+      "base": 17.404,
+      "note": "Marked on the Setter's Map at the south end of the Shield."
+    },
+    {
+      "id": "tree-left",
+      "kind": "tree",
+      "name": "Tree",
+      "x": 11.1,
+      "z": 5,
+      "rot": 0,
+      "base": -2.45,
+      "width": 17.8,
+      "trunk": 3.5,
+      "caveDepth": 4,
+      "caveHeight": 7,
+      "height": 20.5,
+      "headAngle": 6,
+      "color": "#dbe7d8",
+      "note": "The only tree: east wall of the pit, facing the Shield across it. Trunk in the middle with a cave each side (\"Left Tree\" and \"Right Tree\" on the Setter's Map), head wall above. White with green panel outlines."
+    },
+    {
+      "id": "p-pitblock1",
+      "kind": "prop",
+      "name": "Pit bench",
+      "x": 4,
+      "z": 15.5,
+      "rot": 90,
+      "base": -2.45,
+      "w": 1.4,
+      "d": 0.9,
+      "h": 0.5,
+      "color": "#f2c230",
+      "note": "Yellow and black padded blocks on the pit floor below the star."
+    },
+    {
+      "id": "p-pitblock2",
+      "kind": "prop",
+      "name": "Pit bench",
+      "x": 4,
+      "z": 24.5,
+      "rot": 90,
+      "base": -2.45,
+      "w": 1.4,
+      "d": 0.9,
+      "h": 0.5,
+      "color": "#f2c230",
+      "note": ""
+    },
+    {
+      "id": "floor-training",
+      "kind": "floor",
+      "name": "Training cave floor",
+      "x": 29,
+      "z": -5,
+      "rot": 0,
+      "base": 0,
+      "w": 16,
+      "d": 10,
+      "note": "Annex outside the main hall, opening off the east wall right after the Tree."
+    },
+    {
+      "id": "ewsmmqw",
+      "kind": "floor",
+      "name": "Training cave roof",
+      "x": 29,
+      "z": -5,
+      "rot": 0,
+      "base": 4.5,
+      "w": 16,
+      "d": 10,
+      "note": "Low ceiling that makes the Training Area cave-like. The hall wall above its opening carries the comp banners (\"Iron Maiden\", \"Up Peaks\") and the window row."
+    },
+    {
+      "id": "b-training",
+      "kind": "boulder",
+      "name": "Training Area · back",
+      "x": 29,
+      "z": -9.5,
+      "rot": 0,
+      "base": 0,
+      "length": 15,
+      "profile": [
+        {
+          "len": 1,
+          "angle": 0
+        },
+        {
+          "len": 2,
+          "angle": 35
+        },
+        {
+          "len": 1.4,
+          "angle": 70
+        }
+      ],
+      "color": "#e3e6ee",
+      "note": "Cave-like bouldering: steep back wall rolling into a roof. White with blue painted lines, dense small holds."
+    },
+    {
+      "id": "b-training-n",
+      "kind": "boulder",
+      "name": "Training Area · north side",
+      "x": 21.5,
+      "z": -5,
+      "rot": 90,
+      "base": 0,
+      "length": 9,
+      "profile": [
+        {
+          "len": 1.2,
+          "angle": 0
+        },
+        {
+          "len": 2.6,
+          "angle": 30
+        }
+      ],
+      "color": "#e3e6ee",
+      "note": ""
+    },
+    {
+      "id": "b-training-s",
+      "kind": "boulder",
+      "name": "Training Area · south side",
+      "x": 36.5,
+      "z": -5,
+      "rot": 270,
+      "base": 0,
+      "length": 9,
+      "profile": [
+        {
+          "len": 1.2,
+          "angle": 0
+        },
+        {
+          "len": 2.6,
+          "angle": 30
+        }
+      ],
+      "color": "#e3e6ee",
+      "note": ""
+    },
+    {
+      "kind": "pad",
+      "rot": 0,
+      "base": 0,
+      "note": "",
+      "id": "pad-training",
+      "name": "Training pads",
+      "x": 29,
+      "z": -4.75,
+      "w": 14,
+      "d": 9.5,
+      "thick": 0.35,
+      "color": "#9a9e9b"
+    },
+    {
+      "id": "p-hangboard-wall",
+      "kind": "prop",
+      "name": "Hang board wall",
+      "x": 39.5,
+      "z": 0.2,
+      "rot": 0,
+      "base": 0,
+      "w": 4,
+      "d": 0.3,
+      "h": 3.2,
+      "color": "#b9a27f",
+      "note": "Plywood backing on the hall wall just past the Training Area."
+    },
+    {
+      "id": "p-hangboards",
+      "kind": "prop",
+      "name": "Hang boards",
+      "x": 39.5,
+      "z": 0.5,
+      "rot": 0,
+      "base": 2.1,
+      "w": 3.2,
+      "d": 0.3,
+      "h": 0.3,
+      "color": "#8a5a32",
+      "note": "A row of wooden hang boards at about 2.1 m."
+    },
+    {
+      "id": "p-cubbies",
+      "kind": "prop",
+      "name": "Cubbies",
+      "x": 46.25,
+      "z": 1,
+      "rot": 0,
+      "w": 8,
+      "d": 0.8,
+      "h": 2.2,
+      "color": "#a8794a",
+      "note": "The bigger cubby area: wooden shoe/bag cubbies with benches in front; big climbing-photo murals on the hall wall above."
+    },
+    {
+      "id": "p-bench",
+      "kind": "prop",
+      "name": "Benches",
+      "x": 46.25,
+      "z": 2.6,
+      "rot": 0,
+      "w": 8,
+      "d": 0.5,
+      "h": 0.45,
+      "color": "#a8794a",
+      "note": ""
+    },
+    {
+      "id": "p-bathrooms",
+      "kind": "prop",
+      "name": "Bathrooms",
+      "x": 54,
+      "z": -3.5,
+      "rot": 0,
+      "w": 5,
+      "d": 7,
+      "h": 3.2,
+      "color": "#c9c3b8",
+      "note": "After the cubbies, before the Lagoon. Placed just outside the hall wall like the Training Area; exact footprint unknown."
+    },
+    {
+      "id": "w-lagoon-n",
+      "kind": "sport",
+      "name": "The Lagoon · ropes 1–3",
+      "x": 61.5,
+      "z": 0.5,
+      "rot": 0,
+      "base": 0,
+      "length": 7,
+      "profile": [
+        {
+          "len": 5,
+          "angle": 0
+        },
+        {
+          "len": 8,
+          "angle": 10
+        },
+        {
+          "len": 5,
+          "angle": 0
+        }
+      ],
+      "color": "#dfe2e4",
+      "note": "East wall. Ropes numbered 1, 2, 3 at the north end; purple/blue painted panel with pink holds by rope 1.",
+      "ropes": 3
+    },
+    {
+      "id": "w-lagoon-arete",
+      "kind": "sport",
+      "name": "The Lagoon · arête",
+      "x": 67.5,
+      "z": 1.5,
+      "rot": 0,
+      "base": 0,
+      "length": 5,
+      "profile": [
+        {
+          "len": 4,
+          "angle": 0
+        },
+        {
+          "len": 9,
+          "angle": 6
+        },
+        {
+          "len": 5,
+          "angle": 14
+        }
+      ],
+      "color": "#8f969b",
+      "note": "Tall grey pillar standing proud of the wall, big yellow holds up the arête.",
+      "ropes": 1,
+      "back": 1
+    },
+    {
+      "id": "w-lagoon-s",
+      "kind": "sport",
+      "name": "The Lagoon · ropes 5–6",
+      "x": 74.25,
+      "z": 0.5,
+      "rot": 0,
+      "base": 0,
+      "length": 8.5,
+      "profile": [
+        {
+          "len": 6,
+          "angle": 0
+        },
+        {
+          "len": 6,
+          "angle": 15
+        },
+        {
+          "len": 6,
+          "angle": 0
+        }
+      ],
+      "color": "#dfe2e4",
+      "note": "White and grey with blue/purple wave paint low down, pink and green holds.",
+      "ropes": 2
+    },
+    {
+      "id": "w-south-ab",
+      "kind": "sport",
+      "name": "The Lagoon · south side (auto belays)",
+      "x": 79.5,
+      "z": 9,
+      "rot": 270,
+      "base": 0,
+      "length": 16,
+      "profile": [
+        {
+          "len": 5,
+          "angle": 0
+        },
+        {
+          "len": 8,
+          "angle": 8
+        },
+        {
+          "len": 5,
+          "angle": 0
+        }
+      ],
+      "color": "#c9c8e6",
+      "note": "The Lagoon wrapping onto the south wall, as tall as its east side. Auto belays (numbered 7–9 at the top). White top, blue and purple wave bands, black bottom band; black \"CLIP IN\" triangles on the floor.",
+      "ropes": 2
+    },
+    {
+      "id": "ab-autobelay8",
+      "kind": "autobelay",
+      "name": "Auto belay 8",
+      "x": 78.037,
+      "z": 7,
+      "rot": 270,
+      "base": 17.522,
+      "note": "Black \"CLIP IN\" triangle at the floor."
+    },
+    {
+      "id": "ab-autobelay9",
+      "kind": "autobelay",
+      "name": "Auto belay 9",
+      "x": 78.037,
+      "z": 11,
+      "rot": 270,
+      "base": 17.522,
+      "note": "Black \"CLIP IN\" triangle at the floor."
+    },
+    {
+      "id": "b-south",
+      "kind": "boulder",
+      "name": "South wall · boulder (Arch)",
+      "x": 79.5,
+      "z": 25.25,
+      "rot": 270,
+      "base": 0,
+      "length": 16,
+      "profile": [
+        {
+          "len": 1.5,
+          "angle": 0
+        },
+        {
+          "len": 5,
+          "angle": 15
+        }
+      ],
+      "color": "#c9c8e6",
+      "note": "Bouldering wall at the south end; the Arch springs from it. Same blue/purple wave paint; eagle mural nearby. Window row above."
+    },
+    {
+      "id": "door-upstairs",
+      "kind": "windows",
+      "name": "Door to the upstairs gym stairs",
+      "x": 79.98,
+      "z": 37,
+      "rot": 270,
+      "base": 0,
+      "length": 2.2,
+      "count": 2,
+      "winW": 1.05,
+      "h": 2.6,
+      "note": "A plain doorway in the south wall. Behind it the stairs climb round the outside of the hall to the glass gym room; none of that is visible from inside."
+    },
+    {
+      "id": "stairs-up-1",
+      "kind": "stairs",
+      "name": "Upstairs gym stairs · lower flight",
+      "x": 82,
+      "z": 43,
+      "rot": 180,
+      "base": 3.5,
+      "w": 2,
+      "steps": 20,
+      "rise": 0.175,
+      "run": 0.28,
+      "note": "Outside the hall: from the south-wall door up along the outside of the south wall to a landing."
+    },
+    {
+      "id": "landing-up",
+      "kind": "floor",
+      "name": "Upstairs gym stairs · landing",
+      "x": 80.3,
+      "z": 44,
+      "rot": 0,
+      "base": 3.5,
+      "w": 5.4,
+      "d": 3,
+      "note": "Outside the hall, round the south-west corner."
+    },
+    {
+      "id": "stairs-up-2",
+      "kind": "stairs",
+      "name": "Upstairs gym stairs · upper flight",
+      "x": 72,
+      "z": 44,
+      "rot": 90,
+      "base": 7,
+      "w": 2,
+      "steps": 20,
+      "rise": 0.175,
+      "run": 0.28,
+      "note": "Outside the hall: from the landing up to the glass gym room floor."
+    },
+    {
+      "id": "entrance",
+      "kind": "windows",
+      "name": "Entrance · glass doors",
+      "x": 76.75,
+      "z": 39.98,
+      "rot": 180,
+      "base": 0,
+      "length": 5.5,
+      "count": 4,
+      "winW": 1.25,
+      "h": 3.2,
+      "note": "The gym's entrance: glass doors with glass side panels in the west wall, right by the south-west corner and the stairs door. Keep the corner in front of it clear."
+    },
+    {
+      "kind": "pad",
+      "rot": 0,
+      "base": 0,
+      "note": "Walk-in area inside the doors; no mats or walls here.",
+      "id": "entry-mat",
+      "name": "Entry floor",
+      "x": 77,
+      "z": 36.75,
+      "w": 6,
+      "d": 6.5,
+      "thick": 0.03,
+      "color": "#6f6a63"
+    },
+    {
+      "id": "w-alaska-n",
+      "kind": "sport",
+      "name": "Alaska (north)",
+      "x": 26.75,
+      "z": 39.5,
+      "rot": 180,
+      "base": 0,
+      "length": 12.5,
+      "profile": [
+        {
+          "len": 5,
+          "angle": 0
+        },
+        {
+          "len": 7,
+          "angle": 12
+        },
+        {
+          "len": 6,
+          "angle": 0
+        }
+      ],
+      "color": "#d7ddd5",
+      "note": "Long west rope wall. Grey and green panels, blue holds, big white slopers; orange ropes.",
+      "ropes": 4
+    },
+    {
+      "id": "w-alaska-s",
+      "kind": "sport",
+      "name": "Alaska (south)",
+      "x": 41.25,
+      "z": 39.5,
+      "rot": 180,
+      "base": 0,
+      "length": 16.5,
+      "profile": [
+        {
+          "len": 4,
+          "angle": 0
+        },
+        {
+          "len": 8,
+          "angle": 20
+        },
+        {
+          "len": 5.5,
+          "angle": 5
+        }
+      ],
+      "color": "#d7ddd5",
+      "note": "Steeper half of Alaska.",
+      "ropes": 5
+    },
+    {
+      "id": "b-slab-n",
+      "kind": "boulder",
+      "name": "Slab (north)",
+      "x": 58,
+      "z": 38.29,
+      "rot": 180,
+      "base": 0,
+      "length": 17,
+      "profile": [
+        {
+          "len": 1,
+          "angle": 0
+        },
+        {
+          "len": 5,
+          "angle": -14
+        },
+        {
+          "len": 0.6,
+          "angle": 0
+        }
+      ],
+      "color": "#e4e6e2",
+      "note": "Bouldering slab from Alaska south: leans back away from the climber."
+    },
+    {
+      "id": "b-slab-s",
+      "kind": "boulder",
+      "name": "Slab (south)",
+      "x": 70.25,
+      "z": 38.971,
+      "rot": 180,
+      "base": 0,
+      "length": 7.5,
+      "profile": [
+        {
+          "len": 1.2,
+          "angle": 0
+        },
+        {
+          "len": 3.8,
+          "angle": -8
+        },
+        {
+          "len": 1.5,
+          "angle": 10
+        }
+      ],
+      "color": "#e4e6e2",
+      "note": "Bouldering slab with a bulge at the top; ends before the entrance corner."
+    },
+    {
+      "id": "floor-glassgym",
+      "kind": "floor",
+      "name": "Glass gym room floor",
+      "x": 64,
+      "z": 45,
+      "rot": 0,
+      "base": 7,
+      "w": 16,
+      "d": 10,
+      "note": "Fitness/gym area above the Slab, as big as the Training Area. Sits outside the hall rectangle, looking into the hall."
+    },
+    {
+      "id": "roof-glassgym",
+      "kind": "floor",
+      "name": "Glass gym room roof",
+      "x": 64,
+      "z": 45,
+      "rot": 0,
+      "base": 11.2,
+      "w": 16,
+      "d": 10,
+      "note": ""
+    },
+    {
+      "id": "win-glassgym",
+      "kind": "windows",
+      "name": "Glass gym room · glass wall",
+      "x": 64,
+      "z": 39.98,
+      "rot": 180,
+      "base": 7.1,
+      "length": 16,
+      "count": 7,
+      "winW": 2.2,
+      "h": 4,
+      "note": "Floor-to-ceiling glass along the whole hall side of the gym room, right above the Slab."
+    },
+    {
+      "id": "blk-flame",
+      "kind": "block",
+      "name": "Flame",
+      "x": 42.5,
+      "z": 22,
+      "rot": 0,
+      "base": 0,
+      "w": 12,
+      "d": 3.4,
+      "chamfer": 0.9,
+      "profile": [
+        {
+          "len": 1.5,
+          "angle": 0
+        },
+        {
+          "len": 3.6,
+          "angle": 50
+        },
+        {
+          "len": 1.5,
+          "angle": -30
+        }
+      ],
+      "color": "#8e9396",
+      "colorB": "#c8302a",
+      "color2": "#5b55b0",
+      "colorB2": "#e8e8e4",
+      "note": "One long freestanding flame/hull boulder on a narrow base, flaring out hard, with a clear path all round it. North half (\"Left Flame\"): grey with a red base, yellow/red/blue/black volumes. South half (\"Right Flame\"): blue/purple with a white base, black volumes, long green holds."
+    },
+    {
+      "id": "blk-wave",
+      "kind": "block",
+      "name": "Wave",
+      "x": 63.5,
+      "z": 22.5,
+      "rot": 0,
+      "base": 0,
+      "w": 12,
+      "d": 4.5,
+      "chamfer": 0.25,
+      "profile": [
+        {
+          "len": 1.2,
+          "angle": 0
+        },
+        {
+          "len": 4.2,
+          "angle": 25
+        },
+        {
+          "len": 1,
+          "angle": -35
+        }
+      ],
+      "color": "#4a55b0",
+      "colorB": "#1d1d1f",
+      "note": "Long boulder, every side overhanging; its south end runs into the Arch so the two are one structure. Blue, purple and white wave paint over a black base band; big black and blue volumes, orange holds."
+    },
+    {
+      "id": "arch",
+      "kind": "arch",
+      "name": "Arch",
+      "x": 75,
+      "z": 22.5,
+      "rot": 0,
+      "base": 0,
+      "length": 9.5,
+      "d": 5,
+      "height": 6,
+      "opening": 5.5,
+      "openingHeight": 4,
+      "flare": 1.2,
+      "attached": true,
+      "color": "#4057b5",
+      "note": "A literal arch: its north leg joins the Wave, its south end is built into the south boulder wall. You walk under it; through it you see the auto belays. Blue/purple/white wave paint, black volumes, white slopers."
+    },
+    {
+      "kind": "pad",
+      "rot": 0,
+      "base": 0,
+      "note": "Grey mats with black seams; nothing else stands near the Flame.",
+      "id": "pad-flame",
+      "name": "Flame pads",
+      "x": 41.25,
+      "z": 22,
+      "w": 24.5,
+      "d": 16,
+      "thick": 0.35,
+      "color": "#9a9e9b"
+    },
+    {
+      "kind": "pad",
+      "rot": 0,
+      "base": 0,
+      "note": "",
+      "id": "pad-wave-arch",
+      "name": "Wave & Arch pads",
+      "x": 66.75,
+      "z": 23.25,
+      "w": 25.5,
+      "d": 18.5,
+      "thick": 0.35,
+      "color": "#9a9e9b"
+    },
+    {
+      "kind": "pad",
+      "rot": 0,
+      "base": 0,
+      "note": "",
+      "id": "pad-slab",
+      "name": "Slab pads",
+      "x": 61.75,
+      "z": 36.5,
+      "w": 24.5,
+      "d": 5,
+      "thick": 0.35,
+      "color": "#9a9e9b"
+    },
+    {
+      "kind": "pad",
+      "rot": 0,
+      "base": 0,
+      "note": "Rope zone: black floor with a red edge stripe.",
+      "thick": 0.04,
+      "color": "#232325",
+      "id": "rz-alaska",
+      "name": "Rope zone · Alaska",
+      "x": 35,
+      "z": 36.5,
+      "w": 29,
+      "d": 6
+    },
+    {
+      "kind": "pad",
+      "rot": 0,
+      "base": 0,
+      "note": "Rope zone: black floor with a red edge stripe.",
+      "thick": 0.04,
+      "color": "#232325",
+      "id": "rz-lagoon",
+      "name": "Rope zone · Lagoon",
+      "x": 68.25,
+      "z": 3.5,
+      "w": 20.5,
+      "d": 6
+    },
+    {
+      "kind": "pad",
+      "rot": 0,
+      "base": 0,
+      "note": "Rope zone: black floor with a red edge stripe.",
+      "thick": 0.04,
+      "color": "#232325",
+      "id": "rz-south",
+      "name": "Rope zone · auto belays",
+      "x": 77,
+      "z": 12,
+      "w": 5,
+      "d": 10
+    },
+    {
+      "kind": "windows",
+      "base": 14,
+      "winW": 2.2,
+      "h": 6.5,
+      "note": "Tall narrow windows; must stay visible above the lower wall.",
+      "id": "win-starr",
+      "name": "Windows above Starr",
+      "x": 0.02,
+      "z": 20,
+      "rot": 90,
+      "length": 36,
+      "count": 8
+    },
+    {
+      "kind": "windows",
+      "base": 14,
+      "winW": 2.2,
+      "h": 6.5,
+      "note": "Tall narrow windows; must stay visible above the lower wall.",
+      "id": "win-south",
+      "name": "Windows above the Arch wall",
+      "x": 79.98,
+      "z": 28.5,
+      "rot": 270,
+      "length": 20,
+      "count": 5
+    },
+    {
+      "kind": "windows",
+      "base": 14,
+      "winW": 2.2,
+      "h": 6.5,
+      "note": "Tall narrow windows; must stay visible above the lower wall.",
+      "id": "win-training",
+      "name": "Windows above the Training Area",
+      "x": 29,
+      "z": 0.02,
+      "rot": 0,
+      "length": 15,
+      "count": 4
+    }
+  ]
+}

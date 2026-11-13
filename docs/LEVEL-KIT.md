@@ -2,7 +2,8 @@
 
 _Design doc for epic #437 (Alex, 8 Nov 2026: "procedurally create many more levels: new
 worlds, new enemies"). Owned by the Director; builders fix it where it is wrong, in the PR
-that found out. The first world built through it is the Climbing Gym (#457)._
+that found out. The first world built through it is the Climbing Gym: Alex's own gym from his blockout
+(#513 → #514, #517; `docs/levels/`)._
 
 ## The idea
 
@@ -18,7 +19,7 @@ game should never read as random terrain with random enemies.
 | Hand-authored (the look, the memory) | Templated or generated (the rules, the plumbing) |
 |---|---|
 | The **palette, sky, light, fog, grade** (`atmosphere.ts` preset, `config.ts` colour ramp) | **Pacing**: wave times and the boss `at` from `RUN_SECONDS` and a template (#452, `src/levels/pacing.ts`) |
-| The **hero landmark(s)** and set-piece (Pyramid, Volcano, the gym's great wall) | **Placement**: where a wave lands, from the camera's look direction at activation (#451, `spawnPlacement.ts`); trackside / water / wall bands per enemy (`ENEMY_PLACEMENT`) |
+| The **hero landmark(s)** and set-piece (Pyramid, Volcano, the gym's Starr and Flame) | **Placement**: where a wave lands, from the camera's look direction at activation (#451, `spawnPlacement.ts`); trackside / water / wall bands per enemy (`ENEMY_PLACEMENT`) |
 | **Enemy designs** (brief in `docs/art/ENEMIES.md`) and their death style and kill sound | **Enemy motion patterns**: fly, walk, swim, surface, climb (`climbMotion.ts`, #453) are shared modules an enemy picks |
 | **Bosses** (spec + choreography) | **Boss framework** (weak points, phases, retract, projectiles, tell, HUD): `bossModel.ts` |
 | **Music** (a theme round, Alex's pick) | **Score slot, key table, layers lint** |
@@ -36,10 +37,15 @@ A world is `src/levels/environments/biomes/<biome>/` (`config.ts`, `Decorations.
 - **Outdoor** (all five today): terrain from the shared noise with the biome's colour ramp,
   sky dome, optional water, trees, scatter props, landmarks placed by a pure `layout.ts`
   against the track's arc table.
-- **Interior** (the gym, #457): no terrain or sky dome; a hall (floor, walls, ceiling with
-  openings for light), light from the openings, fog for depth, props on the walls. The
-  `BiomeDefinition` gains whatever an interior needs in #457 (flat `heightFn`, a ceiling,
-  no trees), with the outdoor biomes unchanged.
+- **Interior** (the gym, #517): a hall (floor, walls, ceiling, windows), light from strip
+  lights and windows, fog for depth, props on the walls. It is an ordinary biome with a
+  flat floor shaped by the hall (the gym's sunken Starr pit is in its `heightFn`; DECISIONS
+  2026-11-11), the outdoor biomes unchanged.
+- **From a blockout** (the gym, #513): when a world is a real place, its layout is data
+  (`docs/levels/`, a JSON blockout of typed pieces in metres), scaled uniformly to landmark
+  size, and the track is **authored**: a closed `spline` curve through control points built
+  from the blockout's anchors (#514), with tests that it hits the place's ride moments. The
+  trig curves stay for the generated worlds.
 
 A **level** is a roster, not a schedule: which enemies, how many per wave, in what formation,
 which boss; the pacing template gives the seconds. The ride is one lap ≈ one run.
@@ -72,7 +78,8 @@ models only where the world needs a character nothing else gives.
 
 ## Candidate worlds (Director's ranking)
 
-1. **Climbing Gym** (#438 → #457): interior, climbers on walls, boulderers below. First.
+1. **Climbing Gym** (#438 → #513): Alex's gym from his blockout; rats, lanternflies, dust
+   bunnies, climbers you must not shoot, the Medusa. First.
 2. **Neon Metropolis** (#322): night city, drones, billboard bots, helicopter. Deferred from
    M3; comes back through the kit.
 3. **Jungle Ruins**: mist, temples, vines, toucans, spider swarms.

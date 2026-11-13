@@ -1,6 +1,7 @@
 # State of the game
 
-_Rewritten by the Director on 2026-11-09 (fourth Director run, `main` @ a121897). The
+_Rewritten by the Director on 2026-11-09 (fourth Director run, `main` @ a121897); Level 6
+and the studio notes amended 2026-11-13 (mid-week re-plan for #513, `main` @ e6a98d2). The
 Director rewrites this weekly; the Maintainer edits it when fixing things._
 
 ## Summary
@@ -34,7 +35,7 @@ has been posted anywhere yet (#102 waits on Alex); 23 of W45's 28 visitors start
 | 3 Ocean | ocean | 60 s | 20 + 24 jellyfish, 28 sharks (trackside, floating), 36 flying fish at 0 / 14 / 23 / 32 s; **Kraken at 40 s** | Sunken city, sea stacks, water with glitter / swell / shallows / horizon (#430), seabirds, coral, plankton | Reads as an ocean now; jellyfish in view from the start. The whole rail loop sits on the frame as blue cables (#327). Kraken still pale hooks (backlog) |
 | 4 Antarctica | arctic | 60 s | 44 scouts (line), 40 snowmen, 16 brutes at 0 / 15 / 30 s; **Yeti at 40 s** (fists, then the chest while it roars; snowballs are bonus kills) | Ice fortress, mountains, aurora (flares in the tell), crystals, drifts, pines, snow | Sky and snowmen good; the Yeti's snowball splat reads. 178 draws (was 394) |
 | 5 Inferno | volcanic | 60 s | wisps ×2, imps, golems ×2 at 0 / 8 / 16 / 25 / 33 s, one eruption (25 s); **8 drakes at 40 s stand in for the boss** (#320) | Volcano, lava rivers, ash + embers, smoke column, emissive rails | Readable in the dark. The bright vertical slab beside the track remains (#331); wisp / imp / golem are the weakest enemies (#463). 116 draws (was 295) |
-| 6 Climbing Gym | gym (interior) | — | planned: climbers on walls, last-wave sprint, boss TBD | planned: huge walls, bouldering zone, skylights, catwalks | #453 (Climber, ready) → #457 (the level, blocked on it) → #456 (theme round) |
+| 6 Climbing Gym | gym (interior) | — | planned (#513, 12 Nov): Alex's own gym from his blockout (`docs/levels/gym-blockout.json`); rats + dust bunnies (#515), lanternflies (#516), climbers as don't-shoot bystanders (#518), **the Medusa of the Starr** (#521) | planned: the Starr pit and star, the burning Flame (#520), the Tree headwall and rugged walls (#519), the Arch, the glass gym room; an authored spline track through four ride moments (#514) | #503 (a generic hall) was closed by Alex on 12 Nov; #457 superseded. Build order: #514 ∥ #515 ∥ #516 → #517 (level playable) → #518 ∥ #521 ∥ #520 ∥ #519 |
 
 Common: title (poster → fly-by park with a riding coaster, beat-locked cuts, animated logo
 and menu, attract mode after 30 s; any key / PLAY) → level select (postcards, stars,
@@ -129,6 +130,11 @@ visitors and ≈ 1 start a day, 19 % press PLAY. Mobile: 1 of 19 mobile visitors
 a level in three weeks.
 
 ## Known bugs and visual problems (ranked)
+
+0. **Studio stalled (13 Nov, #512, `needs-alex`)**: two scheduled Builders / QA runs passed
+   with no token-ledger post since 12 Nov 07:35 UTC; 0 PRs open, ~30 issues waiting. Only Alex
+   can check the scheduled tasks (CLAUDE.md rule 10). #511 (#503 approved 16 h, unmerged) is
+   moot: #503 is closed.
 
 1. **Fixed 9–10 Nov:** every run is 60 s with the boss at 40 s (#473, closes #452), and waves
    are placed where the camera will look (#470, closes #451). The nightly `pacing` step
