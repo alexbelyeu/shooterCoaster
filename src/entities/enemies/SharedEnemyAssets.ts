@@ -991,6 +991,125 @@ export const CLIMBER_MAT = withRim(new THREE.MeshStandardMaterial({
   flatShading: true,
 }), { color: '#fff4e6', intensity: 0.5, power: 2.5 })
 
+// ── New York rat (#515), built to docs/art/ENEMIES.md ──
+// Faces +z; one material, three moving parts: the body, the snout (nose twitch) about RAT_SNOUT_PIVOT, the tail
+// (swish) about RAT_TAIL_PIVOT. 600-triangle cap.
+
+const RAT_FUR = '#6b6058'
+const RAT_BELLY = '#a39589'
+const RAT_PINK = '#f2a0a8'
+const RAT_EYE = '#111014'
+const RAT_GLINT = '#ffffff'
+const RAT_WHISKER = '#ece6dc'
+
+export const RAT_SNOUT_PIVOT: Vec3 = [0, 1.3, 2.75]
+export const RAT_TAIL_PIVOT: Vec3 = [0, 0.95, -1.85]
+
+export const RAT_BODY_GEO = sunShaded(mergePainted([
+  paintedAt(new THREE.SphereGeometry(1, 8, 5), RAT_FUR, pose([0, 1.05, 0], [0, 0, 0], [1.05, 0.95, 2])),
+  paintedAt(new THREE.SphereGeometry(1, 6, 4), RAT_BELLY, pose([0, 0.72, 0.1], [0, 0, 0], [0.9, 0.55, 1.7])),
+  paintedAt(new THREE.SphereGeometry(0.85, 8, 5), RAT_FUR, pose([0, 1.35, 2.05], [0, 0, 0], [1, 0.9, 1.2])),
+  // Big round ears, pink faces to the front.
+  ...[-1, 1].map((s) => paintedAt(new THREE.SphereGeometry(0.6, 8, 3), RAT_PINK, pose([s * 0.62, 2.2, 1.8], [0, s * 0.35, s * 0.3], [1, 1, 0.3]))),
+  ...[-1, 1].map((s) => painted(new THREE.SphereGeometry(0.17, 5, 3), RAT_EYE, [s * 0.4, 1.62, 2.72])),
+  ...[-1, 1].map((s) => painted(new THREE.SphereGeometry(0.06, 4, 2), RAT_GLINT, [s * 0.44, 1.7, 2.86])),
+  // Little hands in front, long feet behind.
+  ...[-1, 1].map((s) => painted(new THREE.SphereGeometry(0.24, 4, 3), RAT_PINK, [s * 0.55, 0.22, 1.45])),
+  ...[-1, 1].map((s) => paintedAt(new THREE.SphereGeometry(0.26, 4, 3), RAT_PINK, pose([s * 0.65, 0.22, -0.95], [0, 0, 0], [1, 0.8, 1.7]))),
+]))
+
+/** Muzzle, pink nose and whiskers, about RAT_SNOUT_PIVOT (the front of the head). */
+export const RAT_SNOUT_GEO = sunShaded(mergePainted([
+  painted(new THREE.ConeGeometry(0.46, 1.05, 6), RAT_FUR, [0, -0.05, 0.4], [Math.PI / 2, 0, 0]),
+  painted(new THREE.SphereGeometry(0.2, 5, 3), RAT_PINK, [0, -0.02, 0.95]),
+  ...[-1, 1].flatMap((s) => [-0.18, 0, 0.18].map((tilt) =>
+    painted(new THREE.BoxGeometry(1.1, 0.035, 0.035), RAT_WHISKER, [s * 0.6, -0.08, 0.62], [0, s * 0.25, s * tilt]))),
+]))
+
+/** A long tapered pink tail from RAT_TAIL_PIVOT back along -z, curling up at the tip. */
+export const RAT_TAIL_GEO = (() => {
+  const length = 4.6
+  const tail = new THREE.CylinderGeometry(0.06, 0.2, length, 5, 4, true).rotateX(-Math.PI / 2).translate(0, 0, -length / 2)
+  const p = tail.attributes.position
+  for (let i = 0; i < p.count; i++) {
+    const z = p.getZ(i)
+    p.setY(i, p.getY(i) - 0.1 * z + 0.04 * z * z)
+  }
+  tail.computeVertexNormals()
+  return sunShaded(mergePainted([painted(tail, RAT_PINK)]))
+})()
+
+export const RAT_MAT = withRim(new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.6,
+  metalness: 0,
+  flatShading: true,
+}), { color: '#fff0e8', intensity: 0.5, power: 2.5 })
+
+// ── Dust bunny (#515), built to docs/art/ENEMIES.md ──
+// A ball centred on its origin, eyes on +z. Two draw calls: the fluff (rolls) and the eyes (stay facing forward).
+// 500-triangle cap.
+
+const DUST_GREY = '#9a968e'
+const DUST_CORE = '#85817a'
+const DUST_LIGHT = '#aaa69e'
+const DUST_DARK = '#6a665f'
+const DUST_CHALK = '#f6f5f0'
+const DUST_TAPE = '#f2c84b'
+
+export const DUST_BUNNY_RADIUS = 2.4
+
+/** `n` points spread evenly over the unit sphere (a Fibonacci spiral). */
+function sphereDirections(n: number): THREE.Vector3[] {
+  return Array.from({ length: n }, (_, i) => {
+    const y = 1 - (2 * (i + 0.5)) / n
+    const r = Math.sqrt(1 - y * y)
+    const a = i * Math.PI * (3 - Math.sqrt(5))
+    return new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r)
+  })
+}
+
+const _up = new THREE.Vector3(0, 1, 0)
+/** A part at `distance` along unit `dir`, its +y turned to point along `dir`. */
+function alongDir(dir: THREE.Vector3, distance: number): THREE.Matrix4 {
+  const q = new THREE.Quaternion().setFromUnitVectors(_up, dir)
+  return new THREE.Matrix4().compose(dir.clone().multiplyScalar(distance), q, new THREE.Vector3(1, 1, 1))
+}
+
+export const DUST_BUNNY_BODY_GEO = sunShaded(mergePainted([
+  painted(new THREE.IcosahedronGeometry(DUST_BUNNY_RADIUS, 1), DUST_CORE),
+  // Faceted fluff tufts all over.
+  ...sphereDirections(18).map((d, i) =>
+    paintedAt(new THREE.ConeGeometry(0.95, 0.9, 5), [DUST_GREY, DUST_CORE, DUST_LIGHT][i % 3], alongDir(d, DUST_BUNNY_RADIUS + 0.05))),
+  // White chalk flecks caught in it.
+  ...sphereDirections(8).map((d) =>
+    paintedAt(new THREE.OctahedronGeometry(0.22), DUST_CHALK, alongDir(d.applyAxisAngle(_up, 0.9), DUST_BUNNY_RADIUS + 0.05))),
+  // Stray hairs.
+  ...[[0.3, 0.9, -0.3], [-0.7, 0.4, -0.6], [0.8, -0.2, -0.5], [-0.2, -0.5, -0.8]].map(([x, y, z]) =>
+    paintedAt(new THREE.BoxGeometry(0.05, 1.6, 0.05), DUST_DARK, alongDir(new THREE.Vector3(x, y, z).normalize(), DUST_BUNNY_RADIUS + 0.7))),
+  // A lost scrap of hold tape.
+  paintedAt(new THREE.BoxGeometry(1.1, 0.06, 0.5), DUST_TAPE, alongDir(new THREE.Vector3(-0.6, 0.6, 0.5).normalize(), DUST_BUNNY_RADIUS + 0.12)),
+]))
+
+/** Two black dot eyes with a glint, on the front of the ball. */
+export const DUST_BUNNY_EYES_GEO = mergePainted([
+  ...[-1, 1].map((s) => paintedAt(new THREE.SphereGeometry(0.42, 6, 4), RAT_EYE, pose([s * 0.8, 0.55, DUST_BUNNY_RADIUS + 0.2], [0, 0, 0], [1, 1.15, 0.6]))),
+  ...[-1, 1].map((s) => painted(new THREE.SphereGeometry(0.12, 4, 2), RAT_GLINT, [s * 0.8 + 0.14, 0.75, DUST_BUNNY_RADIUS + 0.45])),
+])
+
+export const DUST_BUNNY_MAT = withRim(new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.95,
+  metalness: 0,
+  flatShading: true,
+}), { color: '#e8e4dc', intensity: 0.35, power: 2.2 })
+
+export const DUST_BUNNY_EYE_MAT = new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.15,
+  metalness: 0.1,
+})
+
 // ── Hit flash (shared by every enemy) ───────────────────────────────
 // On hit, EnemyBase swaps each mesh's material to this one for the kill-pop
 // window instead of cloning materials per enemy. Colour > 1 so it blooms.
