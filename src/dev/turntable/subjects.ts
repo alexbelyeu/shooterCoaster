@@ -2,10 +2,11 @@ import type { BiomeType, BossType, EnemyType } from '@/types/level'
 import { CLIMB } from '@/entities/enemies/climbMotion'
 import { RAT_CYCLE } from '@/entities/enemies/ratMotion'
 import { DUST_BUNNY_BOUNCE } from '@/entities/enemies/dustBunnyMotion'
+import { ATMOSPHERES } from '@/levels/environments/atmosphere'
 
 /**
- * What the enemy turntable (`turntable.html`, `npm run turntable`) shows and how: pure, so a test can hold it to
- * `ENEMY_COMPONENTS` and `BOSS_SPECS`.
+ * What the enemy turntable (`turntable.html`, `npm run turntable`) shows and how. Pure, so its test runs in Node; the
+ * specs are keyed by `EnemyType` and `BossType`, so an enemy or boss with no subject fails `tsc -b`.
  */
 export type SubjectId = EnemyType | 'goldenBalloon' | BossType
 
@@ -33,35 +34,47 @@ export const REST_TIME = 2
 const cycle = (hz: number) => (2 * Math.PI) / hz
 const at = (span: number, from = REST_TIME) => ({ from, span })
 
-export const SUBJECTS: readonly Subject[] = [
-  { id: 'balloon', kind: 'enemy', front: 0, motion: at(cycle(1.6)), animated: false },
-  { id: 'goldenBalloon', kind: 'enemy', front: 0, motion: at(cycle(3)), animated: false },
-  { id: 'crow', kind: 'enemy', front: 0, holdHeading: 'model', motion: at(cycle(5)), animated: true },
-  { id: 'scorpion', kind: 'enemy', front: 0, holdHeading: 'model', motion: at(cycle(2.5)), animated: true },
-  { id: 'shark', kind: 'enemy', front: 0, motion: at(cycle(4)), animated: true },
-  { id: 'jellyfish', kind: 'enemy', front: 0, motion: at(cycle(1.2)), animated: true },
-  { id: 'flyingFish', kind: 'enemy', front: 0, holdHeading: 'model', motion: at(1.5), animated: true },
-  { id: 'snowman', kind: 'enemy', front: 0, motion: at(cycle(3)), animated: true },
-  { id: 'snowmanScout', kind: 'enemy', front: 0, motion: at(cycle(3.5)), animated: true },
-  { id: 'snowmanBrute', kind: 'enemy', front: 0, motion: at(cycle(3)), animated: true },
-  { id: 'emberWisp', kind: 'enemy', front: 0, motion: at(cycle(2)), animated: true },
-  { id: 'lavaGolem', kind: 'enemy', front: 0, motion: at(cycle(2)), animated: true },
-  { id: 'fireImp', kind: 'enemy', front: 0, motion: at(cycle(4)), animated: true },
-  { id: 'infernalDrake', kind: 'enemy', front: 0, holdHeading: 'model', motion: at(cycle(3)), animated: true },
+type Spec = Omit<Subject, 'id' | 'kind'>
+
+/** Every enemy the spawner can mount, and the golden balloon. A `Record`, so a missing one fails `tsc -b`. */
+const ENEMY_SUBJECTS: Record<EnemyType | 'goldenBalloon', Spec> = {
+  balloon: { front: 0, motion: at(cycle(1.6)), animated: false },
+  goldenBalloon: { front: 0, motion: at(cycle(3)), animated: false },
+  crow: { front: 0, holdHeading: 'model', motion: at(cycle(5)), animated: true },
+  scorpion: { front: 0, holdHeading: 'model', motion: at(cycle(2.5)), animated: true },
+  shark: { front: 0, motion: at(cycle(4)), animated: true },
+  jellyfish: { front: 0, motion: at(cycle(1.2)), animated: true },
+  flyingFish: { front: 0, holdHeading: 'model', motion: at(1.5), animated: true },
+  snowman: { front: 0, motion: at(cycle(3)), animated: true },
+  snowmanScout: { front: 0, motion: at(cycle(3.5)), animated: true },
+  snowmanBrute: { front: 0, motion: at(cycle(3)), animated: true },
+  emberWisp: { front: 0, motion: at(cycle(2)), animated: true },
+  lavaGolem: { front: 0, motion: at(cycle(2)), animated: true },
+  fireImp: { front: 0, motion: at(cycle(4)), animated: true },
+  infernalDrake: { front: 0, holdHeading: 'model', motion: at(cycle(3)), animated: true },
   // Its face is to the wall: `front` shows what the rider sees, its back. The strip is two moves, left hand then right.
-  { id: 'climber', kind: 'enemy', front: 0, motion: at(2 * (CLIMB.reach + CLIMB.pull + CLIMB.rest)), animated: true, stage: 'wall' },
+  climber: { front: 0, motion: at(2 * (CLIMB.reach + CLIMB.pull + CLIMB.rest)), animated: true, stage: 'wall' },
   // One dash and the stop after it: dart, stop dead, nose twitching.
-  { id: 'rat', kind: 'enemy', front: 0, holdHeading: 'model', motion: at(RAT_CYCLE), animated: true },
-  { id: 'dustBunny', kind: 'enemy', front: 0, holdHeading: 'model', motion: at(DUST_BUNNY_BOUNCE), animated: true },
+  rat: { front: 0, holdHeading: 'model', motion: at(RAT_CYCLE), animated: true },
+  dustBunny: { front: 0, holdHeading: 'model', motion: at(DUST_BUNNY_BOUNCE), animated: true },
+}
+
+/** Every boss. A `Record`, so a missing one fails `tsc -b`. */
+const BOSS_SUBJECTS: Record<BossType, Spec> = {
   // Its nose points along +x.
-  { id: 'goldenBlimp', kind: 'boss', front: Math.PI / 2, motion: at(cycle(1.7)), animated: true },
+  goldenBlimp: { front: Math.PI / 2, motion: at(cycle(1.7)), animated: true },
   // From just before the first tentacle's slam (2.4 s) through its strike and hold.
-  { id: 'kraken', kind: 'boss', front: 0, motion: at(1.6, 2.3), animated: true },
+  kraken: { front: 0, motion: at(1.6, 2.3), animated: true },
   // Through its first lunge (2.2 s): wound up, struck, recovering.
-  { id: 'giantScorpion', kind: 'boss', front: 0, holdHeading: 'root', motion: at(2, 2.3), animated: true },
+  giantScorpion: { front: 0, holdHeading: 'root', motion: at(2, 2.3), animated: true },
   // Roaring at rest (its arrival roar, 0.6–2.8 s); the strip is its first throw: wound up, released, following through.
-  { id: 'yeti', kind: 'boss', front: 0, holdHeading: 'root', motion: at(1.2, 2.8), animated: true },
-]
+  yeti: { front: 0, holdHeading: 'root', motion: at(1.2, 2.8), animated: true },
+}
+
+const subjectsOf = <K extends SubjectId>(kind: Subject['kind'], specs: Record<K, Spec>): Subject[] =>
+  (Object.entries(specs) as [K, Spec][]).map(([id, spec]) => ({ id, kind, ...spec }))
+
+export const SUBJECTS: readonly Subject[] = [...subjectsOf('enemy', ENEMY_SUBJECTS), ...subjectsOf('boss', BOSS_SUBJECTS)]
 
 export const subjectById = (id: string): Subject | undefined => SUBJECTS.find((s) => s.id === id)
 
@@ -127,7 +140,7 @@ export function boardSize(board: Board): { width: number; height: number } {
   }
 }
 
-const BIOMES: readonly BiomeType[] = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic']
+const BIOMES = Object.keys(ATMOSPHERES) as BiomeType[]
 
 export interface TurntableQuery {
   board: Board

@@ -88,10 +88,10 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
    better or the acceptance criteria aren't visibly met, keep iterating. Extend
    `src/testing/e2eHook.tsx` / `e2e/smoke.mjs` if you need to test something new
    (e.g. a new level must appear in `levels()` and pass smoke).
-   **Changed how an enemy or boss looks or moves** (`src/entities/**`, death styles, enemy materials / rim)? Run
+   **Changed how an enemy or boss looks or moves** (`src/entities/**`, enemy materials / rim; the turntable draws no death effect)? Run
    `bash scripts/quiet.sh timeout 270 npm run turntable -- --only <ids>` on `main` and on your branch, look at the
    `<id>-angles.png` / `<id>-motion.png` pairs, and describe the before/after in the PR (CI's `turntable` artifact
-   on the PR holds the branch's set). Judge the look against the enemy's brief in `docs/art/ENEMIES.md` once it exists.
+   on the PR holds the branch's set). Judge the look against the enemy's brief in `docs/art/ENEMIES.md`.
 4. Compare (with `jq`, not by reading the file) `results.json` draw calls / triangles against `main` for levels you
    touched; explain any big increase in the PR.
 5. Update CLAUDE.md / docs if structure or behaviour changed; record non-obvious

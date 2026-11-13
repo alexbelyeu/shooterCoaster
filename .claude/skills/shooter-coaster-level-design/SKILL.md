@@ -45,7 +45,9 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 | `src/utils/terrainNoise.ts` | Per-biome terrain noise configs |
 | `src/entities/enemies/SharedEnemyAssets.ts` | All shared enemy geometries + materials |
 | `src/entities/enemies/*.tsx` | Individual enemy components |
-| `src/entities/spawning/EnemySpawner.tsx` | Spawn logic, collision radii, scores |
+| `src/entities/enemies/enemyComponents.ts` | `ENEMY_COMPONENTS`: enemy type → component (spawner + turntable) |
+| `src/entities/spawning/EnemySpawner.tsx` | Spawn logic, collision radii (`RADII`), scores |
+| `src/dev/turntable/subjects.ts` | Turntable subject per enemy and boss (`npm run turntable`) |
 | `src/entities/spawning/spawnPlacement.ts` | Formation waves (`formation: 'v' \| 'line' \| 'school' \| 'spiral' \| 'ring'` on an `EnemyWave`): seeded slots at load, anchored ahead of the rider at activation, kept on / above `groundFn` and outside the 40-unit near field, with an entry path. Each placement carries a `motion` intent: an enemy that moves on its own should follow `marchHeading(props.motion)` so its group keeps its shape (see `Crow.tsx`), and stay at its slot on `{ kind: 'hold' }` (see `Balloon.tsx`) |
 | `src/levels/environments/BiomeEnvironment.tsx` | Thin host: atmosphere, terrain mesh, water, trees, then the biome's `Decorations` + `Features`. No per-biome code here |
 | `src/levels/environments/biomeRegistry.ts` | `BIOMES: Record<BiomeType, BiomeDefinition>` — one entry per biome |
@@ -189,10 +191,20 @@ timed by the run: a lap takes 99–228 s (`track/ridePhysics.ts`, pinned in its 
 4. `src/entities/enemies/enemyReadability.ts` — add `ENEMY_SILHOUETTE` (world-unit size after scale; drives the ≥12 px readable-spawn rule)
 5. `src/entities/spawning/enemyPlacement.ts` — add its `ENEMY_PLACEMENT` rule, the one table of per-enemy placement: `surface` (`air` / `ground` / `water`, what formations settle it on; water uses `WATER_Y`; `wall` with `scatter: 'wall'` for climbers, which start at the foot of the level's `walls` and never take a formation) and `scatter`: a band (radius from the origin, height above the terrain or the water) for scatter waves, or `'trackside'` for every ground enemy (a band of them round the origin is out of view once the ride leaves it, #469; `enemyPlacement.test.ts`) and a sea enemy that should float beside the ride (seeded slots 60–400 to the side; on the ground one per even step from 700 arc units ahead over the arc the rider covers until the next wave (at least to 2200, at most 3/4 of a lap), each on the side of the track in view on its approach; 300–3600 on water: `TRACKSIDE` in `spawnPlacement.ts`; placed when the wave activates, on `groundFn`, or at `WATER_Y` on the nearest sea within the band that is in view on its approach; half of a water wave lands within 1500 ahead so it is on screen as it arrives). A ground trackside wave sizes itself to the ride (`rideProfile`); a water one covers the ride until its next wave only if its band is sized to the level's ride speed (Ocean ~250 units/s) and wave gaps
 6. `src/levels/scoring.ts` — add its score to `SCORE_VALUES`
-7. `src/entities/spawning/EnemySpawner.tsx` — ALL of:
-   - Import the component
-   - Add collision radius to `RADII`
-   - Add to `ENEMY_COMPONENTS` map
+7. `src/entities/enemies/enemyComponents.ts` — import the component and add it to `ENEMY_COMPONENTS` (the map
+   `EnemySpawner` mounts from and the turntable shares)
+8. `src/entities/spawning/EnemySpawner.tsx` — add its collision radius to `RADII`
+9. `src/dev/turntable/subjects.ts` — add its turntable subject to `ENEMY_SUBJECTS` (`tsc -b` fails without it):
+   - `front`: turntable yaw (radians) that shows the rider's view of it (its face; the climber's back)
+   - `motion: at(span, from?)`: the motion strip, four frames over `span` game seconds from `from` (default
+     `REST_TIME`); make `span` one cycle of its main motion (`cycle(hz)` for a `sin(t * hz)` bob or flap)
+   - `animated`: false only when nothing in it moves once its travel is cancelled (the script then doesn't fail
+     its identical frames)
+   - `holdHeading: 'model'` when its first inner group takes a random or orbiting heading, so it keeps facing
+     `front` (`'root'` is for bosses turned towards the rider); `stage: 'wall'` draws it on a climbing wall
+
+   Then `npm run turntable -- --only <id>` and look at `<id>-angles.png` / `<id>-motion.png`. A boss goes in
+   `BOSS_SUBJECTS` the same way.
 
 ### Special Features (if needed)
 - **Eruption/weather events**: Add `isEruption?: boolean` (or similar) to `EnemyWave`, emit via `eventBus` in spawner, listen in the biome's `Features.tsx` (see `biomes/volcanic/Features.tsx`)
@@ -222,4 +234,4 @@ timed by the run: a lap takes 99–228 s (`track/ridePhysics.ts`, pinned in its 
 | A wave blows the draw-call budget | One `<mesh>` per enemy part × 25+ enemies on screen (Arctic scouts were 12 draws each, 393 for the level) | Merge the parts that share a material and move together with `placedParts` in `SharedEnemyAssets.ts`; only animated parts stay separate meshes |
 | Terrain holes/spikes | Missing noise config | Add entry to terrainNoise.ts |
 | No music plays | Missing MusicManager entry | Add biome config to CONFIGS record |
-| Enemies don't spawn | Missing spawner registration | Check all 4 spawner touchpoints |
+| Enemies don't spawn | Missing spawner registration | Check `ENEMY_COMPONENTS` (`enemyComponents.ts`), `RADII` (`EnemySpawner.tsx`), `ENEMY_PLACEMENT` and `SCORE_VALUES` |
