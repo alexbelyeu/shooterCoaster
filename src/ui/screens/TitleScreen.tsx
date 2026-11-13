@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { isInternalThisLoad } from '@/app/analyticsGate'
-import { audioNow, initAudio } from '@/audio/AudioEngine'
+import { initAudio } from '@/audio/AudioEngine'
 import { prepareSfx } from '@/audio/sfx'
 import { useGameStore } from '@/store/useGameStore'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
@@ -8,10 +8,9 @@ import { motion } from 'framer-motion'
 import { markStartup } from '@/core/startupMarks'
 import { startsGame } from './titleKeys'
 import { handPosterToUi, posterShown } from '@/app/poster'
-import { titleBeatGrid } from '@/audio/titleMusic'
 import { ATTRACT_IDLE_MS, armClickSwallow, setTitleAttract } from '@/canvas/titleAttract'
 import { e2eAttractIdleMs } from '@/testing/e2eHook'
-import { logoBeat } from './titleBeat'
+import { logoFromQuery } from './logo/logoOptions'
 
 const TITLE = 'ShooterCoaster'
 const SUBTITLE_WORDS = ['Ride.', 'Aim.', 'Shoot.']
@@ -21,6 +20,10 @@ const PLAY_IN_S = 1.3
 const PLAY_OVER_POSTER_S = 0.15
 
 let hintShownThisLoad = false
+
+/** A logo concept waiting on Alex's pick (#476) under `?logo=<name>`; its own lazy chunk, never in the startup JS. */
+const LOGO_CONCEPT = typeof location === 'undefined' ? null : logoFromQuery(location.search)
+const LogoConcept = lazy(() => import('./logo/LogoConcept'))
 
 const WAKE_EVENTS = ['pointerdown', 'pointermove', 'wheel'] as const
 
@@ -52,7 +55,6 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
   const [overPoster] = useState(posterShown)
   const playIn = overPoster ? PLAY_OVER_POSTER_S : PLAY_IN_S
   const started = useRef(false)
-  const logoRef = useRef<HTMLHeadingElement>(null)
   const [attract, setAttract] = useState(false)
   const attractRef = useRef(false)
   const lastInput = useRef(performance.now())
@@ -93,23 +95,6 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
     }
   }, [])
 
-  // The logo hits on the title music's bars (and lightly on its beats): `--logo-beat` drives its scale and glow.
-  useEffect(() => {
-    if (reduced) return
-    let raf = 0
-    let last = -1
-    const tick = () => {
-      raf = requestAnimationFrame(tick)
-      const grid = titleBeatGrid()
-      const v = grid ? logoBeat(audioNow(), grid) : 0
-      if (Math.abs(v - last) < 0.005) return
-      last = v
-      logoRef.current?.style.setProperty('--logo-beat', v.toFixed(3))
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [reduced])
-
   async function play() {
     if (started.current) return
     started.current = true
@@ -145,23 +130,36 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
 
   return (
     <div className={attract ? 'title-screen is-attract' : 'title-screen'}>
-      <motion.h1
-        ref={logoRef}
-        aria-label={TITLE}
-        initial={overPoster ? false : reduced ? { opacity: 0 } : { opacity: 0, y: -120, scale: 1.25, filter: 'blur(14px)' }}
-        animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-        transition={{
-          opacity: { duration: 0.6, ease: 'easeOut' },
-          filter: { duration: 0.6, ease: 'easeOut' },
-          scale: { duration: 0.6, ease: 'easeOut' },
-          y: { type: 'spring', damping: 9, stiffness: 140, mass: 0.8 },
-        }}
-      >
-        {TITLE}
-        <span className="title-logo-sweep" aria-hidden="true">
+      {LOGO_CONCEPT ? (
+        <motion.h1
+          className="title-logo-art"
+          aria-label={TITLE}
+          initial={overPoster ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
+        >
+          <Suspense fallback={null}>
+            <LogoConcept name={LOGO_CONCEPT} still={reduced} />
+          </Suspense>
+        </motion.h1>
+      ) : (
+        <motion.h1
+          aria-label={TITLE}
+          initial={overPoster ? false : reduced ? { opacity: 0 } : { opacity: 0, y: -120, scale: 1.25, filter: 'blur(14px)' }}
+          animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+          transition={{
+            opacity: { duration: 0.6, ease: 'easeOut' },
+            filter: { duration: 0.6, ease: 'easeOut' },
+            scale: { duration: 0.6, ease: 'easeOut' },
+            y: { type: 'spring', damping: 9, stiffness: 140, mass: 0.8 },
+          }}
+        >
           {TITLE}
-        </span>
-      </motion.h1>
+          <span className="title-logo-sweep" aria-hidden="true">
+            {TITLE}
+          </span>
+        </motion.h1>
+      )}
 
       <p className="subtitle">
         {SUBTITLE_WORDS.map((word, i) => (

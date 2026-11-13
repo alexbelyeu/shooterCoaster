@@ -14,7 +14,7 @@
  *   --gif-seconds 8 --out docs/marketing/media --url <running preview> --frames-only --encode-only
  *   --ride-only (title and level select still play, uncaptured: the clip opens on the ride)
  *   --title (#419: the title screen alone for --seconds from its first frame, no PLAY: clip-title-<size>.mp4; --attract
- *   starts it in attract mode, clip-title-attract-<size>.mp4)
+ *   starts it in attract mode, clip-title-attract-<size>.mp4; --logo <name> under `?logo=<name>`, #476: clip-title-<name>-<size>.mp4)
  * A portrait --size renders as a phone (touch emulated, so the page takes its touch-only layout) and makes no GIF.
  */
 import { execFileSync } from 'node:child_process'
@@ -38,10 +38,12 @@ const ENCODE_ONLY = process.argv.includes('--encode-only')
 const RIDE_ONLY = process.argv.includes('--ride-only')
 const TITLE = process.argv.includes('--title')
 const ATTRACT = TITLE && process.argv.includes('--attract')
+/** A title logo concept waiting on Alex's pick (#476): `--logo bullseye` renders the title under `?logo=bullseye`. */
+const LOGO = arg('logo', '')
 const [WIDTH, HEIGHT] = SIZE.split('x').map(Number)
 const PORTRAIT = HEIGHT > WIDTH
 const FRAME_DIR = path.resolve('e2e-results/clip', SIZE)
-const NAME = TITLE ? `clip-title${ATTRACT ? '-attract' : ''}-${SIZE}` : `clip-${LEVEL}-${SIZE}`
+const NAME = TITLE ? `clip-title${ATTRACT ? '-attract' : ''}${LOGO ? `-${LOGO}` : ''}-${SIZE}` : `clip-${LEVEL}-${SIZE}`
 /** The fake clock ticks whole ms; a constant step keeps motion even (30 fps → 33 ms, 1% slow). */
 const STEP_MS = Math.round(1000 / FPS)
 const MAX_MP4_BYTES = 3 * 1024 * 1024
@@ -147,7 +149,7 @@ async function render(browser, url) {
     }
   }
 
-  await page.goto(`${url}/?e2e=1&seed=${SEED}`)
+  await page.goto(`${url}/?e2e=1&seed=${SEED}${LOGO ? `&logo=${LOGO}` : ''}`)
   // Boot needs timers to run (canvas measure debounce); nothing is captured yet.
   await settle('the game to boot', 50, () => window.__SC_TEST__?.levels().length > 0 && window.__SC_TEST__.frames >= 3)
   if (TITLE) return renderTitle()
