@@ -15,8 +15,7 @@ to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the 3D scene behind 
 a title sparkle's centre pixel must blend to a colour in [0, 1] (`pointCentreColour('title-sparkles')`: a glow dividing by the distance to the point's centre went NaN there and Bloom spread it to a black frame, #344); the self-hosted Lobster and Inter faces must have loaded; the start hint must show and a key press must fade to black and open level select; the score engine's chunks (`player-*.js`, `synth-*.js`) must not be fetched before that press, and the press must load them, unlock audio and start the title score; the poster (#376): with JS off, index.html alone must show the poster's logo and load its still, and `poster.png` must not look blank behind the logo, and the title page itself is shot over and over from its first paint until the poster has gone (two shots after): no shot may look blank outside the title UI (any that does is kept as `poster-blank-<n>.png`); the title scene must fit budgets.json `scene.title`: its draw calls, the more of the two screenshots' readings, its objects and triangles; the summary line prints them and the load shots); a `landing` step loads the campaign landing path
 `/go/smoke-check?e2e=1&internal=1` (links we post point at `/go/<campaign>`, attributed by the page view's path; `robots.txt` disallows `/go/`):
 it must boot to the title with no failed request, no analytics request and no page error, keep its path (only `internal` stripped) and show the "internal: not tracked" marker (skipped with `--base`); and per level `<id>.png` (after a ride to `--seconds` 10 of *level time* and at least `--min-frames` 10 frames, then game time frozen for the
-ride stats, the perf gate, the shot and the enemy probe; the ride stops at exactly `--seconds` of level time, timer, game clock and ride together on the frame that gets there (`stopAtLevelTime`, #487: a poll used to catch it anywhere from 10.2 to 10.7 s, and level2's enemy probe failed at 10.7); the level steps cap level time per frame (`timerStepMax`: `--seconds` / `--min-frames` on the ride, 0.25 s
-in combat) and ride `--ride-rate` 0.14 s of track per second of level time (`rideRate`: CI's ride, where the budgets were set; the game rides at most
+ride stats, the perf gate, the shot and the enemy probe; the ride stops at exactly `--seconds` of level time, timer, game clock and ride together on the frame that gets there (`stopAtLevelTime`, #487: a poll used to catch it anywhere from 10.2 to 10.7 s, and level2's enemy probe failed at 10.7); the ride gets there in settled steps of `--seconds` / `--min-frames` level seconds (below), combat caps level time per frame (`timerStepMax`, 0.25 s) and ride `--ride-rate` 0.14 s of track per second of level time (`rideRate`: CI's ride, where the budgets were set; the game rides at most
 3/60 s a frame), so a slow runner samples the same moment of the level from the same track point as a fast one; through the combat checks the level timer is then held (`holdLevelTime`: the game clock runs on, the run can't time out and no wave or boss comes due) until the step ends the level itself, so however long the checks take they never run into the boss or the end of the run (#305);
 it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), `<id>-combat.png`
@@ -123,9 +122,16 @@ When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pic
 (spread) with time frozen and shoots it with a real bullet: `weaponState()` must report the spread gun, the next pull must
 count 3 shots and draw 3 bullets, and `level1-pickup.png` holds the tinted tracer with the `.hud-weapon` badge clear of the HUD;
 the pickup must hold through a pause, expire on game time, and a restart must bring back the blaster and every pickup.
-A `pacing` step (#450) rides every level's whole run, GO to the end, on a fixed `timerStep` of `--pacing-step` level seconds a
-frame (default 0.5, so the run is the same on any runner; `rideRate` 1, the ride a 60 fps player gets), with no firing and the
-level time never held. Every frame the page records level time, `stats().onScreenEnemies` (shootable targets inside the
+**Settled steps** (#471, `settledSteps.mjs`): the ride and the pacing run advance level time one fixed step on one frame,
+then hold it (`timerStep` 0) until React has gone quiet (no commit on a held frame, and a message posted on the frame before
+answered), and only then take the next step. Waves, enemy mounts, fly-ins ending and boss arrivals go through React state
+and land a frame or more after the frame that caused them, more frames on a slow runner; on fixed steps alone that moved
+enemies by whole steps, so the ride shot's enemy count and the pacing gaps differed run to run and between a local session
+and CI. React reports commits to a devtools hook `newPage` defines before the page loads (`ctx.addInitScript`). Bosses move
+on the game clock (`core/gameClock.ts` `gameClockStep`), never the frame's delta, so they keep pace with the level too.
+A `pacing` step (#450) rides every level's whole run, GO to the end, in settled steps of `--pacing-step` level seconds
+(default 0.5, so the run is the same on any runner; `rideRate` 1, the ride a 60 fps player gets), with no firing and the
+level time never held. Every step the page records level time, `stats().onScreenEnemies` (shootable targets inside the
 viewport: enemies, boss weak points, projectiles; never pickups), `rideProgress` and whether a wave tell (the 1 s before a
 wave) or the boss tell is on. Pure `pacingMetric.mjs` (`pacingMetric.test.ts`) turns that into `noTargetShare` (share of
 the run with nothing on screen) and the gaps (`longestGapSeconds`, `longestGap` with its start time and track fraction,
@@ -134,8 +140,8 @@ gap. It prints one line per level (`level2 pacing: no target 7% of 60 s, longest
 writes `e2e-results/pacing.json`: those metrics per level plus a `timeline`, one row a level second (`t`, fewest and most
 targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`), which is where to look for where a gap is. A level over
 its `budgets.json` `pacing` ceilings (`longestGapSeconds`, `noTargetShare`) fails with the gap named (`longest gap 9.0 s at
-7.0 s (track 0.03) over budget 3 s`); only the Director lowers or raises them. A level takes its run length in frames
-(150 frames for 75 s; ~2.5 min in a 2-core session), so run one at a time: `--steps pacing --levels level4`.
+7.0 s (track 0.03) over budget 3 s`); only the Director lowers or raises them. A level takes 120 steps plus about one held frame each
+(~260 frames; ~4.5 min in a 2-core session; its summary line prints both), so run one at a time: `--steps pacing --levels level4`.
 `drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
 spawned enemies) and vary run to run; for before/after comparisons use the
 camera-independent `scene` totals the smoke also prints (`track objs/tris` = objects

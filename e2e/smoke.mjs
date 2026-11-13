@@ -94,6 +94,7 @@ import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitFr
 import { planRun, STEP_LEVELS } from './shards.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
 import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { installSettledStepper } from './settledSteps.mjs'
 
 const SECONDS = Number(arg('seconds', 10))
 const OUT = path.resolve(arg('out', 'e2e-results'))
@@ -105,10 +106,10 @@ const FRAME_DEADLINE_MS = SECONDS * 4000
 const SHOT_TIMEOUT = Number(arg('shot-timeout', 120000))
 const COMBAT_SECONDS = Number(arg('combat-seconds', 4))
 const COMBAT_MIN_FRAMES = Number(arg('combat-min-frames', 4))
-// The level steps cap level time per frame (`timerStepMax`), so a slow runner samples the same moment of a level as a
-// fast one (#305): the ride reaches SECONDS of level time in MIN_FRAMES frames at most, and combat gains ≤ 0.25 s a
-// frame, so it never runs on into a boss (level3's Kraken is due at 40 s). Faster frames pass through unchanged.
-const RIDE_STEP_MAX = SECONDS / MIN_FRAMES
+// The ride reaches SECONDS of level time in MIN_FRAMES settled steps (`settledSteps.mjs`, #471), the same moment of a
+// level on any runner; combat caps level time per frame (`timerStepMax`, #305) at 0.25 s, so it never runs on into a boss
+// (level3's Kraken is due at 40 s). Faster frames pass through unchanged.
+const RIDE_STEP = SECONDS / MIN_FRAMES
 const COMBAT_STEP_MAX = 0.25
 // Seconds of ride per second of level time during the ride (`rideRate`). The game rides at most 3/60 s a frame, so on
 // software GL the ride depended on the frame count; 0.14 is CI's (~2.8 fps × 0.05 s), where the budgets were calibrated.
@@ -253,36 +254,43 @@ const getStats = (page) => page.evaluate(() => window.__SC_TEST__.stats())
 
 
 /**
- * Ride (game time running, `rideRate` RIDE_RATE) until the level timer reaches `seconds` and `minFrames` have rendered
- * (a stall past FRAME_DEADLINE_MS stops it), then freeze game time and hand the ride back to the frame time in that
- * same JS turn. `stopAtLevelTime` stops the level timer, game clock and ride exactly at `seconds` on the frame that gets
- * there (#487: the poll used to catch it anywhere from 10.2 to 10.7 s), and `timerStepMax` makes it the same track point:
- * the same moment of the level on any runner.
+ * Start level `id` and ride it (game time running, `rideRate` RIDE_RATE) in settled steps of RIDE_STEP level seconds
+ * (`settledSteps.mjs`, #471) until the level timer reaches `seconds` and `minFrames` have rendered (a stall past
+ * FRAME_DEADLINE_MS stops it), then freeze game time and hand the ride back to the frame time in that same JS turn.
+ * `stopAtLevelTime` stops the level timer, game clock and ride exactly at `seconds` (#487), and the settled steps make
+ * it the same moment of the level on any runner: the same track point with the same enemies flown in.
  */
-async function rideToLevelTime(page, seconds, minFrames) {
+async function rideToLevelTime(page, id, seconds, minFrames) {
   const start = Date.now()
-  const f0 = await page.evaluate(([rate, seconds]) => {
+  await page.evaluate(([lid, seed, step, rate, target, minFrames]) => {
     const s = window.__SC_TEST__
+    // Caps a frame's level time once the ride hands it back (the shots and probe that follow).
+    s.timerStepMax = step
     s.rideRate = rate
-    s.stopAtLevelTime = seconds
+    s.stopAtLevelTime = target
+    const f0 = s.frames
+    s.rideRun = window.__SC_STEP_SETTLED__(step, (run) => {
+      const levelTime = s.nextWave()?.levelTime
+      if (levelTime == null) return 'hold'
+      run.frames = s.frames - f0
+      run.levelTime = levelTime
+      if (!run.overdue && (levelTime < target || run.frames < minFrames)) return
+      s.setTimeScale(0)
+      s.rideRate = null
+      s.stopAtLevelTime = null
+      return false
+    })
+    s.startLevel(lid, seed)
     s.setTimeScale(1)
-    return s.frames
-  }, [RIDE_RATE, seconds])
+  }, [id, SEED, RIDE_STEP, RIDE_RATE, seconds, minFrames])
   for (;;) {
-    const r = await page.evaluate(([target, f0, minFrames, overdue]) => {
-      const s = window.__SC_TEST__
-      const levelTime = s.nextWave()?.levelTime ?? 0
-      const frames = s.frames - f0
-      const done = overdue || (levelTime >= target && frames >= minFrames)
-      if (done) {
-        s.setTimeScale(0)
-        s.rideRate = null
-        s.stopAtLevelTime = null
-      }
-      return { done, frames, levelTime }
-    }, [seconds, f0, minFrames, Date.now() - start >= FRAME_DEADLINE_MS])
-    if (r.done) return { frames: r.frames, ms: Date.now() - start, levelTime: r.levelTime }
     await page.waitForTimeout(250)
+    const r = await page.evaluate((overdue) => {
+      const run = window.__SC_TEST__.rideRun
+      run.overdue ||= overdue
+      return run
+    }, Date.now() - start >= FRAME_DEADLINE_MS)
+    if (r.done) return { frames: r.frames ?? 0, ms: Date.now() - start, levelTime: r.levelTime }
   }
 }
 
@@ -1689,24 +1697,24 @@ async function waveCheck(page) {
   }
 }
 
-/** Fixed level seconds a pacing frame (`timerStep`, the same run on any runner): 0.5 keeps all five runs near 800 frames of the nightly's 60 minutes. */
+/** Level seconds a pacing step (settled steps, `settledSteps.mjs`: the same run on any runner): 0.5 is 120 steps a run. */
 const PACING_STEP = Number(arg('pacing-step', 0.5))
 
-/** Pacing (#450): the whole run unfired, sampled every frame in the page; `rideRate` 1 rides as at 60 fps, so the rider meets each wave where a player would. */
+/** Pacing (#450): the whole run unfired, sampled once a settled step; `rideRate` 1 rides as at 60 fps, so the rider meets each wave where a player would. */
 async function pacingCheck(page, id) {
   const problems = []
   const started = await page.evaluate(([lid, seed, step]) => {
     const s = window.__SC_TEST__
-    s.timerStep = step
     s.rideRate = 1
     s.holdLevelTime = false
     s.autoFire(false)
-    s.startLevel(lid, seed)
     const run = { samples: [], end: null, done: false }
     s.pacingRun = run
-    const sample = () => {
+    run.stepper = window.__SC_STEP_SETTLED__(step, () => {
       const w = s.nextWave()
       const st = s.stats()
+      // No step until the level's waves are registered: the scene, its timer and ride mount together, settled.
+      if (!w && !run.samples.length) return 'hold'
       if (st.phase === 'playing' && w) {
         run.end ??= w.levelTime + st.timeRemaining
         run.samples.push({
@@ -1715,11 +1723,10 @@ async function pacingCheck(page, id) {
         })
       } else if (run.samples.length) {
         run.done = true
-        return
+        return false
       }
-      requestAnimationFrame(sample)
-    }
-    requestAnimationFrame(sample)
+    })
+    s.startLevel(lid, seed)
     return s.frames
   }, [id, SEED, PACING_STEP])
   let last = { frames: started, at: Date.now() }
@@ -1733,12 +1740,12 @@ async function pacingCheck(page, id) {
       break
     }
   }
-  const { samples, end } = await page.evaluate(() => window.__SC_TEST__.pacingRun)
+  const { samples, end, stepper } = await page.evaluate(() => window.__SC_TEST__.pacingRun)
   if (!samples.length) return { id: 'pacing', level: id, problems: [...problems, 'no playing frame sampled'], pacing: null, timeline: [] }
   const pacing = pacingMetrics(samples, end)
   if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   problems.push(...pacingBudgetProblems(id, pacing, BUDGETS.pacing?.[id]))
-  return { id: 'pacing', level: id, problems, samples: samples.length, pacing, timeline: pacingTimeline(samples) }
+  return { id: 'pacing', level: id, problems, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples) }
 }
 
 /**
@@ -3235,6 +3242,8 @@ async function run() {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, ...options })
     // The results Share check reads back what it copied (#87).
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write'])
+    // Settled level steps for the ride and pacing (`settledSteps.mjs`): defined before React loads.
+    await ctx.addInitScript(installSettledStepper)
     const page = await ctx.newPage()
     const errors = []
     collectErrors(page, errors)
@@ -3304,11 +3313,7 @@ async function run() {
   for (const id of has('ride') ? wanted : []) {
     const { ctx, page, errors } = await newPage()
     const started = Date.now()
-    await page.evaluate(([lid, seed, cap]) => {
-      window.__SC_TEST__.timerStepMax = cap
-      window.__SC_TEST__.startLevel(lid, seed)
-    }, [id, SEED, RIDE_STEP_MAX])
-    const ride = await rideToLevelTime(page, SECONDS, MIN_FRAMES)
+    const ride = await rideToLevelTime(page, id, SECONDS, MIN_FRAMES)
     // Frozen at SECONDS of level time until the enemy probe: the ride stats, perf gate, shot and probe share that moment.
     const stats = await page.evaluate(() => {
       const s = window.__SC_TEST__
@@ -3504,7 +3509,7 @@ async function run() {
         ? ` ${r.pickup.count} pickups [${r.pickup.ids.join(',')}] draws=${r.pickup.drawCalls} first at ${r.pickup.px ? `${r.pickup.px.x},${r.pickup.px.y} (${r.pickup.px.distance} units, lead ${r.pickup.lead})` : '-'}` +
           ` fan shots=${r.pickup.fan?.shots} drawn=${r.pickup.fan?.drawn}`
       : r.id === 'pacing'
-        ? ` ${r.pacing ? pacingSummary(r.level, r.pacing) : r.level} (${r.samples ?? 0} frames)`
+        ? ` ${r.pacing ? pacingSummary(r.level, r.pacing) : r.level} (${r.samples ?? 0} steps, ${r.heldFrames ?? 0} held frames)`
       : r.engine
         ? ` title=${r.engine.title} nodes ${r.engine.nodes.join('->')} position ${r.engine.position.map((p) => p.toFixed(1)).join('->')}s` +
           ` sfxNodes ${r.engine.sfxNodes.join('->')} voices ${r.engine.voices ? `peak ${r.engine.voices.peak}/${r.engine.voices.budget} stolen ${r.engine.voices.stolen} dropped ${r.engine.voices.rejected}` : 'none'}` +
