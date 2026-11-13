@@ -2,8 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { createTrigCurve } from '@/track/curves/TrigCurve'
-import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import TrackMesh from '@/track/TrackMesh'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { buildArcTable } from '@/track/arcLength'
@@ -70,10 +69,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
 
   const { track, environment, biome, enemies, combat, boss, pickups, walls } = config
 
-  const curve = useMemo(() => {
-    const factory = track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve
-    return factory(track.varA, track.varB, track.varC, track.scalar)
-  }, [track])
+  const curve = useMemo(() => createTrackCurve(track), [track])
 
   const trackTable = useMemo(() => buildArcTable(curve), [curve])
   const pointAt = useMemo(() => (t: number) => curve.getPointAt(t), [curve])

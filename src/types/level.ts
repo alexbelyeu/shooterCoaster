@@ -1,6 +1,7 @@
 import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
-export type CurveType = 'curve1' | 'curve2'
+/** `curve1` / `curve2`: the generated trig curves; `spline`: an authored track through `controlPoints` (#514). */
+export type CurveType = 'curve1' | 'curve2' | 'spline'
 export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic'
 export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti'
 export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny'
@@ -16,13 +17,17 @@ export interface WallSurface {
 }
 
 export interface TrackParams {
+  /** The trig curves' shape (unused by a `spline`). */
   varA: number
   varB: number
   varC: number
+  /** The trig curves' size; for every curve, the structure's scale (`trackDimensions.ts`). */
   scalar: number
   rollerSpeed: number
   minRollerSpeed: number
   curve: CurveType
+  /** A `spline`'s points in world units, in ride order; the loop closes from the last to the first. */
+  controlPoints?: readonly { x: number; y: number; z: number }[]
   color1: number
   color2: number
   /** Running-rail radius at trackScale 1 (default 0.35); multiplied by trackScale. See src/track/trackDimensions.ts */
