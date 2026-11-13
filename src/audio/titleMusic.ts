@@ -18,7 +18,7 @@ export function stopTitleMusic(untilNextTrack = false): void {
   withScrim((p) => (untilNextTrack ? p.handOverScore('title') : p.stopScore('title')))
 }
 
-/** The title music's beat grid on the audio clock (`audioNow`), for the title's cuts and logo hits (#419); null without music. */
+/** The title music's beat grid on the audio clock (`audioNow`), for the title's camera cuts and drop tower (#419); null without music. */
 export function titleBeatGrid(): MusicGrid | null {
   if (!playing || !isAudioReady()) return null
   return scrimPlayer()?.musicGrid() ?? null
