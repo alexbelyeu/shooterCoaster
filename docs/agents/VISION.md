@@ -5,7 +5,9 @@ _Owned by the Director. v1 written by the first Director run (2026-10-19); v2 on
 closing on two items, M3 opened a week early with the finales and Level 6, milestones on
 GitHub); v4 on 2026-11-09 (M2 closed; Alex's playtest bar — 60 s runs, no spawn gaps, a big
 title world — leads M3; Level 6 becomes the Climbing Gym built through a level kit,
-`docs/LEVEL-KIT.md`; Neon Metropolis deferred; enemy art briefs in `docs/art/ENEMIES.md`).
+`docs/LEVEL-KIT.md`; Neon Metropolis deferred; enemy art briefs in `docs/art/ENEMIES.md`); v4.1 on 2026-11-13
+(Alex, #513: Level 6 is **his own climbing gym**, built from his blockout, with don't-shoot
+climbers, rats / lanternflies / dust bunnies and the Medusa of the Starr).
 Rewritten or amended weekly; direction changes are logged in DECISIONS.md._
 
 ## Elevator pitch
@@ -75,7 +77,7 @@ code-generated, flat-shaded, saturated look:
 | 3 Ocean | ocean | Teal water, deep blue horizon; cool sky, sun shafts | Sunken city, sea stacks | Shark wave breaches; whale passing; **finale: Kraken tentacles** | Jellyfish (glowing), sharks (white belly), flying fish (silver) |
 | 4 Antarctica | arctic | White/blue ice, violet shadows; pale cold sky, aurora | Ice fortress, glacier walls | Aurora intensifies with combo; blizzard wave; **finale: Yeti** | Snowmen (navy scarves/coal — never dark bodies on snow), brutes |
 | 5 Inferno | volcanic | Obsidian black, lava orange; **dark ash sky with red underglow** (never daytime blue). Lava rivers, crater rim and rails glow so the frame reads even though it is dark | Volcano, lava rivers | Eruption: shake, fog pulse, ember rain; **finale: Magma Titan** | Wisps (glow), imps (orange), golems (cracked lava), drakes |
-| 6 Climbing Gym (M3, #457) | gym (the first **interior** biome) | Bright hall: warm skylight sun + cool fill, pale grey walls, holds in six saturated colours, chalk dust in the air, fog for depth | Huge sport-climbing walls with overhangs and arêtes, a bouldering zone on padded floors, catwalks, skylights | The track climbs a wall and crosses the hall at catwalk height; the last wave's "Top-out!" sprint; boss TBD (Director's call after the slice) | Climber figurines (orange / cyan helmets and harnesses, white chalk bags) on the walls, boulderers below — toy-like, nothing graphic |
+| 6 Climbing Gym (M3, #513) | gym (the first **interior** biome) | Alex's real gym from his blockout (`docs/levels/`): a tall white hall, steel trusses, strip lights, windows above the low walls; white / grey walls with painted bands (yellow / black at the Starr and the Shield, blue / purple waves at the south end, green outlines on the Tree), holds in every colour, grey mats, black rope zones with a red stripe, chalk in the air | The **Starr** (a yellow / black star over a sunken pit), the **Flame** boulder with real fire running up it, the **Tree** (a trunk becoming a headwall), the Arch, the glass gym room | Four ride moments (#514): thread the Arch, spiral round the burning Flame, climb the Tree and skim the glass room, dive into the Starr pit; **finale: the Medusa of the Starr** (#521), snakes in her curly hair as weak points | New York rats, dust bunnies (#515), spotted lanternflies flashing red (#516); **climbers are bystanders**: shooting one costs points and the combo (#518) |
 | 7+ (candidates, through the level kit) | Neon Metropolis (city, night; drones, billboard bots, helicopter; #322), Jungle Ruins, Sky Harbour, Haunted Mine, Night Ride variants | | | | |
 
 **The title screen is a world too** (#436): the park must read as a big, expansive,
@@ -134,10 +136,14 @@ Exit criteria:
   Kraken, Scorpion and Yeti, designed for the 20 s window.
 - **The title world** reads as a big, intricate theme park to the horizon (#454, #459),
   still fast from the first paint.
-- **Level 6 is the Climbing Gym**, the first world built through the level kit
-  (`docs/LEVEL-KIT.md`): the Climber and the `wall` surface (#453), the interior biome and
-  the playable slice (#457), its theme round for Alex (#456), the `npm run new-world`
-  scaffold (#460). Its boss and boulderers follow once the slice ships.
+- **Level 6 is Alex's climbing gym** (#513, rewritten 13 Nov; DECISIONS "Level 6 from the
+  blockout"), the first world built through the level kit (`docs/LEVEL-KIT.md`): his
+  blockout as data and an authored track through the four ride moments (#514), the hall
+  at landmark scale and the level playable (#517), rats, dust bunnies and lanternflies
+  (#515, #516), climbers as bystanders, the game's first don't-shoot rule (#518), the
+  Medusa finale (#521), the Flame's fire, the Tree and rugged walls (#520, #519), its theme
+  round for Alex (#456), then the `npm run new-world` scaffold (#460). The Climber and
+  the `wall` surface are done (#453).
 - **Enemy art** (#381): the briefs exist (`docs/art/ENEMIES.md`) and the crow and the
   Inferno trio are characters (#462, #463) in one style with the Climber.
 - The Ocean looks like water (done, #430) and opens with enemies in view (done, #343);
@@ -173,47 +179,41 @@ loop (#332, P3), the swoop intro and results orbit (#328, P3).
 
 Ranked. Each must still be filed as an issue by whoever picks it up, following the
 issue contract in PROTOCOL.md, with the milestone set. Items filed as issues this week are
-not repeated here (the pacing metric and fix, the 60 s template, the Climber and the Gym,
+not repeated here (the pacing metric and fix, the 60 s template, the Climber and the Gym with its enemies and the Medusa,
 the title park and world, the kit scaffold, the crow and Inferno trio, lint).
 
-1. **Gym boss** — the Director's call after #457 ships; candidates: a giant climber
-   figurine on the hardest overhang whose chalk bag, two hands and helmet are the weak
-   points, exposed as it moves between holds; or a belayer duo at the base. Reuses the
-   boss framework's retract + projectiles (#319).
-2. **Boulderers** — the Gym's second enemy: dynos and falls onto pads, re-climbs
-   (`docs/art/ENEMIES.md`).
-3. **Kraken presence pass** — thicker, darker tentacles with bright sucker pads, a bigger
+1. **Kraken presence pass** — thicker, darker tentacles with bright sucker pads, a bigger
    head, a splash that reaches the camera; same spec and framework (brief in ENEMIES.md).
-4. **Boss music variations** — each level's theme gets a darker, louder boss section the
+2. **Boss music variations** — each level's theme gets a darker, louder boss section the
    player switches to on `boss:spawn` (sound bible "Boss / finale" row), on the layers
    engine. `type:audio`.
-5. **Whale set-piece (Ocean)** — a huge low-poly whale breaches across the track at ~30 s;
+3. **Whale set-piece (Ocean)** — a huge low-poly whale breaches across the track at ~30 s;
    camera shake, splash particles. Scenery, not a target.
-6. **Blizzard / sandstorm waves** — a weather pulse (fog near distance + particle burst)
+4. **Blizzard / sandstorm waves** — a weather pulse (fog near distance + particle burst)
    tied to one wave per level; readability must survive it; the pacing metric must not
    regress.
-7. **Positional kill and hit sounds on the arcade engine** — every hit / kill / boss cue
+5. **Positional kill and hit sounds on the arcade engine** — every hit / kill / boss cue
    placed by world position, plus per-biome acoustics send tuning (desert slapback, open
    sea, cavernous Inferno, the Gym's hall).
-8. **Shark + Infernal Drake art pass** — next two from the briefs after #462 / #463.
-9. **Gamepad** — right stick as a virtual cursor, RT fire, Start pause, A/B in menus.
-10. **Photo mode** — pause, hide the HUD, orbit + zoom, PNG save; feeds the Marketer's
+6. **Shark + Infernal Drake art pass** — next two from the briefs after #462 / #463.
+7. **Gamepad** — right stick as a virtual cursor, RT fire, Start pause, A/B in menus.
+8. **Photo mode** — pause, hide the HUD, orbit + zoom, PNG save; feeds the Marketer's
     share images.
-11. **Night Ride variants** — the same level with a night lighting / grade preset and
+9. **Night Ride variants** — the same level with a night lighting / grade preset and
     emissive props; selectable from the level card once the level has 3★.
-12. **Track-progress radar** — a cached offscreen-canvas minimap of the track with the
+10. **Track-progress radar** — a cached offscreen-canvas minimap of the track with the
     coaster and enemies as dots; hidden in portrait.
-13. **Fog tinted by the sky in the view direction** — one shared `onBeforeCompile` helper
+11. **Fog tinted by the sky in the view direction** — one shared `onBeforeCompile` helper
     (touches every material; measure first).
-14. **Spatial chunking + fog-distance cut** for whole-level InstancedMeshes; only if a
+12. **Spatial chunking + fog-distance cut** for whole-level InstancedMeshes; only if a
     kit-built world can't hold 250 draws by batching alone.
-15. **Loading screen** — branded progress on boot (the per-level warm-up already runs
+13. **Loading screen** — branded progress on boot (the per-level warm-up already runs
     behind the countdown; the title poster covers the cold load).
-16. **Colour-blind safe enemy palettes** — verified for deuteranopia.
-17. **Ghost replay (local)** — record aim / fire timeline, replay as a translucent crosshair.
-18. **WebGPU capability event** — one anonymous `webgpu: yes/no` telemetry field per
+14. **Colour-blind safe enemy palettes** — verified for deuteranopia.
+15. **Ghost replay (local)** — record aim / fire timeline, replay as a translucent crosshair.
+16. **WebGPU capability event** — one anonymous `webgpu: yes/no` telemetry field per
     visitor, so the renderer decision can be made on real data.
-19. **Daily Run leaderboard** — a World board per UTC day on the existing API (the
+17. **Daily Run leaderboard** — a World board per UTC day on the existing API (the
     `scores` table gains a `day` column; Alex runs the migration).
 
 Not doing (from the slop-newyork review, #126): unpinned three.js from a CDN,
