@@ -3,8 +3,8 @@ type Listener = (...args: unknown[]) => void
 /** Simple typed event bus for decoupled game systems */
 class EventBus {
   private listeners = new Map<string, Set<Listener>>()
-  /** Sees every event's name before its listeners do: the `?perf=1` recorder (#536). */
-  tap: ((event: string) => void) | null = null
+  /** See every event's name before its listeners do: the `?perf=1` recorder and the smoke's program log (#536). */
+  readonly taps = new Set<(event: string) => void>()
 
   on(event: string, fn: Listener) {
     if (!this.listeners.has(event)) {
@@ -18,7 +18,7 @@ class EventBus {
   }
 
   emit(event: string, ...args: unknown[]) {
-    this.tap?.(event)
+    for (const tap of this.taps) tap(event)
     this.listeners.get(event)?.forEach((fn) => fn(...args))
   }
 

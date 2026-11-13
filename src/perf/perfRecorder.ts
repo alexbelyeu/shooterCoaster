@@ -15,7 +15,7 @@ const milestone = (name: string) => noteMilestone(hitchLog, name, performance.no
 
 /** `?perf=1` (#536): starts recording bus events, phase changes, warm-ups and tab hides, from boot (`main.tsx`). */
 export function startPerfRecorder(): void {
-  eventBus.tap = (event) => noteEvent(hitchLog, event)
+  eventBus.taps.add((event) => noteEvent(hitchLog, event))
   milestone(`recorder started, phase ${useGameStore.getState().phase}`)
   useGameStore.subscribe((s, prev) => {
     if (s.phase !== prev.phase) milestone(`phase ${s.phase}${s.currentLevel ? ` ${s.currentLevel}` : ''}`)
