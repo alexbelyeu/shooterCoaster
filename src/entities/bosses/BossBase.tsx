@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
+import { gameClockStep } from '@/core/gameClock'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
 import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE, type EnemyKilledEvent } from '@/combat/hitFeedback'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
@@ -106,6 +107,7 @@ export default function BossBase({
   const fx = useRef<PartFx[]>(spec.weakPoints.map(() => ({ flashMs: 0, popMs: 0, popFrames: 0, popping: false, points: 0 }))).current
   const registered = useRef(new Set<string>()).current
   const clock = useRef({ age: 0, defeatedAt: -1, placed: false })
+  const [gameStep] = useState(gameClockStep)
   const positions = useMemo(() => spec.weakPoints.map(() => new THREE.Vector3()), [spec])
 
   const targetId = useCallback((wp: string) => `boss:${id}:${wp}`, [id])
@@ -237,7 +239,7 @@ export default function BossBase({
     [id, spec, parts, fx, publishHud, deathStyle],
   )
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     const root = rootRef.current
     const { phase, timeScale } = useGameStore.getState()
     const c = clock.current
@@ -245,7 +247,9 @@ export default function BossBase({
     // The arrival frame always places it, even with game time frozen.
     if (!root || !active || phase !== 'playing' || (timeScale === 0 && c.placed && testStep === null)) return
     c.placed = true
-    const dt = testStep ?? delta * timeScale
+    // On the game clock, like the waves and the enemies: on the frame's delta a boss moved with the frame rate, not the level.
+    const moved = gameStep()
+    const dt = testStep ?? moved
 
     for (let i = 0; i < fx.length; i++) {
       const f = fx[i]

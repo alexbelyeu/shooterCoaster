@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
+import { gameClockStep } from '@/core/gameClock'
 import { useGameStore } from '@/store/useGameStore'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
@@ -83,6 +84,7 @@ export default function Yeti(props: BossProps) {
     [track],
   )
 
+  const [tellStep] = useState(gameClockStep)
   const sim = useMemo(
     () => ({
       heading: new THREE.Vector3(),
@@ -228,10 +230,10 @@ export default function Yeti(props: BossProps) {
   )
 
   // The tell runs before BossBase's frame does.
-  useFrame((_, delta) => {
+  useFrame(() => {
     if (!incoming || active) return
-    const { phase, timeScale } = useGameStore.getState()
-    const dt = phase === 'playing' ? delta * timeScale : 0
+    // Game time, like BossBase: a pause or the end of the run holds it, slow-mo slows it.
+    const dt = tellStep()
     if (sim.tell < 0) {
       sim.tell = 0
       eventBus.emit(AURORA_INTENSITY_EVENT, AURORA_TELL)

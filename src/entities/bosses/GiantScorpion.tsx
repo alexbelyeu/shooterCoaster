@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
-import { useGameStore } from '@/store/useGameStore'
+import { gameClockStep } from '@/core/gameClock'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { SAND_BURST_DEATH_STYLE, SCORPION_SHARD_DEATH_STYLE } from '@/effects/deathStyles'
@@ -71,6 +71,7 @@ export default function GiantScorpion(props: BossProps) {
     [track, groundFn],
   )
 
+  const [tellStep] = useState(gameClockStep)
   const sim = useMemo(
     () => ({
       heading: new THREE.Vector3(),
@@ -127,11 +128,11 @@ export default function GiantScorpion(props: BossProps) {
   )
 
   // The tell runs before BossBase's frame does: the dune heaves where it will burst out.
-  useFrame((_, delta) => {
+  useFrame(() => {
     const mound = moundRef.current
     if (!mound) return
-    const { phase, timeScale } = useGameStore.getState()
-    const dt = phase === 'playing' ? delta * timeScale : 0
+    // Game time, like BossBase: a pause or the end of the run holds it, slow-mo slows it.
+    const dt = tellStep()
     if (incoming && !active) {
       if (sim.tell < 0) {
         sim.tell = 0
