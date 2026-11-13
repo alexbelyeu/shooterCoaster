@@ -15,6 +15,8 @@ import LavaGolem from './LavaGolem'
 import FireImp from './FireImp'
 import InfernalDrake from './InfernalDrake'
 import Climber from './Climber'
+import Rat from './Rat'
+import DustBunny from './DustBunny'
 
 /** Every wave enemy's component: what `EnemySpawner` mounts and the turntable (`src/dev/turntable/`) shows. */
 export const ENEMY_COMPONENTS: Record<EnemyType, ComponentType<EnemyProps>> = {
@@ -32,4 +34,6 @@ export const ENEMY_COMPONENTS: Record<EnemyType, ComponentType<EnemyProps>> = {
   fireImp: FireImp,
   infernalDrake: InfernalDrake,
   climber: Climber,
+  rat: Rat,
+  dustBunny: DustBunny,
 }

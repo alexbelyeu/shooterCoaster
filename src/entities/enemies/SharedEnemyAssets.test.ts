@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
-  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_FEATHER_MAT, CROW_GEO, EMBER_WISP_TENDRILS_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
+  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_FEATHER_MAT, CROW_GEO, DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYES_GEO, EMBER_WISP_TENDRILS_GEO, RAT_BODY_GEO,
+  RAT_SNOUT_GEO, RAT_TAIL_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
   SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, patchCrowWingVertex,
 } from './SharedEnemyAssets'
 
@@ -62,5 +63,26 @@ describe('climber model', () => {
     for (let i = 0; i < normal.count; i++) {
       if (normal.getY(i) > 0.9 && color.getX(i) > 0.8) expect(color.getX(i)).toBeGreaterThan(0.85)
     }
+  })
+})
+
+describe('gym pests (#515)', () => {
+  const tris = (g: THREE.BufferGeometry) => g.attributes.position.count / 3
+
+  it("keep under the briefs' triangle caps: rat 600, dust bunny 500", () => {
+    expect(tris(RAT_BODY_GEO) + tris(RAT_SNOUT_GEO) + tris(RAT_TAIL_GEO)).toBeLessThanOrEqual(600)
+    expect(tris(DUST_BUNNY_BODY_GEO) + tris(DUST_BUNNY_EYES_GEO)).toBeLessThanOrEqual(500)
+  })
+
+  it('give the rat its pink ears, nose and tail', () => {
+    const pink = (g: THREE.BufferGeometry) => {
+      const c = g.attributes.color
+      let n = 0
+      for (let i = 0; i < c.count; i++) if (c.getX(i) > c.getY(i) * 1.6) n++
+      return n
+    }
+    expect(pink(RAT_BODY_GEO)).toBeGreaterThan(0)
+    expect(pink(RAT_SNOUT_GEO)).toBeGreaterThan(0)
+    expect(pink(RAT_TAIL_GEO)).toBe(RAT_TAIL_GEO.attributes.color.count)
   })
 })
