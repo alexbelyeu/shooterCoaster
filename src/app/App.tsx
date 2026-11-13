@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { lazy, Suspense, useState, useEffect, useRef } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import GameCanvas from '@/canvas/GameCanvas'
 import { useGameStore } from '@/store/useGameStore'
@@ -19,6 +19,9 @@ import { sfx } from '@/audio/sfx'
 import { whenAudioReady } from '@/audio/AudioEngine'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { usePauseOnHidden } from './usePauseOnHidden'
+import { perfRequested } from '@/perf/perfFlag'
+
+const PerfPanel = lazy(() => import('@/perf/PerfPanel'))
 
 /** PLAY fades the title to black (with a whoosh) over this long, then opens level select. */
 const TITLE_FADE_S = 0.4
@@ -155,6 +158,12 @@ export default function App() {
 
       {phase === 'playing' && <ScorePopups />}
       {phase === 'playing' && <WaveAnnouncement />}
+
+      {perfRequested() && (
+        <Suspense fallback={null}>
+          <PerfPanel />
+        </Suspense>
+      )}
     </MotionConfig>
   )
 }

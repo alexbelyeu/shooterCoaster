@@ -36,14 +36,17 @@ export function recordFrame(level: string, ms: number, quality: string, dpr: num
 }
 
 /** The unmasked renderer where the browser offers it (newer Chrome returns it from RENDERER anyway). */
-export function noteRenderer(gl: WebGLRenderingContext | WebGL2RenderingContext): void {
-  if (gpu) return
+export function rendererName(gl: WebGLRenderingContext | WebGL2RenderingContext): string | null {
   try {
     const info = gl.getExtension('WEBGL_debug_renderer_info')
-    gpu = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) ?? '') || null
+    return String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) ?? '') || null
   } catch {
-    gpu = null
+    return null
   }
+}
+
+export function noteRenderer(gl: WebGLRenderingContext | WebGL2RenderingContext): void {
+  gpu ??= rendererName(gl)
 }
 
 export function installTelemetry(version: string, storage: FlagStorage | null): void {

@@ -1,3 +1,5 @@
+import { markStartup } from '@/core/startupMarks'
+
 /** The level scene's chunk (#376): fetched once, either when a run starts or ahead of it, once the title is idle. */
 type LevelSceneModule = typeof import('./LevelScene')
 
@@ -23,7 +25,10 @@ export async function importWithRetry<T>(
 }
 
 export function loadLevelScene(): Promise<LevelSceneModule> {
-  pending ??= importWithRetry(() => import('./LevelScene')).catch((err) => {
+  pending ??= importWithRetry(() => import('./LevelScene')).then((mod) => {
+    markStartup('levelChunk')
+    return mod
+  }, (err) => {
     pending = null // the next call starts a fresh fetch
     throw err
   })

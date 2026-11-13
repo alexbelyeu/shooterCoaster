@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Stats } from '@react-three/drei'
 import * as THREE from 'three'
@@ -11,6 +11,9 @@ import { getAdaptiveSteps, setAdaptiveSteps, useCanvasDpr } from './useRenderBud
 import TelemetryFrameProbe from '@/telemetry/TelemetryFrameProbe'
 import { telemetryActive } from '@/telemetry/playerTelemetry'
 import { dismissPoster, posterShown } from '@/app/poster'
+import { perfRequested } from '@/perf/perfFlag'
+
+const PerfProbe = lazy(() => import('@/perf/PerfProbe'))
 
 /** Frames the canvas draws under the poster before it fades: the first can still be compiling its shaders. */
 const POSTER_FRAMES = 2
@@ -61,6 +64,11 @@ export default function GameCanvas() {
       {showFPS && <Stats />}
       {isE2E && <E2EFrameProbe />}
       {telemetryActive() && <TelemetryFrameProbe />}
+      {perfRequested() && (
+        <Suspense fallback={null}>
+          <PerfProbe />
+        </Suspense>
+      )}
     </Canvas>
   )
 }
