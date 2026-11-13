@@ -3,6 +3,8 @@
 export const BIN_MS = 0.5
 /** 0.5 ms bins up to 100 ms; the last bin holds every frame of 100 ms or more. */
 export const HIST_BINS = 201
+/** A frame this long is a visible freeze (#536): the histogram's last bin counts them. */
+export const LONG_FRAME_MS = (HIST_BINS - 1) * BIN_MS
 /** Longer than this, the page was in the background or stalled on a tab switch: not a frame the player saw. */
 export const MAX_FRAME_MS = 1000
 /** A level with fewer frames than this (a quit in the first second) says nothing about its frame rate. */
@@ -18,6 +20,7 @@ export interface LevelFrames {
   level: string
   hist: Uint32Array
   frames: number
+  maxMs: number
   quality: string
   dpr: number
 }
@@ -36,6 +39,10 @@ export interface LevelReport {
   frames: number
   p50Ms: number
   p95Ms: number
+  /** The longest frame (#536): p95 never moves for a few freezes a run. */
+  maxMs: number
+  /** Frames of `LONG_FRAME_MS` or more. */
+  longFrames: number
 }
 
 export interface TelemetryReport {
@@ -49,13 +56,14 @@ export interface TelemetryReport {
 }
 
 export function createLevelFrames(level: string): LevelFrames {
-  return { level, hist: new Uint32Array(HIST_BINS), frames: 0, quality: '', dpr: 0 }
+  return { level, hist: new Uint32Array(HIST_BINS), frames: 0, maxMs: 0, quality: '', dpr: 0 }
 }
 
 export function addFrame(lf: LevelFrames, ms: number): void {
   if (!(ms > 0) || ms > MAX_FRAME_MS) return
   lf.hist[Math.min(HIST_BINS - 1, Math.floor(ms / BIN_MS))]++
   lf.frames++
+  if (ms > lf.maxMs) lf.maxMs = ms
 }
 
 /** The bin's midpoint (100 for the open last bin). */
@@ -128,6 +136,8 @@ export function buildReport(device: Device, errors: ErrorEntry[], contextLost: n
       frames: lf.frames,
       p50Ms: percentileMs(lf.hist, lf.frames, 0.5),
       p95Ms: percentileMs(lf.hist, lf.frames, 0.95),
+      maxMs: round1(lf.maxMs),
+      longFrames: lf.hist[HIST_BINS - 1],
     })
   }
   if (!played.length && !errors.length && !contextLost) return null

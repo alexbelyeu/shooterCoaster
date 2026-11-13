@@ -14,8 +14,10 @@ played a level for at least 60 frames, hit an error, or lost its WebGL context (
 - `contextLost`: how many `webglcontextlost` events;
 - `errors`: up to 5 distinct uncaught errors / unhandled rejections from the game's own scripts, each its message
   (200 chars) and first stack frame (160 chars), URLs cut to their path, with a count;
-- `levels`: per level played, its frames, median and p95 frame time (game play only: not the countdown or a
-  pause), and the graphics quality and dpr in effect.
+- `levels`: per level played, its frames, median and p95 frame time, its longest frame (`maxMs`) and its frames of
+  100 ms or more (`longFrames`; both #536: a few freezes a run never move the p95) (game play only: not the countdown
+  or a pause; a frame over 1 s is a background tab, not counted), and the graphics quality and dpr in effect. They sit
+  in the `levels` jsonb column, so the two newer fields needed no migration; reports from older clients lack them.
 
 No ids, cookies or IPs. Same gate as Web Analytics: only scoaster.com's Vercel build, never dev, `vite preview`,
 CI, the smoke (`?e2e=1`), Alex's browsers (`?internal=1`) or the portal build.
@@ -28,7 +30,8 @@ CI, the smoke (`?e2e=1`), Alex's browsers (`?internal=1`) or the portal build.
   IP in 10 minutes, 429 (keyed by an HMAC of the IP under a daily salt). Now and then it deletes rows older than 30 days.
 - `GET /api/telemetry` → the last 24 h aggregated, CDN-cached 5 minutes: `sessions`, `errors` (per message + frame:
   `key`, sessions, count, first / last seen, versions), `contextLost` (sessions, top GPUs), `frames` (per level ×
-  `touch` / `desktop`: sessions, median of the sessions' p50 and p95, the worst p95). No stored row is returned.
+  `touch` / `desktop`: sessions, median of the sessions' p50 and p95, the worst p95, the longest frame any session reported (`worstMaxMs`) and
+  the frames of 100 ms or more summed (`longFrames`)). No stored row is returned.
 - No env vars, a paused project or any database error: `503 { "error": "unavailable" }`.
 
 ## Who reads it
@@ -42,5 +45,7 @@ sessions (`player-perf:<level>`).
 
 The leaderboard's setup already gave the function its env vars. Open the Supabase project's SQL editor, paste
 `supabase/migrations/0002_telemetry.sql` and run it once. Check: `https://scoaster.com/api/telemetry` answers
-`{"sessions":0,…}` (200) instead of a 503. When the free project pauses, both the leaderboard and telemetry answer
+`{"sessions":0,…}` (200) instead of a 503. (On 13 Nov 2026, #536: `/api/leaderboard` answered 200 while
+`/api/telemetry` answered 503, so the env vars and the project were fine and the table was missing: this step had
+not been run.) When the free project pauses, both the leaderboard and telemetry answer
 503 until it is restored (docs/LEADERBOARD.md).

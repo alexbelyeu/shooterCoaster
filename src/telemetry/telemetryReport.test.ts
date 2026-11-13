@@ -88,8 +88,14 @@ describe('buildReport', () => {
       gpu: 'Adreno (TM) 640',
       contextLost: 0,
       errors: [],
-      levels: [{ level: 'level1', quality: 'low', dpr: 1.3, frames: MIN_FRAMES, p50Ms: 20.25, p95Ms: 20.25 }],
+      levels: [{ level: 'level1', quality: 'low', dpr: 1.3, frames: MIN_FRAMES, p50Ms: 20.25, p95Ms: 20.25, maxMs: 20, longFrames: 0 }],
     })
+  })
+
+  it('reports the longest frame and the frames of 100 ms or more, a background gap not among them', () => {
+    const frames = [...Array(MIN_FRAMES).fill(16), 100, 312.44, 2500]
+    const [level] = buildReport(device, [], 0, [played('level1', frames)])!.levels
+    expect(level).toMatchObject({ frames: MIN_FRAMES + 2, maxMs: 312.4, longFrames: 2 })
   })
 
   it('sends nothing for a visit with nothing to say, but does for an error or a context loss alone', () => {

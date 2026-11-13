@@ -24,6 +24,9 @@ export interface ReportLevel {
   frames: number
   p50Ms: number
   p95Ms: number
+  /** Null from clients built before #536. */
+  maxMs: number | null
+  longFrames: number | null
 }
 
 export interface Report {
@@ -52,10 +55,13 @@ function checkError(v: unknown): ReportError | null {
 
 function checkLevel(v: unknown): ReportLevel | null {
   if (!isRecord(v)) return null
-  const { level, quality, dpr, frames, p50Ms, p95Ms } = v
+  const { level, quality, dpr, frames, p50Ms, p95Ms, maxMs = null, longFrames = null } = v
   if (!isCampaignLevel(level) || typeof quality !== 'string' || !QUALITIES.includes(quality)) return null
   if (!isNum(dpr, 0.1, 8) || !isInt(frames, 1, 10_000_000) || !isNum(p50Ms, 0, 1000) || !isNum(p95Ms, p50Ms, 1000)) return null
-  return { level, quality, dpr, frames, p50Ms, p95Ms }
+  // p95 is a bin's upper edge, so the longest frame can sit up to a bin below it.
+  if (maxMs !== null && !isNum(maxMs, Math.max(0, p95Ms - 0.5), 1000)) return null
+  if (longFrames !== null && !isInt(longFrames, 0, frames)) return null
+  return { level, quality, dpr, frames, p50Ms, p95Ms, maxMs, longFrames }
 }
 
 export function checkReport(body: unknown): Checked<Report> {
@@ -110,6 +116,10 @@ export interface FrameSummary {
   p50Ms: number
   p95Ms: number
   worstP95Ms: number
+  /** The longest frame any session reported (#536); null when none reported one. */
+  worstMaxMs: number | null
+  /** Frames of 100 ms or more, summed over sessions. */
+  longFrames: number
 }
 
 export interface TelemetrySummary {
@@ -144,7 +154,10 @@ const round1 = (n: number) => Math.round(n * 10) / 10
 
 export function summarize(rows: ReportRow[], now: number, truncated = false): TelemetrySummary {
   const errors = new Map<string, ErrorSummary>()
-  const frames = new Map<string, { level: string; device: DeviceClass; p50: number[]; p95: number[]; frames: number }>()
+  const frames = new Map<
+    string,
+    { level: string; device: DeviceClass; p50: number[]; p95: number[]; frames: number; worstMaxMs: number | null; longFrames: number }
+  >()
   const lostGpus = new Map<string, number>()
   let lostSessions = 0
   for (const row of rows) {
@@ -173,12 +186,14 @@ export function summarize(rows: ReportRow[], now: number, truncated = false): Te
       const k = `${l.level}|${device}`
       let f = frames.get(k)
       if (!f) {
-        f = { level: l.level, device, p50: [], p95: [], frames: 0 }
+        f = { level: l.level, device, p50: [], p95: [], frames: 0, worstMaxMs: null, longFrames: 0 }
         frames.set(k, f)
       }
       f.p50.push(l.p50Ms)
       f.p95.push(l.p95Ms)
       f.frames += l.frames
+      if (typeof l.maxMs === 'number') f.worstMaxMs = Math.max(f.worstMaxMs ?? 0, l.maxMs)
+      if (typeof l.longFrames === 'number') f.longFrames += l.longFrames
     }
   }
   return {
@@ -203,6 +218,8 @@ export function summarize(rows: ReportRow[], now: number, truncated = false): Te
         p50Ms: round1(median(f.p50)),
         p95Ms: round1(median(f.p95)),
         worstP95Ms: Math.max(...f.p95),
+        worstMaxMs: f.worstMaxMs,
+        longFrames: f.longFrames,
       }))
       .sort((a, b) => a.level.localeCompare(b.level) || a.device.localeCompare(b.device)),
   }
