@@ -43,7 +43,8 @@ Work through these in order; stop early only if something is on fire.
    README, or if an earlier fold PR is still open): append every inbox entry
    to the bottom of `docs/agents/DECISIONS.md` in date order (filename order), as
    `## YYYY-MM-DD — Title (role, #PR)` sections with the entry body unchanged, then
-   `git rm` exactly those inbox files. If `DECISIONS.md` passes ~1500 lines, first
+   `git rm` exactly those inbox files, and run `node scripts/decisionsFold.cjs` before pushing (it
+   fails if an inbox entry the branch deletes is not in `DECISIONS.md`; #499 and #528 lost them). If `DECISIONS.md` passes ~1500 lines, first
    move whole past years to `docs/agents/decisions/<year>.md`. One docs-only PR
    titled `docs(decisions): fold inbox <date>` on branch `agent/fold-decisions-<date>` (auto-merge
    only takes `agent/*` branches), labelled `agent:needs-qa`. You are the
