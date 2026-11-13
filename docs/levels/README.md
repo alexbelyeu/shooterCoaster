@@ -1,9 +1,21 @@
 # Level blockouts
 
-`gym-blockout.json` is Alex's blockout of his real climbing gym (12 Nov 2026, #513), built
-from the gym's Setter's Map and his photos. Level 6 is built from it: #514 moves it to
-`src/levels/environments/biomes/gym/blockout.json` (keep it verbatim) and reads it with a
-pure `blockout.ts`. Don't name the real gym anywhere: in the game it is "the Climbing Gym".
+`src/levels/environments/biomes/gym/blockout.json` is Alex's blockout of his real climbing gym
+(12 Nov 2026, #513), built from the gym's Setter's Map and his photos; keep it verbatim. Level 6 is
+built from it: the pure `blockout.ts` next to it reads it as typed pieces (their solid boxes, the
+named anchors: pit, star, Arch opening, Flame, Tree face, glass room windows) and scales it to the
+level (`GYM_SCALE`, 16 world units per metre: the 80 m hall is 1280 units long). Don't name the real
+gym anywhere: in the game it is "the Climbing Gym".
+
+## The ride (#514)
+
+`gymTrack.ts` builds the level's authored `spline` track from those anchors; `gymTrack.test.ts`
+proves the four moments below, the clearances and the ~60 s lap. `gym-track.svg` here is its plot
+(re-draw it with `node scripts/plot-gym-track.mjs docs/levels/gym-track.svg`): from GO, up the
+Tree's face (0–3 s), a full turn round the Flame (~10–25 s), west through the Arch (~33 s), a right
+turn to the crest by the glass gym room (~39 s), then the run-in down the west side into the Starr
+pit with the star ahead, where the 60 s run ends; the U-turn under the star closes the lap after it.
+The Medusa rises from the star at 40 s, as the rider leaves the crest facing it.
 
 ## Axes and units
 
