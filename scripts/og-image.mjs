@@ -5,11 +5,13 @@
  *   npm run build && npm run og        (cloud sessions: export SC_CHROME first, see CLAUDE.md)
  *   npm run og -- --icons              (only the icons: no build needed)
  *   npm run og -- --poster             (only the posters)
+ *   npm run og -- --card               (only the share card)
  *
  * public/social/og-1200x630.jpg: a real level-1 gameplay frame, shot at a 1200x630
  * viewport after a short ride, with the muzzle flash, tracer and hitmarker held on a
  * kill frame (the `?e2e=1` hook's holdFeedback + killNearest). JPEG, because a PNG of
- * a rendered scene this size is ~1 MB and unfurlers want small images (docs/marketing/SEO.md).
+ * a rendered scene this size is ~1 MB and unfurlers want small images (docs/marketing/SEO.md). The title logo sits
+ * over it, top centre between the HUD panels: the poster's inline SVG from the served index.html (#533).
  * The icons are public/favicon.svg (hand-written, the master) rasterised on a 2D canvas:
  * favicon.ico (16/32/48), apple-touch-icon.png (180) and the web app manifest's
  * icons/icon-192.png, icon-512.png and icon-maskable-512.png.
@@ -17,7 +19,7 @@
  * public/poster/title-{landscape,portrait}.webp (#376): the title scene with no UI, its camera held at the
  * first moments of the fly-by, which index.html's #poster shows before any JS runs and crossfades into the live scene.
  *
- * Options: --icons, --poster (only the posters), --level level1 --seconds 8 --url http://localhost:4173 (skip vite preview)
+ * Options: --icons, --poster (only the posters), --card (only the share card), --level level1 --seconds 8 --url http://localhost:4173 (skip vite preview)
  */
 import { arg, launchBrowser, startPreview, stopPreview } from './headless.mjs'
 import fs from 'node:fs'
@@ -27,6 +29,7 @@ const LEVEL = arg('level', 'level1')
 const RIDE_SECONDS = Number(arg('seconds', 8))
 const ICONS_ONLY = process.argv.includes('--icons')
 const POSTER_ONLY = process.argv.includes('--poster')
+const CARD_ONLY = process.argv.includes('--card')
 /** Phones get the portrait still, everything else the landscape one (index.html's media queries). Small: under the startup JS. */
 const POSTERS = [
   { file: 'public/poster/title-landscape.webp', width: 960, height: 540, maxBytes: 60 * 1024 },
@@ -71,12 +74,30 @@ async function shootCard(page, url) {
     .waitForFunction((k) => window.__SC_TEST__.combat.kills > k, kills, { timeout: 15000 })
     .catch(() => console.warn('og: no kill event; the card will lack the hitmarker'))
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  await addLogo(page)
   await waitFrames(page, 2)
   for (const quality of [85, 78, 70, 60]) {
     const jpg = await page.screenshot({ type: 'jpeg', quality, timeout: TIMEOUT })
     if (jpg.length <= MAX_OG_BYTES) return { jpg, quality }
   }
   throw new Error('og image is over 300 KB even at quality 60')
+}
+
+/** The poster's still logo, read from the served index.html: the poster itself is gone by now. */
+async function addLogo(page) {
+  await page.evaluate(async () => {
+    const html = await (await fetch('/')).text()
+    const svg = new DOMParser().parseFromString(html, 'text/html').querySelector('#poster .poster-logo svg')
+    if (!svg) throw new Error('og: index.html has no poster logo')
+    const box = document.createElement('div')
+    box.style.cssText = 'position: fixed; top: 22px; left: 50%; transform: translateX(-50%); width: 500px; z-index: 1000; pointer-events: none; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));'
+    svg.setAttribute('width', '100%')
+    svg.style.cssText = 'display: block; height: auto; overflow: visible;'
+    box.append(document.importNode(svg, true))
+    document.body.append(box)
+    await document.fonts.load('700 160px Lobster')
+    await document.fonts.ready
+  })
 }
 
 /** The title scene alone (no UI, no poster) at the poster's size, as WebP under its byte cap. */
@@ -193,9 +214,9 @@ try {
       fs.writeFileSync(OG_FILE, jpg)
       console.log(`og: ${path.relative('.', OG_FILE)} 1200x630 q${quality} ${Math.round(jpg.length / 1024)} KB`)
     }
-    await writePosters(browser, url)
+    if (!CARD_ONLY) await writePosters(browser, url)
   }
-  if (!POSTER_ONLY) await writeIcons(page)
+  if (!POSTER_ONLY && !CARD_ONLY) await writeIcons(page)
   await browser.close()
 } finally {
   if (preview) stopPreview(preview.proc)

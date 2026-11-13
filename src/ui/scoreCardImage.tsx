@@ -1,6 +1,7 @@
 import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { PostcardArt } from '@/ui/screens/LevelPostcard'
+import { CAR, CAR_PARK, CROSSHAIR, CROSSHAIR_PATH, GOLD as LOGO_GOLD, LOGO_TEXT, NAVY, RAIL, RED, TARGET, TRACK, VIEWBOX, WHITE, WORDMARK } from '@/ui/logoArt'
 import { CARD_FONTS, layoutScoreCard, starPoints, type CardItem, type CardSize, type Rect, type ScoreCardLayout, type ScoreCardRun } from '@/ui/scoreCard'
 
 /** Draws the score card (#272) on a 2D canvas, on demand: no WebGL, no request (the art is an inline SVG data URL). */
@@ -38,6 +39,9 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 function drawItem(ctx: CanvasRenderingContext2D, item: CardItem) {
   ctx.save()
   switch (item.kind) {
+    case 'logo':
+      drawLogo(ctx, item.rect)
+      break
     case 'pill': {
       const { x, y, width, height } = item.rect
       ctx.fillStyle = item.color
@@ -71,6 +75,75 @@ function drawItem(ctx: CanvasRenderingContext2D, item: CardItem) {
       break
   }
   ctx.restore()
+}
+
+/**
+ * The title logo (`logoArt.ts`) at rest, its viewBox fitted to `rect`. Drawn with the 2D API rather than as TitleLogo's SVG
+ * in an image: an SVG image is sandboxed from the page's fonts and would set the wordmark in a fallback face.
+ */
+function drawLogo(ctx: CanvasRenderingContext2D, rect: Rect) {
+  const scale = rect.width / VIEWBOX.width
+  ctx.translate(rect.x, rect.y)
+  ctx.scale(scale, scale)
+  ctx.translate(-VIEWBOX.x, -VIEWBOX.y)
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+
+  ctx.font = `${WORDMARK.weight} ${WORDMARK.size}px ${WORDMARK.family}`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+  ctx.strokeStyle = NAVY
+  ctx.lineWidth = WORDMARK.edge
+  ctx.strokeText(LOGO_TEXT, WORDMARK.x, WORDMARK.y)
+  ctx.fillStyle = WHITE
+  ctx.fillText(LOGO_TEXT, WORDMARK.x, WORDMARK.y)
+
+  ctx.save()
+  ctx.translate(TARGET.x, TARGET.y)
+  for (const ring of TARGET.rings) {
+    ctx.fillStyle = ring.fill
+    ctx.beginPath()
+    ctx.arc(0, 0, ring.r, 0, 2 * Math.PI)
+    ctx.fill()
+  }
+  const crosshair = new Path2D(CROSSHAIR_PATH)
+  for (const [colour, width] of [[NAVY, CROSSHAIR.edge], [WHITE, CROSSHAIR.width]] as const) {
+    ctx.strokeStyle = colour
+    ctx.lineWidth = width
+    ctx.stroke(crosshair)
+  }
+  ctx.restore()
+
+  const track = new Path2D(TRACK)
+  for (const [colour, width] of [[NAVY, RAIL.edge], [LOGO_GOLD, RAIL.width]] as const) {
+    ctx.strokeStyle = colour
+    ctx.lineWidth = width
+    ctx.stroke(track)
+  }
+
+  ctx.translate(CAR_PARK.x, CAR_PARK.y)
+  ctx.rotate((CAR_PARK.deg * Math.PI) / 180)
+  ctx.strokeStyle = NAVY
+  ctx.lineWidth = CAR.edge
+  const { rider, body, wheels } = CAR
+  const shapes: [string, Path2D][] = [[WHITE, circle(rider.cx, rider.cy, rider.r)], [RED, roundRect(body)], ...wheels.map((w): [string, Path2D] => [NAVY, circle(w.cx, w.cy, w.r)])]
+  for (const [fill, shape] of shapes) {
+    ctx.fillStyle = fill
+    ctx.fill(shape)
+    ctx.stroke(shape)
+  }
+}
+
+function circle(x: number, y: number, r: number): Path2D {
+  const p = new Path2D()
+  p.arc(x, y, r, 0, 2 * Math.PI)
+  return p
+}
+
+function roundRect({ x, y, width, height, rx }: { x: number; y: number; width: number; height: number; rx: number }): Path2D {
+  const p = new Path2D()
+  p.roundRect(x, y, width, height, rx)
+  return p
 }
 
 async function draw(ctx: CanvasRenderingContext2D, run: ScoreCardRun, layout: ScoreCardLayout) {

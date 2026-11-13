@@ -68,52 +68,18 @@ canvas {
   transition: background-color 0.8s ease;
 }
 
-/* The logo (#419): framer-motion owns its transform (the build-in). After it the wordmark holds still, size and
-   glow fixed (#476: a beat-driven scale and blur re-rasterised it every frame); the light sweep is its one idle touch. */
-.title-screen h1 {
-  position: relative;
-  font-family: 'Lobster', cursive;
-  font-size: clamp(2.5rem, 8vw, 5rem);
-  color: #fff;
-  text-shadow:
-    0 0 10px rgba(255, 200, 0, 0.9),
-    0 0 30px rgba(255, 200, 0, 0.6),
-    0 0 60px rgba(255, 200, 0, 0.3),
-    0 4px 8px rgba(0, 0, 0, 0.5);
+/* The logo (#476, ui/logoArt.ts): one inline SVG sized in em. index.html's .poster-logo repeats these numbers, so the
+   live logo lands exactly on the poster's. */
+.title-screen h1.title-logo {
+  font-size: clamp(2.5rem, 13vw, 5rem);
+  line-height: 0;
   margin-bottom: 0.5rem;
 }
-
-/* A logo concept under ?logo= (#476): one inline SVG sized in em, the wordmark's scale on desktop, wider on phones. */
-.title-screen h1.title-logo-art {
-  font-size: clamp(2.5rem, 13vw, 5rem);
-  text-shadow: none;
-  line-height: 0;
-}
-.title-logo-art svg {
+.title-logo svg {
   display: block;
   max-width: 94vw;
   height: auto;
   overflow: visible;
-}
-
-/* A light sweep across the wordmark: the same text, clipped to a moving gold highlight. */
-.title-logo-sweep {
-  position: absolute;
-  inset: 0;
-  color: transparent;
-  text-shadow: none;
-  background: linear-gradient(110deg, transparent 42%, rgba(255, 226, 122, 0.95) 50%, transparent 58%) no-repeat;
-  background-size: 300% 100%;
-  background-position: 150% 0;
-  -webkit-background-clip: text;
-  background-clip: text;
-  pointer-events: none;
-  animation: title-logo-sweep 7s ease-in-out 1.6s infinite;
-}
-
-@keyframes title-logo-sweep {
-  0% { background-position: 150% 0; }
-  28%, 100% { background-position: -50% 0; }
 }
 
 /* Attract mode (#419): the menu steps aside for the cinematic loop; letterbox bars and a prompt come in. */
@@ -169,10 +135,9 @@ canvas {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .title-logo-sweep, .title-attract::before, .title-attract::after { animation: none; }
+  .title-attract::before, .title-attract::after { animation: none; }
   .title-attract-prompt { animation: none; opacity: 0.8; }
 }
-.reduce-motion .title-logo-sweep,
 .reduce-motion .title-attract::before,
 .reduce-motion .title-attract::after { animation: none; }
 .reduce-motion .title-attract-prompt { animation: none; opacity: 0.8; }
