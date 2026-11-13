@@ -1,15 +1,17 @@
 name: Turntable
 # Enemy turntable (#380): close-ups of every enemy and boss, uploaded as the `turntable` artifact on PRs that can
-# change how one looks. Not part of `verify`, so it never holds up a merge, and other PRs never run it.
+# change how one looks. Not part of `verify`, so it never holds up a merge, and other PRs never run it. It draws no
+# death effect, so death styles aren't in the filter (the smoke's `<id>-combat.png` shows those).
 
 on:
   pull_request:
     paths:
       - 'src/entities/**'
-      - 'src/effects/deathStyles*'
       - 'src/dev/turntable/**'
       - 'turntable.html'
+      - 'vite.config.ts'
       - 'scripts/turntable.mjs'
+      - 'scripts/headless.mjs'
       - '.github/workflows/turntable.yml'
 
 concurrency:

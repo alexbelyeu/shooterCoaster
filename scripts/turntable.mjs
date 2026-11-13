@@ -38,9 +38,9 @@ const { url, proc } = await startPreview({ dist: DIST, page: '/turntable.html' }
 const browser = await launchBrowser()
 const failures = []
 const results = {}
+const errors = []
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
-  const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
   await page.goto(`${url}/turntable.html${biome ? `?biome=${biome}` : ''}`)
@@ -70,10 +70,11 @@ try {
       if (animated && !(peak >= MIN_MOTION)) failures.push(`${name}: motion strip frames are identical (peak change ${peak.toFixed(3)})`)
     }
   }
-  if (errors.length) failures.push(...errors.map((e) => `page error: ${e}`))
 } catch (error) {
   failures.push(String(error?.stack ?? error))
 } finally {
+  // Here, so a board that throws midway still reports the page errors before it.
+  failures.push(...errors.map((e) => `page error: ${e}`))
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
   await browser.close()
   stopPreview(proc)

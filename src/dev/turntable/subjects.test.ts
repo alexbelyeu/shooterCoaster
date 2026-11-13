@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { ENEMY_COMPONENTS } from '@/entities/enemies/enemyComponents'
-import { BOSS_SPECS } from '@/entities/bosses/bossSpecs'
 import { MOTION_FRAMES, REST_TIME, SUBJECTS, boardCells, parseQuery, type Board } from './subjects'
 
 const ids = SUBJECTS.map((s) => s.id)
 
 describe('turntable subjects', () => {
-  it('shows every enemy the spawner can mount, the golden balloon and every boss, once each', () => {
-    const expected = [...Object.keys(ENEMY_COMPONENTS), 'goldenBalloon', ...Object.keys(BOSS_SPECS)]
-    expect([...ids].sort()).toEqual([...expected].sort())
+  // That every enemy and boss has a subject is held by the specs' `Record` types (`tsc -b`).
+  it('lists each subject once, the enemies before the bosses', () => {
     expect(new Set(ids).size).toBe(ids.length)
+    const kinds = SUBJECTS.map((s) => s.kind)
+    expect(kinds.lastIndexOf('enemy')).toBeLessThan(kinds.indexOf('boss'))
   })
 
   it('puts every subject on the sheet', () => {

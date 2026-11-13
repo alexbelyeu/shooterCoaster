@@ -58,9 +58,23 @@ function bossTrack(type: BossType): ArcTable {
   return table
 }
 
-/** Its own `Math.random` stream, so a subject's random choices (heading, colour, flap phase) are the same every run. */
+const nativeRandom = Math.random
+
+/**
+ * Its own `Math.random` stream, so a subject's random choices (heading, colour, flap phase) are the same every run;
+ * the browser's comes back when it unmounts with nothing seeded after it (a new board's subjects render before the old
+ * ones unmount, and keep theirs).
+ */
 function Seeded({ id, children }: { id: string; children: ReactNode }) {
-  Math.random = createRng(hashString(id))
+  const seeded = useRef<() => number>(null)
+  seeded.current = createRng(hashString(id))
+  Math.random = seeded.current
+  useEffect(
+    () => () => {
+      if (Math.random === seeded.current) Math.random = nativeRandom
+    },
+    [],
+  )
   return children
 }
 
