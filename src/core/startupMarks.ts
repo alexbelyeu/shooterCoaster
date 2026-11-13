@@ -2,8 +2,12 @@
 export const STARTUP_PHASES = [
   'boot',
   'titleFrame',
+  // index.html's poster starts fading out: the canvas has drawn.
+  'posterGone',
   // The title screen's mount: PLAY takes clicks from here, while it fades in.
   'playReady',
+  // The level scene's chunk resolved: ahead of a run once the title is idle, or when the first run starts.
+  'levelChunk',
   'runStart',
   // ShaderWarmup's mount effect, which runs after the level's other effects.
   'levelMounted',

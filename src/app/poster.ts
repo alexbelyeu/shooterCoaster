@@ -1,3 +1,5 @@
+import { markStartup } from '@/core/startupMarks'
+
 /** index.html's `#poster` (#376): the title's still and logo, painted before any JS, until the canvas has drawn. */
 
 /** Matches the `#poster.is-leaving` transition in index.html. */
@@ -21,5 +23,6 @@ export function dismissPoster(): void {
   const el = poster()
   if (!el || el.classList.contains('is-leaving')) return
   el.classList.add('is-leaving')
+  markStartup('posterGone')
   window.setTimeout(() => el.remove(), FADE_MS)
 }

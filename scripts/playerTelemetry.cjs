@@ -56,10 +56,10 @@ function telemetrySection(summary, budget) {
     out.push('')
   }
   if (summary.frames.length) {
-    out.push(`| Level | Device | Sessions | p50 ms | p95 ms | Worst p95 |`, '|---|---|---|---|---|---|')
+    out.push(`| Level | Device | Sessions | p50 ms | p95 ms | Worst p95 | Longest frame | Frames ≥ 100 ms |`, '|---|---|---|---|---|---|---|---|')
     for (const f of summary.frames) {
       const over = f.device === 'touch' && budget && f.p95Ms > budget ? ' ⚠️' : ''
-      out.push(`| ${f.level} | ${f.device} | ${f.sessions} | ${f.p50Ms} | ${f.p95Ms}${over} | ${f.worstP95Ms} |`)
+      out.push(`| ${f.level} | ${f.device} | ${f.sessions} | ${f.p50Ms} | ${f.p95Ms}${over} | ${f.worstP95Ms} | ${f.worstMaxMs ?? '-'} | ${f.longFrames ?? '-'} |`)
     }
     out.push(`<sub>Medians over sessions of each session's own p50 / p95 frame time. Phone budget: p95 ≤ ${budget ?? '?'} ms (budgets.json \`playerFrameMs\`).</sub>`)
     out.push('')

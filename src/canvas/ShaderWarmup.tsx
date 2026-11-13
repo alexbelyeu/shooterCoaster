@@ -70,7 +70,10 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     markStartup('levelMounted')
     const started = performance.now()
     const testApi = window.__SC_TEST__
-    if (testApi) testApi.shaderWarmup = { done: false, ms: 0, programs: 0 }
+    if (testApi) {
+      testApi.shaderWarmup = { done: false, ms: 0, programs: 0 }
+      testApi.programGrowth = []
+    }
     const target = new THREE.WebGLRenderTarget(64, 64, { type: THREE.HalfFloatType })
     const specimenGeo = new THREE.BoxGeometry()
     const specimens = new THREE.Group()

@@ -18,9 +18,11 @@ import { markStartup } from './core/startupMarks'
 import { useGameStore } from './store/useGameStore'
 import { installTelemetry } from './telemetry/playerTelemetry'
 import { installE2EApi } from './testing/e2eHook'
+import { perfRequested } from './perf/perfFlag'
 
 markStartup('boot')
 installE2EApi()
+if (perfRequested()) void import('./perf/perfRecorder').then((m) => m.startPerfRecorder())
 
 const { search, pathname, hash } = window.location
 const storage = browserStorage()

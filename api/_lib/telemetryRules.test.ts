@@ -8,13 +8,16 @@ const good = {
   gpu: 'Adreno (TM) 640',
   contextLost: 0,
   errors: [{ message: 'boom', frame: 'f (/assets/index.js:1:2)', count: 2 }],
-  levels: [{ level: 'level1', quality: 'auto', dpr: 1.5, frames: 3000, p50Ms: 16.75, p95Ms: 24.25 }],
+  levels: [{ level: 'level1', quality: 'auto', dpr: 1.5, frames: 3000, p50Ms: 16.75, p95Ms: 24.25, maxMs: 180, longFrames: 2 }],
 }
 
 describe('checkReport', () => {
   it('accepts a well-formed report', () => {
     expect(checkReport(good)).toEqual({ ok: true, value: good })
     expect(checkReport({ ...good, cores: null, gpu: null, errors: [] }).ok).toBe(true)
+    // A client built before #536 sends no longest frame or long-frame count.
+    const { maxMs: _max, longFrames: _long, ...older } = good.levels[0]
+    expect(checkReport({ ...good, levels: [older] })).toMatchObject({ ok: true, value: { levels: [{ ...older, maxMs: null, longFrames: null }] } })
   })
 
   it('drops anything malformed, whole', () => {
@@ -34,6 +37,10 @@ describe('checkReport', () => {
       { ...good, levels: [{ ...good.levels[0], level: 'level99' }] },
       { ...good, levels: [{ ...good.levels[0], quality: 'ultra' }] },
       { ...good, levels: [{ ...good.levels[0], p95Ms: 10 }] },
+      { ...good, levels: [{ ...good.levels[0], maxMs: 12 }] },
+      { ...good, levels: [{ ...good.levels[0], maxMs: 1001 }] },
+      { ...good, levels: [{ ...good.levels[0], longFrames: 3001 }] },
+      { ...good, levels: [{ ...good.levels[0], longFrames: 1.5 }] },
       { ...good, levels: [{ ...good.levels[0], dpr: 0 }] },
       { ...good, levels: Array(9).fill(good.levels[0]) },
       { ...good, errors: [], levels: [] },
@@ -97,16 +104,22 @@ describe('summarize', () => {
     expect(s.contextLost).toEqual({ sessions: 3, gpus: [{ gpu: 'Mali-G52', sessions: 2 }, { gpu: 'unknown', sessions: 1 }] })
   })
 
-  it('gives each level x device class the median session p50 / p95 and the worst p95', () => {
-    const lvl = (p95Ms: number, level = 'level1') => ({ level, quality: 'auto', dpr: 1.5, frames: 100, p50Ms: 16, p95Ms })
+  it('gives each level x device class the median session p50 / p95, the worst p95 and longest frame, and the long frames', () => {
+    const lvl = (p95Ms: number, level = 'level1', maxMs: number | null = null, longFrames: number | null = null) =>
+      ({ level, quality: 'auto', dpr: 1.5, frames: 100, p50Ms: 16, p95Ms, maxMs, longFrames })
     const s = summarize(
-      [row({ levels: [lvl(20)] }), row({ levels: [lvl(30), lvl(18, 'level2')] }), row({ levels: [lvl(90)] }), row({ touch: false, levels: [lvl(17)] })],
+      [
+        row({ levels: [lvl(20, 'level1', 310, 2)] }),
+        row({ levels: [lvl(30, 'level1', 140, 1), lvl(18, 'level2')] }),
+        row({ levels: [lvl(90)] }),
+        row({ touch: false, levels: [lvl(17)] }),
+      ],
       now,
     )
     expect(s.frames).toEqual([
-      { level: 'level1', device: 'desktop', sessions: 1, frames: 100, p50Ms: 16, p95Ms: 17, worstP95Ms: 17 },
-      { level: 'level1', device: 'touch', sessions: 3, frames: 300, p50Ms: 16, p95Ms: 30, worstP95Ms: 90 },
-      { level: 'level2', device: 'touch', sessions: 1, frames: 100, p50Ms: 16, p95Ms: 18, worstP95Ms: 18 },
+      { level: 'level1', device: 'desktop', sessions: 1, frames: 100, p50Ms: 16, p95Ms: 17, worstP95Ms: 17, worstMaxMs: null, longFrames: 0 },
+      { level: 'level1', device: 'touch', sessions: 3, frames: 300, p50Ms: 16, p95Ms: 30, worstP95Ms: 90, worstMaxMs: 310, longFrames: 3 },
+      { level: 'level2', device: 'touch', sessions: 1, frames: 100, p50Ms: 16, p95Ms: 18, worstP95Ms: 18, worstMaxMs: null, longFrames: 0 },
     ])
   })
 

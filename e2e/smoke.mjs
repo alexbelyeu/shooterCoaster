@@ -116,6 +116,9 @@ const COMBAT_STEP_MAX = 0.25
 const RIDE_RATE = Number(arg('ride-rate', 0.14))
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(arg('seed', 1337))
+// --cpu-throttle <rate>: the ride step on a slow machine (#536), CDP's CPU throttling from the level's start;
+// records the longest frame and the frames over 100 ms per level. Reported, not failed, until the fixes land.
+const CPU_THROTTLE = Number(arg('cpu-throttle', 1))
 const DIST = arg('dist', 'dist')
 // Level the speed check rides (default: the first level in the run), e.g. a water level for the streaks over the sea.
 const SPEED_LEVEL = arg('speed-level')
@@ -532,6 +535,33 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
     score: combat.score,
     results: results.screen,
   }
+}
+
+/**
+ * Shader programs compiled after the level's warm-up, over the whole ride (#536): each a shader the warm-up missed,
+ * a hitch on a slow GPU driver (Safari compiles on first draw). Reported, not failed, until the fixes land.
+ */
+function programsAfterWarmup(page) {
+  return page.evaluate(() => {
+    const s = window.__SC_TEST__
+    const moments = s.programGrowth
+    return { warmup: s.shaderWarmup?.programs ?? null, added: moments.reduce((n, m) => n + m.added, 0), moments }
+  })
+}
+
+const GROWTH_SHOWN = 6
+
+function throttleSummary(t) {
+  return t ? ` cpu ${t.rate}x: longest frame ${t.maxMs.toFixed(0)} ms, frames >100 ms: ${t.count}` : ''
+}
+
+function programGrowthSummary(p) {
+  if (!p) return ''
+  const at = p.moments
+    .slice(0, GROWTH_SHOWN)
+    .map((m) => `+${m.added} at ${m.levelTime.toFixed(1)} s ${m.phase}${m.events.length ? ` (${m.events.slice(0, 4).join(', ')})` : ''}`)
+  const more = p.moments.length > GROWTH_SHOWN ? `; ${p.moments.length - GROWTH_SHOWN} more` : ''
+  return ` programs after warm-up: +${p.added}${at.length ? ` [${at.join('; ')}${more}]` : ''}`
 }
 
 /** Largest screen radius a drawn bullet may have, as a fraction of the canvas height (#165). */
@@ -1743,9 +1773,10 @@ async function pacingCheck(page, id) {
   const { samples, end, stepper } = await page.evaluate(() => window.__SC_TEST__.pacingRun)
   if (!samples.length) return { id: 'pacing', level: id, problems: [...problems, 'no playing frame sampled'], pacing: null, timeline: [] }
   const pacing = pacingMetrics(samples, end)
+  const shaders = await programsAfterWarmup(page)
   if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   problems.push(...pacingBudgetProblems(id, pacing, BUDGETS.pacing?.[id]))
-  return { id: 'pacing', level: id, problems, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples) }
+  return { id: 'pacing', level: id, problems, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
 }
 
 /**
@@ -3313,6 +3344,11 @@ async function run() {
   for (const id of has('ride') ? wanted : []) {
     const { ctx, page, errors } = await newPage()
     const started = Date.now()
+    if (CPU_THROTTLE > 1) {
+      const cdp = await ctx.newCDPSession(page)
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE })
+      await page.evaluate(() => { window.__SC_TEST__.longFrames = { maxMs: 0, count: 0 } })
+    }
     const ride = await rideToLevelTime(page, id, SECONDS, MIN_FRAMES)
     // Frozen at SECONDS of level time until the enemy probe: the ride stats, perf gate, shot and probe share that moment.
     const stats = await page.evaluate(() => {
@@ -3354,6 +3390,8 @@ async function run() {
     const play = await playLevel(page, id, { frenzy, leaderboard: frenzy, online, shot: has('shot'), results: has('results'), share: has('share') })
       .finally(() => page.evaluate(() => { window.__SC_TEST__.holdLevelTime = false }).catch(() => {}))
     problems.push(...play.problems)
+    const shaders = await programsAfterWarmup(page)
+    const throttled = CPU_THROTTLE > 1 ? { rate: CPU_THROTTLE, ...(await page.evaluate(() => window.__SC_TEST__.longFrames)) } : null
     const frenzyEnd = frenzy ? await frenzyEndProblems(page, id, online) : null
     if (frenzyEnd) problems.push(...frenzyEnd.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
@@ -3364,7 +3402,7 @@ async function run() {
     delete stats.hookErrors
     results.push({
       id, ok, problems, frames, frameSeconds, rideMsPerFrame: frames > 0 ? ride.ms / frames : null,
-      seconds: (Date.now() - started) / 1000, spawnDigest, ...stats, perfGate,
+      seconds: (Date.now() - started) / 1000, spawnDigest, ...stats, perfGate, shaders, throttled,
       kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
@@ -3509,7 +3547,7 @@ async function run() {
         ? ` ${r.pickup.count} pickups [${r.pickup.ids.join(',')}] draws=${r.pickup.drawCalls} first at ${r.pickup.px ? `${r.pickup.px.x},${r.pickup.px.y} (${r.pickup.px.distance} units, lead ${r.pickup.lead})` : '-'}` +
           ` fan shots=${r.pickup.fan?.shots} drawn=${r.pickup.fan?.drawn}`
       : r.id === 'pacing'
-        ? ` ${r.pacing ? pacingSummary(r.level, r.pacing) : r.level} (${r.samples ?? 0} steps, ${r.heldFrames ?? 0} held frames)`
+        ? ` ${r.pacing ? pacingSummary(r.level, r.pacing) : r.level} (${r.samples ?? 0} steps, ${r.heldFrames ?? 0} held frames)${programGrowthSummary(r.shaders)}`
       : r.engine
         ? ` title=${r.engine.title} nodes ${r.engine.nodes.join('->')} position ${r.engine.position.map((p) => p.toFixed(1)).join('->')}s` +
           ` sfxNodes ${r.engine.sfxNodes.join('->')} voices ${r.engine.voices ? `peak ${r.engine.voices.peak}/${r.engine.voices.budget} stolen ${r.engine.voices.stolen} dropped ${r.engine.voices.rejected}` : 'none'}` +
@@ -3523,7 +3561,7 @@ async function run() {
       : ` levelTime=${r.levelTime?.toFixed(1)}s draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` particles=${r.particles?.points ?? '-'}${r.particles?.boostPoints ? `+${r.particles.boostPoints}` : ''}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° aimJump=${r.combat.freshShot?.aimJump?.aimErrorDeg?.toFixed(0)}°(turn ${r.combat.freshShot?.aimJump?.jumpDeg?.toFixed(0)}°) bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''}`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° aimJump=${r.combat.freshShot?.aimJump?.aimErrorDeg?.toFixed(0)}°(turn ${r.combat.freshShot?.aimJump?.jumpDeg?.toFixed(0)}°) bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''}${programGrowthSummary(r.shaders)}${throttleSummary(r.throttled)}`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${r.id === 'time' ? '' : ` ${r.seconds.toFixed(0)}s`}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     if (r.perfGate?.knownOver && r.perfGate.over.length) console.log(`     WARN over budget (known, ${r.perfGate.knownOver}): ${r.perfGate.over.join(', ')}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)

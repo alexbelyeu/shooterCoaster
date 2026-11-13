@@ -75,8 +75,15 @@ export interface SCTestApi {
   avgFrameMs: number
   /** Longest frame in ms since a test last set this to 0 (first-shot hitch check). */
   maxFrameMs: number
+  /** Longest frame and frames over `LONG_FRAME_MS` since a test last reset it (the throttled ride, #536). */
+  longFrames: { maxMs: number; count: number }
   /** Shader programs the renderer has compiled so far (a rise mid-play is a compile hitch). */
   programs: () => number
+  /**
+   * Every frame since the level's warm-up finished that compiled programs past its count (#536): a shader
+   * the warm-up missed. Cleared when a level's warm-up starts.
+   */
+  programGrowth: ProgramGrowth[]
   /** The renderer's live GPU textures (render targets included) and geometries (`renderer.info.memory`). */
   gpuMemory: () => { textures: number; geometries: number }
   /** Active camera's world position and unit view direction (title fly-by check). */
@@ -428,6 +435,40 @@ export function recordE2ESpawns(positions: readonly { x: number; y: number; z: n
   spawnDigest = `${positions.length}:${hashString(text).toString(16)}`
 }
 
+/** A frame this long is a visible freeze, not a slow frame (`longFrames`). */
+const LONG_FRAME_MS = 100
+
+/** One frame that compiled shader programs after its level's warm-up (#536). */
+export interface ProgramGrowth {
+  /** Level timer seconds (the last playing frame's). */
+  levelTime: number
+  phase: GamePhase
+  added: number
+  total: number
+  /** Bus events since the frame before: what appeared. */
+  events: string[]
+}
+
+/** Bus events since the frame probe's last frame, for naming what a program compile came with. */
+const frameEvents = new Set<string>()
+let lastPrograms = 0
+
+function noteProgramGrowth(api: SCTestApi, programs: number) {
+  const warmup = api.shaderWarmup
+  const from = Math.max(lastPrograms, warmup?.programs ?? 0)
+  if (warmup?.done && programs > from) {
+    api.programGrowth.push({
+      levelTime: e2eLevelTime,
+      phase: useGameStore.getState().phase,
+      added: programs - from,
+      total: programs,
+      events: [...frameEvents],
+    })
+  }
+  lastPrograms = programs
+  frameEvents.clear()
+}
+
 /** The level timer's elapsed seconds, reported by GameTimer every playing frame (for `stopAtLevelTime`). */
 let e2eLevelTime = 0
 export function noteE2ELevelTime(seconds: number) {
@@ -760,10 +801,12 @@ function autoFireTick(camera: THREE.Camera) {
 
 export function installE2EApi() {
   if (!isE2E || window.__SC_TEST__) return
+  eventBus.taps.add((event) => frameEvents.add(event))
   const api: SCTestApi = {
     frames: 0,
     avgFrameMs: 0,
     maxFrameMs: 0,
+    longFrames: { maxMs: 0, count: 0 },
     programs: () => probeGl?.info.programs?.length ?? 0,
     gpuMemory: () => ({ textures: probeGl?.info.memory.textures ?? 0, geometries: probeGl?.info.memory.geometries ?? 0 }),
     cameraPose: readCameraPose,
@@ -826,6 +869,7 @@ export function installE2EApi() {
     bullets: readBullets,
     fireShot: (x: number, y: number) => (probeCamera ? fireAtNDC(x, y, probeCamera) : false),
     shaderWarmup: null,
+    programGrowth: [],
     initTimings: startupTimings,
     sceneStats: () => null,
     autoFire: (enabled: boolean) => {
@@ -1110,9 +1154,12 @@ export function E2EFrameProbe() {
     const ms = delta * 1000
     api.avgFrameMs = api.avgFrameMs === 0 ? ms : api.avgFrameMs + (ms - api.avgFrameMs) / 120
     if (ms > api.maxFrameMs) api.maxFrameMs = ms
+    if (ms > api.longFrames.maxMs) api.longFrames.maxMs = ms
+    if (ms > LONG_FRAME_MS) api.longFrames.count++
     api.drawCalls = gl.info.render.calls
     api.triangles = gl.info.render.triangles
     gl.info.reset()
+    noteProgramGrowth(api, gl.info.programs?.length ?? 0)
   })
   return null
 }
