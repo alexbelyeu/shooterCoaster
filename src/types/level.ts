@@ -3,7 +3,7 @@ import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 export type CurveType = 'curve1' | 'curve2'
 export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic'
 export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti'
-export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber'
+export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny'
 
 /** A climbable wall (#453): from `origin`, its bottom-left corner, along unit `right` and `up`; it faces `right × up`. */
 export interface WallSurface {

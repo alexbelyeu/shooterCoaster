@@ -241,6 +241,23 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
     ],
     lifetime: 2, scale: 1.4, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'chalk',
   },
+  // A toy pop (#515): a soft grey puff and a few tufts of fur, nothing graphic.
+  rat: {
+    layers: [
+      layer({ shape: 'mote', count: 24, colors: ['#e6e0d8', '#c8c0b6'], glow: 1.1, speed: [15, 55], up: 15, drag: 2.8, gravity: 4, size: 5, hold: 0.4 }),
+      layer({ shape: 'feather', count: 12, colors: ['#6b6058', '#8a7e74', '#a39589'], glow: 1, speed: [25, 70], up: 30, drag: 3, gravity: 30, size: 4, spin: 8, hold: 0.6 }),
+      layer({ shape: 'spark', count: 6, colors: ['#ffffff'], glow: 3, speed: [60, 110], drag: 4, size: 1.4 }),
+    ],
+    lifetime: 1.6, scale: 1, lift: 8, flash: 0, flashColor: '#ffffff', sound: 'squeak',
+  },
+  // The climber's chalk-puff family, greyer and fuller: dust and chalk, a few drifting fluff tufts.
+  dustBunny: {
+    layers: [
+      layer({ shape: 'mote', count: 36, colors: ['#bdb9b1', '#9a968e', '#f6f5f0'], glow: 1.1, speed: [12, 55], up: 8, drag: 2.4, gravity: 3, size: 7, hold: 0.5 }),
+      layer({ shape: 'feather', count: 8, colors: ['#76726b', '#9a968e'], glow: 1, speed: [20, 50], up: 20, drag: 3, gravity: 12, size: 4, spin: 6, hold: 0.6 }),
+    ],
+    lifetime: 2.2, scale: 1.3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'chalk',
+  },
 }
 
 /** Particles a style puts in each of the pool's two meshes. */

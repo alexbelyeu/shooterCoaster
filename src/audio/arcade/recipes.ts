@@ -105,6 +105,14 @@ const KILL_BODIES: Record<KillSound, { lengthS: number; render: (S: SynthCore, o
     noise(S, out, t + 0.012, { type: 'highpass', f: 4500, q: 0.4, a: 0.02, tau: 0.12, peak: 0.5 })
     noise(S, out, t + 0.012, { type: 'bandpass', f: 900, q: 0.5, a: 0.015, tau: 0.08, peak: 0.3 })
   } },
+  // Rat: a rubber toy's two-note squeak rising, a soft pop and a puff of fur.
+  squeak: { lengthS: 0.4, render(S, out, t) {
+    partial(S, out, t, 1900, { type: 'triangle', a: 0.002, tau: 0.035, peak: 0.45, bend: 0.6, bendTau: 0.02 })
+    partial(S, out, t + 0.06, 2500, { type: 'triangle', a: 0.002, tau: 0.045, peak: 0.4, bend: 0.65, bendTau: 0.025 })
+    noise(S, out, t, { type: 'bandpass', f: 1800, q: 0.8, a: 0.0005, tau: 0.015, peak: 0.7 })
+    partial(S, out, t, 130, { a: 0.001, tau: 0.04, peak: 0.6, bend: 2, bendTau: 0.01 })
+    noise(S, out, t + 0.01, { type: 'highpass', f: 4000, q: 0.4, a: 0.01, tau: 0.07, peak: 0.35 })
+  } },
 }
 
 function killBody(sound: KillSound): Recipe {
@@ -156,6 +164,7 @@ export const RECIPES: readonly Recipe[] = [
   killBody('splash'),
   killBody('hiss'),
   killBody('chalk'),
+  killBody('squeak'),
   // 2×: a kick under the body.
   { id: 'kill.thump', lengthS: fixed(0.4), render(S, out, t) {
     hitDrum(S, out, 'kick', t, 1)
