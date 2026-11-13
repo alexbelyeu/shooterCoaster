@@ -71,7 +71,7 @@
 
       /*
        * The poster (#376, src/app/poster.ts): the title's still (`npm run og -- --poster`) and logo before any JS, over the
-       * canvas and under the UI. Its text mirrors .title-screen in global.css, so the live logo lands exactly on it.
+       * canvas and under the UI. Its layout mirrors .title-screen in global.css, so the live logo lands exactly on it.
        */
       #poster {
         position: fixed;
@@ -98,13 +98,13 @@
       }
       #poster.has-ui .poster-title { opacity: 0; }
       .poster-title p { margin: 0; }
+      /* The title logo (src/ui/screens/TitleLogo.tsx, its still markup inline): .title-logo's size in global.css. */
       .poster-title .poster-logo {
-        font-family: 'Lobster', cursive;
-        font-weight: bold;
-        font-size: clamp(2.5rem, 8vw, 5rem);
-        text-shadow: 0 0 10px rgba(255, 200, 0, 0.9), 0 0 30px rgba(255, 200, 0, 0.6), 0 0 60px rgba(255, 200, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.5);
+        font-size: clamp(2.5rem, 13vw, 5rem);
+        line-height: 0;
         margin-bottom: 0.5rem;
       }
+      .poster-logo svg { display: block; max-width: 94vw; height: auto; overflow: visible; }
       .poster-title .poster-tag {
         font-size: clamp(0.9rem, 2.5vw, 1.1rem);
         color: rgba(255, 255, 255, 0.7);
@@ -176,7 +176,7 @@
     </main>
     <div id="poster" aria-hidden="true">
       <div class="poster-title">
-        <p class="poster-logo">ShooterCoaster</p>
+        <div class="poster-logo"><svg viewBox="-32 52 1185 202" width="7.40625em" aria-hidden="true"><text x="0" y="200" font-family="Lobster, cursive" font-size="160" font-weight="700" fill="#fff" stroke="#14213d" stroke-width="12" stroke-linejoin="round" paint-order="stroke">ShooterCoaster</text><g transform="translate(1050 140)"><g><circle r="34" fill="#ff4757"></circle><circle r="22" fill="#fff"></circle><circle r="10" fill="#ff4757"></circle></g><g><path d="M0 -80V-66M0 66V80M-80 0H-66M66 0H80" stroke="#14213d" stroke-width="13" stroke-linecap="round"></path><path d="M0 -80V-66M0 66V80M-80 0H-66M66 0H80" stroke="#fff" stroke-width="5" stroke-linecap="round"></path></g></g><path d="M-20 232C300 236 700 232 960 232C1030 232 1105 200 1105 140A55 55 0 1 0 995 140C995 200 1040 238 1120 238" fill="none" stroke-linecap="round" stroke="#14213d" stroke-width="17"></path><path d="M-20 232C300 236 700 232 960 232C1030 232 1105 200 1105 140A55 55 0 1 0 995 140C995 200 1040 238 1120 238" fill="none" stroke-linecap="round" stroke="#ffc93c" stroke-width="7"></path><g transform="translate(1120 238) rotate(0)"><g stroke="#14213d" stroke-width="5"><circle cx="4" cy="-33" r="7" fill="#fff"></circle><rect x="-25" y="-28" width="50" height="22" rx="7" fill="#ff4757"></rect><circle cx="-13" cy="-5" r="5" fill="#14213d"></circle><circle cx="13" cy="-5" r="5" fill="#14213d"></circle></g></g></svg></div>
         <p class="poster-tag"><span>Ride.</span><span>Aim.</span><span>Shoot.</span></p>
         <p class="poster-play">Play</p>
         <p class="poster-hint">Loading</p>

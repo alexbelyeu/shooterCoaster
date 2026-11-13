@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { isInternalThisLoad } from '@/app/analyticsGate'
 import { initAudio } from '@/audio/AudioEngine'
 import { prepareSfx } from '@/audio/sfx'
@@ -10,9 +10,9 @@ import { startsGame } from './titleKeys'
 import { handPosterToUi, posterShown } from '@/app/poster'
 import { ATTRACT_IDLE_MS, armClickSwallow, setTitleAttract } from '@/canvas/titleAttract'
 import { e2eAttractIdleMs } from '@/testing/e2eHook'
-import { logoFromQuery } from './logo/logoOptions'
+import TitleLogo from './TitleLogo'
+import { LOGO_TEXT } from '@/ui/logoArt'
 
-const TITLE = 'ShooterCoaster'
 const SUBTITLE_WORDS = ['Ride.', 'Aim.', 'Shoot.']
 /** The title has landed by here; PLAY and the rest follow. */
 const PLAY_IN_S = 1.3
@@ -20,10 +20,6 @@ const PLAY_IN_S = 1.3
 const PLAY_OVER_POSTER_S = 0.15
 
 let hintShownThisLoad = false
-
-/** A logo concept waiting on Alex's pick (#476) under `?logo=<name>`; its own lazy chunk, never in the startup JS. */
-const LOGO_CONCEPT = typeof location === 'undefined' ? null : logoFromQuery(location.search)
-const LogoConcept = lazy(() => import('./logo/LogoConcept'))
 
 const WAKE_EVENTS = ['pointerdown', 'pointermove', 'wheel'] as const
 
@@ -130,36 +126,16 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
 
   return (
     <div className={attract ? 'title-screen is-attract' : 'title-screen'}>
-      {LOGO_CONCEPT ? (
-        <motion.h1
-          className="title-logo-art"
-          aria-label={TITLE}
-          initial={overPoster ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3, ease: 'easeOut' }}
-        >
-          <Suspense fallback={null}>
-            <LogoConcept name={LOGO_CONCEPT} still={reduced} />
-          </Suspense>
-        </motion.h1>
-      ) : (
-        <motion.h1
-          aria-label={TITLE}
-          initial={overPoster ? false : reduced ? { opacity: 0 } : { opacity: 0, y: -120, scale: 1.25, filter: 'blur(14px)' }}
-          animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-          transition={{
-            opacity: { duration: 0.6, ease: 'easeOut' },
-            filter: { duration: 0.6, ease: 'easeOut' },
-            scale: { duration: 0.6, ease: 'easeOut' },
-            y: { type: 'spring', damping: 9, stiffness: 140, mass: 0.8 },
-          }}
-        >
-          {TITLE}
-          <span className="title-logo-sweep" aria-hidden="true">
-            {TITLE}
-          </span>
-        </motion.h1>
-      )}
+      {/* Over the poster its still logo is already drawn: this one lands on it at rest, no build-in. */}
+      <motion.h1
+        className="title-logo"
+        aria-label={LOGO_TEXT}
+        initial={overPoster ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+      >
+        <TitleLogo still={reduced || overPoster} />
+      </motion.h1>
 
       <p className="subtitle">
         {SUBTITLE_WORDS.map((word, i) => (

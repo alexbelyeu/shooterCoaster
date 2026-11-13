@@ -4,6 +4,7 @@ import type { RunMode } from '@/store/useGameStore'
 import type { BiomeType } from '@/types/level'
 import { biomeTheme, type SkyStop } from '@/ui/theme'
 import { formatAccuracy } from '@/ui/screens/resultsStats'
+import { VIEWBOX } from '@/ui/logoArt'
 
 /** The shareable score card (#272): pure layout, drawn on a 2D canvas by `scoreCardImage.tsx`. */
 
@@ -86,7 +87,7 @@ export interface Rect {
 
 export interface CardText {
   kind: 'text'
-  role: 'wordmark' | 'badge' | 'name' | 'score' | 'statLabel' | 'statValue' | 'cta' | 'url'
+  role: 'badge' | 'name' | 'score' | 'statLabel' | 'statValue' | 'cta' | 'url'
   text: string
   font: string
   size: number
@@ -112,7 +113,12 @@ export interface CardStars {
   earned: number
 }
 
-export type CardItem = CardText | CardPill | CardStars
+export interface CardLogo {
+  kind: 'logo'
+  rect: Rect
+}
+
+export type CardItem = CardText | CardPill | CardStars | CardLogo
 
 export interface ScoreCardLayout {
   size: CardSize
@@ -186,7 +192,7 @@ interface SizeSpec {
   column: (safe: Rect) => Rect
   art: Rect
   fade: ScoreCardLayout['fade']
-  wordmark: number
+  logo: number
   badge: number
   name: number
   star: number
@@ -203,7 +209,7 @@ const SPECS: Record<CardSize, SizeSpec> = {
     column: (safe) => ({ x: safe.x, y: safe.y, width: 560, height: safe.height }),
     art: { x: 400, y: 0, width: 800, height: 630 },
     fade: { from: [700, 0], to: [440, 0] },
-    wordmark: 30,
+    logo: 44,
     badge: 18,
     name: 68,
     star: 30,
@@ -218,7 +224,7 @@ const SPECS: Record<CardSize, SizeSpec> = {
     column: (safe) => ({ x: safe.x, y: 640, width: safe.width, height: safe.y + safe.height - 640 }),
     art: { x: 0, y: 0, width: 1080, height: 900 },
     fade: { from: [0, 520], to: [0, 880] },
-    wordmark: 64,
+    logo: 110,
     badge: 30,
     name: 120,
     star: 60,
@@ -246,7 +252,16 @@ export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Meas
   const textRow = (t: TextSpec, gap = spec.gap): Row => ({ h: t.size * LINE, gap, place: (top, s) => [text(t, s, top)] })
 
   const rows: Row[] = []
-  rows.push(textRow({ role: 'wordmark', text: 'ShooterCoaster', family: 'display', weight: 400, size: spec.wordmark, color: WHITE, glow: 'rgba(0, 0, 0, 0.6)' }, spec.gap * 1.5))
+  const logoHeight = Math.min(spec.logo, (col.width * VIEWBOX.height) / VIEWBOX.width)
+  rows.push({
+    h: logoHeight,
+    gap: spec.gap * 1.5,
+    place: (top, s) => {
+      const height = logoHeight * s
+      const width = (height * VIEWBOX.width) / VIEWBOX.height
+      return [{ kind: 'logo', rect: { x: cx - width / 2, y: top, width, height } }]
+    },
+  })
 
   if (run.daily) {
     const badge: TextSpec = { role: 'badge', text: `DAILY RUN · ${run.daily.toUpperCase()}`, family: 'body', weight: 800, size: spec.badge, color: '#1a1206' }
@@ -321,6 +336,7 @@ export function itemBounds(item: CardItem): Rect {
     case 'text':
       return { x: item.x - item.width / 2, y: item.y - (item.size * LINE) / 2, width: item.width, height: item.size * LINE }
     case 'pill':
+    case 'logo':
       return item.rect
     case 'stars': {
       const xs = item.centres.map((c) => c.x)

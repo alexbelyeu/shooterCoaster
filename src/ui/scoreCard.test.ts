@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
+import { VIEWBOX } from '@/ui/logoArt'
 import {
   CARD_DIMENSIONS,
   dailyDateLabel,
@@ -85,9 +86,12 @@ describe('score card layout', () => {
     }
   })
 
-  it.each(SIZES)('has the run, the call to action and the address (%s)', (size) => {
+  it.each(SIZES)('has the logo, the run, the call to action and the address (%s)', (size) => {
+    const logo = layoutScoreCard(RUN, size, measure).items[0]
+    expect(logo.kind).toBe('logo')
+    if (logo.kind === 'logo') expect(logo.rect.width / logo.rect.height).toBeCloseTo(VIEWBOX.width / VIEWBOX.height)
     const t = texts(RUN, size).map((i) => i.text)
-    expect(t).toEqual(expect.arrayContaining(['ShooterCoaster', 'Theme Park', '12,345', 'BEST COMBO', '×14', 'ACCURACY', '87%', 'Can you beat it?', 'scoaster.com']))
+    expect(t).toEqual(expect.arrayContaining(['Theme Park', '12,345', 'BEST COMBO', '×14', 'ACCURACY', '87%', 'Can you beat it?', 'scoaster.com']))
     expect(t.some((s) => s.startsWith('DAILY RUN'))).toBe(false)
     expect(layoutScoreCard(RUN, size, measure).items.some((i) => i.kind === 'pill')).toBe(false)
   })

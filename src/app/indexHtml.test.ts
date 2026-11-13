@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import TitleLogo from '../ui/screens/TitleLogo'
 import { getAllLevels } from '../levels/LevelRegistry'
 import html from '../../index.html?raw'
 
@@ -66,5 +69,12 @@ describe('index.html about text', () => {
     const words = text.split(' ').length
     expect(words).toBeGreaterThanOrEqual(150)
     expect(words).toBeLessThanOrEqual(250)
+  })
+})
+
+describe('index.html poster', () => {
+  it('paints the title logo before any JS: the same SVG the title draws at rest, so the hand-off has no jump', () => {
+    const poster = html.match(/<div class="poster-logo">([\s\S]*?)<\/div>/)?.[1].trim()
+    expect(poster).toBe(renderToStaticMarkup(createElement(TitleLogo, { still: true })))
   })
 })
