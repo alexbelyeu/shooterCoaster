@@ -36,7 +36,9 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   links for X, Reddit, Bluesky, Threads, WhatsApp, Facebook, LinkedIn and Email. It shares "I scored 1,240 ★★☆ on Theme Park in
   ShooterCoaster 🎢 — beat me:" with `https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=share_<method>`
   (`share_native`, `share_copy`, `share_x`, `share_image_native` …; `results` before 2026-11-02), so its visits show
-  as `requestPath` `/go/share`. Pausing and resuming send nothing; closing
+  as `requestPath` `/go/share`. Once a campaign run's online submission comes back placed on the World top 10, the line reads
+  "I'm #3 in the world on Theme Park — 1,240 ★★☆ in ShooterCoaster 🎢 — beat me:" and the card carries a `WORLD #3` ribbon (#445;
+  shared before that answer, off the World board, or a Daily Run: the plain line). Pausing and resuming send nothing; closing
   the tab mid-run sends no `level_quit` (starts minus completes minus quits ≈ abandons).
 - **Internal traffic (Alex's devices).** Open **https://scoaster.com/?internal=1** once in
   each browser and on each device you play on. The browser remembers it (localStorage), the

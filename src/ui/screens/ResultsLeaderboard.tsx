@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { LeaderboardEntry } from '@/types/game'
 import { LEADERBOARD_SIZE } from '@/store/leaderboard'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
+import { rankLabel } from '@/ui/share'
 import type { InitialsState } from './initialsEntry'
 
 const fmt = new Intl.NumberFormat('en-US')
@@ -43,7 +44,7 @@ export default function ResultsLeaderboard({ board, rank, source, editing, onKey
       data-editing={isEditing || undefined}
     >
       <h3>
-        {rank !== null ? `New high score · #${rank + 1}` : 'Top 10'}
+        {rank !== null ? `New high score · ${rankLabel(rank)}` : 'Top 10'}
         <span className="results-board-source">{source === 'world' ? 'World' : 'This device'}</span>
       </h3>
       {board.length === 0 ? (

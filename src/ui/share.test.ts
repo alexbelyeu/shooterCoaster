@@ -10,6 +10,7 @@ import {
   copyImage,
   copyShare,
   nativeShare,
+  rankLabel,
   SHARE_TARGETS,
   shareCampaign,
   shareMode,
@@ -40,6 +41,15 @@ describe('buildShareText', () => {
     expect(clipboardText(p)).toBe(`${p.text} ${URL_NATIVE}`)
   })
 
+  it("leads with the World place when the run is on the online top 10 (#445), and is today's line without one", () => {
+    const run = { levelName: 'Theme Park', score: 1239.6, stars: 2, url: URL_NATIVE }
+    expect(buildShareText({ ...run, worldRank: 2 }).text).toBe("I'm #3 in the world on Theme Park — 1,240 ★★☆ in ShooterCoaster 🎢 — beat me:")
+    expect(buildShareText({ ...run, worldRank: 0 }).text).toMatch(/^I'm #1 in the world on /)
+    expect(buildShareText({ ...run, worldRank: 9 }).text).toMatch(/^I'm #10 in the world on /)
+    expect(buildShareText({ ...run, worldRank: null })).toEqual(buildShareText(run))
+    expect(rankLabel(0)).toBe('#1')
+  })
+
   it('renders 0 to 3 stars as ★ / ☆', () => {
     expect([0, 1, 2, 3].map(starString)).toEqual(['☆☆☆', '★☆☆', '★★☆', '★★★'])
     expect(starString(7)).toBe('★★★')
@@ -56,6 +66,8 @@ describe('sharePayloadForRun', () => {
     expect(sharePayloadForRun('level1', 0, 'x')!.text).toContain('I scored 0 ☆☆☆')
     expect(sharePayloadForRun('level1', 0, 'x')!.url).toBe(buildShareUrl('share_x'))
     expect(sharePayloadForRun('nope', 10, 'copy')).toBeNull()
+    expect(sharePayloadForRun('level1', 0, 'x', 4)!.text).toBe(`I'm #5 in the world on ${level1.name} — 0 ☆☆☆ in ShooterCoaster 🎢 — beat me:`)
+    expect(sharePayloadForRun('level1', 0, 'x', null)).toEqual(sharePayloadForRun('level1', 0, 'x'))
   })
 })
 
@@ -86,6 +98,14 @@ describe('share targets', () => {
     }
   })
 
+  it('carries the World rank line in the X, Reddit and Bluesky links of a run that placed', () => {
+    const line = "I'm #3 in the world on Theme Park — 1,240 ★★☆ in ShooterCoaster 🎢 — beat me"
+    const ranked = (id: string) => buildShareText({ levelName: 'Theme Park', score: 1240, stars: 2, url: buildShareUrl(`share_${id}`), worldRank: 2 })
+    expect(params(shareTargetHref('x', ranked('x'))).text).toBe(`${line}:`)
+    expect(params(shareTargetHref('reddit', ranked('reddit'))).title).toBe(line)
+    expect(params(shareTargetHref('bluesky', ranked('bluesky'))).text).toBe(`${line}: ${buildShareUrl('share_bluesky')}`)
+  })
+
   it('adapts the line to what each network takes', () => {
     const x = tricky('x')
     expect(params(shareTargetHref('x', x))).toEqual({ text: x.text, url: x.url })
@@ -106,10 +126,12 @@ describe('share targets', () => {
     expect(xPostLength('a')).toBe(1 + 1 + 23)
     expect(xPostLength('★🎢—')).toBe(2 + 2 + 1 + 1 + 23)
     for (const level of getAllLevels()) {
-      const x = sharePayloadForRun(level.id, 9_999_999, 'x')!
-      expect(xPostLength(x.text), level.id).toBeLessThanOrEqual(X_MAX_LENGTH)
-      const bluesky = sharePayloadForRun(level.id, 9_999_999, 'bluesky')!
-      expect([...clipboardText(bluesky)].length, level.id).toBeLessThanOrEqual(300)
+      for (const rank of [null, 9]) {
+        const x = sharePayloadForRun(level.id, 9_999_999, 'x', rank)!
+        expect(xPostLength(x.text), level.id).toBeLessThanOrEqual(X_MAX_LENGTH)
+        const bluesky = sharePayloadForRun(level.id, 9_999_999, 'bluesky', rank)!
+        expect([...clipboardText(bluesky)].length, level.id).toBeLessThanOrEqual(300)
+      }
     }
   })
 })

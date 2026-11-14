@@ -5,6 +5,7 @@ import type { BiomeType } from '@/types/level'
 import { biomeTheme, type SkyStop } from '@/ui/theme'
 import { formatAccuracy } from '@/ui/screens/resultsStats'
 import { VIEWBOX } from '@/ui/logoArt'
+import { rankLabel } from '@/ui/share'
 
 /** The shareable score card (#272): pure layout, drawn on a 2D canvas by `scoreCardImage.tsx`. */
 
@@ -38,6 +39,8 @@ export interface ScoreCardRun {
   accuracy: string
   /** The Daily Run's date (`Nov 4, 2026`), or null for a campaign run. */
   daily: string | null
+  /** 0-based World top 10 place (#445); null draws no ribbon. */
+  worldRank: number | null
 }
 
 export interface RunForCard {
@@ -47,9 +50,10 @@ export interface RunForCard {
   hits: number
   shotsFired: number
   mode: RunMode
+  worldRank?: number | null
 }
 
-export function scoreCardRun({ levelId, score, bestCombo, hits, shotsFired, mode }: RunForCard): ScoreCardRun | null {
+export function scoreCardRun({ levelId, score, bestCombo, hits, shotsFired, mode, worldRank = null }: RunForCard): ScoreCardRun | null {
   const config = getLevelConfig(levelId)
   if (!config) return null
   const rounded = Math.max(0, Math.round(score))
@@ -62,6 +66,7 @@ export function scoreCardRun({ levelId, score, bestCombo, hits, shotsFired, mode
     bestCombo,
     accuracy: formatAccuracy(hits, shotsFired),
     daily: mode.mode === 'daily' ? dailyDateLabel(mode.dateKey) : null,
+    worldRank: mode.mode === 'daily' ? null : worldRank,
   }
 }
 
@@ -87,7 +92,7 @@ export interface Rect {
 
 export interface CardText {
   kind: 'text'
-  role: 'badge' | 'name' | 'score' | 'statLabel' | 'statValue' | 'cta' | 'url'
+  role: 'badge' | 'rank' | 'name' | 'score' | 'statLabel' | 'statValue' | 'cta' | 'url'
   text: string
   font: string
   size: number
@@ -263,20 +268,22 @@ export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Meas
     },
   })
 
-  if (run.daily) {
-    const badge: TextSpec = { role: 'badge', text: `DAILY RUN · ${run.daily.toUpperCase()}`, family: 'body', weight: 800, size: spec.badge, color: '#1a1206' }
+  const pillRow = (role: CardText['role'], label: string, gap: number): Row => {
+    const t: TextSpec = { role, text: label, family: 'body', weight: 800, size: spec.badge, color: '#1a1206' }
     const padY = spec.badge * 0.45
-    rows.push({
+    return {
       h: spec.badge * LINE + 2 * padY,
-      gap: spec.gap,
+      gap,
       place: (top, s) => {
-        const label = text(badge, s, top + padY * s, cx, col.width - 3 * spec.badge * s)
-        const padX = label.size * 1.1
-        const h = label.size * LINE + 2 * padY * s
-        return [{ kind: 'pill', rect: { x: cx - label.width / 2 - padX, y: top, width: label.width + 2 * padX, height: h }, color: GOLD }, label]
+        const fitted = text(t, s, top + padY * s, cx, col.width - 3 * spec.badge * s)
+        const padX = fitted.size * 1.1
+        const h = fitted.size * LINE + 2 * padY * s
+        return [{ kind: 'pill', rect: { x: cx - fitted.width / 2 - padX, y: top, width: fitted.width + 2 * padX, height: h }, color: GOLD }, fitted]
       },
-    })
+    }
   }
+
+  if (run.daily) rows.push(pillRow('badge', `DAILY RUN · ${run.daily.toUpperCase()}`, spec.gap))
   rows.push(textRow({ role: 'name', text: run.levelName, family: 'display', weight: 400, size: spec.name, color: WHITE, glow: theme.glow }, spec.gap * 0.5))
   rows.push({
     h: spec.star * 2,
@@ -287,6 +294,7 @@ export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Meas
       return [{ kind: 'stars', centres: [-1, 0, 1].map((i) => ({ x: cx + i * step, y: top + radius })), radius, earned: Math.max(0, Math.min(3, Math.round(run.stars))) }]
     },
   })
+  if (run.worldRank !== null) rows.push(pillRow('rank', `WORLD ${rankLabel(run.worldRank)}`, spec.gap * 0.75))
   rows.push(textRow({ role: 'score', text: fmt.format(run.score), family: 'display', weight: 400, size: spec.score, color: WHITE, glow: theme.glow }, spec.gap * 0.75))
   const stats: [string, string][] = [
     ['BEST COMBO', run.bestCombo > 0 ? `×${run.bestCombo}` : '—'],
