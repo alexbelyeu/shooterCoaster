@@ -943,7 +943,7 @@ async function frenzyEndProblems(page, id, online) {
   })
   await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
   const after = await page.evaluate(() => ({ timeScale: window.__SC_TEST__.stats().timeScale, ducked: window.__SC_TEST__.audio().musicDucked }))
-  // The results fade in behind AnimatePresence and reveal on timers: on a slow runner that can pass 30 s.
+  // The results fade in behind AnimatePresence and reveal on timers (~3.5 s): 90 s only fails a stalled screen (#367).
   const revealed = await page
     .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 90000, polling: 100 })
     .then(() => true, () => false)
