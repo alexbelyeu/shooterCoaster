@@ -1,16 +1,11 @@
-/**
- * `npm run new-world` (#460), pure: from the repo's current file texts and the biome templates, the files a new
- * world creates, the edits that register it, and the checklist left by hand (docs/LEVEL-KIT.md). `new-world.mjs`
- * reads and writes the files. Also the placeholder budgets the scaffold writes, which the smoke fills on a level's
- * first local run (`e2e/smoke.mjs`).
- */
+/** `npm run new-world` (#460), pure: from the repo's file texts, the files a new world creates and the edits that register it; `new-world.mjs` does the I/O. */
 
 export const USAGE =
   'npm run new-world -- <levelId> --name "<Name>" --biome <biome> [--interior] [--score-from <levelId>] [--dry-run]'
 
 export const TEMPLATE_FILES = ['config.ts', 'Decorations.tsx', 'Features.tsx', 'index.ts']
 
-/** Every file the scaffold edits, read by the CLI and handed to `planNewWorld` as `files`. */
+/** Every file the scaffold edits (`scoring.ts` is only read). */
 export const EDITED_FILES = {
   registry: 'src/levels/LevelRegistry.ts',
   registryTest: 'src/levels/LevelRegistry.test.ts',
@@ -63,19 +58,17 @@ export function parseNewWorldArgs(argv) {
   return opts
 }
 
-/** The template folder a world's biome files come from. */
 export function templateDir(kind) {
   return `scripts/new-world/${kind}`
 }
 
-export function biomeDir(biome) {
+function biomeDir(biome) {
   return `src/levels/environments/biomes/${biome}`
 }
 
-/** `skyHarbour` → `SkyHarbour` (component names). */
 const pascal = (s) => s[0].toUpperCase() + s.slice(1)
 
-/** A small stable hash (FNV-1a) for the seeds and accent hue a scaffold picks. */
+/** FNV-1a: the scaffold's seed and accent hue. */
 function hash(s) {
   let h = 0x811c9dc5
   for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0
@@ -95,7 +88,7 @@ function hslRgba(h, s, l, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
-/** The roster every scaffolded level starts on: air enemies any world can host, paced by the template, ending on a finale wave. */
+/** Air enemies any world can host, ending on a finale wave (no boss fits every world). */
 export const STARTER_ROSTER = {
   waves: [
     { type: 'balloon', count: 30, waveLabel: 'Here They Come!', weight: 2 },
@@ -106,10 +99,7 @@ export const STARTER_ROSTER = {
   finale: { type: 'crow', count: 16, waveLabel: 'Final Wave!' },
 }
 
-const PLURAL = { balloon: 'balloons', crow: 'crows' }
-
-/** `SCORE_VALUES` from `scoring.ts`'s text. */
-export function parseScoreValues(scoringText) {
+function parseScoreValues(scoringText) {
   const block = scoringText.match(/export const SCORE_VALUES[^{]*\{([^}]*)\}/)
   if (!block) throw new NewWorldError('SCORE_VALUES not found in src/levels/scoring.ts')
   return Object.fromEntries([...block[1].matchAll(/(\w+):\s*(\d+)/g)].map(([, k, v]) => [k, Number(v)]))
@@ -118,7 +108,6 @@ export function parseScoreValues(scoringText) {
 function rosterMaxScore(roster, values) {
   const waves = [...roster.waves, roster.finale]
   for (const w of waves) if (!(w.type in values)) throw new NewWorldError(`no SCORE_VALUES entry for ${w.type}`)
-  // Same waves merged by type, in roster order: `30 * 13 * 2` reads worse than `60 * 13`.
   const counts = new Map()
   for (const w of waves) counts.set(w.type, (counts.get(w.type) ?? 0) + w.count)
   const terms = [...counts].map(([type, n]) => ({ text: `${n} * ${values[type]}`, total: n * values[type] }))
@@ -149,7 +138,7 @@ function replaceOnce(text, pattern, replacement, file) {
 
 const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen']
 
-/** "six worlds" → "seven worlds" (and "Six worlds", "six themed worlds") in the page copy. */
+/** "Six worlds" / "six themed worlds" → "Seven …" in the page copy. */
 function bumpWorldCount(html, from) {
   const [a, b] = [NUMBER_WORDS[from], NUMBER_WORDS[from + 1]]
   if (!b) throw new NewWorldError(`index.html: no number word for ${from + 1} worlds`)
@@ -249,7 +238,6 @@ const TERRAIN = {
     transitionWidth: 800,
   },
 `,
-  // Drawn only where the biome has no \`floor\`; an interior always has one.
   interior: `  // __NAME__ draws its biome's \`floor\`, never this: flat for 100 km.
   __BIOME__: {
     frequency: 0.001,
@@ -424,7 +412,7 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
   const ci = replaceOnce(text(F.ci), new RegExp(`(shard: \\[[^\\]]*\\b${previous}), `), `$1, ${id}, `, F.ci)
 
   const worlds = orders.length
-  const enemies = [...new Set([...roster.waves, roster.finale].map((w) => PLURAL[w.type] ?? w.type))]
+  const enemies = [...new Set([...roster.waves, roster.finale].map((w) => `${w.type}s`))]
   let html = text(F.indexHtml)
   const listEnd = html.indexOf('</ul>', html.search(/<h2>\w+ worlds<\/h2>/))
   if (listEnd < 0 || html.search(/<h2>\w+ worlds<\/h2>/) < 0) throw new NewWorldError(`${F.indexHtml}: the #about worlds list not found`)
@@ -464,7 +452,7 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
   }
 }
 
-/** A copy of `obj` with `key: value` right after `after` (budgets.json keeps a level's shard next to its neighbours'). */
+/** A copy of `obj` with `key: value` right after `after`. */
 function insertKeyAfter(obj, after, key, value) {
   const out = {}
   for (const [k, val] of Object.entries(obj)) {
@@ -528,7 +516,6 @@ export function pacingCeilings(m) {
   }
 }
 
-/** `budgets.json` text with `section.id` set to `values`. */
 export function setBudget(budgetsText, section, id, values) {
   const budgets = JSON.parse(budgetsText)
   budgets[section][id] = values

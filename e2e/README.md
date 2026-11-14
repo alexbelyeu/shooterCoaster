@@ -156,6 +156,9 @@ so a later moment has more waves on screen). `budgets.json` `scene` holds per-le
 vary) and on the scene / track objects and triangles (+15%); a level past one fails with `over budget: scene objs=560 (budget 551)`
 (`perfGate` in `results.json`). A level whose entry has `knownOver: "#<open issue>"` only prints a WARN line until that issue lands
 (then drop the key). `--no-perf-gate` skips the gate for local experiments. Ceilings are budgets: only the Director raises them.
+A level scaffolded by `npm run new-world` (#460) starts with a `placeholder` entry in `scene` and `pacing`: a local run of its ride
+(or `pacing` step) writes the first ceilings from what it measured, by the same headroom rules, into `budgets.json`; on CI a placeholder
+fails with the numbers to paste.
 **Programs after the warm-up (#536):** every level's ride (and every `pacing` run, the whole level) ends its summary line with
 `programs after warm-up: +N [+2 at 12.3 s playing (wave:incoming, enemy:killed); …]`: shader programs compiled past the level's
 warm-up count, each with the level time, phase and the bus events since the frame before (`programGrowth` on the hook, `shaders`
