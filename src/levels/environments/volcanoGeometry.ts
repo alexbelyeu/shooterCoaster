@@ -10,6 +10,9 @@ export const VOLCANO = {
   rimTube: 60,
 } as const
 
+/** Where the volcanic biome stands it (ground x, z). */
+export const VOLCANO_SITE = { x: 2400, z: -1500 } as const
+
 /** Cone radius at height y (0 = base, VOLCANO.height = crater). */
 export function coneRadius(y: number): number {
   const t = Math.min(1, Math.max(0, y / VOLCANO.height))

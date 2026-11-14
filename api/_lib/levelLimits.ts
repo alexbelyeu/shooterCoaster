@@ -29,9 +29,9 @@ export const LEVEL_LIMITS: Readonly<Record<string, ScoreLimits>> = {
     "maxKillPoints": 2300
   },
   "level5": {
-    "maxScore": 11170,
-    "maxKills": 102,
-    "maxKillPoints": 300
+    "maxScore": 14570,
+    "maxKills": 106,
+    "maxKillPoints": 2800
   },
   "level6": {
     "maxScore": 8040,
