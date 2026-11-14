@@ -561,8 +561,8 @@ function dryTracksidePoint(
   const { sideMin } = TRACKSIDE.ground
   let fallback: Vec3 | null = null
   for (const scale of bounds ? BOUNDED_SIDE_SCALES : [1]) {
-    const reach = Math.max(sideMin, Math.abs(slot.side) * scale) * Math.sign(slot.side)
-    for (const side of [reach, -reach]) {
+    const offset = Math.max(sideMin, Math.abs(slot.side) * scale) * Math.sign(slot.side)
+    for (const side of [offset, -offset]) {
       const p = tracksidePoint(table, riderIndex, { ahead: slot.ahead, side })
       if (bounds && !insideBounds(p, bounds)) continue
       if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)) return p

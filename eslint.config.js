@@ -37,6 +37,12 @@ export default tseslint.config(
     rules: { 'sc/no-math-random': 'error' },
   },
   {
+    // Placement maths (#546: a loop `const reach` hid the readable-range parameter of the same name and silently
+    // switched off the trackside in-view flip). Clean here; the rest of src has older shadows to work through first.
+    files: ['src/entities/spawning/**/*.ts', 'src/levels/**/*.ts'],
+    rules: { '@typescript-eslint/no-shadow': 'error' },
+  },
+  {
     files: ['api/**/*.ts'],
     ignores: ['api/**/*.test.ts'],
     rules: { 'sc/no-src-in-api': 'error' },
