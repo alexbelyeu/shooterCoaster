@@ -31,7 +31,8 @@ function repo(kind: 'outdoor' | 'interior', scoreFrom = 'level1') {
 const levels = getAllLevels()
 const last = levels[levels.length - 1]
 const id = `level${levels.length + 1}`
-const args = [id, '--name', 'Test World', '--biome', 'testWorld']
+// Not the scratch world's `probeWorld`, so this passes with one scaffolded (the #460 acceptance run).
+const args = [id, '--name', 'Probe World', '--biome', 'probeWorld']
 
 describe('npm run new-world (#460)', () => {
   const plan = planNewWorld(parseNewWorldArgs(args), repo('outdoor'))
@@ -39,15 +40,15 @@ describe('npm run new-world (#460)', () => {
 
   it('creates the biome folder from the template and a score slot', () => {
     expect(plan.creates.map((c: { path: string }) => c.path)).toEqual([
-      'src/levels/environments/biomes/testWorld/config.ts',
-      'src/levels/environments/biomes/testWorld/Decorations.tsx',
-      'src/levels/environments/biomes/testWorld/Features.tsx',
-      'src/levels/environments/biomes/testWorld/index.ts',
+      'src/levels/environments/biomes/probeWorld/config.ts',
+      'src/levels/environments/biomes/probeWorld/Decorations.tsx',
+      'src/levels/environments/biomes/probeWorld/Features.tsx',
+      'src/levels/environments/biomes/probeWorld/index.ts',
       `src/audio/scores/${id}.scrim`,
     ])
     for (const c of plan.creates) expect(c.content).not.toMatch(/__[A-Za-z]+__/)
-    expect(plan.creates[3].content).toContain('export const testWorld: BiomeDefinition')
-    expect(plan.creates[1].content).toContain('export default function TestWorldDecorations')
+    expect(plan.creates[3].content).toContain('export const probeWorld: BiomeDefinition')
+    expect(plan.creates[1].content).toContain('export default function ProbeWorldDecorations')
   })
 
   it('edits every registration, and only those', () => {
@@ -66,14 +67,15 @@ describe('npm run new-world (#460)', () => {
     )
     expect(registry).toContain(`// ${total}:`)
     expect(edit(EDITED_FILES.registryTest)).toContain(`['${id}', '${STARTER_ROSTER.finale.type}', ${total}],`)
+    expect(edit(EDITED_FILES.lapsTest)).toMatch(new RegExp(`const LAPS[^\\n]*\\blevel1: 147\\b.*, ${id}: 147 \\}\\n`))
   })
 
   it('keys the biome in every biome table', () => {
-    expect(edit(EDITED_FILES.biomeType)).toMatch(/export type BiomeType = .*\| 'testWorld'\n/)
-    expect(edit(EDITED_FILES.biomeRegistry)).toContain("import { testWorld } from './biomes/testWorld'")
-    expect(edit(EDITED_FILES.biomeRegistry)).toMatch(/\n {2}testWorld,\n\}/)
+    expect(edit(EDITED_FILES.biomeType)).toMatch(/export type BiomeType = .*\| 'probeWorld'\n/)
+    expect(edit(EDITED_FILES.biomeRegistry)).toContain("import { probeWorld } from './biomes/probeWorld'")
+    expect(edit(EDITED_FILES.biomeRegistry)).toMatch(/\n {2}probeWorld,\n\}/)
     for (const f of [EDITED_FILES.atmosphere, EDITED_FILES.terrain, EDITED_FILES.theme, EDITED_FILES.postcard, EDITED_FILES.sfx]) {
-      expect(edit(f)).toMatch(/\n {2}testWorld: /)
+      expect(edit(f)).toMatch(/\n {2}probeWorld: /)
     }
   })
 
@@ -96,7 +98,7 @@ describe('npm run new-world (#460)', () => {
   it('names the world in #about and counts it', () => {
     const html = edit(EDITED_FILES.indexHtml)
     const count = (h: string) => h.match(/<h2>(\w+) worlds<\/h2>/)![1]
-    expect(html).toContain('<li>Test World: balloons and crows.</li>\n      </ul>')
+    expect(html).toContain('<li>Probe World: balloons and crows.</li>\n      </ul>')
     expect(count(read(EDITED_FILES.indexHtml))).toBe(['Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'][levels.length - 5])
     expect(count(html)).toBe(['Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven'][levels.length - 5])
     expect(html).not.toMatch(new RegExp(`\\b${count(read(EDITED_FILES.indexHtml))} (themed\\s+)?worlds`, 'i'))
@@ -112,7 +114,7 @@ describe('npm run new-world (#460)', () => {
 
   it('refuses an existing level, biome or score, so a second run changes nothing', () => {
     const r = repo('outdoor')
-    expect(() => planNewWorld(parseNewWorldArgs([last.id, '--name', 'X', '--biome', 'testWorld']), r)).toThrow(/already exists/)
+    expect(() => planNewWorld(parseNewWorldArgs([last.id, '--name', 'X', '--biome', 'probeWorld']), r)).toThrow(/already exists/)
     expect(() => planNewWorld(parseNewWorldArgs([id, '--name', 'X', '--biome', 'gym']), r)).toThrow(/already exists/)
     const scored = { ...r, files: { ...r.files, [`src/audio/scores/${id}.scrim`]: '' } }
     expect(() => planNewWorld(parseNewWorldArgs(args), scored)).toThrow(/already exists/)
@@ -121,8 +123,8 @@ describe('npm run new-world (#460)', () => {
   it('parses its flags and rejects bad ones', () => {
     expect(parseNewWorldArgs([...args, '--dry-run', '--score-from', 'level3'])).toMatchObject({
       id,
-      name: 'Test World',
-      biome: 'testWorld',
+      name: 'Probe World',
+      biome: 'probeWorld',
       kind: 'outdoor',
       scoreFrom: 'level3',
       dryRun: true,

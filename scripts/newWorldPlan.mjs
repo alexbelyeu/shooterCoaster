@@ -14,6 +14,7 @@ export const TEMPLATE_FILES = ['config.ts', 'Decorations.tsx', 'Features.tsx', '
 export const EDITED_FILES = {
   registry: 'src/levels/LevelRegistry.ts',
   registryTest: 'src/levels/LevelRegistry.test.ts',
+  lapsTest: 'src/track/ridePhysics.test.ts',
   scoring: 'src/levels/scoring.ts',
   biomeType: 'src/types/level.ts',
   biomeRegistry: 'src/levels/environments/biomeRegistry.ts',
@@ -361,6 +362,12 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
   const registryTestOut =
     registryTest.slice(0, finalesEnd) + `\n      ['${id}', '${roster.finale.type}', ${score.total}],` + registryTest.slice(finalesEnd)
 
+  // The track is level1's, so its pinned lap is too.
+  const laps = text(F.lapsTest)
+  const lap = laps.match(/const LAPS[^\n]*\blevel1: ([\d.]+)/)
+  if (!lap) throw new NewWorldError(`${F.lapsTest}: no LAPS.level1`)
+  const lapsOut = replaceOnce(laps, /(const LAPS[^\n]*?) \}\n/, `$1, ${id}: ${lap[1]} }\n`, F.lapsTest)
+
   const biomeType = replaceOnce(text(F.biomeType), /(export type BiomeType = [^\n]*)/, `$1 | '${biome}'`, F.biomeType)
 
   let biomeRegistry = text(F.biomeRegistry)
@@ -435,6 +442,7 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
   const edits = [
     { path: F.registry, content: registryOut, what: `${id} (order ${order}, after ${previous}): the starter roster, maxScore ${score.total}` },
     { path: F.registryTest, content: registryTestOut, what: `the finales table: ${id} ends on ${roster.finale.type}, ${score.total}` },
+    { path: F.lapsTest, content: lapsOut, what: `LAPS.${id} = ${lap[1]} s (level1's track)` },
     { path: F.biomeType, content: biomeType, what: `BiomeType + '${biome}'` },
     { path: F.biomeRegistry, content: biomeRegistry, what: `BIOMES.${biome}` },
     { path: F.atmosphere, content: insertInObject(text(F.atmosphere), /export const ATMOSPHERES\b/, fill(ATMOSPHERE[kind], v), F.atmosphere), what: `ATMOSPHERES.${biome} (${kind} preset)` },
