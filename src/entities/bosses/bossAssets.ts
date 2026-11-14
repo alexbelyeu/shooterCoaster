@@ -2,8 +2,10 @@ import * as THREE from 'three'
 import { mergePainted, painted, paintedAt, pose } from '@/levels/environments/shared/paintedParts'
 import { withRim } from '@/entities/enemies/enemyRim'
 import { gradientNoiseGlsl } from '@/levels/environments/shared/noiseGlsl'
+import { createRng } from '@/utils/rng'
 import { BLIMP_LAYOUT } from './bossSpecs'
 import { KRAKEN_HEAD } from './krakenMotion'
+import { MEDUSA_BUST } from './medusaMotion'
 
 // Module-level singletons like SharedEnemyAssets; ShaderWarmup walks these exports too.
 
@@ -610,3 +612,207 @@ export const TITAN_CROWN_GEO = mergePainted([
     )
   }),
 ])
+
+// ── The Medusa of the Starr (Climbing Gym) ──
+// Modelled, with her blessing, on a real person: warm brown skin (darker underneath, lighter where the hall's light
+// falls), a big nose with a jewel on its bridge, kind eyes with a sideways, mischievous glance, curly dark hair.
+// Toy-like and flattering: smooth skin, faceted curls, beaded toy snakes with big round eyes.
+
+const SKIN_LOW = new THREE.Color('#4f2b19')
+const SKIN_HIGH = new THREE.Color('#9b5f3c')
+const LIP = '#8a3445'
+const BLUSH = '#9c4f3d'
+const BROW = '#1c120e'
+const IRIS = '#3d2414'
+const GOLD_TRIM = '#ffc845'
+const GOWN = '#6a2c91'
+const CURLS = ['#140e0b', '#1f1511', '#2b1d16', '#3a281d']
+
+/** `geo` placed by `matrix`, then painted per vertex from deep brown below to a warm highlight on top and on the light side. */
+function skin(geo: THREE.BufferGeometry, matrix: THREE.Matrix4): THREE.BufferGeometry {
+  const g = geo.index ? geo.toNonIndexed() : geo
+  if (g !== geo) geo.dispose()
+  g.deleteAttribute('uv')
+  g.applyMatrix4(matrix)
+  const pos = g.attributes.position
+  const nor = g.attributes.normal
+  const colors = new Float32Array(pos.count * 3)
+  const c = new THREE.Color()
+  for (let i = 0; i < pos.count; i++) {
+    const height = Math.min(1, Math.max(0, (pos.getY(i) + 220) / 330))
+    const lit = Math.max(0, nor.getY(i)) * 0.25 + Math.max(0, nor.getZ(i)) * 0.15
+    c.copy(SKIN_LOW).lerp(SKIN_HIGH, Math.min(1, height * 0.75 + lit))
+    c.toArray(colors, i * 3)
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  return g
+}
+
+type V3 = readonly [number, number, number]
+const skinBall = ([x, y, z]: V3, [sx, sy, sz]: V3, detail = 3) =>
+  skin(new THREE.IcosahedronGeometry(1, detail), pose([x, y, z], [0, 0, 0], [sx, sy, sz]))
+
+/** A limb from `a` to `b`, radius `ra` at `a` tapering to `rb`. */
+function limb(a: [number, number, number], b: [number, number, number], ra: number, rb: number): THREE.BufferGeometry {
+  const from = new THREE.Vector3(...a)
+  const to = new THREE.Vector3(...b)
+  const dir = to.clone().sub(from)
+  const m = new THREE.Matrix4().compose(
+    from.clone().add(to).multiplyScalar(0.5),
+    new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize()),
+    new THREE.Vector3(1, 1, 1),
+  )
+  return skin(new THREE.CylinderGeometry(rb, ra, dir.length(), 12, 2), m)
+}
+
+function gown(): THREE.BufferGeometry {
+  const [x, y, z] = MEDUSA_BUST.gown.at
+  const [sx, sy, sz] = MEDUSA_BUST.gown.radii
+  return paintedAt(new THREE.IcosahedronGeometry(1, 3), GOWN, pose([x, y, z], [0, 0, 0], [sx, sy, sz]))
+}
+
+/** Root at the star's hub, +z towards the rider: bust, arms on the star's points, neck, head and face. */
+export const MEDUSA_BODY_GEO = mergePainted([
+  // Shoulders and a jewel-purple gown with a gold neckline.
+  skinBall(MEDUSA_BUST.shoulders.at, MEDUSA_BUST.shoulders.radii),
+  gown(),
+  paintedAt(new THREE.TorusGeometry(1, 0.06, 6, 32), GOLD_TRIM, pose([0, -112, 18], [Math.PI / 2 - 0.25, 0, 0], [118, 52, 60])),
+  // A little gold star on a chain: the Starr's queen.
+  paintedAt(new THREE.TorusGeometry(36, 2.4, 5, 24, Math.PI), GOLD_TRIM, pose([0, -60, 34], [0.35, 0, Math.PI])),
+  paintedAt(new THREE.OctahedronGeometry(1, 0), GOLD_TRIM, pose([0, -100, 52], [0, 0, Math.PI / 4], [11, 11, 5])),
+  // Arms resting forwards on the star's points, big soft hands.
+  ...[-1, 1].flatMap((side) => [
+    limb([side * 118, -92, -5], [side * 172, -168, 40], 30, 24),
+    limb([side * 172, -168, 40], [side * 128, -198, 118], 24, 20),
+    skinBall([side * 172, -168, 40], [25, 25, 25], 2),
+    skinBall([side * 124, -200, 128], [26, 17, 30], 2),
+  ]),
+  // Neck and head.
+  limb([0, -80, -8], [0, -10, -4], 33, 29),
+  skinBall(MEDUSA_BUST.head.at, MEDUSA_BUST.head.radii),
+  ...[-1, 1].flatMap((side) => [
+    skinBall([side * 64, 36, -2], [9, 16, 11], 2),
+    paintedAt(new THREE.TorusGeometry(11, 2.2, 6, 16), GOLD_TRIM, pose([side * 67, 12, 2], [0, Math.PI / 2, 0])),
+  ]),
+  // The big nose: a strong bridge, a round tip and full wings.
+  skinBall([0, 32, 64], [11, 22, 12], 2),
+  skinBall([0, 15, 76], [19, 15, 16], 2),
+  ...[-1, 1].map((side) => skinBall([side * 14, 11, 68], [10, 9, 9], 2)),
+  // Kind eyes glancing sideways, lids a little lowered, one brow up.
+  ...[-1, 1].flatMap((side) => [
+    paintedAt(new THREE.SphereGeometry(1, 14, 10), '#fbf6ee', pose([side * 27, 48, 56], [0, 0, 0], [14, 11, 10])),
+    paintedAt(new THREE.SphereGeometry(1, 12, 8), IRIS, pose([side * 27 + 4, 47, 64], [0, 0, 0], [7.5, 7.5, 4])),
+    paintedAt(new THREE.SphereGeometry(1, 8, 6), '#ffffff', pose([side * 27 + 6.5, 50, 67.5], [0, 0, 0], [2.4, 2.4, 1.2])),
+    skin(new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), pose([side * 27, 49, 57], [-0.35, 0, 0], [15.5, 9, 11])),
+    painted(new THREE.BoxGeometry(26, 4.5, 6), BROW, [side * 27, side > 0 ? 69 : 64, 60], [0, 0, side > 0 ? -0.22 : 0.12]),
+    paintedAt(new THREE.SphereGeometry(1, 10, 8), BLUSH, pose([side * 40, 14, 50], [0, side * 0.5, 0], [10, 6.5, 3])),
+  ]),
+  // A warm, knowing closed smile: a full crescent, a touch higher on her glancing side.
+  paintedAt(new THREE.CircleGeometry(1, 20, Math.PI, Math.PI), LIP, pose([2, -5, 55.5], [-0.25, 0, 0.08], [21, 9, 1])),
+  paintedAt(new THREE.TorusGeometry(1, 0.14, 6, 20, Math.PI), '#5e1f2d', pose([2, -5, 56], [-0.25, 0, Math.PI + 0.08], [21, 9, 9])),
+])
+
+export const MEDUSA_SKIN_MAT = withRim(
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0 }),
+  { color: '#ffe2c4', intensity: 0.45, power: 2.6 },
+)
+
+/** Her curls: faceted clusters round the back, top and sides of her head, falling to her shoulders; laid from a fixed seed. */
+export const MEDUSA_HAIR_GEO = (() => {
+  const rand = createRng(521)
+  const parts: THREE.BufferGeometry[] = [paintedAt(new THREE.IcosahedronGeometry(1, 2), CURLS[0], pose([0, 58, -14], [0, 0, 0], [76, 80, 70]))]
+  const curl = (x: number, y: number, z: number, r: number) =>
+    parts.push(paintedAt(new THREE.IcosahedronGeometry(1, 0), rand.pick(CURLS),
+      pose([x, y, z], [rand() * 6, rand() * 6, rand() * 6], [r, r * rand.range(0.8, 1.2), r])))
+  const n = 230
+  for (let i = 0; i < n; i++) {
+    // Fibonacci sphere directions, skipping the face and under the jaw.
+    const y = 1 - (2 * (i + 0.5)) / n
+    const ring = Math.sqrt(1 - y * y)
+    const a = i * 2.39996
+    const x = Math.cos(a) * ring
+    const z = Math.sin(a) * ring
+    if (y < -0.35 || (z > 0.2 && y < 0.5)) continue
+    curl(x * 90, 54 + y * 94, -12 + z * 82, rand.range(14, 23))
+  }
+  // Falling to her shoulders behind the ears.
+  for (const side of [-1, 1]) {
+    for (let k = 0; k < 16; k++) curl(side * rand.range(76, 102), 34 - k * 8, rand.range(-34, 0) - k, rand.range(16, 24))
+  }
+  return mergePainted(parts)
+})()
+
+export const MEDUSA_HAIR_MAT = withRim(
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.1, flatShading: true }),
+  { color: '#ffd9b0', intensity: 0.5, power: 2.2 },
+)
+
+/** The jewel on the bridge of her nose; its glint is animated (Medusa.tsx). */
+export const MEDUSA_JEWEL_GEO = new THREE.OctahedronGeometry(5.5, 0)
+export const MEDUSA_JEWEL_OFFSET: [number, number, number] = [0, 43, 77]
+export const MEDUSA_JEWEL_MAT = new THREE.MeshStandardMaterial({
+  color: '#7ff6ff', emissive: '#3fe8ff', emissiveIntensity: 1.6, roughness: 0.15, metalness: 0.3, flatShading: true,
+})
+
+/** One bead of a toy snake: a unit sphere stretched along y between two points of its body (instance colour per snake). */
+export const MEDUSA_SNAKE_BEAD_GEO = new THREE.SphereGeometry(1, 10, 8).deleteAttribute('uv')
+export const MEDUSA_SNAKE_MAT = withRim(
+  new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.05 }),
+  { color: '#e8ffd0', intensity: 0.6, power: 2.2 },
+)
+export const MEDUSA_SNAKE_COLORS = ['#2fb36a', '#25a593', '#7cc63a', '#3ec28a'] as const
+export const MEDUSA_CROWN_SNAKE_COLOR = '#d8b03a'
+
+const snakeHead = (skinColor: string) => [
+  paintedAt(new THREE.SphereGeometry(1, 12, 8), skinColor, pose([0, 0, 8], [0, 0, 0], [15, 11, 21])),
+  paintedAt(new THREE.SphereGeometry(1, 10, 6), '#f4f0b0', pose([0, -4, 12], [0, 0, 0], [12, 6, 16])),
+  ...[-1, 1].flatMap((side) => [
+    paintedAt(new THREE.SphereGeometry(1, 10, 8), '#ffffff', pose([side * 8, 7, 17], [0, 0, 0], [5.5, 5.5, 5])),
+    paintedAt(new THREE.SphereGeometry(1, 8, 6), '#141414', pose([side * 8.6, 7.4, 21.3], [0, 0, 0], [2.8, 2.8, 1.6])),
+    painted(new THREE.BoxGeometry(1.6, 1, 9), '#ff5c8a', [side * 2, -3, 32], [0, side * 0.35, 0]),
+  ]),
+]
+
+/** A snake's head about its neck, +z where it looks: big round eyes, a pale jaw, a little forked tongue. */
+export const MEDUSA_SNAKE_HEAD_GEO = mergePainted(snakeHead(MEDUSA_SNAKE_COLORS[0]))
+
+/** The crown snake's head: gold, with a tiny gold crown. */
+export const MEDUSA_CROWN_HEAD_GEO = mergePainted([
+  ...snakeHead(MEDUSA_CROWN_SNAKE_COLOR),
+  painted(new THREE.CylinderGeometry(9, 8, 5, 10, 1, true), GOLD_TRIM, [0, 12, 6]),
+  ...Array.from({ length: 5 }, (_, k) => {
+    const a = (k / 5) * Math.PI * 2
+    return painted(new THREE.ConeGeometry(2.6, 8, 4), k === 0 ? '#ff4f9a' : GOLD_TRIM, [Math.sin(a) * 8.5, 18, 6 + Math.cos(a) * 8.5])
+  }),
+])
+
+export const MEDUSA_SNAKE_HEAD_MAT = withRim(
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.05 }),
+  { color: '#e8ffd0', intensity: 0.7, power: 2.2 },
+)
+
+/** A star outline over the Starr's points (unit outer radius, in its xy plane), which glows and turns in her tell. */
+export const MEDUSA_STAR_GLOW_GEO = (() => {
+  const star = (outer: number, inner: number) => {
+    const points: THREE.Vector2[] = []
+    for (let k = 0; k < 16; k++) {
+      const a = Math.PI / 2 + (k * Math.PI) / 8
+      const r = k % 2 === 0 ? outer : inner
+      points.push(new THREE.Vector2(r * Math.cos(a), r * Math.sin(a)))
+    }
+    return points
+  }
+  const shape = new THREE.Shape(star(1.06, 0.3))
+  shape.holes.push(new THREE.Path(star(0.86, 0.22).reverse()))
+  return new THREE.ShapeGeometry(shape).deleteAttribute('uv')
+})()
+
+export const MEDUSA_STAR_GLOW_MAT = new THREE.MeshBasicMaterial({
+  color: '#ffd23f', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+})
+
+/** The hub opening in her tell: a violet glow she rises out of. */
+export const MEDUSA_HUB_GEO = new THREE.CircleGeometry(1, 32).deleteAttribute('uv')
+export const MEDUSA_HUB_MAT = new THREE.MeshBasicMaterial({
+  color: '#c46bff', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
+})

@@ -71,6 +71,8 @@ const BOSS_SUBJECTS: Record<BossType, Spec> = {
   yeti: { front: 0, holdHeading: 'root', motion: at(1.2, 2.8), animated: true },
   // Its first beat (2.4 s): the two pounds on its chest, then the plates parted on the heart.
   magmaTitan: { front: 0, holdHeading: 'root', motion: at(1.2, 2.4), animated: true },
+  // Risen with her first four snakes out; the strip is one strike cycle of theirs, taking turns.
+  medusa: { front: 0, holdHeading: 'root', motion: at(3), animated: true },
 }
 
 const subjectsOf = <K extends SubjectId>(kind: Subject['kind'], specs: Record<K, Spec>): Subject[] =>

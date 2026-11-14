@@ -120,6 +120,12 @@ When level5 is in the run, the same `boss` step summons the Magma Titan: after 3
 and beats its chest open; the heart is retracted between beats) both shoulder vents and the heart must be on screen
 (`level5-boss.png`, only those exposed), then only the crown of lava on its head (`level5-boss-crown.png`) before it goes
 black, flashes and bursts into lava chunks (`level5-boss-down.png`).
+When level6 is in the run, the step first rides the coaster to 0.75 of the lap (`rideTo`: the Medusa stays in the Starr
+rather than coming to the rider) and summons her: after 2 s of game time (she has risen out of the star) at least three of
+her first four snakes must be on screen (`level6-boss.png`); it clears them, lets her second four uncoil (`midPhases`: a
+phase between the first and the last) and clears those, then only the crown snake is exposed (`level6-boss-crown.png`;
+with her leant out it then rides to 0.84 and 0.9 of the lap, `level6-boss-pass-84.png` / `-90.png`, the ride's last stretch past her)
+before she laughs and sinks back into the star in a chalk burst (`level6-boss-down.png`).
 Every boss must fit its fight window (#452: the boss arrives at 40 s of the 60 s run): the game seconds it moved before
 each phase was on screen plus every weak point's hp at 2 hits a second must be ≤ 20 s (`fight` on the summary line).
 When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pickups()`), parks the coaster behind the first

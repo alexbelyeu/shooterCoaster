@@ -7,6 +7,8 @@ import { getTrackDimensions } from '@/track/trackDimensions'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov'
 import { RUN_SECONDS } from '@/levels/pacing'
+import { getLevelConfig } from '@/levels/LevelRegistry'
+import { MEDUSA_BODY, MEDUSA_HUB, MEDUSA_RISE, bustClearance, yawToward } from '@/entities/bosses/medusaMotion'
 import {
   ARCH,
   BLOCKOUT_BOXES,
@@ -191,5 +193,36 @@ describe('the gym track', () => {
       if (depth > 0 && Math.abs(across) <= MIN_HORIZONTAL_FOV / 2 && Math.abs(vertical) <= VERTICAL_HALF_FOV) seen++
     }
     expect(seen / frames).toBeGreaterThanOrEqual(0.8)
+  })
+
+  it("keeps the rails and the camera clear of the Medusa's bust from her rise to the run's end, leant out or not", () => {
+    /** World units kept between her bust and the rails or the rider's eye. */
+    const MARGIN = 20
+    const from = getLevelConfig('level6')!.boss!.at
+    const local: [number, number, number] = [0, 0, 0]
+    let worst = Infinity
+    for (const lean of [0, 1]) {
+      const out = MEDUSA_BODY.out + MEDUSA_RISE.leanOut * lean
+      const pitch = MEDUSA_RISE.leanPitch * lean
+      for (let k = from * 10; k <= RUN_SECONDS * 10; k++) {
+        const p = curve.getPointAt((profile[k] % table.length) / table.length)
+        for (const lift of [0, dims.eyeHeight]) {
+          // Into her root's frame: x across, z out of the star, y up; then her turn towards the rider, then her lean.
+          const dx = p.x - MEDUSA_HUB[0]
+          const dz = p.z - MEDUSA_HUB[2]
+          const x = dx * STAR.facing.z - dz * STAR.facing.x
+          const z = dx * STAR.facing.x + dz * STAR.facing.z - out
+          const y = p.y + lift - MEDUSA_HUB[1]
+          const yaw = yawToward(x, z + out)
+          const xr = x * Math.cos(yaw) - z * Math.sin(yaw)
+          const zr = x * Math.sin(yaw) + z * Math.cos(yaw)
+          local[0] = xr
+          local[1] = y * Math.cos(pitch) + zr * Math.sin(pitch)
+          local[2] = -y * Math.sin(pitch) + zr * Math.cos(pitch)
+          worst = Math.min(worst, bustClearance(local, MARGIN))
+        }
+      }
+    }
+    expect(worst).toBeGreaterThan(1)
   })
 })

@@ -12,8 +12,7 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { ATMOSPHERES } from '@/levels/environments/atmosphere'
 import Atmosphere from '@/levels/environments/shared/Atmosphere'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
-import { createTrigCurve } from '@/track/curves/TrigCurve'
-import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import type { BiomeType, BossType, EnemyType } from '@/types/level'
 import { createRng, hashString } from '@/utils/rng'
 import KrakenPose from './KrakenPose'
@@ -51,8 +50,7 @@ function bossTrack(type: BossType): ArcTable {
   let table = tracks.get(type)
   if (!table) {
     const level = getAllLevels().find((l) => l.boss?.type === type) ?? getAllLevels()[0]
-    const { curve, varA, varB, varC, scalar } = level.track
-    table = buildArcTable((curve === 'curve2' ? createTrigCurve2 : createTrigCurve)(varA, varB, varC, scalar))
+    table = buildArcTable(createTrackCurve(level.track))
     tracks.set(type, table)
   }
   return table
