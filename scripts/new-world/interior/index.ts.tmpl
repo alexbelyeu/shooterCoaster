@@ -1,0 +1,16 @@
+import type { BiomeDefinition } from '../../shared/types'
+import { PARTICLE_PRESETS } from '../../shared/particlePresets'
+import { COLOR_RAMP, HALL_BOUNDS, hallFloor } from './config'
+import Decorations from './Decorations'
+import Features from './Features'
+
+/** __NAME__ (__ID__): an interior world, a hall on its own floor. */
+export const __BIOME__: BiomeDefinition = {
+  colorRamp: COLOR_RAMP,
+  trees: null,
+  Decorations,
+  Features,
+  particles: PARTICLE_PRESETS.gymChalk,
+  floor: hallFloor,
+  bounds: HALL_BOUNDS,
+}

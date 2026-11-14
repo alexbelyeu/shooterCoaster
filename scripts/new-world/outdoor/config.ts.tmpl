@@ -1,0 +1,33 @@
+import * as THREE from 'three'
+import type { BiomeTreeConfig, ColorRamp } from '../../shared/types'
+
+// __NAME__, scaffolded by `npm run new-world` from the outdoor template: the palette, trees and props are this world's to author.
+
+export const COLOR_RAMP: ColorRamp = {
+  stops: [
+    { height: 0.0, color: new THREE.Color(0x3d5a2a) }, // valley floor
+    { height: 0.3, color: new THREE.Color(0x56763a) }, // low hills
+    { height: 0.6, color: new THREE.Color(0x7d7a5a) }, // upland
+    { height: 0.85, color: new THREE.Color(0x8f8a84) }, // rock
+    { height: 1.0, color: new THREE.Color(0xe8e8e4) }, // peaks
+  ],
+  cliffColor: new THREE.Color(0x6b5e50),
+}
+
+export const TREES: BiomeTreeConfig = {
+  types: [
+    {
+      trunkColor: '#5c3a1e',
+      canopyColors: (rng) => `hsl(${rng.range(95, 135)}, ${rng.range(40, 65)}%, ${rng.range(32, 44)}%)`,
+      canopyGeoFactory: () => new THREE.ConeGeometry(1, 1, 6),
+      heightRange: [30, 80],
+    },
+  ],
+  maxCount: 80,
+  minRadius: 800,
+  maxRadius: 3000,
+  maxSlope: Math.PI / 4,
+}
+
+/** The boulders scattered beside the track (`Decorations.tsx`). */
+export const BOULDER_COLOR = 0x8a8278

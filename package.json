@@ -18,6 +18,7 @@
     "check:bundle": "node scripts/check-bundle.mjs",
     "og": "node scripts/og-image.mjs",
     "clip": "node scripts/clip.mjs",
+    "new-world": "node scripts/new-world.mjs",
     "turntable": "node scripts/turntable.mjs",
     "audio:render": "node scripts/audio/render.mjs",
     "audio:check": "node scripts/audio/check.mjs",
