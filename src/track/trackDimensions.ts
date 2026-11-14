@@ -36,21 +36,16 @@ export const DEFAULT_RAIL_RADIUS = 0.35
 export const DEFAULT_TIE_SPACING = 10
 export const DEFAULT_TOWER_SPACING = 50
 
-/**
- * Projected radius (drawing-buffer px) a part never thins below: `near` out to `PIXEL_FLOOR_FADE_START`
- * units of view depth, easing (smoothstep) to `far` by `PIXEL_FLOOR_FADE_END`. Sub-pixel far lines resolve
- * through MSAA as fainter strokes, so the far loop recedes instead of reading as a bold cable (#327).
- */
+/** Projected radius (drawing-buffer px) a part never thins below; `far` is sub-pixel so MSAA fades the far loop (#327). */
 export interface PixelFloor {
   near: number
   far: number
 }
-/** Rails and spine. */
-export const RAIL_PIXEL_FLOOR: PixelFloor = { near: 1.5, far: 0.6 }
-/** Tower legs, braces and cross-beams: about one pixel wide up close. */
-export const LATTICE_PIXEL_FLOOR: PixelFloor = { near: 0.5, far: 0.35 }
-export const PIXEL_FLOOR_FADE_START = 400
-export const PIXEL_FLOOR_FADE_END = 2000
+export const RAIL_PIXEL_FLOOR: PixelFloor = { near: 1.5, far: 0.5 }
+/** Tower legs, braces and cross-beams. */
+export const LATTICE_PIXEL_FLOOR: PixelFloor = { near: 0.5, far: 0.3 }
+export const PIXEL_FLOOR_FADE_START = 200
+export const PIXEL_FLOOR_FADE_END = 1200
 
 /** The floor's pixel radius at view-space `depth`; the vertex patch in `minThickness.ts` mirrors it. */
 export function pixelFloorAt(floor: PixelFloor, depth: number): number {
@@ -79,11 +74,8 @@ export function minThicknessPush(
   return Math.max(0, minWorldRadius(depth, pixelFloorAt(floor, depth), projScaleY, viewportHeightPx) - radius)
 }
 
-/**
- * Track-only haze: the track takes the scene's linear fog as if it ended at this fraction of `fogFar`,
- * so far rails pick up the sky tint before the landscape does (#327).
- */
-export const TRACK_FOG_REACH = 0.45
+/** The track takes the scene's linear fog as if it ended at this fraction of its span, so far rails take the sky tint first. */
+export const TRACK_FOG_REACH = 0.25
 
 export function getTrackScale(scalar: number): number {
   return Math.min(2.5, Math.max(1, Math.sqrt(scalar / BASE_SCALAR)))

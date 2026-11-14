@@ -47,7 +47,7 @@ describe('minThicknessPush', () => {
 
   it('holds the full floor out to the fade start, never past it', () => {
     expect(projected(PIXEL_FLOOR_FADE_START)).toBeCloseTo(RAIL_PIXEL_FLOOR.near, 9)
-    expect(projected(300)).toBeCloseTo(RAIL_PIXEL_FLOOR.near, 9)
+    expect(projected(150)).toBeCloseTo(RAIL_PIXEL_FLOOR.near, 9)
   })
 
   it('eases the floor down to the far radius by the fade end and holds it beyond', () => {

@@ -63,7 +63,7 @@ const TRACK_FOG = /* glsl */ `
 #endif
 `
 
-/** Fogs `material` sooner than the scene, so far track recedes into the sky tint (#327); returns the same material. */
+/** Fogs `material` sooner than the scene (`TRACK_FOG_REACH`); returns the same material. */
 export function withTrackHaze<T extends THREE.Material>(material: T): T {
   const prevCompile = material.onBeforeCompile
   const prevKey = material.customProgramCacheKey
