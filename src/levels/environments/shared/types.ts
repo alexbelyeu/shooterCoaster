@@ -125,4 +125,6 @@ export interface BiomeDefinition {
   Features?: ComponentType<BiomeFeaturesProps>
   /** Ambient air particles around the camera (one draw call). */
   particles?: ParticleFieldPreset
+  /** An authored floor in place of the noise terrain (an interior: the gym's hall and its pit); no track suppression. */
+  floor?: HeightFunction
 }

@@ -141,7 +141,34 @@ const volcanicAsh: ParticleFieldPreset = {
   boost: { event: 'eruption:start', count: 600, riseS: 0.25, holdS: 3, fadeS: 1 },
 }
 
-export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh } as const
+/** Climbing Gym: chalk hanging in the skylights' light, a few brighter flecks catching it. */
+const gymChalk: ParticleFieldPreset = {
+  count: 1600,
+  box: [440, 260, 440],
+  primary: {
+    color: 0xf2f1ec,
+    opacity: 0.45,
+    size: 0.9,
+    maxPixels: 3,
+    velocity: [1.5, -1, 1],
+    sway: 6,
+    flicker: 0.2,
+    additive: false,
+  },
+  secondary: {
+    color: 0xffffff,
+    opacity: 0.7,
+    size: 1.1,
+    maxPixels: 3,
+    velocity: [1, 1.5, -1],
+    sway: 8,
+    flicker: 0.8,
+    additive: true,
+  },
+  secondaryShare: 0.2,
+}
+
+export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh, gymChalk } as const
 
 /** Points to draw: always-on and boost-only. Touch screens get half (as `renderBudget.ts` cuts their pixels); the graphics quality's `particleScale` thins both. */
 export function particleCounts(preset: ParticleFieldPreset, coarsePointer: boolean, qualityScale = 1): { base: number; boost: number } {

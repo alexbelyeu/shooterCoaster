@@ -1,5 +1,6 @@
 import type { LevelConfig } from '@/types/level'
 import { paceLevel } from './pacing'
+import { GYM_TRACK } from './environments/biomes/gym/gymTrack'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
 const LEVELS: LevelConfig[] = [
@@ -146,7 +147,7 @@ const LEVELS: LevelConfig[] = [
     biome: 'volcanic',
     maxScore: 52 * 12 + 20 * 18 + 22 * 35 + 8 * 60, // 2234: no boss yet (the Magma Titan, #320), so the drakes are the finale
     message: 'You conquered the Inferno!',
-    nextLevel: null,
+    nextLevel: 'level6',
     track: {
       varA: 3,
       varB: 40,
@@ -174,6 +175,31 @@ const LEVELS: LevelConfig[] = [
       hasTrees: true,
       treeCount: 60,
     },
+  },
+  {
+    id: 'level6',
+    name: 'Climbing Gym',
+    description: 'Ride the walls of the climbing gym',
+    order: 6,
+    biome: 'gym',
+    maxScore: 28 * 15 + 24 * 12 + 50 * 18, // 1608: no boss yet (the Medusa, #521), so the pit's rats are the finale
+    message: 'You sent the Climbing Gym!',
+    nextLevel: null,
+    // Authored from Alex's blockout (#514): up the Tree, round the Flame, through the Arch, the dive into the Starr pit.
+    track: GYM_TRACK,
+    // Crows stand in for the rafters' air enemy until the lanternflies (#516) replace them; no climbers yet (bystanders, #518).
+    ...paceLevel({
+      waves: [
+        { type: 'crow', count: 14, waveLabel: 'In the Rafters!', formation: 'v', weight: 2 },
+        { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 2 },
+        { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 2 },
+        { type: 'crow', count: 14, waveLabel: 'Round the Flame!', formation: 'spiral', weight: 2 },
+        { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 3 },
+      ],
+      finale: { type: 'rat', count: 16, waveLabel: 'Into the Pit!' },
+    }),
+    starThresholds: [0.25, 0.55, 0.85],
+    environment: {},
   },
 ]
 

@@ -497,8 +497,23 @@ export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, 
     const p = surface === 'water'
       ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale)
       : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale)
-    return outsideNearField(settle(p, surface, groundFn), camera)
+    const placed = outsideNearField(settle(p, surface, groundFn), camera)
+    return surface === 'ground' ? groundedOutsideNearField(placed, camera, groundFn) : placed
   })
+}
+
+/** A pushed ground enemy back on the ground (a camera close above, as over the gym's pit, pushes it down), pushed again till clear. */
+function groundedOutsideNearField(p: Vec3, camera: Vec3, groundFn: HeightFunction): Vec3 {
+  let q = settle(p, 'ground', groundFn)
+  for (let k = 0; k < 4 && Math.hypot(q.x - camera.x, q.y - camera.y, q.z - camera.z) < NEAR_FIELD; k++) {
+    // Out along the ground to the near field's edge at this height.
+    const dx = q.x - camera.x
+    const dz = q.z - camera.z
+    const h = Math.hypot(dx, dz) || 1e-6
+    const need = Math.sqrt(Math.max(NEAR_FIELD ** 2 - (q.y - camera.y) ** 2, 0)) + 0.01
+    q = settle({ x: camera.x + (dx / h) * need, y: q.y, z: camera.z + (dz / h) * need }, 'ground', groundFn)
+  }
+  return q
 }
 
 function tracksidePoint(table: ArcTable, riderIndex: number, { ahead, side }: TracksideSlot): Vec3 {

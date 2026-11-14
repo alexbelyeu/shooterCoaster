@@ -10,6 +10,7 @@ import CoasterCamera from '@/track/CoasterCamera'
 import { rideSpeeds } from '@/track/ridePhysics'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
+import { BIOMES } from '@/levels/environments/biomeRegistry'
 import ContactShadows from '@/levels/environments/shared/ContactShadows'
 import {
   createHeightFunction,
@@ -74,7 +75,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
   const trackTable = useMemo(() => buildArcTable(curve), [curve])
   const pointAt = useMemo(() => (t: number) => curve.getPointAt(t), [curve])
   const trackSamples = useMemo(() => sampleTrackPath((t) => curve.getPointAt(t)), [curve])
-  const heightFn = useMemo(() => createHeightFunction(biome, trackSamples), [biome, trackSamples])
+  const heightFn = useMemo(() => createHeightFunction(biome, trackSamples, BIOMES[biome].floor), [biome, trackSamples])
   const groundFn = useMemo(
     () => createTerrainSurface(heightFn, getTerrainMeshSize(biome)),
     [heightFn, biome],

@@ -114,6 +114,7 @@ reduced motion (+ an internal-browser toggle coming, #446).
 | level3 | 82 | 192,069 | 73 / 172,424 | 10 / 10 / 78 | 521 |
 | level4 | 178 | 206,635 | 180 / 216,336 | 18 / 12 / 27 | 520 |
 | level5 | 112 | 151,669 | 103 / 150,772 | 30 / 18 / 48 | 456 |
+| level6 | 44 | 151,521 | 92 / 167,084 | 7 / 7 / 42 | 353 (2026-11-14, #517 branch, ride shard) |
 
 Title: 90 draw calls, 80 scene objects, 11,202 triangles (ceilings before today 114 / 89 / 11,356). Budgets: `scene.title` raised today to 140 / 130 / 60 000 for the title
 world (#454 / #459). Bundle: 519 KB gz total JS (budget 630), largest chunk 172 KB (260),

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
-import { createTrigCurve } from './curves/TrigCurve'
-import { createTrigCurve2 } from './curves/TrigCurve2'
+import { createTrackCurve } from './curves/createTrackCurve'
 import { buildArcTable, distanceAtT } from './arcLength'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { advanceRide, lapSeconds, nextVelocity, rideProfile, rideSpeeds, riddenBetween } from './ridePhysics'
@@ -19,8 +18,7 @@ describe('nextVelocity', () => {
 })
 
 describe.each(getAllLevels().map((l) => [l.id, l] as const))('%s rideProfile', (_id, level) => {
-  const factory = level.track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve
-  const table = buildArcTable(factory(level.track.varA, level.track.varB, level.track.varC, level.track.scalar))
+  const table = buildArcTable(createTrackCurve(level.track))
   const speeds = rideSpeeds(level.track)
   const profile = rideProfile(table, speeds, RUN_SECONDS)
 
@@ -29,7 +27,7 @@ describe.each(getAllLevels().map((l) => [l.id, l] as const))('%s rideProfile', (
   })
 
   it('is the arc the coaster rides, not track fraction × length (the curve parameter is not arc length)', () => {
-    const curve = factory(level.track.varA, level.track.varB, level.track.varC, level.track.scalar)
+    const curve = createTrackCurve(level.track)
     const state = { progress: 0, velocity: 0 }
     let arc = 0
     for (let k = 1; k <= 10 * 10; k++) {
@@ -75,11 +73,11 @@ describe('advanceRide', () => {
 })
 
 /** Pinned (#452): a 60 s lap would ride 2.2–3.8× faster than today, a different ride, so a run rides 0.25–0.6 of a lap. */
-const LAPS: Record<string, number> = { level1: 147, level2: 165, level3: 99, level4: 193, level5: 228 }
+const LAPS: Record<string, number> = { level1: 147, level2: 165, level3: 99, level4: 193, level5: 228, level6: 61.5 }
 
 describe.each(getAllLevels().map((l) => [l.id, l.track] as const))('the ride on %s', (id, track) => {
   it('laps in its pinned time, longer than a run', () => {
-    const curve = (track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve)(track.varA, track.varB, track.varC, track.scalar)
+    const curve = createTrackCurve(track)
     const lap = lapSeconds(curve, rideSpeeds(track))
     expect(lap).toBeGreaterThan(RUN_SECONDS)
     expect(Math.abs(lap - LAPS[id])).toBeLessThan(1)

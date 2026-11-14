@@ -1,6 +1,6 @@
 ![ShooterCoaster](public/social/og-1200x630.jpg "ShooterCoaster")
 
-A WebGL on-rails arcade shooter: ride a rollercoaster through five themed worlds and shoot
+A WebGL on-rails arcade shooter: ride a rollercoaster through six themed worlds and shoot
 everything in sight before the timer runs out. Built with React, three.js
 (@react-three/fiber) and Tone.js; every model, texture and sound is made in code.
 

@@ -17,7 +17,8 @@ function pointAt(curve: ReturnType<typeof createTrigCurve>, t: number) {
   return { x: p.x, y: p.y, z: p.z }
 }
 
-const levels = getAllLevels()
+// The trig curves; an authored spline (level6) has its own tests (`SplineCurve.test.ts`, `gymTrack.test.ts`).
+const levels = getAllLevels().filter((l) => l.track.curve !== 'spline')
 
 describe.each(levels.map((l) => [l.id, l.track] as const))('track curve for %s', (_id, track) => {
   const curve = curveFor(track)

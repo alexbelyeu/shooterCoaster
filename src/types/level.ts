@@ -2,7 +2,7 @@ import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
 /** `curve1` / `curve2`: the generated trig curves; `spline`: an authored track through `controlPoints` (#514). */
 export type CurveType = 'curve1' | 'curve2' | 'spline'
-export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic'
+export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic' | 'gym'
 export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti'
 export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny'
 
