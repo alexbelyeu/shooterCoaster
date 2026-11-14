@@ -54,6 +54,12 @@ export const BIOME_UI: Record<BiomeType, BiomeUITheme> = {
     accent2: '#ffc933',
     sky: [['#110a0a', 0], ['#3a1410', 0.55], ['#9c2a10', 1]],
   }),
+  gym: theme({
+    accent: '#22d3c5', // chalk-bag teal
+    glow: 'rgba(34, 211, 197, 0.55)',
+    accent2: '#ff3355',
+    sky: [['#27313d', 0], ['#4b5a6b', 0.6], ['#a9b6c4', 1]],
+  }),
 }
 
 export const DEFAULT_UI_THEME: BiomeUITheme = theme({

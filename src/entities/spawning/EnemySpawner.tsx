@@ -18,8 +18,8 @@ import { recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
 import { requestSlowMo } from '@/combat/slowMo'
 import type { EnemyEntry } from '../enemies/EnemyBase'
 import {
-  ENTRY_SECONDS, ENTRY_STAGGER, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, trackPoint, tracksideSlots,
-  type FormationMotion, type FormationSlot, type RideAhead, type TracksideSlot, type Vec3,
+  ENTRY_SECONDS, ENTRY_STAGGER, clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, trackPoint, tracksideSlots,
+  type FormationMotion, type FormationSlot, type PlacementBounds, type RideAhead, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
 import {
   ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, readableScatterSpawn, wallPoint, wallSlots, type WallSlot,
@@ -40,6 +40,8 @@ interface EnemySpawnerProps {
   rideSpeeds: RideSpeeds
   trackScale: number
   walls?: readonly WallSurface[]
+  /** An interior's walls and roof: every placement stays inside them. */
+  bounds?: PlacementBounds
 }
 
 interface SpawnedEnemy {
@@ -162,6 +164,7 @@ export default function EnemySpawner({
   rideSpeeds,
   trackScale,
   walls = NO_WALLS,
+  bounds,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
   const getThree = useThree((s) => s.get)
@@ -198,14 +201,14 @@ export default function EnemySpawner({
       const members = enemies.filter((e) => e.waveIndex === waveIdx)
       if (members[0]?.trackside) {
         const placed = placeTracksideWave({
-          table: trackTable, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride,
+          table: trackTable, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds,
         })
         return members.map((e, i) => [e.id, { position: toVector3(placed[i]) }])
       }
       // On their walls already, where they enter: never pushed out of the near field.
       if (members[0]?.wall) return members.map((e) => [e.id, { position: e.position! }])
       if (!wave.formation || wave.formation === 'scatter') {
-        return members.map((e) => [e.id, { position: toVector3(outsideNearField(e.position!, camera)) }])
+        return members.map((e) => [e.id, { position: toVector3(clampToBounds(outsideNearField(e.position!, camera), bounds)) }])
       }
       const placed = placeFormationWave({
         table: trackTable,
@@ -217,13 +220,14 @@ export default function EnemySpawner({
         groundFn,
         slots: members.map((e) => e.slot!),
         ride,
+        bounds,
       })
       return members.map((e, i) => {
         const p = placed[i]
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [waves, enemies, trackTable, groundFn, rideAhead],
+    [waves, enemies, trackTable, groundFn, rideAhead, bounds],
   )
 
   const initialActiveWave = useMemo(

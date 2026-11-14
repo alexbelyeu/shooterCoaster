@@ -17,6 +17,13 @@ const STARS: [number, number][] = [
   [14, 10], [38, 22], [70, 8], [104, 16], [128, 6], [150, 24], [186, 12], [174, 34],
 ]
 
+/** The Starr: an 8-point star, yellow and black halves per point. */
+const STAR_POINTS = Array.from({ length: 8 }, (_, k) => {
+  const a = -Math.PI / 2 + (k * Math.PI) / 4
+  const at = (r: number, t: number) => `${(150 + r * Math.cos(t)).toFixed(1)} ${(44 + r * Math.sin(t)).toFixed(1)}`
+  return { left: `M150 44 L${at(7, a - Math.PI / 8)} L${at(26, a)}Z`, right: `M150 44 L${at(26, a)} L${at(7, a + Math.PI / 8)}Z` }
+})
+
 type Scene = (t: BiomeUITheme) => ReactElement
 
 const SCENES: Record<BiomeType, Scene> = {
@@ -95,6 +102,26 @@ const SCENES: Record<BiomeType, Scene> = {
       ))}
       <path d="M0 90 Q50 84 100 92 T200 88 V100 H0Z" fill="#0b0606" />
       <path d="M0 96 Q40 92 80 96 T160 95 T200 94" stroke={t.accent} strokeWidth="2" fill="none" opacity="0.9" />
+    </>
+  ),
+  gym: (t) => (
+    <>
+      <path d="M0 0 H200 V100 H0Z" fill="#e8eae5" />
+      {[24, 58, 92, 126, 160].map((x) => (
+        <rect key={x} x={x} y="4" width="16" height="9" fill="#dcefff" />
+      ))}
+      <rect x="0" y="16" width="200" height="3" fill="#6e1f2a" />
+      {STAR_POINTS.map((p, i) => (
+        <g key={i}>
+          <path d={p.left} fill="#f2c230" />
+          <path d={p.right} fill="#1d2320" />
+        </g>
+      ))}
+      <circle cx="150" cy="44" r="4" fill="#2a2d30" />
+      <path d="M44 88 L50 70 L22 50 L36 44 L64 62 L92 44 L106 50 L78 70 L84 88Z" fill="#c8302a" />
+      <path d="M44 88 L50 70 L64 62 L78 70 L84 88Z" fill="#5b55b0" />
+      <path d="M0 88 H200 V100 H0Z" fill="#9a9e9b" />
+      <path d="M0 88 H200" stroke={t.accent} strokeWidth="1.5" />
     </>
   ),
 }

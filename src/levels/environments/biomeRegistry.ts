@@ -5,6 +5,7 @@ import { desert } from './biomes/desert'
 import { ocean } from './biomes/ocean'
 import { arctic } from './biomes/arctic'
 import { volcanic } from './biomes/volcanic'
+import { gym } from './biomes/gym'
 
 /**
  * Every biome's environment definition (terrain colours, trees, decorations,
@@ -17,4 +18,5 @@ export const BIOMES: Record<BiomeType, BiomeDefinition> = {
   ocean,
   arctic,
   volcanic,
+  gym,
 }

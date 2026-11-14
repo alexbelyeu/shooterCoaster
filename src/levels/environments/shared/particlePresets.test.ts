@@ -5,7 +5,7 @@ const presets = Object.entries(PARTICLE_PRESETS)
 
 describe('particle presets', () => {
   it('has the five biome presets', () => {
-    expect(Object.keys(PARTICLE_PRESETS).sort()).toEqual(['arcticSnow', 'desertDust', 'oceanPlankton', 'parkPollen', 'volcanicAsh'])
+    expect(Object.keys(PARTICLE_PRESETS).sort()).toEqual(['arcticSnow', 'desertDust', 'gymChalk', 'oceanPlankton', 'parkPollen', 'volcanicAsh'])
   })
 
   it.each(presets)('%s stays subtle: count, box and share within bounds', (_, p) => {

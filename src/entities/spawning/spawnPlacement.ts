@@ -269,6 +269,26 @@ export function marchHeading(motion: FormationMotion | undefined): number | unde
   return motion?.kind === 'march' ? motion.heading : undefined
 }
 
+/** An interior's walls and roof, already inset: every placement stays inside (the gym's hall, `BiomeDefinition.bounds`). */
+export interface PlacementBounds {
+  minX: number
+  maxX: number
+  minZ: number
+  maxZ: number
+  maxY: number
+}
+
+export function insideBounds(p: Vec3, b: PlacementBounds): boolean {
+  return p.x >= b.minX && p.x <= b.maxX && p.z >= b.minZ && p.z <= b.maxZ && p.y <= b.maxY
+}
+
+/** `p` moved to the nearest point inside `b`, or `p` itself with no bounds. */
+export function clampToBounds(p: Vec3, b: PlacementBounds | undefined): Vec3 {
+  if (!b) return p
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
+  return { x: clamp(p.x, b.minX, b.maxX), y: Math.min(p.y, b.maxY), z: clamp(p.z, b.minZ, b.maxZ) }
+}
+
 export interface PlaceWaveInput {
   table: ArcTable
   riderIndex: number
@@ -279,11 +299,14 @@ export interface PlaceWaveInput {
   groundFn: HeightFunction
   slots: readonly FormationSlot[]
   ride: RideAhead
+  bounds?: PlacementBounds
 }
 
 /** World placements for a formation wave's slots, in slot order. */
 export function placeFormationWave(input: PlaceWaveInput): Placement[] {
-  const { table, riderIndex, camera, formation, type, groundFn, slots, ride } = input
+  const { table, riderIndex, camera, formation, type, groundFn, slots, ride, bounds } = input
+  // Inside an interior's walls, back on its surface (a clamped air slot keeps its clearance under the roof).
+  const keepIn = (p: Vec3) => (bounds ? clampToBounds(settle(clampToBounds(p, bounds), surface, groundFn), bounds) : p)
   const surface = ENEMY_PLACEMENT[type].surface
   const reach = maxReadableDistance(type)
   const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
@@ -316,8 +339,8 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
     }
     const { from, spin } = entryStart(formation, f, position, groundFn)
     return {
-      position: outsideNearField(position, camera),
-      from: outsideNearField(from, camera),
+      position: keepIn(outsideNearField(keepIn(position), camera)),
+      from: keepIn(outsideNearField(keepIn(from), camera)),
       spin,
       entrySeconds: ENTRY_SECONDS + (ENTRY_STAGGER * slot.index) / Math.max(1, slot.groupSize - 1),
       motion: formationMotion(formation, f),
@@ -487,18 +510,35 @@ export interface PlaceTracksideInput {
   groundFn: HeightFunction
   slots: readonly TracksideSlot[]
   ride: RideAhead
+  bounds?: PlacementBounds
 }
 
-export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride }: PlaceTracksideInput): Vec3[] {
+export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride, bounds }: PlaceTracksideInput): Vec3[] {
   const { surface } = ENEMY_PLACEMENT[type]
   const reach = maxReadableDistance(type)
   return slots.map((slot) => {
     const at = { ahead: tracksideAhead(table, surface, slot, ride), side: slot.side }
     const p = surface === 'water'
       ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale)
-      : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale)
-    return outsideNearField(settle(p, surface, groundFn), camera)
+      : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale, bounds)
+    const placed = outsideNearField(settle(p, surface, groundFn), camera)
+    const out = surface === 'ground' ? groundedOutsideNearField(placed, camera, groundFn) : placed
+    return bounds && !insideBounds(out, bounds) ? settle(clampToBounds(out, bounds), surface, groundFn) : out
   })
+}
+
+/** A pushed ground enemy back on the ground (a camera close above, as over the gym's pit, pushes it down), pushed again till clear. */
+function groundedOutsideNearField(p: Vec3, camera: Vec3, groundFn: HeightFunction): Vec3 {
+  let q = settle(p, 'ground', groundFn)
+  for (let k = 0; k < 4 && Math.hypot(q.x - camera.x, q.y - camera.y, q.z - camera.z) < NEAR_FIELD; k++) {
+    // Out along the ground to the near field's edge at this height.
+    const dx = q.x - camera.x
+    const dz = q.z - camera.z
+    const h = Math.hypot(dx, dz) || 1e-6
+    const need = Math.sqrt(Math.max(NEAR_FIELD ** 2 - (q.y - camera.y) ** 2, 0)) + 0.01
+    q = settle({ x: camera.x + (dx / h) * need, y: q.y, z: camera.z + (dz / h) * need }, 'ground', groundFn)
+  }
+  return q
 }
 
 function tracksidePoint(table: ArcTable, riderIndex: number, { ahead, side }: TracksideSlot): Vec3 {
@@ -507,14 +547,29 @@ function tracksidePoint(table: ArcTable, riderIndex: number, { ahead, side }: Tr
   return { x: table.x[i] - forward.z * side, y: 0, z: table.z[i] + forward.x * side }
 }
 
-/** The slot, or the same spot across the track when only that side is in view on the approach (the inside of a turn). */
+/** Inside an interior, a slot whose spot is past the walls on both sides comes in toward the track. */
+const BOUNDED_SIDE_SCALES = [1, 0.6, 0.35, 0]
+
+/**
+ * The slot, or the same spot across the track when only that side is in view on the approach (the inside of a turn);
+ * inside `bounds`, also nearer the track: the first inside them in view, else the first inside them, else the slot held in.
+ */
 function dryTracksidePoint(
   table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
+  bounds?: PlacementBounds,
 ): Vec3 {
-  const p = tracksidePoint(table, riderIndex, slot)
-  if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)) return p
-  const across = tracksidePoint(table, riderIndex, { ahead: slot.ahead, side: -slot.side })
-  return inViewOnApproach(table, riderIndex, slot.ahead, settle(across, surface, groundFn), reach, trackScale) ? across : p
+  const { sideMin } = TRACKSIDE.ground
+  let fallback: Vec3 | null = null
+  for (const scale of bounds ? BOUNDED_SIDE_SCALES : [1]) {
+    const offset = Math.max(sideMin, Math.abs(slot.side) * scale) * Math.sign(slot.side)
+    for (const side of [offset, -offset]) {
+      const p = tracksidePoint(table, riderIndex, { ahead: slot.ahead, side })
+      if (bounds && !insideBounds(p, bounds)) continue
+      if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)) return p
+      fallback ??= p
+    }
+  }
+  return fallback ?? clampToBounds(tracksidePoint(table, riderIndex, slot), bounds)
 }
 
 /**

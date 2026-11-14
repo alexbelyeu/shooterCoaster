@@ -17,6 +17,7 @@
     "level3": 180,
     "level4": 180,
     "level5": 180,
+    "level6": 180,
     "mobile": 240
   },
   "scene": {
@@ -60,6 +61,13 @@
       "triangles": 170739,
       "trackObjects": 12,
       "trackTriangles": 99742
+    },
+    "level6": {
+      "drawCalls": 60,
+      "objects": 110,
+      "triangles": 195000,
+      "trackObjects": 12,
+      "trackTriangles": 48000
     }
   },
   "pacing": {
@@ -82,6 +90,10 @@
     },
     "level5": {
       "longestGapSeconds": 4,
+      "noTargetShare": 0.1
+    },
+    "level6": {
+      "longestGapSeconds": 3,
       "noTargetShare": 0.1
     }
   }

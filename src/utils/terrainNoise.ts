@@ -176,6 +176,19 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     flatRadius: 600,
     transitionWidth: 900,
   },
+  // The Climbing Gym draws the biome's `floor` (the hall's, with the Starr pit), never this: flat for 100 km.
+  gym: {
+    frequency: 0.001,
+    amplitude: 1,
+    octaves: 1,
+    persistence: 0.5,
+    lacunarity: 2,
+    exponent: 1,
+    ridgeMode: false,
+    baseY: 0,
+    flatRadius: 100_000,
+    transitionWidth: 1,
+  },
 }
 
 /** Desert gets an extra macro-scale mesa layer */
@@ -227,7 +240,10 @@ export function sampleTrackPath(
 export function createHeightFunction(
   biome: BiomeType,
   trackSamples?: TrackSample[],
+  floor?: HeightFunction,
 ): HeightFunction {
+  // An authored floor (an interior's, `BiomeDefinition.floor`) is drawn as given: its track is laid round it.
+  if (floor) return floor
   const config = BIOME_TERRAIN_CONFIGS[biome]
 
   return (x: number, z: number): number => {
@@ -357,7 +373,8 @@ export const TERRAIN_MESH_SEGMENTS = 128
 
 /** Side length of the rendered terrain mesh for a biome. */
 export function getTerrainMeshSize(biome: BiomeType): number {
-  return biome === 'arctic' ? 10000 : biome === 'volcanic' ? 12000 : 6000
+  // The gym's floor is the hall's length (`GYM_SCALE` × 80 m): its 10-unit cells put a grid line on the Starr pit's edge.
+  return biome === 'arctic' ? 10000 : biome === 'volcanic' ? 12000 : biome === 'gym' ? 1280 : 6000
 }
 
 /**
