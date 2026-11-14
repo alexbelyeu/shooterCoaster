@@ -73,6 +73,14 @@ export const lavaFragmentShader = /* glsl */ `
     float cellsPerPixel = length(fwidth(warpedUV * 1.8));
     heat = mix(heat, 0.3, smoothstep(0.06, 0.35, cellsPerPixel));
 
+    #ifdef LAVA_CHANNEL
+    // A channel: a molten core down the middle, crust thickening to dark banks
+    float across = abs(uv.x - 0.5) * 2.0;
+    float core = 1.0 - smoothstep(0.0, 0.5, across);
+    float bank = smoothstep(0.45, 0.95, across);
+    heat = clamp(heat + core * (0.3 + turb * 0.2), 0.0, 1.0) * (1.0 - bank * 0.85);
+    #endif
+
     // --- Color ramp: smooth continuous blend ---
     vec3 crustColor = vec3(0.08, 0.03, 0.01);  // near-black cooled rock
     vec3 deepRed    = vec3(0.5, 0.04, 0.0);     // deep red glow
@@ -94,16 +102,28 @@ export const lavaFragmentShader = /* glsl */ `
     float pulse = 0.95 + sin(uTime * 1.2 + turb * 4.0) * 0.05;
     color *= pulse * uIntensity;
 
-    // --- Edge fade (soften at UV edges for river strips) ---
+    // --- Edge fade (soften at UV edges for river strips; a channel's dark banks only feather) ---
+    #ifdef LAVA_CHANNEL
+    float edgeFade = smoothstep(0.0, 0.06, uv.x) * smoothstep(1.0, 0.94, uv.x);
+    #else
     float edgeFade = smoothstep(0.0, 0.15, uv.x) * smoothstep(1.0, 0.85, uv.x);
+    #endif
 
     gl_FragColor = vec4(color, edgeFade * 0.95);
   }
 `
 
-/** Lava material: geometry `uv.x` 0..1 across a strip, `uv.y` the distance along it in strip widths (round crust cells); flows towards lower `uv.y`. */
-export function createLavaMaterial(flowSpeed = 0.08, intensity = 1.2): THREE.ShaderMaterial {
+/**
+ * Lava material: geometry `uv.x` 0..1 across a strip, `uv.y` the distance along it in strip widths (round crust cells); flows towards lower `uv.y`.
+ * `channel`: a river lying in the ground, bright down its middle and crusted dark at its banks (the volcano's streaks are not).
+ */
+export function createLavaMaterial(flowSpeed = 0.08, intensity = 1.2, channel = false): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
+    defines: channel ? { LAVA_CHANNEL: '' } : {},
+    // A channel is draped 1.5 units over the ground: keep it in front of the terrain it lies on
+    polygonOffset: channel,
+    polygonOffsetFactor: channel ? -2 : 0,
+    polygonOffsetUnits: channel ? -4 : 0,
     uniforms: {
       uTime: { value: 0 },
       uFlowSpeed: { value: flowSpeed },
