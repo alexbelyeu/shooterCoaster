@@ -21,7 +21,7 @@ const LEVELS: LevelConfig[] = [
       rollerSpeed: 0.00001,
       minRollerSpeed: 0.00008,
       curve: 'curve1',
-      color1: 0xffffff,
+      color1: 0xf3ece0,
       color2: 0xffff00,
     },
     ...paceLevel({
