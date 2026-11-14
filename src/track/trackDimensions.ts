@@ -36,10 +36,27 @@ export const DEFAULT_RAIL_RADIUS = 0.35
 export const DEFAULT_TIE_SPACING = 10
 export const DEFAULT_TOWER_SPACING = 50
 
-/** Projected radius (drawing-buffer px) far rails and spine never thin below. */
-export const RAIL_MIN_PIXEL_RADIUS = 1.5
-/** The same floor for tower legs, braces and cross-beams: about one pixel wide. */
-export const LATTICE_MIN_PIXEL_RADIUS = 0.5
+/**
+ * Projected radius (drawing-buffer px) a part never thins below: `near` out to `PIXEL_FLOOR_FADE_START`
+ * units of view depth, easing (smoothstep) to `far` by `PIXEL_FLOOR_FADE_END`. Sub-pixel far lines resolve
+ * through MSAA as fainter strokes, so the far loop recedes instead of reading as a bold cable (#327).
+ */
+export interface PixelFloor {
+  near: number
+  far: number
+}
+/** Rails and spine. */
+export const RAIL_PIXEL_FLOOR: PixelFloor = { near: 1.5, far: 0.6 }
+/** Tower legs, braces and cross-beams: about one pixel wide up close. */
+export const LATTICE_PIXEL_FLOOR: PixelFloor = { near: 0.5, far: 0.35 }
+export const PIXEL_FLOOR_FADE_START = 400
+export const PIXEL_FLOOR_FADE_END = 2000
+
+/** The floor's pixel radius at view-space `depth`; the vertex patch in `minThickness.ts` mirrors it. */
+export function pixelFloorAt(floor: PixelFloor, depth: number): number {
+  const t = Math.min(1, Math.max(0, (depth - PIXEL_FLOOR_FADE_START) / (PIXEL_FLOOR_FADE_END - PIXEL_FLOOR_FADE_START)))
+  return floor.near + (floor.far - floor.near) * t * t * (3 - 2 * t)
+}
 
 /** World radius that projects to `minPixelRadius` px at view-space `depth`; `projScaleY` = projectionMatrix[1][1]. */
 export function minWorldRadius(
@@ -51,16 +68,22 @@ export function minWorldRadius(
   return (2 * Math.max(0, depth) * minPixelRadius) / (projScaleY * viewportHeightPx)
 }
 
-/** Outward push for a part `radius` thick; 0 wherever it is already thicker than the floor. */
+/** Outward push for a part `radius` thick; 0 wherever it is already thicker than the floor at `depth`. */
 export function minThicknessPush(
   radius: number,
   depth: number,
-  minPixelRadius: number,
+  floor: PixelFloor,
   projScaleY: number,
   viewportHeightPx: number,
 ): number {
-  return Math.max(0, minWorldRadius(depth, minPixelRadius, projScaleY, viewportHeightPx) - radius)
+  return Math.max(0, minWorldRadius(depth, pixelFloorAt(floor, depth), projScaleY, viewportHeightPx) - radius)
 }
+
+/**
+ * Track-only haze: the track takes the scene's linear fog as if it ended at this fraction of `fogFar`,
+ * so far rails pick up the sky tint before the landscape does (#327).
+ */
+export const TRACK_FOG_REACH = 0.45
 
 export function getTrackScale(scalar: number): number {
   return Math.min(2.5, Math.max(1, Math.sqrt(scalar / BASE_SCALAR)))
