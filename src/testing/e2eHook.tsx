@@ -11,7 +11,7 @@
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots (fires one real shot, then resolves the
  *     hits through the bullet pool's own processHit path), endLevel() to reach
- *     the results screen (shareText() for what its share menu's Copy link copies, scoreCard(size) for its share image), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
+ *     the results screen (shareText(worldRank?) for what its share menu's Copy link copies, scoreCard(size) for its share image), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
  *     primeCombo(n) to set up a long chain,
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
@@ -202,7 +202,8 @@ export interface SCTestApi {
   /** Force the results phase. */
   endLevel: () => void
   /** What the results share menu's Copy link puts on the clipboard for the current level and score (`text url`), or null. */
-  shareText: () => string | null
+  /** `worldRank` (0-based): the line a run on the World top 10 shares (#445). */
+  shareText: (worldRank?: number | null) => string | null
   /** The results Share image (#272) for the current level and run, drawn as the share menu draws it: its pixel size,
    *  PNG data URL and download name, or null with no level. */
   scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string } | null>
@@ -932,9 +933,9 @@ export function installE2EApi() {
       autoFireEnabled = false
       useGameStore.getState().setPhase('results')
     },
-    shareText: () => {
+    shareText: (worldRank: number | null = null) => {
       const { currentLevel, score } = useGameStore.getState()
-      const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score), 'copy') : null
+      const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score), 'copy', worldRank) : null
       return payload ? clipboardText(payload) : null
     },
     scoreCard: async (size: CardSize) => {

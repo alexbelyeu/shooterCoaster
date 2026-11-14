@@ -805,7 +805,29 @@ async function onlineSubmitProblems(page, id, online, score) {
   if (!world) problems.push('online board: never switched to the World board after the submission')
   else if (board.label !== 'World' || board.rank !== '1' || board.mine !== 'RES' || board.rows !== 10)
     problems.push(`online board: shows ${JSON.stringify(board)}, expected World with RES 2nd of 10`)
+  else problems.push(...(await worldShareProblems(page, id, 1)))
   return { problems, result: { submitted: run, board } }
+}
+
+/** #445: once the World board places the run, Copy link copies the rank line and Save image saves the card with its ribbon (`<id>-card-world.png`). */
+async function worldShareProblems(page, id, rank) {
+  const problems = []
+  const want = await page.evaluate((r) => window.__SC_TEST__.shareText(r), rank)
+  if (!want?.startsWith(`I'm #${rank + 1} in the world on `)) problems.push(`world share: shareText(${rank}) is ${JSON.stringify(want)}, not the rank line`)
+  await page.locator('.results-share').click({ timeout: 30000 }).catch((e) => problems.push(`world share: click Share: ${e.message}`))
+  await page.locator('.share-copy').click({ timeout: 10000 }).catch((e) => problems.push(`world share: click Copy link: ${e.message}`))
+  const copied = await page
+    .waitForFunction(() => document.querySelector('.share-copy')?.textContent === 'Copied!', null, { timeout: 10000, polling: 100 })
+    .then(() => true, () => false)
+  const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null)
+  if (!copied || clip !== want) problems.push(`world share: Copy link copied ${JSON.stringify(clip)}, expected ${JSON.stringify(want)}`)
+  const [file] = await Promise.all([
+    page.waitForEvent('download', { timeout: 20000 }).catch(() => null),
+    page.locator('[data-target="image_download"]').click({ timeout: 10000 }).catch((e) => problems.push(`world share: click Save image: ${e.message}`)),
+  ])
+  if (!file) problems.push('world share: Save image started no download')
+  else await file.saveAs(path.join(OUT, `${id}-card-world.png`))
+  return problems
 }
 
 /** Local leaderboard (#40): a run seeded to place at `rank` takes initials by keyboard (R and S are letters there) and persists them. */
