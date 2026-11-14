@@ -1937,3 +1937,47 @@ the enemy probe sees the same moment on any runner.
 **Context:** Alex built a blockout of his real climbing gym (#513, 12 Nov) and closed #503 (a generic hall for #457): Level 6 is to be that gym, massive, with four must-have ride moments (dive into the Starr pit facing the star, thread the Arch, spiral the burning Flame, climb the Tree and skim the glass gym room), rats / spotted lanternflies / dust bunnies as targets, climbers you must not shoot, and a Medusa boss rising from the star, modelled with her blessing on a real person.
 **Decision:** The blockout is data (`docs/levels/gym-blockout.json`, moved into `biomes/gym/` by #514), scaled uniformly to landmark size. The ride is an **authored** closed `spline` curve built from the blockout's anchors, proven by tests to hit the four moments with a 60 s lap and the pit at ~40 s (#514); trig curves stay for generated worlds. Build order: track ∥ enemies (turntable-first, #515, #516) → the hall and the playable level without climbers (#517) → climbers as **bystanders**, the game's first don't-shoot rule, as a wave/enemy role (−≈ one enemy's points, combo reset, chalk puff, friendly look, taught in the first seconds; #518) ∥ the Medusa (#521) ∥ the Flame's fire (#520) ∥ the Tree and rugged walls (#519). The Boulderer and the "Gym boss" backlog items are dropped (Alex chose the enemies and the boss). The real gym is never named in the game or docs.
 **Consequences:** M3's Level 6 criterion is rewritten (VISION v4.1). Level 6 takes four sequential builder rounds at best; with M3 due 5 Dec it is the critical path, so its issues lead the queue (P1: #514, #515, #517, #518, #521). The `npm run new-world` scaffold (#460) waits on #517. A bystander role is general, so later worlds can reuse it.
+
+## 2026-11-13 — The smoke steps level time only once React has settled (Builder, #471)
+
+**Context:** The pacing step and the ride shot gave different enemy counts for the same seed run to run and between a
+local session and CI. Level time was stepped in fixed amounts per frame, but waves, enemy mounts, fly-ins ending and boss
+arrivals go through React state, which lands a varying number of frames later; bosses also moved on the frame's delta.
+**Decision:** `e2e/settledSteps.mjs` defines a minimal React devtools hook before the page loads (`addInitScript`) to
+count commits, and the ride and pacing step level time once, then hold it until a held frame sees no commit and a posted
+message answered. Bosses step on the game clock (`gameClockStep`), never the frame's delta. The game itself is unchanged
+for players; nothing reads the devtools hook outside the smoke.
+**Consequences:** Same seed, same pacing timeline and ride count on any runner (checked locally with 3x CPU throttling).
+A run costs about one held frame per step on top of its steps. Don't go back to per-frame `timerStep` / `timerStepMax`
+for anything that counts enemies; gameplay motion added later must use the game clock, not `delta`.
+
+## 2026-11-13 — The title logo holds still; logo concepts behind `?logo=` (Builder, #476)
+
+**Context:** Alex: "the 'ShooterCoaster' title is like pulsating in a weird way." The wordmark scaled and grew its
+blurred glow on every beat of the title music (`--logo-beat`, set per frame), on top of an idle float, a light sweep
+and the build-in, so the big Lobster text re-rasterised at a new size every frame. He also asked for a new logo that
+says ride + shoot.
+**Decision:** No title logo motion tied to the music, no animated scale or blur radius: one build-in, then still, with
+at most one gentle idle touch (the wordmark keeps the light sweep; the float and `titleBeat.ts` are gone). Logo
+concepts go live as `?logo=<name>` (`ui/screens/logo/`), a lazy chunk loaded only under the param, until Alex picks in
+the `Look: pick the new logo` issue; the pick then becomes the default (poster, score card, share card) and the rest
+are deleted. A concept's car ride runs on rAF, not SMIL, so `npm run clip`'s virtual time steps it like the page.
+**Consequences:** Don't put a beat-driven pulse back on the logo. The startup JS carries no concept code.
+
+## 2026-11-13 — Measuring hitches before fixing them (Builder, #536)
+
+**Context:** Alex's MacBook Neo stutters and freezes in Safari, even on `?quality=low`. Nothing in the studio measured single long frames: the smoke runs on a fast unthrottled runner and telemetry kept only p50 / p95.
+**Decision:** `?perf=1` turns on a hitch recorder for that page load only: no storage, no network, lazy chunks (only the flag check is in the startup JS). The smoke reports programs compiled after each level's warm-up (ride and `pacing`) and, with `--cpu-throttle`, the longest frame and the frames over 100 ms. Neither fails yet: they are the baseline the fix issues work against, and a later PR makes them gates. Telemetry's `maxMs` / `longFrames` are optional on the server, so cached older clients still validate.
+**Consequences:** `eventBus.taps` sees every event name. Keep a tap cheap (a Set add): it runs on every emit while `?perf=1` or `?e2e=1` is on.
+
+## 2026-11-14 — The Magma Titan: the final eruption, a phase-0 heart, one crack material (Builder, #320)
+
+**Context:** Inferno ended on a drakes wave; #320 asks for the Magma Titan on the final eruption, re-timed for the 60 s run (tell ~38 s, arrival at 40 s).
+**Decision:** The Titan's tell fires `eruption:start` itself (label "Final Eruption!"), so the mid-run 'Eruption!' wave keeps its own eruption and the finale is the second, bigger one. Its eruption passes a fog floor of 3500 (the wave's closes to 200), or the fog pulse would hide the Titan for most of its fight. The drakes stay in the level as a normal wave before 'Golems Return!'. The heart is a **phase-0** weak point (with the vents) that is `retract`ed except while it beats its chest open (2.2 s every 5 s, at once when the vents go); the smoke's boss check waits for it to open (`minOnScreen: 3`). Every part shares one material (`TITAN_OBSIDIAN_MAT`): Voronoi crack glow and painted lava in one `onBeforeCompile` program, so `uGlow` / `uHeat` move the whole body at once and `ShaderWarmup` compiles one program.
+**Consequences:** The volcanic fog pulse takes an optional far floor on `eruption:start`. Level5's `maxScore` is 2914. A boss placed further than ~2000 ahead would miss the smoke's real-bullet check (8 frames of 0.25 s bullet steps), so the Titan's rise spots stay within 1250–2300 ahead.
+
+## 2026-11-14 — Level 6: the Climbing Gym's hall from the blockout (Builder, #517)
+
+**Context:** Level 6 is the first interior and the first world built from a real place's blockout (#513, #514). The noise terrain, sky and scatter of the outdoor biomes don't fit a hall with a sunken pit, and the terrain's track suppression would dent an authored floor.
+**Decision:** A biome may give an authored `floor` (`BiomeDefinition.floor`) in place of the noise terrain; `createHeightFunction` returns it as is (no track suppression: an authored track is laid round its floor and tested against it). The gym's floor is the main floor plus the Starr pit (`floorAt`), drawn by the ordinary terrain mesh sized to the hall (1280 units, so the pit's edge falls on a grid line, `getTerrainMeshSize`). The hall is built in the blockout's metres from its typed pieces (`hallGeometry.ts`) and scaled to the world once: three merged vertex-coloured meshes (solid, lights, glass) and two instanced meshes (holds, volumes) scattered area-weighted on each climbing face (`holds.ts`). Pieces outside the hall that nothing looks into (the upstairs stairs and landing, the bathrooms) are not drawn. Crows stand in for the air enemy until the lanternflies (#516): the first seconds climb the Tree with the camera on the rafters, where no ground enemy is in view. Level 6 plays level 5's score until its theme round (#456).
+**Consequences:** ~44 draw calls and ~167k scene triangles (`budgets.json` `scene.level6`). The blockout JSON (with Alex's notes) is in the startup chunk because the registry's track is built from it (+5 KB gz, inside `startupJsGzipKB`). Trackside ground enemies on the gym's tight spline are in front of the rider on their approach ~70% of the time, not the trig tracks' 85% (`spawnPlacement.test.ts` holds it there; follow-up). A ground enemy pushed out of the near field stays on the ground (`groundedOutsideNearField`): over the pit the camera is close above the floor.
