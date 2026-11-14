@@ -9,6 +9,7 @@ import type { BossProps } from './BossBase'
 import GiantScorpion from './GiantScorpion'
 import GoldenBlimp from './GoldenBlimp'
 import Kraken from './Kraken'
+import MagmaTitan from './MagmaTitan'
 import Yeti from './Yeti'
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
@@ -18,6 +19,7 @@ export const BOSS_COMPONENTS: Record<BossType, React.ComponentType<BossProps>> =
   kraken: Kraken,
   giantScorpion: GiantScorpion,
   yeti: Yeti,
+  magmaTitan: MagmaTitan,
 }
 
 type Stage = Exclude<E2EBossStage, 'none' | 'defeated'>
