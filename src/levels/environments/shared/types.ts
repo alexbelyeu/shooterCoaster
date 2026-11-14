@@ -4,6 +4,7 @@ import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
 import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
+import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 
 /** One stop of a terrain colour ramp. */
 export interface ColorStop {
@@ -127,4 +128,6 @@ export interface BiomeDefinition {
   particles?: ParticleFieldPreset
   /** An authored floor in place of the noise terrain (an interior: the gym's hall and its pit); no track suppression. */
   floor?: HeightFunction
+  /** An interior's walls and roof, inset: enemies are placed inside them, never behind a wall. */
+  bounds?: PlacementBounds
 }

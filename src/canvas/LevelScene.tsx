@@ -131,6 +131,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         rideSpeeds={speeds}
         trackScale={trackDims.trackScale}
         walls={walls}
+        bounds={BIOMES[biome].bounds}
       />
       <ShootingController />
       <GameTimer seconds={RUN_SECONDS} />

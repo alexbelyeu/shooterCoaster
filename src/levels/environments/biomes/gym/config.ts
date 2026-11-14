@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import type { ColorRamp } from '../../shared/types'
-import { GYM_SCALE, floorAt, toBlockout } from './blockout'
+import { GYM_SCALE, HALL, floorAt, toBlockout } from './blockout'
 import type { HeightFunction } from '@/utils/terrainNoise'
+import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 
 /** The hall's floor (the terrain mesh): poured grey concrete, the same at both levels. */
 export const COLOR_RAMP: ColorRamp = {
@@ -10,6 +11,18 @@ export const COLOR_RAMP: ColorRamp = {
     { height: 1, color: new THREE.Color(0x8d939a) },
   ],
   cliffColor: new THREE.Color(0x8d939a),
+}
+
+/** Enemies keep this far (world units, 2.5 m) inside the hall's walls and under its roof. */
+export const HALL_INSET = 40
+
+/** The hall's inside, inset (#546): ground waves beside the track would otherwise land behind a wall. */
+export const HALL_BOUNDS: PlacementBounds = {
+  minX: (-HALL.w / 2) * GYM_SCALE + HALL_INSET,
+  maxX: (HALL.w / 2) * GYM_SCALE - HALL_INSET,
+  minZ: (-HALL.d / 2) * GYM_SCALE + HALL_INSET,
+  maxZ: (HALL.d / 2) * GYM_SCALE - HALL_INSET,
+  maxY: HALL.h * GYM_SCALE - HALL_INSET,
 }
 
 /** World floor height: the main floor at 0, the Starr pit 2.45 m below it. */
