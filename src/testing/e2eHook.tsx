@@ -193,6 +193,9 @@ export interface SCTestApi {
    *  processHit — the bullet pool's own hit path (enemy:hit, hit flash, kill pop;
    *  enemy:killed follows ~80 ms later). Returns how many were hit. */
   killNearest: (n: number) => number
+  /** Hit the nearest live bystander (on-screen ones first) through processHit, the bullet pool's own path (#518).
+   *  Returns its id, or null when none is live. */
+  shootBystander: () => string | null
   stats: () => SCTestStats
   /** Viewport (CSS px) positions of up to n live on-screen enemies (no boss weak points), nearest
    *  first, so a test can tap / click real input at them. */
@@ -371,6 +374,9 @@ export interface SCTestStats {
   liveEnemies: number
   /** Live enemies in front of the camera and inside the viewport (not occlusion-tested). */
   onScreenEnemies: number
+  /** Live bystanders (#518) on screen, as `onScreenEnemies`, and how many were shot this run. */
+  onScreenBystanders: number
+  bystandersHit: number
   shotsFired: number
   hits: number
   bestCombo: number
@@ -748,10 +754,14 @@ let autoFireEnabled = false
 let lastAutoFire = 0
 const _fwd = new THREE.Vector3()
 
-/** Weapon pickups are targets too, but no enemy. */
+/** Dead/unmounted enemies report a parking position far below the world. */
+function isMounted(t: CollisionTarget) {
+  return t.getPosition().y > -9000
+}
+
+/** Weapon pickups and bystanders are targets too, but no enemy. */
 function isLive(t: CollisionTarget) {
-  // Dead/unmounted enemies report a parking position far below the world.
-  return t.kind !== 'pickup' && t.getPosition().y > -9000
+  return t.kind === undefined && isMounted(t)
 }
 
 /** NDC of a target if it is in front of the camera and inside the viewport. */
@@ -885,11 +895,29 @@ export function installE2EApi() {
       for (const { t } of victims) processHit(t)
       return victims.length
     },
+    shootBystander: () => {
+      let best: CollisionTarget | null = null
+      let bestRank = Infinity
+      for (const t of getCollisionTargets().values()) {
+        if (t.kind !== 'bystander' || !isMounted(t)) continue
+        const d = probeCamera ? t.getPosition().distanceToSquared(probeCamera.position) : 0
+        const rank = probeCamera && onScreenNDC(t, probeCamera, _aim) ? d : d + 1e12
+        if (rank < bestRank) {
+          bestRank = rank
+          best = t
+        }
+      }
+      if (!best) return null
+      processHit(best)
+      return best.id
+    },
     stats: () => {
       const s = useGameStore.getState()
       let liveEnemies = 0
       let onScreenEnemies = 0
+      let onScreenBystanders = 0
       for (const t of getCollisionTargets().values()) {
+        if (t.kind === 'bystander' && isMounted(t) && probeCamera && onScreenNDC(t, probeCamera, _aim)) onScreenBystanders++
         if (!isLive(t)) continue
         liveEnemies++
         if (probeCamera && onScreenNDC(t, probeCamera, _aim)) onScreenEnemies++
@@ -902,6 +930,8 @@ export function installE2EApi() {
         phase: s.phase,
         liveEnemies,
         onScreenEnemies,
+        onScreenBystanders,
+        bystandersHit: s.bystandersHit.length,
         shotsFired: s.shotsFired,
         hits: s.hits,
         bestCombo: s.bestCombo,

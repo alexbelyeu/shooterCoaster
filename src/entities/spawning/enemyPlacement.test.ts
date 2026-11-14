@@ -122,6 +122,7 @@ describe('wall enemies', () => {
   })
 
   it.each(getAllLevels().map((l) => [l.id, l] as const))('%s: has walls if it has wall enemies', (_id, level) => {
-    if (level.enemies.some((w) => ENEMY_PLACEMENT[w.type].surface === 'wall')) expect(level.walls?.length).toBeGreaterThan(0)
+    const onLevel = level.enemies.flatMap((w) => (w.bystanders ? [w.type, w.bystanders.type] : [w.type]))
+    if (onLevel.some((t) => ENEMY_PLACEMENT[t].surface === 'wall')) expect(level.walls?.length).toBeGreaterThan(0)
   })
 })

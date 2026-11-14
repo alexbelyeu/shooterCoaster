@@ -576,6 +576,27 @@ canvas {
 .hud-snow-splat.is-left { box-shadow: inset 120px 0 90px -40px rgba(255, 255, 255, 0.8); }
 .hud-snow-splat.is-right { box-shadow: inset -120px 0 90px -40px rgba(255, 255, 255, 0.8); }
 
+/* Don't-shoot hint (#518): a friendly teal pill under the wave banner */
+.hud-bystander-hint {
+  position: absolute;
+  top: 36%;
+  left: 50%;
+  max-width: calc(100vw - 32px);
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  border: 2px solid #5dffa8;
+  border-radius: 999px;
+  background: rgba(8, 60, 58, 0.82);
+  color: #eafff4;
+  font-size: clamp(0.85rem, 2.2vw, 1.15rem);
+  font-weight: 700;
+  text-align: center;
+  text-shadow: var(--hud-shadow);
+  box-shadow: 0 0 18px rgba(93, 255, 168, 0.45);
+  pointer-events: none;
+  animation: hud-fade-in 0.25s ease-out;
+}
+
 @keyframes hud-snow-splat {
   from { opacity: 1; }
   to { opacity: 0; }
@@ -2277,6 +2298,17 @@ canvas {
   margin-left: 4px;
   font-size: 1rem;
   color: #ff4444;
+}
+
+.score-popup--penalty {
+  font-size: 1.9rem;
+  color: #ff4d4d;
+  text-shadow: 0 0 8px rgba(255, 40, 40, 0.8), 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.score-popup-label {
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .score-popup--big {

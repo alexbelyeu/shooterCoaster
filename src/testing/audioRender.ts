@@ -157,6 +157,7 @@ function sfxSheetPlan(level = 'level1'): Plan {
     { name: 'kill 3x (+ ring)', slotS: 0.8, play: () => s.kill(COMBO_TIERS[2].minCount, 'pop', null) },
     { name: 'kill 5x (+ payout)', slotS: 1.1, play: () => s.kill(COMBO_TIERS[TOP_TIER].minCount, 'pop', null) },
     { name: 'combo break', slotS: 0.65, play: () => s.comboBreak() },
+    { name: 'bystander penalty', slotS: 0.6, play: () => s.penalty(null) },
     { name: 'wave tell', slotS: 1.5, play: () => s.waveIncoming() },
     { name: 'boss arrival', slotS: 2.0, play: () => s.bossArrival() },
     { name: 'boss hit (full hp)', slotS: 0.45, play: () => s.bossHit(1) },

@@ -9,6 +9,8 @@ interface ScorePopup {
   multiplier: number
   screenX: number
   screenY: number
+  /** A penalty's warning (negative `score`, #518). */
+  label?: string
   /** Test hold (`holdFeedback`): stays at full opacity until released. */
   held: boolean
 }
@@ -17,12 +19,19 @@ let nextId = 0
 
 const MAX_POPUPS = 6
 const POPUP_MS = 1000
+/** A penalty's warning stays long enough to read. */
+const LABELLED_POPUP_MS = 2000
 /** A boss defeat and other big scores get the big popup. */
 const BIG_SCORE = 200
 
+function popupClass(score: number): string {
+  if (score < 0) return 'score-popup score-popup--penalty'
+  return score >= BIG_SCORE ? 'score-popup score-popup--big' : 'score-popup'
+}
+
 /**
  * Renders floating score popups projected from 3D kill positions.
- * Listens to 'enemy:killed:screen' events emitted with screen coords.
+ * Listens to 'enemy:killed:screen' events emitted with screen coords (a bystander hit's too: a red penalty).
  * Batches rapid kills into a single state update to avoid AnimatePresence thrashing.
  */
 export default function ScorePopups() {
@@ -33,15 +42,16 @@ export default function ScorePopups() {
   const mountedRef = useRef(true)
 
   const handleKill = useCallback((data: unknown) => {
-    const { screenX, screenY, multiplier, score } = data as {
+    const { screenX, screenY, multiplier, score, label } = data as {
       screenX: number
       screenY: number
       multiplier: number
       score: number
+      label?: string
     }
 
     const id = nextId++
-    pendingRef.current.push({ id, score, multiplier, screenX, screenY, held: isFeedbackHeld() })
+    pendingRef.current.push({ id, score, multiplier, screenX, screenY, label, held: isFeedbackHeld() })
 
     // Schedule removal (re-armed while a test holds feedback)
     const remove = () => {
@@ -49,7 +59,7 @@ export default function ScorePopups() {
       if (isFeedbackHeld()) timeoutIdsRef.current.push(setTimeout(remove, POPUP_MS))
       else setPopups((prev) => prev.filter((p) => p.id !== id))
     }
-    timeoutIdsRef.current.push(setTimeout(remove, POPUP_MS))
+    timeoutIdsRef.current.push(setTimeout(remove, label ? LABELLED_POPUP_MS : POPUP_MS))
 
     // Batch: flush pending popups once per microtask
     if (!flushScheduled.current) {
@@ -85,13 +95,14 @@ export default function ScorePopups() {
         {popups.map((popup) => (
           <motion.div
             key={popup.id}
-            className={popup.score >= BIG_SCORE ? 'score-popup score-popup--big' : 'score-popup'}
+            className={popupClass(popup.score)}
             initial={{ opacity: 1, x: popup.screenX, y: popup.screenY, scale: 0.5 }}
             animate={{ opacity: popup.held ? 1 : 0, x: popup.screenX, y: popup.screenY - 60, scale: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.9, ease: 'easeOut' }}
+            transition={{ duration: popup.label ? 1.9 : 0.9, ease: 'easeOut' }}
           >
-            +{popup.score}
+            {popup.score < 0 ? `−${-popup.score}` : `+${popup.score}`}
+            {popup.label && <span className="score-popup-label"> · {popup.label}</span>}
             {popup.multiplier > 1 && (
               <span className="score-popup-combo">×{popup.multiplier}</span>
             )}

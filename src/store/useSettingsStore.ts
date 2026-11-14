@@ -14,6 +14,8 @@ interface SettingsState {
   quality: GraphicsQuality
   /** Same as the OS `prefers-reduced-motion`, for players who haven't set that (`ui/reducedMotion.ts`). */
   reducedMotion: boolean
+  /** The don't-shoot hint has shown once (`ui/hud/BystanderHint`, #518). */
+  bystanderHintSeen: boolean
   setMusicVolume: (v: number) => void
   setSfxVolume: (v: number) => void
   setShowFPS: (v: boolean) => void
@@ -21,6 +23,7 @@ interface SettingsState {
   setScreenShake: (v: ScreenShakeLevel) => void
   setQuality: (v: GraphicsQuality) => void
   setReducedMotion: (v: boolean) => void
+  setBystanderHintSeen: (v: boolean) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -33,6 +36,7 @@ export const useSettingsStore = create<SettingsState>()(
       screenShake: 'reduced',
       quality: 'auto',
       reducedMotion: false,
+      bystanderHintSeen: false,
       setMusicVolume: (v) => set({ musicVolume: v }),
       setSfxVolume: (v) => set({ sfxVolume: v }),
       setShowFPS: (v) => set({ showFPS: v }),
@@ -40,6 +44,7 @@ export const useSettingsStore = create<SettingsState>()(
       setScreenShake: (v) => set({ screenShake: v }),
       setQuality: (v) => set({ quality: v }),
       setReducedMotion: (v) => set({ reducedMotion: v }),
+      setBystanderHintSeen: (v) => set({ bystanderHintSeen: v }),
     }),
     { name: 'shootercoaster-settings' },
   ),

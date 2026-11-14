@@ -1,6 +1,7 @@
 import type { LevelConfig } from '@/types/level'
 import { paceLevel } from './pacing'
 import { GYM_TRACK } from './environments/biomes/gym/gymTrack'
+import { GYM_WALLS } from './environments/biomes/gym/walls'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
 const LEVELS: LevelConfig[] = [
@@ -188,14 +189,16 @@ const LEVELS: LevelConfig[] = [
     nextLevel: null,
     // Authored from Alex's blockout (#514): up the Tree, round the Flame, through the Arch, the dive into the Starr pit.
     track: GYM_TRACK,
-    // Crows stand in for the rafters' air enemy until the lanternflies (#516) replace them; no climbers yet (bystanders, #518).
+    walls: [...GYM_WALLS],
+    // Crows stand in for the rafters' air enemy until the lanternflies (#516) replace them. Climbers are bystanders (#518):
+    // the first wave brings some, to teach the don't-shoot rule from the start.
     ...paceLevel({
       waves: [
-        { type: 'crow', count: 14, waveLabel: 'In the Rafters!', formation: 'v', weight: 2 },
+        { type: 'crow', count: 14, waveLabel: 'In the Rafters!', formation: 'v', weight: 2, bystanders: { type: 'climber', count: 4 } },
         { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 2 },
-        { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 2 },
+        { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 2, bystanders: { type: 'climber', count: 3 } },
         { type: 'crow', count: 14, waveLabel: 'Round the Flame!', formation: 'spiral', weight: 2 },
-        { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 3 },
+        { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 3, bystanders: { type: 'climber', count: 3 } },
       ],
       finale: { type: 'rat', count: 16, waveLabel: 'Into the Pit!' },
     }),

@@ -922,12 +922,14 @@ export const DRAKE_EYE_MAT = new THREE.MeshStandardMaterial({
 
 // ── Climber (#453), built to docs/art/ENEMIES.md ──
 // Faces +z (the wall), so the ride sees its back; one material, four moving parts parted at the shoulders and hips.
+// A bystander (#518), so dressed friendly and in no enemy's colours: calm teal and white, a green harness, and the
+// green friend marker over its helmet.
 
-const CLIMBER_SHIRT = '#3a3f8f'
-const CLIMBER_TROUSERS = '#2c2f3a'
+const CLIMBER_SHIRT = '#1fa898'
+const CLIMBER_TROUSERS = '#d8e2e2'
 const CLIMBER_SKIN = '#e2b48c'
-const CLIMBER_HELMET = '#ff7a1a'
-const CLIMBER_HARNESS = '#19c8e0'
+const CLIMBER_HELMET = '#f4f7f6'
+const CLIMBER_HARNESS = '#3ccf7c'
 const CLIMBER_CHALK = '#f4f4f0'
 const CLIMBER_DARK = '#1c1d24'
 const CLIMBER_METAL = '#b8bcc8'
@@ -990,6 +992,23 @@ export const CLIMBER_MAT = withRim(new THREE.MeshStandardMaterial({
   metalness: 0.05,
   flatShading: true,
 }), { color: '#fff4e6', intensity: 0.5, power: 2.5 })
+
+/** The friend marker: a down-pointing chevron over the helmet, in its plane facing the ride (local −z). */
+export const CLIMBER_MARKER_Y = 5.2
+export const CLIMBER_MARKER_GEO = (() => {
+  const s = new THREE.Shape()
+  s.moveTo(-1.2, 0.7)
+  s.lineTo(-0.75, 0.7)
+  s.lineTo(0, -0.05)
+  s.lineTo(0.75, 0.7)
+  s.lineTo(1.2, 0.7)
+  s.lineTo(0, -0.7)
+  s.closePath()
+  return new THREE.ShapeGeometry(s)
+})()
+
+/** Unlit and bright, so it reads (and blooms a little) at a few pixels against any wall. */
+export const CLIMBER_MARKER_MAT = new THREE.MeshBasicMaterial({ color: '#5dffa8', side: THREE.DoubleSide })
 
 // ── New York rat (#515), built to docs/art/ENEMIES.md ──
 // Faces +z; one material, three moving parts: the body, the snout (nose twitch) about RAT_SNOUT_PIVOT, the tail

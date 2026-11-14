@@ -7,8 +7,11 @@ export interface CollisionTarget {
   getPosition: () => THREE.Vector3
   radiusSq: number
   onHit: () => void
-  /** A weapon pickup (#185) is shot like an enemy but is none: no `enemy:hit`. */
-  kind?: 'pickup'
+  /**
+   * A weapon pickup (#185) is shot like an enemy but is none: no `enemy:hit`. A bystander (#518) is no target at all:
+   * no `enemy:hit`, and its bullet counts as a miss for accuracy.
+   */
+  kind?: 'pickup' | 'bystander'
   hitThisFrame: boolean
   /** The hitting bullet's first target: only that hit counts for accuracy. */
   firstHitThisFrame: boolean
@@ -44,6 +47,10 @@ export function getCollisionTargets(): Map<string, CollisionTarget> {
  * hit handler. The bullet pool's collision pass and the e2e hook both take this path.
  */
 export function processHit(target: CollisionTarget, countHit = true): void {
+  if (target.kind === 'bystander') {
+    target.onHit()
+    return
+  }
   if (countHit) useGameStore.getState().registerHit()
   if (target.kind === 'pickup') {
     target.onHit()

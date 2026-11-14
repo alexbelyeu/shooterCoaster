@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import type * as THREE from 'three'
+import { Vector3, type Vector3 as ThreeVector3 } from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import type { GamePhase } from '@/types/game'
 import { placeSound, prepareSfx, setSfxListener, sfx } from '@/audio/sfx'
@@ -14,6 +14,7 @@ import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 import { intensityForTier } from '@/audio/scrim/layers'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
+import { BYSTANDER_HIT_EVENT, type BystanderHitEvent } from '@/combat/bystanders'
 
 /** The level's score while it runs (held while paused, through the resume Ready / GO), the results score after it. */
 function followPhase(phase: GamePhase, level: string) {
@@ -27,7 +28,7 @@ function followPhase(phase: GamePhase, level: string) {
   })
 }
 
-const onHit = (e: unknown) => sfx().hit(useGameStore.getState().combo.count, placeSound((e as { position?: THREE.Vector3 }).position))
+const onHit = (e: unknown) => sfx().hit(useGameStore.getState().combo.count, placeSound((e as { position?: ThreeVector3 }).position))
 const onKilled = (e: unknown) => {
   const { position, combo, sound = 'pop', bossPart } = e as EnemyKilledEvent
   if (bossPart) sfx().bossPart(combo, bossPart, placeSound(position))
@@ -35,6 +36,11 @@ const onKilled = (e: unknown) => {
 }
 const onWaveIncoming = () => sfx().waveIncoming()
 const onComboBreak = () => sfx().comboBreak()
+const _at = new Vector3()
+const onBystanderHit = (e: unknown) => {
+  const { x, y, z } = (e as BystanderHitEvent).position
+  sfx().penalty(placeSound(_at.set(x, y, z)))
+}
 const onFrenzy = () => sfx().frenzy()
 const onBossSpawn = () => sfx().bossArrival()
 const onBossHit = (e: unknown) => sfx().bossHit((e as { hpFraction?: number } | undefined)?.hpFraction ?? 1)
@@ -52,6 +58,7 @@ const SFX_EVENTS: [string, (e: unknown) => void][] = [
   ['enemy:killed', onKilled],
   ['wave:incoming', onWaveIncoming],
   ['combo:broken', onComboBreak],
+  [BYSTANDER_HIT_EVENT, onBystanderHit],
   ['combo:frenzy', onFrenzy],
   ['boss:spawn', onBossSpawn],
   ['boss:hit', onBossHit],
@@ -61,7 +68,7 @@ const SFX_EVENTS: [string, (e: unknown) => void][] = [
   [FIREWORK_BURST_EVENT, onFireworkBurst],
 ]
 
-/** Level audio host: the level's score + SFX for the level's lifetime, bus-driven hit / kill / wave / combo / boss / firework sounds, slow-mo and pause duck, music intensity. */
+/** Level audio host: the level's score + SFX for the level's lifetime, bus-driven hit / kill / bystander / wave / combo / boss / firework sounds, slow-mo and pause duck, music intensity. */
 export default function LevelAudio() {
   const currentLevel = useGameStore((s) => s.currentLevel)
   const camera = useThree((s) => s.camera)

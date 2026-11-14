@@ -19,6 +19,7 @@ import { startPhaseFor } from './startPhase'
 import { NO_PICKUP, applyPickup, type PickupWeaponId, type WeaponState } from '@/combat/weapons/weaponTypes'
 import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/daily'
 import { getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
+import { scoreAfterPenalty } from '@/levels/scoring'
 
 /** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
 export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }
@@ -58,6 +59,10 @@ interface GameState {
   bestCombo: number
   registerShot: (bullets?: number) => void
   registerHit: () => void
+  /** Ids of the bystanders shot this run (#518). */
+  bystandersHit: readonly string[]
+  /** Takes `penalty` off the score (floored at 0) once per bystander; false when `id` was already hit. */
+  hitBystander: (id: string, penalty: number) => boolean
 
   // Combo (tiers and windows: combat/comboTiers.ts; expiry: combat/comboRuntime.ts)
   combo: ComboState
@@ -117,6 +122,7 @@ const FRESH_RUN = {
   kills: 0,
   shotsFired: 0,
   hits: 0,
+  bystandersHit: [] as readonly string[],
   bestCombo: 0,
   combo: NO_COMBO,
   timeScale: 1,
@@ -169,6 +175,12 @@ export const useGameStore = create<GameState>()(
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
       registerShot: (bullets = 1) => set((s) => ({ shotsFired: s.shotsFired + bullets })),
       registerHit: () => set((s) => ({ hits: s.hits + 1 })),
+      hitBystander: (id, penalty) => {
+        const s = get()
+        if (s.bystandersHit.includes(id)) return false
+        set({ score: scoreAfterPenalty(s.score, penalty), bystandersHit: [...s.bystandersHit, id] })
+        return true
+      },
 
       registerKill: () =>
         set((s) => {
