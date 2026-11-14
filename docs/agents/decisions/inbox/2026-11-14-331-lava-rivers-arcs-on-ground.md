@@ -1,0 +1,5 @@
+## 2026-11-14 — Lava rivers are arcs draped on the drawn ground (Builder, #331)
+
+**Context:** Inferno's "glowing wall" beside the track was a radial lava river lying along a spoke of the ride: seen from the coaster, a strip running down the line of sight stands up the screen. The rivers also sat each row at the max of a 3×3 neighbourhood + 8 (the skill's safeHeight rule), which floated them up to 126 units over steep ground.
+**Decision:** Rivers are arcs round the centre that cross the ride's spokes, ~2× wider, draped on `groundFn` (1.5 lift, each triangle raised by its worst deficit, negative polygon offset), shaded as a channel (bright core, dark banks). `lavaRivers.test.ts` fails any river that runs down the rider's sight line for 400+ units at any half second of the ride, or that floats over 25 units or dips under the ground.
+**Consequences:** Don't go back to radial rivers or row-flat strips for wide features. Re-laying the rivers moves the Magma Titan's river spots with them (they read `riverRow`).

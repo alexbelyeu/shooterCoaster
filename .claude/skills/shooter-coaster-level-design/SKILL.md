@@ -98,9 +98,19 @@ Use the shared helper in `src/levels/environments/shared/safeHeight.ts` (max of 
 import { safeHeight } from '../../shared/safeHeight'
 const y = safeHeight(heightFn, x, z, TERRAIN_CELL * 0.6, 8) // 8+ units above the max neighbor
 ```
-See `biomes/volcanic/lavaRivers.ts` for the full working example.
+Good for a narrow strip on gentle ground. On a wide feature or steep ground the row's max floats it
+tens of units over the slope (the old lava rivers hung up to 126 units over the drawn ground).
 
-### Construction Rules
+### Draping on the Drawn Ground (wide features)
+`biomes/volcanic/lavaRivers.ts` drapes the lava rivers on `groundFn` (the terrain as drawn): a grid of
+quads across the river, each vertex 1.5 over the ground, then each triangle raised by its worst deficit
+against `groundFn` sampled inside it (the contact shadows' lift-by-deficit), and a negative `polygonOffset`
+on the transparent, `depthWrite: false` material. `lavaRivers.test.ts` holds it between 0 and 25 units
+over the ground. Lay a long straight feature so it never runs down the rider's line of sight: from the
+coaster a strip along the view stands up the screen like a wall (#331; the rivers are arcs that cross
+the ride's spokes, and the test checks every half second of the ride).
+
+### Construction Rules (safeHeight strips)
 1. **Build custom BufferGeometry** — each vertex samples `safeHeight(x, z, terrainCellSize)`
 2. **Use 120+ segments** along the length for smooth terrain following
 3. **Both edges of a strip share the same Y** per row — prevents twisting
@@ -135,7 +145,7 @@ with `useContactShadows` (its scales must come from a `useMemo`, not an rng insi
 See `src/levels/environments/LavaShader.ts` for the full working example:
 - `createLavaMaterial(flowSpeed, intensity)` factory returns a `ShaderMaterial`
 - Caller drives `uTime` uniform in `useFrame`
-- Two instances: rivers (flow 0.08, intensity 1.7) and volcano streaks (flow 0.12, intensity 1.8)
+- Two instances: rivers (flow 0.08, intensity 1.7, `channel`: a bright core and dark crusted banks) and volcano streaks (flow 0.12, intensity 1.8)
 - **UVs: `uv.x` 0..1 across the strip, `uv.y` = distance along it in strip widths** (see `lavaRivers.ts`, `volcanoGeometry.ts`). A 0..1 `uv.y` over a long strip stretches the crust cells into one bright line that aliases into a dotted yellow streak
 - Far away the shader fades its cracks to an average heat (`fwidth`), so distant lava is a solid orange band instead of sparkle
 
