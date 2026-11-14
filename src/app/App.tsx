@@ -19,6 +19,7 @@ import { sfx } from '@/audio/sfx'
 import { whenAudioReady } from '@/audio/AudioEngine'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { usePauseOnHidden } from './usePauseOnHidden'
+import Screen from './Screen'
 import { perfRequested } from '@/perf/perfFlag'
 
 const PerfPanel = lazy(() => import('@/perf/PerfPanel'))
@@ -34,6 +35,8 @@ const fadeVariants = {
 
 export default function App() {
   const phase = useGameStore((s) => s.phase)
+  // A fresh results screen per run: a run ending while the last one's screen fades out must not bring that one back.
+  const runId = useGameStore((s) => s.runId)
   const setPhase = useGameStore((s) => s.setPhase)
   const resuming = useGameStore((s) => s.phase === 'paused' && s.resuming)
   const [showSettings, setShowSettings] = useState(false)
@@ -99,7 +102,7 @@ export default function App() {
 
       <AnimatePresence mode="wait">
         {phase === 'title' && !showSettings && (
-          <motion.div
+          <Screen
             key="title"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -107,31 +110,31 @@ export default function App() {
             transition={{ duration: 0.3, ease: 'easeInOut' }}
           >
             <TitleScreen onPlay={playFromTitle} onSettings={() => setShowSettings(true)} />
-          </motion.div>
+          </Screen>
         )}
 
         {phase === 'levelSelect' && !showSettings && (
-          <motion.div key="levelSelect" {...fadeVariants} transition={{ duration: 0.3 }}>
+          <Screen key="levelSelect" {...fadeVariants} transition={{ duration: 0.3 }}>
             <LevelSelectScreen />
-          </motion.div>
+          </Screen>
         )}
 
         {(phase === 'playing' || resuming) && (
-          <motion.div key="hud" {...fadeVariants} transition={{ duration: 0.2 }}>
+          <Screen key="hud" {...fadeVariants} transition={{ duration: 0.2 }}>
             <HUD />
-          </motion.div>
+          </Screen>
         )}
 
         {phase === 'paused' && !resuming && !showSettings && (
-          <motion.div key="paused" {...fadeVariants} transition={{ duration: 0.2 }}>
+          <Screen key="paused" {...fadeVariants} transition={{ duration: 0.2 }}>
             <PauseScreen onSettings={() => setShowSettings(true)} />
-          </motion.div>
+          </Screen>
         )}
 
         {phase === 'results' && (
-          <motion.div key="results" {...fadeVariants} transition={{ duration: 0.4 }}>
+          <Screen key={`results-${runId}`} {...fadeVariants} transition={{ duration: 0.4 }}>
             <ResultsScreen />
-          </motion.div>
+          </Screen>
         )}
       </AnimatePresence>
 
