@@ -13,7 +13,7 @@ export const STEPS = [...UI_STEPS, ...FIRST_LEVEL_STEPS, ...LEVEL_STEPS]
 /** Mirrors the smoke's check constants (WAVE_CHECK, BOSS_CHECKS…), which fail the run at start if they drift. */
 export const STEP_LEVELS = {
   wave: ['level2'],
-  boss: ['level1', 'level2', 'level3', 'level4', 'level5'],
+  boss: ['level1', 'level2', 'level3', 'level4', 'level5', 'level6'],
   pickup: ['level1'],
   audio: ['level1'],
 }

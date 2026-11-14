@@ -1799,11 +1799,13 @@ async function pacingCheck(page, id) {
 
 /**
  * The finales the boss check summons: Theme Park's Golden Blimp (#181), Desert's Giant Scorpion (#318),
- * Ocean's Kraken (#183), Antarctica's Yeti (#319) and Inferno's Magma Titan (#320). `minOnScreen` first-phase weak points
+ * Ocean's Kraken (#183), Antarctica's Yeti (#319), Inferno's Magma Titan (#320) and the Climbing Gym's Medusa (#521). `minOnScreen` first-phase weak points
  * must be on screen after the boss alone has moved `settleS` s (the scorpion bursts out of the sand, the Kraken's tentacles
  * rise out of the water, the Yeti has climbed its ridge and thrown, the Titan has climbed out of the lava and opened its heart); `midSettleS` lets the last phase surface before `midShot`.
  * `firstPhase`: the id prefix(es) of the first phase. `minProjectiles`: thrown things (the Yeti's snowballs) on screen
- * in <level>-boss.png, each then shot through processHit as a normal kill that leaves the boss's hp alone.
+ * in <level>-boss.png, each then shot through processHit as a normal kill that leaves the boss's hp alone. `midPhases`: phases
+ * between the first and the last, each cleared after `midSettleS`. `rideTo`: the track fraction to ride to first, for a boss
+ * that stays where it is (the Medusa in the Starr) rather than coming to the rider.
  */
 const BOSS_CHECKS = [
   { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
@@ -1811,6 +1813,7 @@ const BOSS_CHECKS = [
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
   { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1 },
   { level: 'level5', minWidthFrac: 0.15, weakPoints: 4, firstPhase: ['vent-', 'heart'], lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 3, midSettleS: 0 },
+  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.75 },
 ]
 
 /**
@@ -1844,7 +1847,7 @@ async function stepBoss(page, seconds, ready) {
  * Game time is frozen while it is hit; if the wall-clock level timer still runs out, the step is skipped.
  */
 async function bossCheck(page, check) {
-  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS, minProjectiles = 0 } = check
+  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS, minProjectiles = 0, midPhases = 0, rideTo = null } = check
   const problems = []
   const boss = () => page.evaluate(() => window.__SC_TEST__.boss())
   const events = () => page.evaluate(() => ({ ...window.__SC_TEST__.bossEvents }))
@@ -1852,6 +1855,10 @@ async function bossCheck(page, check) {
   await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
   const startStats = await getStats(page)
+  if (rideTo !== null) {
+    await page.evaluate((t) => { window.__SC_TEST__.rideTo = t }, rideTo)
+    await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  }
   await page.evaluate(() => window.__SC_TEST__.summonBoss())
   const spawned = await pollUntil(page, async () => (await events()).spawn > 0, { ms: 20000 })
   // A couple of frames so it is placed and drawn, then freeze it there.
@@ -1895,6 +1902,16 @@ async function bossCheck(page, check) {
   // Clear the first phase through processHit: what is left of its hp.
   const firstHp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
   const phaseOneHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), firstHp)
+  // Phases between the first and the last (the Medusa's second four snakes): each let surface, then cleared.
+  let midHits = 0
+  let midSurfaced = 0
+  for (let i = 0; i < midPhases; i++) {
+    await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+    midSurfaced += (await stepBoss(page, midSettleS, () => onScreen(1))) ?? midSettleS
+    const hp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
+    midHits += hp
+    await page.evaluate((n) => window.__SC_TEST__.bossHit(n), hp)
+  }
   const midway = await boss()
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const surfaced = await stepBoss(page, midSettleS, () => onScreen(1))
@@ -1925,8 +1942,8 @@ async function bossCheck(page, check) {
     bulletHit, phaseOneHits, exposedMidway: midway.exposed.map((e) => e.id), lastHits, hpMidway: midway.hpFraction,
     stage: after.stage, kills: end.kills - startStats.kills, score: end.score - startStats.score, popup, skipped: false, projectiles,
   }
-  const hits = [...before.exposed, ...midway.exposed].reduce((sum, e) => sum + e.hp, 0)
-  result.fightSeconds = (settled ?? settleS) + (surfaced ?? midSettleS) + hits / BOSS_HITS_PER_SECOND
+  const hits = [...before.exposed, ...midway.exposed].reduce((sum, e) => sum + e.hp, midHits)
+  result.fightSeconds = (settled ?? settleS) + midSurfaced + (surfaced ?? midSettleS) + hits / BOSS_HITS_PER_SECOND
   if (!stillPlaying && !defeated) {
     result.skipped = true
     return { id: 'boss', problems, boss: result }
