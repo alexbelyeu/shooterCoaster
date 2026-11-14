@@ -116,6 +116,10 @@ throws) both fists must be on screen and ≥ 1 snowball in flight (`level4-boss.
 `projectileHit()` then shoots every live snowball: one kill and one combo step each, the boss's hp unchanged (they are left out
 of the per-weak-point kill count). Once the fists are broken it roars at once and only its chest is exposed
 (`level4-boss-chest.png`; between roars the chest is retracted) before it topples backwards into the snow (`level4-boss-down.png`).
+When level5 is in the run, the same `boss` step summons the Magma Titan: after 3 s of game time (it climbs out of the lava
+and beats its chest open; the heart is retracted between beats) both shoulder vents and the heart must be on screen
+(`level5-boss.png`, only those exposed), then only the crown of lava on its head (`level5-boss-crown.png`) before it goes
+black, flashes and bursts into lava chunks (`level5-boss-down.png`).
 Every boss must fit its fight window (#452: the boss arrives at 40 s of the 60 s run): the game seconds it moved before
 each phase was on screen plus every weak point's hp at 2 hits a second must be ≤ 20 s (`fight` on the summary line).
 When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pickups()`), parks the coaster behind the first

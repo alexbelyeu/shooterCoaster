@@ -45,14 +45,14 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2450, Kraken 2624, Yeti 3180; Inferno ends on its drakes, 2234', () => {
+  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2450, Kraken 2624, Yeti 3180, Magma Titan 2914', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
       ['level1', 'goldenBlimp', 2675],
       ['level2', 'giantScorpion', 2450],
       ['level3', 'kraken', 2624],
       ['level4', 'yeti', 3180],
-      ['level5', 'infernalDrake', 2234],
+      ['level5', 'magmaTitan', 2914],
     ])
     expect(getLevelConfig('level1')!.maxScore).toBe(150 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
   })
@@ -74,11 +74,13 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('one eruption in the Inferno, before the drakes', () => {
+  it('one eruption wave in the Inferno, before the Magma Titan, whose tell is the final eruption', () => {
     const level5 = getLevelConfig('level5')!
     const eruptions = level5.enemies.filter((w) => w.isEruption)
     expect(eruptions).toHaveLength(1)
     expect(eruptions[0].spawnDelay!).toBeLessThan(pacingTimes().bossAt)
+    expect(level5.boss?.type).toBe('magmaTitan')
+    expect(level5.enemies.some((w) => w.type === 'infernalDrake')).toBe(true)
   })
 
   it('every level comes at 2–4 enemies a second of the waves before the finale; Theme Park, the bar, keeps its 50-balloon waves', () => {

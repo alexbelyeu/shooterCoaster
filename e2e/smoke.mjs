@@ -43,8 +43,9 @@
  * The boss checks summon each finale and shoot it down in phase order: level1's Golden Blimp
  * (level1-boss.png, level1-boss-gondola.png, level1-boss-down.png), level2's Giant Scorpion
  * (level2-boss.png, level2-boss-stinger.png, level2-boss-down.png), level3's Kraken
- * (level3-boss.png, level3-boss-head.png, level3-boss-down.png) and level4's Yeti
- * (level4-boss.png, level4-boss-chest.png, level4-boss-down.png); see bossCheck().
+ * (level3-boss.png, level3-boss-head.png, level3-boss-down.png), level4's Yeti
+ * (level4-boss.png, level4-boss-chest.png, level4-boss-down.png) and level5's Magma Titan
+ * (level5-boss.png, level5-boss-crown.png, level5-boss-down.png); see bossCheck().
  * The pickup check shoots level1's first weapon pickup with a real bullet: the spread gun's badge,
  * a 3-bullet fan with the tinted tracer (level1-pickup.png), pause-safe expiry, reset on restart; see pickupCheck().
  * The audio check plays level1's sound from the title to its results: the score engine (#214, #416) and the arcade SFX (#217); see audioCheck().
@@ -1781,9 +1782,9 @@ async function pacingCheck(page, id) {
 
 /**
  * The finales the boss check summons: Theme Park's Golden Blimp (#181), Desert's Giant Scorpion (#318),
- * Ocean's Kraken (#183) and Antarctica's Yeti (#319). `minOnScreen` first-phase weak points must be on screen after
- * the boss alone has moved `settleS` s (the scorpion bursts out of the sand, the Kraken's tentacles rise out of the
- * water, the Yeti has climbed its ridge and thrown); `midSettleS` lets the last phase surface before `midShot`.
+ * Ocean's Kraken (#183), Antarctica's Yeti (#319) and Inferno's Magma Titan (#320). `minOnScreen` first-phase weak points
+ * must be on screen after the boss alone has moved `settleS` s (the scorpion bursts out of the sand, the Kraken's tentacles
+ * rise out of the water, the Yeti has climbed its ridge and thrown, the Titan has climbed out of the lava and opened its heart); `midSettleS` lets the last phase surface before `midShot`.
  * `firstPhase`: the id prefix(es) of the first phase. `minProjectiles`: thrown things (the Yeti's snowballs) on screen
  * in <level>-boss.png, each then shot through processHit as a normal kill that leaves the boss's hp alone.
  */
@@ -1792,6 +1793,7 @@ const BOSS_CHECKS = [
   { level: 'level2', minWidthFrac: 0.15, weakPoints: 7, firstPhase: ['claw-', 'tail-'], lastPhase: ['stinger'], midShot: 'boss-stinger', minOnScreen: 4, settleS: 2, midSettleS: 1 },
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
   { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1 },
+  { level: 'level5', minWidthFrac: 0.15, weakPoints: 4, firstPhase: ['vent-', 'heart'], lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 3, midSettleS: 0 },
 ]
 
 /**

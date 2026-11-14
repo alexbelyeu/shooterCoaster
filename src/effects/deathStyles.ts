@@ -160,6 +160,32 @@ export const SNOW_BURST_DEATH_STYLE: DeathStyle = {
   lifetime: 1.9, scale: 3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'crunch',
 }
 
+const LAVA_CHUNKS = (count: number) =>
+  layer({ shape: 'chunk', count, colors: ['#1c1412', '#2e1c16', '#4a2414', '#ff6a10'], speed: [30, 80], up: 50, drag: 0.4, gravity: 130, size: 9, spin: 4, hold: 0.75 })
+const LAVA_SPARKS = (count: number) =>
+  layer({ shape: 'spark', count, colors: ['#ff6a10', '#ffb030', '#ff3a08', '#fff0c0'], glow: 3.5, speed: [30, 130], up: 60, drag: 1.4, gravity: 120, size: 2.6, hold: 0.2 })
+
+/** The Magma Titan's vents, heart and crown: a lava golem's death, bigger. */
+export const TITAN_PART_DEATH_STYLE: DeathStyle = {
+  layers: [LAVA_CHUNKS(8), LAVA_SPARKS(40)],
+  lifetime: 1.9, scale: 3.4, lift: 0, flash: 8, flashColor: '#ff6a20', sound: 'crunch',
+}
+
+/** The Titan breaking apart: the pool's biggest lava-chunk burst, a few at once over its body. */
+export const TITAN_BREAK_DEATH_STYLE: DeathStyle = {
+  layers: [LAVA_CHUNKS(12), LAVA_SPARKS(48)],
+  lifetime: 2.6, scale: 6, lift: 0, flash: 10, flashColor: '#ffb060', sound: 'crunch',
+}
+
+/** Lava heaving where the Titan climbs out: sparks and a few clots, no flash. */
+export const LAVA_BURST_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'spark', count: 36, colors: ['#ff6a10', '#ff3a08', '#ffb030'], glow: 3, speed: [20, 90], up: 110, drag: 1, gravity: 160, size: 3.2, hold: 0.3 }),
+    layer({ shape: 'chunk', count: 6, colors: ['#ff6a10', '#4a2414'], speed: [20, 60], up: 90, drag: 0.5, gravity: 170, size: 7, spin: 4, hold: 0.7 }),
+  ],
+  lifetime: 1.6, scale: 3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'hiss',
+}
+
 export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
   balloon: {
     layers: [

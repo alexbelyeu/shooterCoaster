@@ -144,7 +144,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Descend into the volcanic depths',
     order: 5,
     biome: 'volcanic',
-    maxScore: 52 * 12 + 20 * 18 + 22 * 35 + 8 * 60, // 2234: no boss yet (the Magma Titan, #320), so the drakes are the finale
+    maxScore: 52 * 12 + 20 * 18 + 22 * 35 + 8 * 60 + 3 * 60 + 500, // 2234 + the Magma Titan's vents, heart and reward (bossSpecs.ts) = 2914
     message: 'You conquered the Inferno!',
     nextLevel: null,
     track: {
@@ -165,9 +165,10 @@ const LEVELS: LevelConfig[] = [
         { type: 'fireImp', count: 20, waveLabel: 'Imps Attack!', weight: 2 },
         { type: 'lavaGolem', count: 12, waveLabel: 'Golems Awaken!', weight: 2 },
         { type: 'emberWisp', count: 26, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', weight: 2 },
-        { type: 'lavaGolem', count: 10, waveLabel: 'Golems Return!', weight: 3 },
+        { type: 'infernalDrake', count: 8, waveLabel: 'Drakes Descend!', weight: 2 },
+        { type: 'lavaGolem', count: 10, waveLabel: 'Golems Return!', weight: 4 },
       ],
-      finale: { type: 'infernalDrake', count: 8, waveLabel: 'Drakes Descend!' },
+      boss: 'magmaTitan',
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {

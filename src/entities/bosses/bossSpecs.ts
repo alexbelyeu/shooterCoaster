@@ -3,6 +3,7 @@ import type { BossType } from '@/types/level'
 import type { BossSpec, WeakPointSpec } from './bossModel'
 import { KRAKEN_TENTACLE } from './krakenMotion'
 import { SCORPION_TAIL } from './scorpionMotion'
+import { TITAN_BODY } from './titanMotion'
 import { YETI_BODY } from './yetiMotion'
 
 /** Local frame: +x = nose; the root sits near the middle of hull + tow chain. */
@@ -103,9 +104,28 @@ export const YETI: BossSpec = {
   projectiles: { score: YETI_SNOWBALL.score, max: YETI_SNOWBALL.max },
 }
 
+const titanVent = (id: string, side: 1 | -1): WeakPointSpec => {
+  const [x, y, z] = TITAN_BODY.vent
+  return { id, radius: 105, offset: [side * x, y, z], hp: 2, score: 60, phase: 0 }
+}
+
+/** The vents and the heart first (the heart only while it beats its chest open), then the crown. */
+export const MAGMA_TITAN: BossSpec = {
+  name: 'The Magma Titan',
+  tell: { seconds: 3, label: 'Final Eruption!' },
+  reward: 500,
+  weakPoints: [
+    titanVent('vent-l', 1),
+    titanVent('vent-r', -1),
+    { id: 'heart', radius: 115, offset: [...TITAN_BODY.heart], hp: 2, score: 60, phase: 0 },
+    { id: 'crown', radius: 120, offset: [...TITAN_BODY.crown], hp: 4, score: 0, phase: 1 },
+  ],
+}
+
 export const BOSS_SPECS: Record<BossType, BossSpec> = {
   goldenBlimp: GOLDEN_BLIMP,
   kraken: KRAKEN,
   giantScorpion: GIANT_SCORPION,
   yeti: YETI,
+  magmaTitan: MAGMA_TITAN,
 }

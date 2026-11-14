@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { mergePainted, painted, paintedAt, pose } from '@/levels/environments/shared/paintedParts'
 import { withRim } from '@/entities/enemies/enemyRim'
+import { gradientNoiseGlsl } from '@/levels/environments/shared/noiseGlsl'
 import { BLIMP_LAYOUT } from './bossSpecs'
 import { KRAKEN_HEAD } from './krakenMotion'
 
@@ -447,3 +448,165 @@ export const SNOWBALL_MAT = withRim(
   new THREE.MeshStandardMaterial({ color: '#f4f8ff', roughness: 0.8, metalness: 0, flatShading: true, emissive: '#3a8ad0', emissiveIntensity: 0.35 }),
   { color: '#8fe0ff', intensity: 1.1, power: 1.8 },
 )
+
+// ── The Magma Titan (Inferno) ──
+// Cracked obsidian lit only by its own lava: Voronoi cracks glowing through every surface (hotter as its hp drops),
+// painted lava (eyes, vents, heart, crown, joints) glowing on top, and a warm rim for the edges (dark levels read by
+// emissive edges, never by a brighter frame).
+
+const OBSIDIAN = ['#16111a', '#1d151c', '#241a1e']
+const OBSIDIAN_EDGE = '#2e2024'
+const LAVA = '#ff6a10'
+const LAVA_HOT = '#ffc040'
+
+/** Obsidian painted per triangle in three near-blacks, then placed. */
+function obsidian(geo: THREE.BufferGeometry, matrix: THREE.Matrix4): THREE.BufferGeometry {
+  const g = geo.toNonIndexed()
+  geo.dispose()
+  g.deleteAttribute('uv')
+  const pos = g.attributes.position
+  const colors = new Float32Array(pos.count * 3)
+  const shades = OBSIDIAN.map((c) => new THREE.Color(c))
+  for (let t = 0; t < pos.count; t += 3) {
+    const pick = Math.abs(Math.floor(pos.getX(t) * 31 + pos.getY(t) * 17 + pos.getZ(t) * 13)) % 3
+    for (let k = 0; k < 3; k++) shades[pick].toArray(colors, (t + k) * 3)
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  return g.applyMatrix4(matrix)
+}
+
+const rock = (at: [number, number, number], scale: [number, number, number], rotation: [number, number, number] = [0, 0, 0], detail = 1) =>
+  obsidian(new THREE.IcosahedronGeometry(1, detail), pose(at, rotation, scale))
+
+const spire = (at: [number, number, number], height: number, radius: number, rotation: [number, number, number] = [0, 0, 0]) =>
+  obsidian(new THREE.ConeGeometry(radius, height, 5).translate(0, height / 2, 0), pose(at, rotation))
+
+const TITAN_CRACK_PARS = /* glsl */ `
+uniform float uGlow;
+uniform float uHeat;
+varying vec3 vCrackPos;
+varying vec3 vCrackNormal;
+${gradientNoiseGlsl}
+`
+
+/** Crack edges (F2 − F1 of a Voronoi) on three planes blended by the object normal, plus the painted lava. */
+const TITAN_CRACK_APPLY = /* glsl */ `
+#include <emissivemap_fragment>
+{
+  vec3 w = abs(normalize(vCrackNormal)) + 1e-3;
+  w /= (w.x + w.y + w.z);
+  vec3 p = vCrackPos * 0.011;
+  vec2 vx = voronoi(p.zy);
+  vec2 vy = voronoi(p.xz + 7.3);
+  vec2 vz = voronoi(p.xy + 3.1);
+  float edge = (vx.y - vx.x) * w.x + (vy.y - vy.x) * w.y + (vz.y - vz.x) * w.z;
+  float crack = 1.0 - smoothstep(0.03, 0.11, edge);
+  vec3 heat = mix(vec3(1.0, 0.22, 0.02) * 0.9, vec3(1.0, 0.86, 0.6) * 4.0, uGlow);
+  float painted = smoothstep(0.35, 0.6, vColor.r - vColor.b);
+  totalEmissiveRadiance += (heat * crack + vColor.rgb * painted * mix(1.8, 4.0, uGlow)) * uHeat;
+}
+`
+
+/** One material for its body and every part, so a hit's glow and the defeat's blackout move them all at once. */
+export const TITAN_OBSIDIAN_MAT = (() => {
+  const material = withRim(
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.15, flatShading: true }),
+    { color: '#ff9a50', intensity: 1.1, power: 2.2 },
+  )
+  const uniforms = { uGlow: { value: 0 }, uHeat: { value: 1 } }
+  material.userData.titan = uniforms
+  const rimCompile = material.onBeforeCompile
+  material.onBeforeCompile = (shader, renderer) => {
+    rimCompile(shader, renderer)
+    shader.uniforms.uGlow = uniforms.uGlow
+    shader.uniforms.uHeat = uniforms.uHeat
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vCrackPos;\nvarying vec3 vCrackNormal;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCrackPos = position;\nvCrackNormal = objectNormal;')
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${TITAN_CRACK_PARS}`)
+      .replace('#include <emissivemap_fragment>', TITAN_CRACK_APPLY)
+  }
+  material.customProgramCacheKey = () => 'sc-enemy-rim-v2-titan-crack'
+  return material
+})()
+
+/** The one Titan's crack heat (`crackGlow`) and glow multiplier (`defeatHeat`). */
+export const TITAN_CRACK_UNIFORMS = TITAN_OBSIDIAN_MAT.userData.titan as { uGlow: { value: number }; uHeat: { value: number } }
+
+/** Hips up (the legs, arms and head are separate); +z towards the rider. */
+export const TITAN_BODY_GEO = mergePainted([
+  rock([0, 480, -10], [240, 120, 160]),
+  rock([0, 680, -20], [230, 180, 160], [0.1, 0, 0]),
+  rock([0, 920, -10], [400, 200, 185]),
+  obsidian(new THREE.CylinderGeometry(95, 130, 200, 6), pose([0, 1110, 60], [0.3, 0, 0])),
+  ...[-1, 1].flatMap((side) => [
+    // Chest plates round the heart's hollow, boulders under the vents, spires over the shoulders.
+    rock([side * 150, 860, 160], [140, 150, 70], [0, side * 0.35, side * 0.15], 0),
+    rock([side * 370, 1030, 0], [165, 140, 150]),
+    spire([side * 380, 1060, -90], 330, 70, [-0.35, 0, -side * 0.45]),
+    spire([side * 230, 1000, -170], 280, 60, [-0.6, 0, -side * 0.2]),
+    paintedAt(new THREE.IcosahedronGeometry(1, 0), LAVA, pose([side * 170, 420, 20], [0, 0, 0], [70, 45, 70])),
+  ]),
+  // A spine of spires down its back: the cathedral.
+  ...[0, 1, 2].map((k) => spire([0, 1050 - k * 170, -200 + k * 10], 380 - k * 80, 80 - k * 12, [-0.5, 0, 0])),
+])
+
+/** About its neck; +z its face: a heavy brow over two crater-glow eyes. */
+export const TITAN_HEAD_GEO = mergePainted([
+  rock([0, 40, 0], [140, 140, 125], [0, 0.4, 0], 0),
+  rock([0, 95, 80], [150, 40, 60], [0.2, 0, 0], 0),
+  rock([0, -45, 60], [105, 55, 80], [-0.2, 0, 0], 0),
+  ...[-1, 1].map((side) => paintedAt(new THREE.IcosahedronGeometry(1, 1), LAVA_HOT, pose([side * 55, 40, 115], [0, 0, 0], [32, 24, 16]))),
+  paintedAt(new THREE.BoxGeometry(120, 14, 20), LAVA, pose([0, -55, 135])),
+])
+
+/** Hangs from its shoulder (y 0) down to the fist (y −armLength); lava in the elbow and knuckles. */
+export const TITAN_ARM_GEO = mergePainted([
+  obsidian(new THREE.CylinderGeometry(115, 95, 380, 7).translate(0, -190, 0), new THREE.Matrix4()),
+  paintedAt(new THREE.IcosahedronGeometry(1, 0), LAVA, pose([0, -400, 0], [0, 0, 0], [80, 60, 80])),
+  obsidian(new THREE.CylinderGeometry(100, 125, 330, 7).translate(0, -585, 0), new THREE.Matrix4()),
+  rock([0, -760, 15], [155, 140, 150], [0.3, 0.2, 0], 0),
+  ...[-1, 0, 1].map((k) => paintedAt(new THREE.IcosahedronGeometry(1, 0), LAVA, pose([k * 60, -800, 130], [0, 0, 0], [30, 26, 22]))),
+])
+
+/** Hip (y 0) to foot; the stride swings it about its hip. */
+export const TITAN_LEG_GEO = mergePainted([
+  obsidian(new THREE.CylinderGeometry(140, 115, 300, 7).translate(0, -150, 0), new THREE.Matrix4()),
+  paintedAt(new THREE.IcosahedronGeometry(1, 0), LAVA, pose([0, -310, 30], [0, 0, 0], [80, 55, 80])),
+  obsidian(new THREE.CylinderGeometry(120, 150, 300, 7).translate(0, -470, 0), new THREE.Matrix4()),
+  rock([0, -600, 50], [170, 70, 210], [0, 0, 0], 0),
+])
+
+/** A crater on its shoulder, brimming with lava. */
+export const TITAN_VENT_GEO = mergePainted([
+  obsidian(new THREE.CylinderGeometry(95, 140, 110, 7, 1, true), new THREE.Matrix4()),
+  paintedAt(new THREE.SphereGeometry(1, 10, 6), LAVA_HOT, pose([0, 25, 0], [0, 0, 0], [92, 50, 92])),
+  ...[0, 1, 2, 3, 4].map((k) => spire([Math.cos(k * 1.26) * 105, 30, Math.sin(k * 1.26) * 105], 70 + (k % 2) * 40, 26)),
+])
+
+/** The heart behind its chest plates, shut on a dull seam between beats. */
+export const TITAN_HEART_SHUT_GEO = mergePainted([
+  ...[-1, 1].map((side) => rock([side * 62, 0, -10], [80, 120, 50], [0, side * 0.2, 0], 0)),
+  paintedAt(new THREE.BoxGeometry(18, 170, 20), LAVA, pose([0, 0, 20])),
+])
+
+/** The plates parted on a blazing core. */
+export const TITAN_HEART_OPEN_GEO = mergePainted([
+  ...[-1, 1].map((side) => rock([side * 135, 0, -30], [70, 125, 50], [0, side * 0.6, 0], 0)),
+  paintedAt(new THREE.IcosahedronGeometry(1, 2), LAVA_HOT, pose([0, 0, 0], [0, 0, 0], [105, 115, 85])),
+])
+
+/** A ring of lava spikes on its head. */
+export const TITAN_CROWN_GEO = mergePainted([
+  painted(new THREE.TorusGeometry(110, 32, 6, 12), OBSIDIAN_EDGE, [0, 0, 0], [Math.PI / 2, 0, 0]),
+  ...Array.from({ length: 7 }, (_, k) => {
+    const a = (k / 7) * Math.PI * 2
+    const tall = k % 2 === 0
+    return paintedAt(
+      new THREE.ConeGeometry(30, tall ? 210 : 150, 5).translate(0, tall ? 105 : 75, 0),
+      tall ? LAVA_HOT : LAVA,
+      pose([Math.sin(a) * 110, 10, Math.cos(a) * 110], [Math.cos(a) * 0.25, 0, -Math.sin(a) * 0.25]),
+    )
+  }),
+])
