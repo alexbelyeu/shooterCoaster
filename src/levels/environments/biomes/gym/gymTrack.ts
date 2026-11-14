@@ -112,13 +112,13 @@ export function gymControlPoints(): Vec3[] {
     { x: 36, y: 4.8, z: 34 },
     { x: 28, y: 4.1, z: 32 },
     { x: 22, y: 2.9, z: 30.2 },
-    pit(15.4, 3.3, 7.6),
-    pit(11.4, 1.6, 5.6),
+    pit(16, 3.3, 8),
+    pit(13.2, 1.8, 6.2),
     // Rising gently at the star, then (after the run) the U-turn under it, back to the Tree.
-    pit(8, 2.1, 3.8),
-    pit(5.6, 2.6, 0.6),
-    pit(6.3, 3, -3.4),
-    pit(9.1, 3.4, -6),
+    pit(11, 2.1, 4.2),
+    pit(10, 2.6, 0.6),
+    pit(10.8, 3, -3.6),
+    pit(13, 3.4, -6.4),
     treeFace(0.5, 1.4),
   ]
 }

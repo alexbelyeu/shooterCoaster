@@ -7,7 +7,7 @@ import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake'
 import { placeSound, sfx } from '@/audio/sfx'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { MEDUSA_CHALK_BURST_DEATH_STYLE, MEDUSA_SNAKE_DEATH_STYLE } from '@/effects/deathStyles'
-import { GYM_SCALE, STAR, toWorld } from '@/levels/environments/biomes/gym/blockout'
+import { GYM_SCALE, STAR } from '@/levels/environments/biomes/gym/blockout'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
 import BossConfetti from './BossConfetti'
 import { currentPhase, weakPointHp, type WeakPointSpec } from './bossModel'
@@ -18,7 +18,7 @@ import {
   MEDUSA_SNAKE_HEAD_GEO, MEDUSA_SNAKE_HEAD_MAT, MEDUSA_SNAKE_MAT, MEDUSA_STAR_GLOW_GEO, MEDUSA_STAR_GLOW_MAT,
 } from './bossAssets'
 import {
-  MEDUSA_DEFEAT, MEDUSA_RISE, SNAKE, SNAKE_SLOTS, bodyPlacement, defeatSink, laughShake, laySnake, smooth01,
+  MEDUSA_DEFEAT, MEDUSA_RISE, SNAKE, SNAKE_SLOTS, MEDUSA_HUB, bodyPlacement, defeatSink, laughShake, laySnake, smooth01, yawToward,
   snakeLength, snakeRadius, strikeLandsBetween,
 } from './medusaMotion'
 
@@ -28,8 +28,9 @@ const TELL_SECONDS = MEDUSA.tell.seconds
 /** Phase 0's snakes uncoil as she finishes rising. */
 const FIRST_SNAKES_AT = MEDUSA_RISE.riseS * 0.5
 const CROWN_HEAD_SCALE = 1.5
+/** A snake becomes a target once it is this far out of her curls. */
+const SNAKE_TARGET_GROWN = 0.8
 const LEAN_TAU = 0.35
-const MAX_YAW = 0.35
 const STAR_RADIUS = STAR.radius * GYM_SCALE
 const HUB_RADIUS = 34
 const RISE_TRAUMA = [0.35, 500] as const
@@ -38,11 +39,7 @@ const DEFEAT_TRAUMA = [0.6, 900] as const
 const EXIT_SECONDS = MEDUSA_DEFEAT.laughS + MEDUSA_DEFEAT.sinkS + 0.6
 
 /** The star's front at its hub (world), and the way it faces. */
-const HUB = (() => {
-  const c = toWorld(STAR.centre)
-  const proud = STAR.depth * GYM_SCALE + 2
-  return new THREE.Vector3(c.x + STAR.facing.x * proud, c.y, c.z + STAR.facing.z * proud)
-})()
+const HUB = new THREE.Vector3(...MEDUSA_HUB)
 const FACING = new THREE.Vector3(STAR.facing.x, 0, STAR.facing.z).normalize()
 const FACING_YAW = Math.atan2(FACING.x, FACING.z)
 
@@ -133,7 +130,7 @@ export default function Medusa(props: BossProps) {
   })
 
   const move = useCallback(
-    ({ root, parts, camera, state, dt, age, sinceDefeat }: BossFrame) => {
+    ({ root, parts, camera, state, dt, age, sinceDefeat, retract }: BossFrame) => {
       const fighting = sinceDefeat < 0
       const phase = currentPhase(state)
       if (phase > 0 && sim.phaseAt[phase] === null) sim.phaseAt[phase] = age
@@ -143,8 +140,8 @@ export default function Medusa(props: BossProps) {
       // Rise out of the hub, lean out in phase 2, laugh and sink back on defeat; turn a little towards the rider.
       bodyPlacement(age, sim.lean, sinceDefeat, _place)
       camera.getWorldPosition(_cam)
-      const toward = Math.atan2(_cam.x - HUB.x, _cam.z - HUB.z) - FACING_YAW
-      const yaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, Math.atan2(Math.sin(toward), Math.cos(toward))))
+      _p.subVectors(_cam, HUB)
+      const yaw = yawToward(_p.x * FACING.z - _p.z * FACING.x, _p.x * FACING.x + _p.z * FACING.z)
       const shake = laughShake(sinceDefeat)
       root.rotation.order = 'YXZ'
       root.rotation.set(_place.pitch + shake * 0.03, FACING_YAW + yaw, shake * 0.04)
@@ -155,7 +152,7 @@ export default function Medusa(props: BossProps) {
       if (!sim.placed) {
         sim.placed = true
         // Under her chest, where the star's lower points are, so the cloud never hides her face.
-        getExplosionPool()?.explode(_p.copy(HUB).addScaledVector(FACING, 40).setY(HUB.y - 150), MEDUSA_CHALK_BURST_DEATH_STYLE)
+        getExplosionPool()?.explode(_p.copy(HUB).addScaledVector(FACING, 40).setY(HUB.y - 100), MEDUSA_CHALK_BURST_DEATH_STYLE)
         eventBus.emit(CAMERA_TRAUMA_EVENT, RISE_TRAUMA[0], RISE_TRAUMA[1])
       }
 
@@ -180,10 +177,13 @@ export default function Medusa(props: BossProps) {
       root.worldToLocal(_camLocal)
       const beads = beadsRef.current
       let hissed = false
-      SNAKE_SLOTS.forEach((s, i) => {
+      for (let i = 0; i < SNAKE_SLOTS.length; i++) {
+        const s = SNAKE_SLOTS[i]
         const w = MEDUSA.weakPoints[i]
         const alive = weakPointHp(state, w.id) > 0
         const grown = alive ? snakeLength(s, s.phase <= phase ? sim.phaseAt[s.phase] : null, age, true) : SNAKE.stub * (1 - sunk)
+        // Still uncoiling inside her curls: not a target yet.
+        retract(w.id, fighting && alive && s.phase === phase && grown < SNAKE_TARGET_GROWN)
         _b.set(_camLocal.x - s.root[0], _camLocal.y - s.root[1], _camLocal.z - s.root[2]).normalize()
         _dir[0] = _b.x
         _dir[1] = _b.y
@@ -207,7 +207,7 @@ export default function Medusa(props: BossProps) {
         }
         const part = parts.get(w.id)
         const head = heads.get(w.id)
-        if (!part || !head) return
+        if (!part || !head) continue
         part.position.set(p[N * 3], p[N * 3 + 1], p[N * 3 + 2])
         _b.set(p[N * 3] - p[N * 3 - 3], p[N * 3 + 1] - p[N * 3 - 2], p[N * 3 + 2] - p[N * 3 - 1])
         if (_b.lengthSq() > 1e-6) part.quaternion.setFromUnitVectors(Z_AXIS, _b.normalize())
@@ -217,7 +217,7 @@ export default function Medusa(props: BossProps) {
           eventBus.emit(CAMERA_TRAUMA_EVENT, STRIKE_TRAUMA[0], STRIKE_TRAUMA[1])
           sfx().kill(0, 'hiss', placeSound(part.getWorldPosition(_p)))
         }
-      })
+      }
       if (beads) beads.instanceMatrix.needsUpdate = true
     },
     [sim, points, heads, showStar],

@@ -1805,7 +1805,8 @@ async function pacingCheck(page, id) {
  * `firstPhase`: the id prefix(es) of the first phase. `minProjectiles`: thrown things (the Yeti's snowballs) on screen
  * in <level>-boss.png, each then shot through processHit as a normal kill that leaves the boss's hp alone. `midPhases`: phases
  * between the first and the last, each cleared after `midSettleS`. `rideTo`: the track fraction to ride to first, for a boss
- * that stays where it is (the Medusa in the Starr) rather than coming to the rider.
+ * that stays where it is (the Medusa in the Starr) rather than coming to the rider. `passShots`: track fractions ridden to
+ * after `midShot`, each a `<level>-boss-pass-<percent>.png` (the ride past the leant-out Medusa).
  */
 const BOSS_CHECKS = [
   { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
@@ -1813,7 +1814,7 @@ const BOSS_CHECKS = [
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
   { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1 },
   { level: 'level5', minWidthFrac: 0.15, weakPoints: 4, firstPhase: ['vent-', 'heart'], lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 3, midSettleS: 0 },
-  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.75 },
+  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.75, passShots: [0.84, 0.9] },
 ]
 
 /**
@@ -1847,7 +1848,7 @@ async function stepBoss(page, seconds, ready) {
  * Game time is frozen while it is hit; if the wall-clock level timer still runs out, the step is skipped.
  */
 async function bossCheck(page, check) {
-  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS, minProjectiles = 0, midPhases = 0, rideTo = null } = check
+  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS, minProjectiles = 0, midPhases = 0, rideTo = null, passShots = [] } = check
   const problems = []
   const boss = () => page.evaluate(() => window.__SC_TEST__.boss())
   const events = () => page.evaluate(() => ({ ...window.__SC_TEST__.bossEvents }))
@@ -1916,6 +1917,12 @@ async function bossCheck(page, check) {
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const surfaced = await stepBoss(page, midSettleS, () => onScreen(1))
   await page.screenshot({ path: path.join(OUT, `${level}-${midShot}.png`), timeout: SHOT_TIMEOUT })
+  // Leant out for her last phase: the ride's last stretch past her, for a look that it stays clear of her bust.
+  for (const t of passShots) {
+    await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, t)
+    await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+    await page.screenshot({ path: path.join(OUT, `${level}-boss-pass-${Math.round(t * 100)}.png`), timeout: SHOT_TIMEOUT })
+  }
   const lastHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), midway.exposed.reduce((sum, e) => sum + e.hp, 0))
   const finalHits = await boss()
   // Let the last pop finish (slowly, so the confetti stays near) with its popup held.

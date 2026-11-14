@@ -5,6 +5,7 @@ import { gradientNoiseGlsl } from '@/levels/environments/shared/noiseGlsl'
 import { createRng } from '@/utils/rng'
 import { BLIMP_LAYOUT } from './bossSpecs'
 import { KRAKEN_HEAD } from './krakenMotion'
+import { MEDUSA_BUST } from './medusaMotion'
 
 // Module-level singletons like SharedEnemyAssets; ShaderWarmup walks these exports too.
 
@@ -647,8 +648,9 @@ function skin(geo: THREE.BufferGeometry, matrix: THREE.Matrix4): THREE.BufferGeo
   return g
 }
 
-const skinBall = (at: [number, number, number], scale: [number, number, number], detail = 3) =>
-  skin(new THREE.IcosahedronGeometry(1, detail), pose(at, [0, 0, 0], scale))
+type V3 = readonly [number, number, number]
+const skinBall = ([x, y, z]: V3, [sx, sy, sz]: V3, detail = 3) =>
+  skin(new THREE.IcosahedronGeometry(1, detail), pose([x, y, z], [0, 0, 0], [sx, sy, sz]))
 
 /** A limb from `a` to `b`, radius `ra` at `a` tapering to `rb`. */
 function limb(a: [number, number, number], b: [number, number, number], ra: number, rb: number): THREE.BufferGeometry {
@@ -663,11 +665,17 @@ function limb(a: [number, number, number], b: [number, number, number], ra: numb
   return skin(new THREE.CylinderGeometry(rb, ra, dir.length(), 12, 2), m)
 }
 
+function gown(): THREE.BufferGeometry {
+  const [x, y, z] = MEDUSA_BUST.gown.at
+  const [sx, sy, sz] = MEDUSA_BUST.gown.radii
+  return paintedAt(new THREE.IcosahedronGeometry(1, 3), GOWN, pose([x, y, z], [0, 0, 0], [sx, sy, sz]))
+}
+
 /** Root at the star's hub, +z towards the rider: bust, arms on the star's points, neck, head and face. */
 export const MEDUSA_BODY_GEO = mergePainted([
   // Shoulders and a jewel-purple gown with a gold neckline.
-  skinBall([0, -92, -5], [138, 52, 62]),
-  paintedAt(new THREE.IcosahedronGeometry(1, 3), GOWN, pose([0, -150, 0], [0, 0, 0], [132, 72, 68])),
+  skinBall(MEDUSA_BUST.shoulders.at, MEDUSA_BUST.shoulders.radii),
+  gown(),
   paintedAt(new THREE.TorusGeometry(1, 0.06, 6, 32), GOLD_TRIM, pose([0, -112, 18], [Math.PI / 2 - 0.25, 0, 0], [118, 52, 60])),
   // A little gold star on a chain: the Starr's queen.
   paintedAt(new THREE.TorusGeometry(36, 2.4, 5, 24, Math.PI), GOLD_TRIM, pose([0, -60, 34], [0.35, 0, Math.PI])),
@@ -681,7 +689,7 @@ export const MEDUSA_BODY_GEO = mergePainted([
   ]),
   // Neck and head.
   limb([0, -80, -8], [0, -10, -4], 33, 29),
-  skinBall([0, 40, 0], [66, 80, 68]),
+  skinBall(MEDUSA_BUST.head.at, MEDUSA_BUST.head.radii),
   ...[-1, 1].flatMap((side) => [
     skinBall([side * 64, 36, -2], [9, 16, 11], 2),
     paintedAt(new THREE.TorusGeometry(11, 2.2, 6, 16), GOLD_TRIM, pose([side * 67, 12, 2], [0, Math.PI / 2, 0])),

@@ -4,11 +4,26 @@
  * laughs and sinks back on defeat; each snake grows from a slot in her curls, sways, rears and strikes at the camera.
  */
 
+import { GYM_SCALE, STAR, toWorld } from '@/levels/environments/biomes/gym/blockout'
+
 type V3 = readonly [number, number, number]
 
+/** The star's front at its hub (world): her root's origin before she rises out. */
+export const MEDUSA_HUB: V3 = (() => {
+  const c = toWorld(STAR.centre)
+  const proud = STAR.depth * GYM_SCALE + 2
+  return [c.x + STAR.facing.x * proud, c.y, c.z + STAR.facing.z * proud]
+})()
+
+/** How far she turns her head and shoulders towards the rider, either way (radians). */
+export const MEDUSA_MAX_YAW = 0.35
+
 export const MEDUSA_BODY = {
-  /** Out from the star's front to her root at full rise, so the bust stands clear of the star's points. */
-  out: 60,
+  /**
+   * Out from the star's front to her root at full rise. With `MEDUSA_RISE.leanOut` it keeps her bust off the ride's
+   * last stretch, which turns round in the pit in front of her (`gymTrack.test.ts` checks the clearance).
+   */
+  out: 35,
   /** Head centre (its sphere is about 80 across, the curls reach ~140 out). */
   head: [0, 40, 0] as V3,
 } as const
@@ -19,10 +34,41 @@ export const MEDUSA_RISE = {
   from: [0, -110, -170] as V3,
   fromScale: 0.3,
   /** The second phase: this much further out, pitched this far forwards. */
-  leanOut: 45,
+  leanOut: 25,
   leanPitch: 0.16,
   leanS: 0.8,
 } as const
+
+export interface Ellipsoid {
+  at: V3
+  radii: V3
+}
+
+/** Her bust's solid shapes, root-local: `MEDUSA_BODY_GEO` draws the first three, the last bounds her curls. */
+export const MEDUSA_BUST = {
+  shoulders: { at: [0, -92, -5], radii: [138, 52, 62] },
+  gown: { at: [0, -150, 0], radii: [132, 72, 68] },
+  head: { at: [0, 40, 0], radii: [66, 80, 68] },
+  curls: { at: [0, 54, -12], radii: [113, 117, 105] },
+} as const satisfies Record<string, Ellipsoid>
+
+/** Her turn towards a point `side` across and `out` in front of the hub (root-local x / z), clamped to `MEDUSA_MAX_YAW`. */
+export function yawToward(x: number, z: number): number {
+  return Math.max(-MEDUSA_MAX_YAW, Math.min(MEDUSA_MAX_YAW, Math.atan2(x, z)))
+}
+
+/**
+ * The smallest of `p`'s (root-local) distances from each bust shape grown by `margin`, in units of that shape's
+ * radii: under 1 is inside one.
+ */
+export function bustClearance(p: V3, margin: number): number {
+  let min = Infinity
+  for (const { at, radii } of Object.values(MEDUSA_BUST)) {
+    const d = Math.hypot((p[0] - at[0]) / (radii[0] + margin), (p[1] - at[1]) / (radii[1] + margin), (p[2] - at[2]) / (radii[2] + margin))
+    if (d < min) min = d
+  }
+  return min
+}
 
 export const MEDUSA_DEFEAT = {
   laughS: 1.3,
