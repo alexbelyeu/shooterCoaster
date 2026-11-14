@@ -1,0 +1,42 @@
+import { useEffect, useMemo } from 'react'
+import * as THREE from 'three'
+import type { BiomeDecorationsProps } from '../../shared/types'
+import { scatterNearTrack, settleOnGround, trackExtent } from '../../shared/trackScatter'
+import StaticInstances from '../../shared/StaticInstances'
+import { yawScaleMatrix } from '../../shared/yawScaleMatrix'
+import { createRng } from '@/utils/rng'
+import { BOULDER_COLOR } from './config'
+
+/** Boulders on the ground beside the track, seeded and kept off the rails and towers: one draw call. */
+export default function __Biome__Decorations({ groundFn, track }: BiomeDecorationsProps) {
+  const geometry = useMemo(() => new THREE.DodecahedronGeometry(1, 0), [])
+  const material = useMemo(() => new THREE.MeshStandardMaterial({ color: BOULDER_COLOR, roughness: 0.9, flatShading: true }), [])
+
+  const matrices = useMemo(() => {
+    const rng = createRng(__SEED__)
+    const count = 60
+    const points = scatterNearTrack({
+      count: count * 3,
+      track,
+      heightFn: groundFn,
+      minDist: 60,
+      maxDist: 800,
+      maxRadius: trackExtent(track) * 1.5,
+      maxSlope: Math.PI / 8,
+      bias: 1.5,
+      rng,
+    })
+    const boulders = settleOnGround(points, groundFn, { count, scaleRange: [8, 26], footprint: 1, height: 1, sink: 0.3, maxBury: 0.5, rng })
+    return boulders.map((b) => yawScaleMatrix(b, rng() * Math.PI * 2, b.scale))
+  }, [groundFn, track])
+
+  useEffect(
+    () => () => {
+      geometry.dispose()
+      material.dispose()
+    },
+    [geometry, material],
+  )
+
+  return <StaticInstances matrices={matrices} geometry={geometry} material={material} />
+}

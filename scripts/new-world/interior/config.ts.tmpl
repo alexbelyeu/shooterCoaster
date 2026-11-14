@@ -1,0 +1,35 @@
+import * as THREE from 'three'
+import type { ColorRamp } from '../../shared/types'
+import type { HeightFunction } from '@/utils/terrainNoise'
+import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
+
+// __NAME__, scaffolded by `npm run new-world --interior`: the hall, palette and props are this world's to author
+// (the Climbing Gym, biomes/gym/, is the worked example).
+
+/** The hall's floor (the terrain mesh). */
+export const COLOR_RAMP: ColorRamp = {
+  stops: [
+    { height: 0, color: new THREE.Color(0x6f747a) },
+    { height: 1, color: new THREE.Color(0x6f747a) },
+  ],
+  cliffColor: new THREE.Color(0x6f747a),
+}
+
+/** The hall's inside (world units, centred on the origin): it must hold the whole track, towers and ride. */
+export const HALL = { halfWidth: 1600, halfDepth: 1600, height: 1000 }
+
+/** Enemies keep this far inside the walls and under the roof. */
+const HALL_INSET = 40
+
+export const HALL_BOUNDS: PlacementBounds = {
+  minX: -HALL.halfWidth + HALL_INSET,
+  maxX: HALL.halfWidth - HALL_INSET,
+  minZ: -HALL.halfDepth + HALL_INSET,
+  maxZ: HALL.halfDepth - HALL_INSET,
+  maxY: HALL.height - HALL_INSET,
+}
+
+/** A flat floor: shape it here (pits, steps) and every prop and enemy stands on it. */
+export const hallFloor: HeightFunction = () => 0
+
+export const HALL_COLORS = { wall: 0xe6e8e4, crate: 0x9a7a52 }

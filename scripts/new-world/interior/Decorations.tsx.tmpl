@@ -1,0 +1,40 @@
+import { useEffect, useMemo } from 'react'
+import * as THREE from 'three'
+import type { BiomeDecorationsProps } from '../../shared/types'
+import { scatterNearTrack } from '../../shared/trackScatter'
+import StaticInstances from '../../shared/StaticInstances'
+import { yawScaleMatrix } from '../../shared/yawScaleMatrix'
+import { createRng } from '@/utils/rng'
+import { HALL, HALL_COLORS } from './config'
+
+/** Crates on the floor beside the track, seeded, off the rails and towers and inside the hall: one draw call. */
+export default function __Biome__Decorations({ groundFn, track }: BiomeDecorationsProps) {
+  const geometry = useMemo(() => new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), [])
+  const material = useMemo(() => new THREE.MeshStandardMaterial({ color: HALL_COLORS.crate, roughness: 0.8 }), [])
+
+  const matrices = useMemo(() => {
+    const rng = createRng(__SEED__)
+    const points = scatterNearTrack({
+      count: 40,
+      track,
+      heightFn: groundFn,
+      minDist: 50,
+      maxDist: 400,
+      maxRadius: Math.min(HALL.halfWidth, HALL.halfDepth) - 60,
+      maxSlope: Math.PI / 8,
+      bias: 1.5,
+      rng,
+    })
+    return points.map((p) => yawScaleMatrix(p, rng() * Math.PI * 2, 20 + rng() * 25))
+  }, [groundFn, track])
+
+  useEffect(
+    () => () => {
+      geometry.dispose()
+      material.dispose()
+    },
+    [geometry, material],
+  )
+
+  return <StaticInstances matrices={matrices} geometry={geometry} material={material} />
+}

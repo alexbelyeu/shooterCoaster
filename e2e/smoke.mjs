@@ -96,6 +96,7 @@ import { planRun, STEP_LEVELS } from './shards.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
 import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
+import { isPlaceholder, pacingCeilings, sceneCeilings, setBudget } from '../scripts/newWorldPlan.mjs'
 
 const SECONDS = Number(arg('seconds', 10))
 const OUT = path.resolve(arg('out', 'e2e-results'))
@@ -187,6 +188,20 @@ const BUDGET_KEYS = [
   ['trackTriangles', 'track tris'],
 ]
 
+/**
+ * A level scaffolded by `npm run new-world` starts on placeholder `scene` / `pacing` ceilings: a local run sets them
+ * from what it measured (the budgets' own headroom rules, `newWorldPlan.mjs`), CI fails with the numbers to paste.
+ */
+function fillPlaceholderBudget(section, id, values) {
+  const json = JSON.stringify(values)
+  if (process.env.CI) return [`budgets.json ${section}.${id} is a placeholder: run this smoke locally to set it, or paste ${json}`]
+  const file = new URL('../budgets.json', import.meta.url)
+  fs.writeFileSync(file, setBudget(fs.readFileSync(file, 'utf8'), section, id, values))
+  BUDGETS[section][id] = values
+  console.log(`budgets.json ${section}.${id} set from this run: ${json}`)
+  return []
+}
+
 /** Each ride total past its ceiling; a level whose entry names `knownOver` (an open issue) only warns. */
 function sceneBudgetCheck(id, stats) {
   const budget = SCENE_BUDGETS[id]
@@ -199,6 +214,7 @@ function sceneBudgetCheck(id, stats) {
     trackObjects: track?.objects,
     trackTriangles: track?.triangles,
   }
+  if (isPlaceholder(budget)) return { over: fillPlaceholderBudget('scene', id, sceneCeilings(measured)), knownOver: null }
   const over = BUDGET_KEYS
     .filter(([key]) => measured[key] > budget[key])
     .map(([key, label]) => `${label}=${measured[key]} (budget ${budget[key]})`)
@@ -1776,7 +1792,8 @@ async function pacingCheck(page, id) {
   const pacing = pacingMetrics(samples, end)
   const shaders = await programsAfterWarmup(page)
   if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
-  problems.push(...pacingBudgetProblems(id, pacing, BUDGETS.pacing?.[id]))
+  const budget = BUDGETS.pacing?.[id]
+  problems.push(...(isPlaceholder(budget) ? fillPlaceholderBudget('pacing', id, pacingCeilings(pacing)) : pacingBudgetProblems(id, pacing, budget)))
   return { id: 'pacing', level: id, problems, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
 }
 
