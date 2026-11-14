@@ -185,6 +185,13 @@ export const RECIPES: readonly Recipe[] = [
     for (let i = 0; i < 3; i++) playInstrument(S, out, 'chip', t + i * 0.075, 0.06, top - i, 0.8 - i * 0.1)
     zap(S, out, t + 0.225, 'triangle', 330, 90, 0.25, 0.07, 0.5)
   } },
+  // A bystander shot (#518): a game-show "wrong" buzzer, two flat square-wave honks a semitone apart, falling.
+  { id: 'penalty', lengthS: fixed(0.55), render(S, out, t) {
+    zap(S, out, t, 'square', 185, 175, 0.16, 0.09, 0.7)
+    zap(S, out, t, 'sawtooth', 92, 88, 0.16, 0.09, 0.4)
+    zap(S, out, t + 0.2, 'square', 175, 150, 0.26, 0.13, 0.75)
+    zap(S, out, t + 0.2, 'sawtooth', 87, 75, 0.26, 0.13, 0.45)
+  } },
   // FRENZY: two brass stabs on the beat (tonic, then the octave), crash, kick and timpani, a glock run between.
   { id: 'frenzy', lengthS: (b) => b.beatS * 2 + 1.2, render(S, out, t, b) {
     hitDrum(S, out, 'crash', t, 1)

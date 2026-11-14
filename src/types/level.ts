@@ -61,6 +61,11 @@ export interface EnemyWave {
   formation?: Formation
   /** Overrides the formation's default anchor. */
   formationOrigin?: FormationOrigin
+  /**
+   * Bystanders who come with the wave (#518): people, not targets, so a wall type (`ENEMY_PLACEMENT`) on the level's
+   * `walls`. Shooting one costs `BYSTANDER_PENALTY` and the combo; they are never kills, `maxScore` or the kill count.
+   */
+  bystanders?: { type: EnemyType; count: number }
 }
 
 export interface LevelConfig {

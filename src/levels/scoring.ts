@@ -26,6 +26,14 @@ export const SCORE_VALUES: Record<EnemyType, number> = {
   dustBunny: 12,
 }
 
+/** What shooting a bystander costs (#518): about one level-6 enemy. */
+export const BYSTANDER_PENALTY = SCORE_VALUES.rat
+
+/** A penalty only lowers the score, never below 0. */
+export function scoreAfterPenalty(score: number, penalty: number): number {
+  return Math.max(0, score - penalty)
+}
+
 /** Theme Park's bonus golden balloons: always out, outside the waves and `maxScore` (EnemySpawner). */
 export const GOLDEN_BALLOON = { biome: 'themePark', count: 3, score: SCORE_VALUES.balloon * 5 } as const
 
@@ -33,7 +41,7 @@ export function goldenBalloonCount(biome: string): number {
   return biome === GOLDEN_BALLOON.biome ? GOLDEN_BALLOON.count : 0
 }
 
-/** Σ(count × SCORE_VALUES[type]) over every wave, plus the boss's weak points and reward: the no-combo, kill-everything score. */
+/** Σ(count × SCORE_VALUES[type]) over every wave (its bystanders score nothing), plus the boss's weak points and reward: the no-combo, kill-everything score. */
 export function computeMaxScore(waves: readonly EnemyWave[], boss?: BossSpec): number {
   return waves.reduce((sum, w) => sum + w.count * SCORE_VALUES[w.type], boss ? bossMaxScore(boss) : 0)
 }

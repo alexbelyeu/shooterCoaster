@@ -346,6 +346,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   // Hold the level timer for every check below (the game clock still runs): however long they take on a slow runner,
   // the run can't time out and no wave or boss comes due under them. Released in the turn that ends the level.
   await page.evaluate(() => { window.__SC_TEST__.holdLevelTime = true })
+  problems.push(...(await bystanderProblems(page, id)))
   // Desktop mouse: one real click at the screen centre must fire through pointer input.
   const beforeClick = await getStats(page)
   const vp = page.viewportSize()
@@ -1661,6 +1662,43 @@ async function speedCheck(page, levelId) {
 }
 
 /** The wave the spawn-choreography check watches arrive: level2's first crow wave, a V (#30). */
+/** The level whose first wave brings bystanders (#518): `playLevel` shoots one (`bystanderProblems`). */
+const BYSTANDER_LEVEL = 'level6'
+/** `BYSTANDER_PENALTY` (src/levels/scoring.ts): one rat's points. */
+const BYSTANDER_PENALTY = 18
+
+/**
+ * The don't-shoot rule (#518): with a score and a 2×+ chain, one hit on a live climber must take the penalty off the
+ * score (floored at 0), reset the combo and count no kill and no hit. Screenshot `<id>-bystander.png` holds the red
+ * popup beside the friendly climber. First in the ride, before the climbers top out.
+ */
+async function bystanderProblems(page, id) {
+  if (id !== BYSTANDER_LEVEL) return []
+  const r = await page.evaluate(async () => {
+    const s = window.__SC_TEST__
+    s.killNearest(2)
+    s.primeCombo(5)
+    s.holdFeedback = true
+    const before = s.stats()
+    const hit = s.shootBystander()
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    return { hit, before, after: s.stats(), hint: document.querySelector('.hud-bystander-hint')?.textContent ?? null }
+  })
+  await page.screenshot({ path: path.join(OUT, `${id}-bystander.png`), timeout: SHOT_TIMEOUT })
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+  const { hit, before, after, hint } = r
+  if (!hit) return ['no live climber to check the bystander penalty on']
+  const problems = []
+  const expected = Math.max(0, before.score - BYSTANDER_PENALTY)
+  if (Math.abs(after.score - expected) > 1) problems.push(`bystander hit: score ${before.score} → ${after.score}, expected ${expected}`)
+  if (after.combo !== 0) problems.push(`bystander hit left the combo at ${after.combo}`)
+  if (after.kills !== before.kills || after.hits !== before.hits) problems.push('bystander hit counted as a kill or a hit')
+  if (after.bystandersHit !== 1) problems.push(`bystandersHit ${after.bystandersHit}, expected 1`)
+  if (!hint) problems.push("no don't-shoot hint after the first bystander hit")
+  console.log(`  ${id} bystander: score ${before.score} → ${after.score}, combo ${before.combo} → ${after.combo} (${hit})`)
+  return problems
+}
+
 const WAVE_CHECK = { level: 'level2', type: 'crow', label: 'A Murder of Crows!', minOnScreen: 5 }
 
 const WAVE_PAUSE_MS = 2000

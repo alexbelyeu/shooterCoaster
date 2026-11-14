@@ -95,6 +95,7 @@ export type ArcadeSoundId =
   | 'kill.ring'
   | 'kill.payout'
   | 'comboBreak'
+  | 'penalty'
   | 'frenzy'
   | 'frenzyLift'
   | 'waveTell'
@@ -143,6 +144,7 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   'kill.ring': { prio: PRIO.kill, db: -16, send: 0.2 },
   'kill.payout': { prio: PRIO.kill, db: -15, send: 0.2 },
   comboBreak: { prio: PRIO.cue, db: -13, send: 0.2 },
+  penalty: { prio: PRIO.event, db: -9, send: 0.1 },
   frenzy: { prio: PRIO.event, db: -5, send: 0.3 },
   frenzyLift: { prio: PRIO.event, db: -21, send: 0.1 },
   waveTell: { prio: PRIO.event, db: -8, send: 0.25 },

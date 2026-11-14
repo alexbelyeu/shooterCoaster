@@ -54,3 +54,12 @@ export function waveWindows(delays: readonly number[], bossAt: number | undefine
     return [from, Math.max(from, to)]
   })
 }
+
+/**
+ * The HUD's kill strip from the spawner's tally: an enemy that escaped (a climber topping out) leaves the total, so it
+ * never reads as a kill (#480). Bystanders are never in `spawned`.
+ */
+export function enemyCounts(spawned: number, killed: number, escaped: number): { remaining: number; total: number } {
+  const total = Math.max(0, spawned - escaped)
+  return { remaining: Math.max(0, total - killed), total }
+}

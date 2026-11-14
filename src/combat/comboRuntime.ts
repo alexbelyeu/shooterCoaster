@@ -1,6 +1,6 @@
 /**
  * Combo upkeep ticked by `GameTimer` on playing frames: the game clock, lapsed chains and starting the 5× slow-mo.
- * Emits 'combo:broken' { count, tier } when a 2×+ chain lapses and 'combo:frenzy' { count } on entering 5×.
+ * Emits 'combo:broken' { count, tier } when a 2×+ chain lapses or is broken (`breakCombo`) and 'combo:frenzy' { count } on entering 5×.
  */
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
@@ -41,12 +41,18 @@ export function tickCombo(delta: number): void {
   prevTier = tier
 
   advanceGameTime(delta * store.timeScale)
-  if (comboExpired(count, lastKillTime, gameTime())) {
-    store.resetCombo()
-    if (tier >= 1) {
-      brokenEvent.count = count
-      brokenEvent.tier = tier
-      eventBus.emit('combo:broken', brokenEvent)
-    }
+  if (comboExpired(count, lastKillTime, gameTime())) breakCombo()
+}
+
+/** Ends the chain now: a lapse, or a bystander hit (`bystanderHit.ts`). */
+export function breakCombo(): void {
+  const store = useGameStore.getState()
+  const { count } = store.combo
+  const tier = comboTierIndex(count)
+  store.resetCombo()
+  if (tier >= 1) {
+    brokenEvent.count = count
+    brokenEvent.tier = tier
+    eventBus.emit('combo:broken', brokenEvent)
   }
 }

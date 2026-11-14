@@ -13,7 +13,8 @@ import type { ShareMethod } from '@/ui/share'
 import { scoreCardRun } from '@/ui/scoreCard'
 import type { LeaderboardEntry } from '@/types/game'
 import { onlineEndpoint, onlineLeaderboard, runAccuracy, type OnlineEntry } from '@/store/onlineLeaderboard'
-import { barFill, formatAccuracy, formatTimeLeft, isNewRecord } from './resultsStats'
+import { barFill, bystanderRow, formatAccuracy, formatTimeLeft, isNewRecord } from './resultsStats'
+import { bystanderCount, bystanderNoun, bystanderType } from '@/combat/bystanders'
 import { initialsKey, type InitialsState } from './initialsEntry'
 import ResultsLeaderboard from './ResultsLeaderboard'
 
@@ -37,6 +38,7 @@ function snapshotRun() {
     totalEnemies: s.totalEnemies,
     hits: s.hits,
     shotsFired: s.shotsFired,
+    bystandersHit: s.bystandersHit.length,
     bestCombo: s.bestCombo,
     timeRemaining: s.timeRemaining,
     previousBest: previous?.score ?? 0,
@@ -243,10 +245,13 @@ export default function ResultsScreen() {
   const instant = { duration: 0 }
   const reveal = (from: number) => (stage >= from ? 'shown' : 'hidden')
   const entryOpen = done && initials !== null
+  const bystanders = bystanderType(config.enemies)
+  const spared = bystanders && bystanderRow(bystanderNoun(bystanders), bystanderCount(config.enemies), run.bystandersHit)
   const rows: [string, string][] = [
     ['Kills', `${run.kills} / ${run.totalEnemies}`],
     ['Accuracy', formatAccuracy(run.hits, run.shotsFired)],
     ['Best combo', run.bestCombo > 0 ? `×${run.bestCombo}` : '—'],
+    ...(spared ? [spared] : []),
     ['Time left', formatTimeLeft(run.timeRemaining)],
   ]
 

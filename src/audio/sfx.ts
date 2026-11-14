@@ -31,6 +31,8 @@ export interface SfxEngine {
   kill(combo: number, sound: KillSound, at: Placement | null): void
   bossPart(combo: number, partId: string, at: Placement | null): void
   comboBreak(): void
+  /** A bystander shot (#518). */
+  penalty(at: Placement | null): void
   frenzy(): void
   frenzyLift(on: boolean): void
   waveIncoming(): void
@@ -69,7 +71,7 @@ const silent = () => {}
 /** A mix render's music-only stem. */
 export const silentSfx: SfxEngine = {
   prepare: () => Promise.resolve(),
-  fire: silent, pickup: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, frenzy: silent, frenzyLift: silent,
+  fire: silent, pickup: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, penalty: silent, frenzy: silent, frenzyLift: silent,
   waveIncoming: silent, bossArrival: silent, bossHit: silent, bossDefeat: silent,
   fireworkWhistle: silent, fireworkPop: silent, starChime: silent, ui: silent, countdown: silent, wind: silent,
   nodeCount: () => 0,

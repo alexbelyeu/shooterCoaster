@@ -10,6 +10,7 @@ import FrenzyFlash from './FrenzyFlash'
 import SnowSplat from './SnowSplat'
 import BossBar from './BossBar'
 import WeaponBadge from './WeaponBadge'
+import BystanderHint from './BystanderHint'
 import { setTimeScaleOverride, timeScaleOverride } from '@/combat/slowMo'
 
 /** Thin segmented kills / total strip under the score. Renders on kills only. */
@@ -70,6 +71,7 @@ export default function HUD() {
       <SnowSplat />
       <ComboMeter />
       <WeaponBadge />
+      <BystanderHint levelId={currentLevel} />
       {/* Touch has no Escape key: an always-available pause button. */}
       <button
         className="hud-pause-button"
