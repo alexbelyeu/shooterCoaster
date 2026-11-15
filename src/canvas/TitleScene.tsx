@@ -9,6 +9,8 @@ import { BLEND_S, beatLockedRate, blendPose, titleCameraPose, titleShotS, type T
 import { CROSSING_LOOP, createTitleRide, type TitleRide } from './titleCoaster'
 import TitleCoaster, { type CoasterLivery, type TitleClock } from './TitleCoaster'
 import TitlePark from './TitlePark'
+import TitleHorizon from './TitleHorizon'
+import { CAMERA_FAR, HORIZON_FOG } from './titleHorizon'
 import TitleRides, { createTitleWaterMaterial } from './TitleRides'
 import { CAROUSELS, FERRIS_WHEEL, TENT_RING, clearOfCrossing } from './titlePark'
 import StaticInstances from '@/levels/environments/shared/StaticInstances'
@@ -79,7 +81,7 @@ function FlyByCamera({ ride, clock }: { ride: TitleRide; clock: TitleClock }) {
     cam.lookAt(target[0], target[1], target[2])
   })
 
-  return <PerspectiveCamera ref={camRef} makeDefault fov={55} near={1} far={2000} />
+  return <PerspectiveCamera ref={camRef} makeDefault fov={55} near={1} far={CAMERA_FAR} />
 }
 
 const TENTS: YawPlacement[] = Array.from({ length: TENT_RING.count }, (_, i) => {
@@ -367,6 +369,7 @@ export default function TitleScene() {
 
       {/* Golden-hour sunset sky */}
       <Sky distance={4500} sunPosition={[50, 10, -100]} />
+      <fog attach="fog" args={[HORIZON_FOG.color, HORIZON_FOG.near, HORIZON_FOG.far]} />
 
       {/* Warm lighting */}
       <hemisphereLight color="#fff0e0" groundColor="#553311" intensity={0.8} />
@@ -375,6 +378,8 @@ export default function TitleScene() {
 
       {/* Ground, paths, midway, crowds, trees and the lake; wide enough that the chase shots never see the ground's edge */}
       <TitlePark water={water} />
+      {/* Past the park: hills to the horizon, more rides, a town, their lights */}
+      <TitleHorizon />
 
       {/* Rides */}
       {/* The coaster runs under the wheel's rim, outside its legs (titleCoaster.test.ts). */}

@@ -25,7 +25,8 @@ function orbitShot(t: number, _u: number, _ctx: ShotContext, pos: Vec3, target: 
   pos[1] = 60 + Math.sin(a * 0.5) * 8
   pos[2] = Math.sin(a) * 180
   target[0] = 0
-  target[1] = 30
+  // Tilted up a touch to take in the hills and skyline past the park (#459).
+  target[1] = 40
   target[2] = 0
 }
 
