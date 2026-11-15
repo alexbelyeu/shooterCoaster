@@ -19,6 +19,8 @@ export interface LeaderboardEntry {
   stars: number
   /** Epoch ms of the run; identifies the entry. */
   date: number
+  /** `'60s'` for a run under the 60 s rules (#452); missing on a run from before them (`store/leaderboard.ts` `RULESET`). */
+  ruleset?: '60s'
 }
 
 export interface ComboState {
