@@ -1,0 +1,69 @@
+title    Lanternfly Hop
+composer Claude (ShooterCoaster)
+about    Climbing Gym (level6) option (#456): a cartoon chase in E-flat major at 176. A xylophone hook hops up the chord with a chromatic hiccup before each top note, like a spotted lanternfly jumping, over an oom-pah FM bass, offbeat marimba chords and a woodblock. The last eight bars lift a tone, to F major. Layers: hook, bass, marimba and block from the start, then bigkick, clap and hats at 2x, a glockenspiel an octave over the hook at 3x, sixteenth hats and synth-brass on the offbeats at FRENZY.
+tempo    176
+beats    4
+steps    4
+reverb   0.2
+
+# untagged voices are the base layer, the hook among them (layers only add); the intro plays every layer
+voice lead   xylophone vol=1.14
+voice mar    marimba   vol=0.53 pan=-0.3 center=G4 gate=0.6
+voice bass   fmbass    vol=0.72  gate=0.5
+voice block  block     vol=0.41 pan=0.4
+voice hit    orchhit   vol=0.48
+voice rise   riser     vol=0.31
+voice kick   bigkick   vol=0.53 layer=drums
+voice clap   clap909   vol=0.55 pan=-0.1 layer=drums
+voice hat    hat909    vol=0.31 pan=0.35 layer=drums
+voice crash  crash     vol=0.31 pan=-0.2 layer=drums
+voice glock  glock     vol=0.36  pan=0.25 oct=1 layer=lead
+voice fhat   hat909    vol=0.24  pan=-0.35 layer=frenzy
+voice brass  synbrass  vol=0.29 pan=0.3 center=G4 gate=0.5 layer=frenzy
+
+pattern intro
+lead  | Bb4 . . . Bb4 . . . Bb4 . Bb4 . Bb4 Bb4 Bb4 Bb4 | .--- .--- .--- F5 G5 A5 Bb5 |
+block | x... x... x.x. xxxx | x... x... x.x. xxxx |
+hit   | [Bb7]!--- .--- [Bb7]!--- .--- | [Bb7]!--- [Bb7]!--- [Bb7]!------- |
+bass  | Bb2--- .--- Bb2--- .--- | Bb2--- Bb2--- Bb2------- |
+rise  | _ | Bb5--------------- |
+kick  | X... .... X... .... | X... X... X.X. XXXX |
+
+pattern A
+lead  | Eb5 . G5 . Bb5- . Bb5 A5 Bb5 . G5- Eb5- . | C5 . Eb5 . G5- . G5 F#5 G5 . Eb5- C5- . | Ab5- G5- F5- Eb5- C5- Eb5- F5- Ab5- | Bb5----- Ab5 . F5 . D5- Bb4--- |
+glock | Eb5 . G5 . Bb5- . Bb5 A5 Bb5 . G5- Eb5- . | C5 . Eb5 . G5- . G5 F#5 G5 . Eb5- C5- . | Ab5- G5- F5- Eb5- C5- Eb5- F5- Ab5- | Bb5----- Ab5 . F5 . D5- Bb4--- |
+mar   | .- [Eb]- .- [Eb]- .- [Eb]- .- [Eb]- | .- [Cm]- .- [Cm]- .- [Cm]- .- [Cm]- | .- [Ab]- .- [Ab]- .- [Ab]- .- [Ab]- | .- [Bb7]- .- [Bb7]- .- [Bb7]- .- [Bb7]- |
+brass | .- [Eb]- .- [Eb]- .- [Eb]- .- [Eb]- | .- [Cm]- .- [Cm]- .- [Cm]- .- [Cm]- | .- [Ab]- .- [Ab]- .- [Ab]- .- [Ab]- | .- [Bb7]- .- [Bb7]- .- [Bb7]- .- [Bb7]- |
+bass  | Eb2- .- Eb3- .- Eb2- .- Bb2- .- | C3- .- G2- .- C3- .- G2- .- | Ab2- .- Eb3- .- Ab2- .- Eb3- .- | Bb2- .- F3- .- Bb2- .- D3- .- |
+block | .x.. ...x .x.. .... | % | % | .x.. .x.. x.x. xxxx |
+kick  | x... x... x... x... | % | % | x... x... x... x.xx |
+clap  | .... x... .... x... | % | % | .... x... ..x. x.xx |
+hat   | ..x. ..x. ..x. ..x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+fhat  | xxxx xxxx xxxx xxxx | % | % | % |
+
+pattern A2 from A
+lead  | Eb5 . G5 . Bb5- . Bb5 A5 Bb5 . G5- Eb5- . | C5 . Eb5 . G5- . G5 F#5 G5 . Eb5- C5- . | Ab5- G5- F5- Eb5- C5- Eb5- F5- Ab5- | Bb5--- Ab5 G5 F5 Eb5 D5 C5 Bb4--- Bb4 . |
+glock | Eb5 . G5 . Bb5- . Bb5 A5 Bb5 . G5- Eb5- . | C5 . Eb5 . G5- . G5 F#5 G5 . Eb5- C5- . | Ab5- G5- F5- Eb5- C5- Eb5- F5- Ab5- | Bb5--- Ab5 G5 F5 Eb5 D5 C5 Bb4--- Bb4 . |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+lead  | C6- Bb5- Ab5- Eb5- .- Ab5 . C6- Eb6- | D6--- C6- Bb5- F5--- .--- | C6- G5- Eb5- G5- C6- Eb6- D6- C6- | Eb6------- .- Bb5 . G5 . Eb5 . |
+glock | C6- Bb5- Ab5- Eb5- .- Ab5 . C6- Eb6- | D6--- C6- Bb5- F5--- .--- | C6- G5- Eb5- G5- C6- Eb6- D6- C6- | Eb6------- .- Bb5 . G5 . Eb5 . |
+mar   | .- [Ab]- .- [Ab]- .- [Ab]- .- [Ab]- | .- [Bb]- .- [Bb]- .- [Bb]- .- [Bb]- | .- [Cm]- .- [Cm]- .- [Cm]- .- [Cm]- | .- [Eb]- .- [Eb]- .- [Eb]- .- [Eb]- |
+brass | .- [Ab]- .- [Ab]- .- [Ab]- .- [Ab]- | .- [Bb]- .- [Bb]- .- [Bb]- .- [Bb]- | .- [Cm]- .- [Cm]- .- [Cm]- .- [Cm]- | .- [Eb]- .- [Eb]- .- [Eb]- .- [Eb]- |
+bass  | Ab2- .- Eb3- .- Ab2- .- Eb3- .- | Bb2- .- F3- .- Bb2- .- F3- .- | C3- .- G2- .- C3- .- G2- .- | Eb2- .- Eb3- .- Eb2- .- Bb2- .- |
+block | .... .... .x.x .... | % | % | .... .... x.x. x.x. |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern B2 from B
+lead  | C6- Bb5- Ab5- Eb5- .- Ab5 . C6- Eb6- | D6--- C6- Bb5- F5--- .--- | Ab5- F5- C5- F5- Ab5- C6- Bb5- Ab5- | F5- G5- Ab5- A5- Bb5----- .- |
+glock | C6- Bb5- Ab5- Eb5- .- Ab5 . C6- Eb6- | D6--- C6- Bb5- F5--- .--- | Ab5- F5- C5- F5- Ab5- C6- Bb5- Ab5- | F5- G5- Ab5- A5- Bb5----- .- |
+mar   | .- [Ab]- .- [Ab]- .- [Ab]- .- [Ab]- | .- [Bb]- .- [Bb]- .- [Bb]- .- [Bb]- | .- [Fm7]- .- [Fm7]- .- [Fm7]- .- [Fm7]- | .- [Bb7]- .- [Bb7]- .- [Bb7]- .- [Bb7]- |
+brass | .- [Ab]- .- [Ab]- .- [Ab]- .- [Ab]- | .- [Bb]- .- [Bb]- .- [Bb]- .- [Bb]- | .- [Fm7]- .- [Fm7]- .- [Fm7]- .- [Fm7]- | .- [Bb7]- .- [Bb7]- .- [Bb7]- .- [Bb7]- |
+bass  | Ab2- .- Eb3- .- Ab2- .- Eb3- .- | Bb2- .- F3- .- Bb2- .- F3- .- | F2- .- C2- .- F2- .- C2- .- | Bb2- .- F3- .- Bb2- .- D3- .- |
+hit   | _ | _ | _ | .--- .--- .--- [Bb7]!--- |
+clap  | .... x... .... x... | % | % | ..x. x.x. xxxx XXXX |
+
+play intro
+loop A A2 B B2 A A2 A+2 A2+2
