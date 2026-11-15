@@ -129,7 +129,7 @@ export function profileExtent(profile: readonly Panel[]): { height: number; forw
 }
 
 /** Depth behind a wall's face when the file gives none, and a floor slab's thickness. */
-const DEFAULT_BACK = 0.5
+export const DEFAULT_BACK = 0.5
 const SLAB_THICKNESS = 0.3
 
 /** How far the tree's headwall leans out past the caves' lip, at its top. */

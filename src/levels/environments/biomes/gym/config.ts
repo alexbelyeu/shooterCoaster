@@ -3,6 +3,7 @@ import type { ColorRamp } from '../../shared/types'
 import { GYM_SCALE, HALL, floorAt, toBlockout } from './blockout'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
+import type { WallStyle } from './wallPanels'
 
 /** The hall's floor (the terrain mesh): poured grey concrete, the same at both levels. */
 export const COLOR_RAMP: ColorRamp = {
@@ -33,7 +34,7 @@ export const gymFloor: HeightFunction = (x, z) => {
 
 /**
  * Paint per profile panel, bottom to top, for walls whose note gives bands (the rest are their `color`).
- * Read from Alex's notes in `blockout.json`; #519 adds the rugged panel variety.
+ * Read from Alex's notes in `blockout.json`; the rugged panels (`wallPanels.ts`) take their band's colour.
  */
 export const WALL_PAINT: Record<string, readonly string[]> = {
   'w-starr': ['#e8eae5', '#1d2320', '#f2c230'],
@@ -46,6 +47,26 @@ export const WALL_PAINT: Record<string, readonly string[]> = {
   'w-alaska-s': ['#d7ddd5', '#5f8a6a', '#9aa79c'],
   'b-training': ['#e3e6ee', '#3d6fd0', '#e3e6ee'],
 }
+
+/**
+ * Per-wall panel shapes and paint patterns from Alex's notes (#519): the Shield's big shield-shaped bulge
+ * in yellow and black triangles; the Lagoon's blue / purple waves. Other walls get a seeded small bulge or none.
+ */
+export const WALL_STYLE: Record<string, WallStyle> = {
+  'w-shield': { bulge: { along: 0, y: 6.5, halfW: 6.5, halfH: 5.5, amp: 1.4, shield: true }, pattern: 'triangles', triangles: 0.85 },
+  'w-lagoon-s': { pattern: 'wave' },
+  'w-south-ab': { pattern: 'wave' },
+  'b-south': { pattern: 'wave' },
+}
+
+/** The Tree (#519): bark from groove to ridge, white panels with green outlines, the green band at the top. */
+export const TREE_PAINT = { groove: '#3a2a1f', ridge: '#86643f', panel: '#dbe7d8', outline: '#3f8f4e', top: '#3f8f4e' }
+
+/**
+ * Grime (#558, "spectacularly Bushwick"): every panel a little off its paint, some chalk-caked, some swapped
+ * for bare plywood or grey primer patches, boot scuffs along the foot.
+ */
+export const GRIME = { chalk: '#e2ddd2', plywood: '#b08f62', primer: '#8f948f', seam: 0.45, shell: 0.8, scuffHeight: 1.1, scuff: 0.7 }
 
 /** Hold colours: the route-setters' tape colours. */
 export const HOLD_COLORS = ['#ff3d7f', '#ffd23f', '#3fcf6a', '#2f7bff', '#9b5cff', '#ff8a1f', '#f4f4f4', '#e8322c', '#1f1f22']
