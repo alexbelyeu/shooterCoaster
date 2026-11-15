@@ -12,16 +12,13 @@ import {
 const CROW_FLAP_HOVER = 4.5
 const CROW_FLAP_DIVE = 8
 
-/** On a hit the wings snap up while the crow flashes (`CROW_FLINCH_MAT` keeps the wing patch). */
 const tagFlinch = (mesh: THREE.Mesh | null) => {
   if (mesh) setFlashMaterial(mesh, CROW_FLINCH_MAT)
 }
 
 /**
- * A scrappy desert raven in two draw calls: the merged feathers (body, beak, feet, tail fan,
- * two-segment wings) and the eyes. The wings flap in the feather material's vertex shader from
- * this crow's `flap` angles; it takes turns hovering (slow flap, body bob) and diving (fast flap,
- * nose down), banking into the sway of its path.
+ * A desert raven in two draw calls, feathers and eyes; its wings flap in the feather material's vertex shader.
+ * It takes turns hovering (slow flap, body bob) and diving (fast flap, nose down), banking into its sway.
  */
 export default function Crow(props: EnemyProps) {
   // One speed for the whole flock, or its V stretches apart.

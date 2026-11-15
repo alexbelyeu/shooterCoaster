@@ -6,10 +6,7 @@ import { ENEMY_HIT_FLASH_MAT } from './SharedEnemyAssets'
 const ORIGINAL_MATERIAL = '__scOriginalMaterial'
 const FLASH_MATERIAL = '__scFlashMaterial'
 
-/**
- * Flash `mesh` with `material` instead of the shared one: a mesh whose vertex shader moves it
- * (the crow's flapping wings) needs a flash material with the same patch, or it snaps to its rest pose.
- */
+/** A mesh its vertex shader moves (the crow's wings) needs a flash material with the same patch, or it snaps to rest. */
 export function setFlashMaterial(mesh: THREE.Mesh, material: THREE.Material) {
   mesh.userData[FLASH_MATERIAL] = material
 }

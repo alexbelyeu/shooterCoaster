@@ -63,10 +63,7 @@ function crowSheen(t: number): THREE.Color {
   return _feather.copy(CROW_SHEEN).lerp(CROW_TIP, Math.min(1, Math.max(0, t)) ** 1.3)
 }
 
-/**
- * A flat feather plate: the polygon `outline` ([x, z] corners, any simple shape: notches and fingers too)
- * `thick` deep in y around 0, its top painted by `top(x, z)`, its underside and edges' lower corners `under`.
- */
+/** A flat plate `thick` deep in y from any simple polygon `outline` of [x, z] corners (notches and fingers too). */
 function featherPlate(
   outline: readonly (readonly [number, number])[],
   thick: number,
@@ -77,7 +74,7 @@ function featherPlate(
   const col: number[] = []
   const h = thick / 2
   const at = ([i, up]: Corner) => new THREE.Vector3(outline[i][0], up ? h : -h, outline[i][1])
-  // Pushes a triangle wound to face `outward` (only the direction's sign along its normal matters).
+  // Wound to face `outward`: triangulateShape's winding depends on the outline's.
   const tri = (a: Corner, b: Corner, c: Corner, outward: THREE.Vector3) => {
     const pa = at(a)
     const n = at(b).sub(pa).cross(at(c).sub(pa))
@@ -94,7 +91,6 @@ function featherPlate(
     tri([a, true], [b, true], [c, true], up)
     tri([a, false], [b, false], [c, false], down)
   }
-  // Edges: outward is the edge's perpendicular, turned by the outline's winding.
   let area = 0
   outline.forEach(([x0, z0], i) => {
     const [x1, z1] = outline[(i + 1) % outline.length]
@@ -223,10 +219,7 @@ export function patchCrowWingVertex(vertexShader: string): string {
     .replace('#include <begin_vertex>', `#include <begin_vertex>\n${CROW_WING_FLAP}`)
 }
 
-/**
- * Wing angles (arm, hand; radians, + = down) at flap `phase`: a quick downstroke and a slower upstroke,
- * the hand trailing the arm so the wrist bends (hand up on the downstroke, folded down on the upstroke).
- */
+/** Wing angles (arm, hand; radians, + = down): a quick downstroke, and the hand lagging so the wrist bends. */
 export function crowWingPose(phase: number, out: THREE.Vector2): THREE.Vector2 {
   const p = phase + 0.5 * Math.sin(phase)
   return out.set(0.05 + 0.6 * Math.sin(p), 0.5 * Math.sin(p - 0.9))
@@ -1152,5 +1145,6 @@ export const ENEMY_HIT_FLASH_MAT = new THREE.MeshBasicMaterial({
   fog: false,
 })
 
-/** The crow's hit flash: its wings snap up (a flinch) as it flashes. */
-export const CROW_FLINCH_MAT = withCrowWings(ENEMY_HIT_FLASH_MAT.clone(), { value: new THREE.Vector2(-1.15, -0.5) })
+/** The crow's hit flinch: wings snapped up (arm, hand; radians, + = down). */
+export const CROW_FLINCH_POSE = new THREE.Vector2(-1.15, -0.5)
+export const CROW_FLINCH_MAT = withCrowWings(ENEMY_HIT_FLASH_MAT.clone(), { value: CROW_FLINCH_POSE })
