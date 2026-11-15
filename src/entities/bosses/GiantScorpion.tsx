@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
 import { gameClockStep } from '@/core/gameClock'
-import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake'
+import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { SAND_BURST_DEATH_STYLE, SCORPION_SHARD_DEATH_STYLE } from '@/effects/deathStyles'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
@@ -21,7 +21,7 @@ import {
 import {
   PERCH, SCORPION_BODY, SCORPION_RISE, SCORPION_TAIL, advanceGait, approachAngle, createTailPose, faceYaw, footStep, layTail,
   lungeAmount, lungeImpactBetween, pickPerch, riseOffset, type FootStep, type Perch, type PerchInput,
-} from './scorpionMotion'
+} from './scorpionMotion.hot'
 
 const B = SCORPION_BODY
 const T = SCORPION_TAIL

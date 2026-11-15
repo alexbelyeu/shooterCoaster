@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { applyHit, createBossState, currentPhase, exposedWeakPoints, hpFraction, setRetracted } from './bossModel'
 import { MAGMA_TITAN } from './bossSpecs'
 import type { TrackIndex } from '@/levels/environments/shared/trackClearance'
-import type { PerchInput } from './scorpionMotion'
+import type { PerchInput } from './scorpionMotion.hot'
 import {
   RIVER_SPOT, TITAN_BEAT, TITAN_DEFEAT, TITAN_RISE, beatNowEpoch, crackGlow, defeatHeat, defeatSink, heartOpenAmount,
   isHeartOpen, needsWade, pickRiverSpot, poundAmount, poundBetween, riseOffset, wadeStep,
-} from './titanMotion'
+} from './titanMotion.hot'
 
 const ids = (state: ReturnType<typeof createBossState>) => exposedWeakPoints(state).map((w) => w.id)
 

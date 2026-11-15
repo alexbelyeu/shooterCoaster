@@ -1,5 +1,5 @@
 /**
- * Where a bullet is drawn and how big (#165); its hit test stays on the camera ray (`bulletMotion.ts`).
+ * Where a bullet is drawn and how big (#165); its hit test stays on the camera ray (`bulletMotion.hot.ts`).
  * It is drawn from the muzzle into that ray by the tracer's end, capped on screen so it never fills the lens.
  */
 import { TRACER_RANGE } from '../weaponLayout'

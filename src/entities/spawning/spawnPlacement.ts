@@ -4,8 +4,8 @@ import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import { maxReadableDistance } from '../enemies/enemyReadability'
 import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, type Surface } from './enemyPlacement'
-import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig'
-import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov'
+import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
+import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 
 /**
  * Formation placement, pure. Slots are seeded at level load (so `spawnDigest` stays

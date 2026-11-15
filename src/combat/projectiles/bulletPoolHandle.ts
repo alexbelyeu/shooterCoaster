@@ -1,6 +1,6 @@
 import type * as THREE from 'three'
 import type { CollisionTarget } from '@/combat/CollisionManager'
-import type { PierceState } from './bulletMotion'
+import type { PierceState } from './bulletMotion.hot'
 
 export interface Bullet extends PierceState<CollisionTarget> {
   alive: boolean

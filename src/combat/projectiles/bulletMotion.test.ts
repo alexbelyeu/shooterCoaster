@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BULLET_SPEED_PER_SEC, MAX_BULLET_STEP_SEC, hasHit, recordHit, resetPierce, segmentHitsSphere, stepBullet, type PierceState,
-} from './bulletMotion'
+} from './bulletMotion.hot'
 
 /** Simulate `seconds` of flight at a fixed frame rate; return the distance covered. */
 function flyFor(seconds: number, fps: number): number {

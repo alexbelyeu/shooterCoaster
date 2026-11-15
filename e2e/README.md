@@ -287,13 +287,13 @@ screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes t
 `shaderWarmup` {done, ms, programs} for the current level, `initTimings()` (ms from navigation to each startup phase, the first time: `core/startupMarks.ts`), `summonBoss()` (the level's boss now instead of at its level time),
 `boss()` → stage / hp fraction / exposed weak points on screen (with hp) / the hull's on-screen box / live projectiles on screen, `bossHit(n)` (n hits on exposed
 weak points through `processHit`), `projectileHit()` (one hit on each live boss projectile, `boss-projectile:` targets), `bossEvents` spawn/hit/defeated counters, `fireworks()` → mounted?, launches / bursts, live rockets / bursts and the newest burst on screen, `deaths()` → death effects spawned / live, the newest one's style and origin on screen, `particles()` → the biome particle field: mounted?, points, boost-only points, boost strength now, `weaponState()` → active gun, pickup id + remaining fraction, `pickups()` → the level's weapon pickups: id, track fraction, collected?, screen point). See `src/testing/e2eHook.tsx`. Extend it when you need new test
-surfaces. Bullets travel per *second* with a swept hit test (`combat/projectiles/bulletMotion.ts`) along the camera ray;
+surfaces. Bullets travel per *second* with a swept hit test (`combat/projectiles/bulletMotion.hot.ts`) along the camera ray;
 they are *drawn* from the gun's muzzle into that ray, capped to 1.5% of the canvas height on screen (`bulletVisual.ts`),
 but enemies and the camera still move a lot during one ~1 fps headless frame, so
 autofire only sometimes lands hits — `killNearest` is what guarantees kills.
-The coaster camera sets its own aspect/FOV from the canvas size (`track/cameraFov.ts`:
+The coaster camera sets its own aspect/FOV from the canvas size (`track/cameraFov.hot.ts`:
 portrait screens get a wider vertical FOV, plus a few degrees with speed and on steep drops) and has rotation-only
-weight (`track/cameraRig.ts`: look-ahead into curves, bank into turns, pitch with speed changes;
+weight (`track/cameraRig.hot.ts`: look-ahead into curves, bank into turns, pitch with speed changes;
 bank, pitch and the FOV kick scale with the Screen-shake setting, and the smoke fails past their caps).
 Above ~70% of top speed, camera-space wind streaks fade in (`track/WindStreaks.tsx`, numbers in `windStreaks.ts`;
 one draw call, hidden when slow, also scaled by Screen shake); touch shots get aim assist (`combat/aimAssist.ts`).

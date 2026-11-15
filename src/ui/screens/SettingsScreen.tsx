@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { useGameStore } from '@/store/useGameStore'
-import { SCREEN_SHAKE_LEVELS, type ScreenShakeLevel } from '@/combat/screenShake'
+import { SCREEN_SHAKE_LEVELS, type ScreenShakeLevel } from '@/combat/screenShake.hot'
 import { GRAPHICS_QUALITIES, type GraphicsQuality } from '@/canvas/graphicsQuality'
 import { usePrefersReducedMotion, useSystemPrefersReducedMotion } from '@/ui/reducedMotion'
 import { browserStorage, isInternalBrowser, setInternalBrowser } from '@/app/analyticsGate'

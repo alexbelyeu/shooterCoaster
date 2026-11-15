@@ -8,7 +8,7 @@ import { muzzleTip } from '@/combat/hitFeedback'
 import { e2eBullets, isE2E } from '@/testing/e2eHook'
 import type { Bullet } from './bulletPoolHandle'
 import { setBulletPool } from './bulletPoolHandle'
-import { BULLET_SPEED_PER_SEC, hasHit, recordHit, resetPierce, segmentHitsSphere, stepBullet } from './bulletMotion'
+import { BULLET_SPEED_PER_SEC, hasHit, recordHit, resetPierce, segmentHitsSphere, stepBullet } from './bulletMotion.hot'
 import { BULLET_RADIUS_PER_SIZE, drawnBulletRadius, muzzleOffsetWeight, screenRadiusFraction } from './bulletVisual'
 
 const POOL_SIZE = 350

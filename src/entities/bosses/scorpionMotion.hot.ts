@@ -204,6 +204,7 @@ export interface TailPose {
 
 export function createTailPose(): TailPose {
   const n = SCORPION_TAIL.segments + 1
+  // eslint-disable-next-line sc/no-hot-path-alloc -- cold: once per boss mount, then laid in place
   return { count: 0, y: new Float32Array(n + 1), z: new Float32Array(n + 1), theta: new Float32Array(n) }
 }
 

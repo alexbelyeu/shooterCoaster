@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { eventBus } from '@/core/EventBus'
-import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake'
+import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import type { BiomeFeaturesProps } from '../../shared/types'
 import Volcano from '../../Volcano'
 import { VOLCANO_SITE } from '../../volcanoGeometry'

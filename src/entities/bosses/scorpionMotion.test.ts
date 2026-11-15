@@ -11,7 +11,7 @@ import { applyHit, bossMaxScore, createBossState, exposedWeakPoints, isDefeated,
 import {
   LUNGE_IMPACT_S, PERCH, SCORPION_LUNGE, SCORPION_RISE, SCORPION_TAIL, approachAngle, createTailPose, faceYaw, footStep, layTail,
   lungeAmount, lungeImpactBetween, perchClear, pickPerch, riseOffset, type Perch, type TailPose, type PerchInput,
-} from './scorpionMotion'
+} from './scorpionMotion.hot'
 
 const tailTopY = (pose: TailPose) => pose.y[pose.count]
 

@@ -8,7 +8,7 @@ import { YETI, YETI_SNOWBALL } from './bossSpecs'
 import {
   THROW_S, YETI_ROAM, YETI_ROAR, YETI_THROW, chestRetracted, elbowPose, fistPose, isRoaring, lopeAt, needsRelocate, passedCamera,
   riseOffset, roarAmount, roarNowEpoch, snowballAt, throwArmAlive, throwSwing, timeToNextRoar, toppleAngle, type Point3,
-} from './yetiMotion'
+} from './yetiMotion.hot'
 
 const ids = (s: BossState) => exposedWeakPoints(s).map((w) => w.id)
 const hit = (s: BossState, id: string, n: number) => {

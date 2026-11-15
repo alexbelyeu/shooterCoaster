@@ -8,7 +8,7 @@ import type { EnemyWave, Formation, LevelConfig } from '@/types/level'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
 import { rideProfile, rideSpeeds, riddenBetween } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
-import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov'
+import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import {
   AIR_CLEARANCE, ENTRY_SECONDS, ENTRY_STAGGER, FORMATIONS, NEAR_FIELD, clampToBounds, entryPoint, formationFrame, formationSlots, groupStep,
   indexAhead, insideBounds, marchHeading, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,

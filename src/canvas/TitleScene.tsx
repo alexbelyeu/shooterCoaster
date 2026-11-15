@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { createRng } from '@/utils/rng'
 import FerrisWheel from '@/levels/environments/FerrisWheel'
 import Carousel from '@/levels/environments/Carousel'
-import { BLEND_S, beatLockedRate, blendPose, titleCameraPose, titleShotS, type TitleCameraMode, type Vec3 } from './titleCamera'
+import { BLEND_S, beatLockedRate, blendPose, titleCameraPose, titleShotS, type TitleCameraMode, type Vec3 } from './titleCamera.hot'
 import { CROSSING_LOOP, createTitleRide, type TitleRide } from './titleCoaster'
 import TitleCoaster, { type CoasterLivery, type TitleClock } from './TitleCoaster'
 import TitlePark from './TitlePark'
@@ -31,7 +31,7 @@ const BALLOON_COLORS = ['#ff4444', '#ff8800', '#ffcc00', '#44cc44', '#4488ff', '
 const FIRST_FRAMES = 5
 const FIRST_FRAME_STEP_S = 0.1
 
-/** Fly-by camera over `titleCamera.ts`'s menu or attract sequence, blending when the mode changes; advances `clock`. */
+/** Fly-by camera over `titleCamera.hot.ts`'s menu or attract sequence, blending when the mode changes; advances `clock`. */
 function FlyByCamera({ ride, clock }: { ride: TitleRide; clock: TitleClock }) {
   const camRef = useRef<THREE.PerspectiveCamera>(null)
   const frames = useRef(0)

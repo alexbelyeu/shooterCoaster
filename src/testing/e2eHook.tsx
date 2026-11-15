@@ -47,7 +47,7 @@ import { useSettingsStore } from '@/store/useSettingsStore'
 import { qualityProfile, type GraphicsQuality, type QualityProfile } from '@/canvas/graphicsQuality'
 import { getAdaptiveSteps } from '@/canvas/useRenderBudget'
 import { COMBO_TIERS, TOP_TIER, comboMultiplier } from '@/combat/comboTiers'
-import { setTimeScaleOverride } from '@/combat/slowMo'
+import { setTimeScaleOverride } from '@/combat/slowMo.hot'
 import { getPointerState } from '@/input/pointerInput'
 import { audioContext, initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
 import { loadArcade, sfx, type VoiceStats } from '@/audio/sfx'
@@ -63,8 +63,8 @@ import { renderScoreCard } from '@/ui/scoreCardImage'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
-import { MAX_BANK_DEG, MAX_PITCH_DEG } from '@/track/cameraRig'
-import { DROP_FOV_DEG, SPEED_FOV_DEG } from '@/track/cameraFov'
+import { MAX_BANK_DEG, MAX_PITCH_DEG } from '@/track/cameraRig.hot'
+import { DROP_FOV_DEG, SPEED_FOV_DEG } from '@/track/cameraFov.hot'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -207,7 +207,7 @@ export interface SCTestApi {
   /** The results Share image (#272) for the current level and run, drawn as the share menu draws it: its pixel size,
    *  PNG data URL and download name, or null with no level. */
   scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string } | null>
-  /** Override the game time scale (0 freezes camera + enemies; 1 hands it back to the slow-mo envelopes, `combat/slowMo.ts`). */
+  /** Override the game time scale (0 freezes camera + enemies; 1 hands it back to the slow-mo envelopes, `combat/slowMo.hot.ts`). */
   setTimeScale: (s: number) => void
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null

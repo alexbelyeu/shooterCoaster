@@ -9,7 +9,7 @@ import {
   titleShotIndex,
   type TitleCameraMode,
   type Vec3,
-} from './titleCamera'
+} from './titleCamera.hot'
 import { createTitleRide } from './titleCoaster'
 
 const ride = createTitleRide()

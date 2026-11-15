@@ -49,6 +49,8 @@ export const SPEED_FOV_DEG = 5
 export const DROP_FOV_DEG = 3
 
 /** `fovForAspect`'s FOV plus the speed and drop kicks × `scale` (Screen shake), never past `maxVertical`, so portrait screens at the cap keep theirs. */
+const clamp01 = (v: number) => (Number.isFinite(v) ? Math.min(Math.max(v, 0), 1) : 0)
+
 export function fovWithSpeed(
   screenFov: number,
   speedNorm: number,
@@ -56,7 +58,6 @@ export function fovWithSpeed(
   drop = 0,
   maxVertical = MAX_VERTICAL_FOV,
 ): number {
-  const clamp01 = (v: number) => (Number.isFinite(v) ? Math.min(Math.max(v, 0), 1) : 0)
   const kick = (SPEED_FOV_DEG * clamp01(speedNorm) + DROP_FOV_DEG * clamp01(drop)) * clamp01(scale)
   return Math.max(screenFov, Math.min(screenFov + kick, maxVertical))
 }

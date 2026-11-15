@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dashHeading, newRatPose, RAT, RAT_CYCLE, ratPose } from './ratMotion'
+import { dashHeading, newRatPose, RAT, RAT_CYCLE, ratPose } from './ratMotion.hot'
 
 const at = (base: number, t: number) => ratPose(base, t, newRatPose())
 

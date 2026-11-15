@@ -3,7 +3,7 @@ import {
   KILL_TRAUMA_MS, MAX_PITCH_YAW_DEG, MAX_ROLL_DEG,
   addTrauma, decayTrauma, effectiveShakeScale, killTrauma, shakeAngles, smoothNoise1,
   type ShakeAngles, type TraumaState,
-} from './screenShake'
+} from './screenShake.hot'
 
 const DEG = Math.PI / 180
 

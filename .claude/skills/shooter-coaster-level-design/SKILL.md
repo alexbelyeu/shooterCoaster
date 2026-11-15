@@ -218,7 +218,7 @@ timed by the run: a lap takes 99–228 s (`track/ridePhysics.ts`, pinned in its 
 
 ### Special Features (if needed)
 - **Eruption/weather events**: Add `isEruption?: boolean` (or similar) to `EnemyWave`, emit via `eventBus` in spawner, listen in the biome's `Features.tsx` (see `biomes/volcanic/Features.tsx`)
-- **World-event shake**: `eventBus.emit(CAMERA_TRAUMA_EVENT, amount, durationMs)` (`src/combat/screenShake.ts`); it is rotation-only trauma. Never write `camera.position` (the smoke fails any translation off the track pose)
+- **World-event shake**: `eventBus.emit(CAMERA_TRAUMA_EVENT, amount, durationMs)` (`src/combat/screenShake.hot.ts`); it is rotation-only trauma. Never write `camera.position` (the smoke fails any translation off the track pose)
 - **Terrain-conforming features**: Follow the safeHeight() pattern above
 - **Custom shaders**: Create separate `*Shader.ts` file with `create*Material()` factory, drive uniforms in `useFrame`
 - **Landmark components**: Create in `src/levels/environments/` (render them from the biome's `Features.tsx`), accept optional custom material props

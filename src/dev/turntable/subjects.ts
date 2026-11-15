@@ -1,7 +1,7 @@
 import type { BiomeType, BossType, EnemyType } from '@/types/level'
 import { CLIMB } from '@/entities/enemies/climbMotion'
-import { RAT_CYCLE } from '@/entities/enemies/ratMotion'
-import { DUST_BUNNY_BOUNCE } from '@/entities/enemies/dustBunnyMotion'
+import { RAT_CYCLE } from '@/entities/enemies/ratMotion.hot'
+import { DUST_BUNNY_BOUNCE } from '@/entities/enemies/dustBunnyMotion.hot'
 import { ATMOSPHERES } from '@/levels/environments/atmosphere'
 
 /**
