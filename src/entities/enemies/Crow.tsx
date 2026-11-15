@@ -2,13 +2,26 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
+import { setFlashMaterial } from './hitFlash'
 import { marchHeading } from '@/entities/spawning/spawnPlacement'
-import { CROW_GEO, CROW_EYES_GEO, CROW_EYE_MAT, createCrowFeatherMaterial } from './SharedEnemyAssets'
+import {
+  CROW_EYE_MAT, CROW_EYES_GEO, CROW_FLINCH_MAT, CROW_GEO, createCrowFeatherMaterial, crowWingPose,
+} from './SharedEnemyAssets'
+
+/** Flap rates (radians of flap phase per game second) while hovering and in a dive. */
+const CROW_FLAP_HOVER = 4.5
+const CROW_FLAP_DIVE = 8
+
+/** On a hit the wings snap up while the crow flashes (`CROW_FLINCH_MAT` keeps the wing patch). */
+const tagFlinch = (mesh: THREE.Mesh | null) => {
+  if (mesh) setFlashMaterial(mesh, CROW_FLINCH_MAT)
+}
 
 /**
- * Iridescent crow with a 2-joint articulated wing flap, in two draw calls: the
- * merged feathers (body, tail fan, beak, wings) and the eyes. The wings flap in
- * the feather material's vertex shader from this crow's `flap` angles.
+ * A scrappy desert raven in two draw calls: the merged feathers (body, beak, feet, tail fan,
+ * two-segment wings) and the eyes. The wings flap in the feather material's vertex shader from
+ * this crow's `flap` angles; it takes turns hovering (slow flap, body bob) and diving (fast flap,
+ * nose down), banking into the sway of its path.
  */
 export default function Crow(props: EnemyProps) {
   // One speed for the whole flock, or its V stretches apart.
@@ -19,10 +32,13 @@ export default function Crow(props: EnemyProps) {
   const moveAngle = heading ?? own.angle
   const moveSpeed = heading === undefined ? own.speed : 0.7
   const { flapOffset } = own
+  // The sway's share across the crow's heading (local +x): its bank follows it.
+  const sway = Math.sin(moveAngle) - 0.5 * Math.cos(moveAngle)
   const flap = useMemo(() => ({ value: new THREE.Vector2() }), [])
   const featherMat = useMemo(() => createCrowFeatherMaterial(flap), [flap])
   useEffect(() => () => featherMat.dispose(), [featherMat])
-  const bodyGroupRef = useRef<THREE.Group>(null)
+  const rigRef = useRef<THREE.Group>(null)
+  const phase = useRef(flapOffset)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
@@ -32,23 +48,28 @@ export default function Crow(props: EnemyProps) {
       mesh.position.z += (Math.sin(moveAngle) * moveSpeed + wobble * 0.5) * dt
       mesh.position.y += Math.sin(time * 2 + flapOffset) * 0.05 * dt
 
-      // Inner wing leads, outer trails with a phase delay
-      const t = time * 5 + flapOffset
-      flap.value.set(Math.sin(t) * 0.5, Math.sin(t + 0.5) * 0.4)
+      const dive = 0.5 + 0.5 * Math.sin(time * 0.7 + flapOffset)
+      phase.current += delta * (CROW_FLAP_HOVER + (CROW_FLAP_DIVE - CROW_FLAP_HOVER) * dive)
+      crowWingPose(phase.current, flap.value)
 
-      // Subtle body roll
-      if (bodyGroupRef.current) {
-        bodyGroupRef.current.rotation.z = Math.sin(t) * 0.08
+      const rig = rigRef.current
+      if (rig) {
+        rig.rotation.x = 0.1 + 0.25 * dive
+        rig.rotation.z = -0.5 * sway * Math.cos(time * 1.5)
+        // The body rises on each downstroke, most while hovering.
+        rig.position.y = -0.35 * (1 - dive) * Math.cos(phase.current)
       }
     },
-    [moveAngle, moveSpeed, flapOffset, flap],
+    [moveAngle, moveSpeed, flapOffset, flap, sway],
   )
 
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
-      <group ref={bodyGroupRef} scale={[8, 8, 8]} rotation={[0, -moveAngle + Math.PI / 2, 0]}>
-        <mesh geometry={CROW_GEO} material={featherMat} />
-        <mesh geometry={CROW_EYES_GEO} material={CROW_EYE_MAT} />
+      <group scale={[8, 8, 8]} rotation={[0, -moveAngle + Math.PI / 2, 0]}>
+        <group ref={rigRef}>
+          <mesh ref={tagFlinch} geometry={CROW_GEO} material={featherMat} />
+          <mesh geometry={CROW_EYES_GEO} material={CROW_EYE_MAT} />
+        </group>
       </group>
     </EnemyBase>
   )

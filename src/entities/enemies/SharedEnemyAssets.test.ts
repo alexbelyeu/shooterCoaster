@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
-  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_FEATHER_MAT, CROW_GEO, DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYES_GEO, EMBER_WISP_TENDRILS_GEO, RAT_BODY_GEO,
+  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_GEO, DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYES_GEO, EMBER_WISP_TENDRILS_GEO, RAT_BODY_GEO,
   RAT_SNOUT_GEO, RAT_TAIL_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
-  SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, patchCrowWingVertex,
+  SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, crowWingPose, patchCrowWingVertex,
 } from './SharedEnemyAssets'
 
 describe('crow model', () => {
@@ -22,6 +22,29 @@ describe('crow model', () => {
     const material = createCrowFeatherMaterial({ value: new THREE.Vector2() })
     expect(material.customProgramCacheKey()).toBe(CROW_FEATHER_MAT.customProgramCacheKey())
     material.dispose()
+  })
+
+  it('flinches with the same wing patch, its wings snapped up', () => {
+    const shader = { uniforms: {} as Record<string, { value: THREE.Vector2 }>, vertexShader: THREE.ShaderLib.basic.vertexShader }
+    CROW_FLINCH_MAT.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer)
+    expect(shader.vertexShader).toContain('uniform vec2 uWingFlap;')
+    expect(shader.uniforms.uWingFlap.value.x).toBeLessThan(-1)
+    expect(CROW_FLINCH_MAT.customProgramCacheKey()).toMatch(/-crow-wing$/)
+  })
+
+  it('stays inside the brief\'s 600 triangles', () => {
+    const triangles = (CROW_GEO.attributes.position.count + CROW_EYES_GEO.attributes.position.count) / 3
+    expect(triangles).toBeLessThanOrEqual(600)
+  })
+
+  it('beats down faster than it lifts, the hand trailing the arm', () => {
+    const pose = new THREE.Vector2()
+    const arm = (phase: number) => crowWingPose(phase, pose).x
+    // Phase spent going down (arm angle rising) vs up, over one cycle.
+    let down = 0
+    for (let i = 0; i < 360; i++) if (arm(((i + 1) / 360) * 2 * Math.PI) > arm((i / 360) * 2 * Math.PI)) down++
+    expect(down).toBeLessThan(180)
+    expect(crowWingPose(Math.PI, pose).y).toBeGreaterThan(0.2)
   })
 })
 
