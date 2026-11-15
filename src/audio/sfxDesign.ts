@@ -73,6 +73,9 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
   level6: INFERNO_KEY, // plays level5's score until its own theme (#456)
   results: { tonic: 60, minor: false }, // C major
   // Theme options waiting on Alex's pick (`?theme=`, scores/themes/) get a row each: `'<slot>.<name>': key`
+  'level6.chalkup': { tonic: 62, minor: false }, // D major
+  'level6.subway': { tonic: 64, minor: true }, // E minor
+  'level6.lanternfly': { tonic: 63, minor: false }, // E-flat major
 }
 
 const MAJOR = [0, 2, 4, 5, 7, 9, 11]

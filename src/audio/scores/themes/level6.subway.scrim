@@ -1,0 +1,63 @@
+title    Uptown Local
+composer Claude (ShooterCoaster)
+about    Climbing Gym (level6) option (#456): street funk in E minor at 172. An FM slap bass carries the hook, octave pops and a chromatic run like a rat along the rail, under synth-brass stabs and a guiro scratch; in the B section the brass answers with a line of its own. The last eight bars lift a minor third, to G minor. Layers: bass hook, stabs and scratch from the start, then a broken bigkick beat, snare and clap and hats at 2x, a square wave two octaves over the bass at 3x, sixteenth hats and orchestra hits on the stabs at FRENZY.
+tempo    172
+beats    4
+steps    4
+reverb   0.2
+
+# untagged voices are the base layer, the hook among them (layers only add); the intro plays every layer
+voice bass   fmbass    vol=0.77 gate=0.7 bright=1.3
+voice brass  synbrass  vol=0.60  pan=-0.25 center=B4 gate=0.55 bright=1.3
+voice scrape guiro     vol=0.54 pan=0.45
+voice rise   riser     vol=0.31
+voice kick   bigkick   vol=0.53 layer=drums
+voice snare  snare     vol=0.60  pan=0.05 layer=drums
+voice clap   clap909   vol=0.48  pan=-0.1 layer=drums
+voice hat    hat909    vol=0.41 pan=0.35 layer=drums
+voice crash  crash     vol=0.31 pan=-0.2 layer=drums
+voice chip   square    vol=0.22 pan=0.2 oct=2 gate=0.7 layer=lead
+voice fhat   hat909    vol=0.26 pan=-0.35 layer=frenzy
+voice hit    orchhit   vol=0.36  pan=0.1 layer=frenzy
+
+pattern intro
+scrape| x.x. x.x. x.x. x.x. | x.x. x.x. xxxx xxxx |
+bass  | .--- .--- .--- B1 C2 C#2 D2 | E2!--- .--- .--- B1 C2 C#2 D2 |
+brass | [Em7]!-- . [Em7]!-- . [Em7]!------- | .--- .--- .--- .--- |
+rise  | _ | E5--------------- |
+snare | .... .... .... .... | x.x. x.x. xxxx XXXX |
+
+pattern A
+bass  | E2- E3 . D3 E3 . G2- A2 B2- D3 E3- . | E2- E3 . D3 E3 . G2 . A2 Bb2 B2- D3- E3 | A2- A3 . G3 A3 . C#3- B2 A2 G2- E2- . | B2- B3 . A3 B3 . D#3- C3 B2 A2 F#2- D#2- |
+chip  | E2- E3 . D3 E3 . G2- A2 B2- D3 E3- . | E2- E3 . D3 E3 . G2 . A2 Bb2 B2- D3- E3 | A2- A3 . G3 A3 . C#3- B2 A2 G2- E2- . | B2- B3 . A3 B3 . D#3- C3 B2 A2 F#2- D#2- |
+brass | .--- .- [Em7]- .--- [Em7]!- .- | % | .--- .- [A7]- .--- [A7]!- .- | .--- .- [B7]- .--- [B7]!- .- |
+hit   | .--- .- [Em7]- .--- [Em7]!- .- | % | .--- .- [A7]- .--- [A7]!- .- | .--- .- [B7]- .--- [B7]!- .- |
+scrape| .... .x.. .... .x.x | % | % | .... .x.. .... xxxx |
+kick  | x... ..x. ..x. .... | x... ..x. ..x. ..x. | % | x... ..x. x.x. .x.. |
+snare | .... x... .... x..x | % | % | .... x... ..x. x.xx |
+clap  | .... x... .... x... | % | % | % |
+hat   | x.x. x.x. x.x. x.x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+fhat  | xxxx xxxx xxxx xxxx | % | % | % |
+
+pattern A2 from A
+bass  | E2- E3 . D3 E3 . G2- A2 B2- D3 E3- . | E2- E3 . D3 E3 . G2 . A2 Bb2 B2- D3- E3 | A2- A3 . G3 A3 . C#3- B2 A2 G2- E2- . | B2- B3 . A3 B3 A3 G3 F#3 E3 D#3 . B2--- |
+chip  | E2- E3 . D3 E3 . G2- A2 B2- D3 E3- . | E2- E3 . D3 E3 . G2 . A2 Bb2 B2- D3- E3 | A2- A3 . G3 A3 . C#3- B2 A2 G2- E2- . | B2- B3 . A3 B3 A3 G3 F#3 E3 D#3 . B2--- |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+bass  | C2- C3 . B2 C3 . E2- G2 C3- B2 C3- . | B1- B2 . A2 B2 . D#2- F#2 B2- A2 B2- . | E2- E3 . D3 E3 . G2- A2 B2- D3 E3- . | A2- A3 . G3 A3 . C#3- B2 A2 G2- E2- . |
+chip  | C2- C3 . B2 C3 . E2- G2 C3- B2 C3- . | B1- B2 . A2 B2 . D#2- F#2 B2- A2 B2- . | E2- E3 . D3 E3 . G2- A2 B2- D3 E3- . | A2- A3 . G3 A3 . C#3- B2 A2 G2- E2- . |
+brass | G4--- E4- G4- B4--- A4- .- | F#4------- .- D#4- F#4- A4- | G4--- E4- G4- B4--- D5- .- | C#5----- B4- A4- G4- E4--- |
+hit   | [Cmaj7]!--- .----------- | [B7]!--- .----------- | [Em7]!--- .----------- | [A7]!--- .----------- |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern B2 from B
+bass  | C2- C3 . B2 C3 . E2- G2 C3- B2 C3- . | B1- B2 . A2 B2 . D#2- F#2 B2- A2 B2- . | E2- E3 . D3 E3 . G2- A2 B2- D3 E3- . | B2- B3 . A3 B3 A3 G3 F#3 E3 D#3 . B2--- |
+chip  | C2- C3 . B2 C3 . E2- G2 C3- B2 C3- . | B1- B2 . A2 B2 . D#2- F#2 B2- A2 B2- . | E2- E3 . D3 E3 . G2- A2 B2- D3 E3- . | B2- B3 . A3 B3 A3 G3 F#3 E3 D#3 . B2--- |
+brass | G4--- E4- G4- B4--- A4- .- | F#4------- .- D#4- F#4- A4- | G4--- E4- G4- B4--- D5- .- | B4!------- .--- [B7]!--- |
+hit   | [Cmaj7]!--- .----------- | [B7]!--- .----------- | [Em7]!--- .----------- | [B7]!--- .--- .--- [B7]!--- |
+snare | .... x... .... x..x | % | % | ..x. x.x. xxxx XXXX |
+
+play intro
+loop A A2 B B2 A A2 A+3 A2+3
