@@ -31,6 +31,9 @@ export function isCampaignLevel(level: unknown): level is string {
   return typeof level === 'string' && Object.prototype.hasOwnProperty.call(LEVEL_LIMITS, level)
 }
 
+/** The highest score the World board shows: long runs from before the 60 s rules stay in the table, off the board (#458). */
+export const boardCeiling = (level: string): number => LEVEL_LIMITS[level].maxScore
+
 const isInt = (v: unknown, min: number, max: number): v is number => Number.isSafeInteger(v) && (v as number) >= min && (v as number) <= max
 
 export function checkSubmission(body: unknown): Checked<Submission> {

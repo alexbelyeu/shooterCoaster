@@ -4,6 +4,7 @@ import { advanceGameTime, resetGameTime } from '@/core/gameClock'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import type { ScoreEntry } from '@/types/game'
 import { dailySeed } from '@/levels/daily'
+import { campaignScoreLimits } from '@/levels/scoreLimits'
 
 // Node has no window/localStorage. zustand's persist reads `window.localStorage`
 // when the store is created, so install a tiny in-memory Storage on a bare
@@ -305,7 +306,7 @@ describe('saveScore', () => {
 describe('leaderboard', () => {
   it('enters a run under the last initials and renames it in place', () => {
     expect(store().addLeaderboardEntry('level1', { score: 500, stars: 1, date: 7 })).toBe(0)
-    expect(store().leaderboards.level1[0]).toEqual({ initials: 'AAA', score: 500, stars: 1, date: 7 })
+    expect(store().leaderboards.level1[0]).toEqual({ initials: 'AAA', score: 500, stars: 1, date: 7, ruleset: '60s' })
     store().setEntryInitials('level1', 7, 'zed')
     expect(store().leaderboards.level1[0].initials).toBe('ZED')
     expect(store().lastInitials).toBe('ZED')
@@ -329,6 +330,23 @@ describe('leaderboard', () => {
     await useGameStore.persist.rehydrate()
     expect(store().leaderboards.level1[0]).toMatchObject({ initials: 'BOB', score: 500 })
     expect(store().lastInitials).toBe('BOB')
+  })
+
+  it('loads without the long runs from before the 60 s rules, keeping their stars (#458)', async () => {
+    const limit = campaignScoreLimits().level5.maxScore
+    const old = (score: number, initials: string) => ({ initials, score, stars: 3, date: score })
+    memoryStorage.setItem('shootercoaster-scores', JSON.stringify({
+      state: {
+        savedScores: { level5: { level: 'level5', score: limit + 1, maxScore: 1, stars: 3, timestamp: 1 } },
+        leaderboards: { level5: [old(limit + 1, 'OLD'), old(limit - 1, 'MOD')] },
+        lastInitials: 'OLD',
+      },
+      version: 0,
+    }))
+    await useGameStore.persist.rehydrate()
+    expect(store().leaderboards.level5.map((e) => e.initials)).toEqual(['MOD'])
+    expect(store().savedScores.level5).toMatchObject({ score: limit + 1, stars: 3 })
+    expect(store().lastInitials).toBe('OLD')
   })
 
   it('the daily record round-trips through storage beside the boards', async () => {

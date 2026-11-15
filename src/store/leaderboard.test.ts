@@ -5,6 +5,7 @@ import {
   insertEntry,
   normalizeInitials,
   placement,
+  RULESET,
   sanitizeLeaderboards,
   sanitizeSavedDaily,
   sanitizeSavedScores,
@@ -64,7 +65,7 @@ describe('sanitize', () => {
       level2: 'nope',
       level3: [{ score: -5, initials: 'AAA' }],
     }
-    const boards = sanitizeLeaderboards(raw, {})
+    const boards = sanitizeLeaderboards(raw, {}, {})
     expect(Object.keys(boards)).toEqual(['level1'])
     expect(boards.level1).toHaveLength(LEADERBOARD_SIZE)
     expect(boards.level1[0].score).toBe(1000)
@@ -78,7 +79,7 @@ describe('sanitize', () => {
       level3: { score: 'bad' },
     })
     expect(Object.keys(saved)).toEqual(['level1', 'level2'])
-    const boards = sanitizeLeaderboards({ level2: [row(400, 'ZZZ')] }, saved)
+    const boards = sanitizeLeaderboards({ level2: [row(400, 'ZZZ')] }, saved, {})
     expect(boards.level1).toEqual([{ initials: '---', score: 700, stars: 2, date: 5 }])
     expect(boards.level2).toEqual([row(400, 'ZZZ')])
   })
@@ -90,15 +91,37 @@ describe('sanitize', () => {
     })
     expect(saved.level1.stars).toBe(0)
     expect(saved.level2.stars).toBe(3)
-    const boards = sanitizeLeaderboards(undefined, saved)
+    const boards = sanitizeLeaderboards(undefined, saved, {})
     expect(boards.level1[0].stars).toBe(0)
     expect(boards.level2[0].stars).toBe(3)
+  })
+
+  it('drops a long run from before the 60 s rules over the level\'s limit and keeps one under it (#458)', () => {
+    const ceilings = { level5: 14570 }
+    const inferno120s = row(31_000, 'OLD')
+    const modest = row(9000, 'MOD')
+    const boards = sanitizeLeaderboards({ level5: [inferno120s, modest] }, {}, ceilings)
+    expect(boards.level5).toEqual([modest])
+    expect(sanitizeLeaderboards(boards, {}, ceilings)).toEqual(boards)
+  })
+
+  it('keeps a 60 s entry and its ruleset whatever the limit, and never seeds an old best over it', () => {
+    const now = { ...row(20_000, 'NEW'), ruleset: RULESET }
+    const saved = sanitizeSavedScores({
+      level1: { score: 31_000, stars: 3, timestamp: 1 },
+      level2: { score: 500, stars: 1, timestamp: 2 },
+    })
+    const boards = sanitizeLeaderboards({ level5: [now, { ...row(100), ruleset: 'other' }] }, saved, { level1: 14350, level2: 12250, level5: 14570 })
+    expect(boards.level5).toEqual([now, row(100)])
+    expect(boards.level1).toBeUndefined()
+    expect(boards.level2?.[0].score).toBe(500)
+    expect(saved.level1.score).toBe(31_000)
   })
 
   it('anything that is not an object loads as empty', () => {
     for (const v of [null, undefined, 3, 'x', []]) {
       expect(sanitizeSavedScores(v)).toEqual({})
-      expect(sanitizeLeaderboards(v, {})).toEqual({})
+      expect(sanitizeLeaderboards(v, {}, {})).toEqual({})
       expect(sanitizeSavedDaily(v)).toEqual({})
       expect(sanitizeStreak(v)).toEqual({ count: 0, lastKey: null })
     }

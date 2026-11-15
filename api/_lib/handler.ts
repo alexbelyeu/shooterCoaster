@@ -1,5 +1,5 @@
 /** No env vars, a paused project or any database error answer a bare 503: never a 500, a stack trace or a secret. */
-import { checkSubmission, clientIp, hashIp, isCampaignLevel, MAX_BODY_BYTES, rankFrom, rateLimited, windowStart } from './rules.js'
+import { boardCeiling, checkSubmission, clientIp, hashIp, isCampaignLevel, MAX_BODY_BYTES, rankFrom, rateLimited, windowStart } from './rules.js'
 import type { ScoresDb } from './scoresDb.js'
 
 export interface Deps {
@@ -38,7 +38,7 @@ export async function getBoard(request: Request, { db }: Deps): Promise<Response
   if (!isCampaignLevel(level)) return json(400, { error: 'unknown level' })
   if (!db) return unavailable()
   try {
-    return json(200, { top: await db.top(level) }, BOARD_CACHE)
+    return json(200, { top: await db.top(level, boardCeiling(level)) }, BOARD_CACHE)
   } catch {
     return unavailable()
   }
@@ -56,8 +56,9 @@ export async function postScore(request: Request, { db, salt, now }: Deps): Prom
     const recent = await db.count({ ip_hash: `eq.${ipHash}`, created_at: `gte.${windowStart(now())}` })
     if (rateLimited(recent)) return json(429, { error: 'too many submissions' })
     await db.insert({ ...run, ipHash })
-    const atOrAbove = await db.count({ level_id: `eq.${run.level}`, score: `gte.${run.score}` })
-    return json(200, { rank: rankFrom(atOrAbove), top: await db.top(run.level) })
+    const ceiling = boardCeiling(run.level)
+    const atOrAbove = await db.count({ level_id: `eq.${run.level}`, score: `gte.${run.score}`, and: `(score.lte.${ceiling})` })
+    return json(200, { rank: rankFrom(atOrAbove), top: await db.top(run.level, ceiling) })
   } catch {
     return unavailable()
   }

@@ -5,6 +5,7 @@ import {
   DEFAULT_INITIALS,
   insertEntry,
   normalizeInitials,
+  RULESET,
   sanitizeLeaderboards,
   sanitizeSavedDaily,
   sanitizeSavedScores,
@@ -19,11 +20,15 @@ import { startPhaseFor } from './startPhase'
 import { NO_PICKUP, applyPickup, type PickupWeaponId, type WeaponState } from '@/combat/weapons/weaponTypes'
 import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/daily'
 import { getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
+// The generated table, not `scoreLimits()`, which would pull the boss specs into the startup JS.
+import { LEVEL_LIMITS } from '../../api/_lib/levelLimits'
 
 /** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
 export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }
 
 const CAMPAIGN: RunMode = { mode: 'campaign' }
+
+const boardCeilings = () => Object.fromEntries(Object.entries(LEVEL_LIMITS).map(([id, l]) => [id, l.maxScore]))
 
 interface GameState {
   phase: GamePhase
@@ -217,7 +222,7 @@ export const useGameStore = create<GameState>()(
       lastInitials: DEFAULT_INITIALS,
       addLeaderboardEntry: (levelId, run) => {
         const s = get()
-        const { board, rank } = insertEntry(s.leaderboards[levelId] ?? [], { ...run, initials: s.lastInitials })
+        const { board, rank } = insertEntry(s.leaderboards[levelId] ?? [], { ...run, initials: s.lastInitials, ruleset: RULESET })
         if (rank !== null) set({ leaderboards: { ...s.leaderboards, [levelId]: board } })
         return rank
       },
@@ -277,7 +282,7 @@ export const useGameStore = create<GameState>()(
         return {
           ...current,
           savedScores,
-          leaderboards: sanitizeLeaderboards(p.leaderboards, savedScores),
+          leaderboards: sanitizeLeaderboards(p.leaderboards, savedScores, boardCeilings()),
           lastInitials: normalizeInitials(p.lastInitials),
           savedDaily: sanitizeSavedDaily(p.savedDaily),
           dailyStreak: sanitizeStreak(p.dailyStreak),
