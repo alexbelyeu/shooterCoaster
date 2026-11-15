@@ -71,7 +71,7 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     const started = performance.now()
     const testApi = window.__SC_TEST__
     if (testApi) {
-      testApi.shaderWarmup = { done: false, ms: 0, programs: 0 }
+      testApi.shaderWarmup = { levelId, done: false, ms: 0, programs: 0 }
       testApi.programGrowth = []
     }
     const target = new THREE.WebGLRenderTarget(64, 64, { type: THREE.HalfFloatType })
@@ -101,7 +101,7 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
       cleanup()
       setSceneReady(true)
       markStartup('warmupDone')
-      if (testApi) testApi.shaderWarmup = { done: true, ms: performance.now() - started, programs: gl.info.programs?.length ?? 0 }
+      if (testApi) testApi.shaderWarmup = { levelId, done: true, ms: performance.now() - started, programs: gl.info.programs?.length ?? 0 }
     })
 
     return () => {

@@ -7,6 +7,10 @@ type LevelSceneModule = typeof import('./LevelScene')
 export const RETRY_DELAYS_MS: readonly number[] = [400, 1200]
 
 let pending: Promise<LevelSceneModule> | null = null
+let loaded = false
+
+/** The chunk has arrived: a level scene can mount without suspending. */
+export const isLevelSceneLoaded = (): boolean => loaded
 
 /** Runs `importer`, retrying after each of `delays` before giving up with the last error. */
 export async function importWithRetry<T>(
@@ -26,6 +30,7 @@ export async function importWithRetry<T>(
 
 export function loadLevelScene(): Promise<LevelSceneModule> {
   pending ??= importWithRetry(() => import('./LevelScene')).then((mod) => {
+    loaded = true
     markStartup('levelChunk')
     return mod
   }, (err) => {
