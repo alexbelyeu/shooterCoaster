@@ -70,9 +70,10 @@ and Back to the menu, then ends the level and enters initials by tapping ▲, a 
 switch (there, title → level, and the `audio` step's) the incoming track's first note must land before the outgoing bus has
 faded to 0 (`audio().music.fades` log each ramp's start and the incoming `firstNote`; tracks start on the next beat, `musicBus.ts`).
 A `settings` step opens Settings from the title (`settings.png`: the card inside 1280×720 with the four quality
-options, two volume sliders and two switches), picks Low and a music volume, cycles Med / High / Low three times
+options, two volume sliders and three switches, the last row the "Internal device" toggle, #446; the pause menu's Settings has
+no such row), turns that toggle on, picks Low and a music volume, cycles Med / High / Low three times
 and fails if the renderer's GPU textures grew over the last two cycles (each change rebuilds the post composer, #249),
-closes with Esc, and requires both to survive a reload. A `quality` step loads the first level at device dpr 2 with the default quality and with
+closes with Esc, and requires both to survive a reload and the title's "internal: not tracked" marker to show after it. A `quality` step loads the first level at device dpr 2 with the default quality and with
 `?quality=low` (any preset name works as a URL override and is saved like the setting) on the same seed and frozen
 track point: low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
 A `levelSelect` step seeds saved progress (3★ + 1★) and leaderboards, reloads the page, opens the level select (`levelSelect.png`)

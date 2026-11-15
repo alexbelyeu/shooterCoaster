@@ -1,6 +1,6 @@
 /**
  * Vercel Web Analytics counts real players only: not test runs (`?e2e=1`) and not
- * Alex's browsers (`?internal=1`, cleared by `?internal=0`).
+ * Alex's browsers (`?internal=1`, cleared by `?internal=0`, or the Settings toggle).
  */
 
 const INTERNAL_PARAM = 'internal'
@@ -25,6 +25,18 @@ export function isInternalBrowser(storage: FlagStorage | null): boolean {
   }
 }
 
+/** Stores or clears the flag; false when storage can't be written. The gate reads it on the next page load. */
+export function setInternalBrowser(on: boolean, storage: FlagStorage | null): boolean {
+  if (!storage) return false
+  try {
+    if (on) storage.setItem(INTERNAL_STORAGE_KEY, '1')
+    else storage.removeItem(INTERNAL_STORAGE_KEY)
+    return true
+  } catch {
+    return false
+  }
+}
+
 let internalThisLoad = false
 
 /** What `applyInternalParam` decided for this page load; the title's "not tracked" marker shows it. */
@@ -41,12 +53,8 @@ export function applyInternalParam(search: string, storage: FlagStorage | null):
     return internalThisLoad
   }
   internalThisLoad = value === '1'
-  try {
-    if (internalThisLoad) storage?.setItem(INTERNAL_STORAGE_KEY, '1')
-    else storage?.removeItem(INTERNAL_STORAGE_KEY)
-  } catch {
-    // The flag then lasts only for this page load.
-  }
+  // Unwritable storage: the flag then lasts only for this page load.
+  setInternalBrowser(internalThisLoad, storage)
   return internalThisLoad
 }
 
