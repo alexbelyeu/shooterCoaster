@@ -1,8 +1,11 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { GYM_SCALE, HALL, PIECES, PIT, floorAt, piece, pieceAxes, treeHeadLean, type Panel, type PieceOf } from './blockout'
-import { BUILDING, HIDDEN_PIECES, HOLD_COLORS, VOLUME_COLORS, WALL_PAINT } from './config'
+import { createRng } from '@/utils/rng'
+import { DEFAULT_BACK, GYM_SCALE, HALL, PIECES, PIT, floorAt, piece, pieceAxes, type Panel, type PieceOf } from './blockout'
+import { BUILDING, GRIME, HIDDEN_PIECES, HOLD_COLORS, TREE_PAINT, VOLUME_COLORS, WALL_PAINT, WALL_STYLE } from './config'
 import { scatterOn, type ClimbSurface } from './holds'
+import { buildTreeWood } from './treeTrunk'
+import { FACE, SEAM, SHELL, buildWallPanels, pushTri, wallSpec, type PanelInfo, type V3, type WallPanels } from './wallPanels'
 
 /**
  * The Climbing Gym's hall, built from Alex's blockout (`blockout.ts`) in its metres and scaled once to the
@@ -11,7 +14,6 @@ import { scatterOn, type ClimbSurface } from './holds'
  */
 
 const DEG = Math.PI / 180
-const DEFAULT_BACK = 0.5
 const SLAB = 0.3
 
 type Paint = THREE.ColorRepresentation | ((x: number, y: number, z: number) => THREE.ColorRepresentation)
@@ -84,38 +86,69 @@ function panelAt(tops: readonly number[], y: number): number {
   return i === -1 ? tops.length - 1 : i
 }
 
-/** A wall's cross-section in (facing, up): the climbing face up its panels, then flat back `back` behind its deepest point. */
-function profileShape(profile: readonly Panel[], back: number): THREE.Shape {
-  const pts = [new THREE.Vector2(0, 0)]
-  let f = 0
-  let y = 0
-  let minF = 0
-  for (const panel of profile) {
-    f += panel.len * Math.sin(panel.angle * DEG)
-    y += panel.len * Math.cos(panel.angle * DEG)
-    minF = Math.min(minF, f)
-    pts.push(new THREE.Vector2(f, y))
-  }
-  pts.push(new THREE.Vector2(minF - back, y), new THREE.Vector2(minF - back, 0))
-  return new THREE.Shape(pts)
-}
-
-/** Extrude a (facing, up) shape `length` along the frame's x, centred. */
-function extrudeAlong(shape: THREE.Shape, length: number): THREE.BufferGeometry {
-  const g = new THREE.ExtrudeGeometry(shape, { depth: length, bevelEnabled: false })
-  return g.applyMatrix4(new THREE.Matrix4().makeTranslation(length / 2, 0, 0).multiply(new THREE.Matrix4().makeRotationY(-Math.PI / 2)))
-}
-
 /** Faces that look the way the piece faces (the climbing side) and aren't its top. */
 function facingSide(facing: { x: number; z: number }) {
   return (nx: number, ny: number, nz: number) => nx * facing.x + nz * facing.z > 0.2 && ny < 0.6
 }
 const anySide = (_nx: number, ny: number) => ny < 0.6
 
+const _g = new THREE.Color()
+const GRIME_COLOURS = { chalk: new THREE.Color(GRIME.chalk), plywood: new THREE.Color(GRIME.plywood), primer: new THREE.Color(GRIME.primer) }
+
+/** A panel's paint, grimed (#558): off its paint a little, maybe chalk-caked or patched, scuffed along the foot. */
+function grime(base: THREE.ColorRepresentation, y: number, rng: () => number): THREE.Color {
+  const c = new THREE.Color(base)
+  const r = rng()
+  if (r < 0.05) c.copy(GRIME_COLOURS.plywood)
+  else if (r < 0.09) c.lerp(GRIME_COLOURS.primer, 0.7)
+  c.multiplyScalar(0.84 + 0.16 * rng())
+  if (rng() < 0.3) c.lerp(GRIME_COLOURS.chalk, 0.12 + 0.3 * rng())
+  if (y < GRIME.scuffHeight) c.multiplyScalar(GRIME.scuff)
+  return c
+}
+
+/**
+ * A `buildWallPanels` face as painted geometry placed by `m`: each panel its `colour` grimed, its facets
+ * shaded a touch apart, its seam `seam` (or its own colour darkened), the shell its foot panel's colour dimmed.
+ */
+function panelGeometry(wall: WallPanels, colour: (info: PanelInfo) => THREE.ColorRepresentation, seed: number, m: THREE.Matrix4, seam?: THREE.ColorRepresentation): THREE.BufferGeometry {
+  const rng = createRng(seed)
+  const panels = wall.panels.map((info) => grime(colour(info), info.y, rng))
+  const seamColour = seam === undefined ? null : new THREE.Color(seam)
+  const shell = (panels[0] ?? new THREE.Color(BUILDING.wall)).clone().multiplyScalar(GRIME.shell)
+  const colors = new Float32Array(wall.positions.length)
+  wall.part.forEach((part, t) => {
+    const c = part === SHELL ? shell : panels[wall.panel[t]]
+    if (part === FACE) _g.copy(c).multiplyScalar(0.94 + 0.06 * rng())
+    else if (part === SEAM) {
+      if (seamColour) _g.copy(seamColour)
+      else _g.copy(c).multiplyScalar(GRIME.seam)
+    }
+    else _g.copy(c)
+    for (let k = 0; k < 3; k++) _g.toArray(colors, t * 9 + k * 3)
+  })
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(wall.positions, 3))
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  g.computeVertexNormals()
+  return g.applyMatrix4(m)
+}
+
+/** A sport or boulder wall: its profile broken into rugged panels in its bands (or its note's pattern). */
 function climbingWall(p: PieceOf<'sport' | 'boulder'>, out: Parts): void {
-  const bands = WALL_PAINT[p.id] ?? [p.color ?? BUILDING.wall]
+  const style = WALL_STYLE[p.id] ?? {}
+  const spec = wallSpec(p, style)
+  const wall = buildWallPanels(spec)
   const tops = panelTops(p.profile)
-  const g = paint(extrudeAlong(profileShape(p.profile, p.back ?? DEFAULT_BACK), p.length), (_x, y) => bands[Math.min(bands.length - 1, panelAt(tops, y))], frame(p))
+  const bands = WALL_PAINT[p.id] ?? [p.color ?? BUILDING.wall]
+  const band = (i: number) => bands[Math.min(bands.length - 1, i)]
+  const colour = (info: PanelInfo): THREE.ColorRepresentation => {
+    if (style.pattern === 'wave') return band(panelAt(tops, info.y + 2 * Math.sin(info.along * 0.45)))
+    // The Shield: its middle bands in yellow and black triangles.
+    if (style.pattern === 'triangles' && info.row > 0 && info.row < bands.length - 1) return (info.col + Math.max(0, info.half)) % 2 ? bands[1] : bands[2]
+    return band(info.row)
+  }
+  const g = panelGeometry(wall, colour, spec.seed, frame(p))
   out.solid.push(g)
   const boulder = p.kind === 'boulder'
   out.climb.push({ positions: g.attributes.position.array, accept: facingSide(pieceAxes(p.rot).facing), density: boulder ? 0.9 : 0.6, volumes: boulder ? 0.05 : 0.012 })
@@ -129,17 +162,11 @@ function footprint(hw: number, hd: number, c: number): [number, number][] {
   ]
 }
 
-type V3 = [number, number, number]
-
 /** Triangle soup → geometry, each triangle wound so its normal agrees with its `hint`. */
 class Soup {
   readonly pos: number[] = []
   tri(a: V3, b: V3, c: V3, hint: V3): void {
-    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
-    const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]
-    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
-    const flip = n[0] * hint[0] + n[1] * hint[1] + n[2] * hint[2] < 0
-    this.pos.push(...a, ...(flip ? c : b), ...(flip ? b : c))
+    pushTri(this.pos, a, b, c, hint)
   }
   geometry(): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry()
@@ -200,30 +227,50 @@ function arch(p: PieceOf<'arch'>, out: Parts): void {
   out.climb.push({ positions: g.attributes.position.array, accept: anySide, density: 0.7, volumes: 0.05 })
 }
 
-/** The Tree, a clean first form (#519 makes it a real trunk): back wall, trunk, the two caves' roofs, the leaning headwall. */
+const BARK = { groove: new THREE.Color(TREE_PAINT.groove), ridge: new THREE.Color(TREE_PAINT.ridge) }
+
+/** The Tree's wood as painted geometry: bark from groove to ridge, chalked where it's climbed, muddy at its roots. */
+function woodGeometry(p: PieceOf<'tree'>, m: THREE.Matrix4): THREE.BufferGeometry {
+  const wood = buildTreeWood(p)
+  const rng = createRng(5193)
+  const pos = wood.positions
+  const colors = new Float32Array(pos.length)
+  wood.tone.forEach((tone, t) => {
+    const y = (pos[t * 9 + 1] + pos[t * 9 + 4] + pos[t * 9 + 7]) / 3
+    _g.copy(BARK.groove).lerp(BARK.ridge, tone).multiplyScalar(0.85 + 0.15 * rng())
+    if (y > 0.8 && y < p.caveHeight && rng() < 0.25) _g.lerp(GRIME_COLOURS.chalk, 0.2 + 0.3 * rng())
+    if (y < 0.4) _g.multiplyScalar(GRIME.scuff)
+    for (let k = 0; k < 3; k++) _g.toArray(colors, t * 9 + k * 3)
+  })
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  g.computeVertexNormals()
+  return g.applyMatrix4(m)
+}
+
+/**
+ * The Tree (#519): a barked trunk on four buttress roots (the gap under it, `TREE_GAP`), limbs roofing the
+ * two caves, branches framing the headwall; the caves' back wall and the headwall in white panels with green
+ * outlines.
+ */
 function tree(p: PieceOf<'tree'>, out: Parts): void {
-  const w = p.width / 2
-  const white = p.color ?? BUILDING.wall
   const m = frame(p)
+  const caves = buildWallPanels({ length: p.width, profile: [{ len: p.caveHeight, angle: 0 }], back: DEFAULT_BACK, seed: 5191 })
+  const headLen = (p.height - p.caveHeight) / Math.cos(p.headAngle * DEG)
+  const head = buildWallPanels({ length: p.width, profile: [{ len: headLen, angle: p.headAngle }], back: p.caveDepth + DEFAULT_BACK, seed: 5192, bottom: true })
+  const headFrame = m.clone().multiply(new THREE.Matrix4().makeTranslation(0, p.caveHeight, p.caveDepth))
+  const topBand = p.height - p.caveHeight - 2
   const parts = [
-    paint(box(-w, w, 0, p.caveHeight, -DEFAULT_BACK, 0), white, m),
-    paint(box(-p.trunk / 2, p.trunk / 2, 0, p.caveHeight, 0, p.caveDepth), '#8a6a4a', m),
-    paint(box(-w, w, p.caveHeight - 0.6, p.caveHeight, 0, p.caveDepth), '#5f9a62', m),
+    panelGeometry(caves, () => TREE_PAINT.panel, 5191, m, TREE_PAINT.outline),
+    panelGeometry(head, (info) => (info.y > topBand ? TREE_PAINT.top : TREE_PAINT.panel), 5192, headFrame, TREE_PAINT.outline),
+    woodGeometry(p, m),
   ]
-  const lean = treeHeadLean(p)
-  const head = new THREE.Shape([
-    new THREE.Vector2(p.caveDepth, p.caveHeight),
-    new THREE.Vector2(p.caveDepth + lean, p.height),
-    new THREE.Vector2(-DEFAULT_BACK, p.height),
-    new THREE.Vector2(-DEFAULT_BACK, p.caveHeight),
-  ])
-  const bandY = p.height - 2
-  parts.push(paint(extrudeAlong(head, p.width), (_x, y) => (y > bandY ? '#3f8f4e' : white), m))
   const accept = facingSide(pieceAxes(p.rot).facing)
   for (const g of parts) {
     out.solid.push(g)
-    // The cave roofs' undersides are climbed too.
-    out.climb.push({ positions: g.attributes.position.array, accept: (nx, ny, nz) => accept(nx, ny, nz) || ny < -0.7, density: 0.7, volumes: 0.02 })
+    // The limbs' undersides are climbed too.
+    out.climb.push({ positions: g.attributes.position.array, accept: (nx, ny, nz) => accept(nx, ny, nz) || ny < -0.7, density: 0.6, volumes: 0.02 })
   }
 }
 
