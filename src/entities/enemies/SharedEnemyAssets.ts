@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { mergePainted, painted, paintedAt, pose } from '@/levels/environments/shared/paintedParts'
+import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, pose } from '@/levels/environments/shared/paintedParts'
 import { withRim } from './enemyRim'
 
 // Readability rules (issue #15): every lit enemy material gets a fresnel rim via
@@ -1135,6 +1135,112 @@ export const DUST_BUNNY_EYE_MAT = new THREE.MeshStandardMaterial({
   roughness: 0.15,
   metalness: 0.1,
 })
+
+// ── Spotted lanternfly (#516), built to docs/art/ENEMIES.md ──
+// Lies on a wall: head along +y, its back out of the wall along +z. One material, five moving parts: the body and each
+// side's forewing and hindwing, every wing about its own shoulder (LANTERNFLY_FOREWING_PIVOT / _HINDWING_PIVOT, x
+// mirrored for the left), built for the right side (+x) back along -y in its own xy plane. 500-triangle cap.
+
+const LANTERNFLY_BODY = '#1d1a1a'
+const LANTERNFLY_LEG = '#2a2522'
+const LANTERNFLY_ANTENNA = '#8a2a22'
+const LANTERNFLY_FOREWING = '#c9b8a0'
+const LANTERNFLY_WINGTIP = '#7d756a'
+const LANTERNFLY_FLECK = '#ddd3c2'
+const LANTERNFLY_SPOT = '#141212'
+const LANTERNFLY_RED = '#d8282a'
+const LANTERNFLY_BAND = '#f2efe6'
+
+export const LANTERNFLY_FOREWING_PIVOT: Vec3 = [0.3, 1.2, 1.1]
+export const LANTERNFLY_HINDWING_PIVOT: Vec3 = [0.25, 0.9, 0.9]
+
+type P2 = [number, number]
+
+/** The part of a polygon above (`keep` +1) or below (-1) the line y = `y` (Sutherland–Hodgman). */
+function clipY(poly: readonly P2[], y: number, keep: 1 | -1): P2[] {
+  const out: P2[] = []
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]
+    const b = poly[(i + 1) % poly.length]
+    const ina = (a[1] - y) * keep >= 0
+    const inb = (b[1] - y) * keep >= 0
+    if (ina) out.push(a)
+    if (ina !== inb) {
+      const t = (y - a[1]) / (b[1] - a[1])
+      out.push([a[0] + (b[0] - a[0]) * t, y])
+    }
+  }
+  return out
+}
+
+/** A flat plate in the xy plane at height `z`, fanned from its centroid (any star-shaped outline), facing +z. */
+function wingPlate(poly: readonly P2[], color: string, z = 0): THREE.BufferGeometry {
+  const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length
+  const cy = poly.reduce((s, p) => s + p[1], 0) / poly.length
+  const area = poly.reduce((s, p, i) => {
+    const q = poly[(i + 1) % poly.length]
+    return s + p[0] * q[1] - q[0] * p[1]
+  }, 0)
+  const ring = area >= 0 ? poly : [...poly].reverse()
+  const corners: number[] = []
+  for (let i = 0; i < ring.length; i++) {
+    const p = ring[i]
+    const q = ring[(i + 1) % ring.length]
+    corners.push(cx, cy, z, p[0], p[1], z, q[0], q[1], z)
+  }
+  return paintedPolygon(corners, color)
+}
+
+const wingSpots = (spots: readonly [number, number, number][], color: string, z: number) =>
+  spots.map(([x, y, r]) => painted(new THREE.CircleGeometry(r, 5), color, [x, y, z]))
+
+const FOREWING: P2[] = [[-0.25, 0.1], [0.8, -0.5], [1.45, -2.6], [1.6, -4.6], [1.4, -6.3], [0.95, -7.1], [0.35, -7.2], [-0.15, -6.2], [-0.3, -3]]
+const FOREWING_TIP_Y = -4.9
+const HINDWING: P2[] = [[0, 0.1], [1.1, -0.2], [2.3, -1.4], [2.8, -3.2], [2.6, -4.8], [1.8, -5.7], [0.7, -5.7], [0.05, -4]]
+const HINDWING_BAND: [number, number] = [-3, -3.8]
+
+const forewingParts = () => [
+  wingPlate(clipY(FOREWING, FOREWING_TIP_Y, 1), LANTERNFLY_FOREWING),
+  wingPlate(clipY(FOREWING, FOREWING_TIP_Y, -1), LANTERNFLY_WINGTIP),
+  ...wingSpots([[0.35, -0.8, 0.26], [0.95, -1.35, 0.24], [0.3, -2.2, 0.28], [1.05, -2.7, 0.26], [0.5, -3.4, 0.26], [1.2, -3.9, 0.22], [0.55, -4.3, 0.22]], LANTERNFLY_SPOT, 0.03),
+  ...wingSpots([[0.4, -5.4, 0.12], [1.0, -5.6, 0.1], [0.7, -6.3, 0.12], [1.2, -6.4, 0.1], [0.3, -6.7, 0.1], [0.9, -6.9, 0.1]], LANTERNFLY_FLECK, 0.03),
+]
+
+const hindwingParts = () => [
+  wingPlate(clipY(HINDWING, HINDWING_BAND[0], 1), LANTERNFLY_RED),
+  wingPlate(clipY(clipY(HINDWING, HINDWING_BAND[0], -1), HINDWING_BAND[1], 1), LANTERNFLY_BAND),
+  wingPlate(clipY(HINDWING, HINDWING_BAND[1], -1), LANTERNFLY_SPOT),
+  ...wingSpots([[0.6, -0.8, 0.26], [1.45, -1.1, 0.26], [1.0, -2.0, 0.3], [2.05, -2.3, 0.26], [0.45, -2.6, 0.22]], LANTERNFLY_SPOT, 0.03),
+]
+
+const mirrorX = pose([0, 0, 0], [0, 0, 0], [-1, 1, 1])
+/** The left side's: mirrored, its faces turned the right way out again. */
+const mirrored = (parts: THREE.BufferGeometry[]) => mergePainted(parts.map((g) => flipWinding(g.applyMatrix4(mirrorX))))
+
+export const LANTERNFLY_BODY_GEO = mergePainted([
+  paintedAt(new THREE.SphereGeometry(1, 6, 4), LANTERNFLY_BODY, pose([0, -2.1, 0.6], [0, 0, 0], [0.8, 2.1, 0.6])),
+  paintedAt(new THREE.SphereGeometry(1, 6, 4), LANTERNFLY_BODY, pose([0, 0.55, 0.7], [0, 0, 0], [0.9, 0.95, 0.65])),
+  paintedAt(new THREE.SphereGeometry(0.6, 6, 3), LANTERNFLY_BODY, pose([0, 1.75, 0.6], [0, 0, 0], [1, 0.85, 0.85])),
+  ...[-1, 1].map((s) => painted(new THREE.ConeGeometry(0.13, 0.9, 3), LANTERNFLY_ANTENNA, [s * 0.32, 2.45, 0.7], [0.3, 0, -s * 0.45])),
+  // Three legs a side from under the thorax, splayed forward, out and back.
+  ...[-1, 1].flatMap((s) => [[1.0, 0.5], [0.4, -0.1], [-0.2, -0.7]].map(([y, a]) => {
+    const dx = s * Math.cos(a)
+    const dy = Math.sin(a)
+    return painted(new THREE.CylinderGeometry(0.07, 0.1, 1.9, 3, 1, true), LANTERNFLY_LEG, [s * 0.5 + dx * 0.95, y + dy * 0.95, 0.25], [0, 0, Math.atan2(-dx, dy)])
+  })),
+])
+
+/** [right, left]. */
+export const LANTERNFLY_FOREWING_GEOS = [mergePainted(forewingParts()), mirrored(forewingParts())] as const
+export const LANTERNFLY_HINDWING_GEOS = [mergePainted(hindwingParts()), mirrored(hindwingParts())] as const
+
+export const LANTERNFLY_MAT = withRim(new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.55,
+  metalness: 0,
+  flatShading: true,
+  side: THREE.DoubleSide,
+}), { color: '#fff2e0', intensity: 0.45, power: 2.5 })
 
 // ── Hit flash (shared by every enemy) ───────────────────────────────
 // On hit, EnemyBase swaps each mesh's material to this one for the kill-pop

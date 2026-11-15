@@ -17,12 +17,14 @@ import { createRng, type Rng } from '@/utils/rng'
 import { recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
 import { requestSlowMo } from '@/combat/slowMo.hot'
 import type { EnemyEntry } from '../enemies/EnemyBase'
+import { HOP } from '../enemies/hopGlideMotion'
 import {
-  ENTRY_SECONDS, ENTRY_STAGGER, clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, trackPoint, tracksideSlots,
+  ENTRY_SECONDS, ENTRY_STAGGER, clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallSwarm, trackPoint,
+  tracksideSlots,
   type FormationMotion, type FormationSlot, type PlacementBounds, type RideAhead, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
 import {
-  ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, readableScatterSpawn, wallPoint, wallSlots, type WallSlot,
+  ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
 } from './enemyPlacement'
 import { newWaveProgress, nextWaveDue, tickWaves, waveWindows } from './waveSchedule'
 
@@ -52,6 +54,8 @@ interface SpawnedEnemy {
   slot: FormationSlot | null
   trackside: TracksideSlot | null
   wall?: WallSlot
+  /** A swarm member: its wall is picked when the wave activates. */
+  swarm?: SwarmSlot
   scoreValue: number
   radius: number
   waveIndex: number
@@ -61,6 +65,7 @@ interface Placed {
   position: THREE.Vector3
   entry?: EnemyEntry
   motion?: FormationMotion
+  wall?: WallSlot
 }
 
 const RADII: Record<EnemyType, number> = {
@@ -80,6 +85,7 @@ const RADII: Record<EnemyType, number> = {
   climber: 50,
   rat: 50,
   dustBunny: 45,
+  lanternfly: 40,
 }
 
 const NO_WALLS: readonly WallSurface[] = []
@@ -106,6 +112,14 @@ function generateEnemies(
       for (const wall of wallSlots(wave.count, walls, rng)) {
         const position = toVector3(wallPoint(wall.wall, wall.u, wall.v, WALL_STANDOFF, { x: 0, y: 0, z: 0 }))
         enemies.push({ id: `enemy-${id++}`, position, slot: null, trackside: null, wall, ...base })
+      }
+      continue
+    }
+    if (scatter === 'swarm') {
+      if (wave.formation && wave.formation !== 'scatter') throw new Error(`${wave.type} swarms on a wall: no formation`)
+      if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+      for (const swarm of swarmSlots(wave.count, rng)) {
+        enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside: null, swarm, ...base })
       }
       continue
     }
@@ -179,7 +193,7 @@ export default function EnemySpawner({
   }, [runSeed, waves, goldenBalloonCount, heightFn, trackTable, walls])
   useEffect(() => {
     // Formation and trackside members digest their seeded slots: their world positions depend on where the rider is at activation.
-    recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position ?? e.slot?.local ?? { x: e.trackside!.ahead, y: 0, z: e.trackside!.side }))
+    recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position ?? e.slot?.local ?? (e.swarm && { x: e.swarm.du, y: e.swarm.dv, z: 0 }) ?? { x: e.trackside!.ahead, y: 0, z: e.trackside!.side }))
   }, [enemies, goldenBalloons])
   const phase = useGameStore((s) => s.phase)
 
@@ -205,6 +219,13 @@ export default function EnemySpawner({
         })
         return members.map((e, i) => [e.id, { position: toVector3(placed[i]) }])
       }
+      if (members[0]?.swarm) {
+        const slots = placeWallSwarm({ table: trackTable, riderIndex, type: wave.type, walls, slots: members.map((e) => e.swarm!), ride })
+        return members.map((e, i) => {
+          const wall = slots[i]
+          return [e.id, { position: toVector3(wallPoint(wall.wall, wall.u, wall.v, HOP.standoff, { x: 0, y: 0, z: 0 })), wall }]
+        })
+      }
       // On their walls already, where they enter: never pushed out of the near field.
       if (members[0]?.wall) return members.map((e) => [e.id, { position: e.position! }])
       if (!wave.formation || wave.formation === 'scatter') {
@@ -227,7 +248,7 @@ export default function EnemySpawner({
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [waves, enemies, trackTable, groundFn, rideAhead, bounds],
+    [waves, enemies, trackTable, groundFn, rideAhead, bounds, walls],
   )
 
   const initialActiveWave = useMemo(
@@ -389,7 +410,7 @@ export default function EnemySpawner({
             scoreValue={enemy.scoreValue}
             radius={enemy.radius}
             onKill={onKill}
-            wall={enemy.wall}
+            wall={placed.wall ?? enemy.wall}
             onEscape={onEscape}
           />
         )

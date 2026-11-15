@@ -52,7 +52,7 @@ export function pose(
 }
 
 /** Swap the 2nd and 3rd corner of every triangle of a non-indexed geometry. */
-function flipWinding(g: THREE.BufferGeometry): void {
+export function flipWinding(g: THREE.BufferGeometry): THREE.BufferGeometry {
   for (const attr of Object.values(g.attributes) as THREE.BufferAttribute[]) {
     const { array, itemSize } = attr
     for (let t = 0; t < attr.count; t += 3) {
@@ -65,6 +65,7 @@ function flipWinding(g: THREE.BufferGeometry): void {
       }
     }
   }
+  return g
 }
 
 /** Flat polygon from triangle corners [x, y, z, ...]. */

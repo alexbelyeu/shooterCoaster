@@ -90,9 +90,11 @@ describe('wall enemies', () => {
     },
   ]
 
-  it('climbers climb walls, and only wall enemies do', () => {
+  it('climbers climb walls, lanternflies swarm on them, and only wall enemies do', () => {
     expect(ENEMY_PLACEMENT.climber).toEqual({ surface: 'wall', scatter: 'wall' })
-    for (const t of types) expect(ENEMY_PLACEMENT[t].surface === 'wall', t).toBe(ENEMY_PLACEMENT[t].scatter === 'wall')
+    expect(ENEMY_PLACEMENT.lanternfly).toEqual({ surface: 'wall', scatter: 'swarm' })
+    const onWalls = (t: EnemyType) => ENEMY_PLACEMENT[t].scatter === 'wall' || ENEMY_PLACEMENT[t].scatter === 'swarm'
+    for (const t of types) expect(ENEMY_PLACEMENT[t].surface === 'wall', t).toBe(onWalls(t))
   })
 
   it('starts each at the foot of one of the walls, off its edges, using every wall', () => {
