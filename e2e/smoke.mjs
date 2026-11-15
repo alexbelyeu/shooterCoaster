@@ -121,6 +121,8 @@ const SEED = Number(arg('seed', 1337))
 // --cpu-throttle <rate>: the ride step on a slow machine (#536), CDP's CPU throttling from the level's start;
 // records the longest frame and the frames over 100 ms per level. Reported, not failed, until the fixes land.
 const CPU_THROTTLE = Number(arg('cpu-throttle', 1))
+// --level-chunk-delay <ms>: every page gets the lazy level chunk this late, the slow runner of #464; every step must pass with it.
+const LEVEL_CHUNK_DELAY_MS = Number(arg('level-chunk-delay', 0))
 const DIST = arg('dist', 'dist')
 // Level the speed check rides (default: the first level in the run), e.g. a water level for the streaks over the sea.
 const SPEED_LEVEL = arg('speed-level')
@@ -271,6 +273,23 @@ async function captureEnemyCloseup(page, id, ridePng) {
 }
 
 const getStats = (page) => page.evaluate(() => window.__SC_TEST__.stats())
+
+async function delayLevelChunk(page) {
+  await page.route(/\/LevelScene-[^/]*\.js$/, async (route) => {
+    await new Promise((r) => setTimeout(r, LEVEL_CHUNK_DELAY_MS))
+    await route.continue()
+  })
+}
+
+/** `?e2e=1` starts a run in `playing` before its lazy scene is there: on a slow runner steps measured the composer alone (#464). */
+const levelReady = (page) =>
+  page.waitForFunction(() => window.__SC_TEST__.levelReady(), null, { timeout: 60000, polling: 100 }).then(() => true, () => false)
+
+async function startLevelReady(page, id) {
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [id, SEED])
+  return levelReady(page)
+}
+const NOT_LOADED = (id) => `the ${id} scene never loaded (levelReady)`
 
 
 /**
@@ -1002,6 +1021,22 @@ async function scoreCardProblems(page, prefix, fileName) {
   return { problems, sizes }
 }
 
+/** Watches share item `target` for "Copied!" from before its click (#464): a poll started after a slow click missed its 2 s. */
+async function watchCopied(page, target) {
+  await page.evaluate((t) => {
+    const seen = (window.__SC_COPIED__ ??= {})
+    seen[t] = false
+    const observer = new MutationObserver(() => {
+      if (document.querySelector(`[data-target="${t}"]`)?.textContent !== 'Copied!') return
+      seen[t] = true
+      observer.disconnect()
+    })
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+  }, target)
+  return (timeout) =>
+    page.waitForFunction((t) => window.__SC_COPIED__[t], target, { timeout, polling: 100 }).then(() => true, () => false)
+}
+
 /** #271: the share menu (every target, in the viewport, off the other buttons, keyboard); never clicks a network link,
  *  since a local run fails on other-origin requests. Pass `expectClipboard` only where clipboard-read is granted (it also
  *  checks Copy image), `download` (the expected file name) to click Save image. */
@@ -1047,22 +1082,20 @@ async function shareMenuProblems(page, label, { shot, expectClipboard, download 
   }
   if (shot) await page.screenshot({ path: path.join(OUT, shot), timeout: SHOT_TIMEOUT })
   if (expectClipboard !== undefined) {
-    await page.locator('[data-target="image_copy"]').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Copy image: ${e.message}`))
-    const imageCopied = await page
-      .waitForFunction(() => document.querySelector('[data-target="image_copy"]')?.textContent === 'Copied!', null, { timeout: 20000, polling: 100 })
-      .then(() => true, () => false)
+    const imageCopied = await watchCopied(page, 'image_copy')
+    await page.locator('[data-target="image_copy"]').click({ timeout: 10000, noWaitAfter: true }).catch((e) => problems.push(`${label}: click Copy image: ${e.message}`))
+    const imageShown = await imageCopied(20000)
     const image = await page.evaluate(async () => {
       const item = (await navigator.clipboard.read()).find((i) => i.types.includes('image/png'))
       if (!item) return null
       const bitmap = await createImageBitmap(await item.getType('image/png'))
       return `${bitmap.width}x${bitmap.height}`
     }).catch((e) => `error ${e.message}`)
-    if (!imageCopied) problems.push(`${label}: Copy image did not show "Copied!"`)
+    if (!imageShown) problems.push(`${label}: Copy image did not show "Copied!"`)
     else if (image !== '1200x630') problems.push(`${label}: Copy image put ${image} on the clipboard, not the 1200x630 card`)
-    await page.locator('.share-copy').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Copy link: ${e.message}`))
-    const copied = await page
-      .waitForFunction(() => document.querySelector('.share-copy')?.textContent === 'Copied!', null, { timeout: 10000, polling: 100 })
-      .then(() => true, () => false)
+    const linkCopied = await watchCopied(page, 'copy')
+    await page.locator('.share-copy').click({ timeout: 10000, noWaitAfter: true }).catch((e) => problems.push(`${label}: click Copy link: ${e.message}`))
+    const copied = await linkCopied(10000)
     const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null)
     if (!copied) problems.push(`${label}: Copy link did not show "Copied!"`)
     else if (clip !== expectClipboard) problems.push(`${label}: clipboard ${JSON.stringify(clip)} != ${JSON.stringify(expectClipboard)}`)
@@ -1086,7 +1119,7 @@ async function shareMenuProblems(page, label, { shot, expectClipboard, download 
     await page.locator('.results-share').click({ timeout: 30000 }).catch((e) => problems.push(`${label}: reopen Share: ${e.message}`))
     const [file] = await Promise.all([
       page.waitForEvent('download', { timeout: 20000 }).catch(() => null),
-      page.locator('[data-target="image_download"]').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Save image: ${e.message}`)),
+      page.locator('[data-target="image_download"]').click({ timeout: 10000, noWaitAfter: true }).catch((e) => problems.push(`${label}: click Save image: ${e.message}`)),
     ])
     if (!file) problems.push(`${label}: Save image started no download`)
     else if (file.suggestedFilename() !== download) problems.push(`${label}: Save image saved ${file.suggestedFilename()}, not ${download}`)
@@ -1401,13 +1434,14 @@ async function seedCheck(page, level) {
 }
 
 /** Fake a tab hide / show (headless Chromium can't); returns stats read in the same JS turn, so no frame lands in between. */
-const setHidden = (page, hidden) => page.evaluate((h) => {
+const setHidden = (page, hidden, primeCombo = 0) => page.evaluate(([h, prime]) => {
+  if (prime) window.__SC_TEST__.primeCombo(prime)
   const stats = window.__SC_TEST__.stats()
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (h ? 'hidden' : 'visible') })
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => h })
   document.dispatchEvent(new Event('visibilitychange'))
   return stats
-}, hidden)
+}, [hidden, primeCombo])
 
 const waveAnnounces = (page) => page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'announce').length)
 
@@ -1433,7 +1467,7 @@ const rideAdvance = (a, b) => (((b - a) % 1) + 1) % 1
  * the Resume countdown; then the ride goes on from the same spot and the next wave comes at its original level time (#152).
  */
 async function hiddenPauseCheck(page, levelId) {
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+  if (!(await startLevelReady(page, levelId))) return { id: 'hidden-pause', problems: [NOT_LOADED(levelId)] }
   await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
   await page.evaluate(() => window.__SC_TEST__.killNearest(2))
   await waitFrames(page, 2, { maxMs: 20000 })
@@ -1441,11 +1475,9 @@ async function hiddenPauseCheck(page, levelId) {
   const vp = page.viewportSize()
   await page.mouse.move(vp.width / 2, vp.height / 2)
   await page.mouse.down()
-  const heldBefore = await page.evaluate(() => {
-    window.__SC_TEST__.primeCombo(3)
-    return window.__SC_TEST__.triggerHeld()
-  })
-  const before = await setHidden(page, true)
+  const heldBefore = await page.evaluate(() => window.__SC_TEST__.triggerHeld())
+  // Primed in the hide's own JS turn (#464): one frame between them longer than the 2 s combo window broke the chain.
+  const before = await setHidden(page, true, 3)
   const frozenAt = await frozenState(page)
   const heldAfter = await page.evaluate(() => window.__SC_TEST__.triggerHeld())
   await page.mouse.up()
@@ -1596,7 +1628,7 @@ async function pauseCardLayout(page) {
  */
 async function pauseMenuCheck(page, levelId) {
   const problems = []
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+  if (!(await startLevelReady(page, levelId))) return { id: 'pause-menu', problems: [NOT_LOADED(levelId)] }
   await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
   const name = await page.evaluate((id) => window.__SC_TEST__.levels().find((l) => l.id === id)?.name ?? null, levelId)
   await page.evaluate(() => window.__SC_TEST__.killNearest(1))
@@ -1664,7 +1696,7 @@ async function rideFast(page, fraction) {
 
 /** Sense of speed (#27) at the default Screen-shake setting: streaks and bank at top speed, within the caps (speed.png). */
 async function speedCheck(page, levelId) {
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+  if (!(await startLevelReady(page, levelId))) return { id: 'speed', problems: [NOT_LOADED(levelId)] }
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
   let best = { fraction: SPEED_SCAN[0], roll: -1 }
   for (const fraction of SPEED_SCAN) {
@@ -1698,7 +1730,7 @@ const WAVE_TIMER_STEP = 0.25
 async function waveCheck(page) {
   const { level, type, label, minOnScreen } = WAVE_CHECK
   const problems = []
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  if (!(await startLevelReady(page, level))) return { id: 'wave', problems: [NOT_LOADED(level)] }
   await page.evaluate((l) => {
     const s = window.__SC_TEST__
     const push = s.waveEvents.push.bind(s.waveEvents)
@@ -1875,7 +1907,7 @@ async function bossCheck(page, check) {
   const boss = () => page.evaluate(() => window.__SC_TEST__.boss())
   const events = () => page.evaluate(() => ({ ...window.__SC_TEST__.bossEvents }))
   const playing = async () => (await page.evaluate(() => window.__SC_TEST__.phase())) === 'playing'
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  if (!(await startLevelReady(page, level))) return { id: 'boss', problems: [NOT_LOADED(level)] }
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
   const startStats = await getStats(page)
   if (rideTo !== null) {
@@ -2019,7 +2051,7 @@ async function pickupCheck(page) {
   const problems = []
   const api = (fn, arg) => page.evaluate(fn, arg)
   const weaponState = () => api(() => window.__SC_TEST__.weaponState())
-  await api(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  if (!(await startLevelReady(page, level))) return { id: 'pickup', problems: [NOT_LOADED(level)] }
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
   await api(() => window.__SC_TEST__.setTimeScale(0))
 
@@ -2404,7 +2436,7 @@ async function settingsCheck(page) {
 async function qualityCheck(newPage, levelId) {
   const sample = async (query, png) => {
     const { ctx, page, errors } = await newPage(query, { deviceScaleFactor: 2 })
-    await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+    const ready = await startLevelReady(page, levelId)
     await waitFrames(page, 2, { minMs: 1500, maxMs: 30000 })
     await page.evaluate(() => {
       window.__SC_TEST__.setTimeScale(0)
@@ -2415,13 +2447,14 @@ async function qualityCheck(newPage, levelId) {
       const t = window.__SC_TEST__
       return { drawCalls: t.drawCalls, dpr: t.view()?.dpr, graphics: t.graphics(), shadows: !!t.sceneStats().byName['contact-shadows'], errors: t.errors }
     })
+    s.ready = ready
     if (png) await page.screenshot({ path: path.join(OUT, png), timeout: SHOT_TIMEOUT })
     await ctx.close()
     return { ...s, errors: [...errors, ...s.errors] }
   }
   const high = await sample('e2e=1')
   const low = await sample('e2e=1&quality=low', `${levelId}-low.png`)
-  const problems = []
+  const problems = [high, low].flatMap((s, i) => (s.ready ? [] : [`${['default', 'low'][i]}: ${NOT_LOADED(levelId)}`]))
   if (high.graphics.quality !== 'auto' || high.dpr !== 2) problems.push(`default: quality ${high.graphics.quality} at dpr ${high.dpr}, expected auto at 2`)
   if (low.graphics.quality !== 'low') problems.push(`?quality=low set the quality to "${low.graphics.quality}"`)
   if (low.dpr !== 1) problems.push(`low quality renders at dpr ${low.dpr}, expected 1`)
@@ -3110,6 +3143,7 @@ async function runMobile(browser, base) {
   // toolbars); DPR 2 instead of 3 keeps software rendering tolerable.
   const ctx = await browser.newContext({ ...iphone, viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
   const page = await ctx.newPage()
+  if (LEVEL_CHUNK_DELAY_MS > 0) await delayLevelChunk(page)
   const errors = []
   collectErrors(page, errors)
   const problems = []
@@ -3148,9 +3182,12 @@ async function runMobile(browser, base) {
   problems.push(...music.problems)
   const runSeed = await page.evaluate(() => window.__SC_TEST__.stats().runSeed)
   if (runSeed !== SEED) problems.push(`?seed=${SEED} did not set the run seed (got ${runSeed})`)
+  if (!(await levelReady(page))) problems.push(NOT_LOADED(MOBILE_LEVEL))
 
   if (!(await pollUntil(page, () => waitVisible(page, '.hud-pause-button', 500), { ms: 40000 }))) problems.push('HUD never appeared')
   await pollUntil(page, async () => (await getStats(page)).onScreenEnemies > 0, { ms: Math.max(SECONDS, 10) * 2000 })
+  // Level time held as in the desktop level steps (#305): on a slow runner the 60 s run ended before the Pause tap (#464).
+  await page.evaluate(() => { window.__SC_TEST__.holdLevelTime = true })
 
   const portraitAspect = await aspectProblems(page, 'portrait 390x844')
   problems.push(...portraitAspect.problems)
@@ -3352,6 +3389,7 @@ async function run() {
     // Settled level steps for the ride and pacing (`settledSteps.mjs`): defined before React loads.
     await ctx.addInitScript(installSettledStepper)
     const page = await ctx.newPage()
+    if (LEVEL_CHUNK_DELAY_MS > 0) await delayLevelChunk(page)
     const errors = []
     collectErrors(page, errors)
     await page.goto(`${base}/?${query}`, { waitUntil: whileLoading ? 'commit' : 'load' })

@@ -235,7 +235,9 @@ export interface SCTestApi {
   renderAudio: (req: AudioRenderRequest, seed?: number) => Promise<AudioRenderResult>
   /** The current level's shader warm-up (`canvas/ShaderWarmup.tsx`): finished?, how long it took
    *  from level mount, and the renderer's program count after it. null before the first level. */
-  shaderWarmup: { done: boolean; ms: number; programs: number } | null
+  shaderWarmup: { levelId: string; done: boolean; ms: number; programs: number } | null
+  /** The current level's lazy scene has loaded, mounted and warmed up: `startLevel` enters `playing` before that (#464). */
+  levelReady: () => boolean
   /** ms from navigation to each startup phase (`core/startupMarks.ts`). */
   initTimings: () => Partial<Record<StartupPhase, number>>
   // ── Boss (issue #181) ──
@@ -819,6 +821,10 @@ export function installE2EApi() {
       return getAllLevels().map((l) => ({ id: l.id, name: l.name, maxScore: l.maxScore, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id) }))
     },
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
+    levelReady: () => {
+      const { sceneReady, currentLevel } = useGameStore.getState()
+      return sceneReady && api.shaderWarmup?.levelId === currentLevel
+    },
     setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
     setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
     setLeaderboards: (boards, lastInitials) =>
