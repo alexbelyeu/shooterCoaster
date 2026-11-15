@@ -3,8 +3,7 @@ import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_HIP, CLIMBER_LEGS_GEO, CLIMBER_MAT, CLIMBER_SHOULDER } from './SharedEnemyAssets'
 import { climbPose, climbRoute, newClimbPose } from './climbMotion'
-import { WALL_STANDOFF, wallNormal, wallPoint, type WallSlot } from '@/entities/spawning/enemyPlacement'
-import type { WallSurface } from '@/types/level'
+import { WALL_STANDOFF, freeWallSlot, wallNormal, wallPoint } from '@/entities/spawning/enemyPlacement'
 import { hashString } from '@/utils/rng'
 
 const CLIMBER_SCALE = 8
@@ -20,25 +19,11 @@ function setArm(arm: THREE.Object3D | null, reach: number, side: 1 | -1) {
 const LEG_ROLL = 0.22
 const LEG_PITCH = -0.25
 
-/** Off a level (the turntable): a wall of its own, facing +z, behind where it was mounted. */
-function wallAt(p: THREE.Vector3): WallSlot {
-  const width = 200
-  const wall: WallSurface = {
-    id: 'free',
-    origin: { x: p.x - width / 2, y: p.y, z: p.z - WALL_STANDOFF },
-    right: { x: 1, y: 0, z: 0 },
-    up: { x: 0, y: 1, z: 0 },
-    width,
-    height: 10_000,
-  }
-  return { wall, u: width / 2, v: 0, seed: 0 }
-}
-
 /** A toy climber figurine (#453): enters at the foot of its wall (no fly-in) and climbs `climbMotion.ts`'s route. */
 export default function Climber(props: EnemyProps) {
   const { id, spawnPosition } = props
   // Mount-time only, like EnemyBase's start.
-  const [slot] = useState(() => props.wall ?? wallAt(spawnPosition))
+  const [slot] = useState(() => props.wall ?? freeWallSlot(spawnPosition, WALL_STANDOFF))
   const route = useMemo(() => climbRoute(slot, slot.wall, slot.seed || hashString(id)), [slot, id])
   const normal = useMemo(() => wallNormal(slot.wall), [slot])
   // Faces into the wall: its +z along -normal, its +y up the wall.

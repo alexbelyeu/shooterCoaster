@@ -2,6 +2,9 @@ import type { BiomeType, BossType, EnemyType } from '@/types/level'
 import { CLIMB } from '@/entities/enemies/climbMotion'
 import { RAT_CYCLE } from '@/entities/enemies/ratMotion.hot'
 import { DUST_BUNNY_BOUNCE } from '@/entities/enemies/dustBunnyMotion.hot'
+import { HOP, hopRoute } from '@/entities/enemies/hopGlideMotion'
+import { freeWallSlot } from '@/entities/spawning/enemyPlacement'
+import { hashString } from '@/utils/rng'
 import { ATMOSPHERES } from '@/levels/environments/atmosphere'
 
 /**
@@ -24,8 +27,9 @@ export interface Subject {
   motion: { from: number; span: number }
   /** False when nothing in it moves once its travel is cancelled (the strip's frames are then identical). */
   animated: boolean
-  /** Drawn on a patch of climbing wall. */
+  /** Drawn on a patch of climbing wall, `wallGap` behind its origin (default `WALL_STANDOFF`). */
   stage?: 'wall'
+  wallGap?: number
 }
 
 /** Game seconds of the rest pose on the sheet and the angle strips: every boss has risen, no golden balloon has expired (5 s). */
@@ -35,6 +39,13 @@ const cycle = (hz: number) => (2 * Math.PI) / hz
 const at = (span: number, from = REST_TIME) => ({ from, span })
 
 type Spec = Omit<Subject, 'id' | 'kind'>
+
+/** The turntable lanternfly's first hop, on its free wall (`Lanternfly.tsx`), from just after take-off to just before landing. */
+const FIRST_HOP = (() => {
+  const slot = freeWallSlot({ x: 0, y: 0, z: 0 }, HOP.standoff)
+  const route = hopRoute(slot, slot.wall, hashString('lanternfly'))
+  return { from: HOP.arrive + route.sit[0] + 0.08 * route.hop[0], span: 0.84 * route.hop[0] }
+})()
 
 /** Every enemy the spawner can mount, and the golden balloon. A `Record`, so a missing one fails `tsc -b`. */
 const ENEMY_SUBJECTS: Record<EnemyType | 'goldenBalloon', Spec> = {
@@ -57,6 +68,8 @@ const ENEMY_SUBJECTS: Record<EnemyType | 'goldenBalloon', Spec> = {
   // One dash and the stop after it: dart, stop dead, nose twitching.
   rat: { front: 0, holdHeading: 'model', motion: at(RAT_CYCLE), animated: true },
   dustBunny: { front: 0, holdHeading: 'model', motion: at(DUST_BUNNY_BOUNCE), animated: true },
+  // Folded at rest on its wall; the strip is its first hop (after REST_TIME): wings opening red, open, folding.
+  lanternfly: { front: 0, motion: at(FIRST_HOP.span, FIRST_HOP.from), animated: true, stage: 'wall', wallGap: HOP.standoff },
 }
 
 /** Every boss. A `Record`, so a missing one fails `tsc -b`. */

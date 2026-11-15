@@ -303,6 +303,16 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
     ],
     lifetime: 2.2, scale: 1.3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'chalk',
   },
+  // A pop of its wings (#516): spotted beige flakes and red ones, black specks, and a red flash.
+  lanternfly: {
+    layers: [
+      layer({ shape: 'confetti', count: 14, colors: ['#c9b8a0', '#b3a288', '#7d756a'], glow: 1.1, speed: [30, 80], up: 20, drag: 2.6, gravity: 40, size: 4, spin: 9, hold: 0.6 }),
+      layer({ shape: 'confetti', count: 10, colors: ['#d8282a', '#f03a2a', '#f2efe6'], glow: 1.5, speed: [35, 90], up: 25, drag: 2.6, gravity: 40, size: 3.5, spin: 10, hold: 0.6 }),
+      layer({ shape: 'mote', count: 10, colors: ['#141212', '#2a2522'], glow: 1, speed: [20, 60], drag: 3, gravity: 20, size: 2.5, hold: 0.4 }),
+      layer({ shape: 'spark', count: 8, colors: ['#ff5a4a'], glow: 3, speed: [60, 120], drag: 4, size: 1.4 }),
+    ],
+    lifetime: 1.7, scale: 1, lift: 0, flash: 5, flashColor: '#ff3a2a', sound: 'snap',
+  },
 }
 
 /** Particles a style puts in each of the pool's two meshes. */

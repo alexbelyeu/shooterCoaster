@@ -1,9 +1,10 @@
-import type { EnemyType, Formation, FormationOrigin } from '@/types/level'
+import type { EnemyType, Formation, FormationOrigin, WallSurface } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import { maxReadableDistance } from '../enemies/enemyReadability'
-import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, type Surface } from './enemyPlacement'
+import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, wallNormal, wallPoint, type Surface, type SwarmSlot, type WallSlot } from './enemyPlacement'
+import { HOP } from '../enemies/hopGlideMotion'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 
@@ -651,4 +652,69 @@ function normalize(v: Vec3): Vec3 {
 function horizontal(v: Vec3): Vec3 {
   const len = Math.hypot(v.x, v.z)
   return len > 1e-9 ? { x: v.x / len, y: 0, z: v.z / len } : { x: 1, y: 0, z: 0 }
+}
+
+/** Views of the rider a swarm's wall is judged from, over the first part of its window. */
+const SWARM_VIEWS = 6
+const SWARM_WINDOW_SHARE = 0.6
+/** Candidate centres along each wall, about this far apart. */
+const SWARM_CANDIDATE_STEP = 80
+/** The rider must see the wall's face at least this square-on (the cosine): not edge-on. */
+const SWARM_MIN_FACING = 0.25
+
+export interface PlaceSwarmInput {
+  table: ArcTable
+  riderIndex: number
+  type: EnemyType
+  walls: readonly WallSurface[]
+  slots: readonly SwarmSlot[]
+  ride: RideAhead
+}
+
+/**
+ * A swarm's wall and its members' spots on it (#516): the centre, of a few along each wall, that the rider sees face-on
+ * and within reading distance in the most views over the wave's window, the nearest at the first of them on a tie.
+ */
+export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: PlaceSwarmInput): WallSlot[] {
+  if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+  const reach = maxReadableDistance(type)
+  const views: TrackView[] = []
+  for (let j = 0; j < SWARM_VIEWS; j++) {
+    const ahead = ride.entry + (ride.window * SWARM_WINDOW_SHARE * j) / (SWARM_VIEWS - 1)
+    views.push(trackView(table, indexAhead(table, riderIndex, ahead), ride.trackScale))
+  }
+  const spot = { x: 0, y: 0, z: 0 }
+  let best = { wall: walls[0], u: walls[0].width / 2, v: walls[0].height / 2 }
+  let bestSeen = -1
+  let bestDist = Infinity
+  for (const wall of walls) {
+    const normal = wallNormal(wall)
+    const v = Math.min(wall.height / 2, Math.max(HOP.margin, wall.height * 0.4))
+    const steps = Math.max(1, Math.round(wall.width / SWARM_CANDIDATE_STEP))
+    for (let i = 0; i < steps; i++) {
+      const u = (wall.width * (i + 0.5)) / steps
+      wallPoint(wall, u, v, 0, spot, normal)
+      let seen = 0
+      for (const view of views) {
+        const d = sub(view.eye, spot)
+        const facing = (d.x * normal.x + d.y * normal.y + d.z * normal.z) / Math.max(1e-6, Math.hypot(d.x, d.y, d.z))
+        if (facing >= SWARM_MIN_FACING && inView(view, spot, reach)) seen++
+      }
+      const dist = Math.hypot(spot.x - views[0].eye.x, spot.y - views[0].eye.y, spot.z - views[0].eye.z)
+      if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) {
+        best = { wall, u, v }
+        bestSeen = seen
+        bestDist = dist
+      }
+    }
+  }
+  const { wall } = best
+  const mu = Math.min(HOP.margin, wall.width / 2)
+  const mv = Math.min(HOP.margin, wall.height / 2)
+  return slots.map((s) => ({
+    wall,
+    u: Math.min(wall.width - mu, Math.max(mu, best.u + s.du)),
+    v: Math.min(wall.height - mv, Math.max(mv, best.v + s.dv)),
+    seed: s.seed,
+  }))
 }
