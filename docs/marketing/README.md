@@ -47,6 +47,8 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   "internal: not tracked" in the top-right corner while it's on. **https://scoaster.com/?internal=0**
   turns it off; any other value (`?internal=false`) changes nothing. Clearing site data or a
   private window forgets it, so open the link again.
+  The second way, without the URL: **Settings → Data → "Internal device — don't count my plays"**
+  on the title's Settings (not the pause menu's) sets or clears the same flag; it applies from the next page load.
   Vercel Web Analytics has no IP or user exclusion, so this is the only filter.
 - **2026-10-22 and 2026-10-23 traffic is internal.** Every visitor and every level event on
   those two days was Alex setting up and testing on his own devices. They are not players:

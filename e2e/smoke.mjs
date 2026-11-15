@@ -2300,7 +2300,7 @@ async function dailyCheck(newPage) {
 }
 
 /** The settings card (#35): inside the viewport, no sideways scroll, every control there and ≥ 44 px tall. */
-async function settingsLayout(page, label) {
+async function settingsLayout(page, label, { fromTitle = false } = {}) {
   const r = await page.evaluate(() => {
     const card = document.querySelector('.settings-card')
     const root = document.querySelector('.settings-screen')
@@ -2324,14 +2324,16 @@ async function settingsLayout(page, label) {
   if (r.hScroll) problems.push('settings scroll sideways')
   if (r.quality.length !== 4) problems.push(`${r.quality.length} quality options (${r.quality.join('/')}), expected Auto / Low / Med / High`)
   if (r.sliders !== 2) problems.push(`${r.sliders} volume sliders, expected music + effects`)
-  if (r.switches !== 2) problems.push(`${r.switches} switches, expected show FPS + reduced motion`)
+  const switches = fromTitle ? 3 : 2
+  if (r.switches !== switches) problems.push(`${r.switches} switches, expected show FPS + reduced motion${fromTitle ? ' + internal device' : ''}`)
   if (r.smallTargets) problems.push(`${r.smallTargets} settings control(s) under the 44 px touch target`)
   return { ...r, problems: problems.map((p) => `${label}: ${p}`) }
 }
 
 /**
  * Settings from the title (settings.png): the card's layout, Esc back to the title, and the quality +
- * music volume picked there still set after a reload.
+ * music volume picked there still set after a reload; the internal-device toggle (#446), last in the card,
+ * shows the title's "internal: not tracked" marker after that reload.
  */
 async function settingsCheck(page) {
   const problems = []
@@ -2339,9 +2341,17 @@ async function settingsCheck(page) {
   await page.locator('.settings-button').click({ timeout: 30000 })
   if (!(await waitVisible(page, '.settings-card', 30000))) return { id: 'settings', problems: ['the settings card never showed'] }
   await waitFrames(page, 1, { minMs: 400, maxMs: 8000 })
-  const layout = await settingsLayout(page, 'desktop 1280x720')
+  const layout = await settingsLayout(page, 'desktop 1280x720', { fromTitle: true })
   problems.push(...layout.problems)
   await page.screenshot({ path: path.join(OUT, 'settings.png'), timeout: SHOT_TIMEOUT })
+  const internalSwitch = page.locator('.settings-card input[role="switch"]').last()
+  const lastRow = await internalSwitch.evaluate((el) => {
+    const rows = [...document.querySelectorAll('.settings-card .settings-row')]
+    return rows.at(-1)?.contains(el) ? rows.at(-1).textContent : null
+  })
+  if (!lastRow?.startsWith('Internal device')) problems.push(`the card's last row is not the internal-device toggle (${lastRow})`)
+  if (await internalSwitch.isChecked()) problems.push('the internal-device toggle is on in a fresh browser')
+  await internalSwitch.click({ timeout: 30000 })
 
   const before = await page.evaluate(() => window.__SC_TEST__.graphics().quality)
   if (before !== 'auto') problems.push(`quality "${before}" by default, expected auto`)
@@ -2379,6 +2389,7 @@ async function settingsCheck(page) {
   })
   if (reloaded.quality !== 'low') problems.push(`quality "${reloaded.quality}" after a reload, expected low`)
   if (reloaded.musicVolume !== 0.3) problems.push(`music volume ${reloaded.musicVolume} after a reload, expected 0.3`)
+  if (!(await waitVisible(page, '.internal-marker', 30000))) problems.push('no "internal: not tracked" marker after turning on the internal-device toggle and reloading')
   return {
     id: 'settings',
     problems,

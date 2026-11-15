@@ -102,7 +102,7 @@ Vercel Web Analytics (`@vercel/analytics`: page views, plus the `level_start` /
 only on Vercel builds (`__BUILT_ON_VERCEL__`, set in `vite.config.ts` from `VERCEL=1`)
 and never with `?e2e=1` (`src/app/analyticsGate.ts`), so dev, `vite preview`, CI and the
 smoke tests send nothing. `?internal=1` marks a browser internal (localStorage flag, stripped
-from the URL; `?internal=0` clears it, any other value is ignored): it sends nothing either, via the same gate and a
+from the URL; `?internal=0` clears it, any other value is ignored; the title's Settings has the same flag as an "Internal device" toggle, from the next load): it sends nothing either, via the same gate and a
 `beforeSend` that drops every page view and event while the flag is set. `applyInternalParam` decides once per page
 load and the title's "internal: not tracked" marker reads that decision (`isInternalThisLoad`), so it shows even when
 storage can't be written. Campaign links use landing paths `/go/<campaign>` (the catch-all rewrite serves the game there;
