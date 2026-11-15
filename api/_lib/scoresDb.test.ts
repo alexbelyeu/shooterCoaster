@@ -21,9 +21,9 @@ describe('scoresDb', () => {
 
   it('reads the top 10 with the secret key in apikey only', async () => {
     const { calls, fetchImpl } = recorder(() => Response.json([{ initials: 'ABC', score: 900, created_at: '2026-11-05T12:00:00Z' }]))
-    const top = await scoresDb(env, fetchImpl)!.top('level1')
+    const top = await scoresDb(env, fetchImpl)!.top('level1', 14350)
     expect(top).toEqual([{ initials: 'ABC', score: 900, at: '2026-11-05T12:00:00Z' }])
-    expect(calls[0].url).toBe('https://abc.supabase.co/rest/v1/scores?select=initials,score,created_at&level_id=eq.level1&order=score.desc,created_at.asc&limit=10')
+    expect(calls[0].url).toBe('https://abc.supabase.co/rest/v1/scores?select=initials,score,created_at&level_id=eq.level1&score=lte.14350&order=score.desc,created_at.asc&limit=10')
     expect(calls[0].init.headers).toEqual({ apikey: 'sb_secret_x' })
   })
 
@@ -32,6 +32,8 @@ describe('scoresDb', () => {
     expect(await scoresDb(env, fetchImpl)!.count({ ip_hash: 'eq.ff', created_at: 'gte.2026-11-05T12:00:00.000Z' })).toBe(4)
     expect(calls[0].init.method).toBe('HEAD')
     expect(calls[0].url).toBe('https://abc.supabase.co/rest/v1/scores?select=id&ip_hash=eq.ff&created_at=gte.2026-11-05T12%3A00%3A00.000Z')
+    await scoresDb(env, fetchImpl)!.count({ score: 'gte.900', and: '(score.lte.14350)' })
+    expect(calls[1].url).toBe('https://abc.supabase.co/rest/v1/scores?select=id&score=gte.900&and=(score.lte.14350)')
   })
 
   it('inserts the row under the table\'s column names', async () => {
@@ -44,7 +46,7 @@ describe('scoresDb', () => {
 
   it('throws DbError on an error status (a paused project) or no connection', async () => {
     const paused = recorder(() => new Response('paused', { status: 540 }))
-    await expect(scoresDb(env, paused.fetchImpl)!.top('level1')).rejects.toBeInstanceOf(DbError)
+    await expect(scoresDb(env, paused.fetchImpl)!.top('level1', 1)).rejects.toBeInstanceOf(DbError)
     const down = recorder(() => {
       throw new TypeError('fetch failed')
     })
