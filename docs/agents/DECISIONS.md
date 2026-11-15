@@ -1981,3 +1981,62 @@ are deleted. A concept's car ride runs on rAF, not SMIL, so `npm run clip`'s vir
 **Context:** Level 6 is the first interior and the first world built from a real place's blockout (#513, #514). The noise terrain, sky and scatter of the outdoor biomes don't fit a hall with a sunken pit, and the terrain's track suppression would dent an authored floor.
 **Decision:** A biome may give an authored `floor` (`BiomeDefinition.floor`) in place of the noise terrain; `createHeightFunction` returns it as is (no track suppression: an authored track is laid round its floor and tested against it). The gym's floor is the main floor plus the Starr pit (`floorAt`), drawn by the ordinary terrain mesh sized to the hall (1280 units, so the pit's edge falls on a grid line, `getTerrainMeshSize`). The hall is built in the blockout's metres from its typed pieces (`hallGeometry.ts`) and scaled to the world once: three merged vertex-coloured meshes (solid, lights, glass) and two instanced meshes (holds, volumes) scattered area-weighted on each climbing face (`holds.ts`). Pieces outside the hall that nothing looks into (the upstairs stairs and landing, the bathrooms) are not drawn. Crows stand in for the air enemy until the lanternflies (#516): the first seconds climb the Tree with the camera on the rafters, where no ground enemy is in view. Level 6 plays level 5's score until its theme round (#456).
 **Consequences:** ~44 draw calls and ~167k scene triangles (`budgets.json` `scene.level6`). The blockout JSON (with Alex's notes) is in the startup chunk because the registry's track is built from it (+5 KB gz, inside `startupJsGzipKB`). Trackside ground enemies on the gym's tight spline are in front of the rider on their approach ~70% of the time, not the trig tracks' 85% (`spawnPlacement.test.ts` holds it there; follow-up). A ground enemy pushed out of the near field stays on the ground (`groundedOutsideNearField`): over the pit the camera is close above the floor.
+
+## 2026-11-14 — The track's pixel floor thins with distance, and the track fogs early (Builder, #327)
+
+**Context:** The 2026-10-31 pixel floor kept every far rail 3 px wide with no depth cue, so on bright levels
+(Theme Park, Ocean, Antarctica) the whole far loop read as bold white cables over the landscape.
+
+**Decision:** The floor is a `PixelFloor` (`near` / `far` px, `trackDimensions.ts`): the near value out to
+`PIXEL_FLOOR_FADE_START` (200 units of view depth), smoothstepped to the far one by `PIXEL_FLOOR_FADE_END` (1,200):
+rails 1.5 → 0.5 px, lattice 0.5 → 0.3 px. MSAA resolves the sub-pixel lines as fainter strokes. `withTrackHaze`
+(`minThickness.ts`) fogs the track and tower steel as if the scene's linear fog ended at `TRACK_FOG_REACH` (25%) of
+its span, so far track takes the sky tint before the landscape does. Theme Park's rail is a warm off-white (`0xf3ece0`).
+
+**Consequences:** Raising the far floor back to 1.5 px or dropping the haze brings the cables back. Near rails (under
+~200 units) are unchanged; no geometry, draw call or hit test changes. Exponential fog is left as three draws it.
+
+## 2026-11-14 — Lava rivers are arcs draped on the drawn ground (Builder, #331)
+
+**Context:** Inferno's "glowing wall" beside the track was a radial lava river lying along a spoke of the ride: seen from the coaster, a strip running down the line of sight stands up the screen. The rivers also sat each row at the max of a 3×3 neighbourhood + 8 (the skill's safeHeight rule), which floated them up to 126 units over steep ground.
+**Decision:** Rivers are arcs round the centre that cross the ride's spokes, ~2× wider, draped on `groundFn` (1.5 lift, each triangle raised by its worst deficit, negative polygon offset), shaded as a channel (bright core, dark banks). `lavaRivers.test.ts` fails any river that runs down the rider's sight line for 400+ units at any half second of the ride, or that floats over 25 units or dips under the ground.
+**Consequences:** Don't go back to radial rivers or row-flat strips for wide features. Re-laying the rivers moves the Magma Titan's river spots with them (they read `riverRow`).
+
+## 2026-11-14 — App's screens work round a framer-motion AnimatePresence stall (Builder, #367)
+
+**Context:** The frenzy-end smoke check (and #382 on `main`, #370's portal job) failed with `phase results, results
+screens [none]`: the results screen never mounted. Reproduced locally (about every second run that ends while the last
+results screen is still fading out, on slow frames): when an exit finishing and a phase change land in one React batch,
+`AnimatePresence mode="wait"` restores its stale list of waiting screens and mounts the HUD already leaving. A motion
+element mounted mid-exit never runs its exit, so the wait never ends. framer-motion 12.43 behaves the same.
+
+**Decision:** Every screen in App's `AnimatePresence` is a `Screen` (`src/app/Screen.tsx`): a `motion.div` that drops
+its `exit` when it mounts leaving, so its presence completes at once and the next screen mounts. The results screen is
+keyed per `runId`, so a run ending during the last results screen's fade gets a fresh screen, not that one back.
+
+**Consequences:** A new screen in that `AnimatePresence` must be a `Screen`, not a bare `motion.div`. If a framer
+upgrade fixes the stall, `Screen` can go back to `motion.div`; the scratch repro is described in the PR.
+
+## 2026-11-14 — A new world's first budgets come from its first local smoke (builder, #460)
+
+**Context:** `npm run new-world` scaffolds a level, but its `budgets.json` `scene` and `pacing` ceilings
+can only be measured once the level renders, and a level without them fails the smoke.
+**Decision:** the scaffold writes `{ "placeholder": "…" }` for both. A local smoke run of that level writes
+the first ceilings from what it measured, by the budgets' own headroom rules (`sceneCeilings` /
+`pacingCeilings` in `scripts/newWorldPlan.mjs`: draw calls +20%, objects and triangles +15%; the longest
+gap +1 s, the share +2 points rounded up to 5%). On CI (`CI` set) a placeholder fails with the numbers to
+paste, so no level reaches `main` unbudgeted. This sets a new level's first ceilings only; raising an
+existing one is still the Director's.
+**Consequences:** the builder of a new world commits the budgets its local smoke wrote. `smokeSeconds`
+starts at the previous level's value (it only warns, and only on CI).
+
+## 2026-11-14 — The Medusa's snakes stay shootable between strikes; three phases (builder, #521)
+
+**Context:** #521 suggested snakes "retracting into the hair between strikes (`retract`)", and three phases (four snakes,
+four more, the crown snake). The smoke's boss check knew only two phases and clears a phase by hitting every exposed weak
+point at once.
+**Decision:** A snake recoils between strikes but never leaves the bossModel's exposed set: only later phases are hidden
+(coiled into the curls until their phase begins). Three phases, with the smoke's `bossCheck` taught `midPhases` (phases
+between the first and the last) and `rideTo` (the Medusa stays in the Starr, so the check rides to 0.75 of the lap first).
+**Consequences:** At the smoke's 2 hits a second the fight is ~10 s of hits plus her rise; a retract-between-strikes
+mechanic would need the check (and a player) to wait for each snake, and is a separate design change.
