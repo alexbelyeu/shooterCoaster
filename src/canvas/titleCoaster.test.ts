@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CAR_SPACING, CARS, TRACK_RADIUS, createTitleRide, trainSpeed } from './titleCoaster'
-import type { Vec3 } from './titleCamera'
+import type { Vec3 } from './titleCamera.hot'
 
 const ride = createTitleRide()
 const p: Vec3 = [0, 0, 0]

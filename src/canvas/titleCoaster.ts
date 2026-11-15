@@ -3,7 +3,7 @@
 import * as THREE from 'three'
 import type { TrackCurve } from '@/track/curves/TrackCurve'
 import { buildArcTable, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
-import type { Vec3 } from './titleCamera'
+import type { Vec3 } from './titleCamera.hot'
 
 /** Loop radius: outside the tents (r 120, 18 wide) and inside the orbit camera (r 180). */
 export const TRACK_RADIUS = 152

@@ -3,7 +3,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { gameTime } from '@/core/gameClock'
 import { COMBO_TIERS, comboTierIndex, comboWindowS } from '@/combat/comboTiers'
-import type { ComboBrokenEvent } from '@/combat/comboRuntime'
+import type { ComboBrokenEvent } from '@/combat/comboRuntime.hot'
 import { comboColor } from '@/ui/theme'
 
 const RING_R = 26

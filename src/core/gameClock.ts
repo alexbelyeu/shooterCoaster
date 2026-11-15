@@ -1,4 +1,4 @@
-/** Game-time seconds of the run (`delta × timeScale` on playing frames only), advanced and reset by `combat/comboRuntime.ts`. */
+/** Game-time seconds of the run (`delta × timeScale` on playing frames only), advanced and reset by `combat/comboRuntime.hot.ts`. */
 let seconds = 0
 
 export function gameTime(): number {

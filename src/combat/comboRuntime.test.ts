@@ -3,8 +3,8 @@ import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { gameTime } from '@/core/gameClock'
 import { FRENZY } from './comboTiers'
-import { resetComboRuntime, tickCombo } from './comboRuntime'
-import { resetSlowMo, setTimeScaleOverride, tickSlowMo } from './slowMo'
+import { resetComboRuntime, tickCombo } from './comboRuntime.hot'
+import { resetSlowMo, setTimeScaleOverride, tickSlowMo } from './slowMo.hot'
 
 // zustand's persist wants window.localStorage; a bare in-memory one is enough here.
 vi.hoisted(() => {

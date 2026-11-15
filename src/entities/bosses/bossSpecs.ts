@@ -3,9 +3,9 @@ import type { BossType } from '@/types/level'
 import type { BossSpec, WeakPointSpec } from './bossModel'
 import { KRAKEN_TENTACLE } from './krakenMotion'
 import { SNAKE_SLOTS } from './medusaMotion'
-import { SCORPION_TAIL } from './scorpionMotion'
-import { TITAN_BODY } from './titanMotion'
-import { YETI_BODY } from './yetiMotion'
+import { SCORPION_TAIL } from './scorpionMotion.hot'
+import { TITAN_BODY } from './titanMotion.hot'
+import { YETI_BODY } from './yetiMotion.hot'
 
 /** Local frame: +x = nose; the root sits near the middle of hull + tow chain. */
 export const BLIMP_LAYOUT = {

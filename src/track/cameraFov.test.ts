@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   fovForAspect, fovWithSpeed, horizontalFov, verticalFovFor, MAX_VERTICAL_FOV, MIN_HORIZONTAL_FOV, SPEED_FOV_DEG,
   DROP_FOV_DEG,
-} from './cameraFov'
+} from './cameraFov.hot'
 
 describe('cameraFov', () => {
   it('converts between vertical and horizontal FOV', () => {

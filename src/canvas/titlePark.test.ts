@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { PATH_HALF_WIDTH } from '@/levels/environments/biomes/themePark/parkSpec'
-import { titleCameraPose, type Vec3 } from './titleCamera'
+import { titleCameraPose, type Vec3 } from './titleCamera.hot'
 import { CROSSING_LOOP, MAIN_LOOP, createTitleRide } from './titleCoaster'
 import {
   DROP_TOWER,

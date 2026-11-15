@@ -1,8 +1,8 @@
 import { useEffect, useRef, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
-import { resetComboRuntime, tickCombo } from '@/combat/comboRuntime'
-import { endSlowMo, resetSlowMo, tickSlowMo } from '@/combat/slowMo'
+import { resetComboRuntime, tickCombo } from '@/combat/comboRuntime.hot'
+import { endSlowMo, resetSlowMo, tickSlowMo } from '@/combat/slowMo.hot'
 import { markStartup } from '@/core/startupMarks'
 import { levelTimeHeld, levelTimeStep, noteE2ELevelTime } from '@/testing/e2eHook'
 

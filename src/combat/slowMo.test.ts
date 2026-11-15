@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useGameStore } from '@/store/useGameStore'
 import { FRENZY, LAST_KILL } from './comboTiers'
-import { endSlowMo, requestSlowMo, resetSlowMo, setTimeScaleOverride, tickSlowMo, timeScaleOverride } from './slowMo'
+import { endSlowMo, requestSlowMo, resetSlowMo, setTimeScaleOverride, tickSlowMo, timeScaleOverride } from './slowMo.hot'
 
 // zustand's persist wants window.localStorage; a bare in-memory one is enough here.
 vi.hoisted(() => {
@@ -112,8 +112,8 @@ describe('run end', () => {
 describe('one owner', () => {
   const SOURCES: Record<string, string> = import.meta.glob(['../**/*.{ts,tsx}', '!../**/*.test.*'], { query: '?raw', import: 'default', eager: true })
 
-  it('only combat/slowMo.ts writes timeScale or the frenzy stage (the dev turntable aside)', () => {
-    const exempt = ['./slowMo.ts', '../store/useGameStore.ts']
+  it('only combat/slowMo.hot.ts writes timeScale or the frenzy stage (the dev turntable aside)', () => {
+    const exempt = ['./slowMo.hot.ts', '../store/useGameStore.ts']
     const writers = Object.keys(SOURCES).filter((path) =>
       !exempt.includes(path) && !path.startsWith('../dev/') &&
       /\.setSlowMo\(|\.setTimeScale\(|setState\(\{[^}]*\b(timeScale|frenzy)\b/.test(SOURCES[path]))

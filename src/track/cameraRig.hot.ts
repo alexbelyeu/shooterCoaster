@@ -77,6 +77,7 @@ export interface RigState {
 }
 
 export function createRigState(): RigState {
+  // eslint-disable-next-line sc/no-hot-path-alloc -- cold: once per camera mount
   return { roll: 0, pitch: 0, speedNorm: 0, drop: 0, lastSpeed: null }
 }
 

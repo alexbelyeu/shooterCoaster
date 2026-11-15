@@ -44,6 +44,7 @@ export default function ContactShadows({ groundFn, children }: { groundFn: Heigh
     if (!dirty.current || !mesh) return
     dirty.current = false
     if (mesh.geometry !== empty) mesh.geometry.dispose()
+    // eslint-disable-next-line sc/no-hot-path-alloc -- cold: only on the frame after a caster list was added or removed
     const all = [...lists.current].flat()
     mesh.geometry = all.length > 0 ? buildContactShadowGeometry(all, groundFn) : empty
   })

@@ -3,7 +3,7 @@ import {
   BULLET_MAX_SCREEN_FRAC, BULLET_MERGE_DIST, BULLET_RADIUS_PER_SIZE, drawnBulletRadius, muzzleOffsetWeight,
   screenRadiusFraction,
 } from './bulletVisual'
-import { BULLET_SPEED_PER_SEC } from './bulletMotion'
+import { BULLET_SPEED_PER_SEC } from './bulletMotion.hot'
 
 const TAN_HALF = Math.tan((75 * Math.PI) / 360)
 const ANTARCTICA = 40 * BULLET_RADIUS_PER_SIZE

@@ -59,7 +59,7 @@ interface GameState {
   registerShot: (bullets?: number) => void
   registerHit: () => void
 
-  // Combo (tiers and windows: combat/comboTiers.ts; expiry: combat/comboRuntime.ts)
+  // Combo (tiers and windows: combat/comboTiers.ts; expiry: combat/comboRuntime.hot.ts)
   combo: ComboState
   /** Call before `addScore`, so the kill scores at the tier it reaches. */
   registerKill: () => void
@@ -100,7 +100,7 @@ interface GameState {
 
   timeScale: number
   frenzy: FrenzyStage
-  /** Only `combat/slowMo.ts` calls this (its test checks); everyone else requests a slow-mo there. */
+  /** Only `combat/slowMo.hot.ts` calls this (its test checks); everyone else requests a slow-mo there. */
   setSlowMo: (timeScale: number, frenzy: FrenzyStage) => void
 
   /** The mounted level's shader warm-up is done (`canvas/ShaderWarmup.tsx`); the countdown holds Ready until then. */
