@@ -69,6 +69,23 @@ import { DROP_FOV_DEG, SPEED_FOV_DEG } from '@/track/cameraFov.hot'
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
 
+/**
+ * `?e2e=1&gpuSync=1` (#608): each frame first waits for the GPU to finish the one before. Headless Chromium's old
+ * headless mode (CI's headless shell) runs the page's frames far ahead of SwiftShader, queueing seconds of GL work,
+ * and every screenshot waits for that queue to drain: 8-20 s a shot on the title, a minute more on the ui shard.
+ */
+const gpuSync = isE2E && new URLSearchParams(window.location.search).has('gpuSync')
+const SYNC_PIXEL = new Uint8Array(4)
+
+/** Blocks until the GPU has run every command sent so far (a readPixels from the default framebuffer). */
+function waitForGpu(gl: THREE.WebGLRenderer) {
+  const target = gl.getRenderTarget()
+  gl.setRenderTarget(null)
+  const ctx = gl.getContext()
+  ctx.readPixels(0, 0, 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, SYNC_PIXEL)
+  gl.setRenderTarget(target)
+}
+
 export interface SCTestApi {
   frames: number
   /** Rolling average frame time in ms (last ~120 frames). */
@@ -1146,6 +1163,7 @@ export function E2EFrameProbe() {
   useFrame((state, delta) => {
     const api = window.__SC_TEST__
     if (!api) return
+    if (gpuSync) waitForGpu(gl)
     probeCamera = state.camera
     probeSize = state.size
     probeCanvas = state.gl.domElement
