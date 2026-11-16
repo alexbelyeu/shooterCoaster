@@ -2514,7 +2514,19 @@ async function titleAttractShot(page) {
 
 /** Title (#28): another camera angle 6 s later (`title-2.png`; its draw calls go on `drawCalls`), the start hint, and a key press fading to level select
  *  that also loads the score engine (#187: not before it), unlocks audio and starts the title score. */
-async function titleFlyBy(page, drawCalls) {
+/** Seconds per phase of a step (`lap(name)` closes the phase since the last lap), so a slow step's summary line says where its time went (#608). */
+function lapTimer() {
+  const laps = {}
+  let last = Date.now()
+  const lap = (name) => {
+    laps[name] = +((Date.now() - last) / 1000).toFixed(1)
+    last = Date.now()
+  }
+  lap.laps = laps
+  return lap
+}
+
+async function titleFlyBy(page, drawCalls, lap) {
   const problems = []
   const pose = () => page.evaluate(() => window.__SC_TEST__.cameraPose())
   const a = await pose()
@@ -2524,7 +2536,9 @@ async function titleFlyBy(page, drawCalls) {
   drawCalls.push(await page.evaluate(() => window.__SC_TEST__.drawCalls))
   const waited = (Date.now() - at) / 1000
   // Re-shot like title.png: a GPU CI runner can return one black canvas capture (#291 CI), a black scene stays black.
+  lap('6s')
   const scene2 = await captureTitleScene(page, path.join(OUT, 'title-2.png'), 10000)
+  lap('shot2')
   if (looksBlank(scene2)) problems.push(`title-2.png: the 3D scene behind the UI looks blank (mean ${scene2.mean.toFixed(1)} stddev ${scene2.stddev.toFixed(1)} colours ${scene2.distinctColors})`)
   // #344: a sparkle's centre on a pixel centre must blend to a colour in [0, 1], not NaN that Bloom spreads to a black frame
   const sparkle = await page.evaluate(() => window.__SC_TEST__.pointCentreColour('title-sparkles'))
@@ -2542,7 +2556,9 @@ async function titleFlyBy(page, drawCalls) {
   }
   const hint = await page.locator('.title-hint').textContent({ timeout: 5000 }).catch(() => null)
   if (!hint) problems.push('no start hint on the first title')
+  lap('hint')
   const attract = await titleAttractShot(page)
+  lap('attract')
   problems.push(...attract.problems)
 
   const engineBefore = { requests: await engineRequests(page), loaded: await page.evaluate(() => window.__SC_TEST__.audio().engineLoaded) }
@@ -2569,12 +2585,14 @@ async function titleFlyBy(page, drawCalls) {
     .waitForSelector('.screen-veil', { state: 'detached', timeout: 30000 })
     .then(() => true, () => false)
   if (!veilGone) problems.push('the fade to black never cleared over level select')
+  lap('key')
   const engineAfter = await page
     .waitForFunction(() => {
       const a = window.__SC_TEST__.audio()
       return a.engineLoaded && a.ready && a.scrim?.current === 'title'
     }, null, { timeout: 30000 })
     .then(() => true, () => false)
+  lap('engine')
   if (!engineAfter) problems.push('the key press on the title did not load the score engine, unlock audio and start the title score')
   return { problems, result: { turnedDeg, moved, waited, hint, attract: attract.result, veiled, opened, engineBefore, engineAfter, sparkle } }
 }
@@ -3467,20 +3485,25 @@ async function run() {
   const levels = await t.page.evaluate(() => window.__SC_TEST__.levels())
   if (has('title')) {
     await step(async () => {
+      const lap = lapTimer()
       const titleWait = await waitFrames(t.page, MIN_FRAMES, { maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
+      lap('frames')
       const titleImg = await captureTitleScene(t.page, path.join(OUT, 'title.png'), FRAME_DEADLINE_MS)
+      lap('shot')
       const drawCalls = [await t.page.evaluate(() => window.__SC_TEST__.drawCalls)]
-      const fly = await titleFlyBy(t.page, drawCalls)
+      const fly = await titleFlyBy(t.page, drawCalls, lap)
       const budget = await titleBudget(t.page, drawCalls)
       const poster = t.loading
-      const problems = [...fly.problems, ...poster.problems, ...(await posterWithoutJs(browser, base, t.page)), ...(await fontProblems(t.page))]
+      const noJs = await posterWithoutJs(browser, base, t.page)
+      lap('noJs')
+      const problems = [...fly.problems, ...poster.problems, ...noJs, ...(await fontProblems(t.page))]
       if (titleWait.frames < MIN_FRAMES) problems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
       if (looksBlank(titleImg)) problems.push('title.png: the 3D scene behind the UI looks blank')
       if (budget.over.length && PERF_GATE) problems.push(`title scene over budget: ${budget.over.join(', ')}`)
       if (t.errors.length) problems.push(`${t.errors.length} error(s)`)
       return {
         id: 'title', ok: problems.length === 0, problems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg,
-        title: fly.result, drawCalls: budget.drawCalls, scene: budget.scene, posterShots: poster.shots, errors: t.errors,
+        title: fly.result, drawCalls: budget.drawCalls, scene: budget.scene, posterShots: poster.shots, laps: lap.laps, errors: t.errors,
       }
     })
   }
@@ -3668,7 +3691,7 @@ async function run() {
       ? (r.ok ? ` ${r.text}` : '')
       : r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; attract ${r.title.attract ? `bars ${r.title.attract.bars.join(' / ')}` : 'none'}; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '') +
-        ` draws=${r.drawCalls} scene objs=${r.scene?.objects} tris=${r.scene?.triangles}; poster: ${r.posterShots} load shots`
+        ` draws=${r.drawCalls} scene objs=${r.scene?.objects} tris=${r.scene?.triangles}; poster: ${r.posterShots} load shots; s: ${Object.entries(r.laps ?? {}).map(([k, v]) => `${k} ${v}`).join(', ')}`
       : r.landing
         ? ` ${r.landing.requested} -> ${r.landing.pathname}${r.landing.search} phase=${r.landing.phase} internal marker=${r.landing.marker} failed requests=${r.landing.failed}`
       : r.daily
