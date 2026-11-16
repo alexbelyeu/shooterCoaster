@@ -1,5 +1,0 @@
-## 2026-11-15 — Per-frame helpers live in `*.hot.ts`, linted by `sc/no-hot-path-alloc` (Builder, #461)
-
-**Context:** Hard rule 8 (no allocations in per-frame hot paths) was prose only; a lint rule can see a `useFrame` body but not which helpers that body calls.
-**Decision:** The file name marks a hot module: every function in a `*.hot.ts` file is checked as a hot path (its module scope is where scratch objects go), as is every `useFrame` callback. Once-per-mount factories inside a hot module (`createRigState`, `newRatPose`…) and cold, guarded branches stay allowed one line at a time with `// eslint-disable-next-line sc/no-hot-path-alloc -- <why>`, not by moving them out, so a module keeps its state type and its factory together.
-**Consequences:** A new per-frame helper module should be named `*.hot.ts`; renaming one back drops it from the check. Setup-heavy modules that also have per-frame functions (`krakenMotion`, `medusaMotion`, `climbMotion`, `arcLength`, `ridePhysics`, `titleCoaster`, `windStreaks`) are not hot yet: they need their builders split from their steppers first.
