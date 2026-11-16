@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { mergePainted, painted, paintedAt, pose } from '@/levels/environments/shared/paintedParts'
 import { withRim } from '@/entities/enemies/enemyRim'
 import { gradientNoiseGlsl } from '@/levels/environments/shared/noiseGlsl'
@@ -615,7 +616,7 @@ export const TITAN_CROWN_GEO = mergePainted([
 
 // ── The Medusa of the Starr (Climbing Gym) ──
 // Modelled, with her blessing, on a real person: warm brown skin (darker underneath, lighter where the hall's light
-// falls), a big nose with a jewel on its bridge, kind eyes with a sideways, mischievous glance, curly dark hair.
+// falls), a strong jaw and cheekbones, a big nose with a jewel each side of its bridge, kind eyes with a sideways, mischievous glance, curly dark hair.
 // Toy-like and flattering: smooth skin, faceted curls, beaded toy snakes with big round eyes.
 
 const SKIN_LOW = new THREE.Color('#4f2b19')
@@ -671,6 +672,100 @@ function gown(): THREE.BufferGeometry {
   return paintedAt(new THREE.IcosahedronGeometry(1, 3), GOWN, pose([x, y, z], [0, 0, 0], [sx, sy, sz]))
 }
 
+const HEAD = MEDUSA_BUST.head
+const NOSTRIL = '#2a140c'
+
+/** Her bony landmarks: bumps (+) and hollows (-) of her head's radius, round unit directions from its centre (+z her face). */
+const HEAD_RELIEF = [
+  ...[-1, 1].flatMap((side) => [
+    { at: [side * 0.74, -0.52, 0.42], amount: 0.13, width: 0.34 }, // jaw angles
+    { at: [side * 0.6, 0.04, 0.78], amount: 0.08, width: 0.24 }, // cheekbones
+    { at: [side * 0.56, -0.32, 0.76], amount: -0.035, width: 0.2 }, // the hollows under them
+    { at: [side * 0.3, 0.34, 0.9], amount: 0.035, width: 0.26 }, // brow ridge
+  ]),
+  { at: [0, -0.86, 0.5], amount: 0.12, width: 0.3 }, // chin
+].map(({ at, amount, width }) => ({ at: new THREE.Vector3(at[0], at[1], at[2]).normalize(), amount, width2: width * width }))
+
+const _n = new THREE.Vector3()
+/** Her head's radius along unit direction `n`, as a factor of the plain ellipsoid's. */
+function headRelief(n: THREE.Vector3): number {
+  let f = 1
+  for (const r of HEAD_RELIEF) f += r.amount * Math.exp(-n.distanceToSquared(r.at) / r.width2)
+  return f
+}
+
+/** The point on her face in front of (x, y), `lift` out of the skin. */
+function onFace(x: number, y: number, lift = 0): [number, number, number] {
+  const [cx, cy, cz] = HEAD.at
+  const [rx, ry, rz] = HEAD.radii
+  _n.set((x - cx) / rx, (y - cy) / ry, 0)
+  _n.z = Math.sqrt(Math.max(0, 1 - _n.lengthSq()))
+  return [x, y, cz + rz * _n.z * headRelief(_n) + lift]
+}
+
+/** The head ellipsoid sculpted by `HEAD_RELIEF`, smooth-shaded. */
+function sculptedHead(): THREE.BufferGeometry {
+  const ico = new THREE.IcosahedronGeometry(1, 10)
+  ico.deleteAttribute('normal')
+  ico.deleteAttribute('uv')
+  const g = mergeVertices(ico)
+  ico.dispose()
+  const pos = g.attributes.position
+  const [cx, cy, cz] = HEAD.at
+  const [rx, ry, rz] = HEAD.radii
+  for (let i = 0; i < pos.count; i++) {
+    _n.fromBufferAttribute(pos, i).normalize()
+    const f = headRelief(_n)
+    pos.setXYZ(i, cx + _n.x * rx * f, cy + _n.y * ry * f, cz + _n.z * rz * f)
+  }
+  g.computeVertexNormals()
+  return skin(g, new THREE.Matrix4())
+}
+
+/**
+ * Down her nose from between the brows: [y, depth out of the face, half-width of its front plane, half-width at the
+ * face, how full its sides are]. A narrow bridge sloping out to a broad tip, the wings flaring, then the underside
+ * back to her upper lip.
+ */
+const NOSE_STATIONS = [
+  [60, 3, 3, 8, 0.3],
+  [50, 8, 4.5, 9.5, 0.3],
+  [40, 14, 5.5, 10.5, 0.3],
+  [30, 20, 7, 12, 0.32],
+  [22, 26, 10, 15, 0.4],
+  [16, 29, 12.5, 19, 0.5],
+  [10, 29, 13, 23, 0.6],
+  [5, 24, 11, 24, 0.6],
+  [2, 13, 7, 21, 0.55],
+  [0, 3, 3, 12, 0.5],
+  [-1, 0, 0.5, 2, 0.5],
+] as const
+const NOSE_RING = 10
+
+/** The nose lofted through `NOSE_STATIONS`: a flat front, side planes and an underside, set into the face. */
+function nose(): THREE.BufferGeometry {
+  const positions: number[] = []
+  for (const [y, d, wf, wb, full] of NOSE_STATIONS) {
+    const face = onFace(0, y)[2]
+    const side = wf + (wb - wf) * 0.35
+    const ring = [[-wb, -8], [-wb, d * full], [-side, d * 0.75], [-wf, d * 0.95], [-wf * 0.35, d], [wf * 0.35, d], [wf, d * 0.95], [side, d * 0.75], [wb, d * full], [wb, -8]]
+    for (const [x, out] of ring) positions.push(x, y, face + out)
+  }
+  const index: number[] = []
+  for (let k = 0; k + 1 < NOSE_STATIONS.length; k++) {
+    for (let i = 0; i + 1 < NOSE_RING; i++) {
+      const a = k * NOSE_RING + i
+      const below = a + NOSE_RING
+      index.push(a, below, a + 1, a + 1, below, below + 1)
+    }
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  g.setIndex(index)
+  g.computeVertexNormals()
+  return skin(g, new THREE.Matrix4())
+}
+
 /** Root at the star's hub, +z towards the rider: bust, arms on the star's points, neck, head and face. */
 export const MEDUSA_BODY_GEO = mergePainted([
   // Shoulders and a jewel-purple gown with a gold neckline.
@@ -687,17 +782,17 @@ export const MEDUSA_BODY_GEO = mergePainted([
     skinBall([side * 172, -168, 40], [25, 25, 25], 2),
     skinBall([side * 124, -200, 128], [26, 17, 30], 2),
   ]),
-  // Neck and head.
+  // Neck, a head with a strong jaw, chin and cheekbones, and a big, bony nose.
   limb([0, -80, -8], [0, -10, -4], 33, 29),
-  skinBall(MEDUSA_BUST.head.at, MEDUSA_BUST.head.radii),
+  sculptedHead(),
   ...[-1, 1].flatMap((side) => [
     skinBall([side * 64, 36, -2], [9, 16, 11], 2),
     paintedAt(new THREE.TorusGeometry(11, 2.2, 6, 16), GOLD_TRIM, pose([side * 67, 12, 2], [0, Math.PI / 2, 0])),
   ]),
-  // The big nose: a strong bridge, a round tip and full wings.
-  skinBall([0, 32, 64], [11, 22, 12], 2),
-  skinBall([0, 15, 76], [19, 15, 16], 2),
-  ...[-1, 1].map((side) => skinBall([side * 14, 11, 68], [10, 9, 9], 2)),
+  nose(),
+  ...[-1, 1].map((side) =>
+    paintedAt(new THREE.SphereGeometry(1, 10, 6), NOSTRIL, pose(onFace(side * 7.5, 3.4, 16), [0.9, 0, side * 0.3], [4.8, 2.2, 3.6])),
+  ),
   // Kind eyes glancing sideways, lids a little lowered, one brow up.
   ...[-1, 1].flatMap((side) => [
     paintedAt(new THREE.SphereGeometry(1, 14, 10), '#fbf6ee', pose([side * 27, 48, 56], [0, 0, 0], [14, 11, 10])),
@@ -705,7 +800,7 @@ export const MEDUSA_BODY_GEO = mergePainted([
     paintedAt(new THREE.SphereGeometry(1, 8, 6), '#ffffff', pose([side * 27 + 6.5, 50, 67.5], [0, 0, 0], [2.4, 2.4, 1.2])),
     skin(new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), pose([side * 27, 49, 57], [-0.35, 0, 0], [15.5, 9, 11])),
     painted(new THREE.BoxGeometry(26, 4.5, 6), BROW, [side * 27, side > 0 ? 69 : 64, 60], [0, 0, side > 0 ? -0.22 : 0.12]),
-    paintedAt(new THREE.SphereGeometry(1, 10, 8), BLUSH, pose([side * 40, 14, 50], [0, side * 0.5, 0], [10, 6.5, 3])),
+    paintedAt(new THREE.SphereGeometry(1, 10, 8), BLUSH, pose(onFace(side * 40, 16, 0.6), [0, side * 0.5, 0], [10, 6.5, 3])),
   ]),
   // A warm, knowing closed smile: a full crescent, a touch higher on her glancing side.
   paintedAt(new THREE.CircleGeometry(1, 20, Math.PI, Math.PI), LIP, pose([2, -5, 55.5], [-0.25, 0, 0.08], [21, 9, 1])),
@@ -747,9 +842,13 @@ export const MEDUSA_HAIR_MAT = withRim(
   { color: '#ffd9b0', intensity: 0.5, power: 2.2 },
 )
 
-/** The jewel on the bridge of her nose; its glint is animated (Medusa.tsx). */
-export const MEDUSA_JEWEL_GEO = new THREE.OctahedronGeometry(5.5, 0)
-export const MEDUSA_JEWEL_OFFSET: [number, number, number] = [0, 43, 77]
+/** A jewel each side of the bridge of her nose, in one draw; their glint is animated (Medusa.tsx). */
+export const MEDUSA_JEWEL_GEO = (() => {
+  const jewels = [-1, 1].map((side) => new THREE.OctahedronGeometry(4.2, 0).translate(...onFace(side * 8.5, 51, 3.5)))
+  const g = mergeGeometries(jewels)
+  for (const j of jewels) j.dispose()
+  return g
+})()
 export const MEDUSA_JEWEL_MAT = new THREE.MeshStandardMaterial({
   color: '#7ff6ff', emissive: '#3fe8ff', emissiveIntensity: 1.6, roughness: 0.15, metalness: 0.3, flatShading: true,
 })

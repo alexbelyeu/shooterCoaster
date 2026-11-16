@@ -50,7 +50,7 @@ inside `budgets.json` with its heaviest wave on screen.
 | **Kraken** (3) | Thicker, darker tentacles (deep teal #184a5a) with bright sucker pads (#ffb3a0), a bigger head with one huge eye; a splash that reaches the camera. (Backlog "Kraken presence pass".) |
 | **Giant Scorpion** (2) | The scorpion brief at 10×: plated segments with sand-dust gradients, glowing stinger. |
 | **Yeti** (4) | Shaggy white fur as layered faceted tufts, blue face and palms, a roar pose with the chest exposed. |
-| **Medusa of the Starr** (6, #521) | Modelled, with her blessing, on a real person: brown skin, a big nose with a **jewel piercing on the bridge**, curly dark hair; kind eyes with a mischievous look. A big bust rising out of the yellow / black star; snakes (the weak points) grow from her curls, sway, rear and strike at the camera. Affectionate and flattering, toy-like, never grotesque: she is the gym's queen. |
+| **Medusa of the Starr** (6, #521) | Modelled, with her blessing, on a real person: brown skin; bony features (#594): a **strong, defined jaw**, chin and cheekbones, and a **large nose that is not round** (a narrow bridge sloping out to a broad tip, flat front and side planes, flared wings, nostrils), with **two jewels, one each side of the bridge**; curly dark hair; kind eyes with a mischievous look. A big bust rising out of the yellow / black star; snakes (the weak points) grow from her curls, sway, rear and strike at the camera. Affectionate and flattering, toy-like, never grotesque: she is the gym's queen. |
 | **Magma Titan** (5, #320) | A golem brief at 10×: a cathedral of cracked obsidian with lava veins, eyes as crater glows. |
 
 ## How an upgrade issue is judged
