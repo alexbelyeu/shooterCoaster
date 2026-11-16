@@ -34,6 +34,10 @@ export interface TrackParams {
   railRadius?: number
   /** Arc-length spacing between cross ties at trackScale 1 (default 10); multiplied by trackScale. */
   tieSpacing?: number
+  /** Arc-length spacing between support towers at trackScale 1 (default 50); multiplied by trackScale. */
+  towerSpacing?: number
+  /** Rings the rails are built from along the whole track (default 1000). */
+  segments?: number
   /** The track's own colours also glow at this strength (default 0): `color2` spine and ties read ahead in a dark level. */
   glow?: number
 }

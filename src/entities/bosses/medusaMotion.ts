@@ -15,6 +15,13 @@ export const MEDUSA_HUB: V3 = (() => {
   return [c.x + STAR.facing.x * proud, c.y, c.z + STAR.facing.z * proud]
 })()
 
+/**
+ * Her size against the hall: she is modelled (everything in this module) at the hall's first scale, `GYM_SCALE` 16;
+ * `Medusa.tsx` scales her root, her offsets from the hub and her snakes' hit spheres by this, so she keeps her size
+ * against the star when the hall grows (#592).
+ */
+export const MEDUSA_SIZE = GYM_SCALE / 16
+
 /** How far she turns her head and shoulders towards the rider, either way (radians). */
 export const MEDUSA_MAX_YAW = 0.35
 

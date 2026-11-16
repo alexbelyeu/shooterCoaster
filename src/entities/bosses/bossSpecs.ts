@@ -2,7 +2,7 @@ import { SCORE_VALUES } from '@/levels/scoring'
 import type { BossType } from '@/types/level'
 import type { BossSpec, WeakPointSpec } from './bossModel'
 import { KRAKEN_TENTACLE } from './krakenMotion'
-import { SNAKE_SLOTS } from './medusaMotion'
+import { MEDUSA_SIZE, SNAKE_SLOTS } from './medusaMotion'
 import { SCORPION_TAIL } from './scorpionMotion.hot'
 import { TITAN_BODY } from './titanMotion.hot'
 import { YETI_BODY } from './yetiMotion.hot'
@@ -126,8 +126,8 @@ export const MAGMA_TITAN: BossSpec = {
 /** Placed every frame at the head of its snake (Medusa.tsx), so no offset; the crown snake (the last slot) is bigger. */
 const medusaSnakes: WeakPointSpec[] = SNAKE_SLOTS.map((s, i) =>
   s.phase === 2
-    ? { id: 'crown', radius: 58, offset: [0, 0, 0], hp: 4, score: 0, phase: 2 }
-    : { id: `snake-${i}`, radius: 42, offset: [0, 0, 0], hp: 2, score: 50, phase: s.phase },
+    ? { id: 'crown', radius: 58 * MEDUSA_SIZE, offset: [0, 0, 0], hp: 4, score: 0, phase: 2 }
+    : { id: `snake-${i}`, radius: 42 * MEDUSA_SIZE, offset: [0, 0, 0], hp: 2, score: 50, phase: s.phase },
 )
 
 /** Four snakes, four more, then the crown snake: shoot every snake in her hair. */
