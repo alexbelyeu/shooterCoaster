@@ -109,7 +109,7 @@ export default function LevelAudio() {
   useFrame(() => {
     const { combo, timeScale, phase } = useGameStore.getState()
     const tier = comboTierIndex(combo.count)
-    setMusicDucked(timeScale < 1 || phase === 'paused')
+    setMusicDucked(timeScale < 1)
     sfx().frenzyLift(phase === 'playing' && tier === TOP_TIER)
     scrimPlayer()?.setIntensity(intensityForTier(tier))
   })

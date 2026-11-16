@@ -7,7 +7,7 @@ import { analyticsEventFor, tensPercent, type RunSnapshot } from './analyticsEve
 const level1 = getLevelConfig('level1')!
 
 function snap(phase: GamePhase, extra: Partial<RunSnapshot> = {}): RunSnapshot {
-  return { phase, currentLevel: 'level1', runMode: { mode: 'campaign' }, score: 0, timeRemaining: RUN_SECONDS, ...extra }
+  return { phase, runId: 1, currentLevel: 'level1', runMode: { mode: 'campaign' }, score: 0, timeRemaining: RUN_SECONDS, ...extra }
 }
 
 describe('analyticsEventFor', () => {
@@ -17,6 +17,12 @@ describe('analyticsEventFor', () => {
     expect(analyticsEventFor(snap('results'), snap('playing'))).toEqual(start)
     expect(analyticsEventFor(snap('levelSelect'), snap('countdown'))).toEqual(start)
     expect(analyticsEventFor(snap('results'), snap('countdown'))).toEqual(start)
+  })
+
+  it('sends level_start on a Restart from the pause menu, a new run without leaving one', () => {
+    const start = { name: 'level_start', props: { level: 'level1', mode: 'campaign' } }
+    expect(analyticsEventFor(snap('paused'), snap('countdown', { runId: 2 }))).toEqual(start)
+    expect(analyticsEventFor(snap('playing'), snap('playing', { runId: 2 }))).toEqual(start)
   })
 
   it('tags a Daily Run start with its mode', () => {
