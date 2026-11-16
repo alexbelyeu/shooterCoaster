@@ -10,7 +10,7 @@ export interface Spot {
   z: number
 }
 
-/** The park's original rides (`TitleScene`): tents on a ring, two carousels, the Ferris wheel's plane at z -75. */
+/** The park's original rides: the tent ring (`buildTents`), two carousels and the Ferris wheel (`TitleScene`), its plane at z -75. */
 export const TENT_RING = { r: 120, count: 6, radius: 18 }
 const TENT_TOP_Y = 36
 export const CAROUSELS = [
