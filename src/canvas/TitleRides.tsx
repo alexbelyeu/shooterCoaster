@@ -1,7 +1,8 @@
 /** The title park's extra rides (#454): drop tower, swing ride, log flume; each a merged static part plus one moving part. */
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import StaticInstances from '@/levels/environments/shared/StaticInstances'
 import { mergePainted, painted, paintedAt, pose } from '@/levels/environments/shared/paintedParts'
 import { audioNow } from '@/audio/AudioEngine'
 import { titleBeatGrid } from '@/audio/titleMusic'
@@ -242,14 +243,6 @@ function LogFlume({ clock, water: waterMaterial }: { clock: TitleClock; water: T
     () => () => [channel, water, support, log, wood, logMaterial].forEach((d) => d.dispose()),
     [channel, water, support, log, wood, logMaterial],
   )
-  const supportsRef = useRef<THREE.InstancedMesh>(null)
-  useLayoutEffect(() => {
-    const mesh = supportsRef.current
-    if (!mesh) return
-    supports.forEach((s, i) => mesh.setMatrixAt(i, s))
-    mesh.instanceMatrix.needsUpdate = true
-    mesh.computeBoundingSphere()
-  }, [supports])
   const logsRef = useRef<THREE.InstancedMesh>(null)
   useFrame(() => {
     const mesh = logsRef.current
@@ -266,7 +259,7 @@ function LogFlume({ clock, water: waterMaterial }: { clock: TitleClock; water: T
     <>
       <mesh name="title-flume" geometry={channel} material={wood} />
       <mesh geometry={water} material={waterMaterial} />
-      <instancedMesh ref={supportsRef} args={[support, wood, supports.length]} />
+      <StaticInstances matrices={supports} geometry={support} material={wood} />
       <instancedMesh ref={logsRef} args={[log, logMaterial, FLUME_LOGS]} frustumCulled={false} />
     </>
   )

@@ -1,7 +1,8 @@
-/** The title park's ground, midway, crowds, tree clumps, hedges and lake (#454): static, one draw call per kind of piece. */
+/** The title park's ground, midway, tents and flags, crowds, tree clumps, hedges and lake (#454): static, one draw call per kind of piece. */
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import Midway from '@/levels/environments/biomes/themePark/Midway'
+import TentsAndFlags from '@/levels/environments/biomes/themePark/TentsAndFlags'
 import StaticInstances from '@/levels/environments/shared/StaticInstances'
 import { mergePainted, painted } from '@/levels/environments/shared/paintedParts'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -90,6 +91,7 @@ export default function TitlePark({ water }: { water: THREE.Material }) {
     <>
       <mesh name="title-ground" geometry={assets.ground} material={assets.groundMat} position={[0, GROUND_Y, 0]} />
       <Midway layout={layout} />
+      <TentsAndFlags layout={layout} />
       <StaticInstances placements={layout.people} colors={shirts} geometry={assets.body} material={assets.tintedMat} />
       <StaticInstances placements={layout.people} colors={skins} geometry={assets.head} material={assets.tintedMat} />
       <StaticInstances placements={layout.trees} colors={treeTints} geometry={assets.tree} material={assets.treeMat} />

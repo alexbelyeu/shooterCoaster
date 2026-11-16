@@ -12,9 +12,7 @@ import TitlePark from './TitlePark'
 import TitleHorizon from './TitleHorizon'
 import { CAMERA_FAR, HORIZON_FOG } from './titleHorizon'
 import TitleRides, { createTitleWaterMaterial } from './TitleRides'
-import { CAROUSELS, FERRIS_WHEEL, TENT_RING, clearOfCrossing } from './titlePark'
-import StaticInstances from '@/levels/environments/shared/StaticInstances'
-import type { YawPlacement } from '@/levels/environments/shared/yawScaleMatrix'
+import { CAROUSELS, FERRIS_WHEEL, clearOfCrossing } from './titlePark'
 import { consumeClickSwallow, isTitleAttract } from './titleAttract'
 import TitleSparkles from './TitleSparkles'
 import { audioNow } from '@/audio/AudioEngine'
@@ -24,7 +22,6 @@ import { markStartup } from '@/core/startupMarks'
 import { e2eTitleTime } from '@/testing/e2eHook'
 import { prefetchLevelScene } from './loadLevelScene'
 
-const TENT_COLORS = ['#ff4444', '#ff8800', '#4488ff', '#44cc44', '#ff44ff', '#ffffff']
 const BALLOON_DRIFT_RAD_S = 0.04
 const CROSSING_LIVERY: CoasterLivery = { rail: [0.92, 0.95, 1], spine: [0.15, 0.55, 1], body: '#2f6fd6', seat: '#1d4a9a' }
 const BALLOON_COLORS = ['#ff4444', '#ff8800', '#ffcc00', '#44cc44', '#4488ff', '#ff44ff', '#ffffff', '#cc33ff', '#ff6688', '#44dddd']
@@ -82,44 +79,6 @@ function FlyByCamera({ ride, clock }: { ride: TitleRide; clock: TitleClock }) {
   })
 
   return <PerspectiveCamera ref={camRef} makeDefault fov={55} near={1} far={CAMERA_FAR} />
-}
-
-const TENTS: YawPlacement[] = Array.from({ length: TENT_RING.count }, (_, i) => {
-  const a = (i / TENT_RING.count) * Math.PI * 2
-  return { x: Math.cos(a) * TENT_RING.r, y: 0, z: Math.sin(a) * TENT_RING.r, yaw: 0 }
-})
-
-const FLAG_POLES: YawPlacement[] = Array.from({ length: 12 }, (_, i) => {
-  const a = (i / 12) * Math.PI * 2 + 0.26
-  const r = 80 + (i % 3) * 18
-  return { x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r, yaw: 0 }
-})
-
-/** The tent ring and the flag poles: four draw calls. */
-function TentsAndFlags() {
-  const assets = useMemo(
-    () => ({
-      tentRoof: new THREE.ConeGeometry(18, 28, 6).translate(0, 20, 0),
-      tentBase: new THREE.CylinderGeometry(17, 17, 12, 6).translate(0, 6, 0),
-      pole: new THREE.CylinderGeometry(0.5, 0.5, 40, 4).translate(0, 20, 0),
-      flag: new THREE.BoxGeometry(5, 3.5, 0.3).translate(3, 37, 0),
-      white: new THREE.MeshStandardMaterial({ color: '#eeeeee' }),
-      grey: new THREE.MeshStandardMaterial({ color: '#999999' }),
-      tinted: new THREE.MeshStandardMaterial(),
-    }),
-    [],
-  )
-  useEffect(() => () => Object.values(assets).forEach((a) => a.dispose()), [assets])
-  const tentColors = useMemo(() => TENTS.map((_, i) => new THREE.Color(TENT_COLORS[i % TENT_COLORS.length])), [])
-  const flagColors = useMemo(() => FLAG_POLES.map((_, i) => new THREE.Color(TENT_COLORS[i % TENT_COLORS.length])), [])
-  return (
-    <>
-      <StaticInstances placements={TENTS} colors={tentColors} geometry={assets.tentRoof} material={assets.tinted} />
-      <StaticInstances placements={TENTS} geometry={assets.tentBase} material={assets.white} />
-      <StaticInstances placements={FLAG_POLES} geometry={assets.pole} material={assets.grey} />
-      <StaticInstances placements={FLAG_POLES} colors={flagColors} geometry={assets.flag} material={assets.tinted} />
-    </>
-  )
 }
 
 /** Pop particle burst — small spheres that fly outward then fade */
@@ -393,7 +352,6 @@ export default function TitleScene() {
       <TitleCoaster ride={crossingRide} clock={clock} livery={CROSSING_LIVERY} name="title-crossing" />
 
       {/* Decorations */}
-      <TentsAndFlags />
       <Balloons />
 
       <TitleSparkles />
