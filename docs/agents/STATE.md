@@ -77,7 +77,25 @@ the score card and its World rank, #562). Settings has the internal-browser togg
 
 ## Numbers
 
-NUMBERS_PLACEHOLDER
+Full `npm run verify` on `main` @ c6d60d2, 2026-11-16 (4-core SwiftShader; frame ms relative only):
+1369 unit tests, lint, build, bundle, Lighthouse and the full smoke all green (2566 s).
+
+| Scene | Draw calls | Triangles (frame) | Scene objs / tris | Enemies on screen / readable / largest px | avg frame ms | pacing (no-target share, longest gap) |
+|---|---|---|---|---|---|---|
+| title | 81 | — | 79 / 56,838 | — | — | — |
+| level1 | 80 | 173,503 | 156 / 193,138 | 9 / 9 / 40 | 239 | 2 %, 1.0 s |
+| level2 | 117 | 203,738 | 164 / 217,041 | 12 / 11 / 28 | 548 | 2 %, 1.0 s |
+| level3 | 85 | 192,465 | 73 / 172,424 | 11 / 11 / 71 | 268 | 0 %, none |
+| level4 | 162 | 201,587 | 256 / 240,314 | 14 / 14 / 26 | 332 | 2 %, 1.0 s |
+| level5 | 92 | 151,589 | 185 / 160,452 | 14 / 12 / 25 | 244 | 0 %, none |
+| level6 | 60 | 178,385 | 90 / 189,696 | 12 / 12 / 104 | 240 | 0 %, none |
+
+Programs after warm-up +0 on every level. Every level's longest no-target gap is ≤ 1 s
+(M3's 3 s criterion met). Level 6 sat exactly at its old 60-draw ceiling; it is 130 / 160
+from today. Bundle: 573 KB gz total (630), largest chunk 173 KB (260), **startup 417 KB
+(435; was 397 a week ago: level 6's blockout and track, #589)**. Lighthouse: SEO / A11y / BP
+100, Performance 43 mobile / 60 desktop (report only). The `?perf=1` numbers from real
+hardware are in #561.
 
 ## Known bugs and visual problems (ranked)
 
