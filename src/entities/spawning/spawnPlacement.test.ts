@@ -21,11 +21,8 @@ import { waveWindows } from './waveSchedule'
 import { BIOMES } from '@/levels/environments/biomeRegistry'
 import { REFERENCE_FOV_DEG, maxReadableDistance } from '../enemies/enemyReadability'
 
-/**
- * Share of trackside enemies in front of the rider on their approach. Level 6's authored spline spirals tightly round
- * the Flame inside walls that hold its slots near the track (#543): ~0.67 with every slot inside the hall.
- */
-const inFrontShare = (level: LevelConfig) => (level.id === 'level6' ? 0.65 : 0.85)
+/** Share of trackside enemies in front of the rider on their approach, on every level (level 6's tight spline too, #543). */
+const IN_FRONT_SHARE = 0.85
 
 const choreographed = (f: Formation | undefined): f is ChoreographedFormation => !!f && f !== 'scatter'
 const besideTrack = (w: EnemyWave) => !choreographed(w.formation) && placedBesideTrack(w.type)
@@ -312,7 +309,7 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
         if ((p.x - nearPoint.x) * forward.x + (p.z - nearPoint.z) * forward.z > 0) inFront++
       })
     }
-    expect(inFront / total).toBeGreaterThan(inFrontShare(level))
+    expect(inFront / total).toBeGreaterThan(IN_FRONT_SHARE)
   })
 })
 
