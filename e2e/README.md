@@ -266,8 +266,14 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   (`checks`, `running`, `finished`) after every check, so a run stopped at its cap still says where it was. Without
   `--url` it serves `--dist` (default `dist/`) on localhost the way `vercel.json` says Vercel would, for local runs.
   Back-to-back deploys: the job's concurrency group cancels the older run, which reports nothing.
-- **Nightly full smoke** (06:00 UTC, 60 min cap): `node e2e/smoke.mjs --mobile --url <site> --seconds 10`: every step on
-  every level, so it is also where the deep checks the PR shards leave out run (#372, "Two depths" above).
+- **Nightly full smoke** (06:00 UTC): every step on every level, so it is also where the deep checks the PR shards leave
+  out run (#372, "Two depths" above). One run outgrew its 60 min cap once level 6 joined every deep step (#570), so it runs
+  as three parallel jobs, each under its own 60 min cap: `node e2e/smoke.mjs --nightly-part <main|deep|pacing> --url <site> --seconds 10`
+  (`e2e/shards.mjs` `NIGHTLY_PARTS`: `main` the UI, first-level and phone steps and every level's ride / shot / results / share,
+  `deep` wave / boss / pickup / audio, `pacing`; `shards.test.ts` holds the parts to the full run and to the workflow's matrix).
+  Each part's artifact is `prod-e2e-results-<part>` (its screenshots, `results.json` and `exit-code`); the `nightly` job folds
+  them into one verdict with `scripts/nightlyParts.cjs` (a part that hit its cap or left nothing shows as a failed `part <name>`).
+  A part that nears its cap splits again the same way.
 
 `scripts/prod-alert.cjs` reports both: one `agent:prod-broken` issue per suite (marked `<!-- prod-smoke:<suite> -->`),
 opened on a green → red transition with the failed checks (or "timed out after N min, no check failed"), silent while it

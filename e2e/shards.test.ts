@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import { getAllLevels } from '@/levels/LevelRegistry'
-import { SHARDS, STEPS, nightlyOnly, planRun, stepLevelPairs } from './shards.mjs'
+import { NIGHTLY_PARTS, SHARDS, STEPS, nightlyOnly, planRun, stepLevelPairs } from './shards.mjs'
 
 type Plan = { steps: Set<string>; levels: string[] | null }
 type Pair = [string, string | null]
@@ -50,11 +50,19 @@ describe('smoke shards (#353, #372)', () => {
     expect(line![1].split(',').map((s) => s.trim()).sort()).toEqual([...shardNames].sort())
   })
 
-  it('the nightly production smoke is the full run', () => {
+  it('the nightly production smoke is the full run, in the parts of its matrix (#570)', () => {
+    const parts = Object.keys(NIGHTLY_PARTS).flatMap((p) => stepLevelPairs(planRun({ nightlyPart: p }) as Plan, levels) as Pair[]).map(key)
+    expect(new Set(parts).size).toBe(parts.length)
+    expect([...parts].sort()).toEqual([...full].sort())
     const wf = fs.readFileSync(path.join(root, '.github/workflows/prod-smoke.yml'), 'utf8')
+    const matrix = wf.match(/^\s+part: \[(.*)\]$/m)
+    expect(matrix).not.toBeNull()
+    expect(matrix![1].split(',').map((s) => s.trim()).sort()).toEqual(Object.keys(NIGHTLY_PARTS).sort())
+    const combine = wf.match(/node scripts\/nightlyParts\.cjs \S+ \S+ (\S+)/)
+    expect(combine![1].split(',').sort()).toEqual(Object.keys(NIGHTLY_PARTS).sort())
     const cmd = wf.match(/node e2e\/smoke\.mjs ([^\n]*)/)
     expect(cmd).not.toBeNull()
-    expect(cmd![1]).toContain('--mobile')
+    expect(cmd![1]).toContain('--nightly-part "${{ matrix.part }}"')
     expect(cmd![1]).not.toMatch(/--(shard|steps|levels|skip-desktop)\b/)
   })
 })
@@ -80,5 +88,7 @@ describe('planRun', () => {
     expect(() => planRun({ steps: 'ride,frenzy' })).toThrow(/needs "results"/)
     expect(() => planRun({ steps: 'mobileMenus' })).toThrow(/needs "mobile"/)
     expect(() => planRun({ shard: 'level2', levels: 'level3' })).toThrow(/drop --steps/)
+    expect(() => planRun({ nightlyPart: 'nope' })).toThrow(/unknown nightly part/)
+    expect(() => planRun({ nightlyPart: 'deep', levels: 'level1' })).toThrow(/drop --shard/)
   })
 })
