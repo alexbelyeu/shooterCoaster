@@ -128,6 +128,24 @@ export function profileExtent(profile: readonly Panel[]): { height: number; forw
   return { height: y, forward, backward: -backward }
 }
 
+/** A block's footprint rings up its profile: `f` out from the foot's outline at height `y`, from the floor to its top. */
+export function blockRings(profile: readonly Panel[]): { f: number; y: number }[] {
+  const rings = [{ f: 0, y: 0 }]
+  for (const panel of profile) {
+    const last = rings[rings.length - 1]
+    rings.push({ f: last.f + panel.len * Math.sin(panel.angle * DEG), y: last.y + panel.len * Math.cos(panel.angle * DEG) })
+  }
+  return rings
+}
+
+/** Footprint ring of a chamfered block, offset `f` out, with a vertex mid each long side (so its two colours split cleanly). */
+export function footprint(hw: number, hd: number, c: number): [number, number][] {
+  return [
+    [hw, -hd + c], [hw, hd - c], [hw - c, hd], [0, hd], [-hw + c, hd],
+    [-hw, hd - c], [-hw, -hd + c], [-hw + c, -hd], [0, -hd], [hw - c, -hd],
+  ]
+}
+
 /** Depth behind a wall's face when the file gives none, and a floor slab's thickness. */
 export const DEFAULT_BACK = 0.5
 const SLAB_THICKNESS = 0.3
@@ -261,6 +279,7 @@ if (!flame) throw new Error('blockout has no Flame')
 const flameBox = pieceBoxes(flame)[0]
 /** The Flame boulder: centre, its flared footprint (half sizes along x/z at rot 0) and top. */
 export const FLAME = {
+  piece: flame,
   centre: { x: flame.x, z: flame.z },
   box: flameBox,
   halfX: flameBox.maxA,

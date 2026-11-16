@@ -1,12 +1,13 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import StaticInstances from '../../shared/StaticInstances'
+import FlameFire from './FlameFire'
 import { buildHall } from './hallGeometry'
 
 /** Light fittings and daylit windows: unlit and over 1, so Bloom picks them up. */
 const LIGHT_BOOST = 1.6
 
-/** The Climbing Gym's hall from Alex's blockout: walls, boulders, the Starr, the building, and the holds on every climbing face. */
+/** The Climbing Gym's hall from Alex's blockout: walls, boulders, the Starr, the building, the holds on every climbing face, and the Flame's fire. */
 export default function GymFeatures() {
   const hall = useMemo(() => buildHall(), [])
   const materials = useMemo(
@@ -43,6 +44,7 @@ export default function GymFeatures() {
       <mesh geometry={hall.glass} material={materials.glass} />
       <StaticInstances matrices={hall.holds.matrices} colors={hall.holds.colors} geometry={shapes.hold} material={materials.hold} />
       <StaticInstances matrices={hall.volumes.matrices} colors={hall.volumes.colors} geometry={shapes.volume} material={materials.hold} />
+      <FlameFire />
     </>
   )
 }

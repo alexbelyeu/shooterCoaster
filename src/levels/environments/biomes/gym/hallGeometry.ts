@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { createRng } from '@/utils/rng'
-import { DEFAULT_BACK, GYM_SCALE, HALL, PIECES, PIT, floorAt, piece, pieceAxes, type Panel, type PieceOf } from './blockout'
+import { DEFAULT_BACK, GYM_SCALE, HALL, PIECES, PIT, blockRings, floorAt, footprint, piece, pieceAxes, type Panel, type PieceOf } from './blockout'
 import { BUILDING, GRIME, HIDDEN_PIECES, HOLD_COLORS, TREE_PAINT, VOLUME_COLORS, WALL_PAINT, WALL_STYLE } from './config'
 import { scatterOn, type ClimbSurface } from './holds'
 import { buildTreeWood } from './treeTrunk'
@@ -154,14 +154,6 @@ function climbingWall(p: PieceOf<'sport' | 'boulder'>, out: Parts): void {
   out.climb.push({ positions: g.attributes.position.array, accept: facingSide(pieceAxes(p.rot).facing), density: boulder ? 0.9 : 0.6, volumes: boulder ? 0.05 : 0.012 })
 }
 
-/** Footprint ring of a chamfered block, offset `f` out, with a vertex mid each long side (so its two colours split cleanly). */
-function footprint(hw: number, hd: number, c: number): [number, number][] {
-  return [
-    [hw, -hd + c], [hw, hd - c], [hw - c, hd], [0, hd], [-hw + c, hd],
-    [-hw, hd - c], [-hw, -hd + c], [-hw + c, -hd], [0, -hd], [hw - c, -hd],
-  ]
-}
-
 /** Triangle soup → geometry, each triangle wound so its normal agrees with its `hint`. */
 class Soup {
   readonly pos: number[] = []
@@ -178,12 +170,7 @@ class Soup {
 
 /** The Flame and the Wave: the footprint lofted up the profile's bands, flaring out and pulling in. */
 function block(p: PieceOf<'block'>, out: Parts): void {
-  const rings: { f: number; y: number }[] = [{ f: 0, y: 0 }]
-  for (const panel of p.profile) {
-    const last = rings[rings.length - 1]
-    rings.push({ f: last.f + panel.len * Math.sin(panel.angle * DEG), y: last.y + panel.len * Math.cos(panel.angle * DEG) })
-  }
-  const pts = rings.map((r) => footprint(p.w / 2 + r.f, p.d / 2 + r.f, p.chamfer).map(([x, z]): V3 => [x, r.y, z]))
+  const pts = blockRings(p.profile).map((r) => footprint(p.w / 2 + r.f, p.d / 2 + r.f, p.chamfer).map(([x, z]): V3 => [x, r.y, z]))
   const soup = new Soup()
   for (let k = 0; k + 1 < pts.length; k++) {
     const lo = pts[k]
