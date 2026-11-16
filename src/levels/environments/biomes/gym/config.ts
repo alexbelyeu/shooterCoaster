@@ -8,10 +8,10 @@ import type { WallStyle } from './wallPanels'
 /** The hall's floor (the terrain mesh): poured grey concrete, the same at both levels. */
 export const COLOR_RAMP: ColorRamp = {
   stops: [
-    { height: 0, color: new THREE.Color(0x8d939a) },
-    { height: 1, color: new THREE.Color(0x8d939a) },
+    { height: 0, color: new THREE.Color(0x74777b) },
+    { height: 1, color: new THREE.Color(0x74777b) },
   ],
-  cliffColor: new THREE.Color(0x8d939a),
+  cliffColor: new THREE.Color(0x74777b),
 }
 
 /** Enemies keep this far (world units, 2.5 m) inside the hall's walls and under its roof. */
@@ -63,10 +63,54 @@ export const WALL_STYLE: Record<string, WallStyle> = {
 export const TREE_PAINT = { groove: '#3a2a1f', ridge: '#86643f', panel: '#dbe7d8', outline: '#3f8f4e', top: '#3f8f4e' }
 
 /**
- * Grime (#558, "spectacularly Bushwick"): every panel a little off its paint, some chalk-caked, some swapped
- * for bare plywood or grey primer patches, boot scuffs along the foot.
+ * Grime (#558, #593, "spectacularly Bushwick"). Baked per panel: every panel a little off its paint, some
+ * chalk-caked, some swapped for bare plywood or grey primer patches, boot scuffs along the foot. In the shader
+ * (`grimeShader.ts`, fractions taken off the paint): blotches, drips, the foot's grime up to `footHeight` m,
+ * floor stains, chalk smudges at hand height, the roof's half shaded to `roofShade`, chalk on the holds' tops.
  */
-export const GRIME = { chalk: '#e2ddd2', plywood: '#b08f62', primer: '#8f948f', seam: 0.45, shell: 0.8, scuffHeight: 1.1, scuff: 0.7 }
+export const GRIME = {
+  chalk: '#e2ddd2',
+  plywood: '#b08f62',
+  primer: '#8f948f',
+  rust: '#7a4a2c',
+  seam: 0.45,
+  shell: 0.8,
+  scuffHeight: 1.1,
+  scuff: 0.7,
+  blotch: 0.3,
+  drips: 0.22,
+  foot: 0.45,
+  footHeight: 1.6,
+  floorStain: 0.3,
+  chalkSmudge: 0.4,
+  roofShade: 0.7,
+  holdChalk: 0.55,
+}
+
+/**
+ * The strip-light fixtures under the trusses (blockout metres): one row along the hall at each `rows` z,
+ * fixtures `length` long every `spacing` along x, each casting a warm `pool` (reach `reach`, a fraction `uplight` of it spilling up) in the grime shader.
+ */
+export const STRIP_LIGHTS = { rows: [5, 15, 25, 35], rowGap: 10, spacing: 8, length: 5, color: '#ffc98a', pool: 1.5, reach: 9, uplight: 0.4 }
+/** The fixtures' height: just under the trusses' bottom chord. */
+export const stripLightY = HALL.h - 4.5 - 0.15
+
+/**
+ * Street pieces and tags high on the hall's walls (#593; `murals.ts`), each at its rect's foot centre in a wall
+ * frame (`rot` turns it to face into the hall): one over the cubbies on the east wall, one over the glass gym
+ * room on the west, tags over Alaska and by the entrance. All under the ring beam (H − 5.2 m).
+ */
+export const MURALS = {
+  pieces: [
+    { x: 48, z: 0, rot: 0, base: 11, w: 15, h: 8, seed: 5931, style: { fill: ['#ff4fa3', '#ffd23f', '#2fd0c8'], outline: '#141416', cloud: '#5b55b0', highlight: '#ffffff' } },
+    { x: 64, z: HALL.d, rot: 180, base: 12.5, w: 16, h: 8, seed: 5932, style: { fill: ['#ff7a1f', '#e8322c', '#ffd23f'], outline: '#101012', cloud: '#2a7fd4', highlight: '#fff6d8' } },
+  ],
+  tags: [
+    { x: 46, z: HALL.d, rot: 180, base: 18.3, w: 5, h: 2.4, seed: 5933, colour: '#141416' },
+    { x: 38.5, z: 0, rot: 0, base: 15, w: 4.5, h: 2, seed: 5934, colour: '#c7ccd2' },
+    { x: 77, z: HALL.d, rot: 180, base: 13, w: 4, h: 2, seed: 5935, colour: '#e8322c' },
+  ],
+}
 
 /** Hold colours: the route-setters' tape colours. */
 export const HOLD_COLORS = ['#ff3d7f', '#ffd23f', '#3fcf6a', '#2f7bff', '#9b5cff', '#ff8a1f', '#f4f4f4', '#e8322c', '#1f1f22']
@@ -76,19 +120,20 @@ export const VOLUME_COLORS = ['#1d1d1f', '#2a3fae', '#1d1d1f', '#5b55b0']
 /** Pieces outside the hall that nothing in it looks into (Alex's note: "none of that is visible from inside"). */
 export const HIDDEN_PIECES = new Set(['stairs-up-1', 'landing-up', 'stairs-up-2', 'p-bathrooms'])
 
+/** The building's paint: worn white walls, a dark roof deck over grey steel, Bushwick-dim (#593). */
 export const BUILDING = {
-  wall: '#eef0ec',
-  ceiling: '#d9dde1',
-  steel: '#7a8089',
-  beam: '#6e1f2a',
-  duct: '#c4c9cf',
-  concrete: '#8d939a',
-  pad: '#9a9e9b',
+  wall: '#d9d7cf',
+  ceiling: '#5a5c60',
+  steel: '#5a5e63',
+  beam: '#5e1a24',
+  duct: '#a9afb4',
+  concrete: '#74777b',
+  pad: '#878b88',
   seam: '#1f2022',
   rail: '#d0302a',
   ropeZone: '#232325',
-  daylight: '#dcefff',
-  strip: '#fff8e6',
+  daylight: '#b9d6f2',
+  strip: '#ffe2b0',
   doorGlass: '#33475a',
   glass: '#bfe3ff',
 }

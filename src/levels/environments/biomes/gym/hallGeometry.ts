@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { createRng } from '@/utils/rng'
 import { DEFAULT_BACK, GYM_SCALE, HALL, PIECES, PIT, blockRings, floorAt, footprint, piece, pieceAxes, type Panel, type PieceOf } from './blockout'
-import { BUILDING, GRIME, HIDDEN_PIECES, HOLD_COLORS, TREE_PAINT, VOLUME_COLORS, WALL_PAINT, WALL_STYLE } from './config'
+import { BUILDING, GRIME, HIDDEN_PIECES, HOLD_COLORS, MURALS, STRIP_LIGHTS, TREE_PAINT, VOLUME_COLORS, WALL_PAINT, WALL_STYLE, stripLightY } from './config'
+import { graffitiPiece, tag, type MuralShape } from './murals'
 import { scatterOn, type ClimbSurface } from './holds'
 import { buildTreeWood } from './treeTrunk'
 import { FACE, SEAM, SHELL, buildWallPanels, pushTri, wallSpec, type PanelInfo, type V3, type WallPanels } from './wallPanels'
@@ -401,6 +402,23 @@ function pitEdge(out: Parts): void {
   pad({ id: 'pad-pit', x: (PIT.minX + PIT.maxX) / 2, z: (PIT.minZ + PIT.maxZ) / 2, rot: 0, base: PIT.floorY, w: PIT.maxX - PIT.minX, d: PIT.maxZ - PIT.minZ, thick: 0.35 }, out)
 }
 
+const STEEL = new THREE.Color(BUILDING.steel)
+const RUST = new THREE.Color(GRIME.rust)
+
+/** Steel, rusting in patches and dusty on top: a stable hash of each face's centre picks how much. */
+const rustySteel: Paint = (x, y, z) => {
+  const h = Math.abs(Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453) % 1
+  return _c.copy(STEEL).lerp(RUST, h < 0.4 ? 0.25 + h : 0.1 * h)
+}
+
+/** A wall's mural shapes as flat geometry stacked off it, placed by `m` (the wall's frame, at the rect's foot centre). */
+function mural(shapes: readonly MuralShape[], m: THREE.Matrix4, out: THREE.BufferGeometry[]): void {
+  for (const s of shapes) {
+    const shape = new THREE.Shape(s.points.map(([x, y]) => new THREE.Vector2(x, y)))
+    out.push(paint(new THREE.ShapeGeometry(shape).translate(0, 0, 0.12 + 0.1 * s.layer), s.colour, m))
+  }
+}
+
 /** An axis-aligned box in blockout x / y / z. */
 function hallBox(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, color: THREE.ColorRepresentation, out: THREE.BufferGeometry[]): void {
   out.push(paint(box(x0, x1, y0, y1, z0, z1), color, IDENTITY))
@@ -452,14 +470,14 @@ function building(out: Parts): void {
   const bottom = H - 4.5
   const top = H - 0.6
   for (let x = 4; x < W; x += 8) {
-    hallBox(x - 0.15, x + 0.15, bottom, bottom + 0.3, 0, D, BUILDING.steel, out.solid)
-    hallBox(x - 0.15, x + 0.15, top - 0.3, top, 0, D, BUILDING.steel, out.solid)
-    for (let z = 0; z <= D; z += 5) hallBox(x - 0.08, x + 0.08, bottom, top, z - 0.08, z + 0.08, BUILDING.steel, out.solid)
+    out.solid.push(paint(box(x - 0.15, x + 0.15, bottom, bottom + 0.3, 0, D), rustySteel, IDENTITY))
+    out.solid.push(paint(box(x - 0.15, x + 0.15, top - 0.3, top, 0, D), rustySteel, IDENTITY))
+    for (let z = 0; z <= D; z += 5) out.solid.push(paint(box(x - 0.08, x + 0.08, bottom, top, z - 0.08, z + 0.08), rustySteel, IDENTITY))
     for (let z = 0; z < D; z += 5) {
       const rise = top - bottom
       const len = Math.hypot(5, rise)
       const tilt = Math.atan2(rise, 5) * ((z / 5) % 2 === 0 ? 1 : -1)
-      out.solid.push(paint(new THREE.BoxGeometry(0.12, 0.12, len).rotateX(-tilt).translate(x, (bottom + top) / 2, z + 2.5), BUILDING.steel, IDENTITY))
+      out.solid.push(paint(new THREE.BoxGeometry(0.12, 0.12, len).rotateX(-tilt).translate(x, (bottom + top) / 2, z + 2.5), rustySteel, IDENTITY))
     }
   }
   // Maroon steel: columns up the long walls and a ring beam under the roof.
@@ -472,11 +490,17 @@ function building(out: Parts): void {
   hallBox(0, W, ring, ring + 0.6, D - 0.4, D, BUILDING.beam, out.solid)
   hallBox(0, 0.4, ring, ring + 0.6, 0, D, BUILDING.beam, out.solid)
   hallBox(W - 0.4, W, ring, ring + 0.6, 0, D, BUILDING.beam, out.solid)
-  // Silver ducts along the hall, and the long strip lights under the trusses.
+  // Silver ducts along the hall, and the strip-light fixtures under the trusses, between them (#593: pools, not a flat fill).
   for (const z of [12, 28]) {
     out.solid.push(paint(new THREE.CylinderGeometry(0.6, 0.6, W - 2, 16).rotateZ(Math.PI / 2).translate(W / 2, H - 3, z), BUILDING.duct, IDENTITY))
   }
-  for (const z of [5, 15, 25, 35]) hallBox(3, W - 3, bottom - 0.25, bottom - 0.05, z - 0.15, z + 0.15, BUILDING.strip, out.light)
+  const half = STRIP_LIGHTS.length / 2
+  for (const z of STRIP_LIGHTS.rows) {
+    for (let x = STRIP_LIGHTS.spacing; x < W; x += STRIP_LIGHTS.spacing) {
+      hallBox(x - half, x + half, stripLightY - 0.1, stripLightY + 0.1, z - 0.15, z + 0.15, BUILDING.strip, out.light)
+      hallBox(x - half - 0.1, x + half + 0.1, stripLightY + 0.1, stripLightY + 0.2, z - 0.25, z + 0.25, BUILDING.steel, out.solid)
+    }
+  }
   // Murals: flat colour panels low on the walls (the cubbies' climbing photos, the comp banners, the eagle by the Arch wall).
   const murals: [number, number, number, number, number, number, string][] = [
     [42.2, 46, 2.8, 7.5, 0.02, 0.1, '#2f6db5'],
@@ -486,6 +510,9 @@ function building(out: Parts): void {
     [W - 0.1, W - 0.02, 3.5, 8, 33.6, 35.6, '#6b4a2e'],
   ]
   for (const [x0, x1, y0, y1, z0, z1, c] of murals) hallBox(x0, x1, y0, y1, z0, z1, c, out.solid)
+  // Street pieces and tags high on the walls (#593).
+  for (const p of MURALS.pieces) mural(graffitiPiece(p.seed, p.w, p.h, p.style), frame(p), out.solid)
+  for (const g of MURALS.tags) mural(tag(g.seed, g.w, g.h, g.colour), frame(g), out.solid)
 }
 
 const toWorld = new THREE.Matrix4().makeTranslation((-HALL.w / 2) * GYM_SCALE, 0, (-HALL.d / 2) * GYM_SCALE).multiply(new THREE.Matrix4().makeScale(GYM_SCALE, GYM_SCALE, GYM_SCALE))
