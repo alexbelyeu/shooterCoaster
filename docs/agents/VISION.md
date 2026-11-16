@@ -7,7 +7,9 @@ GitHub); v4 on 2026-11-09 (M2 closed; Alex's playtest bar — 60 s runs, no spaw
 title world — leads M3; Level 6 becomes the Climbing Gym built through a level kit,
 `docs/LEVEL-KIT.md`; Neon Metropolis deferred; enemy art briefs in `docs/art/ENEMIES.md`); v4.1 on 2026-11-13
 (Alex, #513: Level 6 is **his own climbing gym**, built from his blockout, with don't-shoot
-climbers, rats / lanternflies / dust bunnies and the Medusa of the Starr).
+climbers, rats / lanternflies / dust bunnies and the Medusa of the Starr); v5 on 2026-11-16 (Level 6
+shipped; Alex's gym notes #558, the fire #583 and the MacBook Neo stutter #561 lead week 5; smooth on a
+modest laptop moves into M3).
 Rewritten or amended weekly; direction changes are logged in DECISIONS.md._
 
 ## Elevator pitch
@@ -77,7 +79,7 @@ code-generated, flat-shaded, saturated look:
 | 3 Ocean | ocean | Teal water, deep blue horizon; cool sky, sun shafts | Sunken city, sea stacks | Shark wave breaches; whale passing; **finale: Kraken tentacles** | Jellyfish (glowing), sharks (white belly), flying fish (silver) |
 | 4 Antarctica | arctic | White/blue ice, violet shadows; pale cold sky, aurora | Ice fortress, glacier walls | Aurora intensifies with combo; blizzard wave; **finale: Yeti** | Snowmen (navy scarves/coal — never dark bodies on snow), brutes |
 | 5 Inferno | volcanic | Obsidian black, lava orange; **dark ash sky with red underglow** (never daytime blue). Lava rivers, crater rim and rails glow so the frame reads even though it is dark | Volcano, lava rivers | Eruption: shake, fog pulse, ember rain; **finale: Magma Titan** | Wisps (glow), imps (orange), golems (cracked lava), drakes |
-| 6 Climbing Gym (M3, #513) | gym (the first **interior** biome) | Alex's real gym from his blockout (`docs/levels/`): a tall white hall, steel trusses, strip lights, windows above the low walls; white / grey walls with painted bands (yellow / black at the Starr and the Shield, blue / purple waves at the south end, green outlines on the Tree), holds in every colour, grey mats, black rope zones with a red stripe, chalk in the air | The **Starr** (a yellow / black star over a sunken pit), the **Flame** boulder with real fire running up it, the **Tree** (a trunk becoming a headwall), the Arch, the glass gym room | Four ride moments (#514): thread the Arch, spiral round the burning Flame, climb the Tree and skim the glass room, dive into the Starr pit; **finale: the Medusa of the Starr** (#521), snakes in her curly hair as weak points | New York rats, dust bunnies (#515), spotted lanternflies flashing red (#516); **climbers are bystanders**: shooting one costs points and the combo (#518) |
+| 6 Climbing Gym (M3, #513) | gym (the first **interior** biome) | Alex's real gym from his blockout (`docs/levels/`): a tall white hall, steel trusses, strip lights, windows above the low walls; white / grey walls with painted bands (yellow / black at the Starr and the Shield, blue / purple waves at the south end, green outlines on the Tree), holds in every colour, grey mats, black rope zones with a red stripe, chalk in the air | The **Starr** (a yellow / black star over a sunken pit), the **Flame** boulder with realistic fire burning on it that lights the hall (#583), the **Tree** (a barked trunk on roots with a gap under it, becoming a headwall), the Arch, the glass gym room. **Much bigger than the blockout's first scale, grimy "spectacularly Bushwick", in low, moody light** (#558) | Four ride moments (#514): thread the Arch, spiral round the burning Flame, **through the Tree's gap** and skim the glass room, dive into the Starr pit; the ride as fast as Theme Park's; **finale: the Medusa of the Starr** (#521), snakes in her curly hair as weak points; bony, a strong jaw and a large defined nose, two jewels on the bridge (#558) | New York rats, dust bunnies (#515), spotted lanternflies flashing red (#516); **climbers are bystanders**: shooting one costs points and the combo (#518) |
 | 7+ (candidates, through the level kit) | Neon Metropolis (city, night; drones, billboard bots, helicopter; #322), Jungle Ruins, Sky Harbour, Haunted Mine, Night Ride variants | | | | |
 
 **The title screen is a world too** (#436): the park must read as a big, expansive,
@@ -120,12 +122,14 @@ hands.
 
 ### M3 — "Depth and spectacle" (weeks 3–7, 2 Nov – 5 Dec; GitHub milestone 2)
 
-**Status 2026-11-09:** week 3 landed two finales (Scorpion, Yeti), the Ocean's water, the
-title coaster, the online board, the score card and Alex's picked themes on one engine
-(Tone.js gone). Alex's own playtest (#439) then set the bar for the rest of M3, and it
-changes what Level 6 is: the exit criteria below are **rewritten** (DECISIONS "Week 4").
-Week 4 (9–15 Nov) is **his bar first**: 60 s runs, no spawn gaps, the title world, the
-Climber; then the Gym.
+**Status 2026-11-16:** week 4 shipped Alex's bar and nearly all of Level 6: every run 60 s with
+the boss at 40 s, waves where the camera looks, the title world to the horizon, the Magma Titan,
+far rails that recede, Inferno's lava in the ground, the Climber, the gym from his blockout with
+rats, dust bunnies, lanternflies, the Tree, rugged walls, a first fire and the Medusa, the
+Gym's theme round, `npm run new-world`, lint with the hot-path rule, the crow as a character.
+Alex then played it (#558, #583, #561): the gym must be much bigger, grimy and low-lit, the
+Medusa bonier, the fire far more real, and the game stutters on his MacBook Neo. Week 5 (16–22
+Nov) is those notes, the bystanders (#518), boss music (#598) and two enemy-art passes.
 
 Exit criteria:
 - **Every run is 60 s** on one pacing template (waves → boss at ~40 s → the fight ends the
@@ -142,17 +146,22 @@ Exit criteria:
   at landmark scale and the level playable (#517), rats, dust bunnies and lanternflies
   (#515, #516), climbers as bystanders, the game's first don't-shoot rule (#518), the
   Medusa finale (#521), the Flame's fire, the Tree and rugged walls (#520, #519), its theme
-  round for Alex (#456), then the `npm run new-world` scaffold (#460). The Climber and
-  the `wall` surface are done (#453).
-- **Enemy art** (#381): the briefs exist (`docs/art/ENEMIES.md`) and the crow and the
-  Inferno trio are characters (#462, #463) in one style with the Climber.
-- The Ocean looks like water (done, #430) and opens with enemies in view (done, #343);
-  Inferno's lava lies in the ground (#331); far rails recede (#327).
-- **Lint in CI** (#351): ESLint with the repo's own rules in `verify` (#455), the hot-path
-  no-allocation rule (#461); the startup JS budget exists (done, #420).
+  round for Alex (#456), then the `npm run new-world` scaffold (#460). Done: the Climber,
+  #514–#517, #519–#521, #456, #460. Left, from Alex's 14–15 Nov notes: the hall much bigger
+  with the ride through the Tree's gap (#592), spectacularly Bushwick in low light (#593), a
+  bonier Medusa (#594), fire Alex calls realistic (#595, #599; he closes #583), the
+  bystanders (#518), lanternflies on the walls (#575), his theme pick wired in (#565 → #566).
+- **Enemy art** (#381): the briefs exist (`docs/art/ENEMIES.md`) and the crow (done, #573),
+  the Inferno trio (#463) and the Kraken (#600) are characters in one style with the Climber.
+- **Smooth on a modest laptop** (Alex's MacBook Neo, #561): no stall bursts during play and
+  no visible frame over ~250 ms in the countdown on his `?perf=1` re-run (#596, #597).
+- Done: the Ocean looks like water (#430) and opens with enemies in view (#343); Inferno's
+  lava lies in the ground (#331); far rails recede (#327); lint in CI with the repo's rules
+  and the hot-path rule (#455, #461), the startup JS budget (#420).
 - Audio (Alex's priority, largely done): intensity layers (#347), picked themes as defaults
-  for the title and every level (#386, #421), one engine (#431). Left in M3: boss / results
-  variations and positional kill sounds on the arcade engine (epic #212).
+  for the title and every level (#386, #421), one engine (#431). Left in M3: a boss section
+  in every level's theme (#598) and the Gym's picked theme (#566); positional kill sounds go to
+  the backlog (epic #212).
 - Studio tooling that landed this week stays green: sharded PR smoke + nightly deep smoke,
   deploy health check, watchdog, telemetry (Alex still has to run
   `supabase/migrations/0002_telemetry.sql`).
@@ -178,15 +187,14 @@ loop (#332, P3), the swoop intro and results orbit (#328, P3).
 ## Idea backlog (pre-approved; builders may pull from the top when `agent:ready` is empty)
 
 Ranked. Each must still be filed as an issue by whoever picks it up, following the
-issue contract in PROTOCOL.md, with the milestone set. Items filed as issues this week are
-not repeated here (the pacing metric and fix, the 60 s template, the Climber and the Gym with its enemies and the Medusa,
-the title park and world, the kit scaffold, the crow and Inferno trio, lint).
+issue contract in PROTOCOL.md, with the milestone set. Items filed as issues are not
+repeated here (this week: the Kraken presence pass #600, boss music sections #598).
 
-1. **Kraken presence pass** — thicker, darker tentacles with bright sucker pads, a bigger
-   head, a splash that reaches the camera; same spec and framework (brief in ENEMIES.md).
-2. **Boss music variations** — each level's theme gets a darker, louder boss section the
-   player switches to on `boss:spawn` (sound bible "Boss / finale" row), on the layers
-   engine. `type:audio`.
+1. **Results music variations** — a win / lose cut of the results score by stars earned,
+   on the layers engine. `type:audio`.
+2. **A CI gate on long frames** (#539) — once #596 / #597 make the throttled numbers
+   trustworthy: a scheduled throttled pass, then a budget on long frames and post-warm-up
+   programs.
 3. **Whale set-piece (Ocean)** — a huge low-poly whale breaches across the track at ~30 s;
    camera shake, splash particles. Scenery, not a target.
 4. **Blizzard / sandstorm waves** — a weather pulse (fog near distance + particle burst)
