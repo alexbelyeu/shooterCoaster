@@ -16,6 +16,9 @@ Tree's face (0–3 s), a full turn round the Flame (~10–25 s), west through th
 turn to the crest by the glass gym room (~39 s), then the run-in down the west side into the Starr
 pit with the star ahead, where the 60 s run ends; the U-turn under the star closes the lap after it.
 The Medusa rises from the star at 40 s, as the rider leaves the crest facing it.
+`gym-ride-moments.jpg` is the ride from the rider's seat (#544; `?e2e=1`, `rideTo` 0, 0.1, 0.45, 0.55,
+0.65, 0.85, left to right, top to bottom): up the Tree, at the Flame, past the Wave (its contact
+shadow on the mats), through the Arch, by the glass gym room, the run-in to the Starr.
 
 ## Axes and units
 

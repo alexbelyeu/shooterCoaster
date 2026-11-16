@@ -35,7 +35,6 @@ export interface Hall {
   light: THREE.BufferGeometry
   glass: THREE.BufferGeometry
   holds: HoldInstances
-  volumes: HoldInstances
 }
 
 const _c = new THREE.Color()
@@ -566,6 +565,11 @@ export function buildHall(): Hall {
   }
   building(out)
   const holds = instances(out.climb, 'density', 5170, [0.12, 0.3], HOLD_COLORS)
+  // The volumes go into the walls' mesh (one draw call less than their own instances, #544).
   const volumes = instances(out.climb, 'volumes', 5171, [0.5, 1.1], VOLUME_COLORS)
-  return { solid: merge(out.solid), light: merge(out.light), glass: merge(out.glass), holds, volumes }
+  const fromWorld = toWorld.clone().invert()
+  const volume = new THREE.ConeGeometry(1, 1, 4).rotateX(Math.PI / 2).translate(0, 0, 0.5)
+  volumes.matrices.forEach((m, i) => out.solid.push(paint(volume.clone(), volumes.colors[i], fromWorld.clone().multiply(m))))
+  volume.dispose()
+  return { solid: merge(out.solid), light: merge(out.light), glass: merge(out.glass), holds }
 }

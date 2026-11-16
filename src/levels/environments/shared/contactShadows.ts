@@ -17,6 +17,8 @@ export interface ShadowCaster {
   radius?: number
   spread: number
   strength: number
+  /** What it stands on when that isn't the drawn terrain (the gym's mats over its floor); default the level's `groundFn`. */
+  ground?: HeightFunction
 }
 
 /** Round footprint of radius `r`, penumbra `spread` × r. */
@@ -68,7 +70,8 @@ export function buildContactShadowGeometry(
     const sin = Math.sin(c.yaw ?? 0)
     const worldX = (lx: number, lz: number) => c.x + lx * cos + lz * sin
     const worldZ = (lx: number, lz: number) => c.z - lx * sin + lz * cos
-    const ground = (lx: number, lz: number) => groundFn(worldX(lx, lz), worldZ(lx, lz)) + SHADOW_LIFT
+    const surface = c.ground ?? groundFn
+    const ground = (lx: number, lz: number) => surface(worldX(lx, lz), worldZ(lx, lz)) + SHADOW_LIFT
     const radius = Math.min(c.radius ?? 0, c.halfX, c.halfZ)
     const sx = (2 * ex) / nx
     const sz = (2 * ez) / nz
