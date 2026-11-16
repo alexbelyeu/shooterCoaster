@@ -23,6 +23,8 @@ export function shareEvent(level: string, method: ShareMethod): AnalyticsEvent {
 
 export interface RunSnapshot {
   phase: GamePhase
+  /** Bumped by every `startRun`: a Restart from the pause menu starts a run without leaving one. */
+  runId: number
   currentLevel: string | null
   runMode: RunMode
   score: number
@@ -34,12 +36,13 @@ export function tensPercent(fraction: number): number {
 }
 
 export function analyticsEventFor(prev: RunSnapshot, next: RunSnapshot): AnalyticsEvent | null {
-  if (prev.phase === next.phase) return null
+  const newRun = next.runId !== prev.runId
+  if (prev.phase === next.phase && !newRun) return null
   const config = next.currentLevel ? getLevelConfig(next.currentLevel) : undefined
   if (!config) return null
   const level = config.id
 
-  if (isInRun(next.phase) && !isInRun(prev.phase)) {
+  if (isInRun(next.phase) && (newRun || !isInRun(prev.phase))) {
     return { name: 'level_start', props: { level, mode: next.runMode.mode } }
   }
   if (next.phase === 'results' && prev.phase === 'playing') {

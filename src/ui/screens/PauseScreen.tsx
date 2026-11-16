@@ -17,7 +17,7 @@ export default function PauseScreen({ onSettings }: PauseScreenProps) {
   const levelId = useGameStore((s) => s.currentLevel)
   const score = useGameStore((s) => Math.round(s.score))
   const timeRemaining = useGameStore((s) => s.timeRemaining)
-  const killed = useGameStore((s) => s.totalEnemies - s.enemiesRemaining)
+  const kills = useGameStore((s) => s.kills)
   const total = useGameStore((s) => s.totalEnemies)
   const buttons = useRef<(HTMLButtonElement | null)[]>([])
   const config = levelId ? getLevelConfig(levelId) : undefined
@@ -84,7 +84,7 @@ export default function PauseScreen({ onSettings }: PauseScreenProps) {
             <div>
               <dt>Kills</dt>
               <dd>
-                {killed} / {total}
+                {kills} / {total}
               </dd>
             </div>
           </dl>

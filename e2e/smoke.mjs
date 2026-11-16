@@ -1669,6 +1669,18 @@ async function pauseMenuCheck(page, levelId) {
   if (after.kills !== 0 || after.score !== 0) problems.push(`Restart kept the run's kills / score (${after.kills} / ${after.score})`)
   if (!(levelTime !== null && levelTime < levelTimeBefore)) problems.push(`Restart kept the level timer (${levelTimeBefore.toFixed(1)} -> ${levelTime?.toFixed(1)} s in)`)
   if (!(after.ride < rideBefore)) problems.push(`Restart did not put the coaster back at the start (track ${rideBefore.toFixed(4)} -> ${after.ride.toFixed(4)})`)
+  // The HUD strip and the card must count this run's kills, not the last run's (#235).
+  await waitVisible(page, '.hud-kills-count', 10000)
+  const hudKills = await page.evaluate(() => document.querySelector('.hud-kills-count')?.textContent ?? null)
+  if (!hudKills?.startsWith('0/')) problems.push(`after Restart the HUD kill strip reads "${hudKills}", not 0`)
+  await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
+  await waitVisible(page, '.pause-card', 30000)
+  const cardKills = await page.evaluate(() => {
+    const dt = [...document.querySelectorAll('.pause-stats dt')].find((d) => d.textContent === 'Kills')
+    return dt?.nextElementSibling?.textContent?.trim() ?? null
+  })
+  if (!cardKills?.startsWith('0 /')) problems.push(`after Restart the pause card reads Kills "${cardKills}", not 0`)
+  await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
   return {
     id: 'pause-menu',
     problems,

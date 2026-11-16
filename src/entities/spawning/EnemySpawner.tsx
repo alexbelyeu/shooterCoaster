@@ -296,8 +296,9 @@ export default function EnemySpawner({
     waveProgress.current = newWaveProgress(waves.length)
     lastWaveTick.current = null
     goneEnemies.current.clear()
+    useGameStore.getState().setEnemyCounts(enemies.length, enemies.length)
     setGeneration((g) => g + 1)
-  }, [runId, initialActiveWave, waves])
+  }, [runId, initialActiveWave, waves, enemies.length])
 
   // Also after a resume, when the run was paused during its countdown.
   useEffect(() => {
@@ -306,10 +307,7 @@ export default function EnemySpawner({
     setWaveAnnouncement(waves[0]?.waveLabel ?? null)
   }, [phase, runId, waves])
 
-  const totalEnemyCount = useMemo(
-    () => enemies.length,
-    [enemies],
-  )
+  const totalEnemyCount = enemies.length
 
   const setEnemyCounts = useGameStore((s) => s.setEnemyCounts)
   useEffect(() => {
