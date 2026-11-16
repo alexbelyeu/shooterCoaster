@@ -4,7 +4,8 @@
  * Fails if total gzipped JS in dist/, the largest chunk, or the startup JS (what index.html loads before the title, #376)
  * exceeds its budget in budgets.json.
  * Raising a budget is a Director decision and must be logged in docs/agents/DECISIONS.md.
- * Also fails if the online leaderboard's server side (api/: Supabase's REST API and its key) reaches the browser.
+ * Also fails if the online leaderboard's server side (api/: Supabase's REST API and its key) reaches the browser,
+ * or if one of Alex's notes in the gym blockout does (vite.config.ts strips them, #544).
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -25,6 +26,13 @@ const startup = new Set([...html.matchAll(/(?:src|href)="[^"]*\/assets\/([^"]+\.
 const SERVER_ONLY = /SUPABASE_SECRET_KEY|SUPABASE_URL|\/rest\/v1\/|supabase\.co/
 const leaks = []
 
+/** The start of each blockout note, as plain words that read the same in any string escaping. */
+const blockout = JSON.parse(fs.readFileSync('src/levels/environments/biomes/gym/blockout.json', 'utf8'))
+const notes = [blockout.notes, ...blockout.items.map((item) => item.note)]
+  .map((note) => note?.match(/^[\w ,.()-]{12,}/)?.[0])
+  .filter(Boolean)
+const noteLeaks = []
+
 let totalGz = 0
 let largestGz = 0
 let startupGz = 0
@@ -36,7 +44,9 @@ for (const f of fs.readdirSync(dir)) {
   totalGz += gz
   largestGz = Math.max(largestGz, gz)
   if (startup.has(f)) startupGz += gz
-  if (SERVER_ONLY.test(buf.toString('utf8'))) leaks.push(f)
+  const text = buf.toString('utf8')
+  if (SERVER_ONLY.test(text)) leaks.push(f)
+  if (notes.some((note) => text.includes(note))) noteLeaks.push(f)
   rows.push([f, (buf.length / 1024).toFixed(0), (gz / 1024).toFixed(0)])
 }
 rows.sort((a, b) => Number(b[2]) - Number(a[2]))
@@ -63,6 +73,10 @@ if (startupKb > budgets.startupJsGzipKB) {
 }
 if (leaks.length) {
   console.error(`FAIL: server-only leaderboard code in the browser bundle: ${leaks.join(', ')}`)
+  ok = false
+}
+if (noteLeaks.length) {
+  console.error(`FAIL: the gym blockout's notes in the browser bundle: ${noteLeaks.join(', ')} (vite.config.ts stripBlockoutNotes)`)
   ok = false
 }
 process.exit(ok ? 0 : 1)
