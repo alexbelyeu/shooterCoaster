@@ -14,7 +14,7 @@ import { currentPhase, weakPointHp, type WeakPointSpec } from './bossModel'
 import { MEDUSA } from './bossSpecs'
 import {
   MEDUSA_BODY_GEO, MEDUSA_CROWN_HEAD_GEO, MEDUSA_CROWN_SNAKE_COLOR, MEDUSA_HAIR_GEO, MEDUSA_HAIR_MAT, MEDUSA_HUB_GEO, MEDUSA_HUB_MAT,
-  MEDUSA_JEWEL_GEO, MEDUSA_JEWEL_MAT, MEDUSA_JEWEL_OFFSET, MEDUSA_SKIN_MAT, MEDUSA_SNAKE_BEAD_GEO, MEDUSA_SNAKE_COLORS,
+  MEDUSA_JEWEL_GEO, MEDUSA_JEWEL_MAT, MEDUSA_SKIN_MAT, MEDUSA_SNAKE_BEAD_GEO, MEDUSA_SNAKE_COLORS,
   MEDUSA_SNAKE_HEAD_GEO, MEDUSA_SNAKE_HEAD_MAT, MEDUSA_SNAKE_MAT, MEDUSA_STAR_GLOW_GEO, MEDUSA_STAR_GLOW_MAT,
 } from './bossAssets'
 import {
@@ -169,7 +169,7 @@ export default function Medusa(props: BossProps) {
         eventBus.emit(CAMERA_TRAUMA_EVENT, DEFEAT_TRAUMA[0], DEFEAT_TRAUMA[1])
       }
 
-      // The jewel glints now and then.
+      // The jewels glint now and then.
       MEDUSA_JEWEL_MAT.emissiveIntensity = 1.4 + 2.2 * Math.max(0, Math.sin(age * 2.3)) ** 8
 
       // The camera, root-local: what the snakes strike at.
@@ -236,7 +236,7 @@ export default function Medusa(props: BossProps) {
     <>
       <mesh geometry={MEDUSA_BODY_GEO} material={MEDUSA_SKIN_MAT} />
       <mesh geometry={MEDUSA_HAIR_GEO} material={MEDUSA_HAIR_MAT} />
-      <mesh geometry={MEDUSA_JEWEL_GEO} material={MEDUSA_JEWEL_MAT} position={MEDUSA_JEWEL_OFFSET} />
+      <mesh geometry={MEDUSA_JEWEL_GEO} material={MEDUSA_JEWEL_MAT} />
     </>
   )
 
