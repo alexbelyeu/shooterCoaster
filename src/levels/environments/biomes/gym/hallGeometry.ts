@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { createRng } from '@/utils/rng'
+import { createRng, hashString } from '@/utils/rng'
 import { DEFAULT_BACK, GYM_SCALE, HALL, PIECES, PIT, blockRings, floorAt, footprint, piece, pieceAxes, type Panel, type PieceOf } from './blockout'
-import { BUILDING, GRIME, HIDDEN_PIECES, HOLD_COLORS, MURALS, STRIP_LIGHTS, TREE_PAINT, VOLUME_COLORS, WALL_PAINT, WALL_STYLE, stripLightY } from './config'
+import { BUILDING, COLUMN_HALF, GRIME, HIDDEN_PIECES, HOLD_COLORS, MURALS, STRIP_LIGHTS, TREE_PAINT, VOLUME_COLORS, WALL_PAINT, WALL_STYLE, stripLightXs, stripLightY, wallColumns } from './config'
 import { graffitiPiece, tag, type MuralShape } from './murals'
 import { scatterOn, type ClimbSurface } from './holds'
 import { buildTreeWood } from './treeTrunk'
@@ -405,9 +405,9 @@ function pitEdge(out: Parts): void {
 const STEEL = new THREE.Color(BUILDING.steel)
 const RUST = new THREE.Color(GRIME.rust)
 
-/** Steel, rusting in patches and dusty on top: a stable hash of each face's centre picks how much. */
+/** Steel, rusting in patches: a seed hashed from each face's centre picks how much. */
 const rustySteel: Paint = (x, y, z) => {
-  const h = Math.abs(Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453) % 1
+  const h = createRng(hashString(`${x.toFixed(2)},${y.toFixed(2)},${z.toFixed(2)}`))()
   return _c.copy(STEEL).lerp(RUST, h < 0.4 ? 0.25 + h : 0.1 * h)
 }
 
@@ -481,10 +481,9 @@ function building(out: Parts): void {
     }
   }
   // Maroon steel: columns up the long walls and a ring beam under the roof.
-  for (let x = 8; x < W; x += 8) {
-    if (x < tx0 || x > tx1) hallBox(x - 0.25, x + 0.25, 0, H, 0, 0.5, BUILDING.beam, out.solid)
-    if (x < gx0 || x > gx1) hallBox(x - 0.25, x + 0.25, 0, H, D - 0.5, D, BUILDING.beam, out.solid)
-  }
+  const columns = wallColumns()
+  for (const x of columns.east) hallBox(x - COLUMN_HALF, x + COLUMN_HALF, 0, H, 0, 0.5, BUILDING.beam, out.solid)
+  for (const x of columns.west) hallBox(x - COLUMN_HALF, x + COLUMN_HALF, 0, H, D - 0.5, D, BUILDING.beam, out.solid)
   const ring = H - 5.2
   hallBox(0, W, ring, ring + 0.6, 0, 0.4, BUILDING.beam, out.solid)
   hallBox(0, W, ring, ring + 0.6, D - 0.4, D, BUILDING.beam, out.solid)
@@ -496,20 +495,20 @@ function building(out: Parts): void {
   }
   const half = STRIP_LIGHTS.length / 2
   for (const z of STRIP_LIGHTS.rows) {
-    for (let x = STRIP_LIGHTS.spacing; x < W; x += STRIP_LIGHTS.spacing) {
+    for (const x of stripLightXs) {
       hallBox(x - half, x + half, stripLightY - 0.1, stripLightY + 0.1, z - 0.15, z + 0.15, BUILDING.strip, out.light)
       hallBox(x - half - 0.1, x + half + 0.1, stripLightY + 0.1, stripLightY + 0.2, z - 0.25, z + 0.25, BUILDING.steel, out.solid)
     }
   }
-  // Murals: flat colour panels low on the walls (the cubbies' climbing photos, the comp banners, the eagle by the Arch wall).
-  const murals: [number, number, number, number, number, number, string][] = [
+  // Banners: flat colour panels low on the walls (the cubbies' climbing photos, the comp banners, the eagle by the Arch wall).
+  const banners: [number, number, number, number, number, number, string][] = [
     [42.2, 46, 2.8, 7.5, 0.02, 0.1, '#2f6db5'],
     [46.2, 50.4, 2.8, 7.5, 0.02, 0.1, '#d9822b'],
     [tx0 + 0.5, training.x - 0.2, training.base + 0.6, training.base + 3, 0.02, 0.1, '#b3262d'],
     [training.x + 0.2, tx1 - 0.5, training.base + 0.6, training.base + 3, 0.02, 0.1, '#2448a8'],
     [W - 0.1, W - 0.02, 3.5, 8, 33.6, 35.6, '#6b4a2e'],
   ]
-  for (const [x0, x1, y0, y1, z0, z1, c] of murals) hallBox(x0, x1, y0, y1, z0, z1, c, out.solid)
+  for (const [x0, x1, y0, y1, z0, z1, c] of banners) hallBox(x0, x1, y0, y1, z0, z1, c, out.solid)
   // Street pieces and tags high on the walls (#593).
   for (const p of MURALS.pieces) mural(graffitiPiece(p.seed, p.w, p.h, p.style), frame(p), out.solid)
   for (const g of MURALS.tags) mural(tag(g.seed, g.w, g.h, g.colour), frame(g), out.solid)

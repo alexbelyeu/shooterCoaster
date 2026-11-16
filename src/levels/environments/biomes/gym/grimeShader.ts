@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { valueNoiseGlsl } from '../../shared/noiseGlsl'
 import { GYM_SCALE, HALL, PIT } from './blockout'
-import { GRIME, STRIP_LIGHTS, stripLightY } from './config'
+import { GRIME, STRIP_LIGHTS, stripLightXs, stripLightY } from './config'
 
 /**
  * The hall's grime and light (#593, "spectacularly Bushwick"), patched into the hall's, the floor's and the
@@ -12,6 +12,8 @@ import { GRIME, STRIP_LIGHTS, stripLightY } from './config'
  */
 
 const f = (n: number) => n.toFixed(4)
+/** The strip-light rows' spacing: they are evenly spaced (`config.test.ts`), so the nearest row is a snap. */
+const ROW_GAP = STRIP_LIGHTS.rows[1] - STRIP_LIGHTS.rows[0]
 const glslColor = (hex: string) => {
   const c = new THREE.Color(hex)
   return `vec3(${f(c.r)}, ${f(c.g)}, ${f(c.b)})`
@@ -73,10 +75,10 @@ const hallFragment = /* glsl */ `
 /** The nearest strip-light fixture's warm pool, lit like a downlight with some spill up onto the roof: falls off with distance, only on faces turned to it. */
 const poolFragment = /* glsl */ `
 {
-  float lampX = clamp(vGrimePos.x, ${f(STRIP_LIGHTS.spacing)}, ${f(HALL.w - STRIP_LIGHTS.spacing)});
+  float lampX = clamp(vGrimePos.x, ${f(stripLightXs[0])}, ${f(stripLightXs[stripLightXs.length - 1])});
   lampX = floor(lampX / ${f(STRIP_LIGHTS.spacing)} + 0.5) * ${f(STRIP_LIGHTS.spacing)};
   lampX += clamp(vGrimePos.x - lampX, ${f(-STRIP_LIGHTS.length / 2)}, ${f(STRIP_LIGHTS.length / 2)});
-  float lampZ = clamp(floor((vGrimePos.z - ${f(STRIP_LIGHTS.rows[0])}) / ${f(STRIP_LIGHTS.rowGap)} + 0.5) * ${f(STRIP_LIGHTS.rowGap)} + ${f(STRIP_LIGHTS.rows[0])}, ${f(STRIP_LIGHTS.rows[0])}, ${f(STRIP_LIGHTS.rows[STRIP_LIGHTS.rows.length - 1])});
+  float lampZ = clamp(floor((vGrimePos.z - ${f(STRIP_LIGHTS.rows[0])}) / ${f(ROW_GAP)} + 0.5) * ${f(ROW_GAP)} + ${f(STRIP_LIGHTS.rows[0])}, ${f(STRIP_LIGHTS.rows[0])}, ${f(STRIP_LIGHTS.rows[STRIP_LIGHTS.rows.length - 1])});
   vec3 toLamp = vec3(lampX, ${f(stripLightY)}, lampZ) - vGrimePos;
   float dist = max(length(toLamp), 0.5);
   vec3 dir = toLamp / dist;

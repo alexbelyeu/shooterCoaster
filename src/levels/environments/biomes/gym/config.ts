@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { ColorRamp } from '../../shared/types'
-import { GYM_SCALE, HALL, floorAt, toBlockout } from './blockout'
+import { GYM_SCALE, HALL, floorAt, piece, toBlockout } from './blockout'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import type { WallStyle } from './wallPanels'
@@ -88,26 +88,48 @@ export const GRIME = {
 }
 
 /**
- * The strip-light fixtures under the trusses (blockout metres): one row along the hall at each `rows` z,
- * fixtures `length` long every `spacing` along x, each casting a warm `pool` (reach `reach`, a fraction `uplight` of it spilling up) in the grime shader.
+ * The strip-light fixtures under the trusses (blockout metres): one row along the hall at each `rows` z (evenly
+ * spaced, the grime shader snaps to the nearest), fixtures `length` long at `stripLightXs`, each casting a warm `pool`
+ * (reach `reach`, a fraction `uplight` of it spilling up) in the grime shader.
  */
-export const STRIP_LIGHTS = { rows: [5, 15, 25, 35], rowGap: 10, spacing: 8, length: 5, color: '#ffc98a', pool: 1.5, reach: 9, uplight: 0.4 }
+export const STRIP_LIGHTS = { rows: [5, 15, 25, 35], spacing: 8, length: 5, color: '#ffc98a', pool: 1.5, reach: 9, uplight: 0.4 }
+/** The fixtures' x along each row: every `spacing` from one `spacing` in to one short of the far end wall. */
+export const stripLightXs: readonly number[] = Array.from({ length: Math.ceil(HALL.w / STRIP_LIGHTS.spacing) - 1 }, (_, i) => (i + 1) * STRIP_LIGHTS.spacing)
 /** The fixtures' height: just under the trusses' bottom chord. */
 export const stripLightY = HALL.h - 4.5 - 0.15
 
+/** The maroon steel columns' half-width (blockout metres): they stand 0.5 m off the long walls. */
+export const COLUMN_HALF = 0.25
+
+/**
+ * The maroon columns' x on the east (z 0) and west (z `HALL.d`) walls: every 8 m, none where the wall opens onto
+ * the Training Area (east) or the glass gym room (west). `hallGeometry.ts` builds them; murals keep clear of them.
+ */
+export function wallColumns(): { east: number[]; west: number[] } {
+  const training = piece('floor', 'ewsmmqw')
+  const glass = piece('windows', 'win-glassgym')
+  const outside = (x: number, centre: number, width: number) => x < centre - width / 2 || x > centre + width / 2
+  const xs = Array.from({ length: Math.ceil(HALL.w / 8) - 1 }, (_, i) => (i + 1) * 8)
+  return {
+    east: xs.filter((x) => outside(x, training.x, training.w)),
+    west: xs.filter((x) => outside(x, glass.x, glass.length)),
+  }
+}
+
 /**
  * Street pieces and tags high on the hall's walls (#593; `murals.ts`), each at its rect's foot centre in a wall
- * frame (`rot` turns it to face into the hall): one over the cubbies on the east wall, one over the glass gym
- * room on the west, tags over Alaska and by the entrance. All under the ring beam (H − 5.2 m).
+ * frame (`rot` turns it to face into the hall): one over the Training Area on the east wall, one over the glass gym
+ * room on the west, tags higher up. Each sits in a stretch of wall clear of the maroon columns (`wallColumns`), all
+ * under the ring beam (H − 5.2 m).
  */
 export const MURALS = {
   pieces: [
-    { x: 48, z: 0, rot: 0, base: 11, w: 15, h: 8, seed: 5931, style: { fill: ['#ff4fa3', '#ffd23f', '#2fd0c8'], outline: '#141416', cloud: '#5b55b0', highlight: '#ffffff' } },
+    { x: 28, z: 0, rot: 0, base: 11, w: 15, h: 8, seed: 5931, style: { fill: ['#ff4fa3', '#ffd23f', '#2fd0c8'], outline: '#141416', cloud: '#5b55b0', highlight: '#ffffff' } },
     { x: 64, z: HALL.d, rot: 180, base: 12.5, w: 16, h: 8, seed: 5932, style: { fill: ['#ff7a1f', '#e8322c', '#ffd23f'], outline: '#101012', cloud: '#2a7fd4', highlight: '#fff6d8' } },
   ],
   tags: [
-    { x: 46, z: HALL.d, rot: 180, base: 18.3, w: 5, h: 2.4, seed: 5933, colour: '#141416' },
-    { x: 38.5, z: 0, rot: 0, base: 15, w: 4.5, h: 2, seed: 5934, colour: '#c7ccd2' },
+    { x: 44, z: HALL.d, rot: 180, base: 18.3, w: 5, h: 2.4, seed: 5933, colour: '#141416' },
+    { x: 52, z: 0, rot: 0, base: 15, w: 4.5, h: 2, seed: 5934, colour: '#c7ccd2' },
     { x: 77, z: HALL.d, rot: 180, base: 13, w: 4, h: 2, seed: 5935, colour: '#e8322c' },
   ],
 }

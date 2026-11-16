@@ -253,8 +253,9 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     },
   },
   // Climbing Gym (#517), an interior: the dome is never seen (the hall's ceiling covers it) but bakes the walls'
-  // reflections; the "sun" is the skylights straight above, the hemisphere the bounce off the pale walls. Fog is the
-  // hall's chalky air, so the far wall settles back without vanishing.
+  // reflections. Bushwick-dim since #593: the "sun" is cool daylight slanting in from the high windows, the hemisphere
+  // a dim cool-over-warm-dark fill, and the strip lights' warm pools come from the grime shader; fog is the hall's
+  // dusty brown-grey air, so the far wall settles back without vanishing.
   gym: {
     sky: {
       zenith: 0x4a4d52,
