@@ -2040,3 +2040,61 @@ point at once.
 between the first and the last) and `rideTo` (the Medusa stays in the Starr, so the check rides to 0.75 of the lap first).
 **Consequences:** At the smoke's 2 hits a second the fight is ~10 s of hits plus her rise; a retract-between-strikes
 mechanic would need the check (and a player) to wait for each snake, and is a separate design change.
+
+## 2026-11-15: Long-run scores leave the leaderboards through a filter, not a wipe (Builder, #458)
+
+**Context:** #452 (merged in #473) cut every run to 60 s. Scores from the old 75–120 s runs are
+still in the World `scores` table and in players' local boards, and a 60 s run can't beat them.
+**Decision:** Nothing is deleted. The World board and its `rank` count only rows with
+`score <= LEVEL_LIMITS[level].maxScore` (`api/_lib/rules.ts` `boardCeiling`). On the device, new
+entries carry `ruleset: '60s'`, and the store's persist `merge` drops an entry without it when it
+is over the same limit. The store reads the generated `api/_lib/levelLimits.ts` table. Computing
+`scoreLimits()` in the store would add the boss specs to the startup JS (+6 KB gz).
+Old runs under the limit stay on both boards, because a 60 s run can still beat them.
+Stars, unlocks and the Daily record are left alone.
+**Consequences:** Alex has no database step to do. The optional SQL to delete the old rows is in
+`docs/LEADERBOARD.md`. The board's cut-off follows the generated limits, so a later rebalance
+that lowers a level's `maxScore` also hides World rows above the new limit. A rebalance PR has to say so.
+
+## 2026-11-15 — The title's far world: flat silhouettes on rings, one fog, camera far 3500 (Builder, #459)
+
+**Context:** Alex asked for a title world that "must look big" (#436). The park ended in a flat line of grass against the sky, and `scene.title` (140 draws / 130 objects / 60 000 triangles) left ~5 600 triangles.
+**Decision:** Past the park, `titleHorizon.ts` lays out seven hill rows (valley, ridge, valley …) whose ridges rise higher in view each step out, ride silhouettes in the first valley and a skyline in the second as flat vertex-coloured shapes facing the park (the camera never leaves r ≈ 205, so a plane reads as a ride), and every light in one `Points`. The title scene now has a linear fog (`HORIZON_FOG`, 350 → 4200) the colour of the sky's horizon, so each band reads a step paler; the camera's far plane went from 2000 to 3500 to reach the last ridge (r 2750). About 2 500 triangles and four draw calls in all (`scene.title` 54 359 → 56 838 triangles).
+**Consequences:** Don't swap the silhouettes for 3D props without the triangle budget for them. A title material that should stay crisp in the haze sets `fog: false`; the park itself sits inside the fog's near distance. The posters (`npm run og -- --poster`) must be re-rendered whenever the horizon or the orbit shot changes.
+
+## 2026-11-15 — Per-frame helpers live in `*.hot.ts`, linted by `sc/no-hot-path-alloc` (Builder, #461)
+
+**Context:** Hard rule 8 (no allocations in per-frame hot paths) was prose only; a lint rule can see a `useFrame` body but not which helpers that body calls.
+**Decision:** The file name marks a hot module: every function in a `*.hot.ts` file is checked as a hot path (its module scope is where scratch objects go), as is every `useFrame` callback. Once-per-mount factories inside a hot module (`createRigState`, `newRatPose`…) and cold, guarded branches stay allowed one line at a time with `// eslint-disable-next-line sc/no-hot-path-alloc -- <why>`, not by moving them out, so a module keeps its state type and its factory together.
+**Consequences:** A new per-frame helper module should be named `*.hot.ts`; renaming one back drops it from the check. Setup-heavy modules that also have per-frame functions (`krakenMotion`, `medusaMotion`, `climbMotion`, `arcLength`, `ridePhysics`, `titleCoaster`, `windStreaks`) are not hot yet: they need their builders split from their steppers first.
+
+## 2026-11-15 — The crow's hit flinch is its flash material (Builder, #462)
+
+**Context:** The brief asks for the crow's wings to snap up on a hit. A crow dies on its first hit: `EnemyBase` stops
+its motion and swaps every mesh to `ENEMY_HIT_FLASH_MAT` for the kill pop (`ENEMY_HIT_FLASH_MS`, 80 ms), so the
+wings, which flap in the feather material's vertex shader, snapped to their rest pose (#206).
+**Decision:** A mesh can name its own flash material (`hitFlash.ts` `setFlashMaterial`). The crow's is
+`CROW_FLINCH_MAT`: the flash colour with the same wing patch and one fixed wings-up pose, so the flinch needs no
+per-crow state and lasts exactly the flash (80 ms, not the brief's 120 ms: making it longer would delay every
+enemy's death). It is a module export, so `ShaderWarmup` compiles it.
+**Consequences:** Any enemy whose vertex shader moves it needs a flash material with the same patch, or it jumps
+to its rest pose when hit.
+
+## 2026-11-15 — Ready waits for the level chunk; smoke steps wait for `levelReady()` (Builder, #464)
+
+**Context:** Since #376 the level scene is a lazy chunk prefetched once the title is idle. A run started before it lands
+(slow network, cold cache, a quick PLAY) left the countdown's Ready waiting at most 4 s for the warm-up, so GO could open
+on the composer alone: a black scene, 17 draw calls. The smoke's `quality` and `pickup` steps measured exactly that on slow
+sandboxes (`?e2e=1` starts in `playing` at once), and `hidden-pause` primed a combo the late mount then reset.
+**Decision:** Ready holds until the chunk has arrived, however long that takes (a failed load still returns to the title
+through SceneManager's boundary); the 4 s warm-up cap counts from the chunk's arrival (pure `ui/hud/countdownGate.ts`).
+Every smoke step that starts a level waits for the hook's `levelReady()` before it measures, and `--level-chunk-delay <ms>`
+reproduces the slow runner on any machine.
+**Consequences:** On a slow connection the player sees Ready for longer instead of GO over nothing. A new smoke step that
+starts a level goes through `startLevelReady`, never a bare `startLevel` evaluate.
+
+## 2026-11-15 — The Tree's gap runs cave to cave; wall relief stays inside each footprint (Builder, #519)
+
+**Context:** Alex (#558) asked for a gap through the Tree "like the Arch", big enough for the coaster, and for rugged, varied walls. The Tree backs onto the hall's east wall, so an opening front to back leads nowhere a track can go; and the gym track's clearance tests are written against each piece's footprint box (`pieceBoxes`).
+**Decision:** The trunk stands on four buttress roots, front pair at the lip, back pair at the wall: the gap under it runs along the Tree, cave to cave (`TREE_GAP` in `treeTrunk.ts`, 3.25 m wide and 3.1 m high, room for `RAIL_CLEARANCE` either side), and from the pit it reads as the arch the front roots make. Routing the track through it is a separate issue. Every panel's relief, the Tree's wood and its branches are clamped inside the piece's existing footprint box (roots may sink below the floor), so `pieceBoxes` and the track's clearance tests stay unchanged; `wallPanels.test.ts` checks both.
+**Consequences:** A track through the gap must clear `TREE_GAP`, not the Tree's whole box (`pieceBoxes` still treats the Tree as solid: carve the gap out of it when the track goes through). A bigger relief needs a bigger footprint in `blockout.json`, not a looser clamp.
