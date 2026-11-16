@@ -65,8 +65,9 @@
  *   node e2e/smoke.mjs --shard level3                   # one CI shard (e2e/shards.mjs), with its smokeSeconds budget
  *   node e2e/smoke.mjs --steps ride,boss --levels level2   # just those steps (names in e2e/shards.mjs)
  *   node e2e/smoke.mjs --steps pacing --levels level2   # time with nothing to shoot over a whole run (pacing.json)
+ *   node e2e/smoke.mjs --nightly-part deep --url <site>   # one of the nightly's parallel parts (e2e/shards.mjs NIGHTLY_PARTS)
  *
- * Without --shard / --steps this is the full run (the nightly's depth); CI's PR shards run part of it (#372).
+ * Without --shard / --steps / --nightly-part this is the full run (the nightly's depth, run nightly as three parallel parts); CI's PR shards run part of it (#372).
  *
  * --dist / --base: preview that build folder under that sub-path (`npm run smoke:portal`),
  * proving its relative asset URLs. Every local run fails on a request to another origin,
@@ -132,7 +133,7 @@ let preview // module scope so the top-level catch can kill it
 const results = [] // module scope so the time-budget watchdog can write what ran
 let PLAN
 try {
-  PLAN = planRun({ shard: arg('shard'), steps: arg('steps'), levels: arg('levels'), mobile: arg('mobile') !== undefined, skipDesktop: arg('skip-desktop') !== undefined })
+  PLAN = planRun({ shard: arg('shard'), nightlyPart: arg('nightly-part'), steps: arg('steps'), levels: arg('levels'), mobile: arg('mobile') !== undefined, skipDesktop: arg('skip-desktop') !== undefined })
 } catch (e) {
   console.error(`smoke: ${e.message}`)
   process.exit(2)

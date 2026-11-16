@@ -94,7 +94,8 @@ reduced motion (+ an internal-browser toggle coming, #446).
   level1, level1-steps, level2–5, mobile; `smokeSeconds` budgets scaled by the runner's
   measured speed, #443), then the `verify` gate; docs-only PRs skip the smoke (#409). The
   deep checks (full boss fights, waves, FRENZY end, initials, share, daily, pause, pickups,
-  phone menus) run nightly against production (`prod-smoke.yml`); a fast deploy health
+  phone menus) run nightly against production (`prod-smoke.yml`, as three parallel parts since
+  #570: one job outgrew its 60 min cap on 15 Nov once level 6 joined every deep step); a fast deploy health
   check (`prod-check`) runs after every deploy; alerts on transitions only (#355).
 - `npm run clip` (any level, the vertical cut, the title), `npm run og` (share card, poster
   stills, icons), `npm run turntable`, `audio:render` / `audio:check`, `scripts/quiet.sh`.
