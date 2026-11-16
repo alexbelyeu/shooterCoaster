@@ -548,29 +548,77 @@ function tracksidePoint(table: ArcTable, riderIndex: number, { ahead, side }: Tr
   return { x: table.x[i] - forward.z * side, y: 0, z: table.z[i] + forward.x * side }
 }
 
-/** Inside an interior, a slot whose spot is past the walls on both sides comes in toward the track. */
-const BOUNDED_SIDE_SCALES = [1, 0.6, 0.35, 0]
+/** Shares of a slot's side tried nearer the track: inside an interior when its spot is past the walls, and by `bestFacingAround`. */
+const SIDE_SCALES = [1, 0.6, 0.35, 0]
 
 /**
  * The slot, or the same spot across the track when only that side is in view on the approach (the inside of a turn);
- * inside `bounds`, also nearer the track: the first inside them in view, else the first inside them, else the slot held in.
+ * inside `bounds`, also nearer the track. When none is (a tight turn faces the rider away from both sides of the
+ * slot's stretch until the last moment, #543): the spot round the slot's track point, clear of the rails, that the
+ * rider faces most squarely on the near approach.
  */
 function dryTracksidePoint(
   table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
   bounds?: PlacementBounds,
 ): Vec3 {
   const { sideMin } = TRACKSIDE.ground
-  let fallback: Vec3 | null = null
-  for (const scale of bounds ? BOUNDED_SIDE_SCALES : [1]) {
+  for (const scale of bounds ? SIDE_SCALES : [1]) {
     const offset = Math.max(sideMin, Math.abs(slot.side) * scale) * Math.sign(slot.side)
     for (const side of [offset, -offset]) {
       const p = tracksidePoint(table, riderIndex, { ahead: slot.ahead, side })
       if (bounds && !insideBounds(p, bounds)) continue
       if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)) return p
-      fallback ??= p
     }
   }
-  return fallback ?? clampToBounds(tracksidePoint(table, riderIndex, slot), bounds)
+  return bestFacingAround(table, riderIndex, slot, surface, groundFn, reach, trackScale, bounds)
+    ?? clampToBounds(tracksidePoint(table, riderIndex, slot), bounds)
+}
+
+/** Directions tried round a slot's track point, the first on the slot's side. */
+const AROUND_DIRECTIONS = 12
+
+/**
+ * The spot within the slot's side distance of its track point, inside `bounds` and at least `sideMin` from the rails
+ * near it, that the rider faces most squarely on the near approach (`approachFacing`); null if none is clear.
+ */
+function bestFacingAround(
+  table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
+  bounds?: PlacementBounds,
+): Vec3 | null {
+  const { sideMin } = TRACKSIDE.ground
+  const i = indexAhead(table, riderIndex, slot.ahead)
+  const forward = horizontal(trackTangent(table, i))
+  let best: Vec3 | null = null
+  let bestFacing = -Infinity
+  for (const scale of SIDE_SCALES) {
+    const r = Math.max(sideMin, Math.abs(slot.side) * scale)
+    for (let k = 0; k < AROUND_DIRECTIONS; k++) {
+      const a = (k / AROUND_DIRECTIONS) * 2 * Math.PI
+      const right = Math.cos(a) * Math.sign(slot.side) * r
+      const along = Math.sin(a) * r
+      const p = { x: table.x[i] - forward.z * right + forward.x * along, y: 0, z: table.z[i] + forward.x * right + forward.z * along }
+      if (bounds && !insideBounds(p, bounds)) continue
+      if (!clearOfRails(table, i, p, sideMin)) continue
+      const f = approachFacing(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)
+      if (f > bestFacing) {
+        best = p
+        bestFacing = f
+      }
+    }
+  }
+  return best
+}
+
+/** Arc either side of a slot's track point whose rails a spot round it keeps `clearance` from, sampled every step. */
+const RAIL_CHECK_ARC = 600
+const RAIL_CHECK_STEP = 20
+
+function clearOfRails(table: ArcTable, index: number, p: Vec3, clearance: number): boolean {
+  for (let a = -RAIL_CHECK_ARC; a <= RAIL_CHECK_ARC; a += RAIL_CHECK_STEP) {
+    const j = indexAhead(table, index, a)
+    if (Math.hypot(p.x - table.x[j], p.z - table.z[j]) < clearance) return false
+  }
+  return true
 }
 
 /**
@@ -597,13 +645,29 @@ function wetTracksidePoint(
 
 function inViewOnApproach(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): boolean {
   const from = Math.max(0, ahead - VIEW_LEAD)
-  for (const at of [from, from + VIEW_HOLD]) {
-    const { eye, dir } = trackView(table, indexAhead(table, riderIndex, at), trackScale)
-    const d = sub(p, eye)
-    const len = Math.hypot(d.x, d.y, d.z)
-    if (len > reach || dot(d, dir) < len * APPROACH_CONE_COS) return false
+  return lookCos(table, riderIndex, from, p, reach, trackScale) >= APPROACH_CONE_COS
+    && lookCos(table, riderIndex, from + VIEW_HOLD, p, reach, trackScale) >= APPROACH_CONE_COS
+}
+
+/** The looks `approachFacing` sums: every `FACING_STEP` from the second look of `inViewOnApproach` to `FACING_LAST` before the slot. */
+const FACING_STEP = 100
+const FACING_LAST = 300
+
+/** How squarely the rider faces `p` over the near approach, summed over its looks. */
+function approachFacing(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): number {
+  let sum = 0
+  for (let at = Math.max(0, ahead - VIEW_LEAD + VIEW_HOLD); at <= ahead - FACING_LAST; at += FACING_STEP) {
+    sum += lookCos(table, riderIndex, at, p, reach, trackScale)
   }
-  return true
+  return sum
+}
+
+/** Cosine between the rider's look `at` past `riderIndex` and the way to `p`; -1 past `reach`. */
+function lookCos(table: ArcTable, riderIndex: number, at: number, p: Vec3, reach: number, trackScale: number): number {
+  const { eye, dir } = trackView(table, indexAhead(table, riderIndex, at), trackScale)
+  const d = sub(p, eye)
+  const len = Math.hypot(d.x, d.y, d.z)
+  return len > reach ? -1 : dot(d, dir) / len
 }
 
 /** Point on an entry path at `t` (0–1, eased out); `spin` unwinds the horizontal offset around `from`. */
