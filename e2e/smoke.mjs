@@ -2512,8 +2512,6 @@ async function titleAttractShot(page) {
   return { problems, result: { woke, bars: bars.map((b) => +b.mean.toFixed(1)) } }
 }
 
-/** Title (#28): another camera angle 6 s later (`title-2.png`; its draw calls go on `drawCalls`), the start hint, and a key press fading to level select
- *  that also loads the score engine (#187: not before it), unlocks audio and starts the title score. */
 /** Seconds per phase of a step (`lap(name)` closes the phase since the last lap), so a slow step's summary line says where its time went (#608). */
 function lapTimer() {
   const laps = {}
@@ -2526,6 +2524,8 @@ function lapTimer() {
   return lap
 }
 
+/** Title (#28): another camera angle 6 s later (`title-2.png`; its draw calls go on `drawCalls`), the start hint, and a key press fading to level select
+ *  that also loads the score engine (#187: not before it), unlocks audio and starts the title score. */
 async function titleFlyBy(page, drawCalls, lap) {
   const problems = []
   const pose = () => page.evaluate(() => window.__SC_TEST__.cameraPose())
@@ -2535,8 +2535,8 @@ async function titleFlyBy(page, drawCalls, lap) {
   const b = await pose()
   drawCalls.push(await page.evaluate(() => window.__SC_TEST__.drawCalls))
   const waited = (Date.now() - at) / 1000
-  // Re-shot like title.png: a GPU CI runner can return one black canvas capture (#291 CI), a black scene stays black.
   lap('6s')
+  // Re-shot like title.png: a GPU CI runner can return one black canvas capture (#291 CI), a black scene stays black.
   const scene2 = await captureTitleScene(page, path.join(OUT, 'title-2.png'), 10000)
   lap('shot2')
   if (looksBlank(scene2)) problems.push(`title-2.png: the 3D scene behind the UI looks blank (mean ${scene2.mean.toFixed(1)} stddev ${scene2.stddev.toFixed(1)} colours ${scene2.distinctColors})`)
@@ -3481,7 +3481,7 @@ async function run() {
   })
 
   // 1. Title screen
-  const t = await newPage('e2e=1', {}, has('title') ? posterHandoff : null)
+  const t = await newPage('e2e=1&gpuSync=1', {}, has('title') ? posterHandoff : null)
   const levels = await t.page.evaluate(() => window.__SC_TEST__.levels())
   if (has('title')) {
     await step(async () => {
