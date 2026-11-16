@@ -11,9 +11,9 @@ import {
   TENT_RING,
   buildTitlePark,
   distanceToPath,
-  distanceToTrack,
   dropCarHeight,
   flumePoint,
+  nearTrack,
   onRide,
 } from './titlePark'
 
@@ -33,7 +33,7 @@ describe('title park layout', () => {
     for (const s of park.stalls) {
       expect(distanceToPath(s.x, s.z)).toBeGreaterThan(PATH_HALF_WIDTH)
       expect(onRide(s.x, s.z, 0)).toBe(false)
-      expect(distanceToTrack(s.x, s.z)).toBeGreaterThan(10)
+      expect(nearTrack(s.x, s.z, 10)).toBe(false)
     }
   })
 
@@ -50,7 +50,7 @@ describe('title park layout', () => {
     for (const t of park.trees) {
       expect(distanceToPath(t.x, t.z)).toBeGreaterThan(PATH_HALF_WIDTH)
       expect(Math.hypot(t.x, t.z)).toBeGreaterThan(220)
-      expect(distanceToTrack(t.x, t.z)).toBeGreaterThan(8)
+      expect(nearTrack(t.x, t.z, 8)).toBe(false)
     }
   })
 
@@ -136,6 +136,6 @@ describe('title rides', () => {
     let top = 0
     for (let t = 0; t < 1; t += 0.002) top = Math.max(top, flumePoint(t, p).y)
     expect(top).toBeGreaterThan(15)
-    expect(distanceToTrack(p.x, p.z)).toBeGreaterThan(20)
+    expect(nearTrack(p.x, p.z, 20)).toBe(false)
   })
 })

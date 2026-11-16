@@ -2469,6 +2469,37 @@ async function qualityCheck(newPage, levelId) {
 const engineRequests = (page) =>
   page.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/(player|synth)-[^/]*\.js$/.test(e.name)).length)
 
+/** Attract mode (#419, #493): idle at once, the menu steps aside, letterbox bars slide in and the camera blends to its closer shot
+ *  (`title-attract.png`); a pointer move (not a key: the first key press must still be what loads the score engine) brings the menu back. */
+async function titleAttractShot(page) {
+  const problems = []
+  await page.evaluate(() => (window.__SC_TEST__.titleAttractIdleMs = 0))
+  const entered = await page
+    .waitForSelector('.title-screen.is-attract .title-attract', { timeout: 10000 })
+    .then(() => true, () => false)
+  await page.evaluate(() => (window.__SC_TEST__.titleAttractIdleMs = null))
+  if (!entered) return { problems: ['the title never entered attract mode with titleAttractIdleMs 0'], result: null }
+  // The camera's blend to the attract shot (BLEND_S, 4 s) and the bars' 0.9 s slide.
+  await waitFrames(page, 2, { minMs: 4500, maxMs: 30000 })
+  const { width, height } = page.viewportSize()
+  const scene = await captureTitleScene(page, path.join(OUT, 'title-attract.png'), 10000)
+  if (looksBlank(scene)) problems.push('title-attract.png: the 3D scene looks blank')
+  // The bars are 9vh tall: a 7vh strip at the top and bottom must be black.
+  const strip = Math.floor(height * 0.07)
+  const bars = []
+  for (const y of [0, height - strip]) {
+    bars.push(await imageStats(page, await page.screenshot({ clip: { x: 0, y, width, height: strip }, timeout: SHOT_TIMEOUT })))
+  }
+  if (bars.some((b) => b.mean > 4)) problems.push(`attract mode's letterbox bars are not black (mean ${bars.map((b) => b.mean.toFixed(1)).join(' / ')})`)
+  await page.mouse.move(width / 2, height / 2)
+  await page.mouse.move(width / 2 + 20, height / 2 + 20)
+  const woke = await page
+    .waitForSelector('.title-screen:not(.is-attract)', { timeout: 10000 })
+    .then(() => true, () => false)
+  if (!woke) problems.push('a pointer move did not bring the title menu back from attract mode')
+  return { problems, result: { woke, bars: bars.map((b) => +b.mean.toFixed(1)) } }
+}
+
 /** Title (#28): another camera angle 6 s later (`title-2.png`; its draw calls go on `drawCalls`), the start hint, and a key press fading to level select
  *  that also loads the score engine (#187: not before it), unlocks audio and starts the title score. */
 async function titleFlyBy(page, drawCalls) {
@@ -2499,6 +2530,8 @@ async function titleFlyBy(page, drawCalls) {
   }
   const hint = await page.locator('.title-hint').textContent({ timeout: 5000 }).catch(() => null)
   if (!hint) problems.push('no start hint on the first title')
+  const attract = await titleAttractShot(page)
+  problems.push(...attract.problems)
 
   const engineBefore = { requests: await engineRequests(page), loaded: await page.evaluate(() => window.__SC_TEST__.audio().engineLoaded) }
   if (engineBefore.requests > 0 || engineBefore.loaded) problems.push('the score engine loaded before the first key press on the title')
@@ -2531,7 +2564,7 @@ async function titleFlyBy(page, drawCalls) {
     }, null, { timeout: 30000 })
     .then(() => true, () => false)
   if (!engineAfter) problems.push('the key press on the title did not load the score engine, unlock audio and start the title score')
-  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, engineBefore, engineAfter, sparkle } }
+  return { problems, result: { turnedDeg, moved, waited, hint, attract: attract.result, veiled, opened, engineBefore, engineAfter, sparkle } }
 }
 
 /** Longest the cold load may take to hand the poster over to the live scene before the poster check gives up. */
@@ -3622,7 +3655,7 @@ async function run() {
     const extra = r.id === 'time'
       ? (r.ok ? ` ${r.text}` : '')
       : r.id === 'title'
-      ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '') +
+      ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; attract ${r.title.attract ? `bars ${r.title.attract.bars.join(' / ')}` : 'none'}; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '') +
         ` draws=${r.drawCalls} scene objs=${r.scene?.objects} tris=${r.scene?.triangles}; poster: ${r.posterShots} load shots`
       : r.landing
         ? ` ${r.landing.requested} -> ${r.landing.pathname}${r.landing.search} phase=${r.landing.phase} internal marker=${r.landing.marker} failed requests=${r.landing.failed}`
