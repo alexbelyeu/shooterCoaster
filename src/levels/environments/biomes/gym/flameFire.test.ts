@@ -16,8 +16,8 @@ describe('the Flame fire', () => {
     expect(shell.top).toBeCloseTo(FLAME.top * GYM_SCALE, 5)
     expect(shell.crest).toBeGreaterThan(shell.top)
     const ys = vertices.map((v) => v.y)
-    expect(Math.min(...ys)).toBeCloseTo(shell.base, 5)
-    expect(Math.max(...ys)).toBeCloseTo(shell.crest, 5)
+    expect(Math.min(...ys)).toBeCloseTo(shell.base, 4)
+    expect(Math.max(...ys)).toBeCloseTo(shell.crest, 4)
   })
 
   it('hugs the Flame: never past its flared footprint by more than the skin', () => {

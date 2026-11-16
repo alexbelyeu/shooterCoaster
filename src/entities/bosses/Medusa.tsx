@@ -18,7 +18,7 @@ import {
   MEDUSA_SNAKE_HEAD_GEO, MEDUSA_SNAKE_HEAD_MAT, MEDUSA_SNAKE_MAT, MEDUSA_STAR_GLOW_GEO, MEDUSA_STAR_GLOW_MAT,
 } from './bossAssets'
 import {
-  MEDUSA_DEFEAT, MEDUSA_RISE, SNAKE, SNAKE_SLOTS, MEDUSA_HUB, bodyPlacement, defeatSink, laughShake, laySnake, smooth01, yawToward,
+  MEDUSA_DEFEAT, MEDUSA_RISE, MEDUSA_SIZE, SNAKE, SNAKE_SLOTS, MEDUSA_HUB, bodyPlacement, defeatSink, laughShake, laySnake, smooth01, yawToward,
   snakeLength, snakeRadius, strikeLandsBetween,
 } from './medusaMotion'
 
@@ -32,7 +32,7 @@ const CROWN_HEAD_SCALE = 1.5
 const SNAKE_TARGET_GROWN = 0.8
 const LEAN_TAU = 0.35
 const STAR_RADIUS = STAR.radius * GYM_SCALE
-const HUB_RADIUS = 34
+const HUB_RADIUS = 34 * MEDUSA_SIZE
 const RISE_TRAUMA = [0.35, 500] as const
 const STRIKE_TRAUMA = [0.1, 160] as const
 const DEFEAT_TRAUMA = [0.6, 900] as const
@@ -145,14 +145,14 @@ export default function Medusa(props: BossProps) {
       const shake = laughShake(sinceDefeat)
       root.rotation.order = 'YXZ'
       root.rotation.set(_place.pitch + shake * 0.03, FACING_YAW + yaw, shake * 0.04)
-      root.scale.setScalar(_place.scale)
-      root.position.copy(HUB).addScaledVector(FACING, _place.z)
-      root.position.y += _place.y + Math.abs(shake) * 4
+      root.scale.setScalar(_place.scale * MEDUSA_SIZE)
+      root.position.copy(HUB).addScaledVector(FACING, _place.z * MEDUSA_SIZE)
+      root.position.y += (_place.y + Math.abs(shake) * 4) * MEDUSA_SIZE
       root.updateMatrixWorld()
       if (!sim.placed) {
         sim.placed = true
         // Under her chest, where the star's lower points are, so the cloud never hides her face.
-        getExplosionPool()?.explode(_p.copy(HUB).addScaledVector(FACING, 40).setY(HUB.y - 100), MEDUSA_CHALK_BURST_DEATH_STYLE)
+        getExplosionPool()?.explode(_p.copy(HUB).addScaledVector(FACING, 40 * MEDUSA_SIZE).setY(HUB.y - 100 * MEDUSA_SIZE), MEDUSA_CHALK_BURST_DEATH_STYLE)
         eventBus.emit(CAMERA_TRAUMA_EVENT, RISE_TRAUMA[0], RISE_TRAUMA[1])
       }
 

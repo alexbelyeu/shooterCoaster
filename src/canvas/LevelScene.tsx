@@ -102,6 +102,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
           color1={color1}
           color2={color2}
           glow={track.glow}
+          segments={track.segments}
           dims={trackDims}
           groundFn={groundFn}
           table={trackTable}

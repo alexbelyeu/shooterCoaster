@@ -14,7 +14,7 @@
 import type { TrackParams } from '@/types/level'
 import { ARCH, FLAME, GLASS_ROOM, PIT, STAR, TREE, toWorld, type Vec3 } from './blockout'
 
-/** Metres the track's centreline keeps from anything solid: the car (±0.37 m rails) and the rider's eye (0.94 m) fit inside. */
+/** Metres the track's centreline keeps from anything solid: the car (±0.07 m rails) and the rider's eye (0.19 m) fit well inside. */
 export const RAIL_CLEARANCE = 1.5
 
 /** Height of the rails over the Arch's foot: the rider's eye stays under the soffit. */
@@ -127,11 +127,15 @@ export function gymControlPoints(): Vec3[] {
 export const GYM_TRACK: TrackParams = {
   curve: 'spline',
   controlPoints: gymControlPoints().map(toWorld),
-  // Unused by a spline; scalar 125 gives the full structure scale (trackScale 2.5).
+  // Unused by a spline; scalar 20 gives level 1's structure scale (trackScale 1): a small car in the big hall (#592).
   varA: 0,
   varB: 0,
   varC: 0,
-  scalar: 125,
+  scalar: 20,
+  // Rails, ties and towers sparser than level 1's (still finer per metre ridden): the track is twice as long as the first hall's, under the same triangle budget.
+  segments: 800,
+  tieSpacing: 22,
+  towerSpacing: 300,
   rollerSpeed: 0.0000004,
   minRollerSpeed: 0.000348,
   color1: 0x353d48,

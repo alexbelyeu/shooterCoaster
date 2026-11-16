@@ -82,7 +82,7 @@ export function getTrackScale(scalar: number): number {
 }
 
 export function getTrackDimensions(
-  track: Pick<TrackParams, 'scalar' | 'railRadius' | 'tieSpacing'>,
+  track: Pick<TrackParams, 'scalar' | 'railRadius' | 'tieSpacing' | 'towerSpacing'>,
 ): TrackDimensions {
   const s = getTrackScale(track.scalar)
   return {
@@ -93,7 +93,7 @@ export function getTrackDimensions(
     spineOffset: -1.4 * s,
     tieSpacing: (track.tieSpacing ?? DEFAULT_TIE_SPACING) * s,
     tieThickness: 0.6 * s,
-    towerSpacing: DEFAULT_TOWER_SPACING * s,
+    towerSpacing: (track.towerSpacing ?? DEFAULT_TOWER_SPACING) * s,
     eyeHeight: 6 * s,
   }
 }

@@ -373,8 +373,8 @@ export const TERRAIN_MESH_SEGMENTS = 128
 
 /** Side length of the rendered terrain mesh for a biome. */
 export function getTerrainMeshSize(biome: BiomeType): number {
-  // The gym's floor is the hall's length (`GYM_SCALE` × 80 m): its 10-unit cells put a grid line on the Starr pit's edge.
-  return biome === 'arctic' ? 10000 : biome === 'volcanic' ? 12000 : biome === 'gym' ? 1280 : 6000
+  // The gym's floor is the hall's length (`GYM_SCALE` × 80 m): its 20-unit cells put a grid line on the Starr pit's edge.
+  return biome === 'arctic' ? 10000 : biome === 'volcanic' ? 12000 : biome === 'gym' ? 2560 : 6000
 }
 
 /**

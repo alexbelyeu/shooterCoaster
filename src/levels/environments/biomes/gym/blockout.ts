@@ -6,8 +6,11 @@
  */
 import data from './blockout.json'
 
-/** World units per metre: the 80 m hall becomes 1280 units long, the size of today's tracks (≈ 1000–1600). */
-export const GYM_SCALE = 16
+/**
+ * World units per metre: the 80 m hall becomes 2560 units long (#592). With the coaster at level 1's structure scale
+ * (`GYM_TRACK.scalar`) the rider sits 0.19 m up in the hall and rides it as fast, against its own size, as level 1.
+ */
+export const GYM_SCALE = 32
 
 export interface Panel {
   len: number
