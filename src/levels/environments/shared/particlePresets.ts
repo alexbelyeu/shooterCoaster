@@ -169,9 +169,9 @@ const gymChalk: ParticleFieldPreset = {
   secondaryShare: 0.2,
 }
 
-/** The Climbing Gym's Flame (#520): embers and hot sparks rising off it, anchored over it (`ParticleField`'s `anchor`). */
+/** The Climbing Gym's Flame (#520, #599): embers drifting up off it and hot sparks thrown out of it, anchored over it (`ParticleField`'s `anchor`). */
 const gymFlameEmbers: ParticleFieldPreset = {
-  count: 1500,
+  count: 2200,
   box: [320, 160, 200],
   primary: {
     color: 0xff6a1a,
@@ -186,14 +186,14 @@ const gymFlameEmbers: ParticleFieldPreset = {
   secondary: {
     color: 0xffd27a,
     opacity: 0.9,
-    size: 0.7,
+    size: 0.8,
     maxPixels: 3,
-    velocity: [2, 18, 1],
-    sway: 4,
-    flicker: 0.6,
+    velocity: [6, 18, 3],
+    sway: 10,
+    flicker: 0.8,
     additive: true,
   },
-  secondaryShare: 0.3,
+  secondaryShare: 0.4,
 }
 
 export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh, gymChalk, gymFlameEmbers } as const

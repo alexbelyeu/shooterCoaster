@@ -3,6 +3,7 @@
  * rails sit right under it, so any offset makes the world jump. Pure, for Node tests.
  */
 import { TOP_TIER, comboTierIndex } from './comboTiers'
+import { smoothNoise1 } from '@/utils/valueNoise.hot'
 
 export type ScreenShakeLevel = 'off' | 'reduced' | 'full'
 
@@ -59,25 +60,6 @@ export function decayTrauma(state: TraumaState, dtMs: number): TraumaState {
 export function effectiveShakeScale(level: ScreenShakeLevel, prefersReducedMotion: boolean): number {
   if (prefersReducedMotion) return 0
   return SCREEN_SHAKE_SCALE[level] ?? SCREEN_SHAKE_SCALE.reduced
-}
-
-/** Integer hash -> [-1, 1]. */
-function hash1(n: number): number {
-  let h = (n | 0) * 374761393
-  h = (h ^ (h >>> 13)) * 1274126177
-  h ^= h >>> 16
-  return ((h >>> 0) / 4294967295) * 2 - 1
-}
-
-/** Smooth 1D value noise in [-1, 1] (quintic-interpolated lattice). */
-export function smoothNoise1(x: number, seed: number): number {
-  const i = Math.floor(x)
-  const f = x - i
-  const u = f * f * f * (f * (f * 6 - 15) + 10)
-  const s = (seed | 0) * 7919
-  const a = hash1(i + s)
-  const b = hash1(i + 1 + s)
-  return a + (b - a) * u
 }
 
 export interface ShakeAngles {

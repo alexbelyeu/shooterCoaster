@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import { PARTICLE_PRESETS } from '../../shared/particlePresets'
-import { FLAME, GYM_SCALE, blockRings, footprint, toBlockout, type Vec3 } from './blockout'
-import { MAX_TONGUES, PAD_TOP, buildFlameTongues, emberAnchor, fireHeights, flamePool, tongueCount } from './flameFire'
+import { FLAME, GYM_SCALE, HALL, blockRings, footprint, toBlockout, type Vec3 } from './blockout'
+import {
+  FLAME_TOP,
+  MAX_SMOKE_PUFFS,
+  MAX_TONGUES,
+  PAD_TOP,
+  SMOKE_CEILING,
+  buildFlameTongues,
+  buildSmokePuffs,
+  emberAnchor,
+  fireFlicker,
+  fireFootprint,
+  fireHeights,
+  fireLightSource,
+  smokeCount,
+  tongueCount,
+} from './flameFire'
 
 const tongues = buildFlameTongues()
 const heights = fireHeights()
@@ -92,12 +107,50 @@ describe('the Flame fire', () => {
     expect(tongueCount(true, 0.01)).toBe(1)
   })
 
-  it('lays its light pool on the mats round the Flame foot', () => {
-    const pool = flamePool()
-    expect(pool.centre.y).toBeGreaterThan(PAD_TOP * GYM_SCALE)
-    expect(pool.centre.y).toBeLessThan(PAD_TOP * GYM_SCALE + 1)
-    expect(pool.halfX).toBeGreaterThan(FLAME.halfX * GYM_SCALE)
-    expect(pool.halfZ).toBeGreaterThan(FLAME.halfZ * GYM_SCALE)
+  it('bounds the fire round the Flame foot, just over the mats', () => {
+    const ground = fireFootprint()
+    expect(ground.centre.y).toBeGreaterThan(PAD_TOP * GYM_SCALE)
+    expect(ground.centre.y).toBeLessThan(PAD_TOP * GYM_SCALE + 1)
+    expect(ground.halfX).toBeGreaterThan(FLAME.halfX * GYM_SCALE)
+    expect(ground.halfZ).toBeGreaterThan(FLAME.halfZ * GYM_SCALE)
+  })
+
+  it('lights from inside the Flame, from low on its faces to over its top', () => {
+    const light = fireLightSource()
+    expect(light.x).toBe(FLAME.piece.x)
+    expect(light.z).toBe(FLAME.piece.z)
+    expect(light.minY).toBeGreaterThan(PAD_TOP)
+    expect(light.maxY).toBeGreaterThan(FLAME_TOP.y)
+    expect(light.halfLength).toBeLessThan(FLAME_TOP.halfLength)
+  })
+
+  it('flickers between half and full light, never steady', () => {
+    const samples = Array.from({ length: 6000 }, (_, i) => fireFlicker(i / 60))
+    expect(Math.min(...samples)).toBeGreaterThanOrEqual(0.5)
+    expect(Math.max(...samples)).toBeLessThanOrEqual(1)
+    expect(Math.max(...samples) - Math.min(...samples)).toBeGreaterThan(0.3)
+    const steps = samples.slice(1).map((v, i) => Math.abs(v - samples[i]))
+    expect(Math.max(...steps)).toBeLessThan(0.08)
+    expect(steps.filter((d) => d < 1e-4).length).toBeLessThan(samples.length / 50)
+  })
+
+  it('raises smoke off the plume to under the roof, growing as it rises', () => {
+    const puffs = buildSmokePuffs()
+    const finite = [...puffs.start, ...puffs.end, ...puffs.params].every(Number.isFinite)
+    let rises = true
+    let grows = true
+    let underRoof = true
+    for (let i = 0; i < puffs.count; i++) {
+      const from = puffs.start[i * 4 + 1]
+      const to = puffs.end[i * 3 + 1]
+      rises &&= from > heights.top && to > from
+      underRoof &&= to < HALL.h * GYM_SCALE
+      grows &&= puffs.params[i * 4 + 3] > puffs.params[i * 4 + 2]
+    }
+    expect({ finite, rises, grows, underRoof }).toEqual({ finite: true, rises: true, grows: true, underRoof: true })
+    expect(SMOKE_CEILING).toBeLessThan(HALL.h)
+    expect(smokeCount(false, 1)).toBe(MAX_SMOKE_PUFFS)
+    expect(smokeCount(true, 1)).toBe(MAX_SMOKE_PUFFS / 2)
   })
 
   it('anchors rising embers over the Flame, their box reaching from its flare to above the crest', () => {
