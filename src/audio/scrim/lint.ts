@@ -2,7 +2,7 @@
  * Score lint beyond the compiler's own errors: every note inside its instrument's useful range (MIDI, inclusive), and
  * the tune in a layered score's base layer.
  */
-import type { CompiledSong, ScoreEvent } from './score'
+import type { CompiledSong, ScoreEvent, Timeline } from './score'
 
 const RANGES: Record<string, [number, number]> = {
   steeldrum: [55, 91], marimba: [45, 96], vibes: [53, 89], celesta: [60, 108], glock: [79, 108],
@@ -32,7 +32,7 @@ export function lintRanges(song: CompiledSong): string[] {
     const range = RANGES[voice.inst]
     if (voice.drum || !range) return
     let lo = Infinity, hi = -Infinity
-    for (const tl of [song.intro, song.loop]) for (const e of tl.events) if (e.v === vi && e.m) for (const m of e.m) {
+    for (const tl of [song.intro, song.loop, song.boss, song.sting]) for (const e of tl.events) if (e.v === vi && e.m) for (const m of e.m) {
       lo = Math.min(lo, m)
       hi = Math.max(hi, m)
     }
@@ -62,12 +62,17 @@ function doubles(voice: ScoreEvent[], base: ScoreEvent[]): boolean {
  * Layers only add (#415): a run opens on `base` alone, so the tune has to be in it. In a score with `layer=` tags, a
  * pitched voice in a higher layer either doubles one base voice (every note it plays starts with the same pitch class
  * in that voice: the xylophone two octaves over the organ) or stays under the base layer's top line (its loop's mean
- * top note no higher than the highest base voice's). One message per voice that breaks it.
+ * top note no higher than the highest base voice's). One message per voice that breaks it, in the loop and again in
+ * the boss section, which follows the combo the same way.
  */
 export function lintLayers(song: CompiledSong): string[] {
   if (!song.voices.some((v) => v.layer && v.layer !== 'base')) return []
+  return [...lintTimelineLayers(song, song.loop, ''), ...lintTimelineLayers(song, song.boss, 'boss section: ')]
+}
+
+function lintTimelineLayers(song: CompiledSong, timeline: Timeline, prefix: string): string[] {
   const lines = song.voices.map((voice, vi) =>
-    voice.drum || SWEEPS.has(voice.inst) ? [] : song.loop.events.filter((e) => e.v === vi && e.m?.length),
+    voice.drum || SWEEPS.has(voice.inst) ? [] : timeline.events.filter((e) => e.v === vi && e.m?.length),
   )
   const meanTop = (events: ScoreEvent[]) => events.reduce((sum, e) => sum + Math.max(...e.m!), 0) / events.length
   const isBase = (vi: number) => (song.voices[vi].layer ?? 'base') === 'base'
@@ -78,7 +83,7 @@ export function lintLayers(song: CompiledSong): string[] {
     if (isBase(vi) || !events.length || meanTop(events) <= baseTop) return
     if (baseLines.some((base) => doubles(events, base))) return
     const { name, layer } = song.voices[vi]
-    out.push(`"${name}" (layer=${layer}) plays above the base layer's top line without doubling a base voice: the tune belongs in base, layers only add.`)
+    out.push(`${prefix}"${name}" (layer=${layer}) plays above the base layer's top line without doubling a base voice: the tune belongs in base, layers only add.`)
   })
   return out
 }

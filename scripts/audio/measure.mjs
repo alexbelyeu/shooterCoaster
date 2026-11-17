@@ -61,16 +61,20 @@ const round = (x, d = 2) => (x === null || x === undefined || !Number.isFinite(x
 /** A combat mix's kills, from its event list (`kill <n>`, `audioRender.ts`). */
 export const killTimes = (events) => events.filter((e) => /^kill \d+$/.test(e.name)).map((e) => e.t)
 
-/** `kills`: times of kills in a combat mix, each measured against `musicFile`, the same mix rendered without SFX. */
-export function measure(file, { seams = [], bar = null, sounds = [], kills = [], musicFile = null } = {}) {
+/**
+ * `kills`: times of kills in a combat mix, each measured against `musicFile`, the same mix rendered without SFX.
+ * `seamFile`: measure the seams on this render instead (a mix's music stem).
+ */
+export function measure(file, { seams = [], bar = null, sounds = [], kills = [], musicFile = null, seamFile = null } = {}) {
   const channels = decode(file)
   const bands = bandEnergy(powerSpectrum(channels), SAMPLE_RATE)
   const end = channels[0].length / SAMPLE_RATE
   const bars = bar ? barLines(bar.startS, bar.barS, end, seams) : []
+  const seamChannels = seamFile && seams.length ? decode(seamFile) : channels
   const jumps = seams.map((s) => ({
     at: round(s, 3),
-    db: round(seamJump(channels, SAMPLE_RATE, s)),
-    vsBars: round(seamExcess(channels, SAMPLE_RATE, s, bars)),
+    db: round(seamJump(seamChannels, SAMPLE_RATE, s)),
+    vsBars: round(seamExcess(seamChannels, SAMPLE_RATE, s, bars)),
   }))
   const worst = jumps.reduce((w, j) => (w === null || Math.abs(j.vsBars) > Math.abs(w) ? j.vsBars : w), null)
   const l = loudness(file)

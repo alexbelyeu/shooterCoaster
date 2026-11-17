@@ -42,9 +42,7 @@ const onBystanderHit = (e: unknown) => {
   sfx().penalty(placeSound(_at.set(x, y, z)))
 }
 const onFrenzy = () => sfx().frenzy()
-const onBossSpawn = () => sfx().bossArrival()
 const onBossHit = (e: unknown) => sfx().bossHit((e as { hpFraction?: number } | undefined)?.hpFraction ?? 1)
-const onBossDefeated = () => sfx().bossDefeat()
 const onFireworkLaunch = (e: unknown) => {
   const { flightS = 0, timeScale = 1 } = (e as { flightS?: number; timeScale?: number } | undefined) ?? {}
   sfx().fireworkWhistle(flightS, timeScale)
@@ -60,15 +58,13 @@ const SFX_EVENTS: [string, (e: unknown) => void][] = [
   ['combo:broken', onComboBreak],
   [BYSTANDER_HIT_EVENT, onBystanderHit],
   ['combo:frenzy', onFrenzy],
-  ['boss:spawn', onBossSpawn],
   ['boss:hit', onBossHit],
-  ['boss:defeated', onBossDefeated],
   [SNOWBALL_SPLAT_EVENT, onSnowSplat],
   [FIREWORK_LAUNCH_EVENT, onFireworkLaunch],
   [FIREWORK_BURST_EVENT, onFireworkBurst],
 ]
 
-/** Level audio host: the level's score + SFX for the level's lifetime, bus-driven hit / kill / bystander / wave / combo / boss / firework sounds, slow-mo and pause duck, music intensity. */
+/** Level audio host: the level's score (its boss section from `boss:spawn`, a sting on `boss:defeated`) + SFX for the level's lifetime, bus-driven hit / kill / bystander / wave / combo / boss / firework sounds, slow-mo and pause duck, music intensity. */
 export default function LevelAudio() {
   const currentLevel = useGameStore((s) => s.currentLevel)
   const camera = useThree((s) => s.camera)
@@ -82,17 +78,36 @@ export default function LevelAudio() {
     const biome = (currentLevel ? getLevelConfig(currentLevel)?.biome : undefined) ?? 'themePark'
     const level = currentLevel ?? 'level1'
     const unfollow = useGameStore.subscribe((s, prev) => {
-      if (s.phase !== prev.phase && isAudioReady()) followPhase(s.phase, level)
+      if (!isAudioReady()) return
+      // A restart mid-boss takes the score back to its loop (from the pause menu: in place, before it resumes).
+      if (s.runId !== prev.runId) withScrim((p) => p.playSection(level, 'main'))
+      if (s.phase !== prev.phase) followPhase(s.phase, level)
     })
+    // The score's boss section from the boss's arrival, its victory sting on the defeat (then the loop again).
+    const playSection = (section: 'boss' | 'sting') => {
+      if (isAudioReady()) withScrim((p) => p.playSection(level, section))
+    }
+    const onBossSpawn = () => {
+      sfx().bossArrival()
+      playSection('boss')
+    }
+    const onBossDefeated = () => {
+      sfx().bossDefeat()
+      playSection('sting')
+    }
+    const bossEvents: [string, () => void][] = [
+      ['boss:spawn', onBossSpawn],
+      ['boss:defeated', onBossDefeated],
+    ]
     // Audio can unlock after the level mounts (PLAY waits for it only briefly).
     const cancelStart = whenAudioReady(() => {
       followPhase(useGameStore.getState().phase, level)
       void prepareSfx(level, biome)
     })
-    for (const [event, fn] of SFX_EVENTS) eventBus.on(event, fn)
+    for (const [event, fn] of [...SFX_EVENTS, ...bossEvents]) eventBus.on(event, fn)
     return () => {
       cancelStart()
-      for (const [event, fn] of SFX_EVENTS) eventBus.off(event, fn)
+      for (const [event, fn] of [...SFX_EVENTS, ...bossEvents]) eventBus.off(event, fn)
       // Still in a run: the next level's track opens once its scene mounts, so fade under it, not before (#168).
       const nextLevel = isInRun(useGameStore.getState().phase)
       unfollow()

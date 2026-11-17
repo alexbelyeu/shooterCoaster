@@ -146,6 +146,8 @@ interface ParsedSong {
   patternOrder: string[]
   play: PatternRef[]
   loop: PatternRef[]
+  boss: PatternRef[]
+  sting: PatternRef[]
 }
 
 /* ------------------------------------------------------------------ parse */
@@ -154,7 +156,7 @@ function parse(text: string): { song: ParsedSong; errors: ScoreError[] } {
   const err = (ln: number, msg: string) => errors.push({ line: ln, msg })
   const song: ParsedSong = {
     title: 'Untitled', composer: '', about: '', tempo: 120, beats: 4, steps: 4, swing: 0,
-    reverb: 0.3, voices: [], voiceMap: {}, patterns: {}, patternOrder: [], play: [], loop: [],
+    reverb: 0.3, voices: [], voiceMap: {}, patterns: {}, patternOrder: [], play: [], loop: [], boss: [], sting: [],
   }
   let cur: RawPattern | null = null
   const lines = String(text).split(/\r?\n/)
@@ -269,9 +271,9 @@ function parse(text: string): { song: ParsedSong; errors: ScoreError[] } {
         if (!cur) err(ln, '"mute" only works inside a pattern.')
         else for (const w of words.slice(1)) cur.mute.add(w)
         break
-      case 'play': case 'loop': {
+      case 'play': case 'loop': case 'boss': case 'sting': {
         cur = null
-        const list = kw === 'play' ? song.play : song.loop
+        const list = song[kw]
         for (const w of words.slice(1)) {
           const m = /^([A-Za-z_]\w*?)([+-]\d+)?(?:\*(\d+))?$/.exec(w)
           if (!m) { err(ln, `Can't read "${w}". Write a pattern name, optionally with +N/-N to transpose and *N to repeat.`); continue }
@@ -436,6 +438,10 @@ export interface CompiledSong {
   voices: Voice[]
   intro: Timeline
   loop: Timeline
+  /** ShooterCoaster: the boss section, looped from the level's boss arrival (`boss` line; empty without one). */
+  boss: Timeline
+  /** ShooterCoaster: the victory sting played once on the boss's defeat, before the loop again (`sting` line). */
+  sting: Timeline
   errors: ScoreError[]
   patternCount: number
 }
@@ -575,12 +581,14 @@ export function compile(text: string): CompiledSong {
   }
   const intro = timeline(playRefs)
   const loop = timeline(loopRefs)
+  const boss = timeline(song.boss)
+  const sting = timeline(song.sting)
   if (!intro.dur && !loop.dur && !errors.length) errors.push({ line: 1, msg: 'Nothing to play yet. Add a pattern and a loop line.' })
 
   errors.sort((a, b) => a.line - b.line)
   return {
     title: song.title, composer: song.composer, about: song.about, tempo: song.tempo,
     beats: song.beats, steps: song.steps, reverb: song.reverb,
-    voices, intro, loop, errors, patternCount: song.patternOrder.length,
+    voices, intro, loop, boss, sting, errors, patternCount: song.patternOrder.length,
   }
 }

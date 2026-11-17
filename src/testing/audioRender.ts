@@ -23,8 +23,12 @@ export type AudioRenderRequest =
   | { kind: 'music'; track: string; layers?: number | 'ramp'; seconds?: number; seam?: boolean }
   /** Every arcade SFX (`audio/arcade/`) alone, in its own slot. */
   | { kind: 'sfxSheet'; level?: string }
-  /** `stem: 'music'`: the same mix without SFX or wind, to measure the kills against. */
-  | { kind: 'mix'; level: string; seconds?: number; stem?: 'music' }
+  /**
+   * `stem: 'music'`: the same mix without SFX or wind, to measure the kills against. `boss`: the boss arrives at
+   * `BOSS_MIX.arriveS` and falls `BOSS_MIX.defeatBeforeEndS` before the end, as `LevelAudio` plays them (#598); the
+   * section switches are the render's seams.
+   */
+  | { kind: 'mix'; level: string; seconds?: number; stem?: 'music'; boss?: boolean }
   /**
    * Score text through the ported engine alone (`synth.renderOffline`, no game chain): parity with the original page.
    * `chain: 'game'` plays it through the game's music chain instead, exactly like `music`.
@@ -216,18 +220,41 @@ function killPlacement(n: number, out: Placement): Placement {
   return out
 }
 
-function mixPlan(level: string, seconds = 20, musicOnly = false): Plan {
+/** A `boss` mix: when the boss arrives and how long before the end it falls (the sting and the loop after it). */
+const BOSS_MIX = { arriveS: 6, defeatBeforeEndS: 9 }
+
+function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): Plan {
   const biome = biomeOf(level)
   const p = scrim
   const events: Plan['events'] = [{ t: p.SCORE_START_DELAY_S, name: `${level} music + wind` }]
   const s = musicOnly ? silentSfx : sfx
   const place: Placement = { pan: 0, cutoffHz: 20000 }
+  const seams: number[] = []
+  const song = compile(SCORES[scoreIdFor(level)])
+  const barS = (song.loop.sections[0] ?? song.intro.sections[0]).barDur
+  /** Asks for `section` at render time `t`, as `LevelAudio` does on the boss event, and records where it lands. */
+  const switchAt = ({ at }: OfflineRenderScope, t: number, section: 'boss' | 'sting', cue: () => void, name: string) => {
+    events.push({ t, name })
+    at(t, () => {
+      cue()
+      p.playSection(level, section)
+      const { tracks } = p.scrimState()
+      const landsAt = tracks[tracks.length - 1]?.switchAt
+      if (landsAt == null) return
+      seams.push(landsAt)
+      if (section === 'sting') seams.push(landsAt + song.sting.dur)
+    })
+  }
   return {
     seconds,
     events,
-    seams: [],
-    bar: null,
+    seams,
+    bar: boss ? { startS: p.SCORE_START_DELAY_S, barS } : null,
     script: (scope) => {
+      if (boss) {
+        switchAt(scope, BOSS_MIX.arriveS, 'boss', () => s.bossArrival(), 'boss:spawn: boss arrival + the boss section on the next bar')
+        switchAt(scope, seconds - BOSS_MIX.defeatBeforeEndS, 'sting', () => s.bossDefeat(), 'boss:defeated: boss defeat + the sting on the next bar, then the loop')
+      }
       const { at } = scope
       // As LevelAudio: the combo lifts the intensity.
       let kills = 0
@@ -274,7 +301,7 @@ type GamePlanRequest = Exclude<AudioRenderRequest, { kind: 'score' }>
 const RENDERS: { [K in GamePlanRequest['kind']]: (req: Extract<GamePlanRequest, { kind: K }>) => Plan } = {
   music: (r) => musicPlan(scrim, r.track, r.seconds, r.seam, r.layers),
   sfxSheet: (r) => sfxSheetPlan(r.level),
-  mix: (r) => mixPlan(r.level, r.seconds, r.stem === 'music'),
+  mix: (r) => mixPlan(r.level, r.seconds, r.stem === 'music', r.boss),
 }
 
 function toBase64(buffer: AudioBuffer): string {

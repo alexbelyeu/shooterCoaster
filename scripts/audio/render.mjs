@@ -5,7 +5,7 @@
  *   npm run build && npm run audio:render -- --music <title|level1..5|results|<slot>.<theme>> [--seconds 30] [--seam]
  *     [--layers 0..3|ramp]  (the score's intensity layers, 0–3 held, or `ramp` up through them and down again)
  *   npm run audio:render -- --sfx-sheet [--level level1]
- *   npm run audio:render -- --mix level1 [--seconds 20]
+ *   npm run audio:render -- --mix level1 [--seconds 20] [--boss]
  *   npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original] [--voicing jukebox|game] [--seconds 20]
  *   npm run audio:render -- --score <file.scrim> --chain game [--seconds 20] [--seam]
  *
@@ -61,9 +61,11 @@ if (flag('music')) {
   kind = 'sfx'
   defaultName = `sfx-sheet-${flag('level') ?? 'level1'}`
 } else if (flag('mix')) {
-  request = { kind: 'mix', level: flag('mix'), seconds: num('seconds') }
+  // --boss: the boss arrives and falls mid-render, switching the score to its boss section and the sting (#598).
+  const boss = argv.includes('--boss')
+  request = { kind: 'mix', level: flag('mix'), seconds: num('seconds') ?? (boss ? 30 : undefined), boss }
   kind = 'mix'
-  defaultName = `mix-${flag('mix')}`
+  defaultName = `mix-${flag('mix')}${boss ? '-boss' : ''}`
 } else if (flag('score')) {
   const { text, label } = readScore(flag('score'))
   original = engine === 'original'
@@ -176,7 +178,8 @@ if (musicStem) {
   musicFile = path.join(wavDir, `${NAME}-music.wav`)
   writeFloatWav(musicFile, new Float32Array(stem.buffer, stem.byteOffset, stem.byteLength / 4), musicStem.sampleRate)
 }
-const metrics = measure(wav, { seams: result.seams, bar: result.bar, sounds: kind === 'sfx' ? result.events : [], kills: killTimes(result.events), musicFile })
+// A mix's seams (the boss section switches) are judged on its music alone: a kill on the bar line is not a seam jump.
+const metrics = measure(wav, { seams: result.seams, bar: result.bar, sounds: kind === 'sfx' ? result.events : [], kills: killTimes(result.events), musicFile, seamFile: musicFile })
 toMp3(wav, path.join(OUT, `${NAME}.mp3`))
 spectrogram(wav, path.join(OUT, `${NAME}.png`))
 
