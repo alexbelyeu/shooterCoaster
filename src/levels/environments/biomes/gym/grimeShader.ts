@@ -1,13 +1,16 @@
 import * as THREE from 'three'
 import { valueNoiseGlsl } from '../../shared/noiseGlsl'
 import { GYM_SCALE, HALL, PIT } from './blockout'
-import { GRIME, STRIP_LIGHTS, stripLightXs, stripLightY } from './config'
+import { FIRE_LIGHT, GRIME, STRIP_LIGHTS, stripLightXs, stripLightY } from './config'
+import { FLAME_TOP, fireLightSource } from './flameFire'
 
 /**
  * The hall's grime and light (#593, "spectacularly Bushwick"), patched into the hall's, the floor's and the
  * holds' materials: blotchy grime, drips down the walls, dark boot grime along every wall's foot, chalk smudges
  * at hand height, the roof's half of the hall falling into shadow, and a warm pool under each strip-light
- * fixture (`STRIP_LIGHTS`), so the light falls in pools with darker corners between them rather than a flat fill.
+ * fixture (`STRIP_LIGHTS`), so the light falls in pools with darker corners between them rather than a flat fill;
+ * and the Flame's fire (#599): its flickering light on everything round it (`FIRE_LIGHT`, the shared `FIRE_FLICKER`
+ * uniform `FlameFire` sets each frame) and soot over its top.
  * Worked in blockout metres from world position; every term is bounded, so the output stays finite (#344).
  */
 
@@ -18,6 +21,13 @@ const glslColor = (hex: string) => {
   const c = new THREE.Color(hex)
   return `vec3(${f(c.r)}, ${f(c.g)}, ${f(c.b)})`
 }
+
+const fire = fireLightSource()
+const fireCos = Math.cos((fire.rot * Math.PI) / 180)
+const fireSin = Math.sin((fire.rot * Math.PI) / 180)
+
+/** The fire light's level, 0.5..1 (`fireFlicker`): one uniform shared by every patched material, set by `FlameFire` each frame. */
+export const FIRE_FLICKER = { value: 1 }
 
 const vertexHead = /* glsl */ `
 varying vec3 vGrimePos;
@@ -36,7 +46,13 @@ const vertexBody = /* glsl */ `
 
 const fragmentHead = /* glsl */ `
 varying vec3 vGrimePos;
+uniform float uFireFlicker;
 ${valueNoiseGlsl}
+// A hall point in the Flame's own frame: along its length, up, across it
+vec3 fireLocal(vec3 p) {
+  vec2 d = p.xz - vec2(${f(fire.x)}, ${f(fire.z)});
+  return vec3(d.x * ${f(fireCos)} - d.y * ${f(fireSin)}, p.y, d.x * ${f(fireSin)} + d.y * ${f(fireCos)});
+}
 float grimeFbm(vec2 p) {
   return 0.55 * vnoise(p) + 0.3 * vnoise(p * 2.13 + 5.7) + 0.15 * vnoise(p * 4.37 + 11.3);
 }
@@ -67,6 +83,11 @@ const hallFragment = /* glsl */ `
   float floorStain = smoothstep(0.45, 0.85, grimeFbm(vGrimePos.xz * 0.5 + 21.0)) * smoothstep(0.7, 0.95, upness);
   vec3 c = diffuseColor.rgb * (1.0 - ${f(GRIME.blotch)} * blotch - ${f(GRIME.drips)} * drips - ${f(GRIME.foot)} * foot - ${f(GRIME.floorStain)} * floorStain);
   c = mix(c, ${glslColor(GRIME.chalk)}, ${f(GRIME.chalkSmudge)} * chalk);
+  // Soot over the Flame's top, patchy, thickest where the fire licks over its lip
+  vec3 flameLocal = fireLocal(vGrimePos);
+  float onFlame = (1.0 - smoothstep(${f(FLAME_TOP.halfLength)}, ${f(FLAME_TOP.halfLength + 0.6)}, abs(flameLocal.x))) * (1.0 - smoothstep(${f(FLAME_TOP.halfWidth)}, ${f(FLAME_TOP.halfWidth + 0.6)}, abs(flameLocal.z)));
+  float soot = onFlame * smoothstep(${f(FLAME_TOP.y * 0.35)}, ${f(FLAME_TOP.y * 0.9)}, vGrimePos.y) * (0.45 + 0.55 * grimeFbm(grimeUv * 0.9 + 13.0));
+  c = mix(c, ${glslColor(FIRE_LIGHT.soot)}, ${f(FIRE_LIGHT.sootAmount)} * soot);
   c *= mix(1.0, ${f(GRIME.roofShade)}, smoothstep(${f(HALL.h * 0.4)}, ${f(HALL.h * 0.95)}, vGrimePos.y));
   diffuseColor.rgb = c;
 }
@@ -89,6 +110,21 @@ const poolFragment = /* glsl */ `
 }
 `
 
+/** The fire's flickering light from the nearest point of its source; within its shell the flames are on the surface, lighting it whichever way it faces. */
+const fireFragment = /* glsl */ `
+{
+  vec3 local = fireLocal(vGrimePos);
+  vec3 toFire = vec3(clamp(local.x, ${f(-fire.halfLength)}, ${f(fire.halfLength)}), clamp(local.y, ${f(fire.minY)}, ${f(fire.maxY)}), 0.0) - local;
+  float dist = max(length(toFire), 0.5);
+  vec3 dir = toFire / dist;
+  dir = vec3(dir.x * ${f(fireCos)} + dir.z * ${f(fireSin)}, dir.y, -dir.x * ${f(fireSin)} + dir.z * ${f(fireCos)});
+  float facing = max(dot(normal, normalize((viewMatrix * vec4(dir, 0.0)).xyz)), 0.0);
+  facing = mix(1.0, facing, smoothstep(${f(FIRE_LIGHT.shell)}, ${f(FIRE_LIGHT.shell + 2)}, dist));
+  float fireLight = ${f(FIRE_LIGHT.strength)} * clamp(uFireFlicker, 0.0, 1.5) * facing / (1.0 + dist * dist / ${f(FIRE_LIGHT.reach * FIRE_LIGHT.reach)});
+  reflectedLight.directDiffuse += diffuseColor.rgb * ${glslColor(FIRE_LIGHT.color)} * fireLight;
+}
+`
+
 /** Holds: chalk caked on their tops, where hands go, patchy. */
 const holdFragment = /* glsl */ `
 {
@@ -106,7 +142,8 @@ function patch(material: THREE.Material, key: string, surface: string, pool: boo
     shader.vertexShader = inject(shader.vertexShader, '#include <begin_vertex>', vertexBody)
     shader.fragmentShader = inject(shader.fragmentShader, '#include <common>', fragmentHead)
     shader.fragmentShader = inject(shader.fragmentShader, '#include <normal_fragment_maps>', surface)
-    if (pool) shader.fragmentShader = inject(shader.fragmentShader, '#include <lights_fragment_end>', poolFragment)
+    if (pool) shader.fragmentShader = inject(shader.fragmentShader, '#include <lights_fragment_end>', `${poolFragment}\n${fireFragment}`)
+    shader.uniforms.uFireFlicker = FIRE_FLICKER
   }
   material.customProgramCacheKey = () => key
 }

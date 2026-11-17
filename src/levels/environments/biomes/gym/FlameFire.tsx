@@ -5,7 +5,8 @@ import { isCoarsePointer, useFbmOctaves, useQualityProfile } from '@/canvas/useR
 import ParticleField from '../../shared/ParticleField'
 import { PARTICLE_PRESETS } from '../../shared/particlePresets'
 import { gradientNoiseGlsl } from '../../shared/noiseGlsl'
-import { buildFlameTongues, emberAnchor, fireHeights, flamePool, tongueCount } from './flameFire'
+import { buildFlameTongues, buildSmokePuffs, emberAnchor, fireFlicker, fireFootprint, fireHeights, smokeCount, tongueCount } from './flameFire'
+import { FIRE_FLICKER } from './grimeShader'
 
 const tongueVertex = /* glsl */ `
   #include <fog_pars_vertex>
@@ -111,32 +112,72 @@ const tongueFragment = /* glsl */ `
   }
 `
 
-const poolVertex = /* glsl */ `
+const smokeVertex = /* glsl */ `
   #include <fog_pars_vertex>
-  varying vec2 vEllipse;
+  attribute vec4 aStart; // xyz, darkness
+  attribute vec3 aEnd;
+  attribute vec4 aPuff; // phase, life (s), size at start, size at end
+  uniform float uTime;
+  varying vec2 vUv;
+  varying float vAge;
+  varying float vDark;
+  varying float vSeed;
+  varying float vNear;
+
+  ${gradientNoiseGlsl}
 
   void main() {
-    vEllipse = uv * 2.0 - 1.0;
-    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    float cycle = uTime / aPuff.y + aPuff.x;
+    float age = fract(cycle);
+    vSeed = fract(aPuff.x * 7.31 + floor(cycle) * 0.618034);
+    // Quick off the crest, slowing as it spreads under the roof
+    float t = 1.0 - pow(1.0 - age, 1.8);
+    float size = mix(aPuff.z, aPuff.w, t);
+    float wave = uTime * 0.15;
+    vec3 drift = vec3(gnoise(vec2(vSeed * 37.0, wave)), 0.0, gnoise(vec2(vSeed * 19.0 + 5.0, wave))) * size * 0.5 * t;
+    vec3 centre = mix(aStart.xyz, aEnd, t) + drift;
+    // A billboard facing the camera
+    vec4 mvPosition = viewMatrix * vec4(centre, 1.0);
+    mvPosition.xy += (uv - 0.5) * size;
+    vUv = uv;
+    vAge = age;
+    vDark = aStart.w;
+    // Fades out as the camera comes into it, so a puff never fills the screen
+    vNear = smoothstep(size * 0.6, size * 1.6, -mvPosition.z);
     gl_Position = projectionMatrix * mvPosition;
     #include <fog_vertex>
   }
 `
 
-const poolFragment = /* glsl */ `
+const smokeFragment = /* glsl */ `
   #include <fog_pars_fragment>
   uniform float uTime;
-  uniform vec3 uPool;
-  varying vec2 vEllipse;
+  uniform float uFlicker;
+  varying vec2 vUv;
+  varying float vAge;
+  varying float vDark;
+  varying float vSeed;
+  varying float vNear;
+
+  ${gradientNoiseGlsl}
 
   void main() {
-    float flicker = 0.82 + 0.1 * sin(uTime * 7.3) + 0.08 * sin(uTime * 12.9 + 1.7);
-    vec3 rgb = uPool * (1.0 - smoothstep(0.3, 1.0, length(vEllipse))) * flicker;
+    vec2 p = clamp(vUv, 0.0, 1.0) * 2.0 - 1.0;
+    // Billowing: noise rolling through the puff, its edge torn by it
+    float n = fbm(p * 1.3 + vec2(vSeed * 17.0, vSeed * 9.0 - uTime * 0.12));
+    float density = clamp(1.0 - length(p) + n * 0.45, 0.0, 1.0);
+    density = smoothstep(0.0, 0.7, density);
+    density *= smoothstep(0.0, 0.15, vAge) * (1.0 - smoothstep(0.55, 1.0, vAge)) * vNear;
+    float alpha = density * 0.7 * vDark;
+    // Soot black, its underside lit orange by the fire while it is still low over it
+    vec3 lit = vec3(0.7, 0.25, 0.06) * uFlicker * (1.0 - smoothstep(0.0, 0.35, vAge)) * smoothstep(0.2, -0.6, p.y);
+    vec3 rgb = (vec3(0.1, 0.092, 0.085) + lit) * alpha;
     #ifdef USE_FOG
-      // Additive: fog fades the light out rather than tinting it
-      rgb *= 1.0 - smoothstep(fogNear, fogFar, vFogDepth);
+      float fade = 1.0 - smoothstep(fogNear, fogFar, vFogDepth);
+      rgb *= fade;
+      alpha *= fade;
     #endif
-    gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), 1.0);
+    gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), clamp(alpha, 0.0, 1.0));
   }
 `
 
@@ -158,35 +199,53 @@ function tongueGeometry(): THREE.InstancedBufferGeometry {
   plane.dispose()
   // The quad's own bounds mean nothing once the vertex shader places it: bound the whole fire
   const { base, crest } = fireHeights()
-  const pool = flamePool()
+  const ground = fireFootprint()
   geometry.boundingSphere = new THREE.Sphere(
-    new THREE.Vector3(pool.centre.x, (base + crest) / 2, pool.centre.z),
+    new THREE.Vector3(ground.centre.x, (base + crest) / 2, ground.centre.z),
     // Padded for the tongues' width and sway
-    Math.hypot(pool.halfX, pool.halfZ, (crest - base) / 2) + 100,
+    Math.hypot(ground.halfX, ground.halfZ, (crest - base) / 2) + 100,
   )
   return geometry
 }
 
-function poolGeometry(): THREE.PlaneGeometry {
-  const pool = flamePool()
-  const geometry = new THREE.PlaneGeometry(pool.halfX * 2, pool.halfZ * 2)
-  geometry.rotateX(-Math.PI / 2)
-  geometry.translate(pool.centre.x, pool.centre.y, pool.centre.z)
+/** Every smoke puff as one instance of a unit quad, its bounds round the whole column. */
+function smokeGeometry(): THREE.InstancedBufferGeometry {
+  const puffs = buildSmokePuffs()
+  const plane = new THREE.PlaneGeometry(1, 1)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.setIndex(plane.getIndex())
+  geometry.setAttribute('position', plane.getAttribute('position'))
+  geometry.setAttribute('uv', plane.getAttribute('uv'))
+  geometry.setAttribute('aStart', new THREE.InstancedBufferAttribute(puffs.start, 4))
+  geometry.setAttribute('aEnd', new THREE.InstancedBufferAttribute(puffs.end, 3))
+  geometry.setAttribute('aPuff', new THREE.InstancedBufferAttribute(puffs.params, 4))
+  plane.dispose()
+  geometry.boundingSphere = new THREE.Sphere()
+  geometry.boundingSphere.setFromPoints(
+    Array.from({ length: puffs.count * 2 }, (_, k) => {
+      const i = k >> 1
+      return k & 1 ? new THREE.Vector3().fromArray(puffs.end, i * 3) : new THREE.Vector3().fromArray(puffs.start, i * 4)
+    }),
+  )
+  // Padded for the puffs' size and drift
+  geometry.boundingSphere.radius += Math.max(...puffs.params.filter((_, k) => k % 4 === 3))
   return geometry
 }
 
 /**
  * The Flame burns (#520, rebuilt in #595): a few hundred soft tongues of flame (one instanced draw) rise
  * up its faces and off its top, each on a path round the Flame's flare with its own life, sway and noise,
- * so they overlap in front of and behind each other as the coaster circles; the warm pool its light throws
- * on the mats; and embers rising off it (an anchored `ParticleField`). Three draw calls. Touch and lower
- * qualities draw fewer tongues and the quality's `fbmOctaves`.
+ * so they overlap in front of and behind each other as the coaster circles; smoke rising off the crest to
+ * hang under the roof (one instanced draw); and embers rising off it (an anchored `ParticleField`). Its
+ * light on the hall, flickering with `fireFlicker`, is the grime shader's (#599): this sets `FIRE_FLICKER`
+ * every frame. Three draw calls. Touch and lower qualities draw fewer tongues and puffs and the quality's
+ * `fbmOctaves`.
  */
 export default function FlameFire() {
   const octaves = useFbmOctaves()
   const { particleScale } = useQualityProfile()
   const tongues = useMemo(tongueGeometry, [])
-  const pool = useMemo(poolGeometry, [])
+  const smoke = useMemo(smokeGeometry, [])
   const tongueMaterial = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -205,35 +264,42 @@ export default function FlameFire() {
       }),
     [octaves],
   )
-  const poolMaterial = useMemo(
+  const smokeMaterial = useMemo(
     () =>
       new THREE.ShaderMaterial({
-        vertexShader: poolVertex,
-        fragmentShader: poolFragment,
-        uniforms: { ...fogUniforms(), uTime: { value: 0 }, uPool: { value: new THREE.Color(0.42, 0.15, 0.04) } },
+        vertexShader: smokeVertex,
+        fragmentShader: smokeFragment,
+        defines: { FBM_OCTAVES: octaves },
+        uniforms: { ...fogUniforms(), uTime: { value: 0 }, uFlicker: FIRE_FLICKER },
         transparent: true,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.CustomBlending,
+        blendSrc: THREE.OneFactor,
+        blendDst: THREE.OneMinusSrcAlphaFactor,
         fog: true,
       }),
-    [],
+    [octaves],
   )
   useEffect(() => {
     tongues.instanceCount = tongueCount(isCoarsePointer, particleScale)
-  }, [tongues, particleScale])
+    smoke.instanceCount = smokeCount(isCoarsePointer, particleScale)
+  }, [tongues, smoke, particleScale])
   useEffect(() => () => tongues.dispose(), [tongues])
-  useEffect(() => () => pool.dispose(), [pool])
+  useEffect(() => () => smoke.dispose(), [smoke])
   useEffect(() => () => tongueMaterial.dispose(), [tongueMaterial])
-  useEffect(() => () => poolMaterial.dispose(), [poolMaterial])
+  useEffect(() => () => smokeMaterial.dispose(), [smokeMaterial])
 
   useFrame(({ clock }) => {
-    tongueMaterial.uniforms.uTime.value = clock.elapsedTime
-    poolMaterial.uniforms.uTime.value = clock.elapsedTime
+    const t = clock.elapsedTime
+    tongueMaterial.uniforms.uTime.value = t
+    smokeMaterial.uniforms.uTime.value = t
+    FIRE_FLICKER.value = fireFlicker(t)
   })
 
   return (
     <>
-      <mesh geometry={pool} material={poolMaterial} />
+      {/* Under the flames: the tongues' light adds over the smoke where they meet */}
+      <mesh geometry={smoke} material={smokeMaterial} renderOrder={-1} />
       <mesh geometry={tongues} material={tongueMaterial} />
       <ParticleField preset={PARTICLE_PRESETS.gymFlameEmbers} anchor={EMBER_ANCHOR} />
     </>

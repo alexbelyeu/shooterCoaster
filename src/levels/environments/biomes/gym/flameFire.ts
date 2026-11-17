@@ -1,11 +1,11 @@
 import { particleShare } from '@/canvas/graphicsQuality'
 import { createRng } from '@/utils/rng'
-import { FLAME, GYM_SCALE, blockRings, footprint, piece, toWorld, type Vec3 } from './blockout'
+import { FLAME, GYM_SCALE, HALL, blockRings, footprint, piece, toWorld, type Vec3 } from './blockout'
 
 /**
  * The Flame's fire (#520, rebuilt in #595), laid out in the blockout's metres and scaled to the world: the
- * tongues of flame that rise up its faces and off its top, the warm pool its light throws on the mats, and
- * the box its embers rise through. Pure: `FlameFire.tsx` draws it.
+ * tongues of flame that rise up its faces and off its top, where its light comes from and how it flickers, the
+ * smoke rising off it, and the box its embers rise through. Pure: `FlameFire.tsx` draws it.
  *
  * Each tongue is one soft flame sprite on a path of three points that hugs the Flame (its start, a point
  * halfway and its end, each held out from the faces by half the tongue's width so it never cuts into the
@@ -146,16 +146,85 @@ export function fireHeights(): { base: number; top: number; crest: number } {
   }
 }
 
-/** Out past the Flame's flared footprint, the warm pool's edge on the mats (blockout metres). */
-const POOL_REACH = 2.2
+/** Out past the Flame's flared footprint, how far the fire's bounds reach (blockout metres). */
+const FOOTPRINT_REACH = 2.2
 
-/** The light pool on the mats: an ellipse round the Flame's foot, just over the mats (world units). */
-export function flamePool(): { centre: Vec3; halfX: number; halfZ: number } {
+/** The ground the fire stands on: an ellipse round the Flame's foot, just over the mats (world units). */
+export function fireFootprint(): { centre: Vec3; halfX: number; halfZ: number } {
   return {
     centre: worldPoint(0, PAD_TOP + 0.02, 0),
-    halfX: (FLAME.halfX + POOL_REACH) * GYM_SCALE,
-    halfZ: (FLAME.halfZ + POOL_REACH) * GYM_SCALE,
+    halfX: (FLAME.halfX + FOOTPRINT_REACH) * GYM_SCALE,
+    halfZ: (FLAME.halfZ + FOOTPRINT_REACH) * GYM_SCALE,
   }
+}
+
+/**
+ * Where the fire's light comes from (#599), in blockout metres in the Flame's own frame: a segment along the
+ * Flame's length through its middle, from low on its faces to over its top. The grime shader lights the hall from
+ * the nearest point on it; `rot` (degrees) turns the hall's x/z into the frame.
+ */
+export function fireLightSource(): { x: number; z: number; rot: number; halfLength: number; minY: number; maxY: number } {
+  const p = FLAME.piece
+  return { x: p.x, z: p.z, rot: p.rot, halfLength: p.w / 2, minY: PAD_TOP + 1, maxY: TOP.y + PLUME_RISE * 0.4 }
+}
+
+/** The Flame's top in its own frame (blockout metres): its height and how far its top ring stands out round the foot. */
+export const FLAME_TOP = { y: TOP.y, halfLength: FLAME.piece.w / 2 + TOP.f, halfWidth: FLAME.piece.d / 2 + TOP.f }
+
+const hash1 = (i: number) => {
+  const h = Math.sin(i * 127.1 + 311.7) * 43758.5453
+  return (h - Math.floor(h)) * 2 - 1
+}
+
+/** Smooth 1D value noise in -1..1. */
+function noise1(x: number): number {
+  const i = Math.floor(x)
+  const f = x - i
+  const u = f * f * (3 - 2 * f)
+  return hash1(i) + (hash1(i + 1) - hash1(i)) * u
+}
+
+/** The fire's light at time `t` (s), 0.5..1: a slow breathing under a quicker flicker, never steady, never out. */
+export function fireFlicker(t: number): number {
+  return 0.77 + 0.14 * noise1(t * 4.3) + 0.07 * noise1(t * 11.9 + 17.3) + 0.02 * noise1(t * 23.1 + 5.1)
+}
+
+/** Smoke puffs at full quality on a desktop; `smokeCount` thins them. */
+export const MAX_SMOKE_PUFFS = 40
+/** How high the smoke rises (blockout metres): under the roof trusses, where it spreads and hangs. */
+export const SMOKE_CEILING = HALL.h - 6
+
+export interface SmokePuffs {
+  count: number
+  /** Per puff: where it rises from (world xyz) and its darkness (0..1). */
+  start: Float32Array
+  /** Per puff: where its life ends (world xyz). */
+  end: Float32Array
+  /** Per puff: phase (0..1), life (s), size at the start and at the end (world units). */
+  params: Float32Array
+}
+
+/** Smoke rising off the plume's crest, spreading and slowing as it climbs to hang under the roof; shuffled like the tongues. */
+export function buildSmokePuffs(count = MAX_SMOKE_PUFFS, seed = 0x5a0e7): SmokePuffs {
+  const rng = createRng(seed)
+  const start = new Float32Array(count * 4)
+  const end = new Float32Array(count * 3)
+  const params = new Float32Array(count * 4)
+  const crest = TOP.y + PLUME_RISE * 0.6
+  for (let i = 0; i < count; i++) {
+    const along = rng.range(-0.4, 0.4) * FLAME.piece.w
+    const from = worldPoint(along, crest + rng.range(0, 1.5), rng.range(-0.6, 0.6))
+    const to = worldPoint(along * 1.3 + rng.range(-3, 3), SMOKE_CEILING - rng.range(0, 3), rng.range(-3, 3))
+    start.set([from.x, from.y, from.z, rng.range(0.6, 1)], i * 4)
+    end.set([to.x, to.y, to.z], i * 3)
+    params.set([rng(), rng.range(7, 11), rng.range(1.8, 2.6) * GYM_SCALE, rng.range(5, 7) * GYM_SCALE], i * 4)
+  }
+  return { count, start, end, params }
+}
+
+/** Smoke puffs to draw, thinned like the tongues. */
+export function smokeCount(coarsePointer: boolean, particleScale: number): number {
+  return tongueCount(coarsePointer, particleScale, MAX_SMOKE_PUFFS)
 }
 
 /** Where the embers' box sits: over the Flame's centre, its middle this far (blockout metres) up, as high as the spiral. */
