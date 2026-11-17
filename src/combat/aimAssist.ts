@@ -8,6 +8,7 @@
  * aim are left exactly as they are.
  */
 import type { PointerKind } from '@/input/pointerInput'
+import type { CollisionTarget } from './CollisionManager'
 
 /** Snap radius around a touch point, in CSS px. */
 export const TOUCH_ASSIST_RADIUS_PX = 44
@@ -15,6 +16,12 @@ export const TOUCH_ASSIST_RADIUS_PX = 44
 export const TOUCH_HIT_SCALE = 1.25
 /** Weapon pickups snap from a shorter reach and lose a tie to an enemy (#185). */
 export const PICKUP_ASSIST_WEIGHT = 0.6
+
+/** A target kind's reach for the snap: 0 never pulls toward it (a bystander, #518). */
+export function assistWeight(kind: CollisionTarget['kind']): number {
+  if (kind === 'bystander') return 0
+  return kind === 'pickup' ? PICKUP_ASSIST_WEIGHT : 1
+}
 
 /** Snap radius (CSS px) for a pointer kind; 0 = no assist. */
 export function assistRadiusPx(kind: PointerKind): number {
@@ -28,7 +35,7 @@ export function hitScaleFor(kind: PointerKind): number {
 
 /**
  * Index of the candidate screen point nearest to (px, py) within `radiusPx`, or -1.
- * `weights` (default 1) scale each candidate's reach.
+ * `weights` (default 1) scale each candidate's reach; a weight of 0 is never picked.
  */
 export function pickAssistTarget(
   px: number,
@@ -46,6 +53,7 @@ export function pickAssistTarget(
     const dx = xs[i] - px
     const dy = ys[i] - py
     const w = weights ? weights[i] : 1
+    if (!(w > 0)) continue
     const d = (dx * dx + dy * dy) / (w * w)
     if (d <= bestSq) {
       bestSq = d

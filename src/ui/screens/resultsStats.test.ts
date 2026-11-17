@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accuracyPercent, barFill, formatAccuracy, formatTimeLeft, isNewRecord } from './resultsStats'
+import { accuracyPercent, barFill, bystanderRow, formatAccuracy, formatTimeLeft, isNewRecord } from './resultsStats'
 
 describe('accuracy', () => {
   it('is hits / shots as a whole percent', () => {
@@ -42,5 +42,13 @@ describe('barFill', () => {
     expect(barFill(500, 1000)).toBe(0.5)
     expect(barFill(2000, 1000)).toBe(1)
     expect(barFill(10, 0)).toBe(0)
+  })
+})
+
+describe('bystanderRow', () => {
+  it('counts the spared, only on a level with bystanders', () => {
+    expect(bystanderRow('climbers', 10, 0)).toEqual(['Climbers spared', '10 / 10'])
+    expect(bystanderRow('climbers', 10, 3)).toEqual(['Climbers spared', '7 / 10'])
+    expect(bystanderRow('climbers', 0, 0)).toBeNull()
   })
 })

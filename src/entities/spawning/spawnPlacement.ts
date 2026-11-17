@@ -3,7 +3,10 @@ import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import { maxReadableDistance } from '../enemies/enemyReadability'
-import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, wallNormal, wallPoint, type Surface, type SwarmSlot, type WallSlot } from './enemyPlacement'
+import {
+  BYSTANDER_SPACING, ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, wallNormal, wallPoint, type Surface, type SwarmSlot, type WallSlot,
+} from './enemyPlacement'
+import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
@@ -779,6 +782,25 @@ export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: 
     wall,
     u: Math.min(wall.width - mu, Math.max(mu, best.u + s.du)),
     v: Math.min(wall.height - mv, Math.max(mv, best.v + s.dv)),
+    seed: s.seed,
+  }))
+}
+
+/**
+ * Bystander climbers (#518) at the foot of the wall a swarm would take (`placeWallSwarm`: the one the rider sees most over
+ * the wave's window), in a row across it round that spot, closer together on a narrow wall. `slots` are `bystanderSlots`.
+ */
+export function placeWallClimbers(input: PlaceSwarmInput): WallSlot[] {
+  const [{ wall, u }] = placeWallSwarm({ ...input, slots: [{ du: 0, dv: 0, seed: 0 }] })
+  const n = input.slots.length
+  const margin = Math.min(CLIMB.margin, wall.width / 2)
+  const spacing = Math.min(BYSTANDER_SPACING, (wall.width - 2 * margin) / Math.max(1, n))
+  const row = spacing * (n - 1)
+  const first = Math.min(wall.width - margin - row, Math.max(margin, u - row / 2))
+  return input.slots.map((s, i) => ({
+    wall,
+    u: Math.min(wall.width - margin, Math.max(margin, first + i * spacing + s.du * (spacing / BYSTANDER_SPACING))),
+    v: s.dv * wall.height,
     seed: s.seed,
   }))
 }

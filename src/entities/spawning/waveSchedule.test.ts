@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { RUN_SECONDS } from '@/levels/pacing'
-import { WAVE_TELL_SECONDS, newWaveProgress, nextWaveDue, tickWaves, waveWindows } from './waveSchedule'
+import { WAVE_TELL_SECONDS, enemyCounts, newWaveProgress, nextWaveDue, tickWaves, waveWindows } from './waveSchedule'
 
 /** Ticks the schedule at each elapsed time; returns the events in order. */
 function run(delays: number[], times: number[], progress = newWaveProgress(delays.length)) {
@@ -72,5 +72,15 @@ describe('waveWindows', () => {
     expect(waveWindows([0, 20, 45], 55, 75)).toEqual([[0, 20], [20, 45], [45, 55]])
     expect(waveWindows([30, 0, 15], undefined, 60)).toEqual([[30, 60], [0, 15], [15, 30]])
     expect(waveWindows([0, 0], 10, 60)).toEqual([[0, 10], [0, 10]])
+  })
+})
+
+describe('enemyCounts', () => {
+  it('an escaped enemy leaves the total and is never a kill (#480)', () => {
+    expect(enemyCounts(10, 0, 0)).toEqual({ remaining: 10, total: 10 })
+    expect(enemyCounts(10, 3, 0)).toEqual({ remaining: 7, total: 10 })
+    // A climber topping out: killed (total − remaining) stays 3.
+    expect(enemyCounts(10, 3, 1)).toEqual({ remaining: 6, total: 9 })
+    expect(enemyCounts(2, 1, 1)).toEqual({ remaining: 0, total: 1 })
   })
 })

@@ -13,6 +13,7 @@ import { entryPoint, type FormationMotion, type Vec3 } from '@/entities/spawning
 import type { WallSlot } from '@/entities/spawning/enemyPlacement'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { DEATH_STYLES } from '@/effects/deathStyles'
+import { hitBystander } from '@/combat/bystanderHit'
 
 export interface EnemyProps {
   id: string
@@ -28,6 +29,8 @@ export interface EnemyProps {
   wall?: WallSlot
   /** It got away unshot (a climber topped out): gone, unscored. */
   onEscape?: (id: string) => void
+  /** Not a target (#518): a hit costs the penalty and the combo (`combat/bystanderHit.ts`), never a kill. */
+  bystander?: boolean
 }
 
 export interface EnemyEntry {
@@ -56,6 +59,7 @@ interface EnemyBaseProps extends EnemyProps {
  * flashes white at 1.2x scale for ENEMY_HIT_FLASH_MS (game time); then it emits
  * 'enemy:killed', plays its type's death effect (`effects/deathStyles.ts`) and unmounts.
  * An enemy whose `updatePosition` returns 'escaped' unmounts at once, unscored, through `onEscape`.
+ * A bystander is shot like an enemy but puffs out at once through `hitBystander`, with no kill pop.
  */
 export default function EnemyBase({
   id,
@@ -65,6 +69,7 @@ export default function EnemyBase({
   radius,
   onKill,
   onEscape,
+  bystander = false,
   entry,
   children,
   updatePosition,
@@ -128,6 +133,14 @@ export default function EnemyBase({
     setAlive(false)
   }, [id, type, scoreValue, onKill])
 
+  const spare = useCallback(() => {
+    if (!aliveRef.current) return
+    aliveRef.current = false
+    unregisterCollisionTarget(id)
+    if (meshRef.current) hitBystander(id, type, meshRef.current.position)
+    setAlive(false)
+  }, [id, type])
+
   // Register with CollisionManager
   const deadPos = useRef(new THREE.Vector3(0, -9999, 0)).current
   useEffect(() => {
@@ -137,10 +150,11 @@ export default function EnemyBase({
       id,
       getPosition,
       radiusSq: radius * radius,
-      onHit: kill,
+      onHit: bystander ? spare : kill,
+      ...(bystander ? { kind: 'bystander' as const } : {}),
     })
     return () => unregisterCollisionTarget(id)
-  }, [id, radius, kill, entered])
+  }, [id, radius, kill, spare, bystander, entered])
 
   // Unregister when dead
   useEffect(() => {

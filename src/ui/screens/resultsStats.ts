@@ -10,6 +10,12 @@ export function formatAccuracy(hits: number, shotsFired: number): string {
   return pct === null ? '—' : `${pct}%`
 }
 
+/** The results row for a level with bystanders (#518): how many of them were spared; null without any. */
+export function bystanderRow(noun: string, total: number, hit: number): [string, string] | null {
+  if (!(total > 0)) return null
+  return [`${noun[0].toUpperCase()}${noun.slice(1)} spared`, `${Math.max(0, total - hit)} / ${total}`]
+}
+
 export function formatTimeLeft(seconds: number): string {
   return `${Math.max(0, Math.ceil(seconds - 1e-6))}s`
 }

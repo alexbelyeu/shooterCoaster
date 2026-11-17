@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  PICKUP_ASSIST_WEIGHT, TOUCH_ASSIST_RADIUS_PX, TOUCH_HIT_SCALE, assistRadiusPx, hitScaleFor, pickAssistTarget,
+  PICKUP_ASSIST_WEIGHT, TOUCH_ASSIST_RADIUS_PX, TOUCH_HIT_SCALE, assistRadiusPx, assistWeight, hitScaleFor, pickAssistTarget,
 } from './aimAssist'
 
 describe('aim assist', () => {
@@ -41,5 +41,16 @@ describe('aim assist', () => {
     expect(hitScaleFor('mouse')).toBe(1)
     expect(TOUCH_HIT_SCALE).toBeGreaterThan(1)
     expect(TOUCH_HIT_SCALE).toBeLessThan(1.5)
+  })
+})
+
+describe('aim assist and bystanders (#518)', () => {
+  it('never pulls toward a bystander, even the nearest', () => {
+    expect(assistWeight('bystander')).toBe(0)
+    expect(assistWeight('pickup')).toBe(PICKUP_ASSIST_WEIGHT)
+    expect(assistWeight(undefined)).toBe(1)
+    const weights = [assistWeight('bystander'), assistWeight(undefined)]
+    expect(pickAssistTarget(100, 100, [100, 130], [100, 100], 2, 44, weights)).toBe(1)
+    expect(pickAssistTarget(100, 100, [100], [100], 1, 44, [0])).toBe(-1)
   })
 })

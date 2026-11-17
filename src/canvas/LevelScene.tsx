@@ -25,31 +25,38 @@ import EnemySpawner from '@/entities/spawning/EnemySpawner'
 import { goldenBalloonCount } from '@/levels/scoring'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { eventBus } from '@/core/EventBus'
+import { BYSTANDER_HIT_EVENT, bystanderWarning, type BystanderHitEvent } from '@/combat/bystanders'
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
 import LevelAudio from './LevelAudio'
 
-/** Projects 'enemy:killed' 3D events to screen coords for HTML score popups */
+/** Projects 'enemy:killed' and bystander-hit 3D events to screen coords for HTML score popups */
 function KillProjector() {
   const { camera, size } = useThree()
   const vec = useMemo(() => new THREE.Vector3(), [])
 
   useEffect(() => {
-    const handler = (data: unknown) => {
-      const d = data as { position: THREE.Vector3; multiplier: number; score: number }
-      vec.copy(d.position).project(camera)
+    const emitAt = (position: { x: number; y: number; z: number }, popup: { multiplier: number; score: number; label?: string }) => {
+      vec.set(position.x, position.y, position.z).project(camera)
       const screenX = ((vec.x + 1) / 2) * size.width
       const screenY = ((-vec.y + 1) / 2) * size.height
-      eventBus.emit('enemy:killed:screen', {
-        screenX,
-        screenY,
-        multiplier: d.multiplier,
-        score: d.score,
-      })
+      eventBus.emit('enemy:killed:screen', { screenX, screenY, ...popup })
     }
-    eventBus.on('enemy:killed', handler)
-    return () => eventBus.off('enemy:killed', handler)
+    const onKilled = (data: unknown) => {
+      const d = data as { position: THREE.Vector3; multiplier: number; score: number }
+      emitAt(d.position, { multiplier: d.multiplier, score: d.score })
+    }
+    const onBystander = (data: unknown) => {
+      const d = data as BystanderHitEvent
+      emitAt(d.position, { multiplier: 1, score: -d.penalty, label: bystanderWarning(d.type) })
+    }
+    eventBus.on('enemy:killed', onKilled)
+    eventBus.on(BYSTANDER_HIT_EVENT, onBystander)
+    return () => {
+      eventBus.off('enemy:killed', onKilled)
+      eventBus.off(BYSTANDER_HIT_EVENT, onBystander)
+    }
   }, [camera, size, vec])
 
   return null

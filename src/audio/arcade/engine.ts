@@ -331,6 +331,7 @@ export const arcadeSfx: SfxEngine = {
     else playKill('kill.crunch', combo, at)
   },
   comboBreak: () => void play('comboBreak'),
+  penalty: (at) => void play('penalty', 0, 0, 1, 0, at),
   frenzy: () => playOnBeat('frenzy'),
   frenzyLift: setLift,
   waveIncoming: () => playOnBeat('waveTell'),

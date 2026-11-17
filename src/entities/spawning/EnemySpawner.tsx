@@ -19,14 +19,14 @@ import { requestSlowMo } from '@/combat/slowMo.hot'
 import type { EnemyEntry } from '../enemies/EnemyBase'
 import { HOP } from '../enemies/hopGlideMotion'
 import {
-  ENTRY_SECONDS, ENTRY_STAGGER, clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallSwarm, trackPoint,
+  ENTRY_SECONDS, ENTRY_STAGGER, clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, trackPoint,
   tracksideSlots,
   type FormationMotion, type FormationSlot, type PlacementBounds, type RideAhead, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
 import {
-  ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
+  ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, bystanderSlots, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
 } from './enemyPlacement'
-import { newWaveProgress, nextWaveDue, tickWaves, waveWindows } from './waveSchedule'
+import { enemyCounts, newWaveProgress, nextWaveDue, tickWaves, waveWindows } from './waveSchedule'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -54,11 +54,13 @@ interface SpawnedEnemy {
   slot: FormationSlot | null
   trackside: TracksideSlot | null
   wall?: WallSlot
-  /** A swarm member: its wall is picked when the wave activates. */
+  /** A swarm member or a bystander: its wall is picked when the wave activates. */
   swarm?: SwarmSlot
   scoreValue: number
   radius: number
   waveIndex: number
+  /** Comes with its wave, never a target (#518): out of the counts and the wave's placement. */
+  bystander?: boolean
 }
 
 interface Placed {
@@ -107,6 +109,17 @@ function generateEnemies(
     const wave = waves[waveIdx]
     const base = { type: wave.type, scoreValue: SCORE_VALUES[wave.type], radius: RADII[wave.type], waveIndex: waveIdx }
     const { surface, scatter } = ENEMY_PLACEMENT[wave.type]
+    if (wave.bystanders) {
+      const { type, count } = wave.bystanders
+      if (ENEMY_PLACEMENT[type].scatter !== 'wall') throw new Error(`bystander ${type} must climb a wall`)
+      if (walls.length === 0) throw new Error("bystanders climb the level's walls (LevelConfig.walls)")
+      // Their wall is picked when the wave activates, like a swarm's.
+      for (const swarm of bystanderSlots(count, rng)) {
+        enemies.push({
+          id: `bystander-${id++}`, type, position: null, slot: null, trackside: null, swarm, scoreValue: 0, radius: RADII[type], waveIndex: waveIdx, bystander: true,
+        })
+      }
+    }
     if (scatter === 'wall') {
       if (wave.formation && wave.formation !== 'scatter') throw new Error(`${wave.type} climbs a wall: no formation`)
       for (const wall of wallSlots(wave.count, walls, rng)) {
@@ -208,11 +221,8 @@ export default function EnemySpawner({
     }))
   }, [trackTable, rideSpeeds, timerSeconds, waveDelays, boss?.at, trackScale])
 
-  const placeWave = useCallback(
-    (waveIdx: number, riderIndex: number, camera: Vec3): [string, Placed][] => {
-      const wave = waves[waveIdx]
-      const ride = rideAhead[waveIdx]
-      const members = enemies.filter((e) => e.waveIndex === waveIdx)
+  const placeMembers = useCallback(
+    (wave: EnemyWave, ride: RideAhead, members: SpawnedEnemy[], riderIndex: number, camera: Vec3): [string, Placed][] => {
       if (members[0]?.trackside) {
         const placed = placeTracksideWave({
           table: trackTable, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds,
@@ -248,7 +258,25 @@ export default function EnemySpawner({
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [waves, enemies, trackTable, groundFn, rideAhead, bounds, walls],
+    [trackTable, groundFn, bounds, walls],
+  )
+
+  const placeWave = useCallback(
+    (waveIdx: number, riderIndex: number, camera: Vec3): [string, Placed][] => {
+      const wave = waves[waveIdx]
+      const ride = rideAhead[waveIdx]
+      const inWave = enemies.filter((e) => e.waveIndex === waveIdx)
+      const members = inWave.filter((e) => !e.bystander)
+      const bystanders = inWave.filter((e) => e.bystander)
+      const onWalls = bystanders.length === 0 ? [] : placeWallClimbers({
+        table: trackTable, riderIndex, type: wave.bystanders!.type, walls, slots: bystanders.map((e) => e.swarm!), ride,
+      })
+      const placedBystanders = onWalls.map((wall, i): [string, Placed] => [
+        bystanders[i].id, { position: toVector3(wallPoint(wall.wall, wall.u, wall.v, WALL_STANDOFF, { x: 0, y: 0, z: 0 })), wall },
+      ])
+      return [...placeMembers(wave, ride, members, riderIndex, camera), ...placedBystanders]
+    },
+    [waves, enemies, rideAhead, placeMembers, trackTable, walls],
   )
 
   const initialActiveWave = useMemo(
@@ -281,6 +309,8 @@ export default function EnemySpawner({
   /** Level time of the last wave tick, for the e2e probe. */
   const lastWaveTick = useRef<number | null>(null)
   const goneEnemies = useRef(new Set<string>())
+  const escapedEnemies = useRef(new Set<string>())
+  const totalEnemyCount = useMemo(() => enemies.filter((e) => !e.bystander).length, [enemies])
 
   const [generation, setGeneration] = useState(0)
   const runRef = useRef(runId)
@@ -296,9 +326,10 @@ export default function EnemySpawner({
     waveProgress.current = newWaveProgress(waves.length)
     lastWaveTick.current = null
     goneEnemies.current.clear()
-    useGameStore.getState().setEnemyCounts(enemies.length, enemies.length)
+    escapedEnemies.current.clear()
+    useGameStore.getState().setEnemyCounts(totalEnemyCount, totalEnemyCount)
     setGeneration((g) => g + 1)
-  }, [runId, initialActiveWave, waves, enemies.length])
+  }, [runId, initialActiveWave, waves, totalEnemyCount])
 
   // Also after a resume, when the run was paused during its countdown.
   useEffect(() => {
@@ -307,7 +338,6 @@ export default function EnemySpawner({
     setWaveAnnouncement(waves[0]?.waveLabel ?? null)
   }, [phase, runId, waves])
 
-  const totalEnemyCount = enemies.length
 
   const setEnemyCounts = useGameStore((s) => s.setEnemyCounts)
   useEffect(() => {
@@ -360,28 +390,35 @@ export default function EnemySpawner({
 
   useEffect(() => {
     const gone = goneEnemies.current
-    return () => gone.clear()
+    const escaped = escapedEnemies.current
+    return () => {
+      gone.clear()
+      escaped.clear()
+    }
   }, [])
+
+  const publishCounts = useCallback(() => {
+    const { remaining, total } = enemyCounts(totalEnemyCount, goneEnemies.current.size, escapedEnemies.current.size)
+    useGameStore.getState().setEnemyCounts(remaining, total)
+    return remaining
+  }, [totalEnemyCount])
 
   const onKill = useCallback(
     (id: string) => {
       goneEnemies.current.add(id)
-
-      const remaining = totalEnemyCount - goneEnemies.current.size
-      useGameStore.getState().setEnemyCounts(Math.max(0, remaining), totalEnemyCount)
-
-      if (goneEnemies.current.size >= totalEnemyCount) requestSlowMo('lastKill')
+      if (publishCounts() === 0) requestSlowMo('lastKill')
     },
-    [totalEnemyCount],
+    [publishCounts],
   )
 
-  // Gone without a kill (a climber topped out): off the count, no last-kill slow-mo.
+  // Gone without a kill (a climber topped out): off the total, so never a kill (#480); no last-kill slow-mo. A bystander
+  // is in no count.
   const onEscape = useCallback(
     (id: string) => {
-      goneEnemies.current.add(id)
-      useGameStore.getState().setEnemyCounts(Math.max(0, totalEnemyCount - goneEnemies.current.size), totalEnemyCount)
+      escapedEnemies.current.add(id)
+      publishCounts()
     },
-    [totalEnemyCount],
+    [publishCounts],
   )
 
   useEffect(() => {
@@ -409,7 +446,8 @@ export default function EnemySpawner({
             radius={enemy.radius}
             onKill={onKill}
             wall={placed.wall ?? enemy.wall}
-            onEscape={onEscape}
+            onEscape={enemy.bystander ? undefined : onEscape}
+            bystander={enemy.bystander}
           />
         )
       })}
