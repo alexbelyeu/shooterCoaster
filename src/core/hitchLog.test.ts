@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest'
 import {
   HITCH_MS,
   MAX_ENTRIES,
+  callerLabel,
   createHitchLog,
   formatHitchReport,
   hitchSummary,
+  noteCallback,
   noteEvent,
   noteMilestone,
+  noteTabShown,
   noteWarmup,
+  playingSplitLine,
+  programsAfterWarmup,
   recordFrame,
   type FrameSample,
 } from './hitchLog'
@@ -22,6 +27,9 @@ const sample = (over: Partial<FrameSample> = {}): FrameSample => ({
   textures: 10,
   drawCalls: 120,
   heap: null,
+  rafMs: 4,
+  renderMs: 2,
+  timerMs: 0,
   ...over,
 })
 
@@ -96,7 +104,9 @@ describe('hitch log', () => {
     noteWarmup(log, 40)
     recordFrame(log, sample({ heap: 1_000_000 }))
     noteEvent(log, 'boss:spawn')
-    recordFrame(log, sample({ t: 41_234.6, frameMs: 312.4, programs: 42, heap: 1_102_400 }))
+    recordFrame(log, sample({ t: 41_234.6, frameMs: 312.4, programs: 42, heap: 1_102_400, rafMs: 40, renderMs: 25, timerMs: 12 }))
+    noteCallback(log, 'tick player-x.js:1:582', 1000, 2)
+    noteCallback(log, 'tick player-x.js:1:582', 1250, 6)
     recordFrame(log, sample({ t: 41_300, drawCalls: 0, programs: 42 }))
     const text = formatHitchReport(log, {
       userAgent: 'UA',
@@ -109,7 +119,11 @@ describe('hitch log', () => {
     expect(text).toContain('quality: low | dpr: 2')
     expect(text).toContain('      900 titleFrame')
     expect(text).toContain('   5000 phase countdown level1')
-    expect(text).toContain('  41235 ms |   312 ms frame | playing/level1 | programs +2 | heap +100 KB | events: boss:spawn')
+    expect(text).toContain(
+      '  41235 ms |   312 ms frame | playing/level1 | programs +2 | heap +100 KB | rAF 40 (render 25) / timers 12 / outside 260 ms | events: boss:spawn',
+    )
+    expect(text).toContain('  1 hitches while playing, 0.3 s: in animation frames 13% (render 8%), timers 4%, outside 83%')
+    expect(text).toContain('  tick player-x.js:1:582 | every ~250 ms | calls 2 | total 8 ms | max 6.0 ms')
     expect(text).toContain('BLANK (0 draw calls)')
     expect(hitchSummary(log)).toBe('hitches 1 | worst 312 ms | programs after warm-up 2 | blank frames 1')
   })
@@ -123,5 +137,59 @@ describe('hitch log with a reused sample', () => {
     s.programs = 12
     s.frameMs = 200
     expect(recordFrame(log, s)!.programs).toBe(2)
+  })
+})
+
+describe('where a long frame went (#596)', () => {
+  it('splits a hitch into animation frames, timers and the rest, and sums those while playing', () => {
+    const log = createHitchLog()
+    expect(playingSplitLine(log)).toBe('no hitches while playing')
+    const e = recordFrame(log, sample({ frameMs: 300, rafMs: 60, renderMs: 40, timerMs: 30 }))!
+    expect(e.split).toEqual({ raf: 60, render: 40, timers: 30, outside: 210 })
+    recordFrame(log, sample({ frameMs: 100, rafMs: 140, renderMs: 100, timerMs: 0 }))
+    recordFrame(log, sample({ phase: 'countdown', frameMs: 900, rafMs: 0, timerMs: 0 }))
+    expect(log.playingHitches).toEqual({ frames: 2, ms: 400, raf: 200, render: 140, timers: 30, outside: 210 })
+  })
+
+  it('times each callback source with its period', () => {
+    const log = createHitchLog()
+    for (let i = 0; i < 5; i++) noteCallback(log, 'a', 100 + i * 25, i)
+    expect(log.callbacks.get('a')).toEqual({ calls: 5, ms: 10, maxMs: 4, firstT: 100, lastT: 200 })
+  })
+
+  it('names a callback by the first stack frame outside the recorder, in Chrome and Safari', () => {
+    const chrome = [
+      'Error',
+      '    at labelOf (http://x/assets/perfRecorder-a1.js:2:100)',
+      '    at window.setInterval (http://x/assets/perfRecorder-a1.js:2:300)',
+      '    at Y (http://x/assets/player-DP6q30eL.js:1:582)',
+    ].join('\n')
+    expect(callerLabel(chrome, 'perfRecorder-a1.js')).toBe('Y player-DP6q30eL.js:1:582')
+    expect(callerLabel('Error\n    at http://x/assets/index-1.js:9:20', 'perfRecorder-a1.js')).toBe('anon index-1.js:9:20')
+    const safari = ['labelOf@http://x/assets/perfRecorder-a1.js:2:100', '@http://x/assets/index-1.js:372:19411'].join('\n')
+    expect(callerLabel(safari, 'perfRecorder-a1.js')).toBe('anon index-1.js:372:19411')
+    expect(callerLabel(undefined, 'perfRecorder-a1.js')).toBe('unknown')
+  })
+})
+
+describe('tab switches (#541)', () => {
+  it('does not count the frame that spans a hidden tab', () => {
+    const log = createHitchLog()
+    recordFrame(log, sample())
+    noteTabShown(log)
+    expect(recordFrame(log, sample({ frameMs: 9000 }))).toBeNull()
+    expect(log.hitches).toBe(0)
+    expect(log.worst).toBeNull()
+    expect(recordFrame(log, sample({ frameMs: 120 }))).not.toBeNull()
+    expect(log.frames).toBe(3)
+  })
+})
+
+describe('programsAfterWarmup', () => {
+  it('counts only programs above both the previous count and the warm-up, and none before a warm-up', () => {
+    expect(programsAfterWarmup(50, 40, null)).toBe(0)
+    expect(programsAfterWarmup(36, 34, 34)).toBe(2)
+    expect(programsAfterWarmup(34, 30, 34)).toBe(0)
+    expect(programsAfterWarmup(30, 34, 34)).toBe(0)
   })
 })

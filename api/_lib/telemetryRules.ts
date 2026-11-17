@@ -118,8 +118,8 @@ export interface FrameSummary {
   worstP95Ms: number
   /** The longest frame any session reported (#536); null when none reported one. */
   worstMaxMs: number | null
-  /** Frames of 100 ms or more, summed over sessions. */
-  longFrames: number
+  /** Frames of 100 ms or more, summed over sessions; null when none reported a count (rows from before #536). */
+  longFrames: number | null
 }
 
 export interface TelemetrySummary {
@@ -156,7 +156,7 @@ export function summarize(rows: ReportRow[], now: number, truncated = false): Te
   const errors = new Map<string, ErrorSummary>()
   const frames = new Map<
     string,
-    { level: string; device: DeviceClass; p50: number[]; p95: number[]; frames: number; worstMaxMs: number | null; longFrames: number }
+    { level: string; device: DeviceClass; p50: number[]; p95: number[]; frames: number; worstMaxMs: number | null; longFrames: number | null }
   >()
   const lostGpus = new Map<string, number>()
   let lostSessions = 0
@@ -186,14 +186,14 @@ export function summarize(rows: ReportRow[], now: number, truncated = false): Te
       const k = `${l.level}|${device}`
       let f = frames.get(k)
       if (!f) {
-        f = { level: l.level, device, p50: [], p95: [], frames: 0, worstMaxMs: null, longFrames: 0 }
+        f = { level: l.level, device, p50: [], p95: [], frames: 0, worstMaxMs: null, longFrames: null }
         frames.set(k, f)
       }
       f.p50.push(l.p50Ms)
       f.p95.push(l.p95Ms)
       f.frames += l.frames
       if (typeof l.maxMs === 'number') f.worstMaxMs = Math.max(f.worstMaxMs ?? 0, l.maxMs)
-      if (typeof l.longFrames === 'number') f.longFrames += l.longFrames
+      if (typeof l.longFrames === 'number') f.longFrames = (f.longFrames ?? 0) + l.longFrames
     }
   }
   return {

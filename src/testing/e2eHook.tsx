@@ -65,6 +65,8 @@ import type { LivePickup } from '@/combat/pickups/Pickups'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
 import { MAX_BANK_DEG, MAX_PITCH_DEG } from '@/track/cameraRig.hot'
 import { DROP_FOV_DEG, SPEED_FOV_DEG } from '@/track/cameraFov.hot'
+import { programsAfterWarmup } from '@/core/hitchLog'
+import { LONG_FRAME_MS } from '@/telemetry/telemetryReport'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -90,10 +92,10 @@ export interface SCTestApi {
   frames: number
   /** Rolling average frame time in ms (last ~120 frames). */
   avgFrameMs: number
-  /** Longest frame in ms since a test last set this to 0 (first-shot hitch check). */
+  /** Longest frame in ms since a test last set this to 0 (first-shot hitch check, the throttled ride). */
   maxFrameMs: number
-  /** Longest frame and frames over `LONG_FRAME_MS` since a test last reset it (the throttled ride, #536). */
-  longFrames: { maxMs: number; count: number }
+  /** Frames of telemetry's `LONG_FRAME_MS` (100) or more since a test last set this to 0 (the throttled ride, #536). */
+  longFrames: number
   /** Shader programs the renderer has compiled so far (a rise mid-play is a compile hitch). */
   programs: () => number
   /**
@@ -455,9 +457,6 @@ export function recordE2ESpawns(positions: readonly { x: number; y: number; z: n
   spawnDigest = `${positions.length}:${hashString(text).toString(16)}`
 }
 
-/** A frame this long is a visible freeze, not a slow frame (`longFrames`). */
-const LONG_FRAME_MS = 100
-
 /** One frame that compiled shader programs after its level's warm-up (#536). */
 export interface ProgramGrowth {
   /** Level timer seconds (the last playing frame's). */
@@ -475,12 +474,12 @@ let lastPrograms = 0
 
 function noteProgramGrowth(api: SCTestApi, programs: number) {
   const warmup = api.shaderWarmup
-  const from = Math.max(lastPrograms, warmup?.programs ?? 0)
-  if (warmup?.done && programs > from) {
+  const added = programsAfterWarmup(programs, lastPrograms, warmup?.done ? warmup.programs : null)
+  if (added > 0) {
     api.programGrowth.push({
       levelTime: e2eLevelTime,
       phase: useGameStore.getState().phase,
-      added: programs - from,
+      added,
       total: programs,
       events: [...frameEvents],
     })
@@ -710,7 +709,7 @@ function bossHit(n: number): number {
   for (let i = 0; i < n; i++) {
     let best: CollisionTarget | null = null
     let bestD = Infinity
-    for (const t of getCollisionTargets().values()) {
+    for (const t of getCollisionTargets()) {
       if (!isBossTarget(t)) continue
       const d = probeCamera ? t.getPosition().distanceToSquared(probeCamera.position) : 0
       if (d < bestD) {
@@ -729,7 +728,7 @@ function bossHit(n: number): number {
 export const BOSS_PROJECTILE_PREFIX = 'boss-projectile:'
 
 function projectileHit(): number {
-  const live = [...getCollisionTargets().values()].filter((t) => t.id.startsWith(BOSS_PROJECTILE_PREFIX))
+  const live = [...getCollisionTargets()].filter((t) => t.id.startsWith(BOSS_PROJECTILE_PREFIX))
   for (const t of live) processHit(t)
   return live.length
 }
@@ -788,7 +787,7 @@ function onScreenNDC(t: CollisionTarget, camera: THREE.Camera, out: THREE.Vector
 function liveTargetsByDistance(camera: THREE.Camera | null) {
   const list: { t: CollisionTarget; d: number; visible: boolean }[] = []
   const ndc = new THREE.Vector3()
-  for (const t of getCollisionTargets().values()) {
+  for (const t of getCollisionTargets()) {
     if (!isLive(t) || isBossTarget(t)) continue
     const d = camera ? t.getPosition().distanceToSquared(camera.position) : 0
     const visible = camera ? onScreenNDC(t, camera, ndc) : false
@@ -806,7 +805,7 @@ function autoFireTick(camera: THREE.Camera) {
   if (useGameStore.getState().phase !== 'playing') return
   let best: CollisionTarget | null = null
   let bestD = Infinity
-  for (const t of getCollisionTargets().values()) {
+  for (const t of getCollisionTargets()) {
     if (!isLive(t) || !onScreenNDC(t, camera, _aim)) continue
     const d = t.getPosition().distanceToSquared(camera.position)
     if (d < bestD) {
@@ -826,7 +825,7 @@ export function installE2EApi() {
     frames: 0,
     avgFrameMs: 0,
     maxFrameMs: 0,
-    longFrames: { maxMs: 0, count: 0 },
+    longFrames: 0,
     programs: () => probeGl?.info.programs?.length ?? 0,
     gpuMemory: () => ({ textures: probeGl?.info.memory.textures ?? 0, geometries: probeGl?.info.memory.geometries ?? 0 }),
     cameraPose: readCameraPose,
@@ -913,7 +912,7 @@ export function installE2EApi() {
       const s = useGameStore.getState()
       let liveEnemies = 0
       let onScreenEnemies = 0
-      for (const t of getCollisionTargets().values()) {
+      for (const t of getCollisionTargets()) {
         if (!isLive(t)) continue
         liveEnemies++
         if (probeCamera && onScreenNDC(t, probeCamera, _aim)) onScreenEnemies++
@@ -1179,8 +1178,7 @@ export function E2EFrameProbe() {
     const ms = delta * 1000
     api.avgFrameMs = api.avgFrameMs === 0 ? ms : api.avgFrameMs + (ms - api.avgFrameMs) / 120
     if (ms > api.maxFrameMs) api.maxFrameMs = ms
-    if (ms > api.longFrames.maxMs) api.longFrames.maxMs = ms
-    if (ms > LONG_FRAME_MS) api.longFrames.count++
+    if (ms >= LONG_FRAME_MS) api.longFrames++
     api.drawCalls = gl.info.render.calls
     api.triangles = gl.info.render.triangles
     gl.info.reset()

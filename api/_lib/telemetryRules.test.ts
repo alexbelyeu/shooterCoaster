@@ -117,9 +117,9 @@ describe('summarize', () => {
       now,
     )
     expect(s.frames).toEqual([
-      { level: 'level1', device: 'desktop', sessions: 1, frames: 100, p50Ms: 16, p95Ms: 17, worstP95Ms: 17, worstMaxMs: null, longFrames: 0 },
+      { level: 'level1', device: 'desktop', sessions: 1, frames: 100, p50Ms: 16, p95Ms: 17, worstP95Ms: 17, worstMaxMs: null, longFrames: null },
       { level: 'level1', device: 'touch', sessions: 3, frames: 300, p50Ms: 16, p95Ms: 30, worstP95Ms: 90, worstMaxMs: 310, longFrames: 3 },
-      { level: 'level2', device: 'touch', sessions: 1, frames: 100, p50Ms: 16, p95Ms: 18, worstP95Ms: 18, worstMaxMs: null, longFrames: 0 },
+      { level: 'level2', device: 'touch', sessions: 1, frames: 100, p50Ms: 16, p95Ms: 18, worstP95Ms: 18, worstMaxMs: null, longFrames: null },
     ])
   })
 
