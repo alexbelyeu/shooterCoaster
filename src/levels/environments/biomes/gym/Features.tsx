@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { useContactShadows } from '../../shared/ContactShadows'
 import StaticInstances from '../../shared/StaticInstances'
 import FlameFire from './FlameFire'
+import { withHallGrime, withHoldChalk } from './grimeShader'
 import { buildHall } from './hallGeometry'
 import { gymShadowCasters } from './shadows'
 
@@ -15,10 +16,10 @@ export default function GymFeatures() {
   useContactShadows(useMemo(() => gymShadowCasters(), []))
   const materials = useMemo(
     () => ({
-      solid: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true }),
+      solid: withHallGrime(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true })),
       light: new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(LIGHT_BOOST, LIGHT_BOOST, LIGHT_BOOST), toneMapped: false }),
       glass: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.3, depthWrite: false }),
-      hold: new THREE.MeshStandardMaterial({ roughness: 0.6, flatShading: true }),
+      hold: withHoldChalk(new THREE.MeshStandardMaterial({ roughness: 0.75, flatShading: true })),
     }),
     [],
   )

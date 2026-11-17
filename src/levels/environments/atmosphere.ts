@@ -253,13 +253,14 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     },
   },
   // Climbing Gym (#517), an interior: the dome is never seen (the hall's ceiling covers it) but bakes the walls'
-  // reflections; the "sun" is the skylights straight above, the hemisphere the bounce off the pale walls. Fog is the
-  // hall's chalky air, so the far wall settles back without vanishing.
+  // reflections. Bushwick-dim since #593: the "sun" is cool daylight slanting in from the high windows, the hemisphere
+  // a dim cool-over-warm-dark fill, and the strip lights' warm pools come from the grime shader; fog is the hall's
+  // dusty brown-grey air, so the far wall settles back without vanishing.
   gym: {
     sky: {
-      zenith: 0xdfe9f2,
-      horizon: 0xc9d1d9,
-      ground: 0x9aa2aa,
+      zenith: 0x4a4d52,
+      horizon: 0x4a4844,
+      ground: 0x2a2826,
       horizonFalloff: 0.6,
       sunColor: 0xffffff,
       sunSize: 0,
@@ -270,27 +271,29 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
       cloudStretch: 1,
     },
     sunDirection: [0.3, 1, 0.45],
-    sunLightColor: 0xfff1dc,
-    sunLightIntensity: 1.6,
-    hemiSkyColor: 0xe4eefa,
-    hemiGroundColor: 0x8a8f96,
-    hemiIntensity: 1.35,
-    // The hall's haze at its size (GYM_SCALE 32, #592): twice the first hall's 900 / 6500.
-    fogNear: 1800,
-    fogFar: 13000,
-    envIntensity: 0.45,
-    // Bright and clean: neutral-cool shadows, warm skylight highlights, holds kept vivid
+    // Low and moody (#593): cool daylight slanting in from the high windows, a dim warm-floored fill; the
+    // strip-light fixtures' warm pools come from the hall's grime shader (`biomes/gym/grimeShader.ts`).
+    sunLightColor: 0xbcd2ee,
+    sunLightIntensity: 0.9,
+    hemiSkyColor: 0x8d9aac,
+    hemiGroundColor: 0x4a3e33,
+    hemiIntensity: 0.8,
+    // The hall's haze at its size (GYM_SCALE 32, #592): a dusty brown-grey that swallows the far end a little.
+    fogNear: 1400,
+    fogFar: 11000,
+    envIntensity: 0.2,
+    // Gritty: teal shadows, sodium-warm highlights, more contrast, a heavy vignette; holds still vivid
     grade: {
-      exposure: 1.05,
-      temperature: 0.03,
+      exposure: 1.0,
+      temperature: 0.05,
       tint: 0,
-      shadowTint: 0x5a7aa8,
-      highlightTint: 0xffe2b8,
-      splitTone: 0.15,
-      contrast: 1.08,
-      saturation: 1.1,
-      vibrance: 0.3,
-      vignette: 0.25,
+      shadowTint: 0x2f5560,
+      highlightTint: 0xffc890,
+      splitTone: 0.3,
+      contrast: 1.15,
+      saturation: 1.0,
+      vibrance: 0.35,
+      vignette: 0.5,
     },
   },
 }
