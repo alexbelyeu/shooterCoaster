@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import { changedOnly } from './changedOnlyStorage'
 import type { GamePhase, ScoreEntry, ComboState, BossHud } from '@/types/game'
 import {
   DEFAULT_INITIALS,
@@ -268,6 +269,7 @@ export const useGameStore = create<GameState>()(
     }),
     {
       name: 'shootercoaster-scores',
+      storage: changedOnly(createJSONStorage(() => window.localStorage)),
       partialize: (state) => ({
         savedScores: state.savedScores,
         leaderboards: state.leaderboards,
