@@ -11,6 +11,7 @@ voice mar    marimba   vol=0.36 pan=0.35
 voice bass   fmbass    vol=0.64 gate=0.8
 voice clave  clave     vol=0.34 pan=-0.4
 voice wash   surf      vol=0.3  pan=0.2
+voice hit    orchhit   vol=0.36 pan=0.1
 voice kick   kick      vol=0.85 layer=drums
 voice rim    rim       vol=0.42 pan=0.1 layer=drums
 voice shake  shaker    vol=0.36 pan=-0.35 layer=drums
@@ -58,3 +59,43 @@ timb  | ........ | % | % | x.x.xxXX |
 
 play intro
 loop A A2 B B2 A A2 A+2 A2+2
+
+# Boss section (#598): the Kraken. The steel-drum hook sinks into G minor over E-flat and F, orchestra hits on the
+# downbeats and a tighter kick; the sting surfaces in G major and the loop comes back.
+pattern X
+steel | G5- Bb5- D6- Bb5- | Eb6- D6- Bb5- G5- | F5- A5- C6- A5 F5 | F#5--- D5--- |
+mar   | G4 Bb4 D5 Bb4 G4 Bb4 D5 Bb4 | Eb5 G5 Bb5 G5 Eb5 G5 Bb5 G5 | F4 A4 C5 A4 F4 A4 C5 A4 | D5 F#5 A5 F#5 D5 F#5 A5 F#5 |
+bass  | G2-- G2-- D2- | Eb2-- Eb2-- Bb2- | F2-- F2-- C3- | D2-- D2-- A2- |
+clave | x..x..x. | ..x.x... | x..x..x. | ..x.x... |
+wash  | x....... | _ | _ | _ |
+hit   | [Gm]!- .- .- .- | [Eb]!- .- .- .- | [F]!- .- .- .- | [D]!- .- [D]!- [D]!- |
+kick  | x...x.x. | % | % | x.x.x.xx |
+rim   | ..x...x. | % | % | % |
+shake | xoxoxoxo | % | % | % |
+timb  | ........ | % | % | x.x.xxXX |
+crash | X....... | _ | _ | _ |
+horns | [Gm]-- [Gm]-- [Gm]- | [Eb]-- [Eb]-- [Eb]- | [F]-- [F]-- [F]- | [D]-- [D]-- [D]- |
+hat   | xxxxxxxx | % | % | % |
+
+pattern Y from X
+steel | D6- C6 Bb5 A5- G5- | Bb5- G5 Eb5 G5- Bb5- | C6- A5 F5 A5- C6- | D6--- C6- A5- |
+mar   | G4 Bb4 D5 Bb4 G4 Bb4 D5 Bb4 | Eb5 G5 Bb5 G5 Eb5 G5 Bb5 G5 | F4 A4 C5 A4 F4 A4 C5 A4 | D5 F#5 A5 C6 D5 F#5 A5 C6 |
+bass  | G2-- G2-- D2- | Eb2-- Eb2-- Bb2- | F2-- F2-- C3- | D2-- D2-- F#2- |
+hit   | [Gm]!- .- .- .- | [Eb]!- .- .- .- | [F]!- .- .- .- | [D7]!- .- [D7]!- [D7]!- |
+wash  | _ | _ | _ | _ |
+crash | _ | _ | _ | _ |
+horns | [Gm]-- [Gm]-- [Gm]- | [Eb]-- [Eb]-- [Eb]- | [F]-- [F]-- [F]- | [D7]-- [D7]-- [D7]- |
+
+pattern S
+steel | D5- G5- B5- D6- | G6------- |
+mar   | G4 B4 D5 B4 G4 B4 D5 G5 | G5------- |
+bass  | G2- G2- G2- D2- | G2------- |
+hit   | [G]!- .- [G]!- [C]!- | [G]!------- |
+horns | [G]- [G]- [G]- [C]- | [G]------- |
+wash  | _ | x....... |
+kick  | x.x.x.x. | x....... |
+timb  | x.x.xxXX | x....... |
+crash | X....... | X....... |
+
+boss  X Y
+sting S

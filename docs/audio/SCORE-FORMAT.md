@@ -57,6 +57,7 @@ voiced around the voice's `center`, `x X o .` a drum lane. Every bar must add up
 | Randomness | `Math.random` | the same in play; offline renders seed it (`createRng`), so the original page and the port render the same score near bit-identically (`renders/parity-*`) |
 | Instruments | 38 melodic, 27 drums | the same, plus the arcade palette below (7 melodic, 5 drums) |
 | Intensity layers | — | `layer=base\|drums\|lead\|frenzy` on a voice (untagged = `base`): the level's music follows the combo tier (see below) |
+| Boss section | — | `boss X Y` (a loop, like `loop`) and `sting S` (once, like `play`) on a level score (#598): on `boss:spawn` `LevelAudio` moves the score to the boss loop at its next bar line (`player.ts` `playSection`, the bar line past the scheduler's look-ahead, so nothing of the old section overlaps it), on `boss:defeated` to the sting (every layer, like the intro) and then the loop from its top; a restart goes back to the loop. The same voices play every section (declare the boss's extra ones, e.g. an `orchhit`, with the others); every level score needs both lines, on the loop's bar length, its boss loop layered like the loop and a 2-bar sting (`scores.test.ts`; `lintRanges` and `lintLayers` cover them). A score without a `boss` line (a theme option) just keeps playing. Hear it: `npm run audio:render -- --mix <level> --boss` (`renders/mix-level{1,4}-boss`) |
 
 Not there yet (a later issue): beat-quantised stingers. It gets a row here when it lands.
 

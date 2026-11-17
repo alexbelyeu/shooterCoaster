@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
-import { compile } from '@/audio/scrim/score'
+import { compile, type CompiledSong, type Timeline } from '@/audio/scrim/score'
 import { lintLayers, lintRanges } from '@/audio/scrim/lint'
 import { SCORE_KEYS } from '@/audio/sfxDesign'
 import { SCORES, themesFromQuery } from './index'
@@ -60,16 +60,35 @@ loop A`)
     })
   }
 
+  /** Every layer the score tags plays in `timeline`, and base in every bar of it. */
+  function expectLayeredThrough(song: CompiledSong, timeline: Timeline) {
+    const bars = timeline.sections.reduce((n, s) => n + s.bars, 0)
+    const barS = timeline.dur / bars
+    const playing = new Set(timeline.events.map((e) => song.voices[e.v].layer ?? 'base'))
+    expect([...playing].sort()).toEqual([...new Set(song.voices.map((v) => v.layer ?? 'base'))].sort())
+    const baseBars = new Set(timeline.events.filter((e) => !song.voices[e.v].layer).map((e) => Math.floor(e.t / barS)))
+    expect(baseBars.size).toBe(bars)
+  }
+
   for (const [id, text] of Object.entries(SCORES)) {
     const song = compile(text)
     if (!song.voices.some((v) => v.layer)) continue
     it(`${id}'s loop has every layer it tags, and base plays all through it (a run opens on base alone)`, () => {
-      const bars = song.loop.sections.reduce((n, s) => n + s.bars, 0)
-      const barS = song.loop.dur / bars
-      const playing = new Set(song.loop.events.map((e) => song.voices[e.v].layer ?? 'base'))
-      expect([...playing].sort()).toEqual([...new Set(song.voices.map((v) => v.layer ?? 'base'))].sort())
-      const baseBars = new Set(song.loop.events.filter((e) => !song.voices[e.v].layer).map((e) => Math.floor(e.t / barS)))
-      expect(baseBars.size).toBe(bars)
+      expectLayeredThrough(song, song.loop)
+    })
+  }
+
+  for (const level of getAllLevels()) {
+    const song = compile(SCORES[level.id])
+    it(`${level.id}'s score has a boss section on the loop's bar grid, layered like the loop, and a 2-bar sting (#598)`, () => {
+      const bar = song.loop.sections[0]
+      expect(song.boss.dur).toBeGreaterThan(0)
+      for (const s of [...song.boss.sections, ...song.sting.sections]) {
+        expect(s.barDur).toBeCloseTo(bar.barDur, 9)
+        expect(s.beats).toBe(bar.beats)
+      }
+      expectLayeredThrough(song, song.boss)
+      expect(song.sting.dur).toBeCloseTo(2 * bar.barDur, 9)
     })
   }
 })

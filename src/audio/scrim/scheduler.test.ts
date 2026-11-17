@@ -62,6 +62,18 @@ describe('ScoreScheduler', () => {
     expect(played[0]).toBeCloseTo(0.525, 9)
   })
 
+  it('endAt: plays everything before a section switch and nothing from it on (#598)', () => {
+    const played: number[] = []
+    const s = new ScoreScheduler(song, (_, t) => played.push(t))
+    s.start(1)
+    for (let now = 0; now < 7; now += 0.025) {
+      if (Math.abs(now - 2) < 0.01) s.endAt(5)
+      s.tick(now)
+    }
+    expect(Math.max(...played)).toBeCloseTo(4.5, 9)
+    expect(played.filter((t) => t >= 1 && t < 5)).toHaveLength(played.length)
+  })
+
   it('stops after the intro when there is no loop', () => {
     const once = compile('voice kick kick\npattern A\nkick | x... .... .... .... |\nplay A')
     const played: number[] = []

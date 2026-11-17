@@ -49,7 +49,7 @@ describe('score parity with the original Scrimshaw compiler', () => {
       expect(port.intro.events.length + port.loop.events.length).toBeGreaterThan(100)
       expectSameTimeline(port.intro, orig.intro)
       expectSameTimeline(port.loop, orig.loop)
-      expect({ ...port, intro: null, loop: null }).toEqual({ ...orig, intro: null, loop: null })
+      expect({ ...port, intro: null, loop: null, boss: undefined, sting: undefined }).toEqual({ ...orig, intro: null, loop: null })
     })
   }
 

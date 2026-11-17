@@ -2,7 +2,7 @@
  * Plays `audio/scores/` in the game: one `musicBus` per score into the stereo `scoreChannel`, so a change is a
  * 1 s crossfade. Built on Scrimshaw Jukebox's player (docs/audio/reference/scrimshaw-jukebox.html),
  * simonw/tools commit 5fc8e8b, Apache-2.0 (docs/audio/reference/LICENSE-scrimshaw-apache-2.0.txt); modified: game
- * integration (crossfades, pause / resume mid-song, intensity layers, dispose) replaces the page's player.
+ * integration (crossfades, pause / resume mid-song, intensity layers, boss sections, dispose) replaces the page's player.
  */
 
 import { audioContext, audioNow as now, isAudioReady } from '../AudioEngine'
@@ -10,13 +10,25 @@ import { fadeOutMusicBus, openMusicBus, type MusicBus } from '../musicBus'
 import { SCORES, scoreIdFor } from '../scores'
 import { compile, type CompiledSong } from './score'
 import { MAX_INTENSITY, layerState, nextLayerStep, recordLayerStep, resumeLayers, type LayerGrid, type LayerState } from './layers'
-import { ScoreScheduler } from './scheduler'
+import { LOOK_AHEAD_S, ScoreScheduler } from './scheduler'
+import { barLineAtOrAfter, sectionSong, type ScoreSection } from './sections'
 import { createCore, createSynth, type Session, type Synth, type SynthCore } from './synth'
 
 const TICK_MS = 25
 /** First note this far after the call. */
 export const SCORE_START_DELAY_S = 0.15
 const PAUSE_FADE_S = 0.05
+/** A section switch lands on the first bar line past the scheduler's look-ahead, so nothing of the old section is already scheduled beyond it. */
+const SWITCH_LEAD_S = LOOK_AHEAD_S + 2 * (TICK_MS / 1000)
+
+/** A section switch waiting for its bar line: `scheduler` plays the new section from audio time `at`. */
+interface PendingSection {
+  section: ScoreSection
+  scheduler: ScoreScheduler
+  at: number
+  /** Asked for while this one was waiting: switched to once it lands. */
+  then: ScoreSection | null
+}
 
 interface Track {
   id: string
@@ -30,6 +42,8 @@ interface Track {
   /** Null for a score without layers. */
   layers: LayerGrid | null
   layerState: LayerState
+  section: ScoreSection
+  next: PendingSection | null
 }
 
 const songs = new Map<string, CompiledSong>()
@@ -61,7 +75,13 @@ function coreFor(ctx: BaseAudioContext): SynthCore {
 export function tickScores(): void {
   const t = now()
   const hidden = typeof document !== 'undefined' && document.hidden
-  for (let i = 0; i < live.length; i++) if (live[i].session) live[i].scheduler.tick(t, hidden)
+  for (let i = 0; i < live.length; i++) {
+    const track = live[i]
+    if (!track.session) continue
+    if (track.next && t >= track.next.at) landSection(track)
+    track.scheduler.tick(t, hidden)
+    track.next?.scheduler.tick(t, hidden)
+  }
 }
 
 function ensureTimer() {
@@ -118,6 +138,8 @@ export function playScore(id: string, from = 0): void {
     stopWarm: synth.warm(song),
     layers: layerGrid(song),
     layerState: layerState(intensity),
+    section: 'main',
+    next: null,
   }
   track.scheduler.start(start, from)
   live.push(track)
@@ -136,11 +158,62 @@ export function handOverScore(...ids: string[]): void {
   if (current && ids.includes(current.id)) fadeOut(current, true)
 }
 
+/** The new section's scheduler takes over; the sting opens on every layer, like the intro, and the loop after it on the game's. */
+function landSection(track: Track): void {
+  const next = track.next
+  if (!next) return
+  track.next = null
+  track.scheduler = next.scheduler
+  track.section = next.section
+  track.layers = layerGrid(next.scheduler.song)
+  track.layerState = layerState(next.section === 'sting' ? MAX_INTENSITY : track.layerState.intensity)
+  if (next.then) playSection(track.id, next.then)
+}
+
+/**
+ * Moves the current track, if it is score `id`, to `section` of its score (`sections.ts`) on its next bar line: `boss`
+ * on the boss's arrival, `sting` on its defeat (then the loop again), `main` back to the loop (a restart). A paused track
+ * switches in place and resumes at the section's top. Nothing for a score without a boss section.
+ */
+export function playSection(id: string, section: ScoreSection): void {
+  const track = current
+  if (!track || track.id !== id) return
+  if (track.next) {
+    track.next.then = track.next.section === section ? null : section
+    return
+  }
+  if (track.section === section) return
+  const song = sectionSong(songFor(id), section)
+  if (!song) return
+  const scheduler = new ScoreScheduler(song, (ev, t) => track.session?.play(ev, t))
+  if (!track.session) {
+    track.next = { section, scheduler, at: 0, then: null }
+    landSection(track)
+    track.pausedAt = 0
+    return
+  }
+  const t = now()
+  const pos = track.scheduler.position(t)
+  const at = t + barLineAtOrAfter(track.scheduler.song, pos + SWITCH_LEAD_S) - pos
+  track.scheduler.endAt(at)
+  scheduler.start(at)
+  track.next = { section, scheduler, at, then: null }
+  if (section === 'sting') track.session.setIntensity(MAX_INTENSITY, at)
+}
+
 /** Holds the current track where it is (a paused run, a hidden tab) and picks it up there again. */
 export function pauseScore(paused: boolean): void {
   const track = current
   if (!track || paused === (track.pausedAt !== null)) return
   if (paused) {
+    // A switch still waiting for its bar line: the new section resumes from its top.
+    if (track.next) {
+      track.session?.stop(PAUSE_FADE_S)
+      track.session = null
+      landSection(track)
+      track.pausedAt = 0
+      return
+    }
     track.pausedAt = Math.max(0, track.scheduler.position(now()))
     track.session?.stop(PAUSE_FADE_S)
     track.session = null
@@ -160,7 +233,8 @@ export function pauseScore(paused: boolean): void {
 export function setIntensity(intensity: number): void {
   targetIntensity = intensity
   const track = current
-  if (!track?.layers || !track.session || track.pausedAt !== null) return
+  // A section switch holds the layers until it lands (the new section counts its beat lines from its own top).
+  if (!track?.layers || !track.session || track.pausedAt !== null || track.next) return
   const t = now()
   const pos = track.scheduler.position(t)
   const s = track.layerState
@@ -206,7 +280,7 @@ export function musicGrid(): MusicGrid | null {
   return grid
 }
 
-/** e2e: the tracks (current last) with the score each plays (`scoreIdFor`), whether it is paused, its song position and layer intensity, and the long-lived nodes. */
+/** e2e: the tracks (current last) with the score each plays (`scoreIdFor`), whether it is paused, its song position, layer intensity and section (and where a pending switch lands), and the long-lived nodes. */
 export function scrimState() {
   const t = now()
   return {
@@ -218,6 +292,9 @@ export function scrimState() {
       position: tr.pausedAt ?? tr.scheduler.position(t),
       layered: tr.layers !== null,
       intensity: tr.layerState.intensity,
+      section: tr.section,
+      // Audio time a pending section switch lands at.
+      switchAt: tr.next?.at ?? null,
     })),
     targetIntensity,
     nodes: live.reduce((n, tr) => n + tr.synth.nodeCount(), 0),

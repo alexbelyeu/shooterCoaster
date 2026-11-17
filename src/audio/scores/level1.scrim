@@ -10,10 +10,12 @@ reverb   0.22
 voice skank  accordion vol=0.35 pan=0.3  center=A4 gate=0.5
 voice tuba   tuba      vol=0.8  oct=1
 voice lead   organ     vol=0.75 pan=-0.1
+voice hit    orchhit   vol=0.38 pan=0.1
 voice kick   kick      vol=0.85          layer=drums
 voice snare  snare     vol=0.55 pan=0.05 layer=drums
 voice hat    hat       vol=0.35 pan=-0.3 layer=drums
 voice crash  crash     vol=0.35 pan=0.2  layer=drums
+voice timp   timpani   vol=0.5  pan=-0.15 layer=drums
 voice xylo   xylophone vol=0.45 pan=0.35 layer=lead
 voice saw    supersaw  vol=0.42          oct=1 layer=frenzy
 voice fhat   hat909    vol=0.42 pan=0.4  layer=frenzy
@@ -44,3 +46,43 @@ saw   | D5- F5- A5- G5 F5 | F5- D5- Bb4--- | A4 C5 F5 A5 C6- A5- | G5 A5 G5 F5 E
 
 play intro
 loop A B
+
+# Boss section (#598): the riff's minor twin, from the boss's arrival to its defeat: F minor, orchestra hits on the
+# downbeats and timpani under the beat; the sting turns back to F major and the loop comes back.
+pattern X
+lead  | F5- Ab5- C6- Ab5 G5 | F5- Db5- Ab4--- | G5- Bb5- Eb6- Db6 C6 | C6--- E5- G5- |
+hit   | [Fm]!- .- .- .- | [Db]!- .- .- .- | [Eb]!- .- .- .- | [C]!- .- [C]!- [C]!- |
+skank | .- [Fm]- .- [Fm]- | .- [Db]- .- [Db]- | .- [Eb]- .- [Eb]- | .- [C]- .- [C7]- |
+tuba  | F2- C2- F2- C2- | Db2- Ab1- Db2- Ab1- | Eb2- Bb1- Eb2- Bb1- | C2- G1- C2- E2- |
+kick  | x.x.x.x. | % | % | x.x.xxXX |
+snare | ..x...x. | % | % | ..x.xxXX |
+hat   | .x.x.x.x | % | % | % |
+timp  | F2--- .--- | Db2--- .--- | Eb2--- .--- | C2- C2- C2 C2 C2 C2 |
+crash | X....... | _ | _ | _ |
+xylo  | F6- Ab6- C7- Ab6 G6 | F6- Db6- Ab5--- | G6- Bb6- Eb7- Db7 C7 | C7--- E6- G6- |
+saw   | F4- Ab4- C5- Ab4 G4 | F4- Db4- Ab3--- | G4- Bb4- Eb5- Db5 C5 | C5--- E4- G4- |
+fhat  | xoxo xoxo | % | % | xoxo xxXX |
+
+pattern Y from X
+lead  | Ab5 G5 F5 C5 F5- Ab5- | Bb5- Db6- C6 Bb5 Ab5 F5 | Ab5 Bb5 C6 Db6 C6- Ab5- | G5 Ab5 G5 F5 E5- C5- |
+hit   | [Fm]!- .- .- .- | [Bbm]!- .- .- .- | [Db]!- .- .- .- | [C7]!- .- [C7]!- [C7]!- |
+skank | .- [Fm]- .- [Fm]- | .- [Bbm]- .- [Bbm]- | .- [Db]- .- [Db]- | .- [C]- .- [C7]- |
+tuba  | F2- C2- F2- C2- | Bb1- F2- Bb1- F2- | Db2- Ab1- Db2- Ab1- | C2- G1- C2- G1- |
+timp  | F2--- .--- | Bb1--- .--- | Db2--- .--- | C2- C2- C2 C2 C2 C2 |
+crash | _ | _ | _ | _ |
+xylo  | Ab6 G6 F6 C6 F6- Ab6- | Bb6- Db7- C7 Bb6 Ab6 F6 | Ab6 Bb6 C7 Db7 C7- Ab6- | G6 Ab6 G6 F6 E6- C6- |
+saw   | Ab4 G4 F4 C4 F4- Ab4- | Bb4- Db5- C5 Bb4 Ab4 F4 | Ab4 Bb4 C5 Db5 C5- Ab4- | G4 Ab4 G4 F4 E4- C4- |
+
+pattern S
+lead  | C6- A5- F5- C6- | F6------- |
+xylo  | C7- A6- F6- C7- | F7------- |
+hit   | [F]!- .- [F]!- [Bb]!- | [F]!------- |
+skank | .- [F]- .- [Bb]- | [F]------- |
+tuba  | F2- F2- F2- Bb1- | F2------- |
+kick  | x.x.x.x. | x....... |
+snare | ..x.XXXX | X....... |
+timp  | F2- F2- F2 F2 F2 F2 | F2------- |
+crash | X....... | X....... |
+
+boss  X Y
+sting S

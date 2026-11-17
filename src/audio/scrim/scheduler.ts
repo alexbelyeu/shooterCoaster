@@ -42,6 +42,8 @@ export class ScoreScheduler {
   /** Song time where the current pass of the timeline starts. */
   private offset = 0
   private ended = false
+  /** Audio time this pass ends at (`endAt`): a section switch hands over to the next scheduler there. */
+  private endsAt = Infinity
 
   constructor(
     readonly song: CompiledSong,
@@ -53,6 +55,7 @@ export class ScoreScheduler {
     const { intro, loop } = this.song
     this.startAt = at - from
     this.ended = false
+    this.endsAt = Infinity
     if (from < intro.dur || !loop.dur) {
       this.inIntro = true
       this.offset = 0
@@ -68,6 +71,11 @@ export class ScoreScheduler {
   /** Song time at audio time `now` (negative before the start). */
   position(now: number): number {
     return now - this.startAt
+  }
+
+  /** Plays nothing at or after audio time `at`; nothing at or after it may have been scheduled yet (`LOOK_AHEAD_S`). */
+  endAt(at: number): void {
+    this.endsAt = at
   }
 
   tick(now: number, hidden = false): void {
@@ -96,6 +104,10 @@ export class ScoreScheduler {
       }
       const ev = tl.events[this.i]
       const t = this.startAt + this.offset + ev.t
+      if (t >= this.endsAt) {
+        this.ended = true
+        break
+      }
       if (t > horizon) break
       if (t >= now - LATE_S) this.play(ev, Math.max(t, now + NUDGE_S))
       this.i++

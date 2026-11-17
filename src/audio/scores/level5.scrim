@@ -9,6 +9,7 @@ reverb   0.32
 # untagged voices are the base layer, the hook among them (layers only add); the intro plays every layer
 voice str    strings   vol=0.32 pan=0.3 gate=0.7
 voice bass   fmbass    vol=0.64 gate=0.6
+voice chug   distguitar vol=0.3 pan=-0.2 gate=0.5
 voice kick   bigkick   vol=0.62 layer=drums
 voice snare  snare     vol=0.6  pan=0.05 layer=drums
 voice timp   timpani   vol=0.55 pan=-0.1 layer=drums
@@ -64,3 +65,50 @@ snare | .... x... .... x... | % | % | ..x. x.x. xxxx XXXX |
 
 play intro
 loop A A2 B B2 A A2 A+3 A2+3
+
+# Boss section (#598): the Magma Titan, and the Medusa while level6 plays this score. C Phrygian: the brass hook over
+# D-flat, a distorted-guitar chug with the bass on its rhythm (gaps in the low end, as the brief asks), orchestra hits
+# and timpani; the sting is a C major chord and the loop comes back.
+pattern X
+brass | C5--- Db5--- C5--- G4--- | Eb5------- Db5--- C5--- | Ab4--- C5--- Eb5--- G5--- | G5------- F5- Eb5- D5- B4- |
+horn  | C5--- Db5--- C5--- G4--- | Eb5------- Db5--- C5--- | Ab4--- C5--- Eb5--- G5--- | G5------- F5- Eb5- D5- B4- |
+str   | C4 C4 G4 C4 Eb4 C4 G4 C4 C4 C4 G4 C4 Eb4 C4 G4 C4 | Db4 Db4 Ab4 Db4 F4 Db4 Ab4 Db4 Db4 Db4 Ab4 Db4 F4 Db4 Ab4 Db4 | C4 C4 Ab4 C4 Eb4 C4 Ab4 C4 C4 C4 Ab4 C4 Eb4 C4 Ab4 C4 | D4 D4 B4 D4 G4 D4 B4 D4 D4 D4 B4 D4 G4 D4 B4 D4 |
+bass  | C2- C2- .- C2 C2 C2- C2- .- C2 C2 | Db2- Db2- .- Db2 Db2 Db2- Db2- .- Db2 Db2 | Ab2- Ab2- .- Ab2 Ab2 Ab2- Ab2- .- Ab2 Ab2 | G2- G2- .- G2 G2 G2- G2- .- G2 G2 |
+chug  | C3+G3- C3+G3- .- C3+G3 C3+G3 C3+G3- C3+G3- .- C3+G3 C3+G3 | Db3+Ab3- Db3+Ab3- .- Db3+Ab3 Db3+Ab3 Db3+Ab3- Db3+Ab3- .- Db3+Ab3 Db3+Ab3 | Ab2+Eb3- Ab2+Eb3- .- Ab2+Eb3 Ab2+Eb3 Ab2+Eb3- Ab2+Eb3- .- Ab2+Eb3 Ab2+Eb3 | G2+D3- G2+D3- .- G2+D3 G2+D3 G2+D3- G2+D3- .- G2+D3 G2+D3 |
+kick  | x... ..x. x... ..x. | % | % | x... ..x. x.x. xxxx |
+snare | .... x... .... x... | % | % | .... x... ..x. x.xx |
+timp  | C2--- .--- C2--- .--- | Db2--- .--- Db2--- .--- | Ab2--- .--- Ab2--- .--- | G2--- .--- G2- G2- G2 G2 G2 G2 |
+hit   | [Cm]!--- .------- [Cm]!--- | [Db]!--- .----------- | [Ab]!--- .----------- | [G]!--- [G]!--- [G]!------- |
+gong  | x... .... .... .... | _ | _ | _ |
+crash | X... .... .... .... | _ | _ | _ |
+choir | [Cm]--------------- | [Db]--------------- | [Ab]--------------- | [G]--------------- |
+hat   | x.x. x.x. x.x. x.x. | % | % | % |
+
+pattern Y from X
+brass | C6------- Bb5--- Ab5--- | Db6------- C6--- Bb5--- | Ab5--- G5--- F5--- Eb5--- | D5--- F5--- Ab5--- B5--- |
+horn  | C6------- Bb5--- Ab5--- | Db6------- C6--- Bb5--- | Ab5--- G5--- F5--- Eb5--- | D5--- F5--- Ab5--- B5--- |
+str   | C4 C4 G4 C4 Eb4 C4 G4 C4 C4 C4 G4 C4 Eb4 C4 G4 C4 | Db4 Db4 Ab4 Db4 F4 Db4 Ab4 Db4 Db4 Db4 Ab4 Db4 F4 Db4 Ab4 Db4 | C4 C4 Ab4 C4 F4 C4 Ab4 C4 C4 C4 Ab4 C4 F4 C4 Ab4 C4 | D4 D4 B4 D4 F4 D4 B4 D4 D4 D4 B4 D4 F4 D4 B4 D4 |
+bass  | C2- C2- .- C2 C2 C2- C2- .- C2 C2 | Db2- Db2- .- Db2 Db2 Db2- Db2- .- Db2 Db2 | F2- F2- .- F2 F2 F2- F2- .- F2 F2 | G2- G2- .- G2 G2 G2- G2- .- G2 G2 |
+chug  | C3+G3- C3+G3- .- C3+G3 C3+G3 C3+G3- C3+G3- .- C3+G3 C3+G3 | Db3+Ab3- Db3+Ab3- .- Db3+Ab3 Db3+Ab3 Db3+Ab3- Db3+Ab3- .- Db3+Ab3 Db3+Ab3 | F2+C3- F2+C3- .- F2+C3 F2+C3 F2+C3- F2+C3- .- F2+C3 F2+C3 | G2+D3- G2+D3- .- G2+D3 G2+D3 G2+D3- G2+D3- .- G2+D3 G2+D3 |
+timp  | C2--- .--- C2--- .--- | Db2--- .--- Db2--- .--- | F2--- .--- F2--- .--- | G2--- .--- G2- G2- G2 G2 G2 G2 |
+hit   | [Cm]!--- .------- [Cm]!--- | [Db]!--- .----------- | [Fm]!--- .----------- | [G7]!--- [G7]!--- [G7]!------- |
+gong  | _ | _ | _ | _ |
+crash | _ | _ | _ | _ |
+choir | [Cm]--------------- | [Db]--------------- | [Fm]--------------- | [G7]--------------- |
+
+pattern S
+brass | G4--- C5--- E5--- G5--- | C6--------------- |
+horn  | G4--- C5--- E5--- G5--- | C6--------------- |
+str   | C4 C4 G4 C4 E4 C4 G4 C4 C4 C4 G4 C4 E4 C4 G4 C4 | C4--------------- |
+bass  | C2--- C2--- C2--- C2--- | C2--------------- |
+chug  | C3+G3--- C3+G3--- C3+G3--- C3+G3--- | C3+G3--------------- |
+hit   | [C]!--- .--- [C]!--- [F]!--- | [C]!--------------- |
+timp  | C2--- C2--- C2- C2- C2 C2 C2 C2 | C2--------------- |
+kick  | x... x... x... x... | x............... |
+snare | .... .... xxxx XXXX | x............... |
+gong  | _ | x............... |
+crash | X............... | X............... |
+choir | [C]--------------- | [C]--------------- |
+
+boss  X Y
+sting S
