@@ -12,22 +12,44 @@ import TelemetryFrameProbe from '@/telemetry/TelemetryFrameProbe'
 import { telemetryActive } from '@/telemetry/playerTelemetry'
 import { dismissPoster, posterShown } from '@/app/poster'
 import { perfRequested } from '@/perf/perfFlag'
+import { loadLevelScene } from './loadLevelScene'
 
 const PerfProbe = lazy(() => import('@/perf/PerfProbe'))
 
 /** Frames the canvas draws under the poster before it fades: the first can still be compiling its shaders. */
 const POSTER_FRAMES = 2
+/** Longest the poster waits on for the level chunk after those frames (a slow network fades it without). */
+const POSTER_CHUNK_WAIT_MS = 2500
 
-/** Fades the HTML poster (index.html) out once the canvas has drawn real frames, whichever scene they are. */
+/**
+ * Fades the HTML poster (index.html) out once the canvas has drawn real frames, whichever scene they are, and the
+ * level chunk has arrived: evaluating it (every enemy's geometry and materials) is one long task, hidden under the
+ * poster rather than freezing the live title (#597).
+ */
 function PosterHandoff({ onDone }: { onDone: () => void }) {
   const frames = useRef(0)
   useFrame(() => {
-    if (++frames.current < POSTER_FRAMES) return
+    if (++frames.current === POSTER_FRAMES) handOverPoster(onDone)
+  })
+  return null
+}
+
+function handOverPoster(onDone: () => void) {
+  let dismissed = false
+  const dismiss = () => {
+    if (dismissed) return
+    dismissed = true
     // The next animation frame: this one has been rendered by then.
     requestAnimationFrame(dismissPoster)
     onDone()
-  })
-  return null
+  }
+  const cap = window.setTimeout(dismiss, POSTER_CHUNK_WAIT_MS)
+  loadLevelScene()
+    .catch(() => {})
+    .finally(() => {
+      window.clearTimeout(cap)
+      dismiss()
+    })
 }
 
 /**
