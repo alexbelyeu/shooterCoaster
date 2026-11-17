@@ -5,7 +5,7 @@
  * exceeds its budget in budgets.json.
  * Raising a budget is a Director decision and must be logged in docs/agents/DECISIONS.md.
  * Also fails if the online leaderboard's server side (api/: Supabase's REST API and its key) reaches the browser,
- * or if one of Alex's notes in the gym blockout does (vite.config.ts strips them, #544).
+ * or if one of Alex's notes in the gym blockout does (vite.config.ts strips them, #544), or the blockout is in the startup JS (#589).
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -32,6 +32,9 @@ const notes = [blockout.notes, ...blockout.items.map((item) => item.note)]
   .map((note) => note?.match(/^[\w ,.()-]{12,}/)?.[0])
   .filter(Boolean)
 const noteLeaks = []
+/** The blockout's piece ids, but the climbed walls' (`gymLevel.ts` names those): the title never loads the blockout (#589). */
+const pieceIds = blockout.items.map((item) => item.id).filter((id) => id.includes('-') && !id.startsWith('w-'))
+const blockoutAtStartup = []
 
 let totalGz = 0
 let largestGz = 0
@@ -47,6 +50,7 @@ for (const f of fs.readdirSync(dir)) {
   const text = buf.toString('utf8')
   if (SERVER_ONLY.test(text)) leaks.push(f)
   if (notes.some((note) => text.includes(note))) noteLeaks.push(f)
+  if (startup.has(f) && pieceIds.some((id) => text.includes(id))) blockoutAtStartup.push(f)
   rows.push([f, (buf.length / 1024).toFixed(0), (gz / 1024).toFixed(0)])
 }
 rows.sort((a, b) => Number(b[2]) - Number(a[2]))
@@ -77,6 +81,10 @@ if (leaks.length) {
 }
 if (noteLeaks.length) {
   console.error(`FAIL: the gym blockout's notes in the browser bundle: ${noteLeaks.join(', ')} (vite.config.ts stripBlockoutNotes)`)
+  ok = false
+}
+if (blockoutAtStartup.length) {
+  console.error(`FAIL: the gym blockout in the startup JS: ${blockoutAtStartup.join(', ')} (the level registry takes level 6 from gymLevel.ts)`)
   ok = false
 }
 process.exit(ok ? 0 : 1)
