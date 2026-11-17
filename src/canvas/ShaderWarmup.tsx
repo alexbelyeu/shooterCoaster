@@ -1,6 +1,6 @@
 /**
  * Compiles every shader a level can draw behind the countdown, so no kill, explosion or late wave stalls on one.
- * The approach (compile asynchronously, then one warm-up frame) follows slop-newyork's
+ * The approach (compile asynchronously, then a warm-up draw) follows slop-newyork's
  * `precompileShaders` (main.js), Copyright (c) 2026 Mr.doob, MIT License,
  * https://github.com/mrdoob/slop-newyork. Written from its description; no code copied.
  */
@@ -12,6 +12,12 @@ import * as bossAssets from '@/entities/bosses/bossAssets'
 import { useGameStore } from '@/store/useGameStore'
 import { markStartup } from '@/core/startupMarks'
 import { whenProgramsReady } from './programReadiness'
+import { chunk, runInFrameSlices } from './frameSlices'
+
+/** Warm-up work per frame: the rest of the frame is the countdown's (#597). */
+const SLICE_BUDGET_MS = 20
+/** Objects per warm-up draw: each first draw uploads its buffers and textures. */
+const DRAW_BATCH = 4
 
 function enemyMaterials(): THREE.Material[] {
   const out: THREE.Material[] = []
@@ -23,8 +29,36 @@ function enemyMaterials(): THREE.Material[] {
   return out
 }
 
-/** One frame with nothing culled or hidden and empty instanced pools (bullets) given one instance, so buffers and textures upload too. */
-function renderWarmupFrame(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, target: THREE.WebGLRenderTarget) {
+const isDrawable = (o: THREE.Object3D) =>
+  (o as THREE.Mesh).isMesh || (o as THREE.Points).isPoints || (o as THREE.Line).isLine || (o as THREE.Sprite).isSprite
+
+/**
+ * The scene's drawables, and those with a light inside: `compile(object, camera, scene)` gathers the scene's lights
+ * and then the object's again, so one of those compiles with the whole scene instead.
+ */
+function drawables(scene: THREE.Scene): { objects: THREE.Object3D[]; lightHosts: Set<THREE.Object3D> } {
+  const objects: THREE.Object3D[] = []
+  const lightHosts = new Set<THREE.Object3D>()
+  scene.traverse((o) => {
+    if (isDrawable(o)) objects.push(o)
+    if ((o as THREE.Light).isLight) for (let p = o.parent; p; p = p.parent) lightHosts.add(p)
+  })
+  return { objects, lightHosts }
+}
+
+/**
+ * Draws `batch` (and the drawables it hangs from) with nothing culled and empty instanced pools (bullets) given one
+ * instance, so their buffers and textures upload. Every group and light is shown, every other drawable hidden.
+ */
+function renderWarmupBatch(
+  gl: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  target: THREE.WebGLRenderTarget,
+  batch: THREE.Object3D[],
+) {
+  const shown = new Set<THREE.Object3D>()
+  for (const o of batch) for (let p: THREE.Object3D | null = o; p; p = p.parent) shown.add(p)
   const objects: THREE.Object3D[] = []
   const visible: boolean[] = []
   const culled: boolean[] = []
@@ -33,10 +67,10 @@ function renderWarmupFrame(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: 
     objects.push(o)
     visible.push(o.visible)
     culled.push(o.frustumCulled)
-    o.visible = true
+    o.visible = !isDrawable(o) || shown.has(o)
     o.frustumCulled = false
     const pool = o as THREE.InstancedMesh
-    if (pool.isInstancedMesh && pool.count === 0) {
+    if (o.visible && pool.isInstancedMesh && pool.count === 0) {
       pool.count = 1
       emptyPools.push(pool)
     }
@@ -58,6 +92,11 @@ function renderWarmupFrame(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: 
 /**
  * Compiles into an off-screen target, not the canvas: the composer's render pass draws into one,
  * and a canvas compile would build different (sRGB-output) programs. Reruns on Next Level, not on Replay.
+ *
+ * Spread over frames (#597): compiles, readiness polls and warm-up draws each take a slice of a frame. Until it is
+ * done the countdown draws nothing of the level (the camera sees no layer), since a visible frame would wait on
+ * every program still linking. It starts two frames after the mount, once the sky's env bake (`Atmosphere.tsx`,
+ * one frame after the mount) has set `scene.environment`, which every Standard material's program depends on.
  */
 export default function ShaderWarmup({ levelId }: { levelId: string }) {
   const get = useThree((s) => s.get)
@@ -82,30 +121,92 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     for (const m of enemyMaterials()) specimens.add(new THREE.Mesh(specimenGeo, m))
     scene.add(specimens)
 
+    // Sliced and hidden behind the countdown only: once the run has reached `playing` (the countdown's cap ran out,
+    // `?e2e=1`) the level draws as it is, a pause included, and the rest of the warm-up runs in one go.
+    let reachedPlay = useGameStore.getState().phase === 'playing'
+    // At most half of a slow frame (a software renderer's are 200 ms with nothing drawn), so the warm-up still
+    // ends inside the countdown.
+    const budgetMs = (restOfFrameMs: number) => (reachedPlay ? Infinity : Math.max(SLICE_BUDGET_MS, restOfFrameMs / 2))
+    const mask = camera.layers.mask
+    let warming = true
+    /** Hidden while warming up before play, and once the store has moved on to another level: Ready never shows the
+     *  outgoing world while the scene swap is pending (`SceneManager`'s transition). */
+    const applyMask = () => {
+      const leaving = useGameStore.getState().currentLevel !== levelId
+      camera.layers.mask = leaving || (warming && !reachedPlay) ? 0 : mask
+    }
+    applyMask()
+    const unsubscribe = useGameStore.subscribe((s) => {
+      if (s.phase === 'playing') reachedPlay = true
+      applyMask()
+    })
+    /** Compiles and warm-up draws gather the lights through the camera's layers: they need the real ones. */
+    const withLayers = (fn: () => void) => {
+      camera.layers.mask = mask
+      try {
+        fn()
+      } finally {
+        applyMask()
+      }
+    }
+
     let cleaned = false
+    const cancelled = () => cleaned
     const cleanup = () => {
       if (cleaned) return
       cleaned = true
+      warming = false
+      applyMask()
       scene.remove(specimens)
       specimenGeo.dispose()
       target.dispose()
     }
 
-    const prevTarget = gl.getRenderTarget()
-    gl.setRenderTarget(target)
-    const materials = gl.compile(scene, camera)
-    gl.setRenderTarget(prevTarget)
-
-    whenProgramsReady(gl, materials, () => cleaned, () => {
-      renderWarmupFrame(gl, scene, camera, target)
+    const finish = () => {
       cleanup()
-      setSceneReady(true)
+      // A warm-up still finishing after the store moved on to another level must not open that level's Ready.
+      if (useGameStore.getState().currentLevel === levelId) setSceneReady(true)
       markStartup('warmupDone')
       if (testApi) testApi.shaderWarmup = { levelId, done: true, ms: performance.now() - started, programs: gl.info.programs?.length ?? 0 }
+    }
+
+    const draw = (objects: THREE.Object3D[]) =>
+      runInFrameSlices(chunk(objects, DRAW_BATCH), (batch) => withLayers(() => renderWarmupBatch(gl, scene, camera, target, batch)), {
+        budgetMs,
+        cancelled,
+        done: finish,
+      })
+
+    const compile = () => {
+      const { objects, lightHosts } = drawables(scene)
+      const units: THREE.Object3D[] = objects.filter((o) => !lightHosts.has(o))
+      if (units.length < objects.length) units.push(scene)
+      const materials = new Set<object>()
+      const compileUnit = (unit: THREE.Object3D) =>
+        withLayers(() => {
+          const prevTarget = gl.getRenderTarget()
+          gl.setRenderTarget(target)
+          try {
+            for (const m of gl.compile(unit, camera, unit === scene ? null : scene)) materials.add(m)
+          } finally {
+            gl.setRenderTarget(prevTarget)
+          }
+        })
+      runInFrameSlices(units, compileUnit, {
+        budgetMs,
+        cancelled,
+        done: () => whenProgramsReady(gl, materials, cancelled, () => draw(objects)),
+      })
+    }
+    const afterEnvBake = requestAnimationFrame(() => {
+      if (!cleaned) requestAnimationFrame(() => !cleaned && compile())
     })
 
     return () => {
+      cancelAnimationFrame(afterEnvBake)
       cleanup()
+      unsubscribe()
+      camera.layers.mask = mask
       setSceneReady(false)
     }
   }, [get, levelId])

@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, type ReactNode } from 'react'
+import { Component, lazy, startTransition, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import TitleScene from './TitleScene'
@@ -33,7 +33,11 @@ export default function SceneManager() {
   const phase = useGameStore((s) => s.phase)
   const currentLevel = useGameStore((s) => s.currentLevel)
 
-  const level = phase === 'title' || phase === 'levelSelect' || !currentLevel ? null : currentLevel
+  const wanted = phase === 'title' || phase === 'levelSelect' || !currentLevel ? null : currentLevel
+  // A scene swap renders in a transition (#597): React builds the next scene a few milliseconds at a time over
+  // several frames, while the old one keeps drawing, instead of in one long frame.
+  const [level, setLevel] = useState(wanted)
+  useEffect(() => startTransition(() => setLevel(wanted)), [wanted])
   const biome = level ? getLevelConfig(level)?.biome : undefined
 
   return (

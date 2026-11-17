@@ -59,4 +59,28 @@ describe('whenProgramsReady', () => {
     expect(() => vi.advanceTimersByTime(20)).not.toThrow()
     expect(done).toHaveBeenCalledTimes(1)
   })
+
+  it('asks for a poll budget at a time and carries on at the next poll', () => {
+    const r = fakeRenderer(false)
+    let t = 0
+    const asked: number[] = []
+    const ms = new Set([r.add(0), r.add(0), r.add(0), r.add(0)])
+    for (const m of ms) {
+      const program = (r.gl.properties.get(m) as { currentProgram: { isReady(): boolean } }).currentProgram
+      const isReady = program.isReady
+      program.isReady = () => {
+        asked.push(t)
+        t += 5 // a blocking link
+        return isReady()
+      }
+    }
+    const done = vi.fn()
+    whenProgramsReady(r.gl, ms, () => false, done, () => t)
+    vi.advanceTimersByTime(10)
+    expect(asked).toEqual([0, 5])
+    expect(done).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(10)
+    expect(asked).toEqual([0, 5, 10, 15])
+    expect(done).toHaveBeenCalledTimes(1)
+  })
 })

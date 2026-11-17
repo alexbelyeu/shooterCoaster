@@ -47,7 +47,7 @@ export default function Countdown() {
 
   useEffect(() => stepTimeout(() => setReadyShown(true), stepMs), [stepMs])
 
-  // A run can start before the title's prefetch lands (slow network); a failed load returns to the title, unmounting this.
+  // A run can start before the startup fetch lands (slow network); a failed load returns to the title, unmounting this.
   useEffect(() => {
     if (chunkLoaded) return
     let live = true

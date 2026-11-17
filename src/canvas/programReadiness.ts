@@ -5,12 +5,22 @@ interface ReadinessRenderer {
 }
 
 const POLL_MS = 10
+/** A poll stops asking after this long and carries on next time: without the extension each ask can block on a link (#597). */
+const POLL_BUDGET_MS = 8
 
 /** `WebGLRenderer.compileAsync`'s readiness poll, but cancellable: three's keeps polling after an unmount and throws on a disposed material (#141). */
-export function whenProgramsReady(gl: ReadinessRenderer, materials: Set<object>, cancelled: () => boolean, done: () => void): void {
+export function whenProgramsReady(
+  gl: ReadinessRenderer,
+  materials: Set<object>,
+  cancelled: () => boolean,
+  done: () => void,
+  now: () => number = () => performance.now(),
+): void {
   const check = () => {
     if (cancelled()) return
+    const until = now() + POLL_BUDGET_MS
     for (const m of materials) {
+      if (now() > until) break
       // A disposed material has no properties left, so no program to wait on.
       const props = gl.properties.has(m) ? (gl.properties.get(m) as { currentProgram?: { isReady(): boolean } }) : null
       if (!props?.currentProgram || props.currentProgram.isReady()) materials.delete(m)
