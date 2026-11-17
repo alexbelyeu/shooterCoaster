@@ -1,7 +1,7 @@
 import type { LevelConfig } from '@/types/level'
 import { paceLevel } from './pacing'
-import { GYM_TRACK } from './environments/biomes/gym/gymTrack'
-import { GYM_WALLS } from './environments/biomes/gym/walls'
+// Level 6's track and walls as plain numbers: the blockout they are built from stays out of the startup JS (#589).
+import { GYM_LEVEL } from './environments/biomes/gym/gymLevel'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
 const LEVELS: LevelConfig[] = [
@@ -188,8 +188,8 @@ const LEVELS: LevelConfig[] = [
     message: 'You sent the Climbing Gym!',
     nextLevel: null,
     // Authored from Alex's blockout (#514): up the Tree, round the Flame, through the Arch, the dive into the Starr pit.
-    track: GYM_TRACK,
-    walls: [...GYM_WALLS],
+    track: GYM_LEVEL.track,
+    walls: [...GYM_LEVEL.walls],
     // Climbers are bystanders (#518): the first wave brings some, to teach the don't-shoot rule from the start. The
     // lanternflies (#575) come second: from 9 to 13 s the rider climbs past no wall it can read a bug on, and from 14 s it
     // faces Alaska close up, where their swarm lands (`placeWallSwarm`).
