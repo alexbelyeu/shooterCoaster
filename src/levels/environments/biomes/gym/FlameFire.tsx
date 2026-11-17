@@ -183,19 +183,25 @@ const smokeFragment = /* glsl */ `
 const EMBER_ANCHOR = emberAnchor()
 const fogUniforms = () => THREE.UniformsUtils.clone(THREE.UniformsLib.fog)
 
-/** Every tongue as one instance of a unit quad; the quality's share of them drawn (`instanceCount`). */
-function tongueGeometry(): THREE.InstancedBufferGeometry {
-  const tongues = buildFlameTongues()
+/** A unit quad to instance: the vertex shader places and sizes each copy. */
+function instancedQuad(): THREE.InstancedBufferGeometry {
   const plane = new THREE.PlaneGeometry(1, 1)
   const geometry = new THREE.InstancedBufferGeometry()
   geometry.setIndex(plane.getIndex())
   geometry.setAttribute('position', plane.getAttribute('position'))
   geometry.setAttribute('uv', plane.getAttribute('uv'))
+  plane.dispose()
+  return geometry
+}
+
+/** Every tongue as one instance of a unit quad; the quality's share of them drawn (`instanceCount`). */
+function tongueGeometry(): THREE.InstancedBufferGeometry {
+  const tongues = buildFlameTongues()
+  const geometry = instancedQuad()
   geometry.setAttribute('aStart', new THREE.InstancedBufferAttribute(tongues.start, 4))
   geometry.setAttribute('aMid', new THREE.InstancedBufferAttribute(tongues.mid, 3))
   geometry.setAttribute('aEnd', new THREE.InstancedBufferAttribute(tongues.end, 3))
   geometry.setAttribute('aTongue', new THREE.InstancedBufferAttribute(tongues.params, 4))
-  plane.dispose()
   // The quad's own bounds mean nothing once the vertex shader places it: bound the whole fire
   const { base, crest } = fireHeights()
   const ground = fireFootprint()
@@ -210,15 +216,10 @@ function tongueGeometry(): THREE.InstancedBufferGeometry {
 /** Every smoke puff as one instance of a unit quad. */
 function smokeGeometry(): THREE.InstancedBufferGeometry {
   const puffs = buildSmokePuffs()
-  const plane = new THREE.PlaneGeometry(1, 1)
-  const geometry = new THREE.InstancedBufferGeometry()
-  geometry.setIndex(plane.getIndex())
-  geometry.setAttribute('position', plane.getAttribute('position'))
-  geometry.setAttribute('uv', plane.getAttribute('uv'))
+  const geometry = instancedQuad()
   geometry.setAttribute('aStart', new THREE.InstancedBufferAttribute(puffs.start, 4))
   geometry.setAttribute('aEnd', new THREE.InstancedBufferAttribute(puffs.end, 3))
   geometry.setAttribute('aPuff', new THREE.InstancedBufferAttribute(puffs.params, 4))
-  plane.dispose()
   geometry.boundingSphere = new THREE.Sphere()
   geometry.boundingSphere.setFromPoints(
     Array.from({ length: puffs.count * 2 }, (_, k) => {

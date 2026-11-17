@@ -92,14 +92,15 @@ export const GRIME = {
  * spaced, the grime shader snaps to the nearest), fixtures `length` long at `stripLightXs`, each casting a warm `pool`
  * (reach `reach`, a fraction `uplight` of it spilling up) in the grime shader.
  */
-/** The Flame's firelight in the grime shader (#599): within `shell` m of the fire it lights every face, since the tongues are on them. */
-export const FIRE_LIGHT = { color: '#ff8c3c', strength: 2, reach: 8, shell: 4.5, soot: '#1c1712', sootAmount: 0.85 }
-
 export const STRIP_LIGHTS = { rows: [5, 15, 25, 35], spacing: 8, length: 5, color: '#ffc98a', pool: 1.5, reach: 9, uplight: 0.4 }
+
 /** The fixtures' x along each row: every `spacing` from one `spacing` in to one short of the far end wall. */
 export const stripLightXs: readonly number[] = Array.from({ length: Math.ceil(HALL.w / STRIP_LIGHTS.spacing) - 1 }, (_, i) => (i + 1) * STRIP_LIGHTS.spacing)
 /** The fixtures' height: just under the trusses' bottom chord. */
 export const stripLightY = HALL.h - 4.5 - 0.15
+
+/** The Flame's firelight in the grime shader (#599): within `shell` m of the fire it lights every face, since the tongues are on them. */
+export const FIRE_LIGHT = { color: '#ff8c3c', strength: 2, reach: 8, shell: 4.5, soot: '#1c1712', sootAmount: 0.85 }
 
 /** The maroon steel columns' half-width (blockout metres): they stand 0.5 m off the long walls. */
 export const COLUMN_HALF = 0.25

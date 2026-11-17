@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { valueNoiseGlsl } from '../../shared/noiseGlsl'
-import { GYM_SCALE, HALL, PIT } from './blockout'
+import { FLAME, GYM_SCALE, HALL, PIT } from './blockout'
 import { FIRE_LIGHT, GRIME, STRIP_LIGHTS, stripLightXs, stripLightY } from './config'
 import { FLAME_TOP, fireLightSource } from './flameFire'
 
@@ -23,6 +23,8 @@ const glslColor = (hex: string) => {
 }
 
 const fire = fireLightSource()
+/** The Flame's foot in the hall (blockout metres): `FLAME_TOP.y` is above it, `vGrimePos.y` absolute. */
+const flameBase = FLAME.piece.base
 const fireCos = Math.cos((fire.rot * Math.PI) / 180)
 const fireSin = Math.sin((fire.rot * Math.PI) / 180)
 
@@ -86,7 +88,7 @@ const hallFragment = /* glsl */ `
   // Soot over the Flame's top, patchy, thickest where the fire licks over its lip
   vec3 flameLocal = fireLocal(vGrimePos);
   float onFlame = (1.0 - smoothstep(${f(FLAME_TOP.halfLength)}, ${f(FLAME_TOP.halfLength + 0.6)}, abs(flameLocal.x))) * (1.0 - smoothstep(${f(FLAME_TOP.halfWidth)}, ${f(FLAME_TOP.halfWidth + 0.6)}, abs(flameLocal.z)));
-  float soot = onFlame * smoothstep(${f(FLAME_TOP.y * 0.35)}, ${f(FLAME_TOP.y * 0.9)}, vGrimePos.y) * (0.45 + 0.55 * grimeFbm(grimeUv * 0.9 + 13.0));
+  float soot = onFlame * smoothstep(${f(flameBase + FLAME_TOP.y * 0.35)}, ${f(flameBase + FLAME_TOP.y * 0.9)}, vGrimePos.y) * (1.0 - smoothstep(${f(flameBase + FLAME_TOP.y + 0.3)}, ${f(flameBase + FLAME_TOP.y + 1)}, vGrimePos.y)) * (0.45 + 0.55 * grimeFbm(grimeUv * 0.9 + 13.0));
   c = mix(c, ${glslColor(FIRE_LIGHT.soot)}, ${f(FIRE_LIGHT.sootAmount)} * soot);
   c *= mix(1.0, ${f(GRIME.roofShade)}, smoothstep(${f(HALL.h * 0.4)}, ${f(HALL.h * 0.95)}, vGrimePos.y));
   diffuseColor.rgb = c;
@@ -148,20 +150,20 @@ function patch(material: THREE.Material, key: string, surface: string, pool: boo
   material.customProgramCacheKey = () => key
 }
 
-/** The hall's painted solid: grime, drips, chalk, roof shade, the strip lights' pools. */
+/** The hall's painted solid: grime, drips, chalk, roof shade, the strip lights' pools and the firelight. */
 export function withHallGrime<M extends THREE.Material>(material: M): M {
   patch(material, 'gym-hall-grime', hallFragment, true)
   return material
 }
 
-/** The hall's concrete floor (the terrain): the same grime and pools, in flat-shaded Phong like every terrain. */
+/** The hall's concrete floor (the terrain): the same grime, pools and firelight, in flat-shaded Phong like every terrain. */
 export function createGymFloorMaterial(): THREE.MeshPhongMaterial {
   const material = new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 8 })
   patch(material, 'gym-floor-grime', hallFragment, true)
   return material
 }
 
-/** The holds: chalk on their tops, and the pools so a hold under a fixture catches its light like the wall it sits on. */
+/** The holds: chalk on their tops, and the pools and firelight so a hold catches the light like the wall it sits on. */
 export function withHoldChalk<M extends THREE.Material>(material: M): M {
   patch(material, 'gym-hold-chalk', holdFragment, true)
   return material

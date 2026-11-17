@@ -1,5 +1,6 @@
 import { particleShare } from '@/canvas/graphicsQuality'
 import { createRng } from '@/utils/rng'
+import { smoothNoise1 } from '@/utils/valueNoise.hot'
 import { FLAME, GYM_SCALE, HALL, blockRings, footprint, piece, toWorld, type Vec3 } from './blockout'
 
 /**
@@ -14,7 +15,7 @@ import { FLAME, GYM_SCALE, HALL, blockRings, footprint, piece, toWorld, type Vec
 
 const DEG = Math.PI / 180
 const pad = piece('pad', 'pad-flame')
-/** The mats' top, where the fire starts and the light pool lies. */
+/** The mats' top, where the fire starts. */
 export const PAD_TOP = pad.base + pad.thick
 
 /** Tongues at full quality on a desktop; `tongueCount` thins them. */
@@ -167,22 +168,9 @@ export function fireLightSource(): { x: number; z: number; rot: number; halfLeng
 /** The Flame's top in its own frame (blockout metres). */
 export const FLAME_TOP = { y: TOP.y, halfLength: FLAME.piece.w / 2 + TOP.f, halfWidth: FLAME.piece.d / 2 + TOP.f }
 
-const hash1 = (i: number) => {
-  const h = Math.sin(i * 127.1 + 311.7) * 43758.5453
-  return (h - Math.floor(h)) * 2 - 1
-}
-
-/** Smooth 1D value noise in -1..1. */
-function noise1(x: number): number {
-  const i = Math.floor(x)
-  const f = x - i
-  const u = f * f * (3 - 2 * f)
-  return hash1(i) + (hash1(i + 1) - hash1(i)) * u
-}
-
 /** The fire's light at time `t` (s), 0.5..1: a slow breathing under a quicker flicker, never steady, never out. */
 export function fireFlicker(t: number): number {
-  return 0.77 + 0.14 * noise1(t * 4.3) + 0.07 * noise1(t * 11.9 + 17.3) + 0.02 * noise1(t * 23.1 + 5.1)
+  return 0.77 + 0.14 * smoothNoise1(t * 4.3, 1) + 0.07 * smoothNoise1(t * 11.9, 2) + 0.02 * smoothNoise1(t * 23.1, 3)
 }
 
 /** Smoke puffs at full quality on a desktop; `smokeCount` thins them. */

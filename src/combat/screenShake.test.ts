@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   KILL_TRAUMA_MS, MAX_PITCH_YAW_DEG, MAX_ROLL_DEG,
-  addTrauma, decayTrauma, effectiveShakeScale, killTrauma, shakeAngles, smoothNoise1,
+  addTrauma, decayTrauma, effectiveShakeScale, killTrauma, shakeAngles,
   type ShakeAngles, type TraumaState,
 } from './screenShake.hot'
 
@@ -78,16 +78,6 @@ describe('screenShake', () => {
     expect(shakeAngles(0, 1.5, 2, 1, out)).toEqual({ pitch: 0, yaw: 0, roll: 0 })
     out.pitch = 1
     expect(shakeAngles(1, 1.5, 2, 0, out)).toEqual({ pitch: 0, yaw: 0, roll: 0 })
-  })
-
-  it('noise is smooth (no high-frequency jumps) and bounded', () => {
-    let prev = smoothNoise1(0, 4)
-    for (let i = 1; i < 2000; i++) {
-      const v = smoothNoise1(i * 0.01, 4)
-      expect(Math.abs(v)).toBeLessThanOrEqual(1)
-      expect(Math.abs(v - prev)).toBeLessThanOrEqual(0.04)
-      prev = v
-    }
   })
 
   it('settings levels map to scales and reduced motion forces off', () => {
