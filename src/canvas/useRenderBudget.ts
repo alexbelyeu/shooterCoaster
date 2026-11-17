@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useSyncExternalStore } from 'react'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { adaptiveBudgetScale } from './adaptiveDpr'
-import { qualityProfile, type QualityProfile } from './graphicsQuality'
+import { fbmOctaves, qualityProfile, type QualityProfile } from './graphicsQuality'
 import { budgetDpr, composerMultisampling, pixelBudget } from './renderBudget'
 
 /** Phones and tablets. Read once: a device's primary pointer doesn't change mid-session. */
@@ -13,6 +13,11 @@ export const isCoarsePointer =
 /** The current graphics quality's preset; re-renders when the setting changes. */
 export function useQualityProfile(): QualityProfile {
   return qualityProfile(useSettingsStore((s) => s.quality))
+}
+
+/** `FBM_OCTAVES` for the procedural noise shaders, from the quality and the pointer. */
+export function useFbmOctaves(): number {
+  return fbmOctaves(useQualityProfile(), isCoarsePointer)
 }
 
 export function useComposerMultisampling(): number {
