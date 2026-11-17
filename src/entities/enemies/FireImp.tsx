@@ -8,11 +8,8 @@ import {
   FIRE_IMP_ARMS_GEO, FIRE_IMP_BODY_GEO, FIRE_IMP_EYE_MAT, FIRE_IMP_EYES_GEO, FIRE_IMP_MAT,
   FIRE_IMP_RUMP, FIRE_IMP_SHOULDER, FIRE_IMP_TAIL_GEO,
 } from './SharedEnemyAssets'
+import { FIRE_IMP_LIFT, FIRE_IMP_SCALE, HOP_HEIGHT, HOP_RATE, fireImpHop, hopScaleXZ, hopScaleY, type HopPose } from './fireImpHop.hot'
 
-/** Hops a game second, its share of each hop in the air, and the hop's height (model units). */
-const HOP_RATE = 1.8
-const AIRBORNE = 0.75
-const HOP_HEIGHT = 2.2
 /** The arms' swing about the shoulders (radians, - = forward and up): at the top of a hop, and thrown up when hit. */
 const ARMS_HOP = -1.2
 const ARMS_FLINCH = -2.7
@@ -31,6 +28,7 @@ export default function FireImp(props: EnemyProps) {
   const hopRef = useRef<THREE.Group>(null)
   const armsRef = useRef<THREE.Mesh>(null)
   const tailRef = useRef<THREE.Mesh>(null)
+  const pose = useRef<HopPose>({ air: 0, land: 0, stretch: 0 })
   const camera = useThree((s) => s.camera)
   const heightFn = useContext(TerrainContext)
 
@@ -46,17 +44,16 @@ export default function FireImp(props: EnemyProps) {
 
       mesh.position.x += Math.cos(dirRef.current) * moveSpeed * dt
       mesh.position.z += Math.sin(dirRef.current) * moveSpeed * dt
-      mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 2
+      // The group (the hit sphere's centre) sits mid-body; the model's feet are FIRE_IMP_LIFT below it.
+      mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 2 + FIRE_IMP_LIFT
 
       const p = (time * HOP_RATE + hopOffset) % 1
-      const air = p < AIRBORNE ? Math.sin((Math.PI * p) / AIRBORNE) : 0
-      const land = p < AIRBORNE ? 0 : Math.sin((Math.PI * (p - AIRBORNE)) / (1 - AIRBORNE))
-      // Stretched leaving the ground and coming down, round at the top; squashed on landing.
-      const stretch = p < AIRBORNE ? 0.12 * Math.abs(Math.cos((Math.PI * p) / AIRBORNE)) : 0
+      const { air, land } = fireImpHop(p, pose.current)
       const hop = hopRef.current
       if (hop) {
         hop.position.y = HOP_HEIGHT * air
-        hop.scale.set(1 - 0.5 * stretch + 0.16 * land, 1 + stretch - 0.24 * land, 1 - 0.5 * stretch + 0.16 * land)
+        const xz = hopScaleXZ(pose.current)
+        hop.scale.set(xz, hopScaleY(pose.current), xz)
         hop.rotation.x = 0.15 * air
       }
       if (armsRef.current) armsRef.current.rotation.x = ARMS_HOP * air + 0.3 * land
@@ -81,7 +78,7 @@ export default function FireImp(props: EnemyProps) {
 
   return (
     <EnemyBase {...props} updatePosition={updatePosition} onHit={onHit}>
-      <group ref={modelRef} scale={[8, 8, 8]}>
+      <group ref={modelRef} position-y={-FIRE_IMP_LIFT} scale={FIRE_IMP_SCALE}>
         <group ref={hopRef}>
           <mesh geometry={FIRE_IMP_BODY_GEO} material={FIRE_IMP_MAT} />
           <mesh geometry={FIRE_IMP_EYES_GEO} material={FIRE_IMP_EYE_MAT} />
