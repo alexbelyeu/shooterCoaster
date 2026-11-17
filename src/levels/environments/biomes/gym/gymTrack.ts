@@ -9,7 +9,8 @@
  * 5. The dive: down the west side and into the Starr pit, the star ahead all the way (the Medusa
  *    rises from it at 40 s); a U-turn under it closes the lap after the run has ended.
  *
- * `gymTrack.test.ts` holds it to the four moments; `scripts/plot-gym-track.mjs` draws it.
+ * `gymTrack.test.ts` holds it to the four moments; `scripts/plot-gym-track.mjs` draws it. The level rides its copy in
+ * `gymLevel.ts` (`node scripts/gen-gym-level.mjs`), which keeps the blockout out of the startup JS.
  */
 import type { TrackParams } from '@/types/level'
 import { ARCH, FLAME, GLASS_ROOM, PIT, STAR, TREE, toWorld, type Vec3 } from './blockout'
