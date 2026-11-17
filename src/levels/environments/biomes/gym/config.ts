@@ -92,11 +92,7 @@ export const GRIME = {
  * spaced, the grime shader snaps to the nearest), fixtures `length` long at `stripLightXs`, each casting a warm `pool`
  * (reach `reach`, a fraction `uplight` of it spilling up) in the grime shader.
  */
-/**
- * The Flame's firelight (#599) in the grime shader: a warm `color` at `strength`, falling off over `reach` m from the
- * fire (`flameFire.ts` `fireLightSource`), flickering with `fireFlicker`; within `shell` m of it the tongues are on
- * the surface, so it lights every face there whichever way it turns. Soot darkens the Flame's top towards `soot`.
- */
+/** The Flame's firelight in the grime shader (#599): within `shell` m of the fire it lights every face, since the tongues are on them. */
 export const FIRE_LIGHT = { color: '#ff8c3c', strength: 2, reach: 8, shell: 4.5, soot: '#1c1712', sootAmount: 0.85 }
 
 export const STRIP_LIGHTS = { rows: [5, 15, 25, 35], spacing: 8, length: 5, color: '#ffc98a', pool: 1.5, reach: 9, uplight: 0.4 }

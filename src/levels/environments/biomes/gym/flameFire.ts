@@ -158,17 +158,13 @@ export function fireFootprint(): { centre: Vec3; halfX: number; halfZ: number } 
   }
 }
 
-/**
- * Where the fire's light comes from (#599), in blockout metres in the Flame's own frame: a segment along the
- * Flame's length through its middle, from low on its faces to over its top. The grime shader lights the hall from
- * the nearest point on it; `rot` (degrees) turns the hall's x/z into the frame.
- */
+/** The fire's light (#599): a segment through the Flame's middle (blockout metres, its frame turned `rot` degrees) the grime shader lights from. */
 export function fireLightSource(): { x: number; z: number; rot: number; halfLength: number; minY: number; maxY: number } {
   const p = FLAME.piece
   return { x: p.x, z: p.z, rot: p.rot, halfLength: p.w / 2, minY: PAD_TOP + 1, maxY: TOP.y + PLUME_RISE * 0.4 }
 }
 
-/** The Flame's top in its own frame (blockout metres): its height and how far its top ring stands out round the foot. */
+/** The Flame's top in its own frame (blockout metres). */
 export const FLAME_TOP = { y: TOP.y, halfLength: FLAME.piece.w / 2 + TOP.f, halfWidth: FLAME.piece.d / 2 + TOP.f }
 
 const hash1 = (i: number) => {

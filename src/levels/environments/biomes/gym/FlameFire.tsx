@@ -136,7 +136,6 @@ const smokeVertex = /* glsl */ `
     float wave = uTime * 0.15;
     vec3 drift = vec3(gnoise(vec2(vSeed * 37.0, wave)), 0.0, gnoise(vec2(vSeed * 19.0 + 5.0, wave))) * size * 0.5 * t;
     vec3 centre = mix(aStart.xyz, aEnd, t) + drift;
-    // A billboard facing the camera
     vec4 mvPosition = viewMatrix * vec4(centre, 1.0);
     mvPosition.xy += (uv - 0.5) * size;
     vUv = uv;
@@ -208,7 +207,7 @@ function tongueGeometry(): THREE.InstancedBufferGeometry {
   return geometry
 }
 
-/** Every smoke puff as one instance of a unit quad, its bounds round the whole column. */
+/** Every smoke puff as one instance of a unit quad. */
 function smokeGeometry(): THREE.InstancedBufferGeometry {
   const puffs = buildSmokePuffs()
   const plane = new THREE.PlaneGeometry(1, 1)
@@ -233,13 +232,9 @@ function smokeGeometry(): THREE.InstancedBufferGeometry {
 }
 
 /**
- * The Flame burns (#520, rebuilt in #595): a few hundred soft tongues of flame (one instanced draw) rise
- * up its faces and off its top, each on a path round the Flame's flare with its own life, sway and noise,
- * so they overlap in front of and behind each other as the coaster circles; smoke rising off the crest to
- * hang under the roof (one instanced draw); and embers rising off it (an anchored `ParticleField`). Its
- * light on the hall, flickering with `fireFlicker`, is the grime shader's (#599): this sets `FIRE_FLICKER`
- * every frame. Three draw calls. Touch and lower qualities draw fewer tongues and puffs and the quality's
- * `fbmOctaves`.
+ * The Flame burns (#520, #595, #599): a few hundred soft tongues of flame rising up its faces and off its top,
+ * smoke rising off the crest, and embers (an anchored `ParticleField`), in three draw calls; its light on the hall
+ * is the grime shader's, flickering with the `FIRE_FLICKER` this sets each frame.
  */
 export default function FlameFire() {
   const octaves = useFbmOctaves()

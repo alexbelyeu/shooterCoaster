@@ -130,7 +130,6 @@ describe('the Flame fire', () => {
     expect(Math.max(...samples)).toBeLessThanOrEqual(1)
     expect(Math.max(...samples) - Math.min(...samples)).toBeGreaterThan(0.3)
     const steps = samples.slice(1).map((v, i) => Math.abs(v - samples[i]))
-    // Smooth frame to frame, but never still for long
     expect(Math.max(...steps)).toBeLessThan(0.08)
     expect(steps.filter((d) => d < 1e-4).length).toBeLessThan(samples.length / 50)
   })
