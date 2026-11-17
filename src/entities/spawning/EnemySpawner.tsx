@@ -18,6 +18,7 @@ import { recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
 import { requestSlowMo } from '@/combat/slowMo.hot'
 import type { EnemyEntry } from '../enemies/EnemyBase'
 import { HOP } from '../enemies/hopGlideMotion'
+import { FIRE_IMP_HIT_RADIUS } from '../enemies/fireImpHop.hot'
 import {
   ENTRY_SECONDS, ENTRY_STAGGER, clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, trackPoint,
   tracksideSlots,
@@ -82,7 +83,7 @@ const RADII: Record<EnemyType, number> = {
   snowmanBrute: 180,
   emberWisp: 35,
   lavaGolem: 130,
-  fireImp: 55,
+  fireImp: FIRE_IMP_HIT_RADIUS,
   infernalDrake: 200,
   climber: 50,
   rat: 50,

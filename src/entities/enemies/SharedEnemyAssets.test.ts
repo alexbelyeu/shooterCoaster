@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
-  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYES_GEO, EMBER_WISP_TENDRILS_GEO, LANTERNFLY_BODY_GEO,
+  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYES_GEO, LANTERNFLY_BODY_GEO,
   LANTERNFLY_FOREWING_GEOS, LANTERNFLY_HINDWING_GEOS, RAT_BODY_GEO,
   RAT_SNOUT_GEO, RAT_TAIL_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
   SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, crowWingPose, patchCrowWingVertex,
@@ -67,7 +67,6 @@ describe('merged enemy parts', () => {
   it('keeps every part: triangles add up', () => {
     const tris = (g: THREE.BufferGeometry) => g.index!.count / 3
     expect(tris(SNOWMAN_COAL_GEO)).toBe(tris(SNOWMAN_FACE_GEO) + 3 * tris(new THREE.SphereGeometry(1, 6, 6)))
-    expect(tris(EMBER_WISP_TENDRILS_GEO)).toBe(6 * tris(new THREE.ConeGeometry(1, 4, 4)))
   })
 })
 

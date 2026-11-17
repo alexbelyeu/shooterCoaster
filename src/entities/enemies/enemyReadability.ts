@@ -12,9 +12,9 @@ export const ENEMY_SILHOUETTE: Record<EnemyType | 'goldenBalloon', number> = {
   snowman: 65, // 1.3x the base model: 52 wide x 94 tall
   snowmanScout: 48, // 0.9x the base model
   snowmanBrute: 90, // 1.8x the base model
-  emberWisp: 48, // core r=3 x8
-  lavaGolem: 108, // 12 wide x9, 180 tall
-  fireImp: 52, // 6.4 wide x8, 64 tall
+  emberWisp: 48, // teardrop core ~6 wide x8, ribbons above
+  lavaGolem: 108, // ~15 wide x9 at the shoulders, ~175 tall on its legs
+  fireImp: 52, // 5.4 wide x8, ~70 tall to the horn tips
   infernalDrake: 140, // body ~7 x20, wings far wider
   climber: 40, // ~25 wide x58 tall, arms up; its back and helmet face the ride
   rat: 44, // x9: ~48 long x20 wide, plus a ~40 tail

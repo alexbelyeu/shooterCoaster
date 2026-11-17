@@ -59,9 +59,10 @@ const ENEMY_SUBJECTS: Record<EnemyType | 'goldenBalloon', Spec> = {
   snowman: { front: 0, motion: at(cycle(3)), animated: true },
   snowmanScout: { front: 0, motion: at(cycle(3.5)), animated: true },
   snowmanBrute: { front: 0, motion: at(cycle(3)), animated: true },
-  emberWisp: { front: 0, motion: at(cycle(2)), animated: true },
-  lavaGolem: { front: 0, motion: at(cycle(2)), animated: true },
-  fireImp: { front: 0, motion: at(cycle(4)), animated: true },
+  // These three turn to the rider: their heading is cleared so the angle strip goes round them.
+  emberWisp: { front: 0, holdHeading: 'model', motion: at(cycle(1.3)), animated: true },
+  lavaGolem: { front: 0, holdHeading: 'model', motion: at(cycle(2.2)), animated: true },
+  fireImp: { front: 0, holdHeading: 'model', motion: at(1 / 1.8), animated: true },
   infernalDrake: { front: 0, holdHeading: 'model', motion: at(cycle(3)), animated: true },
   // Its face is to the wall: `front` shows what the rider sees, its back. The strip is two moves, left hand then right.
   climber: { front: 0, motion: at(2 * (CLIMB.reach + CLIMB.pull + CLIMB.rest)), animated: true, stage: 'wall' },
