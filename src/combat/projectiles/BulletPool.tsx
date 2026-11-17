@@ -2,7 +2,7 @@ import { useRef, useMemo, useCallback, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
-import { getCollisionTargets, processHit } from '@/combat/CollisionManager'
+import { getCollisionTargets, processFlaggedHits } from '@/combat/CollisionManager'
 import { MAX_PIERCE } from '@/combat/weapons/weaponTypes'
 import { muzzleTip } from '@/combat/hitFeedback'
 import { e2eBullets, isE2E } from '@/testing/e2eHook'
@@ -193,13 +193,7 @@ export default function BulletPool({
       }
 
       // Phase 2: process hits — side effects happen outside the hot loop
-      for (let t = 0; t < targets.length; t++) {
-        const target = targets[t]
-        if (target.hitThisFrame) {
-          target.hitThisFrame = false
-          processHit(target, target.firstHitThisFrame)
-        }
-      }
+      processFlaggedHits()
     }
   })
 

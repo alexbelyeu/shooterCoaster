@@ -28,24 +28,22 @@ const milestone = (name: string) => noteMilestone(hitchLog, name, performance.no
 
 /** This chunk's file name: the stack frames a label skips, the wrappers' own. */
 const SELF_FILE = import.meta.url.slice(import.meta.url.lastIndexOf('/') + 1)
-/** Labels of callbacks passed more than once (R3F's loop every frame, an interval's handler): one stack each. */
-const labels = new WeakMap<object, string>()
-
-function labelOf(fn: object): string {
-  let label = labels.get(fn)
-  if (label === undefined) {
-    label = callerLabel(new Error().stack, SELF_FILE)
-    labels.set(fn, label)
-  }
-  return label
-}
-
 type Callback = (...args: never[]) => unknown
+type Kind = 'raf' | 'timers'
+
+/**
+ * One timed wrapper per callback and kind, built once: R3F's loop passes the same function every frame and an
+ * interval's handler is passed once, so the recorder allocates no closure or stack per call and its own garbage
+ * stays out of the "outside" share it reports. A one-shot `setTimeout(() => …)` still gets one each.
+ */
+const wrappers = { raf: new WeakMap<Callback, Callback>(), timers: new WeakMap<Callback, Callback>() }
 
 /** Times `fn` into `frameTime[kind]` and, while playing, into the log's per-source table. */
-function timed<F extends Callback>(fn: F, kind: 'raf' | 'timers'): F {
-  const label = labelOf(fn)
-  return ((...args: never[]) => {
+function timed<F extends Callback>(fn: F, kind: Kind): F {
+  const cached = wrappers[kind].get(fn)
+  if (cached) return cached as F
+  const label = callerLabel(new Error().stack, SELF_FILE)
+  const wrapper = ((...args: never[]) => {
     const start = performance.now()
     try {
       return fn(...args)
@@ -55,6 +53,8 @@ function timed<F extends Callback>(fn: F, kind: 'raf' | 'timers'): F {
       if (useGameStore.getState().phase === 'playing') noteCallback(hitchLog, label, start, end - start)
     }
   }) as F
+  wrappers[kind].set(fn, wrapper)
+  return wrapper
 }
 
 /**

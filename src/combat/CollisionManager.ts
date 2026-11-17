@@ -24,29 +24,26 @@ export interface EnemyHitEvent {
   position: THREE.Vector3
 }
 
-const targets = new Map<string, CollisionTarget>()
 /**
- * The same targets as an array, walked by index every frame (the bullets' hit test, aim assist): a `for…of` over
- * the map allocates an iterator per walk, and the hit test walked it once per live bullet (#596).
+ * Every registered target, walked by index every frame (the bullets' hit test, aim assist): a `for…of` over
+ * a Map allocates an iterator per walk, and the hit test walked it once per live bullet (#596). Registering
+ * and unregistering are cold paths, so they search it.
  */
 const targetList: CollisionTarget[] = []
-
-function removeFromList(target: CollisionTarget | undefined): void {
-  const i = target ? targetList.indexOf(target) : -1
-  if (i >= 0) targetList.splice(i, 1)
-}
 const hitEvent: EnemyHitEvent = { id: '', position: new THREE.Vector3() }
 
+function removeTarget(id: string): void {
+  const i = targetList.findIndex((t) => t.id === id)
+  if (i >= 0) targetList.splice(i, 1)
+}
+
 export function registerCollisionTarget(target: Omit<CollisionTarget, 'hitThisFrame' | 'firstHitThisFrame'>): void {
-  const entry = { ...target, hitThisFrame: false, firstHitThisFrame: false }
-  removeFromList(targets.get(target.id))
-  targets.set(target.id, entry)
-  targetList.push(entry)
+  removeTarget(target.id)
+  targetList.push({ ...target, hitThisFrame: false, firstHitThisFrame: false })
 }
 
 export function unregisterCollisionTarget(id: string): void {
-  removeFromList(targets.get(id))
-  targets.delete(id)
+  removeTarget(id)
 }
 
 export function getCollisionTargets(): readonly CollisionTarget[] {
@@ -69,9 +66,23 @@ export function processHit(target: CollisionTarget, countHit = true): void {
   target.onHit()
 }
 
+/**
+ * Process every target flagged `hitThisFrame` this frame. A hit handler can unregister targets (a kill, a
+ * pickup, a boss part retracting) or register new ones mid-walk, so the walk runs backwards: a removal at or
+ * before the current index never shifts an unvisited target past it, and targets pushed on the end are new
+ * and unflagged.
+ */
+export function processFlaggedHits(): void {
+  for (let t = targetList.length - 1; t >= 0; t--) {
+    const target = targetList[t]
+    if (target === undefined || !target.hitThisFrame) continue
+    target.hitThisFrame = false
+    processHit(target, target.firstHitThisFrame)
+  }
+}
+
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    targets.clear()
     targetList.length = 0
   })
 }
