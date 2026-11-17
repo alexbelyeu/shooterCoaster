@@ -16,7 +16,7 @@ export interface QualityProfile {
   /** Multiplier on ambient particle counts (`ParticleField`). */
   particleScale: number
   contactShadows: boolean
-  /** Octaves of the procedural noise shaders' `fbm` (`FBM_OCTAVES`: the Flame's fire, the volcano's smoke); `fbmOctaves()` cuts it on touch. */
+  /** Octaves of the procedural noise shaders' `fbm` (`FBM_OCTAVES` of `noiseGlsl.ts`' `fbm`: the Flame's fire, the volcano's smoke and lava); `fbmOctaves()` cuts it on touch. */
   fbmOctaves: number
 }
 
@@ -33,6 +33,11 @@ export function qualityProfile(quality: GraphicsQuality): QualityProfile {
 /** The one rule for `FBM_OCTAVES` (#582): the quality's octaves, at most 3 on touch screens. */
 export function fbmOctaves(profile: QualityProfile, coarsePointer: boolean): number {
   return coarsePointer ? Math.min(profile.fbmOctaves, 3) : profile.fbmOctaves
+}
+
+/** Share of a particle effect's full count to draw (the ambient fields, the Flame's tongues): the quality's `particleScale`, halved on touch screens. */
+export function particleShare(coarsePointer: boolean, particleScale: number): number {
+  return (coarsePointer ? 0.5 : 1) * particleScale
 }
 
 export function isGraphicsQuality(value: unknown): value is GraphicsQuality {

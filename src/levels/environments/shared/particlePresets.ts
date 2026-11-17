@@ -1,3 +1,4 @@
+import { particleShare } from '@/canvas/graphicsQuality'
 import type { ParticleBoost, ParticleFieldPreset } from './types'
 
 /** Ambient air per biome (`BiomeDefinition.particles`); dense or bright fields read as noise at 1280×720, so stay inside the test's bounds. */
@@ -199,7 +200,7 @@ export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticS
 
 /** Points to draw: always-on and boost-only. Touch screens get half (as `renderBudget.ts` cuts their pixels); the graphics quality's `particleScale` thins both. */
 export function particleCounts(preset: ParticleFieldPreset, coarsePointer: boolean, qualityScale = 1): { base: number; boost: number } {
-  const scale = (coarsePointer ? 0.5 : 1) * qualityScale
+  const scale = particleShare(coarsePointer, qualityScale)
   return {
     base: Math.round(preset.count * scale),
     boost: Math.round((preset.boost?.count ?? 0) * scale),

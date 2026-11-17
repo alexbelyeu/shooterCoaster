@@ -116,10 +116,11 @@ export const lavaFragmentShader = /* glsl */ `
 /**
  * Lava material: geometry `uv.x` 0..1 across a strip, `uv.y` the distance along it in strip widths (round crust cells); flows towards lower `uv.y`.
  * `channel`: a river lying in the ground, bright down its middle and crusted dark at its banks (the volcano's streaks are not).
+ * `octaves`: `FBM_OCTAVES`, from `useFbmOctaves()`.
  */
-export function createLavaMaterial(flowSpeed = 0.08, intensity = 1.2, channel = false): THREE.ShaderMaterial {
+export function createLavaMaterial(flowSpeed: number, intensity: number, channel: boolean, octaves: number): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    defines: channel ? { LAVA_CHANNEL: '' } : {},
+    defines: channel ? { LAVA_CHANNEL: '', FBM_OCTAVES: octaves } : { FBM_OCTAVES: octaves },
     // A channel is draped 1.5 units over the ground: keep it in front of the terrain it lies on
     polygonOffset: channel,
     polygonOffsetFactor: channel ? -2 : 0,

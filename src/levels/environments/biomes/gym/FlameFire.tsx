@@ -79,15 +79,16 @@ const tongueFragment = /* glsl */ `
   }
 
   void main() {
-    float x = vUv.x * 2.0 - 1.0;
-    float y = vUv.y;
+    // Clamped: MSAA samples an edge pixel's varyings at its centre, a little off the quad, and pow(1 - y) of y > 1 is NaN
+    float x = clamp(vUv.x, 0.0, 1.0) * 2.0 - 1.0;
+    float y = clamp(vUv.y, 0.0, 1.0);
     // Noise scrolling up through the tongue faster than it rises: the flicker inside it
     float n = fbm(vec2(x * 1.4 + vSeed * 19.0, y * 1.9 - uTime * 2.2 + vSeed * 11.0));
     float fine = gnoise(vec2(x * 3.6 - vSeed * 7.0, y * 4.5 - uTime * 3.7));
     // Licks: the tongue's spine wanders more towards its tip
     float xd = x + (n * 1.1 + fine * 0.3) * y;
     // A teardrop: round root, tapering tip
-    float halfWidth = 0.78 * pow(1.0 - y, 0.55) * smoothstep(0.0, 0.2, y) + 0.001;
+    float halfWidth = 0.78 * pow(max(1.0 - y, 0.0), 0.55) * smoothstep(0.0, 0.2, y) + 0.001;
     float body = clamp(1.0 - abs(xd) / halfWidth, 0.0, 1.0);
     float density = smoothstep(0.0, 0.85, body) * (1.0 - smoothstep(0.4, 0.95, y - n * 0.4));
     // Tears apart higher up into separate wisps

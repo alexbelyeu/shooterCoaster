@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fbmOctaves, GRAPHICS_QUALITIES, isGraphicsQuality, QUALITY_PROFILES, qualityFromQuery, qualityProfile } from './graphicsQuality'
+import { fbmOctaves, particleShare, GRAPHICS_QUALITIES, isGraphicsQuality, QUALITY_PROFILES, qualityFromQuery, qualityProfile } from './graphicsQuality'
 
 describe('graphics quality presets', () => {
   it('auto renders like high', () => {
@@ -38,5 +38,13 @@ describe('qualityFromQuery', () => {
     expect(qualityFromQuery('?e2e=1')).toBeNull()
     expect(qualityFromQuery('?quality=ultra')).toBeNull()
     expect(isGraphicsQuality(undefined)).toBe(false)
+  })
+})
+
+describe('particleShare', () => {
+  it('is the quality scale, halved on touch', () => {
+    expect(particleShare(false, 1)).toBe(1)
+    expect(particleShare(true, 1)).toBe(0.5)
+    expect(particleShare(true, 0.5)).toBe(0.25)
   })
 })

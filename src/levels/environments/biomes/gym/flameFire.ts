@@ -1,3 +1,4 @@
+import { particleShare } from '@/canvas/graphicsQuality'
 import { createRng } from '@/utils/rng'
 import { FLAME, GYM_SCALE, blockRings, footprint, piece, toWorld, type Vec3 } from './blockout'
 
@@ -133,7 +134,7 @@ export function buildFlameTongues(count = MAX_TONGUES, seed = 0x5f1a3e): FlameTo
 
 /** Tongues to draw: touch screens get half (as their particles), the graphics quality's `particleScale` thins them further. */
 export function tongueCount(coarsePointer: boolean, particleScale: number, max = MAX_TONGUES): number {
-  return Math.max(1, Math.round(max * (coarsePointer ? 0.5 : 1) * particleScale))
+  return Math.max(1, Math.round(max * particleShare(coarsePointer, particleScale)))
 }
 
 /** World heights of the mats, the Flame's top and the crest of its plume. */

@@ -6,6 +6,7 @@ import type { BiomeFeaturesProps } from '../../shared/types'
 import Volcano from '../../Volcano'
 import { VOLCANO_SITE } from '../../volcanoGeometry'
 import { createLavaMaterial } from '../../LavaShader'
+import { useFbmOctaves } from '@/canvas/useRenderBudget'
 import { createLavaRiverGeometries } from './lavaRivers'
 
 const ERUPTION_TRAUMA = 0.8
@@ -22,8 +23,9 @@ export default function VolcanicFeatures({ heightFn, groundFn, atmosphere, fogRe
   const riverPulseRef = useRef({ active: false, startTime: 0 })
 
   // Animated molten rock; bright enough that the hot cracks pass the Bloom threshold
-  const lavaRiverMat = useMemo(() => createLavaMaterial(0.08, RIVER_INTENSITY, true), [])
-  const lavaFlowMat = useMemo(() => createLavaMaterial(0.12, 1.8), [])
+  const octaves = useFbmOctaves()
+  const lavaRiverMat = useMemo(() => createLavaMaterial(0.08, RIVER_INTENSITY, true, octaves), [octaves])
+  const lavaFlowMat = useMemo(() => createLavaMaterial(0.12, 1.8, false, octaves), [octaves])
 
   const lavaRiverGeos = useMemo(() => createLavaRiverGeometries(groundFn), [groundFn])
 

@@ -14,4 +14,5 @@ get parallax and overlap for free from real 3D positions, are depth-tested again
 draw call and scale by instance count.
 **Consequences:** the fire is fill-bound by tongue count × size: thin it with `MAX_TONGUES` or the widths in
 `buildFlameTongues`, not by removing noise. Part 2 (light on the surroundings, smoke, heat haze, scorch) builds on
-these tongues. `FBM_OCTAVES` for every noise shader comes from `graphicsQuality.ts` `fbmOctaves` (#582).
+these tongues. `FBM_OCTAVES` for every shader on `noiseGlsl.ts`' `fbm` (the fire, the volcano's smoke and lava) comes from
+`graphicsQuality.ts` `fbmOctaves` (#582); the sky and aurora run their own fixed-octave noise.
