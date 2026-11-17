@@ -181,6 +181,15 @@ describe('startRun', () => {
     store().startRun('level1', 5)
     expect(store().runId).toBe(first + 1)
   })
+
+  it('keeps sceneReady for a restart of the warmed-up level, clears it for a new level (#597)', () => {
+    store().startRun('level1', 5)
+    store().setSceneReady(true)
+    store().startRun('level1', 5)
+    expect(store().sceneReady).toBe(true)
+    store().startRun('level2', 5)
+    expect(store().sceneReady).toBe(false)
+  })
 })
 
 describe('daily runs', () => {

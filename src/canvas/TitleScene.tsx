@@ -20,7 +20,6 @@ import { titleBeatGrid } from '@/audio/titleMusic'
 import { isUiTarget } from '@/input/pointerInput'
 import { markStartup } from '@/core/startupMarks'
 import { e2eTitleTime } from '@/testing/e2eHook'
-import { prefetchLevelScene } from './loadLevelScene'
 
 const BALLOON_DRIFT_RAD_S = 0.04
 const CROSSING_LIVERY: CoasterLivery = { rail: [0.92, 0.95, 1], spine: [0.15, 0.55, 1], body: '#2f6fd6', seat: '#1d4a9a' }
@@ -312,7 +311,6 @@ function TitleClickRaycaster() {
 
 /** Living theme-park panorama for the title screen */
 export default function TitleScene() {
-  useEffect(prefetchLevelScene, [])
   const ride = useMemo(() => createTitleRide(), [])
   const crossingRide = useMemo(() => createTitleRide(CROSSING_LOOP), [])
   const clock = useRef<TitleClock>({ scene: 0 }).current

@@ -121,30 +121,32 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     for (const m of enemyMaterials()) specimens.add(new THREE.Mesh(specimenGeo, m))
     scene.add(specimens)
 
-    // Sliced and hidden behind the countdown only: a run already playing (the countdown's cap ran out, `?e2e=1`)
-    // draws as it is, and the rest of the warm-up runs in one go.
-    const playing = () => useGameStore.getState().phase === 'playing'
-    // At most a third of a slow frame (a software renderer's are 200 ms with nothing drawn), so the warm-up still
+    // Sliced and hidden behind the countdown only: once the run has reached `playing` (the countdown's cap ran out,
+    // `?e2e=1`) the level draws as it is, a pause included, and the rest of the warm-up runs in one go.
+    let reachedPlay = useGameStore.getState().phase === 'playing'
+    // At most half of a slow frame (a software renderer's are 200 ms with nothing drawn), so the warm-up still
     // ends inside the countdown.
-    const budgetMs = (restOfFrameMs: number) => (playing() ? Infinity : Math.max(SLICE_BUDGET_MS, restOfFrameMs / 2))
+    const budgetMs = (restOfFrameMs: number) => (reachedPlay ? Infinity : Math.max(SLICE_BUDGET_MS, restOfFrameMs / 2))
     const mask = camera.layers.mask
-    const hide = () => {
-      if (!playing()) camera.layers.mask = 0
+    let warming = true
+    /** Hidden while warming up before play, and once the store has moved on to another level: Ready never shows the
+     *  outgoing world while the scene swap is pending (`SceneManager`'s transition). */
+    const applyMask = () => {
+      const leaving = useGameStore.getState().currentLevel !== levelId
+      camera.layers.mask = leaving || (warming && !reachedPlay) ? 0 : mask
     }
-    const show = () => {
-      camera.layers.mask = mask
-    }
-    hide()
+    applyMask()
     const unsubscribe = useGameStore.subscribe((s) => {
-      if (s.phase === 'playing') show()
+      if (s.phase === 'playing') reachedPlay = true
+      applyMask()
     })
     /** Compiles and warm-up draws gather the lights through the camera's layers: they need the real ones. */
     const withLayers = (fn: () => void) => {
-      show()
+      camera.layers.mask = mask
       try {
         fn()
       } finally {
-        hide()
+        applyMask()
       }
     }
 
@@ -153,8 +155,8 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     const cleanup = () => {
       if (cleaned) return
       cleaned = true
-      unsubscribe()
-      show()
+      warming = false
+      applyMask()
       scene.remove(specimens)
       specimenGeo.dispose()
       target.dispose()
@@ -162,7 +164,8 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
 
     const finish = () => {
       cleanup()
-      setSceneReady(true)
+      // A warm-up still finishing after the store moved on to another level must not open that level's Ready.
+      if (useGameStore.getState().currentLevel === levelId) setSceneReady(true)
       markStartup('warmupDone')
       if (testApi) testApi.shaderWarmup = { levelId, done: true, ms: performance.now() - started, programs: gl.info.programs?.length ?? 0 }
     }
@@ -202,6 +205,8 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     return () => {
       cancelAnimationFrame(afterEnvBake)
       cleanup()
+      unsubscribe()
+      camera.layers.mask = mask
       setSceneReady(false)
     }
   }, [get, levelId])

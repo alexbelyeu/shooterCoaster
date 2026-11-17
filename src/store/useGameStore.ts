@@ -162,6 +162,8 @@ export const useGameStore = create<GameState>()(
           runSeed: (seed ?? urlSeed() ?? fallback) >>> 0,
           runMode: mode,
           runId: s.runId + 1,
+          // A new level isn't warmed up yet: the outgoing level's `sceneReady` must not open its Ready (#597).
+          sceneReady: levelId === s.currentLevel && s.sceneReady,
           phase: startPhaseFor(urlSearch() ?? ''),
           resuming: false,
         }))
