@@ -16,16 +16,23 @@ export interface QualityProfile {
   /** Multiplier on ambient particle counts (`ParticleField`). */
   particleScale: number
   contactShadows: boolean
+  /** Octaves of the procedural noise shaders' `fbm` (`FBM_OCTAVES`: the Flame's fire, the volcano's smoke); `fbmOctaves()` cuts it on touch. */
+  fbmOctaves: number
 }
 
 export const QUALITY_PROFILES: Record<Exclude<GraphicsQuality, 'auto'>, QualityProfile> = {
-  high: { maxDpr: 2, multisampling: { fine: 8, coarse: 4 }, bloom: true, particleScale: 1, contactShadows: true },
-  medium: { maxDpr: 1.5, multisampling: { fine: 4, coarse: 2 }, bloom: true, particleScale: 0.75, contactShadows: true },
-  low: { maxDpr: 1, multisampling: { fine: 0, coarse: 0 }, bloom: false, particleScale: 0.5, contactShadows: false },
+  high: { maxDpr: 2, multisampling: { fine: 8, coarse: 4 }, bloom: true, particleScale: 1, contactShadows: true, fbmOctaves: 4 },
+  medium: { maxDpr: 1.5, multisampling: { fine: 4, coarse: 2 }, bloom: true, particleScale: 0.75, contactShadows: true, fbmOctaves: 4 },
+  low: { maxDpr: 1, multisampling: { fine: 0, coarse: 0 }, bloom: false, particleScale: 0.5, contactShadows: false, fbmOctaves: 3 },
 }
 
 export function qualityProfile(quality: GraphicsQuality): QualityProfile {
   return QUALITY_PROFILES[quality === 'auto' ? 'high' : quality] ?? QUALITY_PROFILES.high
+}
+
+/** The one rule for `FBM_OCTAVES` (#582): the quality's octaves, at most 3 on touch screens. */
+export function fbmOctaves(profile: QualityProfile, coarsePointer: boolean): number {
+  return coarsePointer ? Math.min(profile.fbmOctaves, 3) : profile.fbmOctaves
 }
 
 export function isGraphicsQuality(value: unknown): value is GraphicsQuality {

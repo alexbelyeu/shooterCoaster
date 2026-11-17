@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GRAPHICS_QUALITIES, isGraphicsQuality, QUALITY_PROFILES, qualityFromQuery, qualityProfile } from './graphicsQuality'
+import { fbmOctaves, GRAPHICS_QUALITIES, isGraphicsQuality, QUALITY_PROFILES, qualityFromQuery, qualityProfile } from './graphicsQuality'
 
 describe('graphics quality presets', () => {
   it('auto renders like high', () => {
@@ -19,6 +19,13 @@ describe('graphics quality presets', () => {
   it('low is 1× dpr, no bloom, no contact shadows, half the particles', () => {
     expect(QUALITY_PROFILES.low).toMatchObject({ maxDpr: 1, bloom: false, contactShadows: false, particleScale: 0.5 })
     expect(QUALITY_PROFILES.high).toMatchObject({ maxDpr: 2, bloom: true, contactShadows: true, particleScale: 1 })
+  })
+
+  it('has one rule for the noise shaders\' octaves: the quality\'s, at most 3 on touch', () => {
+    expect(fbmOctaves(QUALITY_PROFILES.high, false)).toBe(4)
+    expect(fbmOctaves(QUALITY_PROFILES.medium, false)).toBe(4)
+    expect(fbmOctaves(QUALITY_PROFILES.low, false)).toBe(3)
+    for (const profile of Object.values(QUALITY_PROFILES)) expect(fbmOctaves(profile, true)).toBe(3)
   })
 })
 

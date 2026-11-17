@@ -1,47 +1,37 @@
+import { createRng } from '@/utils/rng'
 import { FLAME, GYM_SCALE, blockRings, footprint, piece, toWorld, type Vec3 } from './blockout'
 
 /**
- * The Flame's fire (#520), laid out in the blockout's metres and scaled to the world: a skin of fire
- * lofted up its faces from the mats, a plume narrowing over its top where the tongues break up, the warm
- * pool its light throws on the mats, and the box its embers rise through. Pure: `FlameFire.tsx` draws it.
+ * The Flame's fire (#520, rebuilt in #595), laid out in the blockout's metres and scaled to the world: the
+ * tongues of flame that rise up its faces and off its top, the warm pool its light throws on the mats, and
+ * the box its embers rise through. Pure: `FlameFire.tsx` draws it.
+ *
+ * Each tongue is one soft flame sprite on a path of three points that hugs the Flame (its start, a point
+ * halfway and its end, each held out from the faces by half the tongue's width so it never cuts into the
+ * paint), rising along it over a life of its own and coming back on a new path every life.
  */
-
-/** Out from the Flame's faces, so the fire never z-fights its paint. */
-export const SKIN = 0.15
-/** Rings over the Flame's top: how far above it, and how far in from its top ring (the tongues narrow as they rise). */
-const PLUME: readonly { rise: number; inset: number }[] = [
-  { rise: 1.0, inset: 0.4 },
-  { rise: 2.2, inset: 1.0 },
-  { rise: 3.6, inset: 1.6 },
-]
 
 const DEG = Math.PI / 180
 const pad = piece('pad', 'pad-flame')
 /** The mats' top, where the fire starts and the light pool lies. */
 export const PAD_TOP = pad.base + pad.thick
 
-export interface FlameFireShell {
-  /** World positions, `rings × (ring points + 1)` (each ring repeats its first point to close the seam). */
-  positions: Float32Array
-  /** Per vertex: metres round the Flame (0 → `perimeter`, the same on every ring) and world height. */
-  fire: Float32Array
-  indices: number[]
-  /** World metres round the shell, where the fire's noise wraps. */
-  perimeter: number
-  /** World heights of the mats, the Flame's top and the plume's crest. */
-  base: number
-  top: number
-  crest: number
-}
+/** Tongues at full quality on a desktop; `tongueCount` thins them. */
+export const MAX_TONGUES = 260
+/** Share of the tongues licking up the faces; the rest rise off the Flame's top. */
+const FACE_SHARE = 0.72
+/** How far over the Flame's top the tallest tongues reach (blockout metres). */
+export const PLUME_RISE = 4.2
 
-function ringPerimeter(ring: readonly [number, number][]): number {
-  let length = 0
-  for (let i = 0; i < ring.length; i++) {
-    const [ax, az] = ring[i]
-    const [bx, bz] = ring[(i + 1) % ring.length]
-    length += Math.hypot(bx - ax, bz - az)
-  }
-  return length
+export interface FlameTongues {
+  count: number
+  /** Per tongue: the path's start (world xyz) and its heat (0..1). */
+  start: Float32Array
+  /** Per tongue: the path's middle and end (world xyz). */
+  mid: Float32Array
+  end: Float32Array
+  /** Per tongue: phase (0..1), life (s), width (world units), seed (0..1). */
+  params: Float32Array
 }
 
 /** A Flame-local point (along its length, up, across) in world units. */
@@ -52,62 +42,106 @@ function worldPoint(x: number, y: number, z: number): Vec3 {
   return toWorld({ x: p.x + x * c + z * s, y: p.base + y, z: p.z - x * s + z * c })
 }
 
-/** The fire's skin and plume: one closed loft, from the mats up the Flame's faces to the crest over its top. */
-export function buildFlameFireShell(): FlameFireShell {
-  const p = FLAME.piece
-  const faces = blockRings(p.profile)
-  const top = faces[faces.length - 1]
-  // From the mats' top (interpolating the face ring there), up the faces, then the plume
-  const rings: { f: number; y: number }[] = []
-  for (let k = 0; k + 1 < faces.length; k++) {
-    const lo = faces[k]
-    const hi = faces[k + 1]
-    if (hi.y <= PAD_TOP) continue
-    if (lo.y < PAD_TOP) rings.push({ f: lo.f + ((hi.f - lo.f) * (PAD_TOP - lo.y)) / (hi.y - lo.y), y: PAD_TOP })
-    else rings.push(lo)
-  }
-  rings.push(top)
-  for (const r of PLUME) rings.push({ f: top.f - r.inset, y: top.y + r.rise })
+const RINGS = blockRings(FLAME.piece.profile)
+const TOP = RINGS[RINGS.length - 1]
 
-  const outlines = rings.map((r) => footprint(p.w / 2 + r.f + SKIN, p.d / 2 + r.f + SKIN, p.chamfer))
-  const perimeter = ringPerimeter(outlines[outlines.length - 1]) * GYM_SCALE
-  const n = outlines[0].length
-  const positions = new Float32Array(rings.length * (n + 1) * 3)
-  const fire = new Float32Array(rings.length * (n + 1) * 2)
-  let v = 0
-  rings.forEach((ring, k) => {
-    const outline = outlines[k]
-    const length = ringPerimeter(outline)
-    let along = 0
-    for (let i = 0; i <= n; i++) {
-      const [x, z] = outline[i % n]
-      if (i > 0) {
-        const [px, pz] = outline[i - 1]
-        along += Math.hypot(x - px, z - pz)
-      }
-      const w = worldPoint(x, ring.y, z)
-      positions.set([w.x, w.y, w.z], v * 3)
-      // Each ring's share of its own outline, so the tongues fan out with the flare instead of shearing
-      fire.set([(along / length) * perimeter, w.y], v * 2)
-      v++
-    }
-  })
-  const indices: number[] = []
-  for (let k = 0; k + 1 < rings.length; k++) {
-    for (let i = 0; i < n; i++) {
-      const a = k * (n + 1) + i
-      const b = a + n + 1
-      indices.push(a, a + 1, b + 1, a, b + 1, b)
-    }
+/** How far out from the foot's outline the Flame's faces are at height `y` (blockout metres). */
+function faceOffset(y: number): number {
+  for (let k = 0; k + 1 < RINGS.length; k++) {
+    const lo = RINGS[k]
+    const hi = RINGS[k + 1]
+    if (y <= hi.y) return lo.f + ((hi.f - lo.f) * (Math.max(y, lo.y) - lo.y)) / (hi.y - lo.y)
   }
+  return TOP.f
+}
+
+/** The point `s` (0..1 of the way round) on a footprint ring offset `f`, and its outward normal (Flame-local x/z). */
+function outlinePoint(f: number, s: number): { x: number; z: number; nx: number; nz: number } {
+  const p = FLAME.piece
+  const ring = footprint(p.w / 2 + f, p.d / 2 + f, p.chamfer)
+  const lengths = ring.map(([ax, az], i) => {
+    const [bx, bz] = ring[(i + 1) % ring.length]
+    return Math.hypot(bx - ax, bz - az)
+  })
+  let left = s * lengths.reduce((a, b) => a + b, 0)
+  let i = 0
+  while (i < ring.length - 1 && left > lengths[i]) left -= lengths[i++]
+  const [ax, az] = ring[i]
+  const [bx, bz] = ring[(i + 1) % ring.length]
+  const t = left / lengths[i]
+  const x = ax + (bx - ax) * t
+  const z = az + (bz - az) * t
+  // The edge's normal, turned to point away from the centre
+  let nx = (bz - az) / lengths[i]
+  let nz = -(bx - ax) / lengths[i]
+  if (nx * x + nz * z < 0) [nx, nz] = [-nx, -nz]
+  return { x, z, nx, nz }
+}
+
+/**
+ * Where a tongue `s` of the way round is at height `y`, held `out` off the faces: on the faces up to the
+ * Flame's top, then drawn in over it as the fire narrows into its plume.
+ */
+function firePoint(s: number, y: number, out: number): Vec3 {
+  const above = Math.max(0, y - TOP.y)
+  const o = outlinePoint(above > 0 ? TOP.f - Math.min(above * 0.55, 2.3) : faceOffset(y), s)
+  const hold = above > 0 ? out * 0.4 : out
+  return worldPoint(o.x + o.nx * hold, y, o.z + o.nz * hold)
+}
+
+/** A point over the Flame's top, `r` (0..1) of the way from its middle to its top ring, `rise` above it. */
+function capPoint(s: number, r: number, rise: number): Vec3 {
+  const o = outlinePoint(TOP.f - Math.min(rise * 0.4, 1.8), s)
+  return worldPoint(o.x * r, TOP.y + rise, o.z * r)
+}
+
+/** The tongues, in a shuffled order so any first `n` of them are an even thinning (`tongueCount`). */
+export function buildFlameTongues(count = MAX_TONGUES, seed = 0x5f1a3e): FlameTongues {
+  const rng = createRng(seed)
+  const start = new Float32Array(count * 4)
+  const mid = new Float32Array(count * 3)
+  const end = new Float32Array(count * 3)
+  const params = new Float32Array(count * 4)
+  const put = (into: Float32Array, i: number, stride: number, p: Vec3) => into.set([p.x, p.y, p.z], i * stride)
+  for (let i = 0; i < count; i++) {
+    const s = rng()
+    const onFace = rng() < FACE_SHARE
+    const width = onFace ? rng.range(1.1, 2.0) : rng.range(1.4, 2.5)
+    const out = width * 0.55
+    let heat: number
+    if (onFace) {
+      // Low licks at the foot to tall tongues up the flare and over the lip
+      const y0 = rng.range(PAD_TOP, TOP.y - 0.4)
+      const rise = rng.range(1.3, 2.8)
+      put(start, i, 4, firePoint(s, y0, out))
+      put(mid, i, 3, firePoint(s, y0 + rise / 2, out))
+      put(end, i, 3, firePoint(s, y0 + rise, out))
+      heat = rng.range(0.8, 1.0)
+    } else {
+      const r = rng.range(0.15, 0.95)
+      const rise = rng.range(1.6, PLUME_RISE - 0.3)
+      put(start, i, 4, capPoint(s, r, 0.3))
+      put(mid, i, 3, capPoint(s, r * 0.85, 0.3 + rise / 2))
+      put(end, i, 3, capPoint(s, r * 0.6, 0.3 + rise))
+      heat = rng.range(0.6, 0.85)
+    }
+    start[i * 4 + 3] = heat
+    params.set([rng(), rng.range(0.9, 1.7), width * GYM_SCALE, rng()], i * 4)
+  }
+  return { count, start, mid, end, params }
+}
+
+/** Tongues to draw: touch screens get half (as their particles), the graphics quality's `particleScale` thins them further. */
+export function tongueCount(coarsePointer: boolean, particleScale: number, max = MAX_TONGUES): number {
+  return Math.max(1, Math.round(max * (coarsePointer ? 0.5 : 1) * particleScale))
+}
+
+/** World heights of the mats, the Flame's top and the crest of its plume. */
+export function fireHeights(): { base: number; top: number; crest: number } {
   return {
-    positions,
-    fire,
-    indices,
-    perimeter,
     base: worldPoint(0, PAD_TOP, 0).y,
-    top: worldPoint(0, top.y, 0).y,
-    crest: worldPoint(0, rings[rings.length - 1].y, 0).y,
+    top: worldPoint(0, TOP.y, 0).y,
+    crest: worldPoint(0, TOP.y + PLUME_RISE, 0).y,
   }
 }
 
