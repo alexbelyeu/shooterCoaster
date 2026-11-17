@@ -19,12 +19,12 @@ import { requestSlowMo } from '@/combat/slowMo.hot'
 import type { EnemyEntry } from '../enemies/EnemyBase'
 import { HOP } from '../enemies/hopGlideMotion'
 import {
-  ENTRY_SECONDS, ENTRY_STAGGER, clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallSwarm, trackPoint,
+  ENTRY_SECONDS, ENTRY_STAGGER, clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, trackPoint,
   tracksideSlots,
   type FormationMotion, type FormationSlot, type PlacementBounds, type RideAhead, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
 import {
-  ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
+  ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, bystanderSlots, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
 } from './enemyPlacement'
 import { enemyCounts, newWaveProgress, nextWaveDue, tickWaves, waveWindows } from './waveSchedule'
 
@@ -54,7 +54,7 @@ interface SpawnedEnemy {
   slot: FormationSlot | null
   trackside: TracksideSlot | null
   wall?: WallSlot
-  /** A swarm member: its wall is picked when the wave activates. */
+  /** A swarm member or a bystander: its wall is picked when the wave activates. */
   swarm?: SwarmSlot
   scoreValue: number
   radius: number
@@ -112,10 +112,11 @@ function generateEnemies(
     if (wave.bystanders) {
       const { type, count } = wave.bystanders
       if (ENEMY_PLACEMENT[type].scatter !== 'wall') throw new Error(`bystander ${type} must climb a wall`)
-      for (const wall of wallSlots(count, walls, rng)) {
-        const position = toVector3(wallPoint(wall.wall, wall.u, wall.v, WALL_STANDOFF, { x: 0, y: 0, z: 0 }))
+      if (walls.length === 0) throw new Error("bystanders climb the level's walls (LevelConfig.walls)")
+      // Their wall is picked when the wave activates, like a swarm's.
+      for (const swarm of bystanderSlots(count, rng)) {
         enemies.push({
-          id: `bystander-${id++}`, type, position, slot: null, trackside: null, wall, scoreValue: 0, radius: RADII[type], waveIndex: waveIdx, bystander: true,
+          id: `bystander-${id++}`, type, position: null, slot: null, trackside: null, swarm, scoreValue: 0, radius: RADII[type], waveIndex: waveIdx, bystander: true,
         })
       }
     }
@@ -266,11 +267,16 @@ export default function EnemySpawner({
       const ride = rideAhead[waveIdx]
       const inWave = enemies.filter((e) => e.waveIndex === waveIdx)
       const members = inWave.filter((e) => !e.bystander)
-      // On their walls already, like the wall enemies.
-      const bystanders = inWave.filter((e) => e.bystander).map((e): [string, Placed] => [e.id, { position: e.position! }])
-      return [...placeMembers(wave, ride, members, riderIndex, camera), ...bystanders]
+      const bystanders = inWave.filter((e) => e.bystander)
+      const onWalls = bystanders.length === 0 ? [] : placeWallClimbers({
+        table: trackTable, riderIndex, type: wave.bystanders!.type, walls, slots: bystanders.map((e) => e.swarm!), ride,
+      })
+      const placedBystanders = onWalls.map((wall, i): [string, Placed] => [
+        bystanders[i].id, { position: toVector3(wallPoint(wall.wall, wall.u, wall.v, WALL_STANDOFF, { x: 0, y: 0, z: 0 })), wall },
+      ])
+      return [...placeMembers(wave, ride, members, riderIndex, camera), ...placedBystanders]
     },
-    [waves, enemies, rideAhead, placeMembers],
+    [waves, enemies, rideAhead, placeMembers, trackTable, walls],
   )
 
   const initialActiveWave = useMemo(

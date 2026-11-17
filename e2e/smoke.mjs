@@ -1762,7 +1762,7 @@ async function bystanderProblems(page, id) {
   if (after.kills !== before.kills || after.hits !== before.hits) problems.push('bystander hit counted as a kill or a hit')
   if (after.bystandersHit !== 1) problems.push(`bystandersHit ${after.bystandersHit}, expected 1`)
   if (!hint) problems.push("no don't-shoot hint after the first bystander hit")
-  console.log(`  ${id} bystander: score ${before.score} → ${after.score}, combo ${before.combo} → ${after.combo} (${hit})`)
+  console.log(`  ${id} bystander: score ${before.score} → ${after.score}, combo ${before.combo} → ${after.combo} (${hit}, ${before.onScreenBystanders} climbers on screen)`)
   return problems
 }
 

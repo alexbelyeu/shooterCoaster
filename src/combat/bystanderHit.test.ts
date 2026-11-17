@@ -80,7 +80,7 @@ describe('hitting a bystander', () => {
       radiusSq: 2500,
       onHit: () => hitBystander('bystander-1', 'climber', at),
     })
-    processHit(getCollisionTargets().get('bystander-1')!)
+    processHit(getCollisionTargets().find((t) => t.id === 'bystander-1')!)
     expect(store()).toMatchObject({ kills: 0, hits: 0, bystandersHit: ['bystander-1'] })
     expect(enemyHit).not.toHaveBeenCalled()
   })

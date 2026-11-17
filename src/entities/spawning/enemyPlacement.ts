@@ -144,6 +144,21 @@ export function wallSlots(count: number, walls: readonly WallSurface[], rng: Rng
   })
 }
 
+/** Bystander climbers (#518) stand side by side this far apart along their wall, nudged up to a quarter of it either way. */
+export const BYSTANDER_SPACING = 90
+
+/**
+ * Bystander climbers' slots, placed on a wall when their wave activates (`spawnPlacement.ts` `placeWallClimbers`):
+ * `du` the nudge off its place in the row, `dv` its start as a fraction of the wall's height.
+ */
+export function bystanderSlots(count: number, rng: Rng): SwarmSlot[] {
+  return Array.from({ length: count }, () => ({
+    du: (rng() - 0.5) * 0.5 * BYSTANDER_SPACING,
+    dv: rng() * WALL_START_SPREAD,
+    seed: Math.floor(rng() * 0x7fffffff),
+  }))
+}
+
 /** A swarm member's place off its swarm's centre on the wall (`u` across, `v` up); `seed` picks its hops. */
 export interface SwarmSlot {
   du: number

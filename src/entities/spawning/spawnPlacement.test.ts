@@ -12,10 +12,13 @@ import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import {
   AIR_CLEARANCE, ENTRY_SECONDS, ENTRY_STAGGER, FORMATIONS, NEAR_FIELD, clampToBounds, entryPoint, formationFrame, formationSlots, groupStep,
   indexAhead, insideBounds, marchHeading, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
-  inView, placeWallSwarm, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
+  inView, placeWallClimbers, placeWallSwarm, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
   type ChoreographedFormation, type RideAhead, type Vec3,
 } from './spawnPlacement'
-import { ENEMY_PLACEMENT, SWARM_SPACING, WATER_DEPTH, WATER_Y, placedBesideTrack, swarmSlots, wallPoint } from './enemyPlacement'
+import {
+  ENEMY_PLACEMENT, SWARM_SPACING, WALL_START_SPREAD, WATER_DEPTH, WATER_Y, bystanderSlots, placedBesideTrack, swarmSlots, wallPoint,
+} from './enemyPlacement'
+import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
 import { waveWindows } from './waveSchedule'
 import { BIOMES } from '@/levels/environments/biomeRegistry'
@@ -465,5 +468,20 @@ describe('placeWallSwarm (#516)', () => {
 
   it('needs the level to have walls', () => {
     expect(() => placeWallSwarm({ table, riderIndex: 0, type: 'lanternfly', walls: [], slots, ride: STILL })).toThrow(/walls/)
+  })
+
+  it('stands bystander climbers (#518) in a row at the foot of the wall in front of the rider', () => {
+    const walls = [wallAt('behind', -400), wallAt('ahead', 400)]
+    const climbers = bystanderSlots(4, createRng(9))
+    const placed = placeWallClimbers({ table, riderIndex: 0, type: 'climber', walls, slots: climbers, ride: STILL })
+    expect(new Set(placed.map((p) => p.wall.id))).toEqual(new Set(['ahead']))
+    const us = placed.map((p) => p.u)
+    for (const p of placed) {
+      expect(p.u >= CLIMB.margin && p.u <= 240 - CLIMB.margin && p.v >= 0 && p.v <= WALL_START_SPREAD * 200).toBe(true)
+      expect(inView(view, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), maxReadableDistance('climber'))).toBe(true)
+    }
+    // Squeezed onto a 240-wide wall, still apart: each nudge is at most a quarter of the spacing either way.
+    for (let i = 1; i < us.length; i++) expect(us[i] - us[i - 1]).toBeGreaterThan(((240 - 2 * CLIMB.margin) / 4) * 0.5 - 1e-9)
+    expect(placed.map((p) => p.seed)).toEqual(climbers.map((s) => s.seed))
   })
 })
