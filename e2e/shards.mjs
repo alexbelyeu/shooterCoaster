@@ -13,7 +13,7 @@ export const STEPS = [...UI_STEPS, ...FIRST_LEVEL_STEPS, ...LEVEL_STEPS]
 /** Mirrors the smoke's check constants (WAVE_CHECK, BOSS_CHECKS…), which fail the run at start if they drift. */
 export const STEP_LEVELS = {
   wave: ['level2'],
-  boss: ['level1', 'level2', 'level3', 'level4', 'level5'],
+  boss: ['level1', 'level2', 'level3', 'level4', 'level5', 'level6'],
   pickup: ['level1'],
   audio: ['level1'],
 }
@@ -30,6 +30,16 @@ const NEEDS = {
 
 const PHONE_STEPS = ['mobile', 'mobileMenus']
 
+/**
+ * The nightly production run of the full smoke, split into parallel jobs (prod-smoke.yml's `nightly-part` matrix, #570):
+ * one run outgrew the job's 60 min cap once level 6 joined every deep step. Together they make every step of the full run once.
+ */
+export const NIGHTLY_PARTS = {
+  main: { steps: [...UI_STEPS, ...FIRST_LEVEL_STEPS, 'ride', 'shot', 'results', 'share'] },
+  deep: { steps: ['wave', 'boss', 'pickup', 'audio'] },
+  pacing: { steps: ['pacing'] },
+}
+
 /** One `smoke (<name>)` CI job each (ci.yml matrix, budgets.json `smokeSeconds`); `shot` and `results` don't depend on the level. */
 export const SHARDS = {
   ui: { steps: ['title', 'landing'] },
@@ -45,7 +55,13 @@ export const SHARDS = {
 }
 
 /** Steps + levels (null = all) from the smoke's flags; the default is every desktop step, plus the phone run with --mobile. */
-export function planRun({ shard, steps, levels, mobile, skipDesktop } = {}) {
+export function planRun({ shard, nightlyPart, steps, levels, mobile, skipDesktop } = {}) {
+  if (nightlyPart !== undefined) {
+    const spec = NIGHTLY_PARTS[nightlyPart]
+    if (!spec) throw new Error(`unknown nightly part "${nightlyPart}" (parts: ${Object.keys(NIGHTLY_PARTS).join(', ')})`)
+    if (shard !== undefined || steps !== undefined || levels !== undefined) throw new Error('--nightly-part sets the steps; drop --shard / --steps / --levels')
+    return checked(new Set(spec.steps), null)
+  }
   if (shard !== undefined) {
     const spec = SHARDS[shard]
     if (!spec) throw new Error(`unknown shard "${shard}" (shards: ${Object.keys(SHARDS).join(', ')})`)

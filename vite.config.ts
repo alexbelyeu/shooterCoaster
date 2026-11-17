@@ -18,6 +18,18 @@ function portalHtml(): Plugin {
   }
 }
 
+/** Level 6's track puts Alex's gym blockout in the startup JS: drop his notes on import, leaving his file as he wrote it (#544). */
+function stripBlockoutNotes(): Plugin {
+  return {
+    name: 'strip-blockout-notes',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!id.endsWith('/gym/blockout.json')) return null
+      return { code: JSON.stringify(JSON.parse(code), (key, value) => (key === 'note' || key === 'notes' ? undefined : value)), map: null }
+    },
+  }
+}
+
 // `vite build --mode portal` (`npm run build:portal`): relative asset URLs, so the zip plays from any sub-path.
 // `vite build --mode turntable` (`npm run turntable`): only the dev enemy turntable page, into dist-turntable/.
 export default defineConfig(({ mode }) => {
@@ -27,7 +39,7 @@ export default defineConfig(({ mode }) => {
   const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)
   return {
     base: portal ? './' : '/',
-    plugins: portal ? [react(), portalHtml()] : [react()],
+    plugins: portal ? [react(), stripBlockoutNotes(), portalHtml()] : [react(), stripBlockoutNotes()],
     define: {
       // Vercel sets VERCEL=1 during its builds; gates Web Analytics (src/app/analyticsGate.ts). Portal builds never send it.
       __BUILT_ON_VERCEL__: JSON.stringify(process.env.VERCEL === '1' && !portal),

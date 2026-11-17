@@ -6,7 +6,8 @@ import { countOf, DbError, filterQuery, restTable, type FetchImpl } from './supa
 export { DbError }
 
 export interface ScoresDb {
-  top(level: string): Promise<PublicEntry[]>
+  /** The level's best `BOARD_SIZE` rows scoring at most `maxScore`. */
+  top(level: string, maxScore: number): Promise<PublicEntry[]>
   /** PostgREST filters: `{ column: 'op.value' }`. */
   count(filters: Record<string, string>): Promise<number>
   insert(row: Submission & { ipHash: string }): Promise<void>
@@ -16,8 +17,8 @@ export function scoresDb(env: Record<string, string | undefined>, fetchImpl?: Fe
   const call = restTable(env, 'scores', fetchImpl)
   if (!call) return null
   return {
-    async top(level) {
-      const res = await call(`?select=initials,score,created_at&level_id=eq.${encodeURIComponent(level)}&order=score.desc,created_at.asc&limit=${BOARD_SIZE}`, { method: 'GET' })
+    async top(level, maxScore) {
+      const res = await call(`?select=initials,score,created_at&level_id=eq.${encodeURIComponent(level)}&score=lte.${maxScore}&order=score.desc,created_at.asc&limit=${BOARD_SIZE}`, { method: 'GET' })
       const rows: unknown = await res.json().catch(() => null)
       if (!Array.isArray(rows)) throw new DbError('bad rows')
       return rows.map((r: { initials: string; score: number; created_at: string }) => ({ initials: r.initials, score: r.score, at: r.created_at }))

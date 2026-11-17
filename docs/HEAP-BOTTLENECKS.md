@@ -84,6 +84,7 @@
 
 - **Reuse** vectors/quaternions (e.g. `useRef(new THREE.Vector3())`, `useRef(new THREE.Quaternion())`) instead of `new THREE.Vector3()` in loops or every frame.
 - **TrackMesh** already uses many `new THREE.Vector3()` etc. inside `buildTrackGeometry`; that runs once per curve, so acceptable. Prefer reuse in `useFrame` and other per-frame logic.
+- **Lint (#461):** `sc/no-hot-path-alloc` fails `new`, object / array literals, spreads, closures, template strings, `Array.from` and `.map/.filter/.slice/.concat/.flat/.clone()` inside a `useFrame` callback and inside any function of a `*.hot.ts` module. Per-frame helpers live in `*.hot.ts` files (`bulletMotion`, `comboRuntime`, `slowMo`, `screenShake`, `cameraRig`, `cameraFov`, `rideProgress`, `titleCamera`, the rat, dust bunny, scorpion, yeti and titan motion) with their scratch objects at module scope; a once-per-mount factory or a guarded cold branch carries `// eslint-disable-next-line sc/no-hot-path-alloc -- <why>`.
 
 ---
 

@@ -65,8 +65,9 @@
  *   node e2e/smoke.mjs --shard level3                   # one CI shard (e2e/shards.mjs), with its smokeSeconds budget
  *   node e2e/smoke.mjs --steps ride,boss --levels level2   # just those steps (names in e2e/shards.mjs)
  *   node e2e/smoke.mjs --steps pacing --levels level2   # time with nothing to shoot over a whole run (pacing.json)
+ *   node e2e/smoke.mjs --nightly-part deep --url <site>   # one of the nightly's parallel parts (e2e/shards.mjs NIGHTLY_PARTS)
  *
- * Without --shard / --steps this is the full run (the nightly's depth); CI's PR shards run part of it (#372).
+ * Without --shard / --steps / --nightly-part this is the full run (the nightly's depth, run nightly as three parallel parts); CI's PR shards run part of it (#372).
  *
  * --dist / --base: preview that build folder under that sub-path (`npm run smoke:portal`),
  * proving its relative asset URLs. Every local run fails on a request to another origin,
@@ -118,9 +119,11 @@ const COMBAT_STEP_MAX = 0.25
 const RIDE_RATE = Number(arg('ride-rate', 0.14))
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(arg('seed', 1337))
-// --cpu-throttle <rate>: the ride step on a slow machine (#536), CDP's CPU throttling from the level's start;
-// records the longest frame and the frames over 100 ms per level. Reported, not failed, until the fixes land.
+// --cpu-throttle <rate>: the ride step on a slow machine (#536), CDP's CPU throttling for the ride;
+// records its longest frame and its frames of 100 ms or more per level, from the end of the warm-up (#541). Reported, not failed, until the fixes land.
 const CPU_THROTTLE = Number(arg('cpu-throttle', 1))
+// --level-chunk-delay <ms>: every page gets the lazy level chunk this late, the slow runner of #464; every step must pass with it.
+const LEVEL_CHUNK_DELAY_MS = Number(arg('level-chunk-delay', 0))
 const DIST = arg('dist', 'dist')
 // Level the speed check rides (default: the first level in the run), e.g. a water level for the streaks over the sea.
 const SPEED_LEVEL = arg('speed-level')
@@ -130,7 +133,7 @@ let preview // module scope so the top-level catch can kill it
 const results = [] // module scope so the time-budget watchdog can write what ran
 let PLAN
 try {
-  PLAN = planRun({ shard: arg('shard'), steps: arg('steps'), levels: arg('levels'), mobile: arg('mobile') !== undefined, skipDesktop: arg('skip-desktop') !== undefined })
+  PLAN = planRun({ shard: arg('shard'), nightlyPart: arg('nightly-part'), steps: arg('steps'), levels: arg('levels'), mobile: arg('mobile') !== undefined, skipDesktop: arg('skip-desktop') !== undefined })
 } catch (e) {
   console.error(`smoke: ${e.message}`)
   process.exit(2)
@@ -271,6 +274,23 @@ async function captureEnemyCloseup(page, id, ridePng) {
 }
 
 const getStats = (page) => page.evaluate(() => window.__SC_TEST__.stats())
+
+async function delayLevelChunk(page) {
+  await page.route(/\/LevelScene-[^/]*\.js$/, async (route) => {
+    await new Promise((r) => setTimeout(r, LEVEL_CHUNK_DELAY_MS))
+    await route.continue()
+  })
+}
+
+/** `?e2e=1` starts a run in `playing` before its lazy scene is there: on a slow runner steps measured the composer alone (#464). */
+const levelReady = (page) =>
+  page.waitForFunction(() => window.__SC_TEST__.levelReady(), null, { timeout: 60000, polling: 100 }).then(() => true, () => false)
+
+async function startLevelReady(page, id) {
+  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [id, SEED])
+  return levelReady(page)
+}
+const NOT_LOADED = (id) => `the ${id} scene never loaded (levelReady)`
 
 
 /**
@@ -570,7 +590,7 @@ function programsAfterWarmup(page) {
 const GROWTH_SHOWN = 6
 
 function throttleSummary(t) {
-  return t ? ` cpu ${t.rate}x: longest frame ${t.maxMs.toFixed(0)} ms, frames >100 ms: ${t.count}` : ''
+  return t ? ` cpu ${t.rate}x: longest frame ${t.maxMs.toFixed(0)} ms, frames of 100 ms or more: ${t.count}` : ''
 }
 
 function programGrowthSummary(p) {
@@ -806,7 +826,29 @@ async function onlineSubmitProblems(page, id, online, score) {
   if (!world) problems.push('online board: never switched to the World board after the submission')
   else if (board.label !== 'World' || board.rank !== '1' || board.mine !== 'RES' || board.rows !== 10)
     problems.push(`online board: shows ${JSON.stringify(board)}, expected World with RES 2nd of 10`)
+  else problems.push(...(await worldShareProblems(page, id, 1)))
   return { problems, result: { submitted: run, board } }
+}
+
+/** #445: once the World board places the run, Copy link copies the rank line and Save image saves the card with its ribbon (`<id>-card-world.png`). */
+async function worldShareProblems(page, id, rank) {
+  const problems = []
+  const want = await page.evaluate((r) => window.__SC_TEST__.shareText(r), rank)
+  if (!want?.startsWith(`I'm #${rank + 1} in the world on `)) problems.push(`world share: shareText(${rank}) is ${JSON.stringify(want)}, not the rank line`)
+  await page.locator('.results-share').click({ timeout: 30000 }).catch((e) => problems.push(`world share: click Share: ${e.message}`))
+  await page.locator('.share-copy').click({ timeout: 10000 }).catch((e) => problems.push(`world share: click Copy link: ${e.message}`))
+  const copied = await page
+    .waitForFunction(() => document.querySelector('.share-copy')?.textContent === 'Copied!', null, { timeout: 10000, polling: 100 })
+    .then(() => true, () => false)
+  const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null)
+  if (!copied || clip !== want) problems.push(`world share: Copy link copied ${JSON.stringify(clip)}, expected ${JSON.stringify(want)}`)
+  const [file] = await Promise.all([
+    page.waitForEvent('download', { timeout: 20000 }).catch(() => null),
+    page.locator('[data-target="image_download"]').click({ timeout: 10000 }).catch((e) => problems.push(`world share: click Save image: ${e.message}`)),
+  ])
+  if (!file) problems.push('world share: Save image started no download')
+  else await file.saveAs(path.join(OUT, `${id}-card-world.png`))
+  return problems
 }
 
 /** Local leaderboard (#40): a run seeded to place at `rank` takes initials by keyboard (R and S are letters there) and persists them. */
@@ -922,7 +964,7 @@ async function frenzyEndProblems(page, id, online) {
   })
   await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
   const after = await page.evaluate(() => ({ timeScale: window.__SC_TEST__.stats().timeScale, ducked: window.__SC_TEST__.audio().musicDucked }))
-  // The results fade in behind AnimatePresence and reveal on timers: on a slow runner that can pass 30 s.
+  // The results fade in behind AnimatePresence and reveal on timers (~3.5 s): 90 s only fails a stalled screen (#367).
   const revealed = await page
     .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 90000, polling: 100 })
     .then(() => true, () => false)
@@ -981,6 +1023,22 @@ async function scoreCardProblems(page, prefix, fileName) {
   return { problems, sizes }
 }
 
+/** Watches share item `target` for "Copied!" from before its click (#464): a poll started after a slow click missed its 2 s. */
+async function watchCopied(page, target) {
+  await page.evaluate((t) => {
+    const seen = (window.__SC_COPIED__ ??= {})
+    seen[t] = false
+    const observer = new MutationObserver(() => {
+      if (document.querySelector(`[data-target="${t}"]`)?.textContent !== 'Copied!') return
+      seen[t] = true
+      observer.disconnect()
+    })
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+  }, target)
+  return (timeout) =>
+    page.waitForFunction((t) => window.__SC_COPIED__[t], target, { timeout, polling: 100 }).then(() => true, () => false)
+}
+
 /** #271: the share menu (every target, in the viewport, off the other buttons, keyboard); never clicks a network link,
  *  since a local run fails on other-origin requests. Pass `expectClipboard` only where clipboard-read is granted (it also
  *  checks Copy image), `download` (the expected file name) to click Save image. */
@@ -1026,22 +1084,20 @@ async function shareMenuProblems(page, label, { shot, expectClipboard, download 
   }
   if (shot) await page.screenshot({ path: path.join(OUT, shot), timeout: SHOT_TIMEOUT })
   if (expectClipboard !== undefined) {
-    await page.locator('[data-target="image_copy"]').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Copy image: ${e.message}`))
-    const imageCopied = await page
-      .waitForFunction(() => document.querySelector('[data-target="image_copy"]')?.textContent === 'Copied!', null, { timeout: 20000, polling: 100 })
-      .then(() => true, () => false)
+    const imageCopied = await watchCopied(page, 'image_copy')
+    await page.locator('[data-target="image_copy"]').click({ timeout: 10000, noWaitAfter: true }).catch((e) => problems.push(`${label}: click Copy image: ${e.message}`))
+    const imageShown = await imageCopied(20000)
     const image = await page.evaluate(async () => {
       const item = (await navigator.clipboard.read()).find((i) => i.types.includes('image/png'))
       if (!item) return null
       const bitmap = await createImageBitmap(await item.getType('image/png'))
       return `${bitmap.width}x${bitmap.height}`
     }).catch((e) => `error ${e.message}`)
-    if (!imageCopied) problems.push(`${label}: Copy image did not show "Copied!"`)
+    if (!imageShown) problems.push(`${label}: Copy image did not show "Copied!"`)
     else if (image !== '1200x630') problems.push(`${label}: Copy image put ${image} on the clipboard, not the 1200x630 card`)
-    await page.locator('.share-copy').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Copy link: ${e.message}`))
-    const copied = await page
-      .waitForFunction(() => document.querySelector('.share-copy')?.textContent === 'Copied!', null, { timeout: 10000, polling: 100 })
-      .then(() => true, () => false)
+    const linkCopied = await watchCopied(page, 'copy')
+    await page.locator('.share-copy').click({ timeout: 10000, noWaitAfter: true }).catch((e) => problems.push(`${label}: click Copy link: ${e.message}`))
+    const copied = await linkCopied(10000)
     const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null)
     if (!copied) problems.push(`${label}: Copy link did not show "Copied!"`)
     else if (clip !== expectClipboard) problems.push(`${label}: clipboard ${JSON.stringify(clip)} != ${JSON.stringify(expectClipboard)}`)
@@ -1065,7 +1121,7 @@ async function shareMenuProblems(page, label, { shot, expectClipboard, download 
     await page.locator('.results-share').click({ timeout: 30000 }).catch((e) => problems.push(`${label}: reopen Share: ${e.message}`))
     const [file] = await Promise.all([
       page.waitForEvent('download', { timeout: 20000 }).catch(() => null),
-      page.locator('[data-target="image_download"]').click({ timeout: 10000 }).catch((e) => problems.push(`${label}: click Save image: ${e.message}`)),
+      page.locator('[data-target="image_download"]').click({ timeout: 10000, noWaitAfter: true }).catch((e) => problems.push(`${label}: click Save image: ${e.message}`)),
     ])
     if (!file) problems.push(`${label}: Save image started no download`)
     else if (file.suggestedFilename() !== download) problems.push(`${label}: Save image saved ${file.suggestedFilename()}, not ${download}`)
@@ -1110,8 +1166,8 @@ const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-b
 /** Max angle between the barrel and the tracer on screen (#65). */
 const WEAPON_MAX_AIM_DEG = 25
 /** Caps on the coaster camera weight (#123): MAX_BANK_DEG / MAX_PITCH_DEG in
- *  src/track/cameraRig.ts and SPEED_FOV_DEG + DROP_FOV_DEG in src/track/cameraFov.ts. */
-/** Camera weight maxima past the caps the game publishes from its source constants (cameraRig.ts, cameraFov.ts). */
+ *  src/track/cameraRig.hot.ts and SPEED_FOV_DEG + DROP_FOV_DEG in src/track/cameraFov.hot.ts. */
+/** Camera weight maxima past the caps the game publishes from its source constants (cameraRig.hot.ts, cameraFov.hot.ts). */
 function cameraWeightProblems(w) {
   const caps = w.caps
   if (!caps) return ['cameraWeight.caps missing from the test hook']
@@ -1380,13 +1436,14 @@ async function seedCheck(page, level) {
 }
 
 /** Fake a tab hide / show (headless Chromium can't); returns stats read in the same JS turn, so no frame lands in between. */
-const setHidden = (page, hidden) => page.evaluate((h) => {
+const setHidden = (page, hidden, primeCombo = 0) => page.evaluate(([h, prime]) => {
+  if (prime) window.__SC_TEST__.primeCombo(prime)
   const stats = window.__SC_TEST__.stats()
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (h ? 'hidden' : 'visible') })
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => h })
   document.dispatchEvent(new Event('visibilitychange'))
   return stats
-}, hidden)
+}, [hidden, primeCombo])
 
 const waveAnnounces = (page) => page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'announce').length)
 
@@ -1412,7 +1469,7 @@ const rideAdvance = (a, b) => (((b - a) % 1) + 1) % 1
  * the Resume countdown; then the ride goes on from the same spot and the next wave comes at its original level time (#152).
  */
 async function hiddenPauseCheck(page, levelId) {
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+  if (!(await startLevelReady(page, levelId))) return { id: 'hidden-pause', problems: [NOT_LOADED(levelId)] }
   await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
   await page.evaluate(() => window.__SC_TEST__.killNearest(2))
   await waitFrames(page, 2, { maxMs: 20000 })
@@ -1420,11 +1477,9 @@ async function hiddenPauseCheck(page, levelId) {
   const vp = page.viewportSize()
   await page.mouse.move(vp.width / 2, vp.height / 2)
   await page.mouse.down()
-  const heldBefore = await page.evaluate(() => {
-    window.__SC_TEST__.primeCombo(3)
-    return window.__SC_TEST__.triggerHeld()
-  })
-  const before = await setHidden(page, true)
+  const heldBefore = await page.evaluate(() => window.__SC_TEST__.triggerHeld())
+  // Primed in the hide's own JS turn (#464): one frame between them longer than the 2 s combo window broke the chain.
+  const before = await setHidden(page, true, 3)
   const frozenAt = await frozenState(page)
   const heldAfter = await page.evaluate(() => window.__SC_TEST__.triggerHeld())
   await page.mouse.up()
@@ -1575,7 +1630,7 @@ async function pauseCardLayout(page) {
  */
 async function pauseMenuCheck(page, levelId) {
   const problems = []
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+  if (!(await startLevelReady(page, levelId))) return { id: 'pause-menu', problems: [NOT_LOADED(levelId)] }
   await waitFrames(page, 3, { minMs: 3000, maxMs: 30000 })
   const name = await page.evaluate((id) => window.__SC_TEST__.levels().find((l) => l.id === id)?.name ?? null, levelId)
   await page.evaluate(() => window.__SC_TEST__.killNearest(1))
@@ -1615,6 +1670,18 @@ async function pauseMenuCheck(page, levelId) {
   if (after.kills !== 0 || after.score !== 0) problems.push(`Restart kept the run's kills / score (${after.kills} / ${after.score})`)
   if (!(levelTime !== null && levelTime < levelTimeBefore)) problems.push(`Restart kept the level timer (${levelTimeBefore.toFixed(1)} -> ${levelTime?.toFixed(1)} s in)`)
   if (!(after.ride < rideBefore)) problems.push(`Restart did not put the coaster back at the start (track ${rideBefore.toFixed(4)} -> ${after.ride.toFixed(4)})`)
+  // The HUD strip and the card must count this run's kills, not the last run's (#235).
+  await waitVisible(page, '.hud-kills-count', 10000)
+  const hudKills = await page.evaluate(() => document.querySelector('.hud-kills-count')?.textContent ?? null)
+  if (!hudKills?.startsWith('0/')) problems.push(`after Restart the HUD kill strip reads "${hudKills}", not 0`)
+  await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
+  await waitVisible(page, '.pause-card', 30000)
+  const cardKills = await page.evaluate(() => {
+    const dt = [...document.querySelectorAll('.pause-stats dt')].find((d) => d.textContent === 'Kills')
+    return dt?.nextElementSibling?.textContent?.trim() ?? null
+  })
+  if (!cardKills?.startsWith('0 /')) problems.push(`after Restart the pause card reads Kills "${cardKills}", not 0`)
+  await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
   return {
     id: 'pause-menu',
     problems,
@@ -1643,7 +1710,7 @@ async function rideFast(page, fraction) {
 
 /** Sense of speed (#27) at the default Screen-shake setting: streaks and bank at top speed, within the caps (speed.png). */
 async function speedCheck(page, levelId) {
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+  if (!(await startLevelReady(page, levelId))) return { id: 'speed', problems: [NOT_LOADED(levelId)] }
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
   let best = { fraction: SPEED_SCAN[0], roll: -1 }
   for (const fraction of SPEED_SCAN) {
@@ -1714,7 +1781,7 @@ const WAVE_TIMER_STEP = 0.25
 async function waveCheck(page) {
   const { level, type, label, minOnScreen } = WAVE_CHECK
   const problems = []
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  if (!(await startLevelReady(page, level))) return { id: 'wave', problems: [NOT_LOADED(level)] }
   await page.evaluate((l) => {
     const s = window.__SC_TEST__
     const push = s.waveEvents.push.bind(s.waveEvents)
@@ -1837,11 +1904,14 @@ async function pacingCheck(page, id) {
 
 /**
  * The finales the boss check summons: Theme Park's Golden Blimp (#181), Desert's Giant Scorpion (#318),
- * Ocean's Kraken (#183), Antarctica's Yeti (#319) and Inferno's Magma Titan (#320). `minOnScreen` first-phase weak points
+ * Ocean's Kraken (#183), Antarctica's Yeti (#319), Inferno's Magma Titan (#320) and the Climbing Gym's Medusa (#521). `minOnScreen` first-phase weak points
  * must be on screen after the boss alone has moved `settleS` s (the scorpion bursts out of the sand, the Kraken's tentacles
  * rise out of the water, the Yeti has climbed its ridge and thrown, the Titan has climbed out of the lava and opened its heart); `midSettleS` lets the last phase surface before `midShot`.
  * `firstPhase`: the id prefix(es) of the first phase. `minProjectiles`: thrown things (the Yeti's snowballs) on screen
- * in <level>-boss.png, each then shot through processHit as a normal kill that leaves the boss's hp alone.
+ * in <level>-boss.png, each then shot through processHit as a normal kill that leaves the boss's hp alone. `midPhases`: phases
+ * between the first and the last, each cleared after `midSettleS`. `rideTo`: the track fraction to ride to first, for a boss
+ * that stays where it is (the Medusa in the Starr) rather than coming to the rider. `passShots`: track fractions ridden to
+ * after `midShot`, each a `<level>-boss-pass-<percent>.png` (the ride past the leant-out Medusa).
  */
 const BOSS_CHECKS = [
   { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
@@ -1849,6 +1919,7 @@ const BOSS_CHECKS = [
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
   { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1 },
   { level: 'level5', minWidthFrac: 0.15, weakPoints: 4, firstPhase: ['vent-', 'heart'], lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 3, midSettleS: 0 },
+  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.75, passShots: [0.84, 0.9] },
 ]
 
 /**
@@ -1882,14 +1953,18 @@ async function stepBoss(page, seconds, ready) {
  * Game time is frozen while it is hit; if the wall-clock level timer still runs out, the step is skipped.
  */
 async function bossCheck(page, check) {
-  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS, minProjectiles = 0 } = check
+  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS, minProjectiles = 0, midPhases = 0, rideTo = null, passShots = [] } = check
   const problems = []
   const boss = () => page.evaluate(() => window.__SC_TEST__.boss())
   const events = () => page.evaluate(() => ({ ...window.__SC_TEST__.bossEvents }))
   const playing = async () => (await page.evaluate(() => window.__SC_TEST__.phase())) === 'playing'
-  await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  if (!(await startLevelReady(page, level))) return { id: 'boss', problems: [NOT_LOADED(level)] }
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
   const startStats = await getStats(page)
+  if (rideTo !== null) {
+    await page.evaluate((t) => { window.__SC_TEST__.rideTo = t }, rideTo)
+    await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  }
   await page.evaluate(() => window.__SC_TEST__.summonBoss())
   const spawned = await pollUntil(page, async () => (await events()).spawn > 0, { ms: 20000 })
   // A couple of frames so it is placed and drawn, then freeze it there.
@@ -1933,10 +2008,26 @@ async function bossCheck(page, check) {
   // Clear the first phase through processHit: what is left of its hp.
   const firstHp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
   const phaseOneHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), firstHp)
+  // Phases between the first and the last (the Medusa's second four snakes): each let surface, then cleared.
+  let midHits = 0
+  let midSurfaced = 0
+  for (let i = 0; i < midPhases; i++) {
+    await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+    midSurfaced += (await stepBoss(page, midSettleS, () => onScreen(1))) ?? midSettleS
+    const hp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
+    midHits += hp
+    await page.evaluate((n) => window.__SC_TEST__.bossHit(n), hp)
+  }
   const midway = await boss()
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const surfaced = await stepBoss(page, midSettleS, () => onScreen(1))
   await page.screenshot({ path: path.join(OUT, `${level}-${midShot}.png`), timeout: SHOT_TIMEOUT })
+  // Leant out for her last phase: the ride's last stretch past her, for a look that it stays clear of her bust.
+  for (const t of passShots) {
+    await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, t)
+    await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+    await page.screenshot({ path: path.join(OUT, `${level}-boss-pass-${Math.round(t * 100)}.png`), timeout: SHOT_TIMEOUT })
+  }
   const lastHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), midway.exposed.reduce((sum, e) => sum + e.hp, 0))
   const finalHits = await boss()
   // Let the last pop finish (slowly, so the confetti stays near) with its popup held.
@@ -1963,8 +2054,8 @@ async function bossCheck(page, check) {
     bulletHit, phaseOneHits, exposedMidway: midway.exposed.map((e) => e.id), lastHits, hpMidway: midway.hpFraction,
     stage: after.stage, kills: end.kills - startStats.kills, score: end.score - startStats.score, popup, skipped: false, projectiles,
   }
-  const hits = [...before.exposed, ...midway.exposed].reduce((sum, e) => sum + e.hp, 0)
-  result.fightSeconds = (settled ?? settleS) + (surfaced ?? midSettleS) + hits / BOSS_HITS_PER_SECOND
+  const hits = [...before.exposed, ...midway.exposed].reduce((sum, e) => sum + e.hp, midHits)
+  result.fightSeconds = (settled ?? settleS) + midSurfaced + (surfaced ?? midSettleS) + hits / BOSS_HITS_PER_SECOND
   if (!stillPlaying && !defeated) {
     result.skipped = true
     return { id: 'boss', problems, boss: result }
@@ -2011,7 +2102,7 @@ async function pickupCheck(page) {
   const problems = []
   const api = (fn, arg) => page.evaluate(fn, arg)
   const weaponState = () => api(() => window.__SC_TEST__.weaponState())
-  await api(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [level, SEED])
+  if (!(await startLevelReady(page, level))) return { id: 'pickup', problems: [NOT_LOADED(level)] }
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
   await api(() => window.__SC_TEST__.setTimeScale(0))
 
@@ -2292,7 +2383,7 @@ async function dailyCheck(newPage) {
 }
 
 /** The settings card (#35): inside the viewport, no sideways scroll, every control there and ≥ 44 px tall. */
-async function settingsLayout(page, label) {
+async function settingsLayout(page, label, { fromTitle = false } = {}) {
   const r = await page.evaluate(() => {
     const card = document.querySelector('.settings-card')
     const root = document.querySelector('.settings-screen')
@@ -2316,14 +2407,16 @@ async function settingsLayout(page, label) {
   if (r.hScroll) problems.push('settings scroll sideways')
   if (r.quality.length !== 4) problems.push(`${r.quality.length} quality options (${r.quality.join('/')}), expected Auto / Low / Med / High`)
   if (r.sliders !== 2) problems.push(`${r.sliders} volume sliders, expected music + effects`)
-  if (r.switches !== 2) problems.push(`${r.switches} switches, expected show FPS + reduced motion`)
+  const switches = fromTitle ? 3 : 2
+  if (r.switches !== switches) problems.push(`${r.switches} switches, expected show FPS + reduced motion${fromTitle ? ' + internal device' : ''}`)
   if (r.smallTargets) problems.push(`${r.smallTargets} settings control(s) under the 44 px touch target`)
   return { ...r, problems: problems.map((p) => `${label}: ${p}`) }
 }
 
 /**
  * Settings from the title (settings.png): the card's layout, Esc back to the title, and the quality +
- * music volume picked there still set after a reload.
+ * music volume picked there still set after a reload; the internal-device toggle (#446), last in the card,
+ * shows the title's "internal: not tracked" marker after that reload.
  */
 async function settingsCheck(page) {
   const problems = []
@@ -2331,9 +2424,17 @@ async function settingsCheck(page) {
   await page.locator('.settings-button').click({ timeout: 30000 })
   if (!(await waitVisible(page, '.settings-card', 30000))) return { id: 'settings', problems: ['the settings card never showed'] }
   await waitFrames(page, 1, { minMs: 400, maxMs: 8000 })
-  const layout = await settingsLayout(page, 'desktop 1280x720')
+  const layout = await settingsLayout(page, 'desktop 1280x720', { fromTitle: true })
   problems.push(...layout.problems)
   await page.screenshot({ path: path.join(OUT, 'settings.png'), timeout: SHOT_TIMEOUT })
+  const internalSwitch = page.locator('.settings-card input[role="switch"]').last()
+  const lastRow = await internalSwitch.evaluate((el) => {
+    const rows = [...document.querySelectorAll('.settings-card .settings-row')]
+    return rows.at(-1)?.contains(el) ? rows.at(-1).textContent : null
+  })
+  if (!lastRow?.startsWith('Internal device')) problems.push(`the card's last row is not the internal-device toggle (${lastRow})`)
+  if (await internalSwitch.isChecked()) problems.push('the internal-device toggle is on in a fresh browser')
+  await internalSwitch.click({ timeout: 30000 })
 
   const before = await page.evaluate(() => window.__SC_TEST__.graphics().quality)
   if (before !== 'auto') problems.push(`quality "${before}" by default, expected auto`)
@@ -2371,6 +2472,7 @@ async function settingsCheck(page) {
   })
   if (reloaded.quality !== 'low') problems.push(`quality "${reloaded.quality}" after a reload, expected low`)
   if (reloaded.musicVolume !== 0.3) problems.push(`music volume ${reloaded.musicVolume} after a reload, expected 0.3`)
+  if (!(await waitVisible(page, '.internal-marker', 30000))) problems.push('no "internal: not tracked" marker after turning on the internal-device toggle and reloading')
   return {
     id: 'settings',
     problems,
@@ -2385,7 +2487,7 @@ async function settingsCheck(page) {
 async function qualityCheck(newPage, levelId) {
   const sample = async (query, png) => {
     const { ctx, page, errors } = await newPage(query, { deviceScaleFactor: 2 })
-    await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
+    const ready = await startLevelReady(page, levelId)
     await waitFrames(page, 2, { minMs: 1500, maxMs: 30000 })
     await page.evaluate(() => {
       window.__SC_TEST__.setTimeScale(0)
@@ -2396,13 +2498,14 @@ async function qualityCheck(newPage, levelId) {
       const t = window.__SC_TEST__
       return { drawCalls: t.drawCalls, dpr: t.view()?.dpr, graphics: t.graphics(), shadows: !!t.sceneStats().byName['contact-shadows'], errors: t.errors }
     })
+    s.ready = ready
     if (png) await page.screenshot({ path: path.join(OUT, png), timeout: SHOT_TIMEOUT })
     await ctx.close()
     return { ...s, errors: [...errors, ...s.errors] }
   }
   const high = await sample('e2e=1')
   const low = await sample('e2e=1&quality=low', `${levelId}-low.png`)
-  const problems = []
+  const problems = [high, low].flatMap((s, i) => (s.ready ? [] : [`${['default', 'low'][i]}: ${NOT_LOADED(levelId)}`]))
   if (high.graphics.quality !== 'auto' || high.dpr !== 2) problems.push(`default: quality ${high.graphics.quality} at dpr ${high.dpr}, expected auto at 2`)
   if (low.graphics.quality !== 'low') problems.push(`?quality=low set the quality to "${low.graphics.quality}"`)
   if (low.dpr !== 1) problems.push(`low quality renders at dpr ${low.dpr}, expected 1`)
@@ -2416,9 +2519,52 @@ async function qualityCheck(newPage, levelId) {
 const engineRequests = (page) =>
   page.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/(player|synth)-[^/]*\.js$/.test(e.name)).length)
 
+/** Attract mode (#419, #493): idle at once, the menu steps aside, letterbox bars slide in and the camera blends to its closer shot
+ *  (`title-attract.png`); a pointer move (not a key: the first key press must still be what loads the score engine) brings the menu back. */
+async function titleAttractShot(page) {
+  const problems = []
+  await page.evaluate(() => (window.__SC_TEST__.titleAttractIdleMs = 0))
+  const entered = await page
+    .waitForSelector('.title-screen.is-attract .title-attract', { timeout: 10000 })
+    .then(() => true, () => false)
+  await page.evaluate(() => (window.__SC_TEST__.titleAttractIdleMs = null))
+  if (!entered) return { problems: ['the title never entered attract mode with titleAttractIdleMs 0'], result: null }
+  // The camera's blend to the attract shot (BLEND_S, 4 s) and the bars' 0.9 s slide.
+  await waitFrames(page, 2, { minMs: 4500, maxMs: 30000 })
+  const { width, height } = page.viewportSize()
+  const scene = await captureTitleScene(page, path.join(OUT, 'title-attract.png'), 10000)
+  if (looksBlank(scene)) problems.push('title-attract.png: the 3D scene looks blank')
+  // The bars are 9vh tall: a 7vh strip at the top and bottom must be black.
+  const strip = Math.floor(height * 0.07)
+  const bars = []
+  for (const y of [0, height - strip]) {
+    bars.push(await imageStats(page, await page.screenshot({ clip: { x: 0, y, width, height: strip }, timeout: SHOT_TIMEOUT })))
+  }
+  if (bars.some((b) => b.mean > 4)) problems.push(`attract mode's letterbox bars are not black (mean ${bars.map((b) => b.mean.toFixed(1)).join(' / ')})`)
+  await page.mouse.move(width / 2, height / 2)
+  await page.mouse.move(width / 2 + 20, height / 2 + 20)
+  const woke = await page
+    .waitForSelector('.title-screen:not(.is-attract)', { timeout: 10000 })
+    .then(() => true, () => false)
+  if (!woke) problems.push('a pointer move did not bring the title menu back from attract mode')
+  return { problems, result: { woke, bars: bars.map((b) => +b.mean.toFixed(1)) } }
+}
+
+/** Seconds per phase of a step (`lap(name)` closes the phase since the last lap), so a slow step's summary line says where its time went (#608). */
+function lapTimer() {
+  const laps = {}
+  let last = Date.now()
+  const lap = (name) => {
+    laps[name] = +((Date.now() - last) / 1000).toFixed(1)
+    last = Date.now()
+  }
+  lap.laps = laps
+  return lap
+}
+
 /** Title (#28): another camera angle 6 s later (`title-2.png`; its draw calls go on `drawCalls`), the start hint, and a key press fading to level select
  *  that also loads the score engine (#187: not before it), unlocks audio and starts the title score. */
-async function titleFlyBy(page, drawCalls) {
+async function titleFlyBy(page, drawCalls, lap) {
   const problems = []
   const pose = () => page.evaluate(() => window.__SC_TEST__.cameraPose())
   const a = await pose()
@@ -2427,8 +2573,10 @@ async function titleFlyBy(page, drawCalls) {
   const b = await pose()
   drawCalls.push(await page.evaluate(() => window.__SC_TEST__.drawCalls))
   const waited = (Date.now() - at) / 1000
+  lap('6s')
   // Re-shot like title.png: a GPU CI runner can return one black canvas capture (#291 CI), a black scene stays black.
   const scene2 = await captureTitleScene(page, path.join(OUT, 'title-2.png'), 10000)
+  lap('shot2')
   if (looksBlank(scene2)) problems.push(`title-2.png: the 3D scene behind the UI looks blank (mean ${scene2.mean.toFixed(1)} stddev ${scene2.stddev.toFixed(1)} colours ${scene2.distinctColors})`)
   // #344: a sparkle's centre on a pixel centre must blend to a colour in [0, 1], not NaN that Bloom spreads to a black frame
   const sparkle = await page.evaluate(() => window.__SC_TEST__.pointCentreColour('title-sparkles'))
@@ -2446,6 +2594,10 @@ async function titleFlyBy(page, drawCalls) {
   }
   const hint = await page.locator('.title-hint').textContent({ timeout: 5000 }).catch(() => null)
   if (!hint) problems.push('no start hint on the first title')
+  lap('hint')
+  const attract = await titleAttractShot(page)
+  lap('attract')
+  problems.push(...attract.problems)
 
   const engineBefore = { requests: await engineRequests(page), loaded: await page.evaluate(() => window.__SC_TEST__.audio().engineLoaded) }
   if (engineBefore.requests > 0 || engineBefore.loaded) problems.push('the score engine loaded before the first key press on the title')
@@ -2471,14 +2623,16 @@ async function titleFlyBy(page, drawCalls) {
     .waitForSelector('.screen-veil', { state: 'detached', timeout: 30000 })
     .then(() => true, () => false)
   if (!veilGone) problems.push('the fade to black never cleared over level select')
+  lap('key')
   const engineAfter = await page
     .waitForFunction(() => {
       const a = window.__SC_TEST__.audio()
       return a.engineLoaded && a.ready && a.scrim?.current === 'title'
     }, null, { timeout: 30000 })
     .then(() => true, () => false)
+  lap('engine')
   if (!engineAfter) problems.push('the key press on the title did not load the score engine, unlock audio and start the title score')
-  return { problems, result: { turnedDeg, moved, waited, hint, veiled, opened, engineBefore, engineAfter, sparkle } }
+  return { problems, result: { turnedDeg, moved, waited, hint, attract: attract.result, veiled, opened, engineBefore, engineAfter, sparkle } }
 }
 
 /** Longest the cold load may take to hand the poster over to the live scene before the poster check gives up. */
@@ -3091,6 +3245,7 @@ async function runMobile(browser, base) {
   // toolbars); DPR 2 instead of 3 keeps software rendering tolerable.
   const ctx = await browser.newContext({ ...iphone, viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
   const page = await ctx.newPage()
+  if (LEVEL_CHUNK_DELAY_MS > 0) await delayLevelChunk(page)
   const errors = []
   collectErrors(page, errors)
   const problems = []
@@ -3129,9 +3284,12 @@ async function runMobile(browser, base) {
   problems.push(...music.problems)
   const runSeed = await page.evaluate(() => window.__SC_TEST__.stats().runSeed)
   if (runSeed !== SEED) problems.push(`?seed=${SEED} did not set the run seed (got ${runSeed})`)
+  if (!(await levelReady(page))) problems.push(NOT_LOADED(MOBILE_LEVEL))
 
   if (!(await pollUntil(page, () => waitVisible(page, '.hud-pause-button', 500), { ms: 40000 }))) problems.push('HUD never appeared')
   await pollUntil(page, async () => (await getStats(page)).onScreenEnemies > 0, { ms: Math.max(SECONDS, 10) * 2000 })
+  // Level time held as in the desktop level steps (#305): on a slow runner the 60 s run ended before the Pause tap (#464).
+  await page.evaluate(() => { window.__SC_TEST__.holdLevelTime = true })
 
   const portraitAspect = await aspectProblems(page, 'portrait 390x844')
   problems.push(...portraitAspect.problems)
@@ -3333,6 +3491,7 @@ async function run() {
     // Settled level steps for the ride and pacing (`settledSteps.mjs`): defined before React loads.
     await ctx.addInitScript(installSettledStepper)
     const page = await ctx.newPage()
+    if (LEVEL_CHUNK_DELAY_MS > 0) await delayLevelChunk(page)
     const errors = []
     collectErrors(page, errors)
     await page.goto(`${base}/?${query}`, { waitUntil: whileLoading ? 'commit' : 'load' })
@@ -3360,24 +3519,29 @@ async function run() {
   })
 
   // 1. Title screen
-  const t = await newPage('e2e=1', {}, has('title') ? posterHandoff : null)
+  const t = await newPage('e2e=1&gpuSync=1', {}, has('title') ? posterHandoff : null)
   const levels = await t.page.evaluate(() => window.__SC_TEST__.levels())
   if (has('title')) {
     await step(async () => {
+      const lap = lapTimer()
       const titleWait = await waitFrames(t.page, MIN_FRAMES, { maxMs: FRAME_DEADLINE_MS, pollMs: 500 })
+      lap('frames')
       const titleImg = await captureTitleScene(t.page, path.join(OUT, 'title.png'), FRAME_DEADLINE_MS)
+      lap('shot')
       const drawCalls = [await t.page.evaluate(() => window.__SC_TEST__.drawCalls)]
-      const fly = await titleFlyBy(t.page, drawCalls)
+      const fly = await titleFlyBy(t.page, drawCalls, lap)
       const budget = await titleBudget(t.page, drawCalls)
       const poster = t.loading
-      const problems = [...fly.problems, ...poster.problems, ...(await posterWithoutJs(browser, base, t.page)), ...(await fontProblems(t.page))]
+      const noJs = await posterWithoutJs(browser, base, t.page)
+      lap('noJs')
+      const problems = [...fly.problems, ...poster.problems, ...noJs, ...(await fontProblems(t.page))]
       if (titleWait.frames < MIN_FRAMES) problems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
       if (looksBlank(titleImg)) problems.push('title.png: the 3D scene behind the UI looks blank')
       if (budget.over.length && PERF_GATE) problems.push(`title scene over budget: ${budget.over.join(', ')}`)
       if (t.errors.length) problems.push(`${t.errors.length} error(s)`)
       return {
         id: 'title', ok: problems.length === 0, problems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg,
-        title: fly.result, drawCalls: budget.drawCalls, scene: budget.scene, posterShots: poster.shots, errors: t.errors,
+        title: fly.result, drawCalls: budget.drawCalls, scene: budget.scene, posterShots: poster.shots, laps: lap.laps, errors: t.errors,
       }
     })
   }
@@ -3401,12 +3565,24 @@ async function run() {
   for (const id of has('ride') ? wanted : []) {
     const { ctx, page, errors } = await newPage()
     const started = Date.now()
-    if (CPU_THROTTLE > 1) {
-      const cdp = await ctx.newCDPSession(page)
+    const cdp = CPU_THROTTLE > 1 ? await ctx.newCDPSession(page) : null
+    if (cdp) {
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE })
-      await page.evaluate(() => { window.__SC_TEST__.longFrames = { maxMs: 0, count: 0 } })
+      // Ride frames only (#541): the level mount and the warm-up's compiles are part 2's (#597), not the ride's.
+      await page.evaluate(() => {
+        const s = window.__SC_TEST__
+        const reset = () => {
+          if (!s.shaderWarmup?.done) return requestAnimationFrame(reset)
+          s.maxFrameMs = 0
+          s.longFrames = 0
+        }
+        reset()
+      })
     }
     const ride = await rideToLevelTime(page, id, SECONDS, MIN_FRAMES)
+    const throttled = cdp ? { rate: CPU_THROTTLE, ...(await page.evaluate(() => ({ maxMs: window.__SC_TEST__.maxFrameMs, count: window.__SC_TEST__.longFrames }))) } : null
+    // Combat, the shot and the results run at full speed: their deadlines were set for it.
+    if (cdp) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 })
     // Frozen at SECONDS of level time until the enemy probe: the ride stats, perf gate, shot and probe share that moment.
     const stats = await page.evaluate(() => {
       const s = window.__SC_TEST__
@@ -3448,7 +3624,6 @@ async function run() {
       .finally(() => page.evaluate(() => { window.__SC_TEST__.holdLevelTime = false }).catch(() => {}))
     problems.push(...play.problems)
     const shaders = await programsAfterWarmup(page)
-    const throttled = CPU_THROTTLE > 1 ? { rate: CPU_THROTTLE, ...(await page.evaluate(() => window.__SC_TEST__.longFrames)) } : null
     const frenzyEnd = frenzy ? await frenzyEndProblems(page, id, online) : null
     if (frenzyEnd) problems.push(...frenzyEnd.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
@@ -3564,8 +3739,8 @@ async function run() {
     const extra = r.id === 'time'
       ? (r.ok ? ` ${r.text}` : '')
       : r.id === 'title'
-      ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '') +
-        ` draws=${r.drawCalls} scene objs=${r.scene?.objects} tris=${r.scene?.triangles}; poster: ${r.posterShots} load shots`
+      ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; attract ${r.title.attract ? `bars ${r.title.attract.bars.join(' / ')}` : 'none'}; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '') +
+        ` draws=${r.drawCalls} scene objs=${r.scene?.objects} tris=${r.scene?.triangles}; poster: ${r.posterShots} load shots; s: ${Object.entries(r.laps ?? {}).map(([k, v]) => `${k} ${v}`).join(', ')}`
       : r.landing
         ? ` ${r.landing.requested} -> ${r.landing.pathname}${r.landing.search} phase=${r.landing.phase} internal marker=${r.landing.marker} failed requests=${r.landing.failed}`
       : r.daily

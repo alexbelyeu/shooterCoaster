@@ -6,11 +6,11 @@ import { TerrainContext } from '@/levels/environments/TerrainContext'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import {
   type TrackDimensions,
-  LATTICE_MIN_PIXEL_RADIUS,
-  RAIL_MIN_PIXEL_RADIUS,
+  LATTICE_PIXEL_FLOOR,
+  RAIL_PIXEL_FLOOR,
   getTrackDimensions,
 } from './trackDimensions'
-import { trackViewportHeight, withMinThickness } from './minThickness'
+import { trackViewportHeight, withMinThickness, withTrackHaze } from './minThickness'
 import type { ArcTable } from './arcLength'
 import { buildTrackGeometry } from './trackGeometry'
 import {
@@ -45,7 +45,7 @@ const DEFAULT_DIMS = getTrackDimensions({ scalar: 20 })
 /** Footing pads stand this far proud of the visible ground. */
 const FOOTING_LIFT = 0.5
 
-/** Vertex-coloured steel; `glow` adds the squared (≈ linear: dark rails stay dark) sRGB vertex colours as emissive. Caller disposes. */
+/** Vertex-coloured steel, hazed and thinned with distance; `glow` adds the squared (≈ linear: dark rails stay dark) sRGB vertex colours as emissive. Caller disposes. */
 function createTrackMaterial(glow: number): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.3 })
   if (glow > 0) {
@@ -57,7 +57,7 @@ function createTrackMaterial(glow: number): THREE.MeshStandardMaterial {
     }
     material.customProgramCacheKey = () => 'track-glow'
   }
-  return withMinThickness(material, RAIL_MIN_PIXEL_RADIUS)
+  return withTrackHaze(withMinThickness(material, RAIL_PIXEL_FLOOR))
 }
 
 const _m = new THREE.Matrix4()
@@ -120,9 +120,11 @@ function SupportTowers({
   const footingGeom = useMemo(() => buildFootingGeometry(), [])
   const steel = useMemo(
     () =>
-      withMinThickness(
-        new THREE.MeshStandardMaterial({ color: '#8b939c', roughness: 0.5, metalness: 0.45 }),
-        LATTICE_MIN_PIXEL_RADIUS,
+      withTrackHaze(
+        withMinThickness(
+          new THREE.MeshStandardMaterial({ color: '#8b939c', roughness: 0.5, metalness: 0.45 }),
+          LATTICE_PIXEL_FLOOR,
+        ),
       ),
     [],
   )

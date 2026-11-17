@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { isCoarsePointer } from '@/canvas/useRenderBudget'
+import { useFbmOctaves } from '@/canvas/useRenderBudget'
 import { gradientNoiseGlsl } from './shared/noiseGlsl'
 
 interface Puff {
@@ -122,11 +122,12 @@ interface SmokeColumnProps {
 /** Billowing smoke column: camera-facing puffs with a domain-warped noise shader. */
 export default function SmokeColumn({ puffs }: SmokeColumnProps) {
   const geometry = useMemo(() => createColumnGeometry(puffs), [puffs])
+  const octaves = useFbmOctaves()
   const material = useMemo(() => new THREE.ShaderMaterial({
     vertexShader,
     fragmentShader,
-    // Five fbm per pixel on big billboards: one octave fewer on phones cuts the fill cost by a quarter
-    defines: isCoarsePointer ? { FBM_OCTAVES: 3 } : {},
+    // Five fbm per pixel on big billboards: one octave fewer on phones and low quality cuts the fill cost by a quarter
+    defines: { FBM_OCTAVES: octaves },
     uniforms: THREE.UniformsUtils.merge([
       THREE.UniformsLib.fog,
       {
@@ -139,7 +140,7 @@ export default function SmokeColumn({ puffs }: SmokeColumnProps) {
     transparent: true,
     depthWrite: false,
     fog: true,
-  }), [])
+  }), [octaves])
 
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])

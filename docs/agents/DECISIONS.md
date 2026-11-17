@@ -1981,3 +1981,175 @@ are deleted. A concept's car ride runs on rAF, not SMIL, so `npm run clip`'s vir
 **Context:** Level 6 is the first interior and the first world built from a real place's blockout (#513, #514). The noise terrain, sky and scatter of the outdoor biomes don't fit a hall with a sunken pit, and the terrain's track suppression would dent an authored floor.
 **Decision:** A biome may give an authored `floor` (`BiomeDefinition.floor`) in place of the noise terrain; `createHeightFunction` returns it as is (no track suppression: an authored track is laid round its floor and tested against it). The gym's floor is the main floor plus the Starr pit (`floorAt`), drawn by the ordinary terrain mesh sized to the hall (1280 units, so the pit's edge falls on a grid line, `getTerrainMeshSize`). The hall is built in the blockout's metres from its typed pieces (`hallGeometry.ts`) and scaled to the world once: three merged vertex-coloured meshes (solid, lights, glass) and two instanced meshes (holds, volumes) scattered area-weighted on each climbing face (`holds.ts`). Pieces outside the hall that nothing looks into (the upstairs stairs and landing, the bathrooms) are not drawn. Crows stand in for the air enemy until the lanternflies (#516): the first seconds climb the Tree with the camera on the rafters, where no ground enemy is in view. Level 6 plays level 5's score until its theme round (#456).
 **Consequences:** ~44 draw calls and ~167k scene triangles (`budgets.json` `scene.level6`). The blockout JSON (with Alex's notes) is in the startup chunk because the registry's track is built from it (+5 KB gz, inside `startupJsGzipKB`). Trackside ground enemies on the gym's tight spline are in front of the rider on their approach ~70% of the time, not the trig tracks' 85% (`spawnPlacement.test.ts` holds it there; follow-up). A ground enemy pushed out of the near field stays on the ground (`groundedOutsideNearField`): over the pit the camera is close above the floor.
+
+## 2026-11-14 — The track's pixel floor thins with distance, and the track fogs early (Builder, #327)
+
+**Context:** The 2026-10-31 pixel floor kept every far rail 3 px wide with no depth cue, so on bright levels
+(Theme Park, Ocean, Antarctica) the whole far loop read as bold white cables over the landscape.
+
+**Decision:** The floor is a `PixelFloor` (`near` / `far` px, `trackDimensions.ts`): the near value out to
+`PIXEL_FLOOR_FADE_START` (200 units of view depth), smoothstepped to the far one by `PIXEL_FLOOR_FADE_END` (1,200):
+rails 1.5 → 0.5 px, lattice 0.5 → 0.3 px. MSAA resolves the sub-pixel lines as fainter strokes. `withTrackHaze`
+(`minThickness.ts`) fogs the track and tower steel as if the scene's linear fog ended at `TRACK_FOG_REACH` (25%) of
+its span, so far track takes the sky tint before the landscape does. Theme Park's rail is a warm off-white (`0xf3ece0`).
+
+**Consequences:** Raising the far floor back to 1.5 px or dropping the haze brings the cables back. Near rails (under
+~200 units) are unchanged; no geometry, draw call or hit test changes. Exponential fog is left as three draws it.
+
+## 2026-11-14 — Lava rivers are arcs draped on the drawn ground (Builder, #331)
+
+**Context:** Inferno's "glowing wall" beside the track was a radial lava river lying along a spoke of the ride: seen from the coaster, a strip running down the line of sight stands up the screen. The rivers also sat each row at the max of a 3×3 neighbourhood + 8 (the skill's safeHeight rule), which floated them up to 126 units over steep ground.
+**Decision:** Rivers are arcs round the centre that cross the ride's spokes, ~2× wider, draped on `groundFn` (1.5 lift, each triangle raised by its worst deficit, negative polygon offset), shaded as a channel (bright core, dark banks). `lavaRivers.test.ts` fails any river that runs down the rider's sight line for 400+ units at any half second of the ride, or that floats over 25 units or dips under the ground.
+**Consequences:** Don't go back to radial rivers or row-flat strips for wide features. Re-laying the rivers moves the Magma Titan's river spots with them (they read `riverRow`).
+
+## 2026-11-14 — App's screens work round a framer-motion AnimatePresence stall (Builder, #367)
+
+**Context:** The frenzy-end smoke check (and #382 on `main`, #370's portal job) failed with `phase results, results
+screens [none]`: the results screen never mounted. Reproduced locally (about every second run that ends while the last
+results screen is still fading out, on slow frames): when an exit finishing and a phase change land in one React batch,
+`AnimatePresence mode="wait"` restores its stale list of waiting screens and mounts the HUD already leaving. A motion
+element mounted mid-exit never runs its exit, so the wait never ends. framer-motion 12.43 behaves the same.
+
+**Decision:** Every screen in App's `AnimatePresence` is a `Screen` (`src/app/Screen.tsx`): a `motion.div` that drops
+its `exit` when it mounts leaving, so its presence completes at once and the next screen mounts. The results screen is
+keyed per `runId`, so a run ending during the last results screen's fade gets a fresh screen, not that one back.
+
+**Consequences:** A new screen in that `AnimatePresence` must be a `Screen`, not a bare `motion.div`. If a framer
+upgrade fixes the stall, `Screen` can go back to `motion.div`; the scratch repro is described in the PR.
+
+## 2026-11-14 — A new world's first budgets come from its first local smoke (builder, #460)
+
+**Context:** `npm run new-world` scaffolds a level, but its `budgets.json` `scene` and `pacing` ceilings
+can only be measured once the level renders, and a level without them fails the smoke.
+**Decision:** the scaffold writes `{ "placeholder": "…" }` for both. A local smoke run of that level writes
+the first ceilings from what it measured, by the budgets' own headroom rules (`sceneCeilings` /
+`pacingCeilings` in `scripts/newWorldPlan.mjs`: draw calls +20%, objects and triangles +15%; the longest
+gap +1 s, the share +2 points rounded up to 5%). On CI (`CI` set) a placeholder fails with the numbers to
+paste, so no level reaches `main` unbudgeted. This sets a new level's first ceilings only; raising an
+existing one is still the Director's.
+**Consequences:** the builder of a new world commits the budgets its local smoke wrote. `smokeSeconds`
+starts at the previous level's value (it only warns, and only on CI).
+
+## 2026-11-14 — The Medusa's snakes stay shootable between strikes; three phases (builder, #521)
+
+**Context:** #521 suggested snakes "retracting into the hair between strikes (`retract`)", and three phases (four snakes,
+four more, the crown snake). The smoke's boss check knew only two phases and clears a phase by hitting every exposed weak
+point at once.
+**Decision:** A snake recoils between strikes but never leaves the bossModel's exposed set: only later phases are hidden
+(coiled into the curls until their phase begins). Three phases, with the smoke's `bossCheck` taught `midPhases` (phases
+between the first and the last) and `rideTo` (the Medusa stays in the Starr, so the check rides to 0.75 of the lap first).
+**Consequences:** At the smoke's 2 hits a second the fight is ~10 s of hits plus her rise; a retract-between-strikes
+mechanic would need the check (and a player) to wait for each snake, and is a separate design change.
+
+## 2026-11-15: Long-run scores leave the leaderboards through a filter, not a wipe (Builder, #458)
+
+**Context:** #452 (merged in #473) cut every run to 60 s. Scores from the old 75–120 s runs are
+still in the World `scores` table and in players' local boards, and a 60 s run can't beat them.
+**Decision:** Nothing is deleted. The World board and its `rank` count only rows with
+`score <= LEVEL_LIMITS[level].maxScore` (`api/_lib/rules.ts` `boardCeiling`). On the device, new
+entries carry `ruleset: '60s'`, and the store's persist `merge` drops an entry without it when it
+is over the same limit. The store reads the generated `api/_lib/levelLimits.ts` table. Computing
+`scoreLimits()` in the store would add the boss specs to the startup JS (+6 KB gz).
+Old runs under the limit stay on both boards, because a 60 s run can still beat them.
+Stars, unlocks and the Daily record are left alone.
+**Consequences:** Alex has no database step to do. The optional SQL to delete the old rows is in
+`docs/LEADERBOARD.md`. The board's cut-off follows the generated limits, so a later rebalance
+that lowers a level's `maxScore` also hides World rows above the new limit. A rebalance PR has to say so.
+
+## 2026-11-15 — The title's far world: flat silhouettes on rings, one fog, camera far 3500 (Builder, #459)
+
+**Context:** Alex asked for a title world that "must look big" (#436). The park ended in a flat line of grass against the sky, and `scene.title` (140 draws / 130 objects / 60 000 triangles) left ~5 600 triangles.
+**Decision:** Past the park, `titleHorizon.ts` lays out seven hill rows (valley, ridge, valley …) whose ridges rise higher in view each step out, ride silhouettes in the first valley and a skyline in the second as flat vertex-coloured shapes facing the park (the camera never leaves r ≈ 205, so a plane reads as a ride), and every light in one `Points`. The title scene now has a linear fog (`HORIZON_FOG`, 350 → 4200) the colour of the sky's horizon, so each band reads a step paler; the camera's far plane went from 2000 to 3500 to reach the last ridge (r 2750). About 2 500 triangles and four draw calls in all (`scene.title` 54 359 → 56 838 triangles).
+**Consequences:** Don't swap the silhouettes for 3D props without the triangle budget for them. A title material that should stay crisp in the haze sets `fog: false`; the park itself sits inside the fog's near distance. The posters (`npm run og -- --poster`) must be re-rendered whenever the horizon or the orbit shot changes.
+
+## 2026-11-15 — Per-frame helpers live in `*.hot.ts`, linted by `sc/no-hot-path-alloc` (Builder, #461)
+
+**Context:** Hard rule 8 (no allocations in per-frame hot paths) was prose only; a lint rule can see a `useFrame` body but not which helpers that body calls.
+**Decision:** The file name marks a hot module: every function in a `*.hot.ts` file is checked as a hot path (its module scope is where scratch objects go), as is every `useFrame` callback. Once-per-mount factories inside a hot module (`createRigState`, `newRatPose`…) and cold, guarded branches stay allowed one line at a time with `// eslint-disable-next-line sc/no-hot-path-alloc -- <why>`, not by moving them out, so a module keeps its state type and its factory together.
+**Consequences:** A new per-frame helper module should be named `*.hot.ts`; renaming one back drops it from the check. Setup-heavy modules that also have per-frame functions (`krakenMotion`, `medusaMotion`, `climbMotion`, `arcLength`, `ridePhysics`, `titleCoaster`, `windStreaks`) are not hot yet: they need their builders split from their steppers first.
+
+## 2026-11-15 — The crow's hit flinch is its flash material (Builder, #462)
+
+**Context:** The brief asks for the crow's wings to snap up on a hit. A crow dies on its first hit: `EnemyBase` stops
+its motion and swaps every mesh to `ENEMY_HIT_FLASH_MAT` for the kill pop (`ENEMY_HIT_FLASH_MS`, 80 ms), so the
+wings, which flap in the feather material's vertex shader, snapped to their rest pose (#206).
+**Decision:** A mesh can name its own flash material (`hitFlash.ts` `setFlashMaterial`). The crow's is
+`CROW_FLINCH_MAT`: the flash colour with the same wing patch and one fixed wings-up pose, so the flinch needs no
+per-crow state and lasts exactly the flash (80 ms, not the brief's 120 ms: making it longer would delay every
+enemy's death). It is a module export, so `ShaderWarmup` compiles it.
+**Consequences:** Any enemy whose vertex shader moves it needs a flash material with the same patch, or it jumps
+to its rest pose when hit.
+
+## 2026-11-15 — Ready waits for the level chunk; smoke steps wait for `levelReady()` (Builder, #464)
+
+**Context:** Since #376 the level scene is a lazy chunk prefetched once the title is idle. A run started before it lands
+(slow network, cold cache, a quick PLAY) left the countdown's Ready waiting at most 4 s for the warm-up, so GO could open
+on the composer alone: a black scene, 17 draw calls. The smoke's `quality` and `pickup` steps measured exactly that on slow
+sandboxes (`?e2e=1` starts in `playing` at once), and `hidden-pause` primed a combo the late mount then reset.
+**Decision:** Ready holds until the chunk has arrived, however long that takes (a failed load still returns to the title
+through SceneManager's boundary); the 4 s warm-up cap counts from the chunk's arrival (pure `ui/hud/countdownGate.ts`).
+Every smoke step that starts a level waits for the hook's `levelReady()` before it measures, and `--level-chunk-delay <ms>`
+reproduces the slow runner on any machine.
+**Consequences:** On a slow connection the player sees Ready for longer instead of GO over nothing. A new smoke step that
+starts a level goes through `startLevelReady`, never a bare `startLevel` evaluate.
+
+## 2026-11-15 — The Tree's gap runs cave to cave; wall relief stays inside each footprint (Builder, #519)
+
+**Context:** Alex (#558) asked for a gap through the Tree "like the Arch", big enough for the coaster, and for rugged, varied walls. The Tree backs onto the hall's east wall, so an opening front to back leads nowhere a track can go; and the gym track's clearance tests are written against each piece's footprint box (`pieceBoxes`).
+**Decision:** The trunk stands on four buttress roots, front pair at the lip, back pair at the wall: the gap under it runs along the Tree, cave to cave (`TREE_GAP` in `treeTrunk.ts`, 3.25 m wide and 3.1 m high, room for `RAIL_CLEARANCE` either side), and from the pit it reads as the arch the front roots make. Routing the track through it is a separate issue. Every panel's relief, the Tree's wood and its branches are clamped inside the piece's existing footprint box (roots may sink below the floor), so `pieceBoxes` and the track's clearance tests stay unchanged; `wallPanels.test.ts` checks both.
+**Consequences:** A track through the gap must clear `TREE_GAP`, not the Tree's whole box (`pieceBoxes` still treats the Tree as solid: carve the gap out of it when the track goes through). A bigger relief needs a bigger footprint in `blockout.json`, not a looser clamp.
+
+## 2026-11-16 — Week 5: Alex's gym notes, the Neo stutter and the fire lead; level 6's scene ceiling raised (Director, #558, #561, #583)
+
+**Context:** Week 4 shipped all of M3's Level 6 build order (#514–#521 except the bystanders,
+#518), the Magma Titan, the 60 s template, the title world, lint and the far-rail fix: 50
+merges. Alex then played the gym (#558: much bigger, grimy Bushwick in low light, a bonier
+Medusa, a ride through the Tree's gap), saw the fire (#583: "100x more realistic") and sent a
+`?perf=1` report from a MacBook Neo (#561: 200–370 ms frames in bursts every ~0.4 s during
+the ride, 0.7–1 s frames in the countdown). The bystander climbers (#518, PR #555) were
+blocked on `scene.level6.drawCalls` 60, set from level 6's first smoke before it had
+climbers, the Medusa on screen or fire (#554, #557).
+**Decision:** Week 5 leads with those three steering issues as P1s: #592 (scale-up + the
+Tree's gap), #593 (Bushwick grime, low light), #594 (Medusa face, folds #557), #595 → #599
+(the fire in two parts; #583 stays open for Alex's verdict on the clip), #596 / #597 (the
+stall bursts, then the countdown / level-start freezes). The audio epic gets boss sections
+(#598) and enemy art the Kraken (#600) and the Inferno trio (#463, now P2). `scene.level6`
+goes from 60 / 110 to **130 draws / 160 objects** (triangles unchanged): the climbers measure
+76–78 draws, the Medusa 72–75, and Alex said the fire is worth spending on; 130 stays well
+under the VISION bar of 250 that levels 4 and 5 sit at. Small P3 follow-ups are bundled
+(#601–#606) instead of queued singly. Done steering issues #434, #435, #436, #438 are closed.
+**Consequences:** Level 6's builders this week share files (`biomes/gym/*`): #592 owns sizes
+and positions, #593 looks, #601 waits on #592. The 130 ceiling is a ceiling, not a target:
+lower it once #592 / #595 settle. Perf work in #561 is M3, not M4: smooth on a modest laptop is
+part of "ship quality" now that Alex measured it.
+
+## 2026-11-16 — The gym's strip-light pools are a shader term, not scene lights (Builder, #593)
+
+**Context:** Alex wanted the Climbing Gym lower and moodier: warm pools under the strip lights, darker corners, no flat fill. Real point or rect-area lights would light every material in the scene, enemies included, cost per fragment on every lit shader, and the 36 fixtures would need either many lights or a few that don't match the fixtures.
+**Decision:** The level's light rig (`atmosphere.ts` gym) stays a dim hemisphere plus cool window daylight. Each fixture's warm downlight pool (plus a little spill up onto the roof) is computed in `biomes/gym/grimeShader.ts` and added to the direct diffuse light of the hall's solid, floor and hold materials only. The pool's layout comes from the same `STRIP_LIGHTS` config the fixtures' geometry is built from, so moving the fixtures moves the pools.
+**Consequences:** Enemies aren't lit by the pools. They read by their rims against the darker hall, the way Inferno's enemies do. A new hall material that should catch the fixtures' light has to use `withHallGrime`. Changing the fixtures in `hallGeometry.ts` without `STRIP_LIGHTS` puts the pools in the wrong place.
+
+## 2026-11-16 — The gym grows to GYM_SCALE 32 and the coaster shrinks to level 1's structure scale (Builder, #592)
+
+**Context:** Alex (#513 / #558): the gym "has to be much much bigger so that we still have the speedy rollercoaster that we have in other levels. Keep it proportionate." The lap is fixed at ~61.5 s and ride velocity is a track fraction per frame, so scaling hall and track together alone changes nothing on screen: hall structure passes at the same rate. What reads as speed is the ride against the rider's own size: level 1 rides ~139 units/s at trackScale 1 (eye 6 units), about 23 eye heights a second; level 6 rode ~59 units/s at trackScale 2.5 (eye 15), about 4.
+**Decision:** The hall scales uniformly ×2 (`GYM_SCALE` 16 → 32, blockout proportions exact, hall 2560 units long) and the track's structure scale drops from 2.5 to level 1's 1 (`scalar` 125 → 20). Together the hall is 5× bigger against the car (the rider's eye 0.19 m up instead of 0.94 m) and the ride runs ~117 units/s, ~20 eye heights a second, like level 1. A ×5 hall at trackScale 2.5 would look the same but put the hall at 6400 units and every wall enemy 5× further away; ×2 keeps the world inside the other levels' extents and the enemies at level 1's size against the car. The Medusa keeps her size against the star (`MEDUSA_SIZE`), the fog doubles with the hall, the floor mesh is the hall's length. The longer track's rails, ties and towers are sparser (`TrackParams.segments` / `tieSpacing` / `towerSpacing`) to stay at main's triangle count.
+**Consequences:** The ride through the Tree's gap is a follow-up: a route through it costs ~4–8 s before the dive (which must start by 40 s), and an eastward pass needs the lap's last stretch to reach the left cave past the Medusa.
+
+## 2026-11-17 — The Flame's fire is instanced flame tongues, not a raymarched volume (Builder, #595)
+
+**Context:** #583 / #595 asked for fire with volume and motion on the Flame, choosing between a raymarched
+volume in a box round it, a GPU fluid grid, layered soft sheets / particles on a noise field, or a baked flipbook.
+**Decision:** ~260 soft flame tongues in one instanced draw (`gym/FlameFire.tsx`, layout in pure `gym/flameFire.ts`):
+each a camera-facing (round the vertical) quad on a three-point path that hugs the Flame's flare, with its own
+life, sway and fbm flame shape, re-seeded every life; premultiplied blending (adds light, dims what's behind by
+its alpha) and a blackbody ramp past 1 for Bloom. Low quality and touch draw fewer (`tongueCount`, the quality's
+`particleScale`, half on touch) with the quality's `fbmOctaves`: same program, only the octave define differs.
+A raymarch would cost a fill-bound full-screen-ish pass of 3D noise per step over a Flame that fills half the
+screen on the spiral (SwiftShader and the MacBook Neo, #561), needs a depth texture for the boulder and track,
+and an extra render target; a fluid grid adds per-frame simulation passes and float render targets. Tongues
+get parallax and overlap for free from real 3D positions, are depth-tested against the boulder, cost one
+draw call and scale by instance count.
+**Consequences:** the fire is fill-bound by tongue count × size: thin it with `MAX_TONGUES` or the widths in
+`buildFlameTongues`, not by removing noise. Part 2 (light on the surroundings, smoke, heat haze, scorch) builds on
+these tongues. `FBM_OCTAVES` for every shader on `noiseGlsl.ts`' `fbm` (the fire, the volcano's smoke and lava) comes from
+`graphicsQuality.ts` `fbmOctaves` (#582); the sky and aurora run their own fixed-octave noise.

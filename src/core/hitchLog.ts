@@ -25,6 +25,23 @@ export interface FrameSample {
   drawCalls: number
   /** `performance.memory.usedJSHeapSize` (Chrome only), else null. */
   heap: number | null
+  /** ms since the previous sample inside animation-frame callbacks: R3F's loop (every `useFrame`, the render), framer-motion's. */
+  rafMs: number
+  /** ms inside `renderer.render` (the composer's passes): part of `rafMs`, or of `timerMs` for a render a timer runs (the warm-up's). */
+  renderMs: number
+  /** ms since the previous sample inside `setTimeout` / `setInterval` callbacks (the music scheduler's tick among them). */
+  timerMs: number
+}
+
+/**
+ * Where a frame's time went (#596). `outside` is the rest: our JS outside animation frames and timers (React's HUD
+ * renders, input events) plus everything that isn't our JS (garbage collection, the GPU, the compositor).
+ */
+export interface FrameSplit {
+  raf: number
+  render: number
+  timers: number
+  outside: number
 }
 
 export interface HitchEntry {
@@ -38,9 +55,28 @@ export interface HitchEntry {
   /** Bytes, null where the browser doesn't say. */
   heap: number | null
   drawCalls: number
+  split: FrameSplit
   /** Event name -> times emitted since the previous sample. */
   events: Record<string, number>
 }
+
+/** One callback source (a timer or an animation-frame callback, named by where it was registered) while playing. */
+export interface CallbackStats {
+  calls: number
+  ms: number
+  maxMs: number
+  firstT: number
+  lastT: number
+}
+
+/** Time in the hitches while `playing`, summed: what the report's split line divides. */
+interface PlayingHitches extends FrameSplit {
+  frames: number
+  ms: number
+}
+
+/** Callback sources kept: every timer the game runs fits many times over. */
+const MAX_CALLBACKS = 60
 
 export interface Milestone {
   t: number
@@ -61,6 +97,10 @@ export interface HitchLog {
   programsAfterWarmup: number
   prev: FrameSample | null
   frameEvents: Record<string, number>
+  /** The next frame spans a hidden tab (#541): not a hitch, whatever its length. */
+  skipNext: boolean
+  playingHitches: PlayingHitches
+  callbacks: Map<string, CallbackStats>
 }
 
 export function createHitchLog(): HitchLog {
@@ -76,8 +116,55 @@ export function createHitchLog(): HitchLog {
     programsAfterWarmup: 0,
     prev: null,
     frameEvents: {},
+    skipNext: false,
+    playingHitches: { frames: 0, ms: 0, raf: 0, render: 0, timers: 0, outside: 0 },
+    callbacks: new Map(),
   }
 }
+
+/** The tab is visible again: the frame that spans the hidden time is the switch, not a stall. */
+export function noteTabShown(log: HitchLog): void {
+  log.skipNext = true
+}
+
+/** A timer or animation-frame callback ran for `ms` at `t`; the recorder counts them while `playing` only. */
+export function noteCallback(log: HitchLog, label: string, t: number, ms: number): void {
+  let stats = log.callbacks.get(label)
+  if (!stats) {
+    if (log.callbacks.size >= MAX_CALLBACKS) return
+    stats = { calls: 0, ms: 0, maxMs: 0, firstT: t, lastT: t }
+    log.callbacks.set(label, stats)
+  }
+  stats.calls++
+  stats.ms += ms
+  if (ms > stats.maxMs) stats.maxMs = ms
+  stats.lastT = t
+}
+
+/**
+ * Where a callback was registered, from an `Error().stack` taken inside the wrapper: the first frame outside
+ * `selfFile` (the recorder's own chunk). Chrome's `    at fn (url:line:col)` and Safari's `fn@url:line:col`.
+ */
+export function callerLabel(stack: string | undefined, selfFile: string): string {
+  for (const line of (stack ?? '').split('\n')) {
+    const m = /(?:at\s+(?:(\S+)\s+\()?|^(\S*)@)(\S+?):(\d+):(\d+)\)?\s*$/.exec(line.trim())
+    if (!m || m[3].endsWith(selfFile)) continue
+    const fn = m[1] ?? m[2] ?? ''
+    const file = m[3].slice(m[3].lastIndexOf('/') + 1)
+    return `${fn || 'anon'} ${file}:${m[4]}:${m[5]}`
+  }
+  return 'unknown'
+}
+
+/**
+ * Programs compiled since `before` that a level's warm-up didn't (`warmup`, its count when it finished; null while
+ * a level scene loads, whose own compiles aren't counted). Above the warm-up's count only: its last compiles can
+ * land in the sample after it finished. The one rule for `?perf=1` and the smoke (#541).
+ */
+export function programsAfterWarmup(programs: number, before: number, warmup: number | null): number {
+  return warmup === null ? 0 : Math.max(0, programs - Math.max(before, warmup))
+}
+
 
 /** A bus event: lands on the next sample, the frame it happened in or just before. */
 export function noteEvent(log: HitchLog, name: string): void {
@@ -110,17 +197,22 @@ export function recordFrame(log: HitchLog, s: FrameSample): HitchEntry | null {
   const geometries = grew(s.geometries, prev?.geometries)
   const textures = grew(s.textures, prev?.textures)
   const heap = s.heap !== null && prev?.heap != null ? s.heap - prev.heap : null
-  // Above the warm-up's count only: the warm-up's last compiles can land in the sample after it finished.
-  if (log.warmupPrograms !== null && prev) log.programsAfterWarmup += Math.max(0, s.programs - Math.max(prev.programs, log.warmupPrograms))
+  if (prev) log.programsAfterWarmup += programsAfterWarmup(s.programs, prev.programs, log.warmupPrograms)
   if (prev) Object.assign(prev, s)
   else log.prev = { ...s }
   log.frames++
   const blank = s.drawCalls === 0
   if (blank) log.blankFrames++
+  const skip = log.skipNext
+  log.skipNext = false
   const events = log.frameEvents
+  if ((s.frameMs <= HITCH_MS || skip) && !blank) {
+    for (const name in events) delete events[name]
+    return null
+  }
   log.frameEvents = {}
-  if (s.frameMs <= HITCH_MS && !blank) return null
 
+  const outside = Math.max(0, s.frameMs - s.rafMs - s.timerMs)
   const entry: HitchEntry = {
     t: s.t,
     frameMs: s.frameMs,
@@ -131,11 +223,21 @@ export function recordFrame(log: HitchLog, s: FrameSample): HitchEntry | null {
     textures,
     heap,
     drawCalls: s.drawCalls,
+    split: { raf: s.rafMs, render: s.renderMs, timers: s.timerMs, outside },
     events,
   }
-  if (s.frameMs > HITCH_MS) {
+  if (s.frameMs > HITCH_MS && !skip) {
     log.hitches++
     if (!log.worst || s.frameMs > log.worst.frameMs) log.worst = { frameMs: s.frameMs, t: s.t, phase: s.phase, level: s.level }
+    if (s.phase === 'playing') {
+      const p = log.playingHitches
+      p.frames++
+      p.ms += s.frameMs
+      p.raf += s.rafMs
+      p.render += s.renderMs
+      p.timers += s.timerMs
+      p.outside += outside
+    }
   }
   if (log.entries.length >= MAX_ENTRIES) log.dropped++
   else log.entries.push(entry)
@@ -165,9 +267,33 @@ function entryLine(e: HitchEntry): string {
   if (e.geometries) parts.push(`geometries ${signed(e.geometries)}`)
   if (e.textures) parts.push(`textures ${signed(e.textures)}`)
   if (e.heap !== null) parts.push(`heap ${signed(Math.round(e.heap / 1024))} KB`)
+  parts.push(splitText(e.split))
   const events = Object.entries(e.events).map(([name, n]) => (n > 1 ? `${name} x${n}` : name))
   if (events.length) parts.push(`events: ${events.join(', ')}`)
   return parts.join(' | ')
+}
+
+const whole = (n: number) => n.toFixed(0)
+
+function splitText(p: FrameSplit): string {
+  return `rAF ${whole(p.raf)} (render ${whole(p.render)}) / timers ${whole(p.timers)} / outside ${whole(p.outside)} ms`
+}
+
+/** How the long frames while `playing` split, as shares of their time: the line that names the cause's side. */
+export function playingSplitLine(log: HitchLog): string {
+  const p = log.playingHitches
+  if (!p.frames) return 'no hitches while playing'
+  const pct = (n: number) => `${Math.round((100 * n) / p.ms)}%`
+  return `${p.frames} hitches while playing, ${(p.ms / 1000).toFixed(1)} s: in animation frames ${pct(p.raf)} (render ${pct(p.render)}), timers ${pct(p.timers)}, outside ${pct(p.outside)}`
+}
+
+function callbackLines(log: HitchLog): string[] {
+  return [...log.callbacks]
+    .sort(([, a], [, b]) => b.ms - a.ms)
+    .map(([label, c]) => {
+      const period = c.calls > 1 ? `every ~${whole((c.lastT - c.firstT) / (c.calls - 1))} ms` : 'once'
+      return `  ${label} | ${period} | calls ${c.calls} | total ${whole(c.ms)} ms | max ${c.maxMs.toFixed(1)} ms`
+    })
 }
 
 /** The headline the panel shows. */
@@ -192,6 +318,13 @@ export function formatHitchReport(log: HitchLog, h: ReportHeader): string {
     '',
     'milestones (ms since load):',
     ...log.milestones.map((m) => `  ${ms(m.t).padStart(7)} ${m.name}`),
+    '',
+    'where the long frames went (rAF: our animation-frame callbacks, render: renderer.render, part of rAF or timers,',
+    '  timers: setTimeout / setInterval callbacks, outside: GC, GPU, compositor, React and input outside those):',
+    `  ${playingSplitLine(log)}`,
+    '',
+    'callbacks while playing (where each was registered: chunk:line:column of the build):',
+    ...callbackLines(log),
     '',
     `frames over ${HITCH_MS} ms or blank (${log.entries.length}${log.dropped ? `, ${log.dropped} more not kept` : ''}):`,
     ...log.entries.map(entryLine),

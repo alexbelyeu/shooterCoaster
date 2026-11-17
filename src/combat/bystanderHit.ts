@@ -7,8 +7,8 @@ import { BYSTANDER_PENALTY } from '@/levels/scoring'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { DEATH_STYLES } from '@/effects/deathStyles'
 import { BYSTANDER_HIT_EVENT, type BystanderHitEvent } from './bystanders'
-import { breakCombo } from './comboRuntime'
-import { CAMERA_TRAUMA_EVENT } from './screenShake'
+import { breakCombo } from './comboRuntime.hot'
+import { CAMERA_TRAUMA_EVENT } from './screenShake.hot'
 
 /** A small nudge, under a kill's. */
 const NUDGE: [number, number] = [0.18, 220]

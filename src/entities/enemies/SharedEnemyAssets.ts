@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { mergePainted, painted, paintedAt, pose } from '@/levels/environments/shared/paintedParts'
+import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, pose } from '@/levels/environments/shared/paintedParts'
 import { withRim } from './enemyRim'
 
 // Readability rules (issue #15): every lit enemy material gets a fresnel rim via
@@ -49,155 +49,157 @@ export const GOLDEN_KNOT_MAT = withRim(new THREE.MeshStandardMaterial({
 
 export const GOLDEN_STRING_MAT = new THREE.MeshBasicMaterial({ color: '#cc9900' })
 
-// ── Crow: merged feathers (body, tail, beak, wings) + eyes ───────────
+// ── Crow: merged feathers (body, beak, feet, tail fan, wings) + eyes ─
+// Brief: docs/art/ENEMIES.md (#462). Local axes: +z beak, +y up, +x right wing.
 
-// Body: LatheGeometry with bird-body profile — streamlined with chest bulk + tapered tail
-const crowBodyProfile = [
-  new THREE.Vector2(0, 0),
-  new THREE.Vector2(1.5, -3),
-  new THREE.Vector2(2.8, -1),
-  new THREE.Vector2(3, 0),
-  new THREE.Vector2(2.8, 2),
-  new THREE.Vector2(2, 4),
-  new THREE.Vector2(0.5, 5.5),
-  new THREE.Vector2(0, 6),
-]
+const CROW_BODY = new THREE.Color('#15131a')
+const CROW_SHEEN = new THREE.Color('#3a2a55')
+const CROW_TIP = new THREE.Color('#0b0a0f')
+const CROW_BEAK = '#e8862a'
+const _feather = new THREE.Color()
 
-// Wings: custom tapered shapes via BufferGeometry — inner (shoulder-to-elbow) + outer (elbow-to-tip)
-function makeWingGeo(
-  vertices: number[][],
-  indices: number[],
-): THREE.BufferGeometry {
-  const pos = new Float32Array(vertices.length * 3)
-  for (let i = 0; i < vertices.length; i++) {
-    pos[i * 3] = vertices[i][0]
-    pos[i * 3 + 1] = vertices[i][1]
-    pos[i * 3 + 2] = vertices[i][2]
-  }
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-  geo.setIndex(indices)
-  geo.computeVertexNormals()
-  return geo
+/** Wing-top sheen fading to black at `t` (0 at the shoulder, 1 at the tip). */
+function crowSheen(t: number): THREE.Color {
+  return _feather.copy(CROW_SHEEN).lerp(CROW_TIP, Math.min(1, Math.max(0, t)) ** 1.3)
 }
 
-// Inner wing — wider, connects at body
-const crowWingInnerGeo = () => makeWingGeo(
-  [
-    // top face
-    [0, 0.15, 2],    // 0: leading edge at body
-    [5, 0.15, 1.5],  // 1: leading edge at elbow
-    [5, 0.15, -1],   // 2: trailing edge at elbow
-    [0, 0.15, -1.5], // 3: trailing edge at body
-    // bottom face
-    [0, -0.15, 2],   // 4
-    [5, -0.15, 1.5], // 5
-    [5, -0.15, -1],  // 6
-    [0, -0.15, -1.5],// 7
-  ],
-  [
-    0, 1, 2, 0, 2, 3, // top
-    4, 6, 5, 4, 7, 6, // bottom
-    0, 4, 5, 0, 5, 1, // front
-    2, 6, 7, 2, 7, 3, // back
-    1, 5, 6, 1, 6, 2, // outer edge
-    0, 3, 7, 0, 7, 4, // inner edge
-  ],
-)
+/** A flat plate `thick` deep in y from any simple polygon `outline` of [x, z] corners (notches and fingers too). */
+function featherPlate(
+  outline: readonly (readonly [number, number])[],
+  thick: number,
+  top: (x: number, z: number) => THREE.Color,
+  under: THREE.Color,
+): THREE.BufferGeometry {
+  const pos: number[] = []
+  const col: number[] = []
+  const h = thick / 2
+  const at = ([i, up]: Corner) => new THREE.Vector3(outline[i][0], up ? h : -h, outline[i][1])
+  // Wound to face `outward`: triangulateShape's winding depends on the outline's.
+  const tri = (a: Corner, b: Corner, c: Corner, outward: THREE.Vector3) => {
+    const pa = at(a)
+    const n = at(b).sub(pa).cross(at(c).sub(pa))
+    for (const k of n.dot(outward) >= 0 ? [a, b, c] : [a, c, b]) {
+      const [x, z] = outline[k[0]]
+      pos.push(x, k[1] ? h : -h, z)
+      const colour = k[1] ? top(x, z) : under
+      col.push(colour.r, colour.g, colour.b)
+    }
+  }
+  const up = new THREE.Vector3(0, 1, 0)
+  const down = new THREE.Vector3(0, -1, 0)
+  for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(outline.map(([x, z]) => new THREE.Vector2(x, z)), [])) {
+    tri([a, true], [b, true], [c, true], up)
+    tri([a, false], [b, false], [c, false], down)
+  }
+  let area = 0
+  outline.forEach(([x0, z0], i) => {
+    const [x1, z1] = outline[(i + 1) % outline.length]
+    area += x0 * z1 - x1 * z0
+  })
+  const turn = Math.sign(area)
+  outline.forEach(([x0, z0], i) => {
+    const j = (i + 1) % outline.length
+    const [x1, z1] = outline[j]
+    const out = new THREE.Vector3((z1 - z0) * turn, 0, -(x1 - x0) * turn)
+    tri([i, true], [j, true], [j, false], out)
+    tri([i, true], [j, false], [i, false], out)
+  })
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
+  g.computeVertexNormals()
+  return g
+}
+type Corner = [index: number, top: boolean]
 
-// Outer wing — tapered with feather notches along trailing edge
-const crowWingOuterGeo = () => makeWingGeo(
-  [
-    // top face
-    [0, 0.12, 1.5],   // 0: leading edge at elbow
-    [4, 0.12, 0.8],   // 1: mid leading edge
-    [6.5, 0.08, 0.3], // 2: wingtip
-    [5, 0.12, -1.2],  // 3: feather notch 1
-    [3, 0.12, -1.5],  // 4: feather notch 2
-    [1, 0.12, -1.3],  // 5: feather notch 3
-    [0, 0.12, -1],    // 6: trailing edge at elbow
-    // bottom face
-    [0, -0.12, 1.5],  // 7
-    [4, -0.12, 0.8],  // 8
-    [6.5, -0.08, 0.3],// 9
-    [5, -0.12, -1.2], // 10
-    [3, -0.12, -1.5], // 11
-    [1, -0.12, -1.3], // 12
-    [0, -0.12, -1],   // 13
-  ],
-  [
-    // top face fan from vertex 0
-    0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5, 0, 5, 6,
-    // bottom face fan
-    7, 9, 8, 7, 10, 9, 7, 11, 10, 7, 12, 11, 7, 13, 12,
-    // front edge
-    0, 7, 8, 0, 8, 1, 1, 8, 9, 1, 9, 2,
-    // back edge
-    5, 12, 13, 5, 13, 6,
-    // tip
-    2, 9, 10, 2, 10, 3,
-    // feather edges
-    3, 10, 11, 3, 11, 4, 4, 11, 12, 4, 12, 5,
-    // inner edge
-    0, 6, 13, 0, 13, 7,
-  ],
-)
+// Body and head in one lathe, (radius, z) from the tail to the forehead: a tapered wedge with a raven's head.
+const CROW_BODY_PROFILE = [
+  [0, -3.2], [0.7, -2.6], [1.3, -1.4], [1.8, 0], [1.85, 1.2], [1.45, 2.6],
+  [1.15, 3.4], [1.3, 4.2], [1.1, 5], [0.55, 5.6], [0, 5.8],
+].map(([r, z]) => new THREE.Vector2(r, z))
 
-/** Right shoulder pivot and the elbow's x offset from it (the left wing mirrors x). */
-const CROW_SHOULDER: [number, number, number] = [2.5, 0.5, 0]
+/** Right shoulder pivot and the wrist's x offset from it (the left wing mirrors x). */
+const CROW_SHOULDER: [number, number, number] = [1.3, 0.55, 0.7]
 const CROW_ELBOW_X = 5
+const CROW_SPAN = CROW_ELBOW_X + 6.7
 
-/** `aWing` drives the flap shader: 0 body, ±1 inner wing, ±2 outer wing (+ = right). */
+// Arm: broad, its trailing edge scalloped by the secondaries; [x, z] from the shoulder.
+const CROW_ARM: [number, number][] = [
+  [0, 1.5], [2.4, 1.75], [5, 1.35], [5, -1.6], [4.3, -2.3], [3.6, -1.95], [2.8, -2.45],
+  [2, -2.05], [1.2, -2.45], [0.3, -2], [0, -1.4],
+]
+// Hand: four splayed primaries, a raven's fingered tip; [x, z] from the wrist, tucked under the arm so the bent wrist shows no gap.
+const CROW_HAND: [number, number][] = [
+  [-0.3, 1.35], [2.6, 1.2], [4.9, 0.6], [6.7, -0.1], [5.6, -0.45], [6.3, -1], [5.1, -1.05],
+  [5.5, -1.75], [4.3, -1.6], [4.4, -2.3], [3.2, -1.9], [1.6, -1.9], [-0.3, -1.6],
+]
+// Tail fan: a raven's wedge, the middle feather longest, notched between feathers; [x, z] from the rump.
+const CROW_TAIL: [number, number][] = [
+  [0.45, 0.3],
+  ...Array.from({ length: 9 }, (_, k): [number, number] => {
+    const i = 4 - k
+    const a = i * 0.1375
+    const r = i % 2 === 0 ? 3.8 - Math.abs(a) * 1.2 : 3.2 - Math.abs(a)
+    return [Math.sin(a) * r, -Math.cos(a) * r]
+  }),
+  [-0.45, 0.3],
+]
+
+/** `aWing` drives the flap shader: 0 body, ±1 arm, ±2 hand (+ = right). */
 function wingTagged(g: THREE.BufferGeometry, tag: number): THREE.BufferGeometry {
   g.setAttribute('aWing', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(tag), 1))
   return g
 }
 
-const CROW_WING_COLOR = '#18182a'
-const CROW_BEAK_COLOR = '#d8a028'
+function crowWing(side: 1 | -1): THREE.BufferGeometry[] {
+  const [sx, sy, sz] = CROW_SHOULDER
+  const mirror = (o: [number, number][]) => o.map(([x, z]) => [side * x, z] as const)
+  const arm = featherPlate(mirror(CROW_ARM), 0.3, (x) => crowSheen(Math.abs(x) / CROW_SPAN), CROW_BODY)
+  const hand = featherPlate(
+    mirror(CROW_HAND), 0.18, (x) => crowSheen((CROW_ELBOW_X + Math.abs(x)) / CROW_SPAN), CROW_BODY,
+  )
+  return [
+    wingTagged(arm.translate(side * sx, sy, sz), side),
+    wingTagged(hand.translate(side * (sx + CROW_ELBOW_X), sy, sz), side * 2),
+  ]
+}
 
 export const CROW_GEO = mergePainted([
-  painted(new THREE.LatheGeometry(crowBodyProfile, 10), '#1c1c30', [0, 0, -1], [Math.PI / 2, 0, 0]),
-  paintedAt(new THREE.SphereGeometry(2.6, 8, 6), '#2a2a3e', pose([0, -0.5, 1], [0, 0, 0], [0.85, 0.85, 1])),
-  paintedAt(new THREE.SphereGeometry(2.5, 8, 6), '#1e1e30', pose([0, 1, 4], [0, 0, 0], [0.9, 1, 1.1])),
-  // Beak: upper mandible (longer), lower one shorter and slightly open
-  painted(new THREE.ConeGeometry(0.7, 3.5, 4), CROW_BEAK_COLOR, [0, 0.6, 6.5], [Math.PI / 2, 0, 0]),
-  painted(new THREE.ConeGeometry(0.5, 2.5, 4), CROW_BEAK_COLOR, [0, 0.1, 6], [Math.PI / 2 + 0.15, 0, 0]),
-  // Tail fan: 5 feathers spread at angles
-  ...[-0.4, -0.2, 0, 0.2, 0.4].map((a) =>
-    painted(new THREE.BoxGeometry(1.2, 0.15, 4), '#1c1c30', [Math.sin(a) * 1.5, 0.3, -4.5 - Math.abs(a) * 1.5], [0.1, a, 0]),
-  ),
-].map((g) => wingTagged(g, 0)).concat(
-  [1, -1].flatMap((side) => {
-    const [sx, sy, sz] = CROW_SHOULDER
-    const mirror: [number, number, number] = [side, 1, 1]
-    return [
-      wingTagged(paintedAt(crowWingInnerGeo(), CROW_WING_COLOR, pose([side * sx, sy, sz], [0, 0, 0], mirror)), side),
-      wingTagged(
-        paintedAt(crowWingOuterGeo(), CROW_WING_COLOR, pose([side * (sx + CROW_ELBOW_X), sy, sz], [0, 0, 0], mirror)),
-        side * 2,
-      ),
-    ]
-  }),
-))
+  paintedAt(new THREE.LatheGeometry(CROW_BODY_PROFILE, 8), CROW_BODY, pose([0, 0, 0], [Math.PI / 2, 0, 0], [1, 1, 0.85])),
+  // Beak: a hooked upper mandible over a shorter lower one.
+  painted(new THREE.ConeGeometry(0.55, 2.4, 4), CROW_BEAK, [0, 0.35, 6.6], [Math.PI / 2 + 0.12, 0, 0]),
+  painted(new THREE.ConeGeometry(0.22, 0.75, 4), CROW_BEAK, [0, 0.05, 7.6], [Math.PI + 0.35, 0, 0]),
+  painted(new THREE.ConeGeometry(0.4, 1.8, 4), CROW_BEAK, [0, -0.2, 6.3], [Math.PI / 2 + 0.25, 0, 0]),
+  // Feet tucked under the belly, toes back.
+  ...[1, -1].map((side) =>
+    painted(new THREE.ConeGeometry(0.28, 1.2, 4), CROW_BEAK, [side * 0.55, -1.35, -1.6], [-Math.PI / 2, 0, 0])),
+  featherPlate(CROW_TAIL, 0.18, (_x, z) => crowSheen(0.25 - z / 5), CROW_BODY).rotateX(0.1).translate(0, 0.15, -2.4),
+].map((g) => wingTagged(g, 0)).concat(crowWing(1), crowWing(-1)))
 
-export const CROW_EYES_GEO = mergeGeometries([
-  new THREE.SphereGeometry(0.55, 6, 6).translate(-1.2, 1.8, 5),
-  new THREE.SphereGeometry(0.55, 6, 6).translate(1.2, 1.8, 5),
-])
+// Eyes: a gold iris, a black pupil and a white glint each; unlit, so they read in any light.
+export const CROW_EYES_GEO = mergePainted([1, -1].flatMap((side) => {
+  const eye = new THREE.Vector3(side * 1.05, 0.5, 4.6)
+  const on = (dir: [number, number, number], r: number): [number, number, number] =>
+    eye.clone().addScaledVector(new THREE.Vector3(side * dir[0], dir[1], dir[2]).normalize(), r).toArray()
+  return [
+    painted(new THREE.SphereGeometry(0.36, 6, 4), new THREE.Color('#ffd166').multiplyScalar(1.6), eye.toArray()),
+    painted(new THREE.SphereGeometry(0.2, 5, 3), '#050406', on([0.8, 0.15, 0.55], 0.24)),
+    painted(new THREE.SphereGeometry(0.09, 4, 2), new THREE.Color(3, 3, 3), on([0.6, 0.6, 0.55], 0.36)),
+  ]
+}))
 
 const CROW_WING_PARS = /* glsl */ `
 attribute float aWing;
 uniform vec2 uWingFlap;
 `
 
-// Outer wing about the elbow, then the whole wing about the shoulder; flat shading
+// Hand about the wrist, then the whole wing about the shoulder; flat shading
 // takes normals from screen derivatives, so only positions move.
 const CROW_WING_FLAP = /* glsl */ `
 {
   float side = sign(aWing);
   if (side != 0.0) {
-    vec3 shoulder = vec3(side * ${CROW_SHOULDER[0].toFixed(1)}, ${CROW_SHOULDER[1].toFixed(1)}, ${CROW_SHOULDER[2].toFixed(1)});
+    vec3 shoulder = vec3(side * ${CROW_SHOULDER[0].toFixed(2)}, ${CROW_SHOULDER[1].toFixed(2)}, ${CROW_SHOULDER[2].toFixed(2)});
     vec3 q = transformed - shoulder;
     if (abs(aWing) > 1.5) {
       vec2 elbow = vec2(side * ${CROW_ELBOW_X.toFixed(1)}, 0.0);
@@ -211,46 +213,52 @@ const CROW_WING_FLAP = /* glsl */ `
 }
 `
 
-// Dark iridescent silhouette on the pale sky + a blue-grey rim sheen so crows
-// also read against the hazy horizon and the red mesas.
-const CROW_RIM = { color: '#a8bce0', intensity: 0.5, power: 3 }
-
 export function patchCrowWingVertex(vertexShader: string): string {
   return vertexShader
     .replace('#include <common>', `#include <common>\n${CROW_WING_PARS}`)
     .replace('#include <begin_vertex>', `#include <begin_vertex>\n${CROW_WING_FLAP}`)
 }
 
-/** One crow's feathers, flapping by `flap` (inner, outer radians); every instance shares one program. */
-export function createCrowFeatherMaterial(flap: { value: THREE.Vector2 }): THREE.MeshPhysicalMaterial {
-  const material = withRim(new THREE.MeshPhysicalMaterial({
-    vertexColors: true,
-    metalness: 0.15,
-    roughness: 0.6,
-    iridescence: 0.4,
-    iridescenceIOR: 1.3,
-    iridescenceThicknessRange: [200, 400],
-    flatShading: true,
-  }), CROW_RIM)
-  const rimCompile = material.onBeforeCompile
+/** Wing angles (arm, hand; radians, + = down): a quick downstroke, and the hand lagging so the wrist bends. */
+export function crowWingPose(phase: number, out: THREE.Vector2): THREE.Vector2 {
+  const p = phase + 0.5 * Math.sin(phase)
+  return out.set(0.05 + 0.6 * Math.sin(p), 0.5 * Math.sin(p - 0.9))
+}
+
+/** Flaps `material`'s crow wings by `flap`; every material built the same way shares one program. */
+function withCrowWings<T extends THREE.Material>(material: T, flap: { value: THREE.Vector2 }): T {
+  const base = material.onBeforeCompile
+  const baseKey = material.customProgramCacheKey()
   material.onBeforeCompile = (shader, renderer) => {
-    rimCompile(shader, renderer)
+    base.call(material, shader, renderer)
     shader.uniforms.uWingFlap = flap
     shader.vertexShader = patchCrowWingVertex(shader.vertexShader)
   }
-  material.customProgramCacheKey = () => 'sc-enemy-rim-v2-crow-wing'
+  material.customProgramCacheKey = () => `${baseKey}-crow-wing`
   return material
+}
+
+// Violet-black on the pale sky + a blue-grey rim sheen so crows
+// also read against the hazy horizon and the red mesas.
+const CROW_RIM = { color: '#a8bce0', intensity: 0.4, power: 3.5 }
+
+/** One crow's feathers, flapping by `flap` (arm, hand radians); every instance shares one program. */
+export function createCrowFeatherMaterial(flap: { value: THREE.Vector2 }): THREE.MeshPhysicalMaterial {
+  return withCrowWings(withRim(new THREE.MeshPhysicalMaterial({
+    vertexColors: true,
+    metalness: 0.1,
+    roughness: 0.7,
+    iridescence: 0.3,
+    iridescenceIOR: 1.3,
+    iridescenceThicknessRange: [200, 400],
+    flatShading: true,
+  }), CROW_RIM), flap)
 }
 
 /** Only for ShaderWarmup: crows build their own instances. */
 export const CROW_FEATHER_MAT = createCrowFeatherMaterial({ value: new THREE.Vector2() })
 
-export const CROW_EYE_MAT = new THREE.MeshStandardMaterial({
-  color: '#ffcc00',
-  emissive: '#ffcc00',
-  emissiveIntensity: 0.8,
-  toneMapped: false,
-})
+export const CROW_EYE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
 
 // ── Scorpion: merged shell + swaying tail + glowing stinger ─────────
 
@@ -352,6 +360,24 @@ export const SHARK_BODY_GEO = new THREE.LatheGeometry(sharkBodyProfile, 10)
 
 // Snout: wider cone for hammerhead-like presence
 export const SHARK_SNOUT_GEO = new THREE.ConeGeometry(2, 4, 6)
+
+/** A closed mesh from hand-placed `vertices` and triangle `indices`. */
+function makeWingGeo(
+  vertices: number[][],
+  indices: number[],
+): THREE.BufferGeometry {
+  const pos = new Float32Array(vertices.length * 3)
+  for (let i = 0; i < vertices.length; i++) {
+    pos[i * 3] = vertices[i][0]
+    pos[i * 3 + 1] = vertices[i][1]
+    pos[i * 3 + 2] = vertices[i][2]
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  return geo
+}
 
 // Dorsal fin: custom triangular swept-back shape
 export const SHARK_DORSAL_GEO = makeWingGeo(
@@ -1129,6 +1155,112 @@ export const DUST_BUNNY_EYE_MAT = new THREE.MeshStandardMaterial({
   metalness: 0.1,
 })
 
+// ── Spotted lanternfly (#516), built to docs/art/ENEMIES.md ──
+// Lies on a wall: head along +y, its back out of the wall along +z. One material, five moving parts: the body and each
+// side's forewing and hindwing, every wing about its own shoulder (LANTERNFLY_FOREWING_PIVOT / _HINDWING_PIVOT, x
+// mirrored for the left), built for the right side (+x) back along -y in its own xy plane. 500-triangle cap.
+
+const LANTERNFLY_BODY = '#1d1a1a'
+const LANTERNFLY_LEG = '#2a2522'
+const LANTERNFLY_ANTENNA = '#8a2a22'
+const LANTERNFLY_FOREWING = '#c9b8a0'
+const LANTERNFLY_WINGTIP = '#7d756a'
+const LANTERNFLY_FLECK = '#ddd3c2'
+const LANTERNFLY_SPOT = '#141212'
+const LANTERNFLY_RED = '#d8282a'
+const LANTERNFLY_BAND = '#f2efe6'
+
+export const LANTERNFLY_FOREWING_PIVOT: Vec3 = [0.3, 1.2, 1.1]
+export const LANTERNFLY_HINDWING_PIVOT: Vec3 = [0.25, 0.9, 0.9]
+
+type P2 = [number, number]
+
+/** The part of a polygon above (`keep` +1) or below (-1) the line y = `y` (Sutherland–Hodgman). */
+function clipY(poly: readonly P2[], y: number, keep: 1 | -1): P2[] {
+  const out: P2[] = []
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]
+    const b = poly[(i + 1) % poly.length]
+    const ina = (a[1] - y) * keep >= 0
+    const inb = (b[1] - y) * keep >= 0
+    if (ina) out.push(a)
+    if (ina !== inb) {
+      const t = (y - a[1]) / (b[1] - a[1])
+      out.push([a[0] + (b[0] - a[0]) * t, y])
+    }
+  }
+  return out
+}
+
+/** A flat plate in the xy plane at height `z`, fanned from its centroid (any star-shaped outline), facing +z. */
+function wingPlate(poly: readonly P2[], color: string, z = 0): THREE.BufferGeometry {
+  const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length
+  const cy = poly.reduce((s, p) => s + p[1], 0) / poly.length
+  const area = poly.reduce((s, p, i) => {
+    const q = poly[(i + 1) % poly.length]
+    return s + p[0] * q[1] - q[0] * p[1]
+  }, 0)
+  const ring = area >= 0 ? poly : [...poly].reverse()
+  const corners: number[] = []
+  for (let i = 0; i < ring.length; i++) {
+    const p = ring[i]
+    const q = ring[(i + 1) % ring.length]
+    corners.push(cx, cy, z, p[0], p[1], z, q[0], q[1], z)
+  }
+  return paintedPolygon(corners, color)
+}
+
+const wingSpots = (spots: readonly [number, number, number][], color: string, z: number) =>
+  spots.map(([x, y, r]) => painted(new THREE.CircleGeometry(r, 5), color, [x, y, z]))
+
+const FOREWING: P2[] = [[-0.25, 0.1], [0.8, -0.5], [1.45, -2.6], [1.6, -4.6], [1.4, -6.3], [0.95, -7.1], [0.35, -7.2], [-0.15, -6.2], [-0.3, -3]]
+const FOREWING_TIP_Y = -4.9
+const HINDWING: P2[] = [[0, 0.1], [1.1, -0.2], [2.3, -1.4], [2.8, -3.2], [2.6, -4.8], [1.8, -5.7], [0.7, -5.7], [0.05, -4]]
+const HINDWING_BAND: [number, number] = [-3, -3.8]
+
+const forewingParts = () => [
+  wingPlate(clipY(FOREWING, FOREWING_TIP_Y, 1), LANTERNFLY_FOREWING),
+  wingPlate(clipY(FOREWING, FOREWING_TIP_Y, -1), LANTERNFLY_WINGTIP),
+  ...wingSpots([[0.35, -0.8, 0.26], [0.95, -1.35, 0.24], [0.3, -2.2, 0.28], [1.05, -2.7, 0.26], [0.5, -3.4, 0.26], [1.2, -3.9, 0.22], [0.55, -4.3, 0.22]], LANTERNFLY_SPOT, 0.03),
+  ...wingSpots([[0.4, -5.4, 0.12], [1.0, -5.6, 0.1], [0.7, -6.3, 0.12], [1.2, -6.4, 0.1], [0.3, -6.7, 0.1], [0.9, -6.9, 0.1]], LANTERNFLY_FLECK, 0.03),
+]
+
+const hindwingParts = () => [
+  wingPlate(clipY(HINDWING, HINDWING_BAND[0], 1), LANTERNFLY_RED),
+  wingPlate(clipY(clipY(HINDWING, HINDWING_BAND[0], -1), HINDWING_BAND[1], 1), LANTERNFLY_BAND),
+  wingPlate(clipY(HINDWING, HINDWING_BAND[1], -1), LANTERNFLY_SPOT),
+  ...wingSpots([[0.6, -0.8, 0.26], [1.45, -1.1, 0.26], [1.0, -2.0, 0.3], [2.05, -2.3, 0.26], [0.45, -2.6, 0.22]], LANTERNFLY_SPOT, 0.03),
+]
+
+const mirrorX = pose([0, 0, 0], [0, 0, 0], [-1, 1, 1])
+/** The left side's: mirrored, its faces turned the right way out again. */
+const mirrored = (parts: THREE.BufferGeometry[]) => mergePainted(parts.map((g) => flipWinding(g.applyMatrix4(mirrorX))))
+
+export const LANTERNFLY_BODY_GEO = mergePainted([
+  paintedAt(new THREE.SphereGeometry(1, 6, 4), LANTERNFLY_BODY, pose([0, -2.1, 0.6], [0, 0, 0], [0.8, 2.1, 0.6])),
+  paintedAt(new THREE.SphereGeometry(1, 6, 4), LANTERNFLY_BODY, pose([0, 0.55, 0.7], [0, 0, 0], [0.9, 0.95, 0.65])),
+  paintedAt(new THREE.SphereGeometry(0.6, 6, 3), LANTERNFLY_BODY, pose([0, 1.75, 0.6], [0, 0, 0], [1, 0.85, 0.85])),
+  ...[-1, 1].map((s) => painted(new THREE.ConeGeometry(0.13, 0.9, 3), LANTERNFLY_ANTENNA, [s * 0.32, 2.45, 0.7], [0.3, 0, -s * 0.45])),
+  // Three legs a side from under the thorax, splayed forward, out and back.
+  ...[-1, 1].flatMap((s) => [[1.0, 0.5], [0.4, -0.1], [-0.2, -0.7]].map(([y, a]) => {
+    const dx = s * Math.cos(a)
+    const dy = Math.sin(a)
+    return painted(new THREE.CylinderGeometry(0.07, 0.1, 1.9, 3, 1, true), LANTERNFLY_LEG, [s * 0.5 + dx * 0.95, y + dy * 0.95, 0.25], [0, 0, Math.atan2(-dx, dy)])
+  })),
+])
+
+/** [right, left]. */
+export const LANTERNFLY_FOREWING_GEOS = [mergePainted(forewingParts()), mirrored(forewingParts())] as const
+export const LANTERNFLY_HINDWING_GEOS = [mergePainted(hindwingParts()), mirrored(hindwingParts())] as const
+
+export const LANTERNFLY_MAT = withRim(new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.55,
+  metalness: 0,
+  flatShading: true,
+  side: THREE.DoubleSide,
+}), { color: '#fff2e0', intensity: 0.45, power: 2.5 })
+
 // ── Hit flash (shared by every enemy) ───────────────────────────────
 // On hit, EnemyBase swaps each mesh's material to this one for the kill-pop
 // window instead of cloning materials per enemy. Colour > 1 so it blooms.
@@ -1137,3 +1269,7 @@ export const ENEMY_HIT_FLASH_MAT = new THREE.MeshBasicMaterial({
   toneMapped: false,
   fog: false,
 })
+
+/** The crow's hit flinch: wings snapped up (arm, hand; radians, + = down). */
+export const CROW_FLINCH_POSE = new THREE.Vector2(-1.15, -0.5)
+export const CROW_FLINCH_MAT = withCrowWings(ENEMY_HIT_FLASH_MAT.clone(), { value: CROW_FLINCH_POSE })

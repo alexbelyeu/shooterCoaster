@@ -3,8 +3,8 @@ import type { BiomeType } from '@/types/level'
 import { comboTierIndex } from '@/combat/comboTiers'
 import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
-/** What a kill sounds like, by death style (`effects/deathStyles.ts`): a bright pop, wing flutter, a low crunch, a wash, a hiss, a chalk puff, a toy squeak. */
-export const KILL_SOUNDS = ['pop', 'flutter', 'crunch', 'splash', 'hiss', 'chalk', 'squeak'] as const
+/** What a kill sounds like, by death style (`effects/deathStyles.ts`): a bright pop, wing flutter, a low crunch, a wash, a hiss, a chalk puff, a toy squeak, a bug's snap. */
+export const KILL_SOUNDS = ['pop', 'flutter', 'crunch', 'splash', 'hiss', 'chalk', 'squeak', 'snap'] as const
 export type KillSound = (typeof KILL_SOUNDS)[number]
 
 /** Ride wind: band-passed white noise that opens and brightens with speed (gain 0–0.12, an ambient bed). */
@@ -73,6 +73,9 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
   level6: INFERNO_KEY, // plays level5's score until its own theme (#456)
   results: { tonic: 60, minor: false }, // C major
   // Theme options waiting on Alex's pick (`?theme=`, scores/themes/) get a row each: `'<slot>.<name>': key`
+  'level6.chalkup': { tonic: 62, minor: false }, // D major
+  'level6.subway': { tonic: 64, minor: true }, // E minor
+  'level6.lanternfly': { tonic: 63, minor: false }, // E-flat major
 }
 
 const MAJOR = [0, 2, 4, 5, 7, 9, 11]
@@ -140,6 +143,7 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   'kill.hiss': { prio: PRIO.kill, db: -4, send: 0.12 },
   'kill.chalk': { prio: PRIO.kill, db: -4, send: 0.12 },
   'kill.squeak': { prio: PRIO.kill, db: -5, send: 0.1 },
+  'kill.snap': { prio: PRIO.kill, db: -5, send: 0.1 },
   'kill.thump': { prio: PRIO.kill, db: -6, send: 0.05 },
   'kill.ring': { prio: PRIO.kill, db: -16, send: 0.2 },
   'kill.payout': { prio: PRIO.kill, db: -15, send: 0.2 },

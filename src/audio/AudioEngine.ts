@@ -184,7 +184,7 @@ export function rampParam(param: AudioParam, value: number, seconds: number, exp
   else param.linearRampToValueAtTime(value, now + seconds)
 }
 
-/** Slow-mo "underwater" low-pass on the music bus. */
+/** Slow-mo "underwater" low-pass on the music bus (closed while paused too, `setPauseMix`). */
 export function setMusicDucked(on: boolean, immediate = false): void {
   if (on === ducked) return
   ducked = on
@@ -192,14 +192,14 @@ export function setMusicDucked(on: boolean, immediate = false): void {
 }
 
 function applyDuck(c: MasterChain, immediate: boolean) {
-  rampParam(c.duck.frequency, ducked ? DUCK_CLOSED_HZ : DUCK_OPEN_HZ, immediate ? 0 : DUCK_RAMP_S, true)
+  rampParam(c.duck.frequency, ducked || pauseMix ? DUCK_CLOSED_HZ : DUCK_OPEN_HZ, immediate ? 0 : DUCK_RAMP_S, true)
 }
 
 export function isMusicDucked(): boolean {
   return ducked
 }
 
-/** While paused: music down `PAUSE_MUSIC_DB`, SFX silent. */
+/** While paused: music down `PAUSE_MUSIC_DB` behind the duck's low-pass, SFX silent. Not per frame: a hidden tab gets none. */
 export function setPauseMix(on: boolean, immediate = false): void {
   if (on === pauseMix) return
   pauseMix = on
@@ -210,13 +210,12 @@ function applyPauseMix(c: MasterChain, immediate: boolean) {
   const seconds = immediate ? 0 : PAUSE_RAMP_S
   rampParam(c.musicPause.gain, pauseMix ? dbToGain(PAUSE_MUSIC_DB) : 1, seconds)
   rampParam(c.sfxPause.gain, pauseMix ? 0 : 1, seconds)
+  applyDuck(c, immediate)
 }
 
 /** A run can be paused or in slow-mo before the first gesture: the new chain starts in that mix. */
 function applyMix() {
-  if (!chain) return
-  applyDuck(chain, true)
-  applyPauseMix(chain, true)
+  if (chain) applyPauseMix(chain, true)
 }
 
 export function isPauseMixOn(): boolean {

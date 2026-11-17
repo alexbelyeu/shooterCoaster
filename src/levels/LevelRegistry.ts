@@ -22,7 +22,7 @@ const LEVELS: LevelConfig[] = [
       rollerSpeed: 0.00001,
       minRollerSpeed: 0.00008,
       curve: 'curve1',
-      color1: 0xffffff,
+      color1: 0xf3ece0,
       color2: 0xffff00,
     },
     ...paceLevel({
@@ -184,7 +184,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Ride the walls of the climbing gym',
     order: 6,
     biome: 'gym',
-    maxScore: 28 * 15 + 24 * 12 + 50 * 18, // 1608: no boss yet (the Medusa, #521), so the pit's rats are the finale
+    maxScore: 28 * 15 + 24 * 12 + 34 * 18 + 8 * 50 + 500, // 1320 + the Medusa's eight snakes and reward (bossSpecs.ts) = 2220
     message: 'You sent the Climbing Gym!',
     nextLevel: null,
     // Authored from Alex's blockout (#514): up the Tree, round the Flame, through the Arch, the dive into the Starr pit.
@@ -200,7 +200,7 @@ const LEVELS: LevelConfig[] = [
         { type: 'crow', count: 14, waveLabel: 'Round the Flame!', formation: 'spiral', weight: 2 },
         { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 3, bystanders: { type: 'climber', count: 3 } },
       ],
-      finale: { type: 'rat', count: 16, waveLabel: 'Into the Pit!' },
+      boss: 'medusa',
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},

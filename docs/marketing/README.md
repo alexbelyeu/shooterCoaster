@@ -24,7 +24,7 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
 
   | Event | Properties | Sent when |
   |---|---|---|
-  | `level_start` | `level` (`level1`…), `mode` (`campaign` / `daily`, from 2026-10-31; earlier starts have none) | A run begins: from level select (a level card, or the Daily card: `mode` `daily`), Replay or Next Level. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start |
+  | `level_start` | `level` (`level1`…), `mode` (`campaign` / `daily`, from 2026-10-31; earlier starts have none) | A run begins: from level select (a level card, or the Daily card: `mode` `daily`), Replay or Next Level; from 2026-11-16 (#235) also a Restart from the pause menu. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start |
   | `level_complete` | `level`, `stars` (0–3) | The timer runs out and the results screen opens |
   | `level_quit` | `level`, `progress_pct` (0, 10 … 100: share of the level timer used) | Quit to Menu from the pause screen |
   | `share` | `level`, `method` (`native`, `copy`, `x`, `reddit`, `bluesky`, `threads`, `whatsapp`, `facebook`, `linkedin`, `email`; from 2026-11-02, before which it carried `stars` instead; `image_native`, `image_download`, `image_copy` from #272) | A share went out from the results screen: the phone share sheet completed (`native`; with the score card picture, `image_native`; a dismissed sheet sends nothing), Copy link copied the line (`copy`), Save image / Copy image saved or copied the score card picture (`image_download`, `image_copy`), or the player opened a network's share link from the desktop menu (the network; whether they then posted is unknown). Rare and player-initiated, so it sits outside the ≤ 2 per run count |
@@ -36,7 +36,9 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   links for X, Reddit, Bluesky, Threads, WhatsApp, Facebook, LinkedIn and Email. It shares "I scored 1,240 ★★☆ on Theme Park in
   ShooterCoaster 🎢 — beat me:" with `https://scoaster.com/go/share?utm_source=share&utm_medium=organic&utm_campaign=share_<method>`
   (`share_native`, `share_copy`, `share_x`, `share_image_native` …; `results` before 2026-11-02), so its visits show
-  as `requestPath` `/go/share`. Pausing and resuming send nothing; closing
+  as `requestPath` `/go/share`. Once a campaign run's online submission comes back placed on the World top 10, the line reads
+  "I'm #3 in the world on Theme Park — 1,240 ★★☆ in ShooterCoaster 🎢 — beat me:" and the card carries a `WORLD #3` ribbon (#445;
+  shared before that answer, off the World board, or a Daily Run: the plain line). Pausing and resuming send nothing; closing
   the tab mid-run sends no `level_quit` (starts minus completes minus quits ≈ abandons).
 - **Internal traffic (Alex's devices).** Open **https://scoaster.com/?internal=1** once in
   each browser and on each device you play on. The browser remembers it (localStorage), the
@@ -45,6 +47,8 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   "internal: not tracked" in the top-right corner while it's on. **https://scoaster.com/?internal=0**
   turns it off; any other value (`?internal=false`) changes nothing. Clearing site data or a
   private window forgets it, so open the link again.
+  The second way, without the URL: **Settings → Data → "Internal device — don't count my plays"**
+  on the title's Settings (not the pause menu's) sets or clears the same flag; it applies from the next page load.
   Vercel Web Analytics has no IP or user exclusion, so this is the only filter.
 - **2026-10-22 and 2026-10-23 traffic is internal.** Every visitor and every level event on
   those two days was Alex setting up and testing on his own devices. They are not players:

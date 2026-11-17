@@ -1,11 +1,12 @@
-import type { EnemyType, Formation, FormationOrigin } from '@/types/level'
+import type { EnemyType, Formation, FormationOrigin, WallSurface } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import { maxReadableDistance } from '../enemies/enemyReadability'
-import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, type Surface } from './enemyPlacement'
-import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig'
-import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov'
+import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, wallNormal, wallPoint, type Surface, type SwarmSlot, type WallSlot } from './enemyPlacement'
+import { HOP } from '../enemies/hopGlideMotion'
+import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
+import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 
 /**
  * Formation placement, pure. Slots are seeded at level load (so `spawnDigest` stays
@@ -547,29 +548,77 @@ function tracksidePoint(table: ArcTable, riderIndex: number, { ahead, side }: Tr
   return { x: table.x[i] - forward.z * side, y: 0, z: table.z[i] + forward.x * side }
 }
 
-/** Inside an interior, a slot whose spot is past the walls on both sides comes in toward the track. */
-const BOUNDED_SIDE_SCALES = [1, 0.6, 0.35, 0]
+/** Shares of a slot's side tried nearer the track: inside an interior when its spot is past the walls, and by `bestFacingAround`. */
+const SIDE_SCALES = [1, 0.6, 0.35, 0]
 
 /**
  * The slot, or the same spot across the track when only that side is in view on the approach (the inside of a turn);
- * inside `bounds`, also nearer the track: the first inside them in view, else the first inside them, else the slot held in.
+ * inside `bounds`, also nearer the track. When none is (a tight turn faces the rider away from both sides of the
+ * slot's stretch until the last moment, #543): the spot round the slot's track point, clear of the rails, that the
+ * rider faces most squarely on the near approach.
  */
 function dryTracksidePoint(
   table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
   bounds?: PlacementBounds,
 ): Vec3 {
   const { sideMin } = TRACKSIDE.ground
-  let fallback: Vec3 | null = null
-  for (const scale of bounds ? BOUNDED_SIDE_SCALES : [1]) {
+  for (const scale of bounds ? SIDE_SCALES : [1]) {
     const offset = Math.max(sideMin, Math.abs(slot.side) * scale) * Math.sign(slot.side)
     for (const side of [offset, -offset]) {
       const p = tracksidePoint(table, riderIndex, { ahead: slot.ahead, side })
       if (bounds && !insideBounds(p, bounds)) continue
       if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)) return p
-      fallback ??= p
     }
   }
-  return fallback ?? clampToBounds(tracksidePoint(table, riderIndex, slot), bounds)
+  return bestFacingAround(table, riderIndex, slot, surface, groundFn, reach, trackScale, bounds)
+    ?? clampToBounds(tracksidePoint(table, riderIndex, slot), bounds)
+}
+
+/** Directions tried round a slot's track point, the first on the slot's side. */
+const AROUND_DIRECTIONS = 12
+
+/**
+ * The spot within the slot's side distance of its track point, inside `bounds` and at least `sideMin` from the rails
+ * near it, that the rider faces most squarely on the near approach (`approachFacing`); null if none is clear.
+ */
+function bestFacingAround(
+  table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
+  bounds?: PlacementBounds,
+): Vec3 | null {
+  const { sideMin } = TRACKSIDE.ground
+  const i = indexAhead(table, riderIndex, slot.ahead)
+  const forward = horizontal(trackTangent(table, i))
+  let best: Vec3 | null = null
+  let bestFacing = -Infinity
+  for (const scale of SIDE_SCALES) {
+    const r = Math.max(sideMin, Math.abs(slot.side) * scale)
+    for (let k = 0; k < AROUND_DIRECTIONS; k++) {
+      const a = (k / AROUND_DIRECTIONS) * 2 * Math.PI
+      const right = Math.cos(a) * Math.sign(slot.side) * r
+      const along = Math.sin(a) * r
+      const p = { x: table.x[i] - forward.z * right + forward.x * along, y: 0, z: table.z[i] + forward.x * right + forward.z * along }
+      if (bounds && !insideBounds(p, bounds)) continue
+      if (!clearOfRails(table, i, p, sideMin)) continue
+      const f = approachFacing(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)
+      if (f > bestFacing) {
+        best = p
+        bestFacing = f
+      }
+    }
+  }
+  return best
+}
+
+/** Arc either side of a slot's track point whose rails a spot round it keeps `clearance` from, sampled every step. */
+const RAIL_CHECK_ARC = 600
+const RAIL_CHECK_STEP = 20
+
+function clearOfRails(table: ArcTable, index: number, p: Vec3, clearance: number): boolean {
+  for (let a = -RAIL_CHECK_ARC; a <= RAIL_CHECK_ARC; a += RAIL_CHECK_STEP) {
+    const j = indexAhead(table, index, a)
+    if (Math.hypot(p.x - table.x[j], p.z - table.z[j]) < clearance) return false
+  }
+  return true
 }
 
 /**
@@ -596,13 +645,29 @@ function wetTracksidePoint(
 
 function inViewOnApproach(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): boolean {
   const from = Math.max(0, ahead - VIEW_LEAD)
-  for (const at of [from, from + VIEW_HOLD]) {
-    const { eye, dir } = trackView(table, indexAhead(table, riderIndex, at), trackScale)
-    const d = sub(p, eye)
-    const len = Math.hypot(d.x, d.y, d.z)
-    if (len > reach || dot(d, dir) < len * APPROACH_CONE_COS) return false
+  return lookCos(table, riderIndex, from, p, reach, trackScale) >= APPROACH_CONE_COS
+    && lookCos(table, riderIndex, from + VIEW_HOLD, p, reach, trackScale) >= APPROACH_CONE_COS
+}
+
+/** The looks `approachFacing` sums: every `FACING_STEP` from the second look of `inViewOnApproach` to `FACING_LAST` before the slot. */
+const FACING_STEP = 100
+const FACING_LAST = 300
+
+/** How squarely the rider faces `p` over the near approach, summed over its looks. */
+function approachFacing(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): number {
+  let sum = 0
+  for (let at = Math.max(0, ahead - VIEW_LEAD + VIEW_HOLD); at <= ahead - FACING_LAST; at += FACING_STEP) {
+    sum += lookCos(table, riderIndex, at, p, reach, trackScale)
   }
-  return true
+  return sum
+}
+
+/** Cosine between the rider's look `at` past `riderIndex` and the way to `p`; -1 past `reach`. */
+function lookCos(table: ArcTable, riderIndex: number, at: number, p: Vec3, reach: number, trackScale: number): number {
+  const { eye, dir } = trackView(table, indexAhead(table, riderIndex, at), trackScale)
+  const d = sub(p, eye)
+  const len = Math.hypot(d.x, d.y, d.z)
+  return len > reach ? -1 : dot(d, dir) / len
 }
 
 /** Point on an entry path at `t` (0–1, eased out); `spin` unwinds the horizontal offset around `from`. */
@@ -651,4 +716,69 @@ function normalize(v: Vec3): Vec3 {
 function horizontal(v: Vec3): Vec3 {
   const len = Math.hypot(v.x, v.z)
   return len > 1e-9 ? { x: v.x / len, y: 0, z: v.z / len } : { x: 1, y: 0, z: 0 }
+}
+
+/** Views of the rider a swarm's wall is judged from, over the first part of its window. */
+const SWARM_VIEWS = 6
+const SWARM_WINDOW_SHARE = 0.6
+/** Candidate centres along each wall, about this far apart. */
+const SWARM_CANDIDATE_STEP = 80
+/** The rider must see the wall's face at least this square-on (the cosine): not edge-on. */
+const SWARM_MIN_FACING = 0.25
+
+export interface PlaceSwarmInput {
+  table: ArcTable
+  riderIndex: number
+  type: EnemyType
+  walls: readonly WallSurface[]
+  slots: readonly SwarmSlot[]
+  ride: RideAhead
+}
+
+/**
+ * A swarm's wall and its members' spots on it (#516): the centre, of a few along each wall, that the rider sees face-on
+ * and within reading distance in the most views over the wave's window, the nearest at the first of them on a tie.
+ */
+export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: PlaceSwarmInput): WallSlot[] {
+  if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+  const reach = maxReadableDistance(type)
+  const views: TrackView[] = []
+  for (let j = 0; j < SWARM_VIEWS; j++) {
+    const ahead = ride.entry + (ride.window * SWARM_WINDOW_SHARE * j) / (SWARM_VIEWS - 1)
+    views.push(trackView(table, indexAhead(table, riderIndex, ahead), ride.trackScale))
+  }
+  const spot = { x: 0, y: 0, z: 0 }
+  let best = { wall: walls[0], u: walls[0].width / 2, v: walls[0].height / 2 }
+  let bestSeen = -1
+  let bestDist = Infinity
+  for (const wall of walls) {
+    const normal = wallNormal(wall)
+    const v = Math.min(wall.height / 2, Math.max(HOP.margin, wall.height * 0.4))
+    const steps = Math.max(1, Math.round(wall.width / SWARM_CANDIDATE_STEP))
+    for (let i = 0; i < steps; i++) {
+      const u = (wall.width * (i + 0.5)) / steps
+      wallPoint(wall, u, v, 0, spot, normal)
+      let seen = 0
+      for (const view of views) {
+        const d = sub(view.eye, spot)
+        const facing = (d.x * normal.x + d.y * normal.y + d.z * normal.z) / Math.max(1e-6, Math.hypot(d.x, d.y, d.z))
+        if (facing >= SWARM_MIN_FACING && inView(view, spot, reach)) seen++
+      }
+      const dist = Math.hypot(spot.x - views[0].eye.x, spot.y - views[0].eye.y, spot.z - views[0].eye.z)
+      if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) {
+        best = { wall, u, v }
+        bestSeen = seen
+        bestDist = dist
+      }
+    }
+  }
+  const { wall } = best
+  const mu = Math.min(HOP.margin, wall.width / 2)
+  const mv = Math.min(HOP.margin, wall.height / 2)
+  return slots.map((s) => ({
+    wall,
+    u: Math.min(wall.width - mu, Math.max(mu, best.u + s.du)),
+    v: Math.min(wall.height - mv, Math.max(mv, best.v + s.dv)),
+    seed: s.seed,
+  }))
 }

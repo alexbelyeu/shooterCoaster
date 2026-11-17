@@ -12,8 +12,7 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { ATMOSPHERES } from '@/levels/environments/atmosphere'
 import Atmosphere from '@/levels/environments/shared/Atmosphere'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
-import { createTrigCurve } from '@/track/curves/TrigCurve'
-import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import type { BiomeType, BossType, EnemyType } from '@/types/level'
 import { createRng, hashString } from '@/utils/rng'
 import KrakenPose from './KrakenPose'
@@ -51,8 +50,7 @@ function bossTrack(type: BossType): ArcTable {
   let table = tracks.get(type)
   if (!table) {
     const level = getAllLevels().find((l) => l.boss?.type === type) ?? getAllLevels()[0]
-    const { curve, varA, varB, varC, scalar } = level.track
-    table = buildArcTable((curve === 'curve2' ? createTrigCurve2 : createTrigCurve)(varA, varB, varC, scalar))
+    table = buildArcTable(createTrackCurve(level.track))
     tracks.set(type, table)
   }
   return table
@@ -85,7 +83,7 @@ function Model({ subject }: { subject: Subject }) {
     // The spawner mounts golden balloons as type 'balloon' too.
     const type = id === 'goldenBalloon' ? 'balloon' : (id as EnemyType)
     const enemy = <Enemy id={id} type={type} spawnPosition={ORIGIN} scoreValue={0} radius={1} onKill={noop} />
-    return subject.stage === 'wall' ? <>{enemy}<ClimbingWall /></> : enemy
+    return subject.stage === 'wall' ? <>{enemy}<ClimbingWall gap={subject.wallGap ?? WALL_STANDOFF} /></> : enemy
   }
   if (id === 'kraken') return <KrakenPose />
   const Boss = BOSS_COMPONENTS[id as BossType]
@@ -95,9 +93,9 @@ function Model({ subject }: { subject: Subject }) {
 const WALL_HOLDS: readonly [number, number][] = [[-28, 40], [22, 30], [-14, -10], [30, -24], [-30, -40], [8, 52]]
 
 /** A patch of pale gym wall behind a wall enemy, with dark holds: front face only, so the back view sees the climber. */
-function ClimbingWall() {
+function ClimbingWall({ gap }: { gap: number }) {
   return (
-    <group position={[0, 6, -WALL_STANDOFF]}>
+    <group position={[0, 6, -gap]}>
       <mesh>
         <planeGeometry args={[90, 120]} />
         <meshStandardMaterial color="#ddd8cc" roughness={0.9} />

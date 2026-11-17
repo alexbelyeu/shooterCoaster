@@ -4,27 +4,25 @@ import { RUN_SECONDS } from '@/levels/pacing'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
-import type { EnemyWave, Formation, LevelConfig } from '@/types/level'
+import type { EnemyWave, Formation, LevelConfig, WallSurface } from '@/types/level'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
 import { rideProfile, rideSpeeds, riddenBetween } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
-import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov'
+import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import {
   AIR_CLEARANCE, ENTRY_SECONDS, ENTRY_STAGGER, FORMATIONS, NEAR_FIELD, clampToBounds, entryPoint, formationFrame, formationSlots, groupStep,
   indexAhead, insideBounds, marchHeading, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
-  trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
+  inView, placeWallSwarm, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
   type ChoreographedFormation, type RideAhead, type Vec3,
 } from './spawnPlacement'
-import { ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, placedBesideTrack } from './enemyPlacement'
+import { ENEMY_PLACEMENT, SWARM_SPACING, WATER_DEPTH, WATER_Y, placedBesideTrack, swarmSlots, wallPoint } from './enemyPlacement'
+import { HOP } from '../enemies/hopGlideMotion'
 import { waveWindows } from './waveSchedule'
 import { BIOMES } from '@/levels/environments/biomeRegistry'
 import { REFERENCE_FOV_DEG, maxReadableDistance } from '../enemies/enemyReadability'
 
-/**
- * Share of trackside enemies in front of the rider on their approach. Level 6's authored spline spirals tightly round
- * the Flame inside walls that hold its slots near the track (#543): ~0.67 with every slot inside the hall.
- */
-const inFrontShare = (level: LevelConfig) => (level.id === 'level6' ? 0.65 : 0.85)
+/** Share of trackside enemies in front of the rider on their approach, on every level (level 6's tight spline too, #543). */
+const IN_FRONT_SHARE = 0.85
 
 const choreographed = (f: Formation | undefined): f is ChoreographedFormation => !!f && f !== 'scatter'
 const besideTrack = (w: EnemyWave) => !choreographed(w.formation) && placedBesideTrack(w.type)
@@ -311,7 +309,7 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
         if ((p.x - nearPoint.x) * forward.x + (p.z - nearPoint.z) * forward.z > 0) inFront++
       })
     }
-    expect(inFront / total).toBeGreaterThan(inFrontShare(level))
+    expect(inFront / total).toBeGreaterThan(IN_FRONT_SHARE)
   })
 })
 
@@ -322,7 +320,7 @@ describe('level6: inside the hall', () => {
 
   it('the gym has bounds, the hall inset by 40 units', () => {
     expect(bounds).toBe(hall)
-    expect([hall.minX, hall.maxX, hall.minZ, hall.maxZ]).toEqual([-600, 600, -280, 280])
+    expect([hall.minX, hall.maxX, hall.minZ, hall.maxZ]).toEqual([-1240, 1240, -600, 600])
   })
 
   it('every ground and air placement, entry starts included, lies inside the hall (#546)', () => {
@@ -434,5 +432,38 @@ describe('outsideNearField', () => {
     const p = outsideNearField({ x: 20, y: 0, z: 0 }, cam)
     expect(p).toEqual({ x: 10 + NEAR_FIELD, y: 0, z: 0 })
     expect(dist(outsideNearField(cam, cam), cam)).toBeCloseTo(NEAR_FIELD)
+  })
+})
+
+describe('placeWallSwarm (#516)', () => {
+  const { table, trackScale } = world(getAllLevels()[0])
+  const view = trackView(table, 0, trackScale)
+  const f = { x: view.dir.x / Math.hypot(view.dir.x, view.dir.z), y: 0, z: view.dir.z / Math.hypot(view.dir.x, view.dir.z) }
+  /** A 240 x 200 wall `ahead` along the rider's look, facing back down it at the eye. */
+  const wallAt = (id: string, ahead: number): WallSurface => {
+    const right = { x: -f.z, y: 0, z: f.x }
+    const c = { x: view.eye.x + f.x * ahead, y: view.eye.y, z: view.eye.z + f.z * ahead }
+    return { id, origin: { x: c.x - right.x * 120, y: c.y - 80, z: c.z - right.z * 120 }, right, up: { x: 0, y: 1, z: 0 }, width: 240, height: 200 }
+  }
+  const slots = swarmSlots(14, createRng(5))
+
+  it('clusters a swarm round its centre, wider for more', () => {
+    const extent = (n: number) => Math.max(...swarmSlots(n, createRng(2)).map((s) => Math.hypot(s.du, s.dv)))
+    for (const s of slots) expect(Math.hypot(s.du, s.dv)).toBeLessThanOrEqual(SWARM_SPACING * Math.sqrt(14))
+    expect(extent(30)).toBeGreaterThan(extent(6))
+  })
+
+  it('puts the whole swarm on the wall in front of the rider, never the one behind', () => {
+    const placed = placeWallSwarm({ table, riderIndex: 0, type: 'lanternfly', walls: [wallAt('behind', -400), wallAt('ahead', 400)], slots, ride: STILL })
+    expect(new Set(placed.map((p) => p.wall.id))).toEqual(new Set(['ahead']))
+    for (const p of placed) {
+      expect(p.u >= HOP.margin && p.u <= 240 - HOP.margin && p.v >= HOP.margin && p.v <= 200 - HOP.margin).toBe(true)
+      expect(inView(view, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), maxReadableDistance('lanternfly'))).toBe(true)
+    }
+    expect(placed.map((p) => p.seed)).toEqual(slots.map((s) => s.seed))
+  })
+
+  it('needs the level to have walls', () => {
+    expect(() => placeWallSwarm({ table, riderIndex: 0, type: 'lanternfly', walls: [], slots, ride: STILL })).toThrow(/walls/)
   })
 })

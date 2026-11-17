@@ -26,14 +26,15 @@ export function findAssistTargetNDC(
 ): boolean {
   if (!(radiusPx > 0) || size.width <= 0 || size.height <= 0) return false
   const targets = getCollisionTargets()
-  if (_candX.length < targets.size) {
-    _candX = new Array<number>(targets.size * 2).fill(0)
-    _candY = new Array<number>(targets.size * 2).fill(0)
-    _candW = new Array<number>(targets.size * 2).fill(1)
+  if (_candX.length < targets.length) {
+    _candX = new Array<number>(targets.length * 2).fill(0)
+    _candY = new Array<number>(targets.length * 2).fill(0)
+    _candW = new Array<number>(targets.length * 2).fill(1)
   }
   camera.getWorldDirection(_camFwd)
   let n = 0
-  for (const t of targets.values()) {
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i]
     const pos = t.getPosition()
     // Dead / unmounted enemies park far below the world.
     if (pos.y < -9000) continue

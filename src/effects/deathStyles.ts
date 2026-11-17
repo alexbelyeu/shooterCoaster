@@ -186,6 +186,25 @@ export const LAVA_BURST_DEATH_STYLE: DeathStyle = {
   lifetime: 1.6, scale: 3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'hiss',
 }
 
+/** A Medusa snake: a sparkle in a puff of chalk, a few green and gold scales; nothing falls (a toy, never graphic). */
+export const MEDUSA_SNAKE_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'mote', count: 26, colors: ['#ffffff', '#efeee8', '#dcdad2'], glow: 1.2, speed: [12, 60], up: 15, drag: 2.6, gravity: 6, size: 6, hold: 0.5 }),
+    layer({ shape: 'confetti', count: 12, colors: ['#2fb36a', '#7cc63a', '#ffc845'], glow: 1.5, speed: [30, 80], up: 25, drag: 2.8, gravity: 30, size: 3.5, spin: 8, hold: 0.5 }),
+    layer({ shape: 'spark', count: 10, colors: ['#ffffff', '#ffe27a'], glow: 4, speed: [60, 150], drag: 3, size: 1.6 }),
+  ],
+  lifetime: 1.9, scale: 2, lift: 0, flash: 4, flashColor: '#fff2c0', sound: 'chalk',
+}
+
+/** The Medusa laughing back into the star: a big chalk cloud with gold glints, a few at once over her. */
+export const MEDUSA_CHALK_BURST_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'mote', count: 34, colors: ['#ffffff', '#f3f1ea', '#dedbd2'], glow: 1.15, speed: [15, 75], up: 30, drag: 2, gravity: 8, size: 8, hold: 0.5 }),
+    layer({ shape: 'spark', count: 14, colors: ['#ffd23f', '#ffffff', '#c46bff'], glow: 4, speed: [50, 140], drag: 2.5, size: 2.2 }),
+  ],
+  lifetime: 2.2, scale: 3.5, lift: 0, flash: 6, flashColor: '#ffe9a0', sound: 'chalk',
+}
+
 export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
   balloon: {
     layers: [
@@ -283,6 +302,16 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
       layer({ shape: 'feather', count: 8, colors: ['#76726b', '#9a968e'], glow: 1, speed: [20, 50], up: 20, drag: 3, gravity: 12, size: 4, spin: 6, hold: 0.6 }),
     ],
     lifetime: 2.2, scale: 1.3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'chalk',
+  },
+  // A pop of its wings (#516): spotted beige flakes and red ones, black specks, and a red flash.
+  lanternfly: {
+    layers: [
+      layer({ shape: 'confetti', count: 14, colors: ['#c9b8a0', '#b3a288', '#7d756a'], glow: 1.1, speed: [30, 80], up: 20, drag: 2.6, gravity: 40, size: 4, spin: 9, hold: 0.6 }),
+      layer({ shape: 'confetti', count: 10, colors: ['#d8282a', '#f03a2a', '#f2efe6'], glow: 1.5, speed: [35, 90], up: 25, drag: 2.6, gravity: 40, size: 3.5, spin: 10, hold: 0.6 }),
+      layer({ shape: 'mote', count: 10, colors: ['#141212', '#2a2522'], glow: 1, speed: [20, 60], drag: 3, gravity: 20, size: 2.5, hold: 0.4 }),
+      layer({ shape: 'spark', count: 8, colors: ['#ff5a4a'], glow: 3, speed: [60, 120], drag: 4, size: 1.4 }),
+    ],
+    lifetime: 1.7, scale: 1, lift: 0, flash: 5, flashColor: '#ff3a2a', sound: 'snap',
   },
 }
 

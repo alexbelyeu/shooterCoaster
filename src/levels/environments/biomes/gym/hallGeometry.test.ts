@@ -29,7 +29,7 @@ describe('the Climbing Gym hall', () => {
     }
     expect(bad).toBe(0)
     expect(outside).toBe(0)
-    const holdTriangles = hall.holds.matrices.length * 20 + hall.volumes.matrices.length * 6
+    const holdTriangles = hall.holds.matrices.length * 20
     expect(triangles(hall.solid) + triangles(hall.light) + triangles(hall.glass) + holdTriangles).toBeLessThan(120_000)
   })
 
@@ -37,9 +37,8 @@ describe('the Climbing Gym hall', () => {
     expect(hall.solid.attributes.color.count).toBe(hall.solid.attributes.position.count)
   })
 
-  it('studs the climbing faces with holds and the boulders with volumes', () => {
+  it('studs the climbing faces with holds', () => {
     expect(hall.holds.matrices.length).toBeGreaterThan(800)
-    expect(hall.volumes.matrices.length).toBeGreaterThan(30)
     expect(hall.holds.colors).toHaveLength(hall.holds.matrices.length)
   })
 })

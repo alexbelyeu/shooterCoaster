@@ -38,12 +38,13 @@ export default function KrakenPose() {
     const segments = segmentsRef.current
     if (!segments || !headRef.current || !eyeRef.current) return
     const tau = gameTime()
-    TENTACLE_ANGLES.forEach((a, i) => {
+    for (let i = 0; i < TENTACLE_ANGLES.length; i++) {
+      const a = TENTACLE_ANGLES[i]
       const f = tentacleFrame(sim.tentacle, tau, T.riseS + T.upS, i)
       const chain = layChain(sim.chain, f.emerge, f.bend)
       const out = a + f.yaw
       layTentacle(segments, i, chain, Math.sin(out), Math.cos(out), Math.sin(a) * RING, Math.cos(a) * RING, pads[i] ?? undefined)
-    })
+    }
     segments.instanceMatrix.needsUpdate = true
     segments.boundingBox = null
     const pose = headFrame(sim.head, tau, H.riseS + H.upS, H.sinkS)

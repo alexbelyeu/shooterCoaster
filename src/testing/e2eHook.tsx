@@ -11,7 +11,7 @@
  *   - play: autoFire at the nearest visible enemy, killNearest(n) for
  *     deterministic combat screenshots (fires one real shot, then resolves the
  *     hits through the bullet pool's own processHit path), endLevel() to reach
- *     the results screen (shareText() for what its share menu's Copy link copies, scoreCard(size) for its share image), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
+ *     the results screen (shareText(worldRank?) for what its share menu's Copy link copies, scoreCard(size) for its share image), stats() for score / kills / combo (tier, frenzy slow-mo) / shots / hits,
  *     primeCombo(n) to set up a long chain,
  *     enemyScreenPoints(n) to drive real pointer / touch input at enemies
  *   - count fire / hit / kill events, camera translation / trauma rotation and
@@ -47,7 +47,7 @@ import { useSettingsStore } from '@/store/useSettingsStore'
 import { qualityProfile, type GraphicsQuality, type QualityProfile } from '@/canvas/graphicsQuality'
 import { getAdaptiveSteps } from '@/canvas/useRenderBudget'
 import { COMBO_TIERS, TOP_TIER, comboMultiplier } from '@/combat/comboTiers'
-import { setTimeScaleOverride } from '@/combat/slowMo'
+import { setTimeScaleOverride } from '@/combat/slowMo.hot'
 import { getPointerState } from '@/input/pointerInput'
 import { audioContext, initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
 import { loadArcade, sfx, type VoiceStats } from '@/audio/sfx'
@@ -63,20 +63,39 @@ import { renderScoreCard } from '@/ui/scoreCardImage'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
-import { MAX_BANK_DEG, MAX_PITCH_DEG } from '@/track/cameraRig'
-import { DROP_FOV_DEG, SPEED_FOV_DEG } from '@/track/cameraFov'
+import { MAX_BANK_DEG, MAX_PITCH_DEG } from '@/track/cameraRig.hot'
+import { DROP_FOV_DEG, SPEED_FOV_DEG } from '@/track/cameraFov.hot'
+import { programsAfterWarmup } from '@/core/hitchLog'
+import { LONG_FRAME_MS } from '@/telemetry/telemetryReport'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
+
+/**
+ * `?e2e=1&gpuSync=1` (#608): each frame first waits for the GPU to finish the one before. Headless Chromium's old
+ * headless mode (CI's headless shell) runs the page's frames far ahead of SwiftShader, queueing seconds of GL work,
+ * and every screenshot waits for that queue to drain: 8-20 s a shot on the title, a minute more on the ui shard.
+ */
+const gpuSync = isE2E && new URLSearchParams(window.location.search).has('gpuSync')
+const SYNC_PIXEL = new Uint8Array(4)
+
+/** Blocks until the GPU has run every command sent so far (a readPixels from the default framebuffer). */
+function waitForGpu(gl: THREE.WebGLRenderer) {
+  const target = gl.getRenderTarget()
+  gl.setRenderTarget(null)
+  const ctx = gl.getContext()
+  ctx.readPixels(0, 0, 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, SYNC_PIXEL)
+  gl.setRenderTarget(target)
+}
 
 export interface SCTestApi {
   frames: number
   /** Rolling average frame time in ms (last ~120 frames). */
   avgFrameMs: number
-  /** Longest frame in ms since a test last set this to 0 (first-shot hitch check). */
+  /** Longest frame in ms since a test last set this to 0 (first-shot hitch check, the throttled ride). */
   maxFrameMs: number
-  /** Longest frame and frames over `LONG_FRAME_MS` since a test last reset it (the throttled ride, #536). */
-  longFrames: { maxMs: number; count: number }
+  /** Frames of telemetry's `LONG_FRAME_MS` (100) or more since a test last set this to 0 (the throttled ride, #536). */
+  longFrames: number
   /** Shader programs the renderer has compiled so far (a rise mid-play is a compile hitch). */
   programs: () => number
   /**
@@ -205,11 +224,12 @@ export interface SCTestApi {
   /** Force the results phase. */
   endLevel: () => void
   /** What the results share menu's Copy link puts on the clipboard for the current level and score (`text url`), or null. */
-  shareText: () => string | null
+  /** `worldRank` (0-based): the line a run on the World top 10 shares (#445). */
+  shareText: (worldRank?: number | null) => string | null
   /** The results Share image (#272) for the current level and run, drawn as the share menu draws it: its pixel size,
    *  PNG data URL and download name, or null with no level. */
   scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string } | null>
-  /** Override the game time scale (0 freezes camera + enemies; 1 hands it back to the slow-mo envelopes, `combat/slowMo.ts`). */
+  /** Override the game time scale (0 freezes camera + enemies; 1 hands it back to the slow-mo envelopes, `combat/slowMo.hot.ts`). */
   setTimeScale: (s: number) => void
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null
@@ -237,7 +257,9 @@ export interface SCTestApi {
   renderAudio: (req: AudioRenderRequest, seed?: number) => Promise<AudioRenderResult>
   /** The current level's shader warm-up (`canvas/ShaderWarmup.tsx`): finished?, how long it took
    *  from level mount, and the renderer's program count after it. null before the first level. */
-  shaderWarmup: { done: boolean; ms: number; programs: number } | null
+  shaderWarmup: { levelId: string; done: boolean; ms: number; programs: number } | null
+  /** The current level's lazy scene has loaded, mounted and warmed up: `startLevel` enters `playing` before that (#464). */
+  levelReady: () => boolean
   /** ms from navigation to each startup phase (`core/startupMarks.ts`). */
   initTimings: () => Partial<Record<StartupPhase, number>>
   // ── Boss (issue #181) ──
@@ -441,9 +463,6 @@ export function recordE2ESpawns(positions: readonly { x: number; y: number; z: n
   spawnDigest = `${positions.length}:${hashString(text).toString(16)}`
 }
 
-/** A frame this long is a visible freeze, not a slow frame (`longFrames`). */
-const LONG_FRAME_MS = 100
-
 /** One frame that compiled shader programs after its level's warm-up (#536). */
 export interface ProgramGrowth {
   /** Level timer seconds (the last playing frame's). */
@@ -461,12 +480,12 @@ let lastPrograms = 0
 
 function noteProgramGrowth(api: SCTestApi, programs: number) {
   const warmup = api.shaderWarmup
-  const from = Math.max(lastPrograms, warmup?.programs ?? 0)
-  if (warmup?.done && programs > from) {
+  const added = programsAfterWarmup(programs, lastPrograms, warmup?.done ? warmup.programs : null)
+  if (added > 0) {
     api.programGrowth.push({
       levelTime: e2eLevelTime,
       phase: useGameStore.getState().phase,
-      added: programs - from,
+      added,
       total: programs,
       events: [...frameEvents],
     })
@@ -696,7 +715,7 @@ function bossHit(n: number): number {
   for (let i = 0; i < n; i++) {
     let best: CollisionTarget | null = null
     let bestD = Infinity
-    for (const t of getCollisionTargets().values()) {
+    for (const t of getCollisionTargets()) {
       if (!isBossTarget(t)) continue
       const d = probeCamera ? t.getPosition().distanceToSquared(probeCamera.position) : 0
       if (d < bestD) {
@@ -715,7 +734,7 @@ function bossHit(n: number): number {
 export const BOSS_PROJECTILE_PREFIX = 'boss-projectile:'
 
 function projectileHit(): number {
-  const live = [...getCollisionTargets().values()].filter((t) => t.id.startsWith(BOSS_PROJECTILE_PREFIX))
+  const live = [...getCollisionTargets()].filter((t) => t.id.startsWith(BOSS_PROJECTILE_PREFIX))
   for (const t of live) processHit(t)
   return live.length
 }
@@ -778,7 +797,7 @@ function onScreenNDC(t: CollisionTarget, camera: THREE.Camera, out: THREE.Vector
 function liveTargetsByDistance(camera: THREE.Camera | null) {
   const list: { t: CollisionTarget; d: number; visible: boolean }[] = []
   const ndc = new THREE.Vector3()
-  for (const t of getCollisionTargets().values()) {
+  for (const t of getCollisionTargets()) {
     if (!isLive(t) || isBossTarget(t)) continue
     const d = camera ? t.getPosition().distanceToSquared(camera.position) : 0
     const visible = camera ? onScreenNDC(t, camera, ndc) : false
@@ -796,7 +815,7 @@ function autoFireTick(camera: THREE.Camera) {
   if (useGameStore.getState().phase !== 'playing') return
   let best: CollisionTarget | null = null
   let bestD = Infinity
-  for (const t of getCollisionTargets().values()) {
+  for (const t of getCollisionTargets()) {
     if (!isLive(t) || !onScreenNDC(t, camera, _aim)) continue
     const d = t.getPosition().distanceToSquared(camera.position)
     if (d < bestD) {
@@ -816,7 +835,7 @@ export function installE2EApi() {
     frames: 0,
     avgFrameMs: 0,
     maxFrameMs: 0,
-    longFrames: { maxMs: 0, count: 0 },
+    longFrames: 0,
     programs: () => probeGl?.info.programs?.length ?? 0,
     gpuMemory: () => ({ textures: probeGl?.info.memory.textures ?? 0, geometries: probeGl?.info.memory.geometries ?? 0 }),
     cameraPose: readCameraPose,
@@ -828,6 +847,10 @@ export function installE2EApi() {
       return getAllLevels().map((l) => ({ id: l.id, name: l.name, maxScore: l.maxScore, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id) }))
     },
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
+    levelReady: () => {
+      const { sceneReady, currentLevel } = useGameStore.getState()
+      return sceneReady && api.shaderWarmup?.levelId === currentLevel
+    },
     setPhase: (phase: GamePhase) => useGameStore.getState().setPhase(phase),
     setSavedScores: (scores: Record<string, ScoreEntry>) => useGameStore.setState({ savedScores: scores }),
     setLeaderboards: (boards, lastInitials) =>
@@ -898,7 +921,7 @@ export function installE2EApi() {
     shootBystander: () => {
       let best: CollisionTarget | null = null
       let bestRank = Infinity
-      for (const t of getCollisionTargets().values()) {
+      for (const t of getCollisionTargets()) {
         if (t.kind !== 'bystander' || !isMounted(t)) continue
         const d = probeCamera ? t.getPosition().distanceToSquared(probeCamera.position) : 0
         const rank = probeCamera && onScreenNDC(t, probeCamera, _aim) ? d : d + 1e12
@@ -916,7 +939,7 @@ export function installE2EApi() {
       let liveEnemies = 0
       let onScreenEnemies = 0
       let onScreenBystanders = 0
-      for (const t of getCollisionTargets().values()) {
+      for (const t of getCollisionTargets()) {
         if (t.kind === 'bystander' && isMounted(t) && probeCamera && onScreenNDC(t, probeCamera, _aim)) onScreenBystanders++
         if (!isLive(t)) continue
         liveEnemies++
@@ -962,9 +985,9 @@ export function installE2EApi() {
       autoFireEnabled = false
       useGameStore.getState().setPhase('results')
     },
-    shareText: () => {
+    shareText: (worldRank: number | null = null) => {
       const { currentLevel, score } = useGameStore.getState()
-      const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score), 'copy') : null
+      const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score), 'copy', worldRank) : null
       return payload ? clipboardText(payload) : null
     },
     scoreCard: async (size: CardSize) => {
@@ -1169,6 +1192,7 @@ export function E2EFrameProbe() {
   useFrame((state, delta) => {
     const api = window.__SC_TEST__
     if (!api) return
+    if (gpuSync) waitForGpu(gl)
     probeCamera = state.camera
     probeSize = state.size
     probeCanvas = state.gl.domElement
@@ -1184,8 +1208,7 @@ export function E2EFrameProbe() {
     const ms = delta * 1000
     api.avgFrameMs = api.avgFrameMs === 0 ? ms : api.avgFrameMs + (ms - api.avgFrameMs) / 120
     if (ms > api.maxFrameMs) api.maxFrameMs = ms
-    if (ms > api.longFrames.maxMs) api.longFrames.maxMs = ms
-    if (ms > LONG_FRAME_MS) api.longFrames.count++
+    if (ms >= LONG_FRAME_MS) api.longFrames++
     api.drawCalls = gl.info.render.calls
     api.triangles = gl.info.render.triangles
     gl.info.reset()

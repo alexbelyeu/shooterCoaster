@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
 import { gameClockStep } from '@/core/gameClock'
-import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake'
+import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { LAVA_BURST_DEATH_STYLE, TITAN_BREAK_DEATH_STYLE, TITAN_PART_DEATH_STYLE } from '@/effects/deathStyles'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
@@ -17,12 +17,12 @@ import {
   TITAN_ARM_GEO, TITAN_BODY_GEO, TITAN_CRACK_UNIFORMS, TITAN_CROWN_GEO, TITAN_HEAD_GEO, TITAN_HEART_OPEN_GEO,
   TITAN_HEART_SHUT_GEO, TITAN_LEG_GEO, TITAN_OBSIDIAN_MAT, TITAN_VENT_GEO,
 } from './bossAssets'
-import { approachAngle, pickPerch, type Perch, type PerchInput } from './scorpionMotion'
+import { approachAngle, pickPerch, type Perch, type PerchInput } from './scorpionMotion.hot'
 import {
   TITAN_BODY, TITAN_DEFEAT, TITAN_PERCH, TITAN_RISE, TITAN_WADE, beatNowEpoch, crackGlow, defeatHeat, defeatSink,
   heartOpenAmount, isHeartOpen, needsWade, pickRiverSpot, poundAmount, poundBetween, riseOffset, strideAngle, wadeStep,
   type Point2,
-} from './titanMotion'
+} from './titanMotion.hot'
 
 const B = TITAN_BODY
 const VENTS = ['vent-l', 'vent-r'] as const

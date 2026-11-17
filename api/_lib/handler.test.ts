@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getBoard, postScore, type Deps } from './handler'
 import type { PublicEntry, Submission } from './rules'
 import { DbError, type ScoresDb } from './scoresDb'
+import { LEVEL_LIMITS } from './levelLimits'
 
 type Row = Submission & { ipHash: string; createdAt: number }
 
@@ -13,10 +14,10 @@ function fakeDb(now: () => number, failing = false): ScoresDb & { rows: Row[] } 
   }
   return {
     rows,
-    async top(level) {
+    async top(level, maxScore) {
       guard()
       return rows
-        .filter((r) => r.level === level)
+        .filter((r) => r.level === level && r.score <= maxScore)
         .sort((a, b) => b.score - a.score || a.createdAt - b.createdAt)
         .slice(0, 10)
         .map((r): PublicEntry => ({ initials: r.initials, score: r.score, at: new Date(r.createdAt).toISOString() }))
@@ -28,6 +29,7 @@ function fakeDb(now: () => number, failing = false): ScoresDb & { rows: Row[] } 
         if (filters.created_at && r.createdAt < Date.parse(filters.created_at.slice(4))) return false
         if (filters.level_id && r.level !== filters.level_id.slice(3)) return false
         if (filters.score && r.score < Number(filters.score.slice(4))) return false
+        if (filters.and && r.score > Number(/^\(score\.lte\.(\d+)\)$/.exec(filters.and)?.[1])) return false
         return true
       }).length
     },
@@ -41,6 +43,10 @@ function fakeDb(now: () => number, failing = false): ScoresDb & { rows: Row[] } 
 const run = { level: 'level1', initials: 'ABC', score: 2400, seed: 1, kills: 100, accuracy: 0.8, version: '2.0.0' }
 const post = (body: unknown, ip = '1.2.3.4') =>
   new Request('https://scoaster.com/api/leaderboard', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body), headers: { 'x-forwarded-for': ip } })
+/** A row from before the 60 s rules (#452): a long run over what a 60 s run can score, straight in the table. */
+const longRun = (level: string, createdAt: number): Row => ({
+  ...run, level, initials: 'OLD', score: LEVEL_LIMITS[level].maxScore + 500, ipHash: 'ff', createdAt,
+})
 const get = (level: string) => new Request(`https://scoaster.com/api/leaderboard?level=${level}`)
 
 function setup(failing = false) {
@@ -62,6 +68,14 @@ describe('POST /api/leaderboard', () => {
     expect(body.top.map((e: PublicEntry) => e.score)).toEqual([3000, 2400])
     expect(db.rows[1].ipHash).toMatch(/^[0-9a-f]{64}$/)
     expect(JSON.stringify(db.rows)).not.toContain('1.2.3.4')
+  })
+
+  it('ranks a run among 60 s runs only, past a long run from before the 60 s rules', async () => {
+    const { db, deps } = setup()
+    db.rows.push(longRun('level1', 0))
+    const body = await (await postScore(post(run), deps)).json()
+    expect(body.rank).toBe(1)
+    expect(body.top.map((e: PublicEntry) => e.initials)).toEqual(['ABC'])
   })
 
   it('rejects a forged score, bad initials and junk with 400 and stores nothing', async () => {
@@ -106,6 +120,18 @@ describe('GET /api/leaderboard', () => {
     const { top } = await res.json()
     expect(top).toHaveLength(10)
     expect(top[0]).toEqual({ initials: 'ABC', score: 1200, at: expect.any(String) })
+  })
+
+  it('leaves rows over the level\'s 60 s limit off the board (#458)', async () => {
+    const { db, deps } = setup()
+    db.rows.push(longRun('level5', 0), longRun('level5', 1))
+    for (let i = 1; i <= 10; i++) await postScore(post({ ...run, level: 'level5', score: i * 100 }, `10.0.0.${i}`), deps)
+    db.rows.push({ ...longRun('level5', 2), score: LEVEL_LIMITS.level5.maxScore, initials: 'TOP' })
+    const { top } = await (await getBoard(get('level5'), deps)).json()
+    expect(top).toHaveLength(10)
+    expect(top.map((e: PublicEntry) => e.initials)).not.toContain('OLD')
+    expect(top[0]).toMatchObject({ initials: 'TOP', score: LEVEL_LIMITS.level5.maxScore })
+    expect(top[9].score).toBe(200)
   })
 
   it('400s an unknown level and 503s (uncached) when the board is unavailable', async () => {

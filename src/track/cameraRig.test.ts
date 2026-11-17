@@ -4,7 +4,7 @@ import {
   BANK_RESPONSE, CURVATURE_SAMPLE_UNITS, LATERAL_ACCEL_REF, LOOK_AHEAD_UNITS, MAX_BANK_DEG, MAX_LOOK_AHEAD_DEG,
   MAX_PITCH_DEG, bankAngle, createRigState, damp, dropAmount, lateralAcceleration, lookAheadDirection, pitchAngle,
   resetRig, sampleTrack, smoothingFactor, stepRig, type TrackSamples,
-} from './cameraRig'
+} from './cameraRig.hot'
 import { buildArcTable, distanceAtT } from './arcLength'
 import type { TrackCurve } from './curves/TrackCurve'
 

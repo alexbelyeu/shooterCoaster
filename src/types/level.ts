@@ -3,8 +3,8 @@ import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 /** `curve1` / `curve2`: the generated trig curves; `spline`: an authored track through `controlPoints` (#514). */
 export type CurveType = 'curve1' | 'curve2' | 'spline'
 export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic' | 'gym'
-export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti' | 'magmaTitan'
-export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny'
+export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti' | 'magmaTitan' | 'medusa'
+export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny' | 'lanternfly'
 
 /** A climbable wall (#453): from `origin`, its bottom-left corner, along unit `right` and `up`; it faces `right × up`. */
 export interface WallSurface {
@@ -34,6 +34,10 @@ export interface TrackParams {
   railRadius?: number
   /** Arc-length spacing between cross ties at trackScale 1 (default 10); multiplied by trackScale. */
   tieSpacing?: number
+  /** Arc-length spacing between support towers at trackScale 1 (default 50); multiplied by trackScale. */
+  towerSpacing?: number
+  /** Rings the rails are built from along the whole track (default 1000). */
+  segments?: number
   /** The track's own colours also glow at this strength (default 0): `color2` spine and ties read ahead in a dark level. */
   glow?: number
 }

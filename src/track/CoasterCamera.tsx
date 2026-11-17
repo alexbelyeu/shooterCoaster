@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
 import type { ArcTable } from './arcLength'
-import { setRideProgress } from './rideProgress'
+import { setRideProgress } from './rideProgress.hot'
 import { MAX_RIDE_STEP_FRAMES, advanceRide, rideSpeeds, type RideState } from './ridePhysics'
 import { e2eRideSeconds, levelTimeStep } from '@/testing/e2eHook'
 import { useGameStore } from '@/store/useGameStore'
@@ -13,16 +13,16 @@ import WeaponViewModel from '@/combat/WeaponViewModel'
 import {
   CAMERA_TRAUMA_EVENT, KILL_TRAUMA_MS, addTrauma, decayTrauma, effectiveShakeScale, killTrauma,
   shakeAngles, type ShakeAngles,
-} from '@/combat/screenShake'
+} from '@/combat/screenShake.hot'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
-import { fovForAspect, fovWithSpeed } from './cameraFov'
+import { fovForAspect, fovWithSpeed } from './cameraFov.hot'
 import WindStreaks, { type StreakDrive } from './WindStreaks'
 import { streakOpacity, streakRate } from './windStreaks'
 import {
   LOOK_RESPONSE, createRigState, lateralAcceleration, lookAheadDirection, resetRig, sampleTrack,
   smoothingFactor, stepRig, type TrackSamples,
-} from './cameraRig'
+} from './cameraRig.hot'
 
 interface CoasterCameraProps {
   curve: TrackCurve
@@ -43,7 +43,7 @@ const BASE_FOV = 80
 
 const RAD_TO_DEG = 180 / Math.PI
 
-/** Rides the track (port of Camera.js updateCamGame) with rotation-only weight from cameraRig.ts; the mouse only aims. */
+/** Rides the track (port of Camera.js updateCamGame) with rotation-only weight from cameraRig.hot.ts; the mouse only aims. */
 export default function CoasterCamera({
   curve,
   table,
@@ -75,7 +75,7 @@ export default function CoasterCamera({
   const streaks = useRef<StreakDrive>({ opacity: 0, time: 0 })
   const runId = useRef(-1)
 
-  // Rotation-only trauma from kills and `camera:trauma` world events (#65); see screenShake.ts.
+  // Rotation-only trauma from kills and `camera:trauma` world events (#65); see screenShake.hot.ts.
   const shake = useRef({ trauma: 0, decayMs: KILL_TRAUMA_MS, time: 0, seed: 0 })
   const _angles = useRef<ShakeAngles>({ pitch: 0, yaw: 0, roll: 0 })
 

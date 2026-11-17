@@ -15,6 +15,13 @@ const vertexShader = /* glsl */ `
   uniform float uBoost;
   uniform vec3 uVelocity[2];
   uniform vec4 uShape[2]; // size, maxPixels, sway, flicker
+  #ifdef ANCHORED
+    // The box stays over one spot in the world (the Flame's embers) instead of following the camera
+    uniform vec3 uAnchor;
+    #define FIELD_CENTRE uAnchor
+  #else
+    #define FIELD_CENTRE cameraPosition
+  #endif
 
   // [0, 1): always-on point; [1, 2): boost-only secondary point, shown with uBoost
   attribute float aRand;
@@ -37,13 +44,13 @@ const vertexShader = /* glsl */ `
     vec4 shape = uShape[layer];
     float phase = r * 107.0;
 
-    // position is a seed in [0, 1)^3; drift it, then wrap into the box around the camera
+    // position is a seed in [0, 1)^3; drift it, then wrap into the box around the camera (or the anchor)
     vec3 p = position * uBox + uVelocity[layer] * uTime * (0.7 + 0.6 * fract(r * 13.7));
     p.x += sin(uTime * 0.7 + phase) * shape.z;
     p.z += cos(uTime * 0.53 + phase * 1.3) * shape.z;
-    vec3 rel = mod(p - cameraPosition, uBox) - 0.5 * uBox;
+    vec3 rel = mod(p - FIELD_CENTRE, uBox) - 0.5 * uBox;
 
-    vec4 mvPosition = viewMatrix * vec4(cameraPosition + rel, 1.0);
+    vec4 mvPosition = viewMatrix * vec4(FIELD_CENTRE + rel, 1.0);
     gl_Position = projectionMatrix * mvPosition;
 
     float px = shape.x * projectionMatrix[1][1] * uHalfHeightPx / max(-mvPosition.z, 0.1);
@@ -101,12 +108,14 @@ function createSeeds(base: number, boost: number): THREE.BufferGeometry {
   return geo
 }
 
-function createMaterial(preset: ParticleFieldPreset): THREE.ShaderMaterial {
+function createMaterial(preset: ParticleFieldPreset, anchor?: Anchor): THREE.ShaderMaterial {
   const layers = [preset.primary, preset.secondary]
   return new THREE.ShaderMaterial({
     vertexShader,
     fragmentShader,
+    defines: anchor ? { ANCHORED: '' } : {},
     uniforms: {
+      uAnchor: { value: new THREE.Vector3(...(anchor ?? [0, 0, 0])) },
       uTime: { value: 0 },
       uHalfHeightPx: { value: 360 },
       uBox: { value: new THREE.Vector3(...preset.box) },
@@ -125,11 +134,16 @@ function createMaterial(preset: ParticleFieldPreset): THREE.ShaderMaterial {
   })
 }
 
-/** Ambient particles wrapping in a box around the camera: one draw call, no per-frame CPU work but uniforms. */
-export default function ParticleField({ preset }: { preset: ParticleFieldPreset }) {
+type Anchor = readonly [number, number, number]
+
+/**
+ * Particles wrapping in a box around the camera (a biome's ambient air) or, given an `anchor` (a stable
+ * array), round that world point: one draw call, no per-frame CPU work but uniforms.
+ */
+export default function ParticleField({ preset, anchor }: { preset: ParticleFieldPreset; anchor?: Anchor }) {
   const { base, boost: boostCount } = particleCounts(preset, isCoarsePointer, useQualityProfile().particleScale)
   const geometry = useMemo(() => createSeeds(base, boostCount), [base, boostCount])
-  const material = useMemo(() => createMaterial(preset), [preset])
+  const material = useMemo(() => createMaterial(preset, anchor), [preset, anchor])
   const halfHeightPx = useThree(s => s.size.height * s.viewport.dpr * 0.5)
   // Clock time the current boost started (NaN = none yet); a new event is stamped on the next frame
   const boostStart = useRef(Number.NaN)
@@ -140,12 +154,14 @@ export default function ParticleField({ preset }: { preset: ParticleFieldPreset 
   }, [material, halfHeightPx])
 
   useEffect(() => {
-    if (isE2E) Object.assign(e2eParticles, { mounted: true, points: base, boostPoints: boostCount, boost: 0 })
+    // The test hook reports the biome's ambient field, not an anchored one beside it
+    const report = isE2E && !anchor
+    if (report) Object.assign(e2eParticles, { mounted: true, points: base, boostPoints: boostCount, boost: 0 })
     return () => {
       geometry.dispose()
-      if (isE2E) e2eParticles.mounted = false
+      if (report) e2eParticles.mounted = false
     }
-  }, [geometry, base, boostCount])
+  }, [geometry, base, boostCount, anchor])
   useEffect(() => () => material.dispose(), [material])
 
   useEffect(() => {

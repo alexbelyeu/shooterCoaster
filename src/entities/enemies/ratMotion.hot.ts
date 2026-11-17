@@ -40,6 +40,7 @@ export interface RatPose {
   tail: number
 }
 
+// eslint-disable-next-line sc/no-hot-path-alloc -- cold: once per rat, then stepped in place
 export const newRatPose = (): RatPose => ({ x: 0, z: 0, heading: 0, running: false, hop: 0, nose: 0, tail: 0 })
 
 /** Heading of dash `k`: even dashes turn left of `base`, odd ones right. */

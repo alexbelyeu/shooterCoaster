@@ -107,6 +107,7 @@ export default function BossBase({
   const fx = useRef<PartFx[]>(spec.weakPoints.map(() => ({ flashMs: 0, popMs: 0, popFrames: 0, popping: false, points: 0 }))).current
   const registered = useRef(new Set<string>()).current
   const clock = useRef({ age: 0, defeatedAt: -1, placed: false })
+  const frame = useRef({} as BossFrame).current
   const [gameStep] = useState(gameClockStep)
   const positions = useMemo(() => spec.weakPoints.map(() => new THREE.Vector3()), [spec])
 
@@ -265,7 +266,15 @@ export default function BossBase({
     }
 
     const sinceDefeat = c.defeatedAt < 0 ? -1 : c.age - c.defeatedAt
-    move({ root, parts, camera, state: stateRef.current, dt, age: c.age, sinceDefeat, retract })
+    frame.root = root
+    frame.parts = parts
+    frame.camera = camera
+    frame.state = stateRef.current
+    frame.dt = dt
+    frame.age = c.age
+    frame.sinceDefeat = sinceDefeat
+    frame.retract = retract
+    move(frame)
     c.age += dt
     if (sinceDefeat >= exitSeconds) onDone()
   })

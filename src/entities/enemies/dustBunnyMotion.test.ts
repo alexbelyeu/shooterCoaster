@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DUST_BUNNY, DUST_BUNNY_BOUNCE, dustBunnyPose, newDustBunnyPose } from './dustBunnyMotion'
+import { DUST_BUNNY, DUST_BUNNY_BOUNCE, dustBunnyPose, newDustBunnyPose } from './dustBunnyMotion.hot'
 
 const R = 19
 const at = (base: number, t: number) => dustBunnyPose(base, R, t, newDustBunnyPose())

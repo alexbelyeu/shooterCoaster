@@ -11,6 +11,9 @@ export const UNKNOWN_INITIALS = '---'
 
 export type Leaderboards = Record<string, LeaderboardEntry[]>
 
+/** Marks an entry played under the 60 s rules (#452). */
+export const RULESET = '60s'
+
 /** Where `score` would land (0-based), or null when it misses the board. A tie ranks below the entries already there. */
 export function placement(board: readonly LeaderboardEntry[], score: number): number | null {
   if (!(score > 0)) return null
@@ -48,6 +51,7 @@ function sanitizeEntry(value: unknown): LeaderboardEntry | null {
     score: Math.round(value.score),
     stars: isFiniteNumber(value.stars) ? clampStars(value.stars) : 0,
     date: isFiniteNumber(value.date) ? value.date : 0,
+    ...(value.ruleset === RULESET ? { ruleset: RULESET } : {}),
   }
 }
 
@@ -96,19 +100,27 @@ export function sanitizeStreak(value: unknown): DailyStreak {
 /**
  * Every board sorted, capped and with valid entries only. A level with a saved best but no
  * board (scores from before the leaderboard) starts with that best under `---`.
+ * An entry from before the 60 s rules over its level's ceiling is dropped; one under it can still be beaten, so it stays (#458).
  */
-export function sanitizeLeaderboards(value: unknown, savedScores: Record<string, ScoreEntry>): Leaderboards {
+export function sanitizeLeaderboards(
+  value: unknown,
+  savedScores: Record<string, ScoreEntry>,
+  ceilings: Readonly<Record<string, number>>,
+): Leaderboards {
+  const fits = (level: string, score: number) => !(score > ceilings[level])
   const out: Leaderboards = {}
   if (isRecord(value)) {
     for (const [level, raw] of Object.entries(value)) {
       if (!Array.isArray(raw)) continue
-      const entries = raw.map(sanitizeEntry).filter((e): e is LeaderboardEntry => e !== null)
+      const entries = raw
+        .map(sanitizeEntry)
+        .filter((e): e is LeaderboardEntry => e !== null && (e.ruleset === RULESET || fits(level, e.score)))
       entries.sort((a, b) => b.score - a.score)
       if (entries.length) out[level] = entries.slice(0, LEADERBOARD_SIZE)
     }
   }
   for (const [level, best] of Object.entries(savedScores)) {
-    if (out[level] || !(best.score > 0)) continue
+    if (out[level] || !(best.score > 0) || !fits(level, best.score)) continue
     out[level] = [{ initials: UNKNOWN_INITIALS, score: Math.round(best.score), stars: best.stars, date: best.timestamp }]
   }
   return out

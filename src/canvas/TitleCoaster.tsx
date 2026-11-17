@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { buildTrackGeometry, trackFrame } from '@/track/trackGeometry'
-import { RAIL_MIN_PIXEL_RADIUS, getTrackDimensions } from '@/track/trackDimensions'
+import { RAIL_PIXEL_FLOOR, getTrackDimensions } from '@/track/trackDimensions'
 import { trackViewportHeight, withMinThickness } from '@/track/minThickness'
 import { tAtLoopDistance } from '@/track/arcLength'
 import { mergePainted, painted } from '@/levels/environments/shared/paintedParts'
@@ -72,7 +72,7 @@ export default function TitleCoaster({
   const { curve, table } = ride
   const track = useMemo(() => buildTrackGeometry(curve, table, DIMS, SEGMENTS, livery.rail, livery.spine), [curve, table, livery])
   const trackMaterial = useMemo(
-    () => withMinThickness(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.3 }), RAIL_MIN_PIXEL_RADIUS),
+    () => withMinThickness(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.3 }), RAIL_PIXEL_FLOOR),
     [],
   )
   const column = useMemo(() => new THREE.CylinderGeometry(0.7 * DIMS.trackScale, 1 * DIMS.trackScale, 1, 6, 1, true).translate(0, 0.5, 0), [])

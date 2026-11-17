@@ -31,7 +31,7 @@ const cardSize = (): CardSize => (isTouch() ? 'story' : 'feed')
 
 /** The results screen's Share button (#271): the native sheet on touch (with the score card image, #272), else a menu of image, Copy link and share-intent links. */
 export default function ShareMenu({ card, onShared, avoid = [] }: Props) {
-  const { levelId, score } = card
+  const { levelId, score, worldRank } = card
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState<'copy' | 'image_copy' | null>(null)
   const [placement, setPlacement] = useState<Placement | null>(null)
@@ -41,20 +41,23 @@ export default function ShareMenu({ card, onShared, avoid = [] }: Props) {
   const menuId = useId()
   const copyable = canCopy(navigator)
   const imageCopyable = canCopyImage(navigator)
-  const pngs = useRef(new Map<CardSize, Promise<Blob>>())
+  /** Per size, until the card changes (the World rank came in, #445). */
+  const pngs = useRef({ card, bySize: new Map<CardSize, Promise<Blob>>() })
+  if (pngs.current.card !== card) pngs.current = { card, bySize: new Map() }
 
   function cardPng(size: CardSize): Promise<Blob> {
-    let png = pngs.current.get(size)
+    const cache = pngs.current.bySize
+    let png = cache.get(size)
     if (!png) {
       png = renderScoreCard(card, size)
-      png.catch(() => pngs.current.delete(size))
-      pngs.current.set(size, png)
+      png.catch(() => cache.delete(size))
+      cache.set(size, png)
     }
     return png
   }
 
   async function shareImage(): Promise<'shared' | 'cancelled' | 'failed'> {
-    const payload = sharePayloadForRun(levelId, score, 'image_native')
+    const payload = sharePayloadForRun(levelId, score, 'image_native', worldRank)
     const png = await cardPng('story').catch(() => null)
     if (!payload || !png) return 'failed'
     return nativeShare(navigator, { ...payload, files: [new File([png], scoreCardFileName(levelId, score), { type: 'image/png' })] })
@@ -68,7 +71,7 @@ export default function ShareMenu({ card, onShared, avoid = [] }: Props) {
 
   async function onButton() {
     if (open) return close(false)
-    const native = sharePayloadForRun(levelId, score, 'native')
+    const native = sharePayloadForRun(levelId, score, 'native', worldRank)
     if (!native) return
     const touch = isTouch()
     if (touch && canShareImage(navigator)) {
@@ -85,7 +88,7 @@ export default function ShareMenu({ card, onShared, avoid = [] }: Props) {
   }
 
   async function onCopy() {
-    const payload = sharePayloadForRun(levelId, score, 'copy')
+    const payload = sharePayloadForRun(levelId, score, 'copy', worldRank)
     if (payload && (await copyShare(navigator, payload))) {
       setCopied('copy')
       onShared('copy')
@@ -214,7 +217,7 @@ export default function ShareMenu({ card, onShared, avoid = [] }: Props) {
             </button>
           )}
           {SHARE_TARGETS.map(({ id, label }) => {
-            const payload = sharePayloadForRun(levelId, score, id)
+            const payload = sharePayloadForRun(levelId, score, id, worldRank)
             if (!payload) return null
             const email = id === 'email'
             return (

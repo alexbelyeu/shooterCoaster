@@ -30,6 +30,7 @@ const RUN: ScoreCardRun = {
   bestCombo: 14,
   accuracy: '87%',
   daily: null,
+  worldRank: null,
 }
 
 const texts = (run: ScoreCardRun, size: CardSize) => layoutScoreCard(run, size, measure).items.filter((i): i is CardText => i.kind === 'text')
@@ -62,6 +63,7 @@ describe('score card layout', () => {
   it.each(SIZES)('keeps every item inside the safe margins (%s)', (size) => {
     expectInsideSafe(RUN, size)
     expectInsideSafe({ ...RUN, daily: 'Nov 4, 2026' }, size)
+    expectInsideSafe({ ...RUN, worldRank: 9 }, size)
   })
 
   it.each(SIZES)('fits a 7-digit score and a long level name without cutting the score (%s)', (size) => {
@@ -111,9 +113,29 @@ describe('score card layout', () => {
     expect(b.y + b.height).toBeLessThanOrEqual(p.y + p.height + 0.5)
   })
 
+  it.each(SIZES)('puts a WORLD ribbon between the stars and the score of a run on the World board (%s)', (size) => {
+    const ranked = { ...RUN, worldRank: 2 }
+    expect(role(ranked, size, 'rank').map((t) => t.text)).toEqual(['WORLD #3'])
+    expect(role({ ...RUN, worldRank: 9 }, size, 'rank')[0].text).toBe('WORLD #10')
+    const items = layoutScoreCard(ranked, size, measure).items
+    const pill = itemBounds(items.find((i) => i.kind === 'pill')!)
+    const label = itemBounds(role(ranked, size, 'rank')[0])
+    expect(label.x).toBeGreaterThan(pill.x)
+    expect(label.x + label.width).toBeLessThan(pill.x + pill.width)
+    const stars = itemBounds(items.find((i) => i.kind === 'stars')!)
+    const score = itemBounds(role(ranked, size, 'score')[0])
+    expect(pill.y).toBeGreaterThanOrEqual(stars.y + stars.height)
+    expect(score.y).toBeGreaterThanOrEqual(pill.y + pill.height)
+  })
+
+  it.each(SIZES)('lays out a run without a World rank exactly as before (%s)', (size) => {
+    expect(layoutScoreCard({ ...RUN, worldRank: null }, size, measure)).toEqual(layoutScoreCard(RUN, size, measure))
+    expect(role(RUN, size, 'rank')).toEqual([])
+  })
+
   it.each(SIZES)('stacks the rows without overlaps (%s)', (size) => {
-    const stack = layoutScoreCard({ ...RUN, daily: 'Nov 4, 2026' }, size, measure)
-      .items.filter((i) => i.kind !== 'pill' && !(i.kind === 'text' && (i.role === 'statValue' || i.role === 'badge')))
+    const stack = layoutScoreCard({ ...RUN, daily: 'Nov 4, 2026', worldRank: 0 }, size, measure)
+      .items.filter((i) => i.kind !== 'pill' && !(i.kind === 'text' && (i.role === 'statValue' || i.role === 'badge' || i.role === 'rank')))
       .map(itemBounds)
     // Stat labels share a row: compare row tops only.
     const rows = [...new Map(stack.map((b) => [Math.round(b.y), b])).values()].sort((a, b) => a.y - b.y)
@@ -147,7 +169,13 @@ describe('scoreCardRun', () => {
   it('reads the level, stars and stats of a campaign run', () => {
     const level = getAllLevels()[0]
     const run = scoreCardRun({ levelId: level.id, score: level.maxScore + 0.4, bestCombo: 9, hits: 3, shotsFired: 4, mode: { mode: 'campaign' } })
-    expect(run).toMatchObject({ levelName: level.name, biome: level.biome, score: Math.round(level.maxScore), stars: 3, bestCombo: 9, accuracy: '75%', daily: null })
+    expect(run).toMatchObject({ levelName: level.name, biome: level.biome, score: Math.round(level.maxScore), stars: 3, bestCombo: 9, accuracy: '75%', daily: null, worldRank: null })
+  })
+
+  it('carries a campaign run\'s World rank, never a daily\'s', () => {
+    const run = { levelId: 'level1', score: 100, bestCombo: 0, hits: 0, shotsFired: 0, worldRank: 2 }
+    expect(scoreCardRun({ ...run, mode: { mode: 'campaign' } })?.worldRank).toBe(2)
+    expect(scoreCardRun({ ...run, mode: { mode: 'daily', dateKey: '2026-11-04' } })?.worldRank).toBeNull()
   })
 
   it('dates a daily run and dashes accuracy with no shots', () => {

@@ -4,9 +4,11 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { buildArcTable, tAtLoopDistance } from '@/track/arcLength'
 import { lapSeconds, rideProfile, rideSpeeds } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
-import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig'
-import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov'
+import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
+import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import { RUN_SECONDS } from '@/levels/pacing'
+import { getLevelConfig } from '@/levels/LevelRegistry'
+import { MEDUSA_BODY, MEDUSA_HUB, MEDUSA_RISE, MEDUSA_SIZE, bustClearance, yawToward } from '@/entities/bosses/medusaMotion'
 import {
   ARCH,
   BLOCKOUT_BOXES,
@@ -52,10 +54,10 @@ const track: Vec3[] = Array.from({ length: N }, (_, i) => {
 const secondsAt = (i: number) => profile.findIndex((s) => s >= (i / N) * table.length) / 10
 
 describe('the gym blockout', () => {
-  it('scales the hall to landmark size, the length of the generated tracks (≈ 1000–1600 units)', () => {
+  it('scales the hall to landmark size, inside the other worlds\' extents (≈ 2000–5200 units across)', () => {
     const length = toWorld({ x: HALL.w, y: 0, z: 0 }).x - toWorld({ x: 0, y: 0, z: 0 }).x
-    expect(length).toBeGreaterThanOrEqual(1000)
-    expect(length).toBeLessThanOrEqual(1600)
+    expect(length).toBeGreaterThanOrEqual(2000)
+    expect(length).toBeLessThanOrEqual(5200)
     expect(toWorld({ x: 0, y: HALL.h, z: HALL.d }).y / (HALL.h * GYM_SCALE)).toBe(1)
   })
 
@@ -191,5 +193,36 @@ describe('the gym track', () => {
       if (depth > 0 && Math.abs(across) <= MIN_HORIZONTAL_FOV / 2 && Math.abs(vertical) <= VERTICAL_HALF_FOV) seen++
     }
     expect(seen / frames).toBeGreaterThanOrEqual(0.8)
+  })
+
+  it("keeps the rails and the camera clear of the Medusa's bust from her rise to the run's end, leant out or not", () => {
+    /** Kept between her bust and the rails or the rider's eye, in her own units (world / `MEDUSA_SIZE`). */
+    const MARGIN = 20
+    const from = getLevelConfig('level6')!.boss!.at
+    const local: [number, number, number] = [0, 0, 0]
+    let worst = Infinity
+    for (const lean of [0, 1]) {
+      const out = MEDUSA_BODY.out + MEDUSA_RISE.leanOut * lean
+      const pitch = MEDUSA_RISE.leanPitch * lean
+      for (let k = from * 10; k <= RUN_SECONDS * 10; k++) {
+        const p = curve.getPointAt((profile[k] % table.length) / table.length)
+        for (const lift of [0, dims.eyeHeight]) {
+          // Into her root's frame (her own units, `MEDUSA_SIZE`): x across, z out of the star, y up; then her turn towards the rider, then her lean.
+          const dx = (p.x - MEDUSA_HUB[0]) / MEDUSA_SIZE
+          const dz = (p.z - MEDUSA_HUB[2]) / MEDUSA_SIZE
+          const x = dx * STAR.facing.z - dz * STAR.facing.x
+          const z = dx * STAR.facing.x + dz * STAR.facing.z - out
+          const y = (p.y + lift - MEDUSA_HUB[1]) / MEDUSA_SIZE
+          const yaw = yawToward(x, z + out)
+          const xr = x * Math.cos(yaw) - z * Math.sin(yaw)
+          const zr = x * Math.sin(yaw) + z * Math.cos(yaw)
+          local[0] = xr
+          local[1] = y * Math.cos(pitch) + zr * Math.sin(pitch)
+          local[2] = -y * Math.sin(pitch) + zr * Math.cos(pitch)
+          worst = Math.min(worst, bustClearance(local, MARGIN))
+        }
+      }
+    }
+    expect(worst).toBeGreaterThan(1)
   })
 })

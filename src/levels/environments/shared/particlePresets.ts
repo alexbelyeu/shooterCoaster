@@ -1,3 +1,4 @@
+import { particleShare } from '@/canvas/graphicsQuality'
 import type { ParticleBoost, ParticleFieldPreset } from './types'
 
 /** Ambient air per biome (`BiomeDefinition.particles`); dense or bright fields read as noise at 1280×720, so stay inside the test's bounds. */
@@ -168,11 +169,38 @@ const gymChalk: ParticleFieldPreset = {
   secondaryShare: 0.2,
 }
 
-export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh, gymChalk } as const
+/** The Climbing Gym's Flame (#520): embers and hot sparks rising off it, anchored over it (`ParticleField`'s `anchor`). */
+const gymFlameEmbers: ParticleFieldPreset = {
+  count: 1500,
+  box: [320, 160, 200],
+  primary: {
+    color: 0xff6a1a,
+    opacity: 0.85,
+    size: 1.2,
+    maxPixels: 4,
+    velocity: [1.5, 13, 0.5],
+    sway: 7,
+    flicker: 1,
+    additive: true,
+  },
+  secondary: {
+    color: 0xffd27a,
+    opacity: 0.9,
+    size: 0.7,
+    maxPixels: 3,
+    velocity: [2, 18, 1],
+    sway: 4,
+    flicker: 0.6,
+    additive: true,
+  },
+  secondaryShare: 0.3,
+}
+
+export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh, gymChalk, gymFlameEmbers } as const
 
 /** Points to draw: always-on and boost-only. Touch screens get half (as `renderBudget.ts` cuts their pixels); the graphics quality's `particleScale` thins both. */
 export function particleCounts(preset: ParticleFieldPreset, coarsePointer: boolean, qualityScale = 1): { base: number; boost: number } {
-  const scale = (coarsePointer ? 0.5 : 1) * qualityScale
+  const scale = particleShare(coarsePointer, qualityScale)
   return {
     base: Math.round(preset.count * scale),
     boost: Math.round((preset.boost?.count ?? 0) * scale),

@@ -4,7 +4,7 @@ import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import { RAT_BODY_GEO, RAT_MAT, RAT_SNOUT_GEO, RAT_SNOUT_PIVOT, RAT_TAIL_GEO, RAT_TAIL_PIVOT } from './SharedEnemyAssets'
-import { newRatPose, RAT_CYCLE, ratPose } from './ratMotion'
+import { newRatPose, RAT_CYCLE, ratPose } from './ratMotion.hot'
 
 const RAT_SCALE = 9
 /** World units the body lifts at the top of a stride. */
@@ -12,7 +12,7 @@ const HOP = 2
 const NOSE_TWITCH = 0.14
 const TAIL_SWISH = 0.45
 
-/** A cartoon New York rat (#515): scurries over the ground in quick dashes (`ratMotion.ts`), nose twitching, tail swishing. */
+/** A cartoon New York rat (#515): scurries over the ground in quick dashes (`ratMotion.hot.ts`), nose twitching, tail swishing. */
 export default function Rat(props: EnemyProps) {
   // A random start in the dash cycle, so a wave's rats don't dart in step.
   const { base, phase } = useEnemyRandom(props.id, (rng) => ({ base: rng() * Math.PI * 2, phase: rng() * RAT_CYCLE }))

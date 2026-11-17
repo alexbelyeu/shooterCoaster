@@ -33,6 +33,7 @@ export interface DustBunnyPose {
   squash: number
 }
 
+// eslint-disable-next-line sc/no-hot-path-alloc -- cold: once per dust bunny, then stepped in place
 export const newDustBunnyPose = (): DustBunnyPose => ({ x: 0, z: 0, heading: 0, roll: 0, lift: 0, squash: 0 })
 
 /**

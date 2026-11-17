@@ -6,7 +6,7 @@ import { BYSTANDER_PENALTY } from '@/levels/scoring'
 import { BYSTANDER_HIT_EVENT } from './bystanders'
 import { hitBystander } from './bystanderHit'
 import { processHit, registerCollisionTarget, getCollisionTargets, unregisterCollisionTarget } from './CollisionManager'
-import { resetComboRuntime } from './comboRuntime'
+import { resetComboRuntime } from './comboRuntime.hot'
 
 // zustand's persist wants window.localStorage; a bare in-memory one is enough here.
 vi.hoisted(() => {

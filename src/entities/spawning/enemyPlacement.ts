@@ -23,9 +23,10 @@ export interface EnemyPlacementRule {
   surface: Surface
   /**
    * `'trackside'`: beside the track ahead of the rider (`placeTracksideWave`, #179). `'wall'`: at the foot of one of the
-   * level's walls (`wallSlots`), which it climbs (#453).
+   * level's walls (`wallSlots`), which it climbs (#453). `'swarm'`: clustered on one wall the rider will see when the wave
+   * activates (`swarmSlots`, `placeWallSwarm`, #516).
    */
-  scatter: ScatterBand | 'trackside' | 'wall'
+  scatter: ScatterBand | 'trackside' | 'wall' | 'swarm'
 }
 
 const band = (radiusMin: number, radiusSpan: number, yMin: number, ySpan = 0): ScatterBand => ({ radiusMin, radiusSpan, yMin, ySpan })
@@ -49,6 +50,7 @@ export const ENEMY_PLACEMENT: Record<EnemyType, EnemyPlacementRule> = {
   climber: { surface: 'wall', scatter: 'wall' },
   rat: { surface: 'ground', scatter: 'trackside' },
   dustBunny: { surface: 'ground', scatter: 'trackside' },
+  lanternfly: { surface: 'wall', scatter: 'swarm' },
 }
 
 export const GOLDEN_BALLOON_SCATTER = band(0, 3000, 50, 100)
@@ -142,7 +144,40 @@ export function wallSlots(count: number, walls: readonly WallSurface[], rng: Rng
   })
 }
 
+/** A swarm member's place off its swarm's centre on the wall (`u` across, `v` up); `seed` picks its hops. */
+export interface SwarmSlot {
+  du: number
+  dv: number
+  seed: number
+}
+
+/** A swarm spreads over a disc of this radius × √count on its wall. */
+export const SWARM_SPACING = 22
+
+export function swarmSlots(count: number, rng: Rng): SwarmSlot[] {
+  const radius = SWARM_SPACING * Math.sqrt(count)
+  return Array.from({ length: count }, () => {
+    const r = radius * Math.sqrt(rng())
+    const a = rng() * Math.PI * 2
+    return { du: r * Math.cos(a), dv: r * Math.sin(a), seed: Math.floor(rng() * 0x7fffffff) }
+  })
+}
+
 type XYZ = { x: number; y: number; z: number }
+
+/** Off a level (the turntable): a wall of its own facing +z, `standoff` behind `p`, with `p` at its foot. */
+export function freeWallSlot(p: XYZ, standoff: number): WallSlot {
+  const width = 200
+  const wall: WallSurface = {
+    id: 'free',
+    origin: { x: p.x - width / 2, y: p.y, z: p.z - standoff },
+    right: { x: 1, y: 0, z: 0 },
+    up: { x: 0, y: 1, z: 0 },
+    width,
+    height: 10_000,
+  }
+  return { wall, u: width / 2, v: 0, seed: 0 }
+}
 
 /** The wall's face direction, `right × up`, into `out`. */
 export function wallNormal(wall: WallSurface, out: XYZ = { x: 0, y: 0, z: 0 }): XYZ {

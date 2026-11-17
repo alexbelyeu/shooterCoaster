@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
-  RAIL_MIN_PIXEL_RADIUS,
+  PIXEL_FLOOR_FADE_END,
+  PIXEL_FLOOR_FADE_START,
+  RAIL_PIXEL_FLOOR,
   getTrackDimensions,
   minThicknessPush,
   minWorldRadius,
+  pixelFloorAt,
 } from './trackDimensions'
 
 const projScale = (fovDeg: number) => 1 / Math.tan((fovDeg * Math.PI) / 360)
@@ -34,17 +37,34 @@ describe('minWorldRadius', () => {
 describe('minThicknessPush', () => {
   const p = projScale(70)
   const rail = getTrackDimensions({ scalar: 20 }).railRadius
+  const projected = (depth: number) => pixelRadius(rail + minThicknessPush(rail, depth, RAIL_PIXEL_FLOOR, p, 720), depth, p, 720)
 
   it('leaves the near track untouched (first 100 units at 720 px)', () => {
-    for (let depth = 0; depth <= 100; depth += 5) {
-      expect(minThicknessPush(rail, depth, RAIL_MIN_PIXEL_RADIUS, p, 720)).toBe(0)
-    }
+    let pushed = 0
+    for (let depth = 0; depth <= 100; depth += 5) pushed += minThicknessPush(rail, depth, RAIL_PIXEL_FLOOR, p, 720)
+    expect(pushed).toBe(0)
   })
 
-  it('tops a far rail up to the floor, never past it', () => {
-    const depth = 1000
-    const push = minThicknessPush(rail, depth, RAIL_MIN_PIXEL_RADIUS, p, 720)
-    expect(push).toBeGreaterThan(0)
-    expect(pixelRadius(rail + push, depth, p, 720)).toBeCloseTo(RAIL_MIN_PIXEL_RADIUS, 9)
+  it('holds the full floor out to the fade start, never past it', () => {
+    expect(projected(PIXEL_FLOOR_FADE_START)).toBeCloseTo(RAIL_PIXEL_FLOOR.near, 9)
+    expect(projected(150)).toBeCloseTo(RAIL_PIXEL_FLOOR.near, 9)
+  })
+
+  it('eases the floor down to the far radius by the fade end and holds it beyond', () => {
+    expect(projected(PIXEL_FLOOR_FADE_END)).toBeCloseTo(RAIL_PIXEL_FLOOR.far, 9)
+    expect(projected(5000)).toBeCloseTo(RAIL_PIXEL_FLOOR.far, 9)
+    const mid = projected((PIXEL_FLOOR_FADE_START + PIXEL_FLOOR_FADE_END) / 2)
+    expect(mid).toBeCloseTo((RAIL_PIXEL_FLOOR.near + RAIL_PIXEL_FLOOR.far) / 2, 9)
+  })
+
+  it('thins monotonically across the fade', () => {
+    let prev = Infinity
+    let rising = 0
+    for (let depth = PIXEL_FLOOR_FADE_START; depth <= PIXEL_FLOOR_FADE_END; depth += 50) {
+      const px = pixelFloorAt(RAIL_PIXEL_FLOOR, depth)
+      if (px > prev) rising++
+      prev = px
+    }
+    expect(rising).toBe(0)
   })
 })

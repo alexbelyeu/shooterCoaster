@@ -5,35 +5,41 @@ import SkyDome, { createSkyMaterial, setSkyUniforms } from '../SkyDome'
 import type { AtmosphereConfig } from '../atmosphere'
 import { markStartup } from '@/core/startupMarks'
 
-/** Bakes the sky into scene.environment once per mount; Phong materials ignore it, so only Standard/Physical reflect. */
+/**
+ * Bakes the sky into scene.environment once per mount; Phong materials ignore it, so only Standard/Physical reflect.
+ * On the frame after the mount, not in the mount's own long frame (#597); `ShaderWarmup` compiles after it.
+ */
 function SkyEnvironment({ atmosphere }: { atmosphere: AtmosphereConfig }) {
   const gl = useThree((s) => s.gl)
   const scene = useThree((s) => s.scene)
   useEffect(() => {
-    const start = performance.now()
-    const material = createSkyMaterial()
-    setSkyUniforms(material, atmosphere, false)
-    // Unit dome: inside the cube camera's default 0.1–100 clip range
-    const geometry = new THREE.SphereGeometry(1, 32, 16)
-    const bakeScene = new THREE.Scene()
-    bakeScene.add(new THREE.Mesh(geometry, material))
-    const pmrem = new THREE.PMREMGenerator(gl)
-    const target = pmrem.fromScene(bakeScene)
-    pmrem.dispose()
-    geometry.dispose()
-    material.dispose()
-    target.texture.name = 'SkyEnvironment'
-    target.texture.userData.bakeMs = performance.now() - start
-    markStartup('envBaked')
-
     const prevEnv = scene.environment
     const prevIntensity = scene.environmentIntensity
-    scene.environment = target.texture
-    scene.environmentIntensity = atmosphere.envIntensity
+    let target: THREE.WebGLRenderTarget | null = null
+    const bake = requestAnimationFrame(() => {
+      const start = performance.now()
+      const material = createSkyMaterial()
+      setSkyUniforms(material, atmosphere, false)
+      // Unit dome: inside the cube camera's default 0.1–100 clip range
+      const geometry = new THREE.SphereGeometry(1, 32, 16)
+      const bakeScene = new THREE.Scene()
+      bakeScene.add(new THREE.Mesh(geometry, material))
+      const pmrem = new THREE.PMREMGenerator(gl)
+      target = pmrem.fromScene(bakeScene)
+      pmrem.dispose()
+      geometry.dispose()
+      material.dispose()
+      target.texture.name = 'SkyEnvironment'
+      target.texture.userData.bakeMs = performance.now() - start
+      markStartup('envBaked')
+      scene.environment = target.texture
+      scene.environmentIntensity = atmosphere.envIntensity
+    })
     return () => {
+      cancelAnimationFrame(bake)
       scene.environment = prevEnv
       scene.environmentIntensity = prevIntensity
-      target.dispose()
+      target?.dispose()
     }
   }, [gl, scene, atmosphere])
   return null

@@ -10,6 +10,8 @@ export interface ShareRun {
   score: number
   stars: number
   url: string
+  /** 0-based place on the level's World top 10, or null when the run didn't place (or the online board never answered). */
+  worldRank?: number | null
 }
 
 export interface SharePayload {
@@ -50,17 +52,25 @@ export function starString(stars: number): string {
   return '★'.repeat(earned) + '☆'.repeat(3 - earned)
 }
 
+export function rankLabel(rank: number): string {
+  return `#${rank + 1}`
+}
+
 const fmt = new Intl.NumberFormat('en-US')
 
-export function buildShareText({ levelName, score, stars, url }: ShareRun): SharePayload {
+export function buildShareText({ levelName, score, stars, url, worldRank = null }: ShareRun): SharePayload {
+  const result = `${fmt.format(Math.round(score))} ${starString(stars)}`
   return {
     title: 'ShooterCoaster',
-    text: `I scored ${fmt.format(Math.round(score))} ${starString(stars)} on ${levelName} in ShooterCoaster 🎢 — beat me:`,
+    text:
+      worldRank === null
+        ? `I scored ${result} on ${levelName} in ShooterCoaster 🎢 — beat me:`
+        : `I'm ${rankLabel(worldRank)} in the world on ${levelName} — ${result} in ShooterCoaster 🎢 — beat me:`,
     url,
   }
 }
 
-export function sharePayloadForRun(levelId: string, score: number, method: ShareMethod): SharePayload | null {
+export function sharePayloadForRun(levelId: string, score: number, method: ShareMethod, worldRank: number | null = null): SharePayload | null {
   const config = getLevelConfig(levelId)
   if (!config) return null
   return buildShareText({
@@ -68,6 +78,7 @@ export function sharePayloadForRun(levelId: string, score: number, method: Share
     score,
     stars: computeStars(score, config.maxScore, config.starThresholds),
     url: buildShareUrl(shareCampaign(method)),
+    worldRank,
   })
 }
 

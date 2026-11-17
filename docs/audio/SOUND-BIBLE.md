@@ -55,9 +55,20 @@ Each keeps its hook in `base`: the doubling or stabs come in at 3×.
 | level3 | Ocean | Fast, open, surf-rock energy with a sparkling top. Wet guitars (high `rev`), a `surf` wave every 4–8 bars in the base layer, offbeat strums, and a bright top line (tremolo picking, steel drum, glockenspiel) | spring-reverb guitar, steel drum, sea wash |
 | level4 | Antarctica | Glassy and tense but still driving. Minor key, crystalline: mallets an octave or two up, pads quiet and high (they fill the SFX mids fast), and a hard bigkick so it never floats | bells, celesta, icy pads with a hard kick |
 | level5 | Inferno | Heaviest level, the boss-rush mood. Low and fast, but with gaps in the low end: the bass follows the guitar's chug rhythm instead of droning, and double-kick sixteenths stay in fills, or kick, bass and chug blur into one wall below 250 Hz | distorted guitar, choir stabs, timpani, orchestra hits |
+| level6 | Climbing Gym | Alex's own climbing gym in New York (#513): urban, a little grimy and funny, arcade-bright. Rats, spotted lanternflies and dust bunnies to shoot, climbers not to; the Medusa of the Starr for the finale. Faster than the Desert, less sinister than the Inferno; bouncy and percussive (909 claps and kit), a plucky hook that could be chalk-slapping hands; leave room for a boss section later | a plucky supersaw, FM-bass or mallet hook over 909 claps |
 | FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens (the score's `frenzy` layer: `SCORE-FORMAT.md`, "Intensity layers") | same as the level, brighter |
 | Boss / finale | any | A variation of the level theme, darker and louder | the level's colour + orchestra hits |
 | Results | any | 3–6 s jingle: rising for 3★, flatter for 1★ or 0★, then a calm loop | bells + brass |
+
+**Climbing Gym options (#456), waiting on Alex's pick** (`src/audio/scores/themes/level6.<name>.scrim`, `?theme=<name>`;
+`renders/theme-level6-*`). Each is a 2-bar intro and a 32-bar loop (A A′ B B′ A A′, then the A pair lifted), its hook in `base`:
+"Chalk Up" (`chalkup`, D major, 174: a supersaw hook that stops on its bar's last beat for two 909 claps, offbeat
+synth-brass, pumping FM bass, four-on-the-floor bigkick; lifts a tone; the most direct, Neon-like), "Uptown Local"
+(`subway`, E minor, 172: street funk, an FM slap-bass riff with a chromatic rat run carries the hook under synth-brass
+stabs and a guiro scratch, a broken beat; a square wave doubles the riff two octaves up at 3×; lifts a minor third; the
+grimiest and darkest) and "Lanternfly Hop" (`lanternfly`, E♭ major, 176: a cartoon chase, a xylophone hook hopping up
+the chord with a chromatic hiccup before each top note over an oom-pah FM bass, offbeat marimba and woodblock; lifts a
+tone; the funniest). The boss section (Medusa) is a later issue.
 
 **Picked themes (#301):** the title is "Neon Marquee" (A minor, 160, supersaw hook over a
 four-on-the-floor bigkick, gated snare and FM bass; the lift replays the hook a tone up). level1

@@ -15,6 +15,8 @@ import {
   TITAN_PART_DEATH_STYLE,
   TITAN_BREAK_DEATH_STYLE,
   LAVA_BURST_DEATH_STYLE,
+  MEDUSA_SNAKE_DEATH_STYLE,
+  MEDUSA_CHALK_BURST_DEATH_STYLE,
   nextAge,
   particleOffset,
   sizeAt,
@@ -34,6 +36,8 @@ const ALL: [string, DeathStyle][] = [
   ['titanPart', TITAN_PART_DEATH_STYLE],
   ['titanBreak', TITAN_BREAK_DEATH_STYLE],
   ['lavaBurst', LAVA_BURST_DEATH_STYLE],
+  ['medusaSnake', MEDUSA_SNAKE_DEATH_STYLE],
+  ['medusaChalkBurst', MEDUSA_CHALK_BURST_DEATH_STYLE],
 ]
 
 describe('death styles', () => {

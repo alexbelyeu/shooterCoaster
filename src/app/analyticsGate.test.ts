@@ -7,6 +7,7 @@ import {
   isInternalBrowser,
   isInternalThisLoad,
   searchWithoutInternalParam,
+  setInternalBrowser,
   type FlagStorage,
 } from './analyticsGate'
 
@@ -110,6 +111,32 @@ describe('isInternalBrowser', () => {
   it('is false when storage throws or is missing', () => {
     expect(isInternalBrowser(throwing)).toBe(false)
     expect(isInternalBrowser(null)).toBe(false)
+  })
+})
+
+describe('setInternalBrowser', () => {
+  it("stores '1' and clears by removing the key", () => {
+    const s = memoryStorage()
+    expect(setInternalBrowser(true, s)).toBe(true)
+    expect(s.data.get(INTERNAL_STORAGE_KEY)).toBe('1')
+    expect(setInternalBrowser(false, s)).toBe(true)
+    expect(s.data.has(INTERNAL_STORAGE_KEY)).toBe(false)
+  })
+
+  it('is what the next page load reads', () => {
+    const s = memoryStorage()
+    setInternalBrowser(true, s)
+    expect(isInternalBrowser(s)).toBe(true)
+    expect(applyInternalParam('', s)).toBe(true)
+    expect(isInternalThisLoad()).toBe(true)
+    setInternalBrowser(false, s)
+    expect(applyInternalParam('', s)).toBe(false)
+  })
+
+  it('reports false instead of throwing when storage throws or is missing', () => {
+    expect(setInternalBrowser(true, throwing)).toBe(false)
+    expect(setInternalBrowser(false, throwing)).toBe(false)
+    expect(setInternalBrowser(true, null)).toBe(false)
   })
 })
 

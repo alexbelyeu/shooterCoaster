@@ -47,3 +47,34 @@ tester.run('sc/no-src-in-api', plugin.rules['no-src-in-api'], {
     { filename: at('api/_lib/rules.ts'), code: "import { type Run, normalizeInitials } from '@/store/leaderboard'", errors: [{ messageId: 'banned' }] },
   ],
 })
+
+const frame = (body: string) => `useFrame((state, dt) => {\n${body}\n})`
+const hot = at('src/combat/thing.hot.ts')
+const alloc = { messageId: 'alloc' }
+
+tester.run('sc/no-hot-path-alloc', plugin.rules['no-hot-path-alloc'], {
+  valid: [
+    { code: frame('v.set(1, 2, 3)\nmesh.position.copy(v).addScaledVector(dir, dt)\nconst s = `ready`') },
+    { code: 'const v = new Vector3()\nconst list = [1, 2].map((x) => x * 2)\nconst o = { ...a }\nuseFrame(() => { v.set(0, 0, 0) })' },
+    { code: 'const scratch = useMemo(() => new Vector3(), [])\nconst ref = useRef({ age: 0 })\nuseFrame(() => { ref.current.age += 1 })' },
+    { code: frame('if (!ok) throw new Error(`bad ${id}`)') },
+    { code: 'function step(dt) { return [dt] }\nonFrame(() => ({ a: [...xs] }))' },
+    { code: 'export function step(p, dt) { p.x += dt }', filename: hot },
+    { code: 'const v = new Vector3()\nconst TABLE = [1, 2, 3].map((x) => x * 2)\nexport const step = (p) => { p.x = TABLE[0] }', filename: hot },
+    { code: 'export function step() { return [1] }', filename: at('src/combat/thing.test.ts') },
+  ],
+  invalid: [
+    { code: frame('const b = [...a]'), errors: [alloc] },
+    { code: frame('const v = new Vector3()'), errors: [alloc] },
+    { code: frame('move({ dt })\nconst xs = [dt]'), errors: [alloc, alloc] },
+    { code: frame('const o = { ...a }\nfn(...args)'), errors: [alloc, alloc] },
+    { code: frame('items.forEach((x) => x.step(dt))'), errors: [alloc] },
+    { code: frame('function inner() {}\nconst f = function () {}'), errors: [alloc, alloc] },
+    { code: frame('label.text = `${score}`'), errors: [alloc] },
+    { code: frame('a.map(f); a.filter(f); a.slice(1); a.concat(b); a.flat(); v.clone(); Array.from(set)'), errors: Array(7).fill(alloc) },
+    { code: 'useFrame(function tick() { if (on) { const c = v.clone() } })', errors: [alloc] },
+    { code: 'export function step(p) { return { x: p.x } }', filename: hot, errors: [alloc] },
+    { code: 'export const step = (xs) => xs.some((x) => x > 0)', filename: hot, errors: [alloc] },
+    { code: 'export function step(a) { const v = new Vector3(); return `${a}` }', filename: hot, errors: [alloc, alloc] },
+  ],
+})

@@ -11,7 +11,7 @@ import SnowSplat from './SnowSplat'
 import BossBar from './BossBar'
 import WeaponBadge from './WeaponBadge'
 import BystanderHint from './BystanderHint'
-import { setTimeScaleOverride, timeScaleOverride } from '@/combat/slowMo'
+import { setTimeScaleOverride, timeScaleOverride } from '@/combat/slowMo.hot'
 
 /** Thin segmented kills / total strip under the score. Renders on kills only. */
 function KillStrip() {

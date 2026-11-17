@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { animate, motion } from 'framer-motion'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
@@ -77,6 +77,9 @@ export default function ResultsScreen() {
   const lettersRef = useRef('')
   const left = useRef(false)
   const nextRef = useRef<HTMLButtonElement>(null)
+  /** Only once the submission placed the run (#445): never block Share on it. */
+  const worldRank = world?.rank ?? null
+  const card = useMemo(() => (config ? scoreCardRun({ ...run, levelId: config.id, worldRank }) : null), [config, run, worldRank])
 
   const stars = config ? computeStars(run.score, config.maxScore, config.starThresholds) : 0
   const fill = config ? barFill(run.score, config.maxScore) : 0
@@ -239,7 +242,6 @@ export default function ResultsScreen() {
   if (!config) return null
 
   const theme = biomeTheme(config.biome)
-  const card = scoreCardRun({ ...run, levelId: config.id })
   const nextName = nextLevel ? (getLevelConfig(nextLevel)?.name ?? nextLevel) : null
   const next = nextStar(run.score, config.maxScore, config.starThresholds)
   const instant = { duration: 0 }

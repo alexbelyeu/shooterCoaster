@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { ScreenShakeLevel } from '@/combat/screenShake'
+import type { ScreenShakeLevel } from '@/combat/screenShake.hot'
 import { qualityFromQuery, type GraphicsQuality } from '@/canvas/graphicsQuality'
 
 interface SettingsState {

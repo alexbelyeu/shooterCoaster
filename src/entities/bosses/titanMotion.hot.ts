@@ -1,4 +1,4 @@
-import { perchClear, type PerchConfig, type PerchInput } from './scorpionMotion'
+import { perchClear, type PerchConfig, type PerchInput } from './scorpionMotion.hot'
 
 /** The Magma Titan's motion, pure and allocation-free per frame. Local frame: +z faces the rider, +y up, +x its left; feet at y 0. */
 
@@ -110,9 +110,12 @@ export function poundBetween(prev: number, now: number): boolean {
   const a = beatCycle(prev)
   const b = beatCycle(now)
   const q = TITAN_BEAT.poundS / 4
-  // b < a: wrapped into a new window.
-  const crossed = (at: number) => (b < a ? b >= at : a < at && b >= at)
-  return crossed(q) || crossed(3 * q)
+  return crossedInCycle(a, b, q) || crossedInCycle(a, b, 3 * q)
+}
+
+/** Whether the cycle position passed `at` going from `a` to `b` (b < a: wrapped into a new window). */
+function crossedInCycle(a: number, b: number, at: number): boolean {
+  return b < a ? b >= at : a < at && b >= at
 }
 
 /** Its vents gone, it beats at once: the next window opens now. */

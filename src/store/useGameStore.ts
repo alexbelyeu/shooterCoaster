@@ -1,10 +1,12 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import { changedOnly } from './changedOnlyStorage'
 import type { GamePhase, ScoreEntry, ComboState, BossHud } from '@/types/game'
 import {
   DEFAULT_INITIALS,
   insertEntry,
   normalizeInitials,
+  RULESET,
   sanitizeLeaderboards,
   sanitizeSavedDaily,
   sanitizeSavedScores,
@@ -20,11 +22,15 @@ import { NO_PICKUP, applyPickup, type PickupWeaponId, type WeaponState } from '@
 import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/daily'
 import { getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
 import { scoreAfterPenalty } from '@/levels/scoring'
+// The generated table, not `scoreLimits()`, which would pull the boss specs into the startup JS.
+import { LEVEL_LIMITS } from '../../api/_lib/levelLimits'
 
 /** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
 export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }
 
 const CAMPAIGN: RunMode = { mode: 'campaign' }
+
+const boardCeilings = () => Object.fromEntries(Object.entries(LEVEL_LIMITS).map(([id, l]) => [id, l.maxScore]))
 
 interface GameState {
   phase: GamePhase
@@ -64,7 +70,7 @@ interface GameState {
   /** Takes `penalty` off the score (floored at 0) once per bystander; false when `id` was already hit. */
   hitBystander: (id: string, penalty: number) => boolean
 
-  // Combo (tiers and windows: combat/comboTiers.ts; expiry: combat/comboRuntime.ts)
+  // Combo (tiers and windows: combat/comboTiers.ts; expiry: combat/comboRuntime.hot.ts)
   combo: ComboState
   /** Call before `addScore`, so the kill scores at the tier it reaches. */
   registerKill: () => void
@@ -105,7 +111,7 @@ interface GameState {
 
   timeScale: number
   frenzy: FrenzyStage
-  /** Only `combat/slowMo.ts` calls this (its test checks); everyone else requests a slow-mo there. */
+  /** Only `combat/slowMo.hot.ts` calls this (its test checks); everyone else requests a slow-mo there. */
   setSlowMo: (timeScale: number, frenzy: FrenzyStage) => void
 
   /** The mounted level's shader warm-up is done (`canvas/ShaderWarmup.tsx`); the countdown holds Ready until then. */
@@ -162,6 +168,8 @@ export const useGameStore = create<GameState>()(
           runSeed: (seed ?? urlSeed() ?? fallback) >>> 0,
           runMode: mode,
           runId: s.runId + 1,
+          // A new level isn't warmed up yet: the outgoing level's `sceneReady` must not open its Ready (#597).
+          sceneReady: levelId === s.currentLevel && s.sceneReady,
           phase: startPhaseFor(urlSearch() ?? ''),
           resuming: false,
         }))
@@ -229,7 +237,7 @@ export const useGameStore = create<GameState>()(
       lastInitials: DEFAULT_INITIALS,
       addLeaderboardEntry: (levelId, run) => {
         const s = get()
-        const { board, rank } = insertEntry(s.leaderboards[levelId] ?? [], { ...run, initials: s.lastInitials })
+        const { board, rank } = insertEntry(s.leaderboards[levelId] ?? [], { ...run, initials: s.lastInitials, ruleset: RULESET })
         if (rank !== null) set({ leaderboards: { ...s.leaderboards, [levelId]: board } })
         return rank
       },
@@ -275,6 +283,7 @@ export const useGameStore = create<GameState>()(
     }),
     {
       name: 'shootercoaster-scores',
+      storage: changedOnly(createJSONStorage(() => window.localStorage)),
       partialize: (state) => ({
         savedScores: state.savedScores,
         leaderboards: state.leaderboards,
@@ -289,7 +298,7 @@ export const useGameStore = create<GameState>()(
         return {
           ...current,
           savedScores,
-          leaderboards: sanitizeLeaderboards(p.leaderboards, savedScores),
+          leaderboards: sanitizeLeaderboards(p.leaderboards, savedScores, boardCeilings()),
           lastInitials: normalizeInitials(p.lastInitials),
           savedDaily: sanitizeSavedDaily(p.savedDaily),
           dailyStreak: sanitizeStreak(p.dailyStreak),

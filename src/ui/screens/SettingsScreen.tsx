@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { useGameStore } from '@/store/useGameStore'
-import { SCREEN_SHAKE_LEVELS, type ScreenShakeLevel } from '@/combat/screenShake'
+import { SCREEN_SHAKE_LEVELS, type ScreenShakeLevel } from '@/combat/screenShake.hot'
 import { GRAPHICS_QUALITIES, type GraphicsQuality } from '@/canvas/graphicsQuality'
 import { usePrefersReducedMotion, useSystemPrefersReducedMotion } from '@/ui/reducedMotion'
+import { browserStorage, isInternalBrowser, setInternalBrowser } from '@/app/analyticsGate'
+import { isInRun } from '@/store/startPhase'
 
 const SHAKE_LABELS: Record<ScreenShakeLevel, string> = { off: 'Off', reduced: 'Reduced', full: 'Full' }
 
@@ -113,6 +115,21 @@ function ClearDataRow() {
   )
 }
 
+/** Marks this browser as Alex's own (the `?internal=1` flag), so its plays stay out of analytics. */
+function InternalDeviceRow() {
+  const [internal, setInternal] = useState(() => isInternalBrowser(browserStorage()))
+  return (
+    <ToggleRow
+      label="Internal device — don't count my plays"
+      note="Applies after reload"
+      checked={internal}
+      onChange={(on) => {
+        if (setInternalBrowser(on, browserStorage())) setInternal(on)
+      }}
+    />
+  )
+}
+
 interface SettingsScreenProps {
   onClose: () => void
 }
@@ -120,6 +137,7 @@ interface SettingsScreenProps {
 /** Graphics, sound and comfort settings (persisted); opened from the title and the pause menu. Esc goes back. */
 export default function SettingsScreen({ onClose }: SettingsScreenProps) {
   const s = useSettingsStore()
+  const fromTitle = useGameStore((g) => !isInRun(g.phase))
   const reducedMotion = usePrefersReducedMotion()
   const systemReducedMotion = useSystemPrefersReducedMotion()
   const card = useRef<HTMLDivElement>(null)
@@ -188,6 +206,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
           <section className="settings-group">
             <h3>Data</h3>
             <ClearDataRow />
+            {fromTitle && <InternalDeviceRow />}
           </section>
         </div>
 

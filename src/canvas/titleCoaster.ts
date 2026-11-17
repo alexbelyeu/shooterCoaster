@@ -3,7 +3,7 @@
 import * as THREE from 'three'
 import type { TrackCurve } from '@/track/curves/TrackCurve'
 import { buildArcTable, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
-import type { Vec3 } from './titleCamera'
+import type { Vec3 } from './titleCamera.hot'
 
 /** Loop radius: outside the tents (r 120, 18 wide) and inside the orbit camera (r 180). */
 export const TRACK_RADIUS = 152
@@ -90,10 +90,21 @@ export function trainSpeed(y: number, crestY: number): number {
   return Math.sqrt(CREST_SPEED * CREST_SPEED + 2 * GRAVITY * Math.max(0, crestY - y))
 }
 
+const loopTracks = new WeakMap<TitleLoop, { curve: TrackCurve; table: ArcTable }>()
+
+/** A loop's curve and arc table, built once and shared by its ride and the park's track clearance (`titlePark.ts`). */
+export function loopTrack(loop: TitleLoop): { curve: TrackCurve; table: ArcTable } {
+  let track = loopTracks.get(loop)
+  if (!track) {
+    const curve = createTitleCurve(loop.point)
+    track = { curve, table: buildArcTable(curve, 4096) }
+    loopTracks.set(loop, track)
+  }
+  return track
+}
+
 export function createTitleRide(loop: TitleLoop = MAIN_LOOP): TitleRide {
-  const trackPoint = loop.point
-  const curve = createTitleCurve(trackPoint)
-  const table = buildArcTable(curve, 4096)
+  const { curve, table } = loopTrack(loop)
   let crestY = -Infinity
   for (let i = 0; i < table.count; i++) crestY = Math.max(crestY, table.y[i])
 
@@ -126,7 +137,7 @@ export function createTitleRide(loop: TitleLoop = MAIN_LOOP): TitleRide {
     lapS,
     leadDistance: (time) => startDist + lapDistance(time) + Math.floor(time / lapS) * table.length,
     pointAt: (dist, out) => {
-      trackPoint(tAtLoopDistance(table, dist), p)
+      loop.point(tAtLoopDistance(table, dist), p)
       out[0] = p.x
       out[1] = p.y
       out[2] = p.z

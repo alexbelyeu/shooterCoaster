@@ -4,6 +4,8 @@ import { useGameStore } from '@/store/useGameStore'
 import { subscribePointer } from '@/input/pointerInput'
 import { isFeedbackHeld } from '@/combat/hitFeedback'
 import { sfx } from '@/audio/sfx'
+import { isLevelSceneLoaded, loadLevelScene } from '@/canvas/loadLevelScene'
+import { readyDone } from './countdownGate'
 
 /** GO! sets `playing` and stays up over the HUD for `goHoldMs`: 2.5 s in all on a warm start, ~1.6 s on a resume. */
 const SEQUENCES = {
@@ -12,7 +14,7 @@ const SEQUENCES = {
 } as const
 type CountdownMode = keyof typeof SEQUENCES
 
-/** Ready also waits for the shader warm-up (`sceneReady`), but never longer than this. */
+/** Ready waits for the level chunk (#464), then for the shader warm-up (`sceneReady`), but never longer than this after the chunk. */
 const READY_MAX_MS = 4000
 /** A tap (pointer released off the UI) jumps to GO once the countdown has run this long. */
 const SKIPPABLE_AFTER_MS = 1000
@@ -40,20 +42,31 @@ export default function Countdown() {
   const [step, setStep] = useState<number | null>(mode ? 0 : null)
   const sceneReady = useGameStore((s) => s.sceneReady)
   const [readyShown, setReadyShown] = useState(false)
-  const [readyTimedOut, setReadyTimedOut] = useState(false)
+  const [chunkLoaded, setChunkLoaded] = useState(isLevelSceneLoaded)
+  const [warmupTimedOut, setWarmupTimedOut] = useState(false)
 
+  useEffect(() => stepTimeout(() => setReadyShown(true), stepMs), [stepMs])
+
+  // A run can start before the startup fetch lands (slow network); a failed load returns to the title, unmounting this.
   useEffect(() => {
-    const cancelShown = stepTimeout(() => setReadyShown(true), stepMs)
-    const timedOut = setTimeout(() => setReadyTimedOut(true), READY_MAX_MS)
+    if (chunkLoaded) return
+    let live = true
+    loadLevelScene().then(() => live && setChunkLoaded(true), () => {})
     return () => {
-      cancelShown()
-      clearTimeout(timedOut)
+      live = false
     }
-  }, [stepMs])
+  }, [chunkLoaded])
 
   useEffect(() => {
-    if (step === 0 && readyShown && (sceneReady || readyTimedOut)) return stepTimeout(() => setStep(1), 0)
-  }, [step, readyShown, sceneReady, readyTimedOut])
+    if (!chunkLoaded) return
+    const timedOut = setTimeout(() => setWarmupTimedOut(true), READY_MAX_MS)
+    return () => clearTimeout(timedOut)
+  }, [chunkLoaded])
+
+  const ready = readyDone({ shown: readyShown, chunkLoaded, sceneReady, warmupTimedOut })
+  useEffect(() => {
+    if (step === 0 && ready) return stepTimeout(() => setStep(1), 0)
+  }, [step, ready])
 
   useEffect(() => {
     if (step === null || step === 0) return
@@ -69,12 +82,12 @@ export default function Countdown() {
 
   const counting = step !== null && step < go
   useEffect(() => {
-    if (!counting) return
+    if (!counting || !chunkLoaded) return
     const skippableAt = performance.now() + SKIPPABLE_AFTER_MS
     return subscribePointer((_, type) => {
       if (type === 'up' && performance.now() >= skippableAt) setStep(go)
     })
-  }, [counting, go])
+  }, [counting, chunkLoaded, go])
 
   return (
     <div className="countdown">

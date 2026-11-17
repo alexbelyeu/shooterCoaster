@@ -1,4 +1,4 @@
-import type { PerchConfig } from './scorpionMotion'
+import type { PerchConfig } from './scorpionMotion.hot'
 
 /** The Yeti's motion, pure and allocation-free per frame. Local frame: +z faces the rider, +y up, +x its left. */
 
@@ -118,9 +118,8 @@ export function chestRetracted(lastPhase: boolean, roarT: number): boolean {
 }
 
 export function throwArmAlive(preferred: number, leftAlive: boolean, rightAlive: boolean): number {
-  const alive = (arm: number) => (arm === 0 ? leftAlive : rightAlive)
-  if (alive(preferred)) return preferred
-  if (alive(1 - preferred)) return 1 - preferred
+  if (preferred === 0 ? leftAlive : rightAlive) return preferred
+  if (preferred === 0 ? rightAlive : leftAlive) return 1 - preferred
   return -1
 }
 

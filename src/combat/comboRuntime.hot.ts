@@ -6,7 +6,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { advanceGameTime, gameTime, resetGameTime } from '@/core/gameClock'
 import { FRENZY, TOP_TIER, comboExpired, comboTierIndex } from './comboTiers'
-import { requestSlowMo } from './slowMo'
+import { requestSlowMo } from './slowMo.hot'
 
 export interface ComboBrokenEvent {
   count: number

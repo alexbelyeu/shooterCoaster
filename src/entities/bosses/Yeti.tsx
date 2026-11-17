@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
 import { gameClockStep } from '@/core/gameClock'
 import { useGameStore } from '@/store/useGameStore'
-import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake'
+import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
@@ -22,12 +22,12 @@ import {
   SNOWBALL_GEO, SNOWBALL_MAT, YETI_BODY_GEO, YETI_CHEST_EXPOSED_MAT, YETI_CHEST_GEO, YETI_CHEST_MAT, YETI_FIST_GEO,
   YETI_FUR_MAT, YETI_HEAD_GEO, YETI_LIMB_GEO, YETI_MOUTH_GEO, YETI_MOUTH_OFFSET,
 } from './bossAssets'
-import { approachAngle, pickPerch, type Perch, type PerchInput } from './scorpionMotion'
+import { approachAngle, pickPerch, type Perch, type PerchInput } from './scorpionMotion.hot'
 import {
   YETI_BODY, YETI_PERCH, YETI_RISE, YETI_ROAM, YETI_THROW, THROW_S, chestRetracted, elbowPose, fistPose, isRoaring, lopeAt,
   needsRelocate, passedCamera, riseOffset, roarAmount, roarNowEpoch, snowballAt, throwArmAlive, throwSwing, timeToNextRoar,
   toppleAngle, toppleSink, type Lope, type Point3,
-} from './yetiMotion'
+} from './yetiMotion.hot'
 
 const B = YETI_BODY
 const FISTS = ['fist-l', 'fist-r'] as const

@@ -19,6 +19,15 @@ shows this device's board as before.
     that level and kill count (`src/levels/scoreLimits.ts`); 429 after 5 accepted
     submissions from one IP in 10 minutes (keyed by an HMAC of the IP; no raw IP is stored).
   - No env vars, a paused project or any database error: `503 { "error": "unavailable" }`.
+  - **Only 60 s runs are on the board** (#458). Runs were 75–120 s long before #452 (merged
+    2026-11-09 in #473). Both the board and the `rank` count only rows with `score <=` the
+    level's `maxScore` in `api/_lib/levelLimits.ts`. A long run over that limit stays in the table
+    but drops off the board as soon as the new build deploys. An old run under it stays, because a
+    60 s run can still beat it. Nothing has to be deleted.
+- **Local board:** the same rule on each player's device. New entries are saved with
+  `ruleset: '60s'`. On load, the persist `merge` (`sanitizeLeaderboards` in `src/store/leaderboard.ts`)
+  drops an entry without that field when its score is over the level's limit. Saved
+  stars, best scores and unlocks (`savedScores`), the initials and the Daily record are left as they are.
 - **Game:** after a campaign run that places on the local board, the results screen sends it
   once (when the initials are confirmed, or as the screen closes) and shows the World board
   it gets back. A run that misses the local board just shows the World board. Calls time out
@@ -66,12 +75,24 @@ Initials are three letters, so there is no free text to moderate. To remove a sc
 its row in the Supabase table editor (or `delete from public.scores where id = …;` in the SQL
 editor). The CDN serves the old top 10 for at most ~30 s more.
 
+## Clearing the long runs for good (optional)
+
+Nothing needs doing: the API already leaves them off the board. To delete every row from before
+the 60 s rules anyway (which also removes old runs under the limit), run this once in the
+Supabase SQL editor:
+
+```sql
+delete from public.scores where created_at < '2026-11-09T20:38:43Z';
+```
+
 ## For agents
 
 - Agents never create the project, keys or env vars, and never handle a secret (CLAUDE.md
   hard rule 4).
 - Adding or rebalancing a level changes its score limits: run
   `node scripts/gen-level-limits.mjs` and commit `api/_lib/levelLimits.ts`
-  (`api/_lib/levelLimits.test.ts` fails until you do).
+  (`api/_lib/levelLimits.test.ts` fails until you do). The same `maxScore` is the cut-off for both
+  boards. If it goes down, World rows above the new limit drop off the board, and so do local
+  entries from before the 60 s rules. Local `'60s'` entries always stay.
 - A schema change is a new numbered file in `supabase/migrations/` plus a note in the PR for
   Alex to run it; the code must keep working (503 → local board) until he has.

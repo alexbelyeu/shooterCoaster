@@ -1,15 +1,16 @@
 /** The title park's layout (#454), placed once from a fixed seed so every load and the poster still show the same park. */
 import * as THREE from 'three'
 import { createRng } from '@/utils/rng'
-import { PATH_HALF_WIDTH, STALL_DEPTH, STALL_WIDTH, type PathRow, type Placement, type Pole, type Stall, type Wire, wirePoint } from '@/levels/environments/biomes/themePark/parkSpec'
-import { CROSSING_LOOP, MAIN_LOOP, type TitleLoop } from './titleCoaster'
+import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
+import { PALETTE, PATH_HALF_WIDTH, STALL_DEPTH, STALL_WIDTH, type PathRow, type Placement, type Pole, type Stall, type Wire, wirePoint } from '@/levels/environments/biomes/themePark/parkSpec'
+import { CROSSING_LOOP, MAIN_LOOP, type TitleLoop, loopTrack } from './titleCoaster'
 
 export interface Spot {
   x: number
   z: number
 }
 
-/** The park's original rides (`TitleScene`): tents on a ring, two carousels, the Ferris wheel's plane at z -75. */
+/** The park's original rides: the tent ring (`buildTents`), two carousels and the Ferris wheel (`TitleScene`), its plane at z -75. */
 export const TENT_RING = { r: 120, count: 6, radius: 18 }
 const TENT_TOP_Y = 36
 export const CAROUSELS = [
@@ -64,6 +65,12 @@ export interface Tree extends Placement {
   tint: number
 }
 
+/** A tent or flag pole: the theme park's model (`TentsAndFlags`) at `scale`, in a `PALETTE` colour. */
+interface Scaled extends Placement {
+  scale: number
+  color: number
+}
+
 export interface TitleParkLayout {
   path: PathRow[]
   stalls: (Stall & { scale: number })[]
@@ -76,38 +83,23 @@ export interface TitleParkLayout {
   people: Person[]
   trees: Tree[]
   forest: Tree[]
+  tents: Scaled[]
+  flagPoles: Scaled[]
   hedges: Placement[]
   planters: (Placement & { color: number })[]
 }
 
 export const GROUND_Y = -0.5
 
-function loopFootprint(loop: TitleLoop, samples: number): Spot[] {
-  const p = new THREE.Vector3()
-  const out: Spot[] = []
-  for (let i = 0; i < samples; i++) {
-    loop.point(i / samples, p)
-    out.push({ x: p.x, z: p.z })
-  }
-  return out
-}
+/** The coaster's own arc table, indexed once (`trackClearance.ts`): the ride and the park share both. */
+const trackIndex = (loop: TitleLoop) => buildTrackIndex(loopTrack(loop).table)
 
-const CROSSING_FOOTPRINT = loopFootprint(CROSSING_LOOP, 220)
-const TRACK_FOOTPRINT: Spot[] = [...loopFootprint(MAIN_LOOP, 360), ...CROSSING_FOOTPRINT]
-
-function distanceTo(points: readonly Spot[], x: number, z: number): number {
-  let best = Infinity
-  for (const p of points) {
-    const d = (p.x - x) ** 2 + (p.z - z) ** 2
-    if (d < best) best = d
-  }
-  return Math.sqrt(best)
-}
-
-export const distanceToTrack = (x: number, z: number) => distanceTo(TRACK_FOOTPRINT, x, z)
+/** Is either coaster's track within `radius` (XZ) of (x, z)? */
+export const nearTrack = (x: number, z: number, radius: number) =>
+  trackIndex(MAIN_LOOP).near(x, z, radius) || trackIndex(CROSSING_LOOP).near(x, z, radius)
 
 /** The hero loop's columns stand clear of the second coaster where it ducks under. */
-export const clearOfCrossing = (x: number, z: number) => distanceTo(CROSSING_FOOTPRINT, x, z) > 9
+export const clearOfCrossing = (x: number, z: number) => !trackIndex(CROSSING_LOOP).near(x, z, 9)
 
 function insideFlume(x: number, z: number, margin: number): boolean {
   return ((x - POND.x) / (FLUME_RADII.x + margin)) ** 2 + ((z - POND.z) / (FLUME_RADII.z + margin)) ** 2 < 1
@@ -203,7 +195,7 @@ function buildStalls(rng: ReturnType<typeof createRng>): TitleParkLayout['stalls
       const x = Math.cos(a) * rc
       const z = Math.sin(a) * rc
       if ((run && i % (run + 2) >= run) || nearAvenue(x, z, PATH_HALF_WIDTH + halfW + 2)) continue
-      if (onRide(x, z, halfW) || distanceToTrack(x, z) < halfW + 8) continue
+      if (onRide(x, z, halfW) || nearTrack(x, z, halfW + 8)) continue
       // Local +z (the serving front) faces the park centre, where every camera shot stands.
       const yaw = Math.atan2(-Math.cos(a), -Math.sin(a))
       stalls.push({ x, y: GROUND_Y, z, yaw, variant: Math.floor(rng() * 3), color: Math.floor(rng() * 6), scale: STALL_SCALE })
@@ -229,7 +221,7 @@ function buildLights(layout: Pick<TitleParkLayout, 'lightPoles' | 'lightWires' |
       const a = (i / n) * Math.PI * 2
       const x = Math.cos(a) * r
       const z = Math.sin(a) * r
-      if (nearAvenue(x, z, PATH_HALF_WIDTH + 3) || onRide(x, z, 2) || distanceToTrack(x, z) < 6) return null
+      if (nearAvenue(x, z, PATH_HALF_WIDTH + 3) || onRide(x, z, 2) || nearTrack(x, z, 6)) return null
       return [x, GROUND_Y + POLE_HEIGHT, z]
     }
     const tops = edges.map((r) => Array.from({ length: n }, (_, i) => poleAt(i, r)))
@@ -318,7 +310,7 @@ function buildTrees(rng: ReturnType<typeof createRng>, stalls: readonly Spot[], 
       const z = cz + (rng() - 0.5) * spec.spread
       const tr = Math.hypot(x, z)
       if (tr < spec.inner || distanceToPath(x, z) < PATH_HALF_WIDTH + 5) continue
-      if (onRide(x, z, 6) || distanceToTrack(x, z) < 10) continue
+      if (onRide(x, z, 6) || nearTrack(x, z, 10)) continue
       if (stalls.some((s) => Math.hypot(s.x - x, s.z - z) < 14)) continue
       const scale = spec.scale[0] + rng() * (spec.scale[1] - spec.scale[0])
       trees.push({ x, y: GROUND_Y, z, yaw: rng() * Math.PI * 2, scale, tint: rng() })
@@ -337,7 +329,7 @@ function buildHedges(stalls: readonly Spot[]): Placement[] {
         const x = Math.cos(av) * r + nx * side * (PATH_HALF_WIDTH + 2)
         const z = Math.sin(av) * r + nz * side * (PATH_HALF_WIDTH + 2)
         const half = HEDGE_LENGTH / 2
-        if (RING_PATHS.some((ring) => Math.abs(r - ring) < half + 16) || onRide(x, z, half) || distanceToTrack(x, z) < half + 4) continue
+        if (RING_PATHS.some((ring) => Math.abs(r - ring) < half + 16) || onRide(x, z, half) || nearTrack(x, z, half + 4)) continue
         if (stalls.some((s) => Math.hypot(s.x - x, s.z - z) < half + 8)) continue
         hedges.push({ x, y: GROUND_Y, z, yaw: -av })
       }
@@ -355,7 +347,7 @@ function buildPlanters(rng: ReturnType<typeof createRng>, stalls: readonly Spot[
       const a = ((i + 0.5) / n) * Math.PI * 2
       const x = Math.cos(a) * r
       const z = Math.sin(a) * r
-      if (nearAvenue(x, z, PATH_HALF_WIDTH + 4) || onRide(x, z, 3) || distanceToTrack(x, z) < 5) continue
+      if (nearAvenue(x, z, PATH_HALF_WIDTH + 4) || onRide(x, z, 3) || nearTrack(x, z, 5)) continue
       if (stalls.some((s) => Math.hypot(s.x - x, s.z - z) < 12)) continue
       planters.push({ x, y: GROUND_Y, z, yaw: Math.PI / 2 - a, color: Math.floor(rng() * PLANTER_COLORS) })
     }
@@ -380,8 +372,10 @@ function valueNoise(x: number, y: number, cell: number, seed: number): number {
   const iy = Math.floor(fy)
   const sx = (fx - ix) ** 2 * (3 - 2 * (fx - ix))
   const sy = (fy - iy) ** 2 * (3 - 2 * (fy - iy))
-  const top = lattice(ix, iy, seed) + (lattice(ix + 1, iy, seed) - lattice(ix, iy, seed)) * sx
-  const bottom = lattice(ix, iy + 1, seed) + (lattice(ix + 1, iy + 1, seed) - lattice(ix, iy + 1, seed)) * sx
+  const a = lattice(ix, iy, seed)
+  const b = lattice(ix, iy + 1, seed)
+  const top = a + (lattice(ix + 1, iy, seed) - a) * sx
+  const bottom = b + (lattice(ix + 1, iy + 1, seed) - b) * sx
   return top + (bottom - top) * sy
 }
 
@@ -443,6 +437,26 @@ export function flumePoint(t: number, out: THREE.Vector3): THREE.Vector3 {
   return out.set(POND.x + Math.cos(a) * FLUME_RADII.x, y, POND.z + Math.sin(a) * FLUME_RADII.z)
 }
 
+/** Scaled to the ring's footprint: the level's tent is 25 across the roof. */
+const TENT_SCALE = TENT_RING.radius / 25
+/** The level's pole stands 50 tall. */
+const FLAG_POLE_SCALE = 0.8
+
+function buildTents(): Scaled[] {
+  return Array.from({ length: TENT_RING.count }, (_, i) => {
+    const a = (i / TENT_RING.count) * Math.PI * 2
+    return { x: Math.cos(a) * TENT_RING.r, y: 0, z: Math.sin(a) * TENT_RING.r, yaw: 0, scale: TENT_SCALE, color: i % PALETTE.length }
+  })
+}
+
+function buildFlagPoles(): Scaled[] {
+  return Array.from({ length: 12 }, (_, i) => {
+    const a = (i / 12) * Math.PI * 2 + 0.26
+    const r = 80 + (i % 3) * 18
+    return { x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r, yaw: 0, scale: FLAG_POLE_SCALE, color: i % PALETTE.length }
+  })
+}
+
 export function buildTitlePark(seed = 454): TitleParkLayout {
   const rng = createRng(seed)
   const stalls = buildStalls(rng)
@@ -458,6 +472,8 @@ export function buildTitlePark(seed = 454): TitleParkLayout {
     people: buildPeople(rng),
     trees: buildTrees(rng, stalls, PARK_TREES),
     forest: buildTrees(rng, stalls, FOREST),
+    tents: buildTents(),
+    flagPoles: buildFlagPoles(),
     hedges: buildHedges(stalls),
     planters: buildPlanters(rng, stalls),
   }
