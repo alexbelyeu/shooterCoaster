@@ -168,12 +168,13 @@ export default function BulletPool({
 
     // Centralized collision pass — flag hits first, process after
     const targets = getCollisionTargets()
-    if (targets.size > 0 && count > 0) {
+    if (targets.length > 0 && count > 0) {
       // Phase 1: pure math — flag hits, no side effects
       for (let b = count - 1; b >= 0; b--) {
         const bullet = liveBulletBuffer.current[b]
         if (!bullet.alive) continue
-        for (const target of targets.values()) {
+        for (let t = 0; t < targets.length; t++) {
+          const target = targets[t]
           if (target.hitThisFrame || hasHit(bullet, target)) continue
           const pos = target.getPosition()
           const a = bullet.prev
@@ -192,7 +193,8 @@ export default function BulletPool({
       }
 
       // Phase 2: process hits — side effects happen outside the hot loop
-      for (const target of targets.values()) {
+      for (let t = 0; t < targets.length; t++) {
+        const target = targets[t]
         if (target.hitThisFrame) {
           target.hitThisFrame = false
           processHit(target, target.firstHitThisFrame)

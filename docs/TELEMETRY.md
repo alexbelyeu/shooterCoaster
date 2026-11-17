@@ -31,7 +31,7 @@ CI, the smoke (`?e2e=1`), Alex's browsers (`?internal=1`) or the portal build.
 - `GET /api/telemetry` → the last 24 h aggregated, CDN-cached 5 minutes: `sessions`, `errors` (per message + frame:
   `key`, sessions, count, first / last seen, versions), `contextLost` (sessions, top GPUs), `frames` (per level ×
   `touch` / `desktop`: sessions, median of the sessions' p50 and p95, the worst p95, the longest frame any session reported (`worstMaxMs`) and
-  the frames of 100 ms or more summed (`longFrames`)). No stored row is returned.
+  the frames of 100 ms or more summed (`longFrames`); each null when no session reported it). No stored row is returned.
 - No env vars, a paused project or any database error: `503 { "error": "unavailable" }`.
 
 ## Who reads it
@@ -45,7 +45,6 @@ sessions (`player-perf:<level>`).
 
 The leaderboard's setup already gave the function its env vars. Open the Supabase project's SQL editor, paste
 `supabase/migrations/0002_telemetry.sql` and run it once. Check: `https://scoaster.com/api/telemetry` answers
-`{"sessions":0,…}` (200) instead of a 503. (On 13 Nov 2026, #536: `/api/leaderboard` answered 200 while
-`/api/telemetry` answered 503, so the env vars and the project were fine and the table was missing: this step had
-not been run.) When the free project pauses, both the leaderboard and telemetry answer
+`{"sessions":0,…}` (200) instead of a 503 (a 503 while `/api/leaderboard` answers 200 means the table is missing:
+this step has not been run). When the free project pauses, both the leaderboard and telemetry answer
 503 until it is restored (docs/LEADERBOARD.md).

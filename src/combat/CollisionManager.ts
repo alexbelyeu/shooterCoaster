@@ -25,18 +25,32 @@ export interface EnemyHitEvent {
 }
 
 const targets = new Map<string, CollisionTarget>()
+/**
+ * The same targets as an array, walked by index every frame (the bullets' hit test, aim assist): a `for…of` over
+ * the map allocates an iterator per walk, and the hit test walked it once per live bullet (#596).
+ */
+const targetList: CollisionTarget[] = []
+
+function removeFromList(target: CollisionTarget | undefined): void {
+  const i = target ? targetList.indexOf(target) : -1
+  if (i >= 0) targetList.splice(i, 1)
+}
 const hitEvent: EnemyHitEvent = { id: '', position: new THREE.Vector3() }
 
 export function registerCollisionTarget(target: Omit<CollisionTarget, 'hitThisFrame' | 'firstHitThisFrame'>): void {
-  targets.set(target.id, { ...target, hitThisFrame: false, firstHitThisFrame: false })
+  const entry = { ...target, hitThisFrame: false, firstHitThisFrame: false }
+  removeFromList(targets.get(target.id))
+  targets.set(target.id, entry)
+  targetList.push(entry)
 }
 
 export function unregisterCollisionTarget(id: string): void {
+  removeFromList(targets.get(id))
   targets.delete(id)
 }
 
-export function getCollisionTargets(): Map<string, CollisionTarget> {
-  return targets
+export function getCollisionTargets(): readonly CollisionTarget[] {
+  return targetList
 }
 
 /**
@@ -58,5 +72,6 @@ export function processHit(target: CollisionTarget, countHit = true): void {
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     targets.clear()
+    targetList.length = 0
   })
 }

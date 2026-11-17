@@ -119,8 +119,8 @@ const COMBAT_STEP_MAX = 0.25
 const RIDE_RATE = Number(arg('ride-rate', 0.14))
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(arg('seed', 1337))
-// --cpu-throttle <rate>: the ride step on a slow machine (#536), CDP's CPU throttling from the level's start;
-// records the longest frame and the frames over 100 ms per level. Reported, not failed, until the fixes land.
+// --cpu-throttle <rate>: the ride step on a slow machine (#536), CDP's CPU throttling for the ride;
+// records its longest frame and its frames of 100 ms or more per level, from the end of the warm-up (#541). Reported, not failed, until the fixes land.
 const CPU_THROTTLE = Number(arg('cpu-throttle', 1))
 // --level-chunk-delay <ms>: every page gets the lazy level chunk this late, the slow runner of #464; every step must pass with it.
 const LEVEL_CHUNK_DELAY_MS = Number(arg('level-chunk-delay', 0))
@@ -589,7 +589,7 @@ function programsAfterWarmup(page) {
 const GROWTH_SHOWN = 6
 
 function throttleSummary(t) {
-  return t ? ` cpu ${t.rate}x: longest frame ${t.maxMs.toFixed(0)} ms, frames >100 ms: ${t.count}` : ''
+  return t ? ` cpu ${t.rate}x: longest frame ${t.maxMs.toFixed(0)} ms, frames of 100 ms or more: ${t.count}` : ''
 }
 
 function programGrowthSummary(p) {
@@ -3527,12 +3527,24 @@ async function run() {
   for (const id of has('ride') ? wanted : []) {
     const { ctx, page, errors } = await newPage()
     const started = Date.now()
-    if (CPU_THROTTLE > 1) {
-      const cdp = await ctx.newCDPSession(page)
+    const cdp = CPU_THROTTLE > 1 ? await ctx.newCDPSession(page) : null
+    if (cdp) {
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE })
-      await page.evaluate(() => { window.__SC_TEST__.longFrames = { maxMs: 0, count: 0 } })
+      // Ride frames only (#541): the level mount and the warm-up's compiles are part 2's (#597), not the ride's.
+      await page.evaluate(() => {
+        const s = window.__SC_TEST__
+        const reset = () => {
+          if (!s.shaderWarmup?.done) return requestAnimationFrame(reset)
+          s.maxFrameMs = 0
+          s.longFrames = 0
+        }
+        reset()
+      })
     }
     const ride = await rideToLevelTime(page, id, SECONDS, MIN_FRAMES)
+    const throttled = cdp ? { rate: CPU_THROTTLE, ...(await page.evaluate(() => ({ maxMs: window.__SC_TEST__.maxFrameMs, count: window.__SC_TEST__.longFrames }))) } : null
+    // Combat, the shot and the results run at full speed: their deadlines were set for it.
+    if (cdp) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 })
     // Frozen at SECONDS of level time until the enemy probe: the ride stats, perf gate, shot and probe share that moment.
     const stats = await page.evaluate(() => {
       const s = window.__SC_TEST__
@@ -3574,7 +3586,6 @@ async function run() {
       .finally(() => page.evaluate(() => { window.__SC_TEST__.holdLevelTime = false }).catch(() => {}))
     problems.push(...play.problems)
     const shaders = await programsAfterWarmup(page)
-    const throttled = CPU_THROTTLE > 1 ? { rate: CPU_THROTTLE, ...(await page.evaluate(() => window.__SC_TEST__.longFrames)) } : null
     const frenzyEnd = frenzy ? await frenzyEndProblems(page, id, online) : null
     if (frenzyEnd) problems.push(...frenzyEnd.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
