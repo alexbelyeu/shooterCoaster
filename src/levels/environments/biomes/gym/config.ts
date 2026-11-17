@@ -118,13 +118,13 @@ export function wallColumns(): { east: number[]; west: number[] } {
 
 /**
  * Street pieces and tags high on the hall's walls (#593; `murals.ts`), each at its rect's foot centre in a wall
- * frame (`rot` turns it to face into the hall): one over the Training Area on the east wall, one over the glass gym
- * room on the west, tags higher up. Each sits in a stretch of wall clear of the maroon columns (`wallColumns`), all
- * under the ring beam (H − 5.2 m).
+ * frame (`rot` turns it to face into the hall): one on the east wall between the Training Area's banners and the
+ * windows above it, one over the glass gym room on the west, tags higher up. Each sits in a stretch of wall clear of
+ * the maroon columns (`wallColumns`) and of every window row on its wall, all under the ring beam (H − 5.2 m).
  */
 export const MURALS = {
   pieces: [
-    { x: 28, z: 0, rot: 0, base: 11, w: 15, h: 8, seed: 5931, style: { fill: ['#ff4fa3', '#ffd23f', '#2fd0c8'], outline: '#141416', cloud: '#5b55b0', highlight: '#ffffff' } },
+    { x: 28, z: 0, rot: 0, base: 8, w: 15, h: 5.5, seed: 5931, style: { fill: ['#ff4fa3', '#ffd23f', '#2fd0c8'], outline: '#141416', cloud: '#5b55b0', highlight: '#ffffff' } },
     { x: 64, z: HALL.d, rot: 180, base: 12.5, w: 16, h: 8, seed: 5932, style: { fill: ['#ff7a1f', '#e8322c', '#ffd23f'], outline: '#101012', cloud: '#2a7fd4', highlight: '#fff6d8' } },
   ],
   tags: [
