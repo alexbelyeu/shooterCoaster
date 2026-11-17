@@ -1,7 +1,9 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, pose } from '@/levels/environments/shared/paintedParts'
+import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
 import { withRim } from './enemyRim'
+
+export * from './infernoEnemyAssets'
 
 // Readability rules (issue #15): every lit enemy material gets a fresnel rim via
 // withRim(); base colours keep ΔE ≥ ~15 from their biome's dominant terrain
@@ -745,120 +747,9 @@ export const SNOWMAN_SCARF_MAT = withRim(new THREE.MeshPhongMaterial({
   flatShading: true,
 }), { color: '#ffc0b0', intensity: 0.5 })
 
-// ── Ember Wisp ────────────────────────────────────────────────
-export const EMBER_WISP_CORE_GEO = new THREE.SphereGeometry(3, 8, 8)
-/** Six upright flame tendrils round the core. */
-export const EMBER_WISP_TENDRILS_GEO = placedParts(
-  Array.from({ length: 6 }, (_, i): [THREE.BufferGeometry, Vec3, Vec3] => {
-    const a = (i / 6) * Math.PI * 2
-    return [new THREE.ConeGeometry(1, 4, 4), [Math.cos(a) * 3.5, Math.sin(a), Math.sin(a) * 3.5], [0, a, 0]]
-  }),
-)
-
-export const EMBER_WISP_CORE_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#ff6600',
-  emissive: '#ff3300',
-  emissiveIntensity: 0.8,
-  flatShading: true,
-}), { color: '#ffd080', intensity: 1.1 })
-export const EMBER_WISP_TENDRIL_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#ffaa00',
-  emissive: '#ff6600',
-  emissiveIntensity: 0.5,
-  transparent: true,
-  opacity: 0.7,
-  flatShading: true,
-}), { color: '#ffd080', intensity: 0.6 })
-
-// ── Lava Golem ────────────────────────────────────────────────
-const lavaGolemProfile = [
-  new THREE.Vector2(0, 0),
-  new THREE.Vector2(4, 1),
-  new THREE.Vector2(5.5, 3),
-  new THREE.Vector2(6, 6),
-  new THREE.Vector2(5.5, 9),
-  new THREE.Vector2(5, 12),
-  new THREE.Vector2(4, 15),
-  new THREE.Vector2(3.5, 18),
-  new THREE.Vector2(0, 20),
-]
-export const LAVA_GOLEM_BODY_GEO = placedParts([
-  [new THREE.LatheGeometry(lavaGolemProfile, 10), [0, 0, 0]],
-  [new THREE.SphereGeometry(3, 8, 6), [0, 22, 0]],
-])
-export const LAVA_GOLEM_CRACK_GEO = placedParts([[new THREE.LatheGeometry(lavaGolemProfile, 10), [0, 0, 0], [0, 0, 0], [1.02, 1.01, 1.02]]])
-export const LAVA_GOLEM_ARM_GEO = new THREE.BoxGeometry(2, 8, 2)
-export const LAVA_GOLEM_EYES_GEO = placedParts([
-  [new THREE.SphereGeometry(0.8, 6, 6), [-1.5, 23, 2.5]],
-  [new THREE.SphereGeometry(0.8, 6, 6), [1.5, 23, 2.5]],
-])
-
-// Ash-grey basalt (brown sat at ΔE≈6 from the terrain); a strong rim, since Inferno enemies read by their edges.
-const VOLCANIC_RIM = { color: '#ffb070', intensity: 1.2, power: 2.0 }
-export const LAVA_GOLEM_BODY_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#5c5450',
-  specular: '#ff8844',
-  shininess: 50,
-  flatShading: true,
-}), VOLCANIC_RIM)
-export const LAVA_GOLEM_CRACK_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#ff4400',
-  emissive: '#ff2200',
-  emissiveIntensity: 0.6,
-  flatShading: true,
-}), VOLCANIC_RIM)
-export const LAVA_GOLEM_EYE_MAT = new THREE.MeshStandardMaterial({
-  color: '#ff4400',
-  emissive: '#ff2200',
-  emissiveIntensity: 1.5,
-  toneMapped: false,
-})
-
-// ── Fire Imp ──────────────────────────────────────────────────
-const fireImpProfile = [
-  new THREE.Vector2(0, 0),
-  new THREE.Vector2(2, 0.5),
-  new THREE.Vector2(3, 2),
-  new THREE.Vector2(3.2, 4),
-  new THREE.Vector2(2.8, 6),
-  new THREE.Vector2(2, 7.5),
-  new THREE.Vector2(0, 8),
-]
-export const FIRE_IMP_BODY_GEO = new THREE.LatheGeometry(fireImpProfile, 8)
-export const FIRE_IMP_HORNS_GEO = placedParts([
-  [new THREE.ConeGeometry(0.6, 3, 4), [-1.5, 9, 1], [0.3, 0, -0.2]],
-  [new THREE.ConeGeometry(0.6, 3, 4), [1.5, 9, 1], [0.3, 0, 0.2]],
-])
-export const FIRE_IMP_TAIL_GEO = new THREE.CylinderGeometry(0.3, 0.15, 6, 4)
-export const FIRE_IMP_TAIL_SPIKE_GEO = new THREE.ConeGeometry(0.5, 1.5, 4)
-export const FIRE_IMP_EYES_GEO = placedParts([
-  [new THREE.SphereGeometry(0.5, 6, 6), [-1, 7, 2.8]],
-  [new THREE.SphereGeometry(0.5, 6, 6), [1, 7, 2.8]],
-])
-
-// Orange imp (VISION) with bone horns; the old maroon/near-black read as terrain
-export const FIRE_IMP_BODY_MAT = withRim(new THREE.MeshPhysicalMaterial({
-  color: '#e0561c',
-  metalness: 0.2,
-  roughness: 0.5,
-  iridescence: 0.3,
-  iridescenceIOR: 1.3,
-  flatShading: true,
-}), VOLCANIC_RIM)
-export const FIRE_IMP_HORN_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#e8d8b0',
-  specular: '#ffffff',
-  shininess: 40,
-  flatShading: true,
-}), VOLCANIC_RIM)
-export const FIRE_IMP_EYE_MAT = new THREE.MeshStandardMaterial({
-  color: '#ffcc00',
-  emissive: '#ff8800',
-  emissiveIntensity: 1.5,
-  toneMapped: false,
-})
-
 // ── Infernal Drake ────────────────────────────────────────────
+// A strong rim, since Inferno enemies read by their edges.
+const VOLCANIC_RIM = { color: '#ffb070', intensity: 1.2, power: 2.0 }
 const infernalDrakeProfile = [
   new THREE.Vector2(0, 0),
   new THREE.Vector2(1.5, 1),
@@ -962,17 +853,6 @@ const CLIMBER_METAL = '#b8bcc8'
 
 export const CLIMBER_SHOULDER: [number, number, number] = [0.95, 1.05, 0]
 export const CLIMBER_HIP: [number, number, number] = [0, -1.05, 0]
-
-/** Lighter on top, darker underneath: the brief's gradient, from each vertex's normal. */
-function sunShaded(g: THREE.BufferGeometry): THREE.BufferGeometry {
-  const n = g.attributes.normal
-  const c = g.attributes.color
-  for (let i = 0; i < c.count; i++) {
-    const k = 0.8 + 0.22 * n.getY(i)
-    c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k)
-  }
-  return g
-}
 
 // Low-poly by budget: 700 triangles in all (the brief's cap), so bands are open cylinders and hands, eyes few-sided.
 const capsule = (r: number, length: number, sides = 5) => new THREE.CapsuleGeometry(r, length, 1, sides)

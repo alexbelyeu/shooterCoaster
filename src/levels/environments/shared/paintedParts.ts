@@ -83,3 +83,14 @@ export function mergePainted(parts: THREE.BufferGeometry[]): THREE.BufferGeometr
   g.computeBoundingSphere()
   return g
 }
+
+/** Lighter on top, darker underneath (the enemy briefs' gradient), from each vertex's normal. */
+export function sunShaded(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const n = g.attributes.normal
+  const c = g.attributes.color
+  for (let i = 0; i < c.count; i++) {
+    const k = 0.8 + 0.22 * n.getY(i)
+    c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k)
+  }
+  return g
+}

@@ -48,6 +48,8 @@ interface EnemyBaseProps extends EnemyProps {
     time: number,
     delta: number,
   ) => void | 'escaped'
+  /** Its hit reaction (#463): called once as it is shot, to pose it for the kill pop (an imp throws its arms up). */
+  onHit?: () => void
 }
 
 /**
@@ -73,6 +75,7 @@ export default function EnemyBase({
   entry,
   children,
   updatePosition,
+  onHit,
 }: EnemyBaseProps) {
   const meshRef = useRef<THREE.Group>(null)
   const [alive, setAlive] = useState(true)
@@ -103,12 +106,13 @@ export default function EnemyBase({
     dying.current = true
     dyingMs.current = ENEMY_HIT_FLASH_MS
     dyingFrames.current = 0
+    onHit?.()
     const group = meshRef.current
     if (group) {
       group.traverse(flashMesh)
       group.scale.setScalar(KILL_POP_SCALE)
     }
-  }, [id, scoreValue, addScore, registerKill])
+  }, [id, scoreValue, addScore, registerKill, onHit])
 
   /** End of the kill pop: explosion, events, unmount. */
   const finishKill = useCallback(() => {
