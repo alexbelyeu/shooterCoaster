@@ -184,20 +184,21 @@ const LEVELS: LevelConfig[] = [
     description: 'Ride the walls of the climbing gym',
     order: 6,
     biome: 'gym',
-    maxScore: 28 * 15 + 24 * 12 + 34 * 18 + 8 * 50 + 500, // 1320 + the Medusa's eight snakes and reward (bossSpecs.ts) = 2220
+    maxScore: (14 + 14) * 15 + 24 * 12 + 34 * 18 + 8 * 50 + 500, // 1320 + the Medusa's eight snakes and reward (bossSpecs.ts) = 2220
     message: 'You sent the Climbing Gym!',
     nextLevel: null,
     // Authored from Alex's blockout (#514): up the Tree, round the Flame, through the Arch, the dive into the Starr pit.
     track: GYM_TRACK,
     walls: [...GYM_WALLS],
-    // Crows stand in for the rafters' air enemy until the lanternflies (#516) replace them. Climbers are bystanders (#518):
-    // the first wave brings some, to teach the don't-shoot rule from the start.
+    // Climbers are bystanders (#518): the first wave brings some, to teach the don't-shoot rule from the start. The
+    // lanternflies (#575) come second: from 9 to 13 s the rider climbs past no wall it can read a bug on, and from 14 s it
+    // faces Alaska close up, where their swarm lands (`placeWallSwarm`).
     ...paceLevel({
       waves: [
         { type: 'crow', count: 14, waveLabel: 'In the Rafters!', formation: 'v', weight: 2, bystanders: { type: 'climber', count: 4 } },
+        { type: 'lanternfly', count: 14, waveLabel: 'Lanternflies!', weight: 2 },
         { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 2 },
         { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 2, bystanders: { type: 'climber', count: 3 } },
-        { type: 'crow', count: 14, waveLabel: 'Round the Flame!', formation: 'spiral', weight: 2 },
         { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 3, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
