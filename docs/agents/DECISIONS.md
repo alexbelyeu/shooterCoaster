@@ -2098,3 +2098,58 @@ starts a level goes through `startLevelReady`, never a bare `startLevel` evaluat
 **Context:** Alex (#558) asked for a gap through the Tree "like the Arch", big enough for the coaster, and for rugged, varied walls. The Tree backs onto the hall's east wall, so an opening front to back leads nowhere a track can go; and the gym track's clearance tests are written against each piece's footprint box (`pieceBoxes`).
 **Decision:** The trunk stands on four buttress roots, front pair at the lip, back pair at the wall: the gap under it runs along the Tree, cave to cave (`TREE_GAP` in `treeTrunk.ts`, 3.25 m wide and 3.1 m high, room for `RAIL_CLEARANCE` either side), and from the pit it reads as the arch the front roots make. Routing the track through it is a separate issue. Every panel's relief, the Tree's wood and its branches are clamped inside the piece's existing footprint box (roots may sink below the floor), so `pieceBoxes` and the track's clearance tests stay unchanged; `wallPanels.test.ts` checks both.
 **Consequences:** A track through the gap must clear `TREE_GAP`, not the Tree's whole box (`pieceBoxes` still treats the Tree as solid: carve the gap out of it when the track goes through). A bigger relief needs a bigger footprint in `blockout.json`, not a looser clamp.
+
+## 2026-11-16 — Week 5: Alex's gym notes, the Neo stutter and the fire lead; level 6's scene ceiling raised (Director, #558, #561, #583)
+
+**Context:** Week 4 shipped all of M3's Level 6 build order (#514–#521 except the bystanders,
+#518), the Magma Titan, the 60 s template, the title world, lint and the far-rail fix: 50
+merges. Alex then played the gym (#558: much bigger, grimy Bushwick in low light, a bonier
+Medusa, a ride through the Tree's gap), saw the fire (#583: "100x more realistic") and sent a
+`?perf=1` report from a MacBook Neo (#561: 200–370 ms frames in bursts every ~0.4 s during
+the ride, 0.7–1 s frames in the countdown). The bystander climbers (#518, PR #555) were
+blocked on `scene.level6.drawCalls` 60, set from level 6's first smoke before it had
+climbers, the Medusa on screen or fire (#554, #557).
+**Decision:** Week 5 leads with those three steering issues as P1s: #592 (scale-up + the
+Tree's gap), #593 (Bushwick grime, low light), #594 (Medusa face, folds #557), #595 → #599
+(the fire in two parts; #583 stays open for Alex's verdict on the clip), #596 / #597 (the
+stall bursts, then the countdown / level-start freezes). The audio epic gets boss sections
+(#598) and enemy art the Kraken (#600) and the Inferno trio (#463, now P2). `scene.level6`
+goes from 60 / 110 to **130 draws / 160 objects** (triangles unchanged): the climbers measure
+76–78 draws, the Medusa 72–75, and Alex said the fire is worth spending on; 130 stays well
+under the VISION bar of 250 that levels 4 and 5 sit at. Small P3 follow-ups are bundled
+(#601–#606) instead of queued singly. Done steering issues #434, #435, #436, #438 are closed.
+**Consequences:** Level 6's builders this week share files (`biomes/gym/*`): #592 owns sizes
+and positions, #593 looks, #601 waits on #592. The 130 ceiling is a ceiling, not a target:
+lower it once #592 / #595 settle. Perf work in #561 is M3, not M4: smooth on a modest laptop is
+part of "ship quality" now that Alex measured it.
+
+## 2026-11-16 — The gym's strip-light pools are a shader term, not scene lights (Builder, #593)
+
+**Context:** Alex wanted the Climbing Gym lower and moodier: warm pools under the strip lights, darker corners, no flat fill. Real point or rect-area lights would light every material in the scene, enemies included, cost per fragment on every lit shader, and the 36 fixtures would need either many lights or a few that don't match the fixtures.
+**Decision:** The level's light rig (`atmosphere.ts` gym) stays a dim hemisphere plus cool window daylight. Each fixture's warm downlight pool (plus a little spill up onto the roof) is computed in `biomes/gym/grimeShader.ts` and added to the direct diffuse light of the hall's solid, floor and hold materials only. The pool's layout comes from the same `STRIP_LIGHTS` config the fixtures' geometry is built from, so moving the fixtures moves the pools.
+**Consequences:** Enemies aren't lit by the pools. They read by their rims against the darker hall, the way Inferno's enemies do. A new hall material that should catch the fixtures' light has to use `withHallGrime`. Changing the fixtures in `hallGeometry.ts` without `STRIP_LIGHTS` puts the pools in the wrong place.
+
+## 2026-11-16 — The gym grows to GYM_SCALE 32 and the coaster shrinks to level 1's structure scale (Builder, #592)
+
+**Context:** Alex (#513 / #558): the gym "has to be much much bigger so that we still have the speedy rollercoaster that we have in other levels. Keep it proportionate." The lap is fixed at ~61.5 s and ride velocity is a track fraction per frame, so scaling hall and track together alone changes nothing on screen: hall structure passes at the same rate. What reads as speed is the ride against the rider's own size: level 1 rides ~139 units/s at trackScale 1 (eye 6 units), about 23 eye heights a second; level 6 rode ~59 units/s at trackScale 2.5 (eye 15), about 4.
+**Decision:** The hall scales uniformly ×2 (`GYM_SCALE` 16 → 32, blockout proportions exact, hall 2560 units long) and the track's structure scale drops from 2.5 to level 1's 1 (`scalar` 125 → 20). Together the hall is 5× bigger against the car (the rider's eye 0.19 m up instead of 0.94 m) and the ride runs ~117 units/s, ~20 eye heights a second, like level 1. A ×5 hall at trackScale 2.5 would look the same but put the hall at 6400 units and every wall enemy 5× further away; ×2 keeps the world inside the other levels' extents and the enemies at level 1's size against the car. The Medusa keeps her size against the star (`MEDUSA_SIZE`), the fog doubles with the hall, the floor mesh is the hall's length. The longer track's rails, ties and towers are sparser (`TrackParams.segments` / `tieSpacing` / `towerSpacing`) to stay at main's triangle count.
+**Consequences:** The ride through the Tree's gap is a follow-up: a route through it costs ~4–8 s before the dive (which must start by 40 s), and an eastward pass needs the lap's last stretch to reach the left cave past the Medusa.
+
+## 2026-11-17 — The Flame's fire is instanced flame tongues, not a raymarched volume (Builder, #595)
+
+**Context:** #583 / #595 asked for fire with volume and motion on the Flame, choosing between a raymarched
+volume in a box round it, a GPU fluid grid, layered soft sheets / particles on a noise field, or a baked flipbook.
+**Decision:** ~260 soft flame tongues in one instanced draw (`gym/FlameFire.tsx`, layout in pure `gym/flameFire.ts`):
+each a camera-facing (round the vertical) quad on a three-point path that hugs the Flame's flare, with its own
+life, sway and fbm flame shape, re-seeded every life; premultiplied blending (adds light, dims what's behind by
+its alpha) and a blackbody ramp past 1 for Bloom. Low quality and touch draw fewer (`tongueCount`, the quality's
+`particleScale`, half on touch) with the quality's `fbmOctaves`: same program, only the octave define differs.
+A raymarch would cost a fill-bound full-screen-ish pass of 3D noise per step over a Flame that fills half the
+screen on the spiral (SwiftShader and the MacBook Neo, #561), needs a depth texture for the boulder and track,
+and an extra render target; a fluid grid adds per-frame simulation passes and float render targets. Tongues
+get parallax and overlap for free from real 3D positions, are depth-tested against the boulder, cost one
+draw call and scale by instance count.
+**Consequences:** the fire is fill-bound by tongue count × size: thin it with `MAX_TONGUES` or the widths in
+`buildFlameTongues`, not by removing noise. Part 2 (light on the surroundings, smoke, heat haze, scorch) builds on
+these tongues. `FBM_OCTAVES` for every shader on `noiseGlsl.ts`' `fbm` (the fire, the volcano's smoke and lava) comes from
+`graphicsQuality.ts` `fbmOctaves` (#582); the sky and aurora run their own fixed-octave noise.
