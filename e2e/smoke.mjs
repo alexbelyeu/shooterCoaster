@@ -866,14 +866,20 @@ async function leaderboardEntryProblems(page, id, rank, online, score) {
       lastInitials: window.__SC_TEST__.leaderboards().lastInitials,
       persisted: localStorage.getItem('shootercoaster-scores') ?? '',
       muted: document.querySelector('.mute-button')?.getAttribute('aria-label') ?? null,
+      shareOpen: document.querySelector('.share-menu') !== null,
     }
   }, id)
   const initialsShown = (text) => page
     .waitForFunction((t) => document.querySelector('.results-board li.is-new .results-board-initials')?.textContent === t, text, { timeout: 5000, polling: 50 })
     .then(() => true, () => false)
 
-  // The share check leaves focus on Share, where Enter is that button's click: type as a player who never touched it.
-  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  // #357: the entry owns its keys even with a results button focused (Share, as after its menu closes): Enter must confirm, not click it.
+  const shareFocused = await page.evaluate(() => {
+    const share = document.querySelector('.results-share')
+    share?.focus()
+    return share !== null && document.activeElement === share
+  })
+  if (!shareFocused) problems.push('no Share button on the results screen to focus during the initials entry')
   const opened = await read()
   const openedBoard = await readBoard(page)
   if (openedBoard.source !== 'device' || openedBoard.label !== 'This device') problems.push(`leaderboard during the entry: ${openedBoard.source} "${openedBoard.label}", expected this device's`)
@@ -896,6 +902,7 @@ async function leaderboardEntryProblems(page, id, rank, online, score) {
   const confirmed = await read()
   if (confirmed.editing) problems.push('Enter did not close the initials entry')
   if (confirmed.phase !== 'results') problems.push(`Enter on the entry left the results screen (${confirmed.phase})`)
+  if (confirmed.shareOpen) problems.push('Enter on the entry with Share focused opened the share menu')
   if (confirmed.stored[rank]?.initials !== 'RES' || confirmed.lastInitials !== 'RES')
     problems.push(`stored entry ${JSON.stringify(confirmed.stored[rank])}, last initials ${confirmed.lastInitials}`)
   if (!confirmed.persisted.includes('"RES"')) problems.push('leaderboard entry not persisted to localStorage')

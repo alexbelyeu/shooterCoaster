@@ -182,21 +182,20 @@ export default function ResultsScreen() {
     return () => controls.stop()
   }, [counting, done, run.score, fill])
 
-  function initialsInput(key: string): boolean {
-    if (!initials || !config) return false
+  function initialsInput(key: string): void {
+    if (!initials || !config) return
     const next = initialsKey(initials, key)
-    if (next === null) return false
+    if (next === null) return
     if (next === 'confirm') {
       setInitials(null)
       sfx().ui('launch')
       submitOnline.current?.(initials.letters)
-      return true
+      return
     }
     lettersRef.current = next.letters
     if (next.letters !== initials.letters) useGameStore.getState().setEntryInitials(config.id, run.date, next.letters)
     setInitials(next)
     sfx().ui('select')
-    return true
   }
 
   function onShared(method: ShareMethod) {
@@ -209,21 +208,22 @@ export default function ResultsScreen() {
     if (!config) return
     if (e.metaKey || e.ctrlKey || e.altKey) return
     const target = e.target instanceof Element ? e.target : null
-    // A focused results button or share link turns Enter into its own click; one outside (the mute toggle) must not swallow it.
-    if (e.key === 'Enter' && target?.closest('.results-screen button, .results-screen a')) return
     // The open share menu's own keys (arrows, Esc) stay its own.
     if (target?.closest('.share-menu')) return
     if (initials) {
-      // The entry owns the keys (R and S are letters); Enter before it opens skips the reveal.
+      // A pending entry owns every key it takes, even under a focused button and during the reveal:
+      // preventDefault stops the button's click and MuteButton's S (R and S are letters).
+      if (initialsKey(initials, e.key) === null) return
+      e.preventDefault()
+      // Enter before the entry opens skips the reveal; a held Enter never confirms it.
+      if (e.key === 'Enter' && e.repeat) return
       if (!done) {
-        if (e.key === 'Enter' && !e.repeat) setStage(STAGE.done)
-      } else if (initialsInput(e.key)) {
-        // Capture phase + stop: no other window listener (MuteButton's S) sees a letter.
-        e.preventDefault()
-        e.stopImmediatePropagation()
-      }
+        if (e.key === 'Enter') setStage(STAGE.done)
+      } else initialsInput(e.key)
       return
     }
+    // A focused results button or share link turns Enter into its own click; one outside (the mute toggle) must not swallow it.
+    if (e.key === 'Enter' && target?.closest('.results-screen button, .results-screen a')) return
     if (e.repeat) return
     if (e.key === 'Enter') leave(enterTo)
     else if (e.key === 'r' || e.key === 'R') leave('replay')

@@ -38,7 +38,7 @@ canvas height (also checked on the phone run), a fresh shot isn't drawn at the m
 reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left) or the
 Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), offers Next Level while the next level is locked (or hides it while open), shows NaN, or disagrees with `stats()` on score or kills, has no local leaderboard fully inside 1280×720, or (first level) Enter with the mute button focused doesn't play on;
 on the first level the leaderboard is seeded so the run places 4th: the row must open for initials at the last ones used (AAA),
-ArrowUp must cycle a letter, typing r e s must give RES without leaving or toggling mute (R and S are letters there), and Enter must confirm, store
+all with the Share button focused (#357): ArrowUp must cycle a letter, typing r e s must give RES without leaving or toggling mute (R and S are letters there), and Enter must confirm (not open the share menu), store
 and persist it, with the board labelled This device during the entry. That run has the online board (#365) on a stubbed API (`page.route` on `/api/leaderboard`, never the real one; `onlineBoard(endpoint)`):
 after Enter it must POST once (level, RES, the shown score, kills, accuracy 0..1, seed, version), fetch nothing, and turn the board to World with RES 2nd of 10 (`level1-results-world.png`), and then Copy link must copy `shareText(1)`'s rank line ("I'm #2 in the world on …", #445) and Save image download the card with its `WORLD #2` ribbon (`level1-card-world.png`);
 its frenzy-end rerun is seeded a full board out of reach and must show the board with no rank and no initials entry: the World board (fetched for that level), with nothing submitted;

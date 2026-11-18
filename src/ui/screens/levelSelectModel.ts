@@ -19,6 +19,7 @@ export interface LevelCard {
   biome: BiomeType
   unlocked: boolean
   stars: number
+  /** The board's top score, or the saved best when the board is empty; read with `bestInitials` from one entry. */
   bestScore: number
   /** Initials on the top of the level's board (null when locked or empty). */
   bestInitials: string | null
@@ -37,6 +38,7 @@ export function buildLevelCards(
   return levels.map((level) => {
     const unlocked = isUnlocked(level.id)
     const saved = savedScores[level.id]
+    const top = leaderboards[level.id]?.[0]
     const previousId = unlocked ? null : previousLevel(level.id, levels)
     return {
       id: level.id,
@@ -45,8 +47,8 @@ export function buildLevelCards(
       biome: level.biome,
       unlocked,
       stars: unlocked ? Math.max(0, Math.min(STARS_PER_LEVEL, saved?.stars ?? 0)) : 0,
-      bestScore: unlocked ? Math.max(0, saved?.score ?? 0) : 0,
-      bestInitials: unlocked ? (leaderboards[level.id]?.[0]?.initials ?? null) : null,
+      bestScore: unlocked ? Math.max(0, (top ?? saved)?.score ?? 0) : 0,
+      bestInitials: unlocked ? (top?.initials ?? null) : null,
       unlockedBy: levels.find((l) => l.id === previousId)?.name ?? null,
     }
   })
