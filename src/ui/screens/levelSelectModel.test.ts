@@ -42,6 +42,17 @@ describe('buildLevelCards', () => {
     expect(cards.map((c) => c.bestInitials)).toEqual(['BOB', null, null])
   })
 
+  it('takes the best score and its initials from the same entry when the board and the save disagree', () => {
+    const board = { a: [{ initials: 'ZED', score: 700, stars: 2, date: 1 }] }
+    const scores = { a: entry('a', 900, 2), b: entry('b', 400, 1) }
+    const cards = buildLevelCards(levels, scores, (id) => id !== 'c', board)
+    expect(cards.map((c) => [c.bestScore, c.bestInitials])).toEqual([
+      [700, 'ZED'],
+      [400, null],
+      [0, null],
+    ])
+  })
+
   it('never counts stars on a locked level and clamps bad saves', () => {
     const scores = { a: entry('a', 10, 7), c: entry('c', 99, 3) }
     const cards = buildLevelCards(levels, scores, (id) => id === 'a', {})

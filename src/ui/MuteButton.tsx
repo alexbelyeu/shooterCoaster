@@ -7,9 +7,9 @@ export default function MuteButton() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 's' || e.key === 'S') {
-        toggleMute()
-      }
+      // A key another handler already took (the results' initials entry) is not a mute.
+      if (e.defaultPrevented) return
+      if (e.key === 's' || e.key === 'S') toggleMute()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
