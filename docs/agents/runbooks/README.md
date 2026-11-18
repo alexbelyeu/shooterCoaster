@@ -11,8 +11,8 @@ a role works is therefore an ordinary PR, reviewed by QA like any other.
 | ShooterCoaster · Director (weekly) | Mon 7:44 | `director.md` |
 | ShooterCoaster · Builders (3x daily) | 8:47, 13:47, 18:47 | `builders.md` |
 | ShooterCoaster · QA (3x daily) | 10:17, 15:17, 20:17 | `qa.md` |
-| ShooterCoaster · QA (on label) | a PR gets `agent:needs-qa` | `qa-on-label.md` |
-| ShooterCoaster · Fix (on label) | a PR gets `agent:changes-requested` | `fix-on-label.md` |
+| ShooterCoaster · QA (on label) | a PR gets `agent:needs-qa` (its GitHub trigger, or the control center's autopilot once per label change) | `qa-on-label.md` |
+| ShooterCoaster · Fix (on label) | a PR gets `agent:changes-requested` (same) | `fix-on-label.md` |
 | ShooterCoaster · Maintainer (nightly) | 3:36 | `maintainer.md` |
 
 The bootstrap prompt, identical for every task except the role and runbook name:

@@ -45,6 +45,13 @@ reviewer yourself; the scheduled QA dispatcher spawns one per PR instead.
      comment: "QA: changes requested", "Reviewed head `<sha>`", the numbered required
      changes (file, what's wrong, what good looks like), then "Suggestions" for non-blocking items. Swap
      `agent:needs-qa` → `agent:changes-requested`. That label starts the Fix task.
+   - **Conflicts with main first.** Before approving, read
+     `gh api repos/alexbelyeu/shooterCoaster/pulls/<n> --jq .mergeable_state` (if it prints
+     `unknown`, wait 10 s and read it again). If it is `dirty`, don't approve: request changes
+     with the single required change "merge conflict only; full review passed" (plus your
+     review summary, so the next round can be light) and swap `agent:needs-qa` →
+     `agent:changes-requested`. GitHub runs no workflow on a conflicting PR, so an approval
+     there would sit unmerged for hours.
    - **Approve** otherwise: post one comment, "QA: approved", "Reviewed head `<sha>`",
      the playtest reviewer's 2–3 line summary, "Independent review: correctness ✓
      consistency ✓" (or "skipped (small diff)" / "skipped (small fix)"), and any
