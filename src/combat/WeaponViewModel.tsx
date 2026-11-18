@@ -5,6 +5,7 @@ import { CAMERA_LAYER_ORDER } from '@/core/cameraLayers'
 import { eventBus } from '@/core/EventBus'
 import { useGameStore } from '@/store/useGameStore'
 import { isInRun } from '@/store/startPhase'
+import { cameraOffSeat } from '@/core/introShot'
 import { getPointerState } from '@/input/pointerInput'
 import MuzzleFlash, { type MuzzleAnchor } from './MuzzleFlash'
 import { isFeedbackHeld, lastShot, muzzleTip } from './hitFeedback'
@@ -110,7 +111,8 @@ export default function WeaponViewModel() {
     if (!gun || !tracer || !cam?.isPerspectiveCamera) return
 
     const { phase, timeScale } = useGameStore.getState()
-    const visible = isInRun(phase)
+    // Hidden while the countdown's swoop has the camera off the seat (#328).
+    const visible = isInRun(phase) && !cameraOffSeat()
     gun.visible = visible
     if (!visible) {
       tracer.visible = false

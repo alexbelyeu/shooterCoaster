@@ -235,6 +235,17 @@ export interface SCTestApi {
   scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string } | null>
   /** Override the game time scale (0 freezes camera + enemies; 1 hands it back to the slow-mo envelopes, `combat/slowMo.hot.ts`). */
   setTimeScale: (s: number) => void
+  /** Pins the countdown's intro swoop (#328) at this progress (0 = over the landmark, 1 = the seat) until set back to null. */
+  introAt: number | null
+  /** The coaster camera's shot (#328): riding, the countdown's swoop or the results orbit. The swoop's progress (0–1),
+   *  height over the seat, distance and look angle (degrees) off the seat's pose, and angle off the landmark; `goOffset`
+   *  is the swoop's distance off the seat on the last countdown frame before GO. */
+  intro: {
+    mode: 'ride' | 'swoop' | 'orbit'
+    progress: number; height: number; seatOffset: number; seatAngle: number; anchorAngle: number
+    goOffset: number | null
+    orbitSeconds: number
+  }
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null
   /** Set to a speed (0–1 between the level's min and max velocity) to put the coaster at it on its next frame. */
@@ -1012,6 +1023,8 @@ export function installE2EApi() {
       return out
     },
     setTimeScale: (s: number) => setTimeScaleOverride(s === 1 ? null : s),
+    introAt: null,
+    intro: { mode: 'ride', progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, goOffset: null, orbitSeconds: 0 },
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,

@@ -1,6 +1,9 @@
 import * as THREE from 'three'
 import type { BiomeTreeConfig, ColorRamp } from '../../shared/types'
 
+/** The Ice Fortress's foot. */
+export const FORTRESS_SITE = { x: 2200, z: -1200 } as const
+
 export const COLOR_RAMP: ColorRamp = {
   stops: [
     { height: 0.0, color: new THREE.Color(0x8ab4cc) },  // pale blue ice

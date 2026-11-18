@@ -25,6 +25,11 @@ import {
   LOOK_RESPONSE, createRigState, lateralAcceleration, lookAheadDirection, resetRig, sampleTrack,
   smoothingFactor, stepRig, type TrackSamples,
 } from './cameraRig.hot'
+import {
+  createSwoopClock, orbitPose, resetSwoopClock, stepSwoopClock, swoopPose, type HeroShot,
+} from './introCamera.hot'
+import { countdownGoAt, setCameraOffSeat } from '@/core/introShot'
+import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 
 interface CoasterCameraProps {
   curve: TrackCurve
@@ -39,6 +44,12 @@ interface CoasterCameraProps {
   far?: number
   heightOffset?: number
   enabled?: boolean
+  /** The level's landmark: the countdown swoops in from over it, the results orbit it (#328). */
+  hero: HeroShot
+  /** Terrain as drawn. */
+  groundFn: (x: number, z: number) => number
+  /** An interior's walls: the swoop and orbit stay inside them. */
+  bounds?: PlacementBounds
 }
 
 const BASE_FOV = 80
@@ -57,6 +68,9 @@ export default function CoasterCamera({
   far = 11000,
   heightOffset = 6,
   enabled = true,
+  hero,
+  groundFn,
+  bounds,
 }: CoasterCameraProps) {
   const { set } = useThree()
   const cameraRef = useRef<THREE.PerspectiveCamera>(null)
@@ -87,6 +101,24 @@ export default function CoasterCamera({
     if (tunnelIndex.current >= 0) eventBus.emit(TRACK_TUNNEL_EVENT, 'exit', tunnelIndex.current)
     tunnelIndex.current = -1
   }, [table])
+
+  const heroGround = useMemo(() => hero.ground ?? groundFn(hero.x, hero.z), [hero, groundFn])
+  const intro = useRef({
+    clock: createSwoopClock(),
+    anchor: new THREE.Vector3(),
+    pos: new THREE.Vector3(),
+    dir: new THREE.Vector3(),
+    /** Seconds into the results orbit; -1 before it starts. */
+    orbitSeconds: -1,
+    orbitYaw: 0,
+    /** The swoop's distance off the seat on the last countdown frame. */
+    lastOffset: 0,
+    wasSwooping: false,
+  })
+  useEffect(() => {
+    intro.current.anchor.set(hero.x, heroGround + hero.focus, hero.z)
+  }, [hero, heroGround])
+  useEffect(() => () => setCameraOffSeat(false), [])
 
   // Rotation-only trauma from kills and `camera:trauma` world events (#65); see screenShake.hot.ts.
   const shake = useRef({ trauma: 0, decayMs: KILL_TRAUMA_MS, time: 0, seed: 0 })
@@ -139,6 +171,35 @@ export default function CoasterCamera({
 
     // Slow-mo scales the ride, a pause holds it; the car waits at the start through the countdown and every new run.
     const store = useGameStore.getState()
+    const testApi = window.__SC_TEST__
+    const reducedMotion = prefersReducedMotion()
+    const io = intro.current
+
+    // Behind the results the camera leaves the seat and circles the landmark; reduced motion holds the last frame.
+    if (store.phase === 'results') {
+      setCameraOffSeat(!reducedMotion)
+      streaks.current.opacity = 0
+      sfx().wind(0)
+      if (reducedMotion) return
+      if (io.orbitSeconds < 0) {
+        io.orbitSeconds = 0
+        io.orbitYaw = Math.atan2(cam.position.z - hero.z, cam.position.x - hero.x)
+      } else io.orbitSeconds += delta
+      orbitPose(hero, heroGround, io.orbitSeconds, io.orbitYaw, groundFn, bounds, io.pos, _lookAt.current)
+      cam.position.copy(io.pos)
+      cam.lookAt(_lookAt.current)
+      if (Math.abs(cam.fov - effectiveFov.current) > 0.01) {
+        cam.fov = effectiveFov.current
+        cam.updateProjectionMatrix()
+      }
+      if (testApi) {
+        testApi.intro.mode = 'orbit'
+        testApi.intro.orbitSeconds = io.orbitSeconds
+      }
+      return
+    }
+    io.orbitSeconds = -1
+
     const countdown = store.phase === 'countdown'
     let jumped = countdown || !lookSnapped.current
     if (countdown || store.runId !== runId.current) {
@@ -149,7 +210,6 @@ export default function CoasterCamera({
     }
     const frameDelta = countdown || store.phase === 'paused' ? 0 : delta
 
-    const testApi = window.__SC_TEST__
     if (testApi?.rideTo != null) {
       ride.current.progress = testApi.rideTo
       testApi.rideTo = null
@@ -260,6 +320,37 @@ export default function CoasterCamera({
       testApi.tunnel.index = inTunnel
       testApi.tunnel.depth = tunnel
     }
+
+    // Through Ready / Set the camera swoops down from over the landmark into the seat, landing on this pose at GO (#328).
+    const swooping = countdown && !reducedMotion
+    if (swooping) {
+      const goAt = countdownGoAt()
+      const progress = testApi?.introAt ?? stepSwoopClock(io.clock, delta, store.sceneReady, goAt === null ? null : (goAt - performance.now()) / 1000)
+      const bank = swoopPose(_position.current, dir, io.anchor, trackScale, progress, bounds, io.pos, io.dir)
+      cam.position.copy(io.pos)
+      _lookAt.current.copy(io.pos).add(io.dir)
+      cam.lookAt(_lookAt.current)
+      cam.rotateZ(bank)
+      io.lastOffset = io.pos.distanceTo(_position.current)
+      if (testApi) {
+        const t = testApi.intro
+        t.mode = 'swoop'
+        t.progress = progress
+        t.height = io.pos.y - _position.current.y
+        t.seatOffset = io.lastOffset
+        t.seatAngle = io.dir.angleTo(dir) * RAD_TO_DEG
+        s.lookTarget.copy(io.anchor).sub(io.pos)
+        t.anchorAngle = io.dir.angleTo(s.lookTarget) * RAD_TO_DEG
+      }
+    } else {
+      resetSwoopClock(io.clock)
+      if (testApi) {
+        if (io.wasSwooping) testApi.intro.goOffset = io.lastOffset
+        testApi.intro.mode = 'ride'
+      }
+    }
+    io.wasSwooping = swooping
+    setCameraOffSeat(swooping && io.lastOffset > 0)
 
     sfx().wind(velocityNorm)
   })

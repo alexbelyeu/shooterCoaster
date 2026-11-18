@@ -6,6 +6,7 @@
  *     [--layers 0..3|ramp]  (the score's intensity layers, 0–3 held, or `ramp` up through them and down again)
  *   npm run audio:render -- --sfx-sheet [--level level1]
  *   npm run audio:render -- --mix level1 [--seconds 20] [--boss]
+ *   npm run audio:render -- --launch level2   (level select's launch blip as that level's bank and room land under it: the click check at the swap)
  *   npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original] [--voicing jukebox|game] [--seconds 20]
  *   npm run audio:render -- --score <file.scrim> --chain game [--seconds 20] [--seam]
  *
@@ -66,6 +67,11 @@ if (flag('music')) {
   request = { kind: 'mix', level: flag('mix'), seconds: num('seconds') ?? (boss ? 30 : undefined), boss }
   kind = 'mix'
   defaultName = `mix-${flag('mix')}${boss ? '-boss' : ''}`
+} else if (flag('launch')) {
+  // Level select's launch blip with the level's bank and room landing under it (#246): no click where the graph swaps.
+  request = { kind: 'launch', level: flag('launch') }
+  kind = 'sfx'
+  defaultName = `launch-${flag('launch')}`
 } else if (flag('score')) {
   const { text, label } = readScore(flag('score'))
   original = engine === 'original'
@@ -76,7 +82,7 @@ if (flag('music')) {
   kind = 'music'
   defaultName = `score-${chain === 'game' ? 'game' : original ? 'original' : 'port'}-${label}${seam ? '-seam' : ''}`
 } else {
-  console.error('usage: npm run audio:render -- --music <title|level1..level5|results|<slot>.<theme>> [--seam] | --sfx-sheet [--level <id>] | --mix <level> | --score <file|vendored:N> [--engine port|original] [--name n] [--out dir] [--seed n]')
+  console.error('usage: npm run audio:render -- --music <title|level1..level5|results|<slot>.<theme>> [--seam] | --sfx-sheet [--level <id>] | --mix <level> | --launch <level> | --score <file|vendored:N> [--engine port|original] [--name n] [--out dir] [--seed n]')
   process.exit(2)
 }
 const NAME = flag('name') ?? defaultName
@@ -179,7 +185,7 @@ if (musicStem) {
   writeFloatWav(musicFile, new Float32Array(stem.buffer, stem.byteOffset, stem.byteLength / 4), musicStem.sampleRate)
 }
 // A mix's seams (the boss section switches) are judged on its music alone: a kill on the bar line is not a seam jump.
-const metrics = measure(wav, { seams: result.seams, bar: result.bar, sounds: kind === 'sfx' ? result.events : [], kills: killTimes(result.events), musicFile, seamFile: musicFile })
+const metrics = measure(wav, { seams: result.seams, clicks: result.clicks ?? [], bar: result.bar, sounds: kind === 'sfx' ? result.events : [], kills: killTimes(result.events), musicFile, seamFile: musicFile })
 toMp3(wav, path.join(OUT, `${NAME}.mp3`))
 spectrogram(wav, path.join(OUT, `${NAME}.png`))
 
@@ -192,6 +198,7 @@ const report = {
   measuredFrom: 'the float WAV render (the MP3 is for listening)',
   events: result.events,
   seams: result.seams,
+  ...(result.clicks ? { clicks: result.clicks } : {}),
   bar: result.bar,
   metrics,
   targets: compareTargets(metrics, kind).map(({ label, value, unit, status, min, max }) =>

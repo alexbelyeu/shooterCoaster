@@ -2880,6 +2880,22 @@ async function countdownCheck(page, levelId) {
     stepText = await page.locator('.countdown-step').first().textContent().catch(() => null)
     await page.screenshot({ path: path.join(OUT, 'countdown.png'), timeout: SHOT_TIMEOUT })
   }
+  // The intro swoop (#328), pinned once the level shows: early on, high over the seat with the landmark in view
+  // (`<level>-swoop.png`); at its end, exactly on the ride's start pose, the pose GO hands over.
+  let swoop = null
+  if (during) {
+    await page.waitForFunction(() => window.__SC_TEST__.shaderWarmup?.done, null, { timeout: 60000, polling: 250 }).catch(() => {})
+    const pinned = async (at) => {
+      await page.evaluate((p) => { window.__SC_TEST__.introAt = p }, at)
+      await waitFrames(page, 2, { maxMs: 30000 })
+      return page.evaluate(() => ({ ...window.__SC_TEST__.intro, phase: window.__SC_TEST__.phase() }))
+    }
+    const high = await pinned(0.15)
+    await page.screenshot({ path: path.join(OUT, `${levelId}-swoop.png`), timeout: SHOT_TIMEOUT })
+    const seat = await pinned(1)
+    await page.evaluate(() => { window.__SC_TEST__.introAt = null })
+    swoop = { high, seat }
+  }
   // Read before letting the countdown run on: by now the level is mounted and its timer reset, held at full.
   const held = await page.evaluate(() => {
     const api = window.__SC_TEST__
@@ -2888,6 +2904,7 @@ async function countdownCheck(page, levelId) {
   })
   const goStats = await waitPlaying()
   const atGo = goStats ?? (await getStats(page))
+  if (swoop) swoop.goOffset = await page.evaluate(() => window.__SC_TEST__.intro.goOffset)
   // Still holding in play: the trigger is down, but a press from the countdown never auto-fires.
   await waitFrames(page, 3, { minMs: 2000, maxMs: 30000 })
   const heldInPlay = await page.evaluate((at) => {
@@ -2964,6 +2981,16 @@ async function countdownCheck(page, levelId) {
   if (!during) problems.push('countdown over before the press check')
   else if (during.shotsFired > 0) problems.push(`a press during the countdown fired ${during.shotsFired} shot(s)`)
   if (!goStats) problems.push(`phase never reached playing (still "${atGo.phase}")`)
+  if (swoop?.high.phase === 'countdown') {
+    const { high, seat } = swoop
+    if (high.mode !== 'swoop') problems.push(`no intro swoop during the countdown (camera "${high.mode}")`)
+    else {
+      if (high.height < 60) problems.push(`the swoop starts only ${high.height.toFixed(1)} units over the seat`)
+      if (high.anchorAngle > 20) problems.push(`the swoop's start looks ${high.anchorAngle.toFixed(1)}° off the landmark`)
+      if (seat.seatOffset > 1e-3 || seat.seatAngle > 1e-3)
+        problems.push(`the swoop ends ${seat.seatOffset.toFixed(3)} units / ${seat.seatAngle.toFixed(3)}° off the ride's start pose`)
+    }
+  }
   if (held.phase === 'countdown' && atGo.timeRemaining < held.timeRemaining - 3)
     problems.push(`timer ran during the countdown (${held.timeRemaining.toFixed(1)} -> ${atGo.timeRemaining.toFixed(1)} at GO)`)
   if (!heldInPlay.held) problems.push('the countdown press was no longer held after GO')
@@ -2990,6 +3017,7 @@ async function countdownCheck(page, levelId) {
       timerAtGo: atGo.timeRemaining,
       shotsHeldIntoPlay: heldInPlay.stats.shotsFired,
       skipTapIn: tappedIn,
+      swoop,
       leftDuringWarmup,
       warmup,
       firstShot,
@@ -3075,7 +3103,9 @@ const AUDIO_CHECK = { level: 'level1', maxNodes: 150, burst: [64, 32] }
  * The score engine (#214, the only engine since #416): a real click unlocks audio and starts the title score; level1 must crossfade from it, keep its
  * long-lived node count flat (≤ maxNodes) while it plays, duck with game time frozen, follow the combo tier with its
  * intensity layers (#321: up to 2 at 3×, 3 at 5×, held through a pause, back down to 0 a layer at a time), hold its
- * song position while paused and pick it up again, then crossfade to the results score; nothing dropped, no page errors.
+ * song position while paused and pick it up again, sound its Resume Ready / GO through the pause (#246), then crossfade to
+ * the results score, and from there to the title's on level select without opening a level score (#236); nothing
+ * dropped, no page errors.
  * The arcade SFX (#217): `audioBurst(64, 32)` must stay inside the voice budget (stealing, not growing), keep the SFX
  * node count flat across it, and throw or drop nothing.
  */
@@ -3094,7 +3124,10 @@ async function audioCheck(page) {
   }
   const busNames = (a) => a.music.buses.map((b) => b.name)
   const track = (a) => a.scrim?.tracks.at(-1) ?? null
-  const result = { title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, ducked: null, layers: null, results: false, dropped: 0 }
+  const result = {
+    title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, resumeCountdown: 0, ducked: null, layers: null, results: false,
+    levelsStray: 0, dropped: 0,
+  }
 
   const vp = page.viewportSize()
   await page.mouse.click(8, vp.height - 8) // any pointer press on the title unlocks audio
@@ -3165,8 +3198,17 @@ async function audioCheck(page) {
   const heldAt = track(a)?.position ?? 0
   await page.waitForTimeout(2000)
   const stillAt = track(await audio())?.position ?? 0
-  await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
+  // Resume's Ready / GO plays while the run is still paused, on the UI voices past the pause gate (#246).
+  const uiBefore = (await audio()).sfxVoices?.ui ?? 0
+  const resumeClicked = await page
+    .getByRole('button', { name: 'Resume' })
+    .click({ timeout: 30000 })
+    .then(() => true, () => false)
+  if (!resumeClicked) problems.push('Resume button not clickable')
   const resumed = track(await until((x) => track(x) && !track(x).paused))
+  const uiAfter = (await until((x) => (x.sfxVoices?.ui ?? 0) >= uiBefore + 2, 5000)).sfxVoices?.ui ?? 0
+  result.resumeCountdown = uiAfter - uiBefore
+  if (result.resumeCountdown < 2) problems.push(`the resume Ready / GO played ${result.resumeCountdown} countdown sound(s) (want 2)`)
   result.pausedHeld = { at: heldAt, after2s: stillAt, resumedAt: resumed?.position ?? null }
   if (!track(a)?.paused) problems.push('pausing the run did not hold the score')
   else if (stillAt !== heldAt) problems.push(`the score moved while paused (${heldAt.toFixed(2)} -> ${stillAt.toFixed(2)} s)`)
@@ -3195,6 +3237,17 @@ async function audioCheck(page) {
   if (!levelOut || levelOut.seconds < 0.5 || !resultsIn) problems.push('the level score did not crossfade to the results score')
   if (busNames(a).includes('level')) problems.push('the level score bus was never disposed')
   problems.push(...crossfadeGaps(a.music.fades, 'level', 'results'))
+
+  // Results -> Levels fades the results score under the title's and opens no level score on the way (#236).
+  await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
+  a = await until((x) => x.scrim?.current === 'title' && !busNames(x).includes('results'))
+  await page.waitForTimeout(1500)
+  a = await audio()
+  const stray = a.music.fades.filter((f) => f.name === 'level' && f.ramp === 'in' && f.at > (resultsIn?.at ?? Infinity))
+  result.levelsStray = stray.length
+  if (stray.length || busNames(a).includes('level')) problems.push('leaving the results for level select opened a level score')
+  if (a.scrim?.current !== 'title') problems.push(`level select did not bring the title score back (current "${a.scrim?.current}")`)
+
   result.dropped = a.dropped
   if (a.dropped) problems.push(`${a.dropped} sound(s) dropped by an audio error (${a.lastDrop?.split('\n')[0]})`)
   return { problems, result }
@@ -3862,6 +3915,7 @@ async function run() {
       : r.countdown
         ? ` ${r.countdown.level} "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
           ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +
+          (r.countdown.swoop ? ` swoop ${r.countdown.swoop.high.height.toFixed(0)} over the seat, ${r.countdown.swoop.high.anchorAngle.toFixed(1)}° off the landmark, GO ${r.countdown.swoop.goOffset?.toFixed(2)} off the seat,` : '') +
           ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'},` +
           ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})` +
           ` | startup ${startupSummary(r.initTimings)}`

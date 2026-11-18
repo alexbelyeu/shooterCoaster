@@ -16,8 +16,12 @@ import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
 import { BYSTANDER_HIT_EVENT, type BystanderHitEvent } from '@/combat/bystanders'
 
-/** The level's score while it runs (held while paused, through the resume Ready / GO), the results score after it. */
+/**
+ * The level's score while it runs (held while paused, through the resume Ready / GO), the results score after it.
+ * Leaving for the title or level select: the unmount fades the score, none is built to be faded (#236).
+ */
 function followPhase(phase: GamePhase, level: string) {
+  if (!isInRun(phase) && phase !== 'results') return
   withScrim((p) => {
     if (phase === 'results') p.playScore('results')
     else if (phase === 'paused') p.pauseScore(true)
@@ -81,7 +85,8 @@ export default function LevelAudio() {
       if (!isAudioReady()) return
       // A restart mid-boss takes the score back to its loop (from the pause menu: in place, before it resumes).
       if (s.runId !== prev.runId) withScrim((p) => p.playSection(level, 'main'))
-      if (s.phase !== prev.phase) followPhase(s.phase, level)
+      // Results → the next level: that level's own effect opens its score once its scene mounts (#236).
+      if (s.phase !== prev.phase && s.currentLevel === currentLevel) followPhase(s.phase, level)
     })
     // The score's boss section from the boss's arrival, its victory sting on the defeat (then the loop again).
     const playSection = (section: 'boss' | 'sting') => {

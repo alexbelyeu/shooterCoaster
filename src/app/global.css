@@ -1303,7 +1303,8 @@ canvas {
   align-items: center;
   justify-content: safe center;
   z-index: 100;
-  background: radial-gradient(ellipse at 50% 30%, rgba(20, 20, 30, 0.8), rgba(0, 0, 0, 0.92));
+  /* Dark under the stats, lighter at the edges: the camera orbits the level's landmark behind them (#328). */
+  background: radial-gradient(ellipse at 50% 45%, rgba(12, 12, 22, 0.82) 30%, rgba(0, 0, 0, 0.5));
   overflow-y: auto;
   touch-action: pan-y;
 }

@@ -1,6 +1,6 @@
 import type { BiomeDefinition } from '../../shared/types'
 import { PARTICLE_PRESETS } from '../../shared/particlePresets'
-import { COLOR_RAMP, TREES } from './config'
+import { COLOR_RAMP, LANDMARK_SITE, SPIRE_HEIGHT, TREES } from './config'
 import Decorations from './Decorations'
 import Features from './Features'
 
@@ -11,4 +11,5 @@ export const __BIOME__: BiomeDefinition = {
   Decorations,
   Features,
   particles: PARTICLE_PRESETS.parkPollen,
+  hero: { x: LANDMARK_SITE.x, z: LANDMARK_SITE.z, focus: SPIRE_HEIGHT * 0.5, orbitRadius: 500, orbitHeight: 260 },
 }

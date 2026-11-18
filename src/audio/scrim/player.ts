@@ -8,7 +8,7 @@
 import { audioContext, audioNow as now, isAudioReady } from '../AudioEngine'
 import { fadeOutMusicBus, openMusicBus, type MusicBus } from '../musicBus'
 import { SCORES, scoreIdFor } from '../scores'
-import { compile, type CompiledSong } from './score'
+import { barSection, compile, type CompiledSong } from './score'
 import { MAX_INTENSITY, layerState, nextLayerStep, recordLayerStep, resumeLayers, type LayerGrid, type LayerState } from './layers'
 import { LOOK_AHEAD_S, ScoreScheduler } from './scheduler'
 import { barLineAtOrAfter, sectionSong, type ScoreSection } from './sections'
@@ -96,7 +96,7 @@ function releaseTimer() {
 }
 
 function layerGrid(song: CompiledSong): LayerGrid | null {
-  const section = song.loop.sections[0] ?? song.intro.sections[0]
+  const section = barSection(song)
   if (!section || !song.voices.some((v) => v.layer)) return null
   return { introS: song.intro.dur, beatS: section.barDur / section.beats, barS: section.barDur }
 }
@@ -271,7 +271,7 @@ const grid: MusicGrid = { origin: 0, beatS: 0, beats: 4 }
 export function musicGrid(): MusicGrid | null {
   const track = current
   if (!track || track.pausedAt !== null || track.bus.fading) return null
-  const section = track.scheduler.song.loop.sections[0] ?? track.scheduler.song.intro.sections[0]
+  const section = barSection(track.scheduler.song)
   if (!section) return null
   const t = now()
   grid.origin = t - track.scheduler.position(t)

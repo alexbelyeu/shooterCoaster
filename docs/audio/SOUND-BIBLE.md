@@ -88,6 +88,7 @@ These are measured on offline renders, at default settings, with nothing else pl
 | Low end | nothing below 30 Hz; kick and bass don't mask each other (check the spectrogram) |
 | Stereo | lead and kick centred; pads, hats and percussion spread; mono-compatible |
 | Loop seams | no click, gap or level jump at the loop point (render across it and check) |
+| Cuts (a stolen voice, a graph swapped for a new level's room) | no click: the level drops at most 15 dB in any 1 ms (`clickMax`; `audio:render -- --launch <level>` checks the launch blip under the bank swap) |
 
 ## Rules for SFX
 

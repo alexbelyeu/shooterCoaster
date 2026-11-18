@@ -5,7 +5,7 @@
  * loops, and `start(at, from)` can begin mid-song so a paused track resumes where it stopped.
  */
 
-import type { CompiledSong, ScoreEvent, Timeline } from './score'
+import { barSection, type CompiledSong, type ScoreEvent, type Timeline } from './score'
 
 export const LOOK_AHEAD_S = 0.3
 /** Timers are throttled to ~1 s in a hidden tab. */
@@ -31,7 +31,7 @@ export function loopSeams(song: CompiledSong, until: number): { seams: number[];
   const { intro, loop } = song
   const seams: number[] = []
   if (loop.dur > 0) for (let t = intro.dur + loop.dur; t < until; t += loop.dur) seams.push(t)
-  return { seams, introS: intro.dur, barS: (loop.sections[0] ?? intro.sections[0])?.barDur ?? null }
+  return { seams, introS: intro.dur, barS: barSection(song)?.barDur ?? null }
 }
 
 export class ScoreScheduler {
