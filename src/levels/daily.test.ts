@@ -9,6 +9,7 @@ import {
   dailyLevel,
   dailySeed,
   extendStreak,
+  msUntilNextUtcDay,
   pruneDaily,
 } from './daily'
 
@@ -45,6 +46,13 @@ describe('daily run', () => {
   })
 })
 
+describe('msUntilNextUtcDay', () => {
+  it('counts down to the next UTC midnight', () => {
+    expect(msUntilNextUtcDay(Date.parse('2026-11-18T23:59:59Z'))).toBe(1000)
+    expect(msUntilNextUtcDay(Date.parse('2026-11-18T00:00:00Z'))).toBe(86_400_000)
+  })
+})
+
 describe('daily streak', () => {
   it('extends on the next day, holds on the same day and restarts after a gap', () => {
     let s = extendStreak({ count: 0, lastKey: null }, '2026-10-30')
@@ -54,6 +62,12 @@ describe('daily streak', () => {
     s = extendStreak(s, '2026-11-01')
     expect(s).toEqual({ count: 3, lastKey: '2026-11-01' })
     expect(extendStreak(s, '2026-11-03')).toEqual({ count: 1, lastKey: '2026-11-03' })
+  })
+
+  it('never moves the streak back to an earlier day', () => {
+    const s = { count: 4, lastKey: '2026-11-02' }
+    expect(extendStreak(s, '2026-11-01')).toBe(s)
+    expect(extendStreak(s, '2026-10-20')).toBe(s)
   })
 
   it('reads as alive until a full day is missed', () => {

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { changedOnly } from './changedOnlyStorage'
-import type { GamePhase, ScoreEntry, ComboState, BossHud } from '@/types/game'
+import type { GamePhase, ScoreEntry, ComboState, BossHud, RunMode } from '@/types/game'
 import {
   DEFAULT_INITIALS,
   insertEntry,
@@ -24,9 +24,6 @@ import { getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
 import { scoreAfterPenalty } from '@/levels/scoring'
 // The generated table, not `scoreLimits()`, which would pull the boss specs into the startup JS.
 import { LEVEL_LIMITS } from '../../api/_lib/levelLimits'
-
-/** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
-export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }
 
 const CAMPAIGN: RunMode = { mode: 'campaign' }
 
@@ -108,6 +105,8 @@ interface GameState {
   dailyStreak: DailyStreak
   /** Keeps the higher score of the day and extends the streak. */
   saveDailyScore: (entry: ScoreEntry, dateKey: string) => void
+  /** Saves a finished run where its mode keeps bests: the day's daily best, or the level's campaign best. */
+  saveRunResult: (entry: ScoreEntry) => void
 
   timeScale: number
   frenzy: FrenzyStage
@@ -143,6 +142,12 @@ const urlSearch = (): string | null =>
 function urlSeed(): number | null {
   const search = urlSearch()
   return search === null ? null : seedFromQuery(search)
+}
+
+/** The current run's best so far in its own mode: today's daily best, or the level's campaign best. */
+export function runBest(s: Pick<GameState, 'runMode' | 'currentLevel' | 'savedDaily' | 'savedScores'>): ScoreEntry | undefined {
+  if (s.runMode.mode === 'daily') return s.savedDaily[s.runMode.dateKey]
+  return s.currentLevel ? s.savedScores[s.currentLevel] : undefined
 }
 
 export const useGameStore = create<GameState>()(
@@ -274,6 +279,11 @@ export const useGameStore = create<GameState>()(
             dailyStreak: extendStreak(s.dailyStreak, dateKey),
           }
         }),
+      saveRunResult: (entry) => {
+        const { runMode, saveDailyScore, saveScore } = get()
+        if (runMode.mode === 'daily') saveDailyScore(entry, runMode.dateKey)
+        else saveScore(entry)
+      },
 
       isLevelUnlocked: (levelId) => {
         if (!getLevelConfig(levelId)) return false

@@ -1,6 +1,9 @@
 /** `countdown`: the level is mounted and warming up behind Ready / Set / GO; the clock, spawns and input wait for `playing`. */
 export type GamePhase = 'title' | 'levelSelect' | 'countdown' | 'playing' | 'paused' | 'results'
 
+/** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
+export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }
+
 export interface ScoreEntry {
   level: string
   score: number

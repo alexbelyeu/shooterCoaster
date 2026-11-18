@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useGameStore } from './useGameStore'
+import { runBest, useGameStore } from './useGameStore'
 import { advanceGameTime, resetGameTime } from '@/core/gameClock'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import type { ScoreEntry } from '@/types/game'
@@ -234,6 +234,21 @@ describe('daily runs', () => {
     expect(store().dailyStreak).toEqual({ count: 2, lastKey: '2026-10-31' })
     expect(store().savedScores).toEqual({})
     expect(store().isLevelUnlocked('level3')).toBe(false)
+  })
+
+  it('saveRunResult keeps a daily run apart from the campaign, and runBest reads the run mode\'s best', () => {
+    store().startRun('level2', undefined, daily)
+    store().saveRunResult(entry('level2', 500, 2))
+    expect(store().savedDaily['2026-10-31'].score).toBe(500)
+    expect(store().savedScores).toEqual({})
+    expect(runBest(store())?.score).toBe(500)
+
+    store().startRun('level2', 1)
+    expect(runBest(store())).toBeUndefined()
+    store().saveRunResult(entry('level2', 300, 1))
+    expect(store().savedScores.level2.score).toBe(300)
+    expect(store().savedDaily['2026-10-31'].score).toBe(500)
+    expect(runBest(store())?.score).toBe(300)
   })
 
   it('drops daily bests older than 30 days', () => {

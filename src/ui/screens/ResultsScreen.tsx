@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { animate, motion } from 'framer-motion'
-import { useGameStore } from '@/store/useGameStore'
+import { runBest, useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars, nextStar } from '@/levels/scoring'
 import { sfx } from '@/audio/sfx'
@@ -28,11 +28,9 @@ const NO_BOARD: LeaderboardEntry[] = []
 /** The finished run, read once on mount so a Replay / Next during the exit fade doesn't repaint it. */
 function snapshotRun() {
   const s = useGameStore.getState()
-  const mode = s.runMode
-  const previous = mode.mode === 'daily' ? s.savedDaily[mode.dateKey] : s.currentLevel ? s.savedScores[s.currentLevel] : undefined
   return {
     levelId: s.currentLevel,
-    mode,
+    mode: s.runMode,
     score: Math.round(s.score),
     kills: s.kills,
     totalEnemies: s.totalEnemies,
@@ -41,7 +39,7 @@ function snapshotRun() {
     bystandersHit: s.bystandersHit.length,
     bestCombo: s.bestCombo,
     timeRemaining: s.timeRemaining,
-    previousBest: previous?.score ?? 0,
+    previousBest: runBest(s)?.score ?? 0,
     seed: s.runSeed,
     date: Date.now(),
   }
@@ -117,14 +115,12 @@ export default function ResultsScreen() {
       timestamp: run.date,
       bestCombo: run.bestCombo,
     }
-    if (run.mode.mode === 'daily') {
-      store.saveDailyScore(entry, run.mode.dateKey)
-      return
-    }
+    store.saveRunResult(entry)
+    // A daily run shows no board.
+    if (run.mode.mode === 'daily') return
     const placed = store.addLeaderboardEntry(config.id, { score: run.score, stars, date: run.date })
     setRank(placed)
     if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
-    store.saveScore(entry)
 
     if (!online) return
     const show = (top: OnlineEntry[], rank: number | null) => {

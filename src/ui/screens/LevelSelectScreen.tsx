@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
+import { dailyKey, dailyLevel, msUntilNextUtcDay } from '@/levels/daily'
 import { biomeTheme } from '@/ui/theme'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
 import { prepareSfx, sfx } from '@/audio/sfx'
@@ -38,6 +39,17 @@ const DENIED_SHAKE: Keyframe[] = [
   { transform: 'translateX(0)' },
 ]
 
+/** Today's UTC day key, turning over at midnight UTC while the screen stays open. */
+function useUtcDayKey(): string {
+  const [key, setKey] = useState(() => dailyKey(new Date()))
+  useEffect(() => {
+    // A little past midnight, so the new key is already today's when it fires.
+    const id = window.setTimeout(() => setKey(dailyKey(new Date())), msUntilNextUtcDay(Date.now()) + 50)
+    return () => window.clearTimeout(id)
+  }, [key])
+  return key
+}
+
 export default function LevelSelectScreen() {
   const startRun = useGameStore((s) => s.startRun)
   const setPhase = useGameStore((s) => s.setPhase)
@@ -51,9 +63,10 @@ export default function LevelSelectScreen() {
     () => buildLevelCards(getAllLevels(), savedScores, isLevelUnlocked, leaderboards),
     [savedScores, isLevelUnlocked, leaderboards],
   )
+  const today = useUtcDayKey()
   const daily = useMemo(
-    () => buildDailyCard(new Date(), getAllLevels(), savedDaily, dailyStreak),
-    [savedDaily, dailyStreak],
+    () => buildDailyCard(new Date(today), getAllLevels(), savedDaily, dailyStreak),
+    [today, savedDaily, dailyStreak],
   )
   const dailyIndex = cards.length
   const total = totalStars(cards)
@@ -93,7 +106,9 @@ export default function LevelSelectScreen() {
   function select(i: number) {
     if (launching) return
     if (i === dailyIndex) {
-      launch('daily', () => startRun(daily.levelId, undefined, { mode: 'daily', dateKey: daily.dateKey }))
+      // Today's key at the tap, not the card's: the screen may have been open since before midnight UTC.
+      const dateKey = dailyKey(new Date())
+      launch('daily', () => startRun(dailyLevel(dateKey), undefined, { mode: 'daily', dateKey }))
       return
     }
     const card = cards[i]

@@ -1,6 +1,6 @@
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars } from '@/levels/scoring'
-import type { RunMode } from '@/store/useGameStore'
+import type { RunMode } from '@/types/game'
 import type { BiomeType } from '@/types/level'
 import { biomeTheme, type SkyStop } from '@/ui/theme'
 import { formatAccuracy } from '@/ui/screens/resultsStats'
