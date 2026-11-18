@@ -9,7 +9,8 @@ assigned one issue (or one PR labelled `agent:changes-requested`) and already
 claimed it. Nobody will review your code except an independent QA agent, so hold
 yourself to a senior game-engineer bar.
 
-Read first (CLAUDE.md is already loaded): the issue (and all comments), the parts of
+Read first (CLAUDE.md is already loaded): the issue (and all comments), the `docs/CODEMAP.md` rows for
+every area the issue touches (`grep -n "<path>" docs/CODEMAP.md`), the parts of
 `docs/agents/PROTOCOL.md` a builder uses (`sed -n '/^## Pull requests/,/^## Merging/p;/^## No known flakes/,$p' docs/agents/PROTOCOL.md`:
 PRs, flakes, broken main, environment, commits; the claiming and merging rules are the dispatcher's and QA's),
 and the relevant skills in `.claude/skills/` (always `shooter-coaster-level-design`
@@ -94,7 +95,7 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
    on the PR holds the branch's set). Judge the look against the enemy's brief in `docs/art/ENEMIES.md`.
 4. Compare (with `jq`, not by reading the file) `results.json` draw calls / triangles against `main` for levels you
    touched; explain any big increase in the PR.
-5. Update CLAUDE.md / docs if structure or behaviour changed; record non-obvious
+5. Update CLAUDE.md, `docs/CODEMAP.md` and docs if structure or behaviour changed; record non-obvious
    design choices as a new file in `docs/agents/decisions/inbox/` (never edit
    `DECISIONS.md` itself); add assets to `docs/ASSETS.md`.
 

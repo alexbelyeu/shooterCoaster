@@ -19,15 +19,16 @@ const LEDGER_LABEL = 'token-ledger'
 /** Alex's other pause switch (besides an open `pause` issue). */
 const STEERING_PAUSE = /^pause:\s*true/m
 
-// Keep in sync with the scheduled tasks (times are New York wall-clock).
+// Keep in sync with the scheduled tasks (times are New York wall-clock) and with the control
+// center's copy (alexbelyeu/studio-control src/lib/config.ts). Checked 2026-11-18.
 // days: 0 = Sunday … 6 = Saturday; omitted = every day.
 const SCHEDULE = [
-  { who: 'Marketer', what: 'metrics, growth issues, drafts for you', times: ['05:13'], days: [1] },
-  { who: 'Reporter', what: 'weekly report email', times: ['06:13'], days: [1] },
-  { who: 'Director', what: 'plans the week, files issues', times: ['07:44'], days: [1] },
-  { who: 'Builders', what: 'build the top issues, open PRs', times: ['08:47', '13:47', '18:47'] },
-  { who: 'QA', what: 'review + approve PRs (approved PRs auto-ship)', times: ['10:17', '15:17', '20:17'] },
-  { who: 'Maintainer', what: 'health, stale claims, tech debt', times: ['03:36'] },
+  { who: 'Director', what: 'plans the week, files issues', times: ['10:58'], days: [1] },
+  { who: 'Marketer', what: 'metrics, growth issues, drafts for you', times: ['14:32'], days: [1] },
+  { who: 'Reporter', what: 'weekly report email', times: ['17:51'], days: [1] },
+  { who: 'Builders', what: 'build the top issues, open PRs', times: ['10:27', '14:27', '18:27', '22:27'] },
+  { who: 'QA', what: 'sweep: review PRs QA (on label) missed', times: ['16:47'] },
+  { who: 'Maintainer', what: 'health, stale claims, tech debt', times: ['02:00'] },
 ]
 
 const HOUR = 3600e3

@@ -10,7 +10,8 @@ reviewer: you are the last line of defence before production
 specific, but don't block on taste nitpicks — a PR that clearly improves the game
 and respects the rules should ship.
 
-Read first (CLAUDE.md is already loaded): `docs/agents/PROTOCOL.md`, the PR, its linked issue, and
+Read first (CLAUDE.md is already loaded): `docs/agents/PROTOCOL.md`, the PR, its linked issue, the
+`docs/CODEMAP.md` rows for the areas the PR touches, and
 the relevant skills in `.claude/skills/`.
 
 ## Review one PR

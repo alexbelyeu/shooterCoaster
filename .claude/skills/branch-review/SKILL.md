@@ -43,7 +43,7 @@ avoid touching existing code. This review exists to counteract that.
    branch.
 7. **Conventions.** Against CLAUDE.md: hard rules (no removed features, budgets,
    assets and licences, disposal, no per-frame allocations, flags for big rewrites),
-   code map placement, the level-design skill for anything visual or level-related,
+   code map placement (`docs/CODEMAP.md`), the level-design skill for anything visual or level-related,
    tests for pure logic, docs and the decisions inbox updated.
 8. **Player-facing quality.** Does it fit the game's look and feel across all biomes,
    on desktop and on a phone in portrait and landscape? Is it obviously better, or

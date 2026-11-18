@@ -20,7 +20,7 @@ Token budget; one file per command, never several in one `cat`):
   and how to render it.
 - `docs/audio/SCORE-FORMAT.md` once it exists (our extended score format). Until then,
   read `docs/audio/reference/scrimshaw-llm-prompt.md`.
-- The `src/audio/` files the issue touches, plus the CLAUDE.md `src/audio/` code-map row.
+- The `src/audio/` files the issue touches, plus the `src/audio/` row of `docs/CODEMAP.md`.
 
 ## You can't hear, so measure
 

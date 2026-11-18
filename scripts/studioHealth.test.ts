@@ -214,7 +214,7 @@ describe('findings', () => {
     expect(again[0].lastSeen).toBe(NOW - 2 * H)
   })
 
-  describe('stalled: Builders / QA slots (EST: 08:47, 10:17, …) missed 2 h past their time', () => {
+  describe('stalled: Builders / QA slots (EST: Builders 10:27, 14:27, 18:27, 22:27; QA 16:47) missed 2 h past their time', () => {
     const lastNight = Date.parse('2026-11-04T01:40:00Z')
     const ready = [{ number: 1, title: 't', labels: ['agent:ready'], created_at: iso(H) }]
     const inQa = [{ number: 2, title: 'p', labels: ['agent:needs-qa'], created_at: iso(H), updated_at: iso(H) }]
@@ -226,20 +226,21 @@ describe('findings', () => {
       expect(keys(at('2026-11-04T16:00:00Z'))).toEqual([])
     })
 
-    it('at 14:00, Builders 08:47 and QA 10:17 missed with work queued: Alex\'s', () => {
+    it('at 14:00, Builders 22:27 and 10:27 missed with work queued: Alex\'s', () => {
       const f = findings(at('2026-11-04T19:00:00Z'))
       expect(f.map((x: { key: string; owner: string }) => [x.key, x.owner])).toEqual([['stalled', 'alex']])
       expect(f[0].state).toBe(true)
     })
 
     it('slots with nothing queued for that role, a pause, or an empty queue are not a stall', () => {
-      expect(keys(at('2026-11-04T19:00:00Z', { openPrs: [] }))).toEqual([])
+      // only QA work queued, and QA's 16:47 slot hasn't passed yet
+      expect(keys(at('2026-11-04T19:00:00Z', { openIssues: [] }))).toEqual([])
       expect(keys(at('2026-11-04T19:00:00Z', { paused: true }))).toEqual([])
       expect(keys(at('2026-11-04T19:00:00Z', { openIssues: [], openPrs: [] }))).toEqual([])
     })
 
     it('slots before the work was queued, or before the last pause ended, don\'t count', () => {
-      // Ready at 12:00 and in QA at 12:30 EST: by 19:00 only the 13:47 Builders and 15:17 QA slots are 2 h old.
+      // Ready at 12:00 and in QA at 12:30 EST: by 14:00 no later slot is 2 h old; by 19:00 the 14:27 Builders slot is.
       const late = { openIssues: [{ ...ready[0], labelledAt: { 'agent:ready': '2026-11-04T17:00:00Z' } }], openPrs: [{ ...inQa[0], labelledAt: { 'agent:needs-qa': '2026-11-04T17:30:00Z' } }] }
       expect(keys(at('2026-11-04T19:00:00Z', late))).toEqual([])
       expect(keys(at('2026-11-05T00:00:00Z', late))).toEqual(['stalled'])
