@@ -65,7 +65,7 @@ loop A A2 B B2 A A2 A+3 A2+3
 
 # Boss section (#566): the Medusa of the Starr. The riff turns E Phrygian (F natural, a B-flat tritone), the brass stabs
 # go E minor to F major, orchestra hits land in base and the guiro hisses like her snakes; in Y the brass takes a line of
-# its own over it. The sting is an E major chord and the loop comes back.
+# its own over it. The sting is E major, driving on into the loop's top.
 pattern X
 bass  | E2- E3 . F3 E3 . G2- F2 E2- F3 E3- . | F2- F3 . E3 F3 . A2- G2 F2- E3 F3- . | E2- E3 . F3 E3 . G2- A2 Bb2- A2 G2- F2 | B1- B2 . C3 B2 . D#2- C2 B1 A1 G1 F#1 .- |
 chip  | E2- E3 . F3 E3 . G2- F2 E2- F3 E3- . | F2- F3 . E3 F3 . A2- G2 F2- E3 F3- . | E2- E3 . F3 E3 . G2- A2 Bb2- A2 G2- F2 | B1- B2 . C3 B2 . D#2- C2 B1 A1 G1 F#1 .- |
@@ -86,12 +86,13 @@ rise  | _ | _ | _ | E5--------------- |
 crash | _ | _ | _ | _ |
 
 pattern S
-brass | B4--- E5--- G#5--- B5--- | E5--------------- |
-bass  | E2--- E2--- E2--- E2--- | E2--------------- |
-chip  | E2--- E2--- E2--- E2--- | E2--------------- |
-stab  | [E]!--- .--- [E]!--- [A]!--- | [E]!--------------- |
-kick  | x... x... x... x... | x............... |
-snare | .... .... xxxx XXXX | x............... |
+brass | B4--- E5--- G#5--- B5--- | E5------- [E]!- .- [E]!--- |
+bass  | E2--- E2--- E2--- E2--- | E2- E3- E2- E3- E2- E3- E2- E3- |
+chip  | E2--- E2--- E2--- E2--- | E2- E3- E2- E3- E2- E3- E2- E3- |
+stab  | [E]!--- .--- [E]!--- [A]!--- | [E]!------- .--- [E]!--- |
+kick  | x... x... x... x... | x... x... x... x.xx |
+snare | .... .... xxxx XXXX | .... x... .... xxxx |
+hat   | x.x. x.x. x.x. x.x. | % |
 crash | X............... | X............... |
 
 boss  X Y
