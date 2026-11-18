@@ -86,6 +86,30 @@ export function nextAge(age: number, dt: number, lifetime: number, held: boolean
   return age >= holdAt ? age : Math.min(age + dt, holdAt)
 }
 
+/** What `explode()` needs to know of a pool slot. */
+export interface SlotState {
+  active: boolean
+  /** Expired, its instances not yet zeroed (that happens on the next frame). */
+  needsZero: boolean
+  /** Activation order. */
+  serial: number
+}
+
+/**
+ * The slot a new death takes: the first idle one, else the oldest. `clear` says its instances still hold the
+ * last death's matrices (stolen, or expired this frame), so they must be zeroed before the new style launches
+ * fewer of them (#228).
+ */
+export function pickDeathSlot(slots: readonly SlotState[]): { index: number; clear: boolean } {
+  let index = slots.findIndex((slot) => !slot.active)
+  if (index < 0) {
+    index = 0
+    for (let i = 1; i < slots.length; i++) if (slots[i].serial < slots[index].serial) index = i
+  }
+  const slot = slots[index]
+  return { index, clear: slot.active || slot.needsZero }
+}
+
 const layer = (l: Partial<DeathLayer> & Pick<DeathLayer, 'shape' | 'count' | 'colors' | 'speed'>): DeathLayer => ({
   glow: 1, up: 0, drag: 2.5, gravity: 0, size: 2, spin: 0, hold: 0, ...l,
 })

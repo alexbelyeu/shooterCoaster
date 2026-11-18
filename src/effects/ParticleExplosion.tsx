@@ -16,7 +16,9 @@ import {
   isChunk,
   nextAge,
   particleOffset,
+  pickDeathSlot,
   sizeAt,
+  type SlotState,
   type DeathStyle,
 } from './deathStyles'
 
@@ -35,12 +37,8 @@ interface ParticleSet {
   layer: Uint8Array
 }
 
-interface Slot {
-  active: boolean
-  needsZero: boolean
+interface Slot extends SlotState {
   age: number
-  /** Activation order: a full pool steals the oldest. */
-  serial: number
   style: DeathStyle
   origin: THREE.Vector3
   glowCount: number
@@ -175,15 +173,14 @@ export default function ParticleExplosionPool() {
   useEffect(() => {
     const { slots } = pool
     const explode = (position: THREE.Vector3, style: DeathStyle) => {
-      let s = slots.findIndex((slot) => !slot.active)
-      if (s < 0) {
-        s = 0
-        for (let i = 1; i < DEATH_SLOTS; i++) if (slots[i].serial < slots[s].serial) s = i
+      const { index: s, clear } = pickDeathSlot(slots)
+      if (clear) {
         zero(pool.glow, s)
         zero(pool.chunks, s)
       }
       const slot = slots[s]
       slot.active = true
+      slot.needsZero = false
       slot.age = 0
       slot.serial = ++pool.serial
       slot.style = style
