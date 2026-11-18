@@ -58,7 +58,7 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
    every QA comment).
    If QA's only request is "merge conflict only" (or the auto-merge workflow handed the
    approved PR back with `Auto-merge failed: this branch conflicts with main`), merge `origin/main`, resolve keeping
-   both sides' behaviour, run `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build`, push, reply, swap the labels
+   both sides' behaviour, run `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run lint && bash scripts/quiet.sh npm run build`, push, reply, swap the labels
    and finish. CI runs the full `verify` and QA does a light re-review, so skip steps
    2–7 unless a conflict touched `src/` or `e2e/` (then do steps 3 and 7).
 2. Plan briefly, then implement. Stay inside the issue's scope; note follow-ups instead
@@ -71,7 +71,7 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
    that matter most, ship them, and file the rest as follow-up issues, each with its own Scope.
 3. Verify like a player. Run `scripts/ensure-browser.sh` once for the Chromium path (shell
    variables don't carry between commands, so prefix each smoke with `SC_CHROME=<that path>`). Iterate with
-   `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build`, then the smoke as its own command:
+   `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run lint && bash scripts/quiet.sh npm run build`, then the smoke as its own command:
    `SC_CHROME=<path> bash scripts/quiet.sh timeout 270 node e2e/smoke.mjs --shard <level you touched>`
    (the PR smoke for that level, as CI runs it; `--shard ui` for the title, `--shard menus` for level select and settings, `--shard mobile` for input, UI, HUD,
    camera, audio or layout changes). A 2-core session runs the smoke ~2× slower than CI: one level's `ride` takes
@@ -99,9 +99,9 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
    `DECISIONS.md` itself); add assets to `docs/ASSETS.md`.
 
 6. **Deslop.** Follow `.claude/commands/deslop.md` over every file the branch touches
-   (whole files, not just your lines). Re-run `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build` after cutting.
+   (whole files, not just your lines). Re-run `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run lint && bash scripts/quiet.sh npm run build` after cutting.
 
-7. **Pre-push checks, not the full verify.** `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run build && bash scripts/quiet.sh npm run check:bundle`,
+7. **Pre-push checks, not the full verify.** `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run lint && bash scripts/quiet.sh npm run build && bash scripts/quiet.sh npm run check:bundle`,
    plus the narrow smoke from step 3 for what you touched. Don't run `npm run verify`, the
    full smoke or Lighthouse locally: CI runs them on the PR in parallel shards (~5 min), and
    that `verify` is the gate QA reads; the deep checks run in the nightly full smoke. Push, open the PR, label it and finish; don't wait for CI.

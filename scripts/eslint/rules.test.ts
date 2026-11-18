@@ -78,3 +78,24 @@ tester.run('sc/no-hot-path-alloc', plugin.rules['no-hot-path-alloc'], {
     { code: 'export function step(a) { const v = new Vector3(); return `${a}` }', filename: hot, errors: [alloc, alloc] },
   ],
 })
+
+const slowMoWrite = { messageId: 'setState' }
+
+tester.run('sc/one-slow-mo-writer', plugin.rules['one-slow-mo-writer'], {
+  valid: [
+    { code: "useGameStore.setState({ phase: 'playing', score: 0 })" },
+    { code: 'useGameStore.setState(initial, true)' },
+    { code: 'useGameStore.setState((s) => ({ score: s.score + 1, nested: { timeScale: 2 } }))' },
+    { code: 'useGameStore.setState((s) => { const f = () => ({ timeScale: 2 }); return { score: f() } })' },
+    { code: "requestSlowMo('frenzy')\nsetTimeScaleOverride(0)\nconst o = { timeScale: 1 }" },
+  ],
+  invalid: [
+    { code: "useGameStore.setState({ phase: 'playing', timeScale: 1 })", errors: [slowMoWrite] },
+    { code: "useGameStore.setState((s) => ({ timeScale: 0.5, frenzy: 'hold' }))", errors: [slowMoWrite, slowMoWrite] },
+    { code: "store.setState(function () { if (x) return { frenzy: 'off' }; return {} })", errors: [slowMoWrite] },
+    { code: "useGameStore.setState({ boss: { name: 'x', hp: 1 }, timeScale: 1 })", errors: [slowMoWrite] },
+    { code: "useGameStore.setState({ ['timeScale']: 1 })", errors: [slowMoWrite] },
+    { code: "const { setSlowMo } = useGameStore.getState()\nsetSlowMo(0.5, 'hold')", errors: [{ messageId: 'setSlowMo' }] },
+    { code: "useGameStore.getState().setSlowMo(1, 'off')", errors: [{ messageId: 'setSlowMo' }] },
+  ],
+})
