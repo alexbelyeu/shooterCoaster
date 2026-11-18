@@ -1,21 +1,17 @@
-/**
- * Heat shimmer (#627): where on screen a box of hot air sits, and how hard the composer wavers it. Pure, per
- * frame: `FlameFire` projects the Flame's column with `shimmerRect` and eases `shimmerAmplitude` in and out;
- * `HeatShimmerEffect` distorts the frame inside the rect.
- */
+/** Heat shimmer (#627): where on screen a box of hot air sits and how hard `HeatShimmerEffect` wavers it. Pure, per frame. */
 
-/** Clip-space w of the plane the box is clipped at: anything nearer is at or behind the camera. */
+/** Clip-space w of the plane the box is clipped at. */
 const MIN_W = 0.05
 /** The waver at full strength, as a share of the column's height on screen... */
-export const SHIMMER_HEIGHT_SHARE = 0.012
+const SHIMMER_HEIGHT_SHARE = 0.012
 /** ...and never more than this (uv), so a column filling the screen still only wavers. */
 export const SHIMMER_MAX_UV = 0.006
-/** How fast (per second) the shimmer fades in and out as the column comes into and out of view. */
-export const SHIMMER_FADE_RATE = 3
+/** Per second, as the column comes into and out of view. */
+const SHIMMER_FADE_RATE = 3
 
-/** The box's twelve edges, as corner index pairs (bottom ring, top ring, uprights). */
+/** The box's twelve edges, as corner index pairs. */
 const EDGES = [0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7]
-/** How far off screen (uv) the rect may reach: a box beside the camera projects wide, and the mask only needs its on-screen part's shape. */
+/** How far off screen (uv) the rect may reach: a box beside the camera projects without bound. */
 const RECT_REACH = 1
 /** Scratch clip-space corners (x, y, w per corner). */
 const clip = new Float32Array(24)
@@ -34,11 +30,9 @@ function take(cx: number, cy: number, w: number): void {
 }
 
 /**
- * Projects the box `corners` (8 × world xyz: the bottom ring, then the top ring above it) through
- * `viewProjection` (a column-major 4×4, three's `Matrix4.elements`) and writes the screen bounds (uv: x0, y0,
- * x1, y1) of its part in front of the camera, then its nearest view distance (a perspective clip w), into `out`.
- * A box the camera is beside is clipped at the camera rather than dropped. False when the box is behind the camera, off screen or too small to see, and then `out`
- * is left as it was.
+ * Writes the screen bounds (uv: x0, y0, x1, y1) and nearest view distance of the box `corners` (8 × world xyz:
+ * bottom ring, then top ring) through `viewProjection` (three's `Matrix4.elements`) into `out`, clipped at the
+ * camera; false, leaving `out` as it was, when none of it is on screen.
  */
 export function shimmerRect(corners: ArrayLike<number>, viewProjection: ArrayLike<number>, out: Float32Array): boolean {
   const m = viewProjection

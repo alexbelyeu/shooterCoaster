@@ -3,10 +3,8 @@ import { Uniform, Vector4 } from 'three'
 import { VIEWMODEL_DEPTH_RANGE } from '@/core/cameraLayers'
 
 /**
- * Heat shimmer (#627): wavers the frame inside one screen rect, strongest just over its foot and fading up it,
- * as if seen through hot air. A `mainUv`, so it merges into the composer's one EffectPass and moves everything
- * the pass samples (Bloom included). It reads depth, so only what lies past the hot air's nearest point wavers:
- * never the gun (drawn in the front of the depth range) or a pixel next to it.
+ * Heat shimmer (#627): wavers the frame inside one screen rect, strongest just over its foot. Depth-tested, so only
+ * what lies past the hot air's nearest point wavers, never the gun in the front of the depth range.
  */
 const fragmentShader = /* glsl */ `
 uniform vec4 shimmerRect;
@@ -30,7 +28,7 @@ void mainUv(inout vec2 uv) {
   float edge = smoothstep(0.0, 0.2, p.x) * smoothstep(1.0, 0.8, p.x);
   float rise = smoothstep(0.0, 0.1, p.y) * pow(1.0 - p.y, 1.5);
 
-  // Ripples a few to the column's height, square on screen, rising with the hot air
+  // Ripples square on screen, rising with the hot air
   vec2 q = vec2(p.x * size.x * aspect / size.y, p.y) * 9.0;
   float t = shimmerTime;
   q.y -= t * 2.2;

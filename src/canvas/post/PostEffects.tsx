@@ -13,9 +13,8 @@ export interface BloomSettings {
 }
 
 /**
- * Bloom (not on low quality), the heat shimmer (a level whose atmosphere asks for it, not on low quality or touch
- * screens), grade + vignette and ACES tone mapping: all merge into one EffectPass. The shimmer goes in with the
- * level, before `ShaderWarmup` ends, and brings the composer a depth texture, so only that level pays for it.
+ * Bloom (not on low quality), the heat shimmer, grade + vignette and ACES tone mapping, merged into one EffectPass;
+ * the shimmer needs a depth texture, so only a level that asks for it (not on low quality or touch) pays for one.
  */
 export default function PostEffects({ bloom, grade, heatShimmer }: { bloom: BloomSettings; grade: GradeConfig; heatShimmer: boolean }) {
   const quality = useQualityProfile()
