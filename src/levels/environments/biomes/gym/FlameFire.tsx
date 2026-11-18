@@ -1,11 +1,13 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { HEAT_SHIMMER } from '@/canvas/post/HeatShimmerEffect'
+import { easeShimmer, shimmerAmplitude, shimmerRect } from '@/canvas/post/heatShimmer.hot'
 import { isCoarsePointer, useFbmOctaves, useQualityProfile } from '@/canvas/useRenderBudget'
 import ParticleField from '../../shared/ParticleField'
 import { PARTICLE_PRESETS } from '../../shared/particlePresets'
 import { gradientNoiseGlsl } from '../../shared/noiseGlsl'
-import { buildFlameTongues, buildSmokePuffs, emberAnchor, fireFlicker, fireFootprint, fireHeights, smokeCount, tongueCount } from './flameFire'
+import { buildFlameTongues, buildSmokePuffs, emberAnchor, fireFlicker, fireFootprint, fireHeights, shimmerColumn, smokeCount, tongueCount } from './flameFire'
 import { FIRE_FLICKER } from './grimeShader'
 
 const tongueVertex = /* glsl */ `
@@ -181,6 +183,9 @@ const smokeFragment = /* glsl */ `
 `
 
 const EMBER_ANCHOR = emberAnchor()
+const SHIMMER_COLUMN = shimmerColumn()
+const viewProjection = new THREE.Matrix4()
+const shimmerBounds = new Float32Array(5)
 const fogUniforms = () => THREE.UniformsUtils.clone(THREE.UniformsLib.fog)
 
 /** A unit quad to instance: the vertex shader places and sizes each copy. */
@@ -235,11 +240,13 @@ function smokeGeometry(): THREE.InstancedBufferGeometry {
 /**
  * The Flame burns (#520, #595, #599): a few hundred soft tongues of flame rising up its faces and off its top,
  * smoke rising off the crest, and embers (an anchored `ParticleField`), in three draw calls; its light on the hall
- * is the grime shader's, flickering with the `FIRE_FLICKER` this sets each frame.
+ * is the grime shader's, flickering with the `FIRE_FLICKER` this sets each frame; the air over it wavers through
+ * the composer's `HeatShimmerEffect` (#627), which this aims each frame.
  */
 export default function FlameFire() {
   const octaves = useFbmOctaves()
   const { particleScale } = useQualityProfile()
+  const shimmerStrength = useRef(0)
   const tongues = useMemo(tongueGeometry, [])
   const smoke = useMemo(smokeGeometry, [])
   const tongueMaterial = useMemo(
@@ -284,12 +291,30 @@ export default function FlameFire() {
   useEffect(() => () => smoke.dispose(), [smoke])
   useEffect(() => () => tongueMaterial.dispose(), [tongueMaterial])
   useEffect(() => () => smokeMaterial.dispose(), [smokeMaterial])
+  useEffect(
+    () => () => {
+      HEAT_SHIMMER.shimmerAmp.value = 0
+    },
+    [],
+  )
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock, camera }, delta) => {
     const t = clock.elapsedTime
     tongueMaterial.uniforms.uTime.value = t
     smokeMaterial.uniforms.uTime.value = t
     FIRE_FLICKER.value = fireFlicker(t)
+
+    viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+    const inView = shimmerRect(SHIMMER_COLUMN, viewProjection.elements, shimmerBounds)
+    const strength = easeShimmer(shimmerStrength.current, inView, delta)
+    shimmerStrength.current = strength
+    // Fading out, it keeps the last rect it had in view
+    if (inView) {
+      HEAT_SHIMMER.shimmerRect.value.fromArray(shimmerBounds)
+      HEAT_SHIMMER.shimmerNear.value = shimmerBounds[4]
+    }
+    HEAT_SHIMMER.shimmerAmp.value = shimmerAmplitude(shimmerBounds[3] - shimmerBounds[1], strength)
+    HEAT_SHIMMER.shimmerTime.value = t
   })
 
   return (

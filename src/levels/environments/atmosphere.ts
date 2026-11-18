@@ -56,6 +56,8 @@ export interface AtmosphereConfig {
   envIntensity: number
   /** Colour grade applied before ACES tone mapping (includes exposure) */
   grade: GradeConfig
+  /** Puts the composer's `HeatShimmerEffect` in for this biome: it has a fire that aims it (the gym's Flame, #627). */
+  heatShimmer?: boolean
 }
 
 export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
@@ -295,5 +297,6 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
       vibrance: 0.35,
       vignette: 0.5,
     },
+    heatShimmer: true,
   },
 }

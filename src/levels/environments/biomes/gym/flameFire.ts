@@ -173,6 +173,28 @@ export function fireFlicker(t: number): number {
   return 0.77 + 0.14 * smoothNoise1(t * 4.3, 1) + 0.07 * smoothNoise1(t * 11.9, 2) + 0.02 * smoothNoise1(t * 23.1, 3)
 }
 
+/** How far out past the Flame's top (blockout metres) the air over it shimmers. */
+const SHIMMER_REACH = 1
+/** How high over the Flame's top (blockout metres) the shimmer's column reaches: past the tongues, fading up the plume. */
+const SHIMMER_RISE = PLUME_RISE * 2.5
+
+/** The box of air over the Flame that the heat shimmer wavers (#627): its eight corners, world xyz, bottom four first. */
+export function shimmerColumn(): Float32Array {
+  const corners = new Float32Array(24)
+  const hx = FLAME_TOP.halfLength + SHIMMER_REACH
+  const hz = FLAME_TOP.halfWidth + SHIMMER_REACH
+  const y1 = Math.min(TOP.y + SHIMMER_RISE, SMOKE_CEILING)
+  let i = 0
+  for (const y of [TOP.y + 0.5, y1]) {
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const c = worldPoint(sx * hx, y, sz * hz)
+      corners.set([c.x, c.y, c.z], i)
+      i += 3
+    }
+  }
+  return corners
+}
+
 /** Smoke puffs at full quality on a desktop; `smokeCount` thins them. */
 export const MAX_SMOKE_PUFFS = 40
 /** How high the smoke rises (blockout metres): under the roof trusses, where it spreads and hangs. */

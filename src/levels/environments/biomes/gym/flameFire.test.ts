@@ -14,6 +14,7 @@ import {
   fireFootprint,
   fireHeights,
   fireLightSource,
+  shimmerColumn,
   smokeCount,
   tongueCount,
 } from './flameFire'
@@ -122,6 +123,22 @@ describe('the Flame fire', () => {
     expect(light.minY).toBeGreaterThan(PAD_TOP)
     expect(light.maxY).toBeGreaterThan(FLAME_TOP.y)
     expect(light.halfLength).toBeLessThan(FLAME_TOP.halfLength)
+  })
+
+  it('shimmers the air from just over the top of the Flame up the plume, wider than its top, under the roof', () => {
+    const corners = shimmerColumn()
+    expect(corners).toHaveLength(24)
+    const ys = Array.from({ length: 8 }, (_, i) => corners[i * 3 + 1])
+    const top = toBlockout({ x: 0, y: Math.min(...ys), z: 0 }).y - FLAME.piece.base
+    const crest = toBlockout({ x: 0, y: Math.max(...ys), z: 0 }).y - FLAME.piece.base
+    expect(top).toBeGreaterThan(FLAME_TOP.y)
+    expect(top).toBeLessThan(FLAME_TOP.y + 1)
+    expect(crest).toBeGreaterThan(top + 5)
+    expect(crest).toBeLessThanOrEqual(SMOKE_CEILING + 1e-6)
+    const bottom = Array.from({ length: 4 }, (_, i) => toBlockout({ x: corners[i * 3], y: 0, z: corners[i * 3 + 2] }))
+    const across = Math.hypot(bottom[0].x - bottom[1].x, bottom[0].z - bottom[1].z)
+    expect(across).toBeGreaterThan(FLAME_TOP.halfLength * 2)
+    expect(Number.isFinite(corners.reduce((a, b) => a + b, 0))).toBe(true)
   })
 
   it('flickers between half and full light, never steady', () => {
