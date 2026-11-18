@@ -20,9 +20,10 @@ Your prompt names a bundle path. Make exactly one Bash call:
 cat <BUNDLE_PATH>
 ```
 
-That gives you the intent, commits, changed files, the governing conventions
-(CLAUDE.md, and the heap/level-design rules when relevant) and the diff with 30
-lines of context around every hunk. Use `cat`, not Read.
+That gives you the intent, commits, changed files, the heap rules when `src/` changed,
+and the code diff with 10 lines of context around every hunk (docs are listed, not
+diffed). CLAUDE.md is already in your context. Use `cat`, not Read; open a file with
+`Read` and `offset`/`limit` only when a concern needs more than 10 lines around a hunk.
 
 ## How to review
 
