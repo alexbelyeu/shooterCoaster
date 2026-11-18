@@ -9,8 +9,8 @@ export const KRAKEN_TENTACLE = {
   count: 5,
   segments: 10,
   segLen: 34,
-  baseRadius: 40,
-  tipRadius: 6,
+  baseRadius: 54,
+  tipRadius: 10,
   /** Segment whose rider-facing side carries the sucker pad. */
   padSegment: 6,
   stagger: 0.35,
@@ -40,16 +40,16 @@ export const KRAKEN_HEAD = {
   sinkS: 1.2,
   defeatSinkS: 2.2,
   gapS: 0.4,
-  rx: 190,
-  ry: 130,
-  rz: 160,
-  /** Below the water when down; bobs this much when up. */
-  depth: 160,
+  rx: 230,
+  ry: 150,
+  rz: 190,
+  /** Below the water when down (the mantle's top included); bobs this much when up. */
+  depth: 240,
   bob: 7,
   /** Eye on the rider-facing side of the dome, above the water. */
-  eyeUp: 64,
-  eyeOut: 150,
-  eyeRadius: 42,
+  eyeUp: 74,
+  eyeOut: 170,
+  eyeRadius: 50,
 } as const
 
 /** Surfacing spots: this far from the camera, within `yaw` radians of where it looks (inside the frame on 16:9 and on a phone). */
