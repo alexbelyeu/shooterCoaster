@@ -12,6 +12,7 @@ import * as bossAssets from '@/entities/bosses/bossAssets'
 import { useGameStore } from '@/store/useGameStore'
 import { markStartup } from '@/core/startupMarks'
 import { whenProgramsReady } from './programReadiness'
+import { composerSceneTarget } from './post/composerTargets'
 import { chunk, runInFrameSlices } from './frameSlices'
 
 /** Warm-up work per frame: the rest of the frame is the countdown's (#597). */
@@ -27,6 +28,32 @@ function enemyMaterials(): THREE.Material[] {
     }
   }
   return out
+}
+
+const WARMUP_SIZE = 64
+
+/**
+ * A small target like the composer's scene target: the same samples, format and depth attachment. A GPU links a
+ * pipeline per program for each of those (Metal, Vulkan), so a warm-up into any other target left them all to the
+ * first frame of play (#625).
+ */
+function warmupTarget(): THREE.WebGLRenderTarget {
+  const like = composerSceneTarget()
+  const target = new THREE.WebGLRenderTarget(WARMUP_SIZE, WARMUP_SIZE, {
+    type: like?.texture.type ?? THREE.HalfFloatType,
+    format: like?.texture.format,
+    colorSpace: like?.texture.colorSpace,
+    depthBuffer: like?.depthBuffer ?? true,
+    stencilBuffer: like?.stencilBuffer ?? false,
+    samples: like?.samples ?? 0,
+  })
+  // Its own depth texture: a clone would share the composer's image, which three resizes to this target.
+  const depth = like?.depthTexture
+  if (depth) {
+    target.depthTexture = new THREE.DepthTexture(WARMUP_SIZE, WARMUP_SIZE, depth.type)
+    target.depthTexture.format = depth.format
+  }
+  return target
 }
 
 const isDrawable = (o: THREE.Object3D) =>
@@ -90,7 +117,7 @@ function renderWarmupBatch(
 }
 
 /**
- * Compiles into an off-screen target, not the canvas: the composer's render pass draws into one,
+ * Compiles into an off-screen target like the composer's, not the canvas: the composer's render pass draws into one,
  * and a canvas compile would build different (sRGB-output) programs. Reruns on Next Level, not on Replay.
  *
  * Spread over frames (#597): compiles, readiness polls and warm-up draws each take a slice of a frame. Until it is
@@ -113,7 +140,7 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
       testApi.shaderWarmup = { levelId, done: false, ms: 0, programs: 0 }
       testApi.programGrowth = []
     }
-    const target = new THREE.WebGLRenderTarget(64, 64, { type: THREE.HalfFloatType })
+    const target = warmupTarget()
     const specimenGeo = new THREE.BoxGeometry()
     const specimens = new THREE.Group()
     specimens.name = 'shader-warmup'
@@ -121,12 +148,18 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     for (const m of enemyMaterials()) specimens.add(new THREE.Mesh(specimenGeo, m))
     scene.add(specimens)
 
-    // Sliced and hidden behind the countdown only: once the run has reached `playing` (the countdown's cap ran out,
-    // `?e2e=1`) the level draws as it is, a pause included, and the rest of the warm-up runs in one go.
+    // Hidden behind the countdown only: once the run has reached `playing` (the countdown's cap ran out, `?e2e=1`)
+    // the level draws as it is, a pause included, and the rest of the compiles run in one go (a visible frame
+    // would wait on them anyway).
     let reachedPlay = useGameStore.getState().phase === 'playing'
+    const playingAtMount = reachedPlay
     // At most half of a slow frame (a software renderer's are 200 ms with nothing drawn), so the warm-up still
     // ends inside the countdown.
     const budgetMs = (restOfFrameMs: number) => (reachedPlay ? Infinity : Math.max(SLICE_BUDGET_MS, restOfFrameMs / 2))
+    // One batch a frame, after GO too (#625): a first draw's cost is mostly the GPU's (its pipelines), which the JS
+    // clock never sees, so a time budget let every batch into one frame and the GPU then held the next for seconds.
+    // A run that starts playing (`?e2e=1`) draws them all at once, as before.
+    const drawBudgetMs = () => (playingAtMount ? Infinity : 0)
     const mask = camera.layers.mask
     let warming = true
     /** Hidden while warming up before play, and once the store has moved on to another level: Ready never shows the
@@ -172,7 +205,7 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
 
     const draw = (objects: THREE.Object3D[]) =>
       runInFrameSlices(chunk(objects, DRAW_BATCH), (batch) => withLayers(() => renderWarmupBatch(gl, scene, camera, target, batch)), {
-        budgetMs,
+        budgetMs: drawBudgetMs,
         cancelled,
         done: finish,
       })
