@@ -21,6 +21,11 @@ export function dailyKey(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
 
+/** Milliseconds from `now` (epoch ms) to the next UTC midnight, when the daily changes. */
+export function msUntilNextUtcDay(now: number): number {
+  return DAY_MS - (now % DAY_MS)
+}
+
 const keyOf = (date: Date | string): string => (typeof date === 'string' ? date : dailyKey(date))
 
 function dayNumber(key: string): number {
@@ -36,11 +41,15 @@ export function dailyLevel(date: Date | string): (typeof DAILY_LEVELS)[number] {
   return DAILY_LEVELS[dayNumber(keyOf(date)) % DAILY_LEVELS.length]
 }
 
-/** The streak after finishing a daily on `key`: same day keeps it, the next day extends it, a gap restarts it. */
+/**
+ * The streak after finishing a daily on `key`: same day keeps it, the next day extends it, a gap restarts it.
+ * An earlier day (a run started before midnight UTC and finished after a later day's) leaves it as it is.
+ */
 export function extendStreak(streak: DailyStreak, key: string): DailyStreak {
-  if (streak.lastKey === key) return streak
-  const consecutive = streak.lastKey !== null && dayNumber(key) - dayNumber(streak.lastKey) === 1
-  return { count: consecutive ? streak.count + 1 : 1, lastKey: key }
+  if (streak.lastKey === null) return { count: 1, lastKey: key }
+  const gap = dayNumber(key) - dayNumber(streak.lastKey)
+  if (gap <= 0) return streak
+  return { count: gap === 1 ? streak.count + 1 : 1, lastKey: key }
 }
 
 /** The streak as of `todayKey`: still alive if the last daily was today or yesterday, else 0. */

@@ -60,7 +60,7 @@ export default function HUD() {
   return (
     <div className="hud" style={style}>
       <div className="hud-panel hud-panel--left">
-        <ScoreDisplay levelId={currentLevel} />
+        <ScoreDisplay />
         <KillStrip />
       </div>
       <div className="hud-panel hud-panel--right">

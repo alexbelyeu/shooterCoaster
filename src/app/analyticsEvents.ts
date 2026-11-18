@@ -3,7 +3,7 @@ import { RUN_SECONDS } from '@/levels/pacing'
 import { computeStars } from '@/levels/scoring'
 import type { GamePhase } from '@/types/game'
 import { isInRun } from '@/store/startPhase'
-import type { RunMode } from '@/store/useGameStore'
+import type { RunMode } from '@/types/game'
 import type { ShareMethod } from '@/ui/share'
 
 /** At most 2 properties per event (Vercel Pro), no free text; keep docs/marketing/README.md in sync. */

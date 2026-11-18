@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useGameStore } from '@/store/useGameStore'
+import { runBest, useGameStore } from '@/store/useGameStore'
 
 const fmt = new Intl.NumberFormat('en-US')
 /** Exponential approach rate (1/s): ~0.8 s to settle on a 500-point jump. */
@@ -11,20 +11,14 @@ const POP_KEYFRAMES: Keyframe[] = [
 ]
 const POP_TIMING: KeyframeAnimationOptions = { duration: 280, easing: 'ease-out' }
 
-interface ScoreDisplayProps {
-  levelId: string
-}
-
 /**
  * Score numerals that tween toward the store value. Never re-renders for score
  * changes: it subscribes to the store outside React and runs one rAF loop only
  * while the displayed value is catching up.
  */
-export default function ScoreDisplay({ levelId }: ScoreDisplayProps) {
+export default function ScoreDisplay() {
   const valueRef = useRef<HTMLSpanElement>(null)
-  const best = useGameStore((s) =>
-    s.runMode.mode === 'daily' ? (s.savedDaily[s.runMode.dateKey]?.score ?? 0) : (s.savedScores[levelId]?.score ?? 0),
-  )
+  const best = useGameStore((s) => runBest(s)?.score ?? 0)
 
   useEffect(() => {
     const el = valueRef.current
