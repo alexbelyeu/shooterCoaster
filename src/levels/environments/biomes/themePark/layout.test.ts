@@ -3,6 +3,7 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import { createTrigCurve } from '@/track/curves/TrigCurve'
 import { buildArcTable } from '@/track/arcLength'
 import { getTrackDimensions } from '@/track/trackDimensions'
+import { getTunnelDims, withTunnels } from '@/track/setPieces'
 import {
   createHeightFunction,
   createTerrainSurface,
@@ -15,7 +16,8 @@ import { ARCH_BOARD_HEIGHT, ARCH_HALF_SPAN, FLAG_DROP, RIDES, STALL_DEPTH, STALL
 const level = getLevelConfig('level1')!
 const { varA, varB, varC, scalar } = level.track
 const curve = createTrigCurve(varA, varB, varC, scalar)
-const table = buildArcTable(curve)
+const scale = getTrackDimensions(level.track).trackScale
+const table = withTunnels(buildArcTable(curve), level.track.tunnels, scale)
 const heightFn = createHeightFunction('themePark', sampleTrackPath((t) => curve.getPointAt(t)))
 const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize('themePark'))
 const layout = planThemePark(table, heightFn, groundFn)
@@ -121,6 +123,22 @@ describe('theme park layout (level 1)', () => {
     for (const r of RIDES) expect(trackNear(r.x, r.z, r.radius)).toEqual([])
     for (const t of layout.tents) expect(trackNear(t.x, t.z, 40)).toEqual([])
     for (const p of layout.flagPoles) expect(trackNear(p.x, p.z, 12)).toEqual([])
+  })
+
+  it('keeps every prop and span out of the tunnel under the midway (#332)', () => {
+    const tunnels = table.tunnels ?? []
+    expect(tunnels.length).toBeGreaterThan(0)
+    const tunnel = getTunnelDims(scale)
+    const inTunnel = (i: number) => tunnels.some((t) => i >= t.from && i <= t.to)
+    for (const f of footprints()) {
+      const hits = trackNear(f.x, f.z, f.r + tunnels[0].reach).filter(inTunnel)
+      expect(hits, `${f.kind} at (${f.x.toFixed(0)}, ${f.z.toFixed(0)})`).toEqual([])
+    }
+    // Bunting crossing over the tunnel hangs above its roof.
+    const roof = tunnel.centreUp + tunnel.radius + tunnel.wall
+    for (const f of layout.flags) {
+      for (const i of trackNear(f.x, f.z, tunnels[0].reach).filter(inTunnel)) expect(f.y - FLAG_DROP).toBeGreaterThan(table.y[i] + roof)
+    }
   })
 
   it('never stands one prop on another', () => {

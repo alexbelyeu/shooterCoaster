@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
 import type { TrackDimensions } from './trackDimensions'
-import { type ArcTable, tAtDistance } from './arcLength'
+import { type ArcTable, distanceAtT, tAtDistance } from './arcLength'
+import { tunnelAt } from './tunnelRide.hot'
 
 type RGB = [number, number, number]
 
@@ -10,6 +11,8 @@ const RAIL_SIDES = 6
 const SPINE_SIDES = 8
 /** Ties are capped so very long tracks (Volcanic ≈ 62k units) stay in the triangle budget. */
 export const MAX_TIES = 1600
+/** Inside a tunnel (#332) the track's colours are this much darker: nothing lights it there but the tunnel's lamps. */
+export const TUNNEL_TRACK_SHADE = 0.3
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0)
 
@@ -65,6 +68,9 @@ export function buildTrackGeometry(
   const thick = new Float32Array((tubeVerts + tieVerts) * 4)
   const indices: number[] = []
   let v = 0
+  const shade = (c: RGB): RGB => [c[0] * TUNNEL_TRACK_SHADE, c[1] * TUNNEL_TRACK_SHADE, c[2] * TUNNEL_TRACK_SHADE]
+  const colourAt = (c: RGB, dark: RGB, dist: number) => (tunnelAt(table.tunnels, dist) >= 0 ? dark : c)
+  const color2Dark = shade(color2)
 
   const point = new THREE.Vector3()
   const forward = new THREE.Vector3()
@@ -113,15 +119,17 @@ export function buildTrackGeometry(
   ]
   for (const tube of tubes) {
     const base = v
+    const dark = shade(tube.color)
     prevRight.set(1, 0, 0)
     for (let i = 0; i < ringCount; i++) {
       trackFrame(curve, i / segments, point, forward, right, up, prevRight)
       prevRight.copy(right)
+      const colour = colourAt(tube.color, dark, distanceAtT(table, i / segments))
       center.copy(point).addScaledVector(right, tube.ox).addScaledVector(up, tube.oy)
       for (let j = 0; j < tube.sides; j++) {
         const a = (j / tube.sides) * Math.PI * 2
         dir.copy(right).multiplyScalar(Math.cos(a)).addScaledVector(up, Math.sin(a))
-        pushVertex(point.copy(center).addScaledVector(dir, tube.r), dir, tube.color, tube.r)
+        pushVertex(point.copy(center).addScaledVector(dir, tube.r), dir, colour, tube.r)
       }
     }
     for (let i = 0; i < segments; i++) {
@@ -154,12 +162,13 @@ export function buildTrackGeometry(
     const t = tAtDistance(table, (k + 0.5) * tieSpacing)
     trackFrame(curve, t, point, forward, right, up, prevRight)
     prevRight.copy(right)
+    const tieColour = colourAt(color2, color2Dark, (k + 0.5) * tieSpacing)
 
     // Front and back triangles.
     for (const side of [1, -1]) {
       const b = v
       n.copy(forward).multiplyScalar(side)
-      for (let c = 0; c < 3; c++) pushVertex(local(corner[c], half * side, quad[0]), n, color2)
+      for (let c = 0; c < 3; c++) pushVertex(local(corner[c], half * side, quad[0]), n, tieColour)
       pushTri(b, b + 1, b + 2, n)
     }
     // Three side quads.
@@ -181,7 +190,7 @@ export function buildTrackGeometry(
       dir.copy(right).multiplyScalar(mx).addScaledVector(up, my)
       if (n.dot(dir) < 0) n.negate()
       const b = v
-      for (let q = 0; q < 4; q++) pushVertex(quad[q], n, color2)
+      for (let q = 0; q < 4; q++) pushVertex(quad[q], n, tieColour)
       pushTri(b, b + 1, b + 2, n)
       pushTri(b, b + 2, b + 3, n)
     }

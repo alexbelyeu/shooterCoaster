@@ -40,6 +40,14 @@ export interface TrackParams {
   segments?: number
   /** The track's own colours also glow at this strength (default 0): `color2` spine and ties read ahead in a dark level. */
   glow?: number
+  /** Set-pieces (#332): stretches where the track runs through a lit tube (`src/track/setPieces.ts`). */
+  tunnels?: readonly TunnelSpec[]
+}
+
+/** A tunnel from track fraction `from`, `length` world units of arc long; it may not cross the track's seam (t = 1). */
+export interface TunnelSpec {
+  from: number
+  length: number
 }
 
 /** How a wave arrives; anything but `scatter` (the default) is laid out ahead of the rider by `spawnPlacement.ts`. */

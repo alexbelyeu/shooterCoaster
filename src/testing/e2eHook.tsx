@@ -65,7 +65,7 @@ import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
 import { MAX_BANK_DEG, MAX_PITCH_DEG } from '@/track/cameraRig.hot'
-import { DROP_FOV_DEG, SPEED_FOV_DEG } from '@/track/cameraFov.hot'
+import { DROP_FOV_DEG, SPEED_FOV_DEG, TUNNEL_FOV_DEG } from '@/track/cameraFov.hot'
 import { programsAfterWarmup } from '@/core/hitchLog'
 import { LONG_FRAME_MS } from '@/telemetry/telemetryReport'
 
@@ -166,6 +166,9 @@ export interface SCTestApi {
     speed: number; streaks: number; maxStreaks: number
     caps: { roll: number; pitch: number; fovKick: number }
   }
+  /** Track set-pieces (#332): the level's tunnels as track fractions (`spans`), the one the car is in (-1: none) and how
+   *  deep (`tunnelDepth`, 0–1), set by the coaster camera. */
+  tunnel: { spans: { from: number; to: number }[]; index: number; depth: number }
   /** First-person weapon view-model on screen (CSS px, origin top-left):
    *  bounding box of its projected bounds and the muzzle tip. null before the
    *  first level frame. */
@@ -899,8 +902,9 @@ export function installE2EApi() {
     cameraTrauma: { current: 0, max: 0 },
     cameraWeight: {
       roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0, speed: 0, streaks: 0, maxStreaks: 0,
-      caps: { roll: MAX_BANK_DEG, pitch: MAX_PITCH_DEG, fovKick: SPEED_FOV_DEG + DROP_FOV_DEG },
+      caps: { roll: MAX_BANK_DEG, pitch: MAX_PITCH_DEG, fovKick: SPEED_FOV_DEG + DROP_FOV_DEG + TUNNEL_FOV_DEG },
     },
+    tunnel: { spans: [], index: -1, depth: 0 },
     weapon: null,
     holdFeedback: false,
     bulletStep: null,

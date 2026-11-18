@@ -4,6 +4,8 @@ import type { ArcTable } from '@/track/arcLength'
  * XZ grid over the track's arc-table samples, for keeping props off it. Queries
  * are 2D on purpose: support towers run from the track down to the ground, so
  * anything near the track's ground projection can hit one however high it is.
+ * Inside a tunnel (`ArcTable.tunnels`, #332) the track is as wide as the tube:
+ * a sample there counts within `radius` + the tunnel's `reach`.
  */
 export interface TrackIndex {
   table: ArcTable
@@ -42,15 +44,23 @@ export function buildTrackIndex(table: ArcTable): TrackIndex {
     if (!bucket) cells.set(key, (bucket = []))
     bucket.push(i)
   }
+  const tunnels = table.tunnels ?? []
+  let maxReach = 0
+  for (const span of tunnels) maxReach = Math.max(maxReach, span.reach)
+  const reachAt = (i: number) => {
+    for (const span of tunnels) if (i >= span.from && i <= span.to) return span.reach
+    return 0
+  }
 
   const index: TrackIndex = {
     table,
     near(x, z, radius, filter) {
       const r2 = radius * radius
-      const x0 = Math.floor((x - radius) / CELL)
-      const x1 = Math.floor((x + radius) / CELL)
-      const z0 = Math.floor((z - radius) / CELL)
-      const z1 = Math.floor((z + radius) / CELL)
+      const search = radius + maxReach
+      const x0 = Math.floor((x - search) / CELL)
+      const x1 = Math.floor((x + search) / CELL)
+      const z0 = Math.floor((z - search) / CELL)
+      const z1 = Math.floor((z + search) / CELL)
       for (let cx = x0; cx <= x1; cx++) {
         for (let cz = z0; cz <= z1; cz++) {
           const bucket = cells.get(cellKey(cx, cz))
@@ -58,7 +68,9 @@ export function buildTrackIndex(table: ArcTable): TrackIndex {
           for (const i of bucket) {
             const dx = table.x[i] - x
             const dz = table.z[i] - z
-            if (dx * dx + dz * dz < r2 && (!filter || filter(i))) return true
+            const d2 = dx * dx + dz * dz
+            if (d2 >= r2 && (maxReach === 0 || d2 >= (radius + reachAt(i)) ** 2)) continue
+            if (!filter || filter(i)) return true
           }
         }
       }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  STREAK_COUNT, STREAK_MAX_OPACITY, STREAK_SPEED_THRESHOLD, streakLayout, streakOpacity, streakRate,
+  STREAK_COUNT, STREAK_MAX_OPACITY, STREAK_SPEED_THRESHOLD, STREAK_TUNNEL_OPACITY, STREAK_TUNNEL_RATE, streakLayout,
+  streakOpacity, streakRate,
 } from './windStreaks'
 
 describe('streakOpacity', () => {
@@ -28,6 +29,22 @@ describe('streakRate', () => {
     expect(streakRate(1)).toBe(2)
     expect(streakRate(9)).toBe(2)
     expect(streakRate(Number.NaN)).toBe(1)
+  })
+
+  it('runs faster in a tunnel (#332)', () => {
+    expect(streakRate(1, 1)).toBe(2 + STREAK_TUNNEL_RATE)
+    expect(streakRate(0, Number.NaN)).toBe(1)
+  })
+})
+
+describe('streaks in a tunnel (#332)', () => {
+  it('show at any speed deep in a tunnel, scaled by the setting, never past the top-speed opacity', () => {
+    expect(streakOpacity(0, 1, 1)).toBe(STREAK_TUNNEL_OPACITY)
+    expect(streakOpacity(0, 0.5, 1)).toBe(STREAK_TUNNEL_OPACITY / 2)
+    expect(streakOpacity(0, 0, 1)).toBe(0)
+    expect(streakOpacity(1, 1, 1)).toBeCloseTo(STREAK_MAX_OPACITY, 9)
+    expect(streakOpacity(0, 1, Number.NaN)).toBe(0)
+    expect(STREAK_TUNNEL_OPACITY).toBeLessThanOrEqual(STREAK_MAX_OPACITY)
   })
 })
 

@@ -23,6 +23,7 @@ import {
   towerShadowCasters,
 } from './supportTowers'
 import { useContactShadows } from '@/levels/environments/shared/ContactShadows'
+import TrackTunnels from './TrackTunnels'
 
 interface TrackMeshProps {
   curve: TrackCurve
@@ -204,6 +205,8 @@ export default function TrackMesh({
   )
 
   const material = useMemo(() => createTrackMaterial(glow), [glow])
+  const heightFn = useContext(TerrainContext)
+  const tunnelGround = groundFn ?? heightFn
 
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
@@ -217,6 +220,9 @@ export default function TrackMesh({
     <>
       <mesh name="track" geometry={geometry} material={material} />
       <SupportTowers curve={curve} table={table} dims={dims} groundFn={groundFn} />
+      {table.tunnels?.length ? (
+        <TrackTunnels curve={curve} table={table} trackScale={dims.trackScale} color1={color1} color2={color2} groundFn={tunnelGround} />
+      ) : null}
     </>
   )
 }
