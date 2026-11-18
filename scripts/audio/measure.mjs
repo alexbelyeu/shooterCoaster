@@ -2,7 +2,7 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import {
-  bandEnergy, barLines, clippedSamples, compareTargets, killsOverMusic, powerSpectrum, seamExcess, seamJump, silenceShare, soundEnvelope, stereoCorrelation,
+  bandEnergy, clickDb, barLines, clippedSamples, compareTargets, killsOverMusic, powerSpectrum, seamExcess, seamJump, silenceShare, soundEnvelope, stereoCorrelation,
   targetText,
 } from './metrics.mjs'
 
@@ -65,7 +65,7 @@ export const killTimes = (events) => events.filter((e) => /^kill \d+$/.test(e.na
  * `kills`: times of kills in a combat mix, each measured against `musicFile`, the same mix rendered without SFX.
  * `seamFile`: measure the seams on this render instead (a mix's music stem).
  */
-export function measure(file, { seams = [], bar = null, sounds = [], kills = [], musicFile = null, seamFile = null } = {}) {
+export function measure(file, { seams = [], bar = null, sounds = [], kills = [], musicFile = null, seamFile = null, clicks = [] } = {}) {
   const channels = decode(file)
   const bands = bandEnergy(powerSpectrum(channels), SAMPLE_RATE)
   const end = channels[0].length / SAMPLE_RATE
@@ -76,6 +76,7 @@ export function measure(file, { seams = [], bar = null, sounds = [], kills = [],
     db: round(seamJump(seamChannels, SAMPLE_RATE, s)),
     vsBars: round(seamExcess(seamChannels, SAMPLE_RATE, s, bars)),
   }))
+  const cuts = clicks.map((t) => ({ at: round(t, 3), db: round(clickDb(channels, SAMPLE_RATE, t), 1) }))
   const worst = jumps.reduce((w, j) => (w === null || Math.abs(j.vsBars) > Math.abs(w) ? j.vsBars : w), null)
   const l = loudness(file)
   const items = sounds.map((s, i) => {
@@ -99,6 +100,7 @@ export function measure(file, { seams = [], bar = null, sounds = [], kills = [],
     bands: Object.fromEntries(Object.entries(bands).map(([k, v]) => [k, { pct: round(v.pct, 1), db: round(v.db, 1) }])),
     seamJumps: jumps,
     seamJumpMax: worst,
+    ...(cuts.length ? { clicks: cuts, clickMax: Math.max(...cuts.map((c) => c.db)) } : {}),
     ...(shots.length ? { gunTailMs: Math.max(...shots.map((s) => s.tailMs)) } : {}),
     ...(items.length ? { sounds: items } : {}),
     ...(killRows.length ? { killOverMusicDb: Math.min(...killRows.map((k) => k.overDb)), kills: killRows } : {}),

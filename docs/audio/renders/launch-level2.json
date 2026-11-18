@@ -1,0 +1,177 @@
+{
+  "name": "launch-level2",
+  "kind": "sfx",
+  "request": {
+    "kind": "launch",
+    "level": "level2"
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.3,
+      "name": "ui launch (menus' bank and room)"
+    },
+    {
+      "t": 0.42,
+      "name": "level2's bank and room land: the menus' graph fades out"
+    },
+    {
+      "t": 1,
+      "name": "countdown Ready"
+    },
+    {
+      "t": 1.6,
+      "name": "countdown GO"
+    },
+    {
+      "t": 2.4,
+      "name": "kill 1x"
+    }
+  ],
+  "seams": [],
+  "clicks": [
+    0.42
+  ],
+  "bar": null,
+  "metrics": {
+    "seconds": 3.4,
+    "integrated": -23.3,
+    "shortTermMax": -24.9,
+    "lra": 0.4,
+    "truePeak": -6.3,
+    "clipped": 0,
+    "silence": 25.3,
+    "correlation": 0.997,
+    "below30Db": -52.8,
+    "bands": {
+      "sub": {
+        "pct": 0,
+        "db": -39.5
+      },
+      "low": {
+        "pct": 20.7,
+        "db": -6.8
+      },
+      "mid": {
+        "pct": 64.1,
+        "db": -1.9
+      },
+      "presence": {
+        "pct": 12.2,
+        "db": -9.1
+      },
+      "air": {
+        "pct": 3,
+        "db": -15.2
+      },
+      "below30": {
+        "pct": 0,
+        "db": -52.8
+      }
+    },
+    "seamJumps": [],
+    "seamJumpMax": null,
+    "clicks": [
+      {
+        "at": 0.42,
+        "db": 9.3
+      }
+    ],
+    "clickMax": 9.3,
+    "sounds": [
+      {
+        "t": 0.3,
+        "name": "ui launch (menus' bank and room)",
+        "peakDb": -16.6,
+        "tailMs": 115
+      },
+      {
+        "t": 0.42,
+        "name": "level2's bank and room land: the menus' graph fades out",
+        "peakDb": -17.5,
+        "tailMs": 15
+      },
+      {
+        "t": 1,
+        "name": "countdown Ready",
+        "peakDb": -15.9,
+        "tailMs": 546
+      },
+      {
+        "t": 1.6,
+        "name": "countdown GO",
+        "peakDb": -12.9,
+        "tailMs": 797
+      },
+      {
+        "t": 2.4,
+        "name": "kill 1x",
+        "peakDb": -6.4,
+        "tailMs": 521
+      }
+    ]
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -23.3,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "Short-term max",
+      "value": -24.9,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -6.3,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -52.8,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 0.997,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Steepest 1 ms drop at a cut",
+      "value": 9.3,
+      "unit": "dB",
+      "max": 15,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 0.4,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 25.3,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

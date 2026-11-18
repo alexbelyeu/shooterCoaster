@@ -156,6 +156,26 @@ export function seamExcess(channels, sampleRate, seamS, barTimes = []) {
   return closest ?? jump
 }
 
+/** Levels below this read as it: a cut of a sound already this quiet is not heard. */
+const CUT_FLOOR_DB = -60
+
+/**
+ * A click at `atS` (a voice or graph cut, #246): the steepest level drop between consecutive `stepS` RMS windows from
+ * just before `atS` for `windowS`, in dB. A hard stop takes a ringing sound to silence in one window; a fade a few dB a window.
+ */
+export function clickDb(channels, sampleRate, atS, { windowS = 0.04, stepS = 0.001 } = {}) {
+  const step = Math.max(1, Math.round(stepS * sampleRate))
+  const at = Math.round(atS * sampleRate)
+  let prev = null
+  let worst = 0
+  for (let i = at - step; i < at + windowS * sampleRate; i += step) {
+    const level = Math.max(CUT_FLOOR_DB, rmsDb(channels, i, i + step))
+    if (prev !== null) worst = Math.max(worst, prev - level)
+    prev = level
+  }
+  return worst
+}
+
 /** Bar lines from `startS` every `barS` up to `endS` (minus a window), skipping the seams. */
 export function barLines(startS, barS, endS, seams, windowS = 0.4) {
   const bars = []
@@ -208,6 +228,7 @@ export const TARGETS = [
   { key: 'below30Db', label: 'Energy below 30 Hz', unit: 'dB rel', max: -30, note: '"nothing below 30 Hz"' },
   { key: 'correlation', label: 'Stereo correlation', unit: '', min: 0, note: 'mono-compatible' },
   { key: 'seamJumpMax', label: 'Loop-seam jump vs bar lines', unit: 'dB', max: 1, abs: true, note: 'worst seam' },
+  { key: 'clickMax', label: 'Steepest 1 ms drop at a cut', unit: 'dB', max: 15, note: 'worst cut: a click' },
   { key: 'gunTailMs', label: 'Gun to silence (−60 dB)', unit: 'ms', kinds: ['sfx'], max: 150 },
   { key: 'killOverMusicDb', label: 'Kill peak over the music around it', unit: 'dB', kinds: ['mix'], min: 6, note: 'worst kill' },
   { key: 'lra', label: 'Loudness range', unit: 'LU' },

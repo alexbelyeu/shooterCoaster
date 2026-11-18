@@ -99,10 +99,11 @@ interface MasterChain {
   trim: GainNode
   duck: BiquadFilterNode
   musicPause: GainNode
+  /** The arcade SFX's input: silent while paused. */
   sfxPause: GainNode
   /** The score engine's music, at the Settings music volume. */
   score: GainNode
-  /** The arcade SFX, at the Settings effects volume. */
+  /** The arcade SFX, at the Settings effects volume; the countdown and UI blips come in here, past the pause gate. */
   arcade: GainNode
 }
 
@@ -113,14 +114,14 @@ function createMasterChain(ctx: BaseAudioContext): MasterChain {
   limiter.connect(trim)
   const musicPause = new GainNode(ctx)
   musicPause.connect(limiter)
-  const sfxPause = new GainNode(ctx)
-  sfxPause.connect(limiter)
   const duck = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: DUCK_OPEN_HZ, Q: 1 })
   duck.connect(musicPause)
   const score = new GainNode(ctx)
   score.connect(duck)
   const arcade = new GainNode(ctx)
-  arcade.connect(sfxPause)
+  arcade.connect(limiter)
+  const sfxPause = new GainNode(ctx)
+  sfxPause.connect(arcade)
   return { limiter, trim, duck, musicPause, sfxPause, score, arcade }
 }
 
@@ -132,11 +133,14 @@ let pauseMix = false
 // Live bindings: an offline render swaps them for the length of the render.
 export let scoreChannel: AudioNode
 export let arcadeChannel: AudioNode
+/** The countdown and UI blips: at the effects volume, but heard while paused (the resume Ready / GO, #246). */
+export let arcadeUiChannel: AudioNode
 
 function setChain(c: MasterChain) {
   chain = c
   scoreChannel = c.score
-  arcadeChannel = c.arcade
+  arcadeChannel = c.sfxPause
+  arcadeUiChannel = c.arcade
 }
 
 /** `offlineRender.ts`: a fresh chain in `ctx` on the render's scripted clock, audio marked ready; returns the restore. */

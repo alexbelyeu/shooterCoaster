@@ -17,6 +17,8 @@ export interface VoiceStats {
   played: number
   stolen: number
   rejected: number
+  /** The countdown and UI blips, on their own voices outside the budget. */
+  ui: number
 }
 
 /** `whoosh`: PLAY on the title, under its fade to black. */

@@ -466,6 +466,11 @@ interface CompiledPattern {
   perVoice: Record<string, StepEvent[]>
 }
 
+/** The section whose bar and beat set the song's grid: the loop's first, or the intro's for a song without a loop. */
+export function barSection(song: CompiledSong): Section | undefined {
+  return song.loop.sections[0] ?? song.intro.sections[0]
+}
+
 export function compile(text: string): CompiledSong {
   const { song, errors } = parse(text)
   const err = (ln: number, msg: string) => errors.push({ line: ln, msg })

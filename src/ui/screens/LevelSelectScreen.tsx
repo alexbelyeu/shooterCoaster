@@ -95,7 +95,7 @@ export default function LevelSelectScreen() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  })
+  }, [launching])
 
   function launch(key: string, start: () => void) {
     sfx().ui('launch')

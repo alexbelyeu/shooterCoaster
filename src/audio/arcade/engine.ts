@@ -3,10 +3,10 @@ import type { BiomeType } from '@/types/level'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { createRng, hashString } from '@/utils/rng'
 import { comboTierIndex } from '@/combat/comboTiers'
-import { arcadeChannel, audioContext, audioNow as clock, isAudioReady } from '../AudioEngine'
+import { arcadeChannel, arcadeUiChannel, audioContext, audioNow as clock, isAudioReady } from '../AudioEngine'
 import { scrimPlayer } from '../musicEngine'
 import { dropSound } from '../soundGuard'
-import { compile } from '../scrim/score'
+import { barSection, compile } from '../scrim/score'
 import { makeIR, upmixPanner } from '../scrim/synth'
 import { SCORES, scoreIdFor } from '../scores'
 import {
@@ -31,10 +31,14 @@ interface Graph {
   channel: AudioNode
   biome: BiomeType
   out: GainNode
+  /** The countdown and UI blips, past the pause gate (`arcadeUiChannel`). */
+  uiOut: GainNode
   verb: ConvolverNode
   verbTone: BiquadFilterNode
   verbReturn: GainNode
   voices: Voice[]
+  /** Outside the budget, on `uiOut`: the resume Ready / GO plays while the run is still paused. */
+  uiVoices: Voice[]
   /** The FRENZY lift's own voice: a loop, never stolen. */
   lift: Voice
   /** The ride wind: looped noise → band-pass → gain, silent until `wind` opens it. */
@@ -52,13 +56,25 @@ let graph: Graph | null = null
 let bank: Bank | null = null
 let bankKey: string | null = null
 let bankSpec: BakeSpec | null = null
-let biome: BiomeType = 'themePark'
 /** `score:biome` of the last `prepare`. */
 let wanted: string | null = null
 let baking: { key: string; promise: Promise<void> } | null = null
 let liftOn = false
 
-const stats: VoiceStats = { budget: VOICE_BUDGET, live: 0, peak: 0, played: 0, stolen: 0, rejected: 0 }
+const stats: VoiceStats = { budget: VOICE_BUDGET, live: 0, peak: 0, played: 0, stolen: 0, rejected: 0, ui: 0 }
+/** Every graph's long-lived nodes until disconnected, a fading one's included. */
+let graphNodes = 0
+
+/** A budget voice's source stops counting as live: ended, stolen or disposed (`stats.live`, #246). */
+function release(src: AudioScheduledSourceNode | null) {
+  if (!src?.onended) return
+  src.onended = null
+  stats.live--
+}
+
+function onSourceEnded(this: AudioScheduledSourceNode) {
+  release(this)
+}
 
 function createVoice(ctx: BaseAudioContext, out: AudioNode, verbIn: AudioNode): Voice {
   const gain = ctx.createGain()
@@ -73,14 +89,23 @@ function createVoice(ctx: BaseAudioContext, out: AudioNode, verbIn: AudioNode): 
   return { gain, lp, pan, send, src: null, prio: 0, startedAt: 0, endsAt: 0 }
 }
 
-/** Rebuilt when the context or channel changes (an offline render) or the biome does. */
+const UI_VOICES = 2
+const VOICE_NODES = 4
+const BUS_NODES = 5
+const WIND_NODES = 3
+const nodesOf = (g: Graph) => BUS_NODES + WIND_NODES + VOICE_NODES * (g.voices.length + g.uiVoices.length + 1)
+
+/** Rebuilt when the context or channel changes (an offline render) or the installed bank's biome does: the room comes with the bank (#246). */
 function ensureGraph(): Graph {
   const ctx = audioContext()
+  const biome = bankSpec?.biome ?? 'themePark'
   if (graph && graph.ctx === ctx && graph.channel === arcadeChannel && graph.biome === biome) return graph
   disposeGraph()
   const room = BIOME_REVERB[biome]
   const out = ctx.createGain()
   out.connect(arcadeChannel)
+  const uiOut = ctx.createGain()
+  uiOut.connect(arcadeUiChannel)
   const verb = ctx.createConvolver()
   verb.buffer = makeIR(ctx, room.seconds, room.decayPow)
   const verbTone = ctx.createBiquadFilter()
@@ -91,7 +116,13 @@ function ensureGraph(): Graph {
   verb.connect(verbTone).connect(verbReturn).connect(out)
   const voices: Voice[] = []
   for (let i = 0; i < VOICE_BUDGET; i++) voices.push(createVoice(ctx, out, verb))
-  graph = { ctx, channel: arcadeChannel, biome, out, verb, verbTone, verbReturn, voices, lift: createVoice(ctx, out, verb), ...createWind(ctx, out) }
+  const uiVoices: Voice[] = []
+  for (let i = 0; i < UI_VOICES; i++) uiVoices.push(createVoice(ctx, uiOut, verb))
+  graph = {
+    ctx, channel: arcadeChannel, biome, out, uiOut, verb, verbTone, verbReturn, voices, uiVoices,
+    lift: createVoice(ctx, out, verb), ...createWind(ctx, out),
+  }
+  graphNodes += nodesOf(graph)
   return graph
 }
 
@@ -132,30 +163,43 @@ function setWind(speed: number) {
   }
 }
 
+/** Fades out what still rings (a launch blip under a biome swap) instead of cutting it, then disconnects; another or a finished context's graph goes at once. */
 function disposeGraph() {
-  if (!graph) return
-  for (const v of [...graph.voices, graph.lift]) {
+  const g = graph
+  if (!g) return
+  graph = null
+  liftOn = false
+  const fade = g.ctx === audioContext() && g.ctx.state !== 'closed'
+  const t = fade ? clock() : 0
+  const end = t + 2 * STEAL_FADE_S
+  const voices = [...g.voices, ...g.uiVoices, g.lift]
+  for (const v of voices) {
+    release(v.src)
     try {
-      v.src?.stop()
+      v.src?.stop(end)
     } catch {
       /* never started or already stopped */
     }
-    for (const n of [v.src, v.gain, v.lp, v.pan, v.send]) n?.disconnect()
   }
-  graph.windSrc.stop()
-  for (const n of [graph.windSrc, graph.windBand, graph.windAmp, graph.verb, graph.verbTone, graph.verbReturn, graph.out]) n.disconnect()
-  graph = null
-  liftOn = false
+  const disconnect = () => {
+    for (const v of voices) for (const n of [v.src, v.gain, v.lp, v.pan, v.send]) n?.disconnect()
+    for (const n of [g.windSrc, g.windBand, g.windAmp, g.verb, g.verbTone, g.verbReturn, g.out, g.uiOut]) n.disconnect()
+    graphNodes -= nodesOf(g)
+  }
+  if (fade) {
+    for (const out of [g.out, g.uiOut]) out.gain.setTargetAtTime(0, t, STEAL_FADE_S / 3)
+    g.windSrc.onended = disconnect
+    g.windSrc.stop(end)
+  } else {
+    g.windSrc.stop()
+    disconnect()
+  }
 }
-
-const VOICE_NODES = 4
-const BUS_NODES = 4
-const WIND_NODES = 3
 
 function bakeSpec(scoreId: string, levelBiome: BiomeType, level: string | null): BakeSpec {
   const id = scoreIdFor(scoreId)
   const song = compile(SCORES[id])
-  const section = song.loop.sections[0] ?? song.intro.sections[0]
+  const section = barSection(song)!
   const config = level ? getLevelConfig(level) : undefined
   return {
     key: SCORE_KEYS[id],
@@ -169,11 +213,28 @@ function bakeSpec(scoreId: string, levelBiome: BiomeType, level: string | null):
 
 const scoreIdOf = (level: string | null) => (level && SCORES[level] ? level : 'title')
 
+function install(key: string, spec: BakeSpec, baked: Bank) {
+  bank = baked
+  bankKey = key
+  bankSpec = spec
+  if (isAudioReady()) ensureGraph()
+}
+
+/** Offline renders (`npm run audio:render -- --launch`): bakes a level's bank now, to land at a scripted moment of the render. */
+export async function prebake(level: string, levelBiome: BiomeType): Promise<() => void> {
+  const key = `${scoreIdOf(level)}:${levelBiome}`
+  const spec = bakeSpec(scoreIdOf(level), levelBiome, level)
+  const baked = await bakeBank(spec, BAKE_RATE, hashString(key))
+  return () => {
+    wanted = key
+    install(key, spec, baked)
+  }
+}
+
 /** A bake installs only if it is still the one `wanted`: a menu's and a level's prepare can overlap. */
 function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
   const key = `${scoreIdOf(level)}:${levelBiome}`
   wanted = key
-  biome = levelBiome
   if (bank && bankKey === key) {
     if (isAudioReady()) ensureGraph()
     return Promise.resolve()
@@ -182,11 +243,7 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
   const spec = bakeSpec(scoreIdOf(level), levelBiome, level)
   const promise = bakeBank(spec, isAudioReady() ? audioContext().sampleRate : BAKE_RATE, hashString(key))
     .then((baked) => {
-      if (wanted !== key) return
-      bank = baked
-      bankKey = key
-      bankSpec = spec
-      if (isAudioReady()) ensureGraph()
+      if (wanted === key) install(key, spec, baked)
     })
     .finally(() => {
       if (baking?.key === key) baking = null
@@ -196,6 +253,7 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
 }
 
 const NO_PLACE: Placement = { pan: 0, cutoffHz: 20000 }
+const UI_ROUTED = new Set<ArcadeSoundId>(['countReady', 'countGo', 'uiSelect', 'uiBack', 'uiLaunch', 'uiWhoosh'])
 
 /** Null before audio unlocks or the bank is baked, or when every voice plays something more important. */
 function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: Placement | null = null, loopOffset = -1): Voice | null {
@@ -206,19 +264,22 @@ function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: P
     const now = clock()
     const def = ARCADE_SOUNDS[id]
     const loop = loopOffset >= 0
+    const ui = UI_ROUTED.has(id)
     let t = Math.max(at, now)
     let v: Voice
     if (loop) v = g.lift
     else {
-      const i = pickVoice(g.voices, def.prio, t)
+      const pool = ui ? g.uiVoices : g.voices
+      const i = pickVoice(pool, def.prio, t)
       if (i < 0) {
-        stats.rejected++
+        if (!ui) stats.rejected++
         return null
       }
-      v = g.voices[i]
+      v = pool[i]
     }
+    release(v.src)
     if (v.src && v.endsAt > t) {
-      if (!loop) stats.stolen++
+      if (!loop && !ui) stats.stolen++
       v.gain.gain.cancelScheduledValues(t)
       v.gain.gain.setTargetAtTime(0, t, STEAL_FADE_S / 3)
       t += STEAL_FADE_S
@@ -241,19 +302,17 @@ function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: P
     v.prio = def.prio
     v.startedAt = t
     v.endsAt = loop ? Infinity : t + buffer.duration / rate
-    stats.played++
-    stats.peak = Math.max(stats.peak, liveVoices(t))
+    if (ui) stats.ui++
+    else if (!loop) {
+      src.onended = onSourceEnded
+      stats.played++
+      stats.peak = Math.max(stats.peak, ++stats.live)
+    }
     return v
   } catch (e) {
     dropSound(id, e)
     return null
   }
-}
-
-function liveVoices(now: number): number {
-  let live = 0
-  if (graph) for (const v of graph.voices) if (v.endsAt > now) live++
-  return live
 }
 
 const beat = { t: 0, beatInBar: 0 }
@@ -349,12 +408,9 @@ export const arcadeSfx: SfxEngine = {
   ui: (sound) => void play(UI_SOUNDS[sound]),
   countdown: (go) => void play(go ? 'countGo' : 'countReady'),
   wind: setWind,
-  nodeCount: () => (graph ? BUS_NODES + WIND_NODES + VOICE_NODES * (graph.voices.length + 1) : 0),
+  nodeCount: () => graphNodes,
   killsPlayed: () => killsPlayed,
-  voices() {
-    stats.live = liveVoices(clock())
-    return stats
-  },
+  voices: () => stats,
   dispose(level) {
     setLift(false)
     // A menu may already have asked for its own sounds: leave those alone, but silence the ride wind.
@@ -373,5 +429,6 @@ export const arcadeSfx: SfxEngine = {
 
 /** e2e, before a burst. */
 export function resetVoiceStats(): void {
-  stats.peak = stats.played = stats.stolen = stats.rejected = 0
+  stats.peak = stats.live
+  stats.played = stats.stolen = stats.rejected = 0
 }
