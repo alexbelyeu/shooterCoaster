@@ -1929,22 +1929,61 @@ const BOSS_CHECKS = [
  */
 const BOSS_FIGHT_SECONDS = 20
 const BOSS_HITS_PER_SECOND = 2
+/** Game seconds a `stepBoss` step moves the boss, and how far past its `seconds` it may go looking for `ready`. */
+const BOSS_STEP = 0.25
+const BOSS_STEP_EXTRA_S = 20
 
-/** Moves the boss alone `seconds` (`bossStep`, game time and the level timer frozen) until `ready()`: the game seconds it moved, or null if never ready. */
+/**
+ * Moves the boss alone (`bossStep`, game time and the level timer frozen) in steps of 0.25 game seconds, at least
+ * `seconds` and then on until `ready` holds, at most `BOSS_STEP_EXTRA_S` more: the game seconds it moved, or null if
+ * never ready. The steps and the check run in the page, one step a rendered frame and `ready` checked after each, so
+ * it stops on the step that made it ready whatever the frame rate (#634: polled from here, a slow renderer took a step
+ * or two more before the stop landed, and the Yeti's snowball in flight was gone by the screenshot).
+ * `ready`: `{ exposed, projectiles }`, the boss's weak points and thrown things on screen it needs.
+ */
 async function stepBoss(page, seconds, ready) {
   if (seconds <= 0) return 0
-  const step = 0.25
-  const f0 = await getFrames(page)
-  await page.evaluate((s) => { window.__SC_TEST__.bossStep = s }, step)
-  const ok = await pollUntil(
-    page,
-    async () => (await getFrames(page)) - f0 >= seconds / step && (await ready()),
-    { ms: 30000 + seconds * 8000, frames: Math.ceil(seconds / step) * 3, pollMs: 200 },
-  )
-  await page.evaluate(() => { window.__SC_TEST__.bossStep = null })
-  const moved = ((await getFrames(page)) - f0) * step
-  await waitFrames(page, 1, { maxMs: 20000, pollMs: 100 })
-  return ok ? moved : null
+  return page.evaluate(({ step, minSteps, maxSteps, need, deadlineMs }) => new Promise((resolve) => {
+    const s = window.__SC_TEST__
+    const isReady = () => {
+      const b = s.boss()
+      return b.exposed.filter((e) => e.onScreen).length >= need.exposed
+        && b.projectiles.filter((p) => p.onScreen).length >= need.projectiles
+    }
+    const stop = (result) => {
+      s.bossStep = null
+      resolve(result)
+    }
+    const deadline = Date.now() + deadlineMs
+    let steps = 0
+    let framesAtStep = -1
+    // Registered outside the game's frame callback, so on every frame it runs after it: a step set here is taken by
+    // the next game frame, which `frames` moving past `framesAtStep` confirms.
+    const frame = () => {
+      if (framesAtStep >= 0) {
+        if (s.frames === framesAtStep) {
+          if (Date.now() > deadline) return stop(null)
+          requestAnimationFrame(frame)
+          return
+        }
+        s.bossStep = null
+        framesAtStep = -1
+        steps++
+      }
+      if (steps >= minSteps && isReady()) return stop(steps * step)
+      if (steps >= maxSteps || Date.now() > deadline) return stop(null)
+      s.bossStep = step
+      framesAtStep = s.frames
+      requestAnimationFrame(frame)
+    }
+    requestAnimationFrame(frame)
+  }), {
+    step: BOSS_STEP,
+    minSteps: Math.ceil(seconds / BOSS_STEP),
+    maxSteps: Math.ceil((seconds + BOSS_STEP_EXTRA_S) / BOSS_STEP),
+    need: { exposed: 0, projectiles: 0, ...ready },
+    deadlineMs: 30000 + seconds * 8000,
+  })
 }
 
 /**
@@ -1971,9 +2010,7 @@ async function bossCheck(page, check) {
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
-  const onScreen = async (min) => (await boss()).exposed.filter((e) => e.onScreen).length >= min
-  const thrown = async () => (await boss()).projectiles.filter((p) => p.onScreen).length >= minProjectiles
-  const settled = await stepBoss(page, settleS, async () => (await onScreen(minOnScreen)) && (await thrown()))
+  const settled = await stepBoss(page, settleS, { exposed: minOnScreen, projectiles: minProjectiles })
   const tell = await page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'incoming').map((e) => e.label))
   const before = await boss()
   const drawCalls = await page.evaluate(() => window.__SC_TEST__.drawCalls)
@@ -2013,14 +2050,14 @@ async function bossCheck(page, check) {
   let midSurfaced = 0
   for (let i = 0; i < midPhases; i++) {
     await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
-    midSurfaced += (await stepBoss(page, midSettleS, () => onScreen(1))) ?? midSettleS
+    midSurfaced += (await stepBoss(page, midSettleS, { exposed: 1 })) ?? midSettleS
     const hp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
     midHits += hp
     await page.evaluate((n) => window.__SC_TEST__.bossHit(n), hp)
   }
   const midway = await boss()
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
-  const surfaced = await stepBoss(page, midSettleS, () => onScreen(1))
+  const surfaced = await stepBoss(page, midSettleS, { exposed: 1 })
   await page.screenshot({ path: path.join(OUT, `${level}-${midShot}.png`), timeout: SHOT_TIMEOUT })
   // Leant out for her last phase: the ride's last stretch past her, for a look that it stays clear of her bust.
   for (const t of passShots) {
