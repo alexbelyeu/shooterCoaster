@@ -56,6 +56,7 @@ export default function SceneManager() {
         key={level ? 'level' : 'title'}
         bloom={level ? LEVEL_BLOOM : TITLE_BLOOM}
         grade={biome ? ATMOSPHERES[biome].grade : TITLE_GRADE}
+        heatShimmer={biome ? ATMOSPHERES[biome].heatShimmer === true : false}
       />
     </>
   )

@@ -18,12 +18,14 @@ export interface QualityProfile {
   contactShadows: boolean
   /** Octaves of the procedural noise shaders' `fbm` (`FBM_OCTAVES` of `noiseGlsl.ts`' `fbm`: the Flame's fire, the volcano's smoke and lava); `fbmOctaves()` cuts it on touch. */
   fbmOctaves: number
+  /** The air over the Flame wavers (#627; never on touch screens either). */
+  heatShimmer: boolean
 }
 
 export const QUALITY_PROFILES: Record<Exclude<GraphicsQuality, 'auto'>, QualityProfile> = {
-  high: { maxDpr: 2, multisampling: { fine: 8, coarse: 4 }, bloom: true, particleScale: 1, contactShadows: true, fbmOctaves: 4 },
-  medium: { maxDpr: 1.5, multisampling: { fine: 4, coarse: 2 }, bloom: true, particleScale: 0.75, contactShadows: true, fbmOctaves: 4 },
-  low: { maxDpr: 1, multisampling: { fine: 0, coarse: 0 }, bloom: false, particleScale: 0.5, contactShadows: false, fbmOctaves: 3 },
+  high: { maxDpr: 2, multisampling: { fine: 8, coarse: 4 }, bloom: true, particleScale: 1, contactShadows: true, fbmOctaves: 4, heatShimmer: true },
+  medium: { maxDpr: 1.5, multisampling: { fine: 4, coarse: 2 }, bloom: true, particleScale: 0.75, contactShadows: true, fbmOctaves: 4, heatShimmer: true },
+  low: { maxDpr: 1, multisampling: { fine: 0, coarse: 0 }, bloom: false, particleScale: 0.5, contactShadows: false, fbmOctaves: 3, heatShimmer: false },
 }
 
 export function qualityProfile(quality: GraphicsQuality): QualityProfile {
