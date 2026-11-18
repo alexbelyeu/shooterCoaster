@@ -60,15 +60,13 @@ Each keeps its hook in `base`: the doubling or stabs come in at 3×.
 | Boss / finale | any | A variation of the level theme, darker and louder | the level's colour + orchestra hits |
 | Results | any | 3–6 s jingle: rising for 3★, flatter for 1★ or 0★, then a calm loop | bells + brass |
 
-**Climbing Gym options (#456), waiting on Alex's pick** (`src/audio/scores/themes/level6.<name>.scrim`, `?theme=<name>`;
-`renders/theme-level6-*`). Each is a 2-bar intro and a 32-bar loop (A A′ B B′ A A′, then the A pair lifted), its hook in `base`:
-"Chalk Up" (`chalkup`, D major, 174: a supersaw hook that stops on its bar's last beat for two 909 claps, offbeat
-synth-brass, pumping FM bass, four-on-the-floor bigkick; lifts a tone; the most direct, Neon-like), "Uptown Local"
-(`subway`, E minor, 172: street funk, an FM slap-bass riff with a chromatic rat run carries the hook under synth-brass
-stabs and a guiro scratch, a broken beat; a square wave doubles the riff two octaves up at 3×; lifts a minor third; the
-grimiest and darkest) and "Lanternfly Hop" (`lanternfly`, E♭ major, 176: a cartoon chase, a xylophone hook hopping up
-the chord with a chromatic hiccup before each top note over an oom-pah FM bass, offbeat marimba and woodblock; lifts a
-tone; the funniest). The boss section (Medusa) is a later issue.
+**Climbing Gym pick (#565).** Alex picked "Uptown Local" (`subway`) from the three options of #456, now
+`src/audio/scores/level6.scrim`: street funk in E minor at 172, an FM slap-bass riff with a chromatic rat run carries the
+hook under synth-brass stabs and a guiro scratch over a broken beat; a square wave doubles the riff two octaves up at 3×,
+and the last 8 bars lift a minor third. He took the grimiest and darkest option, and passed on the most Neon-like
+(`chalkup`) and the funniest (`lanternfly`). Its Medusa boss section turns the riff E Phrygian (F natural, a B♭ tritone)
+under E minor / F major stabs, orchestra hits in base and a hissing guiro, with the brass taking a line of its own in its
+second half; the sting is an E major chord (#566).
 
 **Picked themes (#301):** the title is "Neon Marquee" (A minor, 160, supersaw hook over a
 four-on-the-floor bigkick, gated snare and FM bass; the lift replays the hook a tone up). level1

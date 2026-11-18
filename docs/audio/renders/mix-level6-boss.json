@@ -1,0 +1,560 @@
+{
+  "name": "mix-level6-boss",
+  "kind": "mix",
+  "request": {
+    "kind": "mix",
+    "level": "level6",
+    "seconds": 30,
+    "boss": true
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.15,
+      "name": "level6 music + wind"
+    },
+    {
+      "t": 1,
+      "name": "autofire starts (held trigger)"
+    },
+    {
+      "t": 1.6,
+      "name": "kills every 0.75 s, combo climbing"
+    },
+    {
+      "t": 1.68,
+      "name": "kill 1"
+    },
+    {
+      "t": 2.43,
+      "name": "kill 2"
+    },
+    {
+      "t": 3.18,
+      "name": "kill 3"
+    },
+    {
+      "t": 3.93,
+      "name": "kill 4"
+    },
+    {
+      "t": 4,
+      "name": "wave tell"
+    },
+    {
+      "t": 4.68,
+      "name": "kill 5"
+    },
+    {
+      "t": 5.43,
+      "name": "kill 6"
+    },
+    {
+      "t": 6,
+      "name": "boss:spawn: boss arrival + the boss section on the next bar"
+    },
+    {
+      "t": 6.18,
+      "name": "kill 7"
+    },
+    {
+      "t": 6.93,
+      "name": "kill 8"
+    },
+    {
+      "t": 7.68,
+      "name": "kill 9"
+    },
+    {
+      "t": 8.43,
+      "name": "kill 10"
+    },
+    {
+      "t": 9.18,
+      "name": "kill 11"
+    },
+    {
+      "t": 9.93,
+      "name": "kill 12"
+    },
+    {
+      "t": 10.68,
+      "name": "kill 13"
+    },
+    {
+      "t": 11.43,
+      "name": "kill 14"
+    },
+    {
+      "t": 12.1,
+      "name": "FRENZY (kill 15): music ducked for 1.5 s"
+    },
+    {
+      "t": 12.18,
+      "name": "kill 15"
+    },
+    {
+      "t": 12.93,
+      "name": "kill 16"
+    },
+    {
+      "t": 13.68,
+      "name": "kill 17"
+    },
+    {
+      "t": 14.43,
+      "name": "kill 18"
+    },
+    {
+      "t": 15.18,
+      "name": "kill 19"
+    },
+    {
+      "t": 15.93,
+      "name": "kill 20"
+    },
+    {
+      "t": 16.68,
+      "name": "kill 21"
+    },
+    {
+      "t": 17.43,
+      "name": "kill 22"
+    },
+    {
+      "t": 18.18,
+      "name": "kill 23"
+    },
+    {
+      "t": 18.93,
+      "name": "kill 24"
+    },
+    {
+      "t": 19.68,
+      "name": "kill 25"
+    },
+    {
+      "t": 20.43,
+      "name": "kill 26"
+    },
+    {
+      "t": 21,
+      "name": "boss:defeated: boss defeat + the sting on the next bar, then the loop"
+    },
+    {
+      "t": 21.18,
+      "name": "kill 27"
+    },
+    {
+      "t": 21.93,
+      "name": "kill 28"
+    },
+    {
+      "t": 22.68,
+      "name": "kill 29"
+    },
+    {
+      "t": 23.43,
+      "name": "kill 30"
+    },
+    {
+      "t": 24.18,
+      "name": "kill 31"
+    },
+    {
+      "t": 24.93,
+      "name": "kill 32"
+    },
+    {
+      "t": 25.68,
+      "name": "kill 33"
+    },
+    {
+      "t": 26.43,
+      "name": "kill 34"
+    },
+    {
+      "t": 27.18,
+      "name": "kill 35"
+    },
+    {
+      "t": 27.93,
+      "name": "kill 36"
+    },
+    {
+      "t": 28.68,
+      "name": "kill 37"
+    },
+    {
+      "t": 29.43,
+      "name": "kill 38"
+    }
+  ],
+  "seams": [
+    7.126744186046512,
+    22.475581395348836,
+    25.266279069767442
+  ],
+  "bar": {
+    "startS": 0.15,
+    "barS": 1.3953488372093024
+  },
+  "metrics": {
+    "seconds": 30,
+    "integrated": -14,
+    "shortTermMax": -12.8,
+    "lra": 2.4,
+    "truePeak": -1.3,
+    "clipped": 0,
+    "silence": 0.5,
+    "correlation": 0.9,
+    "below30Db": -34.8,
+    "bands": {
+      "sub": {
+        "pct": 27.1,
+        "db": -5.7
+      },
+      "low": {
+        "pct": 48.6,
+        "db": -3.1
+      },
+      "mid": {
+        "pct": 17.6,
+        "db": -7.5
+      },
+      "presence": {
+        "pct": 5.6,
+        "db": -12.5
+      },
+      "air": {
+        "pct": 1.1,
+        "db": -19.6
+      },
+      "below30": {
+        "pct": 0,
+        "db": -34.8
+      }
+    },
+    "seamJumps": [
+      {
+        "at": 7.127,
+        "db": 0.05,
+        "vsBars": -0.14
+      },
+      {
+        "at": 22.476,
+        "db": -1.3,
+        "vsBars": -0.27
+      },
+      {
+        "at": 25.266,
+        "db": -0.13,
+        "vsBars": -0.02
+      }
+    ],
+    "seamJumpMax": -0.27,
+    "killOverMusicDb": 7.2,
+    "kills": [
+      {
+        "t": 1.68,
+        "killDb": -2.4,
+        "musicDb": -10.2,
+        "overDb": 7.8
+      },
+      {
+        "t": 2.43,
+        "killDb": -2.6,
+        "musicDb": -10,
+        "overDb": 7.4
+      },
+      {
+        "t": 3.18,
+        "killDb": -3.1,
+        "musicDb": -10.2,
+        "overDb": 7.2
+      },
+      {
+        "t": 3.93,
+        "killDb": -2.2,
+        "musicDb": -10.3,
+        "overDb": 8.1
+      },
+      {
+        "t": 4.68,
+        "killDb": -2.2,
+        "musicDb": -9.7,
+        "overDb": 7.5
+      },
+      {
+        "t": 5.43,
+        "killDb": -2.1,
+        "musicDb": -10.1,
+        "overDb": 8.1
+      },
+      {
+        "t": 6.18,
+        "killDb": -1.5,
+        "musicDb": -10.1,
+        "overDb": 8.5
+      },
+      {
+        "t": 6.93,
+        "killDb": -1.9,
+        "musicDb": -10.1,
+        "overDb": 8.2
+      },
+      {
+        "t": 7.68,
+        "killDb": -2.3,
+        "musicDb": -10,
+        "overDb": 7.7
+      },
+      {
+        "t": 8.43,
+        "killDb": -1.9,
+        "musicDb": -10.3,
+        "overDb": 8.4
+      },
+      {
+        "t": 9.18,
+        "killDb": -2,
+        "musicDb": -10.3,
+        "overDb": 8.3
+      },
+      {
+        "t": 9.93,
+        "killDb": -2.3,
+        "musicDb": -10.4,
+        "overDb": 8.2
+      },
+      {
+        "t": 10.68,
+        "killDb": -2,
+        "musicDb": -10.5,
+        "overDb": 8.6
+      },
+      {
+        "t": 11.43,
+        "killDb": -2.1,
+        "musicDb": -10.5,
+        "overDb": 8.4
+      },
+      {
+        "t": 12.18,
+        "killDb": -2.5,
+        "musicDb": -10.6,
+        "overDb": 8.1
+      },
+      {
+        "t": 12.93,
+        "killDb": -2,
+        "musicDb": -9.8,
+        "overDb": 7.8
+      },
+      {
+        "t": 13.68,
+        "killDb": -2.2,
+        "musicDb": -9.7,
+        "overDb": 7.5
+      },
+      {
+        "t": 14.43,
+        "killDb": -2.5,
+        "musicDb": -10.2,
+        "overDb": 7.7
+      },
+      {
+        "t": 15.18,
+        "killDb": -2.2,
+        "musicDb": -10.2,
+        "overDb": 8
+      },
+      {
+        "t": 15.93,
+        "killDb": -2.2,
+        "musicDb": -10.4,
+        "overDb": 8.2
+      },
+      {
+        "t": 16.68,
+        "killDb": -2.1,
+        "musicDb": -10.2,
+        "overDb": 8.1
+      },
+      {
+        "t": 17.43,
+        "killDb": -2.1,
+        "musicDb": -10,
+        "overDb": 7.9
+      },
+      {
+        "t": 18.18,
+        "killDb": -2.1,
+        "musicDb": -10.2,
+        "overDb": 8.1
+      },
+      {
+        "t": 18.93,
+        "killDb": -2.4,
+        "musicDb": -9.9,
+        "overDb": 7.6
+      },
+      {
+        "t": 19.68,
+        "killDb": -2.2,
+        "musicDb": -10.4,
+        "overDb": 8.3
+      },
+      {
+        "t": 20.43,
+        "killDb": -2.3,
+        "musicDb": -10.3,
+        "overDb": 8.1
+      },
+      {
+        "t": 21.18,
+        "killDb": -2.1,
+        "musicDb": -9.7,
+        "overDb": 7.6
+      },
+      {
+        "t": 21.93,
+        "killDb": -1.9,
+        "musicDb": -10.3,
+        "overDb": 8.4
+      },
+      {
+        "t": 22.68,
+        "killDb": -2.3,
+        "musicDb": -10.2,
+        "overDb": 7.8
+      },
+      {
+        "t": 23.43,
+        "killDb": -2.1,
+        "musicDb": -10.1,
+        "overDb": 8
+      },
+      {
+        "t": 24.18,
+        "killDb": -1.9,
+        "musicDb": -10.3,
+        "overDb": 8.4
+      },
+      {
+        "t": 24.93,
+        "killDb": -1.9,
+        "musicDb": -9.7,
+        "overDb": 7.8
+      },
+      {
+        "t": 25.68,
+        "killDb": -2,
+        "musicDb": -9.9,
+        "overDb": 7.9
+      },
+      {
+        "t": 26.43,
+        "killDb": -2.1,
+        "musicDb": -9.6,
+        "overDb": 7.5
+      },
+      {
+        "t": 27.18,
+        "killDb": -2.2,
+        "musicDb": -10.5,
+        "overDb": 8.3
+      },
+      {
+        "t": 27.93,
+        "killDb": -2.4,
+        "musicDb": -10.1,
+        "overDb": 7.8
+      },
+      {
+        "t": 28.68,
+        "killDb": -2.1,
+        "musicDb": -10.3,
+        "overDb": 8.2
+      },
+      {
+        "t": 29.43,
+        "killDb": -2.2,
+        "musicDb": -10.3,
+        "overDb": 8
+      }
+    ]
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -14,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "Short-term max",
+      "value": -12.8,
+      "unit": "LUFS",
+      "min": -15,
+      "max": -13,
+      "status": "fail"
+    },
+    {
+      "label": "True peak",
+      "value": -1.3,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -34.8,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 0.9,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Loop-seam jump vs bar lines",
+      "value": -0.27,
+      "unit": "dB",
+      "max": 1,
+      "status": "pass"
+    },
+    {
+      "label": "Kill peak over the music around it",
+      "value": 7.2,
+      "unit": "dB",
+      "min": 6,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 2.4,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 0.5,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

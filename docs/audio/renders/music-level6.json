@@ -1,12 +1,11 @@
 {
-  "name": "theme-level6-chalkup-seam",
+  "name": "music-level6",
   "kind": "music",
   "request": {
     "kind": "music",
-    "track": "level6.chalkup",
+    "track": "level6",
     "layers": 3,
-    "seconds": 20,
-    "seam": true
+    "seam": false
   },
   "seed": 1,
   "sampleRate": 44100,
@@ -14,64 +13,60 @@
   "events": [
     {
       "t": 0.15,
-      "name": "level6.chalkup score from 36.90 s"
+      "name": "level6 score"
+    },
+    {
+      "t": 2.9406976744186046,
+      "name": "loop starts"
     },
     {
       "t": 0.15,
       "name": "intensity 3"
     }
   ],
-  "seams": [
-    10.149999999999999
-  ],
+  "seams": [],
   "bar": {
-    "startS": 0.4948275862068954,
-    "barS": 1.3793103448275863
+    "startS": 2.9406976744186046,
+    "barS": 1.3953488372093024
   },
   "metrics": {
-    "seconds": 20,
+    "seconds": 30,
     "integrated": -17.7,
     "shortTermMax": -17.3,
-    "lra": 0.5,
+    "lra": 0.4,
     "truePeak": -9.5,
     "clipped": 0,
-    "silence": 0.8,
-    "correlation": 0.885,
-    "below30Db": -34.2,
+    "silence": 0.5,
+    "correlation": 0.991,
+    "below30Db": -34.3,
     "bands": {
       "sub": {
-        "pct": 33.8,
-        "db": -4.7
+        "pct": 29,
+        "db": -5.4
       },
       "low": {
-        "pct": 29.6,
-        "db": -5.3
+        "pct": 46.7,
+        "db": -3.3
       },
       "mid": {
-        "pct": 27.7,
-        "db": -5.6
+        "pct": 20.5,
+        "db": -6.9
       },
       "presence": {
-        "pct": 7.6,
-        "db": -11.2
+        "pct": 2.2,
+        "db": -16.6
       },
       "air": {
-        "pct": 1.4,
-        "db": -18.7
+        "pct": 1.6,
+        "db": -17.8
       },
       "below30": {
         "pct": 0,
-        "db": -34.2
+        "db": -34.3
       }
     },
-    "seamJumps": [
-      {
-        "at": 10.15,
-        "db": 0.09,
-        "vsBars": -0.01
-      }
-    ],
-    "seamJumpMax": -0.01
+    "seamJumps": [],
+    "seamJumpMax": null
   },
   "targets": [
     {
@@ -104,34 +99,27 @@
     },
     {
       "label": "Energy below 30 Hz",
-      "value": -34.2,
+      "value": -34.3,
       "unit": "dB rel",
       "max": -30,
       "status": "pass"
     },
     {
       "label": "Stereo correlation",
-      "value": 0.885,
+      "value": 0.991,
       "unit": "",
       "min": 0,
       "status": "pass"
     },
     {
-      "label": "Loop-seam jump vs bar lines",
-      "value": -0.01,
-      "unit": "dB",
-      "max": 1,
-      "status": "pass"
-    },
-    {
       "label": "Loudness range",
-      "value": 0.5,
+      "value": 0.4,
       "unit": "LU",
       "status": "info"
     },
     {
       "label": "Digital silence",
-      "value": 0.8,
+      "value": 0.5,
       "unit": "%",
       "status": "info"
     }
