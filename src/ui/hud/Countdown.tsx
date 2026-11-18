@@ -6,6 +6,7 @@ import { isFeedbackHeld } from '@/combat/hitFeedback'
 import { sfx } from '@/audio/sfx'
 import { isLevelSceneLoaded, loadLevelScene } from '@/canvas/loadLevelScene'
 import { readyDone } from './countdownGate'
+import { setCountdownGoAt } from '@/core/introShot'
 
 /** GO! sets `playing` and stays up over the HUD for `goHoldMs`: 2.5 s in all on a warm start, ~1.6 s on a resume. */
 const SEQUENCES = {
@@ -70,11 +71,18 @@ export default function Countdown() {
 
   useEffect(() => {
     if (step === null || step === 0) return
-    if (step < go) return stepTimeout(() => setStep(step + 1), stepMs)
+    if (step < go) {
+      // The camera's intro swoop lands in the seat on GO (#328).
+      if (mode === 'start' && step === go - 1) setCountdownGoAt(performance.now() + stepMs)
+      return stepTimeout(() => setStep(step + 1), stepMs)
+    }
+    setCountdownGoAt(null)
     const store = useGameStore.getState()
     if (store.phase === 'countdown' || (store.phase === 'paused' && store.resuming)) store.setPhase('playing')
     return stepTimeout(() => setStep(null), goHoldMs)
-  }, [step, go, stepMs, goHoldMs])
+  }, [step, go, stepMs, goHoldMs, mode])
+
+  useEffect(() => () => setCountdownGoAt(null), [])
 
   useEffect(() => {
     if (step !== null) sfx().countdown(step === go)
