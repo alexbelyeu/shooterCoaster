@@ -4,7 +4,7 @@
  * results it circles the landmark. `CoasterCamera` plays both and never moves the camera off the ride in `playing`.
  */
 import type { Vec3Like } from './cameraRig.hot'
-import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
+import { clampIntoBounds, type PlacementBounds } from '@/entities/spawning/spawnPlacement'
 
 /** What a level's intro and results frame: its landmark (`BiomeDefinition.hero`, in each `biomes/<biome>/index.ts`). */
 export interface HeroShot {
@@ -96,13 +96,6 @@ export function stepSwoopClock(c: SwoopClock, dt: number, visible: boolean, toGo
   return c.progress
 }
 
-function clampInto(p: Vec3Like, b: PlacementBounds | undefined): void {
-  if (!b) return
-  p.x = Math.min(b.maxX, Math.max(b.minX, p.x))
-  p.y = Math.min(b.maxY, p.y)
-  p.z = Math.min(b.maxZ, Math.max(b.minZ, p.z))
-}
-
 function smoothstep(x: number): number {
   const t = Math.min(Math.max(x, 0), 1)
   return t * t * (3 - 2 * t)
@@ -172,9 +165,9 @@ export function swoopPose(
   P2.x = seat.x - fx * 2 * back
   P2.y = seat.y + back * 0.5
   P2.z = seat.z - fz * 2 * back
-  clampInto(P0, bounds)
-  clampInto(P1, bounds)
-  clampInto(P2, bounds)
+  clampIntoBounds(P0, bounds)
+  clampIntoBounds(P1, bounds)
+  clampIntoBounds(P2, bounds)
   const s = 1 - t
   const b0 = s * s * s
   const b1 = 3 * s * s * t
@@ -227,7 +220,7 @@ export function orbitPose(
   outPos.x = hero.x + Math.cos(yaw) * hero.orbitRadius
   outPos.z = hero.z + Math.sin(yaw) * hero.orbitRadius
   outPos.y = Math.max(groundY + hero.orbitHeight, heightAt(outPos.x, outPos.z) + ORBIT_CLEARANCE)
-  clampInto(outPos, bounds)
+  clampIntoBounds(outPos, bounds)
   outTarget.x = hero.x
   outTarget.y = groundY + hero.focus
   outTarget.z = hero.z
