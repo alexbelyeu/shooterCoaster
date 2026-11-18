@@ -24,6 +24,8 @@ const LEVELS: LevelConfig[] = [
       curve: 'curve1',
       color1: 0xf3ece0,
       color2: 0xffff00,
+      // Under the midway (#332): the ride's second dip to the grass, about 21 s in.
+      tunnels: [{ from: 0.18, length: 520 }],
     },
     ...paceLevel({
       waves: [

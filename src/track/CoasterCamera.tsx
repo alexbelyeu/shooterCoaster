@@ -2,7 +2,9 @@ import { useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
-import type { ArcTable } from './arcLength'
+import { type ArcTable, distanceAtT } from './arcLength'
+import { TRACK_TUNNEL_EVENT, getTunnelDims } from './setPieces'
+import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
 import { setRideProgress } from './rideProgress.hot'
 import { MAX_RIDE_STEP_FRAMES, advanceRide, rideSpeeds, type RideState } from './ridePhysics'
 import { e2eRideSeconds, levelTimeStep } from '@/testing/e2eHook'
@@ -74,6 +76,17 @@ export default function CoasterCamera({
   const rig = useRef(createRigState())
   const streaks = useRef<StreakDrive>({ opacity: 0, time: 0 })
   const runId = useRef(-1)
+  const tunnelRamp = useMemo(() => getTunnelDims(trackScale).ramp, [trackScale])
+  /** The tunnel the car is in (-1: none), for `track:tunnel` enter / exit. */
+  const tunnelIndex = useRef(-1)
+  useEffect(() => {
+    const testApi = window.__SC_TEST__
+    if (testApi) testApi.tunnel.spans = (table.tunnels ?? []).map((span) => ({ from: table.t[span.from], to: table.t[span.to] }))
+  }, [table])
+  useEffect(() => () => {
+    if (tunnelIndex.current >= 0) eventBus.emit(TRACK_TUNNEL_EVENT, 'exit', tunnelIndex.current)
+    tunnelIndex.current = -1
+  }, [table])
 
   // Rotation-only trauma from kills and `camera:trauma` world events (#65); see screenShake.hot.ts.
   const shake = useRef({ trauma: 0, decayMs: KILL_TRAUMA_MS, time: 0, seed: 0 })
@@ -156,6 +169,14 @@ export default function CoasterCamera({
     const t = ride.current.progress
     _tangent.current.copy(curve.getTangentAt(t))
     setRideProgress(t)
+    const dist = distanceAtT(table, t)
+    const inTunnel = tunnelAt(table.tunnels, dist)
+    if (inTunnel !== tunnelIndex.current) {
+      if (tunnelIndex.current >= 0) eventBus.emit(TRACK_TUNNEL_EVENT, 'exit', tunnelIndex.current)
+      if (inTunnel >= 0) eventBus.emit(TRACK_TUNNEL_EVENT, 'enter', inTunnel)
+      tunnelIndex.current = inTunnel
+    }
+    const tunnel = tunnelDepth(table.tunnels, dist, tunnelRamp)
 
     _position.current.copy(curve.getPointAt(t))
     _position.current.y += heightOffset
@@ -210,10 +231,10 @@ export default function CoasterCamera({
       traumaDeg = Math.max(Math.abs(a.pitch), Math.abs(a.yaw), Math.abs(a.roll)) * RAD_TO_DEG
     }
 
-    const fov = fovWithSpeed(effectiveFov.current, r.speedNorm, motionScale, r.drop)
+    const fov = fovWithSpeed(effectiveFov.current, r.speedNorm, motionScale, r.drop, tunnel)
     const wind = streaks.current
-    wind.opacity = streakOpacity(r.speedNorm, motionScale)
-    wind.time += effectiveDelta * streakRate(r.speedNorm)
+    wind.opacity = streakOpacity(r.speedNorm, motionScale, tunnel)
+    wind.time += effectiveDelta * streakRate(r.speedNorm, tunnel)
     if (Math.abs(cam.fov - fov) > 0.01) {
       cam.fov = fov
       cam.updateProjectionMatrix()
@@ -236,6 +257,8 @@ export default function CoasterCamera({
       w.speed = r.speedNorm
       w.streaks = wind.opacity
       w.maxStreaks = Math.max(w.maxStreaks, wind.opacity)
+      testApi.tunnel.index = inTunnel
+      testApi.tunnel.depth = tunnel
     }
 
     sfx().wind(velocityNorm)

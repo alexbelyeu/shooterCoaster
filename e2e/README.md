@@ -94,7 +94,10 @@ and the shader warm-up must finish (and leaving a level mid-warm-up must log no 
 (`programs()`; the longest frame is reported). The step also prints the startup timings (`initTimings()`: boot, first title
 frame and PLAY from navigation; level mounted, env baked, warm-up done and first `playing` frame from the run's start) and writes
 them to `results.json` (`initTimings` on the `countdown` entry); no thresholds, software GL. A `speed` step holds the first level (or `--speed-level <id>`) at top speed on the most
-banked of ten sampled track points: the wind streaks must show and the camera must bank ≥ 1° (`speed.png`).
+banked of ten sampled track points: the wind streaks must show and the camera must bank ≥ 1° (`speed.png`). On a level with a
+tunnel (#332, the hook's `tunnel.spans`), it then holds the level timer and game time, rides to the first one's approach
+(`<id>-tunnel-entry.png`, not blank) and 75% of the way through it (`<id>-tunnel.png`): the car must be inside (`tunnel.index`),
+at least 35% of the frame dark and some of it near white (its lights).
 When level2 is in the run, a `wave` step rides it to the crow wave: its `wave:incoming` tell (screen-edge pulse +
 label) must come before the wave, on time by the level timer (`waveTellSeconds` ahead; the timer steps a fixed 0.25 s a frame
 around it, `timerStep`, so a slow frame can't land both together), the run is paused and resumed in between (the level timer is held on the tick the tell fires, so the pause lands in the gap on any runner, and the step fails if the wave came before the pause; no tell or wave may fire twice), then the V flies in and is frozen for `level2-wave.png` (≥ 5 crows on screen, none within 40 units).

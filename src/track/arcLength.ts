@@ -1,4 +1,5 @@
 import type { TrackCurve } from './curves/TrackCurve'
+import type { TunnelSpan } from './setPieces'
 
 /**
  * Dense arc-length lookup for a track curve. Track curves are parametric in t
@@ -15,6 +16,8 @@ export interface ArcTable {
   y: Float64Array
   z: Float64Array
   length: number
+  /** The level's tunnels in ride order (`setPieces.ts` `withTunnels`); absent on a track without any. */
+  tunnels?: readonly TunnelSpan[]
 }
 
 export function buildArcTable(curve: TrackCurve, n = 8192): ArcTable {

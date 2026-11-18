@@ -6,6 +6,7 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import TrackMesh from '@/track/TrackMesh'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { buildArcTable } from '@/track/arcLength'
+import { withTunnels } from '@/track/setPieces'
 import CoasterCamera from '@/track/CoasterCamera'
 import { rideSpeeds } from '@/track/ridePhysics'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
@@ -79,7 +80,8 @@ export default function LevelScene({ levelId }: { levelId: string }) {
 
   const curve = useMemo(() => createTrackCurve(track), [track])
 
-  const trackTable = useMemo(() => buildArcTable(curve), [curve])
+  const trackDims = useMemo(() => getTrackDimensions(track), [track])
+  const trackTable = useMemo(() => withTunnels(buildArcTable(curve), track.tunnels, trackDims.trackScale), [curve, track.tunnels, trackDims])
   const pointAt = useMemo(() => (t: number) => curve.getPointAt(t), [curve])
   const trackSamples = useMemo(() => sampleTrackPath((t) => curve.getPointAt(t)), [curve])
   const heightFn = useMemo(() => createHeightFunction(biome, trackSamples, BIOMES[biome].floor), [biome, trackSamples])
@@ -88,7 +90,6 @@ export default function LevelScene({ levelId }: { levelId: string }) {
     [heightFn, biome],
   )
 
-  const trackDims = useMemo(() => getTrackDimensions(track), [track])
   const speeds = useMemo(() => rideSpeeds(track), [track])
   const color1 = useMemo(() => hexToRgb(track.color1), [track.color1])
   const color2 = useMemo(() => hexToRgb(track.color2), [track.color2])

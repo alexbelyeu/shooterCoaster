@@ -1725,7 +1725,67 @@ async function speedCheck(page, levelId) {
   problems.push(...cameraWeightProblems(w))
   const translation = await page.evaluate(() => window.__SC_TEST__.cameraTranslation.max)
   if (translation > 1e-6) problems.push(`camera translated ${translation.toFixed(3)} units off the track pose`)
-  return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w } }
+  const tunnel = await tunnelShot(page, levelId)
+  problems.push(...tunnel.problems)
+  return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w }, tunnel: tunnel.result }
+}
+
+/** How far through a tunnel `<id>-tunnel.png` is shot: past the middle, with the exit ahead. */
+const TUNNEL_SHOT_AT = 0.75
+/** `<id>-tunnel-entry.png` looks at its entry portal from this far back (× the tunnel's length). */
+const TUNNEL_APPROACH = 0.3
+
+/**
+ * A level with a tunnel (#332, `TrackParams.tunnels`): shoot its first one's entry portal on the approach
+ * (`<id>-tunnel-entry.png`, not blank), then ride into it, freeze and shoot `<id>-tunnel.png`.
+ * The car must be inside (`tunnel.index`), the frame must not look blank, and it must be mostly dark: the tube, not
+ * the open sky, with its lights on (a share of near-white pixels).
+ */
+async function tunnelShot(page, levelId) {
+  const spans = await page.evaluate(() => window.__SC_TEST__.tunnel.spans)
+  if (!spans.length) return { problems: [], result: null }
+  const { from, to } = spans[0]
+  // Game time and the level timer held, so the speed scan's late moment can't end the run under the shots; `rideTo` still moves the car.
+  await page.evaluate(() => { window.__SC_TEST__.holdLevelTime = true; window.__SC_TEST__.setTimeScale(0) })
+  const freezeAt = async (t) => {
+    await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, t)
+    await waitFrames(page, 3, { maxMs: 20000, pollMs: 100 })
+  }
+  await freezeAt(from - (to - from) * TUNNEL_APPROACH)
+  const entry = await imageStats(page, await page.screenshot({ path: path.join(OUT, `${levelId}-tunnel-entry.png`), timeout: SHOT_TIMEOUT }))
+  const at = from + (to - from) * TUNNEL_SHOT_AT
+  await freezeAt(at)
+  const state = await page.evaluate(() => ({ ...window.__SC_TEST__.tunnel, fovKick: window.__SC_TEST__.cameraWeight.fovKick, streaks: window.__SC_TEST__.cameraWeight.streaks }))
+  const png = await page.screenshot({ path: path.join(OUT, `${levelId}-tunnel.png`), timeout: SHOT_TIMEOUT })
+  await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1); window.__SC_TEST__.holdLevelTime = false })
+  const light = await page.evaluate(async (b64) => {
+    const img = new Image()
+    img.src = `data:image/png;base64,${b64}`
+    await img.decode()
+    const c = document.createElement('canvas')
+    c.width = 160
+    c.height = 90
+    const ctx = c.getContext('2d')
+    ctx.drawImage(img, 0, 0, c.width, c.height)
+    const d = ctx.getImageData(0, 0, c.width, c.height).data
+    let dark = 0
+    let bright = 0
+    for (let i = 0; i < d.length; i += 4) {
+      const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+      if (l < 50) dark++
+      else if (l > 200) bright++
+    }
+    const n = d.length / 4
+    return { dark: dark / n, bright: bright / n }
+  }, png.toString('base64'))
+  const img = await imageStats(page, png)
+  const problems = []
+  if (state.index !== 0) problems.push(`tunnel shot: the car is not in the tunnel at track ${at.toFixed(4)} (index ${state.index})`)
+  if (looksBlank(img)) problems.push('tunnel shot looks blank')
+  if (looksBlank(entry)) problems.push('tunnel entry shot looks blank')
+  if (light.dark < 0.35) problems.push(`tunnel shot: only ${(light.dark * 100).toFixed(0)}% of the frame is dark (the tube should close round the rider)`)
+  if (light.bright < 0.003) problems.push(`tunnel shot: its lights barely show (${(light.bright * 100).toFixed(2)}% near white)`)
+  return { problems, result: { at, ...state, ...light, image: img } }
 }
 
 /** The wave the spawn-choreography check watches arrive: level2's first crow wave, a V (#30). */
