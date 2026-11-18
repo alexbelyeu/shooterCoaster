@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
+import { useGameStore } from '@/store/useGameStore'
 import { isCoarsePointer, useQualityProfile } from '@/canvas/useRenderBudget'
 import { e2eParticles, isE2E } from '@/testing/e2eHook'
 import type { ParticleFieldPreset } from './types'
-import { boostStrength, particleCounts } from './particlePresets'
+import { newBoostTrack, particleCounts, resetBoost, stepBoost } from './particlePresets'
 
 const vertexShader = /* glsl */ `
   uniform float uTime;
@@ -145,9 +146,8 @@ export default function ParticleField({ preset, anchor }: { preset: ParticleFiel
   const geometry = useMemo(() => createSeeds(base, boostCount), [base, boostCount])
   const material = useMemo(() => createMaterial(preset, anchor), [preset, anchor])
   const halfHeightPx = useThree(s => s.size.height * s.viewport.dpr * 0.5)
-  // Clock time the current boost started (NaN = none yet); a new event is stamped on the next frame
-  const boostStart = useRef(Number.NaN)
-  const boostPending = useRef(false)
+  const [boostTrack] = useState(newBoostTrack)
+  const runId = useGameStore((s) => s.runId)
 
   useEffect(() => {
     material.uniforms.uHalfHeightPx.value = halfHeightPx
@@ -167,10 +167,16 @@ export default function ParticleField({ preset, anchor }: { preset: ParticleFiel
   useEffect(() => {
     const event = preset.boost?.event
     if (!event) return
-    const onBoost = () => { boostPending.current = true }
+    const onBoost = () => { boostTrack.pending = true }
     eventBus.on(event, onBoost)
     return () => { eventBus.off(event, onBoost) }
-  }, [preset])
+  }, [preset, boostTrack])
+
+  useEffect(() => {
+    resetBoost(boostTrack)
+    material.uniforms.uBoost.value = 0
+    if (isE2E && !anchor) e2eParticles.boost = 0
+  }, [runId, boostTrack, material, anchor])
 
   useFrame(({ clock }) => {
     const u = material.uniforms
@@ -178,13 +184,7 @@ export default function ParticleField({ preset, anchor }: { preset: ParticleFiel
     u.uTime.value = t
     const boost = preset.boost
     if (!boost) return
-    if (boostPending.current) {
-      boostPending.current = false
-      // Restart the rise from the current strength, so an event during a boost doesn't pop
-      boostStart.current = t - boost.riseS * u.uBoost.value
-    }
-    if (Number.isNaN(boostStart.current)) return
-    u.uBoost.value = boostStrength(boost, t - boostStart.current)
+    u.uBoost.value = stepBoost(boostTrack, boost, t, u.uBoost.value)
     if (isE2E) e2eParticles.boost = u.uBoost.value
   })
 

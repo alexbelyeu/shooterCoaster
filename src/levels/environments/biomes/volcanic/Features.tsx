@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { eventBus } from '@/core/EventBus'
+import { useGameStore } from '@/store/useGameStore'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import type { BiomeFeaturesProps } from '../../shared/types'
 import Volcano from '../../Volcano'
@@ -21,6 +22,7 @@ const RIVER_PULSE = { gain: 1.4, seconds: 1.6 }
 export default function VolcanicFeatures({ heightFn, groundFn, atmosphere, fogRef }: BiomeFeaturesProps) {
   const fogPulseRef = useRef({ active: false, startTime: 0, far: ERUPTION_FOG_FAR })
   const riverPulseRef = useRef({ active: false, startTime: 0 })
+  const runId = useGameStore((s) => s.runId)
 
   // Animated molten rock; bright enough that the hot cracks pass the Bloom threshold
   const octaves = useFbmOctaves()
@@ -56,6 +58,14 @@ export default function VolcanicFeatures({ heightFn, groundFn, atmosphere, fogRe
       eventBus.off('boss:defeated', onBossDefeated)
     }
   }, [])
+
+  // A new run had no eruption or boss defeat: the last run's fog pulse and river flare end here (#247)
+  useEffect(() => {
+    fogPulseRef.current.active = false
+    riverPulseRef.current.active = false
+    if (fogRef.current) fogRef.current.far = atmosphere.fogFar
+    lavaRiverMat.uniforms.uIntensity.value = RIVER_INTENSITY
+  }, [runId, fogRef, atmosphere, lavaRiverMat])
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime

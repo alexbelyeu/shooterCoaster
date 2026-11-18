@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boostStrength, particleCounts, PARTICLE_PRESETS } from './particlePresets'
+import { boostStrength, newBoostTrack, particleCounts, PARTICLE_PRESETS, resetBoost, stepBoost } from './particlePresets'
 
 const presets = Object.entries(PARTICLE_PRESETS)
 
@@ -91,5 +91,36 @@ describe('boostStrength', () => {
       expect(Math.abs(s - prev)).toBeLessThanOrEqual(maxStep)
       prev = s
     }
+  })
+})
+
+describe('stepBoost', () => {
+  const boost = { event: 'x', count: 1, riseS: 0.25, holdS: 3, fadeS: 1 }
+
+  it('is 0 until an event, then rises from the frame after it', () => {
+    const track = newBoostTrack()
+    expect(stepBoost(track, boost, 5, 0)).toBe(0)
+    track.pending = true
+    expect(stepBoost(track, boost, 10, 0)).toBe(0)
+    expect(stepBoost(track, boost, 10.125, 0)).toBeCloseTo(0.5)
+  })
+
+  it('restarts the rise from the current strength on an event mid-boost', () => {
+    const track = newBoostTrack()
+    track.pending = true
+    stepBoost(track, boost, 0, 0)
+    const fading = stepBoost(track, boost, 3.75, 1)
+    track.pending = true
+    expect(stepBoost(track, boost, 4, fading)).toBeCloseTo(fading)
+  })
+
+  it('drops to 0 on a run reset, a pending event included (#247)', () => {
+    const track = newBoostTrack()
+    track.pending = true
+    stepBoost(track, boost, 0, 0)
+    expect(stepBoost(track, boost, 1, 0)).toBe(1)
+    track.pending = true
+    resetBoost(track)
+    expect(stepBoost(track, boost, 2, 1)).toBe(0)
   })
 })
