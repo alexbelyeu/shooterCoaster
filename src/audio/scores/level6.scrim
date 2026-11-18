@@ -1,6 +1,6 @@
 title    Uptown Local
 composer Claude (ShooterCoaster)
-about    Climbing Gym (level6) option (#456): street funk in E minor at 172. An FM slap bass carries the hook, octave pops and a chromatic run like a rat along the rail, under synth-brass stabs and a guiro scratch; in the B section the brass answers with a line of its own. The last eight bars lift a minor third, to G minor. Layers: bass hook, stabs and scratch from the start, then a broken bigkick beat, snare and clap and hats at 2x, a square wave two octaves over the bass at 3x, sixteenth hats and orchestra hits on the stabs at FRENZY.
+about    Climbing Gym (level6), Alex's pick (#565): street funk in E minor at 172. An FM slap bass carries the hook, octave pops and a chromatic run like a rat along the rail, under synth-brass stabs and a guiro scratch; in the B section the brass answers with a line of its own. The last eight bars lift a minor third, to G minor. Layers: bass hook, stabs and scratch from the start, then a broken bigkick beat, snare and clap and hats at 2x, a square wave two octaves over the bass at 3x, sixteenth hats and orchestra hits on the stabs at FRENZY. The Medusa's boss section goes Phrygian, with orchestra hits in base.
 tempo    172
 beats    4
 steps    4
@@ -19,6 +19,7 @@ voice crash  crash     vol=0.31 pan=-0.2 layer=drums
 voice chip   square    vol=0.22 pan=0.2 oct=2 gate=0.7 layer=lead
 voice fhat   hat909    vol=0.26 pan=-0.35 layer=frenzy
 voice hit    orchhit   vol=0.36  pan=0.1 layer=frenzy
+voice stab   orchhit   vol=0.34  pan=-0.1
 
 pattern intro
 scrape| x.x. x.x. x.x. x.x. | x.x. x.x. xxxx xxxx |
@@ -61,3 +62,37 @@ snare | .... x... .... x..x | % | % | ..x. x.x. xxxx XXXX |
 
 play intro
 loop A A2 B B2 A A2 A+3 A2+3
+
+# Boss section (#566): the Medusa of the Starr. The riff turns E Phrygian (F natural, a B-flat tritone), the brass stabs
+# go E minor to F major, orchestra hits land in base and the guiro hisses like her snakes; in Y the brass takes a line of
+# its own over it. The sting is an E major chord and the loop comes back.
+pattern X
+bass  | E2- E3 . F3 E3 . G2- F2 E2- F3 E3- . | F2- F3 . E3 F3 . A2- G2 F2- E3 F3- . | E2- E3 . F3 E3 . G2- A2 Bb2- A2 G2- F2 | B1- B2 . C3 B2 . D#2- C2 B1 A1 G1 F#1 .- |
+chip  | E2- E3 . F3 E3 . G2- F2 E2- F3 E3- . | F2- F3 . E3 F3 . A2- G2 F2- E3 F3- . | E2- E3 . F3 E3 . G2- A2 Bb2- A2 G2- F2 | B1- B2 . C3 B2 . D#2- C2 B1 A1 G1 F#1 .- |
+brass | .--- .- [Em]- .--- [Em]!- .- | .--- .- [F]- .--- [F]!- .- | .--- .- [Em]- .--- [Em]!- .- | .--- .- [B7]- .--- [B7]!- .- |
+stab  | [Em]!--- .------- [Em]!--- | [F]!--- .----------- | [Em]!--- .------- [Em]!--- | [B7]!--- [B7]!--- [B7]!------- |
+scrape| x.x. x.x. x.x. xxxx | % | % | x.x. x.x. xxxx xxxx |
+kick  | x..x ..x. x..x ..x. | % | % | x..x ..x. x.x. xxxx |
+snare | .... x... .... x... | % | % | .... x... ..x. x.xx |
+clap  | .... x... .... x... | % | % | % |
+hat   | x.x. x.x. x.x. x.x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+fhat  | xxxx xxxx xxxx xxxx | % | % | % |
+
+pattern Y from X
+brass | E5--- F5--- E5--- B4--- | C5------- B4--- A4--- | G4--- A4--- Bb4--- B4--- | B4------- C5- B4- A#4- B4- |
+stab  | [Em]!--- .------- [Em]!--- | [F]!--- .----------- | [C]!--- .------- [C]!--- | [B7]!--- [B7]!--- [B7]!------- |
+rise  | _ | _ | _ | E5--------------- |
+crash | _ | _ | _ | _ |
+
+pattern S
+brass | B4--- E5--- G#5--- B5--- | E5--------------- |
+bass  | E2--- E2--- E2--- E2--- | E2--------------- |
+chip  | E2--- E2--- E2--- E2--- | E2--------------- |
+stab  | [E]!--- .--- [E]!--- [A]!--- | [E]!--------------- |
+kick  | x... x... x... x... | x............... |
+snare | .... .... xxxx XXXX | x............... |
+crash | X............... | X............... |
+
+boss  X Y
+sting S

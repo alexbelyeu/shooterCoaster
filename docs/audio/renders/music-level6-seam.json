@@ -1,9 +1,9 @@
 {
-  "name": "theme-level6-subway-seam",
+  "name": "music-level6-seam",
   "kind": "music",
   "request": {
     "kind": "music",
-    "track": "level6.subway",
+    "track": "level6",
     "layers": 3,
     "seconds": 20,
     "seam": true
@@ -14,7 +14,7 @@
   "events": [
     {
       "t": 0.15,
-      "name": "level6.subway score from 37.44 s"
+      "name": "level6 score from 37.44 s"
     },
     {
       "t": 0.15,
