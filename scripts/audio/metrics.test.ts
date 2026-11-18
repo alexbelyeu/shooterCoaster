@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  bandEnergy, barLines, clippedSamples, compareTargets, fft, killsOverMusic, powerSpectrum, seamExcess, seamJump, silenceShare,
+  bandEnergy, barLines, clickDb, clippedSamples, compareTargets, fft, killsOverMusic, powerSpectrum, seamExcess, seamJump, silenceShare,
   soundEnvelope, stereoCorrelation,
 } from './metrics.mjs'
 
@@ -94,6 +94,23 @@ describe('seamExcess', () => {
     const x = Float32Array.from({ length: 8 * SR }, (_, i) => (Math.floor(i / SR) % 2 ? 0 : 0.3 * Math.sin((2 * Math.PI * 220 * i) / SR)))
     const bars = barLines(0, 1, 8, [4])
     expect(Math.abs(seamExcess([x, x], SR, 4, bars))).toBeLessThan(0.3)
+  })
+})
+
+describe('clickDb', () => {
+  const tone = (cut: (t: number) => number) => {
+    const x = new Float32Array(SR * 2)
+    for (let i = 0; i < x.length; i++) x[i] = 0.5 * Math.sin((2 * Math.PI * 1000 * i) / SR) * cut(i / SR)
+    return [x, x]
+  }
+
+  it('reads a hard stop mid-ring as a click', () => {
+    expect(clickDb(tone((t) => (t < 1.0053 ? 1 : 0)), SR, 1)).toBeGreaterThan(40)
+  })
+
+  it('reads a 24 ms exponential fade, and a tone ringing on, as none', () => {
+    expect(clickDb(tone((t) => (t < 1 ? 1 : Math.exp(-(t - 1) / 0.004) * (t < 1.024 ? 1 : 0))), SR, 1)).toBeLessThan(15)
+    expect(clickDb(tone(() => 1), SR, 1)).toBeLessThan(1)
   })
 })
 

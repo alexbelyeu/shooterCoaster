@@ -7,7 +7,7 @@ import { COMBO_TIERS, FRENZY, TOP_TIER, comboTierIndex } from '@/combat/comboTie
 import { intensityForTier } from '@/audio/scrim/layers'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import type { BiomeType } from '@/types/level'
-import { compile } from '@/audio/scrim/score'
+import { barSection, compile } from '@/audio/scrim/score'
 import { renderOffline as renderScoreOffline, type Voicing } from '@/audio/scrim/synth'
 import { loopSeams } from '@/audio/scrim/scheduler'
 import { SCORES, scoreIdFor } from '@/audio/scores'
@@ -34,6 +34,8 @@ export type AudioRenderRequest =
    * `chain: 'game'` plays it through the game's music chain instead, exactly like `music`.
    */
   | { kind: 'score'; text: string; seconds?: number; voicing?: Voicing; chain?: 'game'; seam?: boolean }
+  /** Level select's launch blip for `level`, its bank and room landing under the blip's ring (#246), then the countdown and a kill. */
+  | { kind: 'launch'; level: string }
 
 export interface AudioRenderResult {
   sampleRate: number
@@ -43,6 +45,8 @@ export interface AudioRenderResult {
   events: { t: number; name: string }[]
   seams: number[]
   bar: { startS: number; barS: number } | null
+  /** Moments to check for a click (`clickDb`). */
+  clicks?: number[]
 }
 
 interface Plan {
@@ -50,6 +54,7 @@ interface Plan {
   events: { t: number; name: string }[]
   seams: number[]
   bar: AudioRenderResult['bar']
+  clicks?: number[]
   script: (scope: OfflineRenderScope) => void
 }
 
@@ -231,7 +236,7 @@ function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): 
   const place: Placement = { pan: 0, cutoffHz: 20000 }
   const seams: number[] = []
   const song = compile(SCORES[scoreIdFor(level)])
-  const barS = (song.loop.sections[0] ?? song.intro.sections[0]).barDur
+  const barS = barSection(song)!.barDur
   /** Asks for `section` at render time `t`, as `LevelAudio` does on the boss event, and records where it lands. */
   const switchAt = ({ at }: OfflineRenderScope, t: number, section: 'boss' | 'sting', cue: () => void, name: string) => {
     events.push({ t, name })
@@ -296,7 +301,35 @@ function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): 
   }
 }
 
-type GamePlanRequest = Exclude<AudioRenderRequest, { kind: 'score' }>
+const LAUNCH = { blipS: 0.3, landS: 0.42, readyS: 1.0, goS: 1.6, killS: 2.4, seconds: 3.4 }
+
+/** Run after `prepare(null, …)` (the menus' bank) and `prebake(level)`, whose install `land` is. */
+function launchPlan(level: string, land: () => void): Plan {
+  const s = sfx
+  const events = [
+    { t: LAUNCH.blipS, name: 'ui launch (menus\' bank and room)' },
+    { t: LAUNCH.landS, name: `${level}'s bank and room land: the menus' graph fades out` },
+    { t: LAUNCH.readyS, name: 'countdown Ready' },
+    { t: LAUNCH.goS, name: 'countdown GO' },
+    { t: LAUNCH.killS, name: 'kill 1x' },
+  ]
+  return {
+    seconds: LAUNCH.seconds,
+    events,
+    seams: [],
+    bar: null,
+    clicks: [LAUNCH.landS],
+    script: ({ at }) => {
+      at(LAUNCH.blipS, () => s.ui('launch'))
+      at(LAUNCH.landS, land)
+      at(LAUNCH.readyS, () => s.countdown(false))
+      at(LAUNCH.goS, () => s.countdown(true))
+      at(LAUNCH.killS, () => s.kill(1, 'pop', null))
+    },
+  }
+}
+
+type GamePlanRequest = Exclude<AudioRenderRequest, { kind: 'score' | 'launch' }>
 
 const RENDERS: { [K in GamePlanRequest['kind']]: (req: Extract<GamePlanRequest, { kind: K }>) => Plan } = {
   music: (r) => musicPlan(scrim, r.track, r.seconds, r.seam, r.layers),
@@ -360,10 +393,20 @@ async function renderScoreInGame(req: Extract<AudioRenderRequest, { kind: 'score
 export async function renderAudio(req: AudioRenderRequest, seed = 1): Promise<AudioRenderResult> {
   if (req.kind === 'score') return req.chain === 'game' ? renderScoreInGame(req, seed) : renderScore(req, seed)
   scrim = await import('@/audio/scrim/player')
-  sfx = (await loadArcade()).arcadeSfx
+  const arcade = await loadArcade()
+  sfx = arcade.arcadeSfx
   // The arcade bake is async, so it runs before the render.
-  if (req.kind !== 'music') await sfx.prepare(req.level ?? 'level1', biomeOf(req.level ?? 'level1'))
-  const plan = (RENDERS[req.kind] as (r: GamePlanRequest) => Plan)(req)
+  let plan: Plan
+  if (req.kind === 'launch') {
+    await sfx.prepare(null, 'themePark')
+    plan = launchPlan(req.level, await arcade.prebake(req.level, biomeOf(req.level)))
+  } else {
+    if (req.kind !== 'music') await sfx.prepare(req.level ?? 'level1', biomeOf(req.level ?? 'level1'))
+    plan = (RENDERS[req.kind] as (r: GamePlanRequest) => Plan)(req)
+  }
   const buffer = await renderOffline({ seconds: plan.seconds, seed }, plan.script, stopAll)
-  return { sampleRate: buffer.sampleRate, seconds: plan.seconds, pcm: toBase64(buffer), events: plan.events, seams: plan.seams, bar: plan.bar }
+  return {
+    sampleRate: buffer.sampleRate, seconds: plan.seconds, pcm: toBase64(buffer), events: plan.events, seams: plan.seams, bar: plan.bar,
+    clicks: plan.clicks,
+  }
 }
