@@ -29,5 +29,11 @@ export const TREES: BiomeTreeConfig = {
   maxSlope: Math.PI / 4,
 }
 
+/** Where the stand-in landmark (`Features.tsx`) stands and the countdown's swoop and results orbit look (`index.ts` `hero`): keep it beyond the track. */
+export const LANDMARK_SITE = { x: 1500, z: -2000 } as const
+
+/** Height of the stand-in landmark (world units). */
+export const SPIRE_HEIGHT = 420
+
 /** The boulders scattered beside the track (`Decorations.tsx`). */
 export const BOULDER_COLOR = 0x8a8278

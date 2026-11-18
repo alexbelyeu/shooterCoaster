@@ -11,7 +11,6 @@ import { rideSpeeds } from '@/track/ridePhysics'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import { BIOMES } from '@/levels/environments/biomeRegistry'
-import { HERO_SHOTS } from '@/levels/environments/heroShots'
 import ContactShadows from '@/levels/environments/shared/ContactShadows'
 import {
   createHeightFunction,
@@ -103,7 +102,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         rollerSpeed={track.rollerSpeed}
         minRollerSpeed={track.minRollerSpeed}
         heightOffset={trackDims.eyeHeight}
-        hero={HERO_SHOTS[biome]}
+        hero={BIOMES[biome].hero}
         groundFn={groundFn}
         bounds={BIOMES[biome].bounds}
       />

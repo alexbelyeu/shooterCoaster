@@ -6,7 +6,7 @@
 import type { Vec3Like } from './cameraRig.hot'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 
-/** What a level's intro and results frame: its landmark (`levels/environments/heroShots.ts`). */
+/** What a level's intro and results frame: its landmark (`BiomeDefinition.hero`, in each `biomes/<biome>/index.ts`). */
 export interface HeroShot {
   /** The landmark's foot, world x / z. */
   x: number

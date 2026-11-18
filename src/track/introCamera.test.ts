@@ -5,7 +5,7 @@ import {
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { getTrackDimensions } from './trackDimensions'
-import { HERO_SHOTS } from '@/levels/environments/heroShots'
+import { BIOMES } from '@/levels/environments/biomeRegistry'
 import { HALL_BOUNDS } from '@/levels/environments/biomes/gym/config'
 
 const v = (x = 0, y = 0, z = 0) => ({ x, y, z })
@@ -23,7 +23,7 @@ function levelShots() {
     const dims = getTrackDimensions(level.track)
     const p = curve.getPointAt(0)
     const t = curve.getTangentAt(0)
-    const hero = HERO_SHOTS[level.biome]
+    const hero = BIOMES[level.biome].hero
     // Flat ground at 0 is enough for the path's shape.
     const anchor = v(hero.x, (hero.ground ?? 0) + hero.focus, hero.z)
     return { id: level.id, seat: v(p.x, p.y + dims.eyeHeight, p.z), dir: v(t.x, t.y, t.z), anchor, scale: dims.trackScale, biome: level.biome }
@@ -146,7 +146,7 @@ describe('orbitPose', () => {
   })
 
   it('swings a wall landmark through its arc, inside the hall', () => {
-    const gym = HERO_SHOTS.gym
+    const gym = BIOMES.gym.hero
     const pos = v()
     const target = v()
     let maxYaw = 0
