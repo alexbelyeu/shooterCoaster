@@ -213,3 +213,26 @@ export function boostStrength(boost: ParticleBoost, elapsed: number): number {
   const fade = Math.min(1, Math.max(0, (elapsed - boost.riseS - boost.holdS) / boost.fadeS))
   return rise * (1 - fade)
 }
+
+/** A field's boost on the clock: an event is stamped on the next frame (`pending`); `start` is NaN until one is. */
+export interface BoostTrack {
+  start: number
+  pending: boolean
+}
+
+export const newBoostTrack = (): BoostTrack => ({ start: Number.NaN, pending: false })
+
+/** The boost's strength at clock time `t`; an event during a boost restarts the rise from `current`, so it doesn't pop. */
+export function stepBoost(track: BoostTrack, boost: ParticleBoost, t: number, current: number): number {
+  if (track.pending) {
+    track.pending = false
+    track.start = t - boost.riseS * current
+  }
+  return Number.isNaN(track.start) ? 0 : boostStrength(boost, t - track.start)
+}
+
+/** A new run (`runId`) starts with no boost: the last run's eruption doesn't fade on into its countdown (#247). */
+export function resetBoost(track: BoostTrack): void {
+  track.start = Number.NaN
+  track.pending = false
+}
