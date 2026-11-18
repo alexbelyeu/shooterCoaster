@@ -2153,3 +2153,63 @@ draw call and scale by instance count.
 `buildFlameTongues`, not by removing noise. Part 2 (light on the surroundings, smoke, heat haze, scorch) builds on
 these tongues. `FBM_OCTAVES` for every shader on `noiseGlsl.ts`' `fbm` (the fire, the volcano's smoke and lava) comes from
 `graphicsQuality.ts` `fbmOctaves` (#582); the sky and aurora run their own fixed-octave noise.
+
+## 2026-11-14 — Bystanders ride on their wave, never in the counts (builder, #518)
+
+**Context:** The game's first don't-shoot rule: the Climbing Gym's climbers are people. They had to share the wall
+code with the climber enemy (#453) without a second spawner, and leave every score rule (`maxScore`, the server's
+kill and score limits, accuracy) as it was.
+
+**Decision:** Bystanders are a property of a wave, `EnemyWave.bystanders: { type, count }`, spawned by
+`EnemySpawner` with their wave on the level's `walls` and mounted with `bystander` on `EnemyBase`. They are a
+`kind: 'bystander'` collision target: no `enemy:hit`, the bullet a miss for accuracy, aim assist weight 0, skipped
+by the e2e autofire and `killNearest`. A hit runs `combat/bystanderHit.ts` once per bystander (the store keeps the
+ids): `BYSTANDER_PENALTY` (one rat, 18) off the score, floored at 0, and `breakCombo()`. They count in no HUD total
+and add nothing to `maxScore` or `scoreLimits.ts`, so the leaderboard needs no new rule. A bystander climber climbs at
+half pace (~15 s on a wall) so it stays long enough to be seen and spared. An escaped enemy now leaves the kill strip's
+total instead of reading as a kill (#480, `waveSchedule.ts` `enemyCounts`).
+
+**Consequences:** A later world's bystanders (any wall type) need only a `bystanders` entry and a noun in
+`combat/bystanders.ts`. Level 6's climbers cost ~5 draw calls each, past its first-smoke scene ceiling (see the PR):
+a budget raise or climber instancing is the Director's call.
+
+## 2026-11-17 — The gym's lanternflies are its second wave, not its first (Builder, #575)
+
+**Context:** #575 asked to swap level6's first crow wave ("In the Rafters!", at 0 s) for a lanternfly swarm. The gym's
+`GYM_WALLS` stand on the hall's perimeter, far off the track's middle: over the first 13 s (up the Tree, camera on the
+rafters) only Lagoon N is ever in view within a lanternfly's reading distance (1073 units), for about one second at 5–7 s, and
+from 9 to 13 s no wall is. As the first wave the swarm sat ~1000+ units off at the smoke's 10 s probe (6 on screen, largest
+10 px: the level6 shard failed), and with dust bunnies first nothing was on screen at 10 s.
+**Decision:** The crows keep the opening (the rafters, where no wall or ground enemy reads) and keep the first climbers;
+the lanternflies take the second slot (8 s), whose window brings the rider face-on to Alaska at 370–460 units from 14 s,
+where `placeWallSwarm` lands them. The second crow wave ("Round the Flame!") is dropped; dust bunnies and the first rats
+move up a slot. `maxScore` is unchanged (14 lanternflies and 14 crows at 15 each).
+**Consequences:** The swarm lands on the wall where wave 1's climbers are still climbing, so the bugs are shot round the
+bystanders. Moving the lanternflies earlier needs a wall the opening can see (the Tree's headwall reads only at 19–21 s).
+
+## 2026-11-17 — The countdown hides the level until its warm-up is done (builder, #597)
+
+**Context:** The MacBook Neo froze for ~1 s in the countdown (#561): the level was drawn behind Ready while
+`ShaderWarmup` compiled, so a visible frame waited on every program still linking; the sky's PMREM bake, the
+compile and the new scene's React render all landed in the mount's one task; and the title froze while the level
+chunk evaluated just after the poster left. #464 made Ready wait for the chunk and the warm-up; #376 is the poster.
+**Decision:** Until the warm-up ends, the countdown draws nothing of the level (the camera's layer mask is 0, so
+Ready sits on black and the level appears at the end of the warm-up, at the latest on GO). The warm-up's compiles
+and draws take a slice of each frame (20 ms, or half the rest of a slow frame) and run in one go once the run is
+playing (the countdown's cap ran out, `?e2e=1`). The env bake moves to the frame after the mount; scene swaps render
+in a React transition; the poster waits for the level chunk (2.5 s at most).
+**Consequences:** Don't show the level behind Ready again without making those frames independent of the compile.
+`ShaderWarmup` must start after the env bake, or every Standard material compiles twice. The countdown's 4 s cap
+still bounds the wait: a device too slow to warm up in it finishes the warm-up in one long frame after GO, as before.
+
+## 2026-11-17 — The Flame's light is an analytic term in the gym's grime shader, not a point light (Builder, #599)
+
+**Context:** #599 asked for a flickering warm light from the Flame on the mats, walls and holds: one point light or a cheap analytic term. A point light changes every lit program in the level (enemies, bosses, the track), and from inside the Flame it would leave the Flame's own outward faces dark (no light reaches a face turned away from it).
+**Decision:** The firelight is a term in `grimeShader.ts`, lit from the nearest point of a segment through the Flame (`flameFire.ts` `fireLightSource`), lighting every face within `FIRE_LIGHT.shell` m of it whichever way it faces (the tongues are on it), driven by one shared uniform (`FIRE_FLICKER`). Only the hall, the floor and the holds receive it; enemies flying past the Flame are not lit by it. It replaces the additive light-pool mesh on the mats (one draw call, spent on the smoke).
+**Consequences:** No new programs outside the gym materials, programs after warm-up stay +0. If enemies near the Flame should catch its light, that is a separate change (a point light, with every enemy program warmed with it).
+
+## 2026-11-18 — The Kraken's slam reaches the camera as a screen-edge spray (Builder, #600)
+
+**Context:** The brief asks for "a splash that reaches the camera", but the Kraken's slams land 550–1150 units out, too far for the pooled death particles to fly that far.
+**Decision:** Each slam emits `sea:spray` with the side of the view it landed on (0 on the defeat, both edges). `ui/hud/SnowSplat` (the Yeti's snowball edge flash) draws it as sea foam and drops over that edge. The splash in the world stays `KRAKEN_SPLASH_DEATH_STYLE` plus camera trauma as before.
+**Consequences:** Any future water hit on the camera reuses `SEA_SPRAY_EVENT`; no new particle system and no extra draw calls.
