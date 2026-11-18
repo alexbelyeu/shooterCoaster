@@ -18,11 +18,14 @@ Your prompt names a bundle path. Make exactly one Bash call:
 cat <BUNDLE_PATH> .claude/skills/branch-review/SKILL.md
 ```
 
-That single call gives you the intent, commits, changed files, the governing
-conventions, the diff with 30 lines of context, and your review rubric. Use `cat`,
-not Read. Then apply the rubric, with these overrides:
+That single call gives you the intent, commits, changed files, the code diff with 10
+lines of context (docs are listed, not diffed: `git diff <base>...HEAD --word-diff -- <file>`
+for one you need, e.g. to check CLAUDE.md or docs/CODEMAP.md were updated), and your
+review rubric. CLAUDE.md is already in your context. For a level, enemy or track change,
+grep `.claude/skills/shooter-coaster-level-design/SKILL.md` for the system in question.
+Use `cat`, not Read. Then apply the rubric, with these overrides:
 
-- Don't read every changed file in full: the diff carries ±30 lines around every
+- Don't read every changed file in full: the diff carries ±10 lines around every
   hunk. Open a file only to trace a **specific** concern, typically an existing
   system the PR should have reused or a caller at a boundary.
 - Prefer `Grep` for "who calls this / does this already exist" over reading files,

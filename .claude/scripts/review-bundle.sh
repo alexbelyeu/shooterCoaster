@@ -15,17 +15,22 @@ git rev-parse --verify --quiet "$BASE" >/dev/null || {
 }
 
 OUT="${2:-${TMPDIR:-/tmp}/review-bundle-${BRANCH//\//-}.md}"
-EXCLUDES=(':!package-lock.json' ':!*.lock' ':!e2e-results' ':!*.png' ':!docs/reports')
+EXCLUDES=(':!package-lock.json' ':!*.lock' ':!e2e-results' ':!*.png' ':!*.webp' ':!*.mp3' ':!docs/reports')
+# Prose and data the reviewers judge by name, not line by line: CLAUDE.md / CODEMAP.md rows are
+# one very long line each, so 30 lines of context around an edited row was 30-40 KB per PR.
+DOCS=(':(glob)**/*.md' 'docs/audio/renders')
 mkdir -p "$(dirname "$OUT")"
 
 changed=$(git diff "$BASE...HEAD" --name-only -- . "${EXCLUDES[@]}")
 touches() { printf '%s\n' "$changed" | grep -Eq "$1"; }
+CODE=(. "${EXCLUDES[@]}" ':!*.md' ':!docs/audio/renders')
 
 {
   echo "# Review bundle: \`$BRANCH\` vs \`$BASE\`"
   echo
   echo "Read this file with \`cat\`. It is the primary input. Open source files only"
-  echo "to trace a specific concern the diff cannot answer."
+  echo "to trace a specific concern the diff cannot answer. CLAUDE.md is already in"
+  echo "your context: it is not repeated here."
   echo
   echo "## Intent"
   echo
@@ -44,13 +49,21 @@ touches() { printf '%s\n' "$changed" | grep -Eq "$1"; }
   git diff "$BASE...HEAD" --stat -- . "${EXCLUDES[@]}"
   echo '```'
   echo
+  if [ -n "$(git diff "$BASE...HEAD" --name-only -- "${DOCS[@]}")" ]; then
+    echo "Docs and render data are listed above but not diffed below. To read one:"
+    echo "\`git diff $BASE...HEAD -U3 -- <file>\` (for CLAUDE.md or docs/CODEMAP.md, add \`--word-diff\`)."
+    echo
+  fi
   echo "## Conventions"
   echo
-  echo "The standards this PR must meet."
-  echo
-  echo "### CLAUDE.md"
-  echo
-  cat CLAUDE.md
+  echo "- CLAUDE.md (in your context): hard rules, commands, context budget."
+  if touches '^src/'; then
+    echo "- docs/HEAP-BOTTLENECKS.md, below: per-frame allocation and disposal rules."
+  fi
+  if touches '^src/(levels|entities|track)/'; then
+    echo "- \`.claude/skills/shooter-coaster-level-design/SKILL.md\`: the level, enemy and track rules."
+    echo "  Read it (grep it for the system you are checking) when a finding depends on them."
+  fi
   echo
   if touches '^src/'; then
     echo "### docs/HEAP-BOTTLENECKS.md"
@@ -58,18 +71,12 @@ touches() { printf '%s\n' "$changed" | grep -Eq "$1"; }
     cat docs/HEAP-BOTTLENECKS.md
     echo
   fi
-  if touches '^src/(levels|entities|track)/'; then
-    echo "### .claude/skills/shooter-coaster-level-design/SKILL.md"
-    echo
-    cat .claude/skills/shooter-coaster-level-design/SKILL.md
-    echo
-  fi
   echo "## Diff"
   echo
-  echo "\`git diff $BASE...HEAD -U30\`, excluding lockfiles, screenshots and reports."
+  echo "\`git diff $BASE...HEAD -U10\`, code only (no docs, lockfiles, images or render data)."
   echo
   echo '```diff'
-  git diff "$BASE...HEAD" -U30 -- . "${EXCLUDES[@]}"
+  git diff "$BASE...HEAD" -U10 -- "${CODE[@]}"
   echo '```'
 } > "$OUT"
 
