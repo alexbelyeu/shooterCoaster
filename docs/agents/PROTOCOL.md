@@ -95,6 +95,13 @@ Every `agent:ready` issue must be completable by one builder in one session and 
 criteria** (checkable, including what the smoke-test screenshot should show),
 **Out of scope**, and **Notes** (relevant skills, decisions, pitfalls).
 
+**Follow-ups filed by builders, Fix and QA.** If a follow-up you file already meets this
+contract (Goal, Scope, Acceptance criteria, Out of scope, Notes), isn't waiting on unmerged
+work or on Alex, and fits one session, label it `agent:ready` with its priority so the next
+Builders run can take it; a P1 left for the Director's weekly triage waits up to a week
+(#613 and #625 did). Anything else (needs a decision, too big, blocked) gets its priority and
+no `agent:ready`: the Director triages it, and a blocker on Alex gets `needs-alex`.
+
 ## Claiming work (Builders)
 
 1. First: your own open PRs labelled `agent:changes-requested` (oldest first). Fix and push to the same branch.
