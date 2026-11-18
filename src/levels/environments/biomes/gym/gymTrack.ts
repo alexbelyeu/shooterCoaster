@@ -13,15 +13,21 @@
  * `gymLevel.ts` (`node scripts/gen-gym-level.mjs`), which keeps the blockout out of the startup JS.
  */
 import type { TrackParams } from '@/types/level'
-import { ARCH, FLAME, GLASS_ROOM, PIT, STAR, TREE, toWorld, type Vec3 } from './blockout'
+import { ARCH, FLAME, GLASS_ROOM, PIT, STAR, TREE, TREE_GAP, toWorld, type Vec3 } from './blockout'
 
-/** Metres the track's centreline keeps from anything solid: the car (±0.07 m rails) and the rider's eye (0.19 m) fit well inside. */
-export const RAIL_CLEARANCE = 1.5
+/**
+ * Metres the track's centreline keeps from anything solid. The car's rails reach 0.07 m out and the rider's eye is
+ * 0.19 m up (#592), so 0.8 m is still four eye heights, and it fits the ride through the Tree's gap (#613).
+ */
+export const RAIL_CLEARANCE = 0.8
 
 /** Height of the rails over the Arch's foot: the rider's eye stays under the soffit. */
 const ARCH_RAIL_Y = 2.1
-/** Out from the Tree's lip while climbing it. */
-const TREE_STANDOFF = 4.5
+/** Height of the rails over the pit floor through the Tree's gap: roughly halfway between the floor's roots and the trunk. */
+const GAP_RAIL_Y = 1.75
+/** The turns in and out of the Tree's caves: `CAVE_TURN_RADIUS` round a centre this far along the Tree from its centre. */
+const CAVE_TURN_ALONG = 4.85
+const CAVE_TURN_RADIUS = 2.6
 /** Out from the glass gym room's windows (the hall wall) while passing them. */
 const GLASS_STANDOFF = 4.5
 /** The spiral's ellipse: this far beyond the Flame's flared footprint along each axis. */
@@ -30,18 +36,34 @@ const SPIRAL_MARGIN_Z = 3.2
 /** The right turn out of the Arch: tight, so the star is ahead early. */
 const TURN_RADIUS = 5.5
 /** The crest, where the run-in to the pit begins: out of the turn after the Arch. */
-const CREST_Y = 5.4
+const CREST_Y = 8.5
+/** The spiral round the Flame: in at this height, out at `SPIRAL_EXIT_Y`. */
+const SPIRAL_TOP_Y = 8.5
+const SPIRAL_EXIT_Y = 5
 
 const DEG = Math.PI / 180
 
-/** `along` the Tree from its centre, `TREE_STANDOFF` out from its lip. */
-function treeFace(along: number, y: number): Vec3 {
-  const out = TREE.lip + TREE_STANDOFF
+/** A point `along` the Tree from its centre and `f` out from its foot line, `y` over the pit floor. */
+function treeFrame(along: number, f: number, y: number): Vec3 {
   return {
-    x: TREE.centre.x + TREE.along.x * along + TREE.facing.x * out,
-    y,
-    z: TREE.centre.z + TREE.along.z * along + TREE.facing.z * out,
+    x: TREE.centre.x + TREE.along.x * along + TREE.facing.x * f,
+    y: PIT.floorY + y,
+    z: TREE.centre.z + TREE.along.z * along + TREE.facing.z * f,
   }
+}
+
+/** The Tree's gap: `along` its centreline from the trunk's middle, `GAP_RAIL_Y` over the pit floor. */
+const GAP_F = (TREE_GAP.minF + TREE_GAP.maxF) / 2
+function gap(along: number): Vec3 {
+  return treeFrame(along, GAP_F, GAP_RAIL_Y)
+}
+
+/**
+ * Round a cave's turn, `side` −1 the left cave (along −), +1 the right: `deg` 0 on the gap's line heading out of it
+ * (left) or into it (right), 90 heading along the Tree's facing in its mouth, 180 back past the mouth (left only).
+ */
+function caveTurn(side: -1 | 1, deg: number, y: number): Vec3 {
+  return treeFrame(side * (CAVE_TURN_ALONG + CAVE_TURN_RADIUS * Math.sin(deg * DEG)), GAP_F + CAVE_TURN_RADIUS * (1 - Math.cos(deg * DEG)), y)
 }
 
 function spiral(deg: number, y: number): Vec3 {
@@ -82,45 +104,44 @@ function pit(out: number, y: number, side: number): Vec3 {
 /** The control points in blockout metres, from the lap start. */
 export function gymControlPoints(): Vec3[] {
   return [
-    // 1. The Tree: on its face below the caves' lip, climbing into the headwall zone.
-    treeFace(5.5, 4.3),
-    treeFace(8.5, 7),
-    // 2. Over the pit's rim to the Flame, then a full turn round it, sinking.
-    { x: 25, y: 11, z: 14.2 },
-    spiral(285, 11.5),
-    spiral(320, 11.1),
-    spiral(360, 10.6),
-    spiral(405, 9.8),
-    spiral(450, 9),
-    spiral(495, 8.4),
-    spiral(540, 7.6),
-    spiral(585, 6.4),
-    spiral(630, 5),
+    // 1. The Tree: through the gap under its trunk, round out of the left cave and back over the pit's floor.
+    gap(0.3),
+    gap(-2.6),
+    caveTurn(-1, 45, 1.8),
+    caveTurn(-1, 90, 1.9),
+    caveTurn(-1, 135, 2.1),
+    caveTurn(-1, 180, 2.5),
+    // 2. Up over the lap's end and the pit's rim to the Flame, then a full turn round it, sinking.
+    { x: 14, y: 2, z: 14.1 },
+    { x: 22, y: 5.5, z: 14.3 },
+    ...[270, 320, 360, 405, 450, 495, 540, 585, 630].map((deg) => spiral(deg, SPIRAL_TOP_Y + (SPIRAL_EXIT_Y - SPIRAL_TOP_Y) * ((deg - 270) / 360))),
     // 3. South down the east side and through the Arch, westward.
     { x: 58, y: 2.6, z: 13.2 },
     archLine(-ARCH.depth / 2 - 6, ARCH_RAIL_Y, -6),
     archLine(-ARCH.depth / 2 - 1.6, ARCH_RAIL_Y, -0.6),
     archLine(0, ARCH_RAIL_Y),
     archLine(ARCH.depth / 2 + 1.6, ARCH_RAIL_Y),
-    // 4. A climbing right turn to the crest, heading north.
-    turnNorth(30, 3.6),
-    turnNorth(60, CREST_Y),
-    turnNorth(90, CREST_Y - 0.1),
-    // 5. The run-in: past the glass room, down the west side, over the pit's rim and down at the star.
-    glass(4.5, 5.2),
-    glass(9, 5.1),
-    { x: 46, y: 5, z: 34.1 },
-    { x: 36, y: 4.8, z: 34 },
-    { x: 28, y: 4.1, z: 32 },
-    { x: 22, y: 2.9, z: 30.2 },
-    pit(16, 3.3, 8),
-    pit(13.2, 1.8, 6.2),
-    // Rising gently at the star, then (after the run) the U-turn under it, back to the Tree.
+    // 4. A climbing right turn, heading north, up to the crest by the glass room's windows.
+    turnNorth(30, 4.4),
+    turnNorth(60, CREST_Y - 1.4),
+    turnNorth(90, CREST_Y),
+    // 5. The run-in: past the glass room's windows, down the west side, over the pit's rim and down at the star.
+    glass(4.5, CREST_Y - 0.05),
+    glass(9, CREST_Y - 0.1),
+    { x: 46, y: CREST_Y - 0.15, z: 34.1 },
+    { x: 36, y: CREST_Y - 0.3, z: 34 },
+    { x: 28, y: CREST_Y - 1.4, z: 32 },
+    { x: 22, y: CREST_Y - 3.8, z: 30.2 },
+    pit(16, 2.9, 8),
+    pit(13.2, 2.2, 6.2),
+    // Rising gently at the star, then (after the run) round under it and into the right cave, to the gap.
     pit(11, 2.1, 4.2),
     pit(10, 2.6, 0.6),
-    pit(10.8, 3, -3.6),
-    pit(13, 3.4, -6.4),
-    treeFace(0.5, 1.4),
+    { x: 13.6, y: 0.1, z: 17.4 },
+    { x: 17.6, y: -0.3, z: 14.4 },
+    caveTurn(1, 90, 1.85),
+    caveTurn(1, 45, 1.8),
+    gap(2.6),
   ]
 }
 
@@ -137,8 +158,8 @@ export const GYM_TRACK: TrackParams = {
   segments: 800,
   tieSpacing: 22,
   towerSpacing: 300,
-  rollerSpeed: 0.0000004,
-  minRollerSpeed: 0.000348,
+  rollerSpeed: 0.000004,
+  minRollerSpeed: 0.00027,
   color1: 0x353d48,
   color2: 0x22d3c5,
 }
