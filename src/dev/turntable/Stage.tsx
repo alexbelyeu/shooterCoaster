@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
@@ -14,7 +14,6 @@ import Atmosphere from '@/levels/environments/shared/Atmosphere'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import type { BiomeType, BossType, EnemyType } from '@/types/level'
-import { createRng, hashString } from '@/utils/rng'
 import KrakenPose from './KrakenPose'
 import type { Cell, Subject, SubjectId } from './subjects'
 
@@ -54,26 +53,6 @@ function bossTrack(type: BossType): ArcTable {
     tracks.set(type, table)
   }
   return table
-}
-
-const nativeRandom = Math.random
-
-/**
- * Its own `Math.random` stream, so a subject's random choices (heading, colour, flap phase) are the same every run;
- * the browser's comes back when it unmounts with nothing seeded after it (a new board's subjects render before the old
- * ones unmount, and keep theirs).
- */
-function Seeded({ id, children }: { id: string; children: ReactNode }) {
-  const seeded = useRef<() => number>(null)
-  seeded.current = createRng(hashString(id))
-  Math.random = seeded.current
-  useEffect(
-    () => () => {
-      if (Math.random === seeded.current) Math.random = nativeRandom
-    },
-    [],
-  )
-  return children
 }
 
 function Model({ subject }: { subject: Subject }) {
@@ -221,6 +200,7 @@ export function Stage({
       let previous: Uint8Array | null = null
 
       cells.forEach((cell, i) => {
+        // eslint-disable-next-line sc/one-slow-mo-writer -- the turntable has no run: it resets the clock's scale to 1 for each cell
         store.setState({ phase: 'playing', timeScale: 1 })
         while (now < cell.time - 1e-6) {
           const dt = Math.min(STEP, cell.time - now)
@@ -298,9 +278,7 @@ export function Stage({
             else turntables.delete(subject.id)
           }}
         >
-          <Seeded id={subject.id}>
-            <Model subject={subject} />
-          </Seeded>
+          <Model subject={subject} />
         </group>
       ))}
     </>

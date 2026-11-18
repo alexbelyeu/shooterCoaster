@@ -18,7 +18,6 @@ const MATH_RANDOM_ALLOWED = [
   'src/audio/offlineRender.ts',
   'src/audio/arcade/bake.ts',
   'src/testing/audioRender.ts',
-  'src/dev/turntable/Stage.tsx',
 ]
 
 export default tseslint.config(
@@ -40,6 +39,12 @@ export default tseslint.config(
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/**/*.test.ts'],
     rules: { 'sc/no-hot-path-alloc': 'error' },
+  },
+  {
+    // The one writer of the store's timeScale / frenzy stage, and the store that declares them.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.test.ts', 'src/combat/slowMo.hot.ts', 'src/store/useGameStore.ts'],
+    rules: { 'sc/one-slow-mo-writer': 'error' },
   },
   {
     // Placement maths (#546: a loop `const reach` hid the readable-range parameter of the same name and silently

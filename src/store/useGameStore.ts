@@ -111,7 +111,7 @@ interface GameState {
 
   timeScale: number
   frenzy: FrenzyStage
-  /** Only `combat/slowMo.hot.ts` calls this (its test checks); everyone else requests a slow-mo there. */
+  /** Only `combat/slowMo.hot.ts` calls this (lint: `sc/one-slow-mo-writer`); everyone else requests a slow-mo there. */
   setSlowMo: (timeScale: number, frenzy: FrenzyStage) => void
 
   /** The mounted level's shader warm-up is done (`canvas/ShaderWarmup.tsx`); the countdown holds Ready until then. */

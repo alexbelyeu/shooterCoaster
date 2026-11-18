@@ -108,16 +108,3 @@ describe('run end', () => {
     expect(store()).toMatchObject({ timeScale: 1, frenzy: 'off' })
   })
 })
-
-describe('one owner', () => {
-  const SOURCES: Record<string, string> = import.meta.glob(['../**/*.{ts,tsx}', '!../**/*.test.*'], { query: '?raw', import: 'default', eager: true })
-
-  it('only combat/slowMo.hot.ts writes timeScale or the frenzy stage (the dev turntable aside)', () => {
-    const exempt = ['./slowMo.hot.ts', '../store/useGameStore.ts']
-    const writers = Object.keys(SOURCES).filter((path) =>
-      !exempt.includes(path) && !path.startsWith('../dev/') &&
-      /\.setSlowMo\(|\.setTimeScale\(|setState\(\{[^}]*\b(timeScale|frenzy)\b/.test(SOURCES[path]))
-    expect(writers).toEqual([])
-    expect(Object.keys(SOURCES).length).toBeGreaterThan(100)
-  })
-})
