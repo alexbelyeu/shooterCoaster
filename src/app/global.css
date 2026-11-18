@@ -576,6 +576,33 @@ canvas {
 .hud-snow-splat.is-left { box-shadow: inset 120px 0 90px -40px rgba(255, 255, 255, 0.8); }
 .hud-snow-splat.is-right { box-shadow: inset -120px 0 90px -40px rgba(255, 255, 255, 0.8); }
 
+/* A Kraken slam threw the sea at the camera: foam over that edge and the bottom, and drops on the lens. */
+.hud-sea-splat {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --drops:
+    radial-gradient(circle at 50% 50%, rgba(235, 252, 255, 0.85) 0 38%, rgba(160, 230, 245, 0.35) 52%, transparent 70%) var(--d1) / 7vmin 7vmin no-repeat,
+    radial-gradient(circle at 50% 50%, rgba(235, 252, 255, 0.8) 0 36%, rgba(160, 230, 245, 0.3) 50%, transparent 68%) var(--d2) / 4.5vmin 4.5vmin no-repeat,
+    radial-gradient(circle at 50% 50%, rgba(235, 252, 255, 0.8) 0 36%, rgba(160, 230, 245, 0.3) 50%, transparent 68%) var(--d3) / 10vmin 10vmin no-repeat,
+    radial-gradient(circle at 50% 50%, rgba(235, 252, 255, 0.75) 0 36%, transparent 66%) var(--d4) / 3vmin 3vmin no-repeat;
+  background: var(--drops);
+  animation: hud-sea-splat 0.7s ease-out forwards;
+}
+.hud-sea-splat.is-left {
+  --d1: 6% 30%; --d2: 14% 62%; --d3: 3% 78%; --d4: 22% 44%;
+  box-shadow: inset 160px 0 110px -50px rgba(205, 245, 255, 0.85), inset 0 -110px 90px -50px rgba(205, 245, 255, 0.6);
+}
+.hud-sea-splat.is-right {
+  --d1: 94% 30%; --d2: 86% 62%; --d3: 97% 78%; --d4: 78% 44%;
+  box-shadow: inset -160px 0 110px -50px rgba(205, 245, 255, 0.85), inset 0 -110px 90px -50px rgba(205, 245, 255, 0.6);
+}
+.hud-sea-splat.is-both {
+  --d1: 8% 34%; --d2: 90% 58%; --d3: 50% 92%; --d4: 76% 30%;
+  box-shadow: inset 140px 0 110px -50px rgba(205, 245, 255, 0.8), inset -140px 0 110px -50px rgba(205, 245, 255, 0.8),
+    inset 0 -130px 100px -50px rgba(205, 245, 255, 0.65);
+}
+
 /* Don't-shoot hint (#518): a friendly teal pill under the wave banner */
 .hud-bystander-hint {
   position: absolute;
@@ -600,6 +627,12 @@ canvas {
 @keyframes hud-snow-splat {
   from { opacity: 1; }
   to { opacity: 0; }
+}
+
+@keyframes hud-sea-splat {
+  0% { opacity: 1; }
+  35% { opacity: 0.9; }
+  100% { opacity: 0; }
 }
 
 @keyframes hud-fade-in {

@@ -12,6 +12,7 @@ import { ATMOSPHERES } from '@/levels/environments/atmosphere'
 import { createFoamMaterial, createFoamRingGeometry } from '@/levels/environments/biomes/ocean/seaMaterials'
 import { oceanLayout, seaObstacles } from '@/levels/environments/biomes/ocean/seaPlacement'
 import { createRng, hashString } from '@/utils/rng'
+import { SEA_SPRAY_EVENT } from '@/ui/hud/SnowSplat'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
 import type { WeakPointSpec } from './bossModel'
 import { KRAKEN } from './bossSpecs'
@@ -207,14 +208,43 @@ export default function Kraken(props: BossProps) {
       _camXZ.x = _cam.x
       _camXZ.y = _cam.y
       _camXZ.z = _cam.z
+
+      // The head moves `root` when it surfaces, before anything is laid relative to it (#264).
+      let padsLeft = 0
+      for (let i = 0; i < T.count; i++) if (state.hp[i] > 0) padsLeft++
+      const headRun = sim.head
+      const eyeAlive = state.hp[EYE_INDEX] > 0
+      if (padsLeft === 0 && !sim.headStarted) {
+        sim.headStarted = true
+        headRun.wait = 0.6
+      }
+      if (!eyeAlive) headRun.sinkS = H.defeatSinkS
+      if (sinceDefeat >= 0 && !sim.defeatSplashed) {
+        sim.defeatSplashed = true
+        for (let k = 0; k < 3; k++) {
+          const a = (k / 3) * Math.PI * 2
+          splash(headRun.spot.x + Math.cos(a) * H.rx * 0.7, headRun.spot.z + Math.sin(a) * H.rz * 0.7, DEFEAT_TRAUMA, k === 0)
+        }
+        eventBus.emit(SEA_SPRAY_EVENT, 0)
+      }
+      if (sim.headStarted && headRun.mode === 'waiting' && eyeAlive) {
+        headRun.wait -= dt
+        if (headRun.wait <= 0) {
+          if (surface(headRun, 'head')) {
+            root.position.set(headRun.spot.x, 0, headRun.spot.z)
+            splash(headRun.spot.x, headRun.spot.z, RISE_TRAUMA, true)
+          } else headRun.wait = 0.25
+        }
+      } else if (headRun.mode === 'up' && !advance(headRun, dt, eyeAlive, H.riseS)) {
+        headRun.mode = eyeAlive ? 'waiting' : 'gone'
+        headRun.wait = H.gapS
+      }
       const ox = root.position.x
       const oz = root.position.z
 
-      let padsLeft = 0
       for (let i = 0; i < T.count; i++) {
         const run = sim.tentacles[i]
         const alive = state.hp[i] > 0
-        if (alive) padsLeft++
         const pad = parts.get(KRAKEN.weakPoints[i].id)
 
         if (run.mode === 'waiting') {
@@ -258,57 +288,34 @@ export default function Kraken(props: BossProps) {
         }
         if (impact) {
           const reach = chain.u[T.segments]
-          splash(run.spot.x + dx * reach, run.spot.z + dz * reach, SLAM_TRAUMA, true)
+          const sx = run.spot.x + dx * reach
+          const sz = run.spot.z + dz * reach
+          splash(sx, sz, SLAM_TRAUMA, true)
+          // Thrown at the lens on the side of the view it landed on (the view's right is (−fz, fx)).
+          eventBus.emit(SEA_SPRAY_EVENT, (sx - _cam.x) * -_fwd.z + (sz - _cam.z) * _fwd.x < 0 ? -1 : 1)
         }
         const wash = run.tau < T.riseS ? (1 - run.tau / T.riseS) * 60 : 0
         foamRings.setMatrixAt(i, foamR > 0 ? _m.makeScale(foamR * 1.1 + wash, 1, foamR * 1.1 + wash).setPosition(px, 0, pz) : ZERO)
       }
 
-      const run = sim.head
       const eye = parts.get('eye')
-      const eyeAlive = state.hp[EYE_INDEX] > 0
-      if (padsLeft === 0 && !sim.headStarted) {
-        sim.headStarted = true
-        run.wait = 0.6
-      }
-      if (!eyeAlive) run.sinkS = H.defeatSinkS
-      if (sinceDefeat >= 0 && !sim.defeatSplashed) {
-        sim.defeatSplashed = true
-        for (let k = 0; k < 3; k++) {
-          const a = (k / 3) * Math.PI * 2
-          splash(run.spot.x + Math.cos(a) * H.rx * 0.7, run.spot.z + Math.sin(a) * H.rz * 0.7, DEFEAT_TRAUMA, k === 0)
-        }
-      }
-      if (sim.headStarted && run.mode === 'waiting' && eyeAlive) {
-        run.wait -= dt
-        if (run.wait <= 0) {
-          if (surface(run, 'head')) {
-            root.position.set(run.spot.x, 0, run.spot.z)
-            splash(run.spot.x, run.spot.z, RISE_TRAUMA, true)
-          } else run.wait = 0.25
-        }
-      } else if (run.mode === 'up' && !advance(run, dt, eyeAlive, H.riseS)) {
-        run.mode = eyeAlive ? 'waiting' : 'gone'
-        run.wait = H.gapS
-      }
-
-      const hx = run.spot.x - root.position.x
-      const hz = run.spot.z - root.position.z
-      const pose = headFrame(sim.headPose, run.mode === 'up' ? run.tau : -1, run.sinkAt, run.sinkS)
-      const yaw = Math.atan2(_cam.x - run.spot.x, _cam.z - run.spot.z)
-      head.visible = run.mode === 'up'
+      const hx = headRun.spot.x - root.position.x
+      const hz = headRun.spot.z - root.position.z
+      const pose = headFrame(sim.headPose, headRun.mode === 'up' ? headRun.tau : -1, headRun.sinkAt, headRun.sinkS)
+      const yaw = Math.atan2(_cam.x - headRun.spot.x, _cam.z - headRun.spot.z)
+      head.visible = headRun.mode === 'up'
       head.position.set(hx, pose.y, hz)
       head.rotation.y = yaw
-      foamRings.setMatrixAt(HEAD_FOAM, run.mode === 'up' ? _m.makeScale(H.rx * 0.92, 1, H.rx * 0.92).setPosition(hx, 0, hz) : ZERO)
+      foamRings.setMatrixAt(HEAD_FOAM, headRun.mode === 'up' ? _m.makeScale(H.rx * 0.92, 1, H.rx * 0.92).setPosition(hx, 0, hz) : ZERO)
       if (eye) {
-        if (eyeAlive) eye.visible = run.mode === 'up'
-        if (run.mode === 'up' && pose.emerge > 0.3) {
+        if (eyeAlive) eye.visible = headRun.mode === 'up'
+        if (headRun.mode === 'up' && pose.emerge > 0.3) {
           eye.position.set(hx + Math.sin(yaw) * H.eyeOut, pose.y + H.eyeUp, hz + Math.cos(yaw) * H.eyeOut)
           eye.rotation.set(0, yaw, 0)
         } else eye.position.set(0, PARKED_Y, 0)
-        if (eyeAlive) KRAKEN_EYE_MAT.emissiveIntensity = 0.9 + 0.5 * Math.sin(run.tau * 6)
+        if (eyeAlive) KRAKEN_EYE_MAT.emissiveIntensity = 0.9 + 0.5 * Math.sin(headRun.tau * 6)
       }
-      KRAKEN_PAD_MAT.emissiveIntensity = 1.3 + 0.4 * Math.sin(age * 5)
+      KRAKEN_PAD_MAT.emissiveIntensity = 1.1 + 0.35 * Math.sin(age * 5)
 
       segments.instanceMatrix.needsUpdate = true
       // Its bounds change every frame; recomputed only when something asks (the e2e box).
