@@ -2820,6 +2820,22 @@ async function countdownCheck(page, levelId) {
     stepText = await page.locator('.countdown-step').first().textContent().catch(() => null)
     await page.screenshot({ path: path.join(OUT, 'countdown.png'), timeout: SHOT_TIMEOUT })
   }
+  // The intro swoop (#328), pinned once the level shows: early on, high over the seat with the landmark in view
+  // (`<level>-swoop.png`); at its end, exactly on the ride's start pose, the pose GO hands over.
+  let swoop = null
+  if (during) {
+    await page.waitForFunction(() => window.__SC_TEST__.shaderWarmup?.done, null, { timeout: 60000, polling: 250 }).catch(() => {})
+    const pinned = async (at) => {
+      await page.evaluate((p) => { window.__SC_TEST__.introAt = p }, at)
+      await waitFrames(page, 2, { maxMs: 30000 })
+      return page.evaluate(() => ({ ...window.__SC_TEST__.intro, phase: window.__SC_TEST__.phase() }))
+    }
+    const high = await pinned(0.15)
+    await page.screenshot({ path: path.join(OUT, `${levelId}-swoop.png`), timeout: SHOT_TIMEOUT })
+    const seat = await pinned(1)
+    await page.evaluate(() => { window.__SC_TEST__.introAt = null })
+    swoop = { high, seat }
+  }
   // Read before letting the countdown run on: by now the level is mounted and its timer reset, held at full.
   const held = await page.evaluate(() => {
     const api = window.__SC_TEST__
@@ -2828,6 +2844,7 @@ async function countdownCheck(page, levelId) {
   })
   const goStats = await waitPlaying()
   const atGo = goStats ?? (await getStats(page))
+  if (swoop) swoop.goOffset = await page.evaluate(() => window.__SC_TEST__.intro.goOffset)
   // Still holding in play: the trigger is down, but a press from the countdown never auto-fires.
   await waitFrames(page, 3, { minMs: 2000, maxMs: 30000 })
   const heldInPlay = await page.evaluate((at) => {
@@ -2904,6 +2921,16 @@ async function countdownCheck(page, levelId) {
   if (!during) problems.push('countdown over before the press check')
   else if (during.shotsFired > 0) problems.push(`a press during the countdown fired ${during.shotsFired} shot(s)`)
   if (!goStats) problems.push(`phase never reached playing (still "${atGo.phase}")`)
+  if (swoop?.high.phase === 'countdown') {
+    const { high, seat } = swoop
+    if (high.mode !== 'swoop') problems.push(`no intro swoop during the countdown (camera "${high.mode}")`)
+    else {
+      if (high.height < 60) problems.push(`the swoop starts only ${high.height.toFixed(1)} units over the seat`)
+      if (high.anchorAngle > 20) problems.push(`the swoop's start looks ${high.anchorAngle.toFixed(1)}° off the landmark`)
+      if (seat.seatOffset > 1e-3 || seat.seatAngle > 1e-3)
+        problems.push(`the swoop ends ${seat.seatOffset.toFixed(3)} units / ${seat.seatAngle.toFixed(3)}° off the ride's start pose`)
+    }
+  }
   if (held.phase === 'countdown' && atGo.timeRemaining < held.timeRemaining - 3)
     problems.push(`timer ran during the countdown (${held.timeRemaining.toFixed(1)} -> ${atGo.timeRemaining.toFixed(1)} at GO)`)
   if (!heldInPlay.held) problems.push('the countdown press was no longer held after GO')
@@ -2930,6 +2957,7 @@ async function countdownCheck(page, levelId) {
       timerAtGo: atGo.timeRemaining,
       shotsHeldIntoPlay: heldInPlay.stats.shotsFired,
       skipTapIn: tappedIn,
+      swoop,
       leftDuringWarmup,
       warmup,
       firstShot,
@@ -3802,6 +3830,7 @@ async function run() {
       : r.countdown
         ? ` ${r.countdown.level} "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
           ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +
+          (r.countdown.swoop ? ` swoop ${r.countdown.swoop.high.height.toFixed(0)} over the seat, ${r.countdown.swoop.high.anchorAngle.toFixed(1)}° off the landmark, GO ${r.countdown.swoop.goOffset?.toFixed(2)} off the seat,` : '') +
           ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'},` +
           ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})` +
           ` | startup ${startupSummary(r.initTimings)}`

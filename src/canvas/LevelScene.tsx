@@ -102,6 +102,9 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         rollerSpeed={track.rollerSpeed}
         minRollerSpeed={track.minRollerSpeed}
         heightOffset={trackDims.eyeHeight}
+        hero={BIOMES[biome].hero}
+        groundFn={groundFn}
+        bounds={BIOMES[biome].bounds}
       />
       <ContactShadows groundFn={groundFn}>
         <TrackMesh

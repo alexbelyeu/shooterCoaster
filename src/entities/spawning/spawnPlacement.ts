@@ -288,9 +288,16 @@ export function insideBounds(p: Vec3, b: PlacementBounds): boolean {
 
 /** `p` moved to the nearest point inside `b`, or `p` itself with no bounds. */
 export function clampToBounds(p: Vec3, b: PlacementBounds | undefined): Vec3 {
+  return b ? clampIntoBounds({ x: p.x, y: p.y, z: p.z }, b) : p
+}
+
+/** `clampToBounds` in place, for per-frame callers (the intro camera). */
+export function clampIntoBounds<T extends Vec3>(p: T, b: PlacementBounds | undefined): T {
   if (!b) return p
-  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
-  return { x: clamp(p.x, b.minX, b.maxX), y: Math.min(p.y, b.maxY), z: clamp(p.z, b.minZ, b.maxZ) }
+  p.x = Math.min(b.maxX, Math.max(b.minX, p.x))
+  p.y = Math.min(p.y, b.maxY)
+  p.z = Math.min(b.maxZ, Math.max(b.minZ, p.z))
+  return p
 }
 
 export interface PlaceWaveInput {

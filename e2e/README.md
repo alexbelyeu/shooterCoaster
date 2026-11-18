@@ -89,7 +89,10 @@ daily mode, a second load must give the same `spawnDigest()`, the results must s
 (`daily-results.png`; its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 `?e2e=1` skips the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1`: the countdown must show (`countdown.png`),
-a press during it must fire nothing (also when held on into `playing`), the timer must hold, a replay tap after 1 s (Ready held by `holdFeedback`) skips to `playing`,
+a press during it must fire nothing (also when held on into `playing`), the timer must hold,
+the intro swoop (#328, pinned with `introAt` once the warm-up is done) must start high over the seat with the level's
+landmark in view (`level1-swoop.png`, `intro.height` / `anchorAngle`) and end exactly on the ride's start pose, the pose GO
+hands over (`intro.seatOffset` / `seatAngle`; the real landing's `goOffset` is reported), a replay tap after 1 s (Ready held by `holdFeedback`) skips to `playing`,
 and the shader warm-up must finish (and leaving a level mid-warm-up must log no error); after it, the first shot + kill must compile no new shader program
 (`programs()`; the longest frame is reported). The step also prints the startup timings (`initTimings()`: boot, first title
 frame and PLAY from navigation; level mounted, env baked, warm-up done and first `playing` frame from the run's start) and writes

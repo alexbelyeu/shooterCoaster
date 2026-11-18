@@ -467,7 +467,7 @@ function checklist({ id, biome, kind }, previous) {
   return [
     'Read .claude/skills/shooter-coaster-level-design and docs/art/ENEMIES.md.',
     `Track: tune ${id}'s curve in LevelRegistry.ts inside the extent formula (or author a spline, like the gym's)${kind === 'interior' ? `, and size HALL in ${dir}/config.ts around it` : ''}.`,
-    `Look: ${dir}/config.ts palette, ATMOSPHERES.${biome} (atmosphere.ts), the hero landmark in Features.tsx, props in Decorations.tsx (seeded, off the track), contact shadows.`,
+    `Look: ${dir}/config.ts palette, ATMOSPHERES.${biome} (atmosphere.ts), the hero landmark in Features.tsx and its hero shot in index.ts, props in Decorations.tsx (seeded, off the track), contact shadows.`,
     `Level select: draw the landmark in LevelPostcard.tsx SCENES.${biome}, pick the BIOME_UI.${biome} accent (theme.ts).`,
     `Roster: swap the starter waves for the world's own enemies; a boss goes in LevelConfig.boss. maxScore and the finales row in LevelRegistry.test.ts follow, then node scripts/gen-level-limits.mjs.`,
     'New enemies: SharedEnemyAssets.ts, enemyComponents.ts, ENEMY_PLACEMENT, SCORE_VALUES, deathStyles.ts, sfxDesign.ts, the turntable subjects.ts, a brief in docs/art/ENEMIES.md.',

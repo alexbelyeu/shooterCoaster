@@ -4,6 +4,7 @@ import { COLOR_RAMP, TREES } from './config'
 import Decorations from './Decorations'
 import Features from './Features'
 import { createLavaGlowSampler } from './lavaGlow'
+import { VOLCANO, VOLCANO_SITE } from '../../volcanoGeometry'
 
 export const volcanic: BiomeDefinition = {
   colorRamp: COLOR_RAMP,
@@ -12,4 +13,5 @@ export const volcanic: BiomeDefinition = {
   Decorations,
   Features,
   particles: PARTICLE_PRESETS.volcanicAsh,
+  hero: { x: VOLCANO_SITE.x, z: VOLCANO_SITE.z, focus: VOLCANO.height * 0.45, orbitRadius: 2300, orbitHeight: 1000 },
 }
