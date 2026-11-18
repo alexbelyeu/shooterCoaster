@@ -19,6 +19,7 @@ import {
   MEDUSA_CHALK_BURST_DEATH_STYLE,
   nextAge,
   particleOffset,
+  pickDeathSlot,
   sizeAt,
   styleCounts,
   type DeathStyle,
@@ -120,5 +121,23 @@ describe('nextAge', () => {
     expect(nextAge(holdAt, 1, 2, true)).toBeCloseTo(holdAt)
     expect(nextAge(1.5, 1, 2, true)).toBe(1.5)
     expect(holdAt).toBeLessThan(2)
+  })
+})
+
+describe('pickDeathSlot', () => {
+  const idle = (serial: number) => ({ active: false, needsZero: false, serial })
+
+  it('takes the first idle slot, clean', () => {
+    expect(pickDeathSlot([{ active: true, needsZero: false, serial: 1 }, idle(0), idle(0)])).toEqual({ index: 1, clear: false })
+  })
+
+  it('clears a slot that expired this frame and is not zeroed yet (#228)', () => {
+    const slots = [{ active: true, needsZero: false, serial: 2 }, { active: false, needsZero: true, serial: 1 }]
+    expect(pickDeathSlot(slots)).toEqual({ index: 1, clear: true })
+  })
+
+  it('steals the oldest active slot when full, and clears it', () => {
+    const slots = [3, 1, 2].map((serial) => ({ active: true, needsZero: false, serial }))
+    expect(pickDeathSlot(slots)).toEqual({ index: 1, clear: true })
   })
 })
