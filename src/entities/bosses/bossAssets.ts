@@ -825,7 +825,6 @@ function nose(): THREE.BufferGeometry {
 }
 
 const EYE = { radii: [14, 9.5, 8] as V3, lids: 1.12, upperLid: -0.55, lowerLid: 0.4 }
-const _eye = new THREE.Matrix4()
 
 /**
  * An almond eye, glancing sideways: an eyeball between two lid shells (hemispheres turned about its across axis),
@@ -833,10 +832,11 @@ const _eye = new THREE.Matrix4()
  */
 function almondEye(side: number): THREE.BufferGeometry[] {
   const [ex, ey, ez] = EYE.radii
-  const at = (m: THREE.Matrix4) => new THREE.Matrix4().multiplyMatrices(_eye, m)
-  pose([side * 27, 48, 57.5], [0, side * 0.3, side * 0.1], [1, 1, 1], _eye)
+  const lidRadii: [number, number, number] = [ex * EYE.lids, ey * EYE.lids, ez * EYE.lids]
+  const placed = pose([side * 27, 48, 57.5], [0, side * 0.3, side * 0.1])
+  const at = (m: THREE.Matrix4) => m.premultiply(placed)
   const lid = (thetaStart: number, turn: number) =>
-    skin(new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, thetaStart, Math.PI / 2), at(pose([0, 0, 0], [turn, 0, 0], [ex * EYE.lids, ey * EYE.lids, ez * EYE.lids])))
+    skin(new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, thetaStart, Math.PI / 2), at(pose([0, 0, 0], [turn, 0, 0], lidRadii)))
   return [
     paintedAt(new THREE.SphereGeometry(1, 16, 12), '#f3ebe0', at(pose([0, 0, 0], [0, 0, 0], [ex, ey, ez]))),
     paintedAt(new THREE.SphereGeometry(1, 14, 10), IRIS, at(pose([ex * 0.3, 0, ez * 0.9], [0, 0.3, 0], [6.4, 6.4, 2.6]))),
@@ -844,7 +844,7 @@ function almondEye(side: number): THREE.BufferGeometry[] {
     lid(0, EYE.upperLid),
     lid(Math.PI / 2, EYE.lowerLid),
     paintedAt(new THREE.TorusGeometry(1, 0.05, 4, 24, Math.PI * 0.84), BROW,
-      at(pose([0, 0, 0], [Math.PI / 2 + EYE.upperLid, 0, Math.PI * 0.08], [ex * EYE.lids, ey * EYE.lids, ez * EYE.lids]))),
+      at(pose([0, 0, 0], [Math.PI / 2 + EYE.upperLid, 0, Math.PI * 0.08], lidRadii))),
   ]
 }
 
