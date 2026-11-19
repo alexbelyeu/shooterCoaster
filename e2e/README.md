@@ -18,8 +18,10 @@ it must boot to the title with no failed request, no analytics request and no pa
 ride stats, the perf gate, the shot and the enemy probe; the ride stops at exactly `--seconds` of level time, timer, game clock and ride together on the frame that gets there (`stopAtLevelTime`, #487: a poll used to catch it anywhere from 10.2 to 10.7 s, and level2's enemy probe failed at 10.7); the ride gets there in settled steps of `--seconds` / `--min-frames` level seconds (below), combat caps level time per frame (`timerStepMax`, 0.25 s) and ride `--ride-rate` 0.14 s of track per second of level time (`rideRate`: CI's ride, where the budgets were set; the game rides at most
 3/60 s a frame), so a slow runner samples the same moment of the level from the same track point as a fast one; through the combat checks the level timer is then held (`holdLevelTime`: the game clock runs on, the run can't time out and no wave or boss comes due) until the step ends the level itself, so however long the checks take they never run into the boss or the end of the run (#305);
 it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
-`<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), on level6 `level6-bystander.png` (#518: first in
-its combat, two kills and a primed 5-chain, then `shootBystander()` on a live climber: the score must drop by `BYSTANDER_PENALTY`
+`<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), on level6 `level6-gap.png` (#659: game time and the
+level timer held, `rideTo` jumps the car into the Tree's gap at the lap's start and back; the car must be there and the frame not
+blank: the trunk on one side, the back wall on the other) and `level6-bystander.png` (#518: first in
+its combat, two kills (their real shot left to land or fly out first) and a primed 5-chain, then `shootBystander()` on a live climber: the score must drop by `BYSTANDER_PENALTY`
 (floored at 0), the combo reset, no kill or hit counted, `bystandersHit` 1 and the don't-shoot hint shown; the shot holds the red
 "−18 · Don't shoot climbers!" popup and the chalk puff; `level6 bystander: score a → b, combo 5 → 0` in the log), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
@@ -134,7 +136,7 @@ When level6 is in the run, the step first rides the coaster to 0.75 of the lap (
 rather than coming to the rider) and summons her: after 2 s of game time (she has risen out of the star) at least three of
 her first four snakes must be on screen (`level6-boss.png`); it clears them, lets her second four uncoil (`midPhases`: a
 phase between the first and the last) and clears those, then only the crown snake is exposed (`level6-boss-crown.png`;
-with her leant out it then rides to 0.84 and 0.9 of the lap, `level6-boss-pass-84.png` / `-90.png`, the ride's last stretch past her)
+with her leant out it then rides to 0.88 and 0.94 of the lap, `level6-boss-pass-88.png` / `-94.png`, the ride's last stretch past her)
 before she laughs and sinks back into the star in a chalk burst (`level6-boss-down.png`).
 Every boss must fit its fight window (#452: the boss arrives at 40 s of the 60 s run): the game seconds it moved before
 each phase was on screen plus every weak point's hp at 2 hits a second must be ≤ 20 s (`fight` on the summary line).

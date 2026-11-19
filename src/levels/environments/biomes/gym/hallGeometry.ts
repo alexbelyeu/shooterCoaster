@@ -210,7 +210,7 @@ function woodGeometry(p: PieceOf<'tree'>, m: THREE.Matrix4): THREE.BufferGeometr
 }
 
 /**
- * The Tree (#519): a barked trunk on four buttress roots (the gap under it, `TREE_GAP`), limbs roofing the
+ * The Tree (#519): a solid barked trunk standing proud of the back wall (the gap between them, `TREE_GAP`), limbs roofing the
  * two caves, branches framing the headwall; the caves' back wall and the headwall in white panels with green
  * outlines.
  */

@@ -216,24 +216,25 @@ export function pieceBoxes(p: BlockoutPiece): OrientedBox[] {
 }
 
 /**
- * The gap under the Tree's trunk (#558), in the Tree's frame (`along` from its centre, `f` out from its foot
- * line, `y` up from the pit floor): cave to cave between the front and back buttress roots, under the
- * trunk's underside. Seen from the pit it is the arch the front roots make as they lean in to the trunk;
- * the ride runs through it (#613). `treeTrunk.ts` builds the wood round it.
+ * The Tree's gap (#671), in its frame (`along` from its centre, `f` out from its foot line, `y` up from the pit
+ * floor): between its solid trunk and the back wall, cave to cave, the way the Arch's opening runs between its legs.
+ * The trunk stands proud of the wall on its buttress roots; over the gap it swells back into the wall under the
+ * limbs that roof the caves (`height`, the `head` box's underside). The ride runs through it (#659).
+ * `treeTrunk.ts` builds the wood round it.
  */
-export const TREE_GAP = { halfAlong: 2.8, minF: 0.75, maxF: 4.0, height: 3.1 } as const
+export const TREE_GAP = { halfAlong: 2.8, minF: 0.75, maxF: 2.85, height: 5 } as const
 
 /**
  * The Tree's wood and walls round its gap and caves, conservatively, in its frame (`treeTrunk.ts` stays inside them,
- * `wallPanels.test.ts` holds it there): the trunk over the gap, the front buttress roots in the caves' mouths, the
+ * `wallPanels.test.ts` holds it there): the trunk in front of the gap, its buttress roots along the caves' mouths, the
  * surface roots on their floor.
  */
-const TREE_WOOD = { trunkHalf: 3.3, frontRootHalf: 5.8, floorRootTop: 0.6, limbsBelowCaveTop: 2 } as const
+const TREE_WOOD = { trunkHalf: 3.3, frontRootHalf: 5.8, floorRootTop: 0.6 } as const
 
 /**
- * The Tree as the ride sees it (#613): its footprint less the gap and the caves. The back wall and back roots up to
- * the gap, the headwall and the limbs roofing the caves, the trunk down to the gap's ceiling, the front roots
- * leaning in to it, and the surface roots on the caves' floor.
+ * The Tree as the ride sees it (#613): its footprint less the gap and the caves. The back wall, the headwall and the
+ * limbs roofing the caves down to the gap's ceiling, the trunk and its front roots from the floor up in front of the
+ * gap, and the surface roots on the caves' floor.
  */
 export function treeSolidBoxes(t: PieceOf<'tree'>): OrientedBox[] {
   const front = t.caveDepth + treeHeadLean(t)
@@ -253,8 +254,8 @@ export function treeSolidBoxes(t: PieceOf<'tree'>): OrientedBox[] {
   const w = TREE_WOOD
   return [
     box('back', -half, half, -DEFAULT_BACK, TREE_GAP.minF, -2, t.height),
-    box('head', -half, half, -DEFAULT_BACK, front, t.caveHeight - w.limbsBelowCaveTop, t.height),
-    box('trunk', -w.trunkHalf, w.trunkHalf, -DEFAULT_BACK, front, TREE_GAP.height, t.height),
+    box('head', -half, half, -DEFAULT_BACK, front, TREE_GAP.height, t.height),
+    box('trunk', -w.trunkHalf, w.trunkHalf, TREE_GAP.maxF, front, -2, t.height),
     box('roots', -w.frontRootHalf, w.frontRootHalf, TREE_GAP.maxF, front, -2, t.caveHeight),
     box('floor', -half, half, -DEFAULT_BACK, front, -2, w.floorRootTop),
   ]
@@ -338,30 +339,21 @@ export const FLAME = {
 
 const tree = piece('tree')
 const treeAxes = pieceAxes(tree.rot)
-/** The Tree's face: along it from its centre, the way it faces, the caves' lip and the headwall above. */
+/** The Tree's frame: its centre, along it and the way it faces, in the blockout's x/z. */
 export const TREE = {
   centre: { x: tree.x, z: tree.z },
   along: treeAxes.along,
   facing: treeAxes.facing,
-  width: tree.width,
-  trunk: tree.trunk,
-  /** The face's lip (trunk front / cave roofs meet) out from the piece's foot line. */
-  lip: tree.caveDepth,
-  caveTopY: tree.base + tree.caveHeight,
-  headTopY: tree.base + tree.height,
-  headLean: treeHeadLean(tree),
-}
-
-/** How far a blockout point stands out from the Tree's face at its height (the headwall leans out). */
-export function treeFaceDistance(p: Vec3): number {
-  const facing = (p.x - TREE.centre.x) * TREE.facing.x + (p.z - TREE.centre.z) * TREE.facing.z
-  const above = Math.min(Math.max(p.y - TREE.caveTopY, 0), TREE.headTopY - TREE.caveTopY)
-  return facing - TREE.lip - (above / (TREE.headTopY - TREE.caveTopY)) * TREE.headLean
 }
 
 /** Along the Tree from its centre. */
 export function treeAlong(p: Vec3): number {
   return (p.x - TREE.centre.x) * TREE.along.x + (p.z - TREE.centre.z) * TREE.along.z
+}
+
+/** Out from the Tree's foot line, the way it faces (`TREE_GAP`'s `minF` / `maxF`). */
+export function treeOut(p: Vec3): number {
+  return (p.x - TREE.centre.x) * TREE.facing.x + (p.z - TREE.centre.z) * TREE.facing.z
 }
 
 const glass = piece('windows', 'win-glassgym')
