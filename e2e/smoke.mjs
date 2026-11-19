@@ -1737,6 +1737,36 @@ async function speedCheck(page, levelId) {
   return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w }, tunnel: tunnel.result }
 }
 
+/** The level whose lap starts in the Tree's gap (#659, `gym/gymTrack.ts`), and the track fraction its still is shot at: under the trunk. */
+const GAP_LEVEL = 'level6'
+const GAP_FRACTION = 0.003
+
+/**
+ * `level6-gap.png`: the ride from inside the Tree's gap, the trunk round the camera. With game time and the level timer
+ * held, `rideTo` jumps the car into the gap and back to where it was, so the combat that follows rides on from there.
+ */
+async function gapShot(page) {
+  const back = await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    s.holdLevelTime = true
+    s.setTimeScale(0)
+    return s.rideProgress
+  })
+  const jump = async (t) => {
+    await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, t)
+    await waitFrames(page, 3, { maxMs: 20000, pollMs: 100 })
+  }
+  await jump(GAP_FRACTION)
+  const at = await page.evaluate(() => window.__SC_TEST__.rideProgress)
+  const image = await imageStats(page, await page.screenshot({ path: path.join(OUT, `${GAP_LEVEL}-gap.png`), timeout: SHOT_TIMEOUT }))
+  await jump(back)
+  await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1); window.__SC_TEST__.holdLevelTime = false })
+  const problems = []
+  if (Math.abs(at - GAP_FRACTION) > 0.002) problems.push(`gap still: the car is at track ${at.toFixed(4)}, not ${GAP_FRACTION} in the Tree's gap`)
+  if (looksBlank(image)) problems.push('gap still looks blank')
+  return { problems, image }
+}
+
 /** How far through a tunnel `<id>-tunnel.png` is shot: past the middle, with the exit ahead. */
 const TUNNEL_SHOT_AT = 0.75
 /** `<id>-tunnel-entry.png` looks at its entry portal from this far back (× the tunnel's length). */
@@ -1811,6 +1841,10 @@ async function bystanderProblems(page, id) {
   const r = await page.evaluate(async () => {
     const s = window.__SC_TEST__
     s.killNearest(2)
+    // killNearest fires a real shot at the first: let it land or fly out (two frames, then until none is drawn; 5 s at
+    // most), so it can't hit an enemy behind under the check.
+    const f0 = s.frames
+    for (let waited = 0; (s.frames - f0 < 2 || s.bullets().drawn > 0) && waited < 5000; waited += 100) await new Promise((resolve) => setTimeout(resolve, 100))
     s.primeCombo(5)
     s.holdFeedback = true
     const before = s.stats()
@@ -3772,6 +3806,8 @@ async function run() {
     const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
     problems.push(...desktopAspect.problems)
     stats.view = desktopAspect.view
+    const gap = id === GAP_LEVEL ? await gapShot(page) : null
+    if (gap) problems.push(...gap.problems)
     const perfGate = PERF_GATE ? sceneBudgetCheck(id, stats) : null
     if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
     const frenzy = has('frenzy') && id === first
@@ -3792,7 +3828,7 @@ async function run() {
     results.push({
       id, ok, problems, frames, frameSeconds, rideMsPerFrame: frames > 0 ? ride.ms / frames : null,
       seconds: (Date.now() - started) / 1000, spawnDigest, ...stats, perfGate, shaders, throttled,
-      kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, errors: allErrors,
+      kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, gap: gap?.image ?? null, errors: allErrors,
     })
     await ctx.close()
   }

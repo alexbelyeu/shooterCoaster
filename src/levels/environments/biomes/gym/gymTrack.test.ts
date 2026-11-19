@@ -18,6 +18,7 @@ import {
   PIT,
   STAR,
   TREE,
+  TREE_GAP,
   archAxial,
   archOpeningClearance,
   distanceToBox,
@@ -26,12 +27,11 @@ import {
   toBlockout,
   toWorld,
   treeAlong,
-  treeFaceDistance,
   type Vec3,
 } from './blockout'
 import { GYM_TRACK, RAIL_CLEARANCE } from './gymTrack'
 
-/** The Tree climb and the glass room pass count within this many metres of the face / windows. */
+/** The glass room pass counts within this many metres of the windows. */
 const NEAR = 5
 /** The spiral's turn is counted while the track is within this many metres of the Flame's centre. */
 const SPIRAL_RADIUS = 20
@@ -138,18 +138,32 @@ describe('the gym track', () => {
     expect(over).toBe(0)
   })
 
-  it('climbs the Tree past its caves into the headwall, close to its face, and passes the glass room windows', () => {
-    const onFace = track.filter((p) => Math.abs(treeAlong(p)) <= TREE.width / 2 && treeFaceDistance(p) <= NEAR)
-    const heights = onFace.map((p) => p.y)
-    expect(Math.min(...heights)).toBeLessThan(TREE.caveTopY)
-    expect(Math.max(...heights)).toBeGreaterThan(TREE.caveTopY + 2)
-    expect(Math.max(...heights)).toBeLessThan(TREE.headTopY)
+  it("rides through the Tree's gap in the run, cave to cave under its trunk (#613)", () => {
+    const inGap = track
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => {
+        const f = (p.x - TREE.centre.x) * TREE.facing.x + (p.z - TREE.centre.z) * TREE.facing.z
+        return Math.abs(treeAlong(p)) <= TREE_GAP.halfAlong && f >= TREE_GAP.minF && f <= TREE_GAP.maxF && p.y - PIT.floorY <= TREE_GAP.height
+      })
+    const metresPerSample = table.length / GYM_SCALE / N
+    const heights = inGap.map(({ p }) => p.y - PIT.floorY)
+    // All the way through, clear of the floor's roots below and with the rider's eye clear of the trunk above.
+    expect(inGap.length * metresPerSample).toBeGreaterThan(2 * TREE_GAP.halfAlong - 0.2)
+    expect(Math.min(...heights)).toBeGreaterThanOrEqual(1.5)
+    expect(Math.max(...heights) + dims.eyeHeight / GYM_SCALE).toBeLessThanOrEqual(TREE_GAP.height - RAIL_CLEARANCE)
+    // The run starts in it and rides out of its far end.
+    expect(inGap.filter(({ i }) => secondsAt(i) < RUN_SECONDS).length * metresPerSample).toBeGreaterThan(TREE_GAP.halfAlong)
+  })
+
+  it('passes the glass room windows', () => {
     expect(Math.min(...track.map(glassDistance))).toBeLessThanOrEqual(NEAR)
   })
 
   it('dives into the Starr pit between 34 and 40 s, its lowest point down in the pit above the floor', () => {
-    let low = 0
-    for (let i = 1; i < N; i++) if (track[i].y < track[low].y) low = i
+    // The dive's lowest point in the run's last 30 s: the lap starts and ends low too, in the Tree's gap.
+    const lastThirty = track.map((_, i) => i).filter((i) => secondsAt(i) >= 30 && secondsAt(i) <= RUN_SECONDS)
+    let low = lastThirty[0]
+    for (const i of lastThirty) if (track[i].y < track[low].y) low = i
     // The dive starts at the crest the track descends from, all the way down to its lowest point.
     let crest = low
     while (track[(crest - 1 + N) % N].y >= track[crest].y) crest = (crest - 1 + N) % N
