@@ -42,12 +42,14 @@ describe('the Tree (#519)', () => {
     expect(nearest).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
   })
 
-  it('has a gap under the trunk the coaster fits through, cave to cave', () => {
+  it('has a gap between its solid trunk and the back wall the coaster fits through, cave to cave (#671)', () => {
     const inGap = vertices(wood.positions).filter(([a, y, f]) => Math.abs(a) < TREE_GAP.halfAlong && f > TREE_GAP.minF && f < TREE_GAP.maxF && y > 0.7 && y < TREE_GAP.height)
     expect(inGap).toHaveLength(0)
     expect(TREE_GAP.maxF - TREE_GAP.minF).toBeGreaterThanOrEqual(2 * RAIL_CLEARANCE)
     expect(TREE_GAP.height).toBeGreaterThanOrEqual(2 * RAIL_CLEARANCE)
-    // The trunk stands on its roots over the gap.
-    expect(vertices(wood.positions).some(([a, y]) => Math.abs(a) < 1 && y > TREE_GAP.height && y < TREE_GAP.height + 0.5)).toBe(true)
+    // The trunk is solid from the pit floor up, in front of the gap, and closes it over the top.
+    const trunk = vertices(wood.positions).filter(([a]) => Math.abs(a) < 1)
+    expect(trunk.some(([, y, f]) => y < 0.5 && f > TREE_GAP.maxF)).toBe(true)
+    expect(trunk.some(([, y, f]) => y > TREE_GAP.height && f < TREE_GAP.maxF)).toBe(true)
   })
 })

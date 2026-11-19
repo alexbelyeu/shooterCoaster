@@ -140,7 +140,7 @@ describe('the gym track', () => {
     expect(over).toBe(0)
   })
 
-  it("rides through the Tree's gap in the run, cave to cave under its trunk (#613)", () => {
+  it("rides through the Tree's gap in the run, cave to cave between its trunk and the back wall (#613, #671)", () => {
     const inGap = track
       .map((p, i) => ({ p, i }))
       .filter(({ p }) => {
@@ -149,7 +149,7 @@ describe('the gym track', () => {
       })
     const metresPerSample = table.length / GYM_SCALE / N
     const heights = inGap.map(({ p }) => p.y - PIT.floorY)
-    // All the way through, clear of the floor's roots below and with the rider's eye clear of the trunk above.
+    // All the way through, clear of the floor's roots below and with the rider's eye clear of the gap's ceiling above.
     expect(inGap.length * metresPerSample).toBeGreaterThan(2 * TREE_GAP.halfAlong - 0.2)
     expect(Math.min(...heights)).toBeGreaterThanOrEqual(1.5)
     expect(Math.max(...heights) + dims.eyeHeight / GYM_SCALE).toBeLessThanOrEqual(TREE_GAP.height - RAIL_CLEARANCE)
@@ -157,7 +157,7 @@ describe('the gym track', () => {
     expect(inGap.filter(({ i }) => secondsAt(i) < RUN_SECONDS).length * metresPerSample).toBeGreaterThan(TREE_GAP.halfAlong)
   })
 
-  it("swoops into the seat under the trunk clear of the wood, riding the track's hairpin in (#659)", () => {
+  it("swoops into the seat behind the trunk clear of the wood, riding the track's hairpin in (#659)", () => {
     const { hero } = gym
     expect(hero.approach).toBeGreaterThan(0)
     const seat = curve.getPointAt(0).clone()

@@ -1737,12 +1737,12 @@ async function speedCheck(page, levelId) {
   return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w }, tunnel: tunnel.result }
 }
 
-/** The level whose lap starts in the Tree's gap (#659, `gym/gymTrack.ts`), and the track fraction its still is shot at: under the trunk. */
+/** The level whose lap starts in the Tree's gap (#659, `gym/gymTrack.ts`), and the track fraction its still is shot at: between the trunk and the back wall. */
 const GAP_LEVEL = 'level6'
 const GAP_FRACTION = 0.003
 
 /**
- * `level6-gap.png`: the ride from inside the Tree's gap, the trunk round the camera. With game time and the level timer
+ * `level6-gap.png`: the ride from inside the Tree's gap, the trunk on one side and the back wall on the other. With game time and the level timer
  * held, `rideTo` jumps the car into the gap and back to where it was, so the combat that follows rides on from there.
  */
 async function gapShot(page) {

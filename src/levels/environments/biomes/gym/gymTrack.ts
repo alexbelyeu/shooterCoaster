@@ -2,7 +2,7 @@
  * Level 6's ride (#514), pure: a closed spline through the Climbing Gym's blockout, built from its
  * anchors (`blockout.ts`), never from hand-typed world numbers. In ride order from the lap start:
  *
- * 1. Through the Tree's gap under its trunk (#659): the run starts in it and climbs out of the right cave.
+ * 1. Through the Tree's gap between its trunk and the back wall (#659, #671): the run starts in it and climbs out of the right cave.
  * 2. Over to the Flame and a sinking spiral right round it.
  * 3. South down the east side and west through the Arch.
  * 4. A climbing right turn to the crest by the glass gym room (~39.5 s).
@@ -27,11 +27,12 @@ export const RAIL_CLEARANCE = 0.8
 
 /** Height of the rails over the Arch's foot: the rider's eye stays under the soffit. */
 const ARCH_RAIL_Y = 2.1
-/** Height of the rails over the pit floor through the Tree's gap: roughly halfway between the floor's roots and the trunk. */
+/** Height of the rails over the pit floor through the Tree's gap: clear of the floor's roots, the trunk beside the rider. */
 const GAP_RAIL_Y = 1.75
-/** The hairpin in the left cave's mouth: `HAIRPIN_RADIUS` round a centre this far along the Tree from its centre. */
+/** The hairpin in the left cave's mouth: round a centre this far along the Tree from its centre, in from `ROOTS_FRONT_F` to the gap's line. */
 const HAIRPIN_ALONG = -5.6
-const HAIRPIN_RADIUS = 2
+/** Out from the Tree's foot line along the roots' front, where the lap heads into the hairpin. */
+const ROOTS_FRONT_F = 6.375
 /** Out from the glass gym room's windows (the hall wall) while passing them. */
 const GLASS_STANDOFF = 4.5
 /** The spiral's ellipse: this far beyond the Flame's flared footprint along each axis. */
@@ -63,6 +64,7 @@ function gap(along: number, y = GAP_RAIL_Y): Vec3 {
 }
 
 /** Round the hairpin in the left cave's mouth: `deg` 0 heading in along the roots' front, 180 heading out along the gap's line. */
+const HAIRPIN_RADIUS = (ROOTS_FRONT_F - GAP_F) / 2
 function hairpin(deg: number, y: number): Vec3 {
   return treeFrame(HAIRPIN_ALONG - HAIRPIN_RADIUS * Math.sin(deg * DEG), GAP_F + HAIRPIN_RADIUS * (1 + Math.cos(deg * DEG)), y)
 }
@@ -105,7 +107,7 @@ function pit(out: number, y: number, side: number): Vec3 {
 /** The control points in blockout metres, from the lap start. */
 export function gymControlPoints(): Vec3[] {
   return [
-    // 1. The Tree: through the gap under its trunk and up out of the right cave, past its end.
+    // 1. The Tree: through the gap behind its trunk and up out of the right cave, past its end.
     gap(-0.3),
     gap(2.4),
     treeFrame(6, GAP_F, 2.6),

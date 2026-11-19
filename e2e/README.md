@@ -20,7 +20,7 @@ ride stats, the perf gate, the shot and the enemy probe; the ride stops at exact
 it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), on level6 `level6-gap.png` (#659: game time and the
 level timer held, `rideTo` jumps the car into the Tree's gap at the lap's start and back; the car must be there and the frame not
-blank: the trunk round the camera) and `level6-bystander.png` (#518: first in
+blank: the trunk on one side, the back wall on the other) and `level6-bystander.png` (#518: first in
 its combat, two kills (their real shot left to land or fly out first) and a primed 5-chain, then `shootBystander()` on a live climber: the score must drop by `BYSTANDER_PENALTY`
 (floored at 0), the combo reset, no kill or hit counted, `bystandersHit` 1 and the don't-shoot hint shown; the shot holds the red
 "−18 · Don't shoot climbers!" popup and the chalk puff; `level6 bystander: score a → b, combo 5 → 0` in the log), `<id>-combat.png`

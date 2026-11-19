@@ -13,10 +13,10 @@ export function treePanelSpecs(t: PieceOf<'tree'>): { caves: PanelSpec; head: Pa
 }
 
 /**
- * The Tree's wood (#519, pure, seeded): a barked trunk standing on four buttress roots, with surface roots
- * spreading over the pit floor into the caves, two great limbs roofing the caves, and branches climbing the
- * headwall as its frame. The four roots leave the gap a tree has (Alex, #558): under the trunk, cave to cave
- * and front to back, big enough for the coaster (`TREE_GAP`). Local frame as `hallGeometry`'s `frame()`:
+ * The Tree's wood (#519, pure, seeded): a solid barked trunk standing on the pit floor on two buttress roots, with
+ * surface roots spreading over the pit floor into the caves, two great limbs roofing the caves, and branches climbing
+ * the headwall as its frame. The trunk stands proud of the back wall, leaving the gap between them, cave to cave, big
+ * enough for the coaster (Alex, #671: `TREE_GAP`); over the gap it swells back into the wall. Local frame as `hallGeometry`'s `frame()`:
  * x along the Tree, y up from the pit floor, z out from its back wall's foot line. Everything stays inside the
  * Tree's footprint (`pieceBoxes`).
  */
@@ -116,14 +116,17 @@ export function buildTreeWood(t: PieceOf<'tree'>): TreeWood {
   const swell = 1 + BARK
   let seed = 1
 
-  // The trunk: from its underside (the gap's ceiling) up through the caves' roof and on up the headwall.
+  // The trunk: from the pit floor in front of the gap, swelling back into the wall over it, then on up the headwall.
   const core = lip * 0.6
   const r = t.trunk / 2 + 0.5
+  /** As deep as the space between the gap and the footprint's front allows, ridges included. */
+  const standing = (front - TREE_GAP.maxF) / 2 / swell - 0.02
   const trunk: { y: number; ru: number; rv: number }[] = [
-    { y: TREE_GAP.height, ru: 0.6, rv: 0.6 },
-    { y: TREE_GAP.height + 0.3, ru: r * 0.8, rv: lip * 0.38 },
-    { y: TREE_GAP.height + 1, ru: r * 1.05, rv: lip * 0.48 },
-    { y: t.caveHeight - 1.5, ru: r, rv: lip * 0.47 },
+    { y: -0.3, ru: r * 1.45, rv: standing },
+    { y: 0.9, ru: r * 1.1, rv: standing },
+    { y: 2.6, ru: r * 0.97, rv: standing },
+    { y: TREE_GAP.height - 0.6, ru: r, rv: standing },
+    { y: TREE_GAP.height, ru: r * 1.02, rv: standing },
     { y: t.caveHeight - 0.4, ru: r * 1.08, rv: lip * 0.5 },
   ]
   for (let y = t.caveHeight + 1; y < t.height - 3; y += 1.6) {
@@ -134,8 +137,8 @@ export function buildTreeWood(t: PieceOf<'tree'>): TreeWood {
   loft(
     out,
     trunk.map((ring) => {
-      // On the headwall the trunk stands proud of the face by its own depth, inside the footprint.
-      const z = ring.y <= t.caveHeight ? core : Math.min(face(ring.y) + 0.15, front - ring.rv * swell)
+      // In the caves its front is the footprint's; on the headwall it stands proud of the face by its own depth.
+      const z = ring.y <= t.caveHeight ? front - ring.rv * swell : Math.min(face(ring.y) + 0.15, front - ring.rv * swell)
       return [0, ring.y, Math.max(z, ring.rv * swell - 0.45)] as V3
     }),
     trunk.map((ring) => [ring.ru, ring.rv]),
@@ -143,12 +146,11 @@ export function buildTreeWood(t: PieceOf<'tree'>): TreeWood {
     seed++,
   )
 
-  // Four buttress roots: thin fins radiating along the Tree, tall in their own plane. Front pair at the lip, back pair at the wall.
+  // Two buttress roots: thin fins along the caves' mouths, tall in their own plane, climbing into the trunk's foot.
   for (const sx of [-1, 1]) {
-    for (const [z, rf] of [[lip + 0.75, 0.5], [0.05, 0.4]] as const) {
-      const path = bezier([sx * (half * 0.56), -0.3, z], [sx * (half * 0.38), 0.4, z], [sx * 2.4, 2.4, z], [sx * 1.5, TREE_GAP.height + 1.4, z], 9)
-      loft(out, path, path.map((_, j) => [rf, lerp(1.3, 0.85, j / 8)]), [0, 0, 1], seed++)
-    }
+    const z = lip + 0.75
+    const path = bezier([sx * (half * 0.56), -0.3, z], [sx * (half * 0.38), 0.4, z], [sx * 2.6, 1.4, z], [sx * 1.5, 2.8, z], 9)
+    loft(out, path, path.map((_, j) => [0.5, lerp(1.3, 0.85, j / 8)]), [0, 0, 1], seed++)
   }
 
   // Surface roots over the pit floor into the caves, half sunk.

@@ -12,8 +12,8 @@ gym anywhere: in the game it is "the Climbing Gym".
 `gymTrack.ts` builds the level's authored `spline` track from those anchors; `gymTrack.test.ts`
 proves the four moments below, the clearances and the ~60 s lap. `gym-track.svg` here is its plot
 (re-draw it with `node scripts/plot-gym-track.mjs docs/levels/gym-track.svg`): from GO, through the
-Tree's gap under its trunk and up out of the right cave (0–3 s, #659), a full turn round the Flame (~9–25 s),
-west through the Arch (~35 s), a right turn to the crest by the glass gym room (~39.5 s), then the run-in
+Tree's gap between its solid trunk and the back wall and up out of the right cave (0–3 s, #659, #671), a full turn round the Flame (~9–25 s),
+west through the Arch (~35 s), a right turn to the crest by the glass gym room (~39.4 s), then the run-in
 down the west side into the Starr pit with the star ahead, until the 60 s run turns south out of the dive;
 past the roots' front, a hairpin in the left cave's mouth closes the lap back into the gap. The countdown's swoop
 comes in the same way: it lands on the roots' front and rides the last 12 m of track in (`hero.approach`, #659).
@@ -48,7 +48,8 @@ Every piece has `x, z` (centre, m), `rot` (degrees; a piece faces local +z, so 0
   `{len, angle}`: 0° vertical, + overhangs toward the climber, − is a slab. Optional
   `ropes`, `color`; `back` is the depth behind the face.
 - `tree`: `width, trunk, caveDepth, caveHeight, height, headAngle`: a trunk in the middle, a
-  cave each side overhanging forward to meet the trunk at `caveHeight`, a headwall on top.
+  cave each side overhanging forward to meet the trunk at `caveHeight`, a headwall on top. The trunk is solid
+  from the floor up and stands proud of the back wall: the ride runs through the gap between them (#671, `TREE_GAP`).
 - `block` (freestanding boulder): footprint `w × d`, corners cut by `chamfer`; `profile`
   bands push every side out (+) or in (−); `color` / `colorB` paint the −x half (body /
   base band), `color2` / `colorB2` the +x half.
