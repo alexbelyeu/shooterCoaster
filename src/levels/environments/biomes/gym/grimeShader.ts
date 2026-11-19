@@ -1,8 +1,9 @@
 import * as THREE from 'three'
 import { valueNoiseGlsl } from '../../shared/noiseGlsl'
 import { FLAME, GYM_SCALE, HALL, PIT } from './blockout'
-import { FIRE_LIGHT, GRIME, STRIP_LIGHTS, stripLightXs, stripLightY } from './config'
+import { FIRE_LIGHT, FLOOR, GRIME, STRIP_LIGHTS, stripLightXs, stripLightY } from './config'
 import { FLAME_TOP, fireLightSource } from './flameFire'
+import { PATHS } from './floorPaths'
 
 /**
  * The hall's grime and light (#593, "spectacularly Bushwick"), patched into the hall's, the floor's and the
@@ -55,6 +56,11 @@ vec3 fireLocal(vec3 p) {
   vec2 d = p.xz - vec2(${f(fire.x)}, ${f(fire.z)});
   return vec3(d.x * ${f(fireCos)} - d.y * ${f(fireSin)}, p.y, d.x * ${f(fireSin)} + d.y * ${f(fireCos)});
 }
+// Signed distance to a rect (min x, min z, max x, max z): negative inside
+float rectDistance(vec2 p, vec4 r) {
+  vec2 d = abs(p - (r.xy + r.zw) * 0.5) - (r.zw - r.xy) * 0.5;
+  return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
 float grimeFbm(vec2 p) {
   return 0.55 * vnoise(p) + 0.3 * vnoise(p * 2.13 + 5.7) + 0.15 * vnoise(p * 4.37 + 11.3);
 }
@@ -92,6 +98,37 @@ const hallFragment = /* glsl */ `
   c = mix(c, ${glslColor(FIRE_LIGHT.soot)}, ${f(FIRE_LIGHT.sootAmount)} * soot);
   c *= mix(1.0, ${f(GRIME.roofShade)}, smoothstep(${f(HALL.h * 0.4)}, ${f(HALL.h * 0.95)}, vGrimePos.y));
   diffuseColor.rgb = c;
+}
+`
+
+/** Signed distance (m) from a hall point to the nearest walkway: negative on one. */
+const pathDistance = PATHS.map((r) => `rectDistance(vGrimePos.xz, vec4(${f(r.minX)}, ${f(r.minZ)}, ${f(r.maxX)}, ${f(r.maxZ)}))`).reduce((a, b) => `min(${a}, ${b})`)
+
+/**
+ * The floor's padded mats (#668), before its grime: a grid of mats, each a shade off its neighbours with a soft
+ * sheen, its edge rounding down into a black seam; the walkways flat black between the mats' edges. Seams and
+ * bevels fade to their average where a pixel spans more than they do, so the far floor doesn't shimmer.
+ */
+const matFragment = /* glsl */ `
+{
+  vec2 floorXz = vGrimePos.xz;
+  float pixel = max(max(fwidth(floorXz.x), fwidth(floorXz.y)), 1e-4);
+  vec2 cell = floor(floorXz / ${f(FLOOR.tile)});
+  vec2 inTile = floorXz - cell * ${f(FLOOR.tile)};
+  vec2 toEdge = min(inTile, ${f(FLOOR.tile)} - inTile);
+  float pathD = ${pathDistance};
+  float onMainFloor = 1.0 - smoothstep(0.2, 0.4, abs(vGrimePos.y));
+  float path = (1.0 - smoothstep(-pixel, pixel, pathD)) * onMainFloor;
+  float edge = min(min(toEdge.x, toEdge.y), mix(1e3, max(pathD, 0.0), onMainFloor));
+  float far = smoothstep(${f(FLOOR.seamWidth)}, ${f(FLOOR.bevel * 2)}, pixel);
+  float seam = mix(1.0 - smoothstep(${f(FLOOR.seamWidth)} - pixel, ${f(FLOOR.seamWidth)} + pixel, edge), ${f((2 * FLOOR.seamWidth) / FLOOR.tile)}, far);
+  float bevel = mix(smoothstep(${f(FLOOR.seamWidth)}, ${f(FLOOR.seamWidth + FLOOR.bevel)}, edge), ${f(1 - FLOOR.bevel / FLOOR.tile)}, far);
+  float tint = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
+  float sheen = 0.93 + 0.12 * vnoise(floorXz * 0.6 + cell * 3.7);
+  vec3 mat = ${glslColor(FLOOR.mat)} * (1.0 - ${f(FLOOR.shade)} * tint) * sheen * mix(0.7, 1.0, bevel);
+  mat = mix(mat, ${glslColor(FLOOR.seam)}, seam);
+  vec3 walkway = ${glslColor(FLOOR.path)} * (0.85 + 0.3 * vnoise(floorXz * 1.7 + 4.2));
+  diffuseColor.rgb = mix(mat, walkway, path);
 }
 `
 
@@ -156,10 +193,10 @@ export function withHallGrime<M extends THREE.Material>(material: M): M {
   return material
 }
 
-/** The hall's concrete floor (the terrain): the same grime, pools and firelight, in flat-shaded Phong like every terrain. */
+/** The hall's floor (the terrain): padded mats and black walkways under the same grime, pools and firelight, in flat-shaded Phong like every terrain. */
 export function createGymFloorMaterial(): THREE.MeshPhongMaterial {
   const material = new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 8 })
-  patch(material, 'gym-floor-grime', hallFragment, true)
+  patch(material, 'gym-floor-mats', `${matFragment}\n${hallFragment}`, true)
   return material
 }
 

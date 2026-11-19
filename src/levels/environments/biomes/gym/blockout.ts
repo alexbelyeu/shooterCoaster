@@ -274,6 +274,8 @@ export const PIT = {
   minZ: pit.z - pit.d / 2,
   maxZ: pit.z + pit.d / 2,
   floorY: pit.base - pit.depth,
+  /** The grey mats over its whole floor (m thick). */
+  mats: 0.35,
 }
 
 /** Floor height at a blockout x/z: the pit's floor inside it, the main floor elsewhere. */

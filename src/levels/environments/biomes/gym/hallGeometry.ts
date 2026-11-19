@@ -2,10 +2,11 @@ import * as THREE from 'three'
 import { createRng, hashString } from '@/utils/rng'
 import { mergePainted, paintedAt as paint, type Paint } from '../../shared/paintedParts'
 import { GYM_SCALE, HALL, PIECES, PIT, blockRings, floorAt, footprint, piece, pieceAxes, type Panel, type PieceOf } from './blockout'
-import { BUILDING, COLUMN_HALF, GRIME, HIDDEN_PIECES, HOLD_COLORS, MURALS, STRIP_LIGHTS, TREE_PAINT, VOLUME_COLORS, WALL_PAINT, WALL_STYLE, stripLightXs, stripLightY, wallColumns } from './config'
+import { BUILDING, COLUMN_HALF, FLOOR, GRIME, HIDDEN_PIECES, HOLD_COLORS, MURALS, STRIP_LIGHTS, TREE_PAINT, VOLUME_COLORS, WALL_PAINT, WALL_STYLE, stripLightXs, stripLightY, wallColumns } from './config'
 import { graffitiPiece, tag, type MuralShape } from './murals'
 import { scatterOn, type ClimbSurface } from './holds'
 import { buildTreeWood, treePanelSpecs } from './treeTrunk'
+import { padLayout } from './floorPaths'
 import { FACE, SEAM, SHELL, buildWallPanels, pushTri, wallSpec, type PanelInfo, type V3, type WallPanels } from './wallPanels'
 
 /**
@@ -277,27 +278,34 @@ function pad(p: { id: string; x: number; z: number; rot: number; base: number; w
     out.solid.push(paint(box(-p.w / 2, p.w / 2, 0, 0.08, -p.d / 2, p.d / 2), p.color ?? BUILDING.concrete, m))
     return
   }
-  const seam = 0.05
-  out.solid.push(paint(box(-p.w / 2, p.w / 2, 0, p.thick - 0.06, -p.d / 2, p.d / 2), BUILDING.seam, m))
-  const nx = Math.max(1, Math.round(p.w / 2.5))
-  const nz = Math.max(1, Math.round(p.d / 2.5))
-  const tw = p.w / nx
-  const td = p.d / nz
-  for (let i = 0; i < nx; i++) {
-    for (let j = 0; j < nz; j++) {
-      const a = -p.w / 2 + i * tw
-      const f = -p.d / 2 + j * td
-      out.solid.push(paint(box(a + seam, a + tw - seam, 0, p.thick, f + seam, f + td - seam), p.color ?? BUILDING.pad, m))
-    }
+  // The walkways (#668) cut the mats back to floor level, so a path runs between mat edges, never over them.
+  const { base, tiles } = padLayout(p)
+  for (const r of base) out.solid.push(paint(box(r.minX, r.maxX, 0, p.thick - 0.06, r.minZ, r.maxZ), FLOOR.seam, m))
+  const rng = createRng(hashString(p.id))
+  for (const tile of tiles) {
+    // Each mat a shade off its neighbours: some newer, some scuffed and dulled.
+    _g.set(p.color ?? FLOOR.mat).multiplyScalar(1 - FLOOR.shade * rng())
+    for (const r of tile) out.solid.push(paint(box(r.minX, r.maxX, 0, p.thick, r.minZ, r.maxZ), _g, m))
   }
+}
+
+/** A climbing crash pad folded in half, used as a bench (#668): two layers in its colour, the black foam showing in the crease, the fold rounded at one end, two carry straps over the top. */
+function crashPad(p: PieceOf<'prop'>, out: Parts): void {
+  const m = frame(p)
+  const r = p.h / 2
+  const end = p.w / 2 - r
+  const colour = p.color ?? FLOOR.mat
+  out.solid.push(paint(box(-p.w / 2, end, 0, r - 0.025, -p.d / 2, p.d / 2), colour, m))
+  out.solid.push(paint(box(-p.w / 2, end, r + 0.025, p.h, -p.d / 2, p.d / 2), colour, m))
+  out.solid.push(paint(box(-p.w / 2 + 0.03, end, r - 0.03, r + 0.03, -p.d / 2 + 0.03, p.d / 2 - 0.03), FLOOR.seam, m))
+  out.solid.push(paint(new THREE.CylinderGeometry(r, r, p.d, 12, 1, false, 0, Math.PI).rotateX(Math.PI / 2).translate(end, r, 0), colour, m))
+  for (const a of [-p.w / 4, p.w / 8]) out.solid.push(paint(box(a - 0.05, a + 0.05, p.h, p.h + 0.015, -p.d / 2 - 0.015, p.d / 2 + 0.015), FLOOR.seam, m))
 }
 
 function prop(p: PieceOf<'prop'>, out: Parts): void {
   const m = frame(p)
   if (p.id.startsWith('p-pitblock')) {
-    // Yellow and black padded blocks.
-    out.solid.push(paint(box(-p.w / 2, p.w / 2, 0, p.h / 2, -p.d / 2, p.d / 2), '#1d2320', m))
-    out.solid.push(paint(box(-p.w / 2, p.w / 2, p.h / 2, p.h, -p.d / 2, p.d / 2), p.color ?? '#f2c230', m))
+    crashPad(p, out)
     return
   }
   out.solid.push(paint(box(-p.w / 2, p.w / 2, 0, p.h, -p.d / 2, p.d / 2), p.color ?? BUILDING.wall, m))
@@ -370,8 +378,8 @@ function pitEdge(out: Parts): void {
       out.solid.push(paint(box(x + 0.1, x + 0.18, 0, 1, z - 0.04, z + 0.04), BUILDING.rail, IDENTITY))
     }
   }
-  // The pit's grey mats ("Grey mats", the pit's note).
-  pad({ id: 'pad-pit', x: (PIT.minX + PIT.maxX) / 2, z: (PIT.minZ + PIT.maxZ) / 2, rot: 0, base: PIT.floorY, w: PIT.maxX - PIT.minX, d: PIT.maxZ - PIT.minZ, thick: 0.35 }, out)
+  // The pit's grey mats, wall to wall ("Grey mats", the pit's note).
+  pad({ id: 'pad-pit', x: (PIT.minX + PIT.maxX) / 2, z: (PIT.minZ + PIT.maxZ) / 2, rot: 0, base: PIT.floorY, w: PIT.maxX - PIT.minX, d: PIT.maxZ - PIT.minZ, thick: PIT.mats }, out)
 }
 
 const STEEL = new THREE.Color(BUILDING.steel)

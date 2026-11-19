@@ -143,12 +143,12 @@
       "x": 4,
       "z": 15.5,
       "rot": 90,
-      "base": -2.45,
+      "base": -2.1,
       "w": 1.4,
       "d": 0.9,
       "h": 0.5,
-      "color": "#f2c230",
-      "note": "Yellow and black padded blocks on the pit floor below the star."
+      "color": "#2f5fc4",
+      "note": "Climbing crash pads folded in half, used as benches on the pit's grey mats below the star (#668)."
     },
     {
       "id": "p-pitblock2",
@@ -157,11 +157,25 @@
       "x": 4,
       "z": 24.5,
       "rot": 90,
-      "base": -2.45,
+      "base": -2.1,
       "w": 1.4,
       "d": 0.9,
       "h": 0.5,
-      "color": "#f2c230",
+      "color": "#c8302a",
+      "note": ""
+    },
+    {
+      "id": "p-pitblock3",
+      "kind": "prop",
+      "name": "Pit bench",
+      "x": 8,
+      "z": 31,
+      "rot": 0,
+      "base": -2.1,
+      "w": 1.4,
+      "d": 0.9,
+      "h": 0.5,
+      "color": "#2f5fc4",
       "note": ""
     },
     {
