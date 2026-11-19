@@ -128,7 +128,7 @@ export function wallColumns(): { east: number[]; west: number[] } {
  */
 export const MURALS = {
   pieces: [
-    { x: 28, z: 0, rot: 0, base: 8, w: 15, h: 5.5, seed: 5931, style: { fill: ['#ff4fa3', '#ffd23f', '#2fd0c8'], outline: '#141416', cloud: '#5b55b0', highlight: '#ffffff' } },
+    { x: 33.5, z: 0, rot: 0, base: 8, w: 21, h: 5.5, seed: 5931, style: { fill: ['#ff4fa3', '#ffd23f', '#2fd0c8'], outline: '#141416', cloud: '#5b55b0', highlight: '#ffffff' } },
     { x: 64, z: HALL.d, rot: 180, base: 12.5, w: 16, h: 8, seed: 5932, style: { fill: ['#ff7a1f', '#e8322c', '#ffd23f'], outline: '#101012', cloud: '#2a7fd4', highlight: '#fff6d8' } },
   ],
   tags: [
