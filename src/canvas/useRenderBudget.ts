@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useSyncExternalStore } from 'react'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { adaptiveBudgetScale } from './adaptiveDpr'
-import { fbmOctaves, qualityProfile, type QualityProfile } from './graphicsQuality'
+import { fbmOctaves, heatShimmerOn, qualityProfile, type QualityProfile } from './graphicsQuality'
 import { budgetDpr, composerMultisampling, pixelBudget } from './renderBudget'
 
 /** Phones and tablets. Read once: a device's primary pointer doesn't change mid-session. */
@@ -18,6 +18,11 @@ export function useQualityProfile(): QualityProfile {
 /** `FBM_OCTAVES` for the procedural noise shaders, from the quality and the pointer. */
 export function useFbmOctaves(): number {
   return fbmOctaves(useQualityProfile(), isCoarsePointer)
+}
+
+/** Whether the heat shimmer runs on this quality and pointer (a level still has to ask for it). */
+export function useHeatShimmer(): boolean {
+  return heatShimmerOn(useQualityProfile(), isCoarsePointer)
 }
 
 export function useComposerMultisampling(): number {

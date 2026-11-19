@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fbmOctaves, particleShare, GRAPHICS_QUALITIES, isGraphicsQuality, QUALITY_PROFILES, qualityFromQuery, qualityProfile } from './graphicsQuality'
+import { fbmOctaves, heatShimmerOn, particleShare, GRAPHICS_QUALITIES, isGraphicsQuality, QUALITY_PROFILES, qualityFromQuery, qualityProfile } from './graphicsQuality'
 
 describe('graphics quality presets', () => {
   it('auto renders like high', () => {
@@ -26,6 +26,13 @@ describe('graphics quality presets', () => {
     expect(fbmOctaves(QUALITY_PROFILES.medium, false)).toBe(4)
     expect(fbmOctaves(QUALITY_PROFILES.low, false)).toBe(3)
     for (const profile of Object.values(QUALITY_PROFILES)) expect(fbmOctaves(profile, true)).toBe(3)
+  })
+
+  it('has one rule for the heat shimmer: high and medium on a mouse, never low or touch', () => {
+    expect(heatShimmerOn(QUALITY_PROFILES.high, false)).toBe(true)
+    expect(heatShimmerOn(QUALITY_PROFILES.medium, false)).toBe(true)
+    expect(heatShimmerOn(QUALITY_PROFILES.low, false)).toBe(false)
+    for (const profile of Object.values(QUALITY_PROFILES)) expect(heatShimmerOn(profile, true)).toBe(false)
   })
 })
 
