@@ -1725,10 +1725,9 @@ async function pauseMenuCheck(page, levelId) {
   await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
   await waitVisible(page, '.pause-card', 30000)
   const cardKills = await page.evaluate(() => {
-    const dt = [...document.querySelectorAll('.pause-stats dt')].find((d) => d.textContent === 'Kills')
-    return dt?.nextElementSibling?.textContent?.trim() ?? null
+    return document.querySelector('.pause-card [data-stat="hits"]')?.textContent?.trim() ?? null
   })
-  if (!cardKills?.startsWith('0 /')) problems.push(`after Restart the pause card reads Kills "${cardKills}", not 0`)
+  if (!cardKills?.startsWith('0 of ')) problems.push(`after Restart the pause card reads "${cardKills}" hit, not 0`)
   await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
   return {
     id: 'pause-menu',
