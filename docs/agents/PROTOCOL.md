@@ -101,6 +101,9 @@ work or on Alex, and fits one session, label it `agent:ready` with its priority 
 Builders run can take it; a P1 left for the Director's weekly triage waits up to a week
 (#613 and #625 did). Anything else (needs a decision, too big, blocked) gets its priority and
 no `agent:ready`: the Director triages it, and a blocker on Alex gets `needs-alex`.
+A follow-up that is ready except that it must wait for another issue (same files, or it builds
+on it) gets `agent:blocked` and a first body line `Waits on #N` (several: `Waits on #N, #M`): the
+control center's autopilot swaps it to `agent:ready` once every issue on that line has closed.
 
 ## Claiming work (Builders)
 
