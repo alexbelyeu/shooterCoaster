@@ -37,6 +37,11 @@ export function fbmOctaves(profile: QualityProfile, coarsePointer: boolean): num
   return coarsePointer ? Math.min(profile.fbmOctaves, 3) : profile.fbmOctaves
 }
 
+/** The one rule for the heat shimmer (#627, #643): the quality's, never on touch screens. */
+export function heatShimmerOn(profile: QualityProfile, coarsePointer: boolean): boolean {
+  return profile.heatShimmer && !coarsePointer
+}
+
 /** Share of a particle effect's full count to draw (the ambient fields, the Flame's tongues): the quality's `particleScale`, halved on touch screens. */
 export function particleShare(coarsePointer: boolean, particleScale: number): number {
   return (coarsePointer ? 0.5 : 1) * particleScale

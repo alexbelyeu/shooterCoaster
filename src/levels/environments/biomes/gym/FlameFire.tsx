@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { HEAT_SHIMMER } from '@/canvas/post/HeatShimmerEffect'
 import { easeShimmer, shimmerAmplitude, shimmerRect } from '@/canvas/post/heatShimmer.hot'
-import { isCoarsePointer, useFbmOctaves, useQualityProfile } from '@/canvas/useRenderBudget'
+import { isCoarsePointer, useFbmOctaves, useHeatShimmer, useQualityProfile } from '@/canvas/useRenderBudget'
 import ParticleField from '../../shared/ParticleField'
 import { gradientNoiseGlsl } from '../../shared/noiseGlsl'
 import { FLAME_EMBERS, buildFlameTongues, buildSmokePuffs, emberAnchor, fireFlicker, fireFootprint, fireHeights, shimmerColumn, smokeCount, tongueCount } from './flameFire'
@@ -263,6 +263,7 @@ function smokeGeometry(): THREE.InstancedBufferGeometry {
 export default function FlameFire() {
   const octaves = useFbmOctaves()
   const { particleScale } = useQualityProfile()
+  const shimmer = useHeatShimmer()
   const shimmerStrength = useRef(0)
   const tongues = useMemo(tongueGeometry, [])
   const smoke = useMemo(smokeGeometry, [])
@@ -312,8 +313,9 @@ export default function FlameFire() {
   useEffect(
     () => () => {
       HEAT_SHIMMER.shimmerAmp.value = 0
+      shimmerStrength.current = 0
     },
-    [],
+    [shimmer],
   )
 
   useFrame(({ clock, camera }, delta) => {
@@ -321,7 +323,11 @@ export default function FlameFire() {
     tongueMaterial.uniforms.uTime.value = t
     smokeMaterial.uniforms.uTime.value = t
     FIRE_FLICKER.value = fireFlicker(t)
+    // Low quality and touch: no shimmer in the composer, so nothing to aim
+    if (!shimmer) return
 
+    // CoasterCamera moves the camera without refreshing its matrices: aim with this frame's view, not the last
+    camera.updateMatrixWorld()
     viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
     const inView = shimmerRect(SHIMMER_COLUMN, viewProjection.elements, shimmerBounds)
     const strength = easeShimmer(shimmerStrength.current, inView, delta)
