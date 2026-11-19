@@ -138,7 +138,8 @@ export function buildTreeWood(t: PieceOf<'tree'>): TreeWood {
     out,
     trunk.map((ring) => {
       // In the caves its front is the footprint's; on the headwall it stands proud of the face by its own depth.
-      const z = ring.y <= t.caveHeight ? front - ring.rv * swell : Math.min(face(ring.y) + 0.15, front - ring.rv * swell)
+      const proud = ring.y <= t.caveHeight ? Infinity : face(ring.y) + 0.15
+      const z = Math.min(proud, front - ring.rv * swell)
       return [0, ring.y, Math.max(z, ring.rv * swell - 0.45)] as V3
     }),
     trunk.map((ring) => [ring.ru, ring.rv]),
