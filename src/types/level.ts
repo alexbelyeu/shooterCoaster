@@ -2,7 +2,9 @@ import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
 /** `curve1` / `curve2`: the generated trig curves; `spline`: an authored track through `controlPoints` (#514). */
 export type CurveType = 'curve1' | 'curve2' | 'spline'
-export type BiomeType = 'themePark' | 'desert' | 'ocean' | 'arctic' | 'volcanic' | 'gym'
+/** Every biome id, the one list (#509): anything per biome is a `Record<BiomeType, …>`, so a missing one fails `tsc -b`. */
+export const BIOME_TYPES = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic', 'gym'] as const
+export type BiomeType = (typeof BIOME_TYPES)[number]
 export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti' | 'magmaTitan' | 'medusa'
 export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny' | 'lanternfly'
 

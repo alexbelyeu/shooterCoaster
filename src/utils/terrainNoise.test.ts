@@ -7,13 +7,13 @@ import {
   sampleTrackPath,
 } from './terrainNoise'
 import { getAllLevels } from '@/levels/LevelRegistry'
-import { biomeHeightFunction } from '@/levels/environments/biomeRegistry'
+import { BIOMES, biomeHeightFunction } from '@/levels/environments/biomeRegistry'
 import { GYM_SCALE } from '@/levels/environments/biomes/gym/blockout'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
-import type { BiomeType, LevelConfig } from '@/types/level'
+import { BIOME_TYPES, type LevelConfig } from '@/types/level'
 
 // The noise-terrain biomes (an interior's ground is its authored floor: `biomeHeightFunction`).
-const ALL_BIOMES: BiomeType[] = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic']
+const NOISE_BIOMES = BIOME_TYPES.filter((b) => !BIOMES[b].floor)
 const levels = getAllLevels()
 
 function trackSamplesFor(level: LevelConfig) {
@@ -23,7 +23,7 @@ function trackSamplesFor(level: LevelConfig) {
 
 describe('BIOME_TERRAIN_CONFIGS', () => {
   it('has a config for every biome', () => {
-    for (const biome of ALL_BIOMES) {
+    for (const biome of BIOME_TYPES) {
       expect(BIOME_TERRAIN_CONFIGS[biome], biome).toBeDefined()
     }
   })
@@ -45,7 +45,7 @@ describe('BIOME_TERRAIN_CONFIGS', () => {
 
 describe('createHeightFunction', () => {
   it('is deterministic: same input gives the same output, across instances', () => {
-    for (const biome of ALL_BIOMES) {
+    for (const biome of NOISE_BIOMES) {
       const a = createHeightFunction(biome)
       const b = createHeightFunction(biome)
       for (const [x, z] of [[0, 0], [1234.5, -987.25], [-3000, 2500], [4100, 4100]]) {
@@ -56,7 +56,7 @@ describe('createHeightFunction', () => {
   })
 
   it('returns finite heights and keeps the centre flat at baseY', () => {
-    for (const biome of ALL_BIOMES) {
+    for (const biome of NOISE_BIOMES) {
       const h = createHeightFunction(biome)
       const { baseY, flatRadius } = BIOME_TERRAIN_CONFIGS[biome]
       expect(h(0, 0)).toBe(baseY)
@@ -70,7 +70,7 @@ describe('createHeightFunction', () => {
   })
 
   it('produces actual relief outside the flat valley', () => {
-    for (const biome of ALL_BIOMES) {
+    for (const biome of NOISE_BIOMES) {
       const h = createHeightFunction(biome)
       const { baseY } = BIOME_TERRAIN_CONFIGS[biome]
       let maxRise = 0

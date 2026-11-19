@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { boostStrength, newBoostTrack, particleCounts, PARTICLE_PRESETS, resetBoost, stepBoost } from './particlePresets'
+import { BIOMES } from '../biomeRegistry'
+import { BIOME_TYPES } from '@/types/level'
 
 const presets = Object.entries(PARTICLE_PRESETS)
 
 describe('particle presets', () => {
-  it('has the six biome presets', () => {
-    expect(Object.keys(PARTICLE_PRESETS).sort()).toEqual(['arcticSnow', 'desertDust', 'gymChalk', 'oceanPlankton', 'parkPollen', 'volcanicAsh'])
+  it("is every biome's field and nothing else: each biome sets one, each preset is some biome's", () => {
+    const used = new Set(BIOME_TYPES.map((b) => BIOMES[b].particles))
+    expect(used.has(undefined)).toBe(false)
+    expect(used).toEqual(new Set(Object.values(PARTICLE_PRESETS)))
   })
 
   it.each(presets)('%s stays subtle: count, box and share within bounds', (_, p) => {
