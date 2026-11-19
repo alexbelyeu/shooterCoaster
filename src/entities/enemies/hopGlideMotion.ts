@@ -1,7 +1,7 @@
 /**
  * The spotted lanternfly's life on a wall (#516), in wall coordinates: `u` across, `v` up and `off` out from the face,
  * world units. It glides in and lands, then sits and crawls a little, hops off and glides in a short arc to another
- * spot, wings open on every hop and folded on landing; its hops loop, so it never runs out. Pure, on game time:
+ * spot, wings open on every hop, folded on landing and flicked open once each sit; its hops loop, so it never runs out. Pure, on game time:
  * the route here, built once at mount; the pose each frame in `hopGlideMotion.hot.ts`.
  */
 import { createRng } from '@/utils/rng'
@@ -10,28 +10,32 @@ export const HOP = {
   /** Its belly off the face while it sits. */
   standoff: 1,
   /** Keeps its spots this far inside the wall's edges. */
-  margin: 24,
+  margin: 40,
   /** A hop's length (world units) and how far its glide bows out from the wall per unit of it. */
-  distMin: 45,
-  distSpan: 70,
+  distMin: 75,
+  distSpan: 110,
   bow: 0.3,
-  bowMin: 12,
+  bowMin: 20,
   /** A hop takes `hopBase` + its length / `hopSpeed` seconds. */
   hopBase: 0.4,
-  hopSpeed: 260,
+  hopSpeed: 420,
   /** Seconds sat between hops; the first, after its arrival, is at least `sitMin`. */
   sitMin: 1.2,
   sitSpan: 1.6,
   /** How far it crawls while it sits, mostly up the wall. */
-  crawl: 9,
+  crawl: 15,
   crawlSpread: 0.7,
   /** The arrival glide: from this far out and up, onto its first spot. */
   arrive: 0.9,
-  arriveOut: 90,
-  arriveUp: 50,
+  arriveOut: 150,
+  arriveUp: 85,
   /** Shares of a glide over which the wings open and fold. */
   open: 0.15,
   fold: 0.2,
+  /** One wing flick each sit, so the red shows between hops too (#665): `flashAt` s after landing, `flashFor` s long, to `flashOpen`. */
+  flashAt: 0.25,
+  flashFor: 0.7,
+  flashOpen: 0.6,
   /** Hops before the route repeats (its last hop returns to its first spot). */
   hops: 16,
   /** Seconds to turn to a new heading. */

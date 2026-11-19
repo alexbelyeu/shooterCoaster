@@ -9,9 +9,10 @@ import { hopPose } from './hopGlideMotion.hot'
 import { freeWallSlot, wallNormal, wallPoint } from '@/entities/spawning/enemyPlacement'
 import { hashString } from '@/utils/rng'
 
-const LANTERNFLY_SCALE = 4
-/** Each wing's swing out in the wall's plane, its roll (a tent over the back when folded) and the hindwing's fan. */
-const FOLDED = { foreSwing: 0.06, foreRoll: 0.5, hindSwing: -0.05, hindRoll: 0.45, hindFan: 0.45 }
+// Reads on the gym's walls from the ride, on a phone (#665); HOP's distances and SWARM_SPACING scale with it.
+const LANTERNFLY_SCALE = 7
+/** Each wing's swing out in the wall's plane, its roll (a tent over the back when folded) and the hindwing's fan; folded, the hindwings show a red edge past the forewings (#665). */
+const FOLDED = { foreSwing: 0.06, foreRoll: 0.5, hindSwing: 0.25, hindRoll: 0.4, hindFan: 0.6 }
 const OPEN = { foreSwing: 1.45, foreRoll: 0.1, hindSwing: 0.55, hindRoll: 0.05, hindFan: 1 }
 const SIDES = [1, -1] as const
 // Built once: R3F compares props by reference, so a per-render Euler would refold the wings on any re-render (the pause, #577).

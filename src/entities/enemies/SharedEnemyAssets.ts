@@ -1133,13 +1133,31 @@ export const LANTERNFLY_BODY_GEO = mergePainted([
 export const LANTERNFLY_FOREWING_GEOS = [mergePainted(forewingParts()), mirrored(forewingParts())] as const
 export const LANTERNFLY_HINDWING_GEOS = [mergePainted(hindwingParts()), mirrored(hindwingParts())] as const
 
-export const LANTERNFLY_MAT = withRim(new THREE.MeshStandardMaterial({
+/** Share of its own paint each lanternfly lights on its own: on the gym's shaded walls its red read as maroon and its forewings as black (#665). */
+const LANTERNFLY_SELF_LIT = 0.45
+
+/** Adds `lift` × the vertex colour as emissive, so the paint reads in shade and the black spots stay black. */
+function withSelfLit<T extends THREE.Material>(material: T, lift: number): T {
+  const base = material.onBeforeCompile
+  const baseKey = material.customProgramCacheKey()
+  material.onBeforeCompile = (shader, renderer) => {
+    base.call(material, shader, renderer)
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>\ntotalEmissiveRadiance += vColor.rgb * ${lift.toFixed(3)};`,
+    )
+  }
+  material.customProgramCacheKey = () => `${baseKey}-self-lit`
+  return material
+}
+
+export const LANTERNFLY_MAT = withSelfLit(withRim(new THREE.MeshStandardMaterial({
   vertexColors: true,
   roughness: 0.55,
   metalness: 0,
   flatShading: true,
   side: THREE.DoubleSide,
-}), { color: '#fff2e0', intensity: 0.45, power: 2.5 })
+}), { color: '#fff2e0', intensity: 0.45, power: 2.5 }), LANTERNFLY_SELF_LIT)
 
 // ── Hit flash (shared by every enemy) ───────────────────────────────
 // On hit, EnemyBase swaps each mesh's material to this one for the kill-pop

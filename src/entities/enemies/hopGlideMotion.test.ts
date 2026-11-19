@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { HOP, hopRoute, newHopPose, type HopPose } from './hopGlideMotion'
-import { glideWings, hopPose } from './hopGlideMotion.hot'
+import { glideWings, hopPose, sitWings } from './hopGlideMotion.hot'
 
 const WALL = { width: 400, height: 240 }
 const route = hopRoute({ u: 200, v: 80 }, WALL, 7)
@@ -46,18 +46,18 @@ describe('hopPose', () => {
     expect(landed).toMatchObject({ phase: 'sit', u: route.u[0], v: route.v[0], off: HOP.standoff, wings: 0 })
   })
 
-  it('sits folded on the face, every hop opens its wings and lands on the wall', () => {
+  it('sits on the face, flicking its wings no wider than a flash, every hop opens them and lands on the wall', () => {
     let hops = 0
     let prev: HopPose | null = null
     for (const p of sweep()) {
       if (p.phase === 'sit') {
-        expect(p.wings).toBe(0)
+        expect(p.wings).toBeLessThanOrEqual(HOP.flashOpen)
         expect(p.off).toBe(HOP.standoff)
       }
       if (prev?.phase === 'hop' && p.phase === 'sit') {
         hops++
         expect(prev.wings).toBeLessThan(0.2)
-        expect(prev.off - HOP.standoff).toBeLessThan(2)
+        expect(prev.off - HOP.standoff).toBeLessThan(HOP.bowMin / 4)
       }
       if (p.phase === 'hop' && p.wings > 0.99) expect(p.off).toBeGreaterThan(HOP.standoff)
       prev = p
@@ -104,6 +104,18 @@ describe('hopPose', () => {
 
   it('is a function of game time alone: a paused clock holds it still', () => {
     for (const t of [0.3, 2.5, 9.1, 47]) expect(at(t)).toEqual(at(t))
+  })
+})
+
+describe('sitWings (#665)', () => {
+  it('folded on landing and at take-off, one flick of red between, even on the shortest sit', () => {
+    for (const sit of [HOP.sitMin * 0.6, HOP.sitMin + HOP.sitSpan]) {
+      expect(sitWings(0, sit)).toBe(0)
+      expect(sitWings(sit, sit)).toBe(0)
+      let peak = 0
+      for (let x = 0; x <= sit; x += 0.01) peak = Math.max(peak, sitWings(x, sit))
+      expect(peak).toBeGreaterThan(HOP.flashOpen * 0.95)
+    }
   })
 })
 

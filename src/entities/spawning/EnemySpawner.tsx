@@ -88,7 +88,7 @@ const RADII: Record<EnemyType, number> = {
   climber: 50,
   rat: 50,
   dustBunny: 45,
-  lanternfly: 40,
+  lanternfly: 65,
 }
 
 const NO_WALLS: readonly WallSurface[] = []
