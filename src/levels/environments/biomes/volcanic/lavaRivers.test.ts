@@ -3,7 +3,7 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { buildArcTable, tAtLoopDistance } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
-import { rideProfile, rideSpeeds } from '@/track/ridePhysics'
+import { rideModel, rideProfile } from '@/track/ridePhysics'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createLavaRiverGeometries, RIVER_COLUMNS } from './lavaRivers'
 import { RIVER_CONFIGS, RIVER_SEGMENTS, riverRow } from './lavaRiverPaths'
@@ -16,7 +16,7 @@ const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize('volcanic'))
 
 /** Where the rider is and which way it faces (XZ), every half second of the run. */
 function riderViews() {
-  const profile = rideProfile(table, rideSpeeds(level.track), RUN_SECONDS)
+  const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
   const views: { x: number; z: number; fx: number; fz: number }[] = []
   for (let k = 0; k < profile.length; k += 5) {
     const t = tAtLoopDistance(table, profile[k])

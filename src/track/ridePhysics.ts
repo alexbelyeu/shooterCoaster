@@ -1,9 +1,12 @@
-import { distanceAtT, indexAtT, type ArcTable } from './arcLength'
+import { distanceAtT, indexAtT, tAtLoopDistance, type ArcTable } from './arcLength'
 import type { TrackCurve } from './curves/TrackCurve'
+import { buildRidePlan, PLAN_RATE, planDistance, planSpeed, planTimeAt, type RidePlan } from './rideV2'
+import type { TrackParams } from '@/types/level'
 
 /**
  * The coaster's speed rule (port of Camera.js updateCamGame), pure: `CoasterCamera` rides it and
  * spawning predicts the ride with it (`rideProfile`). Velocity is track fraction per 60 fps frame.
+ * A level with `ride: 'v2'` rides its solved plan instead (`rideV2.ts`, #696).
  */
 
 // The 2015 game ran frame-dependent physics at ~30-45 fps: slow the 60 fps port to match, and cap runaway downhill speed.
@@ -17,6 +20,8 @@ export interface RideSpeeds {
   roll: number
   min: number
   max: number
+  /** The v2 ride's plan: when set, the ride follows it and the fields above are unused. */
+  plan?: RidePlan
 }
 
 export function rideSpeeds({ rollerSpeed, minRollerSpeed }: { rollerSpeed: number; minRollerSpeed: number }): RideSpeeds {
@@ -27,21 +32,61 @@ export function rideSpeeds({ rollerSpeed, minRollerSpeed }: { rollerSpeed: numbe
   }
 }
 
+/** The level's ride: its v2 plan when it opts in, else today's rule. Cold: solves the plan (a few ms). */
+export function rideModel(track: TrackParams, table: ArcTable): RideSpeeds {
+  const speeds = rideSpeeds(track)
+  return track.ride === 'v2' ? { ...speeds, plan: buildRidePlan(table, track.rideV2 ?? {}) } : speeds
+}
+
 /** Velocity after `frames` on track whose unit tangent rises by `tangentY`, clamped to the ride's speeds. */
 export function nextVelocity(velocity: number, tangentY: number, frames: number, speeds: RideSpeeds): number {
   return Math.min(Math.max(velocity - tangentY * speeds.roll * frames, speeds.min), speeds.max)
 }
 
-/** `progress` is the track parameter (0..1, wrapping), `velocity` that per 60 fps frame. */
+/** `progress` is the track parameter (0..1, wrapping), `velocity` that per 60 fps frame, `time` seconds ridden since GO. */
 export interface RideState {
   progress: number
   velocity: number
+  time: number
 }
 
 const wrap01 = (t: number) => ((t % 1) + 1) % 1
 
+/** Back at the start, at rest. */
+export function resetRide(state: RideState): void {
+  state.progress = 0
+  state.velocity = 0
+  state.time = 0
+}
+
+/** Puts the car at track parameter `t` (the smoke's `rideTo`); a v2 ride resumes its plan from the first time it gets there. */
+export function jumpRide(state: RideState, speeds: RideSpeeds, t: number): void {
+  state.progress = t
+  if (speeds.plan) state.time = planTimeAt(speeds.plan, distanceAtT(speeds.plan.table, t))
+}
+
+/** 0 at the ride's slowest, 1 at its fastest. */
+export function rideSpeedNorm(state: RideState, speeds: RideSpeeds): number {
+  const { plan } = speeds
+  const norm = plan
+    ? (planSpeed(plan, state.time) - plan.minSpeed) / (plan.maxSpeed - plan.minSpeed || 1)
+    : (state.velocity - speeds.min) / (speeds.max - speeds.min)
+  return Math.max(0, Math.min(norm, 1))
+}
+
+/**
+ * The 60 fps frames a live frame of `seconds` rides. Today's rule caps a hitch at `MAX_RIDE_STEP_FRAMES` (it slows
+ * the ride, never skips track); a v2 ride takes the whole step, so its clock keeps pace with the level timer's and
+ * spawning's `rideProfile` at any frame rate.
+ */
+export function rideStepFrames(speeds: RideSpeeds, seconds: number): number {
+  return speeds.plan ? seconds * 60 : Math.min(seconds * 60, MAX_RIDE_STEP_FRAMES)
+}
+
 /** Port of Camera.js updateCamGame: rides `frames` 60 fps frames in steps of at most `MAX_RIDE_STEP_FRAMES`. */
 export function advanceRide(state: RideState, curve: TrackCurve, speeds: RideSpeeds, frames: number): RideState {
+  state.time += frames / 60
+  if (speeds.plan) return followPlan(state, speeds.plan)
   let left = frames
   do {
     const step = Math.min(left, MAX_RIDE_STEP_FRAMES)
@@ -52,9 +97,21 @@ export function advanceRide(state: RideState, curve: TrackCurve, speeds: RideSpe
   return state
 }
 
+/** The v2 ride at `state.time`: its velocity is the track parameter the plan covers over the next frame. */
+function followPlan(state: RideState, plan: RidePlan): RideState {
+  const dist = planDistance(plan, state.time)
+  state.progress = tAtLoopDistance(plan.table, dist)
+  state.velocity = wrap01(tAtLoopDistance(plan.table, dist + planSpeed(plan, state.time) / PLAN_RATE) - state.progress)
+  return state
+}
+
 /** From a standing start at 60 fps; Infinity past `maxSeconds`. */
 export function lapSeconds(curve: TrackCurve, speeds: RideSpeeds, maxSeconds = 600): number {
-  const state: RideState = { progress: 0, velocity: 0 }
+  if (speeds.plan) {
+    const lap = planTimeAt(speeds.plan, speeds.plan.table.length)
+    return lap <= maxSeconds ? lap : Infinity
+  }
+  const state: RideState = { progress: 0, velocity: 0, time: 0 }
   let travelled = 0
   for (let frame = 1; frame <= maxSeconds * 60; frame++) {
     const before = state.progress
@@ -75,6 +132,10 @@ const PROFILE_RATE = 10
 export function rideProfile(table: ArcTable, speeds: RideSpeeds, seconds: number): Float64Array {
   const framesPerSample = 60 / PROFILE_RATE
   const profile = new Float64Array(Math.ceil(seconds * PROFILE_RATE) + 1)
+  if (speeds.plan) {
+    for (let k = 1; k < profile.length; k++) profile[k] = planDistance(speeds.plan, k / PROFILE_RATE)
+    return profile
+  }
   const n = table.count - 1
   let t = 0
   let velocity = 0

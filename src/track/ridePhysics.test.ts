@@ -28,7 +28,7 @@ describe.each(getAllLevels().map((l) => [l.id, l] as const))('%s rideProfile', (
 
   it('is the arc the coaster rides, not track fraction × length (the curve parameter is not arc length)', () => {
     const curve = createTrackCurve(level.track)
-    const state = { progress: 0, velocity: 0 }
+    const state = { progress: 0, velocity: 0, time: 0 }
     let arc = 0
     for (let k = 1; k <= 10 * 10; k++) {
       for (let f = 0; f < 6; f++) {
@@ -58,15 +58,15 @@ describe('advanceRide', () => {
   const speeds = rideSpeeds({ rollerSpeed: 0.00001, minRollerSpeed: 0.0001 })
 
   it('a standing car picks up the minimum speed, holds it on the flat and wraps past 1', () => {
-    const state = advanceRide({ progress: 0.9999, velocity: 0 }, flat, speeds, 1)
-    expect(state).toEqual({ progress: 0.9999, velocity: speeds.min })
+    const state = advanceRide({ progress: 0.9999, velocity: 0, time: 0 }, flat, speeds, 1)
+    expect(state).toEqual({ progress: 0.9999, velocity: speeds.min, time: 1 / 60 })
     advanceRide(state, flat, speeds, 3)
     expect(state.progress).toBeCloseTo(0.9999 + 3 * speeds.min - 1, 10)
   })
 
   it('rides a long step in steps of at most 3 frames, and caps the speed downhill', () => {
     const downhill: TrackCurve = { ...flat, getTangentAt: () => ({ x: 0, y: -1, z: 0 }) as never }
-    const state = advanceRide({ progress: 0, velocity: speeds.min }, downhill, speeds, 1e6)
+    const state = advanceRide({ progress: 0, velocity: speeds.min, time: 0 }, downhill, speeds, 1e6)
     expect(state.velocity).toBe(speeds.max)
     expect(speeds.max / speeds.min).toBe(5)
   })
