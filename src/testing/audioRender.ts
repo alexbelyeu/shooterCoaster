@@ -2,7 +2,7 @@
 import { renderOffline, type OfflineRenderScope } from '@/audio/offlineRender'
 import { setMusicDucked } from '@/audio/AudioEngine'
 import { loadArcade, silentSfx, type Placement, type SfxEngine } from '@/audio/sfx'
-import { FIREWORK_BIOMES, type KillSound } from '@/audio/sfxDesign'
+import { FIREWORK_BIOMES, KILL_SOUNDS, type KillSound } from '@/audio/sfxDesign'
 import { COMBO_TIERS, FRENZY, TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 import { intensityForTier } from '@/audio/scrim/layers'
 import { getLevelConfig } from '@/levels/LevelRegistry'
@@ -21,8 +21,8 @@ export type AudioRenderRequest =
      * `seam`: start `SEAM_LEAD_S` before the first loop seam instead of at the top.
      */
   | { kind: 'music'; track: string; layers?: number | 'ramp'; seconds?: number; seam?: boolean }
-  /** Every arcade SFX (`audio/arcade/`) alone, in its own slot. */
-  | { kind: 'sfxSheet'; level?: string }
+  /** Every arcade SFX (`audio/arcade/`) alone, in its own slot; `kills`: the kill sounds, which the main sheet leaves out. */
+  | { kind: 'sfxSheet'; level?: string; kills?: boolean }
   /**
    * `stem: 'music'`: the same mix without SFX or wind, to measure the kills against. `boss`: the boss arrives at
    * `BOSS_MIX.arriveS` and falls `BOSS_MIX.defeatBeforeEndS` before the end, as `LevelAudio` plays them (#598); the
@@ -149,12 +149,32 @@ interface SheetEntry {
   stop?: () => void
 }
 
-function sfxSheetPlan(level = 'level1'): Plan {
+/** The kill sound the combo-tier slots play. */
+const COMBO_SOUND: KillSound = 'pop'
+
+/**
+ * Every kill: the combo tiers, then each other kill sound in `KILL_SOUNDS` once, so a new one is in the sheet without
+ * an edit here. Its own sheet (`kills`) keeps both under the 30 s render cap as kill sounds are added (#525).
+ */
+function killSheet(): SheetEntry[] {
+  return [
+    { name: 'kill 1x', slotS: 0.5, play: () => sfx.kill(COMBO_TIERS[0].minCount, COMBO_SOUND, null) },
+    { name: 'kill 2x (+ thump)', slotS: 0.7, play: () => sfx.kill(COMBO_TIERS[1].minCount, COMBO_SOUND, null) },
+    { name: 'kill 3x (+ ring)', slotS: 0.8, play: () => sfx.kill(COMBO_TIERS[2].minCount, COMBO_SOUND, null) },
+    { name: 'kill 5x (+ payout)', slotS: 1.1, play: () => sfx.kill(COMBO_TIERS[TOP_TIER].minCount, COMBO_SOUND, null) },
+    ...KILL_SOUNDS.filter((sound) => sound !== COMBO_SOUND).map((sound) => ({
+      name: `kill 1x (${sound})`,
+      slotS: 0.45,
+      play: () => sfx.kill(1, sound, null),
+    })),
+  ]
+}
+
+function sfxSheetPlan(level = 'level1', kills = false): Plan {
   const biome = biomeOf(level)
   const s = sfx
-  const kill = (sound: KillSound): SheetEntry => ({ name: `kill 1x (${sound})`, slotS: 0.45, play: () => s.kill(1, sound, null) })
   // Each sound alone in its own slot.
-  const sheet: SheetEntry[] = [
+  const sheet: SheetEntry[] = kills ? killSheet() : [
     { name: 'fire (single shot)', slotS: 0.35, play: () => s.fire(false) },
     { name: 'fire (auto, held trigger)', slotS: 0.35, play: () => s.fire(true) },
     { name: 'autofire burst (6 shots, 100 ms apart)', slotS: 0.8, play: () => s.fire(true), repeat: 6 },
@@ -163,10 +183,6 @@ function sfxSheetPlan(level = 'level1'): Plan {
     { name: 'fire (piercing pickup)', slotS: 0.4, play: () => s.fire(false, 'piercing') },
     { name: 'pickup chime', slotS: 1.0, play: () => s.pickup() },
     { name: 'hit tick', slotS: 0.3, play: () => s.hit(0, null) },
-    { name: 'kill 1x', slotS: 0.5, play: () => s.kill(COMBO_TIERS[0].minCount, 'pop', null) },
-    { name: 'kill 2x (+ thump)', slotS: 0.7, play: () => s.kill(COMBO_TIERS[1].minCount, 'pop', null) },
-    { name: 'kill 3x (+ ring)', slotS: 0.8, play: () => s.kill(COMBO_TIERS[2].minCount, 'pop', null) },
-    { name: 'kill 5x (+ payout)', slotS: 1.1, play: () => s.kill(COMBO_TIERS[TOP_TIER].minCount, 'pop', null) },
     { name: 'combo break', slotS: 0.65, play: () => s.comboBreak() },
     { name: 'bystander penalty', slotS: 0.6, play: () => s.penalty(null) },
     { name: 'wave tell', slotS: 1.5, play: () => s.waveIncoming() },
@@ -183,10 +199,6 @@ function sfxSheetPlan(level = 'level1'): Plan {
     { name: 'star chime 1', slotS: 0.7, play: () => s.starChime(0) },
     { name: 'star chime 2', slotS: 0.7, play: () => s.starChime(1) },
     { name: 'star chime 3', slotS: 1.5, play: () => s.starChime(2) },
-    kill('flutter'),
-    kill('crunch'),
-    kill('splash'),
-    kill('hiss'),
     { name: 'golden balloon', slotS: 1.0, play: () => s.bossPart(1, 'balloon-0', null) },
     { name: 'FRENZY sting', slotS: 1.6, play: () => s.frenzy() },
     { name: 'FRENZY lift (held 1.5 s)', slotS: 1.9, play: () => s.frenzyLift(true), holdS: 1.5, stop: () => s.frenzyLift(false) },
@@ -383,7 +395,7 @@ type GamePlanRequest = Exclude<AudioRenderRequest, { kind: 'score' | 'launch' }>
 
 const RENDERS: { [K in GamePlanRequest['kind']]: (req: Extract<GamePlanRequest, { kind: K }>) => Plan } = {
   music: (r) => musicPlan(scrim, r.track, r.seconds, r.seam, r.layers),
-  sfxSheet: (r) => sfxSheetPlan(r.level),
+  sfxSheet: (r) => sfxSheetPlan(r.level, r.kills),
   mix: (r) => mixPlan(r.level, r.seconds, r.stem === 'music', r.boss),
   ride: (r) => ridePlan(r.level),
 }
