@@ -75,8 +75,9 @@ biome or score that already exists is refused, so a second run changes nothing. 
    `atmosphere.ts` preset, `BIOME_TERRAIN_CONFIGS` (`utils/terrainNoise.ts`; an interior's is flat and `authoredFloor`:
    `biomeHeightFunction` hands every caller its `floor`), `BIOME_REVERB` (`sfxDesign.ts`), a `theme.ts` accent and a `LevelPostcard`
    stub. **(by hand)** The look: palette, sky, light, fog, grade, the hero landmark in `Features.tsx`
-   and its `hero` shot in `index.ts` (what the countdown's swoop starts over and the results orbit circles:
-   the template's points at the stand-in spire's `LANDMARK_SITE`, or an interior's far wall; #328),
+   and its `hero` shot in `index.ts` (what the intro's 10 s tour passes on its way into the seat and the results orbit circles:
+   the template's points at the stand-in spire's `LANDMARK_SITE`, or an interior's far wall; #328, #675; the tour's
+   reveal and landmark pass are generated from it, and `hero.tour` swaps in hand-picked shots when they frame it badly),
    props in `Decorations.tsx` (seeded, off the track), contact-shadow footprints, the postcard art and
    accent; an interior sizes `HALL` around its track (its `BIOME_TERRAIN_CONFIGS` `meshSize` sizes the floor mesh if the
    default 6000 doesn't fit it).

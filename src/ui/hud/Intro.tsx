@@ -4,7 +4,7 @@ import { subscribePointer } from '@/input/pointerInput'
 import { INTRO_SECONDS, setIntroStartedAt } from '@/core/introShot'
 
 /**
- * The intro (#674): the camera swoops into the seat (`CoasterCamera`) on its own clock, `INTRO_SECONDS` long on
+ * The intro (#674): the camera tours the level into the seat (`CoasterCamera`, #675) on its own clock, `INTRO_SECONDS` long on
  * every device, then Ready / Set / GO. A tap (pointer released off the UI) or any key skips it.
  */
 export default function Intro() {

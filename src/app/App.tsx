@@ -70,7 +70,7 @@ export default function App() {
     veilTimer.current = window.setTimeout(() => setPhase('levelSelect'), TITLE_FADE_S * 1000)
   }
 
-  // Not over the intro's swoop: nothing to aim at yet.
+  // Not over the intro's tour: nothing to aim at yet.
   const showCrosshair = phase === 'title' || phase === 'levelSelect' || (inPlay && phase !== 'intro') || resuming
   useEffect(() => {
     const el = document.documentElement

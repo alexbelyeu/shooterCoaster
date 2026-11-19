@@ -49,6 +49,7 @@ import { qualityProfile, type GraphicsQuality, type QualityProfile } from '@/can
 import { getAdaptiveSteps } from '@/canvas/useRenderBudget'
 import { COMBO_TIERS, TOP_TIER, comboMultiplier } from '@/combat/comboTiers'
 import { setTimeScaleOverride } from '@/combat/slowMo.hot'
+import { INTRO_SECONDS } from '@/core/introShot'
 import { getPointerState } from '@/input/pointerInput'
 import { audioContext, initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
 import { loadArcade, sfx, type VoiceStats } from '@/audio/sfx'
@@ -239,15 +240,18 @@ export interface SCTestApi {
   scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string } | null>
   /** Override the game time scale (0 freezes camera + enemies; 1 hands it back to the slow-mo envelopes, `combat/slowMo.hot.ts`). */
   setTimeScale: (s: number) => void
-  /** Pins the intro swoop (#328) at this progress (0 = over the landmark, 1 = the seat) before GO (loading, intro, countdown) until set back to null. */
+  /** Pins the intro's tour (#328, #675) at this progress (0 = the reveal, 1 = the seat) in any phase short of the results, until set back to null. */
   introAt: number | null
-  /** The coaster camera's shot (#328): riding, the intro's swoop or the results orbit. The swoop's progress (0–1),
-   *  height over the seat, distance and look angle (degrees) off the seat's pose, and angle off the landmark; `goOffset`
-   *  is the swoop's distance off the seat on its last frame; `seconds` how long the last intro lasted (#674) and
-   *  `skipped` whether a tap or key ended it. */
+  /** The coaster camera's shot (#328): riding, the intro's tour or the results orbit. The tour's progress (0–1),
+   *  height over the seat, distance and look angle (degrees) off the seat's pose, angle off the landmark and height over
+   *  the ground; `marks` the progress of its four shots (#675); `goOffset` is the tour's distance off the seat on its
+   *  last frame; `seconds` how long the last intro lasted (#674) and `skipped` whether a tap or key ended it;
+   *  `length` is `INTRO_SECONDS`, its fixed length. */
   intro: {
-    mode: 'ride' | 'swoop' | 'orbit'
-    progress: number; height: number; seatOffset: number; seatAngle: number; anchorAngle: number
+    mode: 'ride' | 'tour' | 'orbit'
+    length: number
+    progress: number; height: number; seatOffset: number; seatAngle: number; anchorAngle: number; clearance: number
+    marks: { reveal: number; landmark: number; track: number; landing: number } | null
     goOffset: number | null
     orbitSeconds: number
     seconds: number | null
@@ -1035,7 +1039,7 @@ export function installE2EApi() {
     },
     setTimeScale: (s: number) => setTimeScaleOverride(s === 1 ? null : s),
     introAt: null,
-    intro: { mode: 'ride', progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, goOffset: null, orbitSeconds: 0, seconds: null, skipped: false },
+    intro: { mode: 'ride', length: INTRO_SECONDS, progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, clearance: 0, marks: null, goOffset: null, orbitSeconds: 0, seconds: null, skipped: false },
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,

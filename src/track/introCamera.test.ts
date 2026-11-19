@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { INTRO_SECONDS } from '@/core/introShot'
-import {
-  ORBIT_RATE, createTrackApproach, introProgress, orbitPose, swoopPose, type HeroShot,
-} from './introCamera.hot'
+import { ORBIT_RATE, introProgress, orbitPose, tourPose, type HeroShot } from './introCamera.hot'
+import { TOUR_SPEED_CAP, buildIntroTour, tourDistance, tourTurnRates } from './introTour'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { getTrackDimensions } from './trackDimensions'
 import { buildArcTable } from './arcLength'
-import { BIOMES } from '@/levels/environments/biomeRegistry'
+import { BIOMES, biomeHeightFunction } from '@/levels/environments/biomeRegistry'
+import { sampleTrackPath } from '@/utils/terrainNoise'
 import { HALL_BOUNDS } from '@/levels/environments/biomes/gym/config'
 
 const v = (x = 0, y = 0, z = 0) => ({ x, y, z })
@@ -18,99 +18,160 @@ const angleDeg = (a: { x: number; y: number; z: number }, b: { x: number; y: num
   return (Math.acos(Math.min(Math.max(d, -1), 1)) * 180) / Math.PI
 }
 
-/** Each level's seat (track start + eye height), ride direction, landmark focus point and track approach (`hero.approach`). */
-function levelShots() {
+/** Ground samples each level's tour build took (the build's dominant cost: terrain noise per path sample). */
+const GROUND_SAMPLES: Record<string, number> = {}
+
+/** Each level's tour as `CoasterCamera` builds it (the real ground), with its seat (track start + eye height) and ride direction. */
+function levelTours() {
   return getAllLevels().map((level) => {
     const curve = createTrackCurve(level.track)
+    const table = buildArcTable(curve)
     const dims = getTrackDimensions(level.track)
+    const biome = BIOMES[level.biome]
+    const ground = biomeHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
+    const hero = biome.hero
+    const heroGround = hero.ground ?? ground(hero.x, hero.z)
+    let samples = 0
+    const counted = (x: number, z: number) => {
+      samples++
+      return ground(x, z)
+    }
+    const tour = buildIntroTour({
+      curve, table, seatT: 0, eyeHeight: dims.eyeHeight, trackScale: dims.trackScale, hero, heroGround, ground: counted, bounds: biome.bounds,
+    })
+    GROUND_SAMPLES[level.id] = samples
     const p = curve.getPointAt(0)
     const t = curve.getTangentAt(0)
-    const hero = BIOMES[level.biome].hero
-    // Flat ground at 0 is enough for the path's shape.
-    const anchor = v(hero.x, (hero.ground ?? 0) + hero.focus, hero.z)
-    const seat = v(p.x, p.y + dims.eyeHeight, p.z)
-    const dir = v(t.x, t.y, t.z)
-    const approach = hero.approach
-      ? createTrackApproach(curve, buildArcTable(curve), hero.approach * dims.trackScale, dims.eyeHeight, () => 0)
-      : undefined
-    return { id: level.id, seat, dir, anchor, scale: dims.trackScale, biome: level.biome, approach }
+    const anchor = v(hero.x, heroGround + hero.focus, hero.z)
+    return { id: level.id, tour, ground, anchor, seat: v(p.x, p.y + dims.eyeHeight, p.z), dir: v(t.x, t.y, t.z), scale: dims.trackScale, bounds: biome.bounds }
   })
 }
 
-describe('swoopPose', () => {
+const TOURS = levelTours()
+/** Frames a second the tests sample the intro at. */
+const FPS = 60
+
+describe('tourPose', () => {
   it('lands exactly on the seat pose at progress 1, on every level', () => {
-    for (const s of levelShots()) {
+    for (const s of TOURS) {
       const pos = v()
       const dir = v()
-      const bank = swoopPose(s.seat, s.dir, s.anchor, s.scale, 1, undefined, pos, dir, s.approach)
+      const bank = tourPose(s.tour, 1, s.seat, s.dir, pos, dir)
       expect({ id: s.id, pos, dir, bank }).toEqual({ id: s.id, pos: s.seat, dir: s.dir, bank: 0 })
     }
   })
 
-  it('starts high over the seat, looking at the landmark, and comes in without a jump', () => {
-    for (const s of levelShots()) {
+  it('tours each level at a steady pace under the speed cap, turning smoothly, and settles into the seat', () => {
+    const frames = INTRO_SECONDS * FPS
+    const rows = TOURS.map((s) => {
       const pos = v()
       const dir = v()
-      swoopPose(s.seat, s.dir, s.anchor, s.scale, 0, undefined, pos, dir, s.approach)
-      const toAnchor = v(s.anchor.x - pos.x, s.anchor.y - pos.y, s.anchor.z - pos.z)
-      const start = { id: s.id, high: pos.y - s.seat.y >= 100 * s.scale, looksAtAnchor: Math.abs(angleDeg(dir, toAnchor) - 12) < 0.01 }
-
-      // Steps of 1/200 of the swoop: no big hop between any two, and the last ones settle into the seat.
-      let maxStep = 0
-      let maxTurn = 0
+      tourPose(s.tour, 0, s.seat, s.dir, pos, dir)
       const prev = { ...pos }
       const prevDir = { ...dir }
-      for (let i = 1; i <= 200; i++) {
-        swoopPose(s.seat, s.dir, s.anchor, s.scale, i / 200, undefined, pos, dir, s.approach)
-        maxStep = Math.max(maxStep, dist(pos, prev))
-        maxTurn = Math.max(maxTurn, angleDeg(dir, prevDir))
+      let topSpeed = 0
+      let topTurn = 0
+      for (let i = 1; i <= frames; i++) {
+        tourPose(s.tour, introProgress(i / FPS), s.seat, s.dir, pos, dir)
+        topSpeed = Math.max(topSpeed, dist(pos, prev) * FPS)
+        topTurn = Math.max(topTurn, angleDeg(dir, prevDir) * FPS)
         Object.assign(prev, pos)
         Object.assign(prevDir, dir)
       }
-      swoopPose(s.seat, s.dir, s.anchor, s.scale, 0.999, undefined, pos, dir, s.approach)
-      const near = { offset: dist(pos, s.seat) < 0.5 * s.scale, angle: angleDeg(dir, s.dir) < 0.5 }
-      expect({ ...start, ...near, smooth: maxStep < 12 * s.scale && maxTurn < 5 }).toEqual({
-        id: s.id, high: true, looksAtAnchor: true, offset: true, angle: true, smooth: true,
-      })
-    }
+      const turns = tourTurnRates(s.tour)
+      tourPose(s.tour, introProgress(INTRO_SECONDS - 1 / FPS), s.seat, s.dir, pos, dir)
+      return {
+        id: s.id,
+        underCap: topSpeed <= TOUR_SPEED_CAP * s.scale,
+        // A tour of a few hundred units would be no tour: it covers the level.
+        covers: s.tour.length >= 1500 * s.scale || s.bounds !== undefined,
+        // The view turns at most this many degrees a second (the gym's hall is tighter: its hand-picked tour is #675's follow-up).
+        smoothTurn: topTurn < (s.bounds ? 170 : 75) && turns.look < (s.bounds ? 170 : 75),
+        settles: dist(pos, s.seat) < 0.1 * s.scale && angleDeg(dir, s.dir) < 0.5,
+      }
+    })
+    expect(rows).toEqual(rows.map(({ id }) => ({ id, underCap: true, covers: true, smoothTurn: true, settles: true })))
   })
 
-  it('keeps an interior swoop inside its walls', () => {
-    const gym = levelShots().find((s) => s.biome === 'gym')!
+  it('starts high over the seat, passes the landmark looking at it, and keeps clear of the ground', () => {
+    const rows = TOURS.map((s) => {
+      const pos = v()
+      const dir = v()
+      tourPose(s.tour, s.tour.marks.reveal, s.seat, s.dir, pos, dir)
+      const high = pos.y - s.seat.y >= 100 * s.scale || s.bounds !== undefined
+      tourPose(s.tour, s.tour.marks.landmark, s.seat, s.dir, pos, dir)
+      const looksAtLandmark = angleDeg(dir, v(s.anchor.x - pos.x, s.anchor.y - pos.y, s.anchor.z - pos.z)) < 20
+      // Off the landing (the last 2 % of the intro), never within 20 units × trackScale of the ground.
+      let lowest = Infinity
+      for (let i = 0; i <= 500; i++) {
+        tourPose(s.tour, (i / 500) * 0.98, s.seat, s.dir, pos, dir)
+        lowest = Math.min(lowest, pos.y - s.ground(pos.x, pos.z))
+      }
+      const { reveal, landmark, track, landing } = s.tour.marks
+      return { id: s.id, high, looksAtLandmark, clear: lowest >= 20 * s.scale, ordered: reveal < landmark && landmark < track && track < landing && landing < 1 }
+    })
+    expect(rows).toEqual(rows.map(({ id }) => ({ id, high: true, looksAtLandmark: true, clear: true, ordered: true })))
+  })
+
+  it('keeps an interior tour inside its walls', () => {
+    const gym = TOURS.find((s) => s.bounds === HALL_BOUNDS)!
     const pos = v()
     const dir = v()
     let outside = 0
-    for (let i = 0; i <= 100; i++) {
-      swoopPose(gym.seat, gym.dir, gym.anchor, gym.scale, i / 100, HALL_BOUNDS, pos, dir, gym.approach)
+    for (let i = 0; i <= 200; i++) {
+      tourPose(gym.tour, i / 200, gym.seat, gym.dir, pos, dir)
       if (pos.x < HALL_BOUNDS.minX || pos.x > HALL_BOUNDS.maxX || pos.z < HALL_BOUNDS.minZ || pos.z > HALL_BOUNDS.maxZ || pos.y > HALL_BOUNDS.maxY) outside++
     }
     expect(outside).toBe(0)
   })
 
-  it('banks into the turn and is level at both ends', () => {
-    const seat = v(0, 100, 0)
-    const ahead = v(1, 0, 0)
-    // Landmark off to the left of the ride (-z is left of +x with y up), so the view turns right onto the track.
-    const left = swoopPose(seat, ahead, v(300, 0, -300), 1, 0.5, undefined, v(), v())
-    const right = swoopPose(seat, ahead, v(300, 0, 300), 1, 0.5, undefined, v(), v())
-    expect(Math.sign(left)).toBe(-Math.sign(right))
-    expect(swoopPose(seat, ahead, v(300, 0, 300), 1, 0, undefined, v(), v())).toBeCloseTo(0, 12)
+  it('eases onto a seat that has moved since the tour was built', () => {
+    const s = TOURS[0]
+    const moved = v(s.seat.x + 30, s.seat.y, s.seat.z)
+    const pos = v()
+    const dir = v()
+    tourPose(s.tour, 0.5, moved, s.dir, pos, dir)
+    const mid = { ...pos }
+    tourPose(s.tour, 0.5, s.seat, s.dir, pos, dir)
+    expect(mid).toEqual(pos)
+    tourPose(s.tour, 1 - 1e-6, moved, s.dir, pos, dir)
+    expect(dist(pos, moved)).toBeLessThan(0.01)
+  })
+
+  it('banks into the turns and is level at both ends', () => {
+    for (const s of TOURS) {
+      expect(Math.abs(tourPose(s.tour, 0, s.seat, s.dir, v(), v()))).toBeLessThan(1e-6)
+      expect(Math.max(...Array.from(s.tour.bank, Math.abs))).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('buildIntroTour', () => {
+  // It runs on the main thread at level mount: a long task there is what #597 took out. 25 000 samples is ~10 ms of
+  // terrain noise on a desktop; a layout whose spline alone is over the speed cap must not pay for its ground.
+  it('samples the ground at most 25 000 times on any level', () => {
+    const over = Object.entries(GROUND_SAMPLES).filter(([, n]) => n > 25_000)
+    expect(over).toEqual([])
+    expect(Object.keys(GROUND_SAMPLES)).toHaveLength(TOURS.length)
+  })
+})
+
+describe('tourDistance', () => {
+  it('runs 0 to 1 over the intro, easing out of the reveal and into the seat', () => {
+    const samples = Array.from({ length: 121 }, (_, i) => tourDistance(i / 120))
+    expect(samples[0]).toBe(0)
+    expect(samples[120]).toBeCloseTo(1, 12)
+    expect(samples.every((x, i) => i === 0 || x > samples[i - 1])).toBe(true)
+    expect(samples[1]).toBeLessThan(1e-3)
+    expect(1 - samples[119]).toBeLessThan(1e-3)
   })
 })
 
 describe('introProgress', () => {
-  it('runs 0 to 1 over the fixed intro, easing out of the start and into the seat', () => {
-    const samples = Array.from({ length: 121 }, (_, i) => introProgress((i / 120) * INTRO_SECONDS))
-    expect(samples[0]).toBe(0)
-    expect(samples[120]).toBe(1)
-    expect(samples.every((x, i) => i === 0 || x > samples[i - 1])).toBe(true)
-    // Slow at both ends, fastest mid-way.
-    expect(samples[1]).toBeLessThan(1e-4)
-    expect(1 - samples[119]).toBeLessThan(1e-4)
-    expect(introProgress(INTRO_SECONDS / 2)).toBeCloseTo(0.5, 10)
-  })
-
-  it('holds the start before the intro and the seat after it', () => {
+  it('runs 0 to 1 over the fixed intro on the clock, holding the start before it and the seat after it', () => {
+    expect(INTRO_SECONDS).toBeGreaterThanOrEqual(8)
+    expect(INTRO_SECONDS).toBeLessThanOrEqual(10)
+    expect(introProgress(INTRO_SECONDS / 2)).toBeCloseTo(0.5, 12)
     expect(introProgress(-1)).toBe(0)
     expect(introProgress(INTRO_SECONDS + 5)).toBe(1)
   })

@@ -94,8 +94,8 @@ loads the first level with `?e2e=1&countdown=1` (#674): the loading screen must 
 warm-up is done, then the intro must run its fixed length (`intro.seconds`, `INTRO_SECONDS` late by at most two of its frames;
 `level1-intro.png` as it runs), then the countdown must show (`countdown.png`),
 a press during it must fire nothing (also when held on into `playing`), the timer must hold,
-the intro swoop (#328, pinned with `introAt`, which holds the camera on its path anywhere before GO) must start high over the seat with the level's
-landmark in view (`level1-swoop.png`, `intro.height` / `anchorAngle`) and end exactly on the ride's start pose, where the countdown
+the intro tour (#328, #675, pinned with `introAt`, which holds the camera on its path in any phase short of the results) must start high
+over the seat (`intro.height`) and end exactly on the ride's start pose, where the countdown
 sits (`intro.seatOffset` / `seatAngle`; the real intro's `goOffset` and longest frame are reported), a replay (`restartLevel()`) must go
 straight to the countdown, where a tap after 1 s (Ready held by `holdFeedback`) skips to `playing`, a new start of the warm level must
 pass the loading screen at once and a tap must skip its intro (`intro.skipped`),
@@ -201,18 +201,18 @@ Every check above belongs to a named step: `title`, `landing`, `levelSelect`, `d
 run's touch play: taps, aim assist, aspect, HUD, audio, up to the Pause tap) and `mobileMenus` (the rest of the phone run on
 the same page: pause card, settings, boss bar, initials entry, results, share, music switches) (no level); `frenzy` (the
 first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ride), `seed`, `quality`, `pause`
-(hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: the ride, the perf
-gate, the enemy probe, combat, the level's end), on the ride's own page `shot` (the frozen fresh shot and aim jump),
+(hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: its intro tour pinned at four marks, #675, on the level held at its start (`timerStep` / `rideRate` 0), which the ride then goes on from: one mount; at each mark the camera must be on the tour and over the ground, at the landmark looking at it; the ride, the perf
+gate, the enemy probe, combat, the level's end), on the ride's own page `tour` (before the ride: each tour mark also shot, `<id>-tour-{reveal,landmark,track,landing}.png`, and not blank; nightly only, a capture costs ~15 s on a software renderer), `shot` (the frozen fresh shot and aim jump),
 `results` (the results screen's reveal, stats, buttons, board) and `share` (its Share line, menu and score cards); and
 `pacing` (every level, a whole run on its own page) and `wave`, `boss`, `pickup`, `audio` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its
-checks disagree). A step that runs on another's page needs it in the same run (`share` and `frenzy` need `ride` and
+checks disagree). A step that runs on another's page needs it in the same run (`tour` needs `ride`, `share` and `frenzy` need `ride` and
 `results`, `mobileMenus` needs `mobile`). `--steps ride,boss --levels level2` runs just those. Without `--steps` every
 desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desktop` leaves `title` and the phone run.
 
 **Two depths (#372).** The PR smoke is rendering and integration: CI runs the shards in `SHARDS`, one `smoke (<name>)`
 job each (`ci.yml` matrix): `ui` (title, landing), `menus` (levelSelect, settings), `level1` (ride, shot, results), `level1-steps`
 (quality, speed), `level2`…`level5` (ride) and `mobile`. The **deep** checks, everything else (`nightlyOnly()` in
-`shards.mjs`: daily, frenzy, seed, pause, countdown, wave, boss, pickup, audio, share, pacing, `mobileMenus`, and shot / results
+`shards.mjs`: daily, frenzy, seed, pause, countdown, tour, wave, boss, pickup, audio, share, pacing, `mobileMenus`, and shot / results
 on levels 2–5), run in the full smoke, which the nightly production run makes (`prod-smoke.yml`, below): they are either
 game logic a unit test covers next to its pure module (the table below), or a browser check too slow for every PR. A red
 nightly opens the `agent:prod-broken` P1 issue the Maintainer takes first. To reproduce one, run its step:

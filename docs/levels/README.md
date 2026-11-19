@@ -15,7 +15,7 @@ proves the four moments below, the clearances and the ~60 s lap. `gym-track.svg`
 Tree's gap between its solid trunk and the back wall and up out of the right cave (0–3 s, #659, #671), a full turn round the Flame (~9–25 s),
 west through the Arch (~35 s), a right turn to the crest by the glass gym room (~39.4 s), then the run-in
 down the west side into the Starr pit with the star ahead, until the 60 s run turns south out of the dive;
-past the roots' front, a hairpin in the left cave's mouth closes the lap back into the gap. The countdown's swoop
+past the roots' front, a hairpin in the left cave's mouth closes the lap back into the gap. The intro's tour
 comes in the same way: it lands on the roots' front and rides the last 12 m of track in (`hero.approach`, #659).
 The Medusa rises from the star at 40 s, as the rider leaves the crest facing it.
 Every moment's time is its share of the lap: the speeds are a fraction of the lap per frame and gravity is nearly
