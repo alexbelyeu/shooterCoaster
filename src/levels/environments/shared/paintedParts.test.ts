@@ -26,6 +26,14 @@ describe('paintedAt', () => {
     expect(mirrored.attributes.position.getX(0)).toBeLessThan(4)
   })
 
+  it('paints each triangle by its centroid in the part’s own frame, before the matrix', () => {
+    const g = paintedAt(new THREE.BoxGeometry(2, 2, 2), (_x, y) => (y > 0.5 ? '#ff0000' : '#0000ff'), pose([0, -100, 0]))
+    const red = new Set<number>()
+    for (let i = 0; i < g.attributes.position.count; i += 3) if (g.attributes.color.getX(i) === 1) red.add(Math.round(g.attributes.normal.getY(i)))
+    // Only the top face's centroids sit above y 0.5, wherever the matrix moves them.
+    expect([...red]).toEqual([1])
+  })
+
   it('composes nested transforms like three groups do', () => {
     const parent = pose([0, 10, 0], [0, 0, Math.PI / 2])
     const g = paintedAt(new THREE.BoxGeometry(0, 0, 0), '#fff', parent.multiply(pose([1, 0, 0])))

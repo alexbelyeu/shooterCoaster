@@ -1,6 +1,19 @@
 import { createRng } from '@/utils/rng'
-import { TREE_GAP, treeHeadLean, type PieceOf } from './blockout'
-import { pushTri, type V3 } from './wallPanels'
+import { DEFAULT_BACK, TREE_GAP, treeHeadLean, type PieceOf } from './blockout'
+import { pushTri, type PanelSpec, type V3 } from './wallPanels'
+
+/**
+ * The caves' back wall and the headwall over them (#519), white panels, as the `buildWallPanels` specs
+ * `hallGeometry` renders: `caves` in the Tree's frame, `head` in a frame moved to `headAt` (the caves' lip).
+ */
+export function treePanelSpecs(t: PieceOf<'tree'>): { caves: PanelSpec; head: PanelSpec; headAt: V3 } {
+  const headLen = (t.height - t.caveHeight) / Math.cos(t.headAngle * (Math.PI / 180))
+  return {
+    caves: { length: t.width, profile: [{ len: t.caveHeight, angle: 0 }], back: DEFAULT_BACK, seed: 5191 },
+    head: { length: t.width, profile: [{ len: headLen, angle: t.headAngle }], back: t.caveDepth + DEFAULT_BACK, seed: 5192, bottom: true },
+    headAt: [0, t.caveHeight, t.caveDepth],
+  }
+}
 
 /**
  * The Tree's wood (#519, pure, seeded): a barked trunk standing on four buttress roots, with surface roots
