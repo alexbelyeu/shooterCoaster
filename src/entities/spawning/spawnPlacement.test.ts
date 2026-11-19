@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
-import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
+import { createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig, WallSurface } from '@/types/level'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
@@ -21,7 +21,7 @@ import {
 import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
 import { waveWindows } from './waveSchedule'
-import { BIOMES } from '@/levels/environments/biomeRegistry'
+import { BIOMES, biomeHeightFunction } from '@/levels/environments/biomeRegistry'
 import { REFERENCE_FOV_DEG, maxReadableDistance } from '../enemies/enemyReadability'
 
 /** Share of trackside enemies in front of the rider on their approach, on every level (level 6's tight spline too, #543). */
@@ -33,7 +33,7 @@ const besideTrack = (w: EnemyWave) => !choreographed(w.formation) && placedBesid
 function world(level: LevelConfig) {
   const curve = createTrackCurve(level.track)
   const table = buildArcTable(curve)
-  const heightFn = createHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)), BIOMES[level.biome].floor)
+  const heightFn = biomeHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
   const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize(level.biome))
   // What EnemySpawner hands each wave: the ride from GO over its entry and its window.
   const profile = rideProfile(table, rideSpeeds(level.track), RUN_SECONDS)

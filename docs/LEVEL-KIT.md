@@ -68,13 +68,13 @@ biome or score that already exists is refused, so a second run changes nothing. 
 2. Biome. **(script)** `biomes/<biome>/` from the outdoor template (noise terrain, trees, seeded boulders
    beside the track, a stand-in spire) or the interior one (a flat `floor`, `bounds` inside a box hall
    (`HALL` in its `config.ts`), crates); `BiomeType` (`src/types/level.ts`), `biomeRegistry.ts`, the
-   `atmosphere.ts` preset, `BIOME_TERRAIN_CONFIGS` (`utils/terrainNoise.ts`; an interior's is flat, it
-   draws its `floor`), `BIOME_REVERB` (`sfxDesign.ts`), a `theme.ts` accent and a `LevelPostcard`
+   `atmosphere.ts` preset, `BIOME_TERRAIN_CONFIGS` (`utils/terrainNoise.ts`; an interior's is flat and `authoredFloor`:
+   `biomeHeightFunction` hands every caller its `floor`), `BIOME_REVERB` (`sfxDesign.ts`), a `theme.ts` accent and a `LevelPostcard`
    stub. **(by hand)** The look: palette, sky, light, fog, grade, the hero landmark in `Features.tsx`
    and its `hero` shot in `index.ts` (what the countdown's swoop starts over and the results orbit circles:
    the template's points at the stand-in spire's `LANDMARK_SITE`, or an interior's far wall; #328),
    props in `Decorations.tsx` (seeded, off the track), contact-shadow footprints, the postcard art and
-   accent; an interior sizes `HALL` around its track (`getTerrainMeshSize` sizes the floor mesh if the
+   accent; an interior sizes `HALL` around its track (its `BIOME_TERRAIN_CONFIGS` `meshSize` sizes the floor mesh if the
    default 6000 doesn't fit it).
 3. Level. **(script)** `LevelRegistry.ts`: the level after the last one (its `nextLevel`, so the last
    level's star unlocks it), level1's track params, a starter roster of balloons and crows through

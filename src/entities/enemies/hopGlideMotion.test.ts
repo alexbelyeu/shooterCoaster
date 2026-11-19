@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { HOP, glideWings, hopPose, hopRoute, newHopPose, type HopPose } from './hopGlideMotion'
+import { HOP, hopRoute, newHopPose, type HopPose } from './hopGlideMotion'
+import { glideWings, hopPose } from './hopGlideMotion.hot'
 
 const WALL = { width: 400, height: 240 }
 const route = hopRoute({ u: 200, v: 80 }, WALL, 7)

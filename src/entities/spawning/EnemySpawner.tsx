@@ -238,7 +238,7 @@ export default function EnemySpawner({
         })
       }
       // On their walls already, where they enter: never pushed out of the near field.
-      if (members[0]?.wall) return members.map((e) => [e.id, { position: e.position! }])
+      if (members[0]?.wall) return members.map((e) => [e.id, { position: e.position!, wall: e.wall }])
       if (!wave.formation || wave.formation === 'scatter') {
         return members.map((e) => [e.id, { position: toVector3(clampToBounds(outsideNearField(e.position!, camera), bounds)) }])
       }
@@ -446,7 +446,7 @@ export default function EnemySpawner({
             scoreValue={enemy.scoreValue}
             radius={enemy.radius}
             onKill={onKill}
-            wall={placed.wall ?? enemy.wall}
+            wall={placed.wall}
             onEscape={enemy.bystander ? undefined : onEscape}
             bystander={enemy.bystander}
           />
