@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { buildArcTable, tAtLoopDistance } from '@/track/arcLength'
-import { lapSeconds, rideProfile, rideSpeeds } from '@/track/ridePhysics'
+import { lapSeconds, rideModel, rideProfile } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
 import { tourPose } from '@/track/introCamera.hot'
@@ -46,7 +46,7 @@ const DEG = 180 / Math.PI
 
 const curve = createTrackCurve(GYM_TRACK)
 const table = buildArcTable(curve)
-const speeds = rideSpeeds(GYM_TRACK)
+const speeds = rideModel(GYM_TRACK, table)
 const dims = getTrackDimensions(GYM_TRACK)
 /** Arc distance ridden every 0.1 s from GO. */
 const profile = rideProfile(table, speeds, RUN_SECONDS + 5)

@@ -25,8 +25,12 @@ export interface TrackParams {
   varC: number
   /** The trig curves' size; for every curve, the structure's scale (`trackDimensions.ts`). */
   scalar: number
+  /** Today's speed rule (`ridePhysics.ts`), unless `ride` is 'v2'. */
   rollerSpeed: number
   minRollerSpeed: number
+  /** 'v2' (#696): gravity, speed zones and beats solved to land on their seconds (`rideV2.ts`, set by `rideV2`); absent, today's rule. */
+  ride?: 'v2'
+  rideV2?: RideV2Spec
   curve: CurveType
   /** A `spline`'s points in world units, in ride order; the loop closes from the last to the first. */
   controlPoints?: readonly { x: number; y: number; z: number }[]
@@ -44,6 +48,39 @@ export interface TrackParams {
   glow?: number
   /** Set-pieces (#332): stretches where the track runs through a lit tube (`src/track/setPieces.ts`). */
   tunnels?: readonly TunnelSpec[]
+}
+
+/**
+ * A stretch of track that drives the car (#696), from `from` to `to` as shares of the lap's arc length (0..1; `to` < `from`
+ * wraps over the seam). Speeds are world units per second, `accel` world units per second².
+ */
+export interface SpeedZone {
+  /** launch: pushes up to `speed` (default `accel`: `speed` / 2, so ~2 s from rest); lift: never slower than `speed`, a chain;
+   * brake: slows down to `speed` (default `accel`: the ride's gravity). */
+  kind: 'launch' | 'lift' | 'brake'
+  from: number
+  to: number
+  speed: number
+  accel?: number
+}
+
+/** A storyboard beat (#696): the car reaches share `at` of the lap's arc length (past 1: a later lap) `second` seconds after GO. */
+export interface RideBeat {
+  at: number
+  second: number
+}
+
+/** The v2 ride (#696): defaults in `rideV2.ts` `RIDE_V2_DEFAULTS`. */
+export interface RideV2Spec {
+  zones?: readonly SpeedZone[]
+  /** In ride order; the solver scales gravity and zone speeds between beats so each lands within `BEAT_TOLERANCE_SECONDS`. */
+  beats?: readonly RideBeat[]
+  /** World units per second². */
+  gravity?: number
+  /** Air and rolling drag: the speed lost per second is `drag` × speed². */
+  drag?: number
+  /** The car never rolls slower than this (world units per second), so a crest can't stall it. */
+  crawl?: number
 }
 
 /** A tunnel from track fraction `from`, `length` world units of arc long; it may not cross the track's seam (t = 1). */
