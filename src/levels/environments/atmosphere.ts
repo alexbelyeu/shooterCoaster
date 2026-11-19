@@ -273,20 +273,21 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
       cloudStretch: 1,
     },
     sunDirection: [0.3, 1, 0.45],
-    // Low and moody (#593): cool daylight slanting in from the high windows, a dim warm-floored fill; the
-    // strip-light fixtures' warm pools come from the hall's grime shader (`biomes/gym/grimeShader.ts`).
+    // Low and moody (#593), a step brighter since #666 so walls, holds and enemies read on a phone: cool daylight
+    // slanting in from the high windows, a dim warm-floored fill; the strip-light fixtures' warm pools come from
+    // the hall's grime shader (`biomes/gym/grimeShader.ts`).
     sunLightColor: 0xbcd2ee,
-    sunLightIntensity: 0.9,
+    sunLightIntensity: 1.1,
     hemiSkyColor: 0x8d9aac,
     hemiGroundColor: 0x4a3e33,
-    hemiIntensity: 0.8,
+    hemiIntensity: 1.05,
     // The hall's haze at its size (GYM_SCALE 32, #592): a dusty brown-grey that swallows the far end a little.
     fogNear: 1400,
     fogFar: 11000,
-    envIntensity: 0.2,
+    envIntensity: 0.28,
     // Gritty: teal shadows, sodium-warm highlights, more contrast, a heavy vignette; holds still vivid
     grade: {
-      exposure: 1.0,
+      exposure: 1.1,
       temperature: 0.05,
       tint: 0,
       shadowTint: 0x2f5560,
@@ -295,7 +296,7 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
       contrast: 1.15,
       saturation: 1.0,
       vibrance: 0.35,
-      vignette: 0.5,
+      vignette: 0.42,
     },
     heatShimmer: true,
   },

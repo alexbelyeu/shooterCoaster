@@ -83,7 +83,7 @@ export const GRIME = {
   footHeight: 1.6,
   floorStain: 0.3,
   chalkSmudge: 0.4,
-  roofShade: 0.7,
+  roofShade: 0.78,
   holdChalk: 0.55,
 }
 
@@ -92,7 +92,7 @@ export const GRIME = {
  * spaced, the grime shader snaps to the nearest), fixtures `length` long at `stripLightXs`, each casting a warm `pool`
  * (reach `reach`, a fraction `uplight` of it spilling up) in the grime shader.
  */
-export const STRIP_LIGHTS = { rows: [5, 15, 25, 35], spacing: 8, length: 5, color: '#ffc98a', pool: 1.5, reach: 9, uplight: 0.4 }
+export const STRIP_LIGHTS = { rows: [5, 15, 25, 35], spacing: 8, length: 5, color: '#ffc98a', pool: 1.8, reach: 10, uplight: 0.4 }
 
 /** The fixtures' x along each row: every `spacing` from one `spacing` in to one short of the far end wall. */
 export const stripLightXs: readonly number[] = Array.from({ length: Math.ceil(HALL.w / STRIP_LIGHTS.spacing) - 1 }, (_, i) => (i + 1) * STRIP_LIGHTS.spacing)
