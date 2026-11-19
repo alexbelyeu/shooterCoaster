@@ -37,7 +37,10 @@ import { createSeatPose, seatPose } from './seatPose.hot'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 
 interface CoasterCameraProps {
+  /** The track the ride's speed and timing follow. */
   curve: TrackCurve
+  /** The track the seat rides, when it differs: a junction's routed curve (#702), the same timing on either route. */
+  seatCurve?: TrackCurve
   /** The curve's arc-length table (SceneManager's `trackTable`). */
   table: ArcTable
   /** `trackDimensions.trackScale`. */
@@ -65,6 +68,7 @@ const WORLD_UP = new THREE.Vector3(0, 1, 0)
 /** Rides the track (port of Camera.js updateCamGame) with rotation-only weight from cameraRig.hot.ts; the mouse only aims. */
 export default function CoasterCamera({
   curve,
+  seatCurve = curve,
   table,
   trackScale,
   speeds,
@@ -265,7 +269,7 @@ export default function CoasterCamera({
     }
     const tunnel = tunnelDepth(table.tunnels, dist, tunnelRamp)
 
-    const pose = seatPose(curve, table, t, trackScale, heightOffset, seat.current)
+    const pose = seatPose(seatCurve, table, t, trackScale, heightOffset, seat.current)
     cam.position.copy(pose.eye)
     const velocityNorm = rideSpeedNorm(ride.current, speeds)
 
@@ -273,8 +277,8 @@ export default function CoasterCamera({
     const s = scratch.current
     const at = pose.samples
     const speed = ride.current.velocity * 60 * at.unitsPerT
-    s.tangentBehind.copy(curve.getTangentAt(at.behindT))
-    s.tangentAhead.copy(curve.getTangentAt(at.aheadT))
+    s.tangentBehind.copy(seatCurve.getTangentAt(at.behindT))
+    s.tangentAhead.copy(seatCurve.getTangentAt(at.aheadT))
     const input = s.rig
     input.lateral = lateralAcceleration(pose.tangent, s.tangentBehind, s.tangentAhead, at.span, speed)
     input.vertical = verticalAcceleration(s.tangentBehind, s.tangentAhead, at.span, speed)

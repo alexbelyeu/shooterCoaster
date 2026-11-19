@@ -51,6 +51,18 @@ export interface TrackParams {
   glow?: number
   /** Set-pieces (#332): stretches where the track runs through a lit tube (`src/track/setPieces.ts`). */
   tunnels?: readonly TunnelSpec[]
+  /** A shoot-to-switch junction (#702, `src/track/junction.ts`): the opt-in harder way round one stretch. */
+  junction?: JunctionSpec
+}
+
+/**
+ * The hard route through a stretch of the track, between the fork at track t `from` and the merge at `to`
+ * (`points`, world units, in ride order). A switch sign before the fork sets it: shoot it to take this way round.
+ */
+export interface JunctionSpec {
+  from: number
+  to: number
+  points: readonly { x: number; y: number; z: number }[]
 }
 
 /**

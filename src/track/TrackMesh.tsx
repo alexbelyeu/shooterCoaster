@@ -11,7 +11,8 @@ import {
   getTrackDimensions,
 } from './trackDimensions'
 import { trackViewportHeight, withMinThickness, withTrackHaze } from './minThickness'
-import type { ArcTable } from './arcLength'
+import { buildArcTable, type ArcTable } from './arcLength'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { buildTrackGeometry } from './trackGeometry'
 import {
   type TowerPlan,
@@ -40,6 +41,8 @@ interface TrackMeshProps {
    */
   groundFn?: HeightFunction
   table: ArcTable
+  /** A junction's branch (#702, `junction.ts`), its own t 0 → 1: laid as more rails beside the main track's. */
+  branch?: TrackCurve
 }
 
 const DEFAULT_DIMS = getTrackDimensions({ scalar: 20 })
@@ -198,11 +201,21 @@ export default function TrackMesh({
   dims = DEFAULT_DIMS,
   groundFn,
   table,
+  branch,
 }: TrackMeshProps) {
-  const geometry = useMemo(
-    () => buildTrackGeometry(curve, table, dims, segments, color1, color2),
-    [curve, table, dims, segments, color1, color2],
-  )
+  const geometry = useMemo(() => {
+    const main = buildTrackGeometry(curve, table, dims, segments, color1, color2)
+    if (!branch) return main
+    const branchTable = buildArcTable(branch, 1024)
+    const rings = Math.max(16, Math.ceil((segments * branchTable.length) / table.length))
+    const fork = buildTrackGeometry(branch, branchTable, dims, rings, color1, color2)
+    const merged = mergeGeometries([main, fork])
+    main.dispose()
+    fork.dispose()
+    if (!merged) throw new Error('track branch geometry merge failed')
+    merged.computeBoundingSphere()
+    return merged
+  }, [curve, table, dims, segments, color1, color2, branch])
 
   const material = useMemo(() => createTrackMaterial(glow), [glow])
   const heightFn = useContext(TerrainContext)
