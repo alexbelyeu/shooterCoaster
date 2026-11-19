@@ -1,4 +1,5 @@
 import type { BiomeType } from '@/types/level'
+import { createHeightFunction, type HeightFunction, type TrackSample } from '@/utils/terrainNoise'
 import type { BiomeDefinition } from './shared/types'
 import { themePark } from './biomes/themePark'
 import { desert } from './biomes/desert'
@@ -19,4 +20,9 @@ export const BIOMES: Record<BiomeType, BiomeDefinition> = {
   arctic,
   volcanic,
   gym,
+}
+
+/** A biome's ground, for every caller: an interior's authored `floor` as given, else the noise terrain kept off the track. */
+export function biomeHeightFunction(biome: BiomeType, trackSamples?: TrackSample[]): HeightFunction {
+  return BIOMES[biome].floor ?? createHeightFunction(biome, trackSamples)
 }

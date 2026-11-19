@@ -7,17 +7,17 @@ import {
   sampleTrackPath,
 } from './terrainNoise'
 import { getAllLevels } from '@/levels/LevelRegistry'
-import { createTrigCurve } from '@/track/curves/TrigCurve'
-import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
+import { biomeHeightFunction } from '@/levels/environments/biomeRegistry'
+import { GYM_SCALE } from '@/levels/environments/biomes/gym/blockout'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import type { BiomeType, LevelConfig } from '@/types/level'
 
+// The noise-terrain biomes (an interior's ground is its authored floor: `biomeHeightFunction`).
 const ALL_BIOMES: BiomeType[] = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic']
 const levels = getAllLevels()
 
 function trackSamplesFor(level: LevelConfig) {
-  const { curve, varA, varB, varC, scalar } = level.track
-  const factory = curve === 'curve2' ? createTrigCurve2 : createTrigCurve
-  const c = factory(varA, varB, varC, scalar)
+  const c = createTrackCurve(level.track)
   return { curve: c, samples: sampleTrackPath((t) => c.getPointAt(t)) }
 }
 
@@ -38,6 +38,7 @@ describe('BIOME_TERRAIN_CONFIGS', () => {
       expect(c.persistence).toBeLessThan(1)
       expect(c.flatRadius).toBeGreaterThan(0)
       expect(c.transitionWidth).toBeGreaterThan(0)
+      expect(c.meshSize).toBeGreaterThan(0)
     }
   })
 })
@@ -82,7 +83,7 @@ describe('createHeightFunction', () => {
 
   describe.each(levels.map((l) => [l.id, l] as const))('track corridor for %s', (_id, level) => {
     const { curve, samples } = trackSamplesFor(level)
-    const h = createHeightFunction(level.biome, samples)
+    const h = biomeHeightFunction(level.biome, samples)
 
     it(`keeps terrain at least TRACK_CLEARANCE (${TRACK_CLEARANCE}) below every track sample`, () => {
       for (const s of samples) {
@@ -98,6 +99,23 @@ describe('createHeightFunction', () => {
         expect(h(p.x, p.z)).toBeLessThan(p.y)
       }
     })
+  })
+})
+
+describe('biomeHeightFunction', () => {
+  it("gives an interior its authored floor (the gym's Starr pit), never the noise", () => {
+    expect(() => createHeightFunction('gym')).toThrow(/authored floor/)
+    const h = biomeHeightFunction('gym')
+    let lowest = Infinity
+    let highest = -Infinity
+    for (let x = -1280; x <= 1280; x += 20) {
+      for (let z = -1280; z <= 1280; z += 20) {
+        lowest = Math.min(lowest, h(x, z))
+        highest = Math.max(highest, h(x, z))
+      }
+    }
+    expect(highest).toBe(0)
+    expect(lowest).toBeCloseTo(-2.45 * GYM_SCALE)
   })
 })
 

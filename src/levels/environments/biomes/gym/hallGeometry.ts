@@ -1,11 +1,11 @@
 import * as THREE from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { createRng, hashString } from '@/utils/rng'
-import { DEFAULT_BACK, GYM_SCALE, HALL, PIECES, PIT, blockRings, floorAt, footprint, piece, pieceAxes, type Panel, type PieceOf } from './blockout'
+import { mergePainted, paintedAt as paint, type Paint } from '../../shared/paintedParts'
+import { GYM_SCALE, HALL, PIECES, PIT, blockRings, floorAt, footprint, piece, pieceAxes, type Panel, type PieceOf } from './blockout'
 import { BUILDING, COLUMN_HALF, GRIME, HIDDEN_PIECES, HOLD_COLORS, MURALS, STRIP_LIGHTS, TREE_PAINT, VOLUME_COLORS, WALL_PAINT, WALL_STYLE, stripLightXs, stripLightY, wallColumns } from './config'
 import { graffitiPiece, tag, type MuralShape } from './murals'
 import { scatterOn, type ClimbSurface } from './holds'
-import { buildTreeWood } from './treeTrunk'
+import { buildTreeWood, treePanelSpecs } from './treeTrunk'
 import { FACE, SEAM, SHELL, buildWallPanels, pushTri, wallSpec, type PanelInfo, type V3, type WallPanels } from './wallPanels'
 
 /**
@@ -16,8 +16,6 @@ import { FACE, SEAM, SHELL, buildWallPanels, pushTri, wallSpec, type PanelInfo, 
 
 const DEG = Math.PI / 180
 const SLAB = 0.3
-
-type Paint = THREE.ColorRepresentation | ((x: number, y: number, z: number) => THREE.ColorRepresentation)
 
 interface Parts {
   solid: THREE.BufferGeometry[]
@@ -36,31 +34,6 @@ export interface Hall {
   light: THREE.BufferGeometry
   glass: THREE.BufferGeometry
   holds: HoldInstances
-}
-
-const _c = new THREE.Color()
-
-/** Non-indexed copy of `geo` (disposed), each triangle painted by its centroid in `geo`'s own frame, then placed by `m`. */
-function paint(geo: THREE.BufferGeometry, color: Paint, m: THREE.Matrix4): THREE.BufferGeometry {
-  const g = geo.index ? geo.toNonIndexed() : geo
-  if (g !== geo) geo.dispose()
-  g.deleteAttribute('uv')
-  if (!g.attributes.normal) g.computeVertexNormals()
-  const pos = g.attributes.position
-  const colors = new Float32Array(pos.count * 3)
-  for (let i = 0; i < pos.count; i += 3) {
-    if (typeof color === 'function') {
-      const cx = (pos.getX(i) + pos.getX(i + 1) + pos.getX(i + 2)) / 3
-      const cy = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3
-      const cz = (pos.getZ(i) + pos.getZ(i + 1) + pos.getZ(i + 2)) / 3
-      _c.set(color(cx, cy, cz))
-    } else {
-      _c.set(color)
-    }
-    for (let k = 0; k < 3; k++) _c.toArray(colors, (i + k) * 3)
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  return g.applyMatrix4(m)
 }
 
 /** A piece's frame: local x along it, z the way it faces, y up from its foot. */
@@ -243,14 +216,13 @@ function woodGeometry(p: PieceOf<'tree'>, m: THREE.Matrix4): THREE.BufferGeometr
  */
 function tree(p: PieceOf<'tree'>, out: Parts): void {
   const m = frame(p)
-  const caves = buildWallPanels({ length: p.width, profile: [{ len: p.caveHeight, angle: 0 }], back: DEFAULT_BACK, seed: 5191 })
-  const headLen = (p.height - p.caveHeight) / Math.cos(p.headAngle * DEG)
-  const head = buildWallPanels({ length: p.width, profile: [{ len: headLen, angle: p.headAngle }], back: p.caveDepth + DEFAULT_BACK, seed: 5192, bottom: true })
-  const headFrame = m.clone().multiply(new THREE.Matrix4().makeTranslation(0, p.caveHeight, p.caveDepth))
+  const specs = treePanelSpecs(p)
+  const headFrame = m.clone().multiply(new THREE.Matrix4().makeTranslation(...specs.headAt))
   const topBand = p.height - p.caveHeight - 2
+  const panel = p.color ?? TREE_PAINT.panel
   const parts = [
-    panelGeometry(caves, () => TREE_PAINT.panel, 5191, m, TREE_PAINT.outline),
-    panelGeometry(head, (info) => (info.y > topBand ? TREE_PAINT.top : TREE_PAINT.panel), 5192, headFrame, TREE_PAINT.outline),
+    panelGeometry(buildWallPanels(specs.caves), () => panel, specs.caves.seed, m, TREE_PAINT.outline),
+    panelGeometry(buildWallPanels(specs.head), (info) => (info.y > topBand ? TREE_PAINT.top : panel), specs.head.seed, headFrame, TREE_PAINT.outline),
     woodGeometry(p, m),
   ]
   const accept = facingSide(pieceAxes(p.rot).facing)
@@ -404,6 +376,7 @@ function pitEdge(out: Parts): void {
 
 const STEEL = new THREE.Color(BUILDING.steel)
 const RUST = new THREE.Color(GRIME.rust)
+const _c = new THREE.Color()
 
 /** Steel, rusting in patches: a seed hashed from each face's centre picks how much. */
 const rustySteel: Paint = (x, y, z) => {
@@ -516,12 +489,7 @@ function building(out: Parts): void {
 
 const toWorld = new THREE.Matrix4().makeTranslation((-HALL.w / 2) * GYM_SCALE, 0, (-HALL.d / 2) * GYM_SCALE).multiply(new THREE.Matrix4().makeScale(GYM_SCALE, GYM_SCALE, GYM_SCALE))
 
-function merge(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  const g = mergeGeometries(list)
-  list.forEach((part) => part.dispose())
-  if (!g) throw new Error('gym: could not merge the hall')
-  return g.applyMatrix4(toWorld)
-}
+const merge = (list: THREE.BufferGeometry[]) => mergePainted(list).applyMatrix4(toWorld)
 
 const _q = new THREE.Quaternion()
 const _r = new THREE.Quaternion()

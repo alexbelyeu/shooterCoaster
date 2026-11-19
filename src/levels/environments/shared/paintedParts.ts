@@ -21,19 +21,32 @@ export function painted(
   return paintedAt(geo, color, pose(position, rotation, undefined, _m))
 }
 
+/** One colour, or one per triangle picked by its centroid in the part's own frame (before the matrix). */
+export type Paint = THREE.ColorRepresentation | ((x: number, y: number, z: number) => THREE.ColorRepresentation)
+
 /** Like `painted`, placed by any matrix (nested groups, scale); a mirroring matrix keeps faces front-facing. */
 export function paintedAt(
   geo: THREE.BufferGeometry,
-  color: THREE.ColorRepresentation,
+  color: Paint,
   matrix: THREE.Matrix4,
 ): THREE.BufferGeometry {
   const g = geo.index ? geo.toNonIndexed() : geo
   if (g !== geo) geo.dispose()
   g.deleteAttribute('uv')
-  _c.set(color)
-  const n = g.attributes.position.count
-  const colors = new Float32Array(n * 3)
-  for (let i = 0; i < n; i++) _c.toArray(colors, i * 3)
+  if (!g.attributes.normal) g.computeVertexNormals()
+  const pos = g.attributes.position
+  const colors = new Float32Array(pos.count * 3)
+  if (typeof color !== 'function') _c.set(color)
+  for (let i = 0; i < pos.count; i += 3) {
+    if (typeof color === 'function') {
+      _c.set(color(
+        (pos.getX(i) + pos.getX(i + 1) + pos.getX(i + 2)) / 3,
+        (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3,
+        (pos.getZ(i) + pos.getZ(i + 1) + pos.getZ(i + 2)) / 3,
+      ))
+    }
+    for (let k = 0; k < 3; k++) _c.toArray(colors, (i + k) * 3)
+  }
   g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
   g.applyMatrix4(matrix)
   if (matrix.determinant() < 0) flipWinding(g)

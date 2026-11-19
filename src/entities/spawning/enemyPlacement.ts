@@ -25,6 +25,8 @@ export interface EnemyPlacementRule {
    * `'trackside'`: beside the track ahead of the rider (`placeTracksideWave`, #179). `'wall'`: at the foot of one of the
    * level's walls (`wallSlots`), which it climbs (#453). `'swarm'`: clustered on one wall the rider will see when the wave
    * activates (`swarmSlots`, `placeWallSwarm`, #516).
+   * Each wall placement is still one enemy's: `'wall'` keeps the climber's `CLIMB.margin` and `WALL_STANDOFF`, `'swarm'`
+   * the lanternfly's `HOP.margin` and `HOP.standoff`. A second enemy on either needs its own margin and standoff here.
    */
   scatter: ScatterBand | 'trackside' | 'wall' | 'swarm'
 }

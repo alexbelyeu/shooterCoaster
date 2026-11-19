@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
-import { createTrigCurve } from '@/track/curves/TrigCurve'
-import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
 import { buildArcTable } from '@/track/arcLength'
-import { createHeightFunction, sampleTrackPath } from '@/utils/terrainNoise'
+import { sampleTrackPath } from '@/utils/terrainNoise'
+import { biomeHeightFunction } from '@/levels/environments/biomeRegistry'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createRng } from '@/utils/rng'
 import type { EnemyType, WallSurface } from '@/types/level'
 import { maxReadableDistance } from '../enemies/enemyReadability'
@@ -43,10 +43,9 @@ describe('scatterSpawn', () => {
 
 describe('readableScatterSpawn', () => {
   it.each(getAllLevels().map((l) => [l.id, l] as const))('%s: scatter waves spawn within readable range of the track', (_id, level) => {
-    const factory = level.track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve
-    const curve = factory(level.track.varA, level.track.varB, level.track.varC, level.track.scalar)
+    const curve = createTrackCurve(level.track)
     const table = buildArcTable(curve)
-    const heightFn = createHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
+    const heightFn = biomeHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
     const rng = createRng(1337)
     const waves = level.enemies.filter((w) => (!w.formation || w.formation === 'scatter') && scattered.includes(w.type))
     let readable = 0
