@@ -640,21 +640,24 @@ export const TITAN_CROWN_GEO = mergePainted([
 
 // ── The Medusa of the Starr (Climbing Gym) ──
 // Modelled, with her blessing, on a real person: warm brown skin (darker underneath, lighter where the hall's light
-// falls), a strong jaw and cheekbones, a big nose with a jewel each side of its bridge, kind eyes with a sideways, mischievous glance, curly dark hair.
-// Toy-like and flattering: smooth skin, faceted curls, beaded toy snakes with big round eyes.
+// falls), a bony jaw with a crisp jawline, high cheekbones, a big straight nose with a sharp bridge from the brow and a
+// jewel each side of it, almond eyes with a sideways, mischievous glance, curly dark hair.
+// Realistic, flattering proportions; faceted curls and beaded toy snakes with big round eyes.
 
 const SKIN_LOW = new THREE.Color('#4f2b19')
 const SKIN_HIGH = new THREE.Color('#9b5f3c')
 const LIP = '#8a3445'
-const BLUSH = '#9c4f3d'
 const BROW = '#1c120e'
 const IRIS = '#3d2414'
 const GOLD_TRIM = '#ffc845'
 const GOWN = '#6a2c91'
 const CURLS = ['#140e0b', '#1f1511', '#2b1d16', '#3a281d']
 
-/** `geo` placed by `matrix`, then painted per vertex from deep brown below to a warm highlight on top and on the light side. */
-function skin(geo: THREE.BufferGeometry, matrix: THREE.Matrix4): THREE.BufferGeometry {
+/**
+ * `geo` placed by `matrix`, then painted per vertex from deep brown below to a warm highlight on top and on the light
+ * side, shadowed where it faces down; `tint` then adjusts a vertex's colour by its position.
+ */
+function skin(geo: THREE.BufferGeometry, matrix: THREE.Matrix4, tint?: (p: THREE.Vector3, c: THREE.Color) => void): THREE.BufferGeometry {
   const g = geo.index ? geo.toNonIndexed() : geo
   if (g !== geo) geo.dispose()
   g.deleteAttribute('uv')
@@ -663,10 +666,13 @@ function skin(geo: THREE.BufferGeometry, matrix: THREE.Matrix4): THREE.BufferGeo
   const nor = g.attributes.normal
   const colors = new Float32Array(pos.count * 3)
   const c = new THREE.Color()
+  const p = new THREE.Vector3()
   for (let i = 0; i < pos.count; i++) {
     const height = Math.min(1, Math.max(0, (pos.getY(i) + 220) / 330))
     const lit = Math.max(0, nor.getY(i)) * 0.25 + Math.max(0, nor.getZ(i)) * 0.15
     c.copy(SKIN_LOW).lerp(SKIN_HIGH, Math.min(1, height * 0.75 + lit))
+    c.multiplyScalar(1 - 0.22 * Math.max(0, -nor.getY(i)))
+    if (tint) tint(p.fromBufferAttribute(pos, i), c)
     c.toArray(colors, i * 3)
   }
   g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
@@ -702,12 +708,13 @@ const NOSTRIL = '#2a140c'
 /** Her bony landmarks: bumps (+) and hollows (-) of her head's radius, round unit directions from its centre (+z her face). */
 const HEAD_RELIEF = [
   ...[-1, 1].flatMap((side) => [
-    { at: [side * 0.74, -0.52, 0.42], amount: 0.13, width: 0.34 }, // jaw angles
-    { at: [side * 0.6, 0.04, 0.78], amount: 0.08, width: 0.24 }, // cheekbones
-    { at: [side * 0.56, -0.32, 0.76], amount: -0.035, width: 0.2 }, // the hollows under them
-    { at: [side * 0.3, 0.34, 0.9], amount: 0.035, width: 0.26 }, // brow ridge
+    { at: [side * 0.74, -0.52, 0.42], amount: 0.14, width: 0.3 }, // jaw angles
+    { at: [side * 0.62, 0.06, 0.78], amount: 0.1, width: 0.2 }, // cheekbones
+    { at: [side * 0.56, -0.3, 0.76], amount: -0.035, width: 0.18 }, // the hollows under them
+    { at: [side * 0.3, 0.34, 0.9], amount: 0.045, width: 0.22 }, // brow ridge
+    { at: [side * 0.38, 0.12, 0.92], amount: -0.03, width: 0.16 }, // eye sockets
   ]),
-  { at: [0, -0.86, 0.5], amount: 0.12, width: 0.3 }, // chin
+  { at: [0, -0.86, 0.5], amount: 0.14, width: 0.26 }, // chin
 ].map(({ at, amount, width }) => ({ at: new THREE.Vector3(at[0], at[1], at[2]).normalize(), amount, width2: width * width }))
 
 const _n = new THREE.Vector3()
@@ -727,9 +734,35 @@ function onFace(x: number, y: number, lift = 0): [number, number, number] {
   return [x, y, cz + rz * _n.z * headRelief(_n) + lift]
 }
 
-/** The head ellipsoid sculpted by `HEAD_RELIEF`, smooth-shaded. */
+/** A minimum of `a` and `b` rounded over `k`: a crisp but smooth crease where they meet. */
+function softMin(a: number, b: number, k: number): number {
+  const h = Math.max(0, k - Math.abs(a - b)) / k
+  return Math.min(a, b) - h * h * k * 0.25
+}
+
+/**
+ * Her mandible cut into the sculpted head, in ellipsoid units (`q`, centred, radius 1): below the cheeks the face
+ * narrows in straight lines from the jaw angles to the chin (her V seen from the front), and her underside is a plane
+ * rising from the chin back to the jaw angle (the jawline seen from the side).
+ */
+function jaw(q: THREE.Vector3): void {
+  const halfWidth = 0.84 + (q.y + 0.4) * (q.y > -0.4 ? 2 : 0.93)
+  q.x = Math.sign(q.x) * softMin(Math.abs(q.x), halfWidth, 0.08)
+  const underside = -0.55 - Math.max(0, q.z + 0.05) * 0.7
+  q.y = -softMin(-q.y, -underside, 0.06)
+}
+
+/** A flush of warmth over her cheekbones and shadow in her eye sockets: a tint for `skin`. */
+function faceTint(p: THREE.Vector3, c: THREE.Color): void {
+  if (p.z < 20) return
+  const cheeks = Math.exp(-((Math.abs(p.x) - 40) ** 2 + (p.y - 22) ** 2) / 420)
+  c.setRGB(c.r * (1 + 0.16 * cheeks), c.g * (1 - 0.04 * cheeks), c.b * (1 - 0.1 * cheeks))
+  c.multiplyScalar(1 - 0.18 * Math.exp(-((Math.abs(p.x) - 27) ** 2 + (p.y - 52) ** 2) / 260))
+}
+
+/** The head ellipsoid sculpted by `HEAD_RELIEF` and its jaw, smooth-shaded. */
 function sculptedHead(): THREE.BufferGeometry {
-  const ico = new THREE.IcosahedronGeometry(1, 10)
+  const ico = new THREE.IcosahedronGeometry(1, 18)
   ico.deleteAttribute('normal')
   ico.deleteAttribute('uv')
   const g = mergeVertices(ico)
@@ -739,29 +772,30 @@ function sculptedHead(): THREE.BufferGeometry {
   const [rx, ry, rz] = HEAD.radii
   for (let i = 0; i < pos.count; i++) {
     _n.fromBufferAttribute(pos, i).normalize()
-    const f = headRelief(_n)
-    pos.setXYZ(i, cx + _n.x * rx * f, cy + _n.y * ry * f, cz + _n.z * rz * f)
+    jaw(_n.multiplyScalar(headRelief(_n)))
+    pos.setXYZ(i, cx + _n.x * rx, cy + _n.y * ry, cz + _n.z * rz)
   }
   g.computeVertexNormals()
-  return skin(g, new THREE.Matrix4())
+  return skin(g, new THREE.Matrix4(), faceTint)
 }
 
 /**
  * Down her nose from between the brows: [y, depth out of the face, half-width of its front plane, half-width at the
- * face, how full its sides are]. A narrow bridge sloping out to a broad tip, the wings flaring, then the underside
- * back to her upper lip.
+ * face, how full its sides are]. A sharp, straight bridge rising out of the brow and sloping out to a defined tip,
+ * the wings flaring, then the underside back to her upper lip.
  */
 const NOSE_STATIONS = [
-  [60, 3, 3, 8, 0.3],
-  [50, 8, 4.5, 9.5, 0.3],
-  [40, 14, 5.5, 10.5, 0.3],
-  [30, 20, 7, 12, 0.32],
-  [22, 26, 10, 15, 0.4],
-  [16, 29, 12.5, 19, 0.5],
-  [10, 29, 13, 23, 0.6],
-  [5, 24, 11, 24, 0.6],
-  [2, 13, 7, 21, 0.55],
-  [0, 3, 3, 12, 0.5],
+  [68, 2, 1.5, 7, 0.3],
+  [60, 7, 2, 7.5, 0.3],
+  [50, 12, 2.5, 8.5, 0.3],
+  [40, 17, 3, 9.5, 0.3],
+  [30, 22, 3.5, 10.5, 0.3],
+  [22, 26.5, 5, 12, 0.35],
+  [16, 30, 7.5, 15, 0.45],
+  [11, 30, 9, 19, 0.55],
+  [6, 25, 8.5, 21, 0.55],
+  [2.5, 14, 6, 19, 0.5],
+  [0, 3, 3, 11, 0.5],
   [-1, 0, 0.5, 2, 0.5],
 ] as const
 const NOSE_RING = 10
@@ -790,6 +824,42 @@ function nose(): THREE.BufferGeometry {
   return skin(g, new THREE.Matrix4())
 }
 
+const EYE = { radii: [14, 9.5, 8] as V3, lids: 1.12, upperLid: -0.55, lowerLid: 0.4 }
+const _eye = new THREE.Matrix4()
+
+/**
+ * An almond eye, glancing sideways: an eyeball between two lid shells (hemispheres turned about its across axis),
+ * whose edges meet in sharp corners at each side; a dark line along the upper lid, the outer corner tilted up.
+ */
+function almondEye(side: number): THREE.BufferGeometry[] {
+  const [ex, ey, ez] = EYE.radii
+  const at = (m: THREE.Matrix4) => new THREE.Matrix4().multiplyMatrices(_eye, m)
+  pose([side * 27, 48, 57.5], [0, side * 0.3, side * 0.1], [1, 1, 1], _eye)
+  const lid = (thetaStart: number, turn: number) =>
+    skin(new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, thetaStart, Math.PI / 2), at(pose([0, 0, 0], [turn, 0, 0], [ex * EYE.lids, ey * EYE.lids, ez * EYE.lids])))
+  return [
+    paintedAt(new THREE.SphereGeometry(1, 16, 12), '#f3ebe0', at(pose([0, 0, 0], [0, 0, 0], [ex, ey, ez]))),
+    paintedAt(new THREE.SphereGeometry(1, 14, 10), IRIS, at(pose([ex * 0.3, 0, ez * 0.9], [0, 0.3, 0], [6.4, 6.4, 2.6]))),
+    paintedAt(new THREE.SphereGeometry(1, 8, 6), '#ffffff', at(pose([ex * 0.3 + 2, 2, ez * 0.9 + 2.4], [0, 0, 0], [1.6, 1.6, 0.8]))),
+    lid(0, EYE.upperLid),
+    lid(Math.PI / 2, EYE.lowerLid),
+    paintedAt(new THREE.TorusGeometry(1, 0.05, 4, 24, Math.PI * 0.84), BROW,
+      at(pose([0, 0, 0], [Math.PI / 2 + EYE.upperLid, 0, Math.PI * 0.08], [ex * EYE.lids, ey * EYE.lids, ez * EYE.lids]))),
+  ]
+}
+
+/** A brow from her nose's bridge outwards, tapering to its tail. */
+function brow(side: number, raise: number, tilt: number): THREE.BufferGeometry {
+  const g = new THREE.BoxGeometry(28, 4.5, 5, 6, 1, 1)
+  const pos = g.attributes.position
+  for (let i = 0; i < pos.count; i++) {
+    const t = (side * pos.getX(i) + 14) / 28
+    pos.setY(i, pos.getY(i) * (1 - 0.6 * t) + Math.sin(t * Math.PI) * 2.5)
+  }
+  g.computeVertexNormals()
+  return painted(g, BROW, [side * 28, 64 + raise, 60], [0, side * 0.25, side * tilt])
+}
+
 /** Root at the star's hub, +z towards the rider: bust, arms on the star's points, neck, head and face. */
 export const MEDUSA_BODY_GEO = mergePainted([
   // Shoulders and a jewel-purple gown with a gold neckline.
@@ -806,7 +876,7 @@ export const MEDUSA_BODY_GEO = mergePainted([
     skinBall([side * 172, -168, 40], [25, 25, 25], 2),
     skinBall([side * 124, -200, 128], [26, 17, 30], 2),
   ]),
-  // Neck, a head with a strong jaw, chin and cheekbones, and a big, bony nose.
+  // Neck, a head with a bony jaw, chin and cheekbones, and a big, straight nose.
   limb([0, -80, -8], [0, -10, -4], 33, 29),
   sculptedHead(),
   ...[-1, 1].flatMap((side) => [
@@ -817,15 +887,8 @@ export const MEDUSA_BODY_GEO = mergePainted([
   ...[-1, 1].map((side) =>
     paintedAt(new THREE.SphereGeometry(1, 10, 6), NOSTRIL, pose(onFace(side * 7.5, 3.4, 16), [0.9, 0, side * 0.3], [4.8, 2.2, 3.6])),
   ),
-  // Kind eyes glancing sideways, lids a little lowered, one brow up.
-  ...[-1, 1].flatMap((side) => [
-    paintedAt(new THREE.SphereGeometry(1, 14, 10), '#fbf6ee', pose([side * 27, 48, 56], [0, 0, 0], [14, 11, 10])),
-    paintedAt(new THREE.SphereGeometry(1, 12, 8), IRIS, pose([side * 27 + 4, 47, 64], [0, 0, 0], [7.5, 7.5, 4])),
-    paintedAt(new THREE.SphereGeometry(1, 8, 6), '#ffffff', pose([side * 27 + 6.5, 50, 67.5], [0, 0, 0], [2.4, 2.4, 1.2])),
-    skin(new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), pose([side * 27, 49, 57], [-0.35, 0, 0], [15.5, 9, 11])),
-    painted(new THREE.BoxGeometry(26, 4.5, 6), BROW, [side * 27, side > 0 ? 69 : 64, 60], [0, 0, side > 0 ? -0.22 : 0.12]),
-    paintedAt(new THREE.SphereGeometry(1, 10, 8), BLUSH, pose(onFace(side * 40, 16, 0.6), [0, side * 0.5, 0], [10, 6.5, 3])),
-  ]),
+  // Almond eyes glancing sideways, one brow up.
+  ...[-1, 1].flatMap((side) => [...almondEye(side), brow(side, side > 0 ? 4 : 0, side > 0 ? -0.18 : -0.06)]),
   // A warm, knowing closed smile: a full crescent, a touch higher on her glancing side.
   paintedAt(new THREE.CircleGeometry(1, 20, Math.PI, Math.PI), LIP, pose([2, -5, 55.5], [-0.25, 0, 0.08], [21, 9, 1])),
   paintedAt(new THREE.TorusGeometry(1, 0.14, 6, 20, Math.PI), '#5e1f2d', pose([2, -5, 56], [-0.25, 0, Math.PI + 0.08], [21, 9, 9])),
@@ -868,7 +931,7 @@ export const MEDUSA_HAIR_MAT = withRim(
 
 /** A jewel each side of the bridge of her nose, in one draw; their glint is animated (Medusa.tsx). */
 export const MEDUSA_JEWEL_GEO = (() => {
-  const jewels = [-1, 1].map((side) => new THREE.OctahedronGeometry(4.2, 0).translate(...onFace(side * 8.5, 51, 3.5)))
+  const jewels = [-1, 1].map((side) => new THREE.OctahedronGeometry(4.2, 0).translate(...onFace(side * 11.5, 51, 3.5)))
   const g = mergeGeometries(jewels)
   for (const j of jewels) j.dispose()
   return g
