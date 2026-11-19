@@ -1,11 +1,10 @@
-import type { BiomeType, BossType, EnemyType } from '@/types/level'
+import { BIOME_TYPES, type BiomeType, type BossType, type EnemyType } from '@/types/level'
 import { CLIMB } from '@/entities/enemies/climbMotion'
 import { RAT_CYCLE } from '@/entities/enemies/ratMotion.hot'
 import { DUST_BUNNY_BOUNCE } from '@/entities/enemies/dustBunnyMotion.hot'
 import { HOP, hopRoute } from '@/entities/enemies/hopGlideMotion'
 import { freeWallSlot } from '@/entities/spawning/enemyPlacement'
 import { hashString } from '@/utils/rng'
-import { ATMOSPHERES } from '@/levels/environments/atmosphere'
 
 /**
  * What the enemy turntable (`turntable.html`, `npm run turntable`) shows and how. Pure, so its test runs in Node; the
@@ -158,8 +157,6 @@ export function boardSize(board: Board): { width: number; height: number } {
   }
 }
 
-const BIOMES = Object.keys(ATMOSPHERES) as BiomeType[]
-
 export interface TurntableQuery {
   board: Board
   /** Light it with this biome's atmosphere instead of the studio. */
@@ -171,7 +168,7 @@ export function parseQuery(search: string): TurntableQuery {
   const q = new URLSearchParams(search)
   const id = q.get('enemy')
   const biomeParam = q.get('biome')
-  const biome = BIOMES.find((b) => b === biomeParam) ?? null
+  const biome = BIOME_TYPES.find((b) => b === biomeParam) ?? null
   const subject = id ? subjectById(id) : undefined
   if (subject) return { board: { kind: q.get('animate') === '1' ? 'motion' : 'angles', id: subject.id }, biome }
   const yaw = Number(q.get('yaw'))

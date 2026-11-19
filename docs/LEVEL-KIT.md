@@ -71,7 +71,7 @@ biome or score that already exists is refused, so a second run changes nothing. 
    z-fighting, terrain-following) and `docs/art/ENEMIES.md` (style).
 2. Biome. **(script)** `biomes/<biome>/` from the outdoor template (noise terrain, trees, seeded boulders
    beside the track, a stand-in spire) or the interior one (a flat `floor`, `bounds` inside a box hall
-   (`HALL` in its `config.ts`), crates); `BiomeType` (`src/types/level.ts`), `biomeRegistry.ts`, the
+   (`HALL` in its `config.ts`), crates); `BIOME_TYPES` (`src/types/level.ts`: the one list of biome ids, which `BiomeType`, the terrain and particle tests and the turntable's `?biome=` read, #509), `biomeRegistry.ts`, the
    `atmosphere.ts` preset, `BIOME_TERRAIN_CONFIGS` (`utils/terrainNoise.ts`; an interior's is flat and `authoredFloor`:
    `biomeHeightFunction` hands every caller its `floor`), `BIOME_REVERB` (`sfxDesign.ts`), a `theme.ts` accent and a `LevelPostcard`
    stub. **(by hand)** The look: palette, sky, light, fog, grade, the hero landmark in `Features.tsx`

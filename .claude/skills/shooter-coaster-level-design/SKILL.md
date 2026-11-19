@@ -40,7 +40,7 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 
 | File | Purpose |
 |------|---------|
-| `src/types/level.ts` | BiomeType, EnemyType, EnemyWave interfaces |
+| `src/types/level.ts` | `BIOME_TYPES` (the one list of biome ids; `BiomeType` derives from it), EnemyType, EnemyWave interfaces |
 | `src/levels/LevelRegistry.ts` | Level configs (track, waves, environment) |
 | `src/utils/terrainNoise.ts` | Per-biome terrain noise configs |
 | `src/entities/enemies/SharedEnemyAssets.ts` | All shared enemy geometries + materials |
@@ -152,7 +152,7 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 ## Workflow: Adding a New Level
 
 ### Biome Registration (all required)
-1. `src/types/level.ts` — add to `BiomeType` union
+1. `src/types/level.ts` — add to the `BIOME_TYPES` tuple (`BiomeType` and every test or tool that walks the biomes read it)
 2. `src/utils/terrainNoise.ts` — add a `BIOME_TERRAIN_CONFIGS` entry (frequency, amplitude, octaves, ridgeMode, baseY, flatRadius,
    `meshSize`: the terrain mesh's side); an interior sets `authoredFloor: true` and gives its `BiomeDefinition` a `floor`,
    and every caller gets a level's ground from `biomeHeightFunction` (`biomeRegistry.ts`), never `createHeightFunction` directly
