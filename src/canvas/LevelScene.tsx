@@ -8,7 +8,7 @@ import { getTrackDimensions } from '@/track/trackDimensions'
 import { buildArcTable } from '@/track/arcLength'
 import { withTunnels } from '@/track/setPieces'
 import CoasterCamera from '@/track/CoasterCamera'
-import { rideSpeeds } from '@/track/ridePhysics'
+import { rideModel } from '@/track/ridePhysics'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import { BIOMES, biomeHeightFunction } from '@/levels/environments/biomeRegistry'
@@ -89,7 +89,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
     [heightFn, biome],
   )
 
-  const speeds = useMemo(() => rideSpeeds(track), [track])
+  const speeds = useMemo(() => rideModel(track, trackTable), [track, trackTable])
   const color1 = useMemo(() => hexToRgb(track.color1), [track.color1])
   const color2 = useMemo(() => hexToRgb(track.color2), [track.color2])
 
@@ -99,8 +99,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         curve={curve}
         table={trackTable}
         trackScale={trackDims.trackScale}
-        rollerSpeed={track.rollerSpeed}
-        minRollerSpeed={track.minRollerSpeed}
+        speeds={speeds}
         heightOffset={trackDims.eyeHeight}
         hero={BIOMES[biome].hero}
         groundFn={groundFn}

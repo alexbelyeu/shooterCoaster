@@ -16,7 +16,7 @@ await build({
 export { GYM_TRACK } from '@/levels/environments/biomes/gym/gymTrack'
 export { createTrackCurve } from '@/track/curves/createTrackCurve'
 export { buildArcTable } from '@/track/arcLength'
-export { rideProfile, rideSpeeds } from '@/track/ridePhysics'`,
+export { rideModel, rideProfile } from '@/track/ridePhysics'`,
     resolveDir: root,
     loader: 'ts',
   },
@@ -32,7 +32,7 @@ fs.rmSync(tmp, { recursive: true, force: true })
 
 const curve = g.createTrackCurve(g.GYM_TRACK)
 const table = g.buildArcTable(curve)
-const profile = g.rideProfile(table, g.rideSpeeds(g.GYM_TRACK), 70)
+const profile = g.rideProfile(table, g.rideModel(g.GYM_TRACK, table), 70)
 const N = 300
 const track = Array.from({ length: N }, (_, i) => {
   const p = curve.getPointAt(i / N)
