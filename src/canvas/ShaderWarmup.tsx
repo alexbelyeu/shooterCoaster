@@ -18,6 +18,8 @@ import { reportLoad } from '@/core/loadProgress'
 
 /** Compile work per frame (#597); the loading screen only needs to keep its bar moving (#674). */
 const SLICE_BUDGET_MS = 60
+/** The loading bar's share of the warm-up for the compiles; the warm-up draws are the rest. */
+const COMPILE_SHARE = 0.7
 /** Objects per warm-up draw: each first draw uploads its buffers and textures. */
 const DRAW_BATCH = 4
 
@@ -203,8 +205,6 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
       if (testApi) testApi.shaderWarmup = { levelId, done: true, ms: performance.now() - started, programs: gl.info.programs?.length ?? 0 }
     }
 
-    // The bar: compiles are most of the wait, the warm-up draws the rest.
-    const COMPILE_SHARE = 0.7
     const draw = (objects: THREE.Object3D[]) => {
       const batches = chunk(objects, DRAW_BATCH)
       let drawn = 0

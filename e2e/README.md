@@ -89,13 +89,17 @@ the phone run checks its cards fit 390 px.
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in
 daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, NEW BEST, no Next Level and no leaderboard or initials entry (the campaign boards stay empty)
 (`daily-results.png`; its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
-`?e2e=1` skips the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
-loads the first level with `?e2e=1&countdown=1`: the countdown must show (`countdown.png`),
+`?e2e=1` skips the loading screen, the intro and the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
+loads the first level with `?e2e=1&countdown=1` (#674): the loading screen must show (`loading.png`) and hold until the shader
+warm-up is done, then the intro must run its fixed length (`intro.seconds`, `INTRO_SECONDS` late by at most two of its frames;
+`level1-intro.png` as it runs), then the countdown must show (`countdown.png`),
 a press during it must fire nothing (also when held on into `playing`), the timer must hold,
-the intro swoop (#328, pinned with `introAt` once the warm-up is done) must start high over the seat with the level's
-landmark in view (`level1-swoop.png`, `intro.height` / `anchorAngle`) and end exactly on the ride's start pose, the pose GO
-hands over (`intro.seatOffset` / `seatAngle`; the real landing's `goOffset` is reported), a replay tap after 1 s (Ready held by `holdFeedback`) skips to `playing`,
-and the shader warm-up must finish (and leaving a level mid-warm-up must log no error); after it, the first shot + kill must compile no new shader program
+the intro swoop (#328, pinned with `introAt`, which holds the camera on its path anywhere before GO) must start high over the seat with the level's
+landmark in view (`level1-swoop.png`, `intro.height` / `anchorAngle`) and end exactly on the ride's start pose, where the countdown
+sits (`intro.seatOffset` / `seatAngle`; the real intro's `goOffset` and longest frame are reported), a replay (`restartLevel()`) must go
+straight to the countdown, where a tap after 1 s (Ready held by `holdFeedback`) skips to `playing`, a new start of the warm level must
+pass the loading screen at once and a tap must skip its intro (`intro.skipped`),
+and leaving a level mid-warm-up must log no error; after it, the first shot + kill must compile no new shader program
 (`programs()`; the longest frame is reported). The step also prints the startup timings (`initTimings()`: boot, first title
 frame and PLAY from navigation; level mounted, env baked, warm-up done and first `playing` frame from the run's start) and writes
 them to `results.json` (`initTimings` on the `countdown` entry); no thresholds, software GL. A `speed` step holds the first level (or `--speed-level <id>`) at top speed on the most
@@ -224,7 +228,7 @@ ridden on the PR, that the nightly job runs the full smoke, and that the shards,
 | `frenzy` | `comboTiers.test.ts`, `comboRuntime.test.ts` (5×, slow-mo, `endFrenzy` → 1), `fireworks.test.ts`, `leaderboard.test.ts`, `initialsEntry.test.ts`, `onlineLeaderboard.test.ts`, `api/_lib/handler.test.ts` | the FRENZY flash and firework on screen, initials typed into the board |
 | `seed` | `spawnPlacement.test.ts` (deterministic per seed, differs between seeds), `utils/rng.test.ts` | the same digest after a reload |
 | `pause` | `waveSchedule.test.ts` (#152, #198), `useGameStore.test.ts` "pause and resume", "combo" (ignores the wall clock), `pauseMenu.test.ts` | tab hide / blur, the pause card |
-| `countdown` | `startPhase.test.ts`, `programReadiness.test.ts`, `startupMarks.test.ts` | Ready / Set / GO over the warm-up, no new shader on the first shot |
+| `countdown` | `startPhase.test.ts`, `loadProgress.test.ts`, `introCamera.test.ts`, `useGameStore.test.ts` "startRun", `programReadiness.test.ts`, `startupMarks.test.ts` | the loading screen, the intro's length and skip, Ready / Set / GO, no new shader on the first shot |
 | `wave` | `waveSchedule.test.ts` (tell 1 s early, on time, no replay after a pause), `spawnPlacement.test.ts` (the V) | the V of crows on screen |
 | `boss` | `bossModel.test.ts`, `krakenMotion.test.ts`, `scorpionMotion.test.ts` (the `turntable` workflow draws every boss on PRs touching `src/entities/`) | the full fights |
 | `pickup` | `weaponTypes.test.ts`, `pickupPlacement.test.ts`, `useGameStore.test.ts` (a run starts with the blaster) | the shot pickup, fan and badge |
