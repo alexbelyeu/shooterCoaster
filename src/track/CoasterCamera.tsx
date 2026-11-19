@@ -17,7 +17,7 @@ import {
   shakeAngles, type ShakeAngles,
 } from '@/combat/screenShake.hot'
 import { useSettingsStore } from '@/store/useSettingsStore'
-import { prefersReducedMotion } from '@/ui/reducedMotion'
+import { prefersReducedMotion, usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { fovForAspect, fovWithSpeed } from './cameraFov.hot'
 import WindStreaks, { type StreakDrive } from './WindStreaks'
 import { streakOpacity, streakRate } from './windStreaks'
@@ -115,14 +115,18 @@ export default function CoasterCamera({
     lastOffset: 0,
     wasTouring: false,
   })
-  // The car waits at the start through the intro, so the tour lands on the track's start.
+  // The car waits at the start through the intro, so the tour lands on the track's start. Reduced motion never
+  // plays it, so it isn't built (cold, but tens of ms on a phone); the smoke pins it, so `?e2e=1` always builds it.
+  const reducedMotion = usePrefersReducedMotion()
   const tour = useMemo(
-    () => buildIntroTour({ curve, table, seatT: 0, eyeHeight: heightOffset, trackScale, hero, heroGround, ground: groundFn, bounds }),
-    [curve, table, heightOffset, trackScale, hero, heroGround, groundFn, bounds],
+    () => (reducedMotion && !window.__SC_TEST__
+      ? null
+      : buildIntroTour({ curve, table, seatT: 0, eyeHeight: heightOffset, trackScale, hero, heroGround, ground: groundFn, bounds })),
+    [reducedMotion, curve, table, heightOffset, trackScale, hero, heroGround, groundFn, bounds],
   )
   useEffect(() => {
     const testApi = window.__SC_TEST__
-    if (testApi) testApi.intro.marks = tour.marks
+    if (testApi && tour) testApi.intro.marks = tour.marks
   }, [tour])
   useEffect(() => {
     intro.current.anchor.set(hero.x, heroGround + hero.focus, hero.z)
@@ -336,7 +340,7 @@ export default function CoasterCamera({
     // `introAt` (e2e) pins it anywhere short of the results, so the smoke can shoot every level's tour.
     const pinned = testApi?.introAt ?? null
     const introNext = phase === 'loading' && !store.skipIntro
-    const touring = pinned != null || ((phase === 'intro' || introNext) && !reducedMotion)
+    const touring = tour !== null && (pinned != null || ((phase === 'intro' || introNext) && !reducedMotion))
     if (touring) {
       const startedAt = introStartedAt()
       const progress = pinned ?? (startedAt === null ? 0 : introProgress((performance.now() - startedAt) / 1000))

@@ -18,6 +18,9 @@ const angleDeg = (a: { x: number; y: number; z: number }, b: { x: number; y: num
   return (Math.acos(Math.min(Math.max(d, -1), 1)) * 180) / Math.PI
 }
 
+/** Ground samples each level's tour build took (the build's dominant cost: terrain noise per path sample). */
+const GROUND_SAMPLES: Record<string, number> = {}
+
 /** Each level's tour as `CoasterCamera` builds it (the real ground), with its seat (track start + eye height) and ride direction. */
 function levelTours() {
   return getAllLevels().map((level) => {
@@ -28,9 +31,15 @@ function levelTours() {
     const ground = biomeHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
     const hero = biome.hero
     const heroGround = hero.ground ?? ground(hero.x, hero.z)
+    let samples = 0
+    const counted = (x: number, z: number) => {
+      samples++
+      return ground(x, z)
+    }
     const tour = buildIntroTour({
-      curve, table, seatT: 0, eyeHeight: dims.eyeHeight, trackScale: dims.trackScale, hero, heroGround, ground, bounds: biome.bounds,
+      curve, table, seatT: 0, eyeHeight: dims.eyeHeight, trackScale: dims.trackScale, hero, heroGround, ground: counted, bounds: biome.bounds,
     })
+    GROUND_SAMPLES[level.id] = samples
     const p = curve.getPointAt(0)
     const t = curve.getTangentAt(0)
     const anchor = v(hero.x, heroGround + hero.focus, hero.z)
@@ -134,6 +143,16 @@ describe('tourPose', () => {
       expect(Math.abs(tourPose(s.tour, 0, s.seat, s.dir, v(), v()))).toBeLessThan(1e-6)
       expect(Math.max(...Array.from(s.tour.bank, Math.abs))).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('buildIntroTour', () => {
+  // It runs on the main thread at level mount: a long task there is what #597 took out. 25 000 samples is ~10 ms of
+  // terrain noise on a desktop; a layout whose spline alone is over the speed cap must not pay for its ground.
+  it('samples the ground at most 25 000 times on any level', () => {
+    const over = Object.entries(GROUND_SAMPLES).filter(([, n]) => n > 25_000)
+    expect(over).toEqual([])
+    expect(Object.keys(GROUND_SAMPLES)).toHaveLength(TOURS.length)
   })
 })
 

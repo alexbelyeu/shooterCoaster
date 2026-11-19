@@ -134,6 +134,9 @@ function trackAt(input: TourInput, back: number, up: number): { at: Vec3Like; ta
   return { at: vec(p.x, p.y + up, p.z), tangent: vec(d.x, d.y, d.z) }
 }
 
+/** The input plus what every layout shares, worked out once per build. */
+type BuildInput = TourInput & { spread: { centre: Vec3Like; radius: number } }
+
 /** One way of laying the tour out; `buildIntroTour` tries them all and flies the smoothest. */
 interface Layout {
   /** Which way round the landmark the reveal sits from the pass. */
@@ -166,9 +169,9 @@ function trackSpread(table: ArcTable): { centre: Vec3Like; radius: number } {
 }
 
 /** The reveal and the landmark pass, generated: high and far out round the landmark, then past it toward the glide. */
-function heroShots(input: TourInput, glideStart: Vec3Like, layout: Layout): TourShot[] {
-  const { hero, heroGround, trackScale, table } = input
-  const { centre, radius } = trackSpread(table)
+function heroShots(input: BuildInput, glideStart: Vec3Like, layout: Layout): TourShot[] {
+  const { hero, heroGround, trackScale } = input
+  const { centre, radius } = input.spread
   const anchor = vec(hero.x, heroGround + hero.focus, hero.z)
   const toGlide = Math.atan2(glideStart.z - hero.z, glideStart.x - hero.x)
   // A landmark on a wall (`hero.arc`) is passed in front of it.
@@ -206,7 +209,7 @@ function heroShots(input: TourInput, glideStart: Vec3Like, layout: Layout): Tour
  * The waypoints: reveal and landmark (generated or the hero's `tour`), then the glide in over the track behind the
  * seat, looking down the track ahead of it (the ride to come), the landing and the seat.
  */
-function tourShots(input: TourInput, seat: Vec3Like, seatDir: Vec3Like, layout: Layout): { shots: TourShot[]; landmarkIndex: number; trackIndex: number } {
+function tourShots(input: BuildInput, seat: Vec3Like, seatDir: Vec3Like, layout: Layout): { shots: TourShot[]; landmarkIndex: number; trackIndex: number } {
   const { hero, trackScale, eyeHeight } = input
   const lookAhead = LOOK_AHEAD * trackScale
   const ahead = (along: number, look: number) => trackAt(input, -(along + look), 0).at
@@ -252,22 +255,32 @@ function tourShots(input: TourInput, seat: Vec3Like, seatDir: Vec3Like, layout: 
       look: start.look,
     })
   }
-  const lead = [...(hero.tour ?? heroShots(input, (swing[0] ?? glide[0]).at, layout)), ...swing]
+  const lead = [...(hero.tour?.length ? hero.tour : heroShots(input, (swing[0] ?? glide[0]).at, layout)), ...swing]
   const seatShot = { at: seat, look: vec(seat.x + seatDir.x * lookAhead, seat.y + seatDir.y * lookAhead, seat.z + seatDir.z * lookAhead) }
   return { shots: [...lead, ...glide, seatShot], landmarkIndex: lead.length - swing.length - 1, trackIndex: lead.length + 1 }
 }
 
-/** Centripetal Catmull-Rom point between `p1` and `p2` at `u` (0–1) with knot gaps `d0`–`d2`. */
-function catmullRom(p0: number, p1: number, p2: number, p3: number, d0: number, d1: number, d2: number, u: number): number {
+/**
+ * One axis of a centripetal Catmull-Rom span between `p1` and `p2` (knot gaps `d0`–`d2`), written to `out` at
+ * samples `first`… (stride 3, axis `ax`), `u` = k / SAMPLES_PER_SPAN for k in 0…`steps`.
+ */
+function catmullRomSpan(out: Float32Array, first: number, ax: number, steps: number, p0: number, p1: number, p2: number, p3: number, d0: number, d1: number, d2: number): void {
   // Tangents of the non-uniform form (Barry–Goldman), scaled to the span.
   const m1 = ((p1 - p0) / d0 - (p2 - p0) / (d0 + d1) + (p2 - p1) / d1) * d1
   const m2 = ((p2 - p1) / d1 - (p3 - p1) / (d1 + d2) + (p3 - p2) / d2) * d1
-  const u2 = u * u
-  const u3 = u2 * u
-  return (2 * u3 - 3 * u2 + 1) * p1 + (u3 - 2 * u2 + u) * m1 + (-2 * u3 + 3 * u2) * p2 + (u3 - u2) * m2
+  for (let k = 0; k <= steps; k++) {
+    const u = k / SAMPLES_PER_SPAN
+    const u2 = u * u
+    const u3 = u2 * u
+    out[(first + k) * 3 + ax] = (2 * u3 - 3 * u2 + 1) * p1 + (u3 - 2 * u2 + u) * m1 + (-2 * u3 + 3 * u2) * p2 + (u3 - u2) * m2
+  }
 }
 
-function sampleTour(input: TourInput, shots: TourShot[], seatDir: Vec3Like): Omit<IntroTour, 'marks' | 'seat' | 'blend'> & { shotSamples: number[] } {
+/**
+ * The waypoints as a dense path held clear of the ground, with its distances and smoothed look; null when the spline
+ * alone is already longer than `budget` (the ground clearance, the costly part, is then skipped).
+ */
+function sampleTour(input: TourInput, shots: TourShot[], seatDir: Vec3Like, budget: number): (Omit<IntroTour, 'marks' | 'seat' | 'blend' | 'bank'> & { shotSamples: number[] }) | null {
   const n = shots.length
   // Phantom ends: the reveal's mirrored, and one ahead of the seat along the ride so the landing arrives along it.
   const first = shots[0]
@@ -292,17 +305,16 @@ function sampleTour(input: TourInput, shots: TourShot[], seatDir: Vec3Like): Omi
     const d2 = gap(c, d)
     shotSamples.push(span * SAMPLES_PER_SPAN)
     const steps = span === n - 2 ? SAMPLES_PER_SPAN : SAMPLES_PER_SPAN - 1
-    for (let k = 0; k <= steps; k++) {
-      const i = span * SAMPLES_PER_SPAN + k
-      const u = k / SAMPLES_PER_SPAN
-      for (let ax = 0; ax < 3; ax++) {
-        const key = axes[ax]
-        pos[i * 3 + ax] = catmullRom(a.at[key], b.at[key], c.at[key], d.at[key], d0, d1, d2, u)
-        look[i * 3 + ax] = catmullRom(a.look[key], b.look[key], c.look[key], d.look[key], d0, d1, d2, u)
-      }
+    for (let ax = 0; ax < 3; ax++) {
+      const key = axes[ax]
+      catmullRomSpan(pos, span * SAMPLES_PER_SPAN, ax, steps, a.at[key], b.at[key], c.at[key], d.at[key], d0, d1, d2)
+      catmullRomSpan(look, span * SAMPLES_PER_SPAN, ax, steps, a.look[key], b.look[key], c.look[key], d.look[key], d0, d1, d2)
     }
   }
   shotSamples.push(count - 1)
+  let splineLength = 0
+  for (let i = 3; i < count * 3; i += 3) splineLength += Math.hypot(pos[i] - pos[i - 3], pos[i + 1] - pos[i - 2], pos[i + 2] - pos[i - 1])
+  if (splineLength > budget) return null
 
   // Clear of the ground and inside an interior's walls, letting go over the landing so it reaches the seat.
   const { ground, bounds, trackScale } = input
@@ -355,7 +367,14 @@ function sampleTour(input: TourInput, shots: TourShot[], seatDir: Vec3Like): Omi
     for (let k = 0; k < 3; k++) look[i * 3 + k] = sum[k] / l
   }
 
-  // Bank into the turns by the heading's change along the path, smoothed, level at both ends.
+  return { count, pos, look, dist, length, shotSamples }
+}
+
+type Sampled = NonNullable<ReturnType<typeof sampleTour>>
+
+/** Bank into the turns by the heading's change along the path, smoothed, level at both ends. */
+function tourBank(tour: Sampled, trackScale: number): Float32Array {
+  const { count, pos, dist, length } = tour
   const turn = new Float32Array(count)
   for (let i = 1; i < count - 1; i++) {
     const h0 = Math.atan2(pos[i * 3 + 2] - pos[i * 3 - 1], pos[i * 3] - pos[i * 3 - 3])
@@ -366,21 +385,21 @@ function sampleTour(input: TourInput, shots: TourShot[], seatDir: Vec3Like): Omi
     turn[i] = ds > 1e-6 ? dh / ds : 0
   }
   const bank = new Float32Array(count)
-  const bankWindow = SAMPLES_PER_SPAN / 2
+  const window = SAMPLES_PER_SPAN / 2
+  // A running sum over the window [i - window, i + window].
+  let sum = 0
+  for (let j = 0; j <= Math.min(count - 1, window); j++) sum += turn[j]
   for (let i = 0; i < count; i++) {
-    let sum = 0
-    let m = 0
-    for (let j = Math.max(0, i - bankWindow); j <= Math.min(count - 1, i + bankWindow); j++) {
-      sum += turn[j]
-      m++
+    if (i > 0) {
+      if (i + window < count) sum += turn[i + window]
+      if (i - window - 1 >= 0) sum -= turn[i - window - 1]
     }
+    const m = Math.min(count - 1, i + window) - Math.max(0, i - window) + 1
     const ends = Math.sin(Math.PI * (length > 0 ? dist[i] / length : 0))
     bank[i] = Math.min(Math.max((-sum / m) * BANK_GAIN * trackScale, -BANK_MAX), BANK_MAX) * ends * ends
   }
-  return { count, pos, look, bank, dist, length, shotSamples }
+  return bank
 }
-
-type Sampled = ReturnType<typeof sampleTour>
 
 /**
  * The tour's sharpest turns, degrees a second as flown (`tourDistance` over INTRO_SECONDS): the look's, and the
@@ -388,45 +407,51 @@ type Sampled = ReturnType<typeof sampleTour>
  * The look is what a player feels turn; the flight, with the look held, reads as the world drifting by.
  */
 export function tourTurnRates(tour: Pick<IntroTour, 'pos' | 'look' | 'dist' | 'count' | 'length'>): { look: number; flight: number } {
+  const { count, dist, pos, look: lookDir } = tour
   const frames = INTRO_SECONDS * 30
-  const at = (d: number, src: Float32Array, out: number[]) => {
-    let i = 1
-    while (i < tour.count - 1 && tour.dist[i] < d) i++
-    const span = tour.dist[i] - tour.dist[i - 1]
-    const f = span > 1e-9 ? Math.min(Math.max((d - tour.dist[i - 1]) / span, 0), 1) : 0
-    for (let k = 0; k < 3; k++) out[k] = src[(i - 1) * 3 + k] + (src[i * 3 + k] - src[(i - 1) * 3 + k]) * f
-  }
-  const angle = (a: number[], b: number[]) => {
-    const la = Math.hypot(a[0], a[1], a[2])
-    const lb = Math.hypot(b[0], b[1], b[2])
-    if (la < 1e-9 || lb < 1e-9) return 0
-    return Math.acos(Math.min(Math.max((a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (la * lb), -1), 1))
-  }
   const top = tour.length / (INTRO_SECONDS * DISTANCE_PER_TOP_SPEED_SECOND)
+  // The sample index only moves forward: the frames' distances rise.
+  let i = 1
   const p = [0, 0, 0]
   const l = [0, 0, 0]
-  let prevPos = [0, 0, 0]
-  let prevLook = [0, 0, 0]
-  let prevMove = [0, 0, 0]
+  const prevPos = [0, 0, 0]
+  const prevLook = [0, 0, 0]
+  const move = [0, 0, 0]
+  const prevMove = [0, 0, 0]
   let look = 0
   let flight = 0
-  for (let i = 0; i <= frames; i++) {
-    at(tourDistance(i / frames) * tour.length, tour.pos, p)
-    at(tourDistance(i / frames) * tour.length, tour.look, l)
-    const view = [...l]
-    const move = [p[0] - prevPos[0], p[1] - prevPos[1], p[2] - prevPos[2]]
-    if (i > 0) look = Math.max(look, angle(view, prevLook))
-    if (i > 1 && Math.hypot(move[0], move[1], move[2]) * 30 > top / 3) flight = Math.max(flight, angle(move, prevMove))
-    prevPos = [...p]
-    prevLook = view
-    prevMove = move
+  for (let frame = 0; frame <= frames; frame++) {
+    const d = tourDistance(frame / frames) * tour.length
+    while (i < count - 1 && dist[i] < d) i++
+    const span = dist[i] - dist[i - 1]
+    const f = span > 1e-9 ? Math.min(Math.max((d - dist[i - 1]) / span, 0), 1) : 0
+    for (let k = 0; k < 3; k++) {
+      p[k] = pos[(i - 1) * 3 + k] + (pos[i * 3 + k] - pos[(i - 1) * 3 + k]) * f
+      l[k] = lookDir[(i - 1) * 3 + k] + (lookDir[i * 3 + k] - lookDir[(i - 1) * 3 + k]) * f
+      move[k] = p[k] - prevPos[k]
+    }
+    if (frame > 0) look = Math.max(look, angle(l, prevLook))
+    if (frame > 1 && Math.hypot(move[0], move[1], move[2]) * 30 > top / 3) flight = Math.max(flight, angle(move, prevMove))
+    for (let k = 0; k < 3; k++) {
+      prevPos[k] = p[k]
+      prevLook[k] = l[k]
+      prevMove[k] = move[k]
+    }
   }
   const perSecond = (30 * 180) / Math.PI
   return { look: look * perSecond, flight: flight * perSecond }
 }
 
+function angle(a: number[], b: number[]): number {
+  const la = Math.hypot(a[0], a[1], a[2])
+  const lb = Math.hypot(b[0], b[1], b[2])
+  if (la < 1e-9 || lb < 1e-9) return 0
+  return Math.acos(Math.min(Math.max((a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (la * lb), -1), 1))
+}
+
 /** The level's tour into the seat at ride progress `seatT` (cold: once per level mount). */
-export function buildIntroTour(input: TourInput): IntroTour {
+export function buildIntroTour(tourInput: TourInput): IntroTour {
+  const input: BuildInput = { ...tourInput, spread: trackSpread(tourInput.table) }
   const { curve, seatT, eyeHeight, trackScale } = input
   const sp = curve.getPointAt(seatT)
   const st = curve.getTangentAt(seatT)
@@ -441,13 +466,13 @@ export function buildIntroTour(input: TourInput): IntroTour {
         // A level too big for the cap draws the reveal and the glide in until the tour fits.
         const layout: Layout = { side, glide, from, swing, shrink: 1 }
         let shots = tourShots(input, seat, seatDir, layout)
-        let built = sampleTour(input, shots.shots, seatDir)
-        for (let tries = 0; built.length > budget && tries < 8; tries++) {
+        let built = sampleTour(input, shots.shots, seatDir, budget)
+        for (let tries = 0; (!built || built.length > budget) && tries < 8; tries++) {
           layout.shrink *= 0.85
           shots = tourShots(input, seat, seatDir, layout)
-          built = sampleTour(input, shots.shots, seatDir)
+          built = sampleTour(input, shots.shots, seatDir, budget)
         }
-        if (built.length > budget) continue
+        if (!built || built.length > budget) continue
         const turns = tourTurnRates(built)
         const rate = Math.max(turns.look, turns.flight * FLIGHT_TURN_WEIGHT)
         if (!best || rate < best.rate) best = { built, shots, rate }
@@ -460,6 +485,7 @@ export function buildIntroTour(input: TourInput): IntroTour {
   const at = (sample: number) => progressAt(tour.dist[sample] / tour.length)
   return {
     ...tour,
+    bank: tourBank(best.built, trackScale),
     seat,
     blend: Math.min(tour.length * 0.1, LAND_BACK * trackScale),
     marks: {

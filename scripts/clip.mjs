@@ -40,10 +40,9 @@ const FRAMES_ONLY = process.argv.includes('--frames-only')
 const ENCODE_ONLY = process.argv.includes('--encode-only')
 const DIRECT = process.argv.includes('--direct')
 const RIDE_ONLY = DIRECT || process.argv.includes('--ride-only')
-// --tour (#675): the level's intro tour into the seat before the ride, `INTRO_SECONDS` long (src/core/introShot.ts);
+// --tour (#675): the level's intro tour into the seat before the ride, `__SC_TEST__.intro.length` seconds long;
 // it lands on the track's start, so pair it with --from 0 for one continuous take.
 const TOUR = process.argv.includes('--tour')
-const INTRO_SECONDS = 10
 const QUALITY = arg('quality', null)
 const TITLE = process.argv.includes('--title')
 const ATTRACT = TITLE && process.argv.includes('--attract')
@@ -212,7 +211,7 @@ async function render(browser, url) {
   })
   if (TOUR) {
     // Still held at the start: `introAt` walks the camera along the tour a frame at a time.
-    const frames = Math.round(INTRO_SECONDS * FPS)
+    const frames = Math.round((await hook(() => window.__SC_TEST__.intro.length)) * FPS)
     await capture(frames, (i) => hook((p) => { window.__SC_TEST__.introAt = p }, i / (frames - 1)))
     await hook(() => { window.__SC_TEST__.introAt = null })
   }

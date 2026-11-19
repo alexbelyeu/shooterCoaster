@@ -2500,7 +2500,7 @@ canvas {
   transition: transform 0.2s linear;
 }
 
-/* The intro's skip hint, low over the swoop. */
+/* The intro's skip hint, low over the tour. */
 .intro-hint {
   position: fixed;
   left: 50%;

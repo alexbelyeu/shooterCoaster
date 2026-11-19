@@ -120,8 +120,6 @@ const COMBAT_STEP_MAX = 0.25
 const RIDE_RATE = Number(arg('ride-rate', 0.14))
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(arg('seed', 1337))
-/** The intro's fixed length, `INTRO_SECONDS` in src/core/introShot.ts (#674). */
-const INTRO_SECONDS = 10
 // --cpu-throttle <rate>: the ride step on a slow machine (#536), CDP's CPU throttling for the ride;
 // records its longest frame and its frames of 100 ms or more per level, from the end of the warm-up (#541). Reported, not failed, until the fixes land.
 const CPU_THROTTLE = Number(arg('cpu-throttle', 1))
@@ -302,10 +300,11 @@ const NOT_LOADED = (id) => `the ${id} scene never loaded (levelReady)`
  * FRAME_DEADLINE_MS stops it), then freeze game time and hand the ride back to the frame time in that same JS turn.
  * `stopAtLevelTime` stops the level timer, game clock and ride exactly at `seconds` (#487), and the settled steps make
  * it the same moment of the level on any runner: the same track point with the same enemies flown in.
+ * `started`: the level is already started with game time frozen at its start (`tourShots`), so it isn't mounted twice.
  */
-async function rideToLevelTime(page, id, seconds, minFrames) {
+async function rideToLevelTime(page, id, seconds, minFrames, { started = false } = {}) {
   const start = Date.now()
-  await page.evaluate(([lid, seed, step, rate, target, minFrames]) => {
+  await page.evaluate(([lid, seed, step, rate, target, minFrames, started]) => {
     const s = window.__SC_TEST__
     // Caps a frame's level time once the ride hands it back (the shots and probe that follow).
     s.timerStepMax = step
@@ -323,9 +322,10 @@ async function rideToLevelTime(page, id, seconds, minFrames) {
       s.stopAtLevelTime = null
       return false
     })
-    s.startLevel(lid, seed)
+    s.timerStep = null
+    if (!started) s.startLevel(lid, seed)
     s.setTimeScale(1)
-  }, [id, SEED, RIDE_STEP, RIDE_RATE, seconds, minFrames])
+  }, [id, SEED, RIDE_STEP, RIDE_RATE, seconds, minFrames, started])
   for (;;) {
     await page.waitForTimeout(250)
     const r = await page.evaluate((overdue) => {
@@ -340,9 +340,18 @@ async function rideToLevelTime(page, id, seconds, minFrames) {
 /**
  * The level's intro tour (#675), pinned by `introAt` at its four marks with the level held at its start:
  * `<id>-tour-{reveal,landmark,track,landing}.png`. None may be blank or under the ground; the landmark shot looks at it.
+ * Starts the level held at its start from its first frame (the level timer, game clock and ride at 0: a `setTimeScale`
+ * set before `startLevel` would not survive the run's mount), so the seat the tour lands on is the track's start;
+ * the ride then goes on from that start (`rideToLevelTime`'s `started`).
  */
 async function tourShots(page, id) {
-  if (!(await startLevelReady(page, id))) return { problems: [NOT_LOADED(id)], shots: null }
+  await page.evaluate(([lid, seed]) => {
+    const t = window.__SC_TEST__
+    t.timerStep = 0
+    t.rideRate = 0
+    t.startLevel(lid, seed)
+  }, [id, SEED])
+  if (!(await levelReady(page))) return { problems: [NOT_LOADED(id)], shots: null }
   const marks = await page.evaluate(() => {
     const t = window.__SC_TEST__
     t.setTimeScale(0)
@@ -2959,7 +2968,7 @@ async function countdownCheck(page, levelId) {
   const reachedCountdown = await waitPhase('countdown', 30000)
   const introRun = await page.evaluate(() => {
     const api = window.__SC_TEST__
-    const r = { seconds: api.intro.seconds, skipped: api.intro.skipped, goOffset: api.intro.goOffset, maxFrameMs: api.maxFrameMs }
+    const r = { seconds: api.intro.seconds, length: api.intro.length, skipped: api.intro.skipped, goOffset: api.intro.goOffset, maxFrameMs: api.maxFrameMs }
     api.maxFrameMs = 0
     return r
   })
@@ -3091,8 +3100,8 @@ async function countdownCheck(page, levelId) {
   else if (introRun.skipped) problems.push('the untouched intro ended as skipped')
   // Its own clock: the same length on any device, its end late only by the frames its timer waits behind (~1 s at
   // a software renderer's ~2 fps, one frame on a phone).
-  else if (!(introRun.seconds >= INTRO_SECONDS - 0.05 && introRun.seconds <= INTRO_SECONDS + Math.max(1, (2 * introRun.maxFrameMs) / 1000)))
-    problems.push(`the intro lasted ${introRun.seconds?.toFixed(2)} s, not ${INTRO_SECONDS} (longest frame ${Math.round(introRun.maxFrameMs)} ms)`)
+  else if (!(introRun.seconds >= introRun.length - 0.05 && introRun.seconds <= introRun.length + Math.max(1, (2 * introRun.maxFrameMs) / 1000)))
+    problems.push(`the intro lasted ${introRun.seconds?.toFixed(2)} s, not ${introRun.length} (longest frame ${Math.round(introRun.maxFrameMs)} ms)`)
   if (!shown) problems.push('no Ready / Set / GO on screen')
   if (!during) problems.push('countdown over before the press check')
   else if (during.shotsFired > 0) problems.push(`a press during the countdown fired ${during.shotsFired} shot(s)`)
@@ -3837,9 +3846,11 @@ async function run() {
     const { ctx, page, errors } = await newPage()
     const started = Date.now()
     const cdp = CPU_THROTTLE > 1 ? await ctx.newCDPSession(page) : null
+    if (cdp) await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE })
+    const tour = await tourShots(page, id)
+    // Ride frames only (#541): the level mount, the warm-up's compiles (#597) and the pinned tour shots are not the
+    // ride's. The tour waited on `levelReady()`, so the warm-up is done unless the scene never loaded.
     if (cdp) {
-      await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE })
-      // Ride frames only (#541): the level mount and the warm-up's compiles are part 2's (#597), not the ride's.
       await page.evaluate(() => {
         const s = window.__SC_TEST__
         const reset = () => {
@@ -3850,8 +3861,7 @@ async function run() {
         reset()
       })
     }
-    const tour = await tourShots(page, id)
-    const ride = await rideToLevelTime(page, id, SECONDS, MIN_FRAMES)
+    const ride = await rideToLevelTime(page, id, SECONDS, MIN_FRAMES, { started: !tour.problems.includes(NOT_LOADED(id)) })
     const throttled = cdp ? { rate: CPU_THROTTLE, ...(await page.evaluate(() => ({ maxMs: window.__SC_TEST__.maxFrameMs, count: window.__SC_TEST__.longFrames }))) } : null
     // Combat, the shot and the results run at full speed: their deadlines were set for it.
     if (cdp) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 })

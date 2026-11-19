@@ -201,7 +201,7 @@ Every check above belongs to a named step: `title`, `landing`, `levelSelect`, `d
 run's touch play: taps, aim assist, aspect, HUD, audio, up to the Pause tap) and `mobileMenus` (the rest of the phone run on
 the same page: pause card, settings, boss bar, initials entry, results, share, music switches) (no level); `frenzy` (the
 first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ride), `seed`, `quality`, `pause`
-(hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: its intro tour pinned at four marks, `<id>-tour-{reveal,landmark,track,landing}.png`, #675; the ride, the perf
+(hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: its intro tour pinned at four marks, `<id>-tour-{reveal,landmark,track,landing}.png`, #675, on the level held at its start (`timerStep` / `rideRate` 0), which the ride then goes on from: one mount; the ride, the perf
 gate, the enemy probe, combat, the level's end), on the ride's own page `shot` (the frozen fresh shot and aim jump),
 `results` (the results screen's reveal, stats, buttons, board) and `share` (its Share line, menu and score cards); and
 `pacing` (every level, a whole run on its own page) and `wave`, `boss`, `pickup`, `audio` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its
