@@ -189,6 +189,18 @@ export async function nativeShare(nav: ShareNavigator | undefined, payload: Shar
   }
 }
 
+/** Runs `run` unless one is still in flight (`busy`), else resolves `null`: a second tap on Share while the sheet is
+ * opening would call `share()` again, which iOS rejects and the menu would open over the sheet (#374). */
+export async function exclusive<T>(busy: { current: boolean }, run: () => Promise<T>): Promise<T | null> {
+  if (busy.current) return null
+  busy.current = true
+  try {
+    return await run()
+  } finally {
+    busy.current = false
+  }
+}
+
 /** Text + link to the clipboard. Never throws. */
 export async function copyShare(nav: ShareNavigator | undefined, payload: SharePayload): Promise<boolean> {
   try {

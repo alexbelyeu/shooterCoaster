@@ -3443,18 +3443,25 @@ async function mobileResults(page) {
   return { problems, buttons, entry: { initials: stored.top, portrait, landscape } }
 }
 
-/** #272: where the sheet takes files (stubbed `canShare` / `share`: headless Chromium has no sheet), Share sends the story card with the line and link. */
+/** #272: where the sheet takes files (stubbed `canShare` / `share`: headless Chromium has no sheet), Share sends the story card with the line and link.
+ * #374: Share is tapped twice while the stubbed sheet stays up until the step closes it: one `share()` call, and no menu over the sheet. */
 async function phoneImageShareProblems(page) {
   const problems = []
   await page.evaluate(() => {
     window.__sharedData = null
+    window.__shareCalls = 0
+    window.__openSheets = []
     const stub = (name, value) => Object.defineProperty(navigator, name, { value, configurable: true, writable: true })
     stub('canShare', (data) => Array.isArray(data?.files) && data.files.every((f) => f.type === 'image/png'))
     stub('share', async (data) => {
+      window.__shareCalls++
       window.__sharedData = data
+      await new Promise((resolve) => window.__openSheets.push(resolve))
     })
   })
-  await page.locator('.results-share').tap({ timeout: 30000 }).catch((e) => problems.push(`phone: tap Share: ${e.message}`))
+  for (const tap of ['tap', 'second tap']) {
+    await page.locator('.results-share').tap({ timeout: 30000 }).catch((e) => problems.push(`phone: ${tap} on Share: ${e.message}`))
+  }
   const shared = await page
     .waitForFunction(() => window.__sharedData, null, { timeout: 30000, polling: 100 })
     .then(() => page.evaluate(async () => {
@@ -3464,9 +3471,15 @@ async function phoneImageShareProblems(page) {
       return {
         url: d.url, text: d.text, files: d.files?.length ?? 0, name: file?.name, type: file?.type,
         size: bitmap ? `${bitmap.width}x${bitmap.height}` : null,
-        score: window.__SC_TEST__.stats().score, menu: !!document.querySelector('.share-menu'),
+        score: window.__SC_TEST__.stats().score,
       }
     }), () => null)
+  // The second tap's share() (the card is drawn by now) would follow its click within a few frames.
+  await page.waitForTimeout(1000)
+  const calls = await page.evaluate(() => window.__shareCalls)
+  await page.evaluate(() => window.__openSheets.forEach((close) => close()))
+  await page.waitForTimeout(500)
+  const menu = await page.evaluate(() => !!document.querySelector('.share-menu'))
   await page.evaluate(() => {
     delete navigator.canShare
     delete navigator.share
@@ -3477,7 +3490,8 @@ async function phoneImageShareProblems(page) {
   if (shared.name !== `shootercoaster-level1-${shared.score}.png`) problems.push(`phone: shared file named ${shared.name}`)
   if (!shared.url?.includes('utm_campaign=share_image_native')) problems.push(`phone: image share link ${shared.url} lacks utm_campaign=share_image_native`)
   if (!shared.text?.startsWith('I scored ')) problems.push(`phone: image share line ${JSON.stringify(shared.text)}`)
-  if (shared.menu) problems.push('phone: the share menu opened although the sheet took the image')
+  if (calls !== 1) problems.push(`phone: two taps on Share while its sheet was up called share() ${calls} times, expected once`)
+  if (menu) problems.push('phone: the share menu opened although the sheet took the image')
   return problems
 }
 
