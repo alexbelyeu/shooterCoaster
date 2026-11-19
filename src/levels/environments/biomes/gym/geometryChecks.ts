@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
+import { buildJunction } from '@/track/mechanics'
 import { PIECES, pieceBoxes, toBlockout, type Vec3 } from './blockout'
 import { GYM_TRACK } from './gymTrack'
 
@@ -20,7 +21,7 @@ export function outsideBox(p: (typeof PIECES)[number], verts: [number, number, n
   return verts.filter(([a, y, f]) => a < b.minA - EPS || a > b.maxA + EPS || f < b.minF - EPS || f > b.maxF + EPS || y + p.base < b.minY - sunk - EPS || y + p.base > b.maxY + EPS).length
 }
 
-// The track in blockout metres, bucketed by 4 m cells for the clearance checks (built on first use).
+// The track in blockout metres, its junction's branch (#702) included, bucketed by 4 m cells for the clearance checks (built on first use).
 const CELL = 4
 /** Track samples about 0.15 m apart: a solid thinner than that (a 0.08 m railing) still lies within half of it of one. */
 const SAMPLES = 5000
@@ -28,15 +29,22 @@ let cells: Map<string, Vec3[]> | undefined
 
 function trackCells(): Map<string, Vec3[]> {
   if (cells) return cells
-  cells = new Map()
+  const map = new Map<string, Vec3[]>()
+  cells = map
   const curve = createTrackCurve(GYM_TRACK)
-  for (let i = 0; i < SAMPLES; i++) {
-    const w = curve.getPointAt(i / SAMPLES)
+  const add = (w: Vec3) => {
     const p = toBlockout({ x: w.x, y: w.y, z: w.z })
     const key = `${Math.floor(p.x / CELL)},${Math.floor(p.y / CELL)},${Math.floor(p.z / CELL)}`
-    cells.set(key, [...(cells.get(key) ?? []), p])
+    map.set(key, [...(map.get(key) ?? []), p])
   }
-  return cells
+  for (let i = 0; i < SAMPLES; i++) add(curve.getPointAt(i / SAMPLES))
+  for (const m of GYM_TRACK.mechanics ?? []) {
+    if (m.kind !== 'junction') continue
+    const { from, to, branch } = buildJunction(curve, m)
+    const n = Math.ceil(SAMPLES * (to - from) * 1.5)
+    for (let i = 0; i <= n; i++) add(branch.getPointAt(i / n))
+  }
+  return map
 }
 
 /** Distance from a blockout point to the nearest sampled track point within a cell of it (Infinity if none). */

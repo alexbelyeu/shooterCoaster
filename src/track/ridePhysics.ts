@@ -1,7 +1,7 @@
 import { distanceAtT, indexAtT, tAtLoopDistance, type ArcTable } from './arcLength'
 import type { TrackCurve } from './curves/TrackCurve'
 import { buildRidePlan, PLAN_RATE, planDistance, planSpeed, planStopShare, planTimeAt, planZoneAt, type RidePlan } from './rideV2'
-import { withMechanics } from './mechanics'
+import { checkMechanics, withMechanics } from './mechanics'
 import type { SpeedZone, TrackParams } from '@/types/level'
 
 /**
@@ -34,13 +34,14 @@ export function rideSpeeds({ rollerSpeed, minRollerSpeed }: { rollerSpeed: numbe
 }
 
 /**
- * The level's ride: its v2 plan when it opts in (with its mechanics' zones and stops, #699), else today's rule, which
- * has no mechanics. Cold: solves the plan (a few ms).
+ * The level's ride: its v2 plan when it opts in (with its mechanics' zones and stops, #699), else today's rule, whose
+ * only mechanic is a junction (#702: no zones). Cold: solves the plan (a few ms).
  */
 export function rideModel(track: TrackParams, table: ArcTable): RideSpeeds {
   const speeds = rideSpeeds(track)
   if (track.ride !== 'v2') {
-    if (track.mechanics?.length) throw new Error('ride mechanics need the v2 ride (track.ride: "v2")')
+    if (track.mechanics?.some((m) => m.kind !== 'junction')) throw new Error('ride mechanics need the v2 ride (track.ride: "v2")')
+    checkMechanics(track.mechanics)
     return speeds
   }
   return { ...speeds, plan: buildRidePlan(table, withMechanics(track.rideV2 ?? {}, track.mechanics, table.length)) }

@@ -1,3 +1,4 @@
+import { BASE_VERTICAL_FOV } from '@/track/cameraFov.hot'
 import type { EnemyType } from '@/types/level'
 
 /** Each enemy's smallest typical on-screen extent in world units after its model scale: what the player has to resolve. */
@@ -24,9 +25,9 @@ export const ENEMY_SILHOUETTE: Record<EnemyType | 'goldenBalloon', number> = {
 
 /** Px at 1280x720 an enemy must reach during the ride; `READABLE_PX` in e2e/smoke.mjs mirrors it. */
 export const MIN_ENEMY_PX = 12
-/** Reference viewport height + vertical FOV (CoasterCamera BASE_FOV). */
+/** Reference viewport height + vertical FOV (the coaster camera's base). */
 export const REFERENCE_VIEWPORT_H = 720
-export const REFERENCE_FOV_DEG = 80
+export const REFERENCE_FOV_DEG = BASE_VERTICAL_FOV
 
 /** Projected size in px of `worldSize` at `distance` for the given viewport/FOV. */
 export function projectedPx(

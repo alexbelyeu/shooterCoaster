@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { RideMechanic } from '@/types/level'
 import type { TrackCurve } from './curves/TrackCurve'
+import { type Route, hardRouteOf } from './mechanics'
 
 // `t` is the car's track parameter, a spline's arc share like the mechanics'; `stopShare` is `planStopShare` (-1 moving).
 
@@ -35,4 +36,23 @@ export function dropPiecePosition(curve: TrackCurve, drop: RideMechanic, t: numb
   if (t >= drop.from && t <= drop.to) return out.copy(curve.getPointAt(t))
   if (t > drop.to && t <= drop.to + pieceShare) return out.copy(curve.getPointAt(drop.to))
   return out.copy(curve.getPointAt(drop.from))
+}
+
+/** The curve the seat rides on `route`: the main track, or on the hard way the junctions' branches through their spans. */
+export function routeCurve(main: TrackCurve, mechanics: readonly RideMechanic[] | undefined, route: Route): TrackCurve {
+  if (route === 'easy' || !mechanics) return main
+  return hardRouteOf(main, mechanics) ?? main
+}
+
+const _p = new THREE.Vector3()
+const SPEED_STEP = 1e-4
+
+/** How much faster the seat moves per t on `seat` than on `main` at t (1 off a branch): the branch's g-forces scale by it. */
+export function routeSpeedScale(main: TrackCurve, seat: TrackCurve, t: number): number {
+  if (seat === main) return 1
+  _p.copy(seat.getPointAt(t + SPEED_STEP))
+  const along = _p.distanceTo(seat.getPointAt(t - SPEED_STEP))
+  _p.copy(main.getPointAt(t + SPEED_STEP))
+  const base = _p.distanceTo(main.getPointAt(t - SPEED_STEP))
+  return base > 0 ? along / base : 1
 }

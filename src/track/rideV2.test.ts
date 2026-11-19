@@ -28,9 +28,6 @@ const TRACK: TrackParams = {
     const d = i * 7.5
     return { x: RADIUS * Math.cos(deg(d)), y: heightAt(d), z: RADIUS * Math.sin(deg(d)) }
   }),
-  varA: 0,
-  varB: 0,
-  varC: 0,
   scalar: 20,
   rollerSpeed: 0.000004,
   minRollerSpeed: 0.0001,

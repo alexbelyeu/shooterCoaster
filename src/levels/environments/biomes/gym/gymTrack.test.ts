@@ -7,8 +7,9 @@ import { getTrackDimensions } from '@/track/trackDimensions'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
 import { tourPose } from '@/track/introCamera.hot'
 import { buildIntroTour } from '@/track/introTour'
+import { type JunctionMechanic, buildJunction, switchPose } from '@/track/mechanics'
 import { gymFloor } from './config'
-import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
+import { BASE_VERTICAL_FOV, MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { MEDUSA_BODY, MEDUSA_HUB, MEDUSA_RISE, MEDUSA_SIZE, bustClearance, yawToward } from '@/entities/bosses/medusaMotion'
@@ -41,8 +42,8 @@ import { gym } from './index'
 const NEAR = 5
 /** The spiral's turn is counted while the track is within this many metres of the Flame's centre. */
 const SPIRAL_RADIUS = 20
-/** Vertical half-angle of the view: the coaster camera's 80° base FOV (narrow screens only widen it). */
-const VERTICAL_HALF_FOV = 40
+/** Vertical half-angle of the view at the coaster camera's base FOV (narrow screens only widen it). */
+const VERTICAL_HALF_FOV = BASE_VERTICAL_FOV / 2
 const N = 4000
 const DEG = 180 / Math.PI
 
@@ -121,6 +122,42 @@ describe('the gym track', () => {
   it('fits the car and rider inside the rail clearance', () => {
     expect((dims.railGauge + dims.railRadius) / GYM_SCALE).toBeLessThan(RAIL_CLEARANCE)
     expect(dims.eyeHeight / GYM_SCALE).toBeLessThan(RAIL_CLEARANCE)
+  })
+
+  it('forks the V8 route (#702) off the east-side run, clear of the blockout, the floor, the hall and the rest of the track', () => {
+    const junction = buildJunction(curve, GYM_TRACK.mechanics!.find((m): m is JunctionMechanic => m.kind === 'junction')!)
+    const branch = Array.from({ length: 801 }, (_, i) => toBlockout(junction.branch.getPointAt(i / 800)))
+    let pieces = Infinity
+    let floor = Infinity
+    let hall = Infinity
+    let apart = 0
+    let others = Infinity
+    const margin = 0.03
+    const rest = track.filter((_, i) => i / N < junction.from - margin || i / N > junction.to + margin)
+    branch.forEach((p, i) => {
+      for (const box of BLOCKOUT_BOXES) pieces = Math.min(pieces, distanceToBox(box, p))
+      floor = Math.min(floor, p.y - floorAt(p.x, p.z))
+      hall = Math.min(hall, p.x, HALL.w - p.x, p.z, HALL.d - p.z, HALL.h - p.y)
+      const m = toBlockout(curve.getPointAt(junction.from + ((junction.to - junction.from) * i) / 800))
+      apart = Math.max(apart, Math.hypot(p.x - m.x, p.y - m.y, p.z - m.z))
+      for (const q of rest) others = Math.min(others, Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z))
+    })
+    expect(pieces).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+    expect(floor).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+    expect(hall).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+    expect(others).toBeGreaterThanOrEqual(2 * RAIL_CLEARANCE)
+    // A real choice: the routes part by metres, not a wiggle.
+    expect(apart).toBeGreaterThan(5)
+    // Both ways fall in the run's middle, after the cubbies and before the Medusa rises at 40 s.
+    const forkSeconds = secondsAt(Math.round(junction.from * N))
+    const mergeSeconds = secondsAt(Math.round(junction.to * N))
+    expect(forkSeconds).toBeGreaterThan(20)
+    expect(mergeSeconds).toBeLessThan(36)
+    // The switch sign stands clear of everything solid, on the branch's side.
+    const sign = toBlockout(switchPose(curve, junction, dims.eyeHeight).position)
+    let signClear = Infinity
+    for (const box of BLOCKOUT_BOXES) signClear = Math.min(signClear, distanceToBox(box, sign))
+    expect(signClear).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
   })
 
   it('threads the Arch: through its opening, clear of the legs and soffit', () => {

@@ -3,7 +3,8 @@ import type { TrackCurve } from './curves/TrackCurve'
 import type { ArcTable } from './arcLength'
 import { type TrackSamples, lookAheadDirection, sampleTrack } from './cameraRig.hot'
 import { seatUp } from './trackGeometry'
-import { backwardsTurn, dropHeading, droppingOn } from './mechanics.hot'
+import { backwardsTurn, dropHeading, droppingOn, routeCurve } from './mechanics.hot'
+import type { Route } from './mechanics'
 import type { RideMechanic } from '@/types/level'
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0)
@@ -32,7 +33,8 @@ export function createSeatPose(): SeatPose {
 /**
  * The seat at t: the eye `eyeHeight` along the rails' up (upside down, the rider hangs under the track). The track's
  * mechanics (#699) turn it: on a drop track it falls upright facing the drop's heading; on a backwards stretch it
- * faces back (turning round over a turntable's stop, `stopShare` through it, -1 when moving).
+ * faces back (turning round over a turntable's stop, `stopShare` through it, -1 when moving); on the run's `route` 'hard'
+ * it rides a junction's branch through its span (#702).
  */
 export function seatPose(
   curve: TrackCurve,
@@ -43,7 +45,9 @@ export function seatPose(
   out: SeatPose,
   mechanics?: readonly RideMechanic[],
   stopShare = -1,
+  route: Route = 'easy',
 ): SeatPose {
+  curve = routeCurve(curve, mechanics, route)
   out.tangent.copy(curve.getTangentAt(t))
   const at = sampleTrack(table, t, trackScale, out.samples)
   const drop = mechanics ? droppingOn(mechanics, t) : null

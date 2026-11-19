@@ -4,7 +4,7 @@ import { createRng } from '@/utils/rng'
 import { buildTrackIndex } from './trackClearance'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { buildArcTable } from '@/track/arcLength'
-import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import {
   createHeightFunction,
   createTerrainSurface,
@@ -14,8 +14,9 @@ import {
 } from '@/utils/terrainNoise'
 
 const level = getLevelConfig('level4')!
-const { varA, varB, varC, scalar } = level.track
-const curve = createTrigCurve2(varA, varB, varC, scalar)
+const { track } = level
+if (track.curve === 'spline') throw new Error('level4 rides a trig curve')
+const curve = createTrackCurve(track)
 const table = buildArcTable(curve)
 const index = buildTrackIndex(table)
 const heightFn = createHeightFunction('arctic', sampleTrackPath((t) => curve.getPointAt(t)))
@@ -24,8 +25,8 @@ const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize('arctic'))
 describe('trackExtent', () => {
   it('matches the varC * 13 * scalar rule for level4', () => {
     const extent = trackExtent(table)
-    expect(extent).toBeLessThanOrEqual(varC * 13 * scalar * 1.01)
-    expect(extent).toBeGreaterThan(varC * 13 * scalar * 0.5)
+    expect(extent).toBeLessThanOrEqual(track.varC * 13 * track.scalar * 1.01)
+    expect(extent).toBeGreaterThan(track.varC * 13 * track.scalar * 0.5)
   })
 })
 

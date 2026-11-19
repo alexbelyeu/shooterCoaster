@@ -8,10 +8,10 @@ export interface CollisionTarget {
   radiusSq: number
   onHit: () => void
   /**
-   * A weapon pickup (#185) is shot like an enemy but is none: no `enemy:hit`. A bystander (#518) is no target at all:
-   * no `enemy:hit`, and its bullet counts as a miss for accuracy.
+   * A weapon pickup (#185) or a junction's switch (#702) is shot like an enemy but is none: no `enemy:hit`. A bystander
+   * (#518) is no target at all: no `enemy:hit`, and its bullet counts as a miss for accuracy.
    */
-  kind?: 'pickup' | 'bystander'
+  kind?: 'pickup' | 'switch' | 'bystander'
   hitThisFrame: boolean
   /** The hitting bullet's first target that counts (`countsForAccuracy`): only that hit counts for accuracy. */
   firstHitThisFrame: boolean
@@ -68,7 +68,7 @@ export function processHit(target: CollisionTarget, countHit = true): void {
     return
   }
   if (countHit) useGameStore.getState().registerHit()
-  if (target.kind === 'pickup') {
+  if (target.kind === 'pickup' || target.kind === 'switch') {
     target.onHit()
     return
   }

@@ -232,9 +232,6 @@ export const GYM_LEVEL: { track: TrackParams; walls: readonly WallSurface[] } = 
         "z": -422.4
       }
     ],
-    "varA": 0,
-    "varB": 0,
-    "varC": 0,
     "scalar": 20,
     "segments": 800,
     "tieSpacing": 22,
@@ -242,7 +239,36 @@ export const GYM_LEVEL: { track: TrackParams; walls: readonly WallSurface[] } = 
     "rollerSpeed": 4e-7,
     "minRollerSpeed": 0.000355,
     "color1": 3489096,
-    "color2": 2282437
+    "color2": 2282437,
+    "mechanics": [
+      {
+        "kind": "junction",
+        "from": 0.385,
+        "to": 0.495,
+        "points": [
+          {
+            "x": 160,
+            "y": 108.8,
+            "z": -304
+          },
+          {
+            "x": 336,
+            "y": 51.2,
+            "z": -409.6
+          },
+          {
+            "x": 512,
+            "y": 51.2,
+            "z": -403.2
+          },
+          {
+            "x": 656,
+            "y": 76.8,
+            "z": -307.2
+          }
+        ]
+      }
+    ]
   },
   "walls": [
     {
