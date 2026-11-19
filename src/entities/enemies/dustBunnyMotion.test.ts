@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DUST_BUNNY, DUST_BUNNY_BOUNCE, dustBunnyPose, newDustBunnyPose } from './dustBunnyMotion.hot'
+import { DUST_BUNNY, DUST_BUNNY_BOUNCE, dustBunnyDrop, dustBunnyPose, newDustBunnyPose } from './dustBunnyMotion.hot'
+import { DUST_BUNNY_RADIUS, DUST_BUNNY_REACH } from './SharedEnemyAssets'
 
 const R = 19
 const at = (base: number, t: number) => dustBunnyPose(base, R, t, newDustBunnyPose())
@@ -34,5 +35,20 @@ describe('dustBunnyPose', () => {
     const top = at(0, DUST_BUNNY_BOUNCE / 2)
     expect(top.lift).toBeCloseTo(DUST_BUNNY.bob)
     expect(top.squash).toBe(0)
+  })
+
+  it('never reaches lower than its drop over a bounce, the rolling hairs pointing straight down (#524)', () => {
+    let lowest = Infinity
+    for (let i = 0; i <= 1000; i++) {
+      const p = at(0, (DUST_BUNNY_BOUNCE * i) / 1000)
+      lowest = Math.min(lowest, p.lift - DUST_BUNNY_REACH * (1 - p.squash))
+    }
+    expect(lowest).toBeGreaterThanOrEqual(-dustBunnyDrop(DUST_BUNNY_REACH) - 1e-9)
+    expect(lowest).toBeCloseTo(-dustBunnyDrop(DUST_BUNNY_REACH), 3)
+  })
+
+  it('keeps its stray hairs short, so it floats only a little over its tufts', () => {
+    expect(DUST_BUNNY_REACH).toBeGreaterThan(DUST_BUNNY_RADIUS + 0.5)
+    expect(DUST_BUNNY_REACH).toBeLessThan(DUST_BUNNY_RADIUS + 1.1)
   })
 })

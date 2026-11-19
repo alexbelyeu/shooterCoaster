@@ -1009,12 +1009,20 @@ export const DUST_BUNNY_BODY_GEO = sunShaded(mergePainted([
   // White chalk flecks caught in it.
   ...sphereDirections(8).map((d) =>
     paintedAt(new THREE.OctahedronGeometry(0.22), DUST_CHALK, alongDir(d.applyAxisAngle(_up, 0.9), DUST_BUNNY_RADIUS + 0.05))),
-  // Stray hairs.
+  // Stray hairs: short, since the fluff rolls and the longest part sets how high it floats (#524).
   ...[[0.3, 0.9, -0.3], [-0.7, 0.4, -0.6], [0.8, -0.2, -0.5], [-0.2, -0.5, -0.8]].map(([x, y, z]) =>
-    paintedAt(new THREE.BoxGeometry(0.05, 1.6, 0.05), DUST_DARK, alongDir(new THREE.Vector3(x, y, z).normalize(), DUST_BUNNY_RADIUS + 0.7))),
+    paintedAt(new THREE.BoxGeometry(0.05, 1.1, 0.05), DUST_DARK, alongDir(new THREE.Vector3(x, y, z).normalize(), DUST_BUNNY_RADIUS + 0.45))),
   // A lost scrap of hold tape.
   paintedAt(new THREE.BoxGeometry(1.1, 0.06, 0.5), DUST_TAPE, alongDir(new THREE.Vector3(-0.6, 0.6, 0.5).normalize(), DUST_BUNNY_RADIUS + 0.12)),
 ]))
+
+/** The fluff's farthest point from its centre, model units: the stray hairs' tips. It rolls, so any of it can point down. */
+export const DUST_BUNNY_REACH = (() => {
+  const p = DUST_BUNNY_BODY_GEO.attributes.position
+  let reach = 0
+  for (let i = 0; i < p.count; i++) reach = Math.max(reach, Math.hypot(p.getX(i), p.getY(i), p.getZ(i)))
+  return reach
+})()
 
 /** Two black dot eyes with a glint, on the front of the ball. */
 export const DUST_BUNNY_EYES_GEO = mergePainted([
