@@ -6,6 +6,9 @@
  *   npm run turntable -- --skip-build              # reuse dist-turntable/
  *   npm run turntable -- --only crow,kraken        # the sheet + these subjects' strips
  *   npm run turntable -- --biome ocean             # lit by a biome's atmosphere instead
+ *   npm run turntable -- --rides                   # the ride elements instead (#698): rides.png, a strip of the
+ *                                                  # demo circuit's loop, zero-g roll, corkscrew… ridden by the seat,
+ *                                                  # and a shot aimed upside down (src/dev/rides/)
  *
  * Writes to e2e-results/turntable/ (`--out`): sheet.png (every subject, 3/4 view), <id>-angles.png
  * (front / side / back / 3/4) and <id>-motion.png (four frames over one cycle), plus results.json. Fails on a page
@@ -28,6 +31,8 @@ const MIN_COVERAGE = 0.005
 /** Mean per-channel change (0–255) that the busiest frame of an animated subject's strip must reach. */
 const MIN_MOTION = 0.05
 
+const rides = arg('rides') === 'true'
+
 if (arg('skip-build') !== 'true') {
   execFileSync('npx', ['vite', 'build', '--mode', 'turntable', '--logLevel', 'warn'], { stdio: 'inherit' })
 }
@@ -43,6 +48,40 @@ try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
   page.on('pageerror', (e) => errors.push(e.message))
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
+  if (rides) await rideStrip(page)
+  else await enemyBoards(page)
+} catch (error) {
+  failures.push(String(error?.stack ?? error))
+} finally {
+  // Here, so a board that throws midway still reports the page errors before it.
+  failures.push(...errors.map((e) => `page error: ${e}`))
+  fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
+  await browser.close()
+  stopPreview(proc)
+}
+
+if (failures.length) {
+  console.error(`turntable FAILED:\n  ${failures.join('\n  ')}`)
+  process.exit(1)
+}
+console.log(`turntable ok: ${Object.keys(results).length} images in ${OUT}/`)
+
+/** The ride elements' strip: every cell drawn, and the shot fired upside down hits its target. */
+async function rideStrip(page) {
+  await page.setViewportSize({ width: 1340, height: 1300 })
+  await page.goto(`${url}/rides.html`)
+  await page.waitForFunction(() => window.__RIDES__?.done, null, { timeout: 120_000 })
+  const result = await page.evaluate(() => window.__RIDES__)
+  await page.screenshot({ path: path.join(OUT, 'rides.png'), fullPage: true })
+  results.rides = result
+  for (const cell of result.cells) {
+    console.log(`${cell.label.padEnd(48)} coverage ${cell.coverage.toFixed(2)}`)
+    if (cell.coverage < MIN_COVERAGE) failures.push(`rides: ${cell.label} drew nothing`)
+  }
+  if (!result.aim?.hit || !(result.aim.upY < -0.9)) failures.push(`rides: the shot upside down missed (${JSON.stringify(result.aim)})`)
+}
+
+async function enemyBoards(page) {
   await page.goto(`${url}/turntable.html${biome ? `?biome=${biome}` : ''}`)
   await page.waitForFunction(() => window.__TT__?.ready, null, { timeout: 120_000 })
   const subjects = await page.evaluate(() => window.__TT__.subjects)
@@ -70,18 +109,4 @@ try {
       if (animated && !(peak >= MIN_MOTION)) failures.push(`${name}: motion strip frames are identical (peak change ${peak.toFixed(3)})`)
     }
   }
-} catch (error) {
-  failures.push(String(error?.stack ?? error))
-} finally {
-  // Here, so a board that throws midway still reports the page errors before it.
-  failures.push(...errors.map((e) => `page error: ${e}`))
-  fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
-  await browser.close()
-  stopPreview(proc)
 }
-
-if (failures.length) {
-  console.error(`turntable FAILED:\n  ${failures.join('\n  ')}`)
-  process.exit(1)
-}
-console.log(`turntable ok: ${Object.keys(results).length} images in ${OUT}/`)

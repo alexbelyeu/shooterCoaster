@@ -22,14 +22,15 @@ import { fovForAspect, fovWithSpeed } from './cameraFov.hot'
 import WindStreaks, { type StreakDrive } from './WindStreaks'
 import { streakOpacity, streakRate } from './windStreaks'
 import {
-  LOOK_RESPONSE, createRigState, lateralAcceleration, lookAheadDirection, resetRig, sampleTrack,
-  smoothingFactor, stepRig, type TrackSamples,
+  LOOK_RESPONSE, createRigState, lateralAcceleration, resetRig,
+  smoothingFactor, stepRig,
 } from './cameraRig.hot'
 import {
   introProgress, orbitPose, tourPose, type HeroShot,
 } from './introCamera.hot'
 import { introStartedAt, setCameraOffSeat } from '@/core/introShot'
 import { buildIntroTour } from './introTour'
+import { createSeatPose, seatPose } from './seatPose.hot'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 
 interface CoasterCameraProps {
@@ -56,6 +57,7 @@ interface CoasterCameraProps {
 const BASE_FOV = 80
 
 const RAD_TO_DEG = 180 / Math.PI
+const WORLD_UP = new THREE.Vector3(0, 1, 0)
 
 /** Rides the track (port of Camera.js updateCamGame) with rotation-only weight from cameraRig.hot.ts; the mouse only aims. */
 export default function CoasterCamera({
@@ -76,11 +78,9 @@ export default function CoasterCamera({
   const cameraRef = useRef<THREE.PerspectiveCamera>(null)
 
   const ride = useRef<RideState>({ progress: 0, velocity: 0, time: 0 })
-  const _position = useRef(new THREE.Vector3())
-  const _tangent = useRef(new THREE.Vector3())
+  const seat = useRef(createSeatPose())
   const _lookAt = useRef(new THREE.Vector3())
   const scratch = useRef({
-    samples: { behindT: 0, aheadT: 0, lookT: 0, span: 0, unitsPerT: 0 } as TrackSamples,
     tangentBehind: new THREE.Vector3(),
     lookTarget: new THREE.Vector3(),
   })
@@ -198,6 +198,7 @@ export default function CoasterCamera({
       } else io.orbitSeconds += delta
       orbitPose(hero, heroGround, io.orbitSeconds, io.orbitYaw, groundFn, bounds, io.pos, _lookAt.current)
       cam.position.copy(io.pos)
+      cam.up.copy(WORLD_UP)
       cam.lookAt(_lookAt.current)
       if (Math.abs(cam.fov - effectiveFov.current) > 0.01) {
         cam.fov = effectiveFov.current
@@ -239,7 +240,6 @@ export default function CoasterCamera({
     const rideFrames = e2eRide === null ? rideStepFrames(speeds, effectiveDelta) : e2eRide * (store.timeScale ?? 1) * 60
     advanceRide(ride.current, curve, speeds, rideFrames)
     const t = ride.current.progress
-    _tangent.current.copy(curve.getTangentAt(t))
     setRideProgress(t)
     const dist = distanceAtT(table, t)
     const inTunnel = tunnelAt(table.tunnels, dist)
@@ -250,35 +250,32 @@ export default function CoasterCamera({
     }
     const tunnel = tunnelDepth(table.tunnels, dist, tunnelRamp)
 
-    _position.current.copy(curve.getPointAt(t))
-    _position.current.y += heightOffset
-    cam.position.copy(_position.current)
+    const pose = seatPose(curve, table, t, trackScale, heightOffset, seat.current)
+    cam.position.copy(pose.eye)
     const velocityNorm = rideSpeedNorm(ride.current, speeds)
 
     // Lateral acceleration from the tangents a few units either side of the car, measured along the track.
     const s = scratch.current
-    const at = sampleTrack(table, t, trackScale, s.samples)
+    const at = pose.samples
     const speed = ride.current.velocity * 60 * at.unitsPerT
     s.tangentBehind.copy(curve.getTangentAt(at.behindT))
-    const lateral = lateralAcceleration(_tangent.current, s.tangentBehind, curve.getTangentAt(at.aheadT), at.span, speed)
+    const lateral = lateralAcceleration(pose.tangent, s.tangentBehind, curve.getTangentAt(at.aheadT), at.span, speed)
 
-    s.lookTarget.copy(curve.getPointAt(at.lookT))
-    s.lookTarget.y += heightOffset
-    s.lookTarget.sub(_position.current).normalize()
-    lookAheadDirection(_tangent.current, s.lookTarget, s.lookTarget)
     const dir = lookDir.current
     if (jumped) {
-      dir.copy(s.lookTarget)
+      dir.copy(pose.look)
       lookSnapped.current = true
       resetRig(rig.current)
     } else {
-      dir.lerp(s.lookTarget, smoothingFactor(effectiveDelta, LOOK_RESPONSE)).normalize()
+      dir.lerp(pose.look, smoothingFactor(effectiveDelta, LOOK_RESPONSE)).normalize()
     }
-    _lookAt.current.copy(_position.current).add(dir)
+    _lookAt.current.copy(pose.eye).add(dir)
+    // The view's up follows the rails' roll through an inversion (#698): no flip at the vertical, no gimbal snap.
+    cam.up.copy(pose.up)
     cam.lookAt(_lookAt.current)
 
     const motionScale = effectiveShakeScale(useSettingsStore.getState().screenShake, prefersReducedMotion())
-    const r = stepRig(rig.current, lateral, speed, velocityNorm, effectiveDelta, trackScale, -_tangent.current.y)
+    const r = stepRig(rig.current, lateral, speed, velocityNorm, effectiveDelta, trackScale, -pose.tangent.y)
     const roll = r.roll * motionScale
     const pitch = r.pitch * motionScale
     if (motionScale > 0) {
@@ -311,7 +308,7 @@ export default function CoasterCamera({
 
     if (testApi) {
       testApi.rideProgress = t
-      const offset = cam.position.distanceTo(_position.current)
+      const offset = cam.position.distanceTo(pose.eye)
       testApi.cameraTranslation.current = offset
       if (offset > testApi.cameraTranslation.max) testApi.cameraTranslation.max = offset
       testApi.cameraTrauma.current = traumaDeg
@@ -339,17 +336,18 @@ export default function CoasterCamera({
     if (touring) {
       const startedAt = introStartedAt()
       const progress = pinned ?? (startedAt === null ? 0 : introProgress((performance.now() - startedAt) / 1000))
-      const bank = tourPose(tour, progress, _position.current, dir, io.pos, io.dir)
+      const bank = tourPose(tour, progress, pose.eye, dir, io.pos, io.dir)
       cam.position.copy(io.pos)
       _lookAt.current.copy(io.pos).add(io.dir)
+      cam.up.copy(WORLD_UP)
       cam.lookAt(_lookAt.current)
       cam.rotateZ(bank)
-      io.lastOffset = io.pos.distanceTo(_position.current)
+      io.lastOffset = io.pos.distanceTo(pose.eye)
       if (testApi) {
         const t = testApi.intro
         t.mode = 'tour'
         t.progress = progress
-        t.height = io.pos.y - _position.current.y
+        t.height = io.pos.y - pose.eye.y
         t.seatOffset = io.lastOffset
         t.seatAngle = io.dir.angleTo(dir) * RAD_TO_DEG
         s.lookTarget.copy(io.anchor).sub(io.pos)

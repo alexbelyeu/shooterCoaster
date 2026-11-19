@@ -31,7 +31,7 @@ function stripBlockoutNotes(): Plugin {
 }
 
 // `vite build --mode portal` (`npm run build:portal`): relative asset URLs, so the zip plays from any sub-path.
-// `vite build --mode turntable` (`npm run turntable`): only the dev enemy turntable page, into dist-turntable/.
+// `vite build --mode turntable` (`npm run turntable`): only the dev pages (the enemy turntable, the ride elements), into dist-turntable/.
 export default defineConfig(({ mode }) => {
   const portal = mode === 'portal'
   const turntable = mode === 'turntable'
@@ -55,7 +55,7 @@ export default defineConfig(({ mode }) => {
       outDir: portal ? 'dist-portal' : turntable ? 'dist-turntable' : 'dist',
       sourcemap: false,
       rollupOptions: {
-        ...(turntable && { input: path.resolve(__dirname, 'turntable.html') }),
+        ...(turntable && { input: [path.resolve(__dirname, 'turntable.html'), path.resolve(__dirname, 'rides.html')] }),
         output: {
           manualChunks: {
             three: ['three'],

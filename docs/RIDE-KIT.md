@@ -40,6 +40,11 @@ storyboard of them. Epic: see the issue that links this file.
 Each element is a pure builder of control points plus markers (where the launch fins, the chain,
 the slow-motion window, the photo are), so camera, audio, pacing and spawning can react.
 
+Built so far (#698): `src/track/elements/` has the loop, zero-g roll, corkscrew, heartline roll, airtime hill
+(with its `slowMotion` marker), helix, banked turn and the head-chopper helper, on a `RideBuilder` whose control
+points carry the track's `up`; a spline with ups rolls, and the ride camera's up follows it. See them ridden with
+`npm run turntable -- --rides` (`e2e-results/turntable/rides.png`).
+
 | Element | What it does | Feel |
 |---|---|---|
 | Launch | Standing start in a station, 0 → top speed in ~2 s on magnetic fins | Whoosh, FOV kick, pushed into the seat |

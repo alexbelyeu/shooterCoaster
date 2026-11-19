@@ -32,8 +32,11 @@ export interface TrackParams {
   ride?: 'v2'
   rideV2?: RideV2Spec
   curve: CurveType
-  /** A `spline`'s points in world units, in ride order; the loop closes from the last to the first. */
-  controlPoints?: readonly { x: number; y: number; z: number }[]
+  /**
+   * A `spline`'s points in world units, in ride order; the loop closes from the last to the first. A point's `up`
+   * rolls the track there (banks, inversions; `src/track/elements/` builds them, #698).
+   */
+  controlPoints?: readonly { x: number; y: number; z: number; up?: { x: number; y: number; z: number } }[]
   color1: number
   color2: number
   /** Running-rail radius at trackScale 1 (default 0.35); multiplied by trackScale. See src/track/trackDimensions.ts */

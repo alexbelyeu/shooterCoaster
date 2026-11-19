@@ -28,6 +28,8 @@ const PANEL_ASPECT = 1.35
 export const HEIGHT_BUCKETS = 8
 /** Towers are skipped where the track is closer than this to the ground. */
 export const MIN_TOWER_HEIGHT = 5
+/** No tower under track whose up is rolled further than this from vertical (cos 60°). */
+const MIN_TOWER_UP = 0.5
 /** How far below the lowest leg footing the tower geometry continues. */
 const BURY = 3
 /**
@@ -155,6 +157,8 @@ function planAtSpacing(
     const dist = (k + 0.5) * spacing
     const t = tAtDistance(table, dist)
     trackFrame(curve, t, point, forward, right, up)
+    // Rolled past 60° (an inversion, a steep bank, #698): a tower from the ground would run up through the rails.
+    if (up.y < MIN_TOWER_UP) continue
     // Spine bottom, directly under the rail centreline.
     center.copy(point).addScaledVector(up, -spineBottom)
     const cx = center.x
