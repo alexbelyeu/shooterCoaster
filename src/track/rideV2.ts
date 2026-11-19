@@ -7,9 +7,10 @@ import type { RideBeat, RideV2Spec, SpeedZone } from '@/types/level'
  * frame from GO: the live ride reads it by ride time (`ridePhysics.ts` `advanceRide`), so it is the same ride at any
  * frame rate and spawning predicts it exactly (`rideProfile`).
  *
- * The solver's one knob per stretch between two beats is a scale `a`: speeds × a and accelerations (gravity, a zone's)
- * × a². Drag per speed² is unchanged, so from rest that is the same ride exactly 1 / a times as long: slow crests and
- * fast drops keep their shape.
+ * The free ride is simulated once from a standing start; the solver then warps its time. Each stretch between two beats
+ * rides at scale `a` (speed × a, eased in from the stretch before's): with gravity × a² and zone speeds × a that is the
+ * same ride, 1 / a times as long, so slow crests and fast drops keep their shape and a carried-in speed can't push a
+ * beat out of reach.
  */
 
 /** Gravity near 9.8 m/s² at the gym's 32 world units per metre; drag a mild cap on the fastest drops. */
@@ -26,6 +27,8 @@ const CELLS = 4096
 const MIN_SCALE = 1 / 16
 const MAX_SCALE = 16
 const SOLVER_STEPS = 40
+/** Share of a stretch over which the warp eases from the stretch before's scale to its own, so speed never jumps. */
+const EASE_SHARE = 0.25
 
 export interface RidePlan {
   table: ArcTable
@@ -55,7 +58,6 @@ interface Course {
 }
 
 interface Car {
-  time: number
   distance: number
   speed: number
 }
@@ -94,50 +96,71 @@ function buildCourse(table: ArcTable, spec: RideV2Spec): Course {
   }
 }
 
-/** One 60 fps frame of the ride at scale `a`. */
-function step(course: Course, car: Car, a: number): void {
+/** One 60 fps frame of the free ride. */
+function step(course: Course, car: Car): void {
   const dt = 1 / PLAN_RATE
   const wrapped = car.distance % course.length
   const i = Math.min(Math.floor(wrapped / course.cell), CELLS - 1)
-  const a2 = a * a
-  let v = car.speed + (-course.gravity * a2 * course.slope[i] - course.drag * car.speed * car.speed) * dt
+  let v = car.speed + (-course.gravity * course.slope[i] - course.drag * car.speed * car.speed) * dt
   const z = course.zone[i]
   if (z >= 0) {
     const zone = course.zones[z]
-    const target = zone.speed * a
-    if (zone.kind === 'lift') v = Math.max(v, target)
-    else if (zone.kind === 'launch' && v < target) v = Math.min(v + (zone.accel ?? zone.speed / 2) * a2 * dt, target)
-    else if (zone.kind === 'brake' && v > target) v = Math.max(v - (zone.accel ?? course.gravity) * a2 * dt, target)
+    if (zone.kind === 'lift') v = Math.max(v, zone.speed)
+    else if (zone.kind === 'launch' && v < zone.speed) v = Math.min(v + (zone.accel ?? zone.speed / 2) * dt, zone.speed)
+    else if (zone.kind === 'brake' && v > zone.speed) v = Math.max(v - (zone.accel ?? course.gravity) * dt, zone.speed)
   }
-  v = Math.max(v, course.crawl * a)
+  v = Math.max(v, course.crawl)
   car.speed = v
   car.distance += v * dt
-  car.time += dt
 }
 
-/** Rides `car` on at scale `a` to `target` distance; the second it gets there (Infinity past `giveUp`). */
-function rideTo(course: Course, car: Car, a: number, target: number, giveUp: number): number {
-  while (car.distance < target) {
-    if (car.time > giveUp) return Infinity
-    const before = car.distance
-    step(course, car, a)
-    if (car.distance >= target) return car.time - (car.distance - target) / (car.distance - before) / PLAN_RATE
+/** The free ride from a standing start, one sample per 60 fps frame, simulated as far as it is read. */
+class FreeRide {
+  readonly distance: number[] = [0]
+  readonly speed: number[] = [0]
+  private readonly car: Car = { distance: 0, speed: 0 }
+  constructor(private readonly course: Course) {}
+
+  /** Makes sure sample `k` exists. */
+  reach(k: number): void {
+    while (this.distance.length <= k) {
+      step(this.course, this.car)
+      this.distance.push(this.car.distance)
+      this.speed.push(this.car.speed)
+    }
   }
-  return car.time
+
+  /** Makes sure the ride gets past `dist`. */
+  reachDistance(dist: number): void {
+    while (this.car.distance <= dist) this.reach(this.distance.length)
+  }
 }
 
-/** The scale that gets the car from `start` to `target` at `second` (as close as `MIN_SCALE`..`MAX_SCALE` allow). */
-function solveStretch(course: Course, start: Car, target: number, second: number): number {
-  let lo = Math.log(MIN_SCALE)
-  let hi = Math.log(MAX_SCALE)
-  const trial: Car = { time: 0, distance: 0, speed: 0 }
-  for (let k = 0; k < SOLVER_STEPS; k++) {
-    const mid = (lo + hi) / 2
-    Object.assign(trial, start)
-    if (rideTo(course, trial, Math.exp(mid), target, second + 60) > second) lo = mid
-    else hi = mid
+/**
+ * The warp's scale at distance `d` in stretch `i` (from `bounds[i - 1]`, 0 for the first, to `bounds[i]`): `scales[i]`,
+ * eased in from the stretch before's over its first `EASE_SHARE`.
+ */
+function scaleAt(scales: readonly number[], bounds: readonly number[], i: number, d: number): number {
+  if (i === 0 || i >= bounds.length) return scales[Math.min(i, scales.length - 1)]
+  const from = bounds[i - 1]
+  const ease = (bounds[i] - from) * EASE_SHARE
+  const f = Math.min((d - from) / ease, 1)
+  return scales[i - 1] + (scales[i] - scales[i - 1]) * f
+}
+
+/** Seconds stretch `i` takes, warped by `scales` (only `scales[i - 1]` and `scales[i]` matter). */
+function stretchSeconds(free: FreeRide, bounds: readonly number[], scales: readonly number[], i: number): number {
+  const from = i > 0 ? bounds[i - 1] : 0
+  const to = bounds[i]
+  let seconds = 0
+  for (let k = 0; k + 1 < free.distance.length && free.distance[k] < to; k++) {
+    const a = Math.max(free.distance[k], from)
+    const b = Math.min(free.distance[k + 1], to)
+    if (b <= a) continue
+    const share = (b - a) / (free.distance[k + 1] - free.distance[k])
+    seconds += share / PLAN_RATE / scaleAt(scales, bounds, i, (a + b) / 2)
   }
-  return Math.exp((lo + hi) / 2)
+  return seconds
 }
 
 function checkBeats(beats: readonly RideBeat[]): void {
@@ -152,34 +175,63 @@ export function buildRidePlan(table: ArcTable, spec: RideV2Spec): RidePlan {
   const course = buildCourse(table, spec)
   const beats = spec.beats ?? []
   checkBeats(beats)
+  const free = new FreeRide(course)
+  const bounds = beats.map((beat) => beat.at * course.length)
+  if (bounds.length > 0) free.reachDistance(bounds[bounds.length - 1])
+
+  // Stretch by stretch, the scale that lands its beat (the time a stretch takes falls as its scale rises).
   const scales: number[] = []
-  const car: Car = { time: 0, distance: 0, speed: 0 }
-  for (const beat of beats) {
-    const target = beat.at * course.length
-    const a = solveStretch(course, car, target, beat.second)
-    scales.push(a)
-    rideTo(course, car, a, target, Infinity)
-  }
+  beats.forEach((beat, i) => {
+    const seconds = beat.second - (i > 0 ? beats[i - 1].second : 0)
+    let lo = Math.log(MIN_SCALE)
+    let hi = Math.log(MAX_SCALE)
+    for (let n = 0; n < SOLVER_STEPS; n++) {
+      const mid = (lo + hi) / 2
+      scales[i] = Math.exp(mid)
+      if (i === 0) scales[1] = scales[0]
+      if (stretchSeconds(free, bounds, scales, i) > seconds) lo = mid
+      else hi = mid
+    }
+    scales[i] = Math.exp((lo + hi) / 2)
+  })
+  scales.length = beats.length
   scales.push(scales.length > 0 ? scales[scales.length - 1] : 1)
 
+  // Ride the warped free ride and sample it at every 60 fps frame.
   const frames = HORIZON_SECONDS * PLAN_RATE
   const distance = new Float64Array(frames + 1)
   const speed = new Float64Array(frames + 1)
   const landed: number[] = []
-  const ride: Car = { time: 0, distance: 0, speed: 0 }
   let minSpeed = Infinity
   let maxSpeed = 0
-  for (let k = 1; k <= frames; k++) {
-    const before = ride.distance
-    step(course, ride, scales[landed.length])
-    const beat = beats[landed.length]
-    if (beat && ride.distance >= beat.at * course.length) {
-      landed.push(ride.time - (ride.distance - beat.at * course.length) / (ride.distance - before) / PLAN_RATE)
+  let k = 0
+  let stretch = 0
+  /** Warped seconds at free sample k, and the scale over sample k to k + 1. */
+  let time = 0
+  let a = scales[0]
+  const advance = () => {
+    free.reach(k + 1)
+    const d0 = free.distance[k]
+    const d1 = free.distance[k + 1]
+    while (stretch < bounds.length && d0 >= bounds[stretch]) stretch++
+    a = scaleAt(scales, bounds, stretch, (d0 + d1) / 2)
+    if (stretch < bounds.length && d1 >= bounds[stretch]) {
+      landed.push(time + (bounds[stretch] - d0) / (d1 - d0) / PLAN_RATE / a)
     }
-    distance[k] = ride.distance
-    speed[k] = ride.speed
-    minSpeed = Math.min(minSpeed, ride.speed)
-    maxSpeed = Math.max(maxSpeed, ride.speed)
+  }
+  advance()
+  for (let j = 1; j <= frames; j++) {
+    const now = j / PLAN_RATE
+    while (time + 1 / PLAN_RATE / a < now) {
+      time += 1 / PLAN_RATE / a
+      k++
+      advance()
+    }
+    const f = (now - time) * PLAN_RATE * a
+    distance[j] = free.distance[k] + (free.distance[k + 1] - free.distance[k]) * f
+    speed[j] = a * (free.speed[k] + (free.speed[k + 1] - free.speed[k]) * f)
+    minSpeed = Math.min(minSpeed, speed[j])
+    maxSpeed = Math.max(maxSpeed, speed[j])
   }
   return { table, distance, speed, minSpeed, maxSpeed, scales, landed }
 }

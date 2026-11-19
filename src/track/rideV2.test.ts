@@ -95,6 +95,7 @@ describe('the beat solver', () => {
   it.each([
     ['slower than it rolls', [{ at: 0.3, second: 20 }, { at: 0.75, second: 45 }]],
     ['faster than it rolls', [{ at: 0.4, second: 3 }, { at: 0.6, second: 5 }]],
+    ['fast and then slow, against the speed it carries in', [{ at: 0.4, second: 3 }, { at: 0.9, second: 60 }]],
     ['into the second lap', [{ at: 0.5, second: 12 }, { at: 1.4, second: 40 }]],
   ])('lands every beat on its second, %s', (_name, beats) => {
     const plan = buildRidePlan(table, { zones: ZONES, beats })

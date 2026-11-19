@@ -73,7 +73,7 @@ export interface RideBeat {
 /** The v2 ride (#696): defaults in `rideV2.ts` `RIDE_V2_DEFAULTS`. */
 export interface RideV2Spec {
   zones?: readonly SpeedZone[]
-  /** In ride order; the solver scales gravity and zone speeds between beats so each lands within `BEAT_TOLERANCE_SECONDS`. */
+  /** In ride order; the solver speeds up or slows down the ride between beats so each lands within `BEAT_TOLERANCE_SECONDS`. */
   beats?: readonly RideBeat[]
   /** World units per second². */
   gravity?: number
