@@ -322,4 +322,7 @@ one draw call, hidden when slow, also scaled by Screen shake); touch shots get a
 `requestAnimationFrame` that runs only when the script asks), so each captured frame is exactly 1/30 s of
 game time for every consumer (R3F, timers, framer-motion) however slowly software GL draws it; no game code is involved.
 A portrait `--size` (e.g. `720x1280`) emulates touch, so the clip shows the phone layout; `--ride-only` plays the title
-and level select uncaptured, so the clip opens on the ride.
+and level select uncaptured, so the clip opens on the ride; `--direct` skips them (`startLevel` at boot) and `--quality <preset>`
+loads the page with `?quality=`, for a quick review clip of one stretch (#622). While the level loads the clock runs (its lazy chunk
+and the shader warm-up's program poll are timers) under `timerStep = 0` and `rideRate = 0`, so the ride still starts at `--from`
+with the full timer.

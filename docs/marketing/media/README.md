@@ -31,6 +31,9 @@ repo's history. Commit them in the PR for that push.
 `npm run build && npm run clip` (cloud sessions: `export SC_CHROME="$(scripts/ensure-browser.sh)"`
 first; needs ffmpeg: `apt-get install -y ffmpeg`). ~15 min on a 2-core session; the frames
 stay in `e2e-results/clip/<size>/` and `npm run clip -- --encode-only` re-encodes them.
+To look at one stretch of a level without committing anything (a review, an issue), skip the menus and
+lower the quality: `npm run clip -- --level level6 --from 0.13 --seconds 6 --direct --quality low`
+(~3.5 min at 1280×720 on a 2-core session; `--fps 10 --size 960x540 --frames-only` is under a minute).
 
 **The GIF is not committed** (twice the MP4's size, from the same frames): the render writes it
 to `e2e-results/clip/<size>/clip-<level>-<size>.gif` (gitignored); attach it from there. Without

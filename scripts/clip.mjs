@@ -13,6 +13,8 @@
  *   --fps 30 --size 1280x720 (or 720x1280) --seed 1337 --intro 2.5 --select 1.5 --kill-every 1.5
  *   --gif-seconds 8 --out docs/marketing/media --url <running preview> --frames-only --encode-only
  *   --ride-only (title and level select still play, uncaptured: the clip opens on the ride)
+ *   --direct (#622: no title or level select at all, the level starts at boot: the quickest way to a review clip of one
+ *   stretch, e.g. --level level6 --from 0.13 --seconds 6 --direct --quality low) --quality <preset> (passed as ?quality=)
  *   --title (#419: the title screen alone for --seconds from its first frame, no PLAY: clip-title-<size>.mp4; --attract
  *   starts it in attract mode, clip-title-attract-<size>.mp4)
  * A portrait --size renders as a phone (touch emulated, so the page takes its touch-only layout) and makes no GIF.
@@ -35,7 +37,9 @@ const GIF_S = Number(arg('gif-seconds', 8))
 const OUT_DIR = path.resolve(arg('out', 'docs/marketing/media'))
 const FRAMES_ONLY = process.argv.includes('--frames-only')
 const ENCODE_ONLY = process.argv.includes('--encode-only')
-const RIDE_ONLY = process.argv.includes('--ride-only')
+const DIRECT = process.argv.includes('--direct')
+const RIDE_ONLY = DIRECT || process.argv.includes('--ride-only')
+const QUALITY = arg('quality', null)
 const TITLE = process.argv.includes('--title')
 const ATTRACT = TITLE && process.argv.includes('--attract')
 const [WIDTH, HEIGHT] = SIZE.split('x').map(Number)
@@ -147,21 +151,15 @@ async function render(browser, url) {
     }
   }
 
-  await page.goto(`${url}/?e2e=1&seed=${SEED}`)
+  await page.goto(`${url}/?e2e=1&seed=${SEED}${QUALITY ? `&quality=${encodeURIComponent(QUALITY)}` : ''}`)
   // Boot needs timers to run (canvas measure debounce); nothing is captured yet.
   await settle('the game to boot', 50, () => window.__SC_TEST__?.levels().length > 0 && window.__SC_TEST__.frames >= 3)
   if (TITLE) return renderTitle()
-  // Starring every level before LEVEL unlocks it and puts the level select's first focus on it.
-  const unlocked = await hook((id) => {
-    const t = window.__SC_TEST__
-    const levels = t.levels()
-    const at = levels.findIndex((l) => l.id === id)
-    if (at < 0) return false
-    const best = (l) => ({ level: l.id, score: Math.round(l.maxScore * 0.92), maxScore: l.maxScore, stars: 3, timestamp: 0 })
-    t.setSavedScores(Object.fromEntries(levels.slice(0, at).map((l) => [l.id, best(l)])))
-    return t.levels().find((l) => l.id === id).unlocked
-  }, LEVEL)
-  if (!unlocked) throw new Error(`clip: unknown level ${LEVEL}, or still locked after starring the levels before it`)
+  if (DIRECT) {
+    const known = await hook((id) => window.__SC_TEST__.levels().some((l) => l.id === id), LEVEL)
+    if (!known) throw new Error(`clip: unknown level ${LEVEL}`)
+    await hook((id) => window.__SC_TEST__.startLevel(id), LEVEL)
+  } else await menusToLevel()
 
   async function renderTitle() {
     if (ATTRACT) await hook(() => (window.__SC_TEST__.titleAttractIdleMs = 0))
@@ -170,20 +168,47 @@ async function render(browser, url) {
     return { frames: captured, rideStart: 0, renderSeconds: Math.round((Date.now() - started) / 1000), errors: [...errors, ...pageErrors] }
   }
 
-  const menus = !RIDE_ONLY
-  await capture(Math.round(INTRO_S * FPS), undefined, menus)
-  await page.keyboard.press('Enter')
-  await capture(Math.round(SELECT_S * FPS), undefined, menus)
-  const focused = await hook(() => document.activeElement?.textContent ?? '')
-  const levelName = await hook((id) => window.__SC_TEST__.levels().find((l) => l.id === id).name, LEVEL)
-  if (!focused.includes(levelName)) throw new Error(`clip: level select focus is not on ${levelName} (got "${focused.slice(0, 60)}")`)
-  await page.keyboard.press('Enter')
-  await capture(FPS * 2, async () => (await hook(() => window.__SC_TEST__.phase())) !== 'playing', menus)
-  await hook((f) => { window.__SC_TEST__.rideTo = f }, FROM)
-  // No time passes while the level mounts, so the ride starts at --from with the full timer.
-  await settle('the level to load', 0, () => {
+  async function menusToLevel() {
+    // Starring every level before LEVEL unlocks it and puts the level select's first focus on it.
+    const unlocked = await hook((id) => {
+      const t = window.__SC_TEST__
+      const levels = t.levels()
+      const at = levels.findIndex((l) => l.id === id)
+      if (at < 0) return false
+      const best = (l) => ({ level: l.id, score: Math.round(l.maxScore * 0.92), maxScore: l.maxScore, stars: 3, timestamp: 0 })
+      t.setSavedScores(Object.fromEntries(levels.slice(0, at).map((l) => [l.id, best(l)])))
+      return t.levels().find((l) => l.id === id).unlocked
+    }, LEVEL)
+    if (!unlocked) throw new Error(`clip: unknown level ${LEVEL}, or still locked after starring the levels before it`)
+
+    const menus = !RIDE_ONLY
+    await capture(Math.round(INTRO_S * FPS), undefined, menus)
+    await page.keyboard.press('Enter')
+    await capture(Math.round(SELECT_S * FPS), undefined, menus)
+    const focused = await hook(() => document.activeElement?.textContent ?? '')
+    const levelName = await hook((id) => window.__SC_TEST__.levels().find((l) => l.id === id).name, LEVEL)
+    if (!focused.includes(levelName)) throw new Error(`clip: level select focus is not on ${levelName} (got "${focused.slice(0, 60)}")`)
+    await page.keyboard.press('Enter')
+    await capture(FPS * 2, async () => (await hook(() => window.__SC_TEST__.phase())) !== 'playing', menus)
+  }
+
+  // The level's lazy chunk and its shader warm-up (whose program poll is a setTimeout) need the clock to run, but the
+  // level must not: a zero level-time step and ride rate hold the timer, the game clock and the ride while it loads,
+  // so the ride starts at --from with the full timer.
+  await hook((f) => {
     const t = window.__SC_TEST__
-    return t.phase() === 'playing' && t.weapon?.visible === true && t.rideTo === null
+    t.rideTo = f
+    t.timerStep = 0
+    t.rideRate = 0
+  }, FROM)
+  await settle('the level to load', STEP_MS, () => {
+    const t = window.__SC_TEST__
+    return t.phase() === 'playing' && t.levelReady() && t.weapon?.visible === true && t.rideTo === null
+  })
+  await hook(() => {
+    const t = window.__SC_TEST__
+    t.timerStep = null
+    t.rideRate = null
   })
 
   const rideStart = captured
