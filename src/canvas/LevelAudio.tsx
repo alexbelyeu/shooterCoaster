@@ -17,6 +17,7 @@ import { intensityForTier } from '@/audio/scrim/layers'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
 import { BYSTANDER_HIT_EVENT, type BystanderHitEvent } from '@/combat/bystanders'
+import { tracePhoto } from '@/store/ridePhoto'
 
 /**
  * The level's score while it runs (held while paused, through the resume Ready / GO), the results score after it.
@@ -54,7 +55,10 @@ const onFireworkLaunch = (e: unknown) => {
   sfx().fireworkWhistle(flightS, timeScale)
 }
 const onFireworkBurst = () => sfx().fireworkPop()
-const onPhoto = () => sfx().shutter()
+const onPhoto = () => {
+  sfx().shutter()
+  tracePhoto('sfx')
+}
 /** An unshot snowball thumps past: the snow crunch, unplaced (it is at the camera). */
 const onSnowSplat = () => sfx().kill(0, 'crunch', null)
 

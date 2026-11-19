@@ -280,7 +280,8 @@ export interface SCTestApi {
     width: number; height: number; bytes: number | null
     /** The HUD's flash started its animation. */
     flashed: boolean
-    /** ms after the capture call each stage reached: the bitmap, scaled, encoded, the next frame. */
+    /** ms after the capture call each stage reached: `sfx` (the shutter played), `bitmap`, `flash` (its animation started),
+     *  `nextFrame` (the capture's frame timed), `posted` (to the darkroom worker), `encoded` (the JPEG back). */
     trace: Record<string, number> | null
   }
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */

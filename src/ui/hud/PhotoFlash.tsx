@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { eventBus } from '@/core/EventBus'
 import { RIDE_PHOTO_EVENT } from '@/track/photoMarker'
+import { tracePhoto } from '@/store/ridePhoto'
 
 /** Under e2e: the flash got on screen (it lasts 0.35 s, less than one smoke frame on a software renderer). */
 function markFlashed() {
-  if (window.__SC_TEST__) window.__SC_TEST__.photo.flashed = true
+  if (!window.__SC_TEST__) return
+  window.__SC_TEST__.photo.flashed = true
+  tracePhoto('flash')
 }
 
 /** The on-ride photo's flash (#701): white over the whole screen, gone in a third of a second (dimmer with reduced motion, in CSS). */

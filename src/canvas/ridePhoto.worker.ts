@@ -1,17 +1,25 @@
 /**
  * The on-ride photo's darkroom (#701): scales the captured frame and encodes its JPEG off the main thread, so neither
  * can land between the game's frames (on CI's headless Chromium the frame after the capture took 11–17 s while a
- * main-thread canvas did this). Answers with the JPEG, or null.
+ * main-thread canvas did this). Answers each request with its run's JPEG, or null.
  */
 export interface DevelopRequest {
+  runId: number
   frame: ImageBitmap
   width: number
   height: number
   quality: number
 }
 
+export interface DevelopResult {
+  runId: number
+  blob: Blob | null
+  width: number
+  height: number
+}
+
 onmessage = async (e: MessageEvent<DevelopRequest>) => {
-  const { frame, width, height, quality } = e.data
+  const { runId, frame, width, height, quality } = e.data
   let blob: Blob | null = null
   try {
     const canvas = new OffscreenCanvas(width, height)
@@ -24,5 +32,6 @@ onmessage = async (e: MessageEvent<DevelopRequest>) => {
     blob = null
   }
   frame.close()
-  postMessage(blob)
+  const result: DevelopResult = { runId, blob, width, height }
+  postMessage(result)
 }
