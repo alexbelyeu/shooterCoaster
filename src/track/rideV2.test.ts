@@ -3,6 +3,7 @@ import type { RideV2Spec, TrackParams } from '@/types/level'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { buildArcTable, distanceAtT, tAtDistance } from './arcLength'
 import { createTrackCurve } from './curves/createTrackCurve'
+import { withMechanics } from './mechanics'
 import {
   MAX_RIDE_STEP_FRAMES, advanceRide, jumpRide, lapSeconds, rideLaunches, rideModel, rideOnLift, rideProfile, rideSpeedNorm, rideSpeeds,
   rideStepFrames, rideTopShare, rideZone, type RideState,
@@ -223,7 +224,8 @@ describe('the ride feel on today\'s rule', () => {
 
 it('every level on the v2 ride lands its storyboard\'s beats', () => {
   for (const level of getAllLevels().filter((l) => l.track.ride === 'v2')) {
-    const plan = buildRidePlan(buildArcTable(createTrackCurve(level.track)), level.track.rideV2 ?? {})
+    const table = buildArcTable(createTrackCurve(level.track))
+    const plan = buildRidePlan(table, withMechanics(level.track.rideV2 ?? {}, level.track.mechanics, table.length))
     const misses = (level.track.rideV2?.beats ?? []).filter((beat, i) => !(Math.abs(plan.landed[i] - beat.second) <= BEAT_TOLERANCE_SECONDS))
     expect(misses, level.id).toEqual([])
   }

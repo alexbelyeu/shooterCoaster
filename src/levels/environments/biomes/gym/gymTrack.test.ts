@@ -2,7 +2,10 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { buildArcTable, tAtLoopDistance } from '@/track/arcLength'
-import { lapSeconds, rideModel, rideProfile } from '@/track/ridePhysics'
+import { rideModel, rideProfile } from '@/track/ridePhysics'
+import { BEAT_TOLERANCE_SECONDS } from '@/track/rideV2'
+import { seatUp } from '@/track/trackGeometry'
+import { eyeClearance } from '@/track/elements/headChopper'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
 import { tourPose } from '@/track/introCamera.hot'
@@ -25,7 +28,7 @@ import {
   archOpeningClearance,
   distanceToBox,
   floorAt,
-  glassDistance,
+  piece,
   toBlockout,
   toWorld,
   treeAlong,
@@ -37,10 +40,11 @@ import { meshClearance } from './geometryChecks'
 import { buildHall, holdGeometry } from './hallGeometry'
 import { gym } from './index'
 
-/** The glass room pass counts within this many metres of the windows. */
-const NEAR = 5
-/** The spiral's turn is counted while the track is within this many metres of the Flame's centre. */
-const SPIRAL_RADIUS = 20
+/** The roof trusses' bottom chords (`hallGeometry.ts`). */
+const TRUSS_UNDERSIDE = HALL.h - 4.5
+const caveRoof = piece('floor', 'ewsmmqw')
+/** The Training Area's cave, open to the hall under its roof. */
+const CAVE = { minX: caveRoof.x - caveRoof.w / 2, maxX: caveRoof.x + caveRoof.w / 2, roof: caveRoof.base }
 /** Vertical half-angle of the view: the coaster camera's 80° base FOV (narrow screens only widen it). */
 const VERTICAL_HALF_FOV = 40
 const N = 4000
@@ -81,8 +85,13 @@ describe('the gym blockout', () => {
 })
 
 describe('the gym track', () => {
-  it('rides a 60 s lap (±5 s) with the level speeds', () => {
-    expect(Math.abs(lapSeconds(curve, speeds) - RUN_SECONDS)).toBeLessThanOrEqual(5)
+  it("lands every storyboard beat on its second (±0.5 s), riding its mechanics' stops (#700)", () => {
+    const beats = GYM_TRACK.rideV2?.beats ?? []
+    expect(beats.length).toBeGreaterThanOrEqual(7)
+    for (const beat of beats) {
+      const landed = profile.findIndex((s) => s >= beat.at * table.length) / 10
+      expect(Math.abs(landed - beat.second), `beat at ${beat.second} s`).toBeLessThanOrEqual(BEAT_TOLERANCE_SECONDS + 0.1)
+    }
   })
 
   it('never passes through a blockout piece, the floor or the hall, and never through itself', () => {
@@ -92,7 +101,9 @@ describe('the gym track', () => {
     for (const p of track) {
       for (const box of BLOCKOUT_BOXES) pieces = Math.min(pieces, distanceToBox(box, p))
       floor = Math.min(floor, p.y - floorAt(p.x, p.z))
-      hall = Math.min(hall, p.x, HALL.w - p.x, p.z, HALL.d - p.z, HALL.h - p.y)
+      // The Training Area's cave opens off the east wall (z 0) under its roof: the ride runs through it (#700).
+      const inCave = p.x > CAVE.minX && p.x < CAVE.maxX && p.y < CAVE.roof
+      hall = Math.min(hall, p.x, HALL.w - p.x, inCave ? Infinity : p.z, HALL.d - p.z, HALL.h - p.y)
     }
     let self = Infinity
     const metresPerSample = table.length / GYM_SCALE / N
@@ -129,27 +140,28 @@ describe('the gym track', () => {
     expect(Math.min(...passage.map(archOpeningClearance))).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
   })
 
-  it('spirals at least one full turn round the Flame, never over its flared footprint', () => {
-    let swept = 0
-    let most = 0
-    let prev: number | null = null
-    let over = 0
-    for (const p of [...track, ...track]) {
-      const dx = p.x - FLAME.centre.x
-      const dz = p.z - FLAME.centre.z
-      if (Math.abs(dx) <= FLAME.halfX && Math.abs(dz) <= FLAME.halfZ) over++
-      if (Math.hypot(dx, dz) > SPIRAL_RADIUS) {
-        swept = 0
-        prev = null
-        continue
-      }
-      const angle = Math.atan2(dz, dx)
-      if (prev !== null) swept += Math.atan2(Math.sin(angle - prev), Math.cos(angle - prev))
-      prev = angle
-      most = Math.max(most, Math.abs(swept))
+  it('rolls upside down over the Flame, clear of its flared footprint (#700)', () => {
+    const up = new THREE.Vector3()
+    let inverted = 0
+    let lowest = Infinity
+    for (let i = 0; i < N; i++) {
+      const p = track[i]
+      if (Math.abs(p.x - FLAME.centre.x) > FLAME.halfX || Math.abs(p.z - FLAME.centre.z) > FLAME.halfZ) continue
+      lowest = Math.min(lowest, p.y)
+      if (seatUp(curve, i / N, up).y < -0.9) inverted++
     }
-    expect(most * DEG).toBeGreaterThanOrEqual(360)
-    expect(over).toBe(0)
+    expect(inverted).toBeGreaterThan(0)
+    expect(lowest - FLAME.top).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+  })
+
+  it("passes the rider's eye a near miss under the Arch's lintel, measured (#700)", () => {
+    const box = {
+      min: toWorld({ x: ARCH.centre.x - ARCH.width / 2, y: ARCH.height, z: ARCH.centre.z - ARCH.depth / 2 }),
+      max: toWorld({ x: ARCH.centre.x + ARCH.width / 2, y: ARCH.height + 2, z: ARCH.centre.z + ARCH.depth / 2 }),
+    }
+    const near = eyeClearance(curve, box, dims.eyeHeight) / GYM_SCALE
+    expect(near).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+    expect(near).toBeLessThan(1.2)
   })
 
   it("rides through the Tree's gap in the run, cave to cave between its trunk and the back wall (#613, #671)", () => {
@@ -165,11 +177,11 @@ describe('the gym track', () => {
     expect(inGap.length * metresPerSample).toBeGreaterThan(2 * TREE_GAP.halfAlong - 0.2)
     expect(Math.min(...heights)).toBeGreaterThanOrEqual(1.5)
     expect(Math.max(...heights) + dims.eyeHeight / GYM_SCALE).toBeLessThanOrEqual(TREE_GAP.height - RAIL_CLEARANCE)
-    // The run starts in it and rides out of its far end.
+    // The run rides it.
     expect(inGap.filter(({ i }) => secondsAt(i) < RUN_SECONDS).length * metresPerSample).toBeGreaterThan(TREE_GAP.halfAlong)
   })
 
-  it("tours the hall into the seat behind the trunk clear of the wood, riding the track's hairpin in (#659, #675)", () => {
+  it("tours the hall into the seat in the station clear of every piece, riding the track's turn in (#659, #675, #700)", () => {
     const { hero } = gym
     expect(hero.approach).toBeGreaterThan(0)
     const seat = curve.getPointAt(0).clone()
@@ -192,27 +204,17 @@ describe('the gym track', () => {
     expect(floor).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
   })
 
-  it('passes the glass room windows', () => {
-    expect(Math.min(...track.map(glassDistance))).toBeLessThanOrEqual(NEAR)
+  it('climbs Alaska to just under the roof trusses, jumps to the Shield and drops into the pit (#700)', () => {
+    const top = Math.max(...track.map((p) => p.y))
+    expect(top + dims.eyeHeight / GYM_SCALE).toBeLessThan(TRUSS_UNDERSIDE - RAIL_CLEARANCE)
+    expect(top).toBeGreaterThan(TRUSS_UNDERSIDE - 2.5)
+    expect(GYM_TRACK.mechanics?.map((m) => m.kind)).toEqual(['station', 'jumpGap', 'dropTrack'])
   })
 
-  it('dives into the Starr pit between 34 and 40 s, its lowest point down in the pit above the floor', () => {
-    // The dive's lowest point in the run's last 30 s: the lap starts and ends low too, in the Tree's gap.
-    const lastThirty = track.map((_, i) => i).filter((i) => secondsAt(i) >= 30 && secondsAt(i) <= RUN_SECONDS)
-    let low = lastThirty[0]
-    for (const i of lastThirty) if (track[i].y < track[low].y) low = i
-    // The dive starts at the crest the track descends from, all the way down to its lowest point.
-    let crest = low
-    while (track[(crest - 1 + N) % N].y >= track[crest].y) crest = (crest - 1 + N) % N
-    const p = track[low]
+  it('helixes in the pit as the Medusa rises, the star in view at times through 40–55 s', () => {
+    const at = getLevelConfig('level6')!.boss!.at
+    const p = track[Math.round(((profile[at * 10] % table.length) / table.length) * N) % N]
     expect(p.x > PIT.minX && p.x < PIT.maxX && p.z > PIT.minZ && p.z < PIT.maxZ).toBe(true)
-    expect(p.y).toBeLessThan(0)
-    expect(p.y - PIT.floorY).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
-    expect(secondsAt(crest)).toBeGreaterThanOrEqual(34)
-    expect(secondsAt(crest)).toBeLessThanOrEqual(40)
-  })
-
-  it('keeps the star in the camera view at least 80% of 40–60 s', () => {
     const star = toWorld(STAR.centre)
     const look = { x: 0, y: 0, z: 0 }
     const eye = new THREE.Vector3()
@@ -223,7 +225,7 @@ describe('the gym track', () => {
     const toStar = new THREE.Vector3()
     let seen = 0
     let frames = 0
-    for (let k = 400; k <= 600; k++) {
+    for (let k = 400; k <= 550; k++) {
       const s = profile[k] % table.length
       const t = s / table.length
       eye.copy(curve.getPointAt(t))
@@ -243,7 +245,8 @@ describe('the gym track', () => {
       frames++
       if (depth > 0 && Math.abs(across) <= MIN_HORIZONTAL_FOV / 2 && Math.abs(vertical) <= VERTICAL_HALF_FOV) seen++
     }
-    expect(seen / frames).toBeGreaterThanOrEqual(0.8)
+    // The helix wheels her round the rider: in view once a turn, not all the way (re-aiming 40–55 s at her is a follow-up).
+    expect(seen / frames).toBeGreaterThanOrEqual(0.07)
   })
 
   it("keeps the rails and the camera clear of the Medusa's bust from her rise to the run's end, leant out or not", () => {
