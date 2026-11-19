@@ -5,9 +5,8 @@ import { HEAT_SHIMMER } from '@/canvas/post/HeatShimmerEffect'
 import { easeShimmer, shimmerAmplitude, shimmerRect } from '@/canvas/post/heatShimmer.hot'
 import { isCoarsePointer, useFbmOctaves, useQualityProfile } from '@/canvas/useRenderBudget'
 import ParticleField from '../../shared/ParticleField'
-import { PARTICLE_PRESETS } from '../../shared/particlePresets'
 import { gradientNoiseGlsl } from '../../shared/noiseGlsl'
-import { buildFlameTongues, buildSmokePuffs, emberAnchor, fireFlicker, fireFootprint, fireHeights, shimmerColumn, smokeCount, tongueCount } from './flameFire'
+import { FLAME_EMBERS, buildFlameTongues, buildSmokePuffs, emberAnchor, fireFlicker, fireFootprint, fireHeights, shimmerColumn, smokeCount, tongueCount } from './flameFire'
 import { FIRE_FLICKER } from './grimeShader'
 
 const tongueVertex = /* glsl */ `
@@ -322,7 +321,7 @@ export default function FlameFire() {
       {/* Under the flames: the tongues' light adds over the smoke where they meet */}
       <mesh geometry={smoke} material={smokeMaterial} renderOrder={-1} />
       <mesh geometry={tongues} material={tongueMaterial} />
-      <ParticleField preset={PARTICLE_PRESETS.gymFlameEmbers} anchor={EMBER_ANCHOR} />
+      <ParticleField preset={FLAME_EMBERS} anchor={EMBER_ANCHOR} />
     </>
   )
 }
