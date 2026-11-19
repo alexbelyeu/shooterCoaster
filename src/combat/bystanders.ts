@@ -12,6 +12,7 @@ export interface BystanderHitEvent {
   type: EnemyType
   /** A copy: listeners may keep it. */
   position: { x: number; y: number; z: number }
+  /** The points actually taken: under `BYSTANDER_PENALTY` when the score was floored at 0. */
   penalty: number
 }
 

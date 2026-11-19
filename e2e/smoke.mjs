@@ -1829,20 +1829,16 @@ async function tunnelShot(page, levelId) {
 }
 
 /** The wave the spawn-choreography check watches arrive: level2's first crow wave, a V (#30). */
-/** The level whose first wave brings bystanders (#518): `playLevel` shoots one (`bystanderProblems`). */
-const BYSTANDER_LEVEL = 'level6'
-/** `BYSTANDER_PENALTY` (src/levels/scoring.ts): one rat's points. */
-const BYSTANDER_PENALTY = 18
-
 /**
  * The don't-shoot rule (#518): with a score and a 2×+ chain, one hit on a live climber must take the penalty off the
  * score (floored at 0), reset the combo and count no kill and no hit. Screenshot `<id>-bystander.png` holds the red
- * popup beside the friendly climber. First in the ride, before the climbers top out.
+ * popup beside the friendly climber. First in the ride, before the climbers top out. Only on a level whose roster brings
+ * bystanders (`stats().levelBystanders`).
  */
 async function bystanderProblems(page, id) {
-  if (id !== BYSTANDER_LEVEL) return []
   const r = await page.evaluate(async () => {
     const s = window.__SC_TEST__
+    if (!s.stats().levelBystanders) return null
     s.killNearest(2)
     // killNearest fires a real shot at the first: let it land or fly out (two frames, then until none is drawn; 5 s at
     // most), so it can't hit an enemy behind under the check.
@@ -1855,18 +1851,19 @@ async function bystanderProblems(page, id) {
     await new Promise((resolve) => setTimeout(resolve, 250))
     return { hit, before, after: s.stats(), hint: document.querySelector('.hud-bystander-hint')?.textContent ?? null }
   })
+  if (!r) return []
   await page.screenshot({ path: path.join(OUT, `${id}-bystander.png`), timeout: SHOT_TIMEOUT })
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
   const { hit, before, after, hint } = r
   if (!hit) return ['no live climber to check the bystander penalty on']
   const problems = []
-  const expected = Math.max(0, before.score - BYSTANDER_PENALTY)
+  const expected = Math.max(0, before.score - hit.penalty)
   if (Math.abs(after.score - expected) > 1) problems.push(`bystander hit: score ${before.score} → ${after.score}, expected ${expected}`)
   if (after.combo !== 0) problems.push(`bystander hit left the combo at ${after.combo}`)
   if (after.kills !== before.kills || after.hits !== before.hits) problems.push('bystander hit counted as a kill or a hit')
   if (after.bystandersHit !== 1) problems.push(`bystandersHit ${after.bystandersHit}, expected 1`)
   if (!hint) problems.push("no don't-shoot hint after the first bystander hit")
-  console.log(`  ${id} bystander: score ${before.score} → ${after.score}, combo ${before.combo} → ${after.combo} (${hit}, ${before.onScreenBystanders} climbers on screen)`)
+  console.log(`  ${id} bystander: score ${before.score} → ${after.score}, combo ${before.combo} → ${after.combo} (${hit.id}, ${before.onScreenBystanders} climbers on screen)`)
   return problems
 }
 

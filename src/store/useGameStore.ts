@@ -68,8 +68,8 @@ interface GameState {
   registerHit: () => void
   /** Ids of the bystanders shot this run (#518). */
   bystandersHit: readonly string[]
-  /** Takes `penalty` off the score (floored at 0) once per bystander; false when `id` was already hit. */
-  hitBystander: (id: string, penalty: number) => boolean
+  /** Takes `penalty` off the score (floored at 0) once per bystander: the points actually taken, null when `id` was already hit. */
+  hitBystander: (id: string, penalty: number) => number | null
 
   // Combo (tiers and windows: combat/comboTiers.ts; expiry: combat/comboRuntime.hot.ts)
   combo: ComboState
@@ -201,9 +201,10 @@ export const useGameStore = create<GameState>()(
       registerHit: () => set((s) => ({ hits: s.hits + 1 })),
       hitBystander: (id, penalty) => {
         const s = get()
-        if (s.bystandersHit.includes(id)) return false
-        set({ score: scoreAfterPenalty(s.score, penalty), bystandersHit: [...s.bystandersHit, id] })
-        return true
+        if (s.bystandersHit.includes(id)) return null
+        const score = scoreAfterPenalty(s.score, penalty)
+        set({ score, bystandersHit: [...s.bystandersHit, id] })
+        return s.score - score
       },
 
       registerKill: () =>

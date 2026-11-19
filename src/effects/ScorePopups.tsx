@@ -31,7 +31,7 @@ function popupClass(score: number): string {
 
 /**
  * Renders floating score popups projected from 3D kill positions.
- * Listens to 'enemy:killed:screen' events emitted with screen coords (a bystander hit's too: a red penalty).
+ * Listens to 'score-popup:screen' events: a kill's or a bystander hit's (a red penalty) popup at screen coords.
  * Batches rapid kills into a single state update to avoid AnimatePresence thrashing.
  */
 export default function ScorePopups() {
@@ -78,14 +78,14 @@ export default function ScorePopups() {
   }, [])
 
   useEffect(() => {
-    eventBus.on('enemy:killed:screen', handleKill)
+    eventBus.on('score-popup:screen', handleKill)
     return () => {
       mountedRef.current = false
       for (const timeoutId of timeoutIdsRef.current) clearTimeout(timeoutId)
       timeoutIdsRef.current = []
       pendingRef.current = []
       flushScheduled.current = false
-      eventBus.off('enemy:killed:screen', handleKill)
+      eventBus.off('score-popup:screen', handleKill)
     }
   }, [handleKill])
 
