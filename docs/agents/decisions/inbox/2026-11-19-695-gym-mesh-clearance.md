@@ -1,0 +1,5 @@
+## 2026-11-19 — The gym's ride is held clear of the drawn hall, not only the blockout's boxes (Builder, #695)
+
+**Context:** `gymTrack.test.ts` checked the ride against `BLOCKOUT_BOXES` (one box per blockout piece), so what `hallGeometry.ts` draws beyond them (the pit edge's railing, the stairs' railings, benches, holds and volumes) was never checked, and the ride went through the pit's railing.
+**Decision:** The test also measures the track against every triangle `buildHall` returns, the holds as their drawn shape (`holdGeometry`), through `geometryChecks.ts` `meshClearance`: a new prop or railing is checked the moment it is drawn. The box check stays (it is what the intro tour test uses and what reads a piece by name).
+**Consequences:** A route change that grazes anything drawn fails the unit test with the nearest triangle's position. The gym's intro tour now flies hand-picked reveal and pass shots (`index.ts` `hero.tour`): its automatic layout chooser flipped to the Tree's side when the route changed and came down through the Tree's head.

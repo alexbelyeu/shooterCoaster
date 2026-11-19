@@ -33,6 +33,8 @@ import {
   type Vec3,
 } from './blockout'
 import { GYM_TRACK, RAIL_CLEARANCE } from './gymTrack'
+import { meshClearance } from './geometryChecks'
+import { buildHall, holdGeometry } from './hallGeometry'
 import { gym } from './index'
 
 /** The glass room pass counts within this many metres of the windows. */
@@ -106,6 +108,14 @@ describe('the gym track', () => {
     expect(floor).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
     expect(hall).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
     expect(self).toBeGreaterThanOrEqual(2 * RAIL_CLEARANCE)
+  })
+
+  it('keeps clear of everything the hall draws: railings, stairs, benches, props, holds (#695)', () => {
+    const hall = buildHall()
+    const hold = holdGeometry()
+    const holds = hall.holds.matrices.map((m) => hold.clone().applyMatrix4(m))
+    const nearest = meshClearance([hall.solid, hall.light, hall.glass, ...holds], RAIL_CLEARANCE)
+    expect(nearest.distance, `nearest at ${JSON.stringify(nearest.at)}`).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
   })
 
   it('fits the car and rider inside the rail clearance', () => {
