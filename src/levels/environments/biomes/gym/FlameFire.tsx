@@ -61,7 +61,8 @@ const tongueVertex = /* glsl */ `
     vAge = age;
     vec4 mvPosition = viewMatrix * vec4(p, 1.0);
     // Fades out as the camera comes into it (the spiral rides through the fire's edge), so a tongue never fills the screen
-    vNear = smoothstep(width * 0.4, width * 1.4, -mvPosition.z);
+    // (its full width, never 0: smoothstep with equal edges is undefined)
+    vNear = smoothstep(aTongue.z * 0.4, aTongue.z * 1.4, -mvPosition.z);
     gl_Position = projectionMatrix * mvPosition;
     #include <fog_vertex>
   }
