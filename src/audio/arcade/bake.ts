@@ -15,21 +15,37 @@ const GATE_FADE_MAX_S = 0.4
 /** "Nothing below 30 Hz": two 12 dB/oct high-passes on the whole bake. */
 const HIGH_PASS_HZ = 32
 
+/** Main-thread work per task while a bank is built: a level's bake lands in its countdown (#625). */
+const TASK_BUDGET_MS = 8
+
 interface Slot {
-  id: ArcadeSoundId
+  recipe: (typeof RECIPES)[number]
+  variant: number
   start: number
   length: number
   loopS: number | null
 }
 
+/** `step` on every item in order, yielding to the event loop each time a task has run `TASK_BUDGET_MS`. */
+async function inTasks<T>(items: readonly T[], step: (item: T) => void): Promise<void> {
+  let taskStart = performance.now()
+  for (const item of items) {
+    if (performance.now() - taskStart > TASK_BUDGET_MS) {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      taskStart = performance.now()
+    }
+    step(item)
+  }
+}
+
 export async function bakeBank(spec: BakeSpec, sampleRate: number, seed: number): Promise<Bank> {
   const slots: Slot[] = []
   let t = GAP_S
-  for (const r of RECIPES) {
-    if (r.when && !r.when(spec)) continue
-    for (let v = 0; v < (r.variants ?? 1); v++) {
-      const length = r.lengthS(spec, v)
-      slots.push({ id: r.id, start: t, length, loopS: r.loopS ? r.loopS(spec) : null })
+  for (const recipe of RECIPES) {
+    if (recipe.when && !recipe.when(spec)) continue
+    for (let variant = 0; variant < (recipe.variants ?? 1); variant++) {
+      const length = recipe.lengthS(spec, variant)
+      slots.push({ recipe, variant, start: t, length, loopS: recipe.loopS ? recipe.loopS(spec) : null })
       t += length + GAP_S
     }
   }
@@ -43,36 +59,34 @@ export async function bakeBank(spec: BakeSpec, sampleRate: number, seed: number)
   }
   hp1.connect(hp2).connect(ctx.destination)
 
-  // Seeded only while the graph is built (this turn): every bake of a level is the same.
-  const random = Math.random
-  Math.random = createRng(seed)
-  try {
-    const S = createCore(ctx)
-    let i = 0
-    for (const r of RECIPES) {
-      if (r.when && !r.when(spec)) continue
-      for (let v = 0; v < (r.variants ?? 1); v++) {
-        const slot = slots[i++]
-        r.render(S, gate(ctx, slot, hp1), slot.start, spec, v)
-      }
+  // The graph is built over several tasks, seeded only while each slot's recipe runs (other code runs in between):
+  // every bake of a level is the same.
+  const rng = createRng(seed)
+  const seeded = <R>(fn: () => R): R => {
+    const random = Math.random
+    Math.random = rng
+    try {
+      return fn()
+    } finally {
+      Math.random = random
     }
-  } finally {
-    Math.random = random
   }
+  const S = seeded(() => createCore(ctx))
+  await inTasks(slots, (slot) => seeded(() => slot.recipe.render(S, gate(ctx, slot, hp1), slot.start, spec, slot.variant)))
 
   const rendered = (await ctx.startRendering()).getChannelData(0)
   const bank: Bank = new Map()
-  for (const s of slots) {
+  await inTasks(slots, (s) => {
     const from = Math.round(s.start * sampleRate)
     const data = rendered.slice(from, from + Math.round(s.length * sampleRate))
     const pcm = s.loopS ? foldLoop(data, Math.round(s.loopS * sampleRate)) : trimTail(data, sampleRate)
     normalise(pcm)
     const buffer = new AudioBuffer({ length: pcm.length, numberOfChannels: 1, sampleRate })
     buffer.copyToChannel(pcm, 0)
-    const list = bank.get(s.id)
+    const list = bank.get(s.recipe.id)
     if (list) list.push(buffer)
-    else bank.set(s.id, [buffer])
-  }
+    else bank.set(s.recipe.id, [buffer])
+  })
   return bank
 }
 
