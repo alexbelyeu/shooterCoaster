@@ -17,9 +17,9 @@ export const TUNNEL_TRACK_SHADE = 0.3
 const WORLD_UP = new THREE.Vector3(0, 1, 0)
 
 /**
- * Orthonormal track frame at t: forward = tangent, right is kept horizontal so
- * the rails never roll, up = forward × right. `prevRight` is reused when the
- * track is (near) vertical and right is undefined.
+ * Orthonormal track frame at t: forward = tangent, up = forward × right. On a track that rolls (`getUpAt`, #698)
+ * right = up × forward; otherwise right is kept horizontal so the rails never roll, and `prevRight` is reused
+ * when the track is (near) vertical and right is undefined.
  */
 export function trackFrame(
   curve: TrackCurve,
@@ -32,13 +32,18 @@ export function trackFrame(
 ) {
   point.copy(curve.getPointAt(t))
   forward.copy(curve.getTangentAt(t))
-  right.crossVectors(WORLD_UP, forward)
+  right.crossVectors(curve.getUpAt ? curve.getUpAt(t) : WORLD_UP, forward)
   if (right.lengthSq() < 1e-6) {
     if (prevRight) right.copy(prevRight)
     else right.set(1, 0, 0)
   }
   right.normalize()
   up.crossVectors(forward, right).normalize()
+}
+
+/** The rider's up at t: the track's roll on a track that has it, else world up. */
+export function seatUp(curve: TrackCurve, t: number, out: THREE.Vector3): THREE.Vector3 {
+  return out.copy(curve.getUpAt ? curve.getUpAt(t) : WORLD_UP)
 }
 
 /**

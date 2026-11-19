@@ -7,6 +7,16 @@ export interface Point3 {
   z: number
 }
 
+/** A control point. `up` (the rails' up there, any length) rolls the track through it: a bank or an inversion (#698). */
+export interface RailPoint extends Point3 {
+  up?: Point3
+}
+
+/** A spline track: `knotT(i)` is the arc fraction of control point i, so markers placed on points find their t. */
+export interface SplineTrackCurve extends TrackCurve {
+  knotT(i: number): number
+}
+
 /** Arc-length samples per segment: getPointAt interpolates between them. */
 const SAMPLES_PER_SEGMENT = 64
 
@@ -15,12 +25,17 @@ const SAMPLES_PER_SEGMENT = 64
  * length (0..1 once round the loop, wrapping), so the ride's speed rule and the arc table read it
  * like the trig curves; the tangent is the spline's own derivative, continuous across the seam.
  * Centripetal (alpha 0.5) never cusps or loops between close points.
+ *
+ * When any point has an `up`, the track rolls (#698): the ups are splined on the same knots, then made
+ * perpendicular to the tangent (`getUpAt`). A point without one takes the unrolled up there (right horizontal).
+ * Neighbouring ups should differ by well under 90° (the ride elements space them ≤ ~35°).
  */
-export function createSplineCurve(points: readonly Point3[]): TrackCurve {
+export function createSplineCurve(points: readonly RailPoint[]): SplineTrackCurve {
   const n = points.length
   if (n < 4) throw new Error(`a closed spline needs at least 4 points, got ${n}`)
   // Per segment and axis, the cubic c0 + c1 u + c2 u² + c3 u³ over u in [0, 1].
   const coef = new Float64Array(n * 12)
+  const dts = new Float64Array(n * 3)
   for (let i = 0; i < n; i++) {
     const p0 = points[(i - 1 + n) % n]
     const p1 = points[i]
@@ -35,7 +50,9 @@ export function createSplineCurve(points: readonly Point3[]): TrackCurve {
     initAxis(coef, i * 12, p0.x, p1.x, p2.x, p3.x, dt0, dt1, dt2)
     initAxis(coef, i * 12 + 4, p0.y, p1.y, p2.y, p3.y, dt0, dt1, dt2)
     initAxis(coef, i * 12 + 8, p0.z, p1.z, p2.z, p3.z, dt0, dt1, dt2)
+    dts.set([dt0, dt1, dt2], i * 3)
   }
+  const upCoef = points.some((p) => p.up) ? splineUps(points, coef, dts) : null
 
   const count = n * SAMPLES_PER_SEGMENT
   const cumulative = new Float64Array(count + 1)
@@ -71,18 +88,68 @@ export function createSplineCurve(points: readonly Point3[]): TrackCurve {
 
   const point = new THREE.Vector3()
   const tangent = new THREE.Vector3()
-  return {
+  const up = new THREE.Vector3(0, 1, 0)
+  const upRaw = new THREE.Vector3()
+  const tangentAt = (): THREE.Vector3 => {
+    const o = segment * 12
+    return tangent.set(derivative(coef, o, local), derivative(coef, o + 4, local), derivative(coef, o + 8, local)).normalize()
+  }
+  const curve: SplineTrackCurve = {
     getPointAt(t: number): THREE.Vector3 {
       locate(t)
       return evaluate(coef, segment, local, point)
     },
     getTangentAt(t: number): THREE.Vector3 {
       locate(t)
-      const o = segment * 12
-      tangent.set(derivative(coef, o, local), derivative(coef, o + 4, local), derivative(coef, o + 8, local))
-      return tangent.normalize()
+      return tangentAt()
     },
+    knotT: (i) => cumulative[(((i % n) + n) % n) * SAMPLES_PER_SEGMENT] / length,
   }
+  if (upCoef) {
+    curve.getUpAt = (t) => {
+      locate(t)
+      const f = tangentAt()
+      evaluate(upCoef, segment, local, upRaw)
+      upRaw.addScaledVector(f, -upRaw.dot(f))
+      // Degenerate only on a badly authored track (an up along the tangent): keep the last good up.
+      if (upRaw.lengthSq() > 1e-12) up.copy(upRaw).normalize()
+      return up
+    }
+  }
+  return curve
+}
+
+/** Per segment and axis, the ups' cubic on the positions' knots; a point with no `up` takes the unrolled one there. */
+function splineUps(points: readonly RailPoint[], coef: Float64Array, dts: Float64Array): Float64Array {
+  const n = points.length
+  const ups = points.map((p, i): Point3 => {
+    if (p.up) {
+      const len = Math.hypot(p.up.x, p.up.y, p.up.z)
+      return { x: p.up.x / len, y: p.up.y / len, z: p.up.z / len }
+    }
+    // Unrolled, from the tangent f at the knot: up = f × (world up × f).
+    const o = i * 12
+    const fx = coef[o + 1]
+    const fy = coef[o + 5]
+    const fz = coef[o + 9]
+    const ux = -fx * fy
+    const uy = fx * fx + fz * fz
+    const uz = -fz * fy
+    const len = Math.hypot(ux, uy, uz)
+    return len > 1e-9 ? { x: ux / len, y: uy / len, z: uz / len } : { x: 0, y: 1, z: 0 }
+  })
+  const out = new Float64Array(n * 12)
+  for (let i = 0; i < n; i++) {
+    const u0 = ups[(i - 1 + n) % n]
+    const u1 = ups[i]
+    const u2 = ups[(i + 1) % n]
+    const u3 = ups[(i + 2) % n]
+    const [dt0, dt1, dt2] = dts.subarray(i * 3, i * 3 + 3)
+    initAxis(out, i * 12, u0.x, u1.x, u2.x, u3.x, dt0, dt1, dt2)
+    initAxis(out, i * 12 + 4, u0.y, u1.y, u2.y, u3.y, dt0, dt1, dt2)
+    initAxis(out, i * 12 + 8, u0.z, u1.z, u2.z, u3.z, dt0, dt1, dt2)
+  }
+  return out
 }
 
 function dist2(p: Point3, q: Point3): number {
