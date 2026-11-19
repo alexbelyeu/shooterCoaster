@@ -169,34 +169,7 @@ const gymChalk: ParticleFieldPreset = {
   secondaryShare: 0.2,
 }
 
-/** The Climbing Gym's Flame (#520, #599): embers drifting up off it and hot sparks thrown out of it, anchored over it (`ParticleField`'s `anchor`). */
-const gymFlameEmbers: ParticleFieldPreset = {
-  count: 2200,
-  box: [320, 160, 200],
-  primary: {
-    color: 0xff6a1a,
-    opacity: 0.85,
-    size: 1.2,
-    maxPixels: 4,
-    velocity: [1.5, 13, 0.5],
-    sway: 7,
-    flicker: 1,
-    additive: true,
-  },
-  secondary: {
-    color: 0xffd27a,
-    opacity: 0.9,
-    size: 0.8,
-    maxPixels: 3,
-    velocity: [6, 18, 3],
-    sway: 10,
-    flicker: 0.8,
-    additive: true,
-  },
-  secondaryShare: 0.4,
-}
-
-export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh, gymChalk, gymFlameEmbers } as const
+export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh, gymChalk } as const
 
 /** Points to draw: always-on and boost-only. Touch screens get half (as `renderBudget.ts` cuts their pixels); the graphics quality's `particleScale` thins both. */
 export function particleCounts(preset: ParticleFieldPreset, coarsePointer: boolean, qualityScale = 1): { base: number; boost: number } {

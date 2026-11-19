@@ -1,6 +1,7 @@
 import { particleShare } from '@/canvas/graphicsQuality'
 import { createRng } from '@/utils/rng'
 import { smoothNoise1 } from '@/utils/valueNoise.hot'
+import type { ParticleFieldPreset } from '../../shared/types'
 import { FLAME, GYM_SCALE, HALL, blockRings, footprint, piece, toWorld, type Vec3 } from './blockout'
 
 /**
@@ -235,9 +236,45 @@ export function smokeCount(coarsePointer: boolean, particleScale: number): numbe
 
 /** Where the embers' box sits: over the Flame's centre, its middle this far (blockout metres) up, as high as the spiral. */
 const EMBER_MID_Y = 7.5
+/** The embers' box height (blockout metres): from the Flame's flare to above its plume's crest. */
+const EMBER_SPAN_Y = 10
 
-/** The anchor of the Flame's ember field (`PARTICLE_PRESETS.gymFlameEmbers`), world units. */
+/** The anchor of the Flame's ember field (`FLAME_EMBERS`), world units. */
 export function emberAnchor(): [number, number, number] {
   const c = worldPoint(0, EMBER_MID_Y, 0)
   return [c.x, c.y, c.z]
+}
+
+/** Blockout metres (and metres per second) to world units. */
+const m = (v: number): number => v * GYM_SCALE
+
+/**
+ * The Flame's embers drifting up off it and hot sparks thrown out of it (#520, #599), a `ParticleField` anchored at
+ * `emberAnchor()`. Sized, sped and swayed in blockout metres, so it keeps to the Flame at any `GYM_SCALE` (#615): its
+ * box covers the fire's footprint (the Flame stands at rot 0, its x along world x).
+ */
+export const FLAME_EMBERS: ParticleFieldPreset = {
+  count: 2200,
+  box: [m(2 * (FLAME.halfX + FOOTPRINT_REACH)), m(EMBER_SPAN_Y), m(2 * (FLAME.halfZ + FOOTPRINT_REACH))],
+  primary: {
+    color: 0xff6a1a,
+    opacity: 0.85,
+    size: m(0.075),
+    maxPixels: 4,
+    velocity: [m(0.09), m(0.8), m(0.03)],
+    sway: m(0.44),
+    flicker: 1,
+    additive: true,
+  },
+  secondary: {
+    color: 0xffd27a,
+    opacity: 0.9,
+    size: m(0.05),
+    maxPixels: 3,
+    velocity: [m(0.38), m(1.1), m(0.19)],
+    sway: m(0.62),
+    flicker: 0.8,
+    additive: true,
+  },
+  secondaryShare: 0.4,
 }
