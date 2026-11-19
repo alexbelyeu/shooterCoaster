@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { setFlashMaterial } from './hitFlash'
-import { marchHeading } from '@/entities/spawning/spawnPlacement'
+import { useMarch } from './useMarch'
 import {
   CROW_EYE_MAT, CROW_EYES_GEO, CROW_FLINCH_MAT, CROW_GEO, createCrowFeatherMaterial, crowWingPose,
 } from './SharedEnemyAssets'
@@ -22,7 +22,7 @@ const tagFlinch = (mesh: THREE.Mesh | null) => {
  */
 export default function Crow(props: EnemyProps) {
   // One speed for the whole flock, or its V stretches apart.
-  const heading = marchHeading(props.motion)
+  const { heading, moving } = useMarch(props.motion)
   const own = useEnemyRandom(props.id, (rng) => ({
     angle: rng() * Math.PI * 2, speed: 0.4 + rng() * 0.6, flapOffset: rng() * Math.PI * 2,
   }))
@@ -41,8 +41,9 @@ export default function Crow(props: EnemyProps) {
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
       const dt = delta * 60
       const wobble = Math.sin(time * 1.5) * 0.3
-      mesh.position.x += (Math.cos(moveAngle) * moveSpeed + wobble) * dt
-      mesh.position.z += (Math.sin(moveAngle) * moveSpeed + wobble * 0.5) * dt
+      const speed = moving() ? moveSpeed : 0
+      mesh.position.x += (Math.cos(moveAngle) * speed + wobble) * dt
+      mesh.position.z += (Math.sin(moveAngle) * speed + wobble * 0.5) * dt
       mesh.position.y += Math.sin(time * 2 + flapOffset) * 0.05 * dt
 
       const dive = 0.5 + 0.5 * Math.sin(time * 0.7 + flapOffset)
@@ -57,7 +58,7 @@ export default function Crow(props: EnemyProps) {
         rig.position.y = -0.35 * (1 - dive) * Math.cos(phase.current)
       }
     },
-    [moveAngle, moveSpeed, flapOffset, flap, sway],
+    [moveAngle, moveSpeed, moving, flapOffset, flap, sway],
   )
 
   return (

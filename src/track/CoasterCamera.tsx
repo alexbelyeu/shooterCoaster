@@ -7,7 +7,7 @@ import { TRACK_TUNNEL_EVENT, getTunnelDims } from './setPieces'
 import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
 import { setRideProgress } from './rideProgress.hot'
 import {
-  advanceRide, jumpRide, resetRide, rideLaunches, rideOnLift, rideSpeedNorm, rideStepFrames, rideStopShare, rideTopShare, rideZone, type RideSpeeds,
+  advanceRide, curveTangentY, jumpRide, resetRide, rideLaunches, rideOnLift, rideSpeedNorm, rideStepFrames, rideStopShare, rideTopShare, rideZone, type RideSpeeds,
   type RideState,
 } from './ridePhysics'
 import { e2eRideSeconds, levelTimeStep } from '@/testing/e2eHook'
@@ -104,6 +104,7 @@ export default function CoasterCamera({
   /** The v2 zone the car was in last frame, so entering a `launch` zone fires once. */
   const lastZone = useRef<ReturnType<typeof rideZone>>(null)
   const tunnelRamp = useMemo(() => getTunnelDims(trackScale).ramp, [trackScale])
+  const tangentY = useMemo(() => curveTangentY(curve), [curve])
   /** The tunnel the car is in (-1: none), for `track:tunnel` enter / exit. */
   const tunnelIndex = useRef(-1)
   useEffect(() => {
@@ -256,7 +257,7 @@ export default function CoasterCamera({
     // turned into a bend late on a fast runner, and saw different enemies there than on a slow one (#469).
     const effectiveDelta = (e2eRide === null ? frameDelta : levelTimeStep(frameDelta)) * (store.timeScale ?? 1)
     const rideFrames = e2eRide === null ? rideStepFrames(speeds, effectiveDelta) : e2eRide * (store.timeScale ?? 1) * 60
-    advanceRide(ride.current, curve, speeds, rideFrames)
+    advanceRide(ride.current, tangentY, speeds, rideFrames)
     const t = ride.current.progress
     setRideProgress(t)
     const dist = distanceAtT(table, t)

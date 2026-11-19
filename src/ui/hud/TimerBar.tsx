@@ -1,11 +1,8 @@
 import { useGameStore } from '@/store/useGameStore'
+import { RUN_SECONDS } from '@/levels/pacing'
 
 const WARN_SECONDS = 15
 const CRITICAL_SECONDS = 5
-
-interface TimerBarProps {
-  totalSeconds: number
-}
 
 /**
  * Shrinking timer bar + numerals. GameTimer only writes `timeRemaining` when the
@@ -13,10 +10,10 @@ interface TimerBarProps {
  * timer will be at the next update and eased there with a 1 s linear transition,
  * which reads as continuous motion without per-frame React work.
  */
-export default function TimerBar({ totalSeconds }: TimerBarProps) {
+export default function TimerBar() {
   const remaining = useGameStore((s) => s.timeRemaining)
   const secs = Math.ceil(remaining)
-  const frac = totalSeconds > 0 ? Math.max(0, Math.min(1, (remaining - 1) / totalSeconds)) : 0
+  const frac = Math.max(0, Math.min(1, (remaining - 1) / RUN_SECONDS))
   const state = secs <= CRITICAL_SECONDS ? 'critical' : secs <= WARN_SECONDS ? 'warn' : 'ok'
 
   return (
