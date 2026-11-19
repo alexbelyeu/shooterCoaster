@@ -1215,8 +1215,6 @@ const MOBILE_LEVEL = 'level1'
 const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-button'
 /** Max angle between the barrel and the tracer on screen (#65). */
 const WEAPON_MAX_AIM_DEG = 25
-/** Caps on the coaster camera weight (#123): MAX_BANK_DEG / MAX_PITCH_DEG in
- *  src/track/cameraRig.hot.ts and SPEED_FOV_DEG + DROP_FOV_DEG in src/track/cameraFov.hot.ts. */
 /** Camera weight maxima past the caps the game publishes from its source constants (cameraRig.hot.ts, cameraFov.hot.ts). */
 function cameraWeightProblems(w) {
   const caps = w.caps

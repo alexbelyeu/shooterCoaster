@@ -35,8 +35,6 @@ const AIRTIME_RESPONSE = 4
 export const FLOAT_PITCH_DEG = 2
 export const FLOAT_DRIFT_DEG = 1.5
 const FLOAT_DRIFT_HZ = 0.6
-/** Chain lift: climbing at the ride's minimum speed is the chain pulling the car up (no zones before #696). */
-const LIFT_MIN_CLIMB = 0.08
 const LIFT_RESPONSE = 6
 
 /** The smoke's caps: every term at its peak. */
@@ -104,11 +102,6 @@ export function airtimeAmount(verticalAccel: number, trackScale: number): number
   return smoothstep01((-verticalAccel / trackScale - AIRTIME_START) / (AIRTIME_FULL - AIRTIME_START))
 }
 
-/** On the chain: climbing while held at the ride's minimum speed (velocities per frame, `ridePhysics`). */
-export function onChainLift(tangentY: number, velocity: number, minVelocity: number): boolean {
-  return tangentY > LIFT_MIN_CLIMB && velocity <= minVelocity * 1.001
-}
-
 /** What the camera reads off the ride each frame; one reused object. */
 export interface RigInput {
   /** Units/s² along the camera's right axis (`lateralAcceleration`). */
@@ -139,7 +132,7 @@ export interface RigState {
   dipSlow: number
   /** Smoothed `airtimeAmount`, 0–1. */
   airtime: number
-  /** Smoothed `onChainLift`, 0–1. */
+  /** Smoothed `RigInput.lifting` (`ridePhysics.ts` `rideOnLift`), 0–1. */
   lift: number
   /** Game seconds, the float's drift clock. */
   time: number

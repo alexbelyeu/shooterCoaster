@@ -142,7 +142,7 @@ export interface ArcadeSound {
   send: number
 }
 
-export const PRIO = { fire: 1, hit: 2, kill: 3, cue: 4, ui: 5, event: 6 } as const
+export const PRIO = { ambient: 0, fire: 1, hit: 2, kill: 3, cue: 4, ui: 5, event: 6 } as const
 
 export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   fire: { prio: PRIO.fire, db: -13, send: 0 },
@@ -181,8 +181,8 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   uiLaunch: { prio: PRIO.ui, db: -13, send: 0.2 },
   uiWhoosh: { prio: PRIO.ui, db: -16, send: 0.2 },
   rideLaunch: { prio: PRIO.cue, db: -8, send: 0.25 },
-  // The lowest priority: a busy pool drops a clank before a gunshot.
-  rideChain: { prio: PRIO.fire, db: -11, send: 0.08 },
+  // Below the guns: a full pool drops a clank rather than cut a gunshot.
+  rideChain: { prio: PRIO.ambient, db: -11, send: 0.08 },
   countReady: { prio: PRIO.ui, db: -14, send: 0.15 },
   countGo: { prio: PRIO.ui, db: -11, send: 0.2 },
 }

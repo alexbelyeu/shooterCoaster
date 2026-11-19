@@ -6,7 +6,10 @@ import { type ArcTable, distanceAtT } from './arcLength'
 import { TRACK_TUNNEL_EVENT, getTunnelDims } from './setPieces'
 import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
 import { setRideProgress } from './rideProgress.hot'
-import { MAX_RIDE_STEP_FRAMES, advanceRide, rideSpeeds, type RideState } from './ridePhysics'
+import {
+  advanceRide, jumpRide, resetRide, rideLaunches, rideOnLift, rideSpeedNorm, rideStepFrames, rideTopShare, rideZone, type RideSpeeds,
+  type RideState,
+} from './ridePhysics'
 import { e2eRideSeconds, levelTimeStep } from '@/testing/e2eHook'
 import { useGameStore } from '@/store/useGameStore'
 import { sfx } from '@/audio/sfx'
@@ -22,7 +25,7 @@ import { fovForAspect, fovWithSpeed } from './cameraFov.hot'
 import WindStreaks, { type StreakDrive } from './WindStreaks'
 import { streakOpacity, streakRate } from './windStreaks'
 import {
-  LOOK_RESPONSE, createRigState, dipAmount, lateralAcceleration, lookAheadDirection, onChainLift, resetRig, rigAngles,
+  LOOK_RESPONSE, createRigState, dipAmount, lateralAcceleration, lookAheadDirection, resetRig, rigAngles,
   sampleTrack, smoothingFactor, stepRig, triggerLaunch, verticalAcceleration, type RigAngles, type RigInput, type TrackSamples,
 } from './cameraRig.hot'
 import {
@@ -38,8 +41,8 @@ interface CoasterCameraProps {
   table: ArcTable
   /** `trackDimensions.trackScale`. */
   trackScale: number
-  rollerSpeed: number
-  minRollerSpeed: number
+  /** The level's ride (`ridePhysics.ts` `rideModel`). */
+  speeds: RideSpeeds
   fov?: number
   near?: number
   far?: number
@@ -62,8 +65,7 @@ export default function CoasterCamera({
   curve,
   table,
   trackScale,
-  rollerSpeed,
-  minRollerSpeed,
+  speeds,
   fov = BASE_FOV,
   near = 1,
   far = 11000,
@@ -76,8 +78,7 @@ export default function CoasterCamera({
   const { set } = useThree()
   const cameraRef = useRef<THREE.PerspectiveCamera>(null)
 
-  const ride = useRef<RideState>({ progress: 0, velocity: 0 })
-  const speeds = useMemo(() => rideSpeeds({ rollerSpeed, minRollerSpeed }), [rollerSpeed, minRollerSpeed])
+  const ride = useRef<RideState>({ progress: 0, velocity: 0, time: 0 })
   const _position = useRef(new THREE.Vector3())
   const _tangent = useRef(new THREE.Vector3())
   const _lookAt = useRef(new THREE.Vector3())
@@ -97,6 +98,8 @@ export default function CoasterCamera({
   const runId = useRef(-1)
   /** Waiting at the station last frame: the next playing frame is the launch. */
   const atStation = useRef(true)
+  /** The v2 zone the car was in last frame, so entering a `launch` zone fires once. */
+  const lastZone = useRef<ReturnType<typeof rideZone>>(null)
   const tunnelRamp = useMemo(() => getTunnelDims(trackScale).ramp, [trackScale])
   /** The tunnel the car is in (-1: none), for `track:tunnel` enter / exit. */
   const tunnelIndex = useRef(-1)
@@ -228,17 +231,17 @@ export default function CoasterCamera({
     let jumped = beforeGo || !lookSnapped.current
     if (beforeGo || store.runId !== runId.current) {
       runId.current = store.runId
-      ride.current.progress = 0
-      ride.current.velocity = 0
+      resetRide(ride.current)
       jumped = true
     }
     const frameDelta = beforeGo || phase === 'paused' ? 0 : delta
 
     if (testApi?.rideTo != null) {
-      ride.current.progress = testApi.rideTo
+      jumpRide(ride.current, speeds, testApi.rideTo)
       testApi.rideTo = null
       jumped = true
     }
+    // Today's rule only: a v2 ride follows its plan, so the override has nothing to hold.
     if (testApi?.rideSpeed != null) {
       ride.current.velocity = speeds.min + Math.min(Math.max(testApi.rideSpeed, 0), 1) * (speeds.max - speeds.min)
       testApi.rideSpeed = null
@@ -248,7 +251,7 @@ export default function CoasterCamera({
     // Under it the look, the rig and the shake follow the level time too: on the frame's own time the camera
     // turned into a bend late on a fast runner, and saw different enemies there than on a slow one (#469).
     const effectiveDelta = (e2eRide === null ? frameDelta : levelTimeStep(frameDelta)) * (store.timeScale ?? 1)
-    const rideFrames = e2eRide === null ? Math.min(effectiveDelta * 60, MAX_RIDE_STEP_FRAMES) : e2eRide * (store.timeScale ?? 1) * 60
+    const rideFrames = e2eRide === null ? rideStepFrames(speeds, effectiveDelta) : e2eRide * (store.timeScale ?? 1) * 60
     advanceRide(ride.current, curve, speeds, rideFrames)
     const t = ride.current.progress
     _tangent.current.copy(curve.getTangentAt(t))
@@ -265,10 +268,7 @@ export default function CoasterCamera({
     _position.current.copy(curve.getPointAt(t))
     _position.current.y += heightOffset
     cam.position.copy(_position.current)
-    const velocityNorm = Math.max(
-      0,
-      Math.min((ride.current.velocity - speeds.min) / (speeds.max - speeds.min), 1),
-    )
+    const velocityNorm = rideSpeedNorm(ride.current, speeds)
 
     // Lateral acceleration from the tangents a few units either side of the car, measured along the track.
     const s = scratch.current
@@ -282,7 +282,7 @@ export default function CoasterCamera({
     input.speed = speed
     input.speedNorm = velocityNorm
     input.descent = -_tangent.current.y
-    input.lifting = phase === 'playing' && onChainLift(_tangent.current.y, ride.current.velocity, speeds.min)
+    input.lifting = phase === 'playing' && rideOnLift(ride.current, speeds, _tangent.current.y)
 
     s.lookTarget.copy(curve.getPointAt(at.lookT))
     s.lookTarget.y += heightOffset
@@ -299,12 +299,14 @@ export default function CoasterCamera({
     _lookAt.current.copy(_position.current).add(dir)
     cam.lookAt(_lookAt.current)
 
-    // GO: the car leaves the station with a shove (FOV kick, view tipped up) and the launch whoosh.
-    if (phase === 'playing' && atStation.current) {
+    // GO, or a v2 ride's launch zone: the car is shoved (FOV kick, view tipped up) with the launch whoosh.
+    const zone = rideZone(ride.current, speeds)
+    if (phase === 'playing' && rideLaunches(atStation.current, zone, lastZone.current)) {
       triggerLaunch(rig.current)
       sfx().rideLaunch()
     }
     atStation.current = beforeGo
+    lastZone.current = zone
 
     const motionScale = effectiveShakeScale(useSettingsStore.getState().screenShake, prefersReducedMotion())
     const r = stepRig(rig.current, input, effectiveDelta, trackScale)
@@ -411,7 +413,7 @@ export default function CoasterCamera({
     setCameraOffSeat(touring && io.lastOffset > 0)
 
     // On the share of top speed, so the crawl (the gym never leaves it) still has wind and rumble.
-    sfx().wind(ride.current.velocity / speeds.max)
+    sfx().wind(rideTopShare(ride.current, speeds))
     sfx().chain(r.lift > 0.5 && phase === 'playing' ? (store.timeScale ?? 1) : 0)
   })
 

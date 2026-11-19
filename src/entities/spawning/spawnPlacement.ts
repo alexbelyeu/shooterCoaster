@@ -282,6 +282,13 @@ export interface PlacementBounds {
   maxY: number
 }
 
+/** A circle (XZ) a ground enemy stood away from the track keeps out of: a landmark or a big prop (`BiomeDefinition.keepOff`). */
+export interface KeepOff {
+  x: number
+  z: number
+  r: number
+}
+
 export function insideBounds(p: Vec3, b: PlacementBounds): boolean {
   return p.x >= b.minX && p.x <= b.maxX && p.z >= b.minZ && p.z <= b.maxZ && p.y <= b.maxY
 }
@@ -522,16 +529,17 @@ export interface PlaceTracksideInput {
   slots: readonly TracksideSlot[]
   ride: RideAhead
   bounds?: PlacementBounds
+  keepOff?: readonly KeepOff[]
 }
 
-export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride, bounds }: PlaceTracksideInput): Vec3[] {
+export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride, bounds, keepOff = [] }: PlaceTracksideInput): Vec3[] {
   const { surface } = ENEMY_PLACEMENT[type]
   const reach = maxReadableDistance(type)
   return slots.map((slot) => {
     const at = { ahead: tracksideAhead(table, surface, slot, ride), side: slot.side }
     const p = surface === 'water'
       ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale)
-      : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale, bounds)
+      : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale, bounds, keepOff)
     const placed = outsideNearField(settle(p, surface, groundFn), camera)
     const out = surface === 'ground' ? groundedOutsideNearField(placed, camera, groundFn) : placed
     return bounds && !insideBounds(out, bounds) ? settle(clampToBounds(out, bounds), surface, groundFn) : out
@@ -565,11 +573,12 @@ const SIDE_SCALES = [1, 0.6, 0.35, 0]
  * The slot, or the same spot across the track when only that side is in view on the approach (the inside of a turn);
  * inside `bounds`, also nearer the track. When none is (a tight turn faces the rider away from both sides of the
  * slot's stretch until the last moment, #543): the spot round the slot's track point, clear of the rails, that the
- * rider faces most squarely on the near approach.
+ * rider faces most squarely on the near approach, if that one is in view on the approach; else whichever of it and
+ * the spot out along the approach's look (`whereTheApproachLooks`, #494) more of the approach's looks see.
  */
 function dryTracksidePoint(
   table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
-  bounds?: PlacementBounds,
+  bounds: PlacementBounds | undefined, keepOff: readonly KeepOff[],
 ): Vec3 {
   const { sideMin } = TRACKSIDE.ground
   for (const scale of bounds ? SIDE_SCALES : [1]) {
@@ -580,8 +589,59 @@ function dryTracksidePoint(
       if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)) return p
     }
   }
-  return bestFacingAround(table, riderIndex, slot, surface, groundFn, reach, trackScale, bounds)
-    ?? clampToBounds(tracksidePoint(table, riderIndex, slot), bounds)
+  const around = bestFacingAround(table, riderIndex, slot, surface, groundFn, reach, trackScale, bounds)
+  if (around && inViewOnApproach(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale)) return around
+  // Not in an interior: its boulders and pieces stand on the floor, and nothing keeps a spot off them.
+  const looked = bounds ? null : whereTheApproachLooks(table, riderIndex, slot, surface, groundFn, reach, trackScale, keepOff)
+  const aroundSeen = around ? looksInView(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale) : -1
+  return (looked && looked.seen > aroundSeen ? looked.p : around) ?? clampToBounds(tracksidePoint(table, riderIndex, slot), bounds)
+}
+
+/** Distances out along the rider's look tried by `whereTheApproachLooks`, nearest first. */
+const LOOK_SPOT_FIRST = 300
+const LOOK_SPOT_STEP = 100
+
+/**
+ * A blind approach (#494: Desert's opening climb, pitched at the sky, the track beyond its crest dropping and turning
+ * away): no spot near the slot's stretch of track is in view while the rider closes on it. The spot out along the look
+ * from the middle of that approach instead, offset by the slot's side: off every rail and out of `keepOff`, at the
+ * distance the most of the approach's looks see (`looksInView`; the nearest of equals). Null if none is.
+ */
+function whereTheApproachLooks(
+  table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
+  keepOff: readonly KeepOff[],
+): { p: Vec3; seen: number } | null {
+  const { eye, dir } = trackView(table, indexAhead(table, riderIndex, Math.max(0, slot.ahead - VIEW_LEAD) + VIEW_HOLD), trackScale)
+  const look = horizontal(dir)
+  let best: { p: Vec3; seen: number } | null = null
+  for (let d = LOOK_SPOT_FIRST; d < reach; d += LOOK_SPOT_STEP) {
+    const p = { x: eye.x + look.x * d - look.z * slot.side, y: 0, z: eye.z + look.z * d + look.x * slot.side }
+    if (keepOff.some((c) => Math.hypot(p.x - c.x, p.z - c.z) < c.r)) continue
+    if (!clearOfTrack(table, p, TRACKSIDE.ground.sideMin)) continue
+    const seen = looksInView(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)
+    if (seen > (best?.seen ?? 0)) best = { p, seen }
+  }
+  return best
+}
+
+/** How many of the approach's looks, every `FACING_STEP` from `VIEW_LEAD` to `FACING_LAST` before the slot, have `p` in their cone. */
+function looksInView(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): number {
+  let seen = 0
+  for (let at = Math.max(0, ahead - VIEW_LEAD); at <= ahead - FACING_LAST; at += FACING_STEP) {
+    if (lookCos(table, riderIndex, at, p, reach, trackScale) >= APPROACH_CONE_COS) seen++
+  }
+  return seen
+}
+
+/** `clearOfTrack` checks every sixth track sample (~20 units apart on Desert's lap). */
+const TRACK_CHECK_STRIDE = 6
+
+/** At least `clearance` from every rail of the lap (and the towers under them). */
+function clearOfTrack(table: ArcTable, p: Vec3, clearance: number): boolean {
+  for (let j = 0; j < table.count; j += TRACK_CHECK_STRIDE) {
+    if (Math.hypot(p.x - table.x[j], p.z - table.z[j]) < clearance) return false
+  }
+  return true
 }
 
 /** Directions tried round a slot's track point, the first on the slot's side. */

@@ -4,7 +4,7 @@ import {
   BANK_RESPONSE, CURVATURE_SAMPLE_UNITS, DIP_DEG, FLOAT_DRIFT_DEG, FLOAT_PITCH_DEG, HIGH_G_BANK_DEG, LATERAL_ACCEL_REF,
   LAUNCH_PITCH_DEG, LOOK_AHEAD_UNITS, MAX_BANK_DEG, MAX_LOOK_AHEAD_DEG, MAX_PITCH_DEG, RIG_MAX_PITCH_DEG, RIG_MAX_ROLL_DEG,
   airtimeAmount, bankAngle, createRigState, damp, dipAmount, dropAmount, lateralAcceleration, lookAheadDirection,
-  onChainLift, pitchAngle, resetRig, rigAngles, sampleTrack, smoothingFactor, stepRig, triggerLaunch, verticalAcceleration,
+  pitchAngle, resetRig, rigAngles, sampleTrack, smoothingFactor, stepRig, triggerLaunch, verticalAcceleration,
   type RigAngles, type RigInput, type TrackSamples,
 } from './cameraRig.hot'
 import { buildArcTable, distanceAtT } from './arcLength'
@@ -181,12 +181,6 @@ describe('ride feel (#697)', () => {
     expect(verticalAcceleration(up, down, 0, 50)).toBe(0)
   })
 
-  it('is on the chain only climbing at the minimum speed', () => {
-    expect(onChainLift(0.3, 0.001, 0.001)).toBe(true)
-    expect(onChainLift(0.3, 0.002, 0.001)).toBe(false)
-    expect(onChainLift(0, 0.001, 0.001)).toBe(false)
-    expect(onChainLift(-0.3, 0.001, 0.001)).toBe(false)
-  })
 
   it('stays inside the smoke caps with every term at its worst', () => {
     const s = createRigState()
