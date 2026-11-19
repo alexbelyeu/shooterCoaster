@@ -91,8 +91,9 @@ daily mode, a second load must give the same `spawnDigest()`, the results must s
 (`daily-results.png`; its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 `?e2e=1` skips the loading screen, the intro and the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1` (#674): the loading screen must show (`loading.png`) and hold until the shader
-warm-up is done, then the intro must run its fixed length (`intro.seconds`, `INTRO_SECONDS` late by at most two of its frames;
-`level1-intro.png` as it runs), then the countdown must show (`countdown.png`),
+warm-up is done, then the intro must run its fixed length before Ready (`intro.seconds`, `INTRO_HANDOFF_SECONDS` late by at most two
+of its frames; `level1-intro.png` as it runs), then the countdown must show (`countdown.png`; it plays over the tour's last
+`COUNTDOWN_LEAD_SECONDS`, timed on the intro's clock, so GO lands as the camera does),
 a press during it must fire nothing (also when held on into `playing`), the timer must hold,
 the intro tour (#328, #675, pinned with `introAt`, which holds the camera on its path in any phase short of the results) must start high
 over the seat (`intro.height`) and end exactly on the ride's start pose, where the countdown

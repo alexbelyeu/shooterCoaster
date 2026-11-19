@@ -49,7 +49,7 @@ import { qualityProfile, type GraphicsQuality, type QualityProfile } from '@/can
 import { getAdaptiveSteps } from '@/canvas/useRenderBudget'
 import { COMBO_TIERS, TOP_TIER, comboMultiplier } from '@/combat/comboTiers'
 import { setTimeScaleOverride } from '@/combat/slowMo.hot'
-import { INTRO_SECONDS } from '@/core/introShot'
+import { INTRO_HANDOFF_SECONDS, INTRO_SECONDS } from '@/core/introShot'
 import { getPointerState } from '@/input/pointerInput'
 import { audioContext, initAudio, isAudioReady, isMusicDucked, isPauseMixOn } from '@/audio/AudioEngine'
 import { loadArcade, sfx, type VoiceStats } from '@/audio/sfx'
@@ -258,11 +258,13 @@ export interface SCTestApi {
   /** The coaster camera's shot (#328): riding, the intro's tour or the results orbit. The tour's progress (0–1),
    *  height over the seat, distance and look angle (degrees) off the seat's pose, angle off the landmark and height over
    *  the ground; `marks` the progress of its four shots (#675); `goOffset` is the tour's distance off the seat on its
-   *  last frame; `seconds` how long the last intro lasted (#674) and `skipped` whether a tap or key ended it;
-   *  `length` is `INTRO_SECONDS`, its fixed length. */
+   *  last frame (GO); `seconds` how long the last intro ran before it handed over to the countdown (#674) and
+   *  `skipped` whether a tap or key ended it; `length` is `INTRO_SECONDS`, the tour's fixed length, and `handoff`
+   *  `INTRO_HANDOFF_SECONDS`, when Ready comes up (the countdown plays over its last `COUNTDOWN_LEAD_SECONDS`). */
   intro: {
     mode: 'ride' | 'tour' | 'orbit'
     length: number
+    handoff: number
     progress: number; height: number; seatOffset: number; seatAngle: number; anchorAngle: number; clearance: number
     marks: { reveal: number; landmark: number; track: number; landing: number } | null
     goOffset: number | null
@@ -1066,7 +1068,7 @@ export function installE2EApi() {
     },
     setTimeScale: (s: number) => setTimeScaleOverride(s === 1 ? null : s),
     introAt: null,
-    intro: { mode: 'ride', length: INTRO_SECONDS, progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, clearance: 0, marks: null, goOffset: null, orbitSeconds: 0, seconds: null, skipped: false },
+    intro: { mode: 'ride', length: INTRO_SECONDS, handoff: INTRO_HANDOFF_SECONDS, progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, clearance: 0, marks: null, goOffset: null, orbitSeconds: 0, seconds: null, skipped: false },
     photo: { at: null, taken: false, progress: null, captureMs: null, frameMs: null, beforeMs: null, width: 0, height: 0, bytes: null, flashed: false, trace: null },
     rideTo: null,
     rideSpeed: null,

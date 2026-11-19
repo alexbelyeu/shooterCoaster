@@ -93,6 +93,46 @@ describe('tourPose', () => {
     expect(rows).toEqual(rows.map(({ id }) => ({ id, underCap: true, covers: true, smoothTurn: true, settles: true })))
   })
 
+  it('never judders: the view and the flight change how fast they turn smoothly from frame to frame', () => {
+    // A path with corners (straight lines between samples, a ground clamp that bumps and lets go) or a look averaged
+    // with one box turns the camera in steps a player feels as judder: 200 to 1900 degrees a second of change in one
+    // frame before #675's follow-up, under 40 after it.
+    const frames = INTRO_SECONDS * FPS
+    const rows = TOURS.map((s) => {
+      const p0 = v()
+      const p1 = v()
+      const p2 = v()
+      const d0 = v()
+      const d1 = v()
+      const top = s.tour.length / INTRO_SECONDS
+      let lookStep = 0
+      let flightStep = 0
+      let prevLook = -1
+      let prevFlight = -1
+      tourPose(s.tour, 0, s.seat, s.dir, p0, d0)
+      tourPose(s.tour, introProgress(1 / FPS), s.seat, s.dir, p1, d1)
+      for (let i = 2; i <= frames; i++) {
+        tourPose(s.tour, introProgress(i / FPS), s.seat, s.dir, p2, d0)
+        const look = angleDeg(d0, d1) * FPS
+        if (prevLook >= 0) lookStep = Math.max(lookStep, Math.abs(look - prevLook))
+        prevLook = look
+        const a = v(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z)
+        const b = v(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z)
+        // The flight's heading only counts while it moves: a turn crawling into the seat reads as none.
+        if (Math.hypot(a.x, a.y, a.z) * FPS > top / 4) {
+          const flight = angleDeg(a, b) * FPS
+          if (prevFlight >= 0) flightStep = Math.max(flightStep, Math.abs(flight - prevFlight))
+          prevFlight = flight
+        } else prevFlight = -1
+        Object.assign(p0, p1)
+        Object.assign(p1, p2)
+        Object.assign(d1, d0)
+      }
+      return { id: s.id, lookSmooth: lookStep < 15, flightSmooth: flightStep < 60 }
+    })
+    expect(rows).toEqual(rows.map(({ id }) => ({ id, lookSmooth: true, flightSmooth: true })))
+  })
+
   it('starts high over the seat, passes the landmark looking at it, and keeps clear of the ground', () => {
     const rows = TOURS.map((s) => {
       const pos = v()
