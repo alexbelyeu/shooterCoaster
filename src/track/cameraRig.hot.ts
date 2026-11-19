@@ -6,6 +6,7 @@
  */
 
 import { distanceAtT, tAtLoopDistance, type ArcTable } from './arcLength'
+import { smoothNoise1 } from '@/utils/valueNoise.hot'
 
 export interface Vec3Like {
   x: number
@@ -13,9 +14,34 @@ export interface Vec3Like {
   z: number
 }
 
-/** Peak bank / pitch (degrees) on the 'full' Screen-shake setting; a p90 turn banks ~5.5°. */
+/** Bank / pitch (degrees) on the 'full' Screen-shake setting at tanh(1); a p90 turn banks ~5.5°. */
 export const MAX_BANK_DEG = 8
 export const MAX_PITCH_DEG = 3
+/** A high-G turn banks up to this much more (×tanh³, so gentle turns keep their bank): a p99 turn ~12° (#697). */
+export const HIGH_G_BANK_DEG = 5
+
+/** Launch (#697): the shove into the seat tips the view up, then fades over ~2 s. */
+export const LAUNCH_PITCH_DEG = 2
+const LAUNCH_DECAY = 1.4
+const LAUNCH_ATTACK = 10
+/** Entering a steep drop the view dips (nose over) and recovers: the gap between a fast and a slow follower of the drop. */
+export const DIP_DEG = 6
+const DIP_FAST = 8
+const DIP_SLOW = 1.5
+/** Crest acceleration (units/s² ÷ trackScale; the levels' p5 runs -25 to -210) where the airtime float starts and is full. */
+const AIRTIME_START = 30
+const AIRTIME_FULL = 110
+const AIRTIME_RESPONSE = 4
+export const FLOAT_PITCH_DEG = 2
+export const FLOAT_DRIFT_DEG = 1.5
+const FLOAT_DRIFT_HZ = 0.6
+/** Chain lift: climbing at the ride's minimum speed is the chain pulling the car up (no zones before #696). */
+const LIFT_MIN_CLIMB = 0.08
+const LIFT_RESPONSE = 6
+
+/** The smoke's caps: every term at its peak. */
+export const RIG_MAX_ROLL_DEG = MAX_BANK_DEG + HIGH_G_BANK_DEG + FLOAT_DRIFT_DEG
+export const RIG_MAX_PITCH_DEG = MAX_PITCH_DEG + LAUNCH_PITCH_DEG + DIP_DEG + FLOAT_PITCH_DEG + FLOAT_DRIFT_DEG
 /** Accelerations that give tanh(1) ≈ 76% of the peak. */
 export const LATERAL_ACCEL_REF = 150
 const LONGITUDINAL_ACCEL_REF = 200
@@ -50,7 +76,8 @@ export function damp(current: number, target: number, rate: number, dt: number):
 /** `rotateZ` radians toward the lateral acceleration along the camera's right axis. */
 export function bankAngle(lateralAccel: number, trackScale: number): number {
   if (!Number.isFinite(lateralAccel)) return 0
-  return -MAX_BANK_DEG * DEG * Math.tanh(lateralAccel / (LATERAL_ACCEL_REF * trackScale))
+  const u = Math.tanh(lateralAccel / (LATERAL_ACCEL_REF * trackScale))
+  return -(MAX_BANK_DEG * u + HIGH_G_BANK_DEG * u * u * u) * DEG
 }
 
 /** `rotateX` radians: speeding up tips the view up, braking down. */
@@ -66,6 +93,37 @@ export function dropAmount(descent: number): number {
   return x * x * (3 - 2 * x)
 }
 
+const smoothstep01 = (x: number) => {
+  const c = Math.min(Math.max(x, 0), 1)
+  return c * c * (3 - 2 * c)
+}
+
+/** 0 off a crest, easing to 1 where it throws the rider up out of the seat. `verticalAccel` is negative over a crest. */
+export function airtimeAmount(verticalAccel: number, trackScale: number): number {
+  if (!Number.isFinite(verticalAccel) || !(trackScale > 0)) return 0
+  return smoothstep01((-verticalAccel / trackScale - AIRTIME_START) / (AIRTIME_FULL - AIRTIME_START))
+}
+
+/** On the chain: climbing while held at the ride's minimum speed (velocities per frame, `ridePhysics`). */
+export function onChainLift(tangentY: number, velocity: number, minVelocity: number): boolean {
+  return tangentY > LIFT_MIN_CLIMB && velocity <= minVelocity * 1.001
+}
+
+/** What the camera reads off the ride each frame; one reused object. */
+export interface RigInput {
+  /** Units/s² along the camera's right axis (`lateralAcceleration`). */
+  lateral: number
+  /** Units/s² across the track in its vertical plane (`verticalAcceleration`): negative over a crest. */
+  vertical: number
+  /** Units/s. */
+  speed: number
+  /** 0 at the ride's minimum speed, 1 at its top. */
+  speedNorm: number
+  /** -tangent.y. */
+  descent: number
+  lifting: boolean
+}
+
 export interface RigState {
   /** Radians, before the Screen-shake scale (so Off is exactly 0 at once). */
   roll: number
@@ -74,11 +132,32 @@ export interface RigState {
   /** Smoothed `dropAmount`, 0–1. */
   drop: number
   lastSpeed: number | null
+  /** The launch's shove: `launchDrive` jumps to 1 and decays, `launch` follows it in. */
+  launchDrive: number
+  launch: number
+  dipFast: number
+  dipSlow: number
+  /** Smoothed `airtimeAmount`, 0–1. */
+  airtime: number
+  /** Smoothed `onChainLift`, 0–1. */
+  lift: number
+  /** Game seconds, the float's drift clock. */
+  time: number
+}
+
+/** Rig rotation before the Screen-shake scale (radians), from `rigAngles`. */
+export interface RigAngles {
+  pitch: number
+  yaw: number
+  roll: number
 }
 
 export function createRigState(): RigState {
   // eslint-disable-next-line sc/no-hot-path-alloc -- cold: once per camera mount
-  return { roll: 0, pitch: 0, speedNorm: 0, drop: 0, lastSpeed: null }
+  return {
+    roll: 0, pitch: 0, speedNorm: 0, drop: 0, lastSpeed: null,
+    launchDrive: 0, launch: 0, dipFast: 0, dipSlow: 0, airtime: 0, lift: 0, time: 0,
+  }
 }
 
 export function resetRig(state: RigState): RigState {
@@ -87,27 +166,57 @@ export function resetRig(state: RigState): RigState {
   state.speedNorm = 0
   state.drop = 0
   state.lastSpeed = null
+  state.launchDrive = 0
+  state.launch = 0
+  state.dipFast = 0
+  state.dipSlow = 0
+  state.airtime = 0
+  state.lift = 0
+  state.time = 0
   return state
 }
 
-/** Game-time step; a frozen frame keeps the view still so frozen-time taps hit what they see. `descent` is -tangent.y. */
-export function stepRig(
-  state: RigState,
-  lateralAccel: number,
-  speed: number,
-  speedNorm: number,
-  dt: number,
-  trackScale: number,
-  descent = 0,
-): RigState {
+/** The car leaves the station (GO), or a launch zone fires (#696). */
+export function triggerLaunch(state: RigState): RigState {
+  state.launchDrive = 1
+  return state
+}
+
+/** Game-time step; a frozen frame keeps the view still so frozen-time taps hit what they see. */
+export function stepRig(state: RigState, input: RigInput, dt: number, trackScale: number): RigState {
   if (!(dt > 0)) return state
+  const { speed } = input
   const longitudinal = state.lastSpeed === null ? 0 : (speed - state.lastSpeed) / dt
   state.lastSpeed = speed
-  state.roll = damp(state.roll, bankAngle(lateralAccel, trackScale), BANK_RESPONSE, dt)
+  state.roll = damp(state.roll, bankAngle(input.lateral, trackScale), BANK_RESPONSE, dt)
   state.pitch = damp(state.pitch, pitchAngle(longitudinal, trackScale), PITCH_RESPONSE, dt)
-  state.speedNorm = damp(state.speedNorm, Math.min(Math.max(speedNorm, 0), 1), SPEED_FOV_RESPONSE, dt)
-  state.drop = damp(state.drop, dropAmount(descent), DROP_RESPONSE, dt)
+  state.speedNorm = damp(state.speedNorm, Math.min(Math.max(input.speedNorm, 0), 1), SPEED_FOV_RESPONSE, dt)
+  const drop = dropAmount(input.descent)
+  state.drop = damp(state.drop, drop, DROP_RESPONSE, dt)
+  state.dipFast = damp(state.dipFast, drop, DIP_FAST, dt)
+  state.dipSlow = damp(state.dipSlow, drop, DIP_SLOW, dt)
+  state.launchDrive *= Math.exp(-dt * LAUNCH_DECAY)
+  state.launch = damp(state.launch, state.launchDrive, LAUNCH_ATTACK, dt)
+  state.airtime = damp(state.airtime, airtimeAmount(input.vertical, trackScale), AIRTIME_RESPONSE, dt)
+  state.lift = damp(state.lift, input.lifting ? 1 : 0, LIFT_RESPONSE, dt)
+  state.time += dt
   return state
+}
+
+/** The drop's dip, 0–1: rises entering a drop, back to 0 once the drop holds. */
+export function dipAmount(state: RigState): number {
+  return Math.max(0, state.dipFast - state.dipSlow)
+}
+
+/** The rig's whole rotation (radians, before the Screen-shake scale): bank, accel pitch, launch, dip and the airtime float. */
+export function rigAngles(state: RigState, out: RigAngles): RigAngles {
+  const drift = FLOAT_DRIFT_DEG * DEG * state.airtime
+  const x = state.time * FLOAT_DRIFT_HZ
+  out.pitch = state.pitch + (LAUNCH_PITCH_DEG * state.launch - DIP_DEG * dipAmount(state) + FLOAT_PITCH_DEG * state.airtime) * DEG
+    + drift * smoothNoise1(x, 7)
+  out.yaw = drift * smoothNoise1(x, 31)
+  out.roll = state.roll + drift * smoothNoise1(x, 53)
+  return out
 }
 
 export interface TrackSamples {
@@ -154,6 +263,12 @@ export function lateralAcceleration(
   if (!(arcSpan > 0) || len < 1e-6) return 0
   const curvatureRight = ((tangentAhead.x - tangentBehind.x) * rx + (tangentAhead.z - tangentBehind.z) * rz) / (len * arcSpan)
   return curvatureRight * speed * speed
+}
+
+/** Acceleration (units/s²) across the track in its vertical plane, from the tangents `arcSpan` apart: negative over a crest. */
+export function verticalAcceleration(tangentBehind: Vec3Like, tangentAhead: Vec3Like, arcSpan: number, speed: number): number {
+  if (!(arcSpan > 0)) return 0
+  return ((tangentAhead.y - tangentBehind.y) / arcSpan) * speed * speed
 }
 
 function normalize(v: Vec3Like): Vec3Like {

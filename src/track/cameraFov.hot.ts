@@ -51,17 +51,25 @@ export const DROP_FOV_DEG = 3
 /** Further extra vertical FOV (degrees) deep in a tunnel (#332), same setting: the walls rush past wider. */
 export const TUNNEL_FOV_DEG = 2
 
-/** `fovForAspect`'s FOV plus the speed, drop and tunnel kicks × `scale` (Screen shake), never past `maxVertical`, so portrait screens at the cap keep theirs. */
+/** Further extra vertical FOV (degrees) at a launch's shove (#697), same setting. */
+export const LAUNCH_FOV_DEG = 6
+
+/** The most the kicks together add: the smoke's cap. */
+export const MAX_FOV_KICK_DEG = SPEED_FOV_DEG + DROP_FOV_DEG + TUNNEL_FOV_DEG + LAUNCH_FOV_DEG
+
 const clamp01 = (v: number) => (Number.isFinite(v) ? Math.min(Math.max(v, 0), 1) : 0)
 
+/** `fovForAspect`'s FOV plus the speed, drop, tunnel and launch kicks × `scale` (Screen shake), never past `maxVertical`, so portrait screens at the cap keep theirs. */
 export function fovWithSpeed(
   screenFov: number,
   speedNorm: number,
   scale: number,
   drop = 0,
   tunnel = 0,
+  launch = 0,
   maxVertical = MAX_VERTICAL_FOV,
 ): number {
-  const kick = (SPEED_FOV_DEG * clamp01(speedNorm) + DROP_FOV_DEG * clamp01(drop) + TUNNEL_FOV_DEG * clamp01(tunnel)) * clamp01(scale)
+  const kick = (SPEED_FOV_DEG * clamp01(speedNorm) + DROP_FOV_DEG * clamp01(drop) + TUNNEL_FOV_DEG * clamp01(tunnel)
+    + LAUNCH_FOV_DEG * clamp01(launch)) * clamp01(scale)
   return Math.max(screenFov, Math.min(screenFov + kick, maxVertical))
 }
