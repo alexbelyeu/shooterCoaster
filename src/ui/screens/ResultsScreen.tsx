@@ -364,7 +364,7 @@ export default function ResultsScreen() {
             <button className="play-button results-secondary" onClick={() => leave('replay')}>
               Replay
             </button>
-            {card && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} />}
+            {card && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} prerender={done} />}
             {nextOpen && (
               <button ref={nextRef} className="play-button" onClick={() => leave('next')}>
                 Next Level

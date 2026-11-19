@@ -9,6 +9,7 @@ import {
   clipboardText,
   copyImage,
   copyShare,
+  exclusive,
   nativeShare,
   rankLabel,
   SHARE_TARGETS,
@@ -168,6 +169,28 @@ describe('sharing', () => {
     expect(await nativeShare({}, payload)).toBe('failed')
     expect(await copyShare({ clipboard: { writeText: rejecting('no focus') } }, payload)).toBe(false)
     expect(await copyShare({}, payload)).toBe(false)
+  })
+})
+
+describe('exclusive', () => {
+  it('drops a second call while the first is in flight, and frees the flag when it ends, even on a throw', async () => {
+    const busy = { current: false }
+    let release = () => {}
+    let calls = 0
+    const slow = () => new Promise<string>((resolve) => {
+      calls++
+      release = () => resolve('shared')
+    })
+    const first = exclusive(busy, slow)
+    expect(busy.current).toBe(true)
+    expect(await exclusive(busy, slow)).toBeNull()
+    release()
+    expect(await first).toBe('shared')
+    expect(calls).toBe(1)
+    expect(busy.current).toBe(false)
+    await expect(exclusive(busy, () => Promise.reject(new Error('boom')))).rejects.toThrow('boom')
+    expect(busy.current).toBe(false)
+    expect(await exclusive(busy, async () => 'again')).toBe('again')
   })
 })
 
