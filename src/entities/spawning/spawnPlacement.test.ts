@@ -502,7 +502,7 @@ describe('placeWallSwarm (#516)', () => {
 describe('level2: the opening climb (#494)', () => {
   const { level, table, groundFn, rideFor, trackScale, keepOff } = world(getAllLevels().find((l) => l.id === 'level2')!)
   const wave = level.enemies[0]
-  const profile = rideProfile(table, rideSpeeds(level.track), RUN_SECONDS)
+  const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
   // The rig's frustum on the smoke's 1280×720 screen (80° vertical), looking where `trackView` does.
   const tanV = Math.tan((REFERENCE_FOV_DEG / 2) * (Math.PI / 180))
   const tanH = tanV * (1280 / 720)
