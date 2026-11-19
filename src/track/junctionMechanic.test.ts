@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { createSplineCurve } from './curves/SplineCurve'
-import { advanceRide, resetRide, rideSpeeds, type RideState } from './ridePhysics'
+import { advanceRide, curveTangentY, resetRide, rideSpeeds, type RideState } from './ridePhysics'
 import { buildArcTable } from './arcLength'
 import { type JunctionMechanic, SWITCH_BOARD_H, SWITCH_HIT_RADIUS, buildJunction, checkMechanics, switchOpen, switchPose } from './mechanics'
 import { routeCurve, routeSpeedScale } from './mechanics.hot'
@@ -102,7 +102,7 @@ describe('a shoot-to-switch junction (#702)', () => {
       resetRide(state)
       const seen: number[] = []
       for (let frame = 0; frame < 60 * 30 && state.progress < TO + 0.02; frame++) {
-        advanceRide(state, main, speeds, 1)
+        advanceRide(state, curveTangentY(main), speeds, 1)
         const p = seat.getPointAt(state.progress)
         if (state.progress >= TO && seen.length === 0) seen.push(state.time, p.x, p.y, p.z)
       }

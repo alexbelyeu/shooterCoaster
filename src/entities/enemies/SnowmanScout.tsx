@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
-import { marchHeading } from '@/entities/spawning/spawnPlacement'
+import { useMarch } from './useMarch'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
   SNOWMAN_BODY_GEO, SNOWMAN_SCOUT_MAT,
@@ -23,7 +23,7 @@ export default function SnowmanScout(props: EnemyProps) {
   const camera = useThree((s) => s.camera)
   const heightFn = useContext(TerrainContext)
 
-  const heading = marchHeading(props.motion)
+  const { heading, moving } = useMarch(props.motion)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
@@ -31,7 +31,7 @@ export default function SnowmanScout(props: EnemyProps) {
       if (heading === undefined) {
         mesh.position.z += ((moveSpeed * Math.cos(time * theta)) / theta) * dt
         mesh.position.x += ((moveSpeed * Math.sin(time * theta)) / theta) * dt
-      } else {
+      } else if (moving()) {
         mesh.position.x += Math.cos(heading) * MARCH_SPEED * dt
         mesh.position.z += Math.sin(heading) * MARCH_SPEED * dt
       }
@@ -39,7 +39,7 @@ export default function SnowmanScout(props: EnemyProps) {
 
       if (bodyRef.current) bodyRef.current.rotation.z = Math.sin(time * 3.5) * 0.06
     },
-    [theta, moveSpeed, heightFn, heading],
+    [theta, moveSpeed, heightFn, heading, moving],
   )
 
   useFrame(() => {

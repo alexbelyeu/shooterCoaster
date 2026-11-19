@@ -6,13 +6,13 @@ import { createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/uti
 import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig, WallSurface } from '@/types/level'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
-import { rideModel, rideProfile, riddenBetween } from '@/track/ridePhysics'
+import { rideModel, rideProfile } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import {
-  AIR_CLEARANCE, ENTRY_SECONDS, ENTRY_STAGGER, FORMATIONS, NEAR_FIELD, clampToBounds, entryPoint, formationFrame, formationSlots, groupStep,
-  indexAhead, insideBounds, marchHeading, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
-  inView, placeWallClimbers, placeWallSwarm, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
+  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, clampToBounds, entryPoint, formationFrame, formationSlots, groupStep,
+  indexAhead, insideBounds, marchHeading, marchMoving, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
+  inView, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
   type ChoreographedFormation, type RideAhead, type Vec3,
 } from './spawnPlacement'
 import {
@@ -20,7 +20,6 @@ import {
 } from './enemyPlacement'
 import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
-import { waveWindows } from './waveSchedule'
 import { BIOMES, biomeHeightFunction } from '@/levels/environments/biomeRegistry'
 import { REFERENCE_FOV_DEG, maxReadableDistance } from '../enemies/enemyReadability'
 
@@ -36,14 +35,8 @@ function world(level: LevelConfig) {
   const heightFn = biomeHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
   const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize(level.biome))
   // What EnemySpawner hands each wave: the ride from GO over its entry and its window.
-  const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
   const { trackScale } = getTrackDimensions(level.track)
-  const windows = waveWindows(level.enemies.map((w) => w.spawnDelay ?? 0), level.boss?.at, RUN_SECONDS)
-  const rides: RideAhead[] = windows.map(([from, to]) => ({
-    entry: riddenBetween(profile, from, from + ENTRY_SECONDS + ENTRY_STAGGER),
-    window: riddenBetween(profile, from, to),
-    trackScale,
-  }))
+  const rides = rideAheadOfWaves(table, rideModel(level.track, table), level.enemies.map((w) => w.spawnDelay ?? 0), level.boss?.at, trackScale)
   const rideFor = (wave: EnemyWave) => rides[level.enemies.indexOf(wave)]
   return { level, table, groundFn, rideFor, trackScale, bounds: BIOMES[level.biome].bounds, keepOff: BIOMES[level.biome].keepOff?.(groundFn, table) ?? [] }
 }
@@ -163,7 +156,7 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
           // One heading per group, so its shape holds.
           const leader = placed[slots.findIndex((s) => s.group === slots[i].group)]
           expect(marchHeading(p.motion)).toBeTypeOf('number')
-          expect(marchHeading(p.motion)).toBe(marchHeading(leader.motion))
+          expect(p.motion).toEqual(leader.motion)
         }
         if (slots[i].group === 0 && bearingCos(landed, p.position) > 0) ahead++
       })
@@ -196,6 +189,28 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
       }
     }
     expect(turns).toBeGreaterThan(0)
+  })
+
+  const marching = waves.filter((w) => ['v', 'line', 'school'].includes(w.formation!) && ENEMY_PLACEMENT[w.type].surface !== 'water')
+  it.each(marching.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: each group marches once the rider reaches it, not from activation (#472)', (_name, wave) => {
+    const formation = wave.formation as ChoreographedFormation
+    const slots = formationSlots(formation, wave.count, createRng(1337))
+    const ride = rideFor(wave)
+    const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
+    const step = groupStep(table, formation, groups, ride)
+    let waiting = 0
+    for (const fraction of RIDER_FRACTIONS) {
+      const riderIndex = Math.round(fraction * (table.count - 1))
+      const camera = trackView(table, riderIndex, trackScale).eye
+      const placed = placeFormationWave({ table, riderIndex, camera, formation, origin: wave.formationOrigin, type: wave.type, groundFn, slots, ride, bounds })
+      for (let g = 0; g < groups; g++) {
+        const { motion } = placed[slots.findIndex((s) => s.group === g)]
+        const there = trackView(table, indexAhead(table, riderIndex, g * step + ride.entry), trackScale)
+        expect(marchMoving(motion, there.eye), `rider ${fraction} group ${g}`).toBe(true)
+        if (!marchMoving(motion, camera)) waiting++
+      }
+    }
+    if (groups > 1) expect(waiting).toBeGreaterThan(0)
   })
 
   it.each(waves.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: groups spread over the window the rider covers', (_name, wave) => {

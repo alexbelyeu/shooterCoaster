@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { WATER_Y } from '@/entities/spawning/enemyPlacement'
-import { marchHeading } from '@/entities/spawning/spawnPlacement'
+import { useMarch } from './useMarch'
 import {
   FFISH_BODY_GEO, FFISH_WING_GEO, FFISH_TAIL_UPPER_GEO, FFISH_TAIL_LOWER_GEO,
   FFISH_DORSAL_GEO, FFISH_EYE_GEO,
@@ -20,7 +20,7 @@ const GRAVITY = 0.08
  */
 export default function FlyingFish(props: EnemyProps) {
   // One speed for the whole school, or it strings out.
-  const heading = marchHeading(props.motion)
+  const { heading, moving } = useMarch(props.motion)
   const own = useEnemyRandom(props.id, (rng) => ({
     angle: rng() * Math.PI * 2, speed: 0.8 + rng() * 0.5, launchSpeed: 1.5 + rng() * 1.0, rng,
   }))
@@ -36,8 +36,9 @@ export default function FlyingFish(props: EnemyProps) {
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
       const dt = delta * 60
-      mesh.position.x += Math.cos(moveAngle) * moveSpeed * dt
-      mesh.position.z += Math.sin(moveAngle) * moveSpeed * dt
+      const speed = moving() ? moveSpeed : 0
+      mesh.position.x += Math.cos(moveAngle) * speed * dt
+      mesh.position.z += Math.sin(moveAngle) * speed * dt
 
       vyRef.current -= GRAVITY * dt
       mesh.position.y += vyRef.current * dt
@@ -65,7 +66,7 @@ export default function FlyingFish(props: EnemyProps) {
         bodyRef.current.rotation.x = THREE.MathUtils.clamp(vyRef.current * -0.15, -0.4, 0.4)
       }
     },
-    [moveAngle, moveSpeed, launchSpeed],
+    [moveAngle, moveSpeed, moving, launchSpeed],
   )
 
   return (

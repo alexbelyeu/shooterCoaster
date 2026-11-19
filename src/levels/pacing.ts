@@ -8,9 +8,6 @@ const BOSS_SHARE = 2 / 3
 const WAVE_SPAN_SHARE = 3 / 4
 const LAST_WAVE_SHARE = 0.55
 
-/** The longest fly-in of an arriving enemy (`spawnPlacement.ts`: 1.2 s + up to 0.6 s down a formation). */
-export const ENTRY_SECONDS_MAX = 2
-
 export interface PacingTimes {
   bossAt: number
   waveSpan: number

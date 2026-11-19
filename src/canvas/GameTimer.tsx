@@ -5,16 +5,13 @@ import { resetComboRuntime, tickCombo } from '@/combat/comboRuntime.hot'
 import { endSlowMo, resetSlowMo, tickSlowMo } from '@/combat/slowMo.hot'
 import { markStartup } from '@/core/startupMarks'
 import { levelTimeHeld, levelTimeStep, noteE2ELevelTime } from '@/testing/e2eHook'
-
-interface GameTimerProps {
-  seconds: number
-}
+import { RUN_SECONDS } from '@/levels/pacing'
 
 /**
  * Counts down the level; reset when a run starts (`runId`), kept through GO, pause and resume.
  * Also the frame that owns the combo game clock (`tickCombo`) and the slow-mo (`tickSlowMo`).
  */
-export default function GameTimer({ seconds }: GameTimerProps) {
+export default function GameTimer() {
   const phase = useGameStore((s) => s.phase)
   const runId = useGameStore((s) => s.runId)
 
@@ -30,8 +27,8 @@ export default function GameTimer({ seconds }: GameTimerProps) {
     lastCeiled.current = -1
     resetComboRuntime()
     resetSlowMo()
-    useGameStore.getState().setTimeRemaining(seconds)
-  }, [runId, seconds])
+    useGameStore.getState().setTimeRemaining(RUN_SECONDS)
+  }, [runId])
 
   // However the run reached results (timer, `endLevel`), the slow-mo must not follow it there.
   useEffect(() => {
@@ -54,7 +51,7 @@ export default function GameTimer({ seconds }: GameTimerProps) {
     } else running.current = true
     noteE2ELevelTime(elapsed.current)
 
-    const remaining = Math.max(0, seconds - elapsed.current)
+    const remaining = Math.max(0, RUN_SECONDS - elapsed.current)
     const ceiled = Math.ceil(remaining)
     if (ceiled !== lastCeiled.current) {
       lastCeiled.current = ceiled
