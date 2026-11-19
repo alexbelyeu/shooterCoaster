@@ -264,6 +264,10 @@ export interface SCTestApi {
   photo: {
     at: number | null; taken: boolean; progress: number | null; captureMs: number | null; frameMs: number | null; beforeMs: number | null
     width: number; height: number; bytes: number | null
+    /** The HUD's flash started its animation. */
+    flashed: boolean
+    /** ms after the capture call each stage reached: the bitmap, scaled, encoded, the next frame. */
+    trace: Record<string, number> | null
   }
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null
@@ -1049,7 +1053,7 @@ export function installE2EApi() {
     setTimeScale: (s: number) => setTimeScaleOverride(s === 1 ? null : s),
     introAt: null,
     intro: { mode: 'ride', length: INTRO_SECONDS, progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, clearance: 0, marks: null, goOffset: null, orbitSeconds: 0, seconds: null, skipped: false },
-    photo: { at: null, taken: false, progress: null, captureMs: null, frameMs: null, beforeMs: null, width: 0, height: 0, bytes: null },
+    photo: { at: null, taken: false, progress: null, captureMs: null, frameMs: null, beforeMs: null, width: 0, height: 0, bytes: null, flashed: false, trace: null },
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,

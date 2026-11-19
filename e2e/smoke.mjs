@@ -649,7 +649,7 @@ async function ridePhotoProblems(page, id) {
   if (!start) return { problems: ['on-ride photo: no marker (RidePhoto not mounted)'], result: null }
   const flash = start.taken
     ? null
-    : page.waitForSelector('.hud-photo-flash', { state: 'attached', timeout: 60000 }).then(() => true, () => false)
+    : page.waitForFunction(() => window.__SC_TEST__.photo.flashed, null, { timeout: 60000, polling: 100 }).then(() => true, () => false)
   const arrived = await page
     .waitForFunction(() => window.__SC_TEST__.photo.bytes != null && window.__SC_TEST__.photo.frameMs != null, null, { timeout: 60000, polling: 100 })
     .then(() => true, () => false)
@@ -660,7 +660,7 @@ async function ridePhotoProblems(page, id) {
     if (flash && !(await flash)) problems.push('on-ride photo: no flash on screen')
     const usual = Math.max(result.beforeMs, result.avgFrameMs)
     if (result.frameMs > PHOTO_FRAME_FACTOR * usual)
-      problems.push(`on-ride photo: its frame took ${result.frameMs.toFixed(0)} ms, over ${PHOTO_FRAME_FACTOR}x a usual ${usual.toFixed(0)} ms`)
+      problems.push(`on-ride photo: its frame took ${result.frameMs.toFixed(0)} ms, over ${PHOTO_FRAME_FACTOR}x a usual ${usual.toFixed(0)} ms (${JSON.stringify(result.trace)})`)
     if (Math.max(result.width, result.height) > 1280 || result.bytes < 5000) problems.push(`on-ride photo is ${result.width}x${result.height}, ${result.bytes} bytes`)
   }
   return { problems, result: { ...result, flash: flash ? await flash : null, id } }

@@ -6,39 +6,47 @@ import { distanceAtT, tAtDistance, type ArcTable } from '@/track/arcLength'
 import { rideProgress } from '@/track/rideProgress.hot'
 import { passedPhoto, photoSize, RIDE_PHOTO_EVENT } from '@/track/photoMarker'
 import { eventBus } from '@/core/EventBus'
+import type { DevelopRequest } from './ridePhoto.worker'
 
 /** The JPEG's quality: a souvenir, still small (~100–200 KB at 1280 px). */
 const PHOTO_QUALITY = 0.9
 
-/** Scales the frame down into a 2D canvas and encodes it, a task after the capture. */
-async function develop(frame: ImageBitmap, runId: number, mounted: { current: boolean }) {
+/** Under e2e: ms after the capture call `stage` was reached. */
+function trace(stage: string) {
+  const photo = window.__SC_TEST__?.photo
+  if (photo?.trace) photo.trace[stage] = performance.now() - photo.trace.start
+}
+
+/** Hands the frame to the darkroom worker to scale and encode, and keeps the JPEG if the run and the level are still on. */
+function develop(frame: ImageBitmap, runId: number, mounted: { current: boolean }) {
+  trace('bitmap')
   const { width, height } = photoSize(frame.width, frame.height)
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')
-  if (ctx) ctx.drawImage(frame, 0, 0, width, height)
-  frame.close()
-  const blob = ctx ? await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', PHOTO_QUALITY)) : null
-  canvas.width = 0
-  canvas.height = 0
-  // A run that ended into the next one, or a level left, before the JPEG was done keeps no photo.
-  if (!blob || !mounted.current || useGameStore.getState().runId !== runId) return
-  setRidePhoto(runId, blob, width, height)
-  const testApi = window.__SC_TEST__
-  if (testApi) Object.assign(testApi.photo, { width, height, bytes: blob.size })
+  const worker = new Worker(new URL('./ridePhoto.worker.ts', import.meta.url), { type: 'module' })
+  const done = (blob: Blob | null) => {
+    worker.terminate()
+    trace('encoded')
+    // A run that ended into the next one, or a level left, before the JPEG was done keeps no photo.
+    if (!blob || !mounted.current || useGameStore.getState().runId !== runId) return
+    setRidePhoto(runId, blob, width, height)
+    const testApi = window.__SC_TEST__
+    if (testApi) Object.assign(testApi.photo, { width, height, bytes: blob.size })
+  }
+  worker.onmessage = (e: MessageEvent<Blob | null>) => done(e.data)
+  worker.onerror = () => done(null)
+  const request: DevelopRequest = { frame, width, height, quality: PHOTO_QUALITY }
+  worker.postMessage(request, [frame])
 }
 
 /**
  * Snapshots the frame: called after it has rendered, while the WebGL drawing buffer still holds it (no
  * `preserveDrawingBuffer`). `createImageBitmap` takes the copy now and resolves later, so the scaling and the JPEG
- * stay off the frame.
+ * stay off the main thread.
  */
 function capture(source: HTMLCanvasElement, runId: number, mounted: { current: boolean }) {
   const started = performance.now()
   const frame = createImageBitmap(source)
   const testApi = window.__SC_TEST__
-  if (testApi) Object.assign(testApi.photo, { taken: true, progress: rideProgress(), captureMs: performance.now() - started })
+  if (testApi) Object.assign(testApi.photo, { taken: true, progress: rideProgress(), captureMs: performance.now() - started, trace: { start: started } })
   eventBus.emit(RIDE_PHOTO_EVENT)
   // No photo is no loss: the card keeps the postcard.
   frame.then((bitmap) => develop(bitmap, runId, mounted)).catch(() => {})
@@ -53,7 +61,7 @@ function startRun(s: RideState, runId: number, dist: number) {
   s.last = dist
   clearRidePhoto()
   const testApi = window.__SC_TEST__
-  if (testApi) Object.assign(testApi.photo, { taken: false, progress: null, captureMs: null, frameMs: null, beforeMs: null, bytes: null })
+  if (testApi) Object.assign(testApi.photo, { taken: false, progress: null, captureMs: null, frameMs: null, beforeMs: null, bytes: null, flashed: false, trace: null })
 }
 
 interface RideState {
@@ -84,6 +92,7 @@ export default function RidePhoto({ table, at }: { table: ArcTable; at: number }
       s.timing = false
       const testApi = window.__SC_TEST__
       if (testApi) testApi.photo.frameMs = delta * 1000
+      trace('nextFrame')
     }
     const { runId, phase } = useGameStore.getState()
     const dist = distanceAtT(table, rideProgress())
