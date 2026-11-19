@@ -9,7 +9,7 @@ import { tourPose } from '@/track/introCamera.hot'
 import { buildIntroTour } from '@/track/introTour'
 import { type JunctionMechanic, buildJunction, switchPose } from '@/track/mechanics'
 import { gymFloor } from './config'
-import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
+import { BASE_VERTICAL_FOV, MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { MEDUSA_BODY, MEDUSA_HUB, MEDUSA_RISE, MEDUSA_SIZE, bustClearance, yawToward } from '@/entities/bosses/medusaMotion'
@@ -42,8 +42,8 @@ import { gym } from './index'
 const NEAR = 5
 /** The spiral's turn is counted while the track is within this many metres of the Flame's centre. */
 const SPIRAL_RADIUS = 20
-/** Vertical half-angle of the view: the coaster camera's 80° base FOV (narrow screens only widen it). */
-const VERTICAL_HALF_FOV = 40
+/** Vertical half-angle of the view at the coaster camera's base FOV (narrow screens only widen it). */
+const VERTICAL_HALF_FOV = BASE_VERTICAL_FOV / 2
 const N = 4000
 const DEG = 180 / Math.PI
 

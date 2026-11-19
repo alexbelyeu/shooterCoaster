@@ -4,12 +4,9 @@ import type { TrackCurve } from './TrackCurve'
 import { createTrigCurve } from './TrigCurve'
 import { createTrigCurve2 } from './TrigCurve2'
 
-/** The curve a level's track rides. */
+/** The curve a level's track rides: the one `TrackParams` → curve factory. */
 export function createTrackCurve(track: TrackParams): TrackCurve {
-  if (track.curve === 'spline') {
-    if (!track.controlPoints) throw new Error('a spline track needs controlPoints')
-    return createSplineCurve(track.controlPoints)
-  }
+  if (track.curve === 'spline') return createSplineCurve(track.controlPoints)
   const factory = track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve
   return factory(track.varA, track.varB, track.varC, track.scalar)
 }

@@ -21,7 +21,7 @@ import {
 } from '@/combat/screenShake.hot'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { prefersReducedMotion, usePrefersReducedMotion } from '@/ui/reducedMotion'
-import { fovForAspect, fovWithSpeed } from './cameraFov.hot'
+import { BASE_VERTICAL_FOV, fovForAspect, fovWithSpeed } from './cameraFov.hot'
 import WindStreaks, { type StreakDrive } from './WindStreaks'
 import { streakOpacity, streakRate } from './windStreaks'
 import {
@@ -61,8 +61,6 @@ interface CoasterCameraProps {
   bounds?: PlacementBounds
 }
 
-const BASE_FOV = 80
-
 const RAD_TO_DEG = 180 / Math.PI
 const WORLD_UP = new THREE.Vector3(0, 1, 0)
 
@@ -73,7 +71,7 @@ export default function CoasterCamera({
   trackScale,
   speeds,
   mechanics,
-  fov = BASE_FOV,
+  fov = BASE_VERTICAL_FOV,
   near = 1,
   far = 11000,
   heightOffset = 6,

@@ -232,9 +232,6 @@ export const GYM_LEVEL: { track: TrackParams; walls: readonly WallSurface[] } = 
         "z": -422.4
       }
     ],
-    "varA": 0,
-    "varB": 0,
-    "varC": 0,
     "scalar": 20,
     "segments": 800,
     "tieSpacing": 22,

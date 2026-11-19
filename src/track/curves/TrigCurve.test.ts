@@ -1,27 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { createTrigCurve } from './TrigCurve'
-import { createTrigCurve2 } from './TrigCurve2'
+import { createTrackCurve } from './createTrackCurve'
+import type { TrackCurve } from './TrackCurve'
 import { getAllLevels } from '@/levels/LevelRegistry'
-import type { TrackParams } from '@/types/level'
+import type { LevelConfig, TrigTrackParams } from '@/types/level'
 
 const SAMPLES = 1000
 
-function curveFor(track: TrackParams) {
-  const factory = track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve
-  return factory(track.varA, track.varB, track.varC, track.scalar)
-}
-
 /** Copy because getPointAt returns a shared scratch vector. */
-function pointAt(curve: ReturnType<typeof createTrigCurve>, t: number) {
+function pointAt(curve: TrackCurve, t: number) {
   const p = curve.getPointAt(t)
   return { x: p.x, y: p.y, z: p.z }
 }
 
 // The trig curves; an authored spline (level6) has its own tests (`SplineCurve.test.ts`, `gymTrack.test.ts`).
-const levels = getAllLevels().filter((l) => l.track.curve !== 'spline')
+const levels = getAllLevels().filter((l): l is LevelConfig & { track: TrigTrackParams } => l.track.curve !== 'spline')
 
 describe.each(levels.map((l) => [l.id, l.track] as const))('track curve for %s', (_id, track) => {
-  const curve = curveFor(track)
+  const curve = createTrackCurve(track)
 
   it('produces finite points and unit tangents across 1000 samples', () => {
     for (let i = 0; i <= SAMPLES; i++) {
@@ -75,7 +70,7 @@ describe.each(levels.map((l) => [l.id, l.track] as const))('track curve for %s',
 describe('TrigCurve (curve1)', () => {
   it('is a closed loop: getPointAt(0) equals getPointAt(1)', () => {
     for (const level of levels.filter((l) => l.track.curve === 'curve1')) {
-      const curve = curveFor(level.track)
+      const curve = createTrackCurve(level.track)
       const a = pointAt(curve, 0)
       const b = pointAt(curve, 1)
       expect(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)).toBeLessThan(1e-6)
@@ -84,7 +79,7 @@ describe('TrigCurve (curve1)', () => {
 
   it('stays above ground level (y > 0) everywhere', () => {
     for (const level of levels.filter((l) => l.track.curve === 'curve1')) {
-      const curve = curveFor(level.track)
+      const curve = createTrackCurve(level.track)
       for (let i = 0; i <= SAMPLES; i++) {
         expect(curve.getPointAt(i / SAMPLES).y).toBeGreaterThan(0)
       }
@@ -100,7 +95,7 @@ describe('TrigCurve2 (curve2)', () => {
   })
 
   describe.each(curve2Levels.map((l) => [l.id, l.track] as const))('%s', (_id, track) => {
-    const curve = curveFor(track)
+    const curve = createTrackCurve(track)
 
     it('is a closed loop: getPointAt(1) meets getPointAt(0)', () => {
       const a = pointAt(curve, 0)
