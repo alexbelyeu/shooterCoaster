@@ -6,6 +6,7 @@
  *     [--layers 0..3|ramp]  (the score's intensity layers, 0–3 held, or `ramp` up through them and down again)
  *   npm run audio:render -- --sfx-sheet [--level level1]
  *   npm run audio:render -- --mix level1 [--seconds 20] [--boss]
+ *   npm run audio:render -- --ride level1   (the ride's sounds: GO's launch whoosh, a chain lift, the drop's wind and rumble to top speed)
  *   npm run audio:render -- --launch level2   (level select's launch blip as that level's bank and room land under it: the click check at the swap)
  *   npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original] [--voicing jukebox|game] [--seconds 20]
  *   npm run audio:render -- --score <file.scrim> --chain game [--seconds 20] [--seam]
@@ -67,6 +68,10 @@ if (flag('music')) {
   request = { kind: 'mix', level: flag('mix'), seconds: num('seconds') ?? (boss ? 30 : undefined), boss }
   kind = 'mix'
   defaultName = `mix-${flag('mix')}${boss ? '-boss' : ''}`
+} else if (flag('ride')) {
+  request = { kind: 'ride', level: flag('ride') }
+  kind = 'sfx'
+  defaultName = `ride-${flag('ride')}`
 } else if (flag('launch')) {
   // Level select's launch blip with the level's bank and room landing under it (#246): no click where the graph swaps.
   request = { kind: 'launch', level: flag('launch') }
@@ -82,7 +87,7 @@ if (flag('music')) {
   kind = 'music'
   defaultName = `score-${chain === 'game' ? 'game' : original ? 'original' : 'port'}-${label}${seam ? '-seam' : ''}`
 } else {
-  console.error('usage: npm run audio:render -- --music <title|level1..level5|results|<slot>.<theme>> [--seam] | --sfx-sheet [--level <id>] | --mix <level> | --launch <level> | --score <file|vendored:N> [--engine port|original] [--name n] [--out dir] [--seed n]')
+  console.error('usage: npm run audio:render -- --music <title|level1..level5|results|<slot>.<theme>> [--seam] | --sfx-sheet [--level <id>] | --mix <level> | --ride <level> | --launch <level> | --score <file|vendored:N> [--engine port|original] [--name n] [--out dir] [--seed n]')
   process.exit(2)
 }
 const NAME = flag('name') ?? defaultName

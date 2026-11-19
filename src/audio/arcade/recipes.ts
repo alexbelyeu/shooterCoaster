@@ -296,6 +296,20 @@ export const RECIPES: readonly Recipe[] = [
   { id: 'uiWhoosh', lengthS: fixed(0.6), render(S, out, t) {
     sweep(S, out, t, 0.4, 300, 3200, 1.2, 1)
   } },
+  // The ride (#697): leaving the station, a magnetic whine climbing over a whoosh and a kick; the lift's chain, a dog's clank.
+  { id: 'rideLaunch', lengthS: fixed(1.6), render(S, out, t) {
+    sweep(S, out, t, 0.9, 150, 2800, 0.9, 1)
+    zap(S, out, t, 'sawtooth', 70, 420, 0.9, 0.45, 0.35)
+    hitDrum(S, out, 'kick', t, 0.8)
+  } },
+  { id: 'rideChain', variants: 2, lengthS: fixed(0.12), render(S, out, t, _b, v) {
+    const f = v ? 1.06 : 1
+    partial(S, out, t, 1250 * f, { a: 0.0005, tau: 0.02, peak: 0.5 })
+    partial(S, out, t, 1980 * f, { a: 0.0005, tau: 0.012, peak: 0.35 })
+    partial(S, out, t, 3150 * f, { a: 0.0005, tau: 0.007, peak: 0.25 })
+    partial(S, out, t, 180, { type: 'triangle', a: 0.001, tau: 0.03, peak: 0.6 })
+    noise(S, out, t, { type: 'bandpass', f: 2500, q: 1.2, a: 0.0005, tau: 0.008, peak: 0.6 })
+  } },
   // Countdown: Ready / Set on the tonic, GO an octave up with the fifth and a crash.
   { id: 'countReady', lengthS: fixed(0.35), render(S, out, t, b) {
     playInstrument(S, out, 'chip', t, 0.12, keyNote(b.key, 0, 1), 1)

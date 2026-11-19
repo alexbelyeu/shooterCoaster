@@ -3,7 +3,10 @@ import type { RideV2Spec, TrackParams } from '@/types/level'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { buildArcTable, distanceAtT, tAtDistance } from './arcLength'
 import { createTrackCurve } from './curves/createTrackCurve'
-import { MAX_RIDE_STEP_FRAMES, advanceRide, jumpRide, lapSeconds, rideModel, rideProfile, rideSpeedNorm, rideSpeeds, rideStepFrames, type RideState } from './ridePhysics'
+import {
+  MAX_RIDE_STEP_FRAMES, advanceRide, jumpRide, lapSeconds, rideLaunches, rideModel, rideOnLift, rideProfile, rideSpeedNorm, rideSpeeds,
+  rideStepFrames, rideTopShare, rideZone, type RideState,
+} from './ridePhysics'
 import { BEAT_TOLERANCE_SECONDS, buildRidePlan, planDistance, planSpeed, planTimeAt, type RidePlan } from './rideV2'
 
 const RADIUS = 400
@@ -163,6 +166,58 @@ describe('ridePhysics on a v2 ride', () => {
       expect(rideSpeedNorm(state, speeds)).toBeGreaterThanOrEqual(0)
     }
     expect(fastest).toBeGreaterThan(0.9)
+  })
+
+  it('drives the ride feel from its zones: one launch per launch zone, the chain only on the lift, wind on the plan\'s speed', () => {
+    const lift = ZONES![1]
+    const state: RideState = { progress: 0, velocity: 0, time: 0 }
+    let launches = 0
+    let lastZone: ReturnType<typeof rideZone> = null
+    let liftFrames = 0
+    let liftOutside = 0
+    let shareMin = Infinity
+    let shareMax = 0
+    for (let k = 0; k < 60 * lapSeconds(curve, speeds) * 1.5; k++) {
+      advanceRide(state, curve, speeds, 1)
+      const zone = rideZone(state, speeds)
+      if (rideLaunches(k === 0, zone, lastZone)) launches++
+      lastZone = zone
+      const share = distanceAtT(table, state.progress) / table.length
+      if (rideOnLift(state, speeds, curve.getTangentAt(state.progress).y)) {
+        liftFrames++
+        if (share < lift.from - 0.005 || share > lift.to + 0.005) liftOutside++
+      }
+      const top = rideTopShare(state, speeds)
+      if (k > 60 * 3) shareMin = Math.min(shareMin, top)
+      shareMax = Math.max(shareMax, top)
+    }
+    // GO in the station's launch zone fires once, the next lap's launch zone once more.
+    expect(launches).toBe(2)
+    expect(liftFrames).toBeGreaterThan(60)
+    expect(liftOutside).toBe(0)
+    expect(shareMax).toBeCloseTo(1, 2)
+    expect(shareMin).toBeGreaterThan(0)
+    expect(shareMin).toBeCloseTo(plan.minSpeed / plan.maxSpeed, 1)
+  })
+})
+
+describe('the ride feel on today\'s rule', () => {
+  const speeds = rideSpeeds({ rollerSpeed: 0.0001, minRollerSpeed: 0.001 })
+  const at = (velocity: number): RideState => ({ progress: 0.3, velocity, time: 5 })
+
+  it('is on the chain only climbing at the minimum speed', () => {
+    expect(rideOnLift(at(speeds.min), speeds, 0.3)).toBe(true)
+    expect(rideOnLift(at(speeds.min * 2), speeds, 0.3)).toBe(false)
+    expect(rideOnLift(at(speeds.min), speeds, 0)).toBe(false)
+    expect(rideOnLift(at(speeds.min), speeds, -0.3)).toBe(false)
+  })
+
+  it('has no zones, so only GO launches, and its wind is the velocity over the top speed', () => {
+    expect(rideZone(at(speeds.min), speeds)).toBeNull()
+    expect(rideLaunches(true, null, null)).toBe(true)
+    expect(rideLaunches(false, null, null)).toBe(false)
+    expect(rideTopShare(at(speeds.max / 2), speeds)).toBeCloseTo(0.5)
+    expect(rideTopShare(at(speeds.min), speeds)).toBeCloseTo(speeds.min / speeds.max)
   })
 })
 

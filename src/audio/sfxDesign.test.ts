@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { FIREWORK_BIOMES, FIREWORK_SFX, fireworkWhistleS, WIND, windGain, windHz, windUpdateDue } from './sfxDesign'
+import {
+  CHAIN, FIREWORK_BIOMES, FIREWORK_SFX, RUMBLE, fireworkWhistleS, nextClankAt, rumbleGain, rumbleHz, WIND, windGain, windHz, windUpdateDue,
+} from './sfxDesign'
 
 describe('wind', () => {
   it('opens and brightens with speed', () => {
@@ -42,3 +44,25 @@ describe('firework cues', () => {
   })
 })
 
+
+describe('ride sounds (#697)', () => {
+  it('the wind has range: a breath at the crawl, a roar at the top', () => {
+    expect(windGain(0.2)).toBeLessThan(WIND.maxGain / 10)
+    expect(windGain(1) / windGain(0.5)).toBeGreaterThan(2.5)
+  })
+
+  it('the rumble sits under the ride from the crawl, opens with speed, and stops at 0', () => {
+    expect(rumbleGain(0)).toBe(0)
+    expect(rumbleGain(0.2)).toBeGreaterThan(RUMBLE.floorGain)
+    expect(rumbleGain(1)).toBeCloseTo(RUMBLE.maxGain)
+    expect(rumbleHz(1)).toBeGreaterThan(rumbleHz(0.2))
+    expect(rumbleHz(1)).toBeLessThan(300)
+  })
+
+  it('clanks a chain dog every period of game time, slower in slow-mo, catching up after a stall', () => {
+    expect(nextClankAt(-Infinity, 5, 1)).toBe(5)
+    expect(nextClankAt(5, 5, 1)).toBeCloseTo(5 + CHAIN.periodS)
+    expect(nextClankAt(5, 5, 0.5)).toBeCloseTo(5 + 2 * CHAIN.periodS)
+    expect(nextClankAt(1, 5, 1)).toBe(5)
+  })
+})

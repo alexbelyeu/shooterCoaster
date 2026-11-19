@@ -1,7 +1,7 @@
 import { distanceAtT, indexAtT, tAtLoopDistance, type ArcTable } from './arcLength'
 import type { TrackCurve } from './curves/TrackCurve'
-import { buildRidePlan, PLAN_RATE, planDistance, planSpeed, planTimeAt, type RidePlan } from './rideV2'
-import type { TrackParams } from '@/types/level'
+import { buildRidePlan, PLAN_RATE, planDistance, planSpeed, planTimeAt, planZoneAt, type RidePlan } from './rideV2'
+import type { SpeedZone, TrackParams } from '@/types/level'
 
 /**
  * The coaster's speed rule (port of Camera.js updateCamGame), pure: `CoasterCamera` rides it and
@@ -72,6 +72,32 @@ export function rideSpeedNorm(state: RideState, speeds: RideSpeeds): number {
     ? (planSpeed(plan, state.time) - plan.minSpeed) / (plan.maxSpeed - plan.minSpeed || 1)
     : (state.velocity - speeds.min) / (speeds.max - speeds.min)
   return Math.max(0, Math.min(norm, 1))
+}
+
+/** Speed as a share of the ride's top speed, 0–1: unlike `rideSpeedNorm`, the slowest speed still has some (the wind's input). */
+export function rideTopShare(state: RideState, speeds: RideSpeeds): number {
+  const { plan } = speeds
+  const share = plan ? planSpeed(plan, state.time) / (plan.maxSpeed || 1) : state.velocity / speeds.max
+  return Math.max(0, Math.min(share, 1))
+}
+
+/** The v2 zone the car is in; today's rule has no zones. */
+export function rideZone(state: RideState, speeds: RideSpeeds): SpeedZone['kind'] | null {
+  return speeds.plan ? planZoneAt(speeds.plan, state.time) : null
+}
+
+/** Today's rule has no chain: climbing this steeply while held at its minimum speed is what pulls the car up. */
+const LIFT_MIN_CLIMB = 0.08
+
+/** On the chain (its clank): a v2 ride inside a `lift` zone, today's rule climbing at its minimum speed. */
+export function rideOnLift(state: RideState, speeds: RideSpeeds, tangentY: number): boolean {
+  if (speeds.plan) return rideZone(state, speeds) === 'lift'
+  return tangentY > LIFT_MIN_CLIMB && state.velocity <= speeds.min * 1.001
+}
+
+/** The one launch signal (`triggerLaunch`, the whoosh): GO leaving the station, or a v2 ride entering a `launch` zone. */
+export function rideLaunches(go: boolean, zone: SpeedZone['kind'] | null, lastZone: SpeedZone['kind'] | null): boolean {
+  return go || (zone === 'launch' && lastZone !== 'launch')
 }
 
 /**
