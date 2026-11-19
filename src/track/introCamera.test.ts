@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { INTRO_SECONDS } from '@/core/introShot'
 import {
-  ORBIT_RATE, READY_HOLD, createSwoopClock, createTrackApproach, orbitPose, stepSwoopClock, swoopPose, type HeroShot,
+  ORBIT_RATE, createTrackApproach, introProgress, orbitPose, swoopPose, type HeroShot,
 } from './introCamera.hot'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { createTrackCurve } from './curves/createTrackCurve'
@@ -97,36 +98,21 @@ describe('swoopPose', () => {
   })
 })
 
-describe('stepSwoopClock', () => {
-  it('waits for the level to show, eases short of the seat through Ready, then lands at GO with zero speed', () => {
-    const c = createSwoopClock()
-    expect(stepSwoopClock(c, 0.1, false, null)).toBe(0)
-    let p = 0
-    for (let i = 0; i < 300; i++) p = stepSwoopClock(c, 1 / 60, true, null)
-    expect(p).toBeLessThan(READY_HOLD)
-    expect(p).toBeGreaterThan(READY_HOLD * 0.9)
-
-    const set = 0.85
-    const samples: number[] = []
-    for (let toGo = set; toGo > 0; toGo -= 1 / 60) samples.push(stepSwoopClock(c, 1 / 60, true, toGo))
-    samples.push(stepSwoopClock(c, 1 / 60, true, 0))
-    expect(samples.every((x, i) => i === 0 || x >= samples[i - 1] - 1e-12)).toBe(true)
-    expect(samples[samples.length - 1]).toBe(1)
-    expect(1 - samples[samples.length - 2]).toBeLessThan(0.01)
-    // GO held back (a smoke hold): the seat holds.
-    expect(stepSwoopClock(c, 1 / 60, true, -0.5)).toBe(1)
+describe('introProgress', () => {
+  it('runs 0 to 1 over the fixed intro, easing out of the start and into the seat', () => {
+    const samples = Array.from({ length: 121 }, (_, i) => introProgress((i / 120) * INTRO_SECONDS))
+    expect(samples[0]).toBe(0)
+    expect(samples[120]).toBe(1)
+    expect(samples.every((x, i) => i === 0 || x > samples[i - 1])).toBe(true)
+    // Slow at both ends, fastest mid-way.
+    expect(samples[1]).toBeLessThan(1e-4)
+    expect(1 - samples[119]).toBeLessThan(1e-4)
+    expect(introProgress(INTRO_SECONDS / 2)).toBeCloseTo(0.5, 10)
   })
 
-  it('lands a swoop that only starts at Set', () => {
-    const c = createSwoopClock()
-    let p = 0
-    for (let toGo = 0.85; toGo > 0; toGo -= 0.1) p = stepSwoopClock(c, 0.1, true, toGo)
-    expect(p).toBeGreaterThan(0.9)
-    expect(stepSwoopClock(c, 0.1, true, 0)).toBe(1)
-  })
-
-  it('goes straight to the seat when GO is already due', () => {
-    expect(stepSwoopClock(createSwoopClock(), 0.016, true, 0)).toBe(1)
+  it('holds the start before the intro and the seat after it', () => {
+    expect(introProgress(-1)).toBe(0)
+    expect(introProgress(INTRO_SECONDS + 5)).toBe(1)
   })
 })
 

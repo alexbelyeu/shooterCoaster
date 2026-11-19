@@ -9,6 +9,7 @@ import { scrimPlayer, withScrim } from '@/audio/musicEngine'
 import { eventBus } from '@/core/EventBus'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { isInRun } from '@/store/startPhase'
+import { reportLoad } from '@/core/loadProgress'
 import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks'
 import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 import { intensityForTier } from '@/audio/scrim/layers'
@@ -20,9 +21,9 @@ import { BYSTANDER_HIT_EVENT, type BystanderHitEvent } from '@/combat/bystanders
  * The level's score while it runs (held while paused, through the resume Ready / GO), the results score after it.
  * Leaving for the title or level select: the unmount fades the score, none is built to be faded (#236).
  */
-function followPhase(phase: GamePhase, level: string) {
-  if (!isInRun(phase) && phase !== 'results') return
-  withScrim((p) => {
+function followPhase(phase: GamePhase, level: string): Promise<void> {
+  if (!isInRun(phase) && phase !== 'results') return Promise.resolve()
+  return withScrim((p) => {
     if (phase === 'results') p.playScore('results')
     else if (phase === 'paused') p.pauseScore(true)
     else {
@@ -105,9 +106,11 @@ export default function LevelAudio() {
       ['boss:defeated', onBossDefeated],
     ]
     // Audio can unlock after the level mounts (PLAY waits for it only briefly).
+    // The loading screen waits for the SFX bake and the score's start (#674).
     const cancelStart = whenAudioReady(() => {
-      followPhase(useGameStore.getState().phase, level)
-      void prepareSfx(level, biome)
+      void Promise.all([followPhase(useGameStore.getState().phase, level), prepareSfx(level, biome)]).then(() =>
+        reportLoad(currentLevel, 'audio', 1),
+      )
     })
     for (const [event, fn] of [...SFX_EVENTS, ...bossEvents]) eventBus.on(event, fn)
     return () => {

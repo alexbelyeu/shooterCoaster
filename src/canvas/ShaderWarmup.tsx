@@ -1,5 +1,5 @@
 /**
- * Compiles every shader a level can draw behind the countdown, so no kill, explosion or late wave stalls on one.
+ * Compiles every shader a level can draw behind the loading screen (#674), so no kill, explosion or late wave stalls on one.
  * The approach (compile asynchronously, then a warm-up draw) follows slop-newyork's
  * `precompileShaders` (main.js), Copyright (c) 2026 Mr.doob, MIT License,
  * https://github.com/mrdoob/slop-newyork. Written from its description; no code copied.
@@ -14,9 +14,10 @@ import { markStartup } from '@/core/startupMarks'
 import { whenProgramsReady } from './programReadiness'
 import { composerSceneTarget } from './post/composerTargets'
 import { chunk, runInFrameSlices } from './frameSlices'
+import { reportLoad } from '@/core/loadProgress'
 
-/** Warm-up work per frame: the rest of the frame is the countdown's (#597). */
-const SLICE_BUDGET_MS = 20
+/** Compile work per frame (#597); the loading screen only needs to keep its bar moving (#674). */
+const SLICE_BUDGET_MS = 60
 /** Objects per warm-up draw: each first draw uploads its buffers and textures. */
 const DRAW_BATCH = 4
 
@@ -120,8 +121,8 @@ function renderWarmupBatch(
  * Compiles into an off-screen target like the composer's, not the canvas: the composer's render pass draws into one,
  * and a canvas compile would build different (sRGB-output) programs. Reruns on Next Level, not on Replay.
  *
- * Spread over frames (#597): compiles, readiness polls and warm-up draws each take a slice of a frame. Until it is
- * done the countdown draws nothing of the level (the camera sees no layer), since a visible frame would wait on
+ * Spread over frames (#597): compiles, readiness polls and warm-up draws each take a slice of a frame, so the
+ * loading screen's bar keeps moving (each step is reported to `core/loadProgress.ts`). Until it is done the camera draws nothing of the level (the camera sees no layer), since a visible frame would wait on
  * every program still linking. It starts two frames after the mount, once the sky's env bake (`Atmosphere.tsx`,
  * one frame after the mount) has set `scene.environment`, which every Standard material's program depends on.
  */
@@ -134,6 +135,7 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     const { setSceneReady } = useGameStore.getState()
     setSceneReady(false)
     markStartup('levelMounted')
+    reportLoad(levelId, 'scene', 1)
     const started = performance.now()
     const testApi = window.__SC_TEST__
     if (testApi) {
@@ -148,15 +150,13 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     for (const m of enemyMaterials()) specimens.add(new THREE.Mesh(specimenGeo, m))
     scene.add(specimens)
 
-    // Hidden behind the countdown only: once the run has reached `playing` (the countdown's cap ran out, `?e2e=1`)
-    // the level draws as it is, a pause included, and the rest of the compiles run in one go (a visible frame
-    // would wait on them anyway).
+    // Hidden behind the loading screen: once the run has reached `playing` (`?e2e=1`) the level draws as it is, a
+    // pause included, and the rest of the compiles run in one go (a visible frame would wait on them anyway).
     let reachedPlay = useGameStore.getState().phase === 'playing'
     const playingAtMount = reachedPlay
-    // At most half of a slow frame (a software renderer's are 200 ms with nothing drawn), so the warm-up still
-    // ends inside the countdown.
+    // At least half of a slow frame (a software renderer's are 200 ms with nothing drawn): fewer, fuller frames.
     const budgetMs = (restOfFrameMs: number) => (reachedPlay ? Infinity : Math.max(SLICE_BUDGET_MS, restOfFrameMs / 2))
-    // One batch a frame, after GO too (#625): a first draw's cost is mostly the GPU's (its pipelines), which the JS
+    // One batch a frame (#625): a first draw's cost is mostly the GPU's (its pipelines), which the JS
     // clock never sees, so a time budget let every batch into one frame and the GPU then held the next for seconds.
     // A run that starts playing (`?e2e=1`) draws them all at once, as before.
     const drawBudgetMs = () => (playingAtMount ? Infinity : 0)
@@ -203,12 +203,21 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
       if (testApi) testApi.shaderWarmup = { levelId, done: true, ms: performance.now() - started, programs: gl.info.programs?.length ?? 0 }
     }
 
-    const draw = (objects: THREE.Object3D[]) =>
-      runInFrameSlices(chunk(objects, DRAW_BATCH), (batch) => withLayers(() => renderWarmupBatch(gl, scene, camera, target, batch)), {
+    // The bar: compiles are most of the wait, the warm-up draws the rest.
+    const COMPILE_SHARE = 0.7
+    const draw = (objects: THREE.Object3D[]) => {
+      const batches = chunk(objects, DRAW_BATCH)
+      let drawn = 0
+      const drawBatch = (batch: THREE.Object3D[]) => {
+        withLayers(() => renderWarmupBatch(gl, scene, camera, target, batch))
+        reportLoad(levelId, 'shaders', COMPILE_SHARE + ((1 - COMPILE_SHARE) * ++drawn) / batches.length)
+      }
+      runInFrameSlices(batches, drawBatch, {
         budgetMs: drawBudgetMs,
         cancelled,
         done: finish,
       })
+    }
 
     const compile = () => {
       const { objects, lightHosts } = drawables(scene)
@@ -225,7 +234,12 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
             gl.setRenderTarget(prevTarget)
           }
         })
-      runInFrameSlices(units, compileUnit, {
+      let compiled = 0
+      const compileStep = (unit: THREE.Object3D) => {
+        compileUnit(unit)
+        reportLoad(levelId, 'shaders', (COMPILE_SHARE * ++compiled) / units.length)
+      }
+      runInFrameSlices(units, compileStep, {
         budgetMs,
         cancelled,
         done: () => whenProgramsReady(gl, materials, cancelled, () => draw(objects)),

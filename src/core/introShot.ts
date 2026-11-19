@@ -1,18 +1,21 @@
 /**
- * What the countdown and the camera's intro swoop (#328, `track/introCamera.hot.ts`) tell each other: when GO is due,
- * and whether the camera is off the seat (the gun stays hidden then).
+ * What the intro (#674, `ui/hud/Intro.tsx`) and the camera's swoop (#328, `track/introCamera.hot.ts`) tell each other:
+ * when the intro started, and whether the camera is off the seat (the gun stays hidden then).
  */
 
-let goAt: number | null = null
+/** The intro's length (#674), the same on every device: the swoop runs on the wall clock, not on frames. */
+export const INTRO_SECONDS = 6
+
+let startedAt: number | null = null
 let offSeat = false
 
-/** `performance.now()` time GO is due, from the countdown's Set; null when not known. */
-export function setCountdownGoAt(at: number | null): void {
-  goAt = at
+/** `performance.now()` time the intro started; null outside it. */
+export function setIntroStartedAt(at: number | null): void {
+  startedAt = at
 }
 
-export function countdownGoAt(): number | null {
-  return goAt
+export function introStartedAt(): number | null {
+  return startedAt
 }
 
 export function setCameraOffSeat(off: boolean): void {

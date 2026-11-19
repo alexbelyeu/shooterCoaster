@@ -1,5 +1,9 @@
-/** `countdown`: the level is mounted and warming up behind Ready / Set / GO; the clock, spawns and input wait for `playing`. */
-export type GamePhase = 'title' | 'levelSelect' | 'countdown' | 'playing' | 'paused' | 'results'
+/**
+ * A run opens with `loading` (the level chunk, its scene, the shader warm-up and the audio, behind the loading screen),
+ * then `intro` (the fixed-length swoop into the seat, #674), then `countdown` (Ready / Set / GO in the seat); the clock,
+ * spawns and input wait for `playing`.
+ */
+export type GamePhase = 'title' | 'levelSelect' | 'loading' | 'intro' | 'countdown' | 'playing' | 'paused' | 'results'
 
 /** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
 export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }

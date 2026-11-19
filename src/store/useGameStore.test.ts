@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runBest, useGameStore } from './useGameStore'
+import { loadFraction, reportLoad } from '@/core/loadProgress'
 import { advanceGameTime, resetGameTime } from '@/core/gameClock'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import type { ScoreEntry } from '@/types/game'
@@ -116,14 +117,15 @@ describe('addScore', () => {
 })
 
 describe('startRun', () => {
-  it('resets the run, sets the level and the given seed, and enters the countdown', () => {
+  it('resets the run, sets the level and the given seed, and opens on the loading screen', () => {
     store().addScore(50)
     store().registerShot()
     store().registerHit()
     store().registerKill()
     store().startRun('level2', 42)
     expect(store()).toMatchObject({
-      phase: 'countdown',
+      phase: 'loading',
+      skipIntro: false,
       currentLevel: 'level2',
       runSeed: 42,
       score: 0,
@@ -189,6 +191,29 @@ describe('startRun', () => {
     expect(store().sceneReady).toBe(true)
     store().startRun('level2', 5)
     expect(store().sceneReady).toBe(false)
+  })
+
+  it('restarts a warm level straight into the countdown, a cold one through the loading screen, never the intro (#674)', () => {
+    store().startRun('level1', 5)
+    store().setSceneReady(true)
+    store().restartRun()
+    expect(store()).toMatchObject({ phase: 'countdown', skipIntro: true, sceneReady: true })
+    store().setSceneReady(false)
+    store().restartRun()
+    expect(store()).toMatchObject({ phase: 'loading', skipIntro: true })
+    store().startRun('level1', 5)
+    expect(store().skipIntro).toBe(false)
+  })
+
+  it('keeps a warm level\'s loading stages for a new start of it, its scene won\'t report them again (#674)', () => {
+    store().startRun('level1', 5)
+    for (const stage of ['chunk', 'scene', 'shaders', 'audio'] as const) reportLoad('level1', stage, 1)
+    store().setSceneReady(true)
+    store().startRun('level1', 5)
+    expect(store().phase).toBe('loading')
+    expect(loadFraction()).toBeCloseTo(1, 10)
+    store().startRun('level2', 5)
+    expect(loadFraction()).toBe(0)
   })
 })
 

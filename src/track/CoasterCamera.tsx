@@ -26,9 +26,9 @@ import {
   smoothingFactor, stepRig, type TrackSamples,
 } from './cameraRig.hot'
 import {
-  createSwoopClock, createTrackApproach, orbitPose, resetSwoopClock, stepSwoopClock, swoopPose, type HeroShot,
+  createTrackApproach, introProgress, orbitPose, swoopPose, type HeroShot,
 } from './introCamera.hot'
-import { countdownGoAt, setCameraOffSeat } from '@/core/introShot'
+import { introStartedAt, setCameraOffSeat } from '@/core/introShot'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 
 interface CoasterCameraProps {
@@ -44,7 +44,7 @@ interface CoasterCameraProps {
   far?: number
   heightOffset?: number
   enabled?: boolean
-  /** The level's landmark: the countdown swoops in from over it, the results orbit it (#328). */
+  /** The level's landmark: the intro swoops in from over it, the results orbit it (#328). */
   hero: HeroShot
   /** Terrain as drawn. */
   groundFn: (x: number, z: number) => number
@@ -104,14 +104,13 @@ export default function CoasterCamera({
 
   const heroGround = useMemo(() => hero.ground ?? groundFn(hero.x, hero.z), [hero, groundFn])
   const intro = useRef({
-    clock: createSwoopClock(),
     anchor: new THREE.Vector3(),
     pos: new THREE.Vector3(),
     dir: new THREE.Vector3(),
     /** Seconds into the results orbit; -1 before it starts. */
     orbitSeconds: -1,
     orbitYaw: 0,
-    /** The swoop's distance off the seat on the last countdown frame. */
+    /** The swoop's distance off the seat on its last frame. */
     lastOffset: 0,
     wasSwooping: false,
   })
@@ -173,7 +172,7 @@ export default function CoasterCamera({
     const cam = cameraRef.current
     if (!cam || !enabled) return
 
-    // Slow-mo scales the ride, a pause holds it; the car waits at the start through the countdown and every new run.
+    // Slow-mo scales the ride, a pause holds it; the car waits at the start until GO, and on every new run.
     const store = useGameStore.getState()
     const testApi = window.__SC_TEST__
     const reducedMotion = prefersReducedMotion()
@@ -204,15 +203,16 @@ export default function CoasterCamera({
     }
     io.orbitSeconds = -1
 
-    const countdown = store.phase === 'countdown'
-    let jumped = countdown || !lookSnapped.current
-    if (countdown || store.runId !== runId.current) {
+    const phase = store.phase
+    const beforeGo = phase === 'loading' || phase === 'intro' || phase === 'countdown'
+    let jumped = beforeGo || !lookSnapped.current
+    if (beforeGo || store.runId !== runId.current) {
       runId.current = store.runId
       ride.current.progress = 0
       ride.current.velocity = 0
       jumped = true
     }
-    const frameDelta = countdown || store.phase === 'paused' ? 0 : delta
+    const frameDelta = beforeGo || phase === 'paused' ? 0 : delta
 
     if (testApi?.rideTo != null) {
       ride.current.progress = testApi.rideTo
@@ -325,11 +325,15 @@ export default function CoasterCamera({
       testApi.tunnel.depth = tunnel
     }
 
-    // Through Ready / Set the camera swoops down from over the landmark into the seat, landing on this pose at GO (#328).
-    const swooping = countdown && !reducedMotion
+    // Through the intro the camera swoops down from over the landmark into the seat, landing on this pose (#328); the
+    // loading screen hides it waiting at the start, so the intro's first frame is one the level has drawn (#674).
+    // `introAt` (e2e) pins it anywhere before GO.
+    const pinned = beforeGo ? testApi?.introAt : null
+    const introNext = phase === 'loading' && !store.skipIntro
+    const swooping = pinned != null || ((phase === 'intro' || introNext) && !reducedMotion)
     if (swooping) {
-      const goAt = countdownGoAt()
-      const progress = testApi?.introAt ?? stepSwoopClock(io.clock, delta, store.sceneReady, goAt === null ? null : (goAt - performance.now()) / 1000)
+      const startedAt = introStartedAt()
+      const progress = pinned ?? (startedAt === null ? 0 : introProgress((performance.now() - startedAt) / 1000))
       const bank = swoopPose(_position.current, dir, io.anchor, trackScale, progress, bounds, io.pos, io.dir, approach)
       cam.position.copy(io.pos)
       _lookAt.current.copy(io.pos).add(io.dir)
@@ -347,7 +351,6 @@ export default function CoasterCamera({
         t.anchorAngle = io.dir.angleTo(s.lookTarget) * RAD_TO_DEG
       }
     } else {
-      resetSwoopClock(io.clock)
       if (testApi) {
         if (io.wasSwooping) testApi.intro.goOffset = io.lastOffset
         testApi.intro.mode = 'ride'
