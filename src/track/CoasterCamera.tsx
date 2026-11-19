@@ -330,14 +330,17 @@ export default function CoasterCamera({
       testApi.tunnel.depth = tunnel
     }
 
-    // Through the intro the camera tours the level into the seat, landing on this pose (#328, #675); the loading
-    // screen hides it waiting at the reveal, so the intro's first frame is one the level has drawn (#674).
+    // Through the intro (and the countdown over its end) the camera tours the level into the seat, landing on this
+    // pose at GO (#328, #675); the loading screen hides it waiting at the reveal, so the intro's first frame is one
+    // the level has drawn (#674).
     // `introAt` (e2e) pins it anywhere short of the results, so the smoke can shoot every level's tour.
     const pinned = testApi?.introAt ?? null
     const introNext = phase === 'loading' && !store.skipIntro
-    const touring = tour !== null && (pinned != null || ((phase === 'intro' || introNext) && !reducedMotion))
+    // The countdown plays over the tour's last stretch while the intro's clock runs on (`COUNTDOWN_LEAD_SECONDS`).
+    const startedAt = introStartedAt()
+    const tourInCountdown = phase === 'countdown' && startedAt !== null
+    const touring = tour !== null && (pinned != null || ((phase === 'intro' || introNext || tourInCountdown) && !reducedMotion))
     if (touring) {
-      const startedAt = introStartedAt()
       const progress = pinned ?? (startedAt === null ? 0 : introProgress((performance.now() - startedAt) / 1000))
       const bank = tourPose(tour, progress, _position.current, dir, io.pos, io.dir)
       cam.position.copy(io.pos)

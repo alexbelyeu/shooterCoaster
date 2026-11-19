@@ -90,10 +90,21 @@ const WALL_MARGIN = 80
 /** Bank (radians) per unit of heading change per world unit, × trackScale, and its ceiling. */
 const BANK_GAIN = 45
 const BANK_MAX = 7 * (Math.PI / 180)
+/** Share of the tour's length either side of a point its turn is averaged over for the bank. */
+const BANK_SMOOTHING = 0.06
 const SAMPLES_PER_SPAN = 48
-/** Share of the tour's length either side of a point its look is averaged over. */
-const LOOK_SMOOTHING = 0.1
+/** Evenly spaced samples the finished tour is stored as. */
+const RESAMPLED = 900
+/** Share of the path either side of a point it is averaged over (three passes), smoothing out small corners. */
+const PATH_SMOOTHING = 0.008
+/** Share of the tour's length either side of a point its look is averaged over (one box's worth; three passes of a
+ *  `LOOK_PASSES_WIDTH`th of it spread about as far). */
+const LOOK_SMOOTHING = 0.12
 const LOOK_SMOOTHING_MIN = 260
+const LOOK_PASSES_WIDTH = 1.4
+/** The ground / wall lift starts this share of the path ahead of where it is needed (at least `CLAMP_EASE_MIN` × trackScale). */
+const CLAMP_EASE = 0.07
+const CLAMP_EASE_MIN = 120
 /** How much the flight's turning counts against a layout next to the look's. */
 const FLIGHT_TURN_WEIGHT = 0.25
 
@@ -260,6 +271,66 @@ function tourShots(input: BuildInput, seat: Vec3Like, seatDir: Vec3Like, layout:
   return { shots: [...lead, ...glide, seatShot], landmarkIndex: lead.length - swing.length - 1, trackIndex: lead.length + 1 }
 }
 
+/** Cumulative path length at each sample of `pos` (xyz interleaved). */
+function pathDistances(pos: Float32Array, count: number): Float32Array {
+  const dist = new Float32Array(count)
+  for (let i = 1; i < count; i++) {
+    dist[i] = dist[i - 1] + Math.hypot(pos[i * 3] - pos[i * 3 - 3], pos[i * 3 + 1] - pos[i * 3 - 2], pos[i * 3 + 2] - pos[i * 3 - 1])
+  }
+  return dist
+}
+
+function smoothstep(x: number): number {
+  const t = Math.min(Math.max(x, 0), 1)
+  return t * t * (3 - 2 * t)
+}
+
+/** `passes` running means of `values` over ±`radius` of path length (`dist`, rising): three are close to a Gaussian. */
+function boxPasses(dist: Float32Array, values: Float32Array, radius: number, passes: number): Float32Array {
+  const n = values.length
+  let src = Float32Array.from(values)
+  for (let pass = 0; pass < passes; pass++) {
+    const out = new Float32Array(n)
+    let lo = 0
+    let hi = 0
+    let sum = 0
+    for (let i = 0; i < n; i++) {
+      while (hi < n && dist[hi] <= dist[i] + radius) sum += src[hi++]
+      while (dist[lo] < dist[i] - radius) sum -= src[lo++]
+      out[i] = sum / (hi - lo)
+    }
+    src = out
+  }
+  return src
+}
+
+/**
+ * A smooth offset at least as large as `need` everywhere `need` is non-zero, each sign on its own: the largest need
+ * within ±`reach` (so the offset starts before it is needed), then three box passes of a third of that, whose span
+ * stays inside the max's, so no sample gets less than it needs.
+ */
+function envelope(dist: Float32Array, need: Float32Array, reach: number): Float32Array {
+  const n = need.length
+  const up = new Float32Array(n)
+  const down = new Float32Array(n)
+  let lo = 0
+  for (let i = 0; i < n; i++) {
+    while (dist[lo] < dist[i] - reach) lo++
+    let hi = 0
+    let lw = 0
+    for (let j = lo; j < n && dist[j] <= dist[i] + reach; j++) {
+      if (need[j] > hi) hi = need[j]
+      if (need[j] < lw) lw = need[j]
+    }
+    up[i] = hi
+    down[i] = lw
+  }
+  const a = boxPasses(dist, up, reach / 3, 3)
+  const b = boxPasses(dist, down, reach / 3, 3)
+  for (let i = 0; i < n; i++) a[i] += b[i]
+  return a
+}
+
 /**
  * One axis of a centripetal Catmull-Rom span between `p1` and `p2` (knot gaps `d0`–`d2`), written to `out` at
  * samples `first`… (stride 3, axis `ax`), `u` = k / SAMPLES_PER_SPAN for k in 0…`steps`.
@@ -280,8 +351,9 @@ function catmullRomSpan(out: Float32Array, first: number, ax: number, steps: num
  * The waypoints as a dense path held clear of the ground, with its distances and smoothed look; null when the spline
  * alone is already longer than `budget` (the ground clearance, the costly part, is then skipped).
  */
-function sampleTour(input: TourInput, shots: TourShot[], seatDir: Vec3Like, budget: number): (Omit<IntroTour, 'marks' | 'seat' | 'blend' | 'bank'> & { shotSamples: number[] }) | null {
+function sampleTour(input: TourInput, shots: TourShot[], trackIndex: number, seatDir: Vec3Like, budget: number): (Omit<IntroTour, 'marks' | 'seat' | 'blend' | 'bank'> & { shotSamples: number[] }) | null {
   const n = shots.length
+  const approach = input.hero.approach !== undefined
   // Phantom ends: the reveal's mirrored, and one ahead of the seat along the ride so the landing arrives along it.
   const first = shots[0]
   const second = shots[1]
@@ -316,58 +388,104 @@ function sampleTour(input: TourInput, shots: TourShot[], seatDir: Vec3Like, budg
   for (let i = 3; i < count * 3; i += 3) splineLength += Math.hypot(pos[i] - pos[i - 3], pos[i + 1] - pos[i - 2], pos[i + 2] - pos[i - 1])
   if (splineLength > budget) return null
 
-  // Clear of the ground and inside an interior's walls, letting go over the landing so it reaches the seat.
+  // Clear of the ground and inside an interior's walls. A hard clamp per sample bumps the camera over every rise
+  // and kinks where it lets go, so what each sample needs is lifted (or pushed in) as a smooth envelope: it
+  // starts rising ahead of a hill and settles after it, then fades out before the seat so the landing is exact.
   const { ground, bounds, trackScale } = input
   const inner = bounds && { minX: bounds.minX + WALL_MARGIN, maxX: bounds.maxX - WALL_MARGIN, minZ: bounds.minZ + WALL_MARGIN, maxZ: bounds.maxZ - WALL_MARGIN, maxY: bounds.maxY - WALL_MARGIN }
-  const landing = shotSamples[shotSamples.length - 2]
+  const rawDist = pathDistances(pos, count)
+  const rawLength = rawDist[count - 1]
+  // Off the ground up to the landing; on a track approach, only up to where it joins the track (kept clear).
+  const clampTo = shotSamples[approach ? trackIndex : shotSamples.length - 2]
+  const need = [new Float32Array(count), new Float32Array(count), new Float32Array(count)]
   const p = vec(0, 0, 0)
-  for (let i = 0; i < landing; i++) {
+  for (let i = 0; i < clampTo; i++) {
     p.x = pos[i * 3]
     p.y = pos[i * 3 + 1]
     p.z = pos[i * 3 + 2]
     clampIntoBounds(p, inner)
     p.y = Math.max(p.y, ground(p.x, p.z) + CLEARANCE * trackScale)
-    pos[i * 3] = p.x
-    pos[i * 3 + 1] = p.y
-    pos[i * 3 + 2] = p.z
+    need[0][i] = p.x - pos[i * 3]
+    need[1][i] = p.y - pos[i * 3 + 1]
+    need[2][i] = p.z - pos[i * 3 + 2]
+  }
+  const ease = Math.max(rawLength * CLAMP_EASE, CLAMP_EASE_MIN * trackScale)
+  // Fully applied up to `clampTo`, then eased out: over the landing to the seat, or ahead of a track approach.
+  const fadeFrom = approach ? Math.max(rawDist[clampTo] - ease, 0) : rawDist[clampTo]
+  const fadeTo = approach ? rawDist[clampTo] : rawLength
+  for (let ax = 0; ax < 3; ax++) {
+    const offset = envelope(rawDist, need[ax], ease)
+    for (let i = 0; i < count; i++) {
+      const fade = fadeTo > fadeFrom ? 1 - smoothstep((rawDist[i] - fadeFrom) / (fadeTo - fadeFrom)) : rawDist[i] < fadeTo ? 1 : 0
+      pos[i * 3 + ax] += offset[i] * fade
+    }
   }
 
-  const dist = new Float32Array(count)
-  for (let i = 1; i < count; i++) {
-    dist[i] = dist[i - 1] + Math.hypot(pos[i * 3] - pos[i * 3 - 3], pos[i * 3 + 1] - pos[i * 3 - 2], pos[i * 3 + 2] - pos[i * 3 - 1])
+  // Evenly spaced along the path: the spline's samples bunch up on short spans and spread out on long ones, and
+  // \`tourPose\` curves through them as if they were even (a smooth camera needs both).
+  const splineDist = pathDistances(pos, count)
+  const length = splineDist[count - 1]
+  const m = RESAMPLED
+  const ePos = new Float32Array(m * 3)
+  const eLook = new Float32Array(m * 3)
+  const eDist = new Float32Array(m)
+  let j = 1
+  for (let i = 0; i < m; i++) {
+    const d = (length * i) / (m - 1)
+    while (j < count - 1 && splineDist[j] < d) j++
+    const span = splineDist[j] - splineDist[j - 1]
+    const f = span > 1e-9 ? Math.min(Math.max((d - splineDist[j - 1]) / span, 0), 1) : 0
+    for (let k = 0; k < 3; k++) {
+      ePos[i * 3 + k] = pos[(j - 1) * 3 + k] + (pos[j * 3 + k] - pos[(j - 1) * 3 + k]) * f
+      eLook[i * 3 + k] = look[(j - 1) * 3 + k] + (look[j * 3 + k] - look[(j - 1) * 3 + k]) * f
+    }
+    eDist[i] = d
   }
-  const length = dist[count - 1]
+  // A light smoothing of the path itself, held at both ends: the spline's own sample corners and the ground's
+  // small bumps otherwise zig-zag the flight a little every frame.
+  {
+    const radius = length * PATH_SMOOTHING
+    const axis = new Float32Array(m)
+    for (let k = 0; k < 3; k++) {
+      for (let i = 0; i < m; i++) axis[i] = ePos[i * 3 + k]
+      const smoothed = boxPasses(eDist, axis, radius, 3)
+      for (let i = 0; i < m; i++) {
+        const hold = smoothstep(Math.min(eDist[i], length - eDist[i]) / (radius * 3))
+        ePos[i * 3 + k] = axis[i] + (smoothed[i] - axis[i]) * hold
+      }
+    }
+  }
+  const eShots = shotSamples.map((sample) => Math.round((splineDist[sample] / length) * (m - 1)))
 
   // The look as a unit direction, averaged over a stretch of path round each sample: passing close by the
   // landmark, or handing the look from it to the track, it turns in a few seconds, not one.
-  const raw = new Float32Array(count * 3)
-  for (let i = 0; i < count; i++) {
-    const x = look[i * 3] - pos[i * 3]
-    const y = look[i * 3 + 1] - pos[i * 3 + 1]
-    const z = look[i * 3 + 2] - pos[i * 3 + 2]
+  const raw = new Float32Array(m * 3)
+  for (let i = 0; i < m; i++) {
+    const x = eLook[i * 3] - ePos[i * 3]
+    const y = eLook[i * 3 + 1] - ePos[i * 3 + 1]
+    const z = eLook[i * 3 + 2] - ePos[i * 3 + 2]
     const l = Math.hypot(x, y, z) || 1
     raw[i * 3] = x / l
     raw[i * 3 + 1] = y / l
     raw[i * 3 + 2] = z / l
   }
-  const span = Math.max(length * LOOK_SMOOTHING, LOOK_SMOOTHING_MIN * trackScale)
-  let lo = 0
-  let hi = 0
-  const sum = [0, 0, 0]
-  for (let i = 0; i < count; i++) {
-    while (hi < count && dist[hi] <= dist[i] + span) {
-      for (let k = 0; k < 3; k++) sum[k] += raw[hi * 3 + k]
-      hi++
-    }
-    while (dist[lo] < dist[i] - span) {
-      for (let k = 0; k < 3; k++) sum[k] -= raw[lo * 3 + k]
-      lo++
-    }
-    const l = Math.hypot(sum[0], sum[1], sum[2]) || 1
-    for (let k = 0; k < 3; k++) look[i * 3 + k] = sum[k] / l
+  // Three box passes (close to a Gaussian): one pass turns the view at a rate that steps where a waypoint's
+  // look enters or leaves the window, which reads as a lurch.
+  const span = Math.max(length * LOOK_SMOOTHING, LOOK_SMOOTHING_MIN * trackScale) / LOOK_PASSES_WIDTH
+  const axis = new Float32Array(m)
+  for (let k = 0; k < 3; k++) {
+    for (let i = 0; i < m; i++) axis[i] = raw[i * 3 + k]
+    const smoothed = boxPasses(eDist, axis, span, 3)
+    for (let i = 0; i < m; i++) eLook[i * 3 + k] = smoothed[i]
+  }
+  for (let i = 0; i < m; i++) {
+    const l = Math.hypot(eLook[i * 3], eLook[i * 3 + 1], eLook[i * 3 + 2]) || 1
+    eLook[i * 3] /= l
+    eLook[i * 3 + 1] /= l
+    eLook[i * 3 + 2] /= l
   }
 
-  return { count, pos, look, dist, length, shotSamples }
+  return { count: m, pos: ePos, look: eLook, dist: eDist, length, shotSamples: eShots }
 }
 
 type Sampled = NonNullable<ReturnType<typeof sampleTour>>
@@ -384,19 +502,11 @@ function tourBank(tour: Sampled, trackScale: number): Float32Array {
     const ds = (dist[i + 1] - dist[i - 1]) / 2
     turn[i] = ds > 1e-6 ? dh / ds : 0
   }
+  const smoothed = boxPasses(dist, turn, Math.max(length * BANK_SMOOTHING, LOOK_SMOOTHING_MIN * trackScale) / LOOK_PASSES_WIDTH, 3)
   const bank = new Float32Array(count)
-  const window = SAMPLES_PER_SPAN / 2
-  // A running sum over the window [i - window, i + window].
-  let sum = 0
-  for (let j = 0; j <= Math.min(count - 1, window); j++) sum += turn[j]
   for (let i = 0; i < count; i++) {
-    if (i > 0) {
-      if (i + window < count) sum += turn[i + window]
-      if (i - window - 1 >= 0) sum -= turn[i - window - 1]
-    }
-    const m = Math.min(count - 1, i + window) - Math.max(0, i - window) + 1
     const ends = Math.sin(Math.PI * (length > 0 ? dist[i] / length : 0))
-    bank[i] = Math.min(Math.max((-sum / m) * BANK_GAIN * trackScale, -BANK_MAX), BANK_MAX) * ends * ends
+    bank[i] = Math.min(Math.max(-smoothed[i] * BANK_GAIN * trackScale, -BANK_MAX), BANK_MAX) * ends * ends
   }
   return bank
 }
@@ -466,11 +576,11 @@ export function buildIntroTour(tourInput: TourInput): IntroTour {
         // A level too big for the cap draws the reveal and the glide in until the tour fits.
         const layout: Layout = { side, glide, from, swing, shrink: 1 }
         let shots = tourShots(input, seat, seatDir, layout)
-        let built = sampleTour(input, shots.shots, seatDir, budget)
+        let built = sampleTour(input, shots.shots, shots.trackIndex, seatDir, budget)
         for (let tries = 0; (!built || built.length > budget) && tries < 8; tries++) {
           layout.shrink *= 0.85
           shots = tourShots(input, seat, seatDir, layout)
-          built = sampleTour(input, shots.shots, seatDir, budget)
+          built = sampleTour(input, shots.shots, shots.trackIndex, seatDir, budget)
         }
         if (!built || built.length > budget) continue
         const turns = tourTurnRates(built)
