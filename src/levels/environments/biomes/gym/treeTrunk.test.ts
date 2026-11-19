@@ -7,7 +7,6 @@ import { buildWallPanels } from './wallPanels'
 
 const tree = piece('tree')
 const wood = buildTreeWood(tree)
-/** The caves' back wall and the headwall over them, from the specs `hallGeometry` renders, in the Tree's frame. */
 const specs = treePanelSpecs(tree)
 const caves = vertices(buildWallPanels(specs.caves).positions)
 const head = vertices(buildWallPanels(specs.head).positions).map(([a, y, f]): [number, number, number] => [a + specs.headAt[0], y + specs.headAt[1], f + specs.headAt[2]])

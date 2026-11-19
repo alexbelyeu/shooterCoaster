@@ -1,7 +1,4 @@
-/**
- * The lanternfly's pose each frame on its `hopRoute` (`hopGlideMotion.ts`, built once at mount): pure, on game
- * time, and allocation-free (`sc/no-hot-path-alloc` checks every function here).
- */
+/** The lanternfly's pose each frame on its `hopRoute` (`hopGlideMotion.ts`, built once at mount). */
 import { HOP, type HopPose, type HopRoute } from './hopGlideMotion'
 
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x))

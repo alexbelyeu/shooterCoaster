@@ -2,10 +2,7 @@ import { createRng } from '@/utils/rng'
 import { DEFAULT_BACK, TREE_GAP, treeHeadLean, type PieceOf } from './blockout'
 import { pushTri, type PanelSpec, type V3 } from './wallPanels'
 
-/**
- * The caves' back wall and the headwall over them (#519), white panels, as the `buildWallPanels` specs
- * `hallGeometry` renders: `caves` in the Tree's frame, `head` in a frame moved to `headAt` (the caves' lip).
- */
+/** The caves' back wall and the headwall (#519) as rendered: `caves` in the Tree's frame, `head` in one moved to `headAt`. */
 export function treePanelSpecs(t: PieceOf<'tree'>): { caves: PanelSpec; head: PanelSpec; headAt: V3 } {
   const headLen = (t.height - t.caveHeight) / Math.cos(t.headAngle * (Math.PI / 180))
   return {

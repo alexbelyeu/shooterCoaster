@@ -22,10 +22,7 @@ export const BIOMES: Record<BiomeType, BiomeDefinition> = {
   gym,
 }
 
-/**
- * A biome's ground: an interior's authored `floor` as given (its track is laid round it), else the noise
- * terrain kept off the track. Every caller resolves the ground here, so none can miss the gym's pit.
- */
+/** A biome's ground, for every caller: an interior's authored `floor` as given, else the noise terrain kept off the track. */
 export function biomeHeightFunction(biome: BiomeType, trackSamples?: TrackSample[]): HeightFunction {
   return BIOMES[biome].floor ?? createHeightFunction(biome, trackSamples)
 }
