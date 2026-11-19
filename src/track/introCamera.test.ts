@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ORBIT_RATE, READY_HOLD, createSwoopClock, orbitPose, stepSwoopClock, swoopPose, type HeroShot,
+  ORBIT_RATE, READY_HOLD, createSwoopClock, createTrackApproach, orbitPose, stepSwoopClock, swoopPose, type HeroShot,
 } from './introCamera.hot'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { getTrackDimensions } from './trackDimensions'
+import { buildArcTable } from './arcLength'
 import { BIOMES } from '@/levels/environments/biomeRegistry'
 import { HALL_BOUNDS } from '@/levels/environments/biomes/gym/config'
 
@@ -16,7 +17,7 @@ const angleDeg = (a: { x: number; y: number; z: number }, b: { x: number; y: num
   return (Math.acos(Math.min(Math.max(d, -1), 1)) * 180) / Math.PI
 }
 
-/** Each level's seat (track start + eye height), ride direction and landmark focus point. */
+/** Each level's seat (track start + eye height), ride direction, landmark focus point and track approach (`hero.approach`). */
 function levelShots() {
   return getAllLevels().map((level) => {
     const curve = createTrackCurve(level.track)
@@ -26,7 +27,12 @@ function levelShots() {
     const hero = BIOMES[level.biome].hero
     // Flat ground at 0 is enough for the path's shape.
     const anchor = v(hero.x, (hero.ground ?? 0) + hero.focus, hero.z)
-    return { id: level.id, seat: v(p.x, p.y + dims.eyeHeight, p.z), dir: v(t.x, t.y, t.z), anchor, scale: dims.trackScale, biome: level.biome }
+    const seat = v(p.x, p.y + dims.eyeHeight, p.z)
+    const dir = v(t.x, t.y, t.z)
+    const approach = hero.approach
+      ? createTrackApproach(curve, buildArcTable(curve), hero.approach * dims.trackScale, dims.eyeHeight, () => 0)
+      : undefined
+    return { id: level.id, seat, dir, anchor, scale: dims.trackScale, biome: level.biome, approach }
   })
 }
 
@@ -35,7 +41,7 @@ describe('swoopPose', () => {
     for (const s of levelShots()) {
       const pos = v()
       const dir = v()
-      const bank = swoopPose(s.seat, s.dir, s.anchor, s.scale, 1, undefined, pos, dir)
+      const bank = swoopPose(s.seat, s.dir, s.anchor, s.scale, 1, undefined, pos, dir, s.approach)
       expect({ id: s.id, pos, dir, bank }).toEqual({ id: s.id, pos: s.seat, dir: s.dir, bank: 0 })
     }
   })
@@ -44,7 +50,7 @@ describe('swoopPose', () => {
     for (const s of levelShots()) {
       const pos = v()
       const dir = v()
-      swoopPose(s.seat, s.dir, s.anchor, s.scale, 0, undefined, pos, dir)
+      swoopPose(s.seat, s.dir, s.anchor, s.scale, 0, undefined, pos, dir, s.approach)
       const toAnchor = v(s.anchor.x - pos.x, s.anchor.y - pos.y, s.anchor.z - pos.z)
       const start = { id: s.id, high: pos.y - s.seat.y >= 100 * s.scale, looksAtAnchor: Math.abs(angleDeg(dir, toAnchor) - 12) < 0.01 }
 
@@ -54,13 +60,13 @@ describe('swoopPose', () => {
       const prev = { ...pos }
       const prevDir = { ...dir }
       for (let i = 1; i <= 200; i++) {
-        swoopPose(s.seat, s.dir, s.anchor, s.scale, i / 200, undefined, pos, dir)
+        swoopPose(s.seat, s.dir, s.anchor, s.scale, i / 200, undefined, pos, dir, s.approach)
         maxStep = Math.max(maxStep, dist(pos, prev))
         maxTurn = Math.max(maxTurn, angleDeg(dir, prevDir))
         Object.assign(prev, pos)
         Object.assign(prevDir, dir)
       }
-      swoopPose(s.seat, s.dir, s.anchor, s.scale, 0.999, undefined, pos, dir)
+      swoopPose(s.seat, s.dir, s.anchor, s.scale, 0.999, undefined, pos, dir, s.approach)
       const near = { offset: dist(pos, s.seat) < 0.5 * s.scale, angle: angleDeg(dir, s.dir) < 0.5 }
       expect({ ...start, ...near, smooth: maxStep < 12 * s.scale && maxTurn < 5 }).toEqual({
         id: s.id, high: true, looksAtAnchor: true, offset: true, angle: true, smooth: true,
@@ -74,7 +80,7 @@ describe('swoopPose', () => {
     const dir = v()
     let outside = 0
     for (let i = 0; i <= 100; i++) {
-      swoopPose(gym.seat, gym.dir, gym.anchor, gym.scale, i / 100, HALL_BOUNDS, pos, dir)
+      swoopPose(gym.seat, gym.dir, gym.anchor, gym.scale, i / 100, HALL_BOUNDS, pos, dir, gym.approach)
       if (pos.x < HALL_BOUNDS.minX || pos.x > HALL_BOUNDS.maxX || pos.z < HALL_BOUNDS.minZ || pos.z > HALL_BOUNDS.maxZ || pos.y > HALL_BOUNDS.maxY) outside++
     }
     expect(outside).toBe(0)

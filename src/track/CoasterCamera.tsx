@@ -26,7 +26,7 @@ import {
   smoothingFactor, stepRig, type TrackSamples,
 } from './cameraRig.hot'
 import {
-  createSwoopClock, orbitPose, resetSwoopClock, stepSwoopClock, swoopPose, type HeroShot,
+  createSwoopClock, createTrackApproach, orbitPose, resetSwoopClock, stepSwoopClock, swoopPose, type HeroShot,
 } from './introCamera.hot'
 import { countdownGoAt, setCameraOffSeat } from '@/core/introShot'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
@@ -115,6 +115,10 @@ export default function CoasterCamera({
     lastOffset: 0,
     wasSwooping: false,
   })
+  const approach = useMemo(
+    () => (hero.approach ? createTrackApproach(curve, table, hero.approach * trackScale, heightOffset, () => ride.current.progress) : undefined),
+    [hero, curve, table, trackScale, heightOffset],
+  )
   useEffect(() => {
     intro.current.anchor.set(hero.x, heroGround + hero.focus, hero.z)
   }, [hero, heroGround])
@@ -326,7 +330,7 @@ export default function CoasterCamera({
     if (swooping) {
       const goAt = countdownGoAt()
       const progress = testApi?.introAt ?? stepSwoopClock(io.clock, delta, store.sceneReady, goAt === null ? null : (goAt - performance.now()) / 1000)
-      const bank = swoopPose(_position.current, dir, io.anchor, trackScale, progress, bounds, io.pos, io.dir)
+      const bank = swoopPose(_position.current, dir, io.anchor, trackScale, progress, bounds, io.pos, io.dir, approach)
       cam.position.copy(io.pos)
       _lookAt.current.copy(io.pos).add(io.dir)
       cam.lookAt(_lookAt.current)

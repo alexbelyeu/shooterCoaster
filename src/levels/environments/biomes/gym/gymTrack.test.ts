@@ -5,6 +5,7 @@ import { buildArcTable, tAtLoopDistance } from '@/track/arcLength'
 import { lapSeconds, rideProfile, rideSpeeds } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
+import { createTrackApproach, swoopPose } from '@/track/introCamera.hot'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { getLevelConfig } from '@/levels/LevelRegistry'
@@ -17,7 +18,6 @@ import {
   HALL,
   PIT,
   STAR,
-  TREE,
   TREE_GAP,
   archAxial,
   archOpeningClearance,
@@ -27,9 +27,11 @@ import {
   toBlockout,
   toWorld,
   treeAlong,
+  treeOut,
   type Vec3,
 } from './blockout'
 import { GYM_TRACK, RAIL_CLEARANCE } from './gymTrack'
+import { gym } from './index'
 
 /** The glass room pass counts within this many metres of the windows. */
 const NEAR = 5
@@ -142,7 +144,7 @@ describe('the gym track', () => {
     const inGap = track
       .map((p, i) => ({ p, i }))
       .filter(({ p }) => {
-        const f = (p.x - TREE.centre.x) * TREE.facing.x + (p.z - TREE.centre.z) * TREE.facing.z
+        const f = treeOut(p)
         return Math.abs(treeAlong(p)) <= TREE_GAP.halfAlong && f >= TREE_GAP.minF && f <= TREE_GAP.maxF && p.y - PIT.floorY <= TREE_GAP.height
       })
     const metresPerSample = table.length / GYM_SCALE / N
@@ -153,6 +155,28 @@ describe('the gym track', () => {
     expect(Math.max(...heights) + dims.eyeHeight / GYM_SCALE).toBeLessThanOrEqual(TREE_GAP.height - RAIL_CLEARANCE)
     // The run starts in it and rides out of its far end.
     expect(inGap.filter(({ i }) => secondsAt(i) < RUN_SECONDS).length * metresPerSample).toBeGreaterThan(TREE_GAP.halfAlong)
+  })
+
+  it("swoops into the seat under the trunk clear of the wood, riding the track's hairpin in (#659)", () => {
+    const { hero } = gym
+    expect(hero.approach).toBeGreaterThan(0)
+    const seat = curve.getPointAt(0).clone()
+    seat.y += dims.eyeHeight
+    const seatDir = curve.getTangentAt(0).clone()
+    const anchor = { x: hero.x, y: (hero.ground ?? 0) + hero.focus, z: hero.z }
+    const approach = createTrackApproach(curve, table, hero.approach! * dims.trackScale, dims.eyeHeight, () => 0)
+    const pos = { x: 0, y: 0, z: 0 }
+    const dir = { x: 0, y: 0, z: 0 }
+    let pieces = Infinity
+    let floor = Infinity
+    for (let i = 0; i <= 1000; i++) {
+      swoopPose(seat, seatDir, anchor, dims.trackScale, i / 1000, gym.bounds, pos, dir, approach)
+      const p = toBlockout(pos)
+      for (const box of BLOCKOUT_BOXES) pieces = Math.min(pieces, distanceToBox(box, p))
+      floor = Math.min(floor, p.y - floorAt(p.x, p.z))
+    }
+    expect(pieces).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+    expect(floor).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
   })
 
   it('passes the glass room windows', () => {

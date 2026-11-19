@@ -4,6 +4,8 @@
  * results it circles the landmark. `CoasterCamera` plays both and never moves the camera off the ride in `playing`.
  */
 import type { Vec3Like } from './cameraRig.hot'
+import { type ArcTable, distanceAtT, tAtLoopDistance } from './arcLength'
+import type { TrackCurve } from './curves/TrackCurve'
 import { clampIntoBounds, type PlacementBounds } from '@/entities/spawning/spawnPlacement'
 
 /** What a level's intro and results frame: its landmark (`BiomeDefinition.hero`, in each `biomes/<biome>/index.ts`). */
@@ -22,6 +24,39 @@ export interface HeroShot {
   arc?: number
   /** Yaw (radians, `atan2(z, x)`) the arc is centred on: the way the landmark faces. */
   facing?: number
+  /**
+   * A seat inside a structure (the gym's Tree, #659): the swoop's last leg rides the last this many world
+   * units × trackScale of the track into the seat, which the track keeps clear, instead of coming down from behind it.
+   */
+  approach?: number
+}
+
+/** The track behind the seat, for a swoop that rides in on it (`HeroShot.approach`). */
+export interface SwoopApproach {
+  /** Track length (world units) ridden in. */
+  length: number
+  /** The eye `back` world units along the track before the seat into `outPos`, the ride's direction there into `outDir`. */
+  at(back: number, outPos: Vec3Like, outDir: Vec3Like): void
+}
+
+/** `length` units of `curve` ridden into the seat at `seatT()` (the ride's progress), the eye `eyeHeight` over the rail. */
+export function createTrackApproach(curve: TrackCurve, table: ArcTable, length: number, eyeHeight: number, seatT: () => number): SwoopApproach {
+  // eslint-disable-next-line sc/no-hot-path-alloc -- cold: once per level mount
+  return {
+    length,
+    // eslint-disable-next-line sc/no-hot-path-alloc -- cold: the method is made with its object, once per level mount
+    at(back, outPos, outDir) {
+      const t = tAtLoopDistance(table, distanceAtT(table, seatT()) - back)
+      const p = curve.getPointAt(t)
+      outPos.x = p.x
+      outPos.y = p.y + eyeHeight
+      outPos.z = p.z
+      const d = curve.getTangentAt(t)
+      outDir.x = d.x
+      outDir.y = d.y
+      outDir.z = d.z
+    },
+  }
 }
 
 /** Swoop path in world units × trackScale: the start's reach toward the landmark and height over the seat. */
@@ -31,6 +66,8 @@ const RISE = 140
 const BACK = 70
 /** The landmark sits this far (radians) under the centre of the view, below the countdown's words. */
 const LANDMARK_DIP = 12 * (Math.PI / 180)
+/** With an approach, the share of the swoop (its end) spent riding the track in. */
+const APPROACH_SHARE = 0.4
 /** Share of the swoop spent looking at the landmark before the view turns onto the track. */
 const LOOK_HOLD = 0.35
 /** Peak bank (radians) into the turn, at mid-swoop. */
@@ -105,11 +142,15 @@ function smoothstep(x: number): number {
 const P0 = { x: 0, y: 0, z: 0 }
 const P1 = { x: 0, y: 0, z: 0 }
 const P2 = { x: 0, y: 0, z: 0 }
+const P3 = { x: 0, y: 0, z: 0 }
+const P3_DIR = { x: 0, y: 0, z: 0 }
 
 /**
  * The camera at swoop progress `p` (0 = high over the landmark, 1 = the seat): position into `outPos`, unit look
  * direction into `outDir`; returns the bank (radians, `rotateZ` after `lookAt`). At p = 1 it is exactly `seat` /
  * `seatDir`, the ride camera's start pose. `anchor` is the landmark's focus point; `bounds` an interior's walls.
+ * With an `approach` the curve comes down onto the track `approach.length` behind the seat, arriving along it at the
+ * speed it then rides the track in at.
  */
 export function swoopPose(
   seat: Vec3Like,
@@ -120,6 +161,7 @@ export function swoopPose(
   bounds: PlacementBounds | undefined,
   outPos: Vec3Like,
   outDir: Vec3Like,
+  approach?: SwoopApproach,
 ): number {
   if (p >= 1) {
     outPos.x = seat.x
@@ -162,20 +204,40 @@ export function swoopPose(
   P1.x = P0.x + (seat.x - P0.x) * 0.25
   P1.y = P0.y + rise * 0.15
   P1.z = P0.z + (seat.z - P0.z) * 0.25
-  P2.x = seat.x - fx * 2 * back
-  P2.y = seat.y + back * 0.5
-  P2.z = seat.z - fz * 2 * back
-  clampIntoBounds(P0, bounds)
-  clampIntoBounds(P1, bounds)
-  clampIntoBounds(P2, bounds)
-  const s = 1 - t
-  const b0 = s * s * s
-  const b1 = 3 * s * s * t
-  const b2 = 3 * s * t * t
-  const b3 = t * t * t
-  outPos.x = b0 * P0.x + b1 * P1.x + b2 * P2.x + b3 * seat.x
-  outPos.y = b0 * P0.y + b1 * P1.y + b2 * P2.y + b3 * seat.y
-  outPos.z = b0 * P0.z + b1 * P1.z + b2 * P2.z + b3 * seat.z
+  const rideIn = approach ? 1 - APPROACH_SHARE : 1
+  if (approach && t >= rideIn) {
+    // Easing out along the track into the seat.
+    const left = 1 - (t - rideIn) / APPROACH_SHARE
+    approach.at(approach.length * left * left, outPos, P3_DIR)
+  } else {
+    if (approach) {
+      // Lands on the track with the ride-in's speed (per unit of t) along it: no kink where the two meet.
+      approach.at(approach.length, P3, P3_DIR)
+      const reach = (2 * approach.length * rideIn) / (3 * APPROACH_SHARE)
+      P2.x = P3.x - P3_DIR.x * reach
+      P2.y = P3.y - P3_DIR.y * reach
+      P2.z = P3.z - P3_DIR.z * reach
+    } else {
+      P3.x = seat.x
+      P3.y = seat.y
+      P3.z = seat.z
+      P2.x = seat.x - fx * 2 * back
+      P2.y = seat.y + back * 0.5
+      P2.z = seat.z - fz * 2 * back
+    }
+    clampIntoBounds(P0, bounds)
+    clampIntoBounds(P1, bounds)
+    clampIntoBounds(P2, bounds)
+    const u = t / rideIn
+    const s = 1 - u
+    const b0 = s * s * s
+    const b1 = 3 * s * s * u
+    const b2 = 3 * s * u * u
+    const b3 = u * u * u
+    outPos.x = b0 * P0.x + b1 * P1.x + b2 * P2.x + b3 * P3.x
+    outPos.y = b0 * P0.y + b1 * P1.y + b2 * P2.y + b3 * P3.y
+    outPos.z = b0 * P0.z + b1 * P1.z + b2 * P2.z + b3 * P3.z
+  }
 
   // From looking at the landmark to the ride's look, by yaw (the short way round) and pitch.
   const lx = anchor.x - outPos.x

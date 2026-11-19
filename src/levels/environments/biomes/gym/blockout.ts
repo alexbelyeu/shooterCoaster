@@ -338,30 +338,21 @@ export const FLAME = {
 
 const tree = piece('tree')
 const treeAxes = pieceAxes(tree.rot)
-/** The Tree's face: along it from its centre, the way it faces, the caves' lip and the headwall above. */
+/** The Tree's frame: its centre, along it and the way it faces, in the blockout's x/z. */
 export const TREE = {
   centre: { x: tree.x, z: tree.z },
   along: treeAxes.along,
   facing: treeAxes.facing,
-  width: tree.width,
-  trunk: tree.trunk,
-  /** The face's lip (trunk front / cave roofs meet) out from the piece's foot line. */
-  lip: tree.caveDepth,
-  caveTopY: tree.base + tree.caveHeight,
-  headTopY: tree.base + tree.height,
-  headLean: treeHeadLean(tree),
-}
-
-/** How far a blockout point stands out from the Tree's face at its height (the headwall leans out). */
-export function treeFaceDistance(p: Vec3): number {
-  const facing = (p.x - TREE.centre.x) * TREE.facing.x + (p.z - TREE.centre.z) * TREE.facing.z
-  const above = Math.min(Math.max(p.y - TREE.caveTopY, 0), TREE.headTopY - TREE.caveTopY)
-  return facing - TREE.lip - (above / (TREE.headTopY - TREE.caveTopY)) * TREE.headLean
 }
 
 /** Along the Tree from its centre. */
 export function treeAlong(p: Vec3): number {
   return (p.x - TREE.centre.x) * TREE.along.x + (p.z - TREE.centre.z) * TREE.along.z
+}
+
+/** Out from the Tree's foot line, the way it faces (`TREE_GAP`'s `minF` / `maxF`). */
+export function treeOut(p: Vec3): number {
+  return (p.x - TREE.centre.x) * TREE.facing.x + (p.z - TREE.centre.z) * TREE.facing.z
 }
 
 const glass = piece('windows', 'win-glassgym')
