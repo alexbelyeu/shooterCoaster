@@ -1,9 +1,8 @@
-# The Flame's fire: review media (#595, PR #623)
+# The Flame's fire: review media (#669)
 
-Stills and a short sequence of the Climbing Gym's Flame (level 6) for judging the fire against #581's version.
+Stills and clips of the Climbing Gym's Flame (level 6) for judging the fire (#583 stays open for Alex's verdict).
+#595's media (PR #623) was replaced by these; it is in git history.
 
-- `before-after-high-low.jpg`: track fractions 0.10 (top row) and 0.38 (the lowest pass, bottom row). Columns: #581's shell on `main`, the tongues on high, the tongues on low.
-- `spiral-stills-high.jpg`: the spiral round the Flame at 0.10, 0.15, 0.20, 0.30, 0.35 and 0.38 on high.
-- `spiral-high-sequence.mp4`: the spiral from 0.13 to 0.30, 60 frames captured in real time, played at 6 fps.
-
-The real-time desktop and low clips the issue asks for wait on #622 (`npm run clip` with a direct level start and `--quality`).
+- `before-after-high-low.jpg`: track fractions 0.08, 0.12 and 0.22 (rows), the spiral round the Flame. Columns: `main` before #669 on high, #669 on high, #669 on low.
+- `clip-high.mp4` / `clip-low.mp4`: 5 s of the ride from fraction 0.07 into the spiral, on high and on low, rendered in virtual time
+  (`npm run clip -- --level level6 --from 0.07 --seconds 5 --fps 24 --direct --size 960x540 [--quality low]`).

@@ -5,9 +5,9 @@ import type { ParticleFieldPreset } from '../../shared/types'
 import { FLAME, GYM_SCALE, HALL, blockRings, footprint, piece, toWorld, type Vec3 } from './blockout'
 
 /**
- * The Flame's fire (#520, rebuilt in #595), laid out in the blockout's metres and scaled to the world: the
- * tongues of flame that rise up its faces and off its top, where its light comes from and how it flickers, the
- * smoke rising off it, and the box its embers rise through. Pure: `FlameFire.tsx` draws it.
+ * The Flame's fire (#520, rebuilt in #595, grown in #669), laid out in the blockout's metres and scaled to the world:
+ * the tongues of flame that rise up its faces and off its top and the licks torn free over it, where its light comes
+ * from and how it flickers, the smoke rising off it, and the box its embers rise through. Pure: `FlameFire.tsx` draws it.
  *
  * Each tongue is one soft flame sprite on a path of three points that hugs the Flame (its start, a point
  * halfway and its end, each held out from the faces by half the tongue's width so it never cuts into the
@@ -20,11 +20,16 @@ const pad = piece('pad', 'pad-flame')
 export const PAD_TOP = pad.base + pad.thick
 
 /** Tongues at full quality on a desktop; `tongueCount` thins them. */
-export const MAX_TONGUES = 260
-/** Share of the tongues licking up the faces; the rest rise off the Flame's top. */
-const FACE_SHARE = 0.72
-/** How far over the Flame's top the tallest tongues reach (blockout metres). */
-export const PLUME_RISE = 4.2
+export const MAX_TONGUES = 300
+/** Share of the tongues licking up the faces. */
+const FACE_SHARE = 0.5
+/** Share of the tongues that are licks: torn off the plume, rising free over it; the rest rise off the Flame's top. */
+const LICK_SHARE = 0.12
+/**
+ * How far over the Flame's top the tallest tongues reach (blockout metres, #669): a fire as tall again as the
+ * 5 m boulder it burns on, so it reads as the hall's centrepiece at `GYM_SCALE`.
+ */
+export const PLUME_RISE = 9.5
 
 export interface FlameTongues {
   count: number
@@ -108,28 +113,44 @@ export function buildFlameTongues(count = MAX_TONGUES, seed = 0x5f1a3e): FlameTo
   const put = (into: Float32Array, i: number, stride: number, p: Vec3) => into.set([p.x, p.y, p.z], i * stride)
   for (let i = 0; i < count; i++) {
     const s = rng()
-    const onFace = rng() < FACE_SHARE
-    const width = onFace ? rng.range(1.1, 2.0) : rng.range(1.4, 2.5)
-    const out = width * 0.55
+    const kind = rng()
+    let width: number
     let heat: number
-    if (onFace) {
-      // Low licks at the foot to tall tongues up the flare and over the lip
+    let life: number
+    if (kind < FACE_SHARE) {
+      // Low licks at the foot to tall sheets up the flare and over the lip
+      width = rng.range(1.4, 2.6)
+      const out = width * 0.55
       const y0 = rng.range(PAD_TOP, TOP.y - 0.4)
-      const rise = rng.range(1.3, 2.8)
+      const rise = rng.range(2.2, 4.4)
       put(start, i, 4, firePoint(s, y0, out))
       put(mid, i, 3, firePoint(s, y0 + rise / 2, out))
       put(end, i, 3, firePoint(s, y0 + rise, out))
       heat = rng.range(0.8, 1.0)
+      life = rng.range(1.0, 1.8)
+    } else if (kind < FACE_SHARE + LICK_SHARE) {
+      // Torn off the plume's upper half, rising fast and burning out before the crest
+      width = rng.range(1.05, 1.8)
+      const r = rng.range(0.1, 0.7)
+      const from = rng.range(0.35, 0.6) * PLUME_RISE
+      const rise = rng.range(0.25, 0.4) * PLUME_RISE
+      put(start, i, 4, capPoint(s, r, from))
+      put(mid, i, 3, capPoint(s, r * 0.8, from + rise / 2))
+      put(end, i, 3, capPoint(s, r * 0.6, from + rise))
+      heat = rng.range(0.45, 0.7)
+      life = rng.range(0.7, 1.2)
     } else {
+      width = rng.range(1.8, 3.4)
       const r = rng.range(0.15, 0.95)
-      const rise = rng.range(1.6, PLUME_RISE - 0.3)
+      const rise = rng.range(0.35, 0.95) * PLUME_RISE - 0.3
       put(start, i, 4, capPoint(s, r, 0.3))
       put(mid, i, 3, capPoint(s, r * 0.85, 0.3 + rise / 2))
-      put(end, i, 3, capPoint(s, r * 0.6, 0.3 + rise))
-      heat = rng.range(0.6, 0.85)
+      put(end, i, 3, capPoint(s, r * 0.55, 0.3 + rise))
+      heat = rng.range(0.65, 0.9)
+      life = rng.range(1.3, 2.2)
     }
     start[i * 4 + 3] = heat
-    params.set([rng(), rng.range(0.9, 1.7), width * GYM_SCALE, rng()], i * 4)
+    params.set([rng(), life, width * GYM_SCALE, rng()], i * 4)
   }
   return { count, start, mid, end, params }
 }
@@ -197,7 +218,7 @@ export function shimmerColumn(): Float32Array {
 }
 
 /** Smoke puffs at full quality on a desktop; `smokeCount` thins them. */
-export const MAX_SMOKE_PUFFS = 40
+export const MAX_SMOKE_PUFFS = 48
 /** How high the smoke rises (blockout metres): under the roof trusses, where it spreads and hangs. */
 export const SMOKE_CEILING = HALL.h - 6
 
@@ -224,7 +245,7 @@ export function buildSmokePuffs(count = MAX_SMOKE_PUFFS, seed = 0x5a0e7): SmokeP
     const to = worldPoint(along * 1.3 + rng.range(-3, 3), SMOKE_CEILING - rng.range(0, 3), rng.range(-3, 3))
     start.set([from.x, from.y, from.z, rng.range(0.6, 1)], i * 4)
     end.set([to.x, to.y, to.z], i * 3)
-    params.set([rng(), rng.range(7, 11), rng.range(1.8, 2.6) * GYM_SCALE, rng.range(5, 7) * GYM_SCALE], i * 4)
+    params.set([rng(), rng.range(7, 11), rng.range(2.6, 3.6) * GYM_SCALE, rng.range(6, 8.5) * GYM_SCALE], i * 4)
   }
   return { count, start, end, params }
 }
@@ -234,10 +255,10 @@ export function smokeCount(coarsePointer: boolean, particleScale: number): numbe
   return tongueCount(coarsePointer, particleScale, MAX_SMOKE_PUFFS)
 }
 
-/** Where the embers' box sits: over the Flame's centre, its middle this far (blockout metres) up, as high as the spiral. */
-const EMBER_MID_Y = 7.5
 /** The embers' box height (blockout metres): from the Flame's flare to above its plume's crest. */
-const EMBER_SPAN_Y = 10
+const EMBER_SPAN_Y = PLUME_RISE + 7
+/** Where the embers' box sits: over the Flame's centre, its middle this far (blockout metres) up, its foot on the flare. */
+const EMBER_MID_Y = 2.5 + EMBER_SPAN_Y / 2
 
 /** The anchor of the Flame's ember field (`FLAME_EMBERS`), world units. */
 export function emberAnchor(): [number, number, number] {

@@ -6,6 +6,7 @@ import {
   MAX_SMOKE_PUFFS,
   MAX_TONGUES,
   PAD_TOP,
+  PLUME_RISE,
   SMOKE_CEILING,
   buildFlameTongues,
   buildSmokePuffs,
@@ -84,6 +85,15 @@ describe('the Flame fire', () => {
     expect(highest).toBeGreaterThan(heights.top + 2 * GYM_SCALE)
   })
 
+  it('burns as tall again as the Flame, with licks torn off the plume rising free over it (#669)', () => {
+    expect(PLUME_RISE).toBeGreaterThan(FLAME.top)
+    const tallest = Math.max(...paths[2].map((p) => p.y))
+    expect(tallest).toBeGreaterThan(heights.top + 0.85 * PLUME_RISE * GYM_SCALE)
+    const licks = paths[0].filter((p) => p.y > heights.top + 0.3 * PLUME_RISE * GYM_SCALE).length
+    expect(licks / tongues.count).toBeGreaterThan(0.05)
+    expect(licks / tongues.count).toBeLessThan(0.25)
+  })
+
   it('holds every tongue off the Flame faces, by over a third of its width', () => {
     let worst = Infinity
     for (let i = 0; i < tongues.count; i++) {
@@ -105,7 +115,7 @@ describe('the Flame fire', () => {
     expect(tongueCount(false, 1)).toBe(MAX_TONGUES)
     expect(tongueCount(true, 1)).toBe(MAX_TONGUES / 2)
     expect(tongueCount(false, 0.5)).toBeLessThan(tongueCount(false, 0.75))
-    expect(tongueCount(true, 0.01)).toBe(1)
+    expect(tongueCount(true, 0.001)).toBe(1)
   })
 
   it('bounds the fire round the Flame foot, just over the mats', () => {
