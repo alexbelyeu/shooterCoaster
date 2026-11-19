@@ -45,7 +45,7 @@ function world(level: LevelConfig) {
     trackScale,
   }))
   const rideFor = (wave: EnemyWave) => rides[level.enemies.indexOf(wave)]
-  return { level, table, groundFn, rideFor, trackScale, bounds: BIOMES[level.biome].bounds }
+  return { level, table, groundFn, rideFor, trackScale, bounds: BIOMES[level.biome].bounds, keepOff: BIOMES[level.biome].keepOff?.(groundFn, table) ?? [] }
 }
 
 const STILL: RideAhead = { entry: 0, window: 0, trackScale: 1 }
@@ -55,6 +55,13 @@ const tracksideWorlds = getAllLevels().filter((l) => l.enemies.some(besideTrack)
 
 const RIDER_FRACTIONS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 const dist = (a: Vec3, b: Vec3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
+
+/** Horizontal distance from `p` to the nearest rail of the lap. */
+function railGap(table: ArcTable, p: Vec3): number {
+  let gap = Infinity
+  for (let i = 0; i < table.count; i++) gap = Math.min(gap, Math.hypot(p.x - table.x[i], p.z - table.z[i]))
+  return gap
+}
 
 function nearestIndex(table: ArcTable, p: Vec3): number {
   let best = 0
@@ -269,7 +276,7 @@ describe.each(groundWorlds.map((w) => [w.level.id, w] as const))('%s ground trac
   })
 })
 
-describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s trackside waves', (_id, { level, table, groundFn, rideFor, bounds }) => {
+describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s trackside waves', (_id, { level, table, groundFn, rideFor, bounds, keepOff }) => {
   const waves = level.enemies.filter(besideTrack)
 
   it.each(waves.map((w) => [w.type, w] as const))('%s: ahead of the rider along the track, beside the rails, on its surface, outside the near field, in front on the approach', (_name, wave) => {
@@ -282,7 +289,7 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
     for (const fraction of RIDER_FRACTIONS) {
       const riderIndex = Math.round(fraction * (table.count - 1))
       const camera = trackPoint(table, riderIndex)
-      const placed = placeTracksideWave({ table, riderIndex, camera, type: wave.type, groundFn, slots, ride, bounds })
+      const placed = placeTracksideWave({ table, riderIndex, camera, type: wave.type, groundFn, slots, ride, bounds, keepOff })
       expect(placed).toHaveLength(wave.count)
       placed.forEach((p, i) => {
         if (surface === 'water') {
@@ -300,8 +307,14 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
           expect(arc).toBeGreaterThan(band.aheadMin - 10)
           expect(arc).toBeLessThan(Math.max(band.aheadMax, band.aheadMin + ride.window) + 10)
           const lateral = Math.hypot(p.x - table.x[anchor], p.z - table.z[anchor])
-          expect(lateral).toBeGreaterThan(band.sideMin - 1)
-          expect(lateral).toBeLessThan(band.sideMax + 1)
+          if (lateral > band.sideMax + 1) {
+            // A blind approach's spot, out along its look (#494): never inside an interior, off every rail and landmark.
+            expect(bounds).toBeUndefined()
+            expect(railGap(table, p)).toBeGreaterThan(band.sideMin - 1)
+            expect(keepOff.every((c) => Math.hypot(p.x - c.x, p.z - c.z) >= c.r)).toBe(true)
+          } else {
+            expect(lateral).toBeGreaterThan(band.sideMin - 1)
+          }
           expect(p.y).toBeGreaterThan(groundFn(p.x, p.z))
         }
         expect(dist(p, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
@@ -483,5 +496,37 @@ describe('placeWallSwarm (#516)', () => {
     // Squeezed onto a 240-wide wall, still apart: each nudge is at most a quarter of the spacing either way.
     for (let i = 1; i < us.length; i++) expect(us[i] - us[i - 1]).toBeGreaterThan(((240 - 2 * CLIMB.margin) / 4) * 0.5 - 1e-9)
     expect(placed.map((p) => p.seed)).toEqual(climbers.map((s) => s.seed))
+  })
+})
+
+describe('level2: the opening climb (#494)', () => {
+  const { level, table, groundFn, rideFor, trackScale, keepOff } = world(getAllLevels().find((l) => l.id === 'level2')!)
+  const wave = level.enemies[0]
+  const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
+  // The rig's frustum on the smoke's 1280×720 screen (80° vertical), looking where `trackView` does.
+  const tanV = Math.tan((REFERENCE_FOV_DEG / 2) * (Math.PI / 180))
+  const tanH = tanV * (1280 / 720)
+
+  it('the scorpions placed at GO (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s, the climb included', () => {
+    const camera = trackView(table, 0, trackScale).eye
+    const placed = placeTracksideWave({
+      table, riderIndex: 0, camera, type: wave.type, groundFn, slots: tracksideSlots(wave.count, 'ground', createRng(1337)), ride: rideFor(wave), keepOff,
+    })
+    const seen: number[] = []
+    for (let t = 1; t <= 12; t++) {
+      const { eye, dir } = trackView(table, indexAhead(table, 0, profile[t * 10]), trackScale)
+      // The camera's right (look × world up) and up (right × look), unit.
+      const rl = Math.hypot(dir.x, dir.z)
+      const right = { x: -dir.z, y: 0, z: dir.x }
+      const up = { x: (-dir.x * dir.y) / rl, y: rl, z: (-dir.z * dir.y) / rl }
+      seen.push(placed.filter((p) => {
+        const d = { x: p.x - eye.x, y: p.y - eye.y, z: p.z - eye.z }
+        const depth = d.x * dir.x + d.y * dir.y + d.z * dir.z
+        const across = (d.x * right.x + d.z * right.z) / rl
+        const high = d.x * up.x + d.y * up.y + d.z * up.z
+        return depth > 0 && Math.abs(across) <= tanH * depth && Math.abs(high) <= tanV * depth
+      }).length)
+    }
+    expect(Math.min(...seen), seen.join(',')).toBeGreaterThanOrEqual(3)
   })
 })

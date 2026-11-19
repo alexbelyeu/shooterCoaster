@@ -13,5 +13,6 @@ export const volcanic: BiomeDefinition = {
   Decorations,
   Features,
   particles: PARTICLE_PRESETS.volcanicAsh,
+  keepOff: () => [{ x: VOLCANO_SITE.x, z: VOLCANO_SITE.z, r: VOLCANO.baseRadius }],
   hero: { x: VOLCANO_SITE.x, z: VOLCANO_SITE.z, focus: VOLCANO.height * 0.45, orbitRadius: 2300, orbitHeight: 1000 },
 }

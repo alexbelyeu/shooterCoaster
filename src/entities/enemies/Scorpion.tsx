@@ -8,35 +8,45 @@ import {
   SCORPION_SHELL_MAT, SCORPION_TAIL_MAT, SCORPION_STINGER_MAT,
 } from './SharedEnemyAssets'
 
+/** The loop a scorpion scuttles round, through its spawn: 40 across, inside the 60 a trackside spot keeps from the rails. */
+const SCUTTLE_RADIUS = 20
+
 /**
  * Ground-crawling scorpion: dark chitin with amber jointed legs, in three draw
- * calls (merged shell, swaying tail, glowing stinger). Follows terrain height as it moves.
+ * calls (merged shell, swaying tail, glowing stinger). Scuttles round a small loop through
+ * where it was placed (#494: a straight crawl took it hundreds of units out of the view its
+ * placement chose within seconds), following terrain height.
  */
 export default function Scorpion(props: EnemyProps) {
-  const { moveAngle, moveSpeed } = useEnemyRandom(props.id, (rng) => ({ moveAngle: rng() * Math.PI * 2, moveSpeed: 0.8 + rng() * 1.2 }))
+  const { moveAngle, turnRate } = useEnemyRandom(props.id, (rng) => ({
+    moveAngle: rng() * Math.PI * 2,
+    // 0.6–1.4 rad/s, either way round: a lap in 4.5–10 s at 12–28 units/s.
+    turnRate: (0.6 + rng() * 0.8) * (rng() < 0.5 ? -1 : 1),
+  }))
+  const bodyRef = useRef<THREE.Group>(null)
   const tailRef = useRef<THREE.Group>(null)
   const heightFn = useContext(TerrainContext)
 
   const updatePosition = useCallback(
-    (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
-      const dt = delta * 60
-      const lateralWobble = Math.sin(time * 3) * 0.3
-      mesh.position.x += (Math.cos(moveAngle) * moveSpeed + lateralWobble) * dt
-      mesh.position.z += (Math.sin(moveAngle) * moveSpeed + lateralWobble * 0.5) * dt
-
-      // Stick to terrain surface
+    (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
+      // Heading `h`, turning at `turnRate`: the loop of SCUTTLE_RADIUS it traces passes through the spawn at h = moveAngle.
+      const h = moveAngle + turnRate * time
+      const r = SCUTTLE_RADIUS * Math.sign(turnRate)
+      mesh.position.x = spawnPos.x + r * (Math.sin(h) - Math.sin(moveAngle))
+      mesh.position.z = spawnPos.z - r * (Math.cos(h) - Math.cos(moveAngle))
       mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 5
+      if (bodyRef.current) bodyRef.current.rotation.y = -h
 
       if (tailRef.current) {
         tailRef.current.rotation.z = Math.sin(time * 2.5) * 0.2
       }
     },
-    [moveAngle, moveSpeed, heightFn],
+    [moveAngle, turnRate, heightFn],
   )
 
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
-      <group scale={[8, 8, 8]} rotation={[0, -moveAngle, 0]}>
+      <group ref={bodyRef} scale={[8, 8, 8]} rotation={[0, -moveAngle, 0]}>
         <mesh geometry={SCORPION_GEO} material={SCORPION_SHELL_MAT} />
         <group ref={tailRef} position={SCORPION_TAIL_PIVOT}>
           <mesh geometry={SCORPION_TAIL_GEO} material={SCORPION_TAIL_MAT} />
