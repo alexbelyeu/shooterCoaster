@@ -2971,7 +2971,7 @@ async function countdownCheck(page, levelId) {
   const reachedCountdown = await waitPhase('countdown', 30000)
   const introRun = await page.evaluate(() => {
     const api = window.__SC_TEST__
-    const r = { seconds: api.intro.seconds, length: api.intro.length, skipped: api.intro.skipped, goOffset: api.intro.goOffset, maxFrameMs: api.maxFrameMs }
+    const r = { seconds: api.intro.seconds, handoff: api.intro.handoff, skipped: api.intro.skipped, goOffset: api.intro.goOffset, maxFrameMs: api.maxFrameMs }
     api.maxFrameMs = 0
     return r
   })
@@ -3019,6 +3019,8 @@ async function countdownCheck(page, levelId) {
   })
   const goStats = await waitPlaying()
   const atGo = goStats ?? (await getStats(page))
+  // The tour runs on under the countdown and lands at GO: its last distance off the seat is known only now.
+  introRun.goOffset = await page.evaluate(() => window.__SC_TEST__.intro.goOffset)
   // Still holding in play: the trigger is down, but a press from the countdown never auto-fires.
   await waitFrames(page, 3, { minMs: 2000, maxMs: 30000 })
   const heldInPlay = await page.evaluate((at) => {
@@ -3103,8 +3105,8 @@ async function countdownCheck(page, levelId) {
   else if (introRun.skipped) problems.push('the untouched intro ended as skipped')
   // Its own clock: the same length on any device, its end late only by the frames its timer waits behind (~1 s at
   // a software renderer's ~2 fps, one frame on a phone).
-  else if (!(introRun.seconds >= introRun.length - 0.05 && introRun.seconds <= introRun.length + Math.max(1, (2 * introRun.maxFrameMs) / 1000)))
-    problems.push(`the intro lasted ${introRun.seconds?.toFixed(2)} s, not ${introRun.length} (longest frame ${Math.round(introRun.maxFrameMs)} ms)`)
+  else if (!(introRun.seconds >= introRun.handoff - 0.05 && introRun.seconds <= introRun.handoff + Math.max(1, (2 * introRun.maxFrameMs) / 1000)))
+    problems.push(`the intro ran ${introRun.seconds?.toFixed(2)} s before Ready, not ${introRun.handoff} (longest frame ${Math.round(introRun.maxFrameMs)} ms)`)
   if (!shown) problems.push('no Ready / Set / GO on screen')
   if (!during) problems.push('countdown over before the press check')
   else if (during.shotsFired > 0) problems.push(`a press during the countdown fired ${during.shotsFired} shot(s)`)

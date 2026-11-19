@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useRef } from 'react'
+import { lazy, Suspense, useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import GameCanvas from '@/canvas/GameCanvas'
 import { useGameStore } from '@/store/useGameStore'
@@ -9,6 +9,7 @@ import SettingsScreen from '@/ui/screens/SettingsScreen'
 import HUD from '@/ui/hud/HUD'
 import Countdown from '@/ui/hud/Countdown'
 import Intro from '@/ui/hud/Intro'
+import { introStartedAt, subscribeIntroClock } from '@/core/introShot'
 import LoadingScreen from '@/ui/screens/LoadingScreen'
 import PauseScreen from '@/ui/screens/PauseScreen'
 import ResultsScreen from '@/ui/screens/ResultsScreen'
@@ -70,8 +71,9 @@ export default function App() {
     veilTimer.current = window.setTimeout(() => setPhase('levelSelect'), TITLE_FADE_S * 1000)
   }
 
-  // Not over the intro's tour: nothing to aim at yet.
-  const showCrosshair = phase === 'title' || phase === 'levelSelect' || (inPlay && phase !== 'intro') || resuming
+  // Not over the intro's tour, the countdown over its end included: nothing to aim at yet.
+  const touring = useSyncExternalStore(subscribeIntroClock, () => introStartedAt() !== null)
+  const showCrosshair = phase === 'title' || phase === 'levelSelect' || (inPlay && phase !== 'intro' && !touring) || resuming
   useEffect(() => {
     const el = document.documentElement
     if (showCrosshair) {

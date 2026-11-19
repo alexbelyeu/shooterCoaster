@@ -4,10 +4,11 @@ import { useGameStore } from '@/store/useGameStore'
 import { subscribePointer } from '@/input/pointerInput'
 import { sfx } from '@/audio/sfx'
 import { isFeedbackHeld } from '@/combat/hitFeedback'
+import { COUNTDOWN_STEPS, COUNTDOWN_STEP_MS, INTRO_SECONDS, introStartedAt, setIntroStartedAt } from '@/core/introShot'
 
 /** GO! sets `playing` and stays up over the HUD for `goHoldMs`: 2.5 s in all on a warm start, ~1.6 s on a resume. */
 const SEQUENCES = {
-  start: { steps: ['Ready', 'Set', 'GO!'], stepMs: 850, goHoldMs: 800 },
+  start: { steps: COUNTDOWN_STEPS, stepMs: COUNTDOWN_STEP_MS, goHoldMs: 800 },
   resume: { steps: ['Ready', 'GO!'], stepMs: 1100, goHoldMs: 500 },
 } as const
 type CountdownMode = keyof typeof SEQUENCES
@@ -31,8 +32,9 @@ function modeAtMount(): CountdownMode | null {
 }
 
 /**
- * Ready / Set / GO in the seat after the loading screen and the intro (#674: nothing left to wait on, the camera
- * still), or Ready / GO over a frozen run resuming; a pause unmounts it.
+ * Ready / Set / GO over the intro tour's last stretch into the seat (#674: the intro hands over with its clock still
+ * running, and each step is timed on that clock, so GO lands as the camera does), or in the seat on a restart or a
+ * skipped intro; Ready / GO over a frozen run resuming. A pause unmounts it.
  */
 export default function Countdown() {
   const [mode] = useState(modeAtMount)
@@ -42,11 +44,20 @@ export default function Countdown() {
 
   useEffect(() => {
     if (step === null) return
-    if (step < go) return stepTimeout(() => setStep(step + 1), stepMs)
+    if (step < go) {
+      // Over the tour, the next step lands where the tour's clock says it does, not a step after this one.
+      const tourStart = mode === 'start' ? introStartedAt() : null
+      const at = tourStart === null ? stepMs : tourStart + INTRO_SECONDS * 1000 - (go - step - 1) * stepMs - performance.now()
+      return stepTimeout(() => setStep(step + 1), Math.max(at, 0))
+    }
+    setIntroStartedAt(null)
     const store = useGameStore.getState()
     if (store.phase === 'countdown' || (store.phase === 'paused' && store.resuming)) store.setPhase('playing')
     return stepTimeout(() => setStep(null), goHoldMs)
-  }, [step, go, stepMs, goHoldMs])
+  }, [step, go, stepMs, goHoldMs, mode])
+
+  // A pause or leaving the level mid-countdown stops the tour: a resume or a new run starts in the seat.
+  useEffect(() => () => setIntroStartedAt(null), [])
 
   useEffect(() => {
     if (step !== null) sfx().countdown(step === go)

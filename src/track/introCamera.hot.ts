@@ -70,21 +70,30 @@ export function tourPose(tour: IntroTour, p: number, seat: Vec3Like, seatDir: Ve
   }
   const span = dist[hi] - dist[lo]
   const f = span > 1e-9 ? Math.min(Math.max((d - dist[lo]) / span, 0), 1) : 0
+  // Through the samples on a Catmull-Rom curve, not straight between them: a straight line per sample turns the
+  // camera in a small step at each one, a visible judder at the tour's speed.
   const a = lo * 3
   const b = hi * 3
+  const a0 = (lo > 0 ? lo - 1 : lo) * 3
+  const b1 = (hi < count - 1 ? hi + 1 : hi) * 3
   // Onto the live seat over the last stretch: the same seat as built, unless the car has moved since.
   const w = smoothstep((d - (length - tour.blend)) / tour.blend)
-  outPos.x = pos[a] + (pos[b] - pos[a]) * f + (seat.x - tour.seat.x) * w
-  outPos.y = pos[a + 1] + (pos[b + 1] - pos[a + 1]) * f + (seat.y - tour.seat.y) * w
-  outPos.z = pos[a + 2] + (pos[b + 2] - pos[a + 2]) * f + (seat.z - tour.seat.z) * w
-  const x = (look[a] + (look[b] - look[a]) * f) * (1 - w) + seatDir.x * w
-  const y = (look[a + 1] + (look[b + 1] - look[a + 1]) * f) * (1 - w) + seatDir.y * w
-  const z = (look[a + 2] + (look[b + 2] - look[a + 2]) * f) * (1 - w) + seatDir.z * w
+  outPos.x = spline(pos[a0], pos[a], pos[b], pos[b1], f) + (seat.x - tour.seat.x) * w
+  outPos.y = spline(pos[a0 + 1], pos[a + 1], pos[b + 1], pos[b1 + 1], f) + (seat.y - tour.seat.y) * w
+  outPos.z = spline(pos[a0 + 2], pos[a + 2], pos[b + 2], pos[b1 + 2], f) + (seat.z - tour.seat.z) * w
+  const x = spline(look[a0], look[a], look[b], look[b1], f) * (1 - w) + seatDir.x * w
+  const y = spline(look[a0 + 1], look[a + 1], look[b + 1], look[b1 + 1], f) * (1 - w) + seatDir.y * w
+  const z = spline(look[a0 + 2], look[a + 2], look[b + 2], look[b1 + 2], f) * (1 - w) + seatDir.z * w
   const m = Math.hypot(x, y, z) || 1
   outDir.x = x / m
   outDir.y = y / m
   outDir.z = z / m
   return bank[lo] + (bank[hi] - bank[lo]) * f
+}
+
+/** Uniform Catmull-Rom between `p1` and `p2` at `f`, with neighbours `p0` and `p3`. */
+function spline(p0: number, p1: number, p2: number, p3: number, f: number): number {
+  return p1 + 0.5 * f * (p2 - p0 + f * (2 * p0 - 5 * p1 + 4 * p2 - p3 + f * (3 * (p1 - p2) + p3 - p0)))
 }
 
 function smoothstep(x: number): number {
