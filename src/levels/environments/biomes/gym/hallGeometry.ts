@@ -406,6 +406,7 @@ function building(out: Parts): void {
   const tx0 = training.x - training.w / 2
   const tx1 = training.x + training.w / 2
   const tz0 = training.z - training.d / 2
+  const cubbies = piece('prop', 'p-cubbies')
   const glass = piece('windows', 'win-glassgym')
   const gx0 = glass.x - glass.length / 2
   const gx1 = glass.x + glass.length / 2
@@ -475,8 +476,8 @@ function building(out: Parts): void {
   }
   // Banners: flat colour panels low on the walls (the cubbies' climbing photos, the comp banners, the eagle by the Arch wall).
   const banners: [number, number, number, number, number, number, string][] = [
-    [42.2, 46, 2.8, 7.5, 0.02, 0.1, '#2f6db5'],
-    [46.2, 50.4, 2.8, 7.5, 0.02, 0.1, '#d9822b'],
+    [cubbies.x - cubbies.w / 2, cubbies.x - 0.1, 2.8, 7.5, 0.02, 0.1, '#2f6db5'],
+    [cubbies.x + 0.1, cubbies.x + cubbies.w / 2, 2.8, 7.5, 0.02, 0.1, '#d9822b'],
     [tx0 + 0.5, training.x - 0.2, training.base + 0.6, training.base + 3, 0.02, 0.1, '#b3262d'],
     [training.x + 0.2, tx1 - 0.5, training.base + 0.6, training.base + 3, 0.02, 0.1, '#2448a8'],
     [W - 0.1, W - 0.02, 3.5, 8, 33.6, 35.6, '#6b4a2e'],
