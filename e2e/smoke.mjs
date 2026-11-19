@@ -1274,8 +1274,6 @@ const MOBILE_LEVEL = 'level1'
 const WEAPON_HUD_SELECTORS = '.hud-panel, .hud-combo, .hud-pause-button, .mute-button'
 /** Max angle between the barrel and the tracer on screen (#65). */
 const WEAPON_MAX_AIM_DEG = 25
-/** Caps on the coaster camera weight (#123): MAX_BANK_DEG / MAX_PITCH_DEG in
- *  src/track/cameraRig.hot.ts and SPEED_FOV_DEG + DROP_FOV_DEG in src/track/cameraFov.hot.ts. */
 /** Camera weight maxima past the caps the game publishes from its source constants (cameraRig.hot.ts, cameraFov.hot.ts). */
 function cameraWeightProblems(w) {
   const caps = w.caps
@@ -1831,6 +1829,9 @@ async function speedCheck(page, levelId) {
   const problems = []
   if (!(w.streaks > 0.05)) problems.push(`no wind streaks at top speed (opacity ${w.streaks?.toFixed(3)}, speed ${w.speed?.toFixed(2)})`)
   if (!(Math.abs(w.roll) >= 1)) problems.push(`camera barely banks at top speed (${w.roll.toFixed(2)}° at track ${best.fraction})`)
+  // Ride feel (#697): GO's launch shoved the view, and the wheels rumble at top speed.
+  if (!(w.feelMax?.launch > 0.3)) problems.push(`no launch shove after GO (peak ${w.feelMax?.launch?.toFixed(2)})`)
+  if (!(w.feel?.rumble > 0)) problems.push('no rail rumble at top speed')
   problems.push(...cameraWeightProblems(w))
   const translation = await page.evaluate(() => window.__SC_TEST__.cameraTranslation.max)
   if (translation > 1e-6) problems.push(`camera translated ${translation.toFixed(3)} units off the track pose`)

@@ -1,0 +1,170 @@
+{
+  "name": "ride-level6",
+  "kind": "sfx",
+  "request": {
+    "kind": "ride",
+    "level": "level6"
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.5,
+      "name": "countdown Ready"
+    },
+    {
+      "t": 2.5,
+      "name": "countdown GO + launch whoosh: wind and rumble at the crawl"
+    },
+    {
+      "t": 5,
+      "name": "chain lift: clanking at the crawl"
+    },
+    {
+      "t": 9,
+      "name": "crest: chain off"
+    },
+    {
+      "t": 9.6,
+      "name": "drop: wind and rumble up to top speed"
+    },
+    {
+      "t": 12.6,
+      "name": "easing to a cruise"
+    }
+  ],
+  "seams": [],
+  "bar": null,
+  "metrics": {
+    "seconds": 15,
+    "integrated": -24.1,
+    "shortTermMax": -22,
+    "lra": 7.5,
+    "truePeak": -6,
+    "clipped": 0,
+    "silence": 3.3,
+    "correlation": 0.994,
+    "below30Db": -38.8,
+    "bands": {
+      "sub": {
+        "pct": 5.9,
+        "db": -12.3
+      },
+      "low": {
+        "pct": 24.9,
+        "db": -6
+      },
+      "mid": {
+        "pct": 39.5,
+        "db": -4
+      },
+      "presence": {
+        "pct": 20.8,
+        "db": -6.8
+      },
+      "air": {
+        "pct": 8.9,
+        "db": -10.5
+      },
+      "below30": {
+        "pct": 0,
+        "db": -38.8
+      }
+    },
+    "seamJumps": [],
+    "seamJumpMax": null,
+    "sounds": [
+      {
+        "t": 0.5,
+        "name": "countdown Ready",
+        "peakDb": -16,
+        "tailMs": 2000
+      },
+      {
+        "t": 2.5,
+        "name": "countdown GO + launch whoosh: wind and rumble at the crawl",
+        "peakDb": -6.1,
+        "tailMs": 2496
+      },
+      {
+        "t": 5,
+        "name": "chain lift: clanking at the crawl",
+        "peakDb": -12.4,
+        "tailMs": 3999
+      },
+      {
+        "t": 9,
+        "name": "crest: chain off",
+        "peakDb": -31.4,
+        "tailMs": 596
+      },
+      {
+        "t": 9.6,
+        "name": "drop: wind and rumble up to top speed",
+        "peakDb": -16.7,
+        "tailMs": 2997
+      },
+      {
+        "t": 12.6,
+        "name": "easing to a cruise",
+        "peakDb": -17.7,
+        "tailMs": 2395
+      }
+    ]
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -24.1,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "Short-term max",
+      "value": -22,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -6,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -38.8,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 0.994,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 7.5,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 3.3,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

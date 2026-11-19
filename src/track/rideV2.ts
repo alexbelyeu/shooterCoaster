@@ -42,6 +42,7 @@ export interface RidePlan {
   scales: number[]
   /** The second each beat lands. */
   landed: number[]
+  zones: readonly SpeedZone[]
 }
 
 interface Course {
@@ -236,7 +237,7 @@ export function buildRidePlan(table: ArcTable, spec: RideV2Spec): RidePlan {
     minSpeed = Math.min(minSpeed, speed[j])
     maxSpeed = Math.max(maxSpeed, speed[j])
   }
-  return { table, distance, speed, minSpeed, maxSpeed, scales, landed }
+  return { table, distance, speed, minSpeed, maxSpeed, scales, landed, zones: spec.zones ?? [] }
 }
 
 function frameAt(plan: RidePlan, time: number): number {
@@ -275,4 +276,12 @@ export function planTimeAt(plan: RidePlan, dist: number): number {
     else hi = mid
   }
   return (lo + (dist - distance[lo]) / (distance[hi] - distance[lo])) / PLAN_RATE
+}
+
+/** The kind of zone the car is in `time` seconds after GO, or null between zones. */
+export function planZoneAt(plan: RidePlan, time: number): SpeedZone['kind'] | null {
+  const lap = plan.table.length
+  const share = (((planDistance(plan, time) % lap) + lap) % lap) / lap
+  for (const zone of plan.zones) if (inZone(zone, share)) return zone.kind
+  return null
 }

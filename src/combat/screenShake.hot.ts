@@ -91,3 +91,19 @@ export function shakeAngles(
   out.roll = MAX_ROLL_DEG * DEG * amp * smoothNoise1(x, seed + 202)
   return out
 }
+
+/** Rail rumble (#697): a constant fine shake with the ride's speed, peak angle (degrees) at top speed on 'full'. */
+export const RUMBLE_DEG = 0.15
+/** A buzz of the wheels on the rail, unlike a kill's few wobbles. */
+export const RUMBLE_HZ = 22
+
+/** Amplitude follows speed^1.5 (nothing at the ride's crawl) times the settings scale; `timeS` is game time. */
+export function rumbleAngles(speedNorm: number, timeS: number, scale: number, out: ShakeAngles): ShakeAngles {
+  const s = Number.isFinite(speedNorm) ? Math.min(Math.max(speedNorm, 0), 1) : 0
+  const amp = RUMBLE_DEG * DEG * s * Math.sqrt(s) * Math.min(Math.max(scale, 0), 1)
+  const x = timeS * RUMBLE_HZ
+  out.pitch = amp * smoothNoise1(x, 911)
+  out.yaw = 0.5 * amp * smoothNoise1(x, 912)
+  out.roll = amp * smoothNoise1(x, 913)
+  return out
+}

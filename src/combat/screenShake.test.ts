@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  KILL_TRAUMA_MS, MAX_PITCH_YAW_DEG, MAX_ROLL_DEG,
-  addTrauma, decayTrauma, effectiveShakeScale, killTrauma, shakeAngles,
+  KILL_TRAUMA_MS, MAX_PITCH_YAW_DEG, MAX_ROLL_DEG, RUMBLE_DEG,
+  addTrauma, decayTrauma, effectiveShakeScale, killTrauma, rumbleAngles, shakeAngles,
   type ShakeAngles, type TraumaState,
 } from './screenShake.hot'
 
@@ -85,5 +85,33 @@ describe('screenShake', () => {
     expect(effectiveShakeScale('reduced', false)).toBe(0.5)
     expect(effectiveShakeScale('full', false)).toBe(1)
     expect(effectiveShakeScale('full', true)).toBe(0)
+  })
+})
+
+describe('rail rumble (#697)', () => {
+  const peak = (speed: number, scale: number) => {
+    const out: ShakeAngles = { pitch: 0, yaw: 0, roll: 0 }
+    let max = 0
+    for (let t = 0; t < 2; t += 1 / 60) {
+      rumbleAngles(speed, t, scale, out)
+      max = Math.max(max, Math.abs(out.pitch), Math.abs(out.yaw), Math.abs(out.roll))
+    }
+    return max / DEG
+  }
+
+  it('grows with speed, never past its cap, and is still at the crawl and with shake off', () => {
+    expect(peak(0, 1)).toBe(0)
+    expect(peak(1, 0)).toBe(0)
+    expect(peak(Number.NaN, 1)).toBe(0)
+    expect(peak(0.3, 1)).toBeLessThan(peak(1, 1) / 3)
+    expect(peak(1, 1)).toBeGreaterThan(0.5 * RUMBLE_DEG)
+    expect(peak(5, 1)).toBeLessThanOrEqual(RUMBLE_DEG)
+    expect(peak(1, 0.5)).toBeCloseTo(peak(1, 1) / 2, 9)
+  })
+
+  it('holds still on a frozen frame (same game time, same angles)', () => {
+    const a = rumbleAngles(1, 0.37, 1, { pitch: 0, yaw: 0, roll: 0 })
+    const b = rumbleAngles(1, 0.37, 1, { pitch: 0, yaw: 0, roll: 0 })
+    expect(b).toEqual(a)
   })
 })

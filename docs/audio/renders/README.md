@@ -26,6 +26,8 @@ it (`palette-groove`), scores in `../palette/`, rendered with `--score <file> --
 `sfx-sheet-*` / `mix-*` are the arcade SFX
 (`--sfx-sheet`, `--mix <level>`): every sound alone, then 20 s of combat over the
 level score, one mix per level (`mix-level6-boss`: the Medusa's arrival, boss section and sting, `--mix level6 --boss`); compare them with `baseline-sfx-sheet-*` / `baseline-mix-*`.
+`ride-level1` / `ride-level6` are the ride's own sounds (#697, `--ride <level>`): the countdown, GO's launch whoosh, a crawl,
+a chain lift clanking, then the drop's wind and rail rumble up to top speed and easing off. `mix-level1` was re-rendered with them.
 `music-title`, `music-level1…5`, `music-results`, `mix-level1…5` and `sfx-sheet-level1` were re-rendered for #416 on the
 game's own Web Audio graph; the `-base` / `-seam` / `-full` / `-frenzy` variants are from before it (renamed from `scrim-*`),
 and the re-renders match their old numbers to within 0.1 LU.

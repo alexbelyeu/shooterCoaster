@@ -16,6 +16,11 @@ export const DUST_BUNNY = {
   squash: 0.14,
 } as const
 
+/** Fraction of a bounce's height by which the touchdown squash has eased off. */
+const SQUASH_EASE = 0.3
+/** Where lift and squash, both linear in the hop, change slope: the deepest point of a bounce is at one of them. */
+const HOP_CORNERS = [0, SQUASH_EASE, 1] as const
+
 /** One bounce, seconds: the turntable's motion strip. */
 export const DUST_BUNNY_BOUNCE = 1 / DUST_BUNNY.bobHz
 
@@ -54,6 +59,19 @@ export function dustBunnyPose(base: number, rollRadius: number, t: number, out: 
   out.roll = along / rollRadius
   const hop = Math.abs(Math.sin(Math.PI * DUST_BUNNY.bobHz * time))
   out.lift = DUST_BUNNY.bob * hop
-  out.squash = DUST_BUNNY.squash * Math.max(0, 1 - hop / 0.3)
+  out.squash = DUST_BUNNY.squash * Math.max(0, 1 - hop / SQUASH_EASE)
   return out
+}
+
+/**
+ * How far below its centre's resting height the bunny ever reaches over a bounce, model units, for fluff `reach` from its centre:
+ * the squash flattens it at touchdown and eases off as it lifts, so its lowest point can come just after touchdown.
+ */
+export function dustBunnyDrop(reach: number): number {
+  let drop = 0
+  for (const hop of HOP_CORNERS) {
+    const squash = DUST_BUNNY.squash * Math.max(0, 1 - hop / SQUASH_EASE)
+    drop = Math.max(drop, reach * (1 - squash) - DUST_BUNNY.bob * hop)
+  }
+  return drop
 }

@@ -48,9 +48,13 @@ export interface SfxEngine {
   starChime(index: number): void
   ui(sound: UiSound): void
   countdown(go: boolean): void
-  /** The ride wind from the coaster's speed (0–1), every frame; silent without a level's sounds. */
+  /** The ride wind and rail rumble from the coaster's share of its top speed (0–1; 0 stops them), every frame; silent without a level's sounds. */
   wind(speed: number): void
-  /** Long-lived nodes, the wind's included: must not grow while playing. */
+  /** The lift's chain clanking, every frame: 0 off, else the clanks' rate (the game's time scale). */
+  chain(rate: number): void
+  /** The car leaves the station: the launch whoosh. */
+  rideLaunch(): void
+  /** Long-lived nodes, the wind's and rumble's included: must not grow while playing. */
   nodeCount(): number
   /** e2e: kills since load that reached the audio engine (not throttled, not refused a voice). */
   killsPlayed(): number
@@ -77,7 +81,7 @@ export const silentSfx: SfxEngine = {
   prepare: () => Promise.resolve(),
   fire: silent, pickup: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, penalty: silent, frenzy: silent, frenzyLift: silent,
   waveIncoming: silent, bossArrival: silent, bossHit: silent, bossDefeat: silent,
-  fireworkWhistle: silent, fireworkPop: silent, shutter: silent, starChime: silent, ui: silent, countdown: silent, wind: silent,
+  fireworkWhistle: silent, fireworkPop: silent, shutter: silent, starChime: silent, ui: silent, countdown: silent, wind: silent, chain: silent, rideLaunch: silent,
   nodeCount: () => 0,
   killsPlayed: () => 0,
   voices: () => null,
