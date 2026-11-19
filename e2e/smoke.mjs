@@ -33,10 +33,11 @@
  * held trigger, keep the timer still (and a primed combo intact), wait for Resume, then
  * neither reset nor jump it, nor bring back killed enemies. On the first level the killNearest kills enter the 5× combo
  * tier: <id>-combat.png must show the "×5 FRENZY" flash during its slow-mo.
- * `?e2e=1` skips the Ready / Set / GO countdown; the countdown check loads the first level
- * with `&countdown=1`: the countdown must show (countdown.png), ignore a press (also once
- * held on into play), hold the timer, reach playing on GO, and the shader warm-up must
- * finish; on a replay, a tap after the 1 s mark must skip to playing.
+ * `?e2e=1` skips the loading screen, intro and Ready / Set / GO; the countdown check loads the first level
+ * with `&countdown=1`: the loading screen (loading.png) until the warm-up is done, the intro for its fixed
+ * length, then the countdown must show (countdown.png), ignore a press (also once held on into play), hold the
+ * timer and reach playing on GO; a replay goes straight to the countdown, where a tap after the 1 s mark must
+ * skip to playing, and a tap skips the intro (countdownCheck).
  * Perf gate (#188): a level fails past its `scene` ceilings in budgets.json; see sceneBudgetCheck().
  * The speed check holds the first level (or `--speed-level <id>`) at top speed on its most banked sampled point:
  * the wind streaks must show and the camera bank ≥ 1° (speed.png).
@@ -119,6 +120,8 @@ const COMBAT_STEP_MAX = 0.25
 const RIDE_RATE = Number(arg('ride-rate', 0.14))
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(arg('seed', 1337))
+/** The intro's fixed length, `INTRO_SECONDS` in src/core/introShot.ts (#674). */
+const INTRO_SECONDS = 6
 // --cpu-throttle <rate>: the ride step on a slow machine (#536), CDP's CPU throttling for the ride;
 // records its longest frame and its frames of 100 ms or more per level, from the end of the warm-up (#541). Reported, not failed, until the fixes land.
 const CPU_THROTTLE = Number(arg('cpu-throttle', 1))
@@ -2876,10 +2879,13 @@ async function landingPathCheck(browser, base) {
 }
 
 /**
- * A real start (`?e2e=1&countdown=1` keeps the hook but not the countdown skip): Ready / Set / GO
- * shows over the mounted level, a press during it fires nothing (not even when held on into
- * play), the timer holds and the shader warm-up finishes. A replay's countdown then checks
- * that a tap after the 1 s mark skips to GO / playing, and leaving a level mid-warm-up must throw nothing.
+ * A real start (`?e2e=1&countdown=1` keeps the hook but not its skip of the opening, #674): the loading screen
+ * (`loading.png`) holds until the shader warm-up is done; then the intro swoop runs its fixed length on its own clock
+ * (`<level>-intro.png` as it runs); then Ready / Set / GO in the seat: a press fires nothing (not even when held on
+ * into play), the timer holds. Pinned with `introAt`, the swoop starts high over the seat with the landmark in view
+ * (`<level>-swoop.png`) and ends exactly on the ride's start pose. A replay (`restartLevel`) of the warm level goes
+ * straight to the countdown, where a tap after the 1 s mark skips to GO; a new start of the warm level passes the
+ * loading screen at once and a tap skips its intro; leaving a level mid-warm-up must throw nothing.
  */
 async function countdownCheck(page, levelId) {
   const start = () => page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [levelId, SEED])
@@ -2887,29 +2893,63 @@ async function countdownCheck(page, levelId) {
   const stepShown = () => page
     .waitForSelector('.countdown-step', { state: 'attached', timeout: 30000 })
     .then(() => true, () => false)
+  const waitPhase = (want, timeout) => page
+    .waitForFunction((p) => window.__SC_TEST__.phase() === p, want, { timeout, polling: 50 })
+    .then(() => true, () => false)
   // Stats read in the page the moment GO lands (the first playing frame doesn't count, the next may).
   const waitPlaying = () => page
     .waitForFunction(() => window.__SC_TEST__.phase() === 'playing' && window.__SC_TEST__.stats(), null, { timeout: 30000, polling: 100 })
     .then((h) => h.jsonValue(), () => null)
   const pointer = { clientX: 640, clientY: 360, pointerId: 1, isPrimary: true, pointerType: 'mouse', bubbles: true }
+  const tap = (at) => page.evaluate((p) => {
+    const canvas = document.querySelector('canvas')
+    canvas.dispatchEvent(new PointerEvent('pointerdown', p))
+    canvas.dispatchEvent(new PointerEvent('pointerup', p))
+  }, at)
 
   // Let the title draw first, so the startup timings cover it.
   await page.waitForFunction(() => window.__SC_TEST__.initTimings().titleFrame !== undefined, null, { timeout: 30000, polling: 100 }).catch(() => {})
 
-  // 1. Press during the countdown and hold it on into play.
+  // 1. The loading screen until the level is warm, then the intro, left to run its length.
   await start()
   const startPhase = await page.evaluate(() => window.__SC_TEST__.phase())
+  const loadingShown = await page
+    .waitForSelector('.loading-screen', { state: 'attached', timeout: 30000 })
+    .then(() => true, () => false)
+  if (loadingShown) await page.screenshot({ path: path.join(OUT, 'loading.png'), timeout: SHOT_TIMEOUT })
+  // A software renderer's warm-up takes a while.
+  const reachedIntro = await waitPhase('intro', 180000)
+  const atIntro = await page.evaluate(() => {
+    const api = window.__SC_TEST__
+    api.maxFrameMs = 0
+    return { warm: api.shaderWarmup?.done === true, phase: api.phase() }
+  })
+  if (reachedIntro) {
+    await waitFrames(page, 1, { maxMs: 30000 })
+    await page.screenshot({ path: path.join(OUT, `${levelId}-intro.png`), timeout: SHOT_TIMEOUT })
+  }
+  // Parks the countdown on Ready once it comes (the intro runs its own clock, never held), so at ~1 fps the press check still finds it.
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = true })
+  const reachedCountdown = await waitPhase('countdown', 30000)
+  const introRun = await page.evaluate(() => {
+    const api = window.__SC_TEST__
+    const r = { seconds: api.intro.seconds, skipped: api.intro.skipped, goOffset: api.intro.goOffset, maxFrameMs: api.maxFrameMs }
+    api.maxFrameMs = 0
+    return r
+  })
+
+  // 2. Ready / Set / GO: press during it and hold the press on into play.
   const shown = await stepShown()
   // One JS turn, so GO can't land between the phase read and the press (shots fire on pointerdown).
-  // holdFeedback holds the step through the screenshot.
+  // holdFeedback holds the step through the screenshot and the pinned swoop.
   const during = await page.evaluate((at) => {
     const api = window.__SC_TEST__
     if (api.phase() !== 'countdown') return null
     document.querySelector('canvas').dispatchEvent(new PointerEvent('pointerdown', at))
-    api.holdFeedback = true
     return api.stats()
   }, pointer)
   let stepText = null
+  let swoop = null
   if (during) {
     // Settled: the held step has finished its scale-in (an exiting step is still mid-transform).
     await page
@@ -2920,12 +2960,8 @@ async function countdownCheck(page, levelId) {
       .catch(() => {})
     stepText = await page.locator('.countdown-step').first().textContent().catch(() => null)
     await page.screenshot({ path: path.join(OUT, 'countdown.png'), timeout: SHOT_TIMEOUT })
-  }
-  // The intro swoop (#328), pinned once the level shows: early on, high over the seat with the landmark in view
-  // (`<level>-swoop.png`); at its end, exactly on the ride's start pose, the pose GO hands over.
-  let swoop = null
-  if (during) {
-    await page.waitForFunction(() => window.__SC_TEST__.shaderWarmup?.done, null, { timeout: 60000, polling: 250 }).catch(() => {})
+    // The intro swoop (#328) pinned (`introAt` holds the camera on its path until GO): early on, high over the seat
+    // with the landmark in view; at its end, exactly on the ride's start pose, where the countdown sits.
     const pinned = async (at) => {
       await page.evaluate((p) => { window.__SC_TEST__.introAt = p }, at)
       await waitFrames(page, 2, { maxMs: 30000 })
@@ -2935,9 +2971,10 @@ async function countdownCheck(page, levelId) {
     await page.screenshot({ path: path.join(OUT, `${levelId}-swoop.png`), timeout: SHOT_TIMEOUT })
     const seat = await pinned(1)
     await page.evaluate(() => { window.__SC_TEST__.introAt = null })
+    await waitFrames(page, 1, { maxMs: 30000 })
     swoop = { high, seat }
   }
-  // Read before letting the countdown run on: by now the level is mounted and its timer reset, held at full.
+  // Read before letting the countdown run on: the timer is held at full.
   const held = await page.evaluate(() => {
     const api = window.__SC_TEST__
     api.holdFeedback = false
@@ -2945,7 +2982,6 @@ async function countdownCheck(page, levelId) {
   })
   const goStats = await waitPlaying()
   const atGo = goStats ?? (await getStats(page))
-  if (swoop) swoop.goOffset = await page.evaluate(() => window.__SC_TEST__.intro.goOffset)
   // Still holding in play: the trigger is down, but a press from the countdown never auto-fires.
   await waitFrames(page, 3, { minMs: 2000, maxMs: 30000 })
   const heldInPlay = await page.evaluate((at) => {
@@ -2954,9 +2990,7 @@ async function countdownCheck(page, levelId) {
     document.querySelector('canvas').dispatchEvent(new PointerEvent('pointerup', at))
     return r
   }, pointer)
-  const warmup = await page
-    .waitForFunction(() => window.__SC_TEST__.shaderWarmup?.done && window.__SC_TEST__.shaderWarmup, null, { timeout: 60000, polling: 250 })
-    .then((h) => h.jsonValue(), () => page.evaluate(() => window.__SC_TEST__.shaderWarmup))
+  const warmup = await page.evaluate(() => window.__SC_TEST__.shaderWarmup)
   // First shot + kill after the warm-up: a new shader program here is the first-shot hitch (#28).
   const shotStart = await page.evaluate((at) => {
     const api = window.__SC_TEST__
@@ -2974,30 +3008,37 @@ async function countdownCheck(page, levelId) {
     return { ...before, programsAfter: api.programs(), maxFrameMs: api.maxFrameMs, shots: api.stats().shotsFired }
   }, shotStart)
 
-  // 2. Replay through results (as the UI does) and tap after the 1 s mark: it skips to GO (#140).
-  // holdFeedback parks the countdown on Ready, so only the skip can reach playing however slow the frames.
+  // 3. Replay through results (as the UI does): the warm level goes straight to Ready, and a tap after the 1 s mark
+  // skips to GO (#140). holdFeedback parks the countdown on Ready, so only the skip can reach playing however slow the frames.
   await page.evaluate(() => window.__SC_TEST__.endLevel())
-  await page.evaluate(([lid, seed]) => {
+  const replayPhase = await page.evaluate(() => {
     const api = window.__SC_TEST__
-    api.startLevel(lid, seed)
+    api.restartLevel()
     api.holdFeedback = true
-  }, [levelId, SEED])
+    return api.phase()
+  })
   const shownAgain = await stepShown()
   // Frames too, so the countdown's mount effects (where its 1 s starts) have run.
   await waitFrames(page, 2, { minMs: 1500, maxMs: 30000 })
-  const tappedIn = await page.evaluate((at) => {
-    const phase = window.__SC_TEST__.phase()
-    if (phase !== 'countdown') return phase
-    const canvas = document.querySelector('canvas')
-    canvas.dispatchEvent(new PointerEvent('pointerdown', at))
-    canvas.dispatchEvent(new PointerEvent('pointerup', at))
-    return phase
-  }, pointer)
+  const tappedIn = await page.evaluate(() => window.__SC_TEST__.phase())
+  if (tappedIn === 'countdown') await tap(pointer)
   const afterTap = await waitPlaying()
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
 
-  // 3. Leave a fresh level mid-warm-up (#141); polled in the page so the unmount beats the warm-up's first check.
+  // 4. A new start of the warm level: the loading screen ends at once, and a tap skips the intro.
+  await start()
+  const warmIntro = await waitPhase('intro', 30000)
+  if (warmIntro) {
+    await waitFrames(page, 1, { maxMs: 30000 })
+    await tap(pointer)
+  }
+  const skipped = await waitPhase('countdown', 30000)
+  const introSkip = await page.evaluate(() => ({ skipped: window.__SC_TEST__.intro.skipped, seconds: window.__SC_TEST__.intro.seconds }))
+
+  // 5. Leave a fresh level mid-warm-up (#141); polled in the page so the unmount beats the warm-up's first check.
+  // Level select first unmounts the level (a transition, several frames at ~2 fps), so the start below remounts it.
   await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
+  await page.waitForFunction(() => !window.__SC_TEST__.levelReady(), null, { timeout: 30000, polling: 100 }).catch(() => {})
   await waitFrames(page, 2, { maxMs: 30000 })
   const leftDuringWarmup = await page.evaluate(([lid, seed]) => new Promise((resolve) => {
     const api = window.__SC_TEST__
@@ -3017,14 +3058,23 @@ async function countdownCheck(page, levelId) {
   const initTimings = await page.evaluate(() => window.__SC_TEST__.initTimings())
 
   const problems = []
-  if (startPhase !== 'countdown') problems.push(`startLevel entered "${startPhase}", not countdown`)
+  if (startPhase !== 'loading') problems.push(`startLevel entered "${startPhase}", not loading`)
+  if (!loadingShown) problems.push('no loading screen')
+  if (!reachedIntro) problems.push(`the loading screen never handed over to the intro (phase "${atIntro.phase}")`)
+  else if (!atIntro.warm) problems.push('the intro started before the shader warm-up was done')
+  if (!reachedCountdown) problems.push('the intro never handed over to the countdown')
+  else if (introRun.skipped) problems.push('the untouched intro ended as skipped')
+  // Its own clock: the same length on any device, its end late only by the frames its timer waits behind (~1 s at
+  // a software renderer's ~2 fps, one frame on a phone).
+  else if (!(introRun.seconds >= INTRO_SECONDS - 0.05 && introRun.seconds <= INTRO_SECONDS + Math.max(1, (2 * introRun.maxFrameMs) / 1000)))
+    problems.push(`the intro lasted ${introRun.seconds?.toFixed(2)} s, not ${INTRO_SECONDS} (longest frame ${Math.round(introRun.maxFrameMs)} ms)`)
   if (!shown) problems.push('no Ready / Set / GO on screen')
   if (!during) problems.push('countdown over before the press check')
   else if (during.shotsFired > 0) problems.push(`a press during the countdown fired ${during.shotsFired} shot(s)`)
   if (!goStats) problems.push(`phase never reached playing (still "${atGo.phase}")`)
-  if (swoop?.high.phase === 'countdown') {
+  if (swoop) {
     const { high, seat } = swoop
-    if (high.mode !== 'swoop') problems.push(`no intro swoop during the countdown (camera "${high.mode}")`)
+    if (high.mode !== 'swoop') problems.push(`introAt did not pin the swoop before GO (camera "${high.mode}")`)
     else {
       if (high.height < 60) problems.push(`the swoop starts only ${high.height.toFixed(1)} units over the seat`)
       if (high.anchorAngle > 20) problems.push(`the swoop's start looks ${high.anchorAngle.toFixed(1)}° off the landmark`)
@@ -3041,10 +3091,13 @@ async function countdownCheck(page, levelId) {
   if (firstShot.shots === 0) problems.push('the first-shot check fired nothing')
   if (firstShot.programsAfter > firstShot.programs)
     problems.push(`the first shot + kill compiled ${firstShot.programsAfter - firstShot.programs} shader program(s) after the warm-up`)
+  if (replayPhase !== 'countdown') problems.push(`a replay of the warm level entered "${replayPhase}", not countdown`)
   if (!shownAgain) problems.push('no countdown on replay')
   if (tappedIn !== 'countdown') problems.push(`the replay's countdown was over before the skip tap (phase "${tappedIn}")`)
   else if (!afterTap) problems.push('the skip tap never reached playing')
   else if (afterTap.shotsFired > 0) problems.push(`the skip tap fired ${afterTap.shotsFired} shot(s)`)
+  if (!warmIntro) problems.push('a new start of the warm level never reached its intro')
+  else if (!skipped || !introSkip.skipped) problems.push('a tap did not skip the intro')
   if (leftDuringWarmup === null) problems.push('the remounted level never started its shader warm-up')
   return {
     id: 'countdown',
@@ -3054,9 +3107,12 @@ async function countdownCheck(page, levelId) {
     countdown: {
       level: levelId,
       stepText,
+      intro: introRun,
+      introSkip,
       timerDuring: held.timeRemaining,
       timerAtGo: atGo.timeRemaining,
       shotsHeldIntoPlay: heldInPlay.stats.shotsFired,
+      replayPhase,
       skipTapIn: tappedIn,
       swoop,
       leftDuringWarmup,
@@ -3956,9 +4012,11 @@ async function run() {
         ? ` ${r.pauseMenu.level} card ${JSON.stringify(r.pauseMenu.card)}, focus ${r.pauseMenu.focusOnOpen} -> ${r.pauseMenu.afterArrow},` +
           ` restart ride ${r.pauseMenu.restart.ride.map((t) => t.toFixed(4)).join('->')} level time ${r.pauseMenu.restart.levelTime.map((t) => t?.toFixed(1)).join('->')}`
       : r.countdown
-        ? ` ${r.countdown.level} "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
-          ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay tap in ${r.countdown.skipTapIn},` +
-          (r.countdown.swoop ? ` swoop ${r.countdown.swoop.high.height.toFixed(0)} over the seat, ${r.countdown.swoop.high.anchorAngle.toFixed(1)}° off the landmark, GO ${r.countdown.swoop.goOffset?.toFixed(2)} off the seat,` : '') +
+        ? ` ${r.countdown.level} intro ${r.countdown.intro.seconds?.toFixed(2)} s (longest frame ${r.countdown.intro.maxFrameMs.toFixed(0)} ms,` +
+          ` ${r.countdown.intro.goOffset?.toFixed(2)} off the seat at its end; a tap skipped one at ${r.countdown.introSkip.seconds?.toFixed(2)} s),` +
+          ` "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
+          ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay into ${r.countdown.replayPhase}, tap in ${r.countdown.skipTapIn},` +
+          (r.countdown.swoop ? ` swoop ${r.countdown.swoop.high.height.toFixed(0)} over the seat, ${r.countdown.swoop.high.anchorAngle.toFixed(1)}° off the landmark,` : '') +
           ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'},` +
           ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})` +
           ` | startup ${startupSummary(r.initTimings)}`

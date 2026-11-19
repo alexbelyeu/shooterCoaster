@@ -18,6 +18,7 @@ import { gameTime } from '@/core/gameClock'
 import { markStartup } from '@/core/startupMarks'
 import { comboExpired, comboMultiplier, type FrenzyStage } from '@/combat/comboTiers'
 import { startPhaseFor } from './startPhase'
+import { resetLoad } from '@/core/loadProgress'
 import { NO_PICKUP, applyPickup, type PickupWeaponId, type WeaponState } from '@/combat/weapons/weaponTypes'
 import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/daily'
 import { getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
@@ -45,12 +46,15 @@ interface GameState {
   runId: number
   runMode: RunMode
   /**
-   * The one way to start a level (enters `countdown`, `playing` under `?e2e=1`); seed precedence:
-   * `seed` > `?seed=` > the daily seed of `mode.dateKey` (daily runs) > `Date.now()`.
+   * The one way to start a level (enters `loading`, `playing` under `?e2e=1`; `startPhase.ts`); seed precedence:
+   * `seed` > `?seed=` > the daily seed of `mode.dateKey` (daily runs) > `Date.now()`. A `replay` skips the intro, and
+   * the loading screen too when the level is still warm.
    */
-  startRun: (levelId: string, seed?: number, mode?: RunMode) => void
+  startRun: (levelId: string, seed?: number, mode?: RunMode, replay?: boolean) => void
   /** Restarts the current level in the same mode: a daily keeps its seed, a campaign run gets a fresh one. */
   restartRun: () => void
+  /** This run's loading screen goes straight to the countdown (a restart), not the intro. */
+  skipIntro: boolean
 
   score: number
   addScore: (points: number) => void
@@ -113,7 +117,7 @@ interface GameState {
   /** Only `combat/slowMo.hot.ts` calls this (lint: `sc/one-slow-mo-writer`); everyone else requests a slow-mo there. */
   setSlowMo: (timeScale: number, frenzy: FrenzyStage) => void
 
-  /** The mounted level's shader warm-up is done (`canvas/ShaderWarmup.tsx`); the countdown holds Ready until then. */
+  /** The mounted level's shader warm-up is done (`canvas/ShaderWarmup.tsx`); the loading screen holds until then. */
   sceneReady: boolean
   setSceneReady: (ready: boolean) => void
 
@@ -164,26 +168,33 @@ export const useGameStore = create<GameState>()(
       runSeed: 0,
       runId: 0,
       runMode: CAMPAIGN,
-      startRun: (levelId, seed, mode = CAMPAIGN) => {
+      startRun: (levelId, seed, mode = CAMPAIGN, replay = false) => {
         markStartup('runStart')
         const fallback = mode.mode === 'daily' ? dailySeed(mode.dateKey) : Date.now()
-        set((s) => ({
+        const s = get()
+        // A new level isn't warmed up yet: the outgoing level's `sceneReady` must not end its loading screen (#597).
+        const warm = levelId === s.currentLevel && s.sceneReady
+        const phase = startPhaseFor({ search: urlSearch() ?? '', warm, replay })
+        // A warm level's stages are all done already; its scene doesn't remount to report them again.
+        if (phase === 'loading' && !warm) resetLoad(levelId)
+        set({
           ...FRESH_RUN,
           currentLevel: levelId,
           runSeed: (seed ?? urlSeed() ?? fallback) >>> 0,
           runMode: mode,
           runId: s.runId + 1,
-          // A new level isn't warmed up yet: the outgoing level's `sceneReady` must not open its Ready (#597).
-          sceneReady: levelId === s.currentLevel && s.sceneReady,
-          phase: startPhaseFor(urlSearch() ?? ''),
+          sceneReady: warm,
+          phase,
           resuming: false,
-        }))
+          skipIntro: replay,
+        })
       },
       restartRun: () => {
         const { currentLevel, runMode, runSeed, startRun } = get()
         if (!currentLevel) return
-        startRun(currentLevel, runMode.mode === 'daily' ? runSeed : undefined, runMode)
+        startRun(currentLevel, runMode.mode === 'daily' ? runSeed : undefined, runMode, true)
       },
+      skipIntro: false,
 
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
       registerShot: (bullets = 1) => set((s) => ({ shotsFired: s.shotsFired + bullets })),

@@ -116,6 +116,8 @@ export interface SCTestApi {
   levels: () => { id: string; name: string; maxScore: number; nextLevel: string | null; unlocked: boolean }[]
   /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one. */
   startLevel: (id: string, seed?: number) => void
+  /** `restartRun`, as Replay / R / the pause menu's Restart do: a warm level goes straight to the countdown (#674). */
+  restartLevel: () => void
   /** `<count>:<hash>` of the latest run's spawn positions (formation members: their seeded slots); null until a spawner has generated them. */
   spawnDigest: () => string | null
   /** Level time (s) now, when the next wave still to come is due (null once all are in) and the spawner's last wave tick (s); null with no level. */
@@ -235,16 +237,19 @@ export interface SCTestApi {
   scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string } | null>
   /** Override the game time scale (0 freezes camera + enemies; 1 hands it back to the slow-mo envelopes, `combat/slowMo.hot.ts`). */
   setTimeScale: (s: number) => void
-  /** Pins the countdown's intro swoop (#328) at this progress (0 = over the landmark, 1 = the seat) until set back to null. */
+  /** Pins the intro swoop (#328) at this progress (0 = over the landmark, 1 = the seat) before GO (loading, intro, countdown) until set back to null. */
   introAt: number | null
-  /** The coaster camera's shot (#328): riding, the countdown's swoop or the results orbit. The swoop's progress (0–1),
+  /** The coaster camera's shot (#328): riding, the intro's swoop or the results orbit. The swoop's progress (0–1),
    *  height over the seat, distance and look angle (degrees) off the seat's pose, and angle off the landmark; `goOffset`
-   *  is the swoop's distance off the seat on the last countdown frame before GO. */
+   *  is the swoop's distance off the seat on its last frame; `seconds` how long the last intro lasted (#674) and
+   *  `skipped` whether a tap or key ended it. */
   intro: {
     mode: 'ride' | 'swoop' | 'orbit'
     progress: number; height: number; seatOffset: number; seatAngle: number; anchorAngle: number
     goOffset: number | null
     orbitSeconds: number
+    seconds: number | null
+    skipped: boolean
   }
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null
@@ -862,6 +867,7 @@ export function installE2EApi() {
       return getAllLevels().map((l) => ({ id: l.id, name: l.name, maxScore: l.maxScore, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id) }))
     },
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
+    restartLevel: () => useGameStore.getState().restartRun(),
     levelReady: () => {
       const { sceneReady, currentLevel } = useGameStore.getState()
       return sceneReady && api.shaderWarmup?.levelId === currentLevel
@@ -1024,7 +1030,7 @@ export function installE2EApi() {
     },
     setTimeScale: (s: number) => setTimeScaleOverride(s === 1 ? null : s),
     introAt: null,
-    intro: { mode: 'ride', progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, goOffset: null, orbitSeconds: 0 },
+    intro: { mode: 'ride', progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, goOffset: null, orbitSeconds: 0, seconds: null, skipped: false },
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,

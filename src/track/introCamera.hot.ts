@@ -1,12 +1,14 @@
 /**
- * The level's opening swoop and the results orbit (#328). Through Ready / Set the camera comes down from high over
- * the level's hero landmark into the coaster seat, landing on the ride camera's start pose as GO fires; behind the
- * results it circles the landmark. `CoasterCamera` plays both and never moves the camera off the ride in `playing`.
+ * The level's intro swoop and the results orbit (#328). Through the intro (#674: its own fixed-length clock, after the
+ * loading screen and before Ready / Set / GO) the camera comes down from high over the level's hero landmark into the
+ * coaster seat, landing on the ride camera's start pose; behind the results it circles the landmark. `CoasterCamera`
+ * plays both and never moves the camera off the ride in `countdown` or `playing`.
  */
 import type { Vec3Like } from './cameraRig.hot'
 import { type ArcTable, distanceAtT, tAtLoopDistance } from './arcLength'
 import type { TrackCurve } from './curves/TrackCurve'
 import { clampIntoBounds, type PlacementBounds } from '@/entities/spawning/spawnPlacement'
+import { INTRO_SECONDS } from '@/core/introShot'
 
 /** What a level's intro and results frame: its landmark (`BiomeDefinition.hero`, in each `biomes/<biome>/index.ts`). */
 export interface HeroShot {
@@ -73,64 +75,14 @@ const LOOK_HOLD = 0.35
 /** Peak bank (radians) into the turn, at mid-swoop. */
 const SWOOP_BANK = 7 * (Math.PI / 180)
 
-/** Before Set the swoop eases toward this share of its path (Ready can wait on the warm-up for a while). */
-export const READY_HOLD = 0.4
-const READY_RATE = 1.3
-
 /** Orbit: a turn a minute, kept this far over the ground under the camera. */
 export const ORBIT_RATE = (2 * Math.PI) / 60
 const ORBIT_CLEARANCE = 40
 
-export interface SwoopClock {
-  progress: number
-  /** progress per second on the last frame. */
-  velocity: number
-  /** Landing (Set → GO): its length (0 = not landing yet), start and starting slope over it. */
-  landSeconds: number
-  landFrom: number
-  landSlope: number
-}
-
-export function createSwoopClock(): SwoopClock {
-  // eslint-disable-next-line sc/no-hot-path-alloc -- cold: once per camera mount
-  return { progress: 0, velocity: 0, landSeconds: 0, landFrom: 0, landSlope: 0 }
-}
-
-export function resetSwoopClock(c: SwoopClock): void {
-  c.progress = 0
-  c.velocity = 0
-  c.landSeconds = 0
-  c.landFrom = 0
-  c.landSlope = 0
-}
-
-/**
- * Advance the swoop. Until the level shows (`visible`) it waits at the start; until GO's time is known (`toGo`
- * seconds, from Set) it eases toward `READY_HOLD`; then a cubic Hermite carries it from where it is, at its speed,
- * to 1 with zero speed exactly at GO, and it holds the seat if GO comes late.
- */
-export function stepSwoopClock(c: SwoopClock, dt: number, visible: boolean, toGo: number | null): number {
-  if (!visible) return c.progress
-  if (toGo === null) {
-    if (dt > 0) {
-      const next = READY_HOLD + (c.progress - READY_HOLD) * Math.exp(-dt * READY_RATE)
-      c.velocity = (next - c.progress) / dt
-      c.progress = next
-    }
-    return c.progress
-  }
-  if (c.landSeconds === 0) {
-    if (toGo <= 0) return (c.progress = 1)
-    c.landSeconds = toGo
-    c.landFrom = c.progress
-    // Capped at 3× the rest of the way so the Hermite never overshoots the seat.
-    c.landSlope = Math.min(Math.max(c.velocity, 0) * toGo, 3 * (1 - c.progress))
-  }
-  const u = Math.min(Math.max(1 - toGo / c.landSeconds, 0), 1)
-  const u2 = u * u
-  const u3 = u2 * u
-  c.progress = c.landFrom * (2 * u3 - 3 * u2 + 1) + c.landSlope * (u3 - 2 * u2 + u) + (-2 * u3 + 3 * u2)
-  return c.progress
+/** Swoop progress `seconds` into the intro: 0 to 1 over `INTRO_SECONDS`, leaving and landing with zero speed and acceleration. */
+export function introProgress(seconds: number): number {
+  const u = Math.min(Math.max(seconds / INTRO_SECONDS, 0), 1)
+  return u * u * u * (u * (u * 6 - 15) + 10)
 }
 
 function smoothstep(x: number): number {
@@ -138,7 +90,7 @@ function smoothstep(x: number): number {
   return t * t * (3 - 2 * t)
 }
 
-/** Scratch control points: the swoop runs every countdown frame. */
+/** Scratch control points: the swoop runs every intro frame. */
 const P0 = { x: 0, y: 0, z: 0 }
 const P1 = { x: 0, y: 0, z: 0 }
 const P2 = { x: 0, y: 0, z: 0 }

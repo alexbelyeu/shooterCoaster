@@ -2437,3 +2437,87 @@ canvas {
   font-size: clamp(3.5rem, 13vw, 6.5rem);
   color: #ffd23f;
 }
+
+/* The run's loading screen (#674): the level's postcard, name and a bar over the hidden level. */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: radial-gradient(ellipse at center, #1c1c2e 0%, #07070d 100%);
+}
+
+.loading-card {
+  width: min(420px, 100%);
+  border: 2px solid #ffd23f;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(10, 10, 20, 0.85);
+  box-shadow: 0 0 40px rgba(255, 210, 63, 0.25);
+}
+
+.loading-card .level-postcard {
+  border-bottom: 2px solid #ffd23f;
+}
+
+.loading-body {
+  padding: 16px 20px 20px;
+  text-align: center;
+}
+
+.loading-name {
+  margin: 0;
+  font-family: 'Lobster', cursive;
+  font-weight: 400;
+  font-size: clamp(2rem, 8vw, 2.6rem);
+  color: #ffd23f;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.loading-desc {
+  margin: 4px 0 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.loading-bar {
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.loading-bar-fill {
+  height: 100%;
+  background: #ffd23f;
+  box-shadow: 0 0 10px rgba(255, 210, 63, 0.8);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.2s linear;
+}
+
+/* The intro's skip hint, low over the swoop. */
+.intro-hint {
+  position: fixed;
+  left: 50%;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 50;
+  pointer-events: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  animation: intro-hint-in 0.6s ease-out 0.8s both;
+}
+
+@keyframes intro-hint-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

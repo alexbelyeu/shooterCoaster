@@ -8,6 +8,8 @@ import LevelSelectScreen from '@/ui/screens/LevelSelectScreen'
 import SettingsScreen from '@/ui/screens/SettingsScreen'
 import HUD from '@/ui/hud/HUD'
 import Countdown from '@/ui/hud/Countdown'
+import Intro from '@/ui/hud/Intro'
+import LoadingScreen from '@/ui/screens/LoadingScreen'
 import PauseScreen from '@/ui/screens/PauseScreen'
 import ResultsScreen from '@/ui/screens/ResultsScreen'
 import MuteButton from '@/ui/MuteButton'
@@ -68,7 +70,8 @@ export default function App() {
     veilTimer.current = window.setTimeout(() => setPhase('levelSelect'), TITLE_FADE_S * 1000)
   }
 
-  const showCrosshair = phase === 'title' || phase === 'levelSelect' || inPlay || resuming
+  // Not over the intro's swoop: nothing to aim at yet.
+  const showCrosshair = phase === 'title' || phase === 'levelSelect' || (inPlay && phase !== 'intro') || resuming
   useEffect(() => {
     const el = document.documentElement
     if (showCrosshair) {
@@ -119,6 +122,12 @@ export default function App() {
           </Screen>
         )}
 
+        {phase === 'loading' && (
+          <Screen key="loading" {...fadeVariants} transition={{ duration: 0.3 }}>
+            <LoadingScreen />
+          </Screen>
+        )}
+
         {(phase === 'playing' || resuming) && (
           <Screen key="hud" {...fadeVariants} transition={{ duration: 0.2 }}>
             <HUD />
@@ -138,7 +147,8 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {(inPlay || resuming) && <Countdown />}
+      {phase === 'intro' && <Intro />}
+      {(phase === 'countdown' || phase === 'playing' || resuming) && <Countdown />}
 
       {/* Black over everything from PLAY until level select has mounted under it. */}
       <AnimatePresence>
