@@ -13,7 +13,7 @@ export interface CollisionTarget {
    */
   kind?: 'pickup' | 'bystander'
   hitThisFrame: boolean
-  /** The hitting bullet's first target: only that hit counts for accuracy. */
+  /** The hitting bullet's first target that counts (`countsForAccuracy`): only that hit counts for accuracy. */
   firstHitThisFrame: boolean
 }
 
@@ -51,6 +51,11 @@ export function unregisterCollisionTarget(id: string): void {
 
 export function getCollisionTargets(): readonly CollisionTarget[] {
   return targetList
+}
+
+/** A bystander hit is no hit for accuracy (#518), so a bullet piercing one still scores the target behind it (#629). */
+export function countsForAccuracy(target: CollisionTarget): boolean {
+  return target.kind !== 'bystander'
 }
 
 /**

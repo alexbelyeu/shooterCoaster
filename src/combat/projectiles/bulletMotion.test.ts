@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BULLET_SPEED_PER_SEC, MAX_BULLET_STEP_SEC, hasHit, recordHit, resetPierce, segmentHitsSphere, stepBullet, type PierceState,
+  BULLET_SPEED_PER_SEC, MAX_BULLET_STEP_SEC, hasHit, noCountedHit, recordHit, resetPierce, segmentHitsSphere, stepBullet, type PierceState,
 } from './bulletMotion.hot'
 
 /** Simulate `seconds` of flight at a fixed frame rate; return the distance covered. */
@@ -76,6 +76,17 @@ describe('piercing', () => {
     expect(hasHit(b, 'b')).toBe(false)
     expect(recordHit(b, 'b')).toBe(false)
     expect(recordHit(b, 'c')).toBe(true)
+  })
+
+  it('a hit that does not count leaves the next one the first that counts (a bystander, #629)', () => {
+    const b = bullet()
+    resetPierce(b, 3)
+    const counts = (t: string) => t !== 'bystander'
+    expect(noCountedHit(b, counts)).toBe(true)
+    recordHit(b, 'bystander')
+    expect(noCountedHit(b, counts)).toBe(true)
+    recordHit(b, 'a')
+    expect(noCountedHit(b, counts)).toBe(false)
   })
 
   it('a reused bullet forgets its old targets', () => {

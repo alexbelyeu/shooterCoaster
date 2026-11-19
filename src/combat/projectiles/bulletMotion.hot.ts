@@ -72,6 +72,12 @@ export function hasHit<T>(p: PierceState<T>, target: T): boolean {
   return false
 }
 
+/** Whether none of the bullet's hits so far is one `counts` (accuracy, #629: a bystander's isn't). */
+export function noCountedHit<T>(p: PierceState<T>, counts: (target: T) => boolean): boolean {
+  for (let i = 0; i < p.hitCount; i++) if (counts(p.hitTargets[i] as T)) return false
+  return true
+}
+
 /** True when the bullet is spent. */
 export function recordHit<T>(p: PierceState<T>, target: T): boolean {
   p.hitTargets[p.hitCount++] = target

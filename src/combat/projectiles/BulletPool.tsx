@@ -2,13 +2,13 @@ import { useRef, useMemo, useCallback, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
-import { getCollisionTargets, processFlaggedHits } from '@/combat/CollisionManager'
+import { countsForAccuracy, getCollisionTargets, processFlaggedHits } from '@/combat/CollisionManager'
 import { MAX_PIERCE } from '@/combat/weapons/weaponTypes'
 import { muzzleTip } from '@/combat/hitFeedback'
 import { e2eBullets, isE2E } from '@/testing/e2eHook'
 import type { Bullet } from './bulletPoolHandle'
 import { setBulletPool } from './bulletPoolHandle'
-import { BULLET_SPEED_PER_SEC, hasHit, recordHit, resetPierce, segmentHitsSphere, stepBullet } from './bulletMotion.hot'
+import { BULLET_SPEED_PER_SEC, hasHit, noCountedHit, recordHit, resetPierce, segmentHitsSphere, stepBullet } from './bulletMotion.hot'
 import { BULLET_RADIUS_PER_SIZE, drawnBulletRadius, muzzleOffsetWeight, screenRadiusFraction } from './bulletVisual'
 
 const POOL_SIZE = 350
@@ -182,7 +182,7 @@ export default function BulletPool({
           const rSq = target.radiusSq * bullet.hitScale * bullet.hitScale
           if (segmentHitsSphere(a.x, a.y, a.z, b.x, b.y, b.z, pos.x, pos.y, pos.z, rSq)) {
             target.hitThisFrame = true
-            target.firstHitThisFrame = bullet.hitCount === 0
+            target.firstHitThisFrame = noCountedHit(bullet, countsForAccuracy)
             if (recordHit(bullet, target)) {
               bullet.alive = false
               bullet.position.set(0, -9999, 0)

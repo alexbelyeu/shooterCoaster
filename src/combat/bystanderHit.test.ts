@@ -58,9 +58,10 @@ describe('hitting a bystander', () => {
   })
 
   it('never takes the score below 0', () => {
-    useGameStore.setState({ score: BYSTANDER_PENALTY / 2 })
+    useGameStore.setState({ score: 5 })
     hitBystander('bystander-1', 'climber', at)
     expect(store().score).toBe(0)
+    expect(hit.mock.calls[0][0]).toMatchObject({ penalty: 5 })
   })
 
   it('breaks the combo, through combo:broken', () => {
