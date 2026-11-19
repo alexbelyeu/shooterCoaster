@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { FLAME, PIECES, distanceToBox, piece, pieceBoxes } from './blockout'
-import { FLAME_ISLAND, PATHS, onPath, subtractRects, type Rect } from './floorPaths'
+import { FLAME, PIECES, PIT, distanceToBox, piece, pieceBoxes } from './blockout'
+import { FLAME_ISLAND, PATHS, onPath, padLayout, subtractRects, type Rect } from './floorPaths'
 
 const area = (r: Rect) => (r.maxX - r.minX) * (r.maxZ - r.minZ)
 const overlap = (a: Rect, b: Rect) => Math.max(0, Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX)) * Math.max(0, Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ))
@@ -66,6 +66,49 @@ describe('the walkways', () => {
     const standing = PIECES.filter((p) => p.kind !== 'floor' && p.kind !== 'pit' && !allowed.has(p.id)).flatMap((p) => pieceBoxes(p))
     const hits = PATHS.flatMap((r) => samples(r)).filter((p) => standing.some((b) => distanceToBox(b, { x: p.x, y: 0.1, z: p.z }) === 0))
     expect(hits).toEqual([])
-    expect(piece('pad', 'pad-flame').rot).toBe(0)
+  })
+
+  it('cross only unrotated pads (`padLayout` cuts nothing out of a rotated one)', () => {
+    const crossed = PIECES.filter((p) => p.kind === 'pad').filter((p) => {
+      const r = (p.rot * Math.PI) / 180
+      const hx = Math.abs((p.w / 2) * Math.cos(r)) + Math.abs((p.d / 2) * Math.sin(r))
+      const hz = Math.abs((p.w / 2) * Math.sin(r)) + Math.abs((p.d / 2) * Math.cos(r))
+      const bound = { minX: p.x - hx, maxX: p.x + hx, minZ: p.z - hz, maxZ: p.z + hz }
+      return PATHS.some((path) => overlap(path, bound) > 0)
+    })
+    expect(crossed.map((p) => p.id)).toContain('pad-flame')
+    expect(crossed.filter((p) => p.rot !== 0).map((p) => p.id)).toEqual([])
+  })
+})
+
+describe('padLayout', () => {
+  const flame = padLayout(piece('pad', 'pad-flame'))
+  const tiles = flame.tiles.flat()
+  const eps = 1e-6
+  const spanOverlap = (a0: number, a1: number, b0: number, b1: number) => Math.min(a1, b1) - Math.max(a0, b0) > eps
+
+  it('cuts the Flame’s mats into an island with the ring round it', () => {
+    expect(tiles.length).toBeGreaterThan(0)
+    const local = (r: Rect, p = piece('pad', 'pad-flame')) => ({ minX: r.minX + p.x, maxX: r.maxX + p.x, minZ: r.minZ + p.z, maxZ: r.maxZ + p.z })
+    for (const r of [...flame.base, ...tiles].map((q) => local(q))) for (const path of PATHS) expect(overlap(r, path)).toBeCloseTo(0, 9)
+  })
+
+  it('leaves no tile side in the plane of an underlay side, cut edges included (they z-fight in one mesh)', () => {
+    const shared: string[] = []
+    for (const t of tiles) {
+      for (const b of flame.base) {
+        for (const x of [t.minX, t.maxX]) if ((Math.abs(x - b.minX) < eps || Math.abs(x - b.maxX) < eps) && spanOverlap(t.minZ, t.maxZ, b.minZ, b.maxZ)) shared.push(`x=${x}`)
+        for (const z of [t.minZ, t.maxZ]) if ((Math.abs(z - b.minZ) < eps || Math.abs(z - b.maxZ) < eps) && spanOverlap(t.minX, t.maxX, b.minX, b.maxX)) shared.push(`z=${z}`)
+      }
+    }
+    expect(shared).toEqual([])
+  })
+})
+
+describe('the pit benches', () => {
+  it('sit on the pit’s mats', () => {
+    const benches = PIECES.filter((p) => p.id.startsWith('p-pitblock'))
+    expect(benches.length).toBe(3)
+    for (const b of benches) expect(b.kind === 'prop' && b.base).toBeCloseTo(PIT.floorY + PIT.mats)
   })
 })

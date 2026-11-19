@@ -6,7 +6,7 @@ import { BUILDING, COLUMN_HALF, FLOOR, GRIME, HIDDEN_PIECES, HOLD_COLORS, MURALS
 import { graffitiPiece, tag, type MuralShape } from './murals'
 import { scatterOn, type ClimbSurface } from './holds'
 import { buildTreeWood, treePanelSpecs } from './treeTrunk'
-import { PATHS, subtractRects, type Rect } from './floorPaths'
+import { padLayout } from './floorPaths'
 import { FACE, SEAM, SHELL, buildWallPanels, pushTri, wallSpec, type PanelInfo, type V3, type WallPanels } from './wallPanels'
 
 /**
@@ -279,27 +279,13 @@ function pad(p: { id: string; x: number; z: number; rot: number; base: number; w
     return
   }
   // The walkways (#668) cut the mats back to floor level, so a path runs between mat edges, never over them.
-  const holes = PATHS.map((r) => ({ minX: r.minX - p.x, maxX: r.maxX - p.x, minZ: r.minZ - p.z, maxZ: r.maxZ - p.z }))
-  const cut = (r: Rect) => (p.rot === 0 ? subtractRects(r, holes) : [r])
-  const seam = 0.05
-  for (const r of cut({ minX: -p.w / 2, maxX: p.w / 2, minZ: -p.d / 2, maxZ: p.d / 2 })) {
-    out.solid.push(paint(box(r.minX, r.maxX, 0, p.thick - 0.06, r.minZ, r.maxZ), BUILDING.seam, m))
-  }
-  const nx = Math.max(1, Math.round(p.w / 2.5))
-  const nz = Math.max(1, Math.round(p.d / 2.5))
-  const tw = p.w / nx
-  const td = p.d / nz
+  const { base, tiles } = padLayout(p)
+  for (const r of base) out.solid.push(paint(box(r.minX, r.maxX, 0, p.thick - 0.06, r.minZ, r.maxZ), FLOOR.seam, m))
   const rng = createRng(hashString(p.id))
-  for (let i = 0; i < nx; i++) {
-    for (let j = 0; j < nz; j++) {
-      const a = -p.w / 2 + i * tw
-      const f = -p.d / 2 + j * td
-      // Each mat a shade off its neighbours: some newer, some scuffed and dulled.
-      _g.set(p.color ?? BUILDING.pad).multiplyScalar(1 - FLOOR.shade * rng())
-      for (const r of cut({ minX: a + seam, maxX: a + tw - seam, minZ: f + seam, maxZ: f + td - seam })) {
-        out.solid.push(paint(box(r.minX, r.maxX, 0, p.thick, r.minZ, r.maxZ), _g, m))
-      }
-    }
+  for (const tile of tiles) {
+    // Each mat a shade off its neighbours: some newer, some scuffed and dulled.
+    _g.set(p.color ?? FLOOR.mat).multiplyScalar(1 - FLOOR.shade * rng())
+    for (const r of tile) out.solid.push(paint(box(r.minX, r.maxX, 0, p.thick, r.minZ, r.maxZ), _g, m))
   }
 }
 
@@ -308,12 +294,12 @@ function crashPad(p: PieceOf<'prop'>, out: Parts): void {
   const m = frame(p)
   const r = p.h / 2
   const end = p.w / 2 - r
-  const colour = p.color ?? BUILDING.pad
+  const colour = p.color ?? FLOOR.mat
   out.solid.push(paint(box(-p.w / 2, end, 0, r - 0.025, -p.d / 2, p.d / 2), colour, m))
   out.solid.push(paint(box(-p.w / 2, end, r + 0.025, p.h, -p.d / 2, p.d / 2), colour, m))
-  out.solid.push(paint(box(-p.w / 2 + 0.03, end, r - 0.03, r + 0.03, -p.d / 2 + 0.03, p.d / 2 - 0.03), BUILDING.seam, m))
+  out.solid.push(paint(box(-p.w / 2 + 0.03, end, r - 0.03, r + 0.03, -p.d / 2 + 0.03, p.d / 2 - 0.03), FLOOR.seam, m))
   out.solid.push(paint(new THREE.CylinderGeometry(r, r, p.d, 12, 1, false, 0, Math.PI).rotateX(Math.PI / 2).translate(end, r, 0), colour, m))
-  for (const a of [-p.w / 4, p.w / 8]) out.solid.push(paint(box(a - 0.05, a + 0.05, p.h, p.h + 0.015, -p.d / 2 - 0.015, p.d / 2 + 0.015), BUILDING.seam, m))
+  for (const a of [-p.w / 4, p.w / 8]) out.solid.push(paint(box(a - 0.05, a + 0.05, p.h, p.h + 0.015, -p.d / 2 - 0.015, p.d / 2 + 0.015), FLOOR.seam, m))
 }
 
 function prop(p: PieceOf<'prop'>, out: Parts): void {

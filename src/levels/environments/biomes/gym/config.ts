@@ -9,7 +9,8 @@ import type { WallStyle } from './wallPanels'
  * The hall's floor (#668): padded mats everywhere, `tile` m square, a `seamWidth` of black between them and each
  * mat's edge rounding off over `bevel` m, every mat up to `shade` darker than the next; the walkways
  * (`floorPaths.ts`) flat black. Painted by the floor shader (`grimeShader.ts`); the raised mats under the boulders
- * and in the pit (`hallGeometry.ts` `pad`) take the same grey and spread.
+ * and in the pit (`hallGeometry.ts` `pad`) take the same grey and spread. Those are real raised mats, ~2.5 m with a wider
+ * gap (`floorPaths.ts` `padLayout`), sized to each pad so its tiles fit it whole; they never sit flush in the painted grid.
  */
 export const FLOOR = { mat: '#9a9e9b', seam: '#1f2022', path: '#17181a', tile: 2, seamWidth: 0.035, bevel: 0.14, shade: 0.12 }
 
@@ -162,8 +163,6 @@ export const BUILDING = {
   beam: '#5e1a24',
   duct: '#a9afb4',
   concrete: '#74777b',
-  pad: FLOOR.mat,
-  seam: FLOOR.seam,
   rail: '#d0302a',
   ropeZone: '#232325',
   daylight: '#b9d6f2',

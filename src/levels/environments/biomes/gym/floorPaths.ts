@@ -82,3 +82,37 @@ export function subtractRects(r: Rect, holes: readonly Rect[]): Rect[] {
   }
   return pieces
 }
+
+/** The black gap round each raised mat tile (m): a tile stops this far short of its neighbours and of every underlay edge. */
+export const PAD_SEAM = 0.05
+
+/** A raised pad's layout (#668) in its own frame: the black underlay's rects and, per tile (by x, then z), the tile's rects. */
+export interface PadLayout {
+  base: Rect[]
+  tiles: Rect[][]
+}
+
+/**
+ * A raised pad of ~2.5 m mats cut back round the walkways. The underlay is cut by the walkways and the tiles by the
+ * walkways grown by `PAD_SEAM`, so a cut edge reads like the pad's outer edge (mat, then its black underlay) and no
+ * tile face lies in the plane of an underlay face (they would z-fight). A rotated pad isn't cut (no walkway crosses one).
+ */
+export function padLayout(p: { x: number; z: number; rot: number; w: number; d: number }): PadLayout {
+  const holes = PATHS.map((r) => ({ minX: r.minX - p.x, maxX: r.maxX - p.x, minZ: r.minZ - p.z, maxZ: r.maxZ - p.z }))
+  const tileHoles = holes.map((h) => ({ minX: h.minX - PAD_SEAM, maxX: h.maxX + PAD_SEAM, minZ: h.minZ - PAD_SEAM, maxZ: h.maxZ + PAD_SEAM }))
+  const cut = (r: Rect, by: readonly Rect[]) => (p.rot === 0 ? subtractRects(r, by) : [r])
+  const base = cut({ minX: -p.w / 2, maxX: p.w / 2, minZ: -p.d / 2, maxZ: p.d / 2 }, holes)
+  const nx = Math.max(1, Math.round(p.w / 2.5))
+  const nz = Math.max(1, Math.round(p.d / 2.5))
+  const tw = p.w / nx
+  const td = p.d / nz
+  const tiles: Rect[][] = []
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < nz; j++) {
+      const a = -p.w / 2 + i * tw
+      const f = -p.d / 2 + j * td
+      tiles.push(cut({ minX: a + PAD_SEAM, maxX: a + tw - PAD_SEAM, minZ: f + PAD_SEAM, maxZ: f + td - PAD_SEAM }, tileHoles))
+    }
+  }
+  return { base, tiles }
+}
