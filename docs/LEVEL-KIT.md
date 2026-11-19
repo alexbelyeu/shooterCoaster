@@ -14,6 +14,10 @@ checklist and an afternoon, and every world inherits the good ride for free. "Pr
 here means _generated from parameters by code we own_, with the look still authored: the
 game should never read as random terrain with random enemies.
 
+**The ride:** every world's ride is a storyboard of the elements in `docs/RIDE-KIT.md` (launch,
+lift hill, drops, airtime, inversions, near misses, a dark section, a finale and the photo). A ride
+without them is a level that isn't finished.
+
 ## What stays hand-authored, what is generated
 
 | Hand-authored (the look, the memory) | Templated or generated (the rules, the plumbing) |
