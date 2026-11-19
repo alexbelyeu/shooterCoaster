@@ -1,0 +1,5 @@
+## 2026-11-19 — The gym's floor: shader mats, axis-aligned walkways cut through the raised mats (builder, #668)
+
+**Context:** Alex wanted every floor padded, black walkways from the entrance to the Flame and round it, and an all-grey pit with crash-pad benches.
+**Decision:** The main floor's mats and the walkways are painted by the floor shader (`grimeShader.ts` `matFragment`, `config.ts` `FLOOR`), not geometry. The walkways are axis-aligned rects (`floorPaths.ts`): a ring along the inside edge of the Flame's raised mats and an L from the entry floor along the Slab's mats; the raised mats (`hallGeometry.ts` `pad`, rot-0 pads only) are cut back round them with `subtractRects`, so a path lies at floor level between mat edges and never on top of a mat (no z-fighting). Contact shadows follow: `shadows.ts` `standingSurfaceAt` puts them on the pit's mats and at floor level on a walkway.
+**Consequences:** A walkway must stay axis-aligned and cross only rot-0 pads (`floorPaths.test.ts`); moving the Flame's mats moves the ring with them. Benches are blockout props `p-pitblock*` (a third added at 8, 31), drawn as folded crash pads on the pit's mats.

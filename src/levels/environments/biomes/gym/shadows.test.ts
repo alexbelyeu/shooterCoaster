@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FLAME, GYM_SCALE, PIT, piece, toWorld } from './blockout'
+import { PATHS } from './floorPaths'
 import { gymShadowCasters, standingSurfaceAt } from './shadows'
 
 describe('gym contact shadows', () => {
@@ -13,9 +14,14 @@ describe('gym contact shadows', () => {
     expect(under!.ground!(flame.x, flame.z)).toBeCloseTo((pad.base + pad.thick) * GYM_SCALE)
   })
 
-  it('stands the Tree on the pit floor', () => {
+  it("stands the Tree on the pit's mats", () => {
     const tree = piece('tree')
-    expect(standingSurfaceAt(tree.x, tree.z)).toBe(PIT.floorY)
+    expect(standingSurfaceAt(tree.x, tree.z)).toBe(PIT.floorY + PIT.mats)
+  })
+
+  it('lays shadows on a walkway at floor level, not on the mats it cuts through', () => {
+    const ring = PATHS[0]
+    expect(standingSurfaceAt((ring.minX + ring.maxX) / 2, (ring.minZ + ring.maxZ) / 2)).toBe(0)
   })
 
   it("casts under the Arch's two legs, not its lintel", () => {

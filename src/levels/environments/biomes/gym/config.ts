@@ -5,13 +5,21 @@ import type { HeightFunction } from '@/utils/terrainNoise'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import type { WallStyle } from './wallPanels'
 
-/** The hall's floor (the terrain mesh): poured grey concrete, the same at both levels. */
+/**
+ * The hall's floor (#668): padded mats everywhere, `tile` m square, a `seamWidth` of black between them and each
+ * mat's edge rounding off over `bevel` m, every mat up to `shade` darker than the next; the walkways
+ * (`floorPaths.ts`) flat black. Painted by the floor shader (`grimeShader.ts`); the raised mats under the boulders
+ * and in the pit (`hallGeometry.ts` `pad`) take the same grey and spread.
+ */
+export const FLOOR = { mat: '#9a9e9b', seam: '#1f2022', path: '#17181a', tile: 2, seamWidth: 0.035, bevel: 0.14, shade: 0.12 }
+
+/** The terrain mesh's own colour, under the floor shader: the mats' grey. */
 export const COLOR_RAMP: ColorRamp = {
   stops: [
-    { height: 0, color: new THREE.Color(0x74777b) },
-    { height: 1, color: new THREE.Color(0x74777b) },
+    { height: 0, color: new THREE.Color(FLOOR.mat) },
+    { height: 1, color: new THREE.Color(FLOOR.mat) },
   ],
-  cliffColor: new THREE.Color(0x74777b),
+  cliffColor: new THREE.Color(FLOOR.mat),
 }
 
 /** Enemies keep this far (world units, 2.5 m) inside the hall's walls and under its roof. */
@@ -154,8 +162,8 @@ export const BUILDING = {
   beam: '#5e1a24',
   duct: '#a9afb4',
   concrete: '#74777b',
-  pad: '#878b88',
-  seam: '#1f2022',
+  pad: FLOOR.mat,
+  seam: FLOOR.seam,
   rail: '#d0302a',
   ropeZone: '#232325',
   daylight: '#b9d6f2',
