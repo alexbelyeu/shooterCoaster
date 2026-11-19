@@ -5,12 +5,14 @@ import {
   canShareImage,
   copyImage,
   copyShare,
+  exclusive,
   nativeShare,
   SHARE_TARGETS,
   shareMode,
   sharePayloadForRun,
   shareTargetHref,
   type ShareMethod,
+  type SharePayload,
 } from '@/ui/share'
 import { placePopover, type Placement } from '@/ui/popoverPlacement'
 import { scoreCardFileName, type CardSize, type ScoreCardRun } from '@/ui/scoreCard'
@@ -24,13 +26,15 @@ interface Props {
   onShared: (method: ShareMethod) => void
   /** Buttons the open menu must not cover (Next Level). */
   avoid?: RefObject<HTMLElement | null>[]
+  /** The results reveal is done: draw the story card now, before the tap, where the sheet will take it (#374). */
+  prerender?: boolean
 }
 
 const isTouch = () => window.matchMedia?.('(pointer: coarse)').matches ?? false
 const cardSize = (): CardSize => (isTouch() ? 'story' : 'feed')
 
 /** The results screen's Share button (#271): the native sheet on touch (with the score card image, #272), else a menu of image, Copy link and share-intent links. */
-export default function ShareMenu({ card, onShared, avoid = [] }: Props) {
+export default function ShareMenu({ card, onShared, avoid = [], prerender = false }: Props) {
   const { levelId, score, worldRank } = card
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState<'copy' | 'image_copy' | null>(null)
@@ -39,6 +43,8 @@ export default function ShareMenu({ card, onShared, avoid = [] }: Props) {
   const menuRef = useRef<HTMLDivElement>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
+  /** A sheet is opening or open: a second tap must not call `share()` again (#374). */
+  const sharing = useRef(false)
   const copyable = canCopy(navigator)
   const imageCopyable = canCopyImage(navigator)
   /** Per size, until the card changes (the World rank came in, #445). */
@@ -69,20 +75,26 @@ export default function ShareMenu({ card, onShared, avoid = [] }: Props) {
     if (refocus) buttonRef.current?.focus()
   }
 
-  async function onButton() {
-    if (open) return close(false)
-    const native = sharePayloadForRun(levelId, score, 'native', worldRank)
-    if (!native) return
+  /** The native sheet where this device has one; `failed` (or no sheet) means the menu instead. */
+  async function shareSheet(native: SharePayload): Promise<'shared' | 'cancelled' | 'failed'> {
     const touch = isTouch()
     if (touch && canShareImage(navigator)) {
       const outcome = await shareImage()
       if (outcome === 'shared') onShared('image_native')
-      if (outcome !== 'failed') return
-    } else if (shareMode(navigator, touch, native) === 'native') {
-      const outcome = await nativeShare(navigator, native)
-      if (outcome === 'shared') onShared('native')
-      if (outcome !== 'failed') return
+      return outcome
     }
+    if (shareMode(navigator, touch, native) !== 'native') return 'failed'
+    const outcome = await nativeShare(navigator, native)
+    if (outcome === 'shared') onShared('native')
+    return outcome
+  }
+
+  async function onButton() {
+    if (open) return close(false)
+    const native = sharePayloadForRun(levelId, score, 'native', worldRank)
+    if (!native) return
+    // null: a sheet from an earlier tap is still opening.
+    if ((await exclusive(sharing, () => shareSheet(native))) !== 'failed') return
     setOpen(true)
     cardPng(cardSize()).catch(() => {})
   }
@@ -109,6 +121,12 @@ export default function ShareMenu({ card, onShared, avoid = [] }: Props) {
       onShared('image_copy')
     }
   }
+
+  // iOS drops the tap's user activation if the sheet waits for the card to draw (fonts, art decode, a 1080x1920 PNG),
+  // and the menu opens instead: draw it once the reveal is done. The press still starts it if this has not run.
+  useEffect(() => {
+    if (prerender && isTouch() && canShareImage(navigator)) cardPng('story').catch(() => {})
+  }, [prerender, card])
 
   useEffect(() => {
     if (!copied) return

@@ -71,7 +71,7 @@ describe('npm run new-world (#460)', () => {
   })
 
   it('keys the biome in every biome table', () => {
-    expect(edit(EDITED_FILES.biomeType)).toMatch(/export type BiomeType = .*\| 'probeWorld'\n/)
+    expect(edit(EDITED_FILES.biomeType)).toMatch(/export const BIOME_TYPES = \[.*, 'probeWorld'\] as const\n/)
     expect(edit(EDITED_FILES.biomeRegistry)).toContain("import { probeWorld } from './biomes/probeWorld'")
     expect(edit(EDITED_FILES.biomeRegistry)).toMatch(/\n {2}probeWorld,\n\}/)
     for (const f of [EDITED_FILES.atmosphere, EDITED_FILES.terrain, EDITED_FILES.theme, EDITED_FILES.postcard, EDITED_FILES.sfx]) {

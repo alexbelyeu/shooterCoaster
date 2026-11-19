@@ -120,8 +120,6 @@ const COMBAT_STEP_MAX = 0.25
 const RIDE_RATE = Number(arg('ride-rate', 0.14))
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(arg('seed', 1337))
-/** The intro's fixed length, `INTRO_SECONDS` in src/core/introShot.ts (#674). */
-const INTRO_SECONDS = 6
 // --cpu-throttle <rate>: the ride step on a slow machine (#536), CDP's CPU throttling for the ride;
 // records its longest frame and its frames of 100 ms or more per level, from the end of the warm-up (#541). Reported, not failed, until the fixes land.
 const CPU_THROTTLE = Number(arg('cpu-throttle', 1))
@@ -302,10 +300,11 @@ const NOT_LOADED = (id) => `the ${id} scene never loaded (levelReady)`
  * FRAME_DEADLINE_MS stops it), then freeze game time and hand the ride back to the frame time in that same JS turn.
  * `stopAtLevelTime` stops the level timer, game clock and ride exactly at `seconds` (#487), and the settled steps make
  * it the same moment of the level on any runner: the same track point with the same enemies flown in.
+ * `started`: the level is already started with game time frozen at its start (`tourShots`), so it isn't mounted twice.
  */
-async function rideToLevelTime(page, id, seconds, minFrames) {
+async function rideToLevelTime(page, id, seconds, minFrames, { started = false } = {}) {
   const start = Date.now()
-  await page.evaluate(([lid, seed, step, rate, target, minFrames]) => {
+  await page.evaluate(([lid, seed, step, rate, target, minFrames, started]) => {
     const s = window.__SC_TEST__
     // Caps a frame's level time once the ride hands it back (the shots and probe that follow).
     s.timerStepMax = step
@@ -323,9 +322,10 @@ async function rideToLevelTime(page, id, seconds, minFrames) {
       s.stopAtLevelTime = null
       return false
     })
-    s.startLevel(lid, seed)
+    s.timerStep = null
+    if (!started) s.startLevel(lid, seed)
     s.setTimeScale(1)
-  }, [id, SEED, RIDE_STEP, RIDE_RATE, seconds, minFrames])
+  }, [id, SEED, RIDE_STEP, RIDE_RATE, seconds, minFrames, started])
   for (;;) {
     await page.waitForTimeout(250)
     const r = await page.evaluate((overdue) => {
@@ -335,6 +335,46 @@ async function rideToLevelTime(page, id, seconds, minFrames) {
     }, Date.now() - start >= FRAME_DEADLINE_MS)
     if (r.done) return { frames: r.frames ?? 0, ms: Date.now() - start, levelTime: r.levelTime }
   }
+}
+
+/**
+ * The level's intro tour (#675), pinned by `introAt` at its four marks with the level held at its start: at each, the
+ * camera must be on the tour and over the ground, and at the landmark mark look at it. With `shots` (the nightly `tour`
+ * step) each mark is also shot, `<id>-tour-{reveal,landmark,track,landing}.png`, and must not be blank: a full frame
+ * capture costs ~15 s on a software renderer, which the PR's level shards can't carry (level 6 went 5.9 -> 10.3 min).
+ * Starts the level held at its start from its first frame (the level timer, game clock and ride at 0: a `setTimeScale`
+ * set before `startLevel` would not survive the run's mount), so the seat the tour lands on is the track's start;
+ * the ride then goes on from that start (`rideToLevelTime`'s `started`).
+ */
+async function tourShots(page, id, { shots: shoot = false } = {}) {
+  await page.evaluate(([lid, seed]) => {
+    const t = window.__SC_TEST__
+    t.timerStep = 0
+    t.rideRate = 0
+    t.startLevel(lid, seed)
+  }, [id, SEED])
+  if (!(await levelReady(page))) return { problems: [NOT_LOADED(id)], shots: null }
+  const marks = await page.evaluate(() => {
+    const t = window.__SC_TEST__
+    t.setTimeScale(0)
+    return t.intro.marks
+  })
+  if (!marks) return { problems: ['the intro tour reported no marks'], shots: null }
+  const problems = []
+  const shots = {}
+  for (const name of ['reveal', 'landmark', 'track', 'landing']) {
+    await page.evaluate((p) => { window.__SC_TEST__.introAt = p }, marks[name])
+    await waitFrames(page, 1, { maxMs: 30000 })
+    const at = await page.evaluate(() => ({ ...window.__SC_TEST__.intro }))
+    const img = shoot ? await imageStats(page, await page.screenshot({ path: path.join(OUT, `${id}-tour-${name}.png`), timeout: SHOT_TIMEOUT })) : null
+    shots[name] = { progress: marks[name], height: at.height, clearance: at.clearance, anchorAngle: at.anchorAngle }
+    if (at.mode !== 'tour') problems.push(`tour ${name}: introAt did not pin the tour (camera "${at.mode}")`)
+    else if (at.clearance < 0) problems.push(`tour ${name}: the camera is ${(-at.clearance).toFixed(1)} units under the ground`)
+    if (img && looksBlank(img)) problems.push(`tour ${name}: the frame looks blank`)
+  }
+  if (shots.landmark.anchorAngle > 25) problems.push(`tour landmark: the view is ${shots.landmark.anchorAngle.toFixed(1)}° off the landmark`)
+  await page.evaluate(() => { window.__SC_TEST__.introAt = null })
+  return { problems, shots }
 }
 
 /** Poll `check()` until true; give up once `ms` passed *and* `frames` rendered, or at `ms` + FRAME_DEADLINE_MS. */
@@ -2877,10 +2917,10 @@ async function landingPathCheck(browser, base) {
 
 /**
  * A real start (`?e2e=1&countdown=1` keeps the hook but not its skip of the opening, #674): the loading screen
- * (`loading.png`) holds until the shader warm-up is done; then the intro swoop runs its fixed length on its own clock
+ * (`loading.png`) holds until the shader warm-up is done; then the intro tour (#675) runs its fixed length on its own clock
  * (`<level>-intro.png` as it runs); then Ready / Set / GO in the seat: a press fires nothing (not even when held on
- * into play), the timer holds. Pinned with `introAt`, the swoop starts high over the seat with the landmark in view
- * (`<level>-swoop.png`) and ends exactly on the ride's start pose. A replay (`restartLevel`) of the warm level goes
+ * into play), the timer holds. Pinned with `introAt`, the tour starts high over the seat
+ * and ends exactly on the ride's start pose. A replay (`restartLevel`) of the warm level goes
  * straight to the countdown, where a tap after the 1 s mark skips to GO; a new start of the warm level passes the
  * loading screen at once and a tap skips its intro; leaving a level mid-warm-up must throw nothing.
  */
@@ -2930,7 +2970,7 @@ async function countdownCheck(page, levelId) {
   const reachedCountdown = await waitPhase('countdown', 30000)
   const introRun = await page.evaluate(() => {
     const api = window.__SC_TEST__
-    const r = { seconds: api.intro.seconds, skipped: api.intro.skipped, goOffset: api.intro.goOffset, maxFrameMs: api.maxFrameMs }
+    const r = { seconds: api.intro.seconds, length: api.intro.length, skipped: api.intro.skipped, goOffset: api.intro.goOffset, maxFrameMs: api.maxFrameMs }
     api.maxFrameMs = 0
     return r
   })
@@ -2938,7 +2978,7 @@ async function countdownCheck(page, levelId) {
   // 2. Ready / Set / GO: press during it and hold the press on into play.
   const shown = await stepShown()
   // One JS turn, so GO can't land between the phase read and the press (shots fire on pointerdown).
-  // holdFeedback holds the step through the screenshot and the pinned swoop.
+  // holdFeedback holds the step through the screenshot and the pinned tour.
   const during = await page.evaluate((at) => {
     const api = window.__SC_TEST__
     if (api.phase() !== 'countdown') return null
@@ -2957,15 +2997,14 @@ async function countdownCheck(page, levelId) {
       .catch(() => {})
     stepText = await page.locator('.countdown-step').first().textContent().catch(() => null)
     await page.screenshot({ path: path.join(OUT, 'countdown.png'), timeout: SHOT_TIMEOUT })
-    // The intro swoop (#328) pinned (`introAt` holds the camera on its path until GO): early on, high over the seat
-    // with the landmark in view; at its end, exactly on the ride's start pose, where the countdown sits.
+    // The intro tour (#328, #675) pinned (`introAt` holds the camera on its path): at its reveal, high over the seat;
+    // at its end, exactly on the ride's start pose, where the countdown sits. Every level's ride shoots its tour.
     const pinned = async (at) => {
       await page.evaluate((p) => { window.__SC_TEST__.introAt = p }, at)
       await waitFrames(page, 2, { maxMs: 30000 })
       return page.evaluate(() => ({ ...window.__SC_TEST__.intro, phase: window.__SC_TEST__.phase() }))
     }
-    const high = await pinned(0.15)
-    await page.screenshot({ path: path.join(OUT, `${levelId}-swoop.png`), timeout: SHOT_TIMEOUT })
+    const high = await pinned(0.04)
     const seat = await pinned(1)
     await page.evaluate(() => { window.__SC_TEST__.introAt = null })
     await waitFrames(page, 1, { maxMs: 30000 })
@@ -3063,20 +3102,19 @@ async function countdownCheck(page, levelId) {
   else if (introRun.skipped) problems.push('the untouched intro ended as skipped')
   // Its own clock: the same length on any device, its end late only by the frames its timer waits behind (~1 s at
   // a software renderer's ~2 fps, one frame on a phone).
-  else if (!(introRun.seconds >= INTRO_SECONDS - 0.05 && introRun.seconds <= INTRO_SECONDS + Math.max(1, (2 * introRun.maxFrameMs) / 1000)))
-    problems.push(`the intro lasted ${introRun.seconds?.toFixed(2)} s, not ${INTRO_SECONDS} (longest frame ${Math.round(introRun.maxFrameMs)} ms)`)
+  else if (!(introRun.seconds >= introRun.length - 0.05 && introRun.seconds <= introRun.length + Math.max(1, (2 * introRun.maxFrameMs) / 1000)))
+    problems.push(`the intro lasted ${introRun.seconds?.toFixed(2)} s, not ${introRun.length} (longest frame ${Math.round(introRun.maxFrameMs)} ms)`)
   if (!shown) problems.push('no Ready / Set / GO on screen')
   if (!during) problems.push('countdown over before the press check')
   else if (during.shotsFired > 0) problems.push(`a press during the countdown fired ${during.shotsFired} shot(s)`)
   if (!goStats) problems.push(`phase never reached playing (still "${atGo.phase}")`)
   if (swoop) {
     const { high, seat } = swoop
-    if (high.mode !== 'swoop') problems.push(`introAt did not pin the swoop before GO (camera "${high.mode}")`)
+    if (high.mode !== 'tour') problems.push(`introAt did not pin the tour before GO (camera "${high.mode}")`)
     else {
-      if (high.height < 60) problems.push(`the swoop starts only ${high.height.toFixed(1)} units over the seat`)
-      if (high.anchorAngle > 20) problems.push(`the swoop's start looks ${high.anchorAngle.toFixed(1)}° off the landmark`)
+      if (high.height < 60) problems.push(`the tour starts only ${high.height.toFixed(1)} units over the seat`)
       if (seat.seatOffset > 1e-3 || seat.seatAngle > 1e-3)
-        problems.push(`the swoop ends ${seat.seatOffset.toFixed(3)} units / ${seat.seatAngle.toFixed(3)}° off the ride's start pose`)
+        problems.push(`the tour ends ${seat.seatOffset.toFixed(3)} units / ${seat.seatAngle.toFixed(3)}° off the ride's start pose`)
     }
   }
   if (held.phase === 'countdown' && atGo.timeRemaining < held.timeRemaining - 3)
@@ -3443,18 +3481,25 @@ async function mobileResults(page) {
   return { problems, buttons, entry: { initials: stored.top, portrait, landscape } }
 }
 
-/** #272: where the sheet takes files (stubbed `canShare` / `share`: headless Chromium has no sheet), Share sends the story card with the line and link. */
+/** #272: where the sheet takes files (stubbed `canShare` / `share`: headless Chromium has no sheet), Share sends the story card with the line and link.
+ * #374: Share is tapped twice while the stubbed sheet stays up until the step closes it: one `share()` call, and no menu over the sheet. */
 async function phoneImageShareProblems(page) {
   const problems = []
   await page.evaluate(() => {
     window.__sharedData = null
+    window.__shareCalls = 0
+    window.__openSheets = []
     const stub = (name, value) => Object.defineProperty(navigator, name, { value, configurable: true, writable: true })
     stub('canShare', (data) => Array.isArray(data?.files) && data.files.every((f) => f.type === 'image/png'))
     stub('share', async (data) => {
+      window.__shareCalls++
       window.__sharedData = data
+      await new Promise((resolve) => window.__openSheets.push(resolve))
     })
   })
-  await page.locator('.results-share').tap({ timeout: 30000 }).catch((e) => problems.push(`phone: tap Share: ${e.message}`))
+  for (const tap of ['tap', 'second tap']) {
+    await page.locator('.results-share').tap({ timeout: 30000 }).catch((e) => problems.push(`phone: ${tap} on Share: ${e.message}`))
+  }
   const shared = await page
     .waitForFunction(() => window.__sharedData, null, { timeout: 30000, polling: 100 })
     .then(() => page.evaluate(async () => {
@@ -3464,9 +3509,15 @@ async function phoneImageShareProblems(page) {
       return {
         url: d.url, text: d.text, files: d.files?.length ?? 0, name: file?.name, type: file?.type,
         size: bitmap ? `${bitmap.width}x${bitmap.height}` : null,
-        score: window.__SC_TEST__.stats().score, menu: !!document.querySelector('.share-menu'),
+        score: window.__SC_TEST__.stats().score,
       }
     }), () => null)
+  // The second tap's share() (the card is drawn by now) would follow its click within a few frames.
+  await page.waitForTimeout(1000)
+  const calls = await page.evaluate(() => window.__shareCalls)
+  await page.evaluate(() => window.__openSheets.forEach((close) => close()))
+  await page.waitForTimeout(500)
+  const menu = await page.evaluate(() => !!document.querySelector('.share-menu'))
   await page.evaluate(() => {
     delete navigator.canShare
     delete navigator.share
@@ -3477,7 +3528,8 @@ async function phoneImageShareProblems(page) {
   if (shared.name !== `shootercoaster-level1-${shared.score}.png`) problems.push(`phone: shared file named ${shared.name}`)
   if (!shared.url?.includes('utm_campaign=share_image_native')) problems.push(`phone: image share link ${shared.url} lacks utm_campaign=share_image_native`)
   if (!shared.text?.startsWith('I scored ')) problems.push(`phone: image share line ${JSON.stringify(shared.text)}`)
-  if (shared.menu) problems.push('phone: the share menu opened although the sheet took the image')
+  if (calls !== 1) problems.push(`phone: two taps on Share while its sheet was up called share() ${calls} times, expected once`)
+  if (menu) problems.push('phone: the share menu opened although the sheet took the image')
   return problems
 }
 
@@ -3810,9 +3862,11 @@ async function run() {
     const { ctx, page, errors } = await newPage()
     const started = Date.now()
     const cdp = CPU_THROTTLE > 1 ? await ctx.newCDPSession(page) : null
+    if (cdp) await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE })
+    const tour = await tourShots(page, id, { shots: has('tour') })
+    // Ride frames only (#541): the level mount, the warm-up's compiles (#597) and the pinned tour shots are not the
+    // ride's. The tour waited on `levelReady()`, so the warm-up is done unless the scene never loaded.
     if (cdp) {
-      await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE })
-      // Ride frames only (#541): the level mount and the warm-up's compiles are part 2's (#597), not the ride's.
       await page.evaluate(() => {
         const s = window.__SC_TEST__
         const reset = () => {
@@ -3823,7 +3877,7 @@ async function run() {
         reset()
       })
     }
-    const ride = await rideToLevelTime(page, id, SECONDS, MIN_FRAMES)
+    const ride = await rideToLevelTime(page, id, SECONDS, MIN_FRAMES, { started: !tour.problems.includes(NOT_LOADED(id)) })
     const throttled = cdp ? { rate: CPU_THROTTLE, ...(await page.evaluate(() => ({ maxMs: window.__SC_TEST__.maxFrameMs, count: window.__SC_TEST__.longFrames }))) } : null
     // Combat, the shot and the results run at full speed: their deadlines were set for it.
     if (cdp) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 })
@@ -3840,7 +3894,8 @@ async function run() {
     const enemyShot = { ...(await captureEnemyCloseup(page, id, png)), levelTime: stats.levelTime }
     const { frames } = ride
     const frameSeconds = ride.ms / 1000
-    const problems = []
+    const problems = [...tour.problems]
+    stats.tour = tour.shots
     const spawnDigest = await nextSpawnDigest(page, null)
     if (!spawnDigest) problems.push('spawnDigest() never reported the spawns')
 
@@ -4013,7 +4068,7 @@ async function run() {
           ` ${r.countdown.intro.goOffset?.toFixed(2)} off the seat at its end; a tap skipped one at ${r.countdown.introSkip.seconds?.toFixed(2)} s),` +
           ` "${r.countdown.stepText}" timer ${r.countdown.timerDuring.toFixed(1)} -> ${r.countdown.timerAtGo.toFixed(1)} at GO,` +
           ` held into play: ${r.countdown.shotsHeldIntoPlay} shots, replay into ${r.countdown.replayPhase}, tap in ${r.countdown.skipTapIn},` +
-          (r.countdown.swoop ? ` swoop ${r.countdown.swoop.high.height.toFixed(0)} over the seat, ${r.countdown.swoop.high.anchorAngle.toFixed(1)}° off the landmark,` : '') +
+          (r.countdown.swoop ? ` tour ${r.countdown.swoop.high.height.toFixed(0)} over the seat at its reveal,` : '') +
           ` shader warm-up ${r.countdown.warmup?.done ? `${r.countdown.warmup.ms.toFixed(0)} ms, ${r.countdown.warmup.programs} programs` : 'unfinished'},` +
           ` first shot: programs ${r.countdown.firstShot.programs} -> ${r.countdown.firstShot.programsAfter}, longest frame ${r.countdown.firstShot.maxFrameMs.toFixed(0)} ms (avg ${r.countdown.firstShot.avgFrameMs.toFixed(0)})` +
           ` | startup ${startupSummary(r.initTimings)}`

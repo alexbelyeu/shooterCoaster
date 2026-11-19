@@ -4,7 +4,7 @@ import { useContactShadows } from '../../shared/ContactShadows'
 import StaticInstances from '../../shared/StaticInstances'
 import FlameFire from './FlameFire'
 import { withHallGrime, withHoldChalk } from './grimeShader'
-import { buildHall } from './hallGeometry'
+import { buildHall, holdGeometry } from './hallGeometry'
 import { gymShadowCasters } from './shadows'
 
 /** Light fittings and daylit windows: unlit and over 1, so Bloom picks them up. */
@@ -23,7 +23,7 @@ export default function GymFeatures() {
     }),
     [],
   )
-  const holdShape = useMemo(() => new THREE.IcosahedronGeometry(1, 0), [])
+  const holdShape = useMemo(holdGeometry, [])
   useEffect(
     () => () => {
       hall.solid.dispose()

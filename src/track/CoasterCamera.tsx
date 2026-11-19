@@ -17,7 +17,7 @@ import {
   shakeAngles, type ShakeAngles,
 } from '@/combat/screenShake.hot'
 import { useSettingsStore } from '@/store/useSettingsStore'
-import { prefersReducedMotion } from '@/ui/reducedMotion'
+import { prefersReducedMotion, usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { fovForAspect, fovWithSpeed } from './cameraFov.hot'
 import WindStreaks, { type StreakDrive } from './WindStreaks'
 import { streakOpacity, streakRate } from './windStreaks'
@@ -26,9 +26,10 @@ import {
   smoothingFactor, stepRig, type TrackSamples,
 } from './cameraRig.hot'
 import {
-  createTrackApproach, introProgress, orbitPose, swoopPose, type HeroShot,
+  introProgress, orbitPose, tourPose, type HeroShot,
 } from './introCamera.hot'
 import { introStartedAt, setCameraOffSeat } from '@/core/introShot'
+import { buildIntroTour } from './introTour'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 
 interface CoasterCameraProps {
@@ -44,11 +45,11 @@ interface CoasterCameraProps {
   far?: number
   heightOffset?: number
   enabled?: boolean
-  /** The level's landmark: the intro swoops in from over it, the results orbit it (#328). */
+  /** The level's landmark: the intro's tour passes it, the results orbit it (#328). */
   hero: HeroShot
   /** Terrain as drawn. */
   groundFn: (x: number, z: number) => number
-  /** An interior's walls: the swoop and orbit stay inside them. */
+  /** An interior's walls: the tour and orbit stay inside them. */
   bounds?: PlacementBounds
 }
 
@@ -110,14 +111,23 @@ export default function CoasterCamera({
     /** Seconds into the results orbit; -1 before it starts. */
     orbitSeconds: -1,
     orbitYaw: 0,
-    /** The swoop's distance off the seat on its last frame. */
+    /** The tour's distance off the seat on its last frame. */
     lastOffset: 0,
-    wasSwooping: false,
+    wasTouring: false,
   })
-  const approach = useMemo(
-    () => (hero.approach ? createTrackApproach(curve, table, hero.approach * trackScale, heightOffset, () => ride.current.progress) : undefined),
-    [hero, curve, table, trackScale, heightOffset],
+  // The car waits at the start through the intro, so the tour lands on the track's start. Reduced motion never
+  // plays it, so it isn't built (cold, but tens of ms on a phone); the smoke pins it, so `?e2e=1` always builds it.
+  const reducedMotion = usePrefersReducedMotion()
+  const tour = useMemo(
+    () => (reducedMotion && !window.__SC_TEST__
+      ? null
+      : buildIntroTour({ curve, table, seatT: 0, eyeHeight: heightOffset, trackScale, hero, heroGround, ground: groundFn, bounds })),
+    [reducedMotion, curve, table, heightOffset, trackScale, hero, heroGround, groundFn, bounds],
   )
+  useEffect(() => {
+    const testApi = window.__SC_TEST__
+    if (testApi && tour) testApi.intro.marks = tour.marks
+  }, [tour])
   useEffect(() => {
     intro.current.anchor.set(hero.x, heroGround + hero.focus, hero.z)
   }, [hero, heroGround])
@@ -325,16 +335,16 @@ export default function CoasterCamera({
       testApi.tunnel.depth = tunnel
     }
 
-    // Through the intro the camera swoops down from over the landmark into the seat, landing on this pose (#328); the
-    // loading screen hides it waiting at the start, so the intro's first frame is one the level has drawn (#674).
-    // `introAt` (e2e) pins it anywhere before GO.
-    const pinned = beforeGo ? testApi?.introAt : null
+    // Through the intro the camera tours the level into the seat, landing on this pose (#328, #675); the loading
+    // screen hides it waiting at the reveal, so the intro's first frame is one the level has drawn (#674).
+    // `introAt` (e2e) pins it anywhere short of the results, so the smoke can shoot every level's tour.
+    const pinned = testApi?.introAt ?? null
     const introNext = phase === 'loading' && !store.skipIntro
-    const swooping = pinned != null || ((phase === 'intro' || introNext) && !reducedMotion)
-    if (swooping) {
+    const touring = tour !== null && (pinned != null || ((phase === 'intro' || introNext) && !reducedMotion))
+    if (touring) {
       const startedAt = introStartedAt()
       const progress = pinned ?? (startedAt === null ? 0 : introProgress((performance.now() - startedAt) / 1000))
-      const bank = swoopPose(_position.current, dir, io.anchor, trackScale, progress, bounds, io.pos, io.dir, approach)
+      const bank = tourPose(tour, progress, _position.current, dir, io.pos, io.dir)
       cam.position.copy(io.pos)
       _lookAt.current.copy(io.pos).add(io.dir)
       cam.lookAt(_lookAt.current)
@@ -342,22 +352,23 @@ export default function CoasterCamera({
       io.lastOffset = io.pos.distanceTo(_position.current)
       if (testApi) {
         const t = testApi.intro
-        t.mode = 'swoop'
+        t.mode = 'tour'
         t.progress = progress
         t.height = io.pos.y - _position.current.y
         t.seatOffset = io.lastOffset
         t.seatAngle = io.dir.angleTo(dir) * RAD_TO_DEG
         s.lookTarget.copy(io.anchor).sub(io.pos)
         t.anchorAngle = io.dir.angleTo(s.lookTarget) * RAD_TO_DEG
+        t.clearance = io.pos.y - groundFn(io.pos.x, io.pos.z)
       }
     } else {
       if (testApi) {
-        if (io.wasSwooping) testApi.intro.goOffset = io.lastOffset
+        if (io.wasTouring) testApi.intro.goOffset = io.lastOffset
         testApi.intro.mode = 'ride'
       }
     }
-    io.wasSwooping = swooping
-    setCameraOffSeat(swooping && io.lastOffset > 0)
+    io.wasTouring = touring
+    setCameraOffSeat(touring && io.lastOffset > 0)
 
     sfx().wind(velocityNorm)
   })

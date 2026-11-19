@@ -1,12 +1,11 @@
 /**
- * The level's intro swoop and the results orbit (#328). Through the intro (#674: its own fixed-length clock, after the
- * loading screen and before Ready / Set / GO) the camera comes down from high over the level's hero landmark into the
- * coaster seat, landing on the ride camera's start pose; behind the results it circles the landmark. `CoasterCamera`
+ * The level's intro tour and the results orbit (#328). Through the intro (#674: its own fixed-length clock, after the
+ * loading screen and before Ready / Set / GO) the camera tours the level (#675, built by `introTour.ts`) and lands in
+ * the coaster seat on the ride camera's start pose; behind the results it circles the landmark. `CoasterCamera`
  * plays both and never moves the camera off the ride in `countdown` or `playing`.
  */
 import type { Vec3Like } from './cameraRig.hot'
-import { type ArcTable, distanceAtT, tAtLoopDistance } from './arcLength'
-import type { TrackCurve } from './curves/TrackCurve'
+import { type IntroTour, type TourShot, tourDistance } from './introTour'
 import { clampIntoBounds, type PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import { INTRO_SECONDS } from '@/core/introShot'
 
@@ -27,94 +26,29 @@ export interface HeroShot {
   /** Yaw (radians, `atan2(z, x)`) the arc is centred on: the way the landmark faces. */
   facing?: number
   /**
-   * A seat inside a structure (the gym's Tree, #659): the swoop's last leg rides the last this many world
-   * units × trackScale of the track into the seat, which the track keeps clear, instead of coming down from behind it.
+   * A seat inside a structure (the gym's Tree, #659): the tour's last leg rides the last this many world
+   * units × trackScale of the track into the seat, which the track keeps clear, instead of flying over it.
    */
   approach?: number
+  /** Hand-picked shots (world positions and look points) for the tour's reveal and landmark pass, in order (#675). */
+  tour?: readonly TourShot[]
 }
-
-/** The track behind the seat, for a swoop that rides in on it (`HeroShot.approach`). */
-export interface SwoopApproach {
-  /** Track length (world units) ridden in. */
-  length: number
-  /** The eye `back` world units along the track before the seat into `outPos`, the ride's direction there into `outDir`. */
-  at(back: number, outPos: Vec3Like, outDir: Vec3Like): void
-}
-
-/** `length` units of `curve` ridden into the seat at `seatT()` (the ride's progress), the eye `eyeHeight` over the rail. */
-export function createTrackApproach(curve: TrackCurve, table: ArcTable, length: number, eyeHeight: number, seatT: () => number): SwoopApproach {
-  // eslint-disable-next-line sc/no-hot-path-alloc -- cold: once per level mount
-  return {
-    length,
-    // eslint-disable-next-line sc/no-hot-path-alloc -- cold: the method is made with its object, once per level mount
-    at(back, outPos, outDir) {
-      const t = tAtLoopDistance(table, distanceAtT(table, seatT()) - back)
-      const p = curve.getPointAt(t)
-      outPos.x = p.x
-      outPos.y = p.y + eyeHeight
-      outPos.z = p.z
-      const d = curve.getTangentAt(t)
-      outDir.x = d.x
-      outDir.y = d.y
-      outDir.z = d.z
-    },
-  }
-}
-
-/** Swoop path in world units × trackScale: the start's reach toward the landmark and height over the seat. */
-const LEAD = 360
-const RISE = 140
-/** The last stretch comes down into the seat from this far behind it. */
-const BACK = 70
-/** The landmark sits this far (radians) under the centre of the view, below the countdown's words. */
-const LANDMARK_DIP = 12 * (Math.PI / 180)
-/** With an approach, the share of the swoop (its end) spent riding the track in. */
-const APPROACH_SHARE = 0.4
-/** Share of the swoop spent looking at the landmark before the view turns onto the track. */
-const LOOK_HOLD = 0.35
-/** Peak bank (radians) into the turn, at mid-swoop. */
-const SWOOP_BANK = 7 * (Math.PI / 180)
 
 /** Orbit: a turn a minute, kept this far over the ground under the camera. */
 export const ORBIT_RATE = (2 * Math.PI) / 60
 const ORBIT_CLEARANCE = 40
 
-/** Swoop progress `seconds` into the intro: 0 to 1 over `INTRO_SECONDS`, leaving and landing with zero speed and acceleration. */
+/** Intro progress `seconds` in: 0 to 1 over `INTRO_SECONDS`, on the wall clock (the tour eases itself, `tourDistance`). */
 export function introProgress(seconds: number): number {
-  const u = Math.min(Math.max(seconds / INTRO_SECONDS, 0), 1)
-  return u * u * u * (u * (u * 6 - 15) + 10)
+  return Math.min(Math.max(seconds / INTRO_SECONDS, 0), 1)
 }
-
-function smoothstep(x: number): number {
-  const t = Math.min(Math.max(x, 0), 1)
-  return t * t * (3 - 2 * t)
-}
-
-/** Scratch control points: the swoop runs every intro frame. */
-const P0 = { x: 0, y: 0, z: 0 }
-const P1 = { x: 0, y: 0, z: 0 }
-const P2 = { x: 0, y: 0, z: 0 }
-const P3 = { x: 0, y: 0, z: 0 }
-const P3_DIR = { x: 0, y: 0, z: 0 }
 
 /**
- * The camera at swoop progress `p` (0 = high over the landmark, 1 = the seat): position into `outPos`, unit look
- * direction into `outDir`; returns the bank (radians, `rotateZ` after `lookAt`). At p = 1 it is exactly `seat` /
- * `seatDir`, the ride camera's start pose. `anchor` is the landmark's focus point; `bounds` an interior's walls.
- * With an `approach` the curve comes down onto the track `approach.length` behind the seat, arriving along it at the
- * speed it then rides the track in at.
+ * The camera at intro progress `p` along the level's `tour` (0 = the reveal, 1 = the seat): position into `outPos`,
+ * unit look direction into `outDir`; returns the bank (radians, `rotateZ` after `lookAt`). Over the tour's last
+ * `blend` it eases onto the live `seat` / `seatDir`, the ride camera's start pose, and at p = 1 it is exactly that.
  */
-export function swoopPose(
-  seat: Vec3Like,
-  seatDir: Vec3Like,
-  anchor: Vec3Like,
-  trackScale: number,
-  p: number,
-  bounds: PlacementBounds | undefined,
-  outPos: Vec3Like,
-  outDir: Vec3Like,
-  approach?: SwoopApproach,
-): number {
+export function tourPose(tour: IntroTour, p: number, seat: Vec3Like, seatDir: Vec3Like, outPos: Vec3Like, outDir: Vec3Like): number {
   if (p >= 1) {
     outPos.x = seat.x
     outPos.y = seat.y
@@ -124,93 +58,38 @@ export function swoopPose(
     outDir.z = seatDir.z
     return 0
   }
-  const t = Math.max(p, 0)
-  // Horizontal ride direction and direction to the landmark.
-  let fx = seatDir.x
-  let fz = seatDir.z
-  const fl = Math.hypot(fx, fz)
-  if (fl > 1e-6) {
-    fx /= fl
-    fz /= fl
-  } else {
-    fx = 1
-    fz = 0
+  const { dist, pos, look, bank, count, length } = tour
+  const d = tourDistance(p) * length
+  // The sample span holding `d`.
+  let lo = 0
+  let hi = count - 1
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1
+    if (dist[mid] <= d) lo = mid
+    else hi = mid
   }
-  let ax = anchor.x - seat.x
-  let az = anchor.z - seat.z
-  const dist = Math.hypot(ax, az)
-  if (dist > 1e-6) {
-    ax /= dist
-    az /= dist
-  } else {
-    ax = fx
-    az = fz
-  }
-  const lead = Math.min(dist * 0.75, LEAD * trackScale)
-  const rise = RISE * trackScale
-  const back = BACK * trackScale
-  P0.x = seat.x + ax * lead
-  P0.y = seat.y + rise
-  P0.z = seat.z + az * lead
-  // Lingers over the landmark, sweeps down to behind the seat, comes in along the track.
-  P1.x = P0.x + (seat.x - P0.x) * 0.25
-  P1.y = P0.y + rise * 0.15
-  P1.z = P0.z + (seat.z - P0.z) * 0.25
-  const rideIn = approach ? 1 - APPROACH_SHARE : 1
-  if (approach && t >= rideIn) {
-    // Easing out along the track into the seat.
-    const left = 1 - (t - rideIn) / APPROACH_SHARE
-    approach.at(approach.length * left * left, outPos, P3_DIR)
-  } else {
-    if (approach) {
-      // Lands on the track with the ride-in's speed (per unit of t) along it: no kink where the two meet.
-      approach.at(approach.length, P3, P3_DIR)
-      const reach = (2 * approach.length * rideIn) / (3 * APPROACH_SHARE)
-      P2.x = P3.x - P3_DIR.x * reach
-      P2.y = P3.y - P3_DIR.y * reach
-      P2.z = P3.z - P3_DIR.z * reach
-    } else {
-      P3.x = seat.x
-      P3.y = seat.y
-      P3.z = seat.z
-      P2.x = seat.x - fx * 2 * back
-      P2.y = seat.y + back * 0.5
-      P2.z = seat.z - fz * 2 * back
-    }
-    clampIntoBounds(P0, bounds)
-    clampIntoBounds(P1, bounds)
-    clampIntoBounds(P2, bounds)
-    const u = t / rideIn
-    const s = 1 - u
-    const b0 = s * s * s
-    const b1 = 3 * s * s * u
-    const b2 = 3 * s * u * u
-    const b3 = u * u * u
-    outPos.x = b0 * P0.x + b1 * P1.x + b2 * P2.x + b3 * P3.x
-    outPos.y = b0 * P0.y + b1 * P1.y + b2 * P2.y + b3 * P3.y
-    outPos.z = b0 * P0.z + b1 * P1.z + b2 * P2.z + b3 * P3.z
-  }
+  const span = dist[hi] - dist[lo]
+  const f = span > 1e-9 ? Math.min(Math.max((d - dist[lo]) / span, 0), 1) : 0
+  const a = lo * 3
+  const b = hi * 3
+  // Onto the live seat over the last stretch: the same seat as built, unless the car has moved since.
+  const w = smoothstep((d - (length - tour.blend)) / tour.blend)
+  outPos.x = pos[a] + (pos[b] - pos[a]) * f + (seat.x - tour.seat.x) * w
+  outPos.y = pos[a + 1] + (pos[b + 1] - pos[a + 1]) * f + (seat.y - tour.seat.y) * w
+  outPos.z = pos[a + 2] + (pos[b + 2] - pos[a + 2]) * f + (seat.z - tour.seat.z) * w
+  const x = (look[a] + (look[b] - look[a]) * f) * (1 - w) + seatDir.x * w
+  const y = (look[a + 1] + (look[b + 1] - look[a + 1]) * f) * (1 - w) + seatDir.y * w
+  const z = (look[a + 2] + (look[b + 2] - look[a + 2]) * f) * (1 - w) + seatDir.z * w
+  const m = Math.hypot(x, y, z) || 1
+  outDir.x = x / m
+  outDir.y = y / m
+  outDir.z = z / m
+  return bank[lo] + (bank[hi] - bank[lo]) * f
+}
 
-  // From looking at the landmark to the ride's look, by yaw (the short way round) and pitch.
-  const lx = anchor.x - outPos.x
-  const ly = anchor.y - outPos.y
-  const lz = anchor.z - outPos.z
-  const ll = Math.hypot(lx, ly, lz) || 1
-  const yawA = Math.atan2(lz, lx)
-  const pitchA = Math.asin(Math.min(Math.max(ly / ll, -1), 1)) + LANDMARK_DIP
-  const yawB = Math.atan2(seatDir.z, seatDir.x)
-  const pitchB = Math.asin(Math.min(Math.max(seatDir.y, -1), 1))
-  let dYaw = yawB - yawA
-  dYaw -= Math.round(dYaw / (2 * Math.PI)) * 2 * Math.PI
-  const w = smoothstep((t - LOOK_HOLD) / (1 - LOOK_HOLD))
-  const yaw = yawA + dYaw * w
-  const pitch = pitchA + (pitchB - pitchA) * w
-  const cp = Math.cos(pitch)
-  outDir.x = Math.cos(yaw) * cp
-  outDir.y = Math.sin(pitch)
-  outDir.z = Math.sin(yaw) * cp
-  // Bank into the turn (yaw decreasing turns left, which is a positive roll).
-  return -Math.sign(dYaw) * SWOOP_BANK * Math.sin(Math.PI * t)
+function smoothstep(x: number): number {
+  const t = Math.min(Math.max(x, 0), 1)
+  return t * t * (3 - 2 * t)
 }
 
 /**

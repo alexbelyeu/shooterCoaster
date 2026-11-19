@@ -133,6 +133,6 @@ export interface BiomeDefinition {
   bounds?: PlacementBounds
   /** Landmarks and big props a ground enemy stood away from the track keeps out of (`spawnPlacement.ts` `whereTheApproachLooks`). */
   keepOff?: (groundFn: HeightFunction, track: ArcTable) => readonly KeepOff[]
-  /** The hero landmark the countdown's swoop starts over and the results orbit circles (#328). */
+  /** The hero landmark the intro's tour passes (#675) and the results orbit circles (#328). */
   hero: HeroShot
 }

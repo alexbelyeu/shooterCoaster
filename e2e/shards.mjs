@@ -6,8 +6,8 @@
 export const UI_STEPS = ['title', 'landing', 'levelSelect', 'daily', 'settings', 'mobile', 'mobileMenus']
 /** On the run's first level; `frenzy` happens inside its ride and `seed` compares against that ride's spawns. */
 export const FIRST_LEVEL_STEPS = ['frenzy', 'seed', 'quality', 'pause', 'countdown', 'speed']
-/** `shot`, `results` and `share` check the ride's own page after its combat. */
-export const LEVEL_STEPS = ['ride', 'shot', 'results', 'share', 'wave', 'boss', 'pickup', 'audio', 'pacing']
+/** `tour`, `shot`, `results` and `share` check the ride's own page (`tour` before the ride, the others after its combat). */
+export const LEVEL_STEPS = ['ride', 'tour', 'shot', 'results', 'share', 'wave', 'boss', 'pickup', 'audio', 'pacing']
 export const STEPS = [...UI_STEPS, ...FIRST_LEVEL_STEPS, ...LEVEL_STEPS]
 
 /** Mirrors the smoke's check constants (WAVE_CHECK, BOSS_CHECKS…), which fail the run at start if they drift. */
@@ -20,6 +20,7 @@ export const STEP_LEVELS = {
 
 /** Steps that run on another step's page: what they need in the same run. */
 const NEEDS = {
+  tour: ['ride'],
   shot: ['ride'],
   results: ['ride'],
   share: ['ride', 'results'],
@@ -35,7 +36,7 @@ const PHONE_STEPS = ['mobile', 'mobileMenus']
  * one run outgrew the job's 60 min cap once level 6 joined every deep step. Together they make every step of the full run once.
  */
 export const NIGHTLY_PARTS = {
-  main: { steps: [...UI_STEPS, ...FIRST_LEVEL_STEPS, 'ride', 'shot', 'results', 'share'] },
+  main: { steps: [...UI_STEPS, ...FIRST_LEVEL_STEPS, 'ride', 'tour', 'shot', 'results', 'share'] },
   deep: { steps: ['wave', 'boss', 'pickup', 'audio'] },
   pacing: { steps: ['pacing'] },
 }

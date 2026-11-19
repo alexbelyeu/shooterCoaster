@@ -1,10 +1,10 @@
 /**
- * What the intro (#674, `ui/hud/Intro.tsx`) and the camera's swoop (#328, `track/introCamera.hot.ts`) tell each other:
+ * What the intro (#674, `ui/hud/Intro.tsx`) and the camera's tour (#328, #675, `track/introCamera.hot.ts`) tell each other:
  * when the intro started, and whether the camera is off the seat (the gun stays hidden then).
  */
 
-/** The intro's length (#674), the same on every device: the swoop runs on the wall clock, not on frames. */
-export const INTRO_SECONDS = 6
+/** The intro's length (#674), the same on every device: the tour (#675) runs on the wall clock, not on frames. */
+export const INTRO_SECONDS = 10
 
 let startedAt: number | null = null
 let offSeat = false
@@ -22,7 +22,7 @@ export function setCameraOffSeat(off: boolean): void {
   offSeat = off
 }
 
-/** The camera is swooping in or orbiting the landmark, not riding. */
+/** The camera is touring the level or orbiting the landmark, not riding. */
 export function cameraOffSeat(): boolean {
   return offSeat
 }

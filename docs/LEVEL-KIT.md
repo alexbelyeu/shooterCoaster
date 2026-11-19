@@ -14,6 +14,10 @@ checklist and an afternoon, and every world inherits the good ride for free. "Pr
 here means _generated from parameters by code we own_, with the look still authored: the
 game should never read as random terrain with random enemies.
 
+**The ride:** every world's ride is a storyboard of the elements in `docs/RIDE-KIT.md` (launch,
+lift hill, drops, airtime, inversions, near misses, a dark section, a finale and the photo). A ride
+without them is a level that isn't finished.
+
 ## What stays hand-authored, what is generated
 
 | Hand-authored (the look, the memory) | Templated or generated (the rules, the plumbing) |
@@ -67,12 +71,13 @@ biome or score that already exists is refused, so a second run changes nothing. 
    z-fighting, terrain-following) and `docs/art/ENEMIES.md` (style).
 2. Biome. **(script)** `biomes/<biome>/` from the outdoor template (noise terrain, trees, seeded boulders
    beside the track, a stand-in spire) or the interior one (a flat `floor`, `bounds` inside a box hall
-   (`HALL` in its `config.ts`), crates); `BiomeType` (`src/types/level.ts`), `biomeRegistry.ts`, the
+   (`HALL` in its `config.ts`), crates); `BIOME_TYPES` (`src/types/level.ts`: the one list of biome ids, which `BiomeType`, the terrain and particle tests and the turntable's `?biome=` read, #509), `biomeRegistry.ts`, the
    `atmosphere.ts` preset, `BIOME_TERRAIN_CONFIGS` (`utils/terrainNoise.ts`; an interior's is flat and `authoredFloor`:
    `biomeHeightFunction` hands every caller its `floor`), `BIOME_REVERB` (`sfxDesign.ts`), a `theme.ts` accent and a `LevelPostcard`
    stub. **(by hand)** The look: palette, sky, light, fog, grade, the hero landmark in `Features.tsx`
-   and its `hero` shot in `index.ts` (what the countdown's swoop starts over and the results orbit circles:
-   the template's points at the stand-in spire's `LANDMARK_SITE`, or an interior's far wall; #328),
+   and its `hero` shot in `index.ts` (what the intro's 10 s tour passes on its way into the seat and the results orbit circles:
+   the template's points at the stand-in spire's `LANDMARK_SITE`, or an interior's far wall; #328, #675; the tour's
+   reveal and landmark pass are generated from it, and `hero.tour` swaps in hand-picked shots when they frame it badly),
    props in `Decorations.tsx` (seeded, off the track), contact-shadow footprints, the postcard art and
    accent; an interior sizes `HALL` around its track (its `BIOME_TERRAIN_CONFIGS` `meshSize` sizes the floor mesh if the
    default 6000 doesn't fit it).

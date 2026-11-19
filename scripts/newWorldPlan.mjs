@@ -359,7 +359,7 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
   if (!lap) throw new NewWorldError(`${F.lapsTest}: no LAPS.level1`)
   const lapsOut = replaceOnce(laps, /(const LAPS[^\n]*?) \}\n/, `$1, ${id}: ${lap[1]} }\n`, F.lapsTest)
 
-  const biomeType = replaceOnce(text(F.biomeType), /(export type BiomeType = [^\n]*)/, `$1 | '${biome}'`, F.biomeType)
+  const biomeType = replaceOnce(text(F.biomeType), /(export const BIOME_TYPES = \[[^\]\n]*)\]/, `$1, '${biome}']`, F.biomeType)
 
   let biomeRegistry = text(F.biomeRegistry)
   const imports = [...biomeRegistry.matchAll(/^import \{ \w+ \} from '\.\/biomes\/\w+'$/gm)]
@@ -434,7 +434,7 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
     { path: F.registry, content: registryOut, what: `${id} (order ${order}, after ${previous}): the starter roster, maxScore ${score.total}` },
     { path: F.registryTest, content: registryTestOut, what: `the finales table: ${id} ends on ${roster.finale.type}, ${score.total}` },
     { path: F.lapsTest, content: lapsOut, what: `LAPS.${id} = ${lap[1]} s (level1's track)` },
-    { path: F.biomeType, content: biomeType, what: `BiomeType + '${biome}'` },
+    { path: F.biomeType, content: biomeType, what: `BIOME_TYPES + '${biome}'` },
     { path: F.biomeRegistry, content: biomeRegistry, what: `BIOMES.${biome}` },
     { path: F.atmosphere, content: insertInObject(text(F.atmosphere), /export const ATMOSPHERES\b/, fill(ATMOSPHERE[kind], v), F.atmosphere), what: `ATMOSPHERES.${biome} (${kind} preset)` },
     { path: F.terrain, content: insertInObject(text(F.terrain), /export const BIOME_TERRAIN_CONFIGS\b/, fill(TERRAIN[kind], v), F.terrain), what: `BIOME_TERRAIN_CONFIGS.${biome}` },

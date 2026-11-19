@@ -30,6 +30,11 @@ export interface HoldInstances {
   colors: THREE.Color[]
 }
 
+/** One hold, drawn at each of `HoldInstances.matrices`. */
+export function holdGeometry(): THREE.BufferGeometry {
+  return new THREE.IcosahedronGeometry(1, 0)
+}
+
 export interface Hall {
   solid: THREE.BufferGeometry
   light: THREE.BufferGeometry
