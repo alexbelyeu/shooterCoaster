@@ -99,8 +99,8 @@ export const stripLightXs: readonly number[] = Array.from({ length: Math.ceil(HA
 /** The fixtures' height: just under the trusses' bottom chord. */
 export const stripLightY = HALL.h - 4.5 - 0.15
 
-/** The Flame's firelight in the grime shader (#599): within `shell` m of the fire it lights every face, since the tongues are on them. */
-export const FIRE_LIGHT = { color: '#ff8c3c', strength: 2, reach: 8, shell: 4.5, soot: '#1c1712', sootAmount: 0.85 }
+/** The Flame's firelight in the grime shader (#599, scaled with the fire in #669): within `shell` m of the fire it lights every face, since the tongues are on them. */
+export const FIRE_LIGHT = { color: '#ff8c3c', strength: 2.4, reach: 11, shell: 5.5, soot: '#1c1712', sootAmount: 0.85 }
 
 /** The maroon steel columns' half-width (blockout metres): they stand 0.5 m off the long walls. */
 export const COLUMN_HALF = 0.25
