@@ -12,6 +12,13 @@ export type ElementKind =
   | 'helix'
   | 'bankedTurn'
   | 'headChopper'
+  | 'liftHill'
+  // The special mechanics (#699, `mechanics.ts`); a jump's booster is its run-up and ramp to the lip.
+  | 'station'
+  | 'jumpBooster'
+  | 'jumpGap'
+  | 'dropTrack'
+  | 'backwards'
 
 /** An element's span, or a moment inside one (`slowMotion`: an airtime crest's window for shots). */
 export type MarkerKind = ElementKind | 'slowMotion'

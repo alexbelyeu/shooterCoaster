@@ -24,6 +24,9 @@ import {
 } from './supportTowers'
 import { useContactShadows } from '@/levels/environments/shared/ContactShadows'
 import TrackTunnels from './TrackTunnels'
+import RideMechanics from './RideMechanics'
+import { dropPieceLength, trackGaps } from './mechanics'
+import type { RideMechanic } from '@/types/level'
 
 interface TrackMeshProps {
   curve: TrackCurve
@@ -40,6 +43,8 @@ interface TrackMeshProps {
    */
   groundFn?: HeightFunction
   table: ArcTable
+  /** The track's special mechanics (#699): their structures, and the rails left open over a jump's gap or a drop. */
+  mechanics?: readonly RideMechanic[]
 }
 
 const DEFAULT_DIMS = getTrackDimensions({ scalar: 20 })
@@ -100,16 +105,18 @@ function SupportTowers({
   table,
   dims,
   groundFn,
+  gaps,
 }: {
   curve: TrackCurve
   table: ArcTable
   dims: TrackDimensions
   groundFn?: HeightFunction
+  gaps: readonly (readonly [number, number])[]
 }) {
   const heightFn = useContext(TerrainContext)
   const plan: TowerPlan = useMemo(
-    () => planTowers(curve, table, dims, heightFn, groundFn ?? heightFn),
-    [curve, table, dims, heightFn, groundFn],
+    () => planTowers(curve, table, dims, heightFn, groundFn ?? heightFn, gaps),
+    [curve, table, dims, heightFn, groundFn, gaps],
   )
   useContactShadows(useMemo(() => towerShadowCasters(plan), [plan]))
 
@@ -198,10 +205,12 @@ export default function TrackMesh({
   dims = DEFAULT_DIMS,
   groundFn,
   table,
+  mechanics,
 }: TrackMeshProps) {
+  const gaps = useMemo(() => trackGaps(mechanics, table.length, dropPieceLength(dims.eyeHeight)), [mechanics, table, dims])
   const geometry = useMemo(
-    () => buildTrackGeometry(curve, table, dims, segments, color1, color2),
-    [curve, table, dims, segments, color1, color2],
+    () => buildTrackGeometry(curve, table, dims, segments, color1, color2, gaps),
+    [curve, table, dims, segments, color1, color2, gaps],
   )
 
   const material = useMemo(() => createTrackMaterial(glow), [glow])
@@ -219,7 +228,10 @@ export default function TrackMesh({
   return (
     <>
       <mesh name="track" geometry={geometry} material={material} />
-      <SupportTowers curve={curve} table={table} dims={dims} groundFn={groundFn} />
+      <SupportTowers curve={curve} table={table} dims={dims} groundFn={groundFn} gaps={gaps} />
+      {mechanics?.length ? (
+        <RideMechanics curve={curve} table={table} mechanics={mechanics} dims={dims} color1={color1} color2={color2} trackMaterial={material} />
+      ) : null}
       {table.tunnels?.length ? (
         <TrackTunnels curve={curve} table={table} trackScale={dims.trackScale} color1={color1} color2={color2} groundFn={tunnelGround} />
       ) : null}

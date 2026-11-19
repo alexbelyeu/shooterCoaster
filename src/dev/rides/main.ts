@@ -1,6 +1,12 @@
 import * as THREE from 'three'
-import { buildArcTable } from '@/track/arcLength'
+import { buildArcTable, tAtLoopDistance } from '@/track/arcLength'
 import { buildTrackGeometry } from '@/track/trackGeometry'
+import { buildMechanicsRide } from '@/track/elements/mechanicsRide'
+import { dropPieceLength, trackGaps, withMechanics } from '@/track/mechanics'
+import { dropHeading, dropPiecePosition } from '@/track/mechanics.hot'
+import { buildDropPieceGeometry, buildMechanicsGeometry } from '@/track/mechanicsGeometry'
+import { buildRidePlan, planDistance, planStopShare, planTimeAt } from '@/track/rideV2'
+import type { RideMechanic } from '@/types/level'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { createSeatPose, seatPose } from '@/track/seatPose.hot'
 import { DEMO_EYE, buildDemoRide, markerT } from '@/track/elements/demoRide'
@@ -8,13 +14,17 @@ import type { MarkerKind } from '@/track/elements/rideBuilder'
 
 /**
  * Dev-only (#698): the ride elements demo circuit ridden by the game's seat (`seatPose`, what `CoasterCamera`
- * rides), one cell per moment, plus a shot aimed and fired by the game's raycast at a target while upside down.
+ * rides), one cell per moment, plus a shot aimed and fired by the game's raycast at a target while upside down; then
+ * the special mechanics' circuit (#699): the station, the jump gap, the drop track, the backwards stretch (and a shot
+ * fired facing back), each posed at a moment of its solved v2 ride.
  * Never part of the game's build (`vite build --mode turntable`, `npm run turntable -- --rides`).
  */
 interface RidesApi {
   done: boolean
   cells: { label: string; t: number; upY: number; coverage: number }[]
   aim: { hit: boolean; upY: number; ndc: [number, number] } | null
+  /** The shot fired riding backwards (#699): it must hit with the view facing back down the track. */
+  aimBack: { hit: boolean; facing: number } | null
 }
 
 declare global {
@@ -95,9 +105,9 @@ const main = document.createElement('main')
 main.style.cssText = `display:grid;grid-template-columns:repeat(4,${CELL.width}px);gap:8px;padding:12px`
 document.getElementById('root')!.append(main)
 
-/** Renders the current view into a new captioned cell; returns the share of pixels that aren't sky. */
-function cell(label: string): number {
-  renderer.render(scene, camera)
+/** Renders the current view of `world` into a new captioned cell; returns the share of pixels that aren't sky. */
+function cell(label: string, world: THREE.Scene = scene): number {
+  renderer.render(world, camera)
   const figure = document.createElement('figure')
   figure.style.margin = '0'
   const caption = document.createElement('figcaption')
@@ -116,7 +126,7 @@ function cell(label: string): number {
   return drawn / (px.length / 16)
 }
 
-const api: RidesApi = { done: false, cells: [], aim: null }
+const api: RidesApi = { done: false, cells: [], aim: null, aimBack: null }
 window.__RIDES__ = api
 
 for (const m of MOMENTS) {
@@ -151,17 +161,118 @@ for (const m of MOMENTS) {
   api.cells.push({ label, t, upY, coverage: cell(label) })
 }
 
-// The whole circuit from outside.
-{
+/** A circuit from outside. */
+function overview(label: string, circuit: typeof table, world: THREE.Scene) {
   const box = new THREE.Box3()
-  for (let i = 0; i < table.count; i++) box.expandByPoint(new THREE.Vector3(table.x[i], table.y[i], table.z[i]))
+  for (let i = 0; i < circuit.count; i++) box.expandByPoint(new THREE.Vector3(circuit.x[i], circuit.y[i], circuit.z[i]))
   const center = box.getCenter(new THREE.Vector3())
   const size = box.getSize(new THREE.Vector3()).length()
   camera.up.set(0, 1, 0)
   camera.position.set(center.x - size * 0.3, center.y + size * 0.22, center.z - size * 0.12)
   camera.lookAt(center)
   camera.updateMatrixWorld()
-  api.cells.push({ label: 'overview', t: 0, upY: 1, coverage: cell('overview') })
+  api.cells.push({ label, t: 0, upY: 1, coverage: cell(label, world) })
+}
+overview('overview', table, scene)
+
+// The special mechanics (#699) on their own circuit, a v2 ride, posed at moments of its solved plan.
+{
+  const mech = buildMechanicsRide()
+  const mechTable = buildArcTable(mech.curve)
+  const plan = buildRidePlan(mechTable, withMechanics(mech.spec, mech.mechanics, mechTable.length))
+  const world = new THREE.Scene()
+  world.background = SKY
+  world.fog = scene.fog
+  world.add(new THREE.HemisphereLight('#dfefff', '#5b6b3a', 1.6), sun.clone(), new THREE.Mesh(grass, grassMaterial), grid.clone())
+  const pieceLength = dropPieceLength(DEMO_EYE)
+  const red: [number, number, number] = [0.85, 0.2, 0.15]
+  const yellow: [number, number, number] = [0.95, 0.85, 0.3]
+  const rails = buildTrackGeometry(mech.curve, mechTable, dims, 4000, red, yellow, trackGaps(mech.mechanics, mechTable.length, pieceLength))
+  const structures = buildMechanicsGeometry(mech.curve, mechTable, mech.mechanics, dims)!
+  const structureMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 })
+  const pieceGeometry = buildDropPieceGeometry(dims, red, yellow)
+  world.add(new THREE.Mesh(rails, trackMaterial), new THREE.Mesh(structures, structureMaterial))
+  const find = (kind: RideMechanic['kind']) => mech.mechanics.find((m) => m.kind === kind)!
+  const drop = find('dropTrack')
+  const piece = new THREE.Mesh(pieceGeometry, trackMaterial)
+  piece.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dropHeading(mech.curve, drop, new THREE.Vector3()))
+  world.add(piece)
+  disposables.push(rails, structures, structureMaterial, pieceGeometry)
+
+  /** Poses the seat and the drop's piece the way the game does `time` seconds after GO. */
+  const poseAt = (time: number) => {
+    const t = tAtLoopDistance(mechTable, planDistance(plan, time))
+    seatPose(mech.curve, mechTable, t, dims.trackScale, DEMO_EYE, pose, mech.mechanics, planStopShare(plan, time))
+    dropPiecePosition(mech.curve, drop, t, pieceLength / 2 / mechTable.length, piece.position)
+    piece.updateMatrixWorld()
+    camera.position.copy(pose.eye)
+    camera.up.copy(pose.up)
+    camera.lookAt(pose.eye.clone().add(pose.look))
+    camera.updateMatrixWorld()
+    return t
+  }
+  const timeOf = (m: RideMechanic, at: number) => planTimeAt(plan, (m.from + (m.to - m.from) * at) * mechTable.length)
+  const stopOf = (share: number) => plan.stops.find((s) => Math.abs(s.distance - share * mechTable.length) < 1e-6)!
+  const midStop = (share: number) => (stopOf(share).start + stopOf(share).end) / 2
+  const station = find('station')
+  const gap = find('jumpGap')
+  const back = find('backwards')
+  const moments: [string, number][] = [
+    ['station (countdown)', 0],
+    ['station launch', timeOf(station, 0.5)],
+    ['jump: the lip', timeOf(gap, 0)],
+    ['jump: mid-air', timeOf(gap, 0.5)],
+    ['drop: stopped at the top', midStop(drop.from)],
+    ['drop: falling', timeOf(drop, 0.5)],
+    ['turntable: turning round', midStop(back.from)],
+    ['backwards', timeOf(back, 0.5)],
+  ]
+  for (const [name, time] of moments) {
+    const t = poseAt(time)
+    const label = `${name} · ${time.toFixed(1)} s`
+    api.cells.push({ label, t, upY: pose.up.y, coverage: cell(label, world) })
+  }
+
+  // The jump and the drop from beside the track, mid-way: the open gap, the piece halfway down its shaft.
+  for (const [name, m] of [['jump gap from the side', gap], ['drop track from the side', drop]] as const) {
+    const t = poseAt(timeOf(m, 0.5))
+    const a = mech.curve.getPointAt(m.from).clone()
+    const b = mech.curve.getPointAt(m.to).clone()
+    const middle = a.clone().add(b).multiplyScalar(0.5)
+    const span = Math.max(a.distanceTo(b), 30)
+    camera.up.set(0, 1, 0)
+    camera.position.copy(middle).add(new THREE.Vector3(-span * 1.3, span * 0.25, -span * 0.3))
+    camera.lookAt(middle)
+    camera.updateMatrixWorld()
+    api.cells.push({ label: name, t, upY: 1, coverage: cell(name, world) })
+  }
+
+  // Riding backwards: a target ahead of the view (back down the track), shot the way `fireAtNDC` shoots.
+  {
+    const t = poseAt(timeOf(back, 0.4))
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
+    const target = pose.eye.clone().addScaledVector(pose.look, 45).addScaledVector(pose.up, 4).addScaledVector(right, -8)
+    const targetGeometry = new THREE.SphereGeometry(2.5, 16, 12)
+    const targetMaterial = new THREE.MeshStandardMaterial({ color: '#ff3df0', emissive: '#7a0070' })
+    const sphere = new THREE.Mesh(targetGeometry, targetMaterial)
+    world.add(sphere)
+    sphere.position.copy(target)
+    sphere.updateMatrixWorld()
+    const ndc = target.clone().project(camera)
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), camera)
+    const hit = raycaster.intersectObject(sphere)[0]
+    const muzzle = pose.eye.clone().addScaledVector(pose.up, -1.5).addScaledVector(pose.look, 2)
+    const tracerGeometry = new THREE.BufferGeometry().setFromPoints([muzzle, hit?.point ?? raycaster.ray.at(200, new THREE.Vector3())])
+    const tracerMaterial = new THREE.LineBasicMaterial({ color: '#fff36b' })
+    world.add(new THREE.Line(tracerGeometry, tracerMaterial))
+    disposables.push(targetGeometry, targetMaterial, tracerGeometry, tracerMaterial)
+    const facing = pose.look.dot(pose.tangent)
+    api.aimBack = { hit: !!hit, facing }
+    const label = `aim backwards · ${hit ? 'HIT' : 'MISS'} · look·track ${facing.toFixed(2)}`
+    api.cells.push({ label, t, upY: pose.up.y, coverage: cell(label, world) })
+  }
+  overview('mechanics overview', mechTable, world)
 }
 
 for (const d of disposables) d.dispose()

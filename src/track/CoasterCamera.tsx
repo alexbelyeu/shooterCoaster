@@ -7,7 +7,7 @@ import { TRACK_TUNNEL_EVENT, getTunnelDims } from './setPieces'
 import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
 import { setRideProgress } from './rideProgress.hot'
 import {
-  advanceRide, jumpRide, resetRide, rideLaunches, rideOnLift, rideSpeedNorm, rideStepFrames, rideTopShare, rideZone, type RideSpeeds,
+  advanceRide, jumpRide, resetRide, rideLaunches, rideOnLift, rideSpeedNorm, rideStepFrames, rideStopShare, rideTopShare, rideZone, type RideSpeeds,
   type RideState,
 } from './ridePhysics'
 import { e2eRideSeconds, levelTimeStep } from '@/testing/e2eHook'
@@ -35,6 +35,7 @@ import { introStartedAt, setCameraOffSeat } from '@/core/introShot'
 import { buildIntroTour } from './introTour'
 import { createSeatPose, seatPose } from './seatPose.hot'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
+import type { RideMechanic } from '@/types/level'
 
 interface CoasterCameraProps {
   curve: TrackCurve
@@ -44,6 +45,8 @@ interface CoasterCameraProps {
   trackScale: number
   /** The level's ride (`ridePhysics.ts` `rideModel`). */
   speeds: RideSpeeds
+  /** The track's special mechanics (#699): a drop track and a backwards stretch turn the seat. */
+  mechanics?: readonly RideMechanic[]
   fov?: number
   near?: number
   far?: number
@@ -68,6 +71,7 @@ export default function CoasterCamera({
   table,
   trackScale,
   speeds,
+  mechanics,
   fov = BASE_FOV,
   near = 1,
   far = 11000,
@@ -265,7 +269,7 @@ export default function CoasterCamera({
     }
     const tunnel = tunnelDepth(table.tunnels, dist, tunnelRamp)
 
-    const pose = seatPose(curve, table, t, trackScale, heightOffset, seat.current)
+    const pose = seatPose(curve, table, t, trackScale, heightOffset, seat.current, mechanics, rideStopShare(ride.current, speeds))
     cam.position.copy(pose.eye)
     const velocityNorm = rideSpeedNorm(ride.current, speeds)
 
