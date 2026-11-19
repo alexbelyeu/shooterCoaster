@@ -84,6 +84,9 @@ function buildCourse(table: ArcTable, spec: RideV2Spec): Course {
     slope[i] = (height[i + 1] - height[i]) / cell
     zone[i] = zones.findIndex((z) => inZone(z, (i + 0.5) / CELLS))
   }
+  const crawl = spec.crawl ?? RIDE_V2_DEFAULTS.crawl
+  // A car that can stop never reaches the next beat: the solver would search for it forever.
+  if (!(crawl > 0)) throw new Error('rideV2.crawl must be above 0')
   return {
     length: table.length,
     cell,
@@ -92,7 +95,7 @@ function buildCourse(table: ArcTable, spec: RideV2Spec): Course {
     zones,
     gravity: spec.gravity ?? RIDE_V2_DEFAULTS.gravity,
     drag: spec.drag ?? RIDE_V2_DEFAULTS.drag,
-    crawl: spec.crawl ?? RIDE_V2_DEFAULTS.crawl,
+    crawl,
   }
 }
 

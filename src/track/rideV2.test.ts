@@ -3,7 +3,7 @@ import type { RideV2Spec, TrackParams } from '@/types/level'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { buildArcTable, distanceAtT, tAtDistance } from './arcLength'
 import { createTrackCurve } from './curves/createTrackCurve'
-import { advanceRide, jumpRide, lapSeconds, rideModel, rideProfile, rideSpeedNorm, type RideState } from './ridePhysics'
+import { MAX_RIDE_STEP_FRAMES, advanceRide, jumpRide, lapSeconds, rideModel, rideProfile, rideSpeedNorm, rideSpeeds, rideStepFrames, type RideState } from './ridePhysics'
 import { BEAT_TOLERANCE_SECONDS, buildRidePlan, planDistance, planSpeed, planTimeAt, type RidePlan } from './rideV2'
 
 const RADIUS = 400
@@ -111,6 +111,10 @@ describe('the beat solver', () => {
     expect(speedAt(plan, 212)).toBeGreaterThan(speedAt(plan, 157) * 5)
   })
 
+  it('refuses a crawl floor that would let the car stop', () => {
+    expect(() => buildRidePlan(table, { crawl: 0 })).toThrow(/crawl/)
+  })
+
   it('refuses beats out of order', () => {
     expect(() => buildRidePlan(table, { beats: [{ at: 0.5, second: 20 }, { at: 0.4, second: 30 }] })).toThrow()
     expect(() => buildRidePlan(table, { beats: [{ at: 0.4, second: 20 }, { at: 0.5, second: 20 }] })).toThrow()
@@ -134,6 +138,18 @@ describe('ridePhysics on a v2 ride', () => {
       expect(Math.abs(distanceAtT(table, state.progress) - profile[150])).toBeLessThan(frames * 3)
     }
     expect(lapSeconds(curve, speeds)).toBeCloseTo(planTimeAt(plan, table.length))
+  })
+
+  it('keeps pace with the level clock on a slow device: a 10 fps frame rides all of its time', () => {
+    expect(rideStepFrames(rideSpeeds(TRACK), 0.1)).toBe(MAX_RIDE_STEP_FRAMES)
+    const state: RideState = { progress: 0, velocity: 0, time: 0 }
+    let levelSeconds = 0
+    for (let k = 0; k < 150; k++) {
+      levelSeconds += 0.1
+      advanceRide(state, curve, speeds, rideStepFrames(speeds, 0.1))
+    }
+    expect(state.time).toBeCloseTo(levelSeconds, 6)
+    expect(distanceAtT(table, state.progress)).toBeCloseTo(planDistance(plan, levelSeconds) % table.length, 0)
   })
 
   it('jumps by track fraction and reports its speed between the slowest and fastest', () => {

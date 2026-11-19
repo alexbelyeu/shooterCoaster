@@ -74,6 +74,15 @@ export function rideSpeedNorm(state: RideState, speeds: RideSpeeds): number {
   return Math.max(0, Math.min(norm, 1))
 }
 
+/**
+ * The 60 fps frames a live frame of `seconds` rides. Today's rule caps a hitch at `MAX_RIDE_STEP_FRAMES` (it slows
+ * the ride, never skips track); a v2 ride takes the whole step, so its clock keeps pace with the level timer's and
+ * spawning's `rideProfile` at any frame rate.
+ */
+export function rideStepFrames(speeds: RideSpeeds, seconds: number): number {
+  return speeds.plan ? seconds * 60 : Math.min(seconds * 60, MAX_RIDE_STEP_FRAMES)
+}
+
 /** Port of Camera.js updateCamGame: rides `frames` 60 fps frames in steps of at most `MAX_RIDE_STEP_FRAMES`. */
 export function advanceRide(state: RideState, curve: TrackCurve, speeds: RideSpeeds, frames: number): RideState {
   state.time += frames / 60

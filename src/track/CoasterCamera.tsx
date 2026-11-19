@@ -6,7 +6,7 @@ import { type ArcTable, distanceAtT } from './arcLength'
 import { TRACK_TUNNEL_EVENT, getTunnelDims } from './setPieces'
 import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
 import { setRideProgress } from './rideProgress.hot'
-import { MAX_RIDE_STEP_FRAMES, advanceRide, jumpRide, resetRide, rideSpeedNorm, type RideSpeeds, type RideState } from './ridePhysics'
+import { advanceRide, jumpRide, resetRide, rideSpeedNorm, rideStepFrames, type RideSpeeds, type RideState } from './ridePhysics'
 import { e2eRideSeconds, levelTimeStep } from '@/testing/e2eHook'
 import { useGameStore } from '@/store/useGameStore'
 import { sfx } from '@/audio/sfx'
@@ -236,7 +236,7 @@ export default function CoasterCamera({
     // Under it the look, the rig and the shake follow the level time too: on the frame's own time the camera
     // turned into a bend late on a fast runner, and saw different enemies there than on a slow one (#469).
     const effectiveDelta = (e2eRide === null ? frameDelta : levelTimeStep(frameDelta)) * (store.timeScale ?? 1)
-    const rideFrames = e2eRide === null ? Math.min(effectiveDelta * 60, MAX_RIDE_STEP_FRAMES) : e2eRide * (store.timeScale ?? 1) * 60
+    const rideFrames = e2eRide === null ? rideStepFrames(speeds, effectiveDelta) : e2eRide * (store.timeScale ?? 1) * 60
     advanceRide(ride.current, curve, speeds, rideFrames)
     const t = ride.current.progress
     _tangent.current.copy(curve.getTangentAt(t))
