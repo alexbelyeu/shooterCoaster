@@ -11,7 +11,8 @@ import { makeIR, upmixPanner } from '../scrim/synth'
 import { SCORES, scoreIdFor } from '../scores'
 import {
   ARCADE_SOUNDS, AUTO_FIRE_DB, BIOME_REVERB, FIREWORK_BIOMES, STEAL_FADE_S, VOICE_BUDGET, WHISTLE_LENGTHS_S, SCORE_KEYS,
-  WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, nextBeat, panGain, pickVoice, windGain, windHz, windUpdateDue,
+  CHAIN, RUMBLE, WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, nextBeat, nextClankAt, panGain, pickVoice,
+  rumbleGain, rumbleHz, windGain, windHz, windUpdateDue,
   type ArcadeSoundId, type VoiceState, type WindRamp,
 } from '../sfxDesign'
 import type { Placement, SfxEngine, UiSound, VoiceStats } from '../sfx'
@@ -45,6 +46,9 @@ interface Graph {
   windSrc: AudioBufferSourceNode
   windBand: BiquadFilterNode
   windAmp: GainNode
+  /** The rail rumble: the same noise → low band-pass → gain, aimed with the wind. */
+  rumbleBand: BiquadFilterNode
+  rumbleAmp: GainNode
 }
 
 const LIFT_FADE_S = 0.12
@@ -92,7 +96,7 @@ function createVoice(ctx: BaseAudioContext, out: AudioNode, verbIn: AudioNode): 
 const UI_VOICES = 2
 const VOICE_NODES = 4
 const BUS_NODES = 5
-const WIND_NODES = 3
+const WIND_NODES = 5
 const nodesOf = (g: Graph) => BUS_NODES + WIND_NODES + VOICE_NODES * (g.voices.length + g.uiVoices.length + 1)
 
 /** Rebuilt when the context or channel changes (an offline render) or the installed bank's biome does: the room comes with the bank (#246). */
@@ -143,10 +147,17 @@ function createWind(ctx: BaseAudioContext, out: AudioNode) {
   windSrc.buffer = buffer
   windSrc.loop = true
   windSrc.connect(windBand).connect(windAmp).connect(out)
+  const rumbleAmp = ctx.createGain()
+  rumbleAmp.gain.value = 0
+  const rumbleBand = ctx.createBiquadFilter()
+  rumbleBand.type = 'bandpass'
+  rumbleBand.frequency.value = RUMBLE.minHz
+  rumbleBand.Q.value = RUMBLE.q
+  windSrc.connect(rumbleBand).connect(rumbleAmp).connect(out)
   windSrc.start()
   windRamp.speed = 0
   windRamp.at = -Infinity
-  return { windSrc, windBand, windAmp }
+  return { windSrc, windBand, windAmp, rumbleBand, rumbleAmp }
 }
 
 const windRamp: WindRamp = { speed: 0, at: -Infinity }
@@ -158,8 +169,27 @@ function setWind(speed: number) {
     if (!windUpdateDue(speed, t, windRamp)) return
     graph.windBand.frequency.setTargetAtTime(windHz(speed), t, WIND.smoothS)
     graph.windAmp.gain.setTargetAtTime(windGain(speed), t, WIND.smoothS)
+    graph.rumbleBand.frequency.setTargetAtTime(rumbleHz(speed), t, WIND.smoothS)
+    graph.rumbleAmp.gain.setTargetAtTime(rumbleGain(speed), t, WIND.smoothS)
   } catch (e) {
     dropSound('wind', e)
+  }
+}
+
+/** Audio time of the last clank scheduled; -Infinity while the chain is off. */
+let lastClank = -Infinity
+let clankVariant = 0
+
+function setChain(rate: number) {
+  if (!(rate > 0) || !graph) {
+    lastClank = -Infinity
+    return
+  }
+  const now = clock()
+  for (let at = nextClankAt(lastClank, now, rate); at <= now + CHAIN.leadS; at = nextClankAt(lastClank, now, rate)) {
+    clankVariant ^= 1
+    play('rideChain', at, clankVariant, 0.97 + Math.random() * 0.06)
+    lastClank = at
   }
 }
 
@@ -169,6 +199,7 @@ function disposeGraph() {
   if (!g) return
   graph = null
   liftOn = false
+  lastClank = -Infinity
   const fade = g.ctx === audioContext() && g.ctx.state !== 'closed'
   const t = fade ? clock() : 0
   const end = t + 2 * STEAL_FADE_S
@@ -183,7 +214,7 @@ function disposeGraph() {
   }
   const disconnect = () => {
     for (const v of voices) for (const n of [v.src, v.gain, v.lp, v.pan, v.send]) n?.disconnect()
-    for (const n of [g.windSrc, g.windBand, g.windAmp, g.verb, g.verbTone, g.verbReturn, g.out, g.uiOut]) n.disconnect()
+    for (const n of [g.windSrc, g.windBand, g.windAmp, g.rumbleBand, g.rumbleAmp, g.verb, g.verbTone, g.verbReturn, g.out, g.uiOut]) n.disconnect()
     graphNodes -= nodesOf(g)
   }
   if (fade) {
@@ -408,6 +439,8 @@ export const arcadeSfx: SfxEngine = {
   ui: (sound) => void play(UI_SOUNDS[sound]),
   countdown: (go) => void play(go ? 'countGo' : 'countReady'),
   wind: setWind,
+  chain: setChain,
+  rideLaunch: () => void play('rideLaunch'),
   nodeCount: () => graphNodes,
   killsPlayed: () => killsPlayed,
   voices: () => stats,
@@ -416,6 +449,7 @@ export const arcadeSfx: SfxEngine = {
     // A menu may already have asked for its own sounds: leave those alone, but silence the ride wind.
     if (level !== undefined && !wanted?.startsWith(`${scoreIdOf(level)}:`)) {
       setWind(0)
+      setChain(0)
       return
     }
     wanted = null

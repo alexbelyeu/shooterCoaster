@@ -34,6 +34,8 @@ export type AudioRenderRequest =
    * `chain: 'game'` plays it through the game's music chain instead, exactly like `music`.
    */
   | { kind: 'score'; text: string; seconds?: number; voicing?: Voicing; chain?: 'game'; seam?: boolean }
+  /** The ride's own sounds (#697): GO's launch whoosh, a crawl, a chain lift, then the drop's wind and rumble up to top speed. */
+  | { kind: 'ride'; level: string }
   /** Level select's launch blip for `level`, its bank and room landing under the blip's ring (#246), then the countdown and a kill. */
   | { kind: 'launch'; level: string }
 
@@ -266,7 +268,8 @@ function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): 
       scrimScript(p, level, seconds, 0, () => intensityForTier(comboTierIndex(kills)))(scope)
       void s.prepare(level, biome)
       for (let t = 0.2; t < seconds; t += 0.5) {
-        const speed = 0.7 + 0.2 * Math.sin(t * 0.8)
+        // A share of top speed, around a level's median (CoasterCamera).
+        const speed = 0.45 + 0.15 * Math.sin(t * 0.8)
         at(t, () => s.wind(speed))
       }
       events.push({ t: 1, name: 'autofire starts (held trigger)' })
@@ -297,6 +300,53 @@ function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): 
       }
       events.push({ t: 1.6, name: `kills every ${KILL_EVERY_S} s, combo climbing` })
       events.sort((a, b) => a.t - b.t)
+    },
+  }
+}
+
+/** The ride render's script (seconds): `speed` is the share of top speed `CoasterCamera` gives `wind`. */
+const RIDE = { readyS: 0.5, goS: 2.5, liftS: 5, crestS: 9, dropS: 9.6, topS: 11.1, easeS: 12.6, seconds: 15, crawl: 0.2, cruise: 0.6 }
+
+function rideSpeed(t: number): number {
+  const r = RIDE
+  if (t < r.goS) return 0
+  if (t < r.dropS) return r.crawl
+  if (t < r.topS) return r.crawl + ((1 - r.crawl) * (t - r.dropS)) / (r.topS - r.dropS)
+  if (t < r.easeS) return 1
+  return Math.max(r.cruise, 1 - ((1 - r.cruise) * (t - r.easeS)) / 1.5)
+}
+
+function ridePlan(level: string): Plan {
+  const s = sfx
+  const r = RIDE
+  const events = [
+    { t: r.readyS, name: 'countdown Ready' },
+    { t: r.goS, name: 'countdown GO + launch whoosh: wind and rumble at the crawl' },
+    { t: r.liftS, name: 'chain lift: clanking at the crawl' },
+    { t: r.crestS, name: 'crest: chain off' },
+    { t: r.dropS, name: 'drop: wind and rumble up to top speed' },
+    { t: r.easeS, name: 'easing to a cruise' },
+  ]
+  return {
+    seconds: r.seconds,
+    events,
+    seams: [],
+    bar: null,
+    script: ({ at }) => {
+      void s.prepare(level, biomeOf(level))
+      at(r.readyS, () => s.countdown(false))
+      at(r.readyS + 1, () => s.countdown(false))
+      at(r.goS, () => {
+        s.countdown(true)
+        s.rideLaunch()
+      })
+      // As CoasterCamera does, every 60 fps frame.
+      for (let t = 0; t < r.seconds; t += 1 / 60) {
+        at(t, () => {
+          s.wind(rideSpeed(t))
+          s.chain(t >= r.liftS && t < r.crestS ? 1 : 0)
+        })
+      }
     },
   }
 }
@@ -335,6 +385,7 @@ const RENDERS: { [K in GamePlanRequest['kind']]: (req: Extract<GamePlanRequest, 
   music: (r) => musicPlan(scrim, r.track, r.seconds, r.seam, r.layers),
   sfxSheet: (r) => sfxSheetPlan(r.level),
   mix: (r) => mixPlan(r.level, r.seconds, r.stem === 'music', r.boss),
+  ride: (r) => ridePlan(r.level),
 }
 
 function toBase64(buffer: AudioBuffer): string {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  fovForAspect, fovWithSpeed, horizontalFov, verticalFovFor, MAX_VERTICAL_FOV, MIN_HORIZONTAL_FOV, SPEED_FOV_DEG,
+  LAUNCH_FOV_DEG, MAX_FOV_KICK_DEG, fovForAspect, fovWithSpeed, horizontalFov, verticalFovFor, MAX_VERTICAL_FOV, MIN_HORIZONTAL_FOV, SPEED_FOV_DEG,
   DROP_FOV_DEG, TUNNEL_FOV_DEG,
 } from './cameraFov.hot'
 
@@ -61,6 +61,13 @@ describe('fovWithSpeed', () => {
     expect(fovWithSpeed(80, 0, 0, 0, 1)).toBe(80)
     expect(fovWithSpeed(80, 0, 1, 0, 7)).toBe(80 + TUNNEL_FOV_DEG)
     expect(fovWithSpeed(80, 0, 1, 0, Number.NaN)).toBe(80)
+  })
+
+  it('kicks wider at a launch, and every kick together stays inside the smoke cap', () => {
+    expect(fovWithSpeed(80, 0, 1, 0, 0, 1)).toBe(80 + LAUNCH_FOV_DEG)
+    expect(fovWithSpeed(80, 0, 0.5, 0, 0, 1)).toBe(80 + LAUNCH_FOV_DEG / 2)
+    expect(fovWithSpeed(80, 0, 0, 0, 0, 1)).toBe(80)
+    expect(fovWithSpeed(80, 9, 1, 9, 9, 9)).toBe(80 + MAX_FOV_KICK_DEG)
   })
 
   it('is off with the setting off and clamps bad inputs', () => {

@@ -7,12 +7,15 @@ import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 export const KILL_SOUNDS = ['pop', 'flutter', 'crunch', 'splash', 'hiss', 'chalk', 'squeak', 'snap'] as const
 export type KillSound = (typeof KILL_SOUNDS)[number]
 
-/** Ride wind: band-passed white noise that opens and brightens with speed (gain 0–0.12, an ambient bed). */
+/**
+ * Ride wind: band-passed white noise that opens and brightens with the share of top speed, on a speed^1.5 curve (#697):
+ * a breath at the crawl (~0.014 at a fifth of top speed), a roar at the top (0.16).
+ */
 export const WIND = {
   q: 0.5,
-  minHz: 200,
-  spanHz: 1800,
-  maxGain: 0.12,
+  minHz: 160,
+  spanHz: 2600,
+  maxGain: 0.16,
   /** setTargetAtTime constant: ~95% of the way in 0.1 s. */
   smoothS: 0.1 / 3,
   /** Re-aim only after the speed moves this much, at most this often: one automation event per frame would pile up. */
@@ -21,7 +24,21 @@ export const WIND = {
 } as const
 
 export const windHz = (speed: number) => WIND.minHz + speed * WIND.spanHz
-export const windGain = (speed: number) => speed * WIND.maxGain
+export const windGain = (speed: number) => speed * Math.sqrt(speed) * WIND.maxGain
+
+/** Rail rumble (#697): the wind's noise band-passed low, kept off the sub below 30 Hz; 0 stops it. */
+export const RUMBLE = { minHz: 90, spanHz: 150, q: 1.4, floorGain: 0.1, maxGain: 0.35 } as const
+export const rumbleHz = (speed: number) => RUMBLE.minHz + speed * RUMBLE.spanHz
+export const rumbleGain = (speed: number) => (speed > 0 ? RUMBLE.floorGain + speed * (RUMBLE.maxGain - RUMBLE.floorGain) : 0)
+
+/** Chain lift (#697): a clank per chain dog every `periodS` of game time, scheduled `leadS` ahead on the audio clock. */
+export const CHAIN = { periodS: 0.15, leadS: 0.05 } as const
+
+/** The next clank's audio time from the last one's, or now when it has fallen behind (the chain just started, a hitch); `rate` > 0. */
+export function nextClankAt(last: number, now: number, rate: number): number {
+  const next = last + CHAIN.periodS / rate
+  return next < now ? now : next
+}
 
 /** The last speed the wind was aimed at, and when (audio-clock seconds). */
 export interface WindRamp {
@@ -111,6 +128,8 @@ export type ArcadeSoundId =
   | 'uiBack'
   | 'uiLaunch'
   | 'uiWhoosh'
+  | 'rideLaunch'
+  | 'rideChain'
   | 'countReady'
   | 'countGo'
 
@@ -123,7 +142,7 @@ export interface ArcadeSound {
   send: number
 }
 
-export const PRIO = { fire: 1, hit: 2, kill: 3, cue: 4, ui: 5, event: 6 } as const
+export const PRIO = { ambient: 0, fire: 1, hit: 2, kill: 3, cue: 4, ui: 5, event: 6 } as const
 
 export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   fire: { prio: PRIO.fire, db: -13, send: 0 },
@@ -161,6 +180,9 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   uiBack: { prio: PRIO.ui, db: -18, send: 0.1 },
   uiLaunch: { prio: PRIO.ui, db: -13, send: 0.2 },
   uiWhoosh: { prio: PRIO.ui, db: -16, send: 0.2 },
+  rideLaunch: { prio: PRIO.cue, db: -8, send: 0.25 },
+  // Below the guns: a full pool drops a clank rather than cut a gunshot.
+  rideChain: { prio: PRIO.ambient, db: -11, send: 0.08 },
   countReady: { prio: PRIO.ui, db: -14, send: 0.15 },
   countGo: { prio: PRIO.ui, db: -11, send: 0.2 },
 }

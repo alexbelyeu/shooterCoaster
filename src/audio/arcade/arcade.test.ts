@@ -25,6 +25,12 @@ describe('pickVoice', () => {
     expect(pickVoice(busy, PRIO.event, 1)).toBe(0)
   })
 
+  it('drops a chain clank rather than cut a gunshot when the pool is full of guns', () => {
+    const guns = Array.from({ length: VOICE_BUDGET }, (_, i) => voice(ARCADE_SOUNDS.fire.prio, i * 0.01, 9))
+    expect(ARCADE_SOUNDS.rideChain.prio).toBeLessThan(ARCADE_SOUNDS.fire.prio)
+    expect(pickVoice(guns, ARCADE_SOUNDS.rideChain.prio, 1)).toBe(-1)
+  })
+
   it('keeps any burst inside the budget, kills winning the pool', () => {
     const pool = Array.from({ length: VOICE_BUDGET }, () => voice(0, 0, 0))
     let dropped = 0
