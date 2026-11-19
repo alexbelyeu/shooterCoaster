@@ -153,6 +153,22 @@ export function gymControlPoints(): Vec3[] {
   ]
 }
 
+/**
+ * The route choice (#702, `docs/RIDE-KIT.md` shoot-to-switch): on the run down the east side (~25–33 s) the V8 way
+ * round forks left off the straight, drops to skim the mats under the south wall's holds and swings back up onto the
+ * main line before the turn to the Arch. Points in blockout metres; the fork and merge are arc shares of the lap (track t).
+ */
+export const JUNCTION_FROM = 0.385
+export const JUNCTION_TO = 0.495
+export function gymJunctionPoints(): Vec3[] {
+  return [
+    { x: 45, y: 3.4, z: 10.5 },
+    { x: 50.5, y: 1.6, z: 7.2 },
+    { x: 56, y: 1.6, z: 7.4 },
+    { x: 60.5, y: 2.4, z: 10.4 },
+  ]
+}
+
 /** The ride in world units. Speeds give a ~63.7 s lap (`lapSeconds`), nearly even: the run's 60 s end turning out of the pit's dive. */
 export const GYM_TRACK: TrackParams = {
   curve: 'spline',
@@ -167,4 +183,5 @@ export const GYM_TRACK: TrackParams = {
   minRollerSpeed: 0.000355,
   color1: 0x353d48,
   color2: 0x22d3c5,
+  mechanics: [{ kind: 'junction', from: JUNCTION_FROM, to: JUNCTION_TO, points: gymJunctionPoints().map(toWorld) }],
 }

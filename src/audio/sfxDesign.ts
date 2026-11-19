@@ -130,6 +130,7 @@ export type ArcadeSoundId =
   | 'uiWhoosh'
   | 'rideLaunch'
   | 'rideChain'
+  | 'trackSwitch'
   | 'countReady'
   | 'countGo'
 
@@ -183,6 +184,7 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   rideLaunch: { prio: PRIO.cue, db: -8, send: 0.25 },
   // Below the guns: a full pool drops a clank rather than cut a gunshot.
   rideChain: { prio: PRIO.ambient, db: -11, send: 0.08 },
+  trackSwitch: { prio: PRIO.cue, db: -9, send: 0.2 },
   countReady: { prio: PRIO.ui, db: -14, send: 0.15 },
   countGo: { prio: PRIO.ui, db: -11, send: 0.2 },
 }

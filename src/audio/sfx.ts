@@ -52,6 +52,8 @@ export interface SfxEngine {
   chain(rate: number): void
   /** The car leaves the station: the launch whoosh. */
   rideLaunch(): void
+  /** A junction's switch thrown (#702): the points clunk over. */
+  trackSwitch(): void
   /** Long-lived nodes, the wind's and rumble's included: must not grow while playing. */
   nodeCount(): number
   /** e2e: kills since load that reached the audio engine (not throttled, not refused a voice). */
@@ -79,7 +81,7 @@ export const silentSfx: SfxEngine = {
   prepare: () => Promise.resolve(),
   fire: silent, pickup: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, penalty: silent, frenzy: silent, frenzyLift: silent,
   waveIncoming: silent, bossArrival: silent, bossHit: silent, bossDefeat: silent,
-  fireworkWhistle: silent, fireworkPop: silent, starChime: silent, ui: silent, countdown: silent, wind: silent, chain: silent, rideLaunch: silent,
+  fireworkWhistle: silent, fireworkPop: silent, starChime: silent, ui: silent, countdown: silent, wind: silent, chain: silent, rideLaunch: silent, trackSwitch: silent,
   nodeCount: () => 0,
   killsPlayed: () => 0,
   voices: () => null,

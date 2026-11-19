@@ -34,6 +34,7 @@ import {
 import { introStartedAt, setCameraOffSeat } from '@/core/introShot'
 import { buildIntroTour } from './introTour'
 import { createSeatPose, seatPose } from './seatPose.hot'
+import { routeCurve, routeSpeedScale } from './mechanics.hot'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import type { RideMechanic } from '@/types/level'
 
@@ -45,7 +46,7 @@ interface CoasterCameraProps {
   trackScale: number
   /** The level's ride (`ridePhysics.ts` `rideModel`). */
   speeds: RideSpeeds
-  /** The track's special mechanics (#699): a drop track and a backwards stretch turn the seat. */
+  /** The track's special mechanics (#699): a drop track and a backwards stretch turn the seat, a junction's branch (#702) routes it. */
   mechanics?: readonly RideMechanic[]
   fov?: number
   near?: number
@@ -267,19 +268,24 @@ export default function CoasterCamera({
     }
     const tunnel = tunnelDepth(table.tunnels, dist, tunnelRamp)
 
-    const pose = seatPose(curve, table, t, trackScale, heightOffset, seat.current, mechanics, rideStopShare(ride.current, speeds))
+    const route = store.route
+    const pose = seatPose(curve, table, t, trackScale, heightOffset, seat.current, mechanics, rideStopShare(ride.current, speeds), route)
     cam.position.copy(pose.eye)
     const velocityNorm = rideSpeedNorm(ride.current, speeds)
 
     // Lateral acceleration from the tangents a few units either side of the car, measured along the track.
     const s = scratch.current
     const at = pose.samples
-    const speed = ride.current.velocity * 60 * at.unitsPerT
-    s.tangentBehind.copy(curve.getTangentAt(at.behindT))
-    s.tangentAhead.copy(curve.getTangentAt(at.aheadT))
+    // On a junction's branch (#702) the seat covers more track per t than the main curve's table says: scale by it.
+    const seatCurve = routeCurve(curve, mechanics, route)
+    const branchScale = routeSpeedScale(curve, seatCurve, t)
+    const speed = ride.current.velocity * 60 * at.unitsPerT * branchScale
+    const span = at.span * branchScale
+    s.tangentBehind.copy(seatCurve.getTangentAt(at.behindT))
+    s.tangentAhead.copy(seatCurve.getTangentAt(at.aheadT))
     const input = s.rig
-    input.lateral = lateralAcceleration(pose.tangent, s.tangentBehind, s.tangentAhead, at.span, speed)
-    input.vertical = verticalAcceleration(s.tangentBehind, s.tangentAhead, at.span, speed)
+    input.lateral = lateralAcceleration(pose.tangent, s.tangentBehind, s.tangentAhead, span, speed)
+    input.vertical = verticalAcceleration(s.tangentBehind, s.tangentAhead, span, speed)
     input.speed = speed
     input.speedNorm = velocityNorm
     input.descent = -pose.tangent.y

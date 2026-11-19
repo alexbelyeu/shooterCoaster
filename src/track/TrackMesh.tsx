@@ -11,7 +11,8 @@ import {
   getTrackDimensions,
 } from './trackDimensions'
 import { trackViewportHeight, withMinThickness, withTrackHaze } from './minThickness'
-import type { ArcTable } from './arcLength'
+import { buildArcTable, type ArcTable } from './arcLength'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { buildTrackGeometry } from './trackGeometry'
 import {
   type TowerPlan,
@@ -25,7 +26,7 @@ import {
 import { useContactShadows } from '@/levels/environments/shared/ContactShadows'
 import TrackTunnels from './TrackTunnels'
 import RideMechanics from './RideMechanics'
-import { dropPieceLength, trackGaps } from './mechanics'
+import { dropPieceLength, junctionOf, trackGaps } from './mechanics'
 import type { RideMechanic } from '@/types/level'
 
 interface TrackMeshProps {
@@ -208,10 +209,25 @@ export default function TrackMesh({
   mechanics,
 }: TrackMeshProps) {
   const gaps = useMemo(() => trackGaps(mechanics, table.length, dropPieceLength(dims.eyeHeight)), [mechanics, table, dims])
-  const geometry = useMemo(
-    () => buildTrackGeometry(curve, table, dims, segments, color1, color2, gaps),
-    [curve, table, dims, segments, color1, color2, gaps],
-  )
+  const geometry = useMemo(() => {
+    const main = buildTrackGeometry(curve, table, dims, segments, color1, color2, gaps)
+    // A junction's branch (#702) is more rails beside the main track's, in the same mesh (no extra draw call), at half
+    // the main track's ring density: a short, gentle stretch, kept inside the level's triangle budget.
+    const branches = (mechanics ?? []).flatMap((m) => {
+      if (m.kind !== 'junction') return []
+      const { branch } = junctionOf(curve, m)
+      const branchTable = buildArcTable(branch, 1024)
+      const rings = Math.max(16, Math.ceil((segments * branchTable.length) / table.length / 2))
+      return [buildTrackGeometry(branch, branchTable, dims, rings, color1, color2)]
+    })
+    if (!branches.length) return main
+    const merged = mergeGeometries([main, ...branches])
+    main.dispose()
+    for (const b of branches) b.dispose()
+    if (!merged) throw new Error('track branch geometry merge failed')
+    merged.computeBoundingSphere()
+    return merged
+  }, [curve, table, dims, segments, color1, color2, gaps, mechanics])
 
   const material = useMemo(() => createTrackMaterial(glow), [glow])
   const heightFn = useContext(TerrainContext)

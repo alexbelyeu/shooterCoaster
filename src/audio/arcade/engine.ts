@@ -441,6 +441,7 @@ export const arcadeSfx: SfxEngine = {
   wind: setWind,
   chain: setChain,
   rideLaunch: () => void play('rideLaunch'),
+  trackSwitch: () => void play('trackSwitch'),
   nodeCount: () => graphNodes,
   killsPlayed: () => killsPlayed,
   voices: () => stats,

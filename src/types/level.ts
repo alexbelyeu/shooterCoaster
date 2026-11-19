@@ -40,7 +40,7 @@ interface TrackBase {
   glow?: number
   /** Set-pieces (#332): stretches where the track runs through a lit tube (`src/track/setPieces.ts`). */
   tunnels?: readonly TunnelSpec[]
-  /** Special ride mechanics (#699, `src/track/mechanics.ts`): a v2 ride only, they set its zones and stops. */
+  /** Special ride mechanics (#699, `src/track/mechanics.ts`): they set a v2 ride's zones and stops; only a junction runs on either ride. */
   mechanics?: readonly RideMechanic[]
 }
 
@@ -71,12 +71,15 @@ export type TrackParams = TrigTrackParams | SplineTrackParams
  * - dropTrack: the car stops at `from` for `seconds`, then its piece of track free-falls with it to the track below at `to`.
  * - jumpGap: no rails from `from` to `to`, a ballistic flight built for `speed`, which a booster from `boostFrom` sets.
  * - backwards: turntables at `from` and `to` (a stop of `seconds`, then a launch to `speed`); the car faces back between.
+ * - junction (#702): a harder way round from the fork at `from` to the merge at `to` through `points` (world units, in ride
+ *   order), on a spline track. A switch sign before the fork sets the run's route: shoot it to take this way.
  */
 export type RideMechanic =
   | { kind: 'station'; from: number; to: number; speed: number }
   | { kind: 'dropTrack'; from: number; to: number; seconds: number }
   | { kind: 'jumpGap'; from: number; to: number; speed: number; boostFrom: number }
   | { kind: 'backwards'; from: number; to: number; seconds: number; speed: number }
+  | { kind: 'junction'; from: number; to: number; points: readonly { x: number; y: number; z: number }[] }
 
 /** A stop (#699): the car halts at share `at` of the lap's arc length for `seconds` (not warped by the beats' solver). */
 export interface RideHold {

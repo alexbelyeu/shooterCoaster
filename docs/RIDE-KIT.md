@@ -50,6 +50,9 @@ a **station** the ride starts in (GO launches it over fins), a **drop track** (t
 free-falls with it and locks into the track below), a **jump gap** (a booster sets the speed its ballistic flight was
 built for; no rails across) and a **backwards** stretch between two turntables. Their stops last their seconds whatever
 the beats' solver does to the stretches round them. `rides.png`'s second half rides them (`mechanicsRide.ts`).
+A **junction** (#702, `kind: 'junction'`, on either ride but only a spline track) is the shoot-to-switch: a branch through
+its `points` from the fork at `from` to the merge at `to`, with a switch sign before the fork. The ride's timing stays on
+the main track, so the branch is ridden faster; no other mechanic may sit between its sign and its merge (`checkMechanics`).
 
 | Element | What it does | Feel |
 |---|---|---|
