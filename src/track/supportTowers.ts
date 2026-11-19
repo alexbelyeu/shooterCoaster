@@ -111,7 +111,7 @@ export function towerTriangles(td: TowerDims, height: number): number {
  * Places towers along the track by arc length, at `dims.towerSpacing` or wider
  * if the triangle budget demands it. A candidate is skipped where the track is
  * < MIN_TOWER_HEIGHT above ground, or where its lattice would intersect another
- * part of the track passing underneath.
+ * part of the track passing underneath, or where the track is open (`gaps`: a jump's gap, a drop, #699).
  */
 export function planTowers(
   curve: TrackCurve,
@@ -119,13 +119,14 @@ export function planTowers(
   dims: TrackDimensions,
   heightFn: HeightFunction,
   groundFn: HeightFunction = heightFn,
+  gaps: readonly (readonly [number, number])[] = [],
 ): TowerPlan {
   const td = getTowerDims(dims)
   let spacing = dims.towerSpacing
-  let plan = planAtSpacing(curve, table, dims, td, heightFn, groundFn, spacing)
+  let plan = planAtSpacing(curve, table, dims, td, heightFn, groundFn, spacing, gaps)
   for (let i = 0; i < 6 && plan.triangles > TOWER_TRI_BUDGET; i++) {
     spacing *= (plan.triangles / TOWER_TRI_BUDGET) * 1.04
-    plan = planAtSpacing(curve, table, dims, td, heightFn, groundFn, spacing)
+    plan = planAtSpacing(curve, table, dims, td, heightFn, groundFn, spacing, gaps)
   }
   return plan
 }
@@ -138,6 +139,7 @@ function planAtSpacing(
   heightFn: HeightFunction,
   groundFn: HeightFunction,
   spacing: number,
+  gaps: readonly (readonly [number, number])[],
 ): TowerPlan {
   const point = new THREE.Vector3()
   const forward = new THREE.Vector3()
@@ -155,6 +157,7 @@ function planAtSpacing(
   const count = Math.floor(table.length / spacing)
   for (let k = 0; k < count; k++) {
     const dist = (k + 0.5) * spacing
+    if (gaps.some(([from, to]) => dist >= from && dist <= to)) continue
     const t = tAtDistance(table, dist)
     trackFrame(curve, t, point, forward, right, up)
     // Rolled past 60° (an inversion, a steep bank, #698): a tower from the ground would run up through the rails.

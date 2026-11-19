@@ -101,6 +101,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         table={trackTable}
         trackScale={trackDims.trackScale}
         speeds={speeds}
+        mechanics={track.mechanics}
         heightOffset={trackDims.eyeHeight}
         hero={BIOMES[biome].hero}
         groundFn={groundFn}
@@ -116,6 +117,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
           dims={trackDims}
           groundFn={groundFn}
           table={trackTable}
+          mechanics={track.mechanics}
         />
         <BiomeEnvironment
           biome={biome}

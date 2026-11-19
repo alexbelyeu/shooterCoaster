@@ -8,7 +8,9 @@
  *   npm run turntable -- --biome ocean             # lit by a biome's atmosphere instead
  *   npm run turntable -- --rides                   # the ride elements instead (#698): rides.png, a strip of the
  *                                                  # demo circuit's loop, zero-g roll, corkscrew… ridden by the seat,
- *                                                  # and a shot aimed upside down (src/dev/rides/)
+ *                                                  # and a shot aimed upside down (src/dev/rides/); then the
+ *                                                  # special mechanics (#699): station, jump gap, drop track,
+ *                                                  # backwards, and a shot fired facing back
  *
  * Writes to e2e-results/turntable/ (`--out`): sheet.png (every subject, 3/4 view), <id>-angles.png
  * (front / side / back / 3/4) and <id>-motion.png (four frames over one cycle), plus results.json. Fails on a page
@@ -79,6 +81,7 @@ async function rideStrip(page) {
     if (cell.coverage < MIN_COVERAGE) failures.push(`rides: ${cell.label} drew nothing`)
   }
   if (!result.aim?.hit || !(result.aim.upY < -0.9)) failures.push(`rides: the shot upside down missed (${JSON.stringify(result.aim)})`)
+  if (!result.aimBack?.hit || !(result.aimBack.facing < -0.9)) failures.push(`rides: the shot riding backwards missed (${JSON.stringify(result.aimBack)})`)
 }
 
 async function enemyBoards(page) {

@@ -51,6 +51,27 @@ export interface TrackParams {
   glow?: number
   /** Set-pieces (#332): stretches where the track runs through a lit tube (`src/track/setPieces.ts`). */
   tunnels?: readonly TunnelSpec[]
+  /** Special ride mechanics (#699, `src/track/mechanics.ts`): a v2 ride only, they set its zones and stops. */
+  mechanics?: readonly RideMechanic[]
+}
+
+/**
+ * A special ride mechanic (#699, `src/track/mechanics.ts`) from `from` to `to`, shares of the lap's arc length (not across the seam):
+ * - station: the car stands at `from` (0) for the countdown; GO launches it over fins toward `speed` by `to`.
+ * - dropTrack: the car stops at `from` for `seconds`, then its piece of track free-falls with it to the track below at `to`.
+ * - jumpGap: no rails from `from` to `to`, a ballistic flight built for `speed`, which a booster from `boostFrom` sets.
+ * - backwards: turntables at `from` and `to` (a stop of `seconds`, then a launch to `speed`); the car faces back between.
+ */
+export type RideMechanic =
+  | { kind: 'station'; from: number; to: number; speed: number }
+  | { kind: 'dropTrack'; from: number; to: number; seconds: number }
+  | { kind: 'jumpGap'; from: number; to: number; speed: number; boostFrom: number }
+  | { kind: 'backwards'; from: number; to: number; seconds: number; speed: number }
+
+/** A stop (#699): the car halts at share `at` of the lap's arc length for `seconds` (not warped by the beats' solver). */
+export interface RideHold {
+  at: number
+  seconds: number
 }
 
 /**
@@ -65,6 +86,8 @@ export interface SpeedZone {
   to: number
   speed: number
   accel?: number
+  /** brake only: coast until it must brake at `accel` to be down to `speed` at `to` (a stop's approach, #699). */
+  stop?: boolean
 }
 
 /** A storyboard beat (#696): the car reaches share `at` of the lap's arc length (past 1: a later lap) `second` seconds after GO. */
@@ -76,6 +99,8 @@ export interface RideBeat {
 /** The v2 ride (#696): defaults in `rideV2.ts` `RIDE_V2_DEFAULTS`. */
 export interface RideV2Spec {
   zones?: readonly SpeedZone[]
+  /** Stops in the ride (a drop track's top, a turntable); `mechanics` add their own. */
+  holds?: readonly RideHold[]
   /** In ride order; the solver speeds up or slows down the ride between beats so each lands within `BEAT_TOLERANCE_SECONDS`. */
   beats?: readonly RideBeat[]
   /** World units per second². */
