@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo } from 'react'
 import { EffectComposer, Bloom, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
-import { isCoarsePointer, useComposerMultisampling, useQualityProfile } from '../useRenderBudget'
+import { useComposerMultisampling, useHeatShimmer, useQualityProfile } from '../useRenderBudget'
 import { ColourGradeEffect } from './ColourGradeEffect'
 import { HeatShimmerEffect } from './HeatShimmerEffect'
 import { freeComposerTargets } from './composerTargets'
@@ -19,13 +19,14 @@ export interface BloomSettings {
 export default function PostEffects({ bloom, grade, heatShimmer }: { bloom: BloomSettings; grade: GradeConfig; heatShimmer: boolean }) {
   const quality = useQualityProfile()
   const bloomOn = quality.bloom
-  const shimmerOn = heatShimmer && quality.heatShimmer && !isCoarsePointer
+  const shimmerOn = useHeatShimmer() && heatShimmer
   const multisampling = useComposerMultisampling()
   // One instance: a grade change only updates uniforms, it never rebuilds the EffectPass
   const gradeEffect = useMemo(() => new ColourGradeEffect(), [])
   useEffect(() => () => gradeEffect.dispose(), [gradeEffect])
-  const shimmerEffect = useMemo(() => new HeatShimmerEffect(), [])
-  useEffect(() => () => shimmerEffect.dispose(), [shimmerEffect])
+  // Built only while a level asks for it and the quality allows it: no other composer carries one
+  const shimmerEffect = useMemo(() => (shimmerOn ? new HeatShimmerEffect() : null), [shimmerOn])
+  useEffect(() => () => shimmerEffect?.dispose(), [shimmerEffect])
   useLayoutEffect(() => gradeEffect.setGrade(grade), [gradeEffect, grade])
 
   return (
@@ -41,7 +42,7 @@ export default function PostEffects({ bloom, grade, heatShimmer }: { bloom: Bloo
         // The composer's children type takes no `false`.
         <></>
       )}
-      {shimmerOn ? <primitive object={shimmerEffect} dispose={null} /> : <></>}
+      {shimmerEffect ? <primitive object={shimmerEffect} dispose={null} /> : <></>}
       <primitive object={gradeEffect} dispose={null} />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
     </EffectComposer>

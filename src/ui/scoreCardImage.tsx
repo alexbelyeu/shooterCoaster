@@ -198,11 +198,14 @@ export async function renderScoreCard(run: ScoreCardRun, size: CardSize): Promis
   }
 }
 
+/** iOS Safari reads the URL when the player answers its download prompt, which can be long after the click (#374). */
+export const DOWNLOAD_URL_LIFETIME_MS = 40_000
+
 export function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = fileName
   a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_LIFETIME_MS)
 }
