@@ -1,6 +1,7 @@
 import type { ShadowCaster } from '../../shared/contactShadows'
-import { GYM_SCALE, PIECES, floorAt, pieceBoxes, pieceToBlockout, toBlockout, toWorld, type BlockoutPiece, type PieceKind } from './blockout'
+import { GYM_SCALE, PIECES, PIT, floorAt, pieceBoxes, pieceToBlockout, toBlockout, toWorld, type BlockoutPiece, type PieceKind } from './blockout'
 import { HIDDEN_PIECES } from './config'
+import { onPath } from './floorPaths'
 
 const DEG = Math.PI / 180
 
@@ -19,9 +20,12 @@ const FLOATING = 0.5
 
 const pads = PIECES.filter((p): p is Extract<BlockoutPiece, { kind: 'pad' }> => p.kind === 'pad')
 
-/** What a piece stands on at a blockout x/z: the floor (the pit's inside it), or the top of the mats over it. */
+/** What a piece stands on at a blockout x/z: the floor, the top of the mats over it (the pit's, wall to wall), or a walkway cut through them. */
 export function standingSurfaceAt(x: number, z: number): number {
-  let y = floorAt(x, z)
+  const floor = floorAt(x, z)
+  if (floor < 0) return floor + PIT.mats
+  if (onPath(x, z)) return floor
+  let y = floor
   for (const pad of pads) {
     const dx = x - pad.x
     const dz = z - pad.z
