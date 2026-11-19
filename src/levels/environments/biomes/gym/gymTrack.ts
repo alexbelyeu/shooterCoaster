@@ -153,6 +153,9 @@ export function gymControlPoints(): Vec3[] {
   ]
 }
 
+/** The on-ride photo (#701): in the Tree's gap, the trunk beside the rider, just before its far end (about 1 s after GO). */
+export const GYM_PHOTO_T = 0.01
+
 /** The ride in world units. Speeds give a ~63.7 s lap (`lapSeconds`), nearly even: the run's 60 s end turning out of the pit's dive. */
 export const GYM_TRACK: TrackParams = {
   curve: 'spline',
@@ -170,4 +173,5 @@ export const GYM_TRACK: TrackParams = {
   minRollerSpeed: 0.000355,
   color1: 0x353d48,
   color2: 0x22d3c5,
+  photo: GYM_PHOTO_T,
 }

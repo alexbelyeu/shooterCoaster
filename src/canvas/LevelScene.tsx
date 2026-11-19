@@ -29,6 +29,8 @@ import { BYSTANDER_HIT_EVENT, bystanderWarning, type BystanderHitEvent } from '@
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
+import RidePhoto from './RidePhoto'
+import { photoDistance } from '@/track/photoMarker'
 import LevelAudio from './LevelAudio'
 
 /** Projects 'enemy:killed' and bystander-hit 3D events to screen coords for HTML score popups */
@@ -90,6 +92,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
   )
 
   const speeds = useMemo(() => rideSpeeds(track), [track])
+  const photoAt = useMemo(() => photoDistance(trackTable, track.photo, speeds, RUN_SECONDS), [trackTable, track.photo, speeds])
   const color1 = useMemo(() => hexToRgb(track.color1), [track.color1])
   const color2 = useMemo(() => hexToRgb(track.color2), [track.color2])
 
@@ -147,6 +150,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
       <ShootingController />
       <GameTimer seconds={RUN_SECONDS} />
       <KillProjector />
+      <RidePhoto table={trackTable} at={photoAt} />
       <ShaderWarmup levelId={levelId} />
     </TerrainContext.Provider>
   )

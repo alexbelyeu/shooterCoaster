@@ -361,3 +361,11 @@ export function starPoints(cx: number, cy: number, outer: number, inner = outer 
     return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]
   })
 }
+
+/** The part of a `width` × `height` image that covers `rect` without stretching (#701: the on-ride photo in the art's place), centred. */
+export function coverCrop(width: number, height: number, rect: Rect): Rect {
+  const k = Math.max(rect.width / width, rect.height / height)
+  const w = rect.width / k
+  const h = rect.height / k
+  return { x: (width - w) / 2, y: (height - h) / 2, width: w, height: h }
+}

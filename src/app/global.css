@@ -519,6 +519,31 @@ canvas {
   75% { transform: translate(calc(-50% + 3px), 0); }
 }
 
+/* The on-ride photo's flash (#701): over the whole screen, never in the photo (that is the canvas alone). */
+.hud-photo-flash {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  pointer-events: none;
+  opacity: 0;
+  animation: hud-photo-flash 0.35s ease-out;
+}
+
+@keyframes hud-photo-flash {
+  0% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-photo-flash { animation-name: hud-photo-flash-soft; }
+}
+.reduce-motion .hud-photo-flash { animation-name: hud-photo-flash-soft; }
+
+@keyframes hud-photo-flash-soft {
+  0% { opacity: 0.3; }
+  100% { opacity: 0; }
+}
+
 /* top-tier slow-mo: "×5 FRENZY" over the combo meter and a red edge pulse */
 .hud-frenzy {
   position: absolute;
@@ -1577,6 +1602,35 @@ canvas {
   }
 }
 
+/* The on-ride photo (#701) as a print: last on a phone (under the board), a column of its own on a wide screen. */
+.results-photo {
+  order: 1;
+  width: min(80%, 17rem);
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.5rem 0.35rem;
+  background: #f6f1e7;
+  border-radius: 3px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.results-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* One print shape for a landscape desktop frame and a portrait phone one. */
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 1px;
+}
+
+.results-photo figcaption {
+  padding-top: 0.3rem;
+  font-family: 'Lobster', cursive;
+  font-size: 1rem;
+  text-align: center;
+  color: #2a2420;
+}
+
 /* Local top 10 (ResultsLeaderboard): under the buttons on a phone, a column of its own when there is room. */
 .results-board-slot,
 .results-board {
@@ -1764,6 +1818,36 @@ canvas {
       'main'
       'side';
   }
+
+  /* Too narrow for the print's column. */
+  .results-photo {
+    display: none;
+  }
+}
+
+/* Wide desktop: the print in a column left of the score. */
+@media (min-width: 1100px) and (min-height: 521px) {
+  .results-card.has-photo {
+    grid-template-columns: 15rem 26rem 17rem;
+    grid-template-areas:
+      'photo main board'
+      'photo side board';
+  }
+
+  .results-screen[data-mode='daily'] .results-card.has-photo {
+    grid-template-columns: 15rem 26rem;
+    grid-template-areas:
+      'photo main'
+      'photo side';
+  }
+
+  .results-photo {
+    display: block;
+    grid-area: photo;
+    align-self: center;
+    width: 100%;
+    margin: 0;
+  }
 }
 
 /* Phone landscape: score + stars on the left, stats + buttons on the right. */
@@ -1804,6 +1888,10 @@ canvas {
 
   .results-board-slot {
     flex: 0 0 14rem;
+  }
+
+  .results-photo {
+    display: none;
   }
 
   .results-board li {

@@ -28,13 +28,15 @@ interface Props {
   avoid?: RefObject<HTMLElement | null>[]
   /** The results reveal is done: draw the story card now, before the tap, where the sheet will take it (#374). */
   prerender?: boolean
+  /** The run's on-ride photo (#701): the card's picture in place of the postcard. */
+  photo?: Blob | null
 }
 
 const isTouch = () => window.matchMedia?.('(pointer: coarse)').matches ?? false
 const cardSize = (): CardSize => (isTouch() ? 'story' : 'feed')
 
 /** The results screen's Share button (#271): the native sheet on touch (with the score card image, #272), else a menu of image, Copy link and share-intent links. */
-export default function ShareMenu({ card, onShared, avoid = [], prerender = false }: Props) {
+export default function ShareMenu({ card, onShared, avoid = [], prerender = false, photo = null }: Props) {
   const { levelId, score, worldRank } = card
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState<'copy' | 'image_copy' | null>(null)
@@ -47,15 +49,15 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
   const sharing = useRef(false)
   const copyable = canCopy(navigator)
   const imageCopyable = canCopyImage(navigator)
-  /** Per size, until the card changes (the World rank came in, #445). */
-  const pngs = useRef({ card, bySize: new Map<CardSize, Promise<Blob>>() })
-  if (pngs.current.card !== card) pngs.current = { card, bySize: new Map() }
+  /** Per size, until the card changes (the World rank came in, #445) or the photo arrives. */
+  const pngs = useRef({ card, photo, bySize: new Map<CardSize, Promise<Blob>>() })
+  if (pngs.current.card !== card || pngs.current.photo !== photo) pngs.current = { card, photo, bySize: new Map() }
 
   function cardPng(size: CardSize): Promise<Blob> {
     const cache = pngs.current.bySize
     let png = cache.get(size)
     if (!png) {
-      png = renderScoreCard(card, size)
+      png = renderScoreCard(card, size, photo)
       png.catch(() => cache.delete(size))
       cache.set(size, png)
     }

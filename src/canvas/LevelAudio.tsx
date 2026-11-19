@@ -11,6 +11,7 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import { isInRun } from '@/store/startPhase'
 import { reportLoad } from '@/core/loadProgress'
 import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks'
+import { RIDE_PHOTO_EVENT } from '@/track/photoMarker'
 import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 import { intensityForTier } from '@/audio/scrim/layers'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
@@ -53,6 +54,7 @@ const onFireworkLaunch = (e: unknown) => {
   sfx().fireworkWhistle(flightS, timeScale)
 }
 const onFireworkBurst = () => sfx().fireworkPop()
+const onPhoto = () => sfx().shutter()
 /** An unshot snowball thumps past: the snow crunch, unplaced (it is at the camera). */
 const onSnowSplat = () => sfx().kill(0, 'crunch', null)
 
@@ -67,9 +69,10 @@ const SFX_EVENTS: [string, (e: unknown) => void][] = [
   [SNOWBALL_SPLAT_EVENT, onSnowSplat],
   [FIREWORK_LAUNCH_EVENT, onFireworkLaunch],
   [FIREWORK_BURST_EVENT, onFireworkBurst],
+  [RIDE_PHOTO_EVENT, onPhoto],
 ]
 
-/** Level audio host: the level's score (its boss section from `boss:spawn`, a sting on `boss:defeated`) + SFX for the level's lifetime, bus-driven hit / kill / bystander / wave / combo / boss / firework sounds, slow-mo and pause duck, music intensity. */
+/** Level audio host: the level's score (its boss section from `boss:spawn`, a sting on `boss:defeated`) + SFX for the level's lifetime, bus-driven hit / kill / bystander / wave / combo / boss / firework / photo shutter sounds, slow-mo and pause duck, music intensity. */
 export default function LevelAudio() {
   const currentLevel = useGameStore((s) => s.currentLevel)
   const camera = useThree((s) => s.camera)

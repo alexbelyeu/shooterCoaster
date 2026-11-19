@@ -32,7 +32,7 @@ import {
   treeOut,
   type Vec3,
 } from './blockout'
-import { GYM_TRACK, RAIL_CLEARANCE } from './gymTrack'
+import { GYM_PHOTO_T, GYM_TRACK, RAIL_CLEARANCE } from './gymTrack'
 import { meshClearance } from './geometryChecks'
 import { buildHall, holdGeometry } from './hallGeometry'
 import { gym } from './index'
@@ -167,6 +167,14 @@ describe('the gym track', () => {
     expect(Math.max(...heights) + dims.eyeHeight / GYM_SCALE).toBeLessThanOrEqual(TREE_GAP.height - RAIL_CLEARANCE)
     // The run starts in it and rides out of its far end.
     expect(inGap.filter(({ i }) => secondsAt(i) < RUN_SECONDS).length * metresPerSample).toBeGreaterThan(TREE_GAP.halfAlong)
+  })
+
+  it("takes the on-ride photo in the Tree's gap (#701)", () => {
+    const p = track[Math.round(GYM_PHOTO_T * N)]
+    const f = treeOut(p)
+    expect(Math.abs(treeAlong(p))).toBeLessThanOrEqual(TREE_GAP.halfAlong)
+    expect(f).toBeGreaterThanOrEqual(TREE_GAP.minF)
+    expect(f).toBeLessThanOrEqual(TREE_GAP.maxF)
   })
 
   it("tours the hall into the seat behind the trunk clear of the wood, riding the track's hairpin in (#659, #675)", () => {

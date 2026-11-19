@@ -3,6 +3,7 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { VIEWBOX } from '@/ui/logoArt'
 import {
   CARD_DIMENSIONS,
+  coverCrop,
   dailyDateLabel,
   fitText,
   itemBounds,
@@ -205,5 +206,21 @@ describe('helpers', () => {
     expect(pts[0][0]).toBeCloseTo(0)
     expect(pts[0][1]).toBeCloseTo(-10)
     expect(Math.hypot(...pts[1])).toBeCloseTo(4.5)
+  })
+})
+
+describe('coverCrop', () => {
+  it("takes the photo's middle at the art's aspect", () => {
+    // A 16:9 photo in the feed card's 800×630 art: full height, the sides cut.
+    const feed = coverCrop(1280, 720, { x: 400, y: 0, width: 800, height: 630 })
+    expect(feed.height).toBeCloseTo(720)
+    expect(feed.width / feed.height).toBeCloseTo(800 / 630)
+    expect(feed.x).toBeCloseTo((1280 - feed.width) / 2)
+    expect(feed.y).toBeCloseTo(0)
+    // A portrait phone photo in the story card's 1080×900 art: full width, top and bottom cut.
+    const story = coverCrop(591, 1280, { x: 0, y: 0, width: 1080, height: 900 })
+    expect(story.width).toBeCloseTo(591)
+    expect(story.width / story.height).toBeCloseTo(1080 / 900)
+    expect(story.y).toBeCloseTo((1280 - story.height) / 2)
   })
 })

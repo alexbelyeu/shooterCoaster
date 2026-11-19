@@ -242,7 +242,8 @@ export const GYM_LEVEL: { track: TrackParams; walls: readonly WallSurface[] } = 
     "rollerSpeed": 4e-7,
     "minRollerSpeed": 0.000355,
     "color1": 3489096,
-    "color2": 2282437
+    "color2": 2282437,
+    "photo": 0.01
   },
   "walls": [
     {

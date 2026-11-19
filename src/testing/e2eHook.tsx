@@ -62,6 +62,7 @@ import { clipboardText, sharePayloadForRun } from '@/ui/share'
 import { setOnlineEndpointOverride } from '@/store/onlineLeaderboard'
 import { scoreCardFileName, scoreCardRun, type CardSize } from '@/ui/scoreCard'
 import { renderScoreCard } from '@/ui/scoreCardImage'
+import { ridePhotoFor } from '@/store/ridePhoto'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
@@ -237,7 +238,7 @@ export interface SCTestApi {
   shareText: (worldRank?: number | null) => string | null
   /** The results Share image (#272) for the current level and run, drawn as the share menu draws it: its pixel size,
    *  PNG data URL and download name, or null with no level. */
-  scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string } | null>
+  scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string; photo: boolean } | null>
   /** Override the game time scale (0 freezes camera + enemies; 1 hands it back to the slow-mo envelopes, `combat/slowMo.hot.ts`). */
   setTimeScale: (s: number) => void
   /** Pins the intro's tour (#328, #675) at this progress (0 = the reveal, 1 = the seat) in any phase short of the results, until set back to null. */
@@ -256,6 +257,13 @@ export interface SCTestApi {
     orbitSeconds: number
     seconds: number | null
     skipped: boolean
+  }
+  /** The on-ride photo (#701), set by `RidePhoto`: its marker as a track fraction (`at`), whether this run's is taken, the
+   *  ride's track fraction then, the snapshot call's ms, the whole capture frame's ms (the next frame's delta) and the
+   *  frame's before it, its size and its JPEG's bytes (once encoded). */
+  photo: {
+    at: number | null; taken: boolean; progress: number | null; captureMs: number | null; frameMs: number | null; beforeMs: number | null
+    width: number; height: number; bytes: number | null
   }
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null
@@ -1025,7 +1033,8 @@ export function installE2EApi() {
       const s = useGameStore.getState()
       const card = s.currentLevel ? scoreCardRun({ ...s, levelId: s.currentLevel, mode: s.runMode }) : null
       if (!card) return null
-      const blob = await renderScoreCard(card, size)
+      const photo = ridePhotoFor(s.runId)
+      const blob = await renderScoreCard(card, size, photo?.blob ?? null)
       const bitmap = await createImageBitmap(blob)
       const png = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
@@ -1033,13 +1042,14 @@ export function installE2EApi() {
         reader.onerror = () => reject(reader.error)
         reader.readAsDataURL(blob)
       })
-      const out = { width: bitmap.width, height: bitmap.height, png, fileName: scoreCardFileName(card.levelId, card.score) }
+      const out = { width: bitmap.width, height: bitmap.height, png, fileName: scoreCardFileName(card.levelId, card.score), photo: photo !== null }
       bitmap.close()
       return out
     },
     setTimeScale: (s: number) => setTimeScaleOverride(s === 1 ? null : s),
     introAt: null,
     intro: { mode: 'ride', length: INTRO_SECONDS, progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, clearance: 0, marks: null, goOffset: null, orbitSeconds: 0, seconds: null, skipped: false },
+    photo: { at: null, taken: false, progress: null, captureMs: null, frameMs: null, beforeMs: null, width: 0, height: 0, bytes: null },
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,

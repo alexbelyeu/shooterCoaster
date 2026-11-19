@@ -2,9 +2,12 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { PostcardArt } from '@/ui/screens/LevelPostcard'
 import { CAR, CAR_PARK, CROSSHAIR, CROSSHAIR_PATH, GOLD as LOGO_GOLD, LOGO_TEXT, NAVY, RAIL, RED, TARGET, TRACK, VIEWBOX, WHITE, WORDMARK } from '@/ui/logoArt'
-import { CARD_FONTS, layoutScoreCard, starPoints, type CardItem, type CardSize, type Rect, type ScoreCardLayout, type ScoreCardRun } from '@/ui/scoreCard'
+import { CARD_FONTS, coverCrop, layoutScoreCard, starPoints, type CardItem, type CardSize, type Rect, type ScoreCardLayout, type ScoreCardRun } from '@/ui/scoreCard'
 
-/** Draws the score card (#272) on a 2D canvas, on demand: no WebGL, no request (the art is an inline SVG data URL). */
+/**
+ * Draws the score card (#272) on a 2D canvas, on demand: no WebGL, no request (the art is an inline SVG data URL, or the
+ * run's on-ride photo when it has one, #701).
+ */
 
 const BACKDROP = 'rgb(9, 9, 15)'
 const BACKDROP_CLEAR = 'rgba(9, 9, 15, 0)'
@@ -146,11 +149,9 @@ function roundRect({ x, y, width, height, rx }: { x: number; y: number; width: n
   return p
 }
 
-async function draw(ctx: CanvasRenderingContext2D, run: ScoreCardRun, layout: ScoreCardLayout) {
-  const { width, height, art } = layout
-  ctx.fillStyle = BACKDROP
-  ctx.fillRect(0, 0, width, height)
-
+/** The level's postcard under its sky. */
+async function drawPostcard(ctx: CanvasRenderingContext2D, run: ScoreCardRun, layout: ScoreCardLayout) {
+  const { art } = layout
   const sky = ctx.createLinearGradient(0, art.y, 0, art.y + art.height)
   for (const [colour, at] of layout.sky) sky.addColorStop(at, colour)
   ctx.fillStyle = sky
@@ -158,6 +159,24 @@ async function draw(ctx: CanvasRenderingContext2D, run: ScoreCardRun, layout: Sc
   const img = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(artMarkup(run.biome, art))}`)
   ctx.drawImage(img, art.x, art.y, art.width, art.height)
   img.src = ''
+}
+
+async function drawPhoto(ctx: CanvasRenderingContext2D, photo: Blob, art: Rect) {
+  const bitmap = await createImageBitmap(photo)
+  try {
+    const src = coverCrop(bitmap.width, bitmap.height, art)
+    ctx.drawImage(bitmap, src.x, src.y, src.width, src.height, art.x, art.y, art.width, art.height)
+  } finally {
+    bitmap.close()
+  }
+}
+
+async function draw(ctx: CanvasRenderingContext2D, run: ScoreCardRun, layout: ScoreCardLayout, photo: Blob | null) {
+  const { width, height } = layout
+  ctx.fillStyle = BACKDROP
+  ctx.fillRect(0, 0, width, height)
+  if (photo) await drawPhoto(ctx, photo, layout.art)
+  else await drawPostcard(ctx, run, layout)
 
   const { from, to } = layout.fade
   const fade = ctx.createLinearGradient(from[0], from[1], to[0], to[1])
@@ -177,8 +196,8 @@ async function draw(ctx: CanvasRenderingContext2D, run: ScoreCardRun, layout: Sc
   for (const item of layout.items) drawItem(ctx, item)
 }
 
-/** Empties the canvas afterwards so its pixels don't linger. */
-export async function renderScoreCard(run: ScoreCardRun, size: CardSize): Promise<Blob> {
+/** Empties the canvas afterwards so its pixels don't linger. `photo`: the run's on-ride photo, in the postcard's place. */
+export async function renderScoreCard(run: ScoreCardRun, size: CardSize, photo: Blob | null = null): Promise<Blob> {
   await fontsReady()
   const canvas = document.createElement('canvas')
   try {
@@ -190,7 +209,7 @@ export async function renderScoreCard(run: ScoreCardRun, size: CardSize): Promis
     })
     canvas.width = layout.width
     canvas.height = layout.height
-    await draw(ctx, run, layout)
+    await draw(ctx, run, layout, photo)
     return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png'))
   } finally {
     canvas.width = 0

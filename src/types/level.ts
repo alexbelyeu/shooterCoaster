@@ -44,6 +44,8 @@ export interface TrackParams {
   glow?: number
   /** Set-pieces (#332): stretches where the track runs through a lit tube (`src/track/setPieces.ts`). */
   tunnels?: readonly TunnelSpec[]
+  /** The on-ride photo (#701): the track fraction where the flash fires; without it, 85% of the way through the run (`photoMarker.ts`). */
+  photo?: number
 }
 
 /** A tunnel from track fraction `from`, `length` world units of arc long; it may not cross the track's seam (t = 1). */

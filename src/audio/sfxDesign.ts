@@ -104,6 +104,7 @@ export type ArcadeSoundId =
   | 'bossDefeat'
   | 'fireworkWhistle'
   | 'fireworkPop'
+  | 'shutter'
   | 'star1'
   | 'star2'
   | 'star3'
@@ -154,6 +155,7 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   bossDefeat: { prio: PRIO.event, db: -4, send: 0.35 },
   fireworkWhistle: { prio: PRIO.hit, db: -22, send: 0.3 },
   fireworkPop: { prio: PRIO.cue, db: -12, send: 0.35 },
+  shutter: { prio: PRIO.event, db: -10, send: 0.1 },
   star1: { prio: PRIO.event, db: -12, send: 0.35 },
   star2: { prio: PRIO.event, db: -11, send: 0.35 },
   star3: { prio: PRIO.event, db: -10, send: 0.35 },

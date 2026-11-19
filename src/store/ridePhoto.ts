@@ -1,0 +1,44 @@
+import { useSyncExternalStore } from 'react'
+
+/** The run's on-ride photo (#701): a JPEG in memory for that run only, never uploaded or stored. */
+export interface RidePhoto {
+  runId: number
+  blob: Blob
+  /** An object URL for the results print, revoked when the photo is dropped. */
+  url: string
+  width: number
+  height: number
+}
+
+let photo: RidePhoto | null = null
+const listeners = new Set<() => void>()
+
+function publish(next: RidePhoto | null) {
+  if (photo) URL.revokeObjectURL(photo.url)
+  photo = next
+  for (const l of listeners) l()
+}
+
+export function setRidePhoto(runId: number, blob: Blob, width: number, height: number): void {
+  publish({ runId, blob, url: URL.createObjectURL(blob), width, height })
+}
+
+export function clearRidePhoto(): void {
+  if (photo) publish(null)
+}
+
+/** The photo taken on run `runId`, or null. */
+export function ridePhotoFor(runId: number): RidePhoto | null {
+  return photo?.runId === runId ? photo : null
+}
+
+function subscribe(l: () => void) {
+  listeners.add(l)
+  return () => {
+    listeners.delete(l)
+  }
+}
+
+export function useRidePhoto(runId: number): RidePhoto | null {
+  return useSyncExternalStore(subscribe, () => ridePhotoFor(runId))
+}

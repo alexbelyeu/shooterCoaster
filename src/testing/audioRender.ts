@@ -178,6 +178,7 @@ function sfxSheetPlan(level = 'level1'): Plan {
           { name: 'firework pop', slotS: 0.8, play: () => s.fireworkPop() },
         ]
       : []),
+    { name: 'photo shutter', slotS: 0.6, play: () => s.shutter() },
     { name: 'star chime 1', slotS: 0.7, play: () => s.starChime(0) },
     { name: 'star chime 2', slotS: 0.7, play: () => s.starChime(1) },
     { name: 'star chime 3', slotS: 1.5, play: () => s.starChime(2) },

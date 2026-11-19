@@ -17,6 +17,7 @@ import { barFill, bystanderRow, formatAccuracy, formatTimeLeft, isNewRecord } fr
 import { bystanderCount, bystanderNoun, bystanderType } from '@/combat/bystanders'
 import { initialsKey, type InitialsState } from './initialsEntry'
 import ResultsLeaderboard from './ResultsLeaderboard'
+import { useRidePhoto, type RidePhoto } from '@/store/ridePhoto'
 
 const fmt = new Intl.NumberFormat('en-US')
 
@@ -30,6 +31,7 @@ function snapshotRun() {
   const s = useGameStore.getState()
   return {
     levelId: s.currentLevel,
+    runId: s.runId,
     mode: s.runMode,
     score: Math.round(s.score),
     kills: s.kills,
@@ -78,6 +80,10 @@ export default function ResultsScreen() {
   /** Only once the submission placed the run (#445): never block Share on it. */
   const worldRank = world?.rank ?? null
   const card = useMemo(() => (config ? scoreCardRun({ ...run, levelId: config.id, worldRank }) : null), [config, run, worldRank])
+  // The on-ride photo (#701): kept once it arrives, so the print stays through the exit fade while the next run drops it.
+  const livePhoto = useRidePhoto(run.runId)
+  const [photo, setPhoto] = useState<RidePhoto | null>(livePhoto)
+  if (livePhoto && livePhoto !== photo) setPhoto(livePhoto)
 
   const stars = config ? computeStars(run.score, config.maxScore, config.starThresholds) : 0
   const fill = config ? barFill(run.score, config.maxScore) : 0
@@ -263,7 +269,7 @@ export default function ResultsScreen() {
         if (!done) setStage(STAGE.done)
       }}
     >
-      <div className="results-card">
+      <div className={`results-card${photo ? ' has-photo' : ''}`}>
         <div className="results-main">
           {daily && <p className="results-daily-badge">Daily Run</p>}
           <motion.h2
@@ -364,7 +370,7 @@ export default function ResultsScreen() {
             <button className="play-button results-secondary" onClick={() => leave('replay')}>
               Replay
             </button>
-            {card && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} prerender={done} />}
+            {card && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} prerender={done} photo={photo?.blob ?? null} />}
             {nextOpen && (
               <button ref={nextRef} className="play-button" onClick={() => leave('next')}>
                 Next Level
@@ -378,6 +384,19 @@ export default function ResultsScreen() {
             {!entryOpen && enterTo === 'replay' && `★ unlocks ${nextName} · Enter / R: replay`}
           </p>
         </div>
+
+        {photo && (
+          <motion.figure
+            className="results-photo"
+            initial={false}
+            variants={{ hidden: { opacity: 0, y: -40, rotate: -16 }, shown: { opacity: 1, y: 0, rotate: -4 } }}
+            animate={reveal(STAGE.stats)}
+            transition={done ? instant : { type: 'spring', stiffness: 220, damping: 18 }}
+          >
+            <img src={photo.url} width={photo.width} height={photo.height} alt={`On-ride photo: ${config.name}`} />
+            <figcaption>On-ride photo</figcaption>
+          </motion.figure>
+        )}
 
         {!daily && (
           <motion.div
