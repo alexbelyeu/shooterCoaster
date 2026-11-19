@@ -85,8 +85,8 @@ describe('tourPose', () => {
         underCap: topSpeed <= TOUR_SPEED_CAP * s.scale,
         // A tour of a few hundred units would be no tour: it covers the level.
         covers: s.tour.length >= 1500 * s.scale || s.bounds !== undefined,
-        // The view turns at most this many degrees a second (the gym's hall is tighter: its hand-picked tour is #675's follow-up).
-        smoothTurn: topTurn < (s.bounds ? 170 : 75) && turns.look < (s.bounds ? 170 : 75),
+        // The view turns at most this many degrees a second (the gym's hall is tighter, its tour hand-picked, #695).
+        smoothTurn: topTurn < (s.bounds ? 120 : 75) && turns.look < (s.bounds ? 120 : 75),
         settles: dist(pos, s.seat) < 0.1 * s.scale && angleDeg(dir, s.dir) < 0.5,
       }
     })

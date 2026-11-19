@@ -2,7 +2,8 @@
  * Level 6's ride (#514), pure: a closed spline through the Climbing Gym's blockout, built from its
  * anchors (`blockout.ts`), never from hand-typed world numbers. In ride order from the lap start:
  *
- * 1. Through the Tree's gap between its trunk and the back wall (#659, #671): the run starts in it and climbs out of the right cave.
+ * 1. Through the Tree's gap between its trunk and the back wall (#659, #671): the run starts in it, turns out of the right
+ *    cave's mouth into the pit and climbs over the pit's railing (#695).
  * 2. Over to the Flame and a sinking spiral right round it.
  * 3. South down the east side and west through the Arch.
  * 4. A climbing right turn to the crest by the glass gym room (~39.5 s).
@@ -107,13 +108,16 @@ function pit(out: number, y: number, side: number): Vec3 {
 /** The control points in blockout metres, from the lap start. */
 export function gymControlPoints(): Vec3[] {
   return [
-    // 1. The Tree: through the gap behind its trunk and up out of the right cave, past its end.
+    // 1. The Tree: through the gap behind its trunk, out of the right cave's mouth into the pit and up over its railing.
     gap(-0.3),
     gap(2.4),
-    treeFrame(6, GAP_F, 2.6),
-    treeFrame(9.6, GAP_F, 3.5),
+    treeFrame(5.2, GAP_F, 1.9),
+    treeFrame(6.9, 2.6, 2.3),
+    treeFrame(7.4, 4.2, 2.9),
+    treeFrame(7.6, 6.4, 3.8),
+    { x: 21.5, y: 2.9, z: 13 },
     // 2. Up to the Flame, then a full turn round it, sinking; under the spiral's last corner on the way in.
-    { x: 27, y: 3.5, z: 9.5 },
+    { x: 27, y: 3.6, z: 11 },
     { x: 34, y: 4.8, z: 12.8 },
     ...[270, 320, 360, 405, 450, 495, 540, 585].map((deg) => spiral(deg, SPIRAL_TOP_Y + (FLAME.top + RAIL_CLEARANCE + 0.1 - SPIRAL_TOP_Y) * ((deg - 270) / 315))),
     spiral(630, SPIRAL_EXIT_Y),
@@ -133,7 +137,7 @@ export function gymControlPoints(): Vec3[] {
     { x: 46, y: CREST_Y - 0.8, z: 34.1 },
     { x: 36, y: CREST_Y - 1.3, z: 34 },
     { x: 28, y: CREST_Y - 2.2, z: 32 },
-    { x: 22, y: CREST_Y - 3.3, z: 30.2 },
+    { x: 22, y: CREST_Y - 2.5, z: 30.2 }, // over the pit's railing
     pit(16.5, 3.4, 7.5),
     pit(13.5, 2.5, 5),
     // Rising gently at the star, then (the run over by ~59 s) south clear of the Medusa's bust, west along the roots'
