@@ -41,7 +41,7 @@ function KillProjector() {
       vec.set(position.x, position.y, position.z).project(camera)
       const screenX = ((vec.x + 1) / 2) * size.width
       const screenY = ((-vec.y + 1) / 2) * size.height
-      eventBus.emit('enemy:killed:screen', { screenX, screenY, ...popup })
+      eventBus.emit('score-popup:screen', { screenX, screenY, ...popup })
     }
     const onKilled = (data: unknown) => {
       const d = data as { position: THREE.Vector3; multiplier: number; score: number }

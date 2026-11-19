@@ -15,10 +15,11 @@ const NUDGE: [number, number] = [0.18, 220]
 
 /** Once per bystander `id` (the store keeps who was hit); a second hit does nothing. */
 export function hitBystander(id: string, type: EnemyType, position: THREE.Vector3): void {
-  if (!useGameStore.getState().hitBystander(id, BYSTANDER_PENALTY)) return
+  const taken = useGameStore.getState().hitBystander(id, BYSTANDER_PENALTY)
+  if (taken === null) return
   breakCombo()
   getExplosionPool()?.explode(position, DEATH_STYLES[type])
-  const event: BystanderHitEvent = { type, position: { x: position.x, y: position.y, z: position.z }, penalty: BYSTANDER_PENALTY }
+  const event: BystanderHitEvent = { type, position: { x: position.x, y: position.y, z: position.z }, penalty: taken }
   eventBus.emit(BYSTANDER_HIT_EVENT, event)
   eventBus.emit(CAMERA_TRAUMA_EVENT, NUDGE[0], NUDGE[1])
 }

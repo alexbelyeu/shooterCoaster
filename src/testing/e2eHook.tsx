@@ -68,6 +68,8 @@ import { MAX_BANK_DEG, MAX_PITCH_DEG } from '@/track/cameraRig.hot'
 import { DROP_FOV_DEG, SPEED_FOV_DEG, TUNNEL_FOV_DEG } from '@/track/cameraFov.hot'
 import { programsAfterWarmup } from '@/core/hitchLog'
 import { LONG_FRAME_MS } from '@/telemetry/telemetryReport'
+import { bystanderCount } from '@/combat/bystanders'
+import { BYSTANDER_PENALTY } from '@/levels/scoring'
 
 export const isE2E =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
@@ -219,8 +221,8 @@ export interface SCTestApi {
    *  enemy:killed follows ~80 ms later). Returns how many were hit. */
   killNearest: (n: number) => number
   /** Hit the nearest live bystander (on-screen ones first) through processHit, the bullet pool's own path (#518).
-   *  Returns its id, or null when none is live. */
-  shootBystander: () => string | null
+   *  Returns its id and the full `BYSTANDER_PENALTY` (what a hit takes off a score that can pay it), or null when none is live. */
+  shootBystander: () => { id: string; penalty: number } | null
   stats: () => SCTestStats
   /** Viewport (CSS px) positions of up to n live on-screen enemies (no boss weak points), nearest
    *  first, so a test can tap / click real input at them. */
@@ -418,6 +420,8 @@ export interface SCTestStats {
   onScreenEnemies: number
   /** Live bystanders (#518) on screen, as `onScreenEnemies`, and how many were shot this run. */
   onScreenBystanders: number
+  /** How many bystanders the current level's roster brings (0: none to check). */
+  levelBystanders: number
   bystandersHit: number
   shotsFired: number
   hits: number
@@ -954,7 +958,7 @@ export function installE2EApi() {
       }
       if (!best) return null
       processHit(best)
-      return best.id
+      return { id: best.id, penalty: BYSTANDER_PENALTY }
     },
     stats: () => {
       const s = useGameStore.getState()
@@ -976,6 +980,7 @@ export function installE2EApi() {
         liveEnemies,
         onScreenEnemies,
         onScreenBystanders,
+        levelBystanders: bystanderCount((s.currentLevel ? getLevelConfig(s.currentLevel)?.enemies : undefined) ?? []),
         bystandersHit: s.bystandersHit.length,
         shotsFired: s.shotsFired,
         hits: s.hits,
