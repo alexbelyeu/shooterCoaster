@@ -6,14 +6,14 @@ import {
   NewWorldError,
   PLACEHOLDER,
   STARTER_ROSTER,
-  TEMPLATE_FILES,
+  TEMPLATE_ROOT,
   isPlaceholder,
   pacingCeilings,
   parseNewWorldArgs,
   planNewWorld,
   sceneCeilings,
   setBudget,
-  templateDir,
+  templatePaths,
 } from './newWorldPlan.mjs'
 import { SCORE_VALUES } from '@/levels/scoring'
 import { getAllLevels } from '@/levels/LevelRegistry'
@@ -24,7 +24,7 @@ const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8')
 function repo(kind: 'outdoor' | 'interior', scoreFrom = 'level1') {
   const files: Record<string, string> = {}
   for (const rel of [...Object.values(EDITED_FILES), `src/audio/scores/${scoreFrom}.scrim`]) files[rel] = read(rel)
-  const templates = Object.fromEntries(TEMPLATE_FILES.map((f) => [f, read(`${templateDir(kind)}/${f}.tmpl`)]))
+  const templates = Object.fromEntries(templatePaths(kind).map((t) => [t, read(`${TEMPLATE_ROOT}/${t}`)]))
   return { files, templates, biomeDirs: fs.readdirSync(path.join(root, 'src/levels/environments/biomes')) }
 }
 

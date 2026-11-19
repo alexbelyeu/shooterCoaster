@@ -58,8 +58,12 @@ export function parseNewWorldArgs(argv) {
   return opts
 }
 
-export function templateDir(kind) {
-  return `scripts/new-world/${kind}`
+/** Where the templates live: real .ts/.tsx that `tsc -b . scripts/new-world` and lint check (`env.d.ts` declares `__SEED__`). */
+export const TEMPLATE_ROOT = 'scripts/new-world'
+
+/** Every template `planNewWorld` reads for `kind`, relative to `TEMPLATE_ROOT`: the biome folder's files, then the entries the world adds to the game's per-biome records. */
+export function templatePaths(kind) {
+  return [...TEMPLATE_FILES.map((f) => `${kind}/${f}`), `${kind}/registrations.ts`, 'postcard.tsx']
 }
 
 function biomeDir(biome) {
@@ -145,133 +149,19 @@ function bumpWorldCount(html, from) {
   return html.replace(new RegExp(`\\b(${a})(?=( themed)?\\s+worlds)`, 'gi'), (w) => (w[0] === w[0].toUpperCase() ? pascal(b) : b))
 }
 
-const ATMOSPHERE = {
-  outdoor: `  // __NAME__ (scaffolded): a clear day, the look still to author (sky, sun, fog, grade)
-  __BIOME__: {
-    sky: {
-      zenith: 0x2f6cc4,
-      horizon: 0xbcd6ea,
-      ground: 0x8fa8b8,
-      horizonFalloff: 0.45,
-      sunColor: 0xfff2d8,
-      sunSize: 0.03,
-      sunGlow: 0.5,
-      cloudiness: 0.4,
-      cloudColor: 0xffffff,
-      cloudSpeed: 4,
-      cloudStretch: 1,
-    },
-    sunDirection: [0.45, 0.6, -0.65],
-    sunLightColor: 0xffe8c8,
-    sunLightIntensity: 1.3,
-    hemiSkyColor: 0xd6e8ff,
-    hemiGroundColor: 0x55603a,
-    hemiIntensity: 1.0,
-    fogNear: 400,
-    fogFar: 5200,
-    envIntensity: 0.5,
-    grade: {
-      exposure: 1.0,
-      temperature: 0.05,
-      tint: 0,
-      shadowTint: 0x4a78c8,
-      highlightTint: 0xffd49a,
-      splitTone: 0.15,
-      contrast: 1.05,
-      saturation: 1.05,
-      vibrance: 0.2,
-      vignette: 0.3,
-    },
-  },
-`,
-  interior: `  // __NAME__ (scaffolded interior): the dome only bakes the walls' reflections; the "sun" is the roof lights
-  __BIOME__: {
-    sky: {
-      zenith: 0xdfe9f2,
-      horizon: 0xc9d1d9,
-      ground: 0x9aa2aa,
-      horizonFalloff: 0.6,
-      sunColor: 0xffffff,
-      sunSize: 0,
-      sunGlow: 0,
-      cloudiness: 0,
-      cloudColor: 0xffffff,
-      cloudSpeed: 0,
-      cloudStretch: 1,
-    },
-    sunDirection: [0.3, 1, 0.45],
-    sunLightColor: 0xfff1dc,
-    sunLightIntensity: 1.6,
-    hemiSkyColor: 0xe4eefa,
-    hemiGroundColor: 0x8a8f96,
-    hemiIntensity: 1.35,
-    fogNear: 900,
-    fogFar: 6500,
-    envIntensity: 0.45,
-    grade: {
-      exposure: 1.05,
-      temperature: 0.03,
-      tint: 0,
-      shadowTint: 0x5a7aa8,
-      highlightTint: 0xffe2b8,
-      splitTone: 0.15,
-      contrast: 1.08,
-      saturation: 1.1,
-      vibrance: 0.3,
-      vignette: 0.25,
-    },
-  },
-`,
+/**
+ * The one entry of the record `name` in a registrations template (`<kind>/registrations.ts`, `postcard.tsx`): its lines
+ * between `= {` and the closing `}`, ready for `insertInObject` into the game's record of the same name.
+ */
+function entryOf(templates, rel, name) {
+  const text = templates[rel]
+  if (text === undefined) throw new NewWorldError(`missing template ${TEMPLATE_ROOT}/${rel}`)
+  const start = text.search(new RegExp(`export const ${name}\\b`))
+  const open = text.indexOf('= {\n', start)
+  const close = text.indexOf('\n}', open)
+  if (start < 0 || open < 0 || close < 0) throw new NewWorldError(`${TEMPLATE_ROOT}/${rel}: no record ${name}`)
+  return text.slice(open + 4, close + 1)
 }
-
-const TERRAIN = {
-  outdoor: `  __BIOME__: {
-    frequency: 0.0008,
-    amplitude: 450,
-    octaves: 5,
-    persistence: 0.45,
-    lacunarity: 2.2,
-    exponent: 1.4,
-    ridgeMode: false,
-    baseY: 0,
-    flatRadius: 600,
-    transitionWidth: 800,
-    meshSize: 6000,
-  },
-`,
-  interior: `  // __NAME__ draws its biome's \`floor\`, never this: flat for 100 km.
-  __BIOME__: {
-    frequency: 0.001,
-    amplitude: 1,
-    octaves: 1,
-    persistence: 0.5,
-    lacunarity: 2,
-    exponent: 1,
-    ridgeMode: false,
-    baseY: 0,
-    flatRadius: 100_000,
-    transitionWidth: 1,
-    meshSize: 6000,
-    authoredFloor: true,
-  },
-`,
-}
-
-const REVERB = {
-  outdoor: '{ seconds: 1.6, decayPow: 3.2, toneHz: 7000, level: 0.8 }',
-  interior: '{ seconds: 2.6, decayPow: 2.8, toneHz: 5000, level: 0.9 }',
-}
-
-const POSTCARD = `  // __NAME__ (scaffolded): a stand-in until the world's landmark is drawn here
-  __BIOME__: (t) => (
-    <>
-      <circle cx="160" cy="26" r="8" fill={t.accent2} />
-      <path d="M118 90 L128 30 L138 90Z" fill="#6f6660" />
-      <path d="M0 80 Q50 70 100 78 T200 74 V100 H0Z" fill="#33402c" />
-      <path d="M8 74 Q50 30 92 62 T192 50" stroke={t.accent} strokeWidth="3" fill="none" />
-    </>
-  ),
-`
 
 function fill(text, v) {
   return text
@@ -284,7 +174,7 @@ function fill(text, v) {
 
 /**
  * The scaffold for `opts` (from `parseNewWorldArgs`). `files`: the text of every `EDITED_FILES` path plus the
- * `--score-from` score (`src/audio/scores/<id>.scrim`); `templates`: `TEMPLATE_FILES` → template text for `opts.kind`;
+ * `--score-from` score (`src/audio/scores/<id>.scrim`); `templates`: each of `templatePaths(opts.kind)` → its text;
  * `biomeDirs`: the folders under `biomes/`. Throws `NewWorldError` on an id, biome or score that already exists.
  */
 export function planNewWorld(opts, { files, templates, biomeDirs }) {
@@ -304,6 +194,7 @@ export function planNewWorld(opts, { files, templates, biomeDirs }) {
   const templateScore = text(`src/audio/scores/${scoreFrom}.scrim`)
 
   const v = { id, name, biome, seed: hash(biome) % 9973 }
+  const registrations = `${kind}/registrations.ts`
   const orders = [...registry.matchAll(/order: (\d+)/g)].map((m) => Number(m[1]))
   const order = Math.max(...orders) + 1
   const last = registry.match(/id: '(\w+)',(?:(?!\n {2}\{)[\s\S])*?nextLevel: null,/)
@@ -377,7 +268,7 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
   }),
 `
 
-  let sfx = insertInObject(text(F.sfx), /export const BIOME_REVERB\b/, `  ${biome}: ${REVERB[kind]},\n`, F.sfx)
+  let sfx = insertInObject(text(F.sfx), /export const BIOME_REVERB\b/, fill(entryOf(templates, registrations, 'BIOME_REVERB'), v), F.sfx)
   const keysAt = sfx.indexOf('export const SCORE_KEYS')
   const keysEnd = sfx.indexOf('\n}', keysAt)
   if (keysAt < 0 || keysEnd < 0) throw new NewWorldError(`${F.sfx}: SCORE_KEYS not found`)
@@ -425,8 +316,8 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
   const dir = biomeDir(biome)
   const creates = [
     ...TEMPLATE_FILES.map((f) => {
-      if (templates[f] === undefined) throw new NewWorldError(`missing template ${templateDir(kind)}/${f}.tmpl`)
-      return { path: `${dir}/${f}`, content: fill(templates[f], v) }
+      if (templates[`${kind}/${f}`] === undefined) throw new NewWorldError(`missing template ${TEMPLATE_ROOT}/${kind}/${f}`)
+      return { path: `${dir}/${f}`, content: fill(templates[`${kind}/${f}`], v) }
     }),
     { path: scorePath, content: scrim },
   ]
@@ -436,10 +327,10 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
     { path: F.lapsTest, content: lapsOut, what: `LAPS.${id} = ${lap[1]} s (level1's track)` },
     { path: F.biomeType, content: biomeType, what: `BIOME_TYPES + '${biome}'` },
     { path: F.biomeRegistry, content: biomeRegistry, what: `BIOMES.${biome}` },
-    { path: F.atmosphere, content: insertInObject(text(F.atmosphere), /export const ATMOSPHERES\b/, fill(ATMOSPHERE[kind], v), F.atmosphere), what: `ATMOSPHERES.${biome} (${kind} preset)` },
-    { path: F.terrain, content: insertInObject(text(F.terrain), /export const BIOME_TERRAIN_CONFIGS\b/, fill(TERRAIN[kind], v), F.terrain), what: `BIOME_TERRAIN_CONFIGS.${biome}` },
+    { path: F.atmosphere, content: insertInObject(text(F.atmosphere), /export const ATMOSPHERES\b/, fill(entryOf(templates, registrations, 'ATMOSPHERES'), v), F.atmosphere), what: `ATMOSPHERES.${biome} (${kind} preset)` },
+    { path: F.terrain, content: insertInObject(text(F.terrain), /export const BIOME_TERRAIN_CONFIGS\b/, fill(entryOf(templates, registrations, 'BIOME_TERRAIN_CONFIGS'), v), F.terrain), what: `BIOME_TERRAIN_CONFIGS.${biome}` },
     { path: F.theme, content: insertInObject(text(F.theme), /export const BIOME_UI\b/, themeEntry, F.theme), what: `BIOME_UI.${biome} accent + postcard sky` },
-    { path: F.postcard, content: insertInObject(text(F.postcard), /const SCENES\b/, fill(POSTCARD, v), F.postcard), what: `the level-select postcard stub` },
+    { path: F.postcard, content: insertInObject(text(F.postcard), /const SCENES\b/, fill(entryOf(templates, 'postcard.tsx', 'SCENES'), v), F.postcard), what: `the level-select postcard stub` },
     { path: F.sfx, content: sfx, what: `BIOME_REVERB.${biome}, SCORE_KEYS.${id} (${scoreFrom}'s key)` },
     { path: F.scores, content: scores, what: `SCORES.${id}` },
     { path: F.budgets, content: JSON.stringify(budgets, null, 2) + '\n', what: `smokeSeconds.${id} = ${shardSeconds} (${previous}'s), scene.${id} + pacing.${id} placeholders` },

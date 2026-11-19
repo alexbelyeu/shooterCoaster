@@ -1,5 +1,5 @@
-import type { BiomeDefinition } from '../../shared/types'
-import { PARTICLE_PRESETS } from '../../shared/particlePresets'
+import type { BiomeDefinition } from '@/levels/environments/shared/types'
+import { PARTICLE_PRESETS } from '@/levels/environments/shared/particlePresets'
 import { COLOR_RAMP, LANDMARK_SITE, SPIRE_HEIGHT, TREES } from './config'
 import Decorations from './Decorations'
 import Features from './Features'

@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { EDITED_FILES, NewWorldError, TEMPLATE_FILES, formatPlan, parseNewWorldArgs, planNewWorld, templateDir } from './newWorldPlan.mjs'
+import { EDITED_FILES, NewWorldError, TEMPLATE_ROOT, formatPlan, parseNewWorldArgs, planNewWorld, templatePaths } from './newWorldPlan.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (rel) => (fs.existsSync(path.join(root, rel)) ? fs.readFileSync(path.join(root, rel), 'utf8') : undefined)
@@ -17,7 +17,7 @@ try {
     const t = read(rel)
     if (t !== undefined) files[rel] = t
   }
-  const templates = Object.fromEntries(TEMPLATE_FILES.map((f) => [f, read(`${templateDir(opts.kind)}/${f}.tmpl`)]))
+  const templates = Object.fromEntries(templatePaths(opts.kind).map((t) => [t, read(`${TEMPLATE_ROOT}/${t}`)]))
   const biomeDirs = fs.readdirSync(path.join(root, 'src/levels/environments/biomes'))
   const plan = planNewWorld(opts, { files, templates, biomeDirs })
   if (!opts.dryRun) {
