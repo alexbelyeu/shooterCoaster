@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { PARTICLE_PRESETS } from '../../shared/particlePresets'
 import { FLAME, GYM_SCALE, HALL, blockRings, footprint, toBlockout, type Vec3 } from './blockout'
 import {
+  FLAME_EMBERS,
   FLAME_TOP,
   MAX_SMOKE_PUFFS,
   MAX_TONGUES,
@@ -170,17 +170,24 @@ describe('the Flame fire', () => {
     expect(smokeCount(true, 1)).toBe(MAX_SMOKE_PUFFS / 2)
   })
 
-  it('anchors rising embers over the Flame, their box reaching from its flare to above the crest', () => {
+  it('anchors rising embers over the Flame, their box covering its footprint and reaching from its flare to above the crest', () => {
     const [x, y, z] = emberAnchor()
     const c = toBlockout({ x, y, z })
     expect(c.x).toBeCloseTo(FLAME.centre.x, 5)
     expect(c.z).toBeCloseTo(FLAME.centre.z, 5)
-    const { box, primary, secondary } = PARTICLE_PRESETS.gymFlameEmbers
+    const { box, primary, secondary } = FLAME_EMBERS
+    const ground = fireFootprint()
+    expect(box[0] / 2).toBeGreaterThanOrEqual(ground.halfX)
+    expect(box[2] / 2).toBeGreaterThanOrEqual(ground.halfZ)
     expect(y - box[1] / 2).toBeLessThan(heights.top)
     expect(y + box[1] / 2).toBeGreaterThan(heights.crest)
     for (const layer of [primary, secondary]) {
-      expect(layer.velocity[1]).toBeGreaterThan(0)
+      // Up through the plume in a few seconds at any GYM_SCALE: the rise, in blockout metres a second
+      expect(layer.velocity[1] / GYM_SCALE).toBeGreaterThan(0.5)
+      expect(layer.velocity[1] / GYM_SCALE).toBeLessThan(2)
       expect(layer.additive).toBe(true)
+      expect(layer.opacity * layer.maxPixels).toBeLessThanOrEqual(3.6)
     }
+    expect(FLAME_EMBERS.count).toBeLessThanOrEqual(4000)
   })
 })

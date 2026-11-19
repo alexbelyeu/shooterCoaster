@@ -4,8 +4,8 @@ import { boostStrength, newBoostTrack, particleCounts, PARTICLE_PRESETS, resetBo
 const presets = Object.entries(PARTICLE_PRESETS)
 
 describe('particle presets', () => {
-  it('has the six biome presets and the Flame embers', () => {
-    expect(Object.keys(PARTICLE_PRESETS).sort()).toEqual(['arcticSnow', 'desertDust', 'gymChalk', 'gymFlameEmbers', 'oceanPlankton', 'parkPollen', 'volcanicAsh'])
+  it('has the six biome presets', () => {
+    expect(Object.keys(PARTICLE_PRESETS).sort()).toEqual(['arcticSnow', 'desertDust', 'gymChalk', 'oceanPlankton', 'parkPollen', 'volcanicAsh'])
   })
 
   it.each(presets)('%s stays subtle: count, box and share within bounds', (_, p) => {
