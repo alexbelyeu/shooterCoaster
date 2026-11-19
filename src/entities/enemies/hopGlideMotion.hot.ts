@@ -7,6 +7,14 @@ const ease = (x: number) => x * x * (3 - 2 * x)
 /** Wings over a glide's progress `p`: open fast at take-off, folded again on landing. */
 export const glideWings = (p: number) => ease(clamp(p / HOP.open, 0, 1)) * ease(clamp((1 - p) / HOP.fold, 0, 1))
 
+/** Wings `x` s into a sit `sit` s long: folded, but for one flick open that shows the red hindwings, over by the hop. */
+export function sitWings(x: number, sit: number): number {
+  const f = (x - HOP.flashAt) / Math.min(HOP.flashFor, sit - HOP.flashAt)
+  if (f <= 0 || f >= 1) return 0
+  const s = Math.sin(Math.PI * f)
+  return HOP.flashOpen * s * s
+}
+
 /** Heading of a move by (du, dv) across the wall. */
 const headingOf = (du: number, dv: number) => Math.atan2(-du, dv)
 
@@ -45,7 +53,7 @@ export function hopPose(route: HopRoute, t: number, out: HopPose): HopPose {
       out.v = route.v[k] + (route.cv[k] - route.v[k]) * e
       out.off = HOP.standoff
       out.heading = turnTo(landed, crawl, tau / HOP.turn)
-      out.wings = 0
+      out.wings = sitWings(tau, route.sit[k])
       out.phase = 'sit'
       return out
     }

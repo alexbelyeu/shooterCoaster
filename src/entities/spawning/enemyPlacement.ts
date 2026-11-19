@@ -169,7 +169,7 @@ export interface SwarmSlot {
 }
 
 /** A swarm spreads over a disc of this radius × √count on its wall. */
-export const SWARM_SPACING = 22
+export const SWARM_SPACING = 34
 
 export function swarmSlots(count: number, rng: Rng): SwarmSlot[] {
   const radius = SWARM_SPACING * Math.sqrt(count)

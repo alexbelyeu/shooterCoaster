@@ -19,7 +19,7 @@ export const ENEMY_SILHOUETTE: Record<EnemyType | 'goldenBalloon', number> = {
   climber: 40, // ~25 wide x58 tall, arms up; its back and helmet face the ride
   rat: 44, // x9: ~48 long x20 wide, plus a ~40 tail
   dustBunny: 46, // ball r=2.4 x8 plus tufts
-  lanternfly: 30, // x4: a ~38-long wedge ~14 wide on its wall, ~60 across with its wings open
+  lanternfly: 52, // x7: a ~67-long wedge ~25 wide on its wall, ~105 across with its wings open
 }
 
 /** Px at 1280x720 an enemy must reach during the ride; `READABLE_PX` in e2e/smoke.mjs mirrors it. */
