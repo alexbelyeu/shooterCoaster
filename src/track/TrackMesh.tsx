@@ -25,6 +25,9 @@ import {
 } from './supportTowers'
 import { useContactShadows } from '@/levels/environments/shared/ContactShadows'
 import TrackTunnels from './TrackTunnels'
+import RideMechanics from './RideMechanics'
+import { dropPieceLength, junctionOf, trackGaps } from './mechanics'
+import type { RideMechanic } from '@/types/level'
 
 interface TrackMeshProps {
   curve: TrackCurve
@@ -41,8 +44,8 @@ interface TrackMeshProps {
    */
   groundFn?: HeightFunction
   table: ArcTable
-  /** A junction's branch (#702, `junction.ts`), its own t 0 → 1: laid as more rails beside the main track's. */
-  branch?: TrackCurve
+  /** The track's special mechanics (#699): their structures, and the rails left open over a jump's gap or a drop. */
+  mechanics?: readonly RideMechanic[]
 }
 
 const DEFAULT_DIMS = getTrackDimensions({ scalar: 20 })
@@ -103,16 +106,18 @@ function SupportTowers({
   table,
   dims,
   groundFn,
+  gaps,
 }: {
   curve: TrackCurve
   table: ArcTable
   dims: TrackDimensions
   groundFn?: HeightFunction
+  gaps: readonly (readonly [number, number])[]
 }) {
   const heightFn = useContext(TerrainContext)
   const plan: TowerPlan = useMemo(
-    () => planTowers(curve, table, dims, heightFn, groundFn ?? heightFn),
-    [curve, table, dims, heightFn, groundFn],
+    () => planTowers(curve, table, dims, heightFn, groundFn ?? heightFn, gaps),
+    [curve, table, dims, heightFn, groundFn, gaps],
   )
   useContactShadows(useMemo(() => towerShadowCasters(plan), [plan]))
 
@@ -201,21 +206,26 @@ export default function TrackMesh({
   dims = DEFAULT_DIMS,
   groundFn,
   table,
-  branch,
+  mechanics,
 }: TrackMeshProps) {
+  const gaps = useMemo(() => trackGaps(mechanics, table.length, dropPieceLength(dims.eyeHeight)), [mechanics, table, dims])
   const geometry = useMemo(() => {
-    const main = buildTrackGeometry(curve, table, dims, segments, color1, color2)
-    if (!branch) return main
-    const branchTable = buildArcTable(branch, 1024)
-    const rings = Math.max(16, Math.ceil((segments * branchTable.length) / table.length))
-    const fork = buildTrackGeometry(branch, branchTable, dims, rings, color1, color2)
-    const merged = mergeGeometries([main, fork])
+    const main = buildTrackGeometry(curve, table, dims, segments, color1, color2, gaps)
+    // A junction's branch (#702) is more rails beside the main track's, in the same mesh (no extra draw call).
+    const branches = (mechanics ?? []).flatMap((m) => {
+      if (m.kind !== 'junction') return []
+      const { branch } = junctionOf(curve, m)
+      const branchTable = buildArcTable(branch, 1024)
+      return [buildTrackGeometry(branch, branchTable, dims, Math.max(16, Math.ceil((segments * branchTable.length) / table.length)), color1, color2)]
+    })
+    if (!branches.length) return main
+    const merged = mergeGeometries([main, ...branches])
     main.dispose()
-    fork.dispose()
+    for (const b of branches) b.dispose()
     if (!merged) throw new Error('track branch geometry merge failed')
     merged.computeBoundingSphere()
     return merged
-  }, [curve, table, dims, segments, color1, color2, branch])
+  }, [curve, table, dims, segments, color1, color2, gaps, mechanics])
 
   const material = useMemo(() => createTrackMaterial(glow), [glow])
   const heightFn = useContext(TerrainContext)
@@ -232,7 +242,10 @@ export default function TrackMesh({
   return (
     <>
       <mesh name="track" geometry={geometry} material={material} />
-      <SupportTowers curve={curve} table={table} dims={dims} groundFn={groundFn} />
+      <SupportTowers curve={curve} table={table} dims={dims} groundFn={groundFn} gaps={gaps} />
+      {mechanics?.length ? (
+        <RideMechanics curve={curve} table={table} mechanics={mechanics} dims={dims} color1={color1} color2={color2} trackMaterial={material} />
+      ) : null}
       {table.tunnels?.length ? (
         <TrackTunnels curve={curve} table={table} trackScale={dims.trackScale} color1={color1} color2={color2} groundFn={tunnelGround} />
       ) : null}

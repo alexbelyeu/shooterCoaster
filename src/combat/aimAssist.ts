@@ -14,13 +14,16 @@ import type { CollisionTarget } from './CollisionManager'
 export const TOUCH_ASSIST_RADIUS_PX = 44
 /** Hit-radius multiplier for bullets fired by touch (1 = exact). */
 export const TOUCH_HIT_SCALE = 1.25
-/** Weapon pickups (#185) and a junction's switch (#702) snap from a shorter reach and lose a tie to an enemy. */
+/** Weapon pickups (#185) snap from a shorter reach and lose a tie to an enemy. */
 export const PICKUP_ASSIST_WEIGHT = 0.6
 
-/** A target kind's reach for the snap: 0 never pulls toward it (a bystander, #518). */
+/**
+ * A target kind's reach for the snap: 0 never pulls toward it (a bystander, #518; a junction's switch, #702, so a tap meant
+ * for an enemy never changes the route).
+ */
 export function assistWeight(kind: CollisionTarget['kind']): number {
-  if (kind === 'bystander') return 0
-  return kind === 'pickup' || kind === 'switch' ? PICKUP_ASSIST_WEIGHT : 1
+  if (kind === 'bystander' || kind === 'switch') return 0
+  return kind === 'pickup' ? PICKUP_ASSIST_WEIGHT : 1
 }
 
 /** Snap radius (CSS px) for a pointer kind; 0 = no assist. */

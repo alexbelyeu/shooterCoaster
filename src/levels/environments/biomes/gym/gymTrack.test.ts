@@ -7,7 +7,7 @@ import { getTrackDimensions } from '@/track/trackDimensions'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
 import { tourPose } from '@/track/introCamera.hot'
 import { buildIntroTour } from '@/track/introTour'
-import { buildJunction, switchPose } from '@/track/junction'
+import { type JunctionMechanic, buildJunction, switchPose } from '@/track/mechanics'
 import { gymFloor } from './config'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import { RUN_SECONDS } from '@/levels/pacing'
@@ -125,7 +125,7 @@ describe('the gym track', () => {
   })
 
   it('forks the V8 route (#702) off the east-side run, clear of the blockout, the floor, the hall and the rest of the track', () => {
-    const junction = buildJunction(curve, GYM_TRACK.junction!)
+    const junction = buildJunction(curve, GYM_TRACK.mechanics!.find((m): m is JunctionMechanic => m.kind === 'junction')!)
     const branch = Array.from({ length: 801 }, (_, i) => toBlockout(junction.branch.getPointAt(i / 800)))
     let pieces = Infinity
     let floor = Infinity

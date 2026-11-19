@@ -1,0 +1,220 @@
+{
+  "name": "sfx-sheet-level1-kills",
+  "kind": "sfx",
+  "request": {
+    "kind": "sfxSheet",
+    "kills": true
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.3,
+      "name": "kill 1x"
+    },
+    {
+      "t": 0.8,
+      "name": "kill 2x (+ thump)"
+    },
+    {
+      "t": 1.5,
+      "name": "kill 3x (+ ring)"
+    },
+    {
+      "t": 2.3,
+      "name": "kill 5x (+ payout)"
+    },
+    {
+      "t": 3.4,
+      "name": "kill 1x (flutter)"
+    },
+    {
+      "t": 3.85,
+      "name": "kill 1x (crunch)"
+    },
+    {
+      "t": 4.3,
+      "name": "kill 1x (splash)"
+    },
+    {
+      "t": 4.75,
+      "name": "kill 1x (hiss)"
+    },
+    {
+      "t": 5.2,
+      "name": "kill 1x (chalk)"
+    },
+    {
+      "t": 5.65,
+      "name": "kill 1x (squeak)"
+    },
+    {
+      "t": 6.1,
+      "name": "kill 1x (snap)"
+    }
+  ],
+  "seams": [],
+  "bar": null,
+  "metrics": {
+    "seconds": 6.6,
+    "integrated": -20.2,
+    "shortTermMax": -19.5,
+    "lra": 1.2,
+    "truePeak": -2.4,
+    "clipped": 0,
+    "silence": 4.5,
+    "correlation": 0.999,
+    "below30Db": -39.6,
+    "bands": {
+      "sub": {
+        "pct": 13.3,
+        "db": -8.8
+      },
+      "low": {
+        "pct": 61.9,
+        "db": -2.1
+      },
+      "mid": {
+        "pct": 11.9,
+        "db": -9.2
+      },
+      "presence": {
+        "pct": 8.1,
+        "db": -10.9
+      },
+      "air": {
+        "pct": 4.8,
+        "db": -13.2
+      },
+      "below30": {
+        "pct": 0,
+        "db": -39.6
+      }
+    },
+    "seamJumps": [],
+    "seamJumpMax": null,
+    "sounds": [
+      {
+        "t": 0.3,
+        "name": "kill 1x",
+        "peakDb": -6.2,
+        "tailMs": 446
+      },
+      {
+        "t": 0.8,
+        "name": "kill 2x (+ thump)",
+        "peakDb": -2.7,
+        "tailMs": 581
+      },
+      {
+        "t": 1.5,
+        "name": "kill 3x (+ ring)",
+        "peakDb": -3.3,
+        "tailMs": 797
+      },
+      {
+        "t": 2.3,
+        "name": "kill 5x (+ payout)",
+        "peakDb": -4.1,
+        "tailMs": 937
+      },
+      {
+        "t": 3.4,
+        "name": "kill 1x (flutter)",
+        "peakDb": -5.7,
+        "tailMs": 421
+      },
+      {
+        "t": 3.85,
+        "name": "kill 1x (crunch)",
+        "peakDb": -5,
+        "tailMs": 446
+      },
+      {
+        "t": 4.3,
+        "name": "kill 1x (splash)",
+        "peakDb": -4.7,
+        "tailMs": 446
+      },
+      {
+        "t": 4.75,
+        "name": "kill 1x (hiss)",
+        "peakDb": -6.2,
+        "tailMs": 446
+      },
+      {
+        "t": 5.2,
+        "name": "kill 1x (chalk)",
+        "peakDb": -6,
+        "tailMs": 446
+      },
+      {
+        "t": 5.65,
+        "name": "kill 1x (squeak)",
+        "peakDb": -7.1,
+        "tailMs": 436
+      },
+      {
+        "t": 6.1,
+        "name": "kill 1x (snap)",
+        "peakDb": -8.1,
+        "tailMs": 205
+      }
+    ]
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -20.2,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "Short-term max",
+      "value": -19.5,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -2.4,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -39.6,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 0.999,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 1.2,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 4.5,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

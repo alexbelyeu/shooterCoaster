@@ -7,7 +7,7 @@ import { TRACK_TUNNEL_EVENT, getTunnelDims } from './setPieces'
 import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
 import { setRideProgress } from './rideProgress.hot'
 import {
-  advanceRide, jumpRide, resetRide, rideLaunches, rideOnLift, rideSpeedNorm, rideStepFrames, rideTopShare, rideZone, type RideSpeeds,
+  advanceRide, jumpRide, resetRide, rideLaunches, rideOnLift, rideSpeedNorm, rideStepFrames, rideStopShare, rideTopShare, rideZone, type RideSpeeds,
   type RideState,
 } from './ridePhysics'
 import { e2eRideSeconds, levelTimeStep } from '@/testing/e2eHook'
@@ -34,19 +34,20 @@ import {
 import { introStartedAt, setCameraOffSeat } from '@/core/introShot'
 import { buildIntroTour } from './introTour'
 import { createSeatPose, seatPose } from './seatPose.hot'
+import { routeCurve, routeSpeedScale } from './mechanics.hot'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
+import type { RideMechanic } from '@/types/level'
 
 interface CoasterCameraProps {
-  /** The track the ride's speed and timing follow. */
   curve: TrackCurve
-  /** The track the seat rides, when it differs: a junction's routed curve (#702), the same timing on either route. */
-  seatCurve?: TrackCurve
   /** The curve's arc-length table (SceneManager's `trackTable`). */
   table: ArcTable
   /** `trackDimensions.trackScale`. */
   trackScale: number
   /** The level's ride (`ridePhysics.ts` `rideModel`). */
   speeds: RideSpeeds
+  /** The track's special mechanics (#699): a drop track and a backwards stretch turn the seat, a junction's branch (#702) routes it. */
+  mechanics?: readonly RideMechanic[]
   fov?: number
   near?: number
   far?: number
@@ -68,10 +69,10 @@ const WORLD_UP = new THREE.Vector3(0, 1, 0)
 /** Rides the track (port of Camera.js updateCamGame) with rotation-only weight from cameraRig.hot.ts; the mouse only aims. */
 export default function CoasterCamera({
   curve,
-  seatCurve = curve,
   table,
   trackScale,
   speeds,
+  mechanics,
   fov = BASE_FOV,
   near = 1,
   far = 11000,
@@ -269,19 +270,24 @@ export default function CoasterCamera({
     }
     const tunnel = tunnelDepth(table.tunnels, dist, tunnelRamp)
 
-    const pose = seatPose(seatCurve, table, t, trackScale, heightOffset, seat.current)
+    const route = store.route
+    const pose = seatPose(curve, table, t, trackScale, heightOffset, seat.current, mechanics, rideStopShare(ride.current, speeds), route)
     cam.position.copy(pose.eye)
     const velocityNorm = rideSpeedNorm(ride.current, speeds)
 
     // Lateral acceleration from the tangents a few units either side of the car, measured along the track.
     const s = scratch.current
     const at = pose.samples
-    const speed = ride.current.velocity * 60 * at.unitsPerT
+    // On a junction's branch (#702) the seat covers more track per t than the main curve's table says: scale by it.
+    const seatCurve = routeCurve(curve, mechanics, route)
+    const branchScale = routeSpeedScale(curve, seatCurve, t)
+    const speed = ride.current.velocity * 60 * at.unitsPerT * branchScale
+    const span = at.span * branchScale
     s.tangentBehind.copy(seatCurve.getTangentAt(at.behindT))
     s.tangentAhead.copy(seatCurve.getTangentAt(at.aheadT))
     const input = s.rig
-    input.lateral = lateralAcceleration(pose.tangent, s.tangentBehind, s.tangentAhead, at.span, speed)
-    input.vertical = verticalAcceleration(s.tangentBehind, s.tangentAhead, at.span, speed)
+    input.lateral = lateralAcceleration(pose.tangent, s.tangentBehind, s.tangentAhead, span, speed)
+    input.vertical = verticalAcceleration(s.tangentBehind, s.tangentAhead, span, speed)
     input.speed = speed
     input.speedNorm = velocityNorm
     input.descent = -pose.tangent.y

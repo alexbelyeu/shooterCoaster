@@ -3,8 +3,6 @@ import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
-import { buildJunction, routedCurve } from '@/track/junction'
-import TrackSwitch from '@/track/TrackSwitch'
 import TrackMesh from '@/track/TrackMesh'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { buildArcTable } from '@/track/arcLength'
@@ -80,9 +78,6 @@ export default function LevelScene({ levelId }: { levelId: string }) {
   const { track, environment, biome, enemies, combat, boss, pickups, walls } = config
 
   const curve = useMemo(() => createTrackCurve(track), [track])
-  /** A shoot-to-switch junction (#702): the car rides `routed`, which takes the branch once the switch is shot. */
-  const junction = useMemo(() => (track.junction ? buildJunction(curve, track.junction) : null), [curve, track.junction])
-  const routed = useMemo(() => (junction ? routedCurve(curve, junction) : null), [curve, junction])
 
   const trackDims = useMemo(() => getTrackDimensions(track), [track])
   const trackTable = useMemo(() => withTunnels(buildArcTable(curve), track.tunnels, trackDims.trackScale), [curve, track.tunnels, trackDims])
@@ -103,10 +98,10 @@ export default function LevelScene({ levelId }: { levelId: string }) {
     <TerrainContext.Provider value={heightFn}>
       <CoasterCamera
         curve={curve}
-        seatCurve={routed ?? undefined}
         table={trackTable}
         trackScale={trackDims.trackScale}
         speeds={speeds}
+        mechanics={track.mechanics}
         heightOffset={trackDims.eyeHeight}
         hero={BIOMES[biome].hero}
         groundFn={groundFn}
@@ -122,7 +117,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
           dims={trackDims}
           groundFn={groundFn}
           table={trackTable}
-          branch={junction?.branch}
+          mechanics={track.mechanics}
         />
         <BiomeEnvironment
           biome={biome}
@@ -135,7 +130,6 @@ export default function LevelScene({ levelId }: { levelId: string }) {
       </ContactShadows>
       <BulletPool bulletColor={combat?.bulletColor} bulletSize={combat?.bulletSize} />
       <ParticleExplosionPool />
-      {junction && routed ? <TrackSwitch main={curve} junction={junction} routed={routed} eyeHeight={trackDims.eyeHeight} /> : null}
       <Pickups levelId={levelId} ids={pickups} pointAt={pointAt} trackScale={trackDims.trackScale} />
       {/* Before EnemySpawner: its mount effect announces the first wave, and the
           stinger listener must already be subscribed. */}

@@ -64,7 +64,7 @@ import { scoreCardFileName, scoreCardRun, type CardSize } from '@/ui/scoreCard'
 import { renderScoreCard } from '@/ui/scoreCardImage'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
-import type { Junction, RoutedCurve, SwitchPose } from '@/track/junction'
+import type { Junction, SwitchPose } from '@/track/mechanics'
 import type { TrackCurve } from '@/track/curves/TrackCurve'
 import { rideProgress } from '@/track/rideProgress.hot'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
@@ -652,7 +652,7 @@ export const e2ePickups: { list: readonly LivePickup[] } = { list: [] }
 
 /** Written by `track/TrackSwitch.tsx` when the e2e flag is on; read through `trackSwitch()`. */
 export const e2eSwitch: {
-  state: { pose: SwitchPose; routed: RoutedCurve; main: TrackCurve; junction: Junction; open: () => boolean } | null
+  state: { pose: SwitchPose; main: TrackCurve; junction: Junction; open: () => boolean } | null
 } = { state: null }
 
 function readSwitch(): E2ESwitch | null {
@@ -674,7 +674,7 @@ function readSwitch(): E2ESwitch | null {
     t,
     from,
     to,
-    hard: s.routed.hard,
+    hard: useGameStore.getState().route === 'hard',
     riding,
     open: s.open(),
     x: ((_v.x + 1) / 2) * probeSize.width,

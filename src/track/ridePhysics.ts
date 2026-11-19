@@ -1,6 +1,7 @@
 import { distanceAtT, indexAtT, tAtLoopDistance, type ArcTable } from './arcLength'
 import type { TrackCurve } from './curves/TrackCurve'
-import { buildRidePlan, PLAN_RATE, planDistance, planSpeed, planTimeAt, planZoneAt, type RidePlan } from './rideV2'
+import { buildRidePlan, PLAN_RATE, planDistance, planSpeed, planStopShare, planTimeAt, planZoneAt, type RidePlan } from './rideV2'
+import { checkMechanics, withMechanics } from './mechanics'
 import type { SpeedZone, TrackParams } from '@/types/level'
 
 /**
@@ -32,10 +33,18 @@ export function rideSpeeds({ rollerSpeed, minRollerSpeed }: { rollerSpeed: numbe
   }
 }
 
-/** The level's ride: its v2 plan when it opts in, else today's rule. Cold: solves the plan (a few ms). */
+/**
+ * The level's ride: its v2 plan when it opts in (with its mechanics' zones and stops, #699), else today's rule, whose
+ * only mechanic is a junction (#702: no zones). Cold: solves the plan (a few ms).
+ */
 export function rideModel(track: TrackParams, table: ArcTable): RideSpeeds {
   const speeds = rideSpeeds(track)
-  return track.ride === 'v2' ? { ...speeds, plan: buildRidePlan(table, track.rideV2 ?? {}) } : speeds
+  if (track.ride !== 'v2') {
+    if (track.mechanics?.some((m) => m.kind !== 'junction')) throw new Error('ride mechanics need the v2 ride (track.ride: "v2")')
+    checkMechanics(track.mechanics)
+    return speeds
+  }
+  return { ...speeds, plan: buildRidePlan(table, withMechanics(track.rideV2 ?? {}, track.mechanics, table.length)) }
 }
 
 /** Velocity after `frames` on track whose unit tangent rises by `tangentY`, clamped to the ride's speeds. */
@@ -84,6 +93,11 @@ export function rideTopShare(state: RideState, speeds: RideSpeeds): number {
 /** The v2 zone the car is in; today's rule has no zones. */
 export function rideZone(state: RideState, speeds: RideSpeeds): SpeedZone['kind'] | null {
   return speeds.plan ? planZoneAt(speeds.plan, state.time) : null
+}
+
+/** How far through a stop (a drop track's top, a turntable) the car is, -1 when moving; today's rule never stops. */
+export function rideStopShare(state: RideState, speeds: RideSpeeds): number {
+  return speeds.plan ? planStopShare(speeds.plan, state.time) : -1
 }
 
 /** Today's rule has no chain: climbing this steeply while held at its minimum speed is what pulls the car up. */

@@ -7,17 +7,13 @@ import { sfx } from '@/audio/sfx'
 import { useGameStore } from '@/store/useGameStore'
 import { e2eSwitch, isE2E } from '@/testing/e2eHook'
 import type { TrackCurve } from './curves/TrackCurve'
-import { type Junction, type RoutedCurve, type SwitchPose, switchOpen, switchPose } from './junction'
+import { type Junction, type SwitchPose, SWITCH_BOARD_H, SWITCH_BOARD_W, SWITCH_HIT_RADIUS, switchOpen, switchPose } from './mechanics'
 import { rideProgress } from './rideProgress.hot'
 
 const TARGET_ID = 'track-switch'
-/** The board and its post, in eye heights. */
-const BOARD_W = 6
-const BOARD_H = 3.6
+/** The post, in eye heights. */
 const POST_H = 4
 const POST_W = 0.35
-/** The hit sphere round the board's centre, in eye heights. */
-const HIT_RADIUS = 3.6
 const FLIP_S = 0.35
 
 const EASY = { label: 'V2', bg: '#15803d', fg: '#f0fdf4' }
@@ -84,8 +80,8 @@ function drawFaces(side: 1 | -1): THREE.CanvasTexture {
 
 /** The board (front: the top half of the faces, back: the bottom half) on a post, in eye heights times `eye`. */
 function buildSignGeometry(eye: number): THREE.BufferGeometry {
-  const w = BOARD_W * eye
-  const h = BOARD_H * eye
+  const w = SWITCH_BOARD_W * eye
+  const h = SWITCH_BOARD_H * eye
   const front = new THREE.PlaneGeometry(w, h)
   const back = new THREE.PlaneGeometry(w, h).rotateY(Math.PI)
   const uvs = (geom: THREE.BufferGeometry, v0: number) => {
@@ -112,13 +108,14 @@ interface TrackSwitchProps {
   /** The main (easy) route. */
   main: TrackCurve
   junction: Junction
-  /** The ride's curve: the switch sets its `hard`. */
-  routed: RoutedCurve
   eyeHeight: number
 }
 
-/** A junction's switch (#702): a V2 sign at the fork; shoot it and it flips to V8 with a clunk, and the car takes the hard way. */
-export default function TrackSwitch({ main, junction, routed, eyeHeight }: TrackSwitchProps) {
+/**
+ * A junction's switch (#702, mounted by `RideMechanics`): a V2 sign at the fork; shoot it and it flips to V8 with a clunk,
+ * and the run's `route` turns 'hard' (the seat takes the branch, `seatPose`).
+ */
+export default function TrackSwitch({ main, junction, eyeHeight }: TrackSwitchProps) {
   const groupRef = useRef<THREE.Group>(null)
   const runId = useGameStore((s) => s.runId)
   const pose: SwitchPose = useMemo(() => switchPose(main, junction, eyeHeight), [main, junction, eyeHeight])
@@ -138,31 +135,31 @@ export default function TrackSwitch({ main, junction, routed, eyeHeight }: Track
     [geometry, texture, material],
   )
 
+  // Per run (`runId`): the store's `startRun` sets the route back to 'easy'.
   useEffect(() => {
-    routed.hard = false
     flipAge.current = -1
     armed.current = true
     registerCollisionTarget({
       id: TARGET_ID,
       kind: 'switch',
       getPosition: () => pose.position,
-      radiusSq: (HIT_RADIUS * eyeHeight) ** 2,
+      radiusSq: (SWITCH_HIT_RADIUS * eyeHeight) ** 2,
       onHit: () => {
-        if (routed.hard || !switchOpen(rideProgress(), pose)) return
-        routed.hard = true
+        const store = useGameStore.getState()
+        if (store.route === 'hard' || !switchOpen(rideProgress(), pose)) return
+        store.setRoute('hard')
         flipAge.current = 0
         armed.current = false
         unregisterCollisionTarget(TARGET_ID)
         sfx().trackSwitch()
       },
     })
-    if (isE2E) e2eSwitch.state = { pose, routed, main, junction, open: () => switchOpen(rideProgress(), pose) }
+    if (isE2E) e2eSwitch.state = { pose, main, junction, open: () => switchOpen(rideProgress(), pose) }
     return () => {
       unregisterCollisionTarget(TARGET_ID)
-      routed.hard = false
       if (isE2E) e2eSwitch.state = null
     }
-  }, [routed, pose, main, junction, eyeHeight, runId])
+  }, [pose, main, junction, eyeHeight, runId])
 
   useFrame((_, delta) => {
     const group = groupRef.current

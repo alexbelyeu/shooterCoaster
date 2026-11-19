@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
-import { buildJunction } from '@/track/junction'
+import { buildJunction } from '@/track/mechanics'
 import { PIECES, pieceBoxes, toBlockout, type Vec3 } from './blockout'
 import { GYM_TRACK } from './gymTrack'
 
@@ -38,8 +38,9 @@ function trackCells(): Map<string, Vec3[]> {
     map.set(key, [...(map.get(key) ?? []), p])
   }
   for (let i = 0; i < SAMPLES; i++) add(curve.getPointAt(i / SAMPLES))
-  if (GYM_TRACK.junction) {
-    const { from, to, branch } = buildJunction(curve, GYM_TRACK.junction)
+  for (const m of GYM_TRACK.mechanics ?? []) {
+    if (m.kind !== 'junction') continue
+    const { from, to, branch } = buildJunction(curve, m)
     const n = Math.ceil(SAMPLES * (to - from) * 1.5)
     for (let i = 0; i <= n; i++) add(branch.getPointAt(i / n))
   }
