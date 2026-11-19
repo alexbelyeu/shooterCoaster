@@ -1,9 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
-import {
-  LANTERNFLY_BODY_GEO, LANTERNFLY_FOREWING_GEOS, LANTERNFLY_FOREWING_PIVOT, LANTERNFLY_HINDWING_GEOS, LANTERNFLY_HINDWING_PIVOT, LANTERNFLY_MAT,
-} from './SharedEnemyAssets'
+import { setFlashMaterial } from './hitFlash'
+import { LANTERNFLY_GEO, createLanternflyFlashMaterial, createLanternflyMaterial } from './SharedEnemyAssets'
 import { HOP, hopRoute, newHopPose } from './hopGlideMotion'
 import { hopPose } from './hopGlideMotion.hot'
 import { freeWallSlot, wallNormal, wallPoint } from '@/entities/spawning/enemyPlacement'
@@ -11,18 +10,8 @@ import { hashString } from '@/utils/rng'
 
 // Reads on the gym's walls from the ride, on a phone (#665); HOP's distances and SWARM_SPACING scale with it.
 const LANTERNFLY_SCALE = 7
-/** Each wing's swing out in the wall's plane, its roll (a tent over the back when folded) and the hindwing's fan; folded, the hindwings show a red edge past the forewings (#665). */
-const FOLDED = { foreSwing: 0.06, foreRoll: 0.5, hindSwing: 0.25, hindRoll: 0.4, hindFan: 0.6 }
-const OPEN = { foreSwing: 1.45, foreRoll: 0.1, hindSwing: 0.55, hindRoll: 0.05, hindFan: 1 }
-const SIDES = [1, -1] as const
-// Built once: R3F compares props by reference, so a per-render Euler would refold the wings on any re-render (the pause, #577).
-const FOLDED_FORE = SIDES.map((s) => new THREE.Euler(0, s * FOLDED.foreRoll, s * FOLDED.foreSwing, 'ZYX'))
-const FOLDED_HIND = SIDES.map((s) => new THREE.Euler(0, s * FOLDED.hindRoll, s * FOLDED.hindSwing, 'ZYX'))
-const FOLDED_HIND_SCALE: [number, number, number] = [FOLDED.hindFan, 1, 1]
 
-const mix = (a: number, b: number, t: number) => a + (b - a) * t
-
-/** A spotted lanternfly (#516): lands on its wall, sits, crawls, and hops and glides about it (`hopGlideMotion.ts`), flashing its red hindwings. */
+/** A spotted lanternfly (#516) in one draw call (#632): lands on its wall, sits, crawls, and hops and glides about it (`hopGlideMotion.ts`), flashing its red hindwings, which open in its material's vertex shader. */
 export default function Lanternfly(props: EnemyProps) {
   const { id, spawnPosition } = props
   // Mount-time only, like EnemyBase's start.
@@ -42,8 +31,16 @@ export default function Lanternfly(props: EnemyProps) {
   const pose = useRef(newHopPose()).current
   const startedAt = useRef<number | null>(null)
   const heading = useRef<THREE.Group>(null)
-  const forewings = useRef<(THREE.Group | null)[]>([null, null])
-  const hindwings = useRef<(THREE.Group | null)[]>([null, null])
+  const wings = useMemo(() => ({ value: 0 }), [])
+  const material = useMemo(() => createLanternflyMaterial(wings), [wings])
+  const flashMaterial = useMemo(() => createLanternflyFlashMaterial(wings), [wings])
+  useEffect(() => () => {
+    material.dispose()
+    flashMaterial.dispose()
+  }, [material, flashMaterial])
+  const tagFlash = useCallback((mesh: THREE.Mesh | null) => {
+    if (mesh) setFlashMaterial(mesh, flashMaterial)
+  }, [flashMaterial])
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number) => {
@@ -51,46 +48,16 @@ export default function Lanternfly(props: EnemyProps) {
       hopPose(route, time - startedAt.current, pose)
       wallPoint(slot.wall, pose.u, pose.v, pose.off, mesh.position, normal)
       if (heading.current) heading.current.rotation.z = pose.heading
-      const w = pose.wings
-      for (let i = 0; i < 2; i++) {
-        const s = SIDES[i]
-        forewings.current[i]?.rotation.set(0, s * mix(FOLDED.foreRoll, OPEN.foreRoll, w), s * mix(FOLDED.foreSwing, OPEN.foreSwing, w))
-        const hind = hindwings.current[i]
-        if (hind) {
-          hind.rotation.set(0, s * mix(FOLDED.hindRoll, OPEN.hindRoll, w), s * mix(FOLDED.hindSwing, OPEN.hindSwing, w))
-          hind.scale.x = mix(FOLDED.hindFan, OPEN.hindFan, w)
-        }
-      }
+      wings.value = pose.wings
     },
-    [route, pose, slot, normal],
+    [route, pose, slot, normal, wings],
   )
 
-  const [fx, fy, fz] = LANTERNFLY_FOREWING_PIVOT
-  const [hx, hy, hz] = LANTERNFLY_HINDWING_PIVOT
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group quaternion={onWall}>
         <group ref={heading} scale={LANTERNFLY_SCALE}>
-          <mesh geometry={LANTERNFLY_BODY_GEO} material={LANTERNFLY_MAT} />
-          {SIDES.map((s, i) => (
-            <group key={s}>
-              <group
-                ref={(g) => { hindwings.current[i] = g }}
-                position={[s * hx, hy, hz]}
-                rotation={FOLDED_HIND[i]}
-                scale={FOLDED_HIND_SCALE}
-              >
-                <mesh geometry={LANTERNFLY_HINDWING_GEOS[i]} material={LANTERNFLY_MAT} />
-              </group>
-              <group
-                ref={(g) => { forewings.current[i] = g }}
-                position={[s * fx, fy, fz]}
-                rotation={FOLDED_FORE[i]}
-              >
-                <mesh geometry={LANTERNFLY_FOREWING_GEOS[i]} material={LANTERNFLY_MAT} />
-              </group>
-            </group>
-          ))}
+          <mesh ref={tagFlash} geometry={LANTERNFLY_GEO} material={material} />
         </group>
       </group>
     </EnemyBase>

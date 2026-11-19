@@ -1036,9 +1036,10 @@ export const DUST_BUNNY_EYE_MAT = new THREE.MeshStandardMaterial({
 })
 
 // ── Spotted lanternfly (#516), built to docs/art/ENEMIES.md ──
-// Lies on a wall: head along +y, its back out of the wall along +z. One material, five moving parts: the body and each
+// Lies on a wall: head along +y, its back out of the wall along +z. One mesh, one draw call (#632): the body and each
 // side's forewing and hindwing, every wing about its own shoulder (LANTERNFLY_FOREWING_PIVOT / _HINDWING_PIVOT, x
-// mirrored for the left), built for the right side (+x) back along -y in its own xy plane. 500-triangle cap.
+// mirrored for the left), built for the right side (+x) back along -y in its own xy plane, then laid at its folded
+// pose; the material's vertex shader opens the wings (`withLanternflyWings`). 500-triangle cap.
 
 const LANTERNFLY_BODY = '#1d1a1a'
 const LANTERNFLY_LEG = '#2a2522'
@@ -1052,6 +1053,9 @@ const LANTERNFLY_BAND = '#f2efe6'
 
 export const LANTERNFLY_FOREWING_PIVOT: Vec3 = [0.3, 1.2, 1.1]
 export const LANTERNFLY_HINDWING_PIVOT: Vec3 = [0.25, 0.9, 0.9]
+/** Each wing's swing out in the wall's plane, its roll (a tent over the back when folded) and the hindwing's fan; folded, the hindwings show a red edge past the forewings (#665). */
+export const LANTERNFLY_FOLDED = { foreSwing: 0.06, foreRoll: 0.5, hindSwing: 0.25, hindRoll: 0.4, hindFan: 0.6 }
+export const LANTERNFLY_OPEN = { foreSwing: 1.45, foreRoll: 0.1, hindSwing: 0.55, hindRoll: 0.05, hindFan: 1 }
 
 type P2 = [number, number]
 
@@ -1116,7 +1120,7 @@ const mirrorX = pose([0, 0, 0], [0, 0, 0], [-1, 1, 1])
 /** The left side's: mirrored, its faces turned the right way out again. */
 const mirrored = (parts: THREE.BufferGeometry[]) => mergePainted(parts.map((g) => flipWinding(g.applyMatrix4(mirrorX))))
 
-export const LANTERNFLY_BODY_GEO = mergePainted([
+const lanternflyBody = () => mergePainted([
   paintedAt(new THREE.SphereGeometry(1, 6, 4), LANTERNFLY_BODY, pose([0, -2.1, 0.6], [0, 0, 0], [0.8, 2.1, 0.6])),
   paintedAt(new THREE.SphereGeometry(1, 6, 4), LANTERNFLY_BODY, pose([0, 0.55, 0.7], [0, 0, 0], [0.9, 0.95, 0.65])),
   paintedAt(new THREE.SphereGeometry(0.6, 6, 3), LANTERNFLY_BODY, pose([0, 1.75, 0.6], [0, 0, 0], [1, 0.85, 0.85])),
@@ -1129,9 +1133,53 @@ export const LANTERNFLY_BODY_GEO = mergePainted([
   })),
 ])
 
-/** [right, left]. */
-export const LANTERNFLY_FOREWING_GEOS = [mergePainted(forewingParts()), mirrored(forewingParts())] as const
-export const LANTERNFLY_HINDWING_GEOS = [mergePainted(hindwingParts()), mirrored(hindwingParts())] as const
+const isHind = (tag: number) => Math.abs(tag) > 1.5
+const wingPivot = (tag: number, out: THREE.Vector3) => {
+  const [px, py, pz] = isHind(tag) ? LANTERNFLY_HINDWING_PIVOT : LANTERNFLY_FOREWING_PIVOT
+  return out.set(Math.sign(tag) * px, py, pz)
+}
+
+/**
+ * A wing built at its shoulder, tagged for the shader (±1 forewing, ±2 hindwing; + = right) and laid at its folded
+ * pose: the hindwing's fan along x, then the roll and swing about its shoulder (Euler ZYX), the transform the shader undoes.
+ */
+function foldedWing(g: THREE.BufferGeometry, tag: number): THREE.BufferGeometry {
+  const side = Math.sign(tag)
+  const f = LANTERNFLY_FOLDED
+  const hind = isHind(tag)
+  const fold = new THREE.Matrix4().compose(
+    wingPivot(tag, new THREE.Vector3()),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(0, side * (hind ? f.hindRoll : f.foreRoll), side * (hind ? f.hindSwing : f.foreSwing), 'ZYX')),
+    new THREE.Vector3(hind ? f.hindFan : 1, 1, 1),
+  )
+  return wingTagged(g.applyMatrix4(fold), tag)
+}
+
+/** Grows the bounds (frustum culling) to every pose, not just the folded one the geometry holds: each wing's reach from its shoulder, fanned out. */
+function boundEveryWingPose(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const sphere = g.boundingSphere!
+  const pos = g.attributes.position
+  const tag = g.attributes.aWing
+  const v = new THREE.Vector3()
+  const pivot = new THREE.Vector3()
+  for (let i = 0; i < pos.count; i++) {
+    const t = tag.getX(i)
+    if (t === 0) continue
+    wingPivot(t, pivot)
+    const reach = v.fromBufferAttribute(pos, i).distanceTo(pivot) / (isHind(t) ? LANTERNFLY_FOLDED.hindFan : 1)
+    sphere.radius = Math.max(sphere.radius, pivot.distanceTo(sphere.center) + reach)
+  }
+  return g
+}
+
+/** The whole bug folded, each side's hindwing under its forewing. */
+export const LANTERNFLY_GEO = boundEveryWingPose(mergePainted([
+  wingTagged(lanternflyBody(), 0),
+  foldedWing(mergePainted(hindwingParts()), 2),
+  foldedWing(mirrored(hindwingParts()), -2),
+  foldedWing(mergePainted(forewingParts()), 1),
+  foldedWing(mirrored(forewingParts()), -1),
+]))
 
 /** Share of its own paint each lanternfly lights on its own: on the gym's shaded walls its red read as maroon and its forewings as black (#665). */
 const LANTERNFLY_SELF_LIT = 0.45
@@ -1151,13 +1199,68 @@ function withSelfLit<T extends THREE.Material>(material: T, lift: number): T {
   return material
 }
 
-export const LANTERNFLY_MAT = withSelfLit(withRim(new THREE.MeshStandardMaterial({
-  vertexColors: true,
-  roughness: 0.55,
-  metalness: 0,
-  flatShading: true,
-  side: THREE.DoubleSide,
-}), { color: '#fff2e0', intensity: 0.45, power: 2.5 }), LANTERNFLY_SELF_LIT)
+const LANTERNFLY_WING_PARS = /* glsl */ `
+attribute float aWing;
+uniform float uLanternflyWings;
+vec3 lanternflyRz(vec3 q, float a) { float c = cos(a), s = sin(a); return vec3(c * q.x - s * q.y, s * q.x + c * q.y, q.z); }
+vec3 lanternflyRy(vec3 q, float a) { float c = cos(a), s = sin(a); return vec3(c * q.x + s * q.z, q.y, c * q.z - s * q.x); }
+`
+
+const glslVec3 = (v: readonly number[]) => `vec3(${v.map((n) => n.toFixed(3)).join(', ')})`
+const LF_FOLDED = LANTERNFLY_FOLDED
+const LF_OPEN = LANTERNFLY_OPEN
+
+// Undoes each wing's folded pose about its shoulder (foldedWing), then lays it at the pose `uLanternflyWings` mixes
+// (0 folded, 1 open). Flat shading takes normals from screen derivatives, so only positions move.
+const LANTERNFLY_WING_OPEN = /* glsl */ `
+{
+  float side = sign(aWing);
+  if (side != 0.0) {
+    bool hind = abs(aWing) > 1.5;
+    vec3 shoulder = (hind ? ${glslVec3(LANTERNFLY_HINDWING_PIVOT)} : ${glslVec3(LANTERNFLY_FOREWING_PIVOT)}) * vec3(side, 1.0, 1.0);
+    // (swing, roll, fan)
+    vec3 folded = hind ? ${glslVec3([LF_FOLDED.hindSwing, LF_FOLDED.hindRoll, LF_FOLDED.hindFan])} : ${glslVec3([LF_FOLDED.foreSwing, LF_FOLDED.foreRoll, 1])};
+    vec3 open = hind ? ${glslVec3([LF_OPEN.hindSwing, LF_OPEN.hindRoll, LF_OPEN.hindFan])} : ${glslVec3([LF_OPEN.foreSwing, LF_OPEN.foreRoll, 1])};
+    vec3 p = mix(folded, open, uLanternflyWings);
+    vec3 q = lanternflyRy(lanternflyRz(transformed - shoulder, -side * folded.x), -side * folded.y);
+    q.x *= p.z / folded.z;
+    transformed = shoulder + lanternflyRz(lanternflyRy(q, side * p.y), side * p.x);
+  }
+}
+`
+
+export function patchLanternflyWingVertex(vertexShader: string): string {
+  return vertexShader
+    .replace('#include <common>', `#include <common>\n${LANTERNFLY_WING_PARS}`)
+    .replace('#include <begin_vertex>', `#include <begin_vertex>\n${LANTERNFLY_WING_OPEN}`)
+}
+
+/** Opens `material`'s lanternfly wings by `wings` (0 folded, 1 open); every material built the same way shares one program. */
+function withLanternflyWings<T extends THREE.Material>(material: T, wings: { value: number }): T {
+  const base = material.onBeforeCompile
+  const baseKey = material.customProgramCacheKey()
+  material.onBeforeCompile = (shader, renderer) => {
+    base.call(material, shader, renderer)
+    shader.uniforms.uLanternflyWings = wings
+    shader.vertexShader = patchLanternflyWingVertex(shader.vertexShader)
+  }
+  material.customProgramCacheKey = () => `${baseKey}-lanternfly-wings`
+  return material
+}
+
+/** One lanternfly's paint, its wings opened by `wings`; every instance shares one program. */
+export function createLanternflyMaterial(wings: { value: number }): THREE.MeshStandardMaterial {
+  return withLanternflyWings(withSelfLit(withRim(new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.55,
+    metalness: 0,
+    flatShading: true,
+    side: THREE.DoubleSide,
+  }), { color: '#fff2e0', intensity: 0.45, power: 2.5 }), LANTERNFLY_SELF_LIT), wings)
+}
+
+/** Only for ShaderWarmup: lanternflies build their own instances. */
+export const LANTERNFLY_MAT = createLanternflyMaterial({ value: 0 })
 
 // ── Hit flash (shared by every enemy) ───────────────────────────────
 // On hit, EnemyBase swaps each mesh's material to this one for the kill-pop
@@ -1171,3 +1274,8 @@ export const ENEMY_HIT_FLASH_MAT = new THREE.MeshBasicMaterial({
 /** The crow's hit flinch: wings snapped up (arm, hand; radians, + = down). */
 export const CROW_FLINCH_POSE = new THREE.Vector2(-1.15, -0.5)
 export const CROW_FLINCH_MAT = withCrowWings(ENEMY_HIT_FLASH_MAT.clone(), { value: CROW_FLINCH_POSE })
+
+/** A lanternfly's hit flash, its wings held where `wings` has them. */
+export const createLanternflyFlashMaterial = (wings: { value: number }) => withLanternflyWings(ENEMY_HIT_FLASH_MAT.clone(), wings)
+/** Only for ShaderWarmup, like LANTERNFLY_MAT. */
+export const LANTERNFLY_FLASH_MAT = createLanternflyFlashMaterial({ value: 0 })
