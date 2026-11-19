@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { ColorRamp } from '../../shared/types'
+import type { ColorRamp } from '@/levels/environments/shared/types'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 

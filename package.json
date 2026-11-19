@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:portal": "tsc -b && vite build --mode portal && node scripts/portal/package.mjs",
+    "build": "tsc -b . scripts/new-world && vite build",
+    "build:portal": "tsc -b . scripts/new-world && vite build --mode portal && node scripts/portal/package.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b . scripts/new-world",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

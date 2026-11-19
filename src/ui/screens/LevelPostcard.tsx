@@ -24,7 +24,7 @@ const STAR_POINTS = Array.from({ length: 8 }, (_, k) => {
   return { left: `M150 44 L${at(7, a - Math.PI / 8)} L${at(26, a)}Z`, right: `M150 44 L${at(26, a)} L${at(7, a + Math.PI / 8)}Z` }
 })
 
-type Scene = (t: BiomeUITheme) => ReactElement
+export type Scene = (t: BiomeUITheme) => ReactElement
 
 const SCENES: Record<BiomeType, Scene> = {
   themePark: (t) => (
