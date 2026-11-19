@@ -3,14 +3,14 @@ import { buildContactShadowGeometry, roundCaster, SHADOW_LIFT, type ShadowCaster
 import { createRng } from '@/utils/rng'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { buildArcTable } from '@/track/arcLength'
-import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { planTowers, towerShadowCasters } from '@/track/supportTowers'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 
 // Arctic: the most ridged terrain, where the drawn mesh strays furthest from heightFn.
 const level = getLevelConfig('level4')!
-const curve = createTrigCurve2(level.track.varA, level.track.varB, level.track.varC, level.track.scalar)
+const curve = createTrackCurve(level.track)
 const table = buildArcTable(curve)
 const heightFn = createHeightFunction('arctic', sampleTrackPath((t) => curve.getPointAt(t)))
 const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize('arctic'))

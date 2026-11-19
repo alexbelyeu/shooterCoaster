@@ -50,7 +50,7 @@ describe('station + launch (#699)', () => {
   it('must be at the ride’s start, on a v2 ride', () => {
     expect(() => withMechanics({}, [{ ...station, from: 0.1, to: 0.2 }], length)).toThrow(/at 0/)
     const track: TrackParams = {
-      curve: 'spline', varA: 0, varB: 0, varC: 0, scalar: 20, rollerSpeed: 0, minRollerSpeed: 0, color1: 0, color2: 0, mechanics: [station],
+      curve: 'spline', controlPoints: [], scalar: 20, rollerSpeed: 0, minRollerSpeed: 0, color1: 0, color2: 0, mechanics: [station],
     }
     expect(() => rideModel(track, table)).toThrow(/v2/)
   })

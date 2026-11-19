@@ -1,7 +1,5 @@
 import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
-/** `curve1` / `curve2`: the generated trig curves; `spline`: an authored track through `controlPoints` (#514). */
-export type CurveType = 'curve1' | 'curve2' | 'spline'
 /** Every biome id, the one list (#509): anything per biome is a `Record<BiomeType, …>`, so a missing one fails `tsc -b`. */
 export const BIOME_TYPES = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic', 'gym'] as const
 export type BiomeType = (typeof BIOME_TYPES)[number]
@@ -18,11 +16,8 @@ export interface WallSurface {
   height: number
 }
 
-export interface TrackParams {
-  /** The trig curves' shape (unused by a `spline`). */
-  varA: number
-  varB: number
-  varC: number
+/** What every track has, whatever its curve. */
+interface TrackBase {
   /** The trig curves' size; for every curve, the structure's scale (`trackDimensions.ts`). */
   scalar: number
   /** Today's speed rule (`ridePhysics.ts`), unless `ride` is 'v2'. */
@@ -31,12 +26,6 @@ export interface TrackParams {
   /** 'v2' (#696): gravity, speed zones and beats solved to land on their seconds (`rideV2.ts`, set by `rideV2`); absent, today's rule. */
   ride?: 'v2'
   rideV2?: RideV2Spec
-  curve: CurveType
-  /**
-   * A `spline`'s points in world units, in ride order; the loop closes from the last to the first. A point's `up`
-   * rolls the track there (banks, inversions; `src/track/elements/` builds them, #698).
-   */
-  controlPoints?: readonly { x: number; y: number; z: number; up?: { x: number; y: number; z: number } }[]
   color1: number
   color2: number
   /** Running-rail radius at trackScale 1 (default 0.35); multiplied by trackScale. See src/track/trackDimensions.ts */
@@ -54,6 +43,27 @@ export interface TrackParams {
   /** Special ride mechanics (#699, `src/track/mechanics.ts`): a v2 ride only, they set its zones and stops. */
   mechanics?: readonly RideMechanic[]
 }
+
+/** A closed trig loop (`TrigCurve` / `TrigCurve2`), shaped by `varA` / `varB` / `varC`. */
+export interface TrigTrackParams extends TrackBase {
+  curve: 'curve1' | 'curve2'
+  varA: number
+  varB: number
+  varC: number
+}
+
+/** An authored spline (`SplineCurve`, #514). */
+export interface SplineTrackParams extends TrackBase {
+  curve: 'spline'
+  /**
+   * The points in world units, in ride order; the loop closes from the last to the first. A point's `up`
+   * rolls the track there (banks, inversions; `src/track/elements/` builds them, #698).
+   */
+  controlPoints: readonly { x: number; y: number; z: number; up?: { x: number; y: number; z: number } }[]
+}
+
+/** A level's track: build its curve with `createTrackCurve`, never a curve factory picked by hand. */
+export type TrackParams = TrigTrackParams | SplineTrackParams
 
 /**
  * A special ride mechanic (#699, `src/track/mechanics.ts`) from `from` to `to`, shares of the lap's arc length (not across the seam):

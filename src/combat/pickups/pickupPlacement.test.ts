@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
-import { createTrigCurve } from '@/track/curves/TrigCurve'
-import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { getTrackDimensions, getTrackScale } from '@/track/trackDimensions'
 import { TOUCH_HIT_SCALE } from '@/combat/aimAssist'
 import {
@@ -37,7 +36,7 @@ describe('placePickups', () => {
   it('every level has 2–4 pickups at finite points on its track', () => {
     for (const level of getAllLevels()) {
       const { track } = level
-      const curve = (track.curve === 'curve2' ? createTrigCurve2 : createTrigCurve)(track.varA, track.varB, track.varC, track.scalar)
+      const curve = createTrackCurve(track)
       const spots = placePickups(level.id, level.pickups, (t) => curve.getPointAt(t), getTrackScale(track.scalar))
       expect(spots.length).toBeGreaterThanOrEqual(MIN_PICKUPS)
       expect(spots.length).toBeLessThanOrEqual(MAX_PICKUPS)

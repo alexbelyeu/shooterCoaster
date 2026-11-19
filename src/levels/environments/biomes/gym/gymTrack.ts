@@ -157,10 +157,7 @@ export function gymControlPoints(): Vec3[] {
 export const GYM_TRACK: TrackParams = {
   curve: 'spline',
   controlPoints: gymControlPoints().map(toWorld),
-  // Unused by a spline; scalar 20 gives level 1's structure scale (trackScale 1): a small car in the big hall (#592).
-  varA: 0,
-  varB: 0,
-  varC: 0,
+  // Scalar 20 gives level 1's structure scale (trackScale 1): a small car in the big hall (#592).
   scalar: 20,
   // Rails, ties and towers sparser than level 1's (still finer per metre ridden): the track is twice as long as the first hall's, under the same triangle budget.
   segments: 800,
