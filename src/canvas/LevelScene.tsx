@@ -89,6 +89,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
     [heightFn, biome],
   )
 
+  const keepOff = useMemo(() => BIOMES[biome].keepOff?.(groundFn, trackTable), [biome, groundFn, trackTable])
   const speeds = useMemo(() => rideSpeeds(track), [track])
   const color1 = useMemo(() => hexToRgb(track.color1), [track.color1])
   const color2 = useMemo(() => hexToRgb(track.color2), [track.color2])
@@ -143,6 +144,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         trackScale={trackDims.trackScale}
         walls={walls}
         bounds={BIOMES[biome].bounds}
+        keepOff={keepOff}
       />
       <ShootingController />
       <GameTimer seconds={RUN_SECONDS} />

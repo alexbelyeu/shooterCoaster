@@ -22,7 +22,7 @@ import { FIRE_IMP_HIT_RADIUS } from '../enemies/fireImpHop.hot'
 import {
   ENTRY_SECONDS, ENTRY_STAGGER, clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, trackPoint,
   tracksideSlots,
-  type FormationMotion, type FormationSlot, type PlacementBounds, type RideAhead, type TracksideSlot, type Vec3,
+  type FormationMotion, type FormationSlot, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
 import {
   ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, bystanderSlots, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
@@ -45,6 +45,8 @@ interface EnemySpawnerProps {
   walls?: readonly WallSurface[]
   /** An interior's walls and roof: every placement stays inside them. */
   bounds?: PlacementBounds
+  /** Landmarks a ground enemy stood away from the track keeps out of (`BiomeDefinition.keepOff`). */
+  keepOff?: readonly KeepOff[]
 }
 
 interface SpawnedEnemy {
@@ -193,6 +195,7 @@ export default function EnemySpawner({
   trackScale,
   walls = NO_WALLS,
   bounds,
+  keepOff,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
   const getThree = useThree((s) => s.get)
@@ -226,7 +229,7 @@ export default function EnemySpawner({
     (wave: EnemyWave, ride: RideAhead, members: SpawnedEnemy[], riderIndex: number, camera: Vec3): [string, Placed][] => {
       if (members[0]?.trackside) {
         const placed = placeTracksideWave({
-          table: trackTable, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds,
+          table: trackTable, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff,
         })
         return members.map((e, i) => [e.id, { position: toVector3(placed[i]) }])
       }
@@ -259,7 +262,7 @@ export default function EnemySpawner({
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [trackTable, groundFn, bounds, walls],
+    [trackTable, groundFn, bounds, keepOff, walls],
   )
 
   const placeWave = useCallback(

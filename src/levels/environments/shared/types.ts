@@ -4,7 +4,7 @@ import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
 import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
-import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
+import type { KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import type { HeroShot } from '@/track/introCamera.hot'
 
 /** One stop of a terrain colour ramp. */
@@ -131,6 +131,8 @@ export interface BiomeDefinition {
   floor?: HeightFunction
   /** An interior's walls and roof, inset: enemies are placed inside them, never behind a wall. */
   bounds?: PlacementBounds
+  /** Landmarks and big props a ground enemy stood away from the track keeps out of (`spawnPlacement.ts` `whereTheApproachLooks`). */
+  keepOff?: (groundFn: HeightFunction, track: ArcTable) => readonly KeepOff[]
   /** The hero landmark the countdown's swoop starts over and the results orbit circles (#328). */
   hero: HeroShot
 }
