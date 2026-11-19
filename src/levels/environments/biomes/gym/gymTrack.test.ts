@@ -5,7 +5,9 @@ import { buildArcTable, tAtLoopDistance } from '@/track/arcLength'
 import { lapSeconds, rideProfile, rideSpeeds } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
-import { createTrackApproach, swoopPose } from '@/track/introCamera.hot'
+import { tourPose } from '@/track/introCamera.hot'
+import { buildIntroTour } from '@/track/introTour'
+import { gymFloor } from './config'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { getLevelConfig } from '@/levels/LevelRegistry'
@@ -157,20 +159,21 @@ describe('the gym track', () => {
     expect(inGap.filter(({ i }) => secondsAt(i) < RUN_SECONDS).length * metresPerSample).toBeGreaterThan(TREE_GAP.halfAlong)
   })
 
-  it("swoops into the seat behind the trunk clear of the wood, riding the track's hairpin in (#659)", () => {
+  it("tours the hall into the seat behind the trunk clear of the wood, riding the track's hairpin in (#659, #675)", () => {
     const { hero } = gym
     expect(hero.approach).toBeGreaterThan(0)
     const seat = curve.getPointAt(0).clone()
     seat.y += dims.eyeHeight
     const seatDir = curve.getTangentAt(0).clone()
-    const anchor = { x: hero.x, y: (hero.ground ?? 0) + hero.focus, z: hero.z }
-    const approach = createTrackApproach(curve, table, hero.approach! * dims.trackScale, dims.eyeHeight, () => 0)
+    const tour = buildIntroTour({
+      curve, table, seatT: 0, eyeHeight: dims.eyeHeight, trackScale: dims.trackScale, hero, heroGround: hero.ground ?? 0, ground: gymFloor, bounds: gym.bounds,
+    })
     const pos = { x: 0, y: 0, z: 0 }
     const dir = { x: 0, y: 0, z: 0 }
     let pieces = Infinity
     let floor = Infinity
     for (let i = 0; i <= 1000; i++) {
-      swoopPose(seat, seatDir, anchor, dims.trackScale, i / 1000, gym.bounds, pos, dir, approach)
+      tourPose(tour, i / 1000, seat, seatDir, pos, dir)
       const p = toBlockout(pos)
       for (const box of BLOCKOUT_BOXES) pieces = Math.min(pieces, distanceToBox(box, p))
       floor = Math.min(floor, p.y - floorAt(p.x, p.z))

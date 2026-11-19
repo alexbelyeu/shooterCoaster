@@ -20,7 +20,7 @@ export function startPhaseFor({ search, warm, replay }: RunStart): 'loading' | '
   return replay && warm ? 'countdown' : 'loading'
 }
 
-/** After the loading screen: the intro swoop, unless it is a restart or reduced motion skips it. */
+/** After the loading screen: the intro's tour, unless it is a restart or reduced motion skips it. */
 export function phaseAfterLoading(skipIntro: boolean, reducedMotion: boolean): 'intro' | 'countdown' {
   return skipIntro || reducedMotion ? 'countdown' : 'intro'
 }

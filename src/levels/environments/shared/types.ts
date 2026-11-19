@@ -131,6 +131,6 @@ export interface BiomeDefinition {
   floor?: HeightFunction
   /** An interior's walls and roof, inset: enemies are placed inside them, never behind a wall. */
   bounds?: PlacementBounds
-  /** The hero landmark the countdown's swoop starts over and the results orbit circles (#328). */
+  /** The hero landmark the intro's tour passes (#675) and the results orbit circles (#328). */
   hero: HeroShot
 }

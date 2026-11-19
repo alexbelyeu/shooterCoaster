@@ -94,8 +94,8 @@ loads the first level with `?e2e=1&countdown=1` (#674): the loading screen must 
 warm-up is done, then the intro must run its fixed length (`intro.seconds`, `INTRO_SECONDS` late by at most two of its frames;
 `level1-intro.png` as it runs), then the countdown must show (`countdown.png`),
 a press during it must fire nothing (also when held on into `playing`), the timer must hold,
-the intro swoop (#328, pinned with `introAt`, which holds the camera on its path anywhere before GO) must start high over the seat with the level's
-landmark in view (`level1-swoop.png`, `intro.height` / `anchorAngle`) and end exactly on the ride's start pose, where the countdown
+the intro tour (#328, #675, pinned with `introAt`, which holds the camera on its path in any phase short of the results) must start high
+over the seat (`intro.height`) and end exactly on the ride's start pose, where the countdown
 sits (`intro.seatOffset` / `seatAngle`; the real intro's `goOffset` and longest frame are reported), a replay (`restartLevel()`) must go
 straight to the countdown, where a tap after 1 s (Ready held by `holdFeedback`) skips to `playing`, a new start of the warm level must
 pass the loading screen at once and a tap must skip its intro (`intro.skipped`),
@@ -201,7 +201,7 @@ Every check above belongs to a named step: `title`, `landing`, `levelSelect`, `d
 run's touch play: taps, aim assist, aspect, HUD, audio, up to the Pause tap) and `mobileMenus` (the rest of the phone run on
 the same page: pause card, settings, boss bar, initials entry, results, share, music switches) (no level); `frenzy` (the
 first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ride), `seed`, `quality`, `pause`
-(hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: the ride, the perf
+(hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: its intro tour pinned at four marks, `<id>-tour-{reveal,landmark,track,landing}.png`, #675; the ride, the perf
 gate, the enemy probe, combat, the level's end), on the ride's own page `shot` (the frozen fresh shot and aim jump),
 `results` (the results screen's reveal, stats, buttons, board) and `share` (its Share line, menu and score cards); and
 `pacing` (every level, a whole run on its own page) and `wave`, `boss`, `pickup`, `audio` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its

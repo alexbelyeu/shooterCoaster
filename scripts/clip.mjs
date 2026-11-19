@@ -13,6 +13,7 @@
  *   --fps 30 --size 1280x720 (or 720x1280) --seed 1337 --intro 2.5 --select 1.5 --kill-every 1.5
  *   --gif-seconds 8 --out docs/marketing/media --url <running preview> --frames-only --encode-only
  *   --ride-only (title and level select still play, uncaptured: the clip opens on the ride)
+ *   --tour (#675: the level's intro tour before the ride; with --from 0 it lands where the ride starts)
  *   --direct (#622: no title or level select at all, the level starts at boot: the quickest way to a review clip of one
  *   stretch, e.g. --level level6 --from 0.13 --seconds 6 --direct --quality low) --quality <preset> (passed as ?quality=)
  *   --title (#419: the title screen alone for --seconds from its first frame, no PLAY: clip-title-<size>.mp4; --attract
@@ -39,6 +40,10 @@ const FRAMES_ONLY = process.argv.includes('--frames-only')
 const ENCODE_ONLY = process.argv.includes('--encode-only')
 const DIRECT = process.argv.includes('--direct')
 const RIDE_ONLY = DIRECT || process.argv.includes('--ride-only')
+// --tour (#675): the level's intro tour into the seat before the ride, `INTRO_SECONDS` long (src/core/introShot.ts);
+// it lands on the track's start, so pair it with --from 0 for one continuous take.
+const TOUR = process.argv.includes('--tour')
+const INTRO_SECONDS = 10
 const QUALITY = arg('quality', null)
 const TITLE = process.argv.includes('--title')
 const ATTRACT = TITLE && process.argv.includes('--attract')
@@ -205,6 +210,12 @@ async function render(browser, url) {
     const t = window.__SC_TEST__
     return t.phase() === 'playing' && t.levelReady() && t.weapon?.visible === true && t.rideTo === null
   })
+  if (TOUR) {
+    // Still held at the start: `introAt` walks the camera along the tour a frame at a time.
+    const frames = Math.round(INTRO_SECONDS * FPS)
+    await capture(frames, (i) => hook((p) => { window.__SC_TEST__.introAt = p }, i / (frames - 1)))
+    await hook(() => { window.__SC_TEST__.introAt = null })
+  }
   await hook(() => {
     const t = window.__SC_TEST__
     t.timerStep = null

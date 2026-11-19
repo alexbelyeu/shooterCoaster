@@ -111,7 +111,7 @@ export default function WeaponViewModel() {
     if (!gun || !tracer || !cam?.isPerspectiveCamera) return
 
     const { phase, timeScale } = useGameStore.getState()
-    // Hidden while the countdown's swoop has the camera off the seat (#328).
+    // Hidden while the intro's tour has the camera off the seat (#328).
     const visible = isInRun(phase) && !cameraOffSeat()
     gun.visible = visible
     if (!visible) {
