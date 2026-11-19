@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
-  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYES_GEO, LANTERNFLY_BODY_GEO,
-  LANTERNFLY_FOREWING_GEOS, LANTERNFLY_HINDWING_GEOS, RAT_BODY_GEO,
+  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYES_GEO, LANTERNFLY_FLASH_MAT,
+  LANTERNFLY_FOLDED, LANTERNFLY_FOREWING_PIVOT, LANTERNFLY_GEO, LANTERNFLY_HINDWING_PIVOT, LANTERNFLY_MAT, LANTERNFLY_OPEN, RAT_BODY_GEO,
   RAT_SNOUT_GEO, RAT_TAIL_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
-  SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, crowWingPose, patchCrowWingVertex,
+  SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, createLanternflyFlashMaterial, createLanternflyMaterial, crowWingPose, patchCrowWingVertex,
+  patchLanternflyWingVertex,
 } from './SharedEnemyAssets'
 
 describe('crow model', () => {
@@ -107,36 +108,70 @@ describe('gym pests (#515)', () => {
 })
 
 describe('lanternfly model (#516)', () => {
-  const tris = (g: THREE.BufferGeometry) => g.attributes.position.count / 3
-  const wings = [...LANTERNFLY_FOREWING_GEOS, ...LANTERNFLY_HINDWING_GEOS]
+  const geo = LANTERNFLY_GEO
+  const tagOf = (i: number) => geo.attributes.aWing.getX(i)
+  /** Vertex indices of one part (0 body, ±1 forewing, ±2 hindwing). */
+  const part = (tag: number) => [...Array(geo.attributes.position.count).keys()].filter((i) => tagOf(i) === tag)
 
-  it("stays under the brief's 500-triangle cap: body and four wings", () => {
-    expect(tris(LANTERNFLY_BODY_GEO) + wings.reduce((n, g) => n + tris(g), 0)).toBeLessThanOrEqual(500)
+  it("is one mesh under the brief's 500-triangle cap: body and four wings, each tagged for the shader", () => {
+    expect(geo.attributes.position.count / 3).toBeLessThanOrEqual(500)
+    expect([...new Set(geo.attributes.aWing.array)].sort((a, b) => a - b)).toEqual([-2, -1, 0, 1, 2])
   })
 
   it('mirrors each wing for the left side, facing out of the wall like the right', () => {
-    for (const [right, left] of [LANTERNFLY_FOREWING_GEOS, LANTERNFLY_HINDWING_GEOS]) {
-      right.computeBoundingBox()
-      left.computeBoundingBox()
-      expect(right.boundingBox!.min.x).toBeCloseTo(-left.boundingBox!.max.x)
-      const n = (g: THREE.BufferGeometry) => g.attributes.normal.getZ(0)
-      expect(n(right)).toBeGreaterThan(0.99)
-      expect(n(left)).toBeGreaterThan(0.99)
+    const pos = geo.attributes.position
+    for (const tag of [1, 2]) {
+      const xs = (t: number) => part(t).map((i) => pos.getX(i))
+      expect(Math.min(...xs(tag))).toBeCloseTo(-Math.max(...xs(-tag)))
+      expect(geo.attributes.normal.getZ(part(tag)[0])).toBeGreaterThan(0.8)
+      expect(geo.attributes.normal.getZ(part(-tag)[0])).toBeGreaterThan(0.8)
     }
   })
 
   it('paints the hindwings red with the white band, the forewings spotted beige', () => {
-    const count = (g: THREE.BufferGeometry, test: (r: number, gr: number, b: number) => boolean) => {
-      const c = g.attributes.color
-      let k = 0
-      for (let i = 0; i < c.count; i++) if (test(c.getX(i), c.getY(i), c.getZ(i))) k++
-      return k
+    const c = geo.attributes.color
+    const count = (tag: number, test: (r: number, gr: number, b: number) => boolean) =>
+      part(tag).filter((i) => test(c.getX(i), c.getY(i), c.getZ(i))).length
+    expect(count(2, (r, g) => r > 0.5 && g < 0.1)).toBeGreaterThan(0)
+    expect(count(2, (r, g, b) => r > 0.7 && g > 0.7 && b > 0.7)).toBeGreaterThan(0)
+    expect(count(1, (r, g, b) => r < 0.02 && g < 0.02 && b < 0.02)).toBeGreaterThan(0)
+    expect(count(1, (r, g) => r > 0.5 && g < 0.1)).toBe(0)
+  })
+
+  it('bounds the wings opened as well as folded, for frustum culling', () => {
+    // The open pose as Lanternfly's groups had it: about the shoulder, Euler ZYX over the hindwing's fan.
+    const at = (tag: number, p: typeof LANTERNFLY_OPEN) => {
+      const s = Math.sign(tag)
+      const hind = Math.abs(tag) === 2
+      const [px, py, pz] = hind ? LANTERNFLY_HINDWING_PIVOT : LANTERNFLY_FOREWING_PIVOT
+      return new THREE.Matrix4().compose(
+        new THREE.Vector3(s * px, py, pz),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, s * (hind ? p.hindRoll : p.foreRoll), s * (hind ? p.hindSwing : p.foreSwing), 'ZYX')),
+        new THREE.Vector3(hind ? p.hindFan : 1, 1, 1),
+      )
     }
-    const [hind] = LANTERNFLY_HINDWING_GEOS
-    const [fore] = LANTERNFLY_FOREWING_GEOS
-    expect(count(hind, (r, g) => r > 0.5 && g < 0.1)).toBeGreaterThan(0)
-    expect(count(hind, (r, g, b) => r > 0.7 && g > 0.7 && b > 0.7)).toBeGreaterThan(0)
-    expect(count(fore, (r, g, b) => r < 0.02 && g < 0.02 && b < 0.02)).toBeGreaterThan(0)
-    expect(count(fore, (r, g) => r > 0.5 && g < 0.1)).toBe(0)
+    const v = new THREE.Vector3()
+    let outside = 0
+    for (const tag of [-2, -1, 1, 2]) {
+      const open = at(tag, LANTERNFLY_OPEN).multiply(at(tag, LANTERNFLY_FOLDED).invert())
+      for (const i of part(tag)) {
+        if (!geo.boundingSphere!.containsPoint(v.fromBufferAttribute(geo.attributes.position, i).applyMatrix4(open))) outside++
+      }
+    }
+    expect(outside).toBe(0)
+  })
+
+  it('opens its wings in the vertex shader, one program for every lanternfly, its hit flash and the warm-up', () => {
+    const patched = patchLanternflyWingVertex(THREE.ShaderLib.standard.vertexShader)
+    expect(patched).toContain('uniform float uLanternflyWings;')
+    expect(patched).toMatch(/#include <begin_vertex>\s+\{\s+float side = sign\(aWing\)/)
+    const wings = { value: 0.5 }
+    const material = createLanternflyMaterial(wings)
+    const flash = createLanternflyFlashMaterial(wings)
+    expect(material.customProgramCacheKey()).toBe(LANTERNFLY_MAT.customProgramCacheKey())
+    expect(flash.customProgramCacheKey()).toBe(LANTERNFLY_FLASH_MAT.customProgramCacheKey())
+    expect(flash.customProgramCacheKey()).toMatch(/-lanternfly-wings$/)
+    material.dispose()
+    flash.dispose()
   })
 })
