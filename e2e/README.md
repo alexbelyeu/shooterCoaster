@@ -201,18 +201,18 @@ Every check above belongs to a named step: `title`, `landing`, `levelSelect`, `d
 run's touch play: taps, aim assist, aspect, HUD, audio, up to the Pause tap) and `mobileMenus` (the rest of the phone run on
 the same page: pause card, settings, boss bar, initials entry, results, share, music switches) (no level); `frenzy` (the
 first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ride), `seed`, `quality`, `pause`
-(hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: its intro tour pinned at four marks, `<id>-tour-{reveal,landmark,track,landing}.png`, #675, on the level held at its start (`timerStep` / `rideRate` 0), which the ride then goes on from: one mount; the ride, the perf
-gate, the enemy probe, combat, the level's end), on the ride's own page `shot` (the frozen fresh shot and aim jump),
+(hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: its intro tour pinned at four marks, #675, on the level held at its start (`timerStep` / `rideRate` 0), which the ride then goes on from: one mount; at each mark the camera must be on the tour and over the ground, at the landmark looking at it; the ride, the perf
+gate, the enemy probe, combat, the level's end), on the ride's own page `tour` (before the ride: each tour mark also shot, `<id>-tour-{reveal,landmark,track,landing}.png`, and not blank; nightly only, a capture costs ~15 s on a software renderer), `shot` (the frozen fresh shot and aim jump),
 `results` (the results screen's reveal, stats, buttons, board) and `share` (its Share line, menu and score cards); and
 `pacing` (every level, a whole run on its own page) and `wave`, `boss`, `pickup`, `audio` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its
-checks disagree). A step that runs on another's page needs it in the same run (`share` and `frenzy` need `ride` and
+checks disagree). A step that runs on another's page needs it in the same run (`tour` needs `ride`, `share` and `frenzy` need `ride` and
 `results`, `mobileMenus` needs `mobile`). `--steps ride,boss --levels level2` runs just those. Without `--steps` every
 desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desktop` leaves `title` and the phone run.
 
 **Two depths (#372).** The PR smoke is rendering and integration: CI runs the shards in `SHARDS`, one `smoke (<name>)`
 job each (`ci.yml` matrix): `ui` (title, landing), `menus` (levelSelect, settings), `level1` (ride, shot, results), `level1-steps`
 (quality, speed), `level2`…`level5` (ride) and `mobile`. The **deep** checks, everything else (`nightlyOnly()` in
-`shards.mjs`: daily, frenzy, seed, pause, countdown, wave, boss, pickup, audio, share, pacing, `mobileMenus`, and shot / results
+`shards.mjs`: daily, frenzy, seed, pause, countdown, tour, wave, boss, pickup, audio, share, pacing, `mobileMenus`, and shot / results
 on levels 2–5), run in the full smoke, which the nightly production run makes (`prod-smoke.yml`, below): they are either
 game logic a unit test covers next to its pure module (the table below), or a browser check too slow for every PR. A red
 nightly opens the `agent:prod-broken` P1 issue the Maintainer takes first. To reproduce one, run its step:

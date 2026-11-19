@@ -338,13 +338,15 @@ async function rideToLevelTime(page, id, seconds, minFrames, { started = false }
 }
 
 /**
- * The level's intro tour (#675), pinned by `introAt` at its four marks with the level held at its start:
- * `<id>-tour-{reveal,landmark,track,landing}.png`. None may be blank or under the ground; the landmark shot looks at it.
+ * The level's intro tour (#675), pinned by `introAt` at its four marks with the level held at its start: at each, the
+ * camera must be on the tour and over the ground, and at the landmark mark look at it. With `shots` (the nightly `tour`
+ * step) each mark is also shot, `<id>-tour-{reveal,landmark,track,landing}.png`, and must not be blank: a full frame
+ * capture costs ~15 s on a software renderer, which the PR's level shards can't carry (level 6 went 5.9 -> 10.3 min).
  * Starts the level held at its start from its first frame (the level timer, game clock and ride at 0: a `setTimeScale`
  * set before `startLevel` would not survive the run's mount), so the seat the tour lands on is the track's start;
  * the ride then goes on from that start (`rideToLevelTime`'s `started`).
  */
-async function tourShots(page, id) {
+async function tourShots(page, id, { shots: shoot = false } = {}) {
   await page.evaluate(([lid, seed]) => {
     const t = window.__SC_TEST__
     t.timerStep = 0
@@ -362,13 +364,13 @@ async function tourShots(page, id) {
   const shots = {}
   for (const name of ['reveal', 'landmark', 'track', 'landing']) {
     await page.evaluate((p) => { window.__SC_TEST__.introAt = p }, marks[name])
-    await waitFrames(page, 2, { maxMs: 30000 })
+    await waitFrames(page, 1, { maxMs: 30000 })
     const at = await page.evaluate(() => ({ ...window.__SC_TEST__.intro }))
-    const img = await imageStats(page, await page.screenshot({ path: path.join(OUT, `${id}-tour-${name}.png`), timeout: SHOT_TIMEOUT }))
+    const img = shoot ? await imageStats(page, await page.screenshot({ path: path.join(OUT, `${id}-tour-${name}.png`), timeout: SHOT_TIMEOUT })) : null
     shots[name] = { progress: marks[name], height: at.height, clearance: at.clearance, anchorAngle: at.anchorAngle }
     if (at.mode !== 'tour') problems.push(`tour ${name}: introAt did not pin the tour (camera "${at.mode}")`)
     else if (at.clearance < 0) problems.push(`tour ${name}: the camera is ${(-at.clearance).toFixed(1)} units under the ground`)
-    if (looksBlank(img)) problems.push(`tour ${name}: the frame looks blank`)
+    if (img && looksBlank(img)) problems.push(`tour ${name}: the frame looks blank`)
   }
   if (shots.landmark.anchorAngle > 25) problems.push(`tour landmark: the view is ${shots.landmark.anchorAngle.toFixed(1)}° off the landmark`)
   await page.evaluate(() => { window.__SC_TEST__.introAt = null })
@@ -3847,7 +3849,7 @@ async function run() {
     const started = Date.now()
     const cdp = CPU_THROTTLE > 1 ? await ctx.newCDPSession(page) : null
     if (cdp) await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE })
-    const tour = await tourShots(page, id)
+    const tour = await tourShots(page, id, { shots: has('tour') })
     // Ride frames only (#541): the level mount, the warm-up's compiles (#597) and the pinned tour shots are not the
     // ride's. The tour waited on `levelReady()`, so the warm-up is done unless the scene never loaded.
     if (cdp) {
