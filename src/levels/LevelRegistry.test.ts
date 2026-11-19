@@ -53,7 +53,7 @@ describe('LevelRegistry', () => {
       ['level3', 'kraken', 2624],
       ['level4', 'yeti', 3180],
       ['level5', 'magmaTitan', 2914],
-      ['level6', 'medusa', 2220],
+      ['level6', 'medusa', 2178],
     ])
     expect(getLevelConfig('level1')!.maxScore).toBe(150 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
   })
