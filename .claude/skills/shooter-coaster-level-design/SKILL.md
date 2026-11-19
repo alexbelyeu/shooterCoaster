@@ -153,8 +153,9 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
 
 ### Biome Registration (all required)
 1. `src/types/level.ts` — add to `BiomeType` union
-2. `src/utils/terrainNoise.ts` — add a `BIOME_TERRAIN_CONFIGS` entry (frequency, amplitude, octaves, ridgeMode, baseY, flatRadius)
-   (terrain mesh size override, if needed, is `getTerrainMeshSize` in the same file)
+2. `src/utils/terrainNoise.ts` — add a `BIOME_TERRAIN_CONFIGS` entry (frequency, amplitude, octaves, ridgeMode, baseY, flatRadius,
+   `meshSize`: the terrain mesh's side); an interior sets `authoredFloor: true` and gives its `BiomeDefinition` a `floor`,
+   and every caller gets a level's ground from `biomeHeightFunction` (`biomeRegistry.ts`), never `createHeightFunction` directly
 3. `src/levels/environments/biomes/<biome>/` — new folder (copy the closest existing biome):
    - `config.ts` — `COLOR_RAMP` (terrain vertex colours by height + `cliffColor` on slopes)
      and `TREES` (`BiomeTreeConfig`: tree types, `maxCount` cap, scatter radii, slope

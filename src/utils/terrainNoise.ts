@@ -111,6 +111,10 @@ export interface TerrainConfig {
   flatRadius: number
   /** Transition width from flat to full-height terrain */
   transitionWidth: number
+  /** Side length of the rendered terrain mesh (`getTerrainMeshSize`). */
+  meshSize: number
+  /** An interior: its ground is the biome's own `BiomeDefinition.floor`, never this noise (`biomeHeightFunction`). */
+  authoredFloor?: true
 }
 
 export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
@@ -125,6 +129,7 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     baseY: 0,
     flatRadius: 600,
     transitionWidth: 800,
+    meshSize: 6000,
   },
   desert: {
     frequency: 0.001,
@@ -137,6 +142,7 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     baseY: 0,
     flatRadius: 600,
     transitionWidth: 600,
+    meshSize: 6000,
   },
   ocean: {
     frequency: 0.0007,
@@ -151,6 +157,7 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     baseY: -40,
     flatRadius: 600,
     transitionWidth: 700,
+    meshSize: 6000,
   },
   arctic: {
     frequency: 0.0006,
@@ -163,6 +170,7 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     baseY: 0,
     flatRadius: 600,
     transitionWidth: 900,
+    meshSize: 10000,
   },
   volcanic: {
     frequency: 0.0006,
@@ -175,6 +183,7 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     baseY: 0,
     flatRadius: 600,
     transitionWidth: 900,
+    meshSize: 12000,
   },
   // The Climbing Gym draws the biome's `floor` (the hall's, with the Starr pit), never this: flat for 100 km.
   gym: {
@@ -188,6 +197,9 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     baseY: 0,
     flatRadius: 100_000,
     transitionWidth: 1,
+    // The hall's length (`GYM_SCALE` × 80 m): its 20-unit cells put a grid line on the Starr pit's edge.
+    meshSize: 2560,
+    authoredFloor: true,
   },
 }
 
@@ -235,16 +247,15 @@ export function sampleTrackPath(
 /**
  * Creates a height function for the given biome terrain config.
  * If trackSamples is provided, terrain is suppressed near the track path
- * so the coaster never goes underground.
+ * so the coaster never goes underground. Throws for an interior (`authoredFloor`): a level's ground
+ * comes from `biomeHeightFunction` (`biomeRegistry.ts`), which knows its floor.
  */
 export function createHeightFunction(
   biome: BiomeType,
   trackSamples?: TrackSample[],
-  floor?: HeightFunction,
 ): HeightFunction {
-  // An authored floor (an interior's, `BiomeDefinition.floor`) is drawn as given: its track is laid round it.
-  if (floor) return floor
   const config = BIOME_TERRAIN_CONFIGS[biome]
+  if (config.authoredFloor) throw new Error(`${biome} has an authored floor: use biomeHeightFunction`)
 
   return (x: number, z: number): number => {
     const dist = Math.sqrt(x * x + z * z)
@@ -373,8 +384,7 @@ export const TERRAIN_MESH_SEGMENTS = 128
 
 /** Side length of the rendered terrain mesh for a biome. */
 export function getTerrainMeshSize(biome: BiomeType): number {
-  // The gym's floor is the hall's length (`GYM_SCALE` × 80 m): its 20-unit cells put a grid line on the Starr pit's edge.
-  return biome === 'arctic' ? 10000 : biome === 'volcanic' ? 12000 : biome === 'gym' ? 2560 : 6000
+  return BIOME_TERRAIN_CONFIGS[biome].meshSize
 }
 
 /**

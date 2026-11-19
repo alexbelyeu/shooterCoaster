@@ -236,6 +236,7 @@ const TERRAIN = {
     baseY: 0,
     flatRadius: 600,
     transitionWidth: 800,
+    meshSize: 6000,
   },
 `,
   interior: `  // __NAME__ draws its biome's \`floor\`, never this: flat for 100 km.
@@ -250,6 +251,8 @@ const TERRAIN = {
     baseY: 0,
     flatRadius: 100_000,
     transitionWidth: 1,
+    meshSize: 6000,
+    authoredFloor: true,
   },
 `,
 }
