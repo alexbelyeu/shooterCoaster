@@ -67,7 +67,7 @@
       "kind": "star",
       "name": "Star",
       "x": 1.063,
-      "z": 20,
+      "z": 24.5,
       "rot": 90,
       "base": 6.2,
       "points": 8,
@@ -76,7 +76,7 @@
       "depth": 1.57,
       "colorA": "#f2c230",
       "colorB": "#1d2320",
-      "note": "The Starr: yellow and black faceted star with a dark hub, centred on the end wall."
+      "note": "The Starr: yellow and black faceted star with a dark hub, centred on the part of the end wall the Tree leaves in view (z 10.4 to 38.5), not the whole wall."
     },
     {
       "id": "w-shield",
