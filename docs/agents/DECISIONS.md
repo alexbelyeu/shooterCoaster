@@ -2213,3 +2213,158 @@ still bounds the wait: a device too slow to warm up in it finishes the warm-up i
 **Context:** The brief asks for "a splash that reaches the camera", but the Kraken's slams land 550–1150 units out, too far for the pooled death particles to fly that far.
 **Decision:** Each slam emits `sea:spray` with the side of the view it landed on (0 on the defeat, both edges). `ui/hud/SnowSplat` (the Yeti's snowball edge flash) draws it as sea foam and drops over that edge. The splash in the world stays `KRAKEN_SPLASH_DEATH_STYLE` plus camera trauma as before.
 **Consequences:** Any future water hit on the camera reuses `SEA_SPRAY_EVENT`; no new particle system and no extra draw calls.
+
+## 2026-11-18 — Control center, usage brake, code map out of CLAUDE.md (Alex's session)
+
+**Context:** Firing scheduled tasks from a chat stopped working; Alex had no live view or
+on-demand runs. A week of the token ledger (105M weighted, 143 runs) showed: QA (on label)
+91 runs for ~46 PRs (its GitHub trigger starts a session on every label event while
+`agent:needs-qa` is on: four on #647); approved PRs that conflict with `main` sat for hours
+(GitHub runs no `pull_request` workflow on a conflicting PR and throttles automerge.yml's
+cron); and every session and subagent loaded a 60 KB CLAUDE.md, 40 KB of it the code map.
+
+**Decision:**
+- Alex runs the studio from the control center (control.scoaster.com, repo
+  `alexbelyeu/studio-control`): status, Run now through each task's API trigger, the PR
+  train, and an autopilot that sweeps auto-merge for waiting approved PRs, brakes Builders
+  at a weekly Claude-usage ceiling (it sets `builder_runs_per_day`: 0, then back), and can
+  start QA / Fix (on label) once per label change instead of the tasks' GitHub triggers.
+  Agents never call it (CLAUDE.md hard rule 10).
+- QA never approves a PR that conflicts with `main`: it hands it to Fix as "merge conflict
+  only; full review passed" (review-one-pr.md step 5).
+- The code map moved to `docs/CODEMAP.md`; agents grep the rows for the areas they touch.
+- `scripts/studio-status.cjs` SCHEDULE matches the tasks' real times (and the control
+  center's `src/lib/config.ts`).
+
+**Consequences:** `builder_runs_per_day` is now managed by the control center while its usage
+meter works; edit it there (the site writes STEERING.md), or the autopilot puts its own
+value back. If the QA / Fix dispatch switch is on, the tasks' GitHub triggers must be off,
+or every PR is reviewed twice. CLAUDE.md is ~20 KB; keep the code map in CODEMAP.md.
+
+## 2026-11-18 — Review bundle: code diff only, no repeated CLAUDE.md (Alex's session)
+
+**Context:** QA (on label) averaged ~310k weighted tokens a run; both independent reviewers read
+the same bundle, which pasted CLAUDE.md (already in their context), the 26 KB level-design skill,
+and a 30-line-context diff in which one edited CLAUDE.md / code-map row (each a very long line)
+cost 30-40 KB. Bundles for #649 / #653 / #654 were 258 / 193 / 102 KB.
+
+**Decision:** `.claude/scripts/review-bundle.sh` diffs code only, with 10 lines of context; docs
+(`*.md`) and audio render data are listed by name with the command to diff one; CLAUDE.md is
+not repeated; the heap rules stay inline for `src/` changes; the level-design skill is a pointer
+reviewers grep. Same PRs: 86 / 30 / 21 KB.
+
+**Consequences:** Reviewers open a file (Read with offset/limit) when a concern needs more than
+10 lines around a hunk, and diff a doc by hand when its content matters. Don't re-add whole
+files to the bundle; point to them.
+
+## 2026-11-18 — The intro swoop rides the countdown's own clock (Builder, #328)
+
+**Context:** The swoop from over the landmark into the seat must land exactly at GO, but Ready waits for the level
+chunk and the shader warm-up (up to 4 s, the camera seeing nothing until it ends), so the time before GO isn't fixed,
+and the countdown's timing was out of scope.
+**Decision:** The swoop is not a fixed 3 s clip. Once the level shows, it eases toward 40% of its path through Ready;
+when Set starts, `Countdown` publishes GO's time (`core/introShot.ts`) and a Hermite carries it from where it is, at its
+speed, to the seat with zero speed exactly at GO (`introCamera.hot.ts` `stepSwoopClock`): ~1.7 s on a warm start. A
+skip tap cuts to the seat. The results screen's backdrop is lighter at the edges so the orbit behind it shows.
+**Consequences:** Lengthening Ready / Set lengthens the swoop with no camera change; a fixed-length swoop would land
+early or late. Darkening the results backdrop again hides the orbit.
+
+## 2026-11-18 — Track tunnels: one merged mesh, dark by geometry, carried on the arc table (Builder, #332)
+
+**Context:** #332 asked for tunnels (a lit tube the track dives through) and a loop-the-loop. The trig curves are one
+closed parametric formula: a vertical circle can't be spliced in without changing the whole track, so the loop is a
+follow-up issue; tunnels shipped.
+**Decision:** A tunnel is `TrackParams.tunnels` (`{ from: t, length: arc units }`). `setPieces.ts` `withTunnels` puts
+the spans on the level's `ArcTable` (`tunnels`), so everything that gets the table knows them without a new prop:
+`trackClearance.ts` counts a tunnel sample as wide as the tube (props stay out), the coaster camera eases a 2° FOV kick
+and denser wind streaks in and emits `track:tunnel` ('enter' | 'exit', index), and `buildTrackGeometry` shades the
+track 0.3× inside. Every tunnel of a level is one merged, world-space mesh (not an InstancedMesh of arches: a swept
+tube has no seams on bends and the portals join the same draw call), with a per-vertex `aEmissive` for its lights.
+The darkness is the near-black inner wall; fog and exposure stay the level's.
+**Consequences:** A level without `tunnels` gets the same table object and byte-identical track geometry. Keep a
+tunnel short (~2 s of ride): nothing outside is shootable from inside, and the nightly `pacing` gate counts it.
+
+## 2026-11-18 — Countdown and UI blips bypass the pause gate; arcade graphs fade out on replacement (Sound designer, #338)
+
+**Context:** The pause mix silences every SFX while `paused`, and the resume Ready / GO runs while the run is still `paused`, so it was mute (#246). The arcade graph was rebuilt for a new biome before the new bank landed and hard-stopped what was ringing (a click under level select's launch blip).
+**Decision:** The master chain is now `arcadeChannel` → pause gate → effects volume (`arcadeUiChannel`) → limiter; the countdown and UI blips play on two voices of their own (outside `VOICE_BUDGET`) into `arcadeUiChannel`, so they keep the volume setting but skip the pause gate. `setPauseMix` is unchanged. The graph's biome is the installed bank's, and a replaced or disposed graph fades out (`STEAL_FADE_S / 3` time constant) before it is disconnected. `stats.live` counts started budget sources until they end, are stolen or disposed, instead of reading the fixed pool. The click check is `audio:check`'s `clickMax` (steepest 1 ms level drop at a cut, ≤ 15 dB), rendered by `npm run audio:render -- --launch <level>`.
+**Consequences:** A new menu or countdown sound must join the engine's `UI_ROUTED` set to be heard while paused; every other SFX stays silent while paused.
+
+## 2026-11-18 — Warm-up draws: one batch a frame, into a target like the composer's (Builder, #625)
+
+**Context:** After #597 the first frames of play still took 1.5–3.5 s, nearly all "outside" our JS. Measured on
+SwiftShader (`?perf=1`, CPU 1× and 4×): the long frame always came straight after the warm-up's draws. A first
+draw's cost is mostly the GPU's (pipeline builds), which `gl.render`'s JS time never shows, so the time-budgeted
+slices put every draw batch into one frame and the GPU held the next one for seconds. Once the warm-up had fully
+finished, the next visible frame took a normal frame's time.
+
+**Decision:** `ShaderWarmup` draws one batch a frame, and keeps doing so after GO instead of finishing in one go
+(the compiles still finish in one go at GO, because a visible frame would wait on them anyway). A run that is already
+playing when the level mounts (`?e2e=1`) draws them all at once, as before. The draws go into a 64×64 target with
+the composer scene target's samples, format and depth attachment (`composerSceneTarget`), because Metal and Vulkan
+build a pipeline per program for each of those.
+
+**Consequences:** `sceneReady` can now arrive a few frames after GO on slow devices; nothing during play reads it.
+Don't put the draws back on a time budget. The SFX bake (`bake.ts`) is built and cut in 8 ms tasks for the same
+reason: it lands in the countdown.
+
+## 2026-11-18 — Heat shimmer: a depth-tested composer term, in only on the gym (Builder, #627)
+
+**Context:** The Flame's heat shimmer could be a term in the composer's EffectPass or refracting sheets reading a
+copy of the frame. A plain screen-rect `mainUv` also wavered the gun and the track in front of the fire.
+**Decision:** `HeatShimmerEffect` is a `mainUv` in the one EffectPass with `EffectAttribute.DEPTH`: only pixels
+past the hot air's nearest point (and past the gun's depth range) waver. Because depth gives the composer a depth
+texture, the effect goes in only on a level whose atmosphere sets `heatShimmer` (the gym), on medium / high and
+never on touch; it joins as the level mounts, so its program compiles before `ShaderWarmup` ends.
+**Consequences:** Don't make it always-on to save the recompile: every level and phone would then pay for the
+depth texture. Another fire that wants it sets `heatShimmer` in its atmosphere and aims `HEAT_SHIMMER` itself.
+
+## 2026-11-19 — Level 6 rides the Tree's gap eastward, its lap closing round a hairpin (Builder, #659)
+
+**Context:** The ride had to go through the Tree's gap (#613) with the crest by 40 s and the star in view for 80 % of
+40–60 s. Every moment's time is its share of the lap, so length before the crest costs star view. The work-in-progress
+route ran the gap westward and turned 180° in the left cave to come back east, ~18 m before the crest: the crest landed at ~44 s.
+**Decision:** The run starts in the gap heading east and climbs straight out of the right cave towards the Flame. The lap
+closes after the run: south out of the dive at x ≥ 11 (outside the Medusa's bust until 60 s), west along the roots'
+front and a 2.3 m hairpin in the left cave's mouth into the gap. Gravity stays nearly off (`rollerSpeed` 4e-7): with it on,
+the run-in's descent speeds the star window up more than the spiral speeds the climb. Lap ~63.7 s.
+**Consequences:** The margins are thin (crest 39.4 s, star in view 0.806, lap 63.7 of 65): adding length before the
+crest, moving the dive's turn earlier or speeding the lap up fails `gymTrack.test.ts`. `docs/levels/README.md` explains
+the budget.
+
+**Countdown swoop (QA round 1):** with the seat inside the Tree, the swoop's usual last leg (down from behind and above
+the seat) passed through the front roots and the trunk. The gym's `hero.approach` (12 m) makes the swoop land on the
+roots' front 12 m back along the track and ride the hairpin into the gap, easing out into the seat: the track's own
+clearance is the camera's. Other levels keep the old swoop (`approach` is optional). `gymTrack.test.ts` samples the whole
+swoop against `BLOCKOUT_BOXES` at `RAIL_CLEARANCE`.
+
+**The gap beside the trunk (QA round 2, Alex's playtest, #671):** the gap first went *under* the trunk (#558's four
+buttress roots). Alex: the trunk is solid, and the gap is between it and the wall, like the Arch's opening. The trunk now
+stands on the pit floor in front of the gap (`TREE_GAP` f 2.85–5.4, two front buttress roots), and over the gap (5 m) it
+swells back into the wall under the limbs. The gap runs between the back wall (f 0.75) and the trunk (f 2.85), so the
+track's line through it moved 0.6 m towards the wall. The hairpin keeps its outer side on the roots' front (radius
+`(ROOTS_FRONT_F − GAP_F) / 2`, 2.3 m), so the lap stays 63.7 s. A tighter hairpin (≤ 6.28 m out) would win the star a
+frame but cuts the front roots' clearance.
+
+## 2026-11-19 — Lanternflies show red at rest, not only in flight (builder, #665)
+
+**Context:** A real spotted lanternfly at rest is a beige wedge: its forewings hide the red hindwings, which show only
+when it opens them. On the gym's pale walls, from the ride and on a phone, that wedge read as nothing at all (Alex's
+18 Nov playtest).
+**Decision:** Readability over accuracy. Folded, the hindwings fan just past the forewings (`Lanternfly.tsx` `FOLDED`),
+so each wedge is edged red; every sit has one wing flick (`hopGlideMotion.hot.ts` `sitWings`, `HOP.flash*`) as well as
+the open wings of every hop; and the model is drawn at x7 (was x4), with the hop distances, swarm spacing and hit
+radius scaled with it.
+**Consequences:** Don't fold the hindwings back under the forewings or drop the flick to match the real insect: the swarm
+goes back to being invisible. A smaller lanternfly needs `HOP` distances, `SWARM_SPACING` and its `RADII` scaled down with it.
+
+## 2026-11-19 — The gym's floor: shader mats, axis-aligned walkways cut through the raised mats (builder, #668)
+
+**Context:** Alex wanted every floor padded, black walkways from the entrance to the Flame and round it, and an all-grey pit with crash-pad benches.
+**Decision:** The main floor's mats and the walkways are painted by the floor shader (`grimeShader.ts` `matFragment`, `config.ts` `FLOOR`), not geometry. The walkways are axis-aligned rects (`floorPaths.ts`): a ring along the inside edge of the Flame's raised mats and an L from the entry floor along the Slab's mats; the raised mats (`hallGeometry.ts` `pad`, rot-0 pads only) are cut back round them with `subtractRects`, so a path lies at floor level between mat edges and never on top of a mat (no z-fighting). Contact shadows follow: `shadows.ts` `standingSurfaceAt` puts them on the pit's mats and at floor level on a walkway.
+**Consequences:** A walkway must stay axis-aligned and cross only rot-0 pads (`floorPaths.test.ts`); moving the Flame's mats moves the ring with them. Benches are blockout props `p-pitblock*` (a third added at 8, 31), drawn as folded crash pads on the pit's mats.
+
+## 2026-11-19 — A run opens loading → intro → countdown (Builder, #674)
+**Context:** The intro swoop was squeezed into Ready / Set / GO, which waited up to 4 s on the warm-up: a 1–2 s blur on fast devices, a stall then a hitchy landing on slow ones (it supersedes the 18 Nov #328 swoop-timing entry).
+**Decision:** Two new phases before `countdown`. `loading` shows a loading screen until the level chunk, the scene, the whole shader warm-up (no cap) and the audio (SFX bake, score started; skipped while audio is still locked) are done and the level has drawn a few frames under it. `intro` runs the swoop on the wall clock for a fixed `INTRO_SECONDS` (6 s), not on frames, so it lasts the same on every device; a tap or key skips it. The countdown never moves the camera. A restart of a warm level goes straight to the countdown; a new start of a warm level passes the loading screen in a few frames (its stages are kept, not reset). `?e2e=1` still starts in `playing`.
+**Consequences:** Anything that must finish before play belongs under the loading screen (report it to `core/loadProgress.ts`), never in the intro or countdown. #675 replaces the swoop path with a tour on the same clock.
