@@ -211,12 +211,14 @@ export default function TrackMesh({
   const gaps = useMemo(() => trackGaps(mechanics, table.length, dropPieceLength(dims.eyeHeight)), [mechanics, table, dims])
   const geometry = useMemo(() => {
     const main = buildTrackGeometry(curve, table, dims, segments, color1, color2, gaps)
-    // A junction's branch (#702) is more rails beside the main track's, in the same mesh (no extra draw call).
+    // A junction's branch (#702) is more rails beside the main track's, in the same mesh (no extra draw call), at half
+    // the main track's ring density: a short, gentle stretch, kept inside the level's triangle budget.
     const branches = (mechanics ?? []).flatMap((m) => {
       if (m.kind !== 'junction') return []
       const { branch } = junctionOf(curve, m)
       const branchTable = buildArcTable(branch, 1024)
-      return [buildTrackGeometry(branch, branchTable, dims, Math.max(16, Math.ceil((segments * branchTable.length) / table.length)), color1, color2)]
+      const rings = Math.max(16, Math.ceil((segments * branchTable.length) / table.length / 2))
+      return [buildTrackGeometry(branch, branchTable, dims, rings, color1, color2)]
     })
     if (!branches.length) return main
     const merged = mergeGeometries([main, ...branches])
