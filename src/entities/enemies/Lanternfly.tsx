@@ -4,7 +4,8 @@ import EnemyBase, { type EnemyProps } from './EnemyBase'
 import {
   LANTERNFLY_BODY_GEO, LANTERNFLY_FOREWING_GEOS, LANTERNFLY_FOREWING_PIVOT, LANTERNFLY_HINDWING_GEOS, LANTERNFLY_HINDWING_PIVOT, LANTERNFLY_MAT,
 } from './SharedEnemyAssets'
-import { HOP, hopPose, hopRoute, newHopPose } from './hopGlideMotion'
+import { HOP, hopRoute, newHopPose } from './hopGlideMotion'
+import { hopPose } from './hopGlideMotion.hot'
 import { freeWallSlot, wallNormal, wallPoint } from '@/entities/spawning/enemyPlacement'
 import { hashString } from '@/utils/rng'
 
@@ -13,6 +14,11 @@ const LANTERNFLY_SCALE = 4
 const FOLDED = { foreSwing: 0.06, foreRoll: 0.5, hindSwing: -0.05, hindRoll: 0.45, hindFan: 0.45 }
 const OPEN = { foreSwing: 1.45, foreRoll: 0.1, hindSwing: 0.55, hindRoll: 0.05, hindFan: 1 }
 const SIDES = [1, -1] as const
+// The folded pose, built once: R3F compares props by reference, so an Euler made per render would be copied back
+// onto the wings on any re-render (the pause), over the pose `updatePosition` set (#577).
+const FOLDED_FORE = SIDES.map((s) => new THREE.Euler(0, s * FOLDED.foreRoll, s * FOLDED.foreSwing, 'ZYX'))
+const FOLDED_HIND = SIDES.map((s) => new THREE.Euler(0, s * FOLDED.hindRoll, s * FOLDED.hindSwing, 'ZYX'))
+const FOLDED_HIND_SCALE: [number, number, number] = [FOLDED.hindFan, 1, 1]
 
 const mix = (a: number, b: number, t: number) => a + (b - a) * t
 
@@ -71,15 +77,15 @@ export default function Lanternfly(props: EnemyProps) {
               <group
                 ref={(g) => { hindwings.current[i] = g }}
                 position={[s * hx, hy, hz]}
-                rotation={new THREE.Euler(0, s * FOLDED.hindRoll, s * FOLDED.hindSwing, 'ZYX')}
-                scale={[FOLDED.hindFan, 1, 1]}
+                rotation={FOLDED_HIND[i]}
+                scale={FOLDED_HIND_SCALE}
               >
                 <mesh geometry={LANTERNFLY_HINDWING_GEOS[i]} material={LANTERNFLY_MAT} />
               </group>
               <group
                 ref={(g) => { forewings.current[i] = g }}
                 position={[s * fx, fy, fz]}
-                rotation={new THREE.Euler(0, s * FOLDED.foreRoll, s * FOLDED.foreSwing, 'ZYX')}
+                rotation={FOLDED_FORE[i]}
               >
                 <mesh geometry={LANTERNFLY_FOREWING_GEOS[i]} material={LANTERNFLY_MAT} />
               </group>
