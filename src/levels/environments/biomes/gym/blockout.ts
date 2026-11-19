@@ -215,7 +215,53 @@ export function pieceBoxes(p: BlockoutPiece): OrientedBox[] {
   }
 }
 
-export const BLOCKOUT_BOXES: readonly OrientedBox[] = PIECES.flatMap(pieceBoxes)
+/**
+ * The gap under the Tree's trunk (#558), in the Tree's frame (`along` from its centre, `f` out from its foot
+ * line, `y` up from the pit floor): cave to cave between the front and back buttress roots, under the
+ * trunk's underside. Seen from the pit it is the arch the front roots make as they lean in to the trunk;
+ * the ride runs through it (#613). `treeTrunk.ts` builds the wood round it.
+ */
+export const TREE_GAP = { halfAlong: 2.8, minF: 0.75, maxF: 4.0, height: 3.1 } as const
+
+/**
+ * The Tree's wood and walls round its gap and caves, conservatively, in its frame (`treeTrunk.ts` stays inside them,
+ * `wallPanels.test.ts` holds it there): the trunk over the gap, the front buttress roots in the caves' mouths, the
+ * surface roots on their floor.
+ */
+const TREE_WOOD = { trunkHalf: 3.3, frontRootHalf: 5.8, floorRootTop: 0.6, limbsBelowCaveTop: 2 } as const
+
+/**
+ * The Tree as the ride sees it (#613): its footprint less the gap and the caves. The back wall and back roots up to
+ * the gap, the headwall and the limbs roofing the caves, the trunk down to the gap's ceiling, the front roots
+ * leaning in to it, and the surface roots on the caves' floor.
+ */
+export function treeSolidBoxes(t: PieceOf<'tree'>): OrientedBox[] {
+  const front = t.caveDepth + treeHeadLean(t)
+  const half = t.width / 2
+  const box = (suffix: string, minA: number, maxA: number, minF: number, maxF: number, minY: number, maxY: number): OrientedBox => ({
+    id: `${t.id}:${suffix}`,
+    x: t.x,
+    z: t.z,
+    rot: t.rot,
+    minA,
+    maxA,
+    minF,
+    maxF,
+    minY: t.base + minY,
+    maxY: t.base + maxY,
+  })
+  const w = TREE_WOOD
+  return [
+    box('back', -half, half, -DEFAULT_BACK, TREE_GAP.minF, -2, t.height),
+    box('head', -half, half, -DEFAULT_BACK, front, t.caveHeight - w.limbsBelowCaveTop, t.height),
+    box('trunk', -w.trunkHalf, w.trunkHalf, -DEFAULT_BACK, front, TREE_GAP.height, t.height),
+    box('roots', -w.frontRootHalf, w.frontRootHalf, TREE_GAP.maxF, front, -2, t.caveHeight),
+    box('floor', -half, half, -DEFAULT_BACK, front, -2, w.floorRootTop),
+  ]
+}
+
+/** Every piece's solid volume, the Tree's with its gap and caves open: what the ride keeps clear of. */
+export const BLOCKOUT_BOXES: readonly OrientedBox[] = PIECES.flatMap((p) => (p.kind === 'tree' ? treeSolidBoxes(p) : pieceBoxes(p)))
 
 // ---- Named anchors: what the track, spawns and the boss are built round. ----
 

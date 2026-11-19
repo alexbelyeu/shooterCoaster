@@ -1,5 +1,5 @@
 import { createRng } from '@/utils/rng'
-import { treeHeadLean, type PieceOf } from './blockout'
+import { TREE_GAP, treeHeadLean, type PieceOf } from './blockout'
 import { pushTri, type V3 } from './wallPanels'
 
 /**
@@ -17,13 +17,6 @@ export interface TreeWood {
   /** Per triangle, 0 in a bark groove … 1 on a ridge. */
   tone: number[]
 }
-
-/**
- * The gap under the trunk, in the Tree's frame: cave to cave between the front and back roots, under the
- * trunk's underside (`halfAlong` either side of its centre; the surface roots spread low over the caves' floor).
- * Seen from the pit it is the arch the front roots make as they lean in to the trunk.
- */
-export const TREE_GAP = { halfAlong: 2.8, minF: 0.75, maxF: 4.0, height: 3.1 } as const
 
 const SEGMENTS = 16
 /** How far bark ridges stand off a ring's radius, at most. */

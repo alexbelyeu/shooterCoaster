@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
-import { PIECES, pieceBoxes, pieceToBlockout, piece, toBlockout, treeHeadLean, type PieceOf, type Vec3 } from './blockout'
+import { PIECES, TREE_GAP, pieceBoxes, pieceToBlockout, piece, toBlockout, treeHeadLean, treeSolidBoxes, type PieceOf, type Vec3 } from './blockout'
 import { WALL_STYLE } from './config'
 import { GYM_TRACK, RAIL_CLEARANCE } from './gymTrack'
-import { TREE_GAP, buildTreeWood } from './treeTrunk'
+import { buildTreeWood } from './treeTrunk'
 import { FACE, buildWallPanels, wallSpec, type WallPanels } from './wallPanels'
 
 const EPS = 1e-6
@@ -11,6 +11,11 @@ const walls = PIECES.filter((p): p is PieceOf<'sport' | 'boulder'> => p.kind ===
 const built = walls.map((p) => ({ p, wall: buildWallPanels(wallSpec(p, WALL_STYLE[p.id])) }))
 const tree = piece('tree')
 const wood = buildTreeWood(tree)
+/** The caves' back wall and the headwall over them, built as `hallGeometry` builds them, in the Tree's frame. */
+const caves = vertices(buildWallPanels({ length: tree.width, profile: [{ len: tree.caveHeight, angle: 0 }], back: 0.5, seed: 5191 }).positions)
+const head = vertices(
+  buildWallPanels({ length: tree.width, profile: [{ len: (tree.height - tree.caveHeight) / Math.cos((tree.headAngle * Math.PI) / 180), angle: tree.headAngle }], back: tree.caveDepth + 0.5, seed: 5192, bottom: true }).positions,
+).map(([a, y, f]): [number, number, number] => [a, y + tree.caveHeight, f + tree.caveDepth])
 
 /** Vertices of a local triangle list as [along, up, facing]. */
 function vertices(positions: readonly number[]): [number, number, number][] {
@@ -112,12 +117,26 @@ describe('the Tree (#519)', () => {
   })
 
   it('keeps its headwall and caves inside its footprint', () => {
-    const caves = buildWallPanels({ length: tree.width, profile: [{ len: tree.caveHeight, angle: 0 }], back: 0.5, seed: 1 })
-    expect(outsideBox(tree, vertices(caves.positions))).toBe(0)
-    const head = buildWallPanels({ length: tree.width, profile: [{ len: (tree.height - tree.caveHeight) / Math.cos((tree.headAngle * Math.PI) / 180), angle: tree.headAngle }], back: tree.caveDepth + 0.5, seed: 2, bottom: true })
-    const lifted = vertices(head.positions).map(([a, y, f]): [number, number, number] => [a, y + tree.caveHeight, f + tree.caveDepth])
-    expect(outsideBox(tree, lifted)).toBe(0)
-    expect(Math.max(...lifted.map(([, , f]) => f))).toBeLessThanOrEqual(tree.caveDepth + treeHeadLean(tree) + EPS)
+    expect(outsideBox(tree, caves)).toBe(0)
+    expect(outsideBox(tree, head)).toBe(0)
+    expect(Math.max(...head.map(([, , f]) => f))).toBeLessThanOrEqual(tree.caveDepth + treeHeadLean(tree) + EPS)
+  })
+
+  it('keeps its wood, caves and headwall inside the solid boxes the ride is held off (#613)', () => {
+    const boxes = treeSolidBoxes(tree)
+    const inSome = ([a, y, f]: [number, number, number]) =>
+      boxes.some((b) => a >= b.minA - EPS && a <= b.maxA + EPS && f >= b.minF - EPS && f <= b.maxF + EPS && y + tree.base >= b.minY - EPS && y + tree.base <= b.maxY + EPS)
+    expect([...vertices(wood.positions), ...caves, ...head].filter((v) => !inSome(v))).toEqual([])
+  })
+
+  it('keeps its wood, caves and headwall off the track by its rail clearance (#613)', () => {
+    const nearest = Math.min(
+      ...[...vertices(wood.positions), ...caves, ...head].map(([a, y, f]) => {
+        const { x, z } = pieceToBlockout(tree, a, f)
+        return trackDistance({ x, y: y + tree.base, z })
+      }),
+    )
+    expect(nearest).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
   })
 
   it('has a gap under the trunk the coaster fits through, cave to cave', () => {
