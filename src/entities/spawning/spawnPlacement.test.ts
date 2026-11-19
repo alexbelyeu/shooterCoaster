@@ -6,7 +6,7 @@ import { createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/uti
 import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig, WallSurface } from '@/types/level'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
-import { rideProfile, rideSpeeds, riddenBetween } from '@/track/ridePhysics'
+import { rideModel, rideProfile, riddenBetween } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import {
@@ -36,7 +36,7 @@ function world(level: LevelConfig) {
   const heightFn = biomeHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
   const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize(level.biome))
   // What EnemySpawner hands each wave: the ride from GO over its entry and its window.
-  const profile = rideProfile(table, rideSpeeds(level.track), RUN_SECONDS)
+  const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
   const { trackScale } = getTrackDimensions(level.track)
   const windows = waveWindows(level.enemies.map((w) => w.spawnDelay ?? 0), level.boss?.at, RUN_SECONDS)
   const rides: RideAhead[] = windows.map(([from, to]) => ({
