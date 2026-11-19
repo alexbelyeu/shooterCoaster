@@ -175,7 +175,8 @@ async function draw(ctx: CanvasRenderingContext2D, run: ScoreCardRun, layout: Sc
   const { width, height } = layout
   ctx.fillStyle = BACKDROP
   ctx.fillRect(0, 0, width, height)
-  if (photo) await drawPhoto(ctx, photo, layout.art)
+  // A photo that won't decode leaves the postcard.
+  if (photo) await drawPhoto(ctx, photo, layout.art).catch(() => drawPostcard(ctx, run, layout))
   else await drawPostcard(ctx, run, layout)
 
   const { from, to } = layout.fade

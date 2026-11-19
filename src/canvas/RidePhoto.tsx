@@ -11,7 +11,7 @@ import { eventBus } from '@/core/EventBus'
 const PHOTO_QUALITY = 0.9
 
 /** Scales the frame down into a 2D canvas and encodes it, a task after the capture. */
-async function develop(frame: ImageBitmap, runId: number) {
+async function develop(frame: ImageBitmap, runId: number, mounted: { current: boolean }) {
   const { width, height } = photoSize(frame.width, frame.height)
   const canvas = document.createElement('canvas')
   canvas.width = width
@@ -22,8 +22,8 @@ async function develop(frame: ImageBitmap, runId: number) {
   const blob = ctx ? await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', PHOTO_QUALITY)) : null
   canvas.width = 0
   canvas.height = 0
-  // A run that ended into the next one before the JPEG was done keeps no photo.
-  if (!blob || useGameStore.getState().runId !== runId) return
+  // A run that ended into the next one, or a level left, before the JPEG was done keeps no photo.
+  if (!blob || !mounted.current || useGameStore.getState().runId !== runId) return
   setRidePhoto(runId, blob, width, height)
   const testApi = window.__SC_TEST__
   if (testApi) Object.assign(testApi.photo, { width, height, bytes: blob.size })
@@ -34,14 +34,14 @@ async function develop(frame: ImageBitmap, runId: number) {
  * `preserveDrawingBuffer`). `createImageBitmap` takes the copy now and resolves later, so the scaling and the JPEG
  * stay off the frame.
  */
-function capture(source: HTMLCanvasElement, runId: number) {
+function capture(source: HTMLCanvasElement, runId: number, mounted: { current: boolean }) {
   const started = performance.now()
   const frame = createImageBitmap(source)
   const testApi = window.__SC_TEST__
   if (testApi) Object.assign(testApi.photo, { taken: true, progress: rideProgress(), captureMs: performance.now() - started })
   eventBus.emit(RIDE_PHOTO_EVENT)
   // No photo is no loss: the card keeps the postcard.
-  frame.then((bitmap) => develop(bitmap, runId)).catch(() => {})
+  frame.then((bitmap) => develop(bitmap, runId, mounted)).catch(() => {})
 }
 
 /** A new run: its photo not taken, the last one dropped. */
@@ -71,6 +71,7 @@ interface RideState {
 export default function RidePhoto({ table, at }: { table: ArcTable; at: number }) {
   const gl = useThree((s) => s.gl)
   const state = useRef<RideState>({ runId: -1, last: 0, due: false, taken: false, timing: false })
+  const mounted = useRef(true)
 
   useEffect(() => {
     const testApi = window.__SC_TEST__
@@ -102,11 +103,17 @@ export default function RidePhoto({ table, at }: { table: ArcTable; at: number }
         if (!s.due) return
         s.due = false
         s.timing = window.__SC_TEST__ !== undefined
-        capture(gl.domElement, s.runId)
+        capture(gl.domElement, s.runId, mounted)
       }),
     [gl],
   )
-  useEffect(() => clearRidePhoto, [])
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      clearRidePhoto()
+    }
+  }, [])
 
   return null
 }
