@@ -423,6 +423,8 @@ canvas {
 
 .hud-combo.is-lost {
   --combo-color: var(--fair-vermilion);
+  /* knocked swinging on its hook */
+  transform-origin: 50% 0;
   animation: hud-combo-shake 0.45s ease-out;
 }
 
@@ -509,27 +511,20 @@ canvas {
 
 @keyframes hud-combo-shake {
   0%, 100% { transform: translate(-50%, 0); }
-  15% { transform: translate(calc(-50% - 9px), 0) rotate(-2deg); }
-  35% { transform: translate(calc(-50% + 8px), 0) rotate(2deg); }
-  55% { transform: translate(calc(-50% - 5px), 0) rotate(-1deg); }
-  75% { transform: translate(calc(-50% + 3px), 0); }
+  15% { transform: translate(-50%, 0) rotate(-7deg); }
+  40% { transform: translate(-50%, 0) rotate(5deg); }
+  65% { transform: translate(-50%, 0) rotate(-2.5deg); }
+  85% { transform: translate(-50%, 0) rotate(1deg); }
 }
 
-/* top-tier slow-mo: "×5 FRENZY" over the combo meter and a red edge pulse */
+/* Top-tier slow-mo: "×5 Frenzy" on a gilt show card over the combo meter, and a gilt frame painted round the screen. */
 .hud-frenzy {
   position: absolute;
   left: 50%;
   bottom: max(150px, calc(env(safe-area-inset-bottom) + 142px));
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  transform: translateX(-50%);
+  translate: -50% 0;
   white-space: nowrap;
-  font-weight: 800;
-  color: #fff;
-  text-shadow: 0 0 18px rgba(255, 59, 59, 0.95), 0 0 36px rgba(255, 154, 31, 0.6), 0 2px 4px rgba(0, 0, 0, 0.85);
   pointer-events: none;
-  animation: hud-frenzy-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.4);
 }
 
 /* The slow-mo's ease back to 1 (`FRENZY.easeS`), after which the flash unmounts. */
@@ -538,22 +533,39 @@ canvas {
   transition: opacity 0.3s ease-in;
 }
 
+.fair-board-shadow.hud-frenzy-card-shadow {
+  width: auto;
+}
+
+/* The one gilt card: tar letters on gold leaf, lined out in tar. */
+.fair-board.hud-frenzy-card {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.95rem 1.7rem 0.85rem;
+  font-family: 'Ultra', serif;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--fair-tar);
+  background: var(--fair-gilt);
+}
+
+.hud-frenzy-card .fair-lining { background: var(--fair-tar); }
+.hud-frenzy-card .fair-lining > span { background: var(--fair-gilt); }
+
 .hud-frenzy-mult {
-  font-size: clamp(2rem, 7vw, 3rem);
-  color: #ff3b3b;
+  font-size: clamp(2rem, 6vw, 2.6rem);
 }
 
 .hud-frenzy-word {
-  font-size: clamp(1.4rem, 5vw, 2.1rem);
-  letter-spacing: 0.22em;
-  margin-right: -0.22em;
+  font-size: clamp(1.5rem, 4.5vw, 1.95rem);
 }
 
 .hud-frenzy-edge {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  box-shadow: inset 0 0 90px 10px rgba(255, 59, 59, 0.55);
+  box-shadow: inset 0 0 0 clamp(6px, 1.2vw, 12px) var(--fair-gilt);
   animation: hud-fade-in 0.35s ease-out;
 }
 
@@ -633,11 +645,6 @@ canvas {
   to { opacity: 1; }
 }
 
-@keyframes hud-frenzy-in {
-  from { opacity: 0; transform: translateX(-50%) scale(1.6); }
-  to { opacity: 1; transform: translateX(-50%) scale(1); }
-}
-
 /* Weapon pickup badge (#185): left of the combo meter; above the pause button on portrait phones */
 .hud-weapon {
   position: absolute;
@@ -714,43 +721,48 @@ canvas {
   .hud-combo-count,
   .hud-combo-mult,
   .hud-combo.is-lost,
-  .hud-frenzy,
   .hud-frenzy-edge { animation: none; }
 }
-.reduce-motion :is(.hud-timer--critical .hud-timer-value, .hud-combo-count, .hud-combo-mult, .hud-combo.is-lost, .hud-frenzy, .hud-frenzy-edge) {
+.reduce-motion :is(.hud-timer--critical .hud-timer-value, .hud-combo-count, .hud-combo-mult, .hud-combo.is-lost, .hud-frenzy-edge) {
   animation: none;
 }
 
-/* Boss bar — top centre between the score and timer panels; under them on phones */
+/* Boss bar: the boss's name in gilt over a painted gauge, one segment per weak point; top centre between the score
+   and timer panels, under them on phones. It drops in on its hook and falls off it when the boss is down. */
 .hud-boss {
   position: absolute;
   top: max(14px, env(safe-area-inset-top));
   left: 50%;
+  translate: -50% 0;
   width: clamp(220px, 32vw, 420px);
-  transform: translateX(-50%);
   text-align: center;
-  animation: hud-boss-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+  transform-origin: 50% 0;
+  animation: fair-hook-drop 0.45s ease-out;
 }
 
 .hud-boss-name {
-  margin-bottom: 6px;
-  font-size: clamp(0.8rem, 1.6vw, 1rem);
-  font-weight: 800;
-  letter-spacing: 0.22em;
-  margin-right: -0.22em;
-  text-transform: uppercase;
-  color: #ffd23f;
-  text-shadow: 0 0 14px rgba(255, 190, 40, 0.75), var(--hud-shadow);
+  margin-bottom: 10px;
+  font-family: 'Ultra', serif;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  line-height: 1.1;
+  color: var(--fair-gilt);
+  text-shadow:
+    -1px -1px 0 var(--fair-tar),
+    1px -1px 0 var(--fair-tar),
+    -1px 1px 0 var(--fair-tar),
+    1px 1px 0 var(--fair-gilt-block),
+    2px 2px 0 var(--fair-gilt-block),
+    3px 4px 0 var(--fair-tar);
 }
 
+/* An oxblood plate on a hard tar edge; each weak point a sunk well filled with gold leaf. */
 .hud-boss-bar {
   display: flex;
   gap: 4px;
   padding: 4px;
-  border-radius: 8px;
-  background: rgba(8, 10, 22, 0.62);
-  border: 1px solid rgba(255, 210, 63, 0.45);
-  box-shadow: 0 0 16px rgba(255, 190, 40, 0.3);
+  border-radius: 5px;
+  background: var(--fair-oxblood);
+  box-shadow: 0 4px 0 var(--fair-tar), inset 0 0 0 2px var(--fair-tar);
 }
 
 .hud-boss-bar.is-hit {
@@ -759,27 +771,23 @@ canvas {
 
 .hud-boss-seg {
   flex-basis: 0;
-  height: 12px;
+  height: 14px;
   overflow: hidden;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  background: var(--fair-oxblood-deep);
+  box-shadow: inset 0 2px 0 var(--fair-tar);
 }
 
 .hud-boss-seg-fill {
   height: 100%;
   transform-origin: left center;
-  background: linear-gradient(180deg, #ffe680, #f0a400);
-  box-shadow: 0 0 8px rgba(255, 190, 40, 0.8);
+  background: var(--fair-gilt);
+  box-shadow: inset 0 -4px 0 var(--fair-gilt-block);
   transition: transform 0.25s ease-out;
 }
 
 .hud-boss.is-defeated {
-  animation: hud-boss-burst 1.2s ease-out forwards;
-}
-
-@keyframes hud-boss-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.9); }
-  to { opacity: 1; transform: translateX(-50%) scale(1); }
+  animation: hud-boss-fall 1.2s ease-in forwards;
 }
 
 @keyframes hud-boss-shake {
@@ -789,10 +797,11 @@ canvas {
   70% { transform: translateX(-3px); }
 }
 
-@keyframes hud-boss-burst {
-  0% { opacity: 1; transform: translateX(-50%) scale(1); }
-  25% { opacity: 1; transform: translateX(-50%) scale(1.15); filter: brightness(1.8); }
-  100% { opacity: 0; transform: translateX(-50%) scale(1.35); filter: brightness(1); }
+/* "X is down!" holds a beat, then the sign slips off one hook and drops out of sight. */
+@keyframes hud-boss-fall {
+  0%, 45% { opacity: 1; transform: none; }
+  60% { opacity: 1; transform: rotate(9deg); }
+  100% { opacity: 0; transform: translateY(70px) rotate(16deg); }
 }
 
 /* Phones (portrait): the panels fill the top row, so the bar goes under them. */
@@ -1265,7 +1274,8 @@ canvas {
   }
 }
 
-/* Results screen. --accent / --accent-glow are the level's biome accent, set inline from src/ui/theme.ts. */
+/* Results board (docs/art/PERSONALITY.md): a fair board over the landmark's orbit, the leaderboard beside it.
+   --accent / --accent-glow are the level's biome accent (src/ui/theme.ts), still used by the leaderboard and share menu. */
 .results-screen {
   position: fixed;
   inset: 0;
@@ -1274,8 +1284,6 @@ canvas {
   align-items: center;
   justify-content: safe center;
   z-index: 100;
-  /* Dark under the stats, lighter at the edges: the camera orbits the level's landmark behind them (#328). */
-  background: radial-gradient(ellipse at 50% 45%, rgba(12, 12, 22, 0.82) 30%, rgba(0, 0, 0, 0.5));
   overflow-y: auto;
   touch-action: pan-y;
 }
@@ -1284,8 +1292,14 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.25rem;
+  gap: 1.5rem;
   width: min(100%, 26rem);
+}
+
+.results-panel {
+  display: grid;
+  gap: 1.1rem;
+  padding: 1.7rem 1.6rem 1.4rem;
 }
 
 .results-main,
@@ -1293,176 +1307,246 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100%;
+  min-width: 0;
 }
 
-.results-screen h2 {
-  font-family: 'Lobster', cursive;
-  font-size: clamp(2rem, 9vw, 3rem);
-  line-height: 1.1;
+.results-panel h2.fair-title {
+  margin: 0;
+  font-size: 2.5rem;
   text-align: center;
-  text-shadow: 0 0 18px var(--accent-glow);
-}
-
-.results-daily-badge {
-  margin-bottom: 0.3rem;
-  padding: 0.15rem 0.7rem;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #1a1206;
-  background: #ffd23f;
-  border-radius: 999px;
 }
 
 .results-message {
-  margin-top: 0.25rem;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.65);
+  margin-top: 0.35rem;
+  font-size: 1.15rem;
   text-align: center;
 }
 
-.results-stars {
-  display: flex;
-  gap: 0.5rem;
-  margin: 0.75rem 0 0.25rem;
-  font-size: clamp(2.6rem, 12vw, 3.6rem);
-  line-height: 1;
-}
-
-.results-star {
-  position: relative;
-  color: rgba(255, 255, 255, 0.22);
-}
-
-.results-star-earned {
-  position: absolute;
-  inset: 0;
-  /* Gold on purpose, not the biome accent: stars are gold on every screen (.level-card-stars .earned). */
-  color: #ffd23f;
-  text-shadow: 0 0 16px rgba(255, 210, 63, 0.8);
+.results-daily-badge {
+  margin-bottom: 0.7rem;
+  color: var(--fair-tar);
+  background: var(--fair-sky);
+  rotate: -3deg;
 }
 
 .results-score {
   position: relative;
-  font-size: clamp(2.2rem, 10vw, 3rem);
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+/* Space above the score for the record's card, so it covers neither the bulbs nor the line above. */
+.results-score.has-record {
+  margin-top: 2.1rem;
 }
 
 .results-record {
   position: absolute;
-  left: 100%;
-  top: -0.2rem;
-  margin-left: 0.5rem;
-  padding: 0.2rem 0.55rem;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 1px;
-  white-space: nowrap;
-  color: #000;
-  background: var(--accent);
-  border-radius: 4px;
-  box-shadow: 0 0 14px var(--accent-glow);
+  right: -0.5rem;
+  bottom: calc(100% + 2px);
+  color: var(--fair-oxblood);
+  background: var(--fair-cream);
+  rotate: 4deg;
+}
+
+.results-screen[data-sequence='running'] .results-record {
+  animation: results-card-slap 220ms ease-out;
+}
+
+@keyframes results-card-slap {
+  from {
+    scale: 1.7;
+    rotate: -10deg;
+  }
+}
+
+/* The score in a sunk well, ringed with chaser bulbs (ResultsMarquee). */
+.results-marquee {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 1.25rem 1rem 1.1rem;
+  border-radius: 5px;
+  background: var(--fair-oxblood-deep);
+}
+
+.results-bulbs {
+  position: absolute;
+  inset: 9px;
+}
+
+.results-bulbs i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: var(--fair-oxblood);
+  box-shadow: 0 0 0 1.5px var(--fair-tar);
+}
+
+.results-bulbs i.lit {
+  background: var(--fair-cream);
+  box-shadow: 0 0 0 2px var(--fair-gilt);
+}
+
+/* One pass round the ring: each bulb flashes as the chase reaches it, then holds lit or goes dark. */
+.results-bulbs.is-chasing i {
+  animation: results-chase 260ms linear calc(var(--i) * 28ms) backwards;
+}
+
+@keyframes results-chase {
+  0% {
+    background: var(--fair-oxblood);
+    box-shadow: 0 0 0 1.5px var(--fair-tar);
+  }
+
+  1%,
+  60% {
+    background: var(--fair-cream);
+    box-shadow: 0 0 0 2px var(--fair-gilt);
+  }
+}
+
+/* The ticket counter: one wheel per digit, its faces stacked and rolled by transform. */
+.results-score-value {
+  display: flex;
+  font-size: 3.25rem;
+}
+
+.results-wheel-slot {
+  display: flex;
+}
+
+.results-wheel {
+  display: block;
+  width: 0.8em;
+  height: 1.1em;
+  margin: 0 0.04em;
+  border-radius: 3px;
+  background: var(--fair-oxblood);
+  overflow-x: visible;
+  overflow-y: clip;
+  text-align: center;
+}
+
+.results-wheel-strip {
+  display: block;
+  line-height: 1.1em;
+}
+
+.results-wheel-strip > span {
+  display: block;
+  height: 1.1em;
+}
+
+.results-comma {
+  width: 0.3em;
+  line-height: 1.1em;
+}
+
+.results-stars {
+  margin-top: 0.8rem;
+}
+
+.results-stars .fair-stars svg {
+  width: 40px;
+  height: 40px;
+}
+
+.results-screen[data-sequence='running'] .results-stars .earned {
+  animation: results-star-pop 240ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes results-star-pop {
+  from {
+    scale: 0.2;
+    rotate: -40deg;
+  }
+}
+
+.results-next,
+.results-best {
+  margin-top: 0.4rem;
+  font-size: 1.15rem;
+  text-align: center;
 }
 
 .results-best {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--fair-sky);
 }
 
-.results-bar {
-  position: relative;
-  width: 100%;
-  height: 0.6rem;
-  margin-top: 1.4rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+.results-next[data-shown='false'],
+.results-stats[data-shown='false'],
+.results-actions[data-shown='false'],
+.results-keys[data-shown='false'] {
+  visibility: hidden;
 }
 
-.results-bar-fill {
-  width: 0;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
-  box-shadow: 0 0 10px var(--accent-glow);
-}
-
-.results-bar-marker {
-  position: absolute;
-  bottom: 100%;
-  transform: translateX(-50%);
-  padding-bottom: 0.15rem;
-  font-size: 0.7rem;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.4);
-  white-space: nowrap;
-}
-
-.results-bar-marker::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 100%;
-  width: 2px;
-  height: 0.6rem;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.55);
-}
-
-.results-bar-marker.reached {
-  /* Gold like the earned stars above. */
-  color: #ffd23f;
-}
-
-.results-next {
-  margin-top: 0.4rem;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
+.results-actions[data-shown='false'] {
+  pointer-events: none;
 }
 
 .results-stats {
   list-style: none;
-  width: 100%;
-  padding: 0;
+  align-self: stretch;
   margin: 0;
+  padding: 0;
 }
 
 .results-stat {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.45rem 0.25rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 1rem;
+  padding: 0.2rem 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-align: center;
 }
 
-.results-stat span {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.results-stat strong {
-  font-variant-numeric: tabular-nums;
-}
-
+/* The one gilt plate across the top, the small plates side by side under it. */
 .results-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-top: 1.25rem;
+  align-self: stretch;
+  gap: 0.65rem;
+  margin-top: 1.1rem;
 }
 
-.results-actions .play-button {
-  padding: 0.75rem 1rem;
-  font-size: 0.95rem;
-  letter-spacing: 1px;
+.results-actions > * {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
-.results-actions .results-secondary {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.14);
+.results-actions > .fair-go {
+  flex-basis: 100%;
+  margin-bottom: 0.3rem;
+  padding: 0.9rem 1rem 0.75rem;
+  font-size: 2rem;
 }
+
+.results-actions .share-anchor .fair-plate {
+  flex: 1;
+}
+
+.results-keys {
+  margin-top: 1rem;
+  font-size: 1.05rem;
+  text-align: center;
+  opacity: 0.72;
+}
+
+@media (hover: none) {
+  .results-keys {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .results-bulbs.is-chasing i,
+  .results-screen[data-sequence] .results-record,
+  .results-screen[data-sequence] .results-stars .earned {
+    animation: none;
+  }
+}
+.reduce-motion :is(.results-bulbs.is-chasing i, .results-screen[data-sequence] .results-record, .results-screen[data-sequence] .results-stars .earned) { animation: none; }
 
 /* Share menu (src/ui/ShareMenu.tsx): placed by popoverPlacement.ts, below the button when it fits beside Next. */
 .share-anchor {
@@ -1471,8 +1555,7 @@ canvas {
 }
 
 .results-actions .results-share[aria-expanded='true'] {
-  color: #000;
-  background: var(--accent);
+  color: var(--fair-gilt);
 }
 
 .share-menu {
@@ -1533,18 +1616,6 @@ canvas {
 
   .share-wide {
     grid-column: auto;
-  }
-}
-
-.results-keys {
-  margin-top: 0.6rem;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-@media (hover: none) {
-  .results-keys {
-    display: none;
   }
 }
 
@@ -1703,74 +1774,110 @@ canvas {
 }
 .reduce-motion .results-board-initials button.is-active { animation: none; }
 
-/* Desktop: score, stats and buttons on the left, the board beside them. */
-@media (min-width: 900px) and (min-height: 521px) {
-  .results-card {
-    display: grid;
-    grid-template-columns: 26rem 17rem;
-    grid-template-areas:
-      'main board'
-      'side board';
-    column-gap: 3rem;
-    width: auto;
-  }
-
-  .results-main {
-    grid-area: main;
-  }
-
-  .results-side {
-    grid-area: side;
-  }
-
-  .results-board-slot {
-    grid-area: board;
-    align-self: center;
-  }
-
-  /* A daily run has no board (it never enters the campaign's). */
-  .results-screen[data-mode='daily'] .results-card {
-    grid-template-columns: 26rem;
-    grid-template-areas:
-      'main'
-      'side';
-  }
-}
-
-/* Phone landscape: score + stars on the left, stats + buttons on the right. */
-@media (orientation: landscape) and (max-height: 520px) {
+/* Desktop and phone landscape: the board in two columns (the score, then the lines and plates), the leaderboard beside it. */
+@media (min-width: 900px) and (min-height: 521px), (orientation: landscape) and (max-height: 520px) {
   .results-card {
     flex-direction: row;
     align-items: center;
-    gap: 1.25rem;
-    width: min(100%, 60rem);
+    gap: 2.5rem;
+    width: auto;
+    max-width: 100%;
   }
 
-  .results-screen h2 {
-    font-size: 1.8rem;
+  .fair-board-shadow.results-panel-shadow {
+    width: 42rem;
+    max-width: 100%;
   }
 
-  .results-stars {
-    margin: 0.4rem 0 0;
-    font-size: 2.4rem;
+  .results-panel {
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    column-gap: 1.8rem;
+  }
+
+  .results-board-slot {
+    flex: 0 0 17rem;
+  }
+}
+
+/* Phone landscape: tighter, so the board and the leaderboard fit 390 px. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .results-card {
+    gap: 1rem;
+  }
+
+  .fair-board-shadow.results-panel-shadow {
+    flex: 1 1 auto;
+    width: auto;
+  }
+
+  .results-panel {
+    gap: 0.4rem;
+    column-gap: 1.2rem;
+    padding: 1.2rem 1.3rem 1rem;
+  }
+
+  .results-panel h2.fair-title {
+    font-size: 1.75rem;
+  }
+
+  .results-message {
+    display: none;
+  }
+
+  .results-daily-badge {
+    margin-bottom: 0.4rem;
   }
 
   .results-score {
-    font-size: 2rem;
+    margin-top: 0.6rem;
+  }
+
+  .results-score.has-record {
+    margin-top: 1.9rem;
+  }
+
+  .results-score-value {
+    font-size: 2.4rem;
+  }
+
+  .results-marquee {
+    padding: 0.9rem 0.8rem 0.8rem;
+  }
+
+  .results-stars {
+    margin-top: 0.5rem;
+  }
+
+  .results-stars .fair-stars svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  .results-next,
+  .results-best {
+    margin-top: 0.2rem;
+    font-size: 1rem;
   }
 
   .results-stat {
-    padding: 0.3rem 0.25rem;
+    padding: 0.05rem 0;
+    font-size: 1.1rem;
   }
 
   .results-actions {
-    margin-top: 0.75rem;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
   }
 
-  /* Levels / Replay / Share on one row beside the board, so the share menu opens above them, not over them. */
-  .results-actions .play-button {
-    padding: 0.75rem 0.7rem;
-    font-size: 0.85rem;
+  .results-actions .fair-go {
+    margin-bottom: 0.2rem;
+    padding: 0.7rem 0.8rem 0.55rem;
+    font-size: 1.6rem;
+  }
+
+  .results-actions .fair-plate:not(.fair-go) {
+    font-size: 1.15rem;
   }
 
   .results-board-slot {
@@ -2297,7 +2404,7 @@ canvas {
   text-shadow: 0 0 18px rgba(255, 200, 0, 0.95), 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
-/* Wave announcement — letterspaced caps between biome-accent rules */
+/* Wave announcement: a show card hung over the ride, its name in gilt (`WaveAnnouncement`). */
 .wave-announcement {
   position: fixed;
   top: 24%;
@@ -2305,47 +2412,31 @@ canvas {
   right: 0;
   display: flex;
   justify-content: center;
-  overflow: hidden;
-  padding: 8px 0;
   pointer-events: none;
   z-index: 15;
 }
 
-.wave-banner {
-  display: flex;
-  align-items: center;
-  gap: clamp(10px, 2vw, 18px);
+.fair-board-shadow.wave-card-shadow {
+  width: auto;
   max-width: calc(100vw - 32px);
 }
 
+.fair-board.wave-card {
+  padding: 1.15rem 1.9rem 1.05rem;
+}
+
 .wave-banner-text {
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
-  font-size: clamp(1.25rem, 4.5vw, 2.4rem);
-  letter-spacing: 0.24em;
-  /* letter-spacing trails the last glyph; balance it */
-  margin-right: -0.24em;
-  text-transform: uppercase;
+  display: block;
+  font-size: clamp(1.5rem, 5vw, 2.3rem);
   text-align: center;
-  color: #fff;
-  text-shadow: 0 0 18px var(--hud-glow), 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
-.wave-banner-rule {
-  flex: none;
-  width: clamp(28px, 8vw, 90px);
-  height: 3px;
-  border-radius: 2px;
-  background: var(--hud-accent);
-  box-shadow: 0 0 10px var(--hud-glow);
-}
-
-/* Wave tell: one screen-edge glow pulse in the biome accent, 1 s before a wave arrives */
+/* Wave tell: a vermilion frame painted round the screen flashes once, 1 s before a wave arrives. */
 .wave-tell {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  box-shadow: inset 0 0 min(14vw, 120px) min(3vw, 26px) var(--hud-glow);
+  box-shadow: inset 0 0 0 clamp(6px, 1.2vw, 12px) var(--fair-vermilion);
   opacity: 0;
   z-index: 14;
   animation: wave-tell-pulse 1s ease-out;
@@ -2358,7 +2449,7 @@ canvas {
   100% { opacity: 0; }
 }
 
-/* Level countdown */
+/* Level countdown: Ready / Set / GO! in gilt fat-face over the ride, each dropped in on its hook. */
 .countdown {
   position: fixed;
   inset: 0;
@@ -2370,18 +2461,25 @@ canvas {
 }
 
 .countdown-step {
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
-  font-size: clamp(2.5rem, 9vw, 4.5rem);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 0 20px rgba(255, 200, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.5);
+  font-family: 'Ultra', serif;
+  font-size: clamp(3rem, min(11vw, 20vh), 5rem);
+  line-height: 1;
+  color: var(--fair-gilt);
+  /* A hard tar outline first, so the gold reads against a white cloud, then the block and the cast shadow. */
+  text-shadow:
+    -2px -2px 0 var(--fair-tar),
+    2px -2px 0 var(--fair-tar),
+    -2px 2px 0 var(--fair-tar),
+    1px 1px 0 var(--fair-gilt-block),
+    2px 2px 0 var(--fair-gilt-block),
+    3px 3px 0 var(--fair-gilt-block),
+    4px 4px 0 var(--fair-gilt-block),
+    5px 5px 0 var(--fair-gilt-block),
+    8px 9px 0 var(--fair-tar);
 }
 
 .countdown-step--go {
-  font-size: clamp(3.5rem, 13vw, 6.5rem);
-  color: #ffd23f;
+  font-size: clamp(4rem, min(16vw, 26vh), 7.5rem);
 }
 
 /* The run's loading screen (#674): the level's postcard, name and a bar over the hidden level. */
@@ -2446,7 +2544,7 @@ canvas {
   transition: transform 0.2s linear;
 }
 
-/* The intro's skip hint, low over the tour. */
+/* The intro's skip hint, low over the tour: cream ink with a hard tar edge. */
 .intro-hint {
   position: fixed;
   left: 50%;
@@ -2454,12 +2552,12 @@ canvas {
   transform: translateX(-50%);
   z-index: 50;
   pointer-events: none;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.85rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.75);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  font-family: 'Big Shoulders', sans-serif;
+  font-variation-settings: 'opsz' 10;
+  font-weight: 600;
+  font-size: 1.0625rem;
+  color: var(--fair-cream);
+  text-shadow: -1px -1px 0 var(--fair-tar), 1px -1px 0 var(--fair-tar), -1px 1px 0 var(--fair-tar), 2px 2px 0 var(--fair-tar);
   animation: intro-hint-in 0.6s ease-out 0.8s both;
 }
 
@@ -2616,8 +2714,66 @@ canvas {
   stroke: var(--fair-tar);
 }
 
+/* Show cards: lettered cards tacked on the board, a little askew. */
+.fair-showcard {
+  padding: 0.3rem 0.6rem 0.2rem;
+  border-radius: 3px;
+  font-family: 'Ultra', serif;
+  font-size: 1rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  box-shadow: 3px 4px 0 var(--fair-tar);
+}
+
+/* A board arriving: it drops onto its hook and swings once before it settles. */
+.fair-arrive {
+  transform-origin: 50% -2rem;
+  animation: fair-arrive 320ms ease-out;
+}
+
+@keyframes fair-arrive {
+  0% {
+    translate: 0 -2.5rem;
+    rotate: -2.5deg;
+  }
+
+  45% {
+    translate: 0 0;
+    rotate: 1.6deg;
+  }
+
+  75% {
+    rotate: -0.6deg;
+  }
+}
+
+/* A HUD sign arriving: dropped onto its hook, it swings once and settles (reduced motion: in place).
+   It animates `transform`, not `.fair-arrive`'s `translate` / `rotate`, because the HUD signs
+   (.hud-frenzy, .hud-boss) centre themselves with the `translate` property. */
+.fair-hook {
+  transform-origin: 50% 0;
+  animation: fair-hook-drop 0.45s ease-out;
+}
+
+@keyframes fair-hook-drop {
+  0% { opacity: 0; transform: translateY(-60px) rotate(-6deg); }
+  15% { opacity: 1; }
+  45% { transform: rotate(4deg); }
+  70% { transform: rotate(-1.5deg); }
+  100% { transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fair-plate {
     transition: none;
   }
+
+  .fair-arrive,
+  .fair-hook {
+    animation: none;
+  }
+}
+.reduce-motion .fair-arrive,
+.reduce-motion .fair-hook {
+  animation: none;
 }

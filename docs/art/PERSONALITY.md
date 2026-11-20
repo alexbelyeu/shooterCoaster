@@ -81,7 +81,8 @@ Never a gradient on a surface; the only soft colour change allowed is the dim ov
 
 Mechanical and physical, never floaty: a sign swung on its hook, a ticket counter rolling, a button pressed.
 
-- A board arrives by dropping in and swinging once on its hook (about 300 ms, settles; no fade-and-slide).
+- A board arrives by dropping in and swinging once on its hook (about 300 ms, settles; no fade-and-slide): the
+  `fair-hook` class in `src/app/global.css`.
 - Numbers that change roll like a ticket counter, digit by digit.
 - **The one signature moment: the results board's chaser bulbs.** A string of bulbs round the final score chases
   once and holds lit for each star earned. No other screen has bulbs.

@@ -1,5 +1,5 @@
 // node scripts/plot-gym-track.mjs [out.svg]: level 6's track (#514) over the gym blockout, a top and a side view,
-// coloured by ride time, the four ride moments marked → e2e-results/gym-track.svg by default.
+// coloured by ride time, the storyboard's elements marked → e2e-results/gym-track.svg by default.
 import { build } from 'esbuild'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -90,11 +90,14 @@ for (let sec = 0; sec <= 60; sec += 5) {
   parts.push(`<circle cx="${tx(p.x)}" cy="${sy(p.y)}" r="3" fill="#000"/><text x="${tx(p.x) + 4}" y="${sy(p.y) - 4}" font-size="10">${sec}s</text>`)
 }
 const label = (x, z, text) => `<text x="${tx(x)}" y="${tz(z)}" font-size="13" font-weight="bold" fill="#b00">${text}</text>`
-parts.push(label(g.STAR.centre.x + 1, g.STAR.centre.z + 1, '★ Starr: the dive'))
-parts.push(label(g.TREE.centre.x - 6, g.TREE.centre.z - 2, 'Tree climb'))
-parts.push(label(g.FLAME.centre.x - 4, g.FLAME.centre.z + 1, 'Flame spiral'))
-parts.push(label(g.ARCH.centre.x - 7, g.ARCH.centre.z - 4, 'Arch'))
-parts.push(label(g.GLASS_ROOM.centre.x - 6, g.GLASS_ROOM.centre.z - 0.6, 'glass gym room'))
+parts.push(label(g.STAR.centre.x + 1, g.STAR.centre.z + 1, '★ Starr: the Medusa'))
+parts.push(label(23, 30, 'Medusa helix'))
+parts.push(label(g.TREE.centre.x - 6, g.TREE.centre.z - 2, 'Tree gap: heartline roll'))
+parts.push(label(g.FLAME.centre.x - 4, g.FLAME.centre.z + 1, 'Flame: zero-g roll'))
+parts.push(label(g.ARCH.centre.x - 7, g.ARCH.centre.z - 4, 'Arch: head-chopper'))
+parts.push(label(70, 31, 'station'))
+parts.push(label(26, 33, 'Alaska: wall ride'))
+parts.push(label(28, -2, 'cave'))
 parts.push(`<text x="${PAD}" y="${PAD - 10}" font-size="14">Top view (x along the hall, Starr end left; z across, east on top). Colour = ride time, blue 0 s → red 60 s, grey after the run.</text>`)
 parts.push(`<text x="${PAD}" y="${sideTop - 10}" font-size="14">Side view (x / height, m): the pit floor at ${g.PIT.floorY} m, ceiling ${g.HALL.h} m.</text>`)
 

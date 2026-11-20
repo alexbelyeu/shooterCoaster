@@ -37,7 +37,7 @@ import type { RunMode } from '@/types/game'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
-import type { EnemyType } from '@/types/level'
+import type { EnemyType, RideBeat } from '@/types/level'
 import type { GamePhase, LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
@@ -280,6 +280,8 @@ export interface SCTestApi {
   rideSpeed: number | null
   /** The coaster's track fraction (0–1) on its last frame. */
   rideProgress: number
+  /** The current level's v2 ride beats (`TrackParams.rideV2.beats`: a track fraction and the second it lands on); [] without one. */
+  rideBeats: () => readonly RideBeat[]
   // ── View / aspect (issue #66) ──
   /** Active camera projection vs the canvas's on-screen box (squash checks). */
   view: () => E2EView | null
@@ -1118,6 +1120,10 @@ export function installE2EApi() {
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,
+    rideBeats: () => {
+      const id = useGameStore.getState().currentLevel
+      return (id ? getLevelConfig(id)?.track.rideV2?.beats : undefined) ?? []
+    },
     view: readView,
     graphics: () => {
       const { quality, reducedMotion } = useSettingsStore.getState()
