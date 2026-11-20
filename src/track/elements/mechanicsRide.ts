@@ -4,7 +4,7 @@ import { STOP_APPROACH } from '../mechanics'
 import { RideBuilder, type RideMarker } from './rideBuilder'
 import { bankedTurn } from './elements'
 import { DEMO_EYE } from './demoRide'
-import { backwards, dropTrack, jumpGap, placeMechanics, station } from './mechanics'
+import { backwards, dropTrack, jumpGap, placeMechanics, station } from './mechanicElements'
 
 const START_Y = 70
 const DROP = 40
