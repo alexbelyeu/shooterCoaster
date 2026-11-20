@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels, getLevelConfig, previousLevel } from './LevelRegistry'
-import { SCORE_VALUES, computeMaxScore, computeStars, nextStar, runStars, shownScore } from './scoring'
+import { SCORE_VALUES, computeMaxScore, computeStars, nextStar, runNextStar, runStars, shownScore } from './scoring'
 import type { EnemyType } from '@/types/level'
 import { BOSS_SPECS } from '@/entities/bosses/bossSpecs'
 import { bossMaxScore } from '@/entities/bosses/bossModel'
@@ -205,6 +205,26 @@ describe('runStars', () => {
   it('never shows a negative score', () => {
     expect(shownScore(-12.7)).toBe(0)
     expect(runStars(-12.7, level)).toBe(0)
+  })
+})
+
+describe('runNextStar', () => {
+  const level = { maxScore: 1000, starThresholds: [0.15, 0.55, 0.85] as [number, number, number] }
+
+  it('asks for the star above the shown stars: 549.6 shows 2 stars, so the line asks for the third', () => {
+    expect(runNextStar(549.6, level)).toEqual({ stars: 3, points: 300 })
+    expect(runNextStar(549.4, level)).toEqual({ stars: 2, points: 1 })
+    expect(runNextStar(849.6, level)).toBeNull()
+  })
+
+  it('agrees with runStars just under every threshold on every level', () => {
+    for (const l of levels) {
+      for (const t of l.starThresholds) {
+        const score = Math.ceil(t * l.maxScore) - 0.4
+        const stars = runStars(score, l)
+        expect(runNextStar(score, l)?.stars ?? 4, `${l.id} @ ${score}`).toBe(stars + 1)
+      }
+    }
   })
 })
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { runBest, useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { computeStars, nextStar, runStars } from '@/levels/scoring'
+import { computeStars, runNextStar, runStars } from '@/levels/scoring'
 import { sfx } from '@/audio/sfx'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { SHARED_EVENT } from '@/app/analyticsEvents'
@@ -219,7 +219,7 @@ export default function ResultsScreen() {
   if (!config) return null
 
   const nextName = nextLevel ? (getLevelConfig(nextLevel)?.name ?? nextLevel) : null
-  const next = nextStar(run.score, config.maxScore, config.starThresholds)
+  const next = runNextStar(run.score, config)
   const instant = { duration: 0 }
   const reveal = (from: number) => (stage >= from ? 'shown' : 'hidden')
   const entryOpen = done && initials !== null

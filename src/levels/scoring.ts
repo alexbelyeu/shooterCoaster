@@ -96,3 +96,8 @@ export function nextStar(
   const needed = thresholds[earned] * maxScore - score
   return { stars: earned + 1, points: Math.max(1, Math.ceil(needed - 1e-9)) }
 }
+
+/** A finished run's next star (`nextStar` on its shown score), so the results screen's next-star line agrees with its `runStars`. */
+export function runNextStar(score: number, level: Pick<LevelConfig, 'maxScore' | 'starThresholds'>): NextStar | null {
+  return nextStar(shownScore(score), level.maxScore, level.starThresholds)
+}
