@@ -112,6 +112,16 @@ time so the storyboard's beats land on their seconds.
 
 ## Rules for building rides
 
+- **Comfort, checked on every level** (`src/track/rideComfort.ts`, `rideComfort.test.ts`, #761): no 2 s stretch whose view
+  turns faster than 110°/s on average, at most 4 s of the run over 90°/s, no 0.1 s snap over 350°/s. Levels 1–5 sit
+  inside it; level 6's first rebuild went to 280°/s for seconds and snapped at 900°/s in a hall too small for its speed,
+  and Alex found it dizzying. Speed is the lever: halve the speed and every turn rate halves. An inversion is a slow,
+  floating roll (3 s or more), never a whip.
+- **Something to shoot through every element** (principle 4, checked): the smoke's `pacing` step holds each level to its
+  `budgets.json` `pacing` ceilings (longest gap with no target, share of the run with none), and CI runs it on every PR
+  that touches a level's ride or spawns. Spawns follow the ride: when the route changes, its targets move with it; on a
+  climb the targets are on the wall beside and above the rider, during an inversion they stay in frame.
+
 - Clearance from **everything solid**, railings, stairs and props included, never only the
   blockout's pieces (level 6 rode through the pit's railing on 19 Nov because they weren't checked).
 - A near miss is measured: the closest the rider's eye passes to a solid at speed, per element.
