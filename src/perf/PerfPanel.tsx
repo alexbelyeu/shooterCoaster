@@ -13,7 +13,8 @@ const panel: CSSProperties = {
   borderRadius: 6,
   background: 'rgba(0, 0, 0, 0.72)',
   color: '#fff',
-  font: '11px/1.4 ui-monospace, Menlo, monospace',
+  font: '600 13px/1.4 "Big Shoulders", sans-serif',
+  fontVariantNumeric: 'tabular-nums',
 }
 
 const button: CSSProperties = { marginTop: 4, font: 'inherit', padding: '2px 8px', cursor: 'pointer' }

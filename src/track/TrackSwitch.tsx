@@ -33,7 +33,7 @@ function drawFaces(side: 1 | -1): THREE.CanvasTexture {
       g.fillRect(8, top + 8, 240, 112)
       g.fillStyle = fg
       g.strokeStyle = fg
-      g.font = 'bold 76px Inter, sans-serif'
+      g.font = '800 76px "Big Shoulders", sans-serif'
       g.textBaseline = 'middle'
       g.textAlign = 'left'
       g.fillText(label, 24, top + 68)

@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { BIOME_UI } from './theme'
+import { BIOME_UI, FAIR } from './theme'
 
 /** WCAG relative luminance of a `#rrggbb` colour. */
 function luminance(hex: string): number {
@@ -15,14 +16,35 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05)
 }
 
-/** --fair-tar in src/app/global.css: the letters on a level-select name plate. */
-const TAR = '#1b110d'
+/** The letters on a level-select name plate. */
+const TAR = FAIR.tar
 
 describe('biome UI theme', () => {
   it("every world's name plate (its accent) reads at 4.5:1 or better under tar letters", () => {
     const low = Object.entries(BIOME_UI)
       .map(([biome, t]) => ({ biome, ratio: contrast(TAR, t.accent) }))
       .filter((r) => r.ratio < 4.5)
+    expect(low).toEqual([])
+  })
+})
+
+describe('the fair palette', () => {
+  it('is the --fair-* colours of src/app/global.css', () => {
+    const css = readFileSync(new URL('../app/global.css', import.meta.url), 'utf8')
+    for (const [name, hex] of Object.entries(FAIR)) {
+      const token = `--fair-${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`
+      expect(new RegExp(`${token}:\\s*([^;]+);`).exec(css)?.[1], token).toBe(hex)
+    }
+  })
+
+  it("the score card's lettering reads at 4.5:1 or better on what it sits on", () => {
+    const pairs: [string, string, string][] = [
+      ['cream on the board', FAIR.cream, FAIR.oxblood],
+      ['gilt on the board', FAIR.gilt, FAIR.oxblood],
+      ['tar on the Daily Run card', FAIR.tar, FAIR.sky],
+      ['oxblood on the World card', FAIR.oxblood, FAIR.cream],
+    ]
+    const low = pairs.map(([what, ink, ground]) => ({ what, ratio: contrast(ink, ground) })).filter((p) => p.ratio < 4.5)
     expect(low).toEqual([])
   })
 })

@@ -2,7 +2,7 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars } from '@/levels/scoring'
 import type { RunMode } from '@/types/game'
 import type { BiomeType } from '@/types/level'
-import { biomeTheme, type SkyStop } from '@/ui/theme'
+import { biomeTheme, FAIR, type SkyStop } from '@/ui/theme'
 import { formatAccuracy } from '@/ui/screens/resultsStats'
 import { VIEWBOX } from '@/ui/logoArt'
 import { rankLabel } from '@/ui/share'
@@ -22,12 +22,10 @@ const MARGIN: Record<CardSize, { x: number; y: number }> = {
   story: { x: 80, y: 230 },
 }
 
-export const CARD_FONTS = { display: '"Lobster", cursive', body: '"Inter", sans-serif' } as const
-const GOLD = '#ffd23f'
-const WHITE = '#ffffff'
-const DIM = 'rgba(255, 255, 255, 0.62)'
-/** Text box height per unit of font size. */
-export const LINE = 1.25
+/** Ultra for the name, score and numbers, Big Shoulders for the rest (docs/art/PERSONALITY.md "Type"). */
+export const CARD_FONTS = { display: '"Ultra", serif', body: '"Big Shoulders", sans-serif' } as const
+/** Text box height per unit of font size: Ultra's glyph box is 1.27 em. */
+export const LINE = 1.3
 
 export interface ScoreCardRun {
   levelId: string
@@ -102,13 +100,17 @@ export interface CardText {
   width: number
   maxWidth: number
   color: string
-  glow: string | null
+  /** `title`: gilt letters with their block and cast shadow; `number`: the cast shadow alone; `plain`: neither. */
+  paint: 'title' | 'number' | 'plain'
 }
 
-export interface CardPill {
-  kind: 'pill'
+/** A show card tacked on the board, a little askew, with its hard shadow (`.fair-showcard`). */
+export interface CardShowcard {
+  kind: 'showcard'
   rect: Rect
   color: string
+  /** Radians, about the card's centre. */
+  tilt: number
 }
 
 export interface CardStars {
@@ -123,19 +125,27 @@ export interface CardLogo {
   rect: Rect
 }
 
-export type CardItem = CardText | CardPill | CardStars | CardLogo
+export type CardItem = CardText | CardShowcard | CardStars | CardLogo
+
+/** The painted board the card is: notched ticket corners, a gilt lining `inset` in and `line` wide, a hard tar shadow. */
+export interface CardBoard {
+  rect: Rect
+  notch: number
+  inset: number
+  line: number
+  shadow: [dx: number, dy: number]
+}
 
 export interface ScoreCardLayout {
   size: CardSize
   width: number
   height: number
   safe: Rect
+  board: CardBoard
+  /** The level's postcard, framed in tar on the board. */
   art: Rect
+  frame: number
   sky: readonly SkyStop[]
-  /** The dark results backdrop fades in over the art along this line: transparent at `from`, solid at `to`. */
-  fade: { from: [number, number]; to: [number, number] }
-  glow: { x: number; y: number; radius: number; colour: string }
-  accent: string
   items: CardItem[]
 }
 
@@ -154,7 +164,7 @@ interface TextSpec {
   weight: number
   size: number
   color: string
-  glow?: string
+  paint?: CardText['paint']
 }
 
 /** Shrinks to fit `maxWidth` (text width scales with size), down to `minSize`; past that, cuts the text with an ellipsis. */
@@ -183,7 +193,7 @@ export function fitText(measure: Measure, spec: TextSpec, maxWidth: number, minS
     width,
     maxWidth,
     color: spec.color,
-    glow: spec.glow ?? null,
+    paint: spec.paint ?? 'plain',
   }
 }
 
@@ -195,8 +205,9 @@ interface Row {
 
 interface SizeSpec {
   column: (safe: Rect) => Rect
+  board: CardBoard
   art: Rect
-  fade: ScoreCardLayout['fade']
+  frame: number
   logo: number
   badge: number
   name: number
@@ -211,32 +222,34 @@ interface SizeSpec {
 
 const SPECS: Record<CardSize, SizeSpec> = {
   feed: {
-    column: (safe) => ({ x: safe.x, y: safe.y, width: 560, height: safe.height }),
-    art: { x: 400, y: 0, width: 800, height: 630 },
-    fade: { from: [700, 0], to: [440, 0] },
-    logo: 44,
-    badge: 18,
-    name: 68,
+    column: (safe) => ({ x: safe.x + 16, y: safe.y, width: 500, height: safe.height }),
+    board: { rect: { x: 16, y: 14, width: 1156, height: 592 }, notch: 30, inset: 18, line: 4, shadow: [12, 16] },
+    art: { x: 608, y: 56, width: 520, height: 518 },
+    frame: 6,
+    logo: 48,
+    badge: 22,
+    name: 60,
     star: 30,
-    score: 104,
-    statLabel: 16,
-    statValue: 38,
-    cta: 36,
+    score: 96,
+    statLabel: 24,
+    statValue: 40,
+    cta: 32,
     url: 24,
     gap: 12,
   },
   story: {
-    column: (safe) => ({ x: safe.x, y: 640, width: safe.width, height: safe.y + safe.height - 640 }),
-    art: { x: 0, y: 0, width: 1080, height: 900 },
-    fade: { from: [0, 520], to: [0, 880] },
+    column: (safe) => ({ x: safe.x, y: 776, width: safe.width, height: safe.y + safe.height - 776 }),
+    board: { rect: { x: 20, y: 20, width: 1024, height: 1864 }, notch: 44, inset: 26, line: 5, shadow: [16, 20] },
+    art: { x: 80, y: 92, width: 904, height: 640 },
+    frame: 8,
     logo: 110,
-    badge: 30,
-    name: 120,
+    badge: 36,
+    name: 116,
     star: 60,
-    score: 190,
-    statLabel: 28,
-    statValue: 68,
-    cta: 64,
+    score: 180,
+    statLabel: 40,
+    statValue: 72,
+    cta: 60,
     url: 42,
     gap: 26,
   },
@@ -247,11 +260,10 @@ export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Meas
   const margin = MARGIN[size]
   const safe = { x: margin.x, y: margin.y, width: width - 2 * margin.x, height: height - 2 * margin.y }
   const spec = SPECS[size]
-  const theme = biomeTheme(run.biome)
   const col = spec.column(safe)
   const cx = col.x + col.width / 2
   const text = (t: TextSpec, scale: number, top: number, x = cx, maxWidth = col.width): CardText => {
-    const fitted = fitText(measure, { ...t, size: Math.round(t.size * scale) }, maxWidth, Math.ceil(t.size * scale * 0.4))
+    const fitted = fitText(measure, { ...t, size: Math.floor(t.size * scale) }, maxWidth, Math.ceil(t.size * scale * 0.4))
     return { ...fitted, x, y: top + (fitted.size * LINE) / 2 }
   }
   const textRow = (t: TextSpec, gap = spec.gap): Row => ({ h: t.size * LINE, gap, place: (top, s) => [text(t, s, top)] })
@@ -268,23 +280,25 @@ export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Meas
     },
   })
 
-  const pillRow = (role: CardText['role'], label: string, gap: number): Row => {
-    const t: TextSpec = { role, text: label, family: 'body', weight: 800, size: spec.badge, color: '#1a1206' }
-    const padY = spec.badge * 0.45
+  const showcardRow = (role: CardText['role'], label: string, card: string, ink: string, tilt: number, gap: number): Row => {
+    const t: TextSpec = { role, text: label, family: 'display', weight: 400, size: spec.badge, color: ink }
+    const padY = spec.badge * 0.3
     return {
       h: spec.badge * LINE + 2 * padY,
       gap,
       place: (top, s) => {
         const fitted = text(t, s, top + padY * s, cx, col.width - 3 * spec.badge * s)
-        const padX = fitted.size * 1.1
+        const padX = fitted.size * 0.6
         const h = fitted.size * LINE + 2 * padY * s
-        return [{ kind: 'pill', rect: { x: cx - fitted.width / 2 - padX, y: top, width: fitted.width + 2 * padX, height: h }, color: GOLD }, fitted]
+        const rect = { x: cx - fitted.width / 2 - padX, y: top, width: fitted.width + 2 * padX, height: h }
+        return [{ kind: 'showcard', rect, color: card, tilt }, fitted]
       },
     }
   }
 
-  if (run.daily) rows.push(pillRow('badge', `DAILY RUN · ${run.daily.toUpperCase()}`, spec.gap))
-  rows.push(textRow({ role: 'name', text: run.levelName, family: 'display', weight: 400, size: spec.name, color: WHITE, glow: theme.glow }, spec.gap * 0.5))
+  // The results board's show cards: the Daily Run on sky, the World place on cream.
+  if (run.daily) rows.push(showcardRow('badge', `Daily Run, ${run.daily}`, FAIR.sky, FAIR.tar, -0.05, spec.gap))
+  rows.push(textRow({ role: 'name', text: run.levelName, family: 'display', weight: 400, size: spec.name, color: FAIR.gilt, paint: 'title' }, spec.gap * 0.5))
   rows.push({
     h: spec.star * 2,
     gap: spec.gap * 0.5,
@@ -294,11 +308,11 @@ export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Meas
       return [{ kind: 'stars', centres: [-1, 0, 1].map((i) => ({ x: cx + i * step, y: top + radius })), radius, earned: Math.max(0, Math.min(3, Math.round(run.stars))) }]
     },
   })
-  if (run.worldRank !== null) rows.push(pillRow('rank', `WORLD ${rankLabel(run.worldRank)}`, spec.gap * 0.75))
-  rows.push(textRow({ role: 'score', text: fmt.format(run.score), family: 'display', weight: 400, size: spec.score, color: WHITE, glow: theme.glow }, spec.gap * 0.75))
+  if (run.worldRank !== null) rows.push(showcardRow('rank', `World ${rankLabel(run.worldRank)}`, FAIR.cream, FAIR.oxblood, 0.06, spec.gap * 0.75))
+  rows.push(textRow({ role: 'score', text: fmt.format(run.score), family: 'display', weight: 400, size: spec.score, color: FAIR.cream, paint: 'number' }, spec.gap * 0.75))
   const stats: [string, string][] = [
-    ['BEST COMBO', run.bestCombo > 0 ? `×${run.bestCombo}` : '—'],
-    ['ACCURACY', run.accuracy],
+    ['Best combo', run.bestCombo > 0 ? `×${run.bestCombo}` : '—'],
+    ['Accuracy', run.accuracy],
   ]
   rows.push({
     h: (spec.statLabel + spec.statValue) * LINE,
@@ -307,14 +321,14 @@ export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Meas
       const cell = col.width / stats.length
       return stats.flatMap(([label, value], i) => {
         const x = col.x + cell * (i + 0.5)
-        const l = text({ role: 'statLabel', text: label, family: 'body', weight: 700, size: spec.statLabel, color: DIM }, s, top, x, cell * 0.9)
-        const v = text({ role: 'statValue', text: value, family: 'body', weight: 800, size: spec.statValue, color: WHITE }, s, top + spec.statLabel * LINE * s, x, cell * 0.9)
+        const l = text({ role: 'statLabel', text: label, family: 'body', weight: 600, size: spec.statLabel, color: FAIR.cream }, s, top, x, cell * 0.9)
+        const v = text({ role: 'statValue', text: value, family: 'display', weight: 400, size: spec.statValue, color: FAIR.cream, paint: 'number' }, s, top + spec.statLabel * LINE * s, x, cell * 0.9)
         return [l, v]
       })
     },
   })
-  rows.push(textRow({ role: 'cta', text: 'Can you beat it?', family: 'display', weight: 400, size: spec.cta, color: theme.accent, glow: 'rgba(0, 0, 0, 0.5)' }, spec.gap * 0.25))
-  rows.push(textRow({ role: 'url', text: 'scoaster.com', family: 'body', weight: 800, size: spec.url, color: WHITE }, 0))
+  rows.push(textRow({ role: 'cta', text: 'Can you beat it?', family: 'body', weight: 800, size: spec.cta, color: FAIR.gilt }, spec.gap * 0.25))
+  rows.push(textRow({ role: 'url', text: 'scoaster.com', family: 'body', weight: 700, size: spec.url, color: FAIR.cream }, 0))
 
   const natural = rows.reduce((sum, r, i) => sum + r.h + (i < rows.length - 1 ? r.gap : 0), 0)
   const scale = Math.min(1, col.height / natural)
@@ -325,25 +339,14 @@ export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Meas
     top += (row.h + row.gap) * scale
   }
 
-  return {
-    size,
-    width,
-    height,
-    safe,
-    art: spec.art,
-    sky: theme.sky,
-    fade: spec.fade,
-    glow: { x: cx, y: col.y + col.height / 2, radius: Math.max(col.width, col.height) * 0.6, colour: theme.glow },
-    accent: theme.accent,
-    items,
-  }
+  return { size, width, height, safe, board: spec.board, art: spec.art, frame: spec.frame, sky: biomeTheme(run.biome).sky, items }
 }
 
 export function itemBounds(item: CardItem): Rect {
   switch (item.kind) {
     case 'text':
       return { x: item.x - item.width / 2, y: item.y - (item.size * LINE) / 2, width: item.width, height: item.size * LINE }
-    case 'pill':
+    case 'showcard':
     case 'logo':
       return item.rect
     case 'stars': {
