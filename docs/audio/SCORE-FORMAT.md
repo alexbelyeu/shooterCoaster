@@ -45,13 +45,13 @@ voiced around the voice's `center`, `x X o .` a drum lane. Every bar must add up
 
 | What | Original | ShooterCoaster |
 |---|---|---|
-| Where scores live | pasted into the page | `src/audio/scores/<id>.scrim`: `title`, one per level id (`level1`…), `results`; listed in `scores/index.ts` |
+| Where scores live | pasted into the page | `src/audio/scores/<id>.scrim`: `title`, one per level id (`level1`…), `results-win` and `results-lose`; listed in `scores/index.ts` |
 | Theme options | — | `scores/themes/<slot>.<name>.scrim`: candidate themes for a slot, waiting on Alex's pick (sound bible "taste gate"; none right now: the folder is read by glob, so a listening round only adds files and their `SCORE_KEYS` rows). `?theme=<name>[,<name>]` plays each named option in its slot's place (`themesFromQuery`, `scoreIdFor`), arcade SFX included (each option has its own `SCORE_KEYS` entry); the default never changes. Render one with `--music <slot>.<name>` |
 | Where it plays | its own `AudioContext`, to the speakers | the game's one `AudioContext` (`AudioEngine.ts`), into its own stereo music channel (`scoreChannel`): music volume, the slow-mo low-pass duck, the pause mix and the master limiter apply |
 | Mix bus | `jukebox` voicing: master 0.72 → +2 dB low shelf @180 Hz → −2.5 dB high shelf @7.5 kHz → compressor (−15 dB, 3.2:1) → limiter (−3 dB) → out 1.0 (≈ −9.5 LUFS) | `game` voicing (`GAME_VOICING` in `synth.ts`): 24 dB/oct high-pass at 32 Hz first, the same EQ and compressor, then a −6 dB limiter and out 0.53, so a score lands at −18…−16 LUFS through the music channel with true peaks near −9 dBTP. Each voice's panner takes a mono voice up to stereo before panning (`upmixPanner`: no 3 dB centre dip), as the scores were mixed (#416) |
 | Track changes | stop with a 60 ms fade | 1 s crossfade on a `musicBus` gain |
 | Pause | — | a paused run holds its score where it is (`pauseScore`) and resumes from that song position |
-| Results | — | the results screen crossfades to the `results` score; Replay crossfades back to the level's |
+| Results | — | the results screen crossfades to one of two results scores, picked by the run's stars when the phase starts (`scores/resultsCut.ts`, #792): `results-win` (a rising fanfare, then a full loop) for 2 or 3 stars, `results-lose` (a soft falling figure over a plagal minor cadence, then a sparse loop) for 0 or 1; Replay crossfades back to the level's |
 | Loading | — | the engine and scores are a separate chunk, loaded after the first gesture unlocks audio |
 | Plucked strings | built on demand, `warm()` in idle slices | the same; a track warms its whole score when it starts (the countdown, for a level) |
 | Randomness | `Math.random` | the same in play; offline renders seed it (`createRng`), so the original page and the port render the same score near bit-identically (`renders/parity-*`) |
@@ -168,7 +168,7 @@ These are not enforced by the compiler; `src/audio/scores/scores.test.ts` checks
   Add `?theme=<name>` for a theme option during a listening round, comma-separated for
   options in different slots (`?theme=<name>,<name>`); with no options in
   `scores/themes/`, it does nothing.
-- `npm run audio:render -- --music <title|level1..5|results|<slot>.<name>>`: a score
+- `npm run audio:render -- --music <title|level1..5|results-win|results-lose|<slot>.<name>>`: a score
   through the game's music chain (`docs/audio/renders/music-*`). Add `--seam` to start
   10 s before the first loop seam, so the render crosses it (a 32-bar loop is longer than a
   30 s render). A seam render starts inside the loop, which opens on intensity 0, so a score
