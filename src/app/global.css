@@ -2134,7 +2134,7 @@ canvas {
   padding: 0.15rem 0 0.2rem;
 }
 
-.settings-row--stacked .settings-segmented button {
+.settings-row--stacked .settings-segmented .fair-plate {
   flex: 1;
 }
 
@@ -2154,25 +2154,13 @@ canvas {
   padding-bottom: 5px;
 }
 
-.settings-segmented button {
+.settings-segmented .fair-plate {
   min-width: 44px;
-  min-height: 44px;
   padding: 0.3rem 0.6rem 0.2rem;
-  border: 0;
-  border-radius: 5px;
-  font-family: 'Big Shoulders', sans-serif;
-  font-variation-settings: 'opsz' 40;
   font-size: 1.15rem;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--fair-cream);
-  background: var(--fair-oxblood-deep);
-  box-shadow: 0 5px 0 var(--fair-tar);
-  cursor: pointer;
-  transition: transform 60ms, box-shadow 60ms;
 }
 
-.settings-segmented button[aria-checked='true'] {
+.settings-segmented .fair-plate[aria-checked='true'] {
   color: var(--fair-tar);
   background: var(--fair-cream);
   transform: translateY(4px);
@@ -2270,7 +2258,7 @@ canvas {
   box-shadow: 0 2px 0 var(--fair-gilt-block);
 }
 
-:is(.settings-switch, .settings-segmented button, .settings-clear .fair-plate):disabled {
+:is(.settings-switch, .settings-segmented .fair-plate, .settings-clear .fair-plate):disabled {
   cursor: default;
   opacity: 0.55;
 }
@@ -2311,14 +2299,12 @@ canvas {
   font-size: 1.9rem;
 }
 
-.reduce-motion .settings-switch::after,
-.reduce-motion .settings-segmented button {
+.reduce-motion .settings-switch::after {
   transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .settings-switch::after,
-  .settings-segmented button {
+  .settings-switch::after {
     transition: none;
   }
 }
@@ -2345,7 +2331,7 @@ canvas {
     grid-template-columns: 1fr auto;
     align-items: center;
     column-gap: 1.5rem;
-    padding: 0.8rem 1.5rem 0.7rem;
+    padding: 0.6rem 1.5rem 0.9rem;
   }
 
   .settings-card h2.fair-title {
@@ -2850,6 +2836,11 @@ canvas {
     animation: none;
   }
 }
+
+.reduce-motion .fair-plate {
+  transition: none;
+}
+
 .reduce-motion .fair-arrive,
 .reduce-motion .fair-hook {
   animation: none;

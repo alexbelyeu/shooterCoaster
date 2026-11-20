@@ -35,6 +35,7 @@ function Segmented<T extends string>({ labelId, options, labels, value, disabled
         <button
           key={option}
           type="button"
+          className="fair-plate"
           role="radio"
           aria-checked={option === value}
           disabled={disabled}
