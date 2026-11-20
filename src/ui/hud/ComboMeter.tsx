@@ -47,7 +47,7 @@ export default function ComboMeter() {
   }, [live, count, lastKillTime])
 
   const showLost = !live && lost !== null
-  // While it fades out, keep showing what it last showed (the store's chain is already 0).
+  // While it fades out, keep showing what it last showed, lost colour included (the store's chain is already 0).
   const lastShown = useRef({ count: 0, lost: false })
   if (live) lastShown.current = { count, lost: false }
   else if (showLost) lastShown.current = { count: lost.count, lost: true }
@@ -57,7 +57,7 @@ export default function ComboMeter() {
 
   return (
     <div
-      className={`hud-combo hud-combo--tier${tier}${live || showLost ? ' is-visible' : ''}${showLost ? ' is-lost' : ''}`}
+      className={`hud-combo hud-combo--tier${tier}${live || showLost ? ' is-visible' : ''}${lastShown.current.lost ? ' is-lost' : ''}`}
       style={style}
       aria-hidden={!live && !showLost}
     >
