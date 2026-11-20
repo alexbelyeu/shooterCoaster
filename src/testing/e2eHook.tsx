@@ -37,7 +37,8 @@ import type { RunMode } from '@/types/game'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
-import type { EnemyType, RideBeat } from '@/types/level'
+import type { EnemyType, EnemyWave, RideBeat } from '@/types/level'
+import { levelWeather, weatherSeconds } from '@/levels/environments/shared/weatherPulse'
 import type { GamePhase, LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
@@ -100,6 +101,11 @@ export interface E2ELevelWeather {
   kind: string
   at: number
   seconds: number
+}
+
+function e2eWeather(waves: readonly EnemyWave[]): E2ELevelWeather | null {
+  const weather = levelWeather(waves)
+  return weather && { kind: weather.kind, at: weather.wave.spawnDelay ?? 0, seconds: weatherSeconds(weather.kind) }
 }
 
 export interface RideFeel {
@@ -962,7 +968,7 @@ export function installE2EApi() {
       const { isLevelUnlocked } = useGameStore.getState()
       return getAllLevels().map((l) => ({
         id: l.id, name: l.name, maxScore: l.maxScore, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id),
-        weather: l.weather ? { kind: l.weather.kind, at: l.enemies[l.weather.wave].spawnDelay ?? 0, seconds: l.weather.seconds } : null,
+        weather: e2eWeather(l.enemies),
       }))
     },
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),

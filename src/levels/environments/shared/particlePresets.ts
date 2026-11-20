@@ -1,5 +1,5 @@
 import { particleShare } from '@/canvas/graphicsQuality'
-import type { ParticleBoost, ParticleFieldPreset } from './types'
+import type { BoostEnvelope, ParticleFieldPreset } from './types'
 
 /** Ambient air per biome (`BiomeDefinition.particles`); dense or bright fields read as noise at 1280×720, so stay inside the test's bounds. */
 
@@ -181,7 +181,7 @@ export function particleCounts(preset: ParticleFieldPreset, coarsePointer: boole
 }
 
 /** 0..1 strength of a boost `elapsed` seconds after its event: linear rise over `riseS`, full until `riseS + holdS`, then a linear fade over `fadeS`. */
-export function boostStrength(boost: ParticleBoost, elapsed: number): number {
+export function boostStrength(boost: BoostEnvelope, elapsed: number): number {
   const rise = Math.min(1, Math.max(0, elapsed / boost.riseS))
   const fade = Math.min(1, Math.max(0, (elapsed - boost.riseS - boost.holdS) / boost.fadeS))
   return rise * (1 - fade)
@@ -196,7 +196,7 @@ export interface BoostTrack {
 export const newBoostTrack = (): BoostTrack => ({ start: Number.NaN, pending: false })
 
 /** The boost's strength at clock time `t`; an event during a boost restarts the rise from `current`, so it doesn't pop. */
-export function stepBoost(track: BoostTrack, boost: ParticleBoost, t: number, current: number): number {
+export function stepBoost(track: BoostTrack, boost: BoostEnvelope, t: number, current: number): number {
   if (track.pending) {
     track.pending = false
     track.start = t - boost.riseS * current

@@ -109,7 +109,7 @@ at least 35% of the frame dark and some of it near white (its lights).
 When level2 is in the run, a `wave` step rides it to the crow wave: its `wave:incoming` tell (screen-edge pulse +
 label) must come before the wave, on time by the level timer (`waveTellSeconds` ahead; the timer steps a fixed 0.25 s a frame
 around it, `timerStep`, so a slow frame can't land both together), the run is paused and resumed in between (the level timer is held on the tick the tell fires, so the pause lands in the gap on any runner, and the step fails if the wave came before the pause; no tell or wave may fire twice), then the V flies in and is frozen for `level2-wave.png` (≥ 5 crows on screen, none within 40 units).
-When level2 or level4 is in the run, a `weather` step rides it to its weather pulse (#798, `LevelConfig.weather`: the
+When level2 or level4 is in the run, a `weather` step rides it to its weather pulse (#798, `EnemyWave.weather`: the
 sandstorm with level2's first crows, the blizzard with level4's snowmen; when and how long from `levels()`'s `weather`),
 3 s after its wave arrives, and freezes for `<id>-weather.png`: the pulse at full strength (`weather.envelope` ≥ 0.9),
 streaks drawn, the fog closed in from the biome's own, at least 3 enemies on screen; then plays on until it clears,
@@ -257,7 +257,7 @@ ridden on the PR, that the nightly job runs the full smoke, and that the shards,
 | `pause` | `waveSchedule.test.ts` (#152, #198), `useGameStore.test.ts` "pause and resume", "combo" (ignores the wall clock), `pauseMenu.test.ts` | tab hide / blur, the pause card |
 | `countdown` | `startPhase.test.ts`, `loadProgress.test.ts`, `introCamera.test.ts`, `useGameStore.test.ts` "startRun", `programReadiness.test.ts`, `startupMarks.test.ts` | the loading screen, the intro's length and skip, Ready / Set / GO, no new shader on the first shot |
 | `wave` | `waveSchedule.test.ts` (tell 1 s early, on time, no replay after a pause), `spawnPlacement.test.ts` (the V) | the V of crows on screen |
-| `weather` | `weatherPulse.test.ts` (the envelope, the fog back to the biome's own, the levels' pulses) | the pulse on screen, the enemies in it |
+| `weather` | `weatherPulse.test.ts` (the fog back to the biome's own, the levels' pulses) | the pulse on screen, the enemies in it |
 | `boss` | `bossModel.test.ts`, `krakenMotion.test.ts`, `scorpionMotion.test.ts` (the `turntable` workflow draws every boss on PRs touching `src/entities/`) | the full fights |
 | `pickup` | `weaponTypes.test.ts`, `pickupPlacement.test.ts`, `useGameStore.test.ts` (a run starts with the blaster) | the shot pickup, fan and badge |
 | `audio` | `src/audio/scrim/*.test.ts` (layers, scheduler, score), `arcade.test.ts`, `AudioEngine.test.ts` | the score engine and arcade SFX in a page |

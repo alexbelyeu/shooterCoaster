@@ -7,8 +7,9 @@ import { isCoarsePointer, useQualityProfile } from '@/canvas/useRenderBudget'
 import { useGameStore } from '@/store/useGameStore'
 import { createRng, hashString } from '@/utils/rng'
 import type { AtmosphereConfig } from '@/levels/environments/atmosphere'
-import type { WeatherSpec } from '@/types/level'
-import { maxWeatherStreaks, WEATHER_LOOKS, weatherEnvelope, weatherFog, type WeatherLook } from './weatherPulse'
+import type { WeatherKind } from '@/types/level'
+import { newBoostTrack, resetBoost, stepBoost } from './particlePresets'
+import { maxWeatherStreaks, WEATHER_LOOKS, weatherFog, type WeatherLook } from './weatherPulse'
 
 /** Streaks live this deep in the view (world units): close enough to read as driven past the rider, never on the lens. */
 const DEPTH = { near: 6, far: 170 } as const
@@ -84,33 +85,37 @@ function createMaterial(look: WeatherLook): THREE.ShaderMaterial {
 }
 
 /**
- * A level's weather pulse (#798) from its wave's `wave:start`, on game time. One draw whose streaks move in the vertex
- * shader; always in the scene (0 instances draws nothing) so `ShaderWarmup` compiles it.
+ * A level's weather pulse (#798) from its wave's `weather:start`, on game time, its envelope a particle boost's
+ * (`stepBoost`). One draw whose streaks move in the vertex shader; always in the scene (0 instances draws nothing) so
+ * `ShaderWarmup` compiles it.
+ *
+ * The fog has other writers that don't compose with this one: `DarkSections` (every frame) and the volcanic eruption.
+ * It holds because no level has weather with either; a level that wants both needs one owner for the fog first.
  */
-export default function Weather({ spec, atmosphere, fogRef }: { spec: WeatherSpec; atmosphere: AtmosphereConfig; fogRef: RefObject<THREE.Fog | null> }) {
-  const look = WEATHER_LOOKS[spec.kind]
+export default function Weather({ kind, atmosphere, fogRef }: { kind: WeatherKind; atmosphere: AtmosphereConfig; fogRef: RefObject<THREE.Fog | null> }) {
+  const look = WEATHER_LOOKS[kind]
   const max = maxWeatherStreaks(look, useQualityProfile().particleScale, isCoarsePointer)
   const geometry = useMemo(() => createStreaks(max), [max])
   const material = useMemo(() => createMaterial(look), [look])
-  const [pulse] = useState(() => ({ start: Number.NaN, envelope: 0, fog: { near: 0, far: 0 } }))
+  const [pulse] = useState(() => ({ track: newBoostTrack(), envelope: 0, fog: { near: 0, far: 0 } }))
   const runId = useGameStore((s) => s.runId)
 
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
 
   useEffect(() => {
-    const onWave = (index: unknown) => {
-      if (index === spec.wave && Number.isNaN(pulse.start)) pulse.start = gameTime()
+    const onWeather = (which: unknown) => {
+      if (which === kind) pulse.track.pending = true
     }
-    eventBus.on('wave:start', onWave)
+    eventBus.on('weather:start', onWeather)
     return () => {
-      eventBus.off('wave:start', onWave)
+      eventBus.off('weather:start', onWeather)
     }
-  }, [spec, pulse])
+  }, [kind, pulse])
 
   // A restart's pulse waits for its own wave, and the last run's fog is the biome's again
   useEffect(() => {
-    pulse.start = Number.NaN
+    resetBoost(pulse.track)
     pulse.envelope = 0
     const fog = fogRef.current
     if (fog) {
@@ -120,18 +125,18 @@ export default function Weather({ spec, atmosphere, fogRef }: { spec: WeatherSpe
     const testApi = window.__SC_TEST__
     if (testApi) {
       const base = { near: atmosphere.fogNear, far: atmosphere.fogFar }
-      testApi.weather = { kind: spec.kind, envelope: 0, streaks: 0, fogNear: base.near, fogFar: base.far, baseFogNear: base.near, baseFogFar: base.far }
+      testApi.weather = { kind, envelope: 0, streaks: 0, fogNear: base.near, fogFar: base.far, baseFogNear: base.near, baseFogFar: base.far }
     }
     return () => {
       const testApi = window.__SC_TEST__
       if (testApi) testApi.weather = null
     }
-  }, [runId, pulse, fogRef, atmosphere, spec])
+  }, [runId, pulse, fogRef, atmosphere, kind])
 
   useFrame(({ camera }) => {
     const t = gameTime()
-    const envelope = weatherEnvelope(spec.seconds, t - pulse.start)
     const was = pulse.envelope
+    const envelope = stepBoost(pulse.track, look.pulse, t, was)
     pulse.envelope = envelope
     geometry.instanceCount = Math.round(max * envelope)
     const fog = fogRef.current

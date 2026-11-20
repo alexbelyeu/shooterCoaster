@@ -2008,7 +2008,7 @@ async function waveCheck(page) {
   }
 }
 
-/** The levels with a weather pulse (#798, `LevelConfig.weather`); the step reads each one's wave time and length from `levels()`. */
+/** The levels with a weather pulse (#798, `EnemyWave.weather`); the step reads each one's wave time and length from `levels()`. */
 const WEATHER_LEVELS = ['level2', 'level4']
 /** Seconds after the weather's wave arrives to shoot it: past its ramp in (1.5 s), well before it clears. */
 const WEATHER_SHOT_AT = 3

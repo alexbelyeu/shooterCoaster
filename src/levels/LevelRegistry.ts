@@ -65,12 +65,11 @@ const LEVELS: LevelConfig[] = [
     ...paceLevel({
       waves: [
         { type: 'scorpion', count: 30, waveLabel: 'Incoming!' },
-        { type: 'crow', count: 39, waveLabel: 'A Murder of Crows!', formation: 'v' },
+        { type: 'crow', count: 39, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm' },
         { type: 'crow', count: 39, waveLabel: 'More Crows!', formation: 'v' },
       ],
       boss: 'giantScorpion',
     }),
-    weather: { kind: 'sandstorm', wave: 1, seconds: 7 }, // blows in with the first crows
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
     },
@@ -132,12 +131,11 @@ const LEVELS: LevelConfig[] = [
     ...paceLevel({
       waves: [
         { type: 'snowmanScout', count: 44, waveLabel: 'Scout Party', formation: 'line' },
-        { type: 'snowman', count: 40, waveLabel: 'Snowmen Incoming!' },
+        { type: 'snowman', count: 40, waveLabel: 'Snowmen Incoming!', weather: 'blizzard' },
         { type: 'snowmanBrute', count: 16, waveLabel: 'Brutes!' },
       ],
       boss: 'yeti',
     }),
-    weather: { kind: 'blizzard', wave: 1, seconds: 7 }, // blows in with the snowmen
     starThresholds: [0.2, 0.5, 0.8],
     combat: { bulletColor: '#000000', bulletSize: 40 }, // big dark snowballs against the snow
     environment: {

@@ -158,6 +158,8 @@ export interface FormationOrigin {
   up: number
 }
 
+export type WeatherKind = 'sandstorm' | 'blizzard'
+
 export interface EnemyWave {
   type: EnemyType
   count: number
@@ -165,6 +167,9 @@ export interface EnemyWave {
   spawnDelay?: number
   waveLabel?: string
   isEruption?: boolean
+  /** A weather pulse that blows in with the wave (#798): the spawner emits `weather:start`, the look and its rise / hold / fade
+   *  are `WEATHER_LOOKS` (`levels/environments/shared/weatherPulse.ts`). A level's waves use one kind. */
+  weather?: WeatherKind
   formation?: Formation
   /** Overrides the formation's default anchor. */
   formationOrigin?: FormationOrigin
@@ -173,15 +178,6 @@ export interface EnemyWave {
    * `walls`. Shooting one costs `BYSTANDER_PENALTY` and the combo; they are never kills, `maxScore` or the kill count.
    */
   bystanders?: { type: EnemyType; count: number }
-}
-
-export type WeatherKind = 'sandstorm' | 'blizzard'
-
-/** A level's weather pulse: `kind`'s look (`WEATHER_LOOKS`) for `seconds` of game time from its wave's arrival, ramps included. */
-export interface WeatherSpec {
-  kind: WeatherKind
-  wave: number
-  seconds: number
 }
 
 export interface LevelConfig {
@@ -198,8 +194,6 @@ export interface LevelConfig {
   starThresholds: [number, number, number] // 1-star, 2-star, 3-star percentages
   /** Finale: the boss arrives `at` seconds of level time after the start (its tell comes before). Spec in `entities/bosses/bossSpecs.ts`. */
   boss?: { type: BossType; at: number }
-  /** One weather pulse a run (#798): it sweeps in with the wave at `wave` (an index into `enemies`), `src/effects/weatherPulse.ts`. */
-  weather?: WeatherSpec
   /** Weapon pickups floating over the track, 2–4 (`combat/pickups/pickupPlacement.ts`); default one of each. */
   pickups?: PickupWeaponId[]
   /** Walls its wall enemies (`ENEMY_PLACEMENT` surface `'wall'`) climb; required when it has any. */

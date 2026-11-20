@@ -364,7 +364,7 @@ export default function EnemySpawner({
       setActiveWaveIndex((a) => Math.max(a, i))
       if (waves[i].waveLabel) setWaveAnnouncement(waves[i].waveLabel!)
       if (waves[i].isEruption) eventBus.emit('eruption:start')
-      eventBus.emit('wave:start', i)
+      if (waves[i].weather) eventBus.emit('weather:start', waves[i].weather)
     },
     [getThree, trackTable, enemies, placeWave, waves],
   )
