@@ -189,18 +189,19 @@ const LEVELS: LevelConfig[] = [
     maxScore: 14 * 15 + (14 + 24) * 12 + 34 * 18 + 8 * 50 + 500, // 1278 + the Medusa's eight snakes and reward (bossSpecs.ts) = 2178
     message: 'You sent the Climbing Gym!',
     nextLevel: null,
-    // Authored from Alex's blockout (#514): up the Tree, round the Flame, through the Arch, the dive into the Starr pit.
+    // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
     track: GYM_LEVEL.track,
     walls: [...GYM_LEVEL.walls],
     // Every enemy is a gym pest: no birds indoors (#664). Climbers are bystanders (#518): the first wave brings some, to
-    // teach the don't-shoot rule from the start. The lanternflies (#575) come second: from 9 to 13 s the rider climbs
-    // past no wall it can read a bug on, and from 14 s it faces Alaska close up, where their swarm lands (`placeWallSwarm`).
+    // teach the don't-shoot rule from the start. The waves follow the storyboard: dust over the launch, the roll and the
+    // Arch, more over the airtime hill, rats in the Training Area's dark cave (~13 s), the lanternflies (#575) as the
+    // rider climbs Alaska (~20 s), where their swarm lands (`placeWallSwarm`), and the pack over the dyno and the drop.
     ...paceLevel({
       waves: [
         { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 2, bystanders: { type: 'climber', count: 4 } },
-        { type: 'lanternfly', count: 14, waveLabel: 'Lanternflies!', weight: 2 },
         { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 2 },
         { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 2, bystanders: { type: 'climber', count: 3 } },
+        { type: 'lanternfly', count: 14, waveLabel: 'Lanternflies!', weight: 2 },
         { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 3, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',

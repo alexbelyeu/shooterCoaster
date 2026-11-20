@@ -139,6 +139,15 @@ function hermite(u: number, m0: number, m1: number): number {
 }
 
 const _a = new THREE.Vector3()
+const _b = new THREE.Vector3()
+const _up = new THREE.Vector3()
+/** A rolling track's up at a fork or merge within 2° of unrolled: the unrolled branch meets it with no visible twist. */
+const UNROLLED_COS = Math.cos((2 * Math.PI) / 180)
+
+/** The unrolled up at a tangent (world up made perpendicular to it): what a track without `getUpAt` rides. */
+function unrolledUp(tangent: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+  return out.set(0, 1, 0).addScaledVector(tangent, -tangent.y).normalize()
+}
 
 /** The main curve's speed |dP/dt| at t, measured across a small step. */
 function speedAt(curve: TrackCurve, t: number): number {
@@ -150,9 +159,14 @@ function speedAt(curve: TrackCurve, t: number): number {
 export function buildJunction(main: TrackCurve, m: JunctionMechanic): Junction {
   checkMechanic(m)
   const { from, to, points } = m
-  if (main.getUpAt) throw new Error('a junction on a rolling track is not supported')
   if (!('knotT' in main)) throw new Error('a junction needs a spline track: its from and to are arc shares')
   const lead = (to - from) * LEAD_SHARE
+  // The branch is never rolled: on a track that rolls, it forks and merges where the main track runs unrolled too.
+  if (main.getUpAt) {
+    for (const t of [from - lead, from, to, to + lead]) {
+      if (main.getUpAt(t).dot(unrolledUp(main.getTangentAt(t), _b)) < UNROLLED_COS) throw new Error(`junction ${from}…${to}: the track rolls at its fork or merge`)
+    }
+  }
   const at = (t: number) => {
     const p = main.getPointAt(t)
     return { x: p.x, y: p.y, z: p.z }
@@ -223,6 +237,14 @@ export function hardRouteOf(main: TrackCurve, mechanics: readonly RideMechanic[]
       },
     }
     : null
+  // On a track that rolls, the hard route takes its up from the main track outside the spans, the unrolled up on a branch.
+  const mainUp = main.getUpAt
+  if (curve && mainUp) {
+    curve.getUpAt = (t) => {
+      const j = junctionAt(junctions, t)
+      return j ? unrolledUp(j.branch.getTangentAt(branchT(j, t)), _up) : mainUp(t)
+    }
+  }
   hardRoutes.set(mechanics, { main, curve })
   return curve
 }

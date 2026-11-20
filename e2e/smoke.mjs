@@ -1780,9 +1780,13 @@ async function speedCheck(page, levelId) {
   return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w }, tunnel: tunnel.result }
 }
 
-/** The level whose lap starts in the Tree's gap (#659, `gym/gymTrack.ts`), and the track fraction its still is shot at: between the trunk and the back wall. */
+/**
+ * The level with the Tree's gap (#659), and the second of its storyboard beat there: the heartline roll through the gap
+ * between the trunk and the back wall (`gym/gymTrack.ts`). The still is shot at that beat's track fraction, read from the
+ * level's v2 ride (`rideBeats()`), so a rebuilt ride can't leave it pointing somewhere else.
+ */
 const GAP_LEVEL = 'level6'
-const GAP_FRACTION = 0.003
+const GAP_BEAT_SECOND = 55
 
 /**
  * `level6-gap.png`: the ride from inside the Tree's gap, the trunk on one side and the back wall on the other. With game time and the level timer
@@ -1799,13 +1803,18 @@ async function gapShot(page) {
     await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, t)
     await waitFrames(page, 3, { maxMs: 20000, pollMs: 100 })
   }
-  await jump(GAP_FRACTION)
+  const gap = await page.evaluate((second) => window.__SC_TEST__.rideBeats().find((b) => b.second === second)?.at ?? null, GAP_BEAT_SECOND)
+  if (gap === null) {
+    await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1); window.__SC_TEST__.holdLevelTime = false })
+    return { problems: [`gap still: ${GAP_LEVEL}'s ride has no beat at ${GAP_BEAT_SECOND} s (the heartline roll through the Tree's gap)`], image: null }
+  }
+  await jump(gap)
   const at = await page.evaluate(() => window.__SC_TEST__.rideProgress)
   const image = await imageStats(page, await page.screenshot({ path: path.join(OUT, `${GAP_LEVEL}-gap.png`), timeout: SHOT_TIMEOUT }))
   await jump(back)
   await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1); window.__SC_TEST__.holdLevelTime = false })
   const problems = []
-  if (Math.abs(at - GAP_FRACTION) > 0.002) problems.push(`gap still: the car is at track ${at.toFixed(4)}, not ${GAP_FRACTION} in the Tree's gap`)
+  if (Math.abs(at - gap) > 0.002) problems.push(`gap still: the car is at track ${at.toFixed(4)}, not ${gap.toFixed(4)} in the Tree's gap`)
   if (looksBlank(image)) problems.push('gap still looks blank')
   return { problems, image }
 }
@@ -2060,7 +2069,7 @@ const BOSS_CHECKS = [
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
   { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1 },
   { level: 'level5', minWidthFrac: 0.15, weakPoints: 4, firstPhase: ['vent-', 'heart'], lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 3, midSettleS: 0 },
-  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.75, passShots: [0.88, 0.94] },
+  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.7, passShots: [0.712, 0.718] },
 ]
 
 /**
@@ -2150,6 +2159,8 @@ async function bossCheck(page, check) {
   // A couple of frames so it is placed and drawn, then freeze it there.
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  // The ride went on through her tell: back to the spot, frozen there.
+  if (rideTo !== null) await page.evaluate((t) => { window.__SC_TEST__.rideTo = t }, rideTo)
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const settled = await stepBoss(page, settleS, { exposed: minOnScreen, projectiles: minProjectiles })
   const tell = await page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'incoming').map((e) => e.label))

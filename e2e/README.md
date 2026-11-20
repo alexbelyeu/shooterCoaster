@@ -19,7 +19,7 @@ ride stats, the perf gate, the shot and the enemy probe; the ride stops at exact
 3/60 s a frame), so a slow runner samples the same moment of the level from the same track point as a fast one; through the combat checks the level timer is then held (`holdLevelTime`: the game clock runs on, the run can't time out and no wave or boss comes due) until the step ends the level itself, so however long the checks take they never run into the boss or the end of the run (#305);
 it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), on level6 `level6-gap.png` (#659: game time and the
-level timer held, `rideTo` jumps the car into the Tree's gap at the lap's start and back; the car must be there and the frame not
+level timer held, `rideTo` jumps the car into the Tree's gap, its 55 s heartline-roll beat read from `rideBeats()`, and back; the car must be there and the frame not
 blank: the trunk on one side, the back wall on the other) and `level6-bystander.png` (#518: first in
 its combat, two kills (their real shot left to land or fly out first) and a primed 5-chain, then `shootBystander()` on a live climber: the score must drop by the penalty it returns
 (floored at 0; any level whose `stats().levelBystanders` is above 0 gets this check), the combo reset, no kill or hit counted, `bystandersHit` 1 and the don't-shoot hint shown; the shot holds the red
@@ -137,11 +137,11 @@ When level5 is in the run, the same `boss` step summons the Magma Titan: after 3
 and beats its chest open; the heart is retracted between beats) both shoulder vents and the heart must be on screen
 (`level5-boss.png`, only those exposed), then only the crown of lava on its head (`level5-boss-crown.png`) before it goes
 black, flashes and bursts into lava chunks (`level5-boss-down.png`).
-When level6 is in the run, the step first rides the coaster to 0.75 of the lap (`rideTo`: the Medusa stays in the Starr
+When level6 is in the run, the step first rides the coaster to 0.7 of the lap (`rideTo`: the run up the hall at her face; the Medusa stays in the Starr
 rather than coming to the rider) and summons her: after 2 s of game time (she has risen out of the star) at least three of
 her first four snakes must be on screen (`level6-boss.png`); it clears them, lets her second four uncoil (`midPhases`: a
 phase between the first and the last) and clears those, then only the crown snake is exposed (`level6-boss-crown.png`;
-with her leant out it then rides to 0.88 and 0.94 of the lap, `level6-boss-pass-88.png` / `-94.png`, the ride's last stretch past her)
+with her leant out it then rides to 0.712 and 0.718 of the lap, `level6-boss-pass-71.png` / `-72.png`, the turn away round her shoulder)
 before she laughs and sinks back into the star in a chalk burst (`level6-boss-down.png`).
 Every boss must fit its fight window (#452: the boss arrives at 40 s of the 60 s run): the game seconds it moved before
 each phase was on screen plus every weak point's hp at 2 hits a second must be ≤ 20 s (`fight` on the summary line).
@@ -311,7 +311,7 @@ onScreenEnemies/onScreenBystanders/levelBystanders/bystandersHit/shotsFired/hits
 bystander through `processHit`; `{ id, penalty }` or null), `killNearest(n)` (never a boss weak point or a bystander; fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
 `fireShot(x, y)` (one real shot through NDC), `bullets()` → drawn count, largest screen radius now / since load, newest bullet's
-screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)` (an override over the slow-mo envelopes; 1 clears it), `gpuMemory()` (`renderer.info.memory` textures / geometries), `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideProgress` (its track fraction on the last frame), `rideSpeed` (set 0–1 to put the coaster at that speed; ignored on a `ride: v2` level, which follows its solved plan, #696), `sceneStats()`, `combat` fire/hit/kill event counters,
+screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)` (an override over the slow-mo envelopes; 1 clears it), `gpuMemory()` (`renderer.info.memory` textures / geometries), `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideProgress` (its track fraction on the last frame), `rideBeats()` (the level's v2 ride beats: track fraction and second), `rideSpeed` (set 0–1 to put the coaster at that speed; ignored on a `ride: v2` level, which follows its solved plan, #696), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
 {current, max} in degrees, `cameraWeight` → bank / pitch / speed + drop FOV kick now and max (degrees), smoothed speed 0–1, wind-streak opacity, the caps the smoke checks (`caps`, from the source constants), `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
 `view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `graphics()` → quality setting, its preset, adaptive steps, reduced motion, `audio()` → unlocked?, score engine chunk loaded? (`engineLoaded`; the title step fails it before the first key press), long-lived SFX node count, arcade voice pool (`sfxVoices`: budget / live / peak / stolen / rejected, and `ui`: countdown and UI blips played on their own voices past the pause gate), music ducked? (the slow-mo low-pass), the pause mix on? (`pauseMix`: music down and low-passed, SFX silent), sounds dropped by a caught audio error, `music` (live music buses with their gain + the last few fade ramps), `scrim` (score engine: current score, tracks with the score each plays (a `?theme=` option or its own), paused + song position + `layered` / `intensity`, the asked-for `targetIntensity`, long-lived nodes, timer running),
