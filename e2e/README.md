@@ -274,7 +274,7 @@ without `portal`.
 Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it hit its cap):
 
 - **Deploy health check** after every production deploy (`deployment_status`, 8 min cap, ~3 min): `npm run prod-check -- --url <site>`
-  (`e2e/prod-check.mjs`). The full smoke already passed in `verify` on the deployed commit; this asks whether the deploy
+  (`e2e/prod-check.mjs`). CI's `verify` (the PR depth: every smoke shard) already passed on the deployed commit, and the full smoke runs nightly below; this asks whether the deploy
   arrived intact. It needs a local build of that commit (CI: `VERCEL=1 npx vite build`) for the list of files to expect.
   `assets`: every file of `dist/` outside `assets/` at its path, and every hashed chunk under its deployed name (matched by
   name without the hash; the deployed names come from crawling the deployed page, stylesheet and chunks, so the lazy

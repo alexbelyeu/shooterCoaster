@@ -59,7 +59,7 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 | `src/levels/environments/LavaShader.ts` | Procedural GLSL lava material (domain warping + Voronoi) |
 | `src/levels/environments/landmarkDimensions.ts` | Pyramid and rock-arch sizes (`PYRAMID_REACH`, `ARCH_REACH`, `archFeet`). Anything that keeps clear of, occludes or shadows a landmark derives its footprint from here, never a copied number |
 | `src/levels/environments/Volcano.tsx` | Volcano landmark component; shapes in pure `volcanoGeometry.ts` (rock + rim with a baked `glow` attribute, lava streaks) |
-| `src/audio/MusicManager.ts` | Per-biome music configs |
+| `src/audio/scores/` | Each level's music: `<levelId>.scrim`, registered in `scores/index.ts` `SCORES`; its key in `SCORE_KEYS` (`src/audio/sfxDesign.ts`), so the arcade SFX play in tune |
 | `src/canvas/SceneManager.tsx` | Wires config to spawner + environment |
 
 ## Enemy Scaling Reference
@@ -180,7 +180,9 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
    shadow/highlight tints, contrast, saturation, vignette) that sets the biome's mood.
    Fog colour is always `sky.horizon`.
 4. (Nothing to add to `BiomeEnvironment.tsx` — it renders whatever the registry entry defines.)
-5. `src/audio/MusicManager.ts` — add music config entry (tempo, chords, bass, lead, hasPerc)
+5. `src/audio/scores/<levelId>.scrim` — the level's score, registered in `scores/index.ts` `SCORES`, plus
+   its key in `SCORE_KEYS` (`src/audio/sfxDesign.ts`) and the biome's room in `BIOME_REVERB`
+   (`npm run new-world` does all three; format in `docs/audio/SCORE-FORMAT.md`)
 6. `src/levels/LevelRegistry.ts` — add level definition (biome, waves, track config, nextLevel chain)
    and, optionally, `combat` (`bulletColor` / `bulletSize`, read by `SceneManager`; never
    special-case a level id in scene code)
@@ -246,5 +248,5 @@ timed by the run: a lap takes 99–228 s (`track/ridePhysics.ts`, pinned in its 
 | Level blows its draw-call budget | One `<mesh>` per prop part (a Ferris wheel was 88 draws) | InstancedMesh per part, or `paintedParts.ts` to merge a multi-coloured prop into one geometry |
 | A wave blows the draw-call budget | One `<mesh>` per enemy part × 25+ enemies on screen (Arctic scouts were 12 draws each, 393 for the level) | Merge the parts that share a material and move together with `placedParts` in `SharedEnemyAssets.ts`; only animated parts stay separate meshes |
 | Terrain holes/spikes | Missing noise config | Add entry to terrainNoise.ts |
-| No music plays | Missing MusicManager entry | Add biome config to CONFIGS record |
+| No music plays | No score for the level | Add `scores/<levelId>.scrim` to `SCORES` (`scores/index.ts`) and its key to `SCORE_KEYS` (`sfxDesign.ts`) |
 | Enemies don't spawn | Missing spawner registration | Check `ENEMY_COMPONENTS` (`enemyComponents.ts`), `RADII` (`EnemySpawner.tsx`), `ENEMY_PLACEMENT` and `SCORE_VALUES` |

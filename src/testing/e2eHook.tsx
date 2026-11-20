@@ -18,7 +18,7 @@
  *     the weapon view-model's on-screen box (hit feedback checks)
  *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses, sounds dropped by a
  *     caught audio error: `dropped` / `lastDrop`), stress it (audioBurst: rapid SFX, every kill tier past the
- *     throttles, late music notes) and render it offline
+ *     throttles) and render it offline
  *   - read the camera pose (title fly-by), shader program count and longest frame (first-shot hitch)
  *   - read startup timings (initTimings)
  *   - summon the level's boss now, read it (hp, exposed weak points, on-screen box) and hit it through processHit
@@ -289,8 +289,7 @@ export interface SCTestApi {
    *  shooting / killing, 0 after level exit), music low-pass ducked (slow-mo). */
   audio: () => E2EAudio
   /** SFX stress (#115), in one JS turn while the audio clock ticks: rapid
-   *  shots + layered kills + a stinger, then 10 pairs of late music-loop notes
-   *  (`lateScheduleErrors` counts their throws). Kills step down through every combo tier, spaced past the SFX
+   *  shots + layered kills, then a stinger (the wave tell). Kills step down through every combo tier, spaced past the SFX
    *  throttles, so `killsPlayed` should equal `kills`. Unlocks audio if needed. */
   audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { killsPlayed: number }>
   /** Whether pointer input has the trigger held (released on blur / tab hide). */
