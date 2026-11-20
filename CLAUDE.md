@@ -21,7 +21,7 @@ anything else.
 npm ci                    # install
 npm run dev               # dev server (vite)
 npm test                  # vitest unit tests for pure modules (~1s; `npm run test:watch` to iterate)
-npm run lint              # ESLint + the repo's `sc/*` rules (scripts/eslint/)
+npm run lint              # ESLint + the repo's `sc/*` rules (scripts/eslint/) + `scripts/uiTells.mjs` (fails when the UI's banned tells, docs/art/PERSONALITY.md "Never", go above `scripts/uiTells.baseline.json`)
 npm run build             # typecheck (`tsc -b . scripts/new-world`: the game and the new-world templates; `npm run typecheck` alone) + production build -> dist/
 npm run build:portal      # the web-portal build (itch.io / Newgrounds / CrazyGames): relative paths, no analytics or share card -> dist-portal/ + dist-portal.zip (checked by scripts/portal/rules.mjs; needs the zip CLI)
 npm run check:bundle      # bundle-size budgets (budgets.json): total, largest chunk, and the startup JS (what index.html loads, `startupJsGzipKB`)
@@ -80,7 +80,7 @@ smoke step checks, or when a failure needs more than its summary line.
 
 React 19 + @react-three/fiber 9 + drei + @react-three/postprocessing, three 0.172,
 Web Audio (procedural music and SFX, no audio library), zustand (state),
-framer-motion (UI), Vite 6, TypeScript strict. Fonts (Lobster, Inter) are self-hosted from `public/fonts/` (OFL); the game makes no
+framer-motion (UI), Vite 6, TypeScript strict. Fonts (Ultra, Big Shoulders; Lobster for the logo; Inter until every screen has moved to the personality below) are self-hosted from `public/fonts/` (OFL, Ultra Apache 2.0); the game makes no
 third-party request at runtime. `vite build --mode portal` (`build:portal`) is the same game with `base: './'` for web portals. Deployed on Vercel: every push to
 `main` goes to production at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it). Preview deployments
 are disabled (`git.deploymentEnabled` in `vercel.json`) — verification happens in CI. `vercel.json` rewrites only
@@ -117,6 +117,7 @@ and read those rows before changing code there; don't read it whole. Areas: `src
 ## Skills in this repo
 
 `.claude/skills/` has project knowledge — use it:
+- **`docs/art/PERSONALITY.md` — read before touching any UI** (screens, HUD, share card, store art): the game's own look, type, motion and voice (the travelling fair's shooting gallery), the shared `src/ui/Fair.tsx` pieces, and the tells that are banned.
 - `shooter-coaster-level-design` — **read before touching levels, enemies, decorations, terrain or landmarks.** It encodes hard-won rules (track extent formula, enemy scaling, z-fighting, terrain-following).
 - `threejs-*` — three.js reference for materials, shaders, lighting, postprocessing, etc.
 - `workflow-orchestration` — plan → execute → verify discipline.

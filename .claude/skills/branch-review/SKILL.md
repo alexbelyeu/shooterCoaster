@@ -47,7 +47,10 @@ avoid touching existing code. This review exists to counteract that.
    tests for pure logic, docs and the decisions inbox updated.
 8. **Player-facing quality.** Does it fit the game's look and feel across all biomes,
    on desktop and on a phone in portrait and landscape? Is it obviously better, or
-   just different?
+   just different? Any UI (screens, HUD, share card, store art) follows
+   `docs/art/PERSONALITY.md`: the fair's boards, plates and lettering from `src/ui/Fair.tsx`
+   and the `fair-*` styles, its palette and voice, and none of its "Never" tells. UI that
+   looks like a generic web app is a high finding, even when `npm run lint` passes.
 
 ## Report Format
 
