@@ -1,4 +1,5 @@
 /** Where and when Ocean's whale breaches (#793), on ride distance so it plays the same every run and in `npm run clip`. */
+import { MathUtils } from 'three'
 import { indexAtT, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
 import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
 
@@ -20,8 +21,7 @@ export const BREACH = {
   roll: 1.6,
 } as const
 
-/** Phases of the splashes: the nose bursting out, then the body crashing back (with the shake). */
-export const SPLASH_RISE = 0.08
+/** Phase of the splash: the body crashing back (with the shake). */
 export const SPLASH_FALL = 0.74
 
 export interface BreachSite {
@@ -33,9 +33,9 @@ export interface BreachSite {
   dirZ: number
 }
 
-export function rideHeading(table: ArcTable, dist: number): { x: number; z: number } {
+/** The ride's heading in plan at sample `i`. */
+export function rideHeading(table: ArcTable, i: number): { x: number; z: number } {
   const n = table.count - 1
-  const i = indexAtT(table, tAtLoopDistance(table, dist))
   const a = (i - 2 + n) % n
   const b = (i + 2) % n
   const dx = table.x[b] - table.x[a]
@@ -49,9 +49,8 @@ export function breachSite(table: ArcTable, speeds: RideSpeeds): BreachSite {
   const profile = rideProfile(table, speeds, end)
   const from = riddenBetween(profile, 0, BREACH.startSeconds)
   const to = riddenBetween(profile, 0, end)
-  const mid = (from + to) / 2
-  const i = indexAtT(table, tAtLoopDistance(table, mid))
-  const h = rideHeading(table, mid)
+  const i = indexAtT(table, tAtLoopDistance(table, (from + to) / 2))
+  const h = rideHeading(table, i)
   const c = Math.cos(BREACH.aim)
   const s = Math.sin(BREACH.aim)
   const ax = h.x * c + h.z * s
@@ -67,7 +66,6 @@ export interface WhalePose {
   x: number
   y: number
   z: number
-  yaw: number
   pitch: number
   roll: number
 }
@@ -77,17 +75,7 @@ export function whalePose(site: BreachSite, u: number, out: WhalePose): WhalePos
   out.x = site.x + site.dirX * along
   out.z = site.z + site.dirZ * along
   out.y = -BREACH.depth + (BREACH.depth + BREACH.apex) * Math.sin(Math.PI * u)
-  out.yaw = Math.atan2(site.dirX, site.dirZ)
   out.pitch = BREACH.pitch * Math.cos(Math.PI * u)
-  const r = Math.min(Math.max((u - 0.2) / 0.7, 0), 1)
-  out.roll = BREACH.roll * r * r * (3 - 2 * r)
+  out.roll = BREACH.roll * MathUtils.smoothstep(u, 0.2, 0.9)
   return out
-}
-
-/** How far along `dir` from the centre the body's axis meets the surface: where the water breaks, within the body. */
-export function surfaceOffset(pose: WhalePose): number {
-  const rise = Math.sin(pose.pitch)
-  const half = WHALE_LENGTH / 2
-  const axial = Math.abs(rise) < 1e-3 ? 0 : Math.min(Math.max(-pose.y / rise, -half), half)
-  return axial * Math.cos(pose.pitch)
 }

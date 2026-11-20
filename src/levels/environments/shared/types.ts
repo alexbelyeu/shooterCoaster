@@ -2,6 +2,7 @@ import type { ComponentType, RefObject } from 'react'
 import type * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
+import type { RideSpeeds } from '@/track/ridePhysics'
 import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
 import type { KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
@@ -56,6 +57,8 @@ export interface BiomeFeaturesProps {
   heightFn: HeightFunction
   groundFn: HeightFunction
   track: ArcTable
+  /** The ride's speeds (`rideModel`), for biome events timed on the ride (Ocean's whale). */
+  speeds: RideSpeeds
   atmosphere: AtmosphereConfig
   /** The scene fog, for biome events that animate it (volcanic eruption). */
   fogRef: RefObject<THREE.Fog | null>

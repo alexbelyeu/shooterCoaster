@@ -134,8 +134,8 @@ export const KRAKEN_SPLASH_DEATH_STYLE: DeathStyle = {
   lifetime: 1.8, scale: 2.4, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'splash',
 }
 
-/** Ocean's breaching whale bursting out and crashing back (#793), ~3.7 km off: the Kraken's splash, a plume ~300 units high. */
-export const WHALE_SPLASH_DEATH_STYLE: DeathStyle = { ...KRAKEN_SPLASH_DEATH_STYLE, lifetime: 2.4, scale: 10 }
+/** Ocean's breaching whale crashing back (#793), ~3.7 km off: the Kraken's splash, a plume ~300 units high. */
+export const WHALE_SPLASH_DEATH_STYLE: DeathStyle = { ...KRAKEN_SPLASH_DEATH_STYLE, scale: 10 }
 
 /** The Giant Scorpion's broken claws and tail segments: plum-black chitin and amber joint shards in a puff of sand. */
 export const SCORPION_SHARD_DEATH_STYLE: DeathStyle = {

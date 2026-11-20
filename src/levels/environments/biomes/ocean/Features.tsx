@@ -4,11 +4,11 @@ import { SUNKEN_CITY_POSITION } from './config'
 import Whale from './Whale'
 
 /** Ocean landmark and the whale that breaches across the ride (#793). */
-export default function OceanFeatures({ track }: BiomeFeaturesProps) {
+export default function OceanFeatures({ track, speeds }: BiomeFeaturesProps) {
   return (
     <>
       <SunkenCity position={SUNKEN_CITY_POSITION} />
-      <Whale track={track} />
+      <Whale track={track} speeds={speeds} />
     </>
   )
 }

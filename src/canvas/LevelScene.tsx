@@ -123,6 +123,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
           biome={biome}
           groundFn={groundFn}
           track={trackTable}
+          speeds={speeds}
           darkSections={track.darkSections}
           weather={levelWeather(enemies)?.kind}
           hasWater={environment.hasWater}

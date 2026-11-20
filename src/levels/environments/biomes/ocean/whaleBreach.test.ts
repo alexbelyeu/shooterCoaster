@@ -18,12 +18,12 @@ const end = BREACH.startSeconds + BREACH.seconds
 const profile = rideProfile(table, speeds, end)
 const HALF = WHALE_LENGTH / 2
 const STEPS = 24
-const pose: WhalePose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0 }
+const pose: WhalePose = { x: 0, y: 0, z: 0, pitch: 0, roll: 0 }
 
 function rider(u: number) {
   const dist = site.from + u * (site.to - site.from)
   const i = indexAtT(table, tAtLoopDistance(table, dist))
-  return { x: table.x[i], y: table.y[i], z: table.z[i], heading: rideHeading(table, dist) }
+  return { x: table.x[i], y: table.y[i], z: table.z[i], heading: rideHeading(table, i) }
 }
 
 describe('the whale breach on Ocean', () => {

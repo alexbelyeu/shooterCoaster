@@ -6,14 +6,12 @@ import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import { placeSound, sfx } from '@/audio/sfx'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { WHALE_SPLASH_DEATH_STYLE } from '@/effects/deathStyles'
-import { getLevelConfig } from '@/levels/LevelRegistry'
-import { useGameStore } from '@/store/useGameStore'
 import { distanceAtT, type ArcTable } from '@/track/arcLength'
-import { rideModel } from '@/track/ridePhysics'
+import type { RideSpeeds } from '@/track/ridePhysics'
 import { rideProgress } from '@/track/rideProgress.hot'
 import { createWhaleGeometry } from './seaProps'
 import {
-  SPLASH_FALL, SPLASH_RISE, WHALE_LENGTH, breachPhase, breachSite, surfaceOffset, whalePose, type WhalePose,
+  SPLASH_FALL, WHALE_LENGTH, breachPhase, breachSite, whalePose, type WhalePose,
 } from './whaleBreach'
 
 /** Mild: the whale is ~3.7 km off (none with reduced motion, `effectiveShakeScale`). */
@@ -23,22 +21,15 @@ const CRASH_TRAUMA_MS = 600
 const MAX_PHASE_STEP = 0.2
 
 /** Scenery, not a target: one mesh, hidden but for the breach, and nothing raycasts it (shots only test enemies). */
-export default function Whale({ track }: { track: ArcTable }) {
-  const levelId = useGameStore((s) => s.currentLevel)
-  const site = useMemo(() => {
-    const level = levelId ? getLevelConfig(levelId) : undefined
-    return level ? breachSite(track, rideModel(level.track, track)) : null
-  }, [levelId, track])
+export default function Whale({ track, speeds }: { track: ArcTable; speeds: RideSpeeds }) {
+  const site = useMemo(() => breachSite(track, speeds), [track, speeds])
   const geometry = useMemo(() => createWhaleGeometry(WHALE_LENGTH), [])
   const material = useMemo(
-    () => new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 40, specular: 0x2a3c4c }),
+    () => new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }),
     [],
   )
   const meshRef = useRef<THREE.Mesh>(null)
-  const state = useMemo(
-    () => ({ phase: -1, pose: { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0 } as WhalePose, at: new THREE.Vector3() }),
-    [],
-  )
+  const state = useMemo(() => ({ phase: -1, pose: {} as WhalePose, at: new THREE.Vector3() }), [])
 
   useEffect(() => {
     return () => {
@@ -49,7 +40,7 @@ export default function Whale({ track }: { track: ArcTable }) {
 
   useFrame(() => {
     const mesh = meshRef.current
-    if (!mesh || !site) return
+    if (!mesh) return
     const u = breachPhase(site, distanceAtT(track, rideProgress()))
     const last = state.phase
     state.phase = u
@@ -58,19 +49,12 @@ export default function Whale({ track }: { track: ArcTable }) {
     const { pose, at } = state
     whalePose(site, u, pose)
     mesh.position.set(pose.x, pose.y, pose.z)
-    mesh.rotation.set(-pose.pitch, pose.yaw, pose.roll)
+    mesh.rotation.set(-pose.pitch, Math.atan2(site.dirX, site.dirZ), pose.roll)
 
-    if (last < 0 || u - last > MAX_PHASE_STEP) return
-    const along = surfaceOffset(pose)
-    at.set(pose.x + site.dirX * along, 0, pose.z + site.dirZ * along)
-    const pool = getExplosionPool()
-    if (last < SPLASH_RISE && u >= SPLASH_RISE) pool?.explode(at, WHALE_SPLASH_DEATH_STYLE)
+    if (u - last > MAX_PHASE_STEP) return
     if (last < SPLASH_FALL && u >= SPLASH_FALL) {
-      pool?.explode(at, WHALE_SPLASH_DEATH_STYLE)
-      const tail = WHALE_LENGTH * 0.3
-      at.x -= site.dirX * tail
-      at.z -= site.dirZ * tail
-      pool?.explode(at, WHALE_SPLASH_DEATH_STYLE)
+      at.set(pose.x, 0, pose.z)
+      getExplosionPool()?.explode(at, WHALE_SPLASH_DEATH_STYLE)
       eventBus.emit(CAMERA_TRAUMA_EVENT, CRASH_TRAUMA, CRASH_TRAUMA_MS)
       sfx().kill(1, 'splash', placeSound(at))
     }
