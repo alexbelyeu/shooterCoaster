@@ -1,7 +1,6 @@
 import type { AtmosphereConfig } from '@/levels/environments/atmosphere'
 import type { TerrainConfig } from '@/utils/terrainNoise'
-import type { BIOME_REVERB as GAME_REVERB } from '@/audio/sfxDesign'
-import type { BiomeType } from '@/types/level'
+import type { BiomeReverb } from '@/audio/sfxDesign'
 
 // The interior world's entries in the game's per-biome records: `npm run new-world` inserts each record's one entry
 // into the record of the same name.
@@ -57,6 +56,6 @@ export const BIOME_TERRAIN_CONFIGS: Record<string, TerrainConfig> = {
 }
 
 /** src/audio/sfxDesign.ts */
-export const BIOME_REVERB: Record<string, (typeof GAME_REVERB)[BiomeType]> = {
+export const BIOME_REVERB: Record<string, BiomeReverb> = {
   __BIOME__: { seconds: 2.6, decayPow: 2.8, toneHz: 5000, level: 0.9 },
 }

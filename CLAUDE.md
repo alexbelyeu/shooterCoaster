@@ -22,7 +22,7 @@ npm ci                    # install
 npm run dev               # dev server (vite)
 npm test                  # vitest unit tests for pure modules (~1s; `npm run test:watch` to iterate)
 npm run lint              # ESLint + the repo's `sc/*` rules (scripts/eslint/) + `scripts/uiTells.mjs` (fails when the UI's banned tells, docs/art/PERSONALITY.md "Never", go above `scripts/uiTells.baseline.json`)
-npm run build             # typecheck (`tsc -b . scripts/new-world`: the game and the new-world templates; `npm run typecheck` alone) + production build -> dist/
+npm run build             # `npm run typecheck` (`tsc -b . scripts/new-world`: the game and the new-world templates, the one place that list is written) + production build -> dist/
 npm run build:portal      # the web-portal build (itch.io / Newgrounds / CrazyGames): relative paths, no analytics or share card -> dist-portal/ + dist-portal.zip (checked by scripts/portal/rules.mjs; needs the zip CLI)
 npm run check:bundle      # bundle-size budgets (budgets.json): total, largest chunk, and the startup JS (what index.html loads, `startupJsGzipKB`)
 npm run smoke             # headless playtest, the full run (the nightly's depth): title + every step on every level + the phone run (needs a build); `-- --shard <name>` runs one CI shard, the PR depth (e2e/shards.mjs)

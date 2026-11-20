@@ -2142,7 +2142,7 @@ canvas {
   padding: 0.15rem 0 0.2rem;
 }
 
-.settings-row--stacked .settings-segmented button {
+.settings-row--stacked .settings-segmented .fair-plate {
   flex: 1;
 }
 
@@ -2162,25 +2162,13 @@ canvas {
   padding-bottom: 5px;
 }
 
-.settings-segmented button {
+.settings-segmented .fair-plate {
   min-width: 44px;
-  min-height: 44px;
   padding: 0.3rem 0.6rem 0.2rem;
-  border: 0;
-  border-radius: 5px;
-  font-family: 'Big Shoulders', sans-serif;
-  font-variation-settings: 'opsz' 40;
   font-size: 1.15rem;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--fair-cream);
-  background: var(--fair-oxblood-deep);
-  box-shadow: 0 5px 0 var(--fair-tar);
-  cursor: pointer;
-  transition: transform 60ms, box-shadow 60ms;
 }
 
-.settings-segmented button[aria-checked='true'] {
+.settings-segmented .fair-plate[aria-checked='true'] {
   color: var(--fair-tar);
   background: var(--fair-cream);
   transform: translateY(4px);
@@ -2278,7 +2266,7 @@ canvas {
   box-shadow: 0 2px 0 var(--fair-gilt-block);
 }
 
-:is(.settings-switch, .settings-segmented button, .settings-clear .fair-plate):disabled {
+:is(.settings-switch, .settings-segmented .fair-plate, .settings-clear .fair-plate):disabled {
   cursor: default;
   opacity: 0.55;
 }
@@ -2319,14 +2307,12 @@ canvas {
   font-size: 1.9rem;
 }
 
-.reduce-motion .settings-switch::after,
-.reduce-motion .settings-segmented button {
+.reduce-motion .settings-switch::after {
   transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .settings-switch::after,
-  .settings-segmented button {
+  .settings-switch::after {
     transition: none;
   }
 }
@@ -2353,7 +2339,7 @@ canvas {
     grid-template-columns: 1fr auto;
     align-items: center;
     column-gap: 1.5rem;
-    padding: 0.8rem 1.5rem 0.7rem;
+    padding: 0.6rem 1.5rem 0.9rem;
   }
 
   .settings-card h2.fair-title {
@@ -2552,7 +2538,7 @@ canvas {
   font-size: clamp(4rem, min(16vw, 26vh), 7.5rem);
 }
 
-/* The run's loading screen (#674): the level's postcard, name and a bar over the hidden level. */
+/* The run's loading screen (#674): the track is painted like the HUD's bars, a tar edge round a well filled with gold leaf. */
 .loading-screen {
   position: fixed;
   inset: 0;
@@ -2561,57 +2547,61 @@ canvas {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: radial-gradient(ellipse at center, #1c1c2e 0%, #07070d 100%);
+  background: var(--fair-oxblood-deep);
 }
 
-.loading-card {
-  width: min(420px, 100%);
-  border: 2px solid #ffd23f;
-  border-radius: 14px;
-  overflow: hidden;
-  background: rgba(10, 10, 20, 0.85);
-  box-shadow: 0 0 40px rgba(255, 210, 63, 0.25);
+.fair-board-shadow.loading-board-shadow {
+  width: min(100%, 24rem);
 }
 
-.loading-card .level-postcard {
-  border-bottom: 2px solid #ffd23f;
-}
-
-.loading-body {
-  padding: 16px 20px 20px;
+.fair-board.loading-card {
+  padding: 1.6rem 1.6rem 1.75rem;
   text-align: center;
 }
 
-.loading-name {
-  margin: 0;
-  font-family: 'Lobster', cursive;
-  font-weight: 400;
-  font-size: clamp(2rem, 8vw, 2.6rem);
-  color: #ffd23f;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+.loading-card .level-postcard {
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 2px var(--fair-tar);
+}
+
+.loading-card h2.loading-name {
+  margin: 1.1rem 0 0;
+  font-size: 2.5rem;
 }
 
 .loading-desc {
-  margin: 4px 0 16px;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.8);
+  margin: 0.6rem 0 1.25rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .loading-bar {
-  height: 8px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.15);
+  height: 18px;
+  padding: 3px;
+  border-radius: 3px;
+  background: var(--fair-oxblood-deep);
+  box-shadow: inset 0 0 0 2px var(--fair-tar), 0 3px 0 var(--fair-tar);
 }
 
 .loading-bar-fill {
   height: 100%;
-  background: #ffd23f;
-  box-shadow: 0 0 10px rgba(255, 210, 63, 0.8);
+  background: var(--fair-gilt);
+  box-shadow: inset 0 -3px 0 var(--fair-gilt-block);
   transform: scaleX(0);
   transform-origin: left center;
   transition: transform 0.2s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-bar-fill { transition: none; }
+}
+.reduce-motion .loading-bar-fill { transition: none; }
+
+/* Short landscape phones: the name and track keep the board inside the screen without the postcard. */
+@media (max-height: 380px) {
+  .loading-card .level-postcard { display: none; }
+  .loading-card h2.loading-name { margin-top: 0; }
 }
 
 /* The intro's skip hint, low over the tour: cream ink with a hard tar edge. */
@@ -2863,6 +2853,11 @@ span:is(.fair-board-shadow, .fair-board) {
     animation: none;
   }
 }
+
+.reduce-motion .fair-plate {
+  transition: none;
+}
+
 .reduce-motion .fair-arrive,
 .reduce-motion .fair-hook {
   animation: none;
