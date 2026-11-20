@@ -141,6 +141,8 @@ export interface ArcadeSound {
   db: number
   /** Send to the level's convolver, 0–1. Guns stay dry: their tail has to be gone in 150 ms. */
   send: number
+  /** `ui`: the menu and countdown voices, past the pause gate (the resume Ready / GO plays while paused); default the gated SFX bus. */
+  bus?: 'ui'
 }
 
 export const PRIO = { ambient: 0, fire: 1, hit: 2, kill: 3, cue: 4, ui: 5, event: 6 } as const
@@ -177,16 +179,16 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   star1: { prio: PRIO.event, db: -12, send: 0.35 },
   star2: { prio: PRIO.event, db: -11, send: 0.35 },
   star3: { prio: PRIO.event, db: -10, send: 0.35 },
-  uiSelect: { prio: PRIO.ui, db: -18, send: 0.1 },
-  uiBack: { prio: PRIO.ui, db: -18, send: 0.1 },
-  uiLaunch: { prio: PRIO.ui, db: -13, send: 0.2 },
-  uiWhoosh: { prio: PRIO.ui, db: -16, send: 0.2 },
+  uiSelect: { prio: PRIO.ui, db: -18, send: 0.1, bus: 'ui' },
+  uiBack: { prio: PRIO.ui, db: -18, send: 0.1, bus: 'ui' },
+  uiLaunch: { prio: PRIO.ui, db: -13, send: 0.2, bus: 'ui' },
+  uiWhoosh: { prio: PRIO.ui, db: -16, send: 0.2, bus: 'ui' },
   rideLaunch: { prio: PRIO.cue, db: -8, send: 0.25 },
   // Below the guns: a full pool drops a clank rather than cut a gunshot.
   rideChain: { prio: PRIO.ambient, db: -11, send: 0.08 },
   trackSwitch: { prio: PRIO.cue, db: -9, send: 0.2 },
-  countReady: { prio: PRIO.ui, db: -14, send: 0.15 },
-  countGo: { prio: PRIO.ui, db: -11, send: 0.2 },
+  countReady: { prio: PRIO.ui, db: -14, send: 0.15, bus: 'ui' },
+  countGo: { prio: PRIO.ui, db: -11, send: 0.2, bus: 'ui' },
 }
 
 /** Voices playing at once; the e2e `audioBurst(64, 32)` must never take more. */
