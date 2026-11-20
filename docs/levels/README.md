@@ -16,11 +16,12 @@ storyboard, with its seconds, is the comment at the top of `gymTrack.ts`: the st
 down the black path at the Flame (0 s), a zero-g roll over the fire (4 s), a head-chopper under the Arch (8 s), an
 airtime hill past the cubbies (12 s), the Training Area's cave (15 s), the route choice across the hall (#702: the V8
 way round swings east over the Flame's pads, 19–21 s), the wall ride up Alaska to just under the trusses (22 s), the
-dyno's jump gap to the Shield (30 s), the auto-belay drop into the pit (31.5 s), the Medusa helix as she rises (37 s,
-she rises at 40 s), the dive along the Tree's roots and the hairpin in its left cave (47 s), a heartline roll through
+dyno's jump gap to the Shield (30 s), the auto-belay drop into the pit (31.5 s), the Medusa helix: a climbing turn round
+over the hall's floor that comes out facing the star as she rises (40 s) and a chain run up the hall at her face
+(40–44 s), the dive round her shoulder, along the Tree's roots and the hairpin in its left cave (45 s), a heartline roll through
 the Tree's gap (55 s) and the brake run (58 s); a chain brings the car home round the hall's west side after the run.
 `gymTrack.test.ts` holds every beat to its second (±0.5 s, solved by `rideV2.ts`), the roll inverted over the Flame,
-the Arch's near miss (measured), the wall ride under the trusses, the mechanics, the helix in the pit at the Medusa's
+the Arch's near miss (measured), the wall ride under the trusses, the mechanics, the star on screen for 4 s from the Medusa's
 rise, and the clearances: the blockout, every triangle the hall draws (#695), the track itself, the junction's branch,
 and the Medusa's bust leant out or not. The intro's tour reveals the pit from mid-hall, pulls back down the hall
 facing the Starr and rides the last 12 m of track into the station (`hero.approach`).

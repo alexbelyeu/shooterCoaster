@@ -11,8 +11,10 @@
  * - **22 s, the wall ride**: straight up Alaska on a chain, rolling over at the trusses (~21 m) to head north.
  * - **30 s, the dyno**: a jump gap off Alaska's top to the Shield.
  * - **31.5 s, the auto-belay drop**: the car stops on the Shield's top, then free-falls with its piece of track into the pit.
- * - **37 s, the Medusa helix**: three climbing turns on a chain in the pit's corner beside the star, as she rises (40 s).
- * - **47 s, the dive** round her shoulders, along the Tree's roots, the hairpin in its left cave.
+ * - **37 s, the Medusa helix**: on a chain, a climbing turn out of the Shield's corner, up the pit and out over the hall's
+ *   floor, then a banked climbing turn round that comes out facing the star as she rises (40 s), and a slow chain lift
+ *   up the hall straight at her face (40–44.5 s, the star in view the whole way).
+ * - **45 s, the dive** round her shoulder, down toward the Tree, along its roots, the hairpin in its left cave.
  * - **55 s, the Tree**: a heartline roll through the gap between its trunk and the back wall, out of its right cave.
  * - **58 s, the brake run** over the pit's railing. After the run, a chain brings the car home round the hall's west side.
  *
@@ -52,7 +54,7 @@ const CHOP_GAP = RAIL_CLEARANCE + 0.2
 const DRAG = RIDE_V2_DEFAULTS.drag / 3
 
 /** Speeds in metres per second. */
-const SPEED = { launch: 18, caveLaunch: 11, jump: 8, wallLift: 4, helixLift: 5, caught: 6, tree: 7, home: 4 } as const
+const SPEED = { launch: 18, caveLaunch: 11, jump: 8, wallLift: 4, helixLift: 5, faceOff: 3, caught: 6, tree: 7, home: 4 } as const
 
 /** Rails over the black path through the station. */
 const STATION_Y = 1
@@ -72,8 +74,12 @@ const CAVE_Y = 1.9
 const WALL_Z = 37
 const WALL_X = 26.5
 const WALL_TOP_Y = 20.4
-/** The pit's corner helix beside the star, clear of the Shield and the Medusa. */
-const HELIX = { x: 8, radius: 2.1, turns: 2.5, climb: 10.5 } as const
+/**
+ * The Medusa's face-off: the helix turns round over the hall's floor east of the pit (its start x, height there) onto a
+ * chain lift up the hall at the star along `z` from `runY` to `topY` (pitching the view up to her crown snake), which
+ * turns away round her shoulder at `turnX` on `diveTurn`.
+ */
+const FACE_OFF = { helixX: 22, helixY: 7, z: 22, runY: 7.5, topY: 9.3, turnX: 17, diveTurn: 4.5 } as const
 /** Rails over the pit's floor at its lowest (clear of its benches) and along the roots' front. */
 const PIT_LOW_Y = PIT.floorY + 1.65
 const ROOTS_Y = PIT.floorY + 2.3
@@ -266,22 +272,21 @@ export function buildGymRide(): GymRide {
   mechanics.push(jumpGap(b, { speed: SPEED.jump, gravity: G, booster: 2.5, ramp: 1.5 }))
   b.mark('straight', () => b.straight(2.9))
   mechanics.push(dropTrack(b, { height: y() - PIT_LOW_Y, radius: 1 }))
-  zone('brake', SPEED.caught, () => b.mark('straight', () => to(b, 'x', HELIX.x)), 60)
+  zone('brake', SPEED.caught, () => b.mark('straight', () => b.straight(1)), 60)
 
-  // 37 s: the Medusa helix, climbing in the pit's corner beside the star.
-  zone('lift', SPEED.helixLift, () =>
-    b.mark('helix', () => {
-      const g = Math.atan2(HELIX.climb, 2 * Math.PI * HELIX.radius * HELIX.turns)
-      b.pitch(g, 2)
-      b.turn(-2 * Math.PI * HELIX.turns, HELIX.radius / Math.cos(g), { at: (u) => -35 * DEG * smoothstep(u / 0.05) * smoothstep((1 - u) / 0.05) })
-      b.pitch(-g, 2)
-    }),
-  )
-  // 47 s: the dive south round her shoulders, over the way out of the Tree, down along its roots' front.
+  // 37 s: the Medusa helix. A climbing turn out of the Shield's corner, up the pit along the Shield and out over the
+  // hall's floor, then the helix: a banked climbing turn round that ends facing the star as she rises (40 s), and a
+  // chain lift straight at her face.
+  zone('lift', SPEED.helixLift, () => {
+    b.mark('bankedTurn', () => turn(b, -Math.PI, 2, 1.5))
+    b.mark('straight', () => to(b, 'x', FACE_OFF.helixX, FACE_OFF.helixY - y()))
+    b.mark('helix', () => turn(b, Math.PI, (b.position.z - FACE_OFF.z) / 2, FACE_OFF.runY - y(), 40 * DEG))
+  })
+  zone('lift', SPEED.faceOff, () => b.mark('liftHill', () => to(b, 'x', FACE_OFF.turnX, FACE_OFF.topY - y(), 3)))
+  // 45 s: the dive round her shoulder, down toward the Tree, and along its roots' front.
   const roots = treeFrame(0, ROOTS_F)
   const rootsTurn = 2.2
-  b.mark('straight', () => to(b, 'x', 11.5))
-  b.mark('bankedTurn', () => turn(b, Math.PI / 2, 5.5, -2, 40 * DEG))
+  b.mark('bankedTurn', () => turn(b, -Math.PI / 2, FACE_OFF.diveTurn, -1, 40 * DEG))
   b.mark('straight', () => to(b, 'z', roots.z + rootsTurn, DIVE_LOW_Y - y()))
   b.mark('bankedTurn', () => turn(b, Math.PI / 2, rootsTurn))
   zone('brake', SPEED.tree, () => b.mark('straight', () => to(b, 'x', treeFrame(HAIRPIN_ALONG, 0).x, ROOTS_Y - y())))

@@ -90,7 +90,8 @@ for (let sec = 0; sec <= 60; sec += 5) {
   parts.push(`<circle cx="${tx(p.x)}" cy="${sy(p.y)}" r="3" fill="#000"/><text x="${tx(p.x) + 4}" y="${sy(p.y) - 4}" font-size="10">${sec}s</text>`)
 }
 const label = (x, z, text) => `<text x="${tx(x)}" y="${tz(z)}" font-size="13" font-weight="bold" fill="#b00">${text}</text>`
-parts.push(label(g.STAR.centre.x + 1, g.STAR.centre.z + 1, '★ Starr: the Medusa helix'))
+parts.push(label(g.STAR.centre.x + 1, g.STAR.centre.z + 1, '★ Starr: the Medusa'))
+parts.push(label(23, 30, 'Medusa helix'))
 parts.push(label(g.TREE.centre.x - 6, g.TREE.centre.z - 2, 'Tree gap: heartline roll'))
 parts.push(label(g.FLAME.centre.x - 4, g.FLAME.centre.z + 1, 'Flame: zero-g roll'))
 parts.push(label(g.ARCH.centre.x - 7, g.ARCH.centre.z - 4, 'Arch: head-chopper'))

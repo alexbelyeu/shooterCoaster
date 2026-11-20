@@ -248,10 +248,8 @@ describe('the gym track', () => {
     expect(GYM_TRACK.mechanics?.map((m) => m.kind)).toEqual(['station', 'junction', 'jumpGap', 'dropTrack'])
   })
 
-  it('helixes in the pit as the Medusa rises, the star in view at times through 40–55 s', () => {
+  it('comes out of the helix facing the star as the Medusa rises, and runs at her for 4 s (#700)', () => {
     const at = getLevelConfig('level6')!.boss!.at
-    const p = track[Math.round(((profile[at * 10] % table.length) / table.length) * N) % N]
-    expect(p.x > PIT.minX && p.x < PIT.maxX && p.z > PIT.minZ && p.z < PIT.maxZ).toBe(true)
     const star = toWorld(STAR.centre)
     const look = { x: 0, y: 0, z: 0 }
     const eye = new THREE.Vector3()
@@ -260,9 +258,9 @@ describe('the gym track', () => {
     const up = new THREE.Vector3()
     const forward = new THREE.Vector3()
     const toStar = new THREE.Vector3()
-    let seen = 0
-    let frames = 0
-    for (let k = 400; k <= 550; k++) {
+    // Every tenth of a second from her rise to 4 s after it, at the narrowest view.
+    const unseen: number[] = []
+    for (let k = at * 10; k <= (at + 4) * 10; k++) {
       const s = profile[k] % table.length
       const t = s / table.length
       eye.copy(curve.getPointAt(t))
@@ -279,11 +277,9 @@ describe('the gym track', () => {
       const depth = toStar.dot(forward)
       const across = Math.atan2(toStar.dot(right), depth) * DEG
       const vertical = Math.atan2(toStar.dot(up), depth) * DEG
-      frames++
-      if (depth > 0 && Math.abs(across) <= MIN_HORIZONTAL_FOV / 2 && Math.abs(vertical) <= VERTICAL_HALF_FOV) seen++
+      if (!(depth > 0 && Math.abs(across) <= MIN_HORIZONTAL_FOV / 2 && Math.abs(vertical) <= VERTICAL_HALF_FOV)) unseen.push(k / 10)
     }
-    // The helix wheels her round the rider: in view once a turn, not all the way (re-aiming 40–55 s at her is a follow-up).
-    expect(seen / frames).toBeGreaterThanOrEqual(0.06)
+    expect(unseen, 'seconds the star is off screen').toEqual([])
   })
 
   it("keeps the rails and the camera clear of the Medusa's bust from her rise to the run's end, leant out or not", () => {

@@ -2061,7 +2061,7 @@ const BOSS_CHECKS = [
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
   { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1 },
   { level: 'level5', minWidthFrac: 0.15, weakPoints: 4, firstPhase: ['vent-', 'heart'], lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 3, midSettleS: 0 },
-  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.75, passShots: [0.88, 0.94] },
+  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.7, passShots: [0.712, 0.718] },
 ]
 
 /**
@@ -2151,6 +2151,8 @@ async function bossCheck(page, check) {
   // A couple of frames so it is placed and drawn, then freeze it there.
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  // The ride went on through her tell: back to the spot, frozen there.
+  if (rideTo !== null) await page.evaluate((t) => { window.__SC_TEST__.rideTo = t }, rideTo)
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const settled = await stepBoss(page, settleS, { exposed: minOnScreen, projectiles: minProjectiles })
   const tell = await page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'incoming').map((e) => e.label))
