@@ -79,7 +79,8 @@ export default function ResultsMarquee({ score, stars, counting, lit, chase, don
                     }}
                   >
                     {FACES.map((f, j) => (
-                      <span key={j}>{f}</span>
+                      // A leading wheel's first face starts blank, so the first paint never flashes 00,000.
+                      <span key={j}>{j === 0 && place > 0 ? '' : f}</span>
                     ))}
                   </span>
                 )}

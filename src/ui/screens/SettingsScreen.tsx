@@ -6,6 +6,7 @@ import { GRAPHICS_QUALITIES, type GraphicsQuality } from '@/canvas/graphicsQuali
 import { usePrefersReducedMotion, useSystemPrefersReducedMotion } from '@/ui/reducedMotion'
 import { browserStorage, isInternalBrowser, setInternalBrowser } from '@/app/analyticsGate'
 import { isInRun } from '@/store/startPhase'
+import { FairBoard } from '@/ui/Fair'
 
 const SHAKE_LABELS: Record<ScreenShakeLevel, string> = { off: 'Off', reduced: 'Reduced', full: 'Full' }
 
@@ -36,7 +37,6 @@ function Segmented<T extends string>({ labelId, options, labels, value, disabled
           type="button"
           role="radio"
           aria-checked={option === value}
-          className={option === value ? 'is-active' : undefined}
           disabled={disabled}
           onClick={() => onChange(option)}
         >
@@ -88,12 +88,12 @@ function ClearDataRow() {
       <div className="settings-row settings-clear" data-step="confirm">
         <span>Erase all scores, stars, leaderboards and daily bests?</span>
         <div className="settings-clear-actions">
-          <button type="button" onClick={() => setStep('idle')}>
+          <button type="button" className="fair-plate" onClick={() => setStep('idle')}>
             Cancel
           </button>
           <button
             type="button"
-            className="is-danger"
+            className="fair-plate is-danger"
             onClick={() => {
               useGameStore.getState().clearLocalData()
               setStep('cleared')
@@ -108,7 +108,7 @@ function ClearDataRow() {
   return (
     <div className="settings-row settings-clear" data-step={step}>
       <span>{step === 'cleared' ? 'Local data cleared' : 'Scores & leaderboards'}</span>
-      <button type="button" disabled={step === 'cleared'} onClick={() => setStep('confirm')}>
+      <button type="button" className="fair-plate" disabled={step === 'cleared'} onClick={() => setStep('confirm')}>
         Clear local data
       </button>
     </div>
@@ -120,8 +120,8 @@ function InternalDeviceRow() {
   const [internal, setInternal] = useState(() => isInternalBrowser(browserStorage()))
   return (
     <ToggleRow
-      label="Internal device — don't count my plays"
-      note="Applies after reload"
+      label="Internal device"
+      note="Your plays here stop counting next load"
       checked={internal}
       onChange={(on) => {
         if (setInternalBrowser(on, browserStorage())) setInternal(on)
@@ -134,19 +134,19 @@ interface SettingsScreenProps {
   onClose: () => void
 }
 
-/** Graphics, sound and comfort settings (persisted); opened from the title and the pause menu. Esc goes back. */
+/** Graphics, sound and comfort settings (persisted) on a fair board, from the title and the pause board; Esc is Back. */
 export default function SettingsScreen({ onClose }: SettingsScreenProps) {
   const s = useSettingsStore()
   const fromTitle = useGameStore((g) => !isInRun(g.phase))
   const reducedMotion = usePrefersReducedMotion()
   const systemReducedMotion = useSystemPrefersReducedMotion()
-  const card = useRef<HTMLDivElement>(null)
+  const screen = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
   close.current = onClose
 
   // Once on open: `onClose` is a fresh arrow on every App render, and refocusing would steal focus.
   useEffect(() => {
-    card.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus({ preventScroll: true })
+    screen.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus({ preventScroll: true })
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !e.repeat) close.current()
     }
@@ -155,9 +155,17 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
   }, [])
 
   return (
-    <div className="pause-screen pause-menu settings-screen">
-      <div ref={card} className="settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-        <h2 id="settings-title">Settings</h2>
+    <div ref={screen} className="pause-screen settings-screen fair-stage">
+      <FairBoard
+        className="settings-card"
+        shadowClassName="settings-board-shadow"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+      >
+        <h2 id="settings-title" className="fair-title">
+          Settings
+        </h2>
 
         <div className="settings-groups">
           <section className="settings-group">
@@ -210,10 +218,10 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
           </section>
         </div>
 
-        <button className="play-button settings-back" onClick={onClose}>
+        <button className="fair-plate fair-go settings-back" onClick={onClose}>
           Back
         </button>
-      </div>
+      </FairBoard>
     </div>
   )
 }
