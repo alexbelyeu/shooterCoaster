@@ -1,3 +1,4 @@
+import { clamp01, smooth, windowCycle } from './bossCycle.hot'
 import { perchClear, type PerchConfig, type PerchInput } from './scorpionMotion.hot'
 
 /** The Magma Titan's motion, pure and allocation-free per frame. Local frame: +z faces the rider, +y up, +x its left; feet at y 0. */
@@ -74,41 +75,17 @@ export const RIVER_SPOT = {
   maxOff: 0.6,
 } as const
 
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
-const smooth = (x: number) => {
-  const t = clamp01(x)
-  return t * t * (3 - 2 * t)
-}
-
-/** Time into the current beat window, negative before the first. */
-function beatCycle(t: number): number {
-  const u = t - TITAN_BEAT.first
-  return u < 0 ? u : u % TITAN_BEAT.period
-}
-
-export function isHeartOpen(t: number): boolean {
-  const u = beatCycle(t)
-  return u >= 0 && u < TITAN_BEAT.openS
-}
-
-/** 0 closed … 1 open: the plates and arms ease in and out of the window. */
-export function heartOpenAmount(t: number): number {
-  const u = beatCycle(t)
-  if (u < 0) return 0
-  return Math.min(smooth(u / TITAN_BEAT.rampS), smooth((TITAN_BEAT.openS - u) / TITAN_BEAT.rampS))
-}
-
 /** 0 at rest … 1 fist on its chest: two pounds at the start of the window. */
 export function poundAmount(t: number): number {
-  const u = beatCycle(t)
+  const u = windowCycle(TITAN_BEAT, t)
   if (u < 0 || u >= TITAN_BEAT.poundS) return 0
   return Math.sin((u / TITAN_BEAT.poundS) * 2 * Math.PI) ** 2
 }
 
 /** Each pound's impact (the fists at the chest), for the thump and trauma. */
 export function poundBetween(prev: number, now: number): boolean {
-  const a = beatCycle(prev)
-  const b = beatCycle(now)
+  const a = windowCycle(TITAN_BEAT, prev)
+  const b = windowCycle(TITAN_BEAT, now)
   const q = TITAN_BEAT.poundS / 4
   return crossedInCycle(a, b, q) || crossedInCycle(a, b, 3 * q)
 }
@@ -116,11 +93,6 @@ export function poundBetween(prev: number, now: number): boolean {
 /** Whether the cycle position passed `at` going from `a` to `b` (b < a: wrapped into a new window). */
 function crossedInCycle(a: number, b: number, at: number): boolean {
   return b < a ? b >= at : a < at && b >= at
-}
-
-/** Its vents gone, it beats at once: the next window opens now. */
-export function beatNowEpoch(now: number): number {
-  return now - TITAN_BEAT.first
 }
 
 /**
@@ -151,12 +123,6 @@ export function defeatSink(sinceDefeat: number): number {
   if (sinceDefeat < 0) return 0
   const { darkS, flashS, sinkS, sinkDepth } = TITAN_DEFEAT
   return -sinkDepth * smooth((sinceDefeat - darkS - flashS) / sinkS)
-}
-
-/** [ahead, side] of the rider: behind it, too far round, or held long enough. */
-export function needsWade(holdAge: number, ahead: number, side: number): boolean {
-  const { holdS, minAhead, maxOffAngle } = TITAN_WADE
-  return holdAge >= holdS || ahead < minAhead || Math.abs(Math.atan2(side, ahead)) > maxOffAngle
 }
 
 export interface Point2 {

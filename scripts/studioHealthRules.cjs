@@ -24,6 +24,8 @@ const NIGHTLY_OVERDUE = 26 * HOUR
 /** How long a scheduled run gets to finish and post to the token ledger before it counts as missed. */
 const SLOT_GRACE = 2 * HOUR
 const STALL_SLOTS = 2
+/** No Builders run for this long with work ready is a finding (rule 4b). */
+const BUILDERS_IDLE = 3 * HOUR
 /** A run over this many weighted tokens is filed (`heavy:<role>`): a typical run is 0.1–2.5M. */
 const HEAVY_RUN = 5e6
 
@@ -290,6 +292,29 @@ function findings(snap) {
         body: `${builderWork} items wait for builders and ${qaWork} PRs for QA, but ${missed.length} scheduled Builders / QA runs have passed since the last token-ledger post (${last}). ` +
           'Every runbook ends by posting there, so the scheduled tasks are probably not running or are exiting early (disabled, no GitHub credentials, a broken setup step).\n\n' +
           'Check the "ShooterCoaster ·" scheduled tasks: their last runs and how long they took. A run that ends in under a minute did nothing.',
+      })
+    }
+  }
+
+  // 4b. Builders idle: issues ready, nothing paused, the day's builder_runs_per_day not spent, and no Builders run
+  // logged for BUILDERS_IDLE. Rule 4 can't see this: on 19-20 Nov the control center's loop stopped and Builders sat
+  // idle for 11 h while QA runs kept posting to the ledger. Runs from the control center and the schedule both log.
+  if (!snap.paused && Array.isArray(snap.builderRuns)) {
+    const labelledAt = (i) => (i.labelledAt?.['agent:ready'] ? Date.parse(i.labelledAt['agent:ready']) : -Infinity)
+    const ready = snap.openIssues.filter((i) => i.labels.includes('agent:ready') && !i.labels.includes('epic'))
+    const lastBuilders = Math.max(-Infinity, ...snap.builderRuns)
+    const idleSince = Math.max(lastBuilders, snap.pauseEndedAt ?? -Infinity, Math.min(...ready.map(labelledAt)))
+    const spent = snap.builderRuns.filter((b) => b > now - 24 * HOUR).length >= (snap.builderBudget ?? Infinity)
+    if (ready.length && !spent && Number.isFinite(idleSince) && now - idleSince > BUILDERS_IDLE) {
+      const hours = Math.round((now - idleSince) / HOUR)
+      out.push({
+        state: true,
+        lastSeen: now,
+        key: 'builders-idle',
+        title: `Builders idle: no Builders run for ${hours} h while ${ready.length} issues are ready`,
+        owner: 'alex',
+        body: `${ready.length} issues are \`agent:ready\`, the studio isn't paused and today's \`builder_runs_per_day\` isn't spent, but no Builders run has posted to the token ledger since ${new Date(idleSince).toISOString().slice(0, 16)}Z. ` +
+          'Builders are started by the control center\'s Keep building loop (and the scheduled Builders task as a backstop), so one of those has stopped starting them: check Keep building and its waiting reason in the control center, and the "ShooterCoaster · Builder" task\'s last runs.',
       })
     }
   }

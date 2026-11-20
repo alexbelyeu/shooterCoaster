@@ -17,23 +17,23 @@ import {
   TITAN_ARM_GEO, TITAN_BODY_GEO, TITAN_CRACK_UNIFORMS, TITAN_CROWN_GEO, TITAN_HEAD_GEO, TITAN_HEART_OPEN_GEO,
   TITAN_HEART_SHUT_GEO, TITAN_LEG_GEO, TITAN_OBSIDIAN_MAT, TITAN_VENT_GEO,
 } from './bossAssets'
-import { approachAngle, pickPerch, type Perch, type PerchInput } from './scorpionMotion.hot'
+import { approachAngle, firstSlot, pickPerch, type Perch, type PerchInput } from './scorpionMotion.hot'
+import { aimAtRider } from './bossAim.hot'
+import { inWindow, needsRelocate, windowAmount, windowNowEpoch } from './bossCycle.hot'
 import {
-  TITAN_BODY, TITAN_DEFEAT, TITAN_PERCH, TITAN_RISE, TITAN_WADE, beatNowEpoch, crackGlow, defeatHeat, defeatSink,
-  heartOpenAmount, isHeartOpen, needsWade, pickRiverSpot, poundAmount, poundBetween, riseOffset, strideAngle, wadeStep,
-  type Point2,
+  TITAN_BEAT, TITAN_BODY, TITAN_DEFEAT, TITAN_PERCH, TITAN_RISE, TITAN_WADE, crackGlow, defeatHeat, defeatSink, pickRiverSpot,
+  poundAmount, poundBetween, riseOffset, strideAngle, wadeStep, type Point2,
 } from './titanMotion.hot'
 
 const B = TITAN_BODY
 const VENTS = ['vent-l', 'vent-r'] as const
 const SIDES = [1, -1] as const
 const HIP: [number, number, number] = [170, 420, 0]
-const HEADING_TAU = 2.5
 const TURN_TAU = 0.6
 const GLOW_TAU = 0.25
 const BUBBLE_EVERY_S = 0.4
 /** The final eruption's fog closes in only this far (an eruption wave's goes to 200), so the Titan stays in view. */
-const ERUPTION_FOG_FAR = 3500
+const FINAL_ERUPTION_FOG_FAR = 3500
 const RISE_TRAUMA = [0.5, 700] as const
 const POUND_TRAUMA = [0.18, 220] as const
 const BREAK_TRAUMA = [0.8, 1100] as const
@@ -51,7 +51,6 @@ const RIVER_SPOTS: readonly Point2[] = RIVER_CONFIGS.flatMap((cfg) =>
 )
 
 const _cam = new THREE.Vector3()
-const _fwd = new THREE.Vector3()
 const _p = new THREE.Vector3()
 
 function lavaBurst(x: number, y: number, z: number, trauma?: readonly [number, number]) {
@@ -107,30 +106,11 @@ export default function MagmaTitan(props: BossProps) {
     [],
   )
 
-  /** Heading smoothed through the loops, like the Yeti's; `repick` moves `sim.perch` to a clear slot ahead. */
+  /** `repick` moves `sim.perch` to a clear slot ahead. */
   const aim = useCallback(
     (dt: number, repick: boolean) => {
-      camera.getWorldPosition(_cam)
-      camera.getWorldDirection(_fwd)
-      _fwd.y = 0
-      if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1)
-      _fwd.normalize()
-      if (!sim.headed) {
-        sim.heading.copy(_fwd)
-        sim.headed = true
-      } else {
-        sim.heading.lerp(_fwd, 1 - Math.exp(-dt / HEADING_TAU))
-        if (sim.heading.lengthSq() < 1e-6) sim.heading.copy(_fwd)
-        sim.heading.normalize()
-      }
-      input.camera.x = _cam.x
-      input.camera.z = _cam.z
-      input.forwardX = sim.heading.x
-      input.forwardZ = sim.heading.z
-      if (!repick || pickPerch(sim.perch, input, TITAN_PERCH)) return
-      const [ahead, side] = TITAN_PERCH.slots[0]
-      sim.perch.x = _cam.x + sim.heading.x * ahead - sim.heading.z * side
-      sim.perch.z = _cam.z + sim.heading.z * ahead + sim.heading.x * side
+      aimAtRider(camera, _cam, sim, input, dt)
+      if (repick && !pickPerch(sim.perch, input, TITAN_PERCH)) firstSlot(sim.perch, input, TITAN_PERCH)
     },
     [camera, sim, input],
   )
@@ -150,7 +130,7 @@ export default function MagmaTitan(props: BossProps) {
     const dt = tellStep()
     if (sim.tell < 0) {
       sim.tell = 0
-      eventBus.emit('eruption:start', ERUPTION_FOG_FAR)
+      eventBus.emit('eruption:start', FINAL_ERUPTION_FOG_FAR)
     }
     sim.tell += dt
     aim(dt, false)
@@ -174,14 +154,14 @@ export default function MagmaTitan(props: BossProps) {
       }
 
       // The heart opens on every beat; it beats at once when its vents are gone.
-      if (!sim.ventsGone && VENTS.every((v) => weakPointHp(state, v) <= 0)) {
+      if (!sim.ventsGone && weakPointHp(state, VENTS[0]) <= 0 && weakPointHp(state, VENTS[1]) <= 0) {
         sim.ventsGone = true
-        if (currentPhase(state) === 0) sim.beatEpoch = beatNowEpoch(age)
+        if (currentPhase(state) === 0) sim.beatEpoch = windowNowEpoch(TITAN_BEAT, age)
       }
       const beatT = age - sim.beatEpoch
-      retract('heart', fighting && weakPointHp(state, 'heart') > 0 && !isHeartOpen(beatT))
+      retract('heart', fighting && weakPointHp(state, 'heart') > 0 && !inWindow(TITAN_BEAT, beatT))
       const pound = fighting ? poundAmount(beatT) : 0
-      const open = fighting ? heartOpenAmount(beatT) : 0
+      const open = fighting ? windowAmount(TITAN_BEAT, beatT) : 0
       if (fighting && poundBetween(beatT - dt, beatT)) eventBus.emit(CAMERA_TRAUMA_EVENT, POUND_TRAUMA[0], POUND_TRAUMA[1])
 
       // Wades after the rider between beats, once it has climbed out.
@@ -190,7 +170,7 @@ export default function MagmaTitan(props: BossProps) {
         const dz = sim.pos.z - _cam.z
         const ahead = dx * sim.heading.x + dz * sim.heading.z
         const side = dz * sim.heading.x - dx * sim.heading.z
-        if (needsWade(age - sim.holdStart, ahead, side)) {
+        if (needsRelocate(TITAN_WADE, age - sim.holdStart, ahead, side)) {
           aim(0, true)
           sim.wading = true
         }
