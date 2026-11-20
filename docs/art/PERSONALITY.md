@@ -70,7 +70,7 @@ Never a gradient on a surface; the only soft colour change allowed is the dim ov
   oxblood-deep plate, smaller, side by side when there's room. Focus: a 3 px cream outline 3 px out.
 - **Stars** are the gallery's star targets: gilt with a tar outline when earned, oxblood-deep when not.
 - **Over the ride** (the HUD), there are no boards: cream lettering and numbers stand straight on the scene with a
-  hard tar shadow, like letters painted on the car. Nothing covers the middle of the screen during play. Over a pale
+  hard tar shadow, like letters painted on the car (the shared `.fair-over-ride` class; the title's lettering on the park uses it too, so reuse it rather than writing another outline). Nothing covers the middle of the screen during play. Over a pale
   sky a shadow alone isn't enough, so HUD letters also get a tar **keyline** (the signwriter's outline: eight hard
   copies 1.5 to 2 px out, `--hud-ink` / `--hud-ink-thin`), which makes their contrast cream on tar wherever they sit.
   Ultra's counters close up behind a keyline below about 30 px, so the small counts (kills, the combo ring's chain)
