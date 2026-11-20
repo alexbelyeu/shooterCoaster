@@ -173,7 +173,11 @@ the run with nothing on screen) and the gaps (`longestGapSeconds`, `longestGap` 
 `gaps` of 1 s or more); the first 2 s after GO and the boss tell are meant to be empty, so they count neither way and end a
 gap. It prints one line per level (`level2 pacing: no target 7% of 60 s, longest gap 2.0 s at 4 s (track 0.03)`) and
 writes `e2e-results/pacing.json`: those metrics per level plus a `timeline`, one row a level second (`t`, fewest and most
-targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`), which is where to look for where a gap is. A level over
+targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`), which is where to look for where a gap is. Each step gets a
+wall-clock deadline (#535): a step still held after the frame deadline (`--seconds` × 4 s; the first step the level's 60 s
+load on top) fails with `never settled: step N held … frames` (React committing on every held frame) or `the level registered no
+waves` (`nextWave()` still null), and the ride step stops at that same deadline with the same no-waves line instead of
+holding for it. A level over
 its `budgets.json` `pacing` ceilings (`longestGapSeconds`, `noTargetShare`) fails with the gap named (`longest gap 9.0 s at
 7.0 s (track 0.03) over budget 3 s`); only the Director lowers or raises them. A level whose entry names `knownOver: "#<open issue>"` only
 prints a WARN line until that issue lands. Besides the nightly, CI runs this step on a PR for every level the PR can change
@@ -190,9 +194,10 @@ so a later moment has more waves on screen). `budgets.json` `scene` holds per-le
 vary) and on the scene / track objects and triangles (+15%); a level past one fails with `over budget: scene objs=560 (budget 551)`
 (`perfGate` in `results.json`). A level whose entry has `knownOver: "#<open issue>"` only prints a WARN line until that issue lands
 (then drop the key). `--no-perf-gate` skips the gate for local experiments. Ceilings are budgets: only the Director raises them.
-A level scaffolded by `npm run new-world` (#460) starts with a `placeholder` entry in `scene` and `pacing`: a local run of its ride
-(or `pacing` step) writes the first ceilings from what it measured, by the same headroom rules, into `budgets.json`; on CI a placeholder
-fails with the numbers to paste.
+A level scaffolded by `npm run new-world` (#460) starts with a `placeholder` entry in `scene` and `pacing`: each clean local run of its ride
+(or `pacing` step: no other problem, every number finite) records what it measured in the placeholder's `runs`, and the second writes
+the first ceilings from the higher of the two, by the same headroom rules, into `budgets.json` (`e2e/placeholderBudget.mjs`, #552); a run
+with any other problem prints `placeholder not set` and records nothing. On CI a placeholder fails.
 **Programs after the warm-up (#536):** every level's ride (and every `pacing` run, the whole level) ends its summary line with
 `programs after warm-up: +N [+2 at 12.3 s playing (wave:incoming, enemy:killed); …]`: shader programs compiled past the level's
 warm-up count, each with the level time, phase and the bus events since the frame before (`programGrowth` on the hook, `shaders`
