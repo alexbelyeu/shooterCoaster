@@ -20,7 +20,6 @@ const HALF = WHALE_LENGTH / 2
 const STEPS = 24
 const pose: WhalePose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0 }
 
-/** The rider's eye (horizontal) and heading at phase `u`. */
 function rider(u: number) {
   const dist = site.from + u * (site.to - site.from)
   const i = indexAtT(table, tAtLoopDistance(table, dist))
@@ -69,8 +68,7 @@ describe('the whale breach on Ocean', () => {
     expect(Math.abs(site.dirX * (site.x - mid.x) + site.dirZ * (site.z - mid.z))).toBeLessThan(1e-6)
   })
 
-  // Only the drawn terrain counts: it ends `meshSize / 2` from the origin, and the sea runs on past it.
-  it('breaches in open water, in plain sight of the rider', () => {
+  it('breaches in open water past the drawn terrain, in plain sight of the rider', () => {
     const heightFn = createHeightFunction('ocean', sampleTrackPath((t) => curve.getPointAt(t)))
     const edge = getTerrainMeshSize('ocean') / 2
     const groundFn = (x: number, z: number) => (Math.max(Math.abs(x), Math.abs(z)) > edge ? -Infinity : heightFn(x, z))
@@ -101,9 +99,7 @@ describe('the whale breach on Ocean', () => {
     expect(nearest).toBeGreaterThan(HALF + TRACKSIDE.water.sideMax)
   })
 
-  // Every spot a wave out by the breach's end can put a target (trackside bands, formation groups, scatter discs), and
-  // the rider's sightline to it never passes behind the whale (top view, the whale as a disc of half its length).
-  it('never hides a target that is out during the breach', () => {
+  it('never stands, as a disc of half its length seen from above, in the sightline to any spot a target can be during the breach', () => {
     const MARGIN = 60
     const bands: { from: number; to: number; side: number }[] = []
     const discs: number[] = []
@@ -150,7 +146,6 @@ describe('the whale breach on Ocean', () => {
           if (angle < half + spread) hidden.push(`u ${u.toFixed(2)}: track ${Math.round(d)} (${Math.round(pd)} away)`)
         }
       }
-      // A disc round the origin: how far each sightline across the whale runs inside it.
       for (const radius of discs) {
         for (const a of [-half, 0, half]) {
           const c = Math.cos(a)

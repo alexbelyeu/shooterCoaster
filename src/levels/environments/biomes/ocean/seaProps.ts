@@ -218,7 +218,6 @@ export function createWhaleGeometry(length: number): THREE.BufferGeometry {
     fin(rootFront, midFront, rootBack, flank, belly)
     fin(rootBack, midFront, midBack, flank, belly)
     fin(midFront, tip, midBack, belly, belly)
-    // Flukes.
     const root = v(0, 0.005, -0.42)
     const lead = v(s * 0.08, 0.008, -0.45)
     const flukeTip = v(s * 0.2, 0.012, -0.54)

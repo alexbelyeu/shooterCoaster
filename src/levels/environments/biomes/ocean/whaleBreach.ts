@@ -1,7 +1,4 @@
-/**
- * The whale that breaches across Ocean's ride (#793): where it crosses and when, from the ride itself, so it plays the
- * same every run and in `npm run clip`. Pure, for Node tests (`whaleBreach.test.ts` holds it clear of every target).
- */
+/** Where and when Ocean's whale breaches (#793), on ride distance so it plays the same every run and in `npm run clip`. */
 import { indexAtT, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
 import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
 
@@ -11,38 +8,31 @@ export const BREACH = {
   /** Level seconds at the ride's own pace (`rideProfile`): it runs on ride distance, so slow-mo slows it with the car. */
   startSeconds: 31.25,
   seconds: 2.75,
-  /** Out along the rider's heading at mid-breach: past the islands, where the drawn terrain ends and the sea runs on. */
+  /** Out along the rider's heading at mid-breach, past the drawn terrain's edge: the islands end there, the sea runs on. */
   lead: 3700,
   /** Turned off that heading (radians, toward the ride's left): through the gap between two islands. */
   aim: 0.1,
-  /** Ground the body covers along its own heading, across the rider's view. */
   travel: 300,
   /** The centre starts and ends this far under the surface (the whole body under), and peaks this far above it. */
   depth: 0.6 * WHALE_LENGTH,
   apex: 0.2 * WHALE_LENGTH,
-  /** Nose up this steeply bursting out, as steeply down going back in. */
   pitch: 1.2,
-  /** It twists onto its side as it falls. */
   roll: 1.6,
 } as const
 
-/** Phases of the splashes: the nose bursting out, then the body crashing back as its middle meets the water (with the shake). */
+/** Phases of the splashes: the nose bursting out, then the body crashing back (with the shake). */
 export const SPLASH_RISE = 0.08
 export const SPLASH_FALL = 0.74
 
 export interface BreachSite {
-  /** Ride distance (arc units from the start) the breach begins and ends at. */
   from: number
   to: number
-  /** Where the body crosses, mid-breach (on the water). */
   x: number
   z: number
-  /** The way it swims, across the rider's view: unit, horizontal. */
   dirX: number
   dirZ: number
 }
 
-/** The ride's unit horizontal heading at arc distance `dist`. */
 export function rideHeading(table: ArcTable, dist: number): { x: number; z: number } {
   const n = table.count - 1
   const i = indexAtT(table, tAtLoopDistance(table, dist))
@@ -69,7 +59,6 @@ export function breachSite(table: ArcTable, speeds: RideSpeeds): BreachSite {
   return { from, to, x: table.x[i] + ax * BREACH.lead, z: table.z[i] + az * BREACH.lead, dirX: -az, dirZ: ax }
 }
 
-/** 0 → 1 over the breach as the car rides it; outside [0, 1] before and after. */
 export function breachPhase(site: BreachSite, ridden: number): number {
   return (ridden - site.from) / (site.to - site.from)
 }
@@ -78,13 +67,11 @@ export interface WhalePose {
   x: number
   y: number
   z: number
-  /** Radians: heading (nose +z turned to `dir`), nose-up pitch, roll onto its side. */
   yaw: number
   pitch: number
   roll: number
 }
 
-/** The body's centre and attitude at phase `u` (0..1): up out of the water nose first, over, and back in. */
 export function whalePose(site: BreachSite, u: number, out: WhalePose): WhalePose {
   const along = (u - 0.5) * BREACH.travel
   out.x = site.x + site.dirX * along
