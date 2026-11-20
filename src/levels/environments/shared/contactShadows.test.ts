@@ -74,6 +74,22 @@ describe('buildContactShadowGeometry', () => {
     expect(abz * acx - abx * acz).toBeGreaterThan(0)
   })
 
+  it("covers only a caster's `grid` part, in the whole footprint's local coordinates, without lifting it to a step beside it", () => {
+    const step = (x: number) => (x > 4 ? 10 : 0)
+    const caster = { x: 0, z: 0, halfX: 10, halfZ: 10, spread: 2, strength: 0.5, ground: step, grid: { minX: -12, maxX: 4, minZ: -12, maxZ: 12 } }
+    const geo = buildContactShadowGeometry([caster], () => 0)
+    const pos = geo.getAttribute('position')
+    const local = geo.getAttribute('aLocal')
+    let maxX = -Infinity
+    for (let i = 0; i < pos.count; i++) {
+      maxX = Math.max(maxX, pos.getX(i))
+      expect(local.getX(i)).toBeCloseTo(pos.getX(i))
+      expect(pos.getY(i)).toBeCloseTo(SHADOW_LIFT)
+    }
+    expect(maxX).toBeCloseTo(4)
+    expect(Math.min(...Array.from({ length: pos.count }, (_, i) => pos.getX(i)))).toBeCloseTo(-12)
+  })
+
   it('switches to 32-bit indices past 65535 vertices', () => {
     const many = Array.from({ length: 300 }, (_, i) => roundCaster(i * 300, 0, 150, 0.5))
     const geo = buildContactShadowGeometry(many, () => 0)
