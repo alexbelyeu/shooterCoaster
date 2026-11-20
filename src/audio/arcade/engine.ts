@@ -13,7 +13,7 @@ import {
   ARCADE_SOUNDS, AUTO_FIRE_DB, BIOME_REVERB, FIREWORK_BIOMES, STEAL_FADE_S, VOICE_BUDGET, WHISTLE_LENGTHS_S, SCORE_KEYS,
   CHAIN, RUMBLE, WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, nextBeat, nextClankAt, panGain, pickVoice,
   rumbleGain, rumbleHz, windGain, windHz, windUpdateDue,
-  type ArcadeSoundId, type VoiceState, type WindRamp,
+  type ArcadeSoundId, type BiomeReverb, type VoiceState, type WindRamp,
 } from '../sfxDesign'
 import type { Placement, SfxEngine, UiSound, VoiceStats } from '../sfx'
 import { bakeBank, type Bank } from './bake'
@@ -107,7 +107,7 @@ interface Room {
 }
 
 /** The biome's convolver → tone → return into `out`. */
-function createRoom(ctx: BaseAudioContext, ir: AudioBuffer, room: (typeof BIOME_REVERB)[BiomeType], out: AudioNode): Room {
+function createRoom(ctx: BaseAudioContext, ir: AudioBuffer, room: BiomeReverb, out: AudioNode): Room {
   const verb = ctx.createConvolver()
   verb.buffer = ir
   const tone = ctx.createBiquadFilter()
