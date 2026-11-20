@@ -5,7 +5,9 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig, WallSurface } from '@/types/level'
-import { buildArcTable, type ArcTable } from '@/track/arcLength'
+import { buildArcTable, indexAtT, type ArcTable } from '@/track/arcLength'
+import { DEMO_EYE, buildDemoRide, markerT } from '@/track/elements/demoRide'
+import { createSeatPose, seatPose } from '@/track/seatPose.hot'
 import { rideModel, rideProfile } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
@@ -543,5 +545,23 @@ describe('level2: the opening climb (#494)', () => {
       }).length)
     }
     expect(Math.min(...seen), seen.join(',')).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('trackView on a rolling track (#715)', () => {
+  it("looks where the seat looks through the demo's loop and rolls", () => {
+    const ride = buildDemoRide()
+    const table = buildArcTable(ride.curve)
+    const pose = createSeatPose()
+    for (const kind of ['verticalLoop', 'zeroGRoll', 'heartlineRoll', 'corkscrew'] as const) {
+      let worst = 1
+      for (let k = 1; k < 20; k++) {
+        const t = markerT(ride, kind, k / 20)
+        seatPose(ride.curve, table, t, 1, DEMO_EYE, pose)
+        const { dir } = trackView(table, indexAtT(table, t), 1)
+        worst = Math.min(worst, dir.x * pose.look.x + dir.y * pose.look.y + dir.z * pose.look.z)
+      }
+      expect(worst, kind).toBeGreaterThan(Math.cos(Math.PI / 180))
+    }
   })
 })
