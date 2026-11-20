@@ -1786,7 +1786,7 @@ async function speedCheck(page, levelId) {
  * level's v2 ride (`rideBeats()`), so a rebuilt ride can't leave it pointing somewhere else.
  */
 const GAP_LEVEL = 'level6'
-const GAP_BEAT_SECOND = 55
+const GAP_BEAT_SECOND = 56.5
 
 /**
  * `level6-gap.png`: the ride from inside the Tree's gap, the trunk on one side and the back wall on the other. With game time and the level timer

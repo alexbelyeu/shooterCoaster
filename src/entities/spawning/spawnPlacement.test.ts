@@ -351,7 +351,7 @@ describe('level6: inside the hall', () => {
 
   it('the gym has bounds, the hall inset by 40 units', () => {
     expect(bounds).toBe(hall)
-    expect([hall.minX, hall.maxX, hall.minZ, hall.maxZ]).toEqual([-1240, 1240, -600, 600])
+    expect([hall.minX, hall.maxX, hall.minZ, hall.maxZ]).toEqual([-1880, 1880, -920, 920])
   })
 
   it('every ground and air placement, entry starts included, lies inside the hall (#546)', () => {

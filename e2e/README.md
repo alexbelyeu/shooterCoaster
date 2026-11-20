@@ -19,7 +19,7 @@ ride stats, the perf gate, the shot and the enemy probe; the ride stops at exact
 3/60 s a frame), so a slow runner samples the same moment of the level from the same track point as a fast one; through the combat checks the level timer is then held (`holdLevelTime`: the game clock runs on, the run can't time out and no wave or boss comes due) until the step ends the level itself, so however long the checks take they never run into the boss or the end of the run (#305);
 it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
 `<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), on level6 `level6-gap.png` (#659: game time and the
-level timer held, `rideTo` jumps the car into the Tree's gap, its 55 s heartline-roll beat read from `rideBeats()`, and back; the car must be there and the frame not
+level timer held, `rideTo` jumps the car into the Tree's gap, its 56.5 s heartline-roll beat read from `rideBeats()`, and back; the car must be there and the frame not
 blank: the trunk on one side, the back wall on the other) and `level6-bystander.png` (#518: first in
 its combat, two kills (their real shot left to land or fly out first) and a primed 5-chain, then `shootBystander()` on a live climber: the score must drop by the penalty it returns
 (floored at 0; any level whose `stats().levelBystanders` is above 0 gets this check), the combo reset, no kill or hit counted, `bystandersHit` 1 and the don't-shoot hint shown; the shot holds the red

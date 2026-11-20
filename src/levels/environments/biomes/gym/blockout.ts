@@ -7,10 +7,11 @@
 import data from './blockout.json'
 
 /**
- * World units per metre: the 80 m hall becomes 2560 units long (#592). With the coaster at level 1's structure scale
- * (`GYM_TRACK.scalar`) the rider sits 0.19 m up in the hall and rides it as fast, against its own size, as level 1.
+ * World units per metre: the 80 m hall becomes 3840 units long (#592, #761). With the coaster at level 1's structure scale
+ * (`GYM_TRACK.scalar`) the rider sits 0.13 m up in the hall, and the ride runs at level 1's gravity and speeds in world
+ * units (`gymTrack.ts`): a small car in a big hall.
  */
-export const GYM_SCALE = 32
+export const GYM_SCALE = 48
 
 export interface Panel {
   len: number

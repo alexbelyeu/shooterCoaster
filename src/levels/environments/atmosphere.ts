@@ -281,9 +281,9 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     hemiSkyColor: 0x8d9aac,
     hemiGroundColor: 0x4a3e33,
     hemiIntensity: 1.05,
-    // The hall's haze at its size (GYM_SCALE 32, #592): a dusty brown-grey that swallows the far end a little.
-    fogNear: 1400,
-    fogFar: 11000,
+    // The hall's haze at its size (GYM_SCALE 48, #761): a dusty brown-grey that swallows the far end a little.
+    fogNear: 2100,
+    fogFar: 16500,
     envIntensity: 0.28,
     // Gritty: teal shadows, sodium-warm highlights, more contrast, a heavy vignette; holds still vivid
     grade: {

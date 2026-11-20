@@ -3,20 +3,26 @@
  * speed zones, beats) built by the ride elements' turtle (`src/track/elements/`) through the Climbing Gym's blockout, in its
  * metres, round its anchors (`blockout.ts`). The storyboard, with the second each beat lands (`GYM_BEATS`):
  *
- * - **0 s, the station** on the black path inside the entrance: GO launches it north at the Flame.
- * - **4 s, the zero-g roll** over the Flame: the fire over your head.
- * - **8 s, the Arch**: a head-chopper under its lintel, then a climbing U-turn over the Wave.
- * - **12 s, the airtime hill** past the cubbies (its slow-motion window), and into the Training Area's cave.
- * - **15 s, the dark cave**: a head-chopper under its lintel, an S through it, out at its north end (where the route choice goes, #702).
- * - **22 s, the wall ride**: straight up Alaska on a chain, rolling over at the trusses (~21 m) to head north.
- * - **30 s, the dyno**: a jump gap off Alaska's top to the Shield.
- * - **31.5 s, the auto-belay drop**: the car stops on the Shield's top, then free-falls with its piece of track into the pit.
- * - **37 s, the Medusa helix**: on a chain, a climbing turn out of the Shield's corner, up the pit and out over the hall's
- *   floor, then a banked climbing turn round that comes out facing the star as she rises (40 s), and a slow chain lift
- *   up the hall straight at her face (40–44.5 s, the star in view the whole way).
- * - **45 s, the dive** round her shoulder, down toward the Tree, along its roots, the hairpin in its left cave.
- * - **55 s, the Tree**: a heartline roll through the gap between its trunk and the back wall, out of its right cave.
- * - **58 s, the brake run** over the pit's railing. After the run, a chain brings the car home round the hall's west side.
+ * - **0 s, the station** on the black path: GO launches it north, climbing at the Flame.
+ * - **6–11 s, over the Flame**: a wide braking turn onto it and a slow heartline roll across it (~5 s), the fire over
+ *   your head at its middle (8.5 s).
+ * - **11–18 s, the dark cave**: down into the Training Area under its lintel (13 s), round north through it, out at its
+ *   north end on a launch across the hall to Alaska (the route choice, #702).
+ * - **21.5 s, the wall ride**: straight up Alaska on a chain, rolling onto its back at the trusses (~21 m) to tip over north.
+ * - **26 s, the dyno**: a jump gap off Alaska's top to the Shield.
+ * - **28 s, the auto-belay drop**: the car stops on the Shield's top, then falls upright with its piece of track into the pit.
+ * - **36 s, the Medusa helix**: a climbing U-turn out of the Shield's corner and up out of the pit, then a level helix that
+ *   brakes all the way round and comes out facing the star as she rises (40 s), and a slow chain lift up the hall
+ *   straight at her face (40–44 s, the star in view the whole way).
+ * - **44 s, the dive** round her shoulder, down toward the Tree, along its roots, the hairpin in its left cave.
+ * - **54–59 s, the Tree**: a slow heartline roll through the gap between its trunk and the back wall (56.5 s), out of its
+ *   right cave.
+ * - **After the run**, home: a chain out of the pit over its railing, down the hall's east side, the Arch's head-chopper
+ *   under its lintel, and round into the station.
+ *
+ * Comfort (#761, `src/track/rideComfort.ts`): the ride runs at level 1's gravity and speeds in world units, so at 48 units a
+ * metre the car takes the hall at 2–7 m/s (12 m/s across it, ~14 m/s at the bottom of the drop), and every element is
+ * spaced and braked so the view never turns faster than ~95°/s in any second of the run.
  *
  * `gymTrack.test.ts` holds it to the beats, the blockout's and the hall's clearances and the Medusa's;
  * `scripts/plot-gym-track.mjs` draws it. The level rides its copy in `gymLevel.ts` (`node scripts/gen-gym-level.mjs`),
@@ -26,7 +32,6 @@ import * as THREE from 'three'
 import type { RideBeat, RideMechanic, RideV2Spec, SpeedZone, TrackParams } from '@/types/level'
 import { createSplineCurve, type RailPoint } from '@/track/curves/SplineCurve'
 import { RideBuilder, smoothstep, type MarkerKind, type Twist } from '@/track/elements/rideBuilder'
-import { airtimeHill, zeroGRoll } from '@/track/elements/elements'
 import { headChopper } from '@/track/elements/headChopper'
 import { dropTrack, jumpGap, placeMechanics, station } from '@/track/elements/mechanics'
 import { getTrackDimensions } from '@/track/trackDimensions'
@@ -48,70 +53,91 @@ const SPACING = 1.2
 /** The ride's gravity in the blockout's metres (9.4 m/s²: the hall is real size). */
 const G = RIDE_V2_DEFAULTS.gravity / GYM_SCALE
 /** How far the Arch's lintel passes over the rider's eye: over the clearance, with room for the drawn soffit's facets. */
-const CHOP_GAP = RAIL_CLEARANCE + 0.2
+const CHOP_GAP = RAIL_CLEARANCE + 0.3
 
 /** Air and rolling drag (`RideV2Spec.drag`): a third of the default, so the launch carries the car over the Flame. */
 const DRAG = RIDE_V2_DEFAULTS.drag / 3
 
-/** Speeds in metres per second. */
-const SPEED = { launch: 18, caveLaunch: 11, jump: 8, wallLift: 4, helixLift: 5, faceOff: 3, caught: 6, tree: 7, home: 4 } as const
+/**
+ * Speeds in metres per second, at the rider's scale (#761): about level 1's speeds in world units (a median of ~115–190 units a
+ * second; the launch across the hall and the drop's bottom ~600–700), so the small car takes the big hall at the pace level 1
+ * takes its park.
+ */
+const SPEED = { launch: 9, climb: 7, roll: 2.3, caveDrop: 6, cave: 5, caveLaunch: 12, wallLift: 6, jump: 6.5, caught: 3.2, helixLift: 7, faceOff: 2, dive: 3.5, tree: 2, treeRoll: 2, treeOut: 2.5, home: 4 } as const
 
-/** Rails over the black path through the station. */
+/** Rails over the black path through the station, its start, and its line along the path. */
 const STATION_Y = 1
-/** The station's line along the path; the way home up the hall, and along the Slab's mats beside the path. */
+const STATION_X = 63
 const STATION_Z = 33.3
-const HOME_X = 24.6
-const HOME_Z = 35.3
-/** The Tree's right cave's mouth, where the ride turns out of the gap. */
-const MOUTH_X = 18.6
 /** Where the rails cross the Flame: high enough that the roll clears its flared footprint. */
 const ROLL_Y = 6
-/** The line along the hall's east side, out from the Lagoon's walls, past the cubbies. */
-const CUBBY_Z = 3.6
-/** Inside the Training Area's cave, between its pads and roof. */
+/** Under the Training Area's cave's lintel, and inside it between its pads and roof. */
+const CAVE_LINTEL_Y = 2.6
 const CAVE_Y = 1.9
+/** The cave's loop: in at the Flame's line, round north inside it, out at its north end onto the run to Alaska. */
+const CAVE_IN_Z = -2.4
+const CAVE_TURN = 3.5
 /** The climb up Alaska: the rails this far from the hall's west wall, and their top under the trusses. */
 const WALL_Z = 37
-const WALL_X = 26.5
+const WALL_X = 32
 const WALL_TOP_Y = 20.4
+/** The wall ride's bends: off the run onto the wall, the roll on the wall, and over its top. */
+const WALL_BENDS = { up: 4.5, roll: 4.5, over: 4 } as const
 /**
- * The Medusa's face-off: the helix turns round over the hall's floor east of the pit (its start x, height there) onto a
- * chain lift up the hall at the star along `z` from `runY` to `topY` (pitching the view up to her crown snake), which
+ * The Medusa's face-off: the helix turns round, level, over the hall's floor east of the pit (its start x, height) onto a
+ * chain lift up the hall at the star along `z` up to `topY` (pitching the view up to her crown snake), which
  * turns away round her shoulder at `turnX` on `diveTurn`.
  */
-const FACE_OFF = { helixX: 22, helixY: 7, z: 22, runY: 7.5, topY: 9.3, turnX: 17, diveTurn: 4.5 } as const
-/** Rails over the pit's floor at its lowest (clear of its benches) and along the roots' front. */
+const FACE_OFF = { helixX: 24, helixY: 7.5, z: 22, topY: 8.5, turnX: 17.5, diveTurn: 5 } as const
+/** The U-turn out of the drop's corner, and the helix's braking (m/s²) from its approach's speed to the face-off's crawl. */
+const CAUGHT_TURN = 2.5
+/** Brakes' decelerations, m/s²: round onto the Flame, at the cave's mouth, and round the helix to the face-off's crawl. */
+const BRAKES = { turnIn: 2.8, cave: 10, helix: 1.6 } as const
+/** Rails over the pit's floor at its lowest, clear of its benches. */
 const PIT_LOW_Y = PIT.floorY + 1.65
-const ROOTS_Y = PIT.floorY + 2.3
-/** The dive's height where it turns along the roots, over the way out of the Tree. */
-const DIVE_LOW_Y = 4
 /** Rails through the Tree's gap: clear of the floor's roots, the rider's eye under the gap's ceiling. */
-const GAP_Y = PIT.floorY + 1.8
+const GAP_Y = PIT.floorY + 2.4
+/**
+ * The dive's heights, spread over its whole length so it never plunges: out of the turn round her shoulder, at the turn
+ * along the roots, along their front, and into the hairpin (which goes on down to the gap).
+ */
+const DIVE = { turned: 4, roots: 2.6, hairpin: GAP_Y + 0.5 } as const
+/** Out from the Tree's foot line, the middle of its gap. */
 const GAP_F = (TREE_GAP.minF + TREE_GAP.maxF) / 2
 /** Out from the Tree's foot line along the roots' front, and the hairpin's centre along the Tree. */
 const ROOTS_F = 6.375
 const HAIRPIN_ALONG = -5.6
+/** The Tree's right cave's mouth, where the ride turns out of the gap. */
+const MOUTH_X = 18.6
+/**
+ * The way home after the run, down the hall's east side: over the run to Alaska (`overY`) and under the dive to the cave
+ * (`underY`) along `z`, then through the Arch at `archX`, down over its pads (`padY`) and round into the station.
+ */
+const HOME = { z: 14, overY: 5, underY: 2.2, archX: 75, archTurn: 4, stationTurn: 3, padY: 1.2 } as const
 
 /** The V8 way round (#702): where it forks off the run to Alaska and merges back (z), and its points in between. */
 const V8 = {
   fork: 11,
   merge: 32,
   points: [
-    { x: 30, y: 1.6, z: 16 },
-    { x: 32.6, y: 1.3, z: 22 },
-    { x: 30, y: 1.6, z: 28 },
+    { x: 28.5, y: 1.6, z: 16 },
+    { x: 25.9, y: 1.3, z: 22 },
+    { x: 28.5, y: 1.6, z: 28 },
   ],
 } as const
 
-/** The storyboard's beats: the second the car reaches the first element of a kind, its start or (`middle`) its middle. */
-const BEATS: { kind: MarkerKind; second: number; middle?: true }[] = [
-  { kind: 'zeroGRoll', second: 4, middle: true },
-  { kind: 'headChopper', second: 8, middle: true },
-  { kind: 'slowMotion', second: 12, middle: true },
-  { kind: 'liftHill', second: 22 },
-  { kind: 'jumpGap', second: 30 },
-  { kind: 'helix', second: 37 },
-  { kind: 'heartlineRoll', second: 55, middle: true },
+/**
+ * The storyboard's beats: the second the car reaches an element (the `nth` of its kind, the first by default), its start
+ * or (`middle`) its middle.
+ */
+const BEATS: { kind: MarkerKind; second: number; nth?: number; middle?: true }[] = [
+  { kind: 'heartlineRoll', second: 8.5, middle: true },
+  { kind: 'headChopper', second: 13, middle: true },
+  { kind: 'liftHill', second: 21.5 },
+  { kind: 'jumpGap', second: 26 },
+  { kind: 'helix', second: 36 },
+  { kind: 'liftHill', nth: 1, second: 40 },
+  { kind: 'heartlineRoll', nth: 1, second: 56.5, middle: true },
 ]
 
 const DEG = Math.PI / 180
@@ -121,6 +147,20 @@ const NORTH = -Math.PI / 2
 /** A bank held through a turn: eased in over its first quarter and out over its last. */
 function bank(angle: number): Twist {
   return { at: (u) => angle * smoothstep(u / 0.25) * smoothstep((1 - u) / 0.25) }
+}
+
+/** The share of a slow roll's length its rate builds up over, and dies away over at its end. */
+const ROLL_EASE = 0.2
+
+/**
+ * A slow heartline roll (#761), `hand` 1 to the right: the roll rate ramps up over its first `ROLL_EASE`, holds, and ramps
+ * down over its last, so a full roll turns the view no faster than 360° / (0.8 × its seconds), where a smoothstep peaks at
+ * 1.5 × the average.
+ */
+function slowRoll(hand: 1 | -1): Twist {
+  const e = ROLL_EASE
+  const ridden = (u: number) => (u < e ? (u * u) / (2 * e) : u > 1 - e ? 1 - e - ((1 - u) * (1 - u)) / (2 * e) : u - e / 2)
+  return { at: (u) => (hand * 2 * Math.PI * ridden(u)) / (1 - e), heartline: 0.6 * EYE }
 }
 
 /**
@@ -198,7 +238,7 @@ export interface GymRide {
 
 /** The ride, element by element, in blockout metres. */
 export function buildGymRide(): GymRide {
-  const b = new RideBuilder({ x: 73, y: STATION_Y, z: STATION_Z, heading: NORTH, eyeHeight: EYE, spacing: SPACING })
+  const b = new RideBuilder({ x: STATION_X, y: STATION_Y, z: STATION_Z, heading: NORTH, eyeHeight: EYE, spacing: SPACING })
   const mechanics: RideMechanic[] = []
   const zones: GymRide['zones'] = []
   const zone = (kind: SpeedZone['kind'], speed: number, build: () => void, accel?: number) => {
@@ -208,114 +248,105 @@ export function buildGymRide(): GymRide {
   }
   const y = () => b.position.y
 
-  // 0 s: the station on the black path; GO launches north along it, climbing, and a right turn heads it at the Flame.
-  mechanics.push(station(b, { speed: SPEED.launch, length: 16 }))
-  const firstTurn = 4.5
-  const rollLength = 2 * FLAME.halfZ + 2.2
-  b.mark('straight', () => to(b, 'x', FLAME.centre.x + firstTurn, ROLL_Y - y()))
-  b.mark('bankedTurn', () => turn(b, -Math.PI / 2, firstTurn))
-  b.mark('straight', () => to(b, 'z', FLAME.centre.z + rollLength / 2))
-  // 4 s: the zero-g roll over the Flame (the element's length is each half's).
-  zeroGRoll(b, { length: rollLength / 2, angle: Math.PI / 7, hand: 1 })
+  // 0 s: the station on the black path; GO launches north along it, climbing, and a wide right turn heads it at the Flame.
+  mechanics.push(station(b, { speed: SPEED.launch, length: 6 }))
+  const firstTurn = 5
+  zone('lift', SPEED.climb, () => b.mark('straight', () => to(b, 'x', FLAME.centre.x + firstTurn, ROLL_Y - y())))
+  // 8 s: braking round onto the Flame, a slow heartline roll across it, upside down over the fire at its middle.
+  zone('brake', SPEED.roll, () => b.mark('bankedTurn', () => turn(b, -Math.PI / 2, firstTurn, 0, 20 * DEG)), BRAKES.turnIn)
+  zone('lift', SPEED.roll, () => b.mark('heartlineRoll', () => b.straight(2 * (b.position.z - FLAME.centre.z), slowRoll(1))))
 
-  // South down the east side, then a right turn into the Arch, under its lintel.
-  const archTurn = 6
-  const archIn = ARCH.centre.z - ARCH.depth / 2 - 1.4
-  const lintel = piece('arch')
-  const chop = headChopper(
-    { min: { x: ARCH.centre.x - ARCH.width / 2, y: lintel.openingHeight, z: archIn }, max: { x: ARCH.centre.x + ARCH.width / 2, y: lintel.height, z: -archIn } },
-    { x: 0, y: -1, z: 0 },
-    { eyeHeight: EYE, clearance: RAIL_CLEARANCE, gap: CHOP_GAP },
+  // 13 s: down into the Training Area's cave under its lintel, round north through it in the dark, out at its north end.
+  zone('launch', SPEED.caveDrop, () => b.mark('headChopper', () => to(b, 'z', CAVE_IN_Z, CAVE_LINTEL_Y - y(), 5)))
+  zone(
+    'brake',
+    SPEED.cave,
+    () => {
+      b.mark('bankedTurn', () => turn(b, Math.PI / 2, CAVE_TURN, 0, 20 * DEG))
+      b.mark('straight', () => to(b, 'x', WALL_X + CAVE_TURN, CAVE_Y - y(), 3))
+      b.mark('bankedTurn', () => turn(b, Math.PI / 2, CAVE_TURN, CAVE_LINTEL_Y - y(), 20 * DEG))
+    },
+    BRAKES.cave,
   )
-  b.mark('bankedTurn', () => turn(b, -Math.PI / 2, b.position.z - (archIn - archTurn)))
-  b.mark('straight', () => to(b, 'x', ARCH.centre.x - archTurn, chop.rail.y - y()))
-  b.mark('bankedTurn', () => turn(b, -Math.PI / 2, archTurn))
-  b.mark('straight', () => to(b, 'z', archIn))
-  // 8 s: under the Arch's lintel.
-  b.mark('headChopper', () => to(b, 'z', 2 * ARCH.centre.z - archIn))
-  // A climbing U-turn over the Wave, down north of it, crossing over the run south, and a left turn onto the east side.
-  const cubbyTurn = 3
-  b.mark('bankedTurn', () => turn(b, -Math.PI, 5, 4, 35 * DEG))
-  b.mark('straight', () => to(b, 'z', 17.4))
-  b.mark('straight', () => to(b, 'z', 13, -0.8))
-  b.mark('straight', () => to(b, 'z', CUBBY_Z + cubbyTurn, 3.2 - y(), 3))
-  b.mark('bankedTurn', () => turn(b, Math.PI / 2, cubbyTurn))
-  // 12 s: an airtime hill past the cubbies.
-  airtimeHill(b, { rise: 2.8, crestRadius: 4, angle: 40 * DEG })
-  // 15 s: right into the Training Area's cave under its lintel, an S through it in the dark, out at its north end.
-  b.mark('bankedTurn', () => turn(b, -Math.PI / 2, 3.9, 0, 25 * DEG))
-  b.mark('headChopper', () => to(b, 'z', -2.4, 2.6 - y(), 2))
-  b.mark('bankedTurn', () => turn(b, Math.PI / 2, 3))
-  b.mark('straight', () => to(b, 'x', WALL_X + 3, CAVE_Y - y(), 2))
-  b.mark('bankedTurn', () => turn(b, Math.PI / 2, 3))
-  b.mark('straight', () => to(b, 'z', -0.5, 2.6 - y(), 2))
   // Bursting out of the cave on a launch, across the hall to Alaska.
-  zone('launch', SPEED.caveLaunch, () => b.mark('straight', () => to(b, 'z', 8)))
+  zone('launch', SPEED.caveLaunch, () => b.mark('straight', () => to(b, 'z', 4)))
   // The route choice (#702): shoot the switch and the V8 way round swings east off the line, down over the Flame's pads
   // beside its boulder, and back onto the line before Alaska.
   b.mark('straight', () => to(b, 'z', V8.fork))
   const fork = b.points.length - 1
   b.mark('straight', () => to(b, 'z', V8.merge))
   mechanics.push({ kind: 'junction', from: fork, to: b.points.length - 1, points: V8.points })
-  b.mark('straight', () => to(b, 'z', WALL_Z - 2))
+  b.mark('straight', () => to(b, 'z', WALL_Z - WALL_BENDS.up))
 
-  // 22 s: the wall ride, straight up Alaska on a chain, rolling over at the top to head north.
+  // 21 s: the wall ride, straight up Alaska on a chain, rolling onto its back at the top to tip over north.
   zone('lift', SPEED.wallLift, () =>
     b.mark('liftHill', () => {
-      b.pitch(Math.PI / 2, 2)
-      b.straight(WALL_TOP_Y - y() - 6.3 - 1.5)
-      b.arc(-Math.PI / 2, new THREE.Vector3(0, 0, 1), 4)
-      b.pitch(-Math.PI / 2, 1.5)
+      b.pitch(Math.PI / 2, WALL_BENDS.up)
+      b.straight(WALL_TOP_Y - y() - (Math.PI / 2) * WALL_BENDS.roll - WALL_BENDS.over)
+      b.arc(-Math.PI / 2, new THREE.Vector3(0, 0, 1), WALL_BENDS.roll)
+      b.pitch(-Math.PI / 2, WALL_BENDS.over)
     }),
   )
-  // 30 s: the dyno off Alaska's top to the Shield; the Shield's auto belay, then the drop into the pit.
-  mechanics.push(jumpGap(b, { speed: SPEED.jump, gravity: G, booster: 2.5, ramp: 1.5 }))
-  b.mark('straight', () => b.straight(2.9))
-  mechanics.push(dropTrack(b, { height: y() - PIT_LOW_Y, radius: 1 }))
-  zone('brake', SPEED.caught, () => b.mark('straight', () => b.straight(1)), 60)
+  // 29 s: the dyno off Alaska's top to the Shield; the Shield's auto belay, then the drop into the pit.
+  mechanics.push(jumpGap(b, { speed: SPEED.jump, gravity: G, booster: 2, ramp: 3 }))
+  b.mark('straight', () => b.straight(1))
+  mechanics.push(dropTrack(b, { height: y() - PIT_LOW_Y, radius: 1, seconds: 0.6 }))
+  zone('brake', SPEED.caught, () => b.mark('straight', () => b.straight(2.5)), 60)
+  zone('lift', SPEED.caught, () => b.mark('bankedTurn', () => turn(b, -Math.PI, CAUGHT_TURN, 1.5, 25 * DEG)))
 
-  // 37 s: the Medusa helix. A climbing turn out of the Shield's corner, up the pit along the Shield and out over the
+  // 35 s: the Medusa helix. A climbing turn out of the Shield's corner, up the pit along the Shield and out over the
   // hall's floor, then the helix: a banked climbing turn round that ends facing the star as she rises (40 s), and a
   // chain lift straight at her face.
-  zone('lift', SPEED.helixLift, () => {
-    b.mark('bankedTurn', () => turn(b, -Math.PI, 2, 1.5))
-    b.mark('straight', () => to(b, 'x', FACE_OFF.helixX, FACE_OFF.helixY - y()))
-    b.mark('helix', () => turn(b, Math.PI, (b.position.z - FACE_OFF.z) / 2, FACE_OFF.runY - y(), 40 * DEG))
-  })
+  zone('lift', SPEED.helixLift, () => b.mark('straight', () => to(b, 'x', FACE_OFF.helixX, FACE_OFF.helixY - y())))
+  // The helix slows the car all the way round, onto the chain at her face.
+  zone('brake', SPEED.faceOff, () => b.mark('helix', () => turn(b, Math.PI, (b.position.z - FACE_OFF.z) / 2, 0, 25 * DEG)), BRAKES.helix)
   zone('lift', SPEED.faceOff, () => b.mark('liftHill', () => to(b, 'x', FACE_OFF.turnX, FACE_OFF.topY - y(), 3)))
   // 45 s: the dive round her shoulder, down toward the Tree, and along its roots' front.
   const roots = treeFrame(0, ROOTS_F)
-  const rootsTurn = 2.2
-  b.mark('bankedTurn', () => turn(b, -Math.PI / 2, FACE_OFF.diveTurn, -1, 40 * DEG))
-  b.mark('straight', () => to(b, 'z', roots.z + rootsTurn, DIVE_LOW_Y - y()))
-  b.mark('bankedTurn', () => turn(b, Math.PI / 2, rootsTurn))
-  zone('brake', SPEED.tree, () => b.mark('straight', () => to(b, 'x', treeFrame(HAIRPIN_ALONG, 0).x, ROOTS_Y - y())))
-  // The hairpin in the left cave's mouth into the gap.
-  b.mark('bankedTurn', () => turn(b, -Math.PI, (ROOTS_F - GAP_F) / 2, GAP_Y - ROOTS_Y, 45 * DEG))
-  // 55 s: a heartline roll through the Tree's gap, then out of the right cave's mouth.
-  const caveOut = 2.2
-  b.mark('straight', () => to(b, 'x', TREE.centre.x - TREE_GAP.halfAlong + 0.6))
-  b.mark('heartlineRoll', () => b.straight(2 * TREE_GAP.halfAlong - 1.2, { at: (u) => -2 * Math.PI * smoothstep(u), heartline: 0.6 * EYE }))
-  // 58 s: the brake run out of the gap, then a chain out of the pit under the dive, over its railing, and home after the run:
-  // up the hall's west side, over the way to Alaska, along the Slab's mats and round into the station.
-  zone('brake', SPEED.home, () => b.mark('straight', () => to(b, 'x', MOUTH_X - caveOut)))
-  const homeTurn = 2.6
-  zone('lift', SPEED.home, () => {
-    b.mark('bankedTurn', () => turn(b, -Math.PI / 2, caveOut))
-    b.mark('straight', () => to(b, 'z', 12.5, 2.2 - y(), 3))
-    b.mark('bankedTurn', () => turn(b, Math.PI / 2, homeTurn, 0.5))
-    b.mark('bankedTurn', () => turn(b, -Math.PI / 2, HOME_X - b.position.x))
-    b.mark('straight', () => to(b, 'z', HOME_Z - 3, 2.6))
-    b.mark('bankedTurn', () => turn(b, Math.PI / 2, 3))
-    b.mark('straight', () => to(b, 'x', 50.5, 1.4 - y()))
-    b.mark('straight', () => {
-      b.turn(-25 * DEG, 4)
-      b.turn(25 * DEG, 4)
-    })
-    b.mark('straight', () => to(b, 'x', 75))
-    b.mark('bankedTurn', () => turn(b, Math.PI, (b.position.z - STATION_Z) / 2, STATION_Y - y()))
+  const rootsTurn = 2.5
+  zone('brake', SPEED.dive, () => {
+    b.mark('bankedTurn', () => turn(b, -Math.PI / 2, FACE_OFF.diveTurn, DIVE.turned - y(), 25 * DEG))
+    b.mark('straight', () => to(b, 'z', roots.z + rootsTurn, DIVE.roots - y()))
+    b.mark('bankedTurn', () => turn(b, Math.PI / 2, rootsTurn, 0, 25 * DEG))
+    b.mark('straight', () => to(b, 'x', treeFrame(HAIRPIN_ALONG, 0).x, DIVE.hairpin - y()))
   })
-  b.mark('straight', () => to(b, 'x', 73 + SPACING))
+  const caveOut = 2.2
+  // The hairpin in the left cave's mouth into the gap.
+  zone('brake', SPEED.tree, () => b.mark('bankedTurn', () => turn(b, -Math.PI, (ROOTS_F - GAP_F) / 2, GAP_Y - y(), 20 * DEG)))
+  zone('lift', SPEED.treeRoll, () => {
+    // 54 s: a slow heartline roll through the Tree's gap, on out of the right cave's mouth.
+    b.mark('heartlineRoll', () => b.straight(MOUTH_X - caveOut - b.position.x, slowRoll(-1)))
+    b.mark('bankedTurn', () => turn(b, -Math.PI / 2, caveOut))
+  })
+  // After the run, the way home: a chain out of the pit over its railing, down the hall's east side over the run to
+  // Alaska and under the way into the cave, a right turn into the Arch, the head-chopper under its lintel, and round
+  // into the station.
+  const lintel = piece('arch')
+  const chop = headChopper(
+    {
+      min: { x: ARCH.centre.x - ARCH.width / 2, y: lintel.openingHeight, z: ARCH.centre.z - ARCH.depth / 2 },
+      max: { x: ARCH.centre.x + ARCH.width / 2, y: lintel.height, z: ARCH.centre.z + ARCH.depth / 2 },
+    },
+    { x: 0, y: -1, z: 0 },
+    { eyeHeight: EYE, clearance: RAIL_CLEARANCE, gap: CHOP_GAP },
+  )
+  const archOut = ARCH.centre.z + ARCH.depth / 2 + 0.5
+  zone('lift', SPEED.treeOut, () => {
+    b.mark('straight', () => to(b, 'z', HOME.z - 2, 2.2 - y(), 3))
+    b.mark('bankedTurn', () => turn(b, Math.PI / 2, 2, 0.5))
+  })
+  zone('lift', SPEED.home, () => {
+    b.mark('straight', () => to(b, 'x', WALL_X - 3, HOME.overY - y(), 3))
+    b.mark('straight', () => to(b, 'x', WALL_X + 6))
+    b.mark('straight', () => to(b, 'x', FLAME.centre.x - 3, HOME.underY - y(), 3))
+    b.mark('straight', () => to(b, 'x', HOME.archX - HOME.archTurn, chop.rail.y - y(), 4))
+    b.mark('bankedTurn', () => turn(b, -Math.PI / 2, HOME.archTurn))
+    b.mark('straight', () => to(b, 'z', ARCH.centre.z - ARCH.depth / 2 - 0.5))
+    b.mark('headChopper', () => to(b, 'z', archOut))
+    b.mark('straight', () => to(b, 'z', STATION_Z - HOME.stationTurn, HOME.padY - y(), 2))
+    b.mark('bankedTurn', () => turn(b, -Math.PI / 2, HOME.stationTurn))
+  })
+  b.mark('straight', () => to(b, 'x', STATION_X + SPACING, STATION_Y - y()))
   return { points: b.points, markers: b.markers, mechanics, zones }
 }
 
@@ -356,8 +387,8 @@ export function buildGymTrack(): TrackParams {
     return 'speed' in m ? { ...m, speed: m.speed * world } : m
   })
   const zones: SpeedZone[] = ride.zones.map((z) => ({ kind: z.kind, from: share(z.from), to: share(z.to), speed: z.speed * world, ...(z.accel ? { accel: z.accel * world } : {}) }))
-  const beats: RideBeat[] = BEATS.map(({ kind, second, middle }) => {
-    const m = ride.markers.find((k) => k.kind === kind)
+  const beats: RideBeat[] = BEATS.map(({ kind, second, nth = 0, middle }) => {
+    const m = ride.markers.filter((k) => k.kind === kind)[nth]
     if (!m) throw new Error(`gym ride: no ${kind} for its beat`)
     return { at: share(middle ? Math.round((m.from + m.to) / 2) : m.from), second }
   })
@@ -370,11 +401,12 @@ export function buildGymTrack(): TrackParams {
     ride: 'v2',
     rideV2,
     mechanics,
-    // Rails, ties and towers sparser than level 1's (~0.93 m a segment, under 3 cm of chord sag on the tightest turn): the
-    // ~500 m track leaves the scene room under `scene.level6` for the enemies in the air at 10 s (#726).
-    segments: 480,
-    tieSpacing: 22,
-    towerSpacing: 750,
+    // Rails, ties and towers sparser than level 1's (~0.86 m a segment, under 3 cm of chord sag on the tightest turn; ties
+    // every ~0.6 m and towers every ~23 m of the hall at 48 units a metre): the ~350 m track leaves the scene room under
+    // `scene.level6` for the enemies in the air at 10 s (#726, #761).
+    segments: 400,
+    tieSpacing: 30,
+    towerSpacing: 1100,
     // Today's rule's speeds, unused by the v2 ride.
     rollerSpeed: 0.0000004,
     minRollerSpeed: 0.000355,

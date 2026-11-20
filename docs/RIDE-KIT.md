@@ -77,25 +77,26 @@ time so the storyboard's beats land on their seconds.
 
 ## Level 6: the Climbing Gym, storyboard (60 s)
 
-1. **0 s, station by the entrance.** Countdown on the black pathway; **launch** straight down it
-   at the Flame.
-2. **~4 s, over the Flame.** Pull up and a **zero-g roll** over the fire: the flames are over your
-   head for a moment.
-3. **~8 s, the Arch and the Training Area.** **Head-chopper** under the Arch's lintel, then into
-   the Training Area cave as a **dark section**: blacklight, the holds glowing, rats lit by the
-   muzzle flash.
-4. **~16 s, the cubbies.** Burst out over an **airtime hill** with a slow-motion window: the
-   lanternfly swarm.
-5. **~19 s, the route choice.** A **shoot-to-switch** sign at the cave's mouth: V2 (the easy way
-   round) or V8 (the harder branch, more points). Grades as route names.
-6. **~22 s, the wall ride.** The track bolted up the Shield like a top-rope climb: a **lift hill**
-   up the wall, climbers beside you, the auto belay clicking, to the roof trusses at ~22 m. The
-   whole gym below.
-7. **~30 s, the dyno.** The rail ends at the top: a **jump gap** across to Alaska.
-8. **~33 s, the auto-belay drop.** A **drop track** free fall down Alaska's face toward the pit.
-9. **~40 s, Medusa.** A **helix** round the Starr pit while she rises and her snakes strike.
-10. **~55 s, the Tree.** A **corkscrew** through the gap between the solid trunk and the wall.
-11. **~58 s, home.** **Brake run**; the **photo** flash fires in the Tree's gap.
+As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrack.ts` has the seconds each beat lands):
+
+1. **0 s, station on the black path.** Countdown; **launch** north up the path, climbing at the Flame.
+2. **~6–11 s, over the Flame.** A wide braking turn onto it and a **slow heartline roll** across it (~5 s): the
+   flames over your head at its middle. (The first build's zero-g roll took a second; a whip like that is dizzying.)
+3. **~11–18 s, the Training Area.** Down under its lintel (a **head-chopper**) into the cave as a **dark section**,
+   round north through it: blacklight, the holds glowing, rats lit by the muzzle flash.
+4. **~18 s, the route choice.** Out of the cave on a launch across the hall: a **shoot-to-switch** sign, V2 (the
+   easy way) or V8 (the harder branch, more points).
+5. **~21.5 s, the wall ride.** A **lift hill** straight up Alaska, climbers and lanternflies on the wall beside and
+   above you, to the roof trusses at ~21 m, rolling onto its back to tip over north.
+6. **~26 s, the dyno.** A **jump gap** off Alaska's top to the Shield.
+7. **~28 s, the auto-belay drop.** A **drop track**: the car stops, then falls upright with its piece of track into
+   the pit.
+8. **~36–44 s, Medusa.** A **helix** up out of the pit that comes out facing the Starr as she rises (40 s), then a
+   slow chain lift straight at her face.
+9. **~44 s, the dive** round her shoulder, along the Tree's roots, a hairpin into its left cave.
+10. **~54–59 s, the Tree.** A slow **heartline roll** through the gap between the solid trunk and the wall.
+11. **After the run, home.** Down the hall's east side and under the **Arch's** lintel (the head-chopper the first
+    build had at ~8 s: the slower ride has no time for the detour to it in the run) into the station.
 
 ## The other levels (ideas for their storyboards)
 
