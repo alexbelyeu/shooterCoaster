@@ -5,6 +5,7 @@
  */
 
 import { GYM_SCALE, STAR, toWorld } from '@/levels/environments/biomes/gym/blockout'
+import { smooth } from './bossCycle.hot'
 
 type V3 = readonly [number, number, number]
 
@@ -137,19 +138,14 @@ export const SNAKE_SLOTS: readonly SnakeSlot[] = [
   slot([0, 172, -5], [0, 0.35, 0.95], 2, 2.6, 0.6, 130, 25),
 ]
 
-export const smooth01 = (x: number): number => {
-  const t = Math.min(1, Math.max(0, x))
-  return t * t * (3 - 2 * t)
-}
-
 /** 0 inside the hub → 1 risen. */
 export function riseAmount(age: number): number {
-  return smooth01(age / MEDUSA_RISE.riseS)
+  return smooth(age / MEDUSA_RISE.riseS)
 }
 
 /** 0 while she fights → 1 sunk back into the star, after her laugh. */
 export function defeatSink(sinceDefeat: number): number {
-  return sinceDefeat < 0 ? 0 : smooth01((sinceDefeat - MEDUSA_DEFEAT.laughS) / MEDUSA_DEFEAT.sinkS)
+  return sinceDefeat < 0 ? 0 : smooth((sinceDefeat - MEDUSA_DEFEAT.laughS) / MEDUSA_DEFEAT.sinkS)
 }
 
 /** Her laugh: a shake of the shoulders that fades out over `laughS`, 0 while she fights. */
@@ -165,7 +161,7 @@ export function bodyPlacement(age: number, lean: number, sinceDefeat: number, ou
   out.y = fy - fy * r
   out.z = MEDUSA_BODY.out * r + fz * (1 - r) + MEDUSA_RISE.leanOut * lean * r
   out.scale = MEDUSA_RISE.fromScale + (1 - MEDUSA_RISE.fromScale) * r
-  out.pitch = MEDUSA_RISE.leanPitch * lean - (sinceDefeat >= 0 ? 0.35 * smooth01(sinceDefeat / 0.3) * (1 - defeatSink(sinceDefeat)) : 0)
+  out.pitch = MEDUSA_RISE.leanPitch * lean - (sinceDefeat >= 0 ? 0.35 * smooth(sinceDefeat / 0.3) * (1 - defeatSink(sinceDefeat)) : 0)
 }
 
 /** Its strike cycle at `t` seconds: −windup..0 rearing back, 0..1 the strike out towards the camera. */
@@ -173,10 +169,10 @@ export function strikePose(s: SnakeSlot, t: number): number {
   const f = ((((t + s.offset) / s.period) % 1) + 1) % 1
   const { windupAt, strikeAt, holdAt, recoilAt, windup } = SNAKE
   if (f < windupAt) return 0
-  if (f < strikeAt) return -windup * smooth01((f - windupAt) / (strikeAt - windupAt))
-  if (f < holdAt) return -windup + (1 + windup) * smooth01((f - strikeAt) / (holdAt - strikeAt))
+  if (f < strikeAt) return -windup * smooth((f - windupAt) / (strikeAt - windupAt))
+  if (f < holdAt) return -windup + (1 + windup) * smooth((f - strikeAt) / (holdAt - strikeAt))
   if (f < recoilAt) return 1
-  return 1 - smooth01((f - recoilAt) / (1 - recoilAt))
+  return 1 - smooth((f - recoilAt) / (1 - recoilAt))
 }
 
 /** True when the strike lands (reaches full reach) between game seconds `t0` and `t1`. */
@@ -192,7 +188,7 @@ export function strikeLandsBetween(s: SnakeSlot, t0: number, t1: number): boolea
 export function snakeLength(s: SnakeSlot, phaseStarted: number | null, age: number, alive: boolean): number {
   if (!alive) return SNAKE.stub
   if (phaseStarted === null) return 0
-  return smooth01((age - phaseStarted) / SNAKE.emergeS)
+  return smooth((age - phaseStarted) / SNAKE.emergeS)
 }
 
 /** Radius of segment boundary `k` (0 at the root, `SNAKE.segments` at the head). */
