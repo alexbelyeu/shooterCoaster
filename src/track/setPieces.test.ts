@@ -5,7 +5,8 @@ import { createTrackCurve } from './curves/createTrackCurve'
 import { buildArcTable } from './arcLength'
 import { getTrackDimensions } from './trackDimensions'
 import { TUNNEL_TRACK_SHADE, buildTrackGeometry } from './trackGeometry'
-import { getTunnelDims, ribCentres, tunnelSpans, withTunnels } from './setPieces'
+import { getTunnelDims, otherPassInTube, ribCentres, tunnelSpans, withTunnels } from './setPieces'
+import { planTowers } from './supportTowers'
 import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
 
 const level = getLevelConfig('level1')!
@@ -46,6 +47,18 @@ describe('tunnel placement', () => {
     expect(() => tunnelSpans(plain, [{ from: 0.2, length: 400 }, { from: 0.2, length: 100 }], 1)).toThrow(/overlap/)
     expect(() => tunnelSpans(plain, [{ from: 1.2, length: 100 }], 1)).toThrow()
     expect(() => tunnelSpans(plain, [{ from: 0.2, length: 0 }], 1)).toThrow()
+  })
+
+  it('refuses another pass of the track through the tube, and level 1 has none', () => {
+    const spec = level.track.tunnels!
+    expect(otherPassInTube(table, span, tunnel.centreUp)).toBe(-1)
+    const mid = (span.from + span.to) >> 1
+    const far = (mid + (plain.count >> 1)) % plain.count
+    const crossed = { ...plain, x: plain.x.slice(), y: plain.y.slice(), z: plain.z.slice() }
+    crossed.x[far] = plain.x[mid]
+    crossed.y[far] = plain.y[mid] + tunnel.centreUp
+    crossed.z[far] = plain.z[mid]
+    expect(() => tunnelSpans(crossed, spec, dims.trackScale)).toThrow(/passes within its reach/)
   })
 
   it('spaces its light rings evenly, none at the mouths', () => {
@@ -99,5 +112,27 @@ describe('the track in a tunnel', () => {
     }
     expect(dark).toBeGreaterThan(100)
     expect(other).toBe(0)
+  })
+})
+
+describe('support towers round a tunnel', () => {
+  let low = Infinity
+  for (let i = 0; i < plain.count; i++) low = Math.min(low, plain.y[i])
+  const ground = () => low - 40
+
+  function nearestTube(t: { x: number; z: number; topY: number }): number {
+    let best = Infinity
+    for (let i = span.from; i <= span.to; i++) {
+      if (plain.y[i] + tunnel.centreUp - span.reach > t.topY) continue
+      best = Math.min(best, Math.hypot(plain.x[i] - t.x, plain.z[i] - t.z))
+    }
+    return best
+  }
+
+  it('keeps every tower out of the tube and its portals, which flat ground under the whole ride would stand one in', () => {
+    const towers = planTowers(curve, table, dims, ground).towers
+    expect(towers.length).toBeGreaterThan(0)
+    expect(Math.min(...towers.map(nearestTube))).toBeGreaterThan(span.reach)
+    expect(planTowers(curve, plain, dims, ground).towers.some((t) => nearestTube(t) < span.reach)).toBe(true)
   })
 })
