@@ -1,6 +1,6 @@
 /** `npm run audio:render`'s renders of the game's own music and SFX code, and of any score through the score engine. */
 import { renderOffline, type OfflineRenderScope } from '@/audio/offlineRender'
-import { setMusicDucked } from '@/audio/AudioEngine'
+import { setMusicDucked, setPauseMix } from '@/audio/AudioEngine'
 import { loadArcade, silentSfx, type Placement, type SfxEngine } from '@/audio/sfx'
 import { FIREWORK_BIOMES, KILL_SOUNDS, type KillSound } from '@/audio/sfxDesign'
 import { COMBO_TIERS, FRENZY, TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
@@ -38,6 +38,11 @@ export type AudioRenderRequest =
   | { kind: 'ride'; level: string }
   /** Level select's launch blip for `level`, its bank and room landing under the blip's ring (#246), then the countdown and a kill. */
   | { kind: 'launch'; level: string }
+  /**
+   * A paused run resuming (#650): the resume Ready / GO under the pause gate, which opens at GO as the run plays again.
+   * `unpaused`: the same sounds with no pause, the reference a resume should match (nothing of the countdown's swells in).
+   */
+  | { kind: 'resume'; level: string; unpaused?: boolean }
 
 export interface AudioRenderResult {
   sampleRate: number
@@ -391,6 +396,33 @@ function launchPlan(level: string, land: () => void): Plan {
   }
 }
 
+const RESUME = { pauseS: 0.2, readyS: 0.5, goS: 1.6, seconds: 4 }
+
+/** The countdown's timing is `Countdown.tsx`'s resume mode: Ready, GO 1.1 s later, `playing` at GO. */
+function resumePlan(level: string, unpaused = false): Plan {
+  const s = sfx
+  const r = RESUME
+  return {
+    seconds: r.seconds,
+    events: [
+      ...(unpaused ? [] : [{ t: r.pauseS, name: 'paused' }]),
+      { t: r.readyS, name: 'countdown Ready' },
+      { t: r.goS, name: unpaused ? 'countdown GO' : 'countdown GO: the pause gate opens' },
+    ],
+    seams: [],
+    bar: null,
+    script: ({ at }) => {
+      void s.prepare(level, biomeOf(level))
+      if (!unpaused) at(r.pauseS, () => setPauseMix(true, true))
+      at(r.readyS, () => s.countdown(false))
+      at(r.goS, () => {
+        s.countdown(true)
+        setPauseMix(false)
+      })
+    },
+  }
+}
+
 type GamePlanRequest = Exclude<AudioRenderRequest, { kind: 'score' | 'launch' }>
 
 const RENDERS: { [K in GamePlanRequest['kind']]: (req: Extract<GamePlanRequest, { kind: K }>) => Plan } = {
@@ -398,6 +430,7 @@ const RENDERS: { [K in GamePlanRequest['kind']]: (req: Extract<GamePlanRequest, 
   sfxSheet: (r) => sfxSheetPlan(r.level, r.kills),
   mix: (r) => mixPlan(r.level, r.seconds, r.stem === 'music', r.boss),
   ride: (r) => ridePlan(r.level),
+  resume: (r) => resumePlan(r.level, r.unpaused),
 }
 
 function toBase64(buffer: AudioBuffer): string {

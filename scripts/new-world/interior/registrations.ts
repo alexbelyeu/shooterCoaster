@@ -49,18 +49,8 @@ export const ATMOSPHERES: Record<string, AtmosphereConfig> = {
 
 /** src/utils/terrainNoise.ts */
 export const BIOME_TERRAIN_CONFIGS: Record<string, TerrainConfig> = {
-  // __NAME__ draws its biome's `floor`, never this: flat for 100 km.
+  // __NAME__ draws its biome's `floor`, never noise: this only sizes the floor mesh.
   __BIOME__: {
-    frequency: 0.001,
-    amplitude: 1,
-    octaves: 1,
-    persistence: 0.5,
-    lacunarity: 2,
-    exponent: 1,
-    ridgeMode: false,
-    baseY: 0,
-    flatRadius: 100_000,
-    transitionWidth: 1,
     meshSize: 6000,
     authoredFloor: true,
   },
