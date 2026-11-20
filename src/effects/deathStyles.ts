@@ -184,6 +184,7 @@ export const SNOW_BURST_DEATH_STYLE: DeathStyle = {
   lifetime: 1.9, scale: 3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'crunch',
 }
 
+/** A lava golem's death; the Titan's parts throw more of the same. */
 const LAVA_CHUNKS = (count: number) =>
   layer({ shape: 'chunk', count, colors: ['#1c1412', '#2e1c16', '#4a2414', '#ff6a10'], speed: [30, 80], up: 50, drag: 0.4, gravity: 130, size: 9, spin: 4, hold: 0.75 })
 const LAVA_SPARKS = (count: number) =>
@@ -288,10 +289,7 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
     lifetime: 1.4, scale: 1.2, lift: 6, flash: 7, flashColor: '#ff5a20', sound: 'hiss',
   },
   lavaGolem: {
-    layers: [
-      layer({ shape: 'chunk', count: 5, colors: ['#1c1412', '#2e1c16', '#4a2414'], speed: [30, 70], up: 40, drag: 0.4, gravity: 130, size: 9, spin: 4, hold: 0.75 }),
-      layer({ shape: 'spark', count: 38, colors: ['#ff6a10', '#ffb030', '#ff3a08'], glow: 3.5, speed: [30, 120], up: 50, drag: 1.4, gravity: 120, size: 2.6, hold: 0.2 }),
-    ],
+    layers: [LAVA_CHUNKS(5), LAVA_SPARKS(38)],
     lifetime: 1.8, scale: 2.4, lift: 100, flash: 8, flashColor: '#ff6a20', sound: 'crunch',
   },
   infernalDrake: {

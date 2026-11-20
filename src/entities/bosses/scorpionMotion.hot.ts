@@ -1,4 +1,5 @@
 import type { TrackIndex } from '@/levels/environments/shared/trackClearance'
+import { smooth } from './bossCycle.hot'
 
 /** The Giant Scorpion's motion, pure and allocation-free per frame. Local frame: +z its head, +y up, +x its left. */
 
@@ -151,9 +152,9 @@ export function pickPerch(out: Perch, input: PerchInput, config: PerchConfig = P
   return false
 }
 
-const smooth = (x: number) => {
-  const t = Math.min(1, Math.max(0, x))
-  return t * t * (3 - 2 * t)
+/** Its first slot, clear or not: where it goes while no slot has been clear yet. */
+export function firstSlot(out: { x: number; z: number }, input: PerchInput, config: PerchConfig = PERCH): void {
+  slotAt(input, config, 0, 1, out)
 }
 
 /** Overshoots past 1 and settles: a burst, not a lift. */

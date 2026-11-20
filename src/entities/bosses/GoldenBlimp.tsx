@@ -10,6 +10,8 @@ import {
   BLIMP_BALLOON_MAT, BLIMP_CABLE_GEO, BLIMP_CABLE_MAT, BLIMP_GONDOLA_EXPOSED_MAT, BLIMP_GONDOLA_GEO, BLIMP_GONDOLA_MAT,
   BLIMP_HULL_GEO, BLIMP_HULL_MAT,
 } from './bossAssets'
+import { flatForward } from './bossAim.hot'
+import { followHeading } from './bossCycle.hot'
 
 /** Rides with the coaster: a fixed boss would be behind the rider within seconds. */
 const AHEAD = 760
@@ -17,7 +19,6 @@ const ABOVE = 170
 const MIN_CLEARANCE = 220
 const SIDE = 340
 const CROSS_SECONDS = 24
-const HEADING_TAU = 2.5
 const FOLLOW_TAU = 1.2
 const FALL_ACCEL = 90
 const FALL_PITCH = 0.5
@@ -44,16 +45,8 @@ export default function GoldenBlimp(props: BossProps) {
 
   const move = useCallback(
     ({ root, parts, camera, state, dt, age, sinceDefeat }: BossFrame) => {
-      camera.getWorldDirection(_fwd)
-      _fwd.y = 0
-      if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1)
-      _fwd.normalize()
-      if (!motion.placed) motion.heading.copy(_fwd)
-      else {
-        motion.heading.lerp(_fwd, 1 - Math.exp(-dt / HEADING_TAU))
-        if (motion.heading.lengthSq() < 1e-6) motion.heading.copy(_fwd)
-        motion.heading.normalize()
-      }
+      flatForward(camera, _fwd)
+      followHeading(motion.heading, _fwd.x, _fwd.z, dt, !motion.placed)
       const h = motion.heading
       const rx = -h.z
       const rz = h.x
