@@ -205,6 +205,8 @@ interface Row {
 
 interface SizeSpec {
   column: (safe: Rect) => Rect
+  /** Where the call to action and the address go when they don't close the column: under the art. */
+  tail?: Rect
   board: CardBoard
   art: Rect
   frame: number
@@ -224,7 +226,8 @@ const SPECS: Record<CardSize, SizeSpec> = {
   feed: {
     column: (safe) => ({ x: safe.x + 16, y: safe.y, width: 500, height: safe.height }),
     board: { rect: { x: 16, y: 14, width: 1156, height: 592 }, notch: 30, inset: 18, line: 4, shadow: [12, 16] },
-    art: { x: 608, y: 56, width: 520, height: 518 },
+    art: { x: 608, y: 56, width: 520, height: 368 },
+    tail: { x: 608, y: 440, width: 520, height: 146 },
     frame: 6,
     logo: 48,
     badge: 22,
@@ -233,7 +236,7 @@ const SPECS: Record<CardSize, SizeSpec> = {
     score: 96,
     statLabel: 24,
     statValue: 40,
-    cta: 32,
+    cta: 40,
     url: 24,
     gap: 12,
   },
@@ -255,6 +258,19 @@ const SPECS: Record<CardSize, SizeSpec> = {
   },
 }
 
+/** Rows top to bottom, centred in `col` and scaled down together when they don't fit. */
+function stack(rows: Row[], col: Rect): CardItem[] {
+  const natural = rows.reduce((sum, r, i) => sum + r.h + (i < rows.length - 1 ? r.gap : 0), 0)
+  const scale = Math.min(1, col.height / natural)
+  let top = col.y + (col.height - natural * scale) / 2
+  const items: CardItem[] = []
+  for (const row of rows) {
+    items.push(...row.place(top, scale))
+    top += (row.h + row.gap) * scale
+  }
+  return items
+}
+
 export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Measure): ScoreCardLayout {
   const { width, height } = CARD_DIMENSIONS[size]
   const margin = MARGIN[size]
@@ -262,11 +278,11 @@ export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Meas
   const spec = SPECS[size]
   const col = spec.column(safe)
   const cx = col.x + col.width / 2
-  const text = (t: TextSpec, scale: number, top: number, x = cx, maxWidth = col.width): CardText => {
+  const text = (t: TextSpec, scale: number, top: number, x: number, maxWidth: number): CardText => {
     const fitted = fitText(measure, { ...t, size: Math.floor(t.size * scale) }, maxWidth, Math.ceil(t.size * scale * 0.4))
     return { ...fitted, x, y: top + (fitted.size * LINE) / 2 }
   }
-  const textRow = (t: TextSpec, gap = spec.gap): Row => ({ h: t.size * LINE, gap, place: (top, s) => [text(t, s, top)] })
+  const textRow = (t: TextSpec, gap: number, c = col): Row => ({ h: t.size * LINE, gap, place: (top, s) => [text(t, s, top, c.x + c.width / 2, c.width)] })
 
   const rows: Row[] = []
   const logoHeight = Math.min(spec.logo, (col.width * VIEWBOX.height) / VIEWBOX.width)
@@ -327,17 +343,11 @@ export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Meas
       })
     },
   })
-  rows.push(textRow({ role: 'cta', text: 'Can you beat it?', family: 'body', weight: 800, size: spec.cta, color: FAIR.gilt }, spec.gap * 0.25))
-  rows.push(textRow({ role: 'url', text: 'scoaster.com', family: 'body', weight: 700, size: spec.url, color: FAIR.cream }, 0))
-
-  const natural = rows.reduce((sum, r, i) => sum + r.h + (i < rows.length - 1 ? r.gap : 0), 0)
-  const scale = Math.min(1, col.height / natural)
-  let top = col.y + (col.height - natural * scale) / 2
-  const items: CardItem[] = []
-  for (const row of rows) {
-    items.push(...row.place(top, scale))
-    top += (row.h + row.gap) * scale
-  }
+  const closing = [
+    textRow({ role: 'cta', text: 'Can you beat it?', family: 'body', weight: 800, size: spec.cta, color: FAIR.gilt }, spec.gap * 0.25, spec.tail),
+    textRow({ role: 'url', text: 'scoaster.com', family: 'body', weight: 700, size: spec.url, color: FAIR.cream }, 0, spec.tail),
+  ]
+  const items = spec.tail ? [...stack(rows, col), ...stack(closing, spec.tail)] : stack([...rows, ...closing], col)
 
   return { size, width, height, safe, board: spec.board, art: spec.art, frame: spec.frame, sky: biomeTheme(run.biome).sky, items }
 }

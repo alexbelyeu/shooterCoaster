@@ -13,6 +13,7 @@ import {
   type CardSize,
   type CardText,
   type Measure,
+  type Rect,
   type ScoreCardRun,
 } from './scoreCard'
 
@@ -134,12 +135,22 @@ describe('score card layout', () => {
   })
 
   it.each(SIZES)('stacks the rows without overlaps (%s)', (size) => {
-    const stack = layoutScoreCard({ ...RUN, daily: 'Nov 4, 2026', worldRank: 0 }, size, measure)
-      .items.filter((i) => i.kind !== 'showcard' && !(i.kind === 'text' && (i.role === 'statValue' || i.role === 'badge' || i.role === 'rank')))
+    const layout = layoutScoreCard({ ...RUN, daily: 'Nov 4, 2026', worldRank: 0 }, size, measure)
+    const stack = layout.items
+      .filter((i) => i.kind !== 'showcard' && !(i.kind === 'text' && (i.role === 'statValue' || i.role === 'badge' || i.role === 'rank')))
       .map(itemBounds)
-    // Stat labels share a row: compare row tops only.
-    const rows = [...new Map(stack.map((b) => [Math.round(b.y), b])).values()].sort((a, b) => a.y - b.y)
-    for (let i = 1; i < rows.length; i++) expect(rows[i].y).toBeGreaterThanOrEqual(rows[i - 1].y + rows[i - 1].height - 0.5)
+    // The feed card's closing lines stand in their own column under the art.
+    const underArt = (b: Rect) => size === 'feed' && b.x >= layout.art.x
+    for (const column of [stack.filter((b) => !underArt(b)), stack.filter(underArt)]) {
+      // Stat labels share a row: compare row tops only.
+      const rows = [...new Map(column.map((b) => [Math.round(b.y), b])).values()].sort((a, b) => a.y - b.y)
+      for (let i = 1; i < rows.length; i++) expect(rows[i].y).toBeGreaterThanOrEqual(rows[i - 1].y + rows[i - 1].height - 0.5)
+    }
+    if (size === 'feed') {
+      const art = layout.art
+      expect(stack.filter(underArt).map((b) => b.y).every((y) => y > art.y + art.height)).toBe(true)
+      expect(stack.filter((b) => !underArt(b)).every((b) => b.x + b.width < art.x)).toBe(true)
+    }
   })
 
   it('keeps the story stack off the clear part of its art', () => {
