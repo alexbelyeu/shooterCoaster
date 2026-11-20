@@ -235,8 +235,12 @@ function diagnose(files) {
   }
 }
 
-/** builder.md "Token budget": past these, a run stops reading and ships what it has. */
-const SELF_LIMITS = { context: 200_000, weighted: 2_500_000 }
+/**
+ * builder.md "Token budget": past `context` / `weighted` a run stops reading and ships what it has;
+ * past `wrapContext` / `wrapWeighted` it starts no new exploration or tuning loop (#770: a builder
+ * that read the first warning at 200k still went on to 348k).
+ */
+const SELF_LIMITS = { context: 200_000, weighted: 2_500_000, wrapContext: 150_000, wrapWeighted: 1_800_000 }
 
 /** Pure: one agent's transcript so far → its last turn's context, turns, weighted tokens and verdict. */
 function selfCheck(text, limits = SELF_LIMITS) {
@@ -254,11 +258,16 @@ function selfCheck(text, limits = SELF_LIMITS) {
   const over = []
   if (context > limits.context) over.push(`context over ${fmtTokens(limits.context)}`)
   if (s.weighted > limits.weighted) over.push(`over ${fmtTokens(limits.weighted)} weighted`)
+  const near = []
+  if (limits.wrapContext && context > limits.wrapContext) near.push(`context over ${fmtTokens(limits.wrapContext)}`)
+  if (limits.wrapWeighted && s.weighted > limits.wrapWeighted) near.push(`over ${fmtTokens(limits.wrapWeighted)} weighted`)
   const head = `context ${fmtTokens(context)} · ${s.turns} turns · ~${fmtTokens(s.weighted)} weighted so far`
   const verdict = over.length
-    ? `OVER BUDGET (${over.join(', ')}): stop reading, ship the slice that works, file the rest as a follow-up issue`
-    : 'within budget'
-  return { context, turns: s.turns, weighted: s.weighted, over: over.length > 0, line: `${head} · ${verdict}` }
+    ? `OVER BUDGET (${over.join(', ')}): stop now, commit and ship the slice that works as it stands, file the rest as a follow-up issue`
+    : near.length
+      ? `WRAP UP (${near.join(', ')}): finish the step in hand, then ship; no new reading or tuning rounds`
+      : 'within budget'
+  return { context, turns: s.turns, weighted: s.weighted, over: over.length > 0, wrapUp: near.length > 0, line: `${head} · ${verdict}` }
 }
 
 /** The calling agent's own transcript: the worktree builder's subagent file, else the session's. */
