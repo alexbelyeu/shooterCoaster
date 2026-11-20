@@ -1,7 +1,7 @@
 import { SCORE_VALUES } from '@/levels/scoring'
 import type { BossType } from '@/types/level'
 import type { BossSpec, WeakPointSpec } from './bossModel'
-import { KRAKEN_TENTACLE } from './krakenMotion'
+import { KRAKEN_HEAD, KRAKEN_TENTACLE } from './krakenMotion'
 import { MEDUSA_SIZE, SNAKE_SLOTS } from './medusaMotion'
 import { SCORPION_TAIL } from './scorpionMotion.hot'
 import { TITAN_BODY } from './titanMotion.hot'
@@ -60,7 +60,7 @@ export const KRAKEN: BossSpec = {
   name: 'The Kraken',
   tell: { seconds: 2, label: 'The Kraken Rises!' },
   reward: 400,
-  weakPoints: [...krakenPads, { id: 'eye', radius: 44, offset: [0, 0, 0], hp: 3, score: 0, phase: 1 }],
+  weakPoints: [...krakenPads, { id: 'eye', radius: KRAKEN_HEAD.eyeRadius, offset: [0, 0, 0], hp: 3, score: 0, phase: 1 }],
 }
 
 /** Placed every frame on its arm or along the tail (GiantScorpion.tsx), so no offset. */
