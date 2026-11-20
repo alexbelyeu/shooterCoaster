@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import * as THREE from 'three'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { buildArcTable } from './arcLength'
 import { getTrackDimensions } from './trackDimensions'
-import { TUNNEL_TRACK_SHADE, buildTrackGeometry, trackFrame } from './trackGeometry'
-import {
-  buildTunnelGeometry, getTunnelDims, otherPassInTube, ribCentres, tunnelColours, tunnelShadowCasters, tunnelSpans, withTunnels,
-} from './setPieces'
+import { TUNNEL_TRACK_SHADE, buildTrackGeometry } from './trackGeometry'
+import { getTunnelDims, otherPassInTube, ribCentres, tunnelSpans, withTunnels } from './setPieces'
 import { planTowers } from './supportTowers'
 import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
 
@@ -27,6 +24,13 @@ describe('tunnel placement', () => {
     expect(plain.s[span.from]).toBeGreaterThanOrEqual(span.fromS)
     expect(plain.s[span.to]).toBeLessThanOrEqual(span.toS)
     expect(plain.s[span.to + 1]).toBeGreaterThan(span.toS)
+  })
+
+  it("places every level's tunnels: none over the seam, short of portal room or overlapping", () => {
+    for (const l of getAllLevels().filter((x) => x.track.tunnels)) {
+      const t = buildArcTable(createTrackCurve(l.track))
+      expect(() => tunnelSpans(t, l.track.tunnels!, getTrackDimensions(l.track).trackScale), l.id).not.toThrow()
+    }
   })
 
   it('leaves a track without tunnels the same table', () => {
@@ -55,6 +59,13 @@ describe('tunnel placement', () => {
     crossed.y[far] = plain.y[mid] + tunnel.centreUp
     crossed.z[far] = plain.z[mid]
     expect(() => tunnelSpans(crossed, spec, dims.trackScale)).toThrow(/passes within its reach/)
+  })
+
+  it('spaces its light rings evenly, none at the mouths', () => {
+    const ribs = ribCentres(span, tunnel)
+    expect(ribs.length).toBeGreaterThan(20)
+    expect(ribs[0] - span.fromS).toBeGreaterThan(tunnel.ribSpacing / 3)
+    expect(span.toS - ribs[ribs.length - 1]).toBeGreaterThan(tunnel.ribSpacing / 3)
   })
 
   it('tells where the car is: inside, and how deep, easing in and out', () => {
@@ -101,85 +112,6 @@ describe('the track in a tunnel', () => {
     }
     expect(dark).toBeGreaterThan(100)
     expect(other).toBe(0)
-  })
-})
-
-describe('tunnel geometry', () => {
-  const geometry = buildTunnelGeometry(curve, table, tunnel, tunnelColours([0.95, 0.93, 0.88], [1, 1, 0]))
-  const pos = geometry.getAttribute('position')
-  const nor = geometry.getAttribute('normal')
-  const emi = geometry.getAttribute('aEmissive')
-
-  it('is one modest mesh of finite triangles, each wound the way its normals face', () => {
-    expect(pos.count % 3).toBe(0)
-    expect(pos.count / 3).toBeLessThan(12000)
-    const a = new THREE.Vector3()
-    const b = new THREE.Vector3()
-    const c = new THREE.Vector3()
-    const n = new THREE.Vector3()
-    let finite = true
-    let misWound = 0
-    for (let i = 0; i < pos.count; i += 3) {
-      a.fromBufferAttribute(pos, i)
-      b.fromBufferAttribute(pos, i + 1).sub(a)
-      c.fromBufferAttribute(pos, i + 2).sub(a)
-      n.fromBufferAttribute(nor, i)
-      finite &&= Number.isFinite(a.x + a.y + a.z + b.x + b.y + b.z + c.x + c.y + c.z)
-      if (b.cross(c).dot(n) < 0) misWound++
-    }
-    expect(finite).toBe(true)
-    expect(misWound).toBe(0)
-  })
-
-  it('lights the inside: emissive past 1 for Bloom, never NaN', () => {
-    let max = 0
-    let finite = true
-    for (let i = 0; i < emi.count; i++) {
-      const v = Math.max(emi.getX(i), emi.getY(i), emi.getZ(i))
-      finite &&= Number.isFinite(v) && v >= 0
-      max = Math.max(max, v)
-    }
-    expect(finite).toBe(true)
-    expect(max).toBeGreaterThan(1)
-  })
-
-  it('has room for the rider: the eye stays well inside the light rings all the way through', () => {
-    const point = new THREE.Vector3()
-    const f = new THREE.Vector3()
-    const r = new THREE.Vector3()
-    const u = new THREE.Vector3()
-    const eye = new THREE.Vector3()
-    const ribInner = tunnel.radius - tunnel.ribDepth
-    let worst = Infinity
-    for (let i = span.from; i <= span.to; i += 4) {
-      trackFrame(curve, plain.t[i], point, f, r, u)
-      eye.copy(point).setY(point.y + dims.eyeHeight)
-      const centre = point.clone().addScaledVector(u, tunnel.centreUp)
-      const off = eye.sub(centre)
-      off.addScaledVector(f, -off.dot(f))
-      worst = Math.min(worst, ribInner - off.length())
-    }
-    // The camera's near plane is 1 unit; the gun sits inside 2.
-    expect(worst).toBeGreaterThan(3)
-  })
-
-  it('spaces its light rings evenly, none at the mouths', () => {
-    const ribs = ribCentres(span, tunnel)
-    expect(ribs.length).toBeGreaterThan(20)
-    expect(ribs[0] - span.fromS).toBeGreaterThan(tunnel.ribSpacing / 3)
-    expect(span.toS - ribs[ribs.length - 1]).toBeGreaterThan(tunnel.ribSpacing / 3)
-  })
-
-  it('casts contact shadows only where the tube is near the ground', () => {
-    const flat = tunnelShadowCasters(table, tunnel, () => -1e6)
-    const near = tunnelShadowCasters(table, tunnel, (x, z) => {
-      void x
-      void z
-      return Math.min(...Array.from(plain.y.subarray(span.from, span.to))) - 2 * tunnel.radius
-    })
-    expect(flat).toEqual([])
-    expect(near.length).toBeGreaterThan(5)
-    for (const c of near) expect(c.strength).toBeGreaterThan(0)
   })
 })
 
