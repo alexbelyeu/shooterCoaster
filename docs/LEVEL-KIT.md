@@ -94,13 +94,13 @@ biome or score that already exists is refused, so a second run changes nothing. 
    `scores/index.ts`, with that score's key in `SCORE_KEYS`. **(by hand)** A theme round for Alex
    (`Listen:`); the winner replaces the copy and its `SCORE_KEYS` row.
 6. Gates. **(script)** A shard in `e2e/shards.mjs` and the `ci.yml` smoke matrix; `budgets.json`
-   `smokeSeconds.<id>` (the previous level's), `scene.<id>` and `pacing.<id>` as `placeholder`s that the
-   first local smoke of the level fills from what it measured (CI fails on a placeholder, with the numbers
-   to paste); `#about` in `index.html` (a line naming the world and its enemies, the world count in the
+   `smokeSeconds.<id>` (the previous level's), `scene.<id>` and `pacing.<id>` as `placeholder`s that
+   two clean local smokes of the level fill from the higher of what they measured (CI fails on a placeholder); `#about` in `index.html` (a line naming the world and its enemies, the world count in the
    copy and meta descriptions; `indexHtml.test.ts`). **(by hand)** Rewrite the `#about` line once the
    world has its enemies and landmark; a `docs/agents/STATE.md` row.
-7. Prove it **(by hand)**: `node e2e/smoke.mjs --shard <id>` (sets `scene.<id>`) and
-   `--steps pacing --levels <id>` (sets `pacing.<id>`); commit the budgets they wrote; look at the ride,
+7. Prove it **(by hand)**: `node e2e/smoke.mjs --shard <id>` twice (sets `scene.<id>`) and
+   `--steps pacing --levels <id>` twice (sets `pacing.<id>`); a run with any other problem records nothing
+   (`placeholder not set`), so fix it and run again; commit the budgets they wrote; look at the ride,
    enemy and combat shots; the turntable sheet for new enemies.
 
 ## Candidate worlds (Director's ranking)

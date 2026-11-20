@@ -98,7 +98,7 @@ import { planRun, STEP_LEVELS } from './shards.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
 import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
-import { isPlaceholder, pacingCeilings, sceneCeilings, setBudget } from '../scripts/newWorldPlan.mjs'
+import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 
 const SECONDS = Number(arg('seconds', 10))
 const OUT = path.resolve(arg('out', 'e2e-results'))
@@ -193,20 +193,26 @@ const BUDGET_KEYS = [
 ]
 
 /**
- * A level scaffolded by `npm run new-world` starts on placeholder `scene` / `pacing` ceilings: a local run sets them
- * from what it measured (the budgets' own headroom rules, `newWorldPlan.mjs`), CI fails with the numbers to paste.
+ * A level scaffolded by `npm run new-world` starts on placeholder `scene` / `pacing` ceilings. Called once the run's
+ * other problems are known: a clean local run records what it measured, the second sets the ceilings
+ * (`placeholderBudget.mjs`); CI fails on a placeholder. Returns the problems to add.
  */
-function fillPlaceholderBudget(section, id, values) {
-  const json = JSON.stringify(values)
-  if (process.env.CI) return [`budgets.json ${section}.${id} is a placeholder: run this smoke locally to set it, or paste ${json}`]
-  const file = new URL('../budgets.json', import.meta.url)
-  fs.writeFileSync(file, setBudget(fs.readFileSync(file, 'utf8'), section, id, values))
-  BUDGETS[section][id] = values
-  console.log(`budgets.json ${section}.${id} set from this run: ${json}`)
+function fillPlaceholderBudget(section, id, measured, problems) {
+  if (process.env.CI) return [`budgets.json ${section}.${id} is a placeholder: run this smoke locally (twice) to set it`]
+  const { entry, note } = placeholderAfterRun(section, BUDGETS[section][id], measured, problems)
+  if (entry) {
+    const file = new URL('../budgets.json', import.meta.url)
+    fs.writeFileSync(file, setBudget(fs.readFileSync(file, 'utf8'), section, id, entry))
+    BUDGETS[section][id] = entry
+  }
+  console.log(`     budgets.json ${section}.${id}: ${note}${entry && !isPlaceholder(entry) ? ` ${JSON.stringify(entry)}` : ''}`)
   return []
 }
 
-/** Each ride total past its ceiling; a level whose entry names `knownOver` (an open issue) only warns. */
+/**
+ * Each ride total past its ceiling; a level whose entry names `knownOver` (an open issue) only warns. On a placeholder,
+ * `placeholder` holds the measured totals for `fillPlaceholderBudget` once the level's other problems are known.
+ */
 function sceneBudgetCheck(id, stats) {
   const budget = SCENE_BUDGETS[id]
   if (!budget) return { over: [`no scene budget for ${id} in budgets.json`], knownOver: null }
@@ -218,7 +224,7 @@ function sceneBudgetCheck(id, stats) {
     trackObjects: track?.objects,
     trackTriangles: track?.triangles,
   }
-  if (isPlaceholder(budget)) return { over: fillPlaceholderBudget('scene', id, sceneCeilings(measured)), knownOver: null }
+  if (isPlaceholder(budget)) return { over: [], knownOver: null, placeholder: measured }
   const over = BUDGET_KEYS
     .filter(([key]) => measured[key] > budget[key])
     .map(([key, label]) => `${label}=${measured[key]} (budget ${budget[key]})`)
@@ -284,8 +290,9 @@ async function delayLevelChunk(page) {
 }
 
 /** `?e2e=1` starts a run in `playing` before its lazy scene is there: on a slow runner steps measured the composer alone (#464). */
+const LEVEL_READY_MS = 60000
 const levelReady = (page) =>
-  page.waitForFunction(() => window.__SC_TEST__.levelReady(), null, { timeout: 60000, polling: 100 }).then(() => true, () => false)
+  page.waitForFunction(() => window.__SC_TEST__.levelReady(), null, { timeout: LEVEL_READY_MS, polling: 100 }).then(() => true, () => false)
 
 async function startLevelReady(page, id) {
   await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [id, SEED])
@@ -296,8 +303,9 @@ const NOT_LOADED = (id) => `the ${id} scene never loaded (levelReady)`
 
 /**
  * Start level `id` and ride it (game time running, `rideRate` RIDE_RATE) in settled steps of RIDE_STEP level seconds
- * (`settledSteps.mjs`, #471) until the level timer reaches `seconds` and `minFrames` have rendered (a stall past
- * FRAME_DEADLINE_MS stops it), then freeze game time and hand the ride back to the frame time in that same JS turn.
+ * (`settledSteps.mjs`, #471) until the level timer reaches `seconds` and `minFrames` have rendered (FRAME_DEADLINE_MS
+ * stops it whatever it waits on, even a level that never registers waves: `levelTime` is then undefined), then freeze
+ * game time and hand the ride back to the frame time in that same JS turn.
  * `stopAtLevelTime` stops the level timer, game clock and ride exactly at `seconds` (#487), and the settled steps make
  * it the same moment of the level on any runner: the same track point with the same enemies flown in.
  * `started`: the level is already started with game time frozen at its start (`tourShots`), so it isn't mounted twice.
@@ -313,8 +321,9 @@ async function rideToLevelTime(page, id, seconds, minFrames, { started = false }
     const f0 = s.frames
     s.rideRun = window.__SC_STEP_SETTLED__(step, (run) => {
       const levelTime = s.nextWave()?.levelTime
-      if (levelTime == null) return 'hold'
       run.frames = s.frames - f0
+      // No step until the level's waves are registered (the scene, its timer and ride mount together), but only until the deadline (#535).
+      if (levelTime == null && !run.overdue) return 'hold'
       run.levelTime = levelTime
       if (!run.overdue && (levelTime < target || run.frames < minFrames)) return
       s.setTimeScale(0)
@@ -2013,6 +2022,8 @@ async function pacingCheck(page, id) {
     const run = { samples: [], end: null, done: false }
     s.pacingRun = run
     run.stepper = window.__SC_STEP_SETTLED__(step, () => {
+      // The step deadline below passed (#535): stop where the run is.
+      if (run.abort) return false
       const w = s.nextWave()
       const st = s.stats()
       // No step until the level's waves are registered: the scene, its timer and ride mount together, settled.
@@ -2032,13 +2043,34 @@ async function pacingCheck(page, id) {
     return s.frames
   }, [id, SEED, PACING_STEP])
   let last = { frames: started, at: Date.now() }
+  // A step that never settles (React committing on every held frame, or a level that never registers its waves) would hold
+  // until the job's timeout (#535): each step gets FRAME_DEADLINE_MS, the first the level's load (LEVEL_READY_MS) on top.
+  let lastStep = { steps: 0, held: 0, at: Date.now() }
   for (;;) {
     await page.waitForTimeout(2000)
-    const now = await page.evaluate(() => ({ done: window.__SC_TEST__.pacingRun.done, frames: window.__SC_TEST__.frames }))
+    const now = await page.evaluate(() => {
+      const s = window.__SC_TEST__
+      const { done, stepper } = s.pacingRun
+      return { done, frames: s.frames, steps: stepper.steps, held: stepper.heldFrames, waves: s.nextWave() != null }
+    })
     if (now.done) break
     if (now.frames !== last.frames) last = { frames: now.frames, at: Date.now() }
     else if (Date.now() - last.at > FRAME_DEADLINE_MS) {
       problems.push(`render loop stalled (no frame in ${(FRAME_DEADLINE_MS / 1000).toFixed(0)} s)`)
+      break
+    }
+    if (now.steps !== lastStep.steps) lastStep = { steps: now.steps, held: now.held, at: Date.now() }
+    else if (Date.now() - lastStep.at > FRAME_DEADLINE_MS + (now.steps ? 0 : LEVEL_READY_MS) && now.held - lastStep.held >= MIN_FRAMES) {
+      const seconds = ((Date.now() - lastStep.at) / 1000).toFixed(0)
+      problems.push(now.waves
+        ? `never settled: step ${now.steps + 1} held ${now.held - lastStep.held} frames over ${seconds} s (React kept committing)`
+        : `the level registered no waves: nextWave() still null after ${seconds} s`)
+      // `overdue` calls the settled callback on the next frame, quiet or not, and `abort` stops the run there.
+      await page.evaluate(() => {
+        const run = window.__SC_TEST__.pacingRun
+        run.abort = true
+        run.stepper.overdue = true
+      })
       break
     }
   }
@@ -2048,11 +2080,13 @@ async function pacingCheck(page, id) {
   const shaders = await programsAfterWarmup(page)
   if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   const budget = BUDGETS.pacing?.[id]
-  const over = isPlaceholder(budget) ? fillPlaceholderBudget('pacing', id, pacingCeilings(pacing)) : pacingBudgetProblems(id, pacing, budget)
+  // A placeholder is filled by the caller once the page's errors are counted too (`fillPlaceholderBudget`).
+  const placeholder = isPlaceholder(budget) ? pacing : null
+  const over = placeholder ? [] : pacingBudgetProblems(id, pacing, budget)
   // A level whose entry names `knownOver` (an open issue fixing it) only warns, like the scene budgets.
   if (budget?.knownOver && over.length) console.log(`     WARN pacing over budget (known, ${budget.knownOver}): ${over.join('; ')}`)
   else problems.push(...over)
-  return { id: 'pacing', level: id, problems, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
+  return { id: 'pacing', level: id, problems, placeholder, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
 }
 
 /**
@@ -3992,11 +4026,13 @@ async function run() {
     results.push(r)
     return r
   }
-  const pageStep = (check, query) => step(async () => {
+  // `finish(r)`: after the page's errors are counted, before the step passes or fails.
+  const pageStep = (check, query, finish) => step(async () => {
     const p = await newPage(query)
     const r = await check(p.page)
     r.errors = [...p.errors, ...(await p.page.evaluate(() => window.__SC_TEST__.errors))]
     if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    finish?.(r)
     r.ok = r.problems.length === 0
     await p.ctx.close()
     return r
@@ -4088,6 +4124,7 @@ async function run() {
     if (!spawnDigest) problems.push('spawnDigest() never reported the spawns')
 
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${frameSeconds.toFixed(0)}s)`)
+    else if (ride.levelTime == null) problems.push(`the level registered no waves: nextWave() still null after ${frameSeconds.toFixed(0)} s`)
     if (looksBlank(img)) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
     if (enemyShot.error) problems.push(`enemy probe failed: ${enemyShot.error}`)
@@ -4118,6 +4155,7 @@ async function run() {
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
     const allErrors = [...errors, ...hookErrors]
     if (allErrors.length) problems.push(`${allErrors.length} error(s)`)
+    if (perfGate?.placeholder) problems.push(...fillPlaceholderBudget('scene', id, perfGate.placeholder, problems))
     const ok = problems.length === 0
     failed ||= !ok
     delete stats.hookErrors
@@ -4206,7 +4244,10 @@ async function run() {
   // 6f. Pacing: every level's whole run, unfired, against budgets.json `pacing` (pacing.json)
   const pacing = {}
   for (const id of has('pacing') ? wanted : []) {
-    const r = await pageStep((page) => pacingCheck(page, id))
+    const r = await pageStep((page) => pacingCheck(page, id), undefined, (r) => {
+      if (r.placeholder) r.problems.push(...fillPlaceholderBudget('pacing', id, r.placeholder, r.problems))
+      delete r.placeholder
+    })
     pacing[id] = { ...r.pacing, timeline: r.timeline }
     delete r.timeline
   }
