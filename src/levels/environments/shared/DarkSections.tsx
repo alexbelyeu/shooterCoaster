@@ -8,6 +8,7 @@ import { DARKNESS, darkSectionDepth } from '@/track/darkSection.hot'
 import { rideProgress } from '@/track/rideProgress.hot'
 import type { DarkSectionSpec } from '@/types/level'
 import type { AtmosphereConfig } from '../atmosphere'
+import type { FogModifiers } from './sceneFog'
 
 /** How a dark section dims: the hemisphere and sun keep `light` of their intensity, the fog closes to `fogFar` of its far in `fogColor`. */
 const LOOK = {
@@ -25,7 +26,8 @@ const lerp = (a: number, b: number, k: number) => a + (b - a) * k
 /**
  * A level's dark sections (#752, `TrackParams.darkSections`): while the rider is in one, the hemisphere, sun, sky
  * reflections and fog dim and close in (`darkSectionDepth`, eased at each end) and `DARKNESS` tells the level's own
- * shaders; each shot's muzzle flash lights what is near the rider. The flash's point light is always in the scene,
+ * shaders; each shot's muzzle flash lights what is near the rider. The fog's far is a modifier (`fog.dark`) that
+ * `BiomeEnvironment` combines with the others'; its colour, which nothing else changes, is set here. The flash's point light is always in the scene,
  * at 0 outside the dark, so no material's program changes on the first shot (`ShaderWarmup` compiles them with it).
  */
 export default function DarkSections({
@@ -34,12 +36,14 @@ export default function DarkSections({
   hemiRef,
   sunRef,
   fogRef,
+  fog,
 }: {
   sections: readonly DarkSectionSpec[]
   atmosphere: AtmosphereConfig
   hemiRef: RefObject<THREE.HemisphereLight | null>
   sunRef: RefObject<THREE.DirectionalLight | null>
   fogRef: RefObject<THREE.Fog | null>
+  fog: FogModifiers
 }) {
   const scene = useThree((s) => s.scene)
   const flashRef = useRef<THREE.PointLight>(null)
@@ -57,9 +61,10 @@ export default function DarkSections({
     return () => {
       eventBus.off('weapon:fire', onFire)
       DARKNESS.value = 0
+      fog.dark.far = 1
       if (testApi) testApi.darkSection = { spans: [], depth: 0, flash: 0 }
     }
-  }, [sections])
+  }, [sections, fog])
 
   useFrame(({ camera }, delta) => {
     const depth = darkSectionDepth(sections, rideProgress())
@@ -69,12 +74,8 @@ export default function DarkSections({
     if (sunRef.current) sunRef.current.intensity = atmosphere.sunLightIntensity * light
     // The baked sky lands on the frame after the mount (`SkyEnvironment`); before it there is nothing to dim.
     if (scene.environment) scene.environmentIntensity = lerp(atmosphere.envIntensity, LOOK.envIntensity, depth)
-    const fog = fogRef.current
-    if (fog) {
-      fog.color.lerpColors(colours.fog, colours.dark, depth)
-      fog.far = lerp(atmosphere.fogFar, atmosphere.fogFar * LOOK.fogFar, depth)
-      fog.near = Math.min(atmosphere.fogNear, fog.far * 0.5)
-    }
+    fogRef.current?.color.lerpColors(colours.fog, colours.dark, depth)
+    fog.dark.far = lerp(1, LOOK.fogFar, depth)
     const flash = flashRef.current
     if (!flash) return
     flash.position.copy(camera.position)
