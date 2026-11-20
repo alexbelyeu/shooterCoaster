@@ -739,12 +739,12 @@ async function resultsScreenProblems(page, id, stats, { share }) {
     const el = document.querySelector('.results-screen')
     if (!el) return null
     const rows = Object.fromEntries(
-      [...el.querySelectorAll('.results-stat')].map((r) => [r.children[0].textContent, r.children[1].textContent]),
+      [...el.querySelectorAll('.results-stat')].map((r) => [r.dataset.stat, r.textContent]),
     )
     const buttons = [...el.querySelectorAll('.results-actions button')]
       .filter((b) => !b.closest('.share-menu') && b.getBoundingClientRect().width > 0)
       .map((b) => b.textContent)
-    const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
+    const stars = el.querySelectorAll('.results-stars .earned').length
     const b = el.querySelector('.results-board')
     const r = b?.getBoundingClientRect()
     const board = b && {
@@ -788,11 +788,11 @@ async function resultsScreenProblems(page, id, stats, { share }) {
     shown.scoreCards = cards.sizes
   }
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
-  for (const label of ['Kills', 'Accuracy', 'Best combo', 'Time left']) {
-    if (!(label in screen.rows)) problems.push(`results screen has no "${label}" row`)
+  for (const stat of ['hits', 'accuracy', 'combo', 'time']) {
+    if (!(stat in screen.rows)) problems.push(`results screen has no "${stat}" line`)
   }
-  if (screen.rows.Kills && !screen.rows.Kills.startsWith(`${stats.kills} /`)) problems.push(`results kills "${screen.rows.Kills}" != ${stats.kills}`)
-  if (stats.shotsFired > 0 && !/^\d+%$/.test(screen.rows.Accuracy ?? '')) problems.push(`results accuracy "${screen.rows.Accuracy}" with ${stats.shotsFired} shots`)
+  if (screen.rows.hits && !screen.rows.hits.startsWith(`${stats.kills} of `)) problems.push(`results hits "${screen.rows.hits}" != ${stats.kills}`)
+  if (stats.shotsFired > 0 && !/^\d+% /.test(screen.rows.accuracy ?? '')) problems.push(`results accuracy "${screen.rows.accuracy}" with ${stats.shotsFired} shots`)
   for (const label of ['Levels', 'Replay', 'Share']) {
     if (!screen.buttons.includes(label)) problems.push(`results buttons ${JSON.stringify(screen.buttons)} lack ${label}`)
   }
@@ -802,7 +802,7 @@ async function resultsScreenProblems(page, id, stats, { share }) {
   if (nextOffered !== nextOpen)
     problems.push(`results ${nextOffered ? 'offer' : 'hide'} Next Level with ${screen.nextLevel?.id ?? 'no next level'} ${nextOpen ? 'unlocked' : 'locked'}`)
   // While the initials entry is open the hint is the entry's own.
-  if (screen.nextLevel && !nextOpen && !screen.board?.editing && !/Enter \/ R: replay/.test(screen.keys)) problems.push(`locked next level, but the keys hint reads "${screen.keys}"`)
+  if (screen.nextLevel && !nextOpen && !screen.board?.editing && !/Enter or R rides again/.test(screen.keys)) problems.push(`locked next level, but the keys hint reads "${screen.keys}"`)
   if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
   if (!screen.board) problems.push('results screen has no leaderboard')
   else {
@@ -2559,7 +2559,7 @@ async function startDailyFromCard(page, savedScores) {
 
 /**
  * Daily Run (#184): the card starts today's level on today's seed in daily mode, two loads spawn the same,
- * the results say DAILY / NEW BEST with no Next Level, Replay keeps the seed, and campaign saves stay as they were.
+ * the results say Daily Run / New best with no Next Level, Replay keeps the seed, and campaign saves stay as they were.
  */
 async function dailyCheck(newPage) {
   const problems = []
@@ -2576,7 +2576,7 @@ async function dailyCheck(newPage) {
   }
   if (!a.digest) problems.push('spawnDigest() never reported the daily spawns')
 
-  // Score something so the day's first result is a NEW BEST, then end the run.
+  // Score something so the day's first result is a new best, then end the run.
   await first.page.evaluate(() => window.__SC_TEST__.killNearest(3))
   await waitFrames(first.page, 2, { maxMs: 20000 })
   await first.page.evaluate(() => window.__SC_TEST__.endLevel())
@@ -2604,7 +2604,7 @@ async function dailyCheck(newPage) {
   const savedDay = run ? results.daily.savedDaily[run.dateKey] : undefined
   if (!resultsShown) problems.push(`daily results screen never finished its reveal (${await revealStall(first.page)})`)
   if (results.mode !== 'daily' || !results.badge) problems.push(`daily results lack the Daily badge (mode ${results.mode})`)
-  if (results.score > 0 && results.record !== 'NEW BEST') problems.push(`first daily result shows "${results.record}", expected NEW BEST`)
+  if (results.score > 0 && results.record !== 'New best') problems.push(`first daily result shows "${results.record}", expected New best`)
   if (results.buttons.includes('Next Level')) problems.push('daily results offer Next Level')
   // #317: a daily never enters the campaign leaderboard, so no board and no initials entry.
   if (results.board || results.entry) problems.push(`daily results show the leaderboard${results.entry ? ' and an initials entry' : ''}`)
@@ -4249,7 +4249,7 @@ function resultsSummary(s) {
   if (!s) return ''
   const board = s.board ? ` board=${s.board.rows}${s.board.rank !== null ? ` #${Number(s.board.rank) + 1}` : ''}` : ' board=none'
   const entry = s.entry ? ` initials=${s.entry.initials}${s.entry.editing ? '(open)' : ''}` : ''
-  return ` results=${s.stars}★ acc=${s.rows.Accuracy} combo=${s.rows['Best combo']}${board}${entry}`
+  return ` results=${s.stars}★ acc=${/^\d+%/.exec(s.rows.accuracy ?? '')?.[0] ?? 'none'} combo=${/\d+x/.exec(s.rows.combo ?? '')?.[0] ?? 'none'}${board}${entry}`
 }
 
 /** Largest bullet screen radius (% of canvas height) since load, and the fresh shot's distance from the muzzle tip. */
