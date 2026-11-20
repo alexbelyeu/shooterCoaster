@@ -20,6 +20,14 @@ export function resetLoad(levelId: string | null): void {
   for (const stage of STAGES) done[stage] = 0
 }
 
+/**
+ * `levelId`'s scene unmounted (`canvas/ShaderWarmup.tsx`): its stages back to 0, so a new start of the same level
+ * waits for the remounted scene to report them again. A level that is no longer the loading one is left alone.
+ */
+export function unloadLevel(levelId: string | null): void {
+  if (levelId === level) resetLoad(levelId)
+}
+
 /** `stage` of `levelId` is `fraction` (0–1) done; a bar never goes back, and a report for another level is dropped. */
 export function reportLoad(levelId: string | null, stage: LoadStage, fraction: number): void {
   if (levelId !== level) return
