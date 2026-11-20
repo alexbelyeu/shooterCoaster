@@ -15,6 +15,8 @@ export interface ArcTable {
   x: Float64Array
   y: Float64Array
   z: Float64Array
+  /** The rails' up at each sample, only on a curve that rolls (`TrackCurve.getUpAt`, #698); upright is world up. */
+  ups?: { x: Float32Array; y: Float32Array; z: Float32Array }
   length: number
   /** The level's tunnels in ride order (`setPieces.ts` `withTunnels`); absent on a track without any. */
   tunnels?: readonly TunnelSpan[]
@@ -44,7 +46,18 @@ export function buildArcTable(curve: TrackCurve, n = 8192): ArcTable {
     }
     s[i] = len
   }
-  return { count, t, s, x, y, z, length: len }
+  const table: ArcTable = { count, t, s, x, y, z, length: len }
+  if (curve.getUpAt) {
+    const ups = { x: new Float32Array(count), y: new Float32Array(count), z: new Float32Array(count) }
+    for (let i = 0; i < count; i++) {
+      const u = curve.getUpAt(t[i])
+      ups.x[i] = u.x
+      ups.y[i] = u.y
+      ups.z[i] = u.z
+    }
+    table.ups = ups
+  }
+  return table
 }
 
 /** Curve parameter t at arc distance `dist` (clamped to [0, length]). */
