@@ -1,23 +1,15 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { eventBus } from '@/core/EventBus'
-import { useGameStore } from '@/store/useGameStore'
-import { getLevelConfig } from '@/levels/LevelRegistry'
-import { biomeTheme } from '@/ui/theme'
+import { FairBoard } from '@/ui/Fair'
 
 const SHOW_MS = 2000
 
-/**
- * Wave banner: letterspaced caps between two accent rules, slides in from the
- * left and out to the right, tinted with the level's biome accent.
- * `wave:incoming`, 1 s before a wave, shows it early with a screen-edge pulse.
- */
+/** The wave's show card, up for 2 s; `wave:incoming`, 1 s before a wave, shows it early with a vermilion frame's flash. */
 export default function WaveAnnouncement() {
   const [text, setText] = useState<string | null>(null)
   const [tells, setTells] = useState(0)
   const clearTextTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const currentLevel = useGameStore((s) => s.currentLevel)
-  const theme = biomeTheme(currentLevel ? getLevelConfig(currentLevel)?.biome : null)
 
   useEffect(() => {
     const handler = (label: unknown) => {
@@ -40,26 +32,17 @@ export default function WaveAnnouncement() {
     }
   }, [])
 
-  const style = { '--hud-accent': theme.accent, '--hud-glow': theme.glow } as CSSProperties
-
   return (
     <>
-      {/* Keyed per tell so each one restarts the CSS pulse. */}
-      {tells > 0 && <div key={tells} className="wave-tell" style={style} aria-hidden />}
-      <div className="wave-announcement" style={style}>
+      {/* Keyed per tell so each one restarts the CSS flash. */}
+      {tells > 0 && <div key={tells} className="wave-tell" aria-hidden />}
+      <div className="wave-announcement">
         <AnimatePresence>
           {text && (
-            <motion.div
-              key={text}
-              className="wave-banner"
-              initial={{ opacity: 0, x: '-40vw' }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: '40vw' }}
-              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <span className="wave-banner-rule" />
-              <span className="wave-banner-text">{text}</span>
-              <span className="wave-banner-rule" />
+            <motion.div key={text} className="wave-banner" exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+              <FairBoard className="wave-card" shadowClassName="wave-card-shadow fair-hook">
+                <span className="wave-banner-text fair-title">{text}</span>
+              </FairBoard>
             </motion.div>
           )}
         </AnimatePresence>
