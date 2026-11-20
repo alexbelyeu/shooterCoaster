@@ -3,6 +3,7 @@ import type { RideHold, RideMechanic, RideV2Spec, SpeedZone } from '@/types/leve
 import { RIDE_V2_DEFAULTS } from './rideV2'
 import { createSplineCurve } from './curves/SplineCurve'
 import type { TrackCurve } from './curves/TrackCurve'
+import { buildArcTable, type ArcTable } from './arcLength'
 
 /** What the special ride mechanics (#699) ask of the v2 ride (zones and stops) and of the rails (where they are open). */
 
@@ -253,6 +254,24 @@ export function hardRouteOf(main: TrackCurve, mechanics: readonly RideMechanic[]
   }
   hardRoutes.set(mechanics, { main, curve })
   return curve
+}
+
+/**
+ * The hard route of a track with a junction (#720): its own arc table, which samples t like the main one (both routes
+ * share the ride's t), so a rider's sample index is the same on either; the track t of the switch sign, where the route
+ * is settled; and of the junction's merge.
+ */
+export interface HardRoute {
+  table: ArcTable
+  signT: number
+  mergeT: number
+}
+
+/** The track's `HardRoute`, or null without a junction. */
+export function hardRouteFor(main: TrackCurve, mechanics: readonly RideMechanic[] | undefined): HardRoute | null {
+  const junction = mechanics?.find((m) => m.kind === 'junction')
+  const curve = junction && hardRouteOf(main, mechanics!)
+  return curve ? { table: buildArcTable(curve), signT: switchShare(junction), mergeT: junction.to } : null
 }
 
 /** Track t where the switch sign stands: the switch can be set until the car reaches it. */

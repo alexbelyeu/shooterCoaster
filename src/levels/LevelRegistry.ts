@@ -187,7 +187,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Ride the walls of the climbing gym',
     order: 6,
     biome: 'gym',
-    maxScore: 14 * 15 + (14 + 24) * 12 + 34 * 18 + 8 * 50 + 500, // 1278 + the Medusa's eight snakes and reward (bossSpecs.ts) = 2178
+    maxScore: 14 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1422 (the V8's rats included) + the Medusa's eight snakes and reward (bossSpecs.ts) = 2322
     message: 'You sent the Climbing Gym!',
     nextLevel: null,
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
@@ -197,6 +197,8 @@ const LEVELS: LevelConfig[] = [
     // teach the don't-shoot rule from the start. The waves follow the storyboard: dust over the launch, the roll and the
     // Arch, more over the airtime hill, rats in the Training Area's dark cave (~13 s), the lanternflies (#575) as the
     // rider climbs Alaska (~20 s), where their swarm lands (`placeWallSwarm`), and the pack over the dyno and the drop.
+    // Shoot the V2 sign and the V8 way round (#702) brings its own rats (#720): from 17 s, once the sign is shot (it can be
+    // until the car reaches it, 18.4 s), they line the branch ahead (ridden 18.7–21.7 s), and only that run meets them.
     ...paceLevel({
       waves: [
         { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 2, bystanders: { type: 'climber', count: 4 } },
@@ -206,6 +208,7 @@ const LEVELS: LevelConfig[] = [
         { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 3, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
+      branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 17 },
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},

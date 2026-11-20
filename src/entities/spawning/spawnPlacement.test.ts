@@ -5,16 +5,17 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig, WallSurface } from '@/types/level'
-import { buildArcTable, indexAtT, type ArcTable } from '@/track/arcLength'
+import { buildArcTable, indexAtT, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
+import { hardRouteFor } from '@/track/mechanics'
 import { DEMO_EYE, buildDemoRide, markerT } from '@/track/elements/demoRide'
 import { createSeatPose, seatPose } from '@/track/seatPose.hot'
-import { rideModel, rideProfile } from '@/track/ridePhysics'
+import { rideModel, rideProfile, riddenAt } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import {
   AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, clampToBounds, clearOfKeepOff, entryPoint, formationFrame, formationSlots, groupStep,
   indexAhead, insideBounds, marchHeading, marchMoving, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
-  inView, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
+  inView, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
   type ChoreographedFormation, type RideAhead, type Vec3,
 } from './spawnPlacement'
 import {
@@ -38,9 +39,12 @@ function world(level: LevelConfig) {
   const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize(level.biome))
   // What EnemySpawner hands each wave: the ride from GO over its entry and its window.
   const { trackScale } = getTrackDimensions(level.track)
-  const rides = rideAheadOfWaves(table, rideModel(level.track, table), level.enemies.map((w) => w.spawnDelay ?? 0), level.boss?.at, trackScale)
+  const hardRoute = hardRouteFor(curve, level.track.mechanics)
+  const rides = rideAheadOfWaves(table, rideModel(level.track, table), level.enemies, level.boss?.at, trackScale)
   const rideFor = (wave: EnemyWave) => rides[level.enemies.indexOf(wave)]
-  return { level, table, groundFn, rideFor, trackScale, bounds: BIOMES[level.biome].bounds, keepOff: BIOMES[level.biome].keepOff?.(groundFn, table) ?? [] }
+  // A hard-route wave (#720) is placed along the hard route's table.
+  const tableFor = (wave: EnemyWave) => (wave.route ? hardRoute!.table : table)
+  return { level, table, tableFor, groundFn, rideFor, trackScale, bounds: BIOMES[level.biome].bounds, keepOff: BIOMES[level.biome].keepOff?.(groundFn, table) ?? [] }
 }
 
 const STILL: RideAhead = { entry: 0, window: 0, trackScale: 1 }
@@ -274,10 +278,11 @@ const APPROACH = 600
 
 const groundWorlds = tracksideWorlds.filter((w) => w.level.enemies.some((e) => besideTrack(e) && ENEMY_PLACEMENT[e.type].surface === 'ground'))
 
-describe.each(groundWorlds.map((w) => [w.level.id, w] as const))('%s ground trackside spread', (_id, { level, table, rideFor }) => {
+describe.each(groundWorlds.map((w) => [w.level.id, w] as const))('%s ground trackside spread', (_id, { level, tableFor, rideFor }) => {
   const waves = level.enemies.filter((w) => besideTrack(w) && ENEMY_PLACEMENT[w.type].surface === 'ground')
 
   it.each(waves.map((w) => [w.type, w] as const))('%s: slots spread evenly along the stretch the rider covers in the window', (_name, wave) => {
+    const table = tableFor(wave)
     const band = tracksideBand('ground')
     const ride = rideFor(wave)
     const aheads = tracksideSlots(wave.count, 'ground', createRng(1337))
@@ -293,10 +298,11 @@ describe.each(groundWorlds.map((w) => [w.level.id, w] as const))('%s ground trac
   })
 })
 
-describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s trackside waves', (_id, { level, table, groundFn, rideFor, bounds, keepOff }) => {
+describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s trackside waves', (_id, { level, tableFor, groundFn, rideFor, bounds, keepOff }) => {
   const waves = level.enemies.filter(besideTrack)
 
   it.each(waves.map((w) => [w.type, w] as const))('%s: ahead of the rider along the track, beside the rails, on its surface, outside the near field, in front on the approach', (_name, wave) => {
+    const table = tableFor(wave)
     const { surface } = ENEMY_PLACEMENT[wave.type]
     const band = tracksideBand(surface)
     const slots = tracksideSlots(wave.count, surface, createRng(1337))
@@ -385,6 +391,42 @@ describe('level6: inside the hall', () => {
     expect(outside).toEqual([])
   })
 })
+
+describe.each(getAllLevels().filter((l) => l.enemies.some((w) => w.route)).map(world).map((w) => [w.level.id, w] as const))(
+  '%s hard-route waves (#720)',
+  (_id, { level, table, tableFor, rideFor }) => {
+    const junction = level.track.mechanics?.find((m) => m.kind === 'junction')
+    const hard = tableFor({ type: 'rat', count: 0, route: 'hard' })
+    const route = { table: hard, signT: 0, mergeT: junction?.to ?? 0 }
+    const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
+
+    it.each(level.enemies.filter((w) => w.route).map((w) => [w.type, w] as const))(
+      '%s: arriving any time from its second until the car reaches the switch sign, it lines the branch and nothing past the merge',
+      (_name, wave) => {
+        expect(junction).toBeDefined()
+        const { surface } = ENEMY_PLACEMENT[wave.type]
+        const slots = tracksideSlots(wave.count, surface, createRng(1337))
+        const signT = hardRouteFor(createTrackCurve(level.track), level.track.mechanics)!.signT
+        let arrivals = 0
+        let off = 0
+        for (let second = wave.spawnDelay!; ; second += 0.1) {
+          const t = tAtLoopDistance(table, riddenAt(profile, second))
+          if (t >= signT) break
+          arrivals++
+          const riderIndex = indexAtT(hard, t)
+          const ride = rideToMerge(route, riderIndex, rideFor(wave))
+          for (const slot of slots) {
+            const at = hard.t[indexAhead(hard, riderIndex, tracksideAhead(hard, surface, slot, ride))]
+            if (at < junction!.from || at > junction!.to) off++
+          }
+        }
+        // It can still arrive for a second or more: the switch takes a shot until the car reaches the sign.
+        expect(arrivals).toBeGreaterThanOrEqual(10)
+        expect(off).toBe(0)
+      },
+    )
+  },
+)
 
 describe('clampToBounds', () => {
   const b = { minX: -10, maxX: 10, minZ: -5, maxZ: 5, maxY: 20 }

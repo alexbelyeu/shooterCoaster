@@ -189,7 +189,7 @@ export function lapSeconds(curve: TrackCurve, speeds: RideSpeeds, maxSeconds = 6
 }
 
 /** Profile samples per second of level time. */
-const PROFILE_RATE = 10
+export const PROFILE_RATE = 10
 
 /**
  * Arc distance ridden at each tenth of a second of level time over `seconds`, from the start at rest, if the ride kept
@@ -224,7 +224,8 @@ export function riddenBetween(profile: Float64Array, from: number, to: number): 
   return Math.max(0, riddenAt(profile, to) - riddenAt(profile, from))
 }
 
-function riddenAt(profile: Float64Array, time: number): number {
+/** Arc distance ridden `time` seconds after GO, interpolated between the profile's samples. */
+export function riddenAt(profile: Float64Array, time: number): number {
   const x = Math.min(Math.max(time * PROFILE_RATE, 0), profile.length - 1)
   const i = Math.min(Math.floor(x), profile.length - 2)
   if (i < 0) return 0

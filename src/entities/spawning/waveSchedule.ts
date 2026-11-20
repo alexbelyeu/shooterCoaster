@@ -1,3 +1,6 @@
+import type { EnemyWave } from '@/types/level'
+import type { Route } from '@/track/mechanics'
+
 /** Seconds of level time the `wave:incoming` tell leads its wave. */
 export const WAVE_TELL_SECONDS = 1
 
@@ -10,27 +13,32 @@ export function newWaveProgress(waveCount: number): WaveProgress {
   return { told: new Array(waveCount).fill(false), arrived: new Array(waveCount).fill(false) }
 }
 
-/** Runs each due tell and arrival once per `progress`; an arrival waits a tick after its tell, so one slow frame can't land both. */
+/**
+ * Runs each due tell and arrival once per `progress`; an arrival waits a tick after its tell, so one slow frame can't land
+ * both. An `arrive` that returns false isn't done: it runs again next tick (a route wave waiting on its route, #720).
+ */
 export function tickWaves(
   delays: readonly number[],
   elapsed: number,
   progress: WaveProgress,
   tell: (wave: number) => void,
-  arrive: (wave: number) => void,
+  arrive: (wave: number) => boolean | void,
 ): void {
   for (let i = 0; i < delays.length; i++) {
     const delay = delays[i]
     if (delay <= 0 || progress.arrived[i]) continue
     if (progress.told[i]) {
-      if (elapsed >= delay) {
-        progress.arrived[i] = true
-        arrive(i)
-      }
+      if (elapsed >= delay) progress.arrived[i] = arrive(i) !== false
     } else if (elapsed >= delay - WAVE_TELL_SECONDS) {
       progress.told[i] = true
       tell(i)
     }
   }
+}
+
+/** Whether a run on `route` meets the wave: a route wave (#720) only on its own route. */
+export function onRoute(wave: Pick<EnemyWave, 'route'>, route: Route): boolean {
+  return !wave.route || wave.route === route
 }
 
 /** Level time (s) the next wave still to arrive is due at, or null once every delayed wave is in. */
