@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '@/store/useGameStore'
 import { subscribePointer } from '@/input/pointerInput'
 import { sfx } from '@/audio/sfx'
@@ -74,20 +73,12 @@ export default function Countdown() {
 
   return (
     <div className="countdown">
-      <AnimatePresence mode="wait">
-        {step !== null && (
-          <motion.div
-            key={step}
-            className={`countdown-step${step === go ? ' countdown-step--go' : ''}`}
-            initial={{ scale: 2, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.5, opacity: 0 }}
-            transition={{ duration: 0.25 }}
-          >
-            {steps[step]}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {step !== null && (
+        // Keyed per step, so each sign drops in on its hook afresh (`fair-hook-drop`).
+        <div key={step} className={`countdown-step fair-hook${step === go ? ' countdown-step--go' : ''}`}>
+          {steps[step]}
+        </div>
+      )}
     </div>
   )
 }

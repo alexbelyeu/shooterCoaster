@@ -536,36 +536,30 @@ canvas {
 .hud-combo--tier3 .hud-combo-mult { font-size: 2.5rem; }
 .hud-combo--tier3 { box-shadow: 0 0 22px rgba(255, 59, 59, 0.45); }
 
-/* a lapsed 2×+ chain: greyed, shaken, then hidden */
+/* a lapsed 2×+ chain: its colour drained to plain ink, knocked swinging on its hook, then hidden */
 .hud-combo.is-lost {
-  color: #a3a8bd;
+  color: var(--fair-cream);
   box-shadow: none;
-  animation: hud-combo-shake 0.45s ease-out;
+  transform-origin: 50% 0;
+  animation: hud-combo-shake 0.5s ease-out;
 }
 
 @keyframes hud-combo-shake {
   0%, 100% { transform: translate(-50%, 0); }
-  15% { transform: translate(calc(-50% - 9px), 0) rotate(-2deg); }
-  35% { transform: translate(calc(-50% + 8px), 0) rotate(2deg); }
-  55% { transform: translate(calc(-50% - 5px), 0) rotate(-1deg); }
-  75% { transform: translate(calc(-50% + 3px), 0); }
+  15% { transform: translate(-50%, 0) rotate(-7deg); }
+  40% { transform: translate(-50%, 0) rotate(5deg); }
+  65% { transform: translate(-50%, 0) rotate(-2.5deg); }
+  85% { transform: translate(-50%, 0) rotate(1deg); }
 }
 
-/* top-tier slow-mo: "×5 FRENZY" over the combo meter and a red edge pulse */
+/* Top-tier slow-mo: "×5 Frenzy" on a gilt show card over the combo meter, and a gilt frame painted round the screen. */
 .hud-frenzy {
   position: absolute;
   left: 50%;
   bottom: max(150px, calc(env(safe-area-inset-bottom) + 142px));
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  transform: translateX(-50%);
+  translate: -50% 0;
   white-space: nowrap;
-  font-weight: 800;
-  color: #fff;
-  text-shadow: 0 0 18px rgba(255, 59, 59, 0.95), 0 0 36px rgba(255, 154, 31, 0.6), 0 2px 4px rgba(0, 0, 0, 0.85);
   pointer-events: none;
-  animation: hud-frenzy-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.4);
 }
 
 /* The slow-mo's ease back to 1 (`FRENZY.easeS`), after which the flash unmounts. */
@@ -574,22 +568,39 @@ canvas {
   transition: opacity 0.3s ease-in;
 }
 
+.fair-board-shadow.hud-frenzy-card-shadow {
+  width: auto;
+}
+
+/* The one gilt card: tar letters on gold leaf, lined out in tar. */
+.fair-board.hud-frenzy-card {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.95rem 1.7rem 0.85rem;
+  font-family: 'Ultra', serif;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--fair-tar);
+  background: var(--fair-gilt);
+}
+
+.hud-frenzy-card .fair-lining { background: var(--fair-tar); }
+.hud-frenzy-card .fair-lining > span { background: var(--fair-gilt); }
+
 .hud-frenzy-mult {
-  font-size: clamp(2rem, 7vw, 3rem);
-  color: #ff3b3b;
+  font-size: clamp(2rem, 6vw, 2.6rem);
 }
 
 .hud-frenzy-word {
-  font-size: clamp(1.4rem, 5vw, 2.1rem);
-  letter-spacing: 0.22em;
-  margin-right: -0.22em;
+  font-size: clamp(1.5rem, 4.5vw, 1.95rem);
 }
 
 .hud-frenzy-edge {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  box-shadow: inset 0 0 90px 10px rgba(255, 59, 59, 0.55);
+  box-shadow: inset 0 0 0 clamp(6px, 1.2vw, 12px) var(--fair-gilt);
   animation: hud-fade-in 0.35s ease-out;
 }
 
@@ -670,11 +681,6 @@ canvas {
 @keyframes hud-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-@keyframes hud-frenzy-in {
-  from { opacity: 0; transform: translateX(-50%) scale(1.6); }
-  to { opacity: 1; transform: translateX(-50%) scale(1); }
 }
 
 /* Weapon pickup badge (#185) — left of the combo meter; above the pause button on portrait phones */
@@ -775,43 +781,48 @@ canvas {
   .hud-combo-count,
   .hud-combo-mult,
   .hud-combo.is-lost,
-  .hud-frenzy,
   .hud-frenzy-edge { animation: none; }
 }
-.reduce-motion :is(.hud-timer--critical .hud-timer-value, .hud-combo-count, .hud-combo-mult, .hud-combo.is-lost, .hud-frenzy, .hud-frenzy-edge) {
+.reduce-motion :is(.hud-timer--critical .hud-timer-value, .hud-combo-count, .hud-combo-mult, .hud-combo.is-lost, .hud-frenzy-edge) {
   animation: none;
 }
 
-/* Boss bar — top centre between the score and timer panels; under them on phones */
+/* Boss bar: the boss's name in gilt over a painted gauge, one segment per weak point; top centre between the score
+   and timer panels, under them on phones. It drops in on its hook and falls off it when the boss is down. */
 .hud-boss {
   position: absolute;
   top: max(14px, env(safe-area-inset-top));
   left: 50%;
+  translate: -50% 0;
   width: clamp(220px, 32vw, 420px);
-  transform: translateX(-50%);
   text-align: center;
-  animation: hud-boss-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+  transform-origin: 50% 0;
+  animation: fair-hook-drop 0.45s ease-out;
 }
 
 .hud-boss-name {
-  margin-bottom: 6px;
-  font-size: clamp(0.8rem, 1.6vw, 1rem);
-  font-weight: 800;
-  letter-spacing: 0.22em;
-  margin-right: -0.22em;
-  text-transform: uppercase;
-  color: #ffd23f;
-  text-shadow: 0 0 14px rgba(255, 190, 40, 0.75), var(--hud-shadow);
+  margin-bottom: 10px;
+  font-family: 'Ultra', serif;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  line-height: 1.1;
+  color: var(--fair-gilt);
+  text-shadow:
+    -1px -1px 0 var(--fair-tar),
+    1px -1px 0 var(--fair-tar),
+    -1px 1px 0 var(--fair-tar),
+    1px 1px 0 var(--fair-gilt-block),
+    2px 2px 0 var(--fair-gilt-block),
+    3px 4px 0 var(--fair-tar);
 }
 
+/* An oxblood plate on a hard tar edge; each weak point a sunk well filled with gold leaf. */
 .hud-boss-bar {
   display: flex;
   gap: 4px;
   padding: 4px;
-  border-radius: 8px;
-  background: rgba(8, 10, 22, 0.62);
-  border: 1px solid rgba(255, 210, 63, 0.45);
-  box-shadow: 0 0 16px rgba(255, 190, 40, 0.3);
+  border-radius: 5px;
+  background: var(--fair-oxblood);
+  box-shadow: 0 4px 0 var(--fair-tar), inset 0 0 0 2px var(--fair-tar);
 }
 
 .hud-boss-bar.is-hit {
@@ -820,27 +831,23 @@ canvas {
 
 .hud-boss-seg {
   flex-basis: 0;
-  height: 12px;
+  height: 14px;
   overflow: hidden;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  background: var(--fair-oxblood-deep);
+  box-shadow: inset 0 2px 0 var(--fair-tar);
 }
 
 .hud-boss-seg-fill {
   height: 100%;
   transform-origin: left center;
-  background: linear-gradient(180deg, #ffe680, #f0a400);
-  box-shadow: 0 0 8px rgba(255, 190, 40, 0.8);
+  background: var(--fair-gilt);
+  box-shadow: inset 0 -4px 0 var(--fair-gilt-block);
   transition: transform 0.25s ease-out;
 }
 
 .hud-boss.is-defeated {
-  animation: hud-boss-burst 1.2s ease-out forwards;
-}
-
-@keyframes hud-boss-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.9); }
-  to { opacity: 1; transform: translateX(-50%) scale(1); }
+  animation: hud-boss-fall 1.2s ease-in forwards;
 }
 
 @keyframes hud-boss-shake {
@@ -850,10 +857,11 @@ canvas {
   70% { transform: translateX(-3px); }
 }
 
-@keyframes hud-boss-burst {
-  0% { opacity: 1; transform: translateX(-50%) scale(1); }
-  25% { opacity: 1; transform: translateX(-50%) scale(1.15); filter: brightness(1.8); }
-  100% { opacity: 0; transform: translateX(-50%) scale(1.35); filter: brightness(1); }
+/* "X is down!" holds a beat, then the sign slips off one hook and drops out of sight. */
+@keyframes hud-boss-fall {
+  0%, 45% { opacity: 1; transform: none; }
+  60% { opacity: 1; transform: rotate(9deg); }
+  100% { opacity: 0; transform: translateY(70px) rotate(16deg); }
 }
 
 /* Phones (portrait): the panels fill the top row, so the bar goes under them. */
@@ -2358,7 +2366,7 @@ canvas {
   text-shadow: 0 0 18px rgba(255, 200, 0, 0.95), 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
-/* Wave announcement — letterspaced caps between biome-accent rules */
+/* Wave announcement: a show card hung over the ride, its name in gilt (`WaveAnnouncement`). */
 .wave-announcement {
   position: fixed;
   top: 24%;
@@ -2366,47 +2374,31 @@ canvas {
   right: 0;
   display: flex;
   justify-content: center;
-  overflow: hidden;
-  padding: 8px 0;
   pointer-events: none;
   z-index: 15;
 }
 
-.wave-banner {
-  display: flex;
-  align-items: center;
-  gap: clamp(10px, 2vw, 18px);
+.fair-board-shadow.wave-card-shadow {
+  width: auto;
   max-width: calc(100vw - 32px);
 }
 
+.fair-board.wave-card {
+  padding: 1.15rem 1.9rem 1.05rem;
+}
+
 .wave-banner-text {
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
-  font-size: clamp(1.25rem, 4.5vw, 2.4rem);
-  letter-spacing: 0.24em;
-  /* letter-spacing trails the last glyph; balance it */
-  margin-right: -0.24em;
-  text-transform: uppercase;
+  display: block;
+  font-size: clamp(1.5rem, 5vw, 2.3rem);
   text-align: center;
-  color: #fff;
-  text-shadow: 0 0 18px var(--hud-glow), 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
-.wave-banner-rule {
-  flex: none;
-  width: clamp(28px, 8vw, 90px);
-  height: 3px;
-  border-radius: 2px;
-  background: var(--hud-accent);
-  box-shadow: 0 0 10px var(--hud-glow);
-}
-
-/* Wave tell: one screen-edge glow pulse in the biome accent, 1 s before a wave arrives */
+/* Wave tell: a vermilion frame painted round the screen flashes once, 1 s before a wave arrives. */
 .wave-tell {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  box-shadow: inset 0 0 min(14vw, 120px) min(3vw, 26px) var(--hud-glow);
+  box-shadow: inset 0 0 0 clamp(6px, 1.2vw, 12px) var(--fair-vermilion);
   opacity: 0;
   z-index: 14;
   animation: wave-tell-pulse 1s ease-out;
@@ -2419,7 +2411,7 @@ canvas {
   100% { opacity: 0; }
 }
 
-/* Level countdown */
+/* Level countdown: Ready / Set / GO! in gilt fat-face over the ride, each dropped in on its hook. */
 .countdown {
   position: fixed;
   inset: 0;
@@ -2431,18 +2423,25 @@ canvas {
 }
 
 .countdown-step {
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
-  font-size: clamp(2.5rem, 9vw, 4.5rem);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 0 20px rgba(255, 200, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.5);
+  font-family: 'Ultra', serif;
+  font-size: clamp(3rem, min(11vw, 20vh), 5rem);
+  line-height: 1;
+  color: var(--fair-gilt);
+  /* A hard tar outline first, so the gold reads against a white cloud, then the block and the cast shadow. */
+  text-shadow:
+    -2px -2px 0 var(--fair-tar),
+    2px -2px 0 var(--fair-tar),
+    -2px 2px 0 var(--fair-tar),
+    1px 1px 0 var(--fair-gilt-block),
+    2px 2px 0 var(--fair-gilt-block),
+    3px 3px 0 var(--fair-gilt-block),
+    4px 4px 0 var(--fair-gilt-block),
+    5px 5px 0 var(--fair-gilt-block),
+    8px 9px 0 var(--fair-tar);
 }
 
 .countdown-step--go {
-  font-size: clamp(3.5rem, 13vw, 6.5rem);
-  color: #ffd23f;
+  font-size: clamp(4rem, min(16vw, 26vh), 7.5rem);
 }
 
 /* The run's loading screen (#674): the level's postcard, name and a bar over the hidden level. */
@@ -2507,7 +2506,7 @@ canvas {
   transition: transform 0.2s linear;
 }
 
-/* The intro's skip hint, low over the tour. */
+/* The intro's skip hint, low over the tour: cream ink with a hard tar edge. */
 .intro-hint {
   position: fixed;
   left: 50%;
@@ -2515,12 +2514,12 @@ canvas {
   transform: translateX(-50%);
   z-index: 50;
   pointer-events: none;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.85rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.75);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  font-family: 'Big Shoulders', sans-serif;
+  font-variation-settings: 'opsz' 10;
+  font-weight: 600;
+  font-size: 1.0625rem;
+  color: var(--fair-cream);
+  text-shadow: -1px -1px 0 var(--fair-tar), 1px -1px 0 var(--fair-tar), -1px 1px 0 var(--fair-tar), 2px 2px 0 var(--fair-tar);
   animation: intro-hint-in 0.6s ease-out 0.8s both;
 }
 
@@ -2677,8 +2676,29 @@ canvas {
   stroke: var(--fair-tar);
 }
 
+/* A sign arriving: dropped onto its hook, it swings once and settles (about 300 ms; reduced motion: in place). */
+.fair-hook {
+  transform-origin: 50% 0;
+  animation: fair-hook-drop 0.45s ease-out;
+}
+
+@keyframes fair-hook-drop {
+  0% { opacity: 0; transform: translateY(-60px) rotate(-6deg); }
+  15% { opacity: 1; }
+  45% { transform: rotate(4deg); }
+  70% { transform: rotate(-1.5deg); }
+  100% { transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fair-plate {
     transition: none;
   }
+
+  .fair-hook {
+    animation: none;
+  }
+}
+.reduce-motion .fair-hook {
+  animation: none;
 }
