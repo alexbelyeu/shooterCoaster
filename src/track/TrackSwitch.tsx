@@ -10,6 +10,7 @@ import type { TrackCurve } from './curves/TrackCurve'
 import { type Junction, type SwitchPose, SWITCH_BOARD_H, SWITCH_BOARD_W, SWITCH_HIT_RADIUS, switchOpen, switchPose } from './mechanics'
 import { rideProgress } from './rideProgress.hot'
 
+/** One id is enough: `checkMechanics` allows one junction per track. */
 const TARGET_ID = 'track-switch'
 /** The post, in eye heights. */
 const POST_H = 4
@@ -33,7 +34,7 @@ function drawFaces(side: 1 | -1): THREE.CanvasTexture {
       g.fillRect(8, top + 8, 240, 112)
       g.fillStyle = fg
       g.strokeStyle = fg
-      g.font = 'bold 76px Inter, sans-serif'
+      g.font = '800 76px "Big Shoulders", sans-serif'
       g.textBaseline = 'middle'
       g.textAlign = 'left'
       g.fillText(label, 24, top + 68)

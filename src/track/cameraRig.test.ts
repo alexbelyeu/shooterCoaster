@@ -9,6 +9,10 @@ import {
 } from './cameraRig.hot'
 import { buildArcTable, distanceAtT } from './arcLength'
 import type { TrackCurve } from './curves/TrackCurve'
+import { DEMO_EYE, buildDemoRide, markerT } from './elements/demoRide'
+import { createSeatPose, seatPose } from './seatPose.hot'
+
+const WORLD_UP = { x: 0, y: 1, z: 0 }
 
 const DEG = Math.PI / 180
 
@@ -174,11 +178,12 @@ describe('ride feel (#697)', () => {
   })
 
   it('a crest bends the tangent down: negative vertical acceleration growing with speed squared', () => {
+    const world = { x: 0, y: 1, z: 0 }
     const up = { x: 0.9, y: 0.3, z: 0 }
     const down = { x: 0.9, y: -0.3, z: 0 }
-    expect(verticalAcceleration(up, down, 10, 50)).toBeCloseTo(-0.06 * 2500, 9)
-    expect(verticalAcceleration(down, up, 10, 50)).toBeGreaterThan(0)
-    expect(verticalAcceleration(up, down, 0, 50)).toBe(0)
+    expect(verticalAcceleration(world, up, down, 10, 50)).toBeCloseTo(-0.06 * 2500, 9)
+    expect(verticalAcceleration(world, down, up, 10, 50)).toBeGreaterThan(0)
+    expect(verticalAcceleration(world, up, down, 0, 50)).toBe(0)
   })
 
 
@@ -279,7 +284,7 @@ describe('lateralAcceleration', () => {
     const curve = unevenCircle(R, dir)
     const s = sampleTrack(buildArcTable(curve), t, 1, freshSamples())
     const tangent = curve.getTangentAt(t)
-    return lateralAcceleration(tangent, curve.getTangentAt(s.behindT), curve.getTangentAt(s.aheadT), s.span, speed)
+    return lateralAcceleration(tangent, WORLD_UP, curve.getTangentAt(s.behindT), curve.getTangentAt(s.aheadT), s.span, speed)
   }
 
   it('is v²/R toward the centre of a circle, positive on a right turn', () => {
@@ -293,8 +298,46 @@ describe('lateralAcceleration', () => {
   it('is 0 on a straight, a vertical tangent or an empty span', () => {
     const x = { x: 1, y: 0, z: 0 }
     const z = { x: 0, y: 0, z: 1 }
-    expect(lateralAcceleration(x, x, x, 8, speed)).toBe(0)
-    expect(lateralAcceleration({ x: 0, y: 1, z: 0 }, x, z, 8, speed)).toBe(0)
-    expect(lateralAcceleration(x, x, z, 0, speed)).toBe(0)
+    expect(lateralAcceleration(x, WORLD_UP, x, x, 8, speed)).toBe(0)
+    expect(lateralAcceleration(WORLD_UP, WORLD_UP, x, z, 8, speed)).toBe(0)
+    expect(lateralAcceleration(x, WORLD_UP, x, z, 0, speed)).toBe(0)
+  })
+
+  it("upside down, a turn to the rider's right still reads positive", () => {
+    const x = { x: 1, y: 0, z: 0 }
+    const right = { x: 0, y: 0, z: 1 } // x × world up
+    const upright = lateralAcceleration(x, WORLD_UP, x, right, 8, speed)
+    expect(upright).toBeGreaterThan(0)
+    expect(lateralAcceleration(x, { x: 0, y: -1, z: 0 }, x, { x: 0, y: 0, z: -1 }, 8, speed)).toBeCloseTo(upright, 9)
+  })
+})
+
+describe('the rig through the demo vertical loop (#715)', () => {
+  const ride = buildDemoRide()
+  const table = buildArcTable(ride.curve)
+  const speed = 40
+  const pose = createSeatPose()
+  const at = (t: number) => {
+    seatPose(ride.curve, table, t, 1, DEMO_EYE, pose)
+    const s = pose.samples
+    const behind = ride.curve.getTangentAt(s.behindT).clone()
+    const ahead = ride.curve.getTangentAt(s.aheadT).clone()
+    return {
+      lateral: lateralAcceleration(pose.tangent, pose.up, behind, ahead, s.span, speed),
+      vertical: verticalAcceleration(pose.up, behind, ahead, s.span, speed),
+    }
+  }
+
+  it('reads no turn and presses the rider into the seat all the way round, apex included', () => {
+    const lateral: number[] = []
+    const vertical: number[] = []
+    for (let k = 1; k < 20; k++) {
+      const a = at(markerT(ride, 'verticalLoop', k / 20))
+      lateral.push(Math.abs(a.lateral))
+      vertical.push(a.vertical)
+    }
+    const apex = at(markerT(ride, 'verticalLoop', 0.5))
+    expect(apex.vertical).toBeGreaterThan(0)
+    expect(Math.max(...lateral)).toBeLessThan(0.05 * Math.min(...vertical))
   })
 })

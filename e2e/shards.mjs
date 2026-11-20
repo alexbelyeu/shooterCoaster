@@ -7,15 +7,17 @@ export const UI_STEPS = ['title', 'landing', 'levelSelect', 'daily', 'settings',
 /** On the run's first level; `frenzy` happens inside its ride and `seed` compares against that ride's spawns. */
 export const FIRST_LEVEL_STEPS = ['frenzy', 'seed', 'quality', 'pause', 'countdown', 'speed']
 /** `tour`, `shot`, `results` and `share` check the ride's own page (`tour` before the ride, the others after its combat). */
-export const LEVEL_STEPS = ['ride', 'tour', 'shot', 'results', 'share', 'wave', 'boss', 'pickup', 'switch', 'audio', 'pacing']
+export const LEVEL_STEPS = ['ride', 'tour', 'shot', 'results', 'share', 'wave', 'weather', 'boss', 'pickup', 'switch', 'dark', 'audio', 'pacing']
 export const STEPS = [...UI_STEPS, ...FIRST_LEVEL_STEPS, ...LEVEL_STEPS]
 
 /** Mirrors the smoke's check constants (WAVE_CHECK, BOSS_CHECKS…), which fail the run at start if they drift. */
 export const STEP_LEVELS = {
   wave: ['level2'],
+  weather: ['level2', 'level4'],
   boss: ['level1', 'level2', 'level3', 'level4', 'level5', 'level6'],
   pickup: ['level1'],
   switch: ['level6'],
+  dark: ['level6'],
   audio: ['level1'],
 }
 
@@ -28,6 +30,8 @@ const NEEDS = {
   frenzy: ['ride', 'results'],
   seed: ['ride'],
   mobileMenus: ['mobile'],
+  // The dark section's shots and the Tree's gap still (#766): taken on the `switch` step's run.
+  dark: ['switch'],
 }
 
 const PHONE_STEPS = ['mobile', 'mobileMenus']
@@ -38,7 +42,7 @@ const PHONE_STEPS = ['mobile', 'mobileMenus']
  */
 export const NIGHTLY_PARTS = {
   main: { steps: [...UI_STEPS, ...FIRST_LEVEL_STEPS, 'ride', 'tour', 'shot', 'results', 'share'] },
-  deep: { steps: ['wave', 'boss', 'pickup', 'switch', 'audio'] },
+  deep: { steps: ['wave', 'weather', 'boss', 'pickup', 'switch', 'dark', 'audio'] },
   pacing: { steps: ['pacing'] },
 }
 

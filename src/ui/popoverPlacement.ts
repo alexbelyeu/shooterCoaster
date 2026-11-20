@@ -7,8 +7,9 @@ export interface Box {
 
 export interface Placement {
   side: 'below' | 'above'
-  /** Horizontal offset (px) from the anchor's left edge to the popover's left edge. */
-  offsetX: number
+  /** The popover's top-left corner in the viewport (px), for a `position: fixed` popover. */
+  left: number
+  top: number
 }
 
 const GAP = 8
@@ -19,7 +20,8 @@ function overlaps(a: Box, b: Box): boolean {
 }
 
 /** Where a `width` x `height` popover goes beside `anchor`: centred on it, kept `MARGIN` inside the viewport, below
- *  when that fits and covers none of `avoid`, else above (or whichever side has more room when neither fits). */
+ *  when that fits and covers none of `avoid`, else above (or whichever side has more room when neither fits, then held
+ *  inside the viewport: it is `position: fixed` and closes on scroll, so nothing past the edge could be reached). */
 export function placePopover(anchor: Box, width: number, height: number, viewport: { width: number; height: number }, avoid: Box[]): Placement {
   const centred = (anchor.left + anchor.right) / 2 - width / 2
   const left = Math.max(MARGIN, Math.min(viewport.width - MARGIN - width, centred))
@@ -30,5 +32,6 @@ export function placePopover(anchor: Box, width: number, height: number, viewpor
   if (fits(below)) side = 'below'
   else if (fits(above)) side = 'above'
   else side = viewport.height - anchor.bottom > anchor.top ? 'below' : 'above'
-  return { side, offsetX: left - anchor.left }
+  const top = Math.max(MARGIN, Math.min(viewport.height - MARGIN - height, (side === 'below' ? below : above).top))
+  return { side, left, top }
 }

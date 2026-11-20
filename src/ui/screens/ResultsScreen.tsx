@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { runBest, useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { computeStars, nextStar } from '@/levels/scoring'
+import { computeStars, runNextStar, runStars } from '@/levels/scoring'
 import { sfx } from '@/audio/sfx'
-import { biomeTheme } from '@/ui/theme'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { SHARED_EVENT } from '@/app/analyticsEvents'
 import { eventBus } from '@/core/EventBus'
@@ -80,7 +79,7 @@ export default function ResultsScreen() {
   const worldRank = world?.rank ?? null
   const card = useMemo(() => (config ? scoreCardRun({ ...run, levelId: config.id, worldRank }) : null), [config, run, worldRank])
 
-  const stars = config ? computeStars(run.score, config.maxScore, config.starThresholds) : 0
+  const stars = config ? runStars(run.score, config) : 0
   const record = isNewRecord(run.score, run.previousBest)
   const counting = stage >= STAGE.count
   const done = stage >= STAGE.done
@@ -219,9 +218,8 @@ export default function ResultsScreen() {
 
   if (!config) return null
 
-  const theme = biomeTheme(config.biome)
   const nextName = nextLevel ? (getLevelConfig(nextLevel)?.name ?? nextLevel) : null
-  const next = nextStar(run.score, config.maxScore, config.starThresholds)
+  const next = runNextStar(run.score, config)
   const instant = { duration: 0 }
   const reveal = (from: number) => (stage >= from ? 'shown' : 'hidden')
   const entryOpen = done && initials !== null
@@ -243,7 +241,6 @@ export default function ResultsScreen() {
       className="results-screen fair-stage"
       data-sequence={done ? 'done' : 'running'}
       data-mode={run.mode.mode}
-      style={{ '--accent': theme.accent, '--accent-glow': theme.glow } as CSSProperties}
       onPointerDown={() => {
         if (!done) setStage(STAGE.done)
       }}

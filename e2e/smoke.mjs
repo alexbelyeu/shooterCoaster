@@ -98,7 +98,7 @@ import { planRun, STEP_LEVELS } from './shards.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
 import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
-import { isPlaceholder, pacingCeilings, sceneCeilings, setBudget } from '../scripts/newWorldPlan.mjs'
+import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 
 const SECONDS = Number(arg('seconds', 10))
 const OUT = path.resolve(arg('out', 'e2e-results'))
@@ -193,20 +193,26 @@ const BUDGET_KEYS = [
 ]
 
 /**
- * A level scaffolded by `npm run new-world` starts on placeholder `scene` / `pacing` ceilings: a local run sets them
- * from what it measured (the budgets' own headroom rules, `newWorldPlan.mjs`), CI fails with the numbers to paste.
+ * A level scaffolded by `npm run new-world` starts on placeholder `scene` / `pacing` ceilings. Called once the run's
+ * other problems are known: a clean local run records what it measured, the second sets the ceilings
+ * (`placeholderBudget.mjs`); CI fails on a placeholder. Returns the problems to add.
  */
-function fillPlaceholderBudget(section, id, values) {
-  const json = JSON.stringify(values)
-  if (process.env.CI) return [`budgets.json ${section}.${id} is a placeholder: run this smoke locally to set it, or paste ${json}`]
-  const file = new URL('../budgets.json', import.meta.url)
-  fs.writeFileSync(file, setBudget(fs.readFileSync(file, 'utf8'), section, id, values))
-  BUDGETS[section][id] = values
-  console.log(`budgets.json ${section}.${id} set from this run: ${json}`)
+function fillPlaceholderBudget(section, id, measured, problems) {
+  if (process.env.CI) return [`budgets.json ${section}.${id} is a placeholder: run this smoke locally (twice) to set it`]
+  const { entry, note } = placeholderAfterRun(section, BUDGETS[section][id], measured, problems)
+  if (entry) {
+    const file = new URL('../budgets.json', import.meta.url)
+    fs.writeFileSync(file, setBudget(fs.readFileSync(file, 'utf8'), section, id, entry))
+    BUDGETS[section][id] = entry
+  }
+  console.log(`     budgets.json ${section}.${id}: ${note}${entry && !isPlaceholder(entry) ? ` ${JSON.stringify(entry)}` : ''}`)
   return []
 }
 
-/** Each ride total past its ceiling; a level whose entry names `knownOver` (an open issue) only warns. */
+/**
+ * Each ride total past its ceiling; a level whose entry names `knownOver` (an open issue) only warns. On a placeholder,
+ * `placeholder` holds the measured totals for `fillPlaceholderBudget` once the level's other problems are known.
+ */
 function sceneBudgetCheck(id, stats) {
   const budget = SCENE_BUDGETS[id]
   if (!budget) return { over: [`no scene budget for ${id} in budgets.json`], knownOver: null }
@@ -218,7 +224,7 @@ function sceneBudgetCheck(id, stats) {
     trackObjects: track?.objects,
     trackTriangles: track?.triangles,
   }
-  if (isPlaceholder(budget)) return { over: fillPlaceholderBudget('scene', id, sceneCeilings(measured)), knownOver: null }
+  if (isPlaceholder(budget)) return { over: [], knownOver: null, placeholder: measured }
   const over = BUDGET_KEYS
     .filter(([key]) => measured[key] > budget[key])
     .map(([key, label]) => `${label}=${measured[key]} (budget ${budget[key]})`)
@@ -284,8 +290,9 @@ async function delayLevelChunk(page) {
 }
 
 /** `?e2e=1` starts a run in `playing` before its lazy scene is there: on a slow runner steps measured the composer alone (#464). */
+const LEVEL_READY_MS = 60000
 const levelReady = (page) =>
-  page.waitForFunction(() => window.__SC_TEST__.levelReady(), null, { timeout: 60000, polling: 100 }).then(() => true, () => false)
+  page.waitForFunction(() => window.__SC_TEST__.levelReady(), null, { timeout: LEVEL_READY_MS, polling: 100 }).then(() => true, () => false)
 
 async function startLevelReady(page, id) {
   await page.evaluate(([lid, seed]) => window.__SC_TEST__.startLevel(lid, seed), [id, SEED])
@@ -296,8 +303,9 @@ const NOT_LOADED = (id) => `the ${id} scene never loaded (levelReady)`
 
 /**
  * Start level `id` and ride it (game time running, `rideRate` RIDE_RATE) in settled steps of RIDE_STEP level seconds
- * (`settledSteps.mjs`, #471) until the level timer reaches `seconds` and `minFrames` have rendered (a stall past
- * FRAME_DEADLINE_MS stops it), then freeze game time and hand the ride back to the frame time in that same JS turn.
+ * (`settledSteps.mjs`, #471) until the level timer reaches `seconds` and `minFrames` have rendered (FRAME_DEADLINE_MS
+ * stops it whatever it waits on, even a level that never registers waves: `levelTime` is then undefined), then freeze
+ * game time and hand the ride back to the frame time in that same JS turn.
  * `stopAtLevelTime` stops the level timer, game clock and ride exactly at `seconds` (#487), and the settled steps make
  * it the same moment of the level on any runner: the same track point with the same enemies flown in.
  * `started`: the level is already started with game time frozen at its start (`tourShots`), so it isn't mounted twice.
@@ -313,8 +321,9 @@ async function rideToLevelTime(page, id, seconds, minFrames, { started = false }
     const f0 = s.frames
     s.rideRun = window.__SC_STEP_SETTLED__(step, (run) => {
       const levelTime = s.nextWave()?.levelTime
-      if (levelTime == null) return 'hold'
       run.frames = s.frames - f0
+      // No step until the level's waves are registered (the scene, its timer and ride mount together), but only until the deadline (#535).
+      if (levelTime == null && !run.overdue) return 'hold'
       run.levelTime = levelTime
       if (!run.overdue && (levelTime < target || run.frames < minFrames)) return
       s.setTimeScale(0)
@@ -867,7 +876,7 @@ async function onlineSubmitProblems(page, id, online, score) {
     problems.push(`online board: submission fields ${JSON.stringify(run)}`)
   if (online.gets.length) problems.push(`online board: a placing run fetched the board (${online.gets.length}×) instead of only submitting`)
   if (!world) problems.push('online board: never switched to the World board after the submission')
-  else if (board.label !== 'World' || board.rank !== '1' || board.mine !== 'RES' || board.rows !== 10)
+  else if (board.label !== "The world's top 10" || board.rank !== '1' || board.mine !== 'RES' || board.rows !== 10)
     problems.push(`online board: shows ${JSON.stringify(board)}, expected World with RES 2nd of 10`)
   else problems.push(...(await worldShareProblems(page, id, 1)))
   return { problems, result: { submitted: run, board } }
@@ -925,7 +934,7 @@ async function leaderboardEntryProblems(page, id, rank, online, score) {
   if (!shareFocused) problems.push('no Share button on the results screen to focus during the initials entry')
   const opened = await read()
   const openedBoard = await readBoard(page)
-  if (openedBoard.source !== 'device' || openedBoard.label !== 'This device') problems.push(`leaderboard during the entry: ${openedBoard.source} "${openedBoard.label}", expected this device's`)
+  if (openedBoard.source !== 'device' || openedBoard.label !== "This device's top 10") problems.push(`leaderboard during the entry: ${openedBoard.source} "${openedBoard.label}", expected this device's`)
   if (opened.rank !== String(rank)) problems.push(`leaderboard: run ranked ${opened.rank}, expected ${rank}`)
   if (opened.rows !== 10) problems.push(`leaderboard shows ${opened.rows} rows, expected 10`)
   if (!opened.editing) problems.push('leaderboard: no initials entry on a placing run')
@@ -1781,7 +1790,7 @@ async function speedCheck(page, levelId) {
 }
 
 /**
- * The level with the Tree's gap (#659), and the second of its storyboard beat there: the heartline roll through the gap
+ * The level with the Tree's gap (#659, shot on the nightly `dark` step's run), and the second of its storyboard beat there: the heartline roll through the gap
  * between the trunk and the back wall (`gym/gymTrack.ts`). The still is shot at that beat's track fraction, read from the
  * level's v2 ride (`rideBeats()`), so a rebuilt ride can't leave it pointing somewhere else.
  */
@@ -1999,6 +2008,43 @@ async function waveCheck(page) {
   }
 }
 
+/** The levels with a weather pulse (#798, `EnemyWave.weather`); the step reads each one's wave time and length from `levels()`. */
+const WEATHER_LEVELS = ['level2', 'level4']
+/** Seconds after the weather's wave arrives to shoot it: past its ramp in (1.5 s), well before it clears. */
+const WEATHER_SHOT_AT = 3
+const WEATHER_MIN_ON_SCREEN = 3
+
+/** The weather pulse (#798), frozen at its height for `<id>-weather.png` with its wave on screen, then played until the fog is the biome's own again. */
+async function weatherCheck(page, id) {
+  const problems = []
+  const weather = await page.evaluate((l) => window.__SC_TEST__.levels().find((x) => x.id === l)?.weather ?? null, id)
+  if (!weather) return { id: 'weather', level: id, problems: [`${id} has no weather in levels()`] }
+  const ride = await rideToLevelTime(page, id, weather.at + WEATHER_SHOT_AT, MIN_FRAMES)
+  if (ride.levelTime == null) return { id: 'weather', level: id, problems: [NOT_LOADED(id)] }
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const held = await page.evaluate(() => ({ ...window.__SC_TEST__.weather }))
+  const onScreen = await page.evaluate(() => window.__SC_TEST__.enemies().length)
+  await page.screenshot({ path: path.join(OUT, `${id}-weather.png`), timeout: SHOT_TIMEOUT })
+  if (!(held.envelope >= 0.9)) problems.push(`the ${weather.kind} is at ${held.envelope?.toFixed(2)} ${WEATHER_SHOT_AT} s after its wave (want ≥ 0.9)`)
+  if (!(held.streaks > 0)) problems.push(`the ${weather.kind} drew no streaks`)
+  if (!(held.fogFar < held.baseFogFar)) problems.push(`the fog did not close in (far ${held.fogFar}, the biome's ${held.baseFogFar})`)
+  if (onScreen < WEATHER_MIN_ON_SCREEN) problems.push(`only ${onScreen} enemies on screen in the ${weather.kind} (want ≥ ${WEATHER_MIN_ON_SCREEN})`)
+
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
+  const cleared = await pollUntil(page, () => page.evaluate(() => window.__SC_TEST__.weather?.envelope === 0), { ms: 30000 })
+  const after = await page.evaluate(() => ({ ...window.__SC_TEST__.weather }))
+  const programs = await programsAfterWarmup(page)
+  if (!cleared) problems.push(`the ${weather.kind} never cleared (strength ${after.envelope?.toFixed(2)})`)
+  else if (after.fogNear !== after.baseFogNear || after.fogFar !== after.baseFogFar)
+    problems.push(`the fog is ${after.fogNear}–${after.fogFar} after the ${weather.kind}, not the biome's ${after.baseFogNear}–${after.baseFogFar}`)
+  return {
+    id: 'weather',
+    level: id,
+    problems,
+    weather: { kind: weather.kind, envelope: +(held.envelope ?? 0).toFixed(2), streaks: held.streaks, fogFar: Math.round(held.fogFar), onScreen, programs },
+  }
+}
+
 /** Level seconds a pacing step (settled steps, `settledSteps.mjs`: the same run on any runner): 0.5 is 120 steps a run. */
 const PACING_STEP = Number(arg('pacing-step', 0.5))
 
@@ -2013,6 +2059,8 @@ async function pacingCheck(page, id) {
     const run = { samples: [], end: null, done: false }
     s.pacingRun = run
     run.stepper = window.__SC_STEP_SETTLED__(step, () => {
+      // The step deadline below passed (#535): stop where the run is.
+      if (run.abort) return false
       const w = s.nextWave()
       const st = s.stats()
       // No step until the level's waves are registered: the scene, its timer and ride mount together, settled.
@@ -2032,13 +2080,34 @@ async function pacingCheck(page, id) {
     return s.frames
   }, [id, SEED, PACING_STEP])
   let last = { frames: started, at: Date.now() }
+  // A step that never settles (React committing on every held frame, or a level that never registers its waves) would hold
+  // until the job's timeout (#535): each step gets FRAME_DEADLINE_MS, the first the level's load (LEVEL_READY_MS) on top.
+  let lastStep = { steps: 0, held: 0, at: Date.now() }
   for (;;) {
     await page.waitForTimeout(2000)
-    const now = await page.evaluate(() => ({ done: window.__SC_TEST__.pacingRun.done, frames: window.__SC_TEST__.frames }))
+    const now = await page.evaluate(() => {
+      const s = window.__SC_TEST__
+      const { done, stepper } = s.pacingRun
+      return { done, frames: s.frames, steps: stepper.steps, held: stepper.heldFrames, waves: s.nextWave() != null }
+    })
     if (now.done) break
     if (now.frames !== last.frames) last = { frames: now.frames, at: Date.now() }
     else if (Date.now() - last.at > FRAME_DEADLINE_MS) {
       problems.push(`render loop stalled (no frame in ${(FRAME_DEADLINE_MS / 1000).toFixed(0)} s)`)
+      break
+    }
+    if (now.steps !== lastStep.steps) lastStep = { steps: now.steps, held: now.held, at: Date.now() }
+    else if (Date.now() - lastStep.at > FRAME_DEADLINE_MS + (now.steps ? 0 : LEVEL_READY_MS) && now.held - lastStep.held >= MIN_FRAMES) {
+      const seconds = ((Date.now() - lastStep.at) / 1000).toFixed(0)
+      problems.push(now.waves
+        ? `never settled: step ${now.steps + 1} held ${now.held - lastStep.held} frames over ${seconds} s (React kept committing)`
+        : `the level registered no waves: nextWave() still null after ${seconds} s`)
+      // `overdue` calls the settled callback on the next frame, quiet or not, and `abort` stops the run there.
+      await page.evaluate(() => {
+        const run = window.__SC_TEST__.pacingRun
+        run.abort = true
+        run.stepper.overdue = true
+      })
       break
     }
   }
@@ -2048,11 +2117,13 @@ async function pacingCheck(page, id) {
   const shaders = await programsAfterWarmup(page)
   if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   const budget = BUDGETS.pacing?.[id]
-  const over = isPlaceholder(budget) ? fillPlaceholderBudget('pacing', id, pacingCeilings(pacing)) : pacingBudgetProblems(id, pacing, budget)
+  // A placeholder is filled by the caller once the page's errors are counted too (`fillPlaceholderBudget`).
+  const placeholder = isPlaceholder(budget) ? pacing : null
+  const over = placeholder ? [] : pacingBudgetProblems(id, pacing, budget)
   // A level whose entry names `knownOver` (an open issue fixing it) only warns, like the scene budgets.
   if (budget?.knownOver && over.length) console.log(`     WARN pacing over budget (known, ${budget.knownOver}): ${over.join('; ')}`)
   else problems.push(...over)
-  return { id: 'pacing', level: id, problems, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
+  return { id: 'pacing', level: id, problems, placeholder, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
 }
 
 /**
@@ -2383,6 +2454,73 @@ async function pickupCheck(page) {
   return { id: 'pickup', problems, pickup: { ...result, drawCalls, badge: hud.rects.at(-1) } }
 }
 
+/**
+ * A level with a dark section (#752, `TrackParams.darkSections`, the hook's `darkSection`): with game time held, ride to
+ * the middle of its first one, then fire one real shot with the muzzle flash held. The ride must be fully dark there and
+ * the shot's flash must light it. With `shots` (the nightly `dark` step) it also shoots `<id>-dark.png` before the shot
+ * and `<id>-dark-flash.png` with the flash: the frame mostly dark but not blank, its glow (saturated bright pixels: the
+ * gym's blacklit holds) showing, and the flash lighting the frame up. A full frame capture costs ~15 s on a software
+ * renderer, which the PR's level6 shard can't carry (#766: its `switch` step went 86 -> 266 s with them).
+ */
+async function darkSectionShot(page, levelId, { shots: shoot = false } = {}) {
+  const spans = await page.evaluate(() => window.__SC_TEST__.darkSection.spans)
+  if (!spans.length) return { problems: [], result: null }
+  const at = (spans[0].from + spans[0].to) / 2
+  const frameLight = (png) => page.evaluate(async (b64) => {
+    const img = new Image()
+    img.src = `data:image/png;base64,${b64}`
+    await img.decode()
+    const c = document.createElement('canvas')
+    c.width = 160
+    c.height = 90
+    const ctx = c.getContext('2d')
+    ctx.drawImage(img, 0, 0, c.width, c.height)
+    const d = ctx.getImageData(0, 0, c.width, c.height).data
+    let dark = 0
+    let glow = 0
+    let sum = 0
+    for (let i = 0; i < d.length; i += 4) {
+      const max = Math.max(d[i], d[i + 1], d[i + 2])
+      const min = Math.min(d[i], d[i + 1], d[i + 2])
+      const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+      sum += l
+      if (l < 50) dark++
+      else if (max > 150 && max - min > 0.5 * max) glow++
+    }
+    const n = d.length / 4
+    return { dark: dark / n, glow: glow / n, mean: sum / n }
+  }, png.toString('base64'))
+  await page.evaluate((t) => {
+    const s = window.__SC_TEST__
+    s.setTimeScale(0)
+    s.rideTo = t
+    s.holdFeedback = true
+  }, at)
+  await waitFrames(page, 3, { maxMs: 20000, pollMs: 100 })
+  const depth = await page.evaluate(() => window.__SC_TEST__.darkSection.depth)
+  const problems = []
+  if (!(depth > 0.99)) problems.push(`dark section: not dark in its middle at track ${at.toFixed(4)} (depth ${depth?.toFixed(2)})`)
+  let light = null
+  if (shoot) {
+    const png = await page.screenshot({ path: path.join(OUT, `${levelId}-dark.png`), timeout: SHOT_TIMEOUT })
+    light = await frameLight(png)
+    if (looksBlank(await imageStats(page, png))) problems.push('dark section shot looks blank')
+    if (light.dark < DARK_SHOT.dark) problems.push(`dark section: only ${(light.dark * 100).toFixed(0)}% of the frame is dark (need ${DARK_SHOT.dark * 100}%)`)
+    if (light.glow < DARK_SHOT.glow) problems.push(`dark section: its glow barely shows (${(light.glow * 100).toFixed(2)}% saturated bright, need ${DARK_SHOT.glow * 100}%)`)
+  }
+  await page.evaluate(() => window.__SC_TEST__.fireShot(0, 0))
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const flash = await page.evaluate(() => window.__SC_TEST__.darkSection.flash)
+  const flashLight = shoot ? await frameLight(await page.screenshot({ path: path.join(OUT, `${levelId}-dark-flash.png`), timeout: SHOT_TIMEOUT })) : null
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+  if (!(flash > 0)) problems.push(`dark section: a shot's muzzle flash lit nothing (light ${flash?.toFixed(2)})`)
+  else if (shoot && flashLight.mean < light.mean + DARK_SHOT.flash)
+    problems.push(`dark section: a shot's muzzle flash lit nothing on screen (mean ${light.mean.toFixed(0)} -> ${flashLight.mean.toFixed(0)})`)
+  return { problems, result: { at, depth, flash, ...light, flashMean: flashLight?.mean } }
+}
+/** The dark shots' floors: the share of the frame that is dark, of saturated bright pixels (the blacklit glow), and how much the flash brightens the frame's mean (0–255). */
+const DARK_SHOT = { dark: 0.4, glow: 0.002, flash: 3 }
+
 const SWITCH_CHECK = { level: 'level6' }
 /** Track-parameter leads behind the switch sign to park the coaster at. */
 const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
@@ -2390,8 +2528,10 @@ const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
 /**
  * Shoot-to-switch (#702): a run that shoots the V2 sign with a real bullet rides the V8 branch, a run that leaves it rides
  * the easy way, and a restart sets it back (level6-switch.png: the sign in view, level6-switch-hard.png: on the branch).
+ * The same run then checks the cave's dark section; the nightly `dark` step (`darkShots`) adds its frame shots and the
+ * Tree's gap still (`gapShot`), which are too slow for the PR's `level6` shard (#766).
  */
-async function switchCheck(page) {
+async function switchCheck(page, { darkShots = false } = {}) {
   const { level } = SWITCH_CHECK
   const problems = []
   const api = (fn, arg) => page.evaluate(fn, arg)
@@ -2450,7 +2590,12 @@ async function switchCheck(page) {
   result.easy = sw.riding
   if (sw.riding !== 'easy') problems.push(`without a shot the ride took the ${sw.riding} way`)
   if (sw.open) problems.push('the switch was still open in the junction')
-  return { id: 'switch', problems, trackSwitch: result }
+  // The cave the switch stands at the mouth of rides dark (#752): checked on the same run, held.
+  const dark = await darkSectionShot(page, level, { shots: darkShots })
+  problems.push(...dark.problems)
+  const gap = darkShots ? await gapShot(page) : null
+  if (gap) problems.push(...gap.problems)
+  return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result, gap: gap?.image ?? null }
 }
 
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
@@ -3380,7 +3525,7 @@ async function audioCheck(page) {
   const busNames = (a) => a.music.buses.map((b) => b.name)
   const track = (a) => a.scrim?.tracks.at(-1) ?? null
   const result = {
-    title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, resumeCountdown: 0, ducked: null, layers: null, results: false,
+    title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, resumeCountdown: 0, ducked: null, layers: null, results: null,
     levelsStray: 0, dropped: 0,
   }
 
@@ -3484,11 +3629,12 @@ async function audioCheck(page) {
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
 
   await page.evaluate(() => window.__SC_TEST__.endLevel())
-  a = await until((x) => x.scrim?.current === 'results' && !busNames(x).includes('level'))
+  a = await until((x) => x.scrim?.current?.startsWith('results-') && !busNames(x).includes('level'))
   const levelOut = a.music.fades.findLast((f) => f.name === 'level' && f.ramp === 'out')
   const resultsIn = a.music.fades.findLast((f) => f.name === 'results' && f.ramp === 'in')
-  result.results = a.scrim?.current === 'results'
-  if (!result.results) problems.push(`no results score after the run (current "${a.scrim?.current}")`)
+  // endLevel ends the run on whatever it scored: a 0-1 star run gets the lose cut, 2-3 the win cut (#792).
+  result.results = a.scrim?.current ?? null
+  if (!result.results?.startsWith('results-')) problems.push(`no results score after the run (current "${a.scrim?.current}")`)
   if (!levelOut || levelOut.seconds < 0.5 || !resultsIn) problems.push('the level score did not crossfade to the results score')
   if (busNames(a).includes('level')) problems.push('the level score bus was never disposed')
   problems.push(...crossfadeGaps(a.music.fades, 'level', 'results'))
@@ -3894,7 +4040,7 @@ async function runMobile(browser, base) {
 
 async function run() {
   const runStarted = Date.now()
-  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['switch', [SWITCH_CHECK.level]], ['audio', [AUDIO_CHECK.level]]]
+  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['switch', [SWITCH_CHECK.level]], ['dark', [SWITCH_CHECK.level]], ['audio', [AUDIO_CHECK.level]], ['weather', WEATHER_LEVELS]]
     .filter(([s, ls]) => ls.join() !== STEP_LEVELS[s].join())
   if (drift.length) throw new Error(`STEP_LEVELS in e2e/shards.mjs disagrees with the checks: ${drift.map(([s, ls]) => `${s} runs on ${ls.join(', ')}`).join('; ')}`)
   const budget = startTimeBudget(runStarted)
@@ -3927,11 +4073,13 @@ async function run() {
     results.push(r)
     return r
   }
-  const pageStep = (check, query) => step(async () => {
+  // `finish(r)`: after the page's errors are counted, before the step passes or fails.
+  const pageStep = (check, query, finish) => step(async () => {
     const p = await newPage(query)
     const r = await check(p.page)
     r.errors = [...p.errors, ...(await p.page.evaluate(() => window.__SC_TEST__.errors))]
     if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+    finish?.(r)
     r.ok = r.problems.length === 0
     await p.ctx.close()
     return r
@@ -4023,6 +4171,7 @@ async function run() {
     if (!spawnDigest) problems.push('spawnDigest() never reported the spawns')
 
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${frameSeconds.toFixed(0)}s)`)
+    else if (ride.levelTime == null) problems.push(`the level registered no waves: nextWave() still null after ${frameSeconds.toFixed(0)} s`)
     if (looksBlank(img)) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
     if (enemyShot.error) problems.push(`enemy probe failed: ${enemyShot.error}`)
@@ -4037,8 +4186,6 @@ async function run() {
     const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
     problems.push(...desktopAspect.problems)
     stats.view = desktopAspect.view
-    const gap = id === GAP_LEVEL ? await gapShot(page) : null
-    if (gap) problems.push(...gap.problems)
     const perfGate = PERF_GATE ? sceneBudgetCheck(id, stats) : null
     if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
     const frenzy = has('frenzy') && id === first
@@ -4053,13 +4200,14 @@ async function run() {
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
     const allErrors = [...errors, ...hookErrors]
     if (allErrors.length) problems.push(`${allErrors.length} error(s)`)
+    if (perfGate?.placeholder) problems.push(...fillPlaceholderBudget('scene', id, perfGate.placeholder, problems))
     const ok = problems.length === 0
     failed ||= !ok
     delete stats.hookErrors
     results.push({
       id, ok, problems, frames, frameSeconds, rideMsPerFrame: frames > 0 ? ride.ms / frames : null,
       seconds: (Date.now() - started) / 1000, spawnDigest, ...stats, perfGate, shaders, throttled,
-      kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, gap: gap?.image ?? null, errors: allErrors,
+      kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
   }
@@ -4115,6 +4263,9 @@ async function run() {
   // 6b. Spawn choreography: the crow wave's tell, then its V flying in (level2-wave.png)
   if (has('wave') && wanted.includes(WAVE_CHECK.level)) await pageStep(waveCheck)
 
+  // 6b'. The weather pulse with its wave: sandstorm, blizzard (<level>-weather.png)
+  for (const id of has('weather') ? WEATHER_LEVELS.filter((l) => wanted.includes(l)) : []) await pageStep((page) => weatherCheck(page, id))
+
   // 6c. The finales: summoned, shot down in phase order (<level>-boss.png, <level>-boss-down.png)
   for (const check of has('boss') ? BOSS_CHECKS.filter((c) => wanted.includes(c.level)) : []) {
     await pageStep((page) => bossCheck(page, check))
@@ -4124,7 +4275,7 @@ async function run() {
   if (has('pickup') && wanted.includes(PICKUP_CHECK.level)) await pageStep(pickupCheck)
 
   // 6f. Shoot-to-switch: the shot run rides the hard branch, the other the easy way (level6-switch.png, level6-switch-hard.png)
-  if (has('switch') && wanted.includes(SWITCH_CHECK.level)) await pageStep(switchCheck)
+  if (has('switch') && wanted.includes(SWITCH_CHECK.level)) await pageStep((page) => switchCheck(page, { darkShots: has('dark') }))
 
   // 6d. The score engine and arcade SFX: title -> level -> pause -> results
   if (has('audio') && wanted.includes(AUDIO_CHECK.level)) {
@@ -4141,7 +4292,10 @@ async function run() {
   // 6f. Pacing: every level's whole run, unfired, against budgets.json `pacing` (pacing.json)
   const pacing = {}
   for (const id of has('pacing') ? wanted : []) {
-    const r = await pageStep((page) => pacingCheck(page, id))
+    const r = await pageStep((page) => pacingCheck(page, id), undefined, (r) => {
+      if (r.placeholder) r.problems.push(...fillPlaceholderBudget('pacing', id, r.placeholder, r.problems))
+      delete r.placeholder
+    })
     pacing[id] = { ...r.pacing, timeline: r.timeline }
     delete r.timeline
   }
@@ -4200,6 +4354,8 @@ async function run() {
           ` | startup ${startupSummary(r.initTimings)}`
       : r.wave
         ? ` ${r.wave.level} wave at ${r.wave.timing?.due ?? '-'}s: tell at ${r.wave.timing?.tellAt?.toFixed(2) ?? '-'}s (tick before ${r.wave.timing?.tickBefore?.toFixed(2) ?? '-'}s), on screen ${r.wave.onScreen} (largest ${r.wave.largestPx}px, nearest ${r.wave.nearest})`
+      : r.weather
+        ? ` ${r.level} ${r.weather.kind} at ${r.weather.envelope}: ${r.weather.streaks} streaks, fog far ${r.weather.fogFar}, on screen ${r.weather.onScreen}${programGrowthSummary(r.weather.programs)}`
       : r.boss
         ? (r.boss.skipped
           ? ` ${r.boss.level} skipped (level timed out)`

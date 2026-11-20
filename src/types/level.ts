@@ -40,6 +40,8 @@ interface TrackBase {
   glow?: number
   /** Set-pieces (#332): stretches where the track runs through a lit tube (`src/track/setPieces.ts`). */
   tunnels?: readonly TunnelSpec[]
+  /** Dark sections (#752): stretches ridden in the dark, the level's light and fog dimmed (`src/track/darkSection.hot.ts`). */
+  darkSections?: readonly DarkSectionSpec[]
   /** Special ride mechanics (#699, `src/track/mechanics.ts`): they set a v2 ride's zones and stops; only a junction runs on either ride. */
   mechanics?: readonly RideMechanic[]
 }
@@ -72,7 +74,8 @@ export type TrackParams = TrigTrackParams | SplineTrackParams
  * - jumpGap: no rails from `from` to `to`, a ballistic flight built for `speed`, which a booster from `boostFrom` sets.
  * - backwards: turntables at `from` and `to` (a stop of `seconds`, then a launch to `speed`); the car faces back between.
  * - junction (#702): a harder way round from the fork at `from` to the merge at `to` through `points` (world units, in ride
- *   order), on a spline track. A switch sign before the fork sets the run's route: shoot it to take this way.
+ *   order), on a spline track. A switch sign before the fork sets the run's route: shoot it to take this way. One per
+ *   track, its sign after the lap's start; the branch gets no towers or scenery clearance (`docs/RIDE-KIT.md`).
  */
 export type RideMechanic =
   | { kind: 'station'; from: number; to: number; speed: number }
@@ -130,6 +133,18 @@ export interface TunnelSpec {
   length: number
 }
 
+/**
+ * A dark section (#752): from track parameter `from` to `to` (the ride's t, as `rideProgress` reports it), the light easing
+ * down over `ramp` of t after `from` and back up over the `ramp` before `to`; it may not cross the track's seam. While
+ * dark, a shot's muzzle flash lights what is within `flashReach` world units of the rider.
+ */
+export interface DarkSectionSpec {
+  from: number
+  to: number
+  ramp: number
+  flashReach: number
+}
+
 /** How a wave arrives; anything but `scatter` (the default) is laid out ahead of the rider by `spawnPlacement.ts`. */
 export type Formation = 'scatter' | 'v' | 'line' | 'school' | 'spiral' | 'ring'
 
@@ -143,6 +158,8 @@ export interface FormationOrigin {
   up: number
 }
 
+export type WeatherKind = 'sandstorm' | 'blizzard'
+
 export interface EnemyWave {
   type: EnemyType
   count: number
@@ -150,6 +167,9 @@ export interface EnemyWave {
   spawnDelay?: number
   waveLabel?: string
   isEruption?: boolean
+  /** A weather pulse that blows in with the wave (#798): the spawner emits `weather:start`, the look and its rise / hold / fade
+   *  are `WEATHER_LOOKS` (`levels/environments/shared/weatherPulse.ts`). A level's waves use one kind. */
+  weather?: WeatherKind
   formation?: Formation
   /** Overrides the formation's default anchor. */
   formationOrigin?: FormationOrigin

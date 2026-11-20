@@ -4,11 +4,12 @@ import { compile, type CompiledSong, type Timeline } from '@/audio/scrim/score'
 import { lintLayers, lintRanges } from '@/audio/scrim/lint'
 import { SCORE_KEYS } from '@/audio/sfxDesign'
 import { SCORES, themesFromQuery } from './index'
+import { RESULTS_CUTS } from './resultsCut'
 
 describe('game scores', () => {
-  it('has a score for the title, every level and the results screen', () => {
+  it("has a score for the title, every level and the results screen's two cuts", () => {
     const slots = Object.keys(SCORES).filter((id) => !id.includes('.'))
-    expect(slots.sort()).toEqual(['results', 'title', ...getAllLevels().map((l) => l.id)].sort())
+    expect(slots.sort()).toEqual([...RESULTS_CUTS, 'title', ...getAllLevels().map((l) => l.id)].sort())
   })
 
   it('every theme option belongs to a slot that has a score', () => {

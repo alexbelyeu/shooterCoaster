@@ -2613,6 +2613,14 @@ export const GYM_LEVEL: { track: TrackParams; walls: readonly WallSurface[] } = 
         "seconds": 0.6
       }
     ],
+    "darkSections": [
+      {
+        "from": 0.1558347,
+        "to": 0.2115457,
+        "ramp": 0.005875506,
+        "flashReach": 672
+      }
+    ],
     "segments": 400,
     "tieSpacing": 30,
     "towerSpacing": 1100,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import type { RideMechanic, TrackParams } from '@/types/level'
-import { buildArcTable } from './arcLength'
+import { buildArcTable, distanceAtT, tAtLoopDistance } from './arcLength'
 import { buildMechanicsRide, MECHANICS_SPEEDS } from './elements/mechanicsRide'
 import { DEMO_EYE } from './elements/demoRide'
 import { buildTrackGeometry } from './trackGeometry'
@@ -137,6 +137,20 @@ describe('drop track (#699)', () => {
     expect(dropPiecePosition(ride.curve, drop, drop.to + pieceShare / 2, pieceShare, piece).distanceTo(bottom)).toBeLessThan(1e-6)
   })
 
+  it('is in drop pose for the whole stop at the top, at the t the plan holds it at (#719)', () => {
+    const stop = plan.stops.find((s) => Math.abs(s.distance - drop.from * length) < 1e-6)!
+    const pose = createSeatPose()
+    const heading = ride.curve.getTangentAt(drop.from).clone().setY(0).normalize()
+    let worst = Infinity
+    for (let time = stop.start; time < stop.end; time += 1 / 60) {
+      const t = tAtLoopDistance(table, planDistance(plan, time))
+      seatPose(ride.curve, table, t, dims.trackScale, DEMO_EYE, pose, ride.mechanics, planStopShare(plan, time))
+      worst = Math.min(worst, pose.up.y, pose.look.dot(heading))
+    }
+    expect(tAtLoopDistance(table, stop.distance)).not.toBe(drop.from)
+    expect(worst).toBeGreaterThan(0.999)
+  })
+
   it('opens the rails down the shaft and builds its guides', () => {
     const [[from, to]] = trackGaps([drop], length, dropPieceLength(DEMO_EYE))
     expect(from).toBeLessThan(drop.from * length)
@@ -159,11 +173,14 @@ describe('backwards (#699)', () => {
 
   it('turns the seat round on the first turntable, rides facing back, turns forward on the second', () => {
     const mid = (back.from + back.to) / 2
-    expect(backwardsTurn(ride.mechanics, back.from - 0.001, -1)).toBe(0)
-    expect(backwardsTurn(ride.mechanics, back.from, 0.5)).toBe(0.5)
-    expect(backwardsTurn(ride.mechanics, mid, -1)).toBe(1)
-    expect(backwardsTurn(ride.mechanics, back.to, 0.25)).toBe(0.75)
-    expect(backwardsTurn(ride.mechanics, back.to + 0.001, -1)).toBe(0)
+    const turnAt = (at: number, stopShare: number) => backwardsTurn(ride.mechanics, at * length, length, stopShare)
+    expect(turnAt(back.from - 0.001, -1)).toBe(0)
+    expect(turnAt(back.from, -1)).toBe(0)
+    expect(turnAt(back.from, 0.5)).toBe(0.5)
+    expect(turnAt(mid, -1)).toBe(1)
+    expect(turnAt(back.to, -1)).toBe(1)
+    expect(turnAt(back.to, 0.25)).toBe(0.75)
+    expect(turnAt(back.to + 0.001, -1)).toBe(0)
 
     const pose = createSeatPose()
     seatPose(ride.curve, table, mid, dims.trackScale, DEMO_EYE, pose, ride.mechanics, -1)
@@ -177,7 +194,28 @@ describe('backwards (#699)', () => {
     const [first] = stops
     const t = timeAt(plan, back.from)
     expect(Math.abs(t - first.start)).toBeLessThan(0.05)
-    expect(backwardsTurn(ride.mechanics, back.from, planStopShare(plan, (first.start + first.end) / 2))).toBeCloseTo(0.5, 1)
+    expect(backwardsTurn(ride.mechanics, back.from * length, length, planStopShare(plan, (first.start + first.end) / 2))).toBeCloseTo(0.5, 1)
+  })
+
+  it('never flips the seat round for a frame as the car arrives at or leaves a turntable (#719)', () => {
+    stops.forEach((stop, i) => {
+      // Forward to back on the first table, back to forward on the second: the turn only ever moves one way.
+      const [before, after] = i === 0 ? [0, 1] : [1, 0]
+      // 60 fps frames on the plan's own grid and off it, from a second before the stop to a second after, at the
+      // t the seat is posed at (the arc table's, a hair off the stop's end).
+      for (const phase of [0, 0.37]) {
+        let last = before
+        let backstep = 0
+        for (let time = stop.start - 1 + phase / 60; time < stop.end + 1; time += 1 / 60) {
+          const t = tAtLoopDistance(table, planDistance(plan, time))
+          const turn = backwardsTurn(ride.mechanics, distanceAtT(table, t), length, planStopShare(plan, time))
+          backstep = Math.max(backstep, (last - turn) * (after - before))
+          last = turn
+        }
+        expect(backstep).toBe(0)
+        expect(last).toBe(after)
+      }
+    })
   })
 })
 
@@ -194,6 +232,11 @@ describe('the mechanics on the solved ride (#699)', () => {
     beats.forEach((beat, i) => expect(Math.abs(solved.landed[i] - beat.second)).toBeLessThan(BEAT_TOLERANCE_SECONDS))
     expect(solved.scales.some((a) => Math.abs(a - 1) > 0.05)).toBe(true)
     for (const stop of solved.stops.slice(0, 3)) expect(stop.end - stop.start).toBeCloseTo(1.5, 1)
+  })
+
+  it('keeps the stops and the frames easing into and out of them out of the ride’s slowest speed (#719)', () => {
+    expect(plan.minSpeed).toBe(RIDE_V2_DEFAULTS.crawl)
+    expect(plan.minSpeed).toBe(buildRidePlan(table, { ...spec, holds: [] }).minSpeed)
   })
 
   it('spawning’s ride profile holds still through a stop', () => {

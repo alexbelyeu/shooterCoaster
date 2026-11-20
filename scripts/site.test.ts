@@ -88,7 +88,7 @@ describe('vercel.json routing', () => {
       expect(h['Permissions-Policy']).toContain('camera=()')
     }
     expect(headersFor('/assets/index-Ab12Cd34.js')['Cache-Control']).toContain('immutable')
-    for (const p of ['/', '/favicon.ico', '/fonts/inter-latin-wght.woff2', '/site.webmanifest']) {
+    for (const p of ['/', '/favicon.ico', '/fonts/ultra-latin-400.woff2', '/site.webmanifest']) {
       expect(headersFor(p)['Cache-Control']).toBeUndefined()
     }
     expect(fs.existsSync(path.join(root, 'public/assets'))).toBe(false)

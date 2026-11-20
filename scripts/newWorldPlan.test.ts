@@ -7,12 +7,8 @@ import {
   PLACEHOLDER,
   STARTER_ROSTER,
   TEMPLATE_ROOT,
-  isPlaceholder,
-  pacingCeilings,
   parseNewWorldArgs,
   planNewWorld,
-  sceneCeilings,
-  setBudget,
   templatePaths,
 } from './newWorldPlan.mjs'
 import { SCORE_VALUES } from '@/levels/scoring'
@@ -81,7 +77,7 @@ describe('npm run new-world (#460)', () => {
 
   it('gives the level a score slot in the template score’s key', () => {
     expect(edit(EDITED_FILES.scores)).toContain(`import ${id} from './${id}.scrim?raw'`)
-    expect(edit(EDITED_FILES.scores)).toMatch(new RegExp(`export const SCORES[^\\n]* ${id}, results,`))
+    expect(edit(EDITED_FILES.scores)).toMatch(new RegExp(`export const SCORES[^\\n]* ${id}, 'results-win':`))
     expect(edit(EDITED_FILES.sfx)).toContain(`  ${id}: { tonic: 65, minor: false }, // level1's score`)
   })
 
@@ -109,7 +105,7 @@ describe('npm run new-world (#460)', () => {
     const index = interior.creates.find((c: { path: string }) => c.path.endsWith('/index.ts'))!.content
     expect(index).toContain('floor: hallFloor')
     expect(index).toContain('bounds: HALL_BOUNDS')
-    expect(interior.edits.find((e: { path: string }) => e.path === EDITED_FILES.terrain)!.content).toContain('flatRadius: 100_000')
+    expect(interior.edits.find((e: { path: string }) => e.path === EDITED_FILES.terrain)!.content).toMatch(/probeWorld: \{\n\s*meshSize: 6000,\n\s*authoredFloor: true,\n\s*\}/)
   })
 
   it('refuses an existing level, biome or score, so a second run changes nothing', () => {
@@ -132,27 +128,5 @@ describe('npm run new-world (#460)', () => {
     expect(() => parseNewWorldArgs([id, '--name', 'X'])).toThrow(NewWorldError)
     expect(() => parseNewWorldArgs([id, '--name', 'X', '--biome', 'sky-harbour'])).toThrow(/camelCase/)
     expect(() => parseNewWorldArgs([...args, '--fast'])).toThrow(/unknown flag/)
-  })
-})
-
-describe('placeholder budgets', () => {
-  it('first ceilings follow the budgets’ headroom rules', () => {
-    expect(sceneCeilings({ drawCalls: 50, objects: 100, triangles: 1000, trackObjects: 10, trackTriangles: 200 })).toEqual({
-      drawCalls: 60,
-      objects: 115,
-      triangles: 1150,
-      trackObjects: 12,
-      trackTriangles: 230,
-    })
-    expect(pacingCeilings({ longestGapSeconds: 2.4, noTargetShare: 0.061 })).toEqual({ longestGapSeconds: 4, noTargetShare: 0.1 })
-    expect(pacingCeilings({ longestGapSeconds: 3, noTargetShare: 0.03 })).toEqual({ longestGapSeconds: 4, noTargetShare: 0.05 })
-  })
-
-  it('a filled budget replaces the placeholder', () => {
-    const text = JSON.stringify({ scene: { level9: PLACEHOLDER } }, null, 2) + '\n'
-    expect(isPlaceholder(JSON.parse(text).scene.level9)).toBe(true)
-    const filled = JSON.parse(setBudget(text, 'scene', 'level9', { drawCalls: 60 }))
-    expect(filled.scene.level9).toEqual({ drawCalls: 60 })
-    expect(isPlaceholder(filled.scene.level9)).toBe(false)
   })
 })

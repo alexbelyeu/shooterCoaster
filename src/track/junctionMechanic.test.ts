@@ -162,6 +162,17 @@ describe('a shoot-to-switch junction (#702)', () => {
     expect(() => buildJunction(main, { kind: 'junction', from: FROM, to: TO, points: [] })).toThrow(/a way round/)
     const flat = { getPointAt: main.getPointAt, getTangentAt: main.getTangentAt }
     expect(() => buildJunction(flat, mechanic)).toThrow(/spline/)
+    // #725: a fork so near the lap's start that its sign would stand before 0, where it never takes a hit.
+    const early: JunctionMechanic = { kind: 'junction', from: 0.01, to: 0.2, points: mechanic.points }
+    expect(() => checkMechanics([early])).toThrow(/sign falls before the lap's start/)
+    expect(() => buildJunction(main, early)).toThrow(/sign falls before the lap's start/)
+    expect(() => checkMechanics([{ ...early, from: 0.03 }])).not.toThrow()
+  })
+
+  it('refuses a second junction on one track: the run has one route and the switch one target (#725)', () => {
+    const second: JunctionMechanic = { kind: 'junction', from: 0.6, to: 0.75, points: mechanic.points }
+    expect(() => checkMechanics([second])).not.toThrow()
+    expect(() => checkMechanics([mechanic, second])).toThrow(/one junction per track/)
   })
 
   it('forks off a track that rolls elsewhere, unrolled on the branch, and refuses a fork where it rolls', () => {

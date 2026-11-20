@@ -33,7 +33,7 @@ import type { RideBeat, RideMechanic, RideV2Spec, SpeedZone, TrackParams } from 
 import { createSplineCurve, type RailPoint } from '@/track/curves/SplineCurve'
 import { RideBuilder, smoothstep, type MarkerKind, type Twist } from '@/track/elements/rideBuilder'
 import { headChopper } from '@/track/elements/headChopper'
-import { dropTrack, jumpGap, placeMechanics, station } from '@/track/elements/mechanics'
+import { dropTrack, jumpGap, placeMechanics, station } from '@/track/elements/mechanicElements'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { RIDE_V2_DEFAULTS } from '@/track/rideV2'
 import { ARCH, FLAME, GYM_SCALE, PIT, TREE, TREE_GAP, piece, toWorld } from './blockout'
@@ -77,6 +77,10 @@ const CAVE_Y = 1.9
 /** The cave's loop: in at the Flame's line, round north inside it, out at its north end onto the run to Alaska. */
 const CAVE_IN_Z = -2.4
 const CAVE_TURN = 3.5
+/** How far a shot's muzzle flash lights the dark cave's rats (#752), in blockout metres. */
+const CAVE_FLASH_REACH = 14
+/** How far before the cave's lintel the light starts going, in blockout metres. */
+const CAVE_DIM_RUN = 3
 /** The climb up Alaska: the rails this far from the hall's west wall, and their top under the trusses. */
 const WALL_Z = 37
 const WALL_X = 32
@@ -234,6 +238,8 @@ export interface GymRide {
   /** By control point index (`placeMechanics` turns them into arc shares), speeds in metres per second. */
   mechanics: RideMechanic[]
   zones: { kind: SpeedZone['kind']; from: number; to: number; speed: number; accel?: number }[]
+  /** The Training Area's dark cave (#752), by control point index: in under its lintel (`from`), dark (`dark`), out on its launch (`out`). */
+  cave: { from: number; dark: number; out: number }
 }
 
 /** The ride, element by element, in blockout metres. */
@@ -257,7 +263,11 @@ export function buildGymRide(): GymRide {
   zone('lift', SPEED.roll, () => b.mark('heartlineRoll', () => b.straight(2 * (b.position.z - FLAME.centre.z), slowRoll(1))))
 
   // 13 s: down into the Training Area's cave under its lintel, round north through it in the dark, out at its north end.
+  const caveDrop = b.points.length
   zone('launch', SPEED.caveDrop, () => b.mark('headChopper', () => to(b, 'z', CAVE_IN_Z, CAVE_LINTEL_Y - y(), 5)))
+  const caveDark = b.points.length - 1
+  // The light goes over the drop's last few metres to the lintel, not the whole way down from the Flame.
+  const caveFrom = b.points.findIndex((p, i) => i >= caveDrop && Math.abs(p.z - CAVE_IN_Z) <= CAVE_DIM_RUN)
   zone(
     'brake',
     SPEED.cave,
@@ -268,6 +278,7 @@ export function buildGymRide(): GymRide {
     },
     BRAKES.cave,
   )
+  const cave = { from: caveFrom, dark: caveDark, out: b.points.length - 1 }
   // Bursting out of the cave on a launch, across the hall to Alaska.
   zone('launch', SPEED.caveLaunch, () => b.mark('straight', () => to(b, 'z', 4)))
   // The route choice (#702): shoot the switch and the V8 way round swings east off the line, down over the Flame's pads
@@ -347,7 +358,7 @@ export function buildGymRide(): GymRide {
     b.mark('bankedTurn', () => turn(b, -Math.PI / 2, HOME.stationTurn))
   })
   b.mark('straight', () => to(b, 'x', STATION_X + SPACING, STATION_Y - y()))
-  return { points: b.points, markers: b.markers, mechanics, zones }
+  return { points: b.points, markers: b.markers, mechanics, zones, cave }
 }
 
 /** Drops the ups a spline would work out anyway (no roll, track not steep), keeping the level's data small. */
@@ -393,6 +404,9 @@ export function buildGymTrack(): TrackParams {
     return { at: share(middle ? Math.round((m.from + m.to) / 2) : m.from), second }
   })
   const rideV2: RideV2Spec = { zones, beats, drag: DRAG }
+  // The cave rides dark (#752): the light goes under its lintel and comes back over as long on its launch out.
+  const caveRamp = share(ride.cave.dark) - share(ride.cave.from)
+  const darkSections = [{ from: share(ride.cave.from), to: share(ride.cave.out) + caveRamp, ramp: caveRamp, flashReach: CAVE_FLASH_REACH * world }]
   return {
     curve: 'spline',
     controlPoints: points,
@@ -401,6 +415,7 @@ export function buildGymTrack(): TrackParams {
     ride: 'v2',
     rideV2,
     mechanics,
+    darkSections,
     // Rails, ties and towers sparser than level 1's (~0.86 m a segment, under 3 cm of chord sag on the tightest turn; ties
     // every ~0.6 m and towers every ~23 m of the hall at 48 units a metre): the ~350 m track leaves the scene room under
     // `scene.level6` for the enemies in the air at 10 s (#726, #761).

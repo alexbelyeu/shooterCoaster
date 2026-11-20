@@ -87,7 +87,8 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
   level4: { tonic: 62, minor: true }, // D minor
   level5: { tonic: 60, minor: true }, // C minor
   level6: { tonic: 64, minor: true }, // E minor
-  results: { tonic: 60, minor: false }, // C major
+  'results-win': { tonic: 60, minor: false }, // C major
+  'results-lose': { tonic: 60, minor: false }, // C major
   // Theme options waiting on Alex's pick (`?theme=`, scores/themes/) get a row each: `'<slot>.<name>': key`
 }
 
@@ -141,6 +142,8 @@ export interface ArcadeSound {
   db: number
   /** Send to the level's convolver, 0–1. Guns stay dry: their tail has to be gone in 150 ms. */
   send: number
+  /** `ui`: the menu and countdown voices, past the pause gate (the resume Ready / GO plays while paused); default the gated SFX bus. */
+  bus?: 'ui'
 }
 
 export const PRIO = { ambient: 0, fire: 1, hit: 2, kill: 3, cue: 4, ui: 5, event: 6 } as const
@@ -177,16 +180,16 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   star1: { prio: PRIO.event, db: -12, send: 0.35 },
   star2: { prio: PRIO.event, db: -11, send: 0.35 },
   star3: { prio: PRIO.event, db: -10, send: 0.35 },
-  uiSelect: { prio: PRIO.ui, db: -18, send: 0.1 },
-  uiBack: { prio: PRIO.ui, db: -18, send: 0.1 },
-  uiLaunch: { prio: PRIO.ui, db: -13, send: 0.2 },
-  uiWhoosh: { prio: PRIO.ui, db: -16, send: 0.2 },
+  uiSelect: { prio: PRIO.ui, db: -18, send: 0.1, bus: 'ui' },
+  uiBack: { prio: PRIO.ui, db: -18, send: 0.1, bus: 'ui' },
+  uiLaunch: { prio: PRIO.ui, db: -13, send: 0.2, bus: 'ui' },
+  uiWhoosh: { prio: PRIO.ui, db: -16, send: 0.2, bus: 'ui' },
   rideLaunch: { prio: PRIO.cue, db: -8, send: 0.25 },
   // Below the guns: a full pool drops a clank rather than cut a gunshot.
   rideChain: { prio: PRIO.ambient, db: -11, send: 0.08 },
   trackSwitch: { prio: PRIO.cue, db: -9, send: 0.2 },
-  countReady: { prio: PRIO.ui, db: -14, send: 0.15 },
-  countGo: { prio: PRIO.ui, db: -11, send: 0.2 },
+  countReady: { prio: PRIO.ui, db: -14, send: 0.15, bus: 'ui' },
+  countGo: { prio: PRIO.ui, db: -11, send: 0.2, bus: 'ui' },
 }
 
 /** Voices playing at once; the e2e `audioBurst(64, 32)` must never take more. */
@@ -253,8 +256,15 @@ export function nextBeat(now: number, origin: number, beatS: number, beats: numb
   return out
 }
 
-/** `makeIR` length / decay curve, a low-pass on the return. */
-export const BIOME_REVERB: Record<BiomeType, { seconds: number; decayPow: number; toneHz: number; level: number }> = {
+/** A biome's room: `makeIR` length / decay curve, a low-pass on the return. */
+export interface BiomeReverb {
+  seconds: number
+  decayPow: number
+  toneHz: number
+  level: number
+}
+
+export const BIOME_REVERB: Record<BiomeType, BiomeReverb> = {
   themePark: { seconds: 1.4, decayPow: 3.2, toneHz: 7000, level: 0.8 },
   desert: { seconds: 1.8, decayPow: 4.5, toneHz: 4500, level: 0.7 },
   ocean: { seconds: 2.4, decayPow: 3, toneHz: 6000, level: 0.9 },

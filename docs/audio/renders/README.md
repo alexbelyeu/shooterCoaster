@@ -29,9 +29,11 @@ level score; the kills have their own sheet, `sfx-sheet-level1-kills` (`--sfx-sh
 other sound in `KILL_SOUNDS`, so a new kill sound is in it without an edit, #525), one mix per level (`mix-level6-boss`: the Medusa's arrival, boss section and sting, `--mix level6 --boss`); compare them with `baseline-sfx-sheet-*` / `baseline-mix-*`.
 `ride-level1` / `ride-level6` are the ride's own sounds (#697, `--ride <level>`): the countdown, GO's launch whoosh, a crawl,
 a chain lift clanking, then the drop's wind and rail rumble up to top speed and easing off. `mix-level1` was re-rendered with them.
-`music-title`, `music-level1…5`, `music-results`, `mix-level1…5` and `sfx-sheet-level1` were re-rendered for #416 on the
+`music-title`, `music-level1…5`, `mix-level1…5` and `sfx-sheet-level1` were re-rendered for #416 on the
 game's own Web Audio graph; the `-base` / `-seam` / `-full` / `-frenzy` variants are from before it (renamed from `scrim-*`),
 and the re-renders match their old numbers to within 0.1 LU.
+`music-results-win` / `music-results-lose` (and their `-seam` renders) are the results screen's two cuts (#792): the win cut after a
+2 or 3 star run, the lose cut after 0 or 1.
 
 During a listening round, `theme-<slot>-<name>` / `theme-<slot>-<name>-seam` are the options waiting on Alex's pick:
 the first 30 s of each, and 20 s across its loop seam (`--music <slot>.<name> [--seam]`). They are

@@ -10,7 +10,7 @@
 import * as THREE from 'three'
 import type { TrackParams } from '@/types/level'
 import { createTrackCurve } from './curves/createTrackCurve'
-import { buildArcTable, tAtLoopDistance } from './arcLength'
+import { buildArcTable, distanceAtT, tAtLoopDistance } from './arcLength'
 import { dropHeading, droppingOn } from './mechanics.hot'
 import { rideModel, rideProfile } from './ridePhysics'
 import { seatUp } from './trackGeometry'
@@ -51,7 +51,7 @@ export function rideComfort(track: TrackParams, seconds: number): RideComfort {
   const basis = new THREE.Matrix4()
   const frame = (k: number, out: THREE.Quaternion) => {
     const t = tAtLoopDistance(table, profile[k])
-    const drop = track.mechanics ? droppingOn(track.mechanics, t) : null
+    const drop = track.mechanics ? droppingOn(track.mechanics, distanceAtT(table, t), table.length) : null
     if (drop) {
       dropHeading(curve, drop, tan)
       up.set(0, 1, 0)

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { TrackCurve } from './curves/TrackCurve'
-import type { ArcTable } from './arcLength'
+import { type ArcTable, distanceAtT } from './arcLength'
 import { type TrackSamples, lookAheadDirection, sampleTrack } from './cameraRig.hot'
 import { seatUp } from './trackGeometry'
 import { backwardsTurn, dropHeading, droppingOn, routeCurve } from './mechanics.hot'
@@ -50,7 +50,8 @@ export function seatPose(
   curve = routeCurve(curve, mechanics, route)
   out.tangent.copy(curve.getTangentAt(t))
   const at = sampleTrack(table, t, trackScale, out.samples)
-  const drop = mechanics ? droppingOn(mechanics, t) : null
+  const dist = mechanics ? distanceAtT(table, t) : 0
+  const drop = mechanics ? droppingOn(mechanics, dist, table.length) : null
   if (drop) {
     out.up.copy(WORLD_UP)
     out.upAhead.copy(WORLD_UP)
@@ -63,7 +64,7 @@ export function seatPose(
   seatUp(curve, at.lookT, out.upAhead)
   out.look.copy(curve.getPointAt(at.lookT)).addScaledVector(out.upAhead, eyeHeight).sub(out.eye).normalize()
   lookAheadDirection(out.tangent, out.look, out.look)
-  const back = mechanics ? backwardsTurn(mechanics, t, stopShare) : 0
+  const back = mechanics ? backwardsTurn(mechanics, dist, table.length, stopShare) : 0
   if (back > 0) out.look.applyQuaternion(turn.setFromAxisAngle(out.up, Math.PI * back))
   return out
 }

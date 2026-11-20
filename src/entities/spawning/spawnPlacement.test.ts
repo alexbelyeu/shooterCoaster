@@ -5,12 +5,14 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig, WallSurface } from '@/types/level'
-import { buildArcTable, type ArcTable } from '@/track/arcLength'
+import { buildArcTable, indexAtT, type ArcTable } from '@/track/arcLength'
+import { DEMO_EYE, buildDemoRide, markerT } from '@/track/elements/demoRide'
+import { createSeatPose, seatPose } from '@/track/seatPose.hot'
 import { rideModel, rideProfile } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import {
-  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, clampToBounds, entryPoint, formationFrame, formationSlots, groupStep,
+  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, clampToBounds, clearOfKeepOff, entryPoint, formationFrame, formationSlots, groupStep,
   indexAhead, insideBounds, marchHeading, marchMoving, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
   inView, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
   type ChoreographedFormation, type RideAhead, type Vec3,
@@ -323,10 +325,11 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
           expect(arc).toBeLessThan(Math.max(band.aheadMax, band.aheadMin + ride.window) + 10)
           const lateral = Math.hypot(p.x - table.x[anchor], p.z - table.z[anchor])
           if (lateral > band.sideMax + 1) {
-            // A blind approach's spot, out along its look (#494): never inside an interior, off every rail and landmark.
+            // A blind approach's spot, out along its look (#494): never inside an interior, off every rail, and off every
+            // landmark by as far as the enemy wanders from it (#708: the scorpion's scuttle loop).
             expect(bounds).toBeUndefined()
             expect(railGap(table, p)).toBeGreaterThan(band.sideMin - 1)
-            expect(keepOff.every((c) => Math.hypot(p.x - c.x, p.z - c.z) >= c.r)).toBe(true)
+            expect(clearOfKeepOff(p, keepOff, ENEMY_PLACEMENT[wave.type].roam ?? 0)).toBe(true)
           } else {
             expect(lateral).toBeGreaterThan(band.sideMin - 1)
           }
@@ -543,5 +546,23 @@ describe('level2: the opening climb (#494)', () => {
       }).length)
     }
     expect(Math.min(...seen), seen.join(',')).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('trackView on a rolling track (#715)', () => {
+  it("looks where the seat looks through the demo's loop and rolls", () => {
+    const ride = buildDemoRide()
+    const table = buildArcTable(ride.curve)
+    const pose = createSeatPose()
+    for (const kind of ['verticalLoop', 'zeroGRoll', 'heartlineRoll', 'corkscrew'] as const) {
+      let worst = 1
+      for (let k = 1; k < 20; k++) {
+        const t = markerT(ride, kind, k / 20)
+        seatPose(ride.curve, table, t, 1, DEMO_EYE, pose)
+        const { dir } = trackView(table, indexAtT(table, t), 1)
+        worst = Math.min(worst, dir.x * pose.look.x + dir.y * pose.look.y + dir.z * pose.look.z)
+      }
+      expect(worst, kind).toBeGreaterThan(Math.cos(Math.PI / 180))
+    }
   })
 })

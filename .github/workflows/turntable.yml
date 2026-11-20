@@ -2,6 +2,8 @@ name: Turntable
 # Enemy turntable (#380): close-ups of every enemy and boss, uploaded as the `turntable` artifact on PRs that can
 # change how one looks. Not part of `verify`, so it never holds up a merge, and other PRs never run it. It draws no
 # death effect, so death styles aren't in the filter (the smoke's `<id>-combat.png` shows those).
+# It also renders the ride elements from the seat (#698, #714: `--rides`, rides.png in the same artifact), which fails on
+# an empty cell or a shot upside down or riding backwards that misses, so track changes run it too.
 
 on:
   pull_request:
@@ -9,6 +11,9 @@ on:
       - 'src/entities/**'
       - 'src/dev/turntable/**'
       - 'turntable.html'
+      - 'src/track/**'
+      - 'src/dev/rides/**'
+      - 'rides.html'
       - 'vite.config.ts'
       - 'scripts/turntable.mjs'
       - 'scripts/headless.mjs'
@@ -42,10 +47,18 @@ jobs:
       - name: Render the turntable
         run: npm run turntable
 
+      # Its own --out: the script clears its output folder at start. Runs after a failed turntable too (it reuses that
+      # step's dist-turntable/), so one red check still shows both.
+      - name: Render the ride elements
+        if: ${{ !cancelled() }}
+        run: npm run turntable -- --rides --skip-build --out e2e-results/rides
+
       - name: Upload turntable
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: turntable
-          path: e2e-results/turntable/
+          path: |
+            e2e-results/turntable/
+            e2e-results/rides/
           retention-days: 30

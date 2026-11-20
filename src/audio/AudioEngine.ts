@@ -99,12 +99,12 @@ interface MasterChain {
   trim: GainNode
   duck: BiquadFilterNode
   musicPause: GainNode
-  /** The arcade SFX's input: silent while paused. */
-  sfxPause: GainNode
+  /** The pause gate, the arcade SFX's input (`arcadeChannel`): silent while paused. */
+  sfxGate: GainNode
   /** The score engine's music, at the Settings music volume. */
   score: GainNode
-  /** The arcade SFX, at the Settings effects volume; the countdown and UI blips come in here, past the pause gate. */
-  arcade: GainNode
+  /** The arcade SFX at the Settings effects volume (`arcadeUiChannel`): the countdown and UI blips come in here, past the pause gate. */
+  sfxVolume: GainNode
 }
 
 function createMasterChain(ctx: BaseAudioContext): MasterChain {
@@ -118,11 +118,11 @@ function createMasterChain(ctx: BaseAudioContext): MasterChain {
   duck.connect(musicPause)
   const score = new GainNode(ctx)
   score.connect(duck)
-  const arcade = new GainNode(ctx)
-  arcade.connect(limiter)
-  const sfxPause = new GainNode(ctx)
-  sfxPause.connect(arcade)
-  return { limiter, trim, duck, musicPause, sfxPause, score, arcade }
+  const sfxVolume = new GainNode(ctx)
+  sfxVolume.connect(limiter)
+  const sfxGate = new GainNode(ctx)
+  sfxGate.connect(sfxVolume)
+  return { limiter, trim, duck, musicPause, sfxGate, score, sfxVolume }
 }
 
 /** Built by `initAudio`: read the channels only while `isAudioReady()`. */
@@ -139,8 +139,8 @@ export let arcadeUiChannel: AudioNode
 function setChain(c: MasterChain) {
   chain = c
   scoreChannel = c.score
-  arcadeChannel = c.sfxPause
-  arcadeUiChannel = c.arcade
+  arcadeChannel = c.sfxGate
+  arcadeUiChannel = c.sfxVolume
 }
 
 /** `offlineRender.ts`: a fresh chain in `ctx` on the render's scripted clock, audio marked ready; returns the restore. */
@@ -213,7 +213,7 @@ export function setPauseMix(on: boolean, immediate = false): void {
 function applyPauseMix(c: MasterChain, immediate: boolean) {
   const seconds = immediate ? 0 : PAUSE_RAMP_S
   rampParam(c.musicPause.gain, pauseMix ? dbToGain(PAUSE_MUSIC_DB) : 1, seconds)
-  rampParam(c.sfxPause.gain, pauseMix ? 0 : 1, seconds)
+  rampParam(c.sfxGate.gain, pauseMix ? 0 : 1, seconds)
   applyDuck(c, immediate)
 }
 
@@ -232,7 +232,7 @@ function syncVolumes(immediate = false): void {
   const { sfxVolume, musicVolume, muted } = useSettingsStore.getState()
   const seconds = immediate ? 0 : VOLUME_RAMP_S
   rampParam(chain.score.gain, muted ? 0 : musicVolume, seconds)
-  rampParam(chain.arcade.gain, muted ? 0 : sfxVolume, seconds)
+  rampParam(chain.sfxVolume.gain, muted ? 0 : sfxVolume, seconds)
 }
 
 // Sliders and the mute button apply live, in game or on the title.

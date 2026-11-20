@@ -37,7 +37,8 @@ import type { RunMode } from '@/types/game'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
-import type { EnemyType, RideBeat } from '@/types/level'
+import type { EnemyType, EnemyWave, RideBeat } from '@/types/level'
+import { levelWeather, weatherSeconds } from '@/levels/environments/shared/weatherPulse'
 import type { GamePhase, LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
@@ -95,6 +96,18 @@ function waitForGpu(gl: THREE.WebGLRenderer) {
   gl.setRenderTarget(target)
 }
 
+/** A level's weather pulse as `levels()` lists it: its kind, the level time its wave arrives and how long it lasts. */
+export interface E2ELevelWeather {
+  kind: string
+  at: number
+  seconds: number
+}
+
+function e2eWeather(waves: readonly EnemyWave[]): E2ELevelWeather | null {
+  const weather = levelWeather(waves)
+  return weather && { kind: weather.kind, at: weather.wave.spawnDelay ?? 0, seconds: weatherSeconds(weather.kind) }
+}
+
 export interface RideFeel {
   launch: number
   dip: number
@@ -127,7 +140,7 @@ export interface SCTestApi {
   drawCalls: number
   triangles: number
   /** Every level in play order, its `nextLevel` and whether the unlock rule opens it now. */
-  levels: () => { id: string; name: string; maxScore: number; nextLevel: string | null; unlocked: boolean }[]
+  levels: () => { id: string; name: string; maxScore: number; nextLevel: string | null; unlocked: boolean; weather: E2ELevelWeather | null }[]
   /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one. */
   startLevel: (id: string, seed?: number) => void
   /** `restartRun`, as Replay / R / the pause menu's Restart do: a warm level goes straight to the countdown (#674). */
@@ -189,6 +202,12 @@ export interface SCTestApi {
   /** Track set-pieces (#332): the level's tunnels as track fractions (`spans`), the one the car is in (-1: none) and how
    *  deep (`tunnelDepth`, 0–1), set by the coaster camera. */
   tunnel: { spans: { from: number; to: number }[]; index: number; depth: number }
+  /** Dark sections (#752): the level's as track fractions, how dark the ride is now (0–1) and the muzzle flash's light
+   *  intensity, set by `DarkSections` each frame. */
+  darkSection: { spans: { from: number; to: number }[]; depth: number; flash: number }
+  /** The level's weather pulse (#798), set by `Weather` each frame: its strength (0–1), streaks drawn and the fog now
+   *  against the biome's own. null on a level without weather. */
+  weather: { kind: string; envelope: number; streaks: number; fogNear: number; fogFar: number; baseFogNear: number; baseFogFar: number } | null
   /** First-person weapon view-model on screen (CSS px, origin top-left):
    *  bounding box of its projected bounds and the muzzle tip. null before the
    *  first level frame. */
@@ -947,7 +966,10 @@ export function installE2EApi() {
     triangles: 0,
     levels: () => {
       const { isLevelUnlocked } = useGameStore.getState()
-      return getAllLevels().map((l) => ({ id: l.id, name: l.name, maxScore: l.maxScore, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id) }))
+      return getAllLevels().map((l) => ({
+        id: l.id, name: l.name, maxScore: l.maxScore, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id),
+        weather: e2eWeather(l.enemies),
+      }))
     },
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
     restartLevel: () => useGameStore.getState().restartRun(),
@@ -996,6 +1018,8 @@ export function installE2EApi() {
       caps: { roll: RIG_MAX_ROLL_DEG, pitch: RIG_MAX_PITCH_DEG, fovKick: MAX_FOV_KICK_DEG },
     },
     tunnel: { spans: [], index: -1, depth: 0 },
+    darkSection: { spans: [], depth: 0, flash: 0 },
+    weather: null,
     weapon: null,
     holdFeedback: false,
     bulletStep: null,

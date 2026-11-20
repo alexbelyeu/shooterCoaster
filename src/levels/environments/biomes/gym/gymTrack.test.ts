@@ -40,6 +40,7 @@ import { GYM_TRACK, RAIL_CLEARANCE } from './gymTrack'
 import { meshClearance } from './geometryChecks'
 import { buildHall, holdGeometry } from './hallGeometry'
 import { gym } from './index'
+import { darkSectionDepth } from '@/track/darkSection.hot'
 
 /** The roof trusses' bottom chords (`hallGeometry.ts`). */
 const TRUSS_UNDERSIDE = HALL.h - 4.5
@@ -239,6 +240,28 @@ describe('the gym track', () => {
     }
     expect(pieces).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
     expect(floor).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+  })
+
+  it("rides the Training Area's cave dark (#752): fully dark only under its roof, from the storyboard's ~15 s", () => {
+    expect(GYM_TRACK.darkSections).toHaveLength(1)
+    const [cave] = GYM_TRACK.darkSections!
+    expect(cave.ramp).toBeGreaterThan(0)
+    expect(cave.to - cave.from).toBeGreaterThan(4 * cave.ramp)
+    // Every point between the ramps is inside the cave's walls, below its roof.
+    const outside: number[] = []
+    for (let i = 0; i < N; i++) {
+      if (darkSectionDepth(GYM_TRACK.darkSections, i / N) < 1) continue
+      const p = track[i]
+      if (p.x < CAVE.minX || p.x > CAVE.maxX || p.y > CAVE.roof) outside.push(i / N)
+    }
+    expect(outside).toEqual([])
+    // In after the airtime hill, out before the run at Alaska.
+    const from = secondsAt(cave.from * N)
+    const to = secondsAt(cave.to * N)
+    expect(from).toBeGreaterThan(12)
+    expect(from).toBeLessThan(16)
+    expect(to - from).toBeGreaterThan(2)
+    expect(to).toBeLessThan(20)
   })
 
   it('climbs Alaska to just under the roof trusses, jumps to the Shield and drops into the pit (#700)', () => {

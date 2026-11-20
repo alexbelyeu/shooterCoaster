@@ -25,8 +25,8 @@ export const EDITED_FILES = {
   indexHtml: 'index.html',
 }
 
-/** What `budgets.json` holds for a level's `scene` and `pacing` until its first local smoke measures them. */
-export const PLACEHOLDER = { placeholder: 'npm run new-world: set by this level\'s first local smoke (scene: the ride; pacing: --steps pacing)' }
+/** What `budgets.json` holds for a level's `scene` and `pacing` until two clean local smokes have measured them. */
+export const PLACEHOLDER = { placeholder: 'npm run new-world: set by two clean local smokes of this level (scene: the ride; pacing: --steps pacing), e2e/placeholderBudget.mjs' }
 
 export class NewWorldError extends Error {}
 
@@ -275,16 +275,16 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
   let keys = sfx.slice(keysAt, keysEnd)
   const key = keys.match(new RegExp(`^  ${scoreFrom}: ([^\\n]+?),(?: *//[^\\n]*)?$`, 'm'))
   if (!key) throw new NewWorldError(`${F.sfx}: no SCORE_KEYS entry for ${scoreFrom}`)
-  keys = replaceOnce(keys, /^( {2}results: [^\n]*\n)/m, `  ${id}: ${key[1]}, // ${scoreFrom}'s score, copied until ${name}'s theme round\n$1`, F.sfx)
+  keys = replaceOnce(keys, /^( {2}'results-win': [^\n]*\n)/m, `  ${id}: ${key[1]}, // ${scoreFrom}'s score, copied until ${name}'s theme round\n$1`, F.sfx)
   sfx = sfx.slice(0, keysAt) + keys + sfx.slice(keysEnd)
 
   let scores = text(F.scores)
   const scoreImports = [...scores.matchAll(/^import \w+ from '\.\/\w+\.scrim\?raw'$/gm)]
-  const lastLevelImport = scoreImports.filter((m) => !/^import (title|results) /.test(m[0])).at(-1)
+  const lastLevelImport = scoreImports.filter((m) => !/^import (title|results\w*) /.test(m[0])).at(-1)
   if (!lastLevelImport) throw new NewWorldError(`${F.scores}: no level score imports`)
   const at = lastLevelImport.index + lastLevelImport[0].length
   scores = scores.slice(0, at) + `\nimport ${id} from './${id}.scrim?raw'` + scores.slice(at)
-  scores = replaceOnce(scores, /(export const SCORES[^\n]*?)( results,)/, `$1 ${id},$2`, F.scores)
+  scores = replaceOnce(scores, /(export const SCORES[^\n]*?)( 'results-win':)/, `$1 ${id},$2`, F.scores)
 
   const scrim = templateScore
     .replace(/^title\s+.*$/m, `title    ${name} (placeholder)`)
@@ -368,7 +368,7 @@ function checklist({ id, biome, kind }, previous) {
     `Music: src/audio/scores/${id}.scrim is a copy; a theme round for Alex (Listen: issue) replaces it, with its SCORE_KEYS row.`,
     `#about: rewrite ${id}'s line in index.html once the world has its enemies and landmark.`,
     `docs/agents/STATE.md: a row for ${id}.`,
-    `Prove it: node e2e/smoke.mjs --shard ${id} (sets scene.${id} in budgets.json on its first local run), then --steps pacing --levels ${id} (sets pacing.${id}); look at the ride, enemy and combat shots. ${previous} now unlocks ${id}.`,
+    `Prove it: node e2e/smoke.mjs --shard ${id}, twice (two clean runs set scene.${id} in budgets.json), then --steps pacing --levels ${id}, twice (sets pacing.${id}); look at the ride, enemy and combat shots. ${previous} now unlocks ${id}.`,
   ]
 }
 
@@ -382,36 +382,4 @@ export function formatPlan(plan, { dryRun }) {
   lines.push('', 'Left by hand (docs/LEVEL-KIT.md):')
   plan.checklist.forEach((c, i) => lines.push(`  ${i + 1}. ${c}`))
   return lines.join('\n')
-}
-
-export function isPlaceholder(budget) {
-  return typeof budget?.placeholder === 'string'
-}
-
-const roundUp = (n, step) => Math.ceil(n / step) * step
-
-/** First `scene` ceilings from a ride's measured totals: draw calls +20%, objects and triangles +15% (budgets.json `scene._comment`). */
-export function sceneCeilings(measured) {
-  const up = (n, f) => Math.ceil(n * f)
-  return {
-    drawCalls: up(measured.drawCalls, 1.2),
-    objects: up(measured.objects, 1.15),
-    triangles: up(measured.triangles, 1.15),
-    trackObjects: up(measured.trackObjects, 1.15),
-    trackTriangles: up(measured.trackTriangles, 1.15),
-  }
-}
-
-/** First `pacing` ceilings from one run: the longest gap +1 s, the share +2 points rounded up to 5% (budgets.json `pacing._comment`). */
-export function pacingCeilings(m) {
-  return {
-    longestGapSeconds: Math.ceil(m.longestGapSeconds + 1),
-    noTargetShare: Math.round(roundUp((m.noTargetShare + 0.02) * 100, 5)) / 100,
-  }
-}
-
-export function setBudget(budgetsText, section, id, values) {
-  const budgets = JSON.parse(budgetsText)
-  budgets[section][id] = values
-  return JSON.stringify(budgets, null, 2) + '\n'
 }

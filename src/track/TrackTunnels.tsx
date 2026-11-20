@@ -4,7 +4,8 @@ import type { HeightFunction } from '@/utils/terrainNoise'
 import { useContactShadows } from '@/levels/environments/shared/ContactShadows'
 import type { TrackCurve } from './curves/TrackCurve'
 import type { ArcTable } from './arcLength'
-import { buildTunnelGeometry, getTunnelDims, tunnelColours, tunnelShadowCasters } from './setPieces'
+import { getTunnelDims } from './setPieces'
+import { buildTunnelGeometry, tunnelColours, tunnelShadowCasters } from './tunnelGeometry'
 
 /** Vertex-coloured, plus the per-vertex `aEmissive` the tunnel's lights glow with. Caller disposes. */
 function createTunnelMaterial(): THREE.MeshStandardMaterial {

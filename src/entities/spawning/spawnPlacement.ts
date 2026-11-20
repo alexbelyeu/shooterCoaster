@@ -13,6 +13,7 @@ import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
+import { EYE_HEIGHT } from '@/track/trackDimensions'
 
 /**
  * Formation placement, pure. Slots are seeded at level load (so `spawnDigest` stays
@@ -150,6 +151,12 @@ export function trackPoint(table: ArcTable, i: number): Vec3 {
   return { x: table.x[i], y: table.y[i], z: table.z[i] }
 }
 
+/** The rails' up at sample `i` (`trackGeometry.ts` `seatUp`'s): world up unless the curve rolls. */
+function trackUp(table: ArcTable, i: number): Vec3 {
+  const { ups } = table
+  return ups ? { x: ups.x[i], y: ups.y[i], z: ups.z[i] } : { x: 0, y: 1, z: 0 }
+}
+
 export interface FormationFrame {
   /** `track` plus the side / up offsets. */
   origin: Vec3
@@ -206,7 +213,10 @@ const VIEW_HALF_ANGLE_COS = Math.cos((MIN_HORIZONTAL_FOV * 0.4 * Math.PI) / 180)
 /** No group or trackside slot leads the rider by more than this share of a lap. */
 const MAX_LEAD_SHARE = 0.75
 
-/** Where the rig looks from track sample `index`: its eye and unit look direction (cameraRig's look-ahead blend, unsmoothed). */
+/**
+ * Where the rig looks from track sample `index`: its eye (the rail point) and unit look direction (`seatPose`'s look,
+ * unsmoothed: on a rolling track the seats sit `EYE_HEIGHT` along the rails' up, which turns the look with the rails).
+ */
 export interface TrackView {
   index: number
   eye: Vec3
@@ -215,8 +225,17 @@ export interface TrackView {
 
 export function trackView(table: ArcTable, index: number, trackScale: number): TrackView {
   const eye = trackPoint(table, index)
-  const toAhead = normalize(sub(trackPoint(table, indexAhead(table, index, LOOK_AHEAD_UNITS * trackScale)), eye))
-  return { index, eye, dir: lookAheadDirection(trackTangent(table, index), toAhead, { x: 0, y: 0, z: 0 }) }
+  const aheadIndex = indexAhead(table, index, LOOK_AHEAD_UNITS * trackScale)
+  const toAhead = sub(trackPoint(table, aheadIndex), eye)
+  if (table.ups) {
+    const up = trackUp(table, index)
+    const upAhead = trackUp(table, aheadIndex)
+    const h = EYE_HEIGHT * trackScale
+    toAhead.x += h * (upAhead.x - up.x)
+    toAhead.y += h * (upAhead.y - up.y)
+    toAhead.z += h * (upAhead.z - up.z)
+  }
+  return { index, eye, dir: lookAheadDirection(trackTangent(table, index), normalize(toAhead), { x: 0, y: 0, z: 0 }) }
 }
 
 export function inView(view: TrackView, p: Vec3, reach: number): boolean {
@@ -322,6 +341,11 @@ export interface KeepOff {
   x: number
   z: number
   r: number
+}
+
+/** Whether `p` is `margin` or more outside every `keepOff` circle. */
+export function clearOfKeepOff(p: Vec3, keepOff: readonly KeepOff[], margin: number): boolean {
+  return keepOff.every((c) => Math.hypot(p.x - c.x, p.z - c.z) >= c.r + margin)
 }
 
 export function insideBounds(p: Vec3, b: PlacementBounds): boolean {
@@ -574,13 +598,13 @@ export interface PlaceTracksideInput {
 }
 
 export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride, bounds, keepOff = [] }: PlaceTracksideInput): Vec3[] {
-  const { surface } = ENEMY_PLACEMENT[type]
+  const { surface, roam = 0 } = ENEMY_PLACEMENT[type]
   const reach = maxReadableDistance(type)
   return slots.map((slot) => {
     const at = { ahead: tracksideAhead(table, surface, slot, ride), side: slot.side }
     const p = surface === 'water'
       ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale)
-      : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale, bounds, keepOff)
+      : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale, bounds, keepOff, roam)
     const placed = outsideNearField(settle(p, surface, groundFn), camera)
     const out = surface === 'ground' ? groundedOutsideNearField(placed, camera, groundFn) : placed
     return bounds && !insideBounds(out, bounds) ? settle(clampToBounds(out, bounds), surface, groundFn) : out
@@ -619,7 +643,7 @@ const SIDE_SCALES = [1, 0.6, 0.35, 0]
  */
 function dryTracksidePoint(
   table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
-  bounds: PlacementBounds | undefined, keepOff: readonly KeepOff[],
+  bounds: PlacementBounds | undefined, keepOff: readonly KeepOff[], roam: number,
 ): Vec3 {
   const { sideMin } = TRACKSIDE.ground
   for (const scale of bounds ? SIDE_SCALES : [1]) {
@@ -633,7 +657,7 @@ function dryTracksidePoint(
   const around = bestFacingAround(table, riderIndex, slot, surface, groundFn, reach, trackScale, bounds)
   if (around && inViewOnApproach(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale)) return around
   // Not in an interior: its boulders and pieces stand on the floor, and nothing keeps a spot off them.
-  const looked = bounds ? null : whereTheApproachLooks(table, riderIndex, slot, surface, groundFn, reach, trackScale, keepOff)
+  const looked = bounds ? null : whereTheApproachLooks(table, riderIndex, slot, surface, groundFn, reach, trackScale, keepOff, roam)
   const aroundSeen = around ? looksInView(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale) : -1
   return (looked && looked.seen > aroundSeen ? looked.p : around) ?? clampToBounds(tracksidePoint(table, riderIndex, slot), bounds)
 }
@@ -645,19 +669,20 @@ const LOOK_SPOT_STEP = 100
 /**
  * A blind approach (#494: Desert's opening climb, pitched at the sky, the track beyond its crest dropping and turning
  * away): no spot near the slot's stretch of track is in view while the rider closes on it. The spot out along the look
- * from the middle of that approach instead, offset by the slot's side: off every rail and out of `keepOff`, at the
- * distance the most of the approach's looks see (`looksInView`; the nearest of equals). Null if none is.
+ * from the middle of that approach instead, offset by the slot's side: off every rail and `roam` (how far the enemy
+ * wanders from its spot, #708) out of `keepOff`, at the distance the most of the approach's looks see (`looksInView`;
+ * the nearest of equals). Null if none is.
  */
 function whereTheApproachLooks(
   table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
-  keepOff: readonly KeepOff[],
+  keepOff: readonly KeepOff[], roam: number,
 ): { p: Vec3; seen: number } | null {
   const { eye, dir } = trackView(table, indexAhead(table, riderIndex, Math.max(0, slot.ahead - VIEW_LEAD) + VIEW_HOLD), trackScale)
   const look = horizontal(dir)
   let best: { p: Vec3; seen: number } | null = null
   for (let d = LOOK_SPOT_FIRST; d < reach; d += LOOK_SPOT_STEP) {
     const p = { x: eye.x + look.x * d - look.z * slot.side, y: 0, z: eye.z + look.z * d + look.x * slot.side }
-    if (keepOff.some((c) => Math.hypot(p.x - c.x, p.z - c.z) < c.r)) continue
+    if (!clearOfKeepOff(p, keepOff, roam)) continue
     if (!clearOfTrack(table, p, TRACKSIDE.ground.sideMin)) continue
     const seen = looksInView(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)
     if (seen > (best?.seen ?? 0)) best = { p, seen }

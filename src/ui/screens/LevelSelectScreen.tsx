@@ -3,7 +3,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { dailyKey, dailyLevel, msUntilNextUtcDay } from '@/levels/daily'
 import { biomeTheme } from '@/ui/theme'
-import { FairLining, FairStar, FairStars } from '@/ui/Fair'
+import { FairBoard, FairStar, FairStars } from '@/ui/Fair'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
 import { prepareSfx, sfx } from '@/audio/sfx'
 import LevelPostcard from './LevelPostcard'
@@ -178,8 +178,7 @@ export default function LevelSelectScreen() {
               onFocus={() => setFocusIndex(i)}
               onClick={() => select(i)}
             >
-              <span className="level-board fair-board fair-notched">
-                <FairLining />
+              <FairBoard as="span" className="level-board" shadowClassName="level-board-shadow">
                 <LevelPostcard biome={card.biome} boarded={!card.unlocked} />
                 <span className="level-plate">{card.name}</span>
                 <span className="level-card-body">
@@ -200,7 +199,7 @@ export default function LevelSelectScreen() {
                     </span>
                   )}
                 </span>
-              </span>
+              </FairBoard>
             </button>
           )
         })}
