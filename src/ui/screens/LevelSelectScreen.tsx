@@ -3,6 +3,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { dailyKey, dailyLevel, msUntilNextUtcDay } from '@/levels/daily'
 import { biomeTheme } from '@/ui/theme'
+import { FairLining, FairStar, FairStars } from '@/ui/Fair'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
 import { prepareSfx, sfx } from '@/audio/sfx'
 import LevelPostcard from './LevelPostcard'
@@ -140,17 +141,19 @@ export default function LevelSelectScreen() {
   }
 
   return (
-    <div className={`level-select${launching ? ' is-launching' : ''}`}>
+    <div className={`level-select fair-stage${launching ? ' is-launching' : ''}`}>
       <header className="level-select-header">
-        <h2>Select World</h2>
+        <button className="fair-plate level-select-back" onClick={back} disabled={!!launching}>
+          Back
+        </button>
+        <h2 className="fair-title">Pick a ride</h2>
         <p className="level-select-total" data-stars={total.earned} aria-label={`${total.earned} of ${total.max} stars`}>
-          <span className="level-select-total-star">★</span> {total.earned} / {total.max}
+          <FairStar earned /> {total.earned} / {total.max}
         </p>
       </header>
 
       <div className="level-grid" role="group" aria-label="Levels" onKeyDown={onGridKeyDown}>
         {cards.map((card, i) => {
-          const theme = biomeTheme(card.biome)
           const classes = ['level-card']
           if (!card.unlocked) classes.push('locked')
           if (launching === card.id) classes.push('is-selected')
@@ -164,7 +167,7 @@ export default function LevelSelectScreen() {
               className={classes.join(' ')}
               data-level={card.id}
               data-locked={card.unlocked ? undefined : 'true'}
-              style={{ '--accent': theme.accent, '--accent-glow': theme.glow } as CSSProperties}
+              style={{ '--plate': biomeTheme(card.biome).accent } as CSSProperties}
               tabIndex={i === focusIndex ? 0 : -1}
               aria-disabled={!card.unlocked}
               aria-label={
@@ -175,40 +178,28 @@ export default function LevelSelectScreen() {
               onFocus={() => setFocusIndex(i)}
               onClick={() => select(i)}
             >
-              <LevelPostcard biome={card.biome} />
-              {!card.unlocked && (
-                <span className="level-card-lock" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <rect x="5" y="10.5" width="14" height="10" rx="2" />
-                    <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" strokeWidth="2.4" />
-                  </svg>
+              <span className="level-board fair-board fair-notched">
+                <FairLining />
+                <LevelPostcard biome={card.biome} boarded={!card.unlocked} />
+                <span className="level-plate">{card.name}</span>
+                <span className="level-card-body">
+                  <span className="level-card-desc">{card.description}</span>
+                  {card.unlocked ? (
+                    <span className="level-card-meta">
+                      <FairStars earned={card.stars} label={`${card.stars} of ${STARS_PER_LEVEL} stars`} />
+                      <span className="level-card-best">
+                        {card.bestScore > 0 ? `Best ${fmt.format(card.bestScore)}` : 'Not ridden yet'}
+                        {card.bestScore > 0 && card.bestInitials && (
+                          <span className="level-card-initials">{card.bestInitials}</span>
+                        )}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="level-card-locked-hint">
+                      {card.unlockedBy ? `Opens with a star on ${card.unlockedBy}` : 'Not open yet'}
+                    </span>
+                  )}
                 </span>
-              )}
-              <span className="level-card-body">
-                <span className="level-card-index">World {i + 1}</span>
-                <span className="level-card-name">{card.name}</span>
-                <span className="level-card-desc">{card.description}</span>
-                {card.unlocked ? (
-                  <span className="level-card-meta">
-                    <span className="level-card-stars" data-stars={card.stars}>
-                      {Array.from({ length: STARS_PER_LEVEL }, (_, s) => (
-                        <span key={s} className={s < card.stars ? 'earned' : undefined}>
-                          ★
-                        </span>
-                      ))}
-                    </span>
-                    <span className="level-card-best">
-                      {card.bestScore > 0 ? `Best ${fmt.format(card.bestScore)}` : 'New'}
-                      {card.bestScore > 0 && card.bestInitials && (
-                        <span className="level-card-initials">{card.bestInitials}</span>
-                      )}
-                    </span>
-                  </span>
-                ) : (
-                  <span className="level-card-locked-hint">
-                    Locked{card.unlockedBy ? ` — earn ★ on ${card.unlockedBy}` : ''}
-                  </span>
-                )}
               </span>
             </button>
           )
@@ -224,10 +215,6 @@ export default function LevelSelectScreen() {
           onClick={() => select(dailyIndex)}
         />
       </div>
-
-      <button className="play-button level-select-back" onClick={back} disabled={!!launching}>
-        Back
-      </button>
     </div>
   )
 }
@@ -241,8 +228,8 @@ interface DailyCardButtonProps {
   onClick: () => void
 }
 
+/** Today's Daily Run: a ticket rather than a ride board, its stub torn off along the perforation. */
 function DailyCardButton({ card, ref, focused, selected, onFocus, onClick }: DailyCardButtonProps) {
-  const theme = biomeTheme(card.biome)
   const date = dateFmt.format(new Date())
   const best = card.bestScore > 0 ? `Best today ${fmt.format(card.bestScore)}` : 'Not played yet'
   const streak = card.streak > 0 ? `${card.streak}-day streak` : null
@@ -252,24 +239,24 @@ function DailyCardButton({ card, ref, focused, selected, onFocus, onClick }: Dai
       type="button"
       className={`level-card level-card-daily${selected ? ' is-selected' : ''}`}
       data-daily={card.dateKey}
-      style={{ '--accent': theme.accent, '--accent-glow': theme.glow } as CSSProperties}
       tabIndex={focused ? 0 : -1}
       title={rolloverHint(card.dateKey)}
       aria-label={`Daily Run, ${date}: ${card.levelName}. ${best}${streak ? `, ${streak}` : ''}`}
       onFocus={onFocus}
       onClick={onClick}
     >
-      <LevelPostcard biome={card.biome} />
-      <span className="level-card-daily-badge" aria-hidden="true">
-        Daily
-      </span>
-      <span className="level-card-body">
-        <span className="level-card-index">{date}</span>
-        <span className="level-card-name">Daily Run</span>
-        <span className="level-card-desc">{card.levelName}: the same run for everyone today</span>
-        <span className="level-card-meta">
-          <span className="level-card-best">{best}</span>
-          {streak && <span className="level-card-streak">{streak}</span>}
+      <span className="level-ticket fair-notched">
+        <span className="level-ticket-stub">
+          <span className="level-ticket-title">Daily Run</span>
+          <span className="level-ticket-date">{date}</span>
+        </span>
+        <LevelPostcard biome={card.biome} />
+        <span className="level-card-body">
+          <span className="level-card-desc">{card.levelName}, the same ride for everyone today</span>
+          <span className="level-card-meta">
+            <span className="level-card-best">{best}</span>
+            {streak && <span className="level-card-streak">{streak}</span>}
+          </span>
         </span>
       </span>
     </button>

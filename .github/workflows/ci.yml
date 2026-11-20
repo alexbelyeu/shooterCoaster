@@ -38,6 +38,7 @@ jobs:
       game: ${{ steps.plan.outputs.game }}
       unit: ${{ steps.plan.outputs.unit }}
       portal: ${{ steps.plan.outputs.portal }}
+      pacing: ${{ steps.plan.outputs.pacing }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,7 +57,7 @@ jobs:
               : []
             const plan = ciPlan({ event: context.eventName, files, merged: context.payload.inputs?.merged || '' })
             core.info(`${files.length} changed files → ${JSON.stringify(plan)}`)
-            for (const [job, run] of Object.entries(plan)) core.setOutput(job, String(run))
+            for (const [job, run] of Object.entries(plan)) core.setOutput(job, Array.isArray(run) ? JSON.stringify(run) : String(run))
 
   unit:
     name: unit + build
@@ -165,9 +166,49 @@ jobs:
           path: e2e-results/
           retention-days: 14
 
+  # Time with nothing to shoot (#761), for the levels the PR touches (scripts/ciPlan.cjs `pacingLevels`): the smoke's
+  # `pacing` step plays the level's whole run against its budgets.json `pacing` ceilings. On a PR only: main's is nightly.
+  pacing:
+    name: pacing (${{ matrix.level }})
+    needs: changes
+    if: ${{ needs.changes.outputs.pacing != '' && needs.changes.outputs.pacing != '[]' }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        level: ${{ fromJSON(needs.changes.outputs.pacing || '["none"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Install Chromium
+        run: bash scripts/install-chromium.sh
+
+      - name: Pacing ${{ matrix.level }}
+        run: node e2e/smoke.mjs --levels ${{ matrix.level }} --steps pacing
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-pacing-${{ matrix.level }}
+          path: e2e-results/
+          retention-days: 14
+
   verify:
     name: verify
-    needs: [changes, unit, lighthouse, smoke]
+    needs: [changes, unit, lighthouse, smoke, pacing]
     # Not always(): a run superseded by a newer push skips this instead of reporting red. It runs when the jobs
     # it needs were skipped too: a skipped required check never reports, so a docs-only PR gets its green here.
     if: ${{ !cancelled() }}
@@ -178,14 +219,15 @@ jobs:
     timeout-minutes: 5
     steps:
       # Skipped passes only where `changes` planned it; if `changes` failed, everything it gates counts as red.
-      - name: Unit tests, Lighthouse and every smoke shard passed (or the plan skipped them)
+      - name: Unit tests, Lighthouse, every smoke shard and pacing passed (or the plan skipped them)
         env:
           NEEDS: ${{ toJSON(needs) }}
         run: |
           echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
           bad=$(echo "$NEEDS" | jq -r '
             (.changes.outputs // {}) as $plan
-            | {unit: $plan.unit, lighthouse: $plan.game, smoke: $plan.game} as $planned
+            | {unit: $plan.unit, lighthouse: $plan.game, smoke: $plan.game,
+               pacing: (if (($plan.pacing // "[]") == "[]" or ($plan.pacing // "") == "") then "false" else "true" end)} as $planned
             | [to_entries[] | select(.value.result != "success" and (.value.result != "skipped" or $planned[.key] != "false"))
                | "\(.key) \(.value.result)"] | join(", ")')
           if [ -n "$bad" ]; then echo "::error title=verify::not green: $bad"; exit 1; fi
