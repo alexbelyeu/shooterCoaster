@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error plain .mjs tooling module, no types
-import { countTells, hasBlur, shadowLayers } from './uiTells.mjs'
+import { compareToBaseline, countTells, hasBlur, shadowLayers } from './uiTells.mjs'
 
 describe('uiTells', () => {
   it('counts a blurred shadow as a glow and a hard one as fine', () => {
@@ -17,5 +17,9 @@ describe('uiTells', () => {
     expect(countTells(css, 'x.css')).toMatchObject({ edgeAccent: 1, tracking: 1, allCaps: 1, pill: 1, gradientSurface: 1, frosted: 1 })
     expect(countTells("const hint = 'Esc: resume · ↑↓ + Enter'", 'a.tsx').middleDot).toBe(1)
     expect(countTells("const hint = 'Esc: resume · ↑↓ + Enter'", 'a.test.ts').middleDot).toBe(0)
+  })
+
+  it('flags a count above the baseline and one below it (a stale baseline to lower)', () => {
+    expect(compareToBaseline({ glow: 3, pill: 1, tracking: 2 }, { glow: 2, pill: 1, tracking: 4 })).toEqual({ over: ['glow'], under: ['tracking'] })
   })
 })

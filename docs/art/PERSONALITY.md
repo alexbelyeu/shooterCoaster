@@ -31,7 +31,7 @@ someone painted for this ride, not like an app's settings panel.
 ## Palette
 
 The house colours are the same on every level; a level's own colour shows only in its name plate on level select
-and in the 3D world. Tokens live in `src/app/global.css` `:root` (`--fair-*`) and `src/ui/theme.ts` `FAIR`.
+and in the 3D world. Tokens live in `src/app/global.css` `:root` (`--fair-*`).
 
 | Token | Hex | What it is | Use |
 |---|---|---|---|

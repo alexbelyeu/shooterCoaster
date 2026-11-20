@@ -36,7 +36,7 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* The house colours (docs/art/PERSONALITY.md "Palette"); `FAIR` in src/ui/theme.ts mirrors them for canvas drawing. */
+/* The house colours (docs/art/PERSONALITY.md "Palette"). */
 :root {
   --fair-oxblood: #5b1220;
   --fair-oxblood-deep: #3a0a13;
@@ -1981,7 +1981,13 @@ canvas {
   }
 }
 
-/* Settings: the pause card's look, grouped rows with 44 px touch targets */
+/* Settings: grouped rows with 44 px touch targets, in its pre-fair look (gold accent) until it moves onto a fair
+   board (docs/art/PERSONALITY.md); the backdrop is .pause-screen's flat dim. */
+.settings-screen {
+  --accent: #ffd23f;
+  --accent-glow: rgba(255, 210, 63, 0.55);
+}
+
 .settings-card {
   display: flex;
   flex-direction: column;
@@ -2200,6 +2206,12 @@ canvas {
   .settings-card {
     width: min(100%, 46rem);
     padding: 0.9rem 1.25rem;
+  }
+
+  .settings-screen h2 {
+    margin-bottom: 0.5rem;
+    font-size: 1.6rem;
+    text-align: left;
   }
 
   .settings-groups {

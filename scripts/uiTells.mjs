@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * The UI's generic tells (docs/art/PERSONALITY.md "Never"), counted across src/. `npm run lint` runs this: it fails
- * when any count is above `scripts/uiTells.baseline.json`, so no PR adds one, and prints where they are. When a
- * screen moves to the personality and a count drops, `node scripts/uiTells.mjs --update` lowers the baseline (it
- * never raises it).
+ * when any count is above `scripts/uiTells.baseline.json`, so no PR adds one, and prints where they are. It also
+ * fails when a count is below it, so a PR that removes tells lowers the baseline with `node scripts/uiTells.mjs
+ * --update` (which never raises it) and the next PR can't add them back unnoticed.
  */
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -96,6 +96,12 @@ function walk(dir, out = []) {
   return out
 }
 
+/** The tells over the baseline and the ones under it (the baseline is stale: lower it). */
+export function compareToBaseline(totals, baseline) {
+  const ids = Object.keys(totals)
+  return { over: ids.filter((id) => totals[id] > (baseline[id] ?? 0)), under: ids.filter((id) => totals[id] < (baseline[id] ?? 0)) }
+}
+
 function main() {
   const totals = Object.fromEntries(Object.keys(TELLS).map((id) => [id, 0]))
   const where = Object.fromEntries(Object.keys(TELLS).map((id) => [id, []]))
@@ -113,7 +119,7 @@ function main() {
     console.log('uiTells: baseline lowered to', next)
     return
   }
-  const over = Object.keys(TELLS).filter((id) => totals[id] > (baseline[id] ?? 0))
+  const { over, under } = compareToBaseline(totals, baseline)
   if (over.length) {
     for (const id of over) {
       console.error(`uiTells: ${TELLS[id].what}: ${totals[id]}, baseline ${baseline[id] ?? 0}. In: ${where[id].join(', ')}`)
@@ -121,8 +127,11 @@ function main() {
     console.error('uiTells: these are banned by docs/art/PERSONALITY.md ("Never"). Use the fair-* pieces instead.')
     process.exit(1)
   }
-  const lower = Object.keys(TELLS).filter((id) => totals[id] < (baseline[id] ?? 0))
-  console.log(`uiTells: ok${lower.length ? ` (lower than the baseline: ${lower.join(', ')}; run node scripts/uiTells.mjs --update)` : ''}`)
+  if (under.length) {
+    console.error(`uiTells: fewer tells than the baseline (${under.map((id) => `${id} ${totals[id]} < ${baseline[id]}`).join(', ')}): run node scripts/uiTells.mjs --update and commit scripts/uiTells.baseline.json`)
+    process.exit(1)
+  }
+  console.log('uiTells: ok')
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main()
