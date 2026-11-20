@@ -4,7 +4,7 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { buildArcTable, distanceAtT, tAtDistance } from './arcLength'
 import { createTrackCurve } from './curves/createTrackCurve'
 import {
-  MAX_RIDE_STEP_FRAMES, advanceRide, jumpRide, lapSeconds, rideLaunches, rideModel, rideOnLift, rideProfile, rideSpeedNorm, rideSpeeds,
+  MAX_RIDE_STEP_FRAMES, advanceRide, curveTangentY, jumpRide, lapSeconds, rideLaunches, rideModel, rideOnLift, rideProfile, rideSpeedNorm, rideSpeeds,
   rideStepFrames, rideTopShare, rideZone, type RideState,
 } from './ridePhysics'
 import { BEAT_TOLERANCE_SECONDS, buildRidePlan, planDistance, planSpeed, planTimeAt, type RidePlan } from './rideV2'
@@ -133,7 +133,7 @@ describe('ridePhysics on a v2 ride', () => {
     const profile = rideProfile(table, speeds, 20)
     for (const frames of [1, 2.4]) {
       const state: RideState = { progress: 0, velocity: 0, time: 0 }
-      while (state.time < 15 - 1e-9) advanceRide(state, curve, speeds, frames)
+      while (state.time < 15 - 1e-9) advanceRide(state, curveTangentY(curve), speeds, frames)
       expect(distanceAtT(table, state.progress) / table.length).toBeCloseTo(0.5, 1)
       expect(Math.abs(distanceAtT(table, state.progress) - profile[150])).toBeLessThan(frames * 3)
     }
@@ -146,7 +146,7 @@ describe('ridePhysics on a v2 ride', () => {
     let levelSeconds = 0
     for (let k = 0; k < 150; k++) {
       levelSeconds += 0.1
-      advanceRide(state, curve, speeds, rideStepFrames(speeds, 0.1))
+      advanceRide(state, curveTangentY(curve), speeds, rideStepFrames(speeds, 0.1))
     }
     expect(state.time).toBeCloseTo(levelSeconds, 6)
     expect(distanceAtT(table, state.progress)).toBeCloseTo(planDistance(plan, levelSeconds) % table.length, 0)
@@ -158,7 +158,7 @@ describe('ridePhysics on a v2 ride', () => {
     expect(state.time).toBeCloseTo(15, 0)
     let fastest = 0
     for (let k = 0; k < 60 * 30; k++) {
-      advanceRide(state, curve, speeds, 1)
+      advanceRide(state, curveTangentY(curve), speeds, 1)
       fastest = Math.max(fastest, rideSpeedNorm(state, speeds))
       expect(rideSpeedNorm(state, speeds)).toBeGreaterThanOrEqual(0)
     }
@@ -175,7 +175,7 @@ describe('ridePhysics on a v2 ride', () => {
     let shareMin = Infinity
     let shareMax = 0
     for (let k = 0; k < 60 * lapSeconds(curve, speeds) * 1.5; k++) {
-      advanceRide(state, curve, speeds, 1)
+      advanceRide(state, curveTangentY(curve), speeds, 1)
       const zone = rideZone(state, speeds)
       if (rideLaunches(k === 0, zone, lastZone)) launches++
       lastZone = zone

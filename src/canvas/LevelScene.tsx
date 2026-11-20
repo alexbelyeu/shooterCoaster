@@ -23,7 +23,6 @@ import Pickups from '@/combat/pickups/Pickups'
 import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
 import { goldenBalloonCount } from '@/levels/scoring'
-import { RUN_SECONDS } from '@/levels/pacing'
 import { eventBus } from '@/core/EventBus'
 import { BYSTANDER_HIT_EVENT, bystanderWarning, type BystanderHitEvent } from '@/combat/bystanders'
 import ShootingController from './ShootingController'
@@ -140,7 +139,6 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         trackTable={trackTable}
         groundFn={groundFn}
         boss={boss}
-        timerSeconds={RUN_SECONDS}
         rideSpeeds={speeds}
         trackScale={trackDims.trackScale}
         walls={walls}
@@ -148,7 +146,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         keepOff={keepOff}
       />
       <ShootingController />
-      <GameTimer seconds={RUN_SECONDS} />
+      <GameTimer />
       <KillProjector />
       <ShaderWarmup levelId={levelId} />
     </TerrainContext.Provider>

@@ -1,5 +1,6 @@
 /**
- * The logo Alex picked in #532 ("loop"), drawn as SVG by `screens/TitleLogo.tsx` and on canvas by `scoreCardImage.tsx`.
+ * The logo Alex picked in #532 ("loop"), drawn as SVG by `screens/TitleLogo.tsx` and on canvas by `scoreCardImage.tsx`
+ * (`drawLogo`): a change to either renderer changes the other with it.
  * Units are Lobster at font-size 160, baseline y = 200.
  */
 

@@ -14,6 +14,7 @@ import Medusa from './Medusa'
 import Yeti from './Yeti'
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
+import { RUN_SECONDS } from '@/levels/pacing'
 
 export const BOSS_COMPONENTS: Record<BossType, React.ComponentType<BossProps>> = {
   goldenBlimp: GoldenBlimp,
@@ -28,13 +29,12 @@ type Stage = Exclude<E2EBossStage, 'none' | 'defeated'>
 
 interface BossSpawnerProps {
   boss: NonNullable<LevelConfig['boss']>
-  timerSeconds: number
   track: ArcTable
   groundFn: HeightFunction
 }
 
 /** Tell and arrival run on GameTimer's `timeRemaining`, which holds through pauses and the countdown. */
-export default function BossSpawner({ boss, timerSeconds, track, groundFn }: BossSpawnerProps) {
+export default function BossSpawner({ boss, track, groundFn }: BossSpawnerProps) {
   const spec = BOSS_SPECS[boss.type]
   const [stage, setStage] = useState<Stage>('waiting')
   const stageRef = useRef<Stage>('waiting')
@@ -60,7 +60,7 @@ export default function BossSpawner({ boss, timerSeconds, track, groundFn }: Bos
     const summoned = isE2E && e2eBoss.summon === runId
     if (summoned) e2eBoss.summon = null
     // Read live: the first playing frame already has this run's reset timer (GameTimer's layout effect).
-    const elapsed = timerSeconds - s.timeRemaining
+    const elapsed = RUN_SECONDS - s.timeRemaining
     if (stageRef.current === 'waiting' && (summoned || elapsed >= boss.at - spec.tell.seconds)) {
       advance('incoming')
       eventBus.emit('wave:incoming', spec.tell.label)

@@ -4,7 +4,8 @@ import { SCORE_VALUES, computeMaxScore, computeStars, nextStar } from './scoring
 import type { EnemyType } from '@/types/level'
 import { BOSS_SPECS } from '@/entities/bosses/bossSpecs'
 import { bossMaxScore } from '@/entities/bosses/bossModel'
-import { ENTRY_SECONDS_MAX, RUN_SECONDS, pacingTimes } from './pacing'
+import { RUN_SECONDS, pacingTimes } from './pacing'
+import { ENTRY_SECONDS_MAX } from '@/entities/spawning/spawnPlacement'
 
 const levels = getAllLevels()
 

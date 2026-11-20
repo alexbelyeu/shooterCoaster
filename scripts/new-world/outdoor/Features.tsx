@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
-import type { BiomeFeaturesProps } from '../../shared/types'
+import type { BiomeFeaturesProps } from '@/levels/environments/shared/types'
 import { LANDMARK_SITE, SPIRE_HEIGHT } from './config'
 
 /** A stone spire beyond the track: the stand-in for this world's hero landmark (docs/LEVEL-KIT.md). */

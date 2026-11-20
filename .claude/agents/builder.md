@@ -60,7 +60,7 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
    If QA's only request is "merge conflict only" (or the auto-merge workflow handed the
    approved PR back with `Auto-merge failed: this branch conflicts with main`), merge `origin/main`, resolve keeping
    both sides' behaviour, run `bash scripts/quiet.sh npm test && bash scripts/quiet.sh npm run lint && bash scripts/quiet.sh npm run build`, push, reply, swap the labels
-   and finish. CI runs the full `verify` and QA does a light re-review, so skip steps
+   and finish. CI runs `verify` (the PR depth) and QA does a light re-review, so skip steps
    2–7 unless a conflict touched `src/` or `e2e/` (then do steps 3 and 7).
 2. Plan briefly, then implement. Stay inside the issue's scope; note follow-ups instead
    of expanding scope. **Size it first:** if doing it properly means reading more than ~10 modules

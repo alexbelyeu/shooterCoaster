@@ -1,9 +1,9 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
-import type { BiomeDecorationsProps } from '../../shared/types'
-import { scatterNearTrack, settleOnGround, trackExtent } from '../../shared/trackScatter'
-import StaticInstances from '../../shared/StaticInstances'
-import { yawScaleMatrix } from '../../shared/yawScaleMatrix'
+import type { BiomeDecorationsProps } from '@/levels/environments/shared/types'
+import { scatterNearTrack, settleOnGround, trackExtent } from '@/levels/environments/shared/trackScatter'
+import StaticInstances from '@/levels/environments/shared/StaticInstances'
+import { yawScaleMatrix } from '@/levels/environments/shared/yawScaleMatrix'
 import { createRng } from '@/utils/rng'
 import { BOULDER_COLOR } from './config'
 
