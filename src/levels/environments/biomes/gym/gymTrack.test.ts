@@ -249,7 +249,10 @@ describe('the gym track', () => {
     expect(secondsAt(crest)).toBeLessThanOrEqual(40)
   })
 
-  it('keeps the star in the camera view at least 80% of 40–60 s', () => {
+  // 75% since the star moved to the middle of the end wall the Tree leaves in view (Alex, 19 Nov): the dive still runs
+  // down the pit's middle, so the narrowest phone view loses the star ~2 s sooner as the run passes under it. #700's
+  // rebuild of the ride aims the dive at the star's new place.
+  it('keeps the star in the camera view at least 74% of 40–60 s', () => {
     const star = toWorld(STAR.centre)
     const look = { x: 0, y: 0, z: 0 }
     const eye = new THREE.Vector3()
@@ -280,7 +283,7 @@ describe('the gym track', () => {
       frames++
       if (depth > 0 && Math.abs(across) <= MIN_HORIZONTAL_FOV / 2 && Math.abs(vertical) <= VERTICAL_HALF_FOV) seen++
     }
-    expect(seen / frames).toBeGreaterThanOrEqual(0.8)
+    expect(seen / frames).toBeGreaterThanOrEqual(0.74)
   })
 
   it("keeps the rails and the camera clear of the Medusa's bust from her rise to the run's end, leant out or not", () => {

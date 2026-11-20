@@ -388,7 +388,7 @@ export const GYM_LEVEL: { track: TrackParams; walls: readonly WallSurface[] } = 
         "y": 0.9978784,
         "z": 3.986552e-18
       },
-      "width": 417.6,
+      "width": 273.6,
       "height": 478.8359
     },
     {
@@ -396,7 +396,7 @@ export const GYM_LEVEL: { track: TrackParams; walls: readonly WallSurface[] } = 
       "origin": {
         "x": -1257.737,
         "y": -78.4,
-        "z": -198.4
+        "z": -54.4
       },
       "right": {
         "x": 6.123234e-17,
@@ -408,7 +408,7 @@ export const GYM_LEVEL: { track: TrackParams; walls: readonly WallSurface[] } = 
         "y": 0.9978784,
         "z": 3.986552e-18
       },
-      "width": 417.6,
+      "width": 561.6,
       "height": 478.8359
     }
   ]
