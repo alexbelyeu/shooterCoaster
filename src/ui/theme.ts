@@ -16,7 +16,19 @@ export interface BiomeUITheme {
   bg: string
 }
 
-export type SkyStop = readonly [colour: string, at: number]
+/** The house colours, `--fair-*` in `src/app/global.css` (docs/art/PERSONALITY.md "Palette"), for drawing on a canvas. */
+export const FAIR = {
+  oxblood: '#5b1220',
+  oxbloodDeep: '#3a0a13',
+  gilt: '#e9b53d',
+  giltBlock: '#9a6414',
+  vermilion: '#d9301f',
+  sky: '#63b7e6',
+  cream: '#f6e7c1',
+  tar: '#1b110d',
+} as const
+
+export type SkyStop =readonly [colour: string, at: number]
 
 function theme(t: Omit<BiomeUITheme, 'bg'>): BiomeUITheme {
   const stops = t.sky.map(([c, at]) => `${c} ${Math.round(at * 100)}%`).join(', ')

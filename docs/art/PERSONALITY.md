@@ -55,7 +55,7 @@ Never a gradient on a surface; the only soft colour change allowed is the dim ov
 - **Big Shoulders** (OFL, condensed signage grotesque, variable with an optical size axis): everything else. Plate
   labels at `opsz` 40 and weight 800; text at `opsz` 10, weight 500 to 600.
 - **Lobster** stays in the logo's wordmark only (Alex's pick) and on the Theme Park's entrance arch in the world.
-- **Inter is retired** from the UI as screens move to this file: it is the default sans of generated pages.
+- **No Inter** (retired with the score card, #735): it is the default sans of generated pages. The page's own default face is Big Shoulders.
 - Scale (px at a 390 px wide phone; desktop the same, the board doesn't grow): 17 hint, 20 to 22 text and small
   plates, 30 to 34 main plate, 40 board title, 52 score. Sentence case for text, title case for plate labels.
   **No letter-spacing and no all-caps labels.** Lines under 60 characters.

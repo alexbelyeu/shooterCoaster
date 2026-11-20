@@ -13,11 +13,12 @@ import {
   type CardSize,
   type CardText,
   type Measure,
+  type Rect,
   type ScoreCardRun,
 } from './scoreCard'
 
-/** A generous stand-in for `measureText`: every glyph 0.62 em wide (wider than Inter's and Lobster's digits). */
-const measure: Measure = (text, font) => [...text].length * Number(/(\d+)px/.exec(font)![1]) * 0.62
+/** A generous stand-in for `measureText`: every glyph 0.85 em wide (wider than Ultra's and Big Shoulders' digits). */
+const measure: Measure = (text, font) => [...text].length * Number(/(\d+)px/.exec(font)![1]) * 0.85
 
 const SIZES: CardSize[] = ['feed', 'story']
 
@@ -93,19 +94,19 @@ describe('score card layout', () => {
     expect(logo.kind).toBe('logo')
     if (logo.kind === 'logo') expect(logo.rect.width / logo.rect.height).toBeCloseTo(VIEWBOX.width / VIEWBOX.height)
     const t = texts(RUN, size).map((i) => i.text)
-    expect(t).toEqual(expect.arrayContaining(['Theme Park', '12,345', 'BEST COMBO', '×14', 'ACCURACY', '87%', 'Can you beat it?', 'scoaster.com']))
-    expect(t.some((s) => s.startsWith('DAILY RUN'))).toBe(false)
-    expect(layoutScoreCard(RUN, size, measure).items.some((i) => i.kind === 'pill')).toBe(false)
+    expect(t).toEqual(expect.arrayContaining(['Theme Park', '12,345', 'Best combo', '×14', 'Accuracy', '87%', 'Can you beat it?', 'scoaster.com']))
+    expect(t.some((s) => s.startsWith('Daily Run'))).toBe(false)
+    expect(layoutScoreCard(RUN, size, measure).items.some((i) => i.kind === 'showcard')).toBe(false)
   })
 
   it.each(SIZES)('gives a daily run its badge and date (%s)', (size) => {
     const daily = { ...RUN, daily: 'Nov 4, 2026' }
-    expect(role(daily, size, 'badge').map((t) => t.text)).toEqual(['DAILY RUN · NOV 4, 2026'])
+    expect(role(daily, size, 'badge').map((t) => t.text)).toEqual(['Daily Run, Nov 4, 2026'])
     const items = layoutScoreCard(daily, size, measure).items
-    const pill = items.find((i) => i.kind === 'pill')
+    const card = items.find((i) => i.kind === 'showcard')
     const badge = role(daily, size, 'badge')[0]
-    expect(pill).toBeDefined()
-    const p = itemBounds(pill!)
+    expect(card).toBeDefined()
+    const p = itemBounds(card!)
     const b = itemBounds(badge)
     expect(b.x).toBeGreaterThan(p.x)
     expect(b.x + b.width).toBeLessThan(p.x + p.width)
@@ -113,19 +114,19 @@ describe('score card layout', () => {
     expect(b.y + b.height).toBeLessThanOrEqual(p.y + p.height + 0.5)
   })
 
-  it.each(SIZES)('puts a WORLD ribbon between the stars and the score of a run on the World board (%s)', (size) => {
+  it.each(SIZES)('puts a World show card between the stars and the score of a run on the World board (%s)', (size) => {
     const ranked = { ...RUN, worldRank: 2 }
-    expect(role(ranked, size, 'rank').map((t) => t.text)).toEqual(['WORLD #3'])
-    expect(role({ ...RUN, worldRank: 9 }, size, 'rank')[0].text).toBe('WORLD #10')
+    expect(role(ranked, size, 'rank').map((t) => t.text)).toEqual(['World #3'])
+    expect(role({ ...RUN, worldRank: 9 }, size, 'rank')[0].text).toBe('World #10')
     const items = layoutScoreCard(ranked, size, measure).items
-    const pill = itemBounds(items.find((i) => i.kind === 'pill')!)
+    const card = itemBounds(items.find((i) => i.kind === 'showcard')!)
     const label = itemBounds(role(ranked, size, 'rank')[0])
-    expect(label.x).toBeGreaterThan(pill.x)
-    expect(label.x + label.width).toBeLessThan(pill.x + pill.width)
+    expect(label.x).toBeGreaterThan(card.x)
+    expect(label.x + label.width).toBeLessThan(card.x + card.width)
     const stars = itemBounds(items.find((i) => i.kind === 'stars')!)
     const score = itemBounds(role(ranked, size, 'score')[0])
-    expect(pill.y).toBeGreaterThanOrEqual(stars.y + stars.height)
-    expect(score.y).toBeGreaterThanOrEqual(pill.y + pill.height)
+    expect(card.y).toBeGreaterThanOrEqual(stars.y + stars.height)
+    expect(score.y).toBeGreaterThanOrEqual(card.y + card.height)
   })
 
   it.each(SIZES)('lays out a run without a World rank exactly as before (%s)', (size) => {
@@ -134,17 +135,27 @@ describe('score card layout', () => {
   })
 
   it.each(SIZES)('stacks the rows without overlaps (%s)', (size) => {
-    const stack = layoutScoreCard({ ...RUN, daily: 'Nov 4, 2026', worldRank: 0 }, size, measure)
-      .items.filter((i) => i.kind !== 'pill' && !(i.kind === 'text' && (i.role === 'statValue' || i.role === 'badge' || i.role === 'rank')))
+    const layout = layoutScoreCard({ ...RUN, daily: 'Nov 4, 2026', worldRank: 0 }, size, measure)
+    const stack = layout.items
+      .filter((i) => i.kind !== 'showcard' && !(i.kind === 'text' && (i.role === 'statValue' || i.role === 'badge' || i.role === 'rank')))
       .map(itemBounds)
-    // Stat labels share a row: compare row tops only.
-    const rows = [...new Map(stack.map((b) => [Math.round(b.y), b])).values()].sort((a, b) => a.y - b.y)
-    for (let i = 1; i < rows.length; i++) expect(rows[i].y).toBeGreaterThanOrEqual(rows[i - 1].y + rows[i - 1].height - 0.5)
+    // The feed card's closing lines stand in their own column under the art.
+    const underArt = (b: Rect) => size === 'feed' && b.x >= layout.art.x
+    for (const column of [stack.filter((b) => !underArt(b)), stack.filter(underArt)]) {
+      // Stat labels share a row: compare row tops only.
+      const rows = [...new Map(column.map((b) => [Math.round(b.y), b])).values()].sort((a, b) => a.y - b.y)
+      for (let i = 1; i < rows.length; i++) expect(rows[i].y).toBeGreaterThanOrEqual(rows[i - 1].y + rows[i - 1].height - 0.5)
+    }
+    if (size === 'feed') {
+      const art = layout.art
+      expect(stack.filter(underArt).map((b) => b.y).every((y) => y > art.y + art.height)).toBe(true)
+      expect(stack.filter((b) => !underArt(b)).every((b) => b.x + b.width < art.x)).toBe(true)
+    }
   })
 
   it('keeps the story stack off the clear part of its art', () => {
     const l = layoutScoreCard({ ...RUN, daily: 'Nov 4, 2026' }, 'story', measure)
-    for (const item of l.items) expect(itemBounds(item).y).toBeGreaterThan(l.fade.from[1])
+    for (const item of l.items) expect(itemBounds(item).y).toBeGreaterThan(l.art.y + l.art.height)
   })
 
   it('shows a dash for a run without a combo or shots', () => {
