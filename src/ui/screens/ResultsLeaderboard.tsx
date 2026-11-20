@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { LeaderboardEntry } from '@/types/game'
 import { LEADERBOARD_SIZE } from '@/store/leaderboard'
+import { FairBoard, FairStars } from '@/ui/Fair'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
 import { rankLabel } from '@/ui/share'
 import type { InitialsState } from './initialsEntry'
@@ -17,7 +18,16 @@ interface Props {
   onSlot: (slot: number) => void
 }
 
-/** The level's top 10 on the results screen, online or local; the run's local row takes arcade initials (keys from ResultsScreen, buttons here for touch). */
+/** Which board it is, in a plain line under the title (the smoke reads it). */
+export const BOARD_SOURCE_LINE = { world: "The world's top 10", device: "This device's top 10" } as const
+
+/** The pad's arrows, drawn rather than typed: ◀ and ▶ turn into emoji on some phones. */
+const ARROW_TURN = { ArrowUp: 0, ArrowRight: 90, ArrowDown: 180, ArrowLeft: 270 } as const
+
+/**
+ * The level's top 10 on the results screen, online or local, as the gallery's prize board; the run's local row takes
+ * arcade initials in three ticket-counter tiles (keys from ResultsScreen, plates here for touch).
+ */
 export default function ResultsLeaderboard({ board, rank, source, editing, onKey, onSlot }: Props) {
   const rootRef = useRef<HTMLDivElement>(null)
   const isEditing = editing !== null
@@ -29,26 +39,27 @@ export default function ResultsLeaderboard({ board, rank, source, editing, onKey
 
   // Keep focus off the pad, or Enter would press the focused arrow instead of confirming.
   const keep = (e: { preventDefault: () => void }) => e.preventDefault()
-  const pad = (key: string, label: string, text: string, className?: string) => (
-    <button type="button" className={className} aria-label={label} onMouseDown={keep} onClick={() => onKey(key)}>
-      {text}
+  const arrow = (key: keyof typeof ARROW_TURN, label: string) => (
+    <button type="button" className="fair-plate" aria-label={label} onMouseDown={keep} onClick={() => onKey(key)}>
+      <svg viewBox="0 0 20 20" aria-hidden="true" style={{ rotate: `${ARROW_TURN[key]}deg` }}>
+        <path d="M10 3l7 12H3z" />
+      </svg>
     </button>
   )
 
   return (
-    <div
+    <FairBoard
       ref={rootRef}
       className="results-board"
+      shadowClassName="results-board-shadow"
       data-rank={rank ?? undefined}
       data-source={source}
       data-editing={isEditing || undefined}
     >
-      <h3>
-        {rank !== null ? `New high score · ${rankLabel(rank)}` : 'Top 10'}
-        <span className="results-board-source">{source === 'world' ? 'World' : 'This device'}</span>
-      </h3>
+      <h3 className="fair-title">{rank !== null ? `You're ${rankLabel(rank)}!` : 'High scores'}</h3>
+      <p className="results-board-source">{BOARD_SOURCE_LINE[source]}</p>
       {board.length === 0 ? (
-        <p className="results-board-empty">No scores yet</p>
+        <p className="results-board-empty">No scores yet. Yours could be the first.</p>
       ) : (
         <ol>
           {board.slice(0, LEADERBOARD_SIZE).map((e, i) => {
@@ -72,10 +83,10 @@ export default function ResultsLeaderboard({ board, rank, source, editing, onKey
                       ))
                     : e.initials}
                 </span>
-                <span className="results-board-stars" aria-label={`${e.stars} stars`}>
-                  {'★'.repeat(e.stars)}
+                <span className="results-board-stars">
+                  <FairStars earned={e.stars} label={`${e.stars} stars`} />
                 </span>
-                <strong>{fmt.format(e.score)}</strong>
+                <strong className="results-board-score">{fmt.format(e.score)}</strong>
               </li>
             )
           })}
@@ -83,13 +94,15 @@ export default function ResultsLeaderboard({ board, rank, source, editing, onKey
       )}
       {editing && (
         <div className="results-initials-pad" role="group" aria-label="Enter your initials">
-          {pad('ArrowLeft', 'Previous letter slot', '◀')}
-          {pad('ArrowUp', 'Next letter', '▲')}
-          {pad('ArrowDown', 'Previous letter', '▼')}
-          {pad('ArrowRight', 'Next letter slot', '▶')}
-          {pad('Enter', 'Confirm initials', 'OK', 'results-initials-ok')}
+          {arrow('ArrowLeft', 'Previous letter slot')}
+          {arrow('ArrowUp', 'Next letter')}
+          {arrow('ArrowDown', 'Previous letter')}
+          {arrow('ArrowRight', 'Next letter slot')}
+          <button type="button" className="fair-plate results-initials-ok" aria-label="Confirm initials" onMouseDown={keep} onClick={() => onKey('Enter')}>
+            OK
+          </button>
         </div>
       )}
-    </div>
+    </FairBoard>
   )
 }

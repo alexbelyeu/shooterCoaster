@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
 import {
   canCopy,
@@ -14,6 +15,7 @@ import {
   type ShareMethod,
   type SharePayload,
 } from '@/ui/share'
+import { FairBoard } from '@/ui/Fair'
 import { placePopover, type Placement } from '@/ui/popoverPlacement'
 import { scoreCardFileName, type CardSize, type ScoreCardRun } from '@/ui/scoreCard'
 import { downloadBlob, renderScoreCard } from '@/ui/scoreCardImage'
@@ -146,27 +148,31 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
   }, [open])
 
   useEffect(() => {
-    if (placement) menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+    if (placement) menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true })
   }, [placement])
 
   useEffect(() => {
     if (!open) return
     const onPointerDown = (e: PointerEvent) => {
-      if (!anchorRef.current?.contains(e.target as Node)) close(false)
+      const target = e.target as Node
+      if (!anchorRef.current?.contains(target) && !menuRef.current?.contains(target)) close(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       e.stopPropagation()
       close(true)
     }
-    const onResize = () => close(false)
+    // The menu is fixed to the viewport: scrolling the results screen or resizing would leave it behind.
+    const onMove = () => close(false)
     document.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('keydown', onKey, true)
-    window.addEventListener('resize', onResize)
+    window.addEventListener('resize', onMove)
+    window.addEventListener('scroll', onMove, true)
     return () => {
       document.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('keydown', onKey, true)
-      window.removeEventListener('resize', onResize)
+      window.removeEventListener('resize', onMove)
+      window.removeEventListener('scroll', onMove, true)
     }
   }, [open])
 
@@ -204,56 +210,61 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
       >
         Share
       </button>
-      {open && (
-        <div
-          ref={menuRef}
-          id={menuId}
-          className="share-menu"
-          role="menu"
-          aria-label="Share your score"
-          data-side={placement?.side}
-          style={{ left: placement?.offsetX ?? 0, visibility: placement ? 'visible' : 'hidden' }}
-          onKeyDown={onMenuKey}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            className={`share-item${imageCopyable ? '' : ' share-wide'}`}
-            data-target="image_download"
-            onClick={onDownload}
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            id={menuId}
+            className="share-menu"
+            role="menu"
+            aria-label="Share your score"
+            data-side={placement?.side}
+            style={{ left: placement?.left ?? 0, top: placement?.top ?? 0, visibility: placement ? 'visible' : 'hidden' }}
+            onKeyDown={onMenuKey}
           >
-            Save image
-          </button>
-          {imageCopyable && (
-            <button type="button" role="menuitem" className="share-item" data-target="image_copy" onClick={onCopyImage}>
-              {copied === 'image_copy' ? 'Copied!' : 'Copy image'}
-            </button>
-          )}
-          {copyable && (
-            <button type="button" role="menuitem" className="share-item share-copy share-wide" data-target="copy" onClick={onCopy}>
-              {copied === 'copy' ? 'Copied!' : 'Copy link'}
-            </button>
-          )}
-          {SHARE_TARGETS.map(({ id, label }) => {
-            const payload = sharePayloadForRun(levelId, score, id, worldRank)
-            if (!payload) return null
-            const email = id === 'email'
-            return (
-              <a
-                key={id}
+            <FairBoard className="share-board">
+              <button
+                type="button"
                 role="menuitem"
-                className="share-item"
-                data-target={id}
-                href={shareTargetHref(id, payload)}
-                target={email ? undefined : '_blank'}
-                rel={email ? undefined : 'noopener noreferrer'}
-                onClick={() => onTarget(id)}
+                className={`fair-plate share-item${imageCopyable ? '' : ' share-wide'}`}
+                data-target="image_download"
+                onClick={onDownload}
               >
-                {label}
-              </a>
-            )
-          })}
-        </div>
+                Save image
+              </button>
+              {imageCopyable && (
+                <button type="button" role="menuitem" className="fair-plate share-item" data-target="image_copy" onClick={onCopyImage}>
+                  {copied === 'image_copy' ? 'Copied!' : 'Copy image'}
+                </button>
+              )}
+              {copyable && (
+                <button type="button" role="menuitem" className="fair-plate share-item share-copy share-wide" data-target="copy" onClick={onCopy}>
+                  {copied === 'copy' ? 'Copied!' : 'Copy link'}
+                </button>
+              )}
+              {SHARE_TARGETS.map(({ id, label }) => {
+                const payload = sharePayloadForRun(levelId, score, id, worldRank)
+                if (!payload) return null
+                const email = id === 'email'
+                return (
+                  <a
+                    key={id}
+                    role="menuitem"
+                    className="fair-plate share-item"
+                    data-target={id}
+                    href={shareTargetHref(id, payload)}
+                    target={email ? undefined : '_blank'}
+                    rel={email ? undefined : 'noopener noreferrer'}
+                    onClick={() => onTarget(id)}
+                  >
+                    {label}
+                  </a>
+                )
+              })}
+            </FairBoard>
+          </div>,
+        // Out of the results board: its notched mask would clip the menu where it hangs over the edge.
+        document.body,
       )}
     </div>
   )

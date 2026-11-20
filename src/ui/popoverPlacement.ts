@@ -7,8 +7,9 @@ export interface Box {
 
 export interface Placement {
   side: 'below' | 'above'
-  /** Horizontal offset (px) from the anchor's left edge to the popover's left edge. */
-  offsetX: number
+  /** The popover's top-left corner in the viewport (px), for a `position: fixed` popover. */
+  left: number
+  top: number
 }
 
 const GAP = 8
@@ -30,5 +31,5 @@ export function placePopover(anchor: Box, width: number, height: number, viewpor
   if (fits(below)) side = 'below'
   else if (fits(above)) side = 'above'
   else side = viewport.height - anchor.bottom > anchor.top ? 'below' : 'above'
-  return { side, offsetX: left - anchor.left }
+  return { side, left, top: (side === 'below' ? below : above).top }
 }
