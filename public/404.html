@@ -5,11 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Vercel answers unknown paths with this page and a real 404 (vercel.json, docs/marketing/SEO.md). -->
     <meta name="robots" content="noindex" />
-    <title>Page not found · ShooterCoaster</title>
+    <title>Page not found at ShooterCoaster</title>
     <meta name="description" content="This page doesn't exist. Ride ShooterCoaster, the free browser rollercoaster shooter, from the home page." />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- No app CSS here: the fair's board and plate (docs/art/PERSONALITY.md) are copied from src/app/global.css `fair-*`. -->
     <style>
+      @font-face {
+        font-family: 'Ultra';
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/ultra-latin-400.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Big Shoulders';
+        font-weight: 100 900;
+        font-display: swap;
+        src: url('/fonts/big-shoulders-latin-opsz.woff2') format('woff2');
+      }
+      :root {
+        --oxblood: #5b1220;
+        --oxblood-deep: #3a0a13;
+        --gilt: #e9b53d;
+        --gilt-block: #9a6414;
+        --sky: #63b7e6;
+        --cream: #f6e7c1;
+        --tar: #1b110d;
+        --notch: 16px;
+      }
       html,
       body {
         height: 100%;
@@ -18,39 +41,114 @@
       body {
         display: grid;
         place-items: center;
-        background: linear-gradient(#7fbcf2, #cfe9ff);
-        color: #10233a;
-        font: 18px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        padding: 16px;
+        box-sizing: border-box;
+        background: var(--sky);
+        font-family: 'Big Shoulders', sans-serif;
+        font-variation-settings: 'opsz' 10;
         text-align: center;
       }
+      /* A ticket's notched corners; --o: how far a layer sits inside the board, so the lining runs parallel. */
+      .notched {
+        --o: 0px;
+        --n: var(--notch);
+        --cut: #0000 var(--n), #000 calc(var(--n) + 0.5px);
+        -webkit-mask:
+          radial-gradient(circle at calc(0px - var(--o)) calc(0px - var(--o)), var(--cut)) top left / 51% 51% no-repeat,
+          radial-gradient(circle at calc(100% + var(--o)) calc(0px - var(--o)), var(--cut)) top right / 51% 51% no-repeat,
+          radial-gradient(circle at calc(0px - var(--o)) calc(100% + var(--o)), var(--cut)) bottom left / 51% 51% no-repeat,
+          radial-gradient(circle at calc(100% + var(--o)) calc(100% + var(--o)), var(--cut)) bottom right / 51% 51% no-repeat;
+        mask:
+          radial-gradient(circle at calc(0px - var(--o)) calc(0px - var(--o)), var(--cut)) top left / 51% 51% no-repeat,
+          radial-gradient(circle at calc(100% + var(--o)) calc(0px - var(--o)), var(--cut)) top right / 51% 51% no-repeat,
+          radial-gradient(circle at calc(0px - var(--o)) calc(100% + var(--o)), var(--cut)) bottom left / 51% 51% no-repeat,
+          radial-gradient(circle at calc(100% + var(--o)) calc(100% + var(--o)), var(--cut)) bottom right / 51% 51% no-repeat;
+      }
+      /* The board's hard cast shadow sits on a wrapper: the board's own mask would clip it. */
+      .shadow {
+        width: min(100%, 26rem);
+        filter: drop-shadow(6px 8px 0 var(--tar));
+      }
       main {
-        padding: 24px;
+        position: relative;
+        padding: 2.2rem 1.9rem 2rem;
+        background: var(--oxblood);
+        color: var(--cream);
+      }
+      .lining {
+        position: absolute;
+        inset: 9px;
+        --o: 9px;
+        --n: calc(var(--notch) + 9px);
+        background: var(--gilt);
+      }
+      .lining > span {
+        position: absolute;
+        inset: 2px;
+        --o: 11px;
+        --n: calc(var(--notch) + 11px);
+        background: var(--oxblood);
+      }
+      main > :not(.lining) {
+        position: relative;
       }
       h1 {
-        margin: 0 0 8px;
-        font-size: 32px;
+        margin: 0;
+        font-family: 'Ultra', serif;
+        font-weight: 400;
+        font-size: 2.5rem;
+        line-height: 1.02;
+        color: var(--gilt);
+        text-wrap: balance;
+        text-shadow:
+          1px 1px 0 var(--gilt-block),
+          2px 2px 0 var(--gilt-block),
+          3px 3px 0 var(--gilt-block),
+          5px 6px 0 var(--tar);
+      }
+      p {
+        margin: 0.9rem 0 1.6rem;
+        font-size: 1.3rem;
+        font-weight: 600;
+        line-height: 1.3;
       }
       a {
         display: inline-block;
-        margin-top: 16px;
-        padding: 12px 28px;
-        border-radius: 999px;
-        background: #ffd23f;
-        color: #10233a;
-        font-weight: 700;
+        padding: 0.75rem 1.4rem 0.6rem;
+        border-radius: 5px;
+        font-variation-settings: 'opsz' 40;
+        font-size: 1.6rem;
+        font-weight: 800;
+        line-height: 1;
+        color: var(--tar);
+        background: var(--gilt);
+        box-shadow: 0 5px 0 var(--gilt-block);
         text-decoration: none;
+        transition: transform 60ms, box-shadow 60ms;
+      }
+      a:active {
+        transform: translateY(4px);
+        box-shadow: 0 1px 0 var(--gilt-block);
       }
       a:focus-visible {
-        outline: 3px solid #10233a;
+        outline: 3px solid var(--cream);
         outline-offset: 3px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        a {
+          transition: none;
+        }
       }
     </style>
   </head>
   <body>
-    <main>
-      <h1>Off the rails</h1>
-      <p>There's no page here.</p>
-      <a href="/">Play ShooterCoaster</a>
-    </main>
+    <div class="shadow">
+      <main class="notched">
+        <span class="lining notched" aria-hidden="true"><span class="notched"></span></span>
+        <h1>Off the rails</h1>
+        <p>This track runs out here, friend. The ride's back at the gate, and your seat's still warm.</p>
+        <a href="/">Play ShooterCoaster</a>
+      </main>
+    </div>
   </body>
 </html>

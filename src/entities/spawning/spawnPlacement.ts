@@ -13,6 +13,7 @@ import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
+import { EYE_HEIGHT } from '@/track/trackDimensions'
 
 /**
  * Formation placement, pure. Slots are seeded at level load (so `spawnDigest` stays
@@ -150,6 +151,12 @@ export function trackPoint(table: ArcTable, i: number): Vec3 {
   return { x: table.x[i], y: table.y[i], z: table.z[i] }
 }
 
+/** The rails' up at sample `i` (`trackGeometry.ts` `seatUp`'s): world up unless the curve rolls. */
+function trackUp(table: ArcTable, i: number): Vec3 {
+  const { ups } = table
+  return ups ? { x: ups.x[i], y: ups.y[i], z: ups.z[i] } : { x: 0, y: 1, z: 0 }
+}
+
 export interface FormationFrame {
   /** `track` plus the side / up offsets. */
   origin: Vec3
@@ -206,7 +213,10 @@ const VIEW_HALF_ANGLE_COS = Math.cos((MIN_HORIZONTAL_FOV * 0.4 * Math.PI) / 180)
 /** No group or trackside slot leads the rider by more than this share of a lap. */
 const MAX_LEAD_SHARE = 0.75
 
-/** Where the rig looks from track sample `index`: its eye and unit look direction (cameraRig's look-ahead blend, unsmoothed). */
+/**
+ * Where the rig looks from track sample `index`: its eye (the rail point) and unit look direction (`seatPose`'s look,
+ * unsmoothed: on a rolling track the seats sit `EYE_HEIGHT` along the rails' up, which turns the look with the rails).
+ */
 export interface TrackView {
   index: number
   eye: Vec3
@@ -215,8 +225,17 @@ export interface TrackView {
 
 export function trackView(table: ArcTable, index: number, trackScale: number): TrackView {
   const eye = trackPoint(table, index)
-  const toAhead = normalize(sub(trackPoint(table, indexAhead(table, index, LOOK_AHEAD_UNITS * trackScale)), eye))
-  return { index, eye, dir: lookAheadDirection(trackTangent(table, index), toAhead, { x: 0, y: 0, z: 0 }) }
+  const aheadIndex = indexAhead(table, index, LOOK_AHEAD_UNITS * trackScale)
+  const toAhead = sub(trackPoint(table, aheadIndex), eye)
+  if (table.ups) {
+    const up = trackUp(table, index)
+    const upAhead = trackUp(table, aheadIndex)
+    const h = EYE_HEIGHT * trackScale
+    toAhead.x += h * (upAhead.x - up.x)
+    toAhead.y += h * (upAhead.y - up.y)
+    toAhead.z += h * (upAhead.z - up.z)
+  }
+  return { index, eye, dir: lookAheadDirection(trackTangent(table, index), normalize(toAhead), { x: 0, y: 0, z: 0 }) }
 }
 
 export function inView(view: TrackView, p: Vec3, reach: number): boolean {

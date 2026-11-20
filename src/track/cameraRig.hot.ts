@@ -106,7 +106,7 @@ export function airtimeAmount(verticalAccel: number, trackScale: number): number
 export interface RigInput {
   /** Units/s² along the camera's right axis (`lateralAcceleration`). */
   lateral: number
-  /** Units/s² across the track in its vertical plane (`verticalAcceleration`): negative over a crest. */
+  /** Units/s² along the rails' up (`verticalAcceleration`): negative over a crest. */
   vertical: number
   /** Units/s. */
   speed: number
@@ -239,29 +239,44 @@ export function sampleTrack(table: ArcTable, t: number, trackScale: number, out:
 }
 
 /**
- * Lateral acceleration (units/s²) along the camera's right axis (tangent × up): curvature × v²,
- * from the unit tangents `arcSpan` units apart around the car. Positive when the track turns right.
+ * Lateral acceleration (units/s²) along the camera's right axis, tangent × the rails' up (`seatPose` `up`, #715: upside
+ * down the view's right is reversed): curvature × v², from the unit tangents `arcSpan` units apart around the car.
+ * Positive when the track turns right.
  */
 export function lateralAcceleration(
   tangent: Vec3Like,
+  up: Vec3Like,
   tangentBehind: Vec3Like,
   tangentAhead: Vec3Like,
   arcSpan: number,
   speed: number,
 ): number {
-  // right = tangent × (0, 1, 0)
-  const rx = -tangent.z
-  const rz = tangent.x
-  const len = Math.hypot(rx, rz)
+  const rx = tangent.y * up.z - tangent.z * up.y
+  const ry = tangent.z * up.x - tangent.x * up.z
+  const rz = tangent.x * up.y - tangent.y * up.x
+  const len = Math.hypot(rx, ry, rz)
   if (!(arcSpan > 0) || len < 1e-6) return 0
-  const curvatureRight = ((tangentAhead.x - tangentBehind.x) * rx + (tangentAhead.z - tangentBehind.z) * rz) / (len * arcSpan)
+  const curvatureRight = (
+    (tangentAhead.x - tangentBehind.x) * rx + (tangentAhead.y - tangentBehind.y) * ry + (tangentAhead.z - tangentBehind.z) * rz
+  ) / (len * arcSpan)
   return curvatureRight * speed * speed
 }
 
-/** Acceleration (units/s²) across the track in its vertical plane, from the tangents `arcSpan` apart: negative over a crest. */
-export function verticalAcceleration(tangentBehind: Vec3Like, tangentAhead: Vec3Like, arcSpan: number, speed: number): number {
+/**
+ * Acceleration (units/s²) along the rails' up, from the tangents `arcSpan` apart: negative over a crest (airtime),
+ * positive through a loop's apex, where the rails' up points down at its centre.
+ */
+export function verticalAcceleration(
+  up: Vec3Like,
+  tangentBehind: Vec3Like,
+  tangentAhead: Vec3Like,
+  arcSpan: number,
+  speed: number,
+): number {
   if (!(arcSpan > 0)) return 0
-  return ((tangentAhead.y - tangentBehind.y) / arcSpan) * speed * speed
+  const along = (tangentAhead.x - tangentBehind.x) * up.x + (tangentAhead.y - tangentBehind.y) * up.y
+    + (tangentAhead.z - tangentBehind.z) * up.z
+  return (along / arcSpan) * speed * speed
 }
 
 function normalize(v: Vec3Like): Vec3Like {
