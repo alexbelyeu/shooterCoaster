@@ -3,24 +3,32 @@ import type { RideMechanic } from '@/types/level'
 import type { TrackCurve } from './curves/TrackCurve'
 import { type Route, hardRouteOf } from './mechanics'
 
-// `t` is the car's track parameter, a spline's arc share like the mechanics'; `stopShare` is `planStopShare` (-1 moving).
+// `dist` is the car's arc distance into the lap (`distanceAtT` of its `t`) and `length` the lap's. A mechanic's ends are
+// compared by distance, where the ride plan stops, never by `t`, which the arc table rounds off an end (#719).
+// `stopShare` is `planStopShare` (-1 moving).
 
 /** A stop lands the car on its turntable to within this share of the lap. */
 const AT_STOP = 1e-4
+/** World units within which the car is on a mechanic's end: above the arc table's round trip, far below a frame's ride. */
+const AT_END = 1e-6
 
 /** The seat's turn about its up, 0 facing forward to 1 facing back: round on the first turntable, back on the second. */
-export function backwardsTurn(mechanics: readonly RideMechanic[], t: number, stopShare: number): number {
+export function backwardsTurn(mechanics: readonly RideMechanic[], dist: number, length: number, stopShare: number): number {
   for (const m of mechanics) {
-    if (m.kind !== 'backwards' || t < m.from - AT_STOP || t > m.to + AT_STOP) continue
-    if (stopShare >= 0) return Math.abs(t - m.from) < Math.abs(t - m.to) ? stopShare : 1 - stopShare
-    return t > m.from && t < m.to ? 1 : 0
+    if (m.kind !== 'backwards') continue
+    const from = m.from * length
+    const to = m.to * length
+    if (dist < from - AT_STOP * length || dist > to + AT_STOP * length) continue
+    if (stopShare >= 0) return Math.abs(dist - from) < Math.abs(dist - to) ? stopShare : 1 - stopShare
+    // Moving on an end, the car is arriving at its stop (it leaves one only past it): still forward on the first, still back on the second.
+    return dist > from + AT_END && dist < to + AT_END ? 1 : 0
   }
   return 0
 }
 
-/** The drop track the car is falling on (from its top to the track below), or null. */
-export function droppingOn(mechanics: readonly RideMechanic[], t: number): RideMechanic | null {
-  for (const m of mechanics) if (m.kind === 'dropTrack' && t >= m.from && t <= m.to) return m
+/** The drop track the car is on, from stopped at its top to the track below, or null. */
+export function droppingOn(mechanics: readonly RideMechanic[], dist: number, length: number): RideMechanic | null {
+  for (const m of mechanics) if (m.kind === 'dropTrack' && dist >= m.from * length - AT_END && dist <= m.to * length) return m
   return null
 }
 

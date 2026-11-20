@@ -45,11 +45,13 @@ Built so far (#698): `src/track/elements/` has the loop, zero-g roll, corkscrew,
 points carry the track's `up`; a spline with ups rolls, and the ride camera's up follows it. See them ridden with
 `npm run turntable -- --rides` (`e2e-results/turntable/rides.png`).
 
-The special mechanics (#699) are `TrackParams.mechanics` on a v2 ride, built with their track by `src/track/elements/mechanics.ts`:
+The special mechanics (#699) are `TrackParams.mechanics` on a v2 ride, built with their track by `src/track/elements/mechanicElements.ts`:
 a **station** the ride starts in (GO launches it over fins), a **drop track** (the car stops on a piece of track that
 free-falls with it and locks into the track below), a **jump gap** (a booster sets the speed its ballistic flight was
 built for; no rails across) and a **backwards** stretch between two turntables. Their stops last their seconds whatever
 the beats' solver does to the stretches round them. `rides.png`'s second half rides them (`mechanicsRide.ts`).
+On a backwards stretch the rider faces back but spawning still places waves ahead along the track, out of view, until
+#716 places them for a rider facing back: keep a level's waves off the stretch until then.
 A **junction** (#702, `kind: 'junction'`, on either ride but only a spline track) is the shoot-to-switch: a branch through
 its `points` from the fork at `from` to the merge at `to`, with a switch sign before the fork. The ride's timing stays on
 the main track, so the branch is ridden faster; no other mechanic may sit between its sign and its merge (`checkMechanics`).

@@ -6,6 +6,7 @@ import { loadLevelScene } from '@/canvas/loadLevelScene'
 import { isAudioReady } from '@/audio/AudioEngine'
 import { loadFraction, reportLoad } from '@/core/loadProgress'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
+import { FairBoard } from '@/ui/Fair'
 import LevelPostcard from './LevelPostcard'
 
 /**
@@ -15,9 +16,9 @@ import LevelPostcard from './LevelPostcard'
 const SETTLE_FRAMES = 3
 
 /**
- * The run's loading screen (#674): the level's name and postcard over a bar for what it waits on (`core/loadProgress.ts`:
- * the level chunk, the scene's mount, the whole shader warm-up and, once audio is unlocked, the SFX bake and the
- * score's start). It ends once all of it is done and the level has drawn, so nothing heavy runs in the intro or the
+ * The run's loading screen (#674): a fair board with the level's postcard and name over a gilt track filling for what
+ * it waits on (`core/loadProgress.ts`: the level chunk, the scene's mount, the whole shader warm-up and, once audio is
+ * unlocked, the SFX bake and the score's start). It ends once all of it is done and the level has drawn, so nothing heavy runs in the intro or the
  * countdown after it.
  */
 export default function LoadingScreen() {
@@ -49,16 +50,14 @@ export default function LoadingScreen() {
 
   return (
     <div className="loading-screen" role="status" aria-label={`Loading ${level?.name ?? 'level'}`}>
-      <div className="loading-card">
+      <FairBoard className="loading-card" shadowClassName="loading-board-shadow fair-arrive">
         {level && <LevelPostcard biome={level.biome} />}
-        <div className="loading-body">
-          <h2 className="loading-name">{level?.name}</h2>
-          {level && <p className="loading-desc">{level.description}</p>}
-          <div className="loading-bar" aria-hidden="true">
-            <div ref={bar} className="loading-bar-fill" />
-          </div>
+        <h2 className="fair-title loading-name">{level?.name}</h2>
+        {level && <p className="loading-desc">{level.description}</p>}
+        <div className="loading-bar" aria-hidden="true">
+          <div ref={bar} className="loading-bar-fill" />
         </div>
-      </div>
+      </FairBoard>
     </div>
   )
 }
