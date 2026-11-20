@@ -14,7 +14,7 @@ import { markStartup } from '@/core/startupMarks'
 import { whenProgramsReady } from './programReadiness'
 import { composerSceneTarget } from './post/composerTargets'
 import { chunk, runInFrameSlices } from './frameSlices'
-import { reportLoad } from '@/core/loadProgress'
+import { reportLoad, unloadLevel } from '@/core/loadProgress'
 
 /** Compile work per frame (#597); the loading screen only needs to keep its bar moving (#674). */
 const SLICE_BUDGET_MS = 60
@@ -199,6 +199,8 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
 
     const finish = () => {
       cleanup()
+      // A warm-up with nothing left to draw (a zero-batch pass) still completes its stage.
+      reportLoad(levelId, 'shaders', 1)
       // A warm-up still finishing after the store moved on to another level must not open that level's Ready.
       if (useGameStore.getState().currentLevel === levelId) setSceneReady(true)
       markStartup('warmupDone')
@@ -255,6 +257,7 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
       unsubscribe()
       camera.layers.mask = mask
       setSceneReady(false)
+      unloadLevel(levelId)
     }
   }, [get, levelId])
 

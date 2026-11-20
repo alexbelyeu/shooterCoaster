@@ -12,6 +12,7 @@ import { ATTRACT_IDLE_MS, armClickSwallow, setTitleAttract } from '@/canvas/titl
 import { e2eAttractIdleMs } from '@/testing/e2eHook'
 import TitleLogo from './TitleLogo'
 import { LOGO_TEXT } from '@/ui/logoArt'
+import { touchFirst } from '@/ui/touchFirst'
 
 const SUBTITLE_WORDS = ['Ride.', 'Aim.', 'Shoot.']
 /** The title has landed by here; PLAY and the rest follow. */
@@ -23,7 +24,6 @@ let hintShownThisLoad = false
 
 const WAKE_EVENTS = ['pointerdown', 'pointermove', 'wheel'] as const
 
-const touchFirst = () => typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches
 
 interface TitleScreenProps {
   onPlay: () => void
