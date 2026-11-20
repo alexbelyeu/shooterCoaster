@@ -3410,7 +3410,7 @@ export const GYM_LEVEL: { track: TrackParams; walls: readonly WallSurface[] } = 
         "seconds": 1.5
       }
     ],
-    "segments": 1600,
+    "segments": 720,
     "tieSpacing": 22,
     "towerSpacing": 300,
     "rollerSpeed": 4e-7,

@@ -365,8 +365,8 @@ export function buildGymTrack(): TrackParams {
     ride: 'v2',
     rideV2,
     mechanics,
-    // Rails, ties and towers sparser than level 1's (still finer per metre ridden): the track is long, under the same triangle budget.
-    segments: 1600,
+    // Rails, ties and towers sparser than level 1's: the ~500 m track stays under `scene.level6`'s track triangles (~0.7 m a segment).
+    segments: 720,
     tieSpacing: 22,
     towerSpacing: 300,
     // Today's rule's speeds, unused by the v2 ride.
