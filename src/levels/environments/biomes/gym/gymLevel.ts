@@ -3391,9 +3391,9 @@ export const GYM_LEVEL: { track: TrackParams; walls: readonly WallSurface[] } = 
         "seconds": 1.5
       }
     ],
-    "segments": 720,
+    "segments": 480,
     "tieSpacing": 22,
-    "towerSpacing": 300,
+    "towerSpacing": 750,
     "rollerSpeed": 4e-7,
     "minRollerSpeed": 0.000355,
     "color1": 3489096,

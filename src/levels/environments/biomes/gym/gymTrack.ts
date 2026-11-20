@@ -31,7 +31,7 @@ import { headChopper } from '@/track/elements/headChopper'
 import { dropTrack, jumpGap, placeMechanics, station } from '@/track/elements/mechanics'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { RIDE_V2_DEFAULTS } from '@/track/rideV2'
-import { ARCH, FLAME, GYM_SCALE, PIT, TREE, TREE_GAP, piece, toWorld, type Vec3 } from './blockout'
+import { ARCH, FLAME, GYM_SCALE, PIT, TREE, TREE_GAP, piece, toWorld } from './blockout'
 
 /**
  * Metres the track's centreline keeps from anything solid. The car's rails reach 0.07 m out and the rider's eye is
@@ -370,10 +370,11 @@ export function buildGymTrack(): TrackParams {
     ride: 'v2',
     rideV2,
     mechanics,
-    // Rails, ties and towers sparser than level 1's: the ~500 m track stays under `scene.level6`'s track triangles (~0.7 m a segment).
-    segments: 720,
+    // Rails, ties and towers sparser than level 1's (~0.93 m a segment, under 3 cm of chord sag on the tightest turn): the
+    // ~500 m track leaves the scene room under `scene.level6` for the enemies in the air at 10 s (#726).
+    segments: 480,
     tieSpacing: 22,
-    towerSpacing: 300,
+    towerSpacing: 750,
     // Today's rule's speeds, unused by the v2 ride.
     rollerSpeed: 0.0000004,
     minRollerSpeed: 0.000355,
@@ -384,4 +385,3 @@ export function buildGymTrack(): TrackParams {
 
 export const GYM_TRACK: TrackParams = buildGymTrack()
 
-export type { Vec3 }
