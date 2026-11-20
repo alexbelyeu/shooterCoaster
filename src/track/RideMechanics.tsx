@@ -7,7 +7,8 @@ import type { ArcTable } from './arcLength'
 import type { TrackDimensions } from './trackDimensions'
 import { buildDropPieceGeometry, buildMechanicsGeometry } from './mechanicsGeometry'
 import { dropHeading, dropPiecePosition } from './mechanics.hot'
-import { dropPieceLength } from './mechanics'
+import { dropPieceLength, junctionOf } from './mechanics'
+import TrackSwitch from './TrackSwitch'
 import { rideProgress } from './rideProgress.hot'
 
 type RGB = [number, number, number]
@@ -45,7 +46,10 @@ function DropPiece({ curve, table, drop, geometry, material, dims }: {
   return <mesh ref={ref} name="drop-piece" geometry={geometry} material={material} quaternion={rotation} />
 }
 
-/** The track's special mechanics (#699): the station and its fins, the drop tracks' guides and pieces, the turntables. */
+/**
+ * The track's special mechanics (#699): the station and its fins, the drop tracks' guides and pieces, the turntables, a
+ * junction's switch sign (#702; its branch's rails are `TrackMesh`'s).
+ */
 export default function RideMechanics({ curve, table, mechanics, dims, color1, color2, trackMaterial }: RideMechanicsProps) {
   const structures = useMemo(() => buildMechanicsGeometry(curve, table, mechanics, dims), [curve, table, mechanics, dims])
   const structureMaterial = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }), [])
@@ -62,6 +66,9 @@ export default function RideMechanics({ curve, table, mechanics, dims, color1, c
           <DropPiece key={i} curve={curve} table={table} drop={drop} geometry={piece} material={trackMaterial} dims={dims} />
         ))
         : null}
+      {mechanics.map((m, i) =>
+        m.kind === 'junction' ? <TrackSwitch key={`switch-${i}`} main={curve} junction={junctionOf(curve, m)} eyeHeight={dims.eyeHeight} /> : null,
+      )}
     </>
   )
 }

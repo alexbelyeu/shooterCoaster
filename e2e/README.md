@@ -149,6 +149,10 @@ When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pic
 (spread) with time frozen and shoots it with a real bullet: `weaponState()` must report the spread gun, the next pull must
 count 3 shots and draw 3 bullets, and `level1-pickup.png` holds the tinted tracer with the `.hud-weapon` badge clear of the HUD;
 the pickup must hold through a pause, expire on game time, and a restart must bring back the blaster and every pickup.
+When level6 is in the run, a `switch` step (#702, on the PR in the `level6` shard) checks the shoot-to-switch junction
+(`trackSwitch()`): it parks the coaster behind the V2 sign with time frozen (`level6-switch.png`) and shoots it with a real
+bullet, which must set the hard way and ride the V8 branch at the junction's middle (`riding: 'hard'`, `level6-switch-hard.png`);
+a restart must set it back, and a run that leaves it must ride the easy way with the switch closed by then.
 **Settled steps** (#471, `settledSteps.mjs`): the ride and the pacing run advance level time one fixed step on one frame,
 then hold it (`timerStep` 0) until React has gone quiet (no commit on a held frame, and a message posted on the frame before
 answered), and only then take the next step. Waves, enemy mounts, fly-ins ending and boss arrivals go through React state
@@ -270,7 +274,7 @@ without `portal`.
 Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it hit its cap):
 
 - **Deploy health check** after every production deploy (`deployment_status`, 8 min cap, ~3 min): `npm run prod-check -- --url <site>`
-  (`e2e/prod-check.mjs`). The full smoke already passed in `verify` on the deployed commit; this asks whether the deploy
+  (`e2e/prod-check.mjs`). CI's `verify` (the PR depth: every smoke shard) already passed on the deployed commit, and the full smoke runs nightly below; this asks whether the deploy
   arrived intact. It needs a local build of that commit (CI: `VERCEL=1 npx vite build`) for the list of files to expect.
   `assets`: every file of `dist/` outside `assets/` at its path, and every hashed chunk under its deployed name (matched by
   name without the hash; the deployed names come from crawling the deployed page, stylesheet and chunks, so the lazy

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { buildArcTable } from '@/track/arcLength'
-import { createTrigCurve } from '@/track/curves/TrigCurve'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { desertObstacles, layoutDesert } from '@/levels/environments/biomes/desert/desertLayout'
@@ -135,8 +135,7 @@ describe('gait and facing', () => {
 })
 
 describe('perch (level 2)', () => {
-  const { varA, varB, varC, scalar } = getLevelConfig('level2')!.track
-  const curve = createTrigCurve(varA, varB, varC, scalar)
+  const curve = createTrackCurve(getLevelConfig('level2')!.track)
   const table = buildArcTable(curve)
   const groundFn = createTerrainSurface(
     createHeightFunction('desert', sampleTrackPath((t) => curve.getPointAt(t))),

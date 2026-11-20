@@ -1,5 +1,8 @@
 import type { EnemyType, Formation, FormationOrigin, WallSurface } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
+import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
+import { RUN_SECONDS } from '@/levels/pacing'
+import { waveWindows } from './waveSchedule'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import { maxReadableDistance } from '../enemies/enemyReadability'
@@ -162,9 +165,9 @@ export interface FormationFrame {
 
 /** What the ride does after a wave activates, from the level's ride profile (`track/ridePhysics.ts`). */
 export interface RideAhead {
-  /** Arc distance the rider covers while the wave flies in (`ENTRY_SECONDS` + `ENTRY_STAGGER`). */
+  /** Arc distance the rider covers while the wave flies in (`ENTRY_SECONDS_MAX`). */
   entry: number
-  /** Arc distance the rider covers over the wave's window: until the next wave, the boss or the end of the run. */
+  /** Arc distance the rider covers over the wave's window (until the next wave, the boss or the end of the run), less `RIDE_PACE_SLACK`. */
   window: number
   /** The level's structure scale: the rig looks `LOOK_AHEAD_UNITS` × this ahead. */
   trackScale: number
@@ -173,6 +176,30 @@ export interface RideAhead {
 /** A formation member flies in over `ENTRY_SECONDS`, the last of its group `ENTRY_STAGGER` later. */
 export const ENTRY_SECONDS = 1.2
 export const ENTRY_STAGGER = 0.6
+/** The longest fly-in of an arriving enemy. */
+export const ENTRY_SECONDS_MAX = ENTRY_SECONDS + ENTRY_STAGGER
+
+/**
+ * A run may ride less far than its profile (`rideProfile`: slow-mo and a capped hitch slow the ride, not the level
+ * timer), so a wave spreads over this share of the arc its window predicts, and the rider still reaches its last.
+ */
+export const RIDE_PACE_SLACK = 0.85
+
+/** Each wave's `RideAhead`: the ride a run takes from GO, over the wave's fly-in and its window (`waveWindows`). */
+export function rideAheadOfWaves(
+  table: ArcTable,
+  speeds: RideSpeeds,
+  delays: readonly number[],
+  bossAt: number | undefined,
+  trackScale: number,
+): RideAhead[] {
+  const profile = rideProfile(table, speeds, RUN_SECONDS)
+  return waveWindows(delays, bossAt, RUN_SECONDS).map(([from, to]) => ({
+    entry: riddenBetween(profile, from, from + ENTRY_SECONDS_MAX),
+    window: RIDE_PACE_SLACK * riddenBetween(profile, from, to),
+    trackScale,
+  }))
+}
 
 /** A group's centre lands this far inside the narrowest screen's half fov (`MIN_HORIZONTAL_FOV`), so the group's width fits. */
 const VIEW_HALF_ANGLE_COS = Math.cos((MIN_HORIZONTAL_FOV * 0.4 * Math.PI) / 180)
@@ -263,14 +290,22 @@ export interface Placement {
 }
 
 /**
- * How a member moves once it has entered: the whole group on one XZ heading
- * (`atan2(dz, dx)`) so its shape holds, or bobbing at its slot. Absent: the enemy's own wander.
+ * How a member moves once it has entered: the whole group on one XZ heading (`atan2(dz, dx)`) so its shape holds,
+ * from when the rider comes within `startWithin` of the group's `anchor` (#472: a group placed far ahead would
+ * otherwise march off before the rider gets there), or bobbing at its slot. Absent: the enemy's own wander.
  */
-export type FormationMotion = { kind: 'march'; heading: number } | { kind: 'hold' }
+export type FormationMotion = { kind: 'march'; heading: number; anchor: Vec3; startWithin: number } | { kind: 'hold' }
 
 /** The group heading of a marching member, else undefined. */
 export function marchHeading(motion: FormationMotion | undefined): number | undefined {
   return motion?.kind === 'march' ? motion.heading : undefined
+}
+
+/** Whether a member may move from `eye`: false only while its group waits for the rider to reach it. */
+export function marchMoving(motion: FormationMotion | undefined, eye: Vec3): boolean {
+  if (motion?.kind !== 'march') return true
+  const { anchor } = motion
+  return Math.hypot(eye.x - anchor.x, eye.y - anchor.y, eye.z - anchor.z) <= motion.startWithin
 }
 
 /** An interior's walls and roof, already inset: every placement stays inside (the gym's hall, `BiomeDefinition.bounds`). */
@@ -329,25 +364,26 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
   const reach = maxReadableDistance(type)
   const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
   const step = groupStep(table, formation, groups, ride)
-  const frames = new Map<number, FormationFrame>()
+  const frames = new Map<number, { f: FormationFrame; motion: FormationMotion | undefined }>()
   const frameFor = (group: number) => {
-    let f = frames.get(group)
-    if (!f) {
+    let framed = frames.get(group)
+    if (!framed) {
       const members = slots.filter((s) => s.group === group)
       const centre = members.reduce(
         (c, s) => ({ x: c.x + s.local.x / members.length, y: c.y + s.local.y / members.length, z: c.z + s.local.z / members.length }),
         { x: 0, y: 0, z: 0 },
       )
       const at = (origin?: FormationOrigin) => formationFrame(table, riderIndex, formation, group, ride, reach, step, origin, centre)
-      f = at(input.origin)
+      let f = at(input.origin)
       if (surface === 'water') f = findWater(at, input.origin ?? FORMATIONS[formation].origin, groundFn, f)
-      frames.set(group, f)
+      framed = { f, motion: formationMotion(formation, f, slotWorld(formation, f, centre), reach) }
+      frames.set(group, framed)
     }
-    return f
+    return framed
   }
 
   return slots.map((slot) => {
-    const f = frameFor(slot.group)
+    const { f, motion } = frameFor(slot.group)
     let local = slot.local
     let position = settle(slotWorld(formation, f, local), surface, groundFn)
     // A fish whose slot is on the shore closes in toward the wet group centre.
@@ -361,7 +397,7 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
       from: keepIn(outsideNearField(keepIn(from), camera)),
       spin,
       entrySeconds: ENTRY_SECONDS + (ENTRY_STAGGER * slot.index) / Math.max(1, slot.groupSize - 1),
-      motion: formationMotion(formation, f),
+      motion,
     }
   })
 }
@@ -449,13 +485,14 @@ function entryStart(
   }
 }
 
-function formationMotion(formation: ChoreographedFormation, f: FormationFrame): FormationMotion | undefined {
+/** `anchor`: the group centre its frame was checked in view of, within `reach`, from where the rider will be. */
+function formationMotion(formation: ChoreographedFormation, f: FormationFrame, anchor: Vec3, reach: number): FormationMotion | undefined {
   switch (formation) {
     case 'v':
-    case 'line':
-      return { kind: 'march', heading: Math.atan2(-f.forward.z, -f.forward.x) } // at the rider
-    case 'school':
-      return { kind: 'march', heading: Math.atan2(f.right.z * -f.sideSign, f.right.x * -f.sideSign) } // across the track
+    case 'line': // at the rider
+      return { kind: 'march', heading: Math.atan2(-f.forward.z, -f.forward.x), anchor, startWithin: reach }
+    case 'school': // across the track
+      return { kind: 'march', heading: Math.atan2(f.right.z * -f.sideSign, f.right.x * -f.sideSign), anchor, startWithin: reach }
     case 'ring':
       return { kind: 'hold' } // drifting off would break the hoop before the rider gets there
     case 'spiral':

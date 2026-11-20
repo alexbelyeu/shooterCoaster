@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ENTRY_SECONDS_MAX, RUN_SECONDS, paceLevel, pacingTimes } from './pacing'
+import { RUN_SECONDS, paceLevel, pacingTimes } from './pacing'
+import { ENTRY_SECONDS_MAX } from '@/entities/spawning/spawnPlacement'
 
 const balloons = (n: number, weight?: number) => ({ type: 'balloon' as const, count: n, ...(weight ? { weight } : {}) })
 

@@ -2370,6 +2370,76 @@ async function pickupCheck(page) {
   return { id: 'pickup', problems, pickup: { ...result, drawCalls, badge: hud.rects.at(-1) } }
 }
 
+const SWITCH_CHECK = { level: 'level6' }
+/** Track-parameter leads behind the switch sign to park the coaster at. */
+const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
+
+/**
+ * Shoot-to-switch (#702): a run that shoots the V2 sign with a real bullet rides the V8 branch, a run that leaves it rides
+ * the easy way, and a restart sets it back (level6-switch.png: the sign in view, level6-switch-hard.png: on the branch).
+ */
+async function switchCheck(page) {
+  const { level } = SWITCH_CHECK
+  const problems = []
+  const api = (fn, arg) => page.evaluate(fn, arg)
+  const read = () => api(() => window.__SC_TEST__.trackSwitch())
+  const rideTo = async (t) => {
+    await api((x) => { window.__SC_TEST__.rideTo = x }, t)
+    await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  }
+  const start = async () => {
+    if (!(await startLevelReady(page, level))) return false
+    await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
+    await api(() => window.__SC_TEST__.setTimeScale(0))
+    return true
+  }
+  if (!(await start())) return { id: 'switch', problems: [NOT_LOADED(level)] }
+  let sw = await read()
+  if (!sw) return { id: 'switch', problems: [`${level} has no switch (trackSwitch() is null)`] }
+  const mid = (sw.from + sw.to) / 2
+  const result = { t: sw.t, lead: null, px: null, hard: null, easy: null }
+
+  // The run that shoots it: park where it is on screen, fire a real bullet at it.
+  let target = null
+  for (const lead of SWITCH_LEADS) {
+    await rideTo(sw.t - lead)
+    sw = await read()
+    if (sw.open && sw.onScreen && Math.abs(sw.ndcX) < 0.8 && Math.abs(sw.ndcY) < 0.8) {
+      target = sw
+      result.lead = lead
+      break
+    }
+  }
+  if (!target) problems.push(`the switch never came on screen from ${SWITCH_LEADS.length} spots behind it`)
+  else {
+    result.px = { x: Math.round(target.x), y: Math.round(target.y), distance: Math.round(target.distance) }
+    await page.screenshot({ path: path.join(OUT, `${level}-switch.png`), timeout: SHOT_TIMEOUT })
+    await api(({ x, y }) => {
+      window.__SC_TEST__.bulletStep = 0.25
+      window.__SC_TEST__.fireShot(x, y)
+    }, { x: target.ndcX, y: target.ndcY })
+    if (!(await pollUntil(page, async () => (await read()).hard, { ms: 8000, frames: 8, pollMs: 200 })))
+      problems.push('shooting the switch did not set the hard way')
+    await api(() => { window.__SC_TEST__.bulletStep = 0 })
+    await rideTo(mid)
+    sw = await read()
+    result.hard = sw.riding
+    if (sw.riding !== 'hard') problems.push(`after the switch was shot the ride took the ${sw.riding} way`)
+    await page.screenshot({ path: path.join(OUT, `${level}-switch-hard.png`), timeout: SHOT_TIMEOUT })
+  }
+
+  // A fresh run that leaves it: set back to the easy way, and ridden that way.
+  if (!(await start())) return { id: 'switch', problems: [...problems, NOT_LOADED(level)] }
+  sw = await read()
+  if (sw.hard) problems.push('a restart kept the hard way')
+  await rideTo(mid)
+  sw = await read()
+  result.easy = sw.riding
+  if (sw.riding !== 'easy') problems.push(`without a shot the ride took the ${sw.riding} way`)
+  if (sw.open) problems.push('the switch was still open in the junction')
+  return { id: 'switch', problems, trackSwitch: result }
+}
+
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
 async function levelSelectCheck(page, levels) {
   const problems = []
@@ -3177,14 +3247,21 @@ function crossfadeGaps(fades, from, to) {
     )
 }
 
-/** Level -> next level and level -> level select (#168), after the phone run's results: each must fade out, fade in, leave one bus and pass `crossfadeGaps`. */
+/**
+ * Results -> next level and level -> level select (#168), after the phone run's results: each must fade out, fade in, leave one bus and pass `crossfadeGaps`.
+ * The first switch starts from the results screen, so the results score (its own `results` bus since #645) is the one fading out, not the level's (#707).
+ */
 async function musicSwitches(page) {
   const problems = []
   const read = () => page.evaluate(() => window.__SC_TEST__.audio().music)
   const latest = (m) => Math.max(0, ...m.fades.map((f) => f.at))
   const switches = []
   const run = async (label, from, to, act) => {
-    const since = latest(await read())
+    const before = await read()
+    const playing = before.buses.map((b) => b.name)
+    // A switch from a bus that isn't playing can't crossfade: say so, not "no fade-out" (#707).
+    if (!playing.includes(from)) problems.push(`${label}: expected the ${from} bus playing before the switch, found ${playing.join(',') || 'none'}`)
+    const since = latest(before)
     await act()
     const deadline = Date.now() + 30000
     let m = await read()
@@ -3200,7 +3277,7 @@ async function musicSwitches(page) {
     if (!done()) problems.push(`${label}: no ${from} fade-out + ${to} fade-in leaving one bus (${m.buses.map((b) => b.name).join(',')})`)
     problems.push(...crossfadeGaps(fades, from, to).map((g) => `${label}: ${g}`))
   }
-  await run('level -> next level', 'level', 'level', () => page.evaluate((seed) => window.__SC_TEST__.startLevel('level2', seed), SEED))
+  await run('results -> next level', 'results', 'level', () => page.evaluate((seed) => window.__SC_TEST__.startLevel('level2', seed), SEED))
   await run('level -> level select', 'level', 'title', () => page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect')))
   return { problems, switches }
 }
@@ -3774,7 +3851,7 @@ async function runMobile(browser, base) {
 
 async function run() {
   const runStarted = Date.now()
-  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['audio', [AUDIO_CHECK.level]]]
+  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['switch', [SWITCH_CHECK.level]], ['audio', [AUDIO_CHECK.level]]]
     .filter(([s, ls]) => ls.join() !== STEP_LEVELS[s].join())
   if (drift.length) throw new Error(`STEP_LEVELS in e2e/shards.mjs disagrees with the checks: ${drift.map(([s, ls]) => `${s} runs on ${ls.join(', ')}`).join('; ')}`)
   const budget = startTimeBudget(runStarted)
@@ -4003,6 +4080,9 @@ async function run() {
   // 6e. Weapon pickups: one shot with a real bullet, the fan, the badge, expiry (level1-pickup.png)
   if (has('pickup') && wanted.includes(PICKUP_CHECK.level)) await pageStep(pickupCheck)
 
+  // 6f. Shoot-to-switch: the shot run rides the hard branch, the other the easy way (level6-switch.png, level6-switch-hard.png)
+  if (has('switch') && wanted.includes(SWITCH_CHECK.level)) await pageStep(switchCheck)
+
   // 6d. The score engine and arcade SFX: title -> level -> pause -> results
   if (has('audio') && wanted.includes(AUDIO_CHECK.level)) {
     await step(async () => {
@@ -4085,6 +4165,9 @@ async function run() {
       : r.pickup
         ? ` ${r.pickup.count} pickups [${r.pickup.ids.join(',')}] draws=${r.pickup.drawCalls} first at ${r.pickup.px ? `${r.pickup.px.x},${r.pickup.px.y} (${r.pickup.px.distance} units, lead ${r.pickup.lead})` : '-'}` +
           ` fan shots=${r.pickup.fan?.shots} drawn=${r.pickup.fan?.drawn}`
+      : r.trackSwitch
+        ? ` switch at ${r.trackSwitch.t.toFixed(3)} ${r.trackSwitch.px ? `${r.trackSwitch.px.x},${r.trackSwitch.px.y} (${r.trackSwitch.px.distance} units, lead ${r.trackSwitch.lead})` : 'never on screen'}` +
+          ` shot -> ${r.trackSwitch.hard ?? '-'}, left -> ${r.trackSwitch.easy ?? '-'}`
       : r.id === 'pacing'
         ? ` ${r.pacing ? pacingSummary(r.level, r.pacing) : r.level} (${r.samples ?? 0} steps, ${r.heldFrames ?? 0} held frames)${programGrowthSummary(r.shaders)}`
       : r.engine

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { changedOnly } from './changedOnlyStorage'
+import type { Route } from '@/track/mechanics'
 import type { GamePhase, ScoreEntry, ComboState, BossHud, RunMode } from '@/types/game'
 import {
   DEFAULT_INITIALS,
@@ -80,6 +81,10 @@ interface GameState {
   weapon: WeaponState
   pickUpWeapon: (id: PickupWeaponId) => void
 
+  /** The way this run takes through the track's junctions (#702): 'hard' once the switch sign is shot. */
+  route: Route
+  setRoute: (route: Route) => void
+
   timeRemaining: number
   setTimeRemaining: (t: number) => void
 
@@ -138,6 +143,7 @@ const FRESH_RUN = {
   frenzy: 'off',
   boss: null,
   weapon: NO_PICKUP,
+  route: 'easy',
 } satisfies Partial<GameState>
 
 const urlSearch = (): string | null =>
@@ -221,6 +227,7 @@ export const useGameStore = create<GameState>()(
       resetCombo: () => set({ combo: NO_COMBO }),
 
       pickUpWeapon: (id) => set({ weapon: applyPickup(id, gameTime()) }),
+      setRoute: (route) => set({ route }),
 
       timeRemaining: 0,
       setTimeRemaining: (t) => set({ timeRemaining: t }),

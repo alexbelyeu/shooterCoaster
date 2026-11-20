@@ -62,10 +62,10 @@ models only where the world needs a character nothing else gives.
 
 ## The checklist for a new world
 
-`npm run new-world -- <levelId> --name "<Name>" --biome <biome> [--interior] [--dry-run]` (#460) does
+`npm run new-world -- <levelId> --name "<Name>" --biome <biome> [--interior] [--score-from <levelId>] [--dry-run]` (#460) does
 every step marked **(script)** and prints the rest. `--dry-run` prints the plan and writes nothing; an id,
 biome or score that already exists is refused, so a second run changes nothing. The plan is pure in
-`scripts/newWorldPlan.mjs` (unit-tested); the biome templates are `scripts/new-world/{outdoor,interior}/`.
+`scripts/newWorldPlan.mjs` (unit-tested); the templates are `scripts/new-world/`: the biome files in `{outdoor,interior}/`, the atmosphere / terrain / reverb entries in `<kind>/registrations.ts`, the postcard stub in `postcard.tsx`, all real TS that the build typechecks and lint checks.
 
 1. Read `.claude/skills/shooter-coaster-level-design` (track extent formula, enemy scaling,
    z-fighting, terrain-following) and `docs/art/ENEMIES.md` (style).

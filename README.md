@@ -2,7 +2,7 @@
 
 A WebGL on-rails arcade shooter: ride a rollercoaster through six themed worlds and shoot
 everything in sight before the timer runs out. Built with React, three.js
-(@react-three/fiber) and Tone.js; every model, texture and sound is made in code.
+(@react-three/fiber) and plain Web Audio; every model, texture and sound is made in code.
 
 Play it at https://scoaster.com
 

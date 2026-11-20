@@ -73,7 +73,7 @@ const WALL_Z = 37
 const WALL_X = 26.5
 const WALL_TOP_Y = 20.4
 /** The pit's corner helix beside the star, clear of the Shield and the Medusa. */
-const HELIX = { x: 8, z: WALL_Z - 2.8, radius: 2.8, turns: 2.5, climb: 10.5 } as const
+const HELIX = { x: 8, radius: 2.1, turns: 2.5, climb: 10.5 } as const
 /** Rails over the pit's floor at its lowest (clear of its benches) and along the roots' front. */
 const PIT_LOW_Y = PIT.floorY + 1.65
 const ROOTS_Y = PIT.floorY + 2.3
@@ -85,6 +85,17 @@ const GAP_F = (TREE_GAP.minF + TREE_GAP.maxF) / 2
 /** Out from the Tree's foot line along the roots' front, and the hairpin's centre along the Tree. */
 const ROOTS_F = 6.375
 const HAIRPIN_ALONG = -5.6
+
+/** The V8 way round (#702): where it forks off the run to Alaska and merges back (z), and its points in between. */
+const V8 = {
+  fork: 11,
+  merge: 32,
+  points: [
+    { x: 30, y: 1.6, z: 16 },
+    { x: 32.6, y: 1.3, z: 22 },
+    { x: 30, y: 1.6, z: 28 },
+  ],
+} as const
 
 /** The storyboard's beats: the second the car reaches the first element of a kind, its start or (`middle`) its middle. */
 const BEATS: { kind: MarkerKind; second: number; middle?: true }[] = [
@@ -234,6 +245,12 @@ export function buildGymRide(): GymRide {
   b.mark('straight', () => to(b, 'z', -0.5, 2.6 - y(), 2))
   // Bursting out of the cave on a launch, across the hall to Alaska.
   zone('launch', SPEED.caveLaunch, () => b.mark('straight', () => to(b, 'z', 8)))
+  // The route choice (#702): shoot the switch and the V8 way round swings east off the line, down over the Flame's pads
+  // beside its boulder, and back onto the line before Alaska.
+  b.mark('straight', () => to(b, 'z', V8.fork))
+  const fork = b.points.length - 1
+  b.mark('straight', () => to(b, 'z', V8.merge))
+  mechanics.push({ kind: 'junction', from: fork, to: b.points.length - 1, points: V8.points })
   b.mark('straight', () => to(b, 'z', WALL_Z - 2))
 
   // 22 s: the wall ride, straight up Alaska on a chain, rolling over at the top to head north.
@@ -329,7 +346,10 @@ export function buildGymTrack(): TrackParams {
   const curve = createSplineCurve(points)
   const share = (i: number) => curve.knotT(i)
   const world = GYM_SCALE
-  const mechanics = placeMechanics(curve, ride.mechanics).map((m) => ('speed' in m ? { ...m, speed: m.speed * world } : m))
+  const mechanics = placeMechanics(curve, ride.mechanics).map((m) => {
+    if (m.kind === 'junction') return { ...m, points: m.points.map(toWorld) }
+    return 'speed' in m ? { ...m, speed: m.speed * world } : m
+  })
   const zones: SpeedZone[] = ride.zones.map((z) => ({ kind: z.kind, from: share(z.from), to: share(z.to), speed: z.speed * world, ...(z.accel ? { accel: z.accel * world } : {}) }))
   const beats: RideBeat[] = BEATS.map(({ kind, second, middle }) => {
     const m = ride.markers.find((k) => k.kind === kind)
@@ -340,10 +360,7 @@ export function buildGymTrack(): TrackParams {
   return {
     curve: 'spline',
     controlPoints: points,
-    // Unused by a spline; scalar 20 gives level 1's structure scale (trackScale 1): a small car in the big hall (#592).
-    varA: 0,
-    varB: 0,
-    varC: 0,
+    // Level 1's structure scale (trackScale 1): a small car in the big hall (#592).
     scalar: SCALAR,
     ride: 'v2',
     rideV2,

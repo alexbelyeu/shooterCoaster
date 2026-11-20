@@ -115,7 +115,7 @@ function nextMainPass(snap, mainRuns, r, jobName) {
  *   now, runs: [{ id, name, path, event, conclusion, head_branch, head_sha, created_at, html_url, prNumber,
  *                 jobs?: [{ name, conclusion, started_at, completed_at, steps, html_url, timedOut?, errors? }] }],
  *   prFiles: { [prNumber]: string[] }, mainDiffs: { ['<sha>...<sha>']: string[] }, timeouts: { [workflowPath]: { [jobOrStep]: minutes } },
- *   openPrs: [{ number, title, labels: string[], created_at, updated_at, labelledAt?: { [label]: iso } }],
+ *   openPrs: [{ number, title, head?: string (the branch), labels: string[], created_at, updated_at, labelledAt?: { [label]: iso } }],
  *   openIssues: [{ number, title, labels: string[], created_at, fixMergedAt?: ms | null, nightlyAlert?: boolean }],
  *   prod: { nightly: { at, conclusion } | null, deploy: { at, conclusion } | null } (the newest of each prod-smoke.yml suite),
  *   closedAt: { [key]: ms }, lastAgentActivity: ms | null, paused: boolean,
@@ -300,6 +300,19 @@ function findings(snap) {
     if (!p.labels.includes('agent:qa-approved')) continue
     const age = now - since(p, 'agent:qa-approved')
     if (age <= 3 * HOUR) continue
+    // automerge.cjs merges only `agent/*` branches (DECISIONS 2026-10-19): Alex merges his own, so it's his to do.
+    if (p.head && !p.head.startsWith('agent/')) {
+      out.push({
+        state: true,
+        lastSeen: now,
+        key: `merge-own:${p.number}`,
+        title: `Your approved PR #${p.number} waits for you to merge it`,
+        owner: 'alex',
+        body: `#${p.number} (${p.title}) has been \`agent:qa-approved\` for over 3 h. Its branch \`${p.head}\` isn't an \`agent/*\` branch, ` +
+          'and auto-merge only merges those, so no agent can land it: merge it yourself, or remove the label if it should wait.',
+      })
+      continue
+    }
     out.push({
       state: true,
       lastSeen: now,

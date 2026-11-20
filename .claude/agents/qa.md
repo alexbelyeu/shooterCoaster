@@ -22,7 +22,7 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
 
 1. **CI first.** Read the `verify` check-run on the head SHA
    (`gh api 'repos/alexbelyeu/shootercoaster/commits/<sha>/check-runs?check_name=verify'`).
-   If it is still running, poll for a few minutes. CI ran the full `verify` on the PR
+   If it is still running, poll for a few minutes. CI ran `verify` (the PR depth) on the PR
    merged with `main` as of its last push, so a `success` is your pass/fail; you don't re-run it.
    A red `verify` you're sure the diff didn't cause is never "a known flake": don't approve,
    name the failing check and run, and link its `studio-health` issue (PROTOCOL.md, "No known flakes").

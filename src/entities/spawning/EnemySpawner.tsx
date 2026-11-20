@@ -4,7 +4,8 @@ import * as THREE from 'three'
 import type { EnemyType, EnemyWave, LevelConfig, WallSurface } from '@/types/level'
 import { indexAtT, type ArcTable } from '@/track/arcLength'
 import { rideProgress } from '@/track/rideProgress.hot'
-import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
+import type { RideSpeeds } from '@/track/ridePhysics'
+import { RUN_SECONDS } from '@/levels/pacing'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -20,14 +21,14 @@ import type { EnemyEntry } from '../enemies/EnemyBase'
 import { HOP } from '../enemies/hopGlideMotion'
 import { FIRE_IMP_HIT_RADIUS } from '../enemies/fireImpHop.hot'
 import {
-  ENTRY_SECONDS, ENTRY_STAGGER, clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, trackPoint,
-  tracksideSlots,
+  clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, rideAheadOfWaves,
+  trackPoint, tracksideSlots,
   type FormationMotion, type FormationSlot, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
 import {
   ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, bystanderSlots, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
 } from './enemyPlacement'
-import { enemyCounts, newWaveProgress, nextWaveDue, tickWaves, waveWindows } from './waveSchedule'
+import { enemyCounts, newWaveProgress, nextWaveDue, tickWaves } from './waveSchedule'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -37,8 +38,6 @@ interface EnemySpawnerProps {
   groundFn: HeightFunction
   /** The level's finale. */
   boss?: LevelConfig['boss']
-  /** The level timer, which waves and the boss run on. */
-  timerSeconds: number
   /** The ride's speeds and structure scale: waves are placed where the rider will be looking (`RideAhead`). */
   rideSpeeds: RideSpeeds
   trackScale: number
@@ -190,7 +189,6 @@ export default function EnemySpawner({
   trackTable,
   groundFn,
   boss,
-  timerSeconds,
   rideSpeeds,
   trackScale,
   walls = NO_WALLS,
@@ -216,14 +214,10 @@ export default function EnemySpawner({
 
   const waveDelays = useMemo(() => waves.map((w) => w.spawnDelay ?? 0), [waves])
   // The ride a run takes from GO, so each wave knows how far the rider goes while it flies in and before the next one.
-  const rideAhead = useMemo((): RideAhead[] => {
-    const profile = rideProfile(trackTable, rideSpeeds, timerSeconds)
-    return waveWindows(waveDelays, boss?.at, timerSeconds).map(([from, to]) => ({
-      entry: riddenBetween(profile, from, from + ENTRY_SECONDS + ENTRY_STAGGER),
-      window: riddenBetween(profile, from, to),
-      trackScale,
-    }))
-  }, [trackTable, rideSpeeds, timerSeconds, waveDelays, boss?.at, trackScale])
+  const rideAhead = useMemo(
+    () => rideAheadOfWaves(trackTable, rideSpeeds, waveDelays, boss?.at, trackScale),
+    [trackTable, rideSpeeds, waveDelays, boss?.at, trackScale],
+  )
 
   const placeMembers = useCallback(
     (wave: EnemyWave, ride: RideAhead, members: SpawnedEnemy[], riderIndex: number, camera: Vec3): [string, Placed][] => {
@@ -376,18 +370,18 @@ export default function EnemySpawner({
 
   useEffect(() => {
     registerE2EWaves(() => ({
-      levelTime: timerSeconds - useGameStore.getState().timeRemaining,
+      levelTime: RUN_SECONDS - useGameStore.getState().timeRemaining,
       due: nextWaveDue(waveDelays, waveProgress.current),
       lastTick: lastWaveTick.current,
     }))
     return () => registerE2EWaves(null)
-  }, [waveDelays, timerSeconds])
+  }, [waveDelays])
   const tellWave = useCallback((i: number) => eventBus.emit('wave:incoming', waves[i].waveLabel), [waves])
   // On the level timer like the boss, so a pause holds them; the rendered phase keeps a restart from reading the last run's timer.
   useFrame(() => {
     const s = useGameStore.getState()
     if (phase !== 'playing' || s.phase !== 'playing') return
-    const levelTime = timerSeconds - s.timeRemaining
+    const levelTime = RUN_SECONDS - s.timeRemaining
     tickWaves(waveDelays, levelTime, waveProgress.current, tellWave, activateWave)
     lastWaveTick.current = levelTime
   })
@@ -470,7 +464,6 @@ export default function EnemySpawner({
         <BossSpawner
           key={`boss-${generation}-${runSeed}`}
           boss={boss}
-          timerSeconds={timerSeconds}
           track={trackTable}
           groundFn={groundFn}
         />

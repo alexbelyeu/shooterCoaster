@@ -3,8 +3,7 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { buildArcTable, distanceAtT } from './arcLength'
 import { RUN_SECONDS } from '@/levels/pacing'
-import { advanceRide, lapSeconds, nextVelocity, rideProfile, rideSpeeds, riddenBetween } from './ridePhysics'
-import type { TrackCurve } from './curves/TrackCurve'
+import { advanceRide, curveTangentY, lapSeconds, nextVelocity, rideProfile, rideSpeeds, riddenBetween, type TangentY } from './ridePhysics'
 
 describe('nextVelocity', () => {
   const speeds = { roll: 0.001, min: 0.01, max: 0.05 }
@@ -33,7 +32,7 @@ describe.each(getAllLevels().map((l) => [l.id, l] as const))('%s rideProfile', (
     for (let k = 1; k <= 10 * 10; k++) {
       for (let f = 0; f < 6; f++) {
         const from = distanceAtT(table, state.progress)
-        advanceRide(state, curve, speeds, 1)
+        advanceRide(state, curveTangentY(curve), speeds, 1)
         arc += (distanceAtT(table, state.progress) - from + table.length) % table.length
       }
       if (k % 10 === 0) expect(Math.abs(profile[k] - arc)).toBeLessThan(0.02 * arc + 1)
@@ -49,10 +48,7 @@ describe.each(getAllLevels().map((l) => [l.id, l] as const))('%s rideProfile', (
   })
 })
 
-const flat: TrackCurve = {
-  getPointAt: () => ({ x: 0, y: 0, z: 0 }) as never,
-  getTangentAt: () => ({ x: 1, y: 0, z: 0 }) as never,
-}
+const flat: TangentY = () => 0
 
 describe('advanceRide', () => {
   const speeds = rideSpeeds({ rollerSpeed: 0.00001, minRollerSpeed: 0.0001 })
@@ -65,7 +61,7 @@ describe('advanceRide', () => {
   })
 
   it('rides a long step in steps of at most 3 frames, and caps the speed downhill', () => {
-    const downhill: TrackCurve = { ...flat, getTangentAt: () => ({ x: 0, y: -1, z: 0 }) as never }
+    const downhill: TangentY = () => -1
     const state = advanceRide({ progress: 0, velocity: speeds.min, time: 0 }, downhill, speeds, 1e6)
     expect(state.velocity).toBe(speeds.max)
     expect(speeds.max / speeds.min).toBe(5)

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { BiomeTreeConfig, ColorRamp } from '../../shared/types'
+import type { BiomeTreeConfig, ColorRamp } from '@/levels/environments/shared/types'
 
 // __NAME__, scaffolded by `npm run new-world` from the outdoor template: the palette, trees and props are this world's to author.
 
