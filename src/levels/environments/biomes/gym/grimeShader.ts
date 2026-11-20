@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { DARKNESS } from '@/track/darkSection.hot'
 import { valueNoiseGlsl } from '../../shared/noiseGlsl'
 import { FLAME, GYM_SCALE, HALL, PIT } from './blockout'
 import { FIRE_LIGHT, FLOOR, GRIME, STRIP_LIGHTS, stripLightXs, stripLightY } from './config'
@@ -11,7 +12,8 @@ import { PATHS } from './floorPaths'
  * at hand height, the roof's half of the hall falling into shadow, and a warm pool under each strip-light
  * fixture (`STRIP_LIGHTS`), so the light falls in pools with darker corners between them rather than a flat fill;
  * and the Flame's fire (#599): its flickering light on everything round it (`FIRE_LIGHT`, the shared `FIRE_FLICKER`
- * uniform `FlameFire` sets each frame) and soot over its top.
+ * uniform `FlameFire` sets each frame) and soot over its top. In the Training Area's dark cave (#752, `DARKNESS`) the
+ * strip lights' pools go out, a faint blacklight fills the dark and the holds glow in their own colours.
  * Worked in blockout metres from world position; every term is bounded, so the output stays finite (#344).
  */
 
@@ -47,9 +49,13 @@ const vertexBody = /* glsl */ `
 }
 `
 
+/** The dark cave's blacklight (#752): the pools it leaves of the strip lights', its violet fill, the holds' glow. */
+const BLACKLIGHT = { pools: 0.1, fill: '#5a3cff', fillStrength: 0.12, holdGlow: 1.3 } as const
+
 const fragmentHead = /* glsl */ `
 varying vec3 vGrimePos;
 uniform float uFireFlicker;
+uniform float uDarkness;
 ${valueNoiseGlsl}
 // A hall point in the Flame's own frame: along its length, up, across it
 vec3 fireLocal(vec3 p) {
@@ -145,7 +151,8 @@ const poolFragment = /* glsl */ `
   float facing = max(dot(normal, normalize((viewMatrix * vec4(dir, 0.0)).xyz)), 0.0);
   float cone = smoothstep(0.35, 0.85, dir.y) + ${f(STRIP_LIGHTS.uplight)} * smoothstep(0.2, 0.8, -dir.y);
   float pool = ${f(STRIP_LIGHTS.pool)} * facing * cone / (1.0 + dist * dist / ${f(STRIP_LIGHTS.reach * STRIP_LIGHTS.reach)});
-  reflectedLight.directDiffuse += diffuseColor.rgb * ${glslColor(STRIP_LIGHTS.color)} * pool;
+  pool *= mix(1.0, ${f(BLACKLIGHT.pools)}, uDarkness);
+  reflectedLight.directDiffuse += diffuseColor.rgb * (${glslColor(STRIP_LIGHTS.color)} * pool + ${glslColor(BLACKLIGHT.fill)} * ${f(BLACKLIGHT.fillStrength)} * uDarkness);
 }
 `
 
@@ -164,12 +171,14 @@ const fireFragment = /* glsl */ `
 }
 `
 
-/** Holds: chalk caked on their tops, where hands go, patchy. */
+/** Holds: chalk caked on their tops, where hands go, patchy; in the dark, fluorescent under the blacklight, the chalk too. */
 const holdFragment = /* glsl */ `
 {
   ${orientation}
   float caked = smoothstep(0.0, 0.7, upness) * smoothstep(0.3, 0.7, vnoise(vGrimePos.xy * 9.0 + vGrimePos.zz * 5.0));
+  vec3 plastic = diffuseColor.rgb;
   diffuseColor.rgb = mix(diffuseColor.rgb, ${glslColor(GRIME.chalk)}, ${f(GRIME.holdChalk)} * caked);
+  totalEmissiveRadiance += (plastic * plastic * 1.6 + 0.12 * caked) * ${f(BLACKLIGHT.holdGlow)} * uDarkness;
 }
 `
 
@@ -183,6 +192,7 @@ function patch(material: THREE.Material, key: string, surface: string, pool: boo
     shader.fragmentShader = inject(shader.fragmentShader, '#include <normal_fragment_maps>', surface)
     if (pool) shader.fragmentShader = inject(shader.fragmentShader, '#include <lights_fragment_end>', `${poolFragment}\n${fireFragment}`)
     shader.uniforms.uFireFlicker = FIRE_FLICKER
+    shader.uniforms.uDarkness = DARKNESS
   }
   material.customProgramCacheKey = () => key
 }

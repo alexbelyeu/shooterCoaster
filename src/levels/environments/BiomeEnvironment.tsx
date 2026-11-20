@@ -1,7 +1,7 @@
 import { useMemo, useRef, useEffect, useContext } from 'react'
 import * as THREE from 'three'
 import { ATMOSPHERES } from './atmosphere'
-import type { BiomeType } from '@/types/level'
+import type { BiomeType, DarkSectionSpec } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
 import {
   getTerrainMeshSize,
@@ -22,6 +22,8 @@ interface BiomeEnvironmentProps {
   /** Terrain as drawn (createTerrainSurface). */
   groundFn: HeightFunction
   track: ArcTable
+  /** The track's dark sections (#752), dimming the atmosphere while the rider is in one. */
+  darkSections?: readonly DarkSectionSpec[]
   hasWater?: boolean
   hasTrees?: boolean
   treeCount?: number
@@ -36,6 +38,7 @@ export default function BiomeEnvironment({
   biome,
   groundFn,
   track,
+  darkSections,
   hasWater = false,
   hasTrees = false,
   treeCount = 0,
@@ -66,7 +69,7 @@ export default function BiomeEnvironment({
 
   return (
     <>
-      <Atmosphere atmosphere={atmosphere} fogRef={fogRef} />
+      <Atmosphere atmosphere={atmosphere} fogRef={fogRef} darkSections={darkSections} />
 
       {/* Terrain mesh */}
       <mesh geometry={groundGeo} material={groundMat} />

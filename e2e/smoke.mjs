@@ -2380,6 +2380,68 @@ async function pickupCheck(page) {
   return { id: 'pickup', problems, pickup: { ...result, drawCalls, badge: hud.rects.at(-1) } }
 }
 
+/**
+ * A level with a dark section (#752, `TrackParams.darkSections`, the hook's `darkSection`): with game time held, ride to
+ * the middle of its first one and shoot `<id>-dark.png`, then fire one real shot with the muzzle flash held and shoot
+ * `<id>-dark-flash.png`. The ride must be fully dark there and the frame mostly dark but not blank, its glow (saturated
+ * bright pixels: the gym's blacklit holds) showing; the shot's flash must light the frame up.
+ */
+async function darkSectionShot(page, levelId) {
+  const spans = await page.evaluate(() => window.__SC_TEST__.darkSection.spans)
+  if (!spans.length) return { problems: [], result: null }
+  const at = (spans[0].from + spans[0].to) / 2
+  const frameLight = (png) => page.evaluate(async (b64) => {
+    const img = new Image()
+    img.src = `data:image/png;base64,${b64}`
+    await img.decode()
+    const c = document.createElement('canvas')
+    c.width = 160
+    c.height = 90
+    const ctx = c.getContext('2d')
+    ctx.drawImage(img, 0, 0, c.width, c.height)
+    const d = ctx.getImageData(0, 0, c.width, c.height).data
+    let dark = 0
+    let glow = 0
+    let sum = 0
+    for (let i = 0; i < d.length; i += 4) {
+      const max = Math.max(d[i], d[i + 1], d[i + 2])
+      const min = Math.min(d[i], d[i + 1], d[i + 2])
+      const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+      sum += l
+      if (l < 50) dark++
+      else if (max > 150 && max - min > 0.5 * max) glow++
+    }
+    const n = d.length / 4
+    return { dark: dark / n, glow: glow / n, mean: sum / n }
+  }, png.toString('base64'))
+  await page.evaluate((t) => {
+    const s = window.__SC_TEST__
+    s.setTimeScale(0)
+    s.rideTo = t
+    s.holdFeedback = true
+  }, at)
+  await waitFrames(page, 3, { maxMs: 20000, pollMs: 100 })
+  const depth = await page.evaluate(() => window.__SC_TEST__.darkSection.depth)
+  const png = await page.screenshot({ path: path.join(OUT, `${levelId}-dark.png`), timeout: SHOT_TIMEOUT })
+  const light = await frameLight(png)
+  const img = await imageStats(page, png)
+  await page.evaluate(() => window.__SC_TEST__.fireShot(0, 0))
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const flash = await page.evaluate(() => window.__SC_TEST__.darkSection.flash)
+  const flashLight = await frameLight(await page.screenshot({ path: path.join(OUT, `${levelId}-dark-flash.png`), timeout: SHOT_TIMEOUT }))
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+  const problems = []
+  if (!(depth > 0.99)) problems.push(`dark section: not dark in its middle at track ${at.toFixed(4)} (depth ${depth?.toFixed(2)})`)
+  if (looksBlank(img)) problems.push('dark section shot looks blank')
+  if (light.dark < DARK_SHOT.dark) problems.push(`dark section: only ${(light.dark * 100).toFixed(0)}% of the frame is dark (need ${DARK_SHOT.dark * 100}%)`)
+  if (light.glow < DARK_SHOT.glow) problems.push(`dark section: its glow barely shows (${(light.glow * 100).toFixed(2)}% saturated bright, need ${DARK_SHOT.glow * 100}%)`)
+  if (!(flash > 0) || flashLight.mean < light.mean + DARK_SHOT.flash)
+    problems.push(`dark section: a shot's muzzle flash lit nothing (light ${flash?.toFixed(2)}, mean ${light.mean.toFixed(0)} -> ${flashLight.mean.toFixed(0)})`)
+  return { problems, result: { at, depth, flash, ...light, flashMean: flashLight.mean } }
+}
+/** The dark shots' floors: the share of the frame that is dark, of saturated bright pixels (the blacklit glow), and how much the flash brightens the frame's mean (0–255). */
+const DARK_SHOT = { dark: 0.4, glow: 0.002, flash: 3 }
+
 const SWITCH_CHECK = { level: 'level6' }
 /** Track-parameter leads behind the switch sign to park the coaster at. */
 const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
@@ -2447,7 +2509,10 @@ async function switchCheck(page) {
   result.easy = sw.riding
   if (sw.riding !== 'easy') problems.push(`without a shot the ride took the ${sw.riding} way`)
   if (sw.open) problems.push('the switch was still open in the junction')
-  return { id: 'switch', problems, trackSwitch: result }
+  // The cave the switch stands at the mouth of rides dark (#752): checked on the same run, held.
+  const dark = await darkSectionShot(page, level)
+  problems.push(...dark.problems)
+  return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result }
 }
 
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
