@@ -93,7 +93,7 @@ function sampleAtOrAfter(table: ArcTable, dist: number): number {
   return lo
 }
 
-/** Each spec placed on the table, in ride order; throws on a tunnel that crosses the seam, overlaps another or has no portal room. */
+/** Each spec placed on the table, in ride order; throws on a tunnel that crosses the seam, overlaps another, has no portal room or another pass through it. */
 export function tunnelSpans(table: ArcTable, specs: readonly TunnelSpec[], trackScale: number): TunnelSpan[] {
   const dims = getTunnelDims(trackScale)
   const reach = dims.radius + dims.wall + dims.portalWidth
@@ -111,7 +111,47 @@ export function tunnelSpans(table: ArcTable, specs: readonly TunnelSpec[], track
   for (let i = 1; i < spans.length; i++) {
     if (spans[i].fromS < spans[i - 1].toS + 2 * dims.portalDepth) throw new Error('tunnels overlap')
   }
+  for (const span of spans) {
+    const pass = otherPassInTube(table, span, dims.centreUp)
+    if (pass >= 0) throw new Error(`tunnel at ${span.fromS.toFixed(0)}: the track at ${pass.toFixed(0)} passes within its reach`)
+  }
   return spans
+}
+
+/** Arc distance of a sample more than `reach` along the track from the span that comes within `reach` of its tube's centre, or -1. */
+export function otherPassInTube(table: ArcTable, span: TunnelSpan, centreUp: number): number {
+  const { reach } = span
+  let minX = Infinity
+  let minY = Infinity
+  let minZ = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let maxZ = -Infinity
+  for (let i = span.from; i <= span.to; i++) {
+    minX = Math.min(minX, table.x[i])
+    maxX = Math.max(maxX, table.x[i])
+    minY = Math.min(minY, table.y[i] + centreUp)
+    maxY = Math.max(maxY, table.y[i] + centreUp)
+    minZ = Math.min(minZ, table.z[i])
+    maxZ = Math.max(maxZ, table.z[i])
+  }
+  const r2 = reach * reach
+  for (let j = 0; j < table.count; j++) {
+    const x = table.x[j]
+    const y = table.y[j]
+    const z = table.z[j]
+    if (x < minX - reach || x > maxX + reach || y < minY - reach || y > maxY + reach || z < minZ - reach || z > maxZ + reach) continue
+    const s = table.s[j]
+    const along = s < span.fromS ? Math.min(span.fromS - s, s + table.length - span.toS) : s > span.toS ? Math.min(s - span.toS, span.fromS + table.length - s) : 0
+    if (along <= reach) continue
+    for (let i = span.from; i <= span.to; i++) {
+      const dx = x - table.x[i]
+      const dy = y - table.y[i] - centreUp
+      const dz = z - table.z[i]
+      if (dx * dx + dy * dy + dz * dz < r2) return s
+    }
+  }
+  return -1
 }
 
 /** `table` with its tunnels on it, or `table` itself when there are none (a level without set-pieces is unchanged). */
