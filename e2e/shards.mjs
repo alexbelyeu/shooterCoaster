@@ -29,7 +29,7 @@ const NEEDS = {
   frenzy: ['ride', 'results'],
   seed: ['ride'],
   mobileMenus: ['mobile'],
-  // The dark section's shots (#766): taken on the `switch` step's run, held in the cave.
+  // The dark section's shots and the Tree's gap still (#766): taken on the `switch` step's run.
   dark: ['switch'],
 }
 

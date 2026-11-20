@@ -1790,7 +1790,7 @@ async function speedCheck(page, levelId) {
 }
 
 /**
- * The level with the Tree's gap (#659), and the second of its storyboard beat there: the heartline roll through the gap
+ * The level with the Tree's gap (#659, shot on the nightly `dark` step's run), and the second of its storyboard beat there: the heartline roll through the gap
  * between the trunk and the back wall (`gym/gymTrack.ts`). The still is shot at that beat's track fraction, read from the
  * level's v2 ride (`rideBeats()`), so a rebuilt ride can't leave it pointing somewhere else.
  */
@@ -2491,7 +2491,8 @@ const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
 /**
  * Shoot-to-switch (#702): a run that shoots the V2 sign with a real bullet rides the V8 branch, a run that leaves it rides
  * the easy way, and a restart sets it back (level6-switch.png: the sign in view, level6-switch-hard.png: on the branch).
- * The same run then checks the cave's dark section, with its frame shots when `darkShots` (the nightly `dark` step).
+ * The same run then checks the cave's dark section; the nightly `dark` step (`darkShots`) adds its frame shots and the
+ * Tree's gap still (`gapShot`), which are too slow for the PR's `level6` shard (#766).
  */
 async function switchCheck(page, { darkShots = false } = {}) {
   const { level } = SWITCH_CHECK
@@ -2555,7 +2556,9 @@ async function switchCheck(page, { darkShots = false } = {}) {
   // The cave the switch stands at the mouth of rides dark (#752): checked on the same run, held.
   const dark = await darkSectionShot(page, level, { shots: darkShots })
   problems.push(...dark.problems)
-  return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result }
+  const gap = darkShots ? await gapShot(page) : null
+  if (gap) problems.push(...gap.problems)
+  return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result, gap: gap?.image ?? null }
 }
 
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
@@ -4145,8 +4148,6 @@ async function run() {
     const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
     problems.push(...desktopAspect.problems)
     stats.view = desktopAspect.view
-    const gap = id === GAP_LEVEL ? await gapShot(page) : null
-    if (gap) problems.push(...gap.problems)
     const perfGate = PERF_GATE ? sceneBudgetCheck(id, stats) : null
     if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
     const frenzy = has('frenzy') && id === first
@@ -4168,7 +4169,7 @@ async function run() {
     results.push({
       id, ok, problems, frames, frameSeconds, rideMsPerFrame: frames > 0 ? ride.ms / frames : null,
       seconds: (Date.now() - started) / 1000, spawnDigest, ...stats, perfGate, shaders, throttled,
-      kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, gap: gap?.image ?? null, errors: allErrors,
+      kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
   }

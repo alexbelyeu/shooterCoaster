@@ -18,9 +18,7 @@ it must boot to the title with no failed request, no analytics request and no pa
 ride stats, the perf gate, the shot and the enemy probe; the ride stops at exactly `--seconds` of level time, timer, game clock and ride together on the frame that gets there (`stopAtLevelTime`, #487: a poll used to catch it anywhere from 10.2 to 10.7 s, and level2's enemy probe failed at 10.7); the ride gets there in settled steps of `--seconds` / `--min-frames` level seconds (below), combat caps level time per frame (`timerStepMax`, 0.25 s) and ride `--ride-rate` 0.14 s of track per second of level time (`rideRate`: CI's ride, where the budgets were set; the game rides at most
 3/60 s a frame), so a slow runner samples the same moment of the level from the same track point as a fast one; through the combat checks the level timer is then held (`holdLevelTime`: the game clock runs on, the run can't time out and no wave or boss comes due) until the step ends the level itself, so however long the checks take they never run into the boss or the end of the run (#305);
 it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
-`<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), on level6 `level6-gap.png` (#659: game time and the
-level timer held, `rideTo` jumps the car into the Tree's gap, its 55 s heartline-roll beat read from `rideBeats()`, and back; the car must be there and the frame not
-blank: the trunk on one side, the back wall on the other) and `level6-bystander.png` (#518: first in
+`<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), on level6 `level6-bystander.png` (#518: first in
 its combat, two kills (their real shot left to land or fly out first) and a primed 5-chain, then `shootBystander()` on a live climber: the score must drop by the penalty it returns
 (floored at 0; any level whose `stats().levelBystanders` is above 0 gets this check), the combo reset, no kill or hit counted, `bystandersHit` 1 and the don't-shoot hint shown; the shot holds the red
 "−18 · Don't shoot climbers!" popup and the chalk puff; `level6 bystander: score a → b, combo 5 → 0` in the log), `<id>-combat.png`
@@ -158,7 +156,10 @@ Then, on the same run held, it checks the Training Area cave's dark section (#75
 held; the ride must be fully dark there (`depth` 1) and the shot must light it (`flash` > 0). The nightly `dark` step (needs
 `switch`) also shoots `level6-dark.png` and `level6-dark-flash.png` there: the frame must be mostly dark (`DARK_SHOT.dark`) but
 not blank, its blacklit holds showing (`DARK_SHOT.glow`, saturated bright pixels), and the flash must brighten it (`DARK_SHOT.flash`).
-Those two frame captures are nightly only, like the tour's (#766: they took the `level6` shard's `switch` step from ~90 s to ~260 s).
+It then shoots `level6-gap.png` (#659: game time and the level timer held, `rideTo` jumps the car into the Tree's gap, its 55 s
+heartline-roll beat read from `rideBeats()`, and back; the car must be there and the frame not blank: the trunk on one side, the
+back wall on the other). These frame captures are nightly only, like the tour's (#766: the dark shots took the `level6` shard's
+`switch` step from ~90 s to ~260 s, and the gap still was ~30 s of its `ride` step on a 2-core box).
 **Settled steps** (#471, `settledSteps.mjs`): the ride and the pacing run advance level time one fixed step on one frame,
 then hold it (`timerStep` 0) until React has gone quiet (no commit on a held frame, and a message posted on the frame before
 answered), and only then take the next step. Waves, enemy mounts, fly-ins ending and boss arrivals go through React state
