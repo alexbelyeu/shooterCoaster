@@ -189,6 +189,9 @@ export interface SCTestApi {
   /** Track set-pieces (#332): the level's tunnels as track fractions (`spans`), the one the car is in (-1: none) and how
    *  deep (`tunnelDepth`, 0–1), set by the coaster camera. */
   tunnel: { spans: { from: number; to: number }[]; index: number; depth: number }
+  /** Dark sections (#752): the level's as track fractions, how dark the ride is now (0–1) and the muzzle flash's light
+   *  intensity, set by `DarkSections` each frame. */
+  darkSection: { spans: { from: number; to: number }[]; depth: number; flash: number }
   /** First-person weapon view-model on screen (CSS px, origin top-left):
    *  bounding box of its projected bounds and the muzzle tip. null before the
    *  first level frame. */
@@ -996,6 +999,7 @@ export function installE2EApi() {
       caps: { roll: RIG_MAX_ROLL_DEG, pitch: RIG_MAX_PITCH_DEG, fovKick: MAX_FOV_KICK_DEG },
     },
     tunnel: { spans: [], index: -1, depth: 0 },
+    darkSection: { spans: [], depth: 0, flash: 0 },
     weapon: null,
     holdFeedback: false,
     bulletStep: null,

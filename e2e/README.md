@@ -153,6 +153,10 @@ When level6 is in the run, a `switch` step (#702, on the PR in the `level6` shar
 (`trackSwitch()`): it parks the coaster behind the V2 sign with time frozen (`level6-switch.png`) and shoots it with a real
 bullet, which must set the hard way and ride the V8 branch at the junction's middle (`riding: 'hard'`, `level6-switch-hard.png`);
 a restart must set it back, and a run that leaves it must ride the easy way with the switch closed by then.
+First, from the same held start, it checks the Training Area cave's dark section (#752, the hook's `darkSection`: its
+`spans`, `depth` and the muzzle flash's light `flash`): it rides to the cave's middle, fires one real shot with the flash held
+and shoots `level6-dark.png`; the ride must be fully dark there (`depth` 1), the shot must light it (`flash` > 0), and the
+frame must be mostly dark (`DARK_SHOT.dark`) but not blank, its blacklit holds showing (`DARK_SHOT.glow`, saturated bright pixels).
 **Settled steps** (#471, `settledSteps.mjs`): the ride and the pacing run advance level time one fixed step on one frame,
 then hold it (`timerStep` 0) until React has gone quiet (no commit on a held frame, and a message posted on the frame before
 answered), and only then take the next step. Waves, enemy mounts, fly-ins ending and boss arrivals go through React state
