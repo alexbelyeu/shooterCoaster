@@ -67,7 +67,7 @@ before it must stay (no killed enemy back); the world is frozen while paused (tr
 the same spot and the next wave arrives at its original level time (slack: 1 s for the whole-second timer store plus two of the longest
 frames since Resume, `maxFrameMs`); a window `blur` must pause too.
 A `pause-menu` step on the same page opens the menu through the hook (`pause.png`): the card inside 1280×720 with the level
-name, Resume focused, ArrowDown moves focus, Esc resumes, and Restart starts the level over (kills, score, timer, ride; paused again, the card's Kills read 0). The
+name, Resume focused, ArrowDown moves focus, Esc resumes, and Restart starts the level over (kills, score, timer, ride; paused again, the card's `[data-stat="hits"]` reads `0 of …`). The
 phone run checks the card after its Pause tap in landscape and portrait (`mobile-pause-landscape.png`, `mobile-pause.png`: inside
 the viewport, no sideways scroll, 44 px buttons), then taps its Settings (`mobile-settings.png`: fits 390 px, 44 px targets)
 and Back to the menu, then ends the level and enters initials by tapping ▲, a letter, ▲ and OK (BBA; 44 px buttons, the pad in view: `mobile-results-entry.png`), then the results buttons must fit and not overlap in portrait and landscape

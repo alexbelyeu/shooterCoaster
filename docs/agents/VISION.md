@@ -85,7 +85,7 @@ code-generated, flat-shaded, saturated look:
 **The title screen is a world too** (#436): the park must read as a big, expansive,
 intricate theme park to the horizon — rides, a crossing coaster line, midway rows, crowds,
 water, lights, layered skyline silhouettes in fog — never a green plain, and still fast from
-the first paint (#376's poster and budgets). Enemy and boss looks follow `docs/art/ENEMIES.md`.
+the first paint (#376's poster and budgets). Enemy and boss looks follow `docs/art/ENEMIES.md`; everything drawn over or around the world (screens, HUD, share card, store art) follows `docs/art/PERSONALITY.md`, the game's own personality: the travelling fair's shooting gallery.
 
 Rules of thumb: enemies must contrast with *both* terrain and sky from the camera's
 usual angle; fog colour equals the sky's horizon colour; the sun colour tints

@@ -376,7 +376,11 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
       const at = (origin?: FormationOrigin) => formationFrame(table, riderIndex, formation, group, ride, reach, step, origin, centre)
       let f = at(input.origin)
       if (surface === 'water') f = findWater(at, input.origin ?? FORMATIONS[formation].origin, groundFn, f)
-      framed = { f, motion: formationMotion(formation, f, slotWorld(formation, f, centre), reach) }
+      const anchor = slotWorld(formation, f, centre)
+      // `findWater` can carry a water group's anchor past `reach` of where the rider frames it (#739): start it from there all the same.
+      const there = trackView(table, indexAhead(table, riderIndex, group * step + ride.entry), ride.trackScale).eye
+      const startWithin = Math.max(reach, Math.hypot(anchor.x - there.x, anchor.y - there.y, anchor.z - there.z))
+      framed = { f, motion: formationMotion(formation, f, anchor, startWithin) }
       frames.set(group, framed)
     }
     return framed
@@ -485,14 +489,14 @@ function entryStart(
   }
 }
 
-/** `anchor`: the group centre its frame was checked in view of, within `reach`, from where the rider will be. */
-function formationMotion(formation: ChoreographedFormation, f: FormationFrame, anchor: Vec3, reach: number): FormationMotion | undefined {
+/** `anchor`: the group centre its frame was checked in view of from where the rider will be, `startWithin` of that eye. */
+function formationMotion(formation: ChoreographedFormation, f: FormationFrame, anchor: Vec3, startWithin: number): FormationMotion | undefined {
   switch (formation) {
     case 'v':
     case 'line': // at the rider
-      return { kind: 'march', heading: Math.atan2(-f.forward.z, -f.forward.x), anchor, startWithin: reach }
+      return { kind: 'march', heading: Math.atan2(-f.forward.z, -f.forward.x), anchor, startWithin }
     case 'school': // across the track
-      return { kind: 'march', heading: Math.atan2(f.right.z * -f.sideSign, f.right.x * -f.sideSign), anchor, startWithin: reach }
+      return { kind: 'march', heading: Math.atan2(f.right.z * -f.sideSign, f.right.x * -f.sideSign), anchor, startWithin }
     case 'ring':
       return { kind: 'hold' } // drifting off would break the hoop before the rider gets there
     case 'spiral':
