@@ -285,8 +285,8 @@ export default function CoasterCamera({
     s.tangentBehind.copy(seatCurve.getTangentAt(at.behindT))
     s.tangentAhead.copy(seatCurve.getTangentAt(at.aheadT))
     const input = s.rig
-    input.lateral = lateralAcceleration(pose.tangent, s.tangentBehind, s.tangentAhead, span, speed)
-    input.vertical = verticalAcceleration(s.tangentBehind, s.tangentAhead, span, speed)
+    input.lateral = lateralAcceleration(pose.tangent, pose.up, s.tangentBehind, s.tangentAhead, span, speed)
+    input.vertical = verticalAcceleration(pose.up, s.tangentBehind, s.tangentAhead, span, speed)
     input.speed = speed
     input.speedNorm = velocityNorm
     input.descent = -pose.tangent.y
