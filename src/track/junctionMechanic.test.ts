@@ -162,12 +162,28 @@ describe('a shoot-to-switch junction (#702)', () => {
     expect(() => buildJunction(main, { kind: 'junction', from: FROM, to: TO, points: [] })).toThrow(/a way round/)
     const flat = { getPointAt: main.getPointAt, getTangentAt: main.getTangentAt }
     expect(() => buildJunction(flat, mechanic)).toThrow(/spline/)
-    const rolling = createSplineCurve([
-      { x: 0, y: 0, z: 0, up: { x: 0, y: 1, z: 0 } },
-      { x: 100, y: 0, z: 0 },
-      { x: 100, y: 0, z: 100 },
-      { x: 0, y: 0, z: 100 },
-    ])
-    expect(() => buildJunction(rolling, mechanic)).toThrow(/rolling/)
+  })
+
+  it('forks off a track that rolls elsewhere, unrolled on the branch, and refuses a fork where it rolls', () => {
+    // The oval again, banked 40° (toward its centre) round its far side only, opposite the junction.
+    const points = Array.from({ length: 24 }, (_, i) => {
+      const a = (i / 24) * Math.PI * 2
+      const p = { x: 500 * Math.cos(a), y: 100, z: -300 * Math.sin(a) }
+      const r = Math.hypot(p.x, p.z)
+      const bank = i >= 10 && i <= 14 ? (40 * Math.PI) / 180 : 0
+      return { ...p, up: { x: (-p.x / r) * Math.sin(bank), y: Math.cos(bank), z: (-p.z / r) * Math.sin(bank) } }
+    })
+    const rolling = createSplineCurve(points)
+    expect(rolling.getUpAt).toBeDefined()
+    const j = buildJunction(rolling, mechanic)
+    const route = routeCurve(rolling, [mechanic], 'hard')
+    expect(route.getUpAt).toBeDefined()
+    const mid = route.getUpAt!((FROM + TO) / 2).clone()
+    expect(mid.dot(j.branch.getTangentAt(0.5))).toBeCloseTo(0, 6)
+    expect(mid.y).toBeGreaterThan(0.9)
+    // Outside the span, the main track's own (banked) up.
+    expect(route.getUpAt!(0.5).distanceTo(rolling.getUpAt!(0.5))).toBeLessThan(1e-9)
+    const banked = { kind: 'junction' as const, from: 0.45, to: 0.55, points: [outward(0.5, 80, 20)] }
+    expect(() => buildJunction(rolling, banked)).toThrow(/rolls at its fork or merge/)
   })
 })

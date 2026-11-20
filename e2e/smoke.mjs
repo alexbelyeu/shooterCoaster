@@ -739,12 +739,12 @@ async function resultsScreenProblems(page, id, stats, { share }) {
     const el = document.querySelector('.results-screen')
     if (!el) return null
     const rows = Object.fromEntries(
-      [...el.querySelectorAll('.results-stat')].map((r) => [r.children[0].textContent, r.children[1].textContent]),
+      [...el.querySelectorAll('.results-stat')].map((r) => [r.dataset.stat, r.textContent]),
     )
     const buttons = [...el.querySelectorAll('.results-actions button')]
       .filter((b) => !b.closest('.share-menu') && b.getBoundingClientRect().width > 0)
       .map((b) => b.textContent)
-    const stars = [...el.querySelectorAll('.results-star-earned')].filter((s) => Number(getComputedStyle(s).opacity) > 0.9).length
+    const stars = el.querySelectorAll('.results-stars .earned').length
     const b = el.querySelector('.results-board')
     const r = b?.getBoundingClientRect()
     const board = b && {
@@ -788,11 +788,11 @@ async function resultsScreenProblems(page, id, stats, { share }) {
     shown.scoreCards = cards.sizes
   }
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
-  for (const label of ['Kills', 'Accuracy', 'Best combo', 'Time left']) {
-    if (!(label in screen.rows)) problems.push(`results screen has no "${label}" row`)
+  for (const stat of ['hits', 'accuracy', 'combo', 'time']) {
+    if (!(stat in screen.rows)) problems.push(`results screen has no "${stat}" line`)
   }
-  if (screen.rows.Kills && !screen.rows.Kills.startsWith(`${stats.kills} /`)) problems.push(`results kills "${screen.rows.Kills}" != ${stats.kills}`)
-  if (stats.shotsFired > 0 && !/^\d+%$/.test(screen.rows.Accuracy ?? '')) problems.push(`results accuracy "${screen.rows.Accuracy}" with ${stats.shotsFired} shots`)
+  if (screen.rows.hits && !screen.rows.hits.startsWith(`${stats.kills} of `)) problems.push(`results hits "${screen.rows.hits}" != ${stats.kills}`)
+  if (stats.shotsFired > 0 && !/^\d+% /.test(screen.rows.accuracy ?? '')) problems.push(`results accuracy "${screen.rows.accuracy}" with ${stats.shotsFired} shots`)
   for (const label of ['Levels', 'Replay', 'Share']) {
     if (!screen.buttons.includes(label)) problems.push(`results buttons ${JSON.stringify(screen.buttons)} lack ${label}`)
   }
@@ -802,7 +802,7 @@ async function resultsScreenProblems(page, id, stats, { share }) {
   if (nextOffered !== nextOpen)
     problems.push(`results ${nextOffered ? 'offer' : 'hide'} Next Level with ${screen.nextLevel?.id ?? 'no next level'} ${nextOpen ? 'unlocked' : 'locked'}`)
   // While the initials entry is open the hint is the entry's own.
-  if (screen.nextLevel && !nextOpen && !screen.board?.editing && !/Enter \/ R: replay/.test(screen.keys)) problems.push(`locked next level, but the keys hint reads "${screen.keys}"`)
+  if (screen.nextLevel && !nextOpen && !screen.board?.editing && !/Enter or R rides again/.test(screen.keys)) problems.push(`locked next level, but the keys hint reads "${screen.keys}"`)
   if (screen.score.replace(/,/g, '') !== String(stats.score)) problems.push(`results score "${screen.score}" != ${stats.score}`)
   if (!screen.board) problems.push('results screen has no leaderboard')
   else {
@@ -1780,9 +1780,13 @@ async function speedCheck(page, levelId) {
   return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w }, tunnel: tunnel.result }
 }
 
-/** The level whose lap starts in the Tree's gap (#659, `gym/gymTrack.ts`), and the track fraction its still is shot at: between the trunk and the back wall. */
+/**
+ * The level with the Tree's gap (#659), and the second of its storyboard beat there: the heartline roll through the gap
+ * between the trunk and the back wall (`gym/gymTrack.ts`). The still is shot at that beat's track fraction, read from the
+ * level's v2 ride (`rideBeats()`), so a rebuilt ride can't leave it pointing somewhere else.
+ */
 const GAP_LEVEL = 'level6'
-const GAP_FRACTION = 0.003
+const GAP_BEAT_SECOND = 55
 
 /**
  * `level6-gap.png`: the ride from inside the Tree's gap, the trunk on one side and the back wall on the other. With game time and the level timer
@@ -1799,13 +1803,18 @@ async function gapShot(page) {
     await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, t)
     await waitFrames(page, 3, { maxMs: 20000, pollMs: 100 })
   }
-  await jump(GAP_FRACTION)
+  const gap = await page.evaluate((second) => window.__SC_TEST__.rideBeats().find((b) => b.second === second)?.at ?? null, GAP_BEAT_SECOND)
+  if (gap === null) {
+    await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1); window.__SC_TEST__.holdLevelTime = false })
+    return { problems: [`gap still: ${GAP_LEVEL}'s ride has no beat at ${GAP_BEAT_SECOND} s (the heartline roll through the Tree's gap)`], image: null }
+  }
+  await jump(gap)
   const at = await page.evaluate(() => window.__SC_TEST__.rideProgress)
   const image = await imageStats(page, await page.screenshot({ path: path.join(OUT, `${GAP_LEVEL}-gap.png`), timeout: SHOT_TIMEOUT }))
   await jump(back)
   await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1); window.__SC_TEST__.holdLevelTime = false })
   const problems = []
-  if (Math.abs(at - GAP_FRACTION) > 0.002) problems.push(`gap still: the car is at track ${at.toFixed(4)}, not ${GAP_FRACTION} in the Tree's gap`)
+  if (Math.abs(at - gap) > 0.002) problems.push(`gap still: the car is at track ${at.toFixed(4)}, not ${gap.toFixed(4)} in the Tree's gap`)
   if (looksBlank(image)) problems.push('gap still looks blank')
   return { problems, image }
 }
@@ -2060,7 +2069,7 @@ const BOSS_CHECKS = [
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
   { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1 },
   { level: 'level5', minWidthFrac: 0.15, weakPoints: 4, firstPhase: ['vent-', 'heart'], lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 3, midSettleS: 0 },
-  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.75, passShots: [0.88, 0.94] },
+  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.7, passShots: [0.712, 0.718] },
 ]
 
 /**
@@ -2150,6 +2159,8 @@ async function bossCheck(page, check) {
   // A couple of frames so it is placed and drawn, then freeze it there.
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  // The ride went on through her tell: back to the spot, frozen there.
+  if (rideTo !== null) await page.evaluate((t) => { window.__SC_TEST__.rideTo = t }, rideTo)
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const settled = await stepBoss(page, settleS, { exposed: minOnScreen, projectiles: minProjectiles })
   const tell = await page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'incoming').map((e) => e.label))
@@ -2548,7 +2559,7 @@ async function startDailyFromCard(page, savedScores) {
 
 /**
  * Daily Run (#184): the card starts today's level on today's seed in daily mode, two loads spawn the same,
- * the results say DAILY / NEW BEST with no Next Level, Replay keeps the seed, and campaign saves stay as they were.
+ * the results say Daily Run / New best with no Next Level, Replay keeps the seed, and campaign saves stay as they were.
  */
 async function dailyCheck(newPage) {
   const problems = []
@@ -2565,7 +2576,7 @@ async function dailyCheck(newPage) {
   }
   if (!a.digest) problems.push('spawnDigest() never reported the daily spawns')
 
-  // Score something so the day's first result is a NEW BEST, then end the run.
+  // Score something so the day's first result is a new best, then end the run.
   await first.page.evaluate(() => window.__SC_TEST__.killNearest(3))
   await waitFrames(first.page, 2, { maxMs: 20000 })
   await first.page.evaluate(() => window.__SC_TEST__.endLevel())
@@ -2593,7 +2604,7 @@ async function dailyCheck(newPage) {
   const savedDay = run ? results.daily.savedDaily[run.dateKey] : undefined
   if (!resultsShown) problems.push(`daily results screen never finished its reveal (${await revealStall(first.page)})`)
   if (results.mode !== 'daily' || !results.badge) problems.push(`daily results lack the Daily badge (mode ${results.mode})`)
-  if (results.score > 0 && results.record !== 'NEW BEST') problems.push(`first daily result shows "${results.record}", expected NEW BEST`)
+  if (results.score > 0 && results.record !== 'New best') problems.push(`first daily result shows "${results.record}", expected New best`)
   if (results.buttons.includes('Next Level')) problems.push('daily results offer Next Level')
   // #317: a daily never enters the campaign leaderboard, so no board and no initials entry.
   if (results.board || results.entry) problems.push(`daily results show the leaderboard${results.entry ? ' and an initials entry' : ''}`)
@@ -4238,7 +4249,7 @@ function resultsSummary(s) {
   if (!s) return ''
   const board = s.board ? ` board=${s.board.rows}${s.board.rank !== null ? ` #${Number(s.board.rank) + 1}` : ''}` : ' board=none'
   const entry = s.entry ? ` initials=${s.entry.initials}${s.entry.editing ? '(open)' : ''}` : ''
-  return ` results=${s.stars}★ acc=${s.rows.Accuracy} combo=${s.rows['Best combo']}${board}${entry}`
+  return ` results=${s.stars}★ acc=${/^\d+%/.exec(s.rows.accuracy ?? '')?.[0] ?? 'none'} combo=${/\d+x/.exec(s.rows.combo ?? '')?.[0] ?? 'none'}${board}${entry}`
 }
 
 /** Largest bullet screen radius (% of canvas height) since load, and the fresh shot's distance from the muzzle tip. */

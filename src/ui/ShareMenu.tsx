@@ -194,7 +194,7 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
     <div ref={anchorRef} className="share-anchor">
       <button
         ref={buttonRef}
-        className="play-button results-secondary results-share"
+        className="fair-plate results-share"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}

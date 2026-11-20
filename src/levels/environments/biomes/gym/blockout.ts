@@ -357,26 +357,3 @@ export function treeAlong(p: Vec3): number {
 export function treeOut(p: Vec3): number {
   return (p.x - TREE.centre.x) * TREE.facing.x + (p.z - TREE.centre.z) * TREE.facing.z
 }
-
-const glass = piece('windows', 'win-glassgym')
-const glassAxes = pieceAxes(glass.rot)
-/** The glass gym room's window band on the hall's west wall, facing into the hall. */
-export const GLASS_ROOM = {
-  centre: { x: glass.x, z: glass.z },
-  along: glassAxes.along,
-  facing: glassAxes.facing,
-  length: glass.length,
-  minY: glass.base,
-  maxY: glass.base + glass.h,
-}
-
-/** Distance from a blockout point to the window band (a rectangle on the wall). */
-export function glassDistance(p: Vec3): number {
-  const dx = p.x - GLASS_ROOM.centre.x
-  const dz = p.z - GLASS_ROOM.centre.z
-  const along = dx * GLASS_ROOM.along.x + dz * GLASS_ROOM.along.z
-  const out = dx * GLASS_ROOM.facing.x + dz * GLASS_ROOM.facing.z
-  const ea = Math.max(Math.abs(along) - GLASS_ROOM.length / 2, 0)
-  const ey = Math.max(GLASS_ROOM.minY - p.y, 0, p.y - GLASS_ROOM.maxY)
-  return Math.hypot(ea, out, ey)
-}
