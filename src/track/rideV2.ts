@@ -305,8 +305,9 @@ export function buildRidePlan(table: ArcTable, spec: RideV2Spec): RidePlan {
     const f = (now - time) * PLAN_RATE * a
     distance[j] = free.distance[k] + (free.distance[k + 1] - free.distance[k]) * f
     speed[j] = free.held[k] ? 0 : a * (free.speed[k] + (free.speed[k + 1] - free.speed[k]) * f)
-    // A stop's standstill isn't the ride's slowest: the wind and FOV scale between running speeds.
-    if (!free.held[k]) minSpeed = Math.min(minSpeed, speed[j])
+    // A stop isn't the ride's slowest, nor are the frames easing into or out of it (one end at rest): the wind and FOV
+    // scale between running speeds.
+    if (free.speed[k] > 0 && free.speed[k + 1] > 0) minSpeed = Math.min(minSpeed, speed[j])
     maxSpeed = Math.max(maxSpeed, speed[j])
   }
   return { table, distance, speed, minSpeed, maxSpeed, scales, landed, zones: spec.zones ?? [], stops }
@@ -358,11 +359,14 @@ export function planZoneAt(plan: RidePlan, time: number): SpeedZone['kind'] | nu
   return null
 }
 
+/** Seconds after a stop's end that still read as its end (share 1): the car is still on the stop, not moving on it (#719). */
+const STOP_END_SLACK = 1e-6
+
 /** How far through a stop the car is `time` seconds after GO (0..1), or -1 while it isn't stopped. */
 export function planStopShare(plan: RidePlan, time: number): number {
   for (const stop of plan.stops) {
     if (time < stop.start) return -1
-    if (time < stop.end) return (time - stop.start) / (stop.end - stop.start)
+    if (time < stop.end + STOP_END_SLACK) return Math.min((time - stop.start) / (stop.end - stop.start), 1)
   }
   return -1
 }
