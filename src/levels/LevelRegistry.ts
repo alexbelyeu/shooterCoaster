@@ -70,6 +70,7 @@ const LEVELS: LevelConfig[] = [
       ],
       boss: 'giantScorpion',
     }),
+    weather: { kind: 'sandstorm', wave: 1, seconds: 7 }, // blows in with the first crows
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
     },
@@ -136,6 +137,7 @@ const LEVELS: LevelConfig[] = [
       ],
       boss: 'yeti',
     }),
+    weather: { kind: 'blizzard', wave: 1, seconds: 7 }, // blows in with the snowmen
     starThresholds: [0.2, 0.5, 0.8],
     combat: { bulletColor: '#000000', bulletSize: 40 }, // big dark snowballs against the snow
     environment: {

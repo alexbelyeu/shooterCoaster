@@ -74,7 +74,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
   const config = getLevelConfig(levelId)
   if (!config) return null
 
-  const { track, environment, biome, enemies, combat, boss, pickups, walls } = config
+  const { track, environment, biome, enemies, combat, boss, pickups, walls, weather } = config
 
   const curve = useMemo(() => createTrackCurve(track), [track])
 
@@ -123,6 +123,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
           groundFn={groundFn}
           track={trackTable}
           darkSections={track.darkSections}
+          weather={weather}
           hasWater={environment.hasWater}
           hasTrees={environment.hasTrees}
           treeCount={environment.treeCount}

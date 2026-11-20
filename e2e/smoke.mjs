@@ -2008,6 +2008,43 @@ async function waveCheck(page) {
   }
 }
 
+/** The levels with a weather pulse (#798, `LevelConfig.weather`); the step reads each one's wave time and length from `levels()`. */
+const WEATHER_LEVELS = ['level2', 'level4']
+/** Seconds after the weather's wave arrives to shoot it: past its ramp in (1.5 s), well before it clears. */
+const WEATHER_SHOT_AT = 3
+const WEATHER_MIN_ON_SCREEN = 3
+
+/** The weather pulse (#798), frozen at its height for `<id>-weather.png` with its wave on screen, then played until the fog is the biome's own again. */
+async function weatherCheck(page, id) {
+  const problems = []
+  const weather = await page.evaluate((l) => window.__SC_TEST__.levels().find((x) => x.id === l)?.weather ?? null, id)
+  if (!weather) return { id: 'weather', level: id, problems: [`${id} has no weather in levels()`] }
+  const ride = await rideToLevelTime(page, id, weather.at + WEATHER_SHOT_AT, MIN_FRAMES)
+  if (ride.levelTime == null) return { id: 'weather', level: id, problems: [NOT_LOADED(id)] }
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const held = await page.evaluate(() => ({ ...window.__SC_TEST__.weather }))
+  const onScreen = await page.evaluate(() => window.__SC_TEST__.enemies().length)
+  await page.screenshot({ path: path.join(OUT, `${id}-weather.png`), timeout: SHOT_TIMEOUT })
+  if (!(held.envelope >= 0.9)) problems.push(`the ${weather.kind} is at ${held.envelope?.toFixed(2)} ${WEATHER_SHOT_AT} s after its wave (want ≥ 0.9)`)
+  if (!(held.streaks > 0)) problems.push(`the ${weather.kind} drew no streaks`)
+  if (!(held.fogFar < held.baseFogFar)) problems.push(`the fog did not close in (far ${held.fogFar}, the biome's ${held.baseFogFar})`)
+  if (onScreen < WEATHER_MIN_ON_SCREEN) problems.push(`only ${onScreen} enemies on screen in the ${weather.kind} (want ≥ ${WEATHER_MIN_ON_SCREEN})`)
+
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
+  const cleared = await pollUntil(page, () => page.evaluate(() => window.__SC_TEST__.weather?.envelope === 0), { ms: 30000 })
+  const after = await page.evaluate(() => ({ ...window.__SC_TEST__.weather }))
+  const programs = await programsAfterWarmup(page)
+  if (!cleared) problems.push(`the ${weather.kind} never cleared (strength ${after.envelope?.toFixed(2)})`)
+  else if (after.fogNear !== after.baseFogNear || after.fogFar !== after.baseFogFar)
+    problems.push(`the fog is ${after.fogNear}–${after.fogFar} after the ${weather.kind}, not the biome's ${after.baseFogNear}–${after.baseFogFar}`)
+  return {
+    id: 'weather',
+    level: id,
+    problems,
+    weather: { kind: weather.kind, envelope: +(held.envelope ?? 0).toFixed(2), streaks: held.streaks, fogFar: Math.round(held.fogFar), onScreen, programs },
+  }
+}
+
 /** Level seconds a pacing step (settled steps, `settledSteps.mjs`: the same run on any runner): 0.5 is 120 steps a run. */
 const PACING_STEP = Number(arg('pacing-step', 0.5))
 
@@ -4002,7 +4039,7 @@ async function runMobile(browser, base) {
 
 async function run() {
   const runStarted = Date.now()
-  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['switch', [SWITCH_CHECK.level]], ['dark', [SWITCH_CHECK.level]], ['audio', [AUDIO_CHECK.level]]]
+  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['switch', [SWITCH_CHECK.level]], ['dark', [SWITCH_CHECK.level]], ['audio', [AUDIO_CHECK.level]], ['weather', WEATHER_LEVELS]]
     .filter(([s, ls]) => ls.join() !== STEP_LEVELS[s].join())
   if (drift.length) throw new Error(`STEP_LEVELS in e2e/shards.mjs disagrees with the checks: ${drift.map(([s, ls]) => `${s} runs on ${ls.join(', ')}`).join('; ')}`)
   const budget = startTimeBudget(runStarted)
@@ -4225,6 +4262,9 @@ async function run() {
   // 6b. Spawn choreography: the crow wave's tell, then its V flying in (level2-wave.png)
   if (has('wave') && wanted.includes(WAVE_CHECK.level)) await pageStep(waveCheck)
 
+  // 6b'. The weather pulse with its wave: sandstorm, blizzard (<level>-weather.png)
+  for (const id of has('weather') ? WEATHER_LEVELS.filter((l) => wanted.includes(l)) : []) await pageStep((page) => weatherCheck(page, id))
+
   // 6c. The finales: summoned, shot down in phase order (<level>-boss.png, <level>-boss-down.png)
   for (const check of has('boss') ? BOSS_CHECKS.filter((c) => wanted.includes(c.level)) : []) {
     await pageStep((page) => bossCheck(page, check))
@@ -4313,6 +4353,8 @@ async function run() {
           ` | startup ${startupSummary(r.initTimings)}`
       : r.wave
         ? ` ${r.wave.level} wave at ${r.wave.timing?.due ?? '-'}s: tell at ${r.wave.timing?.tellAt?.toFixed(2) ?? '-'}s (tick before ${r.wave.timing?.tickBefore?.toFixed(2) ?? '-'}s), on screen ${r.wave.onScreen} (largest ${r.wave.largestPx}px, nearest ${r.wave.nearest})`
+      : r.weather
+        ? ` ${r.level} ${r.weather.kind} at ${r.weather.envelope}: ${r.weather.streaks} streaks, fog far ${r.weather.fogFar}, on screen ${r.weather.onScreen}${programGrowthSummary(r.weather.programs)}`
       : r.boss
         ? (r.boss.skipped
           ? ` ${r.boss.level} skipped (level timed out)`

@@ -61,7 +61,7 @@ The smoke has two depths (#372). On a PR, CI runs the rendering and integration 
 (`e2e/shards.mjs`: the UI steps, the ride and combat on every level, level1's frozen shot, results screen, quality
 and speed, the phone run's touch play), each under a `smokeSeconds` budget in `budgets.json` (over it is a warning; on CI the shard
 fails only past 1.5x it: `level3 shard took 11.0 min, budget 7.0, fails past 10.5`; a level shard's budget is scaled up, at most 2x, on a runner whose ride rendered
-slower than a normal one's, `e2e/shardTime.mjs`). The deep checks (full boss fights, waves, FRENZY end, initials entry,
+slower than a normal one's, `e2e/shardTime.mjs`). The deep checks (full boss fights, waves, the weather pulses, FRENZY end, initials entry,
 share, daily, pause, countdown, pickups, scrim, the phone menus, and `pacing`: every level's whole run, failing a level whose
 time with nothing to shoot is over its `budgets.json` `pacing` ceilings, `e2e-results/pacing.json`; game logic among them has unit tests next to its
 pure module) run in the full smoke, nightly on production (`prod-smoke.yml`, as three parallel parts, `--nightly-part <main|deep|pacing>`; a red one opens `agent:prod-broken`).

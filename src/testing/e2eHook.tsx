@@ -95,6 +95,13 @@ function waitForGpu(gl: THREE.WebGLRenderer) {
   gl.setRenderTarget(target)
 }
 
+/** A level's weather pulse as `levels()` lists it: its kind, the level time its wave arrives and how long it lasts. */
+export interface E2ELevelWeather {
+  kind: string
+  at: number
+  seconds: number
+}
+
 export interface RideFeel {
   launch: number
   dip: number
@@ -127,7 +134,7 @@ export interface SCTestApi {
   drawCalls: number
   triangles: number
   /** Every level in play order, its `nextLevel` and whether the unlock rule opens it now. */
-  levels: () => { id: string; name: string; maxScore: number; nextLevel: string | null; unlocked: boolean }[]
+  levels: () => { id: string; name: string; maxScore: number; nextLevel: string | null; unlocked: boolean; weather: E2ELevelWeather | null }[]
   /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one. */
   startLevel: (id: string, seed?: number) => void
   /** `restartRun`, as Replay / R / the pause menu's Restart do: a warm level goes straight to the countdown (#674). */
@@ -192,6 +199,9 @@ export interface SCTestApi {
   /** Dark sections (#752): the level's as track fractions, how dark the ride is now (0–1) and the muzzle flash's light
    *  intensity, set by `DarkSections` each frame. */
   darkSection: { spans: { from: number; to: number }[]; depth: number; flash: number }
+  /** The level's weather pulse (#798), set by `Weather` each frame: its strength (0–1), streaks drawn and the fog now
+   *  against the biome's own. null on a level without weather. */
+  weather: { kind: string; envelope: number; streaks: number; fogNear: number; fogFar: number; baseFogNear: number; baseFogFar: number } | null
   /** First-person weapon view-model on screen (CSS px, origin top-left):
    *  bounding box of its projected bounds and the muzzle tip. null before the
    *  first level frame. */
@@ -950,7 +960,10 @@ export function installE2EApi() {
     triangles: 0,
     levels: () => {
       const { isLevelUnlocked } = useGameStore.getState()
-      return getAllLevels().map((l) => ({ id: l.id, name: l.name, maxScore: l.maxScore, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id) }))
+      return getAllLevels().map((l) => ({
+        id: l.id, name: l.name, maxScore: l.maxScore, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id),
+        weather: l.weather ? { kind: l.weather.kind, at: l.enemies[l.weather.wave].spawnDelay ?? 0, seconds: l.weather.seconds } : null,
+      }))
     },
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
     restartLevel: () => useGameStore.getState().restartRun(),
@@ -1000,6 +1013,7 @@ export function installE2EApi() {
     },
     tunnel: { spans: [], index: -1, depth: 0 },
     darkSection: { spans: [], depth: 0, flash: 0 },
+    weather: null,
     weapon: null,
     holdFeedback: false,
     bulletStep: null,
