@@ -3,7 +3,7 @@
  * unit tests. No React, three.js or DOM imports: keep it that way so it can be
  * tested under plain Node.
  */
-import type { EnemyType, EnemyWave } from '@/types/level'
+import type { EnemyType, EnemyWave, LevelConfig } from '@/types/level'
 import { bossMaxScore, type BossSpec } from '@/entities/bosses/bossModel'
 
 /** Points awarded per kill, before the combo multiplier (`combat/comboTiers.ts`). */
@@ -63,6 +63,19 @@ export function computeStars(
   if (pct >= thresholds[1]) return 2
   if (pct >= thresholds[0]) return 1
   return 0
+}
+
+/** The score a finished run shows: whole points, never below 0. */
+export function shownScore(score: number): number {
+  return Math.max(0, Math.round(score))
+}
+
+/**
+ * A finished run's stars, from its shown score (`shownScore`), so everything about the run agrees on them: the results
+ * screen, the score card, the share text, the `level_complete` event and the results music's cut (#797).
+ */
+export function runStars(score: number, level: Pick<LevelConfig, 'maxScore' | 'starThresholds'>): 0 | 1 | 2 | 3 {
+  return computeStars(shownScore(score), level.maxScore, level.starThresholds)
 }
 
 export interface NextStar {

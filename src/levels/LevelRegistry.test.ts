@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels, getLevelConfig, previousLevel } from './LevelRegistry'
-import { SCORE_VALUES, computeMaxScore, computeStars, nextStar } from './scoring'
+import { SCORE_VALUES, computeMaxScore, computeStars, nextStar, runStars, shownScore } from './scoring'
 import type { EnemyType } from '@/types/level'
 import { BOSS_SPECS } from '@/entities/bosses/bossSpecs'
 import { bossMaxScore } from '@/entities/bosses/bossModel'
@@ -189,6 +189,22 @@ describe('computeStars', () => {
     for (const l of levels) {
       expect(computeStars(l.maxScore, l.maxScore, l.starThresholds), l.id).toBe(3)
     }
+  })
+})
+
+describe('runStars', () => {
+  const level = { maxScore: 1000, starThresholds: [0.15, 0.55, 0.85] as [number, number, number] }
+
+  it('scores the shown, rounded score: a fraction under a threshold that rounds onto it earns the star', () => {
+    expect(shownScore(549.6)).toBe(550)
+    expect(runStars(549.6, level)).toBe(2)
+    expect(computeStars(549.6, level.maxScore, level.starThresholds)).toBe(1)
+    expect(runStars(549.4, level)).toBe(1)
+  })
+
+  it('never shows a negative score', () => {
+    expect(shownScore(-12.7)).toBe(0)
+    expect(runStars(-12.7, level)).toBe(0)
   })
 })
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
+import { runStars } from '@/levels/scoring'
 import { VIEWBOX } from '@/ui/logoArt'
 import {
   CARD_DIMENSIONS,
@@ -181,6 +182,15 @@ describe('scoreCardRun', () => {
     const level = getAllLevels()[0]
     const run = scoreCardRun({ levelId: level.id, score: level.maxScore + 0.4, bestCombo: 9, hits: 3, shotsFired: 4, mode: { mode: 'campaign' } })
     expect(run).toMatchObject({ levelName: level.name, biome: level.biome, score: Math.round(level.maxScore), stars: 3, bestCombo: 9, accuracy: '75%', daily: null, worldRank: null })
+  })
+
+  it('earns the star the shown score earns, as the results screen and its music do, 0.4 under a threshold (#797)', () => {
+    for (const level of getAllLevels()) {
+      const score = Math.ceil(level.starThresholds[1] * level.maxScore) - 0.4
+      const run = scoreCardRun({ levelId: level.id, score, bestCombo: 0, hits: 0, shotsFired: 0, mode: { mode: 'campaign' } })
+      expect(run?.stars, level.id).toBe(2)
+      expect(runStars(score, level), level.id).toBe(2)
+    }
   })
 
   it('carries a campaign run\'s World rank, never a daily\'s', () => {

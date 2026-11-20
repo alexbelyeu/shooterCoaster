@@ -14,15 +14,15 @@ import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks
 import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 import { intensityForTier } from '@/audio/scrim/layers'
 import { RESULTS_CUTS, resultsCut } from '@/audio/scores/resultsCut'
-import { computeStars } from '@/levels/scoring'
+import { runStars } from '@/levels/scoring'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
 import { BYSTANDER_HIT_EVENT, type BystanderHitEvent } from '@/combat/bystanders'
 
-/** The run's stars, which pick the results score's cut (#792). */
-function runStars(level: string): number {
+/** The run's stars as the results screen shows them, which pick the results score's cut (#792, #797). */
+function finishedRunStars(level: string): number {
   const config = getLevelConfig(level)
-  return config ? computeStars(useGameStore.getState().score, config.maxScore, config.starThresholds) : 0
+  return config ? runStars(useGameStore.getState().score, config) : 0
 }
 
 /**
@@ -33,7 +33,7 @@ function runStars(level: string): number {
 function followPhase(phase: GamePhase, level: string): Promise<void> {
   if (!isInRun(phase) && phase !== 'results') return Promise.resolve()
   return withScrim((p) => {
-    if (phase === 'results') p.playScore(resultsCut(runStars(level)))
+    if (phase === 'results') p.playScore(resultsCut(finishedRunStars(level)))
     else if (phase === 'paused') p.pauseScore(true)
     else {
       p.playScore(level)

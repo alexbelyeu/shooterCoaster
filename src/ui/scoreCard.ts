@@ -1,5 +1,5 @@
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { computeStars } from '@/levels/scoring'
+import { runStars, shownScore } from '@/levels/scoring'
 import type { RunMode } from '@/types/game'
 import type { BiomeType } from '@/types/level'
 import { biomeTheme, FAIR, type SkyStop } from '@/ui/theme'
@@ -54,13 +54,12 @@ export interface RunForCard {
 export function scoreCardRun({ levelId, score, bestCombo, hits, shotsFired, mode, worldRank = null }: RunForCard): ScoreCardRun | null {
   const config = getLevelConfig(levelId)
   if (!config) return null
-  const rounded = Math.max(0, Math.round(score))
   return {
     levelId,
     levelName: config.name,
     biome: config.biome,
-    score: rounded,
-    stars: computeStars(rounded, config.maxScore, config.starThresholds),
+    score: shownScore(score),
+    stars: runStars(score, config),
     bestCombo,
     accuracy: formatAccuracy(hits, shotsFired),
     daily: mode.mode === 'daily' ? dailyDateLabel(mode.dateKey) : null,
@@ -78,7 +77,7 @@ export function dailyDateLabel(dateKey: string): string {
 }
 
 export function scoreCardFileName(levelId: string, score: number): string {
-  return `shootercoaster-${levelId}-${Math.max(0, Math.round(score))}.png`
+  return `shootercoaster-${levelId}-${shownScore(score)}.png`
 }
 
 export interface Rect {
