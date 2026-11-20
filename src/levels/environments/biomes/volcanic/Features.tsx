@@ -19,7 +19,7 @@ const RIVER_INTENSITY = 1.7
 const RIVER_PULSE = { gain: 1.4, seconds: 1.6 }
 
 /** Volcano, lava rivers and the eruption (camera rumble, fog pulse; the ember burst is the `volcanicAsh` particle preset's boost). */
-export default function VolcanicFeatures({ heightFn, groundFn, atmosphere, fogRef }: BiomeFeaturesProps) {
+export default function VolcanicFeatures({ heightFn, groundFn, atmosphere, fog }: BiomeFeaturesProps) {
   const fogPulseRef = useRef({ active: false, startTime: 0, far: ERUPTION_FOG_FAR })
   const riverPulseRef = useRef({ active: false, startTime: 0 })
   const runId = useGameStore((s) => s.runId)
@@ -63,9 +63,8 @@ export default function VolcanicFeatures({ heightFn, groundFn, atmosphere, fogRe
   useEffect(() => {
     fogPulseRef.current.active = false
     riverPulseRef.current.active = false
-    if (fogRef.current) fogRef.current.far = atmosphere.fogFar
     lavaRiverMat.uniforms.uIntensity.value = RIVER_INTENSITY
-  }, [runId, fogRef, atmosphere, lavaRiverMat])
+  }, [runId, lavaRiverMat])
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -80,24 +79,20 @@ export default function VolcanicFeatures({ heightFn, groundFn, atmosphere, fogRe
       lavaRiverMat.uniforms.uIntensity.value = RIVER_INTENSITY * (1 + (u < 1 ? RIVER_PULSE.gain * Math.sin(u * Math.PI) : 0))
     }
 
+    // Fog pulse (a modifier `BiomeEnvironment` combines): close in over 2s, recover over 8s
     const pulse = fogPulseRef.current
-    if (!pulse.active) return
-    if (pulse.startTime < 0) pulse.startTime = clock.elapsedTime
-    const elapsed = clock.elapsedTime - pulse.startTime
-
-    // Fog pulse: close in over 2s, recover over 8s
-    if (fogRef.current) {
-      const baseFar = atmosphere.fogFar
-      if (elapsed < 2) {
-        const t = elapsed / 2
-        fogRef.current.far = baseFar + (pulse.far - baseFar) * t
-      } else if (elapsed < 10) {
-        const t = (elapsed - 2) / 8
-        fogRef.current.far = pulse.far + (baseFar - pulse.far) * t
-      } else {
-        fogRef.current.far = baseFar
-        pulse.active = false
-      }
+    if (!pulse.active) {
+      fog.eruption.far = 1
+      return
+    }
+    if (pulse.startTime < 0) pulse.startTime = t
+    const elapsed = t - pulse.startTime
+    const closed = pulse.far / atmosphere.fogFar
+    if (elapsed < 2) fog.eruption.far = 1 + (closed - 1) * (elapsed / 2)
+    else if (elapsed < 10) fog.eruption.far = closed + (1 - closed) * ((elapsed - 2) / 8)
+    else {
+      fog.eruption.far = 1
+      pulse.active = false
     }
   })
 

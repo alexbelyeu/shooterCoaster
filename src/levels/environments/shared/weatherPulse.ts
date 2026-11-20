@@ -1,4 +1,5 @@
 import type { EnemyWave, WeatherKind } from '@/types/level'
+import type { FogModifier } from './sceneFog'
 import type { BoostEnvelope } from './types'
 
 /**
@@ -37,15 +38,10 @@ export function levelWeather(waves: readonly EnemyWave[]): { kind: WeatherKind; 
   return wave ? { kind: wave.weather!, wave } : null
 }
 
-export interface FogRange {
-  near: number
-  far: number
-}
-
-/** Written into `out`: called every frame. */
-export function weatherFog(base: { fogNear: number; fogFar: number }, look: WeatherLook, envelope: number, out: FogRange): FogRange {
-  out.near = base.fogNear + (base.fogNear * look.fogNear - base.fogNear) * envelope
-  out.far = base.fogFar + (base.fogFar * look.fogFar - base.fogFar) * envelope
+/** The weather's fog modifier at `envelope` (0 clear, 1 at its height), written into `out`: called every frame. */
+export function weatherFog(look: WeatherLook, envelope: number, out: FogModifier): FogModifier {
+  out.near = 1 + (look.fogNear - 1) * envelope
+  out.far = 1 + (look.fogFar - 1) * envelope
   return out
 }
 
