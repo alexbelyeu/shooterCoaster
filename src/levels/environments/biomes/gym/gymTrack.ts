@@ -100,9 +100,12 @@ function turnNorth(deg: number, y: number): Vec3 {
   return { x: start.x - TURN_RADIUS + TURN_RADIUS * Math.cos(deg * DEG), y, z: start.z + TURN_RADIUS * Math.sin(deg * DEG) }
 }
 
-/** `out` from the star along its facing, `y` over the pit's floor, `side` across the pit (+ = west). */
+/** The pit's middle across the hall: the dive runs down it (the star sits on the middle of the wall the Tree leaves in view). */
+const PIT_MID_Z = (PIT.minZ + PIT.maxZ) / 2
+
+/** `out` from the end wall along the star's facing, `y` over the pit's floor, `side` across the pit from its middle (+ = west). */
 function pit(out: number, y: number, side: number): Vec3 {
-  return { x: STAR.centre.x + STAR.facing.x * out, y: PIT.floorY + y, z: STAR.centre.z + side }
+  return { x: STAR.centre.x + STAR.facing.x * out, y: PIT.floorY + y, z: PIT_MID_Z + side }
 }
 
 /** The control points in blockout metres, from the lap start. */
