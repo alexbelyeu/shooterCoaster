@@ -1,3 +1,4 @@
+import { clamp01, inWindow, smooth } from './bossCycle.hot'
 import type { PerchConfig } from './scorpionMotion.hot'
 
 /** The Yeti's motion, pure and allocation-free per frame. Local frame: +z faces the rider, +y up, +x its left. */
@@ -18,10 +19,10 @@ export const YETI_BODY = {
   chest: [0, 560, 150] as const,
 } as const
 
-/** Every roar exposes the chest (phase 1) and flares the aurora; the first comes as it arrives. */
+/** Every roar (`openS`: arms up, head back) exposes the chest (phase 1) and flares the aurora; the first comes as it arrives. */
 export const YETI_ROAR = {
   first: 0.6,
-  roarS: 2.2,
+  openS: 2.2,
   period: 7.5,
   rampS: 0.35,
 } as const
@@ -76,45 +77,9 @@ export const YETI_PERCH: PerchConfig = {
   clearance: 45,
 }
 
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
-const smooth = (x: number) => {
-  const t = clamp01(x)
-  return t * t * (3 - 2 * t)
-}
-
-/** Negative before the first roar. */
-function roarCycle(t: number): number {
-  const u = t - YETI_ROAR.first
-  return u < 0 ? u : u % YETI_ROAR.period
-}
-
-export function isRoaring(t: number): boolean {
-  const u = roarCycle(t)
-  return u >= 0 && u < YETI_ROAR.roarS
-}
-
-/** 0..1: arms up, head back, chest open. */
-export function roarAmount(t: number): number {
-  const u = roarCycle(t)
-  if (u < 0 || u >= YETI_ROAR.roarS) return 0
-  const R = YETI_ROAR
-  return Math.min(smooth(u / R.rampS), smooth((R.roarS - u) / R.rampS))
-}
-
-export function timeToNextRoar(t: number): number {
-  const u = roarCycle(t)
-  if (u < 0) return -u
-  return u < YETI_ROAR.roarS ? 0 : YETI_ROAR.period - u
-}
-
-/** When it loses its last fist it roars at once. */
-export function roarNowEpoch(now: number): number {
-  return now - YETI_ROAR.first
-}
-
 /** Never retracted before the last phase (its phase hides it), so the hit that breaks the last fist exposes it in the same turn. */
 export function chestRetracted(lastPhase: boolean, roarT: number): boolean {
-  return lastPhase && !isRoaring(roarT)
+  return lastPhase && !inWindow(YETI_ROAR, roarT)
 }
 
 export function throwArmAlive(preferred: number, leftAlive: boolean, rightAlive: boolean): number {
@@ -183,12 +148,6 @@ export function toppleAngle(sinceDefeat: number): number {
 
 export function toppleSink(sinceDefeat: number): number {
   return -YETI_RISE.sinkDepth * smooth((sinceDefeat - YETI_RISE.toppleS) / YETI_RISE.sinkS)
-}
-
-/** Held its ridge long enough, the rider is about to pass it, or it is off to the side of the view. */
-export function needsRelocate(holdAge: number, ahead: number, side: number): boolean {
-  const R = YETI_ROAM
-  return holdAge >= R.holdS || ahead < R.minAhead || Math.abs(Math.atan2(side, ahead)) > R.maxOffAngle
 }
 
 export interface Lope {

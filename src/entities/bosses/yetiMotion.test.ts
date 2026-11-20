@@ -5,9 +5,10 @@ import {
   applyHit, bossMaxScore, createBossState, currentPhase, exposedWeakPoints, hpFraction, isDefeated, setRetracted, type BossState,
 } from './bossModel'
 import { YETI, YETI_SNOWBALL } from './bossSpecs'
+import { inWindow, windowNowEpoch } from './bossCycle.hot'
 import {
-  THROW_S, YETI_ROAM, YETI_ROAR, YETI_THROW, chestRetracted, elbowPose, fistPose, isRoaring, lopeAt, needsRelocate, passedCamera,
-  riseOffset, roarAmount, roarNowEpoch, snowballAt, throwArmAlive, throwSwing, timeToNextRoar, toppleAngle, type Point3,
+  THROW_S, YETI_ROAM, YETI_ROAR, YETI_THROW, chestRetracted, elbowPose, fistPose, lopeAt, passedCamera, riseOffset, snowballAt,
+  throwArmAlive, throwSwing, toppleAngle, type Point3,
 } from './yetiMotion.hot'
 
 const ids = (s: BossState) => exposedWeakPoints(s).map((w) => w.id)
@@ -32,18 +33,18 @@ describe('the Yeti spec', () => {
 
   it('the chest is exposed only while it roars, and a hit between roars does nothing', () => {
     let s = hit(hit(createBossState(YETI), 'fist-l', 2), 'fist-r', 2)
-    const epoch = roarNowEpoch(10)
+    const epoch = windowNowEpoch(YETI_ROAR, 10)
     for (let t = 10; t < 10 + 2 * YETI_ROAR.period; t += 0.1) {
       s = atRoarTime(s, t - epoch)
-      expect(ids(s).includes('chest')).toBe(isRoaring(t - epoch))
+      expect(ids(s).includes('chest')).toBe(inWindow(YETI_ROAR, t - epoch))
     }
-    s = atRoarTime(s, YETI_ROAR.first + YETI_ROAR.roarS + 0.5)
+    s = atRoarTime(s, YETI_ROAR.first + YETI_ROAR.openS + 0.5)
     expect(applyHit(s, 'chest')).toBe(s)
   })
 
   it('in the first phase the roar never exposes the chest early', () => {
     const s = atRoarTime(createBossState(YETI), YETI_ROAR.first + 0.5)
-    expect(isRoaring(YETI_ROAR.first + 0.5)).toBe(true)
+    expect(inWindow(YETI_ROAR, YETI_ROAR.first + 0.5)).toBe(true)
     expect(ids(s)).toEqual(['fist-l', 'fist-r'])
   })
 
@@ -65,21 +66,8 @@ describe('the Yeti spec', () => {
 })
 
 describe('yetiMotion', () => {
-  it('roars on a fixed cycle, the first as it arrives, and a roar can start at once', () => {
-    expect(isRoaring(0)).toBe(false)
-    expect(isRoaring(YETI_ROAR.first + 0.1)).toBe(true)
-    expect(isRoaring(YETI_ROAR.first + YETI_ROAR.roarS + 0.1)).toBe(false)
-    expect(isRoaring(YETI_ROAR.first + YETI_ROAR.period + 0.1)).toBe(true)
-    expect(roarAmount(YETI_ROAR.first + YETI_ROAR.roarS / 2)).toBe(1)
-    expect(roarAmount(YETI_ROAR.first + YETI_ROAR.roarS + 0.1)).toBe(0)
-    expect(timeToNextRoar(0)).toBeCloseTo(YETI_ROAR.first)
-    expect(timeToNextRoar(YETI_ROAR.first + 1)).toBe(0)
-    expect(timeToNextRoar(YETI_ROAR.first + YETI_ROAR.roarS)).toBeCloseTo(YETI_ROAR.period - YETI_ROAR.roarS)
-    expect(isRoaring(42 - roarNowEpoch(42))).toBe(true)
-  })
-
   it('leaves room between roars for a throw and a lope', () => {
-    expect(YETI_ROAR.period - YETI_ROAR.roarS).toBeGreaterThan(THROW_S + YETI_ROAM.lopeS)
+    expect(YETI_ROAR.period - YETI_ROAR.openS).toBeGreaterThan(THROW_S + YETI_ROAM.lopeS)
   })
 
   it('throws with the preferred arm, the other when that fist is gone, none with no fists', () => {
@@ -113,11 +101,7 @@ describe('yetiMotion', () => {
     expect(toppleAngle(10)).toBeLessThan(-1.2)
   })
 
-  it('moves on when the rider nears its ridge, it slips off the view or has held it long', () => {
-    expect(needsRelocate(1, 1200, 400)).toBe(false)
-    expect(needsRelocate(YETI_ROAM.holdS, 1200, 400)).toBe(true)
-    expect(needsRelocate(1, YETI_ROAM.minAhead - 1, 0)).toBe(true)
-    expect(needsRelocate(1, 600, 1200)).toBe(true)
+  it('lopes in hops to its next ridge', () => {
     const lope = { t: 0, lift: 0 }
     expect(lopeAt(lope, 0).t).toBe(0)
     expect(lopeAt(lope, YETI_ROAM.lopeS).t).toBe(1)

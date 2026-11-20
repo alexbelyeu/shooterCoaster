@@ -22,17 +22,17 @@ import {
   SNOWBALL_GEO, SNOWBALL_MAT, YETI_BODY_GEO, YETI_CHEST_EXPOSED_MAT, YETI_CHEST_GEO, YETI_CHEST_MAT, YETI_FIST_GEO,
   YETI_FUR_MAT, YETI_HEAD_GEO, YETI_LIMB_GEO, YETI_MOUTH_GEO, YETI_MOUTH_OFFSET,
 } from './bossAssets'
-import { approachAngle, pickPerch, type Perch, type PerchInput } from './scorpionMotion.hot'
+import { approachAngle, firstSlot, pickPerch, type Perch, type PerchInput } from './scorpionMotion.hot'
+import { aimAtRider } from './bossAim.hot'
+import { inWindow, needsRelocate, timeToWindow, windowAmount, windowNowEpoch } from './bossCycle.hot'
 import {
-  YETI_BODY, YETI_PERCH, YETI_RISE, YETI_ROAM, YETI_THROW, THROW_S, chestRetracted, elbowPose, fistPose, isRoaring, lopeAt,
-  needsRelocate, passedCamera, riseOffset, roarAmount, roarNowEpoch, snowballAt, throwArmAlive, throwSwing, timeToNextRoar,
-  toppleAngle, toppleSink, type Lope, type Point3,
+  YETI_BODY, YETI_PERCH, YETI_RISE, YETI_ROAM, YETI_ROAR, YETI_THROW, THROW_S, chestRetracted, elbowPose, fistPose, lopeAt,
+  passedCamera, riseOffset, snowballAt, throwArmAlive, throwSwing, toppleAngle, toppleSink, type Lope, type Point3,
 } from './yetiMotion.hot'
 
 const B = YETI_BODY
 const FISTS = ['fist-l', 'fist-r'] as const
 const FIST_SIDE = [1, -1] as const
-const HEADING_TAU = 2.5
 const TURN_TAU = 0.5
 const AURORA_ROAR = 2.6
 const AURORA_TELL = 2.2
@@ -44,7 +44,6 @@ const FALL_TRAUMA = [0.7, 900] as const
 const EXIT_SECONDS = YETI_RISE.toppleS + YETI_RISE.sinkS + 0.5
 
 const _cam = new THREE.Vector3()
-const _fwd = new THREE.Vector3()
 const _right = new THREE.Vector3()
 const _up = new THREE.Vector3()
 const _to = new THREE.Vector3()
@@ -199,32 +198,11 @@ export default function Yeti(props: BossProps) {
     }
   }, [sim, dropBall])
 
-  /** Heading smoothed through the loops, like the Scorpion's. */
+  /** `repick` moves `sim.perch` to a clear ridge ahead. */
   const aim = useCallback(
     (dt: number, repick: boolean) => {
-      camera.getWorldPosition(_cam)
-      camera.getWorldDirection(_fwd)
-      _fwd.y = 0
-      if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1)
-      _fwd.normalize()
-      if (!sim.headed) {
-        sim.heading.copy(_fwd)
-        sim.headed = true
-      } else {
-        sim.heading.lerp(_fwd, 1 - Math.exp(-dt / HEADING_TAU))
-        if (sim.heading.lengthSq() < 1e-6) sim.heading.copy(_fwd)
-        sim.heading.normalize()
-      }
-      input.camera.x = _cam.x
-      input.camera.z = _cam.z
-      input.forwardX = sim.heading.x
-      input.forwardZ = sim.heading.z
-      if (!repick) return true
-      if (pickPerch(sim.perch, input, YETI_PERCH)) return true
-      const [ahead, side] = YETI_PERCH.slots[0]
-      sim.perch.x = _cam.x + sim.heading.x * ahead - sim.heading.z * side
-      sim.perch.z = _cam.z + sim.heading.z * ahead + sim.heading.x * side
-      return false
+      aimAtRider(camera, _cam, sim, input, dt)
+      if (repick && !pickPerch(sim.perch, input, YETI_PERCH)) firstSlot(sim.perch, input, YETI_PERCH)
     },
     [camera, sim, input],
   )
@@ -258,11 +236,11 @@ export default function Yeti(props: BossProps) {
       const lastPhase = currentPhase(state) === 1
       if (lastPhase && !sim.lastPhase) {
         sim.lastPhase = true
-        sim.roarEpoch = roarNowEpoch(age)
+        sim.roarEpoch = windowNowEpoch(YETI_ROAR, age)
         sim.throwArm = -1
       }
       const roarT = age - sim.roarEpoch
-      const roaring = fighting && isRoaring(roarT)
+      const roaring = fighting && inWindow(YETI_ROAR, roarT)
       if (roaring !== sim.roaring) {
         sim.roaring = roaring
         eventBus.emit(AURORA_INTENSITY_EVENT, roaring ? AURORA_ROAR : AURORA_DEFAULT_INTENSITY)
@@ -274,12 +252,12 @@ export default function Yeti(props: BossProps) {
         sim.anchorX = sim.perch.x
         sim.anchorZ = sim.perch.z
         sim.holdStart = age
-      } else if (fighting && sim.lopeStart < 0 && !roaring && sim.throwArm < 0 && timeToNextRoar(roarT) > YETI_ROAM.lopeS) {
+      } else if (fighting && sim.lopeStart < 0 && !roaring && sim.throwArm < 0 && timeToWindow(YETI_ROAR, roarT) > YETI_ROAM.lopeS) {
         const dx = sim.anchorX - _cam.x
         const dz = sim.anchorZ - _cam.z
         const ahead = dx * sim.heading.x + dz * sim.heading.z
         const side = dz * sim.heading.x - dx * sim.heading.z
-        if (needsRelocate(age - sim.holdStart, ahead, side)) {
+        if (needsRelocate(YETI_ROAM, age - sim.holdStart, ahead, side)) {
           aim(0, true)
           sim.fromX = sim.anchorX
           sim.fromZ = sim.anchorZ
@@ -321,7 +299,7 @@ export default function Yeti(props: BossProps) {
       }
 
       if (fighting && sim.throwArm < 0 && !roaring && sim.lopeStart < 0 && age >= Math.max(sim.nextThrow, YETI_RISE.riseS)
-        && sim.throws < YETI_SNOWBALL.max && timeToNextRoar(roarT) > THROW_S) {
+        && sim.throws < YETI_SNOWBALL.max && timeToWindow(YETI_ROAR, roarT) > THROW_S) {
         const arm = throwArmAlive(sim.nextArm, weakPointHp(state, FISTS[0]) > 0, weakPointHp(state, FISTS[1]) > 0)
         if (arm >= 0) {
           sim.throwArm = arm
@@ -345,7 +323,7 @@ export default function Yeti(props: BossProps) {
         }
       }
 
-      const roar = fighting ? roarAmount(roarT) : 0
+      const roar = fighting ? windowAmount(YETI_ROAR, roarT) : 0
       head.rotation.x = -B.roarTilt * roar + Math.sin(age * 1.3) * 0.04
       mouth.scale.y = 0.3 + 1.5 * roar
       let n = 0
