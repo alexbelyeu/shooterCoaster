@@ -148,7 +148,8 @@ subagents, weighted tokens / turns / peak context per agent).
 
 ## Hard rules (all agents, always)
 
-1. `main` must always build, pass `npm run verify`, and be playable. Never merge red.
+1. `main` must always build, pass CI's `verify` (the PR-depth smoke shards, unit + build, Lighthouse), and be playable. Never merge red.
+   The full smoke runs nightly on production (`prod-smoke.yml`); a red one opens `agent:prod-broken` and is P1.
 2. Never force-push, rewrite history, or push directly to `main`. All changes go through PRs. Agents never merge: approval is the `agent:qa-approved` label and GitHub auto-merges (see PROTOCOL.md).
 3. Never delete or disable an existing level, mode or feature without a playable replacement in the same PR.
 4. No new paid services, accounts, API keys or secrets. No secrets in code. No new third-party network calls at runtime without a DECISIONS.md entry.
