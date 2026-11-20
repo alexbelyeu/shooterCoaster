@@ -6,6 +6,7 @@ import type { AtmosphereConfig } from '../atmosphere'
 import { markStartup } from '@/core/startupMarks'
 import type { DarkSectionSpec } from '@/types/level'
 import DarkSections from './DarkSections'
+import type { FogModifiers } from './sceneFog'
 
 /**
  * Bakes the sky into scene.environment once per mount; Phong materials ignore it, so only Standard/Physical reflect.
@@ -55,7 +56,8 @@ export default function Atmosphere({
 }: {
   atmosphere: AtmosphereConfig
   fogRef: RefObject<THREE.Fog | null>
-  darkSections?: readonly DarkSectionSpec[]
+  /** The track's dark sections and the fog modifiers they publish into. */
+  darkSections?: { sections: readonly DarkSectionSpec[]; fog: FogModifiers }
 }) {
   const hemiRef = useRef<THREE.HemisphereLight>(null)
   const sunRef = useRef<THREE.DirectionalLight>(null)
@@ -89,8 +91,8 @@ export default function Atmosphere({
         attach="fog"
         args={[atmosphere.sky.horizon, atmosphere.fogNear, atmosphere.fogFar]}
       />
-      {darkSections?.length ? (
-        <DarkSections sections={darkSections} atmosphere={atmosphere} hemiRef={hemiRef} sunRef={sunRef} fogRef={fogRef} />
+      {darkSections?.sections.length ? (
+        <DarkSections sections={darkSections.sections} atmosphere={atmosphere} hemiRef={hemiRef} sunRef={sunRef} fogRef={fogRef} fog={darkSections.fog} />
       ) : null}
     </>
   )

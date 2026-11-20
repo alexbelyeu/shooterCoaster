@@ -2,22 +2,25 @@ import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { ATMOSPHERES } from '@/levels/environments/atmosphere'
 import { boostStrength } from './particlePresets'
+import { combineFog, createFogModifiers } from './sceneFog'
 import { levelWeather, maxWeatherStreaks, WEATHER_LOOKS, weatherFog, weatherSeconds } from './weatherPulse'
 
 describe('weatherFog', () => {
-  const base = ATMOSPHERES.desert
   const look = WEATHER_LOOKS.sandstorm
 
-  it("returns to the biome's own fog exactly once the pulse has cleared", () => {
+  it('lets the fog go exactly once the pulse has cleared', () => {
     const out = { near: 0, far: 0 }
     const seconds = weatherSeconds('sandstorm')
-    for (const elapsed of [0.5, 2, seconds - 0.5]) weatherFog(base, look, boostStrength(look.pulse, elapsed), out)
-    weatherFog(base, look, boostStrength(look.pulse, seconds + 0.1), out)
-    expect(out).toEqual({ near: base.fogNear, far: base.fogFar })
+    for (const elapsed of [0.5, 2, seconds - 0.5]) weatherFog(look, boostStrength(look.pulse, elapsed), out)
+    weatherFog(look, boostStrength(look.pulse, seconds + 0.1), out)
+    expect(out).toEqual({ near: 1, far: 1 })
   })
 
-  it('closes in at the hold, never past the near plane', () => {
-    const out = weatherFog(base, look, 1, { near: 0, far: 0 })
+  it("closes the biome's fog in at the hold, never past the near plane", () => {
+    const base = ATMOSPHERES.desert
+    const mods = createFogModifiers()
+    weatherFog(look, 1, mods.weather)
+    const out = combineFog(base, mods, { near: 0, far: 0 })
     expect(out.near).toBeCloseTo(base.fogNear * look.fogNear)
     expect(out.far).toBeCloseTo(base.fogFar * look.fogFar)
     expect(out.far).toBeGreaterThan(out.near)

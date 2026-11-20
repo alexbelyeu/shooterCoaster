@@ -5,9 +5,11 @@ import type { WeaponId } from '@/combat/weapons/weaponTypes'
 import { dropSound } from './soundGuard'
 import { spatial, type KillSound } from './sfxDesign'
 
+/** Where a sound plays from (`spatial`): its pan, the low-pass of its distance and its reverb send's multiplier. */
 export interface Placement {
   pan: number
   cutoffHz: number
+  wet: number
 }
 
 export interface VoiceStats {
@@ -38,9 +40,9 @@ export interface SfxEngine {
   frenzy(): void
   frenzyLift(on: boolean): void
   waveIncoming(): void
-  bossArrival(): void
-  bossHit(hpFraction: number): void
-  bossDefeat(): void
+  bossArrival(at: Placement | null): void
+  bossHit(hpFraction: number, at: Placement | null): void
+  bossDefeat(at: Placement | null): void
   fireworkWhistle(flightS: number, timeScale: number): void
   fireworkPop(): void
   starChime(index: number): void
@@ -107,7 +109,7 @@ export function prepareSfx(level: string | null, biome: BiomeType): Promise<void
 
 let listener: THREE.Camera | null = null
 const _local = new THREE.Vector3()
-const _placement: Placement = { pan: 0, cutoffHz: 20000 }
+const _placement: Placement = { pan: 0, cutoffHz: 20000, wet: 1 }
 
 export function setSfxListener(camera: THREE.Camera | null): void {
   listener = camera

@@ -1,10 +1,11 @@
-import type { ComponentType, RefObject } from 'react'
+import type { ComponentType } from 'react'
 import type * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
 import type { RideSpeeds } from '@/track/ridePhysics'
 import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
+import type { FogModifiers } from './sceneFog'
 import type { KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import type { HeroShot } from '@/track/introCamera.hot'
 
@@ -60,8 +61,8 @@ export interface BiomeFeaturesProps {
   /** The ride's speeds (`rideModel`), for biome events timed on the ride (Ocean's whale). */
   speeds: RideSpeeds
   atmosphere: AtmosphereConfig
-  /** The scene fog, for biome events that animate it (volcanic eruption). */
-  fogRef: RefObject<THREE.Fog | null>
+  /** The scene fog's modifiers, for biome events that pull it in (the volcanic eruption publishes `fog.eruption`). */
+  fog: FogModifiers
 }
 
 /** Ground that gives off its own light (volcanic: beside the lava), baked per terrain vertex. */

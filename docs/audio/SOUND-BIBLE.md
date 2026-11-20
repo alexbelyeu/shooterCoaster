@@ -104,8 +104,11 @@ These are measured on offline renders, at default settings, with nothing else pl
 - The arcade engine (`src/audio/arcade/`, the only SFX engine since #416) bakes every one-shot from the score
   engine's own instruments when a level starts, so SFX and music share one palette and key.
   Positional: kills and hits pan with the enemy's place on screen and dull with distance (their louder channel keeps
-  its level wherever they pan, so a kill at the crosshair is not 3 dB down: `panGain`); each
-  biome has its own room on the SFX send. Guns stay dry.
+  its level wherever they pan, so a kill at the crosshair is not 3 dB down: `panGain`); so do the
+  boss's arrival, hits and defeat. A far sound is wetter (`SPATIAL.farWet`). Each biome has its own
+  room on the SFX send (`BIOME_REVERB`): the desert's slapback off the dunes, the open sea's air with
+  next to no early reflections, the volcano's cavern behind a long pre-delay, the Gym's dense hard hall.
+  Guns stay dry.
 
 ## How we check sound, since no agent can hear
 

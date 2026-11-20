@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
@@ -9,6 +9,7 @@ import { createRng, hashString } from '@/utils/rng'
 import type { AtmosphereConfig } from '@/levels/environments/atmosphere'
 import type { WeatherKind } from '@/types/level'
 import { newBoostTrack, resetBoost, stepBoost } from './particlePresets'
+import type { FogModifiers } from './sceneFog'
 import { maxWeatherStreaks, WEATHER_LOOKS, weatherFog, type WeatherLook } from './weatherPulse'
 
 /** Streaks live this deep in the view (world units): close enough to read as driven past the rider, never on the lens. */
@@ -87,17 +88,14 @@ function createMaterial(look: WeatherLook): THREE.ShaderMaterial {
 /**
  * A level's weather pulse (#798) from its wave's `weather:start`, on game time, its envelope a particle boost's
  * (`stepBoost`). One draw whose streaks move in the vertex shader; always in the scene (0 instances draws nothing) so
- * `ShaderWarmup` compiles it.
- *
- * The fog has other writers that don't compose with this one: `DarkSections` (every frame) and the volcanic eruption.
- * It holds because no level has weather with either; a level that wants both needs one owner for the fog first.
+ * `ShaderWarmup` compiles it. Its fog is a modifier (`fog.weather`) that `BiomeEnvironment` combines with the others'.
  */
-export default function Weather({ kind, atmosphere, fogRef }: { kind: WeatherKind; atmosphere: AtmosphereConfig; fogRef: RefObject<THREE.Fog | null> }) {
+export default function Weather({ kind, atmosphere, fog }: { kind: WeatherKind; atmosphere: AtmosphereConfig; fog: FogModifiers }) {
   const look = WEATHER_LOOKS[kind]
   const max = maxWeatherStreaks(look, useQualityProfile().particleScale, isCoarsePointer)
   const geometry = useMemo(() => createStreaks(max), [max])
   const material = useMemo(() => createMaterial(look), [look])
-  const [pulse] = useState(() => ({ track: newBoostTrack(), envelope: 0, fog: { near: 0, far: 0 } }))
+  const [pulse] = useState(() => ({ track: newBoostTrack(), envelope: 0 }))
   const runId = useGameStore((s) => s.runId)
 
   useEffect(() => () => geometry.dispose(), [geometry])
@@ -113,15 +111,10 @@ export default function Weather({ kind, atmosphere, fogRef }: { kind: WeatherKin
     }
   }, [kind, pulse])
 
-  // A restart's pulse waits for its own wave, and the last run's fog is the biome's again
+  // A restart's pulse waits for its own wave
   useEffect(() => {
     resetBoost(pulse.track)
     pulse.envelope = 0
-    const fog = fogRef.current
-    if (fog) {
-      fog.near = atmosphere.fogNear
-      fog.far = atmosphere.fogFar
-    }
     const testApi = window.__SC_TEST__
     if (testApi) {
       const base = { near: atmosphere.fogNear, far: atmosphere.fogFar }
@@ -131,20 +124,14 @@ export default function Weather({ kind, atmosphere, fogRef }: { kind: WeatherKin
       const testApi = window.__SC_TEST__
       if (testApi) testApi.weather = null
     }
-  }, [runId, pulse, fogRef, atmosphere, kind])
+  }, [runId, pulse, atmosphere, kind])
 
   useFrame(({ camera }) => {
     const t = gameTime()
-    const was = pulse.envelope
-    const envelope = stepBoost(pulse.track, look.pulse, t, was)
+    const envelope = stepBoost(pulse.track, look.pulse, t, pulse.envelope)
     pulse.envelope = envelope
     geometry.instanceCount = Math.round(max * envelope)
-    const fog = fogRef.current
-    if (fog && (envelope > 0 || was > 0)) {
-      weatherFog(atmosphere, look, envelope, pulse.fog)
-      fog.near = pulse.fog.near
-      fog.far = pulse.fog.far
-    }
+    weatherFog(look, envelope, fog.weather)
     const u = material.uniforms
     u.uTime.value = t
     const perspective = camera as THREE.PerspectiveCamera
@@ -154,8 +141,6 @@ export default function Weather({ kind, atmosphere, fogRef }: { kind: WeatherKin
     if (report) {
       report.envelope = envelope
       report.streaks = geometry.instanceCount
-      report.fogNear = fog?.near ?? 0
-      report.fogFar = fog?.far ?? 0
     }
   })
 

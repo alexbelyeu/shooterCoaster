@@ -7,11 +7,11 @@ import { arcadeChannel, arcadeUiChannel, audioContext, audioNow as clock, isAudi
 import { scrimPlayer } from '../musicEngine'
 import { dropSound } from '../soundGuard'
 import { barSection, compile } from '../scrim/score'
-import { makeIR, upmixPanner } from '../scrim/synth'
+import { upmixPanner } from '../scrim/synth'
 import { SCORES, scoreIdFor } from '../scores'
 import {
   ARCADE_SOUNDS, AUTO_FIRE_DB, BIOME_REVERB, FIREWORK_BIOMES, STEAL_FADE_S, VOICE_BUDGET, WHISTLE_LENGTHS_S, SCORE_KEYS,
-  CHAIN, RUMBLE, WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, nextBeat, nextClankAt, panGain, pickVoice,
+  CHAIN, RUMBLE, WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, nextBeat, nextClankAt, panGain, pickVoice, placedSend, roomImpulse,
   rumbleGain, rumbleHz, windGain, windHz, windUpdateDue,
   type ArcadeSoundId, type BiomeReverb, type VoiceState, type WindRamp,
 } from '../sfxDesign'
@@ -130,7 +130,7 @@ function ensureGraph(): Graph {
   out.connect(arcadeChannel)
   const uiOut = ctx.createGain()
   uiOut.connect(arcadeUiChannel)
-  const ir = makeIR(ctx, room.seconds, room.decayPow)
+  const ir = roomBuffer(ctx, room, biome)
   const gameRoom = createRoom(ctx, ir, room, out)
   const uiRoom = createRoom(ctx, ir, room, uiOut)
   const voices: Voice[] = []
@@ -143,6 +143,14 @@ function ensureGraph(): Graph {
   }
   graphNodes += nodesOf(graph)
   return graph
+}
+
+/** The biome's impulse response, the same every time it is built. */
+function roomBuffer(ctx: BaseAudioContext, room: BiomeReverb, biome: BiomeType): AudioBuffer {
+  const channels = roomImpulse(room, ctx.sampleRate, createRng(hashString(`room:${biome}`)))
+  const buffer = ctx.createBuffer(2, channels[0].length, ctx.sampleRate)
+  channels.forEach((data, ch) => buffer.copyToChannel(data, ch))
+  return buffer
 }
 
 const WIND_LOOP_S = 2
@@ -299,7 +307,7 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
   return promise
 }
 
-const NO_PLACE: Placement = { pan: 0, cutoffHz: 20000 }
+const NO_PLACE: Placement = { pan: 0, cutoffHz: 20000, wet: 1 }
 
 /** Null before audio unlocks or the bank is baked, or when every voice plays something more important. */
 function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: Placement | null = null, loopOffset = -1): Voice | null {
@@ -335,7 +343,7 @@ function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: P
     v.gain.gain.setValueAtTime(Math.pow(10, (def.db + db) / 20) * (place ? panGain(p.pan) : 1), t)
     v.lp.frequency.setValueAtTime(p.cutoffHz, t)
     v.pan.pan.setValueAtTime(p.pan, t)
-    v.send.gain.setValueAtTime(def.send, t)
+    v.send.gain.setValueAtTime(placedSend(def.send, p.wet), t)
     const src = g.ctx.createBufferSource()
     src.buffer = buffer
     src.playbackRate.value = rate
@@ -370,8 +378,8 @@ function onBeat(): typeof beat | null {
   return nextBeat(clock(), grid.origin, grid.beatS, grid.beats, BEAT_LEAD_S, beat)
 }
 
-function playOnBeat(id: ArcadeSoundId) {
-  play(id, onBeat()?.t ?? 0)
+function playOnBeat(id: ArcadeSoundId, place: Placement | null = null) {
+  play(id, onBeat()?.t ?? 0, 0, 1, 0, place)
 }
 
 function setLift(on: boolean) {
@@ -440,9 +448,9 @@ export const arcadeSfx: SfxEngine = {
   frenzy: () => playOnBeat('frenzy'),
   frenzyLift: setLift,
   waveIncoming: () => playOnBeat('waveTell'),
-  bossArrival: () => playOnBeat('bossArrival'),
-  bossHit: (hpFraction) => void play('bossHit', 0, 0, bossHitRate(hpFraction)),
-  bossDefeat: () => void play('bossDefeat'),
+  bossArrival: (at) => playOnBeat('bossArrival', at),
+  bossHit: (hpFraction, at) => void play('bossHit', 0, 0, bossHitRate(hpFraction), 0, at),
+  bossDefeat: (at) => void play('bossDefeat', 0, 0, 1, 0, at),
   fireworkWhistle(flightS, timeScale) {
     const s = fireworkWhistleS(flightS, timeScale)
     let v = 0

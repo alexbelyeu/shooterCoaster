@@ -2,7 +2,7 @@
 import { renderOffline, type OfflineRenderScope } from '@/audio/offlineRender'
 import { setMusicDucked, setPauseMix } from '@/audio/AudioEngine'
 import { loadArcade, silentSfx, type Placement, type SfxEngine } from '@/audio/sfx'
-import { FIREWORK_BIOMES, KILL_SOUNDS, type KillSound } from '@/audio/sfxDesign'
+import { FIREWORK_BIOMES, KILL_SOUNDS, spatial, type KillSound } from '@/audio/sfxDesign'
 import { COMBO_TIERS, FRENZY, TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 import { intensityForTier } from '@/audio/scrim/layers'
 import { getLevelConfig } from '@/levels/LevelRegistry'
@@ -191,10 +191,10 @@ function sfxSheetPlan(level = 'level1', kills = false): Plan {
     { name: 'combo break', slotS: 0.65, play: () => s.comboBreak() },
     { name: 'bystander penalty', slotS: 0.6, play: () => s.penalty(null) },
     { name: 'wave tell', slotS: 1.5, play: () => s.waveIncoming() },
-    { name: 'boss arrival', slotS: 2.0, play: () => s.bossArrival() },
-    { name: 'boss hit (full hp)', slotS: 0.45, play: () => s.bossHit(1) },
-    { name: 'boss hit (low hp)', slotS: 0.45, play: () => s.bossHit(0.2) },
-    { name: 'boss defeat', slotS: 2.2, play: () => s.bossDefeat() },
+    { name: 'boss arrival', slotS: 2.0, play: () => s.bossArrival(null) },
+    { name: 'boss hit (full hp)', slotS: 0.45, play: () => s.bossHit(1, null) },
+    { name: 'boss hit (low hp)', slotS: 0.45, play: () => s.bossHit(0.2, null) },
+    { name: 'boss defeat', slotS: 2.2, play: () => s.bossDefeat(null) },
     ...(FIREWORK_BIOMES.includes(biome)
       ? [
           { name: 'firework whistle', slotS: 1.6, play: () => s.fireworkWhistle(1.2, 1) },
@@ -237,22 +237,29 @@ function sfxSheetPlan(level = 'level1', kills = false): Plan {
 
 const KILL_EVERY_S = 0.75
 
-/** Kills around the stereo field, near and far. */
-function killPlacement(n: number, out: Placement): Placement {
-  out.pan = 0.6 * Math.sin(n * 2.1)
-  out.cutoffHz = n % 3 === 2 ? 5000 : 18000
-  return out
+/** tan(half the horizontal field of view): a 60° vertical one at 16:9. */
+const TAN_HALF_HFOV = Math.tan(Math.PI / 6) * (16 / 9)
+
+/** A placement `ahead` metres in front of the camera, at `screenX` of the half-width (-1 the left edge, 1 the right). */
+function placeAhead(screenX: number, ahead: number, out: Placement): Placement {
+  return spatial(screenX * ahead * TAN_HALF_HFOV, -ahead, TAN_HALF_HFOV, out)
 }
 
-/** A `boss` mix: when the boss arrives and how long before the end it falls (the sting and the loop after it). */
-const BOSS_MIX = { arriveS: 6, defeatBeforeEndS: 9 }
+/** Kills around the stereo field, near and (every third) far. */
+function killPlacement(n: number, out: Placement): Placement {
+  return placeAhead(0.8 * Math.sin(n * 2.1), n % 3 === 2 ? 150 : 25, out)
+}
+
+/** A `boss` mix: when the boss arrives and how long before the end it falls (the sting and the loop after it), and where it is. */
+const BOSS_MIX = { arriveS: 6, defeatBeforeEndS: 9, arrive: { screenX: 0.4, ahead: 120 }, defeat: { screenX: -0.25, ahead: 70 } }
 
 function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): Plan {
   const biome = biomeOf(level)
   const p = scrim
   const events: Plan['events'] = [{ t: p.SCORE_START_DELAY_S, name: `${level} music + wind` }]
   const s = musicOnly ? silentSfx : sfx
-  const place: Placement = { pan: 0, cutoffHz: 20000 }
+  const place: Placement = { pan: 0, cutoffHz: 20000, wet: 1 }
+  const bossAt: Placement = { pan: 0, cutoffHz: 20000, wet: 1 }
   const seams: number[] = []
   const song = compile(SCORES[scoreIdFor(level)])
   const barS = barSection(song)!.barDur
@@ -276,8 +283,8 @@ function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): 
     bar: boss ? { startS: p.SCORE_START_DELAY_S, barS } : null,
     script: (scope) => {
       if (boss) {
-        switchAt(scope, BOSS_MIX.arriveS, 'boss', () => s.bossArrival(), 'boss:spawn: boss arrival + the boss section on the next bar')
-        switchAt(scope, seconds - BOSS_MIX.defeatBeforeEndS, 'sting', () => s.bossDefeat(), 'boss:defeated: boss defeat + the sting on the next bar, then the loop')
+        switchAt(scope, BOSS_MIX.arriveS, 'boss', () => s.bossArrival(placeAhead(BOSS_MIX.arrive.screenX, BOSS_MIX.arrive.ahead, bossAt)), 'boss:spawn: boss arrival + the boss section on the next bar')
+        switchAt(scope, seconds - BOSS_MIX.defeatBeforeEndS, 'sting', () => s.bossDefeat(placeAhead(BOSS_MIX.defeat.screenX, BOSS_MIX.defeat.ahead, bossAt)), 'boss:defeated: boss defeat + the sting on the next bar, then the loop')
       }
       const { at } = scope
       // As LevelAudio: the combo lifts the intensity.
