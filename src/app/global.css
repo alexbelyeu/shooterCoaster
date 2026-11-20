@@ -959,7 +959,9 @@ canvas {
   width: min(1120px, 100%);
 }
 
-/* The button is the hanging sign: it tilts a little on its hook, each one its own way, and its board fills it. */
+/* The button is the hanging sign: it tilts a little on its hook, each one its own way, and its board fills it.
+   No filter here: a ride board's tar shadow is its FairBoard's .fair-board-shadow wrapper, the Daily Run
+   ticket's is .level-card-daily's drop-shadow. So a ride board's focus outline casts no shadow, on purpose. */
 .level-card {
   --tilt: -0.8deg;
   display: flex;
@@ -1132,6 +1134,11 @@ canvas {
   line-height: 1.15;
   text-align: center;
   color: var(--fair-gilt);
+}
+
+/* The ticket has no FairBoard, so it casts the same hard tar shadow itself. */
+.level-card-daily {
+  filter: drop-shadow(6px 8px 0 var(--fair-tar));
 }
 
 /* The Daily Run's ticket: cream card, oxblood ink, the stub above a perforation. */
