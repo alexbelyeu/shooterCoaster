@@ -4,7 +4,6 @@ import { eventBus } from '@/core/EventBus'
 import { gameTime } from '@/core/gameClock'
 import { COMBO_TIERS, comboTierIndex, comboWindowS } from '@/combat/comboTiers'
 import type { ComboBrokenEvent } from '@/combat/comboRuntime.hot'
-import { comboColor } from '@/ui/theme'
 
 const RING_R = 26
 const RING_C = 2 * Math.PI * RING_R
@@ -54,7 +53,7 @@ export default function ComboMeter() {
   else if (showLost) lastShown.current = { count: lost.count, lost: true }
   const shown = lastShown.current.count
   const tier = comboTierIndex(shown)
-  const style = { '--combo-color': comboColor(tier), '--ring-c': RING_C } as CSSProperties
+  const style = { '--ring-c': RING_C } as CSSProperties
 
   return (
     <div
@@ -64,6 +63,7 @@ export default function ComboMeter() {
     >
       <div className="hud-combo-ring">
         <svg viewBox="0 0 64 64" width="64" height="64">
+          <circle className="hud-combo-ring-edge" cx="32" cy="32" r={RING_R} />
           <circle className="hud-combo-ring-bg" cx="32" cy="32" r={RING_R} />
           {live && (
             <circle
@@ -84,7 +84,7 @@ export default function ComboMeter() {
         <span key={tier} className="hud-combo-mult">
           ×{COMBO_TIERS[tier].multiplier}
         </span>
-        <span className="hud-combo-word">{lastShown.current.lost ? 'COMBO LOST' : 'COMBO'}</span>
+        <span className="hud-combo-word">{lastShown.current.lost ? 'combo lost' : 'combo'}</span>
       </div>
     </div>
   )

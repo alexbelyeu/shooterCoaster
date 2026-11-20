@@ -66,6 +66,7 @@ export default function WeaponBadge() {
     <div className={`hud-weapon${live ? ' is-visible' : ''}`} style={style} aria-hidden={!live}>
       <div className="hud-weapon-ring">
         <svg viewBox="0 0 52 52" width="52" height="52">
+          <circle className="hud-weapon-ring-edge" cx="26" cy="26" r={RING_R} />
           <circle className="hud-weapon-ring-bg" cx="26" cy="26" r={RING_R} />
           <circle ref={fillRef} className="hud-weapon-ring-fill" cx="26" cy="26" r={RING_R} strokeDasharray={RING_C} />
         </svg>
