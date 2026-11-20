@@ -122,6 +122,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
           biome={biome}
           groundFn={groundFn}
           track={trackTable}
+          darkSections={track.darkSections}
           hasWater={environment.hasWater}
           hasTrees={environment.hasTrees}
           treeCount={environment.treeCount}

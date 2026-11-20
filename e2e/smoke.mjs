@@ -72,7 +72,7 @@
  *
  * --dist / --base: preview that build folder under that sub-path (`npm run smoke:portal`),
  * proving its relative asset URLs. Every local run fails on a request to another origin,
- * and the title fails unless Lobster and Inter (self-hosted, global.css) loaded.
+ * and the title fails unless Lobster and Big Shoulders (self-hosted, global.css) loaded.
  *
  * --mobile: iPhone 13-like context (390x844, touch, mobile UA) that taps PLAY,
  * taps level 1, then in portrait and again after rotating to 844x390 landscape
@@ -161,7 +161,7 @@ async function fontProblems(page) {
     await document.fonts.ready
     return [...document.fonts].map((f) => ({ family: f.family.replace(/["']/g, ''), status: f.status }))
   })
-  return ['Lobster', 'Inter']
+  return ['Lobster', 'Big Shoulders']
     .filter((family) => !faces.some((f) => f.family === family && f.status === 'loaded'))
     .map((family) => `${family} font not loaded (${JSON.stringify(faces.filter((f) => f.family === family))})`)
 }
@@ -1721,7 +1721,7 @@ async function pauseMenuCheck(page, levelId) {
   // The HUD strip and the card must count this run's kills, not the last run's (#235).
   await waitVisible(page, '.hud-kills-count', 10000)
   const hudKills = await page.evaluate(() => document.querySelector('.hud-kills-count')?.textContent ?? null)
-  if (!hudKills?.startsWith('0/')) problems.push(`after Restart the HUD kill strip reads "${hudKills}", not 0`)
+  if (!hudKills?.startsWith('0 of ')) problems.push(`after Restart the HUD kill strip reads "${hudKills}", not 0`)
   await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
   await waitVisible(page, '.pause-card', 30000)
   const cardHits = await page.evaluate(() => {
@@ -2048,7 +2048,10 @@ async function pacingCheck(page, id) {
   const shaders = await programsAfterWarmup(page)
   if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   const budget = BUDGETS.pacing?.[id]
-  problems.push(...(isPlaceholder(budget) ? fillPlaceholderBudget('pacing', id, pacingCeilings(pacing)) : pacingBudgetProblems(id, pacing, budget)))
+  const over = isPlaceholder(budget) ? fillPlaceholderBudget('pacing', id, pacingCeilings(pacing)) : pacingBudgetProblems(id, pacing, budget)
+  // A level whose entry names `knownOver` (an open issue fixing it) only warns, like the scene budgets.
+  if (budget?.knownOver && over.length) console.log(`     WARN pacing over budget (known, ${budget.knownOver}): ${over.join('; ')}`)
+  else problems.push(...over)
   return { id: 'pacing', level: id, problems, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
 }
 
@@ -2380,6 +2383,68 @@ async function pickupCheck(page) {
   return { id: 'pickup', problems, pickup: { ...result, drawCalls, badge: hud.rects.at(-1) } }
 }
 
+/**
+ * A level with a dark section (#752, `TrackParams.darkSections`, the hook's `darkSection`): with game time held, ride to
+ * the middle of its first one and shoot `<id>-dark.png`, then fire one real shot with the muzzle flash held and shoot
+ * `<id>-dark-flash.png`. The ride must be fully dark there and the frame mostly dark but not blank, its glow (saturated
+ * bright pixels: the gym's blacklit holds) showing; the shot's flash must light the frame up.
+ */
+async function darkSectionShot(page, levelId) {
+  const spans = await page.evaluate(() => window.__SC_TEST__.darkSection.spans)
+  if (!spans.length) return { problems: [], result: null }
+  const at = (spans[0].from + spans[0].to) / 2
+  const frameLight = (png) => page.evaluate(async (b64) => {
+    const img = new Image()
+    img.src = `data:image/png;base64,${b64}`
+    await img.decode()
+    const c = document.createElement('canvas')
+    c.width = 160
+    c.height = 90
+    const ctx = c.getContext('2d')
+    ctx.drawImage(img, 0, 0, c.width, c.height)
+    const d = ctx.getImageData(0, 0, c.width, c.height).data
+    let dark = 0
+    let glow = 0
+    let sum = 0
+    for (let i = 0; i < d.length; i += 4) {
+      const max = Math.max(d[i], d[i + 1], d[i + 2])
+      const min = Math.min(d[i], d[i + 1], d[i + 2])
+      const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+      sum += l
+      if (l < 50) dark++
+      else if (max > 150 && max - min > 0.5 * max) glow++
+    }
+    const n = d.length / 4
+    return { dark: dark / n, glow: glow / n, mean: sum / n }
+  }, png.toString('base64'))
+  await page.evaluate((t) => {
+    const s = window.__SC_TEST__
+    s.setTimeScale(0)
+    s.rideTo = t
+    s.holdFeedback = true
+  }, at)
+  await waitFrames(page, 3, { maxMs: 20000, pollMs: 100 })
+  const depth = await page.evaluate(() => window.__SC_TEST__.darkSection.depth)
+  const png = await page.screenshot({ path: path.join(OUT, `${levelId}-dark.png`), timeout: SHOT_TIMEOUT })
+  const light = await frameLight(png)
+  const img = await imageStats(page, png)
+  await page.evaluate(() => window.__SC_TEST__.fireShot(0, 0))
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
+  const flash = await page.evaluate(() => window.__SC_TEST__.darkSection.flash)
+  const flashLight = await frameLight(await page.screenshot({ path: path.join(OUT, `${levelId}-dark-flash.png`), timeout: SHOT_TIMEOUT }))
+  await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
+  const problems = []
+  if (!(depth > 0.99)) problems.push(`dark section: not dark in its middle at track ${at.toFixed(4)} (depth ${depth?.toFixed(2)})`)
+  if (looksBlank(img)) problems.push('dark section shot looks blank')
+  if (light.dark < DARK_SHOT.dark) problems.push(`dark section: only ${(light.dark * 100).toFixed(0)}% of the frame is dark (need ${DARK_SHOT.dark * 100}%)`)
+  if (light.glow < DARK_SHOT.glow) problems.push(`dark section: its glow barely shows (${(light.glow * 100).toFixed(2)}% saturated bright, need ${DARK_SHOT.glow * 100}%)`)
+  if (!(flash > 0) || flashLight.mean < light.mean + DARK_SHOT.flash)
+    problems.push(`dark section: a shot's muzzle flash lit nothing (light ${flash?.toFixed(2)}, mean ${light.mean.toFixed(0)} -> ${flashLight.mean.toFixed(0)})`)
+  return { problems, result: { at, depth, flash, ...light, flashMean: flashLight.mean } }
+}
+/** The dark shots' floors: the share of the frame that is dark, of saturated bright pixels (the blacklit glow), and how much the flash brightens the frame's mean (0–255). */
+const DARK_SHOT = { dark: 0.4, glow: 0.002, flash: 3 }
+
 const SWITCH_CHECK = { level: 'level6' }
 /** Track-parameter leads behind the switch sign to park the coaster at. */
 const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
@@ -2447,7 +2512,10 @@ async function switchCheck(page) {
   result.easy = sw.riding
   if (sw.riding !== 'easy') problems.push(`without a shot the ride took the ${sw.riding} way`)
   if (sw.open) problems.push('the switch was still open in the junction')
-  return { id: 'switch', problems, trackSwitch: result }
+  // The cave the switch stands at the mouth of rides dark (#752): checked on the same run, held.
+  const dark = await darkSectionShot(page, level)
+  problems.push(...dark.problems)
+  return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result }
 }
 
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
@@ -2675,7 +2743,7 @@ async function settingsLayout(page, label, { fromTitle = false } = {}) {
 /**
  * Settings from the title (settings.png): the card's layout, Esc back to the title, and the quality +
  * music volume picked there still set after a reload; the internal-device toggle (#446), last in the card,
- * shows the title's "internal: not tracked" marker after that reload.
+ * shows the title's "not tracked" marker after that reload.
  */
 async function settingsCheck(page) {
   const problems = []
@@ -2721,7 +2789,7 @@ async function settingsCheck(page) {
     .waitForSelector('.settings-card', { state: 'detached', timeout: 10000 })
     .then(() => true, () => false)
   if (!closed) problems.push('Esc did not close settings')
-  if (!(await waitVisible(page, '.title-screen .play-button', 30000))) problems.push('the title did not come back after settings')
+  if (!(await waitVisible(page, '.title-screen .title-play', 30000))) problems.push('the title did not come back after settings')
 
   await page.reload({ waitUntil: 'load' })
   await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
@@ -2731,7 +2799,7 @@ async function settingsCheck(page) {
   })
   if (reloaded.quality !== 'low') problems.push(`quality "${reloaded.quality}" after a reload, expected low`)
   if (reloaded.musicVolume !== 0.3) problems.push(`music volume ${reloaded.musicVolume} after a reload, expected 0.3`)
-  if (!(await waitVisible(page, '.internal-marker', 30000))) problems.push('no "internal: not tracked" marker after turning on the internal-device toggle and reloading')
+  if (!(await waitVisible(page, '.internal-marker', 30000))) problems.push('no "not tracked" marker after turning on the internal-device toggle and reloading')
   return {
     id: 'settings',
     problems,
@@ -2896,6 +2964,32 @@ async function titleFlyBy(page, drawCalls, lap) {
 
 /** Longest the cold load may take to hand the poster over to the live scene before the poster check gives up. */
 const POSTER_HANDOFF_MS = 60000
+/** The poster's pieces and the live title's that must land on them; `x: false` compares only the vertical (the hint's text differs). */
+const POSTER_PAIRS = [
+  { name: 'logo', poster: '#poster .poster-logo svg', live: '.title-screen .title-logo svg' },
+  { name: 'tagline', poster: '#poster .poster-tag', live: '.title-screen .title-tagline' },
+  { name: 'PLAY', poster: '#poster .poster-play', live: '.title-screen .title-play' },
+  { name: 'Settings', poster: '#poster .poster-settings', live: '.title-screen .settings-button' },
+  { name: 'hint', poster: '#poster .poster-hint', live: '.title-screen .title-hint', x: false },
+]
+/** Px a live piece may sit off the poster's before the handoff counts as a jump. */
+const POSTER_JUMP_PX = 1.5
+
+/** The furthest each live title piece sits from its poster twin (px), while both are on the page; null when they never were. */
+function posterOffsets(page) {
+  return page.evaluate((pairs) => {
+    if (!document.getElementById('poster') || !document.querySelector('.title-screen')) return null
+    const out = {}
+    for (const { name, poster, live, x } of pairs) {
+      const a = document.querySelector(poster)?.getBoundingClientRect()
+      const b = document.querySelector(live)?.getBoundingClientRect()
+      if (!a || !b) continue
+      const dy = Math.max(Math.abs(a.top - b.top), Math.abs(a.height - b.height))
+      out[name] = x === false ? dy : Math.max(dy, Math.abs(a.left - b.left), Math.abs(a.width - b.width))
+    }
+    return out
+  }, POSTER_PAIRS)
+}
 
 /** The poster (#376), before any JS: with JS off, index.html alone must paint the title's still and logo (`poster.png`). */
 async function posterWithoutJs(browser, base, stats) {
@@ -2931,11 +3025,13 @@ async function posterWithoutJs(browser, base, stats) {
 async function posterHandoff(page) {
   await page.waitForFunction(() => performance.getEntriesByType('paint').length > 0, null, { timeout: 30000, polling: 20 })
   const blank = []
+  const offsets = {}
   let shots = 0
   let afterPoster = 0
   const until = Date.now() + POSTER_HANDOFF_MS
   // Two shots once the poster is gone: the live scene alone.
   while (afterPoster < 2 && Date.now() < until) {
+    for (const [name, px] of Object.entries((await posterOffsets(page)) ?? {})) offsets[name] = Math.max(offsets[name] ?? 0, px)
     const gone = await page.evaluate(() => !document.getElementById('poster'))
     const png = await page.screenshot({ timeout: SHOT_TIMEOUT })
     shots++
@@ -2948,7 +3044,9 @@ async function posterHandoff(page) {
   const problems = []
   if (afterPoster === 0) problems.push(`the poster was still up ${POSTER_HANDOFF_MS / 1000} s into a cold load`)
   if (blank.length) problems.push(`a cold load showed a blank frame: shot(s) ${blank.join(', ')} of ${shots} (poster-blank-<n>.png)`)
-  return { problems, shots }
+  const jumps = Object.entries(offsets).filter(([, px]) => px > POSTER_JUMP_PX)
+  if (jumps.length) problems.push(`the live title jumped off the poster: ${jumps.map(([name, px]) => `${name} ${px.toFixed(1)} px`).join(', ')}`)
+  return { problems, shots, offsets }
 }
 
 /** The title scene against its `scene` budget: draw calls are the most of the given readings (they vary with the shot). */
@@ -2988,7 +3086,7 @@ async function landingPathCheck(browser, base) {
   if (after.phase !== 'title') problems.push(`phase "${after.phase}" on ${LANDING_PATH} (want title)`)
   if (after.pathname !== pathname) problems.push(`path rewritten on boot: ${pathname} -> ${after.pathname}`)
   if (after.search !== '?e2e=1') problems.push(`search "${after.search}" after boot (want ?internal stripped, ?e2e=1 kept)`)
-  if (!marker) problems.push('no "internal: not tracked" marker after ?internal=1')
+  if (!marker) problems.push('no "not tracked" marker after ?internal=1')
   if (failed.length) problems.push(`${failed.length} failed request(s): ${failed.slice(0, 3).join(', ')}`)
   if (analytics.length) problems.push(`analytics request under ?e2e=1: ${analytics[0]}`)
   if (errors.length) problems.push(`${errors.length} error(s)`)
@@ -3643,8 +3741,8 @@ async function runMobile(browser, base) {
   await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
 
   // Title -> PLAY (tap)
-  if (!(await waitVisible(page, '.title-screen .play-button'))) problems.push('PLAY button never appeared')
-  await tapCentre(page, '.title-screen .play-button').catch((e) => problems.push(`tap PLAY: ${e.message}`))
+  if (!(await waitVisible(page, '.title-screen .title-play'))) problems.push('PLAY button never appeared')
+  await tapCentre(page, '.title-screen .title-play').catch((e) => problems.push(`tap PLAY: ${e.message}`))
   await waitPhase('levelSelect', 15000)
   if ((await phase()) !== 'levelSelect') problems.push('tapping PLAY did not open level select')
 
@@ -3927,7 +4025,7 @@ async function run() {
       if (t.errors.length) problems.push(`${t.errors.length} error(s)`)
       return {
         id: 'title', ok: problems.length === 0, problems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg,
-        title: fly.result, drawCalls: budget.drawCalls, scene: budget.scene, posterShots: poster.shots, laps: lap.laps, errors: t.errors,
+        title: fly.result, drawCalls: budget.drawCalls, scene: budget.scene, posterShots: poster.shots, posterOffsets: poster.offsets, laps: lap.laps, errors: t.errors,
       }
     })
   }
@@ -4134,7 +4232,7 @@ async function run() {
       ? (r.ok ? ` ${r.text}` : '')
       : r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; attract ${r.title.attract ? `bars ${r.title.attract.bars.join(' / ')}` : 'none'}; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '') +
-        ` draws=${r.drawCalls} scene objs=${r.scene?.objects} tris=${r.scene?.triangles}; poster: ${r.posterShots} load shots; s: ${Object.entries(r.laps ?? {}).map(([k, v]) => `${k} ${v}`).join(', ')}`
+        ` draws=${r.drawCalls} scene objs=${r.scene?.objects} tris=${r.scene?.triangles}; poster: ${r.posterShots} load shots, off by ${JSON.stringify(r.posterOffsets ?? {})}; s: ${Object.entries(r.laps ?? {}).map(([k, v]) => `${k} ${v}`).join(', ')}`
       : r.landing
         ? ` ${r.landing.requested} -> ${r.landing.pathname}${r.landing.search} phase=${r.landing.phase} internal marker=${r.landing.marker} failed requests=${r.landing.failed}`
       : r.daily

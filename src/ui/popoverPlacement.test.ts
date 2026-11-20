@@ -25,4 +25,11 @@ describe('placePopover', () => {
     expect(placePopover(box(300, 50, 80, 44), 200, 400, { width: 844, height: 390 }, []).side).toBe('below')
     expect(placePopover(box(300, 300, 80, 44), 200, 400, { width: 844, height: 390 }, []).side).toBe('above')
   })
+
+  it('stays inside the viewport when neither side fits', () => {
+    const phone = { width: 844, height: 390 }
+    expect(placePopover(box(300, 100, 80, 44), 200, 250, phone, [])).toMatchObject({ side: 'below', top: 390 - 8 - 250 })
+    expect(placePopover(box(300, 200, 80, 44), 200, 250, phone, [])).toMatchObject({ side: 'above', top: 8 })
+    expect(placePopover(box(300, 100, 80, 44), 200, 500, phone, []).top).toBe(8)
+  })
 })

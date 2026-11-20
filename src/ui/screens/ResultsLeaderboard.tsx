@@ -18,8 +18,8 @@ interface Props {
   onSlot: (slot: number) => void
 }
 
-/** Which board it is, in a plain line under the title (the smoke reads it). */
-export const BOARD_SOURCE_LINE = { world: "The world's top 10", device: "This device's top 10" } as const
+/** Which board it is, in a plain line under the title (the smoke checks this text). */
+const BOARD_SOURCE_LINE = { world: "The world's top 10", device: "This device's top 10" } as const
 
 /** The pad's arrows, drawn rather than typed: ◀ and ▶ turn into emoji on some phones. */
 const ARROW_TURN = { ArrowUp: 0, ArrowRight: 90, ArrowDown: 180, ArrowLeft: 270 } as const

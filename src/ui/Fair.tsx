@@ -13,25 +13,39 @@ export function FairBoard({ className = '', shadowClassName = '', ref, children,
   return (
     <div className={`fair-board-shadow ${shadowClassName}`.trim()}>
       <div ref={ref} className={`fair-board fair-notched ${className}`.trim()} {...rest}>
-        <div className="fair-lining fair-notched" aria-hidden="true">
-          <span className="fair-notched" />
-        </div>
+        <FairLining />
         {children}
       </div>
     </div>
   )
 }
 
+/** A board's gilt lining, made of spans so a board can be built inside a button (level select's ride boards). */
+export function FairLining() {
+  return (
+    <span className="fair-lining fair-notched" aria-hidden="true">
+      <span className="fair-notched" />
+    </span>
+  )
+}
+
 const STAR_PATH = 'M12 1.8l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9l7.1-.6z'
+
+/** One star target, lit or sunk into the board, painted by the `.fair-stars` rules (or a rule that borrows them). */
+export function FairStar({ earned }: { earned: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className={earned ? 'earned' : undefined} aria-hidden="true">
+      <path d={STAR_PATH} />
+    </svg>
+  )
+}
 
 /** Three star targets, `earned` of them lit. */
 export function FairStars({ earned, label }: { earned: number; label: string }) {
   return (
     <span className="fair-stars" role="img" aria-label={label}>
       {[0, 1, 2].map((i) => (
-        <svg key={i} viewBox="0 0 24 24" className={i < earned ? 'earned' : undefined} aria-hidden="true">
-          <path d={STAR_PATH} />
-        </svg>
+        <FairStar key={i} earned={i < earned} />
       ))}
     </span>
   )

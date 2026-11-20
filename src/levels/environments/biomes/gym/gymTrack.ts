@@ -70,6 +70,8 @@ const ROLL_Y = 6
 const CUBBY_Z = 3.6
 /** Inside the Training Area's cave, between its pads and roof. */
 const CAVE_Y = 1.9
+/** How far a shot's muzzle flash lights the dark cave's rats (#752), in blockout metres. */
+const CAVE_FLASH_REACH = 14
 /** The climb up Alaska: the rails this far from the hall's west wall, and their top under the trusses. */
 const WALL_Z = 37
 const WALL_X = 26.5
@@ -194,6 +196,8 @@ export interface GymRide {
   /** By control point index (`placeMechanics` turns them into arc shares), speeds in metres per second. */
   mechanics: RideMechanic[]
   zones: { kind: SpeedZone['kind']; from: number; to: number; speed: number; accel?: number }[]
+  /** The Training Area's dark cave (#752), by control point index: in under its lintel (`from`), dark (`dark`), out on its launch (`out`). */
+  cave: { from: number; dark: number; out: number }
 }
 
 /** The ride, element by element, in blockout metres. */
@@ -244,11 +248,14 @@ export function buildGymRide(): GymRide {
   airtimeHill(b, { rise: 2.8, crestRadius: 4, angle: 40 * DEG })
   // 15 s: right into the Training Area's cave under its lintel, an S through it in the dark, out at its north end.
   b.mark('bankedTurn', () => turn(b, -Math.PI / 2, 3.9, 0, 25 * DEG))
+  const caveFrom = b.points.length - 1
   b.mark('headChopper', () => to(b, 'z', -2.4, 2.6 - y(), 2))
+  const caveDark = b.points.length - 1
   b.mark('bankedTurn', () => turn(b, Math.PI / 2, 3))
   b.mark('straight', () => to(b, 'x', WALL_X + 3, CAVE_Y - y(), 2))
   b.mark('bankedTurn', () => turn(b, Math.PI / 2, 3))
   b.mark('straight', () => to(b, 'z', -0.5, 2.6 - y(), 2))
+  const cave = { from: caveFrom, dark: caveDark, out: b.points.length - 1 }
   // Bursting out of the cave on a launch, across the hall to Alaska.
   zone('launch', SPEED.caveLaunch, () => b.mark('straight', () => to(b, 'z', 8)))
   // The route choice (#702): shoot the switch and the V8 way round swings east off the line, down over the Flame's pads
@@ -316,7 +323,7 @@ export function buildGymRide(): GymRide {
     b.mark('bankedTurn', () => turn(b, Math.PI, (b.position.z - STATION_Z) / 2, STATION_Y - y()))
   })
   b.mark('straight', () => to(b, 'x', 73 + SPACING))
-  return { points: b.points, markers: b.markers, mechanics, zones }
+  return { points: b.points, markers: b.markers, mechanics, zones, cave }
 }
 
 /** Drops the ups a spline would work out anyway (no roll, track not steep), keeping the level's data small. */
@@ -362,6 +369,9 @@ export function buildGymTrack(): TrackParams {
     return { at: share(middle ? Math.round((m.from + m.to) / 2) : m.from), second }
   })
   const rideV2: RideV2Spec = { zones, beats, drag: DRAG }
+  // The cave rides dark (#752): the light goes under its lintel and comes back over as long on its launch out.
+  const caveRamp = share(ride.cave.dark) - share(ride.cave.from)
+  const darkSections = [{ from: share(ride.cave.from), to: share(ride.cave.out) + caveRamp, ramp: caveRamp, flashReach: CAVE_FLASH_REACH * world }]
   return {
     curve: 'spline',
     controlPoints: points,
@@ -370,6 +380,7 @@ export function buildGymTrack(): TrackParams {
     ride: 'v2',
     rideV2,
     mechanics,
+    darkSections,
     // Rails, ties and towers sparser than level 1's (~0.93 m a segment, under 3 cm of chord sag on the tightest turn): the
     // ~500 m track leaves the scene room under `scene.level6` for the enemies in the air at 10 s (#726).
     segments: 480,

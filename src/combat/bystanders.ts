@@ -31,7 +31,7 @@ export function bystanderWarning(type: EnemyType): string {
 /** The HUD hint that teaches the rule. */
 export function bystanderHint(type: EnemyType): string {
   const noun = bystanderNoun(type)
-  return `${noun[0].toUpperCase()}${noun.slice(1)} are friends — don't shoot them!`
+  return `${noun[0].toUpperCase()}${noun.slice(1)} are friends. Don't shoot them!`
 }
 
 /** Every bystander of a roster. */

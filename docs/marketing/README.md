@@ -44,7 +44,7 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   each browser and on each device you play on. The browser remembers it (localStorage), the
   parameter disappears from the address bar, and from then on that browser sends no page
   views and no events, including that first visit. The title screen shows a small
-  "internal: not tracked" in the top-right corner while it's on. **https://scoaster.com/?internal=0**
+  "Internal device, not tracked" in the top-right corner while it's on. **https://scoaster.com/?internal=0**
   turns it off; any other value (`?internal=false`) changes nothing. Clearing site data or a
   private window forgets it, so open the link again.
   The second way, without the URL: **Settings → Data → "Internal device — don't count my plays"**

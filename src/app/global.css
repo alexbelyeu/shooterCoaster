@@ -97,6 +97,7 @@ canvas {
   justify-content: center;
   z-index: 100;
   background: rgba(0, 0, 0, 0.35);
+  font-family: 'Big Shoulders', sans-serif;
   transition: background-color 0.8s ease;
 }
 
@@ -151,33 +152,95 @@ canvas {
   left: 0;
   right: 0;
   bottom: calc(9vh + 1rem + env(safe-area-inset-bottom));
-  margin: 0;
   text-align: center;
-  font-size: 0.85rem;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
-  animation: title-attract-prompt 2.4s ease-in-out 0.9s infinite both;
-}
-
-@keyframes title-attract-prompt {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 0.95; }
+  font-size: 1.25rem;
+  font-weight: 700;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .title-attract::before, .title-attract::after { animation: none; }
-  .title-attract-prompt { animation: none; opacity: 0.8; }
 }
 .reduce-motion .title-attract::before,
 .reduce-motion .title-attract::after { animation: none; }
-.reduce-motion .title-attract-prompt { animation: none; opacity: 0.8; }
 
-.title-screen .subtitle {
-  font-size: clamp(0.9rem, 2.5vw, 1.1rem);
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 2rem;
+/*
+ * The title's front (docs/art/PERSONALITY.md): lettering on the park, PLAY the one gilt plate, Settings a smaller one.
+ * Every height is fixed (not left to the font) and index.html's .poster-title repeats these numbers, so the live title
+ * lands exactly on the poster's.
+ */
+.title-screen .title-tagline {
+  height: 1.75rem;
+  margin-bottom: 1.75rem;
+  font-size: 1.375rem;
+  font-weight: 800;
+  font-variation-settings: 'opsz' 40;
+  line-height: 1.75rem;
+}
+
+.title-tagline span {
+  display: inline-block;
+  margin: 0 0.2em;
+}
+
+.title-screen .fair-plate {
+  padding: 0.15em 0 0;
+  transition: opacity 0.8s ease, transform 60ms, box-shadow 60ms;
+}
+
+.title-screen .title-play {
+  width: 12rem;
+  height: 4rem;
+  font-size: 2.1rem;
+}
+
+.title-screen .settings-button {
+  width: 9rem;
+  height: 44px;
+  margin-top: 1.4rem;
+  font-size: 1.3rem;
+}
+
+.title-screen .title-hint {
+  height: 1.5rem;
+  margin-top: 1.25rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+  pointer-events: none;
+}
+
+.title-screen .credits {
+  position: absolute;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.title-screen .credits a {
+  color: var(--fair-gilt);
+  text-underline-offset: 3px;
+}
+
+.title-screen .credits a:focus-visible {
+  outline: 3px solid var(--fair-cream);
+  outline-offset: 3px;
+}
+
+.title-screen .internal-marker {
+  position: absolute;
+  top: calc(0.75rem + env(safe-area-inset-top));
+  right: calc(0.75rem + env(safe-area-inset-right));
+  font-size: 0.95rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* Phone landscape: the column reaches the bottom edge, so the credits move to the corner the mute button leaves free. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .title-screen .credits {
+    left: calc(1rem + env(safe-area-inset-left));
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
 }
 
 .play-button {
@@ -207,21 +270,6 @@ canvas {
   transform: scale(0.96);
 }
 
-.title-screen :is(.play-button, .settings-button):focus-visible {
-  outline: 3px solid #fff;
-  outline-offset: 4px;
-}
-
-.title-screen .title-hint {
-  margin-top: 1.25rem;
-  font-size: 0.85rem;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-  pointer-events: none;
-}
-
 /* PLAY's fade to black, over every screen and button. */
 .screen-veil {
   position: fixed;
@@ -230,226 +278,120 @@ canvas {
   background: #000;
 }
 
-.title-screen .credits {
-  position: absolute;
-  bottom: calc(2rem + env(safe-area-inset-bottom));
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.title-screen .credits a {
-  color: rgba(255, 200, 0, 0.7);
-  text-decoration: none;
-}
-
-.title-screen .internal-marker {
-  position: absolute;
-  top: calc(0.75rem + env(safe-area-inset-top));
-  right: calc(0.75rem + env(safe-area-inset-right));
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.45);
-  pointer-events: none;
-}
-
-/* Settings button — bottom-left, glass-morphism */
-.settings-button {
-  position: fixed;
-  bottom: calc(1rem + env(safe-area-inset-bottom));
-  left: calc(1rem + env(safe-area-inset-left));
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  font-size: 1.4rem;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  pointer-events: auto;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-@media (hover: hover) {
-  .settings-button:hover {
-    background: rgba(0, 0, 0, 0.7);
-    border-color: rgba(255, 255, 255, 0.5);
-  }
-}
-
-.settings-button:active {
-  background: rgba(0, 0, 0, 0.7);
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-/* HUD — Inter, tabular numerals; dark glass panels keep text legible over any sky.
-   Accent colours come from src/ui/theme.ts via --hud-accent / --hud-glow. */
+/* HUD: painted on the car, no panels (docs/art/PERSONALITY.md "Over the ride"); the keyline keeps it readable on any sky. */
 .hud {
   --hud-accent: #ffd23f;
   --hud-glow: rgba(255, 210, 63, 0.55);
   --hud-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.45);
+  --hud-ink:
+    -2px -2px 0 var(--fair-tar), 0 -2px 0 var(--fair-tar), 2px -2px 0 var(--fair-tar), 2px 0 0 var(--fair-tar),
+    2px 2px 0 var(--fair-tar), 0 2px 0 var(--fair-tar), -2px 2px 0 var(--fair-tar), -2px 0 0 var(--fair-tar),
+    3px 4px 0 var(--fair-tar);
+  --hud-ink-thin:
+    -1.5px -1.5px 0 var(--fair-tar), 0 -1.5px 0 var(--fair-tar), 1.5px -1.5px 0 var(--fair-tar), 1.5px 0 0 var(--fair-tar),
+    1.5px 1.5px 0 var(--fair-tar), 0 1.5px 0 var(--fair-tar), -1.5px 1.5px 0 var(--fair-tar), -1.5px 0 0 var(--fair-tar),
+    2px 3px 0 var(--fair-tar);
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 10;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Big Shoulders', sans-serif;
+  font-variation-settings: 'opsz' 10;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #fff;
+  color: var(--fair-cream);
+}
+
+.hud-number {
+  font-family: 'Ultra', serif;
+  font-weight: 400;
+  line-height: 1.3; /* Ultra's glyph box (1.27 em), so the lines under it never overlap it */
+  text-shadow: var(--hud-ink);
 }
 
 .hud-panel {
   position: absolute;
-  top: max(12px, env(safe-area-inset-top));
-  padding: 10px 14px 12px;
-  background: linear-gradient(180deg, rgba(8, 10, 22, 0.62), rgba(8, 10, 22, 0.38));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  top: max(14px, env(safe-area-inset-top));
 }
 
 .hud-panel--left {
-  left: max(12px, env(safe-area-inset-left));
-  min-width: clamp(150px, 22vw, 240px);
+  left: max(14px, env(safe-area-inset-left));
 }
 
 .hud-panel--right {
-  right: max(12px, env(safe-area-inset-right));
-  width: clamp(130px, 20vw, 240px);
-}
-
-.hud-score {
-  line-height: 1;
+  right: max(14px, env(safe-area-inset-right));
+  width: clamp(120px, 18vw, 210px);
 }
 
 .hud-score-value {
   display: inline-block;
-  transform-origin: left center;
-  font-size: clamp(1.9rem, 4.2vw, 2.75rem);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  text-shadow: var(--hud-shadow);
+  font-size: clamp(2.1rem, 4.4vw, 3.25rem);
 }
 
-.hud-best {
-  margin-top: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.65);
+.hud-best,
+.hud-kills,
+.hud-timer-label {
+  margin-top: 2px;
+  font-size: 1.1rem;
+  line-height: 1.3;
+  text-shadow: var(--hud-ink-thin);
 }
 
-.hud-kills {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
+/* Not Ultra: under ~30 px its counters close up behind the keyline (a 0 reads as a blob). */
+.hud-kills-value,
+.hud-combo-count {
+  font-variation-settings: 'opsz' 40;
+  font-weight: 800;
+  font-size: 1.35rem;
 }
 
-.hud-kills-track {
-  position: relative;
-  flex: 1;
-  height: 6px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.16);
-  /* 10 segments with 2px gaps */
-  -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%);
-  mask-image: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%);
-}
-
-.hud-kills-fill {
-  position: absolute;
-  inset: 0;
-  transform-origin: left center;
-  background: var(--hud-accent);
-  box-shadow: 0 0 8px var(--hud-glow);
-  transition: transform 0.25s ease-out;
-}
-
-.hud-kills-count {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-shadow: var(--hud-shadow);
-}
-
-.hud-kills-total {
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-/* Timer */
+/* Vermilion on tar is 3.9:1, enough only because the seconds are Ultra over 24 px. */
 .hud-timer {
-  --timer-color: #fff;
+  --timer-color: var(--fair-cream);
   text-align: right;
 }
 
 .hud-timer--warn {
-  --timer-color: #ffb020;
+  --timer-color: var(--fair-gilt);
 }
 
 .hud-timer--critical {
-  --timer-color: #ff3b3b;
+  --timer-color: var(--fair-vermilion);
 }
 
 .hud-timer-value {
-  font-size: clamp(1.9rem, 4.2vw, 2.75rem);
-  font-weight: 700;
-  line-height: 1;
+  font-size: clamp(2.1rem, 4.4vw, 3.25rem);
   color: var(--timer-color);
-  text-shadow: var(--hud-shadow);
-  transform-origin: right center;
-  transition: color 0.3s;
-}
-
-.hud-timer-unit {
-  margin-left: 2px;
-  font-size: 0.5em;
-  font-weight: 600;
-  opacity: 0.75;
 }
 
 .hud-timer--critical .hud-timer-value {
-  animation: hud-pulse 0.5s ease-in-out infinite alternate;
+  animation: hud-tick 0.12s ease-out;
 }
 
 .hud-timer-track {
-  height: 6px;
-  margin-top: 10px;
-  overflow: hidden;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.16);
+  height: 10px;
+  margin-top: 8px;
+  border: 2px solid var(--fair-tar);
+  background: var(--fair-oxblood-deep);
+  box-shadow: 2px 3px 0 var(--fair-tar);
 }
 
 .hud-timer-fill {
   height: 100%;
   transform-origin: right center;
-  border-radius: 3px;
   background: var(--timer-color);
-  box-shadow: 0 0 8px var(--timer-color);
-  transition: transform 1s linear, background-color 0.3s;
+  transition: transform 1s linear;
 }
 
-@keyframes hud-pulse {
-  from { transform: scale(1); }
-  to { transform: scale(1.12); text-shadow: 0 0 18px rgba(255, 59, 59, 0.9), 0 1px 2px rgba(0, 0, 0, 0.85); }
-}
-
-/* Combo meter — centre-bottom */
+/* Combo meter, centre-bottom */
 .hud-combo {
+  --combo-color: var(--fair-cream);
   position: absolute;
   left: 50%;
   bottom: max(72px, calc(env(safe-area-inset-bottom) + 64px));
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 18px 6px 6px;
-  border-radius: 40px;
-  background: rgba(8, 10, 22, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--combo-color);
   opacity: 0;
   transform: translate(-50%, 16px) scale(0.9);
@@ -464,32 +406,57 @@ canvas {
   transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.4);
 }
 
-.hud-combo-ring {
+.hud-combo--tier1,
+.hud-combo--tier2,
+.hud-combo--tier3 {
+  --combo-color: var(--fair-gilt);
+}
+
+.hud-combo.is-lost {
+  --combo-color: var(--fair-vermilion);
+  /* knocked swinging on its hook */
+  transform-origin: 50% 0;
+  animation: hud-combo-shake 0.45s ease-out;
+}
+
+.hud-combo-ring,
+.hud-weapon-ring {
   position: relative;
-  width: 64px;
-  height: 64px;
   flex: none;
 }
 
-.hud-combo-ring svg {
+.hud-combo-ring {
+  width: 64px;
+  height: 64px;
+}
+
+.hud-combo-ring svg,
+.hud-weapon-ring svg:first-child {
   display: block;
   transform: rotate(-90deg);
 }
 
-.hud-combo-ring-bg,
-.hud-combo-ring-fill {
+.hud-combo-ring circle,
+.hud-weapon-ring circle {
   fill: none;
-  stroke-width: 5;
 }
 
-.hud-combo-ring-bg {
-  stroke: rgba(255, 255, 255, 0.15);
+.hud-combo-ring-edge,
+.hud-weapon-ring-edge {
+  stroke: var(--fair-tar);
 }
+
+.hud-combo-ring-bg,
+.hud-weapon-ring-bg {
+  stroke: var(--fair-oxblood-deep);
+}
+
+.hud-combo-ring-edge { stroke-width: 10; }
+.hud-combo-ring-bg,
+.hud-combo-ring-fill { stroke-width: 5; }
 
 .hud-combo-ring-fill {
   stroke: var(--combo-color);
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 4px var(--combo-color));
 }
 
 /* chain count, centred in the ring */
@@ -499,50 +466,39 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 1.3rem;
-  color: #fff;
-  text-shadow: var(--hud-shadow);
-  animation: hud-combo-pop 0.25s ease-out;
+  color: var(--fair-cream);
+  text-shadow: var(--hud-ink-thin);
+  animation: hud-tick 0.12s ease-out;
 }
 
 .hud-combo-label {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: baseline;
+  gap: 8px;
   line-height: 1;
-  text-shadow: var(--hud-shadow);
+  white-space: nowrap;
 }
 
 /* multiplier grows with tier */
 .hud-combo-mult {
   display: inline-block;
-  transform-origin: left center;
-  font-weight: 700;
+  font-family: 'Ultra', serif;
   font-size: 1.6rem;
-  animation: hud-combo-pop 0.25s ease-out;
+  text-shadow: var(--hud-ink-thin);
+  animation: hud-tick 0.12s ease-out;
 }
 
 .hud-combo-word {
-  font-weight: 700;
-  font-size: 0.7rem;
-  letter-spacing: 0.24em;
-  opacity: 0.85;
+  font-variation-settings: 'opsz' 40;
+  font-weight: 800;
+  font-size: 1.35rem;
+  color: var(--fair-cream);
+  text-shadow: var(--hud-ink-thin);
 }
 
 .hud-combo--tier1 .hud-combo-mult { font-size: 1.9rem; }
 .hud-combo--tier2 .hud-combo-mult { font-size: 2.2rem; }
 .hud-combo--tier3 .hud-combo-mult { font-size: 2.5rem; }
-.hud-combo--tier3 { box-shadow: 0 0 22px rgba(255, 59, 59, 0.45); }
-
-/* a lapsed 2×+ chain: its colour drained to plain ink, knocked swinging on its hook, then hidden */
-.hud-combo.is-lost {
-  color: var(--fair-cream);
-  box-shadow: none;
-  transform-origin: 50% 0;
-  animation: hud-combo-shake 0.5s ease-out;
-}
 
 @keyframes hud-combo-shake {
   0%, 100% { transform: translate(-50%, 0); }
@@ -646,23 +602,20 @@ canvas {
     inset 0 -130px 100px -50px rgba(205, 245, 255, 0.65);
 }
 
-/* Don't-shoot hint (#518): a friendly teal pill under the wave banner */
+/* Don't-shoot hint (#518), under the wave banner */
 .hud-bystander-hint {
   position: absolute;
   top: 36%;
   left: 50%;
-  max-width: calc(100vw - 32px);
+  width: max-content;
+  max-width: min(30em, calc(100vw - 32px));
   transform: translateX(-50%);
-  padding: 8px 18px;
-  border: 2px solid #5dffa8;
-  border-radius: 999px;
-  background: rgba(8, 60, 58, 0.82);
-  color: #eafff4;
-  font-size: clamp(0.85rem, 2.2vw, 1.15rem);
-  font-weight: 700;
+  font-size: clamp(1.1rem, 2.4vw, 1.4rem);
+  line-height: 1.15;
+  color: var(--fair-sky);
   text-align: center;
-  text-shadow: var(--hud-shadow);
-  box-shadow: 0 0 18px rgba(93, 255, 168, 0.45);
+  text-wrap: balance;
+  text-shadow: var(--hud-ink-thin);
   pointer-events: none;
   animation: hud-fade-in 0.25s ease-out;
 }
@@ -683,7 +636,7 @@ canvas {
   to { opacity: 1; }
 }
 
-/* Weapon pickup badge (#185) — left of the combo meter; above the pause button on portrait phones */
+/* Weapon pickup badge (#185): left of the combo meter; above the pause button on portrait phones */
 .hud-weapon {
   position: absolute;
   right: calc(50% + 120px);
@@ -691,11 +644,6 @@ canvas {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px 6px 6px;
-  border-radius: 40px;
-  background: rgba(8, 10, 22, 0.5);
-  border: 1px solid var(--weapon-color);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--weapon-color) 45%, transparent);
   color: var(--weapon-color);
   opacity: 0;
   transform: translateY(16px) scale(0.9);
@@ -709,62 +657,45 @@ canvas {
 }
 
 .hud-weapon-ring {
-  position: relative;
   width: 52px;
   height: 52px;
-  flex: none;
 }
 
-.hud-weapon-ring svg:first-child {
-  display: block;
-  transform: rotate(-90deg);
-}
-
+.hud-weapon-ring-edge { stroke-width: 9; }
 .hud-weapon-ring-bg,
-.hud-weapon-ring-fill {
-  fill: none;
-  stroke-width: 4;
-}
-
-.hud-weapon-ring-bg {
-  stroke: rgba(255, 255, 255, 0.15);
-}
+.hud-weapon-ring-fill { stroke-width: 4; }
 
 .hud-weapon-ring-fill {
   stroke: var(--weapon-color);
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 4px var(--weapon-color));
 }
 
 .hud-weapon-icon {
   position: absolute;
   inset: 0;
   margin: auto;
-  filter: drop-shadow(0 0 3px var(--weapon-color));
+  filter: drop-shadow(1.5px 2px 0 var(--fair-tar));
 }
 
 .hud-weapon-label {
-  font-weight: 700;
-  font-size: 0.85rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  text-shadow: var(--hud-shadow);
+  font-variation-settings: 'opsz' 40;
+  font-weight: 800;
+  font-size: 1.35rem;
+  color: var(--fair-cream);
+  text-shadow: var(--hud-ink-thin);
 }
 
-@keyframes hud-combo-pop {
-  from { transform: scale(1.45); }
-  to { transform: scale(1); }
+@keyframes hud-tick {
+  from { transform: translateY(-0.2em); }
+  to { transform: none; }
 }
 
 @media (max-width: 480px) {
-  .hud-panel { padding: 8px 10px 10px; }
   /* bottom row between pause and mute, clear of the first-person gun (#223) */
   .hud-combo { bottom: calc(1rem + env(safe-area-inset-bottom)); }
   .hud-weapon {
     right: auto;
     left: calc(12px + env(safe-area-inset-left));
     bottom: max(72px, calc(env(safe-area-inset-bottom) + 72px));
-    padding: 4px;
   }
   .hud-weapon-label { display: none; }
   .hud-frenzy { bottom: max(162px, calc(env(safe-area-inset-bottom) + 154px)); }
@@ -947,7 +878,8 @@ canvas {
   100% { opacity: 0; transform: scale(1); }
 }
 
-/* Level select */
+/* Level select (docs/art/PERSONALITY.md): each world a ride board hung over the park, its name plate the only place the
+   level's own colour (--plate, the biome accent from src/ui/theme.ts) shows; the Daily Run a paper ticket. */
 .level-select {
   position: fixed;
   inset: 0;
@@ -956,103 +888,142 @@ canvas {
   align-items: center;
   justify-content: safe center;
   z-index: 100;
-  background: radial-gradient(ellipse at 50% 35%, rgba(24, 22, 48, 0.78), rgba(0, 0, 0, 0.92));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
+  font-family: 'Big Shoulders', sans-serif;
+  font-variation-settings: 'opsz' 10;
+  color: var(--fair-cream);
   padding:
-    calc(1.5rem + env(safe-area-inset-top))
+    calc(1.25rem + env(safe-area-inset-top))
     calc(1rem + env(safe-area-inset-right))
     calc(1.5rem + env(safe-area-inset-bottom))
     calc(1rem + env(safe-area-inset-left));
 }
 
 .level-select-header {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 0.35rem;
-  margin-bottom: clamp(1rem, 4vh, 2rem);
+  gap: 0.75rem 1rem;
+  width: min(1120px, 100%);
+  margin-bottom: 1.25rem;
 }
 
-.level-select h2 {
-  font-family: 'Lobster', cursive;
-  font-size: clamp(2rem, 8vw, 2.75rem);
-  text-shadow: 0 0 18px rgba(255, 200, 0, 0.45), 0 3px 6px rgba(0, 0, 0, 0.6);
+.level-select-header h2.fair-title {
+  margin: 0;
+  font-size: 2.5rem;
+  text-align: center;
 }
 
+.level-select-back {
+  justify-self: start;
+  padding-inline: 1.1rem;
+}
+
+/* The stars won so far, on a small plate. */
 .level-select-total {
-  padding: 0.3rem 0.9rem;
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: 1px;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.45rem 0.8rem 0.35rem;
+  border-radius: 5px;
+  font-family: 'Ultra', serif;
+  font-size: 1.25rem;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
-  border: 1px solid rgba(255, 210, 63, 0.45);
-  border-radius: 999px;
-  background: rgba(255, 210, 63, 0.1);
+  background: var(--fair-oxblood-deep);
+  box-shadow: 0 4px 0 var(--fair-tar);
 }
 
-.level-select-total-star {
-  color: #ffd23f;
-  text-shadow: 0 0 8px rgba(255, 210, 63, 0.8);
+.level-select-total svg {
+  width: 24px;
+  height: 24px;
+}
+
+.level-select-total path {
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  fill: var(--fair-gilt);
+  stroke: var(--fair-tar);
 }
 
 .level-grid {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: clamp(0.75rem, 1.4vw, 1.25rem);
-  width: min(1440px, 100%);
+  align-items: flex-start;
+  gap: 1.4rem 1.1rem;
+  width: min(1120px, 100%);
 }
 
+/* The button is the hanging sign: it casts the board's hard shadow (the board's notch mask would clip it) and tilts
+   a little on its hook, each one its own way. */
 .level-card {
-  --accent: #ffd23f;
-  --accent-glow: rgba(255, 210, 63, 0.55);
-  position: relative;
+  --tilt: -0.8deg;
   display: flex;
-  flex-direction: column;
-  /* Five worlds + the Daily card on one row at 1280 px. */
-  width: clamp(160px, 14vw, 224px);
+  width: clamp(200px, 21vw, 258px);
   min-height: 44px;
   padding: 0;
-  overflow: hidden;
+  border: 0;
   font: inherit;
-  color: #fff;
+  color: inherit;
   text-align: left;
-  background: rgba(14, 14, 22, 0.9);
-  border: 2px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  background: none;
   cursor: pointer;
-  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s, box-shadow 0.3s, opacity 0.3s;
+  rotate: var(--tilt);
+  filter: drop-shadow(6px 8px 0 var(--fair-tar));
+  transition: transform 150ms ease-out, rotate 150ms ease-out, opacity 0.3s;
+}
+
+.level-card:nth-child(3n + 2) {
+  --tilt: 0.7deg;
+}
+
+.level-card:nth-child(3n) {
+  --tilt: -0.3deg;
 }
 
 @media (hover: hover) {
-  .level-card:not(.locked):hover {
-    border-color: var(--accent);
-    transform: translateY(-6px);
-    box-shadow: 0 12px 30px var(--accent-glow);
+  .level-card:hover {
+    rotate: 0deg;
+    transform: translateY(-4px);
   }
 }
 
 .level-card:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 3px solid var(--fair-cream);
   outline-offset: 3px;
-  border-color: var(--accent);
-  transform: translateY(-6px);
-  box-shadow: 0 12px 30px var(--accent-glow);
+  rotate: 0deg;
+  transform: translateY(-4px);
 }
 
 .level-card:not(.locked):active {
-  transform: scale(0.97);
+  transform: translateY(2px);
+  transition-duration: 60ms;
+}
+
+.level-board.fair-board {
+  flex: 1;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas: 'art' 'plate' 'body';
+  padding: 20px;
 }
 
 .level-postcard {
   position: relative;
+  display: block;
   aspect-ratio: 2 / 1;
-  flex-shrink: 0;
-  border-bottom: 2px solid var(--accent);
-  transition: filter 0.3s;
+  overflow: hidden;
+}
+
+.level-card .level-postcard {
+  grid-area: art;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 2px var(--fair-tar);
 }
 
 .level-postcard svg {
@@ -1061,31 +1032,42 @@ canvas {
   height: 100%;
 }
 
+.level-postcard-planks {
+  position: absolute;
+  inset: 0;
+}
+
+/* The world's name plate, painted in its biome's colour; tar letters on every biome accent pass 4.5:1 (theme.test.ts). */
+.level-plate {
+  grid-area: plate;
+  justify-self: center;
+  max-width: 100%;
+  margin-top: -14px;
+  padding: 0.4rem 0.75rem 0.3rem;
+  border-radius: 5px;
+  font-family: 'Ultra', serif;
+  font-size: 1.25rem;
+  line-height: 1.05;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--fair-tar);
+  background: var(--plate);
+  box-shadow: 0 4px 0 var(--fair-tar);
+}
+
 .level-card-body {
+  grid-area: body;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  padding: 0.7rem 0.85rem 0.8rem;
-}
-
-.level-card-index {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.level-card-name {
-  font-size: 1.15rem;
-  font-weight: 700;
-  line-height: 1.15;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
 }
 
 .level-card-desc {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.3;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .level-card-meta {
@@ -1093,128 +1075,116 @@ canvas {
   align-items: center;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.15rem 0.5rem;
-  margin-top: 0.35rem;
+  gap: 0.2rem 0.5rem;
+  margin-top: auto;
 }
 
-.level-card-stars {
-  font-size: 1.1rem;
-  letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.22);
+.level-card-meta .fair-stars {
+  gap: 3px;
 }
 
-.level-card-stars .earned {
-  color: #ffd23f;
-  text-shadow: 0 0 6px rgba(255, 210, 63, 0.8);
+.level-card-meta .fair-stars svg {
+  width: 22px;
+  height: 22px;
 }
 
 .level-card-best {
-  font-size: 0.78rem;
+  font-size: 1.125rem;
   font-weight: 600;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.8);
 }
 
 .level-card-initials {
-  margin-left: 0.4rem;
+  margin-left: 0.35rem;
   font-weight: 800;
-  letter-spacing: 1.5px;
-  color: var(--accent);
+  color: var(--fair-gilt);
 }
 
 .level-card-streak {
-  font-size: 0.72rem;
+  font-size: 1.0625rem;
   font-weight: 700;
-  letter-spacing: 0.5px;
-  color: #ffb347;
   white-space: nowrap;
 }
 
-.level-card-daily {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+/* Boarded up: planks across the picture, a plain plate, and what opens it. */
+.level-card.locked {
+  cursor: not-allowed;
 }
 
-.level-card-daily-badge {
-  position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  padding: 0.15rem 0.55rem;
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: #1a1206;
-  background: #ffd23f;
-  border-radius: 999px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-  pointer-events: none;
+.level-card.locked .level-plate {
+  color: var(--fair-cream);
+  background: var(--fair-oxblood-deep);
 }
 
 .level-card-locked-hint {
-  margin-top: 0.35rem;
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  margin-top: auto;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--fair-gilt);
 }
 
-.level-card.locked {
-  cursor: not-allowed;
-  border-color: rgba(255, 255, 255, 0.08);
+/* The Daily Run's ticket: cream card, oxblood ink, the stub above a perforation. */
+.level-ticket {
+  flex: 1;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas: 'stub' 'art' 'body';
+  gap: 0.6rem;
+  padding: 14px 20px 20px;
+  color: var(--fair-oxblood);
+  background: var(--fair-cream);
 }
 
-.level-card.locked .level-postcard {
-  filter: grayscale(1) brightness(0.4);
-  border-bottom-color: rgba(255, 255, 255, 0.12);
-}
-
-.level-card.locked .level-card-index,
-.level-card.locked .level-card-name,
-.level-card.locked .level-card-desc {
-  opacity: 0.55;
-}
-
-.level-card-lock {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  aspect-ratio: 2 / 1;
+.level-ticket-stub {
+  grid-area: stub;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.1rem 0.5rem;
+  padding: 0 4px 0.5rem;
+  border-bottom: 2px dashed var(--fair-oxblood);
 }
 
-.level-card-lock svg {
-  width: 34px;
-  height: 34px;
-  fill: rgba(255, 255, 255, 0.85);
-  stroke: rgba(255, 255, 255, 0.85);
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+.level-ticket-title {
+  font-family: 'Ultra', serif;
+  font-size: 1.375rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 
+.level-ticket-date {
+  font-variation-settings: 'opsz' 40;
+  font-size: 1.125rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.level-ticket .level-postcard {
+  grid-area: art;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 2px var(--fair-oxblood);
+}
+
+.level-ticket .level-card-body {
+  margin-top: 0;
+}
+
+/* Launch: the picked board comes forward, the rest fall back. */
 .level-select.is-launching .level-card {
   opacity: 0.2;
   transform: scale(0.96);
+  transition-duration: 0.3s;
 }
 
 .level-select.is-launching .level-card.is-selected {
   z-index: 1;
   opacity: 1;
-  transform: scale(1.1);
-  border-color: var(--accent);
-  box-shadow: 0 0 40px var(--accent-glow);
-}
-
-.level-select.is-launching .level-card.is-selected .level-postcard {
-  filter: brightness(1.25) saturate(1.2);
-}
-
-.level-select-back {
-  margin-top: clamp(1.25rem, 4vh, 2rem);
-  flex-shrink: 0;
+  rotate: 0deg;
+  transform: scale(1.06);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1223,104 +1193,118 @@ canvas {
   .level-select.is-launching .level-card.is-selected,
   .level-card:focus-visible {
     transform: none;
+    transition: opacity 0.3s;
   }
 }
 .reduce-motion :is(.level-card, .level-select.is-launching .level-card, .level-select.is-launching .level-card.is-selected, .level-card:focus-visible) {
   transform: none;
+  transition: opacity 0.3s;
 }
 
-/* Short landscape screens (phones on their side): one compact row. */
+/* Short landscape screens (phones on their side): smaller boards, four to a row, no description. */
 @media (max-height: 520px) and (min-width: 601px) {
   .level-select-header {
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.9rem;
   }
 
-  .level-select h2 {
-    font-size: 1.8rem;
+  .level-select-header h2.fair-title {
+    font-size: 2rem;
   }
 
   .level-grid {
-    gap: 0.6rem;
+    gap: 1rem 0.9rem;
   }
 
   .level-card {
-    width: clamp(112px, 14vw, 180px);
+    width: clamp(150px, 21vw, 200px);
   }
 
-  .level-card-desc {
+  .level-board .level-card-desc {
     display: none;
   }
 
-  .level-card-body {
-    padding: 0.5rem 0.65rem 0.6rem;
-  }
-
-  .level-card-name {
+  .level-plate {
     font-size: 1rem;
-  }
-
-  .level-card-locked-hint {
-    font-size: 0.66rem;
-  }
-
-  .level-select-back {
-    margin-top: 0.9rem;
-    padding-block: 0.7rem;
+    white-space: nowrap;
   }
 }
 
-/* Phones: one full-width row per world, postcard on the left. */
+/* Phones: one board per row, the picture on the left. */
 @media (max-width: 600px) {
+  .level-select-header {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: 'title title' 'back total';
+    width: min(480px, 100%);
+  }
+
+  .level-select-header h2.fair-title {
+    grid-area: title;
+    font-size: 2.125rem;
+  }
+
+  .level-select-back {
+    grid-area: back;
+  }
+
+  .level-select-total {
+    grid-area: total;
+  }
+
   .level-grid {
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: stretch;
     width: min(480px, 100%);
-    gap: 0.6rem;
+    padding-right: 6px;
   }
 
   .level-card {
-    flex-direction: row;
+    --tilt: -0.4deg;
     width: 100%;
-    min-height: 96px;
   }
 
-  .level-postcard {
-    width: 44%;
+  .level-card:nth-child(3n + 2) {
+    --tilt: 0.35deg;
+  }
+
+  .level-card:nth-child(3n) {
+    --tilt: -0.15deg;
+  }
+
+  .level-board.fair-board {
+    grid-template-columns: 42% 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas: 'art plate' 'art body';
+    column-gap: 0.75rem;
+    padding: 16px;
+  }
+
+  .level-card .level-postcard {
     aspect-ratio: auto;
-    border-bottom: none;
-    border-right: 2px solid var(--accent);
+    min-height: 84px;
   }
 
-  .level-card.locked .level-postcard {
-    border-right-color: rgba(255, 255, 255, 0.12);
+  .level-plate {
+    justify-self: start;
+    margin-top: 0;
+    font-size: 1.125rem;
+    text-align: left;
   }
 
-  .level-card-lock {
-    bottom: 0;
-    right: auto;
-    width: 44%;
-    aspect-ratio: auto;
-  }
-
-  .level-card-body {
-    flex: 1;
-    min-width: 0;
-    justify-content: center;
-    padding: 0.55rem 0.75rem;
-  }
-
-  .level-card-name {
-    font-size: 1.05rem;
-  }
-
-  .level-card-desc {
-    font-size: 0.75rem;
-  }
-
-  .level-card-meta,
+  .level-card-desc,
   .level-card-locked-hint {
-    margin-top: 0.15rem;
+    text-align: left;
+  }
+
+  .level-ticket {
+    grid-template-columns: 42% 1fr;
+    grid-template-areas: 'stub stub' 'art body';
+    column-gap: 0.75rem;
+  }
+
+  .level-ticket .level-postcard {
+    aspect-ratio: auto;
+    min-height: 72px;
   }
 
   /* On top, above the fold: the reason to come back each day. */
@@ -1329,7 +1313,7 @@ canvas {
   }
 
   .level-card:focus-visible,
-  .level-card:not(.locked):hover {
+  .level-card:hover {
     transform: none;
   }
 }
@@ -2720,6 +2704,21 @@ canvas {
     2px 2px 0 var(--fair-gilt-block),
     3px 3px 0 var(--fair-gilt-block),
     5px 6px 0 var(--fair-tar);
+}
+
+/* Cream lettering standing straight on the ride or the park: lined in tar with a hard cast shadow, readable on any scene. */
+.fair-over-ride {
+  color: var(--fair-cream);
+  text-shadow:
+    -2px -2px 0 var(--fair-tar),
+    0 -2px 0 var(--fair-tar),
+    2px -2px 0 var(--fair-tar),
+    2px 0 0 var(--fair-tar),
+    -2px 0 0 var(--fair-tar),
+    -2px 2px 0 var(--fair-tar),
+    0 2px 0 var(--fair-tar),
+    2px 2px 0 var(--fair-tar),
+    3px 4px 0 var(--fair-tar);
 }
 
 .fair-number {

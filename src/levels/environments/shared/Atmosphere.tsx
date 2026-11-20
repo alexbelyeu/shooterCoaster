@@ -1,9 +1,11 @@
-import { useEffect, useMemo, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import SkyDome, { createSkyMaterial, setSkyUniforms } from '../SkyDome'
 import type { AtmosphereConfig } from '../atmosphere'
 import { markStartup } from '@/core/startupMarks'
+import type { DarkSectionSpec } from '@/types/level'
+import DarkSections from './DarkSections'
 
 /**
  * Bakes the sky into scene.environment once per mount; Phong materials ignore it, so only Standard/Physical reflect.
@@ -45,14 +47,18 @@ function SkyEnvironment({ atmosphere }: { atmosphere: AtmosphereConfig }) {
   return null
 }
 
-/** Sky dome, its baked env map, hemisphere + sun lights and fog for one biome (see atmosphere.ts). */
+/** Sky dome, its baked env map, hemisphere + sun lights and fog for one biome (see atmosphere.ts), dimmed in the track's dark sections. */
 export default function Atmosphere({
   atmosphere,
   fogRef,
+  darkSections,
 }: {
   atmosphere: AtmosphereConfig
   fogRef: RefObject<THREE.Fog | null>
+  darkSections?: readonly DarkSectionSpec[]
 }) {
+  const hemiRef = useRef<THREE.HemisphereLight>(null)
+  const sunRef = useRef<THREE.DirectionalLight>(null)
   const sunPosition = useMemo<[number, number, number]>(() => {
     const [x, y, z] = atmosphere.sunDirection
     const len = Math.hypot(x, y, z) || 1
@@ -67,9 +73,11 @@ export default function Atmosphere({
 
       {/* Lighting: tinted hemisphere ambient + coloured sun */}
       <hemisphereLight
+        ref={hemiRef}
         args={[atmosphere.hemiSkyColor, atmosphere.hemiGroundColor, atmosphere.hemiIntensity]}
       />
       <directionalLight
+        ref={sunRef}
         position={sunPosition}
         color={atmosphere.sunLightColor}
         intensity={atmosphere.sunLightIntensity}
@@ -81,6 +89,9 @@ export default function Atmosphere({
         attach="fog"
         args={[atmosphere.sky.horizon, atmosphere.fogNear, atmosphere.fogFar]}
       />
+      {darkSections?.length ? (
+        <DarkSections sections={darkSections} atmosphere={atmosphere} hemiRef={hemiRef} sunRef={sunRef} fogRef={fogRef} />
+      ) : null}
     </>
   )
 }

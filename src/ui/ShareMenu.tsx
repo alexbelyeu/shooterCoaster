@@ -184,7 +184,8 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
     if (step !== undefined) to = (at + step + items.length) % items.length
     else if (e.key === 'Home') to = 0
     else if (e.key === 'End') to = items.length - 1
-    else if (e.key === 'Tab') close(false)
+    // The menu is portalled to the end of body: back on Share first, so Tab carries on from there.
+    else if (e.key === 'Tab') close(true)
     if (to === null) return
     e.preventDefault()
     items[to]?.focus()
