@@ -255,8 +255,15 @@ export function nextBeat(now: number, origin: number, beatS: number, beats: numb
   return out
 }
 
-/** `makeIR` length / decay curve, a low-pass on the return. */
-export const BIOME_REVERB: Record<BiomeType, { seconds: number; decayPow: number; toneHz: number; level: number }> = {
+/** A biome's room: `makeIR` length / decay curve, a low-pass on the return. */
+export interface BiomeReverb {
+  seconds: number
+  decayPow: number
+  toneHz: number
+  level: number
+}
+
+export const BIOME_REVERB: Record<BiomeType, BiomeReverb> = {
   themePark: { seconds: 1.4, decayPow: 3.2, toneHz: 7000, level: 0.8 },
   desert: { seconds: 1.8, decayPow: 4.5, toneHz: 4500, level: 0.7 },
   ocean: { seconds: 2.4, decayPow: 3, toneHz: 6000, level: 0.9 },

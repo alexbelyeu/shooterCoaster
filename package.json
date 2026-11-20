@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b . scripts/new-world && vite build",
-    "build:portal": "tsc -b . scripts/new-world && vite build --mode portal && node scripts/portal/package.mjs",
+    "build": "npm run typecheck && vite build",
+    "build:portal": "npm run typecheck && vite build --mode portal && node scripts/portal/package.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b . scripts/new-world",
     "test": "vitest run",
