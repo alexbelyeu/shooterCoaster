@@ -16,6 +16,7 @@ import { intensityForTier } from '@/audio/scrim/layers'
 import { RESULTS_CUTS, resultsCut } from '@/audio/scores/resultsCut'
 import { computeStars } from '@/levels/scoring'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
+import type { BossDefeatedEvent, BossHitEvent, BossSpawnEvent } from '@/entities/bosses/BossBase'
 import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
 import { BYSTANDER_HIT_EVENT, type BystanderHitEvent } from '@/combat/bystanders'
 
@@ -56,13 +57,16 @@ const onBystanderHit = (e: unknown) => {
   sfx().penalty(placeSound(_at.set(x, y, z)))
 }
 const onFrenzy = () => sfx().frenzy()
-const onBossHit = (e: unknown) => sfx().bossHit((e as { hpFraction?: number } | undefined)?.hpFraction ?? 1)
+const onBossHit = (e: unknown) => {
+  const { hpFraction, position } = e as BossHitEvent
+  sfx().bossHit(hpFraction, placeSound(position))
+}
 const onFireworkLaunch = (e: unknown) => {
   const { flightS = 0, timeScale = 1 } = (e as { flightS?: number; timeScale?: number } | undefined) ?? {}
   sfx().fireworkWhistle(flightS, timeScale)
 }
 const onFireworkBurst = () => sfx().fireworkPop()
-/** An unshot snowball thumps past: the snow crunch, unplaced (it is at the camera). */
+/** An unshot snowball thumps past: the snow crunch, unplaced (it is at the camera; the event carries only its side). */
 const onSnowSplat = () => sfx().kill(0, 'crunch', null)
 
 const SFX_EVENTS: [string, (e: unknown) => void][] = [
@@ -102,15 +106,15 @@ export default function LevelAudio() {
     const playSection = (section: 'boss' | 'sting') => {
       if (isAudioReady()) withScrim((p) => p.playSection(level, section))
     }
-    const onBossSpawn = () => {
-      sfx().bossArrival()
+    const onBossSpawn = (e: unknown) => {
+      sfx().bossArrival(placeSound((e as BossSpawnEvent).position))
       playSection('boss')
     }
-    const onBossDefeated = () => {
-      sfx().bossDefeat()
+    const onBossDefeated = (e: unknown) => {
+      sfx().bossDefeat(placeSound((e as BossDefeatedEvent).position))
       playSection('sting')
     }
-    const bossEvents: [string, () => void][] = [
+    const bossEvents: [string, (e: unknown) => void][] = [
       ['boss:spawn', onBossSpawn],
       ['boss:defeated', onBossDefeated],
     ]
