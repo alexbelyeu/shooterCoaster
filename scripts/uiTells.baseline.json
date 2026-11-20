@@ -1,11 +1,11 @@
 {
-  "glow": 31,
+  "glow": 23,
   "frosted": 2,
-  "gradientSurface": 4,
-  "pill": 7,
-  "tracking": 17,
-  "allCaps": 6,
-  "edgeAccent": 4,
+  "gradientSurface": 3,
+  "pill": 5,
+  "tracking": 10,
+  "allCaps": 3,
+  "edgeAccent": 2,
   "defaultSans": 7,
   "middleDot": 12
 }
