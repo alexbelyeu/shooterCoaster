@@ -5,7 +5,7 @@ import type { BiomeType } from '@/types/level'
  * Accents follow the per-biome art direction in docs/agents/VISION.md.
  */
 export interface BiomeUITheme {
-  /** Primary accent: wave banner rule, kill strip fill. */
+  /** Primary accent: wave banner rule, kill strip fill, and the world's name plate on level select (tar letters on it). */
   accent: string
   /** Glow colour (accent with alpha) for text-shadow / box-shadow. */
   glow: string
