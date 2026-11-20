@@ -3,6 +3,7 @@ import {
   BIOME_TERRAIN_CONFIGS,
   TRACK_CLEARANCE,
   createHeightFunction,
+  type NoiseTerrainConfig,
   getTerrainSlope,
   sampleTrackPath,
 } from './terrainNoise'
@@ -10,11 +11,17 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { BIOMES, biomeHeightFunction } from '@/levels/environments/biomeRegistry'
 import { GYM_SCALE } from '@/levels/environments/biomes/gym/blockout'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
-import { BIOME_TYPES, type LevelConfig } from '@/types/level'
+import { BIOME_TYPES, type BiomeType, type LevelConfig } from '@/types/level'
 
 // The noise-terrain biomes (an interior's ground is its authored floor: `biomeHeightFunction`).
 const NOISE_BIOMES = BIOME_TYPES.filter((b) => !BIOMES[b].floor)
 const levels = getAllLevels()
+
+function noiseConfig(biome: BiomeType): NoiseTerrainConfig {
+  const c = BIOME_TERRAIN_CONFIGS[biome]
+  if ('authoredFloor' in c) throw new Error(`${biome} has an authored floor`)
+  return c
+}
 
 function trackSamplesFor(level: LevelConfig) {
   const c = createTrackCurve(level.track)
@@ -28,10 +35,15 @@ describe('BIOME_TERRAIN_CONFIGS', () => {
     }
   })
 
-  it('has a config for every biome a level uses, with sane values', () => {
-    for (const level of levels) {
-      const c = BIOME_TERRAIN_CONFIGS[level.biome]
-      expect(c, level.id).toBeDefined()
+  it('marks exactly the biomes with an authored floor as authoredFloor', () => {
+    for (const biome of BIOME_TYPES) {
+      expect('authoredFloor' in BIOME_TERRAIN_CONFIGS[biome], biome).toBe(!!BIOMES[biome].floor)
+    }
+  })
+
+  it('has sane noise values for every noise-terrain biome a level uses', () => {
+    for (const level of levels.filter((l) => NOISE_BIOMES.includes(l.biome))) {
+      const c = noiseConfig(level.biome)
       expect(c.octaves).toBeGreaterThanOrEqual(1)
       expect(c.amplitude).toBeGreaterThan(0)
       expect(c.persistence).toBeGreaterThan(0)
@@ -58,7 +70,7 @@ describe('createHeightFunction', () => {
   it('returns finite heights and keeps the centre flat at baseY', () => {
     for (const biome of NOISE_BIOMES) {
       const h = createHeightFunction(biome)
-      const { baseY, flatRadius } = BIOME_TERRAIN_CONFIGS[biome]
+      const { baseY, flatRadius } = noiseConfig(biome)
       expect(h(0, 0)).toBe(baseY)
       expect(h(flatRadius * 0.7, -flatRadius * 0.7)).toBe(baseY)
       for (let i = 0; i < 200; i++) {
@@ -72,7 +84,7 @@ describe('createHeightFunction', () => {
   it('produces actual relief outside the flat valley', () => {
     for (const biome of NOISE_BIOMES) {
       const h = createHeightFunction(biome)
-      const { baseY } = BIOME_TERRAIN_CONFIGS[biome]
+      const { baseY } = noiseConfig(biome)
       let maxRise = 0
       for (let a = 0; a < Math.PI * 2; a += 0.1) {
         maxRise = Math.max(maxRise, h(Math.cos(a) * 3000, Math.sin(a) * 3000) - baseY)
