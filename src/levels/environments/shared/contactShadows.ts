@@ -19,6 +19,12 @@ export interface ShadowCaster {
   strength: number
   /** What it stands on when that isn't the drawn terrain (the gym's mats over its floor); default the level's `groundFn`. */
   ground?: HeightFunction
+  /**
+   * The part of the footprint + spread this grid covers, in the caster's local units; default all of it. A caster whose
+   * ground steps (a raised mat beside a floor-level walkway) is split into one grid per flat piece: the shading stays
+   * continuous across them, and no cell straddles the step for the deficit lift to raise to its top.
+   */
+  grid?: { minX: number; maxX: number; minZ: number; maxZ: number }
 }
 
 /** Round footprint of radius `r`, penumbra `spread` × r. */
@@ -42,12 +48,10 @@ export function buildContactShadowGeometry(
   const grids = casters.map((c) => {
     const ex = c.halfX + c.spread
     const ez = c.halfZ + c.spread
-    return {
-      nx: Math.min(MAX_SEGMENTS, Math.max(1, Math.ceil((2 * ex) / SHADOW_CELL))),
-      nz: Math.min(MAX_SEGMENTS, Math.max(1, Math.ceil((2 * ez) / SHADOW_CELL))),
-      ex,
-      ez,
-    }
+    const { minX, maxX, minZ, maxZ } = c.grid ?? { minX: -ex, maxX: ex, minZ: -ez, maxZ: ez }
+    const nx = Math.min(MAX_SEGMENTS, Math.max(1, Math.ceil((maxX - minX) / SHADOW_CELL)))
+    const nz = Math.min(MAX_SEGMENTS, Math.max(1, Math.ceil((maxZ - minZ) / SHADOW_CELL)))
+    return { nx, nz, minX, minZ, sx: (maxX - minX) / nx, sz: (maxZ - minZ) / nz }
   })
   let vertexCount = 0
   let indexCount = 0
@@ -65,7 +69,7 @@ export function buildContactShadowGeometry(
   let v = 0
   let k = 0
   casters.forEach((c, ci) => {
-    const { nx, nz, ex, ez } = grids[ci]
+    const { nx, nz, minX, minZ, sx, sz } = grids[ci]
     const cos = Math.cos(c.yaw ?? 0)
     const sin = Math.sin(c.yaw ?? 0)
     const worldX = (lx: number, lz: number) => c.x + lx * cos + lz * sin
@@ -73,13 +77,11 @@ export function buildContactShadowGeometry(
     const surface = c.ground ?? groundFn
     const ground = (lx: number, lz: number) => surface(worldX(lx, lz), worldZ(lx, lz)) + SHADOW_LIFT
     const radius = Math.min(c.radius ?? 0, c.halfX, c.halfZ)
-    const sx = (2 * ex) / nx
-    const sz = (2 * ez) / nz
     const base = v
     for (let j = 0; j <= nz; j++) {
-      const lz = -ez + j * sz
+      const lz = minZ + j * sz
       for (let i = 0; i <= nx; i++) {
-        const lx = -ex + i * sx
+        const lx = minX + i * sx
         position.set([worldX(lx, lz), ground(lx, lz), worldZ(lx, lz)], v * 3)
         local.set([lx, lz], v * 2)
         box.set([c.halfX, c.halfZ, radius, c.spread], v * 4)
@@ -105,7 +107,7 @@ export function buildContactShadowGeometry(
           for (let p = 0; p <= CELL_SAMPLES; p++) {
             const s = p / CELL_SAMPLES
             const t = q / CELL_SAMPLES
-            const g = ground(-ex + (i + s) * sx, -ez + (j + t) * sz)
+            const g = ground(minX + (i + s) * sx, minZ + (j + t) * sz)
             if (s + t <= 1) lowAbd = Math.max(lowAbd, g - (ya + s * (yb - ya) + t * (yd - ya)))
             if (s + t >= 1) lowBde = Math.max(lowBde, g - (ye + (1 - s) * (yd - ye) + (1 - t) * (yb - ye)))
           }

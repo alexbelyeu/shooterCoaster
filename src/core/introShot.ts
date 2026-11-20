@@ -20,6 +20,15 @@ export const COUNTDOWN_LEAD_SECONDS = ((COUNTDOWN_STEPS.length - 1) * COUNTDOWN_
 /** Seconds of tour before Ready. */
 export const INTRO_HANDOFF_SECONDS = INTRO_SECONDS - COUNTDOWN_LEAD_SECONDS
 
+/**
+ * The keys that skip the intro: Space, Enter or Escape, never held or with a modifier, so the mute key (S) or a
+ * browser shortcut doesn't cut the tour short.
+ */
+export function isIntroSkipKey(e: Pick<KeyboardEvent, 'key' | 'repeat' | 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>): boolean {
+  if (e.repeat || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return false
+  return e.key === ' ' || e.key === 'Enter' || e.key === 'Escape'
+}
+
 let startedAt: number | null = null
 let offSeat = false
 const listeners = new Set<() => void>()

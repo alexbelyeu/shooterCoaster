@@ -123,6 +123,13 @@ describe('recipes', () => {
     expect(fire.lengthS(spec, 0)).toBeLessThanOrEqual(0.16)
   })
 
+  it('the UI bus, past the pause gate, is exactly the menu and countdown sounds', () => {
+    const ui = (Object.keys(ARCADE_SOUNDS) as ArcadeSoundId[]).filter((id) => ARCADE_SOUNDS[id].bus === 'ui').sort()
+    const uiPrio = (Object.keys(ARCADE_SOUNDS) as ArcadeSoundId[]).filter((id) => ARCADE_SOUNDS[id].prio === PRIO.ui).sort()
+    expect(ui).toEqual(uiPrio)
+    expect(ui).toEqual(['countGo', 'countReady', 'uiBack', 'uiLaunch', 'uiSelect', 'uiWhoosh'])
+  })
+
   it('kills outrank hits and guns, level cues outrank every combat sound, and kills sit 6 dB over the gun', () => {
     expect(ARCADE_SOUNDS['kill.pop'].prio).toBeGreaterThan(ARCADE_SOUNDS.hit.prio)
     expect(ARCADE_SOUNDS.hit.prio).toBeGreaterThan(ARCADE_SOUNDS.fire.prio)

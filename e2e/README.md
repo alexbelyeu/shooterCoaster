@@ -18,9 +18,7 @@ it must boot to the title with no failed request, no analytics request and no pa
 ride stats, the perf gate, the shot and the enemy probe; the ride stops at exactly `--seconds` of level time, timer, game clock and ride together on the frame that gets there (`stopAtLevelTime`, #487: a poll used to catch it anywhere from 10.2 to 10.7 s, and level2's enemy probe failed at 10.7); the ride gets there in settled steps of `--seconds` / `--min-frames` level seconds (below), combat caps level time per frame (`timerStepMax`, 0.25 s) and ride `--ride-rate` 0.14 s of track per second of level time (`rideRate`: CI's ride, where the budgets were set; the game rides at most
 3/60 s a frame), so a slow runner samples the same moment of the level from the same track point as a fast one; through the combat checks the level timer is then held (`holdLevelTime`: the game clock runs on, the run can't time out and no wave or boss comes due) until the step ends the level itself, so however long the checks take they never run into the boss or the end of the run (#305);
 it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
-`<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), on level6 `level6-gap.png` (#659: game time and the
-level timer held, `rideTo` jumps the car into the Tree's gap, its 55 s heartline-roll beat read from `rideBeats()`, and back; the car must be there and the frame not
-blank: the trunk on one side, the back wall on the other) and `level6-bystander.png` (#518: first in
+`<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), on level6 `level6-bystander.png` (#518: first in
 its combat, two kills (their real shot left to land or fly out first) and a primed 5-chain, then `shootBystander()` on a live climber: the score must drop by the penalty it returns
 (floored at 0; any level whose `stats().levelBystanders` is above 0 gets this check), the combo reset, no kill or hit counted, `bystandersHit` 1 and the don't-shoot hint shown; the shot holds the red
 "−18 · Don't shoot climbers!" popup and the chalk puff; `level6 bystander: score a → b, combo 5 → 0` in the log), `<id>-combat.png`
@@ -153,10 +151,15 @@ When level6 is in the run, a `switch` step (#702, on the PR in the `level6` shar
 (`trackSwitch()`): it parks the coaster behind the V2 sign with time frozen (`level6-switch.png`) and shoots it with a real
 bullet, which must set the hard way and ride the V8 branch at the junction's middle (`riding: 'hard'`, `level6-switch-hard.png`);
 a restart must set it back, and a run that leaves it must ride the easy way with the switch closed by then.
-First, from the same held start, it checks the Training Area cave's dark section (#752, the hook's `darkSection`: its
-`spans`, `depth` and the muzzle flash's light `flash`): it rides to the cave's middle, fires one real shot with the flash held
-and shoots `level6-dark.png`; the ride must be fully dark there (`depth` 1), the shot must light it (`flash` > 0), and the
-frame must be mostly dark (`DARK_SHOT.dark`) but not blank, its blacklit holds showing (`DARK_SHOT.glow`, saturated bright pixels).
+Then, on the same run held, it checks the Training Area cave's dark section (#752, the hook's `darkSection`: its
+`spans`, `depth` and the muzzle flash's light `flash`): it rides to the cave's middle and fires one real shot with the flash
+held; the ride must be fully dark there (`depth` 1) and the shot must light it (`flash` > 0). The nightly `dark` step (needs
+`switch`) also shoots `level6-dark.png` and `level6-dark-flash.png` there: the frame must be mostly dark (`DARK_SHOT.dark`) but
+not blank, its blacklit holds showing (`DARK_SHOT.glow`, saturated bright pixels), and the flash must brighten it (`DARK_SHOT.flash`).
+It then shoots `level6-gap.png` (#659: game time and the level timer held, `rideTo` jumps the car into the Tree's gap, its 55 s
+heartline-roll beat read from `rideBeats()`, and back; the car must be there and the frame not blank: the trunk on one side, the
+back wall on the other). These frame captures are nightly only, like the tour's (#766: the dark shots took the `level6` shard's
+`switch` step from ~90 s to ~260 s, and the gap still was ~30 s of its `ride` step on a 2-core box).
 **Settled steps** (#471, `settledSteps.mjs`): the ride and the pacing run advance level time one fixed step on one frame,
 then hold it (`timerStep` 0) until React has gone quiet (no commit on a held frame, and a message posted on the frame before
 answered), and only then take the next step. Waves, enemy mounts, fly-ins ending and boss arrivals go through React state
@@ -229,7 +232,7 @@ desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desk
 **Two depths (#372).** The PR smoke is rendering and integration: CI runs the shards in `SHARDS`, one `smoke (<name>)`
 job each (`ci.yml` matrix): `ui` (title, landing), `menus` (levelSelect, settings), `level1` (ride, shot, results), `level1-steps`
 (quality, speed), `level2`…`level5` (ride) and `mobile`. The **deep** checks, everything else (`nightlyOnly()` in
-`shards.mjs`: daily, frenzy, seed, pause, countdown, tour, wave, boss, pickup, audio, share, pacing, `mobileMenus`, and shot / results
+`shards.mjs`: daily, frenzy, seed, pause, countdown, tour, wave, boss, pickup, dark, audio, share, pacing, `mobileMenus`, and shot / results
 on levels 2–5), run in the full smoke, which the nightly production run makes (`prod-smoke.yml`, below): they are either
 game logic a unit test covers next to its pure module (the table below), or a browser check too slow for every PR. A red
 nightly opens the `agent:prod-broken` P1 issue the Maintainer takes first. To reproduce one, run its step:
@@ -303,7 +306,7 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   out run (#372, "Two depths" above). One run outgrew its 60 min cap once level 6 joined every deep step (#570), so it runs
   as three parallel jobs, each under its own 60 min cap: `node e2e/smoke.mjs --nightly-part <main|deep|pacing> --url <site> --seconds 10`
   (`e2e/shards.mjs` `NIGHTLY_PARTS`: `main` the UI, first-level and phone steps and every level's ride / shot / results / share,
-  `deep` wave / boss / pickup / audio, `pacing`; `shards.test.ts` holds the parts to the full run and to the workflow's matrix).
+  `deep` wave / boss / pickup / switch / dark / audio, `pacing`; `shards.test.ts` holds the parts to the full run and to the workflow's matrix).
   Each part's artifact is `prod-e2e-results-<part>` (its screenshots, `results.json` and `exit-code`); the `nightly` job folds
   them into one verdict with `scripts/nightlyParts.cjs` (a part that hit its cap or left nothing shows as a failed `part <name>`).
   A part that nears its cap splits again the same way.
