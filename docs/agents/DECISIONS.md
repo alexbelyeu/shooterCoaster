@@ -2368,3 +2368,141 @@ goes back to being invisible. A smaller lanternfly needs `HOP` distances, `SWARM
 **Context:** The intro swoop was squeezed into Ready / Set / GO, which waited up to 4 s on the warm-up: a 1–2 s blur on fast devices, a stall then a hitchy landing on slow ones (it supersedes the 18 Nov #328 swoop-timing entry).
 **Decision:** Two new phases before `countdown`. `loading` shows a loading screen until the level chunk, the scene, the whole shader warm-up (no cap) and the audio (SFX bake, score started; skipped while audio is still locked) are done and the level has drawn a few frames under it. `intro` runs the swoop on the wall clock for a fixed `INTRO_SECONDS` (6 s), not on frames, so it lasts the same on every device; a tap or key skips it. The countdown never moves the camera. A restart of a warm level goes straight to the countdown; a new start of a warm level passes the loading screen in a few frames (its stages are kept, not reset). `?e2e=1` still starts in `playing`.
 **Consequences:** Anything that must finish before play belongs under the loading screen (report it to `core/loadProgress.ts`), never in the intro or countdown. #675 replaces the swoop path with a tour on the same clock.
+
+## 2026-11-19 — Trackside enemies on a blind approach; scorpions circle their spot (Builder, #494)
+
+**Context:** Desert's opening climb pitches the rider at the sky while the track past its crest drops and turns away:
+no spot within the trackside band (400) of the slots' stretch of track is in view from it, so 4–7 s showed one
+scorpion. Scorpions also crawled in a straight line at 48–120 units/s, hundreds of units out of the view their
+placement chose within seconds.
+
+**Decision:** A ground trackside slot whose near-track spots are all out of view on its approach stands out along the
+look from the middle of that approach (`spawnPlacement.ts` `whereTheApproachLooks`), beyond the band, off every rail by
+`sideMin` and out of the biome's `keepOff` circles (`BiomeDefinition.keepOff`), when more of the approach's looks see it
+than the best near-track spot. Not in an interior (bounds): its boulders and pieces have no `keepOff`. The scorpion
+scuttles round a 20-unit loop through its spawn instead of crawling away.
+
+**Consequences:** A biome with ground trackside enemies and a landmark or big prop off the track lists it in `keepOff`
+(desert, volcanic, arctic do). Making the scorpion wander off again undoes the placement.
+
+## 2026-11-19 — The new-world templates are real TS in their own tsconfig project (builder, #553)
+
+**Context:** `npm run new-world`'s templates were `.tmpl` text and its atmosphere / terrain / reverb / postcard entries were strings in `newWorldPlan.mjs`, so neither `tsc -b` nor lint saw them and a rename in the shared biome API broke the scaffold silently.
+**Decision:** The templates are `.ts` / `.tsx` under `scripts/new-world/` (the record entries in `<kind>/registrations.ts` and `postcard.tsx`, typed by the game's own record types; the planner copies each record's one entry). They import shared code through the `@/` alias (relative `../../shared` paths only resolve from inside `src/levels/environments/biomes/`), so scaffolded biomes do too. They are their own tsconfig project (`scripts/new-world/tsconfig.json`, whose `env.d.ts` declares the `__SEED__` token, kept out of the game's globals), built by `tsc -b . scripts/new-world` in `build`, `build:portal` and `typecheck`; not a root `references` entry, because a referenced project must be `composite`, which requires listing every `src/` file the templates import. Lint applies the `src/` rules to them.
+**Consequences:** Any new `tsc -b` call meant to cover the whole repo needs both projects. A template must stay valid TS: tokens other than `__SEED__` go only where an identifier, string or comment can be.
+
+## 2026-11-19 — The intro is a generated tour of the level (Builder, #675)
+
+- **Decision:** the intro (now 10 s, `INTRO_SECONDS`) flies a tour built from each level's track and hero landmark
+  (`src/track/introTour.ts`): reveal high round the landmark, pass it, glide in over the track behind the seat looking
+  down the track ahead, land on the seat. The camera runs along a dense Catmull-Rom path by distance, eased at both
+  ends, at most `TOUR_SPEED_CAP` (450 world units × trackScale per second); its look direction is averaged along the path.
+- **Why:** Alex wanted a paced, wider fly-by on every level, including new ones from `npm run new-world`. A hand-tuned
+  path per level would not scale; one fixed recipe swerved on levels whose landmark lies ahead of the seat, so
+  `buildIntroTour` tries a few layouts (side round the landmark, glide length and heading, a swing out) and keeps the
+  one whose view turns least.
+- **Not following the track's bends behind the seat:** level 1's track comes into the seat through a hairpin; flying it
+  made the view whip round. The glide comes in straight and the landing settles onto the ride's heading. An interior
+  seat (`hero.approach`) still rides its track in, looking out past the seat.
+- **Follow-up:** the gym's tour turns faster (up to ~150°/s near the Tree) than the outdoor levels (under 75°/s); a
+  hand-picked `hero.tour` for it is the next step.
+
+## 2026-11-19 — The gym's ride is held clear of the drawn hall, not only the blockout's boxes (Builder, #695)
+
+**Context:** `gymTrack.test.ts` checked the ride against `BLOCKOUT_BOXES` (one box per blockout piece), so what `hallGeometry.ts` draws beyond them (the pit edge's railing, the stairs' railings, benches, holds and volumes) was never checked, and the ride went through the pit's railing.
+**Decision:** The test also measures the track against every triangle `buildHall` returns, the holds as their drawn shape (`holdGeometry`), through `geometryChecks.ts` `meshClearance`: a new prop or railing is checked the moment it is drawn. The box check stays (it is what the intro tour test uses and what reads a piece by name).
+**Consequences:** A route change that grazes anything drawn fails the unit test with the nearest triangle's position. The gym's intro tour now flies hand-picked reveal and pass shots (`index.ts` `hero.tour`): its automatic layout chooser flipped to the Tree's side when the route changed and came down through the Tree's head.
+
+## 2026-11-19 — The v2 ride is a solved plan, ridden by time (builder, #696)
+
+**Context:** Real speed (gravity, launches, lift hills, brakes) changes when the rider reaches each part of the
+track, but a level's timed beats (waves, the boss at 40 s) must still land on their seconds, and spawning predicts the
+ride ahead (`rideProfile`).
+**Decision:** `rideV2.ts` simulates the free ride from GO once per level mount and the live camera reads the result
+by ride time instead of integrating per frame. The solver then warps that ride's time: each stretch between two beats
+rides at a scale `a` (speed × a, eased in from the stretch before's over its first quarter), which is the same ride with
+gravity × a² and zone speeds × a, so slow crests and fast drops keep their shape while each beat moves onto its second.
+It does not re-simulate each stretch with scaled gravity: a fast stretch then carries its speed into the next, and on the
+gym a second beat could not be slowed onto its second even at 1/16 gravity. Opt-in per level (`TrackParams.ride: 'v2'`);
+today's rule is untouched.
+**Consequences:** The ride and its prediction are identical at any frame rate. A stretch asked to be much faster or slower than the
+track rolls feels floaty or heavy (its effective gravity is a² × the real one): place beats the track can roughly reach. The smoke's `rideSpeed` override has nothing to hold on a v2 level.
+A v2 ride takes each frame's whole time: today's rule caps a long frame at 3 ride frames (a hitch slows it), which on a
+15 fps phone would leave the plan ~25% behind the level clock and spawning's prediction (`ridePhysics.ts` `rideStepFrames`).
+Slow-mo (combo FRENZY, the last kill) still slows the car, as it does on today's rule, while the level clock runs on: the
+ride falls behind by the slow-mo's lost time (a few seconds a run at most), the same drift today's rule has, and
+`rideProfile` doesn't model it on either rule. Keeping slow-mo's feel won over a ride locked to the level clock.
+
+## 2026-11-19 — Ride feel reads the ride's zones on v2, the ride itself on today's rule; the wind takes the share of top speed (Builder, #697)
+
+**Context:** #697 wants the camera and sound to react to launches, chain lifts, drops and airtime. #696's v2 ride has
+`launch` / `lift` zones; levels on today's rule have none.
+**Decision:** The ride's inputs live in pure `ridePhysics.ts`, one rule for both rides: `rideLaunches` is the one launch
+signal (GO leaving the station, or a v2 ride entering a `launch` zone) that calls `triggerLaunch` and the whoosh;
+`rideOnLift` is a v2 ride inside a `lift` zone, or on today's rule "climbing while held at the minimum speed" (that clamp
+is what pulls the car up); `rideTopShare` (the wind's input) is the plan's speed over its `maxSpeed`, or velocity / max,
+never 0 while moving, so the crawl (and the gym) still has wind and rail rumble. Airtime is the crest's downward
+acceleration (`airtimeAmount`); the drop's dip is a fast minus a slow follower of `dropAmount`. All camera terms go
+through the Screen-shake scale (Off and reduced motion: none) and the smoke's caps come from `RIG_MAX_ROLL_DEG` /
+`RIG_MAX_PITCH_DEG` / `MAX_FOV_KICK_DEG`. The chain clank has the lowest voice priority (`PRIO.ambient`), so a full pool
+drops it before a gunshot.
+**Consequences:** A level moved to v2 (#700) gets its clank and launch shove from its zones with no camera change.
+
+## 2026-11-19 — Special ride mechanics are track data on the v2 ride; stops are never warped (Builder, #699)
+
+**Context:** The station launch, drop track, jump gap and backwards turntable each need the ride to do something the
+v2 plan (#696) had no word for (stand still for a while, face backwards, fly) while the storyboard's beats still land.
+
+**Decision:** Each mechanic is one entry in `TrackParams.mechanics` (arc shares), built with its track by
+`src/track/elements/mechanics.ts`. Pure `mechanics.ts` turns them into ordinary v2 zones plus a new `RideV2Spec.holds`
+(a stop: the car halts for its seconds); the solver warps only moving time, so a stop lasts its seconds whatever the
+beats ask of the stretches round it. Mechanics need `ride: 'v2'` (`rideModel` throws otherwise). The jump's flight is a
+fixed ballistic arc built for one speed, and a booster (brake, then launch at 2 g) delivers that speed at the lip; the
+solver's warp keeps it physical (speed × a under gravity × a²). The seat faces back by turning the look about the rails'
+up; spawning still lays waves ahead along the track.
+
+**Consequences:** A level that rides backwards must place its waves for a rider facing back (a follow-up); changing a
+jump's speed means rebuilding its arc, not just its zone.
+
+## 2026-11-19 — Junctions share the track's t (builder, #702)
+
+**Context:** Shoot-to-switch needs a track with two ways round one stretch, but the whole game (ride physics, the v2 plan,
+`rideProfile`, spawn windows, pacing, the camera's arc table, the e2e `rideTo`) reads one closed curve's t.
+**Decision:** No general track graph. A junction is a ride mechanic (#699's `TrackParams.mechanics`, `kind: 'junction'`,
+`src/track/mechanics.ts`), a branch over one span [from, to] of the lap's arc share (a spline's t): the ride's speed and
+timing always follow the main curve, and only the seat rides the hard route (`seatPose` on the run's `route` in
+`useGameStore`, 'hard' once the sign is shot). Unlike the other mechanics it sets no zones, so it runs on either ride. Both routes reach every t, so every beat, wave window and the boss land on
+the same second whichever way the car went; the longer branch is ridden faster, its arc eased so the speed matches at the
+fork and merge. On a spline track that doesn't roll, never over another mechanic from its sign to its merge (`checkMechanics`: the
+branch's seat would miss a drop's or turntable's turn), and the switch closes when the car reaches its sign. The switch's
+hit sphere is the board's half height and it gets no aim assist, so a shot or tap meant for an enemy never picks the route.
+The gym's sits on the east-side run (~25–33 s), where there is room for it today, not the storyboard's cave mouth (that ride
+isn't built yet).
+**Consequences:** Spawn placement and the arc table stay on the main route (the branch keeps within ~7 m of it, so the
+waves still fly in to the rider's view). Hard-branch-only waves, their `maxScore` and the server limits are a follow-up;
+until then the hard way changes the ride, not the score, so `levelLimits.ts` is unchanged.
+
+## 2026-11-20 — Hard rule 1 names CI's `verify`, the PR depth (Builder, #414)
+
+**Context:** Hard rule 1 said `main` must "pass `npm run verify`", which is the full smoke. Since #372 / #411 CI's
+`verify` gate runs the PR depth (unit + build, Lighthouse, one job per smoke shard) and the full smoke's deep checks
+run nightly on production (`prod-smoke.yml`).
+**Decision:** Rule 1 now reads: `main` passes CI's `verify` (the PR depth); the full smoke runs nightly, and a red
+nightly opens `agent:prod-broken` at P1. The agent definitions say "`verify` (the PR depth)" instead of "full `verify`".
+**Consequences:** A merge is gated on the PR depth only; a deep check that breaks shows up in the next nightly and is
+fixed or reverted as a P1, not by running `npm run verify` before every push.
+
+## 2026-11-20 — The loop logo is the default; no light sweep, no `?logo=` (Builder, #538)
+
+**Context:** The #476 entry (2026-11-13) kept the wordmark's light sweep and put logo concepts live behind
+`?logo=<name>` (`ui/screens/logo/`) until Alex picked one. He picked the loop logo in #532, and #537 made it the
+default and deleted both the sweep and the concepts.
+**Decision:** The loop logo is the logo everywhere: title, poster, score card and share card. Its shapes live only in
+`src/ui/logoArt.ts`, drawn twice from there: as SVG by `screens/TitleLogo.tsx` and on canvas by `scoreCardImage.tsx`
+`drawLogo`. The poster in `index.html` inlines `TitleLogo`'s still markup, kept equal by `src/app/indexHtml.test.ts`.
+The score card draws with the 2D canvas API on purpose: an SVG drawn as an image can't use the page's Lobster font.
+This supersedes the #476 entry's "the wordmark keeps the light sweep" and `?logo=` clauses; its rule of no
+music-driven logo motion stands.
+**Consequences:** Change a logo shape in `logoArt.ts` and both renderers follow; change how one renderer draws and
+check the other. Don't add an SVG-as-image path to the score card, and don't bring back a `?logo=` switch for a
+settled logo.
