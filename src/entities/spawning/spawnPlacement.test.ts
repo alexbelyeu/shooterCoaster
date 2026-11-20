@@ -497,6 +497,18 @@ describe('placeWallSwarm (#516)', () => {
     expect(placed.map((p) => p.seed)).toEqual(slots.map((s) => s.seed))
   })
 
+  it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, then a wall ahead of the drop", () => {
+    const { level, table: gym, rideFor } = world(getAllLevels().find((l) => l.id === 'level6')!)
+    const wave = level.enemies.find((w) => w.type === 'lanternfly')!
+    const profile = rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)
+    const riderIndex = indexAhead(gym, 0, profile[wave.spawnDelay! * 10])
+    const swarm = swarmSlots(wave.count, createRng(3))
+    const placed = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarm, ride: rideFor(wave) })
+    const walls = placed.map((p) => p.wall.id)
+    expect(walls[0]).toMatch(/alaska/)
+    expect(walls[walls.length - 1]).not.toMatch(/alaska/)
+  })
+
   it('needs the level to have walls', () => {
     expect(() => placeWallSwarm({ table, riderIndex: 0, type: 'lanternfly', walls: [], slots, ride: STILL })).toThrow(/walls/)
   })
