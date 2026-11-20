@@ -172,9 +172,10 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   frenzyLift: { prio: PRIO.event, db: -21, send: 0.1 },
   waveTell: { prio: PRIO.event, db: -8, send: 0.25 },
   goldenBalloon: { prio: PRIO.event, db: -6, send: 0.3 },
-  bossArrival: { prio: PRIO.event, db: -6, send: 0.35 },
-  bossHit: { prio: PRIO.cue, db: -8, send: 0.1 },
-  bossDefeat: { prio: PRIO.event, db: -4, send: 0.35 },
+  // Placed at the boss (#802): 3 dB under their unplaced level, which `panGain` gives back at the centre.
+  bossArrival: { prio: PRIO.event, db: -9, send: 0.35 },
+  bossHit: { prio: PRIO.cue, db: -11, send: 0.1 },
+  bossDefeat: { prio: PRIO.event, db: -7, send: 0.35 },
   fireworkWhistle: { prio: PRIO.hit, db: -22, send: 0.3 },
   fireworkPop: { prio: PRIO.cue, db: -12, send: 0.35 },
   star1: { prio: PRIO.event, db: -12, send: 0.35 },
@@ -229,17 +230,24 @@ export function bossHitRate(hpFraction: number): number {
   return Math.pow(2, (7 * (1 - Math.min(Math.max(hpFraction, 0), 1))) / 12)
 }
 
-export const SPATIAL = { panWidth: 0.75, nearM: 30, farM: 220, nearHz: 18000, farHz: 2400 } as const
+/** `farWet`: the reverb send's multiplier at `farM` and beyond (1 at `nearM`): a far sound is mostly room. */
+export const SPATIAL = { panWidth: 0.75, nearM: 30, farM: 220, nearHz: 18000, farHz: 2400, farWet: 2.5 } as const
 
-/** Camera-space (x, z), z < 0 ahead: the screen edge pans `panWidth`, behind the camera pans fully to its side. */
-export function spatial(x: number, z: number, tanHalfHFov: number, out: { pan: number; cutoffHz: number }) {
+/** Camera-space (x, z), z < 0 ahead: the screen edge pans `panWidth`, behind the camera pans fully to its side; distance dulls it and wets its send. */
+export function spatial(x: number, z: number, tanHalfHFov: number, out: { pan: number; cutoffHz: number; wet: number }) {
   const ahead = -z
   const side = ahead > 0.5 ? x / (ahead * tanHalfHFov) : Math.sign(x) * 1.5
   out.pan = Math.max(-1, Math.min(1, side)) * SPATIAL.panWidth
   const dist = Math.hypot(x, z)
   const f = Math.min(Math.max((dist - SPATIAL.nearM) / (SPATIAL.farM - SPATIAL.nearM), 0), 1)
   out.cutoffHz = SPATIAL.nearHz * Math.pow(SPATIAL.farHz / SPATIAL.nearHz, f)
+  out.wet = 1 + (SPATIAL.farWet - 1) * f
   return out
+}
+
+/** A sound's reverb send (`ARCADE_SOUNDS` `send`) at a placement's `wet`; never past unity. */
+export function placedSend(send: number, wet: number): number {
+  return Math.min(1, send * wet)
 }
 
 /** Keeps a placed sound's louder channel at its level wherever it pans: equal power leaves a kill at the crosshair 3 dB down. */
@@ -256,21 +264,78 @@ export function nextBeat(now: number, origin: number, beatS: number, beats: numb
   return out
 }
 
-/** A biome's room: `makeIR` length / decay curve, a low-pass on the return. */
+/**
+ * A biome's room, the convolver on the SFX send (`roomImpulse`): `seconds` of diffuse tail on a `decayPow` curve,
+ * starting `preDelayMs` after the dry sound; `early` reflections inside that gap, and an optional `slap`, one
+ * discrete echo off a big surface. `early` and `slap.share` are energy against the tail's (1 = as much as the whole
+ * tail). `toneHz` low-passes the return, `level` is its gain.
+ */
 export interface BiomeReverb {
   seconds: number
   decayPow: number
   toneHz: number
   level: number
+  preDelayMs: number
+  early: number
+  slap: { ms: number; share: number } | null
 }
 
 export const BIOME_REVERB: Record<BiomeType, BiomeReverb> = {
-  themePark: { seconds: 1.4, decayPow: 3.2, toneHz: 7000, level: 0.8 },
-  desert: { seconds: 1.8, decayPow: 4.5, toneHz: 4500, level: 0.7 },
-  ocean: { seconds: 2.4, decayPow: 3, toneHz: 6000, level: 0.9 },
-  arctic: { seconds: 3, decayPow: 2.6, toneHz: 9000, level: 0.9 },
-  volcanic: { seconds: 2, decayPow: 3.4, toneHz: 2600, level: 0.85 },
-  gym: { seconds: 2.6, decayPow: 2.8, toneHz: 5000, level: 0.9 }, // a big hard-walled hall
+  // A fairground among stalls: a short, close room.
+  themePark: { seconds: 1.4, decayPow: 3.2, toneHz: 7000, level: 0.8, preDelayMs: 12, early: 0.12, slap: null },
+  // Open sand: little diffuse air, one slapback off the dunes.
+  desert: { seconds: 1.8, decayPow: 4.5, toneHz: 4500, level: 0.7, preDelayMs: 20, early: 0.03, slap: { ms: 115, share: 0.6 } },
+  // Open sea: nothing near to reflect, all air.
+  ocean: { seconds: 2.4, decayPow: 3, toneHz: 6000, level: 0.9, preDelayMs: 25, early: 0.01, slap: null },
+  // Snowfields soak up the early sound; a faint return off the ice cliffs.
+  arctic: { seconds: 3, decayPow: 2.6, toneHz: 9000, level: 0.9, preDelayMs: 18, early: 0.04, slap: { ms: 190, share: 0.15 } },
+  // A cavern: far walls, a long gap before the tail.
+  volcanic: { seconds: 2, decayPow: 3.4, toneHz: 2600, level: 0.85, preDelayMs: 75, early: 0.15, slap: null },
+  // A big hard-walled hall: dense early reflections.
+  gym: { seconds: 2.6, decayPow: 2.8, toneHz: 5000, level: 0.9, preDelayMs: 30, early: 0.4, slap: null },
+}
+
+/** Where the early reflections land, as a share of the pre-delay gap, and their relative amplitudes. */
+const EARLY_TAPS = [[0.15, 0.6], [0.3, 0.4], [0.5, 0.32], [0.7, 0.22], [0.9, 0.15]] as const
+const EARLY_MIN_MS = 4
+/** The right channel's reflections land this much later: the room is wide. */
+const STEREO_SKEW_MS = 2.3
+
+export function roomLength(room: BiomeReverb, sampleRate: number): number {
+  return Math.floor(sampleRate * (room.preDelayMs / 1000 + room.seconds))
+}
+
+/**
+ * A room's stereo impulse response (`rng` in [0, 1)): darkening filtered noise from the pre-delay on, the early taps and
+ * the slap scaled to their share of each channel's tail energy. Built once per room, never per frame.
+ */
+export function roomImpulse(room: BiomeReverb, sampleRate: number, rng: () => number): Float32Array<ArrayBuffer>[] {
+  const len = roomLength(room, sampleRate)
+  const pre = Math.floor((sampleRate * room.preDelayMs) / 1000)
+  const tapEnergy = EARLY_TAPS.reduce((sum, [, a]) => sum + a * a, 0)
+  const out = [new Float32Array(len), new Float32Array(len)]
+  for (let ch = 0; ch < 2; ch++) {
+    const y = out[ch]
+    let lp = 0
+    let tail = 0
+    for (let i = pre; i < len; i++) {
+      const x = (i - pre) / (len - pre)
+      lp += (0.9 - 0.75 * x) * (rng() * 2 - 1 - lp) // darker as it decays
+      y[i] = lp * Math.pow(1 - x, room.decayPow)
+      tail += y[i] * y[i]
+    }
+    const skewMs = ch * STEREO_SKEW_MS
+    const earlyScale = Math.sqrt((room.early * tail) / tapEnergy)
+    for (const [at, a] of EARLY_TAPS) {
+      const ms = EARLY_MIN_MS + at * Math.max(room.preDelayMs - EARLY_MIN_MS, 0) + skewMs
+      y[Math.floor((sampleRate * ms) / 1000)] += earlyScale * a * (rng() < 0.5 ? -1 : 1)
+    }
+    if (room.slap) {
+      const k = Math.floor((sampleRate * (room.slap.ms + skewMs)) / 1000)
+      if (k < len) y[k] += Math.sqrt(room.slap.share * tail)
+    }
+  }
+  return out
 }
 
 /** Whistle bakes (s); a launch plays the nearest, rate-matched to its flight. */
