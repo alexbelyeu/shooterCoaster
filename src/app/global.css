@@ -97,6 +97,7 @@ canvas {
   justify-content: center;
   z-index: 100;
   background: rgba(0, 0, 0, 0.35);
+  font-family: 'Big Shoulders', sans-serif;
   transition: background-color 0.8s ease;
 }
 
@@ -151,33 +152,101 @@ canvas {
   left: 0;
   right: 0;
   bottom: calc(9vh + 1rem + env(safe-area-inset-bottom));
-  margin: 0;
   text-align: center;
-  font-size: 0.85rem;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
-  animation: title-attract-prompt 2.4s ease-in-out 0.9s infinite both;
-}
-
-@keyframes title-attract-prompt {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 0.95; }
+  font-size: 1.25rem;
+  font-weight: 700;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .title-attract::before, .title-attract::after { animation: none; }
-  .title-attract-prompt { animation: none; opacity: 0.8; }
 }
 .reduce-motion .title-attract::before,
 .reduce-motion .title-attract::after { animation: none; }
-.reduce-motion .title-attract-prompt { animation: none; opacity: 0.8; }
 
-.title-screen .subtitle {
-  font-size: clamp(0.9rem, 2.5vw, 1.1rem);
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 2rem;
+/*
+ * The title's front (docs/art/PERSONALITY.md): lettering on the park, PLAY the one gilt plate, Settings a smaller one.
+ * Every height is fixed (not left to the font) and index.html's .poster-title repeats these numbers, so the live title
+ * lands exactly on the poster's.
+ */
+.title-screen .title-tagline {
+  height: 1.75rem;
+  margin-bottom: 1.75rem;
+  font-size: 1.375rem;
+  font-weight: 800;
+  font-variation-settings: 'opsz' 40;
+  line-height: 1.75rem;
+}
+
+.title-tagline span {
+  display: inline-block;
+  margin: 0 0.2em;
+}
+
+.title-screen .fair-plate {
+  padding: 0.15em 0 0;
+  transition: opacity 0.8s ease, transform 60ms, box-shadow 60ms;
+}
+
+.title-screen .title-play {
+  width: 12rem;
+  height: 4rem;
+  font-size: 2.1rem;
+}
+
+.title-screen .settings-button {
+  width: 9rem;
+  height: 44px;
+  margin-top: 1.4rem;
+  font-size: 1.3rem;
+}
+
+.title-screen .title-hint {
+  height: 1.5rem;
+  margin-top: 1.25rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+  pointer-events: none;
+}
+
+.title-screen .credits {
+  position: absolute;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.title-screen .credits a {
+  color: var(--fair-gilt);
+  text-underline-offset: 3px;
+}
+
+.title-screen .credits a:focus-visible {
+  outline: 3px solid var(--fair-cream);
+  outline-offset: 3px;
+}
+
+.title-screen .internal-marker {
+  position: absolute;
+  top: calc(0.75rem + env(safe-area-inset-top));
+  right: calc(0.75rem + env(safe-area-inset-right));
+  font-size: 0.95rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* Phone landscape: the column reaches the bottom edge, so the credits move to the corner the mute button leaves free. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .title-screen .credits {
+    left: calc(1rem + env(safe-area-inset-left));
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-screen .fair-plate {
+    transition: opacity 0.8s ease;
+  }
 }
 
 .play-button {
@@ -207,84 +276,12 @@ canvas {
   transform: scale(0.96);
 }
 
-.title-screen :is(.play-button, .settings-button):focus-visible {
-  outline: 3px solid #fff;
-  outline-offset: 4px;
-}
-
-.title-screen .title-hint {
-  margin-top: 1.25rem;
-  font-size: 0.85rem;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-  pointer-events: none;
-}
-
 /* PLAY's fade to black, over every screen and button. */
 .screen-veil {
   position: fixed;
   inset: 0;
   z-index: 300;
   background: #000;
-}
-
-.title-screen .credits {
-  position: absolute;
-  bottom: calc(2rem + env(safe-area-inset-bottom));
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.title-screen .credits a {
-  color: rgba(255, 200, 0, 0.7);
-  text-decoration: none;
-}
-
-.title-screen .internal-marker {
-  position: absolute;
-  top: calc(0.75rem + env(safe-area-inset-top));
-  right: calc(0.75rem + env(safe-area-inset-right));
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.45);
-  pointer-events: none;
-}
-
-/* Settings button — bottom-left, glass-morphism */
-.settings-button {
-  position: fixed;
-  bottom: calc(1rem + env(safe-area-inset-bottom));
-  left: calc(1rem + env(safe-area-inset-left));
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  font-size: 1.4rem;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  pointer-events: auto;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-@media (hover: hover) {
-  .settings-button:hover {
-    background: rgba(0, 0, 0, 0.7);
-    border-color: rgba(255, 255, 255, 0.5);
-  }
-}
-
-.settings-button:active {
-  background: rgba(0, 0, 0, 0.7);
-  border-color: rgba(255, 255, 255, 0.5);
 }
 
 /* HUD — Inter, tabular numerals; dark glass panels keep text legible over any sky.
@@ -2605,6 +2602,21 @@ canvas {
     2px 2px 0 var(--fair-gilt-block),
     3px 3px 0 var(--fair-gilt-block),
     5px 6px 0 var(--fair-tar);
+}
+
+/* Cream lettering standing straight on the ride or the park: lined in tar with a hard cast shadow, readable on any scene. */
+.fair-over-ride {
+  color: var(--fair-cream);
+  text-shadow:
+    -2px -2px 0 var(--fair-tar),
+    0 -2px 0 var(--fair-tar),
+    2px -2px 0 var(--fair-tar),
+    2px 0 0 var(--fair-tar),
+    -2px 0 0 var(--fair-tar),
+    -2px 2px 0 var(--fair-tar),
+    0 2px 0 var(--fair-tar),
+    2px 2px 0 var(--fair-tar),
+    3px 4px 0 var(--fair-tar);
 }
 
 .fair-number {
