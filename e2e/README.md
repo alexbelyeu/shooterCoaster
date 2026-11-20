@@ -171,7 +171,10 @@ gap. It prints one line per level (`level2 pacing: no target 7% of 60 s, longest
 writes `e2e-results/pacing.json`: those metrics per level plus a `timeline`, one row a level second (`t`, fewest and most
 targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`), which is where to look for where a gap is. A level over
 its `budgets.json` `pacing` ceilings (`longestGapSeconds`, `noTargetShare`) fails with the gap named (`longest gap 9.0 s at
-7.0 s (track 0.03) over budget 3 s`); only the Director lowers or raises them. A level takes 120 steps plus about one held frame each
+7.0 s (track 0.03) over budget 3 s`); only the Director lowers or raises them. A level whose entry names `knownOver: "#<open issue>"` only
+prints a WARN line until that issue lands. Besides the nightly, CI runs this step on a PR for every level the PR can change
+(`pacing (<level>)` jobs, which `verify` requires; `scripts/ciPlan.cjs` `pacingLevels`: the level's biome folder, or every level for
+`src/track/`, `src/levels/LevelRegistry.ts`, `src/levels/pacing.ts`, `src/entities/spawning/` or this metric, #761). A level takes 120 steps plus about one held frame each
 (~260 frames; ~4.5 min in a 2-core session; its summary line prints both), so run one at a time: `--steps pacing --levels level4`.
 `drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
 spawned enemies) and vary run to run; for before/after comparisons use the

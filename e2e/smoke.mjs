@@ -2048,7 +2048,10 @@ async function pacingCheck(page, id) {
   const shaders = await programsAfterWarmup(page)
   if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   const budget = BUDGETS.pacing?.[id]
-  problems.push(...(isPlaceholder(budget) ? fillPlaceholderBudget('pacing', id, pacingCeilings(pacing)) : pacingBudgetProblems(id, pacing, budget)))
+  const over = isPlaceholder(budget) ? fillPlaceholderBudget('pacing', id, pacingCeilings(pacing)) : pacingBudgetProblems(id, pacing, budget)
+  // A level whose entry names `knownOver` (an open issue fixing it) only warns, like the scene budgets.
+  if (budget?.knownOver && over.length) console.log(`     WARN pacing over budget (known, ${budget.knownOver}): ${over.join('; ')}`)
+  else problems.push(...over)
   return { id: 'pacing', level: id, problems, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
 }
 
