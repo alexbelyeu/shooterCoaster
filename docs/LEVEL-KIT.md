@@ -103,6 +103,23 @@ biome or score that already exists is refused, so a second run changes nothing. 
    (`placeholder not set`), so fix it and run again; commit the budgets they wrote; look at the ride,
    enemy and combat shots; the turntable sheet for new enemies.
 
+## Set-pieces: tunnels
+
+A tunnel (#332) is data: `TrackParams.tunnels`, each `{ from: <track t>, length: <arc units> }` (level 1's
+`{ from: 0.18, length: 520 }` under the midway). Pure `src/track/setPieces.ts` `withTunnels` places it on the
+arc table, so clearance, the camera and the e2e hook read it from there; `tunnelGeometry.ts` builds the mesh
+and `TrackTunnels.tsx` draws it. `tunnelSpans` throws on (`setPieces.test.ts` places every level's tunnels, so `npm test` catches it):
+
+- **the seam**: a tunnel and its portals (`portalDepth` at each end) must sit inside one lap, never across t = 1;
+- **portal room**: the same margin at the track's start (`from` past `portalDepth` of arc);
+- **overlap**: two tunnels need two portals' depth of open track between them.
+
+Guidance: keep it short, about 2 s of ride at the speed the car has there (`ridePhysics.ts` `rideProfile`):
+nothing outside is shootable from inside the tube, so it is time with nothing to shoot, which the `pacing` gate counts against the level's
+`budgets.json` `pacing` ceilings (`longestGapSeconds`, `noTargetShare`). Put it between waves, not over one,
+and run `node e2e/smoke.mjs --steps pacing --levels <id>` after placing it. The `speed` step (the `level1-steps` shard) shoots the
+entry and the inside (`<id>-tunnel-entry.png`, `<id>-tunnel.png`).
+
 ## Candidate worlds (Director's ranking)
 
 1. **Climbing Gym** (#438 → #513): Alex's gym from his blockout; rats, lanternflies, dust

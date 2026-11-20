@@ -226,6 +226,7 @@ timed by the run: a lap takes 99–228 s (`track/ridePhysics.ts`, pinned in its 
 - **World-event shake**: `eventBus.emit(CAMERA_TRAUMA_EVENT, amount, durationMs)` (`src/combat/screenShake.hot.ts`); it is rotation-only trauma. Never write `camera.position` (the smoke fails any translation off the track pose)
 - **Terrain-conforming features**: Follow the safeHeight() pattern above
 - **Custom shaders**: Create separate `*Shader.ts` file with `create*Material()` factory, drive uniforms in `useFrame`
+- **Tunnels** (`TrackParams.tunnels`, `docs/LEVEL-KIT.md` "Set-pieces: tunnels"): placement is pure `track/setPieces.ts`, the mesh `track/tunnelGeometry.ts`. It may not cross the seam, needs portal room at each end and may not overlap another. Keep it ~2 s of ride with nothing shootable inside; the `pacing` gate counts that dead time, so place it between waves and re-run `--steps pacing`
 - **Landmark components**: Create in `src/levels/environments/` (render them from the biome's `Features.tsx`), accept optional custom material props
 
 ## Common Pitfalls
