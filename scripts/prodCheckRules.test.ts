@@ -17,7 +17,7 @@ describe('asset names', () => {
     expect(assetStem('/assets/synth-BAgUArOt.js')).toBe('synth.js')
     expect(assetStem('/assets/index--u4UeygU.js')).toBe('index.js')
     expect(assetStem('/assets/index-CN52d6WT.css')).toBe('index.css')
-    expect(assetStem('/fonts/inter-latin-wght.woff2')).toBe('inter-latin-wght.woff2')
+    expect(assetStem('/fonts/ultra-latin-400.woff2')).toBe('ultra-latin-400.woff2')
   })
 
   it('finds the chunk, stylesheet and font paths a page or chunk references', () => {
@@ -42,7 +42,7 @@ describe('responseProblems', () => {
     const immutable = { 'content-type': 'application/javascript', 'cache-control': 'public, max-age=31536000, immutable' }
     expect(responseProblems('/assets/synth-BAgUArOt.js', res(immutable), vercel)).toEqual([])
     expect(responseProblems('/', res({ 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=0, must-revalidate' }), vercel)).toEqual([])
-    expect(responseProblems('/fonts/inter-latin-wght.woff2', res({ 'content-type': 'font/woff2' }), vercel)).toEqual([])
+    expect(responseProblems('/fonts/ultra-latin-400.woff2', res({ 'content-type': 'font/woff2' }), vercel)).toEqual([])
   })
 
   it('catches a chunk answered with HTML, a missing cache rule, a long cache on an unhashed file and a missing header', () => {

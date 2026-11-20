@@ -1,7 +1,7 @@
 import { useMemo, useRef, useEffect, useContext } from 'react'
 import * as THREE from 'three'
 import { ATMOSPHERES } from './atmosphere'
-import type { BiomeType, DarkSectionSpec } from '@/types/level'
+import type { BiomeType, DarkSectionSpec, WeatherKind } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
 import {
   getTerrainMeshSize,
@@ -15,6 +15,7 @@ import Atmosphere from './shared/Atmosphere'
 import OceanWater from './shared/OceanWater'
 import TreeField from './shared/TreeField'
 import ParticleField from './shared/ParticleField'
+import Weather from './shared/Weather'
 import { addTerrainGlow, createNoiseTerrain, createTerrainMaterial } from './shared/terrainMesh'
 
 interface BiomeEnvironmentProps {
@@ -24,6 +25,8 @@ interface BiomeEnvironmentProps {
   track: ArcTable
   /** The track's dark sections (#752), dimming the atmosphere while the rider is in one. */
   darkSections?: readonly DarkSectionSpec[]
+  /** The weather its waves bring (#798): fog and driven streaks with the wave. */
+  weather?: WeatherKind
   hasWater?: boolean
   hasTrees?: boolean
   treeCount?: number
@@ -39,6 +42,7 @@ export default function BiomeEnvironment({
   groundFn,
   track,
   darkSections,
+  weather,
   hasWater = false,
   hasTrees = false,
   treeCount = 0,
@@ -90,6 +94,7 @@ export default function BiomeEnvironment({
 
       {/* Ambient air particles around the camera */}
       {particles && <ParticleField preset={particles} />}
+      {weather && <Weather kind={weather} atmosphere={atmosphere} fogRef={fogRef} />}
     </>
   )
 }

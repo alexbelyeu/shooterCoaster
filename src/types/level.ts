@@ -158,6 +158,8 @@ export interface FormationOrigin {
   up: number
 }
 
+export type WeatherKind = 'sandstorm' | 'blizzard'
+
 export interface EnemyWave {
   type: EnemyType
   count: number
@@ -165,6 +167,9 @@ export interface EnemyWave {
   spawnDelay?: number
   waveLabel?: string
   isEruption?: boolean
+  /** A weather pulse that blows in with the wave (#798): the spawner emits `weather:start`, the look and its rise / hold / fade
+   *  are `WEATHER_LOOKS` (`levels/environments/shared/weatherPulse.ts`). A level's waves use one kind. */
+  weather?: WeatherKind
   formation?: Formation
   /** Overrides the formation's default anchor. */
   formationOrigin?: FormationOrigin

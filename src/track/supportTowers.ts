@@ -5,6 +5,7 @@ import type { ShadowCaster } from '@/levels/environments/shared/contactShadows'
 import type { TrackDimensions } from './trackDimensions'
 import { type ArcTable, tAtDistance } from './arcLength'
 import { trackFrame } from './trackGeometry'
+import { getTunnelDims } from './setPieces'
 
 /**
  * Lattice support towers for the coaster.
@@ -111,7 +112,8 @@ export function towerTriangles(td: TowerDims, height: number): number {
  * Places towers along the track by arc length, at `dims.towerSpacing` or wider
  * if the triangle budget demands it. A candidate is skipped where the track is
  * < MIN_TOWER_HEIGHT above ground, or where its lattice would intersect another
- * part of the track passing underneath, or where the track is open (`gaps`: a jump's gap, a drop, #699).
+ * part of the track passing underneath, or where the track is open (`gaps`: a jump's gap, a drop, #699), or
+ * where it would stand in a tunnel's tube or portals (#651: the tube's contact shadow grounds it instead).
  */
 export function planTowers(
   curve: TrackCurve,
@@ -152,6 +154,7 @@ function planAtSpacing(
   // How close other track may come to a tower's lattice (rails + ties).
   const clearance = dims.railGauge + dims.railRadius + 1.5 * dims.trackScale
   const halfTop = td.topWidth / 2
+  const tunnelUp = getTunnelDims(dims.trackScale).centreUp
 
   const candidates: TowerInstance[] = []
   const count = Math.floor(table.length / spacing)
@@ -221,6 +224,7 @@ function planAtSpacing(
 
     const height = maxDepth + BURY
     if (piercesTrack(table, dist, cx, cz, topY, topY - maxDepth, td, clearance)) continue
+    if (piercesTunnel(table, cx, cz, topY, td, tunnelUp)) continue
 
     candidates.push({ x: cx, z: cz, topY, yaw, height, feet, bucket: 0 })
   }
@@ -285,6 +289,21 @@ function piercesTrack(
     const dx = table.x[i] - cx
     const dz = table.z[i] - cz
     if (dx * dx + dz * dz < reach * reach) return true
+  }
+  return false
+}
+
+/** True if the tower, from its top down, comes within a tunnel's reach of its tube's centre (`centreUp` above the rails). */
+function piercesTunnel(table: ArcTable, cx: number, cz: number, topY: number, td: TowerDims, centreUp: number): boolean {
+  for (const span of table.tunnels ?? []) {
+    for (let i = span.from; i <= span.to; i++) {
+      const tubeY = table.y[i] + centreUp
+      if (tubeY - span.reach > topY) continue
+      const reach = (widthAt(td, Math.max(0, topY - tubeY)) / 2) * Math.SQRT2 + span.reach
+      const dx = table.x[i] - cx
+      const dz = table.z[i] - cz
+      if (dx * dx + dz * dz < reach * reach) return true
+    }
   }
   return false
 }

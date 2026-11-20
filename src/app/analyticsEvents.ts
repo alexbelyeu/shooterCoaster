@@ -1,6 +1,6 @@
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { RUN_SECONDS } from '@/levels/pacing'
-import { computeStars } from '@/levels/scoring'
+import { runStars } from '@/levels/scoring'
 import type { GamePhase } from '@/types/game'
 import { isInRun } from '@/store/startPhase'
 import type { RunMode } from '@/types/game'
@@ -48,7 +48,7 @@ export function analyticsEventFor(prev: RunSnapshot, next: RunSnapshot): Analyti
   if (next.phase === 'results' && prev.phase === 'playing') {
     return {
       name: 'level_complete',
-      props: { level, stars: computeStars(next.score, config.maxScore, config.starThresholds) },
+      props: { level, stars: runStars(next.score, config) },
     }
   }
   if (isInRun(prev.phase) && (next.phase === 'levelSelect' || next.phase === 'title')) {

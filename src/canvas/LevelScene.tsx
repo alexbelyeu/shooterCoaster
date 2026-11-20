@@ -29,6 +29,7 @@ import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
 import LevelAudio from './LevelAudio'
+import { levelWeather } from '@/levels/environments/shared/weatherPulse'
 
 /** Projects 'enemy:killed' and bystander-hit 3D events to screen coords for HTML score popups */
 function KillProjector() {
@@ -123,6 +124,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
           groundFn={groundFn}
           track={trackTable}
           darkSections={track.darkSections}
+          weather={levelWeather(enemies)?.kind}
           hasWater={environment.hasWater}
           hasTrees={environment.hasTrees}
           treeCount={environment.treeCount}

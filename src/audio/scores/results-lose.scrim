@@ -1,0 +1,32 @@
+title    Ride Over (lose)
+composer Claude (ShooterCoaster)
+about    The results screen after a 0 or 1 star run (#792). A soft bell figure that falls over a plagal minor cadence (C, F, F minor, C) and settles low, then a sparse vibes loop over hushed strings and a slow bass, with no drums. Quieter and emptier than the win cut (results-win), and kind: a shrug, not a dirge.
+tempo    92
+beats    4
+steps    2
+reverb   0.45
+
+voice bell   bell     vol=0.6  pan=0.3
+voice horn   horn     vol=0.55 center=G4
+voice timp   timpani  vol=0.45
+voice vibes  vibes    vol=2.0  pan=-0.15
+voice pad    strings  vol=0.55 pan=0.25 center=E4
+voice bass   upright  vol=1.5  oct=1
+
+pattern intro
+bell  | G5- E5- C5--- | A4--- Ab4--- | G4------- |
+horn  | [C]?------- | [F]?--- [Fm]?--- | [C]?------- |
+timp  | C2?------- | _ | C2??------- |
+
+pattern A
+vibes | E5----- D5- | B4------- | C5--- A4--- | G4------- | A4- C5- E5--- | F5----- E5- | D5--- F5- A4- | G4----- .- |
+pad   | [C]?------- | [Em]?------- | [F]?------- | [C]?------- | [Am]?------- | [F]?------- | [Dm]?------- | [G]?------- |
+bass  | C2------- | E2------- | F1------- | C2------- | A1------- | F1------- | D2------- | G1------- |
+
+pattern B
+vibes | A5--- G5- F5- | Ab5----- F5- | E5------- | C5- E5- A5--- | F5--- E5- D5- | C5--- Ab4--- | G4------- | B4--- D5--- |
+pad   | [F]?------- | [Fm]?------- | [Em]?------- | [Am]?------- | [Dm]?------- | [Fm]?------- | [C]?------- | [G]?------- |
+bass  | F1------- | F1------- | E2------- | A1------- | D2------- | F1------- | C2------- | G1------- |
+
+play intro
+loop A B

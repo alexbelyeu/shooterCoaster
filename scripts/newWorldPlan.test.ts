@@ -77,7 +77,7 @@ describe('npm run new-world (#460)', () => {
 
   it('gives the level a score slot in the template score’s key', () => {
     expect(edit(EDITED_FILES.scores)).toContain(`import ${id} from './${id}.scrim?raw'`)
-    expect(edit(EDITED_FILES.scores)).toMatch(new RegExp(`export const SCORES[^\\n]* ${id}, results,`))
+    expect(edit(EDITED_FILES.scores)).toMatch(new RegExp(`export const SCORES[^\\n]* ${id}, 'results-win':`))
     expect(edit(EDITED_FILES.sfx)).toContain(`  ${id}: { tonic: 65, minor: false }, // level1's score`)
   })
 

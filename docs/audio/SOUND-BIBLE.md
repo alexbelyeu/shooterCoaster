@@ -58,7 +58,7 @@ Each keeps its hook in `base`: the doubling or stabs come in at 3×.
 | level6 | Climbing Gym | Alex's own climbing gym in New York (#513): urban, a little grimy and funny, arcade-bright. Rats, spotted lanternflies and dust bunnies to shoot, climbers not to; the Medusa of the Starr for the finale. Faster than the Desert, less sinister than the Inferno; bouncy and percussive (909 claps and kit), a plucky hook that could be chalk-slapping hands; leave room for a boss section later | a plucky supersaw, FM-bass or mallet hook over 909 claps |
 | FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens (the score's `frenzy` layer: `SCORE-FORMAT.md`, "Intensity layers") | same as the level, brighter |
 | Boss / finale | any | A variation of the level theme, darker and louder | the level's colour + orchestra hits |
-| Results | any | 3–6 s jingle: rising for 3★, flatter for 1★ or 0★, then a calm loop | bells + brass |
+| Results | any | 3–6 s jingle: rising for 2–3★ (`results-win`), flatter for 0–1★ (`results-lose`, #792), then a calm loop | bells + brass |
 
 **Climbing Gym pick (#565).** Alex picked "Uptown Local" (`subway`) from the three options of #456, now
 `src/audio/scores/level6.scrim`: street funk in E minor at 172, an FM slap-bass riff with a chromatic rat run carries the
