@@ -16,7 +16,7 @@ import {
   SPLASH_FALL, SPLASH_RISE, WHALE_LENGTH, breachPhase, breachSite, surfaceOffset, whalePose, type WhalePose,
 } from './whaleBreach'
 
-/** Mild: the whale is ~2 km off (none with reduced motion, `effectiveShakeScale`). */
+/** Mild: the whale is ~3.7 km off (none with reduced motion, `effectiveShakeScale`). */
 const CRASH_TRAUMA = 0.3
 const CRASH_TRAUMA_MS = 600
 /** A phase step this big is a jump (the smoke's `rideTo`), not the ride: no splash. */

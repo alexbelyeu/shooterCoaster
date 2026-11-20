@@ -5,7 +5,7 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { rideModel, rideProfile, riddenBetween } from '@/track/ridePhysics'
 import { ENEMY_PLACEMENT } from '@/entities/spawning/enemyPlacement'
 import { FORMATIONS, TRACKSIDE } from '@/entities/spawning/spawnPlacement'
-import { createHeightFunction, sampleTrackPath } from '@/utils/terrainNoise'
+import { createHeightFunction, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { maxGroundUnder } from './seaPlacement'
 import { BREACH, WHALE_LENGTH, breachPhase, breachSite, rideHeading, whalePose, type WhalePose } from './whaleBreach'
 
@@ -29,8 +29,8 @@ function rider(u: number) {
 
 describe('the whale breach on Ocean', () => {
   it('comes about 30 s in and is gone well before the Kraken', () => {
-    expect(BREACH.startSeconds + BREACH.seconds / 2).toBeGreaterThan(28)
-    expect(BREACH.startSeconds + BREACH.seconds / 2).toBeLessThan(32)
+    expect(BREACH.startSeconds + BREACH.seconds / 2).toBeGreaterThan(29)
+    expect(BREACH.startSeconds + BREACH.seconds / 2).toBeLessThan(33)
     expect(level.boss!.at - end).toBeGreaterThan(5)
   })
 
@@ -69,8 +69,11 @@ describe('the whale breach on Ocean', () => {
     expect(Math.abs(site.dirX * (site.x - mid.x) + site.dirZ * (site.z - mid.z))).toBeLessThan(1e-6)
   })
 
+  // Only the drawn terrain counts: it ends `meshSize / 2` from the origin, and the sea runs on past it.
   it('breaches in open water, in plain sight of the rider', () => {
-    const groundFn = createHeightFunction('ocean', sampleTrackPath((t) => curve.getPointAt(t)))
+    const heightFn = createHeightFunction('ocean', sampleTrackPath((t) => curve.getPointAt(t)))
+    const edge = getTerrainMeshSize('ocean') / 2
+    const groundFn = (x: number, z: number) => (Math.max(Math.abs(x), Math.abs(z)) > edge ? -Infinity : heightFn(x, z))
     const blocked: string[] = []
     for (let k = 0; k <= STEPS; k++) {
       const u = k / STEPS

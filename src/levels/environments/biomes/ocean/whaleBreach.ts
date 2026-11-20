@@ -5,16 +5,16 @@
 import { indexAtT, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
 import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
 
-export const WHALE_LENGTH = 400
+export const WHALE_LENGTH = 700
 
 export const BREACH = {
   /** Level seconds at the ride's own pace (`rideProfile`): it runs on ride distance, so slow-mo slows it with the car. */
-  startSeconds: 28.5,
-  seconds: 3.25,
-  /** Out along the rider's heading at mid-breach: past the west edge of the loop, beyond every spot a target can be. */
-  lead: 2300,
-  /** Turned off that heading (radians, toward the ride's left): out over open water, clear of the islands. */
-  aim: 0,
+  startSeconds: 31.25,
+  seconds: 2.75,
+  /** Out along the rider's heading at mid-breach: past the islands, where the drawn terrain ends and the sea runs on. */
+  lead: 3700,
+  /** Turned off that heading (radians, toward the ride's left): through the gap between two islands. */
+  aim: 0.1,
   /** Ground the body covers along its own heading, across the rider's view. */
   travel: 300,
   /** The centre starts and ends this far under the surface (the whole body under), and peaks this far above it. */
