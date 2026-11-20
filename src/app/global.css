@@ -2237,7 +2237,7 @@ canvas {
     grid-template-columns: 1fr auto;
     align-items: center;
     column-gap: 1.5rem;
-    padding: 1.1rem 1.5rem 1rem;
+    padding: 0.8rem 1.5rem 0.7rem;
   }
 
   .settings-card h2.fair-title {
@@ -2248,8 +2248,8 @@ canvas {
 
   .settings-groups {
     grid-column: 1 / -1;
-    margin-top: 0.4rem;
-    gap: 0.3rem 2rem;
+    margin-top: 0.2rem;
+    gap: 0.1rem 2rem;
   }
 
   .settings-card .settings-back {

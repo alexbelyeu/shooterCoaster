@@ -121,7 +121,7 @@ function InternalDeviceRow() {
   return (
     <ToggleRow
       label="Internal device"
-      note="Your plays stop counting from the next load"
+      note="Your plays here stop counting next load"
       checked={internal}
       onChange={(on) => {
         if (setInternalBrowser(on, browserStorage())) setInternal(on)
