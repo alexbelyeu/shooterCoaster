@@ -1,15 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { subscribePointer } from '@/input/pointerInput'
-import { INTRO_HANDOFF_SECONDS, setIntroStartedAt } from '@/core/introShot'
+import { INTRO_HANDOFF_SECONDS, isIntroSkipKey, setIntroStartedAt } from '@/core/introShot'
+import { touchFirst } from '@/ui/touchFirst'
 
 /**
  * The intro (#674): the camera tours the level into the seat (`CoasterCamera`, #675) on its own clock, the same length
  * on every device. Ready / Set / GO comes up over the tour's last stretch (`COUNTDOWN_LEAD_SECONDS`), so GO lands as
  * the camera does: the intro hands over to the countdown with its clock still running. A tap (pointer released off
- * the UI) or any key skips it: the camera cuts to the seat and the countdown runs there.
+ * the UI) or Space / Enter / Escape (`isIntroSkipKey`) skips it: the camera cuts to the seat and the countdown runs there.
  */
 export default function Intro() {
+  const [hint] = useState(() => (touchFirst() ? 'Tap to skip' : 'Press Space to skip'))
   useEffect(() => {
     const started = performance.now()
     setIntroStartedAt(started)
@@ -33,7 +35,7 @@ export default function Intro() {
     const timer = setTimeout(() => end(false), INTRO_HANDOFF_SECONDS * 1000)
     const unsubscribe = subscribePointer((_, type) => type === 'up' && end(true))
     const onKey = (e: KeyboardEvent) => {
-      if (!e.repeat) end(true)
+      if (isIntroSkipKey(e)) end(true)
     }
     window.addEventListener('keydown', onKey)
     return () => {
@@ -47,7 +49,7 @@ export default function Intro() {
 
   return (
     <div className="intro-hint" aria-hidden="true">
-      Tap to skip
+      {hint}
     </div>
   )
 }

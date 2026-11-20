@@ -215,6 +215,18 @@ describe('startRun', () => {
     store().startRun('level2', 5)
     expect(loadFraction()).toBe(0)
   })
+
+  it('lets a cold restart of the still-mounted level finish loading: its stages so far are kept (#686)', () => {
+    store().startRun('level2', 5)
+    store().startRun('level1', 5)
+    for (const stage of ['chunk', 'scene'] as const) reportLoad('level1', stage, 1)
+    reportLoad('level1', 'shaders', 0.4)
+    store().restartRun()
+    expect(store()).toMatchObject({ phase: 'loading', sceneReady: false })
+    reportLoad('level1', 'shaders', 1)
+    reportLoad('level1', 'audio', 1)
+    expect(loadFraction()).toBeCloseTo(1, 10)
+  })
 })
 
 describe('daily runs', () => {

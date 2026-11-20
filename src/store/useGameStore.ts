@@ -181,8 +181,9 @@ export const useGameStore = create<GameState>()(
         // A new level isn't warmed up yet: the outgoing level's `sceneReady` must not end its loading screen (#597).
         const warm = levelId === s.currentLevel && s.sceneReady
         const phase = startPhaseFor({ search: urlSearch() ?? '', warm, replay })
-        // A warm level's stages are all done already; its scene doesn't remount to report them again.
-        if (phase === 'loading' && !warm) resetLoad(levelId)
+        // The same level's scene stays mounted and won't report its stages again, warm or still warming up; an
+        // unmounted one was zeroed as it left (`unloadLevel`) and reports them all once it mounts.
+        if (levelId !== s.currentLevel) resetLoad(levelId)
         set({
           ...FRESH_RUN,
           currentLevel: levelId,

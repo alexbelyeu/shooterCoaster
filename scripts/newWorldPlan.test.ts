@@ -105,7 +105,7 @@ describe('npm run new-world (#460)', () => {
     const index = interior.creates.find((c: { path: string }) => c.path.endsWith('/index.ts'))!.content
     expect(index).toContain('floor: hallFloor')
     expect(index).toContain('bounds: HALL_BOUNDS')
-    expect(interior.edits.find((e: { path: string }) => e.path === EDITED_FILES.terrain)!.content).toContain('flatRadius: 100_000')
+    expect(interior.edits.find((e: { path: string }) => e.path === EDITED_FILES.terrain)!.content).toMatch(/probeWorld: \{\n\s*meshSize: 6000,\n\s*authoredFloor: true,\n\s*\}/)
   })
 
   it('refuses an existing level, biome or score, so a second run changes nothing', () => {
