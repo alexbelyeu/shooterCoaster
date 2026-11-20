@@ -3247,14 +3247,21 @@ function crossfadeGaps(fades, from, to) {
     )
 }
 
-/** Level -> next level and level -> level select (#168), after the phone run's results: each must fade out, fade in, leave one bus and pass `crossfadeGaps`. */
+/**
+ * Results -> next level and level -> level select (#168), after the phone run's results: each must fade out, fade in, leave one bus and pass `crossfadeGaps`.
+ * The first switch starts from the results screen, so the results score (its own `results` bus since #645) is the one fading out, not the level's (#707).
+ */
 async function musicSwitches(page) {
   const problems = []
   const read = () => page.evaluate(() => window.__SC_TEST__.audio().music)
   const latest = (m) => Math.max(0, ...m.fades.map((f) => f.at))
   const switches = []
   const run = async (label, from, to, act) => {
-    const since = latest(await read())
+    const before = await read()
+    const playing = before.buses.map((b) => b.name)
+    // A switch from a bus that isn't playing can't crossfade: say so, not "no fade-out" (#707).
+    if (!playing.includes(from)) problems.push(`${label}: expected the ${from} bus playing before the switch, found ${playing.join(',') || 'none'}`)
+    const since = latest(before)
     await act()
     const deadline = Date.now() + 30000
     let m = await read()
@@ -3270,7 +3277,7 @@ async function musicSwitches(page) {
     if (!done()) problems.push(`${label}: no ${from} fade-out + ${to} fade-in leaving one bus (${m.buses.map((b) => b.name).join(',')})`)
     problems.push(...crossfadeGaps(fades, from, to).map((g) => `${label}: ${g}`))
   }
-  await run('level -> next level', 'level', 'level', () => page.evaluate((seed) => window.__SC_TEST__.startLevel('level2', seed), SEED))
+  await run('results -> next level', 'results', 'level', () => page.evaluate((seed) => window.__SC_TEST__.startLevel('level2', seed), SEED))
   await run('level -> level select', 'level', 'title', () => page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect')))
   return { problems, switches }
 }
