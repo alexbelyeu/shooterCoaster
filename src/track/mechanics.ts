@@ -23,7 +23,9 @@ function checkMechanic(m: RideMechanic): void {
   if ((m.kind === 'dropTrack' || m.kind === 'backwards') && !(m.from > 0 && m.seconds > 0)) {
     throw new Error(`${m.kind}: a stop inside the lap that lasts`)
   }
-  if (m.kind === 'junction' && !(m.from > 0 && m.points.length > 0)) throw new Error('junction: a fork inside the lap and a way round')
+  if (m.kind === 'junction' && !m.points.length) throw new Error('junction: needs points, a way round')
+  // The sign stands before the fork: before 0 it would never take a hit (`switchOpen`) and the overlap check would miss the lap's end.
+  if (m.kind === 'junction' && !(switchShare(m) > 0)) throw new Error(`junction ${m.from}…${m.to}: its switch sign falls before the lap's start (t ${switchShare(m).toFixed(3)})`)
 }
 
 /** Where a mechanic starts taking over the ride: a jump's booster, a junction's switch sign, else its `from`. */
@@ -33,9 +35,13 @@ function reachFrom(m: RideMechanic): number {
   return m.from
 }
 
-/** Each mechanic valid, and no junction (from its sign to its merge) over another mechanic: the branch's seat has none of theirs. */
+/**
+ * Each mechanic valid, at most one junction (the run has one `route` and the switch one collision target), and no junction
+ * (from its sign to its merge) over another mechanic: the branch's seat has none of theirs.
+ */
 export function checkMechanics(mechanics: readonly RideMechanic[] | undefined): void {
   for (const m of mechanics ?? []) checkMechanic(m)
+  if ((mechanics ?? []).filter((m) => m.kind === 'junction').length > 1) throw new Error('one junction per track: the run has a single route')
   for (const j of mechanics ?? []) {
     if (j.kind !== 'junction') continue
     for (const m of mechanics ?? []) {

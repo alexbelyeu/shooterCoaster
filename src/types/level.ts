@@ -74,7 +74,8 @@ export type TrackParams = TrigTrackParams | SplineTrackParams
  * - jumpGap: no rails from `from` to `to`, a ballistic flight built for `speed`, which a booster from `boostFrom` sets.
  * - backwards: turntables at `from` and `to` (a stop of `seconds`, then a launch to `speed`); the car faces back between.
  * - junction (#702): a harder way round from the fork at `from` to the merge at `to` through `points` (world units, in ride
- *   order), on a spline track. A switch sign before the fork sets the run's route: shoot it to take this way.
+ *   order), on a spline track. A switch sign before the fork sets the run's route: shoot it to take this way. One per
+ *   track, its sign after the lap's start; the branch gets no towers or scenery clearance (`docs/RIDE-KIT.md`).
  */
 export type RideMechanic =
   | { kind: 'station'; from: number; to: number; speed: number }
