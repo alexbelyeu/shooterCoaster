@@ -2,7 +2,7 @@
 /**
  * Renders the game's current music / SFX offline in the page (`__SC_TEST__.renderAudio`) and measures it.
  *
- *   npm run build && npm run audio:render -- --music <title|level1..5|results|<slot>.<theme>> [--seconds 30] [--seam]
+ *   npm run build && npm run audio:render -- --music <title|level1..5|results-win|results-lose|<slot>.<theme>> [--seconds 30] [--seam]
  *     [--layers 0..3|ramp]  (the score's intensity layers, 0–3 held, or `ramp` up through them and down again)
  *   npm run audio:render -- --sfx-sheet [--level level1] [--kills]   (--kills: every kill sound and combo tier, its own sheet)
  *   npm run audio:render -- --mix level1 [--seconds 20] [--boss]
@@ -94,7 +94,7 @@ if (flag('music')) {
   kind = 'music'
   defaultName = `score-${chain === 'game' ? 'game' : original ? 'original' : 'port'}-${label}${seam ? '-seam' : ''}`
 } else {
-  console.error('usage: npm run audio:render -- --music <title|level1..level5|results|<slot>.<theme>> [--seam] | --sfx-sheet [--level <id>] [--kills] | --mix <level> | --ride <level> | --launch <level> | --resume <level> [--unpaused] | --score <file|vendored:N> [--engine port|original] [--name n] [--out dir] [--seed n]')
+  console.error('usage: npm run audio:render -- --music <title|level1..level5|results-win|results-lose|<slot>.<theme>> [--seam] | --sfx-sheet [--level <id>] [--kills] | --mix <level> | --ride <level> | --launch <level> | --resume <level> [--unpaused] | --score <file|vendored:N> [--engine port|original] [--name n] [--out dir] [--seed n]')
   process.exit(2)
 }
 const NAME = flag('name') ?? defaultName

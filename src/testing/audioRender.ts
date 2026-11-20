@@ -16,7 +16,7 @@ import { createRng } from '@/utils/rng'
 export type AudioRenderRequest =
   /**
     /**
-     * `track`: 'title', a level id, 'results' or a theme option (`<slot>.<name>`). `layers`: the score's intensity
+     * `track`: 'title', a level id, a results cut ('results-win' / 'results-lose') or a theme option (`<slot>.<name>`). `layers`: the score's intensity
      * layers 0–3 held from the start, or 'ramp' (`LAYER_RAMP`: up through every layer, then a lost combo winding down).
      * `seam`: start `SEAM_LEAD_S` before the first loop seam instead of at the top.
      */

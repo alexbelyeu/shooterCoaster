@@ -3488,7 +3488,7 @@ async function audioCheck(page) {
   const busNames = (a) => a.music.buses.map((b) => b.name)
   const track = (a) => a.scrim?.tracks.at(-1) ?? null
   const result = {
-    title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, resumeCountdown: 0, ducked: null, layers: null, results: false,
+    title: false, nodes: [], position: [], sfxNodes: [], voices: null, pausedHeld: null, resumeCountdown: 0, ducked: null, layers: null, results: null,
     levelsStray: 0, dropped: 0,
   }
 
@@ -3592,11 +3592,12 @@ async function audioCheck(page) {
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
 
   await page.evaluate(() => window.__SC_TEST__.endLevel())
-  a = await until((x) => x.scrim?.current === 'results' && !busNames(x).includes('level'))
+  a = await until((x) => x.scrim?.current?.startsWith('results-') && !busNames(x).includes('level'))
   const levelOut = a.music.fades.findLast((f) => f.name === 'level' && f.ramp === 'out')
   const resultsIn = a.music.fades.findLast((f) => f.name === 'results' && f.ramp === 'in')
-  result.results = a.scrim?.current === 'results'
-  if (!result.results) problems.push(`no results score after the run (current "${a.scrim?.current}")`)
+  // endLevel ends the run on whatever it scored: a 0-1 star run gets the lose cut, 2-3 the win cut (#792).
+  result.results = a.scrim?.current ?? null
+  if (!result.results?.startsWith('results-')) problems.push(`no results score after the run (current "${a.scrim?.current}")`)
   if (!levelOut || levelOut.seconds < 0.5 || !resultsIn) problems.push('the level score did not crossfade to the results score')
   if (busNames(a).includes('level')) problems.push('the level score bus was never disposed')
   problems.push(...crossfadeGaps(a.music.fades, 'level', 'results'))
