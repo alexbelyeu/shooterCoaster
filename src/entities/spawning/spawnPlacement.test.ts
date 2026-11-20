@@ -191,7 +191,7 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
     expect(turns).toBeGreaterThan(0)
   })
 
-  const marching = waves.filter((w) => ['v', 'line', 'school'].includes(w.formation!) && ENEMY_PLACEMENT[w.type].surface !== 'water')
+  const marching = waves.filter((w) => ['v', 'line', 'school'].includes(w.formation!))
   it.each(marching.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: each group marches once the rider reaches it, not from activation (#472)', (_name, wave) => {
     const formation = wave.formation as ChoreographedFormation
     const slots = formationSlots(formation, wave.count, createRng(1337))
