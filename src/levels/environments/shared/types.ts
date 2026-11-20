@@ -97,6 +97,9 @@ export interface ParticleBoost {
   fadeS: number
 }
 
+/** A boost's rise / hold / fade alone: what `boostStrength` and `stepBoost` read (the weather pulse's too, `weatherPulse.ts`). */
+export type BoostEnvelope = Pick<ParticleBoost, 'riseS' | 'holdS' | 'fadeS'>
+
 /** Ambient particles wrapping in a box around the camera (`shared/ParticleField.tsx`, presets in `shared/particlePresets.ts`). */
 export interface ParticleFieldPreset {
   count: number

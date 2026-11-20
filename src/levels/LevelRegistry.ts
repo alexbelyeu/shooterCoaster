@@ -65,7 +65,7 @@ const LEVELS: LevelConfig[] = [
     ...paceLevel({
       waves: [
         { type: 'scorpion', count: 30, waveLabel: 'Incoming!' },
-        { type: 'crow', count: 39, waveLabel: 'A Murder of Crows!', formation: 'v' },
+        { type: 'crow', count: 39, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm' },
         { type: 'crow', count: 39, waveLabel: 'More Crows!', formation: 'v' },
       ],
       boss: 'giantScorpion',
@@ -131,7 +131,7 @@ const LEVELS: LevelConfig[] = [
     ...paceLevel({
       waves: [
         { type: 'snowmanScout', count: 44, waveLabel: 'Scout Party', formation: 'line' },
-        { type: 'snowman', count: 40, waveLabel: 'Snowmen Incoming!' },
+        { type: 'snowman', count: 40, waveLabel: 'Snowmen Incoming!', weather: 'blizzard' },
         { type: 'snowmanBrute', count: 16, waveLabel: 'Brutes!' },
       ],
       boss: 'yeti',
