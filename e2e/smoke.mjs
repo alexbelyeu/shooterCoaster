@@ -1721,7 +1721,7 @@ async function pauseMenuCheck(page, levelId) {
   // The HUD strip and the card must count this run's kills, not the last run's (#235).
   await waitVisible(page, '.hud-kills-count', 10000)
   const hudKills = await page.evaluate(() => document.querySelector('.hud-kills-count')?.textContent ?? null)
-  if (!hudKills?.startsWith('0/')) problems.push(`after Restart the HUD kill strip reads "${hudKills}", not 0`)
+  if (!hudKills?.startsWith('0 of ')) problems.push(`after Restart the HUD kill strip reads "${hudKills}", not 0`)
   await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
   await waitVisible(page, '.pause-card', 30000)
   const cardHits = await page.evaluate(() => {

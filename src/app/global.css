@@ -278,169 +278,120 @@ canvas {
   background: #000;
 }
 
-/* HUD — Inter, tabular numerals; dark glass panels keep text legible over any sky.
-   Accent colours come from src/ui/theme.ts via --hud-accent / --hud-glow. */
+/* HUD: painted on the car, no panels (docs/art/PERSONALITY.md "Over the ride"); the keyline keeps it readable on any sky. */
 .hud {
   --hud-accent: #ffd23f;
   --hud-glow: rgba(255, 210, 63, 0.55);
   --hud-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.45);
+  --hud-ink:
+    -2px -2px 0 var(--fair-tar), 0 -2px 0 var(--fair-tar), 2px -2px 0 var(--fair-tar), 2px 0 0 var(--fair-tar),
+    2px 2px 0 var(--fair-tar), 0 2px 0 var(--fair-tar), -2px 2px 0 var(--fair-tar), -2px 0 0 var(--fair-tar),
+    3px 4px 0 var(--fair-tar);
+  --hud-ink-thin:
+    -1.5px -1.5px 0 var(--fair-tar), 0 -1.5px 0 var(--fair-tar), 1.5px -1.5px 0 var(--fair-tar), 1.5px 0 0 var(--fair-tar),
+    1.5px 1.5px 0 var(--fair-tar), 0 1.5px 0 var(--fair-tar), -1.5px 1.5px 0 var(--fair-tar), -1.5px 0 0 var(--fair-tar),
+    2px 3px 0 var(--fair-tar);
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 10;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Big Shoulders', sans-serif;
+  font-variation-settings: 'opsz' 10;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #fff;
+  color: var(--fair-cream);
+}
+
+.hud-number {
+  font-family: 'Ultra', serif;
+  font-weight: 400;
+  line-height: 1.3; /* Ultra's glyph box (1.27 em), so the lines under it never overlap it */
+  text-shadow: var(--hud-ink);
 }
 
 .hud-panel {
   position: absolute;
-  top: max(12px, env(safe-area-inset-top));
-  padding: 10px 14px 12px;
-  background: linear-gradient(180deg, rgba(8, 10, 22, 0.62), rgba(8, 10, 22, 0.38));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  top: max(14px, env(safe-area-inset-top));
 }
 
 .hud-panel--left {
-  left: max(12px, env(safe-area-inset-left));
-  min-width: clamp(150px, 22vw, 240px);
+  left: max(14px, env(safe-area-inset-left));
 }
 
 .hud-panel--right {
-  right: max(12px, env(safe-area-inset-right));
-  width: clamp(130px, 20vw, 240px);
-}
-
-.hud-score {
-  line-height: 1;
+  right: max(14px, env(safe-area-inset-right));
+  width: clamp(120px, 18vw, 210px);
 }
 
 .hud-score-value {
   display: inline-block;
-  transform-origin: left center;
-  font-size: clamp(1.9rem, 4.2vw, 2.75rem);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  text-shadow: var(--hud-shadow);
+  font-size: clamp(2.1rem, 4.4vw, 3.25rem);
 }
 
-.hud-best {
-  margin-top: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.65);
+.hud-best,
+.hud-kills,
+.hud-timer-label {
+  margin-top: 2px;
+  font-size: 1.1rem;
+  line-height: 1.3;
+  text-shadow: var(--hud-ink-thin);
 }
 
-.hud-kills {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
+/* Not Ultra: under ~30 px its counters close up behind the keyline (a 0 reads as a blob). */
+.hud-kills-value,
+.hud-combo-count {
+  font-variation-settings: 'opsz' 40;
+  font-weight: 800;
+  font-size: 1.35rem;
 }
 
-.hud-kills-track {
-  position: relative;
-  flex: 1;
-  height: 6px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.16);
-  /* 10 segments with 2px gaps */
-  -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%);
-  mask-image: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%);
-}
-
-.hud-kills-fill {
-  position: absolute;
-  inset: 0;
-  transform-origin: left center;
-  background: var(--hud-accent);
-  box-shadow: 0 0 8px var(--hud-glow);
-  transition: transform 0.25s ease-out;
-}
-
-.hud-kills-count {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-shadow: var(--hud-shadow);
-}
-
-.hud-kills-total {
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-/* Timer */
+/* Vermilion on tar is 3.9:1, enough only because the seconds are Ultra over 24 px. */
 .hud-timer {
-  --timer-color: #fff;
+  --timer-color: var(--fair-cream);
   text-align: right;
 }
 
 .hud-timer--warn {
-  --timer-color: #ffb020;
+  --timer-color: var(--fair-gilt);
 }
 
 .hud-timer--critical {
-  --timer-color: #ff3b3b;
+  --timer-color: var(--fair-vermilion);
 }
 
 .hud-timer-value {
-  font-size: clamp(1.9rem, 4.2vw, 2.75rem);
-  font-weight: 700;
-  line-height: 1;
+  font-size: clamp(2.1rem, 4.4vw, 3.25rem);
   color: var(--timer-color);
-  text-shadow: var(--hud-shadow);
-  transform-origin: right center;
-  transition: color 0.3s;
-}
-
-.hud-timer-unit {
-  margin-left: 2px;
-  font-size: 0.5em;
-  font-weight: 600;
-  opacity: 0.75;
 }
 
 .hud-timer--critical .hud-timer-value {
-  animation: hud-pulse 0.5s ease-in-out infinite alternate;
+  animation: hud-tick 0.12s ease-out;
 }
 
 .hud-timer-track {
-  height: 6px;
-  margin-top: 10px;
-  overflow: hidden;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.16);
+  height: 10px;
+  margin-top: 8px;
+  border: 2px solid var(--fair-tar);
+  background: var(--fair-oxblood-deep);
+  box-shadow: 2px 3px 0 var(--fair-tar);
 }
 
 .hud-timer-fill {
   height: 100%;
   transform-origin: right center;
-  border-radius: 3px;
   background: var(--timer-color);
-  box-shadow: 0 0 8px var(--timer-color);
-  transition: transform 1s linear, background-color 0.3s;
+  transition: transform 1s linear;
 }
 
-@keyframes hud-pulse {
-  from { transform: scale(1); }
-  to { transform: scale(1.12); text-shadow: 0 0 18px rgba(255, 59, 59, 0.9), 0 1px 2px rgba(0, 0, 0, 0.85); }
-}
-
-/* Combo meter — centre-bottom */
+/* Combo meter, centre-bottom */
 .hud-combo {
+  --combo-color: var(--fair-cream);
   position: absolute;
   left: 50%;
   bottom: max(72px, calc(env(safe-area-inset-bottom) + 64px));
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 18px 6px 6px;
-  border-radius: 40px;
-  background: rgba(8, 10, 22, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--combo-color);
   opacity: 0;
   transform: translate(-50%, 16px) scale(0.9);
@@ -455,32 +406,57 @@ canvas {
   transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.4);
 }
 
-.hud-combo-ring {
+.hud-combo--tier1,
+.hud-combo--tier2,
+.hud-combo--tier3 {
+  --combo-color: var(--fair-gilt);
+}
+
+.hud-combo.is-lost {
+  --combo-color: var(--fair-vermilion);
+  /* knocked swinging on its hook */
+  transform-origin: 50% 0;
+  animation: hud-combo-shake 0.45s ease-out;
+}
+
+.hud-combo-ring,
+.hud-weapon-ring {
   position: relative;
-  width: 64px;
-  height: 64px;
   flex: none;
 }
 
-.hud-combo-ring svg {
+.hud-combo-ring {
+  width: 64px;
+  height: 64px;
+}
+
+.hud-combo-ring svg,
+.hud-weapon-ring svg:first-child {
   display: block;
   transform: rotate(-90deg);
 }
 
-.hud-combo-ring-bg,
-.hud-combo-ring-fill {
+.hud-combo-ring circle,
+.hud-weapon-ring circle {
   fill: none;
-  stroke-width: 5;
 }
 
-.hud-combo-ring-bg {
-  stroke: rgba(255, 255, 255, 0.15);
+.hud-combo-ring-edge,
+.hud-weapon-ring-edge {
+  stroke: var(--fair-tar);
 }
+
+.hud-combo-ring-bg,
+.hud-weapon-ring-bg {
+  stroke: var(--fair-oxblood-deep);
+}
+
+.hud-combo-ring-edge { stroke-width: 10; }
+.hud-combo-ring-bg,
+.hud-combo-ring-fill { stroke-width: 5; }
 
 .hud-combo-ring-fill {
   stroke: var(--combo-color);
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 4px var(--combo-color));
 }
 
 /* chain count, centred in the ring */
@@ -490,50 +466,39 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 1.3rem;
-  color: #fff;
-  text-shadow: var(--hud-shadow);
-  animation: hud-combo-pop 0.25s ease-out;
+  color: var(--fair-cream);
+  text-shadow: var(--hud-ink-thin);
+  animation: hud-tick 0.12s ease-out;
 }
 
 .hud-combo-label {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: baseline;
+  gap: 8px;
   line-height: 1;
-  text-shadow: var(--hud-shadow);
+  white-space: nowrap;
 }
 
 /* multiplier grows with tier */
 .hud-combo-mult {
   display: inline-block;
-  transform-origin: left center;
-  font-weight: 700;
+  font-family: 'Ultra', serif;
   font-size: 1.6rem;
-  animation: hud-combo-pop 0.25s ease-out;
+  text-shadow: var(--hud-ink-thin);
+  animation: hud-tick 0.12s ease-out;
 }
 
 .hud-combo-word {
-  font-weight: 700;
-  font-size: 0.7rem;
-  letter-spacing: 0.24em;
-  opacity: 0.85;
+  font-variation-settings: 'opsz' 40;
+  font-weight: 800;
+  font-size: 1.35rem;
+  color: var(--fair-cream);
+  text-shadow: var(--hud-ink-thin);
 }
 
 .hud-combo--tier1 .hud-combo-mult { font-size: 1.9rem; }
 .hud-combo--tier2 .hud-combo-mult { font-size: 2.2rem; }
 .hud-combo--tier3 .hud-combo-mult { font-size: 2.5rem; }
-.hud-combo--tier3 { box-shadow: 0 0 22px rgba(255, 59, 59, 0.45); }
-
-/* a lapsed 2×+ chain: its colour drained to plain ink, knocked swinging on its hook, then hidden */
-.hud-combo.is-lost {
-  color: var(--fair-cream);
-  box-shadow: none;
-  transform-origin: 50% 0;
-  animation: hud-combo-shake 0.5s ease-out;
-}
 
 @keyframes hud-combo-shake {
   0%, 100% { transform: translate(-50%, 0); }
@@ -637,23 +602,20 @@ canvas {
     inset 0 -130px 100px -50px rgba(205, 245, 255, 0.65);
 }
 
-/* Don't-shoot hint (#518): a friendly teal pill under the wave banner */
+/* Don't-shoot hint (#518), under the wave banner */
 .hud-bystander-hint {
   position: absolute;
   top: 36%;
   left: 50%;
-  max-width: calc(100vw - 32px);
+  width: max-content;
+  max-width: min(30em, calc(100vw - 32px));
   transform: translateX(-50%);
-  padding: 8px 18px;
-  border: 2px solid #5dffa8;
-  border-radius: 999px;
-  background: rgba(8, 60, 58, 0.82);
-  color: #eafff4;
-  font-size: clamp(0.85rem, 2.2vw, 1.15rem);
-  font-weight: 700;
+  font-size: clamp(1.1rem, 2.4vw, 1.4rem);
+  line-height: 1.15;
+  color: var(--fair-sky);
   text-align: center;
-  text-shadow: var(--hud-shadow);
-  box-shadow: 0 0 18px rgba(93, 255, 168, 0.45);
+  text-wrap: balance;
+  text-shadow: var(--hud-ink-thin);
   pointer-events: none;
   animation: hud-fade-in 0.25s ease-out;
 }
@@ -674,7 +636,7 @@ canvas {
   to { opacity: 1; }
 }
 
-/* Weapon pickup badge (#185) — left of the combo meter; above the pause button on portrait phones */
+/* Weapon pickup badge (#185): left of the combo meter; above the pause button on portrait phones */
 .hud-weapon {
   position: absolute;
   right: calc(50% + 120px);
@@ -682,11 +644,6 @@ canvas {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px 6px 6px;
-  border-radius: 40px;
-  background: rgba(8, 10, 22, 0.5);
-  border: 1px solid var(--weapon-color);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--weapon-color) 45%, transparent);
   color: var(--weapon-color);
   opacity: 0;
   transform: translateY(16px) scale(0.9);
@@ -700,62 +657,45 @@ canvas {
 }
 
 .hud-weapon-ring {
-  position: relative;
   width: 52px;
   height: 52px;
-  flex: none;
 }
 
-.hud-weapon-ring svg:first-child {
-  display: block;
-  transform: rotate(-90deg);
-}
-
+.hud-weapon-ring-edge { stroke-width: 9; }
 .hud-weapon-ring-bg,
-.hud-weapon-ring-fill {
-  fill: none;
-  stroke-width: 4;
-}
-
-.hud-weapon-ring-bg {
-  stroke: rgba(255, 255, 255, 0.15);
-}
+.hud-weapon-ring-fill { stroke-width: 4; }
 
 .hud-weapon-ring-fill {
   stroke: var(--weapon-color);
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 4px var(--weapon-color));
 }
 
 .hud-weapon-icon {
   position: absolute;
   inset: 0;
   margin: auto;
-  filter: drop-shadow(0 0 3px var(--weapon-color));
+  filter: drop-shadow(1.5px 2px 0 var(--fair-tar));
 }
 
 .hud-weapon-label {
-  font-weight: 700;
-  font-size: 0.85rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  text-shadow: var(--hud-shadow);
+  font-variation-settings: 'opsz' 40;
+  font-weight: 800;
+  font-size: 1.35rem;
+  color: var(--fair-cream);
+  text-shadow: var(--hud-ink-thin);
 }
 
-@keyframes hud-combo-pop {
-  from { transform: scale(1.45); }
-  to { transform: scale(1); }
+@keyframes hud-tick {
+  from { transform: translateY(-0.2em); }
+  to { transform: none; }
 }
 
 @media (max-width: 480px) {
-  .hud-panel { padding: 8px 10px 10px; }
   /* bottom row between pause and mute, clear of the first-person gun (#223) */
   .hud-combo { bottom: calc(1rem + env(safe-area-inset-bottom)); }
   .hud-weapon {
     right: auto;
     left: calc(12px + env(safe-area-inset-left));
     bottom: max(72px, calc(env(safe-area-inset-bottom) + 72px));
-    padding: 4px;
   }
   .hud-weapon-label { display: none; }
   .hud-frenzy { bottom: max(162px, calc(env(safe-area-inset-bottom) + 154px)); }
