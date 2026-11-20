@@ -275,16 +275,16 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
   let keys = sfx.slice(keysAt, keysEnd)
   const key = keys.match(new RegExp(`^  ${scoreFrom}: ([^\\n]+?),(?: *//[^\\n]*)?$`, 'm'))
   if (!key) throw new NewWorldError(`${F.sfx}: no SCORE_KEYS entry for ${scoreFrom}`)
-  keys = replaceOnce(keys, /^( {2}results: [^\n]*\n)/m, `  ${id}: ${key[1]}, // ${scoreFrom}'s score, copied until ${name}'s theme round\n$1`, F.sfx)
+  keys = replaceOnce(keys, /^( {2}'results-win': [^\n]*\n)/m, `  ${id}: ${key[1]}, // ${scoreFrom}'s score, copied until ${name}'s theme round\n$1`, F.sfx)
   sfx = sfx.slice(0, keysAt) + keys + sfx.slice(keysEnd)
 
   let scores = text(F.scores)
   const scoreImports = [...scores.matchAll(/^import \w+ from '\.\/\w+\.scrim\?raw'$/gm)]
-  const lastLevelImport = scoreImports.filter((m) => !/^import (title|results) /.test(m[0])).at(-1)
+  const lastLevelImport = scoreImports.filter((m) => !/^import (title|results\w*) /.test(m[0])).at(-1)
   if (!lastLevelImport) throw new NewWorldError(`${F.scores}: no level score imports`)
   const at = lastLevelImport.index + lastLevelImport[0].length
   scores = scores.slice(0, at) + `\nimport ${id} from './${id}.scrim?raw'` + scores.slice(at)
-  scores = replaceOnce(scores, /(export const SCORES[^\n]*?)( results,)/, `$1 ${id},$2`, F.scores)
+  scores = replaceOnce(scores, /(export const SCORES[^\n]*?)( 'results-win':)/, `$1 ${id},$2`, F.scores)
 
   const scrim = templateScore
     .replace(/^title\s+.*$/m, `title    ${name} (placeholder)`)

@@ -102,7 +102,7 @@ function layerGrid(song: CompiledSong): LayerGrid | null {
 }
 
 function busName(id: string) {
-  return id === 'title' || id === 'results' ? id : 'level'
+  return id === 'title' ? id : id.startsWith('results') ? 'results' : 'level'
 }
 
 function disposeTrack(track: Track) {
