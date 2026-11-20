@@ -37,7 +37,7 @@ screen / covers the centre / overlaps the HUD / points > 25° off the tracer of 
 checked in mobile portrait + landscape, and in portrait at four extreme aims with the combo meter showing),
 the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
-reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left) or the
+reveal (`data-sequence="done"`), lacks a stat line (its `data-stat` hits, accuracy, combo, time; hits must start with the kills) or the
 Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), offers Next Level while the next level is locked (or hides it while open), shows NaN, or disagrees with `stats()` on score or kills, has no local leaderboard fully inside 1280×720, or (first level) Enter with the mute button focused doesn't play on;
 on the first level the leaderboard is seeded so the run places 4th: the row must open for initials at the last ones used (AAA),
 all with the Share button focused (#357): ArrowUp must cycle a letter, typing r e s must give RES without leaving or toggling mute (R and S are letters there), and Enter must confirm (not open the share menu), store
@@ -87,7 +87,7 @@ inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move fo
 locked card does nothing, Enter on an open one plays the launch transition and starts that level);
 the phone run checks its cards fit 390 px.
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in
-daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, NEW BEST, no Next Level and no leaderboard or initials entry (the campaign boards stay empty)
+daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, New best, no Next Level and no leaderboard or initials entry (the campaign boards stay empty)
 (`daily-results.png`; its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 `?e2e=1` skips the loading screen, the intro and the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1` (#674): the loading screen must show (`loading.png`) and hold until the shader
