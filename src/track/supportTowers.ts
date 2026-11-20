@@ -161,7 +161,8 @@ function planAtSpacing(
     const t = tAtDistance(table, dist)
     trackFrame(curve, t, point, forward, right, up)
     // Rolled past 60° (an inversion, a steep bank, #698): a tower from the ground would run up through the rails.
-    if (up.y < MIN_TOWER_UP) continue
+    // A curve that doesn't roll keeps its towers on steep track (#715).
+    if (curve.getUpAt && up.y < MIN_TOWER_UP) continue
     // Spine bottom, directly under the rail centreline.
     center.copy(point).addScaledVector(up, -spineBottom)
     const cx = center.x

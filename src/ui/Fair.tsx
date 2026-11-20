@@ -3,25 +3,27 @@ import type { HTMLAttributes, ReactNode, Ref } from 'react'
 /**
  * The fair's shared pieces (docs/art/PERSONALITY.md): a painted board with notched ticket corners, lined out in gilt,
  * casting a hard shadow; and the gallery's star targets. Styles: the `fair-*` rules in `src/app/global.css`.
+ * `as="span"` builds the board from spans, so it can sit inside a button (level select's ride boards).
  */
-export function FairBoard({ className = '', shadowClassName = '', ref, children, ...rest }: {
+export function FairBoard({ as: Tag = 'div', className = '', shadowClassName = '', ref, children, ...rest }: {
+  as?: 'div' | 'span'
   className?: string
   shadowClassName?: string
   ref?: Ref<HTMLDivElement>
   children: ReactNode
-} & HTMLAttributes<HTMLDivElement>) {
+} & HTMLAttributes<HTMLElement>) {
   return (
-    <div className={`fair-board-shadow ${shadowClassName}`.trim()}>
-      <div ref={ref} className={`fair-board fair-notched ${className}`.trim()} {...rest}>
+    <Tag className={`fair-board-shadow ${shadowClassName}`.trim()}>
+      <Tag ref={ref} className={`fair-board fair-notched ${className}`.trim()} {...rest}>
         <FairLining />
         {children}
-      </div>
-    </div>
+      </Tag>
+    </Tag>
   )
 }
 
-/** A board's gilt lining, made of spans so a board can be built inside a button (level select's ride boards). */
-export function FairLining() {
+/** A board's gilt lining, made of spans so it is button-safe too. */
+function FairLining() {
   return (
     <span className="fair-lining fair-notched" aria-hidden="true">
       <span className="fair-notched" />

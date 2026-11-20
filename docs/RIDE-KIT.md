@@ -55,6 +55,11 @@ On a backwards stretch the rider faces back but spawning still places waves ahea
 A **junction** (#702, `kind: 'junction'`, on either ride but only a spline track) is the shoot-to-switch: a branch through
 its `points` from the fork at `from` to the merge at `to`, with a switch sign before the fork. The ride's timing stays on
 the main track, so the branch is ridden faster; no other mechanic may sit between its sign and its merge (`checkMechanics`).
+`checkMechanics` also refuses a second junction on one track (the run has a single `route` and the sign a single collision
+target, #725) and a fork so near the lap's start that its sign (a tenth of the span before `from`) would stand before 0.
+Only the seat, the rails and the sign know the branch: towers (`planTowers`), scenery clearance (`trackClearance.ts`,
+`trackScatter.ts`) and enemy placement all use the main curve. So the branch gets no support towers, and a junction's
+level proves its branch clear of the scenery, the ground and the rest of the track itself, as `gymTrack.test.ts` does.
 
 | Element | What it does | Feel |
 |---|---|---|

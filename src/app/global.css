@@ -950,8 +950,9 @@ canvas {
   width: min(1120px, 100%);
 }
 
-/* The button is the hanging sign: it casts the board's hard shadow (the board's notch mask would clip it) and tilts
-   a little on its hook, each one its own way. */
+/* The button is the hanging sign: it tilts a little on its hook, each one its own way, and its board fills it.
+   No filter here: a ride board's tar shadow is its FairBoard's .fair-board-shadow wrapper, the Daily Run
+   ticket's is .level-card-daily's drop-shadow. So a ride board's focus outline casts no shadow, on purpose. */
 .level-card {
   --tilt: -0.8deg;
   display: flex;
@@ -965,7 +966,6 @@ canvas {
   background: none;
   cursor: pointer;
   rotate: var(--tilt);
-  filter: drop-shadow(6px 8px 0 var(--fair-tar));
   transition: transform 150ms ease-out, rotate 150ms ease-out, opacity 0.3s;
 }
 
@@ -994,6 +994,12 @@ canvas {
 .level-card:not(.locked):active {
   transform: translateY(2px);
   transition-duration: 60ms;
+}
+
+.fair-board-shadow.level-board-shadow {
+  flex: 1;
+  display: flex;
+  width: auto;
 }
 
 .level-board.fair-board {
@@ -1026,6 +1032,10 @@ canvas {
 .level-postcard-planks {
   position: absolute;
   inset: 0;
+}
+
+.level-postcard-tar {
+  fill: var(--fair-tar);
 }
 
 /* The world's name plate, painted in its biome's colour; tar letters on every biome accent pass 4.5:1 (theme.test.ts). */
@@ -1115,6 +1125,11 @@ canvas {
   line-height: 1.15;
   text-align: center;
   color: var(--fair-gilt);
+}
+
+/* The ticket has no FairBoard, so it casts the same hard tar shadow itself. */
+.level-card-daily {
+  filter: drop-shadow(6px 8px 0 var(--fair-tar));
 }
 
 /* The Daily Run's ticket: cream card, oxblood ink, the stub above a perforation. */
@@ -2667,6 +2682,11 @@ canvas {
   --o: 11px;
   --n: calc(var(--fair-notch) + 11px);
   background: var(--fair-oxblood);
+}
+
+/* A board built from spans (`<FairBoard as="span">`, inside a button) still lays out as a block. */
+span:is(.fair-board-shadow, .fair-board) {
+  display: block;
 }
 
 .fair-board > :not(.fair-lining) {

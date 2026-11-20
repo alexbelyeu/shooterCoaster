@@ -20,6 +20,10 @@ function contrast(a: string, b: string): number {
 const TAR = FAIR.tar
 
 describe('biome UI theme', () => {
+  it('reads --fair-tar from the stylesheet', () => {
+    expect(TAR).toMatch(/^#[0-9a-f]{6}$/i)
+  })
+
   it("every world's name plate (its accent) reads at 4.5:1 or better under tar letters", () => {
     const low = Object.entries(BIOME_UI)
       .map(([biome, t]) => ({ biome, ratio: contrast(TAR, t.accent) }))

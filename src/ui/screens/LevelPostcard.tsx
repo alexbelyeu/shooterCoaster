@@ -143,11 +143,11 @@ function Planks() {
     <svg className="level-postcard-planks" viewBox="0 0 200 100" preserveAspectRatio="xMidYMid slice">
       {PLANKS.map(([y, angle]) => (
         <g key={y} transform={`rotate(${angle} 100 ${y + 9})`}>
-          <rect x="-30" y={y + 3} width="260" height="18" fill="#1b110d" />
+          <rect x="-30" y={y + 3} width="260" height="18" className="level-postcard-tar" />
           <rect x="-30" y={y} width="260" height="18" fill="#9b6a37" />
           <path d={`M-30 ${y + 6} H230 M-30 ${y + 12} H230`} stroke="#7a4f26" strokeWidth="1.2" />
           {[18, 182].map((x) => (
-            <circle key={x} cx={x} cy={y + 9} r="2.4" fill="#1b110d" />
+            <circle key={x} cx={x} cy={y + 9} r="2.4" className="level-postcard-tar" />
           ))}
         </g>
       ))}
