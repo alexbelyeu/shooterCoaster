@@ -29,7 +29,12 @@ export interface EnemyPlacementRule {
    * the lanternfly's `HOP.margin` and `HOP.standoff`. A second enemy on either needs its own margin and standoff here.
    */
   scatter: ScatterBand | 'trackside' | 'wall' | 'swarm'
+  /** How far from its placed spot the enemy wanders: a trackside spot keeps this much further out of `keepOff` (#708). */
+  roam?: number
 }
+
+/** The radius of the loop a scorpion scuttles round, through its spawn (`Scorpion.tsx`): it wanders up to twice this away. */
+export const SCUTTLE_RADIUS = 20
 
 const band = (radiusMin: number, radiusSpan: number, yMin: number, ySpan = 0): ScatterBand => ({ radiusMin, radiusSpan, yMin, ySpan })
 
@@ -38,7 +43,7 @@ export const ENEMY_PLACEMENT: Record<EnemyType, EnemyPlacementRule> = {
   // Over the park, a little beyond the track (~±1100), so they float close to the ride (#20).
   balloon: { surface: 'air', scatter: band(0, 1700, 40, 160) },
   crow: { surface: 'air', scatter: band(100, 1200, 100, 160) },
-  scorpion: { surface: 'ground', scatter: 'trackside' },
+  scorpion: { surface: 'ground', scatter: 'trackside', roam: 2 * SCUTTLE_RADIUS },
   shark: { surface: 'water', scatter: 'trackside' },
   jellyfish: { surface: 'water', scatter: 'trackside' },
   flyingFish: { surface: 'water', scatter: band(100, 1000, 0) },
