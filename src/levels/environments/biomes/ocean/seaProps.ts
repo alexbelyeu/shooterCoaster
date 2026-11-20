@@ -148,3 +148,87 @@ export function createGullGeometry(): THREE.BufferGeometry {
   }
   return w.build('aFlap')
 }
+
+/** z (nose +), half width, half height, centre height of each body ring, in whale lengths, nose to tail. */
+const WHALE_RINGS: readonly (readonly [number, number, number, number])[] = [
+  [0.46, 0.045, 0.04, -0.005],
+  [0.38, 0.085, 0.07, 0],
+  [0.26, 0.115, 0.095, 0.005],
+  [0.1, 0.125, 0.105, 0.01],
+  [-0.06, 0.11, 0.095, 0.015],
+  [-0.2, 0.075, 0.07, 0.015],
+  [-0.32, 0.04, 0.05, 0.01],
+  [-0.41, 0.02, 0.035, 0.005],
+]
+const WHALE_SIDES = 10
+
+/** A humpback `length` long, centred on its middle, nose along +z: dark back, grooved pale belly, long white flippers. */
+export function createWhaleGeometry(length: number): THREE.BufferGeometry {
+  const back = c(0x1f3550)
+  const flank = c(0x35546e)
+  const belly = c(0xd9e6e8)
+  const pleat = c(0x9fb5bd)
+  const v = (x: number, y: number, z: number) => new THREE.Vector3(x * length, y * length, z * length)
+  const w = new GeometryWriter()
+
+  const rings = WHALE_RINGS.map(([z, hw, hh, cy]) =>
+    Array.from({ length: WHALE_SIDES }, (_, k) => {
+      const a = Math.PI / 2 + (2 * Math.PI * k) / WHALE_SIDES
+      return v(Math.cos(a) * hw, cy + Math.sin(a) * hh, z)
+    }),
+  )
+  const skin = (k: number, grooved: boolean) => {
+    const up = Math.sin(Math.PI / 2 + (2 * Math.PI * (k + 0.5)) / WHALE_SIDES)
+    if (up > 0.45) return back
+    if (up > -0.35) return flank
+    return grooved && k % 2 === 0 ? pleat : belly
+  }
+  for (let i = 0; i + 1 < rings.length; i++) {
+    const grooved = WHALE_RINGS[i][0] > 0
+    for (let k = 0; k < WHALE_SIDES; k++) {
+      const k1 = (k + 1) % WHALE_SIDES
+      const col = skin(k, grooved)
+      w.tri(rings[i][k], rings[i + 1][k], rings[i][k1], col)
+      w.tri(rings[i][k1], rings[i + 1][k], rings[i + 1][k1], col)
+    }
+  }
+  const nose = v(0, -0.01, 0.5)
+  const tail = v(0, 0.005, -0.45)
+  const last = rings[rings.length - 1]
+  for (let k = 0; k < WHALE_SIDES; k++) {
+    const k1 = (k + 1) % WHALE_SIDES
+    w.tri(nose, rings[0][k], rings[0][k1], skin(k, true))
+    w.tri(tail, last[k1], last[k], skin(k, false))
+  }
+
+  /** A flat fin: `top` on the face that looks up, `under` on the other. */
+  const fin = (a: THREE.Vector3, b: THREE.Vector3, cc: THREE.Vector3, top: THREE.Color, under: THREE.Color) => {
+    const ny = (b.z - a.z) * (cc.x - a.x) - (b.x - a.x) * (cc.z - a.z)
+    const [p, q] = ny >= 0 ? [b, cc] : [cc, b]
+    w.tri(a, p, q, top)
+    w.tri(a, q, p, under)
+  }
+  for (const s of [-1, 1]) {
+    // Pectoral flippers, a third of the body long, swept back.
+    const rootFront = v(s * 0.1, -0.03, 0.2)
+    const rootBack = v(s * 0.1, -0.03, 0.12)
+    const midFront = v(s * 0.22, -0.065, 0.13)
+    const midBack = v(s * 0.2, -0.065, 0.06)
+    const tip = v(s * 0.36, -0.1, -0.02)
+    fin(rootFront, midFront, rootBack, flank, belly)
+    fin(rootBack, midFront, midBack, flank, belly)
+    fin(midFront, tip, midBack, belly, belly)
+    // Flukes.
+    const root = v(0, 0.005, -0.42)
+    const lead = v(s * 0.08, 0.008, -0.45)
+    const flukeTip = v(s * 0.2, 0.012, -0.54)
+    const notch = v(0, 0.005, -0.5)
+    fin(root, lead, notch, back, belly)
+    fin(lead, flukeTip, notch, back, belly)
+  }
+  // A small dorsal hump, seen from both sides.
+  const dorsal = [v(0, 0.082, -0.17), v(0, 0.075, -0.27), v(0, 0.12, -0.25)] as const
+  w.tri(dorsal[0], dorsal[1], dorsal[2], back)
+  w.tri(dorsal[0], dorsal[2], dorsal[1], back)
+  return w.build()
+}
