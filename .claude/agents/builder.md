@@ -62,7 +62,7 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
   or over 2.5M weighted), stop at once: commit the parts that already work and pass, ship them (a draft if they
   aren't whole), and file what is left as a follow-up issue with its own Scope. That is a stop, not a
   "one more fix": a second pass on a fresh context is cheaper than finishing at 300k+ (#496: the #454
-  title-park builder went on to 175 turns, peak 353k, 4.8M; #770, below).
+  title-park builder went on to 175 turns, peak 353k, 4.8M; #770, above).
 
 ## Do the work
 
