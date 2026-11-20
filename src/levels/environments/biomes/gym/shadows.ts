@@ -1,7 +1,7 @@
 import type { ShadowCaster } from '../../shared/contactShadows'
 import { GYM_SCALE, PIECES, PIT, floorAt, pieceBoxes, pieceToBlockout, toBlockout, toWorld, type BlockoutPiece, type PieceKind } from './blockout'
 import { HIDDEN_PIECES } from './config'
-import { onPath } from './floorPaths'
+import { PATHS, onPath, subtractRects, type Rect } from './floorPaths'
 
 const DEG = Math.PI / 180
 
@@ -43,6 +43,21 @@ function gymSurface(x: number, z: number): number {
   return standingSurfaceAt(p.x, p.z) * GYM_SCALE
 }
 
+/**
+ * A footprint's grid (blockout rect `r`) cut at the walkways' edges: the parts off them, then its part on each one. The
+ * mats stop at a walkway's edge, so each part lies on one flat surface and no cell straddles the step for the deficit lift
+ * to raise to the mats' top (#683). A rotated piece keeps one grid: no walkway reaches one's shadow.
+ */
+function gridPieces(r: Rect, rot: number): Rect[] {
+  if (rot !== 0) return [r]
+  const pieces = subtractRects(r, PATHS)
+  PATHS.forEach((path, i) => {
+    const on = { minX: Math.max(r.minX, path.minX), maxX: Math.min(r.maxX, path.maxX), minZ: Math.max(r.minZ, path.minZ), maxZ: Math.min(r.maxZ, path.maxZ) }
+    if (on.minX < on.maxX && on.minZ < on.maxZ) pieces.push(...subtractRects(on, PATHS.slice(0, i)))
+  })
+  return pieces
+}
+
 /** Contact-shadow footprints of everything standing in the hall: walls, boulders, the Tree, the Arch's legs and the props (#544). */
 export function gymShadowCasters(): ShadowCaster[] {
   const out: ShadowCaster[] = []
@@ -53,17 +68,24 @@ export function gymShadowCasters(): ShadowCaster[] {
       const centre = pieceToBlockout(p, (b.minA + b.maxA) / 2, (b.minF + b.maxF) / 2)
       if (b.minY > standingSurfaceAt(centre.x, centre.z) + FLOATING) continue
       const world = toWorld({ x: centre.x, y: 0, z: centre.z })
-      out.push({
-        x: world.x,
-        z: world.z,
-        halfX: ((b.maxA - b.minA) / 2) * GYM_SCALE,
-        halfZ: ((b.maxF - b.minF) / 2) * GYM_SCALE,
-        yaw: p.rot * DEG,
-        radius: shade.radius * GYM_SCALE,
-        spread: shade.spread * GYM_SCALE,
-        strength: shade.strength,
-        ground: gymSurface,
-      })
+      const halfA = (b.maxA - b.minA) / 2
+      const halfF = (b.maxF - b.minF) / 2
+      const ex = halfA + shade.spread
+      const ez = halfF + shade.spread
+      for (const g of gridPieces({ minX: centre.x - ex, maxX: centre.x + ex, minZ: centre.z - ez, maxZ: centre.z + ez }, p.rot)) {
+        out.push({
+          x: world.x,
+          z: world.z,
+          halfX: halfA * GYM_SCALE,
+          halfZ: halfF * GYM_SCALE,
+          yaw: p.rot * DEG,
+          radius: shade.radius * GYM_SCALE,
+          spread: shade.spread * GYM_SCALE,
+          strength: shade.strength,
+          ground: gymSurface,
+          grid: { minX: (g.minX - centre.x) * GYM_SCALE, maxX: (g.maxX - centre.x) * GYM_SCALE, minZ: (g.minZ - centre.z) * GYM_SCALE, maxZ: (g.maxZ - centre.z) * GYM_SCALE },
+        })
+      }
     }
   }
   return out
