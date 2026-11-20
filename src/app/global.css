@@ -1318,8 +1318,7 @@ canvas {
   }
 }
 
-/* Results board (docs/art/PERSONALITY.md): a fair board over the landmark's orbit, the leaderboard beside it.
-   --accent / --accent-glow are the level's biome accent (src/ui/theme.ts), still used by the leaderboard and share menu. */
+/* Results board (docs/art/PERSONALITY.md): a fair board over the landmark's orbit, the leaderboard beside it. */
 .results-screen {
   position: fixed;
   inset: 0;
@@ -1566,7 +1565,7 @@ canvas {
   font-size: 2rem;
 }
 
-.results-actions .share-anchor .fair-plate {
+.results-actions .results-share {
   flex: 1;
 }
 
@@ -1592,9 +1591,9 @@ canvas {
 }
 .reduce-motion :is(.results-bulbs.is-chasing i, .results-screen[data-sequence] .results-record, .results-screen[data-sequence] .results-stars .earned) { animation: none; }
 
-/* Share menu (src/ui/ShareMenu.tsx): placed by popoverPlacement.ts, below the button when it fits beside Next. */
+/* Share menu (src/ui/ShareMenu.tsx): a small fair board of plates popping out of the Share plate, fixed to the
+   viewport where popoverPlacement.ts puts it (below the button when it fits beside Next), over the results screen. */
 .share-anchor {
-  position: relative;
   display: flex;
 }
 
@@ -1603,59 +1602,45 @@ canvas {
 }
 
 .share-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  z-index: 1;
+  position: fixed;
+  z-index: 101;
+  width: 19rem;
+  max-width: calc(100vw - 16px);
+}
+
+.share-menu .fair-board-shadow {
+  width: 100%;
+}
+
+.fair-board.share-board {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.35rem;
-  width: 17rem;
-  max-width: calc(100vw - 16px);
-  padding: 0.5rem;
-  background: rgba(16, 16, 24, 0.97);
-  border: 1px solid var(--accent);
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 18px var(--accent-glow);
+  gap: 0.6rem 0.5rem;
+  padding: 1.1rem 1.1rem 1.35rem;
 }
 
-.share-menu[data-side='above'] {
-  top: auto;
-  bottom: calc(100% + 8px);
-}
-
-.share-item {
+.share-menu .fair-plate.share-item {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 0 0.6rem;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #fff;
+  padding: 0.55rem 0.4rem 0.4rem;
+  font-size: 1.2rem;
+  white-space: nowrap;
   text-decoration: none;
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.share-item:hover,
-.share-item:focus-visible {
-  color: #000;
-  background: var(--accent);
-  outline: none;
 }
 
 .share-wide {
   grid-column: 1 / -1;
 }
 
-/* Phone landscape: three columns, Save / Copy image / Copy link on one row, keep the menu short enough to open above the buttons. */
-@media (max-height: 520px) {
+/* Wider screens: four columns, three rows, short enough to open below Share without covering the gilt plate. */
+@media (min-width: 700px) {
   .share-menu {
-    grid-template-columns: repeat(3, 1fr);
-    width: 23rem;
+    width: 34rem;
+  }
+
+  .fair-board.share-board {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .share-wide {
@@ -1663,44 +1648,43 @@ canvas {
   }
 }
 
-/* Local top 10 (ResultsLeaderboard): under the buttons on a phone, a column of its own when there is room. */
+/* Phone landscape: three columns, Save / Copy image / Copy link on one row, keep the menu short enough to open above the buttons. */
+@media (max-height: 520px) {
+  .share-menu {
+    width: 24rem;
+  }
+
+  .fair-board.share-board {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.45rem;
+    padding: 0.9rem 0.95rem 1.1rem;
+  }
+
+  .share-wide {
+    grid-column: auto;
+  }
+}
+
+/* The leaderboard (ResultsLeaderboard): the gallery's prize board, under the results board on a phone, beside it when
+   there is room. Rank and initials in Big Shoulders, the score in Ultra figures, the run's own row in gilt. */
 .results-board-slot,
-.results-board {
+.fair-board-shadow.results-board-shadow {
   width: 100%;
 }
 
-.results-board h3 {
-  margin-bottom: 0.4rem;
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 2px;
-  text-align: center;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
+.fair-board.results-board {
+  padding: 1.35rem 1.25rem 1.3rem;
 }
 
-/* "World" / "This device": beside the title, or whole on the next line when they don't fit. */
-.results-board h3 {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 0.2em 0.5em;
+.results-board h3.fair-title {
+  font-size: 1.6rem;
+  text-align: center;
 }
 
 .results-board-source {
-  padding: 0.05em 0.45em;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-size: 0.8em;
-  letter-spacing: 1px;
-  white-space: nowrap;
-  opacity: 0.8;
-}
-
-.results-board[data-rank] h3 {
-  color: var(--accent);
-  text-shadow: 0 0 10px var(--accent-glow);
+  margin: 0.3rem 0 0.7rem;
+  font-size: 1.1rem;
+  text-align: center;
 }
 
 .results-board ol {
@@ -1711,112 +1695,118 @@ canvas {
 
 .results-board li {
   display: grid;
-  grid-template-columns: 1.5rem minmax(3.4rem, auto) 1fr auto;
+  grid-template-columns: 1.4rem minmax(2.6rem, auto) 1fr auto;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
+  padding: 0.15rem 0.45rem 0.1rem;
+  border-radius: 3px;
+  font-size: 1.15rem;
   font-variant-numeric: tabular-nums;
 }
 
 .results-board li:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fair-oxblood-deep);
 }
 
 .results-board li.is-new {
-  background: color-mix(in srgb, var(--accent) 24%, transparent);
-  box-shadow: inset 0 0 0 1px var(--accent), 0 0 14px var(--accent-glow);
+  color: var(--fair-tar);
+  background: var(--fair-gilt);
+  box-shadow: 0 3px 0 var(--fair-gilt-block);
 }
 
 .results-board-rank {
   text-align: right;
-  color: rgba(255, 255, 255, 0.45);
 }
 
 .results-board-initials {
   display: flex;
+  gap: 0.25rem;
+  font-variation-settings: 'opsz' 40;
   font-weight: 800;
-  letter-spacing: 3px;
 }
 
-.results-board-stars {
-  font-size: 0.7rem;
-  letter-spacing: 1px;
-  color: #ffd23f;
+.results-board-stars .fair-stars {
+  gap: 1px;
 }
 
-.results-board li strong {
+.results-board-stars .fair-stars svg {
+  width: 14px;
+  height: 14px;
+}
+
+.results-board li.is-new .fair-stars path {
+  fill: var(--fair-gilt-block);
+  stroke: var(--fair-gilt-block);
+}
+
+.results-board li.is-new .fair-stars .earned path {
+  fill: var(--fair-tar);
+  stroke: var(--fair-tar);
+}
+
+.results-board-score {
+  font-family: 'Ultra', serif;
+  font-weight: 400;
+  font-size: 0.95em;
   text-align: right;
 }
 
 .results-board-empty {
   padding: 0.6rem 0;
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   text-align: center;
-  color: rgba(255, 255, 255, 0.5);
 }
 
-/* The run's row while it takes initials: one 44 px button per letter, the active one blinking. */
+/* The run's row while it takes initials: three letters slotted into a ticket counter, the active tile lined in gilt. */
 .results-board-initials button {
   min-width: 44px;
   min-height: 44px;
-  padding: 0;
+  padding: 0.2rem 0 0;
   border: 0;
-  border-bottom: 3px solid transparent;
-  background: none;
-  color: #fff;
-  font: inherit;
-  font-size: 1.25rem;
+  border-radius: 3px;
+  background: var(--fair-oxblood-deep);
+  color: var(--fair-cream);
+  font-family: 'Ultra', serif;
+  font-size: 1.35rem;
+  line-height: 1;
+  box-shadow: inset 0 3px 0 var(--fair-tar);
   cursor: pointer;
 }
 
 .results-board-initials button.is-active {
-  border-bottom-color: var(--accent);
-  color: var(--accent);
-  animation: initials-blink 0.9s steps(2, jump-none) infinite;
+  color: var(--fair-gilt);
+  box-shadow: inset 0 3px 0 var(--fair-tar), inset 0 0 0 3px var(--fair-gilt);
 }
 
-@keyframes initials-blink {
-  50% {
-    opacity: 0.35;
-  }
+.results-board-initials button:focus-visible {
+  outline: 3px solid var(--fair-cream);
+  outline-offset: 2px;
 }
 
 .results-initials-pad {
   display: flex;
   justify-content: center;
-  gap: 0.4rem;
-  margin-top: 0.6rem;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
 }
 
-.results-initials-pad button {
+.results-initials-pad .fair-plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 44px;
-  min-height: 44px;
-  border: 0;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  font: inherit;
-  font-size: 1rem;
-  cursor: pointer;
+  padding: 0 0.6rem;
+}
+
+.results-initials-pad svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
 .results-initials-pad .results-initials-ok {
-  padding: 0 1.1rem;
-  background: var(--accent);
-  color: #000;
-  font-weight: 800;
-  letter-spacing: 1px;
-  box-shadow: 0 0 12px var(--accent-glow);
+  padding: 0.25rem 1rem 0;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .results-board-initials button.is-active {
-    animation: none;
-  }
-}
-.reduce-motion .results-board-initials button.is-active { animation: none; }
 
 /* Desktop and phone landscape: the board in two columns (the score, then the lines and plates), the leaderboard beside it. */
 @media (min-width: 900px) and (min-height: 521px), (orientation: landscape) and (max-height: 520px) {
@@ -1840,7 +1830,7 @@ canvas {
   }
 
   .results-board-slot {
-    flex: 0 0 17rem;
+    flex: 0 0 19rem;
   }
 }
 
@@ -1925,12 +1915,40 @@ canvas {
   }
 
   .results-board-slot {
-    flex: 0 0 14rem;
+    flex: 0 0 15rem;
+  }
+
+  .fair-board.results-board {
+    padding: 0.95rem 0.95rem 1rem;
+  }
+
+  .results-board h3.fair-title {
+    font-size: 1.15rem;
+  }
+
+  .results-board-source {
+    margin: 0.1rem 0 0.35rem;
+    font-size: 0.95rem;
   }
 
   .results-board li {
-    padding: 0.05rem 0.4rem;
-    font-size: 0.8rem;
+    grid-template-columns: 1.2rem auto 1fr;
+    gap: 0.35rem;
+    padding: 0 0.35rem;
+    font-size: 0.95rem;
+  }
+
+  .results-board-stars {
+    display: none;
+  }
+
+  .results-board-initials button {
+    font-size: 1.1rem;
+  }
+
+  .results-initials-pad {
+    gap: 0.35rem;
+    margin-top: 0.5rem;
   }
 }
 

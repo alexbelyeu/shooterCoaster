@@ -876,7 +876,7 @@ async function onlineSubmitProblems(page, id, online, score) {
     problems.push(`online board: submission fields ${JSON.stringify(run)}`)
   if (online.gets.length) problems.push(`online board: a placing run fetched the board (${online.gets.length}×) instead of only submitting`)
   if (!world) problems.push('online board: never switched to the World board after the submission')
-  else if (board.label !== 'World' || board.rank !== '1' || board.mine !== 'RES' || board.rows !== 10)
+  else if (board.label !== "The world's top 10" || board.rank !== '1' || board.mine !== 'RES' || board.rows !== 10)
     problems.push(`online board: shows ${JSON.stringify(board)}, expected World with RES 2nd of 10`)
   else problems.push(...(await worldShareProblems(page, id, 1)))
   return { problems, result: { submitted: run, board } }
@@ -934,7 +934,7 @@ async function leaderboardEntryProblems(page, id, rank, online, score) {
   if (!shareFocused) problems.push('no Share button on the results screen to focus during the initials entry')
   const opened = await read()
   const openedBoard = await readBoard(page)
-  if (openedBoard.source !== 'device' || openedBoard.label !== 'This device') problems.push(`leaderboard during the entry: ${openedBoard.source} "${openedBoard.label}", expected this device's`)
+  if (openedBoard.source !== 'device' || openedBoard.label !== "This device's top 10") problems.push(`leaderboard during the entry: ${openedBoard.source} "${openedBoard.label}", expected this device's`)
   if (opened.rank !== String(rank)) problems.push(`leaderboard: run ranked ${opened.rank}, expected ${rank}`)
   if (opened.rows !== 10) problems.push(`leaderboard shows ${opened.rows} rows, expected 10`)
   if (!opened.editing) problems.push('leaderboard: no initials entry on a placing run')

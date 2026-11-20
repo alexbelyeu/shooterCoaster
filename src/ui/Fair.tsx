@@ -1,17 +1,18 @@
-import type { HTMLAttributes, ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode, Ref } from 'react'
 
 /**
  * The fair's shared pieces (docs/art/PERSONALITY.md): a painted board with notched ticket corners, lined out in gilt,
  * casting a hard shadow; and the gallery's star targets. Styles: the `fair-*` rules in `src/app/global.css`.
  */
-export function FairBoard({ className = '', shadowClassName = '', children, ...rest }: {
+export function FairBoard({ className = '', shadowClassName = '', ref, children, ...rest }: {
   className?: string
   shadowClassName?: string
+  ref?: Ref<HTMLDivElement>
   children: ReactNode
 } & HTMLAttributes<HTMLDivElement>) {
   return (
     <div className={`fair-board-shadow ${shadowClassName}`.trim()}>
-      <div className={`fair-board fair-notched ${className}`.trim()} {...rest}>
+      <div ref={ref} className={`fair-board fair-notched ${className}`.trim()} {...rest}>
         <FairLining />
         {children}
       </div>
