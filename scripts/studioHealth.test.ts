@@ -266,6 +266,14 @@ describe('findings', () => {
     expect(f).toEqual(['stuck-approved:5', 'qa-backlog'])
   })
 
+  it("an approved PR on Alex's own branch is his to merge, not an agents' issue", () => {
+    const approved = (head: string) => ({ number: 8, title: 'a', head, labels: ['agent:qa-approved'], created_at: iso(10 * H), updated_at: iso(H), labelledAt: { 'agent:qa-approved': iso(4 * H) } })
+    const [own] = findings(snap({ openPrs: [approved('fix/gym-star')] }))
+    expect(own).toMatchObject({ key: 'merge-own:8', owner: 'alex' })
+    expect(own.body).toContain('`fix/gym-star`')
+    expect(findings(snap({ openPrs: [approved('agent/8-x')] }))[0]).toMatchObject({ key: 'stuck-approved:8', owner: 'agents' })
+  })
+
   it('a production alert open over 12 h is escalated in place, not filed again', () => {
     const s = snap({
       openIssues: [
