@@ -27,7 +27,7 @@ const touchFirst = () => typeof window.matchMedia === 'function' && window.match
 
 interface TitleScreenProps {
   onPlay: () => void
-  onSettings?: () => void
+  onSettings: () => void
 }
 
 /** PLAY waits this long at most for audio and the menu sounds (its whoosh): the title music starts from App's `whenAudioReady`. */
@@ -45,7 +45,7 @@ function startAudio(): Promise<void> {
 export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
   const [internal] = useState(isInternalThisLoad)
   const [showHint] = useState(() => !hintShownThisLoad)
-  const [hint] = useState(() => (touchFirst() ? 'Tap PLAY to start' : 'Press any key to start'))
+  const [hint] = useState(() => (touchFirst() ? 'Tap Play to start.' : 'Press any key to start.'))
   const reduced = usePrefersReducedMotion()
   // Over index.html's poster, the logo and tagline are already on screen: they stay put instead of flying in.
   const [overPoster] = useState(posterShown)
@@ -137,88 +137,70 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
         <TitleLogo still={reduced || overPoster} />
       </motion.h1>
 
-      <p className="subtitle">
+      <p className="title-tagline fair-over-ride">
         {SUBTITLE_WORDS.map((word, i) => (
           <motion.span
             key={word}
             initial={overPoster ? false : { opacity: 0, y: reduced ? 0 : 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.6 + i * 0.2 }}
-            style={{ display: 'inline-block', marginRight: '0.4em' }}
           >
             {word}
           </motion.span>
         ))}
       </p>
 
+      {/* The plates fade in on opacity alone, so they land exactly on the poster's; CSS presses them. */}
       <motion.button
-        className="play-button"
+        className="fair-plate fair-go title-play"
         onClick={() => void play()}
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{
-          opacity: 1,
-          scale: reduced ? 1 : [1, 1.06, 1],
-          boxShadow: [
-            '0 0 20px rgba(255, 200, 0, 0.3)',
-            '0 0 40px rgba(255, 200, 0, 0.7)',
-            '0 0 20px rgba(255, 200, 0, 0.3)',
-          ],
-        }}
-        transition={{
-          opacity: { duration: 0.4, delay: playIn },
-          scale: reduced
-            ? { duration: 0.4, delay: playIn }
-            : { duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: playIn },
-          boxShadow: { duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: playIn },
-        }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: playIn }}
       >
         Play
       </motion.button>
 
+      <motion.button
+        className="fair-plate settings-button"
+        onClick={onSettings}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: playIn + 0.2 }}
+      >
+        Settings
+      </motion.button>
+
       {showHint && (
         <motion.p
-          className="title-hint"
+          className="title-hint fair-over-ride"
           initial={{ opacity: 0 }}
-          animate={{ opacity: reduced ? 0.8 : [0.45, 0.9, 0.45] }}
-          transition={reduced ? { delay: playIn + 0.6 } : { duration: 2.4, repeat: Infinity, ease: 'easeInOut', delay: playIn + 0.6 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: playIn + 0.6 }}
         >
           {hint}
         </motion.p>
       )}
 
-      {onSettings && (
-        <motion.button
-          className="settings-button"
-          onClick={onSettings}
-          initial={{ opacity: 0, x: reduced ? 0 : -16 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: playIn + 0.35, ease: 'easeOut' }}
-          whileTap={{ scale: 0.9 }}
-          aria-label="Settings"
-        >
-          &#x2699;
-        </motion.button>
-      )}
-
-      <motion.div
-        className="credits"
-        initial={{ opacity: 0, y: reduced ? 0 : 12 }}
-        animate={{ opacity: 1, y: 0 }}
+      <motion.p
+        className="credits fair-over-ride"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: playIn + 0.5 }}
       >
         A Three.js game by{' '}
         <a href="https://github.com/alexbelyeu/shooterCoaster" target="_blank" rel="noreferrer">
           Alex Belyeu
         </a>
-      </motion.div>
+      </motion.p>
 
-      {internal && <div className="internal-marker">internal: not tracked</div>}
+      {internal && <p className="internal-marker fair-over-ride">Internal device, not tracked</p>}
 
       {attract && (
         <div className="title-attract" aria-hidden="true">
-          <p className="title-attract-prompt">{touchFirst() ? 'Tap anywhere' : 'Press any key'}</p>
+          <p className="title-attract-prompt fair-over-ride">
+            {touchFirst() ? 'Tap anywhere to step up.' : 'Press any key to step up.'}
+          </p>
         </div>
       )}
     </div>

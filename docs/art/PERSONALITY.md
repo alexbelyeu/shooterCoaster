@@ -70,13 +70,14 @@ Never a gradient on a surface; the only soft colour change allowed is the dim ov
   oxblood-deep plate, smaller, side by side when there's room. Focus: a 3 px cream outline 3 px out.
 - **Stars** are the gallery's star targets: gilt with a tar outline when earned, oxblood-deep when not.
 - **Over the ride** (the HUD), there are no boards: cream lettering and numbers stand straight on the scene with a
-  hard tar shadow, like letters painted on the car. Nothing covers the middle of the screen during play.
+  hard tar shadow, like letters painted on the car (the shared `.fair-over-ride` class; the title's lettering on the park uses it too, so reuse it rather than writing another outline). Nothing covers the middle of the screen during play.
 
 ## Motion
 
 Mechanical and physical, never floaty: a sign swung on its hook, a ticket counter rolling, a button pressed.
 
-- A board arrives by dropping in and swinging once on its hook (about 300 ms, settles; no fade-and-slide).
+- A board arrives by dropping in and swinging once on its hook (about 300 ms, settles; no fade-and-slide): the
+  `fair-hook` class in `src/app/global.css`.
 - Numbers that change roll like a ticket counter, digit by digit.
 - **The one signature moment: the results board's chaser bulbs.** A string of bulbs round the final score chases
   once and holds lit for each star earned. No other screen has bulbs.
