@@ -3,13 +3,11 @@ import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
+import { SCUTTLE_RADIUS } from '../spawning/enemyPlacement'
 import {
   SCORPION_GEO, SCORPION_TAIL_GEO, SCORPION_STINGER_GEO, SCORPION_TAIL_PIVOT,
   SCORPION_SHELL_MAT, SCORPION_TAIL_MAT, SCORPION_STINGER_MAT,
 } from './SharedEnemyAssets'
-
-/** The loop a scorpion scuttles round, through its spawn: 40 across, inside the 60 a trackside spot keeps from the rails. */
-const SCUTTLE_RADIUS = 20
 
 /**
  * Ground-crawling scorpion: dark chitin with amber jointed legs, in three draw

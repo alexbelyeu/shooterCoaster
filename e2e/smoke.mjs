@@ -1790,7 +1790,7 @@ async function speedCheck(page, levelId) {
 }
 
 /**
- * The level with the Tree's gap (#659), and the second of its storyboard beat there: the heartline roll through the gap
+ * The level with the Tree's gap (#659, shot on the nightly `dark` step's run), and the second of its storyboard beat there: the heartline roll through the gap
  * between the trunk and the back wall (`gym/gymTrack.ts`). The still is shot at that beat's track fraction, read from the
  * level's v2 ride (`rideBeats()`), so a rebuilt ride can't leave it pointing somewhere else.
  */
@@ -2419,11 +2419,13 @@ async function pickupCheck(page) {
 
 /**
  * A level with a dark section (#752, `TrackParams.darkSections`, the hook's `darkSection`): with game time held, ride to
- * the middle of its first one and shoot `<id>-dark.png`, then fire one real shot with the muzzle flash held and shoot
- * `<id>-dark-flash.png`. The ride must be fully dark there and the frame mostly dark but not blank, its glow (saturated
- * bright pixels: the gym's blacklit holds) showing; the shot's flash must light the frame up.
+ * the middle of its first one, then fire one real shot with the muzzle flash held. The ride must be fully dark there and
+ * the shot's flash must light it. With `shots` (the nightly `dark` step) it also shoots `<id>-dark.png` before the shot
+ * and `<id>-dark-flash.png` with the flash: the frame mostly dark but not blank, its glow (saturated bright pixels: the
+ * gym's blacklit holds) showing, and the flash lighting the frame up. A full frame capture costs ~15 s on a software
+ * renderer, which the PR's level6 shard can't carry (#766: its `switch` step went 86 -> 266 s with them).
  */
-async function darkSectionShot(page, levelId) {
+async function darkSectionShot(page, levelId, { shots: shoot = false } = {}) {
   const spans = await page.evaluate(() => window.__SC_TEST__.darkSection.spans)
   if (!spans.length) return { problems: [], result: null }
   const at = (spans[0].from + spans[0].to) / 2
@@ -2459,22 +2461,25 @@ async function darkSectionShot(page, levelId) {
   }, at)
   await waitFrames(page, 3, { maxMs: 20000, pollMs: 100 })
   const depth = await page.evaluate(() => window.__SC_TEST__.darkSection.depth)
-  const png = await page.screenshot({ path: path.join(OUT, `${levelId}-dark.png`), timeout: SHOT_TIMEOUT })
-  const light = await frameLight(png)
-  const img = await imageStats(page, png)
+  const problems = []
+  if (!(depth > 0.99)) problems.push(`dark section: not dark in its middle at track ${at.toFixed(4)} (depth ${depth?.toFixed(2)})`)
+  let light = null
+  if (shoot) {
+    const png = await page.screenshot({ path: path.join(OUT, `${levelId}-dark.png`), timeout: SHOT_TIMEOUT })
+    light = await frameLight(png)
+    if (looksBlank(await imageStats(page, png))) problems.push('dark section shot looks blank')
+    if (light.dark < DARK_SHOT.dark) problems.push(`dark section: only ${(light.dark * 100).toFixed(0)}% of the frame is dark (need ${DARK_SHOT.dark * 100}%)`)
+    if (light.glow < DARK_SHOT.glow) problems.push(`dark section: its glow barely shows (${(light.glow * 100).toFixed(2)}% saturated bright, need ${DARK_SHOT.glow * 100}%)`)
+  }
   await page.evaluate(() => window.__SC_TEST__.fireShot(0, 0))
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const flash = await page.evaluate(() => window.__SC_TEST__.darkSection.flash)
-  const flashLight = await frameLight(await page.screenshot({ path: path.join(OUT, `${levelId}-dark-flash.png`), timeout: SHOT_TIMEOUT }))
+  const flashLight = shoot ? await frameLight(await page.screenshot({ path: path.join(OUT, `${levelId}-dark-flash.png`), timeout: SHOT_TIMEOUT })) : null
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
-  const problems = []
-  if (!(depth > 0.99)) problems.push(`dark section: not dark in its middle at track ${at.toFixed(4)} (depth ${depth?.toFixed(2)})`)
-  if (looksBlank(img)) problems.push('dark section shot looks blank')
-  if (light.dark < DARK_SHOT.dark) problems.push(`dark section: only ${(light.dark * 100).toFixed(0)}% of the frame is dark (need ${DARK_SHOT.dark * 100}%)`)
-  if (light.glow < DARK_SHOT.glow) problems.push(`dark section: its glow barely shows (${(light.glow * 100).toFixed(2)}% saturated bright, need ${DARK_SHOT.glow * 100}%)`)
-  if (!(flash > 0) || flashLight.mean < light.mean + DARK_SHOT.flash)
-    problems.push(`dark section: a shot's muzzle flash lit nothing (light ${flash?.toFixed(2)}, mean ${light.mean.toFixed(0)} -> ${flashLight.mean.toFixed(0)})`)
-  return { problems, result: { at, depth, flash, ...light, flashMean: flashLight.mean } }
+  if (!(flash > 0)) problems.push(`dark section: a shot's muzzle flash lit nothing (light ${flash?.toFixed(2)})`)
+  else if (shoot && flashLight.mean < light.mean + DARK_SHOT.flash)
+    problems.push(`dark section: a shot's muzzle flash lit nothing on screen (mean ${light.mean.toFixed(0)} -> ${flashLight.mean.toFixed(0)})`)
+  return { problems, result: { at, depth, flash, ...light, flashMean: flashLight?.mean } }
 }
 /** The dark shots' floors: the share of the frame that is dark, of saturated bright pixels (the blacklit glow), and how much the flash brightens the frame's mean (0–255). */
 const DARK_SHOT = { dark: 0.4, glow: 0.002, flash: 3 }
@@ -2486,8 +2491,10 @@ const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
 /**
  * Shoot-to-switch (#702): a run that shoots the V2 sign with a real bullet rides the V8 branch, a run that leaves it rides
  * the easy way, and a restart sets it back (level6-switch.png: the sign in view, level6-switch-hard.png: on the branch).
+ * The same run then checks the cave's dark section; the nightly `dark` step (`darkShots`) adds its frame shots and the
+ * Tree's gap still (`gapShot`), which are too slow for the PR's `level6` shard (#766).
  */
-async function switchCheck(page) {
+async function switchCheck(page, { darkShots = false } = {}) {
   const { level } = SWITCH_CHECK
   const problems = []
   const api = (fn, arg) => page.evaluate(fn, arg)
@@ -2547,9 +2554,11 @@ async function switchCheck(page) {
   if (sw.riding !== 'easy') problems.push(`without a shot the ride took the ${sw.riding} way`)
   if (sw.open) problems.push('the switch was still open in the junction')
   // The cave the switch stands at the mouth of rides dark (#752): checked on the same run, held.
-  const dark = await darkSectionShot(page, level)
+  const dark = await darkSectionShot(page, level, { shots: darkShots })
   problems.push(...dark.problems)
-  return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result }
+  const gap = darkShots ? await gapShot(page) : null
+  if (gap) problems.push(...gap.problems)
+  return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result, gap: gap?.image ?? null }
 }
 
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
@@ -3993,7 +4002,7 @@ async function runMobile(browser, base) {
 
 async function run() {
   const runStarted = Date.now()
-  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['switch', [SWITCH_CHECK.level]], ['audio', [AUDIO_CHECK.level]]]
+  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['switch', [SWITCH_CHECK.level]], ['dark', [SWITCH_CHECK.level]], ['audio', [AUDIO_CHECK.level]]]
     .filter(([s, ls]) => ls.join() !== STEP_LEVELS[s].join())
   if (drift.length) throw new Error(`STEP_LEVELS in e2e/shards.mjs disagrees with the checks: ${drift.map(([s, ls]) => `${s} runs on ${ls.join(', ')}`).join('; ')}`)
   const budget = startTimeBudget(runStarted)
@@ -4139,8 +4148,6 @@ async function run() {
     const desktopAspect = await aspectProblems(page, 'desktop 1280x720')
     problems.push(...desktopAspect.problems)
     stats.view = desktopAspect.view
-    const gap = id === GAP_LEVEL ? await gapShot(page) : null
-    if (gap) problems.push(...gap.problems)
     const perfGate = PERF_GATE ? sceneBudgetCheck(id, stats) : null
     if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget: ${perfGate.over.join(', ')}`)
     const frenzy = has('frenzy') && id === first
@@ -4162,7 +4169,7 @@ async function run() {
     results.push({
       id, ok, problems, frames, frameSeconds, rideMsPerFrame: frames > 0 ? ride.ms / frames : null,
       seconds: (Date.now() - started) / 1000, spawnDigest, ...stats, perfGate, shaders, throttled,
-      kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, gap: gap?.image ?? null, errors: allErrors,
+      kills: play.kills, score: play.score, combat: play.combat, results: play.results, frenzyEnd: frenzyEnd?.result ?? null, image: img, enemies: enemyShot, errors: allErrors,
     })
     await ctx.close()
   }
@@ -4227,7 +4234,7 @@ async function run() {
   if (has('pickup') && wanted.includes(PICKUP_CHECK.level)) await pageStep(pickupCheck)
 
   // 6f. Shoot-to-switch: the shot run rides the hard branch, the other the easy way (level6-switch.png, level6-switch-hard.png)
-  if (has('switch') && wanted.includes(SWITCH_CHECK.level)) await pageStep(switchCheck)
+  if (has('switch') && wanted.includes(SWITCH_CHECK.level)) await pageStep((page) => switchCheck(page, { darkShots: has('dark') }))
 
   // 6d. The score engine and arcade SFX: title -> level -> pause -> results
   if (has('audio') && wanted.includes(AUDIO_CHECK.level)) {
