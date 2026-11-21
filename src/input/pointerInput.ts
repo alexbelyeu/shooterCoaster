@@ -14,6 +14,9 @@
  * - A mouse (or hovering pen) moves the aim without a button held; a finger only
  *   aims while it touches the screen.
  *
+ * - A gamepad (`gamepadInput.ts`) drives the same state through `gamepadAim` / `gamepadTrigger`, as a mouse:
+ *   whichever moved last owns the aim, and a held mouse button keeps the trigger until it lifts.
+ *
  * Coordinates are CSS pixels in the viewport (clientX / clientY).
  */
 
@@ -42,6 +45,8 @@ const state: AimPointerState = {
 
 /** pointerId of the pointer currently holding the trigger, or null. */
 let activeId: number | null = null
+/** The gamepad's trigger holds the trigger (no pointer does). */
+let padHeld = false
 const listeners = new Set<PointerListener>()
 
 const UI_SELECTOR = 'button, a, input, select, textarea, label, [role="button"], [data-no-fire]'
@@ -74,6 +79,7 @@ function onPointerDown(e: PointerEvent) {
     return
   }
   activeId = e.pointerId
+  padHeld = false
   state.x = e.clientX
   state.y = e.clientY
   state.kind = kind
@@ -103,6 +109,7 @@ function onPointerUp(e: PointerEvent) {
 function release() {
   if (activeId === null && !state.down) return
   activeId = null
+  padHeld = false
   state.down = false
   emit('up')
 }
@@ -135,6 +142,7 @@ function uninstall() {
   document.removeEventListener('visibilitychange', onVisibilityChange)
   window.removeEventListener('contextmenu', onContextMenu)
   activeId = null
+  padHeld = false
   state.down = false
 }
 
@@ -154,4 +162,23 @@ export function subscribePointer(listener: PointerListener): () => void {
 /** Current aim pointer state (read-only snapshot reference). */
 export function getPointerState(): Readonly<AimPointerState> {
   return state
+}
+
+/** The gamepad's cursor moved the aim to (x, y), CSS px; it aims as a mouse does. */
+export function gamepadAim(x: number, y: number) {
+  state.x = x
+  state.y = y
+  state.kind = 'mouse'
+  emit('move')
+}
+
+/** The gamepad's trigger was pulled or let go; a pointer holding the trigger keeps it. */
+export function gamepadTrigger(pulled: boolean) {
+  if (activeId !== null || pulled === padHeld) return
+  if (pulled) {
+    padHeld = true
+    state.kind = 'mouse'
+    state.down = true
+    emit('down')
+  } else release()
 }

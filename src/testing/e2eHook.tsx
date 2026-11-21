@@ -315,6 +315,8 @@ export interface SCTestApi {
   audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { killsPlayed: number }>
   /** Whether pointer input has the trigger held (released on blur / tab hide). */
   triggerHeld: () => boolean
+  /** The shared aim point (CSS px), whichever device moved it last (pointer or gamepad, #819). */
+  aimPoint: () => { x: number; y: number }
   /** Offline render of the game's own music / SFX code (`npm run audio:render`, `testing/audioRender.ts`).
    *  Only on the title screen before audio unlocks: the engines build in the offline context while it runs. */
   renderAudio: (req: AudioRenderRequest, seed?: number) => Promise<AudioRenderResult>
@@ -1154,6 +1156,10 @@ export function installE2EApi() {
       return { quality, profile: qualityProfile(quality), adaptiveSteps: getAdaptiveSteps(), reducedMotion }
     },
     triggerHeld: () => getPointerState().down,
+    aimPoint: () => {
+      const p = getPointerState()
+      return { x: p.x, y: p.y }
+    },
     summonBoss: () => { e2eBoss.summon = useGameStore.getState().runId },
     boss: readBoss,
     bossHit,

@@ -22,6 +22,7 @@ import { sfx } from '@/audio/sfx'
 import { whenAudioReady } from '@/audio/AudioEngine'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { usePauseOnHidden } from './usePauseOnHidden'
+import { useGamepad } from '@/input/gamepadInput'
 import Screen from './Screen'
 import { perfRequested } from '@/perf/perfFlag'
 import { getAllLevels } from '@/levels/LevelRegistry'
@@ -48,6 +49,7 @@ export default function App() {
   const [veiled, setVeiled] = useState(false)
   const veilTimer = useRef<number | undefined>(undefined)
   usePauseOnHidden()
+  useGamepad()
   const reducedMotion = usePrefersReducedMotion()
   const inPlay = isLevelActive(phase)
 
