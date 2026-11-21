@@ -97,7 +97,7 @@ export default function ResultsScreen() {
     left.current = true
     const store = useGameStore.getState()
     if (to === 'replay') store.restartRun('results')
-    else if (to === 'next' && nextLevel) store.startRun(nextLevel, undefined, undefined, false, 'results')
+    else if (to === 'next' && nextLevel) store.startRun(nextLevel, { from: 'results' })
     else store.setPhase('levelSelect')
   }
 

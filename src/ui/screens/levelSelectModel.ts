@@ -92,25 +92,13 @@ export function totalStars(cards: readonly LevelCard[]): { earned: number; max: 
 }
 
 /**
- * The level title PLAY starts (#329): the first without a star (the next one to play; the chain unlocks it), else the
- * last campaign level played, else the first.
+ * The player's next level, the one rule title PLAY starts (`startNextRun`, #329) and level select focuses first (#818):
+ * the first unlocked level without a star (the chain unlocks it), else the last campaign level played, else the first.
  */
-export function nextLevelForPlayer(
-  levels: readonly Pick<LevelSelectSource, 'id'>[],
-  savedScores: Record<string, ScoreEntry | undefined>,
-  lastLevel: string | null,
-): string {
-  const fresh = levels.find((l) => (savedScores[l.id]?.stars ?? 0) < 1)
-  if (fresh) return fresh.id
-  return levels.find((l) => l.id === lastLevel)?.id ?? levels[0].id
-}
-
-/** Card to focus first: the first unlocked level without a star (the next one to play), else the last unlocked. */
-export function initialFocusIndex(cards: readonly LevelCard[]): number {
+export function nextLevelIndex(cards: readonly Pick<LevelCard, 'id' | 'unlocked' | 'stars'>[], lastLevel: string | null): number {
   const fresh = cards.findIndex((c) => c.unlocked && c.stars === 0)
   if (fresh >= 0) return fresh
-  for (let i = cards.length - 1; i >= 0; i--) if (cards[i].unlocked) return i
-  return 0
+  return Math.max(0, cards.findIndex((c) => c.unlocked && c.id === lastLevel))
 }
 
 export type NavKey = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | 'Home' | 'End'

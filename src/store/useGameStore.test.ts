@@ -6,6 +6,7 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import type { ScoreEntry } from '@/types/game'
 import { dailySeed } from '@/levels/daily'
 import { campaignScoreLimits } from '@/levels/scoreLimits'
+import { buildLevelCards, nextLevelIndex } from '@/ui/screens/levelSelectModel'
 
 // Node has no window/localStorage. zustand's persist reads `window.localStorage`
 // when the store is created, so install a tiny in-memory Storage on a bare
@@ -122,7 +123,7 @@ describe('startRun', () => {
     store().registerShot()
     store().registerHit()
     store().registerKill()
-    store().startRun('level2', 42)
+    store().startRun('level2', { seed: 42 })
     expect(store()).toMatchObject({
       phase: 'loading',
       skipIntro: false,
@@ -139,10 +140,10 @@ describe('startRun', () => {
   })
 
   it('starts at normal time when the last run ended in slow-mo (quit or restart during the last-kill slow-mo)', () => {
-    store().startRun('level1', 1)
+    store().startRun('level1', { seed: 1 })
     store().setSlowMo(0.1, 'on')
     store().setPhase('paused')
-    store().startRun('level1', 1)
+    store().startRun('level1', { seed: 1 })
     expect(store().timeScale).toBe(1)
     expect(store().frenzy).toBe('off')
   })
@@ -154,7 +155,7 @@ describe('startRun', () => {
     store().setSlowMo(0.5, 'out')
     store().pickUpWeapon('spread')
     expect(store().weapon).not.toEqual(fresh.weapon)
-    store().startRun('level1', 1)
+    store().startRun('level1', { seed: 1 })
     for (const key of ['score', 'kills', 'shotsFired', 'hits', 'bestCombo', 'combo', 'timeScale', 'frenzy', 'boss', 'weapon'] as const)
       expect(store()[key], key).toEqual(fresh[key])
   })
@@ -177,48 +178,48 @@ describe('startRun', () => {
   })
 
   it('bumps runId every run, the same level and seed included (Restart)', () => {
-    store().startRun('level1', 5)
+    store().startRun('level1', { seed: 5 })
     const first = store().runId
     store().setPhase('paused')
-    store().startRun('level1', 5)
+    store().startRun('level1', { seed: 5 })
     expect(store().runId).toBe(first + 1)
   })
 
   it('keeps sceneReady for a restart of the warmed-up level, clears it for a new level (#597)', () => {
-    store().startRun('level1', 5)
+    store().startRun('level1', { seed: 5 })
     store().setSceneReady(true)
-    store().startRun('level1', 5)
+    store().startRun('level1', { seed: 5 })
     expect(store().sceneReady).toBe(true)
-    store().startRun('level2', 5)
+    store().startRun('level2', { seed: 5 })
     expect(store().sceneReady).toBe(false)
   })
 
   it('restarts a warm level straight into the countdown, a cold one through the loading screen, never the intro (#674)', () => {
-    store().startRun('level1', 5)
+    store().startRun('level1', { seed: 5 })
     store().setSceneReady(true)
     store().restartRun('results')
     expect(store()).toMatchObject({ phase: 'countdown', skipIntro: true, sceneReady: true })
     store().setSceneReady(false)
     store().restartRun('results')
     expect(store()).toMatchObject({ phase: 'loading', skipIntro: true })
-    store().startRun('level1', 5)
+    store().startRun('level1', { seed: 5 })
     expect(store().skipIntro).toBe(false)
   })
 
   it('keeps a warm level\'s loading stages for a new start of it, its scene won\'t report them again (#674)', () => {
-    store().startRun('level1', 5)
+    store().startRun('level1', { seed: 5 })
     for (const stage of ['chunk', 'scene', 'shaders', 'audio'] as const) reportLoad('level1', stage, 1)
     store().setSceneReady(true)
-    store().startRun('level1', 5)
+    store().startRun('level1', { seed: 5 })
     expect(store().phase).toBe('loading')
     expect(loadFraction()).toBeCloseTo(1, 10)
-    store().startRun('level2', 5)
+    store().startRun('level2', { seed: 5 })
     expect(loadFraction()).toBe(0)
   })
 
   it('lets a cold restart of the still-mounted level finish loading: its stages so far are kept (#686)', () => {
-    store().startRun('level2', 5)
-    store().startRun('level1', 5)
+    store().startRun('level2', { seed: 5 })
+    store().startRun('level1', { seed: 5 })
     for (const stage of ['chunk', 'scene'] as const) reportLoad('level1', stage, 1)
     reportLoad('level1', 'shaders', 0.4)
     store().restartRun('results')
@@ -233,13 +234,13 @@ describe('daily runs', () => {
   const daily = { mode: 'daily', dateKey: '2026-10-31' } as const
 
   it('seeds a daily run from its date, and ?seed= still overrides it', () => {
-    store().startRun('level2', undefined, daily)
+    store().startRun('level2', { mode: daily })
     expect(store().runSeed).toBe(dailySeed('2026-10-31'))
     expect(store().runMode).toEqual(daily)
     const w = globalThis.window as unknown as { location?: { search: string } }
     w.location = { search: '?seed=777' }
     try {
-      store().startRun('level2', undefined, daily)
+      store().startRun('level2', { mode: daily })
       expect(store().runSeed).toBe(777)
     } finally {
       delete w.location
@@ -247,28 +248,42 @@ describe('daily runs', () => {
   })
 
   it('a plain startRun is a campaign run', () => {
-    store().startRun('level2', undefined, daily)
-    store().startRun('level1', 3)
+    store().startRun('level2', { mode: daily })
+    store().startRun('level1', { seed: 3 })
     expect(store().runMode).toEqual({ mode: 'campaign' })
   })
 
   it('restartRun keeps a daily run and its seed, and reseeds a campaign run', () => {
-    store().startRun('level3', 99, daily)
+    store().startRun('level3', { seed: 99, mode: daily })
     store().restartRun('results')
     expect(store()).toMatchObject({ currentLevel: 'level3', runSeed: 99, runMode: daily })
     vi.spyOn(Date, 'now').mockReturnValue(1_000)
-    store().startRun('level1', 5)
+    store().startRun('level1', { seed: 5 })
     store().restartRun('results')
     expect(store()).toMatchObject({ currentLevel: 'level1', runSeed: 1_000, runMode: { mode: 'campaign' } })
   })
 
   it('records where a run started and the last campaign level, which a Daily Run leaves alone', () => {
-    store().startRun('level2', 1, undefined, false, 'title')
+    store().startRun('level2', { seed: 1, from: 'title' })
     expect(store()).toMatchObject({ runFrom: 'title', lastLevel: 'level2' })
     store().restartRun('pause')
     expect(store().runFrom).toBe('pause')
-    store().startRun('level4', 1, daily)
+    store().startRun('level4', { seed: 1, mode: daily })
     expect(store()).toMatchObject({ runFrom: 'select', lastLevel: 'level2' })
+  })
+
+  it('startNextRun starts the level the worlds focus first, on an all-starred save the last one played (#818)', () => {
+    const levels = getAllLevels()
+    useGameStore.setState({ savedScores: Object.fromEntries(levels.map((l) => [l.id, entry(l.id, 100, 3)])) })
+    store().startRun('level2', { seed: 1 })
+    store().startNextRun('title')
+    const cards = buildLevelCards(levels, store().savedScores, store().isLevelUnlocked, {})
+    expect(store()).toMatchObject({ currentLevel: 'level2', runFrom: 'title', runMode: { mode: 'campaign' } })
+    expect(cards[nextLevelIndex(cards, store().lastLevel)].id).toBe('level2')
+
+    useGameStore.setState({ savedScores: { level1: entry('level1', 100, 1) } })
+    store().startNextRun('title')
+    expect(store().currentLevel).toBe('level2')
   })
 
   it('saves the day best and the streak without touching campaign scores or unlocks', () => {
@@ -283,13 +298,13 @@ describe('daily runs', () => {
   })
 
   it('saveRunResult keeps a daily run apart from the campaign, and runBest reads the run mode\'s best', () => {
-    store().startRun('level2', undefined, daily)
+    store().startRun('level2', { mode: daily })
     store().saveRunResult(entry('level2', 500, 2))
     expect(store().savedDaily['2026-10-31'].score).toBe(500)
     expect(store().savedScores).toEqual({})
     expect(runBest(store())?.score).toBe(500)
 
-    store().startRun('level2', 1)
+    store().startRun('level2', { seed: 1 })
     expect(runBest(store())).toBeUndefined()
     store().saveRunResult(entry('level2', 300, 1))
     expect(store().savedScores.level2.score).toBe(300)
@@ -326,7 +341,7 @@ describe('pause and resume', () => {
   it('Restart from the pause menu drops a pending resume', () => {
     store().setPhase('paused')
     store().resume()
-    store().startRun('level1', 1)
+    store().startRun('level1', { seed: 1 })
     expect(store().resuming).toBe(false)
   })
 })
@@ -463,7 +478,7 @@ describe('leaderboard', () => {
     store().addLeaderboardEntry('level1', { score: 500, stars: 1, date: 7 })
     store().setEntryInitials('level1', 7, 'BOB')
     store().saveDailyScore(entry('level1', 300, 1), '2026-10-31')
-    store().startRun('level1', 1)
+    store().startRun('level1', { seed: 1 })
     store().clearLocalData()
     expect(store().lastLevel).toBeNull()
     expect(store().savedScores).toEqual({})

@@ -22,12 +22,20 @@ import { startPhaseFor } from './startPhase'
 import { resetLoad } from '@/core/loadProgress'
 import { NO_PICKUP, applyPickup, type PickupWeaponId, type WeaponState } from '@/combat/weapons/weaponTypes'
 import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/daily'
-import { getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
+import { buildLevelCards, nextLevelIndex } from '@/ui/screens/levelSelectModel'
 import { scoreAfterPenalty } from '@/levels/scoring'
 // The generated table, not `scoreLimits()`, which would pull the boss specs into the startup JS.
 import { LEVEL_LIMITS } from '../../api/_lib/levelLimits'
 
 const CAMPAIGN: RunMode = { mode: 'campaign' }
+
+export interface StartRunOptions {
+  seed?: number
+  mode?: RunMode
+  replay?: boolean
+  from?: RunFrom
+}
 
 const boardCeilings = () => Object.fromEntries(Object.entries(LEVEL_LIMITS).map(([id, l]) => [id, l.maxScore]))
 
@@ -52,9 +60,11 @@ interface GameState {
   /**
    * The one way to start a level (enters `loading`, `playing` under `?e2e=1`; `startPhase.ts`); seed precedence:
    * `seed` > `?seed=` > the daily seed of `mode.dateKey` (daily runs) > `Date.now()`. A `replay` skips the intro, and
-   * the loading screen too when the level is still warm.
+   * the loading screen too when the level is still warm. A campaign run from level select unless told otherwise.
    */
-  startRun: (levelId: string, seed?: number, mode?: RunMode, replay?: boolean, from?: RunFrom) => void
+  startRun: (levelId: string, options?: StartRunOptions) => void
+  /** Starts the player's next level (`nextLevelIndex`, the one level select focuses first): title PLAY, #329. */
+  startNextRun: (from: RunFrom) => void
   /** Restarts the current level in the same mode: a daily keeps its seed, a campaign run gets a fresh one. */
   restartRun: (from: RunFrom) => void
   /** This run's loading screen goes straight to the countdown (a restart), not the intro. */
@@ -179,7 +189,7 @@ export const useGameStore = create<GameState>()(
       runMode: CAMPAIGN,
       runFrom: 'select',
       lastLevel: null,
-      startRun: (levelId, seed, mode = CAMPAIGN, replay = false, from = 'select') => {
+      startRun: (levelId, { seed, mode = CAMPAIGN, replay = false, from = 'select' } = {}) => {
         markStartup('runStart')
         const fallback = mode.mode === 'daily' ? dailySeed(mode.dateKey) : Date.now()
         const s = get()
@@ -206,7 +216,12 @@ export const useGameStore = create<GameState>()(
       restartRun: (from) => {
         const { currentLevel, runMode, runSeed, startRun } = get()
         if (!currentLevel) return
-        startRun(currentLevel, runMode.mode === 'daily' ? runSeed : undefined, runMode, true, from)
+        startRun(currentLevel, { seed: runMode.mode === 'daily' ? runSeed : undefined, mode: runMode, replay: true, from })
+      },
+      startNextRun: (from) => {
+        const { savedScores, isLevelUnlocked, lastLevel, startRun } = get()
+        const cards = buildLevelCards(getAllLevels(), savedScores, isLevelUnlocked, {})
+        startRun(cards[nextLevelIndex(cards, lastLevel)].id, { from })
       },
       skipIntro: false,
 
