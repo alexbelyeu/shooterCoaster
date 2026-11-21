@@ -32,6 +32,14 @@ describe('climbing pieces (#757)', () => {
     expect(climbingStraight(start(), 5).position.y).toBe(0)
   })
 
+  it("throws when the run can't make the rise, rather than tightening forever (#815)", () => {
+    expect(() => climbingStraight(start(), 0.5, { rise: 4 })).toThrow("can't climb 4 over 0.5")
+    expect(() => climbingStraight(start(), 0, { rise: -1 })).toThrow("can't climb -1 over 0")
+    const b = start()
+    expect(() => straightTo(b, 'z', b.position.z, { rise: 1 })).toThrow("can't climb 1 over 0")
+    expect(climbingStraight(start(), 1, { rise: 5 }).position.y).toBeCloseTo(5, 3) // steep, but under tan 1.4
+  })
+
   it('a straight to a line on the plan stops on it', () => {
     const b = start()
     straightTo(b, 'z', 9, { rise: 1.5 })

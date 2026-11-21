@@ -30,7 +30,8 @@ export function gradeFor(length: number, rise: number, ease: number, along: 'gro
 
 /**
  * Straight on over `run` units of ground, climbing `rise` on the way. The pitches cover 2·ease·sin g of the ground and the
- * grade the rest; when even the steepest grade that fits can't climb it, the pitches tighten until one does.
+ * grade the rest; when even the steepest grade that fits can't climb it, the pitches tighten until one does. A rise over
+ * about 5.8 × run (the 1.4 rad grade's tangent), or any rise over no run, can't be climbed: it throws.
  */
 export function climbingStraight(b: RideBuilder, run: number, { rise = 0, ease = 2 * b.eyeHeight } = {}): RideBuilder {
   if (Math.abs(rise) < 1e-6) return b.straight(run)
@@ -38,7 +39,10 @@ export function climbingStraight(b: RideBuilder, run: number, { rise = 0, ease =
   let e = ease
   const climb = (g: number) => 2 * e * (1 - Math.cos(g)) + ((run - 2 * e * Math.sin(g)) / Math.cos(g)) * Math.sin(g)
   const steepest = () => Math.min(Math.asin(Math.min(run / (2 * e), 1)), 1.4)
-  while (climb(steepest()) < up) e *= 0.8
+  for (let i = 0; climb(steepest()) < up; i++) {
+    if (i === MAX_TIGHTENINGS) throw new Error(`climbingStraight: can't climb ${rise} over ${run}`)
+    e *= 0.8
+  }
   let lo = 0
   let hi = steepest()
   for (let i = 0; i < 40; i++) {
@@ -52,6 +56,9 @@ export function climbingStraight(b: RideBuilder, run: number, { rise = 0, ease =
   if (middle > 1e-3) b.straight(middle)
   return b.pitch(-g, e)
 }
+
+/** How many times the pitches tighten (by 0.8 each) before a straight gives up: down to ~1e-10 of their ease. */
+const MAX_TIGHTENINGS = 100
 
 /** A climbing straight on until the builder is at `value` along world `axis` (it must be heading along that axis). */
 export function straightTo(b: RideBuilder, axis: 'x' | 'z', value: number, options: { rise?: number; ease?: number } = {}): RideBuilder {
@@ -77,7 +84,7 @@ export function climbingTurn(
   return b.pitch(-g, ease)
 }
 
-const UNROLLED_COS = Math.cos((0.5 * Math.PI) / 180)
+const TRIM_UP_COS = Math.cos((0.5 * Math.PI) / 180)
 const _tangent = new THREE.Vector3()
 const _unrolled = new THREE.Vector3()
 
@@ -92,6 +99,6 @@ export function trimUnrolledUps(points: readonly RailPoint[]): RailPoint[] {
     if (Math.abs(_tangent.y) > 0.85) return p
     unrolledUp(_tangent, _unrolled)
     const cos = (_unrolled.x * p.up.x + _unrolled.y * p.up.y + _unrolled.z * p.up.z) / Math.hypot(p.up.x, p.up.y, p.up.z)
-    return cos > UNROLLED_COS ? { x: p.x, y: p.y, z: p.z } : p
+    return cos > TRIM_UP_COS ? { x: p.x, y: p.y, z: p.z } : p
   })
 }
