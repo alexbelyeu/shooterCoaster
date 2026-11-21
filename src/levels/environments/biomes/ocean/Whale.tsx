@@ -8,6 +8,7 @@ import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { WHALE_SPLASH_DEATH_STYLE } from '@/effects/deathStyles'
 import { distanceAtT, type ArcTable } from '@/track/arcLength'
 import type { RideSpeeds } from '@/track/ridePhysics'
+import type { WhaleBreachSpec } from '@/types/level'
 import { rideProgress } from '@/track/rideProgress.hot'
 import { createWhaleGeometry } from './seaProps'
 import {
@@ -21,8 +22,8 @@ const CRASH_TRAUMA_MS = 600
 const MAX_PHASE_STEP = 0.2
 
 /** Scenery, not a target: one mesh, hidden but for the breach, and nothing raycasts it (shots only test enemies). */
-export default function Whale({ track, speeds }: { track: ArcTable; speeds: RideSpeeds }) {
-  const site = useMemo(() => breachSite(track, speeds), [track, speeds])
+export default function Whale({ track, speeds, spec }: { track: ArcTable; speeds: RideSpeeds; spec: WhaleBreachSpec }) {
+  const site = useMemo(() => breachSite(track, speeds, spec), [track, speeds, spec])
   const geometry = useMemo(() => createWhaleGeometry(WHALE_LENGTH), [])
   const material = useMemo(
     () => new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }),

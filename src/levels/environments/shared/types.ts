@@ -3,6 +3,7 @@ import type * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
 import type { RideSpeeds } from '@/track/ridePhysics'
+import type { WhaleBreachSpec } from '@/types/level'
 import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
 import type { FogModifiers } from './sceneFog'
@@ -60,6 +61,8 @@ export interface BiomeFeaturesProps {
   track: ArcTable
   /** The ride's speeds (`rideModel`), for biome events timed on the ride (Ocean's whale). */
   speeds: RideSpeeds
+  /** The level's whale breach (`environment.whale`), when it asks for one (Ocean's Features). */
+  whale?: WhaleBreachSpec
   atmosphere: AtmosphereConfig
   /** The scene fog's modifiers, for biome events that pull it in (the volcanic eruption publishes `fog.eruption`). */
   fog: FogModifiers

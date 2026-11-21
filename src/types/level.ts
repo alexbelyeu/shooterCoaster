@@ -201,6 +201,16 @@ export interface EnemyWave {
   route?: 'hard'
 }
 
+/** A whale breaching across the ride (Ocean, #793), where and when the level puts it; the breach's own shape is `BREACH` in `biomes/ocean/whaleBreach.ts`. */
+export interface WhaleBreachSpec {
+  /** Level seconds at the ride's own pace (`rideProfile`): it runs on ride distance, so slow-mo slows it with the car. */
+  startSeconds: number
+  /** Out along the rider's heading at mid-breach, past the drawn terrain's edge. */
+  lead: number
+  /** Turned off that heading (radians, toward the ride's left). */
+  aim: number
+}
+
 export interface LevelConfig {
   id: string
   name: string
@@ -228,5 +238,7 @@ export interface LevelConfig {
     hasWater?: boolean
     hasTrees?: boolean
     treeCount?: number
+    /** Opt-in: an ocean level's whale breach; none when unset. */
+    whale?: WhaleBreachSpec
   }
 }

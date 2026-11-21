@@ -1,40 +1,54 @@
 import { describe, expect, it } from 'vitest'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { getAllLevels } from '@/levels/LevelRegistry'
 import { buildArcTable, indexAtT, tAtLoopDistance } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { rideModel, rideProfile, riddenBetween } from '@/track/ridePhysics'
+import { withTunnels } from '@/track/setPieces'
+import { getTrackDimensions } from '@/track/trackDimensions'
 import { ENEMY_PLACEMENT } from '@/entities/spawning/enemyPlacement'
 import { FORMATIONS, TRACKSIDE } from '@/entities/spawning/spawnPlacement'
 import { createHeightFunction, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
+import type { LevelConfig, WhaleBreachSpec } from '@/types/level'
 import { maxGroundUnder } from './seaPlacement'
 import { BREACH, WHALE_LENGTH, breachPhase, breachSite, rideHeading, whalePose, type WhalePose } from './whaleBreach'
 
-const level = getLevelConfig('level3')!
-const curve = createTrackCurve(level.track)
-const table = buildArcTable(curve)
-const speeds = rideModel(level.track, table)
-const site = breachSite(table, speeds)
-const end = BREACH.startSeconds + BREACH.seconds
-const profile = rideProfile(table, speeds, end)
+const WHALE_LEVELS = getAllLevels().filter((l): l is LevelConfig & { environment: { whale: WhaleBreachSpec } } => !!l.environment.whale)
 const HALF = WHALE_LENGTH / 2
 const STEPS = 24
 const pose: WhalePose = { x: 0, y: 0, z: 0, pitch: 0, roll: 0 }
 
-function rider(u: number) {
-  const dist = site.from + u * (site.to - site.from)
-  const i = indexAtT(table, tAtLoopDistance(table, dist))
-  return { x: table.x[i], y: table.y[i], z: table.z[i], heading: rideHeading(table, i) }
-}
+it('a whale breaches only where a level asks for one, only at sea, and on level 3 about 30 s in', () => {
+  expect(WHALE_LEVELS.map((l) => l.id)).toContain('level3')
+  for (const level of WHALE_LEVELS) expect(level.biome).toBe('ocean')
+  const ocean = WHALE_LEVELS.find((l) => l.id === 'level3')!.environment.whale
+  const mid = ocean.startSeconds + BREACH.seconds / 2
+  expect(mid).toBeGreaterThan(29)
+  expect(mid).toBeLessThan(33)
+})
 
-describe('the whale breach on Ocean', () => {
-  it('comes about 30 s in and is gone well before the Kraken', () => {
-    expect(BREACH.startSeconds + BREACH.seconds / 2).toBeGreaterThan(29)
-    expect(BREACH.startSeconds + BREACH.seconds / 2).toBeLessThan(33)
-    expect(level.boss!.at - end).toBeGreaterThan(5)
+describe.each(WHALE_LEVELS.map((l) => [l.id, l] as const))('the whale breach on %s', (_id, level) => {
+  const spec = level.environment.whale
+  const curve = createTrackCurve(level.track)
+  // The table the scene rides (`LevelScene`): the curve's, with its tunnels.
+  const table = withTunnels(buildArcTable(curve), level.track.tunnels, getTrackDimensions(level.track).trackScale)
+  const speeds = rideModel(level.track, table)
+  const site = breachSite(table, speeds, spec)
+  const end = spec.startSeconds + BREACH.seconds
+  const profile = rideProfile(table, speeds, end)
+
+  function rider(u: number) {
+    const dist = site.from + u * (site.to - site.from)
+    const i = indexAtT(table, tAtLoopDistance(table, dist))
+    return { x: table.x[i], y: table.y[i], z: table.z[i], heading: rideHeading(table, i) }
+  }
+
+  it('comes once the ride is under way and is gone well before the boss', () => {
+    expect(spec.startSeconds).toBeGreaterThan(0)
+    if (level.boss) expect(level.boss.at - end).toBeGreaterThan(5)
   })
 
   it('runs on ride distance, the same every run', () => {
-    expect(breachSite(table, speeds)).toEqual(site)
+    expect(breachSite(table, speeds, spec)).toEqual(site)
     expect(breachPhase(site, site.from)).toBe(0)
     expect(breachPhase(site, site.to)).toBe(1)
     expect(breachPhase(site, site.from - 1)).toBeLessThan(0)
