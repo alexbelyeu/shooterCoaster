@@ -1,18 +1,13 @@
-/** Where and when Ocean's whale breaches (#793), on ride distance so it plays the same every run and in `npm run clip`. */
+/** Ocean's whale breach (#793): its shape (`BREACH`) and where it lands from the level's `environment.whale`, on ride distance so it plays the same every run and in `npm run clip`. */
 import { MathUtils } from 'three'
 import { indexAtT, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
 import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
+import type { WhaleBreachSpec } from '@/types/level'
 
 export const WHALE_LENGTH = 700
 
 export const BREACH = {
-  /** Level seconds at the ride's own pace (`rideProfile`): it runs on ride distance, so slow-mo slows it with the car. */
-  startSeconds: 31.25,
   seconds: 2.75,
-  /** Out along the rider's heading at mid-breach, past the drawn terrain's edge: the islands end there, the sea runs on. */
-  lead: 3700,
-  /** Turned off that heading (radians, toward the ride's left): through the gap between two islands. */
-  aim: 0.1,
   travel: 300,
   /** The centre starts and ends this far under the surface (the whole body under), and peaks this far above it. */
   depth: 0.6 * WHALE_LENGTH,
@@ -44,18 +39,18 @@ export function rideHeading(table: ArcTable, i: number): { x: number; z: number 
   return { x: dx / h, z: dz / h }
 }
 
-export function breachSite(table: ArcTable, speeds: RideSpeeds): BreachSite {
-  const end = BREACH.startSeconds + BREACH.seconds
+export function breachSite(table: ArcTable, speeds: RideSpeeds, spec: WhaleBreachSpec): BreachSite {
+  const end = spec.startSeconds + BREACH.seconds
   const profile = rideProfile(table, speeds, end)
-  const from = riddenBetween(profile, 0, BREACH.startSeconds)
+  const from = riddenBetween(profile, 0, spec.startSeconds)
   const to = riddenBetween(profile, 0, end)
   const i = indexAtT(table, tAtLoopDistance(table, (from + to) / 2))
   const h = rideHeading(table, i)
-  const c = Math.cos(BREACH.aim)
-  const s = Math.sin(BREACH.aim)
+  const c = Math.cos(spec.aim)
+  const s = Math.sin(spec.aim)
   const ax = h.x * c + h.z * s
   const az = h.z * c - h.x * s
-  return { from, to, x: table.x[i] + ax * BREACH.lead, z: table.z[i] + az * BREACH.lead, dirX: -az, dirZ: ax }
+  return { from, to, x: table.x[i] + ax * spec.lead, z: table.z[i] + az * spec.lead, dirX: -az, dirZ: ax }
 }
 
 export function breachPhase(site: BreachSite, ridden: number): number {

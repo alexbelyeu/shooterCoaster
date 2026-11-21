@@ -128,6 +128,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
           speeds={speeds}
           darkSections={track.darkSections}
           weather={levelWeather(enemies)?.kind}
+          whale={environment.whale}
           hasWater={environment.hasWater}
           hasTrees={environment.hasTrees}
           treeCount={environment.treeCount}

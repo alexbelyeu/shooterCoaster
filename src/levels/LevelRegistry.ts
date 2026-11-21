@@ -106,6 +106,8 @@ const LEVELS: LevelConfig[] = [
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
       hasWater: true,
+      /** Through the gap between two islands, out where the sea runs on past the drawn terrain, ~30 s in and gone before the Kraken. */
+      whale: { startSeconds: 31.25, lead: 3700, aim: 0.1 },
     },
   },
   {
