@@ -3017,15 +3017,16 @@ async function titleFlyBy(page, drawCalls, lap) {
     })
     observer.observe(document.body, { childList: true, subtree: true })
   })
-  await page.keyboard.press('Enter')
+  // W is WORLDS (#329); PLAY's own path, straight into a run, is `titlePlayCheck` after the title budget.
+  await page.keyboard.press('w')
   const veiled = await page
     .waitForFunction(() => window.__veilSeen, null, { timeout: 10000, polling: 100 })
     .then(() => true, () => false)
-  if (!veiled) problems.push('a key press on the title did not fade to black')
+  if (!veiled) problems.push('W on the title did not fade to black')
   const opened = await page
     .waitForFunction(() => window.__SC_TEST__.phase() === 'levelSelect', null, { timeout: 30000 })
     .then(() => true, () => false)
-  if (!opened) problems.push('a key press on the title did not open level select')
+  if (!opened) problems.push('W on the title did not open level select')
   const veilGone = await page
     .waitForSelector('.screen-veil', { state: 'detached', timeout: 30000 })
     .then(() => true, () => false)
@@ -3042,6 +3043,32 @@ async function titleFlyBy(page, drawCalls, lap) {
   return { problems, result: { turnedDeg, moved, waited, hint, attract: attract.result, veiled, opened, engineBefore, engineAfter, sparkle } }
 }
 
+/** Title PLAY (#329): Enter on a fresh save starts level1's run with no level select in between. */
+async function titlePlayCheck(page) {
+  const problems = []
+  await page.evaluate(() => window.__SC_TEST__.setPhase('title'))
+  if (!(await waitVisible(page, '.title-screen .title-play', 30000))) return ['the title did not come back for PLAY']
+  await page.waitForTimeout(800) // PLAY's fade-in: a key before it lands still plays, but on a settled title
+  await page.evaluate(() => {
+    const seen = (window.__phasesSeen = [])
+    const tick = () => {
+      const p = window.__SC_TEST__.phase()
+      if (seen[seen.length - 1] !== p) seen.push(p)
+      if (p !== 'playing') requestAnimationFrame(tick)
+    }
+    tick()
+  })
+  await page.keyboard.press('Enter')
+  const started = await page
+    .waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 60000 })
+    .then(() => true, () => false)
+  const { seen, level } = await page.evaluate(() => ({ seen: window.__phasesSeen, level: window.__SC_TEST__.stats().currentLevel }))
+  if (!started) problems.push(`Enter on the title did not start a run (phases: ${seen.join(' > ')})`)
+  else if (level !== 'level1') problems.push(`Enter on a fresh title started ${level}, not level1`)
+  if (seen.includes('levelSelect')) problems.push(`PLAY went through level select (${seen.join(' > ')})`)
+  return problems
+}
+
 /** Longest the cold load may take to hand the poster over to the live scene before the poster check gives up. */
 const POSTER_HANDOFF_MS = 60000
 /** The poster's pieces and the live title's that must land on them; `x: false` compares only the vertical (the hint's text differs). */
@@ -3049,6 +3076,7 @@ const POSTER_PAIRS = [
   { name: 'logo', poster: '#poster .poster-logo svg', live: '.title-screen .title-logo svg' },
   { name: 'tagline', poster: '#poster .poster-tag', live: '.title-screen .title-tagline' },
   { name: 'PLAY', poster: '#poster .poster-play', live: '.title-screen .title-play' },
+  { name: 'Worlds', poster: '#poster .poster-worlds', live: '.title-screen .worlds-button' },
   { name: 'Settings', poster: '#poster .poster-settings', live: '.title-screen .settings-button' },
   { name: 'hint', poster: '#poster .poster-hint', live: '.title-screen .title-hint', x: false },
 ]
@@ -3821,11 +3849,11 @@ async function runMobile(browser, base) {
   await page.goto(`${base}/?e2e=1&seed=${SEED}`, { waitUntil: 'load' })
   await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
 
-  // Title -> PLAY (tap)
-  if (!(await waitVisible(page, '.title-screen .title-play'))) problems.push('PLAY button never appeared')
-  await tapCentre(page, '.title-screen .title-play').catch((e) => problems.push(`tap PLAY: ${e.message}`))
+  // Title -> WORLDS (tap); a tap on PLAY is the prod check's phone run (e2e/prod-check.mjs)
+  if (!(await waitVisible(page, '.title-screen .worlds-button'))) problems.push('WORLDS button never appeared')
+  await tapCentre(page, '.title-screen .worlds-button').catch((e) => problems.push(`tap WORLDS: ${e.message}`))
   await waitPhase('levelSelect', 15000)
-  if ((await phase()) !== 'levelSelect') problems.push('tapping PLAY did not open level select')
+  if ((await phase()) !== 'levelSelect') problems.push('tapping WORLDS did not open level select')
 
   // Level select -> level 1 (tap)
   const card = `.level-card[data-level="${MOBILE_LEVEL}"]`
@@ -4101,7 +4129,10 @@ async function run() {
       const poster = t.loading
       const noJs = await posterWithoutJs(browser, base, t.page)
       lap('noJs')
-      const problems = [...fly.problems, ...poster.problems, ...noJs, ...(await fontProblems(t.page))]
+      const fonts = await fontProblems(t.page)
+      const play = await titlePlayCheck(t.page)
+      lap('play')
+      const problems = [...fly.problems, ...poster.problems, ...noJs, ...fonts, ...play]
       if (titleWait.frames < MIN_FRAMES) problems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
       if (looksBlank(titleImg)) problems.push('title.png: the 3D scene behind the UI looks blank')
       if (budget.over.length && PERF_GATE) problems.push(`title scene over budget: ${budget.over.join(', ')}`)

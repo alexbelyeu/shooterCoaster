@@ -12,7 +12,7 @@ const SEQUENCES = {
 } as const
 type CountdownMode = keyof typeof SEQUENCES
 
-/** A tap (pointer released off the UI) jumps to GO once the countdown has run this long. */
+/** A tap (pointer released off the UI) jumps to GO once the countdown has run this long; before it, Escape backs out to the worlds. */
 const SKIPPABLE_AFTER_MS = 1000
 
 /** setTimeout that also waits out the e2e feedback hold, so a smoke screenshot can catch a step. */
@@ -70,6 +70,19 @@ export default function Countdown() {
       if (type === 'up' && performance.now() >= skippableAt) setStep(go)
     })
   }, [counting, go])
+
+  // Title PLAY goes straight into a run (#329): a player who wanted another world backs out in the first second.
+  useEffect(() => {
+    if (mode !== 'start') return
+    const until = performance.now() + SKIPPABLE_AFTER_MS
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.repeat || performance.now() >= until) return
+      const store = useGameStore.getState()
+      if (store.phase === 'countdown') store.setPhase('levelSelect')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mode])
 
   return (
     <div className="countdown">

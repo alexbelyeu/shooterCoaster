@@ -972,7 +972,7 @@ export function installE2EApi() {
       }))
     },
     startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
-    restartLevel: () => useGameStore.getState().restartRun(),
+    restartLevel: () => useGameStore.getState().restartRun('results'),
     levelReady: () => {
       const { sceneReady, currentLevel } = useGameStore.getState()
       return sceneReady && api.shaderWarmup?.levelId === currentLevel

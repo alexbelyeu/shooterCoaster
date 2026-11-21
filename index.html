@@ -105,7 +105,7 @@
         margin-bottom: 0.5rem;
       }
       .poster-logo svg { display: block; max-width: 94vw; height: auto; overflow: visible; }
-      /* The rest repeats the title's front in global.css (.title-tagline, .title-play, .settings-button, .title-hint, .fair-*). */
+      /* The rest repeats the title's front in global.css (.title-tagline, .title-play, .title-row, .title-hint, .fair-*). */
       .poster-title :is(.poster-tag, .poster-hint) {
         text-shadow: -2px -2px 0 #1b110d, 0 -2px 0 #1b110d, 2px -2px 0 #1b110d, 2px 0 0 #1b110d, -2px 0 0 #1b110d,
           -2px 2px 0 #1b110d, 0 2px 0 #1b110d, 2px 2px 0 #1b110d, 3px 4px 0 #1b110d;
@@ -141,10 +141,14 @@
         background: #e9b53d;
         box-shadow: 0 5px 0 #9a6414;
       }
-      .poster-title .poster-settings {
-        width: 9rem;
-        height: 44px;
+      .poster-title .poster-row {
+        display: flex;
+        gap: 0.75rem;
         margin-top: 1.4rem;
+      }
+      .poster-title .poster-row .poster-plate {
+        width: 8.5rem;
+        height: 44px;
         font-size: 1.3rem;
       }
       .poster-title .poster-hint {
@@ -194,7 +198,10 @@
         <div class="poster-logo"><svg viewBox="-32 52 1185 202" width="7.40625em" aria-hidden="true"><text x="0" y="200" font-family="Lobster, cursive" font-size="160" font-weight="700" fill="#fff" stroke="#14213d" stroke-width="12" stroke-linejoin="round" paint-order="stroke">ShooterCoaster</text><g transform="translate(1050 140)"><g><circle r="34" fill="#ff4757"></circle><circle r="22" fill="#fff"></circle><circle r="10" fill="#ff4757"></circle></g><g><path d="M0 -80V-66M0 66V80M-80 0H-66M66 0H80" stroke="#14213d" stroke-width="13" stroke-linecap="round"></path><path d="M0 -80V-66M0 66V80M-80 0H-66M66 0H80" stroke="#fff" stroke-width="5" stroke-linecap="round"></path></g></g><path d="M-20 232C300 236 700 232 960 232C1030 232 1105 200 1105 140A55 55 0 1 0 995 140C995 200 1040 238 1120 238" fill="none" stroke-linecap="round" stroke="#14213d" stroke-width="17"></path><path d="M-20 232C300 236 700 232 960 232C1030 232 1105 200 1105 140A55 55 0 1 0 995 140C995 200 1040 238 1120 238" fill="none" stroke-linecap="round" stroke="#ffc93c" stroke-width="7"></path><g transform="translate(1120 238) rotate(0)"><g stroke="#14213d" stroke-width="5"><circle cx="4" cy="-33" r="7" fill="#fff"></circle><rect x="-25" y="-28" width="50" height="22" rx="7" fill="#ff4757"></rect><circle cx="-13" cy="-5" r="5" fill="#14213d"></circle><circle cx="13" cy="-5" r="5" fill="#14213d"></circle></g></g></svg></div>
         <p class="poster-tag"><span>Ride.</span><span>Aim.</span><span>Shoot.</span></p>
         <p class="poster-plate poster-play">Play</p>
-        <p class="poster-plate poster-settings">Settings</p>
+        <div class="poster-row">
+          <p class="poster-plate poster-worlds">Worlds</p>
+          <p class="poster-plate poster-settings">Settings</p>
+        </div>
         <p class="poster-hint">Getting the ride ready.</p>
       </div>
     </div>

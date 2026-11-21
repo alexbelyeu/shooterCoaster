@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { changedOnly } from './changedOnlyStorage'
 import type { Route } from '@/track/mechanics'
-import type { GamePhase, ScoreEntry, ComboState, BossHud, RunMode } from '@/types/game'
+import type { GamePhase, ScoreEntry, ComboState, BossHud, RunFrom, RunMode } from '@/types/game'
 import {
   DEFAULT_INITIALS,
   insertEntry,
@@ -46,14 +46,17 @@ interface GameState {
   /** Bumped by every `startRun`: per-run state resets on it, never on a phase change (paused → playing can be a Restart). */
   runId: number
   runMode: RunMode
+  runFrom: RunFrom
+  /** The last campaign level started, persisted: title PLAY falls back to it once every level has a star. */
+  lastLevel: string | null
   /**
    * The one way to start a level (enters `loading`, `playing` under `?e2e=1`; `startPhase.ts`); seed precedence:
    * `seed` > `?seed=` > the daily seed of `mode.dateKey` (daily runs) > `Date.now()`. A `replay` skips the intro, and
    * the loading screen too when the level is still warm.
    */
-  startRun: (levelId: string, seed?: number, mode?: RunMode, replay?: boolean) => void
+  startRun: (levelId: string, seed?: number, mode?: RunMode, replay?: boolean, from?: RunFrom) => void
   /** Restarts the current level in the same mode: a daily keeps its seed, a campaign run gets a fresh one. */
-  restartRun: () => void
+  restartRun: (from: RunFrom) => void
   /** This run's loading screen goes straight to the countdown (a restart), not the intro. */
   skipIntro: boolean
 
@@ -106,7 +109,7 @@ interface GameState {
   /** Enters a run under `lastInitials`; returns its 0-based rank, or null when it misses the board. */
   addLeaderboardEntry: (levelId: string, run: { score: number; stars: number; date: number }) => number | null
   setEntryInitials: (levelId: string, date: number, initials: string) => void
-  /** Settings "Clear local data": scores, stars (so unlocks), leaderboards and the Daily Run's bests and streak. */
+  /** Settings "Clear local data": scores, stars (so unlocks), leaderboards, the last level played and the Daily Run's bests and streak. */
   clearLocalData: () => void
 
   /** Best daily run per UTC day (`YYYY-MM-DD`), the last `DAILY_KEEP_DAYS` only; never touches `savedScores`. */
@@ -174,7 +177,9 @@ export const useGameStore = create<GameState>()(
       runSeed: 0,
       runId: 0,
       runMode: CAMPAIGN,
-      startRun: (levelId, seed, mode = CAMPAIGN, replay = false) => {
+      runFrom: 'select',
+      lastLevel: null,
+      startRun: (levelId, seed, mode = CAMPAIGN, replay = false, from = 'select') => {
         markStartup('runStart')
         const fallback = mode.mode === 'daily' ? dailySeed(mode.dateKey) : Date.now()
         const s = get()
@@ -189,6 +194,8 @@ export const useGameStore = create<GameState>()(
           currentLevel: levelId,
           runSeed: (seed ?? urlSeed() ?? fallback) >>> 0,
           runMode: mode,
+          runFrom: from,
+          lastLevel: mode.mode === 'campaign' ? levelId : s.lastLevel,
           runId: s.runId + 1,
           sceneReady: warm,
           phase,
@@ -196,10 +203,10 @@ export const useGameStore = create<GameState>()(
           skipIntro: replay,
         })
       },
-      restartRun: () => {
+      restartRun: (from) => {
         const { currentLevel, runMode, runSeed, startRun } = get()
         if (!currentLevel) return
-        startRun(currentLevel, runMode.mode === 'daily' ? runSeed : undefined, runMode, true)
+        startRun(currentLevel, runMode.mode === 'daily' ? runSeed : undefined, runMode, true, from)
       },
       skipIntro: false,
 
@@ -286,6 +293,7 @@ export const useGameStore = create<GameState>()(
           lastInitials: DEFAULT_INITIALS,
           savedDaily: {},
           dailyStreak: { count: 0, lastKey: null },
+          lastLevel: null,
         }),
 
       savedDaily: {},
@@ -320,6 +328,7 @@ export const useGameStore = create<GameState>()(
         lastInitials: state.lastInitials,
         savedDaily: state.savedDaily,
         dailyStreak: state.dailyStreak,
+        lastLevel: state.lastLevel,
       }),
       // Hand-edited, older or half-written storage loads as valid data or not at all.
       merge: (persisted, current) => {
@@ -332,6 +341,7 @@ export const useGameStore = create<GameState>()(
           lastInitials: normalizeInitials(p.lastInitials),
           savedDaily: sanitizeSavedDaily(p.savedDaily),
           dailyStreak: sanitizeStreak(p.dailyStreak),
+          lastLevel: typeof p.lastLevel === 'string' && getLevelConfig(p.lastLevel) ? p.lastLevel : null,
         }
       },
     },
