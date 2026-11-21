@@ -99,6 +99,7 @@ import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs
 import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
 import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
+import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
 
 const SECONDS = Number(arg('seconds', 10))
 const OUT = path.resolve(arg('out', 'e2e-results'))
@@ -132,6 +133,7 @@ const SPEED_LEVEL = arg('speed-level')
 const BASE_PATH = `/${arg('base', '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/$/, '')
 let preview // module scope so the top-level catch can kill it
 const results = [] // module scope so the time-budget watchdog can write what ran
+let buildAtStart = null // a --url run's deployed build (#822), fetched again when the run fails
 let PLAN
 try {
   PLAN = planRun({ shard: arg('shard'), nightlyPart: arg('nightly-part'), steps: arg('steps'), levels: arg('levels'), mobile: arg('mobile') !== undefined, skipDesktop: arg('skip-desktop') !== undefined })
@@ -4109,6 +4111,10 @@ async function run() {
   if (drift.length) throw new Error(`STEP_LEVELS in e2e/shards.mjs disagrees with the checks: ${drift.map(([s, ls]) => `${s} runs on ${ls.join(', ')}`).join('; ')}`)
   const budget = startTimeBudget(runStarted)
   const base = arg('url') ?? (preview = await startPreview({ dist: DIST, base: BASE_PATH })).url
+  if (arg('url')) {
+    buildAtStart = await fetchFingerprint(base)
+    console.log(buildAtStart ? `build under test: ${buildAtStart.entry}` : `build under test: unknown (no entry script in ${base}/)`)
+  }
   const browser = await launchBrowser(['--autoplay-policy=no-user-gesture-required'])
   let failed = false
 
@@ -4379,12 +4385,15 @@ async function run() {
     failed ||= !r.ok
     results.push(r)
   }
+  const redeploy = failed ? await redeployedMidRun() : null
+  if (redeploy) results.push(redeploy)
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
   for (const r of results) {
     const en = r.enemies && !r.enemies.error
       ? ` enemiesOnScreen=${r.enemies.onScreen}${r.enemies.levelTime != null ? ` at ${r.enemies.levelTime.toFixed(1)}s` : ''} readable=${r.enemies.readable} largestPx=${r.enemies.largestPx}`
       : ''
-    const extra = r.id === 'time'
+    const note = r.id === 'time' || r.id === 'build'
+    const extra = note
       ? (r.ok ? ` ${r.text}` : '')
       : r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; attract ${r.title.attract ? `bars ${r.title.attract.bars.join(' / ')}` : 'none'}; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '') +
@@ -4450,12 +4459,35 @@ async function run() {
         ` particles=${r.particles?.points ?? '-'}${r.particles?.boostPoints ? `+${r.particles.boostPoints}` : ''}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
         ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° aimJump=${r.combat.freshShot?.aimJump?.aimErrorDeg?.toFixed(0)}°(turn ${r.combat.freshShot?.aimJump?.jumpDeg?.toFixed(0)}°) bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''}${programGrowthSummary(r.shaders)}${throttleSummary(r.throttled)}`
-    console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${r.id === 'time' ? '' : ` ${r.seconds.toFixed(0)}s`}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
+    console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${note ? '' : ` ${r.seconds.toFixed(0)}s`}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     if (r.perfGate?.knownOver && r.perfGate.over.length) console.log(`     WARN over budget (known, ${r.perfGate.knownOver}): ${r.perfGate.over.join(', ')}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
   }
   console.log(`Screenshots + results.json in ${OUT} (total ${((Date.now() - runStarted) / 1000).toFixed(0)}s)`)
-  process.exit(failed ? 1 : 0)
+  process.exit(redeploy ? INCONCLUSIVE_EXIT : failed ? 1 : 0)
+}
+
+/** The deployed build's fingerprint, null when index.html can't be fetched. */
+async function fetchFingerprint(url) {
+  try {
+    const res = await fetch(`${url}/`, { cache: 'no-store' })
+    return res.ok ? buildFingerprint(await res.text()) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * After a failed or crashed --url run: when production redeployed since the start, marks the failed checks
+ * inconclusive and returns the `build` result that says so (#822); null when the build is unchanged or unknown.
+ */
+async function redeployedMidRun() {
+  if (!buildAtStart) return null
+  const now = await fetchFingerprint(arg('url'))
+  const text = redeployVerdict(buildAtStart, now)
+  if (!text) return null
+  for (const r of results) if (!r.ok) r.inconclusive = true
+  return { id: 'build', ok: false, inconclusive: true, problems: [text], before: buildAtStart, after: now, errors: [] }
 }
 
 /**
@@ -4558,8 +4590,14 @@ function sceneSummary(scene) {
   return ` | scene objs=${scene.objects} tris=${scene.triangles} (track objs=${track.objects} tris=${track.triangles})${envText}`
 }
 
-run().catch((e) => {
+// An exception that escapes run() still leaves results.json with what finished, plus the crash as a failed check.
+run().catch(async (e) => {
   console.error(e)
   if (preview) stopPreview(preview.proc) // don't leak the vite preview server on failure
-  process.exit(1)
+  results.push({ id: 'crash', ok: false, problems: [`the run stopped: ${String(e?.message ?? e).split('\n')[0]}`], errors: [] })
+  const redeploy = await redeployedMidRun()
+  if (redeploy) results.push(redeploy)
+  fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
+  if (redeploy) console.log(`INCONCLUSIVE ${redeploy.problems[0]}`)
+  process.exit(redeploy ? INCONCLUSIVE_EXIT : 1)
 })

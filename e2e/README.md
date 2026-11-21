@@ -321,11 +321,22 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   `deep` wave / weather / boss / pickup / switch / dark / audio, `pacing`; `shards.test.ts` holds the parts to the full run and to the workflow's matrix).
   Each part's artifact is `prod-e2e-results-<part>` (its screenshots, `results.json` and `exit-code`); the `nightly` job folds
   them into one verdict with `scripts/nightlyParts.cjs` (a part that hit its cap or left nothing shows as a failed `part <name>`).
-  A part that nears its cap splits again the same way.
+  A part that nears its cap splits again the same way. An exception that escapes the run still writes `results.json` with
+  what finished, plus a failed `crash` check naming it.
+  **Production redeploys mid-run** (#822): `main` deploys whenever an approved PR merges, and Vercel's atomic deploy removes
+  the old build's hashed chunks, so a part can fail on a lazy chunk that no longer exists (`Failed to fetch dynamically
+  imported module`). With `--url`, the smoke fingerprints the deployed build at the start (`index.html`'s entry script and
+  modulepreloads, `e2e/buildFingerprint.mjs`, printed as `build under test: …`) and again when the run fails or throws.
+  When it changed, the failed checks are marked `inconclusive`, a failed `build` check says
+  `production redeployed mid-run (index-AAA.js → index-BBB.js): no single build tested`, and the part exits 3. Such a part
+  is neither red nor green: if no other part is red, the verdict is inconclusive (exit 3), the `nightly` job stays green
+  with a warning, and `prod-alert.cjs` neither opens nor closes the issue; the next nightly tests the new build. A
+  failure on an unchanged (or unreadable) fingerprint stays red exactly as before. It is not re-run in the same job: a
+  part takes most of its 60 min cap.
 
 `scripts/prod-alert.cjs` reports both: one `agent:prod-broken` issue per suite (marked `<!-- prod-smoke:<suite> -->`),
 opened on a green → red transition with the failed checks (or "timed out after N min, no check failed"), silent while it
-stays open, commented on and closed by the next green run of that suite. CI's red-`main` issue is separate. Manual runs:
+stays open, commented on and closed by the next green run of that suite; an inconclusive nightly (above) does neither. CI's red-`main` issue is separate. Manual runs:
 Actions → Production smoke → `suite` (deploy / nightly), `dry_run` to open or close nothing.
 
 
