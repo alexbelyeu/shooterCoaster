@@ -525,6 +525,8 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   problems.push(...audio.problems)
   const shot = await freshShotProblems(page, id, { fresh: freshShot })
   problems.push(...shot.problems)
+  const pad = freshShot && id === 'level1' ? await gamepadProblems(page, id) : null
+  if (pad) problems.push(...pad.problems)
   // These checks are about the level's waves: its boss (slams, weak points, its own death style) is the boss step's.
   const played = await page.evaluate(() => ({ levelTime: window.__SC_TEST__.nextWave()?.levelTime ?? null, boss: window.__SC_TEST__.boss().stage }))
   if (played.boss !== 'none' && played.boss !== 'waiting') problems.push(`the boss arrived during play (stage ${played.boss} at ${played.levelTime?.toFixed(1)} s of level time)`)
@@ -621,6 +623,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
       killCheckSkipped,
       audioBurst: audio.burst,
       freshShot: shot.result,
+      gamepad: pad?.result ?? null,
       endLevelTime: played.levelTime,
     },
     kills: combat.kills,
@@ -716,6 +719,82 @@ async function freshShotProblems(page, id, { fresh }) {
   }
   capProblem(bullets.screenFrac, 'the fresh shot at the muzzle')
   capProblem(inFlight.bullets.maxScreenFrac, 'a bullet in flight')
+  return { problems, result }
+}
+
+/**
+ * Gamepad (#819): a stubbed standard-mapping pad (`navigator.getGamepads`) steers the crosshair onto an enemy with
+ * the right stick and holds RT, game time frozen. The aim must reach the enemy, RT must fire and a bullet must hit;
+ * `<id>-gamepad.png` is the crosshair on the target with the trigger held.
+ */
+async function gamepadProblems(page, id) {
+  const problems = []
+  if ((await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return { problems, result: { skipped: true } }
+  await page.evaluate(() => {
+    const pad = {
+      id: 'smoke stub', index: 0, connected: true, mapping: 'standard', timestamp: 0,
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+    }
+    window.__scPad = pad
+    Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad] })
+    window.__SC_TEST__.setTimeScale(0)
+    window.dispatchEvent(new Event('gamepadconnected'))
+  })
+  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  const [target] = await page.evaluate(() => window.__SC_TEST__.enemyScreenPoints(1))
+  const from = await page.evaluate(() => window.__SC_TEST__.aimPoint())
+  const result = { target: target ?? null, from, aimErrorPx: null, aimFrames: 0, shots: 0, hits: 0 }
+  if (!target) {
+    problems.push('gamepad: no enemy on screen to aim at')
+  } else {
+    // Steer like a player: deflection eases off as the crosshair closes in, in rAF frames (the pad's poll rate).
+    Object.assign(result, await page.evaluate(async (t) => {
+      const api = window.__SC_TEST__
+      const pad = window.__scPad
+      let frames = 0
+      let err = Infinity
+      while (frames < 600) {
+        const a = api.aimPoint()
+        const dx = t.x - a.x
+        const dy = t.y - a.y
+        err = Math.hypot(dx, dy)
+        if (err < 4) break
+        const d = 0.15 + 0.85 * Math.sqrt(Math.min(1, err / 400))
+        pad.axes[2] = (dx / err) * d
+        pad.axes[3] = (dy / err) * d
+        frames++
+        await new Promise(requestAnimationFrame)
+      }
+      pad.axes[2] = 0
+      pad.axes[3] = 0
+      return { aimErrorPx: err, aimFrames: frames }
+    }, target))
+    if (!(result.aimErrorPx < 8)) problems.push(`gamepad: the right stick left the crosshair ${result.aimErrorPx.toFixed(0)} px off the enemy after ${result.aimFrames} frames`)
+    const before = await getStats(page)
+    const hitsBefore = await page.evaluate(() => window.__SC_TEST__.combat.hits)
+    await page.evaluate(() => { window.__scPad.buttons[7] = { pressed: true, touched: true, value: 1 } })
+    await waitFrames(page, 3, { minMs: 250, maxMs: 8000, pollMs: 40 })
+    await page.screenshot({ path: path.join(OUT, `${id}-gamepad.png`), timeout: SHOT_TIMEOUT })
+    await page.evaluate(() => { window.__scPad.buttons[7] = { pressed: false, touched: false, value: 0 } })
+    await waitFrames(page, 1, { maxMs: 8000, pollMs: 40 })
+    result.shots = (await getStats(page)).shotsFired - before.shotsFired
+    const hitDeadline = Date.now() + 15000
+    while (Date.now() < hitDeadline && result.hits === 0) {
+      await waitFrames(page, 1, { maxMs: 4000, pollMs: 60 })
+      result.hits = (await page.evaluate(() => window.__SC_TEST__.combat.hits)) - hitsBefore
+    }
+    if (result.shots === 0) problems.push('gamepad: holding RT fired no shots')
+    else if (result.hits === 0) problems.push(`gamepad: ${result.shots} RT shots at the enemy under the crosshair hit nothing`)
+  }
+  await page.evaluate(() => {
+    window.__scPad.connected = false
+    window.dispatchEvent(new Event('gamepaddisconnected'))
+    delete navigator.getGamepads
+    delete window.__scPad
+    window.__SC_TEST__.setTimeScale(1)
+  })
+  if (await page.evaluate(() => window.__SC_TEST__.triggerHeld())) problems.push('gamepad: the trigger is still held after RT was let go')
   return { problems, result }
 }
 
@@ -4458,7 +4537,7 @@ async function run() {
       : ` levelTime=${r.levelTime?.toFixed(1)}s draws=${r.drawCalls} tris=${r.triangles} avgFrameMs=${r.avgFrameMs?.toFixed(1)}${sceneSummary(r.scene)}${en}` +
         ` particles=${r.particles?.points ?? '-'}${r.particles?.boostPoints ? `+${r.particles.boostPoints}` : ''}` +
         ` kills=${r.kills} (autofire ${r.combat.autofireKills}, shots ${r.combat.shotsFired}, mouse shots ${r.combat.mouseShots}) score=${r.score}` +
-        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° aimJump=${r.combat.freshShot?.aimJump?.aimErrorDeg?.toFixed(0)}°(turn ${r.combat.freshShot?.aimJump?.jumpDeg?.toFixed(0)}°) bullets=${bulletSummary(r.combat.freshShot)}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''}${programGrowthSummary(r.shaders)}${throttleSummary(r.throttled)}`
+        ` audioBurst=${burstSummary(r.combat.audioBurst)} translationMax=${r.combat.translationMax?.toFixed(2)} traumaMax=${r.combat.traumaMaxDeg?.toFixed(2)}° weight=${weightSummary(r.combat.cameraWeight)} gunAimErr=${r.combat.freshShot?.aimErrorDeg?.toFixed(0)}° aimJump=${r.combat.freshShot?.aimJump?.aimErrorDeg?.toFixed(0)}°(turn ${r.combat.freshShot?.aimJump?.jumpDeg?.toFixed(0)}°) bullets=${bulletSummary(r.combat.freshShot)}${r.combat.gamepad?.shots !== undefined ? ` pad=${r.combat.gamepad.shots}shots/${r.combat.gamepad.hits}hits(aim ${r.combat.gamepad.aimErrorPx?.toFixed(0)}px)` : ''}${r.combat.fireworks ? ` fireworks=${r.combat.fireworks.launched}/${r.combat.fireworks.bursts}` : ''}${r.combat.deaths?.lastStyle ? ` death=${r.combat.deaths.lastStyle}${r.combat.deaths.last?.onScreen ? '' : '(off-screen)'}` : ''}${resultsSummary(r.results)}${r.combat.killCheckSkipped ? ' killEvent=skipped(level timed out)' : ''}${programGrowthSummary(r.shaders)}${throttleSummary(r.throttled)}`
     console.log(`${r.ok ? 'PASS' : 'FAIL'} ${r.id.padEnd(10)}${r.frames === undefined ? '' : ` frames=${r.frames} in ${r.frameSeconds.toFixed(1)}s`}${extra}${note ? '' : ` ${r.seconds.toFixed(0)}s`}${r.problems?.length ? ' — ' + r.problems.join('; ') : ''}`)
     if (r.perfGate?.knownOver && r.perfGate.over.length) console.log(`     WARN over budget (known, ${r.perfGate.knownOver}): ${r.perfGate.over.join(', ')}`)
     for (const e of r.errors.slice(0, 5)) console.log(`     ${e}`)
