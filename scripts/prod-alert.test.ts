@@ -14,6 +14,11 @@ describe('decide', () => {
     expect(alert.decide(false, undefined)).toBe('none')
   })
 
+  it('says nothing either way on an inconclusive run (#822: production redeployed mid-run)', () => {
+    expect(alert.decide(null, undefined)).toBe('none')
+    expect(alert.decide(null, { number: 1 })).toBe('none')
+  })
+
   it('owns only the issue with its own marker (not CI\'s red main, not the other suite\'s)', () => {
     const issues = [
       { number: 1, body: 'CI `verify` failed on main' },
