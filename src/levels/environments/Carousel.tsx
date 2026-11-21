@@ -2,11 +2,14 @@ import { useRef, useMemo, useEffect, useCallback } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergePainted, painted } from './shared/paintedParts'
+import { setLampGlow } from './shared/lampGlow'
 
 interface CarouselProps {
   position?: [number, number, number]
   radius?: number
   horseCount?: number
+  /** The atmosphere's `lampGlow`: the carousel lit up at night (#829). */
+  lampGlow?: number
 }
 
 const ROTATION_SPEED = 0.3 // rad/s
@@ -44,6 +47,7 @@ export default function Carousel({
   position = [0, 0, 0],
   radius = 25,
   horseCount = 8,
+  lampGlow = 0,
 }: CarouselProps) {
   const platformRef = useRef<THREE.Group>(null)
   const horsesRef = useRef<THREE.InstancedMesh | null>(null)
@@ -64,6 +68,7 @@ export default function Carousel({
     [radius, angles],
   )
   useEffect(() => () => Object.values(assets).forEach((a) => a.dispose()), [assets])
+  useEffect(() => setLampGlow(assets.painted, 0.3 * lampGlow), [assets, lampGlow])
 
   const placeHorses = useCallback(
     (time: number) => {

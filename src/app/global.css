@@ -1114,6 +1114,26 @@ canvas {
   white-space: nowrap;
 }
 
+/* A board with its Night Ride plate hung under it (#829): a latching switch, held down while it is on. */
+.level-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.fair-plate.level-night {
+  padding-inline: 1rem;
+  font-size: 1.25rem;
+}
+
+.fair-plate.level-night[aria-pressed='true'] {
+  color: var(--fair-tar);
+  background: var(--fair-sky);
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--fair-tar);
+}
+
 /* Boarded up: planks across the picture, a plain plate, and what opens it. */
 .level-card.locked {
   cursor: not-allowed;
@@ -1377,7 +1397,7 @@ canvas {
   text-align: center;
 }
 
-.results-daily-badge {
+.results-badge {
   margin-bottom: 0.7rem;
   color: var(--fair-tar);
   background: var(--fair-sky);
@@ -1871,7 +1891,7 @@ canvas {
     display: none;
   }
 
-  .results-daily-badge {
+  .results-badge {
     margin-bottom: 0.4rem;
   }
 

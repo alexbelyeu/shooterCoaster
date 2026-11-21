@@ -7,7 +7,7 @@ export const UI_STEPS = ['title', 'landing', 'levelSelect', 'daily', 'settings',
 /** On the run's first level; `frenzy` happens inside its ride and `seed` compares against that ride's spawns. */
 export const FIRST_LEVEL_STEPS = ['frenzy', 'seed', 'quality', 'pause', 'countdown', 'speed']
 /** `tour`, `shot`, `results` and `share` check the ride's own page (`tour` before the ride, the others after its combat). */
-export const LEVEL_STEPS = ['ride', 'tour', 'shot', 'results', 'share', 'wave', 'weather', 'boss', 'pickup', 'switch', 'dark', 'audio', 'pacing']
+export const LEVEL_STEPS = ['ride', 'tour', 'shot', 'results', 'share', 'wave', 'weather', 'boss', 'pickup', 'switch', 'dark', 'audio', 'night', 'pacing']
 export const STEPS = [...UI_STEPS, ...FIRST_LEVEL_STEPS, ...LEVEL_STEPS]
 
 /** Mirrors the smoke's check constants (WAVE_CHECK, BOSS_CHECKS…), which fail the run at start if they drift. */
@@ -19,6 +19,7 @@ export const STEP_LEVELS = {
   switch: ['level6'],
   dark: ['level6'],
   audio: ['level1'],
+  night: ['level1'],
 }
 
 /** Steps that run on another step's page: what they need in the same run. */
@@ -42,7 +43,7 @@ const PHONE_STEPS = ['mobile', 'mobileMenus']
  */
 export const NIGHTLY_PARTS = {
   main: { steps: [...UI_STEPS, ...FIRST_LEVEL_STEPS, 'ride', 'tour', 'shot', 'results', 'share'] },
-  deep: { steps: ['wave', 'weather', 'boss', 'pickup', 'switch', 'dark', 'audio'] },
+  deep: { steps: ['wave', 'weather', 'boss', 'pickup', 'switch', 'dark', 'audio', 'night'] },
   pacing: { steps: ['pacing'] },
 }
 

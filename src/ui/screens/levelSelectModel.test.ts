@@ -35,6 +35,16 @@ describe('buildLevelCards', () => {
     expect(totalStars(cards)).toEqual({ earned: 2, max: 9 })
   })
 
+  it('offers a Night Ride on a level with 3 stars and a night preset only (#829)', () => {
+    const night = (scores: Record<string, ScoreEntry>, unlocked = (id: string) => id !== 'c') =>
+      buildLevelCards(levels, scores, unlocked, {}).map((c) => c.nightRide)
+    expect(night({ a: entry('a', 900, 3), b: entry('b', 900, 3) })).toEqual([true, false, false])
+    expect(night({ a: entry('a', 900, 2) })).toEqual([false, false, false])
+    expect(night({ a: entry('a', 900, 3) }, () => false)).toEqual([false, false, false])
+    const level1 = getAllLevels().filter((l) => l.id === 'level1')
+    expect(buildLevelCards(level1, { level1: entry('level1', 2000, 3) }, () => true, {})[0].nightRide).toBe(true)
+  })
+
   it('shows the top initials of an open level only', () => {
     const top = (initials: string) => [{ initials, score: 900, stars: 2, date: 0 }]
     const boards = { a: top('BOB'), c: top('EVE') }

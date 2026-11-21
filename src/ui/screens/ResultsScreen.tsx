@@ -32,6 +32,7 @@ function snapshotRun() {
   return {
     levelId: s.currentLevel,
     mode: s.runMode,
+    variant: s.runVariant,
     score: Math.round(s.score),
     kills: s.kills,
     totalEnemies: s.totalEnemies,
@@ -254,7 +255,8 @@ export default function ResultsScreen() {
       <div className="results-card">
         <FairBoard className="results-panel" shadowClassName="results-panel-shadow fair-arrive" role="region" aria-labelledby="results-title">
           <div className="results-main">
-            {daily && <p className="results-daily-badge fair-showcard">Daily Run</p>}
+            {daily && <p className="results-badge fair-showcard">Daily Run</p>}
+            {run.variant === 'night' && <p className="results-badge fair-showcard">Night Ride</p>}
             <h2 id="results-title" className="fair-title">
               {config.name}
             </h2>

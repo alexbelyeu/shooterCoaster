@@ -4,7 +4,7 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import TitleScene from './TitleScene'
 import PostEffects, { type BloomSettings } from './post/PostEffects'
 import { TITLE_GRADE } from './post/colourGrade'
-import { ATMOSPHERES } from '@/levels/environments/atmosphere'
+import { atmosphereFor } from '@/levels/environments/nightPreset'
 import { loadLevelScene } from './loadLevelScene'
 
 let LevelScene = lazy(loadLevelScene)
@@ -32,6 +32,7 @@ const TITLE_BLOOM: BloomSettings = { threshold: 0.85, intensity: 0.75 }
 export default function SceneManager() {
   const phase = useGameStore((s) => s.phase)
   const currentLevel = useGameStore((s) => s.currentLevel)
+  const variant = useGameStore((s) => s.runVariant)
 
   const wanted = phase === 'title' || phase === 'levelSelect' || !currentLevel ? null : currentLevel
   // A scene swap renders in a transition (#597): React builds the next scene a few milliseconds at a time over
@@ -39,6 +40,7 @@ export default function SceneManager() {
   const [level, setLevel] = useState(wanted)
   useEffect(() => startTransition(() => setLevel(wanted)), [wanted])
   const biome = level ? getLevelConfig(level)?.biome : undefined
+  const atmosphere = biome && atmosphereFor(biome, variant)
 
   return (
     <>
@@ -55,8 +57,8 @@ export default function SceneManager() {
       <PostEffects
         key={level ? 'level' : 'title'}
         bloom={level ? LEVEL_BLOOM : TITLE_BLOOM}
-        grade={biome ? ATMOSPHERES[biome].grade : TITLE_GRADE}
-        heatShimmer={biome ? ATMOSPHERES[biome].heatShimmer === true : false}
+        grade={atmosphere ? atmosphere.grade : TITLE_GRADE}
+        heatShimmer={atmosphere ? atmosphere.heatShimmer === true : false}
       />
     </>
   )

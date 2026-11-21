@@ -8,6 +8,9 @@ export type GamePhase = 'title' | 'levelSelect' | 'loading' | 'intro' | 'countdo
 /** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
 export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }
 
+/** A campaign run's look (#829): the level as built, or its Night Ride (`levels/environments/nightPreset.ts`). */
+export type RideVariant = 'day' | 'night'
+
 /** Which screen started a run (`level_start`'s `from`): title PLAY, a level select card, the results screen or the pause menu. */
 export type RunFrom = 'title' | 'select' | 'results' | 'pause'
 

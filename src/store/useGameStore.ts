@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { changedOnly } from './changedOnlyStorage'
 import type { Route } from '@/track/mechanics'
-import type { GamePhase, ScoreEntry, ComboState, BossHud, RunFrom, RunMode } from '@/types/game'
+import type { GamePhase, ScoreEntry, ComboState, BossHud, RunFrom, RunMode, RideVariant } from '@/types/game'
 import {
   DEFAULT_INITIALS,
   insertEntry,
@@ -35,6 +35,8 @@ export interface StartRunOptions {
   mode?: RunMode
   replay?: boolean
   from?: RunFrom
+  /** A campaign run's Night Ride (#829); a daily is always by day. */
+  variant?: RideVariant
 }
 
 const boardCeilings = () => Object.fromEntries(Object.entries(LEVEL_LIMITS).map(([id, l]) => [id, l.maxScore]))
@@ -63,6 +65,8 @@ interface GameState {
   runId: number
   runMode: RunMode
   runFrom: RunFrom
+  /** Day, or the level's Night Ride (#829): set by every `startRun` (day unless asked), kept by a restart. */
+  runVariant: RideVariant
   /** The last campaign level started, persisted: title PLAY falls back to it once every level has a star. */
   lastLevel: string | null
   /**
@@ -198,8 +202,9 @@ export const useGameStore = create<GameState>()(
       runId: 0,
       runMode: CAMPAIGN,
       runFrom: 'select',
+      runVariant: 'day',
       lastLevel: null,
-      startRun: (levelId, { seed, mode = CAMPAIGN, replay = false, from = 'select' } = {}) => {
+      startRun: (levelId, { seed, mode = CAMPAIGN, replay = false, from = 'select', variant = 'day' } = {}) => {
         markStartup('runStart')
         const fallback = mode.mode === 'daily' ? dailySeed(mode.dateKey) : Date.now()
         const s = get()
@@ -215,6 +220,7 @@ export const useGameStore = create<GameState>()(
           runSeed: (seed ?? urlSeed() ?? fallback) >>> 0,
           runMode: mode,
           runFrom: from,
+          runVariant: mode.mode === 'daily' ? 'day' : variant,
           lastLevel: mode.mode === 'campaign' ? levelId : s.lastLevel,
           runId: s.runId + 1,
           sceneReady: warm,
@@ -225,9 +231,9 @@ export const useGameStore = create<GameState>()(
         })
       },
       restartRun: (from) => {
-        const { currentLevel, runMode, runSeed, startRun } = get()
+        const { currentLevel, runMode, runSeed, runVariant, startRun } = get()
         if (!currentLevel) return
-        startRun(currentLevel, { seed: runMode.mode === 'daily' ? runSeed : undefined, mode: runMode, replay: true, from })
+        startRun(currentLevel, { seed: runMode.mode === 'daily' ? runSeed : undefined, mode: runMode, replay: true, from, variant: runVariant })
       },
       startNextRun: (from) => {
         const { savedScores, isLevelUnlocked, lastLevel, startRun } = get()

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useEffect, useContext, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { ATMOSPHERES } from './atmosphere'
+import { atmosphereFor } from './nightPreset'
 import type { BiomeType, DarkSectionSpec, WeatherKind, WhaleBreachSpec } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
 import type { RideSpeeds } from '@/track/ridePhysics'
@@ -12,6 +12,7 @@ import {
 } from '@/utils/terrainNoise'
 import { hashString } from '@/utils/rng'
 import { useGameStore } from '@/store/useGameStore'
+import { setRimLift } from '@/entities/enemies/enemyRim'
 import { TerrainContext } from './TerrainContext'
 import { BIOMES } from './biomeRegistry'
 import Atmosphere from './shared/Atmosphere'
@@ -58,7 +59,7 @@ export default function BiomeEnvironment({
   hasTrees = false,
   treeCount = 0,
 }: BiomeEnvironmentProps) {
-  const atmosphere = ATMOSPHERES[biome]
+  const atmosphere = atmosphereFor(biome, useGameStore((s) => s.runVariant))
   const def = BIOMES[biome]
   const heightFn = useContext(TerrainContext)
   const fogRef = useRef<THREE.Fog>(null)
@@ -67,6 +68,10 @@ export default function BiomeEnvironment({
   const runId = useGameStore((s) => s.runId)
 
   useEffect(() => resetFogModifiers(fogMods), [runId, fogMods])
+  useEffect(() => {
+    setRimLift(atmosphere.enemyRimLift ?? 1)
+    return () => setRimLift(1)
+  }, [atmosphere])
 
   useFrame(() => {
     const fog = fogRef.current

@@ -228,6 +228,17 @@ describe('startRun', () => {
     reportLoad('level1', 'audio', 1)
     expect(loadFraction()).toBeCloseTo(1, 10)
   })
+
+  it('rides a Night Ride when asked, keeps it on a restart and goes back to day for the next start (#829)', () => {
+    store().startRun('level1', { seed: 5, variant: 'night' })
+    expect(store().runVariant).toBe('night')
+    store().restartRun('results')
+    expect(store().runVariant).toBe('night')
+    store().startRun('level2', { seed: 5 })
+    expect(store().runVariant).toBe('day')
+    store().startRun('level1', { variant: 'night', mode: { mode: 'daily', dateKey: '2026-10-31' } })
+    expect(store().runVariant).toBe('day')
+  })
 })
 
 describe('daily runs', () => {

@@ -2,11 +2,14 @@ import { useRef, useMemo, useEffect, useCallback } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergePainted, painted } from './shared/paintedParts'
+import { setLampGlow } from './shared/lampGlow'
 
 interface FerrisWheelProps {
   position?: [number, number, number]
   radius?: number
   gondolaCount?: number
+  /** The atmosphere's `lampGlow`: lit cabins at night (#829). */
+  lampGlow?: number
 }
 
 const ROTATION_SPEED = 0.1 // rad/s
@@ -77,6 +80,7 @@ export default function FerrisWheel({
   position = [0, 0, 0],
   radius = 80,
   gondolaCount = 12,
+  lampGlow = 0,
 }: FerrisWheelProps) {
   const wheelRef = useRef<THREE.Group>(null)
   const gondolaFrames = useRef<THREE.InstancedMesh>(null)
@@ -101,6 +105,7 @@ export default function FerrisWheel({
   }, [radius, angles])
 
   useEffect(() => () => Object.values(assets).forEach((a) => a.dispose()), [assets])
+  useEffect(() => setLampGlow(assets.tinted, 0.45 * lampGlow), [assets, lampGlow])
 
   const placeGondolas = useCallback(
     (wheelAngle: number) => {
