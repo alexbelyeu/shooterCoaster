@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
-  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYES_GEO, LANTERNFLY_FLASH_MAT,
+  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_GEO, DUST_BUNNY_MAT, dustBunnyRoll, LANTERNFLY_FLASH_MAT,
   LANTERNFLY_FOLDED, LANTERNFLY_FOREWING_PIVOT, LANTERNFLY_GEO, LANTERNFLY_HINDWING_PIVOT, LANTERNFLY_MAT, LANTERNFLY_OPEN, RAT_BODY_GEO,
   RAT_SNOUT_GEO, RAT_TAIL_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
   SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, createLanternflyFlashMaterial, createLanternflyMaterial, crowWingPose, patchCrowWingVertex,
-  patchLanternflyWingVertex,
+  patchEyeGlossFragment, patchEyeGlossVertex, patchLanternflyWingVertex,
 } from './SharedEnemyAssets'
 
 describe('crow model', () => {
@@ -91,7 +91,42 @@ describe('gym pests (#515)', () => {
 
   it("keep under the briefs' triangle caps: rat 600, dust bunny 500", () => {
     expect(tris(RAT_BODY_GEO) + tris(RAT_SNOUT_GEO) + tris(RAT_TAIL_GEO)).toBeLessThanOrEqual(600)
-    expect(tris(DUST_BUNNY_BODY_GEO) + tris(DUST_BUNNY_EYES_GEO)).toBeLessThanOrEqual(500)
+    expect(tris(DUST_BUNNY_GEO)).toBeLessThanOrEqual(500)
+  })
+
+  it("rolls the dust bunny's fluff about x by its morph targets and leaves its eyes on its front (#806)", () => {
+    const g = DUST_BUNNY_GEO
+    const [toward, across] = g.morphAttributes.position
+    const gloss = g.attributes.aGloss
+    const w = [0, 0]
+    const roll = 1.1
+    dustBunnyRoll(w, roll)
+    let worst = 0
+    let eyes = 0
+    for (let i = 0; i < g.attributes.position.count; i++) {
+      const [x, y, z] = [g.attributes.position.getX(i), g.attributes.position.getY(i), g.attributes.position.getZ(i)]
+      const eye = gloss.getX(i) === 1
+      if (eye) eyes++
+      const [ry, rz] = eye ? [y, z] : [y * Math.cos(roll) - z * Math.sin(roll), y * Math.sin(roll) + z * Math.cos(roll)]
+      const mx = x + w[0] * toward.getX(i) + w[1] * across.getX(i)
+      const my = y + w[0] * toward.getY(i) + w[1] * across.getY(i)
+      const mz = z + w[0] * toward.getZ(i) + w[1] * across.getZ(i)
+      worst = Math.max(worst, Math.hypot(mx - x, my - ry, mz - rz))
+    }
+    expect(eyes).toBeGreaterThan(0)
+    expect(worst).toBeLessThan(1e-4)
+    expect(g.morphTargetsRelative).toBe(true)
+  })
+
+  it("glosses the dust bunny's eyes: every patch lands in the standard shader, one program with the warm-up", () => {
+    const vertex = patchEyeGlossVertex(THREE.ShaderLib.standard.vertexShader)
+    expect(vertex).toMatch(/#include <common>\nattribute float aGloss;/)
+    expect(vertex).toMatch(/#include <begin_vertex>\nvGloss = aGloss;/)
+    const fragment = patchEyeGlossFragment(THREE.ShaderLib.standard.fragmentShader)
+    expect(fragment).toMatch(/#include <common>\nvarying float vGloss;/)
+    expect(fragment).toMatch(/#include <roughnessmap_fragment>\nroughnessFactor = mix\(roughnessFactor, [\d.]+, vGloss\);/)
+    expect(fragment).toMatch(/#include <metalnessmap_fragment>\nmetalnessFactor = mix\(metalnessFactor, [\d.]+, vGloss\);/)
+    expect(DUST_BUNNY_MAT.customProgramCacheKey()).toMatch(/-eye-gloss$/)
   })
 
   it('give the rat its pink ears, nose and tail', () => {

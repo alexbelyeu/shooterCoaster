@@ -4,6 +4,7 @@ import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, pose, su
 import { withRim } from './enemyRim'
 
 export * from './infernoEnemyAssets'
+export * from './oceanEnemyAssets'
 
 // Readability rules (issue #15): every lit enemy material gets a fresnel rim via
 // withRim(); base colours keep ΔE ≥ ~15 from their biome's dominant terrain
@@ -343,26 +344,6 @@ export const SCORPION_STINGER_MAT = new THREE.MeshStandardMaterial({
   toneMapped: false,
 })
 
-// ── Shark (~18 primitives) ────────────────────────────────────────
-
-// Body: LatheGeometry — streamlined torpedo profile
-const sharkBodyProfile = [
-  new THREE.Vector2(0, 0),
-  new THREE.Vector2(0.8, 0.5),
-  new THREE.Vector2(1.8, 1.5),
-  new THREE.Vector2(2.5, 3),
-  new THREE.Vector2(2.8, 5),
-  new THREE.Vector2(2.5, 7),
-  new THREE.Vector2(1.8, 9),
-  new THREE.Vector2(1, 10.5),
-  new THREE.Vector2(0.5, 11.5),
-  new THREE.Vector2(0, 12),
-]
-export const SHARK_BODY_GEO = new THREE.LatheGeometry(sharkBodyProfile, 10)
-
-// Snout: wider cone for hammerhead-like presence
-export const SHARK_SNOUT_GEO = new THREE.ConeGeometry(2, 4, 6)
-
 /** A closed mesh from hand-placed `vertices` and triangle `indices`. */
 function makeWingGeo(
   vertices: number[][],
@@ -380,110 +361,6 @@ function makeWingGeo(
   geo.computeVertexNormals()
   return geo
 }
-
-// Dorsal fin: custom triangular swept-back shape
-export const SHARK_DORSAL_GEO = makeWingGeo(
-  [
-    [0, 0, 1.5],     // 0: base front
-    [0, 3.5, 0],     // 1: tip (tall, swept back)
-    [0, 0, -1.5],    // 2: base back
-    [0.15, 0, 1.5],  // 3
-    [0.15, 3.5, 0],  // 4
-    [0.15, 0, -1.5], // 5
-  ],
-  [
-    0, 1, 2,    // left face
-    3, 5, 4,    // right face
-    0, 3, 4, 0, 4, 1,  // front edge
-    2, 1, 4, 2, 4, 5,  // back edge
-    0, 2, 5, 0, 5, 3,  // bottom
-  ],
-)
-
-// Tail: crescent/lunate shape — upper lobe larger than lower
-export const SHARK_TAIL_UPPER_GEO = makeWingGeo(
-  [
-    [0, 0, 0],       // 0: base
-    [0, 2.5, -2],    // 1: tip (up and back)
-    [0, 0.5, -1.5],  // 2: trailing edge
-    [0.15, 0, 0],    // 3
-    [0.15, 2.5, -2], // 4
-    [0.15, 0.5, -1.5], // 5
-  ],
-  [0, 1, 2, 3, 5, 4, 0, 3, 4, 0, 4, 1, 2, 1, 4, 2, 4, 5, 0, 2, 5, 0, 5, 3],
-)
-
-export const SHARK_TAIL_LOWER_GEO = makeWingGeo(
-  [
-    [0, 0, 0],        // 0: base
-    [0, -1.5, -1.5],  // 1: tip (down and back)
-    [0, -0.3, -1.2],  // 2: trailing edge
-    [0.15, 0, 0],     // 3
-    [0.15, -1.5, -1.5], // 4
-    [0.15, -0.3, -1.2], // 5
-  ],
-  [0, 1, 2, 3, 5, 4, 0, 3, 4, 0, 4, 1, 2, 1, 4, 2, 4, 5, 0, 2, 5, 0, 5, 3],
-)
-
-// Pectoral fins: swept-back triangular
-export const SHARK_PECTORAL_GEO = makeWingGeo(
-  [
-    [0, 0.1, 1],      // 0: leading edge at body
-    [3.5, 0.1, 0],    // 1: tip
-    [1.5, 0.1, -1],   // 2: trailing edge
-    [0, -0.1, 1],     // 3
-    [3.5, -0.1, 0],   // 4
-    [1.5, -0.1, -1],  // 5
-  ],
-  [0, 1, 2, 3, 5, 4, 0, 3, 4, 0, 4, 1, 2, 1, 4, 2, 4, 5, 0, 2, 5, 0, 5, 3],
-)
-
-export const SHARK_EYE_GEO = new THREE.SphereGeometry(0.5, 6, 6)
-export const SHARK_MOUTH_GEO = new THREE.BoxGeometry(2, 0.15, 0.5)
-export const SHARK_TOOTH_GEO = new THREE.ConeGeometry(0.15, 0.5, 3)
-export const SHARK_GILL_GEO = new THREE.BoxGeometry(0.05, 0.8, 0.15)
-
-// Steel-blue back (dark slate vanished into the deep water), white belly; Standard so the wet skin reflects the sky env map.
-const SHARK_RIM = { color: '#e0f4ff', intensity: 0.65, power: 2.5 }
-export const SHARK_BODY_MAT = withRim(new THREE.MeshStandardMaterial({
-  color: '#5a6e82',
-  metalness: 0.25,
-  roughness: 0.3,
-  flatShading: true,
-}), SHARK_RIM)
-export const SHARK_SNOUT_MAT = withRim(new THREE.MeshStandardMaterial({
-  color: '#62788c',
-  metalness: 0.25,
-  roughness: 0.32,
-  flatShading: true,
-}), SHARK_RIM)
-export const SHARK_FIN_MAT = withRim(new THREE.MeshStandardMaterial({
-  color: '#485c70',
-  metalness: 0.25,
-  roughness: 0.28,
-  flatShading: true,
-}), SHARK_RIM)
-export const SHARK_BELLY_MAT = withRim(new THREE.MeshStandardMaterial({
-  color: '#e8eef4',
-  metalness: 0.05,
-  roughness: 0.4,
-  flatShading: true,
-}), SHARK_RIM)
-export const SHARK_EYE_MAT = new THREE.MeshStandardMaterial({
-  color: '#111111',
-  emissive: '#222222',
-  emissiveIntensity: 0.3,
-  metalness: 0.8,
-  roughness: 0.2,
-})
-export const SHARK_MOUTH_MAT = new THREE.MeshPhongMaterial({
-  color: '#1a1a22',
-  flatShading: true,
-})
-export const SHARK_TOOTH_MAT = new THREE.MeshPhongMaterial({
-  color: '#eeeedd',
-  flatShading: true,
-})
 
 // ── Jellyfish: bell + glowing core ───────────────────────────────
 const JELLY_TENTACLES = 5
@@ -747,96 +624,6 @@ export const SNOWMAN_SCARF_MAT = withRim(new THREE.MeshPhongMaterial({
   flatShading: true,
 }), { color: '#ffc0b0', intensity: 0.5 })
 
-// ── Infernal Drake ────────────────────────────────────────────
-// A strong rim, since Inferno enemies read by their edges.
-const VOLCANIC_RIM = { color: '#ffb070', intensity: 1.2, power: 2.0 }
-const infernalDrakeProfile = [
-  new THREE.Vector2(0, 0),
-  new THREE.Vector2(1.5, 1),
-  new THREE.Vector2(3, 3),
-  new THREE.Vector2(3.5, 6),
-  new THREE.Vector2(3.2, 9),
-  new THREE.Vector2(2.8, 12),
-  new THREE.Vector2(2, 15),
-  new THREE.Vector2(1, 17),
-  new THREE.Vector2(0, 18),
-]
-export const DRAKE_BODY_GEO = new THREE.LatheGeometry(infernalDrakeProfile, 10)
-export const DRAKE_HEAD_GEO = new THREE.SphereGeometry(2.5, 8, 6)
-export const DRAKE_SPIKE_GEO = new THREE.ConeGeometry(0.8, 3, 4)
-export const DRAKE_TAIL_GEO = new THREE.CylinderGeometry(1.5, 0.3, 12, 6)
-export const DRAKE_EYE_GEO = new THREE.SphereGeometry(0.6, 6, 6)
-export const DRAKE_JAW_GEO = new THREE.BoxGeometry(2.5, 0.8, 3)
-
-// Drake wing — custom bat-like membrane (4 segments)
-function makeDrakeWingGeo(): THREE.BufferGeometry {
-  const verts = new Float32Array([
-    // top
-    0, 0.1, 1.5,     // 0: shoulder
-    3, 0.1, 1,        // 1: mid leading
-    6, 0.08, 0.5,     // 2: outer leading
-    8, 0.05, -0.5,    // 3: wingtip
-    6, 0.08, -1.5,    // 4: trailing outer
-    3, 0.1, -1.8,     // 5: trailing mid
-    0, 0.1, -1,       // 6: trailing shoulder
-    // bottom
-    0, -0.1, 1.5,     // 7
-    3, -0.1, 1,        // 8
-    6, -0.08, 0.5,     // 9
-    8, -0.05, -0.5,    // 10
-    6, -0.08, -1.5,    // 11
-    3, -0.1, -1.8,     // 12
-    0, -0.1, -1,       // 13
-  ])
-  const indices = [
-    // top face
-    0, 1, 6, 1, 5, 6, 1, 2, 5, 2, 4, 5, 2, 3, 4,
-    // bottom face
-    7, 13, 8, 8, 13, 12, 8, 12, 9, 9, 12, 11, 9, 11, 10,
-    // edges
-    0, 7, 8, 0, 8, 1, 3, 10, 11, 3, 11, 4,
-    0, 6, 13, 0, 13, 7,
-  ]
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3))
-  geo.setIndex(indices)
-  geo.computeVertexNormals()
-  return geo
-}
-export const DRAKE_WING_GEO = makeDrakeWingGeo()
-
-// Crimson drake with bone spikes (old #2a0a0a body was ΔE≈7 from obsidian terrain)
-export const DRAKE_BODY_MAT = withRim(new THREE.MeshPhysicalMaterial({
-  color: '#7a1020',
-  metalness: 0.3,
-  roughness: 0.4,
-  iridescence: 0.5,
-  iridescenceIOR: 1.4,
-  iridescenceThicknessRange: [200, 500],
-  flatShading: true,
-}), VOLCANIC_RIM)
-export const DRAKE_WING_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#660000',
-  emissive: '#ff2200',
-  emissiveIntensity: 0.3,
-  transparent: true,
-  opacity: 0.75,
-  flatShading: true,
-  side: THREE.DoubleSide,
-}), VOLCANIC_RIM)
-export const DRAKE_SPIKE_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#d8c8a8',
-  specular: '#ffffff',
-  shininess: 40,
-  flatShading: true,
-}), VOLCANIC_RIM)
-export const DRAKE_EYE_MAT = new THREE.MeshStandardMaterial({
-  color: '#ff4400',
-  emissive: '#ff2200',
-  emissiveIntensity: 2,
-  toneMapped: false,
-})
-
 // ── Climber (#453), built to docs/art/ENEMIES.md ──
 // Faces +z (the wall), so the ride sees its back; one material, four moving parts parted at the shoulders and hips.
 // A bystander (#518), so dressed friendly and in no enemy's colours: calm teal and white, a green harness, and the
@@ -1025,23 +812,84 @@ export const DUST_BUNNY_REACH = (() => {
 })()
 
 /** Two black dot eyes with a glint, on the front of the ball. */
-export const DUST_BUNNY_EYES_GEO = mergePainted([
+const DUST_BUNNY_EYES_GEO = mergePainted([
   ...[-1, 1].map((s) => paintedAt(new THREE.SphereGeometry(0.42, 6, 4), RAT_EYE, pose([s * 0.8, 0.55, DUST_BUNNY_RADIUS + 0.2], [0, 0, 0], [1, 1.15, 0.6]))),
   ...[-1, 1].map((s) => painted(new THREE.SphereGeometry(0.12, 4, 2), RAT_GLINT, [s * 0.8 + 0.14, 0.75, DUST_BUNNY_RADIUS + 0.45])),
 ])
 
-export const DUST_BUNNY_MAT = withRim(new THREE.MeshStandardMaterial({
+/**
+ * The fluff and the eyes in one mesh, one draw call (#806: a dust bunny wave fills the screen). The fluff rolls about
+ * x by two relative morph targets, (0, y, z) and (0, -z, y) weighted cos(roll) - 1 and sin(roll) (`dustBunnyRoll`);
+ * the eyes have none, so they stay on its front. `aGloss` marks the eyes, which `DUST_BUNNY_MAT` keeps glossy.
+ */
+export const DUST_BUNNY_GEO = (() => {
+  const g = mergeGeometries([DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYES_GEO])
+  const fluff = DUST_BUNNY_BODY_GEO.attributes.position
+  const count = g.attributes.position.count
+  const toward = new Float32Array(count * 3)
+  const across = new Float32Array(count * 3)
+  for (let i = 0; i < fluff.count; i++) {
+    const y = fluff.getY(i)
+    const z = fluff.getZ(i)
+    toward[i * 3 + 1] = y
+    toward[i * 3 + 2] = z
+    across[i * 3 + 1] = -z
+    across[i * 3 + 2] = y
+  }
+  g.morphAttributes.position = [new THREE.BufferAttribute(toward, 3), new THREE.BufferAttribute(across, 3)]
+  g.morphTargetsRelative = true
+  g.setAttribute('aGloss', new THREE.BufferAttribute(new Float32Array(count).fill(1, fluff.count), 1))
+  // The roll keeps every point's distance from the centre, so this sphere holds it at any angle.
+  const p = g.attributes.position
+  let reach = 0
+  for (let i = 0; i < count; i++) reach = Math.max(reach, Math.hypot(p.getX(i), p.getY(i), p.getZ(i)))
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), reach)
+  DUST_BUNNY_EYES_GEO.dispose()
+  return g
+})()
+
+/** Turns a `DUST_BUNNY_GEO` mesh's fluff to `roll` about x (its morph target influences). */
+export function dustBunnyRoll(influences: number[], roll: number) {
+  influences[0] = Math.cos(roll) - 1
+  influences[1] = Math.sin(roll)
+}
+
+const EYE_ROUGHNESS = '0.15'
+const EYE_METALNESS = '0.10'
+
+export function patchEyeGlossVertex(vertexShader: string): string {
+  return vertexShader
+    .replace('#include <common>', '#include <common>\nattribute float aGloss;\nvarying float vGloss;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGloss = aGloss;')
+}
+
+export function patchEyeGlossFragment(fragmentShader: string): string {
+  return fragmentShader
+    .replace('#include <common>', '#include <common>\nvarying float vGloss;')
+    .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, ${EYE_ROUGHNESS}, vGloss);`)
+    .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, ${EYE_METALNESS}, vGloss);`)
+}
+
+/** Glosses `material` where the geometry's `aGloss` is 1 (the dust bunny's eyes); every material built the same way shares one program. */
+function withEyeGloss<T extends THREE.Material>(material: T): T {
+  const base = material.onBeforeCompile
+  const baseKey = material.customProgramCacheKey()
+  material.onBeforeCompile = (shader, renderer) => {
+    base.call(material, shader, renderer)
+    shader.vertexShader = patchEyeGlossVertex(shader.vertexShader)
+    shader.fragmentShader = patchEyeGlossFragment(shader.fragmentShader)
+  }
+  material.customProgramCacheKey = () => `${baseKey}-eye-gloss`
+  return material
+}
+
+/** The fluff's matte paint, and the eyes' gloss where `aGloss` is 1. */
+export const DUST_BUNNY_MAT = withEyeGloss(withRim(new THREE.MeshStandardMaterial({
   vertexColors: true,
   roughness: 0.95,
   metalness: 0,
   flatShading: true,
-}), { color: '#e8e4dc', intensity: 0.35, power: 2.2 })
-
-export const DUST_BUNNY_EYE_MAT = new THREE.MeshStandardMaterial({
-  vertexColors: true,
-  roughness: 0.15,
-  metalness: 0.1,
-})
+}), { color: '#e8e4dc', intensity: 0.35, power: 2.2 }))
 
 // ── Spotted lanternfly (#516), built to docs/art/ENEMIES.md ──
 // Lies on a wall: head along +y, its back out of the wall along +z. One mesh, one draw call (#632): the body and each

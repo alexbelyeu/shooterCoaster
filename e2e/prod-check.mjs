@@ -215,11 +215,18 @@ async function phoneCheck(browser, base) {
   const { ctx, page, errors } = await openPage(browser, base, `e2e=1&seed=${SEED}`, { ...iphone, viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
   const problems = []
   const phase = (want, ms) => pollFor(page, async () => (await page.evaluate(() => window.__SC_TEST__.phase())) === want, ms)
-  if (!(await waitVisible(page, '.title-screen .title-play'))) problems.push('no PLAY button')
-  await tapCentre(page, '.title-screen .title-play')
-  if (!(await phase('levelSelect', 15000))) problems.push('tapping PLAY did not open level select')
-  await page.locator(`.level-card[data-level="${LEVEL}"]`).tap({ timeout: 30000 })
-  if (!(await phase('playing', 15000))) problems.push('tapping the level card did not start the level')
+  // A fresh save's PLAY starts level1 (#329); another level goes through WORLDS and its card.
+  if (LEVEL === 'level1') {
+    if (!(await waitVisible(page, '.title-screen .title-play'))) problems.push('no PLAY button')
+    await tapCentre(page, '.title-screen .title-play')
+    if (!(await phase('playing', 30000))) problems.push('tapping PLAY did not start level1')
+  } else {
+    if (!(await waitVisible(page, '.title-screen .worlds-button'))) problems.push('no WORLDS button')
+    await tapCentre(page, '.title-screen .worlds-button')
+    if (!(await phase('levelSelect', 15000))) problems.push('tapping WORLDS did not open level select')
+    await page.locator(`.level-card[data-level="${LEVEL}"]`).tap({ timeout: 30000 })
+    if (!(await phase('playing', 15000))) problems.push('tapping the level card did not start the level')
+  }
   if (!(await pollFor(page, async () => (await stats(page)).onScreenEnemies > 0, 40000))) problems.push('no enemy on screen')
   // Taps must fire; whether a tapped bullet lands depends on the software frame rate (the nightly smoke gates aim assist).
   const before = await stats(page)

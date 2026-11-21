@@ -5,8 +5,8 @@ import { dailyLevel } from '@/levels/daily'
 import {
   buildDailyCard,
   buildLevelCards,
-  initialFocusIndex,
   navigateCards,
+  nextLevelIndex,
   totalStars,
   type CardRect,
   type LevelSelectSource,
@@ -75,14 +75,40 @@ describe('buildLevelCards', () => {
   })
 })
 
-describe('initialFocusIndex', () => {
-  it('focuses the next level to play, else the last unlocked', () => {
-    const fresh = buildLevelCards(levels, {}, (id) => id === 'a', {})
-    expect(initialFocusIndex(fresh)).toBe(0)
-    const partway = buildLevelCards(levels, { a: entry('a', 1, 1) }, (id) => id !== 'c', {})
-    expect(initialFocusIndex(partway)).toBe(1)
-    const done = buildLevelCards(levels, { a: entry('a', 1, 1), b: entry('b', 1, 2) }, (id) => id !== 'c', {})
-    expect(initialFocusIndex(done)).toBe(1)
+describe('nextLevelIndex', () => {
+  const all = getAllLevels()
+  const starred = (ids: string[], stars: number) => Object.fromEntries(ids.map((id) => [id, entry(id, 100, stars)]))
+  /** The chain's unlock rule over `scores`, as the store's `isLevelUnlocked`. */
+  const cardsFor = (scores: Record<string, ScoreEntry>, from: LevelSelectSource[] = all) =>
+    buildLevelCards(from, scores, (id) => {
+      const prev = previousLevel(id, from)
+      return prev === null || (scores[prev]?.stars ?? 0) >= 1
+    }, {})
+  const next = (scores: Record<string, ScoreEntry>, lastLevel: string | null, from: LevelSelectSource[] = all) => {
+    const cards = cardsFor(scores, from)
+    return cards[nextLevelIndex(cards, lastLevel)].id
+  }
+
+  it('starts a new player on the first level, whatever was played last', () => {
+    expect(next({}, null)).toBe('level1')
+    expect(next({}, 'level2')).toBe('level1')
+  })
+
+  it('goes to the first unlocked level without a star', () => {
+    expect(next(starred(['level1', 'level2'], 1), 'level1')).toBe('level3')
+    expect(next({ a: entry('a', 1, 3), b: entry('b', 0, 0) }, 'a', levels)).toBe('b')
+  })
+
+  it('goes back to the last level played once every level has a star, so PLAY and the worlds\' focus agree (#818)', () => {
+    const allStars = starred(all.map((l) => l.id), 3)
+    expect(next(allStars, 'level4')).toBe('level4')
+    expect(next(allStars, null)).toBe('level1')
+    expect(next(allStars, 'gone')).toBe('level1')
+  })
+
+  it('never lands on a locked level', () => {
+    const locked = buildLevelCards(levels, { a: entry('a', 1, 1), b: entry('b', 1, 1) }, (id) => id !== 'c', {})
+    expect(locked[nextLevelIndex(locked, 'c')].id).toBe('a')
   })
 })
 

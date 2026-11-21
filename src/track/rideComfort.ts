@@ -3,13 +3,15 @@
  * 20 Nov and found it dizzying: its view turned at 100–270°/s for whole seconds and snapped at up to 900°/s in a
  * tenth of a second, in a hall too small for its speed. Levels 1–5 never pass 105°/s over 2 s.
  *
- * The rider's frame is the seat's (tangent forward, the track's up), sampled every 0.1 s of ride time from GO. The
- * camera adds a little smoothing on top, so these figures are what the ride asks of the eye, at most.
+ * The rider's frame is the seat's (tangent forward, the track's up; upright facing the drop's heading on a drop track, as
+ * `seatPose` rides it), sampled every 0.1 s of ride time from GO. The camera adds a little smoothing on top, so these
+ * figures are what the ride asks of the eye, at most.
  */
 import * as THREE from 'three'
 import type { TrackParams } from '@/types/level'
 import { createTrackCurve } from './curves/createTrackCurve'
-import { buildArcTable, tAtLoopDistance } from './arcLength'
+import { buildArcTable, distanceAtT, tAtLoopDistance } from './arcLength'
+import { dropHeading, droppingOn } from './mechanics.hot'
 import { rideModel, rideProfile } from './ridePhysics'
 import { seatUp } from './trackGeometry'
 
@@ -49,8 +51,14 @@ export function rideComfort(track: TrackParams, seconds: number): RideComfort {
   const basis = new THREE.Matrix4()
   const frame = (k: number, out: THREE.Quaternion) => {
     const t = tAtLoopDistance(table, profile[k])
-    tan.copy(curve.getTangentAt(t)).normalize()
-    seatUp(curve, t, up)
+    const drop = track.mechanics ? droppingOn(track.mechanics, distanceAtT(table, t), table.length) : null
+    if (drop) {
+      dropHeading(curve, drop, tan)
+      up.set(0, 1, 0)
+    } else {
+      tan.copy(curve.getTangentAt(t)).normalize()
+      seatUp(curve, t, up)
+    }
     right.crossVectors(tan, up).normalize()
     up.crossVectors(right, tan).normalize()
     return out.setFromRotationMatrix(basis.makeBasis(right, up, tan.negate()))

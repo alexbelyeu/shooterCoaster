@@ -17,14 +17,14 @@ export const gym: BiomeDefinition = {
   floor: gymFloor,
   bounds: HALL_BOUNDS,
   // The Starr hangs on the hall's end wall: the orbit swings in front of it, inside the hall. The ride starts in the
-  // station inside the entrance (#700): the tour reveals the pit from mid-hall, pulls back down the hall facing the
-  // Starr (the landmark pass), then rides the turn into the station in (`gymTrack.test.ts`).
+  // station on the black path (#700): the tour reveals the pit from mid-hall, pulls back down the hall facing the
+  // Starr to the south end (the landmark pass), then rides the last of the track into the station (`gymTrack.test.ts`).
   hero: {
     x: star.x, z: star.z, ground: 0, focus: star.y, orbitRadius: 20 * GYM_SCALE, orbitHeight: 9 * GYM_SCALE,
-    arc: 0.7, facing: Math.atan2(STAR.facing.z, STAR.facing.x), approach: 12 * GYM_SCALE,
+    arc: 0.7, facing: Math.atan2(STAR.facing.z, STAR.facing.x), approach: 8 * GYM_SCALE,
     tour: [
       { at: toWorld({ x: 30, y: 14, z: 30 }), look: toWorld({ x: 15, y: 5, z: 22 }) },
-      { at: toWorld({ x: 46, y: 9, z: 27 }), look: star },
+      { at: toWorld({ x: 74, y: 8, z: 30 }), look: star },
     ],
   },
 }

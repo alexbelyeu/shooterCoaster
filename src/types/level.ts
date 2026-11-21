@@ -20,12 +20,6 @@ export interface WallSurface {
 interface TrackBase {
   /** The trig curves' size; for every curve, the structure's scale (`trackDimensions.ts`). */
   scalar: number
-  /** Today's speed rule (`ridePhysics.ts`), unless `ride` is 'v2'. */
-  rollerSpeed: number
-  minRollerSpeed: number
-  /** 'v2' (#696): gravity, speed zones and beats solved to land on their seconds (`rideV2.ts`, set by `rideV2`); absent, today's rule. */
-  ride?: 'v2'
-  rideV2?: RideV2Spec
   color1: number
   color2: number
   /** Running-rail radius at trackScale 1 (default 0.35); multiplied by trackScale. See src/track/trackDimensions.ts */
@@ -46,8 +40,27 @@ interface TrackBase {
   mechanics?: readonly RideMechanic[]
 }
 
+/** Today's speed rule (`ridePhysics.ts`): the car rolls by its slope between these speeds. */
+interface RuleRide {
+  ride?: undefined
+  rideV2?: undefined
+  rollerSpeed: number
+  minRollerSpeed: number
+}
+
+/** The v2 ride (#696): gravity, speed zones and beats solved to land on their seconds (`rideV2.ts`, set by `rideV2`). */
+interface V2Ride {
+  ride: 'v2'
+  rideV2?: RideV2Spec
+}
+
+/** How a track is ridden: today's rule, or the v2 ride, which needs none of the rule's speeds (#757). */
+type TrackRide = RuleRide | V2Ride
+
 /** A closed trig loop (`TrigCurve` / `TrigCurve2`), shaped by `varA` / `varB` / `varC`. */
-export interface TrigTrackParams extends TrackBase {
+export type TrigTrackParams = TrackBase & TrackRide & TrigCurveFields
+
+interface TrigCurveFields {
   curve: 'curve1' | 'curve2'
   varA: number
   varB: number
@@ -55,7 +68,9 @@ export interface TrigTrackParams extends TrackBase {
 }
 
 /** An authored spline (`SplineCurve`, #514). */
-export interface SplineTrackParams extends TrackBase {
+export type SplineTrackParams = TrackBase & TrackRide & SplineCurveFields
+
+interface SplineCurveFields {
   curve: 'spline'
   /**
    * The points in world units, in ride order; the loop closes from the last to the first. A point's `up`
@@ -178,6 +193,12 @@ export interface EnemyWave {
    * `walls`. Shooting one costs `BYSTANDER_PENALTY` and the combo; they are never kills, `maxScore` or the kill count.
    */
   bystanders?: { type: EnemyType; count: number }
+  /**
+   * Only a run on this route meets the wave (#720): 'hard', a run that shot its track's junction switch. It arrives on the
+   * branch (`spawnPlacement.ts` `HardRoute`) while the car rides it; on the easy route it never spawns and never joins the
+   * kill count. `maxScore` counts it: the harder way is the way to three stars.
+   */
+  route?: 'hard'
 }
 
 export interface LevelConfig {

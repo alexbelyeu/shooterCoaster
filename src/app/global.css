@@ -184,10 +184,16 @@ canvas {
   font-size: 2.1rem;
 }
 
-.title-screen .settings-button {
-  width: 9rem;
-  height: 44px;
+/* WORLDS and Settings side by side under PLAY, so the column keeps the poster's height. */
+.title-screen .title-row {
+  display: flex;
+  gap: 0.75rem;
   margin-top: 1.4rem;
+}
+
+.title-screen .title-row .fair-plate {
+  width: 8.5rem;
+  height: 44px;
   font-size: 1.3rem;
 }
 

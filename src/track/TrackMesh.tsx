@@ -16,9 +16,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { buildTrackGeometry } from './trackGeometry'
 import {
   type TowerPlan,
-  type TowerInstance,
   buildFootingGeometry,
-  buildTowerGeometry,
+  buildTowersGeometry,
   getTowerDims,
   planTowers,
   towerShadowCasters,
@@ -73,34 +72,7 @@ const _p = new THREE.Vector3()
 const _s = new THREE.Vector3()
 const _yAxis = new THREE.Vector3(0, 1, 0)
 
-function TowerBucket({
-  geometry,
-  material,
-  towers,
-}: {
-  geometry: THREE.BufferGeometry
-  material: THREE.Material
-  towers: TowerInstance[]
-}) {
-  const setRef = useCallback(
-    (mesh: THREE.InstancedMesh | null) => {
-      if (!mesh) return
-      _s.set(1, 1, 1)
-      for (let i = 0; i < towers.length; i++) {
-        const t = towers[i]
-        _q.setFromAxisAngle(_yAxis, t.yaw)
-        _p.set(t.x, t.topY, t.z)
-        mesh.setMatrixAt(i, _m.compose(_p, _q, _s))
-      }
-      mesh.instanceMatrix.needsUpdate = true
-      mesh.computeBoundingSphere()
-    },
-    [towers],
-  )
-  return <instancedMesh name="track-towers" ref={setRef} args={[geometry, material, towers.length]} />
-}
-
-/** Lattice towers (one InstancedMesh per height bucket) + footing pads. */
+/** Lattice towers (one merged mesh, `buildTowersGeometry`) + footing pads. */
 function SupportTowers({
   curve,
   table,
@@ -122,10 +94,7 @@ function SupportTowers({
   useContactShadows(useMemo(() => towerShadowCasters(plan), [plan]))
 
   const td = useMemo(() => getTowerDims(dims), [dims])
-  const bucketGeoms = useMemo(
-    () => plan.bucketHeights.map((h) => buildTowerGeometry(td, h)),
-    [plan, td],
-  )
+  const towersGeom = useMemo(() => buildTowersGeometry(td, plan), [plan, td])
   const footingGeom = useMemo(() => buildFootingGeometry(), [])
   const steel = useMemo(
     () =>
@@ -142,12 +111,7 @@ function SupportTowers({
     [],
   )
 
-  useEffect(
-    () => () => {
-      for (const g of bucketGeoms) g.dispose()
-    },
-    [bucketGeoms],
-  )
+  useEffect(() => () => towersGeom?.dispose(), [towersGeom])
   useEffect(
     () => () => {
       footingGeom.dispose()
@@ -155,11 +119,6 @@ function SupportTowers({
       concrete.dispose()
     },
     [footingGeom, steel, concrete],
-  )
-
-  const byBucket = useMemo(
-    () => plan.bucketHeights.map((_, b) => plan.towers.filter((t) => t.bucket === b)),
-    [plan],
   )
 
   const footingCount = plan.towers.length * 4
@@ -181,15 +140,11 @@ function SupportTowers({
     [plan],
   )
 
-  if (plan.towers.length === 0) return null
+  if (!towersGeom) return null
 
   return (
     <>
-      {bucketGeoms.map((geom, b) =>
-        byBucket[b].length > 0 ? (
-          <TowerBucket key={geom.uuid} geometry={geom} material={steel} towers={byBucket[b]} />
-        ) : null,
-      )}
+      <mesh name="track-towers" geometry={towersGeom} material={steel} />
       <instancedMesh
         name="track-footings"
         key={footingGeom.uuid + footingCount} ref={setFootingRef} args={[footingGeom, concrete, footingCount]} />

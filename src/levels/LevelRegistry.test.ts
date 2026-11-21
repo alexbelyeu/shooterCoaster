@@ -46,7 +46,7 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2450, Kraken 2624, Yeti 3180, Magma Titan 2914, Medusa 2220', () => {
+  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2450, Kraken 2624, Yeti 3180, Magma Titan 2914, Medusa 2322', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
       ['level1', 'goldenBlimp', 2675],
@@ -54,16 +54,22 @@ describe('LevelRegistry', () => {
       ['level3', 'kraken', 2624],
       ['level4', 'yeti', 3180],
       ['level5', 'magmaTitan', 2914],
-      ['level6', 'medusa', 2178],
+      ['level6', 'medusa', 2322],
     ])
     expect(getLevelConfig('level1')!.maxScore).toBe(150 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
+  })
+
+  it("counts the hard route's wave in maxScore (#720): every wave and the boss, the gym's V8 rats included", () => {
+    for (const l of levels) expect(l.maxScore, l.id).toBe(computeMaxScore(l.enemies, l.boss && BOSS_SPECS[l.boss.type]))
+    expect(getLevelConfig('level6')!.enemies.filter((w) => w.route).map((w) => [w.type, w.count, w.route])).toEqual([['rat', 8, 'hard']])
   })
 
   it.each(levels.map((l) => [l.id, l] as const))(
     '%s: waves from 0 s, the last one shootable by 35 s, then a 18–22 s boss fight (or a finale wave) ending the run',
     (_id, level) => {
       expect(RUN_SECONDS).toBe(60)
-      const delays = level.enemies.map((w) => w.spawnDelay ?? 0)
+      // A hard-route wave is timed by its junction, outside the waves every run meets.
+      const delays = level.enemies.filter((w) => !w.route).map((w) => w.spawnDelay ?? 0)
       expect(delays[0]).toBe(0)
       expect([...delays].sort((a, b) => a - b)).toEqual(delays)
       const finaleAt = level.boss ? level.boss.at : delays[delays.length - 1]

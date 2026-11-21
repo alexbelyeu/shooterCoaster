@@ -27,7 +27,7 @@ import { perfRequested } from '@/perf/perfFlag'
 
 const PerfPanel = lazy(() => import('@/perf/PerfPanel'))
 
-/** PLAY fades the title to black (with a whoosh) over this long, then opens level select. */
+/** PLAY / WORLDS fade the title to black (with a whoosh) over this long, then start the run / open level select. */
 const TITLE_FADE_S = 0.4
 
 const fadeVariants = {
@@ -65,11 +65,14 @@ export default function App() {
   }, [phase])
   useEffect(() => () => window.clearTimeout(veilTimer.current), [])
 
-  function playFromTitle() {
+  function leaveTitle(then: () => void) {
     setVeiled(true)
     sfx().ui('whoosh')
-    veilTimer.current = window.setTimeout(() => setPhase('levelSelect'), TITLE_FADE_S * 1000)
+    veilTimer.current = window.setTimeout(then, TITLE_FADE_S * 1000)
   }
+  // One press from the title to the ride (#329): the player's next level, the worlds a button away.
+  const playFromTitle = () => leaveTitle(() => useGameStore.getState().startNextRun('title'))
+  const worldsFromTitle = () => leaveTitle(() => setPhase('levelSelect'))
 
   // Not over the intro's tour, the countdown over its end included: nothing to aim at yet.
   const touring = useSyncExternalStore(subscribeIntroClock, () => introStartedAt() !== null)
@@ -114,7 +117,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 1.05, filter: 'blur(8px)' }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
           >
-            <TitleScreen onPlay={playFromTitle} onSettings={() => setShowSettings(true)} />
+            <TitleScreen onPlay={playFromTitle} onWorlds={worldsFromTitle} onSettings={() => setShowSettings(true)} />
           </Screen>
         )}
 
@@ -152,7 +155,7 @@ export default function App() {
       {phase === 'intro' && <Intro />}
       {(phase === 'countdown' || phase === 'playing' || resuming) && <Countdown />}
 
-      {/* Black over everything from PLAY until level select has mounted under it. */}
+      {/* Black over everything from PLAY / WORLDS until the loading screen or level select has mounted under it. */}
       <AnimatePresence>
         {veiled && (
           <motion.div

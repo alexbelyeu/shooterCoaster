@@ -1795,7 +1795,7 @@ async function speedCheck(page, levelId) {
  * level's v2 ride (`rideBeats()`), so a rebuilt ride can't leave it pointing somewhere else.
  */
 const GAP_LEVEL = 'level6'
-const GAP_BEAT_SECOND = 55
+const GAP_BEAT_SECOND = 56.5
 
 /**
  * `level6-gap.png`: the ride from inside the Tree's gap, the trunk on one side and the back wall on the other. With game time and the level timer
@@ -2521,20 +2521,43 @@ async function darkSectionShot(page, levelId, { shots: shoot = false } = {}) {
 /** The dark shots' floors: the share of the frame that is dark, of saturated bright pixels (the blacklit glow), and how much the flash brightens the frame's mean (0–255). */
 const DARK_SHOT = { dark: 0.4, glow: 0.002, flash: 3 }
 
-const SWITCH_CHECK = { level: 'level6' }
+/** `branchWave`: the hard route's own wave (#720, `LevelRegistry.ts` level6's `branch`): its banner, size and second. */
+const SWITCH_CHECK = { level: 'level6', branchWave: { label: 'Pad Rats!', count: 8, at: 17 } }
+/** On-screen rats on the branch the hard run must see once its wave is in. */
+const BRANCH_WAVE_ON_SCREEN = 2
 /** Track-parameter leads behind the switch sign to park the coaster at. */
 const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
 
 /**
  * Shoot-to-switch (#702): a run that shoots the V2 sign with a real bullet rides the V8 branch, a run that leaves it rides
  * the easy way, and a restart sets it back (level6-switch.png: the sign in view, level6-switch-hard.png: on the branch).
+ * With the level timer jumped to the branch wave's second (#720), the hard run meets it on the branch, on screen and in the
+ * kill count; the easy run, past the sign, never does.
  * The same run then checks the cave's dark section; the nightly `dark` step (`darkShots`) adds its frame shots and the
  * Tree's gap still (`gapShot`), which are too slow for the PR's `level6` shard (#766).
  */
 async function switchCheck(page, { darkShots = false } = {}) {
-  const { level } = SWITCH_CHECK
+  const { level, branchWave } = SWITCH_CHECK
   const problems = []
   const api = (fn, arg) => page.evaluate(fn, arg)
+  /** Jumps the held level timer to `seconds` in one frame and lets the waves due by then tell and arrive, the ride held. */
+  const toLevelTime = async (seconds) => {
+    await api((x) => {
+      const s = window.__SC_TEST__
+      s.timerStep = x
+      s.stopAtLevelTime = x
+      s.setTimeScale(1)
+    }, seconds)
+    await waitFrames(page, 4, { maxMs: 20000, pollMs: 100 })
+    await api(() => {
+      const s = window.__SC_TEST__
+      s.setTimeScale(0)
+      s.timerStep = null
+      s.stopAtLevelTime = null
+    })
+  }
+  /** Arrivals of the branch wave since load (`waveEvents` spans the page's runs). */
+  const branchArrivals = () => api((label) => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'announce' && e.label === label).length, branchWave.label)
   const read = () => api(() => window.__SC_TEST__.trackSwitch())
   const rideTo = async (t) => {
     await api((x) => { window.__SC_TEST__.rideTo = x }, t)
@@ -2550,7 +2573,7 @@ async function switchCheck(page, { darkShots = false } = {}) {
   let sw = await read()
   if (!sw) return { id: 'switch', problems: [`${level} has no switch (trackSwitch() is null)`] }
   const mid = (sw.from + sw.to) / 2
-  const result = { t: sw.t, lead: null, px: null, hard: null, easy: null }
+  const result = { t: sw.t, lead: null, px: null, hard: null, easy: null, branchRats: null, totals: { hard: null, easy: null } }
 
   // The run that shoots it: park where it is on screen, fire a real bullet at it.
   let target = null
@@ -2574,10 +2597,16 @@ async function switchCheck(page, { darkShots = false } = {}) {
     if (!(await pollUntil(page, async () => (await read()).hard, { ms: 8000, frames: 8, pollMs: 200 })))
       problems.push('shooting the switch did not set the hard way')
     await api(() => { window.__SC_TEST__.bulletStep = 0 })
+    const before = await branchArrivals()
+    await toLevelTime(branchWave.at)
+    if ((await branchArrivals()) === before) problems.push(`the hard route's wave (${branchWave.label}) never arrived at ${branchWave.at} s`)
+    result.totals.hard = (await read()).totalEnemies
     await rideTo(mid)
     sw = await read()
     result.hard = sw.riding
     if (sw.riding !== 'hard') problems.push(`after the switch was shot the ride took the ${sw.riding} way`)
+    result.branchRats = (await api(() => window.__SC_TEST__.enemies())).filter((e) => e.type === 'rat').length
+    if (result.branchRats < BRANCH_WAVE_ON_SCREEN) problems.push(`on the branch only ${result.branchRats} rats on screen (need ${BRANCH_WAVE_ON_SCREEN})`)
     await page.screenshot({ path: path.join(OUT, `${level}-switch-hard.png`), timeout: SHOT_TIMEOUT })
   }
 
@@ -2595,6 +2624,13 @@ async function switchCheck(page, { darkShots = false } = {}) {
   problems.push(...dark.problems)
   const gap = darkShots ? await gapShot(page) : null
   if (gap) problems.push(...gap.problems)
+  // Past the sign the easy way is settled: its wave's second brings nothing, and the kill count never counts it.
+  const before = await branchArrivals()
+  await toLevelTime(branchWave.at)
+  if ((await branchArrivals()) !== before) problems.push(`the easy route met the hard route's wave (${branchWave.label})`)
+  result.totals.easy = (await read()).totalEnemies
+  if (result.totals.hard != null && result.totals.hard - result.totals.easy !== branchWave.count)
+    problems.push(`the hard run's kill count has ${result.totals.hard} enemies, the easy run's ${result.totals.easy}: not ${branchWave.count} apart`)
   return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result, gap: gap?.image ?? null }
 }
 
@@ -3017,15 +3053,16 @@ async function titleFlyBy(page, drawCalls, lap) {
     })
     observer.observe(document.body, { childList: true, subtree: true })
   })
-  await page.keyboard.press('Enter')
+  // W is WORLDS (#329); PLAY's own path, straight into a run, is `titlePlayCheck` after the title budget.
+  await page.keyboard.press('w')
   const veiled = await page
     .waitForFunction(() => window.__veilSeen, null, { timeout: 10000, polling: 100 })
     .then(() => true, () => false)
-  if (!veiled) problems.push('a key press on the title did not fade to black')
+  if (!veiled) problems.push('W on the title did not fade to black')
   const opened = await page
     .waitForFunction(() => window.__SC_TEST__.phase() === 'levelSelect', null, { timeout: 30000 })
     .then(() => true, () => false)
-  if (!opened) problems.push('a key press on the title did not open level select')
+  if (!opened) problems.push('W on the title did not open level select')
   const veilGone = await page
     .waitForSelector('.screen-veil', { state: 'detached', timeout: 30000 })
     .then(() => true, () => false)
@@ -3042,6 +3079,32 @@ async function titleFlyBy(page, drawCalls, lap) {
   return { problems, result: { turnedDeg, moved, waited, hint, attract: attract.result, veiled, opened, engineBefore, engineAfter, sparkle } }
 }
 
+/** Title PLAY (#329): Enter on a fresh save starts level1's run with no level select in between. */
+async function titlePlayCheck(page) {
+  const problems = []
+  await page.evaluate(() => window.__SC_TEST__.setPhase('title'))
+  if (!(await waitVisible(page, '.title-screen .title-play', 30000))) return ['the title did not come back for PLAY']
+  await page.waitForTimeout(800) // PLAY's fade-in: a key before it lands still plays, but on a settled title
+  await page.evaluate(() => {
+    const seen = (window.__phasesSeen = [])
+    const tick = () => {
+      const p = window.__SC_TEST__.phase()
+      if (seen[seen.length - 1] !== p) seen.push(p)
+      if (p !== 'playing') requestAnimationFrame(tick)
+    }
+    tick()
+  })
+  await page.keyboard.press('Enter')
+  const started = await page
+    .waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 60000 })
+    .then(() => true, () => false)
+  const { seen, level } = await page.evaluate(() => ({ seen: window.__phasesSeen, level: window.__SC_TEST__.stats().currentLevel }))
+  if (!started) problems.push(`Enter on the title did not start a run (phases: ${seen.join(' > ')})`)
+  else if (level !== 'level1') problems.push(`Enter on a fresh title started ${level}, not level1`)
+  if (seen.includes('levelSelect')) problems.push(`PLAY went through level select (${seen.join(' > ')})`)
+  return problems
+}
+
 /** Longest the cold load may take to hand the poster over to the live scene before the poster check gives up. */
 const POSTER_HANDOFF_MS = 60000
 /** The poster's pieces and the live title's that must land on them; `x: false` compares only the vertical (the hint's text differs). */
@@ -3049,6 +3112,7 @@ const POSTER_PAIRS = [
   { name: 'logo', poster: '#poster .poster-logo svg', live: '.title-screen .title-logo svg' },
   { name: 'tagline', poster: '#poster .poster-tag', live: '.title-screen .title-tagline' },
   { name: 'PLAY', poster: '#poster .poster-play', live: '.title-screen .title-play' },
+  { name: 'Worlds', poster: '#poster .poster-worlds', live: '.title-screen .worlds-button' },
   { name: 'Settings', poster: '#poster .poster-settings', live: '.title-screen .settings-button' },
   { name: 'hint', poster: '#poster .poster-hint', live: '.title-screen .title-hint', x: false },
 ]
@@ -3821,11 +3885,11 @@ async function runMobile(browser, base) {
   await page.goto(`${base}/?e2e=1&seed=${SEED}`, { waitUntil: 'load' })
   await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
 
-  // Title -> PLAY (tap)
-  if (!(await waitVisible(page, '.title-screen .title-play'))) problems.push('PLAY button never appeared')
-  await tapCentre(page, '.title-screen .title-play').catch((e) => problems.push(`tap PLAY: ${e.message}`))
+  // Title -> WORLDS (tap); a tap on PLAY is the prod check's phone run (e2e/prod-check.mjs)
+  if (!(await waitVisible(page, '.title-screen .worlds-button'))) problems.push('WORLDS button never appeared')
+  await tapCentre(page, '.title-screen .worlds-button').catch((e) => problems.push(`tap WORLDS: ${e.message}`))
   await waitPhase('levelSelect', 15000)
-  if ((await phase()) !== 'levelSelect') problems.push('tapping PLAY did not open level select')
+  if ((await phase()) !== 'levelSelect') problems.push('tapping WORLDS did not open level select')
 
   // Level select -> level 1 (tap)
   const card = `.level-card[data-level="${MOBILE_LEVEL}"]`
@@ -4101,7 +4165,10 @@ async function run() {
       const poster = t.loading
       const noJs = await posterWithoutJs(browser, base, t.page)
       lap('noJs')
-      const problems = [...fly.problems, ...poster.problems, ...noJs, ...(await fontProblems(t.page))]
+      const fonts = await fontProblems(t.page)
+      const play = await titlePlayCheck(t.page)
+      lap('play')
+      const problems = [...fly.problems, ...poster.problems, ...noJs, ...fonts, ...play]
       if (titleWait.frames < MIN_FRAMES) problems.push(`render loop stalled (${titleWait.frames} frames in ${(titleWait.ms / 1000).toFixed(0)}s)`)
       if (looksBlank(titleImg)) problems.push('title.png: the 3D scene behind the UI looks blank')
       if (budget.over.length && PERF_GATE) problems.push(`title scene over budget: ${budget.over.join(', ')}`)

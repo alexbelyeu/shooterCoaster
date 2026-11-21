@@ -13,4 +13,14 @@ describe('api level limits', () => {
     const level1 = getLevelConfig('level1')!
     expect(scoreLimits(level1).maxScore).toBe((level1.maxScore + 3 * GOLDEN_BALLOON.score) * 5)
   })
+
+  it("allow the gym's hard route (#720): the V8's rats in its kills and its score", () => {
+    const level6 = getLevelConfig('level6')!
+    const v8 = level6.enemies.filter((w) => w.route === 'hard')
+    expect(v8.length).toBe(1)
+    const everyRun = level6.enemies.filter((w) => !w.route).reduce((n, w) => n + w.count, 0)
+    const medusa = scoreLimits({ ...level6, enemies: [] }).maxKills
+    expect(LEVEL_LIMITS.level6.maxKills).toBe(everyRun + v8[0].count + medusa)
+    expect(LEVEL_LIMITS.level6.maxScore).toBe(level6.maxScore * 5)
+  })
 })

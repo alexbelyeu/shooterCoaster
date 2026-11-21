@@ -9,7 +9,7 @@ storyboard of them. Epic: see the issue that links this file.
 
 ## Why the rides feel flat
 
-- **One speed.** The gym's `rollerSpeed` is 0.0000004: gravity is off, every metre is ridden at the
+- **One speed.** The gym's `rollerSpeed` was 0.0000004 (before its v2 ride): gravity was off, every metre ridden at the
   same speed (`ridePhysics.ts`). There is no tension and no release.
 - **No use of the space.** The gym hall is 80 × 40 × 27 m; the ride peaks at 5.4 m. Outdoor levels
   have whole landscapes and ride a ribbon a few metres over the ground.
@@ -42,7 +42,8 @@ the slow-motion window, the photo are), so camera, audio, pacing and spawning ca
 
 Built so far (#698): `src/track/elements/` has the loop, zero-g roll, corkscrew, heartline roll, airtime hill
 (with its `slowMotion` marker), helix, banked turn and the head-chopper helper, on a `RideBuilder` whose control
-points carry the track's `up`; a spline with ups rolls, and the ride camera's up follows it. See them ridden with
+points carry the track's `up`; `climbing.ts` has the unmarked pieces a ride laid out on a floor plan uses (#757: a straight
+or a turn that climbs on the way, a straight to a line on the plan; a turn, and so a `bankedTurn` with `rise`, climbs a little more than `rise`, its grade's share by 1 / cos g; a straight throws on a rise over ~5.8 × its run, #815), which level 6's ride is built from; a spline with ups rolls, and the ride camera's up follows it. See them ridden with
 `npm run turntable -- --rides` (`e2e-results/turntable/rides.png`).
 
 The special mechanics (#699) are `TrackParams.mechanics` on a v2 ride, built with their track by `src/track/elements/mechanicElements.ts`:
@@ -84,25 +85,26 @@ time so the storyboard's beats land on their seconds.
 
 ## Level 6: the Climbing Gym, storyboard (60 s)
 
-1. **0 s, station by the entrance.** Countdown on the black pathway; **launch** straight down it
-   at the Flame.
-2. **~4 s, over the Flame.** Pull up and a **zero-g roll** over the fire: the flames are over your
-   head for a moment.
-3. **~8 s, the Arch and the Training Area.** **Head-chopper** under the Arch's lintel, then into
-   the Training Area cave as a **dark section**: blacklight, the holds glowing, rats lit by the
-   muzzle flash.
-4. **~16 s, the cubbies.** Burst out over an **airtime hill** with a slow-motion window: the
-   lanternfly swarm.
-5. **~19 s, the route choice.** A **shoot-to-switch** sign at the cave's mouth: V2 (the easy way
-   round) or V8 (the harder branch, more points). Grades as route names.
-6. **~22 s, the wall ride.** The track bolted up the Shield like a top-rope climb: a **lift hill**
-   up the wall, climbers beside you, the auto belay clicking, to the roof trusses at ~22 m. The
-   whole gym below.
-7. **~30 s, the dyno.** The rail ends at the top: a **jump gap** across to Alaska.
-8. **~33 s, the auto-belay drop.** A **drop track** free fall down Alaska's face toward the pit.
-9. **~40 s, Medusa.** A **helix** round the Starr pit while she rises and her snakes strike.
-10. **~55 s, the Tree.** A **corkscrew** through the gap between the solid trunk and the wall.
-11. **~58 s, home.** **Brake run**; the **photo** flash fires in the Tree's gap.
+As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrack.ts` has the seconds each beat lands):
+
+1. **0 s, station on the black path.** Countdown; **launch** north up the path, climbing at the Flame.
+2. **~6–11 s, over the Flame.** A wide braking turn onto it and a **slow heartline roll** across it (~5 s): the
+   flames over your head at its middle. (The first build's zero-g roll took a second; a whip like that is dizzying.)
+3. **~11–18 s, the Training Area.** Down under its lintel (a **head-chopper**) into the cave as a **dark section**,
+   round north through it: blacklight, the holds glowing, rats lit by the muzzle flash.
+4. **~18 s, the route choice.** Out of the cave on a launch across the hall: a **shoot-to-switch** sign, V2 (the
+   easy way) or V8 (the harder branch, more points).
+5. **~21.5 s, the wall ride.** A **lift hill** straight up Alaska, climbers and lanternflies on the wall beside and
+   above you, to the roof trusses at ~21 m, rolling onto its back to tip over north.
+6. **~26 s, the dyno.** A **jump gap** off Alaska's top to the Shield.
+7. **~28 s, the auto-belay drop.** A **drop track**: the car stops, then falls upright with its piece of track into
+   the pit.
+8. **~36–44 s, Medusa.** A **helix** up out of the pit that comes out facing the Starr as she rises (40 s), then a
+   slow chain lift straight at her face.
+9. **~44 s, the dive** round her shoulder, along the Tree's roots, a hairpin into its left cave.
+10. **~54–59 s, the Tree.** A slow **heartline roll** through the gap between the solid trunk and the wall.
+11. **After the run, home.** Down the hall's east side and under the **Arch's** lintel (the head-chopper the first
+    build had at ~8 s: the slower ride has no time for the detour to it in the run) into the station.
 
 ## The other levels (ideas for their storyboards)
 

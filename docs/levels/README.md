@@ -4,7 +4,7 @@
 (12 Nov 2026, #513), built from the gym's Setter's Map and his photos; keep it verbatim. Level 6 is
 built from it: the pure `blockout.ts` next to it reads it as typed pieces (their solid boxes, the
 named anchors: pit, star, Arch opening, Flame, Tree face, glass room windows) and scales it to the
-level (`GYM_SCALE`, 16 world units per metre: the 80 m hall is 1280 units long). Don't name the real
+level (`GYM_SCALE`, 48 world units per metre: the 80 m hall is 3840 units long). Don't name the real
 gym anywhere: in the game it is "the Climbing Gym".
 
 ## The ride (#514, rebuilt in #700)

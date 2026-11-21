@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { type RideBuilder, TAU, smoothstep } from './rideBuilder'
+import { bankProfile, climbingTurn, gradeFor } from './climbing'
 
 /**
  * The classic coaster elements (`docs/RIDE-KIT.md`, #698), each appended to a `RideBuilder` and marked with its
@@ -13,11 +14,6 @@ const HEART_SHARE = 0.6
 
 /** A whole roll, eased in and out. */
 const fullRoll = (hand: Hand, heartline: number) => ({ at: (u: number) => hand * TAU * smoothstep(u), heartline })
-
-/** A bank held through a run: eased in over the first `ease` of it and out over the last. */
-function bankProfile(bank: number, ease = 0.25) {
-  return { at: (u: number) => bank * smoothstep(u / ease) * smoothstep((1 - u) / ease) }
-}
 
 /**
  * A vertical loop: one whole turn nose-up, a teardrop (`teardrop` tighter at the top than the bottom), exiting
@@ -93,8 +89,7 @@ export function helix(
 ): RideBuilder {
   const entry = b.eyeHeight * 2
   // The pitch into and out of the grade falls too: take it off the turns' share.
-  let grade = 0
-  for (let i = 0; i < 8; i++) grade = Math.atan2(drop - 2 * entry * (1 - Math.cos(grade)), TAU * radius * turns)
+  const grade = gradeFor(TAU * radius * turns, drop, entry)
   return b.mark('helix', () => {
     b.pitch(-grade, entry)
     b.turn(hand * TAU * turns, radius / Math.cos(grade), bankProfile(hand * bank, 0.15 / turns))
@@ -102,7 +97,10 @@ export function helix(
   })
 }
 
-/** A level turn of `angle` (positive left) on `radius`, banked into it. */
-export function bankedTurn(b: RideBuilder, { angle = Math.PI / 2, radius = 4 * b.eyeHeight, bank = (35 * Math.PI) / 180 } = {}): RideBuilder {
-  return b.mark('bankedTurn', () => b.turn(angle, radius, bankProfile(Math.sign(angle) * bank)))
+/** A turn of `angle` (positive left) on `radius`, banked into it, climbing `rise` on the way (pitched in and out on `ease`). */
+export function bankedTurn(
+  b: RideBuilder,
+  { angle = Math.PI / 2, radius = 4 * b.eyeHeight, bank = (35 * Math.PI) / 180, rise = 0, ease = 2 * b.eyeHeight } = {},
+): RideBuilder {
+  return b.mark('bankedTurn', () => climbingTurn(b, angle, radius, { rise, ease, twist: bankProfile(Math.sign(angle) * bank) }))
 }

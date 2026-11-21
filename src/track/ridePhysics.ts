@@ -21,7 +21,7 @@ export interface RideSpeeds {
   roll: number
   min: number
   max: number
-  /** The v2 ride's plan: when set, the ride follows it and the fields above are unused. */
+  /** The v2 ride's plan: when set, the ride follows it and the fields above are 0, unused. */
   plan?: RidePlan
 }
 
@@ -38,13 +38,12 @@ export function rideSpeeds({ rollerSpeed, minRollerSpeed }: { rollerSpeed: numbe
  * only mechanic is a junction (#702: no zones). Cold: solves the plan (a few ms).
  */
 export function rideModel(track: TrackParams, table: ArcTable): RideSpeeds {
-  const speeds = rideSpeeds(track)
-  if (track.ride !== 'v2') {
-    if (track.mechanics?.some((m) => m.kind !== 'junction')) throw new Error('ride mechanics need the v2 ride (track.ride: "v2")')
-    checkMechanics(track.mechanics)
-    return speeds
+  if (track.ride === 'v2') {
+    return { roll: 0, min: 0, max: 0, plan: buildRidePlan(table, withMechanics(track.rideV2 ?? {}, track.mechanics, table.length)) }
   }
-  return { ...speeds, plan: buildRidePlan(table, withMechanics(track.rideV2 ?? {}, track.mechanics, table.length)) }
+  if (track.mechanics?.some((m) => m.kind !== 'junction')) throw new Error('ride mechanics need the v2 ride (track.ride: "v2")')
+  checkMechanics(track.mechanics)
+  return rideSpeeds(track)
 }
 
 /** Velocity after `frames` on track whose unit tangent rises by `tangentY`, clamped to the ride's speeds. */
@@ -189,7 +188,7 @@ export function lapSeconds(curve: TrackCurve, speeds: RideSpeeds, maxSeconds = 6
 }
 
 /** Profile samples per second of level time. */
-const PROFILE_RATE = 10
+export const PROFILE_RATE = 10
 
 /**
  * Arc distance ridden at each tenth of a second of level time over `seconds`, from the start at rest, if the ride kept
@@ -224,7 +223,8 @@ export function riddenBetween(profile: Float64Array, from: number, to: number): 
   return Math.max(0, riddenAt(profile, to) - riddenAt(profile, from))
 }
 
-function riddenAt(profile: Float64Array, time: number): number {
+/** Arc distance ridden `time` seconds after GO, interpolated between the profile's samples. */
+export function riddenAt(profile: Float64Array, time: number): number {
   const x = Math.min(Math.max(time * PROFILE_RATE, 0), profile.length - 1)
   const i = Math.min(Math.floor(x), profile.length - 2)
   if (i < 0) return 0

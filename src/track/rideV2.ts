@@ -13,7 +13,7 @@ import type { RideBeat, RideHold, RideV2Spec, SpeedZone } from '@/types/level'
  * beat out of reach. A hold (a stop: a drop track's top, a turntable, #699) is never warped: it lasts its seconds.
  */
 
-/** Gravity near 9.8 m/s² at the gym's 32 world units per metre; drag a mild cap on the fastest drops. */
+/** Level 1's gravity in world units (6.25 m/s² in the gym's hall at 48 units a metre, #761); drag a mild cap on the fastest drops. */
 export const RIDE_V2_DEFAULTS = { gravity: 300, drag: 0.0005, crawl: 12 } as const
 /** A solved beat lands within this many seconds of its second. */
 export const BEAT_TOLERANCE_SECONDS = 0.5
