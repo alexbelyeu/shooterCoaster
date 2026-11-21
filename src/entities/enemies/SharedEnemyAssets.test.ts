@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
-  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_GEO, dustBunnyRoll, LANTERNFLY_FLASH_MAT,
+  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_GEO, DUST_BUNNY_MAT, dustBunnyRoll, LANTERNFLY_FLASH_MAT,
   LANTERNFLY_FOLDED, LANTERNFLY_FOREWING_PIVOT, LANTERNFLY_GEO, LANTERNFLY_HINDWING_PIVOT, LANTERNFLY_MAT, LANTERNFLY_OPEN, RAT_BODY_GEO,
   RAT_SNOUT_GEO, RAT_TAIL_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
   SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, createLanternflyFlashMaterial, createLanternflyMaterial, crowWingPose, patchCrowWingVertex,
-  patchLanternflyWingVertex,
+  patchEyeGlossFragment, patchEyeGlossVertex, patchLanternflyWingVertex,
 } from './SharedEnemyAssets'
 
 describe('crow model', () => {
@@ -116,6 +116,17 @@ describe('gym pests (#515)', () => {
     expect(eyes).toBeGreaterThan(0)
     expect(worst).toBeLessThan(1e-4)
     expect(g.morphTargetsRelative).toBe(true)
+  })
+
+  it("glosses the dust bunny's eyes: every patch lands in the standard shader, one program with the warm-up", () => {
+    const vertex = patchEyeGlossVertex(THREE.ShaderLib.standard.vertexShader)
+    expect(vertex).toMatch(/#include <common>\nattribute float aGloss;/)
+    expect(vertex).toMatch(/#include <begin_vertex>\nvGloss = aGloss;/)
+    const fragment = patchEyeGlossFragment(THREE.ShaderLib.standard.fragmentShader)
+    expect(fragment).toMatch(/#include <common>\nvarying float vGloss;/)
+    expect(fragment).toMatch(/#include <roughnessmap_fragment>\nroughnessFactor = mix\(roughnessFactor, [\d.]+, vGloss\);/)
+    expect(fragment).toMatch(/#include <metalnessmap_fragment>\nmetalnessFactor = mix\(metalnessFactor, [\d.]+, vGloss\);/)
+    expect(DUST_BUNNY_MAT.customProgramCacheKey()).toMatch(/-eye-gloss$/)
   })
 
   it('give the rat its pink ears, nose and tail', () => {
