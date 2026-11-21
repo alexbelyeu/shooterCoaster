@@ -151,7 +151,7 @@ const _up = new THREE.Vector3()
 const UNROLLED_COS = Math.cos((2 * Math.PI) / 180)
 
 /** The unrolled up at a tangent (world up made perpendicular to it): what a track without `getUpAt` rides. */
-function unrolledUp(tangent: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+export function unrolledUp(tangent: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
   return out.set(0, 1, 0).addScaledVector(tangent, -tangent.y).normalize()
 }
 
