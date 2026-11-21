@@ -971,7 +971,7 @@ export function installE2EApi() {
         weather: e2eWeather(l.enemies),
       }))
     },
-    startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
+    startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, { seed }),
     restartLevel: () => useGameStore.getState().restartRun('results'),
     levelReady: () => {
       const { sceneReady, currentLevel } = useGameStore.getState()

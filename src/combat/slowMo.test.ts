@@ -104,7 +104,7 @@ describe('run end', () => {
   it('startRun resets the store side', () => {
     requestSlowMo('frenzy')
     tickSlowMo(0.5)
-    store().startRun('level1', 1)
+    store().startRun('level1', { seed: 1 })
     expect(store()).toMatchObject({ timeScale: 1, frenzy: 'off' })
   })
 })
