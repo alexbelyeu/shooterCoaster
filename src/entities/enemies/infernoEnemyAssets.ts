@@ -1,10 +1,11 @@
 import * as THREE from 'three'
-import { mergePainted, painted, paintedAt, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
+import { mergePainted, painted, paintedAt, paintedPolygon, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
+import { bent, darkUnder, grin, recolor } from './enemyPaint'
 import { withRim } from './enemyRim'
 
-// Inferno's three small enemies as characters (#463, briefs in docs/art/ENEMIES.md): the Ember Wisp, the Fire
-// Imp and the Lava Golem. Every part is vertex-painted and merged per moving part; +z faces the rider, +y is up.
-// Re-exported by SharedEnemyAssets, so ShaderWarmup compiles every material here.
+// Inferno's enemies as characters (#463, #813, briefs in docs/art/ENEMIES.md): the Ember Wisp, the Fire
+// Imp, the Lava Golem and the Infernal Drake. Every part is vertex-painted and merged per moving part; +z faces the
+// rider (the drake's snout, where it flies), +y is up. Re-exported by SharedEnemyAssets, so ShaderWarmup compiles every material here.
 
 type Vec3 = [number, number, number]
 
@@ -12,36 +13,6 @@ type Vec3 = [number, number, number]
 function hash3(x: number, y: number, z: number): number {
   const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453
   return s - Math.floor(s)
-}
-
-/** Each vertex's colour from its own position (after placement). */
-function recolor(g: THREE.BufferGeometry, paint: (x: number, y: number, z: number, out: THREE.Color) => void): THREE.BufferGeometry {
-  const p = g.attributes.position
-  const c = g.attributes.color
-  const col = new THREE.Color()
-  for (let i = 0; i < p.count; i++) {
-    paint(p.getX(i), p.getY(i), p.getZ(i), col.setRGB(c.getX(i), c.getY(i), c.getZ(i)))
-    c.setXYZ(i, col.r, col.g, col.b)
-  }
-  return g
-}
-
-/** Darker underneath: colours scaled from `low` at `y0` up to 1 at `y1` (the brief's gradient by height). */
-function darkUnder(g: THREE.BufferGeometry, y0: number, y1: number, low: number): THREE.BufferGeometry {
-  return recolor(g, (_x, y, _z, c) => c.multiplyScalar(low + (1 - low) * THREE.MathUtils.smoothstep(y, y0, y1)))
-}
-
-/** Bends a part built along +y: each vertex is offset by `offset(h)` in x and z, `h` its height above the base. */
-function bent(geo: THREE.BufferGeometry, offset: (h: number) => [number, number]): THREE.BufferGeometry {
-  geo.computeBoundingBox()
-  const base = geo.boundingBox!.min.y
-  const p = geo.attributes.position
-  for (let i = 0; i < p.count; i++) {
-    const [dx, dz] = offset(p.getY(i) - base)
-    p.setXYZ(i, p.getX(i) + dx, p.getY(i), p.getZ(i) + dz)
-  }
-  geo.computeVertexNormals()
-  return geo
 }
 
 /** Chains a fragment patch after `material`'s rim, with its own uniforms and program key. */
@@ -191,14 +162,6 @@ function impHorn(side: 1 | -1): THREE.BufferGeometry {
   const g = bent(new THREE.ConeGeometry(0.55, 3, 5, 3).translate(0, 1.5, 0), (h) => [side * 0.2 * h * h, -0.12 * h * h])
   return recolor(paintedAt(g, IMP_BONE, pose([side * 1.25, 7.8, 0.1], [0.25, 0, side * -0.45])), (_x, y, _z, c) =>
     c.lerp(HORN_TIP, THREE.MathUtils.smoothstep(y, 8.6, 10.4)))
-}
-
-/** A unit sphere with its sides lifted: squashed flat, a grin with the corners up. */
-function grin(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  const p = geo.attributes.position
-  for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + 0.9 * p.getX(i) ** 2)
-  geo.computeVertexNormals()
-  return geo
 }
 
 export const FIRE_IMP_BODY_GEO = darkUnder(sunShaded(mergePainted([
@@ -358,3 +321,174 @@ const golemMaterial = (glow: { value: number }, rockHeat: number) => withEmissiv
 export const LAVA_GOLEM_MAT = golemMaterial(LAVA_GOLEM_GLOW, 0)
 /** Its hit flash: the seams flare white-hot and the rock glows (same program as `LAVA_GOLEM_MAT`). */
 export const LAVA_GOLEM_FLARE_MAT = golemMaterial({ value: 7 }, 0.9)
+
+// ── Infernal Drake: a long-necked dragon on bat wings, a spade tail, horns and glowing eyes ──
+// One material for every part: a charcoal body and membrane wings whose scalloped trailing edges glow, as do the
+// eyes and the inside of the jaw (the glow is painted: a hot orange vertex colour lights itself). Moving parts: torso,
+// neck with head, jaw, tail, and each wing's arm and hand.
+
+const DRAKE_CHARCOAL = '#2a1e1e'
+const DRAKE_BELLY = new THREE.Color('#5a3026')
+const DRAKE_MEMBRANE = '#8a1a1a'
+const DRAKE_VEIN = '#3a0c0c'
+const DRAKE_BONE = '#d8c8a8'
+const DRAKE_GLOW = '#ff5a14'
+const DRAKE_EYE = '#ffd040'
+
+/** Pivots (model units): the neck's root, the tail's root, the right shoulder. */
+export const DRAKE_NECK_ROOT: Vec3 = [0, 0.9, 3.6]
+export const DRAKE_TAIL_ROOT: Vec3 = [0, 0.1, -4.6]
+export const DRAKE_SHOULDER: Vec3 = [1.5, 1.4, 1.6]
+/** The elbow in the shoulder's frame: the hand (outer wing) pivots here. */
+export const DRAKE_ELBOW: Vec3 = [6.5, 0.6, 0.5]
+
+const _a = new THREE.Vector3()
+const _b = new THREE.Vector3()
+const _up = new THREE.Vector3(0, 1, 0)
+
+/** A tapered bone from `a` (radius r0) to `b` (radius r1). */
+function strut(a: Vec3, b: Vec3, r0: number, r1: number, color: THREE.ColorRepresentation): THREE.BufferGeometry {
+  _a.fromArray(a)
+  const dir = _b.fromArray(b).sub(_a)
+  const length = dir.length()
+  const m = new THREE.Matrix4().compose(
+    _a.addScaledVector(dir, 0.5),
+    new THREE.Quaternion().setFromUnitVectors(_up, dir.normalize()),
+    new THREE.Vector3(1, 1, 1),
+  )
+  return paintedAt(new THREE.CylinderGeometry(r1, r0, length, 4, 1, true), color, m)
+}
+
+/** Both faces of a flat triangle. */
+const twoSided = (a: Vec3, b: Vec3, c: Vec3, color: THREE.ColorRepresentation) =>
+  [paintedPolygon([...a, ...b, ...c], color), paintedPolygon([...a, ...c, ...b], color)]
+
+const lerp3 = (a: Vec3, b: Vec3, t: number): Vec3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+
+/**
+ * Membrane fanned from `hub` over the `edge` chain. Where `trailing[i]` (the edge from point i to i + 1 is a trailing
+ * edge) its outer strip is painted to glow. Returns the membrane and the glowing parts apart.
+ */
+function membrane(hub: Vec3, edge: Vec3[], trailing: boolean[]): [THREE.BufferGeometry[], THREE.BufferGeometry[]] {
+  const skin: THREE.BufferGeometry[] = []
+  const glow: THREE.BufferGeometry[] = []
+  for (let i = 0; i < edge.length - 1; i++) {
+    const [a, b] = [edge[i], edge[i + 1]]
+    if (!trailing[i]) {
+      skin.push(...twoSided(hub, a, b, DRAKE_MEMBRANE))
+      continue
+    }
+    const [ia, ib] = [lerp3(hub, a, 0.86), lerp3(hub, b, 0.86)]
+    skin.push(...twoSided(hub, ia, ib, DRAKE_MEMBRANE))
+    glow.push(...twoSided(ia, a, b, DRAKE_GLOW), ...twoSided(ia, b, ib, DRAKE_GLOW))
+  }
+  return [skin, glow]
+}
+
+/** One drake part: its charcoal and bone shaded lighter on top, the glowing parts left at full heat. */
+const drakePart = (shaded: THREE.BufferGeometry[], glowing: THREE.BufferGeometry[] = []) =>
+  mergePainted([sunShaded(mergePainted(shaded)), ...glowing])
+
+const DRAKE_TORSO = [[0, -5], [1.2, -4.6], [2.1, -3], [2.6, -0.5], [2.5, 1.8], [1.9, 3.5], [1.2, 4.4], [0, 4.8]]
+
+/** Torso (a warmer belly), tucked hind legs and a ridge of spines. */
+export const DRAKE_BODY_GEO = drakePart([
+  recolor(paintedAt(new THREE.LatheGeometry(DRAKE_TORSO.map(([r, z]) => new THREE.Vector2(r, z)), 8), DRAKE_CHARCOAL,
+    pose([0, 0, 0], [Math.PI / 2, 0, 0], [1, 1, 0.85])), (_x, y, _z, c) => c.lerp(DRAKE_BELLY, 1 - THREE.MathUtils.smoothstep(y, -1.6, -0.6))),
+  ...[-1, 1].flatMap((s) => [
+    painted(new THREE.CapsuleGeometry(0.45, 1.6, 1, 4), DRAKE_CHARCOAL, [s * 1.3, -1.9, -2.4], [-1.1, 0, 0]),
+    painted(new THREE.ConeGeometry(0.4, 0.8, 4), DRAKE_BONE, [s * 1.3, -2.5, -3.6], [-2.1, 0, 0]),
+  ]),
+  ...[3, 1.2, -0.6, -2.4].map((z, i) =>
+    painted(new THREE.ConeGeometry(0.4, 1.3 - i * 0.15, 4), DRAKE_BONE, [0, 2.1 - Math.abs(z) * 0.05, z], [-0.5, 0, 0])),
+])
+
+/** The neck, built along +y and leaned forward: it rises from the shoulders and levels out at the head. */
+const NECK_LENGTH = 6
+const NECK_LEAN = 1.0
+const neckBend = (h: number): [number, number] => [0, 0.06 * h * h]
+/** The head's place in the neck's frame: the neck's end, leaned forward. */
+const DRAKE_HEAD: Vec3 = (() => {
+  const v = new THREE.Vector3(0, NECK_LENGTH, neckBend(NECK_LENGTH)[1]).applyAxisAngle(new THREE.Vector3(1, 0, 0), NECK_LEAN)
+  return [v.x, v.y, v.z]
+})()
+/** The lower jaw's hinge, in the neck's frame. */
+export const DRAKE_JAW_HINGE: Vec3 = [0, DRAKE_HEAD[1] - 0.45, DRAKE_HEAD[2] + 0.1]
+
+/** A horn sweeping back from the crown and curling up, bone fading to charcoal at the tip. */
+function drakeHorn(side: 1 | -1): THREE.BufferGeometry {
+  const tip = new THREE.Color(DRAKE_CHARCOAL)
+  const g = recolor(paintedAt(bent(new THREE.ConeGeometry(0.32, 2.6, 5, 3).translate(0, 1.3, 0), (h) => [side * 0.08 * h * h, 0.14 * h * h]),
+    DRAKE_BONE, new THREE.Matrix4()), (_x, y, _z, c) => c.lerp(tip, THREE.MathUtils.smoothstep(y, 1, 2.4)))
+  const [x, y, z] = DRAKE_HEAD
+  return g.applyMatrix4(pose([x + side * 0.6, y + 0.55, z - 0.5], [-1.9, side * 0.35, 0]))
+}
+
+/** Neck and head, about `DRAKE_NECK_ROOT` (its origin): horns, brows, glowing eyes, the upper jaw. */
+export const DRAKE_NECK_GEO = (() => {
+  const [x, y, z] = DRAKE_HEAD
+  const neck = paintedAt(bent(new THREE.CylinderGeometry(0.75, 1.2, NECK_LENGTH, 6, 4).translate(0, NECK_LENGTH / 2, 0), neckBend),
+    DRAKE_CHARCOAL, pose([0, 0, 0], [NECK_LEAN, 0, 0]))
+  return drakePart([
+    neck,
+    paintedAt(new THREE.SphereGeometry(1, 6, 4), DRAKE_CHARCOAL, pose([x, y, z], [0, 0, 0], [1.05, 0.85, 1.3])),
+    paintedAt(new THREE.CylinderGeometry(0.4, 0.75, 2.4, 5), DRAKE_CHARCOAL, pose([x, y - 0.1, z + 1.7], [Math.PI / 2, 0, 0], [1, 1, 0.8])),
+    ...[-1, 1].map((s) => painted(new THREE.BoxGeometry(0.75, 0.25, 0.9), DRAKE_CHARCOAL, [x + s * 0.5, y + 0.55, z + 0.6], [0.25, 0, s * -0.3])),
+    drakeHorn(-1), drakeHorn(1),
+  ], [-1, 1].map((s) => paintedAt(new THREE.OctahedronGeometry(0.28, 0), DRAKE_EYE, pose([x + s * 0.72, y + 0.3, z + 0.75], [0, 0, 0], [1, 0.7, 1]))))
+})()
+
+/** The lower jaw about `DRAKE_JAW_HINGE` (its origin), glowing inside: shown when it roars. */
+export const DRAKE_JAW_GEO = drakePart(
+  [paintedAt(new THREE.CylinderGeometry(0.3, 0.6, 2.4, 5), DRAKE_CHARCOAL, pose([0, -0.15, 1.3], [Math.PI / 2, 0, 0], [1, 1, 0.6]))],
+  [painted(new THREE.BoxGeometry(0.6, 0.1, 1.9), DRAKE_GLOW, [0, 0.05, 1.3])],
+)
+
+/** The tail from `DRAKE_TAIL_ROOT` (its origin) back to a spade, curling up a little at the end. */
+export const DRAKE_TAIL_GEO = (() => {
+  const length = 9
+  const curl = (h: number): [number, number] => [0.4 * Math.sin(h * 0.55), 0.03 * h * h]
+  const tail = paintedAt(bent(new THREE.ConeGeometry(0.85, length, 4, 6).translate(0, length / 2, 0), curl), DRAKE_CHARCOAL,
+    pose([0, 0, 0], [-Math.PI / 2, 0, 0]))
+  const [tx, ty] = curl(length)
+  // Rotated -90° about x: the curl's z becomes height, the tail's length runs to -z.
+  const spade = paintedAt(new THREE.OctahedronGeometry(1, 0), DRAKE_MEMBRANE, pose([tx, ty, -length - 0.4], [0, 0, 0], [1.1, 0.18, 1.5]))
+  return drakePart([tail, spade])
+})()
+
+/** The right arm about `DRAKE_SHOULDER`: the arm bone along the leading edge, the inner membrane back to the flank. */
+export const DRAKE_WING_ARM_GEO = (() => {
+  const trailing: Vec3[] = [DRAKE_ELBOW, [5.3, 0.1, -3.1], [2.6, 0, -3.6], [-0.3, -0.3, -4.2]]
+  const [skin, glow] = membrane([0, 0, 0], trailing, [false, true, true])
+  return drakePart([
+    strut([0, 0, 0.1], DRAKE_ELBOW, 0.45, 0.32, DRAKE_CHARCOAL), strut([0, 0, 0], trailing[2], 0.07, 0.05, DRAKE_VEIN), ...skin,
+  ], glow)
+})()
+
+/** The right hand about `DRAKE_ELBOW`: three fingers out from the wrist, scalloped membrane between them. */
+export const DRAKE_WING_HAND_GEO = (() => {
+  const fingers: Vec3[] = [[7.5, 0.5, -0.9], [6, 0, -3.9], [3, -0.1, -4.6]]
+  const join: Vec3 = [5.3 - DRAKE_ELBOW[0], 0.1 - DRAKE_ELBOW[1], -3.1 - DRAKE_ELBOW[2]]
+  // Each scallop's low point, pulled in towards the wrist between two tips.
+  const scallop = (a: Vec3, b: Vec3, t: number) => lerp3([0, 0, 0], lerp3(a, b, 0.5), t)
+  const edge: Vec3[] = [
+    fingers[0], scallop(fingers[0], fingers[1], 0.72), fingers[1], scallop(fingers[1], fingers[2], 0.78), fingers[2],
+    scallop(fingers[2], join, 0.85), join,
+  ]
+  const [skin, glow] = membrane([0, 0, 0], edge, edge.slice(1).map(() => true))
+  return drakePart([
+    strut([0, 0, 0], fingers[0], 0.32, 0.12, DRAKE_CHARCOAL),
+    ...fingers.slice(1).map((f) => strut([0, 0, 0], f, 0.14, 0.06, DRAKE_VEIN)),
+    painted(new THREE.ConeGeometry(0.22, 0.9, 4), DRAKE_BONE, [0.1, 0.45, 0.2], [0.2, 0, 0]),
+    ...skin,
+  ], glow)
+})()
+
+// Painted glow lights itself: a hot vertex colour (red high, blue low) is added back as emission.
+const DRAKE_GLOW_APPLY = /* glsl */ `{
+  float glow = smoothstep(0.55, 0.9, vColor.r) * (1.0 - smoothstep(0.08, 0.2, vColor.b));
+  totalEmissiveRadiance += vColor.rgb * glow * 2.2;
+}`
+export const DRAKE_MAT = withEmissivePatch(withRim(new THREE.MeshStandardMaterial({
+  vertexColors: true, roughness: 0.6, metalness: 0.1, flatShading: true,
+}), { color: '#ffb070', intensity: 1.2, power: 2.0 }), 'drake-glow', {}, '', DRAKE_GLOW_APPLY)

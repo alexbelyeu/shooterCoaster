@@ -52,7 +52,7 @@ const ENEMY_SUBJECTS: Record<EnemyType | 'goldenBalloon', Spec> = {
   goldenBalloon: { front: 0, motion: at(cycle(3)), animated: false },
   crow: { front: 0, holdHeading: 'model', motion: at(cycle(6.25)), animated: true },
   scorpion: { front: 0, holdHeading: 'model', motion: at(cycle(2.5)), animated: true },
-  shark: { front: 0, motion: at(cycle(4)), animated: true },
+  shark: { front: 0, motion: at(cycle(4.5)), animated: true },
   jellyfish: { front: 0, motion: at(cycle(1.2)), animated: true },
   flyingFish: { front: 0, holdHeading: 'model', motion: at(1.5), animated: true },
   snowman: { front: 0, motion: at(cycle(3)), animated: true },
