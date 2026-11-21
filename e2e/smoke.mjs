@@ -2893,7 +2893,7 @@ async function dailyCheck(newPage) {
     const s = window.__SC_TEST__
     return {
       mode: el?.dataset.mode ?? null,
-      badge: el?.querySelector('.results-daily-badge')?.textContent ?? null,
+      badge: el?.querySelector('.results-badge')?.textContent ?? null,
       record: el?.querySelector('.results-record')?.textContent ?? null,
       buttons: [...(el?.querySelectorAll('.results-actions button') ?? [])].map((b) => b.textContent),
       board: !!el?.querySelector('.results-board'),

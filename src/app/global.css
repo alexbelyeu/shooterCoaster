@@ -1397,7 +1397,7 @@ canvas {
   text-align: center;
 }
 
-.results-daily-badge {
+.results-badge {
   margin-bottom: 0.7rem;
   color: var(--fair-tar);
   background: var(--fair-sky);
@@ -1891,7 +1891,7 @@ canvas {
     display: none;
   }
 
-  .results-daily-badge {
+  .results-badge {
     margin-bottom: 0.4rem;
   }
 
