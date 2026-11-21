@@ -40,7 +40,7 @@ export default function PauseScreen({ onSettings }: PauseScreenProps) {
   function run(action: PauseMenuAction) {
     const store = useGameStore.getState()
     if (action === 'resume') store.resume()
-    else if (action === 'restart') store.restartRun()
+    else if (action === 'restart') store.restartRun('pause')
     else if (action === 'settings') onSettings()
     else if (action === 'quit') store.setPhase('levelSelect')
   }

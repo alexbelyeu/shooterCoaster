@@ -196,10 +196,10 @@ describe('startRun', () => {
   it('restarts a warm level straight into the countdown, a cold one through the loading screen, never the intro (#674)', () => {
     store().startRun('level1', 5)
     store().setSceneReady(true)
-    store().restartRun()
+    store().restartRun('results')
     expect(store()).toMatchObject({ phase: 'countdown', skipIntro: true, sceneReady: true })
     store().setSceneReady(false)
-    store().restartRun()
+    store().restartRun('results')
     expect(store()).toMatchObject({ phase: 'loading', skipIntro: true })
     store().startRun('level1', 5)
     expect(store().skipIntro).toBe(false)
@@ -221,7 +221,7 @@ describe('startRun', () => {
     store().startRun('level1', 5)
     for (const stage of ['chunk', 'scene'] as const) reportLoad('level1', stage, 1)
     reportLoad('level1', 'shaders', 0.4)
-    store().restartRun()
+    store().restartRun('results')
     expect(store()).toMatchObject({ phase: 'loading', sceneReady: false })
     reportLoad('level1', 'shaders', 1)
     reportLoad('level1', 'audio', 1)
@@ -254,12 +254,21 @@ describe('daily runs', () => {
 
   it('restartRun keeps a daily run and its seed, and reseeds a campaign run', () => {
     store().startRun('level3', 99, daily)
-    store().restartRun()
+    store().restartRun('results')
     expect(store()).toMatchObject({ currentLevel: 'level3', runSeed: 99, runMode: daily })
     vi.spyOn(Date, 'now').mockReturnValue(1_000)
     store().startRun('level1', 5)
-    store().restartRun()
+    store().restartRun('results')
     expect(store()).toMatchObject({ currentLevel: 'level1', runSeed: 1_000, runMode: { mode: 'campaign' } })
+  })
+
+  it('records where a run started and the last campaign level, which a Daily Run leaves alone', () => {
+    store().startRun('level2', 1, undefined, false, 'title')
+    expect(store()).toMatchObject({ runFrom: 'title', lastLevel: 'level2' })
+    store().restartRun('pause')
+    expect(store().runFrom).toBe('pause')
+    store().startRun('level4', 1, daily)
+    expect(store()).toMatchObject({ runFrom: 'select', lastLevel: 'level2' })
   })
 
   it('saves the day best and the streak without touching campaign scores or unlocks', () => {
@@ -355,11 +364,11 @@ describe('saveScore', () => {
     expect(store().savedScores.level1).toMatchObject({ score: 500, bestCombo: 3 })
   })
 
-  it('persists only saved scores, leaderboards, initials and the daily record (not score, combo or phase)', () => {
+  it('persists only saved scores, leaderboards, initials, the daily record and the last level (not score, combo or phase)', () => {
     store().addScore(42)
     store().saveScore(entry('level1', 500, 1))
     const persisted = JSON.parse(memoryStorage.getItem('shootercoaster-scores')!)
-    expect(Object.keys(persisted.state)).toEqual(['savedScores', 'leaderboards', 'lastInitials', 'savedDaily', 'dailyStreak'])
+    expect(Object.keys(persisted.state)).toEqual(['savedScores', 'leaderboards', 'lastInitials', 'savedDaily', 'dailyStreak', 'lastLevel'])
     expect(persisted.state.savedScores.level1.score).toBe(500)
   })
 })
@@ -454,7 +463,9 @@ describe('leaderboard', () => {
     store().addLeaderboardEntry('level1', { score: 500, stars: 1, date: 7 })
     store().setEntryInitials('level1', 7, 'BOB')
     store().saveDailyScore(entry('level1', 300, 1), '2026-10-31')
+    store().startRun('level1', 1)
     store().clearLocalData()
+    expect(store().lastLevel).toBeNull()
     expect(store().savedScores).toEqual({})
     expect(store().leaderboards).toEqual({})
     expect(store().savedDaily).toEqual({})

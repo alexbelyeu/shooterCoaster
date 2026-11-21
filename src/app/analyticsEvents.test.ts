@@ -7,30 +7,30 @@ import { analyticsEventFor, tensPercent, type RunSnapshot } from './analyticsEve
 const level1 = getLevelConfig('level1')!
 
 function snap(phase: GamePhase, extra: Partial<RunSnapshot> = {}): RunSnapshot {
-  return { phase, runId: 1, currentLevel: 'level1', runMode: { mode: 'campaign' }, score: 0, timeRemaining: RUN_SECONDS, ...extra }
+  return { phase, runId: 1, currentLevel: 'level1', runMode: { mode: 'campaign' }, runFrom: 'select', score: 0, timeRemaining: RUN_SECONDS, ...extra }
 }
 
 describe('analyticsEventFor', () => {
-  it('sends level_start when a run begins from the menu or the results screen', () => {
-    const start = { name: 'level_start', props: { level: 'level1', mode: 'campaign' } }
-    expect(analyticsEventFor(snap('levelSelect', { currentLevel: null }), snap('playing'))).toEqual(start)
-    expect(analyticsEventFor(snap('results'), snap('playing'))).toEqual(start)
-    expect(analyticsEventFor(snap('levelSelect'), snap('countdown'))).toEqual(start)
-    expect(analyticsEventFor(snap('results'), snap('countdown'))).toEqual(start)
+  it('sends level_start when a run begins, with the screen that started it', () => {
+    const start = (from: string) => ({ name: 'level_start', props: { level: 'level1', from } })
+    expect(analyticsEventFor(snap('levelSelect', { currentLevel: null }), snap('playing'))).toEqual(start('select'))
+    expect(analyticsEventFor(snap('levelSelect'), snap('countdown'))).toEqual(start('select'))
+    expect(analyticsEventFor(snap('title', { currentLevel: null }), snap('loading', { runFrom: 'title' }))).toEqual(start('title'))
+    expect(analyticsEventFor(snap('results'), snap('playing', { runFrom: 'results' }))).toEqual(start('results'))
+    expect(analyticsEventFor(snap('results'), snap('countdown', { runFrom: 'results' }))).toEqual(start('results'))
   })
 
   it('sends level_start on a Restart from the pause menu, a new run without leaving one', () => {
-    const start = { name: 'level_start', props: { level: 'level1', mode: 'campaign' } }
-    expect(analyticsEventFor(snap('paused'), snap('countdown', { runId: 2 }))).toEqual(start)
-    expect(analyticsEventFor(snap('playing'), snap('playing', { runId: 2 }))).toEqual(start)
+    const start = { name: 'level_start', props: { level: 'level1', from: 'pause' } }
+    expect(analyticsEventFor(snap('paused'), snap('countdown', { runId: 2, runFrom: 'pause' }))).toEqual(start)
+    expect(analyticsEventFor(snap('playing'), snap('playing', { runId: 2, runFrom: 'pause' }))).toEqual(start)
   })
 
-  it('tags a Daily Run start with its mode', () => {
-    const daily = snap('countdown', { runMode: { mode: 'daily', dateKey: '2026-10-31' } })
-    expect(analyticsEventFor(snap('levelSelect'), daily)).toEqual({
-      name: 'level_start',
-      props: { level: 'level1', mode: 'daily' },
-    })
+  it('tags any Daily Run start as daily, whichever screen started it', () => {
+    const daily = { runMode: { mode: 'daily', dateKey: '2026-10-31' } } as const
+    const event = { name: 'level_start', props: { level: 'level1', from: 'daily' } }
+    expect(analyticsEventFor(snap('levelSelect'), snap('countdown', daily))).toEqual(event)
+    expect(analyticsEventFor(snap('results'), snap('countdown', { ...daily, runFrom: 'results' }))).toEqual(event)
   })
 
   it('counts a countdown that ends in GO as one start', () => {
@@ -68,7 +68,7 @@ describe('analyticsEventFor', () => {
     expect(analyticsEventFor(snap('levelSelect'), snap('playing', { currentLevel: 'nope' }))).toBeNull()
   })
 
-  it('keeps every event to at most 2 properties: the level id, the run mode and small integers (Vercel Pro)', () => {
+  it('keeps every event to at most 2 properties: the level id, where a run started and small integers (Vercel Pro)', () => {
     const events = [
       analyticsEventFor(snap('levelSelect'), snap('playing')),
       analyticsEventFor(snap('playing'), snap('results', { score: 123.4 })),
@@ -78,7 +78,7 @@ describe('analyticsEventFor', () => {
       const values = Object.values(event!.props)
       expect(values.length).toBeLessThanOrEqual(2)
       for (const value of values) {
-        expect(typeof value === 'number' ? Number.isInteger(value) : value === 'level1' || value === 'campaign').toBe(true)
+        expect(typeof value === 'number' ? Number.isInteger(value) : value === 'level1' || value === 'select').toBe(true)
       }
     }
   })
