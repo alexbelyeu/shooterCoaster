@@ -830,6 +830,17 @@ canvas {
   -webkit-backdrop-filter: blur(8px);
 }
 
+/* The track radar (#834): painted straight on the ride above the pause button, landscape only. */
+.hud-radar {
+  position: absolute;
+  left: calc(1rem + env(safe-area-inset-left));
+  bottom: calc(1rem + 56px + env(safe-area-inset-bottom));
+}
+
+@media (orientation: portrait) {
+  .hud-radar { display: none; }
+}
+
 .hud-pause-button:active {
   background: rgba(0, 0, 0, 0.75);
 }

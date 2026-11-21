@@ -67,6 +67,9 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: portal ? 'dist-portal' : turntable ? 'dist-turntable' : 'dist',
+      // Vite's default floor (Chrome 87, Firefox 78, Safari 14) has esbuild lower every `?.` (a Chrome 87-90 V8 bug) and
+      // class fields (Firefox 78, Safari 14). Mid-2021 browsers ship both natively: ~1.7 KB gz less JS (#834, DECISIONS).
+      target: ['es2020', 'chrome91', 'edge91', 'firefox90', 'safari15'],
       sourcemap: false,
       rollupOptions: {
         ...(turntable && { input: [path.resolve(__dirname, 'turntable.html'), path.resolve(__dirname, 'rides.html')] }),

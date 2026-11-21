@@ -10,6 +10,7 @@ import SnowSplat from './SnowSplat'
 import BossBar from './BossBar'
 import WeaponBadge from './WeaponBadge'
 import BystanderHint from './BystanderHint'
+import TrackRadar from './TrackRadar'
 import { setTimeScaleOverride, timeScaleOverride } from '@/combat/slowMo.hot'
 
 /** "5 of 86 hit" under the score. Renders on kills only. */
@@ -66,6 +67,7 @@ export default function HUD() {
       <ComboMeter />
       <WeaponBadge />
       <BystanderHint levelId={currentLevel} />
+      <TrackRadar levelId={currentLevel} />
       {/* Touch has no Escape key: an always-available pause button. */}
       <button
         className="hud-pause-button"
