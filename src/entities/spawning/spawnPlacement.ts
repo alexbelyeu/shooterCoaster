@@ -256,6 +256,40 @@ export function trackView(table: ArcTable, index: number, trackScale: number): T
   return { index, eye, dir: lookAheadDirection(trackTangent(table, index), normalize(toAhead), { x: 0, y: 0, z: 0 }) }
 }
 
+/**
+ * A spot counts as in the rider's frame this far inside the narrowest screen's frustum (`MIN_HORIZONTAL_FOV` across,
+ * `BASE_VERTICAL_FOV` up), so a small group round it still fits.
+ */
+const FRAME_MARGIN = 0.8
+const FRAME_TAN_ACROSS = FRAME_MARGIN * Math.tan((MIN_HORIZONTAL_FOV * Math.PI) / 360)
+const FRAME_TAN_UP = FRAME_MARGIN * Math.tan((BASE_VERTICAL_FOV * Math.PI) / 360)
+
+/** The rider's frame at a track sample: `trackView`'s look, with the rails' up turned square to it. */
+export interface RiderFrame extends TrackView {
+  right: Vec3
+  up: Vec3
+}
+
+export function riderFrame(table: ArcTable, index: number, trackScale: number): RiderFrame {
+  const view = trackView(table, index, trackScale)
+  let right = cross(view.dir, trackUp(table, index))
+  if (Math.hypot(right.x, right.y, right.z) < 1e-3) right = cross(view.dir, { x: 0, y: 0, z: 1 })
+  right = normalize(right)
+  return { ...view, right, up: cross(right, view.dir) }
+}
+
+/**
+ * Whether `p` is on the rider's screen from `frame`: in front, within `reach` and inside the frustum's margin, across and up
+ * along the rails' up (on a banked or climbing stretch that is not the world's). The wall swarm is placed with it; formations
+ * and trackside slots still use `inView`'s horizontal cone, which their placement and every level's pacing are tuned to.
+ */
+export function inRiderFrame(frame: RiderFrame, p: Vec3, reach: number): boolean {
+  const d = sub(p, frame.eye)
+  const depth = dot(d, frame.dir)
+  if (depth <= 0 || Math.hypot(d.x, d.y, d.z) > reach) return false
+  return Math.abs(dot(d, frame.right)) <= FRAME_TAN_ACROSS * depth && Math.abs(dot(d, frame.up)) <= FRAME_TAN_UP * depth
+}
+
 export function inView(view: TrackView, p: Vec3, reach: number): boolean {
   const d = sub(p, view.eye)
   const plan = Math.hypot(d.x, d.z)
@@ -886,11 +920,6 @@ const SWARM_GROUP_MIN = 4
 const SWARM_CANDIDATE_STEP = 80
 /** The rider must see the wall's face at least this square-on (the cosine), not edge-on: a car climbing beside a wall sees it at a slant. */
 const SWARM_MIN_FACING = 0.15
-/** A candidate counts as seen this far inside the narrowest screen's frustum (`MIN_HORIZONTAL_FOV` across, `BASE_VERTICAL_FOV` up). */
-const SWARM_FRAME_MARGIN = 0.8
-const SWARM_TAN_ACROSS = SWARM_FRAME_MARGIN * Math.tan((MIN_HORIZONTAL_FOV * Math.PI) / 360)
-const SWARM_TAN_UP = SWARM_FRAME_MARGIN * Math.tan((BASE_VERTICAL_FOV * Math.PI) / 360)
-
 export interface PlaceSwarmInput {
   table: ArcTable
   riderIndex: number
@@ -900,31 +929,8 @@ export interface PlaceSwarmInput {
   ride: RideAhead
 }
 
-/** The rider's frame at a track sample: `trackView`'s look, with the rails' up turned square to it. */
-interface SwarmView {
-  eye: Vec3
-  dir: Vec3
-  right: Vec3
-  up: Vec3
-}
-
-function swarmView(table: ArcTable, index: number, trackScale: number): SwarmView {
-  const { eye, dir } = trackView(table, index, trackScale)
-  let right = cross(dir, trackUp(table, index))
-  if (Math.hypot(right.x, right.y, right.z) < 1e-3) right = cross(dir, { x: 0, y: 0, z: 1 })
-  right = normalize(right)
-  return { eye, dir, right, up: cross(right, dir) }
-}
-
-function inSwarmFrame(view: SwarmView, p: Vec3, reach: number): boolean {
-  const d = sub(p, view.eye)
-  const depth = dot(d, view.dir)
-  if (depth <= 0 || Math.hypot(d.x, d.y, d.z) > reach) return false
-  return Math.abs(dot(d, view.right)) <= SWARM_TAN_ACROSS * depth && Math.abs(dot(d, view.up)) <= SWARM_TAN_UP * depth
-}
-
 /** The spot on any wall the rider sees face-on, in frame and within reading distance in the most `views`; the nearest to the first on a tie. */
-function bestSwarmSpot(walls: readonly WallSurface[], views: readonly SwarmView[], reach: number): { wall: WallSurface; u: number; v: number } {
+function bestSwarmSpot(walls: readonly WallSurface[], views: readonly RiderFrame[], reach: number): { wall: WallSurface; u: number; v: number } {
   const spot = { x: 0, y: 0, z: 0 }
   let best = { wall: walls[0], u: walls[0].width / 2, v: walls[0].height / 2 }
   let bestSeen = -1
@@ -943,7 +949,7 @@ function bestSwarmSpot(walls: readonly WallSurface[], views: readonly SwarmView[
         for (const view of views) {
           const d = sub(view.eye, spot)
           const facing = dot(d, normal) / Math.max(1e-6, Math.hypot(d.x, d.y, d.z))
-          if (facing >= SWARM_MIN_FACING && inSwarmFrame(view, spot, reach)) seen++
+          if (facing >= SWARM_MIN_FACING && inRiderFrame(view, spot, reach)) seen++
         }
         const dist = Math.hypot(spot.x - views[0].eye.x, spot.y - views[0].eye.y, spot.z - views[0].eye.z)
         if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) {
@@ -967,10 +973,10 @@ export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: 
   const groups = Math.max(1, Math.min(SWARM_GROUPS, Math.floor(slots.length / SWARM_GROUP_MIN)))
   const stretch = (ride.window * SWARM_WINDOW_SHARE) / groups
   const spots = Array.from({ length: groups }, (_, g) => {
-    const views: SwarmView[] = []
+    const views: RiderFrame[] = []
     for (let j = 0; j < SWARM_VIEWS; j++) {
       const ahead = ride.entry + stretch * (g + j / (SWARM_VIEWS - 1))
-      views.push(swarmView(table, indexAhead(table, riderIndex, ahead), ride.trackScale))
+      views.push(riderFrame(table, indexAhead(table, riderIndex, ahead), ride.trackScale))
     }
     return bestSwarmSpot(walls, views, reach)
   })

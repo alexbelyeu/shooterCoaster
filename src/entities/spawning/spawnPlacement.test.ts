@@ -15,7 +15,7 @@ import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import {
   AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, clampToBounds, clearOfKeepOff, entryPoint, formationFrame, formationSlots, groupStep,
   indexAhead, insideBounds, marchHeading, marchMoving, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
-  inView, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
+  inRiderFrame, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge, riderFrame, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
   type ChoreographedFormation, type RideAhead, type Vec3,
 } from './spawnPlacement'
 import {
@@ -513,7 +513,7 @@ describe('outsideNearField', () => {
 
 describe('placeWallSwarm (#516)', () => {
   const { table, trackScale } = world(getAllLevels()[0])
-  const view = trackView(table, 0, trackScale)
+  const view = riderFrame(table, 0, trackScale)
   const f = { x: view.dir.x / Math.hypot(view.dir.x, view.dir.z), y: 0, z: view.dir.z / Math.hypot(view.dir.x, view.dir.z) }
   /** A 240 x 200 wall `ahead` along the rider's look, facing back down it at the eye. */
   const wallAt = (id: string, ahead: number): WallSurface => {
@@ -534,7 +534,7 @@ describe('placeWallSwarm (#516)', () => {
     expect(new Set(placed.map((p) => p.wall.id))).toEqual(new Set(['ahead']))
     for (const p of placed) {
       expect(p.u >= HOP.margin && p.u <= 240 - HOP.margin && p.v >= HOP.margin && p.v <= 200 - HOP.margin).toBe(true)
-      expect(inView(view, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), maxReadableDistance('lanternfly'))).toBe(true)
+      expect(inRiderFrame(view, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), maxReadableDistance('lanternfly'))).toBe(true)
     }
     expect(placed.map((p) => p.seed)).toEqual(slots.map((s) => s.seed))
   })
@@ -545,10 +545,17 @@ describe('placeWallSwarm (#516)', () => {
     const profile = rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)
     const riderIndex = indexAhead(gym, 0, profile[wave.spawnDelay! * 10])
     const swarm = swarmSlots(wave.count, createRng(3))
-    const placed = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarm, ride: rideFor(wave) })
+    const ride = rideFor(wave)
+    const placed = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarm, ride })
     const walls = placed.map((p) => p.wall.id)
     expect(walls[0]).toMatch(/alaska/)
     expect(walls[walls.length - 1]).not.toMatch(/alaska/)
+    // Every lanternfly is on the rider's screen at some point of the wave's window, judged in the rails' frame.
+    const frames = Array.from({ length: 41 }, (_, j) =>
+      riderFrame(gym, indexAhead(gym, riderIndex, ride.entry + (ride.window * j) / 40), ride.trackScale))
+    const reach = maxReadableDistance(wave.type)
+    const unseen = placed.filter((p) => !frames.some((fr) => inRiderFrame(fr, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), reach)))
+    expect(unseen.map((p) => p.wall.id)).toEqual([])
   })
 
   it('needs the level to have walls', () => {
@@ -563,7 +570,7 @@ describe('placeWallSwarm (#516)', () => {
     const us = placed.map((p) => p.u)
     for (const p of placed) {
       expect(p.u >= CLIMB.margin && p.u <= 240 - CLIMB.margin && p.v >= 0 && p.v <= WALL_START_SPREAD * 200).toBe(true)
-      expect(inView(view, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), maxReadableDistance('climber'))).toBe(true)
+      expect(inRiderFrame(view, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), maxReadableDistance('climber'))).toBe(true)
     }
     // Squeezed onto a 240-wide wall, still apart: each nudge is at most a quarter of the spacing either way.
     for (let i = 1; i < us.length; i++) expect(us[i] - us[i - 1]).toBeGreaterThan(((240 - 2 * CLIMB.margin) / 4) * 0.5 - 1e-9)
