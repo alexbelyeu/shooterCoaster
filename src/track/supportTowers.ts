@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { TrackCurve } from './curves/TrackCurve'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ShadowCaster } from '@/levels/environments/shared/contactShadows'
@@ -16,16 +17,17 @@ import { getTunnelDims } from './setPieces'
  * stay cheap. Geometry is built in tower-local space with the top at y = 0
  * growing down (-y), x across the track and z along it.
  *
- * Every tower of a given height bucket shares one geometry (InstancedMesh). A
- * bucket's geometry is the top H units of the same infinite tower, so a tower
- * that needs height h < H is simply sunk into the ground by H - h — no Y-scaling.
+ * Every tower of a given height bucket uses one geometry: the top H units of the
+ * same infinite tower, so a tower that needs height h < H is simply sunk into the
+ * ground by H - h — no Y-scaling. `buildTowersGeometry` merges every placed tower
+ * into one mesh, one draw call for the whole track's towers (#806).
  */
 
 /** Width increase per unit of depth (total, across both sides). */
 const SPLAY = 0.09
 /** Panel height as a fraction of the tower width at the panel's top. */
 const PANEL_ASPECT = 1.35
-/** Max distinct tower heights (one InstancedMesh each). */
+/** Max distinct tower heights (one geometry built each). */
 export const HEIGHT_BUCKETS = 8
 /** Towers are skipped where the track is closer than this to the ground. */
 export const MIN_TOWER_HEIGHT = 5
@@ -496,6 +498,38 @@ export function buildTowerGeometry(td: TowerDims, height: number): THREE.BufferG
     }
   }
   return pb.build()
+}
+
+/**
+ * Every tower of the plan in world space, merged into one geometry (one draw call; it was one InstancedMesh per
+ * height bucket, 8 draws). Each tower is its bucket's geometry turned by its yaw and moved to its top; `aThick`'s
+ * direction turns with it, so the thickness floor still pushes outward.
+ */
+export function buildTowersGeometry(td: TowerDims, plan: TowerPlan): THREE.BufferGeometry | null {
+  if (plan.towers.length === 0) return null
+  const buckets = plan.bucketHeights.map((h) => buildTowerGeometry(td, h))
+  const parts: THREE.BufferGeometry[] = []
+  for (const t of plan.towers) {
+    const g = buckets[t.bucket].clone()
+    const cos = Math.cos(t.yaw)
+    const sin = Math.sin(t.yaw)
+    // Rotation about +y by yaw: x' = x cos + z sin, z' = -x sin + z cos (Matrix4.makeRotationY).
+    const turn = (a: THREE.BufferAttribute, x0: number, y0: number, z0: number) => {
+      for (let i = 0; i < a.count; i++) {
+        const x = a.getX(i)
+        const z = a.getZ(i)
+        a.setXYZ(i, x * cos + z * sin + x0, a.getY(i) + y0, -x * sin + z * cos + z0)
+      }
+    }
+    turn(g.attributes.position as THREE.BufferAttribute, t.x, t.topY, t.z)
+    if (g.attributes.normal) turn(g.attributes.normal as THREE.BufferAttribute, 0, 0, 0)
+    turn(g.attributes.aThick as THREE.BufferAttribute, 0, 0, 0)
+    parts.push(g)
+  }
+  const merged = mergeGeometries(parts)
+  for (const g of [...buckets, ...parts]) g.dispose()
+  merged.computeBoundingSphere()
+  return merged
 }
 
 /**

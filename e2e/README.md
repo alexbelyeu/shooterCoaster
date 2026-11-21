@@ -167,7 +167,7 @@ Then, on the same run held, it checks the Training Area cave's dark section (#75
 held; the ride must be fully dark there (`depth` 1) and the shot must light it (`flash` > 0). The nightly `dark` step (needs
 `switch`) also shoots `level6-dark.png` and `level6-dark-flash.png` there: the frame must be mostly dark (`DARK_SHOT.dark`) but
 not blank, its blacklit holds showing (`DARK_SHOT.glow`, saturated bright pixels), and the flash must brighten it (`DARK_SHOT.flash`).
-It then shoots `level6-gap.png` (#659: game time and the level timer held, `rideTo` jumps the car into the Tree's gap, its 55 s
+It then shoots `level6-gap.png` (#659: game time and the level timer held, `rideTo` jumps the car into the Tree's gap, its 56.5 s
 heartline-roll beat read from `rideBeats()`, and back; the car must be there and the frame not blank: the trunk on one side, the
 back wall on the other). These frame captures are nightly only, like the tour's (#766: the dark shots took the `level6` shard's
 `switch` step from ~90 s to ~260 s, and the gap still was ~30 s of its `ride` step on a 2-core box).
