@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
+  DRAKE_BODY_GEO, DRAKE_JAW_GEO, DRAKE_MAT, DRAKE_NECK_GEO, DRAKE_TAIL_GEO, DRAKE_WING_ARM_GEO, DRAKE_WING_HAND_GEO,
   EMBER_WISP_CORE_GEO, EMBER_WISP_CORE_MAT, EMBER_WISP_RIBBON_MAT, EMBER_WISP_RIBBONS_GEO,
   FIRE_IMP_ARMS_GEO, FIRE_IMP_BODY_GEO, FIRE_IMP_EYES_GEO, FIRE_IMP_TAIL_GEO,
   LAVA_GOLEM_BODY_GEO, LAVA_GOLEM_FLARE_MAT, LAVA_GOLEM_LEFT_ARM_GEO, LAVA_GOLEM_LEG_GEO, LAVA_GOLEM_MAT,
@@ -37,6 +38,11 @@ describe("inferno enemies (#463): the briefs' triangle caps", () => {
   it('lava golem: body, two legs and two arms under 900', () => {
     expect(tris(LAVA_GOLEM_BODY_GEO, LAVA_GOLEM_LEG_GEO, LAVA_GOLEM_LEG_GEO, LAVA_GOLEM_LEFT_ARM_GEO, LAVA_GOLEM_RIGHT_ARM_GEO))
       .toBeLessThanOrEqual(900)
+  })
+
+  it('infernal drake: torso, neck, jaw, tail and both wings under 900', () => {
+    const wing = [DRAKE_WING_ARM_GEO, DRAKE_WING_HAND_GEO]
+    expect(tris(DRAKE_BODY_GEO, DRAKE_NECK_GEO, DRAKE_JAW_GEO, DRAKE_TAIL_GEO, ...wing, ...wing)).toBeLessThanOrEqual(900)
   })
 })
 
@@ -82,6 +88,22 @@ describe('inferno enemy models', () => {
     expect(mean((y) => y < 1)).toBeLessThan(0.7 * mean((y) => y > 4 && y < 5))
   })
 
+  it("paint the drake's glow only on the wings' trailing edges, the eyes and the mouth: never on its charcoal", () => {
+    // The material's mask: red high, blue low (DRAKE_GLOW_APPLY).
+    const glowing = (g: THREE.BufferGeometry) => {
+      const c = g.attributes.color
+      let n = 0
+      for (let i = 0; i < c.count; i++) if (c.getX(i) > 0.55 && c.getZ(i) < 0.2) n++
+      return n / c.count
+    }
+    expect(glowing(DRAKE_BODY_GEO)).toBe(0)
+    expect(glowing(DRAKE_TAIL_GEO)).toBe(0)
+    for (const g of [DRAKE_WING_ARM_GEO, DRAKE_WING_HAND_GEO, DRAKE_NECK_GEO, DRAKE_JAW_GEO]) {
+      expect(glowing(g)).toBeGreaterThan(0)
+      expect(glowing(g)).toBeLessThan(0.5)
+    }
+  })
+
   it("mask the wisp's coal eyes out of its glow", () => {
     const c = EMBER_WISP_CORE_GEO.attributes.color
     let eyes = 0
@@ -93,7 +115,7 @@ describe('inferno enemy models', () => {
 
 describe('inferno enemy materials', () => {
   it('patch the emissive after the rim, on their own program keys', () => {
-    for (const material of [EMBER_WISP_CORE_MAT, LAVA_GOLEM_MAT]) {
+    for (const material of [EMBER_WISP_CORE_MAT, LAVA_GOLEM_MAT, DRAKE_MAT]) {
       const { fragmentShader } = compiled(material)
       expect(fragmentShader).toContain('uRimColor')
       expect(fragmentShader).toMatch(/emissivemap_fragment>\s*\{\s+float/)
