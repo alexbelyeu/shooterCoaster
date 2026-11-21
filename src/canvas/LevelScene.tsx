@@ -22,6 +22,7 @@ import BulletPool from '@/combat/projectiles/BulletPool'
 import Pickups from '@/combat/pickups/Pickups'
 import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
+import { hardRouteFor } from '@/track/mechanics'
 import { goldenBalloonCount } from '@/levels/scoring'
 import { eventBus } from '@/core/EventBus'
 import { BYSTANDER_HIT_EVENT, bystanderWarning, type BystanderHitEvent } from '@/combat/bystanders'
@@ -91,6 +92,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
 
   const keepOff = useMemo(() => BIOMES[biome].keepOff?.(groundFn, trackTable), [biome, groundFn, trackTable])
   const speeds = useMemo(() => rideModel(track, trackTable), [track, trackTable])
+  const hardRoute = useMemo(() => hardRouteFor(curve, track.mechanics), [curve, track.mechanics])
   const color1 = useMemo(() => hexToRgb(track.color1), [track.color1])
   const color2 = useMemo(() => hexToRgb(track.color2), [track.color2])
 
@@ -147,6 +149,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         walls={walls}
         bounds={BIOMES[biome].bounds}
         keepOff={keepOff}
+        hardRoute={hardRoute}
       />
       <ShootingController />
       <GameTimer />

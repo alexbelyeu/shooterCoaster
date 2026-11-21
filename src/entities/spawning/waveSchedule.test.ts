@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { RUN_SECONDS } from '@/levels/pacing'
-import { WAVE_TELL_SECONDS, enemyCounts, newWaveProgress, nextWaveDue, tickWaves, waveWindows } from './waveSchedule'
+import { WAVE_TELL_SECONDS, enemyCounts, newWaveProgress, nextWaveDue, onRoute, tickWaves, waveWindows } from './waveSchedule'
 
 /** Ticks the schedule at each elapsed time; returns the events in order. */
 function run(delays: number[], times: number[], progress = newWaveProgress(delays.length)) {
   const events: string[] = []
   for (const t of times) {
-    tickWaves(delays, t, progress, (i) => events.push(`tell ${i} @${t}`), (i) => events.push(`arrive ${i} @${t}`))
+    tickWaves(delays, t, progress, (i) => events.push(`tell ${i} @${t}`), (i) => void events.push(`arrive ${i} @${t}`))
   }
   return events
 }
@@ -16,6 +16,19 @@ describe('tickWaves', () => {
   it('tells each delayed wave a second early, then brings it in on time', () => {
     const times = Array.from({ length: 50 }, (_, i) => i)
     expect(run([0, 20, 45], times)).toEqual(['tell 1 @19', 'arrive 1 @20', 'tell 2 @44', 'arrive 2 @45'])
+  })
+
+  it('runs an arrival that is not done yet again each tick until it is (a route wave waiting on its route, #720)', () => {
+    const progress = newWaveProgress(2)
+    const events: string[] = []
+    for (const t of [0, 16, 17, 17.5, 18, 18.2, 30]) {
+      tickWaves([0, 17], t, progress, () => {}, (i) => {
+        events.push(`arrive ${i} @${t}`)
+        return t >= 18
+      })
+    }
+    expect(events).toEqual(['arrive 1 @17', 'arrive 1 @17.5', 'arrive 1 @18'])
+    expect(nextWaveDue([0, 17], progress)).toBeNull()
   })
 
   it('gives waves live from the start no tell and no arrival', () => {
@@ -64,6 +77,15 @@ describe('tickWaves', () => {
       for (const d of delays) expect(Number.isInteger(d), `${level.id} delay ${d}`).toBe(true)
       expect(run(delays, times).sort(), level.id).toEqual(expected.sort())
     }
+  })
+})
+
+describe('onRoute', () => {
+  it('meets every wave on the hard route, a hard-route wave on no other (#720)', () => {
+    expect(onRoute({}, 'easy')).toBe(true)
+    expect(onRoute({}, 'hard')).toBe(true)
+    expect(onRoute({ route: 'hard' }, 'hard')).toBe(true)
+    expect(onRoute({ route: 'hard' }, 'easy')).toBe(false)
   })
 })
 

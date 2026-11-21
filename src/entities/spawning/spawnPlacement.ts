@@ -1,5 +1,6 @@
-import type { EnemyType, Formation, FormationOrigin, WallSurface } from '@/types/level'
-import type { ArcTable } from '@/track/arcLength'
+import type { EnemyType, EnemyWave, Formation, FormationOrigin, WallSurface } from '@/types/level'
+import { indexAtT, type ArcTable } from '@/track/arcLength'
+import type { HardRoute } from '@/track/mechanics'
 import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { waveWindows } from './waveSchedule'
@@ -178,6 +179,8 @@ export interface RideAhead {
   window: number
   /** The level's structure scale: the rig looks `LOOK_AHEAD_UNITS` × this ahead. */
   trackScale: number
+  /** Arc ahead where the wave's stretch ends, the trackside band's spread included (a hard-route wave's merge, #720). */
+  until?: number
 }
 
 /** A formation member flies in over `ENTRY_SECONDS`, the last of its group `ENTRY_STAGGER` later. */
@@ -192,20 +195,35 @@ export const ENTRY_SECONDS_MAX = ENTRY_SECONDS + ENTRY_STAGGER
  */
 export const RIDE_PACE_SLACK = 0.85
 
-/** Each wave's `RideAhead`: the ride a run takes from GO, over the wave's fly-in and its window (`waveWindows`). */
+/**
+ * Each wave's `RideAhead`: the ride a run takes from GO, over the wave's fly-in and its window (`waveWindows` of the waves
+ * every run meets: a hard-route wave never cuts another's window short). A hard-route wave's window is where it arrives
+ * to its junction's merge, known only then (`rideToMerge`).
+ */
 export function rideAheadOfWaves(
   table: ArcTable,
   speeds: RideSpeeds,
-  delays: readonly number[],
+  waves: readonly Pick<EnemyWave, 'spawnDelay' | 'route'>[],
   bossAt: number | undefined,
   trackScale: number,
 ): RideAhead[] {
   const profile = rideProfile(table, speeds, RUN_SECONDS)
-  return waveWindows(delays, bossAt, RUN_SECONDS).map(([from, to]) => ({
-    entry: riddenBetween(profile, from, from + ENTRY_SECONDS_MAX),
-    window: RIDE_PACE_SLACK * riddenBetween(profile, from, to),
-    trackScale,
-  }))
+  const windows = waveWindows(waves.filter((w) => !w.route).map((w) => w.spawnDelay ?? 0), bossAt, RUN_SECONDS)
+  let everyRun = 0
+  return waves.map((wave) => {
+    const [from, to] = wave.route ? [wave.spawnDelay ?? 0, wave.spawnDelay ?? 0] : windows[everyRun++]
+    return { entry: riddenBetween(profile, from, from + ENTRY_SECONDS_MAX), window: RIDE_PACE_SLACK * riddenBetween(profile, from, to), trackScale }
+  })
+}
+
+/**
+ * A hard-route wave's ride (#720), placed from sample `riderIndex` of the hard route's table: its window and its stretch
+ * end at the junction's merge, so its members line the branch (and the lead-in to it) and never the track after it.
+ */
+export function rideToMerge(route: HardRoute, riderIndex: number, ride: RideAhead): RideAhead {
+  const { table, mergeT } = route
+  const ahead = (table.s[indexAtT(table, mergeT)] - table.s[riderIndex] + table.length) % table.length
+  return { ...ride, window: ahead, until: ahead }
 }
 
 /** A group's centre lands this far inside the narrowest screen's half fov (`MIN_HORIZONTAL_FOV`), so the group's width fits. */
@@ -611,11 +629,12 @@ export function tracksideSlots(count: number, surface: Surface, rng: Rng): Track
   })
 }
 
-/** Arc distance past the rider of a slot: a spread band stretched over the window, never past `MAX_LEAD_SHARE` of a lap. */
+/** Arc distance past the rider of a slot: a spread band stretched over the window, never past `MAX_LEAD_SHARE` of a lap or `until`. */
 export function tracksideAhead(table: ArcTable, surface: Surface, slot: TracksideSlot, ride: RideAhead): number {
   const { aheadMin, aheadMax, spread } = tracksideBand(surface)
   if (!spread) return slot.ahead
-  const span = Math.max(aheadMax - aheadMin, Math.min(ride.window, MAX_LEAD_SHARE * table.length - aheadMin))
+  const stretch = Math.max(aheadMax - aheadMin, Math.min(ride.window, MAX_LEAD_SHARE * table.length - aheadMin))
+  const span = ride.until === undefined ? stretch : Math.max(0, Math.min(stretch, ride.until - aheadMin))
   return aheadMin + ((slot.ahead - aheadMin) / (aheadMax - aheadMin)) * span
 }
 

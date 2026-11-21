@@ -1,0 +1,5 @@
+## 2026-11-20 — A hard-route wave waits on the switch, and lines the branch up to the merge (Builder, #720)
+
+**Context:** The gym's V8 branch is ridden 18.9–21.5 s and only ~840 units long, while a ground trackside wave sits 700–2200 units ahead of the rider. A wave arriving once the car is on the branch would land past the merge.
+**Decision:** A route wave (`EnemyWave.route: 'hard'`, a roster's `branch`) is due from its second (level6: 17 s, before the sign at 18.7 s) and arrives the first tick the route is hard; it gives up once the car passes the sign on the easy route. It is placed on the hard route's own arc table, its trackside spread capped at the merge (`RideAhead.until`), and joins the kill count only when it arrives. It stays out of the other waves' windows, so the every-run waves place as before. `maxScore`, the star thresholds and the server's limits count it.
+**Consequences:** An easy-route run's best score is under `maxScore` by the wave's points (144 on the gym); three stars there want the V8 way or combos.
