@@ -57,5 +57,5 @@ export const BIOME_TERRAIN_CONFIGS: Record<string, TerrainConfig> = {
 
 /** src/audio/sfxDesign.ts */
 export const BIOME_REVERB: Record<string, BiomeReverb> = {
-  __BIOME__: { seconds: 2.6, decayPow: 2.8, toneHz: 5000, level: 0.9 },
+  __BIOME__: { seconds: 2.6, decayPow: 2.8, toneHz: 5000, level: 0.9, preDelayMs: 28, early: 0.3, slap: null },
 }
