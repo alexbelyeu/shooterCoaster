@@ -33,7 +33,7 @@ scheduled task: the Builders dispatcher and Fix (on label) hand it audio work. I
 (`docs/audio/SOUND-BIBLE.md`). No agent can hear, so audio PRs commit short renders to
 `docs/audio/renders/` for Alex. The first new theme for each level waits for his pick in a
 `needs-alex` `Listen:` issue; the issue that wires it in stays `agent:blocked` with
-`Waiting on #<n>` until the Maintainer sees the listening issue closed.
+`Waits on #<n>` until the Maintainer sees the listening issue closed.
 
 Throughput is tuned with the knobs in STEERING.md (`builder_parallelism`,
 `qa_parallelism`), not by changing schedules. Max plan budget: 15 scheduled runs per
@@ -75,7 +75,7 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 ## Labels
 
 - Queue: `agent:ready` → `agent:in-progress` → (PR) `agent:needs-qa` → `agent:qa-approved` (auto-merged by GitHub when `verify` is green), or `agent:changes-requested` → back to the builder.
-- `agent:blocked` — can't proceed; the comment says why. Director re-plans it.
+- `agent:blocked` — waits on something outside the work (another issue, Alex, a budget); the `Blocked:` comment says why, with a `Waits on #N` line the control center releases it on. Unfinished work isn't blocked: it goes back to `agent:ready` with a `Handoff:` comment (`.claude/agents/builder.md`). Director re-plans what stays blocked.
 - `agent:prod-broken` — production went red (`prod-smoke.yml`: the post-deploy health check or the nightly full smoke, one issue each, opened on the green → red transition and closed by the next green run) or `main` did (CI). Maintainer drops everything for it.
 - `steering` — an issue from Alex. Director treats it like STEERING.md.
 - Priority: `P1` (this week, do first), `P2` (this week), `P3` (if time).
