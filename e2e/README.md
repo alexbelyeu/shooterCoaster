@@ -154,6 +154,9 @@ When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pic
 (spread) with time frozen and shoots it with a real bullet: `weaponState()` must report the spread gun, the next pull must
 count 3 shots and draw 3 bullets, and `level1-pickup.png` holds the tinted tracer with the `.hud-weapon` badge clear of the HUD;
 the pickup must hold through a pause, expire on game time, and a restart must bring back the blaster and every pickup.
+When level1 is in the run, a `night` step (#829, nightly) rides its Night Ride (`startLevel(id, seed, 'night')`, `variant()`)
+to the ride step's moment: the run must be `night`, the sky band (top 30%) dark (`NIGHT_CHECK.maxSkyLuma`), the enemies as
+readable as the ride's probe asks (`level1-night-enemy.png`) and the scene inside level1's `scene` budget (`level1-night.png`).
 When level6 is in the run, a `switch` step (#702, on the PR in the `level6` shard) checks the shoot-to-switch junction
 (`trackSwitch()`): it parks the coaster behind the V2 sign with time frozen (`level6-switch.png`) and shoots it with a real
 bullet, which must set the hard way and ride the V8 branch at the junction's middle (`riding: 'hard'`, `level6-switch-hard.png`);
@@ -235,7 +238,7 @@ first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ri
 (hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: its intro tour pinned at four marks, #675, on the level held at its start (`timerStep` / `rideRate` 0), which the ride then goes on from: one mount; at each mark the camera must be on the tour and over the ground, at the landmark looking at it; the ride, the perf
 gate, the enemy probe, combat, the level's end), on the ride's own page `tour` (before the ride: each tour mark also shot, `<id>-tour-{reveal,landmark,track,landing}.png`, and not blank; nightly only, a capture costs ~15 s on a software renderer), `shot` (the frozen fresh shot and aim jump),
 `results` (the results screen's reveal, stats, buttons, board) and `share` (its Share line, menu and score cards); and
-`pacing` (every level, a whole run on its own page) and `wave`, `weather`, `boss`, `pickup`, `audio` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its
+`pacing` (every level, a whole run on its own page) and `wave`, `weather`, `boss`, `pickup`, `audio`, `night` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its
 checks disagree). A step that runs on another's page needs it in the same run (`tour` needs `ride`, `share` and `frenzy` need `ride` and
 `results`, `mobileMenus` needs `mobile`). `--steps ride,boss --levels level2` runs just those. Without `--steps` every
 desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desktop` leaves `title` and the phone run.
@@ -243,7 +246,7 @@ desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desk
 **Two depths (#372).** The PR smoke is rendering and integration: CI runs the shards in `SHARDS`, one `smoke (<name>)`
 job each (`ci.yml` matrix): `ui` (title, landing), `menus` (levelSelect, settings), `level1` (ride, shot, results), `level1-steps`
 (quality, speed), `level2`…`level5` (ride) and `mobile`. The **deep** checks, everything else (`nightlyOnly()` in
-`shards.mjs`: daily, frenzy, seed, pause, countdown, tour, wave, weather, boss, pickup, dark, audio, share, pacing, `mobileMenus`, and shot / results
+`shards.mjs`: daily, frenzy, seed, pause, countdown, tour, wave, weather, boss, pickup, dark, audio, night, share, pacing, `mobileMenus`, and shot / results
 on levels 2–5), run in the full smoke, which the nightly production run makes (`prod-smoke.yml`, below): they are either
 game logic a unit test covers next to its pure module (the table below), or a browser check too slow for every PR. A red
 nightly opens the `agent:prod-broken` P1 issue the Maintainer takes first. To reproduce one, run its step:

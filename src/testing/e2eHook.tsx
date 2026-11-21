@@ -33,7 +33,7 @@ import { dailyKey, dailyLevel, dailySeed, type DailyStreak } from '@/levels/dail
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
-import type { RunMode } from '@/types/game'
+import type { RideVariant, RunMode } from '@/types/game'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
@@ -141,8 +141,10 @@ export interface SCTestApi {
   triangles: number
   /** Every level in play order, its `nextLevel` and whether the unlock rule opens it now. */
   levels: () => { id: string; name: string; maxScore: number; nextLevel: string | null; unlocked: boolean; weather: E2ELevelWeather | null }[]
-  /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one. */
-  startLevel: (id: string, seed?: number) => void
+  /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one; `variant` a Night Ride (#829). */
+  startLevel: (id: string, seed?: number, variant?: RideVariant) => void
+  /** The current run's `runVariant`: day, or the level's Night Ride. */
+  variant: () => RideVariant
   /** `restartRun`, as Replay / R / the pause menu's Restart do: a warm level goes straight to the countdown (#674). */
   restartLevel: () => void
   /** `<count>:<hash>` of the latest run's spawn positions (formation members: their seeded slots); null until a spawner has generated them. */
@@ -976,7 +978,8 @@ export function installE2EApi() {
         weather: e2eWeather(l.enemies),
       }))
     },
-    startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, { seed }),
+    startLevel: (id: string, seed?: number, variant?: RideVariant) => useGameStore.getState().startRun(id, { seed, variant }),
+    variant: () => useGameStore.getState().runVariant,
     restartLevel: () => useGameStore.getState().restartRun('results'),
     levelReady: () => {
       const { sceneReady, currentLevel } = useGameStore.getState()

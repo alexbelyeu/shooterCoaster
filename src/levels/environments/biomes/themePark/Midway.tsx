@@ -13,11 +13,13 @@ import {
 } from './parkSpec'
 import { type StallGeometry, buildStallGeometries } from './stallGeometry'
 import StaticInstances from '../../shared/StaticInstances'
+import { setLampGlow } from '../../shared/lampGlow'
 
 /** Above 1 so the bulbs clear the bloom threshold (the material is not tone-mapped). */
 const BULB_COLORS = ['#fff2c0', '#ffd040', '#ff6a5a', '#7ad0ff', '#9cff8a'].map((c) =>
   new THREE.Color(c).multiplyScalar(2.4),
 )
+const BULB_SIZE = 2.8
 const WIRE_SEGMENTS = 12
 
 function StallVariant({
@@ -131,7 +133,8 @@ type MidwayLayout = Pick<
 >
 
 /** Stalls, string lights, bunting and paths: static, one draw call per kind of piece (level 1's park and the title's, #454). */
-export default function Midway({ layout }: { layout: MidwayLayout }) {
+/** `lampGlow` (the atmosphere's, #829) lights the bulbs harder and bigger and the stalls from inside at night. */
+export default function Midway({ layout, lampGlow = 0 }: { layout: MidwayLayout; lampGlow?: number }) {
   const { stalls, lightPoles, buntingPoles, lightWires, buntingWires, bulbs, flags, path } = layout
 
   const stallGeometries = useMemo(() => buildStallGeometries(), [])
@@ -151,7 +154,7 @@ export default function Midway({ layout }: { layout: MidwayLayout }) {
       bulbGeo: buildBulbGeometry(bulbs),
       bulbTex,
       bulbMat: new THREE.PointsMaterial({
-        size: 2.8,
+        size: BULB_SIZE,
         vertexColors: true,
         map: bulbTex,
         transparent: true,
@@ -171,6 +174,12 @@ export default function Midway({ layout }: { layout: MidwayLayout }) {
     }
   }, [lightWires, buntingWires, bulbs, path])
   useEffect(() => () => Object.values(assets).forEach((a) => a.dispose()), [assets])
+  useEffect(() => {
+    assets.bulbMat.color.setScalar(1 + 0.8 * lampGlow)
+    assets.bulbMat.size = BULB_SIZE * (1 + 0.4 * lampGlow)
+    setLampGlow(assets.stallNeutral, 0.18 * lampGlow)
+    setLampGlow(assets.stallAccent, 0.18 * lampGlow)
+  }, [assets, lampGlow])
 
   const byVariant = useMemo(
     () => stallGeometries.map((_, v) => stalls.filter((s) => s.variant === v)),

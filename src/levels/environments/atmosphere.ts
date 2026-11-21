@@ -58,6 +58,10 @@ export interface AtmosphereConfig {
   grade: GradeConfig
   /** Puts the composer's `HeatShimmerEffect` in for this biome: it has a fire that aims it (the gym's Flame, #627). */
   heatShimmer?: boolean
+  /** How hard the biome's own lamps burn (bulbs, lit cabins), 0 or absent by day: a night preset sets it (#829). */
+  lampGlow?: number
+  /** Scales every enemy's rim light (`setRimLift`), 1 or absent by day: a night preset lifts it so enemies read (#829). */
+  enemyRimLift?: number
 }
 
 export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {

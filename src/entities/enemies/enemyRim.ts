@@ -45,6 +45,17 @@ export const DEFAULT_RIM: Required<RimOptions> = {
 
 const RIM_CACHE_KEY = 'sc-enemy-rim-v2'
 
+/** Every rim material's uniforms with its own intensity, for `setRimLift`. */
+const rimmed: { uniforms: RimUniforms; intensity: number }[] = []
+
+/**
+ * Scales every enemy's rim from its own intensity (1 = as authored): a night atmosphere's `enemyRimLift` (#829), so
+ * enemies keep a bright edge against a dark sky. The materials are shared singletons, so this is scene-wide.
+ */
+export function setRimLift(lift: number): void {
+  for (const { uniforms, intensity } of rimmed) uniforms.uRimIntensity.value = intensity * lift
+}
+
 const RIM_PARS = /* glsl */ `
 uniform vec3 uRimColor;
 uniform float uRimIntensity;
@@ -84,6 +95,7 @@ export function withRim<T extends LitMaterial>(material: T, options: RimOptions 
     uEnemyFog: { value: options.fog ?? DEFAULT_RIM.fog },
   }
   material.userData.rim = uniforms
+  rimmed.push({ uniforms, intensity: uniforms.uRimIntensity.value })
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uRimColor = uniforms.uRimColor
     shader.uniforms.uRimIntensity = uniforms.uRimIntensity

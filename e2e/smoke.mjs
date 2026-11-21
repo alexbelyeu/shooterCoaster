@@ -311,10 +311,11 @@ const NOT_LOADED = (id) => `the ${id} scene never loaded (levelReady)`
  * `stopAtLevelTime` stops the level timer, game clock and ride exactly at `seconds` (#487), and the settled steps make
  * it the same moment of the level on any runner: the same track point with the same enemies flown in.
  * `started`: the level is already started with game time frozen at its start (`tourShots`), so it isn't mounted twice.
+ * `variant`: the run's `RideVariant` (`night`: the Night Ride, #829).
  */
-async function rideToLevelTime(page, id, seconds, minFrames, { started = false } = {}) {
+async function rideToLevelTime(page, id, seconds, minFrames, { started = false, variant = 'day' } = {}) {
   const start = Date.now()
-  await page.evaluate(([lid, seed, step, rate, target, minFrames, started]) => {
+  await page.evaluate(([lid, seed, step, rate, target, minFrames, started, variant]) => {
     const s = window.__SC_TEST__
     // Caps a frame's level time once the ride hands it back (the shots and probe that follow).
     s.timerStepMax = step
@@ -334,9 +335,9 @@ async function rideToLevelTime(page, id, seconds, minFrames, { started = false }
       return false
     })
     s.timerStep = null
-    if (!started) s.startLevel(lid, seed)
+    if (!started) s.startLevel(lid, seed, variant)
     s.setTimeScale(1)
-  }, [id, SEED, RIDE_STEP, RIDE_RATE, seconds, minFrames, started])
+  }, [id, SEED, RIDE_STEP, RIDE_RATE, seconds, minFrames, started, variant])
   for (;;) {
     await page.waitForTimeout(250)
     const r = await page.evaluate((overdue) => {
@@ -2437,6 +2438,43 @@ async function bossCheck(page, check) {
 }
 
 const PICKUP_CHECK = { level: 'level1', min: 2, max: 4, weapon: 'spread', bullets: 3, pauseMs: 3000 }
+/** The Night Ride (#829): its level, and the brightest the sky band (top 30% of the frame, mean luma 0-255) may be. */
+const NIGHT_CHECK = { level: 'level1', maxSkyLuma: 80 }
+
+/**
+ * Level 1's Night Ride, ridden to the ride step's moment (`<id>-night.png`, `<id>-night-enemy.png`): a night run, a
+ * dark sky, enemies as readable as by day and the level's `scene` budget held (no new lights or draw calls).
+ */
+async function nightCheck(page) {
+  const { level, maxSkyLuma } = NIGHT_CHECK
+  const ride = await rideToLevelTime(page, level, SECONDS, MIN_FRAMES, { variant: 'night' })
+  const stats = await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    return { variant: s.variant(), phase: s.phase(), drawCalls: s.drawCalls, triangles: s.triangles, scene: s.sceneStats?.() ?? null }
+  })
+  const png = await page.screenshot({ path: path.join(OUT, `${level}-night.png`), timeout: SHOT_TIMEOUT })
+  const img = await imageStats(page, png)
+  const sky = await imageStats(page, png, [[0, 0.3, 1, 1]])
+  const enemies = await captureEnemyCloseup(page, `${level}-night`, png)
+  const problems = []
+  if (ride.frames < MIN_FRAMES) problems.push(`render loop stalled (${ride.frames} frames)`)
+  if (stats.variant !== 'night') problems.push(`the run is "${stats.variant}", not the Night Ride`)
+  if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" on the Night Ride`)
+  if (looksBlank(img)) problems.push('night frame looks blank')
+  if (sky.mean > maxSkyLuma) problems.push(`the night sky is too bright: mean luma ${sky.mean.toFixed(0)} (max ${maxSkyLuma})`)
+  if (enemies.error) problems.push(`enemy probe failed: ${enemies.error}`)
+  else if (enemies.onScreen === 0) problems.push(`no enemies on screen at ${ride.levelTime?.toFixed(1)} s of the Night Ride`)
+  else if (enemies.readable < Math.min(MIN_READABLE, enemies.onScreen)) {
+    problems.push(`${enemies.readable} readable enemies (≥ ${READABLE_PX} px) of ${enemies.onScreen} on screen on the Night Ride (need ${Math.min(MIN_READABLE, enemies.onScreen)})`)
+  }
+  const perfGate = PERF_GATE ? sceneBudgetCheck(level, stats) : null
+  if (perfGate?.over.length && !perfGate.knownOver) problems.push(`over budget at night: ${perfGate.over.join(', ')}`)
+  return {
+    id: 'night', problems, image: img, skyLuma: Math.round(sky.mean), enemies,
+    drawCalls: stats.drawCalls, triangles: stats.triangles, scene: stats.scene,
+  }
+}
+
 /** Track-parameter leads behind the first pickup to park the coaster at. */
 const PICKUP_LEADS = [0.006, 0.01, 0.015, 0.004, 0.02, 0.03]
 
@@ -4185,7 +4223,7 @@ async function runMobile(browser, base) {
 
 async function run() {
   const runStarted = Date.now()
-  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['switch', [SWITCH_CHECK.level]], ['dark', [SWITCH_CHECK.level]], ['audio', [AUDIO_CHECK.level]], ['weather', WEATHER_LEVELS]]
+  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['switch', [SWITCH_CHECK.level]], ['dark', [SWITCH_CHECK.level]], ['audio', [AUDIO_CHECK.level]], ['weather', WEATHER_LEVELS], ['night', [NIGHT_CHECK.level]]]
     .filter(([s, ls]) => ls.join() !== STEP_LEVELS[s].join())
   if (drift.length) throw new Error(`STEP_LEVELS in e2e/shards.mjs disagrees with the checks: ${drift.map(([s, ls]) => `${s} runs on ${ls.join(', ')}`).join('; ')}`)
   const budget = startTimeBudget(runStarted)
@@ -4426,6 +4464,9 @@ async function run() {
   // 6e. Weapon pickups: one shot with a real bullet, the fan, the badge, expiry (level1-pickup.png)
   if (has('pickup') && wanted.includes(PICKUP_CHECK.level)) await pageStep(pickupCheck)
 
+  // 6e'. Level 1's Night Ride: dark sky, readable enemies, inside the scene budget (level1-night.png)
+  if (has('night') && wanted.includes(NIGHT_CHECK.level)) await pageStep(nightCheck)
+
   // 6f. Shoot-to-switch: the shot run rides the hard branch, the other the easy way (level6-switch.png, level6-switch-hard.png)
   if (has('switch') && wanted.includes(SWITCH_CHECK.level)) await pageStep((page) => switchCheck(page, { darkShots: has('dark') }))
 
@@ -4522,6 +4563,8 @@ async function run() {
       : r.trackSwitch
         ? ` switch at ${r.trackSwitch.t.toFixed(3)} ${r.trackSwitch.px ? `${r.trackSwitch.px.x},${r.trackSwitch.px.y} (${r.trackSwitch.px.distance} units, lead ${r.trackSwitch.lead})` : 'never on screen'}` +
           ` shot -> ${r.trackSwitch.hard ?? '-'}, left -> ${r.trackSwitch.easy ?? '-'}`
+      : r.id === 'night'
+        ? ` skyLuma=${r.skyLuma} draws=${r.drawCalls} tris=${r.triangles}${sceneSummary(r.scene)} enemiesOnScreen=${r.enemies?.onScreen ?? '-'} readable=${r.enemies?.readable ?? '-'} largestPx=${r.enemies?.largestPx ?? '-'}`
       : r.id === 'pacing'
         ? ` ${r.pacing ? pacingSummary(r.level, r.pacing) : r.level} (${r.samples ?? 0} steps, ${r.heldFrames ?? 0} held frames)${programGrowthSummary(r.shaders)}`
       : r.engine

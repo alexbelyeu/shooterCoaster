@@ -22,12 +22,12 @@ function Hedges({ hedges }: { hedges: ThemeParkLayout['hedges'] }) {
   return <StaticInstances placements={hedges} geometry={assets.hedge} material={assets.green} />
 }
 
-export default function FunfairDecorations({ heightFn, groundFn, track }: BiomeDecorationsProps) {
+export default function FunfairDecorations({ heightFn, groundFn, track, atmosphere }: BiomeDecorationsProps) {
   const layout = useMemo(() => getThemeParkLayout(track, heightFn, groundFn), [track, heightFn, groundFn])
   useContactShadows(useMemo(() => themeParkShadowCasters(layout), [layout]))
   return (
     <>
-      <Midway layout={layout} />
+      <Midway layout={layout} lampGlow={atmosphere.lampGlow} />
       <TentsAndFlags layout={layout} />
       <Hedges hedges={layout.hedges} />
     </>

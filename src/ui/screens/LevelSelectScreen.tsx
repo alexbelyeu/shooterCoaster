@@ -73,6 +73,8 @@ export default function LevelSelectScreen() {
   const total = totalStars(cards)
 
   const [launching, setLaunching] = useState<string | null>(null)
+  /** Cards whose Night Ride toggle is down (#829): their next launch rides at night. */
+  const [nightPicks, setNightPicks] = useState<ReadonlySet<string>>(() => new Set())
   const [focusIndex, setFocusIndex] = useState(() => nextLevelIndex(cards, useGameStore.getState().lastLevel))
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
   const launchTimer = useRef<number | undefined>(undefined)
@@ -119,7 +121,18 @@ export default function LevelSelectScreen() {
       if (!prefersReducedMotion()) cardRefs.current[i]?.animate(DENIED_SHAKE, { duration: 280, easing: 'ease-out' })
       return
     }
-    launch(card.id, () => startRun(card.id))
+    const variant = card.nightRide && nightPicks.has(card.id) ? 'night' : 'day'
+    launch(card.id, () => startRun(card.id, { variant }))
+  }
+
+  function toggleNight(id: string) {
+    if (launching) return
+    sfx().ui('select')
+    setNightPicks((picks) => {
+      const next = new Set(picks)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
   }
 
   function onGridKeyDown(e: KeyboardEvent<HTMLDivElement>) {
@@ -157,7 +170,8 @@ export default function LevelSelectScreen() {
           const classes = ['level-card']
           if (!card.unlocked) classes.push('locked')
           if (launching === card.id) classes.push('is-selected')
-          return (
+          const night = card.nightRide && nightPicks.has(card.id)
+          const board = (
             <button
               key={card.id}
               ref={(el) => {
@@ -172,7 +186,7 @@ export default function LevelSelectScreen() {
               aria-disabled={!card.unlocked}
               aria-label={
                 card.unlocked
-                  ? `${card.name}: ${card.stars} of ${STARS_PER_LEVEL} stars${card.bestScore > 0 ? `, best ${card.bestScore}${card.bestInitials ? ` by ${card.bestInitials}` : ''}` : ''}`
+                  ? `${card.name}${night ? ', Night Ride' : ''}: ${card.stars} of ${STARS_PER_LEVEL} stars${card.bestScore > 0 ? `, best ${card.bestScore}${card.bestInitials ? ` by ${card.bestInitials}` : ''}` : ''}`
                   : `${card.name}: locked${card.unlockedBy ? `, earn a star on ${card.unlockedBy}` : ''}`
               }
               onFocus={() => setFocusIndex(i)}
@@ -201,6 +215,23 @@ export default function LevelSelectScreen() {
                 </span>
               </FairBoard>
             </button>
+          )
+          if (!card.nightRide) return board
+          // Its own plate under the board, not inside it: a button can't hold another.
+          return (
+            <div key={card.id} className="level-slot">
+              {board}
+              <button
+                type="button"
+                className="fair-plate level-night"
+                aria-pressed={night}
+                data-night={card.id}
+                disabled={!!launching}
+                onClick={() => toggleNight(card.id)}
+              >
+                Night Ride
+              </button>
+            </div>
           )
         })}
         <DailyCardButton

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ATMOSPHERES } from '@/levels/environments/atmosphere'
+import { NIGHT_ATMOSPHERES } from '@/levels/environments/nightPreset'
 import { combineFog, createFogModifiers, resetFogModifiers } from './sceneFog'
 
 describe('combineFog', () => {
@@ -29,7 +30,8 @@ describe('combineFog', () => {
     expect(out).toEqual({ near: 26, far: 52 })
   })
 
-  it.each(Object.entries(ATMOSPHERES))("keeps %s's own near inside half its far", (_, atmosphere) => {
+  const nights = Object.entries(NIGHT_ATMOSPHERES).map(([biome, a]) => [`${biome} night`, a!] as const)
+  it.each([...Object.entries(ATMOSPHERES), ...nights])("keeps %s's own near inside half its far", (_, atmosphere) => {
     expect(atmosphere.fogNear).toBeLessThanOrEqual(atmosphere.fogFar * 0.5)
   })
 })
