@@ -204,6 +204,12 @@ export default function CoasterCamera({
     const reducedMotion = prefersReducedMotion()
     const io = intro.current
 
+    // Photo mode (#828): PhotoCamera has the camera; the ride's state is left as it was, so the seat comes back exactly.
+    if (store.photo) {
+      streaks.current.opacity = 0
+      return
+    }
+
     // Behind the results the camera leaves the seat and circles the landmark; reduced motion holds the last frame.
     if (store.phase === 'results') {
       setCameraOffSeat(!reducedMotion)

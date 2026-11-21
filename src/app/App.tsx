@@ -27,6 +27,7 @@ import Screen from './Screen'
 import { perfRequested } from '@/perf/perfFlag'
 
 const PerfPanel = lazy(() => import('@/perf/PerfPanel'))
+const PhotoMode = lazy(() => import('@/ui/screens/PhotoMode'))
 
 /** PLAY / WORLDS fade the title to black (with a whoosh) over this long, then start the run / open level select. */
 const TITLE_FADE_S = 0.4
@@ -43,6 +44,7 @@ export default function App() {
   const runId = useGameStore((s) => s.runId)
   const setPhase = useGameStore((s) => s.setPhase)
   const resuming = useGameStore((s) => s.phase === 'paused' && s.resuming)
+  const photo = useGameStore((s) => s.photo)
   const [showSettings, setShowSettings] = useState(false)
   const [veiled, setVeiled] = useState(false)
   const veilTimer = useRef<number | undefined>(undefined)
@@ -141,7 +143,7 @@ export default function App() {
           </Screen>
         )}
 
-        {phase === 'paused' && !resuming && !showSettings && (
+        {phase === 'paused' && !resuming && !showSettings && !photo && (
           <Screen key="paused" {...fadeVariants} transition={{ duration: 0.2 }}>
             <PauseScreen onSettings={() => setShowSettings(true)} />
           </Screen>
@@ -172,7 +174,13 @@ export default function App() {
 
       {showSettings && <SettingsScreen onClose={() => setShowSettings(false)} />}
 
-      <MuteButton />
+      {photo && (
+        <Suspense fallback={null}>
+          <PhotoMode />
+        </Suspense>
+      )}
+
+      {!photo && <MuteButton />}
 
       {showCrosshair && <Crosshair />}
 

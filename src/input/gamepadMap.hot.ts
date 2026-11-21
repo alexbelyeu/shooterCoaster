@@ -10,6 +10,7 @@ import type { GamePhase } from '@/types/game'
 export const PAD = {
   A: 0,
   B: 1,
+  LT: 6,
   RT: 7,
   START: 9,
   UP: 12,

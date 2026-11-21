@@ -13,7 +13,7 @@ interface PauseScreenProps {
 
 /**
  * The stopped ride's board (docs/art/PERSONALITY.md): the level, how long was left, the score and stars so far, hits;
- * Resume (also Esc) as the one gilt plate, then Restart / Settings / Quit.
+ * Resume (also Esc) as the one gilt plate, then Restart / Photo / Settings / Quit.
  */
 export default function PauseScreen({ onSettings }: PauseScreenProps) {
   const levelId = useGameStore((s) => s.currentLevel)
@@ -41,6 +41,7 @@ export default function PauseScreen({ onSettings }: PauseScreenProps) {
     const store = useGameStore.getState()
     if (action === 'resume') store.resume()
     else if (action === 'restart') store.restartRun('pause')
+    else if (action === 'photo') store.setPhoto(true)
     else if (action === 'settings') onSettings()
     else if (action === 'quit') store.setPhase('levelSelect')
   }

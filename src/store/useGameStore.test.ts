@@ -357,6 +357,32 @@ describe('pause and resume', () => {
   })
 })
 
+describe('photo mode (#828)', () => {
+  it('opens only while paused and not counting down to resume', () => {
+    store().setPhase('playing')
+    store().setPhoto(true)
+    expect(store().photo).toBe(false)
+    store().setPhase('paused')
+    store().resume()
+    store().setPhoto(true)
+    expect(store().photo).toBe(false)
+    store().setPhase('paused')
+    store().setPhoto(true)
+    expect(store().photo).toBe(true)
+    store().setPhoto(false)
+    expect(store()).toMatchObject({ phase: 'paused', photo: false })
+  })
+
+  it('resume, a phase change and a restart all leave it', () => {
+    for (const leave of [() => store().resume(), () => store().setPhase('levelSelect'), () => store().startRun('level1', { seed: 1 })]) {
+      store().setPhase('paused')
+      store().setPhoto(true)
+      leave()
+      expect(store().photo).toBe(false)
+    }
+  })
+})
+
 describe('saveScore', () => {
   it('keeps the best score per level', () => {
     store().saveScore(entry('level1', 500, 1))

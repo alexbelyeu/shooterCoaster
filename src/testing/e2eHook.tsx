@@ -295,6 +295,9 @@ export interface SCTestApi {
     seconds: number | null
     skipped: boolean
   }
+  /** Photo mode's orbit (#828), written by `track/PhotoCamera` each frame while it is on: radians, world units, the
+   *  camera's distance from the pivot (the seat's eye at the pause) and its height over the terrain. */
+  photo: { on: boolean; yaw: number; pitch: number; radius: number; offset: number; clearance: number }
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null
   /** Set to a speed (0–1 between the level's min and max velocity) to put the coaster at it on its next frame. */
@@ -1149,6 +1152,7 @@ export function installE2EApi() {
     setTimeScale: (s: number) => setTimeScaleOverride(s === 1 ? null : s),
     introAt: null,
     intro: { mode: 'ride', length: INTRO_SECONDS, handoff: INTRO_HANDOFF_SECONDS, progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, clearance: 0, marks: null, goOffset: null, orbitSeconds: 0, seconds: null, skipped: false },
+    photo: { on: false, yaw: 0, pitch: 0, radius: 0, offset: 0, clearance: 0 },
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,
