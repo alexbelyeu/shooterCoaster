@@ -88,7 +88,7 @@ describe('hitting a bystander', () => {
 
   it('a new run forgets who was hit', () => {
     hitBystander('bystander-1', 'climber', at)
-    store().startRun('level6', 1)
+    store().startRun('level6', { seed: 1 })
     expect(store().bystandersHit).toEqual([])
   })
 })

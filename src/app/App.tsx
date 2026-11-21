@@ -25,8 +25,6 @@ import { usePauseOnHidden } from './usePauseOnHidden'
 import { useGamepad } from '@/input/gamepadInput'
 import Screen from './Screen'
 import { perfRequested } from '@/perf/perfFlag'
-import { getAllLevels } from '@/levels/LevelRegistry'
-import { nextLevelForPlayer } from '@/ui/screens/levelSelectModel'
 
 const PerfPanel = lazy(() => import('@/perf/PerfPanel'))
 
@@ -75,11 +73,7 @@ export default function App() {
     veilTimer.current = window.setTimeout(then, TITLE_FADE_S * 1000)
   }
   // One press from the title to the ride (#329): the player's next level, the worlds a button away.
-  const playFromTitle = () =>
-    leaveTitle(() => {
-      const { savedScores, lastLevel, startRun } = useGameStore.getState()
-      startRun(nextLevelForPlayer(getAllLevels(), savedScores, lastLevel), undefined, undefined, false, 'title')
-    })
+  const playFromTitle = () => leaveTitle(() => useGameStore.getState().startNextRun('title'))
   const worldsFromTitle = () => leaveTitle(() => setPhase('levelSelect'))
 
   // Not over the intro's tour, the countdown over its end included: nothing to aim at yet.

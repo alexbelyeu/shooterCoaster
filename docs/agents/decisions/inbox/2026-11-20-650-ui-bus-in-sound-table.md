@@ -1,5 +1,0 @@
-## 2026-11-20 — UI routing comes from the sound table; UI voices get their own room return (Sound designer, #650)
-
-**Context:** #338's UI voices skipped the pause gate dry but still sent to the shared convolver, whose return sits behind the gate, so the resume GO's reverb swelled in as the gate opened. Which sounds were UI-routed was a hand-kept `UI_ROUTED` set in `engine.ts`.
-**Decision:** `ArcadeSound.bus: 'ui'` in `ARCADE_SOUNDS` (`sfxDesign.ts`) routes a sound to the UI voices; `arcade.test.ts` holds it equal to the `PRIO.ui` sounds. The UI voices send to a second convolver on the same IR buffer, returning into `uiOut`, so their room keeps the biome's sound and is heard while paused. The master chain's fields are `sfxGate` (pause gate) and `sfxVolume` (effects volume).
-**Consequences:** Supersedes #338's consequence line: a new menu or countdown sound gets `prio: PRIO.ui, bus: 'ui'` in `ARCADE_SOUNDS` to be heard while paused (the test fails if one is set without the other). The second convolver costs three nodes per arcade graph and is silent outside UI blips.

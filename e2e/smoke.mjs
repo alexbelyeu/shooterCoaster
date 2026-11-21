@@ -2600,20 +2600,43 @@ async function darkSectionShot(page, levelId, { shots: shoot = false } = {}) {
 /** The dark shots' floors: the share of the frame that is dark, of saturated bright pixels (the blacklit glow), and how much the flash brightens the frame's mean (0–255). */
 const DARK_SHOT = { dark: 0.4, glow: 0.002, flash: 3 }
 
-const SWITCH_CHECK = { level: 'level6' }
+/** `branchWave`: the hard route's own wave (#720, `LevelRegistry.ts` level6's `branch`): its banner, size and second. */
+const SWITCH_CHECK = { level: 'level6', branchWave: { label: 'Pad Rats!', count: 8, at: 17 } }
+/** On-screen rats on the branch the hard run must see once its wave is in. */
+const BRANCH_WAVE_ON_SCREEN = 2
 /** Track-parameter leads behind the switch sign to park the coaster at. */
 const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
 
 /**
  * Shoot-to-switch (#702): a run that shoots the V2 sign with a real bullet rides the V8 branch, a run that leaves it rides
  * the easy way, and a restart sets it back (level6-switch.png: the sign in view, level6-switch-hard.png: on the branch).
+ * With the level timer jumped to the branch wave's second (#720), the hard run meets it on the branch, on screen and in the
+ * kill count; the easy run, past the sign, never does.
  * The same run then checks the cave's dark section; the nightly `dark` step (`darkShots`) adds its frame shots and the
  * Tree's gap still (`gapShot`), which are too slow for the PR's `level6` shard (#766).
  */
 async function switchCheck(page, { darkShots = false } = {}) {
-  const { level } = SWITCH_CHECK
+  const { level, branchWave } = SWITCH_CHECK
   const problems = []
   const api = (fn, arg) => page.evaluate(fn, arg)
+  /** Jumps the held level timer to `seconds` in one frame and lets the waves due by then tell and arrive, the ride held. */
+  const toLevelTime = async (seconds) => {
+    await api((x) => {
+      const s = window.__SC_TEST__
+      s.timerStep = x
+      s.stopAtLevelTime = x
+      s.setTimeScale(1)
+    }, seconds)
+    await waitFrames(page, 4, { maxMs: 20000, pollMs: 100 })
+    await api(() => {
+      const s = window.__SC_TEST__
+      s.setTimeScale(0)
+      s.timerStep = null
+      s.stopAtLevelTime = null
+    })
+  }
+  /** Arrivals of the branch wave since load (`waveEvents` spans the page's runs). */
+  const branchArrivals = () => api((label) => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'announce' && e.label === label).length, branchWave.label)
   const read = () => api(() => window.__SC_TEST__.trackSwitch())
   const rideTo = async (t) => {
     await api((x) => { window.__SC_TEST__.rideTo = x }, t)
@@ -2629,7 +2652,7 @@ async function switchCheck(page, { darkShots = false } = {}) {
   let sw = await read()
   if (!sw) return { id: 'switch', problems: [`${level} has no switch (trackSwitch() is null)`] }
   const mid = (sw.from + sw.to) / 2
-  const result = { t: sw.t, lead: null, px: null, hard: null, easy: null }
+  const result = { t: sw.t, lead: null, px: null, hard: null, easy: null, branchRats: null, totals: { hard: null, easy: null } }
 
   // The run that shoots it: park where it is on screen, fire a real bullet at it.
   let target = null
@@ -2653,10 +2676,16 @@ async function switchCheck(page, { darkShots = false } = {}) {
     if (!(await pollUntil(page, async () => (await read()).hard, { ms: 8000, frames: 8, pollMs: 200 })))
       problems.push('shooting the switch did not set the hard way')
     await api(() => { window.__SC_TEST__.bulletStep = 0 })
+    const before = await branchArrivals()
+    await toLevelTime(branchWave.at)
+    if ((await branchArrivals()) === before) problems.push(`the hard route's wave (${branchWave.label}) never arrived at ${branchWave.at} s`)
+    result.totals.hard = (await read()).totalEnemies
     await rideTo(mid)
     sw = await read()
     result.hard = sw.riding
     if (sw.riding !== 'hard') problems.push(`after the switch was shot the ride took the ${sw.riding} way`)
+    result.branchRats = (await api(() => window.__SC_TEST__.enemies())).filter((e) => e.type === 'rat').length
+    if (result.branchRats < BRANCH_WAVE_ON_SCREEN) problems.push(`on the branch only ${result.branchRats} rats on screen (need ${BRANCH_WAVE_ON_SCREEN})`)
     await page.screenshot({ path: path.join(OUT, `${level}-switch-hard.png`), timeout: SHOT_TIMEOUT })
   }
 
@@ -2674,6 +2703,13 @@ async function switchCheck(page, { darkShots = false } = {}) {
   problems.push(...dark.problems)
   const gap = darkShots ? await gapShot(page) : null
   if (gap) problems.push(...gap.problems)
+  // Past the sign the easy way is settled: its wave's second brings nothing, and the kill count never counts it.
+  const before = await branchArrivals()
+  await toLevelTime(branchWave.at)
+  if ((await branchArrivals()) !== before) problems.push(`the easy route met the hard route's wave (${branchWave.label})`)
+  result.totals.easy = (await read()).totalEnemies
+  if (result.totals.hard != null && result.totals.hard - result.totals.easy !== branchWave.count)
+    problems.push(`the hard run's kill count has ${result.totals.hard} enemies, the easy run's ${result.totals.easy}: not ${branchWave.count} apart`)
   return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result, gap: gap?.image ?? null }
 }
 

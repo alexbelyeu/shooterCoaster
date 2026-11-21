@@ -39,6 +39,15 @@ describe('paceLevel', () => {
     expect(paced.enemies.map((w) => [w.type, w.spawnDelay])).toEqual([['balloon', 0], ['balloon', 15], ['infernalDrake', 40]])
   })
 
+  it('times a hard-route branch wave at its own second, last, leaving the weighted waves as they were (#720)', () => {
+    const plain = paceLevel({ waves: [balloons(1), balloons(1, 2)], boss: 'kraken' })
+    const paced = paceLevel({ waves: [balloons(1), balloons(1, 2)], boss: 'kraken', branch: { type: 'crow', count: 6, at: 19 } })
+    expect(paced.enemies.slice(0, -1)).toEqual(plain.enemies)
+    expect(paced.enemies[paced.enemies.length - 1]).toEqual({ type: 'crow', count: 6, route: 'hard', spawnDelay: 19 })
+    expect(() => paceLevel({ waves: [balloons(1)], boss: 'kraken', branch: { type: 'crow', count: 1, at: 19.5 } })).toThrow(/whole second/)
+    expect(() => paceLevel({ waves: [balloons(1)], boss: 'kraken', branch: { type: 'crow', count: 1, at: 40 } })).toThrow(/before 40 s/)
+  })
+
   it('refuses a last wave too late to be shot before the boss, an empty roster, a bad weight, a boss and a finale', () => {
     expect(() => paceLevel({ waves: [balloons(1), balloons(1), balloons(1), balloons(1)] })).toThrow(/after 33 s/)
     expect(() => paceLevel({ waves: [] })).toThrow()

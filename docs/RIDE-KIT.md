@@ -43,7 +43,7 @@ the slow-motion window, the photo are), so camera, audio, pacing and spawning ca
 Built so far (#698): `src/track/elements/` has the loop, zero-g roll, corkscrew, heartline roll, airtime hill
 (with its `slowMotion` marker), helix, banked turn and the head-chopper helper, on a `RideBuilder` whose control
 points carry the track's `up`; `climbing.ts` has the unmarked pieces a ride laid out on a floor plan uses (#757: a straight
-or a turn that climbs on the way, a straight to a line on the plan), which level 6's ride is built from; a spline with ups rolls, and the ride camera's up follows it. See them ridden with
+or a turn that climbs on the way, a straight to a line on the plan; a turn, and so a `bankedTurn` with `rise`, climbs a little more than `rise`, its grade's share by 1 / cos g; a straight throws on a rise over ~5.8 × its run, #815), which level 6's ride is built from; a spline with ups rolls, and the ride camera's up follows it. See them ridden with
 `npm run turntable -- --rides` (`e2e-results/turntable/rides.png`).
 
 The special mechanics (#699) are `TrackParams.mechanics` on a v2 ride, built with their track by `src/track/elements/mechanicElements.ts`:
