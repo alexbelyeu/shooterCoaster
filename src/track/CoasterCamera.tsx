@@ -5,7 +5,7 @@ import type { TrackCurve } from './curves/TrackCurve'
 import { type ArcTable, distanceAtT } from './arcLength'
 import { TRACK_TUNNEL_EVENT, getTunnelDims } from './setPieces'
 import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
-import { setRideProgress } from './rideProgress.hot'
+import { setRideProgress, setRideSeat } from './rideProgress.hot'
 import {
   advanceRide, curveTangentY, jumpRide, resetRide, rideLaunches, rideOnLift, rideSpeedNorm, rideStepFrames, rideStopShare, rideTopShare, rideZone, type RideSpeeds,
   type RideState,
@@ -278,6 +278,7 @@ export default function CoasterCamera({
     const route = store.route
     const pose = seatPose(curve, table, t, trackScale, heightOffset, seat.current, mechanics, rideStopShare(ride.current, speeds), route)
     cam.position.copy(pose.eye)
+    setRideSeat(pose.eye.x, pose.eye.z)
     const velocityNorm = rideSpeedNorm(ride.current, speeds)
 
     // Lateral acceleration from the tangents a few units either side of the car, measured along the track.
