@@ -33,7 +33,7 @@ scheduled task: the Builders dispatcher and Fix (on label) hand it audio work. I
 (`docs/audio/SOUND-BIBLE.md`). No agent can hear, so audio PRs commit short renders to
 `docs/audio/renders/` for Alex. The first new theme for each level waits for his pick in a
 `needs-alex` `Listen:` issue; the issue that wires it in stays `agent:blocked` with
-`Waiting on #<n>` until the Maintainer sees the listening issue closed.
+`Waits on #<n>` until the Maintainer sees the listening issue closed.
 
 Throughput is tuned with the knobs in STEERING.md (`builder_parallelism`,
 `qa_parallelism`), not by changing schedules. Max plan budget: 15 scheduled runs per

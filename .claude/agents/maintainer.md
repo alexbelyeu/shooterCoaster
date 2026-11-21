@@ -34,8 +34,11 @@ Work through these in order; stop early only if something is on fire.
    - Issues `agent:in-progress` for >20h with no open PR → back to `agent:ready` with a comment.
    - Open PRs labelled `agent:needs-qa` that conflict with `main` → merge `origin/main` into the branch, resolve, re-verify,
      push normally (never rebase/force-push).
-   - Draft PRs from blocked builders → make sure the issue is `agent:blocked` with a clear reason.
-   - Issues labelled `agent:blocked` whose body or latest comment says `Waiting on #<n>`:
+   - Draft PRs from builders that couldn't finish → the issue belongs in `agent:ready` with a latest
+     `Handoff:` comment naming the branch / PR (put it back there, adding that comment, if it isn't).
+     Unfinished work is never `agent:blocked`: that label stays only for a `Blocked:` comment with a
+     `Waits on #N` line, or `needs-alex`.
+   - Issues labelled `agent:blocked` whose body or latest comment says `Waits on #<n>` (older ones: `Waiting on #<n>`):
      if every issue or PR they wait on is closed (merged, or a `Listen:` issue Alex has
      closed with his pick), swap `agent:blocked` → `agent:ready` and comment
      `Unblocked: #<n> is done` (quote Alex's closing comment if it has one).
