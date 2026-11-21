@@ -66,7 +66,7 @@ Never claim something "sounds good". Show it:
   issue (`needs-alex` + `type:audio`, titled `Listen: pick the <level> theme`) that links
   them with a sentence on each, and ship the PR with the options playable behind a URL flag.
   The follow-up issue that makes Alex's pick the default stays `agent:blocked` with
-  `Waiting on #<listening issue>`. The Maintainer re-opens it once Alex closes the
+  `Waits on #<listening issue>`. The Maintainer re-opens it once Alex closes the
   listening issue.
 - Engine work follows hard rule 7: the new engine runs in parallel, behind a flag, until
   it reaches parity. Every node you create is
