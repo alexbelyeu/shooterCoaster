@@ -1794,7 +1794,8 @@ async function photoModeProblems(page, levelId) {
   await page.screenshot({ path: path.join(OUT, `${levelId}-photo.png`), timeout: SHOT_TIMEOUT })
   const [file] = await Promise.all([
     page.waitForEvent('download', { timeout: 20000 }).catch(() => null),
-    page.getByRole('button', { name: 'Save' }).click({ timeout: 10000 }).catch((e) => problems.push(`photo: click Save: ${e.message}`)),
+    // The blob download counts as a navigation the click would wait out.
+    page.getByRole('button', { name: 'Save', exact: true }).click({ timeout: 10000, noWaitAfter: true }).catch((e) => problems.push(`photo: click Save: ${e.message.split('\n')[0]}`)),
   ])
   let png = null
   if (!file) problems.push('photo: Save started no download')
