@@ -1025,23 +1025,73 @@ export const DUST_BUNNY_REACH = (() => {
 })()
 
 /** Two black dot eyes with a glint, on the front of the ball. */
-export const DUST_BUNNY_EYES_GEO = mergePainted([
+const DUST_BUNNY_EYES_GEO = mergePainted([
   ...[-1, 1].map((s) => paintedAt(new THREE.SphereGeometry(0.42, 6, 4), RAT_EYE, pose([s * 0.8, 0.55, DUST_BUNNY_RADIUS + 0.2], [0, 0, 0], [1, 1.15, 0.6]))),
   ...[-1, 1].map((s) => painted(new THREE.SphereGeometry(0.12, 4, 2), RAT_GLINT, [s * 0.8 + 0.14, 0.75, DUST_BUNNY_RADIUS + 0.45])),
 ])
 
+/**
+ * The fluff and the eyes in one mesh, one draw call (#806: a dust bunny wave fills the screen). The fluff rolls about
+ * x by two relative morph targets, (0, y, z) and (0, -z, y) weighted cos(roll) - 1 and sin(roll) (`dustBunnyRoll`);
+ * the eyes have none, so they stay on its front. `aGloss` marks the eyes, which `DUST_BUNNY_MAT` keeps glossy.
+ */
+export const DUST_BUNNY_GEO = (() => {
+  const g = mergeGeometries([DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYES_GEO])
+  const fluff = DUST_BUNNY_BODY_GEO.attributes.position
+  const count = g.attributes.position.count
+  const toward = new Float32Array(count * 3)
+  const across = new Float32Array(count * 3)
+  for (let i = 0; i < fluff.count; i++) {
+    const y = fluff.getY(i)
+    const z = fluff.getZ(i)
+    toward[i * 3 + 1] = y
+    toward[i * 3 + 2] = z
+    across[i * 3 + 1] = -z
+    across[i * 3 + 2] = y
+  }
+  g.morphAttributes.position = [new THREE.BufferAttribute(toward, 3), new THREE.BufferAttribute(across, 3)]
+  g.morphTargetsRelative = true
+  g.setAttribute('aGloss', new THREE.BufferAttribute(new Float32Array(count).fill(1, fluff.count), 1))
+  // The roll keeps every point's distance from the centre, so this sphere holds it at any angle.
+  const p = g.attributes.position
+  let reach = 0
+  for (let i = 0; i < count; i++) reach = Math.max(reach, Math.hypot(p.getX(i), p.getY(i), p.getZ(i)))
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), reach)
+  DUST_BUNNY_EYES_GEO.dispose()
+  return g
+})()
+
+/** Turns a `DUST_BUNNY_GEO` mesh's fluff to `roll` about x (its morph target influences). */
+export function dustBunnyRoll(influences: number[], roll: number) {
+  influences[0] = Math.cos(roll) - 1
+  influences[1] = Math.sin(roll)
+}
+
+const EYE_ROUGHNESS = '0.15'
+const EYE_METALNESS = '0.10'
+
+/** The fluff's matte paint, and the eyes' gloss where `aGloss` is 1. */
 export const DUST_BUNNY_MAT = withRim(new THREE.MeshStandardMaterial({
   vertexColors: true,
   roughness: 0.95,
   metalness: 0,
   flatShading: true,
 }), { color: '#e8e4dc', intensity: 0.35, power: 2.2 })
-
-export const DUST_BUNNY_EYE_MAT = new THREE.MeshStandardMaterial({
-  vertexColors: true,
-  roughness: 0.15,
-  metalness: 0.1,
-})
+{
+  const rim = DUST_BUNNY_MAT.onBeforeCompile
+  const rimKey = DUST_BUNNY_MAT.customProgramCacheKey()
+  DUST_BUNNY_MAT.onBeforeCompile = (shader, renderer) => {
+    rim.call(DUST_BUNNY_MAT, shader, renderer)
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aGloss;\nvarying float vGloss;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGloss = aGloss;')
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vGloss;')
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, ${EYE_ROUGHNESS}, vGloss);`)
+      .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, ${EYE_METALNESS}, vGloss);`)
+  }
+  DUST_BUNNY_MAT.customProgramCacheKey = () => `${rimKey}-eye-gloss`
+}
 
 // ── Spotted lanternfly (#516), built to docs/art/ENEMIES.md ──
 // Lies on a wall: head along +y, its back out of the wall along +z. One mesh, one draw call (#632): the body and each

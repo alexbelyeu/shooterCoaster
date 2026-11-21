@@ -150,6 +150,8 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     specimens.name = 'shader-warmup'
     specimens.visible = false
     for (const m of enemyMaterials()) specimens.add(new THREE.Mesh(specimenGeo, m))
+    // The dust bunny's roll is a morph: its paint and its hit flash compile a morph variant of their programs.
+    for (const m of [enemyAssets.DUST_BUNNY_MAT, enemyAssets.ENEMY_HIT_FLASH_MAT]) specimens.add(new THREE.Mesh(enemyAssets.DUST_BUNNY_GEO, m))
     scene.add(specimens)
 
     // Hidden behind the loading screen: once the run has reached `playing` (`?e2e=1`) the level draws as it is, a

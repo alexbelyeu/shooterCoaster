@@ -1,9 +1,9 @@
-import { useCallback, useContext, useRef } from 'react'
+import { useCallback, useContext, useLayoutEffect, useRef } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
-import { DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYE_MAT, DUST_BUNNY_EYES_GEO, DUST_BUNNY_MAT, DUST_BUNNY_RADIUS, DUST_BUNNY_REACH } from './SharedEnemyAssets'
+import { DUST_BUNNY_GEO, DUST_BUNNY_MAT, DUST_BUNNY_RADIUS, DUST_BUNNY_REACH, dustBunnyRoll } from './SharedEnemyAssets'
 import { DUST_BUNNY, dustBunnyDrop, dustBunnyPose, newDustBunnyPose } from './dustBunnyMotion.hot'
 
 const DUST_BUNNY_SCALE = 8
@@ -17,7 +17,7 @@ const FOOTPRINT = DUST_BUNNY_REACH * (1 + DUST_BUNNY.squash / 2) * DUST_BUNNY_SC
 
 /**
  * A dust bunny (#515): a fluffy ball of dust and chalk rolling and drifting low over the floor (`dustBunnyMotion.hot.ts`).
- * The fluff rolls; the eyes stay on its front.
+ * The fluff rolls; the eyes stay on its front (one mesh, `DUST_BUNNY_GEO`'s morph targets).
  */
 export default function DustBunny(props: EnemyProps) {
   const { base, phase } = useEnemyRandom(props.id, (rng) => ({ base: rng() * Math.PI * 2, phase: rng() * 2 }))
@@ -27,6 +27,8 @@ export default function DustBunny(props: EnemyProps) {
   const heading = useRef<THREE.Group>(null)
   const ball = useRef<THREE.Group>(null)
   const fluff = useRef<THREE.Mesh>(null)
+  // r3f sets the geometry after construction: the mesh only picks up its morph targets here.
+  useLayoutEffect(() => fluff.current?.updateMorphTargets(), [])
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
@@ -45,7 +47,7 @@ export default function DustBunny(props: EnemyProps) {
         ball.current.position.y = pose.lift * DUST_BUNNY_SCALE
         ball.current.scale.set(1 + pose.squash / 2, 1 - pose.squash, 1 + pose.squash / 2).multiplyScalar(DUST_BUNNY_SCALE)
       }
-      if (fluff.current) fluff.current.rotation.x = pose.roll
+      if (fluff.current?.morphTargetInfluences) dustBunnyRoll(fluff.current.morphTargetInfluences, pose.roll)
     },
     [base, phase, heightFn, pose],
   )
@@ -54,8 +56,7 @@ export default function DustBunny(props: EnemyProps) {
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group ref={heading} rotation={[0, base, 0]}>
         <group ref={ball} scale={DUST_BUNNY_SCALE}>
-          <mesh ref={fluff} geometry={DUST_BUNNY_BODY_GEO} material={DUST_BUNNY_MAT} />
-          <mesh geometry={DUST_BUNNY_EYES_GEO} material={DUST_BUNNY_EYE_MAT} />
+          <mesh ref={fluff} geometry={DUST_BUNNY_GEO} material={DUST_BUNNY_MAT} />
         </group>
       </group>
     </EnemyBase>
