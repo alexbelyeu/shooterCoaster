@@ -158,6 +158,10 @@ When level6 is in the run, a `switch` step (#702, on the PR in the `level6` shar
 (`trackSwitch()`): it parks the coaster behind the V2 sign with time frozen (`level6-switch.png`) and shoots it with a real
 bullet, which must set the hard way and ride the V8 branch at the junction's middle (`riding: 'hard'`, `level6-switch-hard.png`);
 a restart must set it back, and a run that leaves it must ride the easy way with the switch closed by then.
+The hard route's own wave (#720, `SWITCH_CHECK.branchWave`): after the shot the level timer jumps to its second, and it must
+arrive (its banner) and show at least `BRANCH_WAVE_ON_SCREEN` rats on screen from the branch's middle; at the end of the
+easy run, held past the sign, the same jump must bring no such wave, and the run's `totalEnemies` must be the wave's size
+under the hard run's.
 Then, on the same run held, it checks the Training Area cave's dark section (#752, the hook's `darkSection`: its
 `spans`, `depth` and the muzzle flash's light `flash`): it rides to the cave's middle and fires one real shot with the flash
 held; the ride must be fully dark there (`depth` 1) and the shot must light it (`flash` > 0). The nightly `dark` step (needs

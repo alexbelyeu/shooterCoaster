@@ -21,14 +21,15 @@ import type { EnemyEntry } from '../enemies/EnemyBase'
 import { HOP } from '../enemies/hopGlideMotion'
 import { FIRE_IMP_HIT_RADIUS } from '../enemies/fireImpHop.hot'
 import {
-  clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, rideAheadOfWaves,
+  clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge,
   trackPoint, tracksideSlots,
   type FormationMotion, type FormationSlot, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot, type Vec3,
 } from './spawnPlacement'
 import {
   ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, bystanderSlots, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
 } from './enemyPlacement'
-import { enemyCounts, newWaveProgress, nextWaveDue, tickWaves } from './waveSchedule'
+import { enemyCounts, newWaveProgress, nextWaveDue, onRoute, tickWaves } from './waveSchedule'
+import type { HardRoute } from '@/track/mechanics'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -46,6 +47,8 @@ interface EnemySpawnerProps {
   bounds?: PlacementBounds
   /** Landmarks a ground enemy stood away from the track keeps out of (`BiomeDefinition.keepOff`). */
   keepOff?: readonly KeepOff[]
+  /** The track's hard route (#720), where a hard-route wave arrives; null without a junction. */
+  hardRoute?: HardRoute | null
 }
 
 interface SpawnedEnemy {
@@ -194,6 +197,7 @@ export default function EnemySpawner({
   walls = NO_WALLS,
   bounds,
   keepOff,
+  hardRoute,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
   const getThree = useThree((s) => s.get)
@@ -215,20 +219,20 @@ export default function EnemySpawner({
   const waveDelays = useMemo(() => waves.map((w) => w.spawnDelay ?? 0), [waves])
   // The ride a run takes from GO, so each wave knows how far the rider goes while it flies in and before the next one.
   const rideAhead = useMemo(
-    () => rideAheadOfWaves(trackTable, rideSpeeds, waveDelays, boss?.at, trackScale),
-    [trackTable, rideSpeeds, waveDelays, boss?.at, trackScale],
+    () => rideAheadOfWaves(trackTable, rideSpeeds, waves, boss?.at, trackScale),
+    [trackTable, rideSpeeds, waves, boss?.at, trackScale],
   )
 
   const placeMembers = useCallback(
-    (wave: EnemyWave, ride: RideAhead, members: SpawnedEnemy[], riderIndex: number, camera: Vec3): [string, Placed][] => {
+    (table: ArcTable, wave: EnemyWave, ride: RideAhead, members: SpawnedEnemy[], riderIndex: number, camera: Vec3): [string, Placed][] => {
       if (members[0]?.trackside) {
         const placed = placeTracksideWave({
-          table: trackTable, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff,
+          table, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff,
         })
         return members.map((e, i) => [e.id, { position: toVector3(placed[i]) }])
       }
       if (members[0]?.swarm) {
-        const slots = placeWallSwarm({ table: trackTable, riderIndex, type: wave.type, walls, slots: members.map((e) => e.swarm!), ride })
+        const slots = placeWallSwarm({ table, riderIndex, type: wave.type, walls, slots: members.map((e) => e.swarm!), ride })
         return members.map((e, i) => {
           const wall = slots[i]
           return [e.id, { position: toVector3(wallPoint(wall.wall, wall.u, wall.v, HOP.standoff, { x: 0, y: 0, z: 0 })), wall }]
@@ -240,7 +244,7 @@ export default function EnemySpawner({
         return members.map((e) => [e.id, { position: toVector3(clampToBounds(outsideNearField(e.position!, camera), bounds)) }])
       }
       const placed = placeFormationWave({
-        table: trackTable,
+        table,
         riderIndex,
         camera,
         formation: wave.formation,
@@ -256,25 +260,27 @@ export default function EnemySpawner({
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [trackTable, groundFn, bounds, keepOff, walls],
+    [groundFn, bounds, keepOff, walls],
   )
 
   const placeWave = useCallback(
     (waveIdx: number, riderIndex: number, camera: Vec3): [string, Placed][] => {
       const wave = waves[waveIdx]
-      const ride = rideAhead[waveIdx]
+      // A hard-route wave lines the branch: both tables sample the ride's t alike, so the rider's index holds on either.
+      const table = wave.route ? hardRoute!.table : trackTable
+      const ride = wave.route ? rideToMerge(hardRoute!, riderIndex, rideAhead[waveIdx]) : rideAhead[waveIdx]
       const inWave = enemies.filter((e) => e.waveIndex === waveIdx)
       const members = inWave.filter((e) => !e.bystander)
       const bystanders = inWave.filter((e) => e.bystander)
       const onWalls = bystanders.length === 0 ? [] : placeWallClimbers({
-        table: trackTable, riderIndex, type: wave.bystanders!.type, walls, slots: bystanders.map((e) => e.swarm!), ride,
+        table, riderIndex, type: wave.bystanders!.type, walls, slots: bystanders.map((e) => e.swarm!), ride,
       })
       const placedBystanders = onWalls.map((wall, i): [string, Placed] => [
         bystanders[i].id, { position: toVector3(wallPoint(wall.wall, wall.u, wall.v, WALL_STANDOFF, { x: 0, y: 0, z: 0 })), wall },
       ])
-      return [...placeMembers(wave, ride, members, riderIndex, camera), ...placedBystanders]
+      return [...placeMembers(table, wave, ride, members, riderIndex, camera), ...placedBystanders]
     },
-    [waves, enemies, rideAhead, placeMembers, trackTable, walls],
+    [waves, enemies, rideAhead, placeMembers, trackTable, hardRoute, walls],
   )
 
   const initialActiveWave = useMemo(
@@ -308,7 +314,9 @@ export default function EnemySpawner({
   const lastWaveTick = useRef<number | null>(null)
   const goneEnemies = useRef(new Set<string>())
   const escapedEnemies = useRef(new Set<string>())
-  const totalEnemyCount = useMemo(() => enemies.filter((e) => !e.bystander).length, [enemies])
+  // A hard-route wave's members join the count when it arrives (`joinedEnemies`): an easy-route run never meets them.
+  const totalEnemyCount = useMemo(() => enemies.filter((e) => !e.bystander && !waves[e.waveIndex].route).length, [enemies, waves])
+  const joinedEnemies = useRef(0)
 
   const [generation, setGeneration] = useState(0)
   const runRef = useRef(runId)
@@ -325,6 +333,7 @@ export default function EnemySpawner({
     lastWaveTick.current = null
     goneEnemies.current.clear()
     escapedEnemies.current.clear()
+    joinedEnemies.current = 0
     useGameStore.getState().setEnemyCounts(totalEnemyCount, totalEnemyCount)
     setGeneration((g) => g + 1)
   }, [runId, initialActiveWave, waves, totalEnemyCount])
@@ -348,9 +357,23 @@ export default function EnemySpawner({
     return () => clearTimeout(t)
   }, [waveAnnouncement])
 
-  /** Places wave `i` ahead of the rider (once per run), mounts and announces it. */
+  const publishCounts = useCallback(() => {
+    const spawned = totalEnemyCount + joinedEnemies.current
+    const { remaining, total } = enemyCounts(spawned, goneEnemies.current.size, escapedEnemies.current.size)
+    useGameStore.getState().setEnemyCounts(remaining, total)
+    return remaining
+  }, [totalEnemyCount])
+
+  /**
+   * Places wave `i` ahead of the rider (once per run), mounts and announces it. A hard-route wave (#720) comes only on that
+   * route, as soon as the switch is shot from its second on; false while the switch is still open, so it is asked again.
+   */
   const activateWave = useCallback(
-    (i: number) => {
+    (i: number): boolean => {
+      if (!onRoute(waves[i], useGameStore.getState().route)) {
+        const t = rideProgress()
+        return t - Math.floor(t) >= hardRoute!.signT
+      }
       const p = getThree().camera.position
       const camera = { x: p.x, y: p.y, z: p.z }
       const riderIndex = indexAtT(trackTable, rideProgress())
@@ -365,8 +388,13 @@ export default function EnemySpawner({
       if (waves[i].waveLabel) setWaveAnnouncement(waves[i].waveLabel!)
       if (waves[i].isEruption) eventBus.emit('eruption:start')
       if (waves[i].weather) eventBus.emit('weather:start', waves[i].weather)
+      if (waves[i].route) {
+        joinedEnemies.current += waves[i].count
+        publishCounts()
+      }
+      return true
     },
-    [getThree, trackTable, enemies, placeWave, waves],
+    [getThree, trackTable, hardRoute, enemies, placeWave, waves, publishCounts],
   )
 
   useEffect(() => {
@@ -377,7 +405,9 @@ export default function EnemySpawner({
     }))
     return () => registerE2EWaves(null)
   }, [waveDelays])
-  const tellWave = useCallback((i: number) => eventBus.emit('wave:incoming', waves[i].waveLabel), [waves])
+  const tellWave = useCallback((i: number) => {
+    if (onRoute(waves[i], useGameStore.getState().route)) eventBus.emit('wave:incoming', waves[i].waveLabel)
+  }, [waves])
   // On the level timer like the boss, so a pause holds them; the rendered phase keeps a restart from reading the last run's timer.
   useFrame(() => {
     const s = useGameStore.getState()
@@ -395,12 +425,6 @@ export default function EnemySpawner({
       escaped.clear()
     }
   }, [])
-
-  const publishCounts = useCallback(() => {
-    const { remaining, total } = enemyCounts(totalEnemyCount, goneEnemies.current.size, escapedEnemies.current.size)
-    useGameStore.getState().setEnemyCounts(remaining, total)
-    return remaining
-  }, [totalEnemyCount])
 
   const onKill = useCallback(
     (id: string) => {

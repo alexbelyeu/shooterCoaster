@@ -371,6 +371,8 @@ export interface E2ESwitch {
   hard: boolean
   riding: 'easy' | 'hard' | 'shared'
   open: boolean
+  /** The run's kill-count total: a hard-route wave joins it when it arrives (#720). */
+  totalEnemies: number
   x: number
   y: number
   ndcX: number
@@ -697,6 +699,7 @@ function readSwitch(): E2ESwitch | null {
     hard: useGameStore.getState().route === 'hard',
     riding,
     open: s.open(),
+    totalEnemies: useGameStore.getState().totalEnemies,
     x: ((_v.x + 1) / 2) * probeSize.width,
     y: ((1 - _v.y) / 2) * probeSize.height,
     ndcX: _v.x,

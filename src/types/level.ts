@@ -193,6 +193,12 @@ export interface EnemyWave {
    * `walls`. Shooting one costs `BYSTANDER_PENALTY` and the combo; they are never kills, `maxScore` or the kill count.
    */
   bystanders?: { type: EnemyType; count: number }
+  /**
+   * Only a run on this route meets the wave (#720): 'hard', a run that shot its track's junction switch. It arrives on the
+   * branch (`spawnPlacement.ts` `HardRoute`) while the car rides it; on the easy route it never spawns and never joins the
+   * kill count. `maxScore` counts it: the harder way is the way to three stars.
+   */
+  route?: 'hard'
 }
 
 export interface LevelConfig {
