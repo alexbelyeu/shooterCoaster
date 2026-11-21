@@ -22,7 +22,8 @@ const PLAY_OVER_POSTER_S = 0.15
 
 let hintShownThisLoad = false
 
-const WAKE_EVENTS = ['pointerdown', 'pointermove', 'wheel'] as const
+/** focusin: a gamepad's d-pad focuses the menu without a key (`gamepadMap.hot.ts` `navTarget`). */
+const WAKE_EVENTS = ['pointerdown', 'pointermove', 'wheel', 'focusin'] as const
 
 
 interface TitleScreenProps {

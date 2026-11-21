@@ -80,7 +80,7 @@ export function navDirection(up: boolean, down: boolean, left: boolean, right: b
   return v < 0 ? 'ArrowUp' : 'ArrowDown'
 }
 
-export type PadAction = 'pause' | 'resume' | 'confirm' | 'back' | 'nav' | null
+export type PadAction = 'pause' | 'resume' | 'confirm' | 'back' | null
 
 /** Phases where the face buttons and d-pad drive the screen's controls. Countdown is #818's (out of #819's scope). */
 function inMenu(phase: GamePhase): boolean {
@@ -102,6 +102,16 @@ export function padAction(button: number, phase: GamePhase, dialogOpen: boolean)
   if (button === PAD.A) return 'confirm'
   if (button === PAD.B) return phase === 'title' && !dialogOpen ? null : 'back'
   return null
+}
+
+/**
+ * Where a menu direction goes: 'key' sends the arrow key to the focused control first (the pause menu's and level
+ * grid's own handlers, else focus moves like Tab); 'focus' moves focus straight to the first / last control. The
+ * title with nothing focused is 'focus': its "press any key" handler reads an unfocused arrow as play
+ * (`titleKeys.ts`), which would leave a pad-only player no way to WORLDS or Settings.
+ */
+export function navTarget(phase: GamePhase, focused: boolean): 'key' | 'focus' {
+  return phase === 'title' && !focused ? 'focus' : 'key'
 }
 
 /** Whether the d-pad / left stick moves focus in this phase. */

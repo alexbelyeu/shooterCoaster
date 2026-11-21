@@ -7,9 +7,11 @@ import {
   moveCursor,
   navActive,
   navDirection,
+  navTarget,
   padAction,
   stickVelocity,
-} from './gamepadMap'
+} from './gamepadMap.hot'
+import { titleAction } from '@/ui/screens/titleKeys'
 
 const v = () => ({ x: 0, y: 0 })
 
@@ -74,6 +76,17 @@ describe('menu navigation', () => {
     expect(navDirection(false, false, false, false, 0.3, 0.2)).toBeNull()
     expect(navDirection(false, false, false, false, -0.8, 0.3)).toBe('ArrowLeft')
     expect(navDirection(false, false, false, false, 0.2, 0.9)).toBe('ArrowDown')
+  })
+
+  it("never sends an arrow to an unfocused title, where it would start a run instead of moving focus", () => {
+    const arrows = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].map((key) =>
+      titleAction({ key, repeat: false, ctrlKey: false, metaKey: false, altKey: false }),
+    )
+    expect(arrows).toEqual(['play', 'play', 'play', 'play'])
+    expect(navTarget('title', false)).toBe('focus')
+    expect(navTarget('title', true)).toBe('key')
+    expect(navTarget('levelSelect', false)).toBe('key')
+    expect(navTarget('paused', false)).toBe('key')
   })
 })
 

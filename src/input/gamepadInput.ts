@@ -7,7 +7,7 @@
  * - A: clicks the focused control (or sends Enter, the screens' "start" key), B: sends Escape, the screens' Back;
  * - d-pad / left stick: sends the arrow keys to the focused control (the pause menu's and level grid's own
  *   handlers), and where nothing handles them, moves focus to the next / previous control as Tab does.
- * The rules are pure in `gamepadMap.ts`. No pad, no poll: the loop starts on `gamepadconnected`.
+ * The rules are pure in `gamepadMap.hot.ts`. No pad, no poll: the loop starts on `gamepadconnected`.
  */
 
 import { useEffect } from 'react'
@@ -19,11 +19,12 @@ import {
   moveCursor,
   navActive,
   navDirection,
+  navTarget,
   padAction,
   stickVelocity,
   type NavKey,
   type Vec2,
-} from './gamepadMap'
+} from './gamepadMap.hot'
 
 const FOCUSABLE = 'button:not([disabled]),a[href],input:not([disabled]),[tabindex="0"]'
 /** Buttons read for presses (edge-triggered); RT is read as a held value. */
@@ -34,7 +35,7 @@ const cursor: Vec2 = { x: 0, y: 0 }
 /** The menu direction held last frame: a direction moves once per press, no auto-repeat. */
 let navHeld: NavKey | null = null
 /** Which of PRESS_BUTTONS were down last frame. */
-const wasDown = [false, false, false]
+const wasDown: boolean[] = PRESS_BUTTONS.map(() => false)
 let raf = 0
 let lastT = 0
 
@@ -70,9 +71,14 @@ function confirm() {
   else sendKey('Enter')
 }
 
-/** Arrow key first; unhandled (not default-prevented), focus moves through the open dialog's (or page's) controls. */
+/**
+ * Arrow key first; unhandled (not default-prevented), focus moves through the open dialog's (or page's) controls.
+ * On the title with nothing focused the arrow would start a run, so focus moves without it (`navTarget`).
+ */
 function moveFocus(key: NavKey) {
-  if (!sendKey(key)) return
+  const el = document.activeElement
+  const focused = el instanceof HTMLElement && el !== document.body
+  if (navTarget(useGameStore.getState().phase, focused) === 'key' && !sendKey(key)) return
   const scope = topDialog() ?? document
   const controls = [...scope.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0)
   if (controls.length === 0) return
@@ -131,7 +137,7 @@ function poll(t: number) {
 }
 
 function start() {
-  if (raf !== 0) return
+  if (raf !== 0 || !activePad()) return
   lastT = 0
   // Buttons already held when the pad appears (the press that woke it) don't count as presses.
   wasDown.fill(true)
@@ -156,7 +162,7 @@ export function useGamepad() {
     if (typeof navigator.getGamepads !== 'function') return
     window.addEventListener('gamepadconnected', start)
     window.addEventListener('gamepaddisconnected', onDisconnected)
-    if (activePad()) start()
+    start()
     return () => {
       window.removeEventListener('gamepadconnected', start)
       window.removeEventListener('gamepaddisconnected', onDisconnected)
