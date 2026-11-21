@@ -362,8 +362,18 @@ describe('photo mode (#828)', () => {
     expect(store()).toMatchObject({ phase: 'paused', photo: false })
   })
 
-  it('resume, a phase change and a restart all leave it', () => {
-    for (const leave of [() => store().resume(), () => store().setPhase('levelSelect'), () => store().startRun('level1', { seed: 1 })]) {
+  it('resume is a no-op while it is on: Esc / B / Start never start the countdown from a photo (#832)', () => {
+    store().setPhase('paused')
+    store().setPhoto(true)
+    store().resume()
+    expect(store()).toMatchObject({ phase: 'paused', photo: true, resuming: false })
+    store().setPhoto(false)
+    store().resume()
+    expect(store()).toMatchObject({ phase: 'paused', photo: false, resuming: true })
+  })
+
+  it('a phase change and a restart both leave it', () => {
+    for (const leave of [() => store().setPhase('levelSelect'), () => store().startRun('level1', { seed: 1 })]) {
       store().setPhase('paused')
       store().setPhoto(true)
       leave()
