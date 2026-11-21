@@ -59,9 +59,12 @@ Read only what picking and claiming needs: this runbook, the runbooks README rul
    `.claude/agents/sound-designer.md` and follow it exactly (it builds on
    `.claude/agents/builder.md`)". Everything else stays the same.
 6. When they finish, check each assignment ended in an open PR labelled
-   `agent:needs-qa` or an issue labelled `agent:blocked` (or was stopped by a pause).
-   If a builder died without either, push whatever branch exists as a draft PR if
-   useful, return the issue to `agent:ready` and comment what happened.
+   `agent:needs-qa`, a handoff (the issue back in `agent:ready` with a `Handoff:` comment
+   naming the branch / PR to continue on), or a real outside wait (`agent:blocked` with a
+   `Blocked:` comment carrying a `Waits on #N` line, or `needs-alex`), or was stopped by a pause.
+   If a builder died without one of those, push whatever branch exists as a draft PR if
+   useful, return the issue to `agent:ready` and comment a `Handoff:` with what happened.
+   Unfinished work never goes to `agent:blocked` (`.claude/agents/builder.md`).
 7. `node scripts/run-usage.cjs --role builders --ref "<the PRs opened or updated, else the
    issues, e.g. #12,#14>" --post`, then reply with one line per assignment: issue/PR,
    outcome, PR number, plus any claims you backed off from.

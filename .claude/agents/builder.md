@@ -135,8 +135,16 @@ PAUSED line.
   independent code reviews (`.claude/commands/wrap-pr.md`).
 - Returned PR: push fixes to the same branch, reply to each QA comment, swap
   `agent:changes-requested` → `agent:needs-qa`.
-- If you cannot finish: push what you have as a **draft** PR, label the issue
-  `agent:blocked`, and comment precisely what's blocking and what you tried.
+- If you run out of context, time or turns with work left that another builder can do: push what you
+  have (as a **draft** PR if it isn't one yet), then hand it off: comment on the issue starting
+  **`Handoff:`** with what's done, exactly what's left, and the branch / PR to continue on; remove
+  `agent:in-progress` and put the issue back to **`agent:ready`**. Never label unfinished work
+  `agent:blocked`: nobody picks a blocked issue up (#768 stalled overnight on 20-21 Nov that way).
+- Only when something outside your work stops it (another issue must land first, a decision for Alex,
+  a budget only the Director raises): label the issue `agent:blocked` and comment starting
+  **`Blocked:`** with why and a `Waits on #N` line naming what it waits for (`needs-alex` instead
+  when it waits on Alex). The control center releases it to `agent:ready` once those close.
+- Picking up an issue whose latest `Handoff:` names a branch or PR: continue there, don't start over.
 
 Never merge, never push to `main`, never force-push a branch someone else created.
 

@@ -75,7 +75,7 @@ the same PR. Keep claim comments in the `Claimed by …` form, since the page re
 ## Labels
 
 - Queue: `agent:ready` → `agent:in-progress` → (PR) `agent:needs-qa` → `agent:qa-approved` (auto-merged by GitHub when `verify` is green), or `agent:changes-requested` → back to the builder.
-- `agent:blocked` — can't proceed; the comment says why. Director re-plans it.
+- `agent:blocked` — waits on something outside the work (another issue, Alex, a budget); the `Blocked:` comment says why, with a `Waits on #N` line the control center releases it on. Unfinished work isn't blocked: it goes back to `agent:ready` with a `Handoff:` comment (`.claude/agents/builder.md`). Director re-plans what stays blocked.
 - `agent:prod-broken` — production went red (`prod-smoke.yml`: the post-deploy health check or the nightly full smoke, one issue each, opened on the green → red transition and closed by the next green run) or `main` did (CI). Maintainer drops everything for it.
 - `steering` — an issue from Alex. Director treats it like STEERING.md.
 - Priority: `P1` (this week, do first), `P2` (this week), `P3` (if time).
