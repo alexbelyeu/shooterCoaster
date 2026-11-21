@@ -31,8 +31,10 @@
 import * as THREE from 'three'
 import type { RideBeat, RideMechanic, RideV2Spec, SpeedZone, TrackParams } from '@/types/level'
 import { createSplineCurve, type RailPoint } from '@/track/curves/SplineCurve'
-import { RideBuilder, smoothstep, type MarkerKind, type Twist } from '@/track/elements/rideBuilder'
+import { RideBuilder, type MarkerKind, type Twist } from '@/track/elements/rideBuilder'
 import { headChopper } from '@/track/elements/headChopper'
+import { bankedTurn } from '@/track/elements/elements'
+import { bankProfile, climbingTurn, straightTo, trimUnrolledUps } from '@/track/elements/climbing'
 import { dropTrack, jumpGap, placeMechanics, station } from '@/track/elements/mechanicElements'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { RIDE_V2_DEFAULTS } from '@/track/rideV2'
@@ -40,7 +42,7 @@ import { ARCH, FLAME, GYM_SCALE, PIT, TREE, TREE_GAP, piece, toWorld } from './b
 
 /**
  * Metres the track's centreline keeps from anything solid. The car's rails reach 0.07 m out and the rider's eye is
- * 0.19 m up (#592), so 0.8 m is still four eye heights, and it fits the ride through the Tree's gap (#613).
+ * 0.13 m up at `GYM_SCALE` 48 (`EYE`), so 0.8 m is about six eye heights, and it fits the ride through the Tree's gap (#613).
  */
 export const RAIL_CLEARANCE = 0.8
 
@@ -148,11 +150,6 @@ const DEG = Math.PI / 180
 /** Heading up the hall, toward the Starr (−x). */
 const NORTH = -Math.PI / 2
 
-/** A bank held through a turn: eased in over its first quarter and out over its last. */
-function bank(angle: number): Twist {
-  return { at: (u) => angle * smoothstep(u / 0.25) * smoothstep((1 - u) / 0.25) }
-}
-
 /** The share of a slow roll's length its rate builds up over, and dies away over at its end. */
 const ROLL_EASE = 0.2
 
@@ -167,61 +164,11 @@ function slowRoll(hand: 1 | -1): Twist {
   return { at: (u) => (hand * 2 * Math.PI * ridden(u)) / (1 - e), heartline: 0.6 * EYE }
 }
 
-/**
- * The grade that climbs (or falls) `dy` over `length` of track eased in and out on pitches of `ease`: solves
- * dy = 2·ease·(1 − cos g) + length·sin g.
- */
-function gradeFor(length: number, dy: number, ease: number): number {
-  let g = 0
-  for (let i = 0; i < 12; i++) g = Math.asin(Math.max(-0.95, Math.min(0.95, (dy - Math.sign(dy) * 2 * ease * (1 - Math.cos(g))) / length)))
-  return g
-}
+/** The gym's banked turn: 30° unless told, climbing on pitches of 3 m. */
+const turn = (b: RideBuilder, angle: number, radius: number, rise = 0, bank = 30 * DEG) => bankedTurn(b, { angle, radius, rise, bank, ease: 3 })
 
-/** Straight on `run` metres of ground, climbing `dy` on the way (pitched in and out on `ease`). */
-function straight(b: RideBuilder, run: number, dy = 0, ease = 4): void {
-  if (Math.abs(dy) < 1e-6) {
-    b.straight(run)
-    return
-  }
-  // The pitches cover 2·e·sin g of ground and climb 2·e·(1 − cos g), the grade the rest: bisect for the grade, easing
-  // in on tighter pitches when even the steepest grade that fits can't climb it.
-  const rise = Math.abs(dy)
-  let e = ease
-  const climb = (g: number) => 2 * e * (1 - Math.cos(g)) + ((run - 2 * e * Math.sin(g)) / Math.cos(g)) * Math.sin(g)
-  const steepest = () => Math.min(Math.asin(Math.min(run / (2 * e), 1)), 1.4)
-  while (climb(steepest()) < rise) e *= 0.8
-  let lo = 0
-  let hi = steepest()
-  for (let i = 0; i < 40; i++) {
-    const mid = (lo + hi) / 2
-    if (climb(mid) < rise) lo = mid
-    else hi = mid
-  }
-  const g = Math.sign(dy) * lo
-  const middle = Math.max((run - 2 * e * Math.sin(lo)) / Math.cos(lo), 0)
-  b.pitch(g, e)
-  if (middle > 1e-3) b.straight(middle)
-  b.pitch(-g, e)
-}
-
-/** A level turn of `angle` (positive left) on `radius` metres, climbing `dy`, banked into it. */
-function turn(b: RideBuilder, angle: number, radius: number, dy = 0, tilt = 30 * DEG, ease = 3): void {
-  const twist = bank(Math.sign(angle) * tilt)
-  if (Math.abs(dy) < 1e-6) {
-    b.turn(angle, radius, twist)
-    return
-  }
-  const g = gradeFor(Math.abs(angle) * radius, dy, ease)
-  b.pitch(g, ease)
-  b.turn(angle, radius / Math.cos(g), twist)
-  b.pitch(-g, ease)
-}
-
-/** Straight on until the builder is at `x` (heading along x) or `z` (heading along z). */
-function to(b: RideBuilder, axis: 'x' | 'z', value: number, dy = 0, ease = 4): void {
-  const run = Math.abs(value - b.position[axis])
-  straight(b, run, dy, ease)
-}
+/** A straight to `value` along `axis`, climbing `rise` on pitches of `ease` m. */
+const to = (b: RideBuilder, axis: 'x' | 'z', value: number, rise = 0, ease = 4) => straightTo(b, axis, value, { rise, ease })
 
 /** A point `along` the Tree from its centre and `f` out from its foot line. */
 function treeFrame(along: number, f: number): { x: number; z: number } {
@@ -259,7 +206,7 @@ export function buildGymRide(): GymRide {
   const firstTurn = 5
   zone('lift', SPEED.climb, () => b.mark('straight', () => to(b, 'x', FLAME.centre.x + firstTurn, ROLL_Y - y())))
   // 8 s: braking round onto the Flame, a slow heartline roll across it, upside down over the fire at its middle.
-  zone('brake', SPEED.roll, () => b.mark('bankedTurn', () => turn(b, -Math.PI / 2, firstTurn, 0, 20 * DEG)), BRAKES.turnIn)
+  zone('brake', SPEED.roll, () => turn(b, -Math.PI / 2, firstTurn, 0, 20 * DEG), BRAKES.turnIn)
   zone('lift', SPEED.roll, () => b.mark('heartlineRoll', () => b.straight(2 * (b.position.z - FLAME.centre.z), slowRoll(1))))
 
   // 13 s: down into the Training Area's cave under its lintel, round north through it in the dark, out at its north end.
@@ -272,9 +219,9 @@ export function buildGymRide(): GymRide {
     'brake',
     SPEED.cave,
     () => {
-      b.mark('bankedTurn', () => turn(b, Math.PI / 2, CAVE_TURN, 0, 20 * DEG))
+      turn(b, Math.PI / 2, CAVE_TURN, 0, 20 * DEG)
       b.mark('straight', () => to(b, 'x', WALL_X + CAVE_TURN, CAVE_Y - y(), 3))
-      b.mark('bankedTurn', () => turn(b, Math.PI / 2, CAVE_TURN, CAVE_LINTEL_Y - y(), 20 * DEG))
+      turn(b, Math.PI / 2, CAVE_TURN, CAVE_LINTEL_Y - y(), 20 * DEG)
     },
     BRAKES.cave,
   )
@@ -303,31 +250,31 @@ export function buildGymRide(): GymRide {
   b.mark('straight', () => b.straight(1))
   mechanics.push(dropTrack(b, { height: y() - PIT_LOW_Y, radius: 1, seconds: 0.6 }))
   zone('brake', SPEED.caught, () => b.mark('straight', () => b.straight(2.5)), 60)
-  zone('lift', SPEED.caught, () => b.mark('bankedTurn', () => turn(b, -Math.PI, CAUGHT_TURN, 1.5, 25 * DEG)))
+  zone('lift', SPEED.caught, () => turn(b, -Math.PI, CAUGHT_TURN, 1.5, 25 * DEG))
 
   // 35 s: the Medusa helix. A climbing turn out of the Shield's corner, up the pit along the Shield and out over the
   // hall's floor, then the helix: a banked climbing turn round that ends facing the star as she rises (40 s), and a
   // chain lift straight at her face.
   zone('lift', SPEED.helixLift, () => b.mark('straight', () => to(b, 'x', FACE_OFF.helixX, FACE_OFF.helixY - y())))
   // The helix slows the car all the way round, onto the chain at her face.
-  zone('brake', SPEED.faceOff, () => b.mark('helix', () => turn(b, Math.PI, (b.position.z - FACE_OFF.z) / 2, 0, 25 * DEG)), BRAKES.helix)
+  zone('brake', SPEED.faceOff, () => b.mark('helix', () => climbingTurn(b, Math.PI, (b.position.z - FACE_OFF.z) / 2, { twist: bankProfile(25 * DEG) })), BRAKES.helix)
   zone('lift', SPEED.faceOff, () => b.mark('liftHill', () => to(b, 'x', FACE_OFF.turnX, FACE_OFF.topY - y(), 3)))
   // 45 s: the dive round her shoulder, down toward the Tree, and along its roots' front.
   const roots = treeFrame(0, ROOTS_F)
   const rootsTurn = 2.5
   zone('brake', SPEED.dive, () => {
-    b.mark('bankedTurn', () => turn(b, -Math.PI / 2, FACE_OFF.diveTurn, DIVE.turned - y(), 25 * DEG))
+    turn(b, -Math.PI / 2, FACE_OFF.diveTurn, DIVE.turned - y(), 25 * DEG)
     b.mark('straight', () => to(b, 'z', roots.z + rootsTurn, DIVE.roots - y()))
-    b.mark('bankedTurn', () => turn(b, Math.PI / 2, rootsTurn, 0, 25 * DEG))
+    turn(b, Math.PI / 2, rootsTurn, 0, 25 * DEG)
     b.mark('straight', () => to(b, 'x', treeFrame(HAIRPIN_ALONG, 0).x, DIVE.hairpin - y()))
   })
   const caveOut = 2.2
   // The hairpin in the left cave's mouth into the gap.
-  zone('brake', SPEED.tree, () => b.mark('bankedTurn', () => turn(b, -Math.PI, (ROOTS_F - GAP_F) / 2, GAP_Y - y(), 20 * DEG)))
+  zone('brake', SPEED.tree, () => turn(b, -Math.PI, (ROOTS_F - GAP_F) / 2, GAP_Y - y(), 20 * DEG))
   zone('lift', SPEED.treeRoll, () => {
     // 54 s: a slow heartline roll through the Tree's gap, on out of the right cave's mouth.
     b.mark('heartlineRoll', () => b.straight(MOUTH_X - caveOut - b.position.x, slowRoll(-1)))
-    b.mark('bankedTurn', () => turn(b, -Math.PI / 2, caveOut))
+    turn(b, -Math.PI / 2, caveOut)
   })
   // After the run, the way home: a chain out of the pit over its railing, down the hall's east side over the run to
   // Alaska and under the way into the cave, a right turn into the Arch, the head-chopper under its lintel, and round
@@ -344,44 +291,21 @@ export function buildGymRide(): GymRide {
   const archOut = ARCH.centre.z + ARCH.depth / 2 + 0.5
   zone('lift', SPEED.treeOut, () => {
     b.mark('straight', () => to(b, 'z', HOME.z - 2, 2.2 - y(), 3))
-    b.mark('bankedTurn', () => turn(b, Math.PI / 2, 2, 0.5))
+    turn(b, Math.PI / 2, 2, 0.5)
   })
   zone('lift', SPEED.home, () => {
     b.mark('straight', () => to(b, 'x', WALL_X - 3, HOME.overY - y(), 3))
     b.mark('straight', () => to(b, 'x', WALL_X + 6))
     b.mark('straight', () => to(b, 'x', FLAME.centre.x - 3, HOME.underY - y(), 3))
     b.mark('straight', () => to(b, 'x', HOME.archX - HOME.archTurn, chop.rail.y - y(), 4))
-    b.mark('bankedTurn', () => turn(b, -Math.PI / 2, HOME.archTurn))
+    turn(b, -Math.PI / 2, HOME.archTurn)
     b.mark('straight', () => to(b, 'z', ARCH.centre.z - ARCH.depth / 2 - 0.5))
     b.mark('headChopper', () => to(b, 'z', archOut))
     b.mark('straight', () => to(b, 'z', STATION_Z - HOME.stationTurn, HOME.padY - y(), 2))
-    b.mark('bankedTurn', () => turn(b, -Math.PI / 2, HOME.stationTurn))
+    turn(b, -Math.PI / 2, HOME.stationTurn)
   })
   b.mark('straight', () => to(b, 'x', STATION_X + SPACING, STATION_Y - y()))
   return { points: b.points, markers: b.markers, mechanics, zones, cave }
-}
-
-/** Drops the ups a spline would work out anyway (no roll, track not steep), keeping the level's data small. */
-function trimUps(points: RailPoint[]): RailPoint[] {
-  const n = points.length
-  return points.map((p, i) => {
-    if (!p.up) return p
-    const a = points[(i - 1 + n) % n]
-    const c = points[(i + 1) % n]
-    const fx = c.x - a.x
-    const fy = c.y - a.y
-    const fz = c.z - a.z
-    const fl = Math.hypot(fx, fy, fz)
-    if (Math.abs(fy / fl) > 0.85) return p
-    // The unrolled up: f × (world up × f), normalised.
-    const ux = -fx * fy
-    const uy = fx * fx + fz * fz
-    const uz = -fz * fy
-    const ul = Math.hypot(ux, uy, uz)
-    const pl = Math.hypot(p.up.x, p.up.y, p.up.z)
-    const cos = (ux * p.up.x + uy * p.up.y + uz * p.up.z) / (ul * pl)
-    return cos > Math.cos(0.5 * DEG) ? { x: p.x, y: p.y, z: p.z } : p
-  })
 }
 
 const toWorldPoint = (p: RailPoint): RailPoint => ({ ...toWorld(p), ...(p.up ? { up: p.up } : {}) })
@@ -389,7 +313,7 @@ const toWorldPoint = (p: RailPoint): RailPoint => ({ ...toWorld(p), ...(p.up ? {
 /** The ride in world units, its v2 spec, mechanics and the storyboard's beats placed on the built track. */
 export function buildGymTrack(): TrackParams {
   const ride = buildGymRide()
-  const points = trimUps(ride.points).map(toWorldPoint)
+  const points = trimUnrolledUps(ride.points).map(toWorldPoint)
   const curve = createSplineCurve(points)
   const share = (i: number) => curve.knotT(i)
   const world = GYM_SCALE
@@ -422,9 +346,6 @@ export function buildGymTrack(): TrackParams {
     segments: 400,
     tieSpacing: 30,
     towerSpacing: 1100,
-    // Today's rule's speeds, unused by the v2 ride.
-    rollerSpeed: 0.0000004,
-    minRollerSpeed: 0.000355,
     color1: 0x353d48,
     color2: 0x22d3c5,
   }

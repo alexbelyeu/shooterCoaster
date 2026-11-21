@@ -6,7 +6,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { motion } from 'framer-motion'
 import { markStartup } from '@/core/startupMarks'
-import { startsGame } from './titleKeys'
+import { titleAction, type TitleAction } from './titleKeys'
 import { handPosterToUi, posterShown } from '@/app/poster'
 import { ATTRACT_IDLE_MS, armClickSwallow, setTitleAttract } from '@/canvas/titleAttract'
 import { e2eAttractIdleMs } from '@/testing/e2eHook'
@@ -26,14 +26,17 @@ const WAKE_EVENTS = ['pointerdown', 'pointermove', 'wheel'] as const
 
 
 interface TitleScreenProps {
+  /** PLAY (and press any key): the player's next level, straight into its run. */
   onPlay: () => void
+  /** WORLDS (W, Escape): the level select. */
+  onWorlds: () => void
   onSettings: () => void
 }
 
-/** PLAY waits this long at most for audio and the menu sounds (its whoosh): the title music starts from App's `whenAudioReady`. */
+/** PLAY / WORLDS wait this long at most for audio and the menu sounds (the whoosh): the title music starts from App's `whenAudioReady`. */
 const PLAY_AUDIO_WAIT_MS = 300
 
-/** Every call resumes the context inside its gesture (`initAudio`), so the PLAY click retries what a touch pointerdown couldn't. */
+/** Every call resumes the context inside its gesture (`initAudio`), so a PLAY / WORLDS click retries what a touch pointerdown couldn't. */
 function startAudio(): Promise<void> {
   return initAudio().then(() => {
     // A level that mounted before audio unlocked has prepared its own sounds already.
@@ -42,7 +45,7 @@ function startAudio(): Promise<void> {
   })
 }
 
-export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
+export default function TitleScreen({ onPlay, onWorlds, onSettings }: TitleScreenProps) {
   const [internal] = useState(isInternalThisLoad)
   const [showHint] = useState(() => !hintShownThisLoad)
   const [hint] = useState(() => (touchFirst() ? 'Tap Play to start.' : 'Press any key to start.'))
@@ -91,13 +94,14 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
     }
   }, [])
 
-  async function play() {
+  async function leave(action: TitleAction) {
     if (started.current) return
     started.current = true
     // A browser that refuses audio, or a slow network, still gets to play.
     const audio = startAudio().catch(() => {})
     await Promise.race([audio, new Promise((r) => window.setTimeout(r, PLAY_AUDIO_WAIT_MS))])
-    onPlay()
+    if (action === 'play') onPlay()
+    else onWorlds()
   }
 
   useEffect(() => {
@@ -111,9 +115,10 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
       }
       // Enter / Space on a focused button already click it.
       const onControl = e.target instanceof HTMLElement && e.target.closest('button, a, input') !== null
-      if (!onControl && startsGame(e)) {
+      const action = titleAction(e)
+      if (action === 'worlds' || (action === 'play' && !onControl)) {
         e.preventDefault()
-        void play()
+        void leave(action)
       }
     }
     window.addEventListener('pointerdown', kickstart, { once: true })
@@ -153,7 +158,7 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
       {/* The plates fade in on opacity alone, so they land exactly on the poster's; CSS presses them. */}
       <motion.button
         className="fair-plate fair-go title-play"
-        onClick={() => void play()}
+        onClick={() => void leave('play')}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4, delay: playIn }}
@@ -161,15 +166,26 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
         Play
       </motion.button>
 
-      <motion.button
-        className="fair-plate settings-button"
-        onClick={onSettings}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.4, delay: playIn + 0.2 }}
-      >
-        Settings
-      </motion.button>
+      <div className="title-row">
+        <motion.button
+          className="fair-plate worlds-button"
+          onClick={() => void leave('worlds')}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: playIn + 0.2 }}
+        >
+          Worlds
+        </motion.button>
+        <motion.button
+          className="fair-plate settings-button"
+          onClick={onSettings}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: playIn + 0.2 }}
+        >
+          Settings
+        </motion.button>
+      </div>
 
       {showHint && (
         <motion.p

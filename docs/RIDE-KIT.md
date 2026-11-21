@@ -9,7 +9,7 @@ storyboard of them. Epic: see the issue that links this file.
 
 ## Why the rides feel flat
 
-- **One speed.** The gym's `rollerSpeed` is 0.0000004: gravity is off, every metre is ridden at the
+- **One speed.** The gym's `rollerSpeed` was 0.0000004 (before its v2 ride): gravity was off, every metre ridden at the
   same speed (`ridePhysics.ts`). There is no tension and no release.
 - **No use of the space.** The gym hall is 80 × 40 × 27 m; the ride peaks at 5.4 m. Outdoor levels
   have whole landscapes and ride a ribbon a few metres over the ground.
@@ -42,7 +42,8 @@ the slow-motion window, the photo are), so camera, audio, pacing and spawning ca
 
 Built so far (#698): `src/track/elements/` has the loop, zero-g roll, corkscrew, heartline roll, airtime hill
 (with its `slowMotion` marker), helix, banked turn and the head-chopper helper, on a `RideBuilder` whose control
-points carry the track's `up`; a spline with ups rolls, and the ride camera's up follows it. See them ridden with
+points carry the track's `up`; `climbing.ts` has the unmarked pieces a ride laid out on a floor plan uses (#757: a straight
+or a turn that climbs on the way, a straight to a line on the plan; a turn, and so a `bankedTurn` with `rise`, climbs a little more than `rise`, its grade's share by 1 / cos g; a straight throws on a rise over ~5.8 × its run, #815), which level 6's ride is built from; a spline with ups rolls, and the ride camera's up follows it. See them ridden with
 `npm run turntable -- --rides` (`e2e-results/turntable/rides.png`).
 
 The special mechanics (#699) are `TrackParams.mechanics` on a v2 ride, built with their track by `src/track/elements/mechanicElements.ts`:

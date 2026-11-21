@@ -7,6 +7,7 @@ import {
   buildLevelCards,
   initialFocusIndex,
   navigateCards,
+  nextLevelForPlayer,
   totalStars,
   type CardRect,
   type LevelSelectSource,
@@ -72,6 +73,28 @@ describe('buildLevelCards', () => {
     const all = getAllLevels()
     const cards = buildLevelCards(all, {}, (id) => id === all[0].id, {})
     for (const c of cards.slice(1)) expect(c.unlockedBy, c.id).toBe(getLevelConfig(previousLevel(c.id)!)!.name)
+  })
+})
+
+describe('nextLevelForPlayer', () => {
+  const all = getAllLevels()
+  const starred = (ids: string[], stars: number) => Object.fromEntries(ids.map((id) => [id, entry(id, 100, stars)]))
+
+  it('starts a new player on level1, whatever was played last', () => {
+    expect(nextLevelForPlayer(all, {}, null)).toBe('level1')
+    expect(nextLevelForPlayer(all, {}, 'level2')).toBe('level1')
+  })
+
+  it('goes to the first level without a star', () => {
+    expect(nextLevelForPlayer(all, starred(['level1', 'level2'], 1), 'level1')).toBe('level3')
+    expect(nextLevelForPlayer(levels, { a: entry('a', 1, 3), b: entry('b', 0, 0) }, 'a')).toBe('b')
+  })
+
+  it('goes back to the last level played once every level has a star', () => {
+    const allStars = starred(all.map((l) => l.id), 3)
+    expect(nextLevelForPlayer(all, allStars, 'level4')).toBe('level4')
+    expect(nextLevelForPlayer(all, allStars, null)).toBe('level1')
+    expect(nextLevelForPlayer(all, allStars, 'gone')).toBe('level1')
   })
 })
 

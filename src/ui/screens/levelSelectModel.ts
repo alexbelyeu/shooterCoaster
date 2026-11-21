@@ -91,6 +91,20 @@ export function totalStars(cards: readonly LevelCard[]): { earned: number; max: 
   return { earned, max: cards.length * STARS_PER_LEVEL }
 }
 
+/**
+ * The level title PLAY starts (#329): the first without a star (the next one to play; the chain unlocks it), else the
+ * last campaign level played, else the first.
+ */
+export function nextLevelForPlayer(
+  levels: readonly Pick<LevelSelectSource, 'id'>[],
+  savedScores: Record<string, ScoreEntry | undefined>,
+  lastLevel: string | null,
+): string {
+  const fresh = levels.find((l) => (savedScores[l.id]?.stars ?? 0) < 1)
+  if (fresh) return fresh.id
+  return levels.find((l) => l.id === lastLevel)?.id ?? levels[0].id
+}
+
 /** Card to focus first: the first unlocked level without a star (the next one to play), else the last unlocked. */
 export function initialFocusIndex(cards: readonly LevelCard[]): number {
   const fresh = cards.findIndex((c) => c.unlocked && c.stars === 0)
