@@ -2506,3 +2506,168 @@ music-driven logo motion stands.
 **Consequences:** Change a logo shape in `logoArt.ts` and both renderers follow; change how one renderer draws and
 check the other. Don't add an SVG-as-image path to the score card, and don't bring back a `?logo=` switch for a
 settled logo.
+
+## 2026-11-19 — The game's own personality: the travelling fair's shooting gallery (Alex, via his Claude session)
+
+**Context:** Alex: the UI's accents (a coloured stripe on a card's top edge, glows, a spaced-out caps label over each
+title) read as AI-generated, never use them; the game needs its own personality. The UI had no design doc, so every
+screen fell back to the same generic look: 51 glow shadows, 31 letter-spaced labels, 13 gradients, frosted glass,
+pill buttons and Inter.
+
+**Decision:** `docs/art/PERSONALITY.md` is the UI's identity: the travelling fair's shooting gallery bolted to a
+rollercoaster, from fairground signwriting (block and shadow, gold leaf, lined-out panels), the midway shooting
+gallery (star targets, notched prize tickets, chaser bulbs) and the ride's enamel boards and operator buttons. House
+palette (oxblood, gilt, vermilion, sky, cream, tar), Ultra and Big Shoulders, notched boards, hard shadows, plates that
+press, the showman's voice, and a list of banned tells. `scripts/uiTells.mjs`, run by `npm run lint`, fails when a
+banned tell's count in `src/` goes up; its baseline only goes down. Fonts: Big Shoulders is SIL OFL 1.1 like Lobster
+and Inter (#88); **Ultra is Apache 2.0**, a permissive licence accepted here for a self-hosted font file (licence
+text in `public/fonts/LICENSE-Ultra.txt`). Lobster stays in the logo's wordmark (Alex's pick); Inter goes as screens
+move over.
+
+**Consequences:** UI PRs are reviewed against `PERSONALITY.md`. Each remaining screen moves over in its own issue;
+the baseline in `scripts/uiTells.baseline.json` drops as they land. Changing the personality's direction is Alex's call.
+
+## 2026-11-20 — A new world's first budgets come from two clean local runs (builder, #552 via #606)
+
+**Context:** The 2026-11-14 entry (#460) had the smoke fill a scaffolded level's `scene` / `pacing` placeholder from
+its first local run, whatever that run measured: a run that had already failed (blank frame, stalled loop, truncated
+pacing) set the level's permanent ceilings, a missing `stats.scene` saved `null`, and one run is noisier than the
+higher-of-two-runs rule the existing ceilings were set by.
+**Decision:** (supersedes that entry's "first local smoke") A local run records its numbers in the placeholder's
+`runs` only when the level had no other problem (page errors included) and every number is finite; otherwise it
+prints `placeholder not set` and writes nothing. The second recorded run sets the ceilings from the higher of the two,
+by the same headroom rules. The rule lives in `e2e/placeholderBudget.mjs` (`placeholderAfterRun`), moved there from
+`scripts/newWorldPlan.mjs`. No opt-in flag: only a placeholder is ever written, CI never writes, and the builder of a
+new world reviews and commits the diff anyway.
+**Consequences:** The scaffold's checklist and `docs/LEVEL-KIT.md` say to run the level's shard and its pacing step
+twice. A half-filled placeholder (`runs` of one) still fails CI, like an empty one.
+
+## 2026-11-20 — UI routing comes from the sound table; UI voices get their own room return (Sound designer, #650)
+
+**Context:** #338's UI voices skipped the pause gate dry but still sent to the shared convolver, whose return sits behind the gate, so the resume GO's reverb swelled in as the gate opened. Which sounds were UI-routed was a hand-kept `UI_ROUTED` set in `engine.ts`.
+**Decision:** `ArcadeSound.bus: 'ui'` in `ARCADE_SOUNDS` (`sfxDesign.ts`) routes a sound to the UI voices; `arcade.test.ts` holds it equal to the `PRIO.ui` sounds. The UI voices send to a second convolver on the same IR buffer, returning into `uiOut`, so their room keeps the biome's sound and is heard while paused. The master chain's fields are `sfxGate` (pause gate) and `sfxVolume` (effects volume).
+**Consequences:** Supersedes #338's consequence line: a new menu or countdown sound gets `prio: PRIO.ui, bus: 'ui'` in `ARCADE_SOUNDS` to be heard while paused (the test fails if one is set without the other). The second convolver costs three nodes per arcade graph and is silent outside UI blips.
+
+## 2026-11-20 — A hard-route wave waits on the switch, and lines the branch up to the merge (Builder, #720)
+
+**Context:** The gym's V8 branch is ridden 18.9–21.5 s and only ~840 units long, while a ground trackside wave sits 700–2200 units ahead of the rider. A wave arriving once the car is on the branch would land past the merge.
+**Decision:** A route wave (`EnemyWave.route: 'hard'`, a roster's `branch`) is due from its second (level6: 17 s, before the sign at 18.7 s) and arrives the first tick the route is hard; it gives up once the car passes the sign on the easy route. It is placed on the hard route's own arc table, its trackside spread capped at the merge (`RideAhead.until`), and joins the kill count only when it arrives. It stays out of the other waves' windows, so the every-run waves place as before. `maxScore`, the star thresholds and the server's limits count it.
+**Consequences:** An easy-route run's best score is under `maxScore` by the wave's points (144 on the gym); three stars there want the V8 way or combos.
+
+## 2026-11-20 — The share menu lives outside the results board (builder, #729)
+
+**Context:** A `FairBoard` cuts its notched ticket corners with a CSS `mask`, which clips everything inside it. The
+share menu hangs off the Share plate past the board's edge, so inside the board it was cut in half.
+**Decision:** `ShareMenu` portals its menu to `document.body`, `position: fixed` at the viewport point
+`popoverPlacement.ts` returns (`{ side, left, top }`), and closes on scroll or resize like it already did on resize.
+Any other popover that hangs off a fair board needs the same.
+**Consequences:** the menu's DOM no longer sits inside `.share-anchor` / `.results-actions` (the smoke finds it by
+`.share-menu`); outside-click checks test the anchor and the menu.
+
+## 2026-11-20 — The HUD's keyline, and the combo tier colours moved to CSS (builder, #730)
+
+**Context:** The HUD now stands on the scene with no panel behind it (`docs/art/PERSONALITY.md` "Over the ride").
+A hard cast shadow alone leaves cream letters at under 2:1 against the theme park's pale sky. The combo meter's tier
+colours were a table in `ui/theme.ts` (`comboColor`: white, gold, orange, red) outside the house palette.
+
+**Decision:**
+- HUD lettering carries a tar keyline: eight zero-blur `text-shadow` copies 1.5 to 2 px out plus the cast shadow
+  (`--hud-ink`, `--hud-ink-thin` on `.hud`). Zero blur, so it is a painted outline, not a glow (`scripts/uiTells.mjs`
+  agrees). Its contrast is cream on tar, ~15:1, whatever the scene behind.
+- Ultra only where a number is ~30 px and up (score, seconds, the combo multiplier); the small counts are heavy
+  Big Shoulders, since Ultra's counters close up behind the keyline (a 0 becomes a blob).
+- Combo tier colours are CSS on `.hud-combo--tier<n>` (1× cream, 2× and up gilt, a lapsed chain vermilion) and
+  `theme.comboColor` / `HUD_COLORS` are gone. They still read the one tier index from `combat/comboTiers.ts`.
+
+**Consequences:** New HUD text uses `var(--hud-ink)` / `var(--hud-ink-thin)`, never a blurred shadow or a panel.
+
+## 2026-11-20 — The ride's big moments are show cards in the house colours, not the level's (builder, #731)
+
+**Context:** The wave banner and its tell were tinted with the level's biome accent and glow; FRENZY glowed red.
+`docs/art/PERSONALITY.md` keeps a level's own colour to its level select name plate and the 3D world, and vermilion
+for danger and loss.
+**Decision:** The wave banner is an oxblood `FairBoard` show card with its name in gilt; its tell (a warning) flashes a
+hard vermilion frame round the screen. FRENZY (a reward) is the one gilt card, tar letters, with a hard gilt frame.
+Ready / Set / GO! are gilt Ultra with a hard tar outline (so the gold reads against a white cloud), block and shadow.
+Every sign arrives with the shared `fair-hook` drop (`src/app/global.css`), none under reduced motion.
+**Consequences:** No HUD moment takes the biome accent any more; `biomeTheme` stays for the always-on HUD (#730).
+
+## 2026-11-20 — Inter retired; Big Shoulders is the page's default face (builder, #735)
+
+**Context:** The score card was the last screen drawn in Inter. `html, body, #root` still named Inter as the default, so any element without its own `font-family` (and two canvas textures: the track switch sign and the `?perf=1` panel) fell back to it.
+**Decision:** Remove Inter (font file, licence, `@font-face`, ASSETS row). The page's default face is Big Shoulders; the track switch sign and the perf panel use it too. The score card draws in Ultra and Big Shoulders from `FAIR` (`src/ui/theme.ts`), the `--fair-*` colours for canvas code, which `theme.test.ts` pins to `global.css`.
+**Consequences:** `uiTells` `defaultSans` is 0, so lint now fails any `'Inter'` or monospace face in `src/`. Don't add Inter back as a "neutral" fallback: an element that needs a face picks Ultra or Big Shoulders (docs/art/PERSONALITY.md "Type").
+
+## 2026-11-20 — Dark sections dim the whole level's light, and the muzzle flash is a real point light (builder, #752)
+**Context:** Level 6's Training Area cave rides as a dark section (RIDE-KIT.md). The level has one hemisphere + one sun for everything, and the gym's strip-light pools are shader terms.
+**Decision:** `TrackParams.darkSections` (by track t) dims the level's hemisphere, sun, sky reflections and fog while the rider is in one (`DarkSections.tsx`, eased by pure `darkSection.hot.ts`), and publishes the depth as the `DARKNESS` uniform for a level's own shaders (the gym's pools, blacklight fill, glowing holds). The muzzle flash lights enemies with one `pointLight` (decay 0, `flashReach`) that is mounted for the whole level at intensity 0, never added or hidden on a shot: three's light count is part of every lit material's program, so adding it mid-run would recompile every shader outside `ShaderWarmup`. Levels without dark sections mount none of it.
+**Consequences:** The whole hall darkens while the rider is in the cave (seen from inside, that reads as the cave). A level 6 lit material shades one more light every frame. Another level's dark section is data plus its own shader response to `DARKNESS`.
+
+## 2026-11-20 — The gym grows to GYM_SCALE 48 and its ride runs at the rider's scale, slower and spread out (builder, #761)
+
+**Context:** Alex found level 6's rebuilt ride dizzying: its view turned at 100–280°/s for seconds and snapped at up
+to 900°/s; the comfort gate (`src/track/rideComfort.ts`, #762) failed it. The ride ran at real-coaster speeds in an
+80 m hall, and the v2 solver warps time so each beat lands on its second, so scaling the art alone changed nothing.
+**Decision:** `GYM_SCALE` 32 → 48 (the hall 3840 units long, everything derived from it; the hall's haze ×1.5). The ride
+keeps level 1's gravity and speeds in world units (6.25 m/s² in the hall; 2–7 m/s through the elements, 12 m/s across
+the hall, ~14 m/s at the drop's bottom) and is reshaped so its natural, unwarped timing already lands the beats
+(solver scales 0.9–1.15): a slow heartline roll over the Flame (~5 s) instead of a zero-g roll, the cave as one loop,
+the wall ride on Alaska at x 32 m, a level braking helix into a 2 m/s face-off, a gentler dive, and a slow roll through
+the Tree. The Arch's head-chopper moves to the ride home after the run (no time for the detour in 60 s), and the
+comfort measure rides a drop track upright, as `seatPose` does.
+**Consequences:** Every level passes the comfort gate with no known-over entry. The station moves 10 m north on the
+black path; the intro tour's landmark pass moves to the hall's south end. Level 6's spawns still leave the wall ride
+and the drop with nothing to shoot (#768).
+
+## 2026-11-20 — The results screen's win and lose cuts are two scores (Sound designer, #792)
+
+**Context:** #792 asked for a results score that differs by stars earned, as two sections of `results.scrim` or its intensity layers. Layers only add over a base that is the whole song, and the intro plays every layer, so a lose cut could only be the win cut with parts missing: same fanfare, same cadence. A new section kind would mean a score-format and compiler change for one screen.
+**Decision:** Two score files, `results-win.scrim` (2–3★) and `results-lose.scrim` (0–1★), each its own score slot. `LevelAudio` picks one with the pure `scores/resultsCut.ts` when the results phase starts; both play on the `results` music bus, so the crossfade and the smoke's bus checks are the same as before. Hyphenated ids, because a dotted id means a theme option (`<slot>.<name>`).
+**Consequences:** Each cut can have its own fanfare, tempo and cadence. A theme option for the results screen names its cut (`results-win.<name>`). A third cut (a 3★ one) is another file and one line in `resultsCut.ts`.
+
+## 2026-11-20 — Weather pulses: streaks in view space, fog colour unchanged (Builder, #798)
+
+**Context:** The Desert's sandstorm and Antarctica's blizzard (`EnemyWave.weather`) close the fog in and drive streaks across the view for one wave.
+**Decision:** The streaks live in view space (placed and moved in the vertex shader, one instanced draw, 0 instances outside the pulse) so they always sweep across the screen whatever way the coaster faces; only fog near / far change, never the fog colour, which stays the sky's `horizon` so the terrain's edge never shows against the dome. The weather sits on its wave beside `isEruption`; the spawner emits `weather:start` with the kind, and the pulse's rise / hold / fade is a particle boost's envelope (`stepBoost`), on game time.
+**Consequences:** Streaks don't parallax with the ride; tinting the fog would need the sky dome tinted with it.
+
+## 2026-11-20 — Biome acoustics live in the impulse response, boss cues placed (Sound designer, #802)
+
+**Context:** Each biome's SFX room was `makeIR` with a different length and tone. The issue asked for a pre-delay,
+early reflections and a desert slapback per biome, and for the boss's cues to be placed like hits and kills.
+**Decision:** The arcade engine builds its room from its own pure `roomImpulse` (`sfxDesign.ts`), seeded per biome,
+instead of the score engine's `makeIR` (which the music keeps): the pre-delay is leading silence, the early
+reflections and the slap are impulses in the IR, sized as a share of the tail's energy. No delay or filter nodes
+were added, so the node and voice counts are unchanged. A placed sound's send is multiplied by `wet` (1 near,
+`SPATIAL.farWet` far, `placedSend` caps it at 1). `bossArrival` / `bossHit` / `bossDefeat` dropped 3 dB in
+`ARCADE_SOUNDS`: placed, `panGain` gives that back at the centre, so the boss mix holds its level; `boss:spawn` is
+now emitted on the boss's first placed frame (not its activation effect) so the event carries where it arrives.
+**Consequences:** Convolver normalisation keeps each room's wet energy about the same whatever its early / slap
+share, so retuning those changes the room's character, not its loudness. A new biome needs the three new fields
+(the `new-world` templates have them); `sfxDesign.test.ts` fails a biome whose room is the same as another's.
+
+## 2026-11-21 — Title PLAY starts a run; `level_start` carries `from` instead of `mode` (Builder, #329)
+
+**Context:** Title PLAY now starts the player's next level straight away (WORLDS opens the level select). The
+Marketer needs to know which screen started each run, but Vercel Pro allows at most 2 properties per event and
+`level_start` already had `level` and `mode`.
+**Decision:** `level_start` is `{ level, from }` with `from` one of `title`, `select`, `results`, `pause`, `daily`.
+`daily` stands for any Daily Run start, so it carries everything `mode` did (`from: daily` ⇔ `mode: daily`); a
+Daily Run's Replay is `daily`, not `results`. The store keeps `runFrom` per run and a persisted `lastLevel`
+(the last campaign level started), which `nextLevelForPlayer` falls back to once every level has a star.
+**Consequences:** Dashboards reading `mode` stop getting it from this release (docs/marketing/README.md says so).
+Adding a third `level_start` property means dropping one of these two.
+
+## 2026-11-21 — Support towers merged into one mesh; the dust bunny's roll is a morph (builder, #806)
+
+**Context:** Level 6's ride shot drew 136 against its 130 budget after the bigger gym (#761). At 10 s about 40
+dust bunnies are on screen, each two meshes (the rolling fluff, the eyes kept on its front), and every level's
+support towers were one `InstancedMesh` per height bucket (8 draws; DECISIONS "one InstancedMesh per height bucket").
+**Decision:** `buildTowersGeometry` (`src/track/supportTowers.ts`) merges every placed tower, its bucket's geometry
+turned and moved (its `aThick` turned with it), into one mesh: one draw, the same triangles. The dust bunny is one
+mesh, `DUST_BUNNY_GEO`: its fluff rolls about x by two relative morph targets (`dustBunnyRoll`: weights cos − 1 and
+sin), its eyes have none, and an `aGloss` attribute keeps the eyes' roughness and metalness in `DUST_BUNNY_MAT`.
+`ShaderWarmup` compiles the morph variants of its paint and of the hit flash.
+**Consequences:** Level 6's ride shot 136 → 94 draws (objects 123 → 78), no new programs after the warm-up; every
+level with towers draws 7 fewer. The towers are no longer culled per bucket (they rarely were: a bucket spans the
+ride). Budgets unchanged.
