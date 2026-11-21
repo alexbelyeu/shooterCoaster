@@ -70,7 +70,8 @@ export function onlineLeaderboard(endpoint: string, fetchImpl: Fetch = (url, ini
       return parseTop((body as { top?: unknown } | null)?.top)
     },
     async submit(run: OnlineSubmission): Promise<SubmitResult | null> {
-      const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(run) }
+      // keepalive: a reload as results closes (`app/staleReload.ts`) must not cancel it.
+      const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(run), keepalive: true }
       const body = (await request(fetchImpl, endpoint, init, timeoutMs)) as { rank?: unknown; top?: unknown } | null
       const top = parseTop(body?.top)
       if (!top) return null

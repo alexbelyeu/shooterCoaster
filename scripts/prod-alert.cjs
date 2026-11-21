@@ -1,11 +1,13 @@
 // Alerting for the production suites (prod-smoke.yml, #352): one `agent:prod-broken` issue per suite, which is the
 // state. Opened on green → red, silent while open, closed on the next green run; CI's red-main issue is never touched.
-// EXIT_CODE is the check step's: 0 green, 124 / 137 stopped by `timeout` at the cap, anything else red.
+// EXIT_CODE is the check step's: 0 green, 124 / 137 stopped by `timeout` at the cap, INCONCLUSIVE when production
+// redeployed mid-run and no single build was tested (#822: neither opens nor closes the issue), anything else red.
 
 const fs = require('node:fs')
 
 const LABEL = 'agent:prod-broken'
 const TIMED_OUT = [124, 137]
+const INCONCLUSIVE = 3 // e2e/buildFingerprint.mjs INCONCLUSIVE_EXIT
 const SUITES = {
   deploy: { title: 'Production deploy check failing', name: 'deploy health check', results: 'prod-check.json' },
   nightly: { title: 'Production nightly smoke failing', name: 'nightly full smoke', results: 'results.json' },
@@ -19,23 +21,35 @@ function ownIssue(openIssues, suite) {
   return openIssues.find((i) => (i.body || '').includes(marker(suite)))
 }
 
-/** `open` (green → red), `close` (red → green), or `none`: a red run while red stays quiet. */
+/**
+ * `open` (green → red), `close` (red → green), or `none`: a red run while red stays quiet, and an inconclusive one
+ * (`red` null: it tested no single build) says nothing either way.
+ */
 function decide(red, issue) {
+  if (red === null) return 'none'
   if (red) return issue ? 'none' : 'open'
   return issue ? 'close' : 'none'
 }
 
-/** From prod-check.json (`{ checks, running }`) or the smoke's results.json (an array). */
-function failedChecks(results) {
+/**
+ * From prod-check.json (`{ checks, running }`) or the smoke's results.json (an array). A check failed on a run that
+ * production redeployed under (`inconclusive`, #822) counts only with `{ inconclusive: true }`.
+ */
+function failedChecks(results, { inconclusive = false } = {}) {
   const checks = Array.isArray(results) ? results : results?.checks ?? []
-  return checks.filter((c) => !c.ok).map((c) => ({ id: c.id, problems: c.problems ?? [] }))
+  return checks.filter((c) => !c.ok && !!c.inconclusive === inconclusive).map((c) => ({ id: c.id, problems: c.problems ?? [] }))
 }
 
+const checkList = (failed) => failed
+  .map((c) => `- **${c.id}**: ${c.problems.slice(0, 3).join('; ') || 'failed'}${c.problems.length > 3 ? ` (+${c.problems.length - 3} more)` : ''}`)
+  .join('\n')
+
 function whatHappened({ exitCode, capMinutes, results }) {
+  if (exitCode === INCONCLUSIVE) {
+    return `Inconclusive, not red: production redeployed mid-run, so no single build was tested. The next nightly tests the new build. Failed across the two builds:\n${checkList(failedChecks(results, { inconclusive: true }))}`
+  }
   const failed = failedChecks(results)
-  const list = failed
-    .map((c) => `- **${c.id}**: ${c.problems.slice(0, 3).join('; ') || 'failed'}${c.problems.length > 3 ? ` (+${c.problems.length - 3} more)` : ''}`)
-    .join('\n')
+  const list = checkList(failed)
   const running = !Array.isArray(results) && results?.running ? ` while running **${results.running}**` : ''
   if (TIMED_OUT.includes(exitCode)) {
     if (!results) return `Timed out after ${capMinutes} min before the suite reported any result.`
@@ -78,7 +92,7 @@ module.exports = async function run({ github, context, core, env = process.env }
   const suite = env.SUITE
   if (!SUITES[suite]) throw new Error(`unknown suite "${suite}"`)
   const exitCode = Number(env.EXIT_CODE)
-  const red = exitCode !== 0
+  const red = exitCode === INCONCLUSIVE ? null : exitCode !== 0
   const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
   const open = await github.paginate(github.rest.issues.listForRepo, { ...context.repo, state: 'open', labels: LABEL, per_page: 100 })
   const issue = ownIssue(open, suite)
@@ -94,14 +108,16 @@ module.exports = async function run({ github, context, core, env = process.env }
     await github.rest.issues.update({ ...context.repo, issue_number: issue.number, state: 'closed', state_reason: 'completed' })
     core.info(`closed #${issue.number}`)
   } else {
-    core.info(red ? `still red, #${issue.number} already open: no alert` : 'green, nothing open')
+    core.info(red === null ? 'inconclusive (production redeployed mid-run): no alert' : red ? `still red, #${issue.number} already open: no alert` : 'green, nothing open')
   }
+  if (red === null) core.warning(whatHappened(facts).split('\n')[0])
   await core.summary
-    .addHeading(`Production ${SUITES[suite].name}: ${red ? 'red' : 'green'}`, 3)
-    .addRaw(red ? whatHappened(facts) : 'Every check passed.', true)
+    .addHeading(`Production ${SUITES[suite].name}: ${red === null ? 'inconclusive' : red ? 'red' : 'green'}`, 3)
+    .addRaw(red === false ? 'Every check passed.' : whatHappened(facts), true)
     .write()
 }
 
+module.exports.INCONCLUSIVE = INCONCLUSIVE
 module.exports.decide = decide
 module.exports.ownIssue = ownIssue
 module.exports.failedChecks = failedChecks

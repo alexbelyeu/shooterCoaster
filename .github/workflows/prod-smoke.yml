@@ -5,6 +5,7 @@ name: Production smoke
 # out (#372), as three parallel parts (e2e/shards.mjs NIGHTLY_PARTS, #570: one run outgrew its 60 min cap; e2e/shards.test.ts
 # holds the matrix to the parts and the parts to the full run) that the `nightly` job folds into one verdict. scripts/prod-alert.cjs reports each on its own
 # agent:prod-broken issue, on green → red and red → green only. `timeout` turns a slow run into a reported timeout.
+# A part that failed while production redeployed under it is inconclusive (exit 3, #822): no alert either way.
 
 on:
   deployment_status:
@@ -145,6 +146,7 @@ jobs:
           script: |
             const run = require(`${process.env.GITHUB_WORKSPACE}/scripts/prod-alert.cjs`)
             await run({ github, context, core })
+      # 3: production redeployed mid-run, no single build tested (#822); the Report step warns, the job stays green.
       - name: Fail a red check
-        if: ${{ steps.check.outputs.exit_code != '0' }}
+        if: ${{ steps.check.outputs.exit_code != '0' && steps.check.outputs.exit_code != '3' }}
         run: exit 1

@@ -16,12 +16,14 @@ import './app/global.css'
 import { eventBus } from './core/EventBus'
 import { markStartup } from './core/startupMarks'
 import { useGameStore } from './store/useGameStore'
+import { installStaleReload } from './app/staleReload'
 import { installTelemetry } from './telemetry/playerTelemetry'
 import { installE2EApi } from './testing/e2eHook'
 import { perfRequested } from './perf/perfFlag'
 
 markStartup('boot')
 installE2EApi()
+installStaleReload()
 if (perfRequested()) void import('./perf/perfRecorder').then((m) => m.startPerfRecorder())
 
 const { search, pathname, hash } = window.location

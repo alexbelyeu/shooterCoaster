@@ -1,6 +1,7 @@
 /** Every SFX goes through here: the arcade engine (`arcade/`), a lazy chunk loaded by the first `prepare`. */
 import * as THREE from 'three'
 import type { BiomeType } from '@/types/level'
+import { lazyChunk } from '@/core/staleBuild'
 import type { WeaponId } from '@/combat/weapons/weaponTypes'
 import { dropSound } from './soundGuard'
 import { spatial, type KillSound } from './sfxDesign'
@@ -66,15 +67,14 @@ export interface SfxEngine {
 }
 
 type ArcadeModule = typeof import('./arcade/engine')
-let arcadeModule: Promise<ArcadeModule> | null = null
+const importArcade = lazyChunk(() => import('./arcade/engine'))
 
-/** Loaded on first use, after the first gesture. */
+/** Loaded on first use, after the first gesture; a failed load is tried again by the next `prepare` (#823). */
 export function loadArcade(): Promise<ArcadeModule> {
-  arcadeModule ??= import('./arcade/engine').then((m) => {
+  return importArcade().then((m) => {
     if (active === pendingArcade) active = m.arcadeSfx
     return m
   })
-  return arcadeModule
 }
 
 const silent = () => {}

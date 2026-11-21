@@ -47,6 +47,32 @@ describe('combine (#570)', () => {
     expect(crashed.results.at(-1)).toMatchObject({ id: 'part main', ok: false })
   })
 
+  it('is inconclusive, not red, when a part failed only because production redeployed under it (#822)', () => {
+    const redeployed = [
+      pass('title'),
+      { ...fail('level6', 'Failed to fetch dynamically imported module'), inconclusive: true },
+      { ...fail('build', 'production redeployed mid-run (index-AAA.js → index-BBB.js): no single build tested'), inconclusive: true },
+    ]
+    const combined = parts.combine([
+      { name: 'main', exitCode: alert.INCONCLUSIVE, results: redeployed },
+      { name: 'deep', exitCode: 0, results: [pass('boss')] },
+    ], 60)
+    expect(combined.exitCode).toBe(alert.INCONCLUSIVE)
+    const text = alert.whatHappened({ exitCode: combined.exitCode, capMinutes: 60, results: combined.results })
+    expect(text).toMatch(/^Inconclusive, not red: production redeployed mid-run/)
+    expect(text).toContain('**level6**: Failed to fetch dynamically imported module')
+    expect(text).toContain('**build**: production redeployed mid-run (index-AAA.js → index-BBB.js)')
+  })
+
+  it('stays red when another part failed on an unchanged build, without counting the inconclusive part\'s checks', () => {
+    const combined = parts.combine([
+      { name: 'main', exitCode: alert.INCONCLUSIVE, results: [{ ...fail('level6', 'stale chunk'), inconclusive: true }] },
+      { name: 'deep', exitCode: 1, results: [fail('boss', 'no kill')] },
+    ], 60)
+    expect(combined.exitCode).toBe(1)
+    expect(alert.whatHappened({ exitCode: 1, capMinutes: 60, results: combined.results })).toBe('Check failed:\n- **boss**: no kill')
+  })
+
   it('reads each part\'s artifact folder', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nightly-parts-'))
     fs.mkdirSync(path.join(dir, 'prod-e2e-results-main'))

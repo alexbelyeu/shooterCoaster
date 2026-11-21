@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { ATMOSPHERES } from './atmosphere'
 import type { BiomeType, DarkSectionSpec, WeatherKind } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
+import type { RideSpeeds } from '@/track/ridePhysics'
 import {
   getTerrainMeshSize,
   TERRAIN_MESH_SEGMENTS,
@@ -26,6 +27,7 @@ interface BiomeEnvironmentProps {
   /** Terrain as drawn (createTerrainSurface). */
   groundFn: HeightFunction
   track: ArcTable
+  speeds: RideSpeeds
   /** The track's dark sections (#752), dimming the atmosphere while the rider is in one. */
   darkSections?: readonly DarkSectionSpec[]
   /** The weather its waves bring (#798): fog and driven streaks with the wave. */
@@ -47,6 +49,7 @@ export default function BiomeEnvironment({
   biome,
   groundFn,
   track,
+  speeds,
   darkSections,
   weather,
   hasWater = false,
@@ -114,7 +117,7 @@ export default function BiomeEnvironment({
       {Decorations && <Decorations heightFn={heightFn} groundFn={groundFn} track={track} atmosphere={atmosphere} />}
 
       {/* Biome landmarks, terrain features and events */}
-      {Features && <Features heightFn={heightFn} groundFn={groundFn} track={track} atmosphere={atmosphere} fog={fogMods} />}
+      {Features && <Features heightFn={heightFn} groundFn={groundFn} track={track} speeds={speeds} atmosphere={atmosphere} fog={fogMods} />}
 
       {/* Ambient air particles around the camera */}
       {particles && <ParticleField preset={particles} />}
