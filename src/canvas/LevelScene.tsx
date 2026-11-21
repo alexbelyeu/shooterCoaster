@@ -8,6 +8,7 @@ import { getTrackDimensions } from '@/track/trackDimensions'
 import { buildArcTable } from '@/track/arcLength'
 import { withTunnels } from '@/track/setPieces'
 import CoasterCamera from '@/track/CoasterCamera'
+import PhotoCamera from '@/track/PhotoCamera'
 import { rideModel } from '@/track/ridePhysics'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -109,6 +110,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         groundFn={groundFn}
         bounds={BIOMES[biome].bounds}
       />
+      <PhotoCamera groundFn={groundFn} bounds={BIOMES[biome].bounds} eyeHeight={trackDims.eyeHeight} />
       <ContactShadows groundFn={groundFn}>
         <TrackMesh
           curve={curve}

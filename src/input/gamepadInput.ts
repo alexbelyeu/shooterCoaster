@@ -5,6 +5,7 @@
  * - right stick: a velocity cursor through `pointerInput`'s aim (`gamepadAim`), RT: its trigger (`gamepadTrigger`);
  * - Start: pause / resume through the store actions the Escape key uses;
  * - A: clicks the focused control (or sends Enter, the screens' "start" key), B: sends Escape, the screens' Back;
+ * - photo mode (#828): the right stick orbits the camera and LT / RT zoom out / in (`track/photoInput.ts`) instead;
  * - d-pad / left stick: sends the arrow keys to the focused control (the pause menu's and level grid's own
  *   handlers), and where nothing handles them, moves focus to the next / previous control as Tab does.
  * The rules are pure in `gamepadMap.hot.ts`. No pad, no poll: the loop starts on `gamepadconnected`.
@@ -13,6 +14,7 @@
 import { useEffect } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { gamepadAim, gamepadTrigger, getPointerState } from './pointerInput'
+import { photoPad } from '@/track/photoInput'
 import {
   PAD,
   TRIGGER_THRESHOLD,
@@ -113,7 +115,9 @@ function poll(t: number) {
   if (!pad) return
 
   stickVelocity(pad.axes[2] ?? 0, pad.axes[3] ?? 0, vel)
-  if (vel.x !== 0 || vel.y !== 0) {
+  if (useGameStore.getState().photo) {
+    photoPad(vel.x, vel.y, (pad.buttons[PAD.LT]?.value ?? 0) - (pad.buttons[PAD.RT]?.value ?? 0))
+  } else if (vel.x !== 0 || vel.y !== 0) {
     // From wherever the aim is now, so the mouse and the stick hand over without a jump.
     const aim = getPointerState()
     cursor.x = aim.x
@@ -121,7 +125,7 @@ function poll(t: number) {
     moveCursor(cursor, vel, dt, window.innerWidth, window.innerHeight)
     gamepadAim(cursor.x, cursor.y)
   }
-  gamepadTrigger((pad.buttons[PAD.RT]?.value ?? 0) >= TRIGGER_THRESHOLD)
+  gamepadTrigger(!useGameStore.getState().photo && (pad.buttons[PAD.RT]?.value ?? 0) >= TRIGGER_THRESHOLD)
 
   for (let i = 0; i < PRESS_BUTTONS.length; i++) {
     const down = pressed(pad, PRESS_BUTTONS[i])
