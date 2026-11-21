@@ -40,7 +40,7 @@ import { ARCH, FLAME, GYM_SCALE, PIT, TREE, TREE_GAP, piece, toWorld } from './b
 
 /**
  * Metres the track's centreline keeps from anything solid. The car's rails reach 0.07 m out and the rider's eye is
- * 0.19 m up (#592), so 0.8 m is still four eye heights, and it fits the ride through the Tree's gap (#613).
+ * 0.13 m up at `GYM_SCALE` 48 (`EYE`), so 0.8 m is about six eye heights, and it fits the ride through the Tree's gap (#613).
  */
 export const RAIL_CLEARANCE = 0.8
 
