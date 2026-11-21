@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
-  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_BODY_GEO, DUST_BUNNY_EYES_GEO, LANTERNFLY_FLASH_MAT,
+  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_GEO, dustBunnyRoll, LANTERNFLY_FLASH_MAT,
   LANTERNFLY_FOLDED, LANTERNFLY_FOREWING_PIVOT, LANTERNFLY_GEO, LANTERNFLY_HINDWING_PIVOT, LANTERNFLY_MAT, LANTERNFLY_OPEN, RAT_BODY_GEO,
   RAT_SNOUT_GEO, RAT_TAIL_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
   SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, createLanternflyFlashMaterial, createLanternflyMaterial, crowWingPose, patchCrowWingVertex,
@@ -91,7 +91,31 @@ describe('gym pests (#515)', () => {
 
   it("keep under the briefs' triangle caps: rat 600, dust bunny 500", () => {
     expect(tris(RAT_BODY_GEO) + tris(RAT_SNOUT_GEO) + tris(RAT_TAIL_GEO)).toBeLessThanOrEqual(600)
-    expect(tris(DUST_BUNNY_BODY_GEO) + tris(DUST_BUNNY_EYES_GEO)).toBeLessThanOrEqual(500)
+    expect(tris(DUST_BUNNY_GEO)).toBeLessThanOrEqual(500)
+  })
+
+  it("rolls the dust bunny's fluff about x by its morph targets and leaves its eyes on its front (#806)", () => {
+    const g = DUST_BUNNY_GEO
+    const [toward, across] = g.morphAttributes.position
+    const gloss = g.attributes.aGloss
+    const w = [0, 0]
+    const roll = 1.1
+    dustBunnyRoll(w, roll)
+    let worst = 0
+    let eyes = 0
+    for (let i = 0; i < g.attributes.position.count; i++) {
+      const [x, y, z] = [g.attributes.position.getX(i), g.attributes.position.getY(i), g.attributes.position.getZ(i)]
+      const eye = gloss.getX(i) === 1
+      if (eye) eyes++
+      const [ry, rz] = eye ? [y, z] : [y * Math.cos(roll) - z * Math.sin(roll), y * Math.sin(roll) + z * Math.cos(roll)]
+      const mx = x + w[0] * toward.getX(i) + w[1] * across.getX(i)
+      const my = y + w[0] * toward.getY(i) + w[1] * across.getY(i)
+      const mz = z + w[0] * toward.getZ(i) + w[1] * across.getZ(i)
+      worst = Math.max(worst, Math.hypot(mx - x, my - ry, mz - rz))
+    }
+    expect(eyes).toBeGreaterThan(0)
+    expect(worst).toBeLessThan(1e-4)
+    expect(g.morphTargetsRelative).toBe(true)
   })
 
   it('give the rat its pink ears, nose and tail', () => {

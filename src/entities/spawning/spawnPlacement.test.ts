@@ -354,7 +354,7 @@ describe('level6: inside the hall', () => {
 
   it('the gym has bounds, the hall inset by 40 units', () => {
     expect(bounds).toBe(hall)
-    expect([hall.minX, hall.maxX, hall.minZ, hall.maxZ]).toEqual([-1240, 1240, -600, 600])
+    expect([hall.minX, hall.maxX, hall.minZ, hall.maxZ]).toEqual([-1880, 1880, -920, 920])
   })
 
   it('every ground and air placement, entry starts included, lies inside the hall (#546)', () => {
@@ -495,6 +495,18 @@ describe('placeWallSwarm (#516)', () => {
       expect(inView(view, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), maxReadableDistance('lanternfly'))).toBe(true)
     }
     expect(placed.map((p) => p.seed)).toEqual(slots.map((s) => s.seed))
+  })
+
+  it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, then a wall ahead of the drop", () => {
+    const { level, table: gym, rideFor } = world(getAllLevels().find((l) => l.id === 'level6')!)
+    const wave = level.enemies.find((w) => w.type === 'lanternfly')!
+    const profile = rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)
+    const riderIndex = indexAhead(gym, 0, profile[wave.spawnDelay! * 10])
+    const swarm = swarmSlots(wave.count, createRng(3))
+    const placed = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarm, ride: rideFor(wave) })
+    const walls = placed.map((p) => p.wall.id)
+    expect(walls[0]).toMatch(/alaska/)
+    expect(walls[walls.length - 1]).not.toMatch(/alaska/)
   })
 
   it('needs the level to have walls', () => {

@@ -7,7 +7,7 @@ import { COMFORT, comfortProblems, rideComfort } from './rideComfort'
  * Levels over the comfort gate while an open issue fixes them: the test reports them instead of failing. Remove a
  * level here in the PR that brings it under (`docs/RIDE-KIT.md` "Rules for building rides").
  */
-const KNOWN_OVER: Record<string, string> = { level6: '#761' }
+const KNOWN_OVER: Record<string, string> = {}
 
 describe('ride comfort: no level turns the rider\'s view faster than the eye can follow', () => {
   const rows = getAllLevels().map((level) => ({ id: level.id, problems: comfortProblems(rideComfort(level.track, RUN_SECONDS)) }))
