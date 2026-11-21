@@ -45,7 +45,12 @@ interface GameState {
   setPhase: (phase: GamePhase) => void
   /** Still `paused` through the resume Ready / GO (`ui/hud/Countdown` sets `playing` on GO), so nothing moves until then. */
   resuming: boolean
+  /** Also leaves photo mode. */
   resume: () => void
+  /** Photo mode (#828): the paused ride's camera orbits for a picture, the pause card and HUD hidden. Only while paused. */
+  photo: boolean
+  /** Enters photo mode (a no-op unless paused and not counting down to resume) or leaves it. */
+  setPhoto: (on: boolean) => void
 
   currentLevel: string | null
 
@@ -177,9 +182,11 @@ export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
       phase: 'title',
-      setPhase: (phase) => set({ phase, resuming: false }),
+      setPhase: (phase) => set({ phase, resuming: false, photo: false }),
       resuming: false,
-      resume: () => set((s) => (s.phase === 'paused' ? { resuming: true } : {})),
+      resume: () => set((s) => (s.phase === 'paused' ? { resuming: true, photo: false } : {})),
+      photo: false,
+      setPhoto: (on) => set((s) => (on ? (s.phase === 'paused' && !s.resuming ? { photo: true } : {}) : { photo: false })),
 
       ...FRESH_RUN,
       currentLevel: null,
@@ -210,6 +217,7 @@ export const useGameStore = create<GameState>()(
           sceneReady: warm,
           phase,
           resuming: false,
+          photo: false,
           skipIntro: replay,
         })
       },

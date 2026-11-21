@@ -1757,9 +1757,65 @@ async function pauseCardLayout(page) {
   else if (r.rect.left < 0 || r.rect.top < 0 || r.rect.right > r.vw || r.rect.bottom > r.vh)
     problems.push(`the pause card (${r.rect.left},${r.rect.top})-(${r.rect.right},${r.rect.bottom}) leaves the ${r.vw}x${r.vh} viewport`)
   if (r.hScroll) problems.push('the pause menu scrolls sideways')
-  if (r.buttons !== 4) problems.push(`${r.buttons} pause buttons, expected Resume / Restart / Settings / Quit`)
+  if (r.buttons !== 5) problems.push(`${r.buttons} pause buttons, expected Resume / Restart / Photo / Settings / Quit`)
   if (r.smallButtons) problems.push(`${r.smallButtons} pause button(s) under the 44 px touch target`)
   return { ...r, problems }
+}
+
+/**
+ * Photo mode (#828), from the open pause card: Photo hides the card and every HUD element, a mouse drag and the wheel
+ * orbit and zoom the camera (`photo` in the hook), Save downloads a non-blank PNG (`<level>-photo-save.png`), the
+ * orbited frame is `<level>-photo.png`, and Back brings the pause card back with the ride camera exactly where it was.
+ */
+async function photoModeProblems(page, levelId) {
+  const problems = []
+  const before = await page.evaluate(() => window.__SC_TEST__.cameraPose())
+  const clickError = await page.getByRole('button', { name: 'Photo', exact: true }).click({ timeout: 30000 }).then(() => null, (e) => e.message.split('\n')[0])
+  if (clickError) return { problems: [`photo: click Photo: ${clickError}`], summary: null }
+  if (!(await waitVisible(page, '.photo-bar', 15000))) return { problems: ['photo: the photo bar never showed'], summary: null }
+  await waitFrames(page, 2, { maxMs: 8000 })
+  const start = await page.evaluate(() => ({ ...window.__SC_TEST__.photo }))
+  await page.mouse.move(640, 300)
+  await page.mouse.down()
+  await page.mouse.move(820, 220, { steps: 8 })
+  await page.mouse.up()
+  await page.mouse.wheel(0, 300)
+  await waitFrames(page, 3, { minMs: 300, maxMs: 8000 })
+  const moved = await page.evaluate(() => ({ ...window.__SC_TEST__.photo }))
+  const shown = await page.evaluate(() =>
+    ['.pause-card', '.hud-score', '.hud-kills-count', '.hud-pause-button', '.mute-button', '.crosshair-svg']
+      .filter((sel) => [...document.querySelectorAll(sel)].some((el) => el.getClientRects().length > 0)),
+  )
+  if (shown.length) problems.push(`photo: still on screen in photo mode: ${shown.join(', ')}`)
+  if (!start.on) problems.push('photo: the photo camera never took over')
+  if (!(Math.abs(moved.yaw - start.yaw) > 0.3)) problems.push(`photo: a 180 px drag turned the orbit ${(moved.yaw - start.yaw).toFixed(2)} rad`)
+  if (!(moved.radius > start.radius * 1.2)) problems.push(`photo: the wheel didn't zoom out (radius ${start.radius.toFixed(1)} -> ${moved.radius.toFixed(1)})`)
+  if (!(moved.clearance > 0)) problems.push(`photo: the camera is under the terrain (${moved.clearance.toFixed(1)})`)
+  await page.screenshot({ path: path.join(OUT, `${levelId}-photo.png`), timeout: SHOT_TIMEOUT })
+  const [file] = await Promise.all([
+    page.waitForEvent('download', { timeout: 20000 }).catch(() => null),
+    // The blob download counts as a navigation the click would wait out.
+    page.getByRole('button', { name: 'Save', exact: true }).click({ timeout: 10000, noWaitAfter: true }).catch((e) => problems.push(`photo: click Save: ${e.message.split('\n')[0]}`)),
+  ])
+  let png = null
+  if (!file) problems.push('photo: Save started no download')
+  else {
+    if (!/^scoaster-[\w-]+-\d{8}-\d{6}\.png$/.test(file.suggestedFilename())) problems.push(`photo: the download is named ${file.suggestedFilename()}`)
+    const out = path.join(OUT, `${levelId}-photo-save.png`)
+    await file.saveAs(out)
+    png = await imageStats(page, fs.readFileSync(out))
+    if (looksBlank(png)) problems.push(`photo: the saved PNG looks blank (stddev ${png.stddev.toFixed(1)}, ${png.distinctColors} colours)`)
+  }
+  await page.getByRole('button', { name: 'Back' }).click({ timeout: 10000 }).catch((e) => problems.push(`photo: click Back: ${e.message}`))
+  if (!(await waitVisible(page, '.pause-card', 15000))) problems.push('photo: Back did not bring the pause card back')
+  await waitFrames(page, 2, { maxMs: 8000 })
+  const after = await page.evaluate(() => window.__SC_TEST__.cameraPose())
+  const drift = before && after ? Math.max(...[...before.position, ...before.forward].map((v, i) => Math.abs(v - [...after.position, ...after.forward][i]))) : null
+  if (drift === null || drift > 1e-4) problems.push(`photo: Back left the ride camera off its pose (drift ${drift})`)
+  return {
+    problems,
+    summary: { yaw: [start.yaw, moved.yaw], radius: [start.radius, moved.radius], saved: png ? Math.round(png.stddev) : null, drift },
+  }
 }
 
 /**
@@ -1784,6 +1840,8 @@ async function pauseMenuCheck(page, levelId) {
   await page.keyboard.press('ArrowDown')
   const afterArrow = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? null)
   if (afterArrow !== 'Restart') problems.push(`ArrowDown moved focus to "${afterArrow}", not Restart`)
+  const photo = await photoModeProblems(page, levelId)
+  problems.push(...photo.problems)
   await page.keyboard.press('Escape')
   const resumed = await page
     .waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 15000, polling: 100 })
@@ -1822,7 +1880,7 @@ async function pauseMenuCheck(page, levelId) {
   return {
     id: 'pause-menu',
     problems,
-    pauseMenu: { level: levelId, card: card.rect, focusOnOpen: card.focused, afterArrow, restart: { ride: [rideBefore, after.ride], levelTime: [levelTimeBefore, levelTime] } },
+    pauseMenu: { level: levelId, card: card.rect, focusOnOpen: card.focused, afterArrow, photo: photo.summary, restart: { ride: [rideBefore, after.ride], levelTime: [levelTimeBefore, levelTime] } },
   }
 }
 
@@ -4497,6 +4555,7 @@ async function run() {
           ` ride ${r.hiddenPause.ride.map((t) => t.toFixed(4)).join('->')}, wave due ${r.hiddenPause.wave.due}s arrived ${typeof r.hiddenPause.wave.arrivedAt === 'number' ? r.hiddenPause.wave.arrivedAt.toFixed(2) + 's' : r.hiddenPause.wave.arrivedAt}`
       : r.pauseMenu
         ? ` ${r.pauseMenu.level} card ${JSON.stringify(r.pauseMenu.card)}, focus ${r.pauseMenu.focusOnOpen} -> ${r.pauseMenu.afterArrow},` +
+          ` photo ${JSON.stringify(r.pauseMenu.photo)},` +
           ` restart ride ${r.pauseMenu.restart.ride.map((t) => t.toFixed(4)).join('->')} level time ${r.pauseMenu.restart.levelTime.map((t) => t?.toFixed(1)).join('->')}`
       : r.countdown
         ? ` ${r.countdown.level} intro ${r.countdown.intro.seconds?.toFixed(2)} s (longest frame ${r.countdown.intro.maxFrameMs.toFixed(0)} ms,` +

@@ -21,7 +21,8 @@ describe('pauseMenuFocus', () => {
     for (const key of ['Enter', 'Escape', ' ', 'r']) expect(pauseMenuFocus(1, key, n)).toBeNull()
   })
 
-  it('Resume comes first, so it is the default focus', () => {
-    expect(PAUSE_MENU.map((b) => b.label)).toEqual(['Resume', 'Restart', 'Settings', 'Quit'])
+  it('Resume comes first, so it is the default focus; Photo (#828) sits after Restart', () => {
+    expect(PAUSE_MENU.map((b) => b.label)).toEqual(['Resume', 'Restart', 'Photo', 'Settings', 'Quit'])
+    expect(PAUSE_MENU.find((b) => b.label === 'Photo')?.action).toBe('photo')
   })
 })

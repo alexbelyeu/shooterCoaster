@@ -2032,7 +2032,7 @@ canvas {
 
 .pause-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.65rem;
 }
 
@@ -2054,6 +2054,70 @@ canvas {
   .pause-keys {
     display: none;
   }
+}
+
+/* Photo mode (#828): the stopped ride with nothing over it but a line and two plates at the bottom. */
+.photo-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.photo-surface {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.photo-surface:active {
+  cursor: grabbing;
+}
+
+.photo-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0 calc(1rem + env(safe-area-inset-right)) 0 calc(1rem + env(safe-area-inset-left));
+  pointer-events: none;
+}
+
+.photo-hint {
+  margin: 0;
+  font-family: 'Big Shoulders', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.photo-hint-touch {
+  display: none;
+}
+
+@media (hover: none) {
+  .photo-hint-mouse {
+    display: none;
+  }
+
+  .photo-hint-touch {
+    display: inline;
+  }
+}
+
+.photo-actions {
+  display: flex;
+  gap: 0.65rem;
+  pointer-events: auto;
+}
+
+.photo-actions .fair-plate {
+  min-width: 8rem;
+  padding-inline: 1.2rem;
 }
 
 /* Phone landscape: the run on the left, the plates on the right. */
