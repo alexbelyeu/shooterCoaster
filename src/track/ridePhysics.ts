@@ -21,7 +21,7 @@ export interface RideSpeeds {
   roll: number
   min: number
   max: number
-  /** The v2 ride's plan: when set, the ride follows it and the fields above are unused. */
+  /** The v2 ride's plan: when set, the ride follows it and the fields above are 0, unused. */
   plan?: RidePlan
 }
 
@@ -38,13 +38,12 @@ export function rideSpeeds({ rollerSpeed, minRollerSpeed }: { rollerSpeed: numbe
  * only mechanic is a junction (#702: no zones). Cold: solves the plan (a few ms).
  */
 export function rideModel(track: TrackParams, table: ArcTable): RideSpeeds {
-  const speeds = rideSpeeds(track)
-  if (track.ride !== 'v2') {
-    if (track.mechanics?.some((m) => m.kind !== 'junction')) throw new Error('ride mechanics need the v2 ride (track.ride: "v2")')
-    checkMechanics(track.mechanics)
-    return speeds
+  if (track.ride === 'v2') {
+    return { roll: 0, min: 0, max: 0, plan: buildRidePlan(table, withMechanics(track.rideV2 ?? {}, track.mechanics, table.length)) }
   }
-  return { ...speeds, plan: buildRidePlan(table, withMechanics(track.rideV2 ?? {}, track.mechanics, table.length)) }
+  if (track.mechanics?.some((m) => m.kind !== 'junction')) throw new Error('ride mechanics need the v2 ride (track.ride: "v2")')
+  checkMechanics(track.mechanics)
+  return rideSpeeds(track)
 }
 
 /** Velocity after `frames` on track whose unit tangent rises by `tangentY`, clamped to the ride's speeds. */
