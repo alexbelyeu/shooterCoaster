@@ -60,7 +60,7 @@ export function paceLevel(roster: Roster, runSeconds = RUN_SECONDS): PacedLevel 
   if (finale) enemies.push({ ...finale, spawnDelay: bossAt })
   if (branch) {
     const { at, ...wave } = branch
-    if (!Number.isInteger(at) || at <= 0 || at >= bossAt) throw new Error(`the branch wave arrives at ${at} s: a whole second in the run, before ${bossAt} s`)
+    if (!Number.isInteger(at) || at <= 0 || at >= bossAt) throw new Error(`branch wave at ${at} s: a whole second before ${bossAt} s`)
     // Last, so the waves every run meets keep their seeded slots.
     enemies.push({ ...wave, route: 'hard', spawnDelay: at })
   }

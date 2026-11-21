@@ -389,7 +389,7 @@ export default function EnemySpawner({
       if (waves[i].isEruption) eventBus.emit('eruption:start')
       if (waves[i].weather) eventBus.emit('weather:start', waves[i].weather)
       if (waves[i].route) {
-        joinedEnemies.current += enemies.filter((e) => e.waveIndex === i && !e.bystander).length
+        joinedEnemies.current += waves[i].count
         publishCounts()
       }
       return true
