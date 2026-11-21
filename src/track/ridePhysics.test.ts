@@ -16,9 +16,10 @@ describe('nextVelocity', () => {
   })
 })
 
-describe.each(getAllLevels().map((l) => [l.id, l] as const))('%s rideProfile', (_id, level) => {
-  const table = buildArcTable(createTrackCurve(level.track))
-  const speeds = rideSpeeds(level.track)
+// Today's rule; the v2 ride's profile is rideV2.test.ts's.
+describe.each(getAllLevels().flatMap((l) => (l.track.ride === 'v2' ? [] : [[l.id, l.track] as const])))('%s rideProfile', (_id, track) => {
+  const table = buildArcTable(createTrackCurve(track))
+  const speeds = rideSpeeds(track)
   const profile = rideProfile(table, speeds, RUN_SECONDS)
 
   it('rides forward every tenth of a second', () => {
@@ -26,7 +27,7 @@ describe.each(getAllLevels().map((l) => [l.id, l] as const))('%s rideProfile', (
   })
 
   it('is the arc the coaster rides, not track fraction × length (the curve parameter is not arc length)', () => {
-    const curve = createTrackCurve(level.track)
+    const curve = createTrackCurve(track)
     const state = { progress: 0, velocity: 0, time: 0 }
     let arc = 0
     for (let k = 1; k <= 10 * 10; k++) {
@@ -71,7 +72,7 @@ describe('advanceRide', () => {
 /** Pinned (#452): a 60 s lap would ride 2.2–3.8× faster than today, a different ride, so a run rides 0.25–0.6 of a lap. */
 const LAPS: Record<string, number> = { level1: 147, level2: 165, level3: 99, level4: 193, level5: 228 }
 
-describe.each(getAllLevels().filter((l) => l.track.ride !== 'v2').map((l) => [l.id, l.track] as const))('the ride on %s', (id, track) => {
+describe.each(getAllLevels().flatMap((l) => (l.track.ride === 'v2' ? [] : [[l.id, l.track] as const])))('the ride on %s', (id, track) => {
   it('laps in its pinned time, longer than a run', () => {
     const curve = createTrackCurve(track)
     const lap = lapSeconds(curve, rideSpeeds(track))
