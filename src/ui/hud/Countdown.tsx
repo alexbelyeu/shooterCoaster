@@ -80,7 +80,8 @@ export default function Countdown() {
   }, [counting, go])
 
   // Title PLAY goes straight into a run (#329): a player who wanted another world backs out with Escape in the seat's
-  // first second (`countdownBacksOut`). The seat clock starts at mount, or when a skip cuts the tour short.
+  // first second (`countdownBacksOut`). The seat clock starts at mount, or when a skip cuts the tour short. A key counts
+  // at its `timeStamp` (the same clock), not when it is handled, so jank can't push a double-tap skip's second press past the guard.
   useEffect(() => {
     if (mode !== 'start') return
     let seatAt = performance.now()
@@ -90,7 +91,7 @@ export default function Countdown() {
     const onKey = (e: KeyboardEvent) => {
       const store = useGameStore.getState()
       if (store.phase !== 'countdown') return
-      const run = { from: store.runFrom, tourOnScreen: introStartedAt() !== null, msInSeat: performance.now() - seatAt }
+      const run = { from: store.runFrom, tourOnScreen: introStartedAt() !== null, msInSeat: e.timeStamp - seatAt }
       if (countdownBacksOut(e, run)) store.setPhase('levelSelect')
     }
     window.addEventListener('keydown', onKey)

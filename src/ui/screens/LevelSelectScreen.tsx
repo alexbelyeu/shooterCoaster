@@ -11,7 +11,7 @@ import {
   STARS_PER_LEVEL,
   buildDailyCard,
   buildLevelCards,
-  initialFocusIndex,
+  nextLevelIndex,
   isNavKey,
   navigateCards,
   totalStars,
@@ -73,7 +73,7 @@ export default function LevelSelectScreen() {
   const total = totalStars(cards)
 
   const [launching, setLaunching] = useState<string | null>(null)
-  const [focusIndex, setFocusIndex] = useState(() => initialFocusIndex(cards))
+  const [focusIndex, setFocusIndex] = useState(() => nextLevelIndex(cards, useGameStore.getState().lastLevel))
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
   const launchTimer = useRef<number | undefined>(undefined)
 
@@ -109,7 +109,7 @@ export default function LevelSelectScreen() {
     if (i === dailyIndex) {
       // Today's key at the tap, not the card's: the screen may have been open since before midnight UTC.
       const dateKey = dailyKey(new Date())
-      launch('daily', () => startRun(dailyLevel(dateKey), undefined, { mode: 'daily', dateKey }))
+      launch('daily', () => startRun(dailyLevel(dateKey), { mode: { mode: 'daily', dateKey } }))
       return
     }
     const card = cards[i]
