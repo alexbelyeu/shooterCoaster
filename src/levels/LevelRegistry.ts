@@ -197,14 +197,14 @@ const LEVELS: LevelConfig[] = [
     // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more over
     // the roll (8 s), rats in the Training Area's dark cave (12 s), the lanternflies (#575) at 20 s, their swarm in groups
     // along the ride (`placeWallSwarm`): beside the car up Alaska, then on the Starr ahead of the drop, and the pack in the
-    // pit from 28 s.
+    // pit from 25 s, before the dyno.
     ...paceLevel({
       waves: [
         { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 8, bystanders: { type: 'climber', count: 4 } },
         { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 4 },
         { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 8, bystanders: { type: 'climber', count: 3 } },
-        { type: 'lanternfly', count: 14, waveLabel: 'Lanternflies!', weight: 8 },
-        { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 17, bystanders: { type: 'climber', count: 3 } },
+        { type: 'lanternfly', count: 14, waveLabel: 'Lanternflies!', weight: 5 },
+        { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 20, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
     }),

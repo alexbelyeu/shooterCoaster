@@ -856,7 +856,7 @@ function horizontal(v: Vec3): Vec3 {
 
 /** Views of the rider each of a swarm's groups is judged from, over its part of the first share of the wave's window. */
 const SWARM_VIEWS = 6
-const SWARM_WINDOW_SHARE = 0.6
+const SWARM_WINDOW_SHARE = 0.9
 /**
  * A swarm of at least twice `SWARM_GROUP_MIN` splits into up to `SWARM_GROUPS` groups, each round the spot the rider sees most
  * over its own stretch of the window (#768): on level 6, beside the car up Alaska, then ahead of it over the dyno and the drop.
