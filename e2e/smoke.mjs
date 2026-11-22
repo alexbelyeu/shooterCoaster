@@ -3945,7 +3945,9 @@ async function mobileResults(page) {
       boardInView: !!board && board.left >= 0 && board.right <= vw && board.top >= 0 && board.bottom <= vh,
     }
   })
-  const portrait = await layout()
+  // The entry scrolls the board into view smoothly; on a slow runner that takes a few frames (#707).
+  let portrait = await layout()
+  for (const until = Date.now() + 5000; !portrait.padInView && Date.now() < until; portrait = await layout()) await page.waitForTimeout(250)
   if (portrait.small) problems.push(`phone: ${portrait.small} initials button(s) under 44 px`)
   if (!portrait.padInView) problems.push('phone portrait: the initials pad is not scrolled into view')
   const initialsShown = (text) => page

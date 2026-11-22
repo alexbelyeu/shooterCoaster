@@ -32,4 +32,18 @@ describe('placePopover', () => {
     expect(placePopover(box(300, 200, 80, 44), 200, 250, phone, [])).toMatchObject({ side: 'above', top: 8 })
     expect(placePopover(box(300, 100, 80, 44), 200, 500, phone, []).top).toBe(8)
   })
+
+  it('opens past the gilt plate rather than over it when neither side of the anchor is free (phone results, #707)', () => {
+    // Portrait 390x844: Replay spans the row above Levels / Share, there is no room below Share.
+    const phone = { width: 390, height: 844 }
+    const share = box(200, 600, 150, 48)
+    const replay = box(40, 530, 310, 60)
+    const p = placePopover(share, 300, 360, phone, [replay])
+    expect(p).toEqual({ side: 'above', left: 390 - 8 - 300, top: 530 - 8 - 360 })
+  })
+
+  it('still sits right beside the anchor when that side is free', () => {
+    const replay = box(560, 230, 200, 44)
+    expect(placePopover(box(600, 300, 100, 44), 200, 150, desktop, [replay])).toEqual({ side: 'below', left: 550, top: 352 })
+  })
 })

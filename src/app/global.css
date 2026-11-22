@@ -1691,16 +1691,23 @@ canvas {
   }
 }
 
-/* Phone landscape: three columns, Save / Copy image / Copy link on one row, keep the menu short enough to open above the buttons. */
+/* Phone landscape: six columns in two rows, short enough to open above the gilt plate (Replay / Next Level) over the
+   Share row, which leaves under 200 px at 390 px tall; popoverPlacement steps past the plate, never over it. */
 @media (max-height: 520px) {
   .share-menu {
-    width: 24rem;
+    width: 46rem;
   }
 
   .fair-board.share-board {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.45rem;
-    padding: 0.9rem 0.95rem 1.1rem;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.4rem;
+    padding: 0.75rem 0.8rem 0.9rem;
+  }
+
+  .share-menu .fair-plate.share-item {
+    min-height: 44px;
+    padding: 0.35rem 0.3rem 0.25rem;
+    font-size: 1.05rem;
   }
 
   .share-wide {
