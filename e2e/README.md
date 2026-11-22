@@ -218,8 +218,10 @@ with any other problem prints `placeholder not set` and records nothing. On CI a
 **Programs after the warm-up (#536):** every level's ride (and every `pacing` run, the whole level) ends its summary line with
 `programs after warm-up: +N [+2 at 12.3 s playing (wave:incoming, enemy:killed); …]`: shader programs compiled past the level's
 warm-up count, each with the level time, phase and the bus events since the frame before (`programGrowth` on the hook, `shaders`
-in `results.json`). Every one is a shader `ShaderWarmup` missed, a freeze on a slow driver (Safari links on first draw); it is
-reported, not failed, until the fixes land (the first-shot check in the `countdown` step does fail on one).
+in `results.json`). Every one is a shader `ShaderWarmup` missed, a freeze on a slow driver (Safari links on first draw). The
+nightly's `slow` and `pacing` parts (and `--gate-programs`) fail a level with one (#539: `programGateProblem` in pure
+`e2e/slowPass.mjs`, the problem names the moments); everywhere else, the PR shards among them, it is reported only (the
+first-shot check in the `countdown` step does fail on one).
 **Late level chunk (`--level-chunk-delay <ms>`, #464):** every page gets the level scene's lazy chunk that many ms late, the
 slow sandbox where `quality` and `pickup` measured the composer alone (17 draw calls) before the level had loaded. Every step
 that starts a level waits for `levelReady()`, so any step must pass with it (`--steps quality,pickup,pause --levels level1
@@ -227,7 +229,9 @@ that starts a level waits for `levelReady()`, so any step must pass with it (`--
 **Slow machine (`--cpu-throttle <rate>`, #536):** the ride step runs each level under CDP `Emulation.setCPUThrottlingRate`
 (4 is a modest laptop) and adds `cpu 4x: longest frame X ms, frames of 100 ms or more: N` (`throttled` in `results.json`, from
 `maxFrameMs` and `longFrames` on the hook: the ride's frames from the end of the level's warm-up, #541; combat, the shot and the
-results then run unthrottled). Software GL makes the absolute numbers slow; compare runs, and nothing fails on them yet.
+results then run unthrottled), and writes `throttle.json` (per level: `maxFrameMs`, `longFrames`, `programsAfterWarmup`, #539).
+Software GL makes the absolute numbers slow; compare runs, and nothing fails on the frame numbers yet. The nightly's `slow` part
+is this at 4x on level1 and level3's ride + results, so `prod-e2e-results-slow/throttle.json` is the trend, night by night.
 
 ## Steps, shards and the time budget (`e2e/shards.mjs`, #353)
 
@@ -322,6 +326,8 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   as three parallel jobs, each under its own 60 min cap: `node e2e/smoke.mjs --nightly-part <main|deep|pacing> --url <site> --seconds 10`
   (`e2e/shards.mjs` `NIGHTLY_PARTS`: `main` the UI, first-level and phone steps and every level's ride / shot / results / share,
   `deep` wave / weather / boss / pickup / switch / dark / audio, `pacing`; `shards.test.ts` holds the parts to the full run and to the workflow's matrix).
+  A fourth, `slow` (#539), is an `extra` part outside that count: level1 and level3's ride + results again under `--cpu-throttle 4`
+  (the part sets it), writing `throttle.json`. `slow` and `pacing` set `gatePrograms`: a shader compiled after the warm-up fails the level.
   Each part's artifact is `prod-e2e-results-<part>` (its screenshots, `results.json` and `exit-code`); the `nightly` job folds
   them into one verdict with `scripts/nightlyParts.cjs` (a part that hit its cap or left nothing shows as a failed `part <name>`).
   A part that nears its cap splits again the same way. An exception that escapes the run still writes `results.json` with

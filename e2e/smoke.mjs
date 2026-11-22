@@ -67,8 +67,10 @@
  *   node e2e/smoke.mjs --steps ride,boss --levels level2   # just those steps (names in e2e/shards.mjs)
  *   node e2e/smoke.mjs --steps pacing --levels level2   # time with nothing to shoot over a whole run (pacing.json)
  *   node e2e/smoke.mjs --nightly-part deep --url <site>   # one of the nightly's parallel parts (e2e/shards.mjs NIGHTLY_PARTS)
+ *   node e2e/smoke.mjs --nightly-part slow              # level1 + level3 ride and results under cpu 4x, programs after warm-up gated (throttle.json, #539)
  *
- * Without --shard / --steps / --nightly-part this is the full run (the nightly's depth, run nightly as three parallel parts); CI's PR shards run part of it (#372).
+ * Without --shard / --steps / --nightly-part this is the full run (the nightly's depth, run nightly as three parallel parts
+ * plus the throttled `slow` pass); CI's PR shards run part of it (#372).
  *
  * --dist / --base: preview that build folder under that sub-path (`npm run smoke:portal`),
  * proving its relative asset URLs. Every local run fails on a request to another origin,
@@ -95,6 +97,7 @@ import path from 'node:path'
 import { arg, launchBrowser, startPreview, stopPreview } from '../scripts/headless.mjs'
 import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitFrames, waitVisible } from './pageChecks.mjs'
 import { planRun, STEP_LEVELS } from './shards.mjs'
+import { growthMoments, programGateProblem, throttleReport } from './slowPass.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
 import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
@@ -121,9 +124,6 @@ const COMBAT_STEP_MAX = 0.25
 const RIDE_RATE = Number(arg('ride-rate', 0.14))
 // Fixed run seed (enemy spawns) so screenshots are comparable run to run.
 const SEED = Number(arg('seed', 1337))
-// --cpu-throttle <rate>: the ride step on a slow machine (#536), CDP's CPU throttling for the ride;
-// records its longest frame and its frames of 100 ms or more per level, from the end of the warm-up (#541). Reported, not failed, until the fixes land.
-const CPU_THROTTLE = Number(arg('cpu-throttle', 1))
 // --level-chunk-delay <ms>: every page gets the lazy level chunk this late, the slow runner of #464; every step must pass with it.
 const LEVEL_CHUNK_DELAY_MS = Number(arg('level-chunk-delay', 0))
 const DIST = arg('dist', 'dist')
@@ -142,6 +142,12 @@ try {
   process.exit(2)
 }
 const has = (step) => PLAN.steps.has(step)
+// --cpu-throttle <rate> (or the nightly `slow` part): the ride step on a slow machine (#536), CDP's CPU throttling for the ride;
+// records its longest frame and its frames of 100 ms or more per level, from the end of the warm-up (#541), into throttle.json (#539).
+const CPU_THROTTLE = Number(arg('cpu-throttle', PLAN.cpuThrottle ?? 1))
+// --gate-programs (or a nightly part with `gatePrograms`: `slow`, `pacing`, #539): a level whose run compiled a shader
+// after its warm-up fails (`programGateProblem`). Otherwise the count is reported only.
+const GATE_PROGRAMS = arg('gate-programs') !== undefined || !!PLAN.gatePrograms
 fs.mkdirSync(OUT, { recursive: true })
 
 
@@ -635,7 +641,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
 
 /**
  * Shader programs compiled after the level's warm-up, over the whole ride (#536): each a shader the warm-up missed,
- * a hitch on a slow GPU driver (Safari compiles on first draw). Reported, not failed, until the fixes land.
+ * a hitch on a slow GPU driver (Safari compiles on first draw). Failed only under GATE_PROGRAMS.
  */
 function programsAfterWarmup(page) {
   return page.evaluate(() => {
@@ -645,19 +651,19 @@ function programsAfterWarmup(page) {
   })
 }
 
-const GROWTH_SHOWN = 6
-
 function throttleSummary(t) {
   return t ? ` cpu ${t.rate}x: longest frame ${t.maxMs.toFixed(0)} ms, frames of 100 ms or more: ${t.count}` : ''
 }
 
 function programGrowthSummary(p) {
   if (!p) return ''
-  const at = p.moments
-    .slice(0, GROWTH_SHOWN)
-    .map((m) => `+${m.added} at ${m.levelTime.toFixed(1)} s ${m.phase}${m.events.length ? ` (${m.events.slice(0, 4).join(', ')})` : ''}`)
-  const more = p.moments.length > GROWTH_SHOWN ? `; ${p.moments.length - GROWTH_SHOWN} more` : ''
-  return ` programs after warm-up: +${p.added}${at.length ? ` [${at.join('; ')}${more}]` : ''}`
+  const at = growthMoments(p)
+  return ` programs after warm-up: +${p.added}${at ? ` ${at}` : ''}`
+}
+
+function gatePrograms(problems, p) {
+  const problem = GATE_PROGRAMS ? programGateProblem(p) : null
+  if (problem) problems.push(problem)
 }
 
 /** Largest screen radius a drawn bullet may have, as a fraction of the canvas height (#165). */
@@ -2255,6 +2261,7 @@ async function pacingCheck(page, id) {
   if (!samples.length) return { id: 'pacing', level: id, problems: [...problems, 'no playing frame sampled'], pacing: null, timeline: [] }
   const pacing = pacingMetrics(samples, end)
   const shaders = await programsAfterWarmup(page)
+  gatePrograms(problems, shaders)
   if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   const budget = BUDGETS.pacing?.[id]
   // A placeholder is filled by the caller once the page's errors are counted too (`fillPlaceholderBudget`).
@@ -4445,6 +4452,7 @@ async function run() {
       .finally(() => page.evaluate(() => { window.__SC_TEST__.holdLevelTime = false }).catch(() => {}))
     problems.push(...play.problems)
     const shaders = await programsAfterWarmup(page)
+    gatePrograms(problems, shaders)
     const frenzyEnd = frenzy ? await frenzyEndProblems(page, id, online) : null
     if (frenzyEnd) problems.push(...frenzyEnd.problems)
     const hookErrors = await page.evaluate(() => window.__SC_TEST__.errors)
@@ -4568,6 +4576,7 @@ async function run() {
   const redeploy = failed ? await redeployedMidRun() : null
   if (redeploy) results.push(redeploy)
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2))
+  if (CPU_THROTTLE > 1 && has('ride')) fs.writeFileSync(path.join(OUT, 'throttle.json'), JSON.stringify({ seed: SEED, ...throttleReport(CPU_THROTTLE, results) }, null, 2))
   for (const r of results) {
     const en = r.enemies && !r.enemies.error
       ? ` enemiesOnScreen=${r.enemies.onScreen}${r.enemies.levelTime != null ? ` at ${r.enemies.levelTime.toFixed(1)}s` : ''} readable=${r.enemies.readable} largestPx=${r.enemies.largestPx}`
