@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { mergePainted, painted, paintedAt, paintedPolygon, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
 import { bent, darkUnder, grin, recolor } from './enemyPaint'
 import { withRim } from './enemyRim'
+import { IMP_ORANGE, IMP_DARK, OBSIDIAN as OBSIDIAN_HEX, LAVA, LAVA_HOT, DRAKE_CHARCOAL, DRAKE_MEMBRANE, DRAKE_GLOW, WISP_EMBER, WISP_FLAME, WISP_WHITE, WISP_RIM, WISP_RIBBON_ROOT, WISP_RIBBON_TIP } from './enemyPalette'
 
 // Inferno's enemies as characters (#463, #813, briefs in docs/art/ENEMIES.md): the Ember Wisp, the Fire
 // Imp, the Lava Golem and the Infernal Drake. Every part is vertex-painted and merged per moving part; +z faces the
@@ -56,11 +57,17 @@ export const EMBER_WISP_CORE_GEO = mergePainted([
   ...[-1, 1].map((s) => painted(new THREE.SphereGeometry(0.5, 4, 2), '#000000', [s * 1.05, 0.4, 2.62], [0, s * 0.35, 0])),
 ])
 
+/** An sRGB hex colour as a GLSL `vec3` in linear RGB, the space the shader adds emissive light in. */
+function glslLinear(hex: string): string {
+  const c = new THREE.Color(hex)
+  return `vec3(${c.r.toFixed(3)}, ${c.g.toFixed(3)}, ${c.b.toFixed(3)})`
+}
+
 const WISP_CORE_PARS = /* glsl */ `
 uniform float uWispHeat;
 vec3 wispRamp(float t) {
-  vec3 c = mix(vec3(0.63, 0.06, 0.06), vec3(1.0, 0.54, 0.16), smoothstep(0.1, 0.5, t));
-  return mix(c, vec3(1.0, 0.93, 0.75), smoothstep(0.7, 1.0, t));
+  vec3 c = mix(${glslLinear(WISP_EMBER)}, ${glslLinear(WISP_FLAME)}, smoothstep(0.1, 0.5, t));
+  return mix(c, ${glslLinear(WISP_WHITE)}, smoothstep(0.7, 1.0, t));
 }
 `
 const WISP_CORE_APPLY = /* glsl */ `
@@ -76,7 +83,7 @@ export const EMBER_WISP_HEAT = { value: 1 }
 
 export const EMBER_WISP_CORE_MAT = withEmissivePatch(
   withRim(new THREE.MeshStandardMaterial({ vertexColors: true, color: '#000000', roughness: 0.5, flatShading: true }), {
-    color: '#ff3a10', intensity: 0.7, power: 2,
+    color: WISP_RIM, intensity: 0.7, power: 2,
   }),
   'wisp-core', { uWispHeat: EMBER_WISP_HEAT }, WISP_CORE_PARS, WISP_CORE_APPLY,
 )
@@ -89,8 +96,8 @@ function ribbon(width: number, yaw: number, roll: number): THREE.BufferGeometry 
   const positions: number[] = []
   const along: number[] = []
   const colors: number[] = []
-  const root = new THREE.Color('#ff8a2a').multiplyScalar(1.15)
-  const tip = new THREE.Color('#a01010')
+  const root = new THREE.Color(WISP_RIBBON_ROOT).multiplyScalar(1.15)
+  const tip = new THREE.Color(WISP_RIBBON_TIP)
   const c = new THREE.Color()
   const at = (t: number, side: number) => {
     const h = t * RIBBON_LENGTH
@@ -142,8 +149,6 @@ export const EMBER_WISP_RIBBON_MAT = (() => {
 
 // ── Fire Imp: pear body, big grinning head, curved horns, stubby arms, whip tail ──
 
-const IMP_ORANGE = '#ff7a1a'
-const IMP_DARK = '#7a2208'
 const IMP_BONE = '#f2dcae'
 const IMP_MOUTH = '#2a0805'
 const IMP_FANG = '#fff6e6'
@@ -211,10 +216,7 @@ export const FIRE_IMP_EYE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true
 // smaller painted lava inside: the gaps between the plates are its seams. One material for every part; the shader makes
 // the painted lava glow (`LAVA_GOLEM_GLOW`, pulsing) and the flare material on a hit makes it white-hot.
 
-const OBSIDIAN = ['#141014', '#1c151a', '#251b1f'].map((c) => new THREE.Color(c))
-const LAVA = '#ff5a1a'
-const LAVA_HOT = '#ffc040'
-
+const OBSIDIAN = OBSIDIAN_HEX.map((c) => new THREE.Color(c))
 /**
  * A cracked boulder placed by `matrix`: its faces grouped into a few plates (each face to the nearest of `plates`
  * seeded directions), each plate shrunk about its own centre along the surface, over a lava core showing through
@@ -327,12 +329,9 @@ export const LAVA_GOLEM_FLARE_MAT = golemMaterial({ value: 7 }, 0.9)
 // eyes and the inside of the jaw (the glow is painted: a hot orange vertex colour lights itself). Moving parts: torso,
 // neck with head, jaw, tail, and each wing's arm and hand.
 
-const DRAKE_CHARCOAL = '#2a1e1e'
 const DRAKE_BELLY = new THREE.Color('#5a3026')
-const DRAKE_MEMBRANE = '#8a1a1a'
 const DRAKE_VEIN = '#3a0c0c'
 const DRAKE_BONE = '#d8c8a8'
-const DRAKE_GLOW = '#ff5a14'
 const DRAKE_EYE = '#ffd040'
 
 /** Pivots (model units): the neck's root, the tail's root, the right shoulder. */

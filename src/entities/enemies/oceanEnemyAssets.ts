@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { mergePainted, painted, paintedAt, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
 import { fin, grin, recolor } from './enemyPaint'
 import { withRim } from './enemyRim'
+import { SHARK_TOP as SHARK_TOP_HEX, SHARK_BELLY as SHARK_BELLY_HEX } from './enemyPalette'
 
 // The Ocean's shark as a character (#813, brief in docs/art/ENEMIES.md): a toy shark, long nose, big dorsal and a
 // red-gummed grin. Every part is vertex-painted and merged per moving part, body and tail; +z is the nose, +y up.
@@ -9,9 +10,9 @@ import { withRim } from './enemyRim'
 
 type Vec3 = [number, number, number]
 
-const SHARK_TOP = new THREE.Color('#3a5f7a')
+const SHARK_TOP = new THREE.Color(SHARK_TOP_HEX)
 const SHARK_SPINE = new THREE.Color('#2a465c')
-const SHARK_BELLY = new THREE.Color('#f2f4f2')
+const SHARK_BELLY = new THREE.Color(SHARK_BELLY_HEX)
 const SHARK_GILL = '#1a2a38'
 const SHARK_GUM = '#a83a3a'
 const SHARK_TOOTH = '#f6f2e4'

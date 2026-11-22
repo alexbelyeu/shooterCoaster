@@ -25,7 +25,7 @@ Procedural knowledge for building levels in the Three.js on-rails shooter coaste
 2. **Never use height-via-scale trick** — `CylinderGeometry(r, r, 1, N)` + `scale.set(1, h, 1)` creates hexagonal sticks. Bake height into geometry.
 3. **Ground enemies must sample `heightFn` every frame** via `TerrainContext` — not just at spawn
 4. **Paired InstancedMesh callbacks need shared config** — pre-compute random values in `useMemo` arrays
-5. **Enemy colors must contrast with terrain** — dark-on-dark = invisible. Keep base colours ΔE ≥ ~15 from the biome's terrain ramp, and wrap every lit enemy material in `withRim()` (`enemyRim.ts`: fresnel rim + reduced fog)
+5. **Enemy colors must contrast with terrain** — dark-on-dark = invisible. Every enemy's read colours keep `MIN_DELTA_E` / `MIN_DELTA_E_PROTAN` (`src/entities/enemies/colourVision.ts`, OKLab, checked under deuteranopia, protanopia and normal vision) from its biome's sky, ground, sea or walls: a new enemy puts its read colours in `enemyPalette.ts` and adds itself to `enemyColourVision.test.ts`, which fails for any enemy type it doesn't check. Wrap every lit enemy material in `withRim()` (`enemyRim.ts`: fresnel rim + reduced fog)
 6. **Add `specular` to MeshPhongMaterial** — flat matte looks like plastic
 7. **Scatter radii must extend beyond track extent** — otherwise outer track sections are empty
 8. **CircleGeometry needs 24+ segments** — 8 segments = visible octagon
