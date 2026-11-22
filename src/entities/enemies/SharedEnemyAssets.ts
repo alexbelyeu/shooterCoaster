@@ -2,14 +2,15 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
 import { withRim } from './enemyRim'
-import { BALLOON_COLORS, CROW_BODY as CROW_BODY_HEX, CROW_SHEEN as CROW_SHEEN_HEX, SCORPION_BODY_COLOR, SCORPION_PINCER_COLOR, SCORPION_LEG_COLOR, JELLY_COLORS, CLIMBER_SHIRT, CLIMBER_TROUSERS, RAT_FUR, RAT_BELLY, DUST_GREY, DUST_CHALK, LANTERNFLY_FOREWING, LANTERNFLY_RED, LANTERNFLY_BODY } from './enemyPalette'
+import { BALLOON_COLORS, CROW_BODY as CROW_BODY_HEX, CROW_SHEEN as CROW_SHEEN_HEX, SCORPION_BODY_COLOR, SCORPION_PINCER_COLOR, SCORPION_LEG_COLOR, JELLY_COLORS, CLIMBER_SHIRT, CLIMBER_TROUSERS, RAT_FUR, RAT_BELLY, DUST_GREY, DUST_LIGHT, DUST_DARK, DUST_CHALK, LANTERNFLY_FOREWING, LANTERNFLY_RED, LANTERNFLY_BODY } from './enemyPalette'
 
 export * from './infernoEnemyAssets'
 export * from './oceanEnemyAssets'
 
-// Readability rules (issue #15): every lit enemy material gets a fresnel rim via
-// withRim(); base colours keep ΔE ≥ ~15 from their biome's dominant terrain
-// colours (see docs/agents/DECISIONS.md, 2026-10-19 enemy readability).
+// Readability rules: every lit enemy material gets a fresnel rim via withRim() (#15), and every enemy's read
+// colours keep `MIN_DELTA_E` (deuteranopia, normal vision) / `MIN_DELTA_E_PROTAN` (protanopia) from what it is seen
+// against (colourVision.ts, #838). A new enemy puts its read colours in enemyPalette.ts and adds itself to
+// enemyColourVision.test.ts, which fails for any enemy type it doesn't check.
 
 // ── Balloon geometries (shared by Balloon + GoldenBalloon) ──────────
 export const BALLOON_BODY_GEO = new THREE.SphereGeometry(30, 16, 16)
@@ -751,8 +752,6 @@ export const RAT_MAT = withRim(new THREE.MeshStandardMaterial({
 // 500-triangle cap.
 
 const DUST_CORE = '#a4a099'
-const DUST_LIGHT = '#cbc7be'
-const DUST_DARK = '#88847d'
 const DUST_TAPE = '#f2c84b'
 
 export const DUST_BUNNY_RADIUS = 2.4

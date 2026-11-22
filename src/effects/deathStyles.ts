@@ -2,6 +2,7 @@
 import type { EnemyType } from '@/types/level'
 import type { KillSound } from '@/audio/sfxDesign'
 import type { Vec3 } from '@/entities/spawning/spawnPlacement'
+import { DUST_CHALK, DUST_DARK, DUST_GREY, DUST_LIGHT } from '@/entities/enemies/enemyPalette'
 
 /** `chunk` layers draw in the lit chunk mesh; every other shape is a stretched unlit box. */
 export type ParticleShape = 'spark' | 'mote' | 'confetti' | 'feather' | 'drop' | 'chunk'
@@ -323,8 +324,8 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
   // The climber's chalk-puff family, greyer and fuller: dust and chalk, a few drifting fluff tufts.
   dustBunny: {
     layers: [
-      layer({ shape: 'mote', count: 36, colors: ['#cbc7be', '#bab6ae', '#f6f5f0'], glow: 1.1, speed: [12, 55], up: 8, drag: 2.4, gravity: 3, size: 7, hold: 0.5 }),
-      layer({ shape: 'feather', count: 8, colors: ['#88847d', '#bab6ae'], glow: 1, speed: [20, 50], up: 20, drag: 3, gravity: 12, size: 4, spin: 6, hold: 0.6 }),
+      layer({ shape: 'mote', count: 36, colors: [DUST_LIGHT, DUST_GREY, DUST_CHALK], glow: 1.1, speed: [12, 55], up: 8, drag: 2.4, gravity: 3, size: 7, hold: 0.5 }),
+      layer({ shape: 'feather', count: 8, colors: [DUST_DARK, DUST_GREY], glow: 1, speed: [20, 50], up: 20, drag: 3, gravity: 12, size: 4, spin: 6, hold: 0.6 }),
     ],
     lifetime: 2.2, scale: 1.3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'chalk',
   },

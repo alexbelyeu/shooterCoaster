@@ -54,6 +54,17 @@ function enemy(id: string, type: EnemyType, biome: BiomeType, rim: THREE.Materia
   return { id, type, biome, reads }
 }
 
+/**
+ * The Ember Wisp has no paint, only glow: its core's emissive ramp at the cool flank (heat 0: ember × 0.8) and the
+ * body (heat 0.5: flame × 1.2), with its rim, and the additive ribbons' root (× 1.15) and tip (infernoEnemyAssets.ts).
+ */
+const emberWisp = (): Read => {
+  const core = enemy('emberWisp', 'emberWisp', 'volcanic', A.EMBER_WISP_CORE_MAT,
+    glowColour(0, hex(P.WISP_EMBER), 0.8), glowColour(0, hex(P.WISP_FLAME), 1.2))
+  core.reads.push(glowColour(0, hex(P.WISP_RIBBON_ROOT), 1.15), hex(P.WISP_RIBBON_TIP))
+  return core
+}
+
 const ENEMIES: Read[] = [
   ...P.BALLOON_COLORS.map((c, i) => enemy(`balloon ${c}`, 'balloon', 'themePark', A.BALLOON_BODY_MATS[i], c)),
   enemy('goldenBalloon', 'balloon', 'themePark', null, A.GOLDEN_BODY_MAT),
@@ -65,6 +76,7 @@ const ENEMIES: Read[] = [
   enemy('snowman', 'snowman', 'arctic', null, A.SNOWMAN_MAT, A.SNOWMAN_ARM_MAT, A.SNOWMAN_NOSE_MAT, A.SNOWMAN_COAL_MAT),
   enemy('snowmanBrute', 'snowmanBrute', 'arctic', null, A.SNOWMAN_MAT, A.SNOWMAN_SCARF_MAT, A.SNOWMAN_HAT_MAT, A.SNOWMAN_COAL_MAT),
   enemy('snowmanScout', 'snowmanScout', 'arctic', null, A.SNOWMAN_SCOUT_MAT, A.SNOWMAN_SCOUT_SHARD_MAT, A.SNOWMAN_NOSE_MAT, A.SNOWMAN_COAL_MAT),
+  emberWisp(),
   enemy('fireImp', 'fireImp', 'volcanic', A.FIRE_IMP_MAT, P.IMP_ORANGE, P.IMP_DARK),
   enemy('lavaGolem', 'lavaGolem', 'volcanic', A.LAVA_GOLEM_MAT, ...P.OBSIDIAN, P.LAVA, P.LAVA_HOT),
   enemy('infernalDrake', 'infernalDrake', 'volcanic', A.DRAKE_MAT, P.DRAKE_CHARCOAL, P.DRAKE_MEMBRANE, P.DRAKE_GLOW),
@@ -133,6 +145,13 @@ function failures(vision: Vision, min: number): string[] {
 }
 
 describe('enemy palettes under colour-vision deficiency (#838)', () => {
+  it('checks every enemy type (a new one adds its read colours to enemyPalette.ts and to ENEMIES here)', () => {
+    const checked = new Set(ENEMIES.map((e) => e.type))
+    // The climber is a bystander: it is checked against the gym targets beside it, not against the backdrop.
+    const missing = (Object.keys(ENEMY_PLACEMENT) as EnemyType[]).filter((t) => t !== 'climber' && !checked.has(t))
+    expect(missing).toEqual([])
+  })
+
   it(`every pair keeps ΔE_OK ≥ ${MIN_DELTA_E} under deuteranopia`, () => {
     expect(failures('deuteranopia', MIN_DELTA_E)).toEqual([])
   })
