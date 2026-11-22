@@ -51,9 +51,13 @@ describe('smoke shards (#353, #372)', () => {
   })
 
   it('the nightly production smoke is the full run, in the parts of its matrix (#570)', () => {
-    const parts = Object.keys(NIGHTLY_PARTS).flatMap((p) => stepLevelPairs(planRun({ nightlyPart: p }) as Plan, levels) as Pair[]).map(key)
+    const pairsOf = (p: string) => (stepLevelPairs(planRun({ nightlyPart: p }) as Plan, levels) as Pair[]).map(key)
+    const names = Object.keys(NIGHTLY_PARTS) as (keyof typeof NIGHTLY_PARTS)[]
+    const parts = names.filter((p) => !('extra' in NIGHTLY_PARTS[p])).flatMap(pairsOf)
     expect(new Set(parts).size).toBe(parts.length)
     expect([...parts].sort()).toEqual([...full].sort())
+    // An extra pass repeats steps of the full run under other conditions (the throttled `slow`, #539).
+    for (const p of names.filter((n) => 'extra' in NIGHTLY_PARTS[n])) for (const k of pairsOf(p)) expect(full).toContain(k)
     const wf = fs.readFileSync(path.join(root, '.github/workflows/prod-smoke.yml'), 'utf8')
     const matrix = wf.match(/^\s+part: \[(.*)\]$/m)
     expect(matrix).not.toBeNull()
@@ -64,6 +68,25 @@ describe('smoke shards (#353, #372)', () => {
     expect(cmd).not.toBeNull()
     expect(cmd![1]).toContain('--nightly-part "${{ matrix.part }}"')
     expect(cmd![1]).not.toMatch(/--(shard|steps|levels|skip-desktop)\b/)
+  })
+})
+
+describe('the throttled nightly pass (#539)', () => {
+  it('rides level1 and a boss level under cpu 4x, and gates programs after warm-up there and in pacing', () => {
+    const slow = planRun({ nightlyPart: 'slow' })
+    expect(slow.cpuThrottle).toBe(4)
+    expect(slow.gatePrograms).toBe(true)
+    expect(stepLevelPairs(slow as Plan, levels).map(key).sort()).toEqual(['results@level1', 'results@level3', 'ride@level1', 'ride@level3'])
+    expect(planRun({ nightlyPart: 'pacing' }).gatePrograms).toBe(true)
+    expect(planRun({ nightlyPart: 'main' })).toMatchObject({ cpuThrottle: 1, gatePrograms: false })
+  })
+
+  it('leaves the PR shards ungated and unthrottled', () => {
+    for (const s of shardNames) {
+      const plan = planRun({ shard: s })
+      expect(plan).not.toHaveProperty('gatePrograms')
+      expect(plan).not.toHaveProperty('cpuThrottle')
+    }
   })
 })
 
