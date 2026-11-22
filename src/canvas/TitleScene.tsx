@@ -11,6 +11,7 @@ import TitleCoaster, { type CoasterLivery, type TitleClock } from './TitleCoaste
 import TitlePark from './TitlePark'
 import TitleHorizon from './TitleHorizon'
 import { CAMERA_FAR, HORIZON_FOG } from './titleHorizon'
+import { AERIAL_OFF, setAerialFog } from '@/levels/environments/shared/aerialFog'
 import TitleRides, { createTitleWaterMaterial } from './TitleRides'
 import { CAROUSELS, FERRIS_WHEEL, clearOfCrossing } from './titlePark'
 import { consumeClickSwallow, isTitleAttract } from './titleAttract'
@@ -316,6 +317,8 @@ export default function TitleScene() {
   const clock = useRef<TitleClock>({ scene: 0 }).current
   const water = useMemo(createTitleWaterMaterial, [])
   useEffect(() => () => water.dispose(), [water])
+  // The title keeps its flat horizon fog (no aerial tint, #836): the poster's still is drawn from this scene
+  useEffect(() => setAerialFog(AERIAL_OFF), [])
   useFrame(() => {
     water.uniforms.uTime.value = clock.scene
   })

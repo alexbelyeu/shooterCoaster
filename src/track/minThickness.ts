@@ -51,7 +51,7 @@ export function withMinThickness<T extends THREE.Material>(material: T, floor: P
   return material
 }
 
-/** The scene's linear fog ending at `TRACK_FOG_REACH` of its span; exponential fog is left as three draws it. */
+/** The scene's linear fog ending at `TRACK_FOG_REACH` of its span, in the sky's aerial tint (`aerialFog.ts`, installed by `GameCanvas`); exponential fog is left as three draws it. */
 const TRACK_FOG = /* glsl */ `
 #ifdef USE_FOG
   #ifdef FOG_EXP2
@@ -59,7 +59,7 @@ const TRACK_FOG = /* glsl */ `
   #else
     float fogFactor = smoothstep( fogNear, mix( fogNear, fogFar, ${TRACK_FOG_REACH.toFixed(3)} ), vFogDepth );
   #endif
-  gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );
+  gl_FragColor.rgb = mix( gl_FragColor.rgb, aerialFogColor( fogFactor, vAerial ), fogFactor );
 #endif
 `
 

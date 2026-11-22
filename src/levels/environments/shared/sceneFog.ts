@@ -36,3 +36,11 @@ export function combineFog(base: Pick<AtmosphereConfig, 'fogNear' | 'fogFar'>, m
   out.near = Math.min(near, far * NEAR_SHARE_OF_FAR)
   return out
 }
+
+/**
+ * How much of the aerial fog tint (`aerialFog.ts`) survives the effects closing the fog in: 1 with none, gone once
+ * they have pulled the fog's far to half the biome's, so the effect's own fog colour wins.
+ */
+export function aerialDamp(mods: FogModifiers): number {
+  return Math.max(2 * mods.dark.far * mods.eruption.far * mods.weather.far - 1, 0)
+}

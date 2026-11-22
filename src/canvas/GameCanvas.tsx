@@ -13,6 +13,10 @@ import { telemetryActive } from '@/telemetry/playerTelemetry'
 import { dismissPoster, posterShown } from '@/app/poster'
 import { perfRequested } from '@/perf/perfFlag'
 import { loadLevelScene } from './loadLevelScene'
+import { installAerialFog } from '@/levels/environments/shared/aerialFog'
+
+// Before any program compiles: three caches a built-in material's program by its parameters, not its source
+installAerialFog()
 
 const PerfProbe = lazy(() => import('@/perf/PerfProbe'))
 

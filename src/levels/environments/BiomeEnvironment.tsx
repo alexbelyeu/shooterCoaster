@@ -20,7 +20,8 @@ import OceanWater from './shared/OceanWater'
 import TreeField from './shared/TreeField'
 import ParticleField from './shared/ParticleField'
 import Weather from './shared/Weather'
-import { combineFog, createFogModifiers, resetFogModifiers } from './shared/sceneFog'
+import { aerialDamp, combineFog, createFogModifiers, resetFogModifiers } from './shared/sceneFog'
+import { AERIAL_OFF, resolveAerialFog, setAerialFog } from './shared/aerialFog'
 import { addTerrainGlow, createNoiseTerrain, createTerrainMaterial } from './shared/terrainMesh'
 
 interface BiomeEnvironmentProps {
@@ -46,6 +47,7 @@ interface BiomeEnvironmentProps {
  *
  * It owns the scene fog's near and far: a dark section, the volcanic eruption and the weather each publish a modifier
  * into `fogMods`, combined here once a frame (`combineFog`), and a new run starts them all from the biome's fog.
+ * It also sets the aerial fog's tint (`shared/aerialFog.ts`), damped while those effects close the fog in.
  */
 export default function BiomeEnvironment({
   biome,
@@ -72,6 +74,8 @@ export default function BiomeEnvironment({
     setRimLift(atmosphere.enemyRimLift ?? 1)
     return () => setRimLift(1)
   }, [atmosphere])
+  const aerial = useMemo(() => resolveAerialFog(atmosphere), [atmosphere])
+  useEffect(() => () => setAerialFog(AERIAL_OFF), [])
 
   useFrame(() => {
     const fog = fogRef.current
@@ -79,6 +83,7 @@ export default function BiomeEnvironment({
     combineFog(atmosphere, fogMods, fogRange)
     fog.near = fogRange.near
     fog.far = fogRange.far
+    setAerialFog(aerial, aerialDamp(fogMods))
     const report = window.__SC_TEST__?.weather
     if (report) {
       report.fogNear = fog.near
