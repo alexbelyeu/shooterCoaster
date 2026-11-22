@@ -2671,3 +2671,114 @@ sin), its eyes have none, and an `aGloss` attribute keeps the eyes' roughness an
 **Consequences:** Level 6's ride shot 136 → 94 draws (objects 123 → 78), no new programs after the warm-up; every
 level with towers draws 7 fewer. The towers are no longer culled per bucket (they rarely were: a bucket spans the
 ride). Budgets unchanged.
+
+## 2026-11-21 — The gamepad drives the mouse's aim and the keyboard's keys, not its own paths (Builder, #819)
+
+**Context:** #819 adds controller play. Combat, the crosshair and every screen already answer the mouse (`pointerInput`) and the keyboard (each screen's `keydown` handler, the pause menu's and level grid's arrow rules).
+**Decision:** `gamepadInput.ts` writes the right stick's cursor and RT into `pointerInput`'s shared state (`gamepadAim` / `gamepadTrigger`, as a mouse: whichever moved last owns the aim), calls the store for Start (pause / resume, the Escape key's actions), and sends synthetic `keydown`s for the menus: B is Escape, the d-pad / left stick are the arrow keys, A clicks the focused control (a synthetic Enter doesn't activate a button) or sends Enter. An arrow no screen handles (not default-prevented) moves focus to the next / previous control in the open dialog, as Tab would. B on the title does nothing unless its Settings dialog is open, because Escape there opens the worlds.
+**Consequences:** A screen's keyboard behaviour is its gamepad behaviour: a new screen gets controller support by handling Escape / arrows / Enter, with no gamepad code. Range sliders in Settings can be focused but not adjusted by the pad (synthetic arrows have no default action); countdown skipping (#818's file) is a follow-up. The poll runs only while a pad is connected.
+
+## 2026-11-21 — A nightly part that production redeployed under is inconclusive, not re-run (builder, #822)
+
+**Context:** The nightly full smoke runs against https://scoaster.com around 15:00Z, when QA approvals merge and
+deploy. Vercel deploys atomically, so the old build's hashed chunks vanish mid-run and a part fails on a stale lazy
+chunk (run 44759142920: `Failed to fetch dynamically imported module …/engine--LMLsimo.js`) with no regression.
+**Decision:** With `--url` the smoke fingerprints `index.html` (entry script + modulepreloads) at the start and again
+when the run fails or throws. If it changed, the part is **inconclusive** (exit 3): its failed checks are marked
+`inconclusive`, a `build` check says `production redeployed mid-run (A → B): no single build tested`, the `nightly`
+job stays green with a warning, and `prod-alert.cjs` neither opens nor closes `agent:prod-broken`. Chosen over a
+re-run because one part already takes most of its 60 min cap, so a re-run in the same job would hit it; the next
+nightly (or a manual dispatch) is the fresh test of the new build. A failure on an unchanged or unreadable fingerprint
+stays red as before, and any other part's real failure still makes the whole verdict red.
+**Consequences:** A nightly that races a deploy confirms nothing; a fix waiting on a green nightly waits one more day
+(or a dispatched run). No retries or timeouts were added.
+
+## 2026-11-21 — A deploy mid-session reloads the page, once, between runs (Builder, #823)
+
+**Context:** Vercel deploys are atomic, so a tab opened before a deploy loses the old build's hashed lazy chunks; the
+game cached the failed import and played the session with no SFX or music. Skew Protection is a paid feature.
+**Decision:** Lazy chunks load through `core/staleBuild.ts` `lazyChunk`, which forgets a failure. A failed import (or
+Vite's `vite:preloadError`) makes `app/staleReload.ts` fetch the page again (same origin, `no-store`, at most every
+30 s) and compare its module entry script with the running one: only a different entry counts as a new build, so an
+outage or offline tab never reloads. The page reloads on the title or level select, or as the player leaves results
+(never mid-run, never with initials open; the online submission goes first with `keepalive`), at most once per session
+(a sessionStorage guard; no storage, no reload).
+**Consequences:** Don't add a bare `import()` that memoises its promise: use `lazyChunk`. A player who taps Replay or
+Next on results after a deploy lands on the title of the new build instead.
+
+## 2026-11-21 — Photo mode: the camera hands over, the PNG comes from the composer's frame (Builder, #828)
+
+**Context:** Photo mode orbits the paused ride's camera and saves a PNG of the composited frame. The canvas has no
+`preserveDrawingBuffer`, and the EffectComposer renders in a priority-1 `useFrame`.
+**Decision:** CoasterCamera returns early while the store's `photo` is on and `track/PhotoCamera.tsx` writes the camera;
+the ride's own state is never touched, so Back restores the seat exactly on CoasterCamera's next frame (the smoke checks
+the pose to 1e-4). Save is answered by a priority-2 `useFrame` (after the composer, same rAF task) calling
+`gl.domElement.toBlob`. The photo UI is a lazy chunk; its pure helpers import `PlacementBounds` as a type only so
+`spawnPlacement` doesn't follow them out of the level chunk.
+**Consequences:** Photo mode costs ~2.7 KB gz of total JS (0.44 KB startup, 1.1 KB the lazy `PhotoMode` chunk, the rest
+the level chunk), which needs a `jsTotalGzipKB` raise: `main` sits at 629.05 KB (the whale, #796, already merged). The Director raised it 630 → 633 on this branch (entry `2026-11-21-828-total-js-633.md`).
+Anything else that must run after the composer's render uses a `useFrame` priority above 1.
+
+## 2026-11-21 — Total JS 630 → 633 KB gz for photo mode (Director, #828)
+
+**Context:** Photo mode (#828, PR #831) adds ~2.7 KB gz of total JS (0.44 KB startup, the rest lazy). `main` is at
+629.05 / 630 KB after #816's cut and the whale (#796). The earlier request, #809 (630 → 636), was opened on a
+`claude/*` branch that auto-merge never takes, and is closed in favour of this.
+**Decision:** `jsTotalGzipKB` 630 → 633, the smallest raise that fits photo mode with ~0.2 KB to spare. `startupJsGzipKB`
+(435) and `jsLargestChunkGzipKB` (260) are unchanged. A player-facing M3 feature at 0.4 % of the bundle is worth it;
+a blanket 636 is not.
+**Consequences:** The next PR that needs total JS cuts code first (as #816 did) before asking for more; the Director
+weighs any further raise against a cut.
+
+## 2026-11-21 — Night Ride is a whole second atmosphere, keyed by biome (builder, #829)
+
+**Context:** The Night Ride needed a darker sky, lights, fog and grade, lit props and enemies that still read, with
+the day look untouched and no new lights or draw calls.
+**Decision:** A night preset is a complete `AtmosphereConfig` in `levels/environments/nightPreset.ts`
+(`NIGHT_ATMOSPHERES`, keyed by biome), not a set of offsets on the day one. `atmosphereFor(biome, runVariant)` is the
+one switch: every reader of the atmosphere (dome, env bake, lights, `combineFog`'s base, the post grade) follows it.
+Two optional fields carry the rest: `lampGlow` (props' emissive, through their existing materials) and
+`enemyRimLift` (scales every enemy rim uniform scene-wide via `enemyRim.ts` `setRimLift`, reset to 1 when the
+environment unmounts). The run option `runVariant` is not persisted, scores and stars stay one board per level, and a
+daily is always by day.
+**Consequences:** A level gets a Night Ride by adding its biome's preset (`nightPreset.test.ts` covers each entry);
+two levels sharing a biome would share it. Anything that reads `ATMOSPHERES[biome]` directly during a run (the
+turntable stage, the Kraken's foam fog) stays on the day values; new run-time readers should use `atmosphereFor`.
+
+## 2026-11-21 — Build target: mid-2021 browsers instead of Vite's default floor (Builder, #834)
+
+**Context:** The track radar (#834) adds ~1.2 KB gz of JS and `main` was at 632.69 / 633 KB gz total, with the #828 entry
+asking the next PR to cut before asking for more. Vite 6's default `build.target` (es2020, Chrome 87, Edge 88, Firefox 78,
+Safari 14) makes esbuild rewrite every `?.` as `a == null ? void 0 : a.b` (for a V8 bug before Chrome 91) and lower class
+fields with helpers (Firefox 78, Safari 14), across the whole bundle.
+**Decision:** `build.target` in `vite.config.ts` is `['es2020', 'chrome91', 'edge91', 'firefox90', 'safari15']` (mid-2021
+browsers). Total JS drops ~1.7 KB gz (632.21 KB with the radar in), the startup JS a little too. No budget is raised.
+**Consequences:** Chrome/Edge 87–90, Firefox 78–89 and Safari 14 are no longer guaranteed to run the game: in late 2026
+these are a vanishing share, and the game already needs WebGL 2. Don't put the default target back without a budget for
+the bytes it costs.
+
+## 2026-11-22 — Aerial fog patches three's fog chunks once, globally (Builder, #836)
+
+**Context:** The fog should take on the sky in the view direction (warmer towards the sun, the zenith's blue away).
+Many materials already carry an `onBeforeCompile` patch, so a per-material patch would mean touching every one.
+**Decision:** `src/levels/environments/shared/aerialFog.ts` `installAerialFog()` appends to `ShaderChunk.fog_*`
+and adds three uniforms to every fogged `ShaderLib` shader and `UniformsLib.fog`. `GameCanvas` calls it at module
+load, before any program compiles (three caches a built-in material's program by its parameters, not its source).
+The uniform values are plain `{x, y, z[, w]}` objects, which `UniformsUtils.clone` passes by reference, so one write a
+frame (`BiomeEnvironment`, damped by `sceneFog.ts` `aerialDamp` while a dark section, the eruption or a weather pulse
+closes the fog) reaches every material. Strength 0 (the default, the title, the gym, Night Ride, the dev pages that
+never install it) is three's own fog exactly.
+**Consequences:** Never swap those values for `Vector3`s (each material would get its own copy and the tint would
+freeze at its first value). Custom fog code that wants the tint calls `aerialFogColorGlsl()` (the track's haze, the
+ocean); shaders with their own fog maths (smoke, flame, contact shadows, enemies) stay flat.
+
+## 2026-11-22 — Total JS 633 → 634 KB gz for colour-blind safe enemies (Director, #840)
+
+**Context:** `main` measures 632.98 / 633 KB gz total JS after photo mode (#828). PR #839 (#838, colour-blind safe
+enemy palettes, an accessibility item from the VISION.md backlog) adds ~70 bytes gz (a shared `WATER_COLOURS` table and
+less compressible hex colours) and lands at 633.05 KB.
+**Decision:** `jsTotalGzipKB` 633 → 634. Asking an accessibility fix to find 70 bytes of cuts costs a builder session for
+0.01 % of the bundle; 1 KB leaves ~0.9 KB of room for small fixes. `startupJsGzipKB` (435) and `jsLargestChunkGzipKB`
+(260) are unchanged.
+**Consequences:** The 2026-11-21 rule stands for anything bigger: a PR adding more than ~0.5 KB gz total JS cuts code
+first (as #816 did) before asking for a raise, and the Director weighs every raise against a cut.
