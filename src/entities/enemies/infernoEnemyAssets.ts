@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { mergePainted, painted, paintedAt, paintedPolygon, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
 import { bent, darkUnder, grin, recolor } from './enemyPaint'
 import { withRim } from './enemyRim'
+import { IMP_ORANGE, IMP_DARK, OBSIDIAN as OBSIDIAN_HEX, LAVA, LAVA_HOT, DRAKE_CHARCOAL, DRAKE_MEMBRANE, DRAKE_GLOW } from './enemyPalette'
 
 // Inferno's enemies as characters (#463, #813, briefs in docs/art/ENEMIES.md): the Ember Wisp, the Fire
 // Imp, the Lava Golem and the Infernal Drake. Every part is vertex-painted and merged per moving part; +z faces the
@@ -142,8 +143,6 @@ export const EMBER_WISP_RIBBON_MAT = (() => {
 
 // ── Fire Imp: pear body, big grinning head, curved horns, stubby arms, whip tail ──
 
-const IMP_ORANGE = '#ff7a1a'
-const IMP_DARK = '#7a2208'
 const IMP_BONE = '#f2dcae'
 const IMP_MOUTH = '#2a0805'
 const IMP_FANG = '#fff6e6'
@@ -211,10 +210,7 @@ export const FIRE_IMP_EYE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true
 // smaller painted lava inside: the gaps between the plates are its seams. One material for every part; the shader makes
 // the painted lava glow (`LAVA_GOLEM_GLOW`, pulsing) and the flare material on a hit makes it white-hot.
 
-const OBSIDIAN = ['#141014', '#1c151a', '#251b1f'].map((c) => new THREE.Color(c))
-const LAVA = '#ff5a1a'
-const LAVA_HOT = '#ffc040'
-
+const OBSIDIAN = OBSIDIAN_HEX.map((c) => new THREE.Color(c))
 /**
  * A cracked boulder placed by `matrix`: its faces grouped into a few plates (each face to the nearest of `plates`
  * seeded directions), each plate shrunk about its own centre along the surface, over a lava core showing through
@@ -327,12 +323,9 @@ export const LAVA_GOLEM_FLARE_MAT = golemMaterial({ value: 7 }, 0.9)
 // eyes and the inside of the jaw (the glow is painted: a hot orange vertex colour lights itself). Moving parts: torso,
 // neck with head, jaw, tail, and each wing's arm and hand.
 
-const DRAKE_CHARCOAL = '#2a1e1e'
 const DRAKE_BELLY = new THREE.Color('#5a3026')
-const DRAKE_MEMBRANE = '#8a1a1a'
 const DRAKE_VEIN = '#3a0c0c'
 const DRAKE_BONE = '#d8c8a8'
-const DRAKE_GLOW = '#ff5a14'
 const DRAKE_EYE = '#ffd040'
 
 /** Pivots (model units): the neck's root, the tail's root, the right shoulder. */

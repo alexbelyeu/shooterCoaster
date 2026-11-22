@@ -323,8 +323,8 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
   // The climber's chalk-puff family, greyer and fuller: dust and chalk, a few drifting fluff tufts.
   dustBunny: {
     layers: [
-      layer({ shape: 'mote', count: 36, colors: ['#bdb9b1', '#9a968e', '#f6f5f0'], glow: 1.1, speed: [12, 55], up: 8, drag: 2.4, gravity: 3, size: 7, hold: 0.5 }),
-      layer({ shape: 'feather', count: 8, colors: ['#76726b', '#9a968e'], glow: 1, speed: [20, 50], up: 20, drag: 3, gravity: 12, size: 4, spin: 6, hold: 0.6 }),
+      layer({ shape: 'mote', count: 36, colors: ['#cbc7be', '#bab6ae', '#f6f5f0'], glow: 1.1, speed: [12, 55], up: 8, drag: 2.4, gravity: 3, size: 7, hold: 0.5 }),
+      layer({ shape: 'feather', count: 8, colors: ['#88847d', '#bab6ae'], glow: 1, speed: [20, 50], up: 20, drag: 3, gravity: 12, size: 4, spin: 6, hold: 0.6 }),
     ],
     lifetime: 2.2, scale: 1.3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'chalk',
   },

@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
 import { withRim } from './enemyRim'
+import { BALLOON_COLORS, CROW_BODY as CROW_BODY_HEX, CROW_SHEEN as CROW_SHEEN_HEX, SCORPION_BODY_COLOR, SCORPION_PINCER_COLOR, SCORPION_LEG_COLOR, JELLY_COLORS, CLIMBER_SHIRT, CLIMBER_TROUSERS, RAT_FUR, RAT_BELLY, DUST_GREY, DUST_CHALK, LANTERNFLY_FOREWING, LANTERNFLY_RED, LANTERNFLY_BODY } from './enemyPalette'
 
 export * from './infernoEnemyAssets'
 export * from './oceanEnemyAssets'
@@ -21,10 +22,6 @@ export const BALLOON_GEO = mergeGeometries([
 ])
 
 // ── Balloon materials (10 color variants) ───────────────────────────
-const BALLOON_COLORS = [
-  '#ff3333', '#ff6633', '#ffcc00', '#33cc33', '#3399ff',
-  '#9933ff', '#ff33cc', '#ff6699', '#00cccc', '#66ff33',
-]
 
 export const BALLOON_BODY_MATS = BALLOON_COLORS.map(
   (c) => withRim(new THREE.MeshPhongMaterial({ color: c, specular: '#ffffff', shininess: 60 })),
@@ -55,8 +52,8 @@ export const GOLDEN_STRING_MAT = new THREE.MeshBasicMaterial({ color: '#cc9900' 
 // ── Crow: merged feathers (body, beak, feet, tail fan, wings) + eyes ─
 // Brief: docs/art/ENEMIES.md (#462). Local axes: +z beak, +y up, +x right wing.
 
-const CROW_BODY = new THREE.Color('#15131a')
-const CROW_SHEEN = new THREE.Color('#3a2a55')
+const CROW_BODY = new THREE.Color(CROW_BODY_HEX)
+const CROW_SHEEN = new THREE.Color(CROW_SHEEN_HEX)
 const CROW_TIP = new THREE.Color('#0b0a0f')
 const CROW_BEAK = '#e8862a'
 const _feather = new THREE.Color()
@@ -266,11 +263,7 @@ export const CROW_EYE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, to
 // ── Scorpion: merged shell + swaying tail + glowing stinger ─────────
 
 // Dark plum-black chitin with amber legs: an amber body sat at ΔE≈9 from the desert cliffs.
-const SCORPION_BODY_COLOR = '#2a1626'
 const SCORPION_HEAD_COLOR = '#24121e'
-const SCORPION_PINCER_COLOR = '#3a1622'
-const SCORPION_LEG_COLOR = '#e0701e'
-
 function scorpionPincer(side: number): THREE.BufferGeometry[] {
   const arm = pose([side * 2, 0.3, 3.5], [0, side * 0.5, 0])
   const at = (p: [number, number, number], r?: [number, number, number], s?: [number, number, number]) =>
@@ -377,7 +370,6 @@ export const JELLY_BODY_GEO = mergeGeometries([
 ])
 export const JELLY_INNER_GEO = new THREE.SphereGeometry(1.5, 6, 6)
 
-const JELLY_COLORS = ['#ff88cc', '#88ccff', '#cc88ff', '#88ffcc']
 export const JELLY_BODY_MATS = JELLY_COLORS.map(
   (c) => withRim(
     new THREE.MeshPhongMaterial({ color: c, transparent: true, opacity: 0.5, flatShading: true, side: THREE.DoubleSide }),
@@ -629,8 +621,6 @@ export const SNOWMAN_SCARF_MAT = withRim(new THREE.MeshPhongMaterial({
 // A bystander (#518), so dressed friendly and in no enemy's colours: calm teal and white, a green harness, and the
 // green friend marker over its helmet.
 
-const CLIMBER_SHIRT = '#1fa898'
-const CLIMBER_TROUSERS = '#d8e2e2'
 const CLIMBER_SKIN = '#e2b48c'
 const CLIMBER_HELMET = '#f4f7f6'
 const CLIMBER_HARNESS = '#3ccf7c'
@@ -707,8 +697,6 @@ export const CLIMBER_MARKER_MAT = new THREE.MeshBasicMaterial({ color: '#5dffa8'
 // Faces +z; one material, three moving parts: the body, the snout (nose twitch) about RAT_SNOUT_PIVOT, the tail
 // (swish) about RAT_TAIL_PIVOT. 600-triangle cap.
 
-const RAT_FUR = '#6b6058'
-const RAT_BELLY = '#a39589'
 const RAT_PINK = '#f2a0a8'
 const RAT_EYE = '#111014'
 const RAT_GLINT = '#ffffff'
@@ -762,11 +750,9 @@ export const RAT_MAT = withRim(new THREE.MeshStandardMaterial({
 // A ball centred on its origin, eyes on +z. Two draw calls: the fluff (rolls) and the eyes (stay facing forward).
 // 500-triangle cap.
 
-const DUST_GREY = '#9a968e'
-const DUST_CORE = '#85817a'
-const DUST_LIGHT = '#aaa69e'
-const DUST_DARK = '#6a665f'
-const DUST_CHALK = '#f6f5f0'
+const DUST_CORE = '#a4a099'
+const DUST_LIGHT = '#cbc7be'
+const DUST_DARK = '#88847d'
 const DUST_TAPE = '#f2c84b'
 
 export const DUST_BUNNY_RADIUS = 2.4
@@ -897,14 +883,11 @@ export const DUST_BUNNY_MAT = withEyeGloss(withRim(new THREE.MeshStandardMateria
 // mirrored for the left), built for the right side (+x) back along -y in its own xy plane, then laid at its folded
 // pose; the material's vertex shader opens the wings (`withLanternflyWings`). 500-triangle cap.
 
-const LANTERNFLY_BODY = '#1d1a1a'
 const LANTERNFLY_LEG = '#2a2522'
 const LANTERNFLY_ANTENNA = '#8a2a22'
-const LANTERNFLY_FOREWING = '#c9b8a0'
 const LANTERNFLY_WINGTIP = '#7d756a'
 const LANTERNFLY_FLECK = '#ddd3c2'
 const LANTERNFLY_SPOT = '#141212'
-const LANTERNFLY_RED = '#d8282a'
 const LANTERNFLY_BAND = '#f2efe6'
 
 export const LANTERNFLY_FOREWING_PIVOT: Vec3 = [0.3, 1.2, 1.1]
