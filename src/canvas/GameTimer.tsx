@@ -6,10 +6,13 @@ import { endSlowMo, resetSlowMo, tickSlowMo } from '@/combat/slowMo.hot'
 import { markStartup } from '@/core/startupMarks'
 import { levelTimeHeld, levelTimeStep, noteE2ELevelTime } from '@/testing/e2eHook'
 import { RUN_SECONDS } from '@/levels/pacing'
+import { recordGhost, resetGhostRecording } from '@/combat/ghostTrack.hot'
+import { gameTime } from '@/core/gameClock'
+import { getPointerState } from '@/input/pointerInput'
 
 /**
  * Counts down the level; reset when a run starts (`runId`), kept through GO, pause and resume.
- * Also the frame that owns the combo game clock (`tickCombo`) and the slow-mo (`tickSlowMo`).
+ * Also the frame that owns the combo game clock (`tickCombo`), the slow-mo (`tickSlowMo`) and the ghost's recording (`recordGhost`).
  */
 export default function GameTimer() {
   const phase = useGameStore((s) => s.phase)
@@ -27,6 +30,7 @@ export default function GameTimer() {
     lastCeiled.current = -1
     resetComboRuntime()
     resetSlowMo()
+    resetGhostRecording()
     useGameStore.getState().setTimeRemaining(RUN_SECONDS)
   }, [runId])
 
@@ -39,7 +43,7 @@ export default function GameTimer() {
 
   useFrame((_, delta) => {
     // The rendered `phase` lags a store change by a render, so a pause from a DOM event (tab hide) is read live.
-    const { phase: livePhase, timeScale, setTimeRemaining, setPhase } = useGameStore.getState()
+    const { phase: livePhase, timeScale, shotsFired, setTimeRemaining, setPhase } = useGameStore.getState()
     if (phase !== 'playing' || livePhase !== 'playing') return
     markStartup('firstPlayingFrame')
     if (timeScale === 0) return
@@ -50,6 +54,8 @@ export default function GameTimer() {
       tickSlowMo(step)
     } else running.current = true
     noteE2ELevelTime(elapsed.current)
+    const aim = getPointerState()
+    recordGhost(gameTime(), aim.x / window.innerWidth, aim.y / window.innerHeight, shotsFired)
 
     const remaining = Math.max(0, RUN_SECONDS - elapsed.current)
     const ceiled = Math.ceil(remaining)

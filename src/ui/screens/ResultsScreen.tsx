@@ -19,6 +19,8 @@ import ResultsLeaderboard from './ResultsLeaderboard'
 import ResultsMarquee from './ResultsMarquee'
 import { FairBoard, FairStars } from '@/ui/Fair'
 import { isNewBuildLive, reloadForNewBuild } from '@/app/staleReload'
+import { saveGhost } from '@/combat/ghost'
+import { recording } from '@/combat/ghostTrack.hot'
 
 const fmt = new Intl.NumberFormat('en-US')
 
@@ -122,8 +124,9 @@ export default function ResultsScreen() {
       bestCombo: run.bestCombo,
     }
     store.saveRunResult(entry)
-    // A daily run shows no board.
+    // A daily run shows no board and leaves no ghost.
     if (run.mode.mode === 'daily') return
+    if (record) saveGhost(config.id, recording)
     const placed = store.addLeaderboardEntry(config.id, { score: run.score, stars, date: run.date })
     setRank(placed)
     if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
@@ -151,7 +154,7 @@ export default function ResultsScreen() {
         })
         .then((result) => result && show(result.top, result.rank))
     }
-  }, [config, run, stars, online])
+  }, [config, run, stars, online, record])
 
   useEffect(() => () => submitOnline.current?.(lettersRef.current), [])
 

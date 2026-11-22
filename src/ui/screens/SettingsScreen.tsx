@@ -80,14 +80,14 @@ function ToggleRow({ label, note, checked, disabled, onChange }: { label: string
   )
 }
 
-/** Wipes scores, stars, leaderboards and the Daily Run record; a second tap confirms. */
+/** Wipes scores, stars, leaderboards, the Daily Run record and the ghosts; a second tap confirms. */
 function ClearDataRow() {
   const [step, setStep] = useState<'idle' | 'confirm' | 'cleared'>('idle')
 
   if (step === 'confirm') {
     return (
       <div className="settings-row settings-clear" data-step="confirm">
-        <span>Erase all scores, stars, leaderboards and daily bests?</span>
+        <span>Erase all scores, stars, leaderboards, daily bests and ghosts?</span>
         <div className="settings-clear-actions">
           <button type="button" className="fair-plate" onClick={() => setStep('idle')}>
             Cancel
@@ -179,6 +179,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
               <Segmented labelId="settings-quality-label" options={GRAPHICS_QUALITIES} labels={QUALITY_LABELS} value={s.quality} onChange={s.setQuality} />
             </div>
             <ToggleRow label="Show FPS" checked={s.showFPS} onChange={s.setShowFPS} />
+            <ToggleRow label="Ghost of your best run" checked={s.ghost} onChange={s.setGhost} />
           </section>
 
           <section className="settings-group">
