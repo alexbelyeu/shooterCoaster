@@ -103,7 +103,8 @@ diffuseColor.a = min(1.0, diffuseColor.a + glint);
 
 const fragmentFog = /* glsl */ `
 #ifdef USE_FOG
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, smoothstep(fogNear, fogFar, vFogDepth) * ${WATER_FOG_MAX.toFixed(2)});
+  float waterFog = smoothstep(fogNear, fogFar, vFogDepth) * ${WATER_FOG_MAX.toFixed(2)};
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, aerialFogColor(waterFog, vAerial), waterFog);
 #endif
 `
 

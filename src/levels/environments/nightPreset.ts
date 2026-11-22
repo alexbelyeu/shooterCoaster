@@ -51,6 +51,8 @@ export const NIGHT_ATMOSPHERES: Partial<Record<BiomeType, AtmosphereConfig>> = {
     },
     lampGlow: 1,
     enemyRimLift: 2.5,
+    // The night's fog stays flat: no sunlit haze under a moon
+    aerialFog: { strength: 0 },
   },
 }
 
