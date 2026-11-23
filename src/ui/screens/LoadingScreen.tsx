@@ -3,6 +3,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { phaseAfterLoading } from '@/store/startPhase'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { loadLevelScene } from '@/canvas/loadLevelScene'
+import { loadPlayScreens } from '@/app/lazyScreens'
 import { isAudioReady } from '@/audio/AudioEngine'
 import { loadFraction, reportLoad } from '@/core/loadProgress'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
@@ -28,8 +29,9 @@ export default function LoadingScreen() {
 
   useEffect(() => {
     let live = true
-    // A failed load returns to the title (`SceneManager`), unmounting this.
-    loadLevelScene().then(() => live && reportLoad(levelId, 'chunk', 1), () => {})
+    // The level's chunk and the run's screens (HUD, countdown, results: `app/lazyScreens.tsx`). A failed load returns
+    // to the title (`SceneManager`), unmounting this.
+    Promise.all([loadLevelScene(), loadPlayScreens()]).then(() => live && reportLoad(levelId, 'chunk', 1), () => {})
     let settled = 0
     let frame = 0
     const tick = () => {
