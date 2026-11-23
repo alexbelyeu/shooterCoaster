@@ -6,14 +6,19 @@ import { createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/uti
 import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig, WallSurface } from '@/types/level'
 import { buildArcTable, indexAtT, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
-import { hardRouteFor } from '@/track/mechanics'
+import { hardRouteFor, withBackwards } from '@/track/mechanics'
+import { MECHANICS_SPEEDS, buildMechanicsRide } from '@/track/elements/mechanicsRide'
+import { backwards, placeMechanics } from '@/track/elements/mechanicElements'
+import { RideBuilder } from '@/track/elements/rideBuilder'
+import { bankedTurn } from '@/track/elements/elements'
+import { createSplineCurve } from '@/track/curves/SplineCurve'
 import { DEMO_EYE, buildDemoRide, markerT } from '@/track/elements/demoRide'
 import { createSeatPose, seatPose } from '@/track/seatPose.hot'
 import { rideModel, rideProfile, riddenAt } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import {
-  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, clampToBounds, clearOfKeepOff, entryPoint, formationFrame, formationSlots, groupStep,
+  AIR_CLEARANCE, ENTRY_SECONDS_MAX, FORMATIONS, RIDE_PACE_SLACK, facingBack, NEAR_FIELD, clampToBounds, clearOfKeepOff, entryPoint, formationFrame, formationSlots, groupStep,
   indexAhead, insideBounds, marchHeading, marchMoving, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
   inRiderFrame, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge, riderFrame, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
   type ChoreographedFormation, type RideAhead, type Vec3,
@@ -630,6 +635,98 @@ describe('trackView on a rolling track (#715)', () => {
         worst = Math.min(worst, dir.x * pose.look.x + dir.y * pose.look.y + dir.z * pose.look.z)
       }
       expect(worst, kind).toBeGreaterThan(Math.cos(Math.PI / 180))
+    }
+  })
+})
+
+/** A long loop whose backwards stretch is a 2 km straight, so a group's anchor lands on the track ridden rather than the fallback. */
+function longBackwardsRide() {
+  const b = new RideBuilder({ x: 0, y: 70, z: 0, eyeHeight: DEMO_EYE })
+  b.straight(1500)
+  const m = backwards(b, () => b.straight(2000), { speed: MECHANICS_SPEEDS.backwards })
+  b.straight(500)
+  bankedTurn(b, { angle: Math.PI, radius: 300 })
+  b.straight(4000)
+  bankedTurn(b, { angle: Math.PI, radius: 300 })
+  const curve = createSplineCurve(b.points)
+  return { curve, mechanics: placeMechanics(curve, [m]) }
+}
+
+describe.each([
+  ['mechanicsRide', buildMechanicsRide()],
+  ['a long backwards straight', longBackwardsRide()],
+] as const)('formation waves on a backwards stretch (#716): %s', (_name, ride) => {
+  const table = withBackwards(buildArcTable(ride.curve), ride.mechanics)
+  const back = ride.mechanics.find((m) => m.kind === 'backwards')!
+  const pose = createSeatPose()
+  const look = (index: number) => seatPose(ride.curve, table, table.t[index], 1, DEMO_EYE, pose, ride.mechanics)
+  const speed = MECHANICS_SPEEDS.backwards
+  const ahead: RideAhead = { entry: speed * ENTRY_SECONDS_MAX, window: RIDE_PACE_SLACK * speed * 12, trackScale: 1 }
+  // Where the rider is once the wave has flown in, from the first turntable to the second.
+  const landings = Array.from({ length: 12 }, (_, k) => indexAtT(table, back.from + ((back.to - back.from) * (k + 0.5)) / 12))
+
+  it('a track without one keeps its table', () => {
+    const plain = buildArcTable(ride.curve)
+    expect(withBackwards(plain, undefined)).toBe(plain)
+    expect(withBackwards(plain, ride.mechanics.filter((m) => m.kind !== 'backwards'))).toBe(plain)
+  })
+
+  it('trackView looks where the seat looks, back down the track, between the turntables', () => {
+    let worst = 1
+    for (const index of landings) {
+      expect(facingBack(table, index)).toBe(true)
+      const { dir } = trackView(table, index, 1)
+      look(index)
+      worst = Math.min(worst, dir.x * pose.look.x + dir.y * pose.look.y + dir.z * pose.look.z)
+    }
+    expect(worst).toBeGreaterThan(Math.cos(Math.PI / 180))
+    expect(facingBack(table, indexAtT(table, back.from - 0.01))).toBe(false)
+    expect(facingBack(table, indexAtT(table, back.to + 0.01))).toBe(false)
+  })
+
+  const cases = [['v', 'crow', 18], ['line', 'crow', 14], ['ring', 'balloon', 10], ['spiral', 'crow', 12]] as const
+  it.each(cases)('%s: each group lands in the seat\'s view cone facing back, every member in front of it', (formation, type, count) => {
+    const slots = formationSlots(formation, count, createRng(1337))
+    const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
+    const step = groupStep(table, formation, groups, ahead)
+    const reach = maxReadableDistance(type)
+    const misses: string[] = []
+    let checked = 0
+    for (const landing of landings) {
+      const riderIndex = indexAhead(table, landing, -ahead.entry)
+      const placed = placeFormationWave({ table, riderIndex, camera: trackPoint(table, riderIndex), formation, type, groundFn: () => 0, slots, ride: ahead })
+      for (let g = 0; g < groups; g++) {
+        const view = indexAhead(table, riderIndex, g * step + ahead.entry)
+        if (!facingBack(table, view)) continue
+        checked++
+        look(view)
+        const members = placed.filter((_, i) => slots[i].group === g).map((p) => p.position)
+        const centre = members.reduce((c, p) => ({ x: c.x + p.x / members.length, y: c.y + p.y / members.length, z: c.z + p.z / members.length }), { x: 0, y: 0, z: 0 })
+        const seat = { eye: pose.eye, dir: pose.look }
+        if (bearingCos(seat, centre) < HALF_FOV_COS || dist(centre, pose.eye) > reach) misses.push(`landing ${landing} group ${g}`)
+        if (members.some((p) => bearingCos(seat, p) <= 0)) misses.push(`landing ${landing} group ${g}: a member behind the seat`)
+      }
+    }
+    expect(checked).toBeGreaterThan(0)
+    expect(misses).toEqual([])
+  })
+}
+)
+
+describe('a group on a long backwards straight', () => {
+  it('anchors on the track already ridden, not the straight-ahead fallback', () => {
+    const ride = longBackwardsRide()
+    const table = withBackwards(buildArcTable(ride.curve), ride.mechanics)
+    const back = ride.mechanics.find((m) => m.kind === 'backwards')!
+    const ahead: RideAhead = { entry: MECHANICS_SPEEDS.backwards * ENTRY_SECONDS_MAX, window: 600, trackScale: 1 }
+    const landing = indexAtT(table, (back.from + back.to) / 2)
+    const riderIndex = indexAhead(table, landing, -ahead.entry)
+    for (const formation of ['v', 'line', 'ring', 'spiral'] as const) {
+      const f = formationFrame(table, riderIndex, formation, 0, ahead, maxReadableDistance('crow'))
+      expect(f.seen, formation).toBe(true)
+      const behind = (table.s[landing] - table.s[nearestIndex(table, f.track)] + table.length) % table.length
+      expect(behind, formation).toBeGreaterThanOrEqual(FORMATIONS[formation].origin.ahead * 0.99)
+      expect(behind, formation).toBeLessThan(table.length / 2)
     }
   })
 })

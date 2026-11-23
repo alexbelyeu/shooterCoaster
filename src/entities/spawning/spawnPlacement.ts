@@ -231,9 +231,16 @@ const VIEW_HALF_ANGLE_COS = Math.cos((MIN_HORIZONTAL_FOV * 0.4 * Math.PI) / 180)
 /** No group or trackside slot leads the rider by more than this share of a lap. */
 const MAX_LEAD_SHARE = 0.75
 
+/** Whether the seat faces back at sample `index`: between a backwards mechanic's turntables (`ArcTable.backwards`, #716). */
+export function facingBack(table: ArcTable, index: number): boolean {
+  const s = table.s[index]
+  return !!table.backwards?.some((span) => s > span.from && s < span.to)
+}
+
 /**
  * Where the rig looks from track sample `index`: its eye (the rail point) and unit look direction (`seatPose`'s look,
- * unsmoothed: on a rolling track the seats sit `EYE_HEIGHT` along the rails' up, which turns the look with the rails).
+ * unsmoothed: on a rolling track the seats sit `EYE_HEIGHT` along the rails' up, which turns the look with the rails;
+ * on a backwards stretch it is turned half round the rails' up, back down the track ridden).
  */
 export interface TrackView {
   index: number
@@ -253,7 +260,15 @@ export function trackView(table: ArcTable, index: number, trackScale: number): T
     toAhead.y += h * (upAhead.y - up.y)
     toAhead.z += h * (upAhead.z - up.z)
   }
-  return { index, eye, dir: lookAheadDirection(trackTangent(table, index), normalize(toAhead), { x: 0, y: 0, z: 0 }) }
+  const dir = lookAheadDirection(trackTangent(table, index), normalize(toAhead), { x: 0, y: 0, z: 0 })
+  if (facingBack(table, index)) {
+    const up = trackUp(table, index)
+    const along = 2 * dot(dir, up)
+    dir.x = along * up.x - dir.x
+    dir.y = along * up.y - dir.y
+    dir.z = along * up.z - dir.z
+  }
+  return { index, eye, dir }
 }
 
 /**
@@ -304,7 +319,11 @@ export function groupStep(table: ArcTable, formation: ChoreographedFormation, gr
   return Math.max(groupGap, Math.min(ride.window, MAX_LEAD_SHARE * table.length) / Math.max(1, groups))
 }
 
-/** Anchor for one group: `centre` (its mean slot offset) in view from where the rider is once the group has flown in; sides alternate per group unless only the other is in view. */
+/**
+ * Anchor for one group: `centre` (its mean slot offset) in view from where the rider is once the group has flown in; sides
+ * alternate per group unless only the other is in view. Facing back there (#716), it lies back along the track ridden, on
+ * track the rider has passed by the time it lands, its frame turned to the rider's look.
+ */
 export function formationFrame(
   table: ArcTable,
   riderIndex: number,
@@ -318,15 +337,20 @@ export function formationFrame(
 ): FormationFrame {
   const view = trackView(table, indexAhead(table, riderIndex, group * step + ride.entry), ride.trackScale)
   const { ahead, up } = origin
+  const back = facingBack(table, view.index)
+  const along = back ? -Math.max(ahead, group * step) : ahead
   const preferred = origin.side * (group % 2 === 0 ? 1 : -1)
   const sides = preferred === 0 ? [0] : [preferred, -preferred]
   for (let k = 0; k <= ANCHOR_SEARCH_STEPS; k++) {
-    const i = indexAhead(table, view.index, ahead * (1 + ((ANCHOR_SEARCH - 1) * k) / ANCHOR_SEARCH_STEPS))
+    const i = indexAhead(table, view.index, along * (1 + ((ANCHOR_SEARCH - 1) * k) / ANCHOR_SEARCH_STEPS))
     const track = trackPoint(table, i)
     const d = sub(track, view.eye)
-    if (Math.hypot(d.x, d.z) < ahead * ANCHOR_MIN_REACH) continue // over the top of a loop
+    if (Math.hypot(d.x, d.z) < Math.abs(along) * ANCHOR_MIN_REACH) continue // over the top of a loop
+    const tangent = trackTangent(table, i)
+    // Facing back, the group's forward is the rider's look: a V flies in from down it and marches back up it at the car.
+    if (back) Object.assign(tangent, { x: -tangent.x, y: -tangent.y, z: -tangent.z })
     for (const side of sides) {
-      const f = frameAt(track, trackTangent(table, i), side, up, true)
+      const f = frameAt(track, tangent, side, up, true)
       if (inView(view, slotWorld(formation, f, centre), reach)) return f
     }
   }
