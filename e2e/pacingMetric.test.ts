@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { bossFraming, bossFramingProblems, pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
 
 /** One sample per `step` s from 0 to `end`, `targets(t)` on screen, track = t / end. */
 function ride(end: number, targets: (t: number) => number, step = 0.5, flags: (t: number) => object = () => ({})) {
@@ -92,5 +92,32 @@ describe('pacing summary and budget', () => {
       'no target 13% of the run over budget 10%',
     ])
     expect(pacingBudgetProblems('level9', m, undefined)).toEqual(['no pacing budget for level9 in budgets.json'])
+  })
+})
+
+describe('bossFraming', () => {
+  const fight = (framed: (t: number) => boolean, arrive = 40, end = 60) => {
+    const samples = []
+    for (let t = 0; t < end; t += 0.5) samples.push({ t, bossStage: t >= arrive ? 'active' : 'none', bossFramed: t >= arrive && framed(t) })
+    return bossFraming(samples, end)
+  }
+
+  it('is null when the boss never fights', () => {
+    expect(bossFraming([{ t: 0, bossStage: 'none' }], 60)).toBeNull()
+  })
+
+  it('counts the seconds a weak point was shootable from her arrival', () => {
+    // Framed 2 s, then the ride turns away for the rest: the gym's Medusa (23 Nov).
+    const m = fight((t) => t < 42)
+    expect(m).toMatchObject({ arrivedAt: 40, fightSeconds: 20, framedSeconds: 2, framedShare: 0.1 })
+    expect(m?.longestUnframed).toEqual({ start: 42, seconds: 18 })
+    expect(bossFramingProblems(m, { bossFramedShare: 0.6 })[0]).toMatch(/shootable 2\.0 s of its 20 s fight \(10%, floor 60%\)/)
+  })
+
+  it('passes a fight the ride faces', () => {
+    const m = fight((t) => t < 44 || t >= 46)
+    expect(m?.framedShare).toBe(0.9)
+    expect(bossFramingProblems(m, { bossFramedShare: 0.6 })).toEqual([])
+    expect(bossFramingProblems(m, {})).toEqual([])
   })
 })

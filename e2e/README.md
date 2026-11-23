@@ -186,10 +186,15 @@ enemies by whole steps, so the ride shot's enemy count and the pacing gaps diffe
 and CI. React reports commits to a devtools hook `newPage` defines before the page loads (`ctx.addInitScript`). Bosses move
 on the game clock (`core/gameClock.ts` `gameClockStep`), never the frame's delta, so they keep pace with the level too.
 A `pacing` step (#450) rides every level's whole run, GO to the end, in settled steps of `--pacing-step` level seconds
-(default 0.5, so the run is the same on any runner; `rideRate` 1, the ride a 60 fps player gets), with no firing and the
-level time never held. Every step the page records level time, `stats().onScreenEnemies` (shootable targets inside the
-viewport: enemies, boss weak points, projectiles; never pickups), `rideProgress` and whether a wave tell (the 1 s before a
-wave) or the boss tell is on. Pure `pacingMetric.mjs` (`pacingMetric.test.ts`) turns that into `noTargetShare` (share of
+(default 0.5, so the run is the same on any runner; `rideRate` 1, the ride a 60 fps player gets), the level time never held,
+played as a player (#925): `autoFire(true, PLAYER_HITS_PER_SECOND)` lands 3 hits a game second on the nearest targets
+`sight()` counts shootable, on the game clock, so a stretch a player clears goes empty as it would for them (unfired, the
+leftovers of earlier waves filled the gym's empty stretches). Every step the page records level time (unrounded), `sight()` (#925, `src/testing/lineOfSight.ts`:
+the live enemies and exposed boss weak points the rider can shoot, inside the view, at least `MIN_ENEMY_PX` and with a clear
+line from the camera; those hidden behind the world and the specks too small to read are counted apart, `hidden` / `specks`),
+`rideProgress`, the boss's stage and whether it is framed, and whether a wave tell (the 1 s before a wave) or the boss tell is
+on. (Until #925 it counted `stats().onScreenEnemies`, every live enemy whose centre projects into the viewport, and passed
+the gym's ride with stretches where every enemy was behind a wall or a speck across the hall.) Pure `pacingMetric.mjs` (`pacingMetric.test.ts`) turns that into `noTargetShare` (share of
 the run with nothing on screen) and the gaps (`longestGapSeconds`, `longestGap` with its start time and track fraction,
 `gaps` of 1 s or more); the first 2 s after GO and the boss tell are meant to be empty, so they count neither way and end a
 gap. It prints one line per level (`level2 pacing: no target 7% of 60 s, longest gap 2.0 s at 4 s (track 0.03)`) and
@@ -201,9 +206,13 @@ waves` (`nextWave()` still null), and the ride step stops at that same deadline 
 holding for it. A level over
 its `budgets.json` `pacing` ceilings (`longestGapSeconds`, `noTargetShare`) fails with the gap named (`longest gap 9.0 s at
 7.0 s (track 0.03) over budget 3 s`); only the Director lowers or raises them. A level whose entry names `knownOver: "#<open issue>"` only
-prints a WARN line until that issue lands. Besides the nightly, CI runs this step on a PR for every level the PR can change
+prints a WARN line until that issue lands. A level whose entry has `bossFramedShare` also fails when its boss, from its arrival
+to the end of the run (at most `BOSS_FIGHT_SECONDS`), has a shootable weak point less than that share of the time
+(`bossFraming`: `the boss was shootable 2.0 s of its 20 s fight (10%, floor 60%), longest out of sight 16.1 s from 43.0 s`).
+The ride review (`npm run review`, `scripts/rideReview.mjs`) is the same count with screenshots, autofiring: look there for
+why. Besides the nightly, CI runs this step on a PR for every level the PR can change
 (`pacing (<level>)` jobs, which `verify` requires; `scripts/ciPlan.cjs` `pacingLevels`: the level's biome folder, or every level for
-`src/track/`, `src/levels/LevelRegistry.ts`, `src/levels/pacing.ts`, `src/entities/spawning/` or this metric, #761). A level takes 120 steps plus about one held frame each
+`src/track/`, `src/levels/LevelRegistry.ts`, `src/levels/pacing.ts`, `src/entities/spawning/`, `src/entities/bosses/` (the boss framing, #925), `src/testing/lineOfSight.ts` or this metric, #761). A level takes 120 steps plus about one held frame each
 (~260 frames; ~4.5 min in a 2-core session; its summary line prints both), so run one at a time: `--steps pacing --levels level4`.
 `drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
 spawned enemies) and vary run to run; for before/after comparisons use the

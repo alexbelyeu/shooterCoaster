@@ -99,7 +99,7 @@ import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitFr
 import { planRun, STEP_LEVELS } from './shards.mjs'
 import { growthMoments, programGateProblem, throttleReport } from './slowPass.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
-import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
 import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
@@ -2350,14 +2350,14 @@ async function weatherCheck(page, id) {
 /** Level seconds a pacing step (settled steps, `settledSteps.mjs`: the same run on any runner): 0.5 is 120 steps a run. */
 const PACING_STEP = Number(arg('pacing-step', 0.5))
 
-/** Pacing (#450): the whole run unfired, sampled once a settled step; `rideRate` 1 rides as at 60 fps, so the rider meets each wave where a player would. */
+/** Pacing (#450): the whole run played (#925: `PLAYER_HITS_PER_SECOND` on what the rider can shoot), sampled once a settled step; `rideRate` 1 rides as at 60 fps, so the rider meets each wave where a player would. */
 async function pacingCheck(page, id) {
   const problems = []
-  const started = await page.evaluate(([lid, seed, step]) => {
+  const started = await page.evaluate(([lid, seed, step, rate]) => {
     const s = window.__SC_TEST__
     s.rideRate = 1
     s.holdLevelTime = false
-    s.autoFire(false)
+    s.autoFire(true, rate)
     const run = { samples: [], end: null, done: false }
     s.pacingRun = run
     run.stepper = window.__SC_STEP_SETTLED__(step, () => {
@@ -2369,9 +2369,12 @@ async function pacingCheck(page, id) {
       if (!w && !run.samples.length) return 'hold'
       if (st.phase === 'playing' && w) {
         run.end ??= w.levelTime + st.timeRemaining
+        // What the rider can shoot (#925): in view, readable and in sight, not every enemy whose centre projects on screen.
+        const v = s.sight()
         run.samples.push({
-          t: w.levelTime, targets: st.onScreenEnemies, track: s.rideProgress,
-          waveTell: w.due != null && w.levelTime >= w.due - s.waveTellSeconds, bossTell: s.boss().stage === 'incoming',
+          t: v.levelTime, targets: v.shootable, hidden: v.occluded, specks: v.tiny, track: s.rideProgress,
+          waveTell: w.due != null && v.levelTime >= w.due - s.waveTellSeconds, bossTell: v.bossStage === 'incoming',
+          bossStage: v.bossStage, bossFramed: v.bossFramed,
         })
       } else if (run.samples.length) {
         run.done = true
@@ -2380,7 +2383,7 @@ async function pacingCheck(page, id) {
     })
     s.startLevel(lid, seed)
     return s.frames
-  }, [id, SEED, PACING_STEP])
+  }, [id, SEED, PACING_STEP, PLAYER_HITS_PER_SECOND])
   let last = { frames: started, at: Date.now() }
   // A step that never settles (React committing on every held frame, or a level that never registers its waves) would hold
   // until the job's timeout (#535): each step gets FRAME_DEADLINE_MS, the first the level's load (LEVEL_READY_MS) on top.
@@ -2416,13 +2419,14 @@ async function pacingCheck(page, id) {
   const { samples, end, stepper } = await page.evaluate(() => window.__SC_TEST__.pacingRun)
   if (!samples.length) return { id: 'pacing', level: id, problems: [...problems, 'no playing frame sampled'], pacing: null, timeline: [] }
   const pacing = pacingMetrics(samples, end)
+  pacing.boss = bossFraming(samples, end)
   const shaders = await programsAfterWarmup(page)
   gatePrograms(problems, shaders)
   if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   const budget = BUDGETS.pacing?.[id]
   // A placeholder is filled by the caller once the page's errors are counted too (`fillPlaceholderBudget`).
   const placeholder = isPlaceholder(budget) ? pacing : null
-  const over = placeholder ? [] : pacingBudgetProblems(id, pacing, budget)
+  const over = placeholder ? [] : [...pacingBudgetProblems(id, pacing, budget), ...bossFramingProblems(pacing.boss, budget)]
   // A level whose entry names `knownOver` (an open issue fixing it) only warns, like the scene budgets.
   if (budget?.knownOver && over.length) console.log(`     WARN pacing over budget (known, ${budget.knownOver}): ${over.join('; ')}`)
   else problems.push(...over)
@@ -2434,7 +2438,6 @@ async function pacingCheck(page, id) {
  * player hitting `BOSS_HITS_PER_SECOND` (a 60 ms blaster fires ~16 shots a second) clears it in that window: the game
  * seconds the boss moved before each phase was on screen, plus every weak point's hp at that rate.
  */
-const BOSS_FIGHT_SECONDS = 20
 const BOSS_HITS_PER_SECOND = 2
 /** Game seconds a `stepBoss` step moves the boss, and how far past its `seconds` it may go looking for `ready`. */
 const BOSS_STEP = 0.25

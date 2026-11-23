@@ -55,6 +55,11 @@ claims against the code/screenshots and that nothing outside `docs/` changed.
    artifact from CI (or run `bash scripts/quiet.sh npm run turntable -- --only <ids>`): look at its
    `<id>-angles.png` and `<id>-motion.png` against the PR's before/after, and judge the look against the enemy's
    brief in `docs/art/ENEMIES.md`.
+   A PR that changes a ride, its waves, a boss or a level's effects (`src/track/**`, `src/levels/**`, `src/entities/spawning/**`,
+   `src/entities/bosses/**`): run `bash scripts/quiet.sh timeout 280 npm run review -- --level <id>` (after the build) and look
+   at `e2e-results/review/<id>/sheet.jpg` against `docs/RIDE-KIT.md` "What the rider must see": red labels (nothing shootable),
+   set pieces against blank walls, the boss out of frame, effects that look wrong from the seat, the `flicker` list in
+   `review.json`. A ride that reads badly there is changes-requested even with every gate green.
 4. Read the full diff. Check:
    - Acceptance criteria are actually met (in the screenshots, not just in the description).
    - CLAUDE.md hard rules: no removed features, no secrets, no new paid services or
