@@ -112,8 +112,13 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   launch, a lift hill over the park, a 60° first drop past the big Ferris wheel into the tunnel, two camelbacks,
   the near miss beside the small wheel's gondolas (28 s), a second lift cresting as the blimp arrives (40 s), a slow
   helix round the carousel for the boss fight and a last hill into the brake run. The photo waits on #701.
-- **Desert (2):** the drop into the Pyramid as a dark ride (torches, the Scorpion's lair), a jump
-  gap over a canyon between mesas.
+- **Desert (2):** built (#864, `desert/desertTrack.ts`, its storyboard and seconds at the top, laid out in a frame turned
+  to face the Pyramid, `landmarks.ts` `RIDE_FRAME`): a station launch and a lift hill at the Pyramid, a 62° drop at its
+  foot into a cut through the dunes, under the west door's lintel (the near miss, 13 s) and through tier 1's torchlit
+  passage in the dark (`Pyramid.tsx` `passage`: torches as emissive points, no lights), a climbing U-turn into the
+  sandstorm, a jump gap over the canyon between two fixed mesas (24 s, `CANYON_MESAS`), an airtime hill (31 s) and the
+  boss's slow wide turn round the flats into the brake run. The scorpions come in two packs (0 s and 12 s) so the
+  straight run to the lift doesn't line all thirty up in view.
 - **Ocean (3):** a splashdown, a glass tunnel under the water with the Kraken passing overhead,
   a corkscrew through a sea stack's arch.
 - **Antarctica (4):** an ice-cave dark section (blue glow), a bobsled helix down a glacier, an
