@@ -438,7 +438,14 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   await waitFrames(page, 1, { maxMs: 4000, pollMs: 40 })
   const atStart = await getStats(page)
   const mouseShots = atStart.shotsFired - beforeClick.shotsFired
-  if (mouseShots === 0) problems.push('mouse click fired no shot')
+  if (mouseShots === 0) {
+    const why = await page.evaluate(([x, y]) => {
+      const t = window.__SC_TEST__
+      const el = document.elementFromPoint(x, y)
+      return `phase ${t.stats().phase}, bullets ${JSON.stringify(t.bullets())}, at centre <${el?.tagName.toLowerCase()}${el?.className ? ` class="${el.className}"` : ''}>`
+    }, [vp.width / 2, vp.height / 2])
+    problems.push(`mouse click fired no shot (${why})`)
+  }
   await page.evaluate(() => window.__SC_TEST__.autoFire(true))
   const fire = await waitFrames(page, COMBAT_MIN_FRAMES, { minMs: COMBAT_SECONDS * 1000, maxMs: COMBAT_SECONDS * 6000 })
   const afterFire = await getStats(page)
