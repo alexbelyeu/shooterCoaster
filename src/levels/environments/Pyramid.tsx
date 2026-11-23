@@ -18,8 +18,11 @@ interface PyramidProps {
   passage?: { layer: number; width: number; height: number }
 }
 
-/** Torches down each wall of the passage, this far apart along it, this high over its floor. */
-const TORCH = { spacing: 110, height: 38, flame: 7, glow: 46 } as const
+/**
+ * Torches down each wall of the passage, this far apart along it, this high over its floor, `inset` off the wall: more than
+ * the glow's radius, or the wall cuts its sprite square.
+ */
+const TORCH = { spacing: 110, height: 38, flame: 7, glow: 18, inset: 10 } as const
 
 /** Stepped pyramid with glowing hieroglyph panels and a spinning golden capstone. */
 export default function Pyramid({ position = [800, 0, -600], yaw = 0, passage }: PyramidProps) {
@@ -93,7 +96,7 @@ export default function Pyramid({ position = [800, 0, -600], yaw = 0, passage }:
     const run = Math.floor((layer.size - TORCH.spacing) / TORCH.spacing)
     for (let k = 0; k <= run; k++) {
       const x = (k - run / 2) * TORCH.spacing
-      for (const zSide of [-1, 1]) torches.push(x, floor + TORCH.height, zSide * (passage.width / 2 - 3))
+      for (const zSide of [-1, 1]) torches.push(x, floor + TORCH.height, zSide * (passage.width / 2 - TORCH.inset))
     }
     return { blocks, torches: new Float32Array(torches), dot: buildDotTexture() }
   }, [layers, passage])
