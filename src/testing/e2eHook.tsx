@@ -377,6 +377,7 @@ export interface E2ESwitch {
   to: number
   hard: boolean
   riding: 'easy' | 'hard' | 'shared'
+  /** The sign still takes a shot: its target is registered, which it is until the car first passes it in the run (#779). */
   open: boolean
   /** The run's kill-count total: a hard-route wave joins it when it arrives (#720). */
   totalEnemies: number
