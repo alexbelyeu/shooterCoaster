@@ -73,7 +73,7 @@ const ENEMIES: Read[] = [
   enemy('scorpion', 'scorpion', 'desert', A.SCORPION_SHELL_MAT, P.SCORPION_BODY_COLOR, P.SCORPION_PINCER_COLOR, P.SCORPION_LEG_COLOR),
   ...P.JELLY_COLORS.map((c, i) => enemy(`jellyfish ${c}`, 'jellyfish', 'ocean', null, A.JELLY_BODY_MATS[i], A.JELLY_INNER_MATS[i])),
   enemy('shark', 'shark', 'ocean', A.SHARK_MAT, P.SHARK_TOP, P.SHARK_BELLY),
-  enemy('flyingFish', 'flyingFish', 'ocean', null, A.FFISH_BODY_MAT, A.FFISH_BELLY_MAT, A.FFISH_WING_MAT),
+  enemy('flyingFish', 'flyingFish', 'ocean', A.FFISH_MAT, P.FFISH_BODY, P.FFISH_BELLY, A.FFISH_WING_MAT),
   enemy('snowman', 'snowman', 'arctic', null, A.SNOWMAN_MAT, A.SNOWMAN_ARM_MAT, A.SNOWMAN_NOSE_MAT, A.SNOWMAN_COAL_MAT),
   enemy('snowmanBrute', 'snowmanBrute', 'arctic', null, A.SNOWMAN_MAT, A.SNOWMAN_SCARF_MAT, A.SNOWMAN_HAT_MAT, A.SNOWMAN_COAL_MAT),
   enemy('snowmanScout', 'snowmanScout', 'arctic', null, A.SNOWMAN_SCOUT_MAT, A.SNOWMAN_SCOUT_SHARD_MAT, A.SNOWMAN_NOSE_MAT, A.SNOWMAN_COAL_MAT),

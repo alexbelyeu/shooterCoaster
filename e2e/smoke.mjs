@@ -2439,6 +2439,10 @@ const BOSS_HITS_PER_SECOND = 2
 /** Game seconds a `stepBoss` step moves the boss, and how far past its `seconds` it may go looking for `ready`. */
 const BOSS_STEP = 0.25
 const BOSS_STEP_EXTRA_S = 20
+/** A boss's projectile counts as on screen in `<level>-boss.png` only this far inside the frame's edges (NDC): one on
+ *  the edge (the Yeti's snowball at y 1.00, #920) is half out of the shot and leaves it on the next step. */
+const PROJECTILE_INNER_NDC = 0.9
+const projectileInFrame = (p) => p.onScreen && Math.abs(p.ndcX) <= PROJECTILE_INNER_NDC && Math.abs(p.ndcY) <= PROJECTILE_INNER_NDC
 
 /**
  * Moves the boss alone (`bossStep`, game time and the level timer frozen) in steps of 0.25 game seconds, at least
@@ -2446,16 +2450,17 @@ const BOSS_STEP_EXTRA_S = 20
  * never ready. The steps and the check run in the page, one step a rendered frame and `ready` checked after each, so
  * it stops on the step that made it ready whatever the frame rate (#634: polled from here, a slow renderer took a step
  * or two more before the stop landed, and the Yeti's snowball in flight was gone by the screenshot).
- * `ready`: `{ exposed, projectiles }`, the boss's weak points and thrown things on screen it needs.
+ * `ready`: `{ exposed, projectiles }`, the boss's weak points on screen and thrown things inside the frame it needs
+ * (`PROJECTILE_INNER_NDC`).
  */
 async function stepBoss(page, seconds, ready) {
   if (seconds <= 0) return 0
-  return page.evaluate(({ step, minSteps, maxSteps, need, deadlineMs }) => new Promise((resolve) => {
+  return page.evaluate(({ step, minSteps, maxSteps, need, inner, deadlineMs }) => new Promise((resolve) => {
     const s = window.__SC_TEST__
     const isReady = () => {
       const b = s.boss()
       return b.exposed.filter((e) => e.onScreen).length >= need.exposed
-        && b.projectiles.filter((p) => p.onScreen).length >= need.projectiles
+        && b.projectiles.filter((p) => p.onScreen && Math.abs(p.ndcX) <= inner && Math.abs(p.ndcY) <= inner).length >= need.projectiles
     }
     const stop = (result) => {
       s.bossStep = null
@@ -2489,6 +2494,7 @@ async function stepBoss(page, seconds, ready) {
     minSteps: Math.ceil(seconds / BOSS_STEP),
     maxSteps: Math.ceil((seconds + BOSS_STEP_EXTRA_S) / BOSS_STEP),
     need: { exposed: 0, projectiles: 0, ...ready },
+    inner: PROJECTILE_INNER_NDC,
     deadlineMs: 30000 + seconds * 8000,
   })
 }
@@ -2499,7 +2505,7 @@ async function stepBoss(page, seconds, ready) {
  * Game time is frozen while it is hit; if the wall-clock level timer still runs out, the step is skipped.
  */
 async function bossCheck(page, check) {
-  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS, minProjectiles = 0, midPhases = 0, rideTo = null, passShots = [] } = check
+  const { level, minWidthFrac, weakPoints, firstPhase, lastPhase, midShot, minOnScreen, settleS, midSettleS, minProjectiles = 0, midPhases = 0, rideTo = null, summonAt = null, passShots = [] } = check
   const problems = []
   const boss = () => page.evaluate(() => window.__SC_TEST__.boss())
   const events = () => page.evaluate(() => ({ ...window.__SC_TEST__.bossEvents }))
@@ -2508,7 +2514,13 @@ async function bossCheck(page, check) {
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
   const startStats = await getStats(page)
   if (rideTo !== null) {
-    await page.evaluate((t) => { window.__SC_TEST__.rideTo = t }, rideTo)
+    // The ride frozen before the summon, so a boss that picks its place off the rider's (the Yeti's ridge ahead) arrives
+    // in the same spot on any runner: riding on through its arrival, the car was wherever the wall clock had taken it
+    // by then, and the same step saw the Yeti 15% to 49% of the frame wide (#920). `summonAt` then steps back to `rideTo`.
+    await page.evaluate((t) => {
+      window.__SC_TEST__.rideTo = t
+      window.__SC_TEST__.setTimeScale(0)
+    }, summonAt ?? rideTo)
     await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   }
   await page.evaluate(() => window.__SC_TEST__.summonBoss())
@@ -2516,8 +2528,7 @@ async function bossCheck(page, check) {
   // A couple of frames so it is placed and drawn, then freeze it there.
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
-  // The ride went on through her tell: back to the spot, frozen there.
-  if (rideTo !== null) await page.evaluate((t) => { window.__SC_TEST__.rideTo = t }, rideTo)
+  if (summonAt !== null) await page.evaluate((t) => { window.__SC_TEST__.rideTo = t }, rideTo)
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const settled = await stepBoss(page, settleS, { exposed: minOnScreen, projectiles: minProjectiles })
   const tell = await page.evaluate(() => window.__SC_TEST__.waveEvents.filter((e) => e.kind === 'incoming').map((e) => e.label))
@@ -2528,7 +2539,14 @@ async function bossCheck(page, check) {
   await page.screenshot({ path: path.join(OUT, `${level}-boss.png`), timeout: SHOT_TIMEOUT })
 
   // Its projectiles: each shot is a kill on the combo; the boss's hp doesn't move. Before the real bullet, so none is in its way.
-  const projectiles = { onScreen: before.projectiles.filter((p) => p.onScreen).length, shot: 0, kills: 0, combo: 0, hpMoved: false }
+  const projectiles = {
+    onScreen: before.projectiles.filter(projectileInFrame).length,
+    at: before.projectiles.map((p) => [p.ndcX.toFixed(2), p.ndcY.toFixed(2)]),
+    shot: 0,
+    kills: 0,
+    combo: 0,
+    hpMoved: false,
+  }
   if (minProjectiles) {
     const s0 = await getStats(page)
     projectiles.shot = await page.evaluate(() => window.__SC_TEST__.projectileHit())
@@ -2629,7 +2647,7 @@ async function bossCheck(page, check) {
   if (result.kills - projectiles.kills !== weakPoints)
     problems.push(`${result.kills - projectiles.kills} kills from the boss (want one per weak point, ${weakPoints})`)
   if (minProjectiles) {
-    if (projectiles.onScreen < minProjectiles) problems.push(`${projectiles.onScreen} projectiles on screen in ${level}-boss.png (want ≥ ${minProjectiles})`)
+    if (projectiles.onScreen < minProjectiles) problems.push(`${projectiles.onScreen} projectiles inside the frame in ${level}-boss.png (want ≥ ${minProjectiles}; at ${projectiles.at.map(([x, y]) => `${x},${y}`).join(' ') || 'none'})`)
     if (projectiles.kills !== projectiles.shot || projectiles.combo !== projectiles.shot)
       problems.push(`${projectiles.shot} projectiles shot gave ${projectiles.kills} kills and +${projectiles.combo} combo (want one each)`)
     if (projectiles.hpMoved) problems.push('shooting its projectiles moved the boss hp')

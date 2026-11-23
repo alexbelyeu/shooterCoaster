@@ -1,8 +1,10 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
+import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, placedParts, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
 import { withRim } from './enemyRim'
-import { BALLOON_COLORS, CROW_BODY as CROW_BODY_HEX, CROW_SHEEN as CROW_SHEEN_HEX, SCORPION_BODY_COLOR, SCORPION_PINCER_COLOR, SCORPION_LEG_COLOR, JELLY_COLORS, CLIMBER_SHIRT, CLIMBER_TROUSERS, RAT_FUR, RAT_BELLY, DUST_GREY, DUST_LIGHT, DUST_DARK, DUST_CHALK, LANTERNFLY_FOREWING, LANTERNFLY_RED, LANTERNFLY_BODY } from './enemyPalette'
+import { BALLOON_COLORS, CROW_BODY as CROW_BODY_HEX, CROW_SHEEN as CROW_SHEEN_HEX, SCORPION_BODY_COLOR, SCORPION_PINCER_COLOR, SCORPION_LEG_COLOR, JELLY_COLORS, FFISH_BODY, FFISH_BELLY, CLIMBER_SHIRT, CLIMBER_TROUSERS, RAT_FUR, RAT_BELLY, DUST_GREY, DUST_LIGHT, DUST_DARK, DUST_CHALK, LANTERNFLY_FOREWING, LANTERNFLY_RED, LANTERNFLY_BODY } from './enemyPalette'
+
+type Vec3 = [number, number, number]
 
 export * from './infernoEnemyAssets'
 export * from './oceanEnemyAssets'
@@ -18,9 +20,9 @@ export const BALLOON_BODY_GEO = new THREE.SphereGeometry(30, 16, 16)
 export const BALLOON_KNOT_GEO = new THREE.SphereGeometry(4, 8, 8)
 export const BALLOON_STRING_GEO = new THREE.CylinderGeometry(0.5, 0.5, 55, 4)
 /** Teardrop body + knot as one geometry: Theme Park has ~150 balloons, so draw calls add up. */
-export const BALLOON_GEO = mergeGeometries([
-  new THREE.SphereGeometry(30, 16, 12).scale(1, 1.3, 1),
-  new THREE.SphereGeometry(4, 6, 4).translate(0, -35, 0),
+export const BALLOON_GEO = placedParts([
+  [new THREE.SphereGeometry(30, 16, 12), [0, 0, 0], [0, 0, 0], [1, 1.3, 1]],
+  [new THREE.SphereGeometry(4, 6, 4), [0, -35, 0]],
 ])
 
 // ── Balloon materials (10 color variants) ───────────────────────────
@@ -311,9 +313,9 @@ export const SCORPION_GEO = mergePainted([
 export const SCORPION_TAIL_PIVOT: [number, number, number] = [0, 0.5, -2.5]
 
 // Chain of spheres curling up and over
-export const SCORPION_TAIL_GEO = mergeGeometries(
-  [[0, 0.5, 0], [0, 1.5, -0.3], [0, 2.8, -0.2], [0, 3.8, 0.3], [0, 4.5, 1.0]].map(([x, y, z]) =>
-    new THREE.SphereGeometry(0.7, 5, 5).translate(x, y, z),
+export const SCORPION_TAIL_GEO = placedParts(
+  ([[0, 0.5, 0], [0, 1.5, -0.3], [0, 2.8, -0.2], [0, 3.8, 0.3], [0, 4.5, 1.0]] as Vec3[]).map((at) =>
+    [new THREE.SphereGeometry(0.7, 5, 5), at],
   ),
 )
 export const SCORPION_STINGER_GEO = new THREE.ConeGeometry(0.6, 2, 4).rotateX(0.5).translate(0, 4.8, 1.8)
@@ -363,11 +365,11 @@ const JELLY_TENTACLES = 5
  * Bell + five hanging tentacles as one geometry: a whole Ocean wave floats in view beside
  * the track (#316), and at 7 draw calls a jellyfish broke level3's draw budget.
  */
-export const JELLY_BODY_GEO = mergeGeometries([
-  new THREE.SphereGeometry(3, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2),
-  ...Array.from({ length: JELLY_TENTACLES }, (_, i) => {
+export const JELLY_BODY_GEO = placedParts([
+  [new THREE.SphereGeometry(3, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), [0, 0, 0]],
+  ...Array.from({ length: JELLY_TENTACLES }, (_, i): [THREE.BufferGeometry, Vec3] => {
     const a = (i / JELLY_TENTACLES) * Math.PI * 2
-    return new THREE.CylinderGeometry(0.15, 0.08, 5, 4).translate(Math.cos(a) * 1.8, -3, Math.sin(a) * 1.8)
+    return [new THREE.CylinderGeometry(0.15, 0.08, 5, 4), [Math.cos(a) * 1.8, -3, Math.sin(a) * 1.8]]
   }),
 ])
 export const JELLY_INNER_GEO = new THREE.SphereGeometry(1.5, 6, 6)
@@ -383,7 +385,7 @@ export const JELLY_INNER_MATS = JELLY_COLORS.map(
 )
 export const JELLY_COLOR_COUNT = JELLY_COLORS.length
 
-// ── Flying Fish (~14 primitives) ──────────────────────────────────
+// ── Flying Fish: one painted body, two wing-fins ─────────────────
 
 // Body: LatheGeometry — sleek laterally-compressed fish shape
 const ffishBodyProfile = [
@@ -397,7 +399,7 @@ const ffishBodyProfile = [
   new THREE.Vector2(0.2, 5.3),
   new THREE.Vector2(0, 5.5),
 ]
-export const FFISH_BODY_GEO = new THREE.LatheGeometry(ffishBodyProfile, 8)
+const ffishBody = () => new THREE.LatheGeometry(ffishBodyProfile, 8)
 
 // Wing-fins: swept-back translucent gliding surfaces
 export const FFISH_WING_GEO = makeWingGeo(
@@ -428,14 +430,14 @@ export const FFISH_WING_GEO = makeWingGeo(
 )
 
 // Tail: forked (two lobes)
-export const FFISH_TAIL_UPPER_GEO = makeWingGeo(
+const ffishTailUpper = () => makeWingGeo(
   [
     [0, 0, 0],      [0, 1.5, -1.8],  [0, 0.3, -1],
     [0.08, 0, 0],   [0.08, 1.5, -1.8], [0.08, 0.3, -1],
   ],
   [0, 1, 2, 3, 5, 4, 0, 3, 4, 0, 4, 1, 2, 1, 4, 2, 4, 5, 0, 2, 5, 0, 5, 3],
 )
-export const FFISH_TAIL_LOWER_GEO = makeWingGeo(
+const ffishTailLower = () => makeWingGeo(
   [
     [0, 0, 0],       [0, -1.2, -1.5],  [0, -0.2, -0.8],
     [0.08, 0, 0],    [0.08, -1.2, -1.5], [0.08, -0.2, -0.8],
@@ -444,7 +446,7 @@ export const FFISH_TAIL_LOWER_GEO = makeWingGeo(
 )
 
 // Dorsal fin — small triangular
-export const FFISH_DORSAL_GEO = makeWingGeo(
+const ffishDorsal = () => makeWingGeo(
   [
     [0, 0, 0.5],    [0, 1, -0.2],   [0, 0, -0.5],
     [0.06, 0, 0.5], [0.06, 1, -0.2], [0.06, 0, -0.5],
@@ -452,20 +454,25 @@ export const FFISH_DORSAL_GEO = makeWingGeo(
   [0, 1, 2, 3, 5, 4, 0, 3, 4, 0, 4, 1, 2, 1, 4, 2, 4, 5, 0, 2, 5, 0, 5, 3],
 )
 
-export const FFISH_EYE_GEO = new THREE.SphereGeometry(0.3, 6, 6)
+/**
+ * Body, belly, dorsal fin, forked tail and eyes, placed as their meshes were in the fish's group and painted: one draw
+ * call where they were eight (36 fish leap in the Ocean's last wave). Only the wing-fins move on their own.
+ */
+export const FFISH_GEO = mergePainted([
+  paintedAt(ffishBody(), FFISH_BODY, pose([0, 0, -1], [Math.PI / 2, 0, 0], [1, 1, 0.7])),
+  paintedAt(ffishBody(), FFISH_BELLY, pose([0, -0.4, -1], [Math.PI / 2, 0, 0], [0.8, 0.8, 0.4])),
+  painted(ffishDorsal(), '#6a9cc0', [0, 1.2, 0]),
+  painted(ffishTailUpper(), '#6a98c0', [0, 0, -3]),
+  painted(ffishTailLower(), '#6a98c0', [0, 0, -3]),
+  ...[-1, 1].map((s) => painted(new THREE.SphereGeometry(0.3, 6, 6), '#111111', [s * 0.6, 0.4, 2])),
+])
 
-// Materials: silver-blue fish with wet sheen (VISION: flying fish read silver)
+// Silver-blue with a wet sheen (VISION: flying fish read silver).
 const FFISH_RIM = { color: '#f0faff', intensity: 0.65, power: 2.5 }
-export const FFISH_BODY_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#7aa8cc',
+export const FFISH_MAT = withRim(new THREE.MeshPhongMaterial({
+  vertexColors: true,
   specular: '#e0f2ff',
-  shininess: 60,
-  flatShading: true,
-}), FFISH_RIM)
-export const FFISH_BELLY_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#dce8f0',
-  specular: '#ffffff',
-  shininess: 50,
+  shininess: 55,
   flatShading: true,
 }), FFISH_RIM)
 export const FFISH_WING_MAT = withRim(new THREE.MeshPhongMaterial({
@@ -477,33 +484,6 @@ export const FFISH_WING_MAT = withRim(new THREE.MeshPhongMaterial({
   flatShading: true,
   side: THREE.DoubleSide,
 }), FFISH_RIM)
-export const FFISH_TAIL_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#6a98c0',
-  specular: '#c8e4f8',
-  shininess: 45,
-  flatShading: true,
-}), FFISH_RIM)
-export const FFISH_FIN_MAT = withRim(new THREE.MeshPhongMaterial({
-  color: '#6a9cc0',
-  specular: '#c8e4f8',
-  shininess: 40,
-  flatShading: true,
-}), FFISH_RIM)
-export const FFISH_EYE_MAT = new THREE.MeshPhongMaterial({
-  color: '#111111',
-  specular: '#444444',
-  shininess: 80,
-  flatShading: true,
-})
-
-type Vec3 = [number, number, number]
-
-/** Fresh parts sharing one material, placed as their meshes were and merged into one draw call (the parts are disposed). */
-function placedParts(parts: [geo: THREE.BufferGeometry, position: Vec3, rotation?: Vec3, scale?: Vec3][]): THREE.BufferGeometry {
-  const g = mergeGeometries(parts.map(([geo, p, r, s]) => geo.applyMatrix4(pose(p, r, s))))
-  for (const [geo] of parts) geo.dispose()
-  return g
-}
 
 // ── Snowman (shared across normal, scout, brute) ───────────────────
 export const SNOWMAN_BODY_GEO = placedParts([
