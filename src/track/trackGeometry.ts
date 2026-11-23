@@ -50,7 +50,8 @@ export function seatUp(curve: TrackCurve, t: number, out: THREE.Vector3): THREE.
  * Builds the running rails, spine and cross ties as one indexed, vertex-coloured
  * BufferGeometry. Rails/spine are smooth tubes sampled uniformly in t (same
  * tessellation as the original RollerCoaster.js port); ties are triangular
- * yokes (rail – rail – spine) spaced evenly by arc length.
+ * yokes (rail – rail – spine) spaced evenly by arc length. `gaps` (arc-distance spans, `mechanics.ts` `trackGaps`)
+ * are left open: no rails, spine or ties (a jump's gap, a drop track's fall, #699).
  */
 export function buildTrackGeometry(
   curve: TrackCurve,
@@ -59,7 +60,9 @@ export function buildTrackGeometry(
   segments: number,
   color1: RGB,
   color2: RGB,
+  gaps: readonly (readonly [number, number])[] = [],
 ): THREE.BufferGeometry {
+  const open = (dist: number) => gaps.some(([from, to]) => dist >= from && dist <= to)
   const ringCount = segments + 1
   const tieSpacing = Math.max(dims.tieSpacing, table.length / MAX_TIES)
   const tieCount = Math.floor(table.length / tieSpacing)
@@ -138,6 +141,7 @@ export function buildTrackGeometry(
       }
     }
     for (let i = 0; i < segments; i++) {
+      if (gaps.length && open(distanceAtT(table, (i + 0.5) / segments))) continue
       const r0 = base + i * tube.sides
       const r1 = r0 + tube.sides
       for (let j = 0; j < tube.sides; j++) {
@@ -164,6 +168,7 @@ export function buildTrackGeometry(
 
   prevRight.set(1, 0, 0)
   for (let k = 0; k < tieCount; k++) {
+    if (open((k + 0.5) * tieSpacing)) continue
     const t = tAtDistance(table, (k + 0.5) * tieSpacing)
     trackFrame(curve, t, point, forward, right, up, prevRight)
     prevRight.copy(right)

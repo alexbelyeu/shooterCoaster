@@ -5,7 +5,7 @@ import type { BiomeType } from '@/types/level'
  * Accents follow the per-biome art direction in docs/agents/VISION.md.
  */
 export interface BiomeUITheme {
-  /** Primary accent: wave banner rule, kill strip fill. */
+  /** Primary accent: the wave banner's rule, and the world's name plate on level select (tar letters on it). */
   accent: string
   /** Glow colour (accent with alpha) for text-shadow / box-shadow. */
   glow: string
@@ -16,7 +16,19 @@ export interface BiomeUITheme {
   bg: string
 }
 
-export type SkyStop = readonly [colour: string, at: number]
+/** The house colours, `--fair-*` in `src/app/global.css` (docs/art/PERSONALITY.md "Palette"), for drawing on a canvas. */
+export const FAIR = {
+  oxblood: '#5b1220',
+  oxbloodDeep: '#3a0a13',
+  gilt: '#e9b53d',
+  giltBlock: '#9a6414',
+  vermilion: '#d9301f',
+  sky: '#63b7e6',
+  cream: '#f6e7c1',
+  tar: '#1b110d',
+} as const
+
+export type SkyStop =readonly [colour: string, at: number]
 
 function theme(t: Omit<BiomeUITheme, 'bg'>): BiomeUITheme {
   const stops = t.sky.map(([c, at]) => `${c} ${Math.round(at * 100)}%`).join(', ')
@@ -71,20 +83,4 @@ export const DEFAULT_UI_THEME: BiomeUITheme = theme({
 
 export function biomeTheme(biome: BiomeType | undefined | null): BiomeUITheme {
   return (biome && BIOME_UI[biome]) || DEFAULT_UI_THEME
-}
-
-/** HUD status colours. */
-export const HUD_COLORS = {
-  text: '#ffffff',
-  gold: '#ffd23f',
-  orange: '#ff9a1f',
-  red: '#ff3b3b',
-  amber: '#ffb020',
-} as const
-
-const COMBO_COLORS = [HUD_COLORS.text, HUD_COLORS.gold, HUD_COLORS.orange, HUD_COLORS.red] as const
-
-/** Combo colour by tier (`combat/comboTiers.ts`): 1× white, 2× gold, 3× orange, 5× red. */
-export function comboColor(tier: number): string {
-  return COMBO_COLORS[Math.min(Math.max(tier, 0), COMBO_COLORS.length - 1)]
 }

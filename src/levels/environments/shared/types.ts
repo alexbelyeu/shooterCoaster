@@ -1,9 +1,12 @@
-import type { ComponentType, RefObject } from 'react'
+import type { ComponentType } from 'react'
 import type * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
+import type { RideSpeeds } from '@/track/ridePhysics'
+import type { WhaleBreachSpec } from '@/types/level'
 import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
+import type { FogModifiers } from './sceneFog'
 import type { KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import type { HeroShot } from '@/track/introCamera.hot'
 
@@ -56,9 +59,13 @@ export interface BiomeFeaturesProps {
   heightFn: HeightFunction
   groundFn: HeightFunction
   track: ArcTable
+  /** The ride's speeds (`rideModel`), for biome events timed on the ride (Ocean's whale). */
+  speeds: RideSpeeds
+  /** The level's whale breach (`environment.whale`), when it asks for one (Ocean's Features). */
+  whale?: WhaleBreachSpec
   atmosphere: AtmosphereConfig
-  /** The scene fog, for biome events that animate it (volcanic eruption). */
-  fogRef: RefObject<THREE.Fog | null>
+  /** The scene fog's modifiers, for biome events that pull it in (the volcanic eruption publishes `fog.eruption`). */
+  fog: FogModifiers
 }
 
 /** Ground that gives off its own light (volcanic: beside the lava), baked per terrain vertex. */
@@ -96,6 +103,9 @@ export interface ParticleBoost {
   holdS: number
   fadeS: number
 }
+
+/** A boost's rise / hold / fade alone: what `boostStrength` and `stepBoost` read (the weather pulse's too, `weatherPulse.ts`). */
+export type BoostEnvelope = Pick<ParticleBoost, 'riseS' | 'holdS' | 'fadeS'>
 
 /** Ambient particles wrapping in a box around the camera (`shared/ParticleField.tsx`, presets in `shared/particlePresets.ts`). */
 export interface ParticleFieldPreset {

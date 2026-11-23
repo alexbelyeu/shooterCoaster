@@ -2,11 +2,12 @@
 /**
  * Renders the game's current music / SFX offline in the page (`__SC_TEST__.renderAudio`) and measures it.
  *
- *   npm run build && npm run audio:render -- --music <title|level1..5|results|<slot>.<theme>> [--seconds 30] [--seam]
+ *   npm run build && npm run audio:render -- --music <title|level1..5|results-win|results-lose|<slot>.<theme>> [--seconds 30] [--seam]
  *     [--layers 0..3|ramp]  (the score's intensity layers, 0–3 held, or `ramp` up through them and down again)
- *   npm run audio:render -- --sfx-sheet [--level level1]
+ *   npm run audio:render -- --sfx-sheet [--level level1] [--kills]   (--kills: every kill sound and combo tier, its own sheet)
  *   npm run audio:render -- --mix level1 [--seconds 20] [--boss]
  *   npm run audio:render -- --ride level1   (the ride's sounds: GO's launch whoosh, a chain lift, the drop's wind and rumble to top speed)
+ *   npm run audio:render -- --resume level1 [--unpaused]   (a paused run's resume Ready / GO, the pause gate opening at GO; --unpaused: the same with no pause, the reference)
  *   npm run audio:render -- --launch level2   (level select's launch blip as that level's bank and room land under it: the click check at the swap)
  *   npm run audio:render -- --score <file.scrim | vendored:1..6> [--engine port|original] [--voicing jukebox|game] [--seconds 20]
  *   npm run audio:render -- --score <file.scrim> --chain game [--seconds 20] [--seam]
@@ -15,7 +16,7 @@
  * the port (default) or the original Scrimshaw page (docs/audio/reference/scrimshaw-jukebox.html), both seeded alike;
  * with --chain game it plays through the game's music chain instead, measured like a level's score. --seam
  * starts 10 s before the first loop seam instead of at the top, so the render crosses it (name suffix -seam).
- * Options: --name <file name> (default music-<track> / sfx-sheet-<level> / mix-<level> / score-<engine>-<score>)
+ * Options: --name <file name> (default music-<track> / sfx-sheet-<level>[-kills] / mix-<level> / score-<engine>-<score>)
  *   --out docs/audio/renders  --seed 1  --url <running preview>
  * Writes <out>/<name>.{mp3,json,png}; the float WAV it measured stays in e2e-results/audio/ (a --mix also renders
  * <name>-music.wav, the same mix without SFX, to measure each kill against the music around it).
@@ -59,9 +60,10 @@ if (flag('music')) {
   kind = 'music'
   defaultName = `music-${flag('music')}${seam ? '-seam' : ''}`
 } else if (argv.includes('--sfx-sheet')) {
-  request = { kind: 'sfxSheet', level: flag('level') }
+  const kills = argv.includes('--kills')
+  request = { kind: 'sfxSheet', level: flag('level'), kills }
   kind = 'sfx'
-  defaultName = `sfx-sheet-${flag('level') ?? 'level1'}`
+  defaultName = `sfx-sheet-${flag('level') ?? 'level1'}${kills ? '-kills' : ''}`
 } else if (flag('mix')) {
   // --boss: the boss arrives and falls mid-render, switching the score to its boss section and the sting (#598).
   const boss = argv.includes('--boss')
@@ -72,6 +74,11 @@ if (flag('music')) {
   request = { kind: 'ride', level: flag('ride') }
   kind = 'sfx'
   defaultName = `ride-${flag('ride')}`
+} else if (flag('resume')) {
+  const unpaused = argv.includes('--unpaused')
+  request = { kind: 'resume', level: flag('resume'), unpaused }
+  kind = 'sfx'
+  defaultName = `resume-${flag('resume')}${unpaused ? '-unpaused' : ''}`
 } else if (flag('launch')) {
   // Level select's launch blip with the level's bank and room landing under it (#246): no click where the graph swaps.
   request = { kind: 'launch', level: flag('launch') }
@@ -87,7 +94,7 @@ if (flag('music')) {
   kind = 'music'
   defaultName = `score-${chain === 'game' ? 'game' : original ? 'original' : 'port'}-${label}${seam ? '-seam' : ''}`
 } else {
-  console.error('usage: npm run audio:render -- --music <title|level1..level5|results|<slot>.<theme>> [--seam] | --sfx-sheet [--level <id>] | --mix <level> | --ride <level> | --launch <level> | --score <file|vendored:N> [--engine port|original] [--name n] [--out dir] [--seed n]')
+  console.error('usage: npm run audio:render -- --music <title|level1..level5|results-win|results-lose|<slot>.<theme>> [--seam] | --sfx-sheet [--level <id>] [--kills] | --mix <level> | --ride <level> | --launch <level> | --resume <level> [--unpaused] | --score <file|vendored:N> [--engine port|original] [--name n] [--out dir] [--seed n]')
   process.exit(2)
 }
 const NAME = flag('name') ?? defaultName

@@ -3,9 +3,10 @@ import { applyHit, createBossState, currentPhase, exposedWeakPoints, hpFraction,
 import { MAGMA_TITAN } from './bossSpecs'
 import type { TrackIndex } from '@/levels/environments/shared/trackClearance'
 import type { PerchInput } from './scorpionMotion.hot'
+import { inWindow } from './bossCycle.hot'
 import {
-  RIVER_SPOT, TITAN_BEAT, TITAN_DEFEAT, TITAN_RISE, beatNowEpoch, crackGlow, defeatHeat, defeatSink, heartOpenAmount,
-  isHeartOpen, needsWade, pickRiverSpot, poundAmount, poundBetween, riseOffset, wadeStep,
+  RIVER_SPOT, TITAN_BEAT, TITAN_DEFEAT, TITAN_RISE, crackGlow, defeatHeat, defeatSink, pickRiverSpot, poundAmount,
+  poundBetween, riseOffset, wadeStep,
 } from './titanMotion.hot'
 
 const ids = (state: ReturnType<typeof createBossState>) => exposedWeakPoints(state).map((w) => w.id)
@@ -36,22 +37,12 @@ describe('Magma Titan phases', () => {
 describe('the heart beat', () => {
   const { first, period, openS, poundS } = TITAN_BEAT
 
-  it('is shut until the first beat, open for openS of every period', () => {
-    expect(isHeartOpen(0)).toBe(false)
-    expect(isHeartOpen(first - 0.01)).toBe(false)
-    for (let k = 0; k < 4; k++) {
-      expect(isHeartOpen(first + k * period + 0.01)).toBe(true)
-      expect(isHeartOpen(first + k * period + openS - 0.01)).toBe(true)
-      expect(isHeartOpen(first + k * period + openS + 0.01)).toBe(false)
-    }
-  })
-
   it('opens at least once in any ~5 s and for a good share of the fight', () => {
     let open = 0
     let longestShut = 0
     let shut = 0
     for (let t = first; t < first + 20; t += 0.05) {
-      if (isHeartOpen(t)) {
+      if (inWindow(TITAN_BEAT, t)) {
         open += 0.05
         shut = 0
       } else longestShut = Math.max(longestShut, (shut += 0.05))
@@ -60,25 +51,12 @@ describe('the heart beat', () => {
     expect(open / 20).toBeGreaterThan(0.35)
   })
 
-  it('eases the plates open and shut inside the window', () => {
-    expect(heartOpenAmount(first - 0.1)).toBe(0)
-    expect(heartOpenAmount(first + openS / 2)).toBe(1)
-    expect(heartOpenAmount(first + openS + 0.1)).toBe(0)
-    const samples = Array.from({ length: 200 }, (_, i) => heartOpenAmount(first + (i / 200) * period))
-    expect(samples.every((v) => v >= 0 && v <= 1)).toBe(true)
-  })
-
   it('pounds twice at the start of each window', () => {
     expect(poundAmount(first + poundS / 4)).toBeCloseTo(1)
     expect(poundAmount(first + poundS + 0.1)).toBe(0)
     let impacts = 0
     for (let t = 0; t < first + period; t += 1 / 60) if (poundBetween(t, t + 1 / 60)) impacts++
     expect(impacts).toBe(2)
-  })
-
-  it('beats at once when asked (its vents gone)', () => {
-    const now = 7.3
-    expect(isHeartOpen(now - beatNowEpoch(now) + 0.01)).toBe(true)
   })
 })
 
@@ -112,13 +90,6 @@ describe('rise, sink and wade', () => {
     expect(defeatSink(-1)).toBe(0)
     expect(defeatSink(TITAN_DEFEAT.darkS)).toBeCloseTo(0)
     expect(defeatSink(10)).toBe(-TITAN_DEFEAT.sinkDepth)
-  })
-
-  it('wades on once behind or off to the side, or after holding', () => {
-    expect(needsWade(1, 1400, 300)).toBe(false)
-    expect(needsWade(1, 400, 0)).toBe(true)
-    expect(needsWade(1, 800, 1500)).toBe(true)
-    expect(needsWade(20, 1400, 300)).toBe(true)
   })
 
   it('steps at its wade speed and lands on the target', () => {

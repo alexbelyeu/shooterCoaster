@@ -1,17 +1,32 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
-import { buildArcTable, tAtLoopDistance } from '@/track/arcLength'
-import { lapSeconds, rideModel, rideProfile } from '@/track/ridePhysics'
+import { buildArcTable, distanceAtT, tAtLoopDistance } from '@/track/arcLength'
+import { rideModel, rideProfile } from '@/track/ridePhysics'
+import { BEAT_TOLERANCE_SECONDS } from '@/track/rideV2'
+import { seatUp } from '@/track/trackGeometry'
+import { eyeClearance } from '@/track/elements/headChopper'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
 import { tourPose } from '@/track/introCamera.hot'
 import { buildIntroTour } from '@/track/introTour'
+import { type JunctionMechanic, buildJunction, switchPose } from '@/track/mechanics'
 import { gymFloor } from './config'
-import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
+import { BASE_VERTICAL_FOV, MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { MEDUSA_BODY, MEDUSA_HUB, MEDUSA_RISE, MEDUSA_SIZE, bustClearance, yawToward } from '@/entities/bosses/medusaMotion'
+import {
+  MEDUSA_BODY,
+  MEDUSA_HUB,
+  MEDUSA_RISE,
+  MEDUSA_SIZE,
+  SNAKE,
+  SNAKE_SLOTS,
+  bodyPlacement,
+  bustClearance,
+  laySnake,
+  yawToward,
+} from '@/entities/bosses/medusaMotion'
 import {
   ARCH,
   BLOCKOUT_BOXES,
@@ -25,24 +40,28 @@ import {
   archOpeningClearance,
   distanceToBox,
   floorAt,
-  glassDistance,
+  piece,
   toBlockout,
   toWorld,
   treeAlong,
   treeOut,
   type Vec3,
 } from './blockout'
-import { GYM_PHOTO_T, GYM_TRACK, RAIL_CLEARANCE } from './gymTrack'
+import { GYM_TRACK, RAIL_CLEARANCE } from './gymTrack'
 import { meshClearance } from './geometryChecks'
 import { buildHall, holdGeometry } from './hallGeometry'
 import { gym } from './index'
+import { darkSectionDepth } from '@/track/darkSection.hot'
 
-/** The glass room pass counts within this many metres of the windows. */
-const NEAR = 5
-/** The spiral's turn is counted while the track is within this many metres of the Flame's centre. */
-const SPIRAL_RADIUS = 20
-/** Vertical half-angle of the view: the coaster camera's 80° base FOV (narrow screens only widen it). */
-const VERTICAL_HALF_FOV = 40
+/** The roof trusses' bottom chords (`hallGeometry.ts`). */
+const TRUSS_UNDERSIDE = HALL.h - 4.5
+const caveRoof = piece('floor', 'ewsmmqw')
+/** The Training Area's cave, open to the hall under its roof. */
+const CAVE = { minX: caveRoof.x - caveRoof.w / 2, maxX: caveRoof.x + caveRoof.w / 2, roof: caveRoof.base }
+/** Vertical half-angle of the view at the coaster camera's base FOV (narrow screens only widen it). */
+const VERTICAL_HALF_FOV = BASE_VERTICAL_FOV / 2
+/** Seconds from the Medusa's arrival that her crown snake stays in the rider's view (#856). */
+const CROWN_IN_VIEW_SECONDS = 2.5
 const N = 4000
 const DEG = 180 / Math.PI
 
@@ -81,8 +100,13 @@ describe('the gym blockout', () => {
 })
 
 describe('the gym track', () => {
-  it('rides a 60 s lap (±5 s) with the level speeds', () => {
-    expect(Math.abs(lapSeconds(curve, speeds) - RUN_SECONDS)).toBeLessThanOrEqual(5)
+  it("lands every storyboard beat on its second (±0.5 s), riding its mechanics' stops (#700)", () => {
+    const beats = GYM_TRACK.rideV2?.beats ?? []
+    expect(beats.length).toBeGreaterThanOrEqual(7)
+    for (const beat of beats) {
+      const landed = profile.findIndex((s) => s >= beat.at * table.length) / 10
+      expect(Math.abs(landed - beat.second), `beat at ${beat.second} s`).toBeLessThanOrEqual(BEAT_TOLERANCE_SECONDS + 0.1)
+    }
   })
 
   it('never passes through a blockout piece, the floor or the hall, and never through itself', () => {
@@ -92,7 +116,9 @@ describe('the gym track', () => {
     for (const p of track) {
       for (const box of BLOCKOUT_BOXES) pieces = Math.min(pieces, distanceToBox(box, p))
       floor = Math.min(floor, p.y - floorAt(p.x, p.z))
-      hall = Math.min(hall, p.x, HALL.w - p.x, p.z, HALL.d - p.z, HALL.h - p.y)
+      // The Training Area's cave opens off the east wall (z 0) under its roof: the ride runs through it (#700).
+      const inCave = p.x > CAVE.minX && p.x < CAVE.maxX && p.y < CAVE.roof
+      hall = Math.min(hall, p.x, HALL.w - p.x, inCave ? Infinity : p.z, HALL.d - p.z, HALL.h - p.y)
     }
     let self = Infinity
     const metresPerSample = table.length / GYM_SCALE / N
@@ -123,33 +149,70 @@ describe('the gym track', () => {
     expect(dims.eyeHeight / GYM_SCALE).toBeLessThan(RAIL_CLEARANCE)
   })
 
+  it('forks the V8 route (#702) off the run across the hall to Alaska, clear of the blockout, the floor, the hall and the rest of the track', () => {
+    const junction = buildJunction(curve, GYM_TRACK.mechanics!.find((m): m is JunctionMechanic => m.kind === 'junction')!)
+    const branch = Array.from({ length: 801 }, (_, i) => toBlockout(junction.branch.getPointAt(i / 800)))
+    let pieces = Infinity
+    let floor = Infinity
+    let hall = Infinity
+    let apart = 0
+    let others = Infinity
+    const margin = 0.03
+    const rest = track.filter((_, i) => i / N < junction.from - margin || i / N > junction.to + margin)
+    branch.forEach((p, i) => {
+      for (const box of BLOCKOUT_BOXES) pieces = Math.min(pieces, distanceToBox(box, p))
+      floor = Math.min(floor, p.y - floorAt(p.x, p.z))
+      hall = Math.min(hall, p.x, HALL.w - p.x, p.z, HALL.d - p.z, HALL.h - p.y)
+      const m = toBlockout(curve.getPointAt(junction.from + ((junction.to - junction.from) * i) / 800))
+      apart = Math.max(apart, Math.hypot(p.x - m.x, p.y - m.y, p.z - m.z))
+      for (const q of rest) others = Math.min(others, Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z))
+    })
+    expect(pieces).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+    expect(floor).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+    expect(hall).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+    expect(others).toBeGreaterThanOrEqual(2 * RAIL_CLEARANCE)
+    // A real choice: the routes part by metres, not a wiggle.
+    expect(apart).toBeGreaterThan(5)
+    // Both ways fall between the burst out of the cave and the wall ride's beat.
+    const forkSeconds = secondsAt(Math.round(junction.from * N))
+    const mergeSeconds = secondsAt(Math.round(junction.to * N))
+    expect(forkSeconds).toBeGreaterThan(18)
+    expect(mergeSeconds).toBeLessThan(22)
+    // The switch sign stands clear of everything solid, on the branch's side.
+    const sign = toBlockout(switchPose(curve, junction, dims.eyeHeight).position)
+    let signClear = Infinity
+    for (const box of BLOCKOUT_BOXES) signClear = Math.min(signClear, distanceToBox(box, sign))
+    expect(signClear).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+  })
+
   it('threads the Arch: through its opening, clear of the legs and soffit', () => {
     const passage = track.filter((p) => Math.abs(archAxial(p)) <= ARCH.depth / 2 && archOpeningClearance(p) > -ARCH.width)
     expect(passage.length * (table.length / GYM_SCALE / N)).toBeGreaterThan(ARCH.depth - 0.5)
     expect(Math.min(...passage.map(archOpeningClearance))).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
   })
 
-  it('spirals at least one full turn round the Flame, never over its flared footprint', () => {
-    let swept = 0
-    let most = 0
-    let prev: number | null = null
-    let over = 0
-    for (const p of [...track, ...track]) {
-      const dx = p.x - FLAME.centre.x
-      const dz = p.z - FLAME.centre.z
-      if (Math.abs(dx) <= FLAME.halfX && Math.abs(dz) <= FLAME.halfZ) over++
-      if (Math.hypot(dx, dz) > SPIRAL_RADIUS) {
-        swept = 0
-        prev = null
-        continue
-      }
-      const angle = Math.atan2(dz, dx)
-      if (prev !== null) swept += Math.atan2(Math.sin(angle - prev), Math.cos(angle - prev))
-      prev = angle
-      most = Math.max(most, Math.abs(swept))
+  it('rolls upside down over the Flame, clear of its flared footprint (#700)', () => {
+    const up = new THREE.Vector3()
+    let inverted = 0
+    let lowest = Infinity
+    for (let i = 0; i < N; i++) {
+      const p = track[i]
+      if (Math.abs(p.x - FLAME.centre.x) > FLAME.halfX || Math.abs(p.z - FLAME.centre.z) > FLAME.halfZ) continue
+      lowest = Math.min(lowest, p.y)
+      if (seatUp(curve, i / N, up).y < -0.9) inverted++
     }
-    expect(most * DEG).toBeGreaterThanOrEqual(360)
-    expect(over).toBe(0)
+    expect(inverted).toBeGreaterThan(0)
+    expect(lowest - FLAME.top).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+  })
+
+  it("passes the rider's eye a near miss under the Arch's lintel, measured (#700)", () => {
+    const box = {
+      min: toWorld({ x: ARCH.centre.x - ARCH.width / 2, y: ARCH.height, z: ARCH.centre.z - ARCH.depth / 2 }),
+      max: toWorld({ x: ARCH.centre.x + ARCH.width / 2, y: ARCH.height + 2, z: ARCH.centre.z + ARCH.depth / 2 }),
+    }
+    const near = eyeClearance(curve, box, dims.eyeHeight) / GYM_SCALE
+    expect(near).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
+    expect(near).toBeLessThan(1.2)
   })
 
   it("rides through the Tree's gap in the run, cave to cave between its trunk and the back wall (#613, #671)", () => {
@@ -165,19 +228,26 @@ describe('the gym track', () => {
     expect(inGap.length * metresPerSample).toBeGreaterThan(2 * TREE_GAP.halfAlong - 0.2)
     expect(Math.min(...heights)).toBeGreaterThanOrEqual(1.5)
     expect(Math.max(...heights) + dims.eyeHeight / GYM_SCALE).toBeLessThanOrEqual(TREE_GAP.height - RAIL_CLEARANCE)
-    // The run starts in it and rides out of its far end.
+    // The run rides it.
     expect(inGap.filter(({ i }) => secondsAt(i) < RUN_SECONDS).length * metresPerSample).toBeGreaterThan(TREE_GAP.halfAlong)
   })
 
-  it("takes the on-ride photo in the Tree's gap (#701)", () => {
-    const p = track[Math.round(GYM_PHOTO_T * N)]
+  it("takes the on-ride photo in the run, upright, riding into the Tree's gap a few metres ahead (#701)", () => {
+    const photo = GYM_TRACK.photo ?? -1
+    const i = Math.round((distanceAtT(table, photo) / table.length) * N)
+    const p = track[i]
     const f = treeOut(p)
-    expect(Math.abs(treeAlong(p))).toBeLessThanOrEqual(TREE_GAP.halfAlong)
+    const ahead = -TREE_GAP.halfAlong - treeAlong(p)
+    expect(ahead).toBeGreaterThan(0)
+    expect(ahead).toBeLessThan(4)
+    expect(treeAlong(track[i + 10])).toBeGreaterThan(treeAlong(p))
     expect(f).toBeGreaterThanOrEqual(TREE_GAP.minF)
     expect(f).toBeLessThanOrEqual(TREE_GAP.maxF)
+    expect(seatUp(curve, photo, new THREE.Vector3()).y).toBeGreaterThan(0.9)
+    expect(secondsAt(i)).toBeLessThan(RUN_SECONDS)
   })
 
-  it("tours the hall into the seat behind the trunk clear of the wood, riding the track's hairpin in (#659, #675)", () => {
+  it("tours the hall into the seat in the station clear of every piece, riding the track's turn in (#659, #675, #700)", () => {
     const { hero } = gym
     expect(hero.approach).toBeGreaterThan(0)
     const seat = curve.getPointAt(0).clone()
@@ -200,68 +270,125 @@ describe('the gym track', () => {
     expect(floor).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
   })
 
-  it('passes the glass room windows', () => {
-    expect(Math.min(...track.map(glassDistance))).toBeLessThanOrEqual(NEAR)
-  })
-
-  it('dives into the Starr pit between 34 and 40 s, its lowest point down in the pit above the floor', () => {
-    // The dive's lowest point in the run's last 30 s: the lap starts and ends low too, in the Tree's gap.
-    const lastThirty = track.map((_, i) => i).filter((i) => secondsAt(i) >= 30 && secondsAt(i) <= RUN_SECONDS)
-    let low = lastThirty[0]
-    for (const i of lastThirty) if (track[i].y < track[low].y) low = i
-    // The dive starts at the crest the track descends from, all the way down to its lowest point.
-    let crest = low
-    while (track[(crest - 1 + N) % N].y >= track[crest].y) crest = (crest - 1 + N) % N
-    const p = track[low]
-    expect(p.x > PIT.minX && p.x < PIT.maxX && p.z > PIT.minZ && p.z < PIT.maxZ).toBe(true)
-    expect(p.y).toBeLessThan(0)
-    expect(p.y - PIT.floorY).toBeGreaterThanOrEqual(RAIL_CLEARANCE)
-    expect(secondsAt(crest)).toBeGreaterThanOrEqual(34)
-    expect(secondsAt(crest)).toBeLessThanOrEqual(40)
-  })
-
-  it('keeps the star in the camera view at least 80% of 40–60 s', () => {
-    const star = toWorld(STAR.centre)
-    const look = { x: 0, y: 0, z: 0 }
-    const eye = new THREE.Vector3()
-    const ahead = new THREE.Vector3()
-    const right = new THREE.Vector3()
-    const up = new THREE.Vector3()
-    const forward = new THREE.Vector3()
-    const toStar = new THREE.Vector3()
-    let seen = 0
-    let frames = 0
-    for (let k = 400; k <= 600; k++) {
-      const s = profile[k] % table.length
-      const t = s / table.length
-      eye.copy(curve.getPointAt(t))
-      eye.y += dims.eyeHeight
-      const tangent = curve.getTangentAt(t).clone()
-      ahead.copy(curve.getPointAt(tAtLoopDistance(table, s + LOOK_AHEAD_UNITS * dims.trackScale)))
-      ahead.y += dims.eyeHeight
-      ahead.sub(eye).normalize()
-      lookAheadDirection(tangent, ahead, look)
-      forward.set(look.x, look.y, look.z)
-      right.crossVectors(forward, THREE.Object3D.DEFAULT_UP).normalize()
-      up.crossVectors(right, forward)
-      toStar.set(star.x, star.y, star.z).sub(eye)
-      const depth = toStar.dot(forward)
-      const across = Math.atan2(toStar.dot(right), depth) * DEG
-      const vertical = Math.atan2(toStar.dot(up), depth) * DEG
-      frames++
-      if (depth > 0 && Math.abs(across) <= MIN_HORIZONTAL_FOV / 2 && Math.abs(vertical) <= VERTICAL_HALF_FOV) seen++
+  it("rides the Training Area's cave dark (#752): fully dark only under its roof, from the storyboard's ~15 s", () => {
+    expect(GYM_TRACK.darkSections).toHaveLength(1)
+    const [cave] = GYM_TRACK.darkSections!
+    expect(cave.ramp).toBeGreaterThan(0)
+    expect(cave.to - cave.from).toBeGreaterThan(4 * cave.ramp)
+    // Every point between the ramps is inside the cave's walls, below its roof.
+    const outside: number[] = []
+    for (let i = 0; i < N; i++) {
+      if (darkSectionDepth(GYM_TRACK.darkSections, i / N) < 1) continue
+      const p = track[i]
+      if (p.x < CAVE.minX || p.x > CAVE.maxX || p.y > CAVE.roof) outside.push(i / N)
     }
-    expect(seen / frames).toBeGreaterThanOrEqual(0.8)
+    expect(outside).toEqual([])
+    // In after the airtime hill, out before the run at Alaska.
+    const from = secondsAt(cave.from * N)
+    const to = secondsAt(cave.to * N)
+    expect(from).toBeGreaterThan(12)
+    expect(from).toBeLessThan(16)
+    expect(to - from).toBeGreaterThan(2)
+    expect(to).toBeLessThan(20)
   })
 
-  it("keeps the rails and the camera clear of the Medusa's bust from her rise to the run's end, leant out or not", () => {
+  it('climbs Alaska to just under the roof trusses, jumps to the Shield and drops into the pit (#700)', () => {
+    const top = Math.max(...track.map((p) => p.y))
+    expect(top + dims.eyeHeight / GYM_SCALE).toBeLessThan(TRUSS_UNDERSIDE - RAIL_CLEARANCE)
+    expect(top).toBeGreaterThan(TRUSS_UNDERSIDE - 2.5)
+    expect(GYM_TRACK.mechanics?.map((m) => m.kind)).toEqual(['station', 'junction', 'jumpGap', 'dropTrack'])
+  })
+
+  /** The rider's view 0.1·`k` s from GO: the eye and the coaster camera's axes, as the star and crown tests see it. */
+  const view = (() => {
+    const look = { x: 0, y: 0, z: 0 }
+    const v = { eye: new THREE.Vector3(), forward: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3() }
+    const ahead = new THREE.Vector3()
+    const to = new THREE.Vector3()
+    return {
+      at(k: number) {
+        const s = profile[k] % table.length
+        const t = s / table.length
+        v.eye.copy(curve.getPointAt(t))
+        v.eye.y += dims.eyeHeight
+        ahead.copy(curve.getPointAt(tAtLoopDistance(table, s + LOOK_AHEAD_UNITS * dims.trackScale)))
+        ahead.y += dims.eyeHeight
+        ahead.sub(v.eye).normalize()
+        lookAheadDirection(curve.getTangentAt(t).clone(), ahead, look)
+        v.forward.set(look.x, look.y, look.z)
+        v.right.crossVectors(v.forward, THREE.Object3D.DEFAULT_UP).normalize()
+        v.up.crossVectors(v.right, v.forward)
+        return v.eye
+      },
+      /** In the narrowest view (narrow screens only widen it vertically). */
+      sees(p: { x: number; y: number; z: number }) {
+        to.set(p.x, p.y, p.z).sub(v.eye)
+        const depth = to.dot(v.forward)
+        const across = Math.atan2(to.dot(v.right), depth) * DEG
+        const vertical = Math.atan2(to.dot(v.up), depth) * DEG
+        return depth > 0 && Math.abs(across) <= MIN_HORIZONTAL_FOV / 2 && Math.abs(vertical) <= VERTICAL_HALF_FOV
+      },
+    }
+  })()
+
+  it('comes out of the helix facing the star as the Medusa rises, and runs at her for 4 s (#700)', () => {
+    const at = getLevelConfig('level6')!.boss!.at
+    const star = toWorld(STAR.centre)
+    // Every tenth of a second from her rise to 4 s after it.
+    const unseen: number[] = []
+    for (let k = at * 10; k <= (at + 4) * 10; k++) {
+      view.at(k)
+      if (!view.sees(star)) unseen.push(k / 10)
+    }
+    expect(unseen, 'seconds the star is off screen').toEqual([])
+  })
+
+  it("holds the Medusa's crown snake, her last phase ducked, in view for the run at her (#856)", () => {
+    const at = getLevelConfig('level6')!.boss!.at
+    const crown = SNAKE_SLOTS[SNAKE_SLOTS.length - 1]
+    const hub = new THREE.Vector3(...MEDUSA_HUB)
+    const facing = new THREE.Vector3(STAR.facing.x, 0, STAR.facing.z).normalize()
+    const place = { y: 0, z: 0, scale: 1, pitch: 0 }
+    bodyPlacement(10, 0, 1, -1, place)
+    // Her root as `Medusa.tsx` places it, turned towards the rider each step.
+    const root = new THREE.Object3D()
+    root.rotation.order = 'YXZ'
+    root.scale.setScalar(place.scale * MEDUSA_SIZE)
+    root.position.copy(hub).addScaledVector(facing, place.z * MEDUSA_SIZE)
+    root.position.y += place.y * MEDUSA_SIZE
+    const toEye = new THREE.Vector3()
+    const head = new THREE.Vector3()
+    const points = new Float32Array((SNAKE.segments + 1) * 3)
+    const n = SNAKE.segments * 3
+    const unseen: string[] = []
+    for (let k = at * 10; k <= (at + CROWN_IN_VIEW_SECONDS) * 10; k++) {
+      const eye = view.at(k)
+      toEye.subVectors(eye, hub)
+      root.rotation.set(place.pitch, Math.atan2(facing.x, facing.z) + yawToward(toEye.x * facing.z - toEye.z * facing.x, toEye.x * facing.x + toEye.z * facing.z), 0)
+      root.updateMatrixWorld()
+      toEye.copy(eye)
+      root.worldToLocal(toEye)
+      toEye.set(toEye.x - crown.root[0], toEye.y - crown.root[1], toEye.z - crown.root[2]).normalize()
+      // Swaying and rearing back, the strike cycle up to its lunge (struck at the rider it fills the view for a moment).
+      for (let f = 0; f < SNAKE.strikeAt; f += 0.05) {
+        laySnake(crown, f * crown.period - crown.offset, 1, true, [toEye.x, toEye.y, toEye.z], points)
+        head.set(points[n], points[n + 1], points[n + 2]).applyMatrix4(root.matrixWorld)
+        if (!view.sees(head)) unseen.push(`${k / 10} s, ${f.toFixed(2)} of its strike`)
+      }
+    }
+    expect(unseen, 'moments the crown snake is off screen').toEqual([])
+  })
+
+  it("keeps the rails and the camera clear of the Medusa's bust from her rise to the run's end, leant out, ducked or not", () => {
     /** Kept between her bust and the rails or the rider's eye, in her own units (world / `MEDUSA_SIZE`). */
     const MARGIN = 20
     const from = getLevelConfig('level6')!.boss!.at
     const local: [number, number, number] = [0, 0, 0]
     let worst = Infinity
-    for (const lean of [0, 1]) {
+    // Risen, leant out (her second phase) and ducked back (her last).
+    for (const [lean, duck] of [[0, 0], [1, 0], [0, 1]]) {
       const out = MEDUSA_BODY.out + MEDUSA_RISE.leanOut * lean
+      const drop = MEDUSA_RISE.duck * duck
       const pitch = MEDUSA_RISE.leanPitch * lean
       for (let k = from * 10; k <= RUN_SECONDS * 10; k++) {
         const p = curve.getPointAt((profile[k] % table.length) / table.length)
@@ -271,7 +398,7 @@ describe('the gym track', () => {
           const dz = (p.z - MEDUSA_HUB[2]) / MEDUSA_SIZE
           const x = dx * STAR.facing.z - dz * STAR.facing.x
           const z = dx * STAR.facing.x + dz * STAR.facing.z - out
-          const y = (p.y + lift - MEDUSA_HUB[1]) / MEDUSA_SIZE
+          const y = (p.y + lift - MEDUSA_HUB[1]) / MEDUSA_SIZE + drop
           const yaw = yawToward(x, z + out)
           const xr = x * Math.cos(yaw) - z * Math.sin(yaw)
           const zr = x * Math.sin(yaw) + z * Math.cos(yaw)

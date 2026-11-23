@@ -1,5 +1,8 @@
 import type { HeightFunction } from '@/utils/terrainNoise'
 
+/** The sea's shades by depth, and its foam (sRGB hex); `enemyColourVision.test.ts` holds the sea's enemies to them. */
+export const WATER_COLOURS = { shallow: 0x1fc4b4, mid: 0x0b86a0, deep: 0x07306c, foam: 0xe6fbff } as const
+
 /** Heights the water's seabed texture can hold; the sea's shades all change between these. */
 export const SEABED_MIN_Y = -60
 export const SEABED_MAX_Y = 20

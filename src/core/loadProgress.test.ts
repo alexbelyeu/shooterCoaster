@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { loadFraction, loadStage, reportLoad, resetLoad } from './loadProgress'
+import { loadFraction, loadStage, reportLoad, resetLoad, unloadLevel } from './loadProgress'
 
 describe('loadProgress', () => {
   beforeEach(() => resetLoad('level1'))
@@ -25,6 +25,16 @@ describe('loadProgress', () => {
     expect(loadStage('chunk')).toBe(1)
     reportLoad('level2', 'audio', 1)
     expect(loadStage('audio')).toBe(0)
+  })
+
+  it('zeroes the loading level\'s stages when its scene unmounts, never another level\'s', () => {
+    reportLoad('level1', 'scene', 1)
+    unloadLevel('level2')
+    expect(loadStage('scene')).toBe(1)
+    unloadLevel('level1')
+    expect(loadFraction()).toBe(0)
+    reportLoad('level1', 'scene', 1)
+    expect(loadStage('scene')).toBe(1)
   })
 
   it('counts a skipped stage as done', () => {

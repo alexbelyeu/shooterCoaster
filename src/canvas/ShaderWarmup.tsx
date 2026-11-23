@@ -14,7 +14,7 @@ import { markStartup } from '@/core/startupMarks'
 import { whenProgramsReady } from './programReadiness'
 import { composerSceneTarget } from './post/composerTargets'
 import { chunk, runInFrameSlices } from './frameSlices'
-import { reportLoad } from '@/core/loadProgress'
+import { reportLoad, unloadLevel } from '@/core/loadProgress'
 
 /** Compile work per frame (#597); the loading screen only needs to keep its bar moving (#674). */
 const SLICE_BUDGET_MS = 60
@@ -150,6 +150,8 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     specimens.name = 'shader-warmup'
     specimens.visible = false
     for (const m of enemyMaterials()) specimens.add(new THREE.Mesh(specimenGeo, m))
+    // The dust bunny's roll is a morph: its paint and its hit flash compile a morph variant of their programs.
+    for (const m of [enemyAssets.DUST_BUNNY_MAT, enemyAssets.ENEMY_HIT_FLASH_MAT]) specimens.add(new THREE.Mesh(enemyAssets.DUST_BUNNY_GEO, m))
     scene.add(specimens)
 
     // Hidden behind the loading screen: once the run has reached `playing` (`?e2e=1`) the level draws as it is, a
@@ -199,6 +201,8 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
 
     const finish = () => {
       cleanup()
+      // A warm-up with nothing left to draw (a zero-batch pass) still completes its stage.
+      reportLoad(levelId, 'shaders', 1)
       // A warm-up still finishing after the store moved on to another level must not open that level's Ready.
       if (useGameStore.getState().currentLevel === levelId) setSceneReady(true)
       markStartup('warmupDone')
@@ -255,6 +259,7 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
       unsubscribe()
       camera.layers.mask = mask
       setSceneReady(false)
+      unloadLevel(levelId)
     }
   }, [get, levelId])
 

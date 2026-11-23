@@ -1,7 +1,5 @@
 import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
-/** `curve1` / `curve2`: the generated trig curves; `spline`: an authored track through `controlPoints` (#514). */
-export type CurveType = 'curve1' | 'curve2' | 'spline'
 /** Every biome id, the one list (#509): anything per biome is a `Record<BiomeType, …>`, so a missing one fails `tsc -b`. */
 export const BIOME_TYPES = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic', 'gym'] as const
 export type BiomeType = (typeof BIOME_TYPES)[number]
@@ -18,25 +16,10 @@ export interface WallSurface {
   height: number
 }
 
-export interface TrackParams {
-  /** The trig curves' shape (unused by a `spline`). */
-  varA: number
-  varB: number
-  varC: number
+/** What every track has, whatever its curve. */
+interface TrackBase {
   /** The trig curves' size; for every curve, the structure's scale (`trackDimensions.ts`). */
   scalar: number
-  /** Today's speed rule (`ridePhysics.ts`), unless `ride` is 'v2'. */
-  rollerSpeed: number
-  minRollerSpeed: number
-  /** 'v2' (#696): gravity, speed zones and beats solved to land on their seconds (`rideV2.ts`, set by `rideV2`); absent, today's rule. */
-  ride?: 'v2'
-  rideV2?: RideV2Spec
-  curve: CurveType
-  /**
-   * A `spline`'s points in world units, in ride order; the loop closes from the last to the first. A point's `up`
-   * rolls the track there (banks, inversions; `src/track/elements/` builds them, #698).
-   */
-  controlPoints?: readonly { x: number; y: number; z: number; up?: { x: number; y: number; z: number } }[]
   color1: number
   color2: number
   /** Running-rail radius at trackScale 1 (default 0.35); multiplied by trackScale. See src/track/trackDimensions.ts */
@@ -53,6 +36,75 @@ export interface TrackParams {
   tunnels?: readonly TunnelSpec[]
   /** The on-ride photo (#701): the track fraction where the flash fires; without it, 85% of the way through the run (`photoMarker.ts`). */
   photo?: number
+  /** Dark sections (#752): stretches ridden in the dark, the level's light and fog dimmed (`src/track/darkSection.hot.ts`). */
+  darkSections?: readonly DarkSectionSpec[]
+  /** Special ride mechanics (#699, `src/track/mechanics.ts`): they set a v2 ride's zones and stops; only a junction runs on either ride. */
+  mechanics?: readonly RideMechanic[]
+}
+
+/** Today's speed rule (`ridePhysics.ts`): the car rolls by its slope between these speeds. */
+interface RuleRide {
+  ride?: undefined
+  rideV2?: undefined
+  rollerSpeed: number
+  minRollerSpeed: number
+}
+
+/** The v2 ride (#696): gravity, speed zones and beats solved to land on their seconds (`rideV2.ts`, set by `rideV2`). */
+interface V2Ride {
+  ride: 'v2'
+  rideV2?: RideV2Spec
+}
+
+/** How a track is ridden: today's rule, or the v2 ride, which needs none of the rule's speeds (#757). */
+type TrackRide = RuleRide | V2Ride
+
+/** A closed trig loop (`TrigCurve` / `TrigCurve2`), shaped by `varA` / `varB` / `varC`. */
+export type TrigTrackParams = TrackBase & TrackRide & TrigCurveFields
+
+interface TrigCurveFields {
+  curve: 'curve1' | 'curve2'
+  varA: number
+  varB: number
+  varC: number
+}
+
+/** An authored spline (`SplineCurve`, #514). */
+export type SplineTrackParams = TrackBase & TrackRide & SplineCurveFields
+
+interface SplineCurveFields {
+  curve: 'spline'
+  /**
+   * The points in world units, in ride order; the loop closes from the last to the first. A point's `up`
+   * rolls the track there (banks, inversions; `src/track/elements/` builds them, #698).
+   */
+  controlPoints: readonly { x: number; y: number; z: number; up?: { x: number; y: number; z: number } }[]
+}
+
+/** A level's track: build its curve with `createTrackCurve`, never a curve factory picked by hand. */
+export type TrackParams = TrigTrackParams | SplineTrackParams
+
+/**
+ * A special ride mechanic (#699, `src/track/mechanics.ts`) from `from` to `to`, shares of the lap's arc length (not across the seam):
+ * - station: the car stands at `from` (0) for the countdown; GO launches it over fins toward `speed` by `to`.
+ * - dropTrack: the car stops at `from` for `seconds`, then its piece of track free-falls with it to the track below at `to`.
+ * - jumpGap: no rails from `from` to `to`, a ballistic flight built for `speed`, which a booster from `boostFrom` sets.
+ * - backwards: turntables at `from` and `to` (a stop of `seconds`, then a launch to `speed`); the car faces back between.
+ * - junction (#702): a harder way round from the fork at `from` to the merge at `to` through `points` (world units, in ride
+ *   order), on a spline track. A switch sign before the fork sets the run's route: shoot it to take this way. One per
+ *   track, its sign after the lap's start; the branch gets no towers or scenery clearance (`docs/RIDE-KIT.md`).
+ */
+export type RideMechanic =
+  | { kind: 'station'; from: number; to: number; speed: number }
+  | { kind: 'dropTrack'; from: number; to: number; seconds: number }
+  | { kind: 'jumpGap'; from: number; to: number; speed: number; boostFrom: number }
+  | { kind: 'backwards'; from: number; to: number; seconds: number; speed: number }
+  | { kind: 'junction'; from: number; to: number; points: readonly { x: number; y: number; z: number }[] }
+
+/** A stop (#699): the car halts at share `at` of the lap's arc length for `seconds` (not warped by the beats' solver). */
+export interface RideHold {
+  at: number
+  seconds: number
 }
 
 /**
@@ -67,6 +119,8 @@ export interface SpeedZone {
   to: number
   speed: number
   accel?: number
+  /** brake only: coast until it must brake at `accel` to be down to `speed` at `to` (a stop's approach, #699). */
+  stop?: boolean
 }
 
 /** A storyboard beat (#696): the car reaches share `at` of the lap's arc length (past 1: a later lap) `second` seconds after GO. */
@@ -78,6 +132,8 @@ export interface RideBeat {
 /** The v2 ride (#696): defaults in `rideV2.ts` `RIDE_V2_DEFAULTS`. */
 export interface RideV2Spec {
   zones?: readonly SpeedZone[]
+  /** Stops in the ride (a drop track's top, a turntable); `mechanics` add their own. */
+  holds?: readonly RideHold[]
   /** In ride order; the solver speeds up or slows down the ride between beats so each lands within `BEAT_TOLERANCE_SECONDS`. */
   beats?: readonly RideBeat[]
   /** World units per second². */
@@ -94,6 +150,18 @@ export interface TunnelSpec {
   length: number
 }
 
+/**
+ * A dark section (#752): from track parameter `from` to `to` (the ride's t, as `rideProgress` reports it), the light easing
+ * down over `ramp` of t after `from` and back up over the `ramp` before `to`; it may not cross the track's seam. While
+ * dark, a shot's muzzle flash lights what is within `flashReach` world units of the rider.
+ */
+export interface DarkSectionSpec {
+  from: number
+  to: number
+  ramp: number
+  flashReach: number
+}
+
 /** How a wave arrives; anything but `scatter` (the default) is laid out ahead of the rider by `spawnPlacement.ts`. */
 export type Formation = 'scatter' | 'v' | 'line' | 'school' | 'spiral' | 'ring'
 
@@ -107,6 +175,8 @@ export interface FormationOrigin {
   up: number
 }
 
+export type WeatherKind = 'sandstorm' | 'blizzard'
+
 export interface EnemyWave {
   type: EnemyType
   count: number
@@ -114,6 +184,9 @@ export interface EnemyWave {
   spawnDelay?: number
   waveLabel?: string
   isEruption?: boolean
+  /** A weather pulse that blows in with the wave (#798): the spawner emits `weather:start`, the look and its rise / hold / fade
+   *  are `WEATHER_LOOKS` (`levels/environments/shared/weatherPulse.ts`). A level's waves use one kind. */
+  weather?: WeatherKind
   formation?: Formation
   /** Overrides the formation's default anchor. */
   formationOrigin?: FormationOrigin
@@ -122,6 +195,22 @@ export interface EnemyWave {
    * `walls`. Shooting one costs `BYSTANDER_PENALTY` and the combo; they are never kills, `maxScore` or the kill count.
    */
   bystanders?: { type: EnemyType; count: number }
+  /**
+   * Only a run on this route meets the wave (#720): 'hard', a run that shot its track's junction switch. It arrives on the
+   * branch (`spawnPlacement.ts` `HardRoute`) while the car rides it; on the easy route it never spawns and never joins the
+   * kill count. `maxScore` counts it: the harder way is the way to three stars.
+   */
+  route?: 'hard'
+}
+
+/** A whale breaching across the ride (Ocean, #793), where and when the level puts it; the breach's own shape is `BREACH` in `biomes/ocean/whaleBreach.ts`. */
+export interface WhaleBreachSpec {
+  /** Level seconds at the ride's own pace (`rideProfile`): it runs on ride distance, so slow-mo slows it with the car. */
+  startSeconds: number
+  /** Out along the rider's heading at mid-breach, past the drawn terrain's edge. */
+  lead: number
+  /** Turned off that heading (radians, toward the ride's left). */
+  aim: number
 }
 
 export interface LevelConfig {
@@ -151,5 +240,7 @@ export interface LevelConfig {
     hasWater?: boolean
     hasTrees?: boolean
     treeCount?: number
+    /** Opt-in: an ocean level's whale breach; none when unset. */
+    whale?: WhaleBreachSpec
   }
 }

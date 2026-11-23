@@ -9,6 +9,8 @@
  * level's base FOV unchanged.
  */
 
+/** The coaster camera's vertical FOV (degrees) on a screen wide enough to need no widening. */
+export const BASE_VERTICAL_FOV = 80
 /** Horizontal FOV (degrees) that narrow screens are widened towards. */
 export const MIN_HORIZONTAL_FOV = 60
 /** Upper bound on the widened vertical FOV (degrees). */

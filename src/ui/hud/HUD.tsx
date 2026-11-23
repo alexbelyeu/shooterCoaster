@@ -1,7 +1,6 @@
 import { useEffect, useMemo, type CSSProperties } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { RUN_SECONDS } from '@/levels/pacing'
 import { biomeTheme } from '@/ui/theme'
 import ScoreDisplay from './ScoreDisplay'
 import TimerBar from './TimerBar'
@@ -12,21 +11,17 @@ import SnowSplat from './SnowSplat'
 import BossBar from './BossBar'
 import WeaponBadge from './WeaponBadge'
 import BystanderHint from './BystanderHint'
+import TrackRadar from './TrackRadar'
 import { setTimeScaleOverride, timeScaleOverride } from '@/combat/slowMo.hot'
 
-/** Thin segmented kills / total strip under the score. Renders on kills only. */
+/** "5 of 86 hit" under the score. Renders on kills only. */
 function KillStrip() {
   const total = useGameStore((s) => s.totalEnemies)
   const killed = useGameStore((s) => s.totalEnemies - s.enemiesRemaining)
-  const frac = total > 0 ? Math.min(1, killed / total) : 0
   return (
-    <div className="hud-kills" aria-label={`${killed} of ${total} enemies`}>
-      <div className="hud-kills-track">
-        <div className="hud-kills-fill" style={{ transform: `scaleX(${frac})` }} />
-      </div>
+    <div className="hud-kills">
       <span className="hud-kills-count">
-        {killed}
-        <span className="hud-kills-total">/{total}</span>
+        <span className="hud-kills-value">{killed}</span> of {total} hit
       </span>
     </div>
   )
@@ -65,7 +60,7 @@ export default function HUD() {
         <KillStrip />
       </div>
       <div className="hud-panel hud-panel--right">
-        <TimerBar totalSeconds={RUN_SECONDS} />
+        <TimerBar />
       </div>
       <BossBar />
       <FrenzyFlash />
@@ -74,6 +69,7 @@ export default function HUD() {
       <ComboMeter />
       <WeaponBadge />
       <BystanderHint levelId={currentLevel} />
+      <TrackRadar levelId={currentLevel} />
       {/* Touch has no Escape key: an always-available pause button. */}
       <button
         className="hud-pause-button"

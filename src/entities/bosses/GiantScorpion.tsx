@@ -19,15 +19,15 @@ import {
   SCORPION_STINGER_GEO, SCORPION_STINGER_MAT, SCORPION_TAIL_MAT, SCORPION_TAIL_SEGMENT_GEO,
 } from './bossAssets'
 import {
-  PERCH, SCORPION_BODY, SCORPION_RISE, SCORPION_TAIL, advanceGait, approachAngle, createTailPose, faceYaw, footStep, layTail,
+  SCORPION_BODY, SCORPION_RISE, SCORPION_TAIL, advanceGait, approachAngle, createTailPose, faceYaw, firstSlot, footStep, layTail,
   lungeAmount, lungeImpactBetween, pickPerch, riseOffset, type FootStep, type Perch, type PerchInput,
 } from './scorpionMotion.hot'
+import { aimAtRider } from './bossAim.hot'
 
 const B = SCORPION_BODY
 const T = SCORPION_TAIL
 const LIMB_COUNT = 20
 const TAIL_IDS = Array.from({ length: T.segments }, (_, i) => `tail-${i}`)
-const HEADING_TAU = 2.5
 const FOLLOW_TAU = 1
 const TURN_TAU = 0.6
 /** Turned this much from the rider towards its heading: a three-quarter view of claws and tail. */
@@ -45,7 +45,6 @@ const DEFEAT_TRAUMA = [0.7, 900] as const
 const EXIT_SECONDS = SCORPION_RISE.sinkS + 0.6
 
 const _cam = new THREE.Vector3()
-const _fwd = new THREE.Vector3()
 const _p = new THREE.Vector3()
 
 function sandBurst(x: number, y: number, z: number, trauma: readonly [number, number]) {
@@ -97,32 +96,12 @@ export default function GiantScorpion(props: BossProps) {
     [],
   )
 
-  /** Heading smoothed through the loops, like the Blimp's. */
+  /** Keeps a clear perch ahead of the rider; once it has one it stays put when every slot is blocked. */
   const aim = useCallback(
     (dt: number) => {
-      camera.getWorldPosition(_cam)
-      camera.getWorldDirection(_fwd)
-      _fwd.y = 0
-      if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1)
-      _fwd.normalize()
-      if (!sim.headed) {
-        sim.heading.copy(_fwd)
-        sim.headed = true
-      } else {
-        sim.heading.lerp(_fwd, 1 - Math.exp(-dt / HEADING_TAU))
-        if (sim.heading.lengthSq() < 1e-6) sim.heading.copy(_fwd)
-        sim.heading.normalize()
-      }
-      input.camera.x = _cam.x
-      input.camera.z = _cam.z
-      input.forwardX = sim.heading.x
-      input.forwardZ = sim.heading.z
+      aimAtRider(camera, _cam, sim, input, dt)
       if (pickPerch(sim.perch, input)) sim.perched = true
-      else if (!sim.perched) {
-        const [ahead, side] = PERCH.slots[0]
-        sim.perch.x = _cam.x + sim.heading.x * ahead - sim.heading.z * side
-        sim.perch.z = _cam.z + sim.heading.z * ahead + sim.heading.x * side
-      }
+      else if (!sim.perched) firstSlot(sim.perch, input)
     },
     [camera, sim, input],
   )

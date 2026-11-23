@@ -17,7 +17,7 @@ describe('bystanders', () => {
     expect(bystanderType(waves)).toBe('climber')
     expect(bystanderType([{ type: 'rat', count: 3 }])).toBeNull()
     expect(bystanderWarning('climber')).toBe("Don't shoot climbers!")
-    expect(bystanderHint('climber')).toBe("Climbers are friends — don't shoot them!")
+    expect(bystanderHint('climber')).toBe("Climbers are friends. Don't shoot them!")
   })
 
   it('add nothing to maxScore', () => {

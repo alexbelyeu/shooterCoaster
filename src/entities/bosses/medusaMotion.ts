@@ -1,10 +1,12 @@
 /**
  * The Medusa of the Starr's motion, pure and allocation-free per frame. Root-local frame: the origin at the star's hub,
- * +z out of the star towards the hall (the rider), y up. She rises out of the hub, leans out for her second phase and
- * laughs and sinks back on defeat; each snake grows from a slot in her curls, sways, rears and strikes at the camera.
+ * +z out of the star towards the hall (the rider), y up. She rises out of the hub, leans out for her second phase, ducks
+ * back for her last, and laughs and sinks back on defeat; each snake grows from a slot in her curls, sways, rears and
+ * strikes at the camera.
  */
 
 import { GYM_SCALE, STAR, toWorld } from '@/levels/environments/biomes/gym/blockout'
+import { smooth } from './bossCycle.hot'
 
 type V3 = readonly [number, number, number]
 
@@ -44,6 +46,11 @@ export const MEDUSA_RISE = {
   leanOut: 25,
   leanPitch: 0.16,
   leanS: 0.8,
+  /**
+   * The last phase, the crown snake alone: she draws back from her lean and ducks this far down into the star, so the
+   * snake on her crown stands in the rider's view as the car runs at her face (#856; `gymTrack.test.ts` holds it there).
+   */
+  duck: 50,
 } as const
 
 export interface Ellipsoid {
@@ -124,7 +131,10 @@ const slot = (root: V3, out: V3, phase: number, period: number, offset: number, 
   root, out: norm(...out), length, radius, phase, period, offset,
 })
 
-/** Four from the sides of her curls first, four more (faster) from below and above them, then the crown snake. */
+/**
+ * Four from the sides of her curls first, four more (faster) from below and above them, then the crown snake: it dips
+ * forwards over her brow before it rears, so its head stands low enough over hers to stay in the rider's view (#856).
+ */
 export const SNAKE_SLOTS: readonly SnakeSlot[] = [
   slot([95, 75, 15], [0.85, 0.45, 0.35], 0, 3, 0),
   slot([-95, 75, 15], [-0.85, 0.45, 0.35], 0, 3, 1.5),
@@ -134,22 +144,17 @@ export const SNAKE_SLOTS: readonly SnakeSlot[] = [
   slot([-112, 15, 0], [-0.95, 0.05, 0.35], 1, 2.2, 1.4),
   slot([30, 158, 0], [0.3, 0.9, 0.3], 1, 2.2, 0.85),
   slot([-30, 158, 0], [-0.3, 0.9, 0.3], 1, 2.2, 1.95),
-  slot([0, 172, -5], [0, 0.35, 0.95], 2, 2.6, 0.6, 130, 25),
+  slot([0, 172, -5], [0, -0.26, 0.97], 2, 2.6, 0.6, 130, 25),
 ]
-
-export const smooth01 = (x: number): number => {
-  const t = Math.min(1, Math.max(0, x))
-  return t * t * (3 - 2 * t)
-}
 
 /** 0 inside the hub → 1 risen. */
 export function riseAmount(age: number): number {
-  return smooth01(age / MEDUSA_RISE.riseS)
+  return smooth(age / MEDUSA_RISE.riseS)
 }
 
 /** 0 while she fights → 1 sunk back into the star, after her laugh. */
 export function defeatSink(sinceDefeat: number): number {
-  return sinceDefeat < 0 ? 0 : smooth01((sinceDefeat - MEDUSA_DEFEAT.laughS) / MEDUSA_DEFEAT.sinkS)
+  return sinceDefeat < 0 ? 0 : smooth((sinceDefeat - MEDUSA_DEFEAT.laughS) / MEDUSA_DEFEAT.sinkS)
 }
 
 /** Her laugh: a shake of the shoulders that fades out over `laughS`, 0 while she fights. */
@@ -158,14 +163,14 @@ export function laughShake(sinceDefeat: number): number {
   return Math.sin(sinceDefeat * 34) * (1 - sinceDefeat / MEDUSA_DEFEAT.laughS)
 }
 
-/** Root-local placement: rise, lean (0..1) and sink folded into an offset and a scale. */
-export function bodyPlacement(age: number, lean: number, sinceDefeat: number, out: { y: number; z: number; scale: number; pitch: number }) {
+/** Root-local placement: rise, lean (0..1), duck (0..1) and sink folded into an offset and a scale. */
+export function bodyPlacement(age: number, lean: number, duck: number, sinceDefeat: number, out: { y: number; z: number; scale: number; pitch: number }) {
   const r = riseAmount(age) * (1 - defeatSink(sinceDefeat))
   const [, fy, fz] = MEDUSA_RISE.from
-  out.y = fy - fy * r
+  out.y = fy - fy * r - MEDUSA_RISE.duck * duck * r
   out.z = MEDUSA_BODY.out * r + fz * (1 - r) + MEDUSA_RISE.leanOut * lean * r
   out.scale = MEDUSA_RISE.fromScale + (1 - MEDUSA_RISE.fromScale) * r
-  out.pitch = MEDUSA_RISE.leanPitch * lean - (sinceDefeat >= 0 ? 0.35 * smooth01(sinceDefeat / 0.3) * (1 - defeatSink(sinceDefeat)) : 0)
+  out.pitch = MEDUSA_RISE.leanPitch * lean - (sinceDefeat >= 0 ? 0.35 * smooth(sinceDefeat / 0.3) * (1 - defeatSink(sinceDefeat)) : 0)
 }
 
 /** Its strike cycle at `t` seconds: −windup..0 rearing back, 0..1 the strike out towards the camera. */
@@ -173,10 +178,10 @@ export function strikePose(s: SnakeSlot, t: number): number {
   const f = ((((t + s.offset) / s.period) % 1) + 1) % 1
   const { windupAt, strikeAt, holdAt, recoilAt, windup } = SNAKE
   if (f < windupAt) return 0
-  if (f < strikeAt) return -windup * smooth01((f - windupAt) / (strikeAt - windupAt))
-  if (f < holdAt) return -windup + (1 + windup) * smooth01((f - strikeAt) / (holdAt - strikeAt))
+  if (f < strikeAt) return -windup * smooth((f - windupAt) / (strikeAt - windupAt))
+  if (f < holdAt) return -windup + (1 + windup) * smooth((f - strikeAt) / (holdAt - strikeAt))
   if (f < recoilAt) return 1
-  return 1 - smooth01((f - recoilAt) / (1 - recoilAt))
+  return 1 - smooth((f - recoilAt) / (1 - recoilAt))
 }
 
 /** True when the strike lands (reaches full reach) between game seconds `t0` and `t1`. */
@@ -192,7 +197,7 @@ export function strikeLandsBetween(s: SnakeSlot, t0: number, t1: number): boolea
 export function snakeLength(s: SnakeSlot, phaseStarted: number | null, age: number, alive: boolean): number {
   if (!alive) return SNAKE.stub
   if (phaseStarted === null) return 0
-  return smooth01((age - phaseStarted) / SNAKE.emergeS)
+  return smooth((age - phaseStarted) / SNAKE.emergeS)
 }
 
 /** Radius of segment boundary `k` (0 at the root, `SNAKE.segments` at the head). */

@@ -1,0 +1,141 @@
+{
+  "name": "resume-level1",
+  "kind": "sfx",
+  "request": {
+    "kind": "resume",
+    "level": "level1",
+    "unpaused": false
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.2,
+      "name": "paused"
+    },
+    {
+      "t": 0.5,
+      "name": "countdown Ready"
+    },
+    {
+      "t": 1.6,
+      "name": "countdown GO: the pause gate opens"
+    }
+  ],
+  "seams": [],
+  "bar": null,
+  "metrics": {
+    "seconds": 4,
+    "integrated": -21.8,
+    "shortTermMax": -25.7,
+    "lra": 1.4,
+    "truePeak": -13.1,
+    "clipped": 0,
+    "silence": 34.8,
+    "correlation": 0.998,
+    "below30Db": -75.6,
+    "bands": {
+      "sub": {
+        "pct": 0,
+        "db": -64.9
+      },
+      "low": {
+        "pct": 0,
+        "db": -51.7
+      },
+      "mid": {
+        "pct": 82.6,
+        "db": -0.8
+      },
+      "presence": {
+        "pct": 15.5,
+        "db": -8.1
+      },
+      "air": {
+        "pct": 2,
+        "db": -17.1
+      },
+      "below30": {
+        "pct": 0,
+        "db": -75.6
+      }
+    },
+    "seamJumps": [],
+    "seamJumpMax": null,
+    "sounds": [
+      {
+        "t": 0.2,
+        "name": "paused",
+        "peakDb": null,
+        "tailMs": 0
+      },
+      {
+        "t": 0.5,
+        "name": "countdown Ready",
+        "peakDb": -16,
+        "tailMs": 501
+      },
+      {
+        "t": 1.6,
+        "name": "countdown GO: the pause gate opens",
+        "peakDb": -13.2,
+        "tailMs": 842
+      }
+    ]
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -21.8,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "Short-term max",
+      "value": -25.7,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -13.1,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -75.6,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 0.998,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 1.4,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 34.8,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { computeStars } from '@/levels/scoring'
+import { runStars } from '@/levels/scoring'
 
 /** Share copy for the results screen (#87, #271); the `/go/share` path attributes visits, since UTM dimensions are paywalled. */
 export const SITE_URL = 'https://scoaster.com/'
@@ -76,7 +76,7 @@ export function sharePayloadForRun(levelId: string, score: number, method: Share
   return buildShareText({
     levelName: config.name,
     score,
-    stars: computeStars(score, config.maxScore, config.starThresholds),
+    stars: runStars(score, config),
     url: buildShareUrl(shareCampaign(method)),
     worldRank,
   })

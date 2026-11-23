@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ARCADE_SOUNDS, KILL_SOUNDS, PRIO, VOICE_BUDGET, bossHitRate, hitRate, keyNote, killRate, nextBeat, panGain, pickVoice, spatial,
+  ARCADE_SOUNDS, KILL_SOUNDS, PRIO, VOICE_BUDGET, bossHitRate, hitRate, keyNote, killRate, nextBeat, panGain, pickVoice, placedSend, spatial, SPATIAL,
   type ArcadeSoundId, type VoiceState,
 } from '../sfxDesign'
 import { RECIPES } from './recipes'
@@ -59,7 +59,7 @@ describe('keyNote', () => {
 })
 
 describe('spatial', () => {
-  const out = { pan: 0, cutoffHz: 0 }
+  const out = { pan: 0, cutoffHz: 0, wet: 0 }
   it('keeps the louder channel of a placed sound at its level wherever it pans', () => {
     for (const pan of [-1, -0.6, 0, 0.3, 0.75, 1]) {
       const a = ((pan + 1) * Math.PI) / 4
@@ -69,13 +69,42 @@ describe('spatial', () => {
     expect(panGain(1)).toBeCloseTo(1)
   })
   it('pans with the screen position and dulls with distance', () => {
-    expect(spatial(0, -20, 0.8, out)).toEqual({ pan: 0, cutoffHz: 18000 })
+    expect(spatial(0, -20, 0.8, out)).toEqual({ pan: 0, cutoffHz: 18000, wet: 1 })
     expect(spatial(80, -100, 0.8, out).pan).toBeCloseTo(0.75)
     expect(spatial(-40, -100, 0.8, out).pan).toBeCloseTo(-0.375)
     expect(spatial(0, -400, 0.8, out).cutoffHz).toBeCloseTo(2400)
     const mid = spatial(0, -125, 0.8, out).cutoffHz
     expect(mid).toBeGreaterThan(2400)
     expect(mid).toBeLessThan(18000)
+  })
+
+  it('places a sound left, right, near and far: pan, then a duller, wetter send with distance (#802)', () => {
+    const at = (x: number, z: number) => {
+      const { pan, cutoffHz, wet } = spatial(x, z, 0.8, out)
+      return { pan, cutoffHz, send: placedSend(0.35, wet) }
+    }
+    const nearLeft = at(-10, -20)
+    const nearRight = at(10, -20)
+    const farLeft = at(-120, -300)
+    const farRight = at(120, -300)
+    expect(nearLeft.pan).toBeCloseTo(-0.46875)
+    expect(nearRight.pan).toBeCloseTo(0.46875)
+    expect(farLeft.pan).toBeCloseTo(-0.375)
+    expect(farRight.pan).toBeCloseTo(0.375)
+    // Inside nearM the send is the sound's own; past farM it is `farWet` times it.
+    expect(nearLeft.send).toBeCloseTo(0.35)
+    expect(nearRight.send).toBe(nearLeft.send)
+    expect(farLeft.send).toBeCloseTo(0.35 * SPATIAL.farWet)
+    expect(farRight.send).toBe(farLeft.send)
+    expect(farLeft.cutoffHz).toBeCloseTo(SPATIAL.farHz)
+    const mid = at(0, -125).send
+    expect(mid).toBeGreaterThan(nearLeft.send)
+    expect(mid).toBeLessThan(farLeft.send)
+  })
+
+  it('never sends past unity', () => {
+    expect(placedSend(0.6, SPATIAL.farWet)).toBe(1)
+    expect(placedSend(0.2, 1)).toBe(0.2)
   })
 
   it('pans a sound behind the camera fully to its side', () => {
@@ -121,6 +150,13 @@ describe('recipes', () => {
     const spec = { key: { tonic: 60, minor: false }, beatS: 0.4, beats: 4, biome: 'themePark' as const, boss: false, fireworks: false }
     expect(ARCADE_SOUNDS.fire.send).toBe(0)
     expect(fire.lengthS(spec, 0)).toBeLessThanOrEqual(0.16)
+  })
+
+  it('the UI bus, past the pause gate, is exactly the menu and countdown sounds', () => {
+    const ui = (Object.keys(ARCADE_SOUNDS) as ArcadeSoundId[]).filter((id) => ARCADE_SOUNDS[id].bus === 'ui').sort()
+    const uiPrio = (Object.keys(ARCADE_SOUNDS) as ArcadeSoundId[]).filter((id) => ARCADE_SOUNDS[id].prio === PRIO.ui).sort()
+    expect(ui).toEqual(uiPrio)
+    expect(ui).toEqual(['countGo', 'countReady', 'uiBack', 'uiLaunch', 'uiSelect', 'uiWhoosh'])
   })
 
   it('kills outrank hits and guns, level cues outrank every combat sound, and kills sit 6 dB over the gun', () => {

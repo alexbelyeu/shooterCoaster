@@ -1,9 +1,8 @@
-import { useEffect, useRef, type CSSProperties, type KeyboardEvent } from 'react'
+import { useEffect, useRef, type KeyboardEvent } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars } from '@/levels/scoring'
-import { biomeTheme } from '@/ui/theme'
-import { formatTimeLeft } from './resultsStats'
+import { FairBoard, FairStars } from '@/ui/Fair'
 import { PAUSE_MENU, pauseMenuFocus, type PauseMenuAction } from './pauseMenu'
 
 const fmt = new Intl.NumberFormat('en-US')
@@ -12,7 +11,10 @@ interface PauseScreenProps {
   onSettings: () => void
 }
 
-/** The frozen run's card: level, score, stars so far, time left; Resume (also Esc) / Restart / Settings / Quit. */
+/**
+ * The stopped ride's board (docs/art/PERSONALITY.md): the level, how long was left, the score and stars so far, hits;
+ * Resume (also Esc) as the one gilt plate, then Restart / Photo / Settings / Quit.
+ */
 export default function PauseScreen({ onSettings }: PauseScreenProps) {
   const levelId = useGameStore((s) => s.currentLevel)
   const score = useGameStore((s) => Math.round(s.score))
@@ -38,7 +40,8 @@ export default function PauseScreen({ onSettings }: PauseScreenProps) {
   function run(action: PauseMenuAction) {
     const store = useGameStore.getState()
     if (action === 'resume') store.resume()
-    else if (action === 'restart') store.restartRun()
+    else if (action === 'restart') store.restartRun('pause')
+    else if (action === 'photo') store.setPhoto(true)
     else if (action === 'settings') onSettings()
     else if (action === 'quit') store.setPhase('levelSelect')
   }
@@ -53,41 +56,32 @@ export default function PauseScreen({ onSettings }: PauseScreenProps) {
 
   if (!config) return null
 
-  const theme = biomeTheme(config.biome)
   const stars = computeStars(score, config.maxScore, config.starThresholds)
+  const seconds = Math.max(0, Math.ceil(timeRemaining - 1e-6))
 
   return (
-    <div
-      className="pause-screen pause-menu"
-      style={{ '--accent': theme.accent, '--accent-glow': theme.glow } as CSSProperties}
-    >
-      <div className="pause-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
-        <p className="pause-label">Paused</p>
-        <h2 id="pause-title">{config.name}</h2>
+    <div className="pause-screen pause-menu fair-stage">
+      <FairBoard
+        className="pause-card"
+        shadowClassName="pause-board-shadow"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pause-title"
+      >
+        <h2 id="pause-title" className="fair-title">
+          {config.name}
+        </h2>
+        <p className="pause-state">
+          Ride stopped with {seconds} {seconds === 1 ? 'second' : 'seconds'} to go
+        </p>
 
         <div className="pause-run">
-          <div className="pause-score">
-            <strong>{fmt.format(score)}</strong>
-            <span className="pause-stars" aria-label={`${stars} of 3 stars so far`}>
-              {[0, 1, 2].map((i) => (
-                <span key={i} className={i < stars ? 'earned' : undefined}>
-                  ★
-                </span>
-              ))}
-            </span>
-          </div>
-          <dl className="pause-stats">
-            <div>
-              <dt>Time left</dt>
-              <dd>{formatTimeLeft(timeRemaining)}</dd>
-            </div>
-            <div>
-              <dt>Kills</dt>
-              <dd>
-                {kills} / {total}
-              </dd>
-            </div>
-          </dl>
+          <strong className="fair-number">{fmt.format(score)}</strong>
+          <FairStars earned={stars} label={`${stars} of 3 stars so far`} />
+          <p>Points</p>
+          <p className="pause-hits" data-stat="hits">
+            <b>{kills}</b> of {total} hit
+          </p>
         </div>
 
         <div className="pause-actions" onKeyDown={onMenuKeyDown}>
@@ -97,15 +91,15 @@ export default function PauseScreen({ onSettings }: PauseScreenProps) {
               ref={(el) => {
                 buttons.current[i] = el
               }}
-              className={`play-button${action === 'resume' ? '' : ' pause-secondary'}`}
+              className={`fair-plate${action === 'resume' ? ' fair-go' : ''}`}
               onClick={() => run(action)}
             >
               {label}
             </button>
           ))}
         </div>
-        <p className="pause-keys">Esc: resume · ↑↓ + Enter</p>
-      </div>
+        <p className="pause-keys">Esc gets you back on. Arrows and Enter pick.</p>
+      </FairBoard>
     </div>
   )
 }

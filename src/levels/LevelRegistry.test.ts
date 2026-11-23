@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels, getLevelConfig, previousLevel } from './LevelRegistry'
-import { SCORE_VALUES, computeMaxScore, computeStars, nextStar } from './scoring'
+import { SCORE_VALUES, computeMaxScore, computeStars, nextStar, runNextStar, runStars, shownScore } from './scoring'
 import type { EnemyType } from '@/types/level'
 import { BOSS_SPECS } from '@/entities/bosses/bossSpecs'
 import { bossMaxScore } from '@/entities/bosses/bossModel'
-import { ENTRY_SECONDS_MAX, RUN_SECONDS, pacingTimes } from './pacing'
+import { RUN_SECONDS, pacingTimes } from './pacing'
+import { ENTRY_SECONDS_MAX } from '@/entities/spawning/spawnPlacement'
 
 const levels = getAllLevels()
 
@@ -45,7 +46,7 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2450, Kraken 2624, Yeti 3180, Magma Titan 2914, Medusa 2220', () => {
+  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2450, Kraken 2624, Yeti 3180, Magma Titan 2914, Medusa 2322', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
       ['level1', 'goldenBlimp', 2675],
@@ -53,16 +54,22 @@ describe('LevelRegistry', () => {
       ['level3', 'kraken', 2624],
       ['level4', 'yeti', 3180],
       ['level5', 'magmaTitan', 2914],
-      ['level6', 'medusa', 2178],
+      ['level6', 'medusa', 2322],
     ])
     expect(getLevelConfig('level1')!.maxScore).toBe(150 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
+  })
+
+  it("counts the hard route's wave in maxScore (#720): every wave and the boss, the gym's V8 rats included", () => {
+    for (const l of levels) expect(l.maxScore, l.id).toBe(computeMaxScore(l.enemies, l.boss && BOSS_SPECS[l.boss.type]))
+    expect(getLevelConfig('level6')!.enemies.filter((w) => w.route).map((w) => [w.type, w.count, w.route])).toEqual([['rat', 8, 'hard']])
   })
 
   it.each(levels.map((l) => [l.id, l] as const))(
     '%s: waves from 0 s, the last one shootable by 35 s, then a 18–22 s boss fight (or a finale wave) ending the run',
     (_id, level) => {
       expect(RUN_SECONDS).toBe(60)
-      const delays = level.enemies.map((w) => w.spawnDelay ?? 0)
+      // A hard-route wave is timed by its junction, outside the waves every run meets.
+      const delays = level.enemies.filter((w) => !w.route).map((w) => w.spawnDelay ?? 0)
       expect(delays[0]).toBe(0)
       expect([...delays].sort((a, b) => a - b)).toEqual(delays)
       const finaleAt = level.boss ? level.boss.at : delays[delays.length - 1]
@@ -187,6 +194,42 @@ describe('computeStars', () => {
   it('a perfect no-combo run earns 3 stars on every level', () => {
     for (const l of levels) {
       expect(computeStars(l.maxScore, l.maxScore, l.starThresholds), l.id).toBe(3)
+    }
+  })
+})
+
+describe('runStars', () => {
+  const level = { maxScore: 1000, starThresholds: [0.15, 0.55, 0.85] as [number, number, number] }
+
+  it('scores the shown, rounded score: a fraction under a threshold that rounds onto it earns the star', () => {
+    expect(shownScore(549.6)).toBe(550)
+    expect(runStars(549.6, level)).toBe(2)
+    expect(computeStars(549.6, level.maxScore, level.starThresholds)).toBe(1)
+    expect(runStars(549.4, level)).toBe(1)
+  })
+
+  it('never shows a negative score', () => {
+    expect(shownScore(-12.7)).toBe(0)
+    expect(runStars(-12.7, level)).toBe(0)
+  })
+})
+
+describe('runNextStar', () => {
+  const level = { maxScore: 1000, starThresholds: [0.15, 0.55, 0.85] as [number, number, number] }
+
+  it('asks for the star above the shown stars: 549.6 shows 2 stars, so the line asks for the third', () => {
+    expect(runNextStar(549.6, level)).toEqual({ stars: 3, points: 300 })
+    expect(runNextStar(549.4, level)).toEqual({ stars: 2, points: 1 })
+    expect(runNextStar(849.6, level)).toBeNull()
+  })
+
+  it('agrees with runStars just under every threshold on every level', () => {
+    for (const l of levels) {
+      for (const t of l.starThresholds) {
+        const score = Math.ceil(t * l.maxScore) - 0.4
+        const stars = runStars(score, l)
+        expect(runNextStar(score, l)?.stars ?? 4, `${l.id} @ ${score}`).toBe(stars + 1)
+      }
     }
   })
 })

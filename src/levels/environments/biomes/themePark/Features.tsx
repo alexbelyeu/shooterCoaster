@@ -9,7 +9,7 @@ import Fireworks from '@/effects/Fireworks'
 import type { Vec3 } from '@/effects/fireworks'
 
 /** Rides, the entrance arch and the combo-streak fireworks (launched from the Ferris wheels and the arch) */
-export default function ThemeParkFeatures({ heightFn, groundFn, track }: BiomeFeaturesProps) {
+export default function ThemeParkFeatures({ heightFn, groundFn, track, atmosphere }: BiomeFeaturesProps) {
   const { arch } = useMemo(() => getThemeParkLayout(track, heightFn, groundFn), [track, heightFn, groundFn])
   const launchPads = useMemo(() => {
     const pads: Vec3[] = RIDES.filter((r) => r.kind === 'ferrisWheel').map((r) => ({ x: r.x, y: groundFn(r.x, r.z), z: r.z }))
@@ -21,9 +21,9 @@ export default function ThemeParkFeatures({ heightFn, groundFn, track }: BiomeFe
       {RIDES.map((r) => {
         const position: [number, number, number] = [r.x, groundFn(r.x, r.z), r.z]
         return r.kind === 'ferrisWheel' ? (
-          <FerrisWheel key={`${r.x},${r.z}`} position={position} radius={r.radius} />
+          <FerrisWheel key={`${r.x},${r.z}`} position={position} radius={r.radius} lampGlow={atmosphere.lampGlow} />
         ) : (
-          <Carousel key={`${r.x},${r.z}`} position={position} radius={r.radius} />
+          <Carousel key={`${r.x},${r.z}`} position={position} radius={r.radius} lampGlow={atmosphere.lampGlow} />
         )
       })}
       {arch && <EntranceArch arch={arch} />}

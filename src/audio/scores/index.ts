@@ -1,4 +1,4 @@
-/** Score texts the score engine plays (docs/audio/SCORE-FORMAT.md): the title, one per level id, and the results screen. */
+/** Score texts the score engine plays (docs/audio/SCORE-FORMAT.md): the title, one per level id, and the results screen's two cuts (`resultsCut.ts`). */
 import title from './title.scrim?raw'
 import level1 from './level1.scrim?raw'
 import level2 from './level2.scrim?raw'
@@ -6,7 +6,8 @@ import level3 from './level3.scrim?raw'
 import level4 from './level4.scrim?raw'
 import level5 from './level5.scrim?raw'
 import level6 from './level6.scrim?raw'
-import results from './results.scrim?raw'
+import resultsWin from './results-win.scrim?raw'
+import resultsLose from './results-lose.scrim?raw'
 
 /**
  * Theme options waiting on Alex's pick (`Listen:` issue, sound bible "taste gate"): `themes/<slot>.<name>.scrim`, keyed
@@ -19,7 +20,7 @@ const THEME_OPTIONS: Record<string, string> = Object.fromEntries(
   ),
 )
 
-export const SCORES: Record<string, string> = { title, level1, level2, level3, level4, level5, level6, results, ...THEME_OPTIONS }
+export const SCORES: Record<string, string> = { title, level1, level2, level3, level4, level5, level6, 'results-win': resultsWin, 'results-lose': resultsLose, ...THEME_OPTIONS }
 
 /** `?theme=neon,carousel` → `{ title: 'title.neon', level1: 'level1.carousel' }`: each named option replaces its slot's score; unknown names are ignored. */
 export function themesFromQuery(search: string, options: readonly string[] = Object.keys(THEME_OPTIONS)): Record<string, string> {
@@ -34,7 +35,7 @@ export function themesFromQuery(search: string, options: readonly string[] = Obj
 
 const ACTIVE_THEMES = typeof location === 'undefined' ? {} : themesFromQuery(location.search)
 
-/** The score that plays for `slot` ('title', a level id, 'results'): its theme option under `?theme=`, else its own. */
+/** The score that plays for `slot` ('title', a level id, a results cut): its theme option under `?theme=`, else its own. */
 export function scoreIdFor(slot: string): string {
   return ACTIVE_THEMES[slot] ?? slot
 }

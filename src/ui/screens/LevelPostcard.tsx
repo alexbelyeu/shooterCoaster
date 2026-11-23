@@ -24,7 +24,7 @@ const STAR_POINTS = Array.from({ length: 8 }, (_, k) => {
   return { left: `M150 44 L${at(7, a - Math.PI / 8)} L${at(26, a)}Z`, right: `M150 44 L${at(26, a)} L${at(7, a + Math.PI / 8)}Z` }
 })
 
-type Scene = (t: BiomeUITheme) => ReactElement
+export type Scene = (t: BiomeUITheme) => ReactElement
 
 const SCENES: Record<BiomeType, Scene> = {
   themePark: (t) => (
@@ -135,11 +135,32 @@ export function PostcardArt({ biome, width, height }: { biome: BiomeType; width?
   )
 }
 
-/** Tiny inline-SVG "postcard" of a biome's hero landmark on its sky gradient. */
-export default function LevelPostcard({ biome }: { biome: BiomeType }) {
+/** Two weathered planks nailed across a ride that isn't open yet: [y, angle] of each, in the postcard's 200 × 100 box. */
+const PLANKS: [number, number][] = [[24, -7], [62, 5]]
+
+function Planks() {
   return (
-    <div className="level-postcard" style={{ background: biomeTheme(biome).bg }} aria-hidden="true">
+    <svg className="level-postcard-planks" viewBox="0 0 200 100" preserveAspectRatio="xMidYMid slice">
+      {PLANKS.map(([y, angle]) => (
+        <g key={y} transform={`rotate(${angle} 100 ${y + 9})`}>
+          <rect x="-30" y={y + 3} width="260" height="18" className="level-postcard-tar" />
+          <rect x="-30" y={y} width="260" height="18" fill="#9b6a37" />
+          <path d={`M-30 ${y + 6} H230 M-30 ${y + 12} H230`} stroke="#7a4f26" strokeWidth="1.2" />
+          {[18, 182].map((x) => (
+            <circle key={x} cx={x} cy={y + 9} r="2.4" className="level-postcard-tar" />
+          ))}
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+/** Tiny inline-SVG "postcard" of a biome's hero landmark on its sky; `boarded`: planked up, a ride not open yet. */
+export default function LevelPostcard({ biome, boarded = false }: { biome: BiomeType; boarded?: boolean }) {
+  return (
+    <span className="level-postcard" style={{ background: biomeTheme(biome).bg }} aria-hidden="true">
       <PostcardArt biome={biome} />
-    </div>
+      {boarded && <Planks />}
+    </span>
   )
 }

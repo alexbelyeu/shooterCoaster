@@ -14,6 +14,11 @@ describe('decide', () => {
     expect(alert.decide(false, undefined)).toBe('none')
   })
 
+  it('says nothing either way on an inconclusive run (#822: production redeployed mid-run)', () => {
+    expect(alert.decide(null, undefined)).toBe('none')
+    expect(alert.decide(null, { number: 1 })).toBe('none')
+  })
+
   it('owns only the issue with its own marker (not CI\'s red main, not the other suite\'s)', () => {
     const issues = [
       { number: 1, body: 'CI `verify` failed on main' },
@@ -28,9 +33,9 @@ describe('decide', () => {
 
 describe('whatHappened', () => {
   it('names the failed check and its problems', () => {
-    const results = prodCheck([{ id: 'title', ok: true }, { id: 'assets', ok: false, problems: ['/assets/tone-x.js: HTTP 404 (want 200)'] }])
+    const results = prodCheck([{ id: 'title', ok: true }, { id: 'assets', ok: false, problems: ['/assets/synth-x.js: HTTP 404 (want 200)'] }])
     const text = alert.whatHappened({ exitCode: 1, capMinutes: 8, results })
-    expect(text).toBe('Check failed:\n- **assets**: /assets/tone-x.js: HTTP 404 (want 200)')
+    expect(text).toBe('Check failed:\n- **assets**: /assets/synth-x.js: HTTP 404 (want 200)')
   })
 
   it('says a timeout with no failed check is just that, and where it was', () => {

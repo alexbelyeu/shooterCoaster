@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { animate, motion } from 'framer-motion'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { runBest, useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { computeStars, nextStar } from '@/levels/scoring'
+import { computeStars, runNextStar, runStars } from '@/levels/scoring'
 import { sfx } from '@/audio/sfx'
-import { biomeTheme } from '@/ui/theme'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { SHARED_EVENT } from '@/app/analyticsEvents'
 import { eventBus } from '@/core/EventBus'
@@ -13,17 +12,21 @@ import type { ShareMethod } from '@/ui/share'
 import { scoreCardRun } from '@/ui/scoreCard'
 import type { LeaderboardEntry } from '@/types/game'
 import { onlineEndpoint, onlineLeaderboard, runAccuracy, type OnlineEntry } from '@/store/onlineLeaderboard'
-import { barFill, bystanderRow, formatAccuracy, formatTimeLeft, isNewRecord } from './resultsStats'
+import { isNewRecord, nextStarLine, runLines } from './resultsStats'
 import { bystanderCount, bystanderNoun, bystanderType } from '@/combat/bystanders'
 import { initialsKey, type InitialsState } from './initialsEntry'
 import ResultsLeaderboard from './ResultsLeaderboard'
+import ResultsMarquee from './ResultsMarquee'
+import { FairBoard, FairStars } from '@/ui/Fair'
+import { isNewBuildLive, reloadForNewBuild } from '@/app/staleReload'
+import { saveGhost } from '@/combat/ghost'
+import { recording } from '@/combat/ghostTrack.hot'
 import { useRidePhoto, type RidePhoto } from '@/store/ridePhoto'
 
 const fmt = new Intl.NumberFormat('en-US')
 
 const STAGE = { title: 0, count: 1, star: 2, stats: 5, done: 6 } as const
 const STAGE_AT_MS = [0, 350, 1700, 2050, 2400, 2800, 3500]
-const COUNT_UP_S = 1.2
 const NO_BOARD: LeaderboardEntry[] = []
 
 /** The finished run, read once on mount so a Replay / Next during the exit fade doesn't repaint it. */
@@ -33,6 +36,7 @@ function snapshotRun() {
     levelId: s.currentLevel,
     runId: s.runId,
     mode: s.runMode,
+    variant: s.runVariant,
     score: Math.round(s.score),
     kills: s.kills,
     totalEnemies: s.totalEnemies,
@@ -47,30 +51,32 @@ function snapshotRun() {
   }
 }
 
-type Run = ReturnType<typeof snapshotRun>
-
 function worldRows(top: readonly OnlineEntry[], maxScore: number, thresholds: readonly [number, number, number]): LeaderboardEntry[] {
   return top.map((e) => ({ initials: e.initials, score: e.score, stars: computeStars(e.score, maxScore, thresholds), date: Date.parse(e.at) || 0 }))
 }
 
-/** Null for dailies and every build but scoaster.com's own. */
-function worldBoard(run: Run) {
-  const endpoint = run.mode.mode === 'campaign' ? onlineEndpoint(__BUILT_ON_VERCEL__, window.location.search) : null
+/** Null on every build but scoaster.com's own. */
+function worldBoard() {
+  const endpoint = onlineEndpoint(__BUILT_ON_VERCEL__, window.location.search)
   return endpoint ? onlineLeaderboard(endpoint) : null
 }
 
 export default function ResultsScreen() {
   const [run] = useState(snapshotRun)
+  // The on-ride photo (#701): kept once it arrives, so the print stays through the exit fade while the next run drops it.
+  const livePhoto = useRidePhoto(run.runId)
+  const [photo, setPhoto] = useState<RidePhoto | null>(livePhoto)
+  if (livePhoto && livePhoto !== photo) setPhoto(livePhoto)
   const config = run.levelId ? getLevelConfig(run.levelId) : undefined
   const reducedMotion = usePrefersReducedMotion()
   const [stage, setStage] = useState<number>(reducedMotion ? STAGE.done : STAGE.title)
-  const scoreRef = useRef<HTMLSpanElement>(null)
-  const fillRef = useRef<HTMLDivElement>(null)
+  /** Only when the reveal reaches the score on its own: a skipped or reduced-motion reveal lights the bulbs without it. */
+  const [chase, setChase] = useState(false)
   const saved = useRef(false)
   const board = useGameStore((s) => (run.levelId ? s.leaderboards[run.levelId] : undefined)) ?? NO_BOARD
   const [rank, setRank] = useState<number | null>(null)
   const [initials, setInitials] = useState<InitialsState | null>(null)
-  const [online] = useState(() => worldBoard(run))
+  const [online] = useState(worldBoard)
   const [world, setWorld] = useState<{ board: LeaderboardEntry[]; rank: number | null } | null>(null)
   /** Once: on OK, or as the screen closes with the entry still open. */
   const submitOnline = useRef<((letters: string) => void) | null>(null)
@@ -80,13 +86,8 @@ export default function ResultsScreen() {
   /** Only once the submission placed the run (#445): never block Share on it. */
   const worldRank = world?.rank ?? null
   const card = useMemo(() => (config ? scoreCardRun({ ...run, levelId: config.id, worldRank }) : null), [config, run, worldRank])
-  // The on-ride photo (#701): kept once it arrives, so the print stays through the exit fade while the next run drops it.
-  const livePhoto = useRidePhoto(run.runId)
-  const [photo, setPhoto] = useState<RidePhoto | null>(livePhoto)
-  if (livePhoto && livePhoto !== photo) setPhoto(livePhoto)
 
-  const stars = config ? computeStars(run.score, config.maxScore, config.starThresholds) : 0
-  const fill = config ? barFill(run.score, config.maxScore) : 0
+  const stars = config ? runStars(run.score, config) : 0
   const record = isNewRecord(run.score, run.previousBest)
   const counting = stage >= STAGE.count
   const done = stage >= STAGE.done
@@ -102,9 +103,14 @@ export default function ResultsScreen() {
   function leave(to: 'levels' | 'replay' | 'next') {
     if (left.current) return
     left.current = true
+    // A deploy replaced this build mid-session (#823): the next screen loads fresh, its sign-off sent first.
+    if (isNewBuildLive()) {
+      submitOnline.current?.(lettersRef.current)
+      if (reloadForNewBuild()) return
+    }
     const store = useGameStore.getState()
-    if (to === 'replay') store.restartRun()
-    else if (to === 'next' && nextLevel) store.startRun(nextLevel)
+    if (to === 'replay') store.restartRun('results')
+    else if (to === 'next' && nextLevel) store.startRun(nextLevel, { from: 'results' })
     else store.setPhase('levelSelect')
   }
 
@@ -122,25 +128,12 @@ export default function ResultsScreen() {
       bestCombo: run.bestCombo,
     }
     store.saveRunResult(entry)
-    // A daily run shows no board.
-    if (run.mode.mode === 'daily') return
-    const placed = store.addLeaderboardEntry(config.id, { score: run.score, stars, date: run.date })
-    setRank(placed)
-    if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
-
-    if (!online) return
     const show = (top: OnlineEntry[], rank: number | null) => {
       if (!left.current) setWorld({ board: worldRows(top, config.maxScore, config.starThresholds), rank })
     }
-    if (placed === null) {
-      void online.top(config.id).then((top) => top && show(top, null))
-      return
-    }
-    lettersRef.current = store.lastInitials
-    submitOnline.current = (letters) => {
-      submitOnline.current = null
-      void online
-        .submit({
+    const submit = (letters: string, daily?: string) =>
+      online
+        ?.submit({
           level: config.id,
           initials: letters,
           score: run.score,
@@ -148,17 +141,44 @@ export default function ResultsScreen() {
           kills: run.kills,
           accuracy: runAccuracy(run.hits, run.shotsFired),
           version: __APP_VERSION__,
+          daily,
         })
         .then((result) => result && show(result.top, result.rank))
+
+    // A daily stays off the campaign board and has no entry: a new best of the day goes up at once under the last
+    // initials, any other run just shows the day's World board (#854). Without either, the local record stands alone.
+    if (run.mode.mode === 'daily') {
+      const day = run.mode.dateKey
+      if (isNewRecord(run.score, run.previousBest)) void submit(store.lastInitials, day)
+      else void online?.top({ daily: day }).then((top) => top && show(top, null))
+      return
     }
-  }, [config, run, stars, online])
+    // Only a new campaign best leaves a ghost (a daily returned above).
+    if (record) saveGhost(config.id, recording)
+    const placed = store.addLeaderboardEntry(config.id, { score: run.score, stars, date: run.date })
+    setRank(placed)
+    if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
+
+    if (!online) return
+    if (placed === null) {
+      void online.top({ level: config.id }).then((top) => top && show(top, null))
+      return
+    }
+    lettersRef.current = store.lastInitials
+    submitOnline.current = (letters) => {
+      submitOnline.current = null
+      void submit(letters)
+    }
+  }, [config, run, stars, online, record])
 
   useEffect(() => () => submitOnline.current?.(lettersRef.current), [])
 
   useEffect(() => {
     if (done) return
     const timer = setTimeout(() => {
-      if (!left.current) setStage(stage + 1)
+      if (left.current) return
+      if (stage + 1 === STAGE.star) setChase(true)
+      setStage(stage + 1)
     }, STAGE_AT_MS[stage + 1] - STAGE_AT_MS[stage])
     return () => clearTimeout(timer)
   }, [stage, done])
@@ -167,26 +187,6 @@ export default function ResultsScreen() {
     const i = stage - STAGE.star
     if (!left.current && i >= 0 && i < 3 && i < stars) sfx().starChime(i)
   }, [stage, stars])
-
-  useEffect(() => {
-    const scoreEl = scoreRef.current
-    const fillEl = fillRef.current
-    if (!scoreEl || !fillEl) return
-    const paint = (v: number) => {
-      scoreEl.textContent = fmt.format(Math.round(v))
-      fillEl.style.width = `${(run.score > 0 ? v / run.score : 0) * fill * 100}%`
-    }
-    if (!counting) {
-      paint(0)
-      return
-    }
-    if (done) {
-      paint(run.score)
-      return
-    }
-    const controls = animate(0, run.score, { duration: COUNT_UP_S, ease: 'easeOut', onUpdate: paint })
-    return () => controls.stop()
-  }, [counting, done, run.score, fill])
 
   function initialsInput(key: string): void {
     if (!initials || !config) return
@@ -243,147 +243,95 @@ export default function ResultsScreen() {
 
   if (!config) return null
 
-  const theme = biomeTheme(config.biome)
   const nextName = nextLevel ? (getLevelConfig(nextLevel)?.name ?? nextLevel) : null
-  const next = nextStar(run.score, config.maxScore, config.starThresholds)
+  const next = runNextStar(run.score, config)
   const instant = { duration: 0 }
   const reveal = (from: number) => (stage >= from ? 'shown' : 'hidden')
   const entryOpen = done && initials !== null
+  const starsShown = done ? stars : Math.max(0, Math.min(stars, stage - STAGE.star + 1))
   const bystanders = bystanderType(config.enemies)
-  const spared = bystanders && bystanderRow(bystanderNoun(bystanders), bystanderCount(config.enemies), run.bystandersHit)
-  const rows: [string, string][] = [
-    ['Kills', `${run.kills} / ${run.totalEnemies}`],
-    ['Accuracy', formatAccuracy(run.hits, run.shotsFired)],
-    ['Best combo', run.bestCombo > 0 ? `×${run.bestCombo}` : '—'],
-    ...(spared ? [spared] : []),
-    ['Time left', formatTimeLeft(run.timeRemaining)],
-  ]
+  const lines = runLines({
+    ...run,
+    bystanders: bystanders && { noun: bystanderNoun(bystanders), total: bystanderCount(config.enemies), hit: run.bystandersHit },
+  })
+  const plates = [
+    { to: 'next', label: 'Next Level', shown: nextOpen },
+    { to: 'replay', label: 'Replay', shown: true },
+    { to: 'levels', label: 'Levels', shown: true },
+  ] as const
+  const go = plates.find((p) => p.to === enterTo)
 
   return (
     <div
-      className="results-screen"
+      className="results-screen fair-stage"
       data-sequence={done ? 'done' : 'running'}
       data-mode={run.mode.mode}
-      style={{ '--accent': theme.accent, '--accent-glow': theme.glow } as CSSProperties}
       onPointerDown={() => {
         if (!done) setStage(STAGE.done)
       }}
     >
       <div className={`results-card${photo ? ' has-photo' : ''}`}>
-        <div className="results-main">
-          {daily && <p className="results-daily-badge">Daily Run</p>}
-          <motion.h2
-            initial={reducedMotion ? false : { opacity: 0, y: -16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={reducedMotion ? instant : { duration: 0.35 }}
-          >
-            {config.name}
-          </motion.h2>
-          <p className="results-message">{config.message}</p>
+        <FairBoard className="results-panel" shadowClassName="results-panel-shadow fair-arrive" role="region" aria-labelledby="results-title">
+          <div className="results-main">
+            {daily && <p className="results-badge fair-showcard">Daily Run</p>}
+            {run.variant === 'night' && <p className="results-badge fair-showcard">Night Ride</p>}
+            <h2 id="results-title" className="fair-title">
+              {config.name}
+            </h2>
+            <p className="results-message">{config.message}</p>
 
-          <div className="results-stars" aria-label={`${stars} of 3 stars`}>
-            {[0, 1, 2].map((i) => (
-              <span key={i} className="results-star">
-                ☆
-                {i < stars && (
-                  <motion.span
-                    className="results-star-earned"
-                    initial={false}
-                    variants={{ hidden: { scale: 0, opacity: 0, rotate: -40 }, shown: { scale: 1, opacity: 1, rotate: 0 } }}
-                    animate={reveal(STAGE.star + i)}
-                    transition={done ? instant : { type: 'spring', stiffness: 420, damping: 13 }}
-                  >
-                    ★
-                  </motion.span>
-                )}
-              </span>
-            ))}
-          </div>
+            <div className={`results-score${record ? ' has-record' : ''}`}>
+              <ResultsMarquee score={run.score} stars={stars} counting={counting} lit={stage >= STAGE.star} chase={chase} done={done} />
+              {record && stage >= STAGE.stats && (
+                <span className="results-record fair-showcard">{daily ? 'New best' : 'New record'}</span>
+              )}
+            </div>
 
-          <div className="results-score">
-            <span ref={scoreRef} className="results-score-value">
-              0
-            </span>
-            {record && (
-              <motion.span
-                className="results-record"
-                initial={false}
-                variants={{ hidden: { scale: 1.8, opacity: 0, rotate: -12 }, shown: { scale: 1, opacity: 1, rotate: -6 } }}
-                animate={reveal(STAGE.stats)}
-                transition={done ? instant : { type: 'spring', stiffness: 500, damping: 18 }}
-              >
-                {daily ? 'NEW BEST' : 'NEW RECORD'}
-              </motion.span>
-            )}
-          </div>
-          {!record && run.previousBest > 0 && (
-            <p className="results-best">
-              {daily ? 'Best today' : 'Best'} {fmt.format(Math.round(run.previousBest))}
+            <div className="results-stars">
+              <FairStars earned={starsShown} label={`${stars} of 3 stars`} />
+            </div>
+            <p className="results-next" data-shown={stage >= STAGE.stats}>
+              {nextStarLine(next, (n) => fmt.format(n))}
             </p>
-          )}
-
-          <div className="results-bar" role="presentation">
-            <div ref={fillRef} className="results-bar-fill" />
-            {config.starThresholds.map((t, i) => (
-              <span
-                key={i}
-                className={`results-bar-marker${i < stars ? ' reached' : ''}`}
-                style={{ left: `${t * 100}%` }}
-              >
-                {'★'.repeat(i + 1)}
-              </span>
-            ))}
-          </div>
-          <p className="results-next" style={{ visibility: stage >= STAGE.stats ? 'visible' : 'hidden' }}>
-            {next ? `${fmt.format(next.points)} pts to ${'★'.repeat(next.stars)}` : 'All stars!'}
-          </p>
-        </div>
-
-        <div className="results-side">
-          <ul className="results-stats">
-            {rows.map(([label, value], i) => (
-              <motion.li
-                key={label}
-                className="results-stat"
-                initial={false}
-                variants={{ hidden: { opacity: 0, x: -24 }, shown: { opacity: 1, x: 0 } }}
-                animate={reveal(STAGE.stats)}
-                transition={done ? instant : { duration: 0.25, delay: i * 0.08 }}
-              >
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </motion.li>
-            ))}
-          </ul>
-
-          <motion.div
-            className="results-actions"
-            initial={false}
-            variants={{ hidden: { opacity: 0, y: 12 }, shown: { opacity: 1, y: 0 } }}
-            animate={reveal(STAGE.done)}
-            transition={reducedMotion ? instant : { duration: 0.25 }}
-            style={{ pointerEvents: done ? 'auto' : 'none' }}
-          >
-            <button className="play-button results-secondary" onClick={() => leave('levels')}>
-              Levels
-            </button>
-            <button className="play-button results-secondary" onClick={() => leave('replay')}>
-              Replay
-            </button>
-            {card && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} prerender={done} photo={photo?.blob ?? null} />}
-            {nextOpen && (
-              <button ref={nextRef} className="play-button" onClick={() => leave('next')}>
-                Next Level
-              </button>
+            {!record && run.previousBest > 0 && (
+              <p className="results-best">
+                {daily ? "Today's best is" : 'Your best is'} {fmt.format(Math.round(run.previousBest))}
+              </p>
             )}
-          </motion.div>
-          <p className="results-keys">
-            {entryOpen && 'Type or ▲▼ letters · ◀▶ move · Enter: OK'}
-            {!entryOpen && enterTo === 'next' && 'Enter: next · R: replay'}
-            {!entryOpen && enterTo === 'levels' && 'Enter: levels · R: replay'}
-            {!entryOpen && enterTo === 'replay' && `★ unlocks ${nextName} · Enter / R: replay`}
-          </p>
-        </div>
+          </div>
+
+          <div className="results-side">
+            <ul className="results-stats" data-shown={stage >= STAGE.stats}>
+              {lines.map(({ stat, text }) => (
+                <li key={stat} className="results-stat" data-stat={stat}>
+                  {text}
+                </li>
+              ))}
+            </ul>
+
+            <div className="results-actions" data-shown={done}>
+              {go && (
+                <button ref={nextRef} className="fair-plate fair-go" onClick={() => leave(go.to)}>
+                  {go.label}
+                </button>
+              )}
+              {plates
+                .filter((p) => p.shown && p !== go)
+                .map((p) => (
+                  <button key={p.to} className="fair-plate" onClick={() => leave(p.to)}>
+                    {p.label}
+                  </button>
+                ))}
+              {card && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} prerender={done} photo={photo?.blob ?? null} />}
+            </div>
+            <p className="results-keys" data-shown={done}>
+              {entryOpen && 'Type your initials or pick them with the arrows. Enter signs it.'}
+              {!entryOpen && enterTo === 'next' && 'Enter rides on. R rides again.'}
+              {!entryOpen && enterTo === 'levels' && 'Enter takes you to the levels. R rides again.'}
+              {!entryOpen && enterTo === 'replay' && `A star unlocks ${nextName}. Enter or R rides again.`}
+            </p>
+          </div>
+        </FairBoard>
 
         {photo && (
           <motion.figure
@@ -398,7 +346,7 @@ export default function ResultsScreen() {
           </motion.figure>
         )}
 
-        {!daily && (
+        {(!daily || world) && (
           <motion.div
             className="results-board-slot"
             initial={false}
@@ -409,7 +357,7 @@ export default function ResultsScreen() {
             <ResultsLeaderboard
               board={world?.board ?? board}
               rank={world ? world.rank : rank}
-              source={world ? 'world' : 'device'}
+              source={daily ? 'today' : world ? 'world' : 'device'}
               editing={entryOpen ? initials : null}
               onKey={initialsInput}
               onSlot={(slot) => initials && setInitials({ ...initials, slot })}

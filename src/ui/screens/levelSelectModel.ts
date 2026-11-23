@@ -3,6 +3,7 @@ import type { BiomeType } from '@/types/level'
 import type { LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { currentStreak, dailyKey, dailyLevel, type DailyStreak } from '@/levels/daily'
 import { previousLevel } from '@/levels/LevelRegistry'
+import { hasNightRide } from '@/levels/environments/nightPreset'
 
 export interface LevelSelectSource {
   id: string
@@ -25,6 +26,8 @@ export interface LevelCard {
   bestInitials: string | null
   /** Name of the level whose star unlocks this one (null when unlocked or first). */
   unlockedBy: string | null
+  /** Offers the Night Ride toggle (#829): the level has all its stars and its biome a night preset. */
+  nightRide: boolean
 }
 
 export const STARS_PER_LEVEL = 3
@@ -38,6 +41,7 @@ export function buildLevelCards(
   return levels.map((level) => {
     const unlocked = isUnlocked(level.id)
     const saved = savedScores[level.id]
+    const stars = unlocked ? Math.max(0, Math.min(STARS_PER_LEVEL, saved?.stars ?? 0)) : 0
     const top = leaderboards[level.id]?.[0]
     const previousId = unlocked ? null : previousLevel(level.id, levels)
     return {
@@ -46,10 +50,11 @@ export function buildLevelCards(
       description: level.description,
       biome: level.biome,
       unlocked,
-      stars: unlocked ? Math.max(0, Math.min(STARS_PER_LEVEL, saved?.stars ?? 0)) : 0,
+      stars,
       bestScore: unlocked ? Math.max(0, (top ?? saved)?.score ?? 0) : 0,
       bestInitials: unlocked ? (top?.initials ?? null) : null,
       unlockedBy: levels.find((l) => l.id === previousId)?.name ?? null,
+      nightRide: stars === STARS_PER_LEVEL && hasNightRide(level.biome),
     }
   })
 }
@@ -91,12 +96,14 @@ export function totalStars(cards: readonly LevelCard[]): { earned: number; max: 
   return { earned, max: cards.length * STARS_PER_LEVEL }
 }
 
-/** Card to focus first: the first unlocked level without a star (the next one to play), else the last unlocked. */
-export function initialFocusIndex(cards: readonly LevelCard[]): number {
+/**
+ * The player's next level, the one rule title PLAY starts (`startNextRun`, #329) and level select focuses first (#818):
+ * the first unlocked level without a star (the chain unlocks it), else the last campaign level played, else the first.
+ */
+export function nextLevelIndex(cards: readonly Pick<LevelCard, 'id' | 'unlocked' | 'stars'>[], lastLevel: string | null): number {
   const fresh = cards.findIndex((c) => c.unlocked && c.stars === 0)
   if (fresh >= 0) return fresh
-  for (let i = cards.length - 1; i >= 0; i--) if (cards[i].unlocked) return i
-  return 0
+  return Math.max(0, cards.findIndex((c) => c.unlocked && c.id === lastLevel))
 }
 
 export type NavKey = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | 'Home' | 'End'

@@ -16,16 +16,15 @@ export const gym: BiomeDefinition = {
   particles: PARTICLE_PRESETS.gymChalk,
   floor: gymFloor,
   bounds: HALL_BOUNDS,
-  // The Starr hangs on the hall's end wall: the orbit swings in front of it, inside the hall. The ride starts under
-  // the Tree's trunk, so the tour comes down on the roots' front and rides the hairpin into the gap (`gymTrack.test.ts`).
-  // Its reveal and pass are hand-picked on the Shield's side of the pit: a pass on the Tree's side comes down through
-  // the Tree's head to the hairpin (#695).
+  // The Starr hangs on the hall's end wall: the orbit swings in front of it, inside the hall. The ride starts in the
+  // station on the black path (#700): the tour reveals the pit from mid-hall, pulls back down the hall facing the
+  // Starr to the south end (the landmark pass), then rides the last of the track into the station (`gymTrack.test.ts`).
   hero: {
     x: star.x, z: star.z, ground: 0, focus: star.y, orbitRadius: 20 * GYM_SCALE, orbitHeight: 9 * GYM_SCALE,
-    arc: 0.7, facing: Math.atan2(STAR.facing.z, STAR.facing.x), approach: 12 * GYM_SCALE,
+    arc: 0.7, facing: Math.atan2(STAR.facing.z, STAR.facing.x), approach: 8 * GYM_SCALE,
     tour: [
-      { at: toWorld({ x: 30, y: 14, z: 34 }), look: toWorld({ x: 15, y: 5, z: 20 }) },
-      { at: toWorld({ x: 26, y: 7, z: 20 }), look: star },
+      { at: toWorld({ x: 30, y: 14, z: 30 }), look: toWorld({ x: 15, y: 5, z: 22 }) },
+      { at: toWorld({ x: 74, y: 8, z: 30 }), look: star },
     ],
   },
 }

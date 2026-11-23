@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { GeometryWriter, buildRingedRock } from '../../shared/ringedRock'
+import { mergePainted, paintedAt, paintedPolygon, pose } from '../../shared/paintedParts'
 import { KELP_HEIGHT, ROCK_CAP_RISE, ROCK_RINGS, STACK_CAP_RISE, STACK_RINGS } from './seaDimensions'
 
 /** Ocean prop geometry with heights baked in: instances only get a uniform scale + yaw. */
@@ -147,4 +148,32 @@ export function createGullGeometry(): THREE.BufferGeometry {
     w.tri(elbowFront, wingTip, elbowBack, black, [0.5, 1, 0.5])
   }
   return w.build('aFlap')
+}
+
+/** A humpback `length` long, centred on its middle, nose along +z: dark back, pale belly, long flippers, flukes. */
+export function createWhaleGeometry(length: number): THREE.BufferGeometry {
+  // The body turned on a lathe, nose to tail: widest a third of the way back, a little deeper than wide.
+  const profile = Array.from({ length: 10 }, (_, i) => {
+    const s = i / 9
+    return new THREE.Vector2(0.128 * Math.sin(Math.PI * s ** 0.75), 0.5 - 0.95 * s)
+  })
+  const body = paintedAt(
+    new THREE.LatheGeometry(profile, 10),
+    (x, _y, z) => {
+      const up = -z / Math.hypot(x, z)
+      return up > 0.45 ? 0x1f3550 : up > -0.35 ? 0x35546e : 0xd9e6e8
+    },
+    pose([0, 0, 0], [Math.PI / 2, 0, 0], [1, 1, 0.85]),
+  )
+  // Long swept-back flippers; flukes and a small dorsal hump (the material is double-sided).
+  const flippers = paintedPolygon([
+    0.1, -0.03, 0.2, 0.36, -0.1, -0.02, 0.1, -0.03, 0.1,
+    -0.1, -0.03, 0.2, -0.36, -0.1, -0.02, -0.1, -0.03, 0.1,
+  ], 0x35546e)
+  const flukes = paintedPolygon([
+    0, 0.005, -0.42, 0.2, 0.012, -0.54, 0, 0.005, -0.5,
+    0, 0.005, -0.42, -0.2, 0.012, -0.54, 0, 0.005, -0.5,
+    0, 0.082, -0.17, 0, 0.075, -0.27, 0, 0.12, -0.25,
+  ], 0x1f3550)
+  return mergePainted([body, flippers, flukes]).scale(length, length, length)
 }

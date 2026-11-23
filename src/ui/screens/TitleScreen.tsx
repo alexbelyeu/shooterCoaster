@@ -6,12 +6,13 @@ import { useGameStore } from '@/store/useGameStore'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { motion } from 'framer-motion'
 import { markStartup } from '@/core/startupMarks'
-import { startsGame } from './titleKeys'
+import { titleAction, type TitleAction } from './titleKeys'
 import { handPosterToUi, posterShown } from '@/app/poster'
 import { ATTRACT_IDLE_MS, armClickSwallow, setTitleAttract } from '@/canvas/titleAttract'
 import { e2eAttractIdleMs } from '@/testing/e2eHook'
 import TitleLogo from './TitleLogo'
 import { LOGO_TEXT } from '@/ui/logoArt'
+import { touchFirst } from '@/ui/touchFirst'
 
 const SUBTITLE_WORDS = ['Ride.', 'Aim.', 'Shoot.']
 /** The title has landed by here; PLAY and the rest follow. */
@@ -21,19 +22,22 @@ const PLAY_OVER_POSTER_S = 0.15
 
 let hintShownThisLoad = false
 
-const WAKE_EVENTS = ['pointerdown', 'pointermove', 'wheel'] as const
+/** focusin: a gamepad's d-pad focuses the menu without a key (`gamepadMap.hot.ts` `navTarget`). */
+const WAKE_EVENTS = ['pointerdown', 'pointermove', 'wheel', 'focusin'] as const
 
-const touchFirst = () => typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches
 
 interface TitleScreenProps {
+  /** PLAY (and press any key): the player's next level, straight into its run. */
   onPlay: () => void
-  onSettings?: () => void
+  /** WORLDS (W, Escape): the level select. */
+  onWorlds: () => void
+  onSettings: () => void
 }
 
-/** PLAY waits this long at most for audio and the menu sounds (its whoosh): the title music starts from App's `whenAudioReady`. */
+/** PLAY / WORLDS wait this long at most for audio and the menu sounds (the whoosh): the title music starts from App's `whenAudioReady`. */
 const PLAY_AUDIO_WAIT_MS = 300
 
-/** Every call resumes the context inside its gesture (`initAudio`), so the PLAY click retries what a touch pointerdown couldn't. */
+/** Every call resumes the context inside its gesture (`initAudio`), so a PLAY / WORLDS click retries what a touch pointerdown couldn't. */
 function startAudio(): Promise<void> {
   return initAudio().then(() => {
     // A level that mounted before audio unlocked has prepared its own sounds already.
@@ -42,10 +46,10 @@ function startAudio(): Promise<void> {
   })
 }
 
-export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
+export default function TitleScreen({ onPlay, onWorlds, onSettings }: TitleScreenProps) {
   const [internal] = useState(isInternalThisLoad)
   const [showHint] = useState(() => !hintShownThisLoad)
-  const [hint] = useState(() => (touchFirst() ? 'Tap PLAY to start' : 'Press any key to start'))
+  const [hint] = useState(() => (touchFirst() ? 'Tap Play to start.' : 'Press any key to start.'))
   const reduced = usePrefersReducedMotion()
   // Over index.html's poster, the logo and tagline are already on screen: they stay put instead of flying in.
   const [overPoster] = useState(posterShown)
@@ -91,13 +95,14 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
     }
   }, [])
 
-  async function play() {
+  async function leave(action: TitleAction) {
     if (started.current) return
     started.current = true
     // A browser that refuses audio, or a slow network, still gets to play.
     const audio = startAudio().catch(() => {})
     await Promise.race([audio, new Promise((r) => window.setTimeout(r, PLAY_AUDIO_WAIT_MS))])
-    onPlay()
+    if (action === 'play') onPlay()
+    else onWorlds()
   }
 
   useEffect(() => {
@@ -111,9 +116,10 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
       }
       // Enter / Space on a focused button already click it.
       const onControl = e.target instanceof HTMLElement && e.target.closest('button, a, input') !== null
-      if (!onControl && startsGame(e)) {
+      const action = titleAction(e)
+      if (action === 'worlds' || (action === 'play' && !onControl)) {
         e.preventDefault()
-        void play()
+        void leave(action)
       }
     }
     window.addEventListener('pointerdown', kickstart, { once: true })
@@ -137,88 +143,81 @@ export default function TitleScreen({ onPlay, onSettings }: TitleScreenProps) {
         <TitleLogo still={reduced || overPoster} />
       </motion.h1>
 
-      <p className="subtitle">
+      <p className="title-tagline fair-over-ride">
         {SUBTITLE_WORDS.map((word, i) => (
           <motion.span
             key={word}
             initial={overPoster ? false : { opacity: 0, y: reduced ? 0 : 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.6 + i * 0.2 }}
-            style={{ display: 'inline-block', marginRight: '0.4em' }}
           >
             {word}
           </motion.span>
         ))}
       </p>
 
+      {/* The plates fade in on opacity alone, so they land exactly on the poster's; CSS presses them. */}
       <motion.button
-        className="play-button"
-        onClick={() => void play()}
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{
-          opacity: 1,
-          scale: reduced ? 1 : [1, 1.06, 1],
-          boxShadow: [
-            '0 0 20px rgba(255, 200, 0, 0.3)',
-            '0 0 40px rgba(255, 200, 0, 0.7)',
-            '0 0 20px rgba(255, 200, 0, 0.3)',
-          ],
-        }}
-        transition={{
-          opacity: { duration: 0.4, delay: playIn },
-          scale: reduced
-            ? { duration: 0.4, delay: playIn }
-            : { duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: playIn },
-          boxShadow: { duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: playIn },
-        }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
+        className="fair-plate fair-go title-play"
+        onClick={() => void leave('play')}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: playIn }}
       >
         Play
       </motion.button>
 
+      <div className="title-row">
+        <motion.button
+          className="fair-plate worlds-button"
+          onClick={() => void leave('worlds')}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: playIn + 0.2 }}
+        >
+          Worlds
+        </motion.button>
+        <motion.button
+          className="fair-plate settings-button"
+          onClick={onSettings}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: playIn + 0.2 }}
+        >
+          Settings
+        </motion.button>
+      </div>
+
       {showHint && (
         <motion.p
-          className="title-hint"
+          className="title-hint fair-over-ride"
           initial={{ opacity: 0 }}
-          animate={{ opacity: reduced ? 0.8 : [0.45, 0.9, 0.45] }}
-          transition={reduced ? { delay: playIn + 0.6 } : { duration: 2.4, repeat: Infinity, ease: 'easeInOut', delay: playIn + 0.6 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: playIn + 0.6 }}
         >
           {hint}
         </motion.p>
       )}
 
-      {onSettings && (
-        <motion.button
-          className="settings-button"
-          onClick={onSettings}
-          initial={{ opacity: 0, x: reduced ? 0 : -16 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: playIn + 0.35, ease: 'easeOut' }}
-          whileTap={{ scale: 0.9 }}
-          aria-label="Settings"
-        >
-          &#x2699;
-        </motion.button>
-      )}
-
-      <motion.div
-        className="credits"
-        initial={{ opacity: 0, y: reduced ? 0 : 12 }}
-        animate={{ opacity: 1, y: 0 }}
+      <motion.p
+        className="credits fair-over-ride"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: playIn + 0.5 }}
       >
         A Three.js game by{' '}
         <a href="https://github.com/alexbelyeu/shooterCoaster" target="_blank" rel="noreferrer">
           Alex Belyeu
         </a>
-      </motion.div>
+      </motion.p>
 
-      {internal && <div className="internal-marker">internal: not tracked</div>}
+      {internal && <p className="internal-marker fair-over-ride">Internal device, not tracked</p>}
 
       {attract && (
         <div className="title-attract" aria-hidden="true">
-          <p className="title-attract-prompt">{touchFirst() ? 'Tap anywhere' : 'Press any key'}</p>
+          <p className="title-attract-prompt fair-over-ride">
+            {touchFirst() ? 'Tap anywhere to step up.' : 'Press any key to step up.'}
+          </p>
         </div>
       )}
     </div>

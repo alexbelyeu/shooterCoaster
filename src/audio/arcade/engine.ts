@@ -7,13 +7,13 @@ import { arcadeChannel, arcadeUiChannel, audioContext, audioNow as clock, isAudi
 import { scrimPlayer } from '../musicEngine'
 import { dropSound } from '../soundGuard'
 import { barSection, compile } from '../scrim/score'
-import { makeIR, upmixPanner } from '../scrim/synth'
+import { upmixPanner } from '../scrim/synth'
 import { SCORES, scoreIdFor } from '../scores'
 import {
   ARCADE_SOUNDS, AUTO_FIRE_DB, BIOME_REVERB, FIREWORK_BIOMES, STEAL_FADE_S, VOICE_BUDGET, WHISTLE_LENGTHS_S, SCORE_KEYS,
-  CHAIN, RUMBLE, WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, nextBeat, nextClankAt, panGain, pickVoice,
+  CHAIN, RUMBLE, WIND, bossHitRate, fireworkWhistleS, hitRate, killRate, nextBeat, nextClankAt, panGain, pickVoice, placedSend, roomImpulse,
   rumbleGain, rumbleHz, windGain, windHz, windUpdateDue,
-  type ArcadeSoundId, type VoiceState, type WindRamp,
+  type ArcadeSoundId, type BiomeReverb, type VoiceState, type WindRamp,
 } from '../sfxDesign'
 import type { Placement, SfxEngine, UiSound, VoiceStats } from '../sfx'
 import { bakeBank, type Bank } from './bake'
@@ -34,12 +34,12 @@ interface Graph {
   out: GainNode
   /** The countdown and UI blips, past the pause gate (`arcadeUiChannel`). */
   uiOut: GainNode
-  verb: ConvolverNode
-  verbTone: BiquadFilterNode
-  verbReturn: GainNode
+  room: Room
   voices: Voice[]
   /** Outside the budget, on `uiOut`: the resume Ready / GO plays while the run is still paused. */
   uiVoices: Voice[]
+  /** The same room returning into `uiOut`: a countdown blip's tail rings while paused, not swelling in as the gate opens (#650). */
+  uiRoom: Room
   /** The FRENZY lift's own voice: a loop, never stolen. */
   lift: Voice
   /** The ride wind: looped noise → band-pass → gain, silent until `wind` opens it. */
@@ -95,9 +95,29 @@ function createVoice(ctx: BaseAudioContext, out: AudioNode, verbIn: AudioNode): 
 
 const UI_VOICES = 2
 const VOICE_NODES = 4
-const BUS_NODES = 5
+const ROOM_NODES = 3
+const BUS_NODES = 2 + 2 * ROOM_NODES
 const WIND_NODES = 5
 const nodesOf = (g: Graph) => BUS_NODES + WIND_NODES + VOICE_NODES * (g.voices.length + g.uiVoices.length + 1)
+
+interface Room {
+  verb: ConvolverNode
+  tone: BiquadFilterNode
+  ret: GainNode
+}
+
+/** The biome's convolver → tone → return into `out`. */
+function createRoom(ctx: BaseAudioContext, ir: AudioBuffer, room: BiomeReverb, out: AudioNode): Room {
+  const verb = ctx.createConvolver()
+  verb.buffer = ir
+  const tone = ctx.createBiquadFilter()
+  tone.type = 'lowpass'
+  tone.frequency.value = room.toneHz
+  const ret = ctx.createGain()
+  ret.gain.value = room.level
+  verb.connect(tone).connect(ret).connect(out)
+  return { verb, tone, ret }
+}
 
 /** Rebuilt when the context or channel changes (an offline render) or the installed bank's biome does: the room comes with the bank (#246). */
 function ensureGraph(): Graph {
@@ -110,24 +130,27 @@ function ensureGraph(): Graph {
   out.connect(arcadeChannel)
   const uiOut = ctx.createGain()
   uiOut.connect(arcadeUiChannel)
-  const verb = ctx.createConvolver()
-  verb.buffer = makeIR(ctx, room.seconds, room.decayPow)
-  const verbTone = ctx.createBiquadFilter()
-  verbTone.type = 'lowpass'
-  verbTone.frequency.value = room.toneHz
-  const verbReturn = ctx.createGain()
-  verbReturn.gain.value = room.level
-  verb.connect(verbTone).connect(verbReturn).connect(out)
+  const ir = roomBuffer(ctx, room, biome)
+  const gameRoom = createRoom(ctx, ir, room, out)
+  const uiRoom = createRoom(ctx, ir, room, uiOut)
   const voices: Voice[] = []
-  for (let i = 0; i < VOICE_BUDGET; i++) voices.push(createVoice(ctx, out, verb))
+  for (let i = 0; i < VOICE_BUDGET; i++) voices.push(createVoice(ctx, out, gameRoom.verb))
   const uiVoices: Voice[] = []
-  for (let i = 0; i < UI_VOICES; i++) uiVoices.push(createVoice(ctx, uiOut, verb))
+  for (let i = 0; i < UI_VOICES; i++) uiVoices.push(createVoice(ctx, uiOut, uiRoom.verb))
   graph = {
-    ctx, channel: arcadeChannel, biome, out, uiOut, verb, verbTone, verbReturn, voices, uiVoices,
-    lift: createVoice(ctx, out, verb), ...createWind(ctx, out),
+    ctx, channel: arcadeChannel, biome, out, uiOut, room: gameRoom, voices, uiVoices, uiRoom,
+    lift: createVoice(ctx, out, gameRoom.verb), ...createWind(ctx, out),
   }
   graphNodes += nodesOf(graph)
   return graph
+}
+
+/** The biome's impulse response, the same every time it is built. */
+function roomBuffer(ctx: BaseAudioContext, room: BiomeReverb, biome: BiomeType): AudioBuffer {
+  const channels = roomImpulse(room, ctx.sampleRate, createRng(hashString(`room:${biome}`)))
+  const buffer = ctx.createBuffer(2, channels[0].length, ctx.sampleRate)
+  channels.forEach((data, ch) => buffer.copyToChannel(data, ch))
+  return buffer
 }
 
 const WIND_LOOP_S = 2
@@ -214,7 +237,8 @@ function disposeGraph() {
   }
   const disconnect = () => {
     for (const v of voices) for (const n of [v.src, v.gain, v.lp, v.pan, v.send]) n?.disconnect()
-    for (const n of [g.windSrc, g.windBand, g.windAmp, g.rumbleBand, g.rumbleAmp, g.verb, g.verbTone, g.verbReturn, g.out, g.uiOut]) n.disconnect()
+    for (const r of [g.room, g.uiRoom]) for (const n of [r.verb, r.tone, r.ret]) n.disconnect()
+    for (const n of [g.windSrc, g.windBand, g.windAmp, g.rumbleBand, g.rumbleAmp, g.out, g.uiOut]) n.disconnect()
     graphNodes -= nodesOf(g)
   }
   if (fade) {
@@ -283,8 +307,7 @@ function prepare(level: string | null, levelBiome: BiomeType): Promise<void> {
   return promise
 }
 
-const NO_PLACE: Placement = { pan: 0, cutoffHz: 20000 }
-const UI_ROUTED = new Set<ArcadeSoundId>(['countReady', 'countGo', 'uiSelect', 'uiBack', 'uiLaunch', 'uiWhoosh'])
+const NO_PLACE: Placement = { pan: 0, cutoffHz: 20000, wet: 1 }
 
 /** Null before audio unlocks or the bank is baked, or when every voice plays something more important. */
 function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: Placement | null = null, loopOffset = -1): Voice | null {
@@ -295,7 +318,7 @@ function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: P
     const now = clock()
     const def = ARCADE_SOUNDS[id]
     const loop = loopOffset >= 0
-    const ui = UI_ROUTED.has(id)
+    const ui = def.bus === 'ui'
     let t = Math.max(at, now)
     let v: Voice
     if (loop) v = g.lift
@@ -320,7 +343,7 @@ function play(id: ArcadeSoundId, at = 0, variant = 0, rate = 1, db = 0, place: P
     v.gain.gain.setValueAtTime(Math.pow(10, (def.db + db) / 20) * (place ? panGain(p.pan) : 1), t)
     v.lp.frequency.setValueAtTime(p.cutoffHz, t)
     v.pan.pan.setValueAtTime(p.pan, t)
-    v.send.gain.setValueAtTime(def.send, t)
+    v.send.gain.setValueAtTime(placedSend(def.send, p.wet), t)
     const src = g.ctx.createBufferSource()
     src.buffer = buffer
     src.playbackRate.value = rate
@@ -355,8 +378,8 @@ function onBeat(): typeof beat | null {
   return nextBeat(clock(), grid.origin, grid.beatS, grid.beats, BEAT_LEAD_S, beat)
 }
 
-function playOnBeat(id: ArcadeSoundId) {
-  play(id, onBeat()?.t ?? 0)
+function playOnBeat(id: ArcadeSoundId, place: Placement | null = null) {
+  play(id, onBeat()?.t ?? 0, 0, 1, 0, place)
 }
 
 function setLift(on: boolean) {
@@ -425,9 +448,9 @@ export const arcadeSfx: SfxEngine = {
   frenzy: () => playOnBeat('frenzy'),
   frenzyLift: setLift,
   waveIncoming: () => playOnBeat('waveTell'),
-  bossArrival: () => playOnBeat('bossArrival'),
-  bossHit: (hpFraction) => void play('bossHit', 0, 0, bossHitRate(hpFraction)),
-  bossDefeat: () => void play('bossDefeat'),
+  bossArrival: (at) => playOnBeat('bossArrival', at),
+  bossHit: (hpFraction, at) => void play('bossHit', 0, 0, bossHitRate(hpFraction), 0, at),
+  bossDefeat: (at) => void play('bossDefeat', 0, 0, 1, 0, at),
   fireworkWhistle(flightS, timeScale) {
     const s = fireworkWhistleS(flightS, timeScale)
     let v = 0
@@ -442,6 +465,7 @@ export const arcadeSfx: SfxEngine = {
   wind: setWind,
   chain: setChain,
   rideLaunch: () => void play('rideLaunch'),
+  trackSwitch: () => void play('trackSwitch'),
   nodeCount: () => graphNodes,
   killsPlayed: () => killsPlayed,
   voices: () => stats,

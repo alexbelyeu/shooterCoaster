@@ -54,3 +54,11 @@ describe('aim assist and bystanders (#518)', () => {
     expect(pickAssistTarget(100, 100, [100], [100], 1, 44, [0])).toBe(-1)
   })
 })
+
+describe('aim assist and a junction\'s switch (#702)', () => {
+  it('never snaps a tap onto the route switch, even beside an enemy', () => {
+    expect(assistWeight('switch')).toBe(0)
+    const weights = [assistWeight('switch'), assistWeight(undefined)]
+    expect(pickAssistTarget(100, 100, [100, 140], [100, 100], 2, 44, weights)).toBe(1)
+  })
+})

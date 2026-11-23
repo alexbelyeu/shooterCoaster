@@ -214,6 +214,26 @@ describe('findings', () => {
     expect(again[0].lastSeen).toBe(NOW - 2 * H)
   })
 
+  describe('builders-idle: work ready, nothing paused, budget not spent, no Builders run for 3 h', () => {
+    const NOW = Date.parse('2026-11-20T12:00:00Z')
+    const ready = [{ number: 1, title: 't', labels: ['agent:ready'], created_at: iso(H), labelledAt: { 'agent:ready': '2026-11-19T12:00:00Z' } }]
+    const at = (over: object = {}) => snap({ now: NOW, lastAgentActivity: NOW - H, openIssues: ready, builderBudget: 48, builderRuns: [NOW - 11 * H], ...over })
+
+    it('11 h without Builders while QA kept posting (19-20 Nov) is Alex\'s', () => {
+      const f = findings(at()).filter((x: { key: string }) => x.key === 'builders-idle')
+      expect(f.map((x: { key: string; owner: string; title: string }) => [x.key, x.owner, x.title])).toEqual([['builders-idle', 'alex', 'Builders idle: no Builders run for 11 h while 1 issues are ready']])
+    })
+
+    it('not with a recent Builders run, a pause, the budget spent, an empty queue, or work that only just became ready', () => {
+      const idle = (over: object) => keys(at(over)).includes('builders-idle')
+      expect(idle({ builderRuns: [NOW - 2 * H] })).toBe(false)
+      expect(idle({ paused: true })).toBe(false)
+      expect(idle({ builderBudget: 1, builderRuns: [NOW - 11 * H] })).toBe(false)
+      expect(idle({ openIssues: [] })).toBe(false)
+      expect(idle({ openIssues: [{ ...ready[0], labelledAt: { 'agent:ready': new Date(NOW - H).toISOString() } }] })).toBe(false)
+    })
+  })
+
   describe('stalled: Builders / QA slots (EST: Builders 10:27, 14:27, 18:27, 22:27; QA 16:47) missed 2 h past their time', () => {
     const lastNight = Date.parse('2026-11-04T01:40:00Z')
     const ready = [{ number: 1, title: 't', labels: ['agent:ready'], created_at: iso(H) }]
@@ -249,7 +269,8 @@ describe('findings', () => {
 
     it('Builders slots after the day\'s builder_runs_per_day was spent don\'t count', () => {
       const builderRuns = [1, 2, 3].map((h) => lastNight - h * H)
-      const f = (budget: number) => keys(at('2026-11-04T23:00:00Z', { openPrs: [], builderRuns, builderBudget: budget }))
+      // Rule 4 only (4b, builders-idle, rightly fires here too: work ready and no Builders for a day).
+      const f = (budget: number) => keys(at('2026-11-04T23:00:00Z', { openPrs: [], builderRuns, builderBudget: budget })).filter((k: string) => k !== 'builders-idle')
       expect(f(6)).toEqual(['stalled'])
       expect(f(3)).toEqual([])
     })
@@ -264,6 +285,14 @@ describe('findings', () => {
       ],
     }))
     expect(f).toEqual(['stuck-approved:5', 'qa-backlog'])
+  })
+
+  it("an approved PR on Alex's own branch is his to merge, not an agents' issue", () => {
+    const approved = (head: string) => ({ number: 8, title: 'a', head, labels: ['agent:qa-approved'], created_at: iso(10 * H), updated_at: iso(H), labelledAt: { 'agent:qa-approved': iso(4 * H) } })
+    const [own] = findings(snap({ openPrs: [approved('fix/gym-star')] }))
+    expect(own).toMatchObject({ key: 'merge-own:8', owner: 'alex' })
+    expect(own.body).toContain('`fix/gym-star`')
+    expect(findings(snap({ openPrs: [approved('agent/8-x')] }))[0]).toMatchObject({ key: 'stuck-approved:8', owner: 'agents' })
   })
 
   it('a production alert open over 12 h is escalated in place, not filed again', () => {

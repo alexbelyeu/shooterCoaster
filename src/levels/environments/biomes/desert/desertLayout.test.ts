@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { buildArcTable } from '@/track/arcLength'
-import { createTrigCurve } from '@/track/curves/TrigCurve'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import {
   createHeightFunction,
   createTerrainSurface,
@@ -13,8 +13,7 @@ import { dustDevilCenter, layoutDesert, MESA_FOOTPRINT, MESA_HEIGHT } from './de
 import { LANDMARK_FOOTPRINTS } from './landmarks'
 
 const level = getLevelConfig('level2')!
-const { varA, varB, varC, scalar } = level.track
-const curve = createTrigCurve(varA, varB, varC, scalar)
+const curve = createTrackCurve(level.track)
 const table = buildArcTable(curve)
 const groundFn = createTerrainSurface(
   createHeightFunction('desert', sampleTrackPath((t) => curve.getPointAt(t))),

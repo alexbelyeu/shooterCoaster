@@ -81,8 +81,12 @@ describe('run-usage summarize', () => {
     const turn = (id: string, read: number) =>
       assistant(id, id, { input_tokens: 1, cache_creation_input_tokens: 999, cache_read_input_tokens: read, output_tokens: 0 })
     const small = usage.selfCheck([turn('a', 50_000), turn('b', 120_000)].join('\n'))
-    expect(small).toMatchObject({ context: 121_000, turns: 2, over: false })
+    expect(small).toMatchObject({ context: 121_000, turns: 2, over: false, wrapUp: false })
     expect(small.line).toBe('context 121k · 2 turns · ~20k weighted so far · within budget')
+
+    const near = usage.selfCheck([turn('a', 50_000), turn('b', 160_000)].join('\n'))
+    expect(near).toMatchObject({ context: 161_000, over: false, wrapUp: true })
+    expect(near.line).toContain('WRAP UP (context over 150k)')
 
     const big = usage.selfCheck([turn('a', 120_000), turn('b', 240_000)].join('\n'))
     expect(big.over).toBe(true)

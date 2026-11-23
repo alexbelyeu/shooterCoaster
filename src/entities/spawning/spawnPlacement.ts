@@ -1,5 +1,9 @@
-import type { EnemyType, Formation, FormationOrigin, WallSurface } from '@/types/level'
-import type { ArcTable } from '@/track/arcLength'
+import type { EnemyType, EnemyWave, Formation, FormationOrigin, WallSurface } from '@/types/level'
+import { indexAtT, type ArcTable } from '@/track/arcLength'
+import type { HardRoute } from '@/track/mechanics'
+import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
+import { RUN_SECONDS } from '@/levels/pacing'
+import { waveWindows } from './waveSchedule'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import { maxReadableDistance } from '../enemies/enemyReadability'
@@ -9,7 +13,8 @@ import {
 import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
-import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
+import { BASE_VERTICAL_FOV, MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
+import { EYE_HEIGHT } from '@/track/trackDimensions'
 
 /**
  * Formation placement, pure. Slots are seeded at level load (so `spawnDigest` stays
@@ -147,6 +152,12 @@ export function trackPoint(table: ArcTable, i: number): Vec3 {
   return { x: table.x[i], y: table.y[i], z: table.z[i] }
 }
 
+/** The rails' up at sample `i` (`trackGeometry.ts` `seatUp`'s): world up unless the curve rolls. */
+function trackUp(table: ArcTable, i: number): Vec3 {
+  const { ups } = table
+  return ups ? { x: ups.x[i], y: ups.y[i], z: ups.z[i] } : { x: 0, y: 1, z: 0 }
+}
+
 export interface FormationFrame {
   /** `track` plus the side / up offsets. */
   origin: Vec3
@@ -162,24 +173,68 @@ export interface FormationFrame {
 
 /** What the ride does after a wave activates, from the level's ride profile (`track/ridePhysics.ts`). */
 export interface RideAhead {
-  /** Arc distance the rider covers while the wave flies in (`ENTRY_SECONDS` + `ENTRY_STAGGER`). */
+  /** Arc distance the rider covers while the wave flies in (`ENTRY_SECONDS_MAX`). */
   entry: number
-  /** Arc distance the rider covers over the wave's window: until the next wave, the boss or the end of the run. */
+  /** Arc distance the rider covers over the wave's window (until the next wave, the boss or the end of the run), less `RIDE_PACE_SLACK`. */
   window: number
   /** The level's structure scale: the rig looks `LOOK_AHEAD_UNITS` × this ahead. */
   trackScale: number
+  /** Arc ahead where the wave's stretch ends, the trackside band's spread included (a hard-route wave's merge, #720). */
+  until?: number
 }
 
 /** A formation member flies in over `ENTRY_SECONDS`, the last of its group `ENTRY_STAGGER` later. */
 export const ENTRY_SECONDS = 1.2
 export const ENTRY_STAGGER = 0.6
+/** The longest fly-in of an arriving enemy. */
+export const ENTRY_SECONDS_MAX = ENTRY_SECONDS + ENTRY_STAGGER
+
+/**
+ * A run may ride less far than its profile (`rideProfile`: slow-mo and a capped hitch slow the ride, not the level
+ * timer), so a wave spreads over this share of the arc its window predicts, and the rider still reaches its last.
+ */
+export const RIDE_PACE_SLACK = 0.85
+
+/**
+ * Each wave's `RideAhead`: the ride a run takes from GO, over the wave's fly-in and its window (`waveWindows` of the waves
+ * every run meets: a hard-route wave never cuts another's window short). A hard-route wave's window is where it arrives
+ * to its junction's merge, known only then (`rideToMerge`).
+ */
+export function rideAheadOfWaves(
+  table: ArcTable,
+  speeds: RideSpeeds,
+  waves: readonly Pick<EnemyWave, 'spawnDelay' | 'route'>[],
+  bossAt: number | undefined,
+  trackScale: number,
+): RideAhead[] {
+  const profile = rideProfile(table, speeds, RUN_SECONDS)
+  const windows = waveWindows(waves.filter((w) => !w.route).map((w) => w.spawnDelay ?? 0), bossAt, RUN_SECONDS)
+  let everyRun = 0
+  return waves.map((wave) => {
+    const [from, to] = wave.route ? [wave.spawnDelay ?? 0, wave.spawnDelay ?? 0] : windows[everyRun++]
+    return { entry: riddenBetween(profile, from, from + ENTRY_SECONDS_MAX), window: RIDE_PACE_SLACK * riddenBetween(profile, from, to), trackScale }
+  })
+}
+
+/**
+ * A hard-route wave's ride (#720), placed from sample `riderIndex` of the hard route's table: its window and its stretch
+ * end at the junction's merge, so its members line the branch (and the lead-in to it) and never the track after it.
+ */
+export function rideToMerge(route: HardRoute, riderIndex: number, ride: RideAhead): RideAhead {
+  const { table, mergeT } = route
+  const ahead = (table.s[indexAtT(table, mergeT)] - table.s[riderIndex] + table.length) % table.length
+  return { ...ride, window: ahead, until: ahead }
+}
 
 /** A group's centre lands this far inside the narrowest screen's half fov (`MIN_HORIZONTAL_FOV`), so the group's width fits. */
 const VIEW_HALF_ANGLE_COS = Math.cos((MIN_HORIZONTAL_FOV * 0.4 * Math.PI) / 180)
 /** No group or trackside slot leads the rider by more than this share of a lap. */
 const MAX_LEAD_SHARE = 0.75
 
-/** Where the rig looks from track sample `index`: its eye and unit look direction (cameraRig's look-ahead blend, unsmoothed). */
+/**
+ * Where the rig looks from track sample `index`: its eye (the rail point) and unit look direction (`seatPose`'s look,
+ * unsmoothed: on a rolling track the seats sit `EYE_HEIGHT` along the rails' up, which turns the look with the rails).
+ */
 export interface TrackView {
   index: number
   eye: Vec3
@@ -188,8 +243,51 @@ export interface TrackView {
 
 export function trackView(table: ArcTable, index: number, trackScale: number): TrackView {
   const eye = trackPoint(table, index)
-  const toAhead = normalize(sub(trackPoint(table, indexAhead(table, index, LOOK_AHEAD_UNITS * trackScale)), eye))
-  return { index, eye, dir: lookAheadDirection(trackTangent(table, index), toAhead, { x: 0, y: 0, z: 0 }) }
+  const aheadIndex = indexAhead(table, index, LOOK_AHEAD_UNITS * trackScale)
+  const toAhead = sub(trackPoint(table, aheadIndex), eye)
+  if (table.ups) {
+    const up = trackUp(table, index)
+    const upAhead = trackUp(table, aheadIndex)
+    const h = EYE_HEIGHT * trackScale
+    toAhead.x += h * (upAhead.x - up.x)
+    toAhead.y += h * (upAhead.y - up.y)
+    toAhead.z += h * (upAhead.z - up.z)
+  }
+  return { index, eye, dir: lookAheadDirection(trackTangent(table, index), normalize(toAhead), { x: 0, y: 0, z: 0 }) }
+}
+
+/**
+ * A spot counts as in the rider's frame this far inside the narrowest screen's frustum (`MIN_HORIZONTAL_FOV` across,
+ * `BASE_VERTICAL_FOV` up), so a small group round it still fits.
+ */
+const FRAME_MARGIN = 0.8
+const FRAME_TAN_ACROSS = FRAME_MARGIN * Math.tan((MIN_HORIZONTAL_FOV * Math.PI) / 360)
+const FRAME_TAN_UP = FRAME_MARGIN * Math.tan((BASE_VERTICAL_FOV * Math.PI) / 360)
+
+/** The rider's frame at a track sample: `trackView`'s look, with the rails' up turned square to it. */
+export interface RiderFrame extends TrackView {
+  right: Vec3
+  up: Vec3
+}
+
+export function riderFrame(table: ArcTable, index: number, trackScale: number): RiderFrame {
+  const view = trackView(table, index, trackScale)
+  let right = cross(view.dir, trackUp(table, index))
+  if (Math.hypot(right.x, right.y, right.z) < 1e-3) right = cross(view.dir, { x: 0, y: 0, z: 1 })
+  right = normalize(right)
+  return { ...view, right, up: cross(right, view.dir) }
+}
+
+/**
+ * Whether `p` is on the rider's screen from `frame`: in front, within `reach` and inside the frustum's margin, across and up
+ * along the rails' up (on a banked or climbing stretch that is not the world's). The wall swarm is placed with it; formations
+ * and trackside slots still use `inView`'s horizontal cone, which their placement and every level's pacing are tuned to.
+ */
+export function inRiderFrame(frame: RiderFrame, p: Vec3, reach: number): boolean {
+  const d = sub(p, frame.eye)
+  const depth = dot(d, frame.dir)
+  if (depth <= 0 || Math.hypot(d.x, d.y, d.z) > reach) return false
+  return Math.abs(dot(d, frame.right)) <= FRAME_TAN_ACROSS * depth && Math.abs(dot(d, frame.up)) <= FRAME_TAN_UP * depth
 }
 
 export function inView(view: TrackView, p: Vec3, reach: number): boolean {
@@ -263,14 +361,22 @@ export interface Placement {
 }
 
 /**
- * How a member moves once it has entered: the whole group on one XZ heading
- * (`atan2(dz, dx)`) so its shape holds, or bobbing at its slot. Absent: the enemy's own wander.
+ * How a member moves once it has entered: the whole group on one XZ heading (`atan2(dz, dx)`) so its shape holds,
+ * from when the rider comes within `startWithin` of the group's `anchor` (#472: a group placed far ahead would
+ * otherwise march off before the rider gets there), or bobbing at its slot. Absent: the enemy's own wander.
  */
-export type FormationMotion = { kind: 'march'; heading: number } | { kind: 'hold' }
+export type FormationMotion = { kind: 'march'; heading: number; anchor: Vec3; startWithin: number } | { kind: 'hold' }
 
 /** The group heading of a marching member, else undefined. */
 export function marchHeading(motion: FormationMotion | undefined): number | undefined {
   return motion?.kind === 'march' ? motion.heading : undefined
+}
+
+/** Whether a member may move from `eye`: false only while its group waits for the rider to reach it. */
+export function marchMoving(motion: FormationMotion | undefined, eye: Vec3): boolean {
+  if (motion?.kind !== 'march') return true
+  const { anchor } = motion
+  return Math.hypot(eye.x - anchor.x, eye.y - anchor.y, eye.z - anchor.z) <= motion.startWithin
 }
 
 /** An interior's walls and roof, already inset: every placement stays inside (the gym's hall, `BiomeDefinition.bounds`). */
@@ -287,6 +393,11 @@ export interface KeepOff {
   x: number
   z: number
   r: number
+}
+
+/** Whether `p` is `margin` or more outside every `keepOff` circle. */
+export function clearOfKeepOff(p: Vec3, keepOff: readonly KeepOff[], margin: number): boolean {
+  return keepOff.every((c) => Math.hypot(p.x - c.x, p.z - c.z) >= c.r + margin)
 }
 
 export function insideBounds(p: Vec3, b: PlacementBounds): boolean {
@@ -329,25 +440,30 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
   const reach = maxReadableDistance(type)
   const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
   const step = groupStep(table, formation, groups, ride)
-  const frames = new Map<number, FormationFrame>()
+  const frames = new Map<number, { f: FormationFrame; motion: FormationMotion | undefined }>()
   const frameFor = (group: number) => {
-    let f = frames.get(group)
-    if (!f) {
+    let framed = frames.get(group)
+    if (!framed) {
       const members = slots.filter((s) => s.group === group)
       const centre = members.reduce(
         (c, s) => ({ x: c.x + s.local.x / members.length, y: c.y + s.local.y / members.length, z: c.z + s.local.z / members.length }),
         { x: 0, y: 0, z: 0 },
       )
       const at = (origin?: FormationOrigin) => formationFrame(table, riderIndex, formation, group, ride, reach, step, origin, centre)
-      f = at(input.origin)
+      let f = at(input.origin)
       if (surface === 'water') f = findWater(at, input.origin ?? FORMATIONS[formation].origin, groundFn, f)
-      frames.set(group, f)
+      const anchor = slotWorld(formation, f, centre)
+      // `findWater` can carry a water group's anchor past `reach` of where the rider frames it (#739): start it from there all the same.
+      const there = trackView(table, indexAhead(table, riderIndex, group * step + ride.entry), ride.trackScale).eye
+      const startWithin = Math.max(reach, Math.hypot(anchor.x - there.x, anchor.y - there.y, anchor.z - there.z))
+      framed = { f, motion: formationMotion(formation, f, anchor, startWithin) }
+      frames.set(group, framed)
     }
-    return f
+    return framed
   }
 
   return slots.map((slot) => {
-    const f = frameFor(slot.group)
+    const { f, motion } = frameFor(slot.group)
     let local = slot.local
     let position = settle(slotWorld(formation, f, local), surface, groundFn)
     // A fish whose slot is on the shore closes in toward the wet group centre.
@@ -361,7 +477,7 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
       from: keepIn(outsideNearField(keepIn(from), camera)),
       spin,
       entrySeconds: ENTRY_SECONDS + (ENTRY_STAGGER * slot.index) / Math.max(1, slot.groupSize - 1),
-      motion: formationMotion(formation, f),
+      motion,
     }
   })
 }
@@ -449,13 +565,14 @@ function entryStart(
   }
 }
 
-function formationMotion(formation: ChoreographedFormation, f: FormationFrame): FormationMotion | undefined {
+/** `anchor`: the group centre its frame was checked in view of from where the rider will be, `startWithin` of that eye. */
+function formationMotion(formation: ChoreographedFormation, f: FormationFrame, anchor: Vec3, startWithin: number): FormationMotion | undefined {
   switch (formation) {
     case 'v':
-    case 'line':
-      return { kind: 'march', heading: Math.atan2(-f.forward.z, -f.forward.x) } // at the rider
-    case 'school':
-      return { kind: 'march', heading: Math.atan2(f.right.z * -f.sideSign, f.right.x * -f.sideSign) } // across the track
+    case 'line': // at the rider
+      return { kind: 'march', heading: Math.atan2(-f.forward.z, -f.forward.x), anchor, startWithin }
+    case 'school': // across the track
+      return { kind: 'march', heading: Math.atan2(f.right.z * -f.sideSign, f.right.x * -f.sideSign), anchor, startWithin }
     case 'ring':
       return { kind: 'hold' } // drifting off would break the hoop before the rider gets there
     case 'spiral':
@@ -512,11 +629,12 @@ export function tracksideSlots(count: number, surface: Surface, rng: Rng): Track
   })
 }
 
-/** Arc distance past the rider of a slot: a spread band stretched over the window, never past `MAX_LEAD_SHARE` of a lap. */
+/** Arc distance past the rider of a slot: a spread band stretched over the window, never past `MAX_LEAD_SHARE` of a lap or `until`. */
 export function tracksideAhead(table: ArcTable, surface: Surface, slot: TracksideSlot, ride: RideAhead): number {
   const { aheadMin, aheadMax, spread } = tracksideBand(surface)
   if (!spread) return slot.ahead
-  const span = Math.max(aheadMax - aheadMin, Math.min(ride.window, MAX_LEAD_SHARE * table.length - aheadMin))
+  const stretch = Math.max(aheadMax - aheadMin, Math.min(ride.window, MAX_LEAD_SHARE * table.length - aheadMin))
+  const span = ride.until === undefined ? stretch : Math.max(0, Math.min(stretch, ride.until - aheadMin))
   return aheadMin + ((slot.ahead - aheadMin) / (aheadMax - aheadMin)) * span
 }
 
@@ -533,13 +651,13 @@ export interface PlaceTracksideInput {
 }
 
 export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride, bounds, keepOff = [] }: PlaceTracksideInput): Vec3[] {
-  const { surface } = ENEMY_PLACEMENT[type]
+  const { surface, roam = 0 } = ENEMY_PLACEMENT[type]
   const reach = maxReadableDistance(type)
   return slots.map((slot) => {
     const at = { ahead: tracksideAhead(table, surface, slot, ride), side: slot.side }
     const p = surface === 'water'
       ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale)
-      : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale, bounds, keepOff)
+      : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale, bounds, keepOff, roam)
     const placed = outsideNearField(settle(p, surface, groundFn), camera)
     const out = surface === 'ground' ? groundedOutsideNearField(placed, camera, groundFn) : placed
     return bounds && !insideBounds(out, bounds) ? settle(clampToBounds(out, bounds), surface, groundFn) : out
@@ -578,7 +696,7 @@ const SIDE_SCALES = [1, 0.6, 0.35, 0]
  */
 function dryTracksidePoint(
   table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
-  bounds: PlacementBounds | undefined, keepOff: readonly KeepOff[],
+  bounds: PlacementBounds | undefined, keepOff: readonly KeepOff[], roam: number,
 ): Vec3 {
   const { sideMin } = TRACKSIDE.ground
   for (const scale of bounds ? SIDE_SCALES : [1]) {
@@ -592,7 +710,7 @@ function dryTracksidePoint(
   const around = bestFacingAround(table, riderIndex, slot, surface, groundFn, reach, trackScale, bounds)
   if (around && inViewOnApproach(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale)) return around
   // Not in an interior: its boulders and pieces stand on the floor, and nothing keeps a spot off them.
-  const looked = bounds ? null : whereTheApproachLooks(table, riderIndex, slot, surface, groundFn, reach, trackScale, keepOff)
+  const looked = bounds ? null : whereTheApproachLooks(table, riderIndex, slot, surface, groundFn, reach, trackScale, keepOff, roam)
   const aroundSeen = around ? looksInView(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale) : -1
   return (looked && looked.seen > aroundSeen ? looked.p : around) ?? clampToBounds(tracksidePoint(table, riderIndex, slot), bounds)
 }
@@ -604,19 +722,20 @@ const LOOK_SPOT_STEP = 100
 /**
  * A blind approach (#494: Desert's opening climb, pitched at the sky, the track beyond its crest dropping and turning
  * away): no spot near the slot's stretch of track is in view while the rider closes on it. The spot out along the look
- * from the middle of that approach instead, offset by the slot's side: off every rail and out of `keepOff`, at the
- * distance the most of the approach's looks see (`looksInView`; the nearest of equals). Null if none is.
+ * from the middle of that approach instead, offset by the slot's side: off every rail and `roam` (how far the enemy
+ * wanders from its spot, #708) out of `keepOff`, at the distance the most of the approach's looks see (`looksInView`;
+ * the nearest of equals). Null if none is.
  */
 function whereTheApproachLooks(
   table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
-  keepOff: readonly KeepOff[],
+  keepOff: readonly KeepOff[], roam: number,
 ): { p: Vec3; seen: number } | null {
   const { eye, dir } = trackView(table, indexAhead(table, riderIndex, Math.max(0, slot.ahead - VIEW_LEAD) + VIEW_HOLD), trackScale)
   const look = horizontal(dir)
   let best: { p: Vec3; seen: number } | null = null
   for (let d = LOOK_SPOT_FIRST; d < reach; d += LOOK_SPOT_STEP) {
     const p = { x: eye.x + look.x * d - look.z * slot.side, y: 0, z: eye.z + look.z * d + look.x * slot.side }
-    if (keepOff.some((c) => Math.hypot(p.x - c.x, p.z - c.z) < c.r)) continue
+    if (!clearOfKeepOff(p, keepOff, roam)) continue
     if (!clearOfTrack(table, p, TRACKSIDE.ground.sideMin)) continue
     const seen = looksInView(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)
     if (seen > (best?.seen ?? 0)) best = { p, seen }
@@ -788,14 +907,19 @@ function horizontal(v: Vec3): Vec3 {
   return len > 1e-9 ? { x: v.x / len, y: 0, z: v.z / len } : { x: 1, y: 0, z: 0 }
 }
 
-/** Views of the rider a swarm's wall is judged from, over the first part of its window. */
+/** Views of the rider each of a swarm's groups is judged from, over its part of the first share of the wave's window. */
 const SWARM_VIEWS = 6
-const SWARM_WINDOW_SHARE = 0.6
-/** Candidate centres along each wall, about this far apart. */
+const SWARM_WINDOW_SHARE = 0.9
+/**
+ * A swarm of at least twice `SWARM_GROUP_MIN` splits into up to `SWARM_GROUPS` groups, each round the spot the rider sees most
+ * over its own stretch of the window (#768): on level 6, beside the car up Alaska, then ahead of it over the dyno and the drop.
+ */
+const SWARM_GROUPS = 3
+const SWARM_GROUP_MIN = 4
+/** Candidate centres across and up each wall, about this far apart. */
 const SWARM_CANDIDATE_STEP = 80
-/** The rider must see the wall's face at least this square-on (the cosine): not edge-on. */
-const SWARM_MIN_FACING = 0.25
-
+/** The rider must see the wall's face at least this square-on (the cosine), not edge-on: a car climbing beside a wall sees it at a slant. */
+const SWARM_MIN_FACING = 0.15
 export interface PlaceSwarmInput {
   table: ArcTable
   riderIndex: number
@@ -805,52 +929,68 @@ export interface PlaceSwarmInput {
   ride: RideAhead
 }
 
-/**
- * A swarm's wall and its members' spots on it (#516): the centre, of a few along each wall, that the rider sees face-on
- * and within reading distance in the most views over the wave's window, the nearest at the first of them on a tie.
- */
-export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: PlaceSwarmInput): WallSlot[] {
-  if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
-  const reach = maxReadableDistance(type)
-  const views: TrackView[] = []
-  for (let j = 0; j < SWARM_VIEWS; j++) {
-    const ahead = ride.entry + (ride.window * SWARM_WINDOW_SHARE * j) / (SWARM_VIEWS - 1)
-    views.push(trackView(table, indexAhead(table, riderIndex, ahead), ride.trackScale))
-  }
+/** The spot on any wall the rider sees face-on, in frame and within reading distance in the most `views`; the nearest to the first on a tie. */
+function bestSwarmSpot(walls: readonly WallSurface[], views: readonly RiderFrame[], reach: number): { wall: WallSurface; u: number; v: number } {
   const spot = { x: 0, y: 0, z: 0 }
   let best = { wall: walls[0], u: walls[0].width / 2, v: walls[0].height / 2 }
   let bestSeen = -1
   let bestDist = Infinity
   for (const wall of walls) {
     const normal = wallNormal(wall)
-    const v = Math.min(wall.height / 2, Math.max(HOP.margin, wall.height * 0.4))
-    const steps = Math.max(1, Math.round(wall.width / SWARM_CANDIDATE_STEP))
-    for (let i = 0; i < steps; i++) {
-      const u = (wall.width * (i + 0.5)) / steps
-      wallPoint(wall, u, v, 0, spot, normal)
-      let seen = 0
-      for (const view of views) {
-        const d = sub(view.eye, spot)
-        const facing = (d.x * normal.x + d.y * normal.y + d.z * normal.z) / Math.max(1e-6, Math.hypot(d.x, d.y, d.z))
-        if (facing >= SWARM_MIN_FACING && inView(view, spot, reach)) seen++
-      }
-      const dist = Math.hypot(spot.x - views[0].eye.x, spot.y - views[0].eye.y, spot.z - views[0].eye.z)
-      if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) {
-        best = { wall, u, v }
-        bestSeen = seen
-        bestDist = dist
+    const across = Math.max(1, Math.round(wall.width / SWARM_CANDIDATE_STEP))
+    const span = wall.height - 2 * HOP.margin
+    const rows = Math.max(1, Math.round(span / SWARM_CANDIDATE_STEP))
+    for (let i = 0; i < across; i++) {
+      const u = (wall.width * (i + 0.5)) / across
+      for (let k = 0; k < rows; k++) {
+        const v = span > 0 ? HOP.margin + (span * (k + 0.5)) / rows : wall.height / 2
+        wallPoint(wall, u, v, 0, spot, normal)
+        let seen = 0
+        for (const view of views) {
+          const d = sub(view.eye, spot)
+          const facing = dot(d, normal) / Math.max(1e-6, Math.hypot(d.x, d.y, d.z))
+          if (facing >= SWARM_MIN_FACING && inRiderFrame(view, spot, reach)) seen++
+        }
+        const dist = Math.hypot(spot.x - views[0].eye.x, spot.y - views[0].eye.y, spot.z - views[0].eye.z)
+        if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) {
+          best = { wall, u, v }
+          bestSeen = seen
+          bestDist = dist
+        }
       }
     }
   }
-  const { wall } = best
-  const mu = Math.min(HOP.margin, wall.width / 2)
-  const mv = Math.min(HOP.margin, wall.height / 2)
-  return slots.map((s) => ({
-    wall,
-    u: Math.min(wall.width - mu, Math.max(mu, best.u + s.du)),
-    v: Math.min(wall.height - mv, Math.max(mv, best.v + s.dv)),
-    seed: s.seed,
-  }))
+  return best
+}
+
+/**
+ * A swarm's walls and its members' spots on them (#516): the members split into groups along the wave's window, each
+ * clustered round the spot its stretch of the ride sees most (`bestSwarmSpot`).
+ */
+export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: PlaceSwarmInput): WallSlot[] {
+  if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+  const reach = maxReadableDistance(type)
+  const groups = Math.max(1, Math.min(SWARM_GROUPS, Math.floor(slots.length / SWARM_GROUP_MIN)))
+  const stretch = (ride.window * SWARM_WINDOW_SHARE) / groups
+  const spots = Array.from({ length: groups }, (_, g) => {
+    const views: RiderFrame[] = []
+    for (let j = 0; j < SWARM_VIEWS; j++) {
+      const ahead = ride.entry + stretch * (g + j / (SWARM_VIEWS - 1))
+      views.push(riderFrame(table, indexAhead(table, riderIndex, ahead), ride.trackScale))
+    }
+    return bestSwarmSpot(walls, views, reach)
+  })
+  return slots.map((s, i) => {
+    const { wall, u, v } = spots[Math.floor((i * groups) / slots.length)]
+    const mu = Math.min(HOP.margin, wall.width / 2)
+    const mv = Math.min(HOP.margin, wall.height / 2)
+    return {
+      wall,
+      u: Math.min(wall.width - mu, Math.max(mu, u + s.du)),
+      v: Math.min(wall.height - mv, Math.max(mv, v + s.dv)),
+      seed: s.seed,
+    }
+  })
 }
 
 /**

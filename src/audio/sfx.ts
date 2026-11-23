@@ -1,13 +1,16 @@
 /** Every SFX goes through here: the arcade engine (`arcade/`), a lazy chunk loaded by the first `prepare`. */
 import * as THREE from 'three'
 import type { BiomeType } from '@/types/level'
+import { lazyChunk } from '@/core/staleBuild'
 import type { WeaponId } from '@/combat/weapons/weaponTypes'
 import { dropSound } from './soundGuard'
 import { spatial, type KillSound } from './sfxDesign'
 
+/** Where a sound plays from (`spatial`): its pan, the low-pass of its distance and its reverb send's multiplier. */
 export interface Placement {
   pan: number
   cutoffHz: number
+  wet: number
 }
 
 export interface VoiceStats {
@@ -38,9 +41,9 @@ export interface SfxEngine {
   frenzy(): void
   frenzyLift(on: boolean): void
   waveIncoming(): void
-  bossArrival(): void
-  bossHit(hpFraction: number): void
-  bossDefeat(): void
+  bossArrival(at: Placement | null): void
+  bossHit(hpFraction: number, at: Placement | null): void
+  bossDefeat(at: Placement | null): void
   fireworkWhistle(flightS: number, timeScale: number): void
   fireworkPop(): void
   /** The on-ride photo's flash (#701). */
@@ -54,6 +57,8 @@ export interface SfxEngine {
   chain(rate: number): void
   /** The car leaves the station: the launch whoosh. */
   rideLaunch(): void
+  /** A junction's switch thrown (#702): the points clunk over. */
+  trackSwitch(): void
   /** Long-lived nodes, the wind's and rumble's included: must not grow while playing. */
   nodeCount(): number
   /** e2e: kills since load that reached the audio engine (not throttled, not refused a voice). */
@@ -64,15 +69,14 @@ export interface SfxEngine {
 }
 
 type ArcadeModule = typeof import('./arcade/engine')
-let arcadeModule: Promise<ArcadeModule> | null = null
+const importArcade = lazyChunk(() => import('./arcade/engine'))
 
-/** Loaded on first use, after the first gesture. */
+/** Loaded on first use, after the first gesture; a failed load is tried again by the next `prepare` (#823). */
 export function loadArcade(): Promise<ArcadeModule> {
-  arcadeModule ??= import('./arcade/engine').then((m) => {
+  return importArcade().then((m) => {
     if (active === pendingArcade) active = m.arcadeSfx
     return m
   })
-  return arcadeModule
 }
 
 const silent = () => {}
@@ -81,7 +85,7 @@ export const silentSfx: SfxEngine = {
   prepare: () => Promise.resolve(),
   fire: silent, pickup: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, penalty: silent, frenzy: silent, frenzyLift: silent,
   waveIncoming: silent, bossArrival: silent, bossHit: silent, bossDefeat: silent,
-  fireworkWhistle: silent, fireworkPop: silent, shutter: silent, starChime: silent, ui: silent, countdown: silent, wind: silent, chain: silent, rideLaunch: silent,
+  fireworkWhistle: silent, fireworkPop: silent, shutter: silent, starChime: silent, ui: silent, countdown: silent, wind: silent, chain: silent, rideLaunch: silent, trackSwitch: silent,
   nodeCount: () => 0,
   killsPlayed: () => 0,
   voices: () => null,
@@ -107,7 +111,7 @@ export function prepareSfx(level: string | null, biome: BiomeType): Promise<void
 
 let listener: THREE.Camera | null = null
 const _local = new THREE.Vector3()
-const _placement: Placement = { pan: 0, cutoffHz: 20000 }
+const _placement: Placement = { pan: 0, cutoffHz: 20000, wet: 1 }
 
 export function setSfxListener(camera: THREE.Camera | null): void {
   listener = camera

@@ -5,7 +5,7 @@ import type { AtmosphereConfig } from '../atmosphere'
 import { TERRAIN_MESH_SEGMENTS, type HeightFunction } from '@/utils/terrainNoise'
 import { WATER_WAVE_GLSL } from './waterWaves'
 import { valueNoiseGlsl } from './noiseGlsl'
-import { SEABED_MAX_Y, SEABED_MIN_Y, seabedHeightTexels, waterGridCoords } from './waterSurface'
+import { SEABED_MAX_Y, SEABED_MIN_Y, WATER_COLOURS, seabedHeightTexels, waterGridCoords } from './waterSurface'
 
 /** 75-unit cells over the terrain, where the swell shows, then out past the camera's far plane (11000) to the horizon. */
 const WATER_GRID = waterGridCoords(3000, 80, 12000, 10)
@@ -103,7 +103,8 @@ diffuseColor.a = min(1.0, diffuseColor.a + glint);
 
 const fragmentFog = /* glsl */ `
 #ifdef USE_FOG
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, smoothstep(fogNear, fogFar, vFogDepth) * ${WATER_FOG_MAX.toFixed(2)});
+  float waterFog = smoothstep(fogNear, fogFar, vFogDepth) * ${WATER_FOG_MAX.toFixed(2)};
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, aerialFogColor(waterFog, vAerial), waterFog);
 #endif
 `
 
@@ -123,10 +124,10 @@ function createWaterMaterial(atmosphere: AtmosphereConfig, seabed: THREE.Texture
       uTime,
       uSeabed: { value: seabed },
       uSeabedGrid: { value: new THREE.Vector3(terrainSize / 2, terrainSize / TERRAIN_MESH_SEGMENTS, TERRAIN_MESH_SEGMENTS + 1) },
-      uShallowColor: { value: new THREE.Color(0x1fc4b4) },
-      uMidColor: { value: new THREE.Color(0x0b86a0) },
-      uDeepColor: { value: new THREE.Color(0x07306c) },
-      uFoamColor: { value: new THREE.Color(0xe6fbff) },
+      uShallowColor: { value: new THREE.Color(WATER_COLOURS.shallow) },
+      uMidColor: { value: new THREE.Color(WATER_COLOURS.mid) },
+      uDeepColor: { value: new THREE.Color(WATER_COLOURS.deep) },
+      uFoamColor: { value: new THREE.Color(WATER_COLOURS.foam) },
       uSunDir: { value: new THREE.Vector3(...atmosphere.sunDirection).normalize() },
       uSunColor: { value: new THREE.Color(atmosphere.sunLightColor) },
     })

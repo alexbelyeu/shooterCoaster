@@ -62,17 +62,17 @@ models only where the world needs a character nothing else gives.
 
 ## The checklist for a new world
 
-`npm run new-world -- <levelId> --name "<Name>" --biome <biome> [--interior] [--dry-run]` (#460) does
+`npm run new-world -- <levelId> --name "<Name>" --biome <biome> [--interior] [--score-from <levelId>] [--dry-run]` (#460) does
 every step marked **(script)** and prints the rest. `--dry-run` prints the plan and writes nothing; an id,
 biome or score that already exists is refused, so a second run changes nothing. The plan is pure in
-`scripts/newWorldPlan.mjs` (unit-tested); the biome templates are `scripts/new-world/{outdoor,interior}/`.
+`scripts/newWorldPlan.mjs` (unit-tested); the templates are `scripts/new-world/`: the biome files in `{outdoor,interior}/`, the atmosphere / terrain / reverb entries in `<kind>/registrations.ts`, the postcard stub in `postcard.tsx`, all real TS that the build typechecks and lint checks.
 
 1. Read `.claude/skills/shooter-coaster-level-design` (track extent formula, enemy scaling,
    z-fighting, terrain-following) and `docs/art/ENEMIES.md` (style).
 2. Biome. **(script)** `biomes/<biome>/` from the outdoor template (noise terrain, trees, seeded boulders
    beside the track, a stand-in spire) or the interior one (a flat `floor`, `bounds` inside a box hall
    (`HALL` in its `config.ts`), crates); `BIOME_TYPES` (`src/types/level.ts`: the one list of biome ids, which `BiomeType`, the terrain and particle tests and the turntable's `?biome=` read, #509), `biomeRegistry.ts`, the
-   `atmosphere.ts` preset, `BIOME_TERRAIN_CONFIGS` (`utils/terrainNoise.ts`; an interior's is flat and `authoredFloor`:
+   `atmosphere.ts` preset, `BIOME_TERRAIN_CONFIGS` (`utils/terrainNoise.ts`; an interior's is just `meshSize` and `authoredFloor: true`, which a test holds to its `floor`:
    `biomeHeightFunction` hands every caller its `floor`), `BIOME_REVERB` (`sfxDesign.ts`), a `theme.ts` accent and a `LevelPostcard`
    stub. **(by hand)** The look: palette, sky, light, fog, grade, the hero landmark in `Features.tsx`
    and its `hero` shot in `index.ts` (what the intro's 10 s tour passes on its way into the seat and the results orbit circles:
@@ -94,14 +94,31 @@ biome or score that already exists is refused, so a second run changes nothing. 
    `scores/index.ts`, with that score's key in `SCORE_KEYS`. **(by hand)** A theme round for Alex
    (`Listen:`); the winner replaces the copy and its `SCORE_KEYS` row.
 6. Gates. **(script)** A shard in `e2e/shards.mjs` and the `ci.yml` smoke matrix; `budgets.json`
-   `smokeSeconds.<id>` (the previous level's), `scene.<id>` and `pacing.<id>` as `placeholder`s that the
-   first local smoke of the level fills from what it measured (CI fails on a placeholder, with the numbers
-   to paste); `#about` in `index.html` (a line naming the world and its enemies, the world count in the
+   `smokeSeconds.<id>` (the previous level's), `scene.<id>` and `pacing.<id>` as `placeholder`s that
+   two clean local smokes of the level fill from the higher of what they measured (CI fails on a placeholder); `#about` in `index.html` (a line naming the world and its enemies, the world count in the
    copy and meta descriptions; `indexHtml.test.ts`). **(by hand)** Rewrite the `#about` line once the
    world has its enemies and landmark; a `docs/agents/STATE.md` row.
-7. Prove it **(by hand)**: `node e2e/smoke.mjs --shard <id>` (sets `scene.<id>`) and
-   `--steps pacing --levels <id>` (sets `pacing.<id>`); commit the budgets they wrote; look at the ride,
+7. Prove it **(by hand)**: `node e2e/smoke.mjs --shard <id>` twice (sets `scene.<id>`) and
+   `--steps pacing --levels <id>` twice (sets `pacing.<id>`); a run with any other problem records nothing
+   (`placeholder not set`), so fix it and run again; commit the budgets they wrote; look at the ride,
    enemy and combat shots; the turntable sheet for new enemies.
+
+## Set-pieces: tunnels
+
+A tunnel (#332) is data: `TrackParams.tunnels`, each `{ from: <track t>, length: <arc units> }` (level 1's
+`{ from: 0.18, length: 520 }` under the midway). Pure `src/track/setPieces.ts` `withTunnels` places it on the
+arc table, so clearance, the camera and the e2e hook read it from there; `tunnelGeometry.ts` builds the mesh
+and `TrackTunnels.tsx` draws it. `tunnelSpans` throws on (`setPieces.test.ts` places every level's tunnels, so `npm test` catches it):
+
+- **the seam**: a tunnel and its portals (`portalDepth` at each end) must sit inside one lap, never across t = 1;
+- **portal room**: the same margin at the track's start (`from` past `portalDepth` of arc);
+- **overlap**: two tunnels need two portals' depth of open track between them.
+
+Guidance: keep it short, about 2 s of ride at the speed the car has there (`ridePhysics.ts` `rideProfile`):
+nothing outside is shootable from inside the tube, so it is time with nothing to shoot, which the `pacing` gate counts against the level's
+`budgets.json` `pacing` ceilings (`longestGapSeconds`, `noTargetShare`). Put it between waves, not over one,
+and run `node e2e/smoke.mjs --steps pacing --levels <id>` after placing it. The `speed` step (the `level1-steps` shard) shoots the
+entry and the inside (`<id>-tunnel-entry.png`, `<id>-tunnel.png`).
 
 ## Candidate worlds (Director's ranking)
 

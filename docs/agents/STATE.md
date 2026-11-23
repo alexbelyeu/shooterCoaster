@@ -102,20 +102,24 @@ hardware are in #561.
 1. **Stutter on a modest laptop** (#561, P1): MacBook Neo, Safari, `low`: 104 hitches in two
    runs, bursts of 200–370 ms frames every ~0.4 s for ~9 s of each 60 s run, 0.7–1 s frames
    in the countdown and before the poster leaves. Cause unknown (#596, #597).
-2. **Level 6 isn't at Alex's bar** (#558, #583): too small for the ride, clean and bright, a
+2. **The Medusa's last weak point is out of view** (#856, P1; found 2026-11-23): since #769's
+   rebuilt gym ride, the crown snake sits above the frame and then behind the car through her
+   whole face-off, so the nightly's `boss level6` stays red (#707) until it is fixed. The step's
+   stale ride fraction is fixed in #857.
+3. **Level 6 isn't at Alex's bar** (#558, #583): too small for the ride, clean and bright, a
    painted-on fire, a round-faced Medusa, the ride beside the Tree instead of through it.
-3. **Bystander climbers unmerged** (#518, draft #555): blocked on `scene.level6` until this
+4. **Bystander climbers unmerged** (#518, draft #555): blocked on `scene.level6` until this
    week's Director PR.
-4. **Lanternflies aren't on level 6's walls yet** (#575): crows stand in for the swarm wave.
-5. Enemies still primitives up close: wisp, imp, golem (#463), the Kraken (#600), shark, drake.
-6. Level 6's blockout and track sit in the startup JS (~4.7 KB gz, #589).
-7. Smoke: settled steps can hold forever (#535 in #606); runner-dependent counts were fixed
+5. **Lanternflies aren't on level 6's walls yet** (#575): crows stand in for the swarm wave.
+6. Enemies still primitives up close: wisp, imp, golem (#463), the Kraken (#600), shark, drake.
+7. Level 6's blockout and track sit in the startup JS (~4.7 KB gz, #589).
+8. Smoke: settled steps can hold forever (#535 in #606); runner-dependent counts were fixed
    by #531 (#471 closed).
-8. **Telemetry endpoint dead** until Alex runs the migration (`docs/TELEMETRY.md`).
-9. Small visual bugs bundled in #333 (Kraken one-frame jump, frozen particles, eruption
+9. **Telemetry endpoint dead** until Alex runs the migration (`docs/TELEMETRY.md`).
+10. Small visual bugs bundled in #333 (Kraken one-frame jump, frozen particles, eruption
    carry-over); dust bunny hairs dip into the floor (#524); an escaped climber counts as a kill
    in the HUD (#480).
-10. Share / results / daily edge cases (#357, #374, #267) — P3 filler.
+11. Share / results / daily edge cases (#357, #374, #267) — P3 filler.
 
 ## Tech debt / architecture notes
 

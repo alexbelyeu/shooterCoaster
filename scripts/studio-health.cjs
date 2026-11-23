@@ -188,7 +188,7 @@ async function collect(api, now, workflowsDir) {
     prod,
     timeouts,
     openPrs: prs.map((p) => ({
-      number: p.number, title: p.title, labels: labelNames(p), created_at: p.created_at, updated_at: p.updated_at, labelledAt: p.labelledAt,
+      number: p.number, title: p.title, head: p.head.ref, labels: labelNames(p), created_at: p.created_at, updated_at: p.updated_at, labelledAt: p.labelledAt,
     })),
     openIssues: openItems.filter((i) => !i.pull_request).map((i) => ({
       number: i.number, title: i.title, labels: labelNames(i), created_at: i.created_at, fixMergedAt: i.fixMergedAt ?? null,

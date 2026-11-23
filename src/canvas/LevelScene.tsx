@@ -8,6 +8,7 @@ import { getTrackDimensions } from '@/track/trackDimensions'
 import { buildArcTable } from '@/track/arcLength'
 import { withTunnels } from '@/track/setPieces'
 import CoasterCamera from '@/track/CoasterCamera'
+import PhotoCamera from '@/track/PhotoCamera'
 import { rideModel } from '@/track/ridePhysics'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -22,16 +23,19 @@ import BulletPool from '@/combat/projectiles/BulletPool'
 import Pickups from '@/combat/pickups/Pickups'
 import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
+import { hardRouteFor, hardRouteOf } from '@/track/mechanics'
+import { sampleTrackXZ, setTrackOutline } from '@/track/trackOutline'
 import { goldenBalloonCount } from '@/levels/scoring'
-import { RUN_SECONDS } from '@/levels/pacing'
 import { eventBus } from '@/core/EventBus'
 import { BYSTANDER_HIT_EVENT, bystanderWarning, type BystanderHitEvent } from '@/combat/bystanders'
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
 import RidePhoto from './RidePhoto'
+import { RUN_SECONDS } from '@/levels/pacing'
 import { photoDistance } from '@/track/photoMarker'
 import LevelAudio from './LevelAudio'
+import { levelWeather } from '@/levels/environments/shared/weatherPulse'
 
 /** Projects 'enemy:killed' and bystander-hit 3D events to screen coords for HTML score popups */
 function KillProjector() {
@@ -94,6 +98,11 @@ export default function LevelScene({ levelId }: { levelId: string }) {
   const keepOff = useMemo(() => BIOMES[biome].keepOff?.(groundFn, trackTable), [biome, groundFn, trackTable])
   const speeds = useMemo(() => rideModel(track, trackTable), [track, trackTable])
   const photoAt = useMemo(() => photoDistance(trackTable, track.photo, speeds, RUN_SECONDS), [trackTable, track.photo, speeds])
+  const hardRoute = useMemo(() => hardRouteFor(curve, track.mechanics), [curve, track.mechanics])
+  useEffect(() => {
+    const hard = track.mechanics && hardRouteOf(curve, track.mechanics)
+    setTrackOutline(levelId, hard ? [sampleTrackXZ(curve), sampleTrackXZ(hard)] : [sampleTrackXZ(curve)])
+  }, [levelId, curve, track.mechanics])
   const color1 = useMemo(() => hexToRgb(track.color1), [track.color1])
   const color2 = useMemo(() => hexToRgb(track.color2), [track.color2])
 
@@ -104,11 +113,13 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         table={trackTable}
         trackScale={trackDims.trackScale}
         speeds={speeds}
+        mechanics={track.mechanics}
         heightOffset={trackDims.eyeHeight}
         hero={BIOMES[biome].hero}
         groundFn={groundFn}
         bounds={BIOMES[biome].bounds}
       />
+      <PhotoCamera groundFn={groundFn} bounds={BIOMES[biome].bounds} eyeHeight={trackDims.eyeHeight} />
       <ContactShadows groundFn={groundFn}>
         <TrackMesh
           curve={curve}
@@ -119,11 +130,16 @@ export default function LevelScene({ levelId }: { levelId: string }) {
           dims={trackDims}
           groundFn={groundFn}
           table={trackTable}
+          mechanics={track.mechanics}
         />
         <BiomeEnvironment
           biome={biome}
           groundFn={groundFn}
           track={trackTable}
+          speeds={speeds}
+          darkSections={track.darkSections}
+          weather={levelWeather(enemies)?.kind}
+          whale={environment.whale}
           hasWater={environment.hasWater}
           hasTrees={environment.hasTrees}
           treeCount={environment.treeCount}
@@ -141,15 +157,15 @@ export default function LevelScene({ levelId }: { levelId: string }) {
         trackTable={trackTable}
         groundFn={groundFn}
         boss={boss}
-        timerSeconds={RUN_SECONDS}
         rideSpeeds={speeds}
         trackScale={trackDims.trackScale}
         walls={walls}
         bounds={BIOMES[biome].bounds}
         keepOff={keepOff}
+        hardRoute={hardRoute}
       />
       <ShootingController />
-      <GameTimer seconds={RUN_SECONDS} />
+      <GameTimer />
       <KillProjector />
       <RidePhoto table={trackTable} at={photoAt} />
       <ShaderWarmup levelId={levelId} />

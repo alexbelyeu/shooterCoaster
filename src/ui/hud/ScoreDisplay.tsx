@@ -1,15 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { runBest, useGameStore } from '@/store/useGameStore'
+import { prefersReducedMotion } from '@/ui/reducedMotion'
 
 const fmt = new Intl.NumberFormat('en-US')
 /** Exponential approach rate (1/s): ~0.8 s to settle on a 500-point jump. */
 const TWEEN_RATE = 8
-const POP_KEYFRAMES: Keyframe[] = [
-  { transform: 'scale(1)' },
-  { transform: 'scale(1.16)', offset: 0.35 },
-  { transform: 'scale(1)' },
-]
-const POP_TIMING: KeyframeAnimationOptions = { duration: 280, easing: 'ease-out' }
+/** A point scored knocks the numbers down a notch, like a ticket counter's wheel clicking over. */
+const TICK_KEYFRAMES: Keyframe[] = [{ transform: 'translateY(-0.12em)' }, { transform: 'none' }]
+const TICK_TIMING: KeyframeAnimationOptions = { duration: 120, easing: 'ease-out' }
 
 /**
  * Score numerals that tween toward the store value. Never re-renders for score
@@ -27,17 +25,17 @@ export default function ScoreDisplay() {
     let target = shown
     let raf = 0
     let last = 0
-    let pop: Animation | null = null
+    let tick: Animation | null = null
     el.textContent = fmt.format(Math.round(shown))
 
-    const tick = (now: number) => {
+    const step = (now: number) => {
       const dt = last ? Math.min(0.25, (now - last) / 1000) : 1 / 60
       last = now
       shown += (target - shown) * (1 - Math.exp(-dt * TWEEN_RATE))
       if (Math.abs(target - shown) < 0.5) shown = target
       el.textContent = fmt.format(Math.round(shown))
       if (shown !== target) {
-        raf = requestAnimationFrame(tick)
+        raf = requestAnimationFrame(step)
       } else {
         raf = 0
         last = 0
@@ -48,26 +46,26 @@ export default function ScoreDisplay() {
       if (s.score === prev.score) return
       if (s.score < shown) shown = s.score // reset (new run): no counting down
       target = s.score
-      if (s.score > prev.score) {
-        pop?.cancel()
-        pop = el.animate(POP_KEYFRAMES, POP_TIMING)
+      if (s.score > prev.score && !prefersReducedMotion()) {
+        tick?.cancel()
+        tick = el.animate(TICK_KEYFRAMES, TICK_TIMING)
       }
-      if (!raf) raf = requestAnimationFrame(tick)
+      if (!raf) raf = requestAnimationFrame(step)
     })
 
     return () => {
       unsub()
       if (raf) cancelAnimationFrame(raf)
-      pop?.cancel()
+      tick?.cancel()
     }
   }, [])
 
   return (
     <div className="hud-score">
-      <span ref={valueRef} className="hud-score-value">
+      <span ref={valueRef} className="hud-score-value hud-number">
         0
       </span>
-      {best > 0 && <div className="hud-best">BEST {fmt.format(Math.round(best))}</div>}
+      {best > 0 && <div className="hud-best">Best {fmt.format(Math.round(best))}</div>}
     </div>
   )
 }

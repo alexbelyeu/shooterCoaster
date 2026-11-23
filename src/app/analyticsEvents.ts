@@ -1,14 +1,14 @@
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { RUN_SECONDS } from '@/levels/pacing'
-import { computeStars } from '@/levels/scoring'
-import type { GamePhase } from '@/types/game'
+import { runStars } from '@/levels/scoring'
+import type { GamePhase, RunFrom, RunMode } from '@/types/game'
 import { isInRun } from '@/store/startPhase'
-import type { RunMode } from '@/types/game'
 import type { ShareMethod } from '@/ui/share'
 
 /** At most 2 properties per event (Vercel Pro), no free text; keep docs/marketing/README.md in sync. */
 export type AnalyticsEvent =
-  | { name: 'level_start'; props: { level: string; mode: RunMode['mode'] } }
+  /** `from`: the screen that started it, `daily` for any Daily Run (it replaced `mode` within the cap, #329). */
+  | { name: 'level_start'; props: { level: string; from: RunFrom | 'daily' } }
   | { name: 'level_complete'; props: { level: string; stars: number } }
   /** `progress_pct`: share of the level timer used, floored to tens. */
   | { name: 'level_quit'; props: { level: string; progress_pct: number } }
@@ -27,6 +27,7 @@ export interface RunSnapshot {
   runId: number
   currentLevel: string | null
   runMode: RunMode
+  runFrom: RunFrom
   score: number
   timeRemaining: number
 }
@@ -43,12 +44,12 @@ export function analyticsEventFor(prev: RunSnapshot, next: RunSnapshot): Analyti
   const level = config.id
 
   if (isInRun(next.phase) && (newRun || !isInRun(prev.phase))) {
-    return { name: 'level_start', props: { level, mode: next.runMode.mode } }
+    return { name: 'level_start', props: { level, from: next.runMode.mode === 'daily' ? 'daily' : next.runFrom } }
   }
   if (next.phase === 'results' && prev.phase === 'playing') {
     return {
       name: 'level_complete',
-      props: { level, stars: computeStars(next.score, config.maxScore, config.starThresholds) },
+      props: { level, stars: runStars(next.score, config) },
     }
   }
   if (isInRun(prev.phase) && (next.phase === 'levelSelect' || next.phase === 'title')) {

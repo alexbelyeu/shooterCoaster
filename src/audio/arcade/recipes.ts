@@ -316,6 +316,15 @@ export const RECIPES: readonly Recipe[] = [
     partial(S, out, t, 180, { type: 'triangle', a: 0.001, tau: 0.03, peak: 0.6 })
     noise(S, out, t, { type: 'bandpass', f: 2500, q: 1.2, a: 0.0005, tau: 0.008, peak: 0.6 })
   } },
+  // A junction's switch (#702): the points thrown, a low iron clunk and the latch's clack after it.
+  { id: 'trackSwitch', lengthS: fixed(0.5), render(S, out, t) {
+    hitDrum(S, out, 'kick', t, 0.7)
+    partial(S, out, t, 95, { type: 'triangle', a: 0.002, tau: 0.09, peak: 0.7 })
+    partial(S, out, t, 610, { a: 0.001, tau: 0.035, peak: 0.35 })
+    noise(S, out, t, { type: 'bandpass', f: 900, q: 1.5, a: 0.001, tau: 0.03, peak: 0.5 })
+    partial(S, out, t + 0.09, 1450, { a: 0.0005, tau: 0.015, peak: 0.35 })
+    noise(S, out, t + 0.09, { type: 'bandpass', f: 3000, q: 1.2, a: 0.0005, tau: 0.01, peak: 0.45 })
+  } },
   // Countdown: Ready / Set on the tonic, GO an octave up with the fifth and a crash.
   { id: 'countReady', lengthS: fixed(0.35), render(S, out, t, b) {
     playInstrument(S, out, 'chip', t, 0.12, keyNote(b.key, 0, 1), 1)

@@ -1,10 +1,12 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { TrackCurve } from './curves/TrackCurve'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ShadowCaster } from '@/levels/environments/shared/contactShadows'
 import type { TrackDimensions } from './trackDimensions'
 import { type ArcTable, tAtDistance } from './arcLength'
 import { trackFrame } from './trackGeometry'
+import { getTunnelDims } from './setPieces'
 
 /**
  * Lattice support towers for the coaster.
@@ -15,16 +17,17 @@ import { trackFrame } from './trackGeometry'
  * stay cheap. Geometry is built in tower-local space with the top at y = 0
  * growing down (-y), x across the track and z along it.
  *
- * Every tower of a given height bucket shares one geometry (InstancedMesh). A
- * bucket's geometry is the top H units of the same infinite tower, so a tower
- * that needs height h < H is simply sunk into the ground by H - h — no Y-scaling.
+ * Every tower of a given height bucket uses one geometry: the top H units of the
+ * same infinite tower, so a tower that needs height h < H is simply sunk into the
+ * ground by H - h — no Y-scaling. `buildTowersGeometry` merges every placed tower
+ * into one mesh, one draw call for the whole track's towers (#806).
  */
 
 /** Width increase per unit of depth (total, across both sides). */
 const SPLAY = 0.09
 /** Panel height as a fraction of the tower width at the panel's top. */
 const PANEL_ASPECT = 1.35
-/** Max distinct tower heights (one InstancedMesh each). */
+/** Max distinct tower heights (one geometry built each). */
 export const HEIGHT_BUCKETS = 8
 /** Towers are skipped where the track is closer than this to the ground. */
 export const MIN_TOWER_HEIGHT = 5
@@ -111,7 +114,8 @@ export function towerTriangles(td: TowerDims, height: number): number {
  * Places towers along the track by arc length, at `dims.towerSpacing` or wider
  * if the triangle budget demands it. A candidate is skipped where the track is
  * < MIN_TOWER_HEIGHT above ground, or where its lattice would intersect another
- * part of the track passing underneath.
+ * part of the track passing underneath, or where the track is open (`gaps`: a jump's gap, a drop, #699), or
+ * where it would stand in a tunnel's tube or portals (#651: the tube's contact shadow grounds it instead).
  */
 export function planTowers(
   curve: TrackCurve,
@@ -119,13 +123,14 @@ export function planTowers(
   dims: TrackDimensions,
   heightFn: HeightFunction,
   groundFn: HeightFunction = heightFn,
+  gaps: readonly (readonly [number, number])[] = [],
 ): TowerPlan {
   const td = getTowerDims(dims)
   let spacing = dims.towerSpacing
-  let plan = planAtSpacing(curve, table, dims, td, heightFn, groundFn, spacing)
+  let plan = planAtSpacing(curve, table, dims, td, heightFn, groundFn, spacing, gaps)
   for (let i = 0; i < 6 && plan.triangles > TOWER_TRI_BUDGET; i++) {
     spacing *= (plan.triangles / TOWER_TRI_BUDGET) * 1.04
-    plan = planAtSpacing(curve, table, dims, td, heightFn, groundFn, spacing)
+    plan = planAtSpacing(curve, table, dims, td, heightFn, groundFn, spacing, gaps)
   }
   return plan
 }
@@ -138,6 +143,7 @@ function planAtSpacing(
   heightFn: HeightFunction,
   groundFn: HeightFunction,
   spacing: number,
+  gaps: readonly (readonly [number, number])[],
 ): TowerPlan {
   const point = new THREE.Vector3()
   const forward = new THREE.Vector3()
@@ -150,15 +156,18 @@ function planAtSpacing(
   // How close other track may come to a tower's lattice (rails + ties).
   const clearance = dims.railGauge + dims.railRadius + 1.5 * dims.trackScale
   const halfTop = td.topWidth / 2
+  const tunnelUp = getTunnelDims(dims.trackScale).centreUp
 
   const candidates: TowerInstance[] = []
   const count = Math.floor(table.length / spacing)
   for (let k = 0; k < count; k++) {
     const dist = (k + 0.5) * spacing
+    if (gaps.some(([from, to]) => dist >= from && dist <= to)) continue
     const t = tAtDistance(table, dist)
     trackFrame(curve, t, point, forward, right, up)
     // Rolled past 60° (an inversion, a steep bank, #698): a tower from the ground would run up through the rails.
-    if (up.y < MIN_TOWER_UP) continue
+    // A curve that doesn't roll keeps its towers on steep track (#715).
+    if (curve.getUpAt && up.y < MIN_TOWER_UP) continue
     // Spine bottom, directly under the rail centreline.
     center.copy(point).addScaledVector(up, -spineBottom)
     const cx = center.x
@@ -217,6 +226,7 @@ function planAtSpacing(
 
     const height = maxDepth + BURY
     if (piercesTrack(table, dist, cx, cz, topY, topY - maxDepth, td, clearance)) continue
+    if (piercesTunnel(table, cx, cz, topY, td, tunnelUp)) continue
 
     candidates.push({ x: cx, z: cz, topY, yaw, height, feet, bucket: 0 })
   }
@@ -281,6 +291,21 @@ function piercesTrack(
     const dx = table.x[i] - cx
     const dz = table.z[i] - cz
     if (dx * dx + dz * dz < reach * reach) return true
+  }
+  return false
+}
+
+/** True if the tower, from its top down, comes within a tunnel's reach of its tube's centre (`centreUp` above the rails). */
+function piercesTunnel(table: ArcTable, cx: number, cz: number, topY: number, td: TowerDims, centreUp: number): boolean {
+  for (const span of table.tunnels ?? []) {
+    for (let i = span.from; i <= span.to; i++) {
+      const tubeY = table.y[i] + centreUp
+      if (tubeY - span.reach > topY) continue
+      const reach = (widthAt(td, Math.max(0, topY - tubeY)) / 2) * Math.SQRT2 + span.reach
+      const dx = table.x[i] - cx
+      const dz = table.z[i] - cz
+      if (dx * dx + dz * dz < reach * reach) return true
+    }
   }
   return false
 }
@@ -473,6 +498,38 @@ export function buildTowerGeometry(td: TowerDims, height: number): THREE.BufferG
     }
   }
   return pb.build()
+}
+
+/**
+ * Every tower of the plan in world space, merged into one geometry (one draw call; it was one InstancedMesh per
+ * height bucket, 8 draws). Each tower is its bucket's geometry turned by its yaw and moved to its top; `aThick`'s
+ * direction turns with it, so the thickness floor still pushes outward.
+ */
+export function buildTowersGeometry(td: TowerDims, plan: TowerPlan): THREE.BufferGeometry | null {
+  if (plan.towers.length === 0) return null
+  const buckets = plan.bucketHeights.map((h) => buildTowerGeometry(td, h))
+  const parts: THREE.BufferGeometry[] = []
+  for (const t of plan.towers) {
+    const g = buckets[t.bucket].clone()
+    const cos = Math.cos(t.yaw)
+    const sin = Math.sin(t.yaw)
+    // Rotation about +y by yaw: x' = x cos + z sin, z' = -x sin + z cos (Matrix4.makeRotationY).
+    const turn = (a: THREE.BufferAttribute, x0: number, y0: number, z0: number) => {
+      for (let i = 0; i < a.count; i++) {
+        const x = a.getX(i)
+        const z = a.getZ(i)
+        a.setXYZ(i, x * cos + z * sin + x0, a.getY(i) + y0, -x * sin + z * cos + z0)
+      }
+    }
+    turn(g.attributes.position as THREE.BufferAttribute, t.x, t.topY, t.z)
+    if (g.attributes.normal) turn(g.attributes.normal as THREE.BufferAttribute, 0, 0, 0)
+    turn(g.attributes.aThick as THREE.BufferAttribute, 0, 0, 0)
+    parts.push(g)
+  }
+  const merged = mergeGeometries(parts)
+  for (const g of [...buckets, ...parts]) g.dispose()
+  merged.computeBoundingSphere()
+  return merged
 }
 
 /**

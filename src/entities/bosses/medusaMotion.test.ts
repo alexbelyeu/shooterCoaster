@@ -24,28 +24,31 @@ describe('Medusa spec', () => {
   })
 })
 
-describe('her rise, lean and defeat', () => {
+describe('her rise, lean, duck and defeat', () => {
   it('rises out of the hub small and lands out in front of the star at full size', () => {
     const p = { y: 0, z: 0, scale: 0, pitch: 0 }
-    bodyPlacement(0, 0, -1, p)
+    bodyPlacement(0, 0, 0, -1, p)
     expect(p).toMatchObject({ y: MEDUSA_RISE.from[1], z: MEDUSA_RISE.from[2], scale: MEDUSA_RISE.fromScale })
-    bodyPlacement(MEDUSA_RISE.riseS, 0, -1, p)
+    bodyPlacement(MEDUSA_RISE.riseS, 0, 0, -1, p)
     expect(p).toMatchObject({ y: 0, z: MEDUSA_BODY.out, scale: 1, pitch: 0 })
-    bodyPlacement(10, 1, -1, p)
+    bodyPlacement(10, 1, 0, -1, p)
     expect(p.z).toBe(MEDUSA_BODY.out + MEDUSA_RISE.leanOut)
     expect(p.pitch).toBeCloseTo(MEDUSA_RISE.leanPitch)
+    expect(p.y).toBe(0)
+    bodyPlacement(10, 0, 1, -1, p)
+    expect(p).toMatchObject({ y: -MEDUSA_RISE.duck, z: MEDUSA_BODY.out, pitch: 0 })
     expect(riseAmount(MEDUSA_RISE.riseS / 2)).toBeCloseTo(0.5)
   })
 
   it('laughs (head back, shaking), then sinks back into the hub', () => {
     const p = { y: 0, z: 0, scale: 0, pitch: 0 }
-    bodyPlacement(10, 1, 0.5, p)
+    bodyPlacement(10, 0, 1, 0.5, p)
     expect(p.pitch).toBeLessThan(0)
     expect(Math.abs(laughShake(0.05))).toBeGreaterThan(0)
     expect(laughShake(MEDUSA_DEFEAT.laughS + 0.1)).toBe(0)
     expect(laughShake(-1)).toBe(0)
     expect(defeatSink(MEDUSA_DEFEAT.laughS)).toBe(0)
-    bodyPlacement(10, 1, MEDUSA_DEFEAT.laughS + MEDUSA_DEFEAT.sinkS, p)
+    bodyPlacement(10, 0, 1, MEDUSA_DEFEAT.laughS + MEDUSA_DEFEAT.sinkS, p)
     expect(p).toMatchObject({ y: MEDUSA_RISE.from[1], z: MEDUSA_RISE.from[2], scale: MEDUSA_RISE.fromScale })
   })
 })

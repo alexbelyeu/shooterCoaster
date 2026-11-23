@@ -1,11 +1,11 @@
 /**
- * The on-ride photo's darkroom (#701): scales the captured frame and encodes its JPEG off the main thread, so neither
- * can land between the game's frames (on CI's headless Chromium the frame after the capture took 11–17 s while a
- * main-thread canvas did this). Answers each request with its run's JPEG, or null.
+ * The on-ride photo's darkroom (#701): encodes the snapshot's JPEG off the main thread, so it never lands between the
+ * game's frames. Answers each request with its run's JPEG, or null.
  */
 export interface DevelopRequest {
   runId: number
-  frame: ImageBitmap
+  /** RGBA, top row first (`GpuSnapshot.collect`). */
+  pixels: ArrayBuffer
   width: number
   height: number
   quality: number
@@ -19,19 +19,18 @@ export interface DevelopResult {
 }
 
 onmessage = async (e: MessageEvent<DevelopRequest>) => {
-  const { runId, frame, width, height, quality } = e.data
+  const { runId, pixels, width, height, quality } = e.data
   let blob: Blob | null = null
   try {
     const canvas = new OffscreenCanvas(width, height)
     const ctx = canvas.getContext('2d')
     if (ctx) {
-      ctx.drawImage(frame, 0, 0, width, height)
+      ctx.putImageData(new ImageData(new Uint8ClampedArray(pixels), width, height), 0, 0)
       blob = await canvas.convertToBlob({ type: 'image/jpeg', quality })
     }
   } catch {
     blob = null
   }
-  frame.close()
   const result: DevelopResult = { runId, blob, width, height }
   postMessage(result)
 }

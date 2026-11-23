@@ -6,6 +6,7 @@ const good = {
   touch: true,
   cores: 8,
   gpu: 'Adreno (TM) 640',
+  webgpu: true,
   contextLost: 0,
   errors: [{ message: 'boom', frame: 'f (/assets/index.js:1:2)', count: 2 }],
   levels: [{ level: 'level1', quality: 'auto', dpr: 1.5, frames: 3000, p50Ms: 16.75, p95Ms: 24.25, maxMs: 180, longFrames: 2 }],
@@ -20,6 +21,12 @@ describe('checkReport', () => {
     expect(checkReport({ ...good, levels: [older] })).toMatchObject({ ok: true, value: { levels: [{ ...older, maxMs: null, longFrames: null }] } })
   })
 
+  it('takes webgpu as yes, no or unknown, and a client from before #850 that sends none as unknown', () => {
+    for (const webgpu of [true, false, null]) expect(checkReport({ ...good, webgpu })).toMatchObject({ ok: true, value: { webgpu } })
+    const { webgpu: _, ...older } = good
+    expect(checkReport(older)).toEqual({ ok: true, value: { ...older, webgpu: null } })
+  })
+
   it('drops anything malformed, whole', () => {
     const bad: unknown[] = [
       null,
@@ -28,6 +35,8 @@ describe('checkReport', () => {
       { ...good, version: 'a b' },
       { ...good, touch: 1 },
       { ...good, cores: 0 },
+      { ...good, webgpu: 'yes' },
+      { ...good, webgpu: 1 },
       { ...good, gpu: 'x'.repeat(121) },
       { ...good, gpu: 'a\nb' },
       { ...good, contextLost: -1 },
@@ -123,8 +132,13 @@ describe('summarize', () => {
     ])
   })
 
+  it('counts the sessions whose browser could run WebGPU, could not, or did not say', () => {
+    const s = summarize([row({ webgpu: true }), row({ webgpu: true }), row({ webgpu: false }), row({ webgpu: null }), row({})], now)
+    expect(s.webgpu).toEqual({ yes: 2, no: 1, unknown: 2 })
+  })
+
   it('is empty for no rows', () => {
     const s = summarize([], now, false)
-    expect(s).toMatchObject({ sessions: 0, truncated: false, errors: [], frames: [], contextLost: { sessions: 0, gpus: [] } })
+    expect(s).toMatchObject({ sessions: 0, truncated: false, errors: [], frames: [], contextLost: { sessions: 0, gpus: [] }, webgpu: { yes: 0, no: 0, unknown: 0 } })
   })
 })

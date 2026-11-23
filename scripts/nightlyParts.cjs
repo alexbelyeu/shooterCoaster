@@ -9,20 +9,27 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
+const { INCONCLUSIVE } = require('./prod-alert.cjs')
+
 const TIMED_OUT = [124, 137]
 
 /**
  * parts: [{ name, exitCode (number, or null when the part left no exit code), results (array or null) }].
  * Exit code: 124 if any part hit the cap (prod-alert then says so and lists what failed), else 1 if any part is red,
- * else 0.
+ * else INCONCLUSIVE if a part failed only because production redeployed under it (#822), else 0.
  */
 function combine(parts, capMinutes) {
   const results = []
   let timedOut = false
   let red = false
+  let inconclusive = false
   for (const { name, exitCode, results: own } of parts) {
     if (Array.isArray(own)) results.push(...own)
     if (exitCode === 0) continue
+    if (exitCode === INCONCLUSIVE) {
+      inconclusive = true
+      continue
+    }
     if (TIMED_OUT.includes(exitCode)) {
       timedOut = true
       results.push({ id: `part ${name}`, ok: false, problems: [`stopped at the ${capMinutes} min cap${own ? '' : ' before it reported any result'}`] })
@@ -32,7 +39,7 @@ function combine(parts, capMinutes) {
       else if (!Array.isArray(own) || own.every((c) => c.ok)) results.push({ id: `part ${name}`, ok: false, problems: [`exited with code ${exitCode} before any check failed`] })
     }
   }
-  return { exitCode: timedOut ? 124 : red ? 1 : 0, results }
+  return { exitCode: timedOut ? 124 : red ? 1 : inconclusive ? INCONCLUSIVE : 0, results }
 }
 
 function readPart(dir, name) {

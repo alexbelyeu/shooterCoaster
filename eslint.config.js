@@ -20,10 +20,13 @@ const MATH_RANDOM_ALLOWED = [
   'src/testing/audioRender.ts',
 ]
 
+/** The game's code, and the new-world templates (scripts/new-world/) that `npm run new-world` copies into it. */
+const SRC = ['src/**/*.{ts,tsx}', 'scripts/new-world/**/*.{ts,tsx}']
+
 export default tseslint.config(
   { ignores: ['dist*/**', 'node_modules/**', 'e2e-results/**', 'docs/**', 'public/**'] },
   {
-    files: ['src/**/*.{ts,tsx}', 'api/**/*.ts'],
+    files: [...SRC, 'api/**/*.ts'],
     extends: [tseslint.configs.recommended],
     plugins: { sc },
     rules: {
@@ -31,25 +34,25 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: SRC,
     ignores: MATH_RANDOM_ALLOWED,
     rules: { 'sc/no-math-random': 'error' },
   },
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: SRC,
     ignores: ['src/**/*.test.ts'],
     rules: { 'sc/no-hot-path-alloc': 'error' },
   },
   {
     // The one writer of the store's timeScale / frenzy stage, and the store that declares them.
-    files: ['src/**/*.{ts,tsx}'],
+    files: SRC,
     ignores: ['src/**/*.test.ts', 'src/combat/slowMo.hot.ts', 'src/store/useGameStore.ts'],
     rules: { 'sc/one-slow-mo-writer': 'error' },
   },
   {
     // Placement maths (#546: a loop `const reach` hid the readable-range parameter of the same name and silently
     // switched off the trackside in-view flip). Clean here; the rest of src has older shadows to work through first.
-    files: ['src/entities/spawning/**/*.ts', 'src/levels/**/*.ts'],
+    files: ['src/entities/spawning/**/*.ts', 'src/levels/**/*.ts', 'scripts/new-world/**/*.ts'],
     rules: { '@typescript-eslint/no-shadow': 'error' },
   },
   {

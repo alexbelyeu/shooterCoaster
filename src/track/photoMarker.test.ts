@@ -3,12 +3,12 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { buildArcTable, distanceAtT } from './arcLength'
-import { rideProfile, rideSpeeds, riddenBetween } from './ridePhysics'
+import { rideModel, rideProfile, riddenBetween } from './ridePhysics'
 import { PHOTO_MAX_SIDE, PHOTO_RUN_SHARE, passedPhoto, photoDistance, photoSize } from './photoMarker'
 
 describe.each(getAllLevels().map((l) => [l.id, l.track] as const))('the on-ride photo on %s', (_id, track) => {
   const table = buildArcTable(createTrackCurve(track))
-  const speeds = rideSpeeds(track)
+  const speeds = rideModel(track, table)
   const at = photoDistance(table, track.photo, speeds, RUN_SECONDS)
   const profile = rideProfile(table, speeds, RUN_SECONDS)
 

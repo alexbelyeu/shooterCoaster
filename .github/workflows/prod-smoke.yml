@@ -3,8 +3,10 @@ name: Production smoke
 # Watches the live site (#352; e2e/README.md "Production"): after every deploy, the deploy health check
 # (e2e/prod-check.mjs, ~3 min); nightly, the full smoke: every step, so also the deep checks the PR shards leave
 # out (#372), as three parallel parts (e2e/shards.mjs NIGHTLY_PARTS, #570: one run outgrew its 60 min cap; e2e/shards.test.ts
-# holds the matrix to the parts and the parts to the full run) that the `nightly` job folds into one verdict. scripts/prod-alert.cjs reports each on its own
+# holds the matrix to the parts and the parts to the full run), plus `slow`, level1 and level3 again under cpu 4x (#539: the
+# long-frame trend in its artifact's throttle.json; it and `pacing` fail a shader compiled after the warm-up), that the `nightly` job folds into one verdict. scripts/prod-alert.cjs reports each on its own
 # agent:prod-broken issue, on green → red and red → green only. `timeout` turns a slow run into a reported timeout.
+# A part that failed while production redeployed under it is inconclusive (exit 3, #822): no alert either way.
 
 on:
   deployment_status:
@@ -89,7 +91,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [main, deep, pacing]
+        part: [main, deep, pacing, slow]
     runs-on: ubuntu-24.04
     timeout-minutes: 80
     env:
@@ -134,7 +136,7 @@ jobs:
           path: parts
       - name: Combine the parts
         id: check
-        run: node scripts/nightlyParts.cjs parts e2e-results main,deep,pacing >> "$GITHUB_OUTPUT"
+        run: node scripts/nightlyParts.cjs parts e2e-results main,deep,pacing,slow >> "$GITHUB_OUTPUT"
       - name: Report
         if: ${{ !cancelled() && steps.check.outcome == 'success' && !inputs.dry_run }}
         uses: actions/github-script@v7
@@ -145,6 +147,7 @@ jobs:
           script: |
             const run = require(`${process.env.GITHUB_WORKSPACE}/scripts/prod-alert.cjs`)
             await run({ github, context, core })
+      # 3: production redeployed mid-run, no single build tested (#822); the Report step warns, the job stays green.
       - name: Fail a red check
-        if: ${{ steps.check.outputs.exit_code != '0' }}
+        if: ${{ steps.check.outputs.exit_code != '0' && steps.check.outputs.exit_code != '3' }}
         run: exit 1

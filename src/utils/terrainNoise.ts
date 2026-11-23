@@ -90,7 +90,8 @@ function simplex2(x: number, y: number): number {
 
 // --- Terrain Config ---
 
-export interface TerrainConfig {
+/** An outdoor biome's noise terrain. */
+export interface NoiseTerrainConfig {
   /** Noise frequency (lower = larger features) */
   frequency: number
   /** Maximum amplitude in world units */
@@ -113,9 +114,16 @@ export interface TerrainConfig {
   transitionWidth: number
   /** Side length of the rendered terrain mesh (`getTerrainMeshSize`). */
   meshSize: number
-  /** An interior: its ground is the biome's own `BiomeDefinition.floor`, never this noise (`biomeHeightFunction`). */
-  authoredFloor?: true
 }
+
+/** An interior: its ground is the biome's own `BiomeDefinition.floor` (`biomeHeightFunction`), never noise; only the floor mesh's size. Exactly the biomes with a `floor` (terrainNoise.test.ts). */
+export interface AuthoredFloorConfig {
+  /** Side length of the rendered floor mesh (`getTerrainMeshSize`). */
+  meshSize: number
+  authoredFloor: true
+}
+
+export type TerrainConfig = NoiseTerrainConfig | AuthoredFloorConfig
 
 export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
   themePark: {
@@ -185,18 +193,8 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     transitionWidth: 900,
     meshSize: 12000,
   },
-  // The Climbing Gym draws the biome's `floor` (the hall's, with the Starr pit), never this: flat for 100 km.
+  // The Climbing Gym draws the biome's `floor` (the hall's, with the Starr pit), never noise.
   gym: {
-    frequency: 0.001,
-    amplitude: 1,
-    octaves: 1,
-    persistence: 0.5,
-    lacunarity: 2,
-    exponent: 1,
-    ridgeMode: false,
-    baseY: 0,
-    flatRadius: 100_000,
-    transitionWidth: 1,
     // The hall's length (`GYM_SCALE` × 80 m): its 20-unit cells put a grid line on the Starr pit's edge.
     meshSize: 2560,
     authoredFloor: true,
@@ -255,7 +253,7 @@ export function createHeightFunction(
   trackSamples?: TrackSample[],
 ): HeightFunction {
   const config = BIOME_TERRAIN_CONFIGS[biome]
-  if (config.authoredFloor) throw new Error(`${biome} has an authored floor: use biomeHeightFunction`)
+  if ('authoredFloor' in config) throw new Error(`${biome} has an authored floor: use biomeHeightFunction`)
 
   return (x: number, z: number): number => {
     const dist = Math.sqrt(x * x + z * z)

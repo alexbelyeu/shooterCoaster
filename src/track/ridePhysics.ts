@@ -1,6 +1,7 @@
 import { distanceAtT, indexAtT, tAtLoopDistance, type ArcTable } from './arcLength'
 import type { TrackCurve } from './curves/TrackCurve'
-import { buildRidePlan, PLAN_RATE, planDistance, planSpeed, planTimeAt, planZoneAt, type RidePlan } from './rideV2'
+import { buildRidePlan, PLAN_RATE, planDistance, planSpeed, planStopShare, planTimeAt, planZoneAt, type RidePlan } from './rideV2'
+import { checkMechanics, withMechanics } from './mechanics'
 import type { SpeedZone, TrackParams } from '@/types/level'
 
 /**
@@ -20,7 +21,7 @@ export interface RideSpeeds {
   roll: number
   min: number
   max: number
-  /** The v2 ride's plan: when set, the ride follows it and the fields above are unused. */
+  /** The v2 ride's plan: when set, the ride follows it and the fields above are 0, unused. */
   plan?: RidePlan
 }
 
@@ -32,10 +33,17 @@ export function rideSpeeds({ rollerSpeed, minRollerSpeed }: { rollerSpeed: numbe
   }
 }
 
-/** The level's ride: its v2 plan when it opts in, else today's rule. Cold: solves the plan (a few ms). */
+/**
+ * The level's ride: its v2 plan when it opts in (with its mechanics' zones and stops, #699), else today's rule, whose
+ * only mechanic is a junction (#702: no zones). Cold: solves the plan (a few ms).
+ */
 export function rideModel(track: TrackParams, table: ArcTable): RideSpeeds {
-  const speeds = rideSpeeds(track)
-  return track.ride === 'v2' ? { ...speeds, plan: buildRidePlan(table, track.rideV2 ?? {}) } : speeds
+  if (track.ride === 'v2') {
+    return { roll: 0, min: 0, max: 0, plan: buildRidePlan(table, withMechanics(track.rideV2 ?? {}, track.mechanics, table.length)) }
+  }
+  if (track.mechanics?.some((m) => m.kind !== 'junction')) throw new Error('ride mechanics need the v2 ride (track.ride: "v2")')
+  checkMechanics(track.mechanics)
+  return rideSpeeds(track)
 }
 
 /** Velocity after `frames` on track whose unit tangent rises by `tangentY`, clamped to the ride's speeds. */
@@ -86,6 +94,11 @@ export function rideZone(state: RideState, speeds: RideSpeeds): SpeedZone['kind'
   return speeds.plan ? planZoneAt(speeds.plan, state.time) : null
 }
 
+/** How far through a stop (a drop track's top, a turntable) the car is, -1 when moving; today's rule never stops. */
+export function rideStopShare(state: RideState, speeds: RideSpeeds): number {
+  return speeds.plan ? planStopShare(speeds.plan, state.time) : -1
+}
+
 /** Today's rule has no chain: climbing this steeply while held at its minimum speed is what pulls the car up. */
 const LIFT_MIN_CLIMB = 0.08
 
@@ -109,8 +122,33 @@ export function rideStepFrames(speeds: RideSpeeds, seconds: number): number {
   return speeds.plan ? seconds * 60 : Math.min(seconds * 60, MAX_RIDE_STEP_FRAMES)
 }
 
-/** Port of Camera.js updateCamGame: rides `frames` 60 fps frames in steps of at most `MAX_RIDE_STEP_FRAMES`. */
-export function advanceRide(state: RideState, curve: TrackCurve, speeds: RideSpeeds, frames: number): RideState {
+/** The rise of the track's unit tangent at track parameter `t`: what today's rule speeds up or slows down by. */
+export type TangentY = (t: number) => number
+
+/** The curve's own tangent (the live ride). */
+export function curveTangentY(curve: TrackCurve): TangentY {
+  return (t) => curve.getTangentAt(t).y
+}
+
+/** The tangent from the arc table's neighbouring samples (spawning's prediction: no curve evaluation per frame). */
+export function tableTangentY(table: ArcTable): TangentY {
+  const n = table.count - 1
+  return (t) => {
+    const i = indexAtT(table, t)
+    const a = (i - 1 + n) % n
+    const b = (i + 1) % n
+    const dx = table.x[b] - table.x[a]
+    const dy = table.y[b] - table.y[a]
+    const dz = table.z[b] - table.z[a]
+    return dy / (Math.hypot(dx, dy, dz) || 1)
+  }
+}
+
+/**
+ * Port of Camera.js updateCamGame: rides `frames` 60 fps frames in steps of at most `MAX_RIDE_STEP_FRAMES`. The one
+ * integrator: `CoasterCamera` rides it on the curve's tangent, `rideProfile` predicts the ride with it on the table's.
+ */
+export function advanceRide(state: RideState, tangentY: TangentY, speeds: RideSpeeds, frames: number): RideState {
   state.time += frames / 60
   if (speeds.plan) return followPlan(state, speeds.plan)
   let left = frames
@@ -118,7 +156,7 @@ export function advanceRide(state: RideState, curve: TrackCurve, speeds: RideSpe
     const step = Math.min(left, MAX_RIDE_STEP_FRAMES)
     left -= step
     state.progress = wrap01(state.progress + state.velocity * step)
-    state.velocity = nextVelocity(state.velocity, curve.getTangentAt(state.progress).y, step, speeds)
+    state.velocity = nextVelocity(state.velocity, tangentY(state.progress), step, speeds)
   } while (left > 0)
   return state
 }
@@ -138,10 +176,11 @@ export function lapSeconds(curve: TrackCurve, speeds: RideSpeeds, maxSeconds = 6
     return lap <= maxSeconds ? lap : Infinity
   }
   const state: RideState = { progress: 0, velocity: 0, time: 0 }
+  const tangentY = curveTangentY(curve)
   let travelled = 0
   for (let frame = 1; frame <= maxSeconds * 60; frame++) {
     const before = state.progress
-    advanceRide(state, curve, speeds, 1)
+    advanceRide(state, tangentY, speeds, 1)
     travelled += wrap01(state.progress - before)
     if (travelled >= 1) return frame / 60
   }
@@ -149,11 +188,12 @@ export function lapSeconds(curve: TrackCurve, speeds: RideSpeeds, maxSeconds = 6
 }
 
 /** Profile samples per second of level time. */
-const PROFILE_RATE = 10
+export const PROFILE_RATE = 10
 
 /**
- * Arc distance ridden at each tenth of a second of level time over `seconds`, from the start at rest:
- * the ride a run takes from GO at 60 fps (the level timer and the ride both run on game time).
+ * Arc distance ridden at each tenth of a second of level time over `seconds`, from the start at rest, if the ride kept
+ * pace with the level timer. It may fall behind: slow-mo (FRENZY) slows the ride and not the timer, and today's rule
+ * caps a hitch at `MAX_RIDE_STEP_FRAMES`. Spawning leaves slack for that (`RIDE_PACE_SLACK`).
  */
 export function rideProfile(table: ArcTable, speeds: RideSpeeds, seconds: number): Float64Array {
   const framesPerSample = 60 / PROFILE_RATE
@@ -162,24 +202,16 @@ export function rideProfile(table: ArcTable, speeds: RideSpeeds, seconds: number
     for (let k = 1; k < profile.length; k++) profile[k] = planDistance(speeds.plan, k / PROFILE_RATE)
     return profile
   }
-  const n = table.count - 1
-  let t = 0
-  let velocity = 0
+  const tangentY = tableTangentY(table)
+  const state: RideState = { progress: 0, velocity: 0, time: 0 }
   let ridden = 0
   for (let k = 1; k < profile.length; k++) {
     for (let f = 0; f < framesPerSample; f++) {
       // The track parameter isn't arc length (`TrigCurve`): measure the arc it moves through.
-      const from = distanceAtT(table, t)
-      t = (t + velocity) % 1
-      const step = distanceAtT(table, t) - from
+      const from = distanceAtT(table, state.progress)
+      advanceRide(state, tangentY, speeds, 1)
+      const step = distanceAtT(table, state.progress) - from
       ridden += step < 0 ? step + table.length : step
-      const i = indexAtT(table, t)
-      const a = (i - 1 + n) % n
-      const b = (i + 1) % n
-      const dx = table.x[b] - table.x[a]
-      const dy = table.y[b] - table.y[a]
-      const dz = table.z[b] - table.z[a]
-      velocity = nextVelocity(velocity, dy / (Math.hypot(dx, dy, dz) || 1), 1, speeds)
     }
     profile[k] = ridden
   }
@@ -191,7 +223,8 @@ export function riddenBetween(profile: Float64Array, from: number, to: number): 
   return Math.max(0, riddenAt(profile, to) - riddenAt(profile, from))
 }
 
-function riddenAt(profile: Float64Array, time: number): number {
+/** Arc distance ridden `time` seconds after GO, interpolated between the profile's samples. */
+export function riddenAt(profile: Float64Array, time: number): number {
   const x = Math.min(Math.max(time * PROFILE_RATE, 0), profile.length - 1)
   const i = Math.min(Math.floor(x), profile.length - 2)
   if (i < 0) return 0

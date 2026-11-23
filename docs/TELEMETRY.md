@@ -11,6 +11,9 @@ played a level for at least 60 frames, hit an error, or lost its WebGL context (
 
 - `version` (`<package version>+<commit>`), `touch` (coarse pointer), `cores` (`hardwareConcurrency`), `gpu`
   (the WebGL renderer string, 120 chars max);
+- `webgpu` (#850, for the WebGL vs WebGPU renderer decision): `true` when `navigator.gpu.requestAdapter()` hands out
+  an adapter, `false` when there is no `navigator.gpu`, no adapter, it throws or takes over 3 s, `null` when the check
+  had not answered by the beacon. Asked once per page load, never a device, nothing about the adapter itself;
 - `contextLost`: how many `webglcontextlost` events;
 - `errors`: up to 5 distinct uncaught errors / unhandled rejections from the game's own scripts, each its message
   (200 chars) and first stack frame (160 chars), URLs cut to their path, with a count;
@@ -32,6 +35,9 @@ CI, the smoke (`?e2e=1`), Alex's browsers (`?internal=1`) or the portal build.
   `key`, sessions, count, first / last seen, versions), `contextLost` (sessions, top GPUs), `frames` (per level ×
   `touch` / `desktop`: sessions, median of the sessions' p50 and p95, the worst p95, the longest frame any session reported (`worstMaxMs`) and
   the frames of 100 ms or more summed (`longFrames`); each null when no session reported it). No stored row is returned.
+- The summary's `webgpu` is `{ yes, no, unknown }` sessions; `unknown` takes reports from before #850 and every
+  row until the `0003` migration below has run (until then the API stores reports without the field: an insert or read
+  naming the missing column is retried once without it).
 - No env vars, a paused project or any database error: `503 { "error": "unavailable" }`.
 
 ## Who reads it
@@ -48,3 +54,6 @@ The leaderboard's setup already gave the function its env vars. Open the Supabas
 `{"sessions":0,…}` (200) instead of a 503 (a 503 while `/api/leaderboard` answers 200 means the table is missing:
 this step has not been run). When the free project pauses, both the leaderboard and telemetry answer
 503 until it is restored (docs/LEADERBOARD.md).
+
+Then `supabase/migrations/0003_telemetry_webgpu.sql` (#850), once, the same way: it adds the `webgpu` column.
+Check: the summary's `webgpu.yes` / `webgpu.no` start counting after it (the status page's "WebGPU available" line).

@@ -32,7 +32,7 @@
     <link rel="manifest" href="/site.webmanifest" />
     <!-- The poster's fonts and still (#376), fetched alongside the JS rather than after it. -->
     <link rel="preload" href="/fonts/lobster-latin-400.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/big-shoulders-latin-opsz.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/poster/title-portrait.webp" as="image" type="image/webp" media="(orientation: portrait)" />
     <link rel="preload" href="/poster/title-landscape.webp" as="image" type="image/webp" media="(orientation: landscape)" />
     <script type="application/ld+json">
@@ -92,8 +92,8 @@
         align-items: center;
         justify-content: center;
         background: rgba(0, 0, 0, 0.35);
-        color: #fff;
-        font-family: 'Inter', sans-serif;
+        color: #f6e7c1;
+        font-family: 'Big Shoulders', sans-serif;
         transition: opacity 0.3s ease-out;
       }
       #poster.has-ui .poster-title { opacity: 0; }
@@ -105,43 +105,61 @@
         margin-bottom: 0.5rem;
       }
       .poster-logo svg { display: block; max-width: 94vw; height: auto; overflow: visible; }
-      .poster-title .poster-tag {
-        font-size: clamp(0.9rem, 2.5vw, 1.1rem);
-        color: rgba(255, 255, 255, 0.7);
-        margin-bottom: 2rem;
+      /* The rest repeats the title's front in global.css (.title-tagline, .title-play, .title-row, .title-hint, .fair-*). */
+      .poster-title :is(.poster-tag, .poster-hint) {
+        text-shadow: -2px -2px 0 #1b110d, 0 -2px 0 #1b110d, 2px -2px 0 #1b110d, 2px 0 0 #1b110d, -2px 0 0 #1b110d,
+          -2px 2px 0 #1b110d, 0 2px 0 #1b110d, 2px 2px 0 #1b110d, 3px 4px 0 #1b110d;
       }
-      .poster-tag span { display: inline-block; margin-right: 0.4em; }
-      /* PLAY's place while the game loads: the button's size, with a light sweep. */
-      .poster-title .poster-play {
+      .poster-title .poster-tag {
+        height: 1.75rem;
+        margin-bottom: 1.75rem;
+        font-size: 1.375rem;
+        font-weight: 800;
+        font-variation-settings: 'opsz' 40;
+        line-height: 1.75rem;
+      }
+      .poster-tag span { display: inline-block; margin: 0 0.2em; }
+      /* The plates, drawn as the live ones; the hint says the game is still loading. */
+      .poster-title .poster-plate {
+        display: flex;
+        align-items: center;
+        justify-content: center;
         box-sizing: border-box;
-        min-height: 44px;
-        padding: 1rem clamp(1.5rem, 6vw, 3rem);
-        font: 700 1.2rem Arial, sans-serif;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        color: transparent;
-        border-radius: 50px;
-        background:
-          linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%) 0 0 / 300% 100%,
-          linear-gradient(135deg, #ffd700, #ff8c00);
-        opacity: 0.5;
-        animation: poster-sweep 1.6s ease-in-out infinite;
+        padding-top: 0.15em;
+        border-radius: 5px;
+        font-weight: 800;
+        font-variation-settings: 'opsz' 40;
+        line-height: 1;
+        background: #3a0a13;
+        box-shadow: 0 5px 0 #1b110d;
+      }
+      .poster-title .poster-play {
+        width: 12rem;
+        height: 4rem;
+        font-size: 2.1rem;
+        color: #1b110d;
+        background: #e9b53d;
+        box-shadow: 0 5px 0 #9a6414;
+      }
+      .poster-title .poster-row {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1.4rem;
+      }
+      .poster-title .poster-row .poster-plate {
+        width: 8.5rem;
+        height: 44px;
+        font-size: 1.3rem;
       }
       .poster-title .poster-hint {
+        height: 1.5rem;
         margin-top: 1.25rem;
-        font-size: 0.85rem;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        opacity: 0.7;
-        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-      }
-      @keyframes poster-sweep {
-        from { background-position: 100% 0, 0 0; }
-        to { background-position: 0 0, 0 0; }
+        font-size: 1.0625rem;
+        font-weight: 600;
+        line-height: 1.5rem;
       }
       @media (prefers-reduced-motion: reduce) {
         #poster, .poster-title { transition: none; }
-        .poster-title .poster-play { animation: none; }
       }
     </style>
   </head>
@@ -179,8 +197,12 @@
       <div class="poster-title">
         <div class="poster-logo"><svg viewBox="-32 52 1185 202" width="7.40625em" aria-hidden="true"><text x="0" y="200" font-family="Lobster, cursive" font-size="160" font-weight="700" fill="#fff" stroke="#14213d" stroke-width="12" stroke-linejoin="round" paint-order="stroke">ShooterCoaster</text><g transform="translate(1050 140)"><g><circle r="34" fill="#ff4757"></circle><circle r="22" fill="#fff"></circle><circle r="10" fill="#ff4757"></circle></g><g><path d="M0 -80V-66M0 66V80M-80 0H-66M66 0H80" stroke="#14213d" stroke-width="13" stroke-linecap="round"></path><path d="M0 -80V-66M0 66V80M-80 0H-66M66 0H80" stroke="#fff" stroke-width="5" stroke-linecap="round"></path></g></g><path d="M-20 232C300 236 700 232 960 232C1030 232 1105 200 1105 140A55 55 0 1 0 995 140C995 200 1040 238 1120 238" fill="none" stroke-linecap="round" stroke="#14213d" stroke-width="17"></path><path d="M-20 232C300 236 700 232 960 232C1030 232 1105 200 1105 140A55 55 0 1 0 995 140C995 200 1040 238 1120 238" fill="none" stroke-linecap="round" stroke="#ffc93c" stroke-width="7"></path><g transform="translate(1120 238) rotate(0)"><g stroke="#14213d" stroke-width="5"><circle cx="4" cy="-33" r="7" fill="#fff"></circle><rect x="-25" y="-28" width="50" height="22" rx="7" fill="#ff4757"></rect><circle cx="-13" cy="-5" r="5" fill="#14213d"></circle><circle cx="13" cy="-5" r="5" fill="#14213d"></circle></g></g></svg></div>
         <p class="poster-tag"><span>Ride.</span><span>Aim.</span><span>Shoot.</span></p>
-        <p class="poster-play">Play</p>
-        <p class="poster-hint">Loading</p>
+        <p class="poster-plate poster-play">Play</p>
+        <div class="poster-row">
+          <p class="poster-plate poster-worlds">Worlds</p>
+          <p class="poster-plate poster-settings">Settings</p>
+        </div>
+        <p class="poster-hint">Getting the ride ready.</p>
       </div>
     </div>
     <div id="root"></div>

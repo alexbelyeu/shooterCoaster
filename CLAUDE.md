@@ -21,21 +21,21 @@ anything else.
 npm ci                    # install
 npm run dev               # dev server (vite)
 npm test                  # vitest unit tests for pure modules (~1s; `npm run test:watch` to iterate)
-npm run lint              # ESLint + the repo's `sc/*` rules (scripts/eslint/)
-npm run build             # typecheck (tsc -b) + production build -> dist/
+npm run lint              # ESLint + the repo's `sc/*` rules (scripts/eslint/) + `scripts/uiTells.mjs` (fails when the UI's banned tells, docs/art/PERSONALITY.md "Never", go above `scripts/uiTells.baseline.json`)
+npm run build             # `npm run typecheck` (`tsc -b . scripts/new-world`: the game and the new-world templates, the one place that list is written) + production build -> dist/
 npm run build:portal      # the web-portal build (itch.io / Newgrounds / CrazyGames): relative paths, no analytics or share card -> dist-portal/ + dist-portal.zip (checked by scripts/portal/rules.mjs; needs the zip CLI)
 npm run check:bundle      # bundle-size budgets (budgets.json): total, largest chunk, and the startup JS (what index.html loads, `startupJsGzipKB`)
 npm run smoke             # headless playtest, the full run (the nightly's depth): title + every step on every level + the phone run (needs a build); `-- --shard <name>` runs one CI shard, the PR depth (e2e/shards.mjs)
 npm run smoke:portal      # smoke the portal build served under /nested/path/ (the title and level1's ride, shot and results, ~5 min; CI `portal` job, only on PRs touching the portal's inputs (`vite.config.ts`, `index.html`, `public/`, `scripts/portal/`, `package*.json`, `ci.yml`) and nightly on main, which then keeps the zip as the 30-day artifact `dist-portal`; needs build:portal)
 npm run prod-check -- --url https://scoaster.com   # deploy health check (#352; run after every production deploy by prod-smoke.yml): every built file served with its headers, /go + 404 routes, title, level1 to a kill, a phone run; needs a build (its file list), no --url serves dist/ the way vercel.json says
 npm run lighthouse        # Lighthouse on dist/ (vite preview), mobile + desktop: fails below SEO 100, Accessibility / Best Practices 95; Performance printed only (needs a build + SC_CHROME; e2e-results/lighthouse.json; docs/marketing/SEO.md)
-npm run verify            # test + lint + build + bundle budget + lighthouse + the full smoke; agents don't run it before pushing (builder.md step 7: test + lint + build + check:bundle + a narrow smoke) (CI's gate on every PR is its PR depth: parallel jobs, `unit + build`, `lighthouse` and one `smoke (<shard>)` each, then the required `verify` gate; a first `changes` job plans the run with `scripts/ciPlan.cjs`: a docs-only PR (`isDocsOnly`) skips the smoke and Lighthouse, and `unit + build` unless it touched `scripts/`, and still gets a green `verify`; e2e/README.md)
+npm run verify            # test + lint + build + bundle budget + lighthouse + the full smoke; agents don't run it before pushing (builder.md step 7: test + lint + build + check:bundle + a narrow smoke) (CI's gate on every PR is its PR depth: parallel jobs, `unit + build`, `lighthouse`, one `smoke (<shard>)` each and a `pacing (<level>)` per level the PR can change (#761), then the required `verify` gate; a first `changes` job plans the run with `scripts/ciPlan.cjs`: a docs-only PR (`isDocsOnly`) skips the smoke and Lighthouse, and `unit + build` unless it touched `scripts/`, and still gets a green `verify`; e2e/README.md)
 bash scripts/quiet.sh <cmd>    # run any noisy command with its output in a log file: prints status (+ failures and tail on error)
 npm run og                # re-render the share card public/social/og-1200x630.jpg (a level-1 frame under the title logo) and the title posters public/poster/*.webp (needs a build) + the icons from public/favicon.svg (favicon.ico, apple-touch-icon, manifest icons/; `-- --icons` for just those, no build; `-- --poster` for just the posters, `-- --card` for just the share card)
 npm run clip              # render the level-1 gameplay clip (MP4 + stills) to docs/marketing/media/ in virtual time, the GIF to e2e-results/clip/ (needs a build + ffmpeg, ~15 min; `-- --level <id>` for another level; the vertical cut: `-- --size 720x1280 --ride-only --seconds 16.4`; the title alone: `-- --title --seconds 9` (`--attract` for attract mode); the level's intro tour before its ride: `-- --tour --from 0`; a quick review clip of one stretch, no menus: `-- --level level6 --from 0.13 --seconds 6 --direct --quality low`; re-render policy in docs/marketing/media/README.md)
-npm run new-world -- <levelId> --name "<Name>" --biome <biome> [--interior] [--dry-run]   # scaffold a new world (#460): biome files from scripts/new-world/<outdoor|interior>/, the level (a starter roster), every registration and gate (scene / pacing budgets as placeholders the first local smoke fills), then prints what is left by hand (docs/LEVEL-KIT.md); refuses an existing id
-npm run turntable         # enemy turntable (#380): every enemy + boss up close under studio light -> e2e-results/turntable/ sheet.png, <id>-angles.png (front / side / back / 3/4), <id>-motion.png (4 frames over a cycle), results.json; builds dist-turntable/ (`-- --skip-build`, `--only crow,kraken`, `--biome ocean`); the page is turntable.html (`npm run dev` serves it: `?enemy=<id>`, `&animate=1`, `?yaw=`, `?biome=`), never in the game's build; CI's `turntable` workflow uploads it on PRs touching src/entities/** or death styles; `-- --rides` renders the ride elements strip instead (#698: `rides.png`, the demo circuit's loop, zero-g roll, corkscrew… from the seat and a shot hit upside down; the page is rides.html, `src/dev/rides/`)
-npm run audio:render -- --music <title|level1..5> | --sfx-sheet [--level id] | --mix <level> [--boss] | --ride <level> | --launch <level>   # offline render of the game's sound → docs/audio/renders/<name>.{mp3,json,png} (needs a build + ffmpeg, ~20 s); (--music also takes results and a theme option `<slot>.<name>`; `--seam` starts 10 s before the loop seam; `--layers 0..3|ramp` plays the score's intensity layers); a --mix also renders its music alone to measure each kill against (and its seams on); `--boss` adds the boss's arrival and defeat, the score's boss section and sting, 30 s; `--ride` is the ride's own sounds (GO's launch whoosh, a chain lift, the drop's wind and rail rumble to top speed); `--launch` is level select's launch blip with the level's bank and room landing under it, checked for a click at the swap
+npm run new-world -- <levelId> --name "<Name>" --biome <biome> [--interior] [--score-from <levelId>] [--dry-run]   # scaffold a new world (#460): biome files and registry entries from the templates in scripts/new-world/ (real TS, typechecked and linted; the plan is pure in scripts/newWorldPlan.mjs), its music score copied from `--score-from` (default level1), the level (a starter roster), every registration and gate (scene / pacing budgets as placeholders the first local smoke fills), then prints what is left by hand (docs/LEVEL-KIT.md); refuses an existing id
+npm run turntable         # enemy turntable (#380): every enemy + boss up close under studio light -> e2e-results/turntable/ sheet.png, <id>-angles.png (front / side / back / 3/4), <id>-motion.png (4 frames over a cycle), results.json; builds dist-turntable/ (`-- --skip-build`, `--only crow,kraken`, `--biome ocean`); the page is turntable.html (`npm run dev` serves it: `?enemy=<id>`, `&animate=1`, `?yaw=`, `?biome=`), never in the game's build; CI's `turntable` workflow uploads it, with `rides.png` from `--rides` in `rides/`, on PRs touching src/entities/**, src/track/** or the dev pages, and goes red when either fails; `-- --rides` renders the ride elements strip instead (#698: `rides.png`, the demo circuit's loop, zero-g roll, corkscrew… from the seat and a shot hit upside down, then the special mechanics' circuit (#699): station launch, jump gap, drop track, backwards and a shot hit facing back; the page is rides.html, `src/dev/rides/`)
+npm run audio:render -- --music <title|level1..5> | --sfx-sheet [--level id] | --mix <level> [--boss] | --ride <level> | --launch <level> | --resume <level> [--unpaused]   # offline render of the game's sound → docs/audio/renders/<name>.{mp3,json,png} (needs a build + ffmpeg, ~20 s); (--music also takes `results-win` / `results-lose`, the results screen's two cuts, and a theme option `<slot>.<name>`; `--seam` starts 10 s before the loop seam; `--layers 0..3|ramp` plays the score's intensity layers); a --mix also renders its music alone to measure each kill against (and its seams on); `--boss` adds the boss's arrival and defeat, the score's boss section and sting, 30 s; `--ride` is the ride's own sounds (GO's launch whoosh, a chain lift, the drop's wind and rail rumble to top speed); `--launch` is level select's launch blip with the level's bank and room landing under it, checked for a click at the swap; `--resume` is a paused run's resume Ready / GO with the pause gate opening at GO (`--unpaused`: the same without the pause, which it should match)
 npm run audio:render -- --score <file.scrim|vendored:1..6> [--engine port|original]          # one score alone through the port or the original Scrimshaw page (parity renders); --chain game plays a score file through the game's music chain
 npm run audio:check -- <file.wav|mp3> [--kind music|mix|sfx] [--seam s] [--click s] [--music stem.wav] [--strict]  # loudness, true peak, clipping, bands, seams, clicks at a cut, gun tail, kill over music vs the sound bible's targets
 ```
@@ -61,13 +61,13 @@ The smoke has two depths (#372). On a PR, CI runs the rendering and integration 
 (`e2e/shards.mjs`: the UI steps, the ride and combat on every level, level1's frozen shot, results screen, quality
 and speed, the phone run's touch play), each under a `smokeSeconds` budget in `budgets.json` (over it is a warning; on CI the shard
 fails only past 1.5x it: `level3 shard took 11.0 min, budget 7.0, fails past 10.5`; a level shard's budget is scaled up, at most 2x, on a runner whose ride rendered
-slower than a normal one's, `e2e/shardTime.mjs`). The deep checks (full boss fights, waves, FRENZY end, initials entry,
+slower than a normal one's, `e2e/shardTime.mjs`). The deep checks (full boss fights, waves, the weather pulses, level 1's Night Ride, FRENZY end, initials entry,
 share, daily, pause, countdown, pickups, scrim, the phone menus, and `pacing`: every level's whole run, failing a level whose
 time with nothing to shoot is over its `budgets.json` `pacing` ceilings, `e2e-results/pacing.json`; game logic among them has unit tests next to its
-pure module) run in the full smoke, nightly on production (`prod-smoke.yml`, as three parallel parts, `--nightly-part <main|deep|pacing>`; a red one opens `agent:prod-broken`).
+pure module) run in the full smoke, nightly on production (`prod-smoke.yml`, as three parallel parts, `--nightly-part <main|deep|pacing>`, plus `slow`, level1 and level3's ride + results under cpu 4x (#539); a red one opens `agent:prod-broken`).
 Every level's ride and `pacing` line ends with `programs after warm-up: +N` (shaders `ShaderWarmup` missed, with the moment
-each appeared; reported, not failed, #536), and `--cpu-throttle 4` runs the ride under CDP CPU throttling, adding the longest
-frame and the frames over 100 ms per level; `--level-chunk-delay <ms>` serves the lazy level chunk that late (every step waits for `levelReady()`, #464). A red `smoke (<shard>)` check names the shard: reproduce it with
+each appeared, #536; the nightly's `slow` and `pacing` parts, or `--gate-programs`, fail a level with one, PR shards only report it), and `--cpu-throttle 4` runs the ride under CDP CPU throttling, adding the longest
+frame and the frames over 100 ms per level (`e2e-results/throttle.json`); `--level-chunk-delay <ms>` serves the lazy level chunk that late (every step waits for `levelReady()`, #464). A red `smoke (<shard>)` check names the shard: reproduce it with
 `node e2e/smoke.mjs --shard <name>`, a nightly failure with its step (`--steps` / `--levels` pick any subset); its screenshots are the run's
 `e2e-results-<shard>` artifact. A new level needs a shard and a budget (`e2e/shards.test.ts` fails until then).
 `drawCalls`/`triangles` vary with the camera: compare levels with the `scene` totals the
@@ -80,7 +80,7 @@ smoke step checks, or when a failure needs more than its summary line.
 
 React 19 + @react-three/fiber 9 + drei + @react-three/postprocessing, three 0.172,
 Web Audio (procedural music and SFX, no audio library), zustand (state),
-framer-motion (UI), Vite 6, TypeScript strict. Fonts (Lobster, Inter) are self-hosted from `public/fonts/` (OFL); the game makes no
+framer-motion (UI), Vite 6, TypeScript strict. Fonts (Ultra, Big Shoulders; Lobster for the logo) are self-hosted from `public/fonts/` (OFL, Ultra Apache 2.0); the game makes no
 third-party request at runtime. `vite build --mode portal` (`build:portal`) is the same game with `base: './'` for web portals. Deployed on Vercel: every push to
 `main` goes to production at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it). Preview deployments
 are disabled (`git.deploymentEnabled` in `vercel.json`) — verification happens in CI. `vercel.json` rewrites only
@@ -104,7 +104,7 @@ and never with `?e2e=1` (`src/app/analyticsGate.ts`), so dev, `vite preview`, CI
 smoke tests send nothing. `?internal=1` marks a browser internal (localStorage flag, stripped
 from the URL; `?internal=0` clears it, any other value is ignored; the title's Settings has the same flag as an "Internal device" toggle, from the next load): it sends nothing either, via the same gate and a
 `beforeSend` that drops every page view and event while the flag is set. `applyInternalParam` decides once per page
-load and the title's "internal: not tracked" marker reads that decision (`isInternalThisLoad`), so it shows even when
+load and the title's "Internal device, not tracked" marker reads that decision (`isInternalThisLoad`), so it shows even when
 storage can't be written. Campaign links use landing paths `/go/<campaign>` (the catch-all rewrite serves the game there;
 never redirect them, the page view's path is the attribution).
 
@@ -117,6 +117,7 @@ and read those rows before changing code there; don't read it whole. Areas: `src
 ## Skills in this repo
 
 `.claude/skills/` has project knowledge — use it:
+- **`docs/art/PERSONALITY.md` — read before touching any UI** (screens, HUD, share card, store art): the game's own look, type, motion and voice (the travelling fair's shooting gallery), the shared `src/ui/Fair.tsx` pieces, and the tells that are banned.
 - `shooter-coaster-level-design` — **read before touching levels, enemies, decorations, terrain or landmarks.** It encodes hard-won rules (track extent formula, enemy scaling, z-fighting, terrain-following).
 - `threejs-*` — three.js reference for materials, shaders, lighting, postprocessing, etc.
 - `workflow-orchestration` — plan → execute → verify discipline.
@@ -148,7 +149,8 @@ subagents, weighted tokens / turns / peak context per agent).
 
 ## Hard rules (all agents, always)
 
-1. `main` must always build, pass `npm run verify`, and be playable. Never merge red.
+1. `main` must always build, pass CI's `verify` (the PR-depth smoke shards, unit + build, Lighthouse), and be playable. Never merge red.
+   The full smoke runs nightly on production (`prod-smoke.yml`); a red one opens `agent:prod-broken` and is P1.
 2. Never force-push, rewrite history, or push directly to `main`. All changes go through PRs. Agents never merge: approval is the `agent:qa-approved` label and GitHub auto-merges (see PROTOCOL.md).
 3. Never delete or disable an existing level, mode or feature without a playable replacement in the same PR.
 4. No new paid services, accounts, API keys or secrets. No secrets in code. No new third-party network calls at runtime without a DECISIONS.md entry.

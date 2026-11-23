@@ -25,7 +25,7 @@
 ### B. **Code (17.1%)**
 
 - **~14.3 MB** in compiled code / script / baseline instruction stream.
-- Normal for a React + Three + Tone.js app; no direct fix, but it underlines that **reducing bundle size and lazy loading** will help both parse time and memory.
+- Normal for a React + Three app (the snapshot predates #416, when the audio was still Tone.js); no direct fix, but it underlines that **reducing bundle size and lazy loading** will help both parse time and memory.
 
 ---
 
@@ -33,13 +33,13 @@
 
 - **Object:** ~10.4 MB  
 - **Array:** ~10.1 MB (including “(object elements)”)
-- **Cause:** Large object graphs: React tree, Three.js scene graph, Tone.js graph, store/state.
+- **Cause:** Large object graphs: React tree, Three.js scene graph, the Web Audio graph, store/state.
 - **Impact:** More objects ⇒ more GC work and pointer chasing; can hurt cache and frame time.
 
 **Actions:**
 
 - Prefer **fewer, larger components** and **instancing** instead of many small objects (see trees below).
-- Avoid retaining big structures unnecessarily (e.g. detach Tone nodes when not playing, dispose Three.js resources on unmount).
+- Avoid retaining big structures unnecessarily (e.g. disconnect Web Audio nodes once they stop, dispose Three.js resources on unmount).
 
 ---
 
@@ -48,12 +48,12 @@
 - **ArrayBuffer:** ~491 KB (constructor name)  
 - **Float32Array:** ~370 KB  
 - **Native JSArrayBufferData:** three × **~1.27 MB** each ⇒ **~3.8 MB** in a few chunks.
-- **Cause:** Likely **audio buffers** (Tone.js/Web Audio) and/or **Three.js geometry buffers** (positions, normals, colors).
+- **Cause:** Likely **audio buffers** (Web Audio) and/or **Three.js geometry buffers** (positions, normals, colors).
 - **Impact:** Fixed cost; acceptable if buffers are created once and reused. Problematic if buffers are recreated every frame or never released.
 
 **Actions:**
 
-- Ensure **Tone.js** synths/players are created once and reused; dispose when changing level/screen.
+- Audio buffers are baked once per level: `src/audio/arcade/bake.ts` renders every SFX into AudioBuffers when the level loads, and a sound plays them back, never rebuilds them.
 - Ensure **Three.js** geometries and textures are **disposed** when no longer needed (`geometry.dispose()`, etc.).
 - Avoid creating new `Float32Array`/ArrayBuffers in hot paths (e.g. per-frame).
 
@@ -84,19 +84,21 @@
 
 - **Reuse** vectors/quaternions (e.g. `useRef(new THREE.Vector3())`, `useRef(new THREE.Quaternion())`) instead of `new THREE.Vector3()` in loops or every frame.
 - **TrackMesh** already uses many `new THREE.Vector3()` etc. inside `buildTrackGeometry`; that runs once per curve, so acceptable. Prefer reuse in `useFrame` and other per-frame logic.
-- **Lint (#461):** `sc/no-hot-path-alloc` fails `new`, object / array literals, spreads, closures, template strings, `Array.from` and `.map/.filter/.slice/.concat/.flat/.clone()` inside a `useFrame` callback and inside any function of a `*.hot.ts` module. Per-frame helpers live in `*.hot.ts` files (`bulletMotion`, `comboRuntime`, `slowMo`, `screenShake`, `cameraRig`, `cameraFov`, `rideProgress`, `titleCamera`, the rat, dust bunny, scorpion, yeti and titan motion) with their scratch objects at module scope; a once-per-mount factory or a guarded cold branch carries `// eslint-disable-next-line sc/no-hot-path-alloc -- <why>`.
+- **Lint (#461):** `sc/no-hot-path-alloc` fails `new`, object / array literals, spreads, closures, template strings, `Array.from` and `.map/.filter/.slice/.concat/.flat/.clone()` inside a `useFrame` callback and inside any function of a `*.hot.ts` module. Per-frame helpers live in `*.hot.ts` files (`bulletMotion`, `comboRuntime`, `slowMo`, `screenShake`, `cameraRig`, `cameraFov`, `rideProgress`, `titleCamera`, the rat, dust bunny, scorpion, yeti and titan motion, and the ground bosses' shared `bossCycle` and `bossAim`) with their scratch objects at module scope; a once-per-mount factory or a guarded cold branch carries `// eslint-disable-next-line sc/no-hot-path-alloc -- <why>`.
 
 ---
 
-### G. **Tone.js / Web Audio**
+### G. **Web Audio**
 
-- Heap shows **exponentialRampToValueAtTime**, **setValueCurveAtTime**, **get maxValue**, **set value**, **get value**, and source-map strings referencing **MusicManager**.
+- The snapshot (Tone.js engine, removed in #416) showed **exponentialRampToValueAtTime**, **setValueCurveAtTime**, **get maxValue**, **set value** and **get value**: audio graph and automation objects.
 - **Impact:** Audio graph and automation objects add to object count and memory; large buffers (above) matter more for raw MB.
 
-**Actions:**
+**How the plain Web Audio engine keeps it bounded (`src/audio/`, `docs/CODEMAP.md`):**
 
-- Reuse synths/effects; **dispose** or disconnect when changing scene (e.g. title vs level).
-- Avoid creating new `Tone.Synth` / buffers in hot paths.
+- **Notes free their nodes on `onended`:** each music note's oscillators, gains and filters (`scrim/synth.ts`) disconnect when the note ends, so the graph does not grow over a run.
+- **SFX play on a fixed voice pool:** `arcade/engine.ts` plays each sound as a fresh `AudioBufferSourceNode` on one of `VOICE_BUDGET` long-lived voices (priority stealing in `pickVoice`), so a busy wave adds no nodes.
+- **Buses are disconnected after their fades:** a music track change crossfades its `musicBus.ts` gain stage, then disposes the old one; a replaced arcade graph fades out over `STEAL_FADE_S` before it is disconnected.
+- Never create nodes or buffers in a per-frame path (hard rule 8).
 
 ---
 
@@ -109,7 +111,7 @@
 | ArrayBuffers      | ~4 MB            | Medium   | Reuse/dispose audio and geometry buffers |
 | Object/array count| 12% + 12%       | Medium   | Fewer nodes; instancing; dispose     |
 | Three.js math     | Allocations      | Low–Med | Reuse Vector3/Quaternion in hot paths |
-| Tone.js           | Object count     | Low     | Reuse/dispose synths and graph       |
+| Web Audio         | Object count     | Low     | Free notes on `onended`; voice pool; disconnect buses |
 
 ---
 
@@ -120,7 +122,7 @@
   - Lists the largest individual nodes (self size ≥ 10 KB).
 - **Codebase** was checked for:
   - Geometry/mesh creation (Three.js, R3F).
-  - Audio (Tone.js) usage.
+  - Audio (then Tone.js, now plain Web Audio) usage.
   - Tree rendering (TreeField) and InstancedMesh use.
   - Build config (source maps).
 

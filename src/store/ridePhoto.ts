@@ -45,6 +45,6 @@ export function useRidePhoto(runId: number): RidePhoto | null {
 
 /** Under e2e: records the ms after the capture call that `stage` of the photo was reached (the smoke prints them on a slow capture frame). */
 export function tracePhoto(stage: string): void {
-  const trace = window.__SC_TEST__?.photo.trace
+  const trace = window.__SC_TEST__?.ridePhoto.trace
   if (trace) trace[stage] = performance.now() - trace.start
 }

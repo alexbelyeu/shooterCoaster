@@ -2,6 +2,7 @@ import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import type { TrackIndex } from '@/levels/environments/shared/trackClearance'
 import type { Vec3 } from '@/entities/spawning/spawnPlacement'
+import { smooth } from './bossCycle.hot'
 
 /** The Kraken's motion, pure and allocation-free per frame; a tentacle bends in its vertical plane, `u` along `out` (away from the rider), `y` up. */
 
@@ -63,11 +64,6 @@ export const SPOTS = {
   /** The ride loops over most of the sea in front of it, so most tries land on it. */
   attempts: 40,
 } as const
-
-const smooth = (x: number) => {
-  const t = Math.min(1, Math.max(0, x))
-  return t * t * (3 - 2 * t)
-}
 
 /** Overshoots past 1 and settles: an eruption, not a lift. */
 const erupt = (x: number) => {

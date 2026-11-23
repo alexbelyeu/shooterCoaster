@@ -1,30 +1,25 @@
 import { useGameStore } from '@/store/useGameStore'
+import { RUN_SECONDS } from '@/levels/pacing'
 
 const WARN_SECONDS = 15
 const CRITICAL_SECONDS = 5
 
-interface TimerBarProps {
-  totalSeconds: number
-}
-
 /**
- * Shrinking timer bar + numerals. GameTimer only writes `timeRemaining` when the
- * whole second changes, so this renders ~1×/s; the bar is aimed at where the
- * timer will be at the next update and eased there with a 1 s linear transition,
- * which reads as continuous motion without per-frame React work.
+ * "50 seconds to go" over a bar that runs down. Renders ~1×/s (GameTimer writes whole seconds); the bar aims at the next
+ * second and eases there over 1 s, so it moves continuously without per-frame React work.
  */
-export default function TimerBar({ totalSeconds }: TimerBarProps) {
+export default function TimerBar() {
   const remaining = useGameStore((s) => s.timeRemaining)
   const secs = Math.ceil(remaining)
-  const frac = totalSeconds > 0 ? Math.max(0, Math.min(1, (remaining - 1) / totalSeconds)) : 0
+  const frac = Math.max(0, Math.min(1, (remaining - 1) / RUN_SECONDS))
   const state = secs <= CRITICAL_SECONDS ? 'critical' : secs <= WARN_SECONDS ? 'warn' : 'ok'
 
   return (
-    <div className={`hud-timer hud-timer--${state}`} role="timer" aria-label={`${secs} seconds left`}>
-      <div className="hud-timer-value">
+    <div className={`hud-timer hud-timer--${state}`} role="timer" aria-label={`${secs} seconds to go`}>
+      <div key={state === 'critical' ? secs : undefined} className="hud-timer-value hud-number">
         {secs}
-        <span className="hud-timer-unit">s</span>
       </div>
+      <div className="hud-timer-label">{secs === 1 ? 'second' : 'seconds'} to go</div>
       <div className="hud-timer-track">
         <div className="hud-timer-fill" style={{ transform: `scaleX(${frac})` }} />
       </div>

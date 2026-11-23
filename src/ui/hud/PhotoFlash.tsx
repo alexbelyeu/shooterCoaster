@@ -6,7 +6,7 @@ import { tracePhoto } from '@/store/ridePhoto'
 /** Under e2e: the flash got on screen (it lasts 0.35 s, less than one smoke frame on a software renderer). */
 function markFlashed() {
   if (!window.__SC_TEST__) return
-  window.__SC_TEST__.photo.flashed = true
+  window.__SC_TEST__.ridePhoto.flashed = true
   tracePhoto('flash')
 }
 

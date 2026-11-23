@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '@/store/useGameStore'
 import { subscribePointer } from '@/input/pointerInput'
 import { sfx } from '@/audio/sfx'
 import { isFeedbackHeld } from '@/combat/hitFeedback'
-import { COUNTDOWN_STEPS, COUNTDOWN_STEP_MS, INTRO_SECONDS, introStartedAt, setIntroStartedAt } from '@/core/introShot'
+import {
+  COUNTDOWN_STEPS,
+  COUNTDOWN_STEP_MS,
+  INTRO_SECONDS,
+  countdownBacksOut,
+  introStartedAt,
+  setIntroStartedAt,
+  subscribeIntroClock,
+} from '@/core/introShot'
 
 /** GO! sets `playing` and stays up over the HUD for `goHoldMs`: 2.5 s in all on a warm start, ~1.6 s on a resume. */
 const SEQUENCES = {
@@ -72,22 +79,36 @@ export default function Countdown() {
     })
   }, [counting, go])
 
+  // Title PLAY goes straight into a run (#329): a player who wanted another world backs out with Escape in the seat's
+  // first second (`countdownBacksOut`). The seat clock starts at mount, or when a skip cuts the tour short. A key counts
+  // at its `timeStamp` (the same clock), not when it is handled, so jank can't push a double-tap skip's second press past the guard.
+  useEffect(() => {
+    if (mode !== 'start') return
+    let seatAt = performance.now()
+    const unsubscribe = subscribeIntroClock(() => {
+      if (introStartedAt() === null) seatAt = performance.now()
+    })
+    const onKey = (e: KeyboardEvent) => {
+      const store = useGameStore.getState()
+      if (store.phase !== 'countdown') return
+      const run = { from: store.runFrom, tourOnScreen: introStartedAt() !== null, msInSeat: e.timeStamp - seatAt }
+      if (countdownBacksOut(e, run)) store.setPhase('levelSelect')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      unsubscribe()
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [mode])
+
   return (
     <div className="countdown">
-      <AnimatePresence mode="wait">
-        {step !== null && (
-          <motion.div
-            key={step}
-            className={`countdown-step${step === go ? ' countdown-step--go' : ''}`}
-            initial={{ scale: 2, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.5, opacity: 0 }}
-            transition={{ duration: 0.25 }}
-          >
-            {steps[step]}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {step !== null && (
+        // Keyed per step, so each sign drops in on its hook afresh (`fair-hook-drop`).
+        <div key={step} className={`countdown-step fair-hook${step === go ? ' countdown-step--go' : ''}`}>
+          {steps[step]}
+        </div>
+      )}
     </div>
   )
 }

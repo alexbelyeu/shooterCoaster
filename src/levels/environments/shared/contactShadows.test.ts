@@ -3,14 +3,14 @@ import { buildContactShadowGeometry, roundCaster, SHADOW_LIFT, type ShadowCaster
 import { createRng } from '@/utils/rng'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { buildArcTable } from '@/track/arcLength'
-import { createTrigCurve2 } from '@/track/curves/TrigCurve2'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { planTowers, towerShadowCasters } from '@/track/supportTowers'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 
 // Arctic: the most ridged terrain, where the drawn mesh strays furthest from heightFn.
 const level = getLevelConfig('level4')!
-const curve = createTrigCurve2(level.track.varA, level.track.varB, level.track.varC, level.track.scalar)
+const curve = createTrackCurve(level.track)
 const table = buildArcTable(curve)
 const heightFn = createHeightFunction('arctic', sampleTrackPath((t) => curve.getPointAt(t)))
 const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize('arctic'))
@@ -72,6 +72,22 @@ describe('buildContactShadowGeometry', () => {
     const acx = pos.getX(c) - pos.getX(a)
     const acz = pos.getZ(c) - pos.getZ(a)
     expect(abz * acx - abx * acz).toBeGreaterThan(0)
+  })
+
+  it("covers only a caster's `grid` part, in the whole footprint's local coordinates, without lifting it to a step beside it", () => {
+    const step = (x: number) => (x > 4 ? 10 : 0)
+    const caster = { x: 0, z: 0, halfX: 10, halfZ: 10, spread: 2, strength: 0.5, ground: step, grid: { minX: -12, maxX: 4, minZ: -12, maxZ: 12 } }
+    const geo = buildContactShadowGeometry([caster], () => 0)
+    const pos = geo.getAttribute('position')
+    const local = geo.getAttribute('aLocal')
+    let maxX = -Infinity
+    for (let i = 0; i < pos.count; i++) {
+      maxX = Math.max(maxX, pos.getX(i))
+      expect(local.getX(i)).toBeCloseTo(pos.getX(i))
+      expect(pos.getY(i)).toBeCloseTo(SHADOW_LIFT)
+    }
+    expect(maxX).toBeCloseTo(4)
+    expect(Math.min(...Array.from({ length: pos.count }, (_, i) => pos.getX(i)))).toBeCloseTo(-12)
   })
 
   it('switches to 32-bit indices past 65535 vertices', () => {

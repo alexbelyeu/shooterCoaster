@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { buildArcTable } from '@/track/arcLength'
-import { createTrigCurve } from '@/track/curves/TrigCurve'
+import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
@@ -99,8 +99,7 @@ describe('Kraken spec', () => {
 })
 
 describe('surfacing spots (level 3)', () => {
-  const { varA, varB, varC, scalar } = getLevelConfig('level3')!.track
-  const curve = createTrigCurve(varA, varB, varC, scalar)
+  const curve = createTrackCurve(getLevelConfig('level3')!.track)
   const table = buildArcTable(curve)
   const groundFn = createTerrainSurface(
     createHeightFunction('ocean', sampleTrackPath((t) => curve.getPointAt(t))),

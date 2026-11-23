@@ -18,7 +18,7 @@
  *     the weapon view-model's on-screen box (hit feedback checks)
  *   - read audio state (live SFX node count, slow-mo music duck, music crossfade buses, sounds dropped by a
  *     caught audio error: `dropped` / `lastDrop`), stress it (audioBurst: rapid SFX, every kill tier past the
- *     throttles, late music notes) and render it offline
+ *     throttles) and render it offline
  *   - read the camera pose (title fly-by), shader program count and longest frame (first-shot hitch)
  *   - read startup timings (initTimings)
  *   - summon the level's boss now, read it (hp, exposed weak points, on-screen box) and hit it through processHit
@@ -33,11 +33,12 @@ import { dailyKey, dailyLevel, dailySeed, type DailyStreak } from '@/levels/dail
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
-import type { RunMode } from '@/types/game'
+import type { RideVariant, RunMode } from '@/types/game'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
-import type { EnemyType } from '@/types/level'
+import type { EnemyType, EnemyWave, RideBeat } from '@/types/level'
+import { levelWeather, weatherSeconds } from '@/levels/environments/shared/weatherPulse'
 import type { GamePhase, LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC } from '@/combat/useShooting'
@@ -65,6 +66,9 @@ import { renderScoreCard } from '@/ui/scoreCardImage'
 import { ridePhotoFor } from '@/store/ridePhoto'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
+import type { Junction, SwitchPose } from '@/track/mechanics'
+import type { TrackCurve } from '@/track/curves/TrackCurve'
+import { rideProgress } from '@/track/rideProgress.hot'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
 import { RIG_MAX_PITCH_DEG, RIG_MAX_ROLL_DEG } from '@/track/cameraRig.hot'
 import { MAX_FOV_KICK_DEG } from '@/track/cameraFov.hot'
@@ -91,6 +95,18 @@ function waitForGpu(gl: THREE.WebGLRenderer) {
   const ctx = gl.getContext()
   ctx.readPixels(0, 0, 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, SYNC_PIXEL)
   gl.setRenderTarget(target)
+}
+
+/** A level's weather pulse as `levels()` lists it: its kind, the level time its wave arrives and how long it lasts. */
+export interface E2ELevelWeather {
+  kind: string
+  at: number
+  seconds: number
+}
+
+function e2eWeather(waves: readonly EnemyWave[]): E2ELevelWeather | null {
+  const weather = levelWeather(waves)
+  return weather && { kind: weather.kind, at: weather.wave.spawnDelay ?? 0, seconds: weatherSeconds(weather.kind) }
 }
 
 export interface RideFeel {
@@ -125,9 +141,11 @@ export interface SCTestApi {
   drawCalls: number
   triangles: number
   /** Every level in play order, its `nextLevel` and whether the unlock rule opens it now. */
-  levels: () => { id: string; name: string; maxScore: number; nextLevel: string | null; unlocked: boolean }[]
-  /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one. */
-  startLevel: (id: string, seed?: number) => void
+  levels: () => { id: string; name: string; maxScore: number; nextLevel: string | null; unlocked: boolean; weather: E2ELevelWeather | null }[]
+  /** Start a level; `seed` pins the run seed (enemy spawns), else `?seed=` or a fresh one; `variant` a Night Ride (#829). */
+  startLevel: (id: string, seed?: number, variant?: RideVariant) => void
+  /** The current run's `runVariant`: day, or the level's Night Ride. */
+  variant: () => RideVariant
   /** `restartRun`, as Replay / R / the pause menu's Restart do: a warm level goes straight to the countdown (#674). */
   restartLevel: () => void
   /** `<count>:<hash>` of the latest run's spawn positions (formation members: their seeded slots); null until a spawner has generated them. */
@@ -187,6 +205,12 @@ export interface SCTestApi {
   /** Track set-pieces (#332): the level's tunnels as track fractions (`spans`), the one the car is in (-1: none) and how
    *  deep (`tunnelDepth`, 0–1), set by the coaster camera. */
   tunnel: { spans: { from: number; to: number }[]; index: number; depth: number }
+  /** Dark sections (#752): the level's as track fractions, how dark the ride is now (0–1) and the muzzle flash's light
+   *  intensity, set by `DarkSections` each frame. */
+  darkSection: { spans: { from: number; to: number }[]; depth: number; flash: number }
+  /** The level's weather pulse (#798), set by `Weather` each frame: its strength (0–1), streaks drawn and the fog now
+   *  against the biome's own. null on a level without weather. */
+  weather: { kind: string; envelope: number; streaks: number; fogNear: number; fogFar: number; baseFogNear: number; baseFogFar: number } | null
   /** First-person weapon view-model on screen (CSS px, origin top-left):
    *  bounding box of its projected bounds and the muzzle tip. null before the
    *  first level frame. */
@@ -272,15 +296,18 @@ export interface SCTestApi {
     seconds: number | null
     skipped: boolean
   }
+  /** Photo mode's orbit (#828), written by `track/PhotoCamera` each frame while it is on: radians, world units, the
+   *  camera's distance from the pivot (the seat's eye at the pause) and its height over the terrain. */
+  photo: { on: boolean; yaw: number; pitch: number; radius: number; offset: number; clearance: number }
   /** The on-ride photo (#701), set by `RidePhoto`: its marker as a track fraction (`at`), whether this run's is taken, the
    *  ride's track fraction then, the snapshot call's ms, the whole capture frame's ms (the next frame's delta) and the
    *  frame's before it, its size and its JPEG's bytes (once encoded). */
-  photo: {
+  ridePhoto: {
     at: number | null; taken: boolean; progress: number | null; captureMs: number | null; frameMs: number | null; beforeMs: number | null
     width: number; height: number; bytes: number | null
     /** The HUD's flash started its animation. */
     flashed: boolean
-    /** ms after the capture call each stage reached: `sfx` (the shutter played), `bitmap`, `flash` (its animation started),
+    /** ms after the capture call each stage reached: `sfx` (the shutter played), `readback` (the pixels back from the GPU), `flash` (its animation started),
      *  `nextFrame` (the capture's frame timed), `posted` (to the darkroom worker), `encoded` (the JPEG back). */
     trace: Record<string, number> | null
   }
@@ -290,6 +317,8 @@ export interface SCTestApi {
   rideSpeed: number | null
   /** The coaster's track fraction (0–1) on its last frame. */
   rideProgress: number
+  /** The current level's v2 ride beats (`TrackParams.rideV2.beats`: a track fraction and the second it lands on); [] without one. */
+  rideBeats: () => readonly RideBeat[]
   // ── View / aspect (issue #66) ──
   /** Active camera projection vs the canvas's on-screen box (squash checks). */
   view: () => E2EView | null
@@ -299,12 +328,13 @@ export interface SCTestApi {
    *  shooting / killing, 0 after level exit), music low-pass ducked (slow-mo). */
   audio: () => E2EAudio
   /** SFX stress (#115), in one JS turn while the audio clock ticks: rapid
-   *  shots + layered kills + a stinger, then 10 pairs of late music-loop notes
-   *  (`lateScheduleErrors` counts their throws). Kills step down through every combo tier, spaced past the SFX
+   *  shots + layered kills, then a stinger (the wave tell). Kills step down through every combo tier, spaced past the SFX
    *  throttles, so `killsPlayed` should equal `kills`. Unlocks audio if needed. */
   audioBurst: (shots: number, kills: number) => Promise<E2EAudio & { killsPlayed: number }>
   /** Whether pointer input has the trigger held (released on blur / tab hide). */
   triggerHeld: () => boolean
+  /** The shared aim point (CSS px), whichever device moved it last (pointer or gamepad, #819). */
+  aimPoint: () => { x: number; y: number }
   /** Offline render of the game's own music / SFX code (`npm run audio:render`, `testing/audioRender.ts`).
    *  Only on the title screen before audio unlocks: the engines build in the offline context while it runs. */
   renderAudio: (req: AudioRenderRequest, seed?: number) => Promise<AudioRenderResult>
@@ -346,6 +376,30 @@ export interface SCTestApi {
   weaponState: () => { active: string; pickup: string | null; remaining: number }
   /** The level's pickups: id, track parameter, collected? (and popped), and where it is on screen (CSS px, NDC). */
   pickups: () => E2EPickup[]
+  // ── Shoot-to-switch junction (issue #702) ──
+  /**
+   * The level's switch sign (null on a level without a junction): its track t, the junction's fork and merge, the route it
+   * is set to, still open?, where it is on screen, and which way the camera rides now (`shared` outside the junction).
+   */
+  trackSwitch: () => E2ESwitch | null
+}
+
+export interface E2ESwitch {
+  t: number
+  from: number
+  to: number
+  hard: boolean
+  riding: 'easy' | 'hard' | 'shared'
+  /** The sign still takes a shot: its target is registered, which it is until the car first passes it in the run (#779). */
+  open: boolean
+  /** The run's kill-count total: a hard-route wave joins it when it arrives (#720). */
+  totalEnemies: number
+  x: number
+  y: number
+  ndcX: number
+  ndcY: number
+  onScreen: boolean
+  distance: number
 }
 
 export interface E2EPickup {
@@ -639,6 +693,43 @@ export const e2eParticles = { mounted: false, points: 0, boostPoints: 0, boost: 
 /** Written by `combat/pickups/Pickups.tsx` when the e2e flag is on; read through `pickups()`. */
 export const e2ePickups: { list: readonly LivePickup[] } = { list: [] }
 
+/** Written by `track/TrackSwitch.tsx` when the e2e flag is on; read through `trackSwitch()`. */
+export const e2eSwitch: {
+  state: { pose: SwitchPose; main: TrackCurve; junction: Junction; open: () => boolean } | null
+} = { state: null }
+
+function readSwitch(): E2ESwitch | null {
+  const cam = probeCamera
+  const s = e2eSwitch.state
+  if (!cam || !s) return null
+  cam.getWorldPosition(_w)
+  const { position, t } = s.pose
+  const { from, to, branch } = s.junction
+  const ride = rideProgress()
+  let riding: E2ESwitch['riding'] = 'shared'
+  if (ride > from + 0.1 * (to - from) && ride < to - 0.1 * (to - from)) {
+    const easy = s.main.getPointAt(ride).distanceTo(_w)
+    riding = branch.getPointAt((ride - from) / (to - from)).distanceTo(_w) < easy ? 'hard' : 'easy'
+  }
+  _v.copy(position).project(cam)
+  const ahead = _toPickup.copy(position).sub(_w).dot(cam.getWorldDirection(_camDir)) > 0
+  return {
+    t,
+    from,
+    to,
+    hard: useGameStore.getState().route === 'hard',
+    riding,
+    open: s.open(),
+    totalEnemies: useGameStore.getState().totalEnemies,
+    x: ((_v.x + 1) / 2) * probeSize.width,
+    y: ((1 - _v.y) / 2) * probeSize.height,
+    ndcX: _v.x,
+    ndcY: _v.y,
+    onScreen: ahead && Math.abs(_v.x) <= 1 && Math.abs(_v.y) <= 1,
+    distance: position.distanceTo(_w),
+  }
+}
+
 const _toPickup = new THREE.Vector3()
 const _camDir = new THREE.Vector3()
 
@@ -833,7 +924,7 @@ function isMounted(t: CollisionTarget) {
   return t.getPosition().y > -9000
 }
 
-/** Weapon pickups and bystanders are targets too, but no enemy. */
+/** Weapon pickups, a junction's switch and bystanders are targets too, but no enemy. */
 function isLive(t: CollisionTarget) {
   return t.kind === undefined && isMounted(t)
 }
@@ -899,10 +990,14 @@ export function installE2EApi() {
     triangles: 0,
     levels: () => {
       const { isLevelUnlocked } = useGameStore.getState()
-      return getAllLevels().map((l) => ({ id: l.id, name: l.name, maxScore: l.maxScore, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id) }))
+      return getAllLevels().map((l) => ({
+        id: l.id, name: l.name, maxScore: l.maxScore, nextLevel: l.nextLevel, unlocked: isLevelUnlocked(l.id),
+        weather: e2eWeather(l.enemies),
+      }))
     },
-    startLevel: (id: string, seed?: number) => useGameStore.getState().startRun(id, seed),
-    restartLevel: () => useGameStore.getState().restartRun(),
+    startLevel: (id: string, seed?: number, variant?: RideVariant) => useGameStore.getState().startRun(id, { seed, variant }),
+    variant: () => useGameStore.getState().runVariant,
+    restartLevel: () => useGameStore.getState().restartRun('results'),
     levelReady: () => {
       const { sceneReady, currentLevel } = useGameStore.getState()
       return sceneReady && api.shaderWarmup?.levelId === currentLevel
@@ -948,6 +1043,8 @@ export function installE2EApi() {
       caps: { roll: RIG_MAX_ROLL_DEG, pitch: RIG_MAX_PITCH_DEG, fovKick: MAX_FOV_KICK_DEG },
     },
     tunnel: { spans: [], index: -1, depth: 0 },
+    darkSection: { spans: [], depth: 0, flash: 0 },
+    weather: null,
     weapon: null,
     holdFeedback: false,
     bulletStep: null,
@@ -1070,16 +1167,25 @@ export function installE2EApi() {
     setTimeScale: (s: number) => setTimeScaleOverride(s === 1 ? null : s),
     introAt: null,
     intro: { mode: 'ride', length: INTRO_SECONDS, handoff: INTRO_HANDOFF_SECONDS, progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, clearance: 0, marks: null, goOffset: null, orbitSeconds: 0, seconds: null, skipped: false },
-    photo: { at: null, taken: false, progress: null, captureMs: null, frameMs: null, beforeMs: null, width: 0, height: 0, bytes: null, flashed: false, trace: null },
+    photo: { on: false, yaw: 0, pitch: 0, radius: 0, offset: 0, clearance: 0 },
+    ridePhoto: { at: null, taken: false, progress: null, captureMs: null, frameMs: null, beforeMs: null, width: 0, height: 0, bytes: null, flashed: false, trace: null },
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,
+    rideBeats: () => {
+      const id = useGameStore.getState().currentLevel
+      return (id ? getLevelConfig(id)?.track.rideV2?.beats : undefined) ?? []
+    },
     view: readView,
     graphics: () => {
       const { quality, reducedMotion } = useSettingsStore.getState()
       return { quality, profile: qualityProfile(quality), adaptiveSteps: getAdaptiveSteps(), reducedMotion }
     },
     triggerHeld: () => getPointerState().down,
+    aimPoint: () => {
+      const p = getPointerState()
+      return { x: p.x, y: p.y }
+    },
     summonBoss: () => { e2eBoss.summon = useGameStore.getState().runId },
     boss: readBoss,
     bossHit,
@@ -1095,6 +1201,7 @@ export function installE2EApi() {
       return { active: activeWeapon(weapon, now).id, pickup: weapon.id, remaining: pickupRemaining(weapon, now) }
     },
     pickups: readPickups,
+    trackSwitch: readSwitch,
   }
   eventBus.on('boss:spawn', () => { api.bossEvents.spawn += 1 })
   eventBus.on('boss:hit', () => { api.bossEvents.hit += 1 })

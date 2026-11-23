@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
+import { minifyGlsl } from './scripts/glslMinify.mjs'
 
 /**
  * Portal pages carry their own share card, canonical URL and structured data, and the zip may
@@ -30,6 +31,19 @@ function stripBlockoutNotes(): Plugin {
   }
 }
 
+// Strips the comments and indentation from the shaders' glsl-tagged source in builds (scripts/glslMinify.mjs).
+function minifyGlslPlugin(): Plugin {
+  return {
+    name: 'minify-glsl',
+    apply: 'build',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!/\/src\/.*\.tsx?$/.test(id) || !code.includes('/* glsl */')) return null
+      return { code: minifyGlsl(code), map: null }
+    },
+  }
+}
+
 // `vite build --mode portal` (`npm run build:portal`): relative asset URLs, so the zip plays from any sub-path.
 // `vite build --mode turntable` (`npm run turntable`): only the dev pages (the enemy turntable, the ride elements), into dist-turntable/.
 export default defineConfig(({ mode }) => {
@@ -39,7 +53,7 @@ export default defineConfig(({ mode }) => {
   const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)
   return {
     base: portal ? './' : '/',
-    plugins: portal ? [react(), stripBlockoutNotes(), portalHtml()] : [react(), stripBlockoutNotes()],
+    plugins: portal ? [react(), stripBlockoutNotes(), minifyGlslPlugin(), portalHtml()] : [react(), stripBlockoutNotes(), minifyGlslPlugin()],
     define: {
       // Vercel sets VERCEL=1 during its builds; gates Web Analytics (src/app/analyticsGate.ts). Portal builds never send it.
       __BUILT_ON_VERCEL__: JSON.stringify(process.env.VERCEL === '1' && !portal),
@@ -53,6 +67,9 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: portal ? 'dist-portal' : turntable ? 'dist-turntable' : 'dist',
+      // Vite's default floor (Chrome 87, Firefox 78, Safari 14) has esbuild lower every `?.` (a Chrome 87-90 V8 bug) and
+      // class fields (Firefox 78, Safari 14). Mid-2021 browsers ship both natively: ~1.7 KB gz less JS (#834, DECISIONS).
+      target: ['es2020', 'chrome91', 'edge91', 'firefox90', 'safari15'],
       sourcemap: false,
       rollupOptions: {
         ...(turntable && { input: [path.resolve(__dirname, 'turntable.html'), path.resolve(__dirname, 'rides.html')] }),

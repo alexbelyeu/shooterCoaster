@@ -3,7 +3,7 @@
  * unit tests. No React, three.js or DOM imports: keep it that way so it can be
  * tested under plain Node.
  */
-import type { EnemyType, EnemyWave } from '@/types/level'
+import type { EnemyType, EnemyWave, LevelConfig } from '@/types/level'
 import { bossMaxScore, type BossSpec } from '@/entities/bosses/bossModel'
 
 /** Points awarded per kill, before the combo multiplier (`combat/comboTiers.ts`). */
@@ -65,6 +65,19 @@ export function computeStars(
   return 0
 }
 
+/** The score a finished run shows: whole points, never below 0. */
+export function shownScore(score: number): number {
+  return Math.max(0, Math.round(score))
+}
+
+/**
+ * A finished run's stars, from its shown score (`shownScore`), so everything about the run agrees on them: the results
+ * screen, the score card, the share text, the `level_complete` event and the results music's cut (#797).
+ */
+export function runStars(score: number, level: Pick<LevelConfig, 'maxScore' | 'starThresholds'>): 0 | 1 | 2 | 3 {
+  return computeStars(shownScore(score), level.maxScore, level.starThresholds)
+}
+
 export interface NextStar {
   /** 1-3 */
   stars: number
@@ -82,4 +95,9 @@ export function nextStar(
   // The epsilon keeps a float product like 0.55 × 100 = 55.00000000000001 from asking for a point too many.
   const needed = thresholds[earned] * maxScore - score
   return { stars: earned + 1, points: Math.max(1, Math.ceil(needed - 1e-9)) }
+}
+
+/** A finished run's next star (`nextStar` on its shown score), so the results screen's next-star line agrees with its `runStars`. */
+export function runNextStar(score: number, level: Pick<LevelConfig, 'maxScore' | 'starThresholds'>): NextStar | null {
+  return nextStar(shownScore(score), level.maxScore, level.starThresholds)
 }

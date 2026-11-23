@@ -12,23 +12,21 @@ This section is the full run (`npm run smoke`, and the nightly production smoke)
 ("Two depths" below says which). The smoke test writes PNG screenshots + `results.json` (frames, draw calls,
 triangles, avg frame ms, kills, score, combat stats, on-screen enemy counts/sizes, errors)
 to `e2e-results/`: `title.png` and `title-2.png` 6 s later (the 3D scene behind the title UI must not look blank, polled on a cold start; the fly-by camera must have turned ≥ 8° or moved ≥ 30 units;
-a title sparkle's centre pixel must blend to a colour in [0, 1] (`pointCentreColour('title-sparkles')`: a glow dividing by the distance to the point's centre went NaN there and Bloom spread it to a black frame, #344); the self-hosted Lobster and Inter faces must have loaded; the start hint must show; attract mode (#419, #493): with `titleAttractIdleMs` 0 the title must enter it, `title-attract.png` is shot once the camera has blended to its closer shot (the 3D scene not blank, the letterbox bars black), and a pointer move (not a key, so the next press is still the first) must bring the menu back; a key press must fade to black and open level select; the score engine's chunks (`player-*.js`, `synth-*.js`) must not be fetched before that press, and the press must load them, unlock audio and start the title score; the poster (#376): with JS off, index.html alone must show the poster's logo and load its still, and `poster.png` must not look blank behind the logo, and the title page itself is shot over and over from its first paint until the poster has gone (two shots after): no shot may look blank outside the title UI (any that does is kept as `poster-blank-<n>.png`); the title scene must fit budgets.json `scene.title`: its draw calls, the more of the two screenshots' readings, its objects and triangles; the summary line prints them, the load shots and the seconds each phase took (`s: frames …, shot …, attract …`, #608)). The title page loads with `?e2e=1&gpuSync=1`: each frame waits for the GPU to finish the last, since CI's headless shell otherwise runs frames seconds ahead of SwiftShader and every screenshot waits for that queue (8–20 s a shot, which put the ui shard over its time budget); a `landing` step loads the campaign landing path
+a title sparkle's centre pixel must blend to a colour in [0, 1] (`pointCentreColour('title-sparkles')`: a glow dividing by the distance to the point's centre went NaN there and Bloom spread it to a black frame, #344); the self-hosted Lobster and Big Shoulders faces must have loaded; the start hint must show; attract mode (#419, #493): with `titleAttractIdleMs` 0 the title must enter it, `title-attract.png` is shot once the camera has blended to its closer shot (the 3D scene not blank, the letterbox bars black), and a pointer move (not a key, so the next press is still the first) must bring the menu back; W (WORLDS) must fade to black and open level select; the score engine's chunks (`player-*.js`, `synth-*.js`) must not be fetched before that press, and the press must load them, unlock audio and start the title score; back on the title, Enter (PLAY, #329) must start level1's run on the fresh save without passing through level select (`titlePlayCheck`); the poster (#376): with JS off, index.html alone must show the poster's logo and load its still, and `poster.png` must not look blank behind the logo, and the title page itself is shot over and over from its first paint until the poster has gone (two shots after): no shot may look blank outside the title UI (any that does is kept as `poster-blank-<n>.png`), and while both are up the live title's logo, tagline, PLAY, Worlds and Settings plates and hint must sit within 1.5 px of the poster's (`POSTER_PAIRS`; the summary line prints each offset); the title scene must fit budgets.json `scene.title`: its draw calls, the more of the two screenshots' readings, its objects and triangles; the summary line prints them, the load shots and the seconds each phase took (`s: frames …, shot …, attract …`, #608)). The title page loads with `?e2e=1&gpuSync=1`: each frame waits for the GPU to finish the last, since CI's headless shell otherwise runs frames seconds ahead of SwiftShader and every screenshot waits for that queue (8–20 s a shot, which put the ui shard over its time budget); a `landing` step loads the campaign landing path
 `/go/smoke-check?e2e=1&internal=1` (links we post point at `/go/<campaign>`, attributed by the page view's path; `robots.txt` disallows `/go/`):
-it must boot to the title with no failed request, no analytics request and no page error, keep its path (only `internal` stripped) and show the "internal: not tracked" marker (skipped with `--base`); and per level `<id>.png` (after a ride to `--seconds` 10 of *level time* and at least `--min-frames` 10 frames, then game time frozen for the
+it must boot to the title with no failed request, no analytics request and no page error, keep its path (only `internal` stripped) and show the "Internal device, not tracked" marker (skipped with `--base`); and per level `<id>.png` (after a ride to `--seconds` 10 of *level time* and at least `--min-frames` 10 frames, then game time frozen for the
 ride stats, the perf gate, the shot and the enemy probe; the ride stops at exactly `--seconds` of level time, timer, game clock and ride together on the frame that gets there (`stopAtLevelTime`, #487: a poll used to catch it anywhere from 10.2 to 10.7 s, and level2's enemy probe failed at 10.7); the ride gets there in settled steps of `--seconds` / `--min-frames` level seconds (below), combat caps level time per frame (`timerStepMax`, 0.25 s) and ride `--ride-rate` 0.14 s of track per second of level time (`rideRate`: CI's ride, where the budgets were set; the game rides at most
 3/60 s a frame), so a slow runner samples the same moment of the level from the same track point as a fast one; through the combat checks the level timer is then held (`holdLevelTime`: the game clock runs on, the run can't time out and no wave or boss comes due) until the step ends the level itself, so however long the checks take they never run into the boss or the end of the run (#305);
 it fails as a stalled render loop only if the frames haven't rendered by 4× `--seconds`, and the summary line prints `frames=N in Xs levelTime=…`; the title waits the same way),
-`<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), on level6 `level6-gap.png` (#659: game time and the
-level timer held, `rideTo` jumps the car into the Tree's gap at the lap's start and back; the car must be there and the frame not
-blank: the trunk on one side, the back wall on the other) and `level6-bystander.png` (#518: first in
+`<id>-enemy.png` (4× close-up of the largest on-screen enemy, time frozen), on level6 `level6-bystander.png` (#518: first in
 its combat, two kills (their real shot left to land or fly out first) and a primed 5-chain, then `shootBystander()` on a live climber: the score must drop by the penalty it returns
 (floored at 0; any level whose `stats().levelBystanders` is above 0 gets this check), the combo reset, no kill or hit counted, `bystandersHit` 1 and the don't-shoot hint shown; the shot holds the red
 "−18 · Don't shoot climbers!" popup and the chalk puff; `level6 bystander: score a → b, combo 5 → 0` in the log), `<id>-combat.png`
 (after 4 s of autofire + `killNearest(5)`, with the weapon's muzzle flash + tracer and the
 gold hitmarker held on the kill frame via `holdFeedback`; on the first level a primed 14-kill chain makes
 that kill enter the 5× combo tier, and the shot must show the "×5 FRENZY" flash with its slow-mo held and, on the Theme Park,
-the streak-15 firework burst held on screen; the kill's death effect must be live in the shot in its enemy type's style, held mid-spread, `death=<type>` in the summary; the first level then starts over, primes 5× and ends through the level timer mid-FRENZY: its results must be at `timeScale` 1 with the music not ducked, `frenzyEnd` in `results.json`; a reveal that never finishes saves `<id>-frenzy-end.png` and names every mounted results screen and its state in the failure, as the daily and phone results checks do), the on-ride photo (#701: unless the ride already passed the level's marker, it is put just short and must ride past it: the flash shown (its animation started, `photo.flashed`), the JPEG taken (scaled and encoded in `canvas/ridePhoto.worker.ts`), and the capture's frame at most 2x the frame before it or the run's average (a failure prints `photo.trace`: ms after the capture to the bitmap, the next frame and the JPEG); `photo` in `results.json`), `<id>-shot.png` (one real shot two 40 ms
-steps into its flight, time frozen), `<id>-results.png`, `<id>-share.png` (the results share menu open) and `<id>-card.png` / `<id>-card-story.png` (the score card share image, #272). A level fails if
+the streak-15 firework burst held on screen; the kill's death effect must be live in the shot in its enemy type's style, held mid-spread, `death=<type>` in the summary; the first level then starts over, primes 5× and ends through the level timer mid-FRENZY: its results must be at `timeScale` 1 with the music not ducked, `frenzyEnd` in `results.json`; a reveal that never finishes saves `<id>-frenzy-end.png` and names every mounted results screen and its state in the failure, as the daily and phone results checks do), the on-ride photo (#701: unless the ride already passed the level's marker, it is put just short and must ride past it: the flash shown (its animation started, `ridePhoto.flashed`), the JPEG taken (blitted down and read back over later frames by `canvas/gpuSnapshot.ts`, encoded in `canvas/ridePhoto.worker.ts`), and the capture's frame at most 2x the frame before it or the run's average (a failure prints `ridePhoto.trace`: ms after the capture to the readback, the next frame and the JPEG); `ridePhoto` in `results.json`), `<id>-shot.png` (one real shot two 40 ms
+steps into its flight, time frozen), `level1-gamepad.png` (#819: a stubbed `navigator.getGamepads` pad's right stick steers the crosshair onto an enemy, time frozen, and RT is held; it fails if the aim ends > 8 px off, RT fires nothing or no shot hits, `gamepad` in `results.json`, `pad=` in the summary), `level1-ghost.png` (#844: a ghost stored for level1 aiming at (0.62, 0.45) of the view, loaded by a pause and back, time frozen; it fails if the ghost ring isn't drawn there or isn't translucent, `ghost` in `results.json`; the results step then fails when the run's best stored no ghost), `<id>-results.png`, `<id>-share.png` (the results share menu open) and `<id>-card.png` / `<id>-card-story.png` (the score card share image, #272). A level fails if
 no enemy is on screen at that probe, or fewer than min(2, on screen) are ≥ 12 px (`enemiesOnScreen` / `readable` / `largestPx` in the summary), its biome particle field isn't mounted (`particles=` in the summary), it gets no kills, a real mouse click doesn't fire, autofire never fires at on-screen
 enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
 level timer already ran out), the level's boss arrives during these checks (they are the boss step's), the camera translates off the track pose at all
@@ -37,17 +35,17 @@ screen / covers the centre / overlaps the HUD / points > 25° off the tracer of 
 checked in mobile portrait + landscape, and in portrait at four extreme aims with the combo meter showing),
 the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
-reveal (`data-sequence="done"`), lacks a stats row (kills, accuracy, best combo, time left) or the
+reveal (`data-sequence="done"`), lacks a stat line (its `data-stat` hits, accuracy, combo, time; hits must start with the kills) or the
 Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), offers Next Level while the next level is locked (or hides it while open), shows NaN, or disagrees with `stats()` on score or kills, has no local leaderboard fully inside 1280×720, or (first level) Enter with the mute button focused doesn't play on;
 on the first level the leaderboard is seeded so the run places 4th: the row must open for initials at the last ones used (AAA),
 all with the Share button focused (#357): ArrowUp must cycle a letter, typing r e s must give RES without leaving or toggling mute (R and S are letters there), and Enter must confirm (not open the share menu), store
-and persist it, with the board labelled This device during the entry. That run has the online board (#365) on a stubbed API (`page.route` on `/api/leaderboard`, never the real one; `onlineBoard(endpoint)`):
-after Enter it must POST once (level, RES, the shown score, kills, accuracy 0..1, seed, version), fetch nothing, and turn the board to World with RES 2nd of 10 (`level1-results-world.png`), and then Copy link must copy `shareText(1)`'s rank line ("I'm #2 in the world on …", #445) and Save image download the card with its `WORLD #2` ribbon (`level1-card-world.png`);
+and persist it, with the board's line reading "This device's top 10" during the entry. That run has the online board (#365) on a stubbed API (`page.route` on `/api/leaderboard`, never the real one; `onlineBoard(endpoint)`):
+after Enter it must POST once (level, RES, the shown score, kills, accuracy 0..1, seed, version), fetch nothing, and turn the board to the World board ("The world's top 10") with RES 2nd of 10 (`level1-results-world.png`), and then Copy link must copy `shareText(1)`'s rank line ("I'm #2 in the world on …", #445) and Save image download the card with its `WORLD #2` ribbon (`level1-card-world.png`);
 its frenzy-end rerun is seeded a full board out of reach and must show the board with no rank and no initials entry: the World board (fetched for that level), with nothing submitted;
 `shareText()` must match the share format with the shown score, stars, level name and the `/go/share` link (`share_copy` campaign); a real Share click must open the share menu (#271) with Save image focused and every target in order (Save image, Copy image, Copy link, X, Reddit, Bluesky, Threads, WhatsApp, Facebook, LinkedIn, Email; items 44 px), inside the viewport and covering no other results button, each link carrying its own `utm_campaign=share_<target>`; Copy image must show "Copied!" and put the 1200×630 PNG on the clipboard, Copy link must show "Copied!" and put `shareText()` on the clipboard, ArrowDown must move focus to Copy image, Esc must close the menu with focus back on Share (network links are never clicked), and Save image must download `shootercoaster-<id>-<score>.png` and close the menu. `scoreCard('feed' | 'story')` must draw a 1200×630 and a 1080×1920 PNG (not blank: ≥ 20 KB) named after the level and score, carrying the run's on-ride photo; the results screen must show the photo's print loaded and in view (#701). Every page of a local run fails on a request to another origin
 (not with `--url`). `--dist <dir> --base <path>` previews another build folder under a sub-path (`smoke:portal`: the title and level 1's ride, shot and results, what a sub-path and the no-other-origin rule can break; the rest of the game is the same code the site's shards and nightly cover, #486).
 `npm run smoke` also passes `--mobile`:
-an iPhone 13-like touch context (390x844) taps PLAY (at its centre, `tapCentre`: its pulse never settles, so no Playwright stability wait) and a level (the title music must ramp out from full and be disposed, the level music ramp in), then in portrait and
+an iPhone 13-like touch context (390x844) taps WORLDS (at its centre, `tapCentre`: its pulse never settles, so no Playwright stability wait) and a level (the title music must ramp out from full and be disposed, the level music ramp in), then in portrait and
 again in 844x390 landscape taps the canvas 10x, each tap 15–30 px off an on-screen
 enemy (game time frozen while tapping, and it fails if the freeze did not hold: `timeScale` must still be 0 after the taps), and requires kills (touch aim assist); checks
 camera aspect == canvas aspect in portrait, landscape and after rotating back, that the
@@ -67,7 +65,7 @@ before it must stay (no killed enemy back); the world is frozen while paused (tr
 the same spot and the next wave arrives at its original level time (slack: 1 s for the whole-second timer store plus two of the longest
 frames since Resume, `maxFrameMs`); a window `blur` must pause too.
 A `pause-menu` step on the same page opens the menu through the hook (`pause.png`): the card inside 1280×720 with the level
-name, Resume focused, ArrowDown moves focus, Esc resumes, and Restart starts the level over (kills, score, timer, ride; paused again, the card's Kills read 0). The
+name, Resume focused, ArrowDown moves focus, then photo mode (#828): Photo hides the card and every HUD element, a mouse drag and the wheel must turn and zoom the orbit (`photo` in the hook: yaw, radius, height over the terrain), `level1-photo.png` is the orbited frame, Save must download a non-blank `scoaster-<level>-<YYYYMMDD-HHMMSS>.png` (kept as `level1-photo-save.png`) and Back must bring the card back with the ride camera on the same pose (`cameraPose()`, within 1e-4); then Esc resumes, and Restart starts the level over (kills, score, timer, ride; paused again, the card's `[data-stat="hits"]` reads `0 of …`). The
 phone run checks the card after its Pause tap in landscape and portrait (`mobile-pause-landscape.png`, `mobile-pause.png`: inside
 the viewport, no sideways scroll, 44 px buttons), then taps its Settings (`mobile-settings.png`: fits 390 px, 44 px targets)
 and Back to the menu, then ends the level and enters initials by tapping ▲, a letter, ▲ and OK (BBA; 44 px buttons, the pad in view: `mobile-results-entry.png`), then the results buttons must fit and not overlap in portrait and landscape
@@ -78,7 +76,7 @@ A `settings` step opens Settings from the title (`settings.png`: the card inside
 options, two volume sliders and three switches, the last row the "Internal device" toggle, #446; the pause menu's Settings has
 no such row), turns that toggle on, picks Low and a music volume, cycles Med / High / Low three times
 and fails if the renderer's GPU textures grew over the last two cycles (each change rebuilds the post composer, #249),
-closes with Esc, and requires both to survive a reload and the title's "internal: not tracked" marker to show after it. A `quality` step loads the first level at device dpr 2 with the default quality and with
+closes with Esc, and requires both to survive a reload and the title's "Internal device, not tracked" marker to show after it. A `quality` step loads the first level at device dpr 2 with the default quality and with
 `?quality=low` (any preset name works as a URL override and is saved like the setting) on the same seed and frozen
 track point: low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
 A `levelSelect` step seeds saved progress (3★ + 1★) and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
@@ -87,8 +85,10 @@ inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move fo
 locked card does nothing, Enter on an open one plays the launch transition and starts that level);
 the phone run checks its cards fit 390 px.
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in
-daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, NEW BEST, no Next Level and no leaderboard or initials entry (the campaign boards stay empty)
-(`daily-results.png`; its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
+daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, New best, no Next Level and no initials entry (the campaign boards stay empty),
+send the new best once to the stubbed online board with `daily` = today and the last initials and show the day's World board it answers (#854, `data-source="today"`, `daily-results.png`); the second load's
+run, with the stub answering 503, must show no board, New best and save the local record (`daily-results-offline.png`)
+( its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 `?e2e=1` skips the loading screen, the intro and the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1` (#674): the loading screen must show (`loading.png`) and hold until the shader
 warm-up is done, then the intro must run its fixed length before Ready (`intro.seconds`, `INTRO_HANDOFF_SECONDS` late by at most two
@@ -111,11 +111,18 @@ at least 35% of the frame dark and some of it near white (its lights).
 When level2 is in the run, a `wave` step rides it to the crow wave: its `wave:incoming` tell (screen-edge pulse +
 label) must come before the wave, on time by the level timer (`waveTellSeconds` ahead; the timer steps a fixed 0.25 s a frame
 around it, `timerStep`, so a slow frame can't land both together), the run is paused and resumed in between (the level timer is held on the tick the tell fires, so the pause lands in the gap on any runner, and the step fails if the wave came before the pause; no tell or wave may fire twice), then the V flies in and is frozen for `level2-wave.png` (≥ 5 crows on screen, none within 40 units).
+When level2 or level4 is in the run, a `weather` step rides it to its weather pulse (#798, `EnemyWave.weather`: the
+sandstorm with level2's first crows, the blizzard with level4's snowmen; when and how long from `levels()`'s `weather`),
+3 s after its wave arrives, and freezes for `<id>-weather.png`: the pulse at full strength (`weather.envelope` ≥ 0.9),
+streaks drawn, the fog closed in from the biome's own, at least 3 enemies on screen; then plays on until it clears,
+when the fog must be the biome's own again. Its line reports the shader programs compiled past the warm-up (+0: the
+streaks' material is in the scene from the start, at 0 instances).
+
 When level1 is in the run, an `audio` step plays its sound from the title on (the score engine and the arcade SFX, the game's only engine since #416): a click must unlock audio and start the
 title score, the level score must crossfade from it, keep its long-lived node count flat (≤ 150) and advance, run `audioBurst(64, 32)`
 on the arcade SFX twice (never more live sources than the budget: counted from each source's start to its end, steal or `onended`; voices stolen, SFX node count flat, nothing thrown or dropped), duck with time frozen,
 follow the combo with its intensity layers (time frozen, `primeCombo(8)` → 2, `primeCombo(15)` → 3, held through the pause, `primeCombo(0)`
-→ back to 0 through 2 or 1, not in one cut), hold its song position while paused and resume there through the pause menu's Resume, whose Ready / GO must play its two countdown sounds while the run is still paused (#246: `sfxVoices.ui`), then crossfade to the results score, and on to the title score on level select without opening a level score on the way (#236), with no page errors or dropped sounds.
+→ back to 0 through 2 or 1, not in one cut), hold its song position while paused and resume there through the pause menu's Resume, whose Ready / GO must play its two countdown sounds while the run is still paused (#246: `sfxVoices.ui`), then crossfade to the results score (the cut its stars pick, `results-win` or `results-lose`, #792; the summary prints which), and on to the title score on level select without opening a level score on the way (#236), with no page errors or dropped sounds.
 When level1 is in the run, a `boss` step summons the Golden Blimp (`summonBoss()`): the tell and `boss:spawn` must fire, the
 hull must be ≥ 15% of the frame wide with the boss bar clear of the HUD (`level1-boss.png`), only the balloons exposed; a real
 bullet must hit one, `bossHit` clears them and must expose only the gondola (`level1-boss-gondola.png`), then defeat it:
@@ -137,11 +144,11 @@ When level5 is in the run, the same `boss` step summons the Magma Titan: after 3
 and beats its chest open; the heart is retracted between beats) both shoulder vents and the heart must be on screen
 (`level5-boss.png`, only those exposed), then only the crown of lava on its head (`level5-boss-crown.png`) before it goes
 black, flashes and bursts into lava chunks (`level5-boss-down.png`).
-When level6 is in the run, the step first rides the coaster to 0.75 of the lap (`rideTo`: the Medusa stays in the Starr
+When level6 is in the run, the step first rides the coaster to 0.59 of the lap, as she arrives (`rideTo`: the run up the hall at her face; the Medusa stays in the Starr
 rather than coming to the rider) and summons her: after 2 s of game time (she has risen out of the star) at least three of
 her first four snakes must be on screen (`level6-boss.png`); it clears them, lets her second four uncoil (`midPhases`: a
 phase between the first and the last) and clears those, then only the crown snake is exposed (`level6-boss-crown.png`;
-with her leant out it then rides to 0.88 and 0.94 of the lap, `level6-boss-pass-88.png` / `-94.png`, the ride's last stretch past her)
+with her ducked back into the star for it (#856) it then rides to 0.627 and 0.64 of the lap, `level6-boss-pass-63.png` / `-64.png`, the turn away round her shoulder; the checks and their lap fractions are in `e2e/bossChecks.mjs`, held to each boss's arrival on the ride by `bossChecks.test.ts`)
 before she laughs and sinks back into the star in a chalk burst (`level6-boss-down.png`).
 Every boss must fit its fight window (#452: the boss arrives at 40 s of the 60 s run): the game seconds it moved before
 each phase was on screen plus every weak point's hp at 2 hits a second must be ≤ 20 s (`fight` on the summary line).
@@ -149,6 +156,28 @@ When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pic
 (spread) with time frozen and shoots it with a real bullet: `weaponState()` must report the spread gun, the next pull must
 count 3 shots and draw 3 bullets, and `level1-pickup.png` holds the tinted tracer with the `.hud-weapon` badge clear of the HUD;
 the pickup must hold through a pause, expire on game time, and a restart must bring back the blaster and every pickup.
+When level1 is in the run, a `night` step (#829, nightly) rides its Night Ride (`startLevel(id, seed, 'night')`, `variant()`)
+to the ride step's moment: the run must be `night`, the sky band (top 30%) dark (`NIGHT_CHECK.maxSkyLuma`), the enemies as
+readable as the ride's probe asks (`level1-night-enemy.png`) and the scene inside level1's `scene` budget (`level1-night.png`).
+When level6 is in the run, a `switch` step (#702, on the PR in the `level6` shard) checks the shoot-to-switch junction
+(`trackSwitch()`): it starts the level held at its start from its first frame (`timerStep` and `rideRate` 0 until
+`levelReady`: ridden on the frame time, a slow runner's car passed the sign while the scene warmed up, and a switch the car
+has passed is closed for the run, #779; `open` is false then), parks the coaster behind the V2 sign with time frozen
+(`level6-switch.png`) and shoots it with a real bullet, which must set the hard way and ride the V8 branch at the junction's middle (`riding: 'hard'`, `level6-switch-hard.png`);
+a restart must set it back, and a run that leaves it must ride the easy way with the switch closed by then.
+The hard route's own wave (#720, `SWITCH_CHECK.branchWave`): after the shot the level timer jumps to its second, and it must
+arrive (its banner) and show at least `BRANCH_WAVE_ON_SCREEN` rats on screen from the branch's middle; at the end of the
+easy run, held past the sign, the same jump must bring no such wave, and the run's `totalEnemies` must be the wave's size
+under the hard run's.
+Then, on the same run held, it checks the Training Area cave's dark section (#752, the hook's `darkSection`: its
+`spans`, `depth` and the muzzle flash's light `flash`): it rides to the cave's middle and fires one real shot with the flash
+held; the ride must be fully dark there (`depth` 1) and the shot must light it (`flash` > 0). The nightly `dark` step (needs
+`switch`) also shoots `level6-dark.png` and `level6-dark-flash.png` there: the frame must be mostly dark (`DARK_SHOT.dark`) but
+not blank, its blacklit holds showing (`DARK_SHOT.glow`, saturated bright pixels), and the flash must brighten it (`DARK_SHOT.flash`).
+It then shoots `level6-gap.png` (#659: game time and the level timer held, `rideTo` jumps the car into the Tree's gap, its 56.5 s
+heartline-roll beat read from `rideBeats()`, and back; the car must be there and the frame not blank: the trunk on one side, the
+back wall on the other). These frame captures are nightly only, like the tour's (#766: the dark shots took the `level6` shard's
+`switch` step from ~90 s to ~260 s, and the gap still was ~30 s of its `ride` step on a 2-core box).
 **Settled steps** (#471, `settledSteps.mjs`): the ride and the pacing run advance level time one fixed step on one frame,
 then hold it (`timerStep` 0) until React has gone quiet (no commit on a held frame, and a message posted on the frame before
 answered), and only then take the next step. Waves, enemy mounts, fly-ins ending and boss arrivals go through React state
@@ -165,9 +194,16 @@ the run with nothing on screen) and the gaps (`longestGapSeconds`, `longestGap` 
 `gaps` of 1 s or more); the first 2 s after GO and the boss tell are meant to be empty, so they count neither way and end a
 gap. It prints one line per level (`level2 pacing: no target 7% of 60 s, longest gap 2.0 s at 4 s (track 0.03)`) and
 writes `e2e-results/pacing.json`: those metrics per level plus a `timeline`, one row a level second (`t`, fewest and most
-targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`), which is where to look for where a gap is. A level over
+targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`), which is where to look for where a gap is. Each step gets a
+wall-clock deadline (#535): a step still held after the frame deadline (`--seconds` × 4 s; the first step the level's 60 s
+load on top) fails with `never settled: step N held … frames` (React committing on every held frame) or `the level registered no
+waves` (`nextWave()` still null), and the ride step stops at that same deadline with the same no-waves line instead of
+holding for it. A level over
 its `budgets.json` `pacing` ceilings (`longestGapSeconds`, `noTargetShare`) fails with the gap named (`longest gap 9.0 s at
-7.0 s (track 0.03) over budget 3 s`); only the Director lowers or raises them. A level takes 120 steps plus about one held frame each
+7.0 s (track 0.03) over budget 3 s`); only the Director lowers or raises them. A level whose entry names `knownOver: "#<open issue>"` only
+prints a WARN line until that issue lands. Besides the nightly, CI runs this step on a PR for every level the PR can change
+(`pacing (<level>)` jobs, which `verify` requires; `scripts/ciPlan.cjs` `pacingLevels`: the level's biome folder, or every level for
+`src/track/`, `src/levels/LevelRegistry.ts`, `src/levels/pacing.ts`, `src/entities/spawning/` or this metric, #761). A level takes 120 steps plus about one held frame each
 (~260 frames; ~4.5 min in a 2-core session; its summary line prints both), so run one at a time: `--steps pacing --levels level4`.
 `drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
 spawned enemies) and vary run to run; for before/after comparisons use the
@@ -179,14 +215,17 @@ so a later moment has more waves on screen). `budgets.json` `scene` holds per-le
 vary) and on the scene / track objects and triangles (+15%); a level past one fails with `over budget: scene objs=560 (budget 551)`
 (`perfGate` in `results.json`). A level whose entry has `knownOver: "#<open issue>"` only prints a WARN line until that issue lands
 (then drop the key). `--no-perf-gate` skips the gate for local experiments. Ceilings are budgets: only the Director raises them.
-A level scaffolded by `npm run new-world` (#460) starts with a `placeholder` entry in `scene` and `pacing`: a local run of its ride
-(or `pacing` step) writes the first ceilings from what it measured, by the same headroom rules, into `budgets.json`; on CI a placeholder
-fails with the numbers to paste.
+A level scaffolded by `npm run new-world` (#460) starts with a `placeholder` entry in `scene` and `pacing`: each clean local run of its ride
+(or `pacing` step: no other problem, every number finite) records what it measured in the placeholder's `runs`, and the second writes
+the first ceilings from the higher of the two, by the same headroom rules, into `budgets.json` (`e2e/placeholderBudget.mjs`, #552); a run
+with any other problem prints `placeholder not set` and records nothing. On CI a placeholder fails.
 **Programs after the warm-up (#536):** every level's ride (and every `pacing` run, the whole level) ends its summary line with
 `programs after warm-up: +N [+2 at 12.3 s playing (wave:incoming, enemy:killed); …]`: shader programs compiled past the level's
 warm-up count, each with the level time, phase and the bus events since the frame before (`programGrowth` on the hook, `shaders`
-in `results.json`). Every one is a shader `ShaderWarmup` missed, a freeze on a slow driver (Safari links on first draw); it is
-reported, not failed, until the fixes land (the first-shot check in the `countdown` step does fail on one).
+in `results.json`). Every one is a shader `ShaderWarmup` missed, a freeze on a slow driver (Safari links on first draw). The
+nightly's `slow` and `pacing` parts (and `--gate-programs`) fail a level with one (#539: `programGateProblem` in pure
+`e2e/slowPass.mjs`, the problem names the moments); everywhere else, the PR shards among them, it is reported only (the
+first-shot check in the `countdown` step does fail on one).
 **Late level chunk (`--level-chunk-delay <ms>`, #464):** every page gets the level scene's lazy chunk that many ms late, the
 slow sandbox where `quality` and `pickup` measured the composer alone (17 draw calls) before the level had loaded. Every step
 that starts a level waits for `levelReady()`, so any step must pass with it (`--steps quality,pickup,pause --levels level1
@@ -194,7 +233,9 @@ that starts a level waits for `levelReady()`, so any step must pass with it (`--
 **Slow machine (`--cpu-throttle <rate>`, #536):** the ride step runs each level under CDP `Emulation.setCPUThrottlingRate`
 (4 is a modest laptop) and adds `cpu 4x: longest frame X ms, frames of 100 ms or more: N` (`throttled` in `results.json`, from
 `maxFrameMs` and `longFrames` on the hook: the ride's frames from the end of the level's warm-up, #541; combat, the shot and the
-results then run unthrottled). Software GL makes the absolute numbers slow; compare runs, and nothing fails on them yet.
+results then run unthrottled), and writes `throttle.json` (per level: `maxFrameMs`, `longFrames`, `programsAfterWarmup`, #539).
+Software GL makes the absolute numbers slow; compare runs, and nothing fails on the frame numbers yet. The nightly's `slow` part
+is this at 4x on level1 and level3's ride + results, so `prod-e2e-results-slow/throttle.json` is the trend, night by night.
 
 ## Steps, shards and the time budget (`e2e/shards.mjs`, #353)
 
@@ -205,7 +246,7 @@ first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ri
 (hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: its intro tour pinned at four marks, #675, on the level held at its start (`timerStep` / `rideRate` 0), which the ride then goes on from: one mount; at each mark the camera must be on the tour and over the ground, at the landmark looking at it; the ride, the perf
 gate, the enemy probe, combat, the level's end), on the ride's own page `tour` (before the ride: each tour mark also shot, `<id>-tour-{reveal,landmark,track,landing}.png`, and not blank; nightly only, a capture costs ~15 s on a software renderer), `shot` (the frozen fresh shot and aim jump),
 `results` (the results screen's reveal, stats, buttons, board) and `share` (its Share line, menu and score cards); and
-`pacing` (every level, a whole run on its own page) and `wave`, `boss`, `pickup`, `audio` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its
+`pacing` (every level, a whole run on its own page) and `wave`, `weather`, `boss`, `pickup`, `audio`, `night` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its
 checks disagree). A step that runs on another's page needs it in the same run (`tour` needs `ride`, `share` and `frenzy` need `ride` and
 `results`, `mobileMenus` needs `mobile`). `--steps ride,boss --levels level2` runs just those. Without `--steps` every
 desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desktop` leaves `title` and the phone run.
@@ -213,7 +254,7 @@ desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desk
 **Two depths (#372).** The PR smoke is rendering and integration: CI runs the shards in `SHARDS`, one `smoke (<name>)`
 job each (`ci.yml` matrix): `ui` (title, landing), `menus` (levelSelect, settings), `level1` (ride, shot, results), `level1-steps`
 (quality, speed), `level2`…`level5` (ride) and `mobile`. The **deep** checks, everything else (`nightlyOnly()` in
-`shards.mjs`: daily, frenzy, seed, pause, countdown, tour, wave, boss, pickup, audio, share, pacing, `mobileMenus`, and shot / results
+`shards.mjs`: daily, frenzy, seed, pause, countdown, tour, wave, weather, boss, pickup, dark, audio, night, share, pacing, `mobileMenus`, and shot / results
 on levels 2–5), run in the full smoke, which the nightly production run makes (`prod-smoke.yml`, below): they are either
 game logic a unit test covers next to its pure module (the table below), or a browser check too slow for every PR. A red
 nightly opens the `agent:prod-broken` P1 issue the Maintainer takes first. To reproduce one, run its step:
@@ -231,6 +272,7 @@ ridden on the PR, that the nightly job runs the full smoke, and that the shards,
 | `pause` | `waveSchedule.test.ts` (#152, #198), `useGameStore.test.ts` "pause and resume", "combo" (ignores the wall clock), `pauseMenu.test.ts` | tab hide / blur, the pause card |
 | `countdown` | `startPhase.test.ts`, `loadProgress.test.ts`, `introCamera.test.ts`, `useGameStore.test.ts` "startRun", `programReadiness.test.ts`, `startupMarks.test.ts` | the loading screen, the intro's length and skip, Ready / Set / GO, no new shader on the first shot |
 | `wave` | `waveSchedule.test.ts` (tell 1 s early, on time, no replay after a pause), `spawnPlacement.test.ts` (the V) | the V of crows on screen |
+| `weather` | `weatherPulse.test.ts` (the fog back to the biome's own, the levels' pulses) | the pulse on screen, the enemies in it |
 | `boss` | `bossModel.test.ts`, `krakenMotion.test.ts`, `scorpionMotion.test.ts` (the `turntable` workflow draws every boss on PRs touching `src/entities/`) | the full fights |
 | `pickup` | `weaponTypes.test.ts`, `pickupPlacement.test.ts`, `useGameStore.test.ts` (a run starts with the blaster) | the shot pickup, fan and badge |
 | `audio` | `src/audio/scrim/*.test.ts` (layers, scheduler, score), `arcade.test.ts`, `AudioEngine.test.ts` | the score engine and arcade SFX in a page |
@@ -270,7 +312,7 @@ without `portal`.
 Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it hit its cap):
 
 - **Deploy health check** after every production deploy (`deployment_status`, 8 min cap, ~3 min): `npm run prod-check -- --url <site>`
-  (`e2e/prod-check.mjs`). The full smoke already passed in `verify` on the deployed commit; this asks whether the deploy
+  (`e2e/prod-check.mjs`). CI's `verify` (the PR depth: every smoke shard) already passed on the deployed commit, and the full smoke runs nightly below; this asks whether the deploy
   arrived intact. It needs a local build of that commit (CI: `VERCEL=1 npx vite build`) for the list of files to expect.
   `assets`: every file of `dist/` outside `assets/` at its path, and every hashed chunk under its deployed name (matched by
   name without the hash; the deployed names come from crawling the deployed page, stylesheet and chunks, so the lazy
@@ -278,7 +320,7 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   `vercel.json` sets (`scripts/vercelRoutes.mjs`: hashed `assets/` a year `immutable`, nothing else cached a day or more);
   `routes`: `/go/prod-check` is the game page, an unknown path a real 404 with `404.html`, `GET /api/leaderboard?level=level1` the CDN-cached top 10 (on a 200 it GETs again 3 s later and wants `x-vercel-cache: HIT` / `STALE`, since Vercel's CDN strips `s-maxage` from what clients see, #397) or, while the board is unavailable (no env vars, a paused project; always when serving dist/ locally), a bare uncached 503, never a 500, a 404 or a leak; `title`: boots with no page error
   or failed same-origin request, the 3D scene not blank (`prod-title.png`); `level`: level1 rides, a real click fires,
-  `killNearest(3)` reaches `enemy:killed` (`prod-level.png`); `phone`: iPhone 13 portrait, tap PLAY, tap the level1 card,
+  `killNearest(3)` reaches `enemy:killed` (`prod-level.png`); `phone`: iPhone 13 portrait, tap PLAY, which starts level1 on a fresh save (#329; `--level` other than level1: tap WORLDS, then its card),
   3 taps at enemies fire, a kill (`prod-phone.png`). Rules in pure `scripts/prodCheckRules.mjs`. Writes `prod-check.json`
   (`checks`, `running`, `finished`) after every check, so a run stopped at its cap still says where it was. Without
   `--url` it serves `--dist` (default `dist/`) on localhost the way `vercel.json` says Vercel would, for local runs.
@@ -287,31 +329,44 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   out run (#372, "Two depths" above). One run outgrew its 60 min cap once level 6 joined every deep step (#570), so it runs
   as three parallel jobs, each under its own 60 min cap: `node e2e/smoke.mjs --nightly-part <main|deep|pacing> --url <site> --seconds 10`
   (`e2e/shards.mjs` `NIGHTLY_PARTS`: `main` the UI, first-level and phone steps and every level's ride / shot / results / share,
-  `deep` wave / boss / pickup / audio, `pacing`; `shards.test.ts` holds the parts to the full run and to the workflow's matrix).
+  `deep` wave / weather / boss / pickup / switch / dark / audio, `pacing`; `shards.test.ts` holds the parts to the full run and to the workflow's matrix).
+  A fourth, `slow` (#539), is an `extra` part outside that count: level1 and level3's ride + results again under `--cpu-throttle 4`
+  (the part sets it), writing `throttle.json`. `slow` and `pacing` set `gatePrograms`: a shader compiled after the warm-up fails the level.
   Each part's artifact is `prod-e2e-results-<part>` (its screenshots, `results.json` and `exit-code`); the `nightly` job folds
   them into one verdict with `scripts/nightlyParts.cjs` (a part that hit its cap or left nothing shows as a failed `part <name>`).
-  A part that nears its cap splits again the same way.
+  A part that nears its cap splits again the same way. An exception that escapes the run still writes `results.json` with
+  what finished, plus a failed `crash` check naming it.
+  **Production redeploys mid-run** (#822): `main` deploys whenever an approved PR merges, and Vercel's atomic deploy removes
+  the old build's hashed chunks, so a part can fail on a lazy chunk that no longer exists (`Failed to fetch dynamically
+  imported module`). With `--url`, the smoke fingerprints the deployed build at the start (`index.html`'s entry script and
+  modulepreloads, `e2e/buildFingerprint.mjs`, printed as `build under test: …`) and again when the run fails or throws.
+  When it changed, the failed checks are marked `inconclusive`, a failed `build` check says
+  `production redeployed mid-run (index-AAA.js → index-BBB.js): no single build tested`, and the part exits 3. Such a part
+  is neither red nor green: if no other part is red, the verdict is inconclusive (exit 3), the `nightly` job stays green
+  with a warning, and `prod-alert.cjs` neither opens nor closes the issue; the next nightly tests the new build. A
+  failure on an unchanged (or unreadable) fingerprint stays red exactly as before. It is not re-run in the same job: a
+  part takes most of its 60 min cap.
 
 `scripts/prod-alert.cjs` reports both: one `agent:prod-broken` issue per suite (marked `<!-- prod-smoke:<suite> -->`),
 opened on a green → red transition with the failed checks (or "timed out after N min, no check failed"), silent while it
-stays open, commented on and closed by the next green run of that suite. CI's red-`main` issue is separate. Manual runs:
+stays open, commented on and closed by the next green run of that suite; an inconclusive nightly (above) does neither. CI's red-`main` issue is separate. Manual runs:
 Actions → Production smoke → `suite` (deploy / nightly), `dry_run` to open or close nothing.
 
 
 ## Test hook (`?e2e=1` → `window.__SC_TEST__`)
 
 Test hook: load the game with `?e2e=1` and use `window.__SC_TEST__`
-(`levels()` (each with its `maxScore`, `nextLevel` and `unlocked` now), `startLevel(id, seed?)` (synchronous; under `?e2e=1` the run is `playing` at once, before its lazy scene may have loaded), `levelReady()` (the current level's scene has loaded, mounted and warmed up: a step that measures a level waits for it first, #464), `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `setLeaderboards(boards, lastInitials?)` / `leaderboards()` (local top 10s), `onlineBoard(endpoint | null)` (the results screen's online board on that endpoint, for a stubbed API; null is off, as every `?e2e=1` page starts), `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `scoreCard(size)` (the results share image for the current run, `feed` or `story`: pixel size, PNG data URL, file name), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time, level time, due wave and the wave tick before it), `nextWave()` → level time now + when the next wave is due + the last wave tick, `waveTellSeconds`, `timerStep` (seconds of level time + game clock per frame; null is the frame time), `timerStepMax` (a cap on that per frame: slower frames count as this much; null is none), `rideRate` (seconds of ride per second of level time; null rides the frame time), `titleTime` (seconds since the title appeared, held: the title camera stays at that pose; null runs it; `npm run og -- --poster` renders the posters with it), `titleAttractIdleMs` (idle ms before the title's attract mode, #419; null, as every `?e2e=1` page starts, never enters it; `npm run clip -- --title --attract` sets 0), `holdLevelTime` (true holds the level timer, so no time runs out and no wave or boss comes due, while the game clock, enemies, effects and combo keep running), `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `longFrames` (frames of 100 ms or more, telemetry's `LONG_FRAME_MS`, since a test set it to 0), `programs()` (compiled shader programs), `programGrowth` (frames that compiled programs past the level's warm-up: level time, phase, added, total, events; cleared when a warm-up starts), `cameraPose()` (position + view direction), `pointCentreColour(name)` (the linear RGBA a scene `Points`' first point blends to over opaque grey with its centre exactly on a pixel centre, in a 1×1 float target),
+(`levels()` (each with its `maxScore`, `nextLevel`, `unlocked` now and `weather`: kind, wave time `at`, `seconds`, or null), `startLevel(id, seed?)` (synchronous; under `?e2e=1` the run is `playing` at once, before its lazy scene may have loaded), `levelReady()` (the current level's scene has loaded, mounted and warmed up: a step that measures a level waits for it first, #464), `primeCombo(n)` (live chain of n kills, last one now), `setPhase(phase)`, `setSavedScores(scores)`, `setLeaderboards(boards, lastInitials?)` / `leaderboards()` (local top 10s), `onlineBoard(endpoint | null)` (the results screen's online board on that endpoint, for a stubbed API; null is off, as every `?e2e=1` page starts), `daily()` (today's UTC key, seed, level; the run's mode, saved daily bests, streak), `shareText()` (what the results Share button sends for the current level + score), `scoreCard(size)` (the results share image for the current run, `feed` or `story`: pixel size, PNG data URL, file name), `spawnDigest()` → hash of the run's spawn positions (formation members: their seeded slots), `waveEvents` (every `wave:incoming` / `wave:announce` with its time, level time, due wave and the wave tick before it), `nextWave()` → level time now + when the next wave is due + the last wave tick, `waveTellSeconds`, `timerStep` (seconds of level time + game clock per frame; null is the frame time), `timerStepMax` (a cap on that per frame: slower frames count as this much; null is none), `rideRate` (seconds of ride per second of level time; null rides the frame time), `titleTime` (seconds since the title appeared, held: the title camera stays at that pose; null runs it; `npm run og -- --poster` renders the posters with it), `titleAttractIdleMs` (idle ms before the title's attract mode, #419; null, as every `?e2e=1` page starts, never enters it; `npm run clip -- --title --attract` sets 0), `holdLevelTime` (true holds the level timer, so no time runs out and no wave or boss comes due, while the game clock, enemies, effects and combo keep running), `frames`, `drawCalls`, `triangles`, `avgFrameMs`, `maxFrameMs` (longest frame since a test set it to 0), `longFrames` (frames of 100 ms or more, telemetry's `LONG_FRAME_MS`, since a test set it to 0), `programs()` (compiled shader programs), `programGrowth` (frames that compiled programs past the level's warm-up: level time, phase, added, total, events; cleared when a warm-up starts), `cameraPose()` (position + view direction), `pointCentreColour(name)` (the linear RGBA a scene `Points`' first point blends to over opaque grey with its centre exactly on a pixel centre, in a 1×1 float target),
 `errors`, `phase()`, `enemies()` → on-screen enemies with projected px, `stats()` → score/kills/combo/multiplier/timeScale/frenzy/timeRemaining/phase/liveEnemies/
 onScreenEnemies/onScreenBystanders/levelBystanders/bystandersHit/shotsFired/hits/bestCombo/runSeed/currentLevel, `autoFire(on)`, `shootBystander()` (the nearest live
 bystander through `processHit`; `{ id, penalty }` or null), `killNearest(n)` (never a boss weak point or a bystander; fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
 `fireShot(x, y)` (one real shot through NDC), `bullets()` → drawn count, largest screen radius now / since load, newest bullet's
-screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)` (an override over the slow-mo envelopes; 1 clears it), `gpuMemory()` (`renderer.info.memory` textures / geometries), `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideProgress` (its track fraction on the last frame), `rideSpeed` (set 0–1 to put the coaster at that speed; ignored on a `ride: v2` level, which follows its solved plan, #696), `sceneStats()`, `combat` fire/hit/kill event counters,
+screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)` (an override over the slow-mo envelopes; 1 clears it), `gpuMemory()` (`renderer.info.memory` textures / geometries), `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideProgress` (its track fraction on the last frame), `rideBeats()` (the level's v2 ride beats: track fraction and second), `rideSpeed` (set 0–1 to put the coaster at that speed; ignored on a `ride: v2` level, which follows its solved plan, #696), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
 {current, max} in degrees, `cameraWeight` → bank / pitch / speed + drop FOV kick now and max (degrees), smoothed speed 0–1, wind-streak opacity, the caps the smoke checks (`caps`, from the source constants), `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
 `view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `graphics()` → quality setting, its preset, adaptive steps, reduced motion, `audio()` → unlocked?, score engine chunk loaded? (`engineLoaded`; the title step fails it before the first key press), long-lived SFX node count, arcade voice pool (`sfxVoices`: budget / live / peak / stolen / rejected, and `ui`: countdown and UI blips played on their own voices past the pause gate), music ducked? (the slow-mo low-pass), the pause mix on? (`pauseMix`: music down and low-passed, SFX silent), sounds dropped by a caught audio error, `music` (live music buses with their gain + the last few fade ramps), `scrim` (score engine: current score, tracks with the score each plays (a `?theme=` option or its own), paused + song position + `layered` / `intensity`, the asked-for `targetIntensity`, long-lived nodes, timer running),
-`audioBurst(shots, kills)` → rapid SFX in one JS turn while the audio clock ticks (every gun, kills spaced 35 ms apart on the audio clock; returns `killsPlayed`, the kills that reached the engine), `renderAudio(req, seed?)` → an offline render as base64 PCM (title screen, before audio unlocks; `npm run audio:render`; kinds music / sfxSheet / mix (`stem: 'music'`: without SFX), and `score` for one score through the port alone), `triggerHeld()` → pointer trigger down?,
+`audioBurst(shots, kills)` → rapid SFX in one JS turn while the audio clock ticks (every gun, kills spaced 35 ms apart on the audio clock; returns `killsPlayed`, the kills that reached the engine), `renderAudio(req, seed?)` → an offline render as base64 PCM (title screen, before audio unlocks; `npm run audio:render`; kinds music / sfxSheet / mix (`stem: 'music'`: without SFX), and `score` for one score through the port alone), `triggerHeld()` → pointer trigger down?, `aimPoint()` → the shared aim point `{x, y}` (CSS px; the mouse or the gamepad's cursor),
 `shaderWarmup` {levelId, done, ms, programs} for the current level, `initTimings()` (ms from navigation to each startup phase, the first time: `core/startupMarks.ts`), `summonBoss()` (the level's boss now instead of at its level time),
 `boss()` → stage / hp fraction / exposed weak points on screen (with hp) / the hull's on-screen box / live projectiles on screen, `bossHit(n)` (n hits on exposed
 weak points through `processHit`), `projectileHit()` (one hit on each live boss projectile, `boss-projectile:` targets), `bossEvents` spawn/hit/defeated counters, `fireworks()` → mounted?, launches / bursts, live rockets / bursts and the newest burst on screen, `deaths()` → death effects spawned / live, the newest one's style and origin on screen, `particles()` → the biome particle field: mounted?, points, boost-only points, boost strength now, `weaponState()` → active gun, pickup id + remaining fraction, `pickups()` → the level's weapon pickups: id, track fraction, collected?, screen point). See `src/testing/e2eHook.tsx`. Extend it when you need new test

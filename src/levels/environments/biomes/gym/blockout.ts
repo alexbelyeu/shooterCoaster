@@ -7,10 +7,11 @@
 import data from './blockout.json'
 
 /**
- * World units per metre: the 80 m hall becomes 2560 units long (#592). With the coaster at level 1's structure scale
- * (`GYM_TRACK.scalar`) the rider sits 0.19 m up in the hall and rides it as fast, against its own size, as level 1.
+ * World units per metre: the 80 m hall becomes 3840 units long (#592, #761). With the coaster at level 1's structure scale
+ * (`GYM_TRACK.scalar`) the rider sits 0.13 m up in the hall, and the ride runs at level 1's gravity and speeds in world
+ * units (`gymTrack.ts`): a small car in a big hall.
  */
-export const GYM_SCALE = 32
+export const GYM_SCALE = 48
 
 export interface Panel {
   len: number
@@ -356,27 +357,4 @@ export function treeAlong(p: Vec3): number {
 /** Out from the Tree's foot line, the way it faces (`TREE_GAP`'s `minF` / `maxF`). */
 export function treeOut(p: Vec3): number {
   return (p.x - TREE.centre.x) * TREE.facing.x + (p.z - TREE.centre.z) * TREE.facing.z
-}
-
-const glass = piece('windows', 'win-glassgym')
-const glassAxes = pieceAxes(glass.rot)
-/** The glass gym room's window band on the hall's west wall, facing into the hall. */
-export const GLASS_ROOM = {
-  centre: { x: glass.x, z: glass.z },
-  along: glassAxes.along,
-  facing: glassAxes.facing,
-  length: glass.length,
-  minY: glass.base,
-  maxY: glass.base + glass.h,
-}
-
-/** Distance from a blockout point to the window band (a rectangle on the wall). */
-export function glassDistance(p: Vec3): number {
-  const dx = p.x - GLASS_ROOM.centre.x
-  const dz = p.z - GLASS_ROOM.centre.z
-  const along = dx * GLASS_ROOM.along.x + dz * GLASS_ROOM.along.z
-  const out = dx * GLASS_ROOM.facing.x + dz * GLASS_ROOM.facing.z
-  const ea = Math.max(Math.abs(along) - GLASS_ROOM.length / 2, 0)
-  const ey = Math.max(GLASS_ROOM.minY - p.y, 0, p.y - GLASS_ROOM.maxY)
-  return Math.hypot(ea, out, ey)
 }

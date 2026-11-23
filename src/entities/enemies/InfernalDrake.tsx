@@ -3,14 +3,30 @@ import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import {
-  DRAKE_BODY_GEO, DRAKE_HEAD_GEO, DRAKE_SPIKE_GEO,
-  DRAKE_TAIL_GEO, DRAKE_WING_GEO, DRAKE_EYE_GEO, DRAKE_JAW_GEO,
-  DRAKE_BODY_MAT, DRAKE_WING_MAT, DRAKE_SPIKE_MAT, DRAKE_EYE_MAT,
+  DRAKE_BODY_GEO, DRAKE_ELBOW, DRAKE_JAW_GEO, DRAKE_JAW_HINGE, DRAKE_MAT, DRAKE_NECK_GEO, DRAKE_NECK_ROOT,
+  DRAKE_SHOULDER, DRAKE_TAIL_GEO, DRAKE_TAIL_ROOT, DRAKE_WING_ARM_GEO, DRAKE_WING_HAND_GEO,
 } from './SharedEnemyAssets'
 
+/** Wing beats (radians per game second); the hand trails the arm by `HAND_LAG`. */
+const FLAP_RATE = 3
+const HAND_LAG = 0.9
+/** Bank into its circle (it always turns left, towards the orbit's centre). */
+const BANK = 0.28
+
+/** Both wings' moving parts: the right one, and the left one mirrored by its parent. */
+type WingRefs = { arm: THREE.Mesh | null, hand: THREE.Mesh | null }
+
+function poseWings(wings: WingRefs[], arm: number, hand: number) {
+  for (const w of wings) {
+    if (w.arm) w.arm.rotation.z = arm
+    if (w.hand) w.hand.rotation.z = hand
+  }
+}
+
 /**
- * Large flying dragon enemy. Slow circling flight at high altitude.
- * Multi-joint wing flap, tail undulation, jaw open/close.
+ * A long-necked dragon (brief: docs/art/ENEMIES.md) circling high over the Inferno, in eight draw calls of one
+ * material: torso, neck, jaw, tail and each wing's arm and hand. Its wings beat, the hands trailing, its neck sways and
+ * its tail swings; it banks into its circle. Shot, it roars: head reared back, jaw open, wings thrown up.
  */
 export default function InfernalDrake(props: EnemyProps) {
   const { orbitSpeed, orbitRadius, orbitOffset, flapOffset } = useEnemyRandom(props.id, (rng) => ({
@@ -20,124 +36,71 @@ export default function InfernalDrake(props: EnemyProps) {
     flapOffset: rng() * Math.PI * 2,
   }))
 
-  const leftWingInnerRef = useRef<THREE.Group>(null)
-  const leftWingOuterRef = useRef<THREE.Group>(null)
-  const rightWingInnerRef = useRef<THREE.Group>(null)
-  const rightWingOuterRef = useRef<THREE.Group>(null)
-  const tailRef = useRef<THREE.Mesh>(null)
+  const headingRef = useRef<THREE.Group>(null)
+  const rigRef = useRef<THREE.Group>(null)
+  const neckRef = useRef<THREE.Mesh>(null)
   const jawRef = useRef<THREE.Mesh>(null)
-  const bodyGroupRef = useRef<THREE.Group>(null)
+  const tailRef = useRef<THREE.Mesh>(null)
+  const wings = useRef<[WingRefs, WingRefs]>([{ arm: null, hand: null }, { arm: null, hand: null }])
 
   const updatePosition = useCallback(
-    (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number, delta: number) => {
-      // Gradual orbit around spawn point
+    (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
       const angle = time * orbitSpeed + orbitOffset
       mesh.position.x = spawnPos.x + Math.cos(angle) * orbitRadius
       mesh.position.z = spawnPos.z + Math.sin(angle) * orbitRadius
       mesh.position.y = spawnPos.y + Math.sin(time * 0.5) * 15
 
-      // Face movement direction
-      if (bodyGroupRef.current) {
-        bodyGroupRef.current.rotation.y = -angle + Math.PI / 2
+      // Nose along its circle.
+      if (headingRef.current) headingRef.current.rotation.y = -angle
+
+      const t = time * FLAP_RATE + flapOffset
+      poseWings(wings.current, 0.55 * Math.sin(t), 0.5 * Math.sin(t - HAND_LAG))
+      const rig = rigRef.current
+      if (rig) {
+        // The body lifts on each downstroke, and pitches with its climb.
+        rig.position.y = -0.3 * Math.cos(t)
+        rig.rotation.x = -0.12 * Math.cos(time * 0.5)
+        rig.rotation.z = BANK
       }
-
-      // Wing flap — inner leads, outer trails
-      const t = time * 3 + flapOffset
-      const innerFlap = Math.sin(t) * 0.6
-      const outerFlap = Math.sin(t + 0.8) * 0.5
-
-      if (leftWingInnerRef.current) leftWingInnerRef.current.rotation.z = innerFlap
-      if (leftWingOuterRef.current) leftWingOuterRef.current.rotation.z = outerFlap
-      if (rightWingInnerRef.current) rightWingInnerRef.current.rotation.z = -innerFlap
-      if (rightWingOuterRef.current) rightWingOuterRef.current.rotation.z = -outerFlap
-
-      // Tail undulation
-      if (tailRef.current) {
-        tailRef.current.rotation.x = Math.sin(time * 2) * 0.15
-        tailRef.current.rotation.z = Math.sin(time * 1.5) * 0.1
-      }
-
-      // Jaw open/close
-      if (jawRef.current) {
-        jawRef.current.rotation.x = Math.sin(time * 1.5) * 0.1 + 0.1
-      }
+      if (neckRef.current) neckRef.current.rotation.set(0.08 * Math.sin(t), 0.22 * Math.sin(time * 0.9 + flapOffset), 0)
+      if (jawRef.current) jawRef.current.rotation.x = 0.12 + 0.08 * Math.sin(time * 1.5)
+      if (tailRef.current) tailRef.current.rotation.set(0.1 * Math.sin(time * 1.2), 0.3 * Math.sin(time * 1.6 + flapOffset), 0)
     },
     [orbitSpeed, orbitRadius, orbitOffset, flapOffset],
   )
 
+  const onHit = useCallback(() => {
+    neckRef.current?.rotation.set(-0.55, 0, 0)
+    jawRef.current?.rotation.set(0.75, 0, 0)
+    tailRef.current?.rotation.set(0.4, 0, 0)
+    poseWings(wings.current, 0.9, 0.6)
+  }, [])
+
+  const wing = (side: 0 | 1) => (
+    <group scale-x={side ? 1 : -1}>
+      <mesh
+        ref={(m) => { wings.current[side].arm = m }}
+        position={DRAKE_SHOULDER}
+        geometry={DRAKE_WING_ARM_GEO}
+        material={DRAKE_MAT}
+      >
+        <mesh ref={(m) => { wings.current[side].hand = m }} position={DRAKE_ELBOW} geometry={DRAKE_WING_HAND_GEO} material={DRAKE_MAT} />
+      </mesh>
+    </group>
+  )
+
   return (
-    <EnemyBase {...props} updatePosition={updatePosition}>
-      <group ref={bodyGroupRef} scale={[20, 20, 20]}>
-        {/* Body — serpentine dragon, rotated so length runs along Z */}
-        <mesh
-          geometry={DRAKE_BODY_GEO}
-          material={DRAKE_BODY_MAT}
-          rotation={[Math.PI / 2, 0, 0]}
-          position={[0, 0, -3]}
-        />
-
-        {/* Head */}
-        <mesh
-          position={[0, 1.5, 6]}
-          geometry={DRAKE_HEAD_GEO}
-          material={DRAKE_BODY_MAT}
-          scale={[1.2, 1, 1.3]}
-        />
-
-        {/* Eyes */}
-        <mesh position={[-1.5, 2.5, 7.5]} geometry={DRAKE_EYE_GEO} material={DRAKE_EYE_MAT} />
-        <mesh position={[1.5, 2.5, 7.5]} geometry={DRAKE_EYE_GEO} material={DRAKE_EYE_MAT} />
-
-        {/* Jaw */}
-        <mesh
-          ref={jawRef}
-          position={[0, 0.2, 7.5]}
-          geometry={DRAKE_JAW_GEO}
-          material={DRAKE_BODY_MAT}
-        />
-
-        {/* Head spikes */}
-        <mesh position={[0, 4, 5.5]} geometry={DRAKE_SPIKE_GEO} material={DRAKE_SPIKE_MAT} />
-        <mesh position={[-1.5, 3.5, 5]} rotation={[0, 0, -0.2]} geometry={DRAKE_SPIKE_GEO} material={DRAKE_SPIKE_MAT} />
-        <mesh position={[1.5, 3.5, 5]} rotation={[0, 0, 0.2]} geometry={DRAKE_SPIKE_GEO} material={DRAKE_SPIKE_MAT} />
-
-        {/* Spine ridge spikes */}
-        {[0, -2, -4, -6].map((zOff, i) => (
-          <mesh
-            key={`spine-${i}`}
-            position={[0, 3 - i * 0.3, zOff]}
-            geometry={DRAKE_SPIKE_GEO}
-            material={DRAKE_SPIKE_MAT}
-            scale={[0.6, 0.8, 0.6]}
-          />
-        ))}
-
-        {/* Left wing — inner (pivot at shoulder) */}
-        <group ref={leftWingInnerRef} position={[-3, 1.5, 0]}>
-          <mesh geometry={DRAKE_WING_GEO} material={DRAKE_WING_MAT} scale={[-1, 1, 1]} />
-          {/* Outer wing (pivot at elbow) */}
-          <group ref={leftWingOuterRef} position={[-8, 0, 0]}>
-            <mesh geometry={DRAKE_WING_GEO} material={DRAKE_WING_MAT} scale={[-0.8, 0.8, 0.8]} />
-          </group>
+    <EnemyBase {...props} updatePosition={updatePosition} onHit={onHit}>
+      <group ref={headingRef} scale={20}>
+        <group ref={rigRef}>
+          <mesh geometry={DRAKE_BODY_GEO} material={DRAKE_MAT} />
+          <mesh ref={neckRef} position={DRAKE_NECK_ROOT} geometry={DRAKE_NECK_GEO} material={DRAKE_MAT}>
+            <mesh ref={jawRef} position={DRAKE_JAW_HINGE} geometry={DRAKE_JAW_GEO} material={DRAKE_MAT} />
+          </mesh>
+          <mesh ref={tailRef} position={DRAKE_TAIL_ROOT} geometry={DRAKE_TAIL_GEO} material={DRAKE_MAT} />
+          {wing(0)}
+          {wing(1)}
         </group>
-
-        {/* Right wing — inner (pivot at shoulder) */}
-        <group ref={rightWingInnerRef} position={[3, 1.5, 0]}>
-          <mesh geometry={DRAKE_WING_GEO} material={DRAKE_WING_MAT} />
-          {/* Outer wing (pivot at elbow) */}
-          <group ref={rightWingOuterRef} position={[8, 0, 0]}>
-            <mesh geometry={DRAKE_WING_GEO} material={DRAKE_WING_MAT} scale={[0.8, 0.8, 0.8]} />
-          </group>
-        </group>
-
-        {/* Tail */}
-        <mesh
-          ref={tailRef}
-          position={[0, 0, -9]}
-          geometry={DRAKE_TAIL_GEO}
-          material={DRAKE_BODY_MAT}
-          rotation={[Math.PI / 2 + 0.2, 0, 0]}
-        />
       </group>
     </EnemyBase>
   )

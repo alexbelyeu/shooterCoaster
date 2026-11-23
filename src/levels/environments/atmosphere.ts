@@ -1,5 +1,6 @@
 import type { BiomeType } from '@/types/level'
 import type { GradeConfig } from '@/canvas/post/colourGrade'
+import type { AerialFogConfig } from './shared/aerialFog'
 
 /**
  * Per-biome atmosphere: sky dome gradient, sun, ambient (hemisphere) light,
@@ -58,6 +59,12 @@ export interface AtmosphereConfig {
   grade: GradeConfig
   /** Puts the composer's `HeatShimmerEffect` in for this biome: it has a fire that aims it (the gym's Flame, #627). */
   heatShimmer?: boolean
+  /** How hard the biome's own lamps burn (bulbs, lit cabins), 0 or absent by day: a night preset sets it (#829). */
+  lampGlow?: number
+  /** Scales every enemy's rim light (`setRimLift`), 1 or absent by day: a night preset lifts it so enemies read (#829). */
+  enemyRimLift?: number
+  /** The fog's tint towards and away from the sun (`shared/aerialFog.ts`, #836); absent derives it from the sky. */
+  aerialFog?: AerialFogConfig
 }
 
 export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
@@ -253,6 +260,8 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
       vibrance: 0.15,
       vignette: 0.36,
     },
+    // No sun glow in the ash sky, but the haze still burns orange towards the volcano's key light
+    aerialFog: { strength: 0.6 },
   },
   // Climbing Gym (#517), an interior: the dome is never seen (the hall's ceiling covers it) but bakes the walls'
   // reflections. Bushwick-dim since #593: the "sun" is cool daylight slanting in from the high windows, the hemisphere
@@ -281,9 +290,9 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     hemiSkyColor: 0x8d9aac,
     hemiGroundColor: 0x4a3e33,
     hemiIntensity: 1.05,
-    // The hall's haze at its size (GYM_SCALE 32, #592): a dusty brown-grey that swallows the far end a little.
-    fogNear: 1400,
-    fogFar: 11000,
+    // The hall's haze at its size (GYM_SCALE 48, #761): a dusty brown-grey that swallows the far end a little.
+    fogNear: 2100,
+    fogFar: 16500,
     envIntensity: 0.28,
     // Gritty: teal shadows, sodium-warm highlights, more contrast, a heavy vignette; holds still vivid
     grade: {

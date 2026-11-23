@@ -2,6 +2,7 @@
 import type { EnemyType } from '@/types/level'
 import type { KillSound } from '@/audio/sfxDesign'
 import type { Vec3 } from '@/entities/spawning/spawnPlacement'
+import { DUST_CHALK, DUST_DARK, DUST_GREY, DUST_LIGHT } from '@/entities/enemies/enemyPalette'
 
 /** `chunk` layers draw in the lit chunk mesh; every other shape is a stretched unlit box. */
 export type ParticleShape = 'spark' | 'mote' | 'confetti' | 'feather' | 'drop' | 'chunk'
@@ -134,6 +135,9 @@ export const KRAKEN_SPLASH_DEATH_STYLE: DeathStyle = {
   lifetime: 1.8, scale: 2.4, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'splash',
 }
 
+/** Ocean's breaching whale crashing back (#793), ~3.7 km off: the Kraken's splash, a plume ~300 units high. */
+export const WHALE_SPLASH_DEATH_STYLE: DeathStyle = { ...KRAKEN_SPLASH_DEATH_STYLE, scale: 10 }
+
 /** The Giant Scorpion's broken claws and tail segments: plum-black chitin and amber joint shards in a puff of sand. */
 export const SCORPION_SHARD_DEATH_STYLE: DeathStyle = {
   layers: [
@@ -184,6 +188,7 @@ export const SNOW_BURST_DEATH_STYLE: DeathStyle = {
   lifetime: 1.9, scale: 3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'crunch',
 }
 
+/** A lava golem's death; the Titan's parts throw more of the same. */
 const LAVA_CHUNKS = (count: number) =>
   layer({ shape: 'chunk', count, colors: ['#1c1412', '#2e1c16', '#4a2414', '#ff6a10'], speed: [30, 80], up: 50, drag: 0.4, gravity: 130, size: 9, spin: 4, hold: 0.75 })
 const LAVA_SPARKS = (count: number) =>
@@ -288,10 +293,7 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
     lifetime: 1.4, scale: 1.2, lift: 6, flash: 7, flashColor: '#ff5a20', sound: 'hiss',
   },
   lavaGolem: {
-    layers: [
-      layer({ shape: 'chunk', count: 5, colors: ['#1c1412', '#2e1c16', '#4a2414'], speed: [30, 70], up: 40, drag: 0.4, gravity: 130, size: 9, spin: 4, hold: 0.75 }),
-      layer({ shape: 'spark', count: 38, colors: ['#ff6a10', '#ffb030', '#ff3a08'], glow: 3.5, speed: [30, 120], up: 50, drag: 1.4, gravity: 120, size: 2.6, hold: 0.2 }),
-    ],
+    layers: [LAVA_CHUNKS(5), LAVA_SPARKS(38)],
     lifetime: 1.8, scale: 2.4, lift: 100, flash: 8, flashColor: '#ff6a20', sound: 'crunch',
   },
   infernalDrake: {
@@ -322,8 +324,8 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
   // The climber's chalk-puff family, greyer and fuller: dust and chalk, a few drifting fluff tufts.
   dustBunny: {
     layers: [
-      layer({ shape: 'mote', count: 36, colors: ['#bdb9b1', '#9a968e', '#f6f5f0'], glow: 1.1, speed: [12, 55], up: 8, drag: 2.4, gravity: 3, size: 7, hold: 0.5 }),
-      layer({ shape: 'feather', count: 8, colors: ['#76726b', '#9a968e'], glow: 1, speed: [20, 50], up: 20, drag: 3, gravity: 12, size: 4, spin: 6, hold: 0.6 }),
+      layer({ shape: 'mote', count: 36, colors: [DUST_LIGHT, DUST_GREY, DUST_CHALK], glow: 1.1, speed: [12, 55], up: 8, drag: 2.4, gravity: 3, size: 7, hold: 0.5 }),
+      layer({ shape: 'feather', count: 8, colors: [DUST_DARK, DUST_GREY], glow: 1, speed: [20, 50], up: 20, drag: 3, gravity: 12, size: 4, spin: 6, hold: 0.6 }),
     ],
     lifetime: 2.2, scale: 1.3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'chalk',
   },

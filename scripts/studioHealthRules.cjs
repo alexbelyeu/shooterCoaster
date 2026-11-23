@@ -16,7 +16,7 @@ const CAN_FIX_A_CHECK = /^(src|e2e|public|api|scripts)\/|^\.github\/workflows\/|
 const GAME_JOB = /^(verify|portal|smoke\b|deploy|nightly)/
 /** Jobs on main whose failure already opens `agent:prod-broken` (ci.yml's `verify` gate and what it needs; prod-alert.cjs). */
 const ALERTED_ON_MAIN = {
-  '.github/workflows/ci.yml': /^(verify|changes|unit|lighthouse|smoke)\b/,
+  '.github/workflows/ci.yml': /^(verify|changes|unit|lighthouse|smoke|pacing)\b/,
   '.github/workflows/prod-smoke.yml': /./,
 }
 /** prod-smoke.yml's nightly runs at 06:00 UTC: older than this, GitHub's cron ran late or skipped it (#487). */
@@ -24,6 +24,8 @@ const NIGHTLY_OVERDUE = 26 * HOUR
 /** How long a scheduled run gets to finish and post to the token ledger before it counts as missed. */
 const SLOT_GRACE = 2 * HOUR
 const STALL_SLOTS = 2
+/** No Builders run for this long with work ready is a finding (rule 4b). */
+const BUILDERS_IDLE = 3 * HOUR
 /** A run over this many weighted tokens is filed (`heavy:<role>`): a typical run is 0.1–2.5M. */
 const HEAVY_RUN = 5e6
 
@@ -115,7 +117,7 @@ function nextMainPass(snap, mainRuns, r, jobName) {
  *   now, runs: [{ id, name, path, event, conclusion, head_branch, head_sha, created_at, html_url, prNumber,
  *                 jobs?: [{ name, conclusion, started_at, completed_at, steps, html_url, timedOut?, errors? }] }],
  *   prFiles: { [prNumber]: string[] }, mainDiffs: { ['<sha>...<sha>']: string[] }, timeouts: { [workflowPath]: { [jobOrStep]: minutes } },
- *   openPrs: [{ number, title, labels: string[], created_at, updated_at, labelledAt?: { [label]: iso } }],
+ *   openPrs: [{ number, title, head?: string (the branch), labels: string[], created_at, updated_at, labelledAt?: { [label]: iso } }],
  *   openIssues: [{ number, title, labels: string[], created_at, fixMergedAt?: ms | null, nightlyAlert?: boolean }],
  *   prod: { nightly: { at, conclusion } | null, deploy: { at, conclusion } | null } (the newest of each prod-smoke.yml suite),
  *   closedAt: { [key]: ms }, lastAgentActivity: ms | null, paused: boolean,
@@ -294,12 +296,48 @@ function findings(snap) {
     }
   }
 
+  // 4b. Builders idle: issues ready, nothing paused, the day's builder_runs_per_day not spent, and no Builders run
+  // logged for BUILDERS_IDLE. Rule 4 can't see this: on 19-20 Nov the control center's loop stopped and Builders sat
+  // idle for 11 h while QA runs kept posting to the ledger. Runs from the control center and the schedule both log.
+  if (!snap.paused && Array.isArray(snap.builderRuns)) {
+    const labelledAt = (i) => (i.labelledAt?.['agent:ready'] ? Date.parse(i.labelledAt['agent:ready']) : -Infinity)
+    const ready = snap.openIssues.filter((i) => i.labels.includes('agent:ready') && !i.labels.includes('epic'))
+    const lastBuilders = Math.max(-Infinity, ...snap.builderRuns)
+    const idleSince = Math.max(lastBuilders, snap.pauseEndedAt ?? -Infinity, Math.min(...ready.map(labelledAt)))
+    const spent = snap.builderRuns.filter((b) => b > now - 24 * HOUR).length >= (snap.builderBudget ?? Infinity)
+    if (ready.length && !spent && Number.isFinite(idleSince) && now - idleSince > BUILDERS_IDLE) {
+      const hours = Math.round((now - idleSince) / HOUR)
+      out.push({
+        state: true,
+        lastSeen: now,
+        key: 'builders-idle',
+        title: `Builders idle: no Builders run for ${hours} h while ${ready.length} issues are ready`,
+        owner: 'alex',
+        body: `${ready.length} issues are \`agent:ready\`, the studio isn't paused and today's \`builder_runs_per_day\` isn't spent, but no Builders run has posted to the token ledger since ${new Date(idleSince).toISOString().slice(0, 16)}Z. ` +
+          'Builders are started by the control center\'s Keep building loop (and the scheduled Builders task as a backstop), so one of those has stopped starting them: check Keep building and its waiting reason in the control center, and the "ShooterCoaster · Builder" task\'s last runs.',
+      })
+    }
+  }
+
   // 5. Stuck PRs, timed from when the label was added.
   const since = (p, label) => Date.parse(p.labelledAt?.[label] || p.updated_at)
   for (const p of snap.openPrs) {
     if (!p.labels.includes('agent:qa-approved')) continue
     const age = now - since(p, 'agent:qa-approved')
     if (age <= 3 * HOUR) continue
+    // automerge.cjs merges only `agent/*` branches (DECISIONS 2026-10-19): Alex merges his own, so it's his to do.
+    if (p.head && !p.head.startsWith('agent/')) {
+      out.push({
+        state: true,
+        lastSeen: now,
+        key: `merge-own:${p.number}`,
+        title: `Your approved PR #${p.number} waits for you to merge it`,
+        owner: 'alex',
+        body: `#${p.number} (${p.title}) has been \`agent:qa-approved\` for over 3 h. Its branch \`${p.head}\` isn't an \`agent/*\` branch, ` +
+          'and auto-merge only merges those, so no agent can land it: merge it yourself, or remove the label if it should wait.',
+      })
+      continue
+    }
     out.push({
       state: true,
       lastSeen: now,

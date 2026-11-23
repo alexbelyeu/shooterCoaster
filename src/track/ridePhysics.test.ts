@@ -3,8 +3,7 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { buildArcTable, distanceAtT } from './arcLength'
 import { RUN_SECONDS } from '@/levels/pacing'
-import { advanceRide, lapSeconds, nextVelocity, rideProfile, rideSpeeds, riddenBetween } from './ridePhysics'
-import type { TrackCurve } from './curves/TrackCurve'
+import { advanceRide, curveTangentY, lapSeconds, nextVelocity, rideProfile, rideSpeeds, riddenBetween, type TangentY } from './ridePhysics'
 
 describe('nextVelocity', () => {
   const speeds = { roll: 0.001, min: 0.01, max: 0.05 }
@@ -17,9 +16,10 @@ describe('nextVelocity', () => {
   })
 })
 
-describe.each(getAllLevels().map((l) => [l.id, l] as const))('%s rideProfile', (_id, level) => {
-  const table = buildArcTable(createTrackCurve(level.track))
-  const speeds = rideSpeeds(level.track)
+// Today's rule; the v2 ride's profile is rideV2.test.ts's.
+describe.each(getAllLevels().flatMap((l) => (l.track.ride === 'v2' ? [] : [[l.id, l.track] as const])))('%s rideProfile', (_id, track) => {
+  const table = buildArcTable(createTrackCurve(track))
+  const speeds = rideSpeeds(track)
   const profile = rideProfile(table, speeds, RUN_SECONDS)
 
   it('rides forward every tenth of a second', () => {
@@ -27,13 +27,13 @@ describe.each(getAllLevels().map((l) => [l.id, l] as const))('%s rideProfile', (
   })
 
   it('is the arc the coaster rides, not track fraction × length (the curve parameter is not arc length)', () => {
-    const curve = createTrackCurve(level.track)
+    const curve = createTrackCurve(track)
     const state = { progress: 0, velocity: 0, time: 0 }
     let arc = 0
     for (let k = 1; k <= 10 * 10; k++) {
       for (let f = 0; f < 6; f++) {
         const from = distanceAtT(table, state.progress)
-        advanceRide(state, curve, speeds, 1)
+        advanceRide(state, curveTangentY(curve), speeds, 1)
         arc += (distanceAtT(table, state.progress) - from + table.length) % table.length
       }
       if (k % 10 === 0) expect(Math.abs(profile[k] - arc)).toBeLessThan(0.02 * arc + 1)
@@ -49,10 +49,7 @@ describe.each(getAllLevels().map((l) => [l.id, l] as const))('%s rideProfile', (
   })
 })
 
-const flat: TrackCurve = {
-  getPointAt: () => ({ x: 0, y: 0, z: 0 }) as never,
-  getTangentAt: () => ({ x: 1, y: 0, z: 0 }) as never,
-}
+const flat: TangentY = () => 0
 
 describe('advanceRide', () => {
   const speeds = rideSpeeds({ rollerSpeed: 0.00001, minRollerSpeed: 0.0001 })
@@ -65,7 +62,7 @@ describe('advanceRide', () => {
   })
 
   it('rides a long step in steps of at most 3 frames, and caps the speed downhill', () => {
-    const downhill: TrackCurve = { ...flat, getTangentAt: () => ({ x: 0, y: -1, z: 0 }) as never }
+    const downhill: TangentY = () => -1
     const state = advanceRide({ progress: 0, velocity: speeds.min, time: 0 }, downhill, speeds, 1e6)
     expect(state.velocity).toBe(speeds.max)
     expect(speeds.max / speeds.min).toBe(5)
@@ -73,9 +70,9 @@ describe('advanceRide', () => {
 })
 
 /** Pinned (#452): a 60 s lap would ride 2.2–3.8× faster than today, a different ride, so a run rides 0.25–0.6 of a lap. */
-const LAPS: Record<string, number> = { level1: 147, level2: 165, level3: 99, level4: 193, level5: 228, level6: 63.7 }
+const LAPS: Record<string, number> = { level1: 147, level2: 165, level3: 99, level4: 193, level5: 228 }
 
-describe.each(getAllLevels().map((l) => [l.id, l.track] as const))('the ride on %s', (id, track) => {
+describe.each(getAllLevels().flatMap((l) => (l.track.ride === 'v2' ? [] : [[l.id, l.track] as const])))('the ride on %s', (id, track) => {
   it('laps in its pinned time, longer than a run', () => {
     const curve = createTrackCurve(track)
     const lap = lapSeconds(curve, rideSpeeds(track))

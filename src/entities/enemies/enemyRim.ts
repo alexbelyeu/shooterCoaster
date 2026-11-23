@@ -43,11 +43,27 @@ export const DEFAULT_RIM: Required<RimOptions> = {
   fog: 0.6,
 }
 
-const RIM_CACHE_KEY = 'sc-enemy-rim-v2'
+const RIM_CACHE_KEY = 'sc-enemy-rim-v3'
+
+/**
+ * One uniform shared by every rim material (as `FIRE_FLICKER` is by the gym's grime): it scales each rim from its
+ * own intensity. No registry, so per-enemy materials (crow, lanternfly) leave nothing behind when disposed, and a
+ * material made after `setRimLift` still gets the lift.
+ */
+export const RIM_LIFT = { value: 1 }
+
+/**
+ * Scales every enemy's rim (1 = as authored): a night atmosphere's `enemyRimLift` (#829), so enemies keep a bright
+ * edge against a dark sky. Scene-wide.
+ */
+export function setRimLift(lift: number): void {
+  RIM_LIFT.value = lift
+}
 
 const RIM_PARS = /* glsl */ `
 uniform vec3 uRimColor;
 uniform float uRimIntensity;
+uniform float uRimLift;
 uniform float uRimPower;
 uniform float uEnemyFog;
 `
@@ -55,7 +71,7 @@ uniform float uEnemyFog;
 const RIM_APPLY = /* glsl */ `
 {
   float rimNdV = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
-  outgoingLight += uRimColor * (uRimIntensity * pow(1.0 - rimNdV, uRimPower));
+  outgoingLight += uRimColor * (uRimIntensity * uRimLift * pow(1.0 - rimNdV, uRimPower));
 }
 #include <opaque_fragment>
 `
@@ -87,6 +103,7 @@ export function withRim<T extends LitMaterial>(material: T, options: RimOptions 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uRimColor = uniforms.uRimColor
     shader.uniforms.uRimIntensity = uniforms.uRimIntensity
+    shader.uniforms.uRimLift = RIM_LIFT
     shader.uniforms.uRimPower = uniforms.uRimPower
     shader.uniforms.uEnemyFog = uniforms.uEnemyFog
     shader.fragmentShader = shader.fragmentShader

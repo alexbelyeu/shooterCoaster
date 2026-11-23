@@ -3,134 +3,79 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
-import {
-  SHARK_BODY_GEO, SHARK_SNOUT_GEO, SHARK_DORSAL_GEO,
-  SHARK_TAIL_UPPER_GEO, SHARK_TAIL_LOWER_GEO,
-  SHARK_PECTORAL_GEO, SHARK_EYE_GEO, SHARK_MOUTH_GEO,
-  SHARK_TOOTH_GEO, SHARK_GILL_GEO,
-  SHARK_BODY_MAT, SHARK_SNOUT_MAT, SHARK_FIN_MAT,
-  SHARK_BELLY_MAT, SHARK_EYE_MAT, SHARK_MOUTH_MAT, SHARK_TOOTH_MAT,
-} from './SharedEnemyAssets'
+import { SHARK_BODY_GEO, SHARK_MAT, SHARK_TAIL_GEO, SHARK_TAIL_ROOT } from './SharedEnemyAssets'
 
-/** Lathe torpedo body, swept-back fins, crescent tail, teeth and gills; always faces the camera. */
+/** Tail beats (radians of swim phase per game second) and the sweep's amplitude; the body yaws against it. */
+const SWIM_RATE = 4.5
+const TAIL_SWEEP = 0.42
+const BODY_COUNTER = 0.08
+/** Roll into the turn at full sideways speed, as seen by the rider. */
+const TURN_ROLL = 0.45
+
+/**
+ * A toy shark (brief: docs/art/ENEMIES.md) in two draw calls, body and tail, nose to the rider, circling beside the
+ * track: its tail sweeps, the body swaying against it, and it rolls into its turn. Shot, it flinches nose-up.
+ */
 export default function Shark(props: EnemyProps) {
   // A circle through the spawn point, small enough to stay beside the track it was placed by (#316).
   const orbit = useEnemyRandom(props.id, (rng) => ({
     radius: 25 + rng() * 35,
     rate: (0.4 + rng() * 0.4) * (rng() < 0.5 ? -1 : 1),
     phase: rng() * Math.PI * 2,
+    swim: rng() * Math.PI * 2,
   }))
   const startTime = useRef<number | null>(null)
-  const tailRef = useRef<THREE.Group>(null)
+  // The direction it swims, (sin, cos) of its heading in world x / z.
+  const heading = useRef({ x: 0, z: 1 })
   const modelRef = useRef<THREE.Group>(null)
+  const rigRef = useRef<THREE.Group>(null)
+  const tailRef = useRef<THREE.Mesh>(null)
   const camera = useThree((s) => s.camera)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
       startTime.current ??= time
-      const { radius, rate, phase } = orbit
+      const { radius, rate, phase, swim } = orbit
       const a = phase + rate * (time - startTime.current)
       mesh.position.x = spawnPos.x + radius * (Math.cos(a) - Math.cos(phase))
       mesh.position.z = spawnPos.z + radius * (Math.sin(a) - Math.sin(phase))
       mesh.position.y = 2
+      const dir = Math.sign(rate)
+      heading.current.x = -Math.sin(a) * dir
+      heading.current.z = Math.cos(a) * dir
 
-      if (tailRef.current) {
-        tailRef.current.rotation.y = Math.sin(time * 4) * 0.3
+      const beat = Math.sin(time * SWIM_RATE + swim)
+      if (tailRef.current) tailRef.current.rotation.y = TAIL_SWEEP * beat
+      if (rigRef.current) {
+        rigRef.current.rotation.y = -BODY_COUNTER * beat
+        rigRef.current.rotation.x = 0.04 * Math.sin(time * SWIM_RATE * 0.5 + swim)
       }
     },
     [orbit],
   )
 
+  const onHit = useCallback(() => {
+    if (rigRef.current) rigRef.current.rotation.set(-0.45, 0, 0.3)
+    if (tailRef.current) tailRef.current.rotation.y = 0.8
+  }, [])
+
   useFrame(() => {
-    if (!modelRef.current?.parent) return
-    const parent = modelRef.current.parent
-    const dx = camera.position.x - parent.position.x
-    const dz = camera.position.z - parent.position.z
-    modelRef.current.rotation.y = Math.atan2(dx, dz)
+    const model = modelRef.current
+    if (!model?.parent) return
+    const yaw = Math.atan2(camera.position.x - model.parent.position.x, camera.position.z - model.parent.position.z)
+    model.rotation.y = yaw
+    // Its heading across the rider's view (the model's +x): it banks that way.
+    const across = heading.current.x * Math.cos(yaw) - heading.current.z * Math.sin(yaw)
+    model.rotation.z = -TURN_ROLL * across
   })
 
   return (
-    <EnemyBase {...props} updatePosition={updatePosition}>
-      <group ref={modelRef} scale={[10, 10, 10]}>
-        {/* Body — lathe torpedo, rotated so length runs along Z */}
-        <mesh
-          geometry={SHARK_BODY_GEO}
-          material={SHARK_BODY_MAT}
-          rotation={[Math.PI / 2, 0, 0]}
-          position={[0, 0, -2]}
-        />
-
-        {/* Belly — lighter underside, slightly smaller */}
-        <mesh
-          geometry={SHARK_BODY_GEO}
-          material={SHARK_BELLY_MAT}
-          rotation={[Math.PI / 2, 0, 0]}
-          position={[0, -1, -2]}
-          scale={[0.85, 0.85, 0.55]}
-        />
-
-        <mesh
-          position={[0, -0.3, 5.5]}
-          geometry={SHARK_SNOUT_GEO}
-          material={SHARK_SNOUT_MAT}
-          rotation={[-Math.PI / 2, 0, 0]}
-        />
-
-        {/* Dorsal fin — tall swept triangle */}
-        <mesh
-          position={[0, 2.8, 0]}
-          geometry={SHARK_DORSAL_GEO}
-          material={SHARK_FIN_MAT}
-        />
-
-        {/* Tail group — crescent shape with sway */}
-        <group ref={tailRef} position={[0, 0, -5]}>
-          <mesh geometry={SHARK_TAIL_UPPER_GEO} material={SHARK_FIN_MAT} scale={[1, 1.2, 1.2]} />
-          <mesh geometry={SHARK_TAIL_LOWER_GEO} material={SHARK_FIN_MAT} scale={[1, 1, 1]} />
+    <EnemyBase {...props} updatePosition={updatePosition} onHit={onHit}>
+      <group ref={modelRef} scale={10}>
+        <group ref={rigRef}>
+          <mesh geometry={SHARK_BODY_GEO} material={SHARK_MAT} />
+          <mesh ref={tailRef} position={SHARK_TAIL_ROOT} geometry={SHARK_TAIL_GEO} material={SHARK_MAT} />
         </group>
-
-        <mesh
-          position={[-2.5, -0.8, 2]}
-          geometry={SHARK_PECTORAL_GEO}
-          material={SHARK_FIN_MAT}
-          rotation={[0.1, 0.2, -0.3]}
-          scale={[-1, 1, 1]}
-        />
-        <mesh
-          position={[2.5, -0.8, 2]}
-          geometry={SHARK_PECTORAL_GEO}
-          material={SHARK_FIN_MAT}
-          rotation={[0.1, -0.2, 0.3]}
-        />
-
-        {/* Eyes — larger, menacing */}
-        <mesh position={[-1.8, 0.8, 4.5]} geometry={SHARK_EYE_GEO} material={SHARK_EYE_MAT} />
-        <mesh position={[1.8, 0.8, 4.5]} geometry={SHARK_EYE_GEO} material={SHARK_EYE_MAT} />
-
-        <mesh position={[0, -1.2, 5]} geometry={SHARK_MOUTH_GEO} material={SHARK_MOUTH_MAT} />
-
-        {/* Teeth — row of small cones along the mouth */}
-        {[-0.8, -0.4, 0, 0.4, 0.8].map((xOff, i) => (
-          <mesh
-            key={`tooth-${i}`}
-            position={[xOff, -1.05, 5.2]}
-            geometry={SHARK_TOOTH_GEO}
-            material={SHARK_TOOTH_MAT}
-            rotation={[Math.PI, 0, 0]}
-          />
-        ))}
-
-        {/* Gill slits — 3 per side */}
-        {[-1, 1].map((side) =>
-          [0, 0.6, 1.2].map((zOff, i) => (
-            <mesh
-              key={`gill-${side}-${i}`}
-              position={[side * 2.4, 0, 3 - zOff]}
-              geometry={SHARK_GILL_GEO}
-              material={SHARK_MOUTH_MAT}
-            />
-          ))
-        )}
       </group>
     </EnemyBase>
   )

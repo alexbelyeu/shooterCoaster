@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ATMOSPHERES } from '@/levels/environments/atmosphere'
+import { NIGHT_ATMOSPHERES } from '@/levels/environments/nightPreset'
 import { hueOf, LUMA, NEUTRAL_GRADE, whiteBalanceGains, type Rgb } from './colourGrade'
 
 const luma = (c: Rgb) => c[0] * LUMA[0] + c[1] * LUMA[1] + c[2] * LUMA[2]
@@ -40,7 +41,8 @@ describe('hueOf', () => {
 
 describe('biome grades', () => {
   it('stay in sane ranges', () => {
-    for (const [biome, { grade }] of Object.entries(ATMOSPHERES)) {
+    const nights = Object.entries(NIGHT_ATMOSPHERES).map(([biome, a]) => [`${biome} night`, a!] as const)
+    for (const [biome, { grade }] of [...Object.entries(ATMOSPHERES), ...nights]) {
       expect(Object.keys(grade).sort(), biome).toEqual(Object.keys(NEUTRAL_GRADE).sort())
       expect(grade.exposure, biome).toBeGreaterThan(0.5)
       expect(grade.exposure, biome).toBeLessThan(1.5)

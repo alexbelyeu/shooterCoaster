@@ -77,6 +77,9 @@ export function minThicknessPush(
 /** The track takes the scene's linear fog as if it ended at this fraction of its span, so far rails take the sky tint first. */
 export const TRACK_FOG_REACH = 0.25
 
+/** The rider's eye above the rails, per unit of `trackScale`. */
+export const EYE_HEIGHT = 6
+
 export function getTrackScale(scalar: number): number {
   return Math.min(2.5, Math.max(1, Math.sqrt(scalar / BASE_SCALAR)))
 }
@@ -94,6 +97,6 @@ export function getTrackDimensions(
     tieSpacing: (track.tieSpacing ?? DEFAULT_TIE_SPACING) * s,
     tieThickness: 0.6 * s,
     towerSpacing: (track.towerSpacing ?? DEFAULT_TOWER_SPACING) * s,
-    eyeHeight: 6 * s,
+    eyeHeight: EYE_HEIGHT * s,
   }
 }

@@ -14,19 +14,29 @@ import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks
 import { RIDE_PHOTO_EVENT } from '@/track/photoMarker'
 import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 import { intensityForTier } from '@/audio/scrim/layers'
+import { RESULTS_CUTS, resultsCut } from '@/audio/scores/resultsCut'
+import { runStars } from '@/levels/scoring'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
+import type { BossDefeatedEvent, BossHitEvent, BossSpawnEvent } from '@/entities/bosses/BossBase'
 import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
 import { BYSTANDER_HIT_EVENT, type BystanderHitEvent } from '@/combat/bystanders'
 import { tracePhoto } from '@/store/ridePhoto'
 
+/** The run's stars as the results screen shows them, which pick the results score's cut (#792, #797). */
+function finishedRunStars(level: string): number {
+  const config = getLevelConfig(level)
+  return config ? runStars(useGameStore.getState().score, config) : 0
+}
+
 /**
- * The level's score while it runs (held while paused, through the resume Ready / GO), the results score after it.
- * Leaving for the title or level select: the unmount fades the score, none is built to be faded (#236).
+ * The level's score while it runs (held while paused, through the resume Ready / GO), the results score after it: its
+ * win cut for 2 or 3 stars, its lose cut for 0 or 1. Leaving for the title or level select: the unmount fades the
+ * score, none is built to be faded (#236).
  */
 function followPhase(phase: GamePhase, level: string): Promise<void> {
   if (!isInRun(phase) && phase !== 'results') return Promise.resolve()
   return withScrim((p) => {
-    if (phase === 'results') p.playScore('results')
+    if (phase === 'results') p.playScore(resultsCut(finishedRunStars(level)))
     else if (phase === 'paused') p.pauseScore(true)
     else {
       p.playScore(level)
@@ -49,7 +59,10 @@ const onBystanderHit = (e: unknown) => {
   sfx().penalty(placeSound(_at.set(x, y, z)))
 }
 const onFrenzy = () => sfx().frenzy()
-const onBossHit = (e: unknown) => sfx().bossHit((e as { hpFraction?: number } | undefined)?.hpFraction ?? 1)
+const onBossHit = (e: unknown) => {
+  const { hpFraction, position } = e as BossHitEvent
+  sfx().bossHit(hpFraction, placeSound(position))
+}
 const onFireworkLaunch = (e: unknown) => {
   const { flightS = 0, timeScale = 1 } = (e as { flightS?: number; timeScale?: number } | undefined) ?? {}
   sfx().fireworkWhistle(flightS, timeScale)
@@ -59,7 +72,7 @@ const onPhoto = () => {
   sfx().shutter()
   tracePhoto('sfx')
 }
-/** An unshot snowball thumps past: the snow crunch, unplaced (it is at the camera). */
+/** An unshot snowball thumps past: the snow crunch, unplaced (it is at the camera; the event carries only its side). */
 const onSnowSplat = () => sfx().kill(0, 'crunch', null)
 
 const SFX_EVENTS: [string, (e: unknown) => void][] = [
@@ -100,15 +113,15 @@ export default function LevelAudio() {
     const playSection = (section: 'boss' | 'sting') => {
       if (isAudioReady()) withScrim((p) => p.playSection(level, section))
     }
-    const onBossSpawn = () => {
-      sfx().bossArrival()
+    const onBossSpawn = (e: unknown) => {
+      sfx().bossArrival(placeSound((e as BossSpawnEvent).position))
       playSection('boss')
     }
-    const onBossDefeated = () => {
-      sfx().bossDefeat()
+    const onBossDefeated = (e: unknown) => {
+      sfx().bossDefeat(placeSound((e as BossDefeatedEvent).position))
       playSection('sting')
     }
-    const bossEvents: [string, () => void][] = [
+    const bossEvents: [string, (e: unknown) => void][] = [
       ['boss:spawn', onBossSpawn],
       ['boss:defeated', onBossDefeated],
     ]
@@ -126,7 +139,7 @@ export default function LevelAudio() {
       // Still in a run: the next level's track opens once its scene mounts, so fade under it, not before (#168).
       const nextLevel = isInRun(useGameStore.getState().phase)
       unfollow()
-      withScrim((p) => (nextLevel ? p.handOverScore(level, 'results') : p.stopScore(level, 'results')))
+      withScrim((p) => (nextLevel ? p.handOverScore(level, ...RESULTS_CUTS) : p.stopScore(level, ...RESULTS_CUTS)))
       sfx().dispose(level)
       setMusicDucked(false, true)
     }

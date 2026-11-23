@@ -24,8 +24,9 @@ const LEVELS: LevelConfig[] = [
       curve: 'curve1',
       color1: 0xf3ece0,
       color2: 0xffff00,
-      // Under the midway (#332): the ride's second dip to the grass, about 21 s in.
-      tunnels: [{ from: 0.18, length: 520 }],
+      // Under the midway (#332): the bottom of the ride's second dip to the grass and the climb out.
+      // It starts past where the track's later pass crosses this dip (#651: `tunnelSpans` refuses a pass through the tube).
+      tunnels: [{ from: 0.191, length: 420 }],
     },
     ...paceLevel({
       waves: [
@@ -64,7 +65,7 @@ const LEVELS: LevelConfig[] = [
     ...paceLevel({
       waves: [
         { type: 'scorpion', count: 30, waveLabel: 'Incoming!' },
-        { type: 'crow', count: 39, waveLabel: 'A Murder of Crows!', formation: 'v' },
+        { type: 'crow', count: 39, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm' },
         { type: 'crow', count: 39, waveLabel: 'More Crows!', formation: 'v' },
       ],
       boss: 'giantScorpion',
@@ -105,6 +106,8 @@ const LEVELS: LevelConfig[] = [
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
       hasWater: true,
+      /** Through the gap between two islands, out where the sea runs on past the drawn terrain, ~30 s in and gone before the Kraken. */
+      whale: { startSeconds: 31.25, lead: 3700, aim: 0.1 },
     },
   },
   {
@@ -130,7 +133,7 @@ const LEVELS: LevelConfig[] = [
     ...paceLevel({
       waves: [
         { type: 'snowmanScout', count: 44, waveLabel: 'Scout Party', formation: 'line' },
-        { type: 'snowman', count: 40, waveLabel: 'Snowmen Incoming!' },
+        { type: 'snowman', count: 40, waveLabel: 'Snowmen Incoming!', weather: 'blizzard' },
         { type: 'snowmanBrute', count: 16, waveLabel: 'Brutes!' },
       ],
       boss: 'yeti',
@@ -186,24 +189,29 @@ const LEVELS: LevelConfig[] = [
     description: 'Ride the walls of the climbing gym',
     order: 6,
     biome: 'gym',
-    maxScore: 14 * 15 + (14 + 24) * 12 + 34 * 18 + 8 * 50 + 500, // 1278 + the Medusa's eight snakes and reward (bossSpecs.ts) = 2178
+    maxScore: 14 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1422 (the V8's rats included) + the Medusa's eight snakes and reward (bossSpecs.ts) = 2322
     message: 'You sent the Climbing Gym!',
     nextLevel: null,
-    // Authored from Alex's blockout (#514): up the Tree, round the Flame, through the Arch, the dive into the Starr pit.
+    // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
     track: GYM_LEVEL.track,
     walls: [...GYM_LEVEL.walls],
     // Every enemy is a gym pest: no birds indoors (#664). Climbers are bystanders (#518): the first wave brings some, to
-    // teach the don't-shoot rule from the start. The lanternflies (#575) come second: from 9 to 13 s the rider climbs
-    // past no wall it can read a bug on, and from 14 s it faces Alaska close up, where their swarm lands (`placeWallSwarm`).
+    // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more over
+    // the roll (8 s), rats in the Training Area's dark cave (12 s), the lanternflies (#575) at 20 s, their swarm in groups
+    // along the ride (`placeWallSwarm`): beside the car up Alaska, then on the Starr ahead of the drop, and the pack in the
+    // pit from 25 s, before the dyno.
+    // Shoot the V2 sign and the V8 way round (#702) brings its own rats (#720): from 17 s, once the sign is shot (it can be
+    // until the car reaches it, 18.7 s), they line the branch ahead (ridden 18.9–21.5 s), and only that run meets them.
     ...paceLevel({
       waves: [
-        { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 2, bystanders: { type: 'climber', count: 4 } },
-        { type: 'lanternfly', count: 14, waveLabel: 'Lanternflies!', weight: 2 },
-        { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 2 },
-        { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 2, bystanders: { type: 'climber', count: 3 } },
-        { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 3, bystanders: { type: 'climber', count: 3 } },
+        { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 8, bystanders: { type: 'climber', count: 4 } },
+        { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 4 },
+        { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 8, bystanders: { type: 'climber', count: 3 } },
+        { type: 'lanternfly', count: 14, waveLabel: 'Lanternflies!', weight: 5 },
+        { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 20, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
+      branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 17 },
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},

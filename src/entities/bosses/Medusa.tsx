@@ -10,6 +10,7 @@ import { MEDUSA_CHALK_BURST_DEATH_STYLE, MEDUSA_SNAKE_DEATH_STYLE } from '@/effe
 import { GYM_SCALE, STAR } from '@/levels/environments/biomes/gym/blockout'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
 import BossConfetti from './BossConfetti'
+import { smooth } from './bossCycle.hot'
 import { currentPhase, weakPointHp, type WeakPointSpec } from './bossModel'
 import { MEDUSA } from './bossSpecs'
 import {
@@ -18,7 +19,7 @@ import {
   MEDUSA_SNAKE_HEAD_GEO, MEDUSA_SNAKE_HEAD_MAT, MEDUSA_SNAKE_MAT, MEDUSA_STAR_GLOW_GEO, MEDUSA_STAR_GLOW_MAT,
 } from './bossAssets'
 import {
-  MEDUSA_DEFEAT, MEDUSA_RISE, MEDUSA_SIZE, SNAKE, SNAKE_SLOTS, MEDUSA_HUB, bodyPlacement, defeatSink, laughShake, laySnake, smooth01, yawToward,
+  MEDUSA_DEFEAT, MEDUSA_RISE, MEDUSA_SIZE, SNAKE, SNAKE_SLOTS, MEDUSA_HUB, bodyPlacement, defeatSink, laughShake, laySnake, yawToward,
   snakeLength, snakeRadius, strikeLandsBetween,
 } from './medusaMotion'
 
@@ -75,6 +76,7 @@ export default function Medusa(props: BossProps) {
       placed: false,
       phaseAt: [FIRST_SNAKES_AT, null, null] as (number | null)[],
       lean: 0,
+      duck: 0,
       spin: 0,
       burst: false,
     }),
@@ -124,7 +126,7 @@ export default function Medusa(props: BossProps) {
     const dt = tellStep()
     if (sim.tell < 0) sim.tell = 0
     sim.tell += dt
-    const k = smooth01(sim.tell / TELL_SECONDS)
+    const k = smooth(sim.tell / TELL_SECONDS)
     sim.spin += dt * (0.6 + 2.4 * k)
     showStar(k, k, 0)
   })
@@ -134,11 +136,13 @@ export default function Medusa(props: BossProps) {
       const fighting = sinceDefeat < 0
       const phase = currentPhase(state)
       if (phase > 0 && sim.phaseAt[phase] === null) sim.phaseAt[phase] = age
-      const leanTarget = sim.phaseAt[1] !== null ? 1 : 0
-      sim.lean += (leanTarget - sim.lean) * (1 - Math.exp(-dt / LEAN_TAU))
+      const ducked = sim.phaseAt[2] !== null
+      const ease = 1 - Math.exp(-dt / LEAN_TAU)
+      sim.lean += ((sim.phaseAt[1] !== null && !ducked ? 1 : 0) - sim.lean) * ease
+      sim.duck += ((ducked ? 1 : 0) - sim.duck) * ease
 
-      // Rise out of the hub, lean out in phase 2, laugh and sink back on defeat; turn a little towards the rider.
-      bodyPlacement(age, sim.lean, sinceDefeat, _place)
+      // Rise out of the hub, lean out in phase 2, draw back and duck in phase 3, laugh and sink back on defeat; turn a little towards the rider.
+      bodyPlacement(age, sim.lean, sim.duck, sinceDefeat, _place)
       camera.getWorldPosition(_cam)
       _p.subVectors(_cam, HUB)
       const yaw = yawToward(_p.x * FACING.z - _p.z * FACING.x, _p.x * FACING.x + _p.z * FACING.z)
@@ -159,8 +163,8 @@ export default function Medusa(props: BossProps) {
       // The star: its tell's glow fades as she rises; on defeat it spins and flashes while she sinks into the hub.
       const sunk = defeatSink(sinceDefeat)
       sim.spin += dt * (fighting ? 0.6 : 9)
-      const fade = sim.tell < 0 ? 0 : 1 - smooth01(age / MEDUSA_RISE.riseS)
-      const defeatGlow = fighting ? 0 : 1 - smooth01((sinceDefeat - MEDUSA_DEFEAT.laughS - MEDUSA_DEFEAT.sinkS) / 0.5)
+      const fade = sim.tell < 0 ? 0 : 1 - smooth(age / MEDUSA_RISE.riseS)
+      const defeatGlow = fighting ? 0 : 1 - smooth((sinceDefeat - MEDUSA_DEFEAT.laughS - MEDUSA_DEFEAT.sinkS) / 0.5)
       const flash = fighting ? 0 : 0.5 + 0.5 * Math.sin(sinceDefeat * 24)
       showStar(Math.max(fade, defeatGlow), Math.max(fade, fighting ? 0 : sunk * defeatGlow), flash)
       if (!fighting && !sim.burst) {

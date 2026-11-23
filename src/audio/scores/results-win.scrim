@@ -1,0 +1,46 @@
+title    Ride Over (win)
+composer Claude (ShooterCoaster)
+about    The results screen after a 2 or 3 star run (#792). A rising brass-and-bell fanfare that lands on a full C major chord with a crash, then a bright vibes loop over strings, harp arpeggios, a walking bass and a light kick and hat. The lose cut (results-lose) is its quiet sibling.
+tempo    100
+beats    4
+steps    2
+reverb   0.4
+
+voice brass  brass    vol=0.6  center=G4
+voice bell   bell     vol=0.5  pan=0.3
+voice glock  glock    vol=0.22 pan=-0.35
+voice timp   timpani  vol=0.6
+voice crash  crash    vol=0.3  pan=0.25
+voice vibes  vibes    vol=1.1  pan=-0.2
+voice harp   harp     vol=0.35 pan=0.4
+voice pad    strings  vol=0.42 pan=0.25 center=E4
+voice bass   upright  vol=1.0  oct=1
+voice kick   kick     vol=0.35
+voice hat    hat      vol=0.14 pan=0.3
+
+pattern intro
+brass | [C]!- [F]!- [G]!--- | [F]!- [G]!- [Am]!- [G]!- | [C]!!------- |
+bell  | C5- E5- G5--- | A5- B5- C6- D6- | E6------- |
+glock | _ | _ | C7------- |
+timp  | C2 . . . G2 . . . | G2 . G2 . G2 G2 G2 G2 | C2!------- |
+crash | ........ | ........ | X....... |
+
+pattern A
+vibes | E5- G5- C6- G5- | A5--- E5- C5- | F5- A5- C6- A5- | B5--- G5- D5- | E5- G5- C6- E6- | D6--- B5- G5- | A5- C6- A5- F5- | G5----- .- |
+harp  | C4 E4 G4 C5 G4 E4 G4 E4 | A3 C4 E4 A4 E4 C4 E4 C4 | F3 A3 C4 F4 C4 A3 C4 A3 | G3 B3 D4 G4 D4 B3 D4 B3 | C4 E4 G4 C5 G4 E4 G4 E4 | E3 G3 B3 E4 B3 G3 B3 G3 | F3 A3 C4 F4 C4 A3 C4 A3 | G3 B3 D4 G4 D4 B3 D4 B3 |
+pad   | [C]?------- | [Am]?------- | [F]?------- | [G]?------- | [C]?------- | [Em]?------- | [F]?------- | [G]?------- |
+bass  | C2--- G1--- | A1--- E2--- | F1--- C2--- | G1--- D2--- | C2--- E2--- | E2--- B1--- | F1--- A1--- | G1--- B1--- |
+kick  | x... x... | % | % | % | % | % | % | % |
+hat   | .x.x .x.x | % | % | % | % | % | % | % |
+
+pattern B
+vibes | C6--- A5- F5- | D6--- B5- G5- | E6- D6- B5- G5- | C6--- A5--- | F5- A5- D6- A5- | G5- B5- D6- B5- | C6------- | B5- A5- G5- D5- |
+glock | C7------- | _ | E7------- | _ | D7------- | _ | C7------- | _ |
+harp  | F3 A3 C4 F4 C4 A3 C4 A3 | G3 B3 D4 G4 D4 B3 D4 B3 | E3 G3 B3 E4 B3 G3 B3 G3 | A3 C4 E4 A4 E4 C4 E4 C4 | D4 F4 A4 D5 A4 F4 A4 F4 | G3 B3 D4 G4 D4 B3 D4 B3 | C4 E4 G4 C5 G4 E4 G4 E4 | G3 B3 D4 G4 D4 B3 D4 B3 |
+pad   | [Fadd9]?------- | [G]?------- | [Em]?------- | [Am]?------- | [Dm]?------- | [G]?------- | [C]?------- | [G]?------- |
+bass  | F1--- C2--- | G1--- D2--- | E2--- B1--- | A1--- E2--- | D2--- A1--- | G1--- D2--- | C2--- G1--- | G1--- B1--- |
+kick  | x... x... | % | % | % | % | % | % | x... x.x. |
+hat   | .x.x .x.x | % | % | % | % | % | % | % |
+
+play intro
+loop A B

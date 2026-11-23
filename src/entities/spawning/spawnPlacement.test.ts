@@ -5,14 +5,17 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
 import type { EnemyWave, Formation, LevelConfig, WallSurface } from '@/types/level'
-import { buildArcTable, type ArcTable } from '@/track/arcLength'
-import { rideModel, rideProfile, riddenBetween } from '@/track/ridePhysics'
+import { buildArcTable, indexAtT, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
+import { hardRouteFor } from '@/track/mechanics'
+import { DEMO_EYE, buildDemoRide, markerT } from '@/track/elements/demoRide'
+import { createSeatPose, seatPose } from '@/track/seatPose.hot'
+import { rideModel, rideProfile, riddenAt } from '@/track/ridePhysics'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import {
-  AIR_CLEARANCE, ENTRY_SECONDS, ENTRY_STAGGER, FORMATIONS, NEAR_FIELD, clampToBounds, entryPoint, formationFrame, formationSlots, groupStep,
-  indexAhead, insideBounds, marchHeading, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
-  inView, placeWallClimbers, placeWallSwarm, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
+  AIR_CLEARANCE, FORMATIONS, NEAR_FIELD, clampToBounds, clearOfKeepOff, entryPoint, formationFrame, formationSlots, groupStep,
+  indexAhead, insideBounds, marchHeading, marchMoving, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
+  inRiderFrame, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge, riderFrame, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
   type ChoreographedFormation, type RideAhead, type Vec3,
 } from './spawnPlacement'
 import {
@@ -20,7 +23,6 @@ import {
 } from './enemyPlacement'
 import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
-import { waveWindows } from './waveSchedule'
 import { BIOMES, biomeHeightFunction } from '@/levels/environments/biomeRegistry'
 import { REFERENCE_FOV_DEG, maxReadableDistance } from '../enemies/enemyReadability'
 
@@ -36,16 +38,13 @@ function world(level: LevelConfig) {
   const heightFn = biomeHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
   const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize(level.biome))
   // What EnemySpawner hands each wave: the ride from GO over its entry and its window.
-  const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
   const { trackScale } = getTrackDimensions(level.track)
-  const windows = waveWindows(level.enemies.map((w) => w.spawnDelay ?? 0), level.boss?.at, RUN_SECONDS)
-  const rides: RideAhead[] = windows.map(([from, to]) => ({
-    entry: riddenBetween(profile, from, from + ENTRY_SECONDS + ENTRY_STAGGER),
-    window: riddenBetween(profile, from, to),
-    trackScale,
-  }))
+  const hardRoute = hardRouteFor(curve, level.track.mechanics)
+  const rides = rideAheadOfWaves(table, rideModel(level.track, table), level.enemies, level.boss?.at, trackScale)
   const rideFor = (wave: EnemyWave) => rides[level.enemies.indexOf(wave)]
-  return { level, table, groundFn, rideFor, trackScale, bounds: BIOMES[level.biome].bounds, keepOff: BIOMES[level.biome].keepOff?.(groundFn, table) ?? [] }
+  // A hard-route wave (#720) is placed along the hard route's table.
+  const tableFor = (wave: EnemyWave) => (wave.route ? hardRoute!.table : table)
+  return { level, table, tableFor, groundFn, rideFor, trackScale, bounds: BIOMES[level.biome].bounds, keepOff: BIOMES[level.biome].keepOff?.(groundFn, table) ?? [] }
 }
 
 const STILL: RideAhead = { entry: 0, window: 0, trackScale: 1 }
@@ -163,7 +162,7 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
           // One heading per group, so its shape holds.
           const leader = placed[slots.findIndex((s) => s.group === slots[i].group)]
           expect(marchHeading(p.motion)).toBeTypeOf('number')
-          expect(marchHeading(p.motion)).toBe(marchHeading(leader.motion))
+          expect(p.motion).toEqual(leader.motion)
         }
         if (slots[i].group === 0 && bearingCos(landed, p.position) > 0) ahead++
       })
@@ -196,6 +195,28 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
       }
     }
     expect(turns).toBeGreaterThan(0)
+  })
+
+  const marching = waves.filter((w) => ['v', 'line', 'school'].includes(w.formation!))
+  it.each(marching.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: each group marches once the rider reaches it, not from activation (#472)', (_name, wave) => {
+    const formation = wave.formation as ChoreographedFormation
+    const slots = formationSlots(formation, wave.count, createRng(1337))
+    const ride = rideFor(wave)
+    const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
+    const step = groupStep(table, formation, groups, ride)
+    let waiting = 0
+    for (const fraction of RIDER_FRACTIONS) {
+      const riderIndex = Math.round(fraction * (table.count - 1))
+      const camera = trackView(table, riderIndex, trackScale).eye
+      const placed = placeFormationWave({ table, riderIndex, camera, formation, origin: wave.formationOrigin, type: wave.type, groundFn, slots, ride, bounds })
+      for (let g = 0; g < groups; g++) {
+        const { motion } = placed[slots.findIndex((s) => s.group === g)]
+        const there = trackView(table, indexAhead(table, riderIndex, g * step + ride.entry), trackScale)
+        expect(marchMoving(motion, there.eye), `rider ${fraction} group ${g}`).toBe(true)
+        if (!marchMoving(motion, camera)) waiting++
+      }
+    }
+    if (groups > 1) expect(waiting).toBeGreaterThan(0)
   })
 
   it.each(waves.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: groups spread over the window the rider covers', (_name, wave) => {
@@ -257,10 +278,11 @@ const APPROACH = 600
 
 const groundWorlds = tracksideWorlds.filter((w) => w.level.enemies.some((e) => besideTrack(e) && ENEMY_PLACEMENT[e.type].surface === 'ground'))
 
-describe.each(groundWorlds.map((w) => [w.level.id, w] as const))('%s ground trackside spread', (_id, { level, table, rideFor }) => {
+describe.each(groundWorlds.map((w) => [w.level.id, w] as const))('%s ground trackside spread', (_id, { level, tableFor, rideFor }) => {
   const waves = level.enemies.filter((w) => besideTrack(w) && ENEMY_PLACEMENT[w.type].surface === 'ground')
 
   it.each(waves.map((w) => [w.type, w] as const))('%s: slots spread evenly along the stretch the rider covers in the window', (_name, wave) => {
+    const table = tableFor(wave)
     const band = tracksideBand('ground')
     const ride = rideFor(wave)
     const aheads = tracksideSlots(wave.count, 'ground', createRng(1337))
@@ -276,10 +298,11 @@ describe.each(groundWorlds.map((w) => [w.level.id, w] as const))('%s ground trac
   })
 })
 
-describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s trackside waves', (_id, { level, table, groundFn, rideFor, bounds, keepOff }) => {
+describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s trackside waves', (_id, { level, tableFor, groundFn, rideFor, bounds, keepOff }) => {
   const waves = level.enemies.filter(besideTrack)
 
   it.each(waves.map((w) => [w.type, w] as const))('%s: ahead of the rider along the track, beside the rails, on its surface, outside the near field, in front on the approach', (_name, wave) => {
+    const table = tableFor(wave)
     const { surface } = ENEMY_PLACEMENT[wave.type]
     const band = tracksideBand(surface)
     const slots = tracksideSlots(wave.count, surface, createRng(1337))
@@ -308,10 +331,11 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
           expect(arc).toBeLessThan(Math.max(band.aheadMax, band.aheadMin + ride.window) + 10)
           const lateral = Math.hypot(p.x - table.x[anchor], p.z - table.z[anchor])
           if (lateral > band.sideMax + 1) {
-            // A blind approach's spot, out along its look (#494): never inside an interior, off every rail and landmark.
+            // A blind approach's spot, out along its look (#494): never inside an interior, off every rail, and off every
+            // landmark by as far as the enemy wanders from it (#708: the scorpion's scuttle loop).
             expect(bounds).toBeUndefined()
             expect(railGap(table, p)).toBeGreaterThan(band.sideMin - 1)
-            expect(keepOff.every((c) => Math.hypot(p.x - c.x, p.z - c.z) >= c.r)).toBe(true)
+            expect(clearOfKeepOff(p, keepOff, ENEMY_PLACEMENT[wave.type].roam ?? 0)).toBe(true)
           } else {
             expect(lateral).toBeGreaterThan(band.sideMin - 1)
           }
@@ -336,7 +360,7 @@ describe('level6: inside the hall', () => {
 
   it('the gym has bounds, the hall inset by 40 units', () => {
     expect(bounds).toBe(hall)
-    expect([hall.minX, hall.maxX, hall.minZ, hall.maxZ]).toEqual([-1240, 1240, -600, 600])
+    expect([hall.minX, hall.maxX, hall.minZ, hall.maxZ]).toEqual([-1880, 1880, -920, 920])
   })
 
   it('every ground and air placement, entry starts included, lies inside the hall (#546)', () => {
@@ -367,6 +391,42 @@ describe('level6: inside the hall', () => {
     expect(outside).toEqual([])
   })
 })
+
+describe.each(getAllLevels().filter((l) => l.enemies.some((w) => w.route)).map(world).map((w) => [w.level.id, w] as const))(
+  '%s hard-route waves (#720)',
+  (_id, { level, table, tableFor, rideFor }) => {
+    const junction = level.track.mechanics?.find((m) => m.kind === 'junction')
+    const hard = tableFor({ type: 'rat', count: 0, route: 'hard' })
+    const route = { table: hard, signT: 0, mergeT: junction?.to ?? 0 }
+    const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
+
+    it.each(level.enemies.filter((w) => w.route).map((w) => [w.type, w] as const))(
+      '%s: arriving any time from its second until the car reaches the switch sign, it lines the branch and nothing past the merge',
+      (_name, wave) => {
+        expect(junction).toBeDefined()
+        const { surface } = ENEMY_PLACEMENT[wave.type]
+        const slots = tracksideSlots(wave.count, surface, createRng(1337))
+        const signT = hardRouteFor(createTrackCurve(level.track), level.track.mechanics)!.signT
+        let arrivals = 0
+        let off = 0
+        for (let second = wave.spawnDelay!; ; second += 0.1) {
+          const t = tAtLoopDistance(table, riddenAt(profile, second))
+          if (t >= signT) break
+          arrivals++
+          const riderIndex = indexAtT(hard, t)
+          const ride = rideToMerge(route, riderIndex, rideFor(wave))
+          for (const slot of slots) {
+            const at = hard.t[indexAhead(hard, riderIndex, tracksideAhead(hard, surface, slot, ride))]
+            if (at < junction!.from || at > junction!.to) off++
+          }
+        }
+        // It can still arrive for a second or more: the switch takes a shot until the car reaches the sign.
+        expect(arrivals).toBeGreaterThanOrEqual(10)
+        expect(off).toBe(0)
+      },
+    )
+  },
+)
 
 describe('clampToBounds', () => {
   const b = { minX: -10, maxX: 10, minZ: -5, maxZ: 5, maxY: 20 }
@@ -453,7 +513,7 @@ describe('outsideNearField', () => {
 
 describe('placeWallSwarm (#516)', () => {
   const { table, trackScale } = world(getAllLevels()[0])
-  const view = trackView(table, 0, trackScale)
+  const view = riderFrame(table, 0, trackScale)
   const f = { x: view.dir.x / Math.hypot(view.dir.x, view.dir.z), y: 0, z: view.dir.z / Math.hypot(view.dir.x, view.dir.z) }
   /** A 240 x 200 wall `ahead` along the rider's look, facing back down it at the eye. */
   const wallAt = (id: string, ahead: number): WallSurface => {
@@ -474,9 +534,28 @@ describe('placeWallSwarm (#516)', () => {
     expect(new Set(placed.map((p) => p.wall.id))).toEqual(new Set(['ahead']))
     for (const p of placed) {
       expect(p.u >= HOP.margin && p.u <= 240 - HOP.margin && p.v >= HOP.margin && p.v <= 200 - HOP.margin).toBe(true)
-      expect(inView(view, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), maxReadableDistance('lanternfly'))).toBe(true)
+      expect(inRiderFrame(view, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), maxReadableDistance('lanternfly'))).toBe(true)
     }
     expect(placed.map((p) => p.seed)).toEqual(slots.map((s) => s.seed))
+  })
+
+  it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, then a wall ahead of the drop", () => {
+    const { level, table: gym, rideFor } = world(getAllLevels().find((l) => l.id === 'level6')!)
+    const wave = level.enemies.find((w) => w.type === 'lanternfly')!
+    const profile = rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)
+    const riderIndex = indexAhead(gym, 0, profile[wave.spawnDelay! * 10])
+    const swarm = swarmSlots(wave.count, createRng(3))
+    const ride = rideFor(wave)
+    const placed = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarm, ride })
+    const walls = placed.map((p) => p.wall.id)
+    expect(walls[0]).toMatch(/alaska/)
+    expect(walls[walls.length - 1]).not.toMatch(/alaska/)
+    // Every lanternfly is on the rider's screen at some point of the wave's window, judged in the rails' frame.
+    const frames = Array.from({ length: 41 }, (_, j) =>
+      riderFrame(gym, indexAhead(gym, riderIndex, ride.entry + (ride.window * j) / 40), ride.trackScale))
+    const reach = maxReadableDistance(wave.type)
+    const unseen = placed.filter((p) => !frames.some((fr) => inRiderFrame(fr, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), reach)))
+    expect(unseen.map((p) => p.wall.id)).toEqual([])
   })
 
   it('needs the level to have walls', () => {
@@ -491,7 +570,7 @@ describe('placeWallSwarm (#516)', () => {
     const us = placed.map((p) => p.u)
     for (const p of placed) {
       expect(p.u >= CLIMB.margin && p.u <= 240 - CLIMB.margin && p.v >= 0 && p.v <= WALL_START_SPREAD * 200).toBe(true)
-      expect(inView(view, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), maxReadableDistance('climber'))).toBe(true)
+      expect(inRiderFrame(view, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), maxReadableDistance('climber'))).toBe(true)
     }
     // Squeezed onto a 240-wide wall, still apart: each nudge is at most a quarter of the spacing either way.
     for (let i = 1; i < us.length; i++) expect(us[i] - us[i - 1]).toBeGreaterThan(((240 - 2 * CLIMB.margin) / 4) * 0.5 - 1e-9)
@@ -528,5 +607,23 @@ describe('level2: the opening climb (#494)', () => {
       }).length)
     }
     expect(Math.min(...seen), seen.join(',')).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('trackView on a rolling track (#715)', () => {
+  it("looks where the seat looks through the demo's loop and rolls", () => {
+    const ride = buildDemoRide()
+    const table = buildArcTable(ride.curve)
+    const pose = createSeatPose()
+    for (const kind of ['verticalLoop', 'zeroGRoll', 'heartlineRoll', 'corkscrew'] as const) {
+      let worst = 1
+      for (let k = 1; k < 20; k++) {
+        const t = markerT(ride, kind, k / 20)
+        seatPose(ride.curve, table, t, 1, DEMO_EYE, pose)
+        const { dir } = trackView(table, indexAtT(table, t), 1)
+        worst = Math.min(worst, dir.x * pose.look.x + dir.y * pose.look.y + dir.z * pose.look.z)
+      }
+      expect(worst, kind).toBeGreaterThan(Math.cos(Math.PI / 180))
+    }
   })
 })

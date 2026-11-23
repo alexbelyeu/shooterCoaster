@@ -1,12 +1,9 @@
 import { markStartup } from '@/core/startupMarks'
-
-/** The level scene's chunk (#376): fetched once, at startup under the poster (`GameCanvas`' poster handoff, #597), or when a run starts if that fetch failed. */
-type LevelSceneModule = typeof import('./LevelScene')
+import { lazyChunk } from '@/core/staleBuild'
 
 /** Pauses between the attempts of one load (a flaky network): `React.lazy` calls its factory once and caches a rejection. */
 export const RETRY_DELAYS_MS: readonly number[] = [400, 1200]
 
-let pending: Promise<LevelSceneModule> | null = null
 let loaded = false
 
 /** The chunk has arrived: a level scene can mount without suspending. */
@@ -28,14 +25,14 @@ export async function importWithRetry<T>(
   }
 }
 
-export function loadLevelScene(): Promise<LevelSceneModule> {
-  pending ??= importWithRetry(() => import('./LevelScene')).then((mod) => {
+/**
+ * The level scene's chunk (#376): fetched once, at startup under the poster (`GameCanvas`' poster handoff, #597), or
+ * when a run starts if that fetch failed every retry (forgotten, so the next call fetches afresh, #823).
+ */
+export const loadLevelScene = lazyChunk(() =>
+  importWithRetry(() => import('./LevelScene')).then((mod) => {
     loaded = true
     markStartup('levelChunk')
     return mod
-  }, (err) => {
-    pending = null // the next call starts a fresh fetch
-    throw err
-  })
-  return pending
-}
+  }),
+)

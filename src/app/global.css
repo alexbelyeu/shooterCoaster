@@ -8,13 +8,36 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* The fair's lettering (docs/art/PERSONALITY.md): Ultra for titles and numbers, Big Shoulders for everything else. */
 @font-face {
-  font-family: 'Inter';
+  font-family: 'Ultra';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ultra-latin-400.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Big Shoulders';
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/inter-latin-wght.woff2') format('woff2');
+  src: url('/fonts/big-shoulders-latin-opsz.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* The house colours (docs/art/PERSONALITY.md "Palette"). */
+:root {
+  --fair-oxblood: #5b1220;
+  --fair-oxblood-deep: #3a0a13;
+  --fair-gilt: #e9b53d;
+  --fair-gilt-block: #9a6414;
+  --fair-vermilion: #d9301f;
+  --fair-sky: #63b7e6;
+  --fair-cream: #f6e7c1;
+  --fair-tar: #1b110d;
+  --fair-notch: 16px;
 }
 
 * {
@@ -28,7 +51,7 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   background: #000;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Big Shoulders', sans-serif;
   color: #fff;
   cursor: default;
   /* Touch: no double-tap zoom, no grey tap flash, no long-press callout / selection */
@@ -65,6 +88,7 @@ canvas {
   justify-content: center;
   z-index: 100;
   background: rgba(0, 0, 0, 0.35);
+  font-family: 'Big Shoulders', sans-serif;
   transition: background-color 0.8s ease;
 }
 
@@ -119,33 +143,101 @@ canvas {
   left: 0;
   right: 0;
   bottom: calc(9vh + 1rem + env(safe-area-inset-bottom));
-  margin: 0;
   text-align: center;
-  font-size: 0.85rem;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
-  animation: title-attract-prompt 2.4s ease-in-out 0.9s infinite both;
-}
-
-@keyframes title-attract-prompt {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 0.95; }
+  font-size: 1.25rem;
+  font-weight: 700;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .title-attract::before, .title-attract::after { animation: none; }
-  .title-attract-prompt { animation: none; opacity: 0.8; }
 }
 .reduce-motion .title-attract::before,
 .reduce-motion .title-attract::after { animation: none; }
-.reduce-motion .title-attract-prompt { animation: none; opacity: 0.8; }
 
-.title-screen .subtitle {
-  font-size: clamp(0.9rem, 2.5vw, 1.1rem);
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 2rem;
+/*
+ * The title's front (docs/art/PERSONALITY.md): lettering on the park, PLAY the one gilt plate, Settings a smaller one.
+ * Every height is fixed (not left to the font) and index.html's .poster-title repeats these numbers, so the live title
+ * lands exactly on the poster's.
+ */
+.title-screen .title-tagline {
+  height: 1.75rem;
+  margin-bottom: 1.75rem;
+  font-size: 1.375rem;
+  font-weight: 800;
+  font-variation-settings: 'opsz' 40;
+  line-height: 1.75rem;
+}
+
+.title-tagline span {
+  display: inline-block;
+  margin: 0 0.2em;
+}
+
+.title-screen .fair-plate {
+  padding: 0.15em 0 0;
+  transition: opacity 0.8s ease, transform 60ms, box-shadow 60ms;
+}
+
+.title-screen .title-play {
+  width: 12rem;
+  height: 4rem;
+  font-size: 2.1rem;
+}
+
+/* WORLDS and Settings side by side under PLAY, so the column keeps the poster's height. */
+.title-screen .title-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.4rem;
+}
+
+.title-screen .title-row .fair-plate {
+  width: 8.5rem;
+  height: 44px;
+  font-size: 1.3rem;
+}
+
+.title-screen .title-hint {
+  height: 1.5rem;
+  margin-top: 1.25rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+  pointer-events: none;
+}
+
+.title-screen .credits {
+  position: absolute;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.title-screen .credits a {
+  color: var(--fair-gilt);
+  text-underline-offset: 3px;
+}
+
+.title-screen .credits a:focus-visible {
+  outline: 3px solid var(--fair-cream);
+  outline-offset: 3px;
+}
+
+.title-screen .internal-marker {
+  position: absolute;
+  top: calc(0.75rem + env(safe-area-inset-top));
+  right: calc(0.75rem + env(safe-area-inset-right));
+  font-size: 0.95rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* Phone landscape: the column reaches the bottom edge, so the credits move to the corner the mute button leaves free. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .title-screen .credits {
+    left: calc(1rem + env(safe-area-inset-left));
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
 }
 
 .play-button {
@@ -175,21 +267,6 @@ canvas {
   transform: scale(0.96);
 }
 
-.title-screen :is(.play-button, .settings-button):focus-visible {
-  outline: 3px solid #fff;
-  outline-offset: 4px;
-}
-
-.title-screen .title-hint {
-  margin-top: 1.25rem;
-  font-size: 0.85rem;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-  pointer-events: none;
-}
-
 /* PLAY's fade to black, over every screen and button. */
 .screen-veil {
   position: fixed;
@@ -198,325 +275,28 @@ canvas {
   background: #000;
 }
 
-.title-screen .credits {
-  position: absolute;
-  bottom: calc(2rem + env(safe-area-inset-bottom));
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.title-screen .credits a {
-  color: rgba(255, 200, 0, 0.7);
-  text-decoration: none;
-}
-
-.title-screen .internal-marker {
-  position: absolute;
-  top: calc(0.75rem + env(safe-area-inset-top));
-  right: calc(0.75rem + env(safe-area-inset-right));
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.45);
-  pointer-events: none;
-}
-
-/* Settings button — bottom-left, glass-morphism */
-.settings-button {
-  position: fixed;
-  bottom: calc(1rem + env(safe-area-inset-bottom));
-  left: calc(1rem + env(safe-area-inset-left));
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  font-size: 1.4rem;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  pointer-events: auto;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-@media (hover: hover) {
-  .settings-button:hover {
-    background: rgba(0, 0, 0, 0.7);
-    border-color: rgba(255, 255, 255, 0.5);
-  }
-}
-
-.settings-button:active {
-  background: rgba(0, 0, 0, 0.7);
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-/* HUD — Inter, tabular numerals; dark glass panels keep text legible over any sky.
-   Accent colours come from src/ui/theme.ts via --hud-accent / --hud-glow. */
+/* HUD: painted on the car, no panels (docs/art/PERSONALITY.md "Over the ride"); the keyline keeps it readable on any sky. */
 .hud {
   --hud-accent: #ffd23f;
   --hud-glow: rgba(255, 210, 63, 0.55);
   --hud-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.45);
+  --hud-ink:
+    -2px -2px 0 var(--fair-tar), 0 -2px 0 var(--fair-tar), 2px -2px 0 var(--fair-tar), 2px 0 0 var(--fair-tar),
+    2px 2px 0 var(--fair-tar), 0 2px 0 var(--fair-tar), -2px 2px 0 var(--fair-tar), -2px 0 0 var(--fair-tar),
+    3px 4px 0 var(--fair-tar);
+  --hud-ink-thin:
+    -1.5px -1.5px 0 var(--fair-tar), 0 -1.5px 0 var(--fair-tar), 1.5px -1.5px 0 var(--fair-tar), 1.5px 0 0 var(--fair-tar),
+    1.5px 1.5px 0 var(--fair-tar), 0 1.5px 0 var(--fair-tar), -1.5px 1.5px 0 var(--fair-tar), -1.5px 0 0 var(--fair-tar),
+    2px 3px 0 var(--fair-tar);
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 10;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Big Shoulders', sans-serif;
+  font-variation-settings: 'opsz' 10;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #fff;
-}
-
-.hud-panel {
-  position: absolute;
-  top: max(12px, env(safe-area-inset-top));
-  padding: 10px 14px 12px;
-  background: linear-gradient(180deg, rgba(8, 10, 22, 0.62), rgba(8, 10, 22, 0.38));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
-}
-
-.hud-panel--left {
-  left: max(12px, env(safe-area-inset-left));
-  min-width: clamp(150px, 22vw, 240px);
-}
-
-.hud-panel--right {
-  right: max(12px, env(safe-area-inset-right));
-  width: clamp(130px, 20vw, 240px);
-}
-
-.hud-score {
-  line-height: 1;
-}
-
-.hud-score-value {
-  display: inline-block;
-  transform-origin: left center;
-  font-size: clamp(1.9rem, 4.2vw, 2.75rem);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  text-shadow: var(--hud-shadow);
-}
-
-.hud-best {
-  margin-top: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.65);
-}
-
-.hud-kills {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.hud-kills-track {
-  position: relative;
-  flex: 1;
-  height: 6px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.16);
-  /* 10 segments with 2px gaps */
-  -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%);
-  mask-image: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%);
-}
-
-.hud-kills-fill {
-  position: absolute;
-  inset: 0;
-  transform-origin: left center;
-  background: var(--hud-accent);
-  box-shadow: 0 0 8px var(--hud-glow);
-  transition: transform 0.25s ease-out;
-}
-
-.hud-kills-count {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-shadow: var(--hud-shadow);
-}
-
-.hud-kills-total {
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-/* Timer */
-.hud-timer {
-  --timer-color: #fff;
-  text-align: right;
-}
-
-.hud-timer--warn {
-  --timer-color: #ffb020;
-}
-
-.hud-timer--critical {
-  --timer-color: #ff3b3b;
-}
-
-.hud-timer-value {
-  font-size: clamp(1.9rem, 4.2vw, 2.75rem);
-  font-weight: 700;
-  line-height: 1;
-  color: var(--timer-color);
-  text-shadow: var(--hud-shadow);
-  transform-origin: right center;
-  transition: color 0.3s;
-}
-
-.hud-timer-unit {
-  margin-left: 2px;
-  font-size: 0.5em;
-  font-weight: 600;
-  opacity: 0.75;
-}
-
-.hud-timer--critical .hud-timer-value {
-  animation: hud-pulse 0.5s ease-in-out infinite alternate;
-}
-
-.hud-timer-track {
-  height: 6px;
-  margin-top: 10px;
-  overflow: hidden;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.hud-timer-fill {
-  height: 100%;
-  transform-origin: right center;
-  border-radius: 3px;
-  background: var(--timer-color);
-  box-shadow: 0 0 8px var(--timer-color);
-  transition: transform 1s linear, background-color 0.3s;
-}
-
-@keyframes hud-pulse {
-  from { transform: scale(1); }
-  to { transform: scale(1.12); text-shadow: 0 0 18px rgba(255, 59, 59, 0.9), 0 1px 2px rgba(0, 0, 0, 0.85); }
-}
-
-/* Combo meter — centre-bottom */
-.hud-combo {
-  position: absolute;
-  left: 50%;
-  bottom: max(72px, calc(env(safe-area-inset-bottom) + 64px));
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 18px 6px 6px;
-  border-radius: 40px;
-  background: rgba(8, 10, 22, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--combo-color);
-  opacity: 0;
-  transform: translate(-50%, 16px) scale(0.9);
-  /* hide: fade + sink */
-  transition: opacity 0.3s ease-in, transform 0.3s ease-in;
-}
-
-.hud-combo.is-visible {
-  opacity: 1;
-  transform: translate(-50%, 0) scale(1);
-  /* show: appear instantly, pop the scale (never caught half-faded) */
-  transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.4);
-}
-
-.hud-combo-ring {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  flex: none;
-}
-
-.hud-combo-ring svg {
-  display: block;
-  transform: rotate(-90deg);
-}
-
-.hud-combo-ring-bg,
-.hud-combo-ring-fill {
-  fill: none;
-  stroke-width: 5;
-}
-
-.hud-combo-ring-bg {
-  stroke: rgba(255, 255, 255, 0.15);
-}
-
-.hud-combo-ring-fill {
-  stroke: var(--combo-color);
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 4px var(--combo-color));
-}
-
-/* chain count, centred in the ring */
-.hud-combo-count {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 1.3rem;
-  color: #fff;
-  text-shadow: var(--hud-shadow);
-  animation: hud-combo-pop 0.25s ease-out;
-}
-
-.hud-combo-label {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  line-height: 1;
-  text-shadow: var(--hud-shadow);
-}
-
-/* multiplier grows with tier */
-.hud-combo-mult {
-  display: inline-block;
-  transform-origin: left center;
-  font-weight: 700;
-  font-size: 1.6rem;
-  animation: hud-combo-pop 0.25s ease-out;
-}
-
-.hud-combo-word {
-  font-weight: 700;
-  font-size: 0.7rem;
-  letter-spacing: 0.24em;
-  opacity: 0.85;
-}
-
-.hud-combo--tier1 .hud-combo-mult { font-size: 1.9rem; }
-.hud-combo--tier2 .hud-combo-mult { font-size: 2.2rem; }
-.hud-combo--tier3 .hud-combo-mult { font-size: 2.5rem; }
-.hud-combo--tier3 { box-shadow: 0 0 22px rgba(255, 59, 59, 0.45); }
-
-/* a lapsed 2×+ chain: greyed, shaken, then hidden */
-.hud-combo.is-lost {
-  color: #a3a8bd;
-  box-shadow: none;
-  animation: hud-combo-shake 0.45s ease-out;
-}
-
-@keyframes hud-combo-shake {
-  0%, 100% { transform: translate(-50%, 0); }
-  15% { transform: translate(calc(-50% - 9px), 0) rotate(-2deg); }
-  35% { transform: translate(calc(-50% + 8px), 0) rotate(2deg); }
-  55% { transform: translate(calc(-50% - 5px), 0) rotate(-1deg); }
-  75% { transform: translate(calc(-50% + 3px), 0); }
+  color: var(--fair-cream);
 }
 
 /* The on-ride photo's flash (#701): over the whole screen, never in the photo (that is the canvas alone). */
@@ -544,21 +324,220 @@ canvas {
   100% { opacity: 0; }
 }
 
-/* top-tier slow-mo: "×5 FRENZY" over the combo meter and a red edge pulse */
+.hud-number {
+  font-family: 'Ultra', serif;
+  font-weight: 400;
+  line-height: 1.3; /* Ultra's glyph box (1.27 em), so the lines under it never overlap it */
+  text-shadow: var(--hud-ink);
+}
+
+.hud-panel {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+}
+
+.hud-panel--left {
+  left: max(14px, env(safe-area-inset-left));
+}
+
+.hud-panel--right {
+  right: max(14px, env(safe-area-inset-right));
+  width: clamp(120px, 18vw, 210px);
+}
+
+.hud-score-value {
+  display: inline-block;
+  font-size: clamp(2.1rem, 4.4vw, 3.25rem);
+}
+
+.hud-best,
+.hud-kills,
+.hud-timer-label {
+  margin-top: 2px;
+  font-size: 1.1rem;
+  line-height: 1.3;
+  text-shadow: var(--hud-ink-thin);
+}
+
+/* Not Ultra: under ~30 px its counters close up behind the keyline (a 0 reads as a blob). */
+.hud-kills-value,
+.hud-combo-count {
+  font-variation-settings: 'opsz' 40;
+  font-weight: 800;
+  font-size: 1.35rem;
+}
+
+/* Vermilion on tar is 3.9:1, enough only because the seconds are Ultra over 24 px. */
+.hud-timer {
+  --timer-color: var(--fair-cream);
+  text-align: right;
+}
+
+.hud-timer--warn {
+  --timer-color: var(--fair-gilt);
+}
+
+.hud-timer--critical {
+  --timer-color: var(--fair-vermilion);
+}
+
+.hud-timer-value {
+  font-size: clamp(2.1rem, 4.4vw, 3.25rem);
+  color: var(--timer-color);
+}
+
+.hud-timer--critical .hud-timer-value {
+  animation: hud-tick 0.12s ease-out;
+}
+
+.hud-timer-track {
+  height: 10px;
+  margin-top: 8px;
+  border: 2px solid var(--fair-tar);
+  background: var(--fair-oxblood-deep);
+  box-shadow: 2px 3px 0 var(--fair-tar);
+}
+
+.hud-timer-fill {
+  height: 100%;
+  transform-origin: right center;
+  background: var(--timer-color);
+  transition: transform 1s linear;
+}
+
+/* Combo meter, centre-bottom */
+.hud-combo {
+  --combo-color: var(--fair-cream);
+  position: absolute;
+  left: 50%;
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 64px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--combo-color);
+  opacity: 0;
+  transform: translate(-50%, 16px) scale(0.9);
+  /* hide: fade + sink */
+  transition: opacity 0.3s ease-in, transform 0.3s ease-in;
+}
+
+.hud-combo.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  /* show: appear instantly, pop the scale (never caught half-faded) */
+  transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+.hud-combo--tier1,
+.hud-combo--tier2,
+.hud-combo--tier3 {
+  --combo-color: var(--fair-gilt);
+}
+
+.hud-combo.is-lost {
+  --combo-color: var(--fair-vermilion);
+  /* knocked swinging on its hook */
+  transform-origin: 50% 0;
+  animation: hud-combo-shake 0.45s ease-out;
+}
+
+.hud-combo-ring,
+.hud-weapon-ring {
+  position: relative;
+  flex: none;
+}
+
+.hud-combo-ring {
+  width: 64px;
+  height: 64px;
+}
+
+.hud-combo-ring svg,
+.hud-weapon-ring svg:first-child {
+  display: block;
+  transform: rotate(-90deg);
+}
+
+.hud-combo-ring circle,
+.hud-weapon-ring circle {
+  fill: none;
+}
+
+.hud-combo-ring-edge,
+.hud-weapon-ring-edge {
+  stroke: var(--fair-tar);
+}
+
+.hud-combo-ring-bg,
+.hud-weapon-ring-bg {
+  stroke: var(--fair-oxblood-deep);
+}
+
+.hud-combo-ring-edge { stroke-width: 10; }
+.hud-combo-ring-bg,
+.hud-combo-ring-fill { stroke-width: 5; }
+
+.hud-combo-ring-fill {
+  stroke: var(--combo-color);
+}
+
+/* chain count, centred in the ring */
+.hud-combo-count {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fair-cream);
+  text-shadow: var(--hud-ink-thin);
+  animation: hud-tick 0.12s ease-out;
+}
+
+.hud-combo-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* multiplier grows with tier */
+.hud-combo-mult {
+  display: inline-block;
+  font-family: 'Ultra', serif;
+  font-size: 1.6rem;
+  text-shadow: var(--hud-ink-thin);
+  animation: hud-tick 0.12s ease-out;
+}
+
+.hud-combo-word {
+  font-variation-settings: 'opsz' 40;
+  font-weight: 800;
+  font-size: 1.35rem;
+  color: var(--fair-cream);
+  text-shadow: var(--hud-ink-thin);
+}
+
+.hud-combo--tier1 .hud-combo-mult { font-size: 1.9rem; }
+.hud-combo--tier2 .hud-combo-mult { font-size: 2.2rem; }
+.hud-combo--tier3 .hud-combo-mult { font-size: 2.5rem; }
+
+@keyframes hud-combo-shake {
+  0%, 100% { transform: translate(-50%, 0); }
+  15% { transform: translate(-50%, 0) rotate(-7deg); }
+  40% { transform: translate(-50%, 0) rotate(5deg); }
+  65% { transform: translate(-50%, 0) rotate(-2.5deg); }
+  85% { transform: translate(-50%, 0) rotate(1deg); }
+}
+
+/* Top-tier slow-mo: "×5 Frenzy" on a gilt show card over the combo meter, and a gilt frame painted round the screen. */
 .hud-frenzy {
   position: absolute;
   left: 50%;
   bottom: max(150px, calc(env(safe-area-inset-bottom) + 142px));
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  transform: translateX(-50%);
+  translate: -50% 0;
   white-space: nowrap;
-  font-weight: 800;
-  color: #fff;
-  text-shadow: 0 0 18px rgba(255, 59, 59, 0.95), 0 0 36px rgba(255, 154, 31, 0.6), 0 2px 4px rgba(0, 0, 0, 0.85);
   pointer-events: none;
-  animation: hud-frenzy-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.4);
 }
 
 /* The slow-mo's ease back to 1 (`FRENZY.easeS`), after which the flash unmounts. */
@@ -567,22 +546,39 @@ canvas {
   transition: opacity 0.3s ease-in;
 }
 
+.fair-board-shadow.hud-frenzy-card-shadow {
+  width: auto;
+}
+
+/* The one gilt card: tar letters on gold leaf, lined out in tar. */
+.fair-board.hud-frenzy-card {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.95rem 1.7rem 0.85rem;
+  font-family: 'Ultra', serif;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--fair-tar);
+  background: var(--fair-gilt);
+}
+
+.hud-frenzy-card .fair-lining { background: var(--fair-tar); }
+.hud-frenzy-card .fair-lining > span { background: var(--fair-gilt); }
+
 .hud-frenzy-mult {
-  font-size: clamp(2rem, 7vw, 3rem);
-  color: #ff3b3b;
+  font-size: clamp(2rem, 6vw, 2.6rem);
 }
 
 .hud-frenzy-word {
-  font-size: clamp(1.4rem, 5vw, 2.1rem);
-  letter-spacing: 0.22em;
-  margin-right: -0.22em;
+  font-size: clamp(1.5rem, 4.5vw, 1.95rem);
 }
 
 .hud-frenzy-edge {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  box-shadow: inset 0 0 90px 10px rgba(255, 59, 59, 0.55);
+  box-shadow: inset 0 0 0 clamp(6px, 1.2vw, 12px) var(--fair-gilt);
   animation: hud-fade-in 0.35s ease-out;
 }
 
@@ -628,23 +624,20 @@ canvas {
     inset 0 -130px 100px -50px rgba(205, 245, 255, 0.65);
 }
 
-/* Don't-shoot hint (#518): a friendly teal pill under the wave banner */
+/* Don't-shoot hint (#518), under the wave banner */
 .hud-bystander-hint {
   position: absolute;
   top: 36%;
   left: 50%;
-  max-width: calc(100vw - 32px);
+  width: max-content;
+  max-width: min(30em, calc(100vw - 32px));
   transform: translateX(-50%);
-  padding: 8px 18px;
-  border: 2px solid #5dffa8;
-  border-radius: 999px;
-  background: rgba(8, 60, 58, 0.82);
-  color: #eafff4;
-  font-size: clamp(0.85rem, 2.2vw, 1.15rem);
-  font-weight: 700;
+  font-size: clamp(1.1rem, 2.4vw, 1.4rem);
+  line-height: 1.15;
+  color: var(--fair-sky);
   text-align: center;
-  text-shadow: var(--hud-shadow);
-  box-shadow: 0 0 18px rgba(93, 255, 168, 0.45);
+  text-wrap: balance;
+  text-shadow: var(--hud-ink-thin);
   pointer-events: none;
   animation: hud-fade-in 0.25s ease-out;
 }
@@ -665,12 +658,7 @@ canvas {
   to { opacity: 1; }
 }
 
-@keyframes hud-frenzy-in {
-  from { opacity: 0; transform: translateX(-50%) scale(1.6); }
-  to { opacity: 1; transform: translateX(-50%) scale(1); }
-}
-
-/* Weapon pickup badge (#185) — left of the combo meter; above the pause button on portrait phones */
+/* Weapon pickup badge (#185): left of the combo meter; above the pause button on portrait phones */
 .hud-weapon {
   position: absolute;
   right: calc(50% + 120px);
@@ -678,11 +666,6 @@ canvas {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px 6px 6px;
-  border-radius: 40px;
-  background: rgba(8, 10, 22, 0.5);
-  border: 1px solid var(--weapon-color);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--weapon-color) 45%, transparent);
   color: var(--weapon-color);
   opacity: 0;
   transform: translateY(16px) scale(0.9);
@@ -696,62 +679,45 @@ canvas {
 }
 
 .hud-weapon-ring {
-  position: relative;
   width: 52px;
   height: 52px;
-  flex: none;
 }
 
-.hud-weapon-ring svg:first-child {
-  display: block;
-  transform: rotate(-90deg);
-}
-
+.hud-weapon-ring-edge { stroke-width: 9; }
 .hud-weapon-ring-bg,
-.hud-weapon-ring-fill {
-  fill: none;
-  stroke-width: 4;
-}
-
-.hud-weapon-ring-bg {
-  stroke: rgba(255, 255, 255, 0.15);
-}
+.hud-weapon-ring-fill { stroke-width: 4; }
 
 .hud-weapon-ring-fill {
   stroke: var(--weapon-color);
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 4px var(--weapon-color));
 }
 
 .hud-weapon-icon {
   position: absolute;
   inset: 0;
   margin: auto;
-  filter: drop-shadow(0 0 3px var(--weapon-color));
+  filter: drop-shadow(1.5px 2px 0 var(--fair-tar));
 }
 
 .hud-weapon-label {
-  font-weight: 700;
-  font-size: 0.85rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  text-shadow: var(--hud-shadow);
+  font-variation-settings: 'opsz' 40;
+  font-weight: 800;
+  font-size: 1.35rem;
+  color: var(--fair-cream);
+  text-shadow: var(--hud-ink-thin);
 }
 
-@keyframes hud-combo-pop {
-  from { transform: scale(1.45); }
-  to { transform: scale(1); }
+@keyframes hud-tick {
+  from { transform: translateY(-0.2em); }
+  to { transform: none; }
 }
 
 @media (max-width: 480px) {
-  .hud-panel { padding: 8px 10px 10px; }
   /* bottom row between pause and mute, clear of the first-person gun (#223) */
   .hud-combo { bottom: calc(1rem + env(safe-area-inset-bottom)); }
   .hud-weapon {
     right: auto;
     left: calc(12px + env(safe-area-inset-left));
     bottom: max(72px, calc(env(safe-area-inset-bottom) + 72px));
-    padding: 4px;
   }
   .hud-weapon-label { display: none; }
   .hud-frenzy { bottom: max(162px, calc(env(safe-area-inset-bottom) + 154px)); }
@@ -768,43 +734,48 @@ canvas {
   .hud-combo-count,
   .hud-combo-mult,
   .hud-combo.is-lost,
-  .hud-frenzy,
   .hud-frenzy-edge { animation: none; }
 }
-.reduce-motion :is(.hud-timer--critical .hud-timer-value, .hud-combo-count, .hud-combo-mult, .hud-combo.is-lost, .hud-frenzy, .hud-frenzy-edge) {
+.reduce-motion :is(.hud-timer--critical .hud-timer-value, .hud-combo-count, .hud-combo-mult, .hud-combo.is-lost, .hud-frenzy-edge) {
   animation: none;
 }
 
-/* Boss bar — top centre between the score and timer panels; under them on phones */
+/* Boss bar: the boss's name in gilt over a painted gauge, one segment per weak point; top centre between the score
+   and timer panels, under them on phones. It drops in on its hook and falls off it when the boss is down. */
 .hud-boss {
   position: absolute;
   top: max(14px, env(safe-area-inset-top));
   left: 50%;
+  translate: -50% 0;
   width: clamp(220px, 32vw, 420px);
-  transform: translateX(-50%);
   text-align: center;
-  animation: hud-boss-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+  transform-origin: 50% 0;
+  animation: fair-hook-drop 0.45s ease-out;
 }
 
 .hud-boss-name {
-  margin-bottom: 6px;
-  font-size: clamp(0.8rem, 1.6vw, 1rem);
-  font-weight: 800;
-  letter-spacing: 0.22em;
-  margin-right: -0.22em;
-  text-transform: uppercase;
-  color: #ffd23f;
-  text-shadow: 0 0 14px rgba(255, 190, 40, 0.75), var(--hud-shadow);
+  margin-bottom: 10px;
+  font-family: 'Ultra', serif;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  line-height: 1.1;
+  color: var(--fair-gilt);
+  text-shadow:
+    -1px -1px 0 var(--fair-tar),
+    1px -1px 0 var(--fair-tar),
+    -1px 1px 0 var(--fair-tar),
+    1px 1px 0 var(--fair-gilt-block),
+    2px 2px 0 var(--fair-gilt-block),
+    3px 4px 0 var(--fair-tar);
 }
 
+/* An oxblood plate on a hard tar edge; each weak point a sunk well filled with gold leaf. */
 .hud-boss-bar {
   display: flex;
   gap: 4px;
   padding: 4px;
-  border-radius: 8px;
-  background: rgba(8, 10, 22, 0.62);
-  border: 1px solid rgba(255, 210, 63, 0.45);
-  box-shadow: 0 0 16px rgba(255, 190, 40, 0.3);
+  border-radius: 5px;
+  background: var(--fair-oxblood);
+  box-shadow: 0 4px 0 var(--fair-tar), inset 0 0 0 2px var(--fair-tar);
 }
 
 .hud-boss-bar.is-hit {
@@ -813,27 +784,23 @@ canvas {
 
 .hud-boss-seg {
   flex-basis: 0;
-  height: 12px;
+  height: 14px;
   overflow: hidden;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  background: var(--fair-oxblood-deep);
+  box-shadow: inset 0 2px 0 var(--fair-tar);
 }
 
 .hud-boss-seg-fill {
   height: 100%;
   transform-origin: left center;
-  background: linear-gradient(180deg, #ffe680, #f0a400);
-  box-shadow: 0 0 8px rgba(255, 190, 40, 0.8);
+  background: var(--fair-gilt);
+  box-shadow: inset 0 -4px 0 var(--fair-gilt-block);
   transition: transform 0.25s ease-out;
 }
 
 .hud-boss.is-defeated {
-  animation: hud-boss-burst 1.2s ease-out forwards;
-}
-
-@keyframes hud-boss-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.9); }
-  to { opacity: 1; transform: translateX(-50%) scale(1); }
+  animation: hud-boss-fall 1.2s ease-in forwards;
 }
 
 @keyframes hud-boss-shake {
@@ -843,10 +810,11 @@ canvas {
   70% { transform: translateX(-3px); }
 }
 
-@keyframes hud-boss-burst {
-  0% { opacity: 1; transform: translateX(-50%) scale(1); }
-  25% { opacity: 1; transform: translateX(-50%) scale(1.15); filter: brightness(1.8); }
-  100% { opacity: 0; transform: translateX(-50%) scale(1.35); filter: brightness(1); }
+/* "X is down!" holds a beat, then the sign slips off one hook and drops out of sight. */
+@keyframes hud-boss-fall {
+  0%, 45% { opacity: 1; transform: none; }
+  60% { opacity: 1; transform: rotate(9deg); }
+  100% { opacity: 0; transform: translateY(70px) rotate(16deg); }
 }
 
 /* Phones (portrait): the panels fill the top row, so the bar goes under them. */
@@ -885,6 +853,17 @@ canvas {
   pointer-events: auto;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+}
+
+/* The track radar (#834): painted straight on the ride above the pause button, landscape only. */
+.hud-radar {
+  position: absolute;
+  left: calc(1rem + env(safe-area-inset-left));
+  bottom: calc(1rem + 56px + env(safe-area-inset-bottom));
+}
+
+@media (orientation: portrait) {
+  .hud-radar { display: none; }
 }
 
 .hud-pause-button:active {
@@ -932,7 +911,46 @@ canvas {
   100% { opacity: 0; transform: scale(1); }
 }
 
-/* Level select */
+/* The ghost of the best run (#844, ui/hud/GhostCrosshair): a dashed sky ring on a tar keyline, see-through, under the
+   player's reticle; the anchor sits on the recorded aim. Its shots flick it: a swell (reduced motion: the colour alone). */
+.ghost-crosshair {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 19;
+  opacity: 0.6;
+}
+.ghost-crosshair::before,
+.ghost-crosshair::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+}
+.ghost-crosshair::before {
+  inset: -15px;
+  border: 2px dashed var(--fair-sky);
+  outline: 2px solid var(--fair-tar);
+}
+.ghost-crosshair::after {
+  inset: -3px;
+  background: var(--fair-sky);
+  outline: 1px solid var(--fair-tar);
+}
+.ghost-crosshair.is-firing::before { animation: sc-ghost-ink 0.14s ease-out, sc-ghost-swell 0.14s ease-out; }
+@keyframes sc-ghost-ink {
+  from { border-color: var(--fair-cream); }
+}
+@keyframes sc-ghost-swell {
+  from { transform: scale(1.3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ghost-crosshair.is-firing::before { animation-name: sc-ghost-ink; }
+}
+.reduce-motion .ghost-crosshair.is-firing::before { animation-name: sc-ghost-ink; }
+
+/* Level select (docs/art/PERSONALITY.md): each world a ride board hung over the park, its name plate the only place the
+   level's own colour (--plate, the biome accent from src/ui/theme.ts) shows; the Daily Run a paper ticket. */
 .level-select {
   position: fixed;
   inset: 0;
@@ -941,103 +959,148 @@ canvas {
   align-items: center;
   justify-content: safe center;
   z-index: 100;
-  background: radial-gradient(ellipse at 50% 35%, rgba(24, 22, 48, 0.78), rgba(0, 0, 0, 0.92));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
+  font-family: 'Big Shoulders', sans-serif;
+  font-variation-settings: 'opsz' 10;
+  color: var(--fair-cream);
   padding:
-    calc(1.5rem + env(safe-area-inset-top))
+    calc(1.25rem + env(safe-area-inset-top))
     calc(1rem + env(safe-area-inset-right))
     calc(1.5rem + env(safe-area-inset-bottom))
     calc(1rem + env(safe-area-inset-left));
 }
 
 .level-select-header {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 0.35rem;
-  margin-bottom: clamp(1rem, 4vh, 2rem);
+  gap: 0.75rem 1rem;
+  width: min(1120px, 100%);
+  margin-bottom: 1.25rem;
 }
 
-.level-select h2 {
-  font-family: 'Lobster', cursive;
-  font-size: clamp(2rem, 8vw, 2.75rem);
-  text-shadow: 0 0 18px rgba(255, 200, 0, 0.45), 0 3px 6px rgba(0, 0, 0, 0.6);
+.level-select-header h2.fair-title {
+  margin: 0;
+  font-size: 2.5rem;
+  text-align: center;
 }
 
+.level-select-back {
+  justify-self: start;
+  padding-inline: 1.1rem;
+}
+
+/* The stars won so far, on a small plate. */
 .level-select-total {
-  padding: 0.3rem 0.9rem;
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: 1px;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.45rem 0.8rem 0.35rem;
+  border-radius: 5px;
+  font-family: 'Ultra', serif;
+  font-size: 1.25rem;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
-  border: 1px solid rgba(255, 210, 63, 0.45);
-  border-radius: 999px;
-  background: rgba(255, 210, 63, 0.1);
+  background: var(--fair-oxblood-deep);
+  box-shadow: 0 4px 0 var(--fair-tar);
 }
 
-.level-select-total-star {
-  color: #ffd23f;
-  text-shadow: 0 0 8px rgba(255, 210, 63, 0.8);
+.level-select-total svg {
+  width: 24px;
+  height: 24px;
+}
+
+.level-select-total path {
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  fill: var(--fair-gilt);
+  stroke: var(--fair-tar);
 }
 
 .level-grid {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: clamp(0.75rem, 1.4vw, 1.25rem);
-  width: min(1440px, 100%);
+  align-items: flex-start;
+  gap: 1.4rem 1.1rem;
+  width: min(1120px, 100%);
 }
 
+/* The button is the hanging sign: it tilts a little on its hook, each one its own way, and its board fills it.
+   No filter here: a ride board's tar shadow is its FairBoard's .fair-board-shadow wrapper, the Daily Run
+   ticket's is .level-card-daily's drop-shadow. So a ride board's focus outline casts no shadow, on purpose. */
 .level-card {
-  --accent: #ffd23f;
-  --accent-glow: rgba(255, 210, 63, 0.55);
-  position: relative;
+  --tilt: -0.8deg;
   display: flex;
-  flex-direction: column;
-  /* Five worlds + the Daily card on one row at 1280 px. */
-  width: clamp(160px, 14vw, 224px);
+  width: clamp(200px, 21vw, 258px);
   min-height: 44px;
   padding: 0;
-  overflow: hidden;
+  border: 0;
   font: inherit;
-  color: #fff;
+  color: inherit;
   text-align: left;
-  background: rgba(14, 14, 22, 0.9);
-  border: 2px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  background: none;
   cursor: pointer;
-  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s, box-shadow 0.3s, opacity 0.3s;
+  rotate: var(--tilt);
+  transition: transform 150ms ease-out, rotate 150ms ease-out, opacity 0.3s;
+}
+
+.level-card:nth-child(3n + 2) {
+  --tilt: 0.7deg;
+}
+
+.level-card:nth-child(3n) {
+  --tilt: -0.3deg;
 }
 
 @media (hover: hover) {
-  .level-card:not(.locked):hover {
-    border-color: var(--accent);
-    transform: translateY(-6px);
-    box-shadow: 0 12px 30px var(--accent-glow);
+  .level-card:hover {
+    rotate: 0deg;
+    transform: translateY(-4px);
   }
 }
 
 .level-card:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 3px solid var(--fair-cream);
   outline-offset: 3px;
-  border-color: var(--accent);
-  transform: translateY(-6px);
-  box-shadow: 0 12px 30px var(--accent-glow);
+  rotate: 0deg;
+  transform: translateY(-4px);
 }
 
 .level-card:not(.locked):active {
-  transform: scale(0.97);
+  transform: translateY(2px);
+  transition-duration: 60ms;
+}
+
+.fair-board-shadow.level-board-shadow {
+  flex: 1;
+  display: flex;
+  width: auto;
+}
+
+.level-board.fair-board {
+  flex: 1;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas: 'art' 'plate' 'body';
+  padding: 20px;
 }
 
 .level-postcard {
   position: relative;
+  display: block;
   aspect-ratio: 2 / 1;
-  flex-shrink: 0;
-  border-bottom: 2px solid var(--accent);
-  transition: filter 0.3s;
+  overflow: hidden;
+}
+
+.level-card .level-postcard {
+  grid-area: art;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 2px var(--fair-tar);
 }
 
 .level-postcard svg {
@@ -1046,31 +1109,46 @@ canvas {
   height: 100%;
 }
 
+.level-postcard-planks {
+  position: absolute;
+  inset: 0;
+}
+
+.level-postcard-tar {
+  fill: var(--fair-tar);
+}
+
+/* The world's name plate, painted in its biome's colour; tar letters on every biome accent pass 4.5:1 (theme.test.ts). */
+.level-plate {
+  grid-area: plate;
+  justify-self: center;
+  max-width: 100%;
+  margin-top: -14px;
+  padding: 0.4rem 0.75rem 0.3rem;
+  border-radius: 5px;
+  font-family: 'Ultra', serif;
+  font-size: 1.25rem;
+  line-height: 1.05;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--fair-tar);
+  background: var(--plate);
+  box-shadow: 0 4px 0 var(--fair-tar);
+}
+
 .level-card-body {
+  grid-area: body;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  padding: 0.7rem 0.85rem 0.8rem;
-}
-
-.level-card-index {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.level-card-name {
-  font-size: 1.15rem;
-  font-weight: 700;
-  line-height: 1.15;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
 }
 
 .level-card-desc {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.3;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .level-card-meta {
@@ -1078,128 +1156,141 @@ canvas {
   align-items: center;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.15rem 0.5rem;
-  margin-top: 0.35rem;
+  gap: 0.2rem 0.5rem;
+  margin-top: auto;
 }
 
-.level-card-stars {
-  font-size: 1.1rem;
-  letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.22);
+.level-card-meta .fair-stars {
+  gap: 3px;
 }
 
-.level-card-stars .earned {
-  color: #ffd23f;
-  text-shadow: 0 0 6px rgba(255, 210, 63, 0.8);
+.level-card-meta .fair-stars svg {
+  width: 22px;
+  height: 22px;
 }
 
 .level-card-best {
-  font-size: 0.78rem;
+  font-size: 1.125rem;
   font-weight: 600;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.8);
 }
 
 .level-card-initials {
-  margin-left: 0.4rem;
+  margin-left: 0.35rem;
   font-weight: 800;
-  letter-spacing: 1.5px;
-  color: var(--accent);
+  color: var(--fair-gilt);
 }
 
 .level-card-streak {
-  font-size: 0.72rem;
+  font-size: 1.0625rem;
   font-weight: 700;
-  letter-spacing: 0.5px;
-  color: #ffb347;
   white-space: nowrap;
 }
 
-.level-card-daily {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+/* A board with its Night Ride plate hung under it (#829): a latching switch, held down while it is on. */
+.level-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
 }
 
-.level-card-daily-badge {
-  position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  padding: 0.15rem 0.55rem;
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: #1a1206;
-  background: #ffd23f;
-  border-radius: 999px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-  pointer-events: none;
+.fair-plate.level-night {
+  padding-inline: 1rem;
+  font-size: 1.25rem;
+}
+
+.fair-plate.level-night[aria-pressed='true'] {
+  color: var(--fair-tar);
+  background: var(--fair-sky);
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--fair-tar);
+}
+
+/* Boarded up: planks across the picture, a plain plate, and what opens it. */
+.level-card.locked {
+  cursor: not-allowed;
+}
+
+.level-card.locked .level-plate {
+  color: var(--fair-cream);
+  background: var(--fair-oxblood-deep);
 }
 
 .level-card-locked-hint {
-  margin-top: 0.35rem;
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  margin-top: auto;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--fair-gilt);
 }
 
-.level-card.locked {
-  cursor: not-allowed;
-  border-color: rgba(255, 255, 255, 0.08);
+/* The ticket has no FairBoard, so it casts the same hard tar shadow itself. */
+.level-card-daily {
+  filter: drop-shadow(6px 8px 0 var(--fair-tar));
 }
 
-.level-card.locked .level-postcard {
-  filter: grayscale(1) brightness(0.4);
-  border-bottom-color: rgba(255, 255, 255, 0.12);
+/* The Daily Run's ticket: cream card, oxblood ink, the stub above a perforation. */
+.level-ticket {
+  flex: 1;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas: 'stub' 'art' 'body';
+  gap: 0.6rem;
+  padding: 14px 20px 20px;
+  color: var(--fair-oxblood);
+  background: var(--fair-cream);
 }
 
-.level-card.locked .level-card-index,
-.level-card.locked .level-card-name,
-.level-card.locked .level-card-desc {
-  opacity: 0.55;
-}
-
-.level-card-lock {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  aspect-ratio: 2 / 1;
+.level-ticket-stub {
+  grid-area: stub;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.1rem 0.5rem;
+  padding: 0 4px 0.5rem;
+  border-bottom: 2px dashed var(--fair-oxblood);
 }
 
-.level-card-lock svg {
-  width: 34px;
-  height: 34px;
-  fill: rgba(255, 255, 255, 0.85);
-  stroke: rgba(255, 255, 255, 0.85);
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+.level-ticket-title {
+  font-family: 'Ultra', serif;
+  font-size: 1.375rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 
+.level-ticket-date {
+  font-variation-settings: 'opsz' 40;
+  font-size: 1.125rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.level-ticket .level-postcard {
+  grid-area: art;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 2px var(--fair-oxblood);
+}
+
+.level-ticket .level-card-body {
+  margin-top: 0;
+}
+
+/* Launch: the picked board comes forward, the rest fall back. */
 .level-select.is-launching .level-card {
   opacity: 0.2;
   transform: scale(0.96);
+  transition-duration: 0.3s;
 }
 
 .level-select.is-launching .level-card.is-selected {
   z-index: 1;
   opacity: 1;
-  transform: scale(1.1);
-  border-color: var(--accent);
-  box-shadow: 0 0 40px var(--accent-glow);
-}
-
-.level-select.is-launching .level-card.is-selected .level-postcard {
-  filter: brightness(1.25) saturate(1.2);
-}
-
-.level-select-back {
-  margin-top: clamp(1.25rem, 4vh, 2rem);
-  flex-shrink: 0;
+  rotate: 0deg;
+  transform: scale(1.06);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1208,104 +1299,118 @@ canvas {
   .level-select.is-launching .level-card.is-selected,
   .level-card:focus-visible {
     transform: none;
+    transition: opacity 0.3s;
   }
 }
 .reduce-motion :is(.level-card, .level-select.is-launching .level-card, .level-select.is-launching .level-card.is-selected, .level-card:focus-visible) {
   transform: none;
+  transition: opacity 0.3s;
 }
 
-/* Short landscape screens (phones on their side): one compact row. */
+/* Short landscape screens (phones on their side): smaller boards, four to a row, no description. */
 @media (max-height: 520px) and (min-width: 601px) {
   .level-select-header {
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.9rem;
   }
 
-  .level-select h2 {
-    font-size: 1.8rem;
+  .level-select-header h2.fair-title {
+    font-size: 2rem;
   }
 
   .level-grid {
-    gap: 0.6rem;
+    gap: 1rem 0.9rem;
   }
 
   .level-card {
-    width: clamp(112px, 14vw, 180px);
+    width: clamp(150px, 21vw, 200px);
   }
 
-  .level-card-desc {
+  .level-board .level-card-desc {
     display: none;
   }
 
-  .level-card-body {
-    padding: 0.5rem 0.65rem 0.6rem;
-  }
-
-  .level-card-name {
+  .level-plate {
     font-size: 1rem;
-  }
-
-  .level-card-locked-hint {
-    font-size: 0.66rem;
-  }
-
-  .level-select-back {
-    margin-top: 0.9rem;
-    padding-block: 0.7rem;
+    white-space: nowrap;
   }
 }
 
-/* Phones: one full-width row per world, postcard on the left. */
+/* Phones: one board per row, the picture on the left. */
 @media (max-width: 600px) {
+  .level-select-header {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: 'title title' 'back total';
+    width: min(480px, 100%);
+  }
+
+  .level-select-header h2.fair-title {
+    grid-area: title;
+    font-size: 2.125rem;
+  }
+
+  .level-select-back {
+    grid-area: back;
+  }
+
+  .level-select-total {
+    grid-area: total;
+  }
+
   .level-grid {
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: stretch;
     width: min(480px, 100%);
-    gap: 0.6rem;
+    padding-right: 6px;
   }
 
   .level-card {
-    flex-direction: row;
+    --tilt: -0.4deg;
     width: 100%;
-    min-height: 96px;
   }
 
-  .level-postcard {
-    width: 44%;
+  .level-card:nth-child(3n + 2) {
+    --tilt: 0.35deg;
+  }
+
+  .level-card:nth-child(3n) {
+    --tilt: -0.15deg;
+  }
+
+  .level-board.fair-board {
+    grid-template-columns: 42% 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas: 'art plate' 'art body';
+    column-gap: 0.75rem;
+    padding: 16px;
+  }
+
+  .level-card .level-postcard {
     aspect-ratio: auto;
-    border-bottom: none;
-    border-right: 2px solid var(--accent);
+    min-height: 84px;
   }
 
-  .level-card.locked .level-postcard {
-    border-right-color: rgba(255, 255, 255, 0.12);
+  .level-plate {
+    justify-self: start;
+    margin-top: 0;
+    font-size: 1.125rem;
+    text-align: left;
   }
 
-  .level-card-lock {
-    bottom: 0;
-    right: auto;
-    width: 44%;
-    aspect-ratio: auto;
-  }
-
-  .level-card-body {
-    flex: 1;
-    min-width: 0;
-    justify-content: center;
-    padding: 0.55rem 0.75rem;
-  }
-
-  .level-card-name {
-    font-size: 1.05rem;
-  }
-
-  .level-card-desc {
-    font-size: 0.75rem;
-  }
-
-  .level-card-meta,
+  .level-card-desc,
   .level-card-locked-hint {
-    margin-top: 0.15rem;
+    text-align: left;
+  }
+
+  .level-ticket {
+    grid-template-columns: 42% 1fr;
+    grid-template-areas: 'stub stub' 'art body';
+    column-gap: 0.75rem;
+  }
+
+  .level-ticket .level-postcard {
+    aspect-ratio: auto;
+    min-height: 72px;
   }
 
   /* On top, above the fold: the reason to come back each day. */
@@ -1314,12 +1419,12 @@ canvas {
   }
 
   .level-card:focus-visible,
-  .level-card:not(.locked):hover {
+  .level-card:hover {
     transform: none;
   }
 }
 
-/* Results screen. --accent / --accent-glow are the level's biome accent, set inline from src/ui/theme.ts. */
+/* Results board (docs/art/PERSONALITY.md): a fair board over the landmark's orbit, the leaderboard beside it. */
 .results-screen {
   position: fixed;
   inset: 0;
@@ -1328,8 +1433,6 @@ canvas {
   align-items: center;
   justify-content: safe center;
   z-index: 100;
-  /* Dark under the stats, lighter at the edges: the camera orbits the level's landmark behind them (#328). */
-  background: radial-gradient(ellipse at 50% 45%, rgba(12, 12, 22, 0.82) 30%, rgba(0, 0, 0, 0.5));
   overflow-y: auto;
   touch-action: pan-y;
 }
@@ -1338,8 +1441,14 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.25rem;
+  gap: 1.5rem;
   width: min(100%, 26rem);
+}
+
+.results-panel {
+  display: grid;
+  gap: 1.1rem;
+  padding: 1.7rem 1.6rem 1.4rem;
 }
 
 .results-main,
@@ -1347,253 +1456,230 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100%;
+  min-width: 0;
 }
 
-.results-screen h2 {
-  font-family: 'Lobster', cursive;
-  font-size: clamp(2rem, 9vw, 3rem);
-  line-height: 1.1;
+.results-panel h2.fair-title {
+  margin: 0;
+  font-size: 2.5rem;
   text-align: center;
-  text-shadow: 0 0 18px var(--accent-glow);
-}
-
-.results-daily-badge {
-  margin-bottom: 0.3rem;
-  padding: 0.15rem 0.7rem;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #1a1206;
-  background: #ffd23f;
-  border-radius: 999px;
 }
 
 .results-message {
-  margin-top: 0.25rem;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.65);
+  margin-top: 0.35rem;
+  font-size: 1.15rem;
   text-align: center;
 }
 
-.results-stars {
-  display: flex;
-  gap: 0.5rem;
-  margin: 0.75rem 0 0.25rem;
-  font-size: clamp(2.6rem, 12vw, 3.6rem);
-  line-height: 1;
-}
-
-.results-star {
-  position: relative;
-  color: rgba(255, 255, 255, 0.22);
-}
-
-.results-star-earned {
-  position: absolute;
-  inset: 0;
-  /* Gold on purpose, not the biome accent: stars are gold on every screen (.level-card-stars .earned). */
-  color: #ffd23f;
-  text-shadow: 0 0 16px rgba(255, 210, 63, 0.8);
+.results-badge {
+  margin-bottom: 0.7rem;
+  color: var(--fair-tar);
+  background: var(--fair-sky);
+  rotate: -3deg;
 }
 
 .results-score {
   position: relative;
-  font-size: clamp(2.2rem, 10vw, 3rem);
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+/* Space above the score for the record's card, so it covers neither the bulbs nor the line above. */
+.results-score.has-record {
+  margin-top: 2.1rem;
 }
 
 .results-record {
   position: absolute;
-  left: 100%;
-  top: -0.2rem;
-  margin-left: 0.5rem;
-  padding: 0.2rem 0.55rem;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 1px;
-  white-space: nowrap;
-  color: #000;
-  background: var(--accent);
-  border-radius: 4px;
-  box-shadow: 0 0 14px var(--accent-glow);
+  right: -0.5rem;
+  bottom: calc(100% + 2px);
+  color: var(--fair-oxblood);
+  background: var(--fair-cream);
+  rotate: 4deg;
+}
+
+.results-screen[data-sequence='running'] .results-record {
+  animation: results-card-slap 220ms ease-out;
+}
+
+@keyframes results-card-slap {
+  from {
+    scale: 1.7;
+    rotate: -10deg;
+  }
+}
+
+/* The score in a sunk well, ringed with chaser bulbs (ResultsMarquee). */
+.results-marquee {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 1.25rem 1rem 1.1rem;
+  border-radius: 5px;
+  background: var(--fair-oxblood-deep);
+}
+
+.results-bulbs {
+  position: absolute;
+  inset: 9px;
+}
+
+.results-bulbs i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: var(--fair-oxblood);
+  box-shadow: 0 0 0 1.5px var(--fair-tar);
+}
+
+.results-bulbs i.lit {
+  background: var(--fair-cream);
+  box-shadow: 0 0 0 2px var(--fair-gilt);
+}
+
+/* One pass round the ring: each bulb flashes as the chase reaches it, then holds lit or goes dark. */
+.results-bulbs.is-chasing i {
+  animation: results-chase 260ms linear calc(var(--i) * 28ms) backwards;
+}
+
+@keyframes results-chase {
+  0% {
+    background: var(--fair-oxblood);
+    box-shadow: 0 0 0 1.5px var(--fair-tar);
+  }
+
+  1%,
+  60% {
+    background: var(--fair-cream);
+    box-shadow: 0 0 0 2px var(--fair-gilt);
+  }
+}
+
+/* The ticket counter: one wheel per digit, its faces stacked and rolled by transform. */
+.results-score-value {
+  display: flex;
+  font-size: 3.25rem;
+}
+
+.results-wheel-slot {
+  display: flex;
+}
+
+.results-wheel {
+  display: block;
+  width: 0.8em;
+  height: 1.1em;
+  margin: 0 0.04em;
+  border-radius: 3px;
+  background: var(--fair-oxblood);
+  overflow-x: visible;
+  overflow-y: clip;
+  text-align: center;
+}
+
+.results-wheel-strip {
+  display: block;
+  line-height: 1.1em;
+}
+
+.results-wheel-strip > span {
+  display: block;
+  height: 1.1em;
+}
+
+.results-comma {
+  width: 0.3em;
+  line-height: 1.1em;
+}
+
+.results-stars {
+  margin-top: 0.8rem;
+}
+
+.results-stars .fair-stars svg {
+  width: 40px;
+  height: 40px;
+}
+
+.results-screen[data-sequence='running'] .results-stars .earned {
+  animation: results-star-pop 240ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes results-star-pop {
+  from {
+    scale: 0.2;
+    rotate: -40deg;
+  }
+}
+
+.results-next,
+.results-best {
+  margin-top: 0.4rem;
+  font-size: 1.15rem;
+  text-align: center;
 }
 
 .results-best {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--fair-sky);
 }
 
-.results-bar {
-  position: relative;
-  width: 100%;
-  height: 0.6rem;
-  margin-top: 1.4rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+.results-next[data-shown='false'],
+.results-stats[data-shown='false'],
+.results-actions[data-shown='false'],
+.results-keys[data-shown='false'] {
+  visibility: hidden;
 }
 
-.results-bar-fill {
-  width: 0;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
-  box-shadow: 0 0 10px var(--accent-glow);
-}
-
-.results-bar-marker {
-  position: absolute;
-  bottom: 100%;
-  transform: translateX(-50%);
-  padding-bottom: 0.15rem;
-  font-size: 0.7rem;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.4);
-  white-space: nowrap;
-}
-
-.results-bar-marker::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 100%;
-  width: 2px;
-  height: 0.6rem;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.55);
-}
-
-.results-bar-marker.reached {
-  /* Gold like the earned stars above. */
-  color: #ffd23f;
-}
-
-.results-next {
-  margin-top: 0.4rem;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
+.results-actions[data-shown='false'] {
+  pointer-events: none;
 }
 
 .results-stats {
   list-style: none;
-  width: 100%;
-  padding: 0;
+  align-self: stretch;
   margin: 0;
+  padding: 0;
 }
 
 .results-stat {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.45rem 0.25rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 1rem;
+  padding: 0.2rem 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-align: center;
 }
 
-.results-stat span {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.results-stat strong {
-  font-variant-numeric: tabular-nums;
-}
-
+/* The one gilt plate across the top, the small plates side by side under it. */
 .results-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-top: 1.25rem;
+  align-self: stretch;
+  gap: 0.65rem;
+  margin-top: 1.1rem;
 }
 
-.results-actions .play-button {
-  padding: 0.75rem 1rem;
-  font-size: 0.95rem;
-  letter-spacing: 1px;
+.results-actions > * {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
-.results-actions .results-secondary {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.14);
+.results-actions > .fair-go {
+  flex-basis: 100%;
+  margin-bottom: 0.3rem;
+  padding: 0.9rem 1rem 0.75rem;
+  font-size: 2rem;
 }
 
-/* Share menu (src/ui/ShareMenu.tsx): placed by popoverPlacement.ts, below the button when it fits beside Next. */
-.share-anchor {
-  position: relative;
-  display: flex;
-}
-
-.results-actions .results-share[aria-expanded='true'] {
-  color: #000;
-  background: var(--accent);
-}
-
-.share-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  z-index: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.35rem;
-  width: 17rem;
-  max-width: calc(100vw - 16px);
-  padding: 0.5rem;
-  background: rgba(16, 16, 24, 0.97);
-  border: 1px solid var(--accent);
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 18px var(--accent-glow);
-}
-
-.share-menu[data-side='above'] {
-  top: auto;
-  bottom: calc(100% + 8px);
-}
-
-.share-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 0 0.6rem;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #fff;
-  text-decoration: none;
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.share-item:hover,
-.share-item:focus-visible {
-  color: #000;
-  background: var(--accent);
-  outline: none;
-}
-
-.share-wide {
-  grid-column: 1 / -1;
-}
-
-/* Phone landscape: three columns, Save / Copy image / Copy link on one row, keep the menu short enough to open above the buttons. */
-@media (max-height: 520px) {
-  .share-menu {
-    grid-template-columns: repeat(3, 1fr);
-    width: 23rem;
-  }
-
-  .share-wide {
-    grid-column: auto;
-  }
+.results-actions .results-share {
+  flex: 1;
 }
 
 .results-keys {
-  margin-top: 0.6rem;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
+  margin-top: 1rem;
+  font-size: 1.05rem;
+  text-align: center;
+  opacity: 0.72;
 }
 
 @media (hover: none) {
@@ -1602,73 +1688,116 @@ canvas {
   }
 }
 
-/* The on-ride photo (#701) as a print: last on a phone (under the board), a column of its own on a wide screen. */
-.results-photo {
-  order: 1;
-  width: min(80%, 17rem);
-  margin: 0.5rem 0 0;
-  padding: 0.5rem 0.5rem 0.35rem;
-  background: #f6f1e7;
-  border-radius: 3px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.2);
+@media (prefers-reduced-motion: reduce) {
+  .results-bulbs.is-chasing i,
+  .results-screen[data-sequence] .results-record,
+  .results-screen[data-sequence] .results-stars .earned {
+    animation: none;
+  }
 }
+.reduce-motion :is(.results-bulbs.is-chasing i, .results-screen[data-sequence] .results-record, .results-screen[data-sequence] .results-stars .earned) { animation: none; }
 
-.results-photo img {
-  display: block;
-  width: 100%;
-  height: auto;
-  /* One print shape for a landscape desktop frame and a portrait phone one. */
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  border-radius: 1px;
-}
-
-.results-photo figcaption {
-  padding-top: 0.3rem;
-  font-family: 'Lobster', cursive;
-  font-size: 1rem;
-  text-align: center;
-  color: #2a2420;
-}
-
-/* Local top 10 (ResultsLeaderboard): under the buttons on a phone, a column of its own when there is room. */
-.results-board-slot,
-.results-board {
-  width: 100%;
-}
-
-.results-board h3 {
-  margin-bottom: 0.4rem;
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 2px;
-  text-align: center;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* "World" / "This device": beside the title, or whole on the next line when they don't fit. */
-.results-board h3 {
+/* Share menu (src/ui/ShareMenu.tsx): a small fair board of plates popping out of the Share plate, fixed to the
+   viewport where popoverPlacement.ts puts it (below the button when it fits beside Next), over the results screen. */
+.share-anchor {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+}
+
+.results-actions .results-share[aria-expanded='true'] {
+  color: var(--fair-gilt);
+}
+
+.share-menu {
+  position: fixed;
+  z-index: 101;
+  width: 19rem;
+  max-width: calc(100vw - 16px);
+}
+
+.share-menu .fair-board-shadow {
+  width: 100%;
+}
+
+.fair-board.share-board {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem 0.5rem;
+  padding: 1.1rem 1.1rem 1.35rem;
+}
+
+.share-menu .fair-plate.share-item {
+  display: flex;
   align-items: center;
-  gap: 0.2em 0.5em;
+  justify-content: center;
+  padding: 0.55rem 0.4rem 0.4rem;
+  font-size: 1.2rem;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.share-wide {
+  grid-column: 1 / -1;
+}
+
+/* Wider screens: four columns, three rows, short enough to open below Share without covering the gilt plate. */
+@media (min-width: 700px) {
+  .share-menu {
+    width: 34rem;
+  }
+
+  .fair-board.share-board {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .share-wide {
+    grid-column: auto;
+  }
+}
+
+/* Phone landscape: six columns in two rows, short enough to open above the gilt plate (Replay / Next Level) over the
+   Share row, which leaves under 200 px at 390 px tall; popoverPlacement steps past the plate, never over it. */
+@media (max-height: 520px) {
+  .share-menu {
+    width: 46rem;
+  }
+
+  .fair-board.share-board {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.4rem;
+    padding: 0.75rem 0.8rem 0.9rem;
+  }
+
+  .share-menu .fair-plate.share-item {
+    min-height: 44px;
+    padding: 0.35rem 0.3rem 0.25rem;
+    font-size: 1.05rem;
+  }
+
+  .share-wide {
+    grid-column: auto;
+  }
+}
+
+/* The leaderboard (ResultsLeaderboard): the gallery's prize board, under the results board on a phone, beside it when
+   there is room. Rank and initials in Big Shoulders, the score in Ultra figures, the run's own row in gilt. */
+.results-board-slot,
+.fair-board-shadow.results-board-shadow {
+  width: 100%;
+}
+
+.fair-board.results-board {
+  padding: 1.35rem 1.25rem 1.3rem;
+}
+
+.results-board h3.fair-title {
+  font-size: 1.6rem;
+  text-align: center;
 }
 
 .results-board-source {
-  padding: 0.05em 0.45em;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-size: 0.8em;
-  letter-spacing: 1px;
-  white-space: nowrap;
-  opacity: 0.8;
-}
-
-.results-board[data-rank] h3 {
-  color: var(--accent);
-  text-shadow: 0 0 10px var(--accent-glow);
+  margin: 0.3rem 0 0.7rem;
+  font-size: 1.1rem;
+  text-align: center;
 }
 
 .results-board ol {
@@ -1679,224 +1808,308 @@ canvas {
 
 .results-board li {
   display: grid;
-  grid-template-columns: 1.5rem minmax(3.4rem, auto) 1fr auto;
+  grid-template-columns: 1.4rem minmax(2.6rem, auto) 1fr auto;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
+  padding: 0.15rem 0.45rem 0.1rem;
+  border-radius: 3px;
+  font-size: 1.15rem;
   font-variant-numeric: tabular-nums;
 }
 
 .results-board li:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fair-oxblood-deep);
 }
 
 .results-board li.is-new {
-  background: color-mix(in srgb, var(--accent) 24%, transparent);
-  box-shadow: inset 0 0 0 1px var(--accent), 0 0 14px var(--accent-glow);
+  color: var(--fair-tar);
+  background: var(--fair-gilt);
+  box-shadow: 0 3px 0 var(--fair-gilt-block);
 }
 
 .results-board-rank {
   text-align: right;
-  color: rgba(255, 255, 255, 0.45);
 }
 
 .results-board-initials {
   display: flex;
+  gap: 0.25rem;
+  font-variation-settings: 'opsz' 40;
   font-weight: 800;
-  letter-spacing: 3px;
 }
 
-.results-board-stars {
-  font-size: 0.7rem;
-  letter-spacing: 1px;
-  color: #ffd23f;
+.results-board-stars .fair-stars {
+  gap: 1px;
 }
 
-.results-board li strong {
+.results-board-stars .fair-stars svg {
+  width: 14px;
+  height: 14px;
+}
+
+.results-board li.is-new .fair-stars path {
+  fill: var(--fair-gilt-block);
+  stroke: var(--fair-gilt-block);
+}
+
+.results-board li.is-new .fair-stars .earned path {
+  fill: var(--fair-tar);
+  stroke: var(--fair-tar);
+}
+
+.results-board-score {
+  font-family: 'Ultra', serif;
+  font-weight: 400;
+  font-size: 0.95em;
   text-align: right;
 }
 
 .results-board-empty {
   padding: 0.6rem 0;
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   text-align: center;
-  color: rgba(255, 255, 255, 0.5);
 }
 
-/* The run's row while it takes initials: one 44 px button per letter, the active one blinking. */
+/* The run's row while it takes initials: three letters slotted into a ticket counter, the active tile lined in gilt. */
 .results-board-initials button {
   min-width: 44px;
   min-height: 44px;
-  padding: 0;
+  padding: 0.2rem 0 0;
   border: 0;
-  border-bottom: 3px solid transparent;
-  background: none;
-  color: #fff;
-  font: inherit;
-  font-size: 1.25rem;
+  border-radius: 3px;
+  background: var(--fair-oxblood-deep);
+  color: var(--fair-cream);
+  font-family: 'Ultra', serif;
+  font-size: 1.35rem;
+  line-height: 1;
+  box-shadow: inset 0 3px 0 var(--fair-tar);
   cursor: pointer;
 }
 
 .results-board-initials button.is-active {
-  border-bottom-color: var(--accent);
-  color: var(--accent);
-  animation: initials-blink 0.9s steps(2, jump-none) infinite;
+  color: var(--fair-gilt);
+  box-shadow: inset 0 3px 0 var(--fair-tar), inset 0 0 0 3px var(--fair-gilt);
 }
 
-@keyframes initials-blink {
-  50% {
-    opacity: 0.35;
-  }
+.results-board-initials button:focus-visible {
+  outline: 3px solid var(--fair-cream);
+  outline-offset: 2px;
 }
 
 .results-initials-pad {
   display: flex;
   justify-content: center;
-  gap: 0.4rem;
-  margin-top: 0.6rem;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
 }
 
-.results-initials-pad button {
+.results-initials-pad .fair-plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 44px;
-  min-height: 44px;
-  border: 0;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  font: inherit;
-  font-size: 1rem;
-  cursor: pointer;
+  padding: 0 0.6rem;
+}
+
+.results-initials-pad svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
 .results-initials-pad .results-initials-ok {
-  padding: 0 1.1rem;
-  background: var(--accent);
-  color: #000;
-  font-weight: 800;
-  letter-spacing: 1px;
-  box-shadow: 0 0 12px var(--accent-glow);
+  padding: 0.25rem 1rem 0;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .results-board-initials button.is-active {
-    animation: none;
-  }
-}
-.reduce-motion .results-board-initials button.is-active { animation: none; }
-
-/* Desktop: score, stats and buttons on the left, the board beside them. */
-@media (min-width: 900px) and (min-height: 521px) {
+/* Desktop and phone landscape: the board in two columns (the score, then the lines and plates), the leaderboard beside it. */
+@media (min-width: 900px) and (min-height: 521px), (orientation: landscape) and (max-height: 520px) {
   .results-card {
-    display: grid;
-    grid-template-columns: 26rem 17rem;
-    grid-template-areas:
-      'main board'
-      'side board';
-    column-gap: 3rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 2.5rem;
     width: auto;
+    max-width: 100%;
   }
 
-  .results-main {
-    grid-area: main;
+  .fair-board-shadow.results-panel-shadow {
+    width: 42rem;
+    max-width: 100%;
   }
 
-  .results-side {
-    grid-area: side;
+  .results-panel {
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    column-gap: 1.8rem;
   }
 
   .results-board-slot {
-    grid-area: board;
-    align-self: center;
+    flex: 0 0 19rem;
   }
+}
 
-  /* A daily run has no board (it never enters the campaign's). */
-  .results-screen[data-mode='daily'] .results-card {
-    grid-template-columns: 26rem;
-    grid-template-areas:
-      'main'
-      'side';
-  }
+/* The on-ride photo (#701) as a print: last on a phone (under the leaderboard), a column left of the board on a wide
+   screen, left out where the row has no room for it. */
+.results-photo {
+  order: 1;
+  width: min(80%, 17rem);
+  margin: 0;
+  padding: 0.5rem 0.5rem 0.3rem;
+  background: var(--fair-cream);
+  border-radius: 2px;
+  box-shadow: 4px 5px 0 var(--fair-tar);
+}
 
-  /* Too narrow for the print's column. */
+.results-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* One print shape for a landscape desktop frame and a portrait phone one. */
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.results-photo figcaption {
+  padding-top: 0.3rem;
+  font-family: 'Big Shoulders', sans-serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  text-align: center;
+  color: var(--fair-tar);
+}
+
+@media (min-width: 900px) and (min-height: 521px), (orientation: landscape) and (max-height: 520px) {
   .results-photo {
     display: none;
   }
 }
 
-/* Wide desktop: the print in a column left of the score. */
-@media (min-width: 1100px) and (min-height: 521px) {
+@media (min-width: 1240px) and (min-height: 521px) {
   .results-card.has-photo {
-    grid-template-columns: 15rem 26rem 17rem;
-    grid-template-areas:
-      'photo main board'
-      'photo side board';
-  }
-
-  .results-screen[data-mode='daily'] .results-card.has-photo {
-    grid-template-columns: 15rem 26rem;
-    grid-template-areas:
-      'photo main'
-      'photo side';
+    gap: 1.5rem;
   }
 
   .results-photo {
     display: block;
-    grid-area: photo;
-    align-self: center;
-    width: 100%;
-    margin: 0;
+    order: -1;
+    flex: 0 0 12rem;
   }
 }
 
-/* Phone landscape: score + stars on the left, stats + buttons on the right. */
+/* Phone landscape: tighter, so the board and the leaderboard fit 390 px. */
 @media (orientation: landscape) and (max-height: 520px) {
   .results-card {
-    flex-direction: row;
-    align-items: center;
-    gap: 1.25rem;
-    width: min(100%, 60rem);
+    gap: 1rem;
   }
 
-  .results-screen h2 {
-    font-size: 1.8rem;
+  .fair-board-shadow.results-panel-shadow {
+    flex: 1 1 auto;
+    width: auto;
   }
 
-  .results-stars {
-    margin: 0.4rem 0 0;
-    font-size: 2.4rem;
+  .results-panel {
+    gap: 0.4rem;
+    column-gap: 1.2rem;
+    padding: 1.2rem 1.3rem 1rem;
   }
 
-  .results-score {
-    font-size: 2rem;
+  .results-panel h2.fair-title {
+    font-size: 1.75rem;
   }
 
-  .results-stat {
-    padding: 0.3rem 0.25rem;
-  }
-
-  .results-actions {
-    margin-top: 0.75rem;
-  }
-
-  /* Levels / Replay / Share on one row beside the board, so the share menu opens above them, not over them. */
-  .results-actions .play-button {
-    padding: 0.75rem 0.7rem;
-    font-size: 0.85rem;
-  }
-
-  .results-board-slot {
-    flex: 0 0 14rem;
-  }
-
-  .results-photo {
+  .results-message {
     display: none;
   }
 
+  .results-badge {
+    margin-bottom: 0.4rem;
+  }
+
+  .results-score {
+    margin-top: 0.6rem;
+  }
+
+  .results-score.has-record {
+    margin-top: 1.9rem;
+  }
+
+  .results-score-value {
+    font-size: 2.4rem;
+  }
+
+  .results-marquee {
+    padding: 0.9rem 0.8rem 0.8rem;
+  }
+
+  .results-stars {
+    margin-top: 0.5rem;
+  }
+
+  .results-stars .fair-stars svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  .results-next,
+  .results-best {
+    margin-top: 0.2rem;
+    font-size: 1rem;
+  }
+
+  .results-stat {
+    padding: 0.05rem 0;
+    font-size: 1.1rem;
+  }
+
+  .results-actions {
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+  }
+
+  .results-actions .fair-go {
+    margin-bottom: 0.2rem;
+    padding: 0.7rem 0.8rem 0.55rem;
+    font-size: 1.6rem;
+  }
+
+  .results-actions .fair-plate:not(.fair-go) {
+    font-size: 1.15rem;
+  }
+
+  .results-board-slot {
+    flex: 0 0 15rem;
+  }
+
+  .fair-board.results-board {
+    padding: 0.95rem 0.95rem 1rem;
+  }
+
+  .results-board h3.fair-title {
+    font-size: 1.15rem;
+  }
+
+  .results-board-source {
+    margin: 0.1rem 0 0.35rem;
+    font-size: 0.95rem;
+  }
+
   .results-board li {
-    padding: 0.05rem 0.4rem;
-    font-size: 0.8rem;
+    grid-template-columns: 1.2rem auto 1fr;
+    gap: 0.35rem;
+    padding: 0 0.35rem;
+    font-size: 0.95rem;
+  }
+
+  .results-board-stars {
+    display: none;
+  }
+
+  .results-board-initials button {
+    font-size: 1.1rem;
+  }
+
+  .results-initials-pad {
+    gap: 0.35rem;
+    margin-top: 0.5rem;
   }
 }
 
@@ -1927,136 +2140,63 @@ canvas {
     calc(1rem + env(safe-area-inset-left));
 }
 
-.pause-screen h2 {
-  font-family: 'Lobster', cursive;
-  font-size: clamp(2rem, 9vw, 3rem);
-  margin-bottom: clamp(1rem, 4vh, 2rem);
-}
-
-/* Pause menu */
-.pause-menu {
-  --accent: #ffd23f;
-  --accent-glow: rgba(255, 210, 63, 0.55);
-  background: radial-gradient(ellipse at 50% 40%, rgba(15, 15, 25, 0.45), rgba(0, 0, 0, 0.75));
-  backdrop-filter: blur(10px) saturate(0.8);
-  -webkit-backdrop-filter: blur(10px) saturate(0.8);
-}
-
-.pause-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: min(100%, 22rem);
-  padding: 1.5rem 1.25rem 1.1rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-top: 3px solid var(--accent);
-  border-radius: 18px;
-  background: rgba(12, 12, 20, 0.72);
-  box-shadow: 0 0 40px var(--accent-glow), 0 18px 40px rgba(0, 0, 0, 0.5);
-}
-
-.pause-label {
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.pause-menu h2 {
-  margin: 0.15rem 0 1rem;
-  font-size: clamp(1.8rem, 8vw, 2.4rem);
-  line-height: 1.1;
+/* Pause menu: a fair board over the stopped ride (docs/art/PERSONALITY.md). */
+.pause-card h2.fair-title {
+  margin: 0;
+  font-family: 'Ultra', serif;
+  font-size: 2.5rem;
   text-align: center;
-  text-shadow: 0 0 18px var(--accent-glow);
+}
+
+.pause-state {
+  margin-top: 0.6rem;
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 .pause-run {
-  width: 100%;
-  padding: 0.75rem 0.25rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 0.35rem 1rem;
+  margin: 1.4rem 0.25rem 1.3rem;
 }
 
-.pause-score {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
+.pause-run .fair-number {
+  font-size: 3.25rem;
 }
 
-.pause-score strong {
-  font-size: 1.9rem;
+.pause-run p {
+  font-size: 1.25rem;
+}
+
+.pause-run p b {
   font-weight: 800;
-  font-variant-numeric: tabular-nums;
 }
 
-.pause-stars {
-  display: flex;
-  gap: 0.2rem;
-  font-size: 1.5rem;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.22);
-}
-
-.pause-stars .earned {
-  color: #ffd23f;
-  text-shadow: 0 0 12px rgba(255, 210, 63, 0.8);
-}
-
-.pause-stats {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-top: 0.4rem;
-  font-size: 0.9rem;
-}
-
-.pause-stats div {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.pause-stats dt {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.pause-stats dd {
-  margin: 0;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+.pause-run .pause-hits {
+  text-align: right;
 }
 
 .pause-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  width: 100%;
-  margin-top: 1.1rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem;
 }
 
-.pause-actions .play-button {
-  width: 100%;
-  padding: 0.7rem 1rem;
-  font-size: 1rem;
-  letter-spacing: 1.5px;
-}
-
-.pause-actions .pause-secondary {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.pause-actions .play-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  box-shadow: 0 0 18px var(--accent-glow);
+.pause-actions .fair-go {
+  grid-column: 1 / -1;
+  margin-bottom: 0.4rem;
+  padding: 1rem 1rem 0.8rem;
+  font-size: 2.1rem;
 }
 
 .pause-keys {
-  margin-top: 0.75rem;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
+  margin-top: 1.1rem;
+  font-size: 1.05rem;
+  text-align: center;
+  opacity: 0.72;
 }
 
 @media (hover: none) {
@@ -2065,40 +2205,102 @@ canvas {
   }
 }
 
-/* Phone landscape: the run on the left, the buttons in a 2 x 2 grid on the right. */
+/* Photo mode (#828): the stopped ride with nothing over it but a line and two plates at the bottom. */
+.photo-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.photo-surface {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.photo-surface:active {
+  cursor: grabbing;
+}
+
+.photo-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0 calc(1rem + env(safe-area-inset-right)) 0 calc(1rem + env(safe-area-inset-left));
+  pointer-events: none;
+}
+
+.photo-hint {
+  margin: 0;
+  font-family: 'Big Shoulders', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.photo-hint-touch {
+  display: none;
+}
+
+@media (hover: none) {
+  .photo-hint-mouse {
+    display: none;
+  }
+
+  .photo-hint-touch {
+    display: inline;
+  }
+}
+
+.photo-actions {
+  display: flex;
+  gap: 0.65rem;
+  pointer-events: auto;
+}
+
+.photo-actions .fair-plate {
+  min-width: 8rem;
+  padding-inline: 1.2rem;
+}
+
+/* Phone landscape: the run on the left, the plates on the right. */
 @media (orientation: landscape) and (max-height: 520px) {
+  .pause-board-shadow {
+    width: min(100%, 42rem);
+  }
+
   .pause-card {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    column-gap: 1.25rem;
+    column-gap: 1.5rem;
     align-items: center;
-    width: min(100%, 40rem);
-    padding: 1rem 1.25rem;
+    padding: 1.4rem 1.6rem 1.2rem;
   }
 
-  .pause-label,
-  .pause-menu h2,
+  .pause-card h2.fair-title,
+  .pause-state,
   .pause-run {
     grid-column: 1;
-  }
-
-  .pause-label,
-  .pause-menu h2 {
-    justify-self: start;
     text-align: left;
   }
 
-  .pause-menu h2 {
-    margin-bottom: 0.5rem;
-    font-size: 1.6rem;
+  .pause-card h2.fair-title {
+    font-size: 2rem;
+  }
+
+  .pause-run {
+    margin: 0.9rem 0 0;
   }
 
   .pause-actions {
     grid-column: 2;
     grid-row: 1 / span 3;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    margin-top: 0;
   }
 
   .pause-keys {
@@ -2106,26 +2308,21 @@ canvas {
   }
 }
 
-/* Settings: the pause card's look, grouped rows with 44 px touch targets */
-.settings-card {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  width: min(100%, 25rem);
-  padding: 1.25rem 1.25rem 1.1rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-top: 3px solid var(--accent);
-  border-radius: 18px;
-  background: rgba(12, 12, 20, 0.72);
-  box-shadow: 0 0 40px var(--accent-glow), 0 18px 40px rgba(0, 0, 0, 0.5);
+/* Settings' fair board, every control 44 px tall; .fair-board(-shadow) in a selector outranks the board's rules below. */
+.fair-board-shadow.settings-board-shadow {
+  width: min(100%, 27rem);
 }
 
-.settings-screen h2 {
+.fair-board.settings-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.7rem 1.7rem 1.5rem;
+}
+
+.settings-card h2.fair-title {
   margin: 0 0 0.5rem;
-  font-size: clamp(1.8rem, 8vw, 2.4rem);
-  line-height: 1.1;
+  font-size: 2.5rem;
   text-align: center;
-  text-shadow: 0 0 18px var(--accent-glow);
 }
 
 .settings-groups {
@@ -2134,18 +2331,13 @@ canvas {
   gap: 0.6rem;
 }
 
-.settings-group {
-  padding-top: 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
 .settings-group h3 {
-  margin: 0 0 0.1rem;
-  font-size: 0.75rem;
+  margin: 0;
+  font-variation-settings: 'opsz' 40;
+  font-size: 1.4rem;
   font-weight: 800;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  color: var(--accent);
+  line-height: 1.1;
+  color: var(--fair-gilt);
 }
 
 .settings-row {
@@ -2154,21 +2346,53 @@ canvas {
   align-items: center;
   gap: 1rem;
   min-height: 44px;
-  font-size: 0.95rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.1;
 }
 
-/* Label and note above, the four quality buttons full width below */
+/* Label and note above, the four quality plates full width below */
 .settings-row--stacked {
   flex-direction: column;
   align-items: stretch;
   gap: 0.35rem;
-  padding: 0.2rem 0 0.3rem;
+  padding: 0.15rem 0 0.2rem;
 }
 
-.settings-row--stacked .settings-segmented button {
+.settings-row--stacked .settings-segmented .fair-plate {
   flex: 1;
 }
 
+.settings-note {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 1.05rem;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+/* Quality and screen shake: a row of small enamel plates; the picked one stays pressed in, painted cream. */
+.settings-segmented {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  padding-bottom: 5px;
+}
+
+.settings-segmented .fair-plate {
+  min-width: 44px;
+  padding: 0.3rem 0.6rem 0.2rem;
+  font-size: 1.15rem;
+}
+
+.settings-segmented .fair-plate[aria-checked='true'] {
+  color: var(--fair-tar);
+  background: var(--fair-cream);
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--fair-tar);
+}
+
+/* Volume: a painted track sunk into the board, a gilt thumb. */
 .settings-slider {
   display: flex;
   align-items: center;
@@ -2176,169 +2400,183 @@ canvas {
 }
 
 .settings-slider input[type='range'] {
+  appearance: none;
   width: clamp(110px, 38vw, 160px);
   min-height: 44px;
-  accent-color: var(--accent);
+  margin: 0;
+  background: none;
+  cursor: pointer;
   touch-action: pan-x;
+}
+
+.settings-slider input[type='range']::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 2px;
+  background: var(--fair-oxblood-deep);
+  box-shadow: inset 0 0 0 2px var(--fair-tar);
+}
+
+.settings-slider input[type='range']::-moz-range-track {
+  height: 10px;
+  border-radius: 2px;
+  background: var(--fair-oxblood-deep);
+  box-shadow: inset 0 0 0 2px var(--fair-tar);
+}
+
+.settings-slider input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 30px;
+  margin-top: -10px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--fair-gilt);
+  box-shadow: 0 3px 0 var(--fair-gilt-block);
+}
+
+.settings-slider input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 30px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--fair-gilt);
+  box-shadow: 0 3px 0 var(--fair-gilt-block);
 }
 
 .settings-slider output {
   width: 2.8rem;
+  font-weight: 700;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.75);
 }
 
-.settings-note {
-  display: block;
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* Toggle switch on a checkbox: a 44 x 26 track; the whole label row is the touch target */
+/* An enamel switch: a sunk slot, its knob cream when off, gilt and thrown right when on. */
 .settings-switch {
   appearance: none;
   position: relative;
   flex-shrink: 0;
-  width: 44px;
-  height: 26px;
+  width: 56px;
+  height: 32px;
   margin: 0;
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+  background: var(--fair-oxblood-deep);
+  box-shadow: inset 0 0 0 2px var(--fair-tar);
   cursor: pointer;
-  transition: background 0.15s;
 }
 
 .settings-switch::after {
   content: '';
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  transition: transform 0.15s;
-}
-
-.settings-switch:checked {
-  background: var(--accent);
+  top: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--fair-cream);
+  box-shadow: 0 2px 0 var(--fair-tar);
+  transition: transform 80ms;
 }
 
 .settings-switch:checked::after {
-  transform: translateX(18px);
+  transform: translateX(26px);
+  background: var(--fair-gilt);
+  box-shadow: 0 2px 0 var(--fair-gilt-block);
 }
 
-.settings-switch:disabled {
+:is(.settings-switch, .settings-segmented .fair-plate, .settings-clear .fair-plate):disabled {
   cursor: default;
-  opacity: 0.6;
+  opacity: 0.55;
 }
 
-/* Segmented controls (quality, screen shake) */
-.settings-segmented {
-  display: flex;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.settings-segmented button {
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0 0.6rem;
-  border: 0;
-  background: rgba(0, 0, 0, 0.35);
-  color: #fff;
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.settings-segmented button + button {
-  border-left: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.settings-segmented button.is-active {
-  background: var(--accent);
-  color: #111;
-  font-weight: 600;
-}
-
-.settings-segmented button:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
-
-/* Clear local data: a second tap confirms */
-.settings-clear button {
-  min-height: 44px;
-  padding: 0 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.35);
-  color: #fff;
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.settings-clear button:disabled {
-  cursor: default;
-  opacity: 0.6;
+/* Clear local data: a second tap confirms, on the fair's red. */
+.settings-clear .fair-plate {
+  flex-shrink: 0;
+  padding: 0.5rem 0.8rem 0.4rem;
+  font-size: 1.15rem;
 }
 
 .settings-clear[data-step='confirm'] > span {
-  font-size: 0.85rem;
+  font-size: 1.1rem;
 }
 
 .settings-clear-actions {
   display: flex;
   flex-shrink: 0;
-  gap: 0.4rem;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.settings-clear button.is-danger {
-  border-color: #ff5a5a;
-  background: rgba(255, 59, 59, 0.85);
-  font-weight: 700;
+/* Cream on vermilion is 3.9:1: the Erase label stays at 24 px. */
+.settings-clear .fair-plate.is-danger {
+  padding: 0.3rem 0.8rem 0.2rem;
+  font-size: 1.5rem;
+  background: var(--fair-vermilion);
 }
 
 .settings-card :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 3px solid var(--fair-cream);
+  outline-offset: 3px;
 }
 
-.settings-back {
-  align-self: center;
-  margin-top: 1rem;
-  padding: 0.7rem 2.5rem;
-  font-size: 1rem;
+.settings-card .settings-back {
+  margin-top: 1.2rem;
+  padding: 0.85rem 1rem 0.7rem;
+  font-size: 1.9rem;
 }
 
-.reduce-motion .settings-switch,
 .reduce-motion .settings-switch::after {
   transition: none;
 }
 
-/* Phone landscape: the groups side by side */
-@media (orientation: landscape) and (max-height: 520px) {
-  .settings-card {
+@media (prefers-reduced-motion: reduce) {
+  .settings-switch::after {
+    transition: none;
+  }
+}
+
+/* A wide board: graphics and sound in one column, comfort and data in the other. */
+@media (min-width: 760px), (orientation: landscape) and (max-height: 520px) {
+  .fair-board-shadow.settings-board-shadow {
     width: min(100%, 46rem);
-    padding: 0.9rem 1.25rem;
   }
 
   .settings-groups {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 0.6rem 2rem;
+  }
+}
+
+/* Phone landscape: the title and Back share the top row. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .fair-board.settings-card {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
     column-gap: 1.5rem;
+    padding: 0.6rem 1.5rem 0.9rem;
   }
 
-  .settings-group:first-child {
-    grid-row: span 2;
+  .settings-card h2.fair-title {
+    margin: 0;
+    font-size: 2rem;
+    text-align: left;
   }
 
-  .settings-back {
-    margin-top: 0.6rem;
+  .settings-groups {
+    grid-column: 1 / -1;
+    margin-top: 0.2rem;
+    gap: 0.1rem 2rem;
+  }
+
+  .settings-card .settings-back {
+    grid-row: 1;
+    grid-column: 2;
+    margin: 0;
+    padding: 0.6rem 1.6rem 0.45rem;
+    font-size: 1.5rem;
   }
 }
 
@@ -2439,7 +2677,7 @@ canvas {
   text-shadow: 0 0 18px rgba(255, 200, 0, 0.95), 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
-/* Wave announcement — letterspaced caps between biome-accent rules */
+/* Wave announcement: a show card hung over the ride, its name in gilt (`WaveAnnouncement`). */
 .wave-announcement {
   position: fixed;
   top: 24%;
@@ -2447,47 +2685,31 @@ canvas {
   right: 0;
   display: flex;
   justify-content: center;
-  overflow: hidden;
-  padding: 8px 0;
   pointer-events: none;
   z-index: 15;
 }
 
-.wave-banner {
-  display: flex;
-  align-items: center;
-  gap: clamp(10px, 2vw, 18px);
+.fair-board-shadow.wave-card-shadow {
+  width: auto;
   max-width: calc(100vw - 32px);
 }
 
+.fair-board.wave-card {
+  padding: 1.15rem 1.9rem 1.05rem;
+}
+
 .wave-banner-text {
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
-  font-size: clamp(1.25rem, 4.5vw, 2.4rem);
-  letter-spacing: 0.24em;
-  /* letter-spacing trails the last glyph; balance it */
-  margin-right: -0.24em;
-  text-transform: uppercase;
+  display: block;
+  font-size: clamp(1.5rem, 5vw, 2.3rem);
   text-align: center;
-  color: #fff;
-  text-shadow: 0 0 18px var(--hud-glow), 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
-.wave-banner-rule {
-  flex: none;
-  width: clamp(28px, 8vw, 90px);
-  height: 3px;
-  border-radius: 2px;
-  background: var(--hud-accent);
-  box-shadow: 0 0 10px var(--hud-glow);
-}
-
-/* Wave tell: one screen-edge glow pulse in the biome accent, 1 s before a wave arrives */
+/* Wave tell: a vermilion frame painted round the screen flashes once, 1 s before a wave arrives. */
 .wave-tell {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  box-shadow: inset 0 0 min(14vw, 120px) min(3vw, 26px) var(--hud-glow);
+  box-shadow: inset 0 0 0 clamp(6px, 1.2vw, 12px) var(--fair-vermilion);
   opacity: 0;
   z-index: 14;
   animation: wave-tell-pulse 1s ease-out;
@@ -2500,7 +2722,7 @@ canvas {
   100% { opacity: 0; }
 }
 
-/* Level countdown */
+/* Level countdown: Ready / Set / GO! in gilt fat-face over the ride, each dropped in on its hook. */
 .countdown {
   position: fixed;
   inset: 0;
@@ -2512,21 +2734,28 @@ canvas {
 }
 
 .countdown-step {
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
-  font-size: clamp(2.5rem, 9vw, 4.5rem);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 0 20px rgba(255, 200, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.5);
+  font-family: 'Ultra', serif;
+  font-size: clamp(3rem, min(11vw, 20vh), 5rem);
+  line-height: 1;
+  color: var(--fair-gilt);
+  /* A hard tar outline first, so the gold reads against a white cloud, then the block and the cast shadow. */
+  text-shadow:
+    -2px -2px 0 var(--fair-tar),
+    2px -2px 0 var(--fair-tar),
+    -2px 2px 0 var(--fair-tar),
+    1px 1px 0 var(--fair-gilt-block),
+    2px 2px 0 var(--fair-gilt-block),
+    3px 3px 0 var(--fair-gilt-block),
+    4px 4px 0 var(--fair-gilt-block),
+    5px 5px 0 var(--fair-gilt-block),
+    8px 9px 0 var(--fair-tar);
 }
 
 .countdown-step--go {
-  font-size: clamp(3.5rem, 13vw, 6.5rem);
-  color: #ffd23f;
+  font-size: clamp(4rem, min(16vw, 26vh), 7.5rem);
 }
 
-/* The run's loading screen (#674): the level's postcard, name and a bar over the hidden level. */
+/* The run's loading screen (#674): the track is painted like the HUD's bars, a tar edge round a well filled with gold leaf. */
 .loading-screen {
   position: fixed;
   inset: 0;
@@ -2535,60 +2764,64 @@ canvas {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: radial-gradient(ellipse at center, #1c1c2e 0%, #07070d 100%);
+  background: var(--fair-oxblood-deep);
 }
 
-.loading-card {
-  width: min(420px, 100%);
-  border: 2px solid #ffd23f;
-  border-radius: 14px;
-  overflow: hidden;
-  background: rgba(10, 10, 20, 0.85);
-  box-shadow: 0 0 40px rgba(255, 210, 63, 0.25);
+.fair-board-shadow.loading-board-shadow {
+  width: min(100%, 24rem);
 }
 
-.loading-card .level-postcard {
-  border-bottom: 2px solid #ffd23f;
-}
-
-.loading-body {
-  padding: 16px 20px 20px;
+.fair-board.loading-card {
+  padding: 1.6rem 1.6rem 1.75rem;
   text-align: center;
 }
 
-.loading-name {
-  margin: 0;
-  font-family: 'Lobster', cursive;
-  font-weight: 400;
-  font-size: clamp(2rem, 8vw, 2.6rem);
-  color: #ffd23f;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+.loading-card .level-postcard {
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 2px var(--fair-tar);
+}
+
+.loading-card h2.loading-name {
+  margin: 1.1rem 0 0;
+  font-size: 2.5rem;
 }
 
 .loading-desc {
-  margin: 4px 0 16px;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.8);
+  margin: 0.6rem 0 1.25rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .loading-bar {
-  height: 8px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.15);
+  height: 18px;
+  padding: 3px;
+  border-radius: 3px;
+  background: var(--fair-oxblood-deep);
+  box-shadow: inset 0 0 0 2px var(--fair-tar), 0 3px 0 var(--fair-tar);
 }
 
 .loading-bar-fill {
   height: 100%;
-  background: #ffd23f;
-  box-shadow: 0 0 10px rgba(255, 210, 63, 0.8);
+  background: var(--fair-gilt);
+  box-shadow: inset 0 -3px 0 var(--fair-gilt-block);
   transform: scaleX(0);
   transform-origin: left center;
   transition: transform 0.2s linear;
 }
 
-/* The intro's skip hint, low over the tour. */
+@media (prefers-reduced-motion: reduce) {
+  .loading-bar-fill { transition: none; }
+}
+.reduce-motion .loading-bar-fill { transition: none; }
+
+/* Short landscape phones: the name and track keep the board inside the screen without the postcard. */
+@media (max-height: 380px) {
+  .loading-card .level-postcard { display: none; }
+  .loading-card h2.loading-name { margin-top: 0; }
+}
+
+/* The intro's skip hint, low over the tour: cream ink with a hard tar edge. */
 .intro-hint {
   position: fixed;
   left: 50%;
@@ -2596,16 +2829,253 @@ canvas {
   transform: translateX(-50%);
   z-index: 50;
   pointer-events: none;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.85rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.75);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  font-family: 'Big Shoulders', sans-serif;
+  font-variation-settings: 'opsz' 10;
+  font-weight: 600;
+  font-size: 1.0625rem;
+  color: var(--fair-cream);
+  text-shadow: -1px -1px 0 var(--fair-tar), 1px -1px 0 var(--fair-tar), -1px 1px 0 var(--fair-tar), 2px 2px 0 var(--fair-tar);
   animation: intro-hint-in 0.6s ease-out 0.8s both;
 }
 
 @keyframes intro-hint-in {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* ---- The fair (docs/art/PERSONALITY.md): boards, plates, lettering. ---- */
+
+/* A ticket's notched corners. --n: the notch's radius from the outer board's corner; --o: how far this layer sits
+   inside that board, so a lining's corners run parallel to the notches. */
+.fair-notched {
+  --o: 0px;
+  --n: var(--fair-notch);
+  --fair-cut: #0000 var(--n), #000 calc(var(--n) + 0.5px);
+  -webkit-mask:
+    radial-gradient(circle at calc(0px - var(--o)) calc(0px - var(--o)), var(--fair-cut)) top left / 51% 51% no-repeat,
+    radial-gradient(circle at calc(100% + var(--o)) calc(0px - var(--o)), var(--fair-cut)) top right / 51% 51% no-repeat,
+    radial-gradient(circle at calc(0px - var(--o)) calc(100% + var(--o)), var(--fair-cut)) bottom left / 51% 51% no-repeat,
+    radial-gradient(circle at calc(100% + var(--o)) calc(100% + var(--o)), var(--fair-cut)) bottom right / 51% 51% no-repeat;
+  mask:
+    radial-gradient(circle at calc(0px - var(--o)) calc(0px - var(--o)), var(--fair-cut)) top left / 51% 51% no-repeat,
+    radial-gradient(circle at calc(100% + var(--o)) calc(0px - var(--o)), var(--fair-cut)) top right / 51% 51% no-repeat,
+    radial-gradient(circle at calc(0px - var(--o)) calc(100% + var(--o)), var(--fair-cut)) bottom left / 51% 51% no-repeat,
+    radial-gradient(circle at calc(100% + var(--o)) calc(100% + var(--o)), var(--fair-cut)) bottom right / 51% 51% no-repeat;
+}
+
+/* A screen with a board over the stopped ride: dimmed warm, never frosted. */
+.fair-stage {
+  background: rgb(27 17 13 / 0.62);
+}
+
+/* The board's hard cast shadow sits on a wrapper: the board's own mask would clip it. */
+.fair-board-shadow {
+  position: relative;
+  width: min(100%, 26rem);
+  filter: drop-shadow(6px 8px 0 var(--fair-tar));
+}
+
+/* A painted oxblood board, lined out in gilt 9 px in from its edge (`<FairBoard>` draws the lining). */
+.fair-board {
+  position: relative;
+  padding: 2rem 1.9rem 1.5rem;
+  background: var(--fair-oxblood);
+  color: var(--fair-cream);
+  font-family: 'Big Shoulders', sans-serif;
+  font-variation-settings: 'opsz' 10;
+  font-weight: 500;
+}
+
+.fair-lining {
+  position: absolute;
+  inset: 9px;
+  --o: 9px;
+  --n: calc(var(--fair-notch) + 9px);
+  background: var(--fair-gilt);
+  pointer-events: none;
+}
+
+.fair-lining > span {
+  position: absolute;
+  inset: 2px;
+  --o: 11px;
+  --n: calc(var(--fair-notch) + 11px);
+  background: var(--fair-oxblood);
+}
+
+/* A board built from spans (`<FairBoard as="span">`, inside a button) still lays out as a block. */
+span:is(.fair-board-shadow, .fair-board) {
+  display: block;
+}
+
+.fair-board > :not(.fair-lining) {
+  position: relative;
+}
+
+/* Gilt letters with their block (the letter's painted depth) and cast shadow: hard, never blurred. */
+.fair-title {
+  font-family: 'Ultra', serif;
+  font-weight: 400;
+  line-height: 1.02;
+  color: var(--fair-gilt);
+  text-wrap: balance;
+  text-shadow:
+    1px 1px 0 var(--fair-gilt-block),
+    2px 2px 0 var(--fair-gilt-block),
+    3px 3px 0 var(--fair-gilt-block),
+    5px 6px 0 var(--fair-tar);
+}
+
+/* Cream lettering standing straight on the ride or the park: lined in tar with a hard cast shadow, readable on any scene. */
+.fair-over-ride {
+  color: var(--fair-cream);
+  text-shadow:
+    -2px -2px 0 var(--fair-tar),
+    0 -2px 0 var(--fair-tar),
+    2px -2px 0 var(--fair-tar),
+    2px 0 0 var(--fair-tar),
+    -2px 0 0 var(--fair-tar),
+    -2px 2px 0 var(--fair-tar),
+    0 2px 0 var(--fair-tar),
+    2px 2px 0 var(--fair-tar),
+    3px 4px 0 var(--fair-tar);
+}
+
+.fair-number {
+  font-family: 'Ultra', serif;
+  font-weight: 400;
+  line-height: 0.9;
+  color: var(--fair-cream);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 3px 3px 0 var(--fair-tar);
+}
+
+/* Enamel plates: a hard edge under each, and they press down onto it. One gilt plate per screen. */
+.fair-plate {
+  min-height: 44px;
+  padding: 0.7rem 0.4rem 0.55rem;
+  border: 0;
+  border-radius: 5px;
+  font-family: 'Big Shoulders', sans-serif;
+  font-variation-settings: 'opsz' 40;
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--fair-cream);
+  background: var(--fair-oxblood-deep);
+  box-shadow: 0 5px 0 var(--fair-tar);
+  cursor: pointer;
+  transition: transform 60ms, box-shadow 60ms;
+}
+
+.fair-plate:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--fair-tar);
+}
+
+.fair-plate.fair-go {
+  color: var(--fair-tar);
+  background: var(--fair-gilt);
+  box-shadow: 0 5px 0 var(--fair-gilt-block);
+}
+
+.fair-plate.fair-go:active {
+  box-shadow: 0 1px 0 var(--fair-gilt-block);
+}
+
+.fair-plate:focus-visible {
+  outline: 3px solid var(--fair-cream);
+  outline-offset: 3px;
+}
+
+/* The gallery's star targets: gilt with a tar edge when earned, sunk into the board when not. */
+.fair-stars {
+  display: flex;
+  gap: 6px;
+}
+
+.fair-stars svg {
+  width: 34px;
+  height: 34px;
+}
+
+.fair-stars path {
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  fill: var(--fair-oxblood-deep);
+  stroke: var(--fair-oxblood-deep);
+}
+
+.fair-stars .earned path {
+  fill: var(--fair-gilt);
+  stroke: var(--fair-tar);
+}
+
+/* Show cards: lettered cards tacked on the board, a little askew. */
+.fair-showcard {
+  padding: 0.3rem 0.6rem 0.2rem;
+  border-radius: 3px;
+  font-family: 'Ultra', serif;
+  font-size: 1rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  box-shadow: 3px 4px 0 var(--fair-tar);
+}
+
+/* A board arriving: it drops onto its hook and swings once before it settles. */
+.fair-arrive {
+  transform-origin: 50% -2rem;
+  animation: fair-arrive 320ms ease-out;
+}
+
+@keyframes fair-arrive {
+  0% {
+    translate: 0 -2.5rem;
+    rotate: -2.5deg;
+  }
+
+  45% {
+    translate: 0 0;
+    rotate: 1.6deg;
+  }
+
+  75% {
+    rotate: -0.6deg;
+  }
+}
+
+/* A HUD sign arriving: dropped onto its hook, it swings once and settles (reduced motion: in place).
+   It animates `transform`, not `.fair-arrive`'s `translate` / `rotate`, because the HUD signs
+   (.hud-frenzy, .hud-boss) centre themselves with the `translate` property. */
+.fair-hook {
+  transform-origin: 50% 0;
+  animation: fair-hook-drop 0.45s ease-out;
+}
+
+@keyframes fair-hook-drop {
+  0% { opacity: 0; transform: translateY(-60px) rotate(-6deg); }
+  15% { opacity: 1; }
+  45% { transform: rotate(4deg); }
+  70% { transform: rotate(-1.5deg); }
+  100% { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fair-plate {
+    transition: none;
+  }
+
+  .fair-arrive,
+  .fair-hook {
+    animation: none;
+  }
+}
+
+.reduce-motion .fair-plate {
+  transition: none;
+}
+
+.reduce-motion .fair-arrive,
+.reduce-motion .fair-hook {
+  animation: none;
 }

@@ -1,8 +1,8 @@
 /** `npm run audio:render`'s renders of the game's own music and SFX code, and of any score through the score engine. */
 import { renderOffline, type OfflineRenderScope } from '@/audio/offlineRender'
-import { setMusicDucked } from '@/audio/AudioEngine'
+import { setMusicDucked, setPauseMix } from '@/audio/AudioEngine'
 import { loadArcade, silentSfx, type Placement, type SfxEngine } from '@/audio/sfx'
-import { FIREWORK_BIOMES, type KillSound } from '@/audio/sfxDesign'
+import { FIREWORK_BIOMES, KILL_SOUNDS, spatial, type KillSound } from '@/audio/sfxDesign'
 import { COMBO_TIERS, FRENZY, TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
 import { intensityForTier } from '@/audio/scrim/layers'
 import { getLevelConfig } from '@/levels/LevelRegistry'
@@ -16,13 +16,13 @@ import { createRng } from '@/utils/rng'
 export type AudioRenderRequest =
   /**
     /**
-     * `track`: 'title', a level id, 'results' or a theme option (`<slot>.<name>`). `layers`: the score's intensity
+     * `track`: 'title', a level id, a results cut ('results-win' / 'results-lose') or a theme option (`<slot>.<name>`). `layers`: the score's intensity
      * layers 0–3 held from the start, or 'ramp' (`LAYER_RAMP`: up through every layer, then a lost combo winding down).
      * `seam`: start `SEAM_LEAD_S` before the first loop seam instead of at the top.
      */
   | { kind: 'music'; track: string; layers?: number | 'ramp'; seconds?: number; seam?: boolean }
-  /** Every arcade SFX (`audio/arcade/`) alone, in its own slot. */
-  | { kind: 'sfxSheet'; level?: string }
+  /** Every arcade SFX (`audio/arcade/`) alone, in its own slot; `kills`: the kill sounds, which the main sheet leaves out. */
+  | { kind: 'sfxSheet'; level?: string; kills?: boolean }
   /**
    * `stem: 'music'`: the same mix without SFX or wind, to measure the kills against. `boss`: the boss arrives at
    * `BOSS_MIX.arriveS` and falls `BOSS_MIX.defeatBeforeEndS` before the end, as `LevelAudio` plays them (#598); the
@@ -38,6 +38,11 @@ export type AudioRenderRequest =
   | { kind: 'ride'; level: string }
   /** Level select's launch blip for `level`, its bank and room landing under the blip's ring (#246), then the countdown and a kill. */
   | { kind: 'launch'; level: string }
+  /**
+   * A paused run resuming (#650): the resume Ready / GO under the pause gate, which opens at GO as the run plays again.
+   * `unpaused`: the same sounds with no pause, the reference a resume should match (nothing of the countdown's swells in).
+   */
+  | { kind: 'resume'; level: string; unpaused?: boolean }
 
 export interface AudioRenderResult {
   sampleRate: number
@@ -149,12 +154,32 @@ interface SheetEntry {
   stop?: () => void
 }
 
-function sfxSheetPlan(level = 'level1'): Plan {
+/** The kill sound the combo-tier slots play. */
+const COMBO_SOUND: KillSound = 'pop'
+
+/**
+ * Every kill: the combo tiers, then each other kill sound in `KILL_SOUNDS` once, so a new one is in the sheet without
+ * an edit here. Its own sheet (`kills`) keeps both under the 30 s render cap as kill sounds are added (#525).
+ */
+function killSheet(): SheetEntry[] {
+  return [
+    { name: 'kill 1x', slotS: 0.5, play: () => sfx.kill(COMBO_TIERS[0].minCount, COMBO_SOUND, null) },
+    { name: 'kill 2x (+ thump)', slotS: 0.7, play: () => sfx.kill(COMBO_TIERS[1].minCount, COMBO_SOUND, null) },
+    { name: 'kill 3x (+ ring)', slotS: 0.8, play: () => sfx.kill(COMBO_TIERS[2].minCount, COMBO_SOUND, null) },
+    { name: 'kill 5x (+ payout)', slotS: 1.1, play: () => sfx.kill(COMBO_TIERS[TOP_TIER].minCount, COMBO_SOUND, null) },
+    ...KILL_SOUNDS.filter((sound) => sound !== COMBO_SOUND).map((sound) => ({
+      name: `kill 1x (${sound})`,
+      slotS: 0.45,
+      play: () => sfx.kill(1, sound, null),
+    })),
+  ]
+}
+
+function sfxSheetPlan(level = 'level1', kills = false): Plan {
   const biome = biomeOf(level)
   const s = sfx
-  const kill = (sound: KillSound): SheetEntry => ({ name: `kill 1x (${sound})`, slotS: 0.45, play: () => s.kill(1, sound, null) })
   // Each sound alone in its own slot.
-  const sheet: SheetEntry[] = [
+  const sheet: SheetEntry[] = kills ? killSheet() : [
     { name: 'fire (single shot)', slotS: 0.35, play: () => s.fire(false) },
     { name: 'fire (auto, held trigger)', slotS: 0.35, play: () => s.fire(true) },
     { name: 'autofire burst (6 shots, 100 ms apart)', slotS: 0.8, play: () => s.fire(true), repeat: 6 },
@@ -163,17 +188,13 @@ function sfxSheetPlan(level = 'level1'): Plan {
     { name: 'fire (piercing pickup)', slotS: 0.4, play: () => s.fire(false, 'piercing') },
     { name: 'pickup chime', slotS: 1.0, play: () => s.pickup() },
     { name: 'hit tick', slotS: 0.3, play: () => s.hit(0, null) },
-    { name: 'kill 1x', slotS: 0.5, play: () => s.kill(COMBO_TIERS[0].minCount, 'pop', null) },
-    { name: 'kill 2x (+ thump)', slotS: 0.7, play: () => s.kill(COMBO_TIERS[1].minCount, 'pop', null) },
-    { name: 'kill 3x (+ ring)', slotS: 0.8, play: () => s.kill(COMBO_TIERS[2].minCount, 'pop', null) },
-    { name: 'kill 5x (+ payout)', slotS: 1.1, play: () => s.kill(COMBO_TIERS[TOP_TIER].minCount, 'pop', null) },
     { name: 'combo break', slotS: 0.65, play: () => s.comboBreak() },
     { name: 'bystander penalty', slotS: 0.6, play: () => s.penalty(null) },
     { name: 'wave tell', slotS: 1.5, play: () => s.waveIncoming() },
-    { name: 'boss arrival', slotS: 2.0, play: () => s.bossArrival() },
-    { name: 'boss hit (full hp)', slotS: 0.45, play: () => s.bossHit(1) },
-    { name: 'boss hit (low hp)', slotS: 0.45, play: () => s.bossHit(0.2) },
-    { name: 'boss defeat', slotS: 2.2, play: () => s.bossDefeat() },
+    { name: 'boss arrival', slotS: 2.0, play: () => s.bossArrival(null) },
+    { name: 'boss hit (full hp)', slotS: 0.45, play: () => s.bossHit(1, null) },
+    { name: 'boss hit (low hp)', slotS: 0.45, play: () => s.bossHit(0.2, null) },
+    { name: 'boss defeat', slotS: 2.2, play: () => s.bossDefeat(null) },
     ...(FIREWORK_BIOMES.includes(biome)
       ? [
           { name: 'firework whistle', slotS: 1.6, play: () => s.fireworkWhistle(1.2, 1) },
@@ -184,10 +205,6 @@ function sfxSheetPlan(level = 'level1'): Plan {
     { name: 'star chime 1', slotS: 0.7, play: () => s.starChime(0) },
     { name: 'star chime 2', slotS: 0.7, play: () => s.starChime(1) },
     { name: 'star chime 3', slotS: 1.5, play: () => s.starChime(2) },
-    kill('flutter'),
-    kill('crunch'),
-    kill('splash'),
-    kill('hiss'),
     { name: 'golden balloon', slotS: 1.0, play: () => s.bossPart(1, 'balloon-0', null) },
     { name: 'FRENZY sting', slotS: 1.6, play: () => s.frenzy() },
     { name: 'FRENZY lift (held 1.5 s)', slotS: 1.9, play: () => s.frenzyLift(true), holdS: 1.5, stop: () => s.frenzyLift(false) },
@@ -221,22 +238,29 @@ function sfxSheetPlan(level = 'level1'): Plan {
 
 const KILL_EVERY_S = 0.75
 
-/** Kills around the stereo field, near and far. */
-function killPlacement(n: number, out: Placement): Placement {
-  out.pan = 0.6 * Math.sin(n * 2.1)
-  out.cutoffHz = n % 3 === 2 ? 5000 : 18000
-  return out
+/** tan(half the horizontal field of view): a 60° vertical one at 16:9. */
+const TAN_HALF_HFOV = Math.tan(Math.PI / 6) * (16 / 9)
+
+/** A placement `ahead` metres in front of the camera, at `screenX` of the half-width (-1 the left edge, 1 the right). */
+function placeAhead(screenX: number, ahead: number, out: Placement): Placement {
+  return spatial(screenX * ahead * TAN_HALF_HFOV, -ahead, TAN_HALF_HFOV, out)
 }
 
-/** A `boss` mix: when the boss arrives and how long before the end it falls (the sting and the loop after it). */
-const BOSS_MIX = { arriveS: 6, defeatBeforeEndS: 9 }
+/** Kills around the stereo field, near and (every third) far. */
+function killPlacement(n: number, out: Placement): Placement {
+  return placeAhead(0.8 * Math.sin(n * 2.1), n % 3 === 2 ? 150 : 25, out)
+}
+
+/** A `boss` mix: when the boss arrives and how long before the end it falls (the sting and the loop after it), and where it is. */
+const BOSS_MIX = { arriveS: 6, defeatBeforeEndS: 9, arrive: { screenX: 0.4, ahead: 120 }, defeat: { screenX: -0.25, ahead: 70 } }
 
 function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): Plan {
   const biome = biomeOf(level)
   const p = scrim
   const events: Plan['events'] = [{ t: p.SCORE_START_DELAY_S, name: `${level} music + wind` }]
   const s = musicOnly ? silentSfx : sfx
-  const place: Placement = { pan: 0, cutoffHz: 20000 }
+  const place: Placement = { pan: 0, cutoffHz: 20000, wet: 1 }
+  const bossAt: Placement = { pan: 0, cutoffHz: 20000, wet: 1 }
   const seams: number[] = []
   const song = compile(SCORES[scoreIdFor(level)])
   const barS = barSection(song)!.barDur
@@ -260,8 +284,8 @@ function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): 
     bar: boss ? { startS: p.SCORE_START_DELAY_S, barS } : null,
     script: (scope) => {
       if (boss) {
-        switchAt(scope, BOSS_MIX.arriveS, 'boss', () => s.bossArrival(), 'boss:spawn: boss arrival + the boss section on the next bar')
-        switchAt(scope, seconds - BOSS_MIX.defeatBeforeEndS, 'sting', () => s.bossDefeat(), 'boss:defeated: boss defeat + the sting on the next bar, then the loop')
+        switchAt(scope, BOSS_MIX.arriveS, 'boss', () => s.bossArrival(placeAhead(BOSS_MIX.arrive.screenX, BOSS_MIX.arrive.ahead, bossAt)), 'boss:spawn: boss arrival + the boss section on the next bar')
+        switchAt(scope, seconds - BOSS_MIX.defeatBeforeEndS, 'sting', () => s.bossDefeat(placeAhead(BOSS_MIX.defeat.screenX, BOSS_MIX.defeat.ahead, bossAt)), 'boss:defeated: boss defeat + the sting on the next bar, then the loop')
       }
       const { at } = scope
       // As LevelAudio: the combo lifts the intensity.
@@ -380,13 +404,41 @@ function launchPlan(level: string, land: () => void): Plan {
   }
 }
 
+const RESUME = { pauseS: 0.2, readyS: 0.5, goS: 1.6, seconds: 4 }
+
+/** The countdown's timing is `Countdown.tsx`'s resume mode: Ready, GO 1.1 s later, `playing` at GO. */
+function resumePlan(level: string, unpaused = false): Plan {
+  const s = sfx
+  const r = RESUME
+  return {
+    seconds: r.seconds,
+    events: [
+      ...(unpaused ? [] : [{ t: r.pauseS, name: 'paused' }]),
+      { t: r.readyS, name: 'countdown Ready' },
+      { t: r.goS, name: unpaused ? 'countdown GO' : 'countdown GO: the pause gate opens' },
+    ],
+    seams: [],
+    bar: null,
+    script: ({ at }) => {
+      void s.prepare(level, biomeOf(level))
+      if (!unpaused) at(r.pauseS, () => setPauseMix(true, true))
+      at(r.readyS, () => s.countdown(false))
+      at(r.goS, () => {
+        s.countdown(true)
+        setPauseMix(false)
+      })
+    },
+  }
+}
+
 type GamePlanRequest = Exclude<AudioRenderRequest, { kind: 'score' | 'launch' }>
 
 const RENDERS: { [K in GamePlanRequest['kind']]: (req: Extract<GamePlanRequest, { kind: K }>) => Plan } = {
   music: (r) => musicPlan(scrim, r.track, r.seconds, r.seam, r.layers),
-  sfxSheet: (r) => sfxSheetPlan(r.level),
+  sfxSheet: (r) => sfxSheetPlan(r.level, r.kills),
   mix: (r) => mixPlan(r.level, r.seconds, r.stem === 'music', r.boss),
   ride: (r) => ridePlan(r.level),
+  resume: (r) => resumePlan(r.level, r.unpaused),
 }
 
 function toBase64(buffer: AudioBuffer): string {

@@ -18,6 +18,7 @@ import {
 } from './bossModel'
 
 const BOSS_HIT_FLASH_MS = 60
+const _eventAt = new THREE.Vector3()
 
 export interface BossFrame {
   root: THREE.Group
@@ -66,15 +67,20 @@ interface PartFx {
   points: number
 }
 
-interface BossSpawnEvent {
+/** `position`s are shared scratch vectors: read them in the listener, don't keep them. */
+export interface BossSpawnEvent {
   id: string
   name: string
+  /** The body where it arrives (the first frame it is placed). */
+  position: THREE.Vector3
 }
-interface BossHitEvent {
+export interface BossHitEvent {
   id: string
   weakPoint: string
   hpFraction: number
   destroyed: boolean
+  /** The weak point hit. */
+  position: THREE.Vector3
 }
 export interface BossDefeatedEvent {
   id: string
@@ -106,7 +112,7 @@ export default function BossBase({
   const parts = useRef(new Map<string, THREE.Group>()).current
   const fx = useRef<PartFx[]>(spec.weakPoints.map(() => ({ flashMs: 0, popMs: 0, popFrames: 0, popping: false, points: 0 }))).current
   const registered = useRef(new Set<string>()).current
-  const clock = useRef({ age: 0, defeatedAt: -1, placed: false })
+  const clock = useRef({ age: 0, defeatedAt: -1, placed: false, announced: false })
   const frame = useRef({} as BossFrame).current
   const [gameStep] = useState(gameClockStep)
   const positions = useMemo(() => spec.weakPoints.map(() => new THREE.Vector3()), [spec])
@@ -147,7 +153,8 @@ export default function BossBase({
       }
       part?.traverse(flashMesh)
       publishHud(after, false)
-      const event: BossHitEvent = { id, weakPoint: wpId, hpFraction: hpFraction(after), destroyed }
+      const position = part?.getWorldPosition(_eventAt) ?? bodyRef.current?.getWorldPosition(_eventAt) ?? _eventAt
+      const event: BossHitEvent = { id, weakPoint: wpId, hpFraction: hpFraction(after), destroyed, position }
       eventBus.emit('boss:hit', event)
     },
     [id, spec, parts, fx, publishHud],
@@ -190,14 +197,12 @@ export default function BossBase({
     if (!active) return
     syncRef.current(stateRef.current)
     publishHud(stateRef.current, false)
-    const event: BossSpawnEvent = { id, name: spec.name }
-    eventBus.emit('boss:spawn', event)
     return () => {
       for (const key of registered) unregisterCollisionTarget(key)
       registered.clear()
       useGameStore.getState().setBoss(null)
     }
-  }, [active, id, spec, publishHud, registered])
+  }, [active, publishHud, registered])
 
   useEffect(() => {
     if (!isE2E || !bodyRef.current) return
@@ -275,6 +280,13 @@ export default function BossBase({
     frame.sinceDefeat = sinceDefeat
     frame.retract = retract
     move(frame)
+    // Announced once placed, so the arrival is heard from where the boss is.
+    if (!c.announced) {
+      c.announced = true
+      // eslint-disable-next-line sc/no-hot-path-alloc -- once per boss, on its arrival frame
+      const event: BossSpawnEvent = { id, name: spec.name, position: (bodyRef.current ?? root).getWorldPosition(_eventAt) }
+      eventBus.emit('boss:spawn', event)
+    }
     c.age += dt
     if (sinceDefeat >= exitSeconds) onDone()
   })
