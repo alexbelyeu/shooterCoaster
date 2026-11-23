@@ -116,8 +116,11 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   helix round the carousel for the boss fight and a last hill into the brake run. The photo waits on #701.
 - **Desert (2):** the drop into the Pyramid as a dark ride (torches, the Scorpion's lair), a jump
   gap over a canyon between mesas.
-- **Ocean (3):** a splashdown, a glass tunnel under the water with the Kraken passing overhead,
-  a corkscrew through a sea stack's arch.
+- **Ocean (3):** built (#865, `ocean/oceanTrack.ts`, its storyboard and seconds at the top): a lift east, a crawl
+  south along its crest with the whale breaching ahead, the drop's splashdown into a glass tunnel under the sea, camelbacks,
+  a slow corkscrew through a sea arch (`environment.seaArch`), the second lift cresting as the Kraken rises, and a
+  quarter helix home under the first lift. No U-turns after the corkscrew: a hairpin or a half helix puts trackside
+  waves behind the rider on their approach (`spawnPlacement.test.ts`).
 - **Antarctica (4):** an ice-cave dark section (blue glow), a bobsled helix down a glacier, an
   airtime hill off a ridge with the aurora.
 - **Inferno (5):** a launch out of a lava tube, a drop-tower free fall inside the volcano, a
