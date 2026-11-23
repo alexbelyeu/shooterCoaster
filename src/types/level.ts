@@ -57,11 +57,11 @@ interface V2Ride {
 /** How a track is ridden: today's rule, or the v2 ride, which needs none of the rule's speeds (#757). */
 type TrackRide = RuleRide | V2Ride
 
-/** A closed trig loop (`TrigCurve` / `TrigCurve2`), shaped by `varA` / `varB` / `varC`. */
+/** A closed trig loop (`TrigCurve`), shaped by `varA` / `varB` / `varC`. */
 export type TrigTrackParams = TrackBase & TrackRide & TrigCurveFields
 
 interface TrigCurveFields {
-  curve: 'curve1' | 'curve2'
+  curve: 'curve1'
   varA: number
   varB: number
   varC: number

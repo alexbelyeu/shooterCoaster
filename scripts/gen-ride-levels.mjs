@@ -1,5 +1,5 @@
 // node scripts/gen-ride-levels.mjs: each ride built from the ride kit (`RIDES`) as plain numbers, a `<name>Level.ts` beside
-// its `<name>Track.ts`: level 1's (#863) and level 4's (#866). The level registry is startup JS; the ride elements that
+// its `<name>Track.ts`: level 1's (#863), level 4's (#866) and level 5's (#867). The level registry is startup JS; the ride elements that
 // build the rides aren't.
 import { build } from 'esbuild'
 import fs from 'node:fs'
@@ -12,6 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const RIDES = [
   { biome: 'themePark', track: 'parkTrack', from: 'PARK_TRACK', level: 'Level 1', file: 'parkLevel', to: 'PARK_LEVEL_TRACK' },
   { biome: 'arctic', track: 'arcticTrack', from: 'ARCTIC_TRACK', level: 'Level 4', file: 'arcticLevel', to: 'ARCTIC_LEVEL_TRACK' },
+  { biome: 'volcanic', track: 'infernoTrack', from: 'INFERNO_TRACK', level: 'Level 5', file: 'infernoLevel', to: 'INFERNO_LEVEL_TRACK' },
 ]
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-rides-'))
 const bundle = path.join(tmp, 'rides.mjs')
