@@ -917,19 +917,21 @@ const ONLINE_TOP = Array.from({ length: 10 }, (_, i) => ({ initials: 'WEB', scor
 
 /**
  * The online board's API (#365), stubbed: the smoke never calls the real one. GET answers ONLINE_TOP; POST records the
- * run and places it 2nd. The results screen uses it only while `__SC_TEST__.onlineBoard(ONLINE_ENDPOINT)` is set.
+ * run and places it 2nd; `down` answers everything 503, as before the daily board's migration (#854).
+ * The results screen uses it only while `__SC_TEST__.onlineBoard(ONLINE_ENDPOINT)` is set.
  */
-async function stubOnlineBoard(page) {
+async function stubOnlineBoard(page, { down = false } = {}) {
   const posts = []
   const gets = []
   await page.route((url) => url.pathname === ONLINE_ENDPOINT, (route) => {
     const req = route.request()
     if (req.method() !== 'POST') {
-      gets.push(new URL(req.url()).searchParams.get('level'))
-      return route.fulfill({ json: { top: ONLINE_TOP } })
-    }
-    const run = req.postDataJSON()
-    posts.push(run)
+      const q = new URL(req.url()).searchParams
+      gets.push(q.get('level') ?? `daily=${q.get('daily')}`)
+    } else posts.push(req.postDataJSON())
+    if (down) return route.fulfill({ status: 503, json: { error: 'unavailable' } })
+    if (req.method() !== 'POST') return route.fulfill({ json: { top: ONLINE_TOP } })
+    const run = posts.at(-1)
     const mine = { initials: run.initials, score: run.score, at: new Date().toISOString() }
     return route.fulfill({ json: { rank: 2, top: [ONLINE_TOP[0], mine, ...ONLINE_TOP.slice(1, 9)] } })
   })
@@ -2944,15 +2946,24 @@ async function dailyCheck(newPage) {
   }
   if (!a.digest) problems.push('spawnDigest() never reported the daily spawns')
 
-  // Score something so the day's first result is a new best, then end the run.
-  await first.page.evaluate(() => window.__SC_TEST__.killNearest(3))
+  // Score something so the day's first result is a new best, then end the run: it goes on the (stubbed) day's World board (#854).
+  const online = await stubOnlineBoard(first.page)
+  await first.page.evaluate((endpoint) => {
+    const s = window.__SC_TEST__
+    s.onlineBoard(endpoint)
+    s.setLeaderboards({}, 'DAY')
+    s.killNearest(3)
+  }, ONLINE_ENDPOINT)
   await waitFrames(first.page, 2, { maxMs: 20000 })
   await first.page.evaluate(() => window.__SC_TEST__.endLevel())
   const resultsShown = await first.page
     .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 60000, polling: 250 })
     .then(() => true, () => false)
-  await first.page.waitForTimeout(1500)
+  await first.page.waitForFunction(() => document.querySelector('.results-board')?.dataset.source === 'today', null, { timeout: 8000, polling: 50 }).catch(() => {})
+  await first.page.waitForTimeout(1000)
   await first.page.screenshot({ path: path.join(OUT, 'daily-results.png'), timeout: SHOT_TIMEOUT })
+  const world = await readBoard(first.page)
+  await first.page.evaluate(() => window.__SC_TEST__.onlineBoard(null))
   const results = await first.page.evaluate(() => {
     const el = document.querySelector('.results-screen')
     const s = window.__SC_TEST__
@@ -2961,7 +2972,6 @@ async function dailyCheck(newPage) {
       badge: el?.querySelector('.results-badge')?.textContent ?? null,
       record: el?.querySelector('.results-record')?.textContent ?? null,
       buttons: [...(el?.querySelectorAll('.results-actions button') ?? [])].map((b) => b.textContent),
-      board: !!el?.querySelector('.results-board'),
       entry: !!el?.querySelector('.results-initials-ok, .results-board[data-editing]'),
       boards: s.leaderboards().boards,
       score: s.stats().score,
@@ -2974,8 +2984,15 @@ async function dailyCheck(newPage) {
   if (results.mode !== 'daily' || !results.badge) problems.push(`daily results lack the Daily badge (mode ${results.mode})`)
   if (results.score > 0 && results.record !== 'New best') problems.push(`first daily result shows "${results.record}", expected New best`)
   if (results.buttons.includes('Next Level')) problems.push('daily results offer Next Level')
-  // #317: a daily never enters the campaign leaderboard, so no board and no initials entry.
-  if (results.board || results.entry) problems.push(`daily results show the leaderboard${results.entry ? ' and an initials entry' : ''}`)
+  // #317: a daily never enters the campaign leaderboard and opens no initials entry; #854: its new best goes up once
+  // under the last initials, and the board shown is the day's World board.
+  if (results.entry) problems.push('daily results open an initials entry')
+  const [sent, ...extraPosts] = online.posts
+  if (!sent || extraPosts.length || online.gets.length) problems.push(`daily World board: ${online.posts.length} submission(s) and ${online.gets.length} fetch(es), expected 1 submission`)
+  else if (sent.daily !== run?.dateKey || sent.level !== run?.level || sent.initials !== 'DAY' || sent.score !== Math.round(results.score))
+    problems.push(`daily World board: submitted ${JSON.stringify(sent)}, expected ${run?.level} DAY ${Math.round(results.score)} daily ${run?.dateKey}`)
+  if (world.source !== 'today' || world.rows !== 10 || world.rank !== '1' || world.label !== "The world's top 10 today")
+    problems.push(`daily World board not shown from the stub: ${JSON.stringify(world)}`)
   if (Object.keys(results.boards).length) problems.push(`a daily run entered the campaign leaderboards: ${JSON.stringify(results.boards)}`)
   if (!savedDay || savedDay.score !== Math.round(results.score)) problems.push(`today's daily best ${JSON.stringify(savedDay)}, expected score ${Math.round(results.score)}`)
   if (results.daily.streak.count !== 1 || results.daily.streak.lastKey !== run?.dateKey) problems.push(`daily streak ${JSON.stringify(results.daily.streak)}, expected 1 day`)
@@ -2991,11 +3008,28 @@ async function dailyCheck(newPage) {
   const errors = [...first.errors, ...(await first.page.evaluate(() => window.__SC_TEST__.errors))]
   await first.ctx.close()
 
-  // A second load on the same date spawns the same enemies.
+  // A second load on the same date spawns the same enemies; with the board's API down its new best keeps the local record alone.
   const second = await newPage()
+  const down = await stubOnlineBoard(second.page, { down: true })
+  await second.page.evaluate((endpoint) => window.__SC_TEST__.onlineBoard(endpoint), ONLINE_ENDPOINT)
   const b = await startDailyFromCard(second.page, {})
+  await second.page.evaluate(() => window.__SC_TEST__.killNearest(3))
+  await waitFrames(second.page, 2, { maxMs: 20000 })
+  await second.page.evaluate(() => window.__SC_TEST__.endLevel())
+  await second.page
+    .waitForFunction(() => document.querySelector('.results-screen')?.getAttribute('data-sequence') === 'done', null, { timeout: 60000, polling: 250 })
+    .catch(() => {})
+  await second.page.waitForTimeout(1000)
+  const offline = await second.page.evaluate(() => ({
+    board: !!document.querySelector('.results-board'),
+    record: document.querySelector('.results-record')?.textContent ?? null,
+    saved: Object.keys(window.__SC_TEST__.daily().savedDaily).length,
+  }))
+  await second.page.screenshot({ path: path.join(OUT, 'daily-results-offline.png'), timeout: SHOT_TIMEOUT })
   errors.push(...second.errors, ...(await second.page.evaluate(() => window.__SC_TEST__.errors)))
   await second.ctx.close()
+  if (down.posts.length !== 1 || offline.board || offline.record !== 'New best' || offline.saved !== 1)
+    problems.push(`daily with the board's API down (503): ${down.posts.length} submission(s), ${JSON.stringify(offline)}; expected 1, no board, New best, the local record saved`)
   if (b.run?.runSeed !== run?.seed) problems.push(`second load ran seed ${b.run?.runSeed}, expected ${run?.seed}`)
   if (b.digest !== a.digest) problems.push(`two loads of today's daily spawned differently (${a.digest} vs ${b.digest})`)
   if (errors.length) problems.push(`${errors.length} error(s)`)
@@ -3005,7 +3039,7 @@ async function dailyCheck(newPage) {
     ok: problems.length === 0,
     problems,
     errors,
-    daily: { dateKey: run?.dateKey, level: run?.level, seed: run?.seed, digest: a.digest, digestAgain: b.digest, record: results.record, replaySeed: replay.runSeed },
+    daily: { dateKey: run?.dateKey, level: run?.level, seed: run?.seed, digest: a.digest, digestAgain: b.digest, record: results.record, replaySeed: replay.runSeed, world, offline },
   }
 }
 
