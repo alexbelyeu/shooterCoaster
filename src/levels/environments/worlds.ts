@@ -29,6 +29,7 @@ export const WORLD_CHUNKS: Record<BiomeType, () => Promise<{ world: World }>> = 
   arctic: () => import('./biomes/arctic/world'),
   volcanic: () => import('./biomes/volcanic/world'),
   gym: () => import('./biomes/gym/world'),
+  city: () => import('./biomes/city/world'),
 }
 
 const worldLoaders = new Map<BiomeType, () => Promise<World>>()

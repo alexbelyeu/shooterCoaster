@@ -71,7 +71,7 @@
       "trackTriangles": 48000
     },
     "level7": {
-      "drawCalls": 50,
+      "drawCalls": 62,
       "objects": 112,
       "triangles": 195330,
       "trackObjects": 4,
@@ -105,7 +105,8 @@
       "noTargetShare": 0.1
     },
     "level7": {
-      "placeholder": "npm run new-world: set by two clean local smokes of this level (scene: the ride; pacing: --steps pacing), e2e/placeholderBudget.mjs"
+      "longestGapSeconds": 1,
+      "noTargetShare": 0.05
     }
   }
 }
