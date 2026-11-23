@@ -20,6 +20,7 @@ const LEVELS: LevelConfig[] = [
     nextLevel: 'level2',
     // The ride kit's classic (#863, `parkTrack.ts`): a station launch, a lift hill, camelbacks, past the Ferris wheel.
     track: PARK_LEVEL_TRACK,
+    goldenBalloons: 3,
     ...paceLevel({
       waves: [
         { type: 'balloon', count: 50, waveLabel: 'Pop em!' },

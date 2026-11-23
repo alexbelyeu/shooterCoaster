@@ -26,7 +26,6 @@ import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
 import { hardRouteFor, hardRouteOf, withBackwards } from '@/track/mechanics'
 import { sampleTrackXZ, setTrackOutline } from '@/track/trackOutline'
-import { goldenBalloonCount } from '@/levels/scoring'
 import { eventBus } from '@/core/EventBus'
 import { BYSTANDER_HIT_EVENT, bystanderWarning, type BystanderHitEvent } from '@/combat/bystanders'
 import ShootingController from './ShootingController'
@@ -90,7 +89,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
 }
 
 function LevelWorld({ levelId, config, world }: { levelId: string; config: LevelConfig; world: World }) {
-  const { track, environment, biome, enemies, combat, boss, pickups, walls } = config
+  const { track, environment, biome, enemies, combat, boss, pickups, walls, goldenBalloons } = config
   const def = world.biome
 
   const curve = useMemo(() => createTrackCurve(track), [track])
@@ -166,7 +165,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
         <LevelAudio />
         <EnemySpawner
           waves={enemies}
-          goldenBalloonCount={goldenBalloonCount(biome)}
+          goldenBalloonCount={goldenBalloons}
           trackTable={trackTable}
           groundFn={groundFn}
           boss={boss}
