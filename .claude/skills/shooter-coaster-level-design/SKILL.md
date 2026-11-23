@@ -183,7 +183,8 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
    `AtmosphereConfig` in `nightPreset.ts`'s `NIGHT_ATMOSPHERES` (read through `atmosphereFor(biome,
    runVariant)`): a moon in the sun slot, a blue hemisphere fill, shorter fog, a cool vignetted grade,
    plus `lampGlow` (lights the biome's lamps and rides through their existing materials,
-   `shared/lampGlow.ts`) and `enemyRimLift` (scales every enemy rim, `enemyRim.ts` `setRimLift`).
+   `shared/lampGlow.ts`; the Pyramid's torches, #880) and `enemyRimLift` (scales every enemy rim, `enemyRim.ts`
+   `setRimLift`). Judge a night frame like Inferno: emissive edges and rim light, not a brighter sky.
 4. (Nothing to add to `BiomeEnvironment.tsx` — it renders whatever the registry entry defines.)
 5. `src/audio/scores/<levelId>.scrim` — the level's score, registered in `scores/index.ts` `SCORES`, plus
    its key in `SCORE_KEYS` (`src/audio/sfxDesign.ts`) and the biome's room in `BIOME_REVERB`
