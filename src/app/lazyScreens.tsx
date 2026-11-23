@@ -23,6 +23,11 @@ function backToTitle(): void {
   if (phase !== 'title') setPhase('title')
 }
 
+/**
+ * Renders nothing for good once its screen failed: the element it holds still points at the rejected `React.lazy`, and
+ * a screen leaving under `AnimatePresence` keeps that element, so rendering it again would throw in a loop. The next
+ * show mounts a new boundary around the fresh `Lazy`.
+ */
 class ChunkBoundary extends Component<{ children: ReactNode; onFail: () => void }, { failed: boolean }> {
   state = { failed: false }
   static getDerivedStateFromError() {
@@ -30,7 +35,6 @@ class ChunkBoundary extends Component<{ children: ReactNode; onFail: () => void 
   }
   componentDidCatch() {
     this.props.onFail()
-    this.setState({ failed: false })
   }
   render() {
     return this.state.failed ? null : this.props.children

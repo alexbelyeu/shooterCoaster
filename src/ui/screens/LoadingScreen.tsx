@@ -29,9 +29,15 @@ export default function LoadingScreen() {
 
   useEffect(() => {
     let live = true
-    // The level's chunk and the run's screens (HUD, countdown, results: `app/lazyScreens.tsx`). A failed load returns
-    // to the title (`SceneManager`), unmounting this.
-    Promise.all([loadLevelScene(), loadPlayScreens()]).then(() => live && reportLoad(levelId, 'chunk', 1), () => {})
+    // The level's chunk and the run's screens (HUD, countdown, results: `app/lazyScreens.tsx`). Either failing every
+    // retry returns to the title, where a new build reloads (`app/staleReload.ts`) and the next PLAY fetches again.
+    Promise.all([loadLevelScene(), loadPlayScreens()]).then(
+      () => live && reportLoad(levelId, 'chunk', 1),
+      () => {
+        const s = useGameStore.getState()
+        if (live && s.phase === 'loading') s.setPhase('title')
+      },
+    )
     let settled = 0
     let frame = 0
     const tick = () => {

@@ -34,8 +34,19 @@ import {
 
 const PerfPanel = lazy(() => import('@/perf/PerfPanel'))
 const PhotoMode = lazy(() => import('@/ui/screens/PhotoMode'))
-/** framer-motion's animation features, fetched as App mounts (#861): the `m` elements start animating once they land. */
-const loadMotionFeatures = lazyChunk(() => importWithRetry(() => import('./motionFeatures').then((mod) => mod.default)))
+const importMotionFeatures = lazyChunk(() => importWithRetry(() => import('./motionFeatures').then((mod) => mod.default)))
+/** Between two rounds of retries of the motion features: `LazyMotion` asks once, so its loader never gives up. */
+const MOTION_FEATURES_RETRY_MS = 10_000
+/**
+ * framer-motion's animation features, fetched as App mounts (#861): the `m` elements start animating once they land.
+ * Until then they sit at their `initial` (the title's invisible), so a failed round waits and fetches again; each
+ * failure reaches `app/staleReload.ts`, which reloads the title when a new build took the chunk.
+ */
+function loadMotionFeatures(): ReturnType<typeof importMotionFeatures> {
+  return importMotionFeatures().catch(
+    () => new Promise((resolve) => setTimeout(resolve, MOTION_FEATURES_RETRY_MS)).then(loadMotionFeatures),
+  )
+}
 
 /** Runs `fn` once the main thread is idle (a timer where `requestIdleCallback` is missing: Safari). */
 function whenIdle(fn: () => void): void {
