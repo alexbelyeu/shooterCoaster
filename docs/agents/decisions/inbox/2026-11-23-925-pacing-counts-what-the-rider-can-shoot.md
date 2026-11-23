@@ -8,10 +8,10 @@ waves all counted.
 **Decision:** The `pacing` step counts `__SC_TEST__.sight()` (in view, at least `MIN_ENEMY_PX`, a clear line from the camera)
 on a run played as a player (`PLAYER_HITS_PER_SECOND`, 3 hits a game second on the nearest shootable targets, on the game
 clock), and fails a level whose boss is shootable less than its `pacing.bossFramedShare` of the fight. Each level's `pacing`
-budget was re-measured with the new count (seed 1337) by Alex's session: levels that pass keep or tighten their ceilings;
-levels over them carry `knownOver` with the issue fixing them, which turns their failure into a warning until it lands. Every
+budget was re-set from its first CI run under the new count (seed 1337) by Alex's session, so nothing gets worse: levels 1–5
+on what they measure (#937 has the targets, 3 s / 10% / boss 60%), level 6 on the targets with `knownOver: "#926"`. Every
 PR that changes a ride, its waves, a boss or a level's effects also runs `npm run review` and posts its sheet.
 
-**Consequences:** A pacing number from before #925 is not comparable with one after it. Removing `knownOver` from a level is
-part of the issue that fixes it, not a budget raise. Don't go back to counting projected centres or to an unfired run: both
+**Consequences:** A pacing number from before #925 is not comparable with one after it. Lowering a level's ceilings toward
+the targets, or removing level 6's `knownOver`, is part of the issue that fixes it, not a budget raise. Don't go back to counting projected centres or to an unfired run: both
 pass rides a player finds empty.
