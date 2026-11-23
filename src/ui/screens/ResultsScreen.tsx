@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { runBest, useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { runNextStar } from '@/levels/scoring'
@@ -321,7 +321,7 @@ export default function ResultsScreen() {
         </FairBoard>
 
         {(!daily || world) && (
-          <motion.div
+          <m.div
             className="results-board-slot"
             initial={false}
             variants={{ hidden: { opacity: 0, x: 24 }, shown: { opacity: 1, x: 0 } }}
@@ -336,7 +336,7 @@ export default function ResultsScreen() {
               onKey={initialsInput}
               onSlot={(slot) => initials && setInitials({ ...initials, slot })}
             />
-          </motion.div>
+          </m.div>
         )}
       </div>
     </div>
