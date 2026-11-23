@@ -2782,3 +2782,34 @@ less compressible hex colours) and lands at 633.05 KB.
 (260) are unchanged.
 **Consequences:** The 2026-11-21 rule stands for anything bigger: a PR adding more than ~0.5 KB gz total JS cuts code
 first (as #816 did) before asking for a raise, and the Director weighs every raise against a cut.
+
+## 2026-11-22 — The throttled pass is an extra nightly part, and the nightly gates programs after warm-up (Builder, #539)
+
+**Context:** Slow machines hitch where CI runners don't, and a shader compiled after `ShaderWarmup` is a mid-ride freeze
+on a slow driver (#536 / #596). PR shards need a Director-set `smokeSeconds` budget each, and a red nightly part opens a P1.
+**Decision:** `e2e/shards.mjs` `NIGHTLY_PARTS.slow` reruns level1 and level3's ride + results under `--cpu-throttle 4`
+(the part sets the rate, so prod-smoke.yml's one smoke command stays generic). It is marked `extra`: not counted in the
+"parts make the full run once" check, only held to be a subset of it. It shares the other parts' 60 min cap and needs no
+`smokeSeconds` entry (two levels; CI rides one level in ~3 min unthrottled). `slow` and `pacing` set `gatePrograms`:
+a level with `programs after warm-up` > 0 fails there; PR shards keep reporting the count only. Frame numbers go to
+`throttle.json` and fail nothing until a few nightlies give a CI baseline (follow-up issue).
+**Consequences:** A new material whose shader the warm-up misses turns the nightly red (P1) within a day, on `pacing`
+for any level. Move the gate onto PR shards only with a Director decision on their time.
+
+## 2026-11-22 — Enemy readability bar: OKLab ΔE under colour-vision deficiency replaces "ΔE ≥ ~15" (Builder, #838)
+
+**Context:** The 2026-10-19 enemy readability rule asked for base colours "ΔE ≥ ~15 from the biome's terrain ramp", unmeasured and silent on colour blindness. Several pairs (the golden balloon vs the lime and yellow balloons, the dust bunny vs the climbers' shirts) were near-identical to a deuteranope or protanope.
+**Decision:** Every enemy's read colours (its main paints, glow and rim band; `enemyPalette.ts`) keep `MIN_DELTA_E` = 0.1 OKLab (five JNDs) under deuteranopia and normal vision and `MIN_DELTA_E_PROTAN` = 0.07 under protanopia (Machado 2009 simulation) from its biome's sky, ground, sea or walls; gym targets also from the climbers, and the golden balloon from every plain balloon. `src/entities/enemies/colourVision.ts` holds the bar and why; `enemyColourVision.test.ts` enforces it and fails for any `EnemyType` (except the bystander `climber`) it doesn't check. This replaces the ΔE 15 rule; the `withRim()` rule stands.
+**Consequences:** A new enemy, hand-made or from `new-world`, adds its read colours to `enemyPalette.ts` and an entry to the test, or the test goes red. A repaint that fails is fixed by the smallest OKLab shift (lightness, then chroma) in the same colour family.
+
+## 2026-11-22 — `jsTotalGzipKB` 634 → 635, `startupJsGzipKB` 435 → 436 for ghost replay (Director, #845)
+
+**Context:** Ghost replay (#844, PR #846: recorder, codec, HUD ring, Settings toggle) adds ~0.9 KB gzipped and lands at 634.12 KB total / 435.17 KB startup, over both budgets by 0.1–0.2 KB after the builder's trims; further cuts move the gzip sum by noise. The recorder runs inside the ride (`GameTimer`) and the store saves the ghost with the best score, so it sits in the startup graph like the rest of the HUD.
+**Decision:** Raise both by 1 KB, the smallest round step that fits. Startup JS is still under the 440 it had before Tone's removal; first paint is held by the poster (#376), not by this byte count. Total has now been raised three times in two days (630 → 633 → 634 → 635) for small features.
+**Consequences:** About 0.8 KB of room on each. The next feature that would cross either budget brings its own trim or moves code into the lazy level chunk (`LevelScene.tsx`) instead of asking for another raise; Monday's plan should look for a startup-JS cut rather than keep stepping these up.
+
+## 2026-11-23 — The Daily Run's World board: same table, no initials entry (Builder, #854)
+
+**Context:** The Daily Run competed only with the player's own record. #854 asked for a per-day World board on the existing leaderboard API, with no new service.
+**Decision:** Daily rows live in `scores` with a nullable `day` (`0004_daily_board.sql`); every campaign query filters `day is null`, and retries without it while the column is missing, so the campaign board never depends on Alex running the migration (daily calls 503 until he does). The server takes a daily score only for today or yesterday on its own UTC clock (a run started before midnight still counts) and only on that day's `dailyLevel`, mirrored in `api/_lib/daily.ts` because `api/` can't import `src/`. The daily results screen opens no initials entry: a new best of the day goes up at once under the player's last initials, any other run just fetches the day's board.
+**Consequences:** A player who never signed a campaign board shows as `AAA` on the daily board. An initials entry for dailies would need a local daily board to edit in; it is a possible follow-up, not a fix. Changing `DAILY_LEVELS` or the rotation means changing `api/_lib/daily.ts` too (`daily.test.ts` fails until both agree).
