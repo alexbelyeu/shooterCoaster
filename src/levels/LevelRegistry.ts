@@ -108,14 +108,15 @@ const LEVELS: LevelConfig[] = [
     description: 'The living snowmen',
     order: 4,
     biome: 'arctic',
-    maxScore: 44 * 15 + 40 * 30 + 16 * 50 + 2 * 60 + 400, // 2660 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 3180
+    maxScore: 36 * 15 + 40 * 30 + 16 * 50 + 2 * 60 + 400, // 2540 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 3060
     message: "You've made it! Congrats!",
     nextLevel: 'level5',
     track: ARCTIC_LEVEL_TRACK,
     ...paceLevel({
       waves: [
-        // Longer, so the blizzard's wave meets the rider out of the ice cave, on the ridge's lift (#866).
-        { type: 'snowmanScout', count: 44, waveLabel: 'Scout Party', formation: 'line', weight: 1.5 },
+        // Longer, so the blizzard's wave meets the rider out of the ice cave, on the ridge's lift; 36, not 44: the whole party
+        // stands up the slow first lift in view at once, and 44 put the scene over its draw-call ceiling (#866).
+        { type: 'snowmanScout', count: 36, waveLabel: 'Scout Party', formation: 'line', weight: 1.5 },
         { type: 'snowman', count: 40, waveLabel: 'Snowmen Incoming!', weather: 'blizzard' },
         { type: 'snowmanBrute', count: 16, waveLabel: 'Brutes!' },
       ],

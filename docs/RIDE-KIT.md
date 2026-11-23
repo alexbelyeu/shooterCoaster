@@ -118,8 +118,10 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   gap over a canyon between mesas.
 - **Ocean (3):** a splashdown, a glass tunnel under the water with the Kraken passing overhead,
   a corkscrew through a sea stack's arch.
-- **Antarctica (4):** an ice-cave dark section (blue glow), a bobsled helix down a glacier, an
-  airtime hill off a ridge with the aurora.
+- **Antarctica (4):** built (#866, `arctic/arcticTrack.ts`, its storyboard and seconds at the top): a station launch,
+  a lift up the valley, a 71° first drop into the ice cave (a dark section with the `ice` look, `IceCave.tsx`, its mouth
+  low over the rails), a second lift up the ridge, an airtime crest heading into the aurora (27 s), a 1.25-turn helix
+  down past the Ice Fortress ending as the Yeti arrives (40 s), and the valley run home.
 - **Inferno (5):** a launch out of a lava tube, a drop-tower free fall inside the volcano, a
   backwards section as the Titan rises behind you.
 
