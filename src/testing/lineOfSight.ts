@@ -7,7 +7,7 @@
  * Test tooling only (`?e2e=1`): it walks the scene and raycasts, so nothing in the game's frame loop calls it.
  */
 import * as THREE from 'three'
-import { MIN_ENEMY_PX, projectedPx } from '@/entities/enemies/enemyReadability'
+import { MIN_ENEMY_PX, REFERENCE_VIEWPORT_H, projectedPx } from '@/entities/enemies/enemyReadability'
 
 /** One live target to judge: its centre, the world size it reads at, and the objects that draw it (left out as occluders). */
 export interface SightTarget {
@@ -67,7 +67,6 @@ export function collectOccluders(scene: THREE.Object3D, camera: THREE.Camera, sk
 export function judgeTarget(
   t: SightTarget,
   camera: THREE.Camera,
-  viewportHeight: number,
   occluders: readonly THREE.Mesh[],
 ): SightVerdict {
   camera.getWorldPosition(_cam)
@@ -78,7 +77,8 @@ export function judgeTarget(
   if (ahead.dot(_dir) <= 0) return 'offscreen'
   const distance = ahead.length()
   const fov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 80
-  if (projectedPx(t.size, distance, viewportHeight, fov) < MIN_ENEMY_PX) return 'tiny'
+  // `MIN_ENEMY_PX` is px of a 720 px tall view: the same share of any viewport.
+  if (projectedPx(t.size, distance, REFERENCE_VIEWPORT_H, fov) < MIN_ENEMY_PX) return 'tiny'
   _ray.set(_cam, ahead.divideScalar(distance))
   _ray.near = 0
   _ray.far = Math.max(0, distance - t.radius)
@@ -93,12 +93,11 @@ export function judgeTarget(
 export function countSight(
   targets: readonly SightTarget[],
   camera: THREE.Camera,
-  viewportHeight: number,
   occluders: readonly THREE.Mesh[],
 ): SightCounts {
   const out: SightCounts = { shootable: 0, occluded: 0, tiny: 0, ids: [] }
   for (const t of targets) {
-    const v = judgeTarget(t, camera, viewportHeight, occluders)
+    const v = judgeTarget(t, camera, occluders)
     if (v === 'shootable') {
       out.shootable++
       out.ids.push(t.id)

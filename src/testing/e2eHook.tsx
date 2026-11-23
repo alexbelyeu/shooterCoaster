@@ -947,7 +947,7 @@ function readSight(): E2ESight {
     const type = enemyRegistry.get(t.id)?.type
     targets.push({ id: t.id, position: t.getPosition().clone(), size: type ? (ENEMY_SILHOUETTE[type] ?? 2 * radius) : 2 * radius, radius })
   }
-  const counts = countSight(targets, cam, probeSize.height, collectOccluders(scene, cam, skip))
+  const counts = countSight(targets, cam, collectOccluders(scene, cam, skip))
   const bossFramed = e2eBoss.stage === 'active' && counts.ids.some((id) => isBossId(id))
   return { ...counts, levelTime: e2eLevelTime, bossStage: e2eBoss.stage, bossFramed }
 }
