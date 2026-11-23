@@ -1,18 +1,12 @@
-import { getLevelConfig } from '@/levels/LevelRegistry'
-import { runStars } from '@/levels/scoring'
+import type { CardSize, ScoreCardRun } from '@/ui/scoreCard'
 
 /** Share copy for the results screen (#87, #271); the `/go/share` path attributes visits, since UTM dimensions are paywalled. */
-export const SITE_URL = 'https://scoaster.com/'
+const SITE_URL = 'https://scoaster.com/'
 const SHARE_PATH = 'go/share'
 
-export interface ShareRun {
-  levelName: string
-  score: number
-  stars: number
-  url: string
-  /** 0-based place on the level's World top 10, or null when the run didn't place (or the online board never answered). */
-  worldRank?: number | null
-}
+/** What the share line says: the score card's own run (#375), so the line, the card and the `share` event can't disagree.
+ *  `worldRank` is null when the run didn't place (or the online board never answered); `daily` is the Daily Run's date. */
+export type ShareRun = Pick<ScoreCardRun, 'levelName' | 'score' | 'stars' | 'daily' | 'worldRank'>
 
 export interface SharePayload {
   title: string
@@ -58,28 +52,16 @@ export function rankLabel(rank: number): string {
 
 const fmt = new Intl.NumberFormat('en-US')
 
-export function buildShareText({ levelName, score, stars, url, worldRank = null }: ShareRun): SharePayload {
+/** A Daily Run says so (#268): its hook is the same ride for everyone that day. A daily never carries a World rank. */
+function shareLine({ levelName, score, stars, daily, worldRank }: ShareRun): string {
   const result = `${fmt.format(Math.round(score))} ${starString(stars)}`
-  return {
-    title: 'ShooterCoaster',
-    text:
-      worldRank === null
-        ? `I scored ${result} on ${levelName} in ShooterCoaster 🎢 — beat me:`
-        : `I'm ${rankLabel(worldRank)} in the world on ${levelName} — ${result} in ShooterCoaster 🎢 — beat me:`,
-    url,
-  }
+  if (daily !== null) return `I scored ${result} on the ${daily} Daily Run (${levelName}) in ShooterCoaster 🎢 — same ride for everyone, beat me:`
+  if (worldRank !== null) return `I'm ${rankLabel(worldRank)} in the world on ${levelName} — ${result} in ShooterCoaster 🎢 — beat me:`
+  return `I scored ${result} on ${levelName} in ShooterCoaster 🎢 — beat me:`
 }
 
-export function sharePayloadForRun(levelId: string, score: number, method: ShareMethod, worldRank: number | null = null): SharePayload | null {
-  const config = getLevelConfig(levelId)
-  if (!config) return null
-  return buildShareText({
-    levelName: config.name,
-    score,
-    stars: runStars(score, config),
-    url: buildShareUrl(shareCampaign(method)),
-    worldRank,
-  })
+export function sharePayload(run: ShareRun, method: ShareMethod): SharePayload {
+  return { title: 'ShooterCoaster', text: shareLine(run), url: buildShareUrl(shareCampaign(method)) }
 }
 
 export function clipboardText(payload: SharePayload): string {
@@ -173,9 +155,17 @@ export function canCopy(nav: ShareNavigator | undefined): boolean {
   return typeof nav?.clipboard?.writeText === 'function'
 }
 
-/** The share sheet only on touch devices: on desktop it offers little (macOS: Notes), so our menu instead. */
-export function shareMode(nav: ShareNavigator | undefined, coarsePointer: boolean, payload: SharePayload): 'native' | 'menu' {
-  return coarsePointer && canNativeShare(nav, payload) ? 'native' : 'menu'
+/** What Share does (#375): the share sheet only on touch devices, with the score card picture when the sheet takes one;
+ *  on desktop the sheet offers little (macOS: Notes), so our menu instead. */
+export function shareMode(nav: ShareNavigator | undefined, coarsePointer: boolean, payload: SharePayload): 'image' | 'native' | 'menu' {
+  if (!coarsePointer) return 'menu'
+  if (canShareImage(nav)) return 'image'
+  return canNativeShare(nav, payload) ? 'native' : 'menu'
+}
+
+/** The card a phone saves is the story size (it goes to a story or a chat); a desktop's is the feed size. */
+export function cardSizeFor(coarsePointer: boolean): CardSize {
+  return coarsePointer ? 'story' : 'feed'
 }
 
 /** `failed` means the menu should open instead; a dismissed sheet is `cancelled`. Never throws. */
