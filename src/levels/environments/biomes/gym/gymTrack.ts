@@ -25,7 +25,7 @@
  * spaced and braked so the view never turns faster than ~95°/s in any second of the run.
  *
  * `gymTrack.test.ts` holds it to the beats, the blockout's and the hall's clearances and the Medusa's;
- * `scripts/plot-gym-track.mjs` draws it. The level rides its copy in `gymLevel.ts` (`node scripts/gen-gym-level.mjs`),
+ * `scripts/plot-gym-track.mjs` draws it. The level rides its copy in `gymLevel.ts` (`node scripts/gen-ride-levels.mjs level6`),
  * which keeps the blockout out of the startup JS.
  */
 import * as THREE from 'three'
