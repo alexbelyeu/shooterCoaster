@@ -8,9 +8,9 @@
  * - **11 s, the first drop**: round south at the top and down the far side into the canyon.
  * - **13–17 s, the ice cave**: under the cave's low mouth (the near miss) and through it in the blue dark, south.
  * - **18–22 s, the ridge**: out of the cave into the blizzard, a climbing turn east up onto the ridge.
- * - **24 s, the airtime crest** off the ridge, east into the aurora, the Ice Fortress ahead on the left.
- * - **27–40 s, the bobsled helix**: one and a half turns down the glacier beside the fortress, which wheels round the
- *   frame; it comes out heading west as the Yeti arrives (40 s).
+ * - **27 s, the airtime crest** off the ridge, east into the aurora, the Ice Fortress ahead on the left.
+ * - **29–40 s, the bobsled helix**: a turn and a quarter down the glacier beside the fortress, which wheels round the
+ *   frame; it comes out as the Yeti arrives (40 s).
  * - **40–58 s, the Yeti's valley**: a long, slow run west and round north for the fight.
  * - **After the run, home**: the brake run into the station.
  *

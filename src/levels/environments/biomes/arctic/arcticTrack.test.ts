@@ -54,7 +54,6 @@ describe.each([
     expect(cave.look).toBe('ice')
     const from = distanceAtT(table, cave.from)
     const to = distanceAtT(table, cave.to)
-    // Its floor is level, so the eye is straight under the vault's crown.
     const mouth = curve.getPointAt(cave.from)
     let rise = 0
     for (let i = 0; i < table.count; i++) if (table.s[i] >= from && table.s[i] <= to) rise = Math.max(rise, table.y[i] - mouth.y)
@@ -64,7 +63,6 @@ describe.each([
     const near = eyeClearance(curve, lip, eye, cave.from - 0.01, cave.from + 0.01)
     expect(near).toBeGreaterThan(eye)
     expect(near).toBeLessThan(4 * eye)
-    // Dark for a few seconds, and over before the blizzard's wave.
     const [enter, leave] = [planTimeAt(plan, from), planTimeAt(plan, to)]
     expect(leave - enter).toBeGreaterThan(2.5)
     expect(leave).toBeLessThan(getLevelConfig('level4')!.enemies.find((w) => w.weather === 'blizzard')!.spawnDelay!)

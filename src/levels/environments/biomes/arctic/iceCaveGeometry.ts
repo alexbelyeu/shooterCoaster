@@ -5,11 +5,7 @@ import type { DarkSectionSpec } from '@/types/level'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import { trackFrameAt } from '../../shared/trackClearance'
 
-/**
- * Level 4's ice cave (#866), pure: a faceted ice vault over the track through its dark section (`arcticTrack.ts`), wide
- * enough for the snowmen standing beside the track to stand inside it. Its mouth hangs low over the rails (the ride's
- * near miss), then the vault rises over `mouth` units of track; blue veins in the ice glow as the cave goes dark.
- */
+/** Level 4's ice cave (#866), pure: a faceted vault over the ice dark section, wide enough that the trackside snowmen stand inside it. */
 export const ICE_CAVE = {
   /** Half the vault's width at the ground, either side of the track. */
   halfWidth: 340,
@@ -45,10 +41,7 @@ export function iceCaveSpan(table: ArcTable, section: DarkSectionSpec): { fromS:
 /** A smooth, cheap wobble in [-1, 1] for the ice's facets. */
 const wobble = (a: number, b: number) => Math.sin(a * 1.7 + Math.sin(b * 2.3)) * Math.cos(b * 1.3 + a * 0.6)
 
-/**
- * The vault as one non-indexed geometry (flat facets): an inner and an outer shell and the bands closing them at both
- * ends, attributes position, normal, color and `aEmissive` (the veins, inner shell only). Caller disposes.
- */
+/** The vault as one non-indexed (flat-faceted) geometry with `aEmissive` veins on its inner shell. Caller disposes. */
 export function buildIceCaveGeometry(table: ArcTable, span: { fromS: number; toS: number }, groundFn: HeightFunction): THREE.BufferGeometry {
   const { halfWidth, wall, sink, facets } = ICE_CAVE
   const sections = Math.max(2, Math.ceil((span.toS - span.fromS) / ICE_CAVE.step))

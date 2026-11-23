@@ -7,8 +7,6 @@ import { GYM_WALLS } from './walls'
 
 describe('gym level data', () => {
   it('is the blockout’s track and walls (regenerate with `node scripts/gen-gym-level.mjs`)', () => {
-    // As the generator writes it: every number to 6 significant digits, float dust to 0, then the control points to 0.01
-    // and the ups to 4 decimals.
     const round = (_key: string, v: unknown) =>
       typeof v === 'number' ? Number((Math.abs(v) < 1e-9 ? 0 : v).toPrecision(6)) + 0 : v
     const fixed = (v: number, digits: number) => Number(v.toFixed(digits)) + 0

@@ -14,8 +14,7 @@ const COLUMN_CLEAR = 30
 
 export default function ArcticDecorations(props: BiomeDecorationsProps) {
   const { heightFn, track } = props
-  // The ride runs low through the valley (#866): boulders (up to 16 wide) and ice columns (60 tall) stand clear of the
-  // track's ground line and its towers.
+  // Level 4's ride runs low through the valley (#866): boulders and columns stand clear of it and its towers.
   const trackIndex = useMemo(() => buildTrackIndex(track), [track])
 
   const boulderPositions = useMemo(

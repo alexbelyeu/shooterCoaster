@@ -12,7 +12,6 @@ describe.each([
   ['level4', ARCTIC_LEVEL_TRACK, ARCTIC_TRACK],
 ] as [string, TrackParams, SplineTrackParams][])('%s ride data', (id, shipped, built) => {
   it('is the built ride (regenerate with `node scripts/gen-ride-levels.mjs`)', () => {
-    // As the generator writes it: positions to whole units, ups to 2 decimals, the rest to 6 significant digits.
     const round = (_key: string, v: unknown) => (typeof v === 'number' ? Number(v.toPrecision(6)) : v)
     const fixed = (v: number) => Number(v.toFixed(2)) + 0
     const controlPoints = built.controlPoints.map((p) => ({
