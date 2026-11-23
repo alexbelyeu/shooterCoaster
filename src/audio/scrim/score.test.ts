@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compile, type CompiledSong, type Timeline } from './score'
+import { compile, noteToMidi, type CompiledSong, type Timeline } from './score'
 import HTML from '../../../docs/audio/reference/scrimshaw-jukebox.html?raw'
 
 /** The original `ScrimScore` IIFE, run as CommonJS (it exports through `module.exports` when it can). */
@@ -90,4 +90,16 @@ describe('score parity with the original Scrimshaw compiler', () => {
       expectSameTimeline(port.loop, orig.loop)
     })
   }
+})
+
+describe('noteToMidi', () => {
+  it('reads note names as the compiler does: C4 is 60, accidentals and lower case included', () => {
+    expect(['C4', 'A4', 'c4', 'C#4', 'Db4', 'B#3', 'Cb4', 'F##2', 'Ebb2', 'C0', 'B8'].map(noteToMidi)).toEqual([
+      60, 69, 60, 61, 61, 60, 59, 43, 38, 12, 119,
+    ])
+  })
+
+  it('is null for anything else', () => {
+    expect(['H4', 'C9', 'C-1', 'C', '4', 'C#', 'Cm', ''].map(noteToMidi)).toEqual(Array(8).fill(null))
+  })
 })

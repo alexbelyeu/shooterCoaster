@@ -1,4 +1,4 @@
-import { swapInOfflineContext } from './AudioEngine'
+import { isAudioReady, swapInOfflineContext } from './AudioEngine'
 import { createRng } from '@/utils/rng'
 
 export interface OfflineRenderScope {
@@ -9,13 +9,14 @@ export interface OfflineRenderScope {
 /**
  * Renders the game's own music / SFX code faster than real time: the script's `at` callbacks run in time order on a
  * scripted clock, scheduling into an OfflineAudioContext that then renders it all. The engines build in that context
- * until it resolves, so call it only while no live audio plays.
+ * until it resolves, and its cleanup stops the engines, so it refuses once live audio has started.
  */
 export async function renderOffline(
   { seconds, sampleRate = 44100, seed = 1 }: { seconds: number; sampleRate?: number; seed?: number },
   script: (scope: OfflineRenderScope) => void,
   cleanup: () => void,
 ): Promise<AudioBuffer> {
+  if (isAudioReady()) throw new Error('renderOffline: live audio has started; render before the first gesture')
   const ctx = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate)
   let now = 0
   /** Sorted by time; a callback at the same time as another runs after it. */

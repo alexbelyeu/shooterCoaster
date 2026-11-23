@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compile, DRUMS, MELODIC } from './score'
+import { compile, DRUMS, MELODIC, noteToMidi } from './score'
 import { INSTRUMENT_RANGES, lintRanges } from './lint'
 import { ARCADE_INSTRUMENTS, createCore, createSynth, DRUM_INSTRUMENTS, MELODIC_INSTRUMENTS } from './synth'
 import FORMAT from '../../../docs/audio/SCORE-FORMAT.md?raw'
@@ -7,11 +7,10 @@ import FORMAT from '../../../docs/audio/SCORE-FORMAT.md?raw'
 const PALETTE: Record<string, string> = import.meta.glob('../../../docs/audio/palette/*.scrim', { query: '?raw', import: 'default', eager: true })
 const paletteScore = (name: string) => PALETTE[`../../../docs/audio/palette/${name}.scrim`]
 
-const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const midi = (name: string) => {
-  const m = /^([A-G]#?)(-?\d)$/.exec(name)
-  if (!m) throw new Error(`bad note ${name}`)
-  return 12 * (Number(m[2]) + 1) + NAMES.indexOf(m[1])
+  const m = noteToMidi(name)
+  if (m === null) throw new Error(`bad note ${name}`)
+  return m
 }
 
 function documented() {

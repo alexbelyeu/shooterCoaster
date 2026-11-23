@@ -56,7 +56,8 @@ let manualClock = false
 /** The game's last `setIntensity`. */
 let targetIntensity = 0
 
-function songFor(id: string): CompiledSong {
+/** The compiled song `playScore(id)` plays: a registered one, else the game score for that slot. */
+export function songFor(id: string): CompiledSong {
   let song = songs.get(id)
   if (!song) {
     const text = SCORES[scoreIdFor(id)]
@@ -65,6 +66,16 @@ function songFor(id: string): CompiledSong {
     songs.set(id, song)
   }
   return song
+}
+
+/** A song that isn't a game score (`audio:render --chain game`), playable as `id` until `unregisterSong(id)`. */
+export function registerSong(id: string, song: CompiledSong): void {
+  if (songs.has(id) || SCORES[scoreIdFor(id)] !== undefined) throw new Error(`score "${id}" is taken`)
+  songs.set(id, song)
+}
+
+export function unregisterSong(id: string): void {
+  songs.delete(id)
 }
 
 function coreFor(ctx: BaseAudioContext): SynthCore {
