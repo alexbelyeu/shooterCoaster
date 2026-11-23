@@ -226,7 +226,7 @@ in `results.json`). Every one is a shader `ShaderWarmup` missed, a freeze on a s
 nightly's `slow` and `pacing` parts (and `--gate-programs`) fail a level with one (#539: `programGateProblem` in pure
 `e2e/slowPass.mjs`, the problem names the moments); everywhere else, the PR shards among them, it is reported only (the
 first-shot check in the `countdown` step does fail on one).
-**Late level chunk (`--level-chunk-delay <ms>`, #464):** every page gets the level scene's lazy chunk that many ms late, the
+**Late level chunk (`--level-chunk-delay <ms>`, #464):** every page gets the level core's lazy chunk and its world's (`world-<biome>-*.js`, #862) that many ms late, the
 slow sandbox where `quality` and `pickup` measured the composer alone (17 draw calls) before the level had loaded. Every step
 that starts a level waits for `levelReady()`, so any step must pass with it (`--steps quality,pickup,pause --levels level1
 --level-chunk-delay 8000`).
