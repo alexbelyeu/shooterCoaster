@@ -4,17 +4,19 @@
  * The storyboard, with the second each beat lands (`BEATS`):
  *
  * - **0 s, the station** on the lagoon's north side: GO launches it east.
- * - **3–12 s, the lift hill**: a chain straight east along the north side, the lagoon and the islands opening up.
- * - **13 s, the first drop**: round onto the east side at the top and straight down at the sea.
- * - **15 s, the splashdown**: the drop's foot skims the surface (spray, a kick, the splash) and dives on into…
- * - **15–25 s, the glass tunnel**: under the water round the south-east corner and west along the south side, the
+ * - **3–10 s, the lift hill**: a chain straight east along the north side, the lagoon and the islands opening up.
+ * - **10–12 s, over the top**: round onto the east side and a crawl south along the crest, the whale breaching dead
+ *   ahead out in the south channel (`environment.whale`).
+ * - **12–13 s, the first drop** straight down at the sea, and **the splashdown**: its foot skims the surface (spray, a
+ *   kick, the splash) and dives on into…
+ * - **13–18 s, the glass tunnel**: under the water round the south-east corner and west along the south side, the
  *   jellyfish bobbing on the surface overhead.
- * - **26–31 s, the camelbacks**: up out of the sea into two airtime hills west along the south side.
- * - **33 s, the sea arch**: round the south-west corner and north through a rock arch in a slow corkscrew (the near
- *   miss: the arch's crown a few metres over the rider's head as they roll under it).
+ * - **19–26 s, the camelbacks**: up out of the sea into the airtime hills west along the south side (25 s).
+ * - **28–34 s, the sea arch**: round the south-west corner and north in a slow corkscrew through a rock arch (31 s, the
+ *   near miss: the arch's crown a few metres over the rider's head as they roll under it).
  * - **35–40 s, the second lift** east across the lagoon, cresting as the Kraken rises (40 s).
- * - **40–55 s, the finale**: a slow helix down over the lagoon's middle for the boss fight, the Kraken in front.
- * - **55–60 s, the brake run** north and west round to the station's hairpin: home.
+ * - **40–46 s, the finale**: a quarter helix down round to the north for the boss fight, under the first lift (44 s).
+ * - **46–61 s, the brake run** west along the north shore and round the station's west end: home.
  *
  * `oceanTrack.test.ts` holds it to the beats and to its clearances (the seabed, the arch, the water over the tunnel).
  */
@@ -45,7 +47,7 @@ const STATION = { x: -480, y: 12, z: 350 } as const
 const LIFT = { from: -250, to: 200, topY: 175 } as const
 const EAST_X = 330
 /** The drop's foot skims the sea (rails this far over it): the splashdown. */
-const DROP = { toZ: 30, footY: 3, ease: 280 } as const
+const DROP = { topZ: 120, toZ: -85, footY: 3, ease: 280 } as const
 /** Under the water: the rails' depth, the dive's run, the corner and the climb back out to `outX`. */
 const DEEP = { y: -21, diveZ: -300, cornerZ: -480, toX: 150, outX: -20, outY: 14 } as const
 const CAMEL = { toX: -480, rise: 60, crest: 150, angle: 30 * DEG } as const
@@ -56,8 +58,10 @@ const CORK = { y: 12, fromZ: -330, length: 360 } as const
 const INNER_Z = 150
 const CORNER = 110
 const LIFT2 = { from: -450, to: -150, topY: 120 } as const
-const FINALE = { helixFrom: -60, helixRadius: 80, helixTurns: 1.5, helixDrop: 80, westTo: -120, northX: -200, returnZ: 250, brakeFrom: -380 } as const
-const HOME_X = STATION.x - 90
+/** The finale: a quarter helix round to the north, under the first lift and back west along the north shore. */
+const FINALE = { helixFrom: -40, helixRadius: 90, helixDrop: 80, northZ: 560, corner: 90, brakeFrom: -300 } as const
+/** Home: round the station's west end (`radius`) and east into it. */
+const HOME = { x: -560, radius: 80 } as const
 
 /** The storyboard's beats: the second the car reaches the `nth` element of a kind, its start or (`middle`) its middle. */
 const BEATS: { kind: MarkerKind; second: number; nth?: number; at?: 'middle' | 'end' }[] = [
@@ -93,7 +97,10 @@ export function buildOceanRide(): OceanRide {
   mechanics.push(station(b, { speed: SPEED.launch }))
   b.mark('straight', () => straightTo(b, 'x', LIFT.from))
   zone('lift', SPEED.lift, () => b.mark('liftHill', () => straightTo(b, 'x', LIFT.to, { rise: LIFT.topY - y(), ease: 8 * EYE })))
-  zone('lift', SPEED.crest, () => turn(Math.PI / 2, EAST_X - LIFT.to, 0, 15 * DEG))
+  zone('lift', SPEED.crest, () => {
+    turn(Math.PI / 2, EAST_X - LIFT.to, 0, 15 * DEG)
+    b.mark('straight', () => straightTo(b, 'z', DROP.topZ))
+  })
   b.mark('straight', () => straightTo(b, 'z', DROP.toZ, { rise: DROP.footY - y(), ease: DROP.ease }))
   const splash = b.points.length - 1
   const tunnelFrom = splash
@@ -115,18 +122,18 @@ export function buildOceanRide(): OceanRide {
   zone('lift', SPEED.lift2, () => b.mark('liftHill', () => straightTo(b, 'x', LIFT2.to, { rise: LIFT2.topY - y(), ease: 8 * EYE })))
   b.mark('straight', () => straightTo(b, 'x', FINALE.helixFrom))
   zone('brake', SPEED.helix, () =>
-    helix(b, { radius: FINALE.helixRadius, turns: FINALE.helixTurns, drop: FINALE.helixDrop, bank: 30 * DEG }),
+    helix(b, { radius: FINALE.helixRadius, turns: 0.25, drop: FINALE.helixDrop, bank: 30 * DEG, hand: -1 }),
   )
-  b.mark('straight', () => straightTo(b, 'x', FINALE.westTo))
-  turn(Math.PI / 2, FINALE.westTo - FINALE.northX)
   zone('brake', SPEED.home, () => {
-    b.mark('straight', () => straightTo(b, 'z', INNER_Z, { rise: STATION.y + 15 - y(), ease: 4 * EYE }))
-    turn(-Math.PI / 2, FINALE.returnZ - INNER_Z)
+    b.mark('straight', () => straightTo(b, 'z', FINALE.northZ - FINALE.corner, { rise: STATION.y + 15 - y(), ease: 4 * EYE }))
+    turn(-Math.PI / 2, FINALE.corner)
     b.mark('straight', () => straightTo(b, 'x', FINALE.brakeFrom, { rise: STATION.y - y(), ease: 4 * EYE }))
   })
   zone('brake', SPEED.brake, () => {
-    b.mark('straight', () => straightTo(b, 'x', HOME_X))
-    turn(Math.PI, (STATION.z - FINALE.returnZ) / 2)
+    b.mark('straight', () => straightTo(b, 'x', HOME.x))
+    turn(-Math.PI / 2, HOME.radius)
+    b.mark('straight', () => straightTo(b, 'z', STATION.z + HOME.radius))
+    turn(-Math.PI / 2, HOME.radius)
   })
   b.mark('straight', () => straightTo(b, 'x', STATION.x - SPACING))
   return {

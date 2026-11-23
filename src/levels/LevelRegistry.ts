@@ -79,8 +79,8 @@ const LEVELS: LevelConfig[] = [
     ...paceLevel({
       waves: [
         // Sharks first; the jellyfish arrive as the car dives into the glass tunnel (~14 s).
-        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 3 },
-        { type: 'jellyfish', count: 20, waveLabel: 'Into the Deep!', weight: 2 },
+        { type: 'jellyfish', count: 20, waveLabel: 'Into the Deep!', weight: 3 },
+        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 2 },
         { type: 'jellyfish', count: 24, waveLabel: 'Jellyfish Bloom!', weight: 2 },
         { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 3 },
       ],
@@ -89,8 +89,8 @@ const LEVELS: LevelConfig[] = [
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
       hasWater: true,
-      /** Through the gap between two islands, out where the sea runs on past the drawn terrain, ~30 s in and gone before the Kraken. */
-      whale: { startSeconds: 31.25, lead: 3700, aim: 0.1 },
+      /** Out to sea down the south channel, past the drawn terrain, dead ahead as the car tips over the first drop (~12 s). */
+      whale: { startSeconds: 11, lead: 4000, aim: 0.2 },
     },
   },
   {
