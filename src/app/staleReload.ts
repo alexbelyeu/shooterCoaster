@@ -49,7 +49,12 @@ export const isReloadDue = (): boolean => due
 
 /** Reloads the page if a reload is due and this session hasn't already reloaded for one; true when it does. */
 export function reloadIfDue(): boolean {
-  if (!due || !claimReload(sessionStore())) return false
+  if (!due) return false
+  // This session already reloaded once: drop the flag so results stops treating a reload as pending.
+  if (!claimReload(sessionStore())) {
+    due = false
+    return false
+  }
   window.location.reload()
   return true
 }
