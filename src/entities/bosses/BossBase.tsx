@@ -218,7 +218,9 @@ export default function BossBase({
         return
       }
       part.visible = false
-      const defeats = isDefeated(stateRef.current) && clock.current.defeatedAt < 0
+      pop.active = false
+      // The last pop to end defeats it: a part shot just before the final one can still be popping.
+      const defeats = isDefeated(stateRef.current) && clock.current.defeatedAt < 0 && !fx.some((f) => f.pop.active)
       finishKillPop(pop, part, part.getWorldPosition(new THREE.Vector3()), deathStyle, defeats ? { bossPart: w.id, big: true } : { bossPart: w.id })
       if (!defeats) return
       clock.current.defeatedAt = clock.current.age
