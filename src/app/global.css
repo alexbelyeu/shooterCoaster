@@ -886,6 +886,44 @@ canvas {
   100% { opacity: 0; transform: scale(1); }
 }
 
+/* The ghost of the best run (#844, ui/hud/GhostCrosshair): a dashed sky ring on a tar keyline, see-through, under the
+   player's reticle; the anchor sits on the recorded aim. Its shots flick it: a swell (reduced motion: the colour alone). */
+.ghost-crosshair {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 19;
+  opacity: 0.6;
+}
+.ghost-crosshair::before,
+.ghost-crosshair::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+}
+.ghost-crosshair::before {
+  inset: -15px;
+  border: 2px dashed var(--fair-sky);
+  outline: 2px solid var(--fair-tar);
+}
+.ghost-crosshair::after {
+  inset: -3px;
+  background: var(--fair-sky);
+  outline: 1px solid var(--fair-tar);
+}
+.ghost-crosshair.is-firing::before { animation: sc-ghost-ink 0.14s ease-out, sc-ghost-swell 0.14s ease-out; }
+@keyframes sc-ghost-ink {
+  from { border-color: var(--fair-cream); }
+}
+@keyframes sc-ghost-swell {
+  from { transform: scale(1.3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ghost-crosshair.is-firing::before { animation-name: sc-ghost-ink; }
+}
+.reduce-motion .ghost-crosshair.is-firing::before { animation-name: sc-ghost-ink; }
+
 /* Level select (docs/art/PERSONALITY.md): each world a ride board hung over the park, its name plate the only place the
    level's own colour (--plate, the biome accent from src/ui/theme.ts) shows; the Daily Run a paper ticket. */
 .level-select {

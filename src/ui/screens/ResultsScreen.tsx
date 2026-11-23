@@ -19,6 +19,8 @@ import ResultsLeaderboard from './ResultsLeaderboard'
 import ResultsMarquee from './ResultsMarquee'
 import { FairBoard, FairStars } from '@/ui/Fair'
 import { isNewBuildLive, reloadForNewBuild } from '@/app/staleReload'
+import { saveGhost } from '@/combat/ghost'
+import { recording } from '@/combat/ghostTrack.hot'
 
 const fmt = new Intl.NumberFormat('en-US')
 
@@ -145,6 +147,8 @@ export default function ResultsScreen() {
       else void online?.top({ daily: day }).then((top) => top && show(top, null))
       return
     }
+    // Only a new campaign best leaves a ghost (a daily returned above).
+    if (record) saveGhost(config.id, recording)
     const placed = store.addLeaderboardEntry(config.id, { score: run.score, stars, date: run.date })
     setRank(placed)
     if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
@@ -159,7 +163,7 @@ export default function ResultsScreen() {
       submitOnline.current = null
       void submit(letters)
     }
-  }, [config, run, stars, online])
+  }, [config, run, stars, online, record])
 
   useEffect(() => () => submitOnline.current?.(lettersRef.current), [])
 

@@ -15,6 +15,7 @@ import PauseScreen from '@/ui/screens/PauseScreen'
 import ResultsScreen from '@/ui/screens/ResultsScreen'
 import MuteButton from '@/ui/MuteButton'
 import Crosshair from '@/combat/Crosshair'
+import GhostCrosshair from '@/ui/hud/GhostCrosshair'
 import ScorePopups from '@/effects/ScorePopups'
 import WaveAnnouncement from '@/ui/hud/WaveAnnouncement'
 import { startTitleMusic, stopTitleMusic } from '@/audio/titleMusic'
@@ -182,6 +183,7 @@ export default function App() {
 
       {!photo && <MuteButton />}
 
+      {phase === 'playing' && <GhostCrosshair />}
       {showCrosshair && <Crosshair />}
 
       {phase === 'playing' && <ScorePopups />}

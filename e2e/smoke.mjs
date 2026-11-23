@@ -534,6 +534,8 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   problems.push(...shot.problems)
   const pad = freshShot && id === 'level1' ? await gamepadProblems(page, id) : null
   if (pad) problems.push(...pad.problems)
+  const ghost = freshShot && id === 'level1' ? await ghostProblems(page, id) : null
+  if (ghost) problems.push(...ghost.problems)
   // These checks are about the level's waves: its boss (slams, weak points, its own death style) is the boss step's.
   const played = await page.evaluate(() => ({ levelTime: window.__SC_TEST__.nextWave()?.levelTime ?? null, boss: window.__SC_TEST__.boss().stage }))
   if (played.boss !== 'none' && played.boss !== 'waiting') problems.push(`the boss arrived during play (stage ${played.boss} at ${played.levelTime?.toFixed(1)} s of level time)`)
@@ -631,6 +633,7 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
       audioBurst: audio.burst,
       freshShot: shot.result,
       gamepad: pad?.result ?? null,
+      ghost: ghost?.result ?? null,
       endLevelTime: played.levelTime,
     },
     kills: combat.kills,
@@ -727,6 +730,56 @@ async function freshShotProblems(page, id, { fresh }) {
   capProblem(bullets.screenFrac, 'the fresh shot at the muzzle')
   capProblem(inFlight.bullets.maxScreenFrac, 'a bullet in flight')
   return { problems, result }
+}
+
+/** Right of the centre and a little high: clear of the player's reticle, which the smoke leaves mid-screen. */
+const GHOST_AT = { x: 0.62, y: 0.45 }
+
+/**
+ * Ghost replay (#844): a ghost stored for the level as a best run's would be, aiming at `GHOST_AT` throughout, then a
+ * pause and back (the ghost loads as play starts), game time frozen. Its ring must show there, translucent;
+ * `<id>-ghost.png` is it beside the player's reticle. The ghost is removed after, so the run's end must store its own
+ * (`resultsScreenProblems`).
+ */
+async function ghostProblems(page, id) {
+  const problems = []
+  if ((await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return { problems, result: { skipped: true } }
+  await page.evaluate(([lid, at]) => {
+    // src/combat/ghost.ts's format: `1;stepMs;base64`, three bytes a sample (x 10 bits, y 10, flags 2).
+    const x = Math.round(at.x * 1023)
+    const y = Math.round(at.y * 1023)
+    const sample = String.fromCharCode(x & 255, (x >> 8) | ((y & 63) << 2), y >> 6)
+    localStorage.setItem(`shootercoaster-ghost:${lid}`, `1;50;${btoa(sample.repeat(1200))}`)
+    const s = window.__SC_TEST__
+    s.setTimeScale(0)
+    s.setPhase('paused')
+  }, [id, GHOST_AT])
+  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+  await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
+  await waitFrames(page, 3, { maxMs: 8000, pollMs: 40 })
+  const seen = await page.evaluate(() => {
+    const el = document.querySelector('.ghost-crosshair')
+    const r = el?.getBoundingClientRect()
+    return {
+      shown: !!el && !el.hidden,
+      x: r ? r.left / window.innerWidth : null,
+      y: r ? r.top / window.innerHeight : null,
+      opacity: el ? Number(getComputedStyle(el).opacity) : null,
+    }
+  })
+  await page.screenshot({ path: path.join(OUT, `${id}-ghost.png`), timeout: SHOT_TIMEOUT })
+  await page.evaluate((lid) => {
+    localStorage.removeItem(`shootercoaster-ghost:${lid}`)
+    window.__SC_TEST__.setTimeScale(1)
+  }, id)
+  if (!seen.shown) problems.push('ghost: a seeded ghost drew no ghost crosshair')
+  else {
+    if (Math.abs(seen.x - GHOST_AT.x) > 0.01 || Math.abs(seen.y - GHOST_AT.y) > 0.01) {
+      problems.push(`ghost: drawn at (${seen.x.toFixed(2)}, ${seen.y.toFixed(2)}) of the view, not its recorded aim (${GHOST_AT.x}, ${GHOST_AT.y})`)
+    }
+    if (!(seen.opacity > 0.2 && seen.opacity < 0.9)) problems.push(`ghost: opacity ${seen.opacity}, not translucent`)
+  }
+  return { problems, result: seen }
 }
 
 /**
@@ -865,6 +918,8 @@ async function resultsScreenProblems(page, id, stats, { share }) {
   if (!screen) return { problems: ['results screen missing'], screen }
   const { text, ...shown } = screen
   problems.push(...(await resultsActionsProblems(page, 'desktop')))
+  // #844: the run's best, kept on the level, leaves a ghost for its next ride.
+  if (stats.score > 0 && !(await page.evaluate((lid) => localStorage.getItem(`shootercoaster-ghost:${lid}`), id))) problems.push(`no ghost stored for ${id}'s best run`)
   if (share) {
     // #87: the shared line can't drift from the run (score, stars, level) or lose its campaign link.
     const shareRe = /^I scored ([\d,]+) ([★☆]{3}) on (.+) in ShooterCoaster 🎢 — beat me: (\S+)$/u
@@ -3068,8 +3123,8 @@ async function settingsLayout(page, label, { fromTitle = false } = {}) {
   if (r.hScroll) problems.push('settings scroll sideways')
   if (r.quality.length !== 4) problems.push(`${r.quality.length} quality options (${r.quality.join('/')}), expected Auto / Low / Med / High`)
   if (r.sliders !== 2) problems.push(`${r.sliders} volume sliders, expected music + effects`)
-  const switches = fromTitle ? 3 : 2
-  if (r.switches !== switches) problems.push(`${r.switches} switches, expected show FPS + reduced motion${fromTitle ? ' + internal device' : ''}`)
+  const switches = fromTitle ? 4 : 3
+  if (r.switches !== switches) problems.push(`${r.switches} switches, expected show FPS + ghost + reduced motion${fromTitle ? ' + internal device' : ''}`)
   if (r.smallTargets) problems.push(`${r.smallTargets} settings control(s) under the 44 px touch target`)
   return { ...r, problems: problems.map((p) => `${label}: ${p}`) }
 }
