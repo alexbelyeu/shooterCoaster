@@ -148,7 +148,7 @@ When level6 is in the run, the step first rides the coaster to 0.59 of the lap, 
 rather than coming to the rider) and summons her: after 2 s of game time (she has risen out of the star) at least three of
 her first four snakes must be on screen (`level6-boss.png`); it clears them, lets her second four uncoil (`midPhases`: a
 phase between the first and the last) and clears those, then only the crown snake is exposed (`level6-boss-crown.png`;
-with her leant out it then rides to 0.627 and 0.64 of the lap, `level6-boss-pass-63.png` / `-64.png`, the turn away round her shoulder; the checks and their lap fractions are in `e2e/bossChecks.mjs`, held to each boss's arrival on the ride by `bossChecks.test.ts`)
+with her ducked back into the star for it (#856) it then rides to 0.627 and 0.64 of the lap, `level6-boss-pass-63.png` / `-64.png`, the turn away round her shoulder; the checks and their lap fractions are in `e2e/bossChecks.mjs`, held to each boss's arrival on the ride by `bossChecks.test.ts`)
 before she laughs and sinks back into the star in a chalk burst (`level6-boss-down.png`).
 Every boss must fit its fight window (#452: the boss arrives at 40 s of the 60 s run): the game seconds it moved before
 each phase was on screen plus every weak point's hp at 2 hits a second must be ≤ 20 s (`fight` on the summary line).

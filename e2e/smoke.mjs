@@ -2470,7 +2470,7 @@ async function bossCheck(page, check) {
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const surfaced = await stepBoss(page, midSettleS, { exposed: 1 })
   await page.screenshot({ path: path.join(OUT, `${level}-${midShot}.png`), timeout: SHOT_TIMEOUT })
-  // Leant out for her last phase: the ride's last stretch past her, for a look that it stays clear of her bust.
+  // Ducked back for her last phase: the ride's last stretch past her, for a look that it stays clear of her bust.
   for (const t of passShots) {
     await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, t)
     await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })

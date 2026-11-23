@@ -9,7 +9,7 @@
  * in <level>-boss.png, each then shot through processHit as a normal kill that leaves the boss's hp alone. `midPhases`: phases
  * between the first and the last, each cleared after `midSettleS`. `rideTo`: the track fraction to ride to first, for a boss
  * that stays where it is (the Medusa in the Starr) rather than coming to the rider. `passShots`: track fractions ridden to
- * after `midShot`, each a `<level>-boss-pass-<percent>.png` (the ride past the leant-out Medusa). Both are fractions of the
+ * after `midShot`, each a `<level>-boss-pass-<percent>.png` (the ride past the Medusa, ducked for her last phase). Both are fractions of the
  * lap, so they move whenever the track is reshaped: `bossChecks.test.ts` holds `rideTo` to the boss's first 4 s on the
  * ride (#769 moved the Medusa from 0.69 to 0.59 of the lap and the step rode on to 0.7, past her) and `passShots` to after it.
  */

@@ -76,6 +76,7 @@ export default function Medusa(props: BossProps) {
       placed: false,
       phaseAt: [FIRST_SNAKES_AT, null, null] as (number | null)[],
       lean: 0,
+      duck: 0,
       spin: 0,
       burst: false,
     }),
@@ -135,11 +136,13 @@ export default function Medusa(props: BossProps) {
       const fighting = sinceDefeat < 0
       const phase = currentPhase(state)
       if (phase > 0 && sim.phaseAt[phase] === null) sim.phaseAt[phase] = age
-      const leanTarget = sim.phaseAt[1] !== null ? 1 : 0
-      sim.lean += (leanTarget - sim.lean) * (1 - Math.exp(-dt / LEAN_TAU))
+      const ducked = sim.phaseAt[2] !== null
+      const ease = 1 - Math.exp(-dt / LEAN_TAU)
+      sim.lean += ((sim.phaseAt[1] !== null && !ducked ? 1 : 0) - sim.lean) * ease
+      sim.duck += ((ducked ? 1 : 0) - sim.duck) * ease
 
-      // Rise out of the hub, lean out in phase 2, laugh and sink back on defeat; turn a little towards the rider.
-      bodyPlacement(age, sim.lean, sinceDefeat, _place)
+      // Rise out of the hub, lean out in phase 2, draw back and duck in phase 3, laugh and sink back on defeat; turn a little towards the rider.
+      bodyPlacement(age, sim.lean, sim.duck, sinceDefeat, _place)
       camera.getWorldPosition(_cam)
       _p.subVectors(_cam, HUB)
       const yaw = yawToward(_p.x * FACING.z - _p.z * FACING.x, _p.x * FACING.x + _p.z * FACING.z)
