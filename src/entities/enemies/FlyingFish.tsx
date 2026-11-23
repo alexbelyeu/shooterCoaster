@@ -4,19 +4,13 @@ import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { WATER_Y } from '@/entities/spawning/enemyPlacement'
 import { useMarch } from './useMarch'
-import {
-  FFISH_BODY_GEO, FFISH_WING_GEO, FFISH_TAIL_UPPER_GEO, FFISH_TAIL_LOWER_GEO,
-  FFISH_DORSAL_GEO, FFISH_EYE_GEO,
-  FFISH_BODY_MAT, FFISH_BELLY_MAT, FFISH_WING_MAT,
-  FFISH_TAIL_MAT, FFISH_FIN_MAT, FFISH_EYE_MAT,
-} from './SharedEnemyAssets'
+import { FFISH_GEO, FFISH_MAT, FFISH_WING_GEO, FFISH_WING_MAT } from './SharedEnemyAssets'
 
 const GRAVITY = 0.08
 
 /**
- * Overhauled flying fish: LatheGeometry body, swept-back wing-fins,
- * forked tail, dorsal fin. Leaps in parabolic arcs.
- * Wings spread when airborne, fold when submerged.
+ * A flying fish in three draw calls: its painted body (lathe body and belly, dorsal fin, forked tail, eyes) and two
+ * swept-back wing-fins. Leaps in parabolic arcs, wings spread when airborne, folded when submerged.
  */
 export default function FlyingFish(props: EnemyProps) {
   // One speed for the whole school, or it strings out.
@@ -72,23 +66,7 @@ export default function FlyingFish(props: EnemyProps) {
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group ref={bodyRef} scale={[8, 8, 8]} rotation={[0, -moveAngle + Math.PI / 2, 0]}>
-        {/* Body — lathe, rotated so length runs along Z */}
-        <mesh
-          geometry={FFISH_BODY_GEO}
-          material={FFISH_BODY_MAT}
-          rotation={[Math.PI / 2, 0, 0]}
-          position={[0, 0, -1]}
-          scale={[1, 1, 0.7]}
-        />
-
-        {/* Belly — lighter underside */}
-        <mesh
-          geometry={FFISH_BODY_GEO}
-          material={FFISH_BELLY_MAT}
-          rotation={[Math.PI / 2, 0, 0]}
-          position={[0, -0.4, -1]}
-          scale={[0.8, 0.8, 0.4]}
-        />
+        <mesh geometry={FFISH_GEO} material={FFISH_MAT} />
 
         {/* Left wing-fin */}
         <group ref={leftWingRef} position={[-1, 0, 0.5]}>
@@ -99,23 +77,6 @@ export default function FlyingFish(props: EnemyProps) {
         <group ref={rightWingRef} position={[1, 0, 0.5]}>
           <mesh geometry={FFISH_WING_GEO} material={FFISH_WING_MAT} />
         </group>
-
-        {/* Dorsal fin */}
-        <mesh
-          position={[0, 1.2, 0]}
-          geometry={FFISH_DORSAL_GEO}
-          material={FFISH_FIN_MAT}
-        />
-
-        {/* Tail — forked */}
-        <group position={[0, 0, -3]}>
-          <mesh geometry={FFISH_TAIL_UPPER_GEO} material={FFISH_TAIL_MAT} />
-          <mesh geometry={FFISH_TAIL_LOWER_GEO} material={FFISH_TAIL_MAT} />
-        </group>
-
-        {/* Eyes */}
-        <mesh position={[-0.6, 0.4, 2]} geometry={FFISH_EYE_GEO} material={FFISH_EYE_MAT} />
-        <mesh position={[0.6, 0.4, 2]} geometry={FFISH_EYE_GEO} material={FFISH_EYE_MAT} />
       </group>
     </EnemyBase>
   )

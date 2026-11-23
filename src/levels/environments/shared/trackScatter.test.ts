@@ -13,24 +13,24 @@ import {
   sampleTrackPath,
 } from '@/utils/terrainNoise'
 
-const level = getLevelConfig('level5')!
+const level = getLevelConfig('level2')!
 const { track } = level
-if (track.curve === 'spline') throw new Error('level5 rides a trig curve')
+if (track.curve === 'spline') throw new Error('level2 rides a trig curve')
 const curve = createTrackCurve(track)
 const table = buildArcTable(curve)
 const index = buildTrackIndex(table)
-const heightFn = createHeightFunction('volcanic', sampleTrackPath((t) => curve.getPointAt(t)))
-const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize('volcanic'))
+const heightFn = createHeightFunction('desert', sampleTrackPath((t) => curve.getPointAt(t)))
+const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize('desert'))
 
 describe('trackExtent', () => {
-  it('matches the varC * 13 * scalar rule for level5', () => {
+  it('matches the varC * 13 * scalar rule for level2', () => {
     const extent = trackExtent(table)
     expect(extent).toBeLessThanOrEqual(track.varC * 13 * track.scalar * 1.01)
     expect(extent).toBeGreaterThan(track.varC * 13 * track.scalar * 0.5)
   })
 })
 
-describe('scatterNearTrack (level5)', () => {
+describe('scatterNearTrack (level2)', () => {
   const opts = {
     count: 150,
     track: table,
@@ -66,7 +66,7 @@ describe('scatterNearTrack (level5)', () => {
   })
 })
 
-describe('settleOnGround (level5, ice crystal settings)', () => {
+describe('settleOnGround (level2, ice crystal settings)', () => {
   const count = 70
   const footprint = 10
   const height = 60
