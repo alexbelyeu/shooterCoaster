@@ -2785,10 +2785,23 @@ async function switchCheck(page, { darkShots = false } = {}) {
     await api((x) => { window.__SC_TEST__.rideTo = x }, t)
     await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   }
+  // Held at its start from its first frame (#779): ridden on the frame time until levelReady, a slow runner's car passed
+  // the sign before the step parked behind it, and the switch, closed for the run once passed, ignored the shot.
   const start = async () => {
-    if (!(await startLevelReady(page, level))) return false
+    await api(([lid, seed]) => {
+      const s = window.__SC_TEST__
+      s.timerStep = 0
+      s.rideRate = 0
+      s.startLevel(lid, seed)
+    }, [level, SEED])
+    if (!(await levelReady(page))) return false
     await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
-    await api(() => window.__SC_TEST__.setTimeScale(0))
+    await api(() => {
+      const s = window.__SC_TEST__
+      s.setTimeScale(0)
+      s.timerStep = null
+      s.rideRate = null
+    })
     return true
   }
   if (!(await start())) return { id: 'switch', problems: [NOT_LOADED(level)] }

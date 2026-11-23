@@ -160,8 +160,10 @@ When level1 is in the run, a `night` step (#829, nightly) rides its Night Ride (
 to the ride step's moment: the run must be `night`, the sky band (top 30%) dark (`NIGHT_CHECK.maxSkyLuma`), the enemies as
 readable as the ride's probe asks (`level1-night-enemy.png`) and the scene inside level1's `scene` budget (`level1-night.png`).
 When level6 is in the run, a `switch` step (#702, on the PR in the `level6` shard) checks the shoot-to-switch junction
-(`trackSwitch()`): it parks the coaster behind the V2 sign with time frozen (`level6-switch.png`) and shoots it with a real
-bullet, which must set the hard way and ride the V8 branch at the junction's middle (`riding: 'hard'`, `level6-switch-hard.png`);
+(`trackSwitch()`): it starts the level held at its start from its first frame (`timerStep` and `rideRate` 0 until
+`levelReady`: ridden on the frame time, a slow runner's car passed the sign while the scene warmed up, and a switch the car
+has passed is closed for the run, #779; `open` is false then), parks the coaster behind the V2 sign with time frozen
+(`level6-switch.png`) and shoots it with a real bullet, which must set the hard way and ride the V8 branch at the junction's middle (`riding: 'hard'`, `level6-switch-hard.png`);
 a restart must set it back, and a run that leaves it must ride the easy way with the switch closed by then.
 The hard route's own wave (#720, `SWITCH_CHECK.branchWave`): after the shot the level timer jumps to its second, and it must
 arrive (its banner) and show at least `BRANCH_WAVE_ON_SCREEN` rats on screen from the branch's middle; at the end of the

@@ -90,7 +90,7 @@ and clear; the same browser crashed minutes later, so unconfirmed: watch the nex
 
 Programs after warm-up +0 on every level. Every level's longest no-target gap is 1 s. Level 6 now has
 41 targets on screen at its probe (lanternfly swarms and climbers) and is the slowest frame here: the
-Neo verdict (#561) matters most on it. Bundle: **total 635 KB gz (budget 635 → 665 in this PR),
+Neo verdict (#561) matters most on it. Bundle: **total 635 KB gz (budget 635 → 665 in #885),
 largest chunk 173 (260), startup 436 (436)**; `LevelScene` 158 KB gz. Lighthouse: SEO / A11y / BP 100,
 Performance 41 mobile / 59 desktop (report only).
 
