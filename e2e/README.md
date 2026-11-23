@@ -136,7 +136,10 @@ When level3 is in the run, the same `boss` step summons the Kraken: after 3 s of
 above the water (`level3-boss.png`, only pads exposed), and after the pads go the head must surface with only its eye exposed
 (`level3-boss-head.png`) before the eye is shot and it sinks in a splash (`level3-boss-down.png`).
 When level4 is in the run, the same `boss` step summons the Yeti: after 4 s of game time (it climbs its ridge, roars and
-throws) both fists must be on screen and ≥ 1 snowball in flight (`level4-boss.png`, only the fists exposed; `boss().projectiles`).
+throws) both fists must be on screen and ≥ 1 snowball in flight inside the frame, not on its edge (`level4-boss.png`, only the fists
+exposed; `boss().projectiles`, each within 0.9 NDC). The Yeti picks its ridge off the rider's place, so the step summons it with the
+ride frozen at `summonAt` (0.53 of the lap) and then holds the camera at `rideTo` (0.5), a little back, where its lob stays in the
+frame: the same view on any runner (#920; riding on through the arrival, the wall clock set where it landed).
 `projectileHit()` then shoots every live snowball: one kill and one combo step each, the boss's hp unchanged (they are left out
 of the per-weak-point kill count). Once the fists are broken it roars at once and only its chest is exposed
 (`level4-boss-chest.png`; between roars the chest is retracted) before it topples backwards into the snow (`level4-boss-down.png`).
