@@ -139,7 +139,7 @@ export interface BiomeDefinition {
   Features?: ComponentType<BiomeFeaturesProps>
   /** Ambient air particles around the camera (one draw call). */
   particles?: ParticleFieldPreset
-  /** An authored floor in place of the noise terrain (an interior: the gym's hall and its pit; its terrain config is `authoredFloor`); no track suppression. Read through `biomeHeightFunction`. */
+  /** An authored floor in place of the noise terrain (an interior: the gym's hall and its pit; its terrain config is `authoredFloor`); no track suppression. Read through `groundOf` (`worlds.ts`). */
   floor?: HeightFunction
   /** An interior's walls and roof, inset: enemies are placed inside them, never behind a wall. */
   bounds?: PlacementBounds

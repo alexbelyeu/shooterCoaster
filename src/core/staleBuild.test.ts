@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GamePhase } from '@/types/game'
-import { claimReload, entryScriptSrc, isNewBuild, isReloadSafe, lazyChunk, onChunkFailure, RELOAD_GUARD_KEY } from './staleBuild'
+import { claimReload, entryScriptSrc, importWithRetry, isNewBuild, isReloadSafe, lazyChunk, onChunkFailure, RELOAD_GUARD_KEY } from './staleBuild'
 
 const missing = () => new TypeError('Failed to fetch dynamically imported module: https://scoaster.com/assets/engine-abc.js')
 
@@ -85,5 +85,21 @@ describe('when to reload', () => {
       },
     }
     expect(claimReload(readOnly)).toBe(false)
+  })
+})
+
+describe('importWithRetry', () => {
+  it('retries after each delay and resolves once an attempt succeeds', async () => {
+    const importer = vi.fn().mockRejectedValueOnce(new Error('a')).mockRejectedValueOnce(new Error('b')).mockResolvedValue('ok')
+    const waits: number[] = []
+    await expect(importWithRetry(importer, [10, 20], async (ms) => void waits.push(ms))).resolves.toBe('ok')
+    expect(importer).toHaveBeenCalledTimes(3)
+    expect(waits).toEqual([10, 20])
+  })
+
+  it('gives up with the last error when every attempt fails', async () => {
+    const importer = vi.fn().mockRejectedValue(new Error('down'))
+    await expect(importWithRetry(importer, [1], async () => {})).rejects.toThrow('down')
+    expect(importer).toHaveBeenCalledTimes(2)
   })
 })

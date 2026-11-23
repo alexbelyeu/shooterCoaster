@@ -78,7 +78,7 @@ const LEVELS: LevelConfig[] = [
     track: OCEAN_LEVEL_TRACK,
     ...paceLevel({
       waves: [
-        // Sharks first; the jellyfish arrive as the car dives into the glass tunnel (~14 s).
+        // "Into the Deep!": the jellyfish arrive as the car dives into the glass tunnel (~14 s).
         { type: 'jellyfish', count: 20, waveLabel: 'Into the Deep!', weight: 3 },
         { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 2 },
         { type: 'jellyfish', count: 24, waveLabel: 'Jellyfish Bloom!', weight: 2 },

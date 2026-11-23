@@ -292,7 +292,7 @@ async function captureEnemyCloseup(page, id, ridePng) {
 const getStats = (page) => page.evaluate(() => window.__SC_TEST__.stats())
 
 async function delayLevelChunk(page) {
-  await page.route(/\/LevelScene-[^/]*\.js$/, async (route) => {
+  await page.route(/\/(LevelScene|world-\w+)-[^/]*\.js$/, async (route) => {
     await new Promise((r) => setTimeout(r, LEVEL_CHUNK_DELAY_MS))
     await route.continue()
   })

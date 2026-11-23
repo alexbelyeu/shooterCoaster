@@ -28,8 +28,14 @@ export default function LoadingScreen() {
 
   useEffect(() => {
     let live = true
-    // A failed load returns to the title (`SceneManager`), unmounting this.
-    loadLevelScene().then(() => live && reportLoad(levelId, 'chunk', 1), () => {})
+    // The level core, then the level's world chunk (#862). A failed load returns to the title (`SceneManager`),
+    // unmounting this.
+    const biome = levelId ? getLevelConfig(levelId)?.biome : undefined
+    if (biome) {
+      loadLevelScene()
+        .then((core) => core.loadWorld(biome))
+        .then(() => live && reportLoad(levelId, 'chunk', 1), () => {})
+    }
     let settled = 0
     let frame = 0
     const tick = () => {

@@ -74,6 +74,11 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         ...(turntable && { input: [path.resolve(__dirname, 'turntable.html'), path.resolve(__dirname, 'rides.html')] }),
         output: {
+          // A world's chunk (#862, `levels/environments/worlds.ts`) is named after its biome: `world-desert-<hash>.js`.
+          chunkFileNames: (chunk) => {
+            const biome = /\/biomes\/(\w+)\/world\.ts$/.exec(chunk.facadeModuleId ?? '')?.[1]
+            return biome ? `assets/world-${biome}-[hash].js` : 'assets/[name]-[hash].js'
+          },
           manualChunks: {
             three: ['three'],
             r3f: ['@react-three/fiber', '@react-three/drei'],
