@@ -6,6 +6,7 @@ import { RUN_SECONDS } from '@/levels/pacing'
 import { waveWindows } from './waveSchedule'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
+import type { Vec3 } from '@/utils/vec3'
 import { maxReadableDistance } from '../enemies/enemyReadability'
 import {
   BYSTANDER_SPACING, ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, wallNormal, wallPoint, type Surface, type SwarmSlot, type WallSlot,
@@ -22,11 +23,7 @@ import { EYE_HEIGHT } from '@/track/trackDimensions'
  * rider's place on the track is.
  */
 
-export interface Vec3 {
-  x: number
-  y: number
-  z: number
-}
+export type { Vec3 }
 
 export type ChoreographedFormation = Exclude<Formation, 'scatter'>
 

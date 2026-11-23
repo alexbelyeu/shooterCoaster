@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, useIsPresent, type HTMLMotionProps } from 'framer-motion'
+import { m, useIsPresent, type HTMLMotionProps } from 'framer-motion'
 
 /**
  * One screen in App's `AnimatePresence mode="wait"` (#367). When an exit finishing and a phase change land in
@@ -12,5 +12,5 @@ export default function Screen({ exit, ...props }: HTMLMotionProps<'div'>) {
   const isPresent = useIsPresent()
   const [entered, setEntered] = useState(isPresent)
   if (isPresent && !entered) setEntered(true)
-  return <motion.div {...props} exit={entered ? exit : undefined} />
+  return <m.div {...props} exit={entered ? exit : undefined} />
 }
