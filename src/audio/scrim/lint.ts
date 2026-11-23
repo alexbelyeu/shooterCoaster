@@ -4,7 +4,8 @@
  */
 import type { CompiledSong, ScoreEvent, Timeline } from './score'
 
-const RANGES: Record<string, [number, number]> = {
+/** Each melodic instrument's useful range (MIDI, inclusive). */
+export const INSTRUMENT_RANGES: Readonly<Record<string, readonly [number, number]>> = {
   steeldrum: [55, 91], marimba: [45, 96], vibes: [53, 89], celesta: [60, 108], glock: [79, 108],
   xylophone: [65, 108], musicbox: [60, 100], bell: [55, 96],
   organ: [36, 96], pipe: [24, 96], harpsichord: [29, 89],
@@ -19,9 +20,6 @@ const RANGES: Record<string, [number, number]> = {
   riser: [48, 96], downlifter: [48, 96],
 }
 
-/** Each melodic instrument's useful range (MIDI, inclusive). */
-export const INSTRUMENT_RANGES: Readonly<Record<string, readonly [number, number]>> = RANGES
-
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const noteName = (m: number) => `${NAMES[m % 12]}${Math.floor(m / 12) - 1}`
 
@@ -29,7 +27,7 @@ const noteName = (m: number) => `${NAMES[m % 12]}${Math.floor(m / 12) - 1}`
 export function lintRanges(song: CompiledSong): string[] {
   const out: string[] = []
   song.voices.forEach((voice, vi) => {
-    const range = RANGES[voice.inst]
+    const range = INSTRUMENT_RANGES[voice.inst]
     if (voice.drum || !range) return
     let lo = Infinity, hi = -Infinity
     for (const tl of [song.intro, song.loop, song.boss, song.sting]) for (const e of tl.events) if (e.v === vi && e.m) for (const m of e.m) {
