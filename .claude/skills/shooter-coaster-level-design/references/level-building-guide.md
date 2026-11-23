@@ -358,7 +358,7 @@ Trees auto-place on terrain with slope rejection and biome-specific filtering.
 ## Per-Biome Feature Toggles
 
 Use props/config to control features per biome:
-- `goldenBalloonCount`: Only theme park gets golden balloons (pass 0 for other biomes)
+- `goldenBalloons` on the `LevelConfig`: bonus golden balloons (3 on level1; none when unset)
 - `hasTrees` + `treeCount`: Per-biome tree density
 - `hasWater`: Ocean biome only
 

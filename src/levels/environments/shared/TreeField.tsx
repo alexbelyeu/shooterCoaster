@@ -5,18 +5,25 @@ import { getTerrainSlope, type HeightFunction } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
 import { hslToRgb } from './scatter'
 import type { BiomeTreeConfig, TreeTypeConfig } from './types'
+import type { ArcTable } from '@/track/arcLength'
+import { buildTrackIndex } from './trackClearance'
 import { bakeCrownShade, CANOPY_PART, treeWindTime, TRUNK_PART, withTreeWind } from './treeWind'
+
+/** XZ gap from the track to a trunk, past the widest canopy: a ride running low through the trees (level 4's) stays clear. */
+const TREE_TRACK_CLEAR = 40
 
 /** Trees placed on terrain with slope rejection and biome variety, swaying in the wind; `seed` fixes the layout. */
 export default function TreeField({
   count,
   config,
   heightFn,
+  track,
   seed,
 }: {
   count: number
   config: BiomeTreeConfig
   heightFn: HeightFunction
+  track: ArcTable
   seed: number
 }) {
   const treeTypes = config.types
@@ -25,6 +32,7 @@ export default function TreeField({
   const trees = useMemo(() => {
     if (actualCount === 0 || treeTypes.length === 0) return []
     const rng = createRng(seed)
+    const trackIndex = buildTrackIndex(track)
     const arr: { x: number; y: number; z: number; height: number; color: string; typeIdx: number }[] = []
     const minR = config.minRadius
     const maxR = config.maxRadius
@@ -37,6 +45,7 @@ export default function TreeField({
       const theta = rng() * Math.PI * 2
       const x = Math.cos(theta) * r
       const z = Math.sin(theta) * r
+      if (trackIndex.near(x, z, TREE_TRACK_CLEAR)) continue
 
       const slope = getTerrainSlope(heightFn, x, z)
       if (slope > maxSlopeAngle) continue
@@ -57,7 +66,7 @@ export default function TreeField({
       })
     }
     return arr
-  }, [actualCount, config, heightFn, treeTypes, seed])
+  }, [actualCount, config, heightFn, track, treeTypes, seed])
 
   const groupedTrees = useMemo(() => {
     const groups: Map<number, typeof trees> = new Map()

@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { setFlashMaterial } from './hitFlash'
+import { leashedTurnRate, orbitStep } from './wanderLeash.hot'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
   LAVA_GOLEM_BODY_GEO, LAVA_GOLEM_FLARE_MAT, LAVA_GOLEM_GLOW, LAVA_GOLEM_HIP, LAVA_GOLEM_LEFT_ARM_GEO,
@@ -29,9 +30,11 @@ const tagFlare = (o: THREE.Object3D) => {
  * Five draw calls (body, two legs, two arms), one material and program.
  */
 export default function LavaGolem(props: EnemyProps) {
-  const { theta, moveSpeed, stepOffset } = useEnemyRandom(props.id, (rng) => ({
-    theta: 0.3 + rng() * 0.8, moveSpeed: 0.8 + rng() * 1.0, stepOffset: rng() * Math.PI * 2,
-  }))
+  const { theta, moveSpeed, stepOffset } = useEnemyRandom(props.id, (rng) => {
+    const turn = 0.3 + rng() * 0.8
+    const speed = 0.8 + rng() * 1.0
+    return { theta: leashedTurnRate(speed, turn), moveSpeed: speed, stepOffset: rng() * Math.PI * 2 }
+  })
   const modelRef = useRef<THREE.Group>(null)
   const rigRef = useRef<THREE.Group>(null)
   const leftLegRef = useRef<THREE.Mesh>(null)
@@ -44,8 +47,7 @@ export default function LavaGolem(props: EnemyProps) {
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
       const dt = delta * 60
-      mesh.position.z += ((moveSpeed * Math.cos(time * theta)) / theta) * dt
-      mesh.position.x += ((moveSpeed * Math.sin(time * theta)) / theta) * dt
+      orbitStep(mesh.position, time, dt, moveSpeed, theta)
       mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 2
 
       LAVA_GOLEM_GLOW.value = 1.8 + 0.7 * Math.sin(time * 2.6)

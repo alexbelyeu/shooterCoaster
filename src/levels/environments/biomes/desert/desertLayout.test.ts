@@ -9,7 +9,9 @@ import {
   sampleTrackPath,
 } from '@/utils/terrainNoise'
 import { trackExtent } from '../../shared/trackScatter'
-import { dustDevilCenter, layoutDesert, MESA_FOOTPRINT, MESA_HEIGHT } from './desertLayout'
+import {
+  dustDevilCenter, layoutDesert, MESA_CLIFF_RADIUS, MESA_FOOTPRINT, MESA_HEIGHT, MESA_SHADOW_RADIUS, MESA_TOP_RADIUS,
+} from './desertLayout'
 import { LANDMARK_FOOTPRINTS } from './landmarks'
 
 const level = getLevelConfig('level2')!
@@ -68,5 +70,11 @@ describe('layoutDesert (level 2)', () => {
       }
       expect(d.spin).not.toBe(0)
     }
+  })
+})
+
+describe('mesa radii (#289)', () => {
+  it('reads the occluder and shadow off the mesa shape: cliff foot, flat top, halfway down the talus', () => {
+    expect([MESA_CLIFF_RADIUS, MESA_TOP_RADIUS, MESA_SHADOW_RADIUS]).toEqual([100, 57, 120])
   })
 })

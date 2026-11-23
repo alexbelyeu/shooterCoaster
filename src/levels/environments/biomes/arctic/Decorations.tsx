@@ -3,15 +3,26 @@ import * as THREE from 'three'
 import type { BiomeDecorationsProps } from '../../shared/types'
 import { createRng } from '@/utils/rng'
 import { scatterPositions } from '../../shared/scatter'
+import { buildTrackIndex } from '../../shared/trackClearance'
 import IceCrystals from './IceCrystals'
 import SnowDrifts from './SnowDrifts'
 import { roundCaster } from '../../shared/contactShadows'
 import { useContactShadows } from '../../shared/ContactShadows'
 
-export default function ArcticDecorations(props: BiomeDecorationsProps) {
-  const { heightFn } = props
+const BOULDER_CLEAR = 40
+const COLUMN_CLEAR = 30
+/** The ice column's base radius (scale 1), which its contact shadow reads too. */
+const COLUMN_BASE_RADIUS = 4
 
-  const boulderPositions = useMemo(() => scatterPositions(createRng(2410), 80, 150, 3500, heightFn), [heightFn])
+export default function ArcticDecorations(props: BiomeDecorationsProps) {
+  const { heightFn, track } = props
+  // Level 4's ride runs low through the valley (#866): boulders and columns stand clear of it and its towers.
+  const trackIndex = useMemo(() => buildTrackIndex(track), [track])
+
+  const boulderPositions = useMemo(
+    () => scatterPositions(createRng(2410), 80, 150, 3500, heightFn).filter((p) => !trackIndex.near(p.x, p.z, BOULDER_CLEAR)),
+    [heightFn, trackIndex],
+  )
   const boulderGeo = useMemo(() => new THREE.DodecahedronGeometry(1, 0), [])
   const boulderMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#d8e0e8', flatShading: true }), [])
 
@@ -41,12 +52,15 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
     mesh.instanceMatrix.needsUpdate = true
   }, [boulderPositions, boulderConfigs])
 
-  const columnPositions = useMemo(() => scatterPositions(createRng(2411), 45, 200, 3500, heightFn), [heightFn])
+  const columnPositions = useMemo(
+    () => scatterPositions(createRng(2411), 45, 200, 3500, heightFn).filter((p) => !trackIndex.near(p.x, p.z, COLUMN_CLEAR)),
+    [heightFn, trackIndex],
+  )
   const columnGeo = useMemo(() => {
     const iceColumnPoints: THREE.Vector2[] = []
     for (let i = 0; i <= 12; i++) {
       const t = i / 12
-      const r = 4 * (1 - t * 0.7) + Math.sin(t * 6) * 0.3
+      const r = COLUMN_BASE_RADIUS * (1 - t * 0.7) + Math.sin(t * 6) * 0.3
       iceColumnPoints.push(new THREE.Vector2(r, t * 60))
     }
     return new THREE.LatheGeometry(iceColumnPoints, 10)
@@ -67,7 +81,7 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
       () => [
         ...boulderPositions.map((p, i) => roundCaster(p.x, p.z, boulderConfigs[i].s * 0.85, 0.4, 0.8)),
         // Translucent ice: a lighter shadow.
-        ...columnPositions.map((p, i) => roundCaster(p.x, p.z, 4 * columnScales[i], 0.3, 1.2)),
+        ...columnPositions.map((p, i) => roundCaster(p.x, p.z, COLUMN_BASE_RADIUS * columnScales[i], 0.3, 1.2)),
       ],
       [boulderPositions, boulderConfigs, columnPositions, columnScales],
     ),

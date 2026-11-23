@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { onlineEndpoint, onlineLeaderboard, runAccuracy, setOnlineEndpointOverride } from './onlineLeaderboard'
+import { onlineEndpoint, onlineLeaderboard, onlinePlan, runAccuracy, setOnlineEndpointOverride, worldRows } from './onlineLeaderboard'
 
 const top = [
   { initials: 'ABC', score: 900, at: '2026-11-05T12:00:00Z' },
@@ -19,11 +19,41 @@ describe('onlineEndpoint', () => {
     expect(onlineEndpoint(false, '')).toBeNull()
   })
 
+  it('still posts from an internal browser: the board is the game, not tracking', () => {
+    expect(onlineEndpoint(true, '?internal=1')).toBe('/api/leaderboard')
+  })
+
   it('takes the smoke\'s override either way', () => {
     setOnlineEndpointOverride('/api/leaderboard')
     expect(onlineEndpoint(false, '?e2e=1')).toBe('/api/leaderboard')
     setOnlineEndpointOverride(null)
     expect(onlineEndpoint(true, '')).toBeNull()
+  })
+})
+
+describe('onlinePlan', () => {
+  it('sends a campaign run that placed locally once its entry closes, and shows the board to one that missed', () => {
+    expect(onlinePlan('level2', null, true, true)).toEqual({ kind: 'submitOnEntry' })
+    expect(onlinePlan('level2', null, false, true)).toEqual({ kind: 'submitOnEntry' })
+    expect(onlinePlan('level2', null, true, false)).toEqual({ kind: 'show', board: { level: 'level2' } })
+  })
+
+  it("sends a daily's new best of the day at once and shows the day's board otherwise, whatever the local board says", () => {
+    expect(onlinePlan('level3', '2026-11-23', true, false)).toEqual({ kind: 'submitNow', daily: '2026-11-23' })
+    expect(onlinePlan('level3', '2026-11-23', false, true)).toEqual({ kind: 'show', board: { daily: '2026-11-23' } })
+  })
+})
+
+describe('worldRows', () => {
+  it("rates each row with the level's stars and keeps a bad date as 0", () => {
+    const rows = worldRows([...top, { initials: 'BAD', score: 100, at: 'nope' }], 1000, [0.3, 0.6, 0.9])
+    expect(rows.map((r) => [r.initials, r.score, r.stars])).toEqual([
+      ['ABC', 900, 3],
+      ['XYZ', 800, 2],
+      ['BAD', 100, 0],
+    ])
+    expect(rows[0].date).toBe(Date.parse(top[0].at))
+    expect(rows[2].date).toBe(0)
   })
 })
 
