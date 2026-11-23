@@ -1,6 +1,14 @@
 /** One Supabase table over its REST API (PostgREST) with plain fetch rather than supabase-js: one less client to keep out of the browser. */
 
-export class DbError extends Error {}
+export class DbError extends Error {
+  /** PostgREST's error code (`PGRST204`, a Postgres SQLSTATE…) when the response carried one. */
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message)
+  }
+}
 
 export type FetchImpl = (url: string, init: RequestInit) => Promise<Response>
 
@@ -21,7 +29,11 @@ export function restTable(env: Record<string, string | undefined>, table: string
     } catch {
       throw new DbError('unreachable')
     }
-    if (!res.ok) throw new DbError(`status ${res.status}`)
+    if (!res.ok) {
+      const body: unknown = await res.json().catch(() => null)
+      const code = body && typeof body === 'object' && 'code' in body && typeof body.code === 'string' ? body.code : undefined
+      throw new DbError(`status ${res.status}`, code)
+    }
     return res
   }
 }
