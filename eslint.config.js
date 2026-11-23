@@ -34,6 +34,17 @@ export default tseslint.config(
     },
   },
   {
+    // framer-motion's full `motion` component carries its animation engine into the startup JS (#861): the UI uses `m`
+    // under `LazyMotion strict` (App.tsx), which throws on a `motion.*` only when that screen renders.
+    files: SRC,
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: [{ name: 'framer-motion', importNames: ['motion'], message: 'Use `m` (App.tsx mounts LazyMotion strict, #861).' }] },
+      ],
+    },
+  },
+  {
     files: SRC,
     ignores: MATH_RANDOM_ALLOWED,
     rules: { 'sc/no-math-random': 'error' },

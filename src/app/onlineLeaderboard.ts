@@ -2,27 +2,18 @@
  * The online top 10 (`api/leaderboard.ts`, #365) and the Daily Run's (#854): every call resolves to null on any failure,
  * and the results screen keeps the local board (or a daily's local record).
  */
+import type { PublicEntry, Submission } from '../../api/_lib/rules'
+import type { LeaderboardEntry } from '@/types/game'
+import { computeStars } from '@/levels/scoring'
+import { isLiveSite } from './analyticsGate'
 
 export const ONLINE_ENDPOINT = '/api/leaderboard'
 export const ONLINE_TIMEOUT_MS = 3000
 
-export interface OnlineEntry {
-  initials: string
-  score: number
-  at: string
-}
+export type OnlineEntry = PublicEntry
 
-export interface OnlineSubmission {
-  level: string
-  initials: string
-  score: number
-  seed: number
-  kills: number
-  accuracy: number
-  version: string
-  /** A daily run's UTC day (`dailyKey`): it goes on that day's board, not the level's. */
-  daily?: string
-}
+/** The server's `Submission`, plus a daily run's UTC day (`dailyKey`): it goes on that day's board, not the level's. */
+export type OnlineSubmission = Submission & { daily?: string }
 
 export interface SubmitResult {
   /** 0-based, like the local board's; null when the run missed the online top 10. */
@@ -37,10 +28,22 @@ export function setOnlineEndpointOverride(endpoint: string | null | undefined): 
   endpointOverride = endpoint
 }
 
-/** Only scoaster.com's own build talks to the API: never dev, preview, CI, the portal build or `?e2e=1` (unless the smoke stubs it). */
+/** Unlike analytics, an internal browser (`?internal=1`) still posts: the World board is the game, not tracking. */
 export function onlineEndpoint(builtOnVercel: boolean, search: string): string | null {
   if (endpointOverride !== undefined) return endpointOverride
-  return builtOnVercel && !new URLSearchParams(search).has('e2e') ? ONLINE_ENDPOINT : null
+  return isLiveSite(builtOnVercel, search) ? ONLINE_ENDPOINT : null
+}
+
+/** `submitOnEntry`: once, on OK or as the screen closes with the initials entry still open. */
+export type OnlinePlan = { kind: 'submitNow'; daily: string } | { kind: 'submitOnEntry' } | { kind: 'show'; board: { level: string } | { daily: string } }
+
+export function onlinePlan(level: string, dailyKey: string | null, newBest: boolean, placedLocally: boolean): OnlinePlan {
+  if (dailyKey !== null) return newBest ? { kind: 'submitNow', daily: dailyKey } : { kind: 'show', board: { daily: dailyKey } }
+  return placedLocally ? { kind: 'submitOnEntry' } : { kind: 'show', board: { level } }
+}
+
+export function worldRows(top: readonly OnlineEntry[], maxScore: number, thresholds: readonly [number, number, number]): LeaderboardEntry[] {
+  return top.map((e) => ({ initials: e.initials, score: e.score, stars: computeStars(e.score, maxScore, thresholds), date: Date.parse(e.at) || 0 }))
 }
 
 const isEntry = (v: unknown): v is OnlineEntry => {

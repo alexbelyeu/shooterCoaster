@@ -27,7 +27,8 @@ const PC: Record<string, number> = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }
 const NOTE_RE = /^([A-Ga-g])(##|bb|#|b)?([0-8])$/
 const ACC: Record<string, number> = { '': 0, '#': 1, '##': 2, b: -1, bb: -2 }
 
-function noteToMidi(s: string): number | null {
+/** A note name (`C4`, `F#2`, `Bb3`; octaves 0–8) as MIDI, or null when it isn't one: the compiler's own reading. */
+export function noteToMidi(s: string): number | null {
   const m = NOTE_RE.exec(s)
   if (!m) return null
   return 12 * (+m[3] + 1) + PC[m[1].toLowerCase()] + ACC[m[2] || '']

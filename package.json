@@ -37,10 +37,12 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.172.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "esbuild": "^0.25.12",
     "eslint": "^9.39.5",
     "lighthouse": "13.5.0",
     "playwright": "^1.58.2",

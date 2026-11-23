@@ -25,7 +25,12 @@ export const MESA_RINGS: readonly RockRing[] = [
 ]
 export const MESA_JITTER = 0.08
 export const MESA_HEIGHT = 300
-export const MESA_FOOTPRINT = 140 * (1 + MESA_JITTER)
+export const MESA_FOOTPRINT = MESA_RINGS[0].r * (1 + MESA_JITTER)
+/** The cliff's foot above the talus apron and the flat top (scale 1): the sun-flare occluder's cone. */
+export const MESA_CLIFF_RADIUS = MESA_RINGS[2].r
+export const MESA_TOP_RADIUS = MESA_RINGS[MESA_RINGS.length - 1].r
+/** The contact shadow reaches halfway down the talus apron. */
+export const MESA_SHADOW_RADIUS = (MESA_RINGS[0].r + MESA_CLIFF_RADIUS) / 2
 
 export interface Mesa {
   x: number

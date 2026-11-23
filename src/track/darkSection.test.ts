@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { darkSectionDepth } from './darkSection.hot'
+import { darkSectionAt, darkSectionDepth } from './darkSection.hot'
 
 const cave = { from: 0.3, to: 0.4, ramp: 0.02, flashReach: 100 }
 
@@ -29,5 +29,7 @@ describe('darkSectionDepth', () => {
     const later = { from: 0.7, to: 0.8, ramp: 0.01, flashReach: 100 }
     expect(darkSectionDepth([cave, later], 0.75)).toBe(1)
     expect(darkSectionDepth([cave, later], 0.5)).toBe(0)
+    expect(darkSectionAt([cave, later], 0.75)).toBe(later)
+    expect(darkSectionAt([cave, later], 0.5)).toBeUndefined()
   })
 })

@@ -72,6 +72,11 @@ export function dropInternalEvents(storage: FlagStorage | null) {
   return <T>(event: T): T | null => (isInternalBrowser(storage) ? null : event)
 }
 
+/** scoaster.com's own build as a player loads it: never dev, `vite preview`, CI, the portal build or a test run (`?e2e`). */
+export function isLiveSite(builtOnVercel: boolean, search: string): boolean {
+  return builtOnVercel && !new URLSearchParams(search).has('e2e')
+}
+
 export function analyticsEnabled(builtOnVercel: boolean, search: string, internal: boolean): boolean {
-  return builtOnVercel && !internal && !new URLSearchParams(search).has('e2e')
+  return isLiveSite(builtOnVercel, search) && !internal
 }
