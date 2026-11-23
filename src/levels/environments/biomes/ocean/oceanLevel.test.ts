@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { OCEAN_LEVEL_TRACK } from './oceanLevel'
-import { OCEAN_TRACK } from './oceanTrack'
+import { OCEAN_LEVEL_TRACK, OCEAN_SEA_ARCH as SHIPPED_ARCH } from './oceanLevel'
+import { OCEAN_SEA_ARCH, OCEAN_TRACK } from './oceanTrack'
 
 describe('ocean level data', () => {
   it('is the built ride (regenerate with `node scripts/gen-ocean-level.mjs`)', () => {
@@ -17,7 +17,9 @@ describe('ocean level data', () => {
     expect(OCEAN_LEVEL_TRACK).toEqual({ ...JSON.parse(JSON.stringify(OCEAN_TRACK, round)), controlPoints })
   })
 
-  it('is what level 3 rides', () => {
+  it('is what level 3 rides, its sea arch with it', () => {
+    expect(SHIPPED_ARCH).toEqual(OCEAN_SEA_ARCH)
     expect(getLevelConfig('level3')!.track).toBe(OCEAN_LEVEL_TRACK)
+    expect(getLevelConfig('level3')!.environment.seaArch).toBe(SHIPPED_ARCH)
   })
 })

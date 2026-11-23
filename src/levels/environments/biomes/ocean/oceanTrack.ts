@@ -20,7 +20,7 @@
  *
  * `oceanTrack.test.ts` holds it to the beats and to its clearances (the seabed, the arch, the water over the tunnel).
  */
-import type { RideBeat, RideMechanic, RideV2Spec, SpeedZone, SplineTrackParams, TunnelSpec } from '@/types/level'
+import type { RideBeat, RideMechanic, RideV2Spec, SeaArchSpec, SpeedZone, SplineTrackParams, TunnelSpec } from '@/types/level'
 import { createSplineCurve } from '@/track/curves/SplineCurve'
 import { RideBuilder, type MarkerKind } from '@/track/elements/rideBuilder'
 import { airtimeHill, bankedTurn, corkscrew, helix } from '@/track/elements/elements'
@@ -54,6 +54,8 @@ const CAMEL = { toX: -480, rise: 60, crest: 150, angle: 30 * DEG } as const
 const WEST_X = -630
 /** The corkscrew north through the sea arch: its rails' height and length (one slow roll). */
 const CORK = { y: 12, fromZ: -330, length: 360 } as const
+/** The sea arch over the corkscrew: its opening's width and its crown's underside over the highest rail under it. */
+const ARCH = { span: 56, crownOver: 3.5 * EYE } as const
 /** The inner loop's line, east from the arch's corner (`CORNER` its radius) on the second lift. */
 const INNER_Z = 150
 const CORNER = 110
@@ -146,6 +148,22 @@ export function buildOceanRide(): OceanRide {
   }
 }
 
+/** The sea arch the corkscrew threads, across the rails at its middle: on the screw's axis, its crown `ARCH.crownOver` over the rails. */
+export function oceanSeaArch(ride: OceanRide = buildOceanRide()): SeaArchSpec {
+  const cork = ride.markers.find((m) => m.kind === 'corkscrew')!
+  const span = ride.points.slice(cork.from, cork.to + 1)
+  const mid = ride.points[Math.round((cork.from + cork.to) / 2)]
+  const first = span[0]
+  const last = span[span.length - 1]
+  return {
+    x: Math.round(span.reduce((sum, p) => sum + p.x, 0) / span.length),
+    z: Math.round(mid.z),
+    heading: Number(Math.atan2(last.x - first.x, last.z - first.z).toFixed(3)),
+    span: ARCH.span,
+    crownY: Math.round(Math.max(...span.map((p) => p.y)) + ARCH.crownOver),
+  }
+}
+
 /** The ride's v2 spec, mechanics, glass tunnel and the storyboard's beats placed on the built track. */
 export function buildOceanTrack(): SplineTrackParams {
   const ride = buildOceanRide()
@@ -177,3 +195,4 @@ export function buildOceanTrack(): SplineTrackParams {
 }
 
 export const OCEAN_TRACK: SplineTrackParams = buildOceanTrack()
+export const OCEAN_SEA_ARCH: SeaArchSpec = oceanSeaArch()

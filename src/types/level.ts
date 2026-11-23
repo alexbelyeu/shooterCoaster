@@ -213,6 +213,17 @@ export interface WhaleBreachSpec {
   aim: number
 }
 
+/** A rock arch standing across the rails, the ride threading it (#865: level 3's corkscrew through a sea stack). */
+export interface SeaArchSpec {
+  /** Where the arch crosses the rails, in plan, and the rails' heading there (radians, `atan2(dx, dz)`). */
+  x: number
+  z: number
+  heading: number
+  /** The opening: its width at the waterline's centre and the underside of its crown, in world y. */
+  span: number
+  crownY: number
+}
+
 export interface LevelConfig {
   id: string
   name: string
@@ -242,5 +253,7 @@ export interface LevelConfig {
     treeCount?: number
     /** Opt-in: an ocean level's whale breach; none when unset. */
     whale?: WhaleBreachSpec
+    /** Opt-in: a sea arch over the rails (Ocean's Features); none when unset. */
+    seaArch?: SeaArchSpec
   }
 }

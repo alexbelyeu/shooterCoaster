@@ -7,7 +7,9 @@ import { getTunnelDims } from '@/track/setPieces'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import type { TrackParams } from '@/types/level'
-import { buildOceanRide, OCEAN_TRACK } from './oceanTrack'
+import { createHeightFunction, sampleTrackPath } from '@/utils/terrainNoise'
+import { buildOceanRide, OCEAN_SEA_ARCH, OCEAN_TRACK } from './oceanTrack'
+import { ARCH_LEG_ANGLE, seaArchClearance, seaArchShape } from './seaArch'
 
 // The authored ride and the one the game ships (`oceanLevel.ts`, rounded by `gen-ocean-level.mjs`).
 describe.each([
@@ -63,5 +65,38 @@ describe.each([
       }
     }
     expect(closest).toBeGreaterThan(40)
+  })
+})
+
+describe("level 3's sea arch (#865)", () => {
+  const track = getLevelConfig('level3')!.track
+  const table = buildArcTable(createTrackCurve(track))
+  const { eyeHeight } = getTrackDimensions(track)
+  const arch = getLevelConfig('level3')!.environment.seaArch!
+
+  it('stands across the corkscrew, the rails threading it with the crown a near miss over the car', () => {
+    let nearest = Infinity
+    let threads = false
+    for (let i = 0; i < table.count; i++) {
+      nearest = Math.min(nearest, seaArchClearance(arch, { x: table.x[i], y: table.y[i], z: table.z[i] }))
+      if (Math.hypot(table.x[i] - arch.x, table.z[i] - arch.z) < 5) threads = true
+    }
+    expect(threads).toBe(true)
+    // The rider's head is within 0.8 eye-heights of the rails' axis in the screw: two eye-heights clear of the rock.
+    expect(nearest).toBeGreaterThan(2 * eyeHeight)
+    expect(nearest).toBeLessThan(5 * eyeHeight)
+  })
+
+  it('stands in the sea on legs whose ends are under the water', () => {
+    const curve = createTrackCurve(OCEAN_TRACK)
+    const ground = createHeightFunction('ocean', sampleTrackPath((t) => curve.getPointAt(t)))
+    const { radius, centreY } = seaArchShape(OCEAN_SEA_ARCH)
+    expect(centreY - radius * Math.sin(ARCH_LEG_ANGLE)).toBeLessThan(-10)
+    for (const side of [-1, 1]) {
+      const across = side * radius * Math.cos(ARCH_LEG_ANGLE)
+      const x = arch.x + across * Math.cos(arch.heading)
+      const z = arch.z - across * Math.sin(arch.heading)
+      expect(ground(x, z)).toBeLessThan(centreY - radius * Math.sin(ARCH_LEG_ANGLE))
+    }
   })
 })

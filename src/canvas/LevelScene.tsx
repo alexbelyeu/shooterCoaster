@@ -139,6 +139,7 @@ export default function LevelScene({ levelId }: { levelId: string }) {
           darkSections={track.darkSections}
           weather={levelWeather(enemies)?.kind}
           whale={environment.whale}
+          seaArch={environment.seaArch}
           hasWater={environment.hasWater}
           hasTrees={environment.hasTrees}
           treeCount={environment.treeCount}

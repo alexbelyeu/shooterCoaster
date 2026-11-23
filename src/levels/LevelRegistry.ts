@@ -3,7 +3,7 @@ import { paceLevel } from './pacing'
 // Level 6's track and walls as plain numbers: the blockout they are built from stays out of the startup JS (#589).
 // Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS.
 import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
-import { OCEAN_LEVEL_TRACK } from './environments/biomes/ocean/oceanLevel'
+import { OCEAN_LEVEL_TRACK, OCEAN_SEA_ARCH } from './environments/biomes/ocean/oceanLevel'
 import { GYM_LEVEL } from './environments/biomes/gym/gymLevel'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
@@ -91,6 +91,7 @@ const LEVELS: LevelConfig[] = [
       hasWater: true,
       /** Out to sea down the south channel, past the drawn terrain, dead ahead as the car tips over the first drop (~12 s). */
       whale: { startSeconds: 11, lead: 4000, aim: 0.2 },
+      seaArch: OCEAN_SEA_ARCH,
     },
   },
   {
