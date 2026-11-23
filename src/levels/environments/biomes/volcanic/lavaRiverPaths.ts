@@ -6,10 +6,8 @@ import { getTerrainMeshSize, TERRAIN_MESH_SEGMENTS } from '@/utils/terrainNoise'
 export const TERRAIN_CELL = getTerrainMeshSize('volcanic') / TERRAIN_MESH_SEGMENTS
 
 /**
- * A river is an arc round the track's centre: it starts `rStart` out at `angle` and turns through
- * `bend` radians while drifting out to `rEnd`. Arcs cross the ride's spokes (the track runs
- * out from and back to the centre on every lobe); a radial river lay along a spoke, and from the
- * coaster it stood up the middle of the view as a glowing wall (#331, `lavaRivers.test.ts`).
+ * An arc round the plain's centre from `rStart` at `angle`, turning `bend` radians out to `rEnd`; never along a sightline,
+ * where it stood up the view as a glowing wall (#331). The first is in the backwards stretch's view, for the Titan.
  */
 export interface LavaRiverConfig {
   angle: number

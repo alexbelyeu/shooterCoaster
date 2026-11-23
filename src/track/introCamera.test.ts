@@ -141,8 +141,7 @@ describe('tourPose', () => {
       const high = pos.y - s.seat.y >= 100 * s.scale || s.bounds !== undefined
       tourPose(s.tour, s.tour.marks.landmark, s.seat, s.dir, pos, dir)
       const looksAtLandmark = angleDeg(dir, v(s.anchor.x - pos.x, s.anchor.y - pos.y, s.anchor.z - pos.z)) < 20
-      // Off the landing (the last 2 % of the intro), never within 20 units × trackScale of the ground, nor lower over it
-      // than the seat is (level5's station sits in a cutting, its lava tube's mouth).
+      // Off the landing (the last 2 % of the intro), never within 20 units × trackScale of the ground, or the seat's own height.
       let lowest = Infinity
       for (let i = 0; i <= 500; i++) {
         tourPose(s.tour, (i / 500) * 0.98, s.seat, s.dir, pos, dir)

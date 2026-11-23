@@ -262,8 +262,7 @@ export function trackView(table: ArcTable, index: number, trackScale: number): T
   }
   const dir = lookAheadDirection(trackTangent(table, index), normalize(toAhead), { x: 0, y: 0, z: 0 })
   if (table.ups && Math.hypot(dir.x, dir.z) < 1e-3) {
-    // A drop track's shaft (#699) runs straight down: the car falls upright, looking level along the heading it came
-    // in on (`dropHeading`), which the rails' up holds there.
+    // A drop track's shaft points straight down; the car falls upright looking along `dropHeading`, the rails' up there.
     const up = trackUp(table, index)
     Object.assign(dir, normalize({ x: up.x, y: 0, z: up.z }))
   }

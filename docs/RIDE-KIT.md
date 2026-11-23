@@ -120,8 +120,10 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   a corkscrew through a sea stack's arch.
 - **Antarctica (4):** an ice-cave dark section (blue glow), a bobsled helix down a glacier, an
   airtime hill off a ridge with the aurora.
-- **Inferno (5):** a launch out of a lava tube, a drop-tower free fall inside the volcano, a
-  backwards section as the Titan rises behind you.
+- **Inferno (5):** built (#867, `volcanic/infernoTrack.ts`, its storyboard and seconds at the top): a station
+  launch through a glowing lava tube, a lift up the volcano's flank into a hole, a drop track falling inside the cone
+  (18 s), out through a second hole a few metres round the rider (the near miss), two camelbacks (30 s), a turntable
+  (38 s) and the Titan's whole fight ridden backwards facing him (40–57 s).
 
 ## Rules for building rides
 
