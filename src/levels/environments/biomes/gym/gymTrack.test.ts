@@ -15,7 +15,18 @@ import { gymFloor } from './config'
 import { BASE_VERTICAL_FOV, MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { MEDUSA_BODY, MEDUSA_HUB, MEDUSA_RISE, MEDUSA_SIZE, bustClearance, yawToward } from '@/entities/bosses/medusaMotion'
+import {
+  MEDUSA_BODY,
+  MEDUSA_HUB,
+  MEDUSA_RISE,
+  MEDUSA_SIZE,
+  SNAKE,
+  SNAKE_SLOTS,
+  bodyPlacement,
+  bustClearance,
+  laySnake,
+  yawToward,
+} from '@/entities/bosses/medusaMotion'
 import {
   ARCH,
   BLOCKOUT_BOXES,
@@ -49,6 +60,8 @@ const caveRoof = piece('floor', 'ewsmmqw')
 const CAVE = { minX: caveRoof.x - caveRoof.w / 2, maxX: caveRoof.x + caveRoof.w / 2, roof: caveRoof.base }
 /** Vertical half-angle of the view at the coaster camera's base FOV (narrow screens only widen it). */
 const VERTICAL_HALF_FOV = BASE_VERTICAL_FOV / 2
+/** Seconds from the Medusa's arrival that her crown snake stays in the rider's view (#856). */
+const CROWN_IN_VIEW_SECONDS = 2.5
 const N = 4000
 const DEG = 180 / Math.PI
 
@@ -271,48 +284,96 @@ describe('the gym track', () => {
     expect(GYM_TRACK.mechanics?.map((m) => m.kind)).toEqual(['station', 'junction', 'jumpGap', 'dropTrack'])
   })
 
+  /** The rider's view 0.1·`k` s from GO: the eye and the coaster camera's axes, as the star and crown tests see it. */
+  const view = (() => {
+    const look = { x: 0, y: 0, z: 0 }
+    const v = { eye: new THREE.Vector3(), forward: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3() }
+    const ahead = new THREE.Vector3()
+    const to = new THREE.Vector3()
+    return {
+      at(k: number) {
+        const s = profile[k] % table.length
+        const t = s / table.length
+        v.eye.copy(curve.getPointAt(t))
+        v.eye.y += dims.eyeHeight
+        ahead.copy(curve.getPointAt(tAtLoopDistance(table, s + LOOK_AHEAD_UNITS * dims.trackScale)))
+        ahead.y += dims.eyeHeight
+        ahead.sub(v.eye).normalize()
+        lookAheadDirection(curve.getTangentAt(t).clone(), ahead, look)
+        v.forward.set(look.x, look.y, look.z)
+        v.right.crossVectors(v.forward, THREE.Object3D.DEFAULT_UP).normalize()
+        v.up.crossVectors(v.right, v.forward)
+        return v.eye
+      },
+      /** In the narrowest view (narrow screens only widen it vertically). */
+      sees(p: { x: number; y: number; z: number }) {
+        to.set(p.x, p.y, p.z).sub(v.eye)
+        const depth = to.dot(v.forward)
+        const across = Math.atan2(to.dot(v.right), depth) * DEG
+        const vertical = Math.atan2(to.dot(v.up), depth) * DEG
+        return depth > 0 && Math.abs(across) <= MIN_HORIZONTAL_FOV / 2 && Math.abs(vertical) <= VERTICAL_HALF_FOV
+      },
+    }
+  })()
+
   it('comes out of the helix facing the star as the Medusa rises, and runs at her for 4 s (#700)', () => {
     const at = getLevelConfig('level6')!.boss!.at
     const star = toWorld(STAR.centre)
-    const look = { x: 0, y: 0, z: 0 }
-    const eye = new THREE.Vector3()
-    const ahead = new THREE.Vector3()
-    const right = new THREE.Vector3()
-    const up = new THREE.Vector3()
-    const forward = new THREE.Vector3()
-    const toStar = new THREE.Vector3()
-    // Every tenth of a second from her rise to 4 s after it, at the narrowest view.
+    // Every tenth of a second from her rise to 4 s after it.
     const unseen: number[] = []
     for (let k = at * 10; k <= (at + 4) * 10; k++) {
-      const s = profile[k] % table.length
-      const t = s / table.length
-      eye.copy(curve.getPointAt(t))
-      eye.y += dims.eyeHeight
-      const tangent = curve.getTangentAt(t).clone()
-      ahead.copy(curve.getPointAt(tAtLoopDistance(table, s + LOOK_AHEAD_UNITS * dims.trackScale)))
-      ahead.y += dims.eyeHeight
-      ahead.sub(eye).normalize()
-      lookAheadDirection(tangent, ahead, look)
-      forward.set(look.x, look.y, look.z)
-      right.crossVectors(forward, THREE.Object3D.DEFAULT_UP).normalize()
-      up.crossVectors(right, forward)
-      toStar.set(star.x, star.y, star.z).sub(eye)
-      const depth = toStar.dot(forward)
-      const across = Math.atan2(toStar.dot(right), depth) * DEG
-      const vertical = Math.atan2(toStar.dot(up), depth) * DEG
-      if (!(depth > 0 && Math.abs(across) <= MIN_HORIZONTAL_FOV / 2 && Math.abs(vertical) <= VERTICAL_HALF_FOV)) unseen.push(k / 10)
+      view.at(k)
+      if (!view.sees(star)) unseen.push(k / 10)
     }
     expect(unseen, 'seconds the star is off screen').toEqual([])
   })
 
-  it("keeps the rails and the camera clear of the Medusa's bust from her rise to the run's end, leant out or not", () => {
+  it("holds the Medusa's crown snake, her last phase ducked, in view for the run at her (#856)", () => {
+    const at = getLevelConfig('level6')!.boss!.at
+    const crown = SNAKE_SLOTS[SNAKE_SLOTS.length - 1]
+    const hub = new THREE.Vector3(...MEDUSA_HUB)
+    const facing = new THREE.Vector3(STAR.facing.x, 0, STAR.facing.z).normalize()
+    const place = { y: 0, z: 0, scale: 1, pitch: 0 }
+    bodyPlacement(10, 0, 1, -1, place)
+    // Her root as `Medusa.tsx` places it, turned towards the rider each step.
+    const root = new THREE.Object3D()
+    root.rotation.order = 'YXZ'
+    root.scale.setScalar(place.scale * MEDUSA_SIZE)
+    root.position.copy(hub).addScaledVector(facing, place.z * MEDUSA_SIZE)
+    root.position.y += place.y * MEDUSA_SIZE
+    const toEye = new THREE.Vector3()
+    const head = new THREE.Vector3()
+    const points = new Float32Array((SNAKE.segments + 1) * 3)
+    const n = SNAKE.segments * 3
+    const unseen: string[] = []
+    for (let k = at * 10; k <= (at + CROWN_IN_VIEW_SECONDS) * 10; k++) {
+      const eye = view.at(k)
+      toEye.subVectors(eye, hub)
+      root.rotation.set(place.pitch, Math.atan2(facing.x, facing.z) + yawToward(toEye.x * facing.z - toEye.z * facing.x, toEye.x * facing.x + toEye.z * facing.z), 0)
+      root.updateMatrixWorld()
+      toEye.copy(eye)
+      root.worldToLocal(toEye)
+      toEye.set(toEye.x - crown.root[0], toEye.y - crown.root[1], toEye.z - crown.root[2]).normalize()
+      // Swaying and rearing back, the strike cycle up to its lunge (struck at the rider it fills the view for a moment).
+      for (let f = 0; f < SNAKE.strikeAt; f += 0.05) {
+        laySnake(crown, f * crown.period - crown.offset, 1, true, [toEye.x, toEye.y, toEye.z], points)
+        head.set(points[n], points[n + 1], points[n + 2]).applyMatrix4(root.matrixWorld)
+        if (!view.sees(head)) unseen.push(`${k / 10} s, ${f.toFixed(2)} of its strike`)
+      }
+    }
+    expect(unseen, 'moments the crown snake is off screen').toEqual([])
+  })
+
+  it("keeps the rails and the camera clear of the Medusa's bust from her rise to the run's end, leant out, ducked or not", () => {
     /** Kept between her bust and the rails or the rider's eye, in her own units (world / `MEDUSA_SIZE`). */
     const MARGIN = 20
     const from = getLevelConfig('level6')!.boss!.at
     const local: [number, number, number] = [0, 0, 0]
     let worst = Infinity
-    for (const lean of [0, 1]) {
+    // Risen, leant out (her second phase) and ducked back (her last).
+    for (const [lean, duck] of [[0, 0], [1, 0], [0, 1]]) {
       const out = MEDUSA_BODY.out + MEDUSA_RISE.leanOut * lean
+      const drop = MEDUSA_RISE.duck * duck
       const pitch = MEDUSA_RISE.leanPitch * lean
       for (let k = from * 10; k <= RUN_SECONDS * 10; k++) {
         const p = curve.getPointAt((profile[k] % table.length) / table.length)
@@ -322,7 +383,7 @@ describe('the gym track', () => {
           const dz = (p.z - MEDUSA_HUB[2]) / MEDUSA_SIZE
           const x = dx * STAR.facing.z - dz * STAR.facing.x
           const z = dx * STAR.facing.x + dz * STAR.facing.z - out
-          const y = (p.y + lift - MEDUSA_HUB[1]) / MEDUSA_SIZE
+          const y = (p.y + lift - MEDUSA_HUB[1]) / MEDUSA_SIZE + drop
           const yaw = yawToward(x, z + out)
           const xr = x * Math.cos(yaw) - z * Math.sin(yaw)
           const zr = x * Math.sin(yaw) + z * Math.cos(yaw)
