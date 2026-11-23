@@ -18,6 +18,7 @@ import Screen from './Screen'
 import { perfRequested } from '@/perf/perfFlag'
 import { importWithRetry, loadLevelScene } from '@/canvas/loadLevelScene'
 import { lazyChunk } from '@/core/staleBuild'
+import { reloadForFailedChunk } from './staleReload'
 import {
   Countdown,
   GhostCrosshair,
@@ -39,13 +40,14 @@ const importMotionFeatures = lazyChunk(() => importWithRetry(() => import('./mot
 const MOTION_FEATURES_RETRY_MS = 10_000
 /**
  * framer-motion's animation features, fetched as App mounts (#861): the `m` elements start animating once they land.
- * Until then they sit at their `initial` (the title's invisible), so a failed round waits and fetches again; each
- * failure reaches `app/staleReload.ts`, which reloads the title when a new build took the chunk.
+ * Until then they sit at their `initial` (the title's invisible). The browser keeps a failed import for the page's
+ * life, so a failed round reloads the page (once per session, `reloadForFailedChunk`); past that it waits and asks again.
  */
 function loadMotionFeatures(): ReturnType<typeof importMotionFeatures> {
-  return importMotionFeatures().catch(
-    () => new Promise((resolve) => setTimeout(resolve, MOTION_FEATURES_RETRY_MS)).then(loadMotionFeatures),
-  )
+  return importMotionFeatures().catch(() => {
+    if (reloadForFailedChunk()) return new Promise<never>(() => {})
+    return new Promise((resolve) => setTimeout(resolve, MOTION_FEATURES_RETRY_MS)).then(loadMotionFeatures)
+  })
 }
 
 /** Runs `fn` once the main thread is idle (a timer where `requestIdleCallback` is missing: Safari). */

@@ -58,6 +58,16 @@ export function reloadForNewBuild(): boolean {
   return true
 }
 
+/**
+ * A chunk the page can't do without failed every retry. Chromium keeps a failed dynamic import for the life of the
+ * page (#888), so fetching it again needs a reload: on the title or level select, once per session; true when it reloads.
+ */
+export function reloadForFailedChunk(): boolean {
+  if (!isReloadSafe(useGameStore.getState().phase) || !claimReload(sessionStore())) return false
+  window.location.reload()
+  return true
+}
+
 export function installStaleReload(): void {
   onChunkFailure(check)
   // Vite's own signal for a dynamic import whose chunk or preloads failed.
