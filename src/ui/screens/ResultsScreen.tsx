@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { m } from 'framer-motion'
 import { runBest, useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { runNextStar, runStars } from '@/levels/scoring'
+import { runNextStar } from '@/levels/scoring'
 import { sfx } from '@/audio/sfx'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { SHARED_EVENT } from '@/app/analyticsEvents'
@@ -77,7 +77,7 @@ export default function ResultsScreen() {
   const worldRank = world?.rank ?? null
   const card = useMemo(() => (config ? scoreCardRun({ ...run, levelId: config.id, worldRank }) : null), [config, run, worldRank])
 
-  const stars = config ? runStars(run.score, config) : 0
+  const stars = card?.stars ?? 0
   const record = isNewRecord(run.score, run.previousBest)
   const counting = stage >= STAGE.count
   const done = stage >= STAGE.done
@@ -191,7 +191,7 @@ export default function ResultsScreen() {
   }
 
   function onShared(method: ShareMethod) {
-    if (config) eventBus.emit(SHARED_EVENT, config.id, method)
+    if (config) eventBus.emit(SHARED_EVENT, config.id, method, daily)
   }
 
   // Read through a ref so the listener sees the live entry state without re-subscribing every render.
@@ -308,7 +308,8 @@ export default function ResultsScreen() {
                     {p.label}
                   </button>
                 ))}
-              {card && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} prerender={done} />}
+              {/* Not in a portal build (#254): its link would send the portal's players off to scoaster.com. */}
+              {card && !__PORTAL_BUILD__ && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} prerender={done} />}
             </div>
             <p className="results-keys" data-shown={done}>
               {entryOpen && 'Type your initials or pick them with the arrows. Enter signs it.'}

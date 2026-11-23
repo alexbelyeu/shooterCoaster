@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
+import { getAllLevels } from '@/levels/LevelRegistry'
+import { scoreCardRun } from './scoreCard'
 import {
-  buildShareText,
   buildShareUrl,
+  cardSizeFor,
   canCopy,
   canCopyImage,
   canShareImage,
@@ -15,16 +16,18 @@ import {
   SHARE_TARGETS,
   shareCampaign,
   shareMode,
-  sharePayloadForRun,
+  sharePayload,
   shareTargetHref,
   starString,
   X_MAX_LENGTH,
   xPostLength,
+  type ShareMethod,
   type ShareNavigator,
+  type ShareRun,
 } from './share'
 
-const level1 = getLevelConfig('level1')!
 const URL_NATIVE = buildShareUrl('share_native')
+const RUN: ShareRun = { levelName: 'Theme Park', score: 1239.6, stars: 2, daily: null, worldRank: null }
 
 describe('buildShareUrl', () => {
   it('links the share campaign path with the UTM tags', () => {
@@ -33,42 +36,40 @@ describe('buildShareUrl', () => {
   })
 })
 
-describe('buildShareText', () => {
-  it('rounds and thousands-separates the score and draws the stars', () => {
-    const p = buildShareText({ levelName: 'Theme Park', score: 1239.6, stars: 2, url: URL_NATIVE })
+describe('sharePayload', () => {
+  it('rounds and thousands-separates the score, draws the stars and tags the campaign with the method', () => {
+    const p = sharePayload(RUN, 'native')
     expect(p.text).toBe('I scored 1,240 ★★☆ on Theme Park in ShooterCoaster 🎢 — beat me:')
     expect(p.url).toBe(URL_NATIVE)
     expect(p.title).toBe('ShooterCoaster')
     expect(clipboardText(p)).toBe(`${p.text} ${URL_NATIVE}`)
+    expect(sharePayload(RUN, 'x').url).toBe(buildShareUrl('share_x'))
   })
 
-  it("leads with the World place when the run is on the online top 10 (#445), and is today's line without one", () => {
-    const run = { levelName: 'Theme Park', score: 1239.6, stars: 2, url: URL_NATIVE }
-    expect(buildShareText({ ...run, worldRank: 2 }).text).toBe("I'm #3 in the world on Theme Park — 1,240 ★★☆ in ShooterCoaster 🎢 — beat me:")
-    expect(buildShareText({ ...run, worldRank: 0 }).text).toMatch(/^I'm #1 in the world on /)
-    expect(buildShareText({ ...run, worldRank: 9 }).text).toMatch(/^I'm #10 in the world on /)
-    expect(buildShareText({ ...run, worldRank: null })).toEqual(buildShareText(run))
+  it('leads with the World place when the run is on the online top 10 (#445)', () => {
+    expect(sharePayload({ ...RUN, worldRank: 2 }, 'x').text).toBe("I'm #3 in the world on Theme Park — 1,240 ★★☆ in ShooterCoaster 🎢 — beat me:")
+    expect(sharePayload({ ...RUN, worldRank: 0 }, 'x').text).toMatch(/^I'm #1 in the world on /)
+    expect(sharePayload({ ...RUN, worldRank: 9 }, 'x').text).toMatch(/^I'm #10 in the world on /)
     expect(rankLabel(0)).toBe('#1')
+  })
+
+  it("says a Daily Run is that day's daily (#268)", () => {
+    expect(sharePayload({ ...RUN, daily: 'Nov 4, 2026' }, 'copy').text).toBe(
+      'I scored 1,240 ★★☆ on the Nov 4, 2026 Daily Run (Theme Park) in ShooterCoaster 🎢 — same ride for everyone, beat me:',
+    )
+  })
+
+  it("takes the card's level name, shown score and stars, so the line can't disagree with the card (#375)", () => {
+    const fmt = new Intl.NumberFormat('en-US')
+    for (const level of getAllLevels()) {
+      const card = scoreCardRun({ levelId: level.id, score: level.maxScore, bestCombo: 0, hits: 0, shotsFired: 0, mode: { mode: 'campaign' } })!
+      expect(sharePayload(card, 'copy').text, level.id).toBe(`I scored ${fmt.format(card.score)} ★★★ on ${level.name} in ShooterCoaster 🎢 — beat me:`)
+    }
   })
 
   it('renders 0 to 3 stars as ★ / ☆', () => {
     expect([0, 1, 2, 3].map(starString)).toEqual(['☆☆☆', '★☆☆', '★★☆', '★★★'])
     expect(starString(7)).toBe('★★★')
-  })
-})
-
-describe('sharePayloadForRun', () => {
-  it('takes the level name and stars from the registry, and the campaign from the method', () => {
-    const score = Math.ceil(level1.maxScore * level1.starThresholds[2])
-    const p = sharePayloadForRun('level1', score, 'native')!
-    expect(p.text).toContain(`on ${level1.name} in`)
-    expect(p.text).toContain('★★★')
-    expect(p.url).toBe(URL_NATIVE)
-    expect(sharePayloadForRun('level1', 0, 'x')!.text).toContain('I scored 0 ☆☆☆')
-    expect(sharePayloadForRun('level1', 0, 'x')!.url).toBe(buildShareUrl('share_x'))
-    expect(sharePayloadForRun('nope', 10, 'copy')).toBeNull()
-    expect(sharePayloadForRun('level1', 0, 'x', 4)!.text).toBe(`I'm #5 in the world on ${level1.name} — 0 ☆☆☆ in ShooterCoaster 🎢 — beat me:`)
-    expect(sharePayloadForRun('level1', 0, 'x', null)).toEqual(sharePayloadForRun('level1', 0, 'x'))
   })
 })
 
@@ -80,8 +81,7 @@ function params(href: string): Record<string, string> {
 
 describe('share targets', () => {
   // `&`, `#` and `?` in the level name and a huge score: the encoding traps and the longest line.
-  const tricky = (id: string) =>
-    buildShareText({ levelName: 'Fish & Chips #1?', score: 9_999_999, stars: 2, url: buildShareUrl(`share_${id}`) })
+  const tricky = (id: ShareMethod) => sharePayload({ ...RUN, levelName: 'Fish & Chips #1?', score: 9_999_999 }, id)
 
   it('builds a well-formed, fully encoded link per network that carries its own campaign', () => {
     expect(SHARE_TARGETS.map((t) => t.id)).toEqual(['x', 'reddit', 'bluesky', 'threads', 'whatsapp', 'facebook', 'linkedin', 'email'])
@@ -101,7 +101,7 @@ describe('share targets', () => {
 
   it('carries the World rank line in the X, Reddit and Bluesky links of a run that placed', () => {
     const line = "I'm #3 in the world on Theme Park — 1,240 ★★☆ in ShooterCoaster 🎢 — beat me"
-    const ranked = (id: string) => buildShareText({ levelName: 'Theme Park', score: 1240, stars: 2, url: buildShareUrl(`share_${id}`), worldRank: 2 })
+    const ranked = (id: ShareMethod) => sharePayload({ ...RUN, worldRank: 2 }, id)
     expect(params(shareTargetHref('x', ranked('x'))).text).toBe(`${line}:`)
     expect(params(shareTargetHref('reddit', ranked('reddit'))).title).toBe(line)
     expect(params(shareTargetHref('bluesky', ranked('bluesky'))).text).toBe(`${line}: ${buildShareUrl('share_bluesky')}`)
@@ -126,25 +126,30 @@ describe('share targets', () => {
   it("fits X's and Bluesky's length limits for every level", () => {
     expect(xPostLength('a')).toBe(1 + 1 + 23)
     expect(xPostLength('★🎢—')).toBe(2 + 2 + 1 + 1 + 23)
-    for (const level of getAllLevels()) {
-      for (const rank of [null, 9]) {
-        const x = sharePayloadForRun(level.id, 9_999_999, 'x', rank)!
-        expect(xPostLength(x.text), level.id).toBeLessThanOrEqual(X_MAX_LENGTH)
-        const bluesky = sharePayloadForRun(level.id, 9_999_999, 'bluesky', rank)!
-        expect([...clipboardText(bluesky)].length, level.id).toBeLessThanOrEqual(300)
-      }
+    const lines = getAllLevels().flatMap((level): [string, ShareRun][] => {
+      const run = { ...RUN, levelName: level.name, score: 9_999_999, stars: 3 }
+      return [[level.id, run], [`${level.id} ranked`, { ...run, worldRank: 9 }], [`${level.id} daily`, { ...run, daily: 'Sep 30, 2026' }]]
+    })
+    for (const [name, run] of lines) {
+      expect(xPostLength(sharePayload(run, 'x').text), name).toBeLessThanOrEqual(X_MAX_LENGTH)
+      expect([...clipboardText(sharePayload(run, 'bluesky'))].length, name).toBeLessThanOrEqual(300)
     }
   })
 })
 
 describe('sharing', () => {
-  const payload = sharePayloadForRun('level1', 1240, 'native')!
+  const payload = sharePayload(RUN, 'native')
   const share = async () => {}
   const writeText = async () => {}
 
-  it('uses the native sheet only on touch devices that have one, else the menu', () => {
+  it('uses the share sheet only on touch devices that have one, with the card picture when it takes a file, else the menu (#375)', () => {
     expect(shareMode({ share, clipboard: { writeText } }, false, payload)).toBe('menu')
+    expect(shareMode({ share, canShare: () => true }, false, payload)).toBe('menu')
+    expect(shareMode({ share, canShare: () => true }, true, payload)).toBe('image')
+    expect(shareMode({ share, canShare: (d) => !d.files }, true, payload)).toBe('native')
     expect(shareMode({ share }, true, payload)).toBe('native')
+    expect(cardSizeFor(true)).toBe('story')
+    expect(cardSizeFor(false)).toBe('feed')
     expect(shareMode({ share, canShare: () => false }, true, payload)).toBe('menu')
     expect(shareMode({ clipboard: { writeText } }, true, payload)).toBe('menu')
     expect(shareMode(undefined, true, payload)).toBe('menu')
@@ -237,6 +242,6 @@ describe('sharing the score card image', () => {
   })
 
   it('tags each image share with its own campaign', () => {
-    expect(sharePayloadForRun('level1', 1240, 'image_native')!.url).toBe(buildShareUrl('share_image_native'))
+    expect(sharePayload(RUN, 'image_native').url).toBe(buildShareUrl('share_image_native'))
   })
 })

@@ -27,9 +27,11 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   | `level_start` | `level` (`level1`…), `from` (from #329: `title` = title PLAY, `select` = a level select card, `results` = Replay / Next Level, `pause` = Restart in the pause menu, `daily` = any Daily Run start; it replaced `mode` (`campaign` / `daily`, 2026-10-31 to #329; earlier starts have none) within the 2-property limit, `from` `daily` ⇔ `mode` `daily`) | A run begins: from title PLAY (the player's next level straight away, #329), from level select (a level card, or the Daily card: `mode` `daily`), Replay or Next Level; from 2026-11-16 (#235) also a Restart from the pause menu. From 2026-10-24 it fires when the Ready / Set / GO countdown starts, so a player who leaves during it still counts as a start; from 2026-11-19 (#674) it fires when the loading screen opens, before the level's intro tour, so a player who leaves while it loads or during the tour counts as a start too (the completion rate dips from that day) |
   | `level_complete` | `level`, `stars` (0–3) | The timer runs out and the results screen opens |
   | `level_quit` | `level`, `progress_pct` (0, 10 … 100: share of the level timer used) | Quit to Menu from the pause screen |
-  | `share` | `level`, `method` (`native`, `copy`, `x`, `reddit`, `bluesky`, `threads`, `whatsapp`, `facebook`, `linkedin`, `email`; from 2026-11-02, before which it carried `stars` instead; `image_native`, `image_download`, `image_copy` from #272) | A share went out from the results screen: the phone share sheet completed (`native`; with the score card picture, `image_native`; a dismissed sheet sends nothing), Copy link copied the line (`copy`), Save image / Copy image saved or copied the score card picture (`image_download`, `image_copy`), or the player opened a network's share link from the desktop menu (the network; whether they then posted is unknown). Rare and player-initiated, so it sits outside the ≤ 2 per run count |
+  | `share` | `level`, `method` (`native`, `copy`, `x`, `reddit`, `bluesky`, `threads`, `whatsapp`, `facebook`, `linkedin`, `email`; from 2026-11-02, before which it carried `stars` instead; `image_native`, `image_download`, `image_copy` from #272; `level` is `daily` for a Daily Run's share from 2026-11-24, #268, before which a daily share carried its level and can't be told apart) | A share went out from the results screen: the phone share sheet completed (`native`; with the score card picture, `image_native`; a dismissed sheet sends nothing), Copy link copied the line (`copy`), Save image / Copy image saved or copied the score card picture (`image_download`, `image_copy`), or the player opened a network's share link from the desktop menu (the network; whether they then posted is unknown). Rare and player-initiated, so it sits outside the ≤ 2 per run count |
 
-  Completion rate per level = `level_complete` / `level_start`. The Share button (#87, #271,
+  Completion rate per level = `level_complete` / `level_start`; both mix campaign and Daily Run runs of the level
+  (a daily start is `from` `daily`, its completion has no mark), so split out the daily starts only as a check of how many
+  there are. The Share button (#87, #271,
   copy in `src/ui/share.ts`) opens the phone's share sheet on touch devices that have one (with
   the 1080×1920 score card picture where the sheet takes files, #272), and everywhere else a menu
   of Save image / Copy image (the 1200×630 card; 1080×1920 on phones), Copy link plus share
@@ -38,7 +40,9 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   (`share_native`, `share_copy`, `share_x`, `share_image_native` …; `results` before 2026-11-02), so its visits show
   as `requestPath` `/go/share`. Once a campaign run's online submission comes back placed on the World top 10, the line reads
   "I'm #3 in the world on Theme Park — 1,240 ★★☆ in ShooterCoaster 🎢 — beat me:" and the card carries a `WORLD #3` ribbon (#445;
-  shared before that answer, off the World board, or a Daily Run: the plain line). Pausing and resuming send nothing; closing
+  shared before that answer, or off the World board: the plain line). A Daily Run's line names its day: "I scored 1,240 ★★☆ on the
+  Nov 4, 2026 Daily Run (Theme Park) in ShooterCoaster 🎢 — same ride for everyone, beat me:" (#268). The portal build
+  (`build:portal`) has no Share button (#254), so every `/go/share` visit comes from scoaster.com. Pausing and resuming send nothing; closing
   the tab mid-run sends no `level_quit` (starts minus completes minus quits ≈ abandons).
 - **Internal traffic (Alex's devices).** Open **https://scoaster.com/?internal=1** once in
   each browser and on each device you play on. The browser remembers it (localStorage), the
@@ -64,7 +68,7 @@ the `marketing` / `needs-alex` issues, and the metrics section of the weekly rep
   as `2026-10-19T04:00Z … 2026-10-26T04:00Z` and the daily rows come back as UTC days; say so
   in the metrics file rather than pretending they are New York days. Available breakdowns:
   `day`, `country`, `deviceType`, `osName`, `browserName`, `referrerHostname`, `requestPath`;
-  events by `eventName` and `eventData/<property>` (`level`, `stars`, `progress_pct`).
+  events by `eventName` and `eventData/<property>` (`level`, `from`, `stars`, `progress_pct`, and `method` on `share` from 2026-11-02).
   Bounce rate is not in the API (and meaningless here, below).
 - **If the Vercel connector answers "Web Analytics not found"** while the dashboard shows
   data, the connector can't see the "Belyeu's projects" team: say so in the metrics file and
