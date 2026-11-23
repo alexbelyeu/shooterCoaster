@@ -136,7 +136,10 @@ When level3 is in the run, the same `boss` step summons the Kraken: after 3 s of
 above the water (`level3-boss.png`, only pads exposed), and after the pads go the head must surface with only its eye exposed
 (`level3-boss-head.png`) before the eye is shot and it sinks in a splash (`level3-boss-down.png`).
 When level4 is in the run, the same `boss` step summons the Yeti: after 4 s of game time (it climbs its ridge, roars and
-throws) both fists must be on screen and ≥ 1 snowball in flight (`level4-boss.png`, only the fists exposed; `boss().projectiles`).
+throws) both fists must be on screen and ≥ 1 snowball in flight inside the frame, not on its edge (`level4-boss.png`, only the fists
+exposed; `boss().projectiles`, each within 0.9 NDC). The Yeti picks its ridge off the rider's place, so the step summons it with the
+ride frozen at `summonAt` (0.53 of the lap) and then holds the camera at `rideTo` (0.5), a little back, where its lob stays in the
+frame: the same view on any runner (#920; riding on through the arrival, the wall clock set where it landed).
 `projectileHit()` then shoots every live snowball: one kill and one combo step each, the boss's hp unchanged (they are left out
 of the per-weak-point kill count). Once the fists are broken it roars at once and only its chest is exposed
 (`level4-boss-chest.png`; between roars the chest is retracted) before it topples backwards into the snow (`level4-boss-down.png`).
@@ -156,9 +159,10 @@ When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pic
 (spread) with time frozen and shoots it with a real bullet: `weaponState()` must report the spread gun, the next pull must
 count 3 shots and draw 3 bullets, and `level1-pickup.png` holds the tinted tracer with the `.hud-weapon` badge clear of the HUD;
 the pickup must hold through a pause, expire on game time, and a restart must bring back the blaster and every pickup.
-When level1 is in the run, a `night` step (#829, nightly) rides its Night Ride (`startLevel(id, seed, 'night')`, `variant()`)
-to the ride step's moment: the run must be `night`, the sky band (top 30%) dark (`NIGHT_CHECK.maxSkyLuma`), the enemies as
-readable as the ride's probe asks (`level1-night-enemy.png`) and the scene inside level1's `scene` budget (`level1-night.png`).
+For each level with a Night Ride in the run (`STEP_LEVELS.night`: level1, level2, level3; #829, #880), a `night` step (nightly)
+rides it (`startLevel(id, seed, 'night')`, `variant()`) to the ride step's moment: the run must be `night`, the sky band (top 30%)
+dark (`NIGHT_CHECK.maxSkyLuma`), the enemies as readable as the ride's probe asks (`<id>-night-enemy.png`) and the scene inside
+the level's `scene` budget (`<id>-night.png`); its line ends with `programs after warm-up: +N` (failed under `--gate-programs`).
 When level6 is in the run, a `switch` step (#702, on the PR in the `level6` shard) checks the shoot-to-switch junction
 (`trackSwitch()`): it starts the level held at its start from its first frame (`timerStep` and `rideRate` 0 until
 `levelReady`: ridden on the frame time, a slow runner's car passed the sign while the scene warmed up, and a switch the car
