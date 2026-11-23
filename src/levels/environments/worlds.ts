@@ -35,6 +35,8 @@ const worldLoaders = new Map<BiomeType, () => Promise<World>>()
 const loadedWorlds = new Map<BiomeType, World>()
 /** Each biome's latest load, kept once it fails: the render that suspended on it reads the rejection (#889). */
 const attempts = new Map<BiomeType, Promise<World>>()
+/** The biomes whose latest attempt rejected: only these does `forgetWorldFailures` drop, never one still in flight. */
+const failed = new Set<BiomeType>()
 
 /**
  * A biome's world chunk: fetched once, when a run of it starts (the loading screen asks for it as soon as the core is
@@ -57,13 +59,17 @@ export function loadWorld(biome: BiomeType): Promise<World> {
   }
   attempt = load()
   attempts.set(biome, attempt)
-  attempt.catch(() => {})
+  failed.delete(biome)
+  attempt.catch(() => {
+    if (attempts.get(biome) === attempt) failed.add(biome)
+  })
   return attempt
 }
 
 /** Drop the failed loads, so the next run fetches their worlds afresh (`LevelSceneBoundary`, after it catches one). */
 export function forgetWorldFailures(): void {
-  for (const biome of attempts.keys()) if (!loadedWorlds.has(biome)) attempts.delete(biome)
+  for (const biome of failed) attempts.delete(biome)
+  failed.clear()
 }
 
 /** The biome's world once its chunk has arrived: a level of it mounts without suspending. */

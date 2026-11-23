@@ -58,4 +58,22 @@ describe('loadWorld (#889)', () => {
       vi.useRealTimers()
     }
   })
+
+  it('forgetting failures keeps a load still in flight', async () => {
+    const real = WORLD_CHUNKS.desert
+    let arrive: (m: { world: World }) => void = () => {}
+    const slow = vi.fn(() => new Promise<{ world: World }>(resolve => (arrive = resolve)))
+    WORLD_CHUNKS.desert = slow
+    try {
+      const pending = loadWorld('desert')
+      forgetWorldFailures()
+      expect(loadWorld('desert')).toBe(pending)
+      const { world } = await real()
+      arrive({ world })
+      await expect(pending).resolves.toBe(world)
+      expect(slow).toHaveBeenCalledTimes(1)
+    } finally {
+      WORLD_CHUNKS.desert = real
+    }
+  })
 })
