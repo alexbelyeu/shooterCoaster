@@ -12,5 +12,5 @@ export const arctic: BiomeDefinition = {
   particles: PARTICLE_PRESETS.arcticSnow,
   // The Ice Fortress: its side towers stand 55 out, 10 wide at the base.
   keepOff: () => [{ x: FORTRESS_SITE.x, z: FORTRESS_SITE.z, r: 80 }],
-  hero: { x: FORTRESS_SITE.x, z: FORTRESS_SITE.z, focus: 50, orbitRadius: 520, orbitHeight: 240 },
+  hero: { x: FORTRESS_SITE.x, z: FORTRESS_SITE.z, focus: 50, orbitRadius: 600, orbitHeight: 240 },
 }
