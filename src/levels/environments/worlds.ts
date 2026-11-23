@@ -2,7 +2,7 @@ import { createContext, useContext, type ComponentType } from 'react'
 import type { BiomeType, BossType, EnemyType } from '@/types/level'
 import type { EnemyProps } from '@/entities/enemies/EnemyBase'
 import type { BossProps } from '@/entities/bosses/BossBase'
-import { importWithRetry, lazyChunk } from '@/core/staleBuild'
+import { lazyChunk } from '@/core/staleBuild'
 import { createHeightFunction, type HeightFunction, type TrackSample } from '@/utils/terrainNoise'
 import type { BiomeDefinition } from './shared/types'
 
@@ -40,7 +40,7 @@ const failed = new Set<BiomeType>()
 
 /**
  * A biome's world chunk: fetched once, when a run of it starts (the loading screen asks for it as soon as the core is
- * in, `LevelScene` waits for it), retried like the core (`canvas/loadLevelScene.ts`, #823). A failed load stays
+ * in, `LevelScene` waits for it); a failure reloads the page, like the core's (`core/staleBuild.ts`, #888). A failed load stays
  * failed until `forgetWorldFailures`: a fresh promise on every render would keep `LevelScene` suspended for good,
  * never reaching its error boundary.
  */
@@ -50,7 +50,7 @@ export function loadWorld(biome: BiomeType): Promise<World> {
   let load = worldLoaders.get(biome)
   if (!load) {
     load = lazyChunk(() =>
-      importWithRetry(WORLD_CHUNKS[biome]).then(({ world }) => {
+      WORLD_CHUNKS[biome]().then(({ world }) => {
         loadedWorlds.set(biome, world)
         return world
       }),

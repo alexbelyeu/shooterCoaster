@@ -34,20 +34,17 @@ describe('world chunks (#862)', () => {
 
 describe('loadWorld (#889)', () => {
   it('a world chunk that fails stays failed for the render waiting on it, until the boundary forgets it', async () => {
-    vi.useFakeTimers()
     const real = WORLD_CHUNKS.gym
     const offline = vi.fn(() => Promise.reject<{ world: World }>(new Error('offline')))
     WORLD_CHUNKS.gym = offline
     try {
       const first = loadWorld('gym')
-      const failed = expect(first).rejects.toThrow('offline')
-      await vi.runAllTimersAsync()
-      await failed
-      expect(offline).toHaveBeenCalledTimes(3)
+      await expect(first).rejects.toThrow('offline')
+      expect(offline).toHaveBeenCalledTimes(1)
       // After it settles, the next render still reads the same rejection (and throws it to `LevelSceneBoundary`),
       // instead of a fresh promise that suspends again.
       expect(loadWorld('gym')).toBe(first)
-      expect(offline).toHaveBeenCalledTimes(3)
+      expect(offline).toHaveBeenCalledTimes(1)
 
       forgetWorldFailures()
       WORLD_CHUNKS.gym = real
@@ -55,7 +52,6 @@ describe('loadWorld (#889)', () => {
       expect(loadedWorld('gym')).toBe(world)
     } finally {
       WORLD_CHUNKS.gym = real
-      vi.useRealTimers()
     }
   })
 
