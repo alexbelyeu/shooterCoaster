@@ -320,8 +320,28 @@ export const KRAKEN_EYE_MAT = withRim(
 // The small scorpion's colours: plum-black chitin reads against gold sand, amber underside and joints against the dark.
 const CHITIN = '#2a1626'
 const CHITIN_EDGE = '#3a1622'
+const CHITIN_SUN = '#40223a'
+const DUST = '#a8814c'
 const AMBER = '#e0701e'
 const AMBER_HOT = '#ffb347'
+
+const _chitin = new THREE.Color(CHITIN)
+const _sun = new THREE.Color(CHITIN_SUN)
+const _dust = new THREE.Color(DUST)
+const _amber = new THREE.Color(AMBER)
+
+/**
+ * Chitin with desert dust settled on it, by each triangle's height in a unit shape (y -1 to 1): a lit crown,
+ * plum-black flanks fading to sand down to `split`, the amber underside below it; a speckle of dust breaks the fade.
+ */
+function dusted(geo: THREE.BufferGeometry, matrix: THREE.Matrix4, split = -0.25): THREE.BufferGeometry {
+  return paintedAt(geo, (x, y, z) => {
+    if (y < split - 0.2) return _amber
+    const speckle = y < 0 ? (Math.abs(Math.floor(x * 41 + z * 29 + y * 17)) % 5) * 0.06 : 0
+    const fall = THREE.MathUtils.smoothstep(-y, 0, 0.2 - split) * 0.7 + speckle
+    return new THREE.Color().lerpColors(y > 0.45 ? _sun : _chitin, _dust, Math.min(1, fall))
+  }, matrix)
+}
 
 /** `geo` painted per triangle: `under` below `split` (its own y, before placing), `top` above. */
 function twoTone(geo: THREE.BufferGeometry, top: string, under: string, split: number, matrix: THREE.Matrix4): THREE.BufferGeometry {
@@ -342,14 +362,24 @@ function twoTone(geo: THREE.BufferGeometry, top: string, under: string, split: n
 }
 
 const shell = (rx: number, ry: number, rz: number, at: [number, number, number], split = -0.25) =>
-  twoTone(new THREE.SphereGeometry(1, 18, 10), CHITIN, AMBER, split, pose(at, [0, 0, 0], [rx, ry, rz]))
+  dusted(new THREE.SphereGeometry(1, 14, 8), pose(at, [0, 0, 0], [rx, ry, rz]), split)
+
+/** A faceted low dome (tergite) on a segment's back, its rear edge dipping under the next one like a shingle. */
+const plate = (rx: number, rz: number, at: [number, number, number], tilt = -0.12) =>
+  dusted(new THREE.SphereGeometry(1, 8, 3, 0, Math.PI * 2, 0, Math.PI / 2), pose(at, [tilt, Math.PI / 8, 0], [rx, 22, rz]), -2)
 
 const ABDOMEN = [0, 1, 2, 3, 4].map((k) => ({ rx: 150 - 11 * k, ry: 60 - 3 * k, z: -25 - 58 * k, y: 95 - 3 * k }))
 
 /** +z is its head. */
 export const SCORPION_BODY_GEO = mergePainted([
   shell(150, 70, 165, [0, 100, 125]),
-  ...ABDOMEN.map((p) => shell(p.rx, p.ry, 55, [0, p.y, p.z])),
+  // The carapace: a broad plate with a raised keel down its middle.
+  plate(128, 140, [0, 150, 125], 0.08),
+  dusted(new THREE.OctahedronGeometry(1, 0), pose([0, 172, 120], [0, 0, 0], [26, 18, 120]), -2),
+  ...ABDOMEN.flatMap((p) => [
+    shell(p.rx, p.ry, 55, [0, p.y, p.z]),
+    plate(p.rx * 0.88, 40, [0, p.y + p.ry * 0.8, p.z - 6]),
+  ]),
   shell(50, 48, 50, [0, 112, -280], -0.5),
   ...[-1, 1].map((side) => painted(new THREE.BoxGeometry(30, 34, 56), CHITIN_EDGE, [side * 36, 78, 285], [0.3, side * 0.2, 0])),
 ])
@@ -388,7 +418,7 @@ export const SCORPION_LIMB_MAT = withRim(
 
 /** Along +z around its palm, the fixed finger on +x. */
 export const SCORPION_CLAW_GEO = mergePainted([
-  twoTone(new THREE.SphereGeometry(1, 16, 10), CHITIN_EDGE, AMBER, -0.3, pose([0, 0, 0], [0, 0, 0], [72, 54, 95])),
+  dusted(new THREE.SphereGeometry(1, 12, 8), pose([0, 0, 0], [0, 0, 0], [72, 54, 95]), -0.3),
   painted(new THREE.ConeGeometry(28, 150, 6).rotateX(Math.PI / 2), CHITIN, [32, 0, 140], [0, -0.12, 0]),
   painted(new THREE.SphereGeometry(13, 6, 5), AMBER_HOT, [44, 0, 72]),
 ])
@@ -403,7 +433,9 @@ export const SCORPION_FINGER_HINGE: [number, number, number] = [-30, 0, 70]
 
 /** Along +y around its middle. */
 export const SCORPION_TAIL_SEGMENT_GEO = mergePainted([
-  twoTone(new THREE.SphereGeometry(1, 12, 8), CHITIN, CHITIN_EDGE, -0.9, pose([0, 0, 0], [0, 0, 0], [46, 62, 46])),
+  dusted(new THREE.SphereGeometry(1, 10, 6), pose([0, 0, 0], [0, 0, 0], [46, 62, 46]), -0.9),
+  // A dorsal plate on its outer (-z) curve.
+  dusted(new THREE.CylinderGeometry(1, 0.8, 1, 6, 1), pose([0, 4, -40], [Math.PI / 2, 0, 0], [34, 14, 48]), -2),
   painted(new THREE.TorusGeometry(42, 9, 5, 14), AMBER_HOT, [0, -48, 0], [Math.PI / 2, 0, 0]),
 ])
 
@@ -412,14 +444,21 @@ export const SCORPION_TAIL_MAT = withRim(
   { color: '#ffd9a0', intensity: 0.8, power: 2.2 },
 )
 
-/** Along +y from its base, the barb hooking towards +z. */
+const VENOM_DEEP = new THREE.Color('#9a1410')
+const VENOM_HOT = new THREE.Color('#ff7a2a')
+
+/** Along +y from its base, the barb hooking towards +z: a venom bulb glowing hotter towards the barb, a bead on its tip. */
 export const SCORPION_STINGER_GEO = mergePainted([
-  paintedAt(new THREE.SphereGeometry(1, 14, 10), '#8a1a1a', pose([0, 40, 0], [0, 0, 0], [46, 58, 46])),
+  paintedAt(new THREE.SphereGeometry(1, 14, 10), (_x, y) => new THREE.Color().lerpColors(VENOM_DEEP, VENOM_HOT, (y + 1) / 2),
+    pose([0, 40, 0], [0, 0, 0], [46, 58, 46])),
+  // Glowing seams round the bulb.
+  ...[[14, 40], [38, 46], [62, 41]].map(([y, r]) => painted(new THREE.TorusGeometry(r, 3, 4, 16), '#ffc060', [0, y, 0], [Math.PI / 2, 0, 0])),
   painted(new THREE.ConeGeometry(17, 95, 8), '#ff4422', [0, 120, 22], [0.45, 0, 0]),
+  painted(new THREE.OctahedronGeometry(9, 0), '#ffe08a', [0, 162, 42]),
 ])
 
 export const SCORPION_STINGER_MAT = withRim(
-  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.1, emissive: '#ff2200', emissiveIntensity: 0.5 }),
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.1, emissive: '#ff3a10', emissiveIntensity: 0.9 }),
   { color: '#ffc0a0', intensity: 0.6, power: 2.2 },
 )
 
@@ -454,10 +493,11 @@ export const SCORPION_MOUND_GEO = (() => {
 export const SCORPION_MOUND_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true })
 
 // ── The Yeti (Antarctica) ──
-// Blue-grey fur, never white on the snow; navy face, palms, claws and feet so it reads from the ridge.
+// Blue-grey fur, never white on the snow; a blue face and palms, navy claws and feet so it reads from the ridge.
 
 const FUR_LIGHT = ['#dbe4f0', '#cdd8e8', '#e6edf6']
 const FUR_SHADE = ['#8ea2bf', '#7f94b3', '#9aaecb']
+const FACE_BLUE = '#2f4f8f'
 const NAVY = '#1d2a4a'
 const NAVY_DEEP = '#121a30'
 const ICE = '#8fe0ff'
@@ -484,18 +524,98 @@ function fur(geo: THREE.BufferGeometry, matrix: THREE.Matrix4, split = -0.2): TH
 const furBall = (at: [number, number, number], scale: [number, number, number], split?: number, detail = 1) =>
   fur(new THREE.IcosahedronGeometry(1, detail), pose(at, [0, 0, 0], scale), split)
 
+const TUFT_LIGHT = FUR_LIGHT.map((c) => new THREE.Color(c))
+const TUFT_SHADE = FUR_SHADE.map((c) => new THREE.Color(c))
+const _tuftDir = new THREE.Vector3()
+const _tuftQ = new THREE.Quaternion()
+const _tuftUp = new THREE.Vector3(0, 1, 0)
+const _tuftM = new THREE.Matrix4()
+const _tuftS = new THREE.Vector3()
+
+/**
+ * One tuft: a four-sided shard rooted at `at`, its tip hanging along `normal` bent down by `droop`,
+ * its facets in two fur shades (shaded when `shaded`) so each one catches the light. `stretchY` squashes it
+ * for a unit limb, whose instance scale stretches y.
+ */
+function tuft(at: THREE.Vector3, normal: THREE.Vector3, length: number, droop: number, shaded: boolean, rng: () => number, stretchY = 1) {
+  const tones = shaded ? TUFT_SHADE : TUFT_LIGHT
+  const [a, b] = [tones[Math.floor(rng() * 3)], tones[Math.floor(rng() * 3)]]
+  const cone = new THREE.ConeGeometry(length * 0.42, length, 4, 1, true).translate(0, length / 2, 0).rotateY(rng() * Math.PI)
+  _tuftDir.copy(normal).multiplyScalar(1 - droop).addScaledVector(_tuftUp, -droop).normalize()
+  _tuftQ.setFromUnitVectors(_tuftUp, _tuftDir)
+  const root = at.clone().addScaledVector(normal, -length * 0.3)
+  _tuftM.compose(root, _tuftQ, _tuftS.set(1, 1, 1))
+  const g = paintedAt(cone, (x) => (x > 0 ? a : b), _tuftM)
+  return stretchY === 1 ? g : g.translate(0, -root.y, 0).scale(1, 1 / stretchY, 1).translate(0, root.y, 0)
+}
+
+interface TuftCoatOptions { from?: number; to?: number; droop?: number; split?: number; skip?: (p: THREE.Vector3) => boolean }
+
+/**
+ * Layered tufts over an ellipsoid (centre, radii): rows from polar angle `from` to `to` (fractions of pi from the
+ * top), each row offset half a step like shingles, shaded below the centre plus `split` x its height radius.
+ * `skip` leaves a window bare (the face, the chest plate).
+ */
+function tuftCoat(
+  seed: number, centre: [number, number, number], radii: [number, number, number], length: number,
+  { from = 0.12, to = 0.8, droop = 0.55, split = -0.25, skip }: TuftCoatOptions = {},
+): THREE.BufferGeometry[] {
+  const rng = createRng(seed)
+  const out: THREE.BufferGeometry[] = []
+  const rows = Math.max(2, Math.round(((to - from) * Math.PI * radii[1]) / (length * 0.62)))
+  for (let r = 0; r < rows; r++) {
+    const phi = Math.PI * (from + ((to - from) * (r + 0.5)) / rows)
+    const ring = (radii[0] + radii[2]) * 0.5 * Math.sin(phi)
+    const count = Math.max(5, Math.round((2 * Math.PI * ring) / (length * 0.55)))
+    for (let k = 0; k < count; k++) {
+      const theta = (2 * Math.PI * (k + (r % 2) * 0.5 + (rng() - 0.5) * 0.3)) / count
+      const ux = Math.sin(phi) * Math.sin(theta)
+      const uy = Math.cos(phi)
+      const uz = Math.sin(phi) * Math.cos(theta)
+      const p = new THREE.Vector3(centre[0] + ux * radii[0], centre[1] + uy * radii[1], centre[2] + uz * radii[2])
+      if (skip?.(p)) continue
+      const n = new THREE.Vector3(ux / radii[0], uy / radii[1], uz / radii[2]).normalize()
+      out.push(tuft(p, n, length * (0.85 + rng() * 0.3), droop, uy < split, rng))
+    }
+  }
+  return out
+}
+
+/** Rings of tufts round an upright cylinder (centre, radius, y from bottom to top). */
+function tuftRings(seed: number, centre: [number, number], radius: number, ys: number[], length: number, stretchY = 1): THREE.BufferGeometry[] {
+  const rng = createRng(seed)
+  const out: THREE.BufferGeometry[] = []
+  ys.forEach((y, r) => {
+    const count = Math.max(5, Math.round((2 * Math.PI * radius) / (length * 0.55)))
+    for (let k = 0; k < count; k++) {
+      const theta = (2 * Math.PI * (k + (r % 2) * 0.5)) / count
+      const n = new THREE.Vector3(Math.sin(theta), 0, Math.cos(theta))
+      const p = new THREE.Vector3(centre[0] + n.x * radius, y, centre[1] + n.z * radius)
+      out.push(tuft(p, n, length * (0.85 + rng() * 0.3), 0.5, r === 0, rng, stretchY))
+    }
+  })
+  return out
+}
+
+const CHEST_WINDOW = (p: THREE.Vector3) => p.z > 40 && Math.hypot(p.x / 1.1, p.y - 555) < 125
+
 /** Feet at y 0, +z towards the rider; the head, arms, fists and chest are separate. */
 export const YETI_BODY_GEO = mergePainted([
   furBall([0, 540, 0], [235, 250, 165], -0.35, 2),
   furBall([0, 330, -10], [175, 120, 135], 0.2),
+  ...tuftCoat(11, [0, 540, 0], [228, 242, 158], 64, { from: 0.1, to: 0.78, skip: CHEST_WINDOW }),
+  ...tuftCoat(12, [0, 330, -10], [170, 115, 130], 56, { from: 0.35, to: 0.72, split: 0.1 }),
   ...[-1, 1].flatMap((side) => [
     furBall([side * 215, 680, 0], [100, 95, 100]),
+    ...tuftCoat(13 + side, [side * 215, 680, 0], [96, 90, 96], 50, { from: 0.08, to: 0.6, droop: 0.6 }),
     fur(new THREE.CylinderGeometry(78, 66, 290, 8, 3), pose([side * 110, 170, 0]), 0.3),
+    ...tuftRings(15 + side, [side * 110, 0], 72, [80, 160, 240], 54),
     painted(new THREE.BoxGeometry(130, 50, 190), NAVY, [side * 112, 25, 25]),
     ...[-1, 0, 1].map((k) => painted(new THREE.ConeGeometry(14, 40, 5).rotateX(Math.PI / 2), NAVY_DEEP, [side * 112 + k * 40, 22, 135])),
   ]),
   // A shelf of fur over the chest, so the chest plate sits in a hollow.
   furBall([0, 645, 110], [150, 50, 60], 0.5),
+  ...tuftCoat(18, [0, 645, 110], [146, 48, 58], 44, { from: 0.35, to: 0.7, droop: 0.7, split: -2 }),
 ])
 
 export const YETI_FUR_MAT = withRim(
@@ -507,7 +627,9 @@ export const YETI_FUR_MAT = withRim(
 export const YETI_HEAD_GEO = mergePainted([
   furBall([0, 30, -10], [125, 120, 120], -0.5),
   furBall([0, 140, -30], [70, 45, 70], 0),
-  paintedAt(new THREE.SphereGeometry(1, 12, 8), NAVY, pose([0, 10, 82], [0, 0, 0], [80, 72, 42])),
+  // A crown of tufts and a mane framing the face.
+  ...tuftCoat(21, [0, 30, -10], [120, 116, 116], 46, { from: 0.05, to: 0.7, droop: 0.45, split: -0.6, skip: (p) => p.z > 20 && Math.abs(p.x) < 95 && p.y < 95 }),
+  paintedAt(new THREE.SphereGeometry(1, 12, 8), FACE_BLUE, pose([0, 10, 82], [0, 0, 0], [80, 72, 42])),
   painted(new THREE.BoxGeometry(110, 24, 30), NAVY_DEEP, [0, 48, 108], [0.25, 0, 0]),
   ...[-1, 1].map((side) => painted(new THREE.SphereGeometry(13, 8, 6), ICE, [side * 30, 30, 118])),
 ])
@@ -520,13 +642,17 @@ export const YETI_MOUTH_GEO = mergePainted([
 
 export const YETI_MOUTH_OFFSET: [number, number, number] = [0, -32, 112]
 
-/** Unit limb from y 0 to 1 (instance scale: radius, length, radius): shaggy fur, shaded underneath. */
-export const YETI_LIMB_GEO = fur(new THREE.CylinderGeometry(0.85, 1, 1, 8, 3).translate(0, 0.5, 0), new THREE.Matrix4(), 0.35)
+/** Unit limb from y 0 to 1 (instance scale: radius, length, radius): shaggy fur, shaded underneath, tufts hanging back to the shoulder. */
+export const YETI_LIMB_GEO = mergePainted([
+  fur(new THREE.CylinderGeometry(0.85, 1, 1, 8, 3).translate(0, 0.5, 0), new THREE.Matrix4(), 0.35),
+  ...tuftRings(31, [0, 0], 0.92, [0.35, 0.62, 0.9], 0.75, 4.5),
+])
 
-/** Fist about its centre: fur cuff, navy palm and knuckles, navy claws pointing at the rider (+z). */
+/** Fist about its centre: fur cuff, blue palm and knuckles, navy claws pointing at the rider (+z). */
 export const YETI_FIST_GEO = mergePainted([
   furBall([0, 55, -10], [70, 50, 70], -0.3),
-  paintedAt(new THREE.IcosahedronGeometry(1, 1), NAVY, pose([0, 0, 10], [0, 0, 0], [66, 62, 72])),
+  ...tuftRings(41, [0, -10], 66, [70], 38),
+  paintedAt(new THREE.IcosahedronGeometry(1, 1), FACE_BLUE, pose([0, 0, 10], [0, 0, 0], [66, 62, 72])),
   ...[-1, 0, 1].map((k) => painted(new THREE.ConeGeometry(11, 46, 5).rotateX(Math.PI / 2), NAVY_DEEP, [k * 30, -20, 82], [0.4, 0, 0])),
 ])
 
