@@ -11,15 +11,15 @@ const fmt = new Intl.NumberFormat('en-US')
 interface Props {
   board: readonly LeaderboardEntry[]
   rank: number | null
-  /** The online top 10 or this browser's own. */
-  source: 'world' | 'device'
+  /** The online top 10, the Daily Run's online top 10 of the day, or this browser's own. */
+  source: 'world' | 'today' | 'device'
   editing: InitialsState | null
   onKey: (key: string) => void
   onSlot: (slot: number) => void
 }
 
 /** Which board it is, in a plain line under the title (the smoke checks this text). */
-const BOARD_SOURCE_LINE = { world: "The world's top 10", device: "This device's top 10" } as const
+const BOARD_SOURCE_LINE = { world: "The world's top 10", today: "The world's top 10 today", device: "This device's top 10" } as const
 
 /** The pad's arrows, drawn rather than typed: ◀ and ▶ turn into emoji on some phones. */
 const ARROW_TURN = { ArrowUp: 0, ArrowRight: 90, ArrowDown: 180, ArrowLeft: 270 } as const

@@ -85,8 +85,10 @@ inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move fo
 locked card does nothing, Enter on an open one plays the launch transition and starts that level);
 the phone run checks its cards fit 390 px.
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in
-daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, New best, no Next Level and no leaderboard or initials entry (the campaign boards stay empty)
-(`daily-results.png`; its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
+daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, New best, no Next Level and no initials entry (the campaign boards stay empty),
+send the new best once to the stubbed online board with `daily` = today and the last initials and show the day's World board it answers (#854, `data-source="today"`, `daily-results.png`); the second load's
+run, with the stub answering 503, must show no board, New best and save the local record (`daily-results-offline.png`)
+( its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 `?e2e=1` skips the loading screen, the intro and the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1` (#674): the loading screen must show (`loading.png`) and hold until the shader
 warm-up is done, then the intro must run its fixed length before Ready (`intro.seconds`, `INTRO_HANDOFF_SECONDS` late by at most two
