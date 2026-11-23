@@ -4,7 +4,7 @@ import { mergePainted, painted, paintedAt, pose } from '@/levels/environments/sh
 import { withRim } from '@/entities/enemies/enemyRim'
 import { gradientNoiseGlsl } from '@/levels/environments/shared/noiseGlsl'
 import { createRng } from '@/utils/rng'
-import { BLIMP_LAYOUT } from './bossSpecs'
+import { BLIMP_LAYOUT, blimpHullRadius } from './bossSpecs'
 import { KRAKEN_HEAD } from './krakenMotion'
 import { MEDUSA_BUST } from './medusaMotion'
 
@@ -14,35 +14,54 @@ const { hullX, hullRx, hullR, gondolaY, balloonScale, balloons } = BLIMP_LAYOUT
 
 // Orange-leaning: the park's blue sky light turns a lemon gold olive.
 const GOLD = '#ffa81f'
+// Darker than the towed balloons' lemon so they read as the targets against the hull.
+const BRASS = '#b06a14'
 const CRIMSON = '#c8102e'
 const CREAM = '#fff1cf'
 const BRONZE = '#6b4a1f'
+const WINDOW = '#1d2a4a'
+const BUNTING = [CRIMSON, CREAM, '#2a6fd6', GOLD]
+
+/** Gores around the hull, alternating gold and brass. */
+const GORES = 12
+const LATHE_SIDES = GORES * 2
+/** Panel lines: rings of brass along the hull (u, -1 tail to 1 nose). */
+const PANEL_RINGS = [-0.62, -0.25, 0.12, 0.48]
+
+const gold = new THREE.Color(GOLD)
+const brass = new THREE.Color(BRASS)
+const crimson = new THREE.Color(CRIMSON)
+
+/** One rib of the envelope from tail to nose, closer together at the ends where it curves most. */
+function envelopeProfile(): THREE.Vector2[] {
+  const rows = 26
+  return Array.from({ length: rows + 1 }, (_, i) => {
+    const x = hullX - hullRx * Math.cos((Math.PI * i) / rows)
+    return new THREE.Vector2(blimpHullRadius(x), x)
+  })
+}
+
+/** Panel lines as colour: gold and brass gores, brass rings, a crimson stripe down each flank; lighter on top. */
+function paintEnvelope(x: number, y: number, z: number): THREE.Color {
+  const u = (x - hullX) / hullRx
+  const r = Math.hypot(y, z) || 1
+  const gore = Math.floor(((Math.atan2(z, y) / (2 * Math.PI) + 1) * LATHE_SIDES) % LATHE_SIDES)
+  let c = (gore >> 1) % 2 === 0 ? gold : brass
+  if (Math.abs(z / r) > 0.97) c = crimson
+  if (u > 0.9 || PANEL_RINGS.some((p) => Math.abs(u - p) < 0.035)) c = brass
+  return c.clone().multiplyScalar(0.8 + 0.22 * (y / r))
+}
 
 function envelopeGeo(): THREE.BufferGeometry {
-  const g = new THREE.SphereGeometry(1, 28, 16).toNonIndexed()
-  g.deleteAttribute('uv')
-  const pos = g.attributes.position
-  const colors = new Float32Array(pos.count * 3)
-  const gold = new THREE.Color(GOLD)
-  const band = new THREE.Color(CRIMSON)
-  const cap = new THREE.Color(CREAM)
-  for (let t = 0; t < pos.count; t += 3) {
-    let cx = 0
-    let cy = 0
-    for (let k = 0; k < 3; k++) {
-      cx += pos.getX(t + k) / 3
-      cy += pos.getY(t + k) / 3
-    }
-    const c = cx > 0.86 ? cap : Math.abs(cy) < 0.12 ? band : gold
-    for (let k = 0; k < 3; k++) c.toArray(colors, (t + k) * 3)
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  g.scale(hullRx, hullR, hullR)
-  g.translate(hullX, 0, 0)
-  return g
+  // The lathe turns about y; laid along x, its y becomes the hull's x.
+  const g = new THREE.LatheGeometry(envelopeProfile(), LATHE_SIDES)
+  g.rotateZ(-Math.PI / 2)
+  return paintedAt(g, paintEnvelope, new THREE.Matrix4())
 }
 
 const tailX = hullX - hullRx
+const noseX = hullX + hullRx
+const GONDOLA_HALF = 62
 
 function finGeo(): THREE.BufferGeometry {
   const shape = new THREE.Shape([
@@ -54,16 +73,46 @@ function finGeo(): THREE.BufferGeometry {
   return new THREE.ExtrudeGeometry(shape, { depth: 5, bevelEnabled: false }).translate(0, hullR * 0.55, -2.5)
 }
 
+function cable(from: THREE.Vector3, to: THREE.Vector3, radius: number, color: string): THREE.BufferGeometry {
+  const d = new THREE.Vector3().subVectors(to, from)
+  const g = new THREE.CylinderGeometry(radius, radius, d.length(), 4)
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())
+  const m = new THREE.Matrix4().compose(new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5), q, new THREE.Vector3(1, 1, 1))
+  return paintedAt(g, color, m)
+}
+
+/** A flat pennant hanging point down, facing the side. */
+const pennant = (at: THREE.Vector3, color: string) =>
+  painted(new THREE.ConeGeometry(7, 15, 3).scale(1, 1, 0.2), color, [at.x, at.y - 8, at.z], [Math.PI, 0, 0])
+
+/** A garland of pennants sagging between two points, on its cord. */
+function bunting(from: THREE.Vector3, to: THREE.Vector3, sag: number): THREE.BufferGeometry[] {
+  const flags = Math.round(from.distanceTo(to) / 17)
+  const points = Array.from({ length: flags + 1 }, (_, i) => {
+    const t = i / flags
+    return new THREE.Vector3().lerpVectors(from, to, t).setY(from.y + (to.y - from.y) * t - sag * 4 * t * (1 - t))
+  })
+  return [
+    ...points.slice(1).map((p, i) => cable(points[i], p, 0.9, BRONZE)),
+    ...points.slice(1, -1).map((p, i) => pennant(p, BUNTING[i % BUNTING.length])),
+  ]
+}
+
 export const BLIMP_HULL_GEO = mergePainted([
   envelopeGeo(),
   ...[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a) => painted(finGeo(), CRIMSON, [tailX + 100, 0, 0], [a, 0, 0])),
+  // Engine nacelles on outriggers, a brass spinner at the back of each.
   ...[1, -1].flatMap((side) => [
     painted(new THREE.CylinderGeometry(10, 7, 46, 8), BRONZE, [hullX - 50, -hullR * 0.72, side * hullR * 0.95], [0, 0, Math.PI / 2]),
     painted(new THREE.BoxGeometry(6, 4, hullR * 0.5), BRONZE, [hullX - 50, -hullR * 0.72, side * hullR * 0.7]),
-    painted(new THREE.CylinderGeometry(22, 22, 1.5, 12), CREAM, [hullX - 76, -hullR * 0.72, side * hullR * 0.95], [0, 0, Math.PI / 2]),
+    painted(new THREE.ConeGeometry(7, 14, 8), BRASS, [hullX - 80, -hullR * 0.72, side * hullR * 0.95], [0, 0, Math.PI / 2]),
   ]),
   ...[-38, 38].map((dx) => painted(new THREE.BoxGeometry(4, 34, 4), BRONZE, [hullX + dx, gondolaY + 30, 0])),
-  painted(new THREE.SphereGeometry(8, 8, 6), BRONZE, [tailX, 0, 0]),
+  // The tail cone the propeller turns on.
+  painted(new THREE.CylinderGeometry(6, 9, 14, 8), BRONZE, [tailX + 2, 0, 0], [0, 0, Math.PI / 2]),
+  // Bunting from the nose down to the gondola and from the gondola back to the lower fin.
+  ...bunting(new THREE.Vector3(noseX - 18, -hullR * 0.45, 0), new THREE.Vector3(hullX + GONDOLA_HALF, gondolaY + 14, 0), 18),
+  ...bunting(new THREE.Vector3(hullX - GONDOLA_HALF, gondolaY + 14, 0), new THREE.Vector3(tailX + 50, -hullR * 1.3, 0), 22),
 ])
 
 // Low metalness: a metallic envelope mirrors the green park and reads olive, not gold.
@@ -72,11 +121,51 @@ export const BLIMP_HULL_MAT = withRim(
   { color: '#fff4d0', intensity: 0.45, power: 3 },
 )
 
+/** Where the propeller turns (about x), just behind the tail cone. */
+export const BLIMP_PROP_AT: [number, number, number] = [tailX - 8, 0, 0]
+
+/** Four pitched brass blades with cream tips round a hub, on its axis (x). */
+export const BLIMP_PROP_GEO = mergePainted([
+  painted(new THREE.SphereGeometry(8, 8, 6), BRASS),
+  ...[0, 1, 2, 3].flatMap((k) => {
+    const a = (k * Math.PI) / 2
+    const along = (d: number): [number, number, number] => [0, Math.cos(a) * d, Math.sin(a) * d]
+    return [
+      painted(new THREE.BoxGeometry(3, 34, 14), BRASS, along(22), [a + 0.55, 0, 0]),
+      painted(new THREE.BoxGeometry(3, 9, 14), CREAM, along(43), [a + 0.55, 0, 0]),
+    ]
+  }),
+])
+
+/** The glint sweeping along the hull: an arc over the top of a unit ring, placed and scaled each frame (GoldenBlimp.tsx). */
+export const BLIMP_GLINT_GEO = (() => {
+  // An open cylinder about y laid along x: θ in (π, 2π) ends up on top.
+  const g = new THREE.CylinderGeometry(1.03, 1.03, 1, 16, 1, true, Math.PI - 0.5, Math.PI + 1)
+  g.rotateZ(-Math.PI / 2)
+  return g
+})()
+
+export const BLIMP_GLINT_MAT = new THREE.MeshBasicMaterial({
+  color: '#fff3c4',
+  transparent: true,
+  opacity: 0,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+})
+
 export const BLIMP_GONDOLA_GEO = mergePainted([
-  painted(new THREE.BoxGeometry(124, 38, 44), CREAM),
-  painted(new THREE.BoxGeometry(112, 11, 45), '#2a3550', [0, 4, 0]),
-  painted(new THREE.BoxGeometry(128, 7, 48), CRIMSON, [0, -20, 0]),
-  painted(new THREE.ConeGeometry(22, 30, 4), CRIMSON, [70, -2, 0], [0, 0, -Math.PI / 2]),
+  painted(new THREE.BoxGeometry(GONDOLA_HALF * 2, 38, 44), CREAM),
+  // A row of windows down each side, cream mullions between.
+  ...[-1, 1].flatMap((side) =>
+    [-45, -27, -9, 9, 27, 45].map((x) => painted(new THREE.BoxGeometry(13, 12, 2), WINDOW, [x, 4, side * 22.2])),
+  ),
+  painted(new THREE.BoxGeometry(GONDOLA_HALF * 2 + 6, 5, 50), GOLD, [0, 21, 0]),
+  painted(new THREE.BoxGeometry(GONDOLA_HALF * 2 + 4, 7, 48), CRIMSON, [0, -20, 0]),
+  // A rounded brass keel.
+  painted(new THREE.CylinderGeometry(20, 20, GONDOLA_HALF * 2 - 8, 10, 1, false, Math.PI / 2, Math.PI), BRASS, [0, -23, 0], [0, 0, Math.PI / 2]),
+  painted(new THREE.ConeGeometry(22, 30, 4), GOLD, [GONDOLA_HALF + 8, -2, 0], [0, 0, -Math.PI / 2]),
+  painted(new THREE.ConeGeometry(18, 18, 4), CRIMSON, [-GONDOLA_HALF - 5, -2, 0], [0, 0, Math.PI / 2]),
 ])
 
 export const BLIMP_GONDOLA_MAT = withRim(
@@ -110,17 +199,11 @@ export const BLIMP_BALLOON_MAT = withRim(
 /** BALLOON_GEO's knot (y -35), scaled. */
 const BLIMP_KNOT_DROP = 35 * balloonScale * 1.05
 
-function cable(from: THREE.Vector3, to: THREE.Vector3): THREE.BufferGeometry {
-  const d = new THREE.Vector3().subVectors(to, from)
-  const g = new THREE.CylinderGeometry(1.6, 1.6, d.length(), 4)
-  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())
-  const m = new THREE.Matrix4().compose(new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5), q, new THREE.Vector3(1, 1, 1))
-  return paintedAt(g, '#4a3a20', m)
-}
-
+/** The tow line leaves a hook under the stern, clear of the propeller. */
 export const BLIMP_CABLE_GEO = (() => {
-  const knots = [new THREE.Vector3(tailX, 0, 0), ...balloons.map(([x, y]) => new THREE.Vector3(x, y - BLIMP_KNOT_DROP, 0))]
-  return mergePainted(knots.slice(1).map((k, i) => cable(knots[i], k)))
+  const hook = new THREE.Vector3(tailX + 70, 2 - blimpHullRadius(tailX + 70), 0)
+  const knots = [hook, ...balloons.map(([x, y]) => new THREE.Vector3(x, y - BLIMP_KNOT_DROP, 0))]
+  return mergePainted(knots.slice(1).map((k, i) => cable(knots[i], k, 1.6, '#4a3a20')))
 })()
 
 export const BLIMP_CABLE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true })
