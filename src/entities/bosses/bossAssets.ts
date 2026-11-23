@@ -337,13 +337,13 @@ const _amber = new THREE.Color(AMBER)
 
 /**
  * Chitin with desert dust settled on it, by each triangle's height in a unit shape (y -1 to 1): a lit crown,
- * plum-black flanks fading to sand down the sides, the amber underside below `split`; a speckle of dust breaks the fade.
+ * plum-black flanks fading to sand down to `split`, the amber underside below it; a speckle of dust breaks the fade.
  */
 function dusted(geo: THREE.BufferGeometry, matrix: THREE.Matrix4, split = -0.25): THREE.BufferGeometry {
   return paintedAt(geo, (x, y, z) => {
     if (y < split - 0.2) return _amber
-    const speckle = (Math.abs(Math.floor(x * 41 + z * 29 + y * 17)) % 5) * 0.06
-    const fall = THREE.MathUtils.smoothstep(-y, 0, 0.2 - split) * 0.7 + speckle * (y < 0 ? 1 : 0)
+    const speckle = y < 0 ? (Math.abs(Math.floor(x * 41 + z * 29 + y * 17)) % 5) * 0.06 : 0
+    const fall = THREE.MathUtils.smoothstep(-y, 0, 0.2 - split) * 0.7 + speckle
     return new THREE.Color().lerpColors(y > 0.45 ? _sun : _chitin, _dust, Math.min(1, fall))
   }, matrix)
 }
@@ -456,7 +456,8 @@ const VENOM_HOT = new THREE.Color('#ff7a2a')
 export const SCORPION_STINGER_GEO = mergePainted([
   paintedAt(new THREE.SphereGeometry(1, 14, 10), (_x, y) => new THREE.Color().lerpColors(VENOM_DEEP, VENOM_HOT, (y + 1) / 2),
     pose([0, 40, 0], [0, 0, 0], [46, 58, 46])),
-  ...[0, 1, 2].map((k) => paintedAt(new THREE.TorusGeometry(1, 0.06, 4, 16), '#ffc060', pose([0, 14 + 24 * k, 0], [Math.PI / 2, 0, 0], [46 * [0.86, 0.99, 0.9][k], 46 * [0.86, 0.99, 0.9][k], 1]))),
+  // Glowing seams round the bulb.
+  ...[[14, 40], [38, 46], [62, 41]].map(([y, r]) => painted(new THREE.TorusGeometry(r, 3, 4, 16), '#ffc060', [0, y, 0], [Math.PI / 2, 0, 0])),
   painted(new THREE.ConeGeometry(17, 95, 8), '#ff4422', [0, 120, 22], [0.45, 0, 0]),
   painted(new THREE.OctahedronGeometry(9, 0), '#ffe08a', [0, 162, 42]),
 ])
@@ -528,6 +529,8 @@ function fur(geo: THREE.BufferGeometry, matrix: THREE.Matrix4, split = -0.2): TH
 const furBall = (at: [number, number, number], scale: [number, number, number], split?: number, detail = 1) =>
   fur(new THREE.IcosahedronGeometry(1, detail), pose(at, [0, 0, 0], scale), split)
 
+const TUFT_LIGHT = FUR_LIGHT.map((c) => new THREE.Color(c))
+const TUFT_SHADE = FUR_SHADE.map((c) => new THREE.Color(c))
 const _tuftDir = new THREE.Vector3()
 const _tuftQ = new THREE.Quaternion()
 const _tuftUp = new THREE.Vector3(0, 1, 0)
@@ -540,7 +543,7 @@ const _tuftS = new THREE.Vector3()
  * for a unit limb, whose instance scale stretches y.
  */
 function tuft(at: THREE.Vector3, normal: THREE.Vector3, length: number, droop: number, shaded: boolean, rng: () => number, stretchY = 1) {
-  const tones = (shaded ? FUR_SHADE : FUR_LIGHT).map((c) => new THREE.Color(c))
+  const tones = shaded ? TUFT_SHADE : TUFT_LIGHT
   const [a, b] = [tones[Math.floor(rng() * 3)], tones[Math.floor(rng() * 3)]]
   const cone = new THREE.ConeGeometry(length * 0.42, length, 4, 1, true).translate(0, length / 2, 0).rotateY(rng() * Math.PI)
   _tuftDir.copy(normal).multiplyScalar(1 - droop).addScaledVector(_tuftUp, -droop).normalize()
