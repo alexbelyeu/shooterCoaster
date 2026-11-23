@@ -12,7 +12,7 @@ interface Ride {
 /** Placed where no pass of the level 1 track (or its towers) crosses them. */
 export const RIDES: Ride[] = [
   { kind: 'ferrisWheel', x: 510, z: -90, radius: 80 },
-  { kind: 'ferrisWheel', x: -500, z: 130, radius: 60 },
+  { kind: 'ferrisWheel', x: -636, z: 130, radius: 60 },
   { kind: 'carousel', x: -450, z: -220, radius: 25 },
   { kind: 'carousel', x: 220, z: 380, radius: 20 },
   { kind: 'carousel', x: 360, z: 320, radius: 20 },

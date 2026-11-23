@@ -51,8 +51,10 @@ a **station** the ride starts in (GO launches it over fins), a **drop track** (t
 free-falls with it and locks into the track below), a **jump gap** (a booster sets the speed its ballistic flight was
 built for; no rails across) and a **backwards** stretch between two turntables. Their stops last their seconds whatever
 the beats' solver does to the stretches round them. `rides.png`'s second half rides them (`mechanicsRide.ts`).
-On a backwards stretch the rider faces back but spawning still places waves ahead along the track, out of view, until
-#716 places them for a rider facing back: keep a level's waves off the stretch until then.
+On a backwards stretch (`withBackwards` puts it on the level's arc table) the spawner looks where the seat does (#716):
+`trackView` turns the look half round, and a formation group the rider meets there lies back along the track already
+ridden, never ahead of where the rider is when it lands. Trackside and wall waves only get the honest view check: their
+slots are still laid ahead, so keep those off the stretch.
 A **junction** (#702, `kind: 'junction'`, on either ride but only a spline track) is the shoot-to-switch: a branch through
 its `points` from the fork at `from` to the merge at `to`, with a switch sign before the fork. The ride's timing stays on
 the main track, so the branch is ridden faster; no other mechanic may sit between its sign and its merge (`checkMechanics`).
@@ -108,8 +110,10 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
 
 ## The other levels (ideas for their storyboards)
 
-- **Theme Park (1):** a classic: a station launch, a wooden-coaster lift hill, camelback airtime
-  over the midway, a head-chopper through the Ferris wheel, the photo at the splash.
+- **Theme Park (1):** built (#863, `themePark/parkTrack.ts`, its storyboard and seconds at the top): a station
+  launch, a lift hill over the park, a 60° first drop past the big Ferris wheel into the tunnel, two camelbacks,
+  the near miss beside the small wheel's gondolas (28 s), a second lift cresting as the blimp arrives (40 s), a slow
+  helix round the carousel for the boss fight and a last hill into the brake run. The photo waits on #701.
 - **Desert (2):** the drop into the Pyramid as a dark ride (torches, the Scorpion's lair), a jump
   gap over a canyon between mesas.
 - **Ocean (3):** a splashdown, a glass tunnel under the water with the Kraken passing overhead,

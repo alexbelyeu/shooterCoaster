@@ -1,0 +1,5 @@
+## 2026-11-23 — Generated ride data is rounded to fit the startup JS budget (builder, #863)
+
+**Context:** The level registry is startup JS, so ride-kit levels ship their tracks as generated plain numbers (`gymLevel.ts`, `parkLevel.ts`). Level 1's v2 ride did not fit the 436 KB gz startup budget at full precision.
+**Decision:** `gen-park-level.mjs` rounds level 1's control points to whole world units (delta-encoded); `gen-gym-level.mjs` writes level 6's numbers to 6 significant digits (under 0.01 units in the hall). Ride tests check the shipped (rounded) track, not only the authored one, so rounding can't quietly break a drop angle or a clearance.
+**Consequences:** Every new v2 level hits the same pressure. The lasting fix is to load each level's track from its lazy chunk and keep only level 1's eager for the title; until then, a ride test against `getLevelConfig(id).track` is required for anything the rounding could move.

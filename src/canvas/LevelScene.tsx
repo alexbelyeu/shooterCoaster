@@ -24,7 +24,7 @@ import BulletPool from '@/combat/projectiles/BulletPool'
 import Pickups from '@/combat/pickups/Pickups'
 import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
-import { hardRouteFor, hardRouteOf } from '@/track/mechanics'
+import { hardRouteFor, hardRouteOf, withBackwards } from '@/track/mechanics'
 import { sampleTrackXZ, setTrackOutline } from '@/track/trackOutline'
 import { goldenBalloonCount } from '@/levels/scoring'
 import { eventBus } from '@/core/EventBus'
@@ -96,7 +96,10 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
   const curve = useMemo(() => createTrackCurve(track), [track])
 
   const trackDims = useMemo(() => getTrackDimensions(track), [track])
-  const trackTable = useMemo(() => withTunnels(buildArcTable(curve), track.tunnels, trackDims.trackScale), [curve, track.tunnels, trackDims])
+  const trackTable = useMemo(
+    () => withBackwards(withTunnels(buildArcTable(curve), track.tunnels, trackDims.trackScale), track.mechanics),
+    [curve, track.tunnels, track.mechanics, trackDims],
+  )
   const pointAt = useMemo(() => (t: number) => curve.getPointAt(t), [curve])
   const trackSamples = useMemo(() => sampleTrackPath((t) => curve.getPointAt(t)), [curve])
   const heightFn = useMemo(() => groundOf(biome, def, trackSamples), [biome, def, trackSamples])
