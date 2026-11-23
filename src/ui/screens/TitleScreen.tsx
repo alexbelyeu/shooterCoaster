@@ -4,7 +4,7 @@ import { initAudio } from '@/audio/AudioEngine'
 import { prepareSfx } from '@/audio/sfx'
 import { useGameStore } from '@/store/useGameStore'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { markStartup } from '@/core/startupMarks'
 import { titleAction, type TitleAction } from './titleKeys'
 import { handPosterToUi, posterShown } from '@/app/poster'
@@ -133,7 +133,7 @@ export default function TitleScreen({ onPlay, onWorlds, onSettings }: TitleScree
   return (
     <div className={attract ? 'title-screen is-attract' : 'title-screen'}>
       {/* Over the poster its still logo is already drawn: this one lands on it at rest, no build-in. */}
-      <motion.h1
+      <m.h1
         className="title-logo"
         aria-label={LOGO_TEXT}
         initial={overPoster ? false : { opacity: 0 }}
@@ -141,23 +141,23 @@ export default function TitleScreen({ onPlay, onWorlds, onSettings }: TitleScree
         transition={{ duration: 0.3, ease: 'easeOut' }}
       >
         <TitleLogo still={reduced || overPoster} />
-      </motion.h1>
+      </m.h1>
 
       <p className="title-tagline fair-over-ride">
         {SUBTITLE_WORDS.map((word, i) => (
-          <motion.span
+          <m.span
             key={word}
             initial={overPoster ? false : { opacity: 0, y: reduced ? 0 : 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.6 + i * 0.2 }}
           >
             {word}
-          </motion.span>
+          </m.span>
         ))}
       </p>
 
       {/* The plates fade in on opacity alone, so they land exactly on the poster's; CSS presses them. */}
-      <motion.button
+      <m.button
         className="fair-plate fair-go title-play"
         onClick={() => void leave('play')}
         initial={{ opacity: 0 }}
@@ -165,10 +165,10 @@ export default function TitleScreen({ onPlay, onWorlds, onSettings }: TitleScree
         transition={{ duration: 0.4, delay: playIn }}
       >
         Play
-      </motion.button>
+      </m.button>
 
       <div className="title-row">
-        <motion.button
+        <m.button
           className="fair-plate worlds-button"
           onClick={() => void leave('worlds')}
           initial={{ opacity: 0 }}
@@ -176,8 +176,8 @@ export default function TitleScreen({ onPlay, onWorlds, onSettings }: TitleScree
           transition={{ duration: 0.4, delay: playIn + 0.2 }}
         >
           Worlds
-        </motion.button>
-        <motion.button
+        </m.button>
+        <m.button
           className="fair-plate settings-button"
           onClick={onSettings}
           initial={{ opacity: 0 }}
@@ -185,21 +185,21 @@ export default function TitleScreen({ onPlay, onWorlds, onSettings }: TitleScree
           transition={{ duration: 0.4, delay: playIn + 0.2 }}
         >
           Settings
-        </motion.button>
+        </m.button>
       </div>
 
       {showHint && (
-        <motion.p
+        <m.p
           className="title-hint fair-over-ride"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.4, delay: playIn + 0.6 }}
         >
           {hint}
-        </motion.p>
+        </m.p>
       )}
 
-      <motion.p
+      <m.p
         className="credits fair-over-ride"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -209,7 +209,7 @@ export default function TitleScreen({ onPlay, onWorlds, onSettings }: TitleScree
         <a href="https://github.com/alexbelyeu/shooterCoaster" target="_blank" rel="noreferrer">
           Alex Belyeu
         </a>
-      </motion.p>
+      </m.p>
 
       {internal && <p className="internal-marker fair-over-ride">Internal device, not tracked</p>}
 

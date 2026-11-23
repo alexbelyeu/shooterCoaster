@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { eventBus } from '@/core/EventBus'
 import { isFeedbackHeld } from '@/combat/hitFeedback'
 
@@ -93,7 +93,7 @@ export default function ScorePopups() {
     <div className="score-popups-container">
       <AnimatePresence>
         {popups.map((popup) => (
-          <motion.div
+          <m.div
             key={popup.id}
             className={popupClass(popup)}
             initial={{ opacity: 1, x: popup.screenX, y: popup.screenY, scale: 0.5 }}
@@ -106,7 +106,7 @@ export default function ScorePopups() {
             {popup.multiplier > 1 && (
               <span className="score-popup-combo">×{popup.multiplier}</span>
             )}
-          </motion.div>
+          </m.div>
         ))}
       </AnimatePresence>
     </div>
