@@ -1968,6 +1968,33 @@ async function rideFast(page, fraction) {
   return { ...w }
 }
 
+/**
+ * #888: the level core's chunk fails once at startup. The browser keeps that import failed for the page's life, so the
+ * page must reload (`app/staleReload.ts`) and the reloaded page load the level. `page` is fresh, its route not yet set.
+ */
+async function chunkRetryCheck(page, base, levelId) {
+  const requests = []
+  await page.route(/\/LevelScene-[^/]*\.js$/, (route) => {
+    requests.push(route.request().url())
+    return requests.length === 1 ? route.abort() : route.continue()
+  })
+  let loads = 0
+  page.on('load', () => loads++)
+  await page.goto(`${base}/?e2e=1`)
+  const problems = []
+  const deadline = Date.now() + 30000
+  while (requests.length < 2 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 250))
+  if (!requests.length) problems.push('the level chunk was never requested')
+  else if (requests.length === 1) problems.push('the failed level chunk was never fetched again (the page never reloaded)')
+  else {
+    await page.waitForLoadState('load')
+    await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
+    if (loads < 2) problems.push(`the chunk was fetched again without a reload (${loads} page load)`)
+    if (!(await startLevelReady(page, levelId))) problems.push(`${NOT_LOADED(levelId)} after its chunk failed once`)
+  }
+  return { id: 'chunkRetry', level: levelId, requests: requests.length, loads, problems }
+}
+
 /** Sense of speed (#27) at the default Screen-shake setting: streaks and bank at top speed, within the caps (speed.png). */
 async function speedCheck(page, levelId) {
   if (!(await startLevelReady(page, levelId))) return { id: 'speed', problems: [NOT_LOADED(levelId)] }
@@ -4610,6 +4637,23 @@ async function run() {
   // 6. Top speed: banking + wind streaks (speed.png)
   if (has('speed') && first) await pageStep((page) => speedCheck(page, SPEED_LEVEL && wanted.includes(SPEED_LEVEL) ? SPEED_LEVEL : first))
 
+  // 6a. A lazy chunk that fails once loads after the page reloads (#888): its own page, so the route is set before the first load
+  if (has('chunkRetry') && first) {
+    await step(async () => {
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+      const page = await ctx.newPage()
+      const errors = []
+      collectErrors(page, errors)
+      const r = await chunkRetryCheck(page, base, first)
+      // The aborted request is the one expected error.
+      r.errors = [...errors.filter((e) => !/Failed to load resource: net::ERR_FAILED/.test(e)), ...(await page.evaluate(() => window.__SC_TEST__.errors))]
+      if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+      r.ok = r.problems.length === 0
+      await ctx.close()
+      return r
+    })
+  }
+
   // 6b. Spawn choreography: the crow wave's tell, then its V flying in (level2-wave.png)
   if (has('wave') && wanted.includes(WAVE_CHECK.level)) await pageStep(waveCheck)
 
@@ -4733,6 +4777,8 @@ async function run() {
         ? ` title=${r.engine.title} nodes ${r.engine.nodes.join('->')} position ${r.engine.position.map((p) => p.toFixed(1)).join('->')}s` +
           ` sfxNodes ${r.engine.sfxNodes.join('->')} voices ${r.engine.voices ? `peak ${r.engine.voices.peak}/${r.engine.voices.budget} stolen ${r.engine.voices.stolen} dropped ${r.engine.voices.rejected}` : 'none'}` +
           ` ducked=${r.engine.ducked} layers ${r.engine.layers ? `up ${r.engine.layers.rise.join('->')} paused ${r.engine.layers.paused} resumed ${r.engine.layers.resumed} down ${r.engine.layers.fall.join('->')}` : 'none'} paused at ${r.engine.pausedHeld?.at.toFixed(1)}s (${r.engine.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.engine.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.engine.results}`
+      : r.id === 'chunkRetry'
+        ? ` ${r.level}: the level chunk's first request aborted, ${r.requests} request(s) over ${r.loads} page load(s)`
       : r.speed
         ? ` ${r.speed.level} at track ${r.speed.fraction.toFixed(3)}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile

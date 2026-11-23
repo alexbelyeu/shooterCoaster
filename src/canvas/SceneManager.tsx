@@ -10,7 +10,7 @@ import { loadLevelScene } from './loadLevelScene'
 let LevelScene = lazy(loadLevelScene)
 
 /**
- * A level chunk that failed to load (after its retries): back to the title, and a fresh `lazy` and no remembered world
+ * A level chunk that failed to load (the page reloads when it can, `app/staleReload.ts`): back to the title, and a fresh `lazy` and no remembered world
  * failure (#889), so the next start fetches again.
  */
 class LevelSceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

@@ -18,7 +18,7 @@ import { initialsKey, type InitialsState } from './initialsEntry'
 import ResultsLeaderboard from './ResultsLeaderboard'
 import ResultsMarquee from './ResultsMarquee'
 import { FairBoard, FairStars } from '@/ui/Fair'
-import { isNewBuildLive, reloadForNewBuild } from '@/app/staleReload'
+import { isReloadDue, reloadIfDue } from '@/app/staleReload'
 import { saveGhost } from '@/combat/ghost'
 import { recording } from '@/combat/ghostTrack.hot'
 
@@ -97,10 +97,10 @@ export default function ResultsScreen() {
   function leave(to: 'levels' | 'replay' | 'next') {
     if (left.current) return
     left.current = true
-    // A deploy replaced this build mid-session (#823): the next screen loads fresh, its sign-off sent first.
-    if (isNewBuildLive()) {
+    // A chunk failed mid-session (#823, #888): the next screen loads fresh, its sign-off sent first.
+    if (isReloadDue()) {
       submitOnline.current?.(lettersRef.current)
-      if (reloadForNewBuild()) return
+      if (reloadIfDue()) return
     }
     const store = useGameStore.getState()
     if (to === 'replay') store.restartRun('results')

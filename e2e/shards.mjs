@@ -5,7 +5,7 @@
 
 export const UI_STEPS = ['title', 'landing', 'levelSelect', 'daily', 'settings', 'mobile', 'mobileMenus']
 /** On the run's first level; `frenzy` happens inside its ride and `seed` compares against that ride's spawns. */
-export const FIRST_LEVEL_STEPS = ['frenzy', 'seed', 'quality', 'pause', 'countdown', 'speed']
+export const FIRST_LEVEL_STEPS = ['frenzy', 'seed', 'quality', 'pause', 'countdown', 'speed', 'chunkRetry']
 /** `tour`, `shot`, `results` and `share` check the ride's own page (`tour` before the ride, the others after its combat). */
 export const LEVEL_STEPS = ['ride', 'tour', 'shot', 'results', 'share', 'wave', 'weather', 'boss', 'pickup', 'switch', 'dark', 'audio', 'night', 'pacing']
 export const STEPS = [...UI_STEPS, ...FIRST_LEVEL_STEPS, ...LEVEL_STEPS]
@@ -55,7 +55,7 @@ export const SHARDS = {
   ui: { steps: ['title', 'landing'] },
   menus: { steps: ['levelSelect', 'settings'] },
   level1: { levels: ['level1'], steps: ['ride', 'shot', 'results'] },
-  'level1-steps': { levels: ['level1'], steps: ['quality', 'speed'] },
+  'level1-steps': { levels: ['level1'], steps: ['quality', 'speed', 'chunkRetry'] },
   level2: { levels: ['level2'], steps: ['ride'] },
   level3: { levels: ['level3'], steps: ['ride'] },
   level4: { levels: ['level4'], steps: ['ride'] },
