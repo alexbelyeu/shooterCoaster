@@ -47,6 +47,12 @@ function telemetrySection(summary, budget) {
   const gpus = lost.gpus.length ? ` (${lost.gpus.map((g) => `${short(g.gpu, 40)} ×${g.sessions}`).join(', ')})` : ''
   out.push(`${summary.sessions}${summary.truncated ? '+' : ''} play sessions reported · ${summary.errors.length ? `${summary.errors.length} distinct errors` : 'no errors'} · ` +
     `${lost.sessions} WebGL context losses${gpus}`)
+  // The renderer decision's data (#850): absent from a server deployed before it.
+  const w = summary.webgpu
+  if (w) {
+    const known = w.yes + w.no
+    out.push('', `WebGPU available: ${w.yes} of ${known} sessions that answered${known ? ` (${Math.round((100 * w.yes) / known)}%)` : ''} · ${w.unknown} unknown`)
+  }
   out.push('')
   if (summary.errors.length) {
     out.push('| Sessions | Count | Error | Where | Versions |', '|---|---|---|---|---|')

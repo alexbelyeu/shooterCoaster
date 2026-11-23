@@ -64,10 +64,10 @@ fails only past 1.5x it: `level3 shard took 11.0 min, budget 7.0, fails past 10.
 slower than a normal one's, `e2e/shardTime.mjs`). The deep checks (full boss fights, waves, the weather pulses, level 1's Night Ride, FRENZY end, initials entry,
 share, daily, pause, countdown, pickups, scrim, the phone menus, and `pacing`: every level's whole run, failing a level whose
 time with nothing to shoot is over its `budgets.json` `pacing` ceilings, `e2e-results/pacing.json`; game logic among them has unit tests next to its
-pure module) run in the full smoke, nightly on production (`prod-smoke.yml`, as three parallel parts, `--nightly-part <main|deep|pacing>`; a red one opens `agent:prod-broken`).
+pure module) run in the full smoke, nightly on production (`prod-smoke.yml`, as three parallel parts, `--nightly-part <main|deep|pacing>`, plus `slow`, level1 and level3's ride + results under cpu 4x (#539); a red one opens `agent:prod-broken`).
 Every level's ride and `pacing` line ends with `programs after warm-up: +N` (shaders `ShaderWarmup` missed, with the moment
-each appeared; reported, not failed, #536), and `--cpu-throttle 4` runs the ride under CDP CPU throttling, adding the longest
-frame and the frames over 100 ms per level; `--level-chunk-delay <ms>` serves the lazy level chunk that late (every step waits for `levelReady()`, #464). A red `smoke (<shard>)` check names the shard: reproduce it with
+each appeared, #536; the nightly's `slow` and `pacing` parts, or `--gate-programs`, fail a level with one, PR shards only report it), and `--cpu-throttle 4` runs the ride under CDP CPU throttling, adding the longest
+frame and the frames over 100 ms per level (`e2e-results/throttle.json`); `--level-chunk-delay <ms>` serves the lazy level chunk that late (every step waits for `levelReady()`, #464). A red `smoke (<shard>)` check names the shard: reproduce it with
 `node e2e/smoke.mjs --shard <name>`, a nightly failure with its step (`--steps` / `--levels` pick any subset); its screenshots are the run's
 `e2e-results-<shard>` artifact. A new level needs a shard and a budget (`e2e/shards.test.ts` fails until then).
 `drawCalls`/`triangles` vary with the camera: compare levels with the `scene` totals the

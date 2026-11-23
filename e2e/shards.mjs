@@ -39,12 +39,15 @@ const PHONE_STEPS = ['mobile', 'mobileMenus']
 
 /**
  * The nightly production run of the full smoke, split into parallel jobs (prod-smoke.yml's `nightly-part` matrix, #570):
- * one run outgrew the job's 60 min cap once level 6 joined every deep step. Together they make every step of the full run once.
+ * one run outgrew the job's 60 min cap once level 6 joined every deep step. Together the parts not marked `extra` make
+ * every step of the full run once. `gatePrograms` fails a level whose run compiled a shader after its warm-up (#539).
+ * `slow` is an extra pass (#539): level1 and level3's ride under `--cpu-throttle 4`, for the long-frame trend (throttle.json).
  */
 export const NIGHTLY_PARTS = {
   main: { steps: [...UI_STEPS, ...FIRST_LEVEL_STEPS, 'ride', 'tour', 'shot', 'results', 'share'] },
   deep: { steps: ['wave', 'weather', 'boss', 'pickup', 'switch', 'dark', 'audio', 'night'] },
-  pacing: { steps: ['pacing'] },
+  pacing: { steps: ['pacing'], gatePrograms: true },
+  slow: { steps: ['ride', 'results'], levels: ['level1', 'level3'], cpuThrottle: 4, gatePrograms: true, extra: true },
 }
 
 /** One `smoke (<name>)` CI job each (ci.yml matrix, budgets.json `smokeSeconds`); `shot` and `results` don't depend on the level. */
@@ -61,13 +64,15 @@ export const SHARDS = {
   mobile: { steps: ['mobile'] },
 }
 
-/** Steps + levels (null = all) from the smoke's flags; the default is every desktop step, plus the phone run with --mobile. */
+/**
+ * Steps + levels (null = all) from the smoke's flags, plus a nightly part's `cpuThrottle` and `gatePrograms`; the default is every desktop step, plus the phone run with --mobile.
+ */
 export function planRun({ shard, nightlyPart, steps, levels, mobile, skipDesktop } = {}) {
   if (nightlyPart !== undefined) {
     const spec = NIGHTLY_PARTS[nightlyPart]
     if (!spec) throw new Error(`unknown nightly part "${nightlyPart}" (parts: ${Object.keys(NIGHTLY_PARTS).join(', ')})`)
     if (shard !== undefined || steps !== undefined || levels !== undefined) throw new Error('--nightly-part sets the steps; drop --shard / --steps / --levels')
-    return checked(new Set(spec.steps), null)
+    return { ...checked(new Set(spec.steps), spec.levels ?? null), cpuThrottle: spec.cpuThrottle ?? 1, gatePrograms: !!spec.gatePrograms }
   }
   if (shard !== undefined) {
     const spec = SHARDS[shard]

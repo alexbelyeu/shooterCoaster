@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   addFrame,
   buildReport,
+  detectWebGpu,
   cleanMessage,
   createLevelFrames,
   firstStackFrame,
@@ -14,7 +15,7 @@ import {
   type ErrorEntry,
 } from './telemetryReport'
 
-const device = { version: '0.1.0+abc1234', touch: true, cores: 8, gpu: 'Adreno (TM) 640' }
+const device = { version: '0.1.0+abc1234', touch: true, cores: 8, gpu: 'Adreno (TM) 640', webgpu: true }
 
 function played(level: string, frameMs: number[], quality = 'auto', dpr = 1.5) {
   const lf = createLevelFrames(level)
@@ -86,6 +87,7 @@ describe('buildReport', () => {
       touch: true,
       cores: 8,
       gpu: 'Adreno (TM) 640',
+      webgpu: true,
       contextLost: 0,
       errors: [],
       levels: [{ level: 'level1', quality: 'low', dpr: 1.3, frames: MIN_FRAMES, p50Ms: 20.25, p95Ms: 20.25, maxMs: 20, longFrames: 0 }],
@@ -109,5 +111,21 @@ describe('buildReport', () => {
     expect(report.cores).toBeNull()
     expect(report.gpu).toHaveLength(120)
     expect(buildReport({ ...device, gpu: '   ' }, [], 1, [])!.gpu).toBeNull()
+  })
+
+  it('carries the WebGPU answer as it is: yes, no or not known yet', () => {
+    for (const webgpu of [true, false, null]) expect(buildReport({ ...device, webgpu }, [], 1, [])!.webgpu).toBe(webgpu)
+  })
+})
+
+describe('detectWebGpu', () => {
+  const adapter = (result: () => Promise<unknown>) => ({ gpu: { requestAdapter: result } })
+
+  it('is yes only for an adapter, never waiting past its timeout', async () => {
+    expect(await detectWebGpu(adapter(async () => ({})))).toBe(true)
+    expect(await detectWebGpu(adapter(async () => null))).toBe(false)
+    expect(await detectWebGpu({})).toBe(false)
+    expect(await detectWebGpu(adapter(() => Promise.reject(new Error('blocked'))))).toBe(false)
+    expect(await detectWebGpu(adapter(() => new Promise(() => {})), 5)).toBe(false)
   })
 })

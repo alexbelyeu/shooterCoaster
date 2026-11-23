@@ -50,6 +50,8 @@ export interface TelemetryReport {
   touch: boolean
   cores: number | null
   gpu: string | null
+  /** Whether the browser offered a WebGPU adapter (#850); null when the check hadn't answered by the beacon. */
+  webgpu: boolean | null
   contextLost: number
   errors: ErrorEntry[]
   levels: LevelReport[]
@@ -120,6 +122,30 @@ export interface Device {
   touch: boolean
   cores: number | null
   gpu: string | null
+  webgpu: boolean | null
+}
+
+/** `navigator`'s WebGPU entry point, as far as the check needs it (lib.dom doesn't type it yet). */
+export interface GpuNavigator {
+  gpu?: { requestAdapter(): Promise<unknown> }
+}
+
+export const WEBGPU_TIMEOUT_MS = 3000
+
+/** Whether the browser hands out a WebGPU adapter (#850): never a device, false on any failure or a hung request. */
+export async function detectWebGpu(nav: GpuNavigator, timeoutMs = WEBGPU_TIMEOUT_MS): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    if (!nav.gpu) return false
+    const timeout = new Promise<null>((resolve) => {
+      timer = setTimeout(resolve, timeoutMs, null)
+    })
+    return (await Promise.race([nav.gpu.requestAdapter(), timeout])) != null
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10
@@ -144,5 +170,5 @@ export function buildReport(device: Device, errors: ErrorEntry[], contextLost: n
   const { cores: c } = device
   const cores = c !== null && Number.isSafeInteger(c) && c > 0 ? Math.min(256, c) : null
   const gpu = device.gpu ? cut(device.gpu.replace(/\s+/g, ' ').trim(), MAX_GPU) || null : null
-  return { version: device.version, touch: device.touch, cores, gpu, contextLost: Math.min(100, contextLost), errors: errors.slice(0, MAX_ERRORS), levels: played }
+  return { version: device.version, touch: device.touch, cores, gpu, webgpu: device.webgpu, contextLost: Math.min(100, contextLost), errors: errors.slice(0, MAX_ERRORS), levels: played }
 }

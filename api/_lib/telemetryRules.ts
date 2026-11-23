@@ -34,6 +34,8 @@ export interface Report {
   touch: boolean
   cores: number | null
   gpu: string | null
+  /** Could the browser have run WebGPU (#850); null when unknown, or the report came from before it. */
+  webgpu: boolean | null
   contextLost: number
   errors: ReportError[]
   levels: ReportLevel[]
@@ -66,18 +68,19 @@ function checkLevel(v: unknown): ReportLevel | null {
 
 export function checkReport(body: unknown): Checked<Report> {
   if (!isRecord(body)) return { ok: false, error: 'bad body' }
-  const { version, touch, cores, gpu, contextLost, errors, levels } = body
+  const { version, touch, cores, gpu, webgpu = null, contextLost, errors, levels } = body
   if (typeof version !== 'string' || !VERSION.test(version)) return { ok: false, error: 'bad version' }
   if (typeof touch !== 'boolean') return { ok: false, error: 'bad touch' }
   if (cores !== null && !isInt(cores, 1, 256)) return { ok: false, error: 'bad cores' }
   if (gpu !== null && !isText(gpu, 1, 120)) return { ok: false, error: 'bad gpu' }
+  if (webgpu !== null && typeof webgpu !== 'boolean') return { ok: false, error: 'bad webgpu' }
   if (!isInt(contextLost, 0, 100)) return { ok: false, error: 'bad contextLost' }
   if (!Array.isArray(errors) || errors.length > 5 || !Array.isArray(levels) || levels.length > 8) return { ok: false, error: 'bad lists' }
   const goodErrors = errors.map(checkError)
   const goodLevels = levels.map(checkLevel)
   if (goodErrors.some((e) => !e) || goodLevels.some((l) => !l)) return { ok: false, error: 'bad entry' }
   if (!goodErrors.length && !goodLevels.length && !contextLost) return { ok: false, error: 'empty' }
-  return { ok: true, value: { version, touch, cores, gpu, contextLost, errors: goodErrors as ReportError[], levels: goodLevels as ReportLevel[] } }
+  return { ok: true, value: { version, touch, cores, gpu, webgpu, contextLost, errors: goodErrors as ReportError[], levels: goodLevels as ReportLevel[] } }
 }
 
 /** The rate limit's key: an HMAC of the IP under a salt that changes every UTC day, so no row links to another day's. */
@@ -88,6 +91,8 @@ export interface ReportRow {
   client_version: string
   touch: boolean
   gpu: string | null
+  /** Absent until the `0003_telemetry_webgpu.sql` migration has run. */
+  webgpu?: boolean | null
   context_lost: number
   errors: ReportError[]
   levels: ReportLevel[]
@@ -130,6 +135,8 @@ export interface TelemetrySummary {
   truncated: boolean
   errors: ErrorSummary[]
   contextLost: { sessions: number; gpus: { gpu: string; sessions: number }[] }
+  /** Sessions whose browser offered a WebGPU adapter (#850), didn't, or didn't say. */
+  webgpu: { yes: number; no: number; unknown: number }
   frames: FrameSummary[]
 }
 
@@ -160,7 +167,9 @@ export function summarize(rows: ReportRow[], now: number, truncated = false): Te
   >()
   const lostGpus = new Map<string, number>()
   let lostSessions = 0
+  const webgpu = { yes: 0, no: 0, unknown: 0 }
   for (const row of rows) {
+    webgpu[row.webgpu === true ? 'yes' : row.webgpu === false ? 'no' : 'unknown']++
     const seenHere = new Set<string>()
     for (const e of Array.isArray(row.errors) ? row.errors : []) {
       const key = errorKey(e.message, e.frame)
@@ -209,6 +218,7 @@ export function summarize(rows: ReportRow[], now: number, truncated = false): Te
       sessions: lostSessions,
       gpus: [...lostGpus].map(([gpu, sessions]) => ({ gpu, sessions })).sort((a, b) => b.sessions - a.sessions || a.gpu.localeCompare(b.gpu)).slice(0, 5),
     },
+    webgpu,
     frames: [...frames.values()]
       .map((f) => ({
         level: f.level,
