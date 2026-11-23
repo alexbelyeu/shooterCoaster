@@ -3,7 +3,7 @@ import type { BiomeFeaturesProps } from '../../shared/types'
 import Pyramid from '../../Pyramid'
 import RockArches from '../../RockArches'
 import { ARCH_PILLAR_BASE_RADIUS, archFeet, PYRAMID_HALF_BASE, PYRAMID_HEIGHT } from '../../landmarkDimensions'
-import { layoutDesert, MESA_HEIGHT } from './desertLayout'
+import { layoutDesert, MESA_CLIFF_RADIUS, MESA_HEIGHT, MESA_SHADOW_RADIUS, MESA_TOP_RADIUS } from './desertLayout'
 import DustDevils from './DustDevils'
 import { ARCHES, PYRAMID } from './landmarks'
 import Mesas from './Mesas'
@@ -31,8 +31,8 @@ export default function DesertFeatures({ heightFn, groundFn, track, atmosphere }
         z: m.z,
         baseY: m.y,
         topY: m.y + MESA_HEIGHT * m.scale,
-        baseR: 100 * m.scale,
-        topR: 57 * m.scale,
+        baseR: MESA_CLIFF_RADIUS * m.scale,
+        topR: MESA_TOP_RADIUS * m.scale,
       })),
     ],
     [layout, pyramidY],
@@ -43,7 +43,7 @@ export default function DesertFeatures({ heightFn, groundFn, track, atmosphere }
       () => [
         { x: PYRAMID.x, z: PYRAMID.z, halfX: PYRAMID_HALF_BASE, halfZ: PYRAMID_HALF_BASE, spread: 70, strength: 0.5 },
         ...ARCH_SHADOWS,
-        ...layout.mesas.map((m) => roundCaster(m.x, m.z, 120 * m.scale, 0.45, 0.35)),
+        ...layout.mesas.map((m) => roundCaster(m.x, m.z, MESA_SHADOW_RADIUS * m.scale, 0.45, 0.35)),
       ],
       [layout],
     ),

@@ -70,7 +70,29 @@ World / This-device / Daily boards, initials, Share). Pause has photo mode. Game
 
 ## Numbers
 
-NUMBERS_PLACEHOLDER
+Full `npm run verify` on `main` @ 7815b80, 2026-11-23 (4-core SwiftShader; frame ms relative only, this
+session ran ~2× slower than last week's on every level): 1846 unit tests in 186 files, lint, build,
+bundle and Lighthouse green; the full smoke ran every level, boss, wave, weather, pause, countdown and
+pacing step green, then was stopped at the session's 90-minute limit in the phone run. Two steps failed:
+level 6's **switch** step (#779, the known intermittent miss, reproduced) and level 6's **results**
+step (the share menu's buttons timed out on desktop although `level6-share.png` shows the menu open
+and clear; the same browser crashed minutes later, so unconfirmed: watch the next nightly).
+
+| Scene | Draw calls | Triangles (frame) | Scene objs / tris | Enemies on screen / readable / largest px | avg frame ms | pacing (no-target share, longest gap) |
+|---|---|---|---|---|---|---|
+| title | 93 | — | 79 / 56,838 | — | — | — |
+| level1 | 73 | 174,213 | 150 / 202,476 | 9 / 9 / 40 | 537 | 2 %, 1 s |
+| level2 | 118 | 205,666 | 158 / 217,043 | 16 / 13 / 27 | 543 | 2 %, 1 s |
+| level3 | 78 | 192,465 | 66 / 172,424 | 11 / 11 / 68 | 628 | 0 %, none |
+| level4 | 156 | 203,159 | 250 / 240,316 | 14 / 14 / 26 | 537 | 2 %, 1 s |
+| level5 | 97 | 154,761 | 158 / 167,280 | 16 / 15 / 27 | 523 | 2 %, 1 s |
+| level6 | 94 | 193,299 | 78 / 193,074 | 41 / 35 / 27 | 957 | 5 %, 1 s |
+
+Programs after warm-up +0 on every level. Every level's longest no-target gap is 1 s. Level 6 now has
+41 targets on screen at its probe (lanternfly swarms and climbers) and is the slowest frame here: the
+Neo verdict (#561) matters most on it. Bundle: **total 635 KB gz (budget 635 → 665 in #885),
+largest chunk 173 (260), startup 436 (436)**; `LevelScene` 158 KB gz. Lighthouse: SEO / A11y / BP 100,
+Performance 41 mobile / 59 desktop (report only).
 
 ## Known bugs and visual problems (ranked)
 

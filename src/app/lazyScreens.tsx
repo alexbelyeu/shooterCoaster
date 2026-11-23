@@ -1,17 +1,16 @@
 import { Component, lazy, Suspense, type ComponentType, type ReactNode } from 'react'
 import { lazyChunk } from '@/core/staleBuild'
-import { importWithRetry } from '@/canvas/loadLevelScene'
 import { useGameStore } from '@/store/useGameStore'
 
 /**
  * The screens the title's first frame doesn't need (#861): level select and Settings in one chunk, the run's HUD,
  * countdown, pause and results in another. `preloadScreens` fetches both once the title is idle; a screen asked for
- * before then suspends to nothing for the moment its chunk takes. A chunk that fails every retry (offline, or a deploy
- * took it, #823) is reported to `app/staleReload.ts` and forgotten, and the screen gives up: back to the title, where
- * a new build reloads the page, instead of a blank screen.
+ * before then suspends to nothing for the moment its chunk takes. A chunk that fails to load (a deploy took it, #823,
+ * or a dropped request) is reported to `app/staleReload.ts` and forgotten, and the screen gives up: back to the title,
+ * where the page reloads to fetch it again (#888), instead of a blank screen.
  */
-export const loadPlayScreens = lazyChunk(() => importWithRetry(() => import('./playScreens')))
-const loadMenuScreens = lazyChunk(() => importWithRetry(() => import('./menuScreens')))
+export const loadPlayScreens = lazyChunk(() => import('./playScreens'))
+const loadMenuScreens = lazyChunk(() => import('./menuScreens'))
 
 export function preloadScreens(): void {
   loadMenuScreens().catch(() => {})

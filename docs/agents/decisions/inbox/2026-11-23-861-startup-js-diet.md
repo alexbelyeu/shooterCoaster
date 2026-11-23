@@ -8,6 +8,6 @@ results with its share / score card / leaderboard) were in the entry chunk.
 chunks (`app/lazyScreens.tsx`), preloaded when the title is idle after the level chunk; the loading screen waits for
 the run's. `startupJsGzipKB` lowered to 392 (the new 390 + 2).
 **Consequences:** Writing `motion.div` throws at runtime (`strict`): use `m.div`. A new screen the title doesn't show
-belongs in `menuScreens.ts` or `playScreens.ts`, not as a static import in App. A screen whose chunk fails every retry
-goes back to the title (Settings closes), where `staleReload.ts` reloads a new build (#823). three's chunk (173 KB) is
+belongs in `menuScreens.ts` or `playScreens.ts`, not as a static import in App. A screen whose chunk fails to load
+goes back to the title (Settings closes), where `staleReload.ts` reloads the page (#823, #888). three's chunk (173 KB) is
 `three.core` + `three.module` with no `examples/jsm` addon in it: nothing more to tree-shake there short of a renderer swap.

@@ -1,15 +1,16 @@
 /**
- * The browser side of `core/staleBuild.ts` (#823): when a chunk import fails, fetch this page again (same origin,
- * uncached) and compare its entry script with the running one. A new build is live: reload on the title or level
- * select, or as the player leaves results (`reloadForNewBuild`), at most once per session.
+ * The browser side of `core/staleBuild.ts` (#823, #888): a chunk that failed to load stays failed until the page
+ * reloads, whether a deploy removed it or the network dropped it once. When one fails, fetch this page again (same
+ * origin, uncached): if it still serves the game, reload on the title or level select, or as the player leaves results
+ * (`reloadIfDue`), at most once per session.
  */
-import { claimReload, entryScriptSrc, isNewBuild, isReloadSafe, onChunkFailure } from '@/core/staleBuild'
+import { claimReload, entryScriptSrc, isReloadSafe, onChunkFailure } from '@/core/staleBuild'
 import { useGameStore } from '@/store/useGameStore'
 
 /** Between two checks: a failing network fails every import, and one fetch of the page answers for all of them. */
 const CHECK_EVERY_MS = 30_000
 
-let stale = false
+let due = false
 let checking = false
 let lastCheck = -Infinity
 
@@ -21,49 +22,39 @@ function sessionStore(): Storage | null {
   }
 }
 
-const absolute = (src: string | null): string | null => (src === null ? null : new URL(src, window.location.href).href)
-
-function runningEntry(): string | null {
-  return document.querySelector<HTMLScriptElement>('script[type="module"][src]')?.src ?? null
-}
-
-async function servedEntry(): Promise<string | null> {
+/** The page answers with the game (an entry script): offline, an error page or a captive portal don't. */
+async function servesGame(): Promise<boolean> {
   try {
     const res = await fetch(window.location.href.split('#')[0], { cache: 'no-store' })
-    return res.ok ? absolute(entryScriptSrc(await res.text())) : null
+    return res.ok && entryScriptSrc(await res.text()) !== null
   } catch {
-    return null
+    return false
   }
 }
 
 function check(): void {
   const now = performance.now()
-  if (stale || checking || now - lastCheck < CHECK_EVERY_MS) return
+  if (due || checking || now - lastCheck < CHECK_EVERY_MS) return
   checking = true
   lastCheck = now
-  void servedEntry().then((served) => {
+  void servesGame().then((serves) => {
     checking = false
-    stale = isNewBuild(runningEntry(), served)
-    if (stale && isReloadSafe(useGameStore.getState().phase)) reloadForNewBuild()
+    due = serves
+    if (due && isReloadSafe(useGameStore.getState().phase)) reloadIfDue()
   })
 }
 
-/** A chunk failed and the page now serves another build. */
-export const isNewBuildLive = (): boolean => stale
+/** A chunk failed and a reload would load it: the page still serves the game. */
+export const isReloadDue = (): boolean => due
 
-/** Reloads the page if a new build is live and this session hasn't already reloaded for one; true when it does. */
-export function reloadForNewBuild(): boolean {
-  if (!stale || !claimReload(sessionStore())) return false
-  window.location.reload()
-  return true
-}
-
-/**
- * A chunk the page can't do without failed every retry. Chromium keeps a failed dynamic import for the life of the
- * page (#888), so fetching it again needs a reload: on the title or level select, once per session; true when it reloads.
- */
-export function reloadForFailedChunk(): boolean {
-  if (!isReloadSafe(useGameStore.getState().phase) || !claimReload(sessionStore())) return false
+/** Reloads the page if a reload is due and this session hasn't already reloaded for one; true when it does. */
+export function reloadIfDue(): boolean {
+  if (!due) return false
+  // This session already reloaded once: drop the flag so results stops treating a reload as pending.
+  if (!claimReload(sessionStore())) {
+    due = false
+    return false
+  }
   window.location.reload()
   return true
 }
@@ -73,6 +64,6 @@ export function installStaleReload(): void {
   // Vite's own signal for a dynamic import whose chunk or preloads failed.
   window.addEventListener('vite:preloadError', check)
   useGameStore.subscribe((next, prev) => {
-    if (stale && next.phase !== prev.phase && isReloadSafe(next.phase)) reloadForNewBuild()
+    if (due && next.phase !== prev.phase && isReloadSafe(next.phase)) reloadIfDue()
   })
 }

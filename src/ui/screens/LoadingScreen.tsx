@@ -29,15 +29,18 @@ export default function LoadingScreen() {
 
   useEffect(() => {
     let live = true
-    // The level's chunk and the run's screens (HUD, countdown, results: `app/lazyScreens.tsx`). Either failing every
-    // retry returns to the title, where a new build reloads (`app/staleReload.ts`) and the next PLAY fetches again.
-    Promise.all([loadLevelScene(), loadPlayScreens()]).then(
-      () => live && reportLoad(levelId, 'chunk', 1),
-      () => {
-        const s = useGameStore.getState()
-        if (live && s.phase === 'loading') s.setPhase('title')
-      },
-    )
+    // The level core, then the level's world chunk (#862), and the run's screens (HUD, countdown, results:
+    // `app/lazyScreens.tsx`). A failure returns to the title, where `app/staleReload.ts` reloads the page (#888).
+    const biome = levelId ? getLevelConfig(levelId)?.biome : undefined
+    if (biome) {
+      Promise.all([loadLevelScene().then((core) => core.loadWorld(biome)), loadPlayScreens()]).then(
+        () => live && reportLoad(levelId, 'chunk', 1),
+        () => {
+          const s = useGameStore.getState()
+          if (live && s.phase === 'loading') s.setPhase('title')
+        },
+      )
+    }
     let settled = 0
     let frame = 0
     const tick = () => {

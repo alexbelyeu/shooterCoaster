@@ -292,7 +292,7 @@ async function captureEnemyCloseup(page, id, ridePng) {
 const getStats = (page) => page.evaluate(() => window.__SC_TEST__.stats())
 
 async function delayLevelChunk(page) {
-  await page.route(/\/LevelScene-[^/]*\.js$/, async (route) => {
+  await page.route(/\/(LevelScene|world-\w+)-[^/]*\.js$/, async (route) => {
     await new Promise((r) => setTimeout(r, LEVEL_CHUNK_DELAY_MS))
     await route.continue()
   })
@@ -1949,39 +1949,104 @@ async function pauseMenuCheck(page, levelId) {
   }
 }
 
+/** Wind-streak opacity the speed check needs to see at top speed. */
+const STREAK_FLOOR = 0.05
+
 /** Track fractions the speed check tries for its banked fast section. */
 const SPEED_SCAN = [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
 
-/** Hold top speed at `fraction` for ≥ 1.5 s so the rig and streaks ease in; returns the camera weight. */
+/**
+ * Hold top speed from `fraction` until the ride stops speeding up (1.5–4 s and ≥ 3 frames, so the rig and streaks ease
+ * in); returns the camera weight at the fastest reading. The speed peaks in game time: a slow runner draws a frame or
+ * two per poll, so a fixed 1.5 s caught level 1's fastest point at 0.76 on the way up (#913), and one poll past its peak
+ * (0.90) it was back at 0.71.
+ */
 async function rideFast(page, fraction) {
   await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, fraction)
   const start = Date.now()
   const f0 = await getFrames(page)
   let w
+  let top = null
+  let last = { frames: f0, speed: -1 }
   while (Date.now() - start < 20000) {
     await page.evaluate(() => { window.__SC_TEST__.rideSpeed = 1 })
     await page.waitForTimeout(250)
     const now = await page.evaluate(() => ({ frames: window.__SC_TEST__.frames, w: window.__SC_TEST__.cameraWeight }))
     w = now.w
-    if (now.frames - f0 >= 3 && Date.now() - start >= 1500) break
+    // Judged over polls with frames drawn in between: on a throttled page a poll can see none.
+    if (now.frames - last.frames < 2) continue
+    const climbing = w.speed > last.speed + 0.005
+    last = { frames: now.frames, speed: w.speed }
+    if (now.frames - f0 < 3) continue
+    if (!top || w.speed > top.speed) top = w
+    // At most 4 s: a point still speeding up after that is a long climb, and longer holds run the level clock out.
+    if (Date.now() - start >= (climbing ? 4000 : 1500)) break
   }
-  return { ...w }
+  return { ...(top ?? w) }
+}
+
+/**
+ * #888: the level core's chunk fails once at startup. The browser keeps that import failed for the page's life, so the
+ * page must reload (`app/staleReload.ts`) and the reloaded page load the level. `page` is fresh, its route not yet set.
+ */
+async function chunkRetryCheck(page, base, levelId) {
+  const requests = []
+  await page.route(/\/LevelScene-[^/]*\.js$/, (route) => {
+    requests.push(route.request().url())
+    return requests.length === 1 ? route.abort() : route.continue()
+  })
+  let loads = 0
+  page.on('load', () => loads++)
+  await page.goto(`${base}/?e2e=1`)
+  const problems = []
+  const deadline = Date.now() + 30000
+  while (requests.length < 2 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 250))
+  if (!requests.length) problems.push('the level chunk was never requested')
+  else if (requests.length === 1) problems.push('the failed level chunk was never fetched again (the page never reloaded)')
+  else {
+    await page.waitForLoadState('load')
+    await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
+    if (loads < 2) problems.push(`the chunk was fetched again without a reload (${loads} page load)`)
+    if (!(await startLevelReady(page, levelId))) problems.push(`${NOT_LOADED(levelId)} after its chunk failed once`)
+  }
+  return { id: 'chunkRetry', level: levelId, requests: requests.length, loads, problems }
 }
 
 /** Sense of speed (#27) at the default Screen-shake setting: streaks and bank at top speed, within the caps (speed.png). */
 async function speedCheck(page, levelId) {
   if (!(await startLevelReady(page, levelId))) return { id: 'speed', problems: [NOT_LOADED(levelId)] }
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
-  let best = { fraction: SPEED_SCAN[0], roll: -1 }
-  for (const fraction of SPEED_SCAN) {
+  // GO's launch shove must play out to its peak before the scan: every `rideTo` jump resets the rig, and on a slow
+  // runner the first jump came a frame or two after GO, cutting the shove off at 0.23 (#902).
+  await page
+    .waitForFunction(() => {
+      const w = window.__SC_TEST__.cameraWeight
+      return w.feelMax.launch > 0 && w.feel.launch < w.feelMax.launch
+    }, null, { timeout: 30000, polling: 100 })
+    .catch(() => {})
+  // Streaks at the most banked point where the scan saw them (opacity past STREAK_FLOOR), else the point with the most;
+  // the bank at the scan's most banked point. A v2 ride's turns can be slower than its drops (level 1's top speed is the
+  // straight at the first drop's foot) and its top speed short, so it also tries `rideFastest`. The pick goes by the
+  // streaks measured, not by speed past `caps.streakSpeed`: just past it they are faint by design (smoothstep, × the
+  // default Screen-shake scale), and a slow runner held a point at 0.76 that drew 0.045 (#913).
+  const samples = []
+  const fastest = await page.evaluate(() => window.__SC_TEST__.rideFastest)
+  for (const fraction of fastest === null ? SPEED_SCAN : [...SPEED_SCAN, fastest]) {
     const w = await rideFast(page, fraction)
-    if (Math.abs(w.roll) > best.roll) best = { fraction, roll: Math.abs(w.roll) }
+    samples.push({ fraction, roll: Math.abs(w.roll), speed: w.speed, streaks: w.streaks ?? 0 })
   }
+  const streaky = samples.filter((s) => s.streaks > STREAK_FLOOR)
+  const best = streaky.length
+    ? streaky.reduce((a, b) => (b.roll > a.roll ? b : a))
+    : samples.reduce((a, b) => (b.streaks > a.streaks || (b.streaks === a.streaks && b.speed > a.speed) ? b : a))
   const w = await rideFast(page, best.fraction)
   await page.screenshot({ path: path.join(OUT, 'speed.png'), timeout: SHOT_TIMEOUT })
   const problems = []
-  if (!(w.streaks > 0.05)) problems.push(`no wind streaks at top speed (opacity ${w.streaks?.toFixed(3)}, speed ${w.speed?.toFixed(2)})`)
-  if (!(Math.abs(w.roll) >= 1)) problems.push(`camera barely banks at top speed (${w.roll.toFixed(2)}° at track ${best.fraction})`)
+  // The held point's streaks, or the scan's there if the re-ride came in a little slower on a slow runner.
+  const streaks = Math.max(w.streaks ?? 0, best.streaks)
+  if (!(streaks > STREAK_FLOOR)) problems.push(`no wind streaks at top speed (opacity ${streaks.toFixed(3)}, speed ${w.speed?.toFixed(2)}, the scan's most ${best.streaks.toFixed(3)} at track ${best.fraction.toFixed(3)})`)
+  const banked = samples.reduce((a, b) => (b.roll > a.roll ? b : a))
+  if (!(banked.roll >= 1)) problems.push(`camera barely banks at speed (${banked.roll.toFixed(2)}° at track ${banked.fraction.toFixed(3)}, the most of the scan)`)
   // Ride feel (#697): GO's launch shoved the view, and the wheels rumble at top speed.
   if (!(w.feelMax?.launch > 0.3)) problems.push(`no launch shove after GO (peak ${w.feelMax?.launch?.toFixed(2)})`)
   if (!(w.feel?.rumble > 0)) problems.push('no rail rumble at top speed')
@@ -1990,7 +2055,7 @@ async function speedCheck(page, levelId) {
   if (translation > 1e-6) problems.push(`camera translated ${translation.toFixed(3)} units off the track pose`)
   const tunnel = await tunnelShot(page, levelId)
   problems.push(...tunnel.problems)
-  return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w }, tunnel: tunnel.result }
+  return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, scan: samples, ...w }, tunnel: tunnel.result }
 }
 
 /**
@@ -4601,6 +4666,23 @@ async function run() {
   // 6. Top speed: banking + wind streaks (speed.png)
   if (has('speed') && first) await pageStep((page) => speedCheck(page, SPEED_LEVEL && wanted.includes(SPEED_LEVEL) ? SPEED_LEVEL : first))
 
+  // 6a. A lazy chunk that fails once loads after the page reloads (#888): its own page, so the route is set before the first load
+  if (has('chunkRetry') && first) {
+    await step(async () => {
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+      const page = await ctx.newPage()
+      const errors = []
+      collectErrors(page, errors)
+      const r = await chunkRetryCheck(page, base, first)
+      // The aborted request is the one expected error.
+      r.errors = [...errors.filter((e) => !/Failed to load resource: net::ERR_FAILED/.test(e)), ...(await page.evaluate(() => window.__SC_TEST__.errors))]
+      if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
+      r.ok = r.problems.length === 0
+      await ctx.close()
+      return r
+    })
+  }
+
   // 6b. Spawn choreography: the crow wave's tell, then its V flying in (level2-wave.png)
   if (has('wave') && wanted.includes(WAVE_CHECK.level)) await pageStep(waveCheck)
 
@@ -4724,8 +4806,10 @@ async function run() {
         ? ` title=${r.engine.title} nodes ${r.engine.nodes.join('->')} position ${r.engine.position.map((p) => p.toFixed(1)).join('->')}s` +
           ` sfxNodes ${r.engine.sfxNodes.join('->')} voices ${r.engine.voices ? `peak ${r.engine.voices.peak}/${r.engine.voices.budget} stolen ${r.engine.voices.stolen} dropped ${r.engine.voices.rejected}` : 'none'}` +
           ` ducked=${r.engine.ducked} layers ${r.engine.layers ? `up ${r.engine.layers.rise.join('->')} paused ${r.engine.layers.paused} resumed ${r.engine.layers.resumed} down ${r.engine.layers.fall.join('->')}` : 'none'} paused at ${r.engine.pausedHeld?.at.toFixed(1)}s (${r.engine.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.engine.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.engine.results}`
+      : r.id === 'chunkRetry'
+        ? ` ${r.level}: the level chunk's first request aborted, ${r.requests} request(s) over ${r.loads} page load(s)`
       : r.speed
-        ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
+        ? ` ${r.speed.level} at track ${r.speed.fraction.toFixed(3)}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +

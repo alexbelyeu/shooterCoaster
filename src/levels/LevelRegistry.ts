@@ -1,6 +1,10 @@
 import type { LevelConfig } from '@/types/level'
 import { paceLevel } from './pacing'
 // Level 6's track and walls as plain numbers: the blockout they are built from stays out of the startup JS (#589).
+// Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS.
+import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
+// Level 4's ride too (#866).
+import { ARCTIC_LEVEL_TRACK } from './environments/biomes/arctic/arcticLevel'
 import { GYM_LEVEL } from './environments/biomes/gym/gymLevel'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
@@ -14,20 +18,9 @@ const LEVELS: LevelConfig[] = [
     maxScore: 150 * 13 + 5 * 65 + 400, // 1950 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 2675
     message: 'Well, that was easy...',
     nextLevel: 'level2',
-    track: {
-      varA: 3,
-      varB: 17,
-      varC: 4,
-      scalar: 20,
-      rollerSpeed: 0.00001,
-      minRollerSpeed: 0.00008,
-      curve: 'curve1',
-      color1: 0xf3ece0,
-      color2: 0xffff00,
-      // Under the midway (#332): the bottom of the ride's second dip to the grass and the climb out.
-      // It starts past where the track's later pass crosses this dip (#651: `tunnelSpans` refuses a pass through the tube).
-      tunnels: [{ from: 0.191, length: 420 }],
-    },
+    // The ride kit's classic (#863, `parkTrack.ts`): a station launch, a lift hill, camelbacks, past the Ferris wheel.
+    track: PARK_LEVEL_TRACK,
+    goldenBalloons: 3,
     ...paceLevel({
       waves: [
         { type: 'balloon', count: 50, waveLabel: 'Pop em!' },
@@ -116,23 +109,15 @@ const LEVELS: LevelConfig[] = [
     description: 'The living snowmen',
     order: 4,
     biome: 'arctic',
-    maxScore: 44 * 15 + 40 * 30 + 16 * 50 + 2 * 60 + 400, // 2660 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 3180
+    maxScore: 36 * 15 + 40 * 30 + 16 * 50 + 2 * 60 + 400, // 2540 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 3060
     message: "You've made it! Congrats!",
     nextLevel: 'level5',
-    track: {
-      varA: 3,
-      varB: 36,
-      varC: 4,
-      scalar: 35,
-      rollerSpeed: 0.000006,
-      minRollerSpeed: 0.00006,
-      curve: 'curve2',
-      color1: 0x909090,
-      color2: 0xffffff,
-    },
+    track: ARCTIC_LEVEL_TRACK,
     ...paceLevel({
       waves: [
-        { type: 'snowmanScout', count: 44, waveLabel: 'Scout Party', formation: 'line' },
+        // Longer, so the blizzard's wave meets the rider out of the ice cave, on the ridge's lift; 36, not 44: the whole party
+        // stands up the slow first lift in view at once, and 44 put the scene over its draw-call ceiling (#866).
+        { type: 'snowmanScout', count: 36, waveLabel: 'Scout Party', formation: 'line', weight: 1.5 },
         { type: 'snowman', count: 40, waveLabel: 'Snowmen Incoming!', weather: 'blizzard' },
         { type: 'snowmanBrute', count: 16, waveLabel: 'Brutes!' },
       ],

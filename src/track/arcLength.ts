@@ -20,6 +20,8 @@ export interface ArcTable {
   length: number
   /** The level's tunnels in ride order (`setPieces.ts` `withTunnels`); absent on a track without any. */
   tunnels?: readonly TunnelSpan[]
+  /** Arc-distance spans the seat rides facing back, between a backwards mechanic's turntables (`mechanics.ts` `withBackwards`). */
+  backwards?: readonly { from: number; to: number }[]
 }
 
 export function buildArcTable(curve: TrackCurve, n = 8192): ArcTable {

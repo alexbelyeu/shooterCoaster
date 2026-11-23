@@ -3,7 +3,7 @@
 export const USAGE =
   'npm run new-world -- <levelId> --name "<Name>" --biome <biome> [--interior] [--score-from <levelId>] [--dry-run]'
 
-export const TEMPLATE_FILES = ['config.ts', 'Decorations.tsx', 'Features.tsx', 'index.ts']
+export const TEMPLATE_FILES = ['config.ts', 'Decorations.tsx', 'Features.tsx', 'index.ts', 'world.ts']
 
 /** Every file the scaffold edits (`scoring.ts` is only read). */
 export const EDITED_FILES = {
@@ -13,6 +13,7 @@ export const EDITED_FILES = {
   scoring: 'src/levels/scoring.ts',
   biomeType: 'src/types/level.ts',
   biomeRegistry: 'src/levels/environments/biomeRegistry.ts',
+  worlds: 'src/levels/environments/worlds.ts',
   atmosphere: 'src/levels/environments/atmosphere.ts',
   terrain: 'src/utils/terrainNoise.ts',
   theme: 'src/ui/theme.ts',
@@ -327,6 +328,7 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
     { path: F.lapsTest, content: lapsOut, what: `LAPS.${id} = ${lap[1]} s (level1's track)` },
     { path: F.biomeType, content: biomeType, what: `BIOME_TYPES + '${biome}'` },
     { path: F.biomeRegistry, content: biomeRegistry, what: `BIOMES.${biome}` },
+    { path: F.worlds, content: insertInObject(text(F.worlds), /export const WORLD_CHUNKS\b/, `  ${biome}: () => import('./biomes/${biome}/world'),\n`, F.worlds), what: `WORLD_CHUNKS.${biome}: the world's own chunk` },
     { path: F.atmosphere, content: insertInObject(text(F.atmosphere), /export const ATMOSPHERES\b/, fill(entryOf(templates, registrations, 'ATMOSPHERES'), v), F.atmosphere), what: `ATMOSPHERES.${biome} (${kind} preset)` },
     { path: F.terrain, content: insertInObject(text(F.terrain), /export const BIOME_TERRAIN_CONFIGS\b/, fill(entryOf(templates, registrations, 'BIOME_TERRAIN_CONFIGS'), v), F.terrain), what: `BIOME_TERRAIN_CONFIGS.${biome}` },
     { path: F.theme, content: insertInObject(text(F.theme), /export const BIOME_UI\b/, themeEntry, F.theme), what: `BIOME_UI.${biome} accent + postcard sky` },
@@ -364,7 +366,7 @@ function checklist({ id, biome, kind }, previous) {
     `Look: ${dir}/config.ts palette, ATMOSPHERES.${biome} (atmosphere.ts), the hero landmark in Features.tsx and its hero shot in index.ts, props in Decorations.tsx (seeded, off the track), contact shadows.`,
     `Level select: draw the landmark in LevelPostcard.tsx SCENES.${biome}, pick the BIOME_UI.${biome} accent (theme.ts).`,
     `Roster: swap the starter waves for the world's own enemies; a boss goes in LevelConfig.boss. maxScore and the finales row in LevelRegistry.test.ts follow, then node scripts/gen-level-limits.mjs.`,
-    'New enemies: SharedEnemyAssets.ts, enemyComponents.ts, ENEMY_PLACEMENT, SCORE_VALUES, deathStyles.ts, sfxDesign.ts, the turntable subjects.ts, a brief in docs/art/ENEMIES.md.',
+    `New enemies: SharedEnemyAssets.ts, ${dir}/world.ts (its chunk; a boss too), enemyComponents.ts (the turntable's), ENEMY_PLACEMENT, SCORE_VALUES, deathStyles.ts, sfxDesign.ts, the turntable subjects.ts, a brief in docs/art/ENEMIES.md.`,
     `Music: src/audio/scores/${id}.scrim is a copy; a theme round for Alex (Listen: issue) replaces it, with its SCORE_KEYS row.`,
     `#about: rewrite ${id}'s line in index.html once the world has its enemies and landmark.`,
     `docs/agents/STATE.md: a row for ${id}.`,

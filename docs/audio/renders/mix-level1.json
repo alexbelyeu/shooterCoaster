@@ -84,7 +84,7 @@
     },
     {
       "t": 12.1,
-      "name": "FRENZY (kill 15): music ducked for 1.5 s"
+      "name": "FRENZY (kill 15): slow-mo ducks the music for 1.5 s"
     },
     {
       "t": 12.18,
@@ -133,23 +133,23 @@
     "seconds": 20,
     "integrated": -14.1,
     "shortTermMax": -13,
-    "lra": 2.5,
+    "lra": 2.6,
     "truePeak": -1.6,
     "clipped": 0,
     "silence": 0.8,
-    "correlation": 0.902,
-    "below30Db": -38,
+    "correlation": 0.9,
+    "below30Db": -37.7,
     "bands": {
       "sub": {
-        "pct": 21.1,
-        "db": -6.8
+        "pct": 21.7,
+        "db": -6.6
       },
       "low": {
-        "pct": 48,
+        "pct": 47.6,
         "db": -3.2
       },
       "mid": {
-        "pct": 20.7,
+        "pct": 20.4,
         "db": -6.9
       },
       "presence": {
@@ -158,11 +158,11 @@
       },
       "air": {
         "pct": 0.8,
-        "db": -20.9
+        "db": -20.8
       },
       "below30": {
         "pct": 0,
-        "db": -38
+        "db": -37.7
       }
     },
     "seamJumps": [],
@@ -177,9 +177,9 @@
       },
       {
         "t": 2.43,
-        "killDb": -2.7,
+        "killDb": -2.6,
         "musicDb": -10.1,
-        "overDb": 7.4
+        "overDb": 7.5
       },
       {
         "t": 3.18,
@@ -190,18 +190,18 @@
       {
         "t": 3.93,
         "killDb": -1.8,
-        "musicDb": -10,
-        "overDb": 8.2
+        "musicDb": -9.9,
+        "overDb": 8.1
       },
       {
         "t": 4.68,
-        "killDb": -1.8,
+        "killDb": -1.9,
         "musicDb": -9.7,
         "overDb": 7.8
       },
       {
         "t": 5.43,
-        "killDb": -2,
+        "killDb": -1.9,
         "musicDb": -9.6,
         "overDb": 7.6
       },
@@ -209,7 +209,7 @@
         "t": 6.18,
         "killDb": -1.9,
         "musicDb": -9.4,
-        "overDb": 7.5
+        "overDb": 7.6
       },
       {
         "t": 6.93,
@@ -225,15 +225,15 @@
       },
       {
         "t": 8.43,
-        "killDb": -2.3,
+        "killDb": -2.2,
         "musicDb": -10.2,
         "overDb": 7.9
       },
       {
         "t": 9.18,
-        "killDb": -2.2,
+        "killDb": -2.1,
         "musicDb": -10.1,
-        "overDb": 7.9
+        "overDb": 8
       },
       {
         "t": 9.93,
@@ -243,13 +243,13 @@
       },
       {
         "t": 10.68,
-        "killDb": -2,
+        "killDb": -2.1,
         "musicDb": -10.5,
-        "overDb": 8.5
+        "overDb": 8.4
       },
       {
         "t": 11.43,
-        "killDb": -2.1,
+        "killDb": -2,
         "musicDb": -10.2,
         "overDb": 8.2
       },
@@ -261,27 +261,27 @@
       },
       {
         "t": 12.93,
-        "killDb": -2,
+        "killDb": -2.1,
         "musicDb": -9.6,
-        "overDb": 7.6
+        "overDb": 7.5
       },
       {
         "t": 13.68,
-        "killDb": -1.7,
-        "musicDb": -9.8,
+        "killDb": -1.8,
+        "musicDb": -9.7,
         "overDb": 8
       },
       {
         "t": 14.43,
-        "killDb": -2.3,
+        "killDb": -2.4,
         "musicDb": -10.2,
-        "overDb": 7.8
+        "overDb": 7.7
       },
       {
         "t": 15.18,
         "killDb": -2.2,
         "musicDb": -9.5,
-        "overDb": 7.3
+        "overDb": 7.4
       },
       {
         "t": 15.93,
@@ -297,15 +297,15 @@
       },
       {
         "t": 17.43,
-        "killDb": -2.1,
+        "killDb": -2,
         "musicDb": -10.3,
-        "overDb": 8.2
+        "overDb": 8.3
       },
       {
         "t": 18.18,
         "killDb": -2,
         "musicDb": -10.3,
-        "overDb": 8.3
+        "overDb": 8.4
       },
       {
         "t": 18.93,
@@ -346,14 +346,14 @@
     },
     {
       "label": "Energy below 30 Hz",
-      "value": -38,
+      "value": -37.7,
       "unit": "dB rel",
       "max": -30,
       "status": "pass"
     },
     {
       "label": "Stereo correlation",
-      "value": 0.902,
+      "value": 0.9,
       "unit": "",
       "min": 0,
       "status": "pass"
@@ -367,7 +367,7 @@
     },
     {
       "label": "Loudness range",
-      "value": 2.5,
+      "value": 2.6,
       "unit": "LU",
       "status": "info"
     },

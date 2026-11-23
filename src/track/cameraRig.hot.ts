@@ -24,6 +24,11 @@ export const HIGH_G_BANK_DEG = 5
 export const LAUNCH_PITCH_DEG = 2
 const LAUNCH_DECAY = 1.4
 const LAUNCH_ATTACK = 10
+/**
+ * The longest step the launch takes per frame (#906): GO's frame is often a long one (the HUD mounts, the countdown
+ * leaves), and one 0.9 s step decayed the shove to 0.28 before it was ever drawn. A slower frame plays it later instead.
+ */
+const LAUNCH_MAX_STEP = 0.1
 /** Entering a steep drop the view dips (nose over) and recovers: the gap between a fast and a slow follower of the drop. */
 export const DIP_DEG = 6
 const DIP_FAST = 8
@@ -188,8 +193,9 @@ export function stepRig(state: RigState, input: RigInput, dt: number, trackScale
   state.drop = damp(state.drop, drop, DROP_RESPONSE, dt)
   state.dipFast = damp(state.dipFast, drop, DIP_FAST, dt)
   state.dipSlow = damp(state.dipSlow, drop, DIP_SLOW, dt)
-  state.launchDrive *= Math.exp(-dt * LAUNCH_DECAY)
-  state.launch = damp(state.launch, state.launchDrive, LAUNCH_ATTACK, dt)
+  const launchStep = Math.min(dt, LAUNCH_MAX_STEP)
+  state.launchDrive *= Math.exp(-launchStep * LAUNCH_DECAY)
+  state.launch = damp(state.launch, state.launchDrive, LAUNCH_ATTACK, launchStep)
   state.airtime = damp(state.airtime, airtimeAmount(input.vertical, trackScale), AIRTIME_RESPONSE, dt)
   state.lift = damp(state.lift, input.lifting ? 1 : 0, LIFT_RESPONSE, dt)
   state.time += dt

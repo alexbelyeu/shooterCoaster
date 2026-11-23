@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { getBoard, postScore, type Deps } from './handler'
 import type { PublicEntry, Submission } from './rules'
-import { DbError, type ScoresDb } from './scoresDb'
+import { DbError, RATE_LIMITED, type ScoresDb } from './scoresDb'
+import { RATE_LIMIT } from './rules'
+import fs from 'node:fs'
+import path from 'node:path'
 import { LEVEL_LIMITS } from './levelLimits'
 import { DAILY_LEVELS, dayLevel } from './daily'
 
@@ -10,8 +13,9 @@ type Row = Submission & { ipHash: string; createdAt: number; day?: string }
 /**
  * In-memory `scores` with the filters the handler uses. `noDayColumn`: before `0004_daily_board.sql`, where every
  * daily call throws and the campaign's (scoresDb retries its `day is null` without it) still work.
+ * `rateTrigger`: after `0005_rate_limit.sql`, whose trigger refuses an IP's insert past the limit.
  */
-function fakeDb(now: () => number, failing = false, noDayColumn = false): ScoresDb & { rows: Row[] } {
+function fakeDb(now: () => number, failing = false, noDayColumn = false, rateTrigger = false): ScoresDb & { rows: Row[] } {
   const rows: Row[] = []
   const guard = (daily = false) => {
     if (failing) throw new DbError('status 540')
@@ -41,6 +45,8 @@ function fakeDb(now: () => number, failing = false, noDayColumn = false): Scores
     },
     async insert(row) {
       guard(row.day !== undefined)
+      const recent = rows.filter((r) => r.ipHash === row.ipHash && r.createdAt >= now() - RATE_LIMIT.windowMs).length
+      if (rateTrigger && recent >= RATE_LIMIT.max) throw new DbError('status 429', RATE_LIMITED)
       rows.push({ ...row, createdAt: now() })
     },
   }
@@ -56,10 +62,10 @@ const longRun = (level: string, createdAt: number): Row => ({
 const get = (level: string) => new Request(`https://scoaster.com/api/leaderboard?level=${level}`)
 const getDaily = (day: string) => new Request(`https://scoaster.com/api/leaderboard?daily=${day}`)
 
-function setup(failing = false, noDayColumn = false) {
+function setup(failing = false, noDayColumn = false, rateTrigger = false) {
   let t = Date.UTC(2026, 10, 5, 12)
   const now = () => t
-  const db = fakeDb(now, failing, noDayColumn)
+  const db = fakeDb(now, failing, noDayColumn, rateTrigger)
   const deps: Deps = { db, salt: 'secret', now }
   return { db, deps, advance: (ms: number) => (t += ms) }
 }
@@ -108,6 +114,25 @@ describe('POST /api/leaderboard', () => {
     expect(db.rows).toHaveLength(7)
   })
 
+  it("holds parallel POSTs from one IP to the limit with the migration's trigger, though every count passed (#384)", async () => {
+    // Each POST counts before any of the others inserts: the race the count alone loses.
+    const raced = (db: ScoresDb): ScoresDb => ({ ...db, count: (f) => (f.ip_hash ? Promise.resolve(0) : db.count(f)) })
+    const burst = async (db: ScoresDb, deps: Deps) =>
+      (await Promise.all(Array.from({ length: 8 }, () => postScore(post(run), { ...deps, db: raced(db) })))).map((r) => r.status).sort()
+    const before = setup()
+    expect(await burst(before.db, before.deps)).toEqual(Array(8).fill(200))
+    const after = setup(false, false, true)
+    expect(await burst(after.db, after.deps)).toEqual([...Array(5).fill(200), ...Array(3).fill(429)])
+    expect(after.db.rows).toHaveLength(5)
+  })
+
+  it("keeps the trigger's limit and error code in step with RATE_LIMIT", () => {
+    const sql = fs.readFileSync(path.resolve(__dirname, '../../supabase/migrations/0005_rate_limit.sql'), 'utf8')
+    expect(sql).toContain(`>= ${RATE_LIMIT.max} then`)
+    expect(sql).toContain(`interval '${RATE_LIMIT.windowMs / 60000} minutes'`)
+    expect(sql).toContain(`errcode = '${RATE_LIMITED}'`)
+  })
+
   it('answers a bare 503 without env vars or with the database down', async () => {
     for (const deps of [{ ...setup().deps, db: null }, setup(true).deps]) {
       const res = await postScore(post(run), deps)
@@ -123,7 +148,7 @@ describe('GET /api/leaderboard', () => {
     for (let i = 1; i <= 12; i++) await postScore(post({ ...run, score: i * 100 }, `10.0.0.${i}`), deps)
     const res = await getBoard(get('level1'), deps)
     expect(res.status).toBe(200)
-    expect(res.headers.get('cache-control')).toBe('public, s-maxage=30, stale-while-revalidate=300')
+    expect(res.headers.get('cache-control')).toBe('public, s-maxage=30, stale-while-revalidate=30')
     const { top } = await res.json()
     expect(top).toHaveLength(10)
     expect(top[0]).toEqual({ initials: 'ABC', score: 1200, at: expect.any(String) })

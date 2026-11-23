@@ -24,6 +24,18 @@ export const BLIMP_LAYOUT = {
   ] as const,
 } as const
 
+/**
+ * The envelope's radius at local x: a blunt nose and a long taper to a pointed tail, never wider than `hullR`.
+ * 0 off the ends.
+ */
+export function blimpHullRadius(x: number): number {
+  const { hullX, hullRx, hullR } = BLIMP_LAYOUT
+  const u = (x - hullX) / hullRx
+  if (Math.abs(u) >= 1) return 0
+  const round = 1 - u * u
+  return hullR * (u >= 0 ? Math.sqrt(round) : round ** 0.75)
+}
+
 /** 5× a balloon, like EnemySpawner's bonus golden balloons. */
 const GOLDEN_BALLOON_SCORE = SCORE_VALUES.balloon * 5
 
