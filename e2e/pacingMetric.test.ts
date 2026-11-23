@@ -68,12 +68,12 @@ describe('pacingMetrics', () => {
 })
 
 describe('pacingTimeline', () => {
-  it('has one row a level second with the fewest and most targets and the tell flags', () => {
+  it('has one row a level second with the fewest and most targets, the tell flags and the boss', () => {
     const rows = pacingTimeline(ride(3, (t) => (t === 1.5 ? 0 : 3), 0.5, (t) => ({ waveTell: t === 2.5 })))
     expect(rows).toEqual([
-      { t: 0, min: 3, max: 3, track: 0, waveTell: false, bossTell: false },
-      { t: 1, min: 0, max: 3, track: 0.333, waveTell: false, bossTell: false },
-      { t: 2, min: 3, max: 3, track: 0.667, waveTell: true, bossTell: false },
+      { t: 0, min: 3, max: 3, track: 0, waveTell: false, bossTell: false, boss: 'none', bossFramed: false },
+      { t: 1, min: 0, max: 3, track: 0.333, waveTell: false, bossTell: false, boss: 'none', bossFramed: false },
+      { t: 2, min: 3, max: 3, track: 0.667, waveTell: true, bossTell: false, boss: 'none', bossFramed: false },
     ])
   })
 })
@@ -112,6 +112,16 @@ describe('bossFraming', () => {
     expect(m).toMatchObject({ arrivedAt: 40, fightSeconds: 20, framedSeconds: 2, framedShare: 0.1 })
     expect(m?.longestUnframed).toEqual({ start: 42, seconds: 18 })
     expect(bossFramingProblems(m, { bossFramedShare: 0.6 })[0]).toMatch(/shootable 2\.0 s of its 20 s fight \(10%, floor 60%\)/)
+  })
+
+  it('ends the fight at the boss\'s defeat, and the coda after it counts neither way', () => {
+    const samples = []
+    for (let t = 0; t < 60; t += 0.5) {
+      const bossStage = t < 40 ? 'none' : t < 48 ? 'active' : 'defeated'
+      samples.push({ t, targets: t < 40 ? 3 : t < 48 ? 2 : 0, track: t / 60, bossStage, bossFramed: bossStage === 'active' })
+    }
+    expect(bossFraming(samples, 60)).toMatchObject({ beatenAt: 48, fightSeconds: 8, framedShare: 1 })
+    expect(pacingMetrics(samples, 60)).toMatchObject({ longestGapSeconds: 0, noTargetShare: 0 })
   })
 
   it('passes a fight the ride faces', () => {
