@@ -1972,6 +1972,14 @@ async function rideFast(page, fraction) {
 async function speedCheck(page, levelId) {
   if (!(await startLevelReady(page, levelId))) return { id: 'speed', problems: [NOT_LOADED(levelId)] }
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
+  // GO's launch shove must play out to its peak before the scan: every `rideTo` jump resets the rig, and on a slow
+  // runner the first jump came a frame or two after GO, cutting the shove off at 0.23 (#902).
+  await page
+    .waitForFunction(() => {
+      const w = window.__SC_TEST__.cameraWeight
+      return w.feelMax.launch > 0 && w.feel.launch < w.feelMax.launch
+    }, null, { timeout: 30000, polling: 100 })
+    .catch(() => {})
   // Streaks at the most banked point fast enough for them (`caps.streakSpeed`), else the fastest; the bank at the scan's
   // most banked point. A v2 ride's turns can be slower than its drops (level 1's top speed is the straight at the first
   // drop's foot) and its top speed short, so it also tries `rideFastest`.

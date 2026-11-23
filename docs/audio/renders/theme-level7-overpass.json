@@ -1,0 +1,139 @@
+{
+  "name": "theme-level7-overpass",
+  "kind": "music",
+  "request": {
+    "kind": "music",
+    "track": "level7.overpass",
+    "layers": "ramp",
+    "seam": false
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.15,
+      "name": "level7.overpass score"
+    },
+    {
+      "t": 3.35,
+      "name": "loop starts"
+    },
+    {
+      "t": 6.65,
+      "name": "intensity 1 asked"
+    },
+    {
+      "t": 10.45,
+      "name": "intensity 2 asked"
+    },
+    {
+      "t": 15.049999999999999,
+      "name": "intensity 3 asked"
+    },
+    {
+      "t": 22.75,
+      "name": "intensity 0 asked"
+    }
+  ],
+  "seams": [],
+  "bar": {
+    "startS": 3.35,
+    "barS": 1.6
+  },
+  "metrics": {
+    "seconds": 30,
+    "integrated": -17.9,
+    "shortTermMax": -17.3,
+    "lra": 0.6,
+    "truePeak": -9.6,
+    "clipped": 0,
+    "silence": 0.5,
+    "correlation": 0.892,
+    "below30Db": -34.7,
+    "bands": {
+      "sub": {
+        "pct": 24.7,
+        "db": -6.1
+      },
+      "low": {
+        "pct": 39.4,
+        "db": -4
+      },
+      "mid": {
+        "pct": 28.5,
+        "db": -5.4
+      },
+      "presence": {
+        "pct": 6.5,
+        "db": -11.9
+      },
+      "air": {
+        "pct": 0.8,
+        "db": -20.8
+      },
+      "below30": {
+        "pct": 0,
+        "db": -34.7
+      }
+    },
+    "seamJumps": [],
+    "seamJumpMax": null
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -17.9,
+      "unit": "LUFS",
+      "min": -18,
+      "max": -16,
+      "status": "pass"
+    },
+    {
+      "label": "Short-term max",
+      "value": -17.3,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -9.6,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -34.7,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 0.892,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 0.6,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 0.5,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}
