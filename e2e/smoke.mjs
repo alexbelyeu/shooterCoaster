@@ -1949,6 +1949,9 @@ async function pauseMenuCheck(page, levelId) {
   }
 }
 
+/** Wind-streak opacity the speed check needs to see at top speed. */
+const STREAK_FLOOR = 0.05
+
 /** Track fractions the speed check tries for its banked fast section. */
 const SPEED_SCAN = [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
 
@@ -2007,23 +2010,27 @@ async function speedCheck(page, levelId) {
       return w.feelMax.launch > 0 && w.feel.launch < w.feelMax.launch
     }, null, { timeout: 30000, polling: 100 })
     .catch(() => {})
-  // Streaks at the most banked point fast enough for them (`caps.streakSpeed`), else the fastest; the bank at the scan's
-  // most banked point. A v2 ride's turns can be slower than its drops (level 1's top speed is the straight at the first
-  // drop's foot) and its top speed short, so it also tries `rideFastest`.
+  // Streaks at the most banked point where the scan saw them (opacity past STREAK_FLOOR), else the point with the most;
+  // the bank at the scan's most banked point. A v2 ride's turns can be slower than its drops (level 1's top speed is the
+  // straight at the first drop's foot) and its top speed short, so it also tries `rideFastest`. The pick goes by the
+  // streaks measured, not by speed past `caps.streakSpeed`: just past it they are faint by design (smoothstep, × the
+  // default Screen-shake scale), and a slow runner held a point at 0.76 that drew 0.045 (#913).
   const samples = []
   const fastest = await page.evaluate(() => window.__SC_TEST__.rideFastest)
   for (const fraction of fastest === null ? SPEED_SCAN : [...SPEED_SCAN, fastest]) {
     const w = await rideFast(page, fraction)
-    samples.push({ fraction, roll: Math.abs(w.roll), speed: w.speed, streakSpeed: w.caps?.streakSpeed ?? 0.7 })
+    samples.push({ fraction, roll: Math.abs(w.roll), speed: w.speed, streaks: w.streaks ?? 0 })
   }
-  const fast = samples.filter((s) => s.speed > s.streakSpeed + 0.05)
-  const best = fast.length
-    ? fast.reduce((a, b) => (b.roll > a.roll ? b : a))
-    : samples.reduce((a, b) => (b.speed > a.speed ? b : a))
+  const streaky = samples.filter((s) => s.streaks > STREAK_FLOOR)
+  const best = streaky.length
+    ? streaky.reduce((a, b) => (b.roll > a.roll ? b : a))
+    : samples.reduce((a, b) => (b.streaks > a.streaks || (b.streaks === a.streaks && b.speed > a.speed) ? b : a))
   const w = await rideFast(page, best.fraction)
   await page.screenshot({ path: path.join(OUT, 'speed.png'), timeout: SHOT_TIMEOUT })
   const problems = []
-  if (!(w.streaks > 0.05)) problems.push(`no wind streaks at top speed (opacity ${w.streaks?.toFixed(3)}, speed ${w.speed?.toFixed(2)})`)
+  // The held point's streaks, or the scan's there if the re-ride came in a little slower on a slow runner.
+  const streaks = Math.max(w.streaks ?? 0, best.streaks)
+  if (!(streaks > STREAK_FLOOR)) problems.push(`no wind streaks at top speed (opacity ${streaks.toFixed(3)}, speed ${w.speed?.toFixed(2)}, the scan's most ${best.streaks.toFixed(3)} at track ${best.fraction.toFixed(3)})`)
   const banked = samples.reduce((a, b) => (b.roll > a.roll ? b : a))
   if (!(banked.roll >= 1)) problems.push(`camera barely banks at speed (${banked.roll.toFixed(2)}° at track ${banked.fraction.toFixed(3)}, the most of the scan)`)
   // Ride feel (#697): GO's launch shoved the view, and the wheels rumble at top speed.
@@ -2034,7 +2041,7 @@ async function speedCheck(page, levelId) {
   if (translation > 1e-6) problems.push(`camera translated ${translation.toFixed(3)} units off the track pose`)
   const tunnel = await tunnelShot(page, levelId)
   problems.push(...tunnel.problems)
-  return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, scan: samples.map(({ fraction, roll, speed }) => ({ fraction, roll, speed })), ...w }, tunnel: tunnel.result }
+  return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, scan: samples, ...w }, tunnel: tunnel.result }
 }
 
 /**
