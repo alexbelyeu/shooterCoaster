@@ -39,9 +39,8 @@ export function isDefeated(state: BossState): boolean {
 
 /** Lowest phase with a weak point alive, or -1 once defeated. */
 export function currentPhase(state: BossState): number {
-  const { weakPoints } = state.spec
   let phase = Infinity
-  for (let i = 0; i < weakPoints.length; i++) if (state.hp[i] > 0 && weakPoints[i].phase < phase) phase = weakPoints[i].phase
+  for (let i = 0; i < state.hp.length; i++) if (state.hp[i] > 0) phase = Math.min(phase, state.spec.weakPoints[i].phase)
   return phase === Infinity ? -1 : phase
 }
 
@@ -62,9 +61,10 @@ export function setRetracted(state: BossState, id: string, retracted: boolean): 
 /** One of `exposedWeakPoints`; allocates nothing, so the bosses' per-frame motion can ask. */
 export function isExposed(state: BossState, id: string): boolean {
   const { weakPoints } = state.spec
-  let i = 0
-  while (i < weakPoints.length && weakPoints[i].id !== id) i++
-  return i < weakPoints.length && state.hp[i] > 0 && weakPoints[i].phase === currentPhase(state) && !state.retracted.has(id)
+  for (let i = 0; i < weakPoints.length; i++) {
+    if (weakPoints[i].id === id) return state.hp[i] > 0 && weakPoints[i].phase === currentPhase(state) && !state.retracted.has(id)
+  }
+  return false
 }
 
 export function weakPointHp(state: BossState, id: string): number {
