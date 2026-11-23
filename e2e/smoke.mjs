@@ -1955,20 +1955,34 @@ const STREAK_FLOOR = 0.05
 /** Track fractions the speed check tries for its banked fast section. */
 const SPEED_SCAN = [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
 
-/** Hold top speed at `fraction` for ≥ 1.5 s so the rig and streaks ease in; returns the camera weight. */
+/**
+ * Hold top speed from `fraction` until the ride stops speeding up (1.5–4 s and ≥ 3 frames, so the rig and streaks ease
+ * in); returns the camera weight at the fastest reading. The speed peaks in game time: a slow runner draws a frame or
+ * two per poll, so a fixed 1.5 s caught level 1's fastest point at 0.76 on the way up (#913), and one poll past its peak
+ * (0.90) it was back at 0.71.
+ */
 async function rideFast(page, fraction) {
   await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, fraction)
   const start = Date.now()
   const f0 = await getFrames(page)
   let w
+  let top = null
+  let last = { frames: f0, speed: -1 }
   while (Date.now() - start < 20000) {
     await page.evaluate(() => { window.__SC_TEST__.rideSpeed = 1 })
     await page.waitForTimeout(250)
     const now = await page.evaluate(() => ({ frames: window.__SC_TEST__.frames, w: window.__SC_TEST__.cameraWeight }))
     w = now.w
-    if (now.frames - f0 >= 3 && Date.now() - start >= 1500) break
+    // Judged over polls with frames drawn in between: on a throttled page a poll can see none.
+    if (now.frames - last.frames < 2) continue
+    const climbing = w.speed > last.speed + 0.005
+    last = { frames: now.frames, speed: w.speed }
+    if (now.frames - f0 < 3) continue
+    if (!top || w.speed > top.speed) top = w
+    // At most 4 s: a point still speeding up after that is a long climb, and longer holds run the level clock out.
+    if (Date.now() - start >= (climbing ? 4000 : 1500)) break
   }
-  return { ...w }
+  return { ...(top ?? w) }
 }
 
 /**
