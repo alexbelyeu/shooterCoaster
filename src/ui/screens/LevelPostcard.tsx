@@ -13,6 +13,8 @@ const WHEEL = ring(136, 46, 30, 10)
 const EMBERS: [number, number, number][] = [
   [62, 30, 1.4], [84, 18, 1], [118, 24, 1.6], [140, 12, 1], [160, 34, 1.2], [36, 46, 1], [176, 20, 1.3],
 ]
+/** Lit windows in the city's towers. */
+const WINDOWS: [number, number][] = [[4, 64], [8, 70], [18, 50], [24, 58], [46, 42], [52, 48], [46, 60], [84, 58], [94, 66], [116, 30], [122, 50], [112, 68], [156, 56], [168, 36], [174, 44], [184, 60], [194, 48]]
 const STARS: [number, number][] = [
   [14, 10], [38, 22], [70, 8], [104, 16], [128, 6], [150, 24], [186, 12], [174, 34],
 ]
@@ -124,13 +126,20 @@ const SCENES: Record<BiomeType, Scene> = {
       <path d="M0 88 H200" stroke={t.accent} strokeWidth="1.5" />
     </>
   ),
-  // Neon Metropolis (scaffolded): a stand-in until the world's landmark is drawn here
+  // Neon Metropolis: a night skyline round the stepped hero tower and its lit needle, one neon band across it
   city: (t) => (
     <>
-      <circle cx="160" cy="26" r="8" fill={t.accent2} />
-      <path d="M118 90 L128 30 L138 90Z" fill="#6f6660" />
-      <path d="M0 80 Q50 70 100 78 T200 74 V100 H0Z" fill="#33402c" />
-      <path d="M8 74 Q50 30 92 62 T192 50" stroke={t.accent} strokeWidth="3" fill="none" />
+      <path d="M0 100 V58 H14 V44 H30 V64 H42 V36 H58 V56 H70 V100Z M150 100 V50 H164 V30 H180 V54 H192 V40 H200 V100Z" fill="#17122a" />
+      <path d="M78 100 V52 H100 V100Z M138 100 V60 H152 V100Z" fill="#100c20" />
+      <path d="M120 4 V24" stroke="#ffa424" strokeWidth="1.5" />
+      <path d="M107 100 V62 H110.5 V44 H114 V24 H126 V44 H129.5 V62 H133 V100Z" fill="#0a0716" />
+      <path d="M107 62 H133 M114 24 H126" stroke={t.accent2} strokeWidth="1.5" />
+      <path d="M110.5 44 H129.5" stroke={t.accent} strokeWidth="1.5" />
+      {WINDOWS.map(([x, y], i) => (
+        <rect key={i} x={x} y={y} width="2" height="2" fill="#ffd98a" opacity="0.8" />
+      ))}
+      <path d="M0 76 H200" stroke={t.accent} strokeWidth="2" opacity="0.9" />
+      <path d="M0 92 H200 V100 H0Z" fill="#08060f" />
     </>
   ),
 }

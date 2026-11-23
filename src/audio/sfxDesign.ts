@@ -87,7 +87,7 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
   level4: { tonic: 62, minor: true }, // D minor
   level5: { tonic: 60, minor: true }, // C minor
   level6: { tonic: 64, minor: true }, // E minor
-  level7: { tonic: 60, minor: true }, // level5's score, copied until Neon Metropolis's theme round
+  level7: { tonic: 60, minor: true }, // level5's score, aliased until Neon Metropolis's theme round
   'results-win': { tonic: 60, minor: false }, // C major
   'results-lose': { tonic: 60, minor: false }, // C major
   // Theme options waiting on Alex's pick (`?theme=`, scores/themes/) get a row each: `'<slot>.<name>': key`

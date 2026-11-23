@@ -3,11 +3,11 @@ import { useFrame, useThree } from '@react-three/fiber'
 import type * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
+import { DRONE_BOB, DRONE_SWING } from './hoverDroneMotion'
 import { DRONE_BODY_GEO, DRONE_GLOW_GEO, DRONE_GLOW_MAT, DRONE_MAT } from './SharedEnemyAssets'
 
-/** Radians of figure-eight per game second; how far (world units) the drift swings either way. */
+/** Radians of figure-eight per game second. */
 const FIGURE_EIGHT_RATE = 0.9
-const SWING = 40
 
 /**
  * A hover drone (brief: docs/art/ENEMIES.md, #323): a dark quad-drone with cyan rotor rings and eye, turned to watch
@@ -25,9 +25,9 @@ export default function HoverDrone(props: EnemyProps) {
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
       const f = time * FIGURE_EIGHT_RATE + phase
-      mesh.position.x = spawnPos.x + Math.sin(f) * SWING
-      mesh.position.z = spawnPos.z + Math.sin(2 * f) * SWING * 0.5
-      mesh.position.y = spawnPos.y + Math.sin(time * bobRate + phase) * 4
+      mesh.position.x = spawnPos.x + Math.sin(f) * DRONE_SWING.x
+      mesh.position.z = spawnPos.z + Math.sin(2 * f) * DRONE_SWING.z
+      mesh.position.y = spawnPos.y + Math.sin(time * bobRate + phase) * DRONE_BOB
       const model = modelRef.current
       if (model) {
         // Banks into the swing's velocity

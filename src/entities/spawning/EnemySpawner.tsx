@@ -47,6 +47,8 @@ interface EnemySpawnerProps {
   bounds?: PlacementBounds
   /** Landmarks a ground enemy stood away from the track keeps out of (`BiomeDefinition.keepOff`). */
   keepOff?: readonly KeepOff[]
+  /** Moves an air enemy's spot out of the world's buildings (`BiomeDefinition.clearAir`). */
+  clearAir?: (p: Vec3) => Vec3
   /** The track's hard route (#720), where a hard-route wave arrives; null without a junction. */
   hardRoute?: HardRoute | null
 }
@@ -198,6 +200,7 @@ export default function EnemySpawner({
   walls = NO_WALLS,
   bounds,
   keepOff,
+  clearAir,
   hardRoute,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
@@ -243,7 +246,8 @@ export default function EnemySpawner({
       // On their walls already, where they enter: never pushed out of the near field.
       if (members[0]?.wall) return members.map((e) => [e.id, { position: e.position!, wall: e.wall }])
       if (!wave.formation || wave.formation === 'scatter') {
-        return members.map((e) => [e.id, { position: toVector3(clampToBounds(outsideNearField(e.position!, camera), bounds)) }])
+        const clear = ENEMY_PLACEMENT[wave.type].surface === 'air' && clearAir ? clearAir : (p: Vec3) => p
+        return members.map((e) => [e.id, { position: toVector3(clear(clampToBounds(outsideNearField(e.position!, camera), bounds))) }])
       }
       const placed = placeFormationWave({
         table,
@@ -256,13 +260,14 @@ export default function EnemySpawner({
         slots: members.map((e) => e.slot!),
         ride,
         bounds,
+        clearAir,
       })
       return members.map((e, i) => {
         const p = placed[i]
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [groundFn, bounds, keepOff, walls],
+    [groundFn, bounds, keepOff, clearAir, walls],
   )
 
   const placeWave = useCallback(

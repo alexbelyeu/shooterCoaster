@@ -7,7 +7,7 @@ import type { DarkSectionSpec, WhaleBreachSpec } from '@/types/level'
 import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
 import type { FogModifiers } from './sceneFog'
-import type { KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
+import type { KeepOff, PlacementBounds, Vec3 } from '@/entities/spawning/spawnPlacement'
 import type { HeroShot } from '@/track/introCamera.hot'
 
 /** One stop of a terrain colour ramp. */
@@ -145,6 +145,8 @@ export interface BiomeDefinition {
   bounds?: PlacementBounds
   /** Landmarks and big props a ground enemy stood away from the track keeps out of (`spawnPlacement.ts` `whereTheApproachLooks`). */
   keepOff?: (groundFn: HeightFunction, track: ArcTable) => readonly KeepOff[]
+  /** Moves an air enemy's placed spot out of the world's buildings (the city's towers, #323): scatter and formation alike. */
+  clearAir?: (groundFn: HeightFunction, track: ArcTable) => (p: Vec3) => Vec3
   /** The hero landmark the intro's tour passes (#675) and the results orbit circles (#328). */
   hero: HeroShot
 }

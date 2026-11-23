@@ -204,7 +204,7 @@ const LEVELS: LevelConfig[] = [
   {
     id: 'level7',
     name: 'Neon Metropolis',
-    description: 'Ride through Neon Metropolis',
+    description: 'Drones over the city that never sleeps',
     order: 7,
     biome: 'city',
     maxScore: 102 * 15, // 1530: no boss, a finale wave ends the run

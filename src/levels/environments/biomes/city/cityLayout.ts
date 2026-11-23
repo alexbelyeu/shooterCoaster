@@ -1,7 +1,7 @@
 import type { ArcTable } from '@/track/arcLength'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { createRng, type Rng } from '@/utils/rng'
-import { LANDMARK_SITE } from './config'
+import { LANDMARK_SITE, SPIRE_HEIGHT } from './config'
 
 /**
  * Neon Metropolis's city plan (#323), pure and seeded: towers on a street grid, kept off the track and its support
@@ -161,4 +161,89 @@ export function layoutCity(track: ArcTable, extent: number, seed = 7323): CityLa
     skyline.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, w: rng.range(110, 220), d: rng.range(110, 220), h: rng.range(320, 720) })
   }
   return { towers, skyline, signs }
+}
+
+/** The hero tower's tiers, widest first: each stands on the one below. */
+const TIERS = [
+  { w: 260, h: 0.42 },
+  { w: 190, h: 0.28 },
+  { w: 120, h: 0.18 },
+] as const
+const NEEDLE = { w: 10, h: SPIRE_HEIGHT * 0.12 }
+const CROWN = { h: 7, d: 4 }
+
+export function layoutHeroTower(): { tiers: Tower[]; neon: NeonSign[] } {
+  const tiers: Tower[] = []
+  const neon: NeonSign[] = []
+  let base = 0
+  for (const [i, t] of TIERS.entries()) {
+    const h = SPIRE_HEIGHT * t.h
+    tiers.push({ x: LANDMARK_SITE.x, z: LANDMARK_SITE.z, w: t.w, d: t.w, h: base + h })
+    base += h
+    // A neon crown round the top of each tier, magenta and cyan in turn
+    const color = i % 2 === 0 ? 'magenta' : 'cyan'
+    for (const side of [0, 1, 2, 3]) {
+      const yaw = (side * Math.PI) / 2
+      const out = t.w / 2 + CROWN.d / 2
+      neon.push({
+        x: LANDMARK_SITE.x + Math.sin(yaw) * out,
+        y: base - CROWN.h,
+        z: LANDMARK_SITE.z + Math.cos(yaw) * out,
+        w: t.w + CROWN.d * 2,
+        h: CROWN.h,
+        d: CROWN.d,
+        yaw,
+        color,
+      })
+    }
+  }
+  neon.push({ x: LANDMARK_SITE.x, y: base + NEEDLE.h / 2, z: LANDMARK_SITE.z, w: NEEDLE.w, h: NEEDLE.h, d: NEEDLE.w, yaw: 0, color: 'amber' })
+  return { tiers, neon }
+}
+
+/** Every tower an air enemy must stay out of: the blocks, the skyline and the hero tower's tiers. */
+export function cityTowers(track: ArcTable, extent: number): Tower[] {
+  const { towers, skyline } = layoutCity(track, extent)
+  return [...towers, ...skyline, ...layoutHeroTower().tiers]
+}
+
+/** How far an air enemy's centre must stay from a tower's faces (x, z) and above its roof (y). */
+export interface Clearance {
+  x: number
+  y: number
+  z: number
+}
+
+interface Point {
+  x: number
+  y: number
+  z: number
+}
+
+function clearOf(towers: readonly Tower[], p: Point, ground: number, c: Clearance): boolean {
+  const up = p.y - ground - c.y
+  return towers.every((t) => up >= t.h || Math.abs(p.x - t.x) >= t.w / 2 + c.x || Math.abs(p.z - t.z) >= t.d / 2 + c.z)
+}
+
+/** Street centre lines tried for a blocked spot, nearest first. */
+const STREETS_TRIED = 6
+
+/**
+ * `p` if it is `c` clear of every tower, else `p` moved across z onto the nearest centre line of a street running
+ * along x that is (`STREET_GRID`: those lines lie at odd multiples of half the pitch). An air enemy whose drift is
+ * wide along x and narrow across z keeps it inside that street. `ground` is the ground's height under `p`.
+ */
+export function clearOfTowers(towers: readonly Tower[], p: Point, ground: number, c: Clearance): Point {
+  if (clearOf(towers, p, ground, c)) return p
+  const { pitch } = STREET_GRID
+  const at = p.z / pitch - 0.5
+  const nearest = Math.round(at)
+  const toward = at >= nearest ? 1 : -1
+  for (let k = 0; k < STREETS_TRIED; k++) {
+    // The nearest line, then the next nearest on either side in turn
+    const line = nearest + toward * (k % 2 === 1 ? (k + 1) / 2 : -k / 2)
+    const q = { x: p.x, y: p.y, z: (line + 0.5) * pitch }
+    if (clearOf(towers, q, ground, c)) return q
+  }
+  return p
 }
