@@ -11,6 +11,8 @@ interface ScorePopup {
   screenY: number
   /** A penalty's warning (negative `score`, #518). */
   label?: string
+  /** A boss defeat's (`EnemyKilledEvent.big`). */
+  big: boolean
   /** Test hold (`holdFeedback`): stays at full opacity until released. */
   held: boolean
 }
@@ -21,12 +23,9 @@ const MAX_POPUPS = 6
 const POPUP_MS = 1000
 /** A penalty's warning stays long enough to read. */
 const LABELLED_POPUP_MS = 2000
-/** A boss defeat and other big scores get the big popup. */
-const BIG_SCORE = 200
-
-function popupClass(score: number): string {
-  if (score < 0) return 'score-popup score-popup--penalty'
-  return score >= BIG_SCORE ? 'score-popup score-popup--big' : 'score-popup'
+function popupClass(popup: ScorePopup): string {
+  if (popup.score < 0) return 'score-popup score-popup--penalty'
+  return popup.big ? 'score-popup score-popup--big' : 'score-popup'
 }
 
 /**
@@ -42,16 +41,17 @@ export default function ScorePopups() {
   const mountedRef = useRef(true)
 
   const handleKill = useCallback((data: unknown) => {
-    const { screenX, screenY, multiplier, score, label } = data as {
+    const { screenX, screenY, multiplier, score, label, big = false } = data as {
       screenX: number
       screenY: number
       multiplier: number
       score: number
       label?: string
+      big?: boolean
     }
 
     const id = nextId++
-    pendingRef.current.push({ id, score, multiplier, screenX, screenY, label, held: isFeedbackHeld() })
+    pendingRef.current.push({ id, score, multiplier, screenX, screenY, label, big, held: isFeedbackHeld() })
 
     // Schedule removal (re-armed while a test holds feedback)
     const remove = () => {
@@ -95,7 +95,7 @@ export default function ScorePopups() {
         {popups.map((popup) => (
           <motion.div
             key={popup.id}
-            className={popupClass(popup.score)}
+            className={popupClass(popup)}
             initial={{ opacity: 1, x: popup.screenX, y: popup.screenY, scale: 0.5 }}
             animate={{ opacity: popup.held ? 1 : 0, x: popup.screenX, y: popup.screenY - 60, scale: 1 }}
             exit={{ opacity: 0 }}

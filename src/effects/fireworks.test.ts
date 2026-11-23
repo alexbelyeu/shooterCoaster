@@ -11,8 +11,8 @@ import {
   rocketsForStreak,
   slotLifetime,
   sparkOffset,
-  type Vec3,
 } from './fireworks'
+import type { Vec3 } from '@/utils/vec3'
 
 const v3 = (x: number, y: number, z: number): Vec3 => ({ x, y, z })
 

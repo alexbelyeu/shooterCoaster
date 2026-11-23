@@ -1,7 +1,7 @@
 /** Per-enemy-type death effects drawn by the pooled `ParticleExplosion`; pure, so unit-tested. */
 import type { EnemyType } from '@/types/level'
 import type { KillSound } from '@/audio/sfxDesign'
-import type { Vec3 } from '@/entities/spawning/spawnPlacement'
+import type { Vec3 } from '@/utils/vec3'
 import { DUST_CHALK, DUST_DARK, DUST_GREY, DUST_LIGHT } from '@/entities/enemies/enemyPalette'
 
 /** `chunk` layers draw in the lit chunk mesh; every other shape is a stretched unlit box. */
@@ -157,7 +157,40 @@ export const SAND_BURST_DEATH_STYLE: DeathStyle = {
   lifetime: 1.9, scale: 3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'crunch',
 }
 
-const BALLOON_CONFETTI =['#ff3b6b', '#ffd23f', '#3bc9ff', '#7dff6a', '#c86bff']
+const BALLOON_CONFETTI = ['#ff3b6b', '#ffd23f', '#3bc9ff', '#7dff6a', '#c86bff']
+const BALLOON_POP = (colors: readonly string[], sparkColors: readonly string[]): readonly DeathLayer[] => [
+  layer({ shape: 'confetti', count: 40, colors, glow: 1.6, speed: [30, 90], up: 20, drag: 3, gravity: 18, size: 5, spin: 9, hold: 0.6 }),
+  layer({ shape: 'spark', count: 8, colors: sparkColors, glow: 4, speed: [80, 140], drag: 4, size: 1.6 }),
+]
+
+/** A golden bonus balloon: the balloon's pop in gold leaf, with a warmer, brighter flash. */
+export const GOLDEN_BALLOON_DEATH_STYLE: DeathStyle = {
+  layers: BALLOON_POP(['#ffd700', '#ffc21a', '#ffe680', '#e0a010'], ['#fff4c0']),
+  lifetime: 1.8, scale: 1, lift: 0, flash: 5, flashColor: '#ffcc44', sound: 'pop',
+}
+
+/**
+ * A boss's defeat: a fairground confetti shower. One slot holds 48 pieces, so `BossBase` fires it at each of
+ * `BOSS_DEFEAT_BURST_OFFSETS` (4 of the pool's 8 slots) to spread ~190 pieces across the boss. No flash, no sound
+ * of its own: the defeat's sting plays it.
+ */
+export const BOSS_DEFEAT_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({
+      shape: 'confetti', count: 48, colors: ['#ff3355', '#ffd23f', '#33c3ff', '#7cff4f', '#ff7a1a', '#c86bff', '#ffffff'],
+      glow: 1.2, speed: [120, 380], up: 160, drag: 1, gravity: 70, size: 12, spin: 14, hold: 0.8,
+    }),
+  ],
+  lifetime: 3.2, scale: 1, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'pop',
+}
+
+/** Where `BOSS_DEFEAT_DEATH_STYLE` bursts, around the boss body's centre (world axes). */
+export const BOSS_DEFEAT_BURST_OFFSETS: readonly Vec3[] = [
+  { x: -150, y: 30, z: 0 },
+  { x: -50, y: -30, z: 30 },
+  { x: 50, y: 30, z: -30 },
+  { x: 150, y: -30, z: 0 },
+]
 
 const SNOW_CRUMBLE = (ice: string): readonly DeathLayer[] => [
   layer({ shape: 'chunk', count: 9, colors: ['#f4f8ff', '#e2ecf8', ice], speed: [25, 70], up: 30, drag: 0.8, gravity: 140, size: 5.5, spin: 6, hold: 0.7 }),
@@ -236,10 +269,7 @@ export const MEDUSA_CHALK_BURST_DEATH_STYLE: DeathStyle = {
 
 export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
   balloon: {
-    layers: [
-      layer({ shape: 'confetti', count: 40, colors: BALLOON_CONFETTI, glow: 1.6, speed: [30, 90], up: 20, drag: 3, gravity: 18, size: 5, spin: 9, hold: 0.6 }),
-      layer({ shape: 'spark', count: 8, colors: ['#ffffff'], glow: 4, speed: [80, 140], drag: 4, size: 1.6 }),
-    ],
+    layers: BALLOON_POP(BALLOON_CONFETTI, ['#ffffff']),
     lifetime: 1.8, scale: 1, lift: 0, flash: 3, flashColor: '#ffffff', sound: 'pop',
   },
   crow: {

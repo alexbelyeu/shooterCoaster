@@ -6,10 +6,9 @@ import { gameClockStep } from '@/core/gameClock'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import { placeSound, sfx } from '@/audio/sfx'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
-import { MEDUSA_CHALK_BURST_DEATH_STYLE, MEDUSA_SNAKE_DEATH_STYLE } from '@/effects/deathStyles'
+import { BOSS_DEFEAT_DEATH_STYLE, MEDUSA_CHALK_BURST_DEATH_STYLE, MEDUSA_SNAKE_DEATH_STYLE } from '@/effects/deathStyles'
 import { GYM_SCALE, STAR } from '@/levels/environments/biomes/gym/blockout'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
-import BossConfetti from './BossConfetti'
 import { smooth } from './bossCycle.hot'
 import { currentPhase, weakPointHp, type WeakPointSpec } from './bossModel'
 import { MEDUSA } from './bossSpecs'
@@ -253,6 +252,7 @@ export default function Medusa(props: BossProps) {
       rigging={<instancedMesh ref={beadsRef} args={[MEDUSA_SNAKE_BEAD_GEO, MEDUSA_SNAKE_MAT, BEADS]} frustumCulled={false} />}
       renderWeakPoint={renderWeakPoint}
       exitSeconds={EXIT_SECONDS}
+      defeatBurst={BOSS_DEFEAT_DEATH_STYLE}
       deathStyle={MEDUSA_SNAKE_DEATH_STYLE}
     >
       <group ref={starRef} position={HUB} rotation={[0, FACING_YAW, 0]} visible={false}>
@@ -261,7 +261,6 @@ export default function Medusa(props: BossProps) {
         </group>
         <mesh ref={hubRef} geometry={MEDUSA_HUB_GEO} material={MEDUSA_HUB_MAT} position={[0, 0, 1]} />
       </group>
-      <BossConfetti bossId={props.id} />
     </BossBase>
   )
 }

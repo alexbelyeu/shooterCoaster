@@ -6,7 +6,7 @@ import { getThemeParkLayout } from './layout'
 import { RIDES } from './parkSpec'
 import EntranceArch from './EntranceArch'
 import Fireworks from '@/effects/Fireworks'
-import type { Vec3 } from '@/effects/fireworks'
+import type { Vec3 } from '@/utils/vec3'
 
 /** Rides, the entrance arch and the combo-streak fireworks (launched from the Ferris wheels and the arch) */
 export default function ThemeParkFeatures({ heightFn, groundFn, track, atmosphere }: BiomeFeaturesProps) {

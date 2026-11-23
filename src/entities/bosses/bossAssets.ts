@@ -208,11 +208,6 @@ export const BLIMP_CABLE_GEO = (() => {
 
 export const BLIMP_CABLE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true })
 
-export const CONFETTI_COUNT = 220
-export const CONFETTI_GEO = new THREE.PlaneGeometry(12, 7)
-export const CONFETTI_MAT = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
-export const CONFETTI_COLORS = ['#ff3355', '#ffd23f', '#33c3ff', '#7cff4f', '#ff7a1a', '#c86bff', '#ffffff']
-
 // ── The Kraken (Ocean) ──
 
 // Dark wet teal on top (the brief's #184a5a) reads dark against the sea; a salmon sucker side faces the rider and
