@@ -1,6 +1,8 @@
 import type { LevelConfig } from '@/types/level'
 import { paceLevel } from './pacing'
 // Level 6's track and walls as plain numbers: the blockout they are built from stays out of the startup JS (#589).
+// Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS.
+import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
 import { GYM_LEVEL } from './environments/biomes/gym/gymLevel'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
@@ -14,20 +16,8 @@ const LEVELS: LevelConfig[] = [
     maxScore: 150 * 13 + 5 * 65 + 400, // 1950 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 2675
     message: 'Well, that was easy...',
     nextLevel: 'level2',
-    track: {
-      varA: 3,
-      varB: 17,
-      varC: 4,
-      scalar: 20,
-      rollerSpeed: 0.00001,
-      minRollerSpeed: 0.00008,
-      curve: 'curve1',
-      color1: 0xf3ece0,
-      color2: 0xffff00,
-      // Under the midway (#332): the bottom of the ride's second dip to the grass and the climb out.
-      // It starts past where the track's later pass crosses this dip (#651: `tunnelSpans` refuses a pass through the tube).
-      tunnels: [{ from: 0.191, length: 420 }],
-    },
+    // The ride kit's classic (#863, `parkTrack.ts`): a station launch, a lift hill, camelbacks, past the Ferris wheel.
+    track: PARK_LEVEL_TRACK,
     ...paceLevel({
       waves: [
         { type: 'balloon', count: 50, waveLabel: 'Pop em!' },

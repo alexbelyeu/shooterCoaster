@@ -10,6 +10,7 @@ import {
   advanceRide, curveTangentY, jumpRide, resetRide, rideLaunches, rideOnLift, rideSpeedNorm, rideStepFrames, rideStopShare, rideTopShare, rideZone, type RideSpeeds,
   type RideState,
 } from './ridePhysics'
+import { planFastestLeadT } from './rideV2'
 import { e2eRideSeconds, levelTimeStep } from '@/testing/e2eHook'
 import { useGameStore } from '@/store/useGameStore'
 import { sfx } from '@/audio/sfx'
@@ -37,6 +38,9 @@ import { createSeatPose, seatPose } from './seatPose.hot'
 import { routeCurve, routeSpeedScale } from './mechanics.hot'
 import type { PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import type { RideMechanic } from '@/types/level'
+
+/** How far before its top speed the smoke's speed step drops the car, so it rides into it while the rig eases in. */
+const E2E_FASTEST_LEAD_SECONDS = 1.5
 
 interface CoasterCameraProps {
   curve: TrackCurve
@@ -109,8 +113,10 @@ export default function CoasterCamera({
   const tunnelIndex = useRef(-1)
   useEffect(() => {
     const testApi = window.__SC_TEST__
-    if (testApi) testApi.tunnel.spans = (table.tunnels ?? []).map((span) => ({ from: table.t[span.from], to: table.t[span.to] }))
-  }, [table])
+    if (!testApi) return
+    testApi.tunnel.spans = (table.tunnels ?? []).map((span) => ({ from: table.t[span.from], to: table.t[span.to] }))
+    testApi.rideFastest = speeds.plan ? planFastestLeadT(speeds.plan, E2E_FASTEST_LEAD_SECONDS) : null
+  }, [table, speeds])
   useEffect(() => () => {
     if (tunnelIndex.current >= 0) eventBus.emit(TRACK_TUNNEL_EVENT, 'exit', tunnelIndex.current)
     tunnelIndex.current = -1
