@@ -221,7 +221,7 @@ export interface TrackSample {
 /** Hard clamp radius — terrain is always forced below track here */
 const TRACK_HARD_RADIUS = 40
 /** Soft blend radius — terrain transitions from suppressed to natural */
-const TRACK_SOFT_RADIUS = 120
+export const TRACK_SOFT_RADIUS = 120
 /** Extra clearance below the track */
 export const TRACK_CLEARANCE = 15
 
