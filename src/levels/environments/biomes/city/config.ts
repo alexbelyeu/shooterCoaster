@@ -1,39 +1,19 @@
 import * as THREE from 'three'
-import type { BiomeTreeConfig, ColorRamp } from '@/levels/environments/shared/types'
+import type { ColorRamp } from '@/levels/environments/shared/types'
 
-// Neon Metropolis, scaffolded by `npm run new-world` from the outdoor template: the palette, trees and props are this world's to author.
+// Neon Metropolis (#323): a flat city at night. The ground is asphalt (the street grid comes from `cityShaders.ts`).
 
 export const COLOR_RAMP: ColorRamp = {
   stops: [
-    { height: 0.0, color: new THREE.Color(0x3d5a2a) }, // valley floor
-    { height: 0.3, color: new THREE.Color(0x56763a) }, // low hills
-    { height: 0.6, color: new THREE.Color(0x7d7a5a) }, // upland
-    { height: 0.85, color: new THREE.Color(0x8f8a84) }, // rock
-    { height: 1.0, color: new THREE.Color(0xe8e8e4) }, // peaks
+    { height: 0.0, color: new THREE.Color(0x24222c) }, // asphalt
+    { height: 0.5, color: new THREE.Color(0x2c2a34) },
+    { height: 1.0, color: new THREE.Color(0x34303c) }, // the low swell beyond the skyline
   ],
-  cliffColor: new THREE.Color(0x6b5e50),
+  cliffColor: new THREE.Color(0x2a2832),
 }
 
-export const TREES: BiomeTreeConfig = {
-  types: [
-    {
-      trunkColor: '#5c3a1e',
-      canopyColors: (rng) => `hsl(${rng.range(95, 135)}, ${rng.range(40, 65)}%, ${rng.range(32, 44)}%)`,
-      canopyGeoFactory: () => new THREE.ConeGeometry(1, 1, 6),
-      heightRange: [30, 80],
-    },
-  ],
-  maxCount: 80,
-  minRadius: 800,
-  maxRadius: 3000,
-  maxSlope: Math.PI / 4,
-}
+/** Where the hero tower stands (`Features.tsx`), the intro's tour passes and the results orbit looks: beyond the track. */
+export const LANDMARK_SITE = { x: 1500, z: -1900 } as const
 
-/** Where the stand-in landmark (`Features.tsx`) stands and the intro's tour passes and the results orbit looks at (`index.ts` `hero`): keep it beyond the track. */
-export const LANDMARK_SITE = { x: 1500, z: -2000 } as const
-
-/** Height of the stand-in landmark (world units). */
-export const SPIRE_HEIGHT = 420
-
-/** The boulders scattered beside the track (`Decorations.tsx`). */
-export const BOULDER_COLOR = 0x8a8278
+/** Height of the hero tower (world units): the tallest thing in the city. */
+export const SPIRE_HEIGHT = 820

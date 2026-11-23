@@ -222,32 +222,37 @@ const LEVELS: LevelConfig[] = [
     description: 'Ride through Neon Metropolis',
     order: 7,
     biome: 'city',
-    maxScore: 60 * 13 + 44 * 15, // 1440: no boss, a finale wave ends the run
+    maxScore: 102 * 15, // 1530: no boss, a finale wave ends the run
     message: 'You cleared Neon Metropolis!',
     nextLevel: null,
-    // Scaffolded by npm run new-world: level1's curve family; tune it inside the track extent formula (level-design skill).
+    // The first v2 ride (#323; the full storyboard is #871): the car waits in a station on the curve's crest for the
+    // countdown, GO launches it over the fins and it drops straight into the street canyons; gravity rides the rest,
+    // the beat keeping a run to about half the lap. level1's curve family, extent varC × 13 × scalar = 1040.
     track: {
       varA: 3,
       varB: 17,
       varC: 4,
       scalar: 20,
-      rollerSpeed: 0.00001,
-      minRollerSpeed: 0.00008,
       curve: 'curve1',
-      color1: 0xffffff,
-      color2: 0x44aaff,
+      ride: 'v2',
+      mechanics: [{ kind: 'station', from: 0, to: 0.012, speed: 260 }],
+      rideV2: { crawl: 100, drag: 0.001 },
+      color1: 0xff3fb4,
+      color2: 0x2ee6ff,
+      glow: 0.6,
     },
+    // Hover drones patrol the street canyons in Vs and rings; no boss yet (the helicopter is #322's), a finale wave ends the run.
     ...paceLevel({
       waves: [
-        { type: 'balloon', count: 30, waveLabel: 'Here They Come!', weight: 2 },
-        { type: 'crow', count: 14, waveLabel: 'Crows!', formation: 'v', weight: 2 },
-        { type: 'balloon', count: 30, waveLabel: 'More Balloons!', weight: 2 },
-        { type: 'crow', count: 14, waveLabel: 'The Flock!', formation: 'spiral', weight: 3 },
+        { type: 'hoverDrone', count: 20, waveLabel: 'Drones Incoming!', weight: 2 },
+        { type: 'hoverDrone', count: 20, waveLabel: 'Patrol Wing!', formation: 'v', weight: 2 },
+        { type: 'hoverDrone', count: 22, waveLabel: 'Surveillance Ring!', formation: 'ring', weight: 2 },
+        { type: 'hoverDrone', count: 20, waveLabel: 'Swarm Protocol!', formation: 'v', weight: 3 },
       ],
-      finale: { type: 'crow', count: 16, waveLabel: 'Final Wave!' },
+      finale: { type: 'hoverDrone', count: 20, waveLabel: 'Final Wave!', formation: 'ring' },
     }),
     starThresholds: [0.25, 0.55, 0.85],
-    environment: { hasTrees: true, treeCount: 60 },
+    environment: {},
   },
 ]
 

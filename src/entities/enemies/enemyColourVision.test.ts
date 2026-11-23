@@ -10,6 +10,7 @@ import { COLOR_RAMP as OCEAN_RAMP } from '@/levels/environments/biomes/ocean/con
 import { COLOR_RAMP as ARCTIC_RAMP } from '@/levels/environments/biomes/arctic/config'
 import { COLOR_RAMP as VOLCANIC_RAMP } from '@/levels/environments/biomes/volcanic/config'
 import { COLOR_RAMP as GYM_RAMP, WALL_PAINT } from '@/levels/environments/biomes/gym/config'
+import { COLOR_RAMP as CITY_RAMP } from '@/levels/environments/biomes/city/config'
 import { WATER_COLOURS } from '@/levels/environments/shared/waterSurface'
 import * as A from './SharedEnemyAssets'
 import * as P from './enemyPalette'
@@ -83,11 +84,12 @@ const ENEMIES: Read[] = [
   enemy('rat', 'rat', 'gym', A.RAT_MAT, P.RAT_FUR, P.RAT_BELLY),
   enemy('dustBunny', 'dustBunny', 'gym', A.DUST_BUNNY_MAT, P.DUST_GREY, P.DUST_CHALK),
   enemy('lanternfly', 'lanternfly', 'gym', A.LANTERNFLY_MAT, P.LANTERNFLY_FOREWING, P.LANTERNFLY_RED, P.LANTERNFLY_BODY),
+  enemy('hoverDrone', 'hoverDrone', 'city', A.DRONE_MAT, P.DRONE_BODY, P.DRONE_DOME, glowColour(0, hex(P.DRONE_GLOW), 1.8)),
 ]
 
 const RAMPS: Record<BiomeType, ColorRamp> = {
   themePark: THEME_PARK_RAMP, desert: DESERT_RAMP, ocean: OCEAN_RAMP,
-  arctic: ARCTIC_RAMP, volcanic: VOLCANIC_RAMP, gym: GYM_RAMP,
+  arctic: ARCTIC_RAMP, volcanic: VOLCANIC_RAMP, gym: GYM_RAMP, city: CITY_RAMP,
 }
 
 /**

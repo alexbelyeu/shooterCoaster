@@ -18,6 +18,7 @@ import Climber from './Climber'
 import Rat from './Rat'
 import DustBunny from './DustBunny'
 import Lanternfly from './Lanternfly'
+import HoverDrone from './HoverDrone'
 
 /** Every wave enemy's component: what `EnemySpawner` mounts and the turntable (`src/dev/turntable/`) shows. */
 export const ENEMY_COMPONENTS: Record<EnemyType, ComponentType<EnemyProps>> = {
@@ -38,4 +39,5 @@ export const ENEMY_COMPONENTS: Record<EnemyType, ComponentType<EnemyProps>> = {
   rat: Rat,
   dustBunny: DustBunny,
   lanternfly: Lanternfly,
+  hoverDrone: HoverDrone,
 }

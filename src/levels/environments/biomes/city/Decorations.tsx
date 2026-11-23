@@ -1,42 +1,37 @@
 import { useEffect, useMemo } from 'react'
-import * as THREE from 'three'
 import type { BiomeDecorationsProps } from '@/levels/environments/shared/types'
-import { scatterNearTrack, settleOnGround, trackExtent } from '@/levels/environments/shared/trackScatter'
+import { trackExtent } from '@/levels/environments/shared/trackScatter'
 import StaticInstances from '@/levels/environments/shared/StaticInstances'
-import { yawScaleMatrix } from '@/levels/environments/shared/yawScaleMatrix'
-import { createRng } from '@/utils/rng'
-import { BOULDER_COLOR } from './config'
+import { layoutCity } from './cityLayout'
+import { createNeonMaterial, createTowerGeometry, neonGeometry, towerMatrix } from './cityNeon'
+import { createTowerMaterial } from './cityShaders'
 
-/** Boulders on the ground beside the track, seeded and kept off the rails and towers: one draw call. */
+/** The city (#323): every tower and the skyline as one instanced draw call with lit windows, all the neon as one more. */
 export default function CityDecorations({ groundFn, track }: BiomeDecorationsProps) {
-  const geometry = useMemo(() => new THREE.DodecahedronGeometry(1, 0), [])
-  const material = useMemo(() => new THREE.MeshStandardMaterial({ color: BOULDER_COLOR, roughness: 0.9, flatShading: true }), [])
-
-  const matrices = useMemo(() => {
-    const rng = createRng(7274)
-    const count = 60
-    const points = scatterNearTrack({
-      count: count * 3,
-      track,
-      heightFn: groundFn,
-      minDist: 60,
-      maxDist: 800,
-      maxRadius: trackExtent(track) * 1.5,
-      maxSlope: Math.PI / 8,
-      bias: 1.5,
-      rng,
-    })
-    const boulders = settleOnGround(points, groundFn, { count, scaleRange: [8, 26], footprint: 1, height: 1, sink: 0.3, maxBury: 0.5, rng })
-    return boulders.map((b) => yawScaleMatrix(b, rng() * Math.PI * 2, b.scale))
-  }, [groundFn, track])
+  const layout = useMemo(() => layoutCity(track, trackExtent(track)), [track])
+  const towerGeometry = useMemo(createTowerGeometry, [])
+  const towerMaterial = useMemo(createTowerMaterial, [])
+  const neonMaterial = useMemo(createNeonMaterial, [])
+  const neon = useMemo(() => neonGeometry(layout.signs), [layout])
+  const matrices = useMemo(
+    () => [...layout.towers, ...layout.skyline].map((t) => towerMatrix(t, groundFn(t.x, t.z))),
+    [layout, groundFn],
+  )
 
   useEffect(
     () => () => {
-      geometry.dispose()
-      material.dispose()
+      towerGeometry.dispose()
+      towerMaterial.dispose()
+      neonMaterial.dispose()
     },
-    [geometry, material],
+    [towerGeometry, towerMaterial, neonMaterial],
   )
+  useEffect(() => () => neon.dispose(), [neon])
 
-  return <StaticInstances matrices={matrices} geometry={geometry} material={material} />
+  return (
+    <>
+      <StaticInstances matrices={matrices} geometry={towerGeometry} material={towerMaterial} />
+      <mesh geometry={neon} material={neonMaterial} />
+    </>
+  )
 }
