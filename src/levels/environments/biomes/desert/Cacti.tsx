@@ -6,6 +6,9 @@ import { scatterPositions } from '../../shared/scatter'
 import { roundCaster } from '../../shared/contactShadows'
 import { useContactShadows } from '../../shared/ContactShadows'
 
+/** The columnar cactus trunk's base radius (scale 1), which its contact shadow reads too. */
+const COLUMNAR_BASE_RADIUS = 4
+
 /** Saguaro, barrel and columnar cacti (rendered first by DesertDecorations). */
 export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
   const saguaroPositions = useMemo(() => scatterPositions(createRng(2310), 40, 400, 2800, heightFn), [heightFn])
@@ -232,7 +235,7 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
     mesh.instanceMatrix.needsUpdate = true
   }, [barrelPositions, barrelConfigs])
 
-  const columnarGeo = useMemo(() => new THREE.CylinderGeometry(3.5, 4, 30, 10), [])
+  const columnarGeo = useMemo(() => new THREE.CylinderGeometry(3.5, COLUMNAR_BASE_RADIUS, 30, 10), [])
   const columnarCapGeo = useMemo(() => new THREE.SphereGeometry(3.5, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), [])
 
   // Pre-compute per-instance scale so trunk and cap use the same value
@@ -241,7 +244,7 @@ export default function Cacti({ heightFn }: { heightFn: HeightFunction }) {
     return columnarPositions.map(() => 0.8 + rng() * 1.2)
   }, [columnarPositions])
   useContactShadows(
-    useMemo(() => columnarPositions.map((p, i) => roundCaster(p.x, p.z, 4 * columnarScales[i], 0.5, 1.2)), [columnarPositions, columnarScales]),
+    useMemo(() => columnarPositions.map((p, i) => roundCaster(p.x, p.z, COLUMNAR_BASE_RADIUS * columnarScales[i], 0.5, 1.2)), [columnarPositions, columnarScales]),
   )
 
   const setColumnarRef = useCallback((mesh: THREE.InstancedMesh | null) => {
