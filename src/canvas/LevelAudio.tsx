@@ -11,8 +11,7 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import { isInRun } from '@/store/startPhase'
 import { reportLoad } from '@/core/loadProgress'
 import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks'
-import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
-import { intensityForTier } from '@/audio/scrim/layers'
+import { applyCombatMix, type CombatMixTargets } from '@/audio/combatMix'
 import { RESULTS_CUTS, resultsCut } from '@/audio/scores/resultsCut'
 import { runStars } from '@/levels/scoring'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
@@ -68,6 +67,12 @@ const onFireworkLaunch = (e: unknown) => {
 const onFireworkBurst = () => sfx().fireworkPop()
 /** An unshot snowball thumps past: the snow crunch, unplaced (it is at the camera; the event carries only its side). */
 const onSnowSplat = () => sfx().kill(0, 'crunch', null)
+
+const COMBAT_MIX: CombatMixTargets = {
+  duck: (on) => setMusicDucked(on),
+  frenzyLift: (on) => sfx().frenzyLift(on),
+  intensity: (n) => scrimPlayer()?.setIntensity(n),
+}
 
 const SFX_EVENTS: [string, (e: unknown) => void][] = [
   ['enemy:hit', onHit],
@@ -151,10 +156,7 @@ export default function LevelAudio() {
 
   useFrame(() => {
     const { combo, timeScale, phase } = useGameStore.getState()
-    const tier = comboTierIndex(combo.count)
-    setMusicDucked(timeScale < 1)
-    sfx().frenzyLift(phase === 'playing' && tier === TOP_TIER)
-    scrimPlayer()?.setIntensity(intensityForTier(tier))
+    applyCombatMix(COMBAT_MIX, combo.count, timeScale, phase === 'playing')
   })
 
   return null
