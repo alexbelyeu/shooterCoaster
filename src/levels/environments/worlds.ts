@@ -2,8 +2,7 @@ import { createContext, useContext, type ComponentType } from 'react'
 import type { BiomeType, BossType, EnemyType } from '@/types/level'
 import type { EnemyProps } from '@/entities/enemies/EnemyBase'
 import type { BossProps } from '@/entities/bosses/BossBase'
-import { lazyChunk } from '@/core/staleBuild'
-import { importWithRetry } from '@/canvas/loadLevelScene'
+import { importWithRetry, lazyChunk } from '@/core/staleBuild'
 import { createHeightFunction, type HeightFunction, type TrackSample } from '@/utils/terrainNoise'
 import type { BiomeDefinition } from './shared/types'
 
@@ -34,12 +33,18 @@ export const WORLD_CHUNKS: Record<BiomeType, () => Promise<{ world: World }>> = 
 
 const worldLoaders = new Map<BiomeType, () => Promise<World>>()
 const loadedWorlds = new Map<BiomeType, World>()
+/** Each biome's latest load, kept once it fails: the render that suspended on it reads the rejection (#889). */
+const attempts = new Map<BiomeType, Promise<World>>()
 
 /**
  * A biome's world chunk: fetched once, when a run of it starts (the loading screen asks for it as soon as the core is
- * in, `LevelScene` waits for it), retried and forgotten on failure like the core (`canvas/loadLevelScene.ts`, #823).
+ * in, `LevelScene` waits for it), retried like the core (`canvas/loadLevelScene.ts`, #823). A failed load stays
+ * failed until `forgetWorldFailures`: a fresh promise on every render would keep `LevelScene` suspended for good,
+ * never reaching its error boundary.
  */
 export function loadWorld(biome: BiomeType): Promise<World> {
+  let attempt = attempts.get(biome)
+  if (attempt) return attempt
   let load = worldLoaders.get(biome)
   if (!load) {
     load = lazyChunk(() =>
@@ -50,7 +55,15 @@ export function loadWorld(biome: BiomeType): Promise<World> {
     )
     worldLoaders.set(biome, load)
   }
-  return load()
+  attempt = load()
+  attempts.set(biome, attempt)
+  attempt.catch(() => {})
+  return attempt
+}
+
+/** Drop the failed loads, so the next run fetches their worlds afresh (`LevelSceneBoundary`, after it catches one). */
+export function forgetWorldFailures(): void {
+  for (const biome of attempts.keys()) if (!loadedWorlds.has(biome)) attempts.delete(biome)
 }
 
 /** The biome's world once its chunk has arrived: a level of it mounts without suspending. */

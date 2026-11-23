@@ -1,10 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { BIOME_TYPES } from '@/types/level'
 import { BIOMES } from './biomeRegistry'
-import { WORLD_CHUNKS } from './worlds'
+import { forgetWorldFailures, loadedWorld, loadWorld, WORLD_CHUNKS, type World } from './worlds'
 
 describe('world chunks (#862)', () => {
   it.each(BIOME_TYPES)('%s: its world holds its biome and every enemy, bystander and boss its levels spawn', async (biome) => {
@@ -29,5 +29,33 @@ describe('world chunks (#862)', () => {
       if (registries.test(readFileSync(join(src, entry), 'utf8'))) offenders.push(entry)
     }
     expect(offenders).toEqual([])
+  })
+})
+
+describe('loadWorld (#889)', () => {
+  it('a world chunk that fails stays failed for the render waiting on it, until the boundary forgets it', async () => {
+    vi.useFakeTimers()
+    const real = WORLD_CHUNKS.gym
+    const offline = vi.fn(() => Promise.reject<{ world: World }>(new Error('offline')))
+    WORLD_CHUNKS.gym = offline
+    try {
+      const first = loadWorld('gym')
+      const failed = expect(first).rejects.toThrow('offline')
+      await vi.runAllTimersAsync()
+      await failed
+      expect(offline).toHaveBeenCalledTimes(3)
+      // After it settles, the next render still reads the same rejection (and throws it to `LevelSceneBoundary`),
+      // instead of a fresh promise that suspends again.
+      expect(loadWorld('gym')).toBe(first)
+      expect(offline).toHaveBeenCalledTimes(3)
+
+      forgetWorldFailures()
+      WORLD_CHUNKS.gym = real
+      const world = await loadWorld('gym')
+      expect(loadedWorld('gym')).toBe(world)
+    } finally {
+      WORLD_CHUNKS.gym = real
+      vi.useRealTimers()
+    }
   })
 })

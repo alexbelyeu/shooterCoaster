@@ -2,6 +2,7 @@ import { use, useEffect, useMemo } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getLevelConfig } from '@/levels/LevelRegistry'
+import type { LevelConfig } from '@/types/level'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import TrackMesh from '@/track/TrackMesh'
 import { getTrackDimensions } from '@/track/trackDimensions'
@@ -12,7 +13,7 @@ import PhotoCamera from '@/track/PhotoCamera'
 import { rideModel } from '@/track/ridePhysics'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
-import { groundOf, loadedWorld, loadWorld, WorldContext } from '@/levels/environments/worlds'
+import { forgetWorldFailures, groundOf, loadedWorld, loadWorld, WorldContext, type World } from '@/levels/environments/worlds'
 import ContactShadows from '@/levels/environments/shared/ContactShadows'
 import {
   createTerrainSurface,
@@ -73,19 +74,23 @@ function hexToRgb(hex: number): [number, number, number] {
   ]
 }
 
-/** The level's world chunk (#862), for the loading screen to fetch as soon as this chunk is in. */
-export { loadWorld }
+/** The level's world chunk (#862), for the loading screen to fetch as soon as this chunk is in; a failed one is forgotten by `SceneManager`'s boundary. */
+export { forgetWorldFailures, loadWorld }
 
 /**
  * A level's whole scene, in its own lazy chunk (#376) so the title's startup JS carries no level code; it suspends
- * until its world's chunk (#862: the biome, its enemies and boss) has arrived too.
+ * until its world's chunk (#862: the biome, its enemies and boss) has arrived too. Only this wrapper suspends: the
+ * scene's hooks live in `LevelWorld`, which renders with its world in hand.
  */
 export default function LevelScene({ levelId }: { levelId: string }) {
   const config = getLevelConfig(levelId)
   if (!config) return null
+  const world = loadedWorld(config.biome) ?? use(loadWorld(config.biome))
+  return <LevelWorld levelId={levelId} config={config} world={world} />
+}
 
+function LevelWorld({ levelId, config, world }: { levelId: string; config: LevelConfig; world: World }) {
   const { track, environment, biome, enemies, combat, boss, pickups, walls } = config
-  const world = loadedWorld(biome) ?? use(loadWorld(biome))
   const def = world.biome
 
   const curve = useMemo(() => createTrackCurve(track), [track])
