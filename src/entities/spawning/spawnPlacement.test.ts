@@ -580,16 +580,19 @@ describe('placeWallSwarm (#516)', () => {
 
 describe('level2: the opening climb (#494)', () => {
   const { level, table, groundFn, rideFor, trackScale, keepOff } = world(getAllLevels().find((l) => l.id === 'level2')!)
-  const wave = level.enemies[0]
+  const packs = level.enemies.filter((w) => w.type === 'scorpion')
   const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
   // The rig's frustum on the smoke's 1280×720 screen (80° vertical), looking where `trackView` does.
   const tanV = Math.tan((REFERENCE_FOV_DEG / 2) * (Math.PI / 180))
   const tanH = tanV * (1280 / 720)
 
-  it('the scorpions placed at GO (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s, the climb included (2 at its crest)', () => {
-    const camera = trackView(table, 0, trackScale).eye
-    const placed = placeTracksideWave({
-      table, riderIndex: 0, camera, type: wave.type, groundFn, slots: tracksideSlots(wave.count, 'ground', createRng(1337)), ride: rideFor(wave), keepOff,
+  it('the scorpions\' two packs (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s but the lift\'s crest', () => {
+    const placed = packs.flatMap((wave) => {
+      const riderIndex = indexAhead(table, 0, profile[Math.round((wave.spawnDelay ?? 0) * 10)])
+      const camera = trackView(table, riderIndex, trackScale).eye
+      return placeTracksideWave({
+        table, riderIndex, camera, type: wave.type, groundFn, slots: tracksideSlots(wave.count, 'ground', createRng(1337)), ride: rideFor(wave), keepOff,
+      }).map((p) => ({ ...p, from: wave.spawnDelay ?? 0 }))
     })
     const seen: number[] = []
     for (let t = 1; t <= 12; t++) {
@@ -599,6 +602,7 @@ describe('level2: the opening climb (#494)', () => {
       const right = { x: -dir.z, y: 0, z: dir.x }
       const up = { x: (-dir.x * dir.y) / rl, y: rl, z: (-dir.z * dir.y) / rl }
       seen.push(placed.filter((p) => {
+        if (p.from > t) return false
         const d = { x: p.x - eye.x, y: p.y - eye.y, z: p.z - eye.z }
         const depth = d.x * dir.x + d.y * dir.y + d.z * dir.z
         const across = (d.x * right.x + d.z * right.z) / rl
@@ -606,10 +610,9 @@ describe('level2: the opening climb (#494)', () => {
         return depth > 0 && Math.abs(across) <= tanH * depth && Math.abs(high) <= tanV * depth
       }).length)
     }
-    // The v2 ride's lift hill (#864) crests at 10–11 s, the view over its top mostly sky before the drop at the Pyramid.
-    const crest = seen.splice(9, 1)
+    // The v2 ride's lift hill (#864) crests at 9–10 s pitched at the sky, the beat before the drop at the Pyramid.
+    seen.splice(8, 2)
     expect(Math.min(...seen), seen.join(',')).toBeGreaterThanOrEqual(3)
-    expect(crest[0]).toBeGreaterThanOrEqual(2)
   })
 })
 

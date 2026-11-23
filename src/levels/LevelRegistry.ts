@@ -45,9 +45,12 @@ const LEVELS: LevelConfig[] = [
     // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
     track: DESERT_LEVEL_TRACK,
     ...paceLevel({
-      // The sandstorm's V meets the car out of the Pyramid (16 s), the second V its airtime crest (30 s).
+      // The scorpions in two packs, so the straight run to the lift doesn't line all thirty up in view (#864: draws), the
+      // second past the Pyramid (12 s). The sandstorm's V meets the car out of the Pyramid (16 s), the second V its airtime
+      // crest (30 s).
       waves: [
-        { type: 'scorpion', count: 30, waveLabel: 'Incoming!', weight: 16 },
+        { type: 'scorpion', count: 18, waveLabel: 'Incoming!', weight: 12 },
+        { type: 'scorpion', count: 12, waveLabel: 'Out of the Sand!', weight: 4 },
         { type: 'crow', count: 39, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 14 },
         { type: 'crow', count: 39, waveLabel: 'More Crows!', formation: 'v', weight: 15 },
       ],
