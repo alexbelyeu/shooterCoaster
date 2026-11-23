@@ -3,10 +3,10 @@
  * `version;stepMs;base64`, three bytes per sample (x 10 bits, y 10, shot 1), ~9.6 KB at most. Anything that doesn't
  * decode exactly (another version, a hand edit, half a write) is no ghost. Timeline and sampling: `ghostTrack.hot.ts`.
  */
+import { GHOST_KEY as KEY } from './ghostKey'
 import { GHOST_MAX_SAMPLES, decimateGhost, type GhostTrack } from './ghostTrack.hot'
 
 export const GHOST_VERSION = 1
-const KEY = 'shootercoaster-ghost:'
 
 /** Decimates the track in place until it fits `GHOST_MAX_SAMPLES` (a recording never needs it). */
 export function encodeGhost(t: GhostTrack): string {
@@ -59,14 +59,5 @@ export function loadGhost(levelId: string): GhostTrack | null {
     return decodeGhost(localStorage.getItem(KEY + levelId))
   } catch {
     return null
-  }
-}
-
-/** Settings "Clear local data": every level's ghost goes with the scores. */
-export function clearGhosts(): void {
-  try {
-    for (const k of Object.keys(localStorage)) if (k.startsWith(KEY)) localStorage.removeItem(k)
-  } catch {
-    // no storage, nothing to clear
   }
 }

@@ -3089,8 +3089,8 @@ async function settingsLayout(page, label, { fromTitle = false } = {}) {
   if (r.hScroll) problems.push('settings scroll sideways')
   if (r.quality.length !== 4) problems.push(`${r.quality.length} quality options (${r.quality.join('/')}), expected Auto / Low / Med / High`)
   if (r.sliders !== 2) problems.push(`${r.sliders} volume sliders, expected music + effects`)
-  const switches = fromTitle ? 3 : 2
-  if (r.switches !== switches) problems.push(`${r.switches} switches, expected show FPS + reduced motion${fromTitle ? ' + internal device' : ''}`)
+  const switches = fromTitle ? 4 : 3
+  if (r.switches !== switches) problems.push(`${r.switches} switches, expected show FPS + ghost + reduced motion${fromTitle ? ' + internal device' : ''}`)
   if (r.smallTargets) problems.push(`${r.smallTargets} settings control(s) under the 44 px touch target`)
   return { ...r, problems: problems.map((p) => `${label}: ${p}`) }
 }

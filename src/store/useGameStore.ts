@@ -21,7 +21,7 @@ import { comboExpired, comboMultiplier, type FrenzyStage } from '@/combat/comboT
 import { startPhaseFor } from './startPhase'
 import { resetLoad } from '@/core/loadProgress'
 import { NO_PICKUP, applyPickup, type PickupWeaponId, type WeaponState } from '@/combat/weapons/weaponTypes'
-import { clearGhosts } from '@/combat/ghost'
+import { clearGhosts } from '@/combat/ghostKey'
 import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/daily'
 import { getAllLevels, getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
 import { buildLevelCards, nextLevelIndex } from '@/ui/screens/levelSelectModel'

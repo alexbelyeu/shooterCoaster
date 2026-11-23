@@ -21,11 +21,20 @@ export default function GhostCrosshair() {
     el.hidden = false
     const at: GhostPoint = { x: 0, y: 0, index: -1 }
     let last = -1
+    let px = NaN
+    let py = NaN
     let raf = 0
     const frame = () => {
       raf = requestAnimationFrame(frame)
       sampleGhost(track, gameTime(), at)
-      el.style.transform = `translate(${at.x * innerWidth}px, ${at.y * innerHeight}px)`
+      const nx = Math.round(at.x * innerWidth)
+      const ny = Math.round(at.y * innerHeight)
+      // A frozen clock (pause, menus) leaves the ring where it is: no style write.
+      if (nx !== px || ny !== py) {
+        px = nx
+        py = ny
+        el.style.transform = `translate(${nx}px, ${ny}px)`
+      }
       if (at.index !== last && track.shot[at.index]) {
         // Restart the flick's animation.
         el.classList.remove('is-firing')
