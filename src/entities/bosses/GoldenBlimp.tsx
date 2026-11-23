@@ -2,8 +2,8 @@ import { useCallback, useContext, useRef } from 'react'
 import * as THREE from 'three'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import { BALLOON_GEO } from '@/entities/enemies/SharedEnemyAssets'
+import { BOSS_DEFEAT_DEATH_STYLE } from '@/effects/deathStyles'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
-import BossConfetti from './BossConfetti'
 import { isExposed, type WeakPointSpec } from './bossModel'
 import { BLIMP_LAYOUT, GOLDEN_BLIMP } from './bossSpecs'
 import {
@@ -72,10 +72,11 @@ export default function GoldenBlimp(props: BossProps) {
       root.rotation.x = Math.sin(age * 0.5) * 0.03
       root.rotation.z = sinceDefeat < 0 ? Math.sin(age * 0.7) * 0.03 : -Math.min(FALL_PITCH, sinceDefeat * 0.25)
 
-      GOLDEN_BLIMP.weakPoints.forEach((w, i) => {
+      for (let i = 0; i < GOLDEN_BLIMP.weakPoints.length; i++) {
+        const w = GOLDEN_BLIMP.weakPoints[i]
         const part = parts.get(w.id)
         if (part && w.phase === 0) part.position.y = w.offset[1] + Math.sin(age * 1.7 + i * 1.3) * 6
-      })
+      }
       if (isExposed(state, 'gondola')) BLIMP_GONDOLA_EXPOSED_MAT.emissiveIntensity = 1 + 0.6 * Math.sin(age * 7)
     },
     [heightFn, motion],
@@ -90,8 +91,7 @@ export default function GoldenBlimp(props: BossProps) {
       rigging={towLine}
       renderWeakPoint={renderWeakPoint}
       exitSeconds={EXIT_SECONDS}
-    >
-      <BossConfetti bossId={props.id} />
-    </BossBase>
+      defeatBurst={BOSS_DEFEAT_DEATH_STYLE}
+    />
   )
 }

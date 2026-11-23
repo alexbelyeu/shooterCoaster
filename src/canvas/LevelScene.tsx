@@ -29,6 +29,7 @@ import { sampleTrackXZ, setTrackOutline } from '@/track/trackOutline'
 import { goldenBalloonCount } from '@/levels/scoring'
 import { eventBus } from '@/core/EventBus'
 import { BYSTANDER_HIT_EVENT, bystanderWarning, type BystanderHitEvent } from '@/combat/bystanders'
+import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
@@ -41,15 +42,15 @@ function KillProjector() {
   const vec = useMemo(() => new THREE.Vector3(), [])
 
   useEffect(() => {
-    const emitAt = (position: { x: number; y: number; z: number }, popup: { multiplier: number; score: number; label?: string }) => {
+    const emitAt = (position: { x: number; y: number; z: number }, popup: { multiplier: number; score: number; label?: string; big?: true }) => {
       vec.set(position.x, position.y, position.z).project(camera)
       const screenX = ((vec.x + 1) / 2) * size.width
       const screenY = ((-vec.y + 1) / 2) * size.height
       eventBus.emit('score-popup:screen', { screenX, screenY, ...popup })
     }
     const onKilled = (data: unknown) => {
-      const d = data as { position: THREE.Vector3; multiplier: number; score: number }
-      emitAt(d.position, { multiplier: d.multiplier, score: d.score })
+      const d = data as EnemyKilledEvent
+      emitAt(d.position, { multiplier: d.multiplier, score: d.score, big: d.big })
     }
     const onBystander = (data: unknown) => {
       const d = data as BystanderHitEvent

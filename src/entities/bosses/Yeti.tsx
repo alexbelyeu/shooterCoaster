@@ -3,18 +3,16 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
 import { gameClockStep } from '@/core/gameClock'
-import { useGameStore } from '@/store/useGameStore'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
-import type { EnemyKilledEvent } from '@/combat/hitFeedback'
+import { emitKill, scoreKill } from '@/entities/enemies/killPop'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
-import { SNOW_BURST_DEATH_STYLE, SNOWBALL_DEATH_STYLE, YETI_PART_DEATH_STYLE } from '@/effects/deathStyles'
+import { BOSS_DEFEAT_DEATH_STYLE, SNOWBALL_DEATH_STYLE, SNOW_BURST_DEATH_STYLE, YETI_PART_DEATH_STYLE } from '@/effects/deathStyles'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { AURORA_DEFAULT_INTENSITY, AURORA_INTENSITY_EVENT } from '@/levels/environments/biomes/arctic/aurora'
 import { BOSS_PROJECTILE_PREFIX, e2eBoss, isE2E } from '@/testing/e2eHook'
 import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
-import BossConfetti from './BossConfetti'
 import { setLimb } from './bossLimbs'
 import { currentPhase, isExposed, weakPointHp, type WeakPointSpec } from './bossModel'
 import { YETI, YETI_SNOWBALL } from './bossSpecs'
@@ -149,20 +147,9 @@ export default function Yeti(props: BossProps) {
     (b: Snowball) => {
       if (!b.live) return
       dropBall(b)
-      const store = useGameStore.getState()
-      store.registerKill()
-      store.addScore(YETI_SNOWBALL.score)
-      const position = b.pos.clone()
-      getExplosionPool()?.explode(position, SNOWBALL_DEATH_STYLE)
-      const { combo } = useGameStore.getState()
-      const event: EnemyKilledEvent = {
-        position,
-        combo: combo.count,
-        multiplier: combo.multiplier,
-        score: Math.round(YETI_SNOWBALL.score * combo.multiplier),
-        sound: SNOWBALL_DEATH_STYLE.sound,
-      }
-      eventBus.emit('enemy:killed', event)
+      // A normal kill with no pop: it vanishes on the hit.
+      scoreKill(YETI_SNOWBALL.score)
+      emitKill(b.pos.clone(), YETI_SNOWBALL.score, SNOWBALL_DEATH_STYLE)
       layBalls()
     },
     [dropBall, layBalls],
@@ -397,10 +384,10 @@ export default function Yeti(props: BossProps) {
       body={body}
       renderWeakPoint={renderWeakPoint}
       exitSeconds={EXIT_SECONDS}
+      defeatBurst={BOSS_DEFEAT_DEATH_STYLE}
       deathStyle={YETI_PART_DEATH_STYLE}
     >
       <instancedMesh ref={ballsRef} args={[SNOWBALL_GEO, SNOWBALL_MAT, YETI_THROW.pool]} visible={active} frustumCulled={false} count={0} />
-      <BossConfetti bossId={props.id} />
     </BossBase>
   )
 }

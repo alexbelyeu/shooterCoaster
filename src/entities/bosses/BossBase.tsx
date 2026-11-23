@@ -5,10 +5,10 @@ import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { gameClockStep } from '@/core/gameClock'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
-import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE, type EnemyKilledEvent } from '@/combat/hitFeedback'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
-import { BOSS_PART_DEATH_STYLE, type DeathStyle } from '@/effects/deathStyles'
+import { BOSS_DEFEAT_BURST_OFFSETS, BOSS_PART_DEATH_STYLE, type DeathStyle } from '@/effects/deathStyles'
 import { flashMesh, restoreMesh } from '@/entities/enemies/hitFlash'
+import { createKillPop, finishKillPop, startKillPop, tickKillPop, type KillPop } from '@/entities/enemies/killPop'
 import { e2eBoss, isE2E } from '@/testing/e2eHook'
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
@@ -19,6 +19,7 @@ import {
 
 const BOSS_HIT_FLASH_MS = 60
 const _eventAt = new THREE.Vector3()
+const _burstAt = new THREE.Vector3()
 
 export interface BossFrame {
   root: THREE.Group
@@ -55,16 +56,16 @@ interface BossBaseProps extends Omit<BossProps, 'track' | 'groundFn' | 'incoming
   exitSeconds: number
   /** Each destroyed weak point's burst. */
   deathStyle?: DeathStyle
-  /** World space, not moved with the body (e.g. confetti). */
+  /** Burst at each of `BOSS_DEFEAT_BURST_OFFSETS` around the body on its defeat (the fair's confetti shower). */
+  defeatBurst?: DeathStyle
+  /** World space, not moved with the body (e.g. the Yeti's snowballs). */
   children?: ReactNode
 }
 
 interface PartFx {
   flashMs: number
-  popMs: number
-  popFrames: number
-  popping: boolean
-  points: number
+  /** A destroyed part's kill pop, the same as an enemy's. */
+  pop: KillPop
 }
 
 /** `position`s are shared scratch vectors: read them in the listener, don't keep them. */
@@ -102,6 +103,7 @@ export default function BossBase({
   renderWeakPoint,
   exitSeconds,
   deathStyle = BOSS_PART_DEATH_STYLE,
+  defeatBurst,
   children,
 }: BossBaseProps) {
   const camera = useThree((s) => s.camera)
@@ -110,7 +112,7 @@ export default function BossBase({
   const stateRef = useRef(createBossState(spec))
   const [, setPhaseVersion] = useState(0)
   const parts = useRef(new Map<string, THREE.Group>()).current
-  const fx = useRef<PartFx[]>(spec.weakPoints.map(() => ({ flashMs: 0, popMs: 0, popFrames: 0, popping: false, points: 0 }))).current
+  const fx = useRef<PartFx[]>(spec.weakPoints.map(() => ({ flashMs: 0, pop: createKillPop() }))).current
   const registered = useRef(new Set<string>()).current
   const clock = useRef({ age: 0, defeatedAt: -1, placed: false, announced: false })
   const frame = useRef({} as BossFrame).current
@@ -138,20 +140,13 @@ export default function BossBase({
       const partFx = fx[index]
       const destroyed = weakPointHp(after, wpId) <= 0
       if (destroyed) {
-        const store = useGameStore.getState()
-        partFx.points = destroyScore(before, after, wpId)
-        store.registerKill()
-        store.addScore(partFx.points)
-        partFx.popping = true
-        partFx.popMs = ENEMY_HIT_FLASH_MS
-        partFx.popFrames = 0
-        part?.scale.setScalar(KILL_POP_SCALE)
+        startKillPop(partFx.pop, part, destroyScore(before, after, wpId))
         syncRef.current(after)
         setPhaseVersion((v) => v + 1)
       } else {
         partFx.flashMs = BOSS_HIT_FLASH_MS
+        part?.traverse(flashMesh)
       }
-      part?.traverse(flashMesh)
       publishHud(after, false)
       const position = part?.getWorldPosition(_eventAt) ?? bodyRef.current?.getWorldPosition(_eventAt) ?? _eventAt
       const event: BossHitEvent = { id, weakPoint: wpId, hpFraction: hpFraction(after), destroyed, position }
@@ -217,32 +212,23 @@ export default function BossBase({
     (index: number) => {
       const w = spec.weakPoints[index]
       const part = parts.get(w.id)
-      const partFx = fx[index]
-      partFx.popping = false
-      if (!part) return
-      part.traverse(restoreMesh)
-      part.scale.setScalar(1)
+      const { pop } = fx[index]
+      if (!part) {
+        pop.active = false
+        return
+      }
       part.visible = false
-      const position = part.getWorldPosition(new THREE.Vector3())
-      const { combo } = useGameStore.getState()
-      getExplosionPool()?.explode(position, deathStyle)
-      const event: EnemyKilledEvent = {
-        position,
-        combo: combo.count,
-        multiplier: combo.multiplier,
-        score: Math.round(partFx.points * combo.multiplier),
-        bossPart: w.id,
-      }
-      eventBus.emit('enemy:killed', event)
-      if (isDefeated(stateRef.current) && clock.current.defeatedAt < 0) {
-        clock.current.defeatedAt = clock.current.age
-        publishHud(stateRef.current, true)
-        if (isE2E) e2eBoss.stage = 'defeated'
-        const event: BossDefeatedEvent = { id, position: bodyRef.current?.getWorldPosition(new THREE.Vector3()) ?? position }
-        eventBus.emit('boss:defeated', event)
-      }
+      const defeats = isDefeated(stateRef.current) && clock.current.defeatedAt < 0
+      finishKillPop(pop, part, part.getWorldPosition(new THREE.Vector3()), deathStyle, defeats ? { bossPart: w.id, big: true } : { bossPart: w.id })
+      if (!defeats) return
+      clock.current.defeatedAt = clock.current.age
+      publishHud(stateRef.current, true)
+      if (isE2E) e2eBoss.stage = 'defeated'
+      const event: BossDefeatedEvent = { id, position: bodyRef.current?.getWorldPosition(new THREE.Vector3()) ?? part.getWorldPosition(new THREE.Vector3()) }
+      eventBus.emit('boss:defeated', event)
+      if (defeatBurst) for (const o of BOSS_DEFEAT_BURST_OFFSETS) getExplosionPool()?.explode(_burstAt.copy(event.position).add(o), defeatBurst)
     },
-    [id, spec, parts, fx, publishHud, deathStyle],
+    [id, spec, parts, fx, publishHud, deathStyle, defeatBurst],
   )
 
   useFrame(() => {
@@ -259,11 +245,8 @@ export default function BossBase({
 
     for (let i = 0; i < fx.length; i++) {
       const f = fx[i]
-      if (f.popping) {
-        // Like EnemyBase: the pop is rendered at least once, even at very low frame rates.
-        f.popMs -= dt * 1000
-        f.popFrames += 1
-        if (f.popMs <= 0 && f.popFrames >= 2) finishPop(i)
+      if (f.pop.active) {
+        if (tickKillPop(f.pop, dt)) finishPop(i)
       } else if (f.flashMs > 0) {
         f.flashMs -= dt * 1000
         if (f.flashMs <= 0) parts.get(spec.weakPoints[i].id)?.traverse(restoreMesh)

@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import {
+  BOSS_DEFEAT_BURST_OFFSETS,
+  BOSS_DEFEAT_DEATH_STYLE,
   BOSS_PART_DEATH_STYLE,
+  DEATH_SLOTS,
+  GOLDEN_BALLOON_DEATH_STYLE,
   CHUNKS_PER_SLOT,
   DEATH_STYLES,
   GLOW_PER_SLOT,
@@ -29,6 +33,8 @@ import {
 const ALL: [string, DeathStyle][] = [
   ...Object.entries(DEATH_STYLES),
   ['bossPart', BOSS_PART_DEATH_STYLE],
+  ['bossDefeat', BOSS_DEFEAT_DEATH_STYLE],
+  ['goldenBalloon', GOLDEN_BALLOON_DEATH_STYLE],
   ['krakenSplash', KRAKEN_SPLASH_DEATH_STYLE],
   ['whaleSplash', WHALE_SPLASH_DEATH_STYLE],
   ['scorpionShard', SCORPION_SHARD_DEATH_STYLE],
@@ -44,6 +50,22 @@ const ALL: [string, DeathStyle][] = [
 ]
 
 describe('death styles', () => {
+  it("a boss defeat bursts in at most half the pool, so the boss's own break and the last part still fit", () => {
+    expect(BOSS_DEFEAT_BURST_OFFSETS.length).toBeLessThanOrEqual(DEATH_SLOTS / 2)
+    expect(styleCounts(BOSS_DEFEAT_DEATH_STYLE).glow * BOSS_DEFEAT_BURST_OFFSETS.length).toBeGreaterThanOrEqual(180)
+  })
+
+  it('a golden balloon pops in gold: every confetti piece is a warm yellow, unlike a plain balloon', () => {
+    const confetti = GOLDEN_BALLOON_DEATH_STYLE.layers.find((l) => l.shape === 'confetti')!
+    for (const c of confetti.colors) {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16))
+      expect(r, c).toBeGreaterThan(200)
+      expect(g, c).toBeGreaterThan(140)
+      expect(b, c).toBeLessThan(g)
+    }
+    expect(GOLDEN_BALLOON_DEATH_STYLE.sound).toBe(DEATH_STYLES.balloon.sound)
+  })
+
   it.each(ALL)('%s fits one pool slot and is well formed', (_, style) => {
     const { glow, chunks } = styleCounts(style)
     expect(glow).toBeLessThanOrEqual(GLOW_PER_SLOT)
