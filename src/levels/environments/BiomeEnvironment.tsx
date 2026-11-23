@@ -122,7 +122,7 @@ export default function BiomeEnvironment({
 
       {/* Trees */}
       {hasTrees && treeCount > 0 && def.trees && (
-        <TreeField count={treeCount} config={def.trees} heightFn={heightFn} seed={hashString(`trees:${biome}`)} />
+        <TreeField count={treeCount} config={def.trees} heightFn={heightFn} track={track} seed={hashString(`trees:${biome}`)} />
       )}
 
       {/* Biome-specific InstancedMesh decorations */}
