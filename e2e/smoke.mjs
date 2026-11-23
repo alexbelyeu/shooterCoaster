@@ -784,6 +784,23 @@ async function ghostProblems(page, id) {
 }
 
 /**
+ * The nearest on-screen enemy with game time frozen, or null. A slow runner (#919: 21 frames in 8.6 s) can freeze
+ * the ride between waves with nothing on screen, so game time runs until an enemy shows (up to 20 s wall clock),
+ * then freezes and reads it again once the frozen frame has rendered.
+ */
+async function frozenEnemyTarget(page) {
+  const deadline = Date.now() + 20000
+  for (;;) {
+    await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+    await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+    const [target] = await page.evaluate(() => window.__SC_TEST__.enemyScreenPoints(1))
+    if (target || Date.now() > deadline || (await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return target ?? null
+    await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
+    await waitFrames(page, 2, { minMs: 250, maxMs: 4000, pollMs: 40 })
+  }
+}
+
+/**
  * Gamepad (#819): a stubbed standard-mapping pad (`navigator.getGamepads`) steers the crosshair onto an enemy with
  * the right stick and holds RT, game time frozen. The aim must reach the enemy, RT must fire and a bullet must hit;
  * `<id>-gamepad.png` is the crosshair on the target with the trigger held.
@@ -799,11 +816,9 @@ async function gamepadProblems(page, id) {
     }
     window.__scPad = pad
     Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad] })
-    window.__SC_TEST__.setTimeScale(0)
     window.dispatchEvent(new Event('gamepadconnected'))
   })
-  await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
-  const [target] = await page.evaluate(() => window.__SC_TEST__.enemyScreenPoints(1))
+  const target = await frozenEnemyTarget(page)
   const from = await page.evaluate(() => window.__SC_TEST__.aimPoint())
   const result = { target: target ?? null, from, aimErrorPx: null, aimFrames: 0, shots: 0, hits: 0 }
   if (!target) {

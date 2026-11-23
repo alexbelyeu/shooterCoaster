@@ -84,7 +84,7 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
     setFlash((f) => ({ target, ok, n: (f?.n ?? 0) + 1 }))
   }
 
-  function label(target: FlashTarget, idle: string): string {
+  function plateLabel(target: FlashTarget, idle: string): string {
     if (flash?.target !== target) return idle
     return flash.ok ? 'Copied!' : FAILED_LABEL[target]
   }
@@ -191,7 +191,7 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
     // The menu is portalled to the end of body: back on Share first, so Tab carries on from there.
     if (e.key === 'Tab') return close(true)
     const items = [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])]
-    const to = menuFocus(Math.max(items.indexOf(document.activeElement as HTMLElement), 0), e.key, items.length)
+    const to = menuFocus(items.indexOf(document.activeElement as HTMLElement), e.key, items.length)
     if (to === null) return
     e.preventDefault()
     items[to]?.focus()
@@ -237,16 +237,16 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
                 data-target="image_download"
                 onClick={onDownload}
               >
-                {label('image_download', 'Save image')}
+                {plateLabel('image_download', 'Save image')}
               </button>
               {imageCopyable && (
                 <button type="button" role="menuitem" className="fair-plate share-item" data-target="image_copy" onClick={onCopyImage}>
-                  {label('image_copy', 'Copy image')}
+                  {plateLabel('image_copy', 'Copy image')}
                 </button>
               )}
               {copyable && (
                 <button type="button" role="menuitem" className="fair-plate share-item share-copy share-wide" data-target="copy" onClick={onCopy}>
-                  {label('copy', 'Copy link')}
+                  {plateLabel('copy', 'Copy link')}
                 </button>
               )}
               {SHARE_TARGETS.map(({ id, label }) => {

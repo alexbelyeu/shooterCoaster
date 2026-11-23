@@ -36,7 +36,7 @@ export interface RunLine {
   text: string
 }
 
-/** The run as plain lines in the showman's voice (docs/art/PERSONALITY.md "Voice"): "12 of 86 hit", "Best combo 3x". */
+/** The run as plain lines in the showman's voice (docs/art/PERSONALITY.md "Voice"): "12 of 86 hit", "Best combo ×3". */
 export function runLines(run: RunLineInput): RunLine[] {
   const pct = accuracyPercent(run.hits, run.shotsFired)
   const seconds = Math.max(0, Math.ceil(run.timeRemaining - 1e-6))

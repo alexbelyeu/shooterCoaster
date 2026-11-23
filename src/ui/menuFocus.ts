@@ -1,6 +1,6 @@
 /** Pure keyboard rules shared by the game's menus, the pause menu and the share menu (no React / DOM, unit-tested). */
 
-/** The item index a key moves focus to (wrapping), or null if the key isn't a menu move. */
+/** The item index a key moves focus to (wrapping), or null if the key isn't a menu move. `from` -1 is no item focused: down goes to the first, up to the last. */
 export function menuFocus(from: number, key: string, count: number): number | null {
   if (count <= 0) return null
   switch (key) {
@@ -9,7 +9,7 @@ export function menuFocus(from: number, key: string, count: number): number | nu
       return (from + 1) % count
     case 'ArrowUp':
     case 'ArrowLeft':
-      return (from - 1 + count) % count
+      return from < 0 ? count - 1 : (from - 1 + count) % count
     case 'Home':
       return 0
     case 'End':

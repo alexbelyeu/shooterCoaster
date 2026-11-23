@@ -269,7 +269,7 @@ export interface SCTestApi {
   primeCombo: (count: number) => void
   /** Force the results phase. */
   endLevel: () => void
-  /** What the results share menu's Copy link puts on the clipboard for the current level and score (`text url`), or null. */
+  /** What the results share menu's Copy link puts on the clipboard for the current level and score (`text url`), or null (and always null in the portal build, which has no Share). */
   /** `worldRank` (0-based): the line a run on the World top 10 shares (#445). */
   shareText: (worldRank?: number | null) => string | null
   /** The results Share image (#272) for the current level and run, drawn as the share menu draws it: its pixel size,
@@ -1134,6 +1134,8 @@ export function installE2EApi() {
     },
     shareText: (worldRank: number | null = null) => {
       const s = useGameStore.getState()
+      // The portal build has no Share (#254): its bundle must not carry the share link (scripts/portal/rules.mjs).
+      if (__PORTAL_BUILD__) return null
       const card = s.currentLevel ? scoreCardRun({ ...s, levelId: s.currentLevel, mode: s.runMode, worldRank }) : null
       return card ? clipboardText(sharePayload(card, 'copy')) : null
     },

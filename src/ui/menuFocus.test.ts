@@ -12,6 +12,13 @@ describe('menuFocus', () => {
     expect(menuFocus(2, 'ArrowRight', n)).toBe(3)
   })
 
+  it('with no item focused (-1), down / right go to the first item and up / left to the last', () => {
+    expect(menuFocus(-1, 'ArrowDown', n)).toBe(0)
+    expect(menuFocus(-1, 'ArrowRight', n)).toBe(0)
+    expect(menuFocus(-1, 'ArrowUp', n)).toBe(n - 1)
+    expect(menuFocus(-1, 'ArrowLeft', n)).toBe(n - 1)
+  })
+
   it('Home / End jump to the first / last item', () => {
     expect(menuFocus(2, 'Home', n)).toBe(0)
     expect(menuFocus(0, 'End', n)).toBe(n - 1)
