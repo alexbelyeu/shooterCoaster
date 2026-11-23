@@ -33,6 +33,14 @@ describe('placePopover', () => {
     expect(placePopover(box(300, 100, 80, 44), 200, 500, phone, []).top).toBe(8)
   })
 
+  it('when neither side fits, takes the side that leaves Next Level uncovered before the roomier one (#342)', () => {
+    const phone = { width: 844, height: 390 }
+    const next = box(300, 300, 200, 44)
+    expect(placePopover(box(300, 100, 80, 44), 200, 250, phone, [next])).toEqual({ side: 'above', left: 240, top: 8 })
+    // Both sides cover it: still the roomier one.
+    expect(placePopover(box(300, 100, 80, 44), 200, 250, phone, [box(300, 150, 200, 44)])).toMatchObject({ side: 'below', top: 390 - 8 - 250 })
+  })
+
   it('opens past the gilt plate rather than over it when neither side of the anchor is free (phone results, #707)', () => {
     // Portrait 390x844: Replay spans the row above Levels / Share, there is no room below Share.
     const phone = { width: 390, height: 844 }

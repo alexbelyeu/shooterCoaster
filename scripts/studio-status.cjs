@@ -9,6 +9,7 @@
 //   node scripts/studio-status.cjs --dry-run
 
 const { fetchTelemetry, phoneFrameBudget, telemetrySection } = require('./playerTelemetry.cjs')
+const { latestVerify } = require('./automerge.cjs')
 
 const TZ = 'America/New_York'
 const STATUS_LABEL = 'studio-status'
@@ -137,6 +138,8 @@ function usual(entry) {
 
 // ---------- markdown helpers ----------
 
+/** A title as markdown text: its `[`, `]`, `|` and the like can't open a link, close one or split a table cell. */
+const mdText = (s) => String(s).replace(/[\\`*_[\]<>|]/g, '\\$&')
 const cell = (s) => String(s).replace(/\|/g, '\\|').replace(/\n/g, ' ')
 const short = (s, n = 70) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
 const hasLabel = (x, name) => x.labels.some((l) => (typeof l === 'string' ? l : l.name) === name)
@@ -222,13 +225,15 @@ async function collectLedger(api, since, until = Infinity) {
 const fmtDue = (ms) => new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }).format(new Date(ms))
 
 /**
- * Pure: the Milestones section, or '' when no milestone is open. Each milestone is the
- * REST shape (`title`, `html_url`, `due_on`, `open_issues`, `closed_issues`) plus `p1`,
- * its open P1 issues.
+ * Pure: the Milestones section, or '' when no milestone is open, soonest due first (no due
+ * date last). Each milestone is the REST shape (`number`, `title`, `html_url`, `due_on`,
+ * `open_issues`, `closed_issues`) plus `p1`, its open P1 issues (null when that lookup failed:
+ * the bar still shows).
  */
 function milestoneSection(milestones, now) {
   if (!milestones || !milestones.length) return ''
-  const lines = milestones.map((m) => {
+  const dueAt = (m) => (m.due_on ? Date.parse(m.due_on) : Infinity)
+  const lines = [...milestones].sort((a, b) => dueAt(a) - dueAt(b) || a.number - b.number).map((m) => {
     const total = m.open_issues + m.closed_issues
     const frac = total ? m.closed_issues / total : 0
     const filled = Math.floor(frac * 10)
@@ -240,23 +245,65 @@ function milestoneSection(milestones, now) {
       const left = days > 0 ? `${days} day${days === 1 ? '' : 's'} left` : days === 0 ? 'due today' : `⚠️ ${-days} day${days === -1 ? '' : 's'} overdue`
       due = `due ${fmtDue(at)} (${left})`
     }
-    const p1 = m.p1.length
-      ? `Open P1: ${m.p1.map((i) => `#${i.number} ${short(i.title, 50)}`).join(' · ')}`
-      : 'No open P1.'
-    return `**[${m.title}](${m.html_url})** · ${due}\n\`${bar}\` ${m.closed_issues} / ${total} closed (${Math.floor(frac * 100)} %) · ${p1}`
+    const p1 = !m.p1
+      ? 'Open P1s unavailable.'
+      : m.p1.length
+        ? `Open P1: ${m.p1.map((i) => `#${i.number} ${mdText(short(i.title, 50))}`).join(' · ')}`
+        : 'No open P1.'
+    return `**[${mdText(m.title)}](${m.html_url})** · ${due}\n\`${bar}\` ${m.closed_issues} / ${total} closed (${Math.floor(frac * 100)} %) · ${p1}`
   })
   return `### 🎯 Milestones\n${lines.join('\n\n')}\n`
 }
 
-/** Open milestones, soonest due first (no due date last), each with its open P1 issues. */
+/** Open milestones, each with its open P1 issues (null when that request fails). */
 async function collectMilestones(api) {
   const open = await api('GET /repos/{owner}/{repo}/milestones', { state: 'open', per_page: 30 })
-  const dueAt = (m) => (m.due_on ? Date.parse(m.due_on) : Infinity)
-  open.sort((a, b) => dueAt(a) - dueAt(b) || a.number - b.number)
   return Promise.all(open.map(async (m) => {
-    const p1 = await api('GET /repos/{owner}/{repo}/issues', { state: 'open', milestone: m.number, labels: 'P1', per_page: 100 })
-    return { ...m, p1: p1.filter((i) => !i.pull_request).sort((a, b) => a.number - b.number) }
+    const p1 = await api('GET /repos/{owner}/{repo}/issues', { state: 'open', milestone: m.number, labels: 'P1', per_page: 100 }).catch(() => null)
+    return { ...m, p1: p1 && p1.filter((i) => !i.pull_request).sort((a, b) => a.number - b.number) }
   }))
+}
+
+// ---------- production suites ----------
+// prod-smoke.yml runs two suites (#359): the deploy check after every production deploy and the nightly full smoke.
+// A run's event names its suite; a manual dispatch's `suite` input isn't in the run's REST shape, so its jobs do.
+
+const meaningful = (run) => run.status === 'completed' && !['skipped', 'cancelled'].includes(run.conclusion)
+
+/** Pure: 'deploy', 'nightly' or null for one prod-smoke.yml run; `jobs` (its jobs) only matters for a dispatch. */
+function prodSuite(run, jobs = []) {
+  if (run.event === 'deployment_status') return 'deploy'
+  if (run.event === 'schedule') return 'nightly'
+  if (run.event !== 'workflow_dispatch') return null
+  const ran = jobs.filter((j) => j.conclusion !== 'skipped')
+  if (ran.some((j) => j.name === 'deploy')) return 'deploy'
+  if (ran.some((j) => j.name.startsWith('nightly'))) return 'nightly'
+  return null
+}
+
+/**
+ * Pure: the newest run that checked something of each suite, `{ deploy, nightly }` (null for none). Skipped runs
+ * (a non-production deploy) and cancelled ones (superseded by a newer deploy) checked nothing. `jobsOf(run)` gives a
+ * dispatch's jobs.
+ */
+function pickProdRuns(runs, jobsOf = () => []) {
+  const picked = { deploy: null, nightly: null }
+  for (const run of [...runs].filter(meaningful).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))) {
+    const suite = prodSuite(run, jobsOf(run))
+    if (suite && !picked[suite]) picked[suite] = run
+  }
+  return picked
+}
+
+async function collectProdSmoke(api) {
+  // The nightly runs once a day among many deploys: ask for each event's runs on its own.
+  const runsOf = async (event) =>
+    (await api('GET /repos/{owner}/{repo}/actions/workflows/{workflow}/runs', { workflow: 'prod-smoke.yml', event, per_page: 20 })).workflow_runs
+  const [deploys, nightlies, dispatches] = await Promise.all(['deployment_status', 'schedule', 'workflow_dispatch'].map(runsOf))
+  const recent = dispatches.filter(meaningful).slice(0, 5)
+  const jobs = new Map(await Promise.all(recent.map(async (run) =>
+    [run.id, (await api('GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs', { run_id: run.id, per_page: 30 })).jobs])))
+  return pickProdRuns([...deploys, ...nightlies, ...recent], (run) => jobs.get(run.id) || [])
 }
 
 // ---------- data ----------
@@ -294,14 +341,8 @@ async function collect(api, now) {
     }),
   )
 
-  // GitHub creates the `verify` check only once the CI jobs it needs end: same stand-in as automerge.cjs.
-  const verifyRun = async (ref) => {
-    const runs = (await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref, per_page: 100 })).check_runs
-    const run = runs.filter((r) => r.name === 'verify').sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0]
-    if (run) return run
-    const need = runs.find((r) => (r.name === 'changes' || r.name === 'unit + build' || r.name === 'lighthouse' || r.name.startsWith('smoke (')) && r.status !== 'completed')
-    return need ? { status: 'waiting', head_sha: need.head_sha } : null
-  }
+  const verifyRun = async (ref) =>
+    latestVerify((await api('GET /repos/{owner}/{repo}/commits/{ref}/check-runs', { ref, per_page: 100 })).check_runs) || null
 
   // CI state for PRs that are in review or sent back.
   const verifyOf = async (sha) => {
@@ -323,9 +364,7 @@ async function collect(api, now) {
 
   let prodSmoke = null
   try {
-    // Skip the runs that checked nothing: deployment_status events that skip the job, and runs superseded by a newer deploy.
-    const r = await api('GET /repos/{owner}/{repo}/actions/workflows/{workflow}/runs', { workflow: 'prod-smoke.yml', per_page: 30 })
-    prodSmoke = r.workflow_runs.find((w) => w.status === 'completed' && !['skipped', 'cancelled'].includes(w.conclusion)) || null
+    prodSmoke = await collectProdSmoke(api)
   } catch {
     prodSmoke = null
   }
@@ -350,6 +389,11 @@ function render(data, now) {
   const sentBack = prs.filter((p) => hasLabel(p, 'agent:changes-requested'))
   const blocked = issues.filter((i) => hasLabel(i, 'agent:blocked'))
   const prodBroken = issues.filter((i) => hasLabel(i, 'agent:prod-broken'))
+  // prod-alert.cjs marks each suite's issue `<!-- prod-smoke:<suite> -->`.
+  const brokenRef = (i) => {
+    const suite = /<!-- prod-smoke:(\w+) -->/.exec(i.body || '')
+    return suite ? `#${i.number} ${suite[1]}` : `#${i.number}`
+  }
   const ready = issues.filter((i) => hasLabel(i, 'agent:ready') && !hasLabel(i, 'epic'))
     .sort((a, b) => prio(a) - prio(b) || a.number - b.number)
   const steering = issues.filter((i) => hasLabel(i, 'steering'))
@@ -360,7 +404,7 @@ function render(data, now) {
   const when = (r) => `${fmtTime(r.next, now)} (in ${fmtDur(r.next - now)})`
 
   const headline = []
-  if (prodBroken.length) headline.push(`🚨 production smoke failing (${prodBroken.map((i) => `#${i.number}`).join(', ')})`)
+  if (prodBroken.length) headline.push(`🚨 production smoke failing (${prodBroken.map(brokenRef).join(', ')})`)
   headline.push(building.length ? `🔨 ${building.length} being built` : '🔨 nothing being built')
   headline.push(`🔍 ${inQa.length} waiting for QA`)
   if (approved.length) headline.push(`✅ ${approved.length} approved, merging`)
@@ -422,15 +466,20 @@ function render(data, now) {
     : '_Nothing merged in the last 48h._\n')
 
   out.push('### 🩺 Production')
-  const smoke = prodSmoke
-    ? `${prodSmoke.conclusion === 'success' ? '✅ passed' : `❌ ${prodSmoke.conclusion}`} ${ago(Date.parse(prodSmoke.updated_at), now)} ([run](${prodSmoke.html_url}))`
-    : 'no run yet'
+  const suiteLine = (run) => !run
+    ? 'no run yet'
+    : `${run.conclusion === 'success' ? '✅ passed' : `❌ ${run.conclusion}`} ${ago(Date.parse(run.updated_at), now)} ([run](${run.html_url}))`
   const mainCi = !mainVerify
     ? 'no run on the latest commit'
     : mainVerify.status !== 'completed'
       ? `⏳ running (${mainVerify.head_sha.slice(0, 7)})`
       : `${mainVerify.conclusion === 'success' ? '✅ green' : `❌ ${mainVerify.conclusion}`} on ${mainVerify.head_sha.slice(0, 7)} ${ago(Date.parse(mainVerify.completed_at), now)} ([run](${mainVerify.html_url}))`
-  out.push(`\`main\` verify: ${mainCi}. Live-site smoke test: ${smoke}. Open prod-broken issues: ${prodBroken.length ? prodBroken.map((i) => `#${i.number}`).join(', ') : 'none'}.`)
+  out.push(
+    `- \`main\` verify: ${mainCi}`,
+    `- Deploy check: ${prodSmoke ? suiteLine(prodSmoke.deploy) : 'unavailable'}`,
+    `- Nightly full smoke: ${prodSmoke ? suiteLine(prodSmoke.nightly) : 'unavailable'}`,
+    `- Open prod-broken issues: ${prodBroken.length ? prodBroken.map(brokenRef).join(', ') : 'none'}`,
+  )
   out.push('')
 
   // null: /api/telemetry didn't answer (the section says so); undefined: not collected (tests).
@@ -512,6 +561,10 @@ function ghReadApi(repo = process.env.GITHUB_REPOSITORY || REPO) {
 module.exports.render = render
 module.exports.ledgerSummary = ledgerSummary
 module.exports.collectLedger = collectLedger
+module.exports.collectMilestones = collectMilestones
+module.exports.prodSuite = prodSuite
+module.exports.pickProdRuns = pickProdRuns
+module.exports.collectProdSmoke = collectProdSmoke
 module.exports.milestoneSection = milestoneSection
 module.exports.ghReadApi = ghReadApi
 module.exports.nextRun = nextRun

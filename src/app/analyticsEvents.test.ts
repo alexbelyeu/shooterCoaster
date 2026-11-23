@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { RUN_SECONDS } from '@/levels/pacing'
 import type { GamePhase } from '@/types/game'
-import { analyticsEventFor, tensPercent, type RunSnapshot } from './analyticsEvents'
+import { analyticsEventFor, shareEvent, tensPercent, type RunSnapshot } from './analyticsEvents'
 
 const level1 = getLevelConfig('level1')!
 
@@ -91,5 +91,12 @@ describe('tensPercent', () => {
     expect(tensPercent(1)).toBe(100)
     expect(tensPercent(1.3)).toBe(100)
     expect(tensPercent(-0.2)).toBe(0)
+  })
+})
+
+describe('shareEvent', () => {
+  it("carries the level and the method, and a Daily Run's share as level `daily` (#268)", () => {
+    expect(shareEvent('level3', 'x', false)).toEqual({ name: 'share', props: { level: 'level3', method: 'x' } })
+    expect(shareEvent('level3', 'image_native', true)).toEqual({ name: 'share', props: { level: 'daily', method: 'image_native' } })
   })
 })

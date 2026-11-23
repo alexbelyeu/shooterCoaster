@@ -30,14 +30,21 @@ function sweepNumbers(openPrs) {
   return openPrs.filter((p) => p.state === 'open' && hasLabel(p, APPROVED)).map((p) => p.number).sort((a, b) => a - b)
 }
 
-/** CI jobs that `verify` waits on (ci.yml): GitHub creates the `verify` check only once they end. */
-const isVerifyNeed = (name) => name === 'changes' || name === 'unit + build' || name === 'lighthouse' || name.startsWith('smoke (')
+/** CI jobs that `verify` waits on (ci.yml `verify.needs`, held to it by automerge.test.ts): GitHub creates the `verify` check only once they end. */
+const isVerifyNeed = (name) =>
+  name === 'changes' || name === 'unit + build' || name === 'lighthouse' || name.startsWith('smoke (') || name.startsWith('pacing (')
 
-/** The newest `verify` check run of a commit, a `waiting` stand-in while the jobs it needs run, or undefined. */
+/**
+ * The newest `verify` check run of a commit, or a `waiting` stand-in (with the commit's `head_sha`) while a job it
+ * needs is unfinished or started after it (a "Re-run failed jobs" keeps the first attempt's red `verify` until the
+ * re-run ends, #369), or undefined when CI hasn't started.
+ */
 function latestVerify(checkRuns) {
   const verify = checkRuns.filter((r) => r.name === 'verify').sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))[0]
-  if (verify) return verify
-  return checkRuns.some((r) => isVerifyNeed(r.name) && r.status !== 'completed') ? { name: 'verify', status: 'waiting' } : undefined
+  const pending = checkRuns.find((r) => isVerifyNeed(r.name) &&
+    (r.status !== 'completed' || (verify && Date.parse(r.started_at) > Date.parse(verify.started_at))))
+  if (pending) return { name: 'verify', status: 'waiting', head_sha: pending.head_sha }
+  return verify
 }
 
 /**
@@ -233,6 +240,7 @@ module.exports.decide = decide
 module.exports.unionNumbers = unionNumbers
 module.exports.sweepNumbers = sweepNumbers
 module.exports.latestVerify = latestVerify
+module.exports.isVerifyNeed = isVerifyNeed
 module.exports.shouldComment = shouldComment
 module.exports.isConflictError = isConflictError
 module.exports.skipComment = skipComment

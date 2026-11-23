@@ -48,6 +48,7 @@ jobs:
         with:
           sparse-checkout: |
             scripts/studio-status.cjs
+            scripts/automerge.cjs
             scripts/playerTelemetry.cjs
             budgets.json
           sparse-checkout-cone-mode: false

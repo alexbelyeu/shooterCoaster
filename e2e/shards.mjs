@@ -3,6 +3,8 @@
  * integration; the rest (`nightlyOnly()`) runs in the nightly production run of the full smoke (#372).
  */
 
+import { BOSS_CHECKS } from './bossChecks.mjs'
+
 export const UI_STEPS = ['title', 'landing', 'levelSelect', 'daily', 'settings', 'mobile', 'mobileMenus']
 /** On the run's first level; `frenzy` happens inside its ride and `seed` compares against that ride's spawns. */
 export const FIRST_LEVEL_STEPS = ['frenzy', 'seed', 'quality', 'pause', 'countdown', 'speed', 'chunkRetry']
@@ -10,14 +12,14 @@ export const FIRST_LEVEL_STEPS = ['frenzy', 'seed', 'quality', 'pause', 'countdo
 export const LEVEL_STEPS = ['ride', 'tour', 'shot', 'results', 'share', 'wave', 'weather', 'boss', 'pickup', 'switch', 'dark', 'audio', 'night', 'pacing']
 export const STEPS = [...UI_STEPS, ...FIRST_LEVEL_STEPS, ...LEVEL_STEPS]
 
-/** Mirrors the smoke's check constants (WAVE_CHECK, BOSS_CHECKS…), which fail the run at start if they drift. */
+/** The levels each of these steps runs on: the smoke's checks (WAVE_CHECK…) take their level from here, the boss step from BOSS_CHECKS. */
 export const STEP_LEVELS = {
   wave: ['level2'],
   weather: ['level2', 'level4'],
-  boss: ['level1', 'level2', 'level3', 'level4', 'level5', 'level6'],
+  boss: BOSS_CHECKS.map((c) => c.level),
   pickup: ['level1'],
   switch: ['level6'],
-  dark: ['level6'],
+  dark: ['level6'], // on the `switch` step's run (NEEDS)
   audio: ['level1'],
   night: ['level1'],
 }
@@ -83,7 +85,7 @@ export function planRun({ shard, nightlyPart, steps, levels, mobile, skipDesktop
   }
   const wantedLevels = levels === undefined ? null : levels.split(',')
   if (steps !== undefined) return checked(new Set(steps.split(',')), wantedLevels)
-  if (skipDesktop) return checked(new Set(['title', ...PHONE_STEPS]), wantedLevels)
+  if (skipDesktop) return checked(new Set(mobile ? ['title', ...PHONE_STEPS] : ['title']), wantedLevels)
   return checked(new Set(STEPS.filter((s) => !PHONE_STEPS.includes(s) || mobile)), wantedLevels)
 }
 
