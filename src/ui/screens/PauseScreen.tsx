@@ -3,7 +3,8 @@ import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars } from '@/levels/scoring'
 import { FairBoard, FairStars } from '@/ui/Fair'
-import { PAUSE_MENU, pauseMenuFocus, type PauseMenuAction } from './pauseMenu'
+import { menuFocus } from '@/ui/menuFocus'
+import { PAUSE_MENU, type PauseMenuAction } from './pauseMenu'
 
 const fmt = new Intl.NumberFormat('en-US')
 
@@ -48,7 +49,7 @@ export default function PauseScreen({ onSettings }: PauseScreenProps) {
 
   function onMenuKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const from = buttons.current.findIndex((b) => b === document.activeElement)
-    const to = pauseMenuFocus(Math.max(from, 0), e.key, PAUSE_MENU.length)
+    const to = menuFocus(Math.max(from, 0), e.key, PAUSE_MENU.length)
     if (to === null) return
     e.preventDefault()
     buttons.current[to]?.focus()

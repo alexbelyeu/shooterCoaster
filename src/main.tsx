@@ -40,8 +40,8 @@ if (analyticsOn) {
     const event = analyticsEventFor(prev, next)
     if (event) track(event.name, event.props)
   })
-  eventBus.on(SHARED_EVENT, (level, method) => {
-    const { name, props } = shareEvent(level as string, method as ShareMethod)
+  eventBus.on(SHARED_EVENT, (level, method, daily) => {
+    const { name, props } = shareEvent(level as string, method as ShareMethod, daily === true)
     track(name, props)
   })
   installTelemetry(__APP_VERSION__, storage)

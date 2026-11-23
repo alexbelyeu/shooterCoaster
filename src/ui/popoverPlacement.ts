@@ -47,7 +47,10 @@ export function placePopover(anchor: Box, width: number, height: number, viewpor
   ]
   const found = candidates.find(([, b]) => free(b))
   if (found) return { side: found[0], left, top: found[1].top }
-  const side: Placement['side'] = viewport.height - anchor.bottom > anchor.top ? 'below' : 'above'
-  const top = Math.max(MARGIN, Math.min(viewport.height - MARGIN - height, candidates[side === 'below' ? 0 : 1][1].top))
-  return { side, left, top }
+  // Held inside the viewport, the roomier side first, but a side that covers none of `avoid` before it (#342).
+  const held = (side: Placement['side']): Box => at(Math.max(MARGIN, Math.min(viewport.height - MARGIN - height, candidates[side === 'below' ? 0 : 1][1].top)))
+  const roomier: Placement['side'] = viewport.height - anchor.bottom > anchor.top ? 'below' : 'above'
+  const sides: Placement['side'][] = roomier === 'below' ? ['below', 'above'] : ['above', 'below']
+  const side = sides.find((s) => !avoid.some((a) => overlaps(a, held(s)))) ?? roomier
+  return { side, left, top: held(side).top }
 }

@@ -3,8 +3,9 @@ import { paceLevel } from './pacing'
 // Level 6's track and walls as plain numbers: the blockout they are built from stays out of the startup JS (#589).
 // Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS.
 import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
-// Level 4's ride too (#866).
+// Level 4's ride too (#866), and level 5's (#867).
 import { ARCTIC_LEVEL_TRACK } from './environments/biomes/arctic/arcticLevel'
+import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel'
 import { GYM_LEVEL } from './environments/biomes/gym/gymLevel'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
@@ -139,18 +140,7 @@ const LEVELS: LevelConfig[] = [
     maxScore: 52 * 12 + 20 * 18 + 22 * 35 + 8 * 60 + 3 * 60 + 500, // 2234 + the Magma Titan's vents, heart and reward (bossSpecs.ts) = 2914
     message: 'You conquered the Inferno!',
     nextLevel: 'level6',
-    track: {
-      varA: 3,
-      varB: 40,
-      varC: 5,
-      scalar: 40,
-      rollerSpeed: 0.000005,
-      minRollerSpeed: 0.00005,
-      curve: 'curve2',
-      color1: 0x2a2a2a,
-      color2: 0xff4400,
-      glow: 1.0,
-    },
+    track: INFERNO_LEVEL_TRACK,
     ...paceLevel({
       waves: [
         { type: 'emberWisp', count: 26, waveLabel: 'Embers Rise!', formation: 'spiral', weight: 2 },
