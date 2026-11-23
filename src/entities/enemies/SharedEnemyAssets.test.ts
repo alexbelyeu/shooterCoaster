@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
-  CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_GEO, DUST_BUNNY_MAT, dustBunnyRoll, LANTERNFLY_FLASH_MAT,
+  BALLOON_GEO, CLIMBER_ARM_GEO, CLIMBER_BODY_GEO, CLIMBER_LEGS_GEO, CROW_EYES_GEO, FFISH_GEO, FFISH_MAT, CROW_FEATHER_MAT, CROW_FLINCH_MAT, CROW_FLINCH_POSE, CROW_GEO, DUST_BUNNY_GEO, DUST_BUNNY_MAT, dustBunnyRoll, LANTERNFLY_FLASH_MAT,
   LANTERNFLY_FOLDED, LANTERNFLY_FOREWING_PIVOT, LANTERNFLY_GEO, LANTERNFLY_HINDWING_PIVOT, LANTERNFLY_MAT, LANTERNFLY_OPEN, RAT_BODY_GEO,
   RAT_SNOUT_GEO, RAT_TAIL_GEO, SNOWMAN_BODY_GEO, SNOWMAN_COAL_GEO, SNOWMAN_FACE_GEO,
   SNOWMAN_LEFT_ARM_GEO, SNOWMAN_RIGHT_ARM_GEO, createCrowFeatherMaterial, createLanternflyFlashMaterial, createLanternflyMaterial, crowWingPose, patchCrowWingVertex,
@@ -68,6 +68,25 @@ describe('merged enemy parts', () => {
   it('keeps every part: triangles add up', () => {
     const tris = (g: THREE.BufferGeometry) => g.index!.count / 3
     expect(tris(SNOWMAN_COAL_GEO)).toBe(tris(SNOWMAN_FACE_GEO) + 3 * tris(new THREE.SphereGeometry(1, 6, 6)))
+  })
+
+  it('places the balloon knot under its stretched body, as the meshes had them', () => {
+    const { min, max } = box(BALLOON_GEO)
+    expect(max.y).toBeCloseTo(39)
+    expect(min.y).toBeCloseTo(-39)
+  })
+
+  it('paints the flying fish in one geometry: dark eyes in front, the pale belly underneath', () => {
+    const { position, color } = FFISH_GEO.attributes
+    let eyes = 0
+    let belly = 0
+    for (let i = 0; i < color.count; i++) {
+      if (color.getX(i) < 0.01) eyes++
+      else if (color.getX(i) > 0.6 && position.getY(i) < 0) belly++
+    }
+    expect(eyes).toBe(2 * new THREE.SphereGeometry(0.3, 6, 6).toNonIndexed().attributes.position.count)
+    expect(belly).toBeGreaterThan(0)
+    expect(FFISH_MAT.vertexColors).toBe(true)
   })
 })
 
