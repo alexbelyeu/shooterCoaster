@@ -32,7 +32,8 @@ import { useEffect } from 'react'
 import { dailyKey, dailyLevel, dailySeed, type DailyStreak } from '@/levels/daily'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useGameStore } from '@/store/useGameStore'
+import { runMedals, useGameStore } from '@/store/useGameStore'
+import { LONGEST_COMBO_MEDAL, levelMedals } from '@/levels/medals'
 import type { RideVariant, RunMode } from '@/types/game'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
@@ -269,6 +270,13 @@ export interface SCTestApi {
   primeCombo: (count: number) => void
   /** Force the results phase. */
   endLevel: () => void
+  /** The medal ids the current run has won so far (`store/useGameStore.ts` `runMedals`, #879). */
+  medalsWon: () => string[]
+  /** A level's medal ids in order, and the saved medals to put in the store (and so localStorage). */
+  levelMedalIds: (levelId: string) => string[]
+  setSavedMedals: (medals: Record<string, string[]>) => void
+  /** The longest chain any medal asks for (`levels/medals.ts`): a run primed to it wins its level's combo medal. */
+  longestComboMedal: number
   /** What the results share menu's Copy link puts on the clipboard for the current level and score (`text url`), or null. */
   /** `worldRank` (0-based): the line a run on the World top 10 shares (#445). */
   shareText: (worldRank?: number | null) => string | null
@@ -1132,6 +1140,10 @@ export function installE2EApi() {
       autoFireEnabled = false
       useGameStore.getState().setPhase('results')
     },
+    medalsWon: () => runMedals(useGameStore.getState()),
+    longestComboMedal: LONGEST_COMBO_MEDAL,
+    levelMedalIds: (levelId) => levelMedals(levelId).map((m) => m.id),
+    setSavedMedals: (medals) => useGameStore.setState({ savedMedals: medals }),
     shareText: (worldRank: number | null = null) => {
       const { currentLevel, score } = useGameStore.getState()
       const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score), 'copy', worldRank) : null

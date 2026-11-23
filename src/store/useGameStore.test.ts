@@ -426,11 +426,11 @@ describe('saveScore', () => {
     expect(store().savedScores.level1).toMatchObject({ score: 500, bestCombo: 3 })
   })
 
-  it('persists only saved scores, leaderboards, initials, the daily record and the last level (not score, combo or phase)', () => {
+  it('persists only saved scores and medals, leaderboards, initials, the daily record and the last level (not score, combo or phase)', () => {
     store().addScore(42)
     store().saveScore(entry('level1', 500, 1))
     const persisted = JSON.parse(memoryStorage.getItem('shootercoaster-scores')!)
-    expect(Object.keys(persisted.state)).toEqual(['savedScores', 'leaderboards', 'lastInitials', 'savedDaily', 'dailyStreak', 'lastLevel'])
+    expect(Object.keys(persisted.state)).toEqual(['savedScores', 'savedMedals', 'leaderboards', 'lastInitials', 'savedDaily', 'dailyStreak', 'lastLevel'])
     expect(persisted.state.savedScores.level1.score).toBe(500)
   })
 })
@@ -562,5 +562,49 @@ describe('isLevelUnlocked', () => {
       store().saveScore(entry(l.id, 500, 1))
       expect(store().isLevelUnlocked(l.nextLevel), `${l.nextLevel} after ${l.id}`).toBe(true)
     }
+  })
+})
+
+describe('medal stats (#879)', () => {
+  beforeEach(() => {
+    resetGameTime()
+    store().startRun('level1')
+  })
+
+  it('counts shots and hits inside a FRENZY apart, and golden balloons', () => {
+    store().registerShot(2)
+    store().registerHit()
+    store().setSlowMo(0.35, 'on')
+    store().registerShot(3)
+    store().registerHit()
+    store().setSlowMo(1, 'off')
+    store().popGolden()
+    expect(store()).toMatchObject({ shotsFired: 5, hits: 2, frenzyShots: 3, frenzyHits: 1, goldens: 1 })
+  })
+
+  it("times the boss from its arrival to its defeat in game seconds, once", () => {
+    const hud = { name: 'Boss', hp: [1], maxHp: [1], defeated: false }
+    advanceGameTime(40)
+    store().setBoss(hud)
+    advanceGameTime(5)
+    store().setBoss(hud)
+    expect(store().bossSeconds).toBeNull()
+    advanceGameTime(6)
+    store().setBoss({ ...hud, defeated: true })
+    advanceGameTime(2)
+    store().setBoss({ ...hud, defeated: true })
+    store().setBoss(null)
+    expect(store().bossSeconds).toBeCloseTo(11)
+    store().startRun('level1')
+    expect(store()).toMatchObject({ bossArrivedAt: null, bossSeconds: null, goldens: 0, frenzyShots: 0 })
+  })
+
+  it('keeps every medal a level has won, and Clear local data wipes them', () => {
+    store().saveMedals('level1', ['hotStreak'])
+    store().saveMedals('level1', ['goldRush'])
+    store().saveMedals('level1', [])
+    expect(store().savedMedals).toEqual({ level1: ['goldRush', 'hotStreak'] })
+    store().clearLocalData()
+    expect(store().savedMedals).toEqual({})
   })
 })

@@ -4,6 +4,7 @@ import type { LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { currentStreak, dailyKey, dailyLevel, type DailyStreak } from '@/levels/daily'
 import { previousLevel } from '@/levels/LevelRegistry'
 import { hasNightRide } from '@/levels/environments/nightPreset'
+import { levelMedals } from '@/levels/medals'
 
 export interface LevelSelectSource {
   id: string
@@ -28,15 +29,24 @@ export interface LevelCard {
   unlockedBy: string | null
   /** Offers the Night Ride toggle (#829): the level has all its stars and its biome a night preset. */
   nightRide: boolean
+  /** The level's three medals (#879) and which it has won; none while it is locked. */
+  medals: { id: string; name: string; line: string; earned: boolean }[]
 }
 
 export const STARS_PER_LEVEL = 3
+
+/** What a card's medals say aloud: "1 of 3 medals, Gold Rush". */
+export function medalsLine(medals: readonly Pick<LevelCard['medals'][number], 'name' | 'earned'>[]): string {
+  const won = medals.filter((m) => m.earned).map((m) => m.name)
+  return `${won.length} of ${medals.length} medals${won.length > 0 ? `, ${won.join(', ')}` : ''}`
+}
 
 export function buildLevelCards(
   levels: readonly LevelSelectSource[],
   savedScores: Record<string, ScoreEntry | undefined>,
   isUnlocked: (id: string) => boolean,
   leaderboards: Record<string, readonly LeaderboardEntry[] | undefined>,
+  savedMedals: Record<string, readonly string[] | undefined> = {},
 ): LevelCard[] {
   return levels.map((level) => {
     const unlocked = isUnlocked(level.id)
@@ -55,6 +65,9 @@ export function buildLevelCards(
       bestInitials: unlocked ? (top?.initials ?? null) : null,
       unlockedBy: levels.find((l) => l.id === previousId)?.name ?? null,
       nightRide: stars === STARS_PER_LEVEL && hasNightRide(level.biome),
+      medals: unlocked
+        ? levelMedals(level.id).map(({ id, name, line }) => ({ id, name, line, earned: savedMedals[level.id]?.includes(id) ?? false }))
+        : [],
     }
   })
 }

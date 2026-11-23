@@ -26,6 +26,7 @@ import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/
 import { getAllLevels, getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
 import { buildLevelCards, nextLevelIndex } from '@/ui/screens/levelSelectModel'
 import { scoreAfterPenalty } from '@/levels/scoring'
+import { medalsWon, mergeMedals, sanitizeSavedMedals } from '@/levels/medals'
 // The generated table, not `scoreLimits()`, which would pull the boss specs into the startup JS.
 import { LEVEL_LIMITS } from '../../api/_lib/levelLimits'
 
@@ -93,6 +94,12 @@ interface GameState {
   bestCombo: number
   registerShot: (bullets?: number) => void
   registerHit: () => void
+  /** Shots and hits while a FRENZY's slow-mo is on (`frenzy` not 'off'), for the Frenzy medals (#879). */
+  frenzyShots: number
+  frenzyHits: number
+  /** Theme Park's golden balloons popped this run. */
+  goldens: number
+  popGolden: () => void
   /** Ids of the bystanders shot this run (#518). */
   bystandersHit: readonly string[]
   /** Takes `penalty` off the score (floored at 0) once per bystander: the points actually taken, null when `id` was already hit. */
@@ -121,10 +128,16 @@ interface GameState {
   /** The live boss, for the HUD; null when none is up. */
   boss: BossHud | null
   setBoss: (boss: BossHud | null) => void
+  /** Game time of the boss's arrival (its first HUD), and the game seconds it took to beat; null until then. */
+  bossArrivedAt: number | null
+  bossSeconds: number | null
 
   savedScores: Record<string, ScoreEntry>
   /** Keeps the higher score's entry; `bestCombo` is kept at its max across runs either way. */
   saveScore: (entry: ScoreEntry) => void
+  /** Medal ids each level has won (`levels/medals.ts`), campaign runs only; persisted. */
+  savedMedals: Record<string, string[]>
+  saveMedals: (levelId: string, won: readonly string[]) => void
 
   leaderboards: Leaderboards
   /** The default for the next entry. */
@@ -162,6 +175,11 @@ const FRESH_RUN = {
   kills: 0,
   shotsFired: 0,
   hits: 0,
+  frenzyShots: 0,
+  frenzyHits: 0,
+  goldens: 0,
+  bossArrivedAt: null,
+  bossSeconds: null,
   bystandersHit: [] as readonly string[],
   bestCombo: 0,
   combo: NO_COMBO,
@@ -184,6 +202,23 @@ function urlSeed(): number | null {
 export function runBest(s: Pick<GameState, 'runMode' | 'currentLevel' | 'savedDaily' | 'savedScores'>): ScoreEntry | undefined {
   if (s.runMode.mode === 'daily') return s.savedDaily[s.runMode.dateKey]
   return s.currentLevel ? s.savedScores[s.currentLevel] : undefined
+}
+
+/** The medals the current run has won so far (#879); none on a daily, which is one run, not a step in the campaign. */
+export function runMedals(s: GameState): string[] {
+  if (!s.currentLevel || s.runMode.mode !== 'campaign') return []
+  return medalsWon(s.currentLevel, {
+    kills: s.kills,
+    shotsFired: s.shotsFired,
+    hits: s.hits,
+    bestCombo: s.bestCombo,
+    bystandersHit: s.bystandersHit.length,
+    route: s.route,
+    goldens: s.goldens,
+    frenzyShots: s.frenzyShots,
+    frenzyHits: s.frenzyHits,
+    bossSeconds: s.bossSeconds,
+  })
 }
 
 export const useGameStore = create<GameState>()(
@@ -244,8 +279,10 @@ export const useGameStore = create<GameState>()(
       skipIntro: false,
 
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
-      registerShot: (bullets = 1) => set((s) => ({ shotsFired: s.shotsFired + bullets })),
-      registerHit: () => set((s) => ({ hits: s.hits + 1 })),
+      registerShot: (bullets = 1) =>
+        set((s) => ({ shotsFired: s.shotsFired + bullets, frenzyShots: s.frenzyShots + (s.frenzy === 'off' ? 0 : bullets) })),
+      registerHit: () => set((s) => ({ hits: s.hits + 1, frenzyHits: s.frenzyHits + (s.frenzy === 'off' ? 0 : 1) })),
+      popGolden: () => set((s) => ({ goldens: s.goldens + 1 })),
       hitBystander: (id, penalty) => {
         const s = get()
         if (s.bystandersHit.includes(id)) return null
@@ -279,7 +316,13 @@ export const useGameStore = create<GameState>()(
 
       setSlowMo: (timeScale, frenzy) => set({ timeScale, frenzy }),
 
-      setBoss: (boss) => set({ boss }),
+      setBoss: (boss) =>
+        set((s) => {
+          if (!boss) return { boss }
+          if (s.bossArrivedAt === null) return { boss, bossArrivedAt: gameTime() }
+          if (boss.defeated && s.bossSeconds === null) return { boss, bossSeconds: gameTime() - s.bossArrivedAt }
+          return { boss }
+        }),
 
       sceneReady: false,
       setSceneReady: (ready) => set({ sceneReady: ready }),
@@ -296,6 +339,13 @@ export const useGameStore = create<GameState>()(
             return { savedScores: { ...s.savedScores, [entry.level]: { ...existing, bestCombo } } }
           }
           return {}
+        }),
+      savedMedals: {},
+      saveMedals: (levelId, won) =>
+        set((s) => {
+          const kept = mergeMedals(levelId, s.savedMedals[levelId], won)
+          if (kept.length === (s.savedMedals[levelId]?.length ?? 0)) return {}
+          return { savedMedals: { ...s.savedMedals, [levelId]: kept } }
         }),
 
       leaderboards: {},
@@ -323,6 +373,7 @@ export const useGameStore = create<GameState>()(
         clearGhosts()
         set({
           savedScores: {},
+          savedMedals: {},
           leaderboards: {},
           lastInitials: DEFAULT_INITIALS,
           savedDaily: {},
@@ -359,6 +410,7 @@ export const useGameStore = create<GameState>()(
       storage: changedOnly(createJSONStorage(() => window.localStorage)),
       partialize: (state) => ({
         savedScores: state.savedScores,
+        savedMedals: state.savedMedals,
         leaderboards: state.leaderboards,
         lastInitials: state.lastInitials,
         savedDaily: state.savedDaily,
@@ -372,6 +424,7 @@ export const useGameStore = create<GameState>()(
         return {
           ...current,
           savedScores,
+          savedMedals: sanitizeSavedMedals(p.savedMedals),
           leaderboards: sanitizeLeaderboards(p.leaderboards, savedScores, boardCeilings()),
           lastInitials: normalizeInitials(p.lastInitials),
           savedDaily: sanitizeSavedDaily(p.savedDaily),
