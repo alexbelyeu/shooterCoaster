@@ -4,7 +4,7 @@ import { PARK_LEVEL_TRACK } from './parkLevel'
 import { PARK_TRACK } from './parkTrack'
 
 describe('park level data', () => {
-  it('is the built ride (regenerate with `node scripts/gen-park-level.mjs`)', () => {
+  it('is the built ride (regenerate with `node scripts/gen-ride-level.mjs`)', () => {
     // As the generator writes it: positions to whole units, ups to 2 decimals, the rest to 6 significant digits.
     const round = (_key: string, v: unknown) => (typeof v === 'number' ? Number(v.toPrecision(6)) : v)
     const fixed = (v: number) => Number(v.toFixed(2)) + 0

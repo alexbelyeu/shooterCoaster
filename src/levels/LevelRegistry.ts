@@ -1,8 +1,9 @@
 import type { LevelConfig } from '@/types/level'
 import { paceLevel } from './pacing'
 // Level 6's track and walls as plain numbers: the blockout they are built from stays out of the startup JS (#589).
-// Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS.
+// Levels 1 and 2's rides as plain numbers: the ride elements that build them stay out of the startup JS.
 import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
+import { DESERT_LEVEL_TRACK } from './environments/biomes/desert/desertLevel'
 import { GYM_LEVEL } from './environments/biomes/gym/gymLevel'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
@@ -41,22 +42,14 @@ const LEVELS: LevelConfig[] = [
     maxScore: 30 * 20 + 78 * 15 + 2 * 60 + 4 * 40 + 400, // 1770 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2450
     message: 'Ready for this one?',
     nextLevel: 'level3',
-    track: {
-      varA: 5,
-      varB: 27,
-      varC: 2,
-      scalar: 60,
-      rollerSpeed: 0.000004,
-      minRollerSpeed: 0.00006,
-      curve: 'curve1',
-      color1: 0x51411a,
-      color2: 0x812a2a,
-    },
+    // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
+    track: DESERT_LEVEL_TRACK,
     ...paceLevel({
+      // The sandstorm's V meets the car out of the Pyramid (16 s), the second V its airtime crest (30 s).
       waves: [
-        { type: 'scorpion', count: 30, waveLabel: 'Incoming!' },
-        { type: 'crow', count: 39, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm' },
-        { type: 'crow', count: 39, waveLabel: 'More Crows!', formation: 'v' },
+        { type: 'scorpion', count: 30, waveLabel: 'Incoming!', weight: 16 },
+        { type: 'crow', count: 39, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 14 },
+        { type: 'crow', count: 39, waveLabel: 'More Crows!', formation: 'v', weight: 15 },
       ],
       boss: 'giantScorpion',
     }),

@@ -586,7 +586,7 @@ describe('level2: the opening climb (#494)', () => {
   const tanV = Math.tan((REFERENCE_FOV_DEG / 2) * (Math.PI / 180))
   const tanH = tanV * (1280 / 720)
 
-  it('the scorpions placed at GO (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s, the climb included', () => {
+  it('the scorpions placed at GO (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s, the climb included (2 at its crest)', () => {
     const camera = trackView(table, 0, trackScale).eye
     const placed = placeTracksideWave({
       table, riderIndex: 0, camera, type: wave.type, groundFn, slots: tracksideSlots(wave.count, 'ground', createRng(1337)), ride: rideFor(wave), keepOff,
@@ -606,7 +606,10 @@ describe('level2: the opening climb (#494)', () => {
         return depth > 0 && Math.abs(across) <= tanH * depth && Math.abs(high) <= tanV * depth
       }).length)
     }
+    // The v2 ride's lift hill (#864) crests at 10–11 s, the view over its top mostly sky before the drop at the Pyramid.
+    const crest = seen.splice(9, 1)
     expect(Math.min(...seen), seen.join(',')).toBeGreaterThanOrEqual(3)
+    expect(crest[0]).toBeGreaterThanOrEqual(2)
   })
 })
 

@@ -5,7 +5,7 @@ import RockArches from '../../RockArches'
 import { ARCH_PILLAR_BASE_RADIUS, archFeet, PYRAMID_HALF_BASE, PYRAMID_HEIGHT } from '../../landmarkDimensions'
 import { layoutDesert, MESA_HEIGHT } from './desertLayout'
 import DustDevils from './DustDevils'
-import { ARCHES, PYRAMID } from './landmarks'
+import { ARCHES, PYRAMID, PYRAMID_PASSAGE } from './landmarks'
 import Mesas from './Mesas'
 import SunFlare from './SunFlare'
 import type { Occluder } from './sunOcclusion'
@@ -41,7 +41,7 @@ export default function DesertFeatures({ heightFn, groundFn, track, atmosphere }
   useContactShadows(
     useMemo<ShadowCaster[]>(
       () => [
-        { x: PYRAMID.x, z: PYRAMID.z, halfX: PYRAMID_HALF_BASE, halfZ: PYRAMID_HALF_BASE, spread: 70, strength: 0.5 },
+        { x: PYRAMID.x, z: PYRAMID.z, halfX: PYRAMID_HALF_BASE, halfZ: PYRAMID_HALF_BASE, yaw: PYRAMID.yaw, spread: 70, strength: 0.5 },
         ...ARCH_SHADOWS,
         ...layout.mesas.map((m) => roundCaster(m.x, m.z, 120 * m.scale, 0.45, 0.35)),
       ],
@@ -51,7 +51,7 @@ export default function DesertFeatures({ heightFn, groundFn, track, atmosphere }
 
   return (
     <>
-      <Pyramid position={[PYRAMID.x, pyramidY, PYRAMID.z]} />
+      <Pyramid position={[PYRAMID.x, pyramidY, PYRAMID.z]} yaw={PYRAMID.yaw} passage={PYRAMID_PASSAGE} />
       <RockArches arches={ARCHES} />
       <Mesas mesas={layout.mesas} />
       <DustDevils devils={layout.devils} groundFn={groundFn} />

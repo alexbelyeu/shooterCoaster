@@ -17,7 +17,7 @@ const wheelBox = {
   max: { x: wheel.x + wheel.radius + 4, y: 2 * wheel.radius + 14, z: wheel.z + 6 },
 }
 
-// The authored ride and the one the game ships (`parkLevel.ts`, rounded to whole units by `gen-park-level.mjs`):
+// The authored ride and the one the game ships (`parkLevel.ts`, rounded to whole units by `gen-ride-level.mjs`):
 // a regeneration that rounds the drop under 60° or the near miss out of its band fails here.
 describe.each([
   ['as shipped', getLevelConfig('level1')!.track],

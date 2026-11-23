@@ -21,6 +21,24 @@ export const PYRAMID_PASSAGE = { layer: 1, width: 70, height: 60 } as const
 /** The passage's floor (the top of the tier below), over the Pyramid's base. */
 export const PYRAMID_PASSAGE_FLOOR = PYRAMID_PASSAGE.layer * PYRAMID_LAYER_HEIGHT
 
+/** The ride's frame (#864): +x from the middle of the level toward the Pyramid, turned `PYRAMID.yaw` about y into the world. */
+export const RIDE_FRAME = { cos: Math.cos(PYRAMID.yaw), sin: Math.sin(PYRAMID.yaw), pyramidX: Math.hypot(PYRAMID.x, PYRAMID.z) } as const
+
+/** World XZ of a point in the ride's frame (as three.js turns a group by `rotation.y = yaw`). */
+export function rideFrameToWorld<P extends { x: number; z: number }>(p: P): P {
+  return { ...p, x: p.x * RIDE_FRAME.cos + p.z * RIDE_FRAME.sin, z: -p.x * RIDE_FRAME.sin + p.z * RIDE_FRAME.cos }
+}
+
+/**
+ * The canyon the ride jumps (#864), in the ride's frame: the jump's flight runs west along `z` over `x`, between two mesas
+ * `halfGap` either side of it (their talus ~40 units clear of the line).
+ */
+export const CANYON = { x: 1793, z: 600, halfGap: 190 } as const
+/** The canyon's two mesas, in the world. */
+export const CANYON_MESAS: readonly { x: number; z: number }[] = [-1, 1].map((side) =>
+  rideFrameToWorld({ x: CANYON.x, z: CANYON.z + side * CANYON.halfGap }),
+)
+
 /** Circles (XZ) that mesas and dust devils stay out of. */
 export const LANDMARK_FOOTPRINTS: readonly { x: number; z: number; r: number }[] = [
   { x: PYRAMID.x, z: PYRAMID.z, r: PYRAMID_REACH },

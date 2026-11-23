@@ -10,7 +10,7 @@ import {
 } from '@/utils/terrainNoise'
 import { trackExtent } from '../../shared/trackScatter'
 import { dustDevilCenter, layoutDesert, MESA_FOOTPRINT, MESA_HEIGHT } from './desertLayout'
-import { LANDMARK_FOOTPRINTS } from './landmarks'
+import { CANYON_MESAS, LANDMARK_FOOTPRINTS } from './landmarks'
 
 const level = getLevelConfig('level2')!
 const curve = createTrackCurve(level.track)
@@ -34,8 +34,11 @@ describe('layoutDesert (level 2)', () => {
     expect(layoutDesert(groundFn, table)).toEqual(layout)
   })
 
-  it('stands 4–6 grounded mesas 0.6–1.3× the track extent out, 60–400 units off the track', () => {
-    const { mesas } = layout
+  it('stands the canyon\'s two mesas and 4–6 more, grounded, 0.6–1.3× the track extent out, 60–400 units off the track', () => {
+    const [canyon, mesas] = [layout.mesas.slice(0, 2), layout.mesas.slice(2)]
+    expect(canyon.map(({ x, z }) => ({ x, z }))).toEqual(CANYON_MESAS)
+    // Either side of the jump's flight, their talus just clear of it.
+    for (const m of canyon) expect(trackDistance(m.x, m.z) - MESA_FOOTPRINT).toBeGreaterThanOrEqual(30)
     expect(mesas.length).toBeGreaterThanOrEqual(4)
     expect(mesas.length).toBeLessThanOrEqual(6)
     for (const m of mesas) {
@@ -45,6 +48,7 @@ describe('layoutDesert (level 2)', () => {
       const reach = MESA_FOOTPRINT * m.scale
       expect(trackDistance(m.x, m.z) - reach).toBeGreaterThanOrEqual(60)
       expect(trackDistance(m.x, m.z) - reach).toBeLessThan(400)
+      for (const c of canyon) expect(Math.hypot(c.x - m.x, c.z - m.z)).toBeGreaterThanOrEqual(520)
       for (const c of LANDMARK_FOOTPRINTS) expect(Math.hypot(c.x - m.x, c.z - m.z)).toBeGreaterThan(c.r + reach)
       expect(m.y).toBeLessThanOrEqual(groundFn(m.x, m.z))
       expect(groundFn(m.x, m.z) - m.y).toBeLessThan(MESA_HEIGHT * m.scale * 0.34)

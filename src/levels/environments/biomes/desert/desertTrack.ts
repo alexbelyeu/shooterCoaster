@@ -19,7 +19,7 @@
  * The level rides its copy in `desertLevel.ts` (`node scripts/gen-desert-level.mjs`), which keeps the ride elements out of
  * the startup JS.
  */
-import type { RideBeat, RideMechanic, RideV2Spec, SpeedZone, TrackParams } from '@/types/level'
+import type { RideBeat, RideMechanic, RideV2Spec, SpeedZone, SplineTrackParams } from '@/types/level'
 import { createSplineCurve, type RailPoint } from '@/track/curves/SplineCurve'
 import { RideBuilder, type MarkerKind } from '@/track/elements/rideBuilder'
 import { airtimeHill, bankedTurn } from '@/track/elements/elements'
@@ -29,7 +29,7 @@ import { getTrackDimensions } from '@/track/trackDimensions'
 import { RIDE_V2_DEFAULTS } from '@/track/rideV2'
 import { createHeightFunction } from '@/utils/terrainNoise'
 import { PYRAMID_BASE_SIZE, PYRAMID_SHRINK } from '../../landmarkDimensions'
-import { PYRAMID, PYRAMID_PASSAGE, PYRAMID_PASSAGE_FLOOR } from './landmarks'
+import { PYRAMID, PYRAMID_PASSAGE, PYRAMID_PASSAGE_FLOOR, RIDE_FRAME, rideFrameToWorld } from './landmarks'
 
 /** The desert's structure scale: a big car over a big landscape. */
 const SCALAR = 60
@@ -38,13 +38,9 @@ const EYE = getTrackDimensions({ scalar: SCALAR }).eyeHeight
 const SPACING = 60
 const DEG = Math.PI / 180
 
-/** The ride's frame: +x from the middle toward the Pyramid, turned `PYRAMID.yaw` about y into the world. */
-const LOCAL = { cos: Math.cos(PYRAMID.yaw), sin: Math.sin(PYRAMID.yaw), pyramidX: Math.hypot(PYRAMID.x, PYRAMID.z) } as const
-
-/** World XZ of a point on the ride's frame (as three.js turns a group by `rotation.y = yaw`). */
-export function toWorld(p: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
-  return { x: p.x * LOCAL.cos + p.z * LOCAL.sin, y: p.y, z: -p.x * LOCAL.sin + p.z * LOCAL.cos }
-}
+/** The ride's yaw into the world (`desertLevel.ts` ships the ride in its own frame, `RIDE_FRAME`). */
+export const DESERT_RIDE_YAW = PYRAMID.yaw
+const LOCAL = RIDE_FRAME
 
 /** Heading +x in the ride's frame (`RideBuilder`: +z at 0, a positive turn to the left, toward −z here). */
 const EAST = Math.PI / 2
@@ -69,7 +65,8 @@ const PASSAGE = {
 const DOOR_RUN = 60
 
 const TURN_BACK = { radius: 300, topY: 320 } as const
-const CANYON = { fromX: 2150 } as const
+/** The jump takes off from here, west over `CANYON` (`landmarks.ts`) between its two mesas. */
+const JUMP = { fromX: 2150 } as const
 const CAMEL = { toX: 700, y: 80, rise: 110, crest: 220, angle: 40 * DEG } as const
 const FINALE = { homeTurn: 150 } as const
 
@@ -126,7 +123,7 @@ export function buildDesertRide(): DesertRide {
   // 17 s: out into the sandstorm, a wide climbing U-turn round the Pyramid's east side and back west along its south.
   b.mark('straight', () => straightTo(b, 'x', LOCAL.pyramidX + PASSAGE.half + 100))
   zone('lift', SPEED.turn, () => turn(-Math.PI, TURN_BACK.radius, TURN_BACK.topY - y()))
-  b.mark('straight', () => straightTo(b, 'x', CANYON.fromX))
+  b.mark('straight', () => straightTo(b, 'x', JUMP.fromX))
   // 24 s: the canyon between two mesas, jumped.
   mechanics.push(jumpGap(b, { speed: SPEED.jump, booster: 12 * EYE, ramp: 20 * EYE }))
   // 31 s: down to the flats and over an airtime hill.
@@ -140,15 +137,10 @@ export function buildDesertRide(): DesertRide {
   return { points: b.points, markers: b.markers, mechanics, zones, passage: { from: passageFrom, to: passageTo } }
 }
 
-const toWorldPoint = (p: RailPoint): RailPoint => {
-  const w = toWorld(p)
-  if (!p.up) return w
-  const u = toWorld(p.up)
-  return { ...w, up: u }
-}
+const toWorldPoint = (p: RailPoint): RailPoint => (p.up ? { ...rideFrameToWorld(p), up: rideFrameToWorld(p.up) } : rideFrameToWorld(p))
 
 /** The ride's v2 spec, mechanics, dark passage and the storyboard's beats placed on the built track. */
-export function buildDesertTrack(): TrackParams {
+export function buildDesertTrack(): SplineTrackParams {
   const ride = buildDesertRide()
   const points = trimUnrolledUps(ride.points).map(toWorldPoint)
   const curve = createSplineCurve(points)
@@ -176,4 +168,4 @@ export function buildDesertTrack(): TrackParams {
   }
 }
 
-export const DESERT_TRACK: TrackParams = buildDesertTrack()
+export const DESERT_TRACK: SplineTrackParams = buildDesertTrack()
