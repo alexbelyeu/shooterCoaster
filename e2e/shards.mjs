@@ -21,7 +21,7 @@ export const STEP_LEVELS = {
   switch: ['level6'],
   dark: ['level6'], // on the `switch` step's run (NEEDS)
   audio: ['level1'],
-  night: ['level1'],
+  night: ['level1', 'level2', 'level3'],
 }
 
 /** Steps that run on another step's page: what they need in the same run. */

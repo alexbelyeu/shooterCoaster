@@ -11,8 +11,8 @@ function luma(hex: number): number {
 const nights = Object.entries(NIGHT_ATMOSPHERES) as [BiomeType, AtmosphereConfig][]
 
 describe('night presets', () => {
-  it('level 1 has one', () => {
-    expect(hasNightRide('themePark')).toBe(true)
+  it.each(['themePark', 'desert', 'ocean'] as const)('%s has one', (biome) => {
+    expect(hasNightRide(biome)).toBe(true)
   })
 
   it.each(nights)('%s at night is darker than by day, its lamps lit and its lights still there', (biome, night) => {
