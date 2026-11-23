@@ -2194,7 +2194,7 @@ async function bystanderProblems(page, id) {
   return problems
 }
 
-const WAVE_CHECK = { level: 'level2', type: 'crow', label: 'A Murder of Crows!', minOnScreen: 5 }
+const WAVE_CHECK = { level: STEP_LEVELS.wave[0], type: 'crow', label: 'A Murder of Crows!', minOnScreen: 5 }
 
 const WAVE_PAUSE_MS = 2000
 /** From this level time (s) the timer steps a fixed `WAVE_TIMER_STEP` s a frame, so a slow frame can't jump the tell and the wave together. */
@@ -2278,7 +2278,7 @@ async function waveCheck(page) {
 }
 
 /** The levels with a weather pulse (#798, `EnemyWave.weather`); the step reads each one's wave time and length from `levels()`. */
-const WEATHER_LEVELS = ['level2', 'level4']
+const WEATHER_LEVELS = STEP_LEVELS.weather
 /** Seconds after the weather's wave arrives to shoot it: past its ramp in (1.5 s), well before it clears. */
 const WEATHER_SHOT_AT = 3
 const WEATHER_MIN_ON_SCREEN = 3
@@ -2605,9 +2605,9 @@ async function bossCheck(page, check) {
   return { id: 'boss', problems, boss: result }
 }
 
-const PICKUP_CHECK = { level: 'level1', min: 2, max: 4, weapon: 'spread', bullets: 3, pauseMs: 3000 }
+const PICKUP_CHECK = { level: STEP_LEVELS.pickup[0], min: 2, max: 4, weapon: 'spread', bullets: 3, pauseMs: 3000 }
 /** The Night Ride (#829): its level, and the brightest the sky band (top 30% of the frame, mean luma 0-255) may be. */
-const NIGHT_CHECK = { level: 'level1', maxSkyLuma: 80 }
+const NIGHT_CHECK = { level: STEP_LEVELS.night[0], maxSkyLuma: 80 }
 
 /**
  * Level 1's Night Ride, ridden to the ride step's moment (`<id>-night.png`, `<id>-night-enemy.png`): a night run, a
@@ -2809,7 +2809,7 @@ async function darkSectionShot(page, levelId, { shots: shoot = false } = {}) {
 const DARK_SHOT = { dark: 0.4, glow: 0.002, flash: 3 }
 
 /** `branchWave`: the hard route's own wave (#720, `LevelRegistry.ts` level6's `branch`): its banner, size and second. */
-const SWITCH_CHECK = { level: 'level6', branchWave: { label: 'Pad Rats!', count: 8, at: 17 } }
+const SWITCH_CHECK = { level: STEP_LEVELS.switch[0], branchWave: { label: 'Pad Rats!', count: 8, at: 17 } }
 /** On-screen rats on the branch the hard run must see once its wave is in. */
 const BRANCH_WAVE_ON_SCREEN = 2
 /** Track-parameter leads behind the switch sign to park the coaster at. */
@@ -3893,7 +3893,7 @@ async function musicCrossfade(page) {
   return { problems, result: { fades, buses } }
 }
 
-const AUDIO_CHECK = { level: 'level1', maxNodes: 150, burst: [64, 32] }
+const AUDIO_CHECK = { level: STEP_LEVELS.audio[0], maxNodes: 150, burst: [64, 32] }
 
 /**
  * The score engine (#214, the only engine since #416): a real click unlocks audio and starts the title score; level1 must crossfade from it, keep its
@@ -4438,9 +4438,6 @@ async function runMobile(browser, base) {
 
 async function run() {
   const runStarted = Date.now()
-  const drift = [['wave', [WAVE_CHECK.level]], ['boss', BOSS_CHECKS.map((c) => c.level)], ['pickup', [PICKUP_CHECK.level]], ['switch', [SWITCH_CHECK.level]], ['dark', [SWITCH_CHECK.level]], ['audio', [AUDIO_CHECK.level]], ['weather', WEATHER_LEVELS], ['night', [NIGHT_CHECK.level]]]
-    .filter(([s, ls]) => ls.join() !== STEP_LEVELS[s].join())
-  if (drift.length) throw new Error(`STEP_LEVELS in e2e/shards.mjs disagrees with the checks: ${drift.map(([s, ls]) => `${s} runs on ${ls.join(', ')}`).join('; ')}`)
   const budget = startTimeBudget(runStarted)
   const base = arg('url') ?? (preview = await startPreview({ dist: DIST, base: BASE_PATH })).url
   if (arg('url')) {

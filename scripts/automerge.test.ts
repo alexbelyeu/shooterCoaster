@@ -65,7 +65,25 @@ describe('candidate selection', () => {
     expect(gate.decide(pr(1), waiting, REPO)).toEqual({ action: 'wait', reason: '`verify` is waiting' })
     expect(gate.latestVerify([portal])).toBeUndefined()
     expect(gate.latestVerify([verify('completed', 'success', '2026-10-30T20:00:00Z', 'smoke (ui)')])).toBeUndefined()
-    expect(gate.latestVerify([shard, green])).toBe(green)
+    expect(gate.latestVerify([shard, green])).toMatchObject({ status: 'waiting' })
+  })
+
+  it('latestVerify waits while a re-run of the jobs verify needs runs, over the first attempt\'s red verify (#369)', () => {
+    const red = verify('completed', 'failure', '2026-10-30T20:00:00Z')
+    const rerun = verify('in_progress', null, '2026-10-30T21:00:00Z', 'smoke (level3)')
+    expect(gate.latestVerify([red, rerun])).toMatchObject({ name: 'verify', status: 'waiting' })
+    expect(gate.latestVerify([red, verify('completed', 'success', '2026-10-30T21:00:00Z', 'pacing (level3)')])).toMatchObject({ status: 'waiting' })
+    expect(gate.latestVerify([red, verify('completed', 'success', '2026-10-30T19:00:00Z', 'smoke (level3)')])).toBe(red)
+  })
+
+  it('isVerifyNeed accepts exactly the jobs ci.yml\'s verify needs', () => {
+    const ci = readFileSync('.github/workflows/ci.yml', 'utf8')
+    const needs = ci.match(/^  verify:\n(?:    .*\n)*?    needs: \[([^\]]+)\]/m)![1].split(',').map((s) => s.trim())
+    // Job id -> its check's name, a matrix job's `${{ matrix.x }}` filled with a sample value.
+    const names = Object.fromEntries([...ci.matchAll(/^  ([\w-]+):\n    name: (.+)$/gm)].map(([, id, name]) => [id, name.replace(/\$\{\{[^}]*\}\}/g, 'x')]))
+    expect(needs.length).toBeGreaterThan(3)
+    for (const id of needs) expect([id, gate.isVerifyNeed(names[id])]).toEqual([id, true])
+    for (const id of Object.keys(names).filter((id) => !needs.includes(id))) expect([id, gate.isVerifyNeed(names[id])]).toEqual([id, false])
   })
 })
 

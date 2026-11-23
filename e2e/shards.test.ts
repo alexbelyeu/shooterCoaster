@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import { getAllLevels } from '@/levels/LevelRegistry'
-import { NIGHTLY_PARTS, SHARDS, STEPS, nightlyOnly, planRun, stepLevelPairs } from './shards.mjs'
+import { NIGHTLY_PARTS, SHARDS, STEPS, STEP_LEVELS, nightlyOnly, planRun, stepLevelPairs } from './shards.mjs'
 
 type Plan = { steps: Set<string>; levels: string[] | null }
 type Pair = [string, string | null]
@@ -95,6 +95,11 @@ describe('planRun', () => {
     expect([...planRun().steps]).toEqual(STEPS.filter((s: string) => s !== 'mobile' && s !== 'mobileMenus'))
     expect(planRun({ mobile: true }).steps.has('mobileMenus')).toBe(true)
     expect([...planRun({ mobile: true, skipDesktop: true }).steps].sort()).toEqual(['mobile', 'mobileMenus', 'title'])
+    expect([...planRun({ skipDesktop: true }).steps]).toEqual(['title'])
+  })
+
+  it('runs `dark` on the levels of the `switch` step whose page it shares', () => {
+    expect(STEP_LEVELS.dark).toEqual(STEP_LEVELS.switch)
   })
 
   it('takes --steps and --levels', () => {
