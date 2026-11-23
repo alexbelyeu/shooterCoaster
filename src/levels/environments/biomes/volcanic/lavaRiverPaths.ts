@@ -20,11 +20,11 @@ export interface LavaRiverConfig {
 }
 
 export const RIVER_CONFIGS: readonly LavaRiverConfig[] = [
-  { angle: 0.0, bend: 1, rStart: 1300, rEnd: 1700, halfWidth: 60 },
-  { angle: 2.45, bend: -1, rStart: 1300, rEnd: 1700, halfWidth: 50 },
-  { angle: 2.8, bend: 1, rStart: 1200, rEnd: 2000, halfWidth: 66 },
-  { angle: 4.9, bend: -1, rStart: 1000, rEnd: 1400, halfWidth: 56 },
-  { angle: 5.25, bend: 1, rStart: 1200, rEnd: 2000, halfWidth: 64 },
+  { angle: 2.58, bend: -1.16, rStart: 500, rEnd: 1410, halfWidth: 60 },
+  { angle: 3.15, bend: 0.57, rStart: 1550, rEnd: 320, halfWidth: 50 },
+  { angle: 4.01, bend: 0.5, rStart: 1280, rEnd: 1750, halfWidth: 66 },
+  { angle: 5.16, bend: 0.81, rStart: 900, rEnd: 1520, halfWidth: 56 },
+  { angle: 5.39, bend: -0.55, rStart: 1530, rEnd: 2120, halfWidth: 64 },
 ]
 
 export const RIVER_SEGMENTS = 120

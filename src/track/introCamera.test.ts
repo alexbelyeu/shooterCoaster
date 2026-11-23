@@ -141,14 +141,15 @@ describe('tourPose', () => {
       const high = pos.y - s.seat.y >= 100 * s.scale || s.bounds !== undefined
       tourPose(s.tour, s.tour.marks.landmark, s.seat, s.dir, pos, dir)
       const looksAtLandmark = angleDeg(dir, v(s.anchor.x - pos.x, s.anchor.y - pos.y, s.anchor.z - pos.z)) < 20
-      // Off the landing (the last 2 % of the intro), never within 20 units × trackScale of the ground.
+      // Off the landing (the last 2 % of the intro), never within 20 units × trackScale of the ground, nor lower over it
+      // than the seat is (level5's station sits in a cutting, its lava tube's mouth).
       let lowest = Infinity
       for (let i = 0; i <= 500; i++) {
         tourPose(s.tour, (i / 500) * 0.98, s.seat, s.dir, pos, dir)
         lowest = Math.min(lowest, pos.y - s.ground(pos.x, pos.z))
       }
       const { reveal, landmark, track, landing } = s.tour.marks
-      return { id: s.id, high, looksAtLandmark, clear: lowest >= 20 * s.scale, ordered: reveal < landmark && landmark < track && track < landing && landing < 1 }
+      return { id: s.id, high, looksAtLandmark, clear: lowest >= Math.min(20 * s.scale, s.seat.y - s.ground(s.seat.x, s.seat.z)), ordered: reveal < landmark && landmark < track && track < landing && landing < 1 }
     })
     expect(rows).toEqual(rows.map(({ id }) => ({ id, high: true, looksAtLandmark: true, clear: true, ordered: true })))
   })
