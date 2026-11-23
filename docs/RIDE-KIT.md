@@ -122,8 +122,10 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   a lift up the valley, a 71° first drop into the ice cave (a dark section with the `ice` look, `IceCave.tsx`, its mouth
   low over the rails), a second lift up the ridge, an airtime crest heading into the aurora (27 s), a 1.25-turn helix
   down past the Ice Fortress ending as the Yeti arrives (40 s), and the valley run home.
-- **Inferno (5):** a launch out of a lava tube, a drop-tower free fall inside the volcano, a
-  backwards section as the Titan rises behind you.
+- **Inferno (5):** built (#867, `volcanic/infernoTrack.ts`, its storyboard and seconds at the top): a station
+  launch through a glowing lava tube, a lift up the volcano's flank into a hole, a drop track falling inside the cone
+  (18 s), out through a second hole a few metres round the rider (the near miss), two camelbacks (30 s), a turntable
+  (38 s) and the Titan's whole fight ridden backwards facing him (40–57 s).
 
 ## Rules for building rides
 
