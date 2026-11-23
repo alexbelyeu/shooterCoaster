@@ -156,9 +156,10 @@ When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pic
 (spread) with time frozen and shoots it with a real bullet: `weaponState()` must report the spread gun, the next pull must
 count 3 shots and draw 3 bullets, and `level1-pickup.png` holds the tinted tracer with the `.hud-weapon` badge clear of the HUD;
 the pickup must hold through a pause, expire on game time, and a restart must bring back the blaster and every pickup.
-When level1 is in the run, a `night` step (#829, nightly) rides its Night Ride (`startLevel(id, seed, 'night')`, `variant()`)
-to the ride step's moment: the run must be `night`, the sky band (top 30%) dark (`NIGHT_CHECK.maxSkyLuma`), the enemies as
-readable as the ride's probe asks (`level1-night-enemy.png`) and the scene inside level1's `scene` budget (`level1-night.png`).
+For each level with a Night Ride in the run (`STEP_LEVELS.night`: level1, level2, level3; #829, #880), a `night` step (nightly)
+rides it (`startLevel(id, seed, 'night')`, `variant()`) to the ride step's moment: the run must be `night`, the sky band (top 30%)
+dark (`NIGHT_CHECK.maxSkyLuma`), the enemies as readable as the ride's probe asks (`<id>-night-enemy.png`) and the scene inside
+the level's `scene` budget (`<id>-night.png`); its line ends with `programs after warm-up: +N` (failed under `--gate-programs`).
 When level6 is in the run, a `switch` step (#702, on the PR in the `level6` shard) checks the shoot-to-switch junction
 (`trackSwitch()`): it starts the level held at its start from its first frame (`timerStep` and `rideRate` 0 until
 `levelReady`: ridden on the frame time, a slow runner's car passed the sign while the scene warmed up, and a switch the car
