@@ -19,7 +19,7 @@ import Rat from './Rat'
 import DustBunny from './DustBunny'
 import Lanternfly from './Lanternfly'
 
-/** Every wave enemy's component: what `EnemySpawner` mounts and the turntable (`src/dev/turntable/`) shows. */
+/** Every wave enemy's component, for the turntable (`src/dev/turntable/`); the game mounts an enemy from its world chunk (`levels/environments/worlds.ts`). */
 export const ENEMY_COMPONENTS: Record<EnemyType, ComponentType<EnemyProps>> = {
   balloon: Balloon,
   crow: Crow,

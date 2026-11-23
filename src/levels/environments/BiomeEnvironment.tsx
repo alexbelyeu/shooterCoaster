@@ -14,7 +14,7 @@ import { hashString } from '@/utils/rng'
 import { useGameStore } from '@/store/useGameStore'
 import { setRimLift } from '@/entities/enemies/enemyRim'
 import { TerrainContext } from './TerrainContext'
-import { BIOMES } from './biomeRegistry'
+import { useWorld } from './worlds'
 import Atmosphere from './shared/Atmosphere'
 import OceanWater from './shared/OceanWater'
 import TreeField from './shared/TreeField'
@@ -42,8 +42,8 @@ interface BiomeEnvironmentProps {
 
 /**
  * Thin host for one biome: shared atmosphere + terrain + water + trees, then the
- * biome's own Decorations and Features from `biomeRegistry.ts`
- * (`biomes/<biome>/`). Per-biome code never goes in this file.
+ * biome's own Decorations and Features from its world (`worlds.ts`,
+ * `biomes/<biome>/`). Per-biome code never goes in this file.
  *
  * It owns the scene fog's near and far: a dark section, the volcanic eruption and the weather each publish a modifier
  * into `fogMods`, combined here once a frame (`combineFog`), and a new run starts them all from the biome's fog.
@@ -62,7 +62,7 @@ export default function BiomeEnvironment({
   treeCount = 0,
 }: BiomeEnvironmentProps) {
   const atmosphere = atmosphereFor(biome, useGameStore((s) => s.runVariant))
-  const def = BIOMES[biome]
+  const def = useWorld().biome
   const heightFn = useContext(TerrainContext)
   const fogRef = useRef<THREE.Fog>(null)
   const [fogMods] = useState(createFogModifiers)

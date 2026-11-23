@@ -29,6 +29,25 @@ export function lazyChunk<T>(importer: () => Promise<T>): () => Promise<T> {
   }
 }
 
+/** Pauses between the attempts of one load (a flaky network): `React.lazy` calls its factory once and caches a rejection. */
+export const RETRY_DELAYS_MS: readonly number[] = [400, 1200]
+
+/** Runs `importer`, retrying after each of `delays` before giving up with the last error. */
+export async function importWithRetry<T>(
+  importer: () => Promise<T>,
+  delays: readonly number[] = RETRY_DELAYS_MS,
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await importer()
+    } catch (err) {
+      if (attempt >= delays.length) throw err
+      await wait(delays[attempt])
+    }
+  }
+}
+
 /** The page's module entry script (`<script type="module" src>`), from the HTML a build serves; null when it has none. */
 export function entryScriptSrc(html: string): string | null {
   for (const [tag] of html.matchAll(/<script\b[^>]*>/gi)) {

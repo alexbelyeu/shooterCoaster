@@ -10,7 +10,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import type { HeightFunction } from '@/utils/terrainNoise'
-import { ENEMY_COMPONENTS } from '../enemies/enemyComponents'
+import { useWorld } from '@/levels/environments/worlds'
 import GoldenBalloon from '../enemies/GoldenBalloon'
 import BossSpawner from '../bosses/BossSpawner'
 import { GOLDEN_BALLOON, SCORE_VALUES } from '@/levels/scoring'
@@ -200,6 +200,7 @@ export default function EnemySpawner({
   hardRoute,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
+  const components = useWorld().enemies
   const getThree = useThree((s) => s.get)
   const runSeed = useGameStore((s) => s.runSeed)
   // One stream per run: the same seed gives the same enemies and golden balloons.
@@ -455,7 +456,7 @@ export default function EnemySpawner({
       {enemies.map((enemy) => {
         const placed = enemy.waveIndex <= activeWaveIndex ? placements.get(enemy.id) : undefined
         const type = enemy.type as EnemyType
-        const Component = ENEMY_COMPONENTS[type]
+        const Component = components[type]
         if (!placed || !Component) return null
         return (
           <Component

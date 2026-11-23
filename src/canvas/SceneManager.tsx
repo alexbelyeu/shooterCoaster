@@ -9,7 +9,10 @@ import { loadLevelScene } from './loadLevelScene'
 
 let LevelScene = lazy(loadLevelScene)
 
-/** A level chunk that failed to load (after its retries): back to the title, and a fresh `lazy` so the next start fetches again. */
+/**
+ * A level chunk that failed to load (after its retries): back to the title, and a fresh `lazy` and no remembered world
+ * failure (#889), so the next start fetches again.
+ */
 class LevelSceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
   static getDerivedStateFromError() {
@@ -17,6 +20,8 @@ class LevelSceneBoundary extends Component<{ children: ReactNode }, { failed: bo
   }
   componentDidCatch() {
     LevelScene = lazy(loadLevelScene)
+    // A failed world (#889): the core is in, and it forgets the failure before the player can start again.
+    loadLevelScene().then((core) => core.forgetWorldFailures(), () => {})
     useGameStore.getState().setPhase('title')
     this.setState({ failed: false })
   }
