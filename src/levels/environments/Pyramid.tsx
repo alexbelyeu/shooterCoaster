@@ -1,6 +1,8 @@
-import { useRef, useMemo } from 'react'
+import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { LAMP_WARM } from './shared/lampGlow'
+import StaticInstances from './shared/StaticInstances'
 import {
   PYRAMID_BASE_SIZE,
   PYRAMID_HEIGHT,
@@ -11,11 +13,51 @@ import {
 
 interface PyramidProps {
   position?: [number, number, number]
+  /** The atmosphere's `lampGlow`: torches burning on every layer's corners and the stone warm under them at night (#880). */
+  lampGlow?: number
 }
 
+/** A torch's flame: a cone standing on its base, sized to read from the ride a couple of kilometres off. */
+const TORCH_RADIUS = 10
+const TORCH_HEIGHT = 34
+
+/** One torch on each top corner of every layer, inset a little so it stands on the step. */
+function torchMatrices(): THREE.Matrix4[] {
+  const out: THREE.Matrix4[] = []
+  let size = PYRAMID_BASE_SIZE
+  for (let i = 0; i < PYRAMID_LAYER_COUNT; i++) {
+    const h = size * 0.5 - TORCH_RADIUS
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      out.push(new THREE.Matrix4().makeTranslation(sx * h, (i + 1) * PYRAMID_LAYER_HEIGHT, sz * h))
+    }
+    size *= PYRAMID_SHRINK
+  }
+  return out
+}
+
+/** The torches: one instanced draw, past white so Bloom takes them, flickering together. */
+function Torches({ glow }: { glow: number }) {
+  const assets = useMemo(() => {
+    const geometry = new THREE.ConeGeometry(TORCH_RADIUS, TORCH_HEIGHT, 6).translate(0, TORCH_HEIGHT / 2, 0)
+    const material = new THREE.MeshBasicMaterial({ toneMapped: false })
+    return { geometry, material, matrices: torchMatrices() }
+  }, [])
+  useEffect(() => () => {
+    assets.geometry.dispose()
+    assets.material.dispose()
+  }, [assets])
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    const flicker = glow * (1.5 + 0.2 * Math.sin(t * 9.1) + 0.15 * Math.sin(t * 23.7))
+    assets.material.color.setRGB(flicker, flicker * 0.42, flicker * 0.08)
+  })
+
+  return <StaticInstances matrices={assets.matrices} geometry={assets.geometry} material={assets.material} />
+}
 
 /** Stepped pyramid with glowing hieroglyph panels and a spinning golden capstone. */
-export default function Pyramid({ position = [800, 0, -600] }: PyramidProps) {
+export default function Pyramid({ position = [800, 0, -600], lampGlow = 0 }: PyramidProps) {
   const capstoneRef = useRef<THREE.Mesh>(null)
   const glyphRefs = useRef<(THREE.Mesh | null)[]>([])
 
@@ -72,7 +114,7 @@ export default function Pyramid({ position = [800, 0, -600] }: PyramidProps) {
       {layers.map((layer, i) => (
         <mesh key={`layer-${i}`} position={[0, layer.y, 0]}>
           <boxGeometry args={[layer.size, PYRAMID_LAYER_HEIGHT, layer.size]} />
-          <meshPhongMaterial color={layer.color} flatShading />
+          <meshPhongMaterial color={layer.color} emissive={LAMP_WARM} emissiveIntensity={0.08 * lampGlow} flatShading />
         </mesh>
       ))}
 
@@ -107,6 +149,8 @@ export default function Pyramid({ position = [800, 0, -600] }: PyramidProps) {
           toneMapped={false}
         />
       </mesh>
+
+      {lampGlow > 0 && <Torches glow={lampGlow} />}
     </group>
   )
 }
