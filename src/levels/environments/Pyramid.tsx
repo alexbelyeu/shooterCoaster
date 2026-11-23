@@ -12,16 +12,12 @@ import { buildDotTexture } from './shared/lampGlow'
 
 interface PyramidProps {
   position?: [number, number, number]
-  /** Turned about y. */
   yaw?: number
   /** A passage through tier `layer` along the Pyramid's x (#864): `width` wide, `height` up from the tier's floor, torchlit. */
   passage?: { layer: number; width: number; height: number }
 }
 
-/**
- * Torches down each wall of the passage, this far apart along it, this high over its floor, `inset` off the wall: more than
- * the glow's radius, or the wall cuts its sprite square.
- */
+/** Passage torches; `inset` off the wall exceeds the glow's radius, or the wall cuts its sprite square. */
 const TORCH = { spacing: 110, height: 38, flame: 7, glow: 18, inset: 10 } as const
 
 /** Stepped pyramid with glowing hieroglyph panels and a spinning golden capstone. */

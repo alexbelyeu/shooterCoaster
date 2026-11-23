@@ -9,11 +9,7 @@ export const ARCHES: readonly ArchConfig[] = [
   { pos: [-1400, 0, -600], rotY: 4.2, scale: 0.9 },
 ]
 
-/**
- * The Pyramid, turned (`yaw`, about y) to face the middle of the level square on: the ride (#864) comes at it from there,
- * dives into a doorway in its second tier's west face, rides the `passage` through the tier along the Pyramid's own x and
- * out of the east face.
- */
+/** The Pyramid, turned (`yaw`) to face the middle of the level square on, where the ride (#864) comes at its doorway from. */
 export const PYRAMID = { x: 2000, z: -1600, yaw: Math.atan2(1600, 2000) }
 
 /** The passage through the Pyramid's tier `layer` (#864): `width` wide, `height` over the tier below's top, along its centre. */
@@ -29,10 +25,7 @@ export function rideFrameToWorld<P extends { x: number; z: number }>(p: P): P {
   return { ...p, x: p.x * RIDE_FRAME.cos + p.z * RIDE_FRAME.sin, z: -p.x * RIDE_FRAME.sin + p.z * RIDE_FRAME.cos }
 }
 
-/**
- * The canyon the ride jumps (#864), in the ride's frame: the jump's flight runs west along `z` over `x`, between two mesas
- * `halfGap` either side of it (their talus ~40 units clear of the line).
- */
+/** The canyon the ride jumps (#864), in the ride's frame: mesas `halfGap` either side of the flight, their talus ~40 clear. */
 export const CANYON = { x: 1793, z: 600, halfGap: 190 } as const
 /** The canyon's two mesas, in the world. */
 export const CANYON_MESAS: readonly { x: number; z: number }[] = [-1, 1].map((side) =>

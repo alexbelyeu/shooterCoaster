@@ -591,7 +591,7 @@ describe('level2: the opening climb (#494)', () => {
   const tanV = Math.tan((REFERENCE_FOV_DEG / 2) * (Math.PI / 180))
   const tanH = tanV * (1280 / 720)
 
-  it('the scorpions\' two packs (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s but the lift\'s crest', () => {
+  it('the scorpions\' two packs (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s but the lift\'s crest at 9–10 s, pitched at the sky', () => {
     const placed = packs.flatMap((wave) => {
       const riderIndex = indexAhead(table, 0, profile[Math.round((wave.spawnDelay ?? 0) * 10)])
       const camera = trackView(table, riderIndex, trackScale).eye
@@ -615,7 +615,6 @@ describe('level2: the opening climb (#494)', () => {
         return depth > 0 && Math.abs(across) <= tanH * depth && Math.abs(high) <= tanV * depth
       }).length)
     }
-    // The v2 ride's lift hill (#864) crests at 9–10 s pitched at the sky, the beat before the drop at the Pyramid.
     seen.splice(8, 2)
     expect(Math.min(...seen), seen.join(',')).toBeGreaterThanOrEqual(3)
   })

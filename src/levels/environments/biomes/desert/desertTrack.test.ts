@@ -12,18 +12,16 @@ import { MESA_FOOTPRINT } from './desertLayout'
 import { buildDesertRide, DESERT_TRACK, PYRAMID_BASE_Y } from './desertTrack'
 import { CANYON, CANYON_MESAS, PYRAMID_PASSAGE, PYRAMID_PASSAGE_FLOOR, RIDE_FRAME, rideFrameToWorld } from './landmarks'
 
-/** World XZ back into the ride's frame (`rideFrameToWorld`'s inverse). */
+/** `rideFrameToWorld`'s inverse. */
 const toRideFrame = ({ x, y = 0, z }: { x: number; y?: number; z: number }) => ({
   x: x * RIDE_FRAME.cos - z * RIDE_FRAME.sin,
   y,
   z: x * RIDE_FRAME.sin + z * RIDE_FRAME.cos,
 })
 
-/** The passage tier's half length along the ride's x, either side of the Pyramid's middle. */
 const PASSAGE_HALF = (PYRAMID_BASE_SIZE * PYRAMID_SHRINK ** PYRAMID_PASSAGE.layer) / 2
 const PASSAGE_FLOOR_Y = PYRAMID_BASE_Y + PYRAMID_PASSAGE_FLOOR
 
-// The authored ride and the one the game ships (`desertLevel.ts`, whole units in the ride's frame from `gen-ride-level.mjs`).
 describe.each([
   ['as shipped', getLevelConfig('level2')!.track],
   ['as authored', DESERT_TRACK],
@@ -67,13 +65,12 @@ describe.each([
     }
   })
 
-  it('jumps the canyon between its two mesas', () => {
+  it('jumps the canyon between its two mesas, their footprints clear of the flight', () => {
     const jump = track.mechanics!.find((m) => m.kind === 'jumpGap')!
     const [off, on] = [jump.from, jump.to].map((t) => toRideFrame(curve.getPointAt(t)))
     expect(off.x).toBeGreaterThan(CANYON.x)
     expect(on.x).toBeLessThan(CANYON.x)
     for (const p of [off, on]) expect(Math.abs(p.z - CANYON.z)).toBeLessThan(10)
-    // Each mesa's footprint clear of the flight's line (XZ), either side of it.
     const sides = CANYON_MESAS.map(toRideFrame).map((m) => {
       expect(Math.abs(m.z - off.z)).toBeGreaterThan(MESA_FOOTPRINT)
       return Math.sign(m.z - off.z)
@@ -81,9 +78,8 @@ describe.each([
     expect(sides[0]).toBe(-sides[1])
   })
 
-  it('keeps its rails over the natural ground but in the cut to the west door', () => {
+  it('keeps its rails over the natural ground but in the dunes\' cut to the west door, at most 120 deep', () => {
     const ground = createHeightFunction('desert')
-    // The drop's foot runs into the dunes at the Pyramid's west face, a trench the terrain's track cut digs to the door.
     const inCut = (p: { x: number; z: number }) => Math.abs(p.z) < 1 && p.x > RIDE_FRAME.pyramidX - PASSAGE_HALF - 400 && p.x < RIDE_FRAME.pyramidX
     let outside = Infinity
     let cut = Infinity
