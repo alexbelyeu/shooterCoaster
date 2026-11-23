@@ -2024,6 +2024,21 @@ async function speedCheck(page, levelId) {
       return w.feelMax.launch > 0 && w.feel.launch < w.feelMax.launch
     }, null, { timeout: 30000, polling: 100 })
     .catch(() => {})
+  // The level timer held from here to the end of the step: the scan and its re-rides take 75 s or more of wall time on a slow
+  // runner, past the run's 60 s, and once the run reached results the camera stopped reporting (streaks 0, tunnel index -1).
+  await page.evaluate(() => { window.__SC_TEST__.holdLevelTime = true })
+  try {
+    const result = await speedScan(page, levelId)
+    const phase = await page.evaluate(() => window.__SC_TEST__.phase())
+    if (phase !== 'playing') result.problems.unshift(`the run left playing (phase ${phase}) during the speed step`)
+    return result
+  } finally {
+    await page.evaluate(() => { window.__SC_TEST__.holdLevelTime = false })
+  }
+}
+
+/** `speedCheck`'s scan, held point and tunnel shots, under a held level timer. */
+async function speedScan(page, levelId) {
   // Streaks at the most banked point where the scan saw them (opacity past STREAK_FLOOR), else the point with the most;
   // the bank at the scan's most banked point. A v2 ride's turns can be slower than its drops (level 1's top speed is the
   // straight at the first drop's foot) and its top speed short, so it also tries `rideFastest`. The pick goes by the
@@ -2112,8 +2127,8 @@ async function tunnelShot(page, levelId) {
   const spans = await page.evaluate(() => window.__SC_TEST__.tunnel.spans)
   if (!spans.length) return { problems: [], result: null }
   const { from, to } = spans[0]
-  // Game time and the level timer held, so the speed scan's late moment can't end the run under the shots; `rideTo` still moves the car.
-  await page.evaluate(() => { window.__SC_TEST__.holdLevelTime = true; window.__SC_TEST__.setTimeScale(0) })
+  // Game time frozen for the shots (the speed step already holds the level timer); `rideTo` still moves the car.
+  await page.evaluate(() => { window.__SC_TEST__.setTimeScale(0) })
   const freezeAt = async (t) => {
     await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, t)
     await waitFrames(page, 3, { maxMs: 20000, pollMs: 100 })
@@ -2124,7 +2139,7 @@ async function tunnelShot(page, levelId) {
   await freezeAt(at)
   const state = await page.evaluate(() => ({ ...window.__SC_TEST__.tunnel, fovKick: window.__SC_TEST__.cameraWeight.fovKick, streaks: window.__SC_TEST__.cameraWeight.streaks }))
   const png = await page.screenshot({ path: path.join(OUT, `${levelId}-tunnel.png`), timeout: SHOT_TIMEOUT })
-  await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1); window.__SC_TEST__.holdLevelTime = false })
+  await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1) })
   const light = await page.evaluate(async (b64) => {
     const img = new Image()
     img.src = `data:image/png;base64,${b64}`
