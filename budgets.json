@@ -18,6 +18,7 @@
     "level4": 180,
     "level5": 180,
     "level6": 180,
+    "level7": 180,
     "mobile": 240
   },
   "scene": {
@@ -68,6 +69,9 @@
       "triangles": 195000,
       "trackObjects": 12,
       "trackTriangles": 48000
+    },
+    "level7": {
+      "placeholder": "npm run new-world: set by two clean local smokes of this level (scene: the ride; pacing: --steps pacing), e2e/placeholderBudget.mjs"
     }
   },
   "pacing": {
@@ -95,6 +99,9 @@
     "level6": {
       "longestGapSeconds": 3,
       "noTargetShare": 0.1
+    },
+    "level7": {
+      "placeholder": "npm run new-world: set by two clean local smokes of this level (scene: the ride; pacing: --steps pacing), e2e/placeholderBudget.mjs"
     }
   }
 }

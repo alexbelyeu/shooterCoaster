@@ -6,6 +6,7 @@ import level3 from './level3.scrim?raw'
 import level4 from './level4.scrim?raw'
 import level5 from './level5.scrim?raw'
 import level6 from './level6.scrim?raw'
+import level7 from './level7.scrim?raw'
 import resultsWin from './results-win.scrim?raw'
 import resultsLose from './results-lose.scrim?raw'
 
@@ -20,7 +21,7 @@ const THEME_OPTIONS: Record<string, string> = Object.fromEntries(
   ),
 )
 
-export const SCORES: Record<string, string> = { title, level1, level2, level3, level4, level5, level6, 'results-win': resultsWin, 'results-lose': resultsLose, ...THEME_OPTIONS }
+export const SCORES: Record<string, string> = { title, level1, level2, level3, level4, level5, level6, level7, 'results-win': resultsWin, 'results-lose': resultsLose, ...THEME_OPTIONS }
 
 /** `?theme=neon,carousel` → `{ title: 'title.neon', level1: 'level1.carousel' }`: each named option replaces its slot's score; unknown names are ignored. */
 export function themesFromQuery(search: string, options: readonly string[] = Object.keys(THEME_OPTIONS)): Record<string, string> {

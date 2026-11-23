@@ -124,6 +124,15 @@ const SCENES: Record<BiomeType, Scene> = {
       <path d="M0 88 H200" stroke={t.accent} strokeWidth="1.5" />
     </>
   ),
+  // Neon Metropolis (scaffolded): a stand-in until the world's landmark is drawn here
+  city: (t) => (
+    <>
+      <circle cx="160" cy="26" r="8" fill={t.accent2} />
+      <path d="M118 90 L128 30 L138 90Z" fill="#6f6660" />
+      <path d="M0 80 Q50 70 100 78 T200 74 V100 H0Z" fill="#33402c" />
+      <path d="M8 74 Q50 30 92 62 T192 50" stroke={t.accent} strokeWidth="3" fill="none" />
+    </>
+  ),
 }
 
 /** The landmark art alone, on a transparent ground; the score card (#272) draws it as an image at `width` × `height`. */

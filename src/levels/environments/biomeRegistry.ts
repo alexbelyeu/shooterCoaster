@@ -7,6 +7,7 @@ import { ocean } from './biomes/ocean'
 import { arctic } from './biomes/arctic'
 import { volcanic } from './biomes/volcanic'
 import { gym } from './biomes/gym'
+import { city } from './biomes/city'
 
 /**
  * Every biome's environment definition (terrain colours, trees, decorations,
@@ -20,6 +21,7 @@ export const BIOMES: Record<BiomeType, BiomeDefinition> = {
   arctic,
   volcanic,
   gym,
+  city,
 }
 
 /** A biome's ground, for every caller: an interior's authored `floor` as given, else the noise terrain kept off the track. */

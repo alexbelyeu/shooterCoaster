@@ -72,6 +72,12 @@ export const BIOME_UI: Record<BiomeType, BiomeUITheme> = {
     accent2: '#ff3355',
     sky: [['#27313d', 0], ['#4b5a6b', 0.6], ['#a9b6c4', 1]],
   }),
+  city: theme({
+    accent: '#47c5eb', // scaffolded: pick the world's accent
+    glow: 'rgba(71, 197, 235, 0.55)',
+    accent2: '#f04271',
+    sky: [['#1a414d', 0], ['#3f8ea6', 0.6], ['#c2e5f0', 1]],
+  }),
 }
 
 export const DEFAULT_UI_THEME: BiomeUITheme = theme({

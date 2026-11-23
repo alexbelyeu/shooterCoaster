@@ -191,7 +191,7 @@ const LEVELS: LevelConfig[] = [
     biome: 'gym',
     maxScore: 14 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1422 (the V8's rats included) + the Medusa's eight snakes and reward (bossSpecs.ts) = 2322
     message: 'You sent the Climbing Gym!',
-    nextLevel: null,
+    nextLevel: 'level7',
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
     track: GYM_LEVEL.track,
     walls: [...GYM_LEVEL.walls],
@@ -215,6 +215,39 @@ const LEVELS: LevelConfig[] = [
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},
+  },
+  {
+    id: 'level7',
+    name: 'Neon Metropolis',
+    description: 'Ride through Neon Metropolis',
+    order: 7,
+    biome: 'city',
+    maxScore: 60 * 13 + 44 * 15, // 1440: no boss, a finale wave ends the run
+    message: 'You cleared Neon Metropolis!',
+    nextLevel: null,
+    // Scaffolded by npm run new-world: level1's curve family; tune it inside the track extent formula (level-design skill).
+    track: {
+      varA: 3,
+      varB: 17,
+      varC: 4,
+      scalar: 20,
+      rollerSpeed: 0.00001,
+      minRollerSpeed: 0.00008,
+      curve: 'curve1',
+      color1: 0xffffff,
+      color2: 0x44aaff,
+    },
+    ...paceLevel({
+      waves: [
+        { type: 'balloon', count: 30, waveLabel: 'Here They Come!', weight: 2 },
+        { type: 'crow', count: 14, waveLabel: 'Crows!', formation: 'v', weight: 2 },
+        { type: 'balloon', count: 30, waveLabel: 'More Balloons!', weight: 2 },
+        { type: 'crow', count: 14, waveLabel: 'The Flock!', formation: 'spiral', weight: 3 },
+      ],
+      finale: { type: 'crow', count: 16, waveLabel: 'Final Wave!' },
+    }),
+    starThresholds: [0.25, 0.55, 0.85],
+    environment: { hasTrees: true, treeCount: 60 },
   },
 ]
 

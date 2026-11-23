@@ -61,6 +61,7 @@ export const SHARDS = {
   level4: { levels: ['level4'], steps: ['ride'] },
   level5: { levels: ['level5'], steps: ['ride'] },
   level6: { levels: ['level6'], steps: ['ride', 'switch'] },
+  level7: { levels: ['level7'], steps: ['ride'] },
   mobile: { steps: ['mobile'] },
 }
 
