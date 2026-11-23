@@ -17,7 +17,7 @@
  *
  * `parkTrack.test.ts` holds it to the beats and to its clearances (the ground, the rides, its own other passes).
  */
-import type { RideBeat, RideMechanic, RideV2Spec, SpeedZone, TrackParams, TunnelSpec } from '@/types/level'
+import type { RideBeat, RideMechanic, RideV2Spec, SpeedZone, SplineTrackParams, TunnelSpec } from '@/types/level'
 import { createSplineCurve } from '@/track/curves/SplineCurve'
 import { RideBuilder, type MarkerKind } from '@/track/elements/rideBuilder'
 import { airtimeHill, bankedTurn, helix } from '@/track/elements/elements'
@@ -119,7 +119,7 @@ export function buildParkRide(): ParkRide {
 }
 
 /** The ride's v2 spec, mechanics, tunnel and the storyboard's beats placed on the built track. */
-export function buildParkTrack(): TrackParams {
+export function buildParkTrack(): SplineTrackParams {
   const ride = buildParkRide()
   const points = trimUnrolledUps(ride.points)
   const curve = createSplineCurve(points)
@@ -146,4 +146,4 @@ export function buildParkTrack(): TrackParams {
   }
 }
 
-export const PARK_TRACK: TrackParams = buildParkTrack()
+export const PARK_TRACK: SplineTrackParams = buildParkTrack()

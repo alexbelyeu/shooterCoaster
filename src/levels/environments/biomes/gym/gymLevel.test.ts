@@ -6,8 +6,8 @@ import { GYM_WALLS } from './walls'
 
 describe('gym level data', () => {
   it('is the blockout’s track and walls (regenerate with `node scripts/gen-gym-level.mjs`)', () => {
-    // As the generator writes it: every number to 7 significant digits.
-    const round = (_key: string, v: unknown) => (typeof v === 'number' ? Number(v.toPrecision(7)) : v)
+    // As the generator writes it: every number to 6 significant digits.
+    const round = (_key: string, v: unknown) => (typeof v === 'number' ? Number(v.toPrecision(6)) : v)
     expect(GYM_LEVEL).toEqual(JSON.parse(JSON.stringify({ track: GYM_TRACK, walls: GYM_WALLS }, round)))
   })
 
