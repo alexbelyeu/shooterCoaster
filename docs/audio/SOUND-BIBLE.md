@@ -56,6 +56,7 @@ Each keeps its hook in `base`: the doubling or stabs come in at 3×.
 | level4 | Antarctica | Glassy and tense but still driving. Minor key, crystalline: mallets an octave or two up, pads quiet and high (they fill the SFX mids fast), and a hard bigkick so it never floats | bells, celesta, icy pads with a hard kick |
 | level5 | Inferno | Heaviest level, the boss-rush mood. Low and fast, but with gaps in the low end: the bass follows the guitar's chug rhythm instead of droning, and double-kick sixteenths stay in fills, or kick, bass and chug blur into one wall below 250 Hz | distorted guitar, choir stabs, timpani, orchestra hits |
 | level6 | Climbing Gym | Alex's own climbing gym in New York (#513): urban, a little grimy and funny, arcade-bright. Rats, spotted lanternflies and dust bunnies to shoot, climbers not to; the Medusa of the Starr for the finale. Faster than the Desert, less sinister than the Inferno; bouncy and percussive (909 claps and kit), a plucky hook that could be chalk-slapping hands; leave room for a boss section later | a plucky supersaw, FM-bass or mallet hook over 909 claps |
+| level7 | Neon Metropolis | Night city, synthwave through a late-90s arcade lens (#322): synth bass, gated drums, a hook you'd hum, neon and wet asphalt; hover drones and billboard bots, a helicopter for the finale (its boss section can chop like a rotor) | supersaw, synth brass or square-wave hook over gatesnare and FM bass |
 | FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens (the score's `frenzy` layer: `SCORE-FORMAT.md`, "Intensity layers") | same as the level, brighter |
 | Boss / finale | any | A variation of the level theme, darker and louder | the level's colour + orchestra hits |
 | Results | any | 3–6 s jingle: rising for 2–3★ (`results-win`), flatter for 0–1★ (`results-lose`, #792), then a calm loop | bells + brass |
@@ -67,6 +68,8 @@ and the last 8 bars lift a minor third. He took the grimiest and darkest option,
 (`chalkup`) and the funniest (`lanternfly`). Its Medusa boss section turns the riff E Phrygian (F natural, a B♭ tritone)
 under E minor / F major stabs, orchestra hits in base and a hissing guiro, with the brass taking a line of its own in its
 second half; the sting is an E major chord (#566).
+
+**Neon Metropolis round (#868, open).** Three options for level7 in `scores/themes/level7.<name>.scrim`, filed before the world lands: "Neon Overpass" (`overpass`, B minor, 150: night-drive synthwave, a supersaw hook over pumping FM octaves, rotor-sixteenth bass in the boss section), "Gridlock" (`gridlock`, F-sharp minor, 168: synth-brass hook over distorted power-chord punches, a galloping boss section) and "Pixel Avenue" (`pixel`, A-flat major, 144: bright arcade house, a square-wave hook over house organ, the boss drops to F minor). Each has layers, a boss section and a sting; renders in `renders/theme-level7-*` (`-seam`, `-boss`).
 
 **Picked themes (#301):** the title is "Neon Marquee" (A minor, 160, supersaw hook over a
 four-on-the-floor bigkick, gated snare and FM bass; the lift replays the hook a tone up). level1
