@@ -11,6 +11,8 @@ import { useContactShadows } from '../../shared/ContactShadows'
 
 const BOULDER_CLEAR = 40
 const COLUMN_CLEAR = 30
+/** The ice column's base radius (scale 1), which its contact shadow reads too. */
+const COLUMN_BASE_RADIUS = 4
 
 export default function ArcticDecorations(props: BiomeDecorationsProps) {
   const { heightFn, track } = props
@@ -58,7 +60,7 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
     const iceColumnPoints: THREE.Vector2[] = []
     for (let i = 0; i <= 12; i++) {
       const t = i / 12
-      const r = 4 * (1 - t * 0.7) + Math.sin(t * 6) * 0.3
+      const r = COLUMN_BASE_RADIUS * (1 - t * 0.7) + Math.sin(t * 6) * 0.3
       iceColumnPoints.push(new THREE.Vector2(r, t * 60))
     }
     return new THREE.LatheGeometry(iceColumnPoints, 10)
@@ -79,7 +81,7 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
       () => [
         ...boulderPositions.map((p, i) => roundCaster(p.x, p.z, boulderConfigs[i].s * 0.85, 0.4, 0.8)),
         // Translucent ice: a lighter shadow.
-        ...columnPositions.map((p, i) => roundCaster(p.x, p.z, 4 * columnScales[i], 0.3, 1.2)),
+        ...columnPositions.map((p, i) => roundCaster(p.x, p.z, COLUMN_BASE_RADIUS * columnScales[i], 0.3, 1.2)),
       ],
       [boulderPositions, boulderConfigs, columnPositions, columnScales],
     ),
