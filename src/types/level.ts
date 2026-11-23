@@ -229,6 +229,8 @@ export interface LevelConfig {
   starThresholds: [number, number, number] // 1-star, 2-star, 3-star percentages
   /** Finale: the boss arrives `at` seconds of level time after the start (its tell comes before). Spec in `entities/bosses/bossSpecs.ts`. */
   boss?: { type: BossType; at: number }
+  /** Bonus golden balloons (`GOLDEN_BALLOON`), out for the whole ride and outside `maxScore`; none when unset. */
+  goldenBalloons?: number
   /** Weapon pickups floating over the track, 2–4 (`combat/pickups/pickupPlacement.ts`); default one of each. */
   pickups?: PickupWeaponId[]
   /** Walls its wall enemies (`ENEMY_PLACEMENT` surface `'wall'`) climb; required when it has any. */
