@@ -3,28 +3,34 @@ import { getBoard, postScore, type Deps } from './handler'
 import type { PublicEntry, Submission } from './rules'
 import { DbError, type ScoresDb } from './scoresDb'
 import { LEVEL_LIMITS } from './levelLimits'
+import { DAILY_LEVELS, dayLevel } from './daily'
 
-type Row = Submission & { ipHash: string; createdAt: number }
+type Row = Submission & { ipHash: string; createdAt: number; day?: string }
 
-/** In-memory `scores` with the filters the handler uses. */
-function fakeDb(now: () => number, failing = false): ScoresDb & { rows: Row[] } {
+/**
+ * In-memory `scores` with the filters the handler uses. `noDayColumn`: before `0004_daily_board.sql`, where every
+ * daily call throws and the campaign's (scoresDb retries its `day is null` without it) still work.
+ */
+function fakeDb(now: () => number, failing = false, noDayColumn = false): ScoresDb & { rows: Row[] } {
   const rows: Row[] = []
-  const guard = () => {
+  const guard = (daily = false) => {
     if (failing) throw new DbError('status 540')
+    if (noDayColumn && daily) throw new DbError('status 400', '42703')
   }
   return {
     rows,
-    async top(level, maxScore) {
-      guard()
+    async top(level, maxScore, day) {
+      guard(day !== null)
       return rows
-        .filter((r) => r.level === level && r.score <= maxScore)
+        .filter((r) => r.level === level && r.score <= maxScore && (r.day ?? null) === day)
         .sort((a, b) => b.score - a.score || a.createdAt - b.createdAt)
         .slice(0, 10)
         .map((r): PublicEntry => ({ initials: r.initials, score: r.score, at: new Date(r.createdAt).toISOString() }))
     },
     async count(filters) {
-      guard()
+      guard(filters.day?.startsWith('eq.'))
       return rows.filter((r) => {
+        if (filters.day && (filters.day === 'is.null' ? r.day !== undefined : r.day !== filters.day.slice(3))) return false
         if (filters.ip_hash && r.ipHash !== filters.ip_hash.slice(3)) return false
         if (filters.created_at && r.createdAt < Date.parse(filters.created_at.slice(4))) return false
         if (filters.level_id && r.level !== filters.level_id.slice(3)) return false
@@ -34,7 +40,7 @@ function fakeDb(now: () => number, failing = false): ScoresDb & { rows: Row[] } 
       }).length
     },
     async insert(row) {
-      guard()
+      guard(row.day !== undefined)
       rows.push({ ...row, createdAt: now() })
     },
   }
@@ -48,11 +54,12 @@ const longRun = (level: string, createdAt: number): Row => ({
   ...run, level, initials: 'OLD', score: LEVEL_LIMITS[level].maxScore + 500, ipHash: 'ff', createdAt,
 })
 const get = (level: string) => new Request(`https://scoaster.com/api/leaderboard?level=${level}`)
+const getDaily = (day: string) => new Request(`https://scoaster.com/api/leaderboard?daily=${day}`)
 
-function setup(failing = false) {
+function setup(failing = false, noDayColumn = false) {
   let t = Date.UTC(2026, 10, 5, 12)
   const now = () => t
-  const db = fakeDb(now, failing)
+  const db = fakeDb(now, failing, noDayColumn)
   const deps: Deps = { db, salt: 'secret', now }
   return { db, deps, advance: (ms: number) => (t += ms) }
 }
@@ -141,5 +148,50 @@ describe('GET /api/leaderboard', () => {
       expect(res.status).toBe(503)
       expect(res.headers.get('cache-control')).toBe('no-store')
     }
+  })
+})
+
+describe('the Daily Run board (#854)', () => {
+  const today = '2026-11-05'
+  const daily = { ...run, level: dayLevel(today), daily: today }
+  const scores = (top: PublicEntry[]) => top.map((e) => e.score)
+
+  it("keeps daily and campaign rows apart: each board and rank counts its own", async () => {
+    const { db, deps } = setup()
+    await postScore(post({ ...run, level: daily.level, score: 5000 }, '7.7.7.7'), deps)
+    const res = await postScore(post(daily), deps)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ rank: 1, top: [{ score: 2400 }] })
+    expect(db.rows[1].day).toBe(today)
+    expect(scores((await (await getBoard(getDaily(today), deps)).json()).top)).toEqual([2400])
+    expect(scores((await (await getBoard(get(daily.level), deps)).json()).top)).toEqual([5000])
+    expect(scores((await (await getBoard(getDaily('2026-11-04'), deps)).json()).top)).toEqual([])
+  })
+
+  it("takes yesterday's daily, not an older or a future one, and only on the day's level", async () => {
+    const { db, deps } = setup()
+    expect((await postScore(post({ ...daily, level: dayLevel('2026-11-04'), daily: '2026-11-04' }), deps)).status).toBe(200)
+    const other = DAILY_LEVELS.find((l) => l !== daily.level)!
+    for (const body of [
+      { ...daily, level: dayLevel('2026-11-03'), daily: '2026-11-03' },
+      { ...daily, level: dayLevel('2026-11-06'), daily: '2026-11-06' },
+      { ...daily, level: other },
+      { ...daily, daily: '2026-11-5' },
+      { ...daily, daily: 20261105 },
+    ]) expect((await postScore(post(body), deps)).status).toBe(400)
+    expect(db.rows).toHaveLength(1)
+  })
+
+  it('400s a bad day on GET', async () => {
+    for (const day of ['2026-13-01', 'today', '']) expect((await getBoard(getDaily(day), setup().deps)).status).toBe(400)
+  })
+
+  it('503s daily calls before the migration while the campaign board keeps working', async () => {
+    const { db, deps } = setup(false, true)
+    expect((await postScore(post(daily), deps)).status).toBe(503)
+    expect((await getBoard(getDaily(today), deps)).status).toBe(503)
+    expect((await postScore(post(run), deps)).status).toBe(200)
+    expect((await getBoard(get('level1'), deps)).status).toBe(200)
+    expect(db.rows.map((r) => r.day)).toEqual([undefined])
   })
 })

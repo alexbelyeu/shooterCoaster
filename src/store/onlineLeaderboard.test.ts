@@ -28,8 +28,15 @@ describe('onlineEndpoint', () => {
 })
 
 describe('onlineLeaderboard', () => {
-  it('reads the top 10', async () => {
-    expect(await onlineLeaderboard('/api', respond(200, { top })).top('level1')).toEqual(top)
+  it("reads a level's top 10 or a day's daily board", async () => {
+    const urls: string[] = []
+    const fetchImpl: Fetch = async (url) => {
+      urls.push(url)
+      return new Response(JSON.stringify({ top }), { status: 200 })
+    }
+    expect(await onlineLeaderboard('/api', fetchImpl).top({ level: 'level1' })).toEqual(top)
+    expect(await onlineLeaderboard('/api', fetchImpl).top({ daily: '2026-11-23' })).toEqual(top)
+    expect(urls).toEqual(['/api?level=level1', '/api?daily=2026-11-23'])
   })
 
   it('submits and turns the 1-based rank into the board index', async () => {
@@ -55,7 +62,7 @@ describe('onlineLeaderboard', () => {
       onlineLeaderboard('/api', (_url, init) => new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))), 20),
     ]
     for (const board of boards) {
-      expect(await board.top('level1')).toBeNull()
+      expect(await board.top({ level: 'level1' })).toBeNull()
       expect(await board.submit(run)).toBeNull()
     }
   })

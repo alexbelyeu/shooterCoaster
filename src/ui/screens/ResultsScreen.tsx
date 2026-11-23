@@ -49,15 +49,13 @@ function snapshotRun() {
   }
 }
 
-type Run = ReturnType<typeof snapshotRun>
-
 function worldRows(top: readonly OnlineEntry[], maxScore: number, thresholds: readonly [number, number, number]): LeaderboardEntry[] {
   return top.map((e) => ({ initials: e.initials, score: e.score, stars: computeStars(e.score, maxScore, thresholds), date: Date.parse(e.at) || 0 }))
 }
 
-/** Null for dailies and every build but scoaster.com's own. */
-function worldBoard(run: Run) {
-  const endpoint = run.mode.mode === 'campaign' ? onlineEndpoint(__BUILT_ON_VERCEL__, window.location.search) : null
+/** Null on every build but scoaster.com's own. */
+function worldBoard() {
+  const endpoint = onlineEndpoint(__BUILT_ON_VERCEL__, window.location.search)
   return endpoint ? onlineLeaderboard(endpoint) : null
 }
 
@@ -72,7 +70,7 @@ export default function ResultsScreen() {
   const board = useGameStore((s) => (run.levelId ? s.leaderboards[run.levelId] : undefined)) ?? NO_BOARD
   const [rank, setRank] = useState<number | null>(null)
   const [initials, setInitials] = useState<InitialsState | null>(null)
-  const [online] = useState(() => worldBoard(run))
+  const [online] = useState(worldBoard)
   const [world, setWorld] = useState<{ board: LeaderboardEntry[]; rank: number | null } | null>(null)
   /** Once: on OK, or as the screen closes with the entry still open. */
   const submitOnline = useRef<((letters: string) => void) | null>(null)
@@ -124,26 +122,12 @@ export default function ResultsScreen() {
       bestCombo: run.bestCombo,
     }
     store.saveRunResult(entry)
-    // A daily run shows no board and leaves no ghost.
-    if (run.mode.mode === 'daily') return
-    if (record) saveGhost(config.id, recording)
-    const placed = store.addLeaderboardEntry(config.id, { score: run.score, stars, date: run.date })
-    setRank(placed)
-    if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
-
-    if (!online) return
     const show = (top: OnlineEntry[], rank: number | null) => {
       if (!left.current) setWorld({ board: worldRows(top, config.maxScore, config.starThresholds), rank })
     }
-    if (placed === null) {
-      void online.top(config.id).then((top) => top && show(top, null))
-      return
-    }
-    lettersRef.current = store.lastInitials
-    submitOnline.current = (letters) => {
-      submitOnline.current = null
-      void online
-        .submit({
+    const submit = (letters: string, daily?: string) =>
+      online
+        ?.submit({
           level: config.id,
           initials: letters,
           score: run.score,
@@ -151,8 +135,33 @@ export default function ResultsScreen() {
           kills: run.kills,
           accuracy: runAccuracy(run.hits, run.shotsFired),
           version: __APP_VERSION__,
+          daily,
         })
         .then((result) => result && show(result.top, result.rank))
+
+    // A daily stays off the campaign board and has no entry: a new best of the day goes up at once under the last
+    // initials, any other run just shows the day's World board (#854). Without either, the local record stands alone.
+    if (run.mode.mode === 'daily') {
+      const day = run.mode.dateKey
+      if (isNewRecord(run.score, run.previousBest)) void submit(store.lastInitials, day)
+      else void online?.top({ daily: day }).then((top) => top && show(top, null))
+      return
+    }
+    // Only a new campaign best leaves a ghost (a daily returned above).
+    if (record) saveGhost(config.id, recording)
+    const placed = store.addLeaderboardEntry(config.id, { score: run.score, stars, date: run.date })
+    setRank(placed)
+    if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
+
+    if (!online) return
+    if (placed === null) {
+      void online.top({ level: config.id }).then((top) => top && show(top, null))
+      return
+    }
+    lettersRef.current = store.lastInitials
+    submitOnline.current = (letters) => {
+      submitOnline.current = null
+      void submit(letters)
     }
   }, [config, run, stars, online, record])
 
@@ -318,7 +327,7 @@ export default function ResultsScreen() {
           </div>
         </FairBoard>
 
-        {!daily && (
+        {(!daily || world) && (
           <motion.div
             className="results-board-slot"
             initial={false}
@@ -329,7 +338,7 @@ export default function ResultsScreen() {
             <ResultsLeaderboard
               board={world?.board ?? board}
               rank={world ? world.rank : rank}
-              source={world ? 'world' : 'device'}
+              source={daily ? 'today' : world ? 'world' : 'device'}
               editing={entryOpen ? initials : null}
               onKey={initialsInput}
               onSlot={(slot) => initials && setInitials({ ...initials, slot })}

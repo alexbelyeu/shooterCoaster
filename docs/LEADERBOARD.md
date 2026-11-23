@@ -1,24 +1,34 @@
 # Online leaderboard
 
-The campaign's top 10 per level, shared by everyone who plays on scoaster.com (#365). The
-game runs fine without it: until it is set up, and whenever it is down, the results screen
-shows this device's board as before.
+The campaign's top 10 per level, shared by everyone who plays on scoaster.com (#365), and
+the Daily Run's top 10 of each UTC day (#854). The game runs fine without it: until it is set up, and whenever it is down, the results screen
+shows this device's board (a daily, its local record) as before.
 
 ## How it fits together
 
 - **Database:** a dedicated Supabase project on Alex's free plan, one table `scores`
-  (`supabase/migrations/0001_leaderboard.sql`). RLS is on with no policies, and only
+  (`supabase/migrations/0001_leaderboard.sql`; `0004_daily_board.sql` adds `day`, a daily
+  run's UTC day, null on every campaign row). RLS is on with no policies, and only
   `service_role` has grants, so the publishable/anon key can do nothing with it.
 - **API:** `api/leaderboard.ts`, a Vercel Function in this repo, is the only thing that
   talks to Supabase, with the server-side secret key from the Vercel env vars.
   - `GET /api/leaderboard?level=level1` → `{ top: [{ initials, score, at }] }`, cached by
-    Vercel's CDN for 30 s (`s-maxage=30, stale-while-revalidate=300`).
+    Vercel's CDN for 30 s (`s-maxage=30, stale-while-revalidate=300`). Campaign rows only
+    (`day is null`).
+  - `GET /api/leaderboard?daily=2026-11-23` → that day's Daily Run top 10, same shape and cache
+    (the level is the day's `dailyLevel`); 400 unless the day is a real `YYYY-MM-DD` date.
   - `POST /api/leaderboard` `{ level, initials, score, seed, kills, accuracy, version }` →
     `{ rank, top }` (`rank` 1-10, or null off the board). Rejected with 400 unless the level
     is a campaign level, the initials are three letters A-Z and the score is possible for
     that level and kill count (`src/levels/scoreLimits.ts`); 429 after 5 accepted
     submissions from one IP in 10 minutes (keyed by an HMAC of the IP; no raw IP is stored).
+    With `daily: 'YYYY-MM-DD'` the run goes on that day's board, and its rank counts that day
+    only. Also 400 unless the day is today or yesterday on the server's clock (UTC; yesterday
+    so a run started before midnight still counts) and the level is that day's `dailyLevel`
+    (`api/_lib/daily.ts`, which mirrors `src/levels/daily.ts`; `daily.test.ts` checks they agree).
   - No env vars, a paused project or any database error: `503 { "error": "unavailable" }`.
+    So is every daily call until `0004_daily_board.sql` has run. The campaign board works
+    without it: its `day is null` filter retries without the column (`api/_lib/scoresDb.ts`).
   - **Only 60 s runs are on the board** (#458). Runs were 75–120 s long before #452 (merged
     2026-11-09 in #473). Both the board and the `rank` count only rows with `score <=` the
     level's `maxScore` in `api/_lib/levelLimits.ts`. A long run over that limit stays in the table
@@ -33,7 +43,12 @@ shows this device's board as before.
   it gets back. A run that misses the local board just shows the World board. Calls time out
   after 3 s and fall back to the local board silently. Only the production build on Vercel
   calls the API: never dev, `vite preview`, CI, the smoke (`?e2e=1`, which stubs it) or the
-  portal build (itch.io etc.). The Daily Run has no online board yet.
+  portal build (itch.io etc.).
+  After a Daily Run there is no initials entry. A new best of the day is sent at once,
+  under the player's last initials (from their last campaign board entry, `AAA` before
+  one). The results screen then shows the day's World board it gets back ("The world's top
+  10 today"). Any other daily run just fetches that board. On any failure the screen shows
+  the local Daily record alone, as before.
 
 ## Setup (Alex, once)
 
@@ -44,7 +59,8 @@ shows this device's board as before.
    - "Automatically expose new tables" **off** (the migration grants what it needs);
    - automatic RLS **on** (the migration enables RLS on `scores` anyway).
 2. **Table:** open the project's SQL editor, paste
-   `supabase/migrations/0001_leaderboard.sql` and run it once.
+   `supabase/migrations/0001_leaderboard.sql` and run it once, then
+   `0004_daily_board.sql` (the Daily Run's board, #854) the same way.
 3. **Vercel env vars** on the `shooter-coaster` project, environment **Production** only
    (names also in `.env.example`):
    - `SUPABASE_URL`: Project Settings → Data API → Project URL (`https://<ref>.supabase.co`);
@@ -53,7 +69,7 @@ shows this device's board as before.
 4. **Redeploy** production (env vars apply to new deployments): push to `main` or redeploy
    the latest deployment in Vercel.
 5. **Check:** `https://scoaster.com/api/leaderboard?level=level1` should answer
-   `{"top":[]}` (200). A 503 means a variable is missing or wrong, or the table isn't there.
+   `{"top":[]}` (200), and so should `?daily=<today, YYYY-MM-DD>` once `0004` has run. A 503 means a variable is missing or wrong, or the table isn't there.
    The post-deploy health check (`npm run prod-check`) accepts either, and fails on a 500.
 
 Rotating the secret key: create a new secret key in Supabase, update the Vercel env var,

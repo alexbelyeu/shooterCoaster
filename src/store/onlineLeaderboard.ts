@@ -1,4 +1,7 @@
-/** The online top 10 (`api/leaderboard.ts`, #365): every call resolves to null on any failure, and the results screen keeps the local board. */
+/**
+ * The online top 10 (`api/leaderboard.ts`, #365) and the Daily Run's (#854): every call resolves to null on any failure,
+ * and the results screen keeps the local board (or a daily's local record).
+ */
 
 export const ONLINE_ENDPOINT = '/api/leaderboard'
 export const ONLINE_TIMEOUT_MS = 3000
@@ -17,6 +20,8 @@ export interface OnlineSubmission {
   kills: number
   accuracy: number
   version: string
+  /** A daily run's UTC day (`dailyKey`): it goes on that day's board, not the level's. */
+  daily?: string
 }
 
 export interface SubmitResult {
@@ -65,8 +70,10 @@ async function request(fetchImpl: Fetch, url: string, init: RequestInit, timeout
 
 export function onlineLeaderboard(endpoint: string, fetchImpl: Fetch = (url, init) => fetch(url, init), timeoutMs = ONLINE_TIMEOUT_MS) {
   return {
-    async top(level: string): Promise<OnlineEntry[] | null> {
-      const body = await request(fetchImpl, `${endpoint}?level=${encodeURIComponent(level)}`, { method: 'GET' }, timeoutMs)
+    /** The campaign board of `board.level`, or the daily board of `board.daily`. */
+    async top(board: { level: string } | { daily: string }): Promise<OnlineEntry[] | null> {
+      const query = 'daily' in board ? `daily=${encodeURIComponent(board.daily)}` : `level=${encodeURIComponent(board.level)}`
+      const body = await request(fetchImpl, `${endpoint}?${query}`, { method: 'GET' }, timeoutMs)
       return parseTop((body as { top?: unknown } | null)?.top)
     },
     async submit(run: OnlineSubmission): Promise<SubmitResult | null> {
