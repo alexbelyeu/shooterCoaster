@@ -54,6 +54,14 @@ describe('telemetrySection', () => {
     expect(md).toContain('| level4 | desktop | 5 | 18 | 50 | 80 |')
   })
 
+  it('shows the WebGPU share when the summary has it, nothing from a server without it', () => {
+    expect(telemetrySection({ ...summary(), webgpu: { yes: 30, no: 10, unknown: 2 } }, 33.4).join('\n')).toContain(
+      'WebGPU available: 30 of 40 sessions that answered (75%) · 2 unknown',
+    )
+    expect(telemetrySection({ ...summary(), webgpu: { yes: 0, no: 0, unknown: 3 } }, 33.4).join('\n')).toContain('WebGPU available: 0 of 0 sessions that answered · 3 unknown')
+    expect(telemetrySection(summary(), 33.4).join('\n')).not.toContain('WebGPU')
+  })
+
   it('says when telemetry is unavailable', () => {
     expect(telemetrySection(null, 33.4).join('\n')).toContain('Telemetry unavailable')
   })

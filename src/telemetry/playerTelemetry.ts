@@ -5,11 +5,13 @@ import {
   buildReport,
   cleanMessage,
   createLevelFrames,
+  detectWebGpu,
   firstStackFrame,
   isGameError,
   MAX_LEVELS,
   recordError,
   type ErrorEntry,
+  type GpuNavigator,
   type LevelFrames,
 } from './telemetryReport'
 
@@ -19,6 +21,7 @@ const errors: ErrorEntry[] = []
 const levels = new Map<string, LevelFrames>()
 let contextLost = 0
 let gpu: string | null = null
+let webgpu: boolean | null = null
 let active = false
 
 export const telemetryActive = () => active
@@ -63,12 +66,15 @@ export function installTelemetry(version: string, storage: FlagStorage | null): 
   window.addEventListener('unhandledrejection', (e) => note(e.reason, (e.reason as Error | undefined)?.stack))
   // The event doesn't bubble: capture it on its way to the canvas.
   window.addEventListener('webglcontextlost', () => contextLost++, true)
+  void detectWebGpu(navigator as GpuNavigator).then((yes) => {
+    webgpu = yes
+  })
 
   let sent = false
   const send = () => {
     // `?internal=1` in another tab silences this one too, like `dropInternalEvents`.
     if (sent || isInternalBrowser(storage)) return
-    const report = buildReport({ version, touch, cores: navigator.hardwareConcurrency ?? null, gpu }, errors, contextLost, levels.values())
+    const report = buildReport({ version, touch, cores: navigator.hardwareConcurrency ?? null, gpu, webgpu }, errors, contextLost, levels.values())
     if (!report) return
     sent = true
     try {

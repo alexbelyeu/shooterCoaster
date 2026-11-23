@@ -9,6 +9,7 @@ const report: Report = {
   touch: false,
   cores: 4,
   gpu: null,
+  webgpu: false,
   contextLost: 1,
   errors: [{ message: 'boom', frame: '', count: 1 }],
   levels: [],
@@ -42,6 +43,7 @@ function fakeDb(now: () => number, failing = false): TelemetryDb & { rows: Store
           client_version: r.version,
           touch: r.touch,
           gpu: r.gpu,
+          webgpu: r.webgpu,
           context_lost: r.contextLost,
           errors: r.errors,
           levels: r.levels,
@@ -74,6 +76,7 @@ describe('POST /api/telemetry', () => {
     const res = await postReport(post(report), deps)
     expect(res.status).toBe(204)
     expect(db.rows).toHaveLength(1)
+    expect(db.rows[0].webgpu).toBe(false)
     expect(db.rows[0].ipHash).toMatch(/^[0-9a-f]{64}$/)
     expect(JSON.stringify(db.rows)).not.toContain('203.0.113.7')
   })
@@ -126,7 +129,7 @@ describe('GET /api/telemetry', () => {
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toMatch(/s-maxage=\d+/)
     const body = await res.json()
-    expect(body).toMatchObject({ sessions: 1, truncated: false, contextLost: { sessions: 0 } })
+    expect(body).toMatchObject({ sessions: 1, truncated: false, contextLost: { sessions: 0 }, webgpu: { yes: 0, no: 1, unknown: 0 } })
     expect(body.errors[0]).toMatchObject({ message: 'boom', sessions: 1 })
   })
 
@@ -161,13 +164,45 @@ describe('telemetryDb', () => {
     expect(calls.map((c) => `${c.init.method} ${c.url}`)).toEqual([
       'POST https://abc.supabase.co/rest/v1/telemetry_reports',
       'HEAD https://abc.supabase.co/rest/v1/telemetry_reports?select=id&ip_hash=eq.h',
-      'GET https://abc.supabase.co/rest/v1/telemetry_reports?select=created_at,client_version,touch,gpu,context_lost,errors,levels&created_at=gte.2026-11-06T12%3A00%3A00.000Z&order=created_at.desc&limit=3000',
+      'GET https://abc.supabase.co/rest/v1/telemetry_reports?select=created_at,client_version,touch,gpu,context_lost,errors,levels,webgpu&created_at=gte.2026-11-06T12%3A00%3A00.000Z&order=created_at.desc&limit=3000',
       'DELETE https://abc.supabase.co/rest/v1/telemetry_reports?created_at=lt.2026-10-08T12%3A00%3A00.000Z',
     ])
     expect(Object.keys(JSON.parse(calls[0].init.body as string)).sort()).toEqual(
-      ['client_version', 'context_lost', 'cores', 'errors', 'gpu', 'ip_hash', 'levels', 'touch'],
+      ['client_version', 'context_lost', 'cores', 'errors', 'gpu', 'ip_hash', 'levels', 'touch', 'webgpu'],
     )
+    expect(JSON.parse(calls[0].init.body as string).webgpu).toBe(false)
     expect((calls[0].init.headers as Record<string, string>).apikey).toBe('sb_secret_x')
+  })
+
+  it('keeps storing and summarising, without webgpu, until the column is migrated', async () => {
+    const calls: { url: string; body?: Record<string, unknown> }[] = []
+    // PostgREST before `0003_telemetry_webgpu.sql`: an unknown column in a write or a read is a 400 with its code.
+    const missing = (code: string) => Response.json({ code, message: 'webgpu' }, { status: 400 })
+    const db = telemetryDb(env, async (url, init) => {
+      const body = init.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : undefined
+      calls.push({ url, body })
+      if (init.method === 'POST') return body && 'webgpu' in body ? missing('PGRST204') : new Response(null, { status: 201 })
+      if (init.method === 'HEAD') return new Response(null, { headers: { 'content-range': '*/0' } })
+      return url.includes('webgpu') ? missing('42703') : Response.json([{ created_at: '2026-11-07T11:00:00.000Z', client_version: '0.1.0', touch: false, gpu: null, context_lost: 1, errors: [], levels: [] }])
+    })!
+    const deps: TelemetryDeps = { db, salt: 'secret', now: () => Date.parse('2026-11-07T12:00:00Z'), random: () => 0.5 }
+    expect((await postReport(post(report), deps)).status).toBe(204)
+    const posts = calls.filter((c) => c.body)
+    expect(posts.map((c) => 'webgpu' in c.body!)).toEqual([true, false])
+    expect(posts[1].body).toMatchObject({ client_version: '0.1.0', context_lost: 1 })
+    const res = await getSummary(new Request('https://scoaster.com/api/telemetry'), deps)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ sessions: 1, webgpu: { yes: 0, no: 0, unknown: 1 } })
+  })
+
+  it('retries no other failure', async () => {
+    let posts = 0
+    const db = telemetryDb(env, async () => {
+      posts++
+      return Response.json({ code: '23502' }, { status: 400 })
+    })!
+    await expect(db.insert({ ...report, ipHash: 'h' })).rejects.toMatchObject({ code: '23502' })
+    expect(posts).toBe(1)
   })
 
   it('throws DbError on a failed call', async () => {
