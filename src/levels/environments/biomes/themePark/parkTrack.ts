@@ -8,8 +8,8 @@
  *   climbs to the top (~180 units).
  * - **13 s, the first drop**: round onto the east side at the top and down past the big Ferris wheel's rim into the
  *   tunnel under the midway.
- * - **17–25 s, the camelbacks**: three airtime hills west along the park's south side, the balloons on the crests.
- * - **30 s, the Ferris wheel**: up round the south-west corner and north past the small wheel, its gondolas sweeping by
+ * - **17–25 s, the camelbacks**: two airtime hills west along the park's south side, the balloons on the crests.
+ * - **28 s, the Ferris wheel**: up round the south-west corner and north past the small wheel, its gondolas sweeping by
  *   a few metres off the rider's shoulder (the near miss).
  * - **34–40 s, the second lift** east along the park's north edge, cresting as the Golden Blimp arrives (40 s).
  * - **40–55 s, the finale**: a long, slow curve round the north-east and back west over the park, the blimp in front.
@@ -44,7 +44,7 @@ const STATION = { x: -350, y: 12, z: 150 } as const
 const LIFT = { from: -150, to: 310, topY: 200 } as const
 /** The east side's line: just off the big wheel's rim (its west edge is 430). */
 const EAST_X = 400
-const DROP = { toZ: -220, bottomY: 16, ease: 150 } as const
+const DROP = { toZ: -220, bottomY: 16, ease: 152 } as const
 /** The tunnel: from the drop's foot, round the south-east corner and on along the south side to `toX`. */
 const TUNNEL = { cornerZ: -450, toX: 180 } as const
 const CAMEL = { z: -650, toX: -560, rise: 50, crest: 150, angle: 30 * DEG } as const
