@@ -108,8 +108,10 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
 
 ## The other levels (ideas for their storyboards)
 
-- **Theme Park (1):** a classic: a station launch, a wooden-coaster lift hill, camelback airtime
-  over the midway, a head-chopper through the Ferris wheel, the photo at the splash.
+- **Theme Park (1):** built (#863, `themePark/parkTrack.ts`, its storyboard and seconds at the top): a station
+  launch, a lift hill over the park, a 60° first drop past the big Ferris wheel into the tunnel, two camelbacks,
+  the near miss beside the small wheel's gondolas (28 s), a second lift cresting as the blimp arrives (40 s), a slow
+  helix round the carousel for the boss fight and a last hill into the brake run. The photo waits on #701.
 - **Desert (2):** the drop into the Pyramid as a dark ride (torches, the Scorpion's lair), a jump
   gap over a canyon between mesas.
 - **Ocean (3):** a splashdown, a glass tunnel under the water with the Kraken passing overhead,

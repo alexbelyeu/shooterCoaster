@@ -8,7 +8,7 @@ import {
   MAX_RIDE_STEP_FRAMES, advanceRide, curveTangentY, jumpRide, lapSeconds, rideLaunches, rideModel, rideOnLift, rideProfile, rideSpeedNorm, rideSpeeds,
   rideStepFrames, rideTopShare, rideZone, type RideState,
 } from './ridePhysics'
-import { BEAT_TOLERANCE_SECONDS, buildRidePlan, planDistance, planSpeed, planTimeAt, type RidePlan } from './rideV2'
+import { BEAT_TOLERANCE_SECONDS, buildRidePlan, planDistance, planFastestLeadT, planSpeed, planTimeAt, type RidePlan } from './rideV2'
 
 const RADIUS = 400
 const CREST = 150
@@ -89,6 +89,13 @@ describe('the v2 ride on a launch, a lift hill and a drop', () => {
 
   it('reads back by distance: planTimeAt inverts planDistance', () => {
     for (const time of [0.5, 7.25, 31, 300]) expect(planTimeAt(plan, planDistance(plan, time))).toBeCloseTo(time, 6)
+  })
+
+  it('finds where the car is just before its top speed: the drop, ridden into top speed after the lead', () => {
+    const lead = 1.5
+    const time = planTimeAt(plan, distanceAtT(table, planFastestLeadT(plan, lead)))
+    expect(planSpeed(plan, time + lead) / plan.maxSpeed).toBeCloseTo(1, 3)
+    expect(planSpeed(plan, time)).toBeLessThan(plan.maxSpeed)
   })
 })
 

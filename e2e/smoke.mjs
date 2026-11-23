@@ -1972,16 +1972,25 @@ async function rideFast(page, fraction) {
 async function speedCheck(page, levelId) {
   if (!(await startLevelReady(page, levelId))) return { id: 'speed', problems: [NOT_LOADED(levelId)] }
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
-  let best = { fraction: SPEED_SCAN[0], roll: -1 }
-  for (const fraction of SPEED_SCAN) {
+  // Streaks at the most banked point fast enough for them (`caps.streakSpeed`), else the fastest; the bank at the scan's
+  // most banked point. A v2 ride's turns can be slower than its drops (level 1's top speed is the straight at the first
+  // drop's foot) and its top speed short, so it also tries `rideFastest`.
+  const samples = []
+  const fastest = await page.evaluate(() => window.__SC_TEST__.rideFastest)
+  for (const fraction of fastest === null ? SPEED_SCAN : [...SPEED_SCAN, fastest]) {
     const w = await rideFast(page, fraction)
-    if (Math.abs(w.roll) > best.roll) best = { fraction, roll: Math.abs(w.roll) }
+    samples.push({ fraction, roll: Math.abs(w.roll), speed: w.speed, streakSpeed: w.caps?.streakSpeed ?? 0.7 })
   }
+  const fast = samples.filter((s) => s.speed > s.streakSpeed + 0.05)
+  const best = fast.length
+    ? fast.reduce((a, b) => (b.roll > a.roll ? b : a))
+    : samples.reduce((a, b) => (b.speed > a.speed ? b : a))
   const w = await rideFast(page, best.fraction)
   await page.screenshot({ path: path.join(OUT, 'speed.png'), timeout: SHOT_TIMEOUT })
   const problems = []
   if (!(w.streaks > 0.05)) problems.push(`no wind streaks at top speed (opacity ${w.streaks?.toFixed(3)}, speed ${w.speed?.toFixed(2)})`)
-  if (!(Math.abs(w.roll) >= 1)) problems.push(`camera barely banks at top speed (${w.roll.toFixed(2)}° at track ${best.fraction})`)
+  const banked = samples.reduce((a, b) => (b.roll > a.roll ? b : a))
+  if (!(banked.roll >= 1)) problems.push(`camera barely banks at speed (${banked.roll.toFixed(2)}° at track ${banked.fraction.toFixed(3)}, the most of the scan)`)
   // Ride feel (#697): GO's launch shoved the view, and the wheels rumble at top speed.
   if (!(w.feelMax?.launch > 0.3)) problems.push(`no launch shove after GO (peak ${w.feelMax?.launch?.toFixed(2)})`)
   if (!(w.feel?.rumble > 0)) problems.push('no rail rumble at top speed')
@@ -1990,7 +1999,7 @@ async function speedCheck(page, levelId) {
   if (translation > 1e-6) problems.push(`camera translated ${translation.toFixed(3)} units off the track pose`)
   const tunnel = await tunnelShot(page, levelId)
   problems.push(...tunnel.problems)
-  return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, ...w }, tunnel: tunnel.result }
+  return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, scan: samples.map(({ fraction, roll, speed }) => ({ fraction, roll, speed })), ...w }, tunnel: tunnel.result }
 }
 
 /**
@@ -4725,7 +4734,7 @@ async function run() {
           ` sfxNodes ${r.engine.sfxNodes.join('->')} voices ${r.engine.voices ? `peak ${r.engine.voices.peak}/${r.engine.voices.budget} stolen ${r.engine.voices.stolen} dropped ${r.engine.voices.rejected}` : 'none'}` +
           ` ducked=${r.engine.ducked} layers ${r.engine.layers ? `up ${r.engine.layers.rise.join('->')} paused ${r.engine.layers.paused} resumed ${r.engine.layers.resumed} down ${r.engine.layers.fall.join('->')}` : 'none'} paused at ${r.engine.pausedHeld?.at.toFixed(1)}s (${r.engine.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.engine.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.engine.results}`
       : r.speed
-        ? ` ${r.speed.level} at track ${r.speed.fraction}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
+        ? ` ${r.speed.level} at track ${r.speed.fraction.toFixed(3)}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile
         ? ` taps=${r.mobile.taps} (on enemies ${r.mobile.tapsOnEnemies}) tapShots=${r.mobile.tapShots}` +
           ` tapKills=${r.mobile.tapKills} landscapeTapKills=${r.mobile.landscapeTaps?.tapKills ?? '-'}` +
