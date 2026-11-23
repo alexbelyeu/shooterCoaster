@@ -11,7 +11,7 @@ import { buildTunnelGeometry, tunnelColours, tunnelShadowCasters, type TunnelCol
 function createTunnelMaterial(glass: boolean): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial(
     glass
-      ? { vertexColors: true, roughness: 0.15, metalness: 0.3, transparent: true, opacity: GLASS_OPACITY, depthWrite: false, side: THREE.DoubleSide }
+      ? { vertexColors: true, roughness: 0.15, metalness: 0.3, transparent: true, opacity: GLASS_OPACITY, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true }
       : { vertexColors: true, roughness: 0.8, metalness: 0.1 },
   )
   material.onBeforeCompile = (shader) => {
