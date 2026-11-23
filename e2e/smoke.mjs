@@ -103,6 +103,7 @@ import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } fr
 import { installSettledStepper } from './settledSteps.mjs'
 import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
+import { BOSS_CHECKS } from './bossChecks.mjs'
 
 const SECONDS = Number(arg('seconds', 10))
 const OUT = path.resolve(arg('out', 'e2e-results'))
@@ -2329,26 +2330,6 @@ async function pacingCheck(page, id) {
   else problems.push(...over)
   return { id: 'pacing', level: id, problems, placeholder, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
 }
-
-/**
- * The finales the boss check summons: Theme Park's Golden Blimp (#181), Desert's Giant Scorpion (#318),
- * Ocean's Kraken (#183), Antarctica's Yeti (#319), Inferno's Magma Titan (#320) and the Climbing Gym's Medusa (#521). `minOnScreen` first-phase weak points
- * must be on screen after the boss alone has moved `settleS` s (the scorpion bursts out of the sand, the Kraken's tentacles
- * rise out of the water, the Yeti has climbed its ridge and thrown, the Titan has climbed out of the lava and opened its heart); `midSettleS` lets the last phase surface before `midShot`.
- * `firstPhase`: the id prefix(es) of the first phase. `minProjectiles`: thrown things (the Yeti's snowballs) on screen
- * in <level>-boss.png, each then shot through processHit as a normal kill that leaves the boss's hp alone. `midPhases`: phases
- * between the first and the last, each cleared after `midSettleS`. `rideTo`: the track fraction to ride to first, for a boss
- * that stays where it is (the Medusa in the Starr) rather than coming to the rider. `passShots`: track fractions ridden to
- * after `midShot`, each a `<level>-boss-pass-<percent>.png` (the ride past the leant-out Medusa).
- */
-const BOSS_CHECKS = [
-  { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
-  { level: 'level2', minWidthFrac: 0.15, weakPoints: 7, firstPhase: ['claw-', 'tail-'], lastPhase: ['stinger'], midShot: 'boss-stinger', minOnScreen: 4, settleS: 2, midSettleS: 1 },
-  { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
-  { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1 },
-  { level: 'level5', minWidthFrac: 0.15, weakPoints: 4, firstPhase: ['vent-', 'heart'], lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 3, midSettleS: 0 },
-  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.7, passShots: [0.712, 0.718] },
-]
 
 /**
  * #452: a boss fight lasts from its arrival to the end of the run (`pacing.ts`: 20 s of 60). The boss step proves a
