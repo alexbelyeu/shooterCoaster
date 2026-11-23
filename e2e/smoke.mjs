@@ -947,7 +947,10 @@ async function resultsScreenProblems(page, id, stats, { share }) {
   if (screen.rows.hits && !screen.rows.hits.startsWith(`${stats.kills} of `)) problems.push(`results hits "${screen.rows.hits}" != ${stats.kills}`)
   if (stats.shotsFired > 0 && !/^\d+% /.test(screen.rows.accuracy ?? '')) problems.push(`results accuracy "${screen.rows.accuracy}" with ${stats.shotsFired} shots`)
   for (const label of ['Levels', 'Replay', 'Share']) {
-    if (!screen.buttons.includes(label)) problems.push(`results buttons ${JSON.stringify(screen.buttons)} lack ${label}`)
+    // #254: the portal zip (--base) has no Share, whose scoaster.com link would take its players off the portal.
+    if (label === 'Share' && arg('base')) {
+      if (screen.buttons.includes(label)) problems.push(`portal build: results buttons ${JSON.stringify(screen.buttons)} offer Share`)
+    } else if (!screen.buttons.includes(label)) problems.push(`results buttons ${JSON.stringify(screen.buttons)} lack ${label}`)
   }
   // #162: Next Level only when the unlock rule opens it (a 0★ run on a fresh save leaves it locked); Enter replays instead.
   const nextOffered = screen.buttons.includes('Next Level')

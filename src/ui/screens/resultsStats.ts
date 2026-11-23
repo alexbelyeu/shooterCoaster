@@ -10,6 +10,11 @@ export function formatAccuracy(hits: number, shotsFired: number): string {
   return pct === null ? '—' : `${pct}%`
 }
 
+/** `×14`, the HUD's multiplier sign, or a dash for a run without a combo: the results line and the score card both say it so. */
+export function formatBestCombo(bestCombo: number): string {
+  return bestCombo > 0 ? `×${bestCombo}` : '—'
+}
+
 export function isNewRecord(score: number, previousBest: number): boolean {
   return score > 0 && score > previousBest
 }
@@ -38,7 +43,7 @@ export function runLines(run: RunLineInput): RunLine[] {
   const lines: RunLine[] = [
     { stat: 'hits', text: `${run.kills} of ${run.totalEnemies} hit` },
     { stat: 'accuracy', text: pct === null ? 'Not a shot fired' : `${pct}% of shots on target` },
-    { stat: 'combo', text: run.bestCombo > 0 ? `Best combo ${run.bestCombo}x` : 'No combo this time' },
+    { stat: 'combo', text: run.bestCombo > 0 ? `Best combo ${formatBestCombo(run.bestCombo)}` : 'No combo this time' },
   ]
   const b = run.bystanders
   if (b && b.total > 0) lines.push({ stat: 'spared', text: `${Math.max(0, b.total - b.hit)} of ${b.total} ${b.noun} spared` })

@@ -4,23 +4,33 @@ import {
   canCopy,
   canCopyImage,
   canShareImage,
+  cardSizeFor,
   copyImage,
   copyShare,
   exclusive,
   nativeShare,
   SHARE_TARGETS,
   shareMode,
-  sharePayloadForRun,
+  sharePayload,
   shareTargetHref,
   type ShareMethod,
-  type SharePayload,
 } from '@/ui/share'
 import { FairBoard } from '@/ui/Fair'
+import { isHeldActivation, menuFocus } from '@/ui/menuFocus'
 import { placePopover, type Placement } from '@/ui/popoverPlacement'
 import { scoreCardFileName, type CardSize, type ScoreCardRun } from '@/ui/scoreCard'
 import { downloadBlob, renderScoreCard } from '@/ui/scoreCardImage'
 
-const COPIED_MS = 2000
+const FLASH_MS = 2000
+
+type FlashTarget = 'copy' | 'image_copy' | 'image_download'
+/** A menu item's answer to its click (#254): "Copied!", or why nothing happened. `n` restarts the timer on a second click. */
+interface Flash {
+  target: FlashTarget
+  ok: boolean
+  n: number
+}
+const FAILED_LABEL: Record<FlashTarget, string> = { copy: "Couldn't copy", image_copy: "Couldn't copy", image_download: "Couldn't save" }
 
 interface Props {
   card: ScoreCardRun
@@ -33,13 +43,13 @@ interface Props {
 }
 
 const isTouch = () => window.matchMedia?.('(pointer: coarse)').matches ?? false
-const cardSize = (): CardSize => (isTouch() ? 'story' : 'feed')
+const cardSize = (): CardSize => cardSizeFor(isTouch())
 
 /** The results screen's Share button (#271): the native sheet on touch (with the score card image, #272), else a menu of image, Copy link and share-intent links. */
 export default function ShareMenu({ card, onShared, avoid = [], prerender = false }: Props) {
-  const { levelId, score, worldRank } = card
+  const { levelId, score } = card
   const [open, setOpen] = useState(false)
-  const [copied, setCopied] = useState<'copy' | 'image_copy' | null>(null)
+  const [flash, setFlash] = useState<Flash | null>(null)
   const [placement, setPlacement] = useState<Placement | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -65,10 +75,18 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
   }
 
   async function shareImage(): Promise<'shared' | 'cancelled' | 'failed'> {
-    const payload = sharePayloadForRun(levelId, score, 'image_native', worldRank)
     const png = await cardPng('story').catch(() => null)
-    if (!payload || !png) return 'failed'
-    return nativeShare(navigator, { ...payload, files: [new File([png], scoreCardFileName(levelId, score), { type: 'image/png' })] })
+    if (!png) return 'failed'
+    return nativeShare(navigator, { ...sharePayload(card, 'image_native'), files: [new File([png], scoreCardFileName(levelId, score), { type: 'image/png' })] })
+  }
+
+  function showFlash(target: FlashTarget, ok: boolean) {
+    setFlash((f) => ({ target, ok, n: (f?.n ?? 0) + 1 }))
+  }
+
+  function label(target: FlashTarget, idle: string): string {
+    if (flash?.target !== target) return idle
+    return flash.ok ? 'Copied!' : FAILED_LABEL[target]
   }
 
   function close(refocus: boolean) {
@@ -77,51 +95,42 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
     if (refocus) buttonRef.current?.focus()
   }
 
-  /** The native sheet where this device has one; `failed` (or no sheet) means the menu instead. */
-  async function shareSheet(native: SharePayload): Promise<'shared' | 'cancelled' | 'failed'> {
-    const touch = isTouch()
-    if (touch && canShareImage(navigator)) {
-      const outcome = await shareImage()
-      if (outcome === 'shared') onShared('image_native')
-      return outcome
-    }
-    if (shareMode(navigator, touch, native) !== 'native') return 'failed'
-    const outcome = await nativeShare(navigator, native)
-    if (outcome === 'shared') onShared('native')
+  /** The share sheet where this device has one; `failed` (a sheet that refused, or none) opens the menu instead. */
+  async function shareSheet(): Promise<'shared' | 'cancelled' | 'failed'> {
+    const native = sharePayload(card, 'native')
+    const mode = shareMode(navigator, isTouch(), native)
+    if (mode === 'menu') return 'failed'
+    const outcome = mode === 'image' ? await shareImage() : await nativeShare(navigator, native)
+    if (outcome === 'shared') onShared(mode === 'image' ? 'image_native' : 'native')
     return outcome
   }
 
   async function onButton() {
     if (open) return close(false)
-    const native = sharePayloadForRun(levelId, score, 'native', worldRank)
-    if (!native) return
     // null: a sheet from an earlier tap is still opening.
-    if ((await exclusive(sharing, () => shareSheet(native))) !== 'failed') return
+    if ((await exclusive(sharing, shareSheet)) !== 'failed') return
     setOpen(true)
     cardPng(cardSize()).catch(() => {})
   }
 
   async function onCopy() {
-    const payload = sharePayloadForRun(levelId, score, 'copy', worldRank)
-    if (payload && (await copyShare(navigator, payload))) {
-      setCopied('copy')
-      onShared('copy')
-    }
+    const ok = await copyShare(navigator, sharePayload(card, 'copy'))
+    showFlash('copy', ok)
+    if (ok) onShared('copy')
   }
 
   async function onDownload() {
     const png = await cardPng(cardSize()).catch(() => null)
-    if (!png) return
+    if (!png) return showFlash('image_download', false)
     downloadBlob(png, scoreCardFileName(levelId, score))
     onShared('image_download')
     close(true)
   }
 
   async function onCopyImage() {
-    if (await copyImage(navigator, cardPng(cardSize()))) {
-      setCopied('image_copy')
-      onShared('image_copy')
-    }
+    const ok = await copyImage(navigator, cardPng(cardSize()))
+    showFlash('image_copy', ok)
+    if (ok) onShared('image_copy')
   }
 
   // iOS drops the tap's user activation if the sheet waits for the card to draw (fonts, art decode, a 1080x1920 PNG),
@@ -131,10 +140,10 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
   }, [prerender, card])
 
   useEffect(() => {
-    if (!copied) return
-    const timer = setTimeout(() => setCopied(null), COPIED_MS)
+    if (!flash) return
+    const timer = setTimeout(() => setFlash(null), FLASH_MS)
     return () => clearTimeout(timer)
-  }, [copied])
+  }, [flash])
 
   // Measured before paint, so the menu never flashes on the wrong side.
   useLayoutEffect(() => {
@@ -177,15 +186,12 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
   }, [open])
 
   function onMenuKey(e: ReactKeyboardEvent<HTMLDivElement>) {
-    const items = [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])]
-    const at = items.indexOf(document.activeElement as HTMLElement)
-    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key]
-    let to: number | null = null
-    if (step !== undefined) to = (at + step + items.length) % items.length
-    else if (e.key === 'Home') to = 0
-    else if (e.key === 'End') to = items.length - 1
+    // Enter held on Share opened the menu and moved focus to its first item: the repeat must not click it.
+    if (isHeldActivation(e.key, e.repeat)) return e.preventDefault()
     // The menu is portalled to the end of body: back on Share first, so Tab carries on from there.
-    else if (e.key === 'Tab') close(true)
+    if (e.key === 'Tab') return close(true)
+    const items = [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])]
+    const to = menuFocus(Math.max(items.indexOf(document.activeElement as HTMLElement), 0), e.key, items.length)
     if (to === null) return
     e.preventDefault()
     items[to]?.focus()
@@ -231,21 +237,19 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
                 data-target="image_download"
                 onClick={onDownload}
               >
-                Save image
+                {label('image_download', 'Save image')}
               </button>
               {imageCopyable && (
                 <button type="button" role="menuitem" className="fair-plate share-item" data-target="image_copy" onClick={onCopyImage}>
-                  {copied === 'image_copy' ? 'Copied!' : 'Copy image'}
+                  {label('image_copy', 'Copy image')}
                 </button>
               )}
               {copyable && (
                 <button type="button" role="menuitem" className="fair-plate share-item share-copy share-wide" data-target="copy" onClick={onCopy}>
-                  {copied === 'copy' ? 'Copied!' : 'Copy link'}
+                  {label('copy', 'Copy link')}
                 </button>
               )}
               {SHARE_TARGETS.map(({ id, label }) => {
-                const payload = sharePayloadForRun(levelId, score, id, worldRank)
-                if (!payload) return null
                 const email = id === 'email'
                 return (
                   <a
@@ -253,7 +257,7 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
                     role="menuitem"
                     className="fair-plate share-item"
                     data-target={id}
-                    href={shareTargetHref(id, payload)}
+                    href={shareTargetHref(id, sharePayload(card, id))}
                     target={email ? undefined : '_blank'}
                     rel={email ? undefined : 'noopener noreferrer'}
                     onClick={() => onTarget(id)}
