@@ -124,9 +124,9 @@ entry and the inside (`<id>-tunnel-entry.png`, `<id>-tunnel.png`).
 
 1. **Climbing Gym** (#438 → #513): Alex's gym from his blockout; rats, lanternflies, dust
    bunnies, climbers you must not shoot, the Medusa. First.
-2. **Neon Metropolis** (#322): night city, drones, billboard bots, helicopter. Deferred from
+2. **Neon Metropolis** (#322, **level 7**, M4): night city, drones, billboard bots, helicopter. Deferred from
    M3; comes back through the kit.
-3. **Jungle Ruins**: mist, temples, vines, toucans, spider swarms.
+3. **Jungle Ruins** (#869, **level 8**, M4): mist, temples, vines, toucans, spider swarms.
 4. **Sky Harbour**: floating islands, airships, a cloud layer under the track.
 5. **Haunted Mine**: interior #2, lanterns, bats, carts on side rails.
 6. **Night Ride variants** of existing worlds: a lighting / grade preset and emissive props
