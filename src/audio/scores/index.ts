@@ -11,7 +11,7 @@ import resultsLose from './results-lose.scrim?raw'
 
 /**
  * Theme options waiting on Alex's pick (`Listen:` issue, sound bible "taste gate"): `themes/<slot>.<name>.scrim`, keyed
- * `<slot>.<name>`. None right now. They never play by default: `?theme=<name>` puts one in its slot's place
+ * `<slot>.<name>`. Now level7's three (#868), filed before its world lands. They never play by default: `?theme=<name>` puts one in its slot's place
  * (`themesFromQuery`). Once Alex picks, the winner replaces `<slot>.scrim` and the options are deleted.
  */
 const THEME_OPTIONS: Record<string, string> = Object.fromEntries(

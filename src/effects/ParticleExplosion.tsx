@@ -8,8 +8,10 @@ import { setExplosionPool } from './explosionPoolHandle'
 import {
   CHUNKS_PER_SLOT,
   DEATH_SLOTS,
+  BOSS_DEFEAT_DEATH_STYLE,
   BOSS_PART_DEATH_STYLE,
   DEATH_STYLES,
+  GOLDEN_BALLOON_DEATH_STYLE,
   KRAKEN_SPLASH_DEATH_STYLE,
   GLOW_PER_SLOT,
   SHAPE_STRETCH,
@@ -147,6 +149,8 @@ function zero(set: ParticleSet, s: number): void {
 
 function styleName(style: DeathStyle): string {
   for (const [type, s] of Object.entries(DEATH_STYLES)) if (s === style) return type
+  if (style === GOLDEN_BALLOON_DEATH_STYLE) return 'goldenBalloon'
+  if (style === BOSS_DEFEAT_DEATH_STYLE) return 'bossDefeat'
   return style === BOSS_PART_DEATH_STYLE || style === KRAKEN_SPLASH_DEATH_STYLE ? 'bossPart' : 'custom'
 }
 

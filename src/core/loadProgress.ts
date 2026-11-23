@@ -1,6 +1,6 @@
 /**
- * What the loading screen (#674) waits on, reported by the parts doing the work: the level's lazy chunk
- * (`canvas/loadLevelScene.ts`), its scene's mount, the shader warm-up (`canvas/ShaderWarmup.tsx`) and the audio
+ * What the loading screen (#674) waits on, reported by the parts doing the work: the level's lazy chunks
+ * (`canvas/loadLevelScene.ts`: the level core and its world), its scene's mount, the shader warm-up (`canvas/ShaderWarmup.tsx`) and the audio
  * (`canvas/LevelAudio.tsx`: the level's SFX bake and its score started). Reports carry the level they are for, so
  * a level being left can't fill the next one's bar.
  */

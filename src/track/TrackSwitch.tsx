@@ -155,7 +155,7 @@ export default function TrackSwitch({ main, junction, eyeHeight }: TrackSwitchPr
         sfx().trackSwitch()
       },
     })
-    if (isE2E) e2eSwitch.state = { pose, main, junction, open: () => switchOpen(rideProgress(), pose) }
+    if (isE2E) e2eSwitch.state = { pose, main, junction, open: () => armed.current && switchOpen(rideProgress(), pose) }
     return () => {
       unregisterCollisionTarget(TARGET_ID)
       if (isE2E) e2eSwitch.state = null

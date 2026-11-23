@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
+import { leashedTurnRate, orbitStep } from './wanderLeash.hot'
 import { useMarch } from './useMarch'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
@@ -17,7 +18,11 @@ const MARCH_SPEED = 0.6
 
 /** Smaller, faster scout snowman (0.9× the base model) with an icy tint and ice-shard crown. */
 export default function SnowmanScout(props: EnemyProps) {
-  const { theta, moveSpeed } = useEnemyRandom(props.id, (rng) => ({ theta: 1 + rng() * 2, moveSpeed: 3 + rng() * 2 }))
+  const { theta, moveSpeed } = useEnemyRandom(props.id, (rng) => {
+    const turn = 1 + rng() * 2
+    const speed = 3 + rng() * 2
+    return { theta: leashedTurnRate(speed, turn), moveSpeed: speed }
+  })
   const modelRef = useRef<THREE.Group>(null)
   const bodyRef = useRef<THREE.Group>(null)
   const camera = useThree((s) => s.camera)
@@ -29,8 +34,7 @@ export default function SnowmanScout(props: EnemyProps) {
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
       const dt = delta * 60
       if (heading === undefined) {
-        mesh.position.z += ((moveSpeed * Math.cos(time * theta)) / theta) * dt
-        mesh.position.x += ((moveSpeed * Math.sin(time * theta)) / theta) * dt
+        orbitStep(mesh.position, time, dt, moveSpeed, theta)
       } else if (moving()) {
         mesh.position.x += Math.cos(heading) * MARCH_SPEED * dt
         mesh.position.z += Math.sin(heading) * MARCH_SPEED * dt

@@ -104,7 +104,7 @@ and leaving a level mid-warm-up must log no error; after it, the first shot + ki
 (`programs()`; the longest frame is reported). The step also prints the startup timings (`initTimings()`: boot, first title
 frame and PLAY from navigation; level mounted, env baked, warm-up done and first `playing` frame from the run's start) and writes
 them to `results.json` (`initTimings` on the `countdown` entry); no thresholds, software GL. A `speed` step holds the first level (or `--speed-level <id>`) at top speed on the most
-banked of ten sampled track points: the wind streaks must show, the camera must bank ≥ 1° and the rail rumble shake, and GO's launch must have shoved the view (`cameraWeight.feelMax.launch` > 0.3, #697) (`speed.png`). On a level with a
+banked of ten sampled track points (plus, on a v2 ride, the hook's `rideFastest`: 1.5 s before its top speed) where the scan saw wind streaks (held opacity > 0.05, else the point with the most; picked by the streaks measured, not by speed, #913; the scan is in `results.json`): the wind streaks must show and the rail rumble shake there, the camera must bank ≥ 1° at the scan's most banked point, and GO's launch must have shoved the view (`cameraWeight.feelMax.launch` > 0.3, #697; the step waits for the shove to pass its peak before its first jump, which resets the rig) (`speed.png`). On a level with a
 tunnel (#332, the hook's `tunnel.spans`), it then holds the level timer and game time, rides to the first one's approach
 (`<id>-tunnel-entry.png`, not blank) and 75% of the way through it (`<id>-tunnel.png`): the car must be inside (`tunnel.index`),
 at least 35% of the frame dark and some of it near white (its lights).
@@ -160,8 +160,10 @@ When level1 is in the run, a `night` step (#829, nightly) rides its Night Ride (
 to the ride step's moment: the run must be `night`, the sky band (top 30%) dark (`NIGHT_CHECK.maxSkyLuma`), the enemies as
 readable as the ride's probe asks (`level1-night-enemy.png`) and the scene inside level1's `scene` budget (`level1-night.png`).
 When level6 is in the run, a `switch` step (#702, on the PR in the `level6` shard) checks the shoot-to-switch junction
-(`trackSwitch()`): it parks the coaster behind the V2 sign with time frozen (`level6-switch.png`) and shoots it with a real
-bullet, which must set the hard way and ride the V8 branch at the junction's middle (`riding: 'hard'`, `level6-switch-hard.png`);
+(`trackSwitch()`): it starts the level held at its start from its first frame (`timerStep` and `rideRate` 0 until
+`levelReady`: ridden on the frame time, a slow runner's car passed the sign while the scene warmed up, and a switch the car
+has passed is closed for the run, #779; `open` is false then), parks the coaster behind the V2 sign with time frozen
+(`level6-switch.png`) and shoots it with a real bullet, which must set the hard way and ride the V8 branch at the junction's middle (`riding: 'hard'`, `level6-switch-hard.png`);
 a restart must set it back, and a run that leaves it must ride the easy way with the switch closed by then.
 The hard route's own wave (#720, `SWITCH_CHECK.branchWave`): after the shot the level timer jumps to its second, and it must
 arrive (its banner) and show at least `BRANCH_WAVE_ON_SCREEN` rats on screen from the branch's middle; at the end of the
@@ -224,7 +226,7 @@ in `results.json`). Every one is a shader `ShaderWarmup` missed, a freeze on a s
 nightly's `slow` and `pacing` parts (and `--gate-programs`) fail a level with one (#539: `programGateProblem` in pure
 `e2e/slowPass.mjs`, the problem names the moments); everywhere else, the PR shards among them, it is reported only (the
 first-shot check in the `countdown` step does fail on one).
-**Late level chunk (`--level-chunk-delay <ms>`, #464):** every page gets the level scene's lazy chunk that many ms late, the
+**Late level chunk (`--level-chunk-delay <ms>`, #464):** every page gets the level core's lazy chunk and its world's (`world-<biome>-*.js`, #862) that many ms late, the
 slow sandbox where `quality` and `pickup` measured the composer alone (17 draw calls) before the level had loaded. Every step
 that starts a level waits for `levelReady()`, so any step must pass with it (`--steps quality,pickup,pause --levels level1
 --level-chunk-delay 8000`).
@@ -241,7 +243,7 @@ Every check above belongs to a named step: `title`, `landing`, `levelSelect`, `d
 run's touch play: taps, aim assist, aspect, HUD, audio, up to the Pause tap) and `mobileMenus` (the rest of the phone run on
 the same page: pause card, settings, boss bar, initials entry, results, share, music switches) (no level); `frenzy` (the
 first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ride), `seed`, `quality`, `pause`
-(hidden-pause + pause menu), `countdown`, `speed` (on the run's first level); `ride` (every level: its intro tour pinned at four marks, #675, on the level held at its start (`timerStep` / `rideRate` 0), which the ride then goes on from: one mount; at each mark the camera must be on the tour and over the ground, at the landmark looking at it; the ride, the perf
+(hidden-pause + pause menu), `countdown`, `speed`, `chunkRetry` (the level core's chunk aborted once at startup: the page must reload, #888, and the reloaded page load the level) (on the run's first level); `ride` (every level: its intro tour pinned at four marks, #675, on the level held at its start (`timerStep` / `rideRate` 0), which the ride then goes on from: one mount; at each mark the camera must be on the tour and over the ground, at the landmark looking at it; the ride, the perf
 gate, the enemy probe, combat, the level's end), on the ride's own page `tour` (before the ride: each tour mark also shot, `<id>-tour-{reveal,landmark,track,landing}.png`, and not blank; nightly only, a capture costs ~15 s on a software renderer), `shot` (the frozen fresh shot and aim jump),
 `results` (the results screen's reveal, stats, buttons, board) and `share` (its Share line, menu and score cards); and
 `pacing` (every level, a whole run on its own page) and `wave`, `weather`, `boss`, `pickup`, `audio`, `night` (only on the levels in `STEP_LEVELS`; the smoke fails at start if that table and its
@@ -251,7 +253,7 @@ desktop step runs, plus `mobile` and `mobileMenus` with `--mobile`; `--skip-desk
 
 **Two depths (#372).** The PR smoke is rendering and integration: CI runs the shards in `SHARDS`, one `smoke (<name>)`
 job each (`ci.yml` matrix): `ui` (title, landing), `menus` (levelSelect, settings), `level1` (ride, shot, results), `level1-steps`
-(quality, speed), `level2`…`level5` (ride) and `mobile`. The **deep** checks, everything else (`nightlyOnly()` in
+(quality, speed, chunkRetry), `level2`…`level5` (ride) and `mobile`. The **deep** checks, everything else (`nightlyOnly()` in
 `shards.mjs`: daily, frenzy, seed, pause, countdown, tour, wave, weather, boss, pickup, dark, audio, night, share, pacing, `mobileMenus`, and shot / results
 on levels 2–5), run in the full smoke, which the nightly production run makes (`prod-smoke.yml`, below): they are either
 game logic a unit test covers next to its pure module (the table below), or a browser check too slow for every PR. A red
@@ -360,7 +362,7 @@ onScreenEnemies/onScreenBystanders/levelBystanders/bystandersHit/shotsFired/hits
 bystander through `processHit`; `{ id, penalty }` or null), `killNearest(n)` (never a boss weak point or a bystander; fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
 `fireShot(x, y)` (one real shot through NDC), `bullets()` → drawn count, largest screen radius now / since load, newest bullet's
-screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)` (an override over the slow-mo envelopes; 1 clears it), `gpuMemory()` (`renderer.info.memory` textures / geometries), `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideProgress` (its track fraction on the last frame), `rideBeats()` (the level's v2 ride beats: track fraction and second), `rideSpeed` (set 0–1 to put the coaster at that speed; ignored on a `ride: v2` level, which follows its solved plan, #696), `sceneStats()`, `combat` fire/hit/kill event counters,
+screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)` (an override over the slow-mo envelopes; 1 clears it), `gpuMemory()` (`renderer.info.memory` textures / geometries), `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideProgress` (its track fraction on the last frame), `rideBeats()` (the level's v2 ride beats: track fraction and second), `rideFastest` (on a v2 ride, the track fraction 1.5 s before its top speed; null otherwise), `rideSpeed` (set 0–1 to put the coaster at that speed; ignored on a `ride: v2` level, which follows its solved plan, #696), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
 {current, max} in degrees, `cameraWeight` → bank / pitch / speed + drop FOV kick now and max (degrees), smoothed speed 0–1, wind-streak opacity, the caps the smoke checks (`caps`, from the source constants), `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
 `view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `graphics()` → quality setting, its preset, adaptive steps, reduced motion, `audio()` → unlocked?, score engine chunk loaded? (`engineLoaded`; the title step fails it before the first key press), long-lived SFX node count, arcade voice pool (`sfxVoices`: budget / live / peak / stolen / rejected, and `ui`: countdown and UI blips played on their own voices past the pause gate), music ducked? (the slow-mo low-pass), the pause mix on? (`pauseMix`: music down and low-passed, SFX silent), sounds dropped by a caught audio error, `music` (live music buses with their gain + the last few fade ramps), `scrim` (score engine: current score, tracks with the score each plays (a `?theme=` option or its own), paused + song position + `layered` / `intensity`, the asked-for `targetIntensity`, long-lived nodes, timer running),

@@ -8,12 +8,13 @@ shows this device's board (a daily, its local record) as before.
 
 - **Database:** a dedicated Supabase project on Alex's free plan, one table `scores`
   (`supabase/migrations/0001_leaderboard.sql`; `0004_daily_board.sql` adds `day`, a daily
-  run's UTC day, null on every campaign row). RLS is on with no policies, and only
+  run's UTC day, null on every campaign row; `0005_rate_limit.sql` adds the rate limit's trigger). RLS is on with no policies, and only
   `service_role` has grants, so the publishable/anon key can do nothing with it.
 - **API:** `api/leaderboard.ts`, a Vercel Function in this repo, is the only thing that
   talks to Supabase, with the server-side secret key from the Vercel env vars.
   - `GET /api/leaderboard?level=level1` → `{ top: [{ initials, score, at }] }`, cached by
-    Vercel's CDN for 30 s (`s-maxage=30, stale-while-revalidate=300`). Campaign rows only
+    Vercel's CDN for 30 s (`s-maxage=30, stale-while-revalidate=30`: a copy is never more than
+    about a minute old, so a score shows in another browser within ~30-60 s, #384). Campaign rows only
     (`day is null`).
   - `GET /api/leaderboard?daily=2026-11-23` → that day's Daily Run top 10, same shape and cache
     (the level is the day's `dailyLevel`); 400 unless the day is a real `YYYY-MM-DD` date.
@@ -22,6 +23,10 @@ shows this device's board (a daily, its local record) as before.
     is a campaign level, the initials are three letters A-Z and the score is possible for
     that level and kill count (`src/levels/scoreLimits.ts`); 429 after 5 accepted
     submissions from one IP in 10 minutes (keyed by an HMAC of the IP; no raw IP is stored).
+    The handler counts the IP's recent rows first, which turns most repeats away but lets parallel
+    POSTs through together; `0005_rate_limit.sql`'s `before insert` trigger counts again under a
+    per-IP lock and raises `PT429`, which the handler answers with the same 429 (#384). Until that
+    migration runs the count alone limits, as before.
     With `daily: 'YYYY-MM-DD'` the run goes on that day's board, and its rank counts that day
     only. Also 400 unless the day is today or yesterday on the server's clock (UTC; yesterday
     so a run started before midnight still counts) and the level is that day's `dailyLevel`
@@ -43,7 +48,10 @@ shows this device's board (a daily, its local record) as before.
   it gets back. A run that misses the local board just shows the World board. Calls time out
   after 3 s and fall back to the local board silently. Only the production build on Vercel
   calls the API: never dev, `vite preview`, CI, the smoke (`?e2e=1`, which stubs it) or the
-  portal build (itch.io etc.).
+  portal build (itch.io etc.). That is `isLiveSite` in `src/app/analyticsGate.ts`, the rule
+  analytics and telemetry share. An internal browser (`?internal=1`, Alex's) still posts and
+  reads the World board: the board is part of the game, not tracking, and his runs are real
+  runs (#385). The rules are the pure `onlinePlan` in `src/app/onlineLeaderboard.ts`.
   After a Daily Run there is no initials entry. A new best of the day is sent at once,
   under the player's last initials (from their last campaign board entry, `AAA` before
   one). The results screen then shows the day's World board it gets back ("The world's top
@@ -60,7 +68,8 @@ shows this device's board (a daily, its local record) as before.
    - automatic RLS **on** (the migration enables RLS on `scores` anyway).
 2. **Table:** open the project's SQL editor, paste
    `supabase/migrations/0001_leaderboard.sql` and run it once, then
-   `0004_daily_board.sql` (the Daily Run's board, #854) the same way.
+   `0004_daily_board.sql` (the Daily Run's board, #854) and `0005_rate_limit.sql` (the
+   rate limit's trigger, #384) the same way.
 3. **Vercel env vars** on the `shooter-coaster` project, environment **Production** only
    (names also in `.env.example`):
    - `SUPABASE_URL`: Project Settings → Data API → Project URL (`https://<ref>.supabase.co`);

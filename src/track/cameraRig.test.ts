@@ -139,6 +139,14 @@ describe('ride feel (#697)', () => {
     expect(s.launch).toBeLessThan(0.01)
   })
 
+  it('a launch on a long frame still shoves the view on that frame (#906)', () => {
+    for (const hitch of [0.5, 0.9, 2]) {
+      const s = triggerLaunch(createRigState())
+      stepRig(s, ride(), hitch, 1)
+      expect(s.launch).toBeGreaterThan(0.5)
+    }
+  })
+
   it('dips the view entering a drop, then recovers while the drop holds', () => {
     const s = createRigState()
     let deepest = 0

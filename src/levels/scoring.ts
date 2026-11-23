@@ -36,12 +36,8 @@ export function scoreAfterPenalty(score: number, penalty: number): number {
   return Math.max(0, score - penalty)
 }
 
-/** Theme Park's bonus golden balloons: always out, outside the waves and `maxScore` (EnemySpawner). */
-export const GOLDEN_BALLOON = { biome: 'themePark', count: 3, score: SCORE_VALUES.balloon * 5 } as const
-
-export function goldenBalloonCount(biome: string): number {
-  return biome === GOLDEN_BALLOON.biome ? GOLDEN_BALLOON.count : 0
-}
+/** A level's bonus golden balloons (`LevelConfig.goldenBalloons`): always out, outside the waves and `maxScore` (EnemySpawner). */
+export const GOLDEN_BALLOON = { score: SCORE_VALUES.balloon * 5 } as const
 
 /** Σ(count × SCORE_VALUES[type]) over every wave (its bystanders score nothing), plus the boss's weak points and reward: the no-combo, kill-everything score. */
 export function computeMaxScore(waves: readonly EnemyWave[], boss?: BossSpec): number {

@@ -5,12 +5,11 @@ import { eventBus } from '@/core/EventBus'
 import { gameClockStep } from '@/core/gameClock'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
-import { LAVA_BURST_DEATH_STYLE, TITAN_BREAK_DEATH_STYLE, TITAN_PART_DEATH_STYLE } from '@/effects/deathStyles'
+import { BOSS_DEFEAT_DEATH_STYLE, LAVA_BURST_DEATH_STYLE, TITAN_BREAK_DEATH_STYLE, TITAN_PART_DEATH_STYLE } from '@/effects/deathStyles'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { RIVER_CONFIGS, RIVER_SEGMENTS, riverRow } from '@/levels/environments/biomes/volcanic/lavaRiverPaths'
 import { VOLCANO, VOLCANO_SITE } from '@/levels/environments/volcanoGeometry'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
-import BossConfetti from './BossConfetti'
 import { currentPhase, hpFraction, weakPointHp, type WeakPointSpec } from './bossModel'
 import { MAGMA_TITAN } from './bossSpecs'
 import {
@@ -258,9 +257,9 @@ export default function MagmaTitan(props: BossProps) {
       body={body}
       renderWeakPoint={renderWeakPoint}
       exitSeconds={EXIT_SECONDS}
+      defeatBurst={BOSS_DEFEAT_DEATH_STYLE}
       deathStyle={TITAN_PART_DEATH_STYLE}
     >
-      <BossConfetti bossId={props.id} />
     </BossBase>
   )
 }

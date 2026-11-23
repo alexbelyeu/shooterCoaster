@@ -47,7 +47,7 @@ inside `budgets.json` with its heaviest wave on screen.
 
 | Boss | Brief |
 |---|---|
-| **Golden Blimp** (1) | A brass-and-gold airship with a gondola, towing five golden balloons; bunting, a propeller that spins. Seen large: panel lines as colour bands, a glint sweep. |
+| **Golden Blimp** (1, #872) | A brass-and-gold airship with a gondola, towing five golden balloons; bunting, a propeller that spins. Seen large: panel lines as colour bands, a glint sweep. |
 | **Kraken** (3) | Thicker, darker tentacles (deep teal #184a5a) with bright sucker pads (#ffb3a0), a bigger head with one huge eye; a splash that reaches the camera. (Backlog "Kraken presence pass".) |
 | **Giant Scorpion** (2) | The scorpion brief at 10×: plated segments with sand-dust gradients, glowing stinger. |
 | **Yeti** (4) | Shaggy white fur as layered faceted tufts, blue face and palms, a roar pose with the chest exposed. |

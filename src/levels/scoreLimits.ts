@@ -3,7 +3,7 @@ import type { LevelConfig } from '@/types/level'
 import { BOSS_SPECS } from '@/entities/bosses/bossSpecs'
 import { COMBO_TIERS, TOP_TIER } from '@/combat/comboTiers'
 import { getAllLevels } from './LevelRegistry'
-import { GOLDEN_BALLOON, SCORE_VALUES, goldenBalloonCount } from './scoring'
+import { GOLDEN_BALLOON, SCORE_VALUES } from './scoring'
 
 export interface ScoreLimits {
   /** Every kill at the top combo multiplier, golden balloons and a boss's projectiles included (`maxScore` leaves them out). */
@@ -15,7 +15,7 @@ export interface ScoreLimits {
 
 export function scoreLimits(level: LevelConfig): ScoreLimits {
   const multiplier = COMBO_TIERS[TOP_TIER].multiplier
-  const golden = goldenBalloonCount(level.biome)
+  const golden = level.goldenBalloons ?? 0
   const boss = level.boss ? BOSS_SPECS[level.boss.type] : undefined
   const thrown = boss?.projectiles
   const killPoints = [

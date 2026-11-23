@@ -71,7 +71,7 @@ biome or score that already exists is refused, so a second run changes nothing. 
    z-fighting, terrain-following) and `docs/art/ENEMIES.md` (style).
 2. Biome. **(script)** `biomes/<biome>/` from the outdoor template (noise terrain, trees, seeded boulders
    beside the track, a stand-in spire) or the interior one (a flat `floor`, `bounds` inside a box hall
-   (`HALL` in its `config.ts`), crates); `BIOME_TYPES` (`src/types/level.ts`: the one list of biome ids, which `BiomeType`, the terrain and particle tests and the turntable's `?biome=` read, #509), `biomeRegistry.ts`, the
+   (`HALL` in its `config.ts`), crates); `BIOME_TYPES` (`src/types/level.ts`: the one list of biome ids, which `BiomeType`, the terrain and particle tests and the turntable's `?biome=` read, #509), `biomeRegistry.ts` (the tests' and dev pages' registry), `world.ts` and its `WORLD_CHUNKS` entry (`levels/environments/worlds.ts`, #862: the world's own lazy chunk, which the game reaches it through; it holds the biome, the enemies its levels spawn and its boss), the
    `atmosphere.ts` preset, `BIOME_TERRAIN_CONFIGS` (`utils/terrainNoise.ts`; an interior's is just `meshSize` and `authoredFloor: true`, which a test holds to its `floor`:
    `biomeHeightFunction` hands every caller its `floor`), `BIOME_REVERB` (`sfxDesign.ts`), a `theme.ts` accent and a `LevelPostcard`
    stub. **(by hand)** The look: palette, sky, light, fog, grade, the hero landmark in `Features.tsx`
@@ -88,7 +88,8 @@ biome or score that already exists is refused, so a second run changes nothing. 
    `node scripts/gen-level-limits.mjs` (the server's limits). **(by hand)** The track (inside the
    extent formula, or an authored spline from a blockout like the gym's; its `LAPS` pin follows), the
    world's own roster and boss; then `maxScore`, the finales row and `gen-level-limits` again.
-4. Enemies **(by hand)**: anything new in `SharedEnemyAssets.ts` (warm-up finds it), `enemyComponents.ts`,
+4. Enemies **(by hand)**: anything new in `SharedEnemyAssets.ts` (warm-up finds it), the world's `world.ts` (each enemy and the boss its
+   levels spawn: `worlds.test.ts` fails a missing one), `enemyComponents.ts` / `bossComponents.ts` (the turntable's),
    `ENEMY_PLACEMENT`, `SCORE_VALUES`, `deathStyles.ts`, `sfxDesign.ts`, the turntable's `subjects.ts`.
 5. Music. **(script)** `scores/<levelId>.scrim`, a copy of `--score-from`'s score (level1 by default), in
    `scores/index.ts`, with that score's key in `SCORE_KEYS`. **(by hand)** A theme round for Alex
@@ -124,9 +125,9 @@ entry and the inside (`<id>-tunnel-entry.png`, `<id>-tunnel.png`).
 
 1. **Climbing Gym** (#438 → #513): Alex's gym from his blockout; rats, lanternflies, dust
    bunnies, climbers you must not shoot, the Medusa. First.
-2. **Neon Metropolis** (#322): night city, drones, billboard bots, helicopter. Deferred from
+2. **Neon Metropolis** (#322, **level 7**, M4): night city, drones, billboard bots, helicopter. Deferred from
    M3; comes back through the kit.
-3. **Jungle Ruins**: mist, temples, vines, toucans, spider swarms.
+3. **Jungle Ruins** (#869, **level 8**, M4): mist, temples, vines, toucans, spider swarms.
 4. **Sky Harbour**: floating islands, airships, a cloud layer under the track.
 5. **Haunted Mine**: interior #2, lanterns, bats, carts on side rails.
 6. **Night Ride variants** of existing worlds: a lighting / grade preset and emissive props

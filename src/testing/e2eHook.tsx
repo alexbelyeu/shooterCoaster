@@ -60,7 +60,7 @@ import { scrimPlayer } from '@/audio/musicEngine'
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
 import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
 import { clipboardText, sharePayloadForRun } from '@/ui/share'
-import { setOnlineEndpointOverride } from '@/store/onlineLeaderboard'
+import { setOnlineEndpointOverride } from '@/app/onlineLeaderboard'
 import { scoreCardFileName, scoreCardRun, type CardSize } from '@/ui/scoreCard'
 import { renderScoreCard } from '@/ui/scoreCardImage'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
@@ -70,6 +70,7 @@ import type { TrackCurve } from '@/track/curves/TrackCurve'
 import { rideProgress } from '@/track/rideProgress.hot'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
 import { RIG_MAX_PITCH_DEG, RIG_MAX_ROLL_DEG } from '@/track/cameraRig.hot'
+import { STREAK_SPEED_THRESHOLD } from '@/track/windStreaks'
 import { MAX_FOV_KICK_DEG } from '@/track/cameraFov.hot'
 import { programsAfterWarmup } from '@/core/hitchLog'
 import { LONG_FRAME_MS } from '@/telemetry/telemetryReport'
@@ -191,13 +192,13 @@ export interface SCTestApi {
   cameraTrauma: { current: number; max: number }
   /** Coaster camera weight (#123) applied this frame and the max seen since load:
    *  bank and pitch (degrees, signed; maxima are absolute), the speed + drop FOV widening,
-   *  the smoothed ride speed (0–1), the wind-streak opacity (#27) and the caps (degrees) from the source constants.
+   *  the smoothed ride speed (0–1), the wind-streak opacity (#27) and the caps from the source constants (degrees; `streakSpeed` is the speed the streaks start at).
    *  Ride feel (#697): the launch shove, drop dip, airtime float and chain lift (0–1, before Screen shake), the rail
    *  rumble (degrees, after it), and the peak of each since load (`feelMax`). */
   cameraWeight: {
     roll: number; pitch: number; fovKick: number; maxRoll: number; maxPitch: number; maxFovKick: number
     speed: number; streaks: number; maxStreaks: number
-    caps: { roll: number; pitch: number; fovKick: number }
+    caps: { roll: number; pitch: number; fovKick: number; streakSpeed: number }
     feel: RideFeel
     feelMax: RideFeel
   }
@@ -306,6 +307,8 @@ export interface SCTestApi {
   rideProgress: number
   /** The current level's v2 ride beats (`TrackParams.rideV2.beats`: a track fraction and the second it lands on); [] without one. */
   rideBeats: () => readonly RideBeat[]
+  /** On a v2 ride, the track fraction 1.5 s before its top speed (`rideV2.ts` `planFastestLeadT`), set by `CoasterCamera`; null otherwise. */
+  rideFastest: number | null
   // ── View / aspect (issue #66) ──
   /** Active camera projection vs the canvas's on-screen box (squash checks). */
   view: () => E2EView | null
@@ -377,6 +380,7 @@ export interface E2ESwitch {
   to: number
   hard: boolean
   riding: 'easy' | 'hard' | 'shared'
+  /** The sign still takes a shot: its target is registered, which it is until the car first passes it in the run (#779). */
   open: boolean
   /** The run's kill-count total: a hard-route wave joins it when it arrives (#720). */
   totalEnemies: number
@@ -1026,7 +1030,7 @@ export function installE2EApi() {
       roll: 0, pitch: 0, fovKick: 0, maxRoll: 0, maxPitch: 0, maxFovKick: 0, speed: 0, streaks: 0, maxStreaks: 0,
       feel: { launch: 0, dip: 0, airtime: 0, lift: 0, rumble: 0 },
       feelMax: { launch: 0, dip: 0, airtime: 0, lift: 0, rumble: 0 },
-      caps: { roll: RIG_MAX_ROLL_DEG, pitch: RIG_MAX_PITCH_DEG, fovKick: MAX_FOV_KICK_DEG },
+      caps: { roll: RIG_MAX_ROLL_DEG, pitch: RIG_MAX_PITCH_DEG, fovKick: MAX_FOV_KICK_DEG, streakSpeed: STREAK_SPEED_THRESHOLD },
     },
     tunnel: { spans: [], index: -1, depth: 0 },
     darkSection: { spans: [], depth: 0, flash: 0 },
@@ -1156,6 +1160,7 @@ export function installE2EApi() {
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,
+    rideFastest: null,
     rideBeats: () => {
       const id = useGameStore.getState().currentLevel
       return (id ? getLevelConfig(id)?.track.rideV2?.beats : undefined) ?? []

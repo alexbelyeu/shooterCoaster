@@ -2,17 +2,14 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
-import { eventBus } from '@/core/EventBus'
 import { gameTime } from '@/core/gameClock'
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
 import type { EnemyType } from '@/types/level'
 import { registerE2EEnemy, unregisterE2EEnemy } from '@/testing/e2eHook'
-import { flashMesh, restoreMesh } from './hitFlash'
-import { ENEMY_HIT_FLASH_MS, KILL_POP_SCALE, type EnemyKilledEvent } from '@/combat/hitFeedback'
 import { entryPoint, type FormationMotion, type Vec3 } from '@/entities/spawning/spawnPlacement'
 import type { WallSlot } from '@/entities/spawning/enemyPlacement'
-import { getExplosionPool } from '@/effects/explosionPoolHandle'
-import { DEATH_STYLES } from '@/effects/deathStyles'
+import { DEATH_STYLES, type DeathStyle } from '@/effects/deathStyles'
+import { createKillPop, finishKillPop, startKillPop, tickKillPop } from './killPop'
 import { hitBystander } from '@/combat/bystanderHit'
 
 export interface EnemyProps {
@@ -50,6 +47,8 @@ interface EnemyBaseProps extends EnemyProps {
   ) => void | 'escaped'
   /** Its hit reaction (#463): called once as it is shot, to pose it for the kill pop (an imp throws its arms up). */
   onHit?: () => void
+  /** Its burst instead of its type's (a golden balloon pops in gold). */
+  deathStyle?: DeathStyle
 }
 
 /**
@@ -57,7 +56,7 @@ interface EnemyBaseProps extends EnemyProps {
  * Handles visibility, collision registration, formation entry and death.
  * An entering enemy is not a collision target until it reaches its slot, so touch aim assist never snaps to one still flying in.
  *
- * Death is two-step: on hit the enemy is scored immediately, stops moving and
+ * Death is the shared kill pop (`killPop.ts`): on hit the enemy is scored immediately, stops moving and
  * flashes white at 1.2x scale for ENEMY_HIT_FLASH_MS (game time); then it emits
  * 'enemy:killed', plays its type's death effect (`effects/deathStyles.ts`) and unmounts.
  * An enemy whose `updatePosition` returns 'escaped' unmounts at once, unscored, through `onEscape`.
@@ -76,12 +75,11 @@ export default function EnemyBase({
   children,
   updatePosition,
   onHit,
+  deathStyle = DEATH_STYLES[type],
 }: EnemyBaseProps) {
   const meshRef = useRef<THREE.Group>(null)
   const [alive, setAlive] = useState(true)
   const aliveRef = useRef(true)
-  const addScore = useGameStore((s) => s.addScore)
-  const registerKill = useGameStore((s) => s.registerKill)
   const entryT = useRef(entry ? 0 : 1)
   const clockAt = useRef<number | null>(null)
   const [entered, setEntered] = useState(!entry)
@@ -91,51 +89,26 @@ export default function EnemyBase({
     return [p.x, p.y, p.z]
   })
 
-  // Kill-pop state: dying between the hit and the explosion.
-  const dying = useRef(false)
-  const dyingMs = useRef(0)
-  const dyingFrames = useRef(0)
+  // Dying between the hit and the explosion.
+  const pop = useRef(createKillPop()).current
 
   const kill = useCallback(() => {
     if (!aliveRef.current) return
     aliveRef.current = false
     unregisterCollisionTarget(id)
-    registerKill()
-    addScore(scoreValue)
-
-    dying.current = true
-    dyingMs.current = ENEMY_HIT_FLASH_MS
-    dyingFrames.current = 0
     onHit?.()
-    const group = meshRef.current
-    if (group) {
-      group.traverse(flashMesh)
-      group.scale.setScalar(KILL_POP_SCALE)
-    }
-  }, [id, scoreValue, addScore, registerKill, onHit])
+    startKillPop(pop, meshRef.current, scoreValue)
+  }, [id, scoreValue, onHit, pop])
 
   /** End of the kill pop: explosion, events, unmount. */
   const finishKill = useCallback(() => {
-    dying.current = false
-    const combo = useGameStore.getState().combo
-    const style = DEATH_STYLES[type]
     const group = meshRef.current
     if (group) {
-      group.traverse(restoreMesh)
-      const pos = group.position.clone()
-      const event: EnemyKilledEvent = {
-        position: pos,
-        combo: combo.count,
-        multiplier: combo.multiplier,
-        score: Math.round(scoreValue * combo.multiplier),
-        sound: style.sound,
-      }
-      eventBus.emit('enemy:killed', event)
-      getExplosionPool()?.explode(pos, style)
+      finishKillPop(pop, group, group.position.clone(), deathStyle)
       onKill(id)
     }
     setAlive(false)
-  }, [id, type, scoreValue, onKill])
+  }, [id, deathStyle, onKill, pop])
 
   const spare = useCallback(() => {
     if (!aliveRef.current) return
@@ -196,13 +169,9 @@ export default function EnemyBase({
         setAlive(false)
         onEscape?.(id)
       }
-    } else if (dying.current) {
-      // Frozen in the white pop. The hit may land earlier in this same frame
-      // (bullet pool runs first), so require a 2nd tick: the pop is always
-      // rendered at least once, even at very low frame rates.
-      dyingMs.current -= delta * timeScale * 1000
-      dyingFrames.current += 1
-      if (dyingMs.current <= 0 && dyingFrames.current >= 2) finishKill()
+    } else if (tickKillPop(pop, delta * timeScale)) {
+      // Frozen in the white pop until it is over.
+      finishKill()
     }
   })
 
