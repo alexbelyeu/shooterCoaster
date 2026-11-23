@@ -21,10 +21,24 @@ describe('scoresDb', () => {
 
   it('reads the top 10 with the secret key in apikey only', async () => {
     const { calls, fetchImpl } = recorder(() => Response.json([{ initials: 'ABC', score: 900, created_at: '2026-11-05T12:00:00Z' }]))
-    const top = await scoresDb(env, fetchImpl)!.top('level1', 14350)
+    const top = await scoresDb(env, fetchImpl)!.top('level1', 14350, null)
     expect(top).toEqual([{ initials: 'ABC', score: 900, at: '2026-11-05T12:00:00Z' }])
-    expect(calls[0].url).toBe('https://abc.supabase.co/rest/v1/scores?select=initials,score,created_at&level_id=eq.level1&score=lte.14350&order=score.desc,created_at.asc&limit=10')
+    expect(calls[0].url).toBe('https://abc.supabase.co/rest/v1/scores?select=initials,score,created_at&level_id=eq.level1&score=lte.14350&day=is.null&order=score.desc,created_at.asc&limit=10')
     expect(calls[0].init.headers).toEqual({ apikey: 'sb_secret_x' })
+    await scoresDb(env, fetchImpl)!.top('level2', 12250, '2026-11-05')
+    expect(calls[1].url).toContain('&level_id=eq.level2&score=lte.12250&day=eq.2026-11-05&')
+  })
+
+  it('before the day column exists (#854): retries the campaign board without it, fails a daily call', async () => {
+    const missing = () => Response.json({ code: '42703', message: 'column scores.day does not exist' }, { status: 400 })
+    const { calls, fetchImpl } = recorder((url) => (url.includes('day=') ? missing() : Response.json([])))
+    const db = scoresDb(env, fetchImpl)!
+    expect(await db.top('level1', 14350, null)).toEqual([])
+    expect(calls[1].url).not.toContain('day=')
+    await expect(db.top('level1', 14350, '2026-11-05')).rejects.toMatchObject({ code: '42703' })
+    const counted = recorder((url) => (url.includes('day=') ? missing() : new Response(null, { headers: { 'Content-Range': '*/2' } })))
+    expect(await scoresDb(env, counted.fetchImpl)!.count({ level_id: 'eq.level1', day: 'is.null' })).toBe(2)
+    await expect(scoresDb(env, counted.fetchImpl)!.count({ day: 'eq.2026-11-05' })).rejects.toBeInstanceOf(DbError)
   })
 
   it('counts from Content-Range', async () => {
@@ -42,11 +56,13 @@ describe('scoresDb', () => {
     expect(JSON.parse(calls[0].init.body as string)).toEqual({
       level_id: 'level2', initials: 'XYZ', score: 10, run_seed: 7, kills: 1, accuracy: 0.5, client_version: '2.0.0', ip_hash: 'ab',
     })
+    await scoresDb(env, fetchImpl)!.insert({ level: 'level2', initials: 'XYZ', score: 10, seed: 7, kills: 1, accuracy: 0.5, version: '2.0.0', ipHash: 'ab', day: '2026-11-05' })
+    expect(JSON.parse(calls[1].init.body as string).day).toBe('2026-11-05')
   })
 
   it('throws DbError on an error status (a paused project) or no connection', async () => {
     const paused = recorder(() => new Response('paused', { status: 540 }))
-    await expect(scoresDb(env, paused.fetchImpl)!.top('level1', 1)).rejects.toBeInstanceOf(DbError)
+    await expect(scoresDb(env, paused.fetchImpl)!.top('level1', 1, null)).rejects.toBeInstanceOf(DbError)
     const down = recorder(() => {
       throw new TypeError('fetch failed')
     })
