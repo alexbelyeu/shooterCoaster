@@ -10,6 +10,10 @@ export interface RidePhoto {
   height: number
 }
 
+/** Bus event on the frame the photo is taken: the HUD's flash and the shutter sound. Here, not in `track/photoMarker.ts`,
+ *  so the HUD's flash keeps the ride's physics out of the startup JS. */
+export const RIDE_PHOTO_EVENT = 'ride:photo'
+
 let photo: RidePhoto | null = null
 const listeners = new Set<() => void>()
 

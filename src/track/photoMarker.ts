@@ -29,6 +29,3 @@ export function photoSize(width: number, height: number): { width: number; heigh
   const k = Math.min(1, PHOTO_MAX_SIDE / Math.max(width, height, 1))
   return { width: Math.max(1, Math.round(width * k)), height: Math.max(1, Math.round(height * k)) }
 }
-
-/** Bus event on the frame the photo is taken: the HUD's flash and the shutter sound. */
-export const RIDE_PHOTO_EVENT = 'ride:photo'
