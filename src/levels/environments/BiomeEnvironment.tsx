@@ -129,7 +129,7 @@ export default function BiomeEnvironment({
       {Decorations && <Decorations heightFn={heightFn} groundFn={groundFn} track={track} atmosphere={atmosphere} />}
 
       {/* Biome landmarks, terrain features and events */}
-      {Features && <Features heightFn={heightFn} groundFn={groundFn} track={track} speeds={speeds} whale={whale} atmosphere={atmosphere} fog={fogMods} />}
+      {Features && <Features heightFn={heightFn} groundFn={groundFn} track={track} speeds={speeds} whale={whale} darkSections={darkSections} atmosphere={atmosphere} fog={fogMods} />}
 
       {/* Ambient air particles around the camera */}
       {particles && <ParticleField preset={particles} />}

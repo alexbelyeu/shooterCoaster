@@ -151,14 +151,18 @@ export interface TunnelSpec {
 /**
  * A dark section (#752): from track parameter `from` to `to` (the ride's t, as `rideProgress` reports it), the light easing
  * down over `ramp` of t after `from` and back up over the `ramp` before `to`; it may not cross the track's seam. While
- * dark, a shot's muzzle flash lights what is within `flashReach` world units of the rider.
+ * dark, a shot's muzzle flash lights what is within `flashReach` world units of the rider. `look` is how it is dark
+ * (`DarkSections.tsx` `LOOKS`): `blacklight` (the default, the gym's cave) or `ice` (level 4's ice cave, a blue glow).
  */
 export interface DarkSectionSpec {
   from: number
   to: number
   ramp: number
   flashReach: number
+  look?: DarkLook
 }
+
+export type DarkLook = 'blacklight' | 'ice'
 
 /** How a wave arrives; anything but `scatter` (the default) is laid out ahead of the rider by `spawnPlacement.ts`. */
 export type Formation = 'scatter' | 'v' | 'line' | 'school' | 'spiral' | 'ring'
