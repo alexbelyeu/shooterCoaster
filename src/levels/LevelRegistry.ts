@@ -3,6 +3,7 @@ import { paceLevel } from './pacing'
 // Level 6's track and walls as plain numbers: the blockout they are built from stays out of the startup JS (#589).
 // Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS.
 import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
+import { OCEAN_LEVEL_TRACK } from './environments/biomes/ocean/oceanLevel'
 import { GYM_LEVEL } from './environments/biomes/gym/gymLevel'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
@@ -73,21 +74,13 @@ const LEVELS: LevelConfig[] = [
     maxScore: 44 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 1924 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 2624
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
-    track: {
-      varA: 3,
-      varB: 36,
-      varC: 4,
-      scalar: 20,
-      rollerSpeed: 0.00001,
-      minRollerSpeed: 0.0001,
-      curve: 'curve1',
-      color1: 0x416fa0,
-      color2: 0x31ffd5,
-    },
+    // The ride kit's (#865, `oceanTrack.ts`): a lift, a splashdown into a glass tunnel under the sea, through a sea arch.
+    track: OCEAN_LEVEL_TRACK,
     ...paceLevel({
       waves: [
-        { type: 'jellyfish', count: 20, waveLabel: 'Into the Deep!', weight: 3 },
-        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 2 },
+        // Sharks first; the jellyfish arrive as the car dives into the glass tunnel (~14 s).
+        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 3 },
+        { type: 'jellyfish', count: 20, waveLabel: 'Into the Deep!', weight: 2 },
         { type: 'jellyfish', count: 24, waveLabel: 'Jellyfish Bloom!', weight: 2 },
         { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 3 },
       ],

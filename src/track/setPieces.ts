@@ -20,6 +20,8 @@ export interface TunnelSpan {
   to: number
   /** How far from the centreline (XZ) the tube and its portals reach: `trackClearance.ts` keeps props out of it. */
   reach: number
+  /** A glass tube (`TunnelSpec.glass`): drawn see-through, and Ocean splashes as the car dives into it. */
+  glass?: boolean
 }
 
 /** Tube sizes in world units, all × `trackScale` (the rider's eye is 6 above the rails). */
@@ -82,7 +84,7 @@ export function tunnelSpans(table: ArcTable, specs: readonly TunnelSpec[], track
       if (fromS < dims.portalDepth || toS + dims.portalDepth > table.length) {
         throw new Error(`tunnel at ${spec.from} runs over the track's seam`)
       }
-      return { fromS, toS, from: sampleAtOrAfter(table, fromS), to: sampleAtOrAfter(table, toS) - 1, reach }
+      return { fromS, toS, from: sampleAtOrAfter(table, fromS), to: sampleAtOrAfter(table, toS) - 1, reach, ...(spec.glass ? { glass: true } : {}) }
     })
     .sort((a, b) => a.fromS - b.fromS)
   for (let i = 1; i < spans.length; i++) {

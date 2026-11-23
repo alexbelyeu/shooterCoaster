@@ -146,6 +146,8 @@ export interface RideV2Spec {
 export interface TunnelSpec {
   from: number
   length: number
+  /** A glass tube (level 3's, under the sea, #865): see-through between its ribs, no dark ride inside. */
+  glass?: boolean
 }
 
 /**
