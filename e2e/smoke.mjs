@@ -3761,24 +3761,37 @@ async function countdownCheck(page, levelId) {
   const skipped = await waitPhase('countdown', 30000)
   const introSkip = await page.evaluate(() => ({ skipped: window.__SC_TEST__.intro.skipped, seconds: window.__SC_TEST__.intro.seconds }))
 
-  // 5. Leave a fresh level mid-warm-up (#141); polled in the page so the unmount beats the warm-up's first check.
-  // Level select first unmounts the level (a transition, several frames at ~2 fps), so the start below remounts it.
+  // 5. Leave a fresh level mid-warm-up (#141). Level select first unmounts the level: its scene swap is a transition
+  // (#597) that a software renderer's slow frames starve (~27 s on one core), and a start before it commits keeps the
+  // mounted level, so nothing remounts (#646). Both waits are on their event, bounded like the first warm-up.
   await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
-  await page.waitForFunction(() => !window.__SC_TEST__.levelReady(), null, { timeout: 30000, polling: 100 }).catch(() => {})
+  const unmounted = await page
+    .waitForFunction(() => !window.__SC_TEST__.levelReady(), null, { timeout: 180000, polling: 100 })
+    .then(() => true, () => false)
   await waitFrames(page, 2, { maxMs: 30000 })
-  const leftDuringWarmup = await page.evaluate(([lid, seed]) => new Promise((resolve) => {
+  // The remount's first write of `shaderWarmup` (in its mount effect, before the warm-up's first step) leaves at once.
+  const leftDuringWarmup = !unmounted ? null : await page.evaluate(([lid, seed]) => new Promise((resolve) => {
     const api = window.__SC_TEST__
-    api.shaderWarmup = null
-    api.startLevel(lid, seed)
-    const until = performance.now() + 30000
-    const poll = () => {
-      const w = api.shaderWarmup
-      if (w || performance.now() > until) {
-        api.setPhase('levelSelect')
-        resolve(w ? !w.done : null)
-      } else setTimeout(poll, 0)
+    let warmup = null
+    const leave = (r) => {
+      clearTimeout(timer)
+      delete api.shaderWarmup
+      api.shaderWarmup = warmup
+      api.setPhase('levelSelect')
+      resolve(r)
     }
-    poll()
+    const timer = setTimeout(() => leave(null), 180000)
+    Object.defineProperty(api, 'shaderWarmup', {
+      configurable: true,
+      enumerable: true,
+      get: () => warmup,
+      set: (w) => {
+        warmup = w
+        // Once the mount effect has returned, as a player's click would land.
+        if (w) setTimeout(() => leave(!w.done), 0)
+      },
+    })
+    api.startLevel(lid, seed)
   }), [levelId, SEED])
   await waitFrames(page, 3, { minMs: 1500, maxMs: 30000 })
   const initTimings = await page.evaluate(() => window.__SC_TEST__.initTimings())
@@ -3823,7 +3836,8 @@ async function countdownCheck(page, levelId) {
   else if (afterTap.shotsFired > 0) problems.push(`the skip tap fired ${afterTap.shotsFired} shot(s)`)
   if (!warmIntro) problems.push('a new start of the warm level never reached its intro')
   else if (!skipped || !introSkip.skipped) problems.push('a tap did not skip the intro')
-  if (leftDuringWarmup === null) problems.push('the remounted level never started its shader warm-up')
+  if (!unmounted) problems.push('level select never unmounted the level')
+  else if (leftDuringWarmup === null) problems.push('the remounted level never started its shader warm-up')
   return {
     id: 'countdown',
     ok: problems.length === 0,
