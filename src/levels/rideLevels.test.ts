@@ -5,11 +5,14 @@ import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
 import { PARK_TRACK } from './environments/biomes/themePark/parkTrack'
 import { ARCTIC_LEVEL_TRACK } from './environments/biomes/arctic/arcticLevel'
 import { ARCTIC_TRACK } from './environments/biomes/arctic/arcticTrack'
+import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel'
+import { INFERNO_TRACK } from './environments/biomes/volcanic/infernoTrack'
 
 // The rides built from the ride kit, as the level registry takes them: plain numbers from `scripts/gen-ride-levels.mjs`.
 describe.each([
   ['level1', PARK_LEVEL_TRACK, PARK_TRACK],
   ['level4', ARCTIC_LEVEL_TRACK, ARCTIC_TRACK],
+  ['level5', INFERNO_LEVEL_TRACK, INFERNO_TRACK],
 ] as [string, TrackParams, SplineTrackParams][])('%s ride data', (id, shipped, built) => {
   it('is the built ride (regenerate with `node scripts/gen-ride-levels.mjs`)', () => {
     const round = (_key: string, v: unknown) => (typeof v === 'number' ? Number(v.toPrecision(6)) : v)

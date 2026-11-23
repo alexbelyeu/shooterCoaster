@@ -16,7 +16,7 @@ it("stands the volcano where the ride's base height says (the ground at its site
   expect(Math.round(createHeightFunction('volcanic')(VOLCANO_SITE.x, VOLCANO_SITE.z))).toBe(VOLCANO_BASE_Y)
 })
 
-// The authored ride and the one the game ships (`infernoLevel.ts`, rounded by `gen-inferno-level.mjs`).
+// The authored ride and the one the game ships (`infernoLevel.ts`, rounded by `scripts/gen-ride-levels.mjs`).
 describe.each([
   ['as shipped', getLevelConfig('level5')!.track],
   ['as authored', INFERNO_TRACK],

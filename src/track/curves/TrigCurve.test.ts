@@ -35,7 +35,7 @@ describe.each(levels.map((l) => [l.id, l.track] as const))('track curve for %s',
     const { varA: A, varB: B, varC: C, scalar: s } = track
     const dx = 13 * C * (A + C)
     const dz = 13 * C * (1 + C)
-    const dy = 2 * Math.PI * C * C + (Math.PI / 2) * C + B // covers curve2's envelope too
+    const dy = 2 * C * C + B
     const maxStep = (2 * Math.PI * s * (dx + dy + dz)) / SAMPLES
     let prev = pointAt(curve, 0)
     for (let i = 1; i <= SAMPLES; i++) {
