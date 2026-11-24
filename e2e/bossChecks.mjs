@@ -8,7 +8,8 @@
  * `firstPhase`: the id prefix(es) of the first phase. `minProjectiles`: thrown things (the Yeti's snowballs) on screen
  * in <level>-boss.png, each then shot through processHit as a normal kill that leaves the boss's hp alone. `midPhases`: phases
  * between the first and the last, each cleared after `midSettleS`. `rideTo`: the track fraction to ride to first, for a boss
- * that stays where it is (the Medusa in the Starr) rather than coming to the rider. `passShots`: track fractions ridden to
+ * that stays where it is (the Medusa in the Starr; the Helicopter over the face-off's avenue, #871: summoned wherever the
+ * wall clock had taken the car, it hung over the frame's top edge behind the drones) rather than coming to the rider. `passShots`: track fractions ridden to
  * after `midShot`, each a `<level>-boss-pass-<percent>.png` (the ride past the Medusa, ducked for her last phase). `summonAt`:
  * for a boss that picks its place off the rider's (the Yeti's ridge ahead), the track fraction the ride is frozen at when it
  * is summoned, the camera then going back to `rideTo`: the rider's view from a little before where it arrived, far enough
@@ -23,5 +24,5 @@ export const BOSS_CHECKS = [
   { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1, rideTo: 0.5, summonAt: 0.53 },
   { level: 'level5', minWidthFrac: 0.15, weakPoints: 4, firstPhase: ['vent-', 'heart'], lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 3, midSettleS: 0 },
   { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.59, passShots: [0.627, 0.64] },
-  { level: 'level7', minWidthFrac: 0.15, weakPoints: 3, firstPhase: ['searchlight', 'tail-rotor'], lastPhase: ['hub'], midShot: 'boss-hub', minOnScreen: 2, settleS: 2, midSettleS: 0 },
+  { level: 'level7', minWidthFrac: 0.15, weakPoints: 3, firstPhase: ['searchlight', 'tail-rotor'], lastPhase: ['hub'], midShot: 'boss-hub', minOnScreen: 2, settleS: 2, midSettleS: 0, rideTo: 0.82 },
 ]
