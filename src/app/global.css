@@ -1326,6 +1326,11 @@ canvas {
   margin-top: 0;
 }
 
+/* Gilt doesn't read on the ticket's cream: what opens the Boss Rush is in its ink. */
+.level-card-rush .level-card-locked-hint {
+  color: var(--fair-oxblood);
+}
+
 /* Launch: the picked board comes forward, the rest fall back. */
 .level-select.is-launching .level-card {
   opacity: 0.2;
