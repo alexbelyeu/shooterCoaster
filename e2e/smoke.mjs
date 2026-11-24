@@ -410,6 +410,21 @@ async function pollUntil(page, check, { ms, frames = MIN_FRAMES, pollMs = 500 })
 }
 
 /**
+ * Why a click at the centre fired nothing (#933): the phase, the level and run, the element under the centre, the
+ * bullets, and the hook's `runLog` changes (what started each run). Two CI failures on level 5 ended in a level-1 run
+ * (a golden-balloon kill, fireworks), so the page had left the run under test.
+ */
+async function runReport(page, id, vp) {
+  return page.evaluate(([id, x, y]) => {
+    const t = window.__SC_TEST__
+    const el = document.elementFromPoint(x, y)
+    const at = el ? `<${el.tagName.toLowerCase()}${el.className ? ` class="${el.className}"` : ''}>` : 'nothing'
+    const log = t.runLog.slice(-6).map((e) => `${e.ms} ms f${e.frame} ${e.phase} ${e.level ?? '-'} from ${e.from}`).join(' | ')
+    return `expected ${id}; phase ${t.phase()}, level ${t.stats().currentLevel ?? '-'}, at centre ${at}, bullets ${JSON.stringify(t.bullets())}; run log: ${log}`
+  }, [id, vp.width / 2, vp.height / 2])
+}
+
+/**
  * Play: autofire for a few seconds, then killNearest(5) and screenshot the
  * explosions; then force results and screenshot.
  *
@@ -432,13 +447,14 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   // Desktop mouse: one real click at the screen centre must fire through pointer input.
   const beforeClick = await getStats(page)
   const vp = page.viewportSize()
+  if (beforeClick.phase !== 'playing' || beforeClick.currentLevel !== id) problems.push(`the page left the ${id} run before combat (${await runReport(page, id, vp)})`)
   await page.mouse.move(vp.width / 2, vp.height / 2)
   await page.mouse.down()
   await page.mouse.up()
   await waitFrames(page, 1, { maxMs: 4000, pollMs: 40 })
   const atStart = await getStats(page)
   const mouseShots = atStart.shotsFired - beforeClick.shotsFired
-  if (mouseShots === 0) problems.push('mouse click fired no shot')
+  if (mouseShots === 0) problems.push(`mouse click fired no shot (${await runReport(page, id, vp)})`)
   await page.evaluate(() => window.__SC_TEST__.autoFire(true))
   const fire = await waitFrames(page, COMBAT_MIN_FRAMES, { minMs: COMBAT_SECONDS * 1000, maxMs: COMBAT_SECONDS * 6000 })
   const afterFire = await getStats(page)
