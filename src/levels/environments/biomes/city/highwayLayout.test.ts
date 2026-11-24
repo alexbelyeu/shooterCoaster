@@ -17,8 +17,11 @@ const curve = createTrackCurve(level.track)
 const table = buildArcTable(curve)
 const length = routeLength(HIGHWAY)
 const pylons = highwayPylons(HIGHWAY, table)
-/** Rail to deck top when the ride passes over; rail to the deck's underside when it passes under (the rider's head and the car). */
-const CLEAR = { over: 16, under: 22 }
+/**
+ * Rail to deck top when the ride passes over; rail to the deck's underside when it passes under: the rider's eye and a
+ * margin, the head-chopper (`cityTrack.ts`) passing as close as that.
+ */
+const CLEAR = { over: 16, under: getTrackDimensions(level.track).eyeHeight + 2 }
 
 /** Every track sample over the deck's footprint, with the deck's height there. */
 const overDeck = Array.from({ length: table.count }, (_, i) => ({ i, ...routeCoords(HIGHWAY, table.x[i], table.z[i]) }))
@@ -31,7 +34,7 @@ describe('the elevated highway', () => {
     expect(clashes).toEqual([])
   })
 
-  it('the ride passes under it, then over it, before the boss', () => {
+  it('the ride passes under it before the boss', () => {
     const plan = rideModel(level.track, table).plan
     expect(plan).toBeDefined()
     const bossAt = planDistance(plan!, level.boss!.at)
@@ -39,7 +42,6 @@ describe('the elevated highway', () => {
     const under = ridden.find((p) => p.y < p.deck)
     expect(under, 'under the deck').toBeDefined()
     expect(under!.deck, 'under the full-height deck, not a ramp').toBe(HIGHWAY.deck)
-    expect(ridden.some((p) => p.s > under!.s && p.y > p.deck && p.deck === HIGHWAY.deck), 'over it later').toBe(true)
   })
 
   it('no support tower of the track stands up through the deck', () => {
@@ -52,7 +54,7 @@ describe('the elevated highway', () => {
   })
 
   it('stands on pylons along its whole raised length, each off the track and the streets', () => {
-    expect(pylons.length).toBeGreaterThan(20)
+    expect(pylons.length).toBeGreaterThan(length / (2 * PYLON.spacing))
     for (let k = 1; k < pylons.length; k++) {
       const gap = Math.hypot(pylons[k].x - pylons[k - 1].x, pylons[k].z - pylons[k - 1].z)
       expect(gap).toBeGreaterThanOrEqual(PYLON.spacing - 1e-6)

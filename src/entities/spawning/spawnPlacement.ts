@@ -467,7 +467,7 @@ export interface PlaceWaveInput {
   ride: RideAhead
   bounds?: PlacementBounds
   /** Moves an air member's spot out of the world's buildings (`BiomeDefinition.clearAir`). */
-  clearAir?: (p: Vec3) => Vec3
+  clearAir?: SpotClearer
 }
 
 /** World placements for a formation wave's slots, in slot order. */
@@ -476,7 +476,6 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
   // Inside an interior's walls, back on its surface (a clamped air slot keeps its clearance under the roof).
   const keepIn = (p: Vec3) => (bounds ? clampToBounds(settle(clampToBounds(p, bounds), surface, groundFn), bounds) : p)
   const surface = ENEMY_PLACEMENT[type].surface
-  const clear = surface === 'air' && clearAir ? clearAir : (p: Vec3) => p
   const reach = maxReadableDistance(type)
   const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
   const step = groupStep(table, formation, groups, ride)
@@ -512,8 +511,11 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
       position = settle(slotWorld(formation, f, local), surface, groundFn)
     }
     const { from, spin } = entryStart(formation, f, position, groundFn)
+    const placed = keepIn(outsideNearField(keepIn(position), camera))
+    // Seen by the looks from where the group is framed (`formationFrame`) on
+    const lands = slot.group * step + ride.entry + VIEW_LEAD
     return {
-      position: clear(keepIn(outsideNearField(keepIn(position), camera))),
+      position: surface === 'air' && clearAir ? clearAir(placed, (q) => eyesSeeing(table, riderIndex, lands, q, reach, ride.trackScale)) : placed,
       from: keepIn(outsideNearField(keepIn(from), camera)),
       spin,
       entrySeconds: ENTRY_SECONDS + (ENTRY_STAGGER * slot.index) / Math.max(1, slot.groupSize - 1),
@@ -689,7 +691,7 @@ export interface PlaceTracksideInput {
   bounds?: PlacementBounds
   keepOff?: readonly KeepOff[]
   /** Moves a ground spot onto open ground (`BiomeDefinition.clearGround`: the city's pavements), given the eyes that see a spot. */
-  clearGround?: GroundClearer
+  clearGround?: SpotClearer
 }
 
 export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride, bounds, keepOff = [], clearGround }: PlaceTracksideInput): Vec3[] {
@@ -789,10 +791,11 @@ function whereTheApproachLooks(
 }
 
 /**
- * A biome's move of a ground spot `p` onto open ground. `eyesSeeing` gives, for a candidate spot, the eyes of the
- * approach's looks that have it in their cone, so the biome can pick the one its own buildings hide least (#963).
+ * A biome's move of a spot `p` out of its buildings: a ground enemy onto open ground (#963), an air enemy into open air
+ * (#871). `eyesSeeing` gives, for a candidate spot, the eyes of the approach's looks that have it in their cone, so the
+ * biome can pick the one its own buildings hide least; without it (a scatter wave has no approach) the nearest clear spot.
  */
-export type GroundClearer = (p: Vec3, eyesSeeing: (q: Vec3) => Vec3[]) => Vec3
+export type SpotClearer = (p: Vec3, eyesSeeing?: (q: Vec3) => Vec3[]) => Vec3
 
 /** The eyes of the approach's looks, every `FACING_STEP` from `VIEW_LEAD` to `FACING_LAST` before the slot, that have `p` in their cone. */
 function eyesSeeing(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number, ground?: HeightFunction): Vec3[] {

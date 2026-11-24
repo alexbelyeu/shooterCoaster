@@ -24,7 +24,7 @@ import { FIRE_IMP_HIT_RADIUS } from '../enemies/fireImpHop.hot'
 import {
   clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge,
   trackPoint, tracksideSlots,
-  type FormationMotion, type FormationSlot, type GroundClearer, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot,
+  type FormationMotion, type FormationSlot, type SpotClearer, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot,
 } from './spawnPlacement'
 import type { Vec3 } from '@/utils/vec3'
 import {
@@ -52,9 +52,9 @@ interface EnemySpawnerProps {
   /** Landmarks a ground enemy stood away from the track keeps out of (`BiomeDefinition.keepOff`). */
   keepOff?: readonly KeepOff[]
   /** Moves an air enemy's spot out of the world's buildings (`BiomeDefinition.clearAir`). */
-  clearAir?: (p: Vec3) => Vec3
+  clearAir?: SpotClearer
   /** Moves a ground enemy's trackside spot onto open ground (`BiomeDefinition.clearGround`). */
-  clearGround?: GroundClearer
+  clearGround?: SpotClearer
   /** The track's hard route (#720), where a hard-route wave arrives; null without a junction. */
   hardRoute?: HardRoute | null
 }
@@ -261,7 +261,8 @@ export default function EnemySpawner({
       // On their walls already, where they enter: never pushed out of the near field.
       if (members[0]?.wall) return members.map((e) => [e.id, { position: e.position!, wall: e.wall }])
       if (!wave.formation || wave.formation === 'scatter') {
-        const clear = ENEMY_PLACEMENT[wave.type].surface === 'air' && clearAir ? clearAir : (p: Vec3) => p
+        // A scatter spot has no approach to be seen from, so the clearer takes the nearest open spot.
+        const clear = ENEMY_PLACEMENT[wave.type].surface === 'air' && clearAir ? (p: Vec3) => clearAir(p) : (p: Vec3) => p
         return members.map((e) => [e.id, { position: toVector3(clear(clampToBounds(outsideNearField(e.position!, camera), bounds))) }])
       }
       const placed = placeFormationWave({

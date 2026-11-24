@@ -1,6 +1,6 @@
 import type { BiomeDefinition } from '@/levels/environments/shared/types'
 import { PARTICLE_PRESETS } from '@/levels/environments/shared/particlePresets'
-import { COLOR_RAMP, LANDMARK_SITE, SPIRE_HEIGHT } from './config'
+import { COLOR_RAMP, HERO_SHOT } from './config'
 import { createAsphaltMaterial } from './cityShaders'
 import Decorations from './Decorations'
 import { trackExtent } from '@/levels/environments/shared/trackScatter'
@@ -20,7 +20,7 @@ export const city: BiomeDefinition = {
   // Its air enemies are hover drones: each spot clears the towers by the drone's drift
   clearAir: (groundFn, track) => {
     const towers = cityTowers(track, trackExtent(track))
-    return (p) => clearOfTowers(towers, p, groundFn(p.x, p.z), DRONE_CLEARANCE)
+    return (p, eyesSeeing) => clearOfTowers(towers, p, groundFn(p.x, p.z), DRONE_CLEARANCE, eyesSeeing)
   },
   // Its ground enemies are billboard bots (#963): each trackside spot moves onto the nearby pavement the rider sees best
   clearGround: (_groundFn, track) => {
@@ -28,5 +28,5 @@ export const city: BiomeDefinition = {
     const index = buildTrackIndex(track)
     return (p, eyesSeeing) => onPavement(towers, index, p, eyesSeeing)
   },
-  hero: { x: LANDMARK_SITE.x, z: LANDMARK_SITE.z, focus: SPIRE_HEIGHT * 0.45, orbitRadius: 700, orbitHeight: 360 },
+  hero: HERO_SHOT,
 }
