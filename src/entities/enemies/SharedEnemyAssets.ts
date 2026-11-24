@@ -2,6 +2,8 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, placedParts, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
 import { withRim } from './enemyRim'
+import { DRAKE_PARTS, withDrakePose } from './infernoEnemyAssets'
+import { DRAKE_ROAR, poseDrake } from './drakePose.hot'
 import { BALLOON_COLORS, CROW_BODY as CROW_BODY_HEX, CROW_SHEEN as CROW_SHEEN_HEX, SCORPION_BODY_COLOR, SCORPION_PINCER_COLOR, SCORPION_LEG_COLOR, JELLY_COLORS, FFISH_BODY, FFISH_BELLY, CLIMBER_SHIRT, CLIMBER_TROUSERS, RAT_FUR, RAT_BELLY, DUST_GREY, DUST_LIGHT, DUST_DARK, DUST_CHALK, LANTERNFLY_FOREWING, LANTERNFLY_RED, LANTERNFLY_BODY } from './enemyPalette'
 
 type Vec3 = [number, number, number]
@@ -1098,3 +1100,10 @@ export const CROW_FLINCH_MAT = withCrowWings(ENEMY_HIT_FLASH_MAT.clone(), { valu
 export const createLanternflyFlashMaterial = (wings: { value: number }) => withLanternflyWings(ENEMY_HIT_FLASH_MAT.clone(), wings)
 /** Only for ShaderWarmup, like LANTERNFLY_MAT. */
 export const LANTERNFLY_FLASH_MAT = createLanternflyFlashMaterial({ value: 0 })
+
+/** The drake's hit flash, holding its roar (`DRAKE_ROAR`): one for every drake. */
+export const DRAKE_ROAR_MAT = (() => {
+  const roar = Array.from({ length: DRAKE_PARTS }, () => new THREE.Matrix4())
+  poseDrake(roar, DRAKE_ROAR)
+  return withDrakePose(ENEMY_HIT_FLASH_MAT.clone(), { value: roar })
+})()

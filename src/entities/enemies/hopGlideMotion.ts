@@ -40,6 +40,9 @@ export const HOP = {
   hops: 16,
   /** Seconds to turn to a new heading. */
   turn: 0.3,
+  /** One shot within `startleRadius` of it (#928) startles it: its clock runs `startleRate` times faster to the end of its sit, and it takes off. */
+  startleRadius: 160,
+  startleRate: 8,
 } as const
 
 export interface HopRoute {
@@ -67,6 +70,9 @@ export interface HopPose {
   wings: number
   phase: HopPhase
 }
+
+/** Its route clock `moved` game seconds on; a startled one hurries through its sit (`HOP.startleRate`). */
+export const hopClock = (t: number, moved: number, startled: boolean) => t + moved * (startled ? HOP.startleRate : 1)
 
 export const newHopPose = (): HopPose => ({ u: 0, v: 0, off: HOP.standoff, heading: 0, wings: 0, phase: 'sit' })
 

@@ -164,7 +164,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Ride the walls of the climbing gym',
     order: 6,
     biome: 'gym',
-    maxScore: 14 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1422 (the V8's rats included) + the Medusa's eight snakes and reward (bossSpecs.ts) = 2322
+    maxScore: 20 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1512 (the V8's rats included) + the Medusa's eight snakes and reward (bossSpecs.ts) = 2412
     message: 'You sent the Climbing Gym!',
     nextLevel: 'level7',
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
@@ -173,8 +173,8 @@ const LEVELS: LevelConfig[] = [
     // Every enemy is a gym pest: no birds indoors (#664). Climbers are bystanders (#518): the first wave brings some, to
     // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more over
     // the roll (8 s), rats in the Training Area's dark cave (12 s), the lanternflies (#575) at 20 s, their swarm in groups
-    // along the ride (`placeWallSwarm`): beside the car up Alaska, then on the Starr ahead of the drop, and the pack in the
-    // pit from 25 s, before the dyno.
+    // landing one after another on the Alaska walls beside the climbing car, each where the rider looks as it lands
+    // (`placeWallSwarm`), the last on the Starr past the crest, and the pack in the pit from 25 s, before the dyno.
     // Shoot the V2 sign and the V8 way round (#702) brings its own rats (#720): from 17 s, once the sign is shot (it can be
     // until the car reaches it, 18.7 s), they line the branch ahead (ridden 18.9–21.5 s), and only that run meets them.
     ...paceLevel({
@@ -182,7 +182,7 @@ const LEVELS: LevelConfig[] = [
         { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 8, bystanders: { type: 'climber', count: 4 } },
         { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 4 },
         { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 8, bystanders: { type: 'climber', count: 3 } },
-        { type: 'lanternfly', count: 14, waveLabel: 'Lanternflies!', weight: 5 },
+        { type: 'lanternfly', count: 20, waveLabel: 'Lanternflies!', weight: 5 },
         { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 20, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',

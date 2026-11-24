@@ -555,6 +555,8 @@ export interface E2ESight extends SightCounts {
   levelTime: number
   bossStage: E2EBossStage
   bossFramed: boolean
+  /** The shootable enemies by type (#928: how long a wave's own enemies last). */
+  byType: Record<string, number>
 }
 
 export interface E2EEnemyOnScreen {
@@ -936,7 +938,7 @@ function isMounted(t: CollisionTarget) {
   return t.getPosition().y > -9000
 }
 
-const NO_SIGHT: E2ESight = { levelTime: 0, shootable: 0, occluded: 0, tiny: 0, ids: [], bossStage: 'none', bossFramed: false }
+const NO_SIGHT: E2ESight = { levelTime: 0, shootable: 0, occluded: 0, tiny: 0, ids: [], bossStage: 'none', bossFramed: false, byType: {} }
 
 function readSight(): E2ESight {
   const cam = probeCamera
@@ -954,7 +956,12 @@ function readSight(): E2ESight {
   }
   const counts = countSight(targets, cam, collectOccluders(scene, cam, skip))
   const bossFramed = e2eBoss.stage === 'active' && counts.ids.some((id) => isBossId(id))
-  return { ...counts, levelTime: e2eLevelTime, bossStage: e2eBoss.stage, bossFramed }
+  const byType: Record<string, number> = {}
+  for (const id of counts.ids) {
+    const type = enemyRegistry.get(id)?.type
+    if (type) byType[type] = (byType[type] ?? 0) + 1
+  }
+  return { ...counts, levelTime: e2eLevelTime, bossStage: e2eBoss.stage, bossFramed, byType }
 }
 
 /** Weapon pickups, a junction's switch and bystanders are targets too, but no enemy. */

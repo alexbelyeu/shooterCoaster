@@ -144,7 +144,7 @@ export interface BiomeDefinition {
   floor?: HeightFunction
   /** An interior's walls and roof, inset: enemies are placed inside them, never behind a wall. */
   bounds?: PlacementBounds
-  /** Landmarks and big props a ground enemy stood away from the track keeps out of (`spawnPlacement.ts` `whereTheApproachLooks`). */
+  /** Landmarks and big props a ground enemy stood away from the track keeps out of (`spawnPlacement.ts` `whereTheApproachLooks`), and a swimmer's circle (`swimOrbit.ts`). */
   keepOff?: (groundFn: HeightFunction, track: ArcTable) => readonly KeepOff[]
   /** Moves an air enemy's placed spot out of the world's buildings (the city's towers, #323): scatter and formation alike. */
   clearAir?: (groundFn: HeightFunction, track: ArcTable) => (p: Vec3) => Vec3

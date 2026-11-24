@@ -132,6 +132,8 @@ export interface WallSlot {
   u: number
   v: number
   seed: number
+  /** Seconds after its wave arrives that it does (a swarm's later groups, #928); none, with the wave. */
+  after?: number
 }
 
 /** A wall enemy's origin off the wall's face, world units: its hands and feet on the wall. */

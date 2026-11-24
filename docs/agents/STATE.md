@@ -35,7 +35,7 @@ highest degree**. That is M4.
 ### Levels (`src/levels/LevelRegistry.ts`)
 
 Every level: 60 s, waves on `levels/pacing.ts` over the first 45 s, boss at 40 s, a 10 s intro tour
-before Ready. Levels 1–5 still ride trig loops (`curve1` / `curve2`); level 6 rides a v2 ride-kit spline.
+before Ready. Levels 2 and 3 still ride trig loops (`curve1`); levels 1 and 4–6 ride v2 ride-kit splines (`docs/RIDE-KIT.md`).
 
 | Level | Biome | Waves / finale | Landmarks / features | Director's read |
 |---|---|---|---|---|
