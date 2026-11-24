@@ -946,7 +946,11 @@ function readSight(): E2ESight {
   if (!cam || !scene) return { ...NO_SIGHT, levelTime: e2eLevelTime, bossStage: e2eBoss.stage }
   const skip = new Set<THREE.Object3D>()
   for (const { object } of enemyRegistry.values()) skip.add(object)
-  if (e2eBoss.handle) skip.add(e2eBoss.handle.body)
+  if (e2eBoss.handle) {
+    skip.add(e2eBoss.handle.body)
+    // A weak point is a target, not an occluder: the Kraken's eye (its pupil and glint stand past its hit radius) hid itself.
+    for (const part of e2eBoss.handle.parts.values()) skip.add(part)
+  }
   const targets: SightTarget[] = []
   for (const t of getCollisionTargets()) {
     if (!isLive(t)) continue
