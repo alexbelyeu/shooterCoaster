@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel, shippedLevels } from '@/levels/shippedLevels'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { buildArcTable } from './arcLength'
@@ -9,7 +9,7 @@ import { getTunnelDims, otherPassInTube, ribCentres, tunnelSpans, withDarkSectio
 import { planTowers } from './supportTowers'
 import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
 
-const level = getLevelConfig('level1')!
+const level = shippedLevel('level1')
 const curve = createTrackCurve(level.track)
 const plain = buildArcTable(curve)
 const dims = getTrackDimensions(level.track)
@@ -27,7 +27,7 @@ describe('tunnel placement', () => {
   })
 
   it("places every level's tunnels: none over the seam, short of portal room or overlapping", () => {
-    for (const l of getAllLevels().filter((x) => x.track.tunnels)) {
+    for (const l of shippedLevels().filter((x) => x.track.tunnels)) {
       const t = buildArcTable(createTrackCurve(l.track))
       expect(() => tunnelSpans(t, l.track.tunnels!, getTrackDimensions(l.track).trackScale), l.id).not.toThrow()
     }
@@ -36,7 +36,7 @@ describe('tunnel placement', () => {
   it('leaves a track without tunnels the same table', () => {
     expect(withTunnels(plain, undefined, 1)).toBe(plain)
     expect(withTunnels(plain, [], 1)).toBe(plain)
-    for (const l of getAllLevels().filter((x) => !x.track.tunnels)) {
+    for (const l of shippedLevels().filter((x) => !x.track.tunnels)) {
       const t = buildArcTable(createTrackCurve(l.track))
       expect(withTunnels(t, l.track.tunnels, 1)).toBe(t)
     }

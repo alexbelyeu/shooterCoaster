@@ -20,9 +20,9 @@ describe('world chunks (#862)', () => {
     expect(needed.filter((type) => !held.includes(type))).toEqual([])
   })
 
-  it('no game module imports the all-biome registries: a world reaches the game only through its chunk', () => {
+  it('no game module imports the all-biome registries or every ride: a world reaches the game only through its chunk', () => {
     const src = join(__dirname, '../..')
-    const registries = /from '[^']*\/(biomeRegistry|enemyComponents|bossComponents)'/
+    const registries = /from '[^']*\/(biomeRegistry|enemyComponents|bossComponents|shippedLevels)'/
     const offenders: string[] = []
     for (const entry of readdirSync(src, { recursive: true, encoding: 'utf8' })) {
       if (!/\.tsx?$/.test(entry) || /\.test\.tsx?$/.test(entry) || entry.startsWith('dev/')) continue

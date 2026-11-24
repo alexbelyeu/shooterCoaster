@@ -32,9 +32,9 @@ import { useEffect } from 'react'
 import { dailyKey, dailyLevel, dailySeed, type DailyStreak } from '@/levels/daily'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useGameStore } from '@/store/useGameStore'
+import { medalRun, useGameStore } from '@/store/useGameStore'
 import type { RideVariant, RunMode } from '@/types/game'
-import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig, levelRide } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType, EnemyWave, RideBeat } from '@/types/level'
@@ -277,6 +277,13 @@ export interface SCTestApi {
   primeCombo: (count: number) => void
   /** Force the results phase. */
   endLevel: () => void
+  /** The medal ids the current run has won so far (`levels/medals.ts` `medalsWon`, #879). */
+  medalsWon: () => string[]
+  /** A level's medal ids in order, and the saved medals to put in the store (and so localStorage). */
+  levelMedalIds: (levelId: string) => string[]
+  setSavedMedals: (medals: Record<string, string[]>) => void
+  /** The longest chain any medal asks for (`levels/medals.ts`): a run primed to it wins its level's combo medal. */
+  longestComboMedal: number
   /** What the results share menu's Copy link puts on the clipboard for the current level and score (`text url`), or null (and always null in the portal build, which has no Share). */
   /** `worldRank` (0-based): the line a run on the World top 10 shares (#445). */
   shareText: (worldRank?: number | null) => string | null
@@ -946,7 +953,11 @@ function readSight(): E2ESight {
   if (!cam || !scene) return { ...NO_SIGHT, levelTime: e2eLevelTime, bossStage: e2eBoss.stage }
   const skip = new Set<THREE.Object3D>()
   for (const { object } of enemyRegistry.values()) skip.add(object)
-  if (e2eBoss.handle) skip.add(e2eBoss.handle.body)
+  if (e2eBoss.handle) {
+    skip.add(e2eBoss.handle.body)
+    // A weak point is a target, not an occluder: the Kraken's eye (its pupil and glint stand past its hit radius) hid itself.
+    for (const part of e2eBoss.handle.parts.values()) skip.add(part)
+  }
   const targets: SightTarget[] = []
   for (const t of getCollisionTargets()) {
     if (!isLive(t)) continue
@@ -1057,6 +1068,14 @@ function logRunChanges(api: SCTestApi) {
 export function installE2EApi() {
   if (!isE2E || window.__SC_TEST__) return
   eventBus.taps.add((event) => frameEvents.add(event))
+  // The medal table loads with the screens, not the startup JS this hook is part of; it has arrived long before a run ends.
+  let medals: typeof import('@/levels/medals') | null = null
+  void import('@/levels/medals').then((m) => (medals = m))
+  // Throw rather than answer "no medals" while the chunk is on its way: a slow runner's failure then says so.
+  const loadedMedals = () => {
+    if (!medals) throw new Error('the medals chunk (@/levels/medals) has not loaded yet')
+    return medals
+  }
   const api: SCTestApi = {
     frames: 0,
     avgFrameMs: 0,
@@ -1225,6 +1244,15 @@ export function installE2EApi() {
       autoFireEnabled = false
       useGameStore.getState().setPhase('results')
     },
+    medalsWon: () => {
+      const s = useGameStore.getState()
+      return s.currentLevel ? loadedMedals().medalsWon(s.currentLevel, medalRun(s)) : []
+    },
+    get longestComboMedal() {
+      return loadedMedals().LONGEST_COMBO_MEDAL
+    },
+    levelMedalIds: (levelId) => loadedMedals().levelMedals(levelId).map((m) => m.id),
+    setSavedMedals: (medals) => useGameStore.setState({ savedMedals: medals }),
     shareText: (worldRank: number | null = null) => {
       const s = useGameStore.getState()
       // The portal build has no Share (#254): its bundle must not carry the share link (scripts/portal/rules.mjs).
@@ -1258,7 +1286,7 @@ export function installE2EApi() {
     rideFastest: null,
     rideBeats: () => {
       const id = useGameStore.getState().currentLevel
-      return (id ? getLevelConfig(id)?.track.rideV2?.beats : undefined) ?? []
+      return (id ? levelRide(id)?.track.rideV2?.beats : undefined) ?? []
     },
     sight: readSight,
     graphics: () => {

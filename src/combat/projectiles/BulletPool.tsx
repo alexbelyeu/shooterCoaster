@@ -44,6 +44,7 @@ export default function BulletPool({
         muzzleOffset: new THREE.Vector3(),
         muzzlePending: false,
         travelled: 0,
+        firedInFrenzy: false,
         pierce: 1,
         hitCount: 0,
         hitTargets: new Array(MAX_PIERCE).fill(null),
@@ -82,6 +83,7 @@ export default function BulletPool({
       bullet.hitScale = hitScale
       bullet.muzzlePending = true
       bullet.travelled = 0
+      bullet.firedInFrenzy = useGameStore.getState().frenzy !== 'off'
       resetPierce(bullet, pierce)
       return true
     },
@@ -183,6 +185,7 @@ export default function BulletPool({
           if (segmentHitsSphere(a.x, a.y, a.z, b.x, b.y, b.z, pos.x, pos.y, pos.z, rSq)) {
             target.hitThisFrame = true
             target.firstHitThisFrame = noCountedHit(bullet, countsForAccuracy)
+            target.hitInFrenzy = bullet.firedInFrenzy
             if (recordHit(bullet, target)) {
               bullet.alive = false
               bullet.position.set(0, -9999, 0)

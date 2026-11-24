@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { buildArcTable } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
@@ -135,7 +135,7 @@ describe('gait and facing', () => {
 })
 
 describe('perch (level 2)', () => {
-  const curve = createTrackCurve(getLevelConfig('level2')!.track)
+  const curve = createTrackCurve(shippedLevel('level2').track)
   const table = buildArcTable(curve)
   const groundFn = createTerrainSurface(
     createHeightFunction('desert', sampleTrackPath((t) => curve.getPointAt(t))),
@@ -152,10 +152,14 @@ describe('perch (level 2)', () => {
 
   it('finds a spot ahead of the rider, clear of the rails, towers, landmarks and mesas, almost everywhere on the ride', () => {
     let found = 0
-    for (const at of riders) {
+    const misses: number[] = []
+    for (const [i, at] of riders.entries()) {
       const input = view(at)
       const perch: Perch = { x: 0, z: 0, slot: 0, sign: 1 }
-      if (!pickPerch(perch, input)) continue
+      if (!pickPerch(perch, input)) {
+        misses.push(i / riders.length)
+        continue
+      }
       found++
       expect(perchClear(input, perch.x, perch.z)).toBe(true)
       expect(index.near(perch.x, perch.z, PERCH.footprint)).toBe(false)
@@ -164,7 +168,9 @@ describe('perch (level 2)', () => {
       const dz = perch.z - input.camera.z
       expect(dx * input.forwardX + dz * input.forwardZ).toBeGreaterThan(500)
     }
-    expect(found / riders.length).toBeGreaterThan(0.9)
+    // The misses are the first drop, facing the Pyramid it dives into (#864), long before the boss: none in its turn home.
+    expect(found / riders.length).toBeGreaterThanOrEqual(0.9)
+    expect(misses.filter((share) => share > 0.8)).toEqual([])
   })
 
   it('keeps its slot and side while they stay clear', () => {

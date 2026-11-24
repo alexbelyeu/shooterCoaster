@@ -5,7 +5,7 @@ import { rideModel } from '@/track/ridePhysics'
 import { BEAT_TOLERANCE_SECONDS, planTimeAt } from '@/track/rideV2'
 import { eyeClearance } from '@/track/elements/headChopper'
 import { getTrackDimensions } from '@/track/trackDimensions'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import type { TrackParams } from '@/types/level'
 import { TRACK_SOFT_RADIUS } from '@/utils/terrainNoise'
 import { arctic } from '.'
@@ -24,7 +24,7 @@ const fortress = arctic.keepOff!(() => 0, buildArcTable(createTrackCurve(ARCTIC_
 
 // The authored ride and the one the game ships (`arcticLevel.ts`, rounded to whole units by `gen-ride-levels.mjs`).
 describe.each([
-  ['as shipped', getLevelConfig('level4')!.track],
+  ['as shipped', shippedLevel('level4').track],
   ['as authored', ARCTIC_TRACK],
 ] as [string, TrackParams][])("level 4's ride (#866), %s", (_name, track) => {
   const curve = createTrackCurve(track)
@@ -70,7 +70,7 @@ describe.each([
     expect(near).toBeLessThan(4 * eye)
     const [enter, leave] = [planTimeAt(plan, from), planTimeAt(plan, to)]
     expect(leave - enter).toBeGreaterThan(2.5)
-    expect(leave).toBeLessThan(getLevelConfig('level4')!.enemies.find((w) => w.weather === 'blizzard')!.spawnDelay!)
+    expect(leave).toBeLessThan(shippedLevel('level4').enemies.find((w) => w.weather === 'blizzard')!.spawnDelay!)
   })
 
   it('crests the airtime hill heading into the aurora', () => {
@@ -103,7 +103,7 @@ describe.each([
 })
 
 describe("level 4's ice cave keeps scenery out (#911)", () => {
-  const track = getLevelConfig('level4')!.track
+  const track = shippedLevel('level4').track
   const plain = buildArcTable(createTrackCurve(track))
   // As `LevelScene` builds it: the vault's span is on the table every prop is placed against.
   const table = withDarkSections(plain, track.darkSections)

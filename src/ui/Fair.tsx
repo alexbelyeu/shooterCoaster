@@ -52,3 +52,14 @@ export function FairStars({ earned, label }: { earned: number; label: string }) 
     </span>
   )
 }
+
+/** A gallery prize medal on its ribbon: gilt with a tar edge when won, sunk into the board when not (`.fair-medal`). */
+export function FairMedal({ earned }: { earned: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`fair-medal${earned ? ' earned' : ''}`} aria-hidden="true">
+      <path className="fair-medal-ribbon" d="M8 12.5 5 22l3.2-1.6L10 23l2.2-9M16 12.5l3 9.5-3.2-1.6L14 23l-2.2-9" />
+      <circle cx="12" cy="9" r="7.2" />
+      <circle className="fair-medal-ring" cx="12" cy="9" r="4" />
+    </svg>
+  )
+}

@@ -5,7 +5,7 @@ import { rideModel } from '@/track/ridePhysics'
 import { BEAT_TOLERANCE_SECONDS } from '@/track/rideV2'
 import { eyeClearance } from '@/track/elements/headChopper'
 import { getTrackDimensions } from '@/track/trackDimensions'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import type { TrackParams } from '@/types/level'
 import { buildParkRide, PARK_TRACK } from './parkTrack'
 import { RIDES } from './parkSpec'
@@ -20,7 +20,7 @@ const wheelBox = {
 // The authored ride and the one the game ships (`parkLevel.ts`, rounded to whole units by `scripts/gen-ride-levels.mjs`):
 // a regeneration that rounds the drop under 60° or the near miss out of its band fails here.
 describe.each([
-  ['as shipped', getLevelConfig('level1')!.track],
+  ['as shipped', shippedLevel('level1').track],
   ['as authored', PARK_TRACK],
 ] as [string, TrackParams][])("level 1's ride (#863), %s", (_name, track) => {
   const curve = createTrackCurve(track)

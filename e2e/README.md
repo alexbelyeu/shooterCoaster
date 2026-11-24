@@ -35,7 +35,7 @@ screen / covers the centre / overlaps the HUD / points > 25° off the tracer of 
 checked in mobile portrait + landscape, and in portrait at four extreme aims with the combo meter showing),
 the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
-reveal (`data-sequence="done"`), lacks a stat line (its `data-stat` hits, accuracy, combo, time; hits must start with the kills) or the
+reveal (`data-sequence="done"`), shows no medal or not exactly the medals the run won, unsaved (#879: the run's last kill lands on a chain primed to the longest medal chain), lacks a stat line (its `data-stat` hits, accuracy, combo, time; hits must start with the kills) or the
 Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), offers Next Level while the next level is locked (or hides it while open), shows NaN, or disagrees with `stats()` on score or kills, has no local leaderboard fully inside 1280×720, or (first level) Enter with the mute button focused doesn't play on;
 on the first level the leaderboard is seeded so the run places 4th: the row must open for initials at the last ones used (AAA),
 all with the Share button focused (#357): ArrowUp must cycle a letter, typing r e s must give RES without leaving or toggling mute (R and S are letters there), and Enter must confirm (not open the share menu), store
@@ -49,7 +49,7 @@ an iPhone 13-like touch context (390x844) taps WORLDS (at its centre, `tapCentre
 again in 844x390 landscape taps the canvas 10x, each tap 15–30 px off an on-screen
 enemy (game time frozen while tapping, and it fails if the freeze did not hold: `timeScale` must still be 0 after the taps), and requires kills (touch aim assist); checks
 camera aspect == canvas aspect in portrait, landscape and after rotating back, that the
-HUD is inside the viewport with no overlap in both orientations, that the SFX node count doesn't grow across the taps and the music ducks while time is frozen (and opens again within two frames of `timeScale` 1), runs the `audioBurst` SFX stress in portrait and after rotating (every desktop level runs it too: any page error or dropped sound fails, and so do fewer than 10 of its 10 spaced kills reaching the engine, `killsPlayed`, summary `audioBurst=ok kills10/10`), and taps Pause (`mobile-level-select.png`, `mobile-level1.png`,
+HUD is inside the viewport with no overlap in both orientations, that the SFX node count doesn't grow across the taps and the music ducks while time is frozen (and opens again within two frames of the game's `timeScale` back at 1: once `setTimeScale(1)` lets a FRENZY or last-kill slow-mo the taps set off run out, at most 8 s), runs the `audioBurst` SFX stress in portrait and after rotating (every desktop level runs it too: any page error or dropped sound fails, and so do fewer than 10 of its 10 spaced kills reaching the engine, `killsPlayed`, summary `audioBurst=ok kills10/10`), and taps Pause (`mobile-level-select.png`, `mobile-level1.png`,
 `mobile-level1-landscape.png`; `--skip-desktop` runs only that). **Look at the screenshots** with the Read tool — that is how you
 playtest visually. Waits are polled against the frame counter because software
 rendering can run at ~1 fps; tune with `--seconds`, `--combat-seconds`,
@@ -78,12 +78,14 @@ no such row), turns that toggle on, picks Low and a music volume, cycles Med / H
 and fails if the renderer's GPU textures grew over the last two cycles (each change rebuilds the post composer, #249),
 closes with Esc, and requires both to survive a reload and the title's "Internal device, not tracked" marker to show after it. A `quality` step loads the first level at device dpr 2 with the default quality and with
 `?quality=low` (any preset name works as a URL override and is saved like the setting) on the same seed and frozen
-track point: low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
-A `levelSelect` step seeds saved progress (3★ + 1★) and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
+track point, each held at the level's start from its first frame (level timer, game clock and ride at 0, so no enemy flies in
+however long the level takes to load) and counted once its draw count has held for 5 frames (`waitDrawsSettled`, #972: the same counts on
+any runner): low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
+A `levelSelect` step seeds saved progress (3★ + 1★), two of the first level's medals and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
 and requires one card per level plus the Daily card, each top's initials on its card after the reload, the right locked count and `★ x / 15` total, every card
-inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move focus, Enter on a
+inside 1280×720 with no sideways scroll, exactly one medal ticket out (#978: the focused card's, its three feat lines inside the viewport, at open and after ArrowLeft), and keyboard-only play (arrows move focus, Enter on a
 locked card does nothing, Enter on an open one plays the launch transition and starts that level);
-the phone run checks its cards fit 390 px.
+the phone run checks its cards fit 390 px and every open card shows its medal ticket.
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in
 daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, New best, no Next Level and no initials entry (the campaign boards stay empty),
 send the new best once to the stubbed online board with `daily` = today and the last initials and show the day's World board it answers (#854, `data-source="today"`, `daily-results.png`); the second load's
@@ -191,7 +193,7 @@ and land a frame or more after the frame that caused them, more frames on a slow
 enemies by whole steps, so the ride shot's enemy count and the pacing gaps differed run to run and between a local session
 and CI. React reports commits to a devtools hook `newPage` defines before the page loads (`ctx.addInitScript`). Bosses move
 on the game clock (`core/gameClock.ts` `gameClockStep`), never the frame's delta, so they keep pace with the level too.
-A `pacing` step (#450) rides every level's whole run, GO to the end, in settled steps of `--pacing-step` level seconds
+A `pacing` step (#450) rides every level's whole run, GO to the end (a boss win with nothing left ends it early, #961: `samplingCutShort`), in settled steps of `--pacing-step` level seconds
 (default 0.5, so the run is the same on any runner; `rideRate` 1, the ride a 60 fps player gets), the level time never held,
 played as a player (#925): `autoFire(true, PLAYER_HITS_PER_SECOND)` lands 3 hits a game second on the nearest targets
 `sight()` counts shootable, on the game clock (each through `processHit`, the only path that hits; the shot's look is `showShotAtNDC`, no colliding bullet), so a stretch a player clears goes empty as it would for them (unfired, the
@@ -349,8 +351,11 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   (the part sets it), writing `throttle.json`. `slow` and `pacing` set `gatePrograms`: a shader compiled after the warm-up fails the level.
   Each part's artifact is `prod-e2e-results-<part>` (its screenshots, `results.json` and `exit-code`); the `nightly` job folds
   them into one verdict with `scripts/nightlyParts.cjs` (a part that hit its cap or left nothing shows as a failed `part <name>`).
-  A part that nears its cap splits again the same way. An exception that escapes the run still writes `results.json` with
-  what finished, plus a failed `crash` check naming it.
+  A part that nears its cap splits again the same way. A step that throws (a dropped connection to production, a page
+  that crashed) fails as that step, `threw: <message>` under its own id and level, and the run goes on to the next step
+  with the contexts it opened closed (`e2e/runStep.mjs`, #707: one `ERR_CONNECTION_RESET` in `daily` used to cost the
+  `main` part every step after it). An exception outside a step (the title's page, a level's ride) still escapes the run,
+  which writes `results.json` with what finished, plus a failed `crash` check naming it.
   **Production redeploys mid-run** (#822): `main` deploys whenever an approved PR merges, and Vercel's atomic deploy removes
   the old build's hashed chunks, so a part can fail on a lazy chunk that no longer exists (`Failed to fetch dynamically
   imported module`). With `--url`, the smoke fingerprints the deployed build at the start (`index.html`'s entry script and

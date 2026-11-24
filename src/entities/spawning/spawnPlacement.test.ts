@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
-import type { EnemyWave, Formation, LevelConfig, WallSurface } from '@/types/level'
+import type { EnemyWave, Formation, RiddenLevel, WallSurface } from '@/types/level'
 import { buildArcTable, indexAtT, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
 import { hardRouteFor, withBackwards } from '@/track/mechanics'
 import { MECHANICS_SPEEDS, buildMechanicsRide } from '@/track/elements/mechanicsRide'
@@ -44,7 +44,7 @@ const IN_FRONT_SHARE = 0.85
 const choreographed = (f: Formation | undefined): f is ChoreographedFormation => !!f && f !== 'scatter'
 const besideTrack = (w: EnemyWave) => !choreographed(w.formation) && placedBesideTrack(w.type)
 
-function world(level: LevelConfig) {
+function world(level: RiddenLevel) {
   const curve = createTrackCurve(level.track)
   const table = buildArcTable(curve)
   const heightFn = biomeHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
@@ -61,8 +61,8 @@ function world(level: LevelConfig) {
 
 const STILL: RideAhead = { entry: 0, window: 0, trackScale: 1 }
 
-const worlds = getAllLevels().filter((l) => l.enemies.some((w) => choreographed(w.formation))).map(world)
-const tracksideWorlds = getAllLevels().filter((l) => l.enemies.some(besideTrack)).map(world)
+const worlds = shippedLevels().filter((l) => l.enemies.some((w) => choreographed(w.formation))).map(world)
+const tracksideWorlds = shippedLevels().filter((l) => l.enemies.some(besideTrack)).map(world)
 
 const RIDER_FRACTIONS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 const dist = (a: Vec3, b: Vec3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
@@ -372,7 +372,7 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
 })
 
 describe('level6: inside the hall', () => {
-  const w = world(getAllLevels().find((l) => l.id === 'level6')!)
+  const w = world(shippedLevels().find((l) => l.id === 'level6')!)
   const { level, table, groundFn, rideFor, bounds } = w
   const hall = BIOMES.gym.bounds!
 
@@ -410,7 +410,7 @@ describe('level6: inside the hall', () => {
   })
 })
 
-describe.each(getAllLevels().filter((l) => l.enemies.some((w) => w.route)).map(world).map((w) => [w.level.id, w] as const))(
+describe.each(shippedLevels().filter((l) => l.enemies.some((w) => w.route)).map(world).map((w) => [w.level.id, w] as const))(
   '%s hard-route waves (#720)',
   (_id, { level, table, tableFor, rideFor }) => {
     const junction = level.track.mechanics?.find((m) => m.kind === 'junction')
@@ -569,7 +569,7 @@ describe('outsideNearField', () => {
 })
 
 describe('placeWallSwarm (#516)', () => {
-  const { table, trackScale } = world(getAllLevels()[0])
+  const { table, trackScale } = world(shippedLevels()[0])
   const view = riderFrame(table, 0, trackScale)
   const f = { x: view.dir.x / Math.hypot(view.dir.x, view.dir.z), y: 0, z: view.dir.z / Math.hypot(view.dir.x, view.dir.z) }
   /** A 240 x 200 wall `ahead` along the rider's look, facing back down it at the eye. */
@@ -596,8 +596,8 @@ describe('placeWallSwarm (#516)', () => {
     expect(placed.map((p) => p.seed)).toEqual(slots.map((s) => s.seed))
   })
 
-  it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, the last on a wall past the crest", () => {
-    const { level, table: gym, rideFor } = world(getAllLevels().find((l) => l.id === 'level6')!)
+  it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, the last ones on the walls seen from the Shield's top and its drop", () => {
+    const { level, table: gym, rideFor } = world(shippedLevels().find((l) => l.id === 'level6')!)
     const wave = level.enemies.find((w) => w.type === 'lanternfly')!
     const profile = rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)
     const riderIndex = indexAhead(gym, 0, profile[wave.spawnDelay! * 10])
@@ -607,17 +607,19 @@ describe('placeWallSwarm (#516)', () => {
     const walls = placed.map((p) => p.wall.id)
     expect(walls[0]).toMatch(/alaska/)
     expect(walls[walls.length - 1]).not.toMatch(/alaska/)
-    // Every lanternfly is on the rider's screen at some point of the wave's window or the last group's second after it, as the
+    // The crest (#948): over Alaska's top no wall is in frame, so a group lands on the roof the rider looks up into.
+    expect(walls).toContain('roof-alaska')
+    // Every lanternfly is on the rider's screen at some point of the wave's window or the late groups' seconds after it, as the
     // ride's profile rides it, judged in the rails' frame.
     const frames = Array.from({ length: 41 }, (_, j) =>
-      riderFrame(gym, indexAhead(gym, riderIndex, ride.riddenAfter!(((ride.seconds! + 1.5) * j) / 40)), ride.trackScale))
+      riderFrame(gym, indexAhead(gym, riderIndex, ride.riddenAfter!(((ride.seconds! + 7) * j) / 40)), ride.trackScale))
     const reach = maxReadableDistance(wave.type)
     const unseen = placed.filter((p) => !frames.some((fr) => inRiderFrame(fr, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), reach)))
     expect(unseen.map((p) => p.wall.id)).toEqual([])
   })
 
   it('lands level 6\'s lanternflies group by group through the wave (#928), not all at its tell', () => {
-    const { level, table: gym, rideFor } = world(getAllLevels().find((l) => l.id === 'level6')!)
+    const { level, table: gym, rideFor } = world(shippedLevels().find((l) => l.id === 'level6')!)
     const wave = level.enemies.find((w) => w.type === 'lanternfly')!
     const ride = rideFor(wave)
     const placed = placeWallSwarm({ table: gym, riderIndex: 0, type: wave.type, walls: level.walls!, slots: swarmSlots(wave.count, createRng(3)), ride })
@@ -625,8 +627,9 @@ describe('placeWallSwarm (#516)', () => {
     expect(arrivals[0]).toBe(0)
     expect(arrivals.length).toBeGreaterThanOrEqual(5)
     for (let g = 1; g < arrivals.length; g++) expect(arrivals[g]).toBeGreaterThan(arrivals[g - 1])
-    // The last lands as the wave's window closes, for the stretch after it.
-    expect(arrivals[arrivals.length - 1]).toBeCloseTo(ride.seconds!)
+    // The last ones land after the wave's window closes, for the stretch after it: the Shield's top and the fall (#957).
+    expect(arrivals[arrivals.length - 1]).toBeGreaterThan(ride.seconds! + 4)
+    expect(arrivals[arrivals.length - 1]).toBeLessThan(ride.seconds! + 6)
     // Each group lands in the rider's frame: some member of it is on screen within a second of its landing (#949).
     const riderIndex = indexAhead(gym, 0, rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)[wave.spawnDelay! * 10])
     const atRider = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarmSlots(wave.count, createRng(3)), ride })
@@ -648,6 +651,14 @@ describe('placeWallSwarm (#516)', () => {
     expect(() => placeWallSwarm({ table, riderIndex: 0, type: 'lanternfly', walls: [], slots, ride: STILL })).toThrow(/walls/)
   })
 
+  it('never stands bystander climbers on a perch (#948), even the one in front of the rider', () => {
+    const walls = [wallAt('behind', -400), { ...wallAt('ahead', 400), perch: true }]
+    const placed = placeWallClimbers({ table, riderIndex: 0, type: 'climber', walls, slots: bystanderSlots(3, createRng(9)), ride: STILL })
+    expect(new Set(placed.map((p) => p.wall.id))).toEqual(new Set(['behind']))
+    // A swarm lands on it.
+    expect(new Set(placeWallSwarm({ table, riderIndex: 0, type: 'lanternfly', walls, slots, ride: STILL }).map((p) => p.wall.id))).toEqual(new Set(['ahead']))
+  })
+
   it('stands bystander climbers (#518) in a row at the foot of the wall in front of the rider', () => {
     const walls = [wallAt('behind', -400), wallAt('ahead', 400)]
     const climbers = bystanderSlots(4, createRng(9))
@@ -665,17 +676,27 @@ describe('placeWallSwarm (#516)', () => {
 })
 
 describe('level2: the opening climb (#494)', () => {
-  const { level, table, groundFn, rideFor, trackScale, keepOff } = world(getAllLevels().find((l) => l.id === 'level2')!)
-  const wave = level.enemies[0]
+  const { level, table, groundFn, rideFor, trackScale, keepOff } = world(shippedLevels().find((l) => l.id === 'level2')!)
+  const opening = level.enemies.filter((w) => (w.spawnDelay ?? 0) <= 12)
   const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
   // The rig's frustum on the smoke's 1280×720 screen (80° vertical), looking where `trackView` does.
   const tanV = Math.tan((REFERENCE_FOV_DEG / 2) * (Math.PI / 180))
   const tanH = tanV * (1280 / 720)
 
-  it('the scorpions placed at GO (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s, the climb included', () => {
-    const camera = trackView(table, 0, trackScale).eye
-    const placed = placeTracksideWave({
-      table, riderIndex: 0, camera, type: wave.type, groundFn, slots: tracksideSlots(wave.count, 'ground', createRng(1337)), ride: rideFor(wave), keepOff,
+  it('the scorpions\' two packs and the crest\'s crow V (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s', () => {
+    const placed = opening.flatMap((wave) => {
+      const riderIndex = indexAhead(table, 0, profile[Math.round((wave.spawnDelay ?? 0) * 10)])
+      const camera = trackView(table, riderIndex, trackScale).eye
+      const ride = rideFor(wave)
+      const spots: Vec3[] = wave.formation && wave.formation !== 'scatter'
+        ? placeFormationWave({
+          table, riderIndex, camera, formation: wave.formation, origin: wave.formationOrigin, type: wave.type, groundFn,
+          slots: formationSlots(wave.formation, wave.count, createRng(1337)), ride,
+        }).map((p) => p.position)
+        : placeTracksideWave({
+          table, riderIndex, camera, type: wave.type, groundFn, slots: tracksideSlots(wave.count, 'ground', createRng(1337)), ride, keepOff,
+        })
+      return spots.map((p) => ({ ...p, from: wave.spawnDelay ?? 0 }))
     })
     const seen: number[] = []
     for (let t = 1; t <= 12; t++) {
@@ -685,6 +706,7 @@ describe('level2: the opening climb (#494)', () => {
       const right = { x: -dir.z, y: 0, z: dir.x }
       const up = { x: (-dir.x * dir.y) / rl, y: rl, z: (-dir.z * dir.y) / rl }
       seen.push(placed.filter((p) => {
+        if (p.from > t) return false
         const d = { x: p.x - eye.x, y: p.y - eye.y, z: p.z - eye.z }
         const depth = d.x * dir.x + d.y * dir.y + d.z * dir.z
         const across = (d.x * right.x + d.z * right.z) / rl
@@ -807,7 +829,7 @@ describe('a group on a long backwards straight', () => {
 })
 
 describe('level7 hover drones keep out of the towers (#323)', () => {
-  const { level, table, groundFn, rideFor } = world(getAllLevels().find((l) => l.id === 'level7')!)
+  const { level, table, groundFn, rideFor } = world(shippedLevels().find((l) => l.id === 'level7')!)
   const clearAir = BIOMES.city.clearAir!(groundFn, table)
   const towers = cityTowers(table, trackExtent(table))
   const c = DRONE_CLEARANCE

@@ -20,6 +20,7 @@ export const EDITED_FILES = {
   postcard: 'src/ui/screens/LevelPostcard.tsx',
   sfx: 'src/audio/sfxDesign.ts',
   scores: 'src/audio/scores/index.ts',
+  medals: 'src/levels/medals.ts',
   budgets: 'budgets.json',
   shards: 'e2e/shards.mjs',
   ci: '.github/workflows/ci.yml',
@@ -94,6 +95,19 @@ function hslRgba(h, s, l, alpha) {
 }
 
 /** Air enemies any world can host, ending on a finale wave (no boss fits every world). */
+/** The level's starter medals (#879): feats any starter roster reaches (no boss, goldens or junction); renamed for the world by hand. */
+export const STARTER_MEDALS = [
+  { id: 'hotHand', name: 'Hot Hand', line: 'Chain 20 hits in a row', feat: { kind: 'combo', count: 20 } },
+  { id: 'sharpEye', name: 'Sharp Eye', line: 'Hit 7 shots in 10, firing 30 or more', feat: { kind: 'accuracy', percent: 70, minShots: 30 } },
+  { id: 'steadyNerve', name: 'Steady Nerve', line: 'Miss nothing through a Frenzy', feat: { kind: 'frenzyClean' } },
+]
+
+function medalsEntry(id) {
+  const feat = (f) => `{ ${Object.entries(f).map(([k, v]) => `${k}: ${typeof v === 'string' ? `'${v}'` : v}`).join(', ')} }`
+  const rows = STARTER_MEDALS.map((m) => `    medal('${m.id}', '${m.name}', '${m.line}', ${feat(m.feat)}),\n`)
+  return `  ${id}: [\n${rows.join('')}  ],\n`
+}
+
 export const STARTER_ROSTER = {
   waves: [
     { type: 'balloon', count: 30, waveLabel: 'Here They Come!', weight: 2 },
@@ -214,16 +228,19 @@ export function planNewWorld(opts, { files, templates, biomeDirs }) {
     message: 'You cleared ${name}!',
     nextLevel: null,
     // Scaffolded by npm run new-world: level1's curve family; tune it inside the track extent formula (level-design skill).
-    track: {
-      varA: 3,
-      varB: 17,
-      varC: 4,
-      scalar: 20,
-      rollerSpeed: 0.00001,
-      minRollerSpeed: 0.00008,
-      curve: 'curve1',
-      color1: 0xffffff,
-      color2: ${kind === 'interior' ? '0xff3355' : '0x44aaff'},
+    // A kit ride goes in this world's chunk instead (World.rides, docs/LEVEL-KIT.md), out of the startup JS.
+    ride: {
+      track: {
+        varA: 3,
+        varB: 17,
+        varC: 4,
+        scalar: 20,
+        rollerSpeed: 0.00001,
+        minRollerSpeed: 0.00008,
+        curve: 'curve1',
+        color1: 0xffffff,
+        color2: ${kind === 'interior' ? '0xff3355' : '0x44aaff'},
+      },
     },
     ...paceLevel({
       waves: [
@@ -335,6 +352,7 @@ ${roster.waves.map((w) => `        ${waveLiteral(w)},`).join('\n')}
     { path: F.postcard, content: insertInObject(text(F.postcard), /const SCENES\b/, fill(entryOf(templates, 'postcard.tsx', 'SCENES'), v), F.postcard), what: `the level-select postcard stub` },
     { path: F.sfx, content: sfx, what: `BIOME_REVERB.${biome}, SCORE_KEYS.${id} (${scoreFrom}'s key)` },
     { path: F.scores, content: scores, what: `SCORES.${id}` },
+    { path: F.medals, content: insertInObject(text(F.medals), /export const LEVEL_MEDALS\b/, medalsEntry(id), F.medals), what: `LEVEL_MEDALS.${id}: starter medals (${STARTER_MEDALS.map((m) => m.name).join(', ')})` },
     { path: F.budgets, content: JSON.stringify(budgets, null, 2) + '\n', what: `smokeSeconds.${id} = ${shardSeconds} (${previous}'s), scene.${id} + pacing.${id} placeholders` },
     { path: F.shards, content: shards, what: `the ${id} shard (ride)` },
     { path: F.ci, content: ci, what: `the smoke matrix + ${id}` },
@@ -362,12 +380,13 @@ function checklist({ id, biome, kind }, previous) {
   const dir = biomeDir(biome)
   return [
     'Read .claude/skills/shooter-coaster-level-design and docs/art/ENEMIES.md.',
-    `Track: tune ${id}'s curve in LevelRegistry.ts inside the extent formula (or author a spline, like the gym's)${kind === 'interior' ? `, and size HALL in ${dir}/config.ts around it` : ''}.`,
+    `Track: tune ${id}'s curve in LevelRegistry.ts inside the extent formula (or author a ride from the ride kit: a scripts/gen-ride-levels.mjs row, its generated ride in ${dir}/world.ts \`rides\` and no \`ride\` in the registry, docs/LEVEL-KIT.md)${kind === 'interior' ? `, and size HALL in ${dir}/config.ts around it` : ''}.`,
     `Look: ${dir}/config.ts palette, ATMOSPHERES.${biome} (atmosphere.ts), the hero landmark in Features.tsx and its hero shot in index.ts, props in Decorations.tsx (seeded, off the track), contact shadows.`,
     `Level select: draw the landmark in LevelPostcard.tsx SCENES.${biome}, pick the BIOME_UI.${biome} accent (theme.ts).`,
     `Roster: swap the starter waves for the world's own enemies; a boss goes in LevelConfig.boss. maxScore and the finales row in LevelRegistry.test.ts follow, then node scripts/gen-level-limits.mjs.`,
     `New enemies: SharedEnemyAssets.ts, ${dir}/world.ts (its chunk; a boss too), enemyComponents.ts (the turntable's), ENEMY_PLACEMENT, SCORE_VALUES, deathStyles.ts, sfxDesign.ts, the turntable subjects.ts, a brief in docs/art/ENEMIES.md.`,
     `Music: src/audio/scores/${id}.scrim is a copy; a theme round for Alex (Listen: issue) replaces it, with its SCORE_KEYS row.`,
+    `Medals: rename LEVEL_MEDALS.${id}'s starter three (medals.ts) for the world, a boss / golden / hard-route feat once it has one; medals.test.ts checks the roster can win each.`,
     `#about: rewrite ${id}'s line in index.html once the world has its enemies and landmark.`,
     `docs/agents/STATE.md: a row for ${id}.`,
     `Prove it: node e2e/smoke.mjs --shard ${id}, twice (two clean runs set scene.${id} in budgets.json), then --steps pacing --levels ${id}, twice (sets pacing.${id}); look at the ride, enemy and combat shots. ${previous} now unlocks ${id}.`,

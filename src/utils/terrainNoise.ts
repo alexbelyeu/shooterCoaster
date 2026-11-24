@@ -271,6 +271,17 @@ function mesaNoise(x: number, z: number): number {
 
 export type HeightFunction = (x: number, z: number) => number
 
+/** No ground over the straight line from (`ax`, `ay`, `az`) to (`bx`, `by`, `bz`), sampled at `samples` - 1 points between them. */
+export function sightClear(
+  ground: HeightFunction, ax: number, ay: number, az: number, bx: number, by: number, bz: number, samples = 16,
+): boolean {
+  for (let k = 1; k < samples; k++) {
+    const t = k / samples
+    if (ground(ax + (bx - ax) * t, az + (bz - az) * t) > ay + (by - ay) * t) return false
+  }
+  return true
+}
+
 /** Pre-sampled track point for terrain suppression */
 export interface TrackSample {
   x: number

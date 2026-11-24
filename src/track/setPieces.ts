@@ -17,6 +17,8 @@ export interface ClearanceSpan {
   to: number
   /** How far from the centreline (XZ) the set-piece reaches. */
   reach: number
+  /** A glass tube (`TunnelSpec.glass`): drawn see-through, and Ocean splashes as the car dives into it. */
+  glass?: boolean
 }
 
 /** A tunnel's place on the track; its `reach` is the tube's and its portals'. */
@@ -86,7 +88,7 @@ export function tunnelSpans(table: ArcTable, specs: readonly TunnelSpec[], track
       if (fromS < dims.portalDepth || toS + dims.portalDepth > table.length) {
         throw new Error(`tunnel at ${spec.from} runs over the track's seam`)
       }
-      return { fromS, toS, from: sampleAtOrAfter(table, fromS), to: sampleAtOrAfter(table, toS) - 1, reach }
+      return { fromS, toS, from: sampleAtOrAfter(table, fromS), to: sampleAtOrAfter(table, toS) - 1, reach, ...(spec.glass ? { glass: true } : {}) }
     })
     .sort((a, b) => a.fromS - b.fromS)
   for (let i = 1; i < spans.length; i++) {

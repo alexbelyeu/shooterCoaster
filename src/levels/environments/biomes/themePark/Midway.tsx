@@ -13,7 +13,7 @@ import {
 } from './parkSpec'
 import { type StallGeometry, buildStallGeometries } from './stallGeometry'
 import StaticInstances from '../../shared/StaticInstances'
-import { setLampGlow } from '../../shared/lampGlow'
+import { buildDotTexture, setLampGlow } from '../../shared/lampGlow'
 
 /** Above 1 so the bulbs clear the bloom threshold (the material is not tone-mapped). */
 const BULB_COLORS = ['#fff2c0', '#ffd040', '#ff6a5a', '#7ad0ff', '#9cff8a'].map((c) =>
@@ -83,21 +83,6 @@ function buildBulbGeometry(bulbs: number[]): THREE.BufferGeometry {
   g.setAttribute('position', new THREE.Float32BufferAttribute(bulbs, 3))
   g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
   return g
-}
-
-/** Soft round sprite so Points read as bulbs, not squares. */
-function buildDotTexture(): THREE.Texture {
-  const size = 32
-  const canvas = document.createElement('canvas')
-  canvas.width = canvas.height = size
-  const ctx = canvas.getContext('2d')!
-  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-  grad.addColorStop(0, 'rgba(255,255,255,1)')
-  grad.addColorStop(0.45, 'rgba(255,255,255,0.9)')
-  grad.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, size, size)
-  return new THREE.CanvasTexture(canvas)
 }
 
 function buildPathGeometry(rows: ThemeParkLayout['path']): THREE.BufferGeometry {

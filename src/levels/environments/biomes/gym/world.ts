@@ -5,10 +5,12 @@ import Rat from '@/entities/enemies/Rat'
 import DustBunny from '@/entities/enemies/DustBunny'
 import Lanternfly from '@/entities/enemies/Lanternfly'
 import Medusa from '@/entities/bosses/Medusa'
+import { GYM_LEVEL_RIDE } from './gymLevel'
 
-/** The gym world's chunk (#862): its biome, the enemies its levels spawn and its boss. */
+/** The gym world's chunk (#862): its biome, the enemies its levels spawn, its boss and its ride. */
 export const world: World = {
   biome: gym,
   enemies: { climber: Climber, rat: Rat, dustBunny: DustBunny, lanternfly: Lanternfly },
   bosses: { medusa: Medusa },
+  rides: { level6: GYM_LEVEL_RIDE },
 }

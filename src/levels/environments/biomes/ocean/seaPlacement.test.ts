@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { buildArcTable } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import {
@@ -21,7 +21,7 @@ import {
 } from './seaDimensions'
 import { layoutOcean, maxGroundUnder } from './seaPlacement'
 
-const level = getLevelConfig('level3')!
+const level = shippedLevel('level3')
 const curve = createTrackCurve(level.track)
 const table = buildArcTable(curve)
 const groundFn = createTerrainSurface(

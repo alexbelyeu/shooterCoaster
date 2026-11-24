@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { buildArcTable } from './arcLength'
 import { getTrackDimensions } from './trackDimensions'
 import { buildTowerGeometry, buildTowersGeometry, getTowerDims, planTowers } from './supportTowers'
 
 describe('buildTowersGeometry', () => {
-  const track = getLevelConfig('level1')!.track
+  const track = shippedLevel('level1').track
   const curve = createTrackCurve(track)
   const dims = getTrackDimensions(track)
   const plan = planTowers(curve, buildArcTable(curve), dims, () => 0)

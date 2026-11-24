@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { getAllLevels, getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
 import type { ScoreEntry } from '@/types/game'
 import { dailyLevel } from '@/levels/daily'
+import { levelMedals } from '@/levels/medals'
 import {
   buildDailyCard,
   buildLevelCards,
+  medalsLine,
   navigateCards,
   nextLevelIndex,
   totalStars,
@@ -43,6 +45,18 @@ describe('buildLevelCards', () => {
     expect(night({ a: entry('a', 900, 3) }, () => false)).toEqual([false, false, false])
     const level1 = getAllLevels().filter((l) => l.id === 'level1')
     expect(buildLevelCards(level1, { level1: entry('level1', 2000, 3) }, () => true, {})[0].nightRide).toBe(true)
+  })
+
+  it("shows an open level's three medals, the won ones lit, and none on a locked one", () => {
+    const [level1, level2] = getAllLevels()
+    const cards = buildLevelCards([level1, level2], {}, (id) => id === 'level1', {}, { level1: ['hotStreak'], level2: ['deadEye'] }, levelMedals)
+    expect(cards[0].medals.map((m) => [m.id, m.earned])).toEqual([['goldRush', false], ['blimpBuster', false], ['hotStreak', true]])
+    expect(cards[1].medals).toEqual([])
+    expect(medalsLine(cards[0].medals)).toBe(
+      '1 of 3 medals. Gold Rush: Pop all 3 golden balloons. Blimp Buster: Bring the Golden Blimp down in 12 seconds. Hot Streak, won',
+    )
+    expect(medalsLine(buildLevelCards([level1], {}, () => true, {}, {}, levelMedals)[0].medals)).toMatch(/^0 of 3 medals\. Gold Rush: /)
+    expect(medalsLine([])).toBe('0 of 0 medals')
   })
 
   it('shows the top initials of an open level only', () => {

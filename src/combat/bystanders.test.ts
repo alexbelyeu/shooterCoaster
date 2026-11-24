@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EnemyWave } from '@/types/level'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { computeMaxScore, scoreAfterPenalty } from '@/levels/scoring'
 import { ENEMY_PLACEMENT } from '@/entities/spawning/enemyPlacement'
 import { bystanderCount, bystanderHint, bystanderType, bystanderWarning } from './bystanders'
@@ -31,7 +31,7 @@ describe('bystanders', () => {
   })
 
   it('the Climbing Gym brings climbers from its first wave, on its walls', () => {
-    const gym = getLevelConfig('level6')!
+    const gym = shippedLevel('level6')
     expect(gym.enemies[0].bystanders?.type).toBe('climber')
     expect(bystanderCount(gym.enemies)).toBeGreaterThanOrEqual(6)
     for (const w of gym.enemies) if (w.bystanders) expect(ENEMY_PLACEMENT[w.bystanders.type].scatter).toBe('wall')

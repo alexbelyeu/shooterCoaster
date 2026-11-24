@@ -95,15 +95,16 @@ import { devices } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
 import { arg, launchBrowser, startPreview, stopPreview } from '../scripts/headless.mjs'
-import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitFrames, waitVisible } from './pageChecks.mjs'
+import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitDrawsSettled, waitFrames, waitVisible } from './pageChecks.mjs'
 import { planRun, STEP_LEVELS } from './shards.mjs'
 import { growthMoments, programGateProblem, throttleReport } from './slowPass.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
-import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline, samplingCutShort } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
 import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
 import { BOSS_CHECKS } from './bossChecks.mjs'
+import { runStep } from './runStep.mjs'
 
 const SECONDS = Number(arg('seconds', 10))
 const OUT = path.resolve(arg('out', 'e2e-results'))
@@ -561,11 +562,17 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
 
   // With `leaderboard`, seed nine entries so this run places 4th, in the same turn as the end so the score can't move.
   const seeding = await page.evaluate(
-    ([lid, seed, endpoint]) => {
+    ([lid, seed, endpoint, medal]) => {
       const t = window.__SC_TEST__
       t.holdLevelTime = false
       const phase = t.phase()
       if (phase !== 'playing') return { phase, rank: null }
+      // #879: for the results board, one more kill on a chain primed to the longest medal chain wins the level's combo medal.
+      let noMedalKill = false
+      if (medal) {
+        t.primeCombo(t.longestComboMedal - 1)
+        noMedalKill = t.killNearest(1) === 0
+      }
       const score = Math.round(t.stats().score)
       const seeded = seed && score > 0
       const above = [3000, 2000, 1000].map((d) => score + d)
@@ -576,12 +583,13 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
         t.setLeaderboards({ [lid]: [...above, ...below].map(row) }, 'AAA')
       }
       t.endLevel()
-      return { phase, rank: seeded ? above.length : null }
+      return { phase, rank: seeded ? above.length : null, noMedalKill }
     },
-    [id, leaderboard, online ? ONLINE_ENDPOINT : null],
+    [id, leaderboard, online ? ONLINE_ENDPOINT : null, resultsScreen],
   )
   // With the level timer held this can't happen; if it does, say so instead of failing the board checks on it.
   if (seeding.phase !== 'playing') problems.push(`level left play (${seeding.phase}) before the results checks, with the level timer held`)
+  if (seeding.noMedalKill) problems.push('no enemy left to win the combo medal (killNearest found none)')
   const seededRank = seeding.rank
   // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
   const resultsShown = await page
@@ -946,6 +954,8 @@ async function resultsScreenProblems(page, id, stats, { share }) {
       nextLevel: next ? { id: next.id, unlocked: next.unlocked } : null,
       keys: el.querySelector('.results-keys')?.textContent ?? '',
       score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent,
+      medals: [...el.querySelectorAll('.results-medal')].map((m) => m.dataset.medal), medalsWon: s.medalsWon(),
+      saved: Object.keys(JSON.parse(localStorage.getItem('shootercoaster-scores') ?? '{}').state?.savedMedals ?? {}),
     }
   })
   const problems = []
@@ -974,6 +984,10 @@ async function resultsScreenProblems(page, id, stats, { share }) {
     shown.scoreCards = cards.sizes
   }
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
+  // #879: the board shows the medals the run won (the run primed a medal chain, so at least one) and saves them.
+  if (screen.medals.length === 0) problems.push(`results board shows no medal (the run won ${JSON.stringify(screen.medalsWon)})`)
+  if (JSON.stringify(screen.medals) !== JSON.stringify(screen.medalsWon)) problems.push(`results medals ${JSON.stringify(screen.medals)} != won ${JSON.stringify(screen.medalsWon)}`)
+  if (screen.medals.length > 0 && !screen.saved.includes(id)) problems.push(`${id}'s medals ${JSON.stringify(screen.medals)} weren't saved`)
   for (const stat of ['hits', 'accuracy', 'combo', 'time']) {
     if (!(stat in screen.rows)) problems.push(`results screen has no "${stat}" line`)
   }
@@ -2480,7 +2494,7 @@ async function pacingCheck(page, id) {
   pacing.boss = bossFraming(samples, end)
   const shaders = await programsAfterWarmup(page)
   gatePrograms(problems, shaders)
-  if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
+  if (samplingCutShort(samples, end, PACING_STEP)) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   const budget = BUDGETS.pacing?.[id]
   // A placeholder is filled by the caller once the page's errors are counted too (`fillPlaceholderBudget`).
   const placeholder = isPlaceholder(budget) ? pacing : null
@@ -3064,10 +3078,13 @@ async function levelSelectCheck(page, levels) {
     Object.values(scores).map((e, i) => [e.level, [{ initials: champions[i], score: e.score, stars: e.stars, date: 1 }]]),
   )
   // Reloaded so the cards come back from localStorage.
-  await page.evaluate(([s, b]) => {
+  // #879: the first level has won two of its three medals.
+  const firstMedals = 2
+  await page.evaluate(([s, b, lid, n]) => {
     window.__SC_TEST__.setSavedScores(s)
     window.__SC_TEST__.setLeaderboards(b)
-  }, [scores, boards])
+    window.__SC_TEST__.setSavedMedals({ [lid]: window.__SC_TEST__.levelMedalIds(lid).slice(0, n) })
+  }, [scores, boards, levels[0].id, firstMedals])
   await page.reload({ waitUntil: 'load' })
   await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
   await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
@@ -3092,6 +3109,9 @@ async function levelSelectCheck(page, levels) {
       initials: cards.filter((c) => !c.classList.contains('level-card-daily')).map((c) => c.querySelector('.level-card-initials')?.textContent ?? null),
       hScroll: root ? root.scrollWidth > root.clientWidth : true,
       focused: document.activeElement?.dataset?.level ?? null,
+      medals: cards
+        .filter((c) => !c.classList.contains('level-card-daily'))
+        .map((c) => [c.querySelectorAll('.level-medal').length, c.querySelectorAll('.level-medal[data-earned="true"]').length]),
     }
   })
   // One card per level plus the Daily Run card (#184).
@@ -3105,14 +3125,19 @@ async function levelSelectCheck(page, levels) {
   if (JSON.stringify(layout.initials) !== JSON.stringify(expectInitials))
     problems.push(`card initials ${JSON.stringify(layout.initials)} after a reload, expected ${JSON.stringify(expectInitials)}`)
   if (layout.hScroll) problems.push('level select scrolls sideways')
+  const expectMedals = levels.map((_, i) => (i >= expectOpen ? [0, 0] : [3, i === 0 ? firstMedals : 0]))
+  if (JSON.stringify(layout.medals) !== JSON.stringify(expectMedals))
+    problems.push(`card medals [shown, won] ${JSON.stringify(layout.medals)} after a reload, expected ${JSON.stringify(expectMedals)}`)
 
   const focused = () => page.evaluate(() => document.activeElement?.dataset?.level ?? null)
   const target = levels[Math.min(2, levels.length - 1)].id
+  problems.push(...featsProblems(await page.evaluate(shownFeats), target, 'at open'))
   if (layout.focused !== target) problems.push(`initial focus on ${layout.focused}, expected ${target}`)
   let keyboard = null
   if (levels.length >= 4) {
     await page.keyboard.press('ArrowLeft')
     const left = await focused()
+    problems.push(...featsProblems(await page.evaluate(shownFeats), levels[1].id, 'after ArrowLeft'))
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('ArrowRight')
     const locked = await focused()
@@ -3138,6 +3163,27 @@ async function levelSelectCheck(page, levels) {
     if (after.phase !== 'playing' || after.level !== target) problems.push(`Enter started ${after.level} (${after.phase}), expected ${target}`)
   }
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
+}
+
+/** The level select's medal tickets on screen (#978): each shown one's card, feat count and whether it stays in the viewport. */
+function shownFeats() {
+  return [...document.querySelectorAll('.level-feats')]
+    .filter((t) => t.getBoundingClientRect().height > 0)
+    .map((t) => {
+      const r = t.getBoundingClientRect()
+      return {
+        level: t.closest('.level-card')?.dataset.level ?? null,
+        feats: [...t.querySelectorAll('.level-feat-line')].filter((l) => l.textContent.trim()).length,
+        inView: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
+      }
+    })
+}
+
+/** One ticket out, the focused card's, with its three feats on screen. */
+function featsProblems(shown, level, when) {
+  if (shown.length !== 1 || shown[0].level !== level) return [`medal tickets ${when} ${JSON.stringify(shown)}, expected only ${level}'s`]
+  const [t] = shown
+  return t.feats === 3 && t.inView ? [] : [`${level}'s medal ticket ${when} ${JSON.stringify(t)}, expected 3 feats on screen`]
 }
 
 /** Click the level select's Daily card (#184) and return the run it started and its spawnDigest(). */
@@ -3377,13 +3423,20 @@ async function settingsCheck(page) {
 async function qualityCheck(newPage, levelId) {
   const sample = async (query, png) => {
     const { ctx, page, errors } = await newPage(query, { deviceScaleFactor: 2 })
-    const ready = await startLevelReady(page, levelId)
-    await waitFrames(page, 2, { minMs: 1500, maxMs: 30000 })
+    // Held at its start from its first frame (level timer, game clock and ride at 0, as `tourShots`): however long a
+    // runner takes to load the level, no enemy flies in and no effect ages before the count (#972: 77 vs 91 draws).
+    await page.evaluate(([lid, seed]) => {
+      const t = window.__SC_TEST__
+      t.timerStep = 0
+      t.rideRate = 0
+      t.startLevel(lid, seed)
+    }, [levelId, SEED])
+    const ready = await levelReady(page)
     await page.evaluate(() => {
       window.__SC_TEST__.setTimeScale(0)
       window.__SC_TEST__.rideTo = 0.1
     })
-    await waitFrames(page, 3, { maxMs: 30000 })
+    await waitDrawsSettled(page)
     const s = await page.evaluate(() => {
       const t = window.__SC_TEST__
       return { drawCalls: t.drawCalls, dpr: t.view()?.dpr, graphics: t.graphics(), shadows: !!t.sceneStats().byName['contact-shadows'], errors: t.errors }
@@ -4375,9 +4428,13 @@ async function runMobile(browser, base) {
       const r = c.getBoundingClientRect()
       return r.left < 0 || r.right > window.innerWidth || r.height < 44
     })
-    return { hScroll: root ? root.scrollWidth > root.clientWidth : true, bad: tooNarrow.map((c) => c.dataset.level) }
+    const open = cards.filter((c) => !c.dataset.locked && !c.classList.contains('level-card-daily'))
+    const noFeats = open.filter((c) => !(c.querySelector('.level-feats')?.getBoundingClientRect().height > 0))
+    return { hScroll: root ? root.scrollWidth > root.clientWidth : true, bad: tooNarrow.map((c) => c.dataset.level), noFeats: noFeats.map((c) => c.dataset.level) }
   })
   if (selectLayout.hScroll) problems.push('phone level select scrolls sideways')
+  // #978: a phone can't hover or focus a card without launching it, so every open board shows its medals' feats.
+  if (selectLayout.noFeats.length) problems.push(`phone level cards without their medal ticket: ${selectLayout.noFeats.join(',')}`)
   if (selectLayout.bad.length) problems.push(`phone level cards off screen or under 44 px: ${selectLayout.bad.join(',')}`)
   await page.locator(card).tap({ timeout: 30000 }).catch((e) => problems.push(`tap level: ${e.message}`))
   await waitPhase('playing', 15000)
@@ -4493,9 +4550,16 @@ async function runMobile(browser, base) {
 
   // Back to normal speed: the music low-pass must open again.
   // LevelAudio sets the duck every frame: decided on two rendered frames, not on wall time (#248).
+  // A FRENZY or last-kill slow-mo the taps set off still ducks the music, as it should: wait its envelope out
+  // (1.5 s of play) so the check sees the game's own timeScale back at 1 (#969).
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
   const unducked = await waitFrames(page, 2, { pollMs: 40 })
+  const slowMoDeadline = Date.now() + 8000
+  while (Date.now() < slowMoDeadline && (await getStats(page)).timeScale < 1) await waitFrames(page, 1, { maxMs: 2000, pollMs: 40 })
+  await waitFrames(page, 2, { maxMs: 4000, pollMs: 40 }) // LevelAudio's next frame applies the duck
+  const gameTimeScale = (await getStats(page)).timeScale
   if (unducked.frames < 2) problems.push(`only ${unducked.frames} frame(s) in ${unducked.ms} ms after timeScale 1: the music duck went unchecked`)
+  else if (gameTimeScale < 1) problems.push(`game timeScale still ${gameTimeScale} 8 s after setTimeScale(1): a slow-mo envelope never ended`)
   else if (audioPortrait.ready && (await page.evaluate(() => window.__SC_TEST__.audio().musicDucked)))
     problems.push('music still ducked at timeScale 1')
 
@@ -4603,16 +4667,15 @@ async function run() {
     await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
     return { ctx, page, errors, loading }
   }
-  const step = async (fn) => {
-    const started = Date.now()
-    const r = await fn()
-    r.seconds ??= (Date.now() - started) / 1000
+  /** `id` (and `level`) name the failed check when the step throws (`runStep.mjs`). */
+  const step = async (fn, id, level) => {
+    const r = await runStep(fn, { id, level, browser })
     failed ||= !r.ok
     results.push(r)
     return r
   }
   // `finish(r)`: after the page's errors are counted, before the step passes or fails.
-  const pageStep = (check, query, finish) => step(async () => {
+  const pageStep = (id, level, check, query, finish) => step(async () => {
     const p = await newPage(query)
     const r = await check(p.page)
     r.errors = [...p.errors, ...(await p.page.evaluate(() => window.__SC_TEST__.errors))]
@@ -4621,7 +4684,7 @@ async function run() {
     r.ok = r.problems.length === 0
     await p.ctx.close()
     return r
-  })
+  }, id, level)
 
   // 1. Title screen
   const t = await newPage('e2e=1&gpuSync=1', {}, has('title') ? posterHandoff : null)
@@ -4651,21 +4714,21 @@ async function run() {
         id: 'title', ok: problems.length === 0, problems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg,
         title: fly.result, drawCalls: budget.drawCalls, scene: budget.scene, posterShots: poster.shots, posterOffsets: poster.offsets, laps: lap.laps, errors: t.errors,
       }
-    })
+    }, 'title')
   }
   await t.ctx.close()
 
   // 1a. Campaign landing path; not for portal builds (--base), which portals serve at their own path.
-  if (has('landing') && !arg('base')) await step(() => landingPathCheck(browser, base))
+  if (has('landing') && !arg('base')) await step(() => landingPathCheck(browser, base), 'landing')
 
   // 1b. Level select with saved progress + keyboard-only start
-  if (has('levelSelect')) await pageStep((page) => levelSelectCheck(page, levels))
+  if (has('levelSelect')) await pageStep('levelSelect', null, (page) => levelSelectCheck(page, levels))
 
   // 1b'. Daily Run from its card: today's seed, same spawns on a second load, daily results, campaign saves untouched
-  if (has('daily')) await step(() => dailyCheck(newPage))
+  if (has('daily')) await step(() => dailyCheck(newPage), 'daily')
 
   // 1c. Settings from the title (settings.png): layout, Esc, persisted across a reload
-  if (has('settings')) await pageStep(settingsCheck)
+  if (has('settings')) await pageStep('settings', null, settingsCheck)
 
   // 2. Every level (or the requested subset); the first one also plays the FRENZY / leaderboard checks (`frenzy`)
   const wanted = PLAN.levels ?? levels.map((l) => l.id)
@@ -4761,7 +4824,7 @@ async function run() {
       if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
       r.ok = r.problems.length === 0
       return r
-    })
+    }, 'quality', first)
   }
 
   // 3. Seeded spawns: a fresh page + the same seed gives the same enemies; another seed doesn't
@@ -4773,7 +4836,7 @@ async function run() {
       r.errors = s.errors
       await s.ctx.close()
       return r
-    })
+    }, 'seed-check', first)
   }
 
   // 4. Leaving the tab pauses the run and never drains the timer; then 4b. the pause menu on the same page (pause.png)
@@ -4785,22 +4848,22 @@ async function run() {
       if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
       r.ok = r.problems.length === 0
       return r
-    })
+    }, 'hidden-pause', first)
     await step(async () => {
       const m = await pauseMenuCheck(h.page, first)
       m.errors = [...h.errors, ...(await h.page.evaluate(() => window.__SC_TEST__.errors))].slice(r.errors.length)
       if (m.errors.length) m.problems.push(`${m.errors.length} error(s)`)
       m.ok = m.problems.length === 0
       return m
-    })
+    }, 'pause-menu', first)
     await h.ctx.close()
   }
 
   // 5. A real start: Ready / Set / GO over the warming-up level, then playing
-  if (has('countdown') && first) await pageStep((page) => countdownCheck(page, first), 'e2e=1&countdown=1')
+  if (has('countdown') && first) await pageStep('countdown', first, (page) => countdownCheck(page, first), 'e2e=1&countdown=1')
 
   // 6. Top speed: banking + wind streaks (speed.png)
-  if (has('speed') && first) await pageStep((page) => speedCheck(page, SPEED_LEVEL && wanted.includes(SPEED_LEVEL) ? SPEED_LEVEL : first))
+  if (has('speed') && first) await pageStep('speed', first, (page) => speedCheck(page, SPEED_LEVEL && wanted.includes(SPEED_LEVEL) ? SPEED_LEVEL : first))
 
   // 6a. A lazy chunk that fails once loads after the page reloads (#888): its own page, so the route is set before the first load
   if (has('chunkRetry') && first) {
@@ -4824,28 +4887,28 @@ async function run() {
       if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
       r.ok = r.problems.length === 0
       return r
-    })
+    }, 'chunkRetry', first)
   }
 
   // 6b. Spawn choreography: the crow wave's tell, then its V flying in (level2-wave.png)
-  if (has('wave') && wanted.includes(WAVE_CHECK.level)) await pageStep(waveCheck)
+  if (has('wave') && wanted.includes(WAVE_CHECK.level)) await pageStep('wave', WAVE_CHECK.level, waveCheck)
 
   // 6b'. The weather pulse with its wave: sandstorm, blizzard (<level>-weather.png)
-  for (const id of has('weather') ? WEATHER_LEVELS.filter((l) => wanted.includes(l)) : []) await pageStep((page) => weatherCheck(page, id))
+  for (const id of has('weather') ? WEATHER_LEVELS.filter((l) => wanted.includes(l)) : []) await pageStep('weather', id, (page) => weatherCheck(page, id))
 
   // 6c. The finales: summoned, shot down in phase order (<level>-boss.png, <level>-boss-down.png)
   for (const check of has('boss') ? BOSS_CHECKS.filter((c) => wanted.includes(c.level)) : []) {
-    await pageStep((page) => bossCheck(page, check))
+    await pageStep('boss', check.level, (page) => bossCheck(page, check))
   }
 
   // 6e. Weapon pickups: one shot with a real bullet, the fan, the badge, expiry (level1-pickup.png)
-  if (has('pickup') && wanted.includes(PICKUP_CHECK.level)) await pageStep(pickupCheck)
+  if (has('pickup') && wanted.includes(PICKUP_CHECK.level)) await pageStep('pickup', PICKUP_CHECK.level, pickupCheck)
 
   // 6e'. The Night Rides: dark sky, readable enemies, inside the scene budget (level1-night.png, level2-night.png…)
-  for (const id of has('night') ? NIGHT_CHECK.levels.filter((l) => wanted.includes(l)) : []) await pageStep((page) => nightCheck(page, id))
+  for (const id of has('night') ? NIGHT_CHECK.levels.filter((l) => wanted.includes(l)) : []) await pageStep('night', id, (page) => nightCheck(page, id))
 
   // 6f. Shoot-to-switch: the shot run rides the hard branch, the other the easy way (level6-switch.png, level6-switch-hard.png)
-  if (has('switch') && wanted.includes(SWITCH_CHECK.level)) await pageStep((page) => switchCheck(page, { darkShots: has('dark') }))
+  if (has('switch') && wanted.includes(SWITCH_CHECK.level)) await pageStep('switch', SWITCH_CHECK.level, (page) => switchCheck(page, { darkShots: has('dark') }))
 
   // 6d. The score engine and arcade SFX: title -> level -> pause -> results
   if (has('audio') && wanted.includes(AUDIO_CHECK.level)) {
@@ -4856,23 +4919,23 @@ async function run() {
       if (errors.length) r.problems.push(`${errors.length} error(s)`)
       await sc.ctx.close()
       return { id: 'audio', ok: r.problems.length === 0, problems: r.problems, engine: r.result, errors }
-    })
+    }, 'audio', AUDIO_CHECK.level)
   }
 
   // 6f. Pacing: every level's whole run, unfired, against budgets.json `pacing` (pacing.json)
   const pacing = {}
   for (const id of has('pacing') ? wanted : []) {
-    const r = await pageStep((page) => pacingCheck(page, id), undefined, (r) => {
+    const r = await pageStep('pacing', id, (page) => pacingCheck(page, id), undefined, (r) => {
       if (r.placeholder) r.problems.push(...fillPlaceholderBudget('pacing', id, r.placeholder, r.problems))
       delete r.placeholder
     })
-    pacing[id] = { ...r.pacing, timeline: r.timeline }
+    if (!r.threw) pacing[id] = { ...r.pacing, timeline: r.timeline }
     delete r.timeline
   }
   if (Object.keys(pacing).length) fs.writeFileSync(path.join(OUT, 'pacing.json'), JSON.stringify({ step: PACING_STEP, seed: SEED, levels: pacing }))
 
   // 7. Touch playtest on a phone viewport (--mobile)
-  if (has('mobile')) await step(() => runMobile(browser, base))
+  if (has('mobile')) await step(() => runMobile(browser, base), `mobile-${MOBILE_LEVEL}`)
 
   await browser.close()
   if (preview) stopPreview(preview.proc)
@@ -4893,6 +4956,8 @@ async function run() {
     const note = r.id === 'time' || r.id === 'build'
     const extra = note
       ? (r.ok ? ` ${r.text}` : '')
+      : r.threw
+      ? (r.level ? ` ${r.level}` : '')
       : r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; attract ${r.title.attract ? `bars ${r.title.attract.bars.join(' / ')}` : 'none'}; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '') +
         ` draws=${r.drawCalls} scene objs=${r.scene?.objects} tris=${r.scene?.triangles}; poster: ${r.posterShots} load shots, off by ${JSON.stringify(r.posterOffsets ?? {})}; s: ${Object.entries(r.laps ?? {}).map(([k, v]) => `${k} ${v}`).join(', ')}`
