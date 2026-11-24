@@ -128,7 +128,8 @@
       "knownOverOnly": "boss"
     },
     "level8": {
-      "placeholder": "npm run new-world: set by two clean local smokes of this level (scene: the ride; pacing: --steps pacing), e2e/placeholderBudget.mjs"
+      "longestGapSeconds": 5,
+      "noTargetShare": 0.5
     }
   }
 }
