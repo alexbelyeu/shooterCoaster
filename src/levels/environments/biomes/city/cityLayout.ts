@@ -202,10 +202,14 @@ export function layoutHeroTower(): { tiers: Tower[]; neon: NeonSign[] } {
   return { tiers, neon }
 }
 
-/** Every tower an air enemy must stay out of: the blocks, the skyline, the hero tower's tiers and the elevated highway. */
+/** Every tower standing on the blocks: the blocks', the skyline and the hero tower's tiers (the traffic drives between them). */
+export function streetTowers(layout: Pick<CityLayout, 'towers' | 'skyline'>): Tower[] {
+  return [...layout.towers, ...layout.skyline, ...layoutHeroTower().tiers]
+}
+
+/** Every tower an air enemy must stay out of: the street towers and the elevated highway. */
 export function cityTowers(track: ArcTable, extent: number): Tower[] {
-  const { towers, skyline } = layoutCity(track, extent)
-  return [...towers, ...skyline, ...layoutHeroTower().tiers, ...highwayObstacles(HIGHWAY)]
+  return [...streetTowers(layoutCity(track, extent)), ...highwayObstacles(HIGHWAY)]
 }
 
 /** How far an air enemy's centre must stay from a tower's faces (x, z) and above its roof (y). */
