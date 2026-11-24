@@ -115,11 +115,17 @@ const LEVELS: LevelConfig[] = [
     track: ARCTIC_LEVEL_TRACK,
     ...paceLevel({
       waves: [
-        // Longer, so the blizzard's wave meets the rider out of the ice cave, on the ridge's lift; 36, not 44: the whole party
-        // stands up the slow first lift in view at once, and 44 put the scene over its draw-call ceiling (#866).
-        { type: 'snowmanScout', count: 36, waveLabel: 'Scout Party', formation: 'line', weight: 1.5 },
-        { type: 'snowman', count: 40, waveLabel: 'Snowmen Incoming!', weather: 'blizzard' },
-        { type: 'snowmanBrute', count: 16, waveLabel: 'Brutes!' },
+        // A wave to each stretch of the storyboard (weights in seconds of the 45 s wave span), so no element rides empty
+        // (#937): the station and the lift's foot, up the lift to the drop, the ice cave and out of it, the blizzard's
+        // ridge, the crest, then the brutes down the helix. Half the party at a time also keeps the lift's draws
+        // under the ceiling (all 44 at once went over it, #866).
+        { type: 'snowmanScout', count: 18, waveLabel: 'Scout Party', formation: 'line', weight: 6 },
+        { type: 'snowmanScout', count: 18, formation: 'line', weight: 6 },
+        { type: 'snowman', count: 10, weight: 6 },
+        { type: 'snowman', count: 15, waveLabel: 'Snowmen Incoming!', weather: 'blizzard', weight: 5 },
+        { type: 'snowman', count: 15, weight: 6 },
+        { type: 'snowmanBrute', count: 8, waveLabel: 'Brutes!', weight: 4 },
+        { type: 'snowmanBrute', count: 8, weight: 12 },
       ],
       boss: 'yeti',
     }),

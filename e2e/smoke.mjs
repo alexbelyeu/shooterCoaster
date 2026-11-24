@@ -4523,9 +4523,16 @@ async function runMobile(browser, base) {
 
   // Back to normal speed: the music low-pass must open again.
   // LevelAudio sets the duck every frame: decided on two rendered frames, not on wall time (#248).
+  // A FRENZY or last-kill slow-mo the taps set off still ducks the music, as it should: wait its envelope out
+  // (1.5 s of play) so the check sees the game's own timeScale back at 1 (#969).
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
   const unducked = await waitFrames(page, 2, { pollMs: 40 })
+  const slowMoDeadline = Date.now() + 8000
+  while (Date.now() < slowMoDeadline && (await getStats(page)).timeScale < 1) await waitFrames(page, 1, { maxMs: 2000, pollMs: 40 })
+  await waitFrames(page, 2, { maxMs: 4000, pollMs: 40 }) // LevelAudio's next frame applies the duck
+  const gameTimeScale = (await getStats(page)).timeScale
   if (unducked.frames < 2) problems.push(`only ${unducked.frames} frame(s) in ${unducked.ms} ms after timeScale 1: the music duck went unchecked`)
+  else if (gameTimeScale < 1) problems.push(`game timeScale still ${gameTimeScale} 8 s after setTimeScale(1): a slow-mo envelope never ended`)
   else if (audioPortrait.ready && (await page.evaluate(() => window.__SC_TEST__.audio().musicDucked)))
     problems.push('music still ducked at timeScale 1')
 
