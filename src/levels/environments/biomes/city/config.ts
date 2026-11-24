@@ -12,6 +12,9 @@ export const COLOR_RAMP: ColorRamp = {
   cliffColor: new THREE.Color(0x2a2832),
 }
 
+/** Block pitch and street width (world units): the asphalt shader paints the same grid. */
+export const STREET_GRID = { pitch: 240, street: 64 } as const
+
 /** Where the hero tower stands (`Features.tsx`), the intro's tour passes and the results orbit looks: beyond the track. */
 export const LANDMARK_SITE = { x: 1500, z: -1900 } as const
 

@@ -3,7 +3,8 @@ import { shippedLevel } from '@/levels/shippedLevels'
 import { buildArcTable } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { trackExtent } from '../../shared/trackScatter'
-import { layoutCity, STREET_GRID } from './cityLayout'
+import { layoutCity } from './cityLayout'
+import { STREET_GRID } from './config'
 
 const table = buildArcTable(createTrackCurve(shippedLevel('level7').track))
 const extent = trackExtent(table)
