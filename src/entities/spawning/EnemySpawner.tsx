@@ -85,6 +85,7 @@ interface Placed {
 const RADII: Record<EnemyType, number> = {
   balloon: 45,
   crow: 65,
+  toucan: 70,
   scorpion: 55,
   shark: 50,
   jellyfish: 40,

@@ -236,32 +236,40 @@ const LEVELS: LevelConfig[] = [
   {
     id: 'level8',
     name: 'Jungle Ruins',
-    description: 'Ride through Jungle Ruins',
+    description: 'Toucans over the temple ruins',
     order: 8,
     biome: 'jungle',
-    maxScore: 60 * 13 + 44 * 15, // 1440: no boss, a finale wave ends the run
+    maxScore: 83 * 15 + 5 * 65 + 400, // 1245 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 1970
     message: 'You cleared Jungle Ruins!',
     nextLevel: null,
-    track: {
-      varA: 3,
-      varB: 17,
-      varC: 4,
-      scalar: 20,
-      curve: 'curve1',
-      ride: 'v2',
-      mechanics: [{ kind: 'station', from: 0, to: 0.01, speed: 120 }],
-      rideV2: { gravity: 480, crawl: 90, drag: 0.0012, zones: [{ kind: 'lift', from: 0.085, to: 0.122, speed: 60 }] },
-      color1: 0xd8c9a0,
-      color2: 0x3f8a4a,
+    ride: {
+      track: {
+        varA: 3,
+        varB: 17,
+        varC: 4,
+        scalar: 20,
+        curve: 'curve1',
+        ride: 'v2',
+        mechanics: [{ kind: 'station', from: 0, to: 0.01, speed: 120 }],
+        rideV2: { gravity: 480, crawl: 90, drag: 0.0012, zones: [{ kind: 'lift', from: 0.085, to: 0.122, speed: 60 }] },
+        color1: 0xd8c9a0,
+        color2: 0x3f8a4a,
+      },
     },
+    // Toucans over the canopy in Vs, rings and spirals ahead of the rider, one wave every few seconds from the
+    // station to the temple, then the boss slot, held by the Golden Blimp until the guardian (#869). Each V is one
+    // group of 9: on this curve a second group would sit within reading range of the rider from the wave's start.
     ...paceLevel({
       waves: [
-        { type: 'balloon', count: 30, waveLabel: 'Here They Come!', weight: 2 },
-        { type: 'crow', count: 14, waveLabel: 'Crows!', formation: 'v', weight: 2 },
-        { type: 'balloon', count: 30, waveLabel: 'More Balloons!', weight: 2 },
-        { type: 'crow', count: 14, waveLabel: 'The Flock!', formation: 'spiral', weight: 3 },
+        { type: 'toucan', count: 9, waveLabel: 'Toucans!', formation: 'v', weight: 0.75 },
+        { type: 'toucan', count: 10, waveLabel: 'Over the Canopy!', formation: 'ring' },
+        { type: 'toucan', count: 9, waveLabel: 'The Flock!', formation: 'v' },
+        { type: 'toucan', count: 16, waveLabel: 'Temple Run!', formation: 'spiral' },
+        { type: 'toucan', count: 9, waveLabel: 'Bills Out!', formation: 'v' },
+        { type: 'toucan', count: 9, waveLabel: 'Down the Falls!', formation: 'v' },
+        { type: 'toucan', count: 21, waveLabel: 'The Whole Jungle!', formation: 'ring', weight: 2.5 },
       ],
-      finale: { type: 'crow', count: 16, waveLabel: 'Final Wave!' },
+      boss: 'goldenBlimp',
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: { hasTrees: true, treeCount: 60 },

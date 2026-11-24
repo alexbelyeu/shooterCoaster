@@ -319,6 +319,13 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
     ],
     lifetime: 2, scale: 1, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'flutter',
   },
+  toucan: {
+    layers: [
+      layer({ shape: 'feather', count: 24, colors: ['#141216', '#26222c', '#f7d43a'], glow: 1, speed: [25, 80], up: 10, drag: 3.2, gravity: 14, size: 7, spin: 7, hold: 0.65 }),
+      layer({ shape: 'chunk', count: 6, colors: ['#ff8a1c', '#d42e2a'], speed: [30, 70], up: 30, drag: 0.8, gravity: 120, size: 4, spin: 9, hold: 0.5 }),
+    ],
+    lifetime: 2, scale: 1, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'flutter',
+  },
   scorpion: {
     layers: [
       layer({ shape: 'chunk', count: 10, colors: ['#3a2416', '#7a4a22', '#c08a3a'], speed: [30, 80], up: 45, drag: 0.6, gravity: 160, size: 5, spin: 10, hold: 0.7 }),

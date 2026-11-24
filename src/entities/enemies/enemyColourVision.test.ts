@@ -71,6 +71,7 @@ const ENEMIES: Read[] = [
   ...P.BALLOON_COLORS.map((c, i) => enemy(`balloon ${c}`, 'balloon', 'themePark', A.BALLOON_BODY_MATS[i], c)),
   enemy('goldenBalloon', 'balloon', 'themePark', null, A.GOLDEN_BODY_MAT),
   enemy('crow', 'crow', 'desert', A.CROW_FEATHER_MAT, P.CROW_BODY, P.CROW_SHEEN),
+  enemy('toucan', 'toucan', 'jungle', A.CROW_FEATHER_MAT, P.TOUCAN_BODY, P.TOUCAN_BIB, P.TOUCAN_BILL),
   enemy('scorpion', 'scorpion', 'desert', A.SCORPION_SHELL_MAT, P.SCORPION_BODY_COLOR, P.SCORPION_PINCER_COLOR, P.SCORPION_LEG_COLOR),
   ...P.JELLY_COLORS.map((c, i) => enemy(`jellyfish ${c}`, 'jellyfish', 'ocean', null, A.JELLY_BODY_MATS[i], A.JELLY_INNER_MATS[i])),
   enemy('shark', 'shark', 'ocean', A.SHARK_MAT, P.SHARK_TOP, P.SHARK_BELLY),

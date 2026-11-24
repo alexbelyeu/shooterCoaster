@@ -3,6 +3,7 @@ import type { EnemyType } from '@/types/level'
 import type { EnemyProps } from './EnemyBase'
 import Balloon from './Balloon'
 import Crow from './Crow'
+import Toucan from './Toucan'
 import Scorpion from './Scorpion'
 import Shark from './Shark'
 import Jellyfish from './Jellyfish'
@@ -24,6 +25,7 @@ import HoverDrone from './HoverDrone'
 export const ENEMY_COMPONENTS: Record<EnemyType, ComponentType<EnemyProps>> = {
   balloon: Balloon,
   crow: Crow,
+  toucan: Toucan,
   scorpion: Scorpion,
   shark: Shark,
   jellyfish: Jellyfish,

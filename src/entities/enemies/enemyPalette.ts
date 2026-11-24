@@ -11,6 +11,10 @@ export const BALLOON_COLORS = [
 ]
 export const CROW_BODY = '#15131a'
 export const CROW_SHEEN = '#3a2a55'
+export const TOUCAN_BODY = '#141216'
+export const TOUCAN_BIB = '#f7d43a'
+export const TOUCAN_BILL = '#ff8a1c'
+export const TOUCAN_TIP = '#d42e2a'
 export const SCORPION_BODY_COLOR = '#2a1626'
 export const SCORPION_PINCER_COLOR = '#3a1622'
 export const SCORPION_LEG_COLOR = '#e0701e'

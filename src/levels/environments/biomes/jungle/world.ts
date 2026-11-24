@@ -1,11 +1,11 @@
 import type { World } from '@/levels/environments/worlds'
-import Balloon from '@/entities/enemies/Balloon'
-import Crow from '@/entities/enemies/Crow'
+import Toucan from '@/entities/enemies/Toucan'
+import GoldenBlimp from '@/entities/bosses/GoldenBlimp'
 import { jungle } from '.'
 
-/** Jungle Ruins's chunk (#862): its biome and the starter roster's enemies. Each enemy and the boss its level gains goes here too. */
+/** Jungle Ruins's chunk (#862): its biome, its toucans and its boss (the Golden Blimp holds the slot until the guardian, #869). */
 export const world: World = {
   biome: jungle,
-  enemies: { balloon: Balloon, crow: Crow },
-  bosses: {},
+  enemies: { toucan: Toucan },
+  bosses: { goldenBlimp: GoldenBlimp },
 }
