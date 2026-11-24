@@ -32,6 +32,9 @@ import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
+import RidePhoto from './RidePhoto'
+import { RUN_SECONDS } from '@/levels/pacing'
+import { photoDistance } from '@/track/photoMarker'
 import LevelAudio from './LevelAudio'
 import { levelWeather } from '@/levels/environments/shared/weatherPulse'
 
@@ -112,6 +115,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
   const keepOff = useMemo(() => def.keepOff?.(groundFn, trackTable), [def, groundFn, trackTable])
   const clearAir = useMemo(() => def.clearAir?.(groundFn, trackTable), [def, groundFn, trackTable])
   const speeds = useMemo(() => rideModel(track, trackTable), [track, trackTable])
+  const photoAt = useMemo(() => photoDistance(trackTable, track.photo, speeds, RUN_SECONDS), [trackTable, track.photo, speeds])
   const hardRoute = useMemo(() => hardRouteFor(curve, track.mechanics), [curve, track.mechanics])
   useEffect(() => {
     const hard = track.mechanics && hardRouteOf(curve, track.mechanics)
@@ -184,6 +188,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
         <ShootingController />
         <GameTimer />
         <KillProjector />
+        <RidePhoto table={trackTable} at={photoAt} />
         <ShaderWarmup levelId={levelId} />
       </TerrainContext.Provider>
     </WorldContext.Provider>

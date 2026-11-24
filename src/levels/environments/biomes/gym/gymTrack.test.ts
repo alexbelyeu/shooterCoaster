@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
-import { buildArcTable, tAtLoopDistance } from '@/track/arcLength'
+import { buildArcTable, distanceAtT, tAtLoopDistance } from '@/track/arcLength'
 import { rideModel, rideProfile } from '@/track/ridePhysics'
 import { BEAT_TOLERANCE_SECONDS } from '@/track/rideV2'
 import { seatUp } from '@/track/trackGeometry'
@@ -230,6 +230,21 @@ describe('the gym track', () => {
     expect(Math.max(...heights) + dims.eyeHeight / GYM_SCALE).toBeLessThanOrEqual(TREE_GAP.height - RAIL_CLEARANCE)
     // The run rides it.
     expect(inGap.filter(({ i }) => secondsAt(i) < RUN_SECONDS).length * metresPerSample).toBeGreaterThan(TREE_GAP.halfAlong)
+  })
+
+  it("takes the on-ride photo in the run, upright, riding into the Tree's gap a few metres ahead (#701)", () => {
+    const photo = GYM_TRACK.photo ?? -1
+    const i = Math.round((distanceAtT(table, photo) / table.length) * N)
+    const p = track[i]
+    const f = treeOut(p)
+    const ahead = -TREE_GAP.halfAlong - treeAlong(p)
+    expect(ahead).toBeGreaterThan(0)
+    expect(ahead).toBeLessThan(4)
+    expect(treeAlong(track[i + 10])).toBeGreaterThan(treeAlong(p))
+    expect(f).toBeGreaterThanOrEqual(TREE_GAP.minF)
+    expect(f).toBeLessThanOrEqual(TREE_GAP.maxF)
+    expect(seatUp(curve, photo, new THREE.Vector3()).y).toBeGreaterThan(0.9)
+    expect(secondsAt(i)).toBeLessThan(RUN_SECONDS)
   })
 
   it("tours the hall into the seat in the station clear of every piece, riding the track's turn in (#659, #675, #700)", () => {

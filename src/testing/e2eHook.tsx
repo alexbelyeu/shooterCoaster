@@ -63,6 +63,7 @@ import { clipboardText, sharePayload } from '@/ui/share'
 import { setOnlineEndpointOverride } from '@/app/onlineLeaderboard'
 import { scoreCardFileName, scoreCardRun, type CardSize } from '@/ui/scoreCard'
 import { renderScoreCard } from '@/ui/scoreCardImage'
+import { ridePhotoFor } from '@/store/ridePhoto'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
 import type { LivePickup } from '@/combat/pickups/Pickups'
 import type { Junction, SwitchPose } from '@/track/mechanics'
@@ -289,7 +290,7 @@ export interface SCTestApi {
   shareText: (worldRank?: number | null) => string | null
   /** The results Share image (#272) for the current level and run, drawn as the share menu draws it: its pixel size,
    *  PNG data URL and download name, or null with no level. */
-  scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string } | null>
+  scoreCard: (size: CardSize) => Promise<{ width: number; height: number; png: string; fileName: string; photo: boolean } | null>
   /** Override the game time scale (0 freezes camera + enemies; 1 hands it back to the slow-mo envelopes, `combat/slowMo.hot.ts`). */
   setTimeScale: (s: number) => void
   /** Pins the intro's tour (#328, #675) at this progress (0 = the reveal, 1 = the seat) in any phase short of the results, until set back to null. */
@@ -314,6 +315,18 @@ export interface SCTestApi {
   /** Photo mode's orbit (#828), written by `track/PhotoCamera` each frame while it is on: radians, world units, the
    *  camera's distance from the pivot (the seat's eye at the pause) and its height over the terrain. */
   photo: { on: boolean; yaw: number; pitch: number; radius: number; offset: number; clearance: number }
+  /** The on-ride photo (#701), set by `RidePhoto`: its marker as a track fraction (`at`), whether this run's is taken, the
+   *  ride's track fraction then, the snapshot call's ms, the whole capture frame's ms (the next frame's delta), the
+   *  readback's frame's (the one after) and the frame's before the capture, its size and its JPEG's bytes (once encoded). */
+  ridePhoto: {
+    at: number | null; taken: boolean; progress: number | null; captureMs: number | null; frameMs: number | null; readMs: number | null; beforeMs: number | null
+    width: number; height: number; bytes: number | null
+    /** The HUD's flash started its animation. */
+    flashed: boolean
+    /** ms after the capture call each stage reached: `sfx` (the shutter played), `readback` (the pixels back from the GPU), `flash` (its animation started),
+     *  `nextFrame` (the capture's frame timed), `posted` (to the darkroom worker), `encoded` (the JPEG back). */
+    trace: Record<string, number> | null
+  }
   /** Set to a track fraction (0–1) to jump the coaster there on its next frame. */
   rideTo: number | null
   /** Set to a speed (0–1 between the level's min and max velocity) to put the coaster at it on its next frame. */
@@ -1264,7 +1277,8 @@ export function installE2EApi() {
       const s = useGameStore.getState()
       const card = s.currentLevel ? scoreCardRun({ ...s, levelId: s.currentLevel, mode: s.runMode }) : null
       if (!card) return null
-      const blob = await renderScoreCard(card, size)
+      const photo = ridePhotoFor(s.runId)
+      const blob = await renderScoreCard(card, size, photo?.blob ?? null)
       const bitmap = await createImageBitmap(blob)
       const png = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
@@ -1272,7 +1286,7 @@ export function installE2EApi() {
         reader.onerror = () => reject(reader.error)
         reader.readAsDataURL(blob)
       })
-      const out = { width: bitmap.width, height: bitmap.height, png, fileName: scoreCardFileName(card.levelId, card.score) }
+      const out = { width: bitmap.width, height: bitmap.height, png, fileName: scoreCardFileName(card.levelId, card.score), photo: photo !== null }
       bitmap.close()
       return out
     },
@@ -1280,6 +1294,7 @@ export function installE2EApi() {
     introAt: null,
     intro: { mode: 'ride', length: INTRO_SECONDS, handoff: INTRO_HANDOFF_SECONDS, progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, clearance: 0, marks: null, goOffset: null, orbitSeconds: 0, seconds: null, skipped: false },
     photo: { on: false, yaw: 0, pitch: 0, radius: 0, offset: 0, clearance: 0 },
+    ridePhoto: { at: null, taken: false, progress: null, captureMs: null, frameMs: null, readMs: null, beforeMs: null, width: 0, height: 0, bytes: null, flashed: false, trace: null },
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,

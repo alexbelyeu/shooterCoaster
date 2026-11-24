@@ -6,6 +6,7 @@ import ScoreDisplay from './ScoreDisplay'
 import TimerBar from './TimerBar'
 import ComboMeter from './ComboMeter'
 import FrenzyFlash from './FrenzyFlash'
+import PhotoFlash from './PhotoFlash'
 import SnowSplat from './SnowSplat'
 import BossBar from './BossBar'
 import WeaponBadge from './WeaponBadge'
@@ -63,6 +64,7 @@ export default function HUD() {
       </div>
       <BossBar />
       <FrenzyFlash />
+      <PhotoFlash />
       <SnowSplat />
       <ComboMeter />
       <WeaponBadge />

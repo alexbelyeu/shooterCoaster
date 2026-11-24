@@ -46,6 +46,8 @@ export interface SfxEngine {
   bossDefeat(at: Placement | null): void
   fireworkWhistle(flightS: number, timeScale: number): void
   fireworkPop(): void
+  /** The on-ride photo's flash (#701). */
+  shutter(): void
   starChime(index: number): void
   ui(sound: UiSound): void
   countdown(go: boolean): void
@@ -83,7 +85,7 @@ export const silentSfx: SfxEngine = {
   prepare: () => Promise.resolve(),
   fire: silent, pickup: silent, hit: silent, kill: silent, bossPart: silent, comboBreak: silent, penalty: silent, frenzy: silent, frenzyLift: silent,
   waveIncoming: silent, bossArrival: silent, bossHit: silent, bossDefeat: silent,
-  fireworkWhistle: silent, fireworkPop: silent, starChime: silent, ui: silent, countdown: silent, wind: silent, chain: silent, rideLaunch: silent, trackSwitch: silent,
+  fireworkWhistle: silent, fireworkPop: silent, shutter: silent, starChime: silent, ui: silent, countdown: silent, wind: silent, chain: silent, rideLaunch: silent, trackSwitch: silent,
   nodeCount: () => 0,
   killsPlayed: () => 0,
   voices: () => null,

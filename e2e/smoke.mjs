@@ -560,6 +560,8 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   const played = await page.evaluate(() => ({ levelTime: window.__SC_TEST__.nextWave()?.levelTime ?? null, boss: window.__SC_TEST__.boss().stage }))
   if (played.boss !== 'none' && played.boss !== 'waiting') problems.push(`the boss arrived during play (stage ${played.boss} at ${played.levelTime?.toFixed(1)} s of level time)`)
 
+  const photo = await ridePhotoProblems(page, id)
+  problems.push(...photo.problems)
   // With `leaderboard`, seed nine entries so this run places 4th, in the same turn as the end so the score can't move.
   const seeding = await page.evaluate(
     ([lid, seed, endpoint, medal]) => {
@@ -661,12 +663,76 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
       freshShot: shot.result,
       gamepad: pad?.result ?? null,
       ghost: ghost?.result ?? null,
+      ridePhoto: photo.result,
       endLevelTime: played.levelTime,
     },
     kills: combat.kills,
     score: combat.score,
     results: results.screen,
   }
+}
+
+/**
+ * Track fraction short of the photo marker the ride is put at: it must then ride past it (#701). Several frames short
+ * even at CI's ~800 ms frames (a frame there rides up to ~0.02): the first frames after the jump catch the level up
+ * (#887: a capture on that frame read 2.8x a usual one, the catch-up, not the snapshot).
+ */
+const PHOTO_APPROACH = 0.03
+/** Frames the ride is held frozen after the jump, so the jumped-to place has drawn before it moves on. */
+const PHOTO_SETTLE_FRAMES = 5
+/**
+ * The capture's frame, and the readback's frame after it, against the frame before the capture or the run's average, the
+ * longer (#701): a software renderer does the GPU's work on the CPU, so a fixed ms cap would only measure the runner.
+ * The JPEG comes on the worker.
+ */
+const PHOTO_FRAME_FACTOR = 2
+
+/**
+ * The on-ride photo (#701): unless the ride already passed the level's marker, put it
+ * just short and let it ride past. The flash must show, the JPEG must arrive, and the capture's frame take at most
+ * `PHOTO_FRAME_FACTOR` times a frame without it.
+ */
+async function ridePhotoProblems(page, id) {
+  // The jump is made with the ride frozen: on a slow runner one frame rides further than the approach, and a jump and
+  // a pass on the same frame read as one jump, never a pass. Frozen, `RidePhoto` sees the car short of the marker first.
+  const start = await page.evaluate((approach) => {
+    const s = window.__SC_TEST__
+    if (s.ridePhoto.at == null) return null
+    const taken = s.ridePhoto.taken
+    if (!taken) {
+      s.setTimeScale(0)
+      s.rideTo = Math.max(0, s.ridePhoto.at - approach)
+    }
+    return { taken, frames: s.frames }
+  }, PHOTO_APPROACH)
+  if (!start) return { problems: ['on-ride photo: no marker (RidePhoto not mounted)'], result: null }
+  let jumpedTo = null
+  if (!start.taken) {
+    await page.waitForFunction((f) => window.__SC_TEST__.frames >= f, start.frames + PHOTO_SETTLE_FRAMES, { timeout: 30000, polling: 50 }).catch(() => {})
+    jumpedTo = await page.evaluate(() => {
+      const s = window.__SC_TEST__
+      s.setTimeScale(1)
+      return s.rideProgress
+    })
+  }
+  const flash = start.taken
+    ? null
+    : page.waitForFunction(() => window.__SC_TEST__.ridePhoto.flashed, null, { timeout: 60000, polling: 100 }).then(() => true, () => false)
+  const arrived = await page
+    .waitForFunction(() => window.__SC_TEST__.ridePhoto.bytes != null && window.__SC_TEST__.ridePhoto.readMs != null, null, { timeout: 60000, polling: 100 })
+    .then(() => true, () => false)
+  const result = await page.evaluate(() => ({ ...window.__SC_TEST__.ridePhoto, avgFrameMs: window.__SC_TEST__.avgFrameMs }))
+  const problems = []
+  if (!arrived) problems.push(`on-ride photo not taken (marker at track ${result.at?.toFixed(4)}, ride at ${(await page.evaluate(() => window.__SC_TEST__.rideProgress)).toFixed(4)}; jumped to ${jumpedTo?.toFixed(4)}; ${JSON.stringify(result.trace)})`)
+  else {
+    if (flash && !(await flash)) problems.push('on-ride photo: no flash on screen')
+    const usual = Math.max(result.beforeMs, result.avgFrameMs)
+    for (const [frame, ms] of [['its frame', result.frameMs], ['the readback frame', result.readMs]])
+      if (ms > PHOTO_FRAME_FACTOR * usual)
+        problems.push(`on-ride photo: ${frame} took ${ms.toFixed(0)} ms, over ${PHOTO_FRAME_FACTOR}x a usual ${usual.toFixed(0)} ms (${JSON.stringify(result.trace)})`)
+    if (Math.max(result.width, result.height) > 1280 || result.bytes < 5000) problems.push(`on-ride photo is ${result.width}x${result.height}, ${result.bytes} bytes`)
+  }
+  return { problems, result: { ...result, flash: flash ? await flash : null, id } }
 }
 
 /**
@@ -954,6 +1020,12 @@ async function resultsScreenProblems(page, id, stats, { share }) {
       nextLevel: next ? { id: next.id, unlocked: next.unlocked } : null,
       keys: el.querySelector('.results-keys')?.textContent ?? '',
       score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent,
+      photo: (() => {
+        const img = el.querySelector('.results-photo img')
+        if (!img) return null
+        const p = img.getBoundingClientRect()
+        return { loaded: img.complete && img.naturalWidth > 0, inView: p.width > 0 && p.left >= 0 && p.top >= 0 && p.right <= window.innerWidth && p.bottom <= window.innerHeight }
+      })(),
       medals: [...el.querySelectorAll('.results-medal')].map((m) => m.dataset.medal), medalsWon: s.medalsWon(),
       saved: Object.keys(JSON.parse(localStorage.getItem('shootercoaster-scores') ?? '{}').state?.savedMedals ?? {}),
     }
@@ -979,10 +1051,13 @@ async function resultsScreenProblems(page, id, stats, { share }) {
     const menu = await shareMenuProblems(page, 'desktop', { shot: `${id}-share.png`, expectClipboard: screen.shareText, download: `shootercoaster-${id}-${stats.score}.png` })
     problems.push(...menu.problems)
     shown.shareMenu = menu.targets
-    const cards = await scoreCardProblems(page, id, `shootercoaster-${id}-${stats.score}.png`)
+    const cards = await scoreCardProblems(page, id, `shootercoaster-${id}-${stats.score}.png`, { photo: true })
     problems.push(...cards.problems)
     shown.scoreCards = cards.sizes
   }
+  // #701: the run's on-ride photo as a print beside the score.
+  if (!screen.photo) problems.push('results screen shows no on-ride photo')
+  else if (!screen.photo.loaded || !screen.photo.inView) problems.push(`results on-ride photo ${screen.photo.loaded ? 'not inside the viewport' : 'not loaded'}`)
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
   // #879: the board shows the medals the run won (the run primed a medal chain, so at least one) and saves them.
   if (screen.medals.length === 0) problems.push(`results board shows no medal (the run won ${JSON.stringify(screen.medalsWon)})`)
@@ -1256,7 +1331,8 @@ const CARD_SIZES = { feed: { width: 1200, height: 630, shot: 'card' }, story: { 
 // A blank or text-only card compresses to a few KB; the art alone is far more.
 const CARD_MIN_BYTES = 20000
 
-async function scoreCardProblems(page, prefix, fileName) {
+/** `photo`: the run took its on-ride photo, so the cards must carry it (#701). */
+async function scoreCardProblems(page, prefix, fileName, { photo = false } = {}) {
   const problems = []
   const sizes = {}
   for (const [size, want] of Object.entries(CARD_SIZES)) {
@@ -1273,6 +1349,7 @@ async function scoreCardProblems(page, prefix, fileName) {
       problems.push(`score card ${size} is ${dims?.join('x') ?? 'not a PNG'} (bitmap ${card.width}x${card.height}), expected ${want.width}x${want.height}`)
     if (png.length < CARD_MIN_BYTES) problems.push(`score card ${size} is only ${png.length} bytes: blank?`)
     if (card.fileName !== fileName) problems.push(`score card ${size} file name ${card.fileName}, expected ${fileName}`)
+    if (photo && !card.photo) problems.push(`score card ${size} has the postcard, not the run's on-ride photo`)
     sizes[size] = { bytes: png.length }
   }
   return { problems, sizes }

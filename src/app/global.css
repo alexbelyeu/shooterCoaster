@@ -299,6 +299,31 @@ canvas {
   color: var(--fair-cream);
 }
 
+/* The on-ride photo's flash (#701): over the whole screen, never in the photo (that is the canvas alone). */
+.hud-photo-flash {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  pointer-events: none;
+  opacity: 0;
+  animation: hud-photo-flash 0.35s ease-out;
+}
+
+@keyframes hud-photo-flash {
+  0% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-photo-flash { animation-name: hud-photo-flash-soft; }
+}
+.reduce-motion .hud-photo-flash { animation-name: hud-photo-flash-soft; }
+
+@keyframes hud-photo-flash-soft {
+  0% { opacity: 0.3; }
+  100% { opacity: 0; }
+}
+
 .hud-number {
   font-family: 'Ultra', serif;
   font-weight: 400;
@@ -1957,6 +1982,54 @@ canvas {
 
   .results-board-slot {
     flex: 0 0 19rem;
+  }
+}
+
+/* The on-ride photo (#701) as a print: last on a phone (under the leaderboard), a column left of the board on a wide
+   screen, left out where the row has no room for it. */
+.results-photo {
+  order: 1;
+  width: min(80%, 17rem);
+  margin: 0;
+  padding: 0.5rem 0.5rem 0.3rem;
+  background: var(--fair-cream);
+  border-radius: 2px;
+  box-shadow: 4px 5px 0 var(--fair-tar);
+}
+
+.results-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* One print shape for a landscape desktop frame and a portrait phone one. */
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.results-photo figcaption {
+  padding-top: 0.3rem;
+  font-family: 'Big Shoulders', sans-serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  text-align: center;
+  color: var(--fair-tar);
+}
+
+@media (min-width: 900px) and (min-height: 521px), (orientation: landscape) and (max-height: 520px) {
+  .results-photo {
+    display: none;
+  }
+}
+
+@media (min-width: 1240px) and (min-height: 521px) {
+  .results-card.has-photo {
+    gap: 1.5rem;
+  }
+
+  .results-photo {
+    display: block;
+    order: -1;
+    flex: 0 0 12rem;
   }
 }
 

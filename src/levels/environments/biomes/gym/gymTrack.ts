@@ -331,6 +331,9 @@ export function buildGymTrack(): TrackParams {
   // The cave rides dark (#752): the light goes under its lintel and comes back over as long on its launch out.
   const caveRamp = share(ride.cave.dark) - share(ride.cave.from)
   const darkSections = [{ from: share(ride.cave.from), to: share(ride.cave.out) + caveRamp, ramp: caveRamp, flashReach: CAVE_FLASH_REACH * world }]
+  // The on-ride photo (#701): as the slow roll through the Tree's gap starts, the rider upright and the gap straight ahead.
+  const treeRoll = ride.markers.filter((k) => k.kind === 'heartlineRoll')[1]
+  if (!treeRoll) throw new Error('gym ride: no roll through the Tree for its photo')
   return {
     curve: 'spline',
     controlPoints: points,
@@ -340,6 +343,7 @@ export function buildGymTrack(): TrackParams {
     rideV2,
     mechanics,
     darkSections,
+    photo: share(treeRoll.from),
     // Rails, ties and towers sparser than level 1's (~0.86 m a segment, under 3 cm of chord sag on the tightest turn; ties
     // every ~0.6 m and towers every ~23 m of the hall at 48 units a metre): the ~350 m track leaves the scene room under
     // `scene.level6` for the enemies in the air at 10 s (#726, #761).

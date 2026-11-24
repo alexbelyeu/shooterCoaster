@@ -2,10 +2,13 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { PostcardArt } from '@/ui/screens/LevelPostcard'
 import { CAR, CAR_PARK, CROSSHAIR, CROSSHAIR_PATH, GOLD, LOGO_TEXT, NAVY, RAIL, RED, TARGET, TRACK, VIEWBOX, WHITE, WORDMARK } from '@/ui/logoArt'
-import { CARD_FONTS, layoutScoreCard, starPoints, type CardBoard, type CardItem, type CardSize, type CardText, type Rect, type ScoreCardLayout, type ScoreCardRun } from '@/ui/scoreCard'
+import { CARD_FONTS, coverCrop, layoutScoreCard, starPoints, type CardBoard, type CardItem, type CardSize, type CardText, type Rect, type ScoreCardLayout, type ScoreCardRun } from '@/ui/scoreCard'
 import { FAIR } from '@/ui/theme'
 
-/** Draws the score card (#272) on a 2D canvas, on demand: no WebGL, no request (the art is an inline SVG data URL). */
+/**
+ * Draws the score card (#272) on a 2D canvas, on demand: no WebGL, no request (the art is an inline SVG data URL, or the
+ * run's on-ride photo when it has one, #701).
+ */
 
 /** The faces the card uses, loaded before measuring: a canvas silently falls back to a system font. */
 async function fontsReady(): Promise<void> {
@@ -203,15 +206,8 @@ function roundRect({ x, y, width, height, rx }: { x: number; y: number; width: n
   return p
 }
 
-async function draw(ctx: CanvasRenderingContext2D, run: ScoreCardRun, layout: ScoreCardLayout) {
-  const { width, height, art, frame } = layout
-  ctx.fillStyle = FAIR.tar
-  ctx.fillRect(0, 0, width, height)
-  drawBoard(ctx, layout.board)
-
-  // The postcard: its own sky behind the landmark, framed in tar.
-  ctx.fillStyle = FAIR.tar
-  ctx.fillRect(art.x - frame, art.y - frame, art.width + 2 * frame, art.height + 2 * frame)
+/** The level's postcard: its own sky behind the landmark. */
+async function drawPostcard(ctx: CanvasRenderingContext2D, layout: ScoreCardLayout, run: ScoreCardRun, art: Rect) {
   const sky = ctx.createLinearGradient(0, art.y, 0, art.y + art.height)
   for (const [colour, at] of layout.sky) sky.addColorStop(at, colour)
   ctx.fillStyle = sky
@@ -219,12 +215,36 @@ async function draw(ctx: CanvasRenderingContext2D, run: ScoreCardRun, layout: Sc
   const img = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(artMarkup(run.biome, art))}`)
   ctx.drawImage(img, art.x, art.y, art.width, art.height)
   img.src = ''
+}
+
+async function drawPhoto(ctx: CanvasRenderingContext2D, photo: Blob, art: Rect) {
+  const bitmap = await createImageBitmap(photo)
+  try {
+    const src = coverCrop(bitmap.width, bitmap.height, art)
+    ctx.drawImage(bitmap, src.x, src.y, src.width, src.height, art.x, art.y, art.width, art.height)
+  } finally {
+    bitmap.close()
+  }
+}
+
+async function draw(ctx: CanvasRenderingContext2D, run: ScoreCardRun, layout: ScoreCardLayout, photo: Blob | null) {
+  const { width, height, art, frame } = layout
+  ctx.fillStyle = FAIR.tar
+  ctx.fillRect(0, 0, width, height)
+  drawBoard(ctx, layout.board)
+
+  // The picture, framed in tar: the run's on-ride photo, else (or when it won't decode) the postcard.
+  ctx.fillStyle = FAIR.tar
+  ctx.fillRect(art.x - frame, art.y - frame, art.width + 2 * frame, art.height + 2 * frame)
+  if (photo) await drawPhoto(ctx, photo, art).catch(() => drawPostcard(ctx, layout, run, art))
+  else await drawPostcard(ctx, layout, run, art)
 
   for (const item of layout.items) drawItem(ctx, item)
 }
 
 /** Empties the canvas afterwards so its pixels don't linger. */
-export async function renderScoreCard(run: ScoreCardRun, size: CardSize): Promise<Blob> {
+/** `photo`: the run's on-ride photo, in the postcard's place. */
+export async function renderScoreCard(run: ScoreCardRun, size: CardSize, photo: Blob | null = null): Promise<Blob> {
   await fontsReady()
   const canvas = document.createElement('canvas')
   try {
@@ -236,7 +256,7 @@ export async function renderScoreCard(run: ScoreCardRun, size: CardSize): Promis
     })
     canvas.width = layout.width
     canvas.height = layout.height
-    await draw(ctx, run, layout)
+    await draw(ctx, run, layout, photo)
     return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png'))
   } finally {
     canvas.width = 0

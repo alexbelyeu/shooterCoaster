@@ -39,6 +39,8 @@ interface TrackBase {
   glow?: number
   /** Set-pieces (#332): stretches where the track runs through a lit tube (`src/track/setPieces.ts`). */
   tunnels?: readonly TunnelSpec[]
+  /** The on-ride photo (#701): the track fraction where the flash fires; without it, 85% of the way through the run (`photoMarker.ts`). */
+  photo?: number
   /** Dark sections (#752): stretches ridden in the dark, the level's light and fog dimmed (`src/track/darkSection.hot.ts`). */
   darkSections?: readonly DarkSectionSpec[]
   /** Special ride mechanics (#699, `src/track/mechanics.ts`): they set a v2 ride's zones and stops; only a junction runs on either ride. */

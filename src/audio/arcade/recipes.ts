@@ -276,6 +276,12 @@ export const RECIPES: readonly Recipe[] = [
     for (let i = 0; i < 7; i++) noise(S, out, t + 0.06 + i * 0.05 + (i % 3) * 0.013, { type: 'highpass', f: 5000, q: 0.5, a: 0.0005, tau: 0.01, peak: 0.5 - i * 0.05 })
     hitDrum(S, out, 'kick', t, 0.7)
   } },
+  // The on-ride photo's camera (#701): the shutter's click-clack, then the flash's capacitor whine falling away.
+  { id: 'shutter', lengthS: fixed(0.45), render(S, out, t) {
+    noise(S, out, t, { type: 'bandpass', f: 3800, q: 1.4, a: 0.0005, tau: 0.008, peak: 1 })
+    noise(S, out, t + 0.07, { type: 'bandpass', f: 2200, q: 1.2, a: 0.0005, tau: 0.012, peak: 0.85 })
+    sweep(S, out, t + 0.02, 0.35, 7000, 4500, 6, 0.12)
+  } },
   // Results stars: bell + glock on the third, fifth and octave.
   ...[2, 4, 7].map((deg, i): Recipe => ({ id: `star${i + 1}` as ArcadeSoundId, lengthS: fixed(1.6), render(S, out, t, b) {
     playInstrument(S, out, 'bell', t, 0.4, keyNote(b.key, deg, 1), 0.9)

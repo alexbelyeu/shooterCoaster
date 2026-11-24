@@ -22,6 +22,7 @@ import { levelMedals, medalsWon } from '@/levels/medals'
 import { isReloadDue, reloadIfDue } from '@/app/staleReload'
 import { saveGhost } from '@/combat/ghost'
 import { recording } from '@/combat/ghostTrack.hot'
+import { useRidePhoto, type RidePhoto } from '@/store/ridePhoto'
 
 const fmt = new Intl.NumberFormat('en-US')
 
@@ -35,6 +36,7 @@ function snapshotRun() {
   return {
     medals: s.currentLevel ? medalsWon(s.currentLevel, medalRun(s)) : [],
     levelId: s.currentLevel,
+    runId: s.runId,
     mode: s.runMode,
     variant: s.runVariant,
     score: Math.round(s.score),
@@ -59,6 +61,10 @@ function worldBoard() {
 
 export default function ResultsScreen() {
   const [run] = useState(snapshotRun)
+  // The on-ride photo (#701): kept once it arrives, so the print stays through the exit fade while the next run drops it.
+  const livePhoto = useRidePhoto(run.runId)
+  const [photo, setPhoto] = useState<RidePhoto | null>(livePhoto)
+  if (livePhoto && livePhoto !== photo) setPhoto(livePhoto)
   const config = run.levelId ? getLevelConfig(run.levelId) : undefined
   const reducedMotion = usePrefersReducedMotion()
   const [stage, setStage] = useState<number>(reducedMotion ? STAGE.done : STAGE.title)
@@ -260,7 +266,7 @@ export default function ResultsScreen() {
         if (!done) setStage(STAGE.done)
       }}
     >
-      <div className="results-card">
+      <div className={`results-card${photo ? ' has-photo' : ''}`}>
         <FairBoard className="results-panel" shadowClassName="results-panel-shadow fair-arrive" role="region" aria-labelledby="results-title">
           <div className="results-main">
             {daily && <p className="results-badge fair-showcard">Daily Run</p>}
@@ -323,7 +329,7 @@ export default function ResultsScreen() {
                   </button>
                 ))}
               {/* Not in a portal build (#254): its link would send the portal's players off to scoaster.com. */}
-              {card && !__PORTAL_BUILD__ && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} prerender={done} />}
+              {card && !__PORTAL_BUILD__ && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} prerender={done} photo={photo?.blob ?? null} />}
             </div>
             <p className="results-keys" data-shown={done}>
               {entryOpen && 'Type your initials or pick them with the arrows. Enter signs it.'}
@@ -333,6 +339,19 @@ export default function ResultsScreen() {
             </p>
           </div>
         </FairBoard>
+
+        {photo && (
+          <m.figure
+            className="results-photo"
+            initial={false}
+            variants={{ hidden: { opacity: 0, y: -40, rotate: -16 }, shown: { opacity: 1, y: 0, rotate: -4 } }}
+            animate={reveal(STAGE.stats)}
+            transition={done ? instant : { type: 'spring', stiffness: 220, damping: 18 }}
+          >
+            <img src={photo.url} width={photo.width} height={photo.height} alt={`On-ride photo: ${config.name}`} />
+            <figcaption>On-ride photo</figcaption>
+          </m.figure>
+        )}
 
         {(!daily || world) && (
           <m.div

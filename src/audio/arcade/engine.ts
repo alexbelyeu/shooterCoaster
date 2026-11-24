@@ -458,6 +458,7 @@ export const arcadeSfx: SfxEngine = {
     play('fireworkWhistle', 0, v, WHISTLE_LENGTHS_S[v] / s)
   },
   fireworkPop: () => void play('fireworkPop'),
+  shutter: () => void play('shutter'),
   starChime: (index) => void play(index <= 0 ? 'star1' : index === 1 ? 'star2' : 'star3'),
   ui: (sound) => void play(UI_SOUNDS[sound]),
   countdown: (go) => void play(go ? 'countGo' : 'countReady'),
