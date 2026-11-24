@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
 import { bent, darkUnder, grin, recolor } from './enemyPaint'
-import { withRim } from './enemyRim'
+import { withEmissivePatch, withRim } from './enemyRim'
 import { IMP_ORANGE, IMP_DARK, OBSIDIAN as OBSIDIAN_HEX, LAVA, LAVA_HOT, DRAKE_CHARCOAL, DRAKE_MEMBRANE, DRAKE_GLOW, WISP_EMBER, WISP_FLAME, WISP_WHITE, WISP_RIM, WISP_RIBBON_ROOT, WISP_RIBBON_TIP } from './enemyPalette'
 
 // Inferno's enemies as characters (#463, #813, briefs in docs/art/ENEMIES.md): the Ember Wisp, the Fire
@@ -14,27 +14,6 @@ type Vec3 = [number, number, number]
 function hash3(x: number, y: number, z: number): number {
   const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453
   return s - Math.floor(s)
-}
-
-/** Chains a fragment patch after `material`'s rim, with its own uniforms and program key. */
-function withEmissivePatch<T extends THREE.Material>(
-  material: T,
-  key: string,
-  uniforms: Record<string, THREE.IUniform>,
-  pars: string,
-  apply: string,
-): T {
-  const base = material.onBeforeCompile
-  const baseKey = material.customProgramCacheKey()
-  material.onBeforeCompile = (shader, renderer) => {
-    base.call(material, shader, renderer)
-    Object.assign(shader.uniforms, uniforms)
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${pars}`)
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${apply}`)
-  }
-  material.customProgramCacheKey = () => `${baseKey}-${key}`
-  return material
 }
 
 // ── Ember Wisp: a flame teardrop with coal eyes + three trailing ribbon flames ──

@@ -110,6 +110,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
   )
 
   const keepOff = useMemo(() => def.keepOff?.(groundFn, trackTable), [def, groundFn, trackTable])
+  const clearAir = useMemo(() => def.clearAir?.(groundFn, trackTable), [def, groundFn, trackTable])
   const speeds = useMemo(() => rideModel(track, trackTable), [track, trackTable])
   const hardRoute = useMemo(() => hardRouteFor(curve, track.mechanics), [curve, track.mechanics])
   useEffect(() => {
@@ -176,6 +177,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
           walls={walls}
           bounds={def.bounds}
           keepOff={keepOff}
+          clearAir={clearAir}
           hardRoute={hardRoute}
         />
         <ShootingController />

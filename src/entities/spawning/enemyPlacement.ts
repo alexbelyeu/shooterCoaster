@@ -58,6 +58,8 @@ export const ENEMY_PLACEMENT: Record<EnemyType, EnemyPlacementRule> = {
   rat: { surface: 'ground', scatter: 'trackside' },
   dustBunny: { surface: 'ground', scatter: 'trackside' },
   lanternfly: { surface: 'wall', scatter: 'swarm' },
+  // Hovers in the street canyons ahead of the rider, about the ride's height
+  hoverDrone: { surface: 'air', scatter: band(150, 1400, 50, 150) },
 }
 
 export const GOLDEN_BALLOON_SCATTER = band(0, 3000, 50, 100)

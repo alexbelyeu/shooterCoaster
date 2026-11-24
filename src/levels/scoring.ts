@@ -25,6 +25,7 @@ export const SCORE_VALUES: Record<EnemyType, number> = {
   rat: 18,
   dustBunny: 12,
   lanternfly: 15,
+  hoverDrone: 15,
 }
 
 /** What shooting a bystander costs (#518): about one level-6 enemy. */

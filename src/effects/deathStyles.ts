@@ -381,6 +381,15 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
     ],
     lifetime: 1.7, scale: 1, lift: 0, flash: 5, flashColor: '#ff3a2a', sound: 'snap',
   },
+  // A short-out: cyan sparks, a magenta spit off its tail light and dark gunmetal chunks falling.
+  hoverDrone: {
+    layers: [
+      layer({ shape: 'spark', count: 34, colors: ['#2ee8ff', '#9af4ff', '#ffffff'], glow: 4, speed: [50, 160], up: 20, drag: 2.4, gravity: 50, size: 2.2, hold: 0.1 }),
+      layer({ shape: 'chunk', count: 9, colors: ['#2a2e3a', '#3c4354', '#1a1d26'], speed: [30, 85], up: 40, drag: 0.6, gravity: 160, size: 5, spin: 9, hold: 0.7 }),
+      layer({ shape: 'spark', count: 6, colors: ['#ff2fb0'], glow: 3, speed: [40, 100], drag: 3, size: 1.6 }),
+    ],
+    lifetime: 1.5, scale: 1, lift: 0, flash: 6, flashColor: '#2ee8ff', sound: 'snap',
+  },
 }
 
 /** Particles a style puts in each of the pool's two meshes. */
