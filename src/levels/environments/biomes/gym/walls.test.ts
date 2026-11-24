@@ -17,7 +17,7 @@ describe('gym walls', () => {
     expect(chordOf([{ len: 10, angle: 0 }]).standoff).toBe(0)
   })
 
-  it.each(GYM_WALLS.map((w) => [w.id, w] as const))('%s faces into the hall from its wall, inside its walls', (_id, w) => {
+  it.each(GYM_WALLS.filter((w) => !w.perch).map((w) => [w.id, w] as const))('%s faces into the hall from its wall, inside its walls', (_id, w) => {
     const piece = PIECES.find((p) => w.id.startsWith(p.id))!
     const { facing } = pieceAxes(piece.rot)
     const n = cross(w.right, w.up)
@@ -27,6 +27,18 @@ describe('gym walls', () => {
       expect(Math.abs(p.x)).toBeLessThanOrEqual((HALL.w / 2) * GYM_SCALE)
       expect(Math.abs(p.z)).toBeLessThanOrEqual((HALL.d / 2) * GYM_SCALE)
       expect(p.y).toBeLessThanOrEqual(HALL.h * GYM_SCALE)
+    }
+  })
+
+  it('have one perch (#948), the roof deck over Alaska’s top, facing down inside the hall', () => {
+    const perches = GYM_WALLS.filter((w) => w.perch)
+    expect(perches.map((w) => w.id)).toEqual(['roof-alaska'])
+    const [roof] = perches
+    expect(cross(roof.right, roof.up)).toEqual({ x: 0, y: -1, z: 0 })
+    expect(roof.origin.y).toBe(HALL.h * GYM_SCALE)
+    for (const [u, v] of [[0, 0], [roof.width, roof.height]]) {
+      expect(Math.abs(roof.origin.x + roof.right.x * u)).toBeLessThanOrEqual((HALL.w / 2) * GYM_SCALE)
+      expect(Math.abs(roof.origin.z + roof.up.z * v)).toBeLessThanOrEqual((HALL.d / 2) * GYM_SCALE)
     }
   })
 

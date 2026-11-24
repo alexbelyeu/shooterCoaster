@@ -1,7 +1,7 @@
 /** Per-enemy-type death effects drawn by the pooled `ParticleExplosion`; pure, so unit-tested. */
 import type { EnemyType } from '@/types/level'
 import type { KillSound } from '@/audio/sfxDesign'
-import type { Vec3 } from '@/entities/spawning/spawnPlacement'
+import type { Vec3 } from '@/utils/vec3'
 import { DUST_CHALK, DUST_DARK, DUST_GREY, DUST_LIGHT } from '@/entities/enemies/enemyPalette'
 
 /** `chunk` layers draw in the lit chunk mesh; every other shape is a stretched unlit box. */
@@ -43,8 +43,11 @@ export interface DeathStyle {
   sound: KillSound
 }
 
-/** Concurrent explosions; unlit particles and chunks per explosion. */
-export const DEATH_SLOTS = 8
+/**
+ * Concurrent explosions; unlit particles and chunks per explosion. The Magma Titan's defeat, the busiest moment,
+ * takes 9 (its crown, 4 confetti, 4 break bursts): 10 leaves one for a kill alongside (`deathStyles.test.ts`).
+ */
+export const DEATH_SLOTS = 10
 export const GLOW_PER_SLOT = 48
 export const CHUNKS_PER_SLOT = 12
 
@@ -111,6 +114,15 @@ export function pickDeathSlot(slots: readonly SlotState[]): { index: number; cle
   return { index, clear: slot.active || slot.needsZero }
 }
 
+/**
+ * Slots the pool draws: up to the highest live one (at least one, so the programs stay in use). `pickDeathSlot` fills
+ * the lowest free slot first, so an idle pool draws one slot's instances instead of all `DEATH_SLOTS` at zero scale.
+ */
+export function drawnSlots(slots: readonly SlotState[]): number {
+  for (let i = slots.length - 1; i > 0; i--) if (slots[i].active) return i + 1
+  return 1
+}
+
 const layer = (l: Partial<DeathLayer> & Pick<DeathLayer, 'shape' | 'count' | 'colors' | 'speed'>): DeathLayer => ({
   glow: 1, up: 0, drag: 2.5, gravity: 0, size: 2, spin: 0, hold: 0, ...l,
 })
@@ -157,7 +169,40 @@ export const SAND_BURST_DEATH_STYLE: DeathStyle = {
   lifetime: 1.9, scale: 3, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'crunch',
 }
 
-const BALLOON_CONFETTI =['#ff3b6b', '#ffd23f', '#3bc9ff', '#7dff6a', '#c86bff']
+const BALLOON_CONFETTI = ['#ff3b6b', '#ffd23f', '#3bc9ff', '#7dff6a', '#c86bff']
+const BALLOON_POP = (colors: readonly string[], sparkColors: readonly string[]): readonly DeathLayer[] => [
+  layer({ shape: 'confetti', count: 40, colors, glow: 1.6, speed: [30, 90], up: 20, drag: 3, gravity: 18, size: 5, spin: 9, hold: 0.6 }),
+  layer({ shape: 'spark', count: 8, colors: sparkColors, glow: 4, speed: [80, 140], drag: 4, size: 1.6 }),
+]
+
+/** A golden bonus balloon: the balloon's pop in gold leaf, with a warmer, brighter flash. */
+export const GOLDEN_BALLOON_DEATH_STYLE: DeathStyle = {
+  layers: BALLOON_POP(['#ffd700', '#ffc21a', '#ffe680', '#e0a010'], ['#fff4c0']),
+  lifetime: 1.8, scale: 1, lift: 0, flash: 5, flashColor: '#ffcc44', sound: 'pop',
+}
+
+/**
+ * A boss's defeat: a fairground confetti shower. One slot holds 48 pieces, so `BossBase` fires it at each of
+ * `BOSS_DEFEAT_BURST_OFFSETS` (4 of the pool's `DEATH_SLOTS`) to spread ~190 pieces across the boss. No flash, no sound
+ * of its own: the defeat's sting plays it.
+ */
+export const BOSS_DEFEAT_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({
+      shape: 'confetti', count: 48, colors: ['#ff3355', '#ffd23f', '#33c3ff', '#7cff4f', '#ff7a1a', '#c86bff', '#ffffff'],
+      glow: 1.2, speed: [120, 380], up: 160, drag: 1, gravity: 70, size: 12, spin: 14, hold: 0.8,
+    }),
+  ],
+  lifetime: 3.2, scale: 1, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'pop',
+}
+
+/** Where `BOSS_DEFEAT_DEATH_STYLE` bursts, around the boss body's centre (world axes). */
+export const BOSS_DEFEAT_BURST_OFFSETS: readonly Vec3[] = [
+  { x: -150, y: 30, z: 0 },
+  { x: -50, y: -30, z: 30 },
+  { x: 50, y: 30, z: -30 },
+  { x: 150, y: -30, z: 0 },
+]
 
 const SNOW_CRUMBLE = (ice: string): readonly DeathLayer[] => [
   layer({ shape: 'chunk', count: 9, colors: ['#f4f8ff', '#e2ecf8', ice], speed: [25, 70], up: 30, drag: 0.8, gravity: 140, size: 5.5, spin: 6, hold: 0.7 }),
@@ -234,12 +279,37 @@ export const MEDUSA_CHALK_BURST_DEATH_STYLE: DeathStyle = {
   lifetime: 2.2, scale: 3.5, lift: 0, flash: 6, flashColor: '#ffe9a0', sound: 'chalk',
 }
 
+/** A shot-out Helicopter part: the hover drone's spray of cyan sparks and gunmetal chunks, at the boss's size. */
+export const HELI_PART_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'spark', count: 34, colors: ['#2ee8ff', '#9af4ff', '#ffffff'], glow: 4, speed: [50, 160], up: 20, drag: 2.4, gravity: 50, size: 2.2, hold: 0.1 }),
+    layer({ shape: 'chunk', count: 10, colors: ['#262b38', '#3c4354', '#1a1d26'], speed: [30, 85], up: 40, drag: 0.6, gravity: 160, size: 5, spin: 9, hold: 0.7 }),
+    layer({ shape: 'spark', count: 10, colors: ['#ff2fb0', '#ffb020'], glow: 3, speed: [40, 110], drag: 3, size: 1.8 }),
+  ],
+  lifetime: 1.6, scale: 2.4, lift: 0, flash: 6, flashColor: '#2ee8ff', sound: 'snap',
+}
+
+/** The Helicopter's smoke trail as it spins down: a dark puff off its tail every `HELI_FALL.smokeEvery` s, rising. */
+export const HELI_SMOKE_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'mote', count: 22, colors: ['#2a2c33', '#3a3d46', '#4a4e58'], glow: 0.6, speed: [5, 30], drag: 2, gravity: -12, size: 9, hold: 0.5 }),
+    layer({ shape: 'spark', count: 6, colors: ['#ffb020', '#ff6a10'], glow: 3, speed: [20, 70], drag: 3, size: 1.6 }),
+  ],
+  lifetime: 1.2, scale: 2.5, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'snap',
+}
+
+/** The Helicopter hitting the street: a fountain of sparks and the last of its chunks. */
+export const HELI_CRASH_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'spark', count: 40, colors: ['#ffb020', '#ffffff', '#2ee8ff', '#ff2fb0'], glow: 4, speed: [60, 200], up: 140, drag: 1.4, gravity: 220, size: 2.6, hold: 0.2 }),
+    layer({ shape: 'chunk', count: 12, colors: ['#262b38', '#3c4354', '#1a1d26'], speed: [40, 110], up: 90, drag: 0.6, gravity: 200, size: 6, spin: 9, hold: 0.7 }),
+  ],
+  lifetime: 1.8, scale: 3, lift: 0, flash: 8, flashColor: '#ffb020', sound: 'crunch',
+}
+
 export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
   balloon: {
-    layers: [
-      layer({ shape: 'confetti', count: 40, colors: BALLOON_CONFETTI, glow: 1.6, speed: [30, 90], up: 20, drag: 3, gravity: 18, size: 5, spin: 9, hold: 0.6 }),
-      layer({ shape: 'spark', count: 8, colors: ['#ffffff'], glow: 4, speed: [80, 140], drag: 4, size: 1.6 }),
-    ],
+    layers: BALLOON_POP(BALLOON_CONFETTI, ['#ffffff']),
     lifetime: 1.8, scale: 1, lift: 0, flash: 3, flashColor: '#ffffff', sound: 'pop',
   },
   crow: {
@@ -338,6 +408,15 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
       layer({ shape: 'spark', count: 8, colors: ['#ff5a4a'], glow: 3, speed: [60, 120], drag: 4, size: 1.4 }),
     ],
     lifetime: 1.7, scale: 1, lift: 0, flash: 5, flashColor: '#ff3a2a', sound: 'snap',
+  },
+  // A short-out: cyan sparks, a magenta spit off its tail light and dark gunmetal chunks falling.
+  hoverDrone: {
+    layers: [
+      layer({ shape: 'spark', count: 34, colors: ['#2ee8ff', '#9af4ff', '#ffffff'], glow: 4, speed: [50, 160], up: 20, drag: 2.4, gravity: 50, size: 2.2, hold: 0.1 }),
+      layer({ shape: 'chunk', count: 9, colors: ['#2a2e3a', '#3c4354', '#1a1d26'], speed: [30, 85], up: 40, drag: 0.6, gravity: 160, size: 5, spin: 9, hold: 0.7 }),
+      layer({ shape: 'spark', count: 6, colors: ['#ff2fb0'], glow: 3, speed: [40, 100], drag: 3, size: 1.6 }),
+    ],
+    lifetime: 1.5, scale: 1, lift: 0, flash: 6, flashColor: '#2ee8ff', sound: 'snap',
   },
 }
 

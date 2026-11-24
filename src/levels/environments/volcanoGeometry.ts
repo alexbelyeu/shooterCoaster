@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import type { ArcTable } from '@/track/arcLength'
 
 /** Volcano shape in its local frame (base centre at the origin). */
 export const VOLCANO = {
@@ -17,6 +18,33 @@ export const VOLCANO_SITE = { x: 2400, z: -1500 } as const
 export function coneRadius(y: number): number {
   const t = Math.min(1, Math.max(0, y / VOLCANO.height))
   return VOLCANO.baseRadius + (VOLCANO.topRadius - VOLCANO.baseRadius) * t
+}
+
+/** The holes the track rides through the flank (#867), world units: round the rails at the crossing, `centreUp` above them. */
+export const CONE_HOLE = { radius: 30, centreUp: 8 } as const
+
+/**
+ * Where a track crosses the cone's surface (the volcano's base at `baseY`, at `VOLCANO_SITE`), in ride order: the rails'
+ * point at each crossing, interpolated between the arc table's samples.
+ */
+export function coneCrossings(table: Pick<ArcTable, 'x' | 'y' | 'z' | 'count'>, baseY: number): { x: number; y: number; z: number }[] {
+  const outside = (i: number) => {
+    const up = table.y[i] - baseY
+    if (up < 0 || up > VOLCANO.height) return Infinity
+    return Math.hypot(table.x[i] - VOLCANO_SITE.x, table.z[i] - VOLCANO_SITE.z) - coneRadius(up)
+  }
+  const crossings: { x: number; y: number; z: number }[] = []
+  let prev = outside(0)
+  for (let i = 1; i < table.count; i++) {
+    const gap = outside(i)
+    if (Number.isFinite(prev) && Number.isFinite(gap) && prev > 0 !== gap > 0) {
+      const u = prev / (prev - gap)
+      const at = (a: ArrayLike<number>) => a[i - 1] + (a[i] - a[i - 1]) * u
+      crossings.push({ x: at(table.x), y: at(table.y), z: at(table.z) })
+    }
+    prev = gap
+  }
+  return crossings
 }
 
 const BASE_ROCK = new THREE.Color(0x2a1510)

@@ -4,7 +4,7 @@ import type { LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { currentStreak, dailyKey, dailyLevel, type DailyStreak } from '@/levels/daily'
 import { previousLevel } from '@/levels/LevelRegistry'
 import { hasNightRide } from '@/levels/environments/nightPreset'
-import { levelMedals } from '@/levels/medals'
+import type { Medal } from '@/levels/medals'
 
 export interface LevelSelectSource {
   id: string
@@ -47,6 +47,8 @@ export function buildLevelCards(
   isUnlocked: (id: string) => boolean,
   leaderboards: Record<string, readonly LeaderboardEntry[] | undefined>,
   savedMedals: Record<string, readonly string[] | undefined> = {},
+  /** A level's medals (`levels/medals.ts` `levelMedals`), passed in so the store's startup path doesn't carry the table. */
+  medalsOf: (levelId: string) => readonly Medal[] = () => [],
 ): LevelCard[] {
   return levels.map((level) => {
     const unlocked = isUnlocked(level.id)
@@ -66,7 +68,7 @@ export function buildLevelCards(
       unlockedBy: levels.find((l) => l.id === previousId)?.name ?? null,
       nightRide: stars === STARS_PER_LEVEL && hasNightRide(level.biome),
       medals: unlocked
-        ? levelMedals(level.id).map(({ id, name, line }) => ({ id, name, line, earned: savedMedals[level.id]?.includes(id) ?? false }))
+        ? medalsOf(level.id).map(({ id, name, line }) => ({ id, name, line, earned: savedMedals[level.id]?.includes(id) ?? false }))
         : [],
     }
   })

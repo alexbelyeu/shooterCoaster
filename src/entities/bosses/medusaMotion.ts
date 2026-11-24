@@ -89,6 +89,9 @@ export const MEDUSA_DEFEAT = {
   sinkS: 1.5,
 } as const
 
+/** Her defeat's chalk bursts, at these heights up her local frame. One explosion slot each. */
+export const MEDUSA_DEFEAT_BURST_YS: readonly number[] = [40, -60, 140]
+
 export const SNAKE = {
   segments: 8,
   /** Seconds a snake takes to uncoil out of the curls when its phase begins. */

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { FLAME, GYM_SCALE, HALL, blockRings, footprint, toBlockout, type Vec3 } from './blockout'
 import {
   FLAME_EMBERS,
+  FIRE_FLOOR,
   FLAME_TOP,
   MAX_SMOKE_PUFFS,
   MAX_TONGUES,
@@ -68,7 +69,7 @@ describe('the Flame fire', () => {
     }
   })
 
-  it('rises: every tongue from the mats or the Flame top upwards, none past the crest', () => {
+  it('rises: every tongue from the Flame top or the bevel up to it, upwards, none past the crest', () => {
     expect(heights.base).toBeCloseTo(PAD_TOP * GYM_SCALE, 5)
     expect(heights.top).toBeCloseTo(FLAME.top * GYM_SCALE, 5)
     let lowest = Infinity
@@ -79,8 +80,8 @@ describe('the Flame fire', () => {
       lowest = Math.min(lowest, paths[0][i].y)
       highest = Math.max(highest, paths[2][i].y)
     }
-    expect(lowest).toBeGreaterThanOrEqual(heights.base - 1e-3)
-    expect(lowest).toBeLessThan(heights.base + GYM_SCALE)
+    expect(lowest).toBeGreaterThanOrEqual(FIRE_FLOOR * GYM_SCALE - 1e-3)
+    expect(lowest).toBeLessThan(FIRE_FLOOR * GYM_SCALE + GYM_SCALE)
     expect(highest).toBeLessThanOrEqual(heights.crest + 1e-3)
     expect(highest).toBeGreaterThan(heights.top + 2 * GYM_SCALE)
   })
@@ -92,6 +93,15 @@ describe('the Flame fire', () => {
     const licks = paths[0].filter((p) => p.y > heights.top + 0.3 * PLUME_RISE * GYM_SCALE).length
     expect(licks / tongues.count).toBeGreaterThan(0.05)
     expect(licks / tongues.count).toBeLessThan(0.25)
+  })
+
+  it('burns only from the top: nothing starts down the faces or hangs under the overhang (#927)', () => {
+    const lip = rings.reduce((a, b) => (b.f > a.f ? b : a))
+    expect(lip.y).toBeGreaterThan(rings[1].y)
+    expect(FIRE_FLOOR).toBeGreaterThan(lip.y)
+    expect(FIRE_FLOOR).toBeLessThan(FLAME_TOP.y)
+    const lowest = Math.min(...paths.flatMap((path) => path.map((p) => p.y)))
+    expect(lowest).toBeGreaterThanOrEqual(FIRE_FLOOR * GYM_SCALE - 1e-3)
   })
 
   it('holds every tongue off the Flame faces, by over a third of its width', () => {

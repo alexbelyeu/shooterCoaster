@@ -57,6 +57,8 @@ export default defineConfig(({ mode }) => {
     define: {
       // Vercel sets VERCEL=1 during its builds; gates Web Analytics (src/app/analyticsGate.ts). Portal builds never send it.
       __BUILT_ON_VERCEL__: JSON.stringify(process.env.VERCEL === '1' && !portal),
+      // The portal zip has no results Share: its scoaster.com link would take the portal's players off it (#254).
+      __PORTAL_BUILD__: JSON.stringify(portal),
       // Sent with online leaderboard scores (`client_version`, #365).
       __APP_VERSION__: JSON.stringify(commit ? `${version}+${commit}` : version),
     },

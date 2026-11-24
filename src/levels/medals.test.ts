@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels } from './LevelRegistry'
-import { goldenBalloonCount } from './scoring'
 import { RUN_SECONDS } from './pacing'
 import { COMBO_TIERS, TOP_TIER } from '@/combat/comboTiers'
 import type { LevelConfig } from '@/types/level'
@@ -10,8 +9,6 @@ import {
   NO_RUN,
   featMet,
   medalsWon,
-  mergeMedals,
-  sanitizeSavedMedals,
   type Medal,
   type MedalRun,
 } from './medals'
@@ -22,7 +19,7 @@ const killable = (level: LevelConfig) => level.enemies.reduce((n, w) => n + w.co
 function runFor(level: LevelConfig, { feat }: Medal): MedalRun {
   switch (feat.kind) {
     case 'goldens':
-      if (feat.count > goldenBalloonCount(level.biome)) throw new Error(`${level.id} has fewer than ${feat.count} golden balloons`)
+      if (feat.count > (level.goldenBalloons ?? 0)) throw new Error(`${level.id} has fewer than ${feat.count} golden balloons`)
       return { ...NO_RUN, goldens: feat.count, kills: feat.count }
     case 'boss': {
       if (!level.boss) throw new Error(`${level.id} has no boss`)
@@ -73,6 +70,10 @@ describe('medals', () => {
     expect(medalsWon('nowhere', { ...NO_RUN, bestCombo: 99 })).toEqual([])
   })
 
+  it('wins nothing without a run (a daily)', () => {
+    expect(medalsWon('level1', null)).toEqual([])
+  })
+
   it('a chain of the longest combo medal wins every level a medal', () => {
     for (const level of getAllLevels()) expect(medalsWon(level.id, { ...NO_RUN, bestCombo: LONGEST_COMBO_MEDAL }).length).toBeGreaterThan(0)
   })
@@ -90,19 +91,5 @@ describe('medals', () => {
     expect(featMet(accuracy, { ...NO_RUN, shotsFired: 10, hits: 10 })).toBe(false)
     expect(featMet({ kind: 'cleanRoute' }, { ...NO_RUN, route: 'hard', bystandersHit: 1 })).toBe(false)
     expect(featMet({ kind: 'cleanRoute' }, { ...NO_RUN, route: 'easy' })).toBe(false)
-  })
-
-  it('keeps medals once won, in the level order', () => {
-    expect(mergeMedals('level1', ['hotStreak'], ['goldRush'])).toEqual(['goldRush', 'hotStreak'])
-    expect(mergeMedals('level1', undefined, ['goldRush', 'goldRush'])).toEqual(['goldRush'])
-    expect(mergeMedals('level1', ['deadEye'], [])).toEqual([])
-  })
-
-  it('loads stored medals as valid data or nothing', () => {
-    expect(sanitizeSavedMedals(null)).toEqual({})
-    expect(sanitizeSavedMedals('x')).toEqual({})
-    expect(sanitizeSavedMedals({ level1: ['goldRush', 7, 'deadEye'], level2: 'deadEye', nowhere: ['goldRush'], level3: [] })).toEqual({
-      level1: ['goldRush'],
-    })
   })
 })

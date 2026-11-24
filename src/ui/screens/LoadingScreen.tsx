@@ -3,6 +3,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { phaseAfterLoading } from '@/store/startPhase'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { loadLevelScene } from '@/canvas/loadLevelScene'
+import { loadPlayScreens } from '@/app/lazyScreens'
 import { isAudioReady } from '@/audio/AudioEngine'
 import { loadFraction, reportLoad } from '@/core/loadProgress'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
@@ -28,13 +29,17 @@ export default function LoadingScreen() {
 
   useEffect(() => {
     let live = true
-    // The level core, then the level's world chunk (#862). A failed load returns to the title (`SceneManager`),
-    // unmounting this.
+    // The level core, then the level's world chunk (#862), and the run's screens (HUD, countdown, results:
+    // `app/lazyScreens.tsx`). A failure returns to the title, where `app/staleReload.ts` reloads the page (#888).
     const biome = levelId ? getLevelConfig(levelId)?.biome : undefined
     if (biome) {
-      loadLevelScene()
-        .then((core) => core.loadWorld(biome))
-        .then(() => live && reportLoad(levelId, 'chunk', 1), () => {})
+      Promise.all([loadLevelScene().then((core) => core.loadWorld(biome)), loadPlayScreens()]).then(
+        () => live && reportLoad(levelId, 'chunk', 1),
+        () => {
+          const s = useGameStore.getState()
+          if (live && s.phase === 'loading') s.setPhase('title')
+        },
+      )
     }
     let settled = 0
     let frame = 0

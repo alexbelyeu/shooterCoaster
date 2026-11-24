@@ -1,6 +1,6 @@
 # Marketing strategy
 
-_v1.5 (2026-11-16). First written 2026-10-22; rewritten or amended every week;
+_v1.6 (2026-11-23). First written 2026-10-22; rewritten or amended every week;
 the "What changed" section at the bottom is the changelog._
 
 Alex's direction (2026-10-22): organic first (web-game portals, communities, short
@@ -8,26 +8,32 @@ gameplay clips, launch posts); then a small paid test, about $100/month, once me
 works and a channel shows promise. Alex places every post and ad himself from the
 Marketer's drafts until an ad account is connected. Analytics: Vercel Web Analytics only.
 
+**Alex's launch bar (#610, 18 Nov): no public post "until the game is AAA. We need 10 levels at
+the highest degree."** That is M4 in `VISION.md` (ten worlds, every ride a thrill; due 8 Jan).
+Until it closes the Marketer measures, keeps this file and the launch kit list current, and
+drafts nothing.
+
 ## Positioning
 
 **One-line pitch:** *House of the Dead on a rollercoaster — a free browser rail shooter.
 Ride, aim, blast. Sixty seconds a run, no install, works on your phone.*
-Ride, aim, blast. Two minutes a run, no install, works on your phone.*
 
 What makes it worth a click, in the order we lead with it:
 
-1. **Instant.** A link is the whole install. Title → riding → first kill in under 15 s.
+1. **Instant.** A link is the whole install: title → PLAY → a 10 s tour of the world → riding.
 2. **The ride is the hook.** Nobody else's browser shooter puts you on a coaster through
-   six themed worlds (Theme Park, Desert, Ocean, Antarctica, Inferno, and a Climbing Gym built
-   from Alex's own gym). The clip sells itself: speed, drops, a Ferris wheel passing overhead,
-   balloons popping.
+   six themed worlds, ten at launch (Theme Park, Desert, Ocean, Antarctica, Inferno, and a
+   Climbing Gym built from Alex's own gym; Neon Metropolis and Jungle Ruins next). Since the ride
+   kit (#703, week of 16 Nov) the rides are real coaster rides: launches, loops, corkscrews, drop
+   tracks, jump gaps, a stretch ridden backwards, junctions you shoot to switch. The clip sells
+   itself: speed, drops, a Ferris wheel passing overhead, balloons popping.
 3. **Arcade scoring.** Every run is 60 s (#434): combo tiers to ×5 FRENZY, stars, weapon
    pickups, a boss finale on every level (the Golden Blimp, the Giant Scorpion, the Kraken, the
    Yeti, the Magma Titan, the Medusa), an online top 10 per level with arcade initials, a
    Daily Run everyone plays with the same seed, "one more run".
 4. **Made with three.js, zero asset files.** Everything on screen is procedural (geometry,
    shaders; music and SFX synthesised in plain Web Audio on the Scrimshaw score engine — no
-   audio library since #431). 417 KB gz of startup JS, three.js included. That is the story for
+   audio library since #431). 436 KB gz of startup JS, three.js included. That is the story for
    the web-dev crowd, which is the cheapest audience to reach and the most likely to share.
 
 Public name: **ShooterCoaster**. Home: **https://scoaster.com**
@@ -51,7 +57,7 @@ no post does. Segment C comes with the arcade loop (M2: leaderboards, daily run)
 |---|---|---|---|---|---|
 | 1 | **Web-game portals** — CrazyGames (Basic Launch), itch.io, Newgrounds | A | The only channels with standing traffic for browser games. CrazyGames' Basic Launch is a 7–21 day trial on their site that ends at 500 plays; itch and Newgrounds host a zip with `index.html` at the root. All need an **embeddable build** (relative paths, no external requests, pause on tab hide) — **shipped 31 Oct (#251, `npm run build:portal` → `dist-portal.zip`, smoked under a nested path in CI)**; the zip is kept as the `dist-portal` artifact of every green `main` CI run (#349, 3 Nov; README "Portal zip"). Poki is excluded for now: it wants a web-exclusive deal (default 5 years) and its SDK/ads, which would conflict with scoaster.com being the home. | Alex uploads | 2 |
 | 2 | **three.js forum Showcase + r/threejs + `#threejs` on X/Bluesky** | B | Exactly our audience, free, moderated (so no spam), and Showcase posts "will be considered for the three.js homepage". Work-in-progress posts are the norm there, so it doesn't wait on Alex's player bar. A good post here is also the seed for the Show HN later. | 1 post + a GIF | 1a |
-| 3 | **r/WebGames** and **r/playmygame** | A, C | Players who want a browser game *now*. r/playmygame rules are quoted below; r/WebGames rules could not be read from the agent sandbox (Reddit is blocked) — Alex checks the sidebar before posting. One post per sub per month. Alex's bar (#434 / #435 / #436) is in since 16 Nov; it now waits on #610. | 2 posts | 1b |
+| 3 | **r/WebGames** and **r/playmygame** | A, C | Players who want a browser game *now*. r/playmygame rules are quoted below; r/WebGames rules could not be read from the agent sandbox (Reddit is blocked) — Alex checks the sidebar before posting. One post per sub per month. Waits on the launch bar (#610). | 2 posts | 1b |
 | 4 | **Show HN** | B | Highest ceiling of any single post; one shot, needs the game to be polished and the first 30 s to be flawless. "The project should be non-trivial", must be tryable "without barriers such as signups". The arcade loop and the online leaderboard are in; the "what's new" for the HN day is Level 6 or the procedural worlds (#437). | 1 post, Alex on the thread all day | 3 |
 | 5 | **Short-form video** (TikTok / Shorts / Reels) of the ride | A, C | The ride is visual; a 15 s vertical clip of the Inferno drop or the Ferris wheel pass is the ad. `npm run clip` renders the vertical 720×1280 cut from the real game (#395, in `docs/marketing/media/`); Alex only has to upload it with a caption. | Alex's time | 2–3 |
 | 6 | **SEO** on scoaster.com | A | "rollercoaster shooter game", "rail shooter browser", "free online shooting game no download" are long-tail and slow. Everything on our side is shipped (#96, #255, #275; checklist in `SEO.md`) and Alex verified the domain and submitted the sitemap (#274, closed 9 Nov). **First google.com visit: 12 Nov.** A matter of months, not weeks; the weekly file tracks search referrals as a series from W46. | – | 1 |
@@ -65,53 +71,65 @@ servers (needs a community to exist first), Product Hunt (weak fit for a game).
 | Stage | Name | Gate to enter | What happens |
 |---|---|---|---|
 | **0** | **Get measurable** — **done 26 Oct** | – | Web Analytics on and reading ✅ (first page view 22 Oct; 31 visitors in W43, all direct), scoaster.com attached ✅, OG card + meta ✅, GA tag removed ✅, custom events live ✅ (#98). No traffic pushed; baseline week runs 24 Oct – 1 Nov. |
-| **1a** | **Soft launch, dev audience** — **we are here: nothing has been posted; waiting on #610** | Readiness gate below green, production green. **One yellow since 14 Nov: #561, a MacBook stalls for ~15 % of a run** | Post 1: three.js Showcase (draft text kept in the closed #102). Recommended date: the first weekday after #596 merges (#610, option A). Then r/threejs and one X/Bluesky thread. Collect feedback into issues. |
-| **1b** | **Soft launch, player audience** | Stage 1a posted. Alex's 8 Nov bar (#434, #435, #436) ✅ closed 16 Nov | r/playmygame + r/WebGames (#308, the first weekend after the Showcase post has had its week), then the Daily Run as a weekly hook. One channel a week, each measured against the baseline. |
+| **Hold** | **Build to the launch bar** — **we are here since 18 Nov** | Alex's answer on #610 | No posts, no drafts. Weekly: measure the no-post baseline, keep SEO and the share path working, keep the launch kit list below current. Leaves when M4 closes (ten levels at Alex's bar) or Alex says otherwise in STEERING.md. |
+| **1a** | **Soft launch, dev audience** | **M4 closed (Alex's bar, #610)**; readiness gate below green, production green | Post 1: three.js Showcase (draft text kept in the closed #102, to be rewritten with launch-week facts). Then r/threejs and one X/Bluesky thread. Collect feedback into issues. |
+| **1b** | **Soft launch, player audience** | Stage 1a posted | r/playmygame + r/WebGames (text kept in the closed #308; the first weekend after the Showcase post has had its week), then the Daily Run as a weekly hook. One channel a week, each measured against the baseline. |
 | 2 | Portals | Embeddable build ✅ (#251), zip downloadable from CI ✅ (#349); Stage 1b feedback addressed | itch.io first (free, no review queue, link back allowed), then Newgrounds, then CrazyGames Basic Launch. The vertical clip ✅ (#395) for Shorts / Reels. |
 | 3 | Big swing | M2 arcade loop ✅; Level 6 ✅ playable (#546), at Alex's bar ⏳ (#558, #583); the procedural worlds (#437) as the "what's new" | Show HN (Alex's words); clip series; the $100 paid test on whichever channel had the best start rate. |
 
-**Where we are** (16 Nov, 14:40 NY). Three weeks after the gate first went green, **nothing has
-been posted**. Alex's 8 Nov bar closed today (60 s runs, spawns in view, the title park), the game
-has six worlds with a boss on each, and four strangers started levels last week with no post out
-(`metrics/2026-W46.md`). But Alex's own perf report (#561, 14 Nov) shows a MacBook Neo in Safari
-spending ~15 % of a run in long frames, and the dev audience is the MacBook audience. So the
-Marketer stopped re-dating: #102 is closed under the three-week rule and **#610 asks Alex one
-question — what does the first post wait for** (A: #596 only, recommended; B: Level 6 at his bar;
-C: no posts for now). Everything else in this file follows from his answer.
+**Where we are** (23 Nov, 14:45 NY). **On hold by Alex's decision.** He answered #610 on 18 Nov:
+no public post "until the game is AAA. We need 10 levels at the highest degree." The Director made
+that M4 ("Ten worlds, every ride a thrill", due 8 Jan): six levels exist, level 7 Neon Metropolis
+is in progress, 8 Jungle Ruins is planned, 9 and 10 come from the level kit. So the Marketer drafts
+nothing: #308 (Reddit) is closed, its text and #102's stay in the closed issues. Four weeks without
+a post read 37, 28, 26, 19 visitors (`metrics/2026-W47.md`): the trickle is shrinking, and
+that is the expected cost of waiting, not a problem to fix with a post.
 
-## Readiness gate (checked 2026-11-16 14:40 NY)
+**Launch kit (what the first post will need, re-made in launch week, not before):**
+
+| Piece | State | Launch-week action |
+|---|---|---|
+| Showcase text + link `/go/showcase` | kept in closed #102 (six worlds, old UI) | rewrite with ten worlds, the ride kit, the fair UI; new `needs-alex` draft |
+| Reddit pair `/go/playmygame`, `/go/webgames` | kept in closed #308 | same, the weekend after |
+| Clips (`docs/marketing/media/`) | all predate the fair UI, the ride kit and the intro tour | `npm run build && npm run clip` (landscape + vertical), plus one clip of a ride-kit ride (level 6 or a new world) |
+| Share card / posters | `npm run og` output, re-rendered by builders when the title changes | check the card shows the launch title |
+| Portal zip | `dist-portal` artifact on every green `main` CI run | upload at Stage 2 |
+| Measurement | Web Analytics live; **telemetry endpoint still waits on Alex's `0002_telemetry.sql`**; **Alex's phones unflagged** | both before the first post, or its numbers can't be read |
+
+## Readiness gate (checked 2026-11-23 14:45 NY)
 
 | Check | Status | Evidence / what closes it |
 |---|---|---|
-| scoaster.com serves the game over HTTPS | ✅ | Production is `main` @ `d73f529`; CI `verify` on `main` green 17:08 UTC on 16 Nov after one red run at 16:02 (`agent:prod-broken` #591, still open when read). 26 visitors reached it in W46 from 6 countries. The sandbox still cannot open the site itself (blocked host). |
-| Analytics on | ✅ | Reading since 22 Oct; `level_start` (with `mode`; Restart counts since #588) / `level_complete` / `level_quit` / `share` (with `method`). UTM dimensions paywalled (402) → referrer + `requestPath`. **Hygiene gap:** Settings → "Internal device" shipped (#446, 14 Nov) but Alex's Macs still recorded starts on 15 Nov. |
-| Real-player telemetry | ⏳ | #373 shipped 7 Nov, long-frame telemetry added (#540), but `/api/telemetry` still waits: **Alex runs `supabase/migrations/0002_telemetry.sql` once.** Without it the first post's phones report no frame times. |
+| scoaster.com serves the game over HTTPS | ✅ / ⚠️ | Production is `main` @ `36843f1`; 19 visitors reached it in W47 from 3 countries. **Two `agent:prod-broken` open when read:** #894 (CI `verify` red on `main` @ `36843f1`, 23 Nov 19:04 UTC) and #707 (the nightly, red since 20 Nov for three causes, each fixed; closes on the next green one). The sandbox still cannot open the site itself (blocked host). |
+| Analytics on | ✅ | Reading since 22 Oct; `level_start` (now with `from`, #811; counted from the loading screen since #674) / `level_complete` / `level_quit` / `share` (with `method`). UTM dimensions paywalled (402) → referrer + `requestPath`. **Hygiene gap:** two US iPhones made 11 of W47's 15 starts with no internal flag; by every sign the studio's own (Settings → Data → Internal device on each phone). |
+| Real-player telemetry | ⏳ | #373 shipped 7 Nov, long frames (#540) and a WebGPU capability field (#851) added, but `/api/telemetry` still waits: **Alex runs `supabase/migrations/0002_telemetry.sql` once.** M4's "60 fps on a mid-range phone from real telemetry" criterion waits on it too. |
 | Title, description, social preview card | ✅ | #96 → #275: title, description, canonical, full `og:*` + `twitter:*` set with alt text, card under every unfurler's weight limit, `site.webmanifest` + icons, real 404s, security headers, Lighthouse gate (SEO 100, A11y / BP ≥ 95) in `npm run verify`. Checklist with sources: `SEO.md`. Card still shows the HUD frame without a title — experiment 5 tests a titled card. |
 | Indexable | ✅ | #255: visually hidden `#about` text (six worlds named, 60 s runs) + `["VideoGame","WebApplication"]` JSON-LD, unit-tested. Search Console + Bing done by Alex (#274, 9 Nov); first google.com visit 12 Nov. |
-| Loads fast | ✅ | `main` @ `d73f529`: **417 KB gz startup JS** (budget 435; Level 6's track and blockout are in it until #589), total 573 of 630 KB. The level scene is a lazy chunk and the poster paints before any JS (#420). |
-| Runs smoothly (new) | ⚠️ | **#561 (Alex's `?perf=1` report, MacBook Neo, Safari, 14 Nov): 104 frames over 50 ms in two runs, ~15 % of each run, worst 997 ms; no shader compiles mid-play.** #596 (ride stalls) and #597 (countdown / title) are queued. The first post waits for #596 (#610, option A). |
-| Plays on a phone | ✅ / ❓ | Smoke `mobile` shard passes on every merge. Mobile start rate: 3 of 24 mobile + tablet visitors over four weeks (0 of 9, 1 of 9, 0 of 1, **2 of 5 in W46**, one of them an iPhone player with 3 starts and 2 completes). Past the 20-visitor bar with no sign the phone path is worse than desktop's (2 of 14 non-Mac desktop in W46); a post with volume decides. |
-| First 10 seconds exciting | ✅ | The title park fills the frame (#492: midway, crowds, rides, a crossing coaster, a lake) with a world beyond it (#572) and the loop logo (#537); #436 closed 16 Nov. 4 of 19 non-Mac visitors pressed PLAY in W46 (21 %; W44 19 %). |
-| Production smoke green | ✅ / ⚠️ | Deploy check after every deploy, the full smoke nightly in three parts (#584). `agent:prod-broken` #591 (red `verify` on `main` at 16:02 UTC, 16 Nov) was open when read, with `verify` green again at 17:08. |
-| A clip to post | ✅ | `docs/marketing/media/`: the landscape and vertical level-1 clips (2 and 6 Nov; they predate the 60 s pacing, the loop logo and the crow redesign), title clip re-rendered 10 Nov (#454). Re-render the level-1 clips on the day of the first post (`npm run build && npm run clip`, ~15 min; media README policy). |
-| Share-your-score | ✅ | #253 text share + #368 score-card image + **#445 (14 Nov): the line and the card say the run's World rank**. First 2 `share` events in W46, both Alex testing; 0 from players. |
+| Loads fast | ✅ / ⚠️ | **436 KB gz startup JS, exactly at its 436 budget** (STATE.md, 23 Nov); total 635 of 665 KB. #861 takes 20+ KB back and each world now loads in its own chunk (#862 → #889, 23 Nov). The poster paints before any JS (#420). |
+| Runs smoothly | ⚠️ | #561 (Alex's MacBook Neo, 14 Nov: ~15 % of a run in frames over 50 ms). Since then the countdown warm-up moved off visible frames (#626) and the recorder splits long frames by cause (#621). **Waits on Alex's re-run on the Neo** (#620). Level 6 is the heaviest scene now (41 targets at its probe). |
+| Plays on a phone | ✅ / ❓ | Smoke `mobile` shard passes on every merge. Mobile start rate without the US iPhones: 4 of 26 visitor-days since 22 Oct (W47: 1 of 2). The iPhones themselves finished 7 of 11 runs, level 6 included, so the phone path works end to end on iOS. A post with volume decides the rate. |
+| First 10 seconds exciting | ✅ / ❓ | The title is now the fair's front with the park to the horizon; PLAY goes straight to the next unlocked level (#811), through a loading screen and a 10 s intro tour (#690) before Ready / Set / GO. **New question:** a 10 s tour and the countdown now sit between PLAY and the first shot; two `level_quit` at 0 % on level1 in W47 (studio phones, probably). Stranger start rate W47: 2 of 13 visitor-days (15 %; W46 21 %, W44 19 %). |
+| Production smoke green | ⚠️ | Nightly red since 20 Nov (#707; three causes, each fixed on `main`, closes on the next green nightly); `main`'s CI red at 19:04 UTC today (#894). Not a launch blocker while on hold; it must be green in launch week. |
+| A clip to post | ⏳ (by design) | Every committed clip predates the fair UI, the ride kit and the intro tour. Re-render in launch week only (media README policy; launch kit above). |
+| Share-your-score | ✅ | #253 text share + #368 score-card image + #445 World rank on the line and the card. `share` events: 0 in W47; 2 ever, both Alex testing. Strangers' completes in W46 and W47: 3. |
 | Portal build | ✅ | #251 `dist-portal.zip` + #349: kept as the `dist-portal` artifact of every green `main` CI run (README "Portal zip"). Ready to upload when Stage 2 opens. |
-| Alex's own bar | ✅ | #434 (60 s runs), #435 (spawn gaps), #436 (title world) all closed 16 Nov. His current bar is Level 6 (#558, #583), which gates nothing unless he picks option B in #610. |
+| Alex's own bar | ⏳ | **Ten levels "at the highest degree" (#610, 18 Nov) = M4, due 8 Jan.** Six exist; his verdicts on level 6 (#671), the Neo (#561) and the results music (#794) are pending; level 7 (#323) is in progress. This row is the gate for every post. |
 
 ## Experiment queue (ranked)
 
 1. ~~**Referrer baseline**~~ — **done (W44, 26 Oct – 1 Nov):** 37 visitors, 43 views, 8 level
    starts (7 people), 3 completes, 100 % direct; ≈ 5 visitors and ≈ 1 start a day; 19 % of
    visitors press PLAY. This is the ruler every post is measured against.
-2. **three.js Showcase post** (draft kept in the closed #102; **date set by Alex's answer on
+2. **three.js Showcase post** (draft kept in the closed #102; **after M4, Alex's answer on
    #610**) — measure `requestPath = /go/showcase` and referrer `discourse.threejs.org` for 7 days;
    success = 100 visitors, ≥ 30 % start a level, ≥ 10 % complete one. Events carry
    `requestPath`, so starts and completes on `/go/showcase` are the post's own funnel.
 3. **Mobile start rate** (passive, continues) — `level_start` visitors on mobile ÷ mobile
-   visitors. W43: 0 of 9; W44: 1 of 9; W45: 0 of 1; **W46: 2 of 5** → 3 of 24. Past the
+   visitors. W43: 0 of 9; W44: 1 of 9; W45: 0 of 1; W46: 2 of 5; **W47: 1 of 2 without the two
+   US iPhones** → 4 of 26. Past the
    20-visitor bar and not under half of desktop's rate, so no P1 on the phone path. The first
    post's volume, and telemetry once Alex runs the migration, give the real read.
-4. **r/playmygame vs r/WebGames** (#308, the first weekend after the Showcase post has had its
+4. **r/playmygame vs r/WebGames** (text in the closed #308; the first weekend after the Showcase post has had its
    week) — same weekend, different landing paths (`/go/playmygame`, `/go/webgames`); which sub
    sends more visitors and which sends visitors who finish a level.
 5. **OG card A/B** — the current HUD gameplay frame vs a titled card (game name + "free
@@ -122,11 +140,17 @@ C: no posts for now). Everything else in this file follows from his answer.
    0 over 50 real completes, the button needs a prompt (a "beat me" nudge on NEW RECORD). The
    World-rank share line (#445) is live since 14 Nov.
 7. **Organic baseline without posts** (new, passive) — non-Mac visitors who start a level, and
-   google.com referrals, per week. W46: 4 of 19 started (21 %); 1 search visit. This is what the
+   google.com referrals, per week. W46: 4 of 19 started (21 %), 1 search visit; **W47: 2 of 13
+   (15 %, also leaving out two US iPhones), 0 search visits.** On hold this is the main series:
+   visitors 37, 28, 26, 19. This is what the
    game earns by itself, and the floor every post is measured above.
 8. **Portal cross-traffic** — does an itch.io / CrazyGames listing send anyone to scoaster.com
    (link in the description where allowed → `/go/itch`, `/go/crazygames`)?
 9. **Paid $100** — Reddit ads, 7 days, $14/day, stop rule: < 30 visitors/day for 3 days.
+10. **Time to first shot** (new, passive) — `level_quit` at `progress_pct` 0 and abandons on
+   level1 among strangers, now that a first run is title → loading → 10 s intro tour → countdown.
+   W47: 0 stranger quits (3 stranger starts). If strangers start leaving before the ride once
+   there is volume, the tour needs a skip prompt on first run; nothing to file at n = 3.
 
 ## Measurement notes
 
@@ -180,6 +204,20 @@ C: no posts for now). Everything else in this file follows from his answer.
   (5 years), own SDK only, "Target an initial download size under 8 MB": **skip Poki**.
 
 ## What changed
+
+- **2026-11-23 (v1.6, weekly run).** **Alex answered #610 (18 Nov): no public post "until the game
+  is AAA. We need 10 levels at the highest degree."** The plan moves to a new **Hold** stage until
+  M4 closes (due 8 Jan): no drafts, #308 closed (its text and #102's stay as the launch drafts'
+  starting point), a launch kit table says what gets re-made in launch week. W47 = 19 visitors, 24
+  views, 15 starts → 9 completes, 100 % direct, no search visit, a zero-visitor Sunday; 11 of the
+  15 starts are two unflagged US iPhones that had level 6 unlocked (the studio's own, by every
+  sign); strangers: 2 people, 3 starts, 1 complete (`metrics/2026-W47.md`). Readiness gate re-read:
+  startup JS at its budget (436 / 436), two `agent:prod-broken` open (#707 nightly, #894 CI on
+  `main`), clips stale by design, "Alex's own bar" is now the gate for everything. Pitch updated
+  for the ride kit and "ten at launch"; a stray second pitch line ("Two minutes a run") removed.
+  New passive experiment 10 (time to first shot, now that the intro tour sits before every run).
+  **No new growth issues**: nothing on the growth side blocks M4 and every builder hour is
+  better spent on levels 7–10. No spend (knob 0); the earliest paid test moves to February.
 
 - **2026-11-16 (v1.5, weekly run).** W46 = 26 visitors, 42 views, 22 starts → 16 completes, of
   which Alex's Macs made 15 and 14; **the first players who aren't Alex: 4 people in 4 countries,

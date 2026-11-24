@@ -199,6 +199,20 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     meshSize: 2560,
     authoredFloor: true,
   },
+  // Neon Metropolis: flat streets out to the skyline, only a low swell far beyond it.
+  city: {
+    frequency: 0.0008,
+    amplitude: 60,
+    octaves: 5,
+    persistence: 0.45,
+    lacunarity: 2.2,
+    exponent: 1.4,
+    ridgeMode: false,
+    baseY: 0,
+    flatRadius: 2600,
+    transitionWidth: 1200,
+    meshSize: 6000,
+  },
 }
 
 /** Desert gets an extra macro-scale mesa layer */
@@ -221,7 +235,7 @@ export interface TrackSample {
 /** Hard clamp radius — terrain is always forced below track here */
 const TRACK_HARD_RADIUS = 40
 /** Soft blend radius — terrain transitions from suppressed to natural */
-const TRACK_SOFT_RADIUS = 120
+export const TRACK_SOFT_RADIUS = 120
 /** Extra clearance below the track */
 export const TRACK_CLEARANCE = 15
 

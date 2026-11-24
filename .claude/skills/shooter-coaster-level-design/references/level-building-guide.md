@@ -59,13 +59,9 @@ The `scalar` value multiplies ALL curve coordinates (x, y, z). A high scalar mak
 |-------|-------|--------|------|
 | Theme Park | curve1 | 60 | Moderate, close to ground |
 | Desert | curve1 | 60 | Moderate |
-| Ocean | curve2 | 20 | Low, near water |
-| Antarctica | curve2 | 35 | Medium, through mountains |
 
-**Altitude:** curve1 `y = (cos(2Cθ)·C + cos(Bθ) + 5)·scalar`; curve2
-`y = (cos(2Cθ)·(1 − cos θ)·π/2·C + cos(Bθ) + 15)·scalar`, so curve2 spans
-`(15 ± (π·C + 1))·scalar` with its biggest swings mid-ride and starts/ends calm (a closed
-loop, #178). Use integer `varA`/`varB`/`varC` or the loop won't close.
+**Altitude:** curve1 `y = (cos(2Cθ)·C + cos(Bθ) + 5)·scalar`. Use integer `varA`/`varB`/`varC`
+or the loop won't close. Levels 1 and 4–6 ride authored splines (`docs/RIDE-KIT.md`).
 
 ### Track Max Extent Formula
 The farthest point the track reaches from origin:
@@ -75,7 +71,8 @@ maxExtent = varC * 13 * scalar
 Examples:
 - Desert: 2 * 13 * 60 = 1560
 - Ocean: 4 * 13 * 20 = 1040
-- Arctic: 4 * 13 * 35 = 1820
+
+A spline ride (levels 1 and 4–6) has no formula: `trackExtent(table)` (`shared/trackScatter.ts`) measures it.
 
 This value is critical for:
 - Placing landmarks BEYOND the track
@@ -358,7 +355,7 @@ Trees auto-place on terrain with slope rejection and biome-specific filtering.
 ## Per-Biome Feature Toggles
 
 Use props/config to control features per biome:
-- `goldenBalloonCount`: Only theme park gets golden balloons (pass 0 for other biomes)
+- `goldenBalloons` on the `LevelConfig`: bonus golden balloons (3 on level1; none when unset)
 - `hasTrees` + `treeCount`: Per-biome tree density
 - `hasWater`: Ocean biome only
 

@@ -1,0 +1,98 @@
+title    Gridlock
+composer Claude (ShooterCoaster)
+about    Neon Metropolis (level7) option: street-canyon arcade rock in F-sharp minor at 168. A 90s synth-brass hook carries the tune over distorted power-chord punches and an FM bass that walks chromatically into each chord; i-VI-VII-V in the A section, iv-VI-i-V in the B. The last eight bars lift a tone, to G-sharp minor. Layers: brass hook, guitar and bass from the start, then bigkick, gated snare and hats at 2x, the hook doubled an octave up on a chip square at 3x, sixteenth hats and orchestra hits at FRENZY. The helicopter's boss section gallops the bass and guitar and bends the hook F-sharp Phrygian (G natural), orchestra hits in base; the sting is F-sharp major.
+tempo    168
+beats    4
+steps    4
+reverb   0.2
+
+# untagged voices are the base layer, the hook among them (layers only add); the intro plays every layer
+voice brass  synbrass   vol=0.80 gate=0.85 bright=1.2
+voice guit   distguitar vol=0.32 pan=-0.3 gate=0.5
+voice bass   fmbass     vol=0.58 gate=0.6 bright=1.2
+voice stab   orchhit    vol=0.40 pan=0.15
+voice rise   riser      vol=0.31
+voice kick   bigkick    vol=0.57 layer=drums
+voice snare  gatesnare  vol=0.64 pan=0.05 layer=drums
+voice hat    hat909     vol=0.35 pan=0.35 layer=drums
+voice crash  crash      vol=0.33 pan=-0.2 layer=drums
+voice chip   chip       vol=0.14 pan=0.3 oct=1 gate=0.7 layer=lead
+voice fhat   hat909     vol=0.26 pan=-0.35 layer=frenzy
+voice hit    orchhit    vol=0.33 pan=-0.15 layer=frenzy
+
+pattern intro
+stab  | [F#m]!-- . [F#m]!-- . [F#m]!------- | [D]!--- [E]!--- [C#]!------- |
+guit  | F#3+C#4-- . F#3+C#4-- . F#3+C#4------- | D3+A3--- E3+B3--- C#3+G#3------- |
+rise  | _ | C#5--------------- |
+kick  | X... .... X... .... | X... .... X... X.X. |
+snare | .... .... .... .... | .... .... XxXx XXXX |
+
+pattern A
+brass | F#4- .- F#4- A4- C#5--- B4- A4- | D5--- C#5- A4- F#4--- A4- B4- | B4- .- B4- C#5- E5--- D5- C#5- | C#5------- B4- G#4- F4- G#4- |
+chip  | F#4- .- F#4- A4- C#5--- B4- A4- | D5--- C#5- A4- F#4--- A4- B4- | B4- .- B4- C#5- E5--- D5- C#5- | C#5------- B4- G#4- F4- G#4- |
+guit  | F#3+C#4--- .- F#3+C#4- .--- F#3+C#4- .- | D3+A3--- .- D3+A3- .--- D3+A3- .- | E3+B3--- .- E3+B3- .--- E3+B3- .- | C#3+G#3--- .- C#3+G#3- .--- C#3+G#3- .- |
+bass  | F#2- F#2- F#3- F#2- .- F#2- F#3- E3- | D2- D2- D3- D2- .- D2- D3- D#3- | E2- E2- E3- E2- .- E2- E3- D#3- | C#2- C#2- C#3- C#2- .- C#2- C#3- E3- |
+hit   | [F#m]!--- .----------- | [D]!--- .----------- | [E]!--- .----------- | [C#]!--- .------- [C#7]!--- |
+kick  | x... ..x. x.x. .... | % | % | x... ..x. x.x. x.x. |
+snare | .... X... .... X... | % | % | .... X... .... X.xx |
+hat   | x.x. x.x. x.x. x.x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+fhat  | xxxx xxxx xxxx xxxx | % | % | % |
+
+pattern A2 from A
+brass | F#4- .- F#4- A4- C#5--- B4- A4- | D5--- C#5- A4- F#4--- A4- B4- | B4- .- B4- C#5- E5--- D5- C#5- | C#5--- .- G#4- C#5- E5- G#5--- |
+chip  | F#4- .- F#4- A4- C#5--- B4- A4- | D5--- C#5- A4- F#4--- A4- B4- | B4- .- B4- C#5- E5--- D5- C#5- | C#5--- .- G#4- C#5- E5- G#5--- |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+brass | D5--- F#5--- E5- D5- C#5- B4- | A4------- F#4- A4- D5- E5- | F#5--- E5- C#5- A4--- C#5- E5- | F5------- C#5- B4- G#4- B4- |
+chip  | D5--- F#5--- E5- D5- C#5- B4- | A4------- F#4- A4- D5- E5- | F#5--- E5- C#5- A4--- C#5- E5- | F5------- C#5- B4- G#4- B4- |
+guit  | B3+F#4--- .- B3+F#4- .--- B3+F#4- .- | D3+A3--- .- D3+A3- .--- D3+A3- .- | F#3+C#4--- .- F#3+C#4- .--- F#3+C#4- .- | C#3+G#3--- .- C#3+G#3- .--- C#3+G#3- .- |
+bass  | B2- B2- B3- B2- .- B2- B3- C#3- | D2- D2- D3- D2- .- D2- D3- E3- | F#2- F#2- F#3- F#2- .- F#2- F#3- G#2- | C#2- C#2- C#3- C#2- .- C#2- C#3- B2- |
+hit   | [Bm]!--- .----------- | [D]!--- .----------- | [F#m]!--- .----------- | [C#]!--- .------- [C#7]!--- |
+
+pattern B2 from B
+brass | D5--- F#5--- E5- D5- C#5- B4- | B4------- G#4- B4- E5- G#5- | A5--- G#5- E5- C#5--- E5- A5- | G#5------- .--- C#5- G#4- |
+chip  | D5--- F#5--- E5- D5- C#5- B4- | B4------- G#4- B4- E5- G#5- | A5--- G#5- E5- C#5--- E5- A5- | G#5------- .--- C#5- G#4- |
+guit  | B3+F#4--- .- B3+F#4- .--- B3+F#4- .- | E3+B3--- .- E3+B3- .--- E3+B3- .- | A3+E4--- .- A3+E4- .--- A3+E4- .- | C#3+G#3--- .- C#3+G#3- .--- C#3+G#3- .- |
+bass  | B2- B2- B3- B2- .- B2- B3- C#3- | E2- E2- E3- E2- .- E2- E3- G#2- | A2- A2- A3- A2- .- A2- A3- G#2- | C#2- C#2- C#3- C#2- .- C#2- C#3- E3- |
+hit   | [Bm]!--- .----------- | [E]!--- .----------- | [A]!--- .----------- | [C#]!--- .------- [C#7]!--- |
+snare | .... X... .... X... | % | % | ..x. X.x. XxXx XXXX |
+
+play intro
+loop A A2 B B2 A A2 A+2 A2+2
+
+# Boss section: the helicopter. Bass and guitar gallop, the hook bends F-sharp Phrygian (G natural) over F#m / G,
+# orchestra hits land in base; in Y the brass takes the hook up an octave. The sting is F-sharp major.
+pattern X
+brass | F#4- .- F#4- G4- C#5--- B4- A4- | G4--- B4- D5- G5--- F#5- D5- | F#5- .- F#5- E5- C#5--- A4- G4- | F4------- G#4- B4- C#5- F5- |
+chip  | F#4- .- F#4- G4- C#5--- B4- A4- | G4--- B4- D5- G5--- F#5- D5- | F#5- .- F#5- E5- C#5--- A4- G4- | F4------- G#4- B4- C#5- F5- |
+guit  | F#3+C#4- F#3+C#4 F#3+C#4 F#3+C#4- F#3+C#4 F#3+C#4 F#3+C#4- F#3+C#4 F#3+C#4 F#3+C#4- F#3+C#4- | G3+D4- G3+D4 G3+D4 G3+D4- G3+D4 G3+D4 G3+D4- G3+D4 G3+D4 G3+D4- G3+D4- | F#3+C#4- F#3+C#4 F#3+C#4 F#3+C#4- F#3+C#4 F#3+C#4 F#3+C#4- F#3+C#4 F#3+C#4 F#3+C#4- F#3+C#4- | C#3+G#3- C#3+G#3 C#3+G#3 C#3+G#3- C#3+G#3 C#3+G#3 C#3+G#3- C#3+G#3 C#3+G#3 C#3+G#3- C#3+G#3- |
+bass  | F#2- F#2 F#2 F#2- F#2 F#2 F#2- F#2 F#2 F#2- F#3- | G2- G2 G2 G2- G2 G2 G2- G2 G2 G2- G3- | F#2- F#2 F#2 F#2- F#2 F#2 F#2- F#2 F#2 F#2- F#3- | C#2- C#2 C#2 C#2- C#2 C#2 C#2- C#2 C#2 C#2- C#3- |
+stab  | [F#m]!--- .------- [F#m]!--- | [G]!--- .----------- | [F#m]!--- .------- [F#m]!--- | [C#]!--- [C#]!--- [C#7]!------- |
+hit   | [F#m]!--- .----------- | [G]!--- .----------- | [F#m]!--- .----------- | [C#]!--- .------- [C#7]!--- |
+kick  | x..x ..x. x..x ..x. | % | % | x..x ..x. x.x. xxxx |
+snare | .... X... .... X... | % | % | .... X... ..X. XXXX |
+hat   | x.x. x.x. x.x. x.x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+fhat  | xxxx xxxx xxxx xxxx | % | % | % |
+
+pattern Y from X
+brass | C#5--- D5--- C#5--- A4--- | B4------- D5--- G5--- | F#5--- E5--- D5--- C#5--- | C#5------- F5- G#5- C#6- B5- |
+chip  | C#5--- D5--- C#5--- A4--- | B4------- D5--- G5--- | F#5--- E5--- D5--- C#5--- | C#5------- F5- G#5- C#6- B5- |
+rise  | _ | _ | _ | C#5--------------- |
+crash | _ | _ | _ | _ |
+
+pattern S
+brass | C#5--- F#5--- A#5--- C#6--- | F#5------- .------- |
+chip  | C#5--- F#5--- A#5--- C#6--- | F#5------- .------- |
+stab  | [F#]!--- .--- [F#]!--- [B]!--- | [F#]!------- .--- [F#]!--- |
+guit  | F#3+C#4--- .--- F#3+C#4--- B3+F#4--- | F#3+C#4------- .--- F#3+C#4--- |
+bass  | F#2--- F#2--- F#2--- F#2--- | F#2- F#3- F#2- F#3- F#2- F#3- F#2- F#3- |
+kick  | x... x... x... x... | x... x... x... x.xx |
+snare | .... .... xxxx XXXX | .... X... .... xxxx |
+hat   | x.x. x.x. x.x. x.x. | % |
+crash | X... .... .... .... | X... .... .... .... |
+
+boss  X Y
+sting S

@@ -3,15 +3,21 @@ import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { setFlashMaterial } from './hitFlash'
 import { LANTERNFLY_GEO, createLanternflyFlashMaterial, createLanternflyMaterial } from './SharedEnemyAssets'
-import { HOP, hopRoute, newHopPose } from './hopGlideMotion'
+import { HOP, hopClock, hopRoute, newHopPose } from './hopGlideMotion'
 import { hopPose } from './hopGlideMotion.hot'
 import { freeWallSlot, wallNormal, wallPoint } from '@/entities/spawning/enemyPlacement'
 import { hashString } from '@/utils/rng'
+import { eventBus } from '@/core/EventBus'
+import type { EnemyHitEvent } from '@/combat/CollisionManager'
 
 // Reads on the gym's walls from the ride, on a phone (#665); HOP's distances and SWARM_SPACING scale with it.
 const LANTERNFLY_SCALE = 7
 
-/** A spotted lanternfly (#516) in one draw call (#632): lands on its wall, sits, crawls, and hops and glides about it (`hopGlideMotion.ts`), flashing its red hindwings, which open in its material's vertex shader. */
+/**
+ * A spotted lanternfly (#516) in one draw call (#632): lands on its wall, sits, crawls, and hops and glides about it
+ * (`hopGlideMotion.ts`), flashing its red hindwings, which open in its material's vertex shader. One shot beside it
+ * startles it into its next hop at once (#928), so a group is tracked across the wall, not cleared in one burst.
+ */
 export default function Lanternfly(props: EnemyProps) {
   const { id, spawnPosition } = props
   // Mount-time only, like EnemyBase's start.
@@ -29,7 +35,8 @@ export default function Lanternfly(props: EnemyProps) {
     return new THREE.Quaternion().setFromRotationMatrix(basis)
   }, [slot, normal])
   const pose = useRef(newHopPose()).current
-  const startedAt = useRef<number | null>(null)
+  const clock = useRef(0)
+  const startled = useRef(false)
   const heading = useRef<THREE.Group>(null)
   const wings = useMemo(() => ({ value: 0 }), [])
   const material = useMemo(() => createLanternflyMaterial(wings), [wings])
@@ -42,10 +49,24 @@ export default function Lanternfly(props: EnemyProps) {
     if (mesh) setFlashMaterial(mesh, flashMaterial)
   }, [flashMaterial])
 
+  useEffect(() => {
+    const at = new THREE.Vector3()
+    const onHit = (event: unknown) => {
+      const e = event as EnemyHitEvent
+      // Its clock stays at 0 while it waits on `after`: not on the wall yet, nothing to startle.
+      if (e.id === id || clock.current === 0 || pose.phase !== 'sit') return
+      wallPoint(slot.wall, pose.u, pose.v, pose.off, at, normal)
+      if (at.distanceToSquared(e.position) < HOP.startleRadius * HOP.startleRadius) startled.current = true
+    }
+    eventBus.on('enemy:hit', onHit)
+    return () => eventBus.off('enemy:hit', onHit)
+  }, [id, pose, slot, normal])
+
   const updatePosition = useCallback(
-    (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number) => {
-      startedAt.current ??= time
-      hopPose(route, time - startedAt.current, pose)
+    (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, _time: number, moved: number) => {
+      clock.current = hopClock(clock.current, moved, startled.current && pose.phase === 'sit')
+      hopPose(route, clock.current, pose)
+      if (pose.phase !== 'sit') startled.current = false
       wallPoint(slot.wall, pose.u, pose.v, pose.off, mesh.position, normal)
       if (heading.current) heading.current.rotation.z = pose.heading
       wings.value = pose.wings
@@ -54,7 +75,7 @@ export default function Lanternfly(props: EnemyProps) {
   )
 
   return (
-    <EnemyBase {...props} updatePosition={updatePosition}>
+    <EnemyBase {...props} updatePosition={updatePosition} after={slot.after}>
       <group quaternion={onWall}>
         <group ref={heading} scale={LANTERNFLY_SCALE}>
           <mesh ref={tagFlash} geometry={LANTERNFLY_GEO} material={material} />

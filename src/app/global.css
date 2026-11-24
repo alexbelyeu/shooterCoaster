@@ -1769,7 +1769,7 @@ canvas {
 
 /* Phone landscape: six columns in two rows, short enough to open above the gilt plate (Replay / Next Level) over the
    Share row, which leaves under 200 px at 390 px tall; popoverPlacement steps past the plate, never over it. */
-@media (max-height: 520px) {
+@media (orientation: landscape) and (max-height: 520px) {
   .share-menu {
     width: 46rem;
   }

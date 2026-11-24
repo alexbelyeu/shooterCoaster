@@ -26,7 +26,9 @@ import { dailySeed, extendStreak, pruneDaily, type DailyStreak } from '@/levels/
 import { getAllLevels, getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
 import { buildLevelCards, nextLevelIndex } from '@/ui/screens/levelSelectModel'
 import { scoreAfterPenalty } from '@/levels/scoring'
-import { medalsWon, mergeMedals, sanitizeSavedMedals } from '@/levels/medals'
+// The saved-medal helpers, not `levels/medals.ts`, whose table only the lazy results and level select screens need.
+import { addMedals, sanitizeSavedMedals } from '@/levels/savedMedals'
+import type { MedalRun } from '@/levels/medals'
 // The generated table, not `scoreLimits()`, which would pull the boss specs into the startup JS.
 import { LEVEL_LIMITS } from '../../api/_lib/levelLimits'
 
@@ -204,10 +206,10 @@ export function runBest(s: Pick<GameState, 'runMode' | 'currentLevel' | 'savedDa
   return s.currentLevel ? s.savedScores[s.currentLevel] : undefined
 }
 
-/** The medals the current run has won so far (#879); none on a daily, which is one run, not a step in the campaign. */
-export function runMedals(s: GameState): string[] {
-  if (!s.currentLevel || s.runMode.mode !== 'campaign') return []
-  return medalsWon(s.currentLevel, {
+/** What the current run did that medals read (#879); null on a daily, which is one run, not a step in the campaign. */
+export function medalRun(s: GameState): MedalRun | null {
+  if (s.runMode.mode !== 'campaign') return null
+  return {
     kills: s.kills,
     shotsFired: s.shotsFired,
     hits: s.hits,
@@ -218,7 +220,7 @@ export function runMedals(s: GameState): string[] {
     frenzyShots: s.frenzyShots,
     frenzyHits: s.frenzyHits,
     bossSeconds: s.bossSeconds,
-  })
+  }
 }
 
 export const useGameStore = create<GameState>()(
@@ -343,7 +345,7 @@ export const useGameStore = create<GameState>()(
       savedMedals: {},
       saveMedals: (levelId, won) =>
         set((s) => {
-          const kept = mergeMedals(levelId, s.savedMedals[levelId], won)
+          const kept = addMedals(s.savedMedals[levelId], won)
           if (kept.length === (s.savedMedals[levelId]?.length ?? 0)) return {}
           return { savedMedals: { ...s.savedMedals, [levelId]: kept } }
         }),

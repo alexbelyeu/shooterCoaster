@@ -1,5 +1,5 @@
-import type { TunnelSpec } from '@/types/level'
-import { type ArcTable, distanceAtT } from './arcLength'
+import type { DarkSectionSpec, TunnelSpec } from '@/types/level'
+import { type ArcTable, distanceAtT, indexAtT } from './arcLength'
 
 /**
  * Track set-pieces (#332): tunnels, stretches where the track dives through a lit tube. A tunnel is data on
@@ -10,16 +10,20 @@ import { type ArcTable, distanceAtT } from './arcLength'
 /** Bus event as the car enters or leaves a tunnel: `(kind: 'enter' | 'exit', tunnel: number)`, the index in `ArcTable.tunnels`. */
 export const TRACK_TUNNEL_EVENT = 'track:tunnel'
 
-/** A tunnel's place on the track. */
-export interface TunnelSpan {
-  /** Arc distance of its entry and exit. */
-  fromS: number
-  toS: number
+/** A stretch of track a set-piece is built over: `trackClearance.ts` keeps props further than `reach` (XZ) from its samples. */
+export interface ClearanceSpan {
   /** First and last arc-table sample inside it. */
   from: number
   to: number
-  /** How far from the centreline (XZ) the tube and its portals reach: `trackClearance.ts` keeps props out of it. */
+  /** How far from the centreline (XZ) the set-piece reaches. */
   reach: number
+}
+
+/** A tunnel's place on the track; its `reach` is the tube's and its portals'. */
+export interface TunnelSpan extends ClearanceSpan {
+  /** Arc distance of its entry and exit. */
+  fromS: number
+  toS: number
 }
 
 /** Tube sizes in world units, all × `trackScale` (the rider's eye is 6 above the rails). */
@@ -136,6 +140,12 @@ export function withTunnels(table: ArcTable, specs: readonly TunnelSpec[] | unde
   if (!specs?.length) return table
   return { ...table, tunnels: tunnelSpans(table, specs, trackScale) }
 }
+/** `table` with a clearance over each dark section that has a `reach` (level 4's ice cave, #911), or `table` itself when none has. */
+export function withDarkSections(table: ArcTable, sections: readonly DarkSectionSpec[] | undefined): ArcTable {
+  const clearances = (sections ?? []).flatMap((d) => (d.reach ? [{ from: indexAtT(table, d.from), to: indexAtT(table, d.to), reach: d.reach }] : []))
+  return clearances.length ? { ...table, clearances } : table
+}
+
 /** Ribs' centres along a span: evenly spaced, none closer than half a spacing to either end. */
 export function ribCentres(span: TunnelSpan, dims: TunnelDims): number[] {
   const n = Math.max(1, Math.round((span.toS - span.fromS) / dims.ribSpacing))

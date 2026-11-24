@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getAllLevels, getLevelConfig, previousLevel } from '@/levels/LevelRegistry'
 import type { ScoreEntry } from '@/types/game'
 import { dailyLevel } from '@/levels/daily'
+import { levelMedals } from '@/levels/medals'
 import {
   buildDailyCard,
   buildLevelCards,
@@ -15,7 +16,7 @@ import {
 
 const levels: LevelSelectSource[] = [
   { id: 'a', name: 'Alpha', description: '', biome: 'themePark', nextLevel: 'b' },
-  { id: 'b', name: 'Bravo', description: '', biome: 'desert', nextLevel: 'c' },
+  { id: 'b', name: 'Bravo', description: '', biome: 'arctic', nextLevel: 'c' },
   { id: 'c', name: 'Charlie', description: '', biome: 'ocean', nextLevel: null },
 ]
 
@@ -48,11 +49,11 @@ describe('buildLevelCards', () => {
 
   it("shows an open level's three medals, the won ones lit, and none on a locked one", () => {
     const [level1, level2] = getAllLevels()
-    const cards = buildLevelCards([level1, level2], {}, (id) => id === 'level1', {}, { level1: ['hotStreak'], level2: ['deadEye'] })
+    const cards = buildLevelCards([level1, level2], {}, (id) => id === 'level1', {}, { level1: ['hotStreak'], level2: ['deadEye'] }, levelMedals)
     expect(cards[0].medals.map((m) => [m.id, m.earned])).toEqual([['goldRush', false], ['blimpBuster', false], ['hotStreak', true]])
     expect(cards[1].medals).toEqual([])
     expect(medalsLine(cards[0].medals)).toBe('1 of 3 medals, Hot Streak')
-    expect(medalsLine(buildLevelCards([level1], {}, () => true, {})[0].medals)).toBe('0 of 3 medals')
+    expect(medalsLine(buildLevelCards([level1], {}, () => true, {}, {}, levelMedals)[0].medals)).toBe('0 of 3 medals')
   })
 
   it('shows the top initials of an open level only', () => {

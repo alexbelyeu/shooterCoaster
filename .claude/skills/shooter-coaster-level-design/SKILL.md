@@ -183,7 +183,8 @@ See `src/levels/environments/LavaShader.ts` for the full working example:
    `AtmosphereConfig` in `nightPreset.ts`'s `NIGHT_ATMOSPHERES` (read through `atmosphereFor(biome,
    runVariant)`): a moon in the sun slot, a blue hemisphere fill, shorter fog, a cool vignetted grade,
    plus `lampGlow` (lights the biome's lamps and rides through their existing materials,
-   `shared/lampGlow.ts`) and `enemyRimLift` (scales every enemy rim, `enemyRim.ts` `setRimLift`).
+   `shared/lampGlow.ts`; the Pyramid's torches, #880) and `enemyRimLift` (scales every enemy rim, `enemyRim.ts`
+   `setRimLift`). Judge a night frame like Inferno: emissive edges and rim light, not a brighter sky.
 4. (Nothing to add to `BiomeEnvironment.tsx` — it renders whatever the registry entry defines.)
 5. `src/audio/scores/<levelId>.scrim` — the level's score, registered in `scores/index.ts` `SCORES`, plus
    its key in `SCORE_KEYS` (`src/audio/sfxDesign.ts`) and the biome's room in `BIOME_REVERB`
@@ -233,6 +234,7 @@ timed by the run: a lap takes 99–228 s (`track/ridePhysics.ts`, pinned in its 
 - **Terrain-conforming features**: Follow the safeHeight() pattern above
 - **Custom shaders**: Create separate `*Shader.ts` file with `create*Material()` factory, drive uniforms in `useFrame`
 - **Tunnels** (`TrackParams.tunnels`, `docs/LEVEL-KIT.md` "Set-pieces: tunnels"): placement is pure `track/setPieces.ts`, the mesh `track/tunnelGeometry.ts`. It may not cross the seam, needs portal room at each end and may not overlap another. Keep it ~2 s of ride with nothing shootable inside; the `pacing` gate counts that dead time, so place it between waves and re-run `--steps pacing`
+- **Other set-pieces over the track** (a cave, an arcade): give its dark section a `reach` (`DarkSectionSpec`, how far from the centreline it stands), as level 4's ice cave does (#911). `setPieces.ts` `withDarkSections` puts it on the arc table and `trackClearance.ts` keeps every prop out, so no prop needs its own clearance for it
 - **Landmark components**: Create in `src/levels/environments/` (render them from the biome's `Features.tsx`), accept optional custom material props
 
 ## Common Pitfalls
@@ -254,7 +256,7 @@ timed by the run: a lap takes 99–228 s (`track/ridePhysics.ts`, pinned in its 
 | A junction's branch (#702) runs through scenery or the ground | Towers, `trackClearance.ts` / `trackScatter.ts` and enemy placement see only the main curve; the branch gets no towers | Prove the branch clear in the level's own test, as `gymTrack.test.ts` does; one junction per track, its sign after t 0 (`checkMechanics`, `docs/RIDE-KIT.md`) |
 | Prop or ride intersects the track or a support tower | Placed by radius from the origin, ignoring the track | Plan positions against `buildTrackIndex(track)` (2D clearance) and unit-test them, as `themePark/layout.test.ts` does |
 | Level blows its draw-call budget | One `<mesh>` per prop part (a Ferris wheel was 88 draws) | InstancedMesh per part, or `paintedParts.ts` to merge a multi-coloured prop into one geometry |
-| A wave blows the draw-call budget | One `<mesh>` per enemy part × 25+ enemies on screen (Arctic scouts were 12 draws each, 393 for the level) | Merge the parts that share a material and move together with `placedParts` in `SharedEnemyAssets.ts`; only animated parts stay separate meshes |
+| A wave blows the draw-call budget | One `<mesh>` per enemy part × 25+ enemies on screen (Arctic scouts were 12 draws each, 393 for the level) | Merge the parts that share a material and move together with `placedParts` in `shared/paintedParts.ts` (one colour) or `mergePainted` (vertex-coloured parts, one material); only animated parts stay separate meshes |
 | Terrain holes/spikes | Missing noise config | Add entry to terrainNoise.ts |
 | No music plays | No score for the level | Add `scores/<levelId>.scrim` to `SCORES` (`scores/index.ts`) and its key to `SCORE_KEYS` (`sfxDesign.ts`) |
 | Enemies don't spawn | Missing spawner registration | Check its world's `enemies` (`biomes/<biome>/world.ts`), `RADII` (`EnemySpawner.tsx`), `ENEMY_PLACEMENT` and `SCORE_VALUES` |

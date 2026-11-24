@@ -1,7 +1,8 @@
 /**
  * Medals (#879): three named feats per level, the reason to ride a 3-star level again. Each is a predicate over the
  * run's stats (`MedalRun`, read from the game store as the run ends); a campaign run's medals are saved per level
- * (`savedMedals`), a daily earns none. Pure: no React, three.js or store imports. A new level adds its three here.
+ * (`savedMedals`, `savedMedals.ts`), a daily earns none. Pure: no React, three.js or store imports. A new level adds its
+ * three here. Only the lazy results and level select screens import it, so the table stays out of the startup JS.
  */
 import type { Route } from '@/track/mechanics'
 
@@ -86,6 +87,11 @@ export const LEVEL_MEDALS: Readonly<Record<string, readonly [Medal, Medal, Medal
     medal('snakeCharmer', 'Snake Charmer', 'Beat Medusa in 15 seconds', { kind: 'boss', seconds: 15 }),
     medal('ratRace', 'Rat Race', 'Chain 20 hits in a row', { kind: 'combo', count: 20 }),
   ],
+  level7: [
+    medal('chopperDown', 'Chopper Down', 'Ground the Helicopter in 12 seconds', { kind: 'boss', seconds: 12 }),
+    medal('neonEye', 'Neon Eye', 'Hit 3 shots in 4, firing 30 or more', { kind: 'accuracy', percent: 75, minShots: 30 }),
+    medal('gridlock', 'Gridlock', 'Chain 25 hits in a row', { kind: 'combo', count: 25 }),
+  ],
 }
 
 /** The longest combo any medal asks for: a chain this long wins every combo medal (the smoke primes it). */
@@ -114,29 +120,10 @@ export function featMet(feat: Feat, run: MedalRun): boolean {
   }
 }
 
-/** Ids of the level's medals this run won, in the level's order. */
-export function medalsWon(levelId: string, run: MedalRun): string[] {
+/** Ids of the level's medals this run won, in the level's order; none for no run (a daily, `store` `medalRun`). */
+export function medalsWon(levelId: string, run: MedalRun | null): string[] {
+  if (!run) return []
   return levelMedals(levelId)
     .filter((m) => featMet(m.feat, run))
     .map((m) => m.id)
-}
-
-/** Ids saved so far plus this run's, in the level's order; unknown ids drop out. */
-export function mergeMedals(levelId: string, saved: readonly string[] | undefined, won: readonly string[]): string[] {
-  const have = new Set([...(saved ?? []), ...won])
-  return levelMedals(levelId)
-    .filter((m) => have.has(m.id))
-    .map((m) => m.id)
-}
-
-/** Stored medals as valid data or nothing: per known level, its own ids only. */
-export function sanitizeSavedMedals(raw: unknown): Record<string, string[]> {
-  if (typeof raw !== 'object' || raw === null) return {}
-  const out: Record<string, string[]> = {}
-  for (const [levelId, ids] of Object.entries(raw)) {
-    if (!LEVEL_MEDALS[levelId] || !Array.isArray(ids)) continue
-    const kept = mergeMedals(levelId, ids.filter((id): id is string => typeof id === 'string'), [])
-    if (kept.length > 0) out[levelId] = kept
-  }
-  return out
 }

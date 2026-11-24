@@ -24,6 +24,18 @@ export const BLIMP_LAYOUT = {
   ] as const,
 } as const
 
+/**
+ * The envelope's radius at local x: a blunt nose and a long taper to a pointed tail, never wider than `hullR`.
+ * 0 off the ends.
+ */
+export function blimpHullRadius(x: number): number {
+  const { hullX, hullRx, hullR } = BLIMP_LAYOUT
+  const u = (x - hullX) / hullRx
+  if (Math.abs(u) >= 1) return 0
+  const round = 1 - u * u
+  return hullR * (u >= 0 ? Math.sqrt(round) : round ** 0.75)
+}
+
 /** 5× a balloon, like EnemySpawner's bonus golden balloons. */
 const GOLDEN_BALLOON_SCORE = SCORE_VALUES.balloon * 5
 
@@ -138,6 +150,27 @@ export const MEDUSA: BossSpec = {
   weakPoints: medusaSnakes,
 }
 
+/** Local frame: +z = nose, +y up; the root is the cabin's centre. */
+export const HELI_LAYOUT = {
+  searchlight: [0, -40, 72],
+  tailRotor: [18, 22, -238],
+  hub: [0, 62, 0],
+  rotorRadius: 200,
+  rotorY: 70,
+} as const
+
+/** The searchlight and the tail rotor first, then the main rotor's hub brings it down. */
+export const HELICOPTER: BossSpec = {
+  name: 'The Helicopter',
+  tell: { seconds: 2.5, label: 'Searchlight Incoming!' },
+  reward: 400,
+  weakPoints: [
+    { id: 'searchlight', radius: 36, offset: [...HELI_LAYOUT.searchlight], hp: 2, score: 60, phase: 0 },
+    { id: 'tail-rotor', radius: 42, offset: [...HELI_LAYOUT.tailRotor], hp: 2, score: 60, phase: 0 },
+    { id: 'hub', radius: 40, offset: [...HELI_LAYOUT.hub], hp: 4, score: 0, phase: 1 },
+  ],
+}
+
 export const BOSS_SPECS: Record<BossType, BossSpec> = {
   goldenBlimp: GOLDEN_BLIMP,
   kraken: KRAKEN,
@@ -145,4 +178,5 @@ export const BOSS_SPECS: Record<BossType, BossSpec> = {
   yeti: YETI,
   magmaTitan: MAGMA_TITAN,
   medusa: MEDUSA,
+  helicopter: HELICOPTER,
 }

@@ -4,6 +4,7 @@ import { getAllLevels } from '@/levels/LevelRegistry'
 import { dailyKey, dailyLevel, msUntilNextUtcDay } from '@/levels/daily'
 import { biomeTheme } from '@/ui/theme'
 import { FairBoard, FairMedal, FairStar, FairStars } from '@/ui/Fair'
+import { levelMedals } from '@/levels/medals'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
 import { prepareSfx, sfx } from '@/audio/sfx'
 import LevelPostcard from './LevelPostcard'
@@ -63,7 +64,7 @@ export default function LevelSelectScreen() {
   const dailyStreak = useGameStore((s) => s.dailyStreak)
 
   const cards = useMemo(
-    () => buildLevelCards(getAllLevels(), savedScores, isLevelUnlocked, leaderboards, savedMedals),
+    () => buildLevelCards(getAllLevels(), savedScores, isLevelUnlocked, leaderboards, savedMedals, levelMedals),
     [savedScores, isLevelUnlocked, leaderboards, savedMedals],
   )
   const today = useUtcDayKey()

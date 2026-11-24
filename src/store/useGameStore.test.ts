@@ -603,7 +603,7 @@ describe('medal stats (#879)', () => {
     store().saveMedals('level1', ['hotStreak'])
     store().saveMedals('level1', ['goldRush'])
     store().saveMedals('level1', [])
-    expect(store().savedMedals).toEqual({ level1: ['goldRush', 'hotStreak'] })
+    expect(store().savedMedals).toEqual({ level1: ['hotStreak', 'goldRush'] })
     store().clearLocalData()
     expect(store().savedMedals).toEqual({})
   })
