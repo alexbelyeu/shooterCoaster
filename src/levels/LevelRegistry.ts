@@ -9,6 +9,9 @@ import { ARCTIC_LEVEL_TRACK } from './environments/biomes/arctic/arcticLevel'
 import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel'
 import { GYM_LEVEL_TRACK, GYM_LEVEL_WALLS } from './environments/biomes/gym/gymLevel'
 
+/** Level 1's lift-hill rings (`formationOrigin`). */
+const LIFT_RINGS = { ahead: 700, side: 250, up: 150 }
+
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
 const LEVELS: LevelConfig[] = [
   {
@@ -25,9 +28,13 @@ const LEVELS: LevelConfig[] = [
     goldenBalloons: 3,
     ...paceLevel({
       waves: [
-        { type: 'balloon', count: 50, waveLabel: 'Pop em!' },
-        { type: 'balloon', count: 50, waveLabel: 'More Balloons!' },
-        { type: 'balloon', count: 50, waveLabel: 'Final Wave!', formation: 'ring' },
+        { type: 'balloon', count: 25, waveLabel: 'Pop em!', formation: 'ring', weight: 5 },
+        // Up the lift hill (5–12 s), a ring every few seconds of the slow climb (a wave's later groups are a lift's length
+        // apart): up in the sky it looks at, either side of the lift so its rails hide none of them.
+        { type: 'balloon', count: 10, waveLabel: 'Up they go!', formation: 'ring', formationOrigin: LIFT_RINGS, weight: 4 },
+        { type: 'balloon', count: 15, formation: 'ring', formationOrigin: LIFT_RINGS, weight: 4 },
+        { type: 'balloon', count: 50, waveLabel: 'More Balloons!', weight: 15 },
+        { type: 'balloon', count: 50, waveLabel: 'Final Wave!', formation: 'ring', weight: 17 },
       ],
       boss: 'goldenBlimp',
     }),
