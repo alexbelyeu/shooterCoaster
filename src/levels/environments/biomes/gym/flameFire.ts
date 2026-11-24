@@ -6,7 +6,7 @@ import { FLAME, GYM_SCALE, HALL, blockRings, footprint, piece, toWorld, type Vec
 
 /**
  * The Flame's fire (#520, rebuilt in #595, grown in #669), laid out in the blockout's metres and scaled to the world:
- * the tongues of flame that rise up its faces and off its top and the licks torn free over it, where its light comes
+ * the tongues of flame that rise off its top and the bevel up to it and the licks torn free over it, where its light comes
  * from and how it flickers, the smoke rising off it, and the box its embers rise through. Pure: `FlameFire.tsx` draws it.
  *
  * Each tongue is one soft flame sprite on a path of three points that hugs the Flame (its start, a point

@@ -125,8 +125,8 @@ const tongueFragment = /* glsl */ `
     #endif
     // Licks: the tongue's spine wanders more towards its tip, held inside the quad so no edge cuts it
     float xd = x + clamp((n + fine * 0.3) * y, -0.35, 0.35);
-    // A teardrop: round root, tapering tip
-    float halfWidth = 0.8 * pow(max(1.0 - y, 0.0), 0.7) * smoothstep(0.0, 0.12, y) + 0.001;
+    // A teardrop: round root (no point under it), tapering tip
+    float halfWidth = 0.8 * pow(max(1.0 - y, 0.0), 0.7) * sqrt(smoothstep(0.0, 0.2, y)) + 0.001;
     float tear = clamp(1.0 - abs(xd) / halfWidth, 0.0, 1.0);
     float disc = clamp(1.0 - (r + n * 0.3) / 0.85, 0.0, 1.0);
     float body = mix(disc, tear, vSide);
@@ -135,8 +135,8 @@ const tongueFragment = /* glsl */ `
     density *= smoothstep(-soft, soft, n + fine * 0.5 + 0.6 - 0.6 * up * (0.5 + vAge));
     // Fades in at its root, out as it burns away
     density *= smoothstep(0.0, 0.15, vAge) * (1.0 - smoothstep(0.7, 1.0, vAge)) * vNear;
-    // Nothing reaches the quad's edges
-    density *= smoothstep(1.0, 0.8, abs(x)) * smoothstep(1.0, 0.85, y) * smoothstep(0.0, 0.05, y);
+    // Nothing reaches the quad's edges; from the side its root grows out of a glow rather than starting on a line
+    density *= smoothstep(1.0, 0.8, abs(x)) * smoothstep(1.0, 0.85, y) * smoothstep(0.0, mix(0.05, 0.2, vSide), y);
 
     // Hottest in a core low along the spine (in its heart, seen from above), cooling to red at its edges and with age;
     // its tip, higher on an older tongue, burns out into soot
