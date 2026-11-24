@@ -14,9 +14,14 @@ const KIT = { position: 0, up: 2 }
  * Each ride: its level, biome folder, track module and export, the generated module and its export, the decimals its control
  * points keep (`RidePrecision`), any climbable walls it ships and any other plain data its track module builds for the level
  * (`extra`: level 3's sea arch). Level 6's hall is small, so it keeps 0.01 units (#866).
+ * `yaw` names the track module's export of the angle its ride is laid out turned by: its points pack in that frame (#864).
  */
 const RIDES = [
   { level: 'level1', biome: 'themePark', track: 'parkTrack', from: 'PARK_TRACK', file: 'parkLevel', to: 'PARK_LEVEL_TRACK', precision: KIT },
+  {
+    level: 'level2', biome: 'desert', track: 'desertTrack', from: 'DESERT_TRACK', file: 'desertLevel', to: 'DESERT_LEVEL_TRACK',
+    precision: KIT, yaw: 'DESERT_RIDE_YAW',
+  },
   {
     level: 'level3', biome: 'ocean', track: 'oceanTrack', from: 'OCEAN_TRACK', file: 'oceanLevel', to: 'OCEAN_LEVEL_TRACK', precision: KIT,
     extra: { from: 'OCEAN_SEA_ARCH', type: 'SeaArchSpec', doc: 'The sea arch the corkscrew threads (`oceanSeaArch`).' },
@@ -44,7 +49,7 @@ await build({
   stdin: {
     contents: [
       "export { packPoints, roundNumbers } from '@/levels/rideData'",
-      ...rides.map((r) => `export { ${r.from} } from '${biomes}/${r.biome}/${r.track}'`),
+      ...rides.map((r) => `export { ${[r.from, r.yaw].filter(Boolean).join(', ')} } from '${biomes}/${r.biome}/${r.track}'`),
       ...rides.filter((r) => r.walls).map((r) => `export { ${r.walls.from} } from '${biomes}/${r.biome}/${r.walls.module}'`),
       ...rides.filter((r) => r.extra).map((r) => `export { ${r.extra.from} } from '${biomes}/${r.biome}/${r.track}'`),
     ].join('\n'),
@@ -82,7 +87,7 @@ import type { ${types.join(', ')} } from '@/types/level'
 export const ${ride.to}: TrackParams = {
   ...${JSON.stringify(rest)},
   curve: 'spline',
-  controlPoints: unpackPoints(${JSON.stringify(packPoints(track.controlPoints, ride.precision))}),
+  controlPoints: unpackPoints(${JSON.stringify(packPoints(track.controlPoints, ride.precision, ride.yaw ? mod[ride.yaw] : 0))}),
 } as TrackParams
 ${walls}${extra}`
   fs.writeFileSync(outFile, body)

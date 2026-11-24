@@ -1,5 +1,0 @@
-## 2026-11-23 — Dark sections take a `look`; level 6's ride data packed harder for level 4's (builder, #866)
-
-**Context:** Level 4's ice cave is a dark section, but the gym's blacklight look (light almost out, violet) would hide the white snowmen inside it. Level 4's ride as generated numbers also put the startup JS 0.8 KB over its 436 KB budget.
-**Decision:** `DarkSectionSpec.look` names a row in `DarkSections.tsx`'s table of looks: `blacklight` (default) or `ice` (45% of the light kept, a blue hemisphere). A new look is a new row, not a new component. For the budget, the generator (`gen-gym-level.mjs` then, `gen-ride-levels.mjs` since #890) writes level 6's control points to 0.01 world units and its ups to 4 decimals (float dust to 0) instead of 6 significant digits each, which saves ~1.4 KB gz; `gymLevel.test.ts` and the gym's ride tests check the shipped numbers.
-**Consequences:** Startup JS is back at ~435.4 KB. The next kit ride (levels 2, 3, 5) will not fit without the lasting fix from #863's entry: load each level's track from its world chunk and keep only level 1's eager for the title.

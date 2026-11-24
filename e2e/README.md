@@ -349,8 +349,11 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   (the part sets it), writing `throttle.json`. `slow` and `pacing` set `gatePrograms`: a shader compiled after the warm-up fails the level.
   Each part's artifact is `prod-e2e-results-<part>` (its screenshots, `results.json` and `exit-code`); the `nightly` job folds
   them into one verdict with `scripts/nightlyParts.cjs` (a part that hit its cap or left nothing shows as a failed `part <name>`).
-  A part that nears its cap splits again the same way. An exception that escapes the run still writes `results.json` with
-  what finished, plus a failed `crash` check naming it.
+  A part that nears its cap splits again the same way. A step that throws (a dropped connection to production, a page
+  that crashed) fails as that step, `threw: <message>` under its own id and level, and the run goes on to the next step
+  with the contexts it opened closed (`e2e/runStep.mjs`, #707: one `ERR_CONNECTION_RESET` in `daily` used to cost the
+  `main` part every step after it). An exception outside a step (the title's page, a level's ride) still escapes the run,
+  which writes `results.json` with what finished, plus a failed `crash` check naming it.
   **Production redeploys mid-run** (#822): `main` deploys whenever an approved PR merges, and Vercel's atomic deploy removes
   the old build's hashed chunks, so a part can fail on a lazy chunk that no longer exists (`Failed to fetch dynamically
   imported module`). With `--url`, the smoke fingerprints the deployed build at the start (`index.html`'s entry script and

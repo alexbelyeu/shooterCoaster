@@ -104,6 +104,7 @@ import { installSettledStepper } from './settledSteps.mjs'
 import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
 import { BOSS_CHECKS } from './bossChecks.mjs'
+import { runStep } from './runStep.mjs'
 
 const SECONDS = Number(arg('seconds', 10))
 const OUT = path.resolve(arg('out', 'e2e-results'))
@@ -4603,16 +4604,15 @@ async function run() {
     await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
     return { ctx, page, errors, loading }
   }
-  const step = async (fn) => {
-    const started = Date.now()
-    const r = await fn()
-    r.seconds ??= (Date.now() - started) / 1000
+  /** `id` (and `level`) name the failed check when the step throws (`runStep.mjs`). */
+  const step = async (fn, id, level) => {
+    const r = await runStep(fn, { id, level, browser })
     failed ||= !r.ok
     results.push(r)
     return r
   }
   // `finish(r)`: after the page's errors are counted, before the step passes or fails.
-  const pageStep = (check, query, finish) => step(async () => {
+  const pageStep = (id, level, check, query, finish) => step(async () => {
     const p = await newPage(query)
     const r = await check(p.page)
     r.errors = [...p.errors, ...(await p.page.evaluate(() => window.__SC_TEST__.errors))]
@@ -4621,7 +4621,7 @@ async function run() {
     r.ok = r.problems.length === 0
     await p.ctx.close()
     return r
-  })
+  }, id, level)
 
   // 1. Title screen
   const t = await newPage('e2e=1&gpuSync=1', {}, has('title') ? posterHandoff : null)
@@ -4651,21 +4651,21 @@ async function run() {
         id: 'title', ok: problems.length === 0, problems, frames: titleWait.frames, frameSeconds: titleWait.ms / 1000, image: titleImg,
         title: fly.result, drawCalls: budget.drawCalls, scene: budget.scene, posterShots: poster.shots, posterOffsets: poster.offsets, laps: lap.laps, errors: t.errors,
       }
-    })
+    }, 'title')
   }
   await t.ctx.close()
 
   // 1a. Campaign landing path; not for portal builds (--base), which portals serve at their own path.
-  if (has('landing') && !arg('base')) await step(() => landingPathCheck(browser, base))
+  if (has('landing') && !arg('base')) await step(() => landingPathCheck(browser, base), 'landing')
 
   // 1b. Level select with saved progress + keyboard-only start
-  if (has('levelSelect')) await pageStep((page) => levelSelectCheck(page, levels))
+  if (has('levelSelect')) await pageStep('levelSelect', null, (page) => levelSelectCheck(page, levels))
 
   // 1b'. Daily Run from its card: today's seed, same spawns on a second load, daily results, campaign saves untouched
-  if (has('daily')) await step(() => dailyCheck(newPage))
+  if (has('daily')) await step(() => dailyCheck(newPage), 'daily')
 
   // 1c. Settings from the title (settings.png): layout, Esc, persisted across a reload
-  if (has('settings')) await pageStep(settingsCheck)
+  if (has('settings')) await pageStep('settings', null, settingsCheck)
 
   // 2. Every level (or the requested subset); the first one also plays the FRENZY / leaderboard checks (`frenzy`)
   const wanted = PLAN.levels ?? levels.map((l) => l.id)
@@ -4761,7 +4761,7 @@ async function run() {
       if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
       r.ok = r.problems.length === 0
       return r
-    })
+    }, 'quality', first)
   }
 
   // 3. Seeded spawns: a fresh page + the same seed gives the same enemies; another seed doesn't
@@ -4773,7 +4773,7 @@ async function run() {
       r.errors = s.errors
       await s.ctx.close()
       return r
-    })
+    }, 'seed-check', first)
   }
 
   // 4. Leaving the tab pauses the run and never drains the timer; then 4b. the pause menu on the same page (pause.png)
@@ -4785,22 +4785,22 @@ async function run() {
       if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
       r.ok = r.problems.length === 0
       return r
-    })
+    }, 'hidden-pause', first)
     await step(async () => {
       const m = await pauseMenuCheck(h.page, first)
       m.errors = [...h.errors, ...(await h.page.evaluate(() => window.__SC_TEST__.errors))].slice(r.errors.length)
       if (m.errors.length) m.problems.push(`${m.errors.length} error(s)`)
       m.ok = m.problems.length === 0
       return m
-    })
+    }, 'pause-menu', first)
     await h.ctx.close()
   }
 
   // 5. A real start: Ready / Set / GO over the warming-up level, then playing
-  if (has('countdown') && first) await pageStep((page) => countdownCheck(page, first), 'e2e=1&countdown=1')
+  if (has('countdown') && first) await pageStep('countdown', first, (page) => countdownCheck(page, first), 'e2e=1&countdown=1')
 
   // 6. Top speed: banking + wind streaks (speed.png)
-  if (has('speed') && first) await pageStep((page) => speedCheck(page, SPEED_LEVEL && wanted.includes(SPEED_LEVEL) ? SPEED_LEVEL : first))
+  if (has('speed') && first) await pageStep('speed', first, (page) => speedCheck(page, SPEED_LEVEL && wanted.includes(SPEED_LEVEL) ? SPEED_LEVEL : first))
 
   // 6a. A lazy chunk that fails once loads after the page reloads (#888): its own page, so the route is set before the first load
   if (has('chunkRetry') && first) {
@@ -4824,28 +4824,28 @@ async function run() {
       if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
       r.ok = r.problems.length === 0
       return r
-    })
+    }, 'chunkRetry', first)
   }
 
   // 6b. Spawn choreography: the crow wave's tell, then its V flying in (level2-wave.png)
-  if (has('wave') && wanted.includes(WAVE_CHECK.level)) await pageStep(waveCheck)
+  if (has('wave') && wanted.includes(WAVE_CHECK.level)) await pageStep('wave', WAVE_CHECK.level, waveCheck)
 
   // 6b'. The weather pulse with its wave: sandstorm, blizzard (<level>-weather.png)
-  for (const id of has('weather') ? WEATHER_LEVELS.filter((l) => wanted.includes(l)) : []) await pageStep((page) => weatherCheck(page, id))
+  for (const id of has('weather') ? WEATHER_LEVELS.filter((l) => wanted.includes(l)) : []) await pageStep('weather', id, (page) => weatherCheck(page, id))
 
   // 6c. The finales: summoned, shot down in phase order (<level>-boss.png, <level>-boss-down.png)
   for (const check of has('boss') ? BOSS_CHECKS.filter((c) => wanted.includes(c.level)) : []) {
-    await pageStep((page) => bossCheck(page, check))
+    await pageStep('boss', check.level, (page) => bossCheck(page, check))
   }
 
   // 6e. Weapon pickups: one shot with a real bullet, the fan, the badge, expiry (level1-pickup.png)
-  if (has('pickup') && wanted.includes(PICKUP_CHECK.level)) await pageStep(pickupCheck)
+  if (has('pickup') && wanted.includes(PICKUP_CHECK.level)) await pageStep('pickup', PICKUP_CHECK.level, pickupCheck)
 
   // 6e'. The Night Rides: dark sky, readable enemies, inside the scene budget (level1-night.png, level2-night.png…)
-  for (const id of has('night') ? NIGHT_CHECK.levels.filter((l) => wanted.includes(l)) : []) await pageStep((page) => nightCheck(page, id))
+  for (const id of has('night') ? NIGHT_CHECK.levels.filter((l) => wanted.includes(l)) : []) await pageStep('night', id, (page) => nightCheck(page, id))
 
   // 6f. Shoot-to-switch: the shot run rides the hard branch, the other the easy way (level6-switch.png, level6-switch-hard.png)
-  if (has('switch') && wanted.includes(SWITCH_CHECK.level)) await pageStep((page) => switchCheck(page, { darkShots: has('dark') }))
+  if (has('switch') && wanted.includes(SWITCH_CHECK.level)) await pageStep('switch', SWITCH_CHECK.level, (page) => switchCheck(page, { darkShots: has('dark') }))
 
   // 6d. The score engine and arcade SFX: title -> level -> pause -> results
   if (has('audio') && wanted.includes(AUDIO_CHECK.level)) {
@@ -4856,23 +4856,23 @@ async function run() {
       if (errors.length) r.problems.push(`${errors.length} error(s)`)
       await sc.ctx.close()
       return { id: 'audio', ok: r.problems.length === 0, problems: r.problems, engine: r.result, errors }
-    })
+    }, 'audio', AUDIO_CHECK.level)
   }
 
   // 6f. Pacing: every level's whole run, unfired, against budgets.json `pacing` (pacing.json)
   const pacing = {}
   for (const id of has('pacing') ? wanted : []) {
-    const r = await pageStep((page) => pacingCheck(page, id), undefined, (r) => {
+    const r = await pageStep('pacing', id, (page) => pacingCheck(page, id), undefined, (r) => {
       if (r.placeholder) r.problems.push(...fillPlaceholderBudget('pacing', id, r.placeholder, r.problems))
       delete r.placeholder
     })
-    pacing[id] = { ...r.pacing, timeline: r.timeline }
+    if (!r.threw) pacing[id] = { ...r.pacing, timeline: r.timeline }
     delete r.timeline
   }
   if (Object.keys(pacing).length) fs.writeFileSync(path.join(OUT, 'pacing.json'), JSON.stringify({ step: PACING_STEP, seed: SEED, levels: pacing }))
 
   // 7. Touch playtest on a phone viewport (--mobile)
-  if (has('mobile')) await step(() => runMobile(browser, base))
+  if (has('mobile')) await step(() => runMobile(browser, base), `mobile-${MOBILE_LEVEL}`)
 
   await browser.close()
   if (preview) stopPreview(preview.proc)
@@ -4893,6 +4893,8 @@ async function run() {
     const note = r.id === 'time' || r.id === 'build'
     const extra = note
       ? (r.ok ? ` ${r.text}` : '')
+      : r.threw
+      ? (r.level ? ` ${r.level}` : '')
       : r.id === 'title'
       ? (r.title ? ` 6 s later: turned ${r.title.turnedDeg.toFixed(1)} deg, moved ${r.title.moved.toFixed(0)}; hint "${r.title.hint}"; attract ${r.title.attract ? `bars ${r.title.attract.bars.join(' / ')}` : 'none'}; key -> ${r.title.opened ? 'levelSelect' : 'stuck'}` : '') +
         ` draws=${r.drawCalls} scene objs=${r.scene?.objects} tris=${r.scene?.triangles}; poster: ${r.posterShots} load shots, off by ${JSON.stringify(r.posterOffsets ?? {})}; s: ${Object.entries(r.laps ?? {}).map(([k, v]) => `${k} ${v}`).join(', ')}`
