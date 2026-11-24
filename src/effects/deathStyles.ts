@@ -418,6 +418,14 @@ export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
     ],
     lifetime: 1.5, scale: 1, lift: 0, flash: 6, flashColor: '#2ee8ff', sound: 'snap',
   },
+  // A sign shatter (#963): magenta shards of its lit face and dark frame chunks falling.
+  billboardBot: {
+    layers: [
+      layer({ shape: 'confetti', count: 22, colors: ['#ff2fb0', '#ff7ad2', '#ffd0ef'], glow: 2.4, speed: [50, 140], up: 30, drag: 2, gravity: 120, size: 4.5, spin: 12, hold: 0.5 }),
+      layer({ shape: 'chunk', count: 8, colors: ['#2a2e3a', '#3c4354', '#14161e'], speed: [25, 70], up: 30, drag: 0.6, gravity: 170, size: 5.5, spin: 8, hold: 0.7 }),
+    ],
+    lifetime: 1.6, scale: 1, lift: 0, flash: 6, flashColor: '#ff2fb0', sound: 'shatter',
+  },
 }
 
 /** Particles a style puts in each of the pool's two meshes. */

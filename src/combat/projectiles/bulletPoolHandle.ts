@@ -18,6 +18,8 @@ export interface Bullet extends PierceState<CollisionTarget> {
   /** The pool sets muzzleOffset on the first frame, once the gun has turned to the shot. */
   muzzlePending: boolean
   travelled: number
+  /** Fired while FRENZY was on: its hit counts toward the FRENZY medals by when it was fired, not when it lands (#904). */
+  firedInFrenzy: boolean
 }
 
 export interface BulletPoolHandle {

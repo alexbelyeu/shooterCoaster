@@ -1,5 +1,6 @@
 /** Title fly-by (#376, #419): camera shots taking turns, each blended into the next with a lift that clears the tents and flags. */
 import { CAR_SPACING, CARS, type TitleRide } from './titleCoaster'
+import { smoothstep } from '@/utils/ease'
 
 export type Vec3 = [number, number, number]
 export type TitleCameraMode = 'menu' | 'attract'
@@ -76,10 +77,6 @@ function trackingShot(_t: number, u: number, { ride, rideTime }: ShotContext, po
 const MENU_SHOTS: Shot[] = [orbitShot, chaseShot, dollyShot]
 const ATTRACT_SHOTS: Shot[] = [chaseShot, trackingShot, orbitShot]
 
-function smoothstep(x: number): number {
-  const c = Math.min(1, Math.max(0, x))
-  return c * c * (3 - 2 * c)
-}
 
 /** Shot `index` at time t; it is on screen from (index * shotS - blendS) to ((index + 1) * shotS). */
 function shotPose(shots: Shot[], shotS: number, blendS: number, index: number, t: number, ctx: ShotContext, pos: Vec3, target: Vec3) {

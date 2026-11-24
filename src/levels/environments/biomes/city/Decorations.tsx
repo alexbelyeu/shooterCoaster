@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import type { BiomeDecorationsProps } from '@/levels/environments/shared/types'
 import { trackExtent } from '@/levels/environments/shared/trackScatter'
 import StaticInstances from '@/levels/environments/shared/StaticInstances'
-import { CITY_REACH, layoutCity, layoutHeroTower } from './cityLayout'
+import { CITY_REACH, layoutCity, streetTowers } from './cityLayout'
 import { createNeonMaterial, createTowerGeometry, neonGeometry, towerMatrix, useNeonClock } from './cityNeon'
 import { createTowerMaterial } from './cityShaders'
 import Traffic from './Traffic'
@@ -13,9 +13,8 @@ export default function CityDecorations({ groundFn, track }: BiomeDecorationsPro
   const extent = useMemo(() => trackExtent(track), [track])
   const layout = useMemo(() => layoutCity(track, extent), [track, extent])
   const traffic = useMemo(() => {
-    const towers = [...layout.towers, ...layout.skyline, ...layoutHeroTower().tiers]
     // `terrainNoise`'s city is flat out past the skyline
-    return layoutTraffic(laneRuns(track, extent * CITY_REACH, towers), groundFn(0, 0))
+    return layoutTraffic(laneRuns(track, extent * CITY_REACH, streetTowers(layout)), groundFn(0, 0))
   }, [track, extent, layout, groundFn])
   useNeonClock()
   const towerGeometry = useMemo(createTowerGeometry, [])

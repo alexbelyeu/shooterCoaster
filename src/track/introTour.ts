@@ -10,6 +10,7 @@ import type { TrackCurve } from './curves/TrackCurve'
 import type { HeroShot } from './introCamera.hot'
 import { clampIntoBounds, type PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import { INTRO_SECONDS } from '@/core/introShot'
+import { smoothstep } from '@/utils/ease'
 
 /** A tour waypoint: where the camera is and the point it looks at there. */
 export interface TourShot {
@@ -75,7 +76,7 @@ const REVEAL_OUT = 1.5
 const REVEAL_TURN = 1.1
 const PASS_TURN = 0.45
 /** The pass goes by this many orbit radii out from the landmark. */
-const PASS_OUT = 1.3
+export const PASS_OUT = 1.3
 /** The reveal is at least this many track half-diagonals over the track's mean height: high enough to see the level. */
 const REVEAL_RISE = 0.3
 /** A track approach (`hero.approach`) is joined from this many times its length further back along the track's line. */
@@ -280,10 +281,6 @@ function pathDistances(pos: Float32Array, count: number): Float32Array {
   return dist
 }
 
-function smoothstep(x: number): number {
-  const t = Math.min(Math.max(x, 0), 1)
-  return t * t * (3 - 2 * t)
-}
 
 /** `passes` running means of `values` over ±`radius` of path length (`dist`, rising): three are close to a Gaussian. */
 function boxPasses(dist: Float32Array, values: Float32Array, radius: number, passes: number): Float32Array {

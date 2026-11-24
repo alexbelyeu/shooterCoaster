@@ -3,12 +3,11 @@ import type * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
 import type { RideSpeeds } from '@/track/ridePhysics'
-import type { DarkSectionSpec, WhaleBreachSpec } from '@/types/level'
+import type { DarkSectionSpec, SeaArchSpec, WhaleBreachSpec } from '@/types/level'
 import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
 import type { FogModifiers } from './sceneFog'
-import type { KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
-import type { Vec3 } from '@/utils/vec3'
+import type { SpotClearer, KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import type { HeroShot } from '@/track/introCamera.hot'
 
 /** One stop of a terrain colour ramp. */
@@ -64,6 +63,8 @@ export interface BiomeFeaturesProps {
   speeds: RideSpeeds
   /** The level's whale breach (`environment.whale`), when it asks for one (Ocean's Features). */
   whale?: WhaleBreachSpec
+  /** The level's sea arch over the rails (`environment.seaArch`), when it has one (Ocean's Features). */
+  seaArch?: SeaArchSpec
   /** The track's dark sections (#752), for a biome that builds round one (Arctic's ice cave). */
   darkSections?: readonly DarkSectionSpec[]
   atmosphere: AtmosphereConfig
@@ -146,8 +147,10 @@ export interface BiomeDefinition {
   bounds?: PlacementBounds
   /** Landmarks and big props a ground enemy stood away from the track keeps out of (`spawnPlacement.ts` `whereTheApproachLooks`), and a swimmer's circle (`swimOrbit.ts`). */
   keepOff?: (groundFn: HeightFunction, track: ArcTable) => readonly KeepOff[]
-  /** Moves an air enemy's placed spot out of the world's buildings (the city's towers, #323): scatter and formation alike. */
-  clearAir?: (groundFn: HeightFunction, track: ArcTable) => (p: Vec3) => Vec3
+  /** Moves an air enemy's placed spot out of the world's buildings (the city's towers, #323): scatter and formation alike, a formation's to where its approach sees it best (#871). */
+  clearAir?: (groundFn: HeightFunction, track: ArcTable) => SpotClearer
+  /** Moves a ground enemy's trackside spot onto open ground (the city's pavements, #963): `spawnPlacement.ts` `placeTracksideWave`. */
+  clearGround?: (groundFn: HeightFunction, track: ArcTable) => SpotClearer
   /** The hero landmark the intro's tour passes (#675) and the results orbit circles (#328). */
   hero: HeroShot
 }

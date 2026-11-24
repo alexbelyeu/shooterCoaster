@@ -18,6 +18,8 @@ interface SettingsState {
   bystanderHintSeen: boolean
   /** Draw the level's best run's aim beside the player's (`ui/hud/GhostCrosshair`, #844). */
   ghost: boolean
+  /** Phone haptics on kills and boss hits (`input/useHaptics`, #995); reduced motion forces it off. */
+  vibration: boolean
   setMusicVolume: (v: number) => void
   setSfxVolume: (v: number) => void
   setShowFPS: (v: boolean) => void
@@ -27,6 +29,7 @@ interface SettingsState {
   setReducedMotion: (v: boolean) => void
   setBystanderHintSeen: (v: boolean) => void
   setGhost: (v: boolean) => void
+  setVibration: (v: boolean) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -41,6 +44,7 @@ export const useSettingsStore = create<SettingsState>()(
       reducedMotion: false,
       bystanderHintSeen: false,
       ghost: true,
+      vibration: true,
       setMusicVolume: (v) => set({ musicVolume: v }),
       setSfxVolume: (v) => set({ sfxVolume: v }),
       setShowFPS: (v) => set({ showFPS: v }),
@@ -50,6 +54,7 @@ export const useSettingsStore = create<SettingsState>()(
       setReducedMotion: (v) => set({ reducedMotion: v }),
       setBystanderHintSeen: (v) => set({ bystanderHintSeen: v }),
       setGhost: (v) => set({ ghost: v }),
+      setVibration: (v) => set({ vibration: v }),
     }),
     { name: 'shootercoaster-settings' },
   ),

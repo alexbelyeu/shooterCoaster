@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Deploy health check (#352): did this deploy arrive intact? Checks `assets`, `routes`, `title`, `level`, `phone`
+ * Deploy health check (#352): did this deploy arrive intact? Checks `assets`, `routes`, `title`, `level`, `phone`, `offline`
  * (what each covers: e2e/README.md "Production") and rewrites `prod-check.json` after each, for scripts/prod-alert.cjs.
  *   npm run build && node e2e/prod-check.mjs --url https://scoaster.com
  *   npm run build && node e2e/prod-check.mjs     # serves dist/ on localhost the way vercel.json says
+ *   npm run build && node e2e/prod-check.mjs --checks assets,routes,offline   # a subset (CI's `offline` job, #1004)
  */
 import { devices } from 'playwright'
 import fs from 'node:fs'
@@ -11,6 +12,7 @@ import http from 'node:http'
 import path from 'node:path'
 import { launchBrowser } from '../scripts/headless.mjs'
 import { assetRefs, leaderboardApiProblems, missingAssets, responseProblems } from '../scripts/prodCheckRules.mjs'
+import { readManifest } from '../scripts/swPrecache.mjs'
 import { headersFor, route } from '../scripts/vercelRoutes.mjs'
 import { TITLE_UI, ignored, imageStats, looksBlank, tapCentre, waitFrames, waitVisible } from './pageChecks.mjs'
 
@@ -25,6 +27,13 @@ const OUT = path.resolve(args.out ?? 'e2e-results')
 const LEVEL = args.level ?? 'level1'
 const SEED = Number(args.seed ?? 1337)
 const SHOT_TIMEOUT = 120000
+const ALL_CHECKS = ['assets', 'routes', 'title', 'level', 'phone', 'offline']
+const CHECKS = args.checks ? args.checks.split(',') : ALL_CHECKS
+const unknown = CHECKS.filter((c) => !ALL_CHECKS.includes(c))
+if (unknown.length) {
+  console.error(`Unknown --checks ${unknown.join(', ')}; known: ${ALL_CHECKS.join(', ')}`)
+  process.exit(2)
+}
 const vercel = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
 fs.mkdirSync(OUT, { recursive: true })
 
@@ -33,6 +42,7 @@ const save = () => fs.writeFileSync(path.join(OUT, 'prod-check.json'), JSON.stri
 
 /** A throw is a failed check, not a crash. */
 async function check(id, fn) {
+  if (!CHECKS.includes(id)) return
   report.running = id
   save()
   const started = Date.now()
@@ -110,6 +120,11 @@ async function assetsCheck(base) {
     frontier = await fetchAll(refs)
   }
   await fetchAll(['/', ...local.filter((p) => !p.startsWith('/assets/'))])
+  // The service worker (#999) names every file it precaches, the chunks no dep map lists among them.
+  const sw = fetched.get('/sw.js')
+  const precache = sw?.status === 200 ? readManifest(sw.body.toString()) : null
+  if (!precache) problems.push('/sw.js: no precache list')
+  else await fetchAll(precache.files)
   const deployedAssets = [...fetched.keys()].filter((p) => p.startsWith('/assets/'))
   for (const p of missingAssets(localAssets, deployedAssets)) problems.push(`${p}: no file of that name in the deployed build`)
   for (const [p, r] of fetched) problems.push(...responseProblems(p, r, vercel))
@@ -246,6 +261,34 @@ async function phoneCheck(browser, base) {
   return { problems, summary: `${LEVEL} tap shots=${shots} kills=${after.kills - before.kills}` }
 }
 
+/** The service worker (#999): once it controls the page, the game loads and rides with the network off. */
+async function offlineCheck(browser, base) {
+  const { ctx, page, errors } = await openPage(browser, base, 'e2e=1&sw=1')
+  const problems = []
+  // `clients.claim` runs after install precached everything: control means the build is in the cache.
+  if (!(await pollFor(page, () => page.evaluate(() => !!navigator.serviceWorker?.controller), 60000))) {
+    await ctx.close()
+    return { problems: ['no service worker took control of the page in 60 s'] }
+  }
+  const online = errors.length
+  await ctx.setOffline(true)
+  await page.reload({ waitUntil: 'load' })
+  await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 60000 })
+  if (!(await waitVisible(page, '.title-screen .title-play'))) problems.push('offline: no PLAY button')
+  await page.screenshot({ path: path.join(OUT, 'prod-offline-title.png'), timeout: SHOT_TIMEOUT })
+  await page.evaluate(([id, seed]) => window.__SC_TEST__.startLevel(id, seed), [LEVEL, SEED])
+  const wait = await waitFrames(page, 10, { minMs: 4000, maxMs: 40000, pollMs: 500 })
+  if (!(await pollFor(page, async () => (await stats(page)).onScreenEnemies > 0, 40000))) problems.push(`offline: no enemy on screen in ${LEVEL}`)
+  await page.screenshot({ path: path.join(OUT, 'prod-offline-ride.png'), timeout: SHOT_TIMEOUT })
+  // Expected offline: the board's calls failing and the reload aborting the old page's requests.
+  errors.push(...(await hookErrors(page)))
+  problems.push(...errors.slice(online).filter((e) => !e.includes('/api/') && !e.startsWith('net::ERR_ABORTED')).slice(0, 5).map((e) => `offline: ${e}`))
+  // robots.txt isn't precached: it loading would mean the network was never off.
+  if (await page.evaluate(() => fetch('/robots.txt', { cache: 'no-store' }).then(() => true, () => false))) problems.push('the network stayed up: robots.txt loaded "offline"')
+  await ctx.close()
+  return { problems, summary: `${LEVEL} offline frames=${wait.frames}` }
+}
+
 async function run() {
   const started = Date.now()
   const local = args.url ? null : await serveDist()
@@ -254,11 +297,14 @@ async function run() {
   console.log(`Deploy health check of ${base} (local build: ${path.relative(process.cwd(), DIST) || '.'})`)
   await check('assets', () => assetsCheck(base))
   await check('routes', () => routesCheck(base))
-  const browser = await launchBrowser(['--autoplay-policy=no-user-gesture-required'])
-  await check('title', () => titleCheck(browser, base))
-  await check('level', () => levelCheck(browser, base))
-  await check('phone', () => phoneCheck(browser, base))
-  await browser.close()
+  if (CHECKS.some((c) => !['assets', 'routes'].includes(c))) {
+    const browser = await launchBrowser(['--autoplay-policy=no-user-gesture-required'])
+    await check('title', () => titleCheck(browser, base))
+    await check('level', () => levelCheck(browser, base))
+    await check('phone', () => phoneCheck(browser, base))
+    await check('offline', () => offlineCheck(browser, base))
+    await browser.close()
+  }
   local?.server.close()
   report.finished = true
   save()

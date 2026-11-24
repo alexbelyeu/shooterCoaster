@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { STREET_GRID } from './cityLayout'
+import { STREET_GRID } from './config'
 
 /**
  * Neon Metropolis's two patched materials (#323): the towers' window grid and the wet asphalt with its street grid.

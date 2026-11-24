@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { particleShare } from '@/canvas/graphicsQuality'
 import { isCoarsePointer, useQualityProfile } from '@/canvas/useRenderBudget'
-import { createCarGeometry, createCarMaterial } from './cityNeon'
+import { createCarGeometry, createCarMaterial } from './carModel'
 import { writeTraffic } from './traffic.hot'
 import type { Traffic as TrafficLayout } from './trafficPaths'
 

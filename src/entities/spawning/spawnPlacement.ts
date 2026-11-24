@@ -4,7 +4,7 @@ import type { HardRoute } from '@/track/mechanics'
 import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { waveWindows } from './waveSchedule'
-import type { HeightFunction } from '@/utils/terrainNoise'
+import { sightClear, type HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import type { Vec3 } from '@/utils/vec3'
 import { maxReadableDistance } from '../enemies/enemyReadability'
@@ -467,7 +467,7 @@ export interface PlaceWaveInput {
   ride: RideAhead
   bounds?: PlacementBounds
   /** Moves an air member's spot out of the world's buildings (`BiomeDefinition.clearAir`). */
-  clearAir?: (p: Vec3) => Vec3
+  clearAir?: SpotClearer
 }
 
 /** World placements for a formation wave's slots, in slot order. */
@@ -476,7 +476,6 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
   // Inside an interior's walls, back on its surface (a clamped air slot keeps its clearance under the roof).
   const keepIn = (p: Vec3) => (bounds ? clampToBounds(settle(clampToBounds(p, bounds), surface, groundFn), bounds) : p)
   const surface = ENEMY_PLACEMENT[type].surface
-  const clear = surface === 'air' && clearAir ? clearAir : (p: Vec3) => p
   const reach = maxReadableDistance(type)
   const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
   const step = groupStep(table, formation, groups, ride)
@@ -512,8 +511,11 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
       position = settle(slotWorld(formation, f, local), surface, groundFn)
     }
     const { from, spin } = entryStart(formation, f, position, groundFn)
+    const placed = keepIn(outsideNearField(keepIn(position), camera))
+    // Seen by the looks from where the group is framed (`formationFrame`) on
+    const lands = slot.group * step + ride.entry + VIEW_LEAD
     return {
-      position: clear(keepIn(outsideNearField(keepIn(position), camera))),
+      position: surface === 'air' && clearAir ? clearAir(placed, (q) => eyesSeeing(table, riderIndex, lands, q, reach, ride.trackScale)) : placed,
       from: keepIn(outsideNearField(keepIn(from), camera)),
       spin,
       entrySeconds: ENTRY_SECONDS + (ENTRY_STAGGER * slot.index) / Math.max(1, slot.groupSize - 1),
@@ -688,9 +690,11 @@ export interface PlaceTracksideInput {
   ride: RideAhead
   bounds?: PlacementBounds
   keepOff?: readonly KeepOff[]
+  /** Moves a ground spot onto open ground (`BiomeDefinition.clearGround`: the city's pavements), given the eyes that see a spot. */
+  clearGround?: SpotClearer
 }
 
-export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride, bounds, keepOff = [] }: PlaceTracksideInput): Vec3[] {
+export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride, bounds, keepOff = [], clearGround }: PlaceTracksideInput): Vec3[] {
   const { surface, roam = 0 } = ENEMY_PLACEMENT[type]
   const reach = maxReadableDistance(type)
   return slots.map((slot) => {
@@ -698,7 +702,10 @@ export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, 
     const p = surface === 'water'
       ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale, ORBITS[type] ? keepOff : null)
       : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale, bounds, keepOff, roam)
-    const placed = outsideNearField(settle(p, surface, groundFn), camera)
+    const open = surface === 'ground' && clearGround
+      ? clearGround(settle(p, surface, groundFn), (q) => eyesSeeing(table, riderIndex, at.ahead, settle(q, surface, groundFn), reach, ride.trackScale, groundFn))
+      : p
+    const placed = outsideNearField(settle(open, surface, groundFn), camera)
     const out = surface === 'ground' ? groundedOutsideNearField(placed, camera, groundFn) : placed
     return bounds && !insideBounds(out, bounds) ? settle(clampToBounds(out, bounds), surface, groundFn) : out
   })
@@ -744,14 +751,14 @@ function dryTracksidePoint(
     for (const side of [offset, -offset]) {
       const p = tracksidePoint(table, riderIndex, { ahead: slot.ahead, side })
       if (bounds && !insideBounds(p, bounds)) continue
-      if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)) return p
+      if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale, groundFn)) return p
     }
   }
   const around = bestFacingAround(table, riderIndex, slot, surface, groundFn, reach, trackScale, bounds)
-  if (around && inViewOnApproach(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale)) return around
+  if (around && inViewOnApproach(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale, groundFn)) return around
   // Not in an interior: its boulders and pieces stand on the floor, and nothing keeps a spot off them.
   const looked = bounds ? null : whereTheApproachLooks(table, riderIndex, slot, surface, groundFn, reach, trackScale, keepOff, roam)
-  const aroundSeen = around ? looksInView(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale) : -1
+  const aroundSeen = around ? eyesSeeing(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale, groundFn).length : -1
   return (looked && looked.seen > aroundSeen ? looked.p : around) ?? clampToBounds(tracksidePoint(table, riderIndex, slot), bounds)
 }
 
@@ -763,7 +770,7 @@ const LOOK_SPOT_STEP = 100
  * A blind approach (#494: Desert's opening climb, pitched at the sky, the track beyond its crest dropping and turning
  * away): no spot near the slot's stretch of track is in view while the rider closes on it. The spot out along the look
  * from the middle of that approach instead, offset by the slot's side: off every rail and `roam` (how far the enemy
- * wanders from its spot, #708) out of `keepOff`, at the distance the most of the approach's looks see (`looksInView`;
+ * wanders from its spot, #708) out of `keepOff`, at the distance the most of the approach's looks see (`eyesSeeing`;
  * the nearest of equals). Null if none is.
  */
 function whereTheApproachLooks(
@@ -777,19 +784,28 @@ function whereTheApproachLooks(
     const p = { x: eye.x + look.x * d - look.z * slot.side, y: 0, z: eye.z + look.z * d + look.x * slot.side }
     if (!clearOfKeepOff(p, keepOff, roam)) continue
     if (!clearOfTrack(table, p, TRACKSIDE.ground.sideMin)) continue
-    const seen = looksInView(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)
+    const seen = eyesSeeing(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale, groundFn).length
     if (seen > (best?.seen ?? 0)) best = { p, seen }
   }
   return best
 }
 
-/** How many of the approach's looks, every `FACING_STEP` from `VIEW_LEAD` to `FACING_LAST` before the slot, have `p` in their cone. */
-function looksInView(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): number {
-  let seen = 0
+/**
+ * A biome's move of a spot `p` out of its buildings: a ground enemy onto open ground (#963), an air enemy into open air
+ * (#871). `eyesSeeing` gives, for a candidate spot, the eyes of the approach's looks that have it in their cone, so the
+ * biome can pick the one its own buildings hide least; without it (a scatter wave has no approach) the nearest clear spot.
+ */
+export type SpotClearer = (p: Vec3, eyesSeeing?: (q: Vec3) => Vec3[]) => Vec3
+
+/** The eyes of the approach's looks, every `FACING_STEP` from `VIEW_LEAD` to `FACING_LAST` before the slot, that have `p` in their cone. */
+function eyesSeeing(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number, ground?: HeightFunction): Vec3[] {
+  const eyes: Vec3[] = []
   for (let at = Math.max(0, ahead - VIEW_LEAD); at <= ahead - FACING_LAST; at += FACING_STEP) {
-    if (lookCos(table, riderIndex, at, p, reach, trackScale) >= APPROACH_CONE_COS) seen++
+    if (lookCos(table, riderIndex, at, p, reach, trackScale, ground) >= APPROACH_CONE_COS) {
+      eyes.push(trackView(table, indexAhead(table, riderIndex, at), trackScale).eye)
+    }
   }
-  return seen
+  return eyes
 }
 
 /** `clearOfTrack` checks every sixth track sample (~20 units apart on Desert's lap). */
@@ -828,7 +844,7 @@ function bestFacingAround(
       const p = { x: table.x[i] - forward.z * right + forward.x * along, y: 0, z: table.z[i] + forward.x * right + forward.z * along }
       if (bounds && !insideBounds(p, bounds)) continue
       if (!clearOfRails(table, i, p, sideMin)) continue
-      const f = approachFacing(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)
+      const f = approachFacing(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale, groundFn)
       if (f > bestFacing) {
         best = p
         bestFacing = f
@@ -883,10 +899,12 @@ function wetTracksidePoint(
   return wet ?? tracksidePoint(table, riderIndex, slot)
 }
 
-function inViewOnApproach(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): boolean {
+function inViewOnApproach(
+  table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number, ground?: HeightFunction,
+): boolean {
   const from = Math.max(0, ahead - VIEW_LEAD)
-  return lookCos(table, riderIndex, from, p, reach, trackScale) >= APPROACH_CONE_COS
-    && lookCos(table, riderIndex, from + VIEW_HOLD, p, reach, trackScale) >= APPROACH_CONE_COS
+  return lookCos(table, riderIndex, from, p, reach, trackScale, ground) >= APPROACH_CONE_COS
+    && lookCos(table, riderIndex, from + VIEW_HOLD, p, reach, trackScale, ground) >= APPROACH_CONE_COS
 }
 
 /** The looks `approachFacing` sums: every `FACING_STEP` from the second look of `inViewOnApproach` to `FACING_LAST` before the slot. */
@@ -894,20 +912,31 @@ const FACING_STEP = 100
 const FACING_LAST = 300
 
 /** How squarely the rider faces `p` over the near approach, summed over its looks. */
-function approachFacing(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): number {
+function approachFacing(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number, ground?: HeightFunction): number {
   let sum = 0
   for (let at = Math.max(0, ahead - VIEW_LEAD + VIEW_HOLD); at <= ahead - FACING_LAST; at += FACING_STEP) {
-    sum += lookCos(table, riderIndex, at, p, reach, trackScale)
+    sum += lookCos(table, riderIndex, at, p, reach, trackScale, ground)
   }
   return sum
 }
 
-/** Cosine between the rider's look `at` past `riderIndex` and the way to `p`; -1 past `reach`. */
-function lookCos(table: ArcTable, riderIndex: number, at: number, p: Vec3, reach: number, trackScale: number): number {
+/** Cosine between the rider's look `at` past `riderIndex` and the way to `p`; -1 past `reach` or, given its `ground`, behind it. */
+function lookCos(table: ArcTable, riderIndex: number, at: number, p: Vec3, reach: number, trackScale: number, ground?: HeightFunction): number {
   const { eye, dir } = trackView(table, indexAhead(table, riderIndex, at), trackScale)
   const d = sub(p, eye)
   const len = Math.hypot(d.x, d.y, d.z)
-  return len > reach ? -1 : dot(d, dir) / len
+  if (len > reach) return -1
+  return ground && !terrainClear(eye, p, ground) ? -1 : dot(d, dir) / len
+}
+
+/** Height over its foot of the point a ground slot is sighted at: the body, not the snow it stands in. */
+const SIGHT_HEIGHT = 25
+/**
+ * No terrain over the line from `eye` to `SIGHT_HEIGHT` over `p` (#937): Antarctica's valley walls and ridges hid most
+ * of its trackside snowmen from the rider who was looking right at them.
+ */
+function terrainClear(eye: Vec3, p: Vec3, ground: HeightFunction): boolean {
+  return sightClear(ground, eye.x, eye.y, eye.z, p.x, p.y + SIGHT_HEIGHT, p.z)
 }
 
 /** Point on an entry path at `t` (0–1, eased out); `spin` unwinds the horizontal offset around `from`. */
@@ -963,17 +992,18 @@ const SWARM_VIEWS = 6
 /** A group is judged from the rider's views over this long from its arrival: about as long as it takes to clear. */
 const SWARM_GROUP_SECONDS = 1.5
 /**
- * A swarm's groups land evenly from the wave's tell to this long after its window closes (#948): the rider clears a small
- * group in about a second, so the last holds the stretch while the next wave is still arriving.
+ * A swarm's groups land evenly from the wave's tell to this long after its window closes (#948, #957): the rider clears a
+ * small group in about a second, so the late ones hold the stretch while the next wave is still out of sight (on level 6,
+ * the Shield's top, its stop and the auto belay's fall to the pit, where the pack is first seen).
  */
-const SWARM_LAST_LATE = 1
+const SWARM_LAST_LATE = 5.5
 /**
  * A swarm splits into groups of at least `SWARM_GROUP_MIN`, up to `SWARM_GROUPS`, each round the spot the rider sees most
  * while that group is in play (#768), from the moment it arrives (#928): on level 6, one after another on the walls beside
- * the car up Alaska, then on the roof over its top as it rolls over (#948), the last on the Starr past the crest, so new
- * ones keep landing in frame through the wave, not one burst.
+ * the car up Alaska, then on the roof over its top as it rolls over (#948), the last ones on the Starr and the Shield the
+ * car looks at from the Shield's top and on its fall (#957), so new ones keep landing in frame through the wave, not one burst.
  */
-const SWARM_GROUPS = 7
+const SWARM_GROUPS = 12
 const SWARM_GROUP_MIN = 3
 /** Candidate centres across and up each wall, about this far apart. */
 const SWARM_CANDIDATE_STEP = 80
@@ -1028,7 +1058,7 @@ function bestSwarmSpot(walls: readonly WallSurface[], views: readonly RiderFrame
  * stretch starts, so the wave is a stretch of shooting (#928).
  */
 export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: PlaceSwarmInput): WallSlot[] {
-  if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+  if (walls.length === 0) throw new Error("wall enemies need the ride's walls (LevelRide.walls)")
   const reach = maxReadableDistance(type)
   const groups = Math.max(1, Math.min(SWARM_GROUPS, Math.floor(slots.length / SWARM_GROUP_MIN)))
   const arrivals = Array.from({ length: groups }, (_, g) => swarmArrival(ride, g, groups))
@@ -1056,8 +1086,8 @@ export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: 
 
 /**
  * Seconds after its wave activates that group `g` of a swarm lands: the first with the wave, the rest evenly after it, the
- * last `SWARM_LAST_LATE` after the window closes, for the stretch after it (on level 6, the Starr past the crest while the
- * next wave, the pack, is still out of sight in the pit). No window: every group at once.
+ * last `SWARM_LAST_LATE` after the window closes, for the stretch after it (on level 6, the Starr and the Shield from the
+ * crest to the bottom of the drop while the next wave, the pack, is still out of sight in the pit). No window: every group at once.
  */
 function swarmArrival(ride: RideAhead, g: number, groups: number): number {
   const seconds = ride.seconds ?? 0

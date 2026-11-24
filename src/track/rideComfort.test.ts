@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { COMFORT, comfortProblems, rideComfort } from './rideComfort'
 
@@ -10,7 +10,7 @@ import { COMFORT, comfortProblems, rideComfort } from './rideComfort'
 const KNOWN_OVER: Record<string, string> = {}
 
 describe('ride comfort: no level turns the rider\'s view faster than the eye can follow', () => {
-  const rows = getAllLevels().map((level) => ({ id: level.id, problems: comfortProblems(rideComfort(level.track, RUN_SECONDS)) }))
+  const rows = shippedLevels().map((level) => ({ id: level.id, problems: comfortProblems(rideComfort(level.track, RUN_SECONDS)) }))
 
   it(`no 2 s over ${COMFORT.twoSecondMax}°/s, at most ${COMFORT.fastSeconds} s over ${COMFORT.fastSecond}°/s, no snap over ${COMFORT.snapMax}°/s`, () => {
     for (const r of rows.filter((r) => KNOWN_OVER[r.id] && r.problems.length)) console.warn(`ride comfort ${r.id} (known, ${KNOWN_OVER[r.id]}): ${r.problems.join('; ')}`)
@@ -24,7 +24,7 @@ describe('ride comfort: no level turns the rider\'s view faster than the eye can
 
 describe('storyboard beats are inside the run (#925, docs/RIDE-KIT.md "What the rider must see" 6)', () => {
   it('no level lands a beat after its run ends', () => {
-    const late = getAllLevels().flatMap((level) =>
+    const late = shippedLevels().flatMap((level) =>
       (level.track.rideV2?.beats ?? []).filter((b) => b.second > RUN_SECONDS).map((b) => `${level.id} beat at ${b.second} s`),
     )
     expect(late).toEqual([])

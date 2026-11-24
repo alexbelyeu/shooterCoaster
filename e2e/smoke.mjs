@@ -95,11 +95,11 @@ import { devices } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
 import { arg, launchBrowser, startPreview, stopPreview } from '../scripts/headless.mjs'
-import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitFrames, waitVisible } from './pageChecks.mjs'
+import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitDrawsSettled, waitFrames, waitVisible } from './pageChecks.mjs'
 import { planRun, STEP_LEVELS } from './shards.mjs'
 import { growthMoments, programGateProblem, throttleReport } from './slowPass.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
-import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline, samplingCutShort } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
 import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
@@ -562,11 +562,17 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
 
   // With `leaderboard`, seed nine entries so this run places 4th, in the same turn as the end so the score can't move.
   const seeding = await page.evaluate(
-    ([lid, seed, endpoint]) => {
+    ([lid, seed, endpoint, medal]) => {
       const t = window.__SC_TEST__
       t.holdLevelTime = false
       const phase = t.phase()
       if (phase !== 'playing') return { phase, rank: null }
+      // #879: for the results board, one more kill on a chain primed to the longest medal chain wins the level's combo medal.
+      let noMedalKill = false
+      if (medal) {
+        t.primeCombo(t.longestComboMedal - 1)
+        noMedalKill = t.killNearest(1) === 0
+      }
       const score = Math.round(t.stats().score)
       const seeded = seed && score > 0
       const above = [3000, 2000, 1000].map((d) => score + d)
@@ -577,12 +583,13 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
         t.setLeaderboards({ [lid]: [...above, ...below].map(row) }, 'AAA')
       }
       t.endLevel()
-      return { phase, rank: seeded ? above.length : null }
+      return { phase, rank: seeded ? above.length : null, noMedalKill }
     },
-    [id, leaderboard, online ? ONLINE_ENDPOINT : null],
+    [id, leaderboard, online ? ONLINE_ENDPOINT : null, resultsScreen],
   )
   // With the level timer held this can't happen; if it does, say so instead of failing the board checks on it.
   if (seeding.phase !== 'playing') problems.push(`level left play (${seeding.phase}) before the results checks, with the level timer held`)
+  if (seeding.noMedalKill) problems.push('no enemy left to win the combo medal (killNearest found none)')
   const seededRank = seeding.rank
   // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
   const resultsShown = await page
@@ -947,6 +954,8 @@ async function resultsScreenProblems(page, id, stats, { share }) {
       nextLevel: next ? { id: next.id, unlocked: next.unlocked } : null,
       keys: el.querySelector('.results-keys')?.textContent ?? '',
       score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent,
+      medals: [...el.querySelectorAll('.results-medal')].map((m) => m.dataset.medal), medalsWon: s.medalsWon(),
+      saved: Object.keys(JSON.parse(localStorage.getItem('shootercoaster-scores') ?? '{}').state?.savedMedals ?? {}),
     }
   })
   const problems = []
@@ -975,6 +984,10 @@ async function resultsScreenProblems(page, id, stats, { share }) {
     shown.scoreCards = cards.sizes
   }
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
+  // #879: the board shows the medals the run won (the run primed a medal chain, so at least one) and saves them.
+  if (screen.medals.length === 0) problems.push(`results board shows no medal (the run won ${JSON.stringify(screen.medalsWon)})`)
+  if (JSON.stringify(screen.medals) !== JSON.stringify(screen.medalsWon)) problems.push(`results medals ${JSON.stringify(screen.medals)} != won ${JSON.stringify(screen.medalsWon)}`)
+  if (screen.medals.length > 0 && !screen.saved.includes(id)) problems.push(`${id}'s medals ${JSON.stringify(screen.medals)} weren't saved`)
   for (const stat of ['hits', 'accuracy', 'combo', 'time']) {
     if (!(stat in screen.rows)) problems.push(`results screen has no "${stat}" line`)
   }
@@ -2481,7 +2494,7 @@ async function pacingCheck(page, id) {
   pacing.boss = bossFraming(samples, end)
   const shaders = await programsAfterWarmup(page)
   gatePrograms(problems, shaders)
-  if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
+  if (samplingCutShort(samples, end, PACING_STEP)) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   const budget = BUDGETS.pacing?.[id]
   // A placeholder is filled by the caller once the page's errors are counted too (`fillPlaceholderBudget`).
   const placeholder = isPlaceholder(budget) ? pacing : null
@@ -2924,8 +2937,7 @@ async function darkSectionShot(page, levelId, { shots: shoot = false } = {}) {
 /** The dark shots' floors: the share of the frame that is dark, of saturated bright pixels (the blacklit glow), and how much the flash brightens the frame's mean (0–255). */
 const DARK_SHOT = { dark: 0.4, glow: 0.002, flash: 3 }
 
-/** `branchWave`: the hard route's own wave (#720, `LevelRegistry.ts` level6's `branch`): its banner, size and second. */
-const SWITCH_CHECK = { level: STEP_LEVELS.switch[0], branchWave: { label: 'Pad Rats!', count: 8, at: 17 } }
+const SWITCH_CHECK = { level: STEP_LEVELS.switch[0] }
 /** On-screen rats on the branch the hard run must see once its wave is in. */
 const BRANCH_WAVE_ON_SCREEN = 2
 /** Track-parameter leads behind the switch sign to park the coaster at. */
@@ -2940,7 +2952,7 @@ const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
  * Tree's gap still (`gapShot`), which are too slow for the PR's `level6` shard (#766).
  */
 async function switchCheck(page, { darkShots = false } = {}) {
-  const { level, branchWave } = SWITCH_CHECK
+  const { level } = SWITCH_CHECK
   const problems = []
   const api = (fn, arg) => page.evaluate(fn, arg)
   /** Jumps the held level timer to `seconds` in one frame and lets the waves due by then tell and arrive, the ride held. */
@@ -2988,6 +3000,9 @@ async function switchCheck(page, { darkShots = false } = {}) {
   if (!(await start())) return { id: 'switch', problems: [NOT_LOADED(level)] }
   let sw = await read()
   if (!sw) return { id: 'switch', problems: [`${level} has no switch (trackSwitch() is null)`] }
+  // The hard route's own wave (#720, the level's roster `branch`), read from the game so a re-timed fork can't drift from it.
+  const { branchWave } = sw
+  if (!branchWave) return { id: 'switch', problems: [`${level} has a switch but no hard-route wave`] }
   const mid = (sw.from + sw.to) / 2
   const result = { t: sw.t, lead: null, px: null, hard: null, easy: null, branchRats: null, totals: { hard: null, easy: null } }
 
@@ -3065,10 +3080,13 @@ async function levelSelectCheck(page, levels) {
     Object.values(scores).map((e, i) => [e.level, [{ initials: champions[i], score: e.score, stars: e.stars, date: 1 }]]),
   )
   // Reloaded so the cards come back from localStorage.
-  await page.evaluate(([s, b]) => {
+  // #879: the first level has won two of its three medals.
+  const firstMedals = 2
+  await page.evaluate(([s, b, lid, n]) => {
     window.__SC_TEST__.setSavedScores(s)
     window.__SC_TEST__.setLeaderboards(b)
-  }, [scores, boards])
+    window.__SC_TEST__.setSavedMedals({ [lid]: window.__SC_TEST__.levelMedalIds(lid).slice(0, n) })
+  }, [scores, boards, levels[0].id, firstMedals])
   await page.reload({ waitUntil: 'load' })
   await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
   await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
@@ -3093,6 +3111,9 @@ async function levelSelectCheck(page, levels) {
       initials: cards.filter((c) => !c.classList.contains('level-card-daily')).map((c) => c.querySelector('.level-card-initials')?.textContent ?? null),
       hScroll: root ? root.scrollWidth > root.clientWidth : true,
       focused: document.activeElement?.dataset?.level ?? null,
+      medals: cards
+        .filter((c) => !c.classList.contains('level-card-daily'))
+        .map((c) => [c.querySelectorAll('.level-medal').length, c.querySelectorAll('.level-medal[data-earned="true"]').length]),
     }
   })
   // One card per level plus the Daily Run card (#184).
@@ -3106,14 +3127,19 @@ async function levelSelectCheck(page, levels) {
   if (JSON.stringify(layout.initials) !== JSON.stringify(expectInitials))
     problems.push(`card initials ${JSON.stringify(layout.initials)} after a reload, expected ${JSON.stringify(expectInitials)}`)
   if (layout.hScroll) problems.push('level select scrolls sideways')
+  const expectMedals = levels.map((_, i) => (i >= expectOpen ? [0, 0] : [3, i === 0 ? firstMedals : 0]))
+  if (JSON.stringify(layout.medals) !== JSON.stringify(expectMedals))
+    problems.push(`card medals [shown, won] ${JSON.stringify(layout.medals)} after a reload, expected ${JSON.stringify(expectMedals)}`)
 
   const focused = () => page.evaluate(() => document.activeElement?.dataset?.level ?? null)
   const target = levels[Math.min(2, levels.length - 1)].id
+  problems.push(...featsProblems(await page.evaluate(shownFeats), target, 'at open'))
   if (layout.focused !== target) problems.push(`initial focus on ${layout.focused}, expected ${target}`)
   let keyboard = null
   if (levels.length >= 4) {
     await page.keyboard.press('ArrowLeft')
     const left = await focused()
+    problems.push(...featsProblems(await page.evaluate(shownFeats), levels[1].id, 'after ArrowLeft'))
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('ArrowRight')
     const locked = await focused()
@@ -3139,6 +3165,27 @@ async function levelSelectCheck(page, levels) {
     if (after.phase !== 'playing' || after.level !== target) problems.push(`Enter started ${after.level} (${after.phase}), expected ${target}`)
   }
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
+}
+
+/** The level select's medal tickets on screen (#978): each shown one's card, feat count and whether it stays in the viewport. */
+function shownFeats() {
+  return [...document.querySelectorAll('.level-feats')]
+    .filter((t) => t.getBoundingClientRect().height > 0)
+    .map((t) => {
+      const r = t.getBoundingClientRect()
+      return {
+        level: t.closest('.level-card')?.dataset.level ?? null,
+        feats: [...t.querySelectorAll('.level-feat-line')].filter((l) => l.textContent.trim()).length,
+        inView: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
+      }
+    })
+}
+
+/** One ticket out, the focused card's, with its three feats on screen. */
+function featsProblems(shown, level, when) {
+  if (shown.length !== 1 || shown[0].level !== level) return [`medal tickets ${when} ${JSON.stringify(shown)}, expected only ${level}'s`]
+  const [t] = shown
+  return t.feats === 3 && t.inView ? [] : [`${level}'s medal ticket ${when} ${JSON.stringify(t)}, expected 3 feats on screen`]
 }
 
 /** Click the level select's Daily card (#184) and return the run it started and its spawnDigest(). */
@@ -3288,6 +3335,8 @@ async function settingsLayout(page, label, { fromTitle = false } = {}) {
       quality: [...document.querySelectorAll('[aria-labelledby="settings-quality-label"] [role="radio"]')].map((el) => el.textContent),
       sliders: document.querySelectorAll('.settings-card input[type="range"]').length,
       switches: document.querySelectorAll('.settings-card input[role="switch"]').length,
+      // The Vibration toggle (#995) shows only on a touch-first device that can vibrate (the phone run).
+      vibration: typeof navigator.vibrate === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches,
       smallTargets: targets.filter((el) => el.getBoundingClientRect().height < 44).length,
     }
   })
@@ -3298,8 +3347,9 @@ async function settingsLayout(page, label, { fromTitle = false } = {}) {
   if (r.hScroll) problems.push('settings scroll sideways')
   if (r.quality.length !== 4) problems.push(`${r.quality.length} quality options (${r.quality.join('/')}), expected Auto / Low / Med / High`)
   if (r.sliders !== 2) problems.push(`${r.sliders} volume sliders, expected music + effects`)
-  const switches = fromTitle ? 4 : 3
-  if (r.switches !== switches) problems.push(`${r.switches} switches, expected show FPS + ghost + reduced motion${fromTitle ? ' + internal device' : ''}`)
+  const switches = 3 + (r.vibration ? 1 : 0) + (fromTitle ? 1 : 0)
+  if (r.switches !== switches)
+    problems.push(`${r.switches} switches, expected show FPS + ghost + reduced motion${r.vibration ? ' + vibration' : ''}${fromTitle ? ' + internal device' : ''}`)
   if (r.smallTargets) problems.push(`${r.smallTargets} settings control(s) under the 44 px touch target`)
   return { ...r, problems: problems.map((p) => `${label}: ${p}`) }
 }
@@ -3378,13 +3428,20 @@ async function settingsCheck(page) {
 async function qualityCheck(newPage, levelId) {
   const sample = async (query, png) => {
     const { ctx, page, errors } = await newPage(query, { deviceScaleFactor: 2 })
-    const ready = await startLevelReady(page, levelId)
-    await waitFrames(page, 2, { minMs: 1500, maxMs: 30000 })
+    // Held at its start from its first frame (level timer, game clock and ride at 0, as `tourShots`): however long a
+    // runner takes to load the level, no enemy flies in and no effect ages before the count (#972: 77 vs 91 draws).
+    await page.evaluate(([lid, seed]) => {
+      const t = window.__SC_TEST__
+      t.timerStep = 0
+      t.rideRate = 0
+      t.startLevel(lid, seed)
+    }, [levelId, SEED])
+    const ready = await levelReady(page)
     await page.evaluate(() => {
       window.__SC_TEST__.setTimeScale(0)
       window.__SC_TEST__.rideTo = 0.1
     })
-    await waitFrames(page, 3, { maxMs: 30000 })
+    await waitDrawsSettled(page)
     const s = await page.evaluate(() => {
       const t = window.__SC_TEST__
       return { drawCalls: t.drawCalls, dpr: t.view()?.dpr, graphics: t.graphics(), shadows: !!t.sceneStats().byName['contact-shadows'], errors: t.errors }
@@ -4376,9 +4433,13 @@ async function runMobile(browser, base) {
       const r = c.getBoundingClientRect()
       return r.left < 0 || r.right > window.innerWidth || r.height < 44
     })
-    return { hScroll: root ? root.scrollWidth > root.clientWidth : true, bad: tooNarrow.map((c) => c.dataset.level) }
+    const open = cards.filter((c) => !c.dataset.locked && !c.classList.contains('level-card-daily'))
+    const noFeats = open.filter((c) => !(c.querySelector('.level-feats')?.getBoundingClientRect().height > 0))
+    return { hScroll: root ? root.scrollWidth > root.clientWidth : true, bad: tooNarrow.map((c) => c.dataset.level), noFeats: noFeats.map((c) => c.dataset.level) }
   })
   if (selectLayout.hScroll) problems.push('phone level select scrolls sideways')
+  // #978: a phone can't hover or focus a card without launching it, so every open board shows its medals' feats.
+  if (selectLayout.noFeats.length) problems.push(`phone level cards without their medal ticket: ${selectLayout.noFeats.join(',')}`)
   if (selectLayout.bad.length) problems.push(`phone level cards off screen or under 44 px: ${selectLayout.bad.join(',')}`)
   await page.locator(card).tap({ timeout: 30000 }).catch((e) => problems.push(`tap level: ${e.message}`))
   await waitPhase('playing', 15000)
@@ -4494,9 +4555,16 @@ async function runMobile(browser, base) {
 
   // Back to normal speed: the music low-pass must open again.
   // LevelAudio sets the duck every frame: decided on two rendered frames, not on wall time (#248).
+  // A FRENZY or last-kill slow-mo the taps set off still ducks the music, as it should: wait its envelope out
+  // (1.5 s of play) so the check sees the game's own timeScale back at 1 (#969).
   await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
   const unducked = await waitFrames(page, 2, { pollMs: 40 })
+  const slowMoDeadline = Date.now() + 8000
+  while (Date.now() < slowMoDeadline && (await getStats(page)).timeScale < 1) await waitFrames(page, 1, { maxMs: 2000, pollMs: 40 })
+  await waitFrames(page, 2, { maxMs: 4000, pollMs: 40 }) // LevelAudio's next frame applies the duck
+  const gameTimeScale = (await getStats(page)).timeScale
   if (unducked.frames < 2) problems.push(`only ${unducked.frames} frame(s) in ${unducked.ms} ms after timeScale 1: the music duck went unchecked`)
+  else if (gameTimeScale < 1) problems.push(`game timeScale still ${gameTimeScale} 8 s after setTimeScale(1): a slow-mo envelope never ended`)
   else if (audioPortrait.ready && (await page.evaluate(() => window.__SC_TEST__.audio().musicDucked)))
     problems.push('music still ducked at timeScale 1')
 

@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import { GeometryWriter, buildRingedRock } from '../../shared/ringedRock'
 import { mergePainted, paintedAt, paintedPolygon, pose } from '../../shared/paintedParts'
+import type { SeaArchSpec } from '@/types/level'
+import { ARCH_DEPTH, ARCH_JITTER, ARCH_LEG_ANGLE, ARCH_TUBE, seaArchShape } from './seaArch'
 import { KELP_HEIGHT, ROCK_CAP_RISE, ROCK_RINGS, STACK_CAP_RISE, STACK_RINGS } from './seaDimensions'
 
 /** Ocean prop geometry with heights baked in: instances only get a uniform scale + yaw. */
@@ -176,4 +178,41 @@ export function createWhaleGeometry(length: number): THREE.BufferGeometry {
     0, 0.082, -0.17, 0, 0.075, -0.27, 0, 0.12, -0.25,
   ], 0x1f3550)
   return mergePainted([body, flippers, flukes]).scale(length, length, length)
+}
+
+/** The sea arch's rock (`seaArch.ts`), built round its centre: position it at `spec.x, centreY, spec.z`. */
+export function createSeaArchGeometry(spec: SeaArchSpec): THREE.BufferGeometry {
+  const { radius } = seaArchShape(spec)
+  const torus = new THREE.TorusGeometry(radius, ARCH_TUBE, 7, 22, Math.PI + 2 * ARCH_LEG_ANGLE)
+  torus.rotateZ(-ARCH_LEG_ANGLE)
+  torus.scale(1, 1, ARCH_DEPTH)
+  torus.rotateY(spec.heading)
+  // The same knock for the same corner on both sides of a seam: a hash of where it is.
+  const pos = torus.getAttribute('position')
+  const v = new THREE.Vector3()
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i)
+    const h = Math.sin(Math.round(v.x) * 12.9898 + Math.round(v.y) * 78.233 + Math.round(v.z) * 37.719) * 43758.5453
+    const rnd = (k: number) => ((h * k) % 1 + 1) % 1 - 0.5
+    pos.setXYZ(i, v.x + rnd(1) * 2 * ARCH_JITTER, v.y + rnd(7) * 2 * ARCH_JITTER, v.z + rnd(13) * 2 * ARCH_JITTER)
+  }
+  const geo = torus.toNonIndexed()
+  torus.dispose()
+  const lower = c(0x6c665c)
+  const upper = c(0xa39680)
+  const moss = c(0x6f9a44)
+  const p = geo.getAttribute('position')
+  const colors = new Float32Array(p.count * 3)
+  const col = new THREE.Color()
+  for (let i = 0; i < p.count; i += 3) {
+    // One colour a face: by its height, moss where it faces the sky up top.
+    const y = (p.getY(i) + p.getY(i + 1) + p.getY(i + 2)) / 3
+    const share = THREE.MathUtils.clamp((y + radius * 0.5) / (radius * 1.5 + ARCH_TUBE), 0, 1)
+    col.copy(lower).lerp(upper, share)
+    if (y > radius) col.lerp(moss, 0.7)
+    for (let k = 0; k < 3; k++) col.toArray(colors, (i + k) * 3)
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  geo.computeVertexNormals()
+  return geo
 }

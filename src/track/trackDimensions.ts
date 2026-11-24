@@ -1,4 +1,5 @@
 import type { TrackParams } from '@/types/level'
+import { smoothstep } from '@/utils/ease'
 
 /**
  * Coaster structure dimensions, derived from the level's track params.
@@ -49,8 +50,7 @@ export const PIXEL_FLOOR_FADE_END = 1200
 
 /** The floor's pixel radius at view-space `depth`; the vertex patch in `minThickness.ts` mirrors it. */
 export function pixelFloorAt(floor: PixelFloor, depth: number): number {
-  const t = Math.min(1, Math.max(0, (depth - PIXEL_FLOOR_FADE_START) / (PIXEL_FLOOR_FADE_END - PIXEL_FLOOR_FADE_START)))
-  return floor.near + (floor.far - floor.near) * t * t * (3 - 2 * t)
+  return floor.near + (floor.far - floor.near) * smoothstep((depth - PIXEL_FLOOR_FADE_START) / (PIXEL_FLOOR_FADE_END - PIXEL_FLOOR_FADE_START))
 }
 
 /** World radius that projects to `minPixelRadius` px at view-space `depth`; `projScaleY` = projectionMatrix[1][1]. */

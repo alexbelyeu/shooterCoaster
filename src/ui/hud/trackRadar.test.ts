@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { hardRouteOf } from '@/track/mechanics'
 import { sampleTrackXZ, setTrackOutline, trackOutline } from '@/track/trackOutline'
@@ -67,7 +67,7 @@ describe('radarShown', () => {
 describe('every level', () => {
   it('fits each track, and a junction hard route, inside its box', () => {
     const misses: string[] = []
-    for (const level of getAllLevels()) {
+    for (const level of shippedLevels()) {
       const main = createTrackCurve(level.track)
       const hard = level.track.mechanics && hardRouteOf(main, level.track.mechanics)
       const paths = hard ? [sampleTrackXZ(main), sampleTrackXZ(hard)] : [sampleTrackXZ(main)]

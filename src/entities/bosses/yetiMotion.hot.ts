@@ -22,8 +22,9 @@ export const YETI_BODY = {
 /** Every roar (`openS`: arms up, head back) exposes the chest (phase 1) and flares the aurora; the first comes as it arrives. */
 export const YETI_ROAR = {
   first: 0.6,
-  openS: 2.2,
-  period: 7.5,
+  // Open half of each cycle (was 2.2 of 7.5), so the last phase's chest is a target half of it (#937).
+  openS: 3,
+  period: 6,
   rampS: 0.35,
 } as const
 

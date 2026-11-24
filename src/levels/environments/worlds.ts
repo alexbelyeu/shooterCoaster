@@ -1,5 +1,6 @@
 import { createContext, useContext, type ComponentType } from 'react'
-import type { BiomeType, BossType, EnemyType } from '@/types/level'
+import type { BiomeType, BossType, EnemyType, LevelRide } from '@/types/level'
+import { getLevelConfig } from '@/levels/LevelRegistry'
 import type { EnemyProps } from '@/entities/enemies/EnemyBase'
 import type { BossProps } from '@/entities/bosses/BossBase'
 import { lazyChunk } from '@/core/staleBuild'
@@ -7,7 +8,8 @@ import { createHeightFunction, type HeightFunction, type TrackSample } from '@/u
 import type { BiomeDefinition } from './shared/types'
 
 /**
- * One world's own code (#862): its biome (decorations, features, terrain) and the enemies and boss its levels spawn.
+ * One world's own code (#862): its biome (decorations, features, terrain), the enemies and boss its levels spawn, and its
+ * levels' rides (#960) unless the registry carries one (`LevelConfig.ride`).
  * Each is a lazy chunk of its own (`biomes/<biome>/world.ts`), fetched by the level core when a run starts (`loadWorld`),
  * so a run loads its world and never the other worlds'. Only the core imports this module: what a world shares with
  * the core is then the core's, never a chunk of its own.
@@ -16,6 +18,8 @@ export interface World {
   biome: BiomeDefinition
   enemies: Partial<Record<EnemyType, ComponentType<EnemyProps>>>
   bosses: Partial<Record<BossType, ComponentType<BossProps>>>
+  /** Its levels' rides by level id (`levelRide` has them once this chunk is in). */
+  rides?: Readonly<Record<string, LevelRide>>
 }
 
 /**
@@ -75,6 +79,12 @@ export function forgetWorldFailures(): void {
 
 /** The biome's world once its chunk has arrived: a level of it mounts without suspending. */
 export const loadedWorld = (biome: BiomeType): World | undefined => loadedWorlds.get(biome)
+
+/** A level's ride: the registry's (level 1's), else its world's once that chunk has arrived (#960); undefined before. */
+export function levelRide(id: string): LevelRide | undefined {
+  const config = getLevelConfig(id)
+  return config && (config.ride ?? loadedWorld(config.biome)?.rides?.[id])
+}
 
 /** A biome's ground, for every caller: an interior's authored `floor` as given, else the noise terrain kept off the track. */
 export function groundOf(biome: BiomeType, def: BiomeDefinition, trackSamples?: TrackSample[]): HeightFunction {

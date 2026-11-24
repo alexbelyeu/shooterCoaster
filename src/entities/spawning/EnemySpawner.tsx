@@ -6,6 +6,7 @@ import { indexAtT, type ArcTable } from '@/track/arcLength'
 import { rideProgress } from '@/track/rideProgress.hot'
 import type { RideSpeeds } from '@/track/ridePhysics'
 import { RUN_SECONDS } from '@/levels/pacing'
+import { nothingLeft } from '@/levels/bossWin'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -23,13 +24,13 @@ import { FIRE_IMP_HIT_RADIUS } from '../enemies/fireImpHop.hot'
 import {
   clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge,
   trackPoint, tracksideSlots,
-  type FormationMotion, type FormationSlot, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot,
+  type FormationMotion, type FormationSlot, type SpotClearer, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot,
 } from './spawnPlacement'
 import type { Vec3 } from '@/utils/vec3'
 import {
   ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, bystanderSlots, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
 } from './enemyPlacement'
-import { enemyCounts, newWaveProgress, nextWaveDue, onRoute, tickWaves } from './waveSchedule'
+import { enemiesLeft, enemyCounts, newWaveProgress, nextWaveDue, onRoute, tickWaves } from './waveSchedule'
 import type { HardRoute } from '@/track/mechanics'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { ORBITS, placeOrbit, type SwimOrbit } from './swimOrbit'
@@ -51,7 +52,9 @@ interface EnemySpawnerProps {
   /** Landmarks a ground enemy stood away from the track keeps out of (`BiomeDefinition.keepOff`). */
   keepOff?: readonly KeepOff[]
   /** Moves an air enemy's spot out of the world's buildings (`BiomeDefinition.clearAir`). */
-  clearAir?: (p: Vec3) => Vec3
+  clearAir?: SpotClearer
+  /** Moves a ground enemy's trackside spot onto open ground (`BiomeDefinition.clearGround`). */
+  clearGround?: SpotClearer
   /** The track's hard route (#720), where a hard-route wave arrives; null without a junction. */
   hardRoute?: HardRoute | null
 }
@@ -100,6 +103,7 @@ const RADII: Record<EnemyType, number> = {
   dustBunny: 45,
   lanternfly: 65,
   hoverDrone: 55,
+  billboardBot: 55,
 }
 
 const NO_WALLS: readonly WallSurface[] = []
@@ -124,7 +128,7 @@ function generateEnemies(
     if (wave.bystanders) {
       const { type, count } = wave.bystanders
       if (ENEMY_PLACEMENT[type].scatter !== 'wall') throw new Error(`bystander ${type} must climb a wall`)
-      if (walls.length === 0) throw new Error("bystanders climb the level's walls (LevelConfig.walls)")
+      if (walls.length === 0) throw new Error("bystanders climb the ride's walls (LevelRide.walls)")
       // Their wall is picked when the wave activates, like a swarm's.
       for (const swarm of bystanderSlots(count, rng)) {
         enemies.push({
@@ -142,7 +146,7 @@ function generateEnemies(
     }
     if (scatter === 'swarm') {
       if (wave.formation && wave.formation !== 'scatter') throw new Error(`${wave.type} swarms on a wall: no formation`)
-      if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+      if (walls.length === 0) throw new Error("wall enemies need the ride's walls (LevelRide.walls)")
       for (const swarm of swarmSlots(wave.count, rng)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside: null, swarm, ...base })
       }
@@ -205,6 +209,7 @@ export default function EnemySpawner({
   bounds,
   keepOff,
   clearAir,
+  clearGround,
   hardRoute,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
@@ -236,7 +241,7 @@ export default function EnemySpawner({
     (table: ArcTable, wave: EnemyWave, ride: RideAhead, members: SpawnedEnemy[], riderIndex: number, camera: Vec3): [string, Placed][] => {
       if (members[0]?.trackside) {
         const placed = placeTracksideWave({
-          table, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff,
+          table, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff, clearGround,
         })
         // A shark's circle, clear of the rails, the stacks and the shore (#922): its own stream, so the placement's is unchanged.
         const band = ORBITS[wave.type]
@@ -256,7 +261,8 @@ export default function EnemySpawner({
       // On their walls already, where they enter: never pushed out of the near field.
       if (members[0]?.wall) return members.map((e) => [e.id, { position: e.position!, wall: e.wall }])
       if (!wave.formation || wave.formation === 'scatter') {
-        const clear = ENEMY_PLACEMENT[wave.type].surface === 'air' && clearAir ? clearAir : (p: Vec3) => p
+        // A scatter spot has no approach to be seen from, so the clearer takes the nearest open spot.
+        const clear = ENEMY_PLACEMENT[wave.type].surface === 'air' && clearAir ? (p: Vec3) => clearAir(p) : (p: Vec3) => p
         return members.map((e) => [e.id, { position: toVector3(clear(clampToBounds(outsideNearField(e.position!, camera), bounds))) }])
       }
       const placed = placeFormationWave({
@@ -277,7 +283,7 @@ export default function EnemySpawner({
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [groundFn, bounds, keepOff, clearAir, walls, runSeed],
+    [groundFn, bounds, keepOff, clearAir, clearGround, walls, runSeed],
   )
 
   const placeWave = useCallback(
@@ -331,6 +337,11 @@ export default function EnemySpawner({
   const lastWaveTick = useRef<number | null>(null)
   const goneEnemies = useRef(new Set<string>())
   const escapedEnemies = useRef(new Set<string>())
+  /** Golden balloons popped or floated off: outside the kill tally, but one still up is something left to shoot. */
+  const goneGolden = useRef(new Set<string>())
+  const bossBeaten = useRef(false)
+  /** `run:cleared` went out this run (#961). */
+  const cleared = useRef(false)
   // A hard-route wave's members join the count when it arrives (`joinedEnemies`): an easy-route run never meets them.
   const totalEnemyCount = useMemo(() => enemies.filter((e) => !e.bystander && !waves[e.waveIndex].route).length, [enemies, waves])
   const joinedEnemies = useRef(0)
@@ -350,6 +361,9 @@ export default function EnemySpawner({
     lastWaveTick.current = null
     goneEnemies.current.clear()
     escapedEnemies.current.clear()
+    goneGolden.current.clear()
+    bossBeaten.current = false
+    cleared.current = false
     joinedEnemies.current = 0
     useGameStore.getState().setEnemyCounts(totalEnemyCount, totalEnemyCount)
     setGeneration((g) => g + 1)
@@ -432,14 +446,28 @@ export default function EnemySpawner({
     const levelTime = RUN_SECONDS - s.timeRemaining
     tickWaves(waveDelays, levelTime, waveProgress.current, tellWave, activateWave)
     lastWaveTick.current = levelTime
+    // The boss beaten with nothing left to shoot or still to come: GameTimer ends the run after the defeat's hold (#961).
+    if (cleared.current) return
+    const left = enemiesLeft(totalEnemyCount + joinedEnemies.current, goneEnemies.current.size, escapedEnemies.current.size)
+    if (!nothingLeft(bossBeaten.current, left, goldenBalloons.length - goneGolden.current.size, nextWaveDue(waveDelays, waveProgress.current))) return
+    cleared.current = true
+    eventBus.emit('run:cleared')
   })
+
+  useEffect(() => {
+    const onDefeated = () => { bossBeaten.current = true }
+    eventBus.on('boss:defeated', onDefeated)
+    return () => eventBus.off('boss:defeated', onDefeated)
+  }, [])
 
   useEffect(() => {
     const gone = goneEnemies.current
     const escaped = escapedEnemies.current
+    const golden = goneGolden.current
     return () => {
       gone.clear()
       escaped.clear()
+      golden.clear()
     }
   }, [])
 
@@ -450,6 +478,8 @@ export default function EnemySpawner({
     },
     [publishCounts],
   )
+
+  const onGoldenGone = useCallback((id: string) => { goneGolden.current.add(id) }, [])
 
   // Gone without a kill (a climber topped out): off the total, so never a kill (#480); no last-kill slow-mo. A bystander
   // is in no count.
@@ -500,7 +530,8 @@ export default function EnemySpawner({
           spawnPosition={gb.position}
           scoreValue={gb.scoreValue}
           radius={gb.radius}
-          onKill={onKill}
+          onKill={onGoldenGone}
+          onEscape={onGoldenGone}
         />
       ))}
       {boss && (

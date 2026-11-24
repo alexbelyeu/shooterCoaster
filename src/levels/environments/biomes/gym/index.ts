@@ -24,7 +24,7 @@ export const gym: BiomeDefinition = {
     arc: 0.7, facing: Math.atan2(STAR.facing.z, STAR.facing.x), approach: 8 * GYM_SCALE,
     tour: [
       { at: toWorld({ x: 30, y: 14, z: 30 }), look: toWorld({ x: 15, y: 5, z: 22 }) },
-      { at: toWorld({ x: 74, y: 8, z: 30 }), look: star },
+      { at: toWorld({ x: 68, y: 7, z: 13 }), look: star },
     ],
   },
 }

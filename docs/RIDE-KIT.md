@@ -14,7 +14,7 @@ storyboard of them. Epic: see the issue that links this file.
 - **No use of the space.** The gym hall is 80 × 40 × 27 m; the ride peaks at 5.4 m. Outdoor levels
   have whole landscapes and ride a ribbon a few metres over the ground.
 - **No elements.** No launch, no lift hill, no drop, no airtime, no inversion, no near miss.
-- **No beginning or end.** The run starts mid-scene (level 6: inside the Tree's gap) and stops
+- **No beginning or end.** The run starts mid-scene (level 6: under the Arch) and stops
   when the timer does.
 - **The camera doesn't sell it.** Speed changes barely show in the field of view, the horizon or
   the sound.
@@ -87,26 +87,29 @@ time so the storyboard's beats land on their seconds.
 
 ## Level 6: the Climbing Gym, storyboard (60 s)
 
-As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrack.ts` has the seconds each beat lands):
+As built (#761: slowed and spread out for comfort at the rider's scale; #926: the Arch first, the finale on the Medusa;
+`gymTrack.ts` has the seconds each beat lands):
 
-1. **0 s, station on the black path.** Countdown; **launch** north up the path, climbing at the Flame.
-2. **~6–11 s, over the Flame.** A wide braking turn onto it and a **slow heartline roll** across it (~5 s): the
-   flames over your head at its middle. (The first build's zero-g roll took a second; a whip like that is dizzying.)
-3. **~11–18 s, the Training Area.** Down under its lintel (a **head-chopper**) into the cave as a **dark section**,
+1. **0 s, station on the Arch's pads.** Countdown; **launch** north through the **Arch**, a **head-chopper** under
+   its lintel (2 s), and a wide turn onto the black path, climbing at the Flame.
+2. **~8–13 s, over the Flame.** A braking turn onto it and a **slow heartline roll** across it (~5 s): the
+   flames over your head at its middle (11 s). (The first build's zero-g roll took a second; a whip like that is dizzying.)
+3. **~13–19 s, the Training Area.** Down under its lintel (a **head-chopper**, 15 s) into the cave as a **dark section**,
    round north through it: blacklight, the holds glowing, rats lit by the muzzle flash.
-4. **~18 s, the route choice.** Out of the cave on a launch across the hall: a **shoot-to-switch** sign, V2 (the
+4. **~19 s, the route choice.** Out of the cave on a launch across the hall: a **shoot-to-switch** sign, V2 (the
    easy way) or V8 (the harder branch, more points).
-5. **~21.5 s, the wall ride.** A **lift hill** straight up Alaska, climbers and lanternflies on the wall beside and
+5. **~22.5 s, the wall ride.** A **lift hill** straight up Alaska, climbers and lanternflies on the wall beside and
    above you, to the roof trusses at ~21 m, rolling onto its back to tip over north.
-6. **~26 s, the dyno.** A **jump gap** off Alaska's top to the Shield.
-7. **~28 s, the auto-belay drop.** A **drop track**: the car stops, then falls upright with its piece of track into
+6. **~27 s, the dyno.** A **jump gap** off Alaska's top to the Shield.
+7. **~29 s, the auto-belay drop.** A **drop track**: the car stops, then falls upright with its piece of track into
    the pit.
-8. **~36–44 s, Medusa.** A **helix** up out of the pit that comes out facing the Starr as she rises (40 s), then a
-   slow chain lift straight at her face.
-9. **~44 s, the dive** round her shoulder, along the Tree's roots, a hairpin into its left cave.
-10. **~54–59 s, the Tree.** A slow **heartline roll** through the gap between the solid trunk and the wall.
-11. **After the run, home.** Down the hall's east side and under the **Arch's** lintel (the head-chopper the first
-    build had at ~8 s: the slower ride has no time for the detour to it in the run) into the station.
+8. **~36.5 s, the Medusa helix.** A **helix** up out of the pit that comes out facing the Starr as she rises (40 s).
+9. **~40–60 s, the finale: her fight.** A slow serpentine up the hall at her face, swinging 25° either side of her so
+   she stays in frame while her snakes strike from both sides, climbing to her face level as the timer runs out.
+10. **After the run, home.** A U-turn under her, down the hall's east side, onto the Lagoon's pads and into the station.
+
+The Tree's heartline roll through its gap left the run on 24 Nov (Alex's call on #926: it pushed the Medusa out of
+frame for the last 16 s); the Tree stays as scenery.
 
 ## The other levels (ideas for their storyboards)
 
@@ -122,8 +125,11 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   boss's slow wide turn round the flats into the brake run. The scorpions come in two packs (0 s, and 11 s on the sand
   before the door) so the straight run to the lift doesn't line all thirty up in view; a first crow V (5 s) fills the lift
   hill's crest, where the view is pitched at the sky (#925's pacing gate).
-- **Ocean (3):** a splashdown, a glass tunnel under the water with the Kraken passing overhead,
-  a corkscrew through a sea stack's arch.
+- **Ocean (3):** built (#865, `ocean/oceanTrack.ts`, its storyboard and seconds at the top): a lift east, a crawl
+  south along its crest with the whale breaching ahead, the drop's splashdown into a glass tunnel under the sea, camelbacks,
+  a slow corkscrew through a sea arch (`environment.seaArch`), the second lift cresting as the Kraken rises, the fight run
+  east across the open lagoon facing it (40–50 s), and a quarter helix home along the north shore. No U-turns after the corkscrew: a hairpin or a half helix puts trackside
+  waves behind the rider on their approach (`spawnPlacement.test.ts`).
 - **Antarctica (4):** built (#866, `arctic/arcticTrack.ts`, its storyboard and seconds at the top): a station launch,
   a lift up the valley, a 71° first drop into the ice cave (a dark section with the `ice` look, `IceCave.tsx`, its mouth
   low over the rails), a second lift up the ridge, an airtime crest heading into the aurora (27 s), a 1.25-turn helix
@@ -132,6 +138,10 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   launch through a glowing lava tube, a lift up the volcano's flank into a hole, a drop track falling inside the cone
   (18 s), out through a second hole a few metres round the rider (the near miss), two camelbacks (30 s), a turntable
   (38 s) and the Titan's whole fight ridden backwards facing him (40–57 s).
+- **Neon Metropolis (7):** built (#871, `city/cityTrack.ts`, its storyboard and seconds at the top): a station launch down
+  an avenue, a lift up a street beside the lift tower, a 66° first drop between two towers, the head-chopper under the
+  elevated train line (20.5 s), an airtime crest (26 s), a climbing helix round the hero tower to 40 s and a slow run
+  south through the west side's streets for the fight. The ride runs down the streets' centre lines, towers on both sides.
 
 ## Rules for building rides
 

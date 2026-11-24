@@ -35,7 +35,7 @@ screen / covers the centre / overlaps the HUD / points > 25° off the tracer of 
 checked in mobile portrait + landscape, and in portrait at four extreme aims with the combo meter showing),
 the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
-reveal (`data-sequence="done"`), lacks a stat line (its `data-stat` hits, accuracy, combo, time; hits must start with the kills) or the
+reveal (`data-sequence="done"`), shows no medal or not exactly the medals the run won, unsaved (#879: the run's last kill lands on a chain primed to the longest medal chain), lacks a stat line (its `data-stat` hits, accuracy, combo, time; hits must start with the kills) or the
 Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), offers Next Level while the next level is locked (or hides it while open), shows NaN, or disagrees with `stats()` on score or kills, has no local leaderboard fully inside 1280×720, or (first level) Enter with the mute button focused doesn't play on;
 on the first level the leaderboard is seeded so the run places 4th: the row must open for initials at the last ones used (AAA),
 all with the Share button focused (#357): ArrowUp must cycle a letter, typing r e s must give RES without leaving or toggling mute (R and S are letters there), and Enter must confirm (not open the share menu), store
@@ -49,7 +49,7 @@ an iPhone 13-like touch context (390x844) taps WORLDS (at its centre, `tapCentre
 again in 844x390 landscape taps the canvas 10x, each tap 15–30 px off an on-screen
 enemy (game time frozen while tapping, and it fails if the freeze did not hold: `timeScale` must still be 0 after the taps), and requires kills (touch aim assist); checks
 camera aspect == canvas aspect in portrait, landscape and after rotating back, that the
-HUD is inside the viewport with no overlap in both orientations, that the SFX node count doesn't grow across the taps and the music ducks while time is frozen (and opens again within two frames of `timeScale` 1), runs the `audioBurst` SFX stress in portrait and after rotating (every desktop level runs it too: any page error or dropped sound fails, and so do fewer than 10 of its 10 spaced kills reaching the engine, `killsPlayed`, summary `audioBurst=ok kills10/10`), and taps Pause (`mobile-level-select.png`, `mobile-level1.png`,
+HUD is inside the viewport with no overlap in both orientations, that the SFX node count doesn't grow across the taps and the music ducks while time is frozen (and opens again within two frames of the game's `timeScale` back at 1: once `setTimeScale(1)` lets a FRENZY or last-kill slow-mo the taps set off run out, at most 8 s), runs the `audioBurst` SFX stress in portrait and after rotating (every desktop level runs it too: any page error or dropped sound fails, and so do fewer than 10 of its 10 spaced kills reaching the engine, `killsPlayed`, summary `audioBurst=ok kills10/10`), and taps Pause (`mobile-level-select.png`, `mobile-level1.png`,
 `mobile-level1-landscape.png`; `--skip-desktop` runs only that). **Look at the screenshots** with the Read tool — that is how you
 playtest visually. Waits are polled against the frame counter because software
 rendering can run at ~1 fps; tune with `--seconds`, `--combat-seconds`,
@@ -78,12 +78,14 @@ no such row), turns that toggle on, picks Low and a music volume, cycles Med / H
 and fails if the renderer's GPU textures grew over the last two cycles (each change rebuilds the post composer, #249),
 closes with Esc, and requires both to survive a reload and the title's "Internal device, not tracked" marker to show after it. A `quality` step loads the first level at device dpr 2 with the default quality and with
 `?quality=low` (any preset name works as a URL override and is saved like the setting) on the same seed and frozen
-track point: low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
-A `levelSelect` step seeds saved progress (3★ + 1★) and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
+track point, each held at the level's start from its first frame (level timer, game clock and ride at 0, so no enemy flies in
+however long the level takes to load) and counted once its draw count has held for 5 frames (`waitDrawsSettled`, #972: the same counts on
+any runner): low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
+A `levelSelect` step seeds saved progress (3★ + 1★), two of the first level's medals and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
 and requires one card per level plus the Daily card, each top's initials on its card after the reload, the right locked count and `★ x / 15` total, every card
-inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move focus, Enter on a
+inside 1280×720 with no sideways scroll, exactly one medal ticket out (#978: the focused card's, its three feat lines inside the viewport, at open and after ArrowLeft), and keyboard-only play (arrows move focus, Enter on a
 locked card does nothing, Enter on an open one plays the launch transition and starts that level);
-the phone run checks its cards fit 390 px.
+the phone run checks its cards fit 390 px and every open card shows its medal ticket.
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in
 daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, New best, no Next Level and no initials entry (the campaign boards stay empty),
 send the new best once to the stubbed online board with `daily` = today and the last initials and show the day's World board it answers (#854, `data-source="today"`, `daily-results.png`); the second load's
@@ -161,7 +163,7 @@ When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pic
 (spread) with time frozen and shoots it with a real bullet: `weaponState()` must report the spread gun, the next pull must
 count 3 shots and draw 3 bullets, and `level1-pickup.png` holds the tinted tracer with the `.hud-weapon` badge clear of the HUD;
 the pickup must hold through a pause, expire on game time, and a restart must bring back the blaster and every pickup.
-For each level with a Night Ride in the run (`STEP_LEVELS.night`: level1, level2, level3; #829, #880), a `night` step (nightly)
+For each level with a Night Ride in the run (`STEP_LEVELS.night`: level1 to level6; #829, #880, #994), a `night` step (nightly)
 rides it (`startLevel(id, seed, 'night')`, `variant()`) to the ride step's moment: the run must be `night`, the sky band (top 30%)
 dark (`NIGHT_CHECK.maxSkyLuma`), the enemies as readable as the ride's probe asks (`<id>-night-enemy.png`) and the scene inside
 the level's `scene` budget (`<id>-night.png`); its line ends with `programs after warm-up: +N` (failed under `--gate-programs`).
@@ -171,7 +173,7 @@ When level6 is in the run, a `switch` step (#702, on the PR in the `level6` shar
 has passed is closed for the run, #779; `open` is false then), parks the coaster behind the V2 sign with time frozen
 (`level6-switch.png`) and shoots it with a real bullet, which must set the hard way and ride the V8 branch at the junction's middle (`riding: 'hard'`, `level6-switch-hard.png`);
 a restart must set it back, and a run that leaves it must ride the easy way with the switch closed by then.
-The hard route's own wave (#720, `SWITCH_CHECK.branchWave`): after the shot the level timer jumps to its second, and it must
+The hard route's own wave (#720, `trackSwitch().branchWave`, read from the level's roster so a re-timed fork can't drift from the check): after the shot the level timer jumps to its second, and it must
 arrive (its banner) and show at least `BRANCH_WAVE_ON_SCREEN` rats on screen from the branch's middle; at the end of the
 easy run, held past the sign, the same jump must bring no such wave, and the run's `totalEnemies` must be the wave's size
 under the hard run's.
@@ -191,7 +193,7 @@ and land a frame or more after the frame that caused them, more frames on a slow
 enemies by whole steps, so the ride shot's enemy count and the pacing gaps differed run to run and between a local session
 and CI. React reports commits to a devtools hook `newPage` defines before the page loads (`ctx.addInitScript`). Bosses move
 on the game clock (`core/gameClock.ts` `gameClockStep`), never the frame's delta, so they keep pace with the level too.
-A `pacing` step (#450) rides every level's whole run, GO to the end, in settled steps of `--pacing-step` level seconds
+A `pacing` step (#450) rides every level's whole run, GO to the end (a boss win with nothing left ends it early, #961: `samplingCutShort`), in settled steps of `--pacing-step` level seconds
 (default 0.5, so the run is the same on any runner; `rideRate` 1, the ride a 60 fps player gets), the level time never held,
 played as a player (#925): `autoFire(true, PLAYER_HITS_PER_SECOND)` lands 3 hits a game second on the nearest targets
 `sight()` counts shootable, on the game clock (each through `processHit`, the only path that hits; the shot's look is `showShotAtNDC`, no colliding bullet), so a stretch a player clears goes empty as it would for them (unfired, the
@@ -320,7 +322,11 @@ every `smoke (<shard>)`, and `unit + build` too unless it touched `scripts/`; `v
 Any other PR runs the full gate. `portal` (the portal build smoked under `/nested/path/`) runs only on a PR touching
 `vite.config.ts`, `index.html`, `public/`, `scripts/portal/`, `package*.json` or `ci.yml`, on a hand-started run, and in the
 nightly run on `main` (`schedule`, the full gate plus `portal`, its own concurrency group). Merges to `main` run the full gate
-without `portal`.
+without `portal`. `offline (service worker)` (#1004) is the one PR job that registers the service worker (the smoke loads `?e2e=1`,
+Lighthouse runs on `vite preview`): `node e2e/prod-check.mjs --checks assets,routes,offline` on the job's own `dist/` ("Production"
+below; ~1 min, artifact `e2e-results-offline`). `verify` requires it where it is planned: a PR touching `src/sw/`,
+`scripts/swPrecache.mjs`, `src/app/serviceWorker.ts`, `vite.config.ts`, `vercel.json`, `e2e/prod-check.mjs` or `ci.yml` (`SW_INPUT`,
+tests excluded), a hand-started run and the nightly; reproduce it locally with the same command after `npm run build`.
 
 ## Production (`.github/workflows/prod-smoke.yml`, #352)
 
@@ -336,9 +342,12 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   `routes`: `/go/prod-check` is the game page, an unknown path a real 404 with `404.html`, `GET /api/leaderboard?level=level1` the CDN-cached top 10 (on a 200 it GETs again 3 s later and wants `x-vercel-cache: HIT` / `STALE`, since Vercel's CDN strips `s-maxage` from what clients see, #397) or, while the board is unavailable (no env vars, a paused project; always when serving dist/ locally), a bare uncached 503, never a 500, a 404 or a leak; `title`: boots with no page error
   or failed same-origin request, the 3D scene not blank (`prod-title.png`); `level`: level1 rides, a real click fires,
   `killNearest(3)` reaches `enemy:killed` (`prod-level.png`); `phone`: iPhone 13 portrait, tap PLAY, which starts level1 on a fresh save (#329; `--level` other than level1: tap WORLDS, then its card),
-  3 taps at enemies fire, a kill (`prod-phone.png`). Rules in pure `scripts/prodCheckRules.mjs`. Writes `prod-check.json`
+  3 taps at enemies fire, a kill (`prod-phone.png`); `offline` (#999): `?e2e=1&sw=1` until the service worker controls the page,
+  then the network off (and proven off: `robots.txt` fails), reload: the title (`prod-offline-title.png`) and level1's ride with an enemy on screen
+  (`prod-offline-ride.png`), no failed request but `/api/*`; `assets` also fetches every file `/sw.js` precaches. Rules in pure `scripts/prodCheckRules.mjs`. Writes `prod-check.json`
   (`checks`, `running`, `finished`) after every check, so a run stopped at its cap still says where it was. Without
   `--url` it serves `--dist` (default `dist/`) on localhost the way `vercel.json` says Vercel would, for local runs.
+  `--checks <id,…>` runs only those (an unknown id exits 2; no browser starts for `assets,routes` alone): CI's `offline` job above.
   Back-to-back deploys: the job's concurrency group cancels the older run, which reports nothing.
 - **Nightly full smoke** (06:00 UTC): every step on every level, so it is also where the deep checks the PR shards leave
   out run (#372, "Two depths" above). One run outgrew its 60 min cap once level 6 joined every deep step (#570), so it runs

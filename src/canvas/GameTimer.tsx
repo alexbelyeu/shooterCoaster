@@ -6,12 +6,15 @@ import { endSlowMo, resetSlowMo, tickSlowMo } from '@/combat/slowMo.hot'
 import { markStartup } from '@/core/startupMarks'
 import { levelTimeHeld, levelTimeStep, noteE2ELevelTime } from '@/testing/e2eHook'
 import { RUN_SECONDS } from '@/levels/pacing'
+import { bossWinEndsAt } from '@/levels/bossWin'
+import { eventBus } from '@/core/EventBus'
 import { recordGhost, resetGhostRecording } from '@/combat/ghostTrack.hot'
 import { gameTime } from '@/core/gameClock'
 import { getPointerState } from '@/input/pointerInput'
 
 /**
- * Counts down the level; reset when a run starts (`runId`), kept through GO, pause and resume.
+ * Counts down the level; reset when a run starts (`runId`), kept through GO, pause and resume. A boss win with nothing
+ * left (`run:cleared`, #961) ends it early, after the defeat's hold.
  * Also the frame that owns the combo game clock (`tickCombo`), the slow-mo (`tickSlowMo`) and the ghost's recording (`recordGhost`).
  */
 export default function GameTimer() {
@@ -22,17 +25,26 @@ export default function GameTimer() {
   /** The first frame's delta can include the level's load, so counting starts on the second. */
   const running = useRef(false)
   const lastCeiled = useRef(-1)
+  /** Level time a boss win ends the run at, or null. */
+  const endsAt = useRef<number | null>(null)
 
   // A layout effect, so the reset lands in the same commit as the new run and no frame can tick the old run's time.
   useLayoutEffect(() => {
     elapsed.current = 0
     running.current = false
     lastCeiled.current = -1
+    endsAt.current = null
     resetComboRuntime()
     resetSlowMo()
     resetGhostRecording()
     useGameStore.getState().setTimeRemaining(RUN_SECONDS)
   }, [runId])
+
+  useEffect(() => {
+    const onCleared = () => { endsAt.current ??= bossWinEndsAt(elapsed.current) }
+    eventBus.on('run:cleared', onCleared)
+    return () => eventBus.off('run:cleared', onCleared)
+  }, [])
 
   // However the run reached results (timer, `endLevel`), the slow-mo must not follow it there.
   useEffect(() => {
@@ -64,7 +76,9 @@ export default function GameTimer() {
       setTimeRemaining(remaining)
     }
 
-    if (remaining <= 0) {
+    if (remaining <= 0 || (endsAt.current !== null && elapsed.current >= endsAt.current)) {
+      // A boss win ends between whole seconds: the results' "seconds to spare" reads the exact time left.
+      setTimeRemaining(remaining)
       endSlowMo()
       setPhase('results')
     }

@@ -1,18 +1,19 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { buildArcTable } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { buildTrackIndex } from '../../shared/trackClearance'
 import { trackExtent } from '../../shared/trackScatter'
 import { yawScaleMatrix } from '../../shared/yawScaleMatrix'
-import { CITY_REACH, cityTowers } from './cityLayout'
+import { CITY_REACH, layoutCity, streetTowers } from './cityLayout'
 import { laneRuns, layoutTraffic, SINK } from './trafficPaths'
 import { sinkAt, writeTraffic } from './traffic.hot'
 
-const table = buildArcTable(createTrackCurve(getLevelConfig('level7')!.track))
+const table = buildArcTable(createTrackCurve(shippedLevel('level7').track))
 const reach = trackExtent(table) * CITY_REACH
-const towers = cityTowers(table, trackExtent(table))
+// The towers `Decorations.tsx` lays the lanes between
+const towers = streetTowers(layoutCity(table, trackExtent(table)))
 const track = buildTrackIndex(table)
 const runs = laneRuns(table, reach, towers)
 const traffic = layoutTraffic(runs, 0)
