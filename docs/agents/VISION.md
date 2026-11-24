@@ -49,11 +49,11 @@ code-generated, flat-shaded, saturated look:
    the aurora over the ice fortress).
 2. **Juicy, readable shooting** — enemies pop against the scenery; every hit has
    feedback (flash, particles, audio, combo escalation, slow-mo on streaks).
-2. **Arcade mastery** — scores, stars, combos, accuracy, local leaderboards, a daily
+3. **Arcade mastery** — scores, stars, combos, accuracy, local leaderboards, a daily
    seeded run, ghosts later; short runs (60–120 s) with high replay value.
-3. **Cohesive stylised look** — code-generated geometry, shaders and post-processing
+4. **Cohesive stylised look** — code-generated geometry, shaders and post-processing
    with a strong art direction per biome; polish over realism.
-4. **Runs everywhere** — smooth on a mid-range laptop and on phones (touch), fast to
+5. **Runs everywhere** — smooth on a mid-range laptop and on phones (touch), fast to
    load, no blank screens.
 
 ## Quality bar (checked by QA on every PR)
@@ -211,10 +211,10 @@ photo mode, Night Ride for level 1, the radar, aerial fog, the loading screen, c
 palettes, ghost replay, the WebGPU event, the Daily Run board).
 
 1. **Medals for new worlds** — each world adds its three to `medals.ts` once #879 lands.
-3. **Remappable input** — keyboard and gamepad bindings in Settings, saved locally.
-4. **PWA install + offline play** — a service worker that caches the hashed assets (never the
+2. **Remappable input** — keyboard and gamepad bindings in Settings, saved locally.
+3. **PWA install + offline play** — a service worker that caches the hashed assets (never the
    `api/` calls), the manifest's install prompt from the title.
-5. **Boss rush** — every boss back to back, unlocked when every level has 3★; a local best.
+4. **Boss rush** — every boss back to back, unlocked when every level has 3★; a local best.
 5. **Spatial chunking + fog-distance cut** for whole-level InstancedMeshes; only if a world can't
    hold 250 draws by batching alone.
 6. **The Blender spike** (#381 step 4) — one enemy from a Blender script, with a recorded adopt /
