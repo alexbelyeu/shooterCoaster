@@ -19,6 +19,16 @@ const LISTED_GAP_SECONDS = 1
 const round = (x, places) => Number(x.toFixed(places))
 
 /**
+ * Whether sampling ended short of the run's `end`: more than `step` × 2 before it, unless the boss was beaten by then (a
+ * boss win with nothing left ends the run early, #961).
+ * @param {{ t: number, bossStage?: string }[]} samples
+ */
+export function samplingCutShort(samples, end, step) {
+  const last = samples.at(-1)
+  return last.t < end - 2 * step && !BEATEN.has(last.bossStage)
+}
+
+/**
  * @param {{ t: number, targets: number, track: number, waveTell?: boolean, bossTell?: boolean }[]} samples in level-time order
  * @param {number} end the run's length in level seconds
  */
