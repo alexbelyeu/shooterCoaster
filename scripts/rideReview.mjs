@@ -8,7 +8,7 @@
  * (`PLAYER_HITS_PER_SECOND` on what the rider can shoot), and every step
  * reads what the rider can actually shoot (`__SC_TEST__.sight()`: in view, big enough, not behind the world) and whether the
  * boss is framed. Writes to e2e-results/review/<level>/:
- *   - `review.json`: the timeline (a row per step: level time, track, shootable / occluded / tiny, boss), the gaps with
+ *   - `review.json`: the timeline (a row per step: level time, track, shootable (and `byType`) / occluded / tiny, boss), the gaps with
  *     nothing shootable (`pacingMetrics`), the boss's framing (`bossFraming`), and the flicker spikes (a screen region that
  *     jumps in brightness for one step and comes back, the next step);
  *   - `sheet.jpg`: a contact sheet, a frame every `--every` seconds, each labelled with its time, track and counts (a red
@@ -115,6 +115,7 @@ async function run(browser, url) {
         phase: st.phase,
         track: t.rideProgress,
         targets: sight.shootable,
+        byType: sight.byType,
         occluded: sight.occluded,
         tiny: sight.tiny,
         live: st.liveEnemies,
