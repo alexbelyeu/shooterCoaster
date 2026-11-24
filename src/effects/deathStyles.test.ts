@@ -54,9 +54,11 @@ const ALL: [string, DeathStyle][] = [
 describe('death styles', () => {
   it("every boss's defeat fits the pool with a slot to spare: its last part, the confetti and its own bursts", () => {
     // The confetti lives 3.2 s and every boss's own defeat bursts fire within it, so all of these overlap.
+    const lastPart = 1
+    const spareForAKill = 1
     const ownDefeatBursts = { magmaTitan: TITAN_BREAK_POINTS.length, medusa: MEDUSA_DEFEAT_BURST_YS.length, other: 0 }
     for (const own of Object.values(ownDefeatBursts)) {
-      expect(1 + BOSS_DEFEAT_BURST_OFFSETS.length + own + 1).toBeLessThanOrEqual(DEATH_SLOTS)
+      expect(lastPart + BOSS_DEFEAT_BURST_OFFSETS.length + own + spareForAKill).toBeLessThanOrEqual(DEATH_SLOTS)
     }
     expect(styleCounts(BOSS_DEFEAT_DEATH_STYLE).glow * BOSS_DEFEAT_BURST_OFFSETS.length).toBeGreaterThanOrEqual(180)
   })
