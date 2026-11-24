@@ -139,10 +139,16 @@ export const WALL_STANDOFF = 11
 /** Starts within this fraction of the wall's height from its foot, so a wave doesn't climb in lockstep. */
 export const WALL_START_SPREAD = 0.12
 
+/** The walls a climber may go up: every one but the perches (#948). */
+export function climbableWalls(walls: readonly WallSurface[]): readonly WallSurface[] {
+  return walls.filter((w) => !w.perch)
+}
+
 export function wallSlots(count: number, walls: readonly WallSurface[], rng: Rng): WallSlot[] {
-  if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+  const climbable = climbableWalls(walls)
+  if (climbable.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
   return Array.from({ length: count }, () => {
-    const wall = walls[Math.floor(rng() * walls.length)]
+    const wall = climbable[Math.floor(rng() * climbable.length)]
     const margin = Math.min(CLIMB.margin, wall.width / 2)
     return {
       wall,
