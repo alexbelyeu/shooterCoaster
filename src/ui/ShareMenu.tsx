@@ -139,7 +139,7 @@ export default function ShareMenu({ card, onShared, avoid = [], prerender = fals
   // and the menu opens instead: draw it once the reveal is done. The press still starts it if this has not run.
   useEffect(() => {
     if (prerender && isTouch() && canShareImage(navigator)) cardPng('story').catch(() => {})
-  }, [prerender, card])
+  }, [prerender, card, photo])
 
   useEffect(() => {
     if (!flash) return

@@ -680,17 +680,28 @@ const PHOTO_FRAME_FACTOR = 2
  * `PHOTO_FRAME_FACTOR` times a frame without it.
  */
 async function ridePhotoProblems(page, id) {
+  // The jump is made with the ride frozen: on a slow runner one frame rides further than the approach, and a jump and
+  // a pass on the same frame read as one jump, never a pass. Frozen, `RidePhoto` sees the car short of the marker first.
   const start = await page.evaluate((approach) => {
     const s = window.__SC_TEST__
     if (s.ridePhoto.at == null) return null
     const taken = s.ridePhoto.taken
     if (!taken) {
-      s.setTimeScale(1)
+      s.setTimeScale(0)
       s.rideTo = Math.max(0, s.ridePhoto.at - approach)
     }
-    return { taken }
+    return { taken, frames: s.frames }
   }, PHOTO_APPROACH)
   if (!start) return { problems: ['on-ride photo: no marker (RidePhoto not mounted)'], result: null }
+  let jumpedTo = null
+  if (!start.taken) {
+    await page.waitForFunction((f) => window.__SC_TEST__.frames >= f + 3, start.frames, { timeout: 30000, polling: 50 }).catch(() => {})
+    jumpedTo = await page.evaluate(() => {
+      const s = window.__SC_TEST__
+      s.setTimeScale(1)
+      return s.rideProgress
+    })
+  }
   const flash = start.taken
     ? null
     : page.waitForFunction(() => window.__SC_TEST__.ridePhoto.flashed, null, { timeout: 60000, polling: 100 }).then(() => true, () => false)
@@ -699,7 +710,7 @@ async function ridePhotoProblems(page, id) {
     .then(() => true, () => false)
   const result = await page.evaluate(() => ({ ...window.__SC_TEST__.ridePhoto, avgFrameMs: window.__SC_TEST__.avgFrameMs }))
   const problems = []
-  if (!arrived) problems.push(`on-ride photo not taken (marker at track ${result.at?.toFixed(4)}, ride at ${(await page.evaluate(() => window.__SC_TEST__.rideProgress)).toFixed(4)})`)
+  if (!arrived) problems.push(`on-ride photo not taken (marker at track ${result.at?.toFixed(4)}, ride at ${(await page.evaluate(() => window.__SC_TEST__.rideProgress)).toFixed(4)}; jumped to ${jumpedTo?.toFixed(4)}; ${JSON.stringify(result.trace)})`)
   else {
     if (flash && !(await flash)) problems.push('on-ride photo: no flash on screen')
     const usual = Math.max(result.beforeMs, result.avgFrameMs)

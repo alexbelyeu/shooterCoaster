@@ -51,7 +51,8 @@ interface RideState {
   /** Passed this frame: captured once it has rendered. */
   due: boolean
   taken: boolean
-  /** The frame after the capture: it reports how long the capture's frame took (under e2e) and collects nothing. */
+  /** The frame after the capture: it reports how long the capture's frame took (under e2e), starts the readback and
+   *  flashes, so the capture's frame does nothing but the blit. */
   timing: boolean
   /** Frames the snapshot has been on its way back. */
   waited: number
@@ -82,14 +83,22 @@ export default function RidePhoto({ table, at }: { table: ArcTable; at: number }
   }, [table, at])
 
   useEffect(() => {
-    const worker = new Worker(new URL('./ridePhoto.worker.ts', import.meta.url), { type: 'module' })
-    worker.onmessage = (e: MessageEvent<DevelopResult>) => developed(e.data)
-    worker.onerror = () => tracePhoto('failed')
+    let worker: Worker | null = null
+    try {
+      worker = new Worker(new URL('./ridePhoto.worker.ts', import.meta.url), { type: 'module' })
+    } catch {
+      // No module workers here (a sandboxed portal frame, an old browser): no photo, and the card keeps the postcard.
+      tracePhoto('failed')
+    }
+    if (worker) {
+      worker.onmessage = (e: MessageEvent<DevelopResult>) => developed(e.data)
+      worker.onerror = () => tracePhoto('failed')
+    }
     darkroom.current = worker
     snapshot.current = new GpuSnapshot(gl.getContext() as WebGL2RenderingContext)
     return () => {
       darkroom.current = null
-      worker.terminate()
+      worker?.terminate()
       snapshot.current?.dispose()
       snapshot.current = null
       clearRidePhoto()
@@ -111,6 +120,8 @@ export default function RidePhoto({ table, at }: { table: ArcTable; at: number }
       const testApi = window.__SC_TEST__
       if (testApi) testApi.ridePhoto.frameMs = delta * 1000
       tracePhoto('nextFrame')
+      shot?.read()
+      eventBus.emit(RIDE_PHOTO_EVENT)
     } else if (shot?.pending) {
       // Two frames after the capture at the earliest, so the readback never shares the capture's frame.
       const back = shot.collect()
@@ -136,6 +147,7 @@ export default function RidePhoto({ table, at }: { table: ArcTable; at: number }
         const shot = snapshot.current
         if (!s.due || !shot) return
         s.due = false
+        if (!darkroom.current) return
         s.timing = true
         s.waited = 0
         const started = performance.now()
@@ -144,7 +156,6 @@ export default function RidePhoto({ table, at }: { table: ArcTable; at: number }
         shot.take(width, height)
         const testApi = window.__SC_TEST__
         if (testApi) Object.assign(testApi.ridePhoto, { taken: true, progress: rideProgress(), captureMs: performance.now() - started, trace: { start: started } })
-        eventBus.emit(RIDE_PHOTO_EVENT)
       }),
     [gl],
   )

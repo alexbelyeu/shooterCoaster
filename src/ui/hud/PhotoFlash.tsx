@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { eventBus } from '@/core/EventBus'
-import { RIDE_PHOTO_EVENT } from '@/store/ridePhoto'
-import { tracePhoto } from '@/store/ridePhoto'
+import { RIDE_PHOTO_EVENT, tracePhoto } from '@/store/ridePhoto'
 
 /** Under e2e: the flash got on screen (it lasts 0.35 s, less than one smoke frame on a software renderer). */
 function markFlashed() {
