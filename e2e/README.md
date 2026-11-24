@@ -322,7 +322,11 @@ every `smoke (<shard>)`, and `unit + build` too unless it touched `scripts/`; `v
 Any other PR runs the full gate. `portal` (the portal build smoked under `/nested/path/`) runs only on a PR touching
 `vite.config.ts`, `index.html`, `public/`, `scripts/portal/`, `package*.json` or `ci.yml`, on a hand-started run, and in the
 nightly run on `main` (`schedule`, the full gate plus `portal`, its own concurrency group). Merges to `main` run the full gate
-without `portal`.
+without `portal`. `offline (service worker)` (#1004) is the one PR job that registers the service worker (the smoke loads `?e2e=1`,
+Lighthouse runs on `vite preview`): `node e2e/prod-check.mjs --checks assets,routes,offline` on the job's own `dist/` ("Production"
+below; ~1 min, artifact `e2e-results-offline`). `verify` requires it where it is planned: a PR touching `src/sw/`,
+`scripts/swPrecache.mjs`, `src/app/serviceWorker.ts`, `vite.config.ts`, `vercel.json`, `e2e/prod-check.mjs` or `ci.yml` (`SW_INPUT`,
+tests excluded), a hand-started run and the nightly; reproduce it locally with the same command after `npm run build`.
 
 ## Production (`.github/workflows/prod-smoke.yml`, #352)
 
@@ -343,6 +347,7 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   (`prod-offline-ride.png`), no failed request but `/api/*`; `assets` also fetches every file `/sw.js` precaches. Rules in pure `scripts/prodCheckRules.mjs`. Writes `prod-check.json`
   (`checks`, `running`, `finished`) after every check, so a run stopped at its cap still says where it was. Without
   `--url` it serves `--dist` (default `dist/`) on localhost the way `vercel.json` says Vercel would, for local runs.
+  `--checks <id,…>` runs only those (an unknown id exits 2; no browser starts for `assets,routes` alone): CI's `offline` job above.
   Back-to-back deploys: the job's concurrency group cancels the older run, which reports nothing.
 - **Nightly full smoke** (06:00 UTC): every step on every level, so it is also where the deep checks the PR shards leave
   out run (#372, "Two depths" above). One run outgrew its 60 min cap once level 6 joined every deep step (#570), so it runs
