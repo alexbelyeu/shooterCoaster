@@ -10,6 +10,7 @@ import type { TrackCurve } from './curves/TrackCurve'
 import type { HeroShot } from './introCamera.hot'
 import { clampIntoBounds, type PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import { INTRO_SECONDS } from '@/core/introShot'
+import { smoothstep } from '@/utils/ease'
 
 /** A tour waypoint: where the camera is and the point it looks at there. */
 export interface TourShot {
@@ -280,10 +281,6 @@ function pathDistances(pos: Float32Array, count: number): Float32Array {
   return dist
 }
 
-function smoothstep(x: number): number {
-  const t = Math.min(Math.max(x, 0), 1)
-  return t * t * (3 - 2 * t)
-}
 
 /** `passes` running means of `values` over ±`radius` of path length (`dist`, rising): three are close to a Gaussian. */
 function boxPasses(dist: Float32Array, values: Float32Array, radius: number, passes: number): Float32Array {

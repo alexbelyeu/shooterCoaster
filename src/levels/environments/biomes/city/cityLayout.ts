@@ -1,7 +1,8 @@
 import type { ArcTable } from '@/track/arcLength'
 import { buildTrackIndex, type TrackIndex } from '@/levels/environments/shared/trackClearance'
 import { createRng, type Rng } from '@/utils/rng'
-import { ELEVATED_LINE, LANDMARK_SITE, RIDE_TOWERS, SPIRE_HEIGHT } from './config'
+import { LANDMARK_SITE, RIDE_TOWERS, SPIRE_HEIGHT, STREET_GRID } from './config'
+import { HIGHWAY, highwayObstacles, nearHighway } from './highwayLayout'
 
 /**
  * Neon Metropolis's city plan (#323), pure and seeded: towers on a street grid, kept off the track and its support
@@ -10,9 +11,6 @@ import { ELEVATED_LINE, LANDMARK_SITE, RIDE_TOWERS, SPIRE_HEIGHT } from './confi
  * The ride runs down the streets' centre lines (#871), so the towers either side stand `TRACK_CLEARANCE` off the rails:
  * close at speed. The ride's own towers (`RIDE_TOWERS`: the lift's, the first drop's) stand where the ride needs them.
  */
-
-/** Block pitch and street width (world units): the asphalt shader paints the same grid. */
-export const STREET_GRID = { pitch: 240, street: 64 } as const
 
 /** A box tower standing on the ground at (x, z): footprint `w` × `d`, `h` tall, axis-aligned to the grid. */
 export interface Tower {
@@ -54,6 +52,8 @@ export const TRACK_CLEARANCE = 30
 const SIGN_CLEARANCE = 20
 /** The shortest blade worth hanging. */
 const MIN_BLADE = 8
+/** Clearance from the elevated highway's deck (`highwayLayout.ts`) to a tower's corner. */
+const HIGHWAY_CLEARANCE = 8
 /** Towers within this of the track carry signs. */
 const SIGN_REACH = 420
 const NEON: readonly NeonColor[] = ['magenta', 'cyan', 'magenta', 'cyan', 'amber']
@@ -173,6 +173,7 @@ export function layoutCity(track: ArcTable, extent: number, seed = 7323): CityLa
         const t = { x: l.x, z: l.z, w, d, h: towerHeight(rng) }
         if (!clearOfTrack(track, index, t, TRACK_CLEARANCE)) continue
         if (Math.hypot(l.x - LANDMARK_SITE.x, l.z - LANDMARK_SITE.z) < HERO_CLEARANCE) continue
+        if (nearHighway(HIGHWAY, t.x, t.z, Math.hypot(t.w, t.d) / 2 + HIGHWAY_CLEARANCE)) continue
         if (RIDE_TOWERS.some((r) => Math.abs(r.x - t.x) < (r.w + t.w) / 2 && Math.abs(r.z - t.z) < (r.d + t.d) / 2)) continue
         towers.push(t)
         const near = nearestTrackPoint(track, t.x, t.z)
@@ -231,40 +232,14 @@ export function layoutHeroTower(): { tiers: Tower[]; neon: NeonSign[] } {
   return { tiers, neon }
 }
 
-/** A box standing at `y` (its base) on the ground plan's (x, z), `w` × `d`, `h` tall. */
-export interface RaisedBox extends Tower {
-  y: number
+/** Every tower standing on the blocks: the blocks', the skyline and the hero tower's tiers (the traffic drives between them). */
+export function streetTowers(layout: Pick<CityLayout, 'towers' | 'skyline'>): Tower[] {
+  return [...layout.towers, ...layout.skyline, ...layoutHeroTower().tiers]
 }
 
-/**
- * The elevated train line (#871, `ELEVATED_LINE`): its deck, the pillars under it on the block centres and a train standing
- * over the crossing the ride passes under, its windows neon strips down both sides.
- */
-export function layoutElevatedLine(): { boxes: RaisedBox[]; neon: NeonSign[] } {
-  const L = ELEVATED_LINE
-  const boxes: RaisedBox[] = [{ x: (L.from + L.to) / 2, y: L.under, z: L.z, w: L.to - L.from, h: L.deck, d: L.width }]
-  const { pitch } = STREET_GRID
-  for (let x = Math.ceil(L.from / pitch) * pitch; x <= L.to; x += pitch) boxes.push({ x, y: 0, z: L.z, w: L.pillar, h: L.under, d: L.pillar })
-  const neon: NeonSign[] = []
-  const { length, height, width, gap } = L.car
-  const top = L.under + L.deck
-  const first = L.trainX - ((L.cars - 1) * (length + gap)) / 2
-  for (let k = 0; k < L.cars; k++) {
-    const x = first + k * (length + gap)
-    boxes.push({ x, y: top, z: L.z, w: length, h: height, d: width })
-    for (const side of [-1, 1]) {
-      neon.push({ x, y: top + height * 0.6, z: L.z + side * (width / 2 + 0.3), w: length - 6, h: 2.5, d: 0.6, yaw: 0, color: k === 0 ? 'amber' : 'cyan' })
-    }
-  }
-  return { boxes, neon }
-}
-
-/** Every tower an air enemy must stay out of: the blocks, the skyline, the hero tower's tiers and the train line (as a wall). */
+/** Every tower an air enemy must stay out of: the street towers and the elevated highway. */
 export function cityTowers(track: ArcTable, extent: number): Tower[] {
-  const { towers, skyline } = layoutCity(track, extent)
-  const line = ELEVATED_LINE
-  const wall = { x: (line.from + line.to) / 2, z: line.z, w: line.to - line.from, d: line.width, h: line.under + line.deck + line.car.height }
-  return [...towers, ...skyline, ...layoutHeroTower().tiers, wall]
+  return [...streetTowers(layoutCity(track, extent)), ...highwayObstacles(HIGHWAY)]
 }
 
 /** How far an air enemy's centre must stay from a tower's faces (x, z) and above its roof (y). */
@@ -306,4 +281,70 @@ export function clearOfTowers(towers: readonly Tower[], p: Point, ground: number
     if (clearOf(towers, q, ground, c)) return q
   }
   return p
+}
+
+/** How far off a street's centre line a ground enemy stands: past the traffic lanes, on the pavement's edge (#963). */
+export const KERB_OFFSET = 22
+/** A pavement spot stays this far from the rails and their towers, as the traffic does (`trafficPaths.ts`). */
+const PAVEMENT_TRACK_CLEARANCE = 44
+const PAVEMENT_TOWER_CLEARANCE = 12
+
+/** Height over its foot of the bot's face, the point a tower must not hide from the rider. */
+const FACE_HEIGHT = 25
+
+/** Whether a tower stands across the line from `eye` to `FACE_HEIGHT` over `q` (`ground` the street's height): the line's lowest point over its footprint is under its roof. */
+function hidden(towers: readonly Tower[], eye: Point, q: Point, ground: number): boolean {
+  const dx = q.x - eye.x
+  const dy = q.y + FACE_HEIGHT - eye.y
+  const dz = q.z - eye.z
+  // The slab test: where the line enters and leaves the tower's footprint (a zero d divides to ±Infinity, as it should)
+  return towers.some((t) => {
+    const ax = (t.x - t.w / 2 - eye.x) / dx
+    const bx = (t.x + t.w / 2 - eye.x) / dx
+    const az = (t.z - t.d / 2 - eye.z) / dz
+    const bz = (t.z + t.d / 2 - eye.z) / dz
+    const t0 = Math.max(0, Math.min(ax, bx), Math.min(az, bz))
+    const t1 = Math.min(1, Math.max(ax, bx), Math.max(az, bz))
+    return t0 < t1 && eye.y + dy * (dy < 0 ? t1 : t0) - ground < t.h
+  })
+}
+
+/**
+ * The kerb spot on the nearest streets either way of a ground enemy's `p`, clear of the rails and every tower, that
+ * the most of the approach's looks see past the towers (`eyesSeeing`: the eyes whose cone holds a spot, #963); the
+ * nearest of equals. Where the rails take every kerb in reach (the helix round the hero tower, #871), the best kerb clear
+ * of the towers alone, so nothing stands inside one; else `p`.
+ */
+export function onPavement(towers: readonly Tower[], index: TrackIndex, p: Point, eyesSeeing: (q: Point) => Point[]): Point {
+  const { pitch } = STREET_GRID
+  const clearance = { x: PAVEMENT_TOWER_CLEARANCE, y: 0, z: PAVEMENT_TOWER_CLEARANCE }
+  let best = p
+  let bestSeen = -1
+  let bestDist = Infinity
+  for (const offRails of [true, false]) {
+    for (const alongX of [true, false]) {
+      const nearest = Math.round((alongX ? p.z : p.x) / pitch - 0.5)
+      for (let k = -1; k <= 1; k++) {
+        for (const side of [-1, 1]) {
+          const across = (nearest + k + 0.5) * pitch + side * KERB_OFFSET
+          const q = alongX ? { x: p.x, y: p.y, z: across } : { x: across, y: p.y, z: p.z }
+          if ((offRails && index.near(q.x, q.z, PAVEMENT_TRACK_CLEARANCE)) || !clearOf(towers, q, p.y, clearance)) continue
+          const seen = eyesSeeing(q).filter((eye) => !hidden(towers, eye, q, p.y)).length
+          const dist = Math.hypot(q.x - p.x, q.z - p.z)
+          if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) [best, bestSeen, bestDist] = [q, seen, dist]
+        }
+      }
+    }
+    if (best !== p) return best
+  }
+  return best
+}
+
+/** Which way the street under a spot runs (the one along x where two cross); null inside a block. */
+export function streetAxis(x: number, z: number): 'x' | 'z' | null {
+  const { pitch, street } = STREET_GRID
+  const offLine = (c: number) => Math.abs(((c / pitch - 0.5) % 1 + 1.5) % 1 - 0.5) * pitch
+  if (offLine(z) <= street / 2) return 'x'
+  if (offLine(x) <= street / 2) return 'z'
+  return null
 }

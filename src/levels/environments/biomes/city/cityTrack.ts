@@ -7,13 +7,13 @@
  * - **0 s, the station** on the avenue south of the centre: GO launches it east between the neon signs.
  * - **5–13 s, the lift hill**: round north and up a chain beside the lift tower's face, drones alongside.
  * - **15 s, the first drop**: round east at the top and down (66°) between the two drop towers into the street below.
- * - **20.5 s, the head-chopper**: north under the elevated train line's deck, a train standing on it (the near miss).
+ * - **20.5 s, the head-chopper**: north under the elevated highway's deck (`highwayLayout.ts`), the near miss.
  * - **26 s, the airtime crest** west along the north side, the hero tower ahead.
  * - **31–40 s, the helix**: a climbing turn and a quarter round the hero tower; it comes out as the helicopter arrives (40 s).
  * - **40–60 s, the face-off**: a slow run back south through the west side's streets for the fight.
  * - **After the run, home**: the brake run into the station.
  *
- * `cityTrack.test.ts` holds it to the beats and to its clearances (the towers, the hero tower, the train line, itself).
+ * `cityTrack.test.ts` holds it to the beats and to its clearances (the towers, the hero tower, the highway, itself).
  */
 import type { RideBeat, RideMechanic, RideV2Spec, SpeedZone, SplineTrackParams } from '@/types/level'
 import { createSplineCurve } from '@/track/curves/SplineCurve'
@@ -24,7 +24,8 @@ import { straightTo, trimUnrolledUps } from '@/track/elements/climbing'
 import { placeMechanics, station } from '@/track/elements/mechanicElements'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { RIDE_V2_DEFAULTS } from '@/track/rideV2'
-import { ELEVATED_LINE, LANDMARK_SITE } from './config'
+import { LANDMARK_SITE } from './config'
+import { DECK, HIGHWAY } from './highwayLayout'
 
 /** Level 7's structure scale. */
 const SCALAR = 20
@@ -48,16 +49,16 @@ const STATION = { x: -840, y: 12, z: 600 } as const
 /** The lift: north up the street beside the lift tower, to the crest. */
 const LIFT = { x: -120, toZ: -360, topY: 300 } as const
 /**
- * The first drop: east along the top to `edge`, then down the street between the drop towers to the train line's height at
+ * The first drop: east along the top to `edge`, then down the street between the drop towers to the head-chopper's height at
  * `grade`, pitched over the edge slowly (`top`) and out at the bottom on a wider radius, the car being fast by then.
  */
 const DROP = { edge: 120, grade: 62 * DEG, top: 35, bottom: 100 } as const
-/** The street ridden under the elevated line (north along x = 600). */
-const CROSSING = { x: 600, toZ: -720 } as const
+/** The street ridden under the elevated highway (north along x = 600, under the deck at its end). */
+const CROSSING = { x: 600, toZ: HIGHWAY.from.z } as const
 const RAIL = headChopper(
   {
-    min: { x: ELEVATED_LINE.from, y: ELEVATED_LINE.under, z: ELEVATED_LINE.z - ELEVATED_LINE.width / 2 },
-    max: { x: ELEVATED_LINE.to, y: ELEVATED_LINE.under + ELEVATED_LINE.deck, z: ELEVATED_LINE.z + ELEVATED_LINE.width / 2 },
+    min: { x: HIGHWAY.from.x, y: HIGHWAY.deck - DECK.thickness, z: HIGHWAY.from.z - DECK.width / 2 },
+    max: { x: HIGHWAY.to.x, y: HIGHWAY.deck + DECK.parapet, z: HIGHWAY.from.z + DECK.width / 2 },
   },
   { x: 0, y: -1, z: 0 },
   { eyeHeight: EYE, clearance: 2, gap: EYE },
@@ -110,11 +111,10 @@ export function buildCityRide(): CityRide {
   zone('brake', SPEED.street, () => {
     b.mark('straight', () => straightTo(b, 'x', CROSSING.x - CORNER))
     corner(LEFT)
-    b.mark('straight', () => straightTo(b, 'z', ELEVATED_LINE.z + 4 * EYE))
-    b.mark('headChopper', () => straightTo(b, 'z', ELEVATED_LINE.z - 4 * EYE))
+    b.mark('straight', () => straightTo(b, 'z', CROSSING.toZ + 4 * EYE))
+    b.mark('headChopper', () => straightTo(b, 'z', CROSSING.toZ))
   })
   zone('lift', SPEED.street, () => {
-    b.mark('straight', () => straightTo(b, 'z', CROSSING.toZ))
     corner(LEFT)
     b.mark('straight', () => straightTo(b, 'x', CREST.fromX))
   })

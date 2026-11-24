@@ -1,4 +1,5 @@
 import type { DarkSectionSpec } from '@/types/level'
+import { smoothstep } from '@/utils/ease'
 
 /**
  * Dark sections (#752): how dark the ride is at track parameter `t`, 0 in the light to 1 once a section's `ramp` past its
@@ -7,8 +8,7 @@ import type { DarkSectionSpec } from '@/types/level'
 export function darkSectionDepth(sections: readonly DarkSectionSpec[] | undefined, t: number): number {
   const s = darkSectionAt(sections, t)
   if (!s) return 0
-  const k = Math.min(Math.max(Math.min(t - s.from, s.to - t) / Math.max(s.ramp, 1e-6), 0), 1)
-  return k * k * (3 - 2 * k)
+  return smoothstep(Math.min(t - s.from, s.to - t) / Math.max(s.ramp, 1e-6))
 }
 
 /** The dark section the ride is in at track parameter `t`, if any. */

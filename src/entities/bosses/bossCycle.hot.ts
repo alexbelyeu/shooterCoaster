@@ -1,11 +1,9 @@
+import { smoothstep } from '@/utils/ease'
 /** What the ground bosses share, pure and allocation-free per frame: exposure windows, when to move on, the rider's heading. */
 
 export const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 
-export const smooth = (x: number) => {
-  const t = clamp01(x)
-  return t * t * (3 - 2 * t)
-}
+export { smoothstep as smooth }
 
 /** A window that opens every `period` s from `first` and stays open `openS`, easing in and out over `rampS`. */
 export interface ExposureWindow {
@@ -30,7 +28,7 @@ export function inWindow(w: ExposureWindow, t: number): boolean {
 export function windowAmount(w: ExposureWindow, t: number): number {
   const u = windowCycle(w, t)
   if (u < 0 || u >= w.openS) return 0
-  return Math.min(smooth(u / w.rampS), smooth((w.openS - u) / w.rampS))
+  return Math.min(smoothstep(u / w.rampS), smoothstep((w.openS - u) / w.rampS))
 }
 
 /** 0 while open. */

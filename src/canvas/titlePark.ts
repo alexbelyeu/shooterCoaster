@@ -4,6 +4,7 @@ import { createRng } from '@/utils/rng'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { PALETTE, PATH_HALF_WIDTH, STALL_DEPTH, STALL_WIDTH, type PathRow, type Placement, type Pole, type Stall, type Wire, wirePoint } from '@/levels/environments/biomes/themePark/parkSpec'
 import { CROSSING_LOOP, MAIN_LOOP, type TitleLoop, loopTrack } from './titleCoaster'
+import { smoothstep } from '@/utils/ease'
 
 export interface Spot {
   x: number
@@ -379,10 +380,7 @@ function valueNoise(x: number, y: number, cell: number, seed: number): number {
   return top + (bottom - top) * sy
 }
 
-const smooth = (a: number, b: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
-  return t * t * (3 - 2 * t)
-}
+const smooth = (a: number, b: number, x: number) => smoothstep((x - a) / (b - a))
 
 /** sRGB RGBA texels of the grass: broad light and dark swathes, drier patches, a fine mottle. */
 export function grassTexels(size: number): Uint8Array {

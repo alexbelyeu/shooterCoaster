@@ -1,4 +1,4 @@
-import type { LevelConfig, LevelRide } from '@/types/level'
+import type { LevelConfig } from '@/types/level'
 import { paceLevel } from './pacing'
 // Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS (#863). Every other generated
 // ride is its world chunk's (`World.rides`), out of the startup JS altogether (#960).
@@ -193,20 +193,21 @@ const LEVELS: LevelConfig[] = [
     description: 'Drones over the city that never sleeps',
     order: 7,
     biome: 'city',
-    maxScore: 82 * 15 + 60 + 60 + 400, // 1230 + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1750
+    maxScore: 55 * 15 + 25 * 20 + 60 + 60 + 400, // 55 drones and 25 bots, 1325, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1845
     message: 'You cleared Neon Metropolis!',
     nextLevel: null,
     // The ride kit's storyboard down the city's streets (#871, `cityTrack.ts`), shipped in the city world's chunk (#960).
-    // Drone waves every ~6 s to 29 s, then the Helicopter (#325) at 40 s over the helix; the towers hide stragglers, so
-    // the waves are big. 'Patrol Wing!' is one group: on this compact ride a second 'v' group is in reach from activation
-    // and would march before the rider got there (#472).
+    // The air and the street take turns (#963): hover drones patrol the canyons in Vs, rings and a spiral, billboard bots
+    // march the pavements beside the track between them, then the Helicopter (#325) arrives at 40 s over the helix.
+    // Every drone wave is a formation ahead of the rider: scattered over the whole city, the towers hid them and left
+    // the rider with nothing to shoot for most of the run (the pacing gate).
     ...paceLevel({
       waves: [
         { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v', weight: 0.75 },
+        { type: 'billboardBot', count: 12, waveLabel: 'Billboard Bots!' },
         { type: 'hoverDrone', count: 8, waveLabel: 'Surveillance Ring!', formation: 'ring' },
-        { type: 'hoverDrone', count: 9, waveLabel: 'Patrol Wing!', formation: 'v' },
-        { type: 'hoverDrone', count: 21, waveLabel: 'Street Sweep!', formation: 'spiral' },
-        { type: 'hoverDrone', count: 14, waveLabel: 'Swarm Protocol!', formation: 'v' },
+        { type: 'billboardBot', count: 13, waveLabel: 'Street March!' },
+        { type: 'hoverDrone', count: 17, waveLabel: 'Street Sweep!', formation: 'spiral' },
         { type: 'hoverDrone', count: 21, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.5 },
       ],
       boss: 'helicopter',
@@ -222,19 +223,6 @@ export function getLevelConfig(id: string): LevelConfig | undefined {
 
 export function getAllLevels(): LevelConfig[] {
   return [...LEVELS].sort((a, b) => a.order - b.order)
-}
-
-/** The rides that came with their worlds' chunks (`addRides`, from `loadWorld`), by level. */
-const arrivedRides = new Map<string, LevelRide>()
-
-/** A world chunk's rides, once it has arrived (`loadWorld`). */
-export function addRides(rides: Readonly<Record<string, LevelRide>>): void {
-  for (const [id, ride] of Object.entries(rides)) arrivedRides.set(id, ride)
-}
-
-/** A level's ride: the registry's (level 1's), else its world's once that chunk is in (#960); undefined before. */
-export function levelRide(id: string): LevelRide | undefined {
-  return getLevelConfig(id)?.ride ?? arrivedRides.get(id)
 }
 
 /** The level whose `nextLevel` is `id` (its star unlocks `id`); null for the first level or an unknown id. */

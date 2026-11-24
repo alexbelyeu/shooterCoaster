@@ -9,13 +9,16 @@ import { shippedLevel } from '@/levels/shippedLevels'
 import type { TrackParams } from '@/types/level'
 import { trackExtent } from '../../shared/trackScatter'
 import { buildCityRide, CITY_TRACK } from './cityTrack'
-import { layoutCity, layoutElevatedLine, layoutHeroTower, type RaisedBox, type Tower } from './cityLayout'
-import { ELEVATED_LINE, RIDE_TOWERS } from './config'
+import { layoutCity, layoutHeroTower, type Tower } from './cityLayout'
+import { RIDE_TOWERS } from './config'
+import { DECK, HIGHWAY } from './highwayLayout'
 
 const DEG = 180 / Math.PI
 const solid = (t: Tower): Box => ({ min: { x: t.x - t.w / 2, y: -10, z: t.z - t.d / 2 }, max: { x: t.x + t.w / 2, y: t.h, z: t.z + t.d / 2 } })
-const L = ELEVATED_LINE
-const deck: Box = { min: { x: L.from, y: L.under, z: L.z - L.width / 2 }, max: { x: L.to, y: L.under + L.deck, z: L.z + L.width / 2 } }
+const deck: Box = {
+  min: { x: HIGHWAY.from.x, y: HIGHWAY.deck - DECK.thickness, z: HIGHWAY.from.z - DECK.width / 2 },
+  max: { x: HIGHWAY.to.x, y: HIGHWAY.deck + DECK.parapet, z: HIGHWAY.from.z + DECK.width / 2 },
+}
 
 // The authored ride and the one the game ships (`cityLevel.ts`, rounded to whole units by `gen-ride-levels.mjs`).
 describe.each([
@@ -48,13 +51,13 @@ describe.each([
     expect(steepest * DEG).toBeGreaterThanOrEqual(60)
   })
 
-  it('passes under the elevated line close but clear: the near miss', () => {
+  it('passes under the elevated highway close but clear: the near miss', () => {
     const near = eyeClearance(curve, deck, eye)
     expect(near).toBeGreaterThan(eye / 2)
     expect(near).toBeLessThan(2 * eye)
   })
 
-  it('passes the ride towers close on both sides, and every tower, the hero tower and the line clear', () => {
+  it('passes the ride towers close on both sides, and every tower and the hero tower clear', () => {
     const near = RIDE_TOWERS.map((t) => eyeClearance(curve, solid(t), eye, 0, 1, 4000))
     for (const d of near) expect(d).toBeLessThan(8 * eye)
     const { towers } = layoutCity(table, trackExtent(table))
@@ -62,9 +65,6 @@ describe.each([
     let closest = Infinity
     for (const t of all) closest = Math.min(closest, eyeClearance(curve, solid(t), eye, 0, 1, 2000))
     expect(closest).toBeGreaterThan(4 * eye)
-    // The line's deck is the near miss (above); its pillars and the train stand clear
-    const raised = (b: RaisedBox): Box => ({ min: { x: b.x - b.w / 2, y: b.y, z: b.z - b.d / 2 }, max: { x: b.x + b.w / 2, y: b.y + b.h, z: b.z + b.d / 2 } })
-    for (const b of layoutElevatedLine().boxes.slice(1)) expect(eyeClearance(curve, raised(b), eye, 0, 1, 2000)).toBeGreaterThan(eye)
   })
 
   it('winds the helix round the hero tower', () => {
