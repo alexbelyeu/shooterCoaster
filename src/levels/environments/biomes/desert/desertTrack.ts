@@ -16,7 +16,7 @@
  * - **55–60 s, the brake run** into the station: home.
  *
  * `desertTrack.test.ts` holds it to the beats and its clearances (the ground, the Pyramid's passage, the canyon's mesas).
- * The level rides its copy in `desertLevel.ts` (`node scripts/gen-desert-level.mjs`), which keeps the ride elements out of
+ * The level rides its copy in `desertLevel.ts` (`node scripts/gen-ride-levels.mjs level2`), which keeps the ride elements out of
  * the startup JS.
  */
 import type { RideBeat, RideMechanic, RideV2Spec, SpeedZone, SplineTrackParams } from '@/types/level'

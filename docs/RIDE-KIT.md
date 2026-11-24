@@ -119,8 +119,9 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   foot into a cut through the dunes, under the west door's lintel (the near miss, 13 s) and through tier 1's torchlit
   passage in the dark (`Pyramid.tsx` `passage`: torches as emissive points, no lights), a climbing U-turn into the
   sandstorm, a jump gap over the canyon between two fixed mesas (24 s, `CANYON_MESAS`), an airtime hill (31 s) and the
-  boss's slow wide turn round the flats into the brake run. The scorpions come in two packs (0 s and 12 s) so the
-  straight run to the lift doesn't line all thirty up in view.
+  boss's slow wide turn round the flats into the brake run. The scorpions come in two packs (0 s, and 11 s on the sand
+  before the door) so the straight run to the lift doesn't line all thirty up in view; a first crow V (5 s) fills the lift
+  hill's crest, where the view is pitched at the sky (#925's pacing gate).
 - **Ocean (3):** a splashdown, a glass tunnel under the water with the Kraken passing overhead,
   a corkscrew through a sea stack's arch.
 - **Antarctica (4):** built (#866, `arctic/arcticTrack.ts`, its storyboard and seconds at the top): a station launch,

@@ -677,19 +677,26 @@ describe('placeWallSwarm (#516)', () => {
 
 describe('level2: the opening climb (#494)', () => {
   const { level, table, groundFn, rideFor, trackScale, keepOff } = world(getAllLevels().find((l) => l.id === 'level2')!)
-  const packs = level.enemies.filter((w) => w.type === 'scorpion')
+  const opening = level.enemies.filter((w) => (w.spawnDelay ?? 0) <= 12)
   const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
   // The rig's frustum on the smoke's 1280×720 screen (80° vertical), looking where `trackView` does.
   const tanV = Math.tan((REFERENCE_FOV_DEG / 2) * (Math.PI / 180))
   const tanH = tanV * (1280 / 720)
 
-  it('the scorpions\' two packs (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s but the lift\'s crest at 9–10 s, pitched at the sky', () => {
-    const placed = packs.flatMap((wave) => {
+  it('the scorpions\' two packs and the crest\'s crow V (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s', () => {
+    const placed = opening.flatMap((wave) => {
       const riderIndex = indexAhead(table, 0, profile[Math.round((wave.spawnDelay ?? 0) * 10)])
       const camera = trackView(table, riderIndex, trackScale).eye
-      return placeTracksideWave({
-        table, riderIndex, camera, type: wave.type, groundFn, slots: tracksideSlots(wave.count, 'ground', createRng(1337)), ride: rideFor(wave), keepOff,
-      }).map((p) => ({ ...p, from: wave.spawnDelay ?? 0 }))
+      const ride = rideFor(wave)
+      const spots: Vec3[] = wave.formation && wave.formation !== 'scatter'
+        ? placeFormationWave({
+          table, riderIndex, camera, formation: wave.formation, origin: wave.formationOrigin, type: wave.type, groundFn,
+          slots: formationSlots(wave.formation, wave.count, createRng(1337)), ride,
+        }).map((p) => p.position)
+        : placeTracksideWave({
+          table, riderIndex, camera, type: wave.type, groundFn, slots: tracksideSlots(wave.count, 'ground', createRng(1337)), ride, keepOff,
+        })
+      return spots.map((p) => ({ ...p, from: wave.spawnDelay ?? 0 }))
     })
     const seen: number[] = []
     for (let t = 1; t <= 12; t++) {
@@ -707,7 +714,6 @@ describe('level2: the opening climb (#494)', () => {
         return depth > 0 && Math.abs(across) <= tanH * depth && Math.abs(high) <= tanV * depth
       }).length)
     }
-    seen.splice(8, 2)
     expect(Math.min(...seen), seen.join(',')).toBeGreaterThanOrEqual(3)
   })
 })
