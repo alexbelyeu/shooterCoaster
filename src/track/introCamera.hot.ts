@@ -8,6 +8,7 @@ import type { Vec3Like } from './cameraRig.hot'
 import { type IntroTour, type TourShot, tourDistance } from './introTour'
 import { clampIntoBounds, type PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import { INTRO_SECONDS } from '@/core/introShot'
+import { smoothstep } from '@/utils/ease'
 
 /** What a level's intro and results frame: its landmark (`BiomeDefinition.hero`, in each `biomes/<biome>/index.ts`). */
 export interface HeroShot {
@@ -96,10 +97,6 @@ function spline(p0: number, p1: number, p2: number, p3: number, f: number): numb
   return p1 + 0.5 * f * (p2 - p0 + f * (2 * p0 - 5 * p1 + 4 * p2 - p3 + f * (3 * (p1 - p2) + p3 - p0)))
 }
 
-function smoothstep(x: number): number {
-  const t = Math.min(Math.max(x, 0), 1)
-  return t * t * (3 - 2 * t)
-}
 
 /**
  * The results orbit `seconds` in: position into `outPos`, the point it looks at into `outTarget`. A full circle

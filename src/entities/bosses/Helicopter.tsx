@@ -4,7 +4,6 @@ import * as THREE from 'three'
 import { gameClockStep } from '@/core/gameClock'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { BOSS_DEFEAT_DEATH_STYLE, HELI_CRASH_DEATH_STYLE, HELI_PART_DEATH_STYLE, HELI_SMOKE_DEATH_STYLE } from '@/effects/deathStyles'
-import type { HeightFunction } from '@/utils/terrainNoise'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
 import { isExposed, weakPointHp, type WeakPointSpec } from './bossModel'
 import { HELICOPTER, HELI_LAYOUT } from './bossSpecs'
@@ -14,8 +13,10 @@ import {
   HELI_TAIL_ROTOR_GEO,
 } from './helicopterAssets'
 import { flatForward } from './bossAim.hot'
-import { followHeading, smooth, type FlatDir } from './bossCycle.hot'
-import { HELI, HELI_FALL, beamSpot, dropInHeight, heliPose, type BeamSpot, type HeliPose } from './helicopterMotion.hot'
+import { followHeading, smooth } from './bossCycle.hot'
+import {
+  HELI, HELI_FALL, anchorAt, beamSpot, dropInHeight, heliPose, lookSlope, spotAt, type BeamSpot, type HeliPose,
+} from './helicopterMotion.hot'
 
 /** The beam's opacity once it has swept in; it fades in over the tell. */
 const BEAM_OPACITY = 0.5
@@ -30,21 +31,6 @@ const _spot = new THREE.Vector3()
 const _at = new THREE.Vector3()
 const _pose: HeliPose = { dy: 0, pitch: 0, roll: 0, yaw: 0, drop: 0 }
 const _beam: BeamSpot = { ahead: 0, side: 0 }
-
-/** Where it hovers `age` s into its fight: ahead of the camera on the rider's heading, weaving across the street. */
-function anchorAt(out: THREE.Vector3, cam: THREE.Vector3, h: FlatDir, age: number, ground: HeightFunction): THREE.Vector3 {
-  const side = HELI.side * Math.sin(age * HELI.weaveRate)
-  out.set(cam.x + h.x * HELI.ahead - h.z * side, 0, cam.z + h.z * HELI.ahead + h.x * side)
-  out.y = Math.max(cam.y + HELI.above, ground(out.x, out.z) + HELI.minClearance)
-  return out
-}
-
-/** The searchlight's spot on the street for `spot`, on the rider's heading from the camera. */
-function spotAt(out: THREE.Vector3, cam: THREE.Vector3, h: FlatDir, spot: BeamSpot, ground: HeightFunction): THREE.Vector3 {
-  out.set(cam.x + h.x * spot.ahead - h.z * spot.side, 0, cam.z + h.z * spot.ahead + h.x * spot.side)
-  out.y = ground(out.x, out.z) + 1
-  return out
-}
 
 /** Lays the beam from the lamp at `from` onto the street at `to`, its spot where it lands. */
 function layBeam(beam: THREE.Group, cone: THREE.Object3D, pool: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3) {
@@ -84,11 +70,7 @@ export default function Helicopter(props: BossProps) {
   const beam = useRef<THREE.Group>(null)
   const cone = useRef<THREE.Mesh>(null)
   const pool = useRef<THREE.Mesh>(null)
-  const [tellStep] = useState(() => {
-    HELI_BEAM_MAT.opacity = 0
-    HELI_HUB_MAT.emissiveIntensity = 0
-    return gameClockStep()
-  })
+  const [tellStep] = useState(gameClockStep)
 
   // The tell: the beam sweeps in from off the side of the frame, from up where it will drop in from. On game time.
   useFrame(({ camera }) => {
@@ -97,12 +79,13 @@ export default function Helicopter(props: BossProps) {
     const first = motion.tell === 0
     motion.tell += dt
     flatForward(camera, _fwd)
-    followHeading(motion.heading, _fwd.x, _fwd.z, dt, first)
+    followHeading(motion.heading, _fwd.x, _fwd.z, dt, first, HELI.headingTau)
     camera.getWorldPosition(_cam)
     anchorAt(_lamp, _cam, motion.heading, 0, groundFn).y += HELI.dropIn
     const k = motion.tell / HELICOPTER.tell.seconds
     spotAt(_spot, _cam, motion.heading, beamSpot(_beam, motion.tell, k), groundFn)
     layBeam(beam.current, cone.current, pool.current, _lamp, _spot)
+    // From 0 on the first frame (its step is 0), which also clears a previous fight's opacity off the shared material.
     HELI_BEAM_MAT.opacity = BEAM_OPACITY * smooth(k)
   })
 
@@ -111,11 +94,12 @@ export default function Helicopter(props: BossProps) {
       const fighting = sinceDefeat < 0
       const tailLost = weakPointHp(state, 'tail-rotor') <= 0
       heliPose(_pose, age, tailLost, sinceDefeat)
+      const slope = lookSlope(camera.getWorldDirection(_fwd))
       flatForward(camera, _fwd)
-      followHeading(motion.heading, _fwd.x, _fwd.z, dt, !motion.placed)
+      followHeading(motion.heading, _fwd.x, _fwd.z, dt, !motion.placed, HELI.headingTau)
       const h = motion.heading
       camera.getWorldPosition(_cam)
-      anchorAt(_anchor, _cam, h, age, groundFn)
+      anchorAt(_anchor, _cam, h, age, groundFn, slope)
       _anchor.y += _pose.dy + dropInHeight(age)
 
       const k = 1 - Math.exp(-dt / HELI.followTau)

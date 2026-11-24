@@ -87,6 +87,7 @@ const ENEMIES: Read[] = [
   enemy('dustBunny', 'dustBunny', 'gym', A.DUST_BUNNY_MAT, P.DUST_GREY, P.DUST_CHALK),
   enemy('lanternfly', 'lanternfly', 'gym', A.LANTERNFLY_MAT, P.LANTERNFLY_FOREWING, P.LANTERNFLY_RED, P.LANTERNFLY_BODY),
   enemy('hoverDrone', 'hoverDrone', 'city', A.DRONE_MAT, P.DRONE_BODY, P.DRONE_DOME, glowColour(0, hex(P.DRONE_GLOW), 1.8)),
+  enemy('billboardBot', 'billboardBot', 'city', A.BOT_MAT, P.DRONE_BODY, glowColour(0, hex(P.BOT_FACE), 1.8)),
 ]
 
 const RAMPS: Record<BiomeType, ColorRamp> = {

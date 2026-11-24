@@ -8,6 +8,7 @@ import {
   isInternalThisLoad,
   isLiveSite,
   searchWithoutInternalParam,
+  serviceWorkerEnabled,
   setInternalBrowser,
   type FlagStorage,
 } from './analyticsGate'
@@ -39,6 +40,21 @@ describe('isLiveSite', () => {
     expect(isLiveSite(true, '?internal=1')).toBe(true)
     expect(isLiveSite(true, '?e2e=1')).toBe(false)
     expect(isLiveSite(false, '')).toBe(false)
+  })
+})
+
+describe('serviceWorkerEnabled', () => {
+  it('registers on the live site, internal or not, and wherever ?sw=1 asks', () => {
+    expect(serviceWorkerEnabled(true, false, '')).toBe(true)
+    expect(serviceWorkerEnabled(true, false, '?internal=1')).toBe(true)
+    expect(serviceWorkerEnabled(false, false, '?sw=1&e2e=1')).toBe(true)
+  })
+
+  it('never in dev, vite preview, CI, a test run or the portal build', () => {
+    expect(serviceWorkerEnabled(false, false, '')).toBe(false)
+    expect(serviceWorkerEnabled(true, false, '?e2e=1')).toBe(false)
+    expect(serviceWorkerEnabled(false, false, '?sw=0')).toBe(false)
+    expect(serviceWorkerEnabled(false, true, '?sw=1')).toBe(false)
   })
 })
 

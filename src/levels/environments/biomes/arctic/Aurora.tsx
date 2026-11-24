@@ -9,7 +9,8 @@ import {
   createAuroraMaterial,
 } from './aurora'
 
-export default function Aurora() {
+/** `glow` scales the whole curtain, the Yeti's tell and roar included: a Night Ride's polar night burns it brighter (#994). */
+export default function Aurora({ glow = 1 }: { glow?: number }) {
   const geometry = useMemo(() => createAuroraGeometry(), [])
   const material = useMemo(() => createAuroraMaterial(), [])
   const target = useRef(AURORA_DEFAULT_INTENSITY)
@@ -40,7 +41,7 @@ export default function Aurora() {
     mesh.position.copy(camera.position)
     const u = material.uniforms
     u.uTime.value = clock.elapsedTime
-    u.uIntensity.value += (target.current - u.uIntensity.value) * Math.min(1, delta * 2)
+    u.uIntensity.value += (target.current * glow - u.uIntensity.value) * Math.min(1, delta * 2)
   })
 
   return <primitive object={mesh} />

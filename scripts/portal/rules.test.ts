@@ -35,6 +35,12 @@ describe('portalProblems', () => {
     expect(portalProblems([ok, js])).toEqual(['assets/a.js: carries the share link `go/share` (the portal build has no Share)'])
   })
 
+  it('rejects a service worker, as a file or a registration (#999)', () => {
+    expect(portalProblems([ok, { path: 'sw.js', bytes: 1 }])).toEqual(['sw.js: a service worker in the portal build'])
+    const js = { path: 'assets/a.js', bytes: 1, text: 'navigator.serviceWorker.register("/sw.js")' }
+    expect(portalProblems([ok, js])).toEqual(['assets/a.js: registers a service worker (the portal build must not)'])
+  })
+
   it('caps the file count', () => {
     const many = Array.from({ length: MAX_FILES }, (_, i) => ({ path: `f${i}`, bytes: 1 }))
     expect(portalProblems([ok, ...many])).toEqual([`${MAX_FILES + 1} files (limit ${MAX_FILES})`])

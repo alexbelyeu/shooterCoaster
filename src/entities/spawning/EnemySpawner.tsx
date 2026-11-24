@@ -24,7 +24,7 @@ import { FIRE_IMP_HIT_RADIUS } from '../enemies/fireImpHop.hot'
 import {
   clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge,
   trackPoint, tracksideSlots,
-  type FormationMotion, type FormationSlot, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot,
+  type FormationMotion, type FormationSlot, type SpotClearer, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot,
 } from './spawnPlacement'
 import type { Vec3 } from '@/utils/vec3'
 import {
@@ -52,7 +52,9 @@ interface EnemySpawnerProps {
   /** Landmarks a ground enemy stood away from the track keeps out of (`BiomeDefinition.keepOff`). */
   keepOff?: readonly KeepOff[]
   /** Moves an air enemy's spot out of the world's buildings (`BiomeDefinition.clearAir`). */
-  clearAir?: (p: Vec3) => Vec3
+  clearAir?: SpotClearer
+  /** Moves a ground enemy's trackside spot onto open ground (`BiomeDefinition.clearGround`). */
+  clearGround?: SpotClearer
   /** The track's hard route (#720), where a hard-route wave arrives; null without a junction. */
   hardRoute?: HardRoute | null
 }
@@ -102,6 +104,7 @@ const RADII: Record<EnemyType, number> = {
   dustBunny: 45,
   lanternfly: 65,
   hoverDrone: 55,
+  billboardBot: 55,
 }
 
 const NO_WALLS: readonly WallSurface[] = []
@@ -126,7 +129,7 @@ function generateEnemies(
     if (wave.bystanders) {
       const { type, count } = wave.bystanders
       if (ENEMY_PLACEMENT[type].scatter !== 'wall') throw new Error(`bystander ${type} must climb a wall`)
-      if (walls.length === 0) throw new Error("bystanders climb the level's walls (LevelConfig.walls)")
+      if (walls.length === 0) throw new Error("bystanders climb the ride's walls (LevelRide.walls)")
       // Their wall is picked when the wave activates, like a swarm's.
       for (const swarm of bystanderSlots(count, rng)) {
         enemies.push({
@@ -144,7 +147,7 @@ function generateEnemies(
     }
     if (scatter === 'swarm') {
       if (wave.formation && wave.formation !== 'scatter') throw new Error(`${wave.type} swarms on a wall: no formation`)
-      if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+      if (walls.length === 0) throw new Error("wall enemies need the ride's walls (LevelRide.walls)")
       for (const swarm of swarmSlots(wave.count, rng)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside: null, swarm, ...base })
       }
@@ -207,6 +210,7 @@ export default function EnemySpawner({
   bounds,
   keepOff,
   clearAir,
+  clearGround,
   hardRoute,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
@@ -238,7 +242,7 @@ export default function EnemySpawner({
     (table: ArcTable, wave: EnemyWave, ride: RideAhead, members: SpawnedEnemy[], riderIndex: number, camera: Vec3): [string, Placed][] => {
       if (members[0]?.trackside) {
         const placed = placeTracksideWave({
-          table, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff,
+          table, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff, clearGround,
         })
         // A shark's circle, clear of the rails, the stacks and the shore (#922): its own stream, so the placement's is unchanged.
         const band = ORBITS[wave.type]
@@ -258,7 +262,8 @@ export default function EnemySpawner({
       // On their walls already, where they enter: never pushed out of the near field.
       if (members[0]?.wall) return members.map((e) => [e.id, { position: e.position!, wall: e.wall }])
       if (!wave.formation || wave.formation === 'scatter') {
-        const clear = ENEMY_PLACEMENT[wave.type].surface === 'air' && clearAir ? clearAir : (p: Vec3) => p
+        // A scatter spot has no approach to be seen from, so the clearer takes the nearest open spot.
+        const clear = ENEMY_PLACEMENT[wave.type].surface === 'air' && clearAir ? (p: Vec3) => clearAir(p) : (p: Vec3) => p
         return members.map((e) => [e.id, { position: toVector3(clear(clampToBounds(outsideNearField(e.position!, camera), bounds))) }])
       }
       const placed = placeFormationWave({
@@ -279,7 +284,7 @@ export default function EnemySpawner({
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [groundFn, bounds, keepOff, clearAir, walls, runSeed],
+    [groundFn, bounds, keepOff, clearAir, clearGround, walls, runSeed],
   )
 
   const placeWave = useCallback(

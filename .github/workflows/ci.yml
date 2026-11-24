@@ -25,8 +25,8 @@ concurrency:
 jobs:
   # The required check `verify` (main's ruleset, automerge.cjs, studio-status.cjs) is the gate job at the end (#353).
   # This job decides which jobs the run needs (scripts/ciPlan.cjs, #371): a docs-only PR (studioHealthRules.cjs
-  # `isDocsOnly`) skips the game jobs, `unit` too unless it touched scripts/, and `portal` runs only on a PR
-  # touching its inputs, nightly, or a hand-started run.
+  # `isDocsOnly`) skips the game jobs, `unit` too unless it touched scripts/, and `portal` and `offline` run only on a PR
+  # touching their inputs, nightly, or a hand-started run.
   changes:
     name: changes
     permissions:
@@ -38,6 +38,7 @@ jobs:
       game: ${{ steps.plan.outputs.game }}
       unit: ${{ steps.plan.outputs.unit }}
       portal: ${{ steps.plan.outputs.portal }}
+      offline: ${{ steps.plan.outputs.offline }}
       pacing: ${{ steps.plan.outputs.pacing }}
     steps:
       - uses: actions/checkout@v4
@@ -206,9 +207,47 @@ jobs:
           path: e2e-results/
           retention-days: 14
 
+  # The service worker (#1004): the smoke loads ?e2e=1 and Lighthouse runs on vite preview, so no other PR job registers it.
+  # prod-check on the local build: `assets` (every file /sw.js precaches, with vercel.json's headers), `routes`, and
+  # `offline` (?e2e=1&sw=1 until it controls the page, then the network off: the title and level1's ride from the cache).
+  # Only on a PR touching the worker's inputs (scripts/ciPlan.cjs SW_INPUT), nightly, or a hand-started run.
+  offline:
+    name: offline (service worker)
+    needs: changes
+    if: ${{ needs.changes.outputs.offline == 'true' }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Install Chromium
+        run: bash scripts/install-chromium.sh
+
+      - name: Service worker offline check on dist/
+        run: node e2e/prod-check.mjs --checks assets,routes,offline
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-offline
+          path: e2e-results/
+          retention-days: 14
+
   verify:
     name: verify
-    needs: [changes, unit, lighthouse, smoke, pacing]
+    needs: [changes, unit, lighthouse, smoke, pacing, offline]
     # Not always(): a run superseded by a newer push skips this instead of reporting red. It runs when the jobs
     # it needs were skipped too: a skipped required check never reports, so a docs-only PR gets its green here.
     if: ${{ !cancelled() }}
@@ -219,14 +258,14 @@ jobs:
     timeout-minutes: 5
     steps:
       # Skipped passes only where `changes` planned it; if `changes` failed, everything it gates counts as red.
-      - name: Unit tests, Lighthouse, every smoke shard and pacing passed (or the plan skipped them)
+      - name: Unit tests, Lighthouse, every smoke shard, pacing and offline passed (or the plan skipped them)
         env:
           NEEDS: ${{ toJSON(needs) }}
         run: |
           echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
           bad=$(echo "$NEEDS" | jq -r '
             (.changes.outputs // {}) as $plan
-            | {unit: $plan.unit, lighthouse: $plan.game, smoke: $plan.game,
+            | {unit: $plan.unit, lighthouse: $plan.game, smoke: $plan.game, offline: $plan.offline,
                pacing: (if (($plan.pacing // "[]") == "[]" or ($plan.pacing // "") == "") then "false" else "true" end)} as $planned
             | [to_entries[] | select(.value.result != "success" and (.value.result != "skipped" or $planned[.key] != "false"))
                | "\(.key) \(.value.result)"] | join(", ")')

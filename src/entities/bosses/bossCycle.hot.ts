@@ -1,11 +1,9 @@
+import { smoothstep } from '@/utils/ease'
 /** What the ground bosses share, pure and allocation-free per frame: exposure windows, when to move on, the rider's heading. */
 
 export const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 
-export const smooth = (x: number) => {
-  const t = clamp01(x)
-  return t * t * (3 - 2 * t)
-}
+export { smoothstep as smooth }
 
 /** A window that opens every `period` s from `first` and stays open `openS`, easing in and out over `rampS`. */
 export interface ExposureWindow {
@@ -30,7 +28,7 @@ export function inWindow(w: ExposureWindow, t: number): boolean {
 export function windowAmount(w: ExposureWindow, t: number): number {
   const u = windowCycle(w, t)
   if (u < 0 || u >= w.openS) return 0
-  return Math.min(smooth(u / w.rampS), smooth((w.openS - u) / w.rampS))
+  return Math.min(smoothstep(u / w.rampS), smoothstep((w.openS - u) / w.rampS))
 }
 
 /** 0 while open. */
@@ -65,12 +63,12 @@ export interface FlatDir {
   z: number
 }
 
-/** Eases the unit `heading` towards the flat unit forward (`fx`, `fz`) over `HEADING_TAU`; `snap` sets it outright. */
-export function followHeading(heading: FlatDir, fx: number, fz: number, dt: number, snap: boolean): void {
+/** Eases the unit `heading` towards the flat unit forward (`fx`, `fz`) over `tau` s; `snap` sets it outright. */
+export function followHeading(heading: FlatDir, fx: number, fz: number, dt: number, snap: boolean, tau = HEADING_TAU): void {
   let x = fx
   let z = fz
   if (!snap) {
-    const k = 1 - Math.exp(-dt / HEADING_TAU)
+    const k = 1 - Math.exp(-dt / tau)
     const lx = heading.x + (fx - heading.x) * k
     const lz = heading.z + (fz - heading.z) * k
     const len = Math.hypot(lx, lz)

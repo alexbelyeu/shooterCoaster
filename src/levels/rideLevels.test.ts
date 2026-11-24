@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels, getLevelConfig, levelRide } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { shippedLevel, WORLD_RIDES } from '@/levels/shippedLevels'
-import { loadWorld, WORLD_CHUNKS } from '@/levels/environments/worlds'
+import { levelRide, loadWorld, WORLD_CHUNKS } from '@/levels/environments/worlds'
 import type { SplineTrackParams, TrackParams } from '@/types/level'
 import { roundNumbers, roundPoints, type RidePrecision } from './rideData'
 import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
@@ -16,6 +16,8 @@ import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel
 import { INFERNO_TRACK } from './environments/biomes/volcanic/infernoTrack'
 import { GYM_LEVEL_TRACK } from './environments/biomes/gym/gymLevel'
 import { GYM_TRACK } from './environments/biomes/gym/gymTrack'
+import { CITY_LEVEL_TRACK } from './environments/biomes/city/cityLevel'
+import { CITY_TRACK } from './environments/biomes/city/cityTrack'
 
 const KIT: RidePrecision = { position: 0, up: 2 }
 
@@ -28,6 +30,7 @@ describe.each([
   ['level4', ARCTIC_LEVEL_TRACK, ARCTIC_TRACK, KIT, 0],
   ['level5', INFERNO_LEVEL_TRACK, INFERNO_TRACK, KIT, 0],
   ['level6', GYM_LEVEL_TRACK, GYM_TRACK, { position: 2, up: 4 }, 0],
+  ['level7', CITY_LEVEL_TRACK, CITY_TRACK, KIT, 0],
 ] as [string, TrackParams, SplineTrackParams, RidePrecision, number][])('%s ride data', (id, shipped, built, precision, yaw) => {
   it(`is the built ride (regenerate with \`node scripts/gen-ride-levels.mjs ${id}\`)`, () => {
     expect(shipped).toEqual({ ...roundNumbers(built), controlPoints: roundPoints(built.controlPoints, precision, yaw) })

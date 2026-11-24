@@ -3,8 +3,8 @@ import type { BiomeType } from '@/types/level'
 import { comboTierIndex } from '@/combat/comboTiers'
 import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
-/** What a kill sounds like, by death style (`effects/deathStyles.ts`): a bright pop, wing flutter, a low crunch, a wash, a hiss, a chalk puff, a toy squeak, a bug's snap. */
-export const KILL_SOUNDS = ['pop', 'flutter', 'crunch', 'splash', 'hiss', 'chalk', 'squeak', 'snap'] as const
+/** What a kill sounds like, by death style (`effects/deathStyles.ts`): a bright pop, wing flutter, a low crunch, a wash, a hiss, a chalk puff, a toy squeak, a bug's snap, a sign's glass shatter. */
+export const KILL_SOUNDS = ['pop', 'flutter', 'crunch', 'splash', 'hiss', 'chalk', 'squeak', 'snap', 'shatter'] as const
 export type KillSound = (typeof KILL_SOUNDS)[number]
 
 /**
@@ -168,6 +168,7 @@ export const ARCADE_SOUNDS: Record<ArcadeSoundId, ArcadeSound> = {
   'kill.chalk': { prio: PRIO.kill, db: -4, send: 0.12 },
   'kill.squeak': { prio: PRIO.kill, db: -5, send: 0.1 },
   'kill.snap': { prio: PRIO.kill, db: -5, send: 0.1 },
+  'kill.shatter': { prio: PRIO.kill, db: -5, send: 0.12 },
   'kill.thump': { prio: PRIO.kill, db: -6, send: 0.05 },
   'kill.ring': { prio: PRIO.kill, db: -16, send: 0.2 },
   'kill.payout': { prio: PRIO.kill, db: -15, send: 0.2 },

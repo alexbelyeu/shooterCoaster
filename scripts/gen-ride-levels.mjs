@@ -33,6 +33,7 @@ const RIDES = [
     level: 'level6', biome: 'gym', track: 'gymTrack', from: 'GYM_TRACK', file: 'gymLevel', to: 'GYM_LEVEL_TRACK',
     precision: { position: 2, up: 4 }, walls: { module: 'walls', from: 'GYM_WALLS', to: 'GYM_LEVEL_WALLS' },
   },
+  { level: 'level7', biome: 'city', track: 'cityTrack', from: 'CITY_TRACK', file: 'cityLevel', to: 'CITY_LEVEL_TRACK', precision: KIT },
 ]
 
 /** `PARK_LEVEL_TRACK` → `PARK_LEVEL_RIDE`. */

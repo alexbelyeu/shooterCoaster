@@ -61,6 +61,8 @@ export const ENEMY_PLACEMENT: Record<EnemyType, EnemyPlacementRule> = {
   lanternfly: { surface: 'wall', scatter: 'swarm' },
   // Hovers in the street canyons ahead of the rider, about the ride's height
   hoverDrone: { surface: 'air', scatter: band(150, 1400, 50, 150) },
+  // On the pavement beside the track (`BiomeDefinition.clearGround`), marching up and down its street
+  billboardBot: { surface: 'ground', scatter: 'trackside', roam: 16 },
 }
 
 export const GOLDEN_BALLOON_SCATTER = band(0, 3000, 50, 100)
@@ -149,7 +151,7 @@ export function climbableWalls(walls: readonly WallSurface[]): readonly WallSurf
 
 export function wallSlots(count: number, walls: readonly WallSurface[], rng: Rng): WallSlot[] {
   const climbable = climbableWalls(walls)
-  if (climbable.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+  if (climbable.length === 0) throw new Error("wall enemies need the ride's walls (LevelRide.walls)")
   return Array.from({ length: count }, () => {
     const wall = climbable[Math.floor(rng() * climbable.length)]
     const margin = Math.min(CLIMB.margin, wall.width / 2)

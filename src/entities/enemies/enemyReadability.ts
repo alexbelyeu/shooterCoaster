@@ -22,6 +22,7 @@ export const ENEMY_SILHOUETTE: Record<EnemyType | 'goldenBalloon', number> = {
   rat: 44, // x9: ~48 long x20 wide, plus a ~40 tail
   dustBunny: 46, // ball r=2.4 x8 plus tufts
   hoverDrone: 50, // x9: a ~40-wide puck, rotor rings ~60 across
+  billboardBot: 52, // x8: a sign ~52 wide on legs, ~60 tall
   lanternfly: 52, // x7: a ~67-long wedge ~25 wide on its wall, ~105 across with its wings open
 }
 

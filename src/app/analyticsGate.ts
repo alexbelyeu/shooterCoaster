@@ -80,3 +80,11 @@ export function isLiveSite(builtOnVercel: boolean, search: string): boolean {
 export function analyticsEnabled(builtOnVercel: boolean, search: string, internal: boolean): boolean {
   return isLiveSite(builtOnVercel, search) && !internal
 }
+
+/** The service worker (#999) as the live site loads, or wherever `?sw=1` asks (prod-check's `offline`); never in the portal build. */
+export function serviceWorkerEnabled(builtOnVercel: boolean, portal: boolean, search: string): boolean {
+  // Not through `isLiveSite`: a second caller stops Rollup folding `analyticsEnabled` to false off Vercel, and the
+  // analytics code then ships in every other build's startup JS.
+  const params = new URLSearchParams(search)
+  return !portal && (params.get('sw') === '1' || (builtOnVercel && !params.has('e2e')))
+}

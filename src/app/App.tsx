@@ -14,6 +14,7 @@ import { whenAudioReady } from '@/audio/AudioEngine'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { usePauseOnHidden } from './usePauseOnHidden'
 import { useGamepad } from '@/input/gamepadInput'
+import { useHaptics } from '@/input/useHaptics'
 import Screen from './Screen'
 import { perfRequested } from '@/perf/perfFlag'
 import { loadLevelScene } from '@/canvas/loadLevelScene'
@@ -75,6 +76,7 @@ export default function App() {
   const veilTimer = useRef<number | undefined>(undefined)
   usePauseOnHidden()
   useGamepad()
+  useHaptics()
   const reducedMotion = usePrefersReducedMotion()
   const inPlay = isLevelActive(phase)
 

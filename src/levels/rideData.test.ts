@@ -58,14 +58,26 @@ describe('ride data', () => {
     let worst = 0
     shipped.forEach((p, i) => (worst = Math.max(worst, Math.hypot(p.x - source[i].x, p.y - source[i].y, p.z - source[i].z))))
     expect(worst).toBeLessThanOrEqual(Math.sqrt(3) / 2 + 1e-9)
-    // A straight along the frame's x packs as one repeated step.
+    // A straight along the frame's x packs as its one step, then zeros: no change from step to step.
     const straight = [0, 1, 2, 3].map((k) => ({ x: 100 * k * Math.cos(yaw), y: 5, z: -100 * k * Math.sin(yaw) }))
-    expect(packPoints(straight, precision, yaw).xyz.slice(3)).toEqual([100, 0, 0, 100, 0, 0, 100, 0, 0])
+    expect(packPoints(straight, precision, yaw).xyz.slice(3)).toEqual([100, 0, 0, 0, 0, 0, 0, 0, 0])
+  })
+
+  it('packs positions as the first point, the first step, then each step\'s change, in whole numbers', () => {
+    const turning = [{ x: 0, y: 2, z: 0 }, { x: 10, y: 2, z: 0 }, { x: 20, y: 3, z: 1 }, { x: 30, y: 4, z: 3 }]
+    expect(packPoints(turning, { position: 0, up: 2 }).xyz).toEqual([0, 2, 0, 10, 0, 0, 0, 1, 1, 0, 0, 1])
+    expect(unpackPoints(packPoints(turning, { position: 0, up: 2 }))).toEqual(turning)
   })
 
   it('packs positions as whole-number steps', () => {
     const { xyz } = packPoints(points(3), { position: 2, up: 4 })
     expect(xyz.every(Number.isInteger)).toBe(true)
+  })
+
+  it('packs ups as whole numbers, each after its index step from the last rolled point', () => {
+    const up = { x: 0.5, y: 0.86, z: -0.123456 }
+    const source = [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0, up }, { x: 2, y: 0, z: 0, up }, { x: 3, y: 0, z: 0 }, { x: 4, y: 0, z: 0, up }]
+    expect(packPoints(source, { position: 0, up: 2 }).ups).toEqual([1, 50, 86, -12, 1, 50, 86, -12, 2, 50, 86, -12])
   })
 
   it('keeps 6 significant digits of everything else and drops float dust', () => {

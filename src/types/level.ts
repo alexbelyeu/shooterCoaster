@@ -4,7 +4,7 @@ import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 export const BIOME_TYPES = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic', 'gym', 'city', 'jungle'] as const
 export type BiomeType = (typeof BIOME_TYPES)[number]
 export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti' | 'magmaTitan' | 'medusa' | 'helicopter'
-export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny' | 'lanternfly' | 'hoverDrone' | 'toucan'
+export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny' | 'lanternfly' | 'hoverDrone' | 'billboardBot' | 'toucan'
 
 /**
  * A wall (#453), climbable unless it is a `perch`: from `origin`, its bottom-left corner, along unit `right` and `up`; it
@@ -247,7 +247,7 @@ export interface LevelConfig {
   /**
    * The ride, when the registry carries it: level 1's (the run most players start first) and small hand-written tracks.
    * Every other ride comes with its world's chunk (`World.rides`, #960), so its data is never startup JS: read a level's
-   * ride with `levelRide`, which has it once that chunk is in.
+   * ride with `worlds.ts` `levelRide`, which has it once that chunk is in.
    */
   ride?: LevelRide
   enemies: EnemyWave[]

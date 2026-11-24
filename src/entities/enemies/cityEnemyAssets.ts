@@ -1,9 +1,9 @@
 import * as THREE from 'three'
 import { mergePainted, painted } from '@/levels/environments/shared/paintedParts'
 import { withEmissivePatch, withRim } from './enemyRim'
-import { DRONE_BODY, DRONE_DOME, DRONE_GLOW, DRONE_TAIL } from './enemyPalette'
+import { BOT_FACE, BOT_GLYPH, DRONE_BODY, DRONE_DOME, DRONE_GLOW, DRONE_TAIL } from './enemyPalette'
 
-// Neon Metropolis's enemies (#323, briefs in docs/art/ENEMIES.md): the hover drone. +z faces the rider, +y is up.
+// Neon Metropolis's enemies (briefs in docs/art/ENEMIES.md): the hover drone (#323) and the billboard bot (#963). +z faces the rider, +y is up.
 // Re-exported by SharedEnemyAssets, so ShaderWarmup compiles every material here.
 
 /** Where the four rotors sit: the ends of the X of arms, in the model's units. */
@@ -57,3 +57,35 @@ export function cityMachineMaterial(rim: THREE.ColorRepresentation): THREE.MeshS
 }
 
 export const DRONE_MAT = cityMachineMaterial(DRONE_GLOW)
+
+// The billboard bot (#963): a lit sign on two legs, feet at y = 0, painted by the drone's rule (dark lit, bright burns).
+
+const SIGN = { w: 6, h: 4.2, y: 3.6 }
+const FRAME_TOP = SIGN.y + (SIGN.h + 0.5) / 2
+const BULB_Y = FRAME_TOP + 0.8
+export const BOT_HEIGHT = BULB_Y + 0.35
+
+const BOT_FRAME = [
+  painted(new THREE.BoxGeometry(SIGN.w + 0.5, SIGN.h + 0.5, 0.5), DRONE_BODY, [0, SIGN.y, 0]),
+  ...[-1, 1].flatMap((s) => [
+    painted(new THREE.BoxGeometry(0.4, 1.4, 0.4), DRONE_BODY, [s * 1.4, 0.75, 0]),
+    painted(new THREE.BoxGeometry(0.9, 0.3, 1.2), DRONE_DOME, [s * 1.4, 0.15, 0.2]),
+    painted(new THREE.CylinderGeometry(0.1, 0.1, 0.5, 4), DRONE_BODY, [s * (SIGN.w / 2 - 0.2), FRAME_TOP + 0.25, 0]),
+  ]),
+]
+
+/** Two slanted eyes and a zigzag mouth, raised off the face so they never z-fight with it. */
+const BOT_GLYPHS = [
+  painted(new THREE.BoxGeometry(1.4, 0.55, 0.2), BOT_GLYPH, [-1.2, SIGN.y + 0.7, 0.45], [0, 0, -0.3]),
+  painted(new THREE.BoxGeometry(1.4, 0.55, 0.2), BOT_GLYPH, [1.2, SIGN.y + 0.7, 0.45], [0, 0, 0.3]),
+  ...[-1.5, -0.5, 0.5, 1.5].map((x, i) => painted(new THREE.BoxGeometry(1.15, 0.35, 0.2), BOT_GLYPH, [x, SIGN.y - 0.9, 0.45], [0, 0, i % 2 ? -0.45 : 0.45])),
+]
+
+const BOT_LIGHTS = [
+  painted(new THREE.BoxGeometry(SIGN.w - 0.4, SIGN.h - 0.4, 0.3), BOT_FACE, [0, SIGN.y, 0.2]),
+  ...[-1, 1].map((s) => painted(new THREE.SphereGeometry(0.35, 6, 4), DRONE_GLOW, [s * (SIGN.w / 2 - 0.2), BULB_Y, 0])),
+]
+
+export const BOT_GEO = mergePainted([...BOT_FRAME, ...BOT_GLYPHS, ...BOT_LIGHTS])
+
+export const BOT_MAT = cityMachineMaterial(BOT_FACE)

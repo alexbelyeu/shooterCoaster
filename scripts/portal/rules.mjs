@@ -9,6 +9,8 @@ const ABSOLUTE_REF = /\b(?:src|href)\s*=\s*["']?\/|url\(\s*["']?\//
 const OTHER_ORIGIN = /https?:\/\//
 // The share link: the portal build has no Share button (#254), so ShareMenu must be tree-shaken out of it.
 const SHARE_LINK = 'go/share'
+// Portals serve the zip from their own origin and paths: a service worker there would cache under their scope (#999).
+const SW_REGISTER = 'serviceWorker.register'
 
 /** @param {{ path: string, bytes: number, text?: string }[]} files  paths relative to the zip root; `text` for text files */
 export function portalProblems(files) {
@@ -18,7 +20,9 @@ export function portalProblems(files) {
   const bytes = files.reduce((sum, f) => sum + f.bytes, 0)
   if (bytes > MAX_BYTES) problems.push(`${(bytes / 1024 / 1024).toFixed(0)} MB (limit ${MAX_BYTES / 1024 / 1024} MB)`)
   for (const f of files) {
+    if (/(^|\/)sw\.js$/.test(f.path)) problems.push(`${f.path}: a service worker in the portal build`)
     if (f.text === undefined) continue
+    if (f.text.includes(SW_REGISTER)) problems.push(`${f.path}: registers a service worker (the portal build must not)`)
     if (THIRD_PARTY.test(f.text)) problems.push(`${f.path}: references ${f.text.match(THIRD_PARTY)[0]}`)
     if (f.text.includes(SHARE_LINK)) problems.push(`${f.path}: carries the share link \`${SHARE_LINK}\` (the portal build has no Share)`)
     // JS carries harmless URL strings (React error links, the GitHub link on the title); markup and styles may not.

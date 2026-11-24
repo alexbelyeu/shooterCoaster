@@ -6,6 +6,9 @@ const { isDocsOnly } = require('./studioHealthRules.cjs')
 /** What the portal build depends on beyond the game itself (CLAUDE.md `build:portal`). */
 const PORTAL_INPUT = /^(vite\.config\.ts|index\.html|public\/|scripts\/portal\/|package(-lock)?\.json|\.github\/workflows\/ci\.yml)/
 
+/** What the service worker depends on (#1004): its source and precache list, the build that bundles it, the headers it is served with, its registration, the check and the job. */
+const SW_INPUT = /^(src\/sw\/|scripts\/swPrecache\.mjs$|vite\.config\.ts$|vercel\.json$|src\/app\/serviceWorker\.ts$|e2e\/prod-check\.mjs$|\.github\/workflows\/ci\.yml$)/
+
 /** Each level's biome folder (`src/levels/environments/biomes/<biome>/`); `ciPlan.test.ts` holds it to the registry. */
 const BIOME_LEVEL = { themePark: 'level1', desert: 'level2', ocean: 'level3', arctic: 'level4', volcanic: 'level5', gym: 'level6', city: 'level7', jungle: 'level8' }
 /** Code every level's pacing runs through: the ride, the level configs and their spawns, and the metric itself. */
@@ -29,19 +32,22 @@ function pacingLevels(files) {
 
 /**
  * `game`: unit + build, Lighthouse and the smoke shards; `pacing`: the levels to run the pacing step on (off only on a docs-only PR; a docs-only PR touching
- * `scripts/` still runs `unit`). `portal`: on a PR touching its inputs, nightly, or a hand-started run.
- * Pushes to main and the post-merge runs (`merged` set) run the game jobs, not portal.
+ * `scripts/` still runs `unit`). `portal`: on a PR touching its inputs, nightly, or a hand-started run. `offline`: prod-check's
+ * `assets`, `routes` and `offline` checks on the local build (the only PR job that registers the service worker), when the same holds for its inputs.
+ * Pushes to main and the post-merge runs (`merged` set) run the game jobs, not portal or offline.
  */
 function ciPlan({ event, files = [], merged = '' }) {
   if (event !== 'pull_request') {
     // main's pacing is the nightly's (prod-smoke.yml); a PR checks the levels it touches.
-    return { game: true, unit: true, portal: event === 'schedule' || (event === 'workflow_dispatch' && !merged), pacing: [] }
+    const nightlyOrByHand = event === 'schedule' || (event === 'workflow_dispatch' && !merged)
+    return { game: true, unit: true, portal: nightlyOrByHand, offline: nightlyOrByHand, pacing: [] }
   }
   const game = !isDocsOnly(files)
   return {
     game,
     unit: game || files.some((f) => f.startsWith('scripts/')),
     portal: files.some((f) => PORTAL_INPUT.test(f)),
+    offline: files.some((f) => SW_INPUT.test(f) && !isTest(f)),
     pacing: game ? pacingLevels(files) : [],
   }
 }

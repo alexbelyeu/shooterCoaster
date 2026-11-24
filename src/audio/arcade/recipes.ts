@@ -120,6 +120,13 @@ const KILL_BODIES: Record<KillSound, { lengthS: number; render: (S: SynthCore, o
     partial(S, out, t, 130, { a: 0.001, tau: 0.04, peak: 0.6, bend: 2, bendTau: 0.01 })
     noise(S, out, t + 0.01, { type: 'highpass', f: 4000, q: 0.4, a: 0.01, tau: 0.07, peak: 0.35 })
   } },
+  // Billboard bot: a tube's pop, the lit panel cracking and a tinkle of glass falling.
+  shatter: { lengthS: 0.5, render(S, out, t) {
+    noise(S, out, t, { type: 'highpass', f: 4200, q: 0.6, a: 0.0003, tau: 0.02, peak: 0.85 })
+    partial(S, out, t, 110, { a: 0.001, tau: 0.04, peak: 0.6, bend: 2, bendTau: 0.01 })
+    for (let i = 0; i < 5; i++) partial(S, out, t + 0.02 + i * 0.03, 3400 + ((i * 1370) % 2100), { a: 0.0005, tau: 0.03, peak: 0.28 * (1 - i * 0.12) })
+    noise(S, out, t + 0.015, { type: 'bandpass', f: 6500, q: 1.2, a: 0.004, tau: 0.08, peak: 0.4 })
+  } },
 }
 
 function killBody(sound: KillSound): Recipe {
@@ -173,6 +180,7 @@ export const RECIPES: readonly Recipe[] = [
   killBody('chalk'),
   killBody('squeak'),
   killBody('snap'),
+  killBody('shatter'),
   // 2×: a kick under the body.
   { id: 'kill.thump', lengthS: fixed(0.4), render(S, out, t) {
     hitDrum(S, out, 'kick', t, 1)

@@ -2937,8 +2937,7 @@ async function darkSectionShot(page, levelId, { shots: shoot = false } = {}) {
 /** The dark shots' floors: the share of the frame that is dark, of saturated bright pixels (the blacklit glow), and how much the flash brightens the frame's mean (0–255). */
 const DARK_SHOT = { dark: 0.4, glow: 0.002, flash: 3 }
 
-/** `branchWave`: the hard route's own wave (#720, `LevelRegistry.ts` level6's `branch`): its banner, size and second. */
-const SWITCH_CHECK = { level: STEP_LEVELS.switch[0], branchWave: { label: 'Pad Rats!', count: 8, at: 17 } }
+const SWITCH_CHECK = { level: STEP_LEVELS.switch[0] }
 /** On-screen rats on the branch the hard run must see once its wave is in. */
 const BRANCH_WAVE_ON_SCREEN = 2
 /** Track-parameter leads behind the switch sign to park the coaster at. */
@@ -2953,7 +2952,7 @@ const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
  * Tree's gap still (`gapShot`), which are too slow for the PR's `level6` shard (#766).
  */
 async function switchCheck(page, { darkShots = false } = {}) {
-  const { level, branchWave } = SWITCH_CHECK
+  const { level } = SWITCH_CHECK
   const problems = []
   const api = (fn, arg) => page.evaluate(fn, arg)
   /** Jumps the held level timer to `seconds` in one frame and lets the waves due by then tell and arrive, the ride held. */
@@ -3001,6 +3000,9 @@ async function switchCheck(page, { darkShots = false } = {}) {
   if (!(await start())) return { id: 'switch', problems: [NOT_LOADED(level)] }
   let sw = await read()
   if (!sw) return { id: 'switch', problems: [`${level} has no switch (trackSwitch() is null)`] }
+  // The hard route's own wave (#720, the level's roster `branch`), read from the game so a re-timed fork can't drift from it.
+  const { branchWave } = sw
+  if (!branchWave) return { id: 'switch', problems: [`${level} has a switch but no hard-route wave`] }
   const mid = (sw.from + sw.to) / 2
   const result = { t: sw.t, lead: null, px: null, hard: null, easy: null, branchRats: null, totals: { hard: null, easy: null } }
 
@@ -3333,6 +3335,8 @@ async function settingsLayout(page, label, { fromTitle = false } = {}) {
       quality: [...document.querySelectorAll('[aria-labelledby="settings-quality-label"] [role="radio"]')].map((el) => el.textContent),
       sliders: document.querySelectorAll('.settings-card input[type="range"]').length,
       switches: document.querySelectorAll('.settings-card input[role="switch"]').length,
+      // The Vibration toggle (#995) shows only on a touch-first device that can vibrate (the phone run).
+      vibration: typeof navigator.vibrate === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches,
       smallTargets: targets.filter((el) => el.getBoundingClientRect().height < 44).length,
     }
   })
@@ -3343,8 +3347,9 @@ async function settingsLayout(page, label, { fromTitle = false } = {}) {
   if (r.hScroll) problems.push('settings scroll sideways')
   if (r.quality.length !== 4) problems.push(`${r.quality.length} quality options (${r.quality.join('/')}), expected Auto / Low / Med / High`)
   if (r.sliders !== 2) problems.push(`${r.sliders} volume sliders, expected music + effects`)
-  const switches = fromTitle ? 4 : 3
-  if (r.switches !== switches) problems.push(`${r.switches} switches, expected show FPS + ghost + reduced motion${fromTitle ? ' + internal device' : ''}`)
+  const switches = 3 + (r.vibration ? 1 : 0) + (fromTitle ? 1 : 0)
+  if (r.switches !== switches)
+    problems.push(`${r.switches} switches, expected show FPS + ghost + reduced motion${r.vibration ? ' + vibration' : ''}${fromTitle ? ' + internal device' : ''}`)
   if (r.smallTargets) problems.push(`${r.smallTargets} settings control(s) under the 44 px touch target`)
   return { ...r, problems: problems.map((p) => `${label}: ${p}`) }
 }

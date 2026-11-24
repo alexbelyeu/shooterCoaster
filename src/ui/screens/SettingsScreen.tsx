@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { useGameStore } from '@/store/useGameStore'
 import { SCREEN_SHAKE_LEVELS, type ScreenShakeLevel } from '@/combat/screenShake.hot'
 import { GRAPHICS_QUALITIES, type GraphicsQuality } from '@/canvas/graphicsQuality'
 import { usePrefersReducedMotion, useSystemPrefersReducedMotion } from '@/ui/reducedMotion'
 import { browserStorage, isInternalBrowser, setInternalBrowser } from '@/app/analyticsGate'
+import { canInstall, onInstallChange, promptInstall } from '@/app/installPrompt'
 import { isInRun } from '@/store/startPhase'
 import { FairBoard } from '@/ui/Fair'
+import { touchFirst } from '@/ui/touchFirst'
+import { canVibrate } from '@/input/useHaptics'
 
 const SHAKE_LABELS: Record<ScreenShakeLevel, string> = { off: 'Off', reduced: 'Reduced', full: 'Full' }
 
@@ -131,6 +134,23 @@ function InternalDeviceRow() {
   )
 }
 
+/** The browser's install offer (#999), while it holds one: never on iOS or once installed. */
+function InstallRow() {
+  const available = useSyncExternalStore(onInstallChange, canInstall)
+  if (!available) return null
+  return (
+    <div className="settings-row settings-install">
+      <span>
+        Home screen
+        <small className="settings-note">Plays full screen, even offline</small>
+      </span>
+      <button type="button" className="fair-plate" onClick={promptInstall}>
+        Install
+      </button>
+    </div>
+  )
+}
+
 interface SettingsScreenProps {
   onClose: () => void
 }
@@ -141,6 +161,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
   const fromTitle = useGameStore((g) => !isInRun(g.phase))
   const reducedMotion = usePrefersReducedMotion()
   const systemReducedMotion = useSystemPrefersReducedMotion()
+  const showVibration = canVibrate() && touchFirst()
   const screen = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
   close.current = onClose
@@ -211,10 +232,20 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
               disabled={systemReducedMotion}
               onChange={s.setReducedMotion}
             />
+            {showVibration && (
+              <ToggleRow
+                label="Vibration"
+                note={reducedMotion ? 'Off (reduced motion)' : 'A buzz on kills and boss hits'}
+                checked={s.vibration && !reducedMotion}
+                disabled={reducedMotion}
+                onChange={s.setVibration}
+              />
+            )}
           </section>
 
           <section className="settings-group">
             <h3>Data</h3>
+            {fromTitle && <InstallRow />}
             <ClearDataRow />
             {fromTitle && <InternalDeviceRow />}
           </section>

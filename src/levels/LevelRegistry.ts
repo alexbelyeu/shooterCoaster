@@ -1,4 +1,4 @@
-import type { LevelConfig, LevelRide } from '@/types/level'
+import type { LevelConfig } from '@/types/level'
 import { paceLevel } from './pacing'
 // Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS (#863). Every other generated
 // ride is its world chunk's (`World.rides`), out of the startup JS altogether (#960).
@@ -171,8 +171,8 @@ const LEVELS: LevelConfig[] = [
     // (`placeWallSwarm`), then on the roof the car looks up into as it rolls over the top (#948), the last ones on the Starr
     // and the Shield the car looks at from the Shield's top and on the auto belay's fall (#957), and the pack in the pit
     // from 25 s, before the dyno.
-    // Shoot the V2 sign and the V8 way round (#702) brings its own rats (#720): from 17 s, once the sign is shot (it can be
-    // until the car reaches it, 18.7 s), they line the branch ahead (ridden 18.9–21.5 s), and only that run meets them.
+    // Shoot the V2 sign and the V8 way round (#702) brings its own rats (#720): from 19 s, once the sign is shot (it can be
+    // until the car reaches it, ~20 s), they line the branch ahead (ridden 20.2–22.5 s), and only that run meets them.
     ...paceLevel({
       waves: [
         { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 8, bystanders: { type: 'climber', count: 4 } },
@@ -182,7 +182,7 @@ const LEVELS: LevelConfig[] = [
         { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 20, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
-      branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 17 },
+      branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 19 },
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},
@@ -193,39 +193,22 @@ const LEVELS: LevelConfig[] = [
     description: 'Drones over the city that never sleeps',
     order: 7,
     biome: 'city',
-    maxScore: 82 * 15 + 60 + 60 + 400, // 1230 + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1750
+    maxScore: 55 * 15 + 25 * 20 + 60 + 60 + 400, // 55 drones and 25 bots, 1325, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1845
     message: 'You cleared Neon Metropolis!',
     nextLevel: 'level8',
-    // The first v2 ride (#323; the full storyboard is #871): the car waits in a station on the curve's crest for the
-    // countdown, GO launches it over the fins and it drops straight into the street canyons; gravity rides the rest,
-    // the beat keeping a run to about half the lap. level1's curve family, extent varC × 13 × scalar = 1040.
-    ride: {
-      track: {
-        varA: 3,
-        varB: 17,
-        varC: 4,
-        scalar: 20,
-        curve: 'curve1',
-        ride: 'v2',
-        mechanics: [{ kind: 'station', from: 0, to: 0.012, speed: 260 }],
-        rideV2: { crawl: 100, drag: 0.001 },
-        color1: 0xff3fb4,
-        color2: 0x2ee6ff,
-        glow: 0.6,
-      },
-    },
-    // Hover drones patrol the street canyons in Vs and rings, then the Helicopter (#325) drops in over the street ahead.
-    // Every wave is a formation ahead of the rider, one every ~6 s to 29 s, then the boss at 40 s. A wave of drones is
-    // shot down in a few seconds and the towers hide stragglers: four big waves 10 s apart, two scattered over the whole
-    // city, left the rider with nothing to shoot for most of the run (the pacing gate). The ring comes second, centred on
-    // the track, so the drop into the canyons has targets; the last wave comes in three rings, so it lasts until the boss.
+    // The ride kit's storyboard down the city's streets (#871, `cityTrack.ts`), shipped in the city world's chunk (#960).
+    // The street and the air take turns (#963): billboard bots line the launch's avenue, where the rider is at street
+    // level, hover drones patrol the canyons in Vs, rings and a spiral from the lift on (the towers hide the pavements
+    // from up there), then the Helicopter (#325) arrives at 40 s over the helix. Every drone wave is a formation ahead
+    // of the rider, each drone moved onto the street its approach sees best (`clearOfTowers`): scattered over the whole
+    // city, or in the cross streets beside the ride's avenue, the towers hid them (the pacing gate, #950).
     ...paceLevel({
       waves: [
-        { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v', weight: 0.75 },
+        { type: 'billboardBot', count: 12, waveLabel: 'Billboard Bots!', weight: 0.75 },
+        { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v' },
         { type: 'hoverDrone', count: 8, waveLabel: 'Surveillance Ring!', formation: 'ring' },
-        { type: 'hoverDrone', count: 13, waveLabel: 'Patrol Wing!', formation: 'v' },
+        { type: 'billboardBot', count: 13, waveLabel: 'Street March!' },
         { type: 'hoverDrone', count: 17, waveLabel: 'Street Sweep!', formation: 'spiral' },
-        { type: 'hoverDrone', count: 14, waveLabel: 'Swarm Protocol!', formation: 'v' },
         { type: 'hoverDrone', count: 21, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.5 },
       ],
       boss: 'helicopter',
@@ -282,19 +265,6 @@ export function getLevelConfig(id: string): LevelConfig | undefined {
 
 export function getAllLevels(): LevelConfig[] {
   return [...LEVELS].sort((a, b) => a.order - b.order)
-}
-
-/** The rides that came with their worlds' chunks (`addRides`, from `loadWorld`), by level. */
-const arrivedRides = new Map<string, LevelRide>()
-
-/** A world chunk's rides, once it has arrived (`loadWorld`). */
-export function addRides(rides: Readonly<Record<string, LevelRide>>): void {
-  for (const [id, ride] of Object.entries(rides)) arrivedRides.set(id, ride)
-}
-
-/** A level's ride: the registry's (level 1's), else its world's once that chunk is in (#960); undefined before. */
-export function levelRide(id: string): LevelRide | undefined {
-  return getLevelConfig(id)?.ride ?? arrivedRides.get(id)
 }
 
 /** The level whose `nextLevel` is `id` (its star unlocks `id`); null for the first level or an unknown id. */

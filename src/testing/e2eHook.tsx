@@ -34,7 +34,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { medalRun, useGameStore } from '@/store/useGameStore'
 import type { RideVariant, RunMode } from '@/types/game'
-import { getAllLevels, getLevelConfig, levelRide } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType, EnemyWave, RideBeat } from '@/types/level'
@@ -405,6 +405,8 @@ export interface E2ESwitch {
   open: boolean
   /** The run's kill-count total: a hard-route wave joins it when it arrives (#720). */
   totalEnemies: number
+  /** The level's hard-route wave (`EnemyWave.route` 'hard', from its roster's `branch`): banner, size and second; null without one. */
+  branchWave: { label: string; count: number; at: number } | null
   x: number
   y: number
   ndcX: number
@@ -710,6 +712,9 @@ export const e2eFireworks = {
 /** Written by `shared/ParticleField.tsx` when the e2e flag is on; read through `particles()`. */
 export const e2eParticles = { mounted: false, points: 0, boostPoints: 0, boost: 0 }
 
+/** Written by `canvas/LevelScene.tsx` when the e2e flag is on: the running level's v2 ride beats (its ride is in its world's chunk, #960); read through `rideBeats()`. */
+export const e2eRide: { beats: readonly RideBeat[] } = { beats: [] }
+
 /** Written by `combat/pickups/Pickups.tsx` when the e2e flag is on; read through `pickups()`. */
 export const e2ePickups: { list: readonly LivePickup[] } = { list: [] }
 
@@ -741,6 +746,7 @@ function readSwitch(): E2ESwitch | null {
     riding,
     open: s.open(),
     totalEnemies: useGameStore.getState().totalEnemies,
+    branchWave: readBranchWave(),
     x: ((_v.x + 1) / 2) * probeSize.width,
     y: ((1 - _v.y) / 2) * probeSize.height,
     ndcX: _v.x,
@@ -748,6 +754,12 @@ function readSwitch(): E2ESwitch | null {
     onScreen: ahead && Math.abs(_v.x) <= 1 && Math.abs(_v.y) <= 1,
     distance: position.distanceTo(_w),
   }
+}
+
+function readBranchWave(): E2ESwitch['branchWave'] {
+  const level = useGameStore.getState().currentLevel
+  const wave = (level ? getLevelConfig(level)?.enemies : undefined)?.find((e) => e.route === 'hard')
+  return wave ? { label: wave.waveLabel ?? '', count: wave.count, at: wave.spawnDelay ?? 0 } : null
 }
 
 const _toPickup = new THREE.Vector3()
@@ -1284,10 +1296,7 @@ export function installE2EApi() {
     rideSpeed: null,
     rideProgress: 0,
     rideFastest: null,
-    rideBeats: () => {
-      const id = useGameStore.getState().currentLevel
-      return (id ? levelRide(id)?.track.rideV2?.beats : undefined) ?? []
-    },
+    rideBeats: () => e2eRide.beats,
     sight: readSight,
     graphics: () => {
       const { quality, reducedMotion } = useSettingsStore.getState()

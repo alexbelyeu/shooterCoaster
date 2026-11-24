@@ -1,4 +1,5 @@
 import type { TunnelSpan } from './setPieces'
+import { smoothstep } from '@/utils/ease'
 
 /** Index of the tunnel the arc distance `dist` is inside, or -1. */
 export function tunnelAt(tunnels: readonly TunnelSpan[] | undefined, dist: number): number {
@@ -14,7 +15,5 @@ export function tunnelDepth(tunnels: readonly TunnelSpan[] | undefined, dist: nu
   const i = tunnelAt(tunnels, dist)
   if (i < 0 || !tunnels) return 0
   const span = tunnels[i]
-  const x = Math.min(dist - span.fromS, span.toS - dist) / Math.max(ramp, 1e-6)
-  const k = Math.min(Math.max(x, 0), 1)
-  return k * k * (3 - 2 * k)
+  return smoothstep(Math.min(dist - span.fromS, span.toS - dist) / Math.max(ramp, 1e-6))
 }
