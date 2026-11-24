@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 import { createRng } from '@/utils/rng'
-import type { EnemyWave, Formation, LevelConfig, WallSurface } from '@/types/level'
+import type { EnemyWave, Formation, RiddenLevel, WallSurface } from '@/types/level'
 import { buildArcTable, indexAtT, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
 import { hardRouteFor, withBackwards } from '@/track/mechanics'
 import { MECHANICS_SPEEDS, buildMechanicsRide } from '@/track/elements/mechanicsRide'
@@ -44,7 +44,7 @@ const IN_FRONT_SHARE = 0.85
 const choreographed = (f: Formation | undefined): f is ChoreographedFormation => !!f && f !== 'scatter'
 const besideTrack = (w: EnemyWave) => !choreographed(w.formation) && placedBesideTrack(w.type)
 
-function world(level: LevelConfig) {
+function world(level: RiddenLevel) {
   const curve = createTrackCurve(level.track)
   const table = buildArcTable(curve)
   const heightFn = biomeHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
@@ -61,8 +61,8 @@ function world(level: LevelConfig) {
 
 const STILL: RideAhead = { entry: 0, window: 0, trackScale: 1 }
 
-const worlds = getAllLevels().filter((l) => l.enemies.some((w) => choreographed(w.formation))).map(world)
-const tracksideWorlds = getAllLevels().filter((l) => l.enemies.some(besideTrack)).map(world)
+const worlds = shippedLevels().filter((l) => l.enemies.some((w) => choreographed(w.formation))).map(world)
+const tracksideWorlds = shippedLevels().filter((l) => l.enemies.some(besideTrack)).map(world)
 
 const RIDER_FRACTIONS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 const dist = (a: Vec3, b: Vec3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
@@ -372,7 +372,7 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
 })
 
 describe('level6: inside the hall', () => {
-  const w = world(getAllLevels().find((l) => l.id === 'level6')!)
+  const w = world(shippedLevels().find((l) => l.id === 'level6')!)
   const { level, table, groundFn, rideFor, bounds } = w
   const hall = BIOMES.gym.bounds!
 
@@ -410,7 +410,7 @@ describe('level6: inside the hall', () => {
   })
 })
 
-describe.each(getAllLevels().filter((l) => l.enemies.some((w) => w.route)).map(world).map((w) => [w.level.id, w] as const))(
+describe.each(shippedLevels().filter((l) => l.enemies.some((w) => w.route)).map(world).map((w) => [w.level.id, w] as const))(
   '%s hard-route waves (#720)',
   (_id, { level, table, tableFor, rideFor }) => {
     const junction = level.track.mechanics?.find((m) => m.kind === 'junction')
@@ -569,7 +569,7 @@ describe('outsideNearField', () => {
 })
 
 describe('placeWallSwarm (#516)', () => {
-  const { table, trackScale } = world(getAllLevels()[0])
+  const { table, trackScale } = world(shippedLevels()[0])
   const view = riderFrame(table, 0, trackScale)
   const f = { x: view.dir.x / Math.hypot(view.dir.x, view.dir.z), y: 0, z: view.dir.z / Math.hypot(view.dir.x, view.dir.z) }
   /** A 240 x 200 wall `ahead` along the rider's look, facing back down it at the eye. */
@@ -597,7 +597,7 @@ describe('placeWallSwarm (#516)', () => {
   })
 
   it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, the last ones on the walls seen from the Shield's top and its drop", () => {
-    const { level, table: gym, rideFor } = world(getAllLevels().find((l) => l.id === 'level6')!)
+    const { level, table: gym, rideFor } = world(shippedLevels().find((l) => l.id === 'level6')!)
     const wave = level.enemies.find((w) => w.type === 'lanternfly')!
     const profile = rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)
     const riderIndex = indexAhead(gym, 0, profile[wave.spawnDelay! * 10])
@@ -619,7 +619,7 @@ describe('placeWallSwarm (#516)', () => {
   })
 
   it('lands level 6\'s lanternflies group by group through the wave (#928), not all at its tell', () => {
-    const { level, table: gym, rideFor } = world(getAllLevels().find((l) => l.id === 'level6')!)
+    const { level, table: gym, rideFor } = world(shippedLevels().find((l) => l.id === 'level6')!)
     const wave = level.enemies.find((w) => w.type === 'lanternfly')!
     const ride = rideFor(wave)
     const placed = placeWallSwarm({ table: gym, riderIndex: 0, type: wave.type, walls: level.walls!, slots: swarmSlots(wave.count, createRng(3)), ride })
@@ -676,7 +676,7 @@ describe('placeWallSwarm (#516)', () => {
 })
 
 describe('level2: the opening climb (#494)', () => {
-  const { level, table, groundFn, rideFor, trackScale, keepOff } = world(getAllLevels().find((l) => l.id === 'level2')!)
+  const { level, table, groundFn, rideFor, trackScale, keepOff } = world(shippedLevels().find((l) => l.id === 'level2')!)
   const opening = level.enemies.filter((w) => (w.spawnDelay ?? 0) <= 12)
   const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
   // The rig's frustum on the smoke's 1280×720 screen (80° vertical), looking where `trackView` does.
@@ -829,7 +829,7 @@ describe('a group on a long backwards straight', () => {
 })
 
 describe('level7 hover drones keep out of the towers (#323)', () => {
-  const { level, table, groundFn, rideFor } = world(getAllLevels().find((l) => l.id === 'level7')!)
+  const { level, table, groundFn, rideFor } = world(shippedLevels().find((l) => l.id === 'level7')!)
   const clearAir = BIOMES.city.clearAir!(groundFn, table)
   const towers = cityTowers(table, trackExtent(table))
   const c = DRONE_CLEARANCE

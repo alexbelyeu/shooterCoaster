@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RideV2Spec, TrackParams } from '@/types/level'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { buildArcTable, distanceAtT, tAtDistance } from './arcLength'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { withMechanics } from './mechanics'
@@ -227,7 +227,7 @@ describe('the ride feel on today\'s rule', () => {
 })
 
 it('every level on the v2 ride lands its storyboard\'s beats', () => {
-  for (const level of getAllLevels().filter((l) => l.track.ride === 'v2')) {
+  for (const level of shippedLevels().filter((l) => l.track.ride === 'v2')) {
     const table = buildArcTable(createTrackCurve(level.track))
     const plan = buildRidePlan(table, withMechanics(level.track.rideV2 ?? {}, level.track.mechanics, table.length))
     const misses = (level.track.rideV2?.beats ?? []).filter((beat, i) => !(Math.abs(plan.landed[i] - beat.second) <= BEAT_TOLERANCE_SECONDS))

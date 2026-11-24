@@ -84,7 +84,7 @@ if (noteLeaks.length) {
   ok = false
 }
 if (blockoutAtStartup.length) {
-  console.error(`FAIL: the gym blockout in the startup JS: ${blockoutAtStartup.join(', ')} (the level registry takes level 6 from gymLevel.ts)`)
+  console.error(`FAIL: the gym blockout in the startup JS: ${blockoutAtStartup.join(', ')} (level 6's ride is gymLevel.ts, in the gym world's chunk)`)
   ok = false
 }
 process.exit(ok ? 0 : 1)

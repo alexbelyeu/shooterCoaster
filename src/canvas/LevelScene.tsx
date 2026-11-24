@@ -1,8 +1,8 @@
 import { use, useEffect, useMemo } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { getLevelConfig } from '@/levels/LevelRegistry'
-import type { LevelConfig } from '@/types/level'
+import { getLevelConfig, levelRide } from '@/levels/LevelRegistry'
+import type { LevelConfig, LevelRide } from '@/types/level'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import TrackMesh from '@/track/TrackMesh'
 import { getTrackDimensions } from '@/track/trackDimensions'
@@ -79,18 +79,21 @@ export { forgetWorldFailures, loadWorld }
 
 /**
  * A level's whole scene, in its own lazy chunk (#376) so the title's startup JS carries no level code; it suspends
- * until its world's chunk (#862: the biome, its enemies and boss) has arrived too. Only this wrapper suspends: the
+ * until its world's chunk (#862: the biome, its enemies and boss, the level's ride, #960) has arrived too. Only this wrapper suspends: the
  * scene's hooks live in `LevelWorld`, which renders with its world in hand.
  */
 export default function LevelScene({ levelId }: { levelId: string }) {
   const config = getLevelConfig(levelId)
   if (!config) return null
   const world = loadedWorld(config.biome) ?? use(loadWorld(config.biome))
-  return <LevelWorld levelId={levelId} config={config} world={world} />
+  const ride = levelRide(levelId)
+  if (!ride) throw new Error(`${levelId}: no ride in the registry or its world's chunk (LevelConfig.ride, World.rides)`)
+  return <LevelWorld levelId={levelId} config={config} ride={ride} world={world} />
 }
 
-function LevelWorld({ levelId, config, world }: { levelId: string; config: LevelConfig; world: World }) {
-  const { track, environment, biome, enemies, combat, boss, pickups, walls, goldenBalloons } = config
+function LevelWorld({ levelId, config, ride, world }: { levelId: string; config: LevelConfig; ride: LevelRide; world: World }) {
+  const { environment, biome, enemies, combat, boss, pickups, goldenBalloons } = config
+  const { track, walls, seaArch } = ride
   const def = world.biome
 
   const curve = useMemo(() => createTrackCurve(track), [track])
@@ -154,7 +157,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
             speeds={speeds}
             darkSections={track.darkSections}
             weather={levelWeather(enemies)?.kind}
-            seaArch={environment.seaArch}
+            seaArch={seaArch}
             whale={environment.whale}
             hasWater={environment.hasWater}
             hasTrees={environment.hasTrees}

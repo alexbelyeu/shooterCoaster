@@ -4,7 +4,7 @@ import type { HardRoute } from '@/track/mechanics'
 import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { waveWindows } from './waveSchedule'
-import type { HeightFunction } from '@/utils/terrainNoise'
+import { sightClear, type HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import type { Vec3 } from '@/utils/vec3'
 import { maxReadableDistance } from '../enemies/enemyReadability'
@@ -744,14 +744,14 @@ function dryTracksidePoint(
     for (const side of [offset, -offset]) {
       const p = tracksidePoint(table, riderIndex, { ahead: slot.ahead, side })
       if (bounds && !insideBounds(p, bounds)) continue
-      if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)) return p
+      if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale, groundFn)) return p
     }
   }
   const around = bestFacingAround(table, riderIndex, slot, surface, groundFn, reach, trackScale, bounds)
-  if (around && inViewOnApproach(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale)) return around
+  if (around && inViewOnApproach(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale, groundFn)) return around
   // Not in an interior: its boulders and pieces stand on the floor, and nothing keeps a spot off them.
   const looked = bounds ? null : whereTheApproachLooks(table, riderIndex, slot, surface, groundFn, reach, trackScale, keepOff, roam)
-  const aroundSeen = around ? looksInView(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale) : -1
+  const aroundSeen = around ? looksInView(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale, groundFn) : -1
   return (looked && looked.seen > aroundSeen ? looked.p : around) ?? clampToBounds(tracksidePoint(table, riderIndex, slot), bounds)
 }
 
@@ -777,17 +777,17 @@ function whereTheApproachLooks(
     const p = { x: eye.x + look.x * d - look.z * slot.side, y: 0, z: eye.z + look.z * d + look.x * slot.side }
     if (!clearOfKeepOff(p, keepOff, roam)) continue
     if (!clearOfTrack(table, p, TRACKSIDE.ground.sideMin)) continue
-    const seen = looksInView(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)
+    const seen = looksInView(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale, groundFn)
     if (seen > (best?.seen ?? 0)) best = { p, seen }
   }
   return best
 }
 
 /** How many of the approach's looks, every `FACING_STEP` from `VIEW_LEAD` to `FACING_LAST` before the slot, have `p` in their cone. */
-function looksInView(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): number {
+function looksInView(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number, ground?: HeightFunction): number {
   let seen = 0
   for (let at = Math.max(0, ahead - VIEW_LEAD); at <= ahead - FACING_LAST; at += FACING_STEP) {
-    if (lookCos(table, riderIndex, at, p, reach, trackScale) >= APPROACH_CONE_COS) seen++
+    if (lookCos(table, riderIndex, at, p, reach, trackScale, ground) >= APPROACH_CONE_COS) seen++
   }
   return seen
 }
@@ -828,7 +828,7 @@ function bestFacingAround(
       const p = { x: table.x[i] - forward.z * right + forward.x * along, y: 0, z: table.z[i] + forward.x * right + forward.z * along }
       if (bounds && !insideBounds(p, bounds)) continue
       if (!clearOfRails(table, i, p, sideMin)) continue
-      const f = approachFacing(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale)
+      const f = approachFacing(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale, groundFn)
       if (f > bestFacing) {
         best = p
         bestFacing = f
@@ -883,10 +883,12 @@ function wetTracksidePoint(
   return wet ?? tracksidePoint(table, riderIndex, slot)
 }
 
-function inViewOnApproach(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): boolean {
+function inViewOnApproach(
+  table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number, ground?: HeightFunction,
+): boolean {
   const from = Math.max(0, ahead - VIEW_LEAD)
-  return lookCos(table, riderIndex, from, p, reach, trackScale) >= APPROACH_CONE_COS
-    && lookCos(table, riderIndex, from + VIEW_HOLD, p, reach, trackScale) >= APPROACH_CONE_COS
+  return lookCos(table, riderIndex, from, p, reach, trackScale, ground) >= APPROACH_CONE_COS
+    && lookCos(table, riderIndex, from + VIEW_HOLD, p, reach, trackScale, ground) >= APPROACH_CONE_COS
 }
 
 /** The looks `approachFacing` sums: every `FACING_STEP` from the second look of `inViewOnApproach` to `FACING_LAST` before the slot. */
@@ -894,20 +896,31 @@ const FACING_STEP = 100
 const FACING_LAST = 300
 
 /** How squarely the rider faces `p` over the near approach, summed over its looks. */
-function approachFacing(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number): number {
+function approachFacing(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number, ground?: HeightFunction): number {
   let sum = 0
   for (let at = Math.max(0, ahead - VIEW_LEAD + VIEW_HOLD); at <= ahead - FACING_LAST; at += FACING_STEP) {
-    sum += lookCos(table, riderIndex, at, p, reach, trackScale)
+    sum += lookCos(table, riderIndex, at, p, reach, trackScale, ground)
   }
   return sum
 }
 
-/** Cosine between the rider's look `at` past `riderIndex` and the way to `p`; -1 past `reach`. */
-function lookCos(table: ArcTable, riderIndex: number, at: number, p: Vec3, reach: number, trackScale: number): number {
+/** Cosine between the rider's look `at` past `riderIndex` and the way to `p`; -1 past `reach` or, given its `ground`, behind it. */
+function lookCos(table: ArcTable, riderIndex: number, at: number, p: Vec3, reach: number, trackScale: number, ground?: HeightFunction): number {
   const { eye, dir } = trackView(table, indexAhead(table, riderIndex, at), trackScale)
   const d = sub(p, eye)
   const len = Math.hypot(d.x, d.y, d.z)
-  return len > reach ? -1 : dot(d, dir) / len
+  if (len > reach) return -1
+  return ground && !terrainClear(eye, p, ground) ? -1 : dot(d, dir) / len
+}
+
+/** Height over its foot of the point a ground slot is sighted at: the body, not the snow it stands in. */
+const SIGHT_HEIGHT = 25
+/**
+ * No terrain over the line from `eye` to `SIGHT_HEIGHT` over `p` (#937): Antarctica's valley walls and ridges hid most
+ * of its trackside snowmen from the rider who was looking right at them.
+ */
+function terrainClear(eye: Vec3, p: Vec3, ground: HeightFunction): boolean {
+  return sightClear(ground, eye.x, eye.y, eye.z, p.x, p.y + SIGHT_HEIGHT, p.z)
 }
 
 /** Point on an entry path at `t` (0–1, eased out); `spin` unwinds the horizontal offset around `from`. */

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig, levelRide } from '@/levels/LevelRegistry'
+import { shippedLevel, WORLD_RIDES } from '@/levels/shippedLevels'
+import { loadWorld, WORLD_CHUNKS } from '@/levels/environments/worlds'
 import type { SplineTrackParams, TrackParams } from '@/types/level'
 import { roundNumbers, roundPoints, type RidePrecision } from './rideData'
 import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
@@ -32,6 +34,30 @@ describe.each([
   })
 
   it(`is what ${id} rides`, () => {
-    expect(getLevelConfig(id)!.track).toBe(shipped)
+    expect(shippedLevel(id).track).toBe(shipped)
+  })
+})
+
+// Where each ride is (#960): level 1's in the registry, the startup JS; the others in their worlds' chunks only.
+describe('ride sources', () => {
+  it('only level 1 and the hand-written trig tracks ride from the registry', () => {
+    const inRegistry = getAllLevels().filter((l) => l.ride)
+    expect(inRegistry.filter((l) => l.id !== 'level1' && l.ride!.track.curve === 'spline').map((l) => l.id)).toEqual([])
+    expect(getLevelConfig('level1')!.ride).toBeDefined()
+  })
+
+  it.each(getAllLevels().map((l) => [l.id, l] as const))('%s: one ride, from the registry or its world, the one the tests sample', async (id, level) => {
+    const { world } = await WORLD_CHUNKS[level.biome]()
+    const fromWorld = world.rides?.[id]
+    expect(!!level.ride !== !!fromWorld, 'exactly one of LevelConfig.ride and World.rides').toBe(true)
+    expect(fromWorld).toBe(WORLD_RIDES[id])
+    expect(Object.keys(world.rides ?? {}).filter((other) => getLevelConfig(other)?.biome !== level.biome)).toEqual([])
+  })
+
+  it('levelRide has a world\'s ride once its chunk has loaded through loadWorld, not before', async () => {
+    expect(levelRide('level2')).toBeUndefined()
+    await loadWorld('desert')
+    expect(levelRide('level2')).toBe(WORLD_RIDES.level2)
+    expect(levelRide('level1')).toBe(getLevelConfig('level1')!.ride)
   })
 })

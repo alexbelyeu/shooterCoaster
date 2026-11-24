@@ -1,5 +1,6 @@
 import { createContext, useContext, type ComponentType } from 'react'
-import type { BiomeType, BossType, EnemyType } from '@/types/level'
+import type { BiomeType, BossType, EnemyType, LevelRide } from '@/types/level'
+import { addRides } from '@/levels/LevelRegistry'
 import type { EnemyProps } from '@/entities/enemies/EnemyBase'
 import type { BossProps } from '@/entities/bosses/BossBase'
 import { lazyChunk } from '@/core/staleBuild'
@@ -7,7 +8,8 @@ import { createHeightFunction, type HeightFunction, type TrackSample } from '@/u
 import type { BiomeDefinition } from './shared/types'
 
 /**
- * One world's own code (#862): its biome (decorations, features, terrain) and the enemies and boss its levels spawn.
+ * One world's own code (#862): its biome (decorations, features, terrain), the enemies and boss its levels spawn, and its
+ * levels' rides (#960) unless the registry carries one (`LevelConfig.ride`).
  * Each is a lazy chunk of its own (`biomes/<biome>/world.ts`), fetched by the level core when a run starts (`loadWorld`),
  * so a run loads its world and never the other worlds'. Only the core imports this module: what a world shares with
  * the core is then the core's, never a chunk of its own.
@@ -16,6 +18,8 @@ export interface World {
   biome: BiomeDefinition
   enemies: Partial<Record<EnemyType, ComponentType<EnemyProps>>>
   bosses: Partial<Record<BossType, ComponentType<BossProps>>>
+  /** Its levels' rides by level id (`levelRide` has them once this chunk is in). */
+  rides?: Readonly<Record<string, LevelRide>>
 }
 
 /**
@@ -52,6 +56,7 @@ export function loadWorld(biome: BiomeType): Promise<World> {
   if (!load) {
     load = lazyChunk(() =>
       WORLD_CHUNKS[biome]().then(({ world }) => {
+        if (world.rides) addRides(world.rides)
         loadedWorlds.set(biome, world)
         return world
       }),

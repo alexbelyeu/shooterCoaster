@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { buildArcTable } from '@/track/arcLength'
 import { getTrackDimensions } from '@/track/trackDimensions'
@@ -13,7 +13,7 @@ import {
 import { planThemePark } from './layout'
 import { ARCH_BOARD_HEIGHT, ARCH_HALF_SPAN, FLAG_DROP, RIDES, STALL_DEPTH, STALL_WIDTH } from './parkSpec'
 
-const level = getLevelConfig('level1')!
+const level = shippedLevel('level1')
 const curve = createTrackCurve(level.track)
 const scale = getTrackDimensions(level.track).trackScale
 const table = withTunnels(buildArcTable(curve), level.track.tunnels, scale)

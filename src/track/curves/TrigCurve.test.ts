@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createTrackCurve } from './createTrackCurve'
 import type { TrackCurve } from './TrackCurve'
-import { getAllLevels } from '@/levels/LevelRegistry'
-import type { LevelConfig, TrigTrackParams } from '@/types/level'
+import { shippedLevels } from '@/levels/shippedLevels'
+import type { RiddenLevel, TrigTrackParams } from '@/types/level'
 
 const SAMPLES = 1000
 
@@ -13,7 +13,7 @@ function pointAt(curve: TrackCurve, t: number) {
 }
 
 // The trig curves; an authored spline (level6) has its own tests (`SplineCurve.test.ts`, `gymTrack.test.ts`).
-const levels = getAllLevels().filter((l): l is LevelConfig & { track: TrigTrackParams } => l.track.curve !== 'spline')
+const levels = shippedLevels().filter((l): l is RiddenLevel & { track: TrigTrackParams } => l.track.curve !== 'spline')
 
 describe.each(levels.map((l) => [l.id, l.track] as const))('track curve for %s', (_id, track) => {
   const curve = createTrackCurve(track)

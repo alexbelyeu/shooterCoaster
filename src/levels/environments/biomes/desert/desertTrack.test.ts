@@ -4,7 +4,7 @@ import { buildArcTable } from '@/track/arcLength'
 import { rideModel } from '@/track/ridePhysics'
 import { BEAT_TOLERANCE_SECONDS } from '@/track/rideV2'
 import { getTrackDimensions } from '@/track/trackDimensions'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { createHeightFunction } from '@/utils/terrainNoise'
 import type { TrackParams } from '@/types/level'
 import { PYRAMID_BASE_SIZE, PYRAMID_SHRINK } from '../../landmarkDimensions'
@@ -23,7 +23,7 @@ const PASSAGE_HALF = (PYRAMID_BASE_SIZE * PYRAMID_SHRINK ** PYRAMID_PASSAGE.laye
 const PASSAGE_FLOOR_Y = PYRAMID_BASE_Y + PYRAMID_PASSAGE_FLOOR
 
 describe.each([
-  ['as shipped', getLevelConfig('level2')!.track],
+  ['as shipped', shippedLevel('level2').track],
   ['as authored', DESERT_TRACK],
 ] as [string, TrackParams][])("level 2's ride (#864), %s", (_name, track) => {
   const curve = createTrackCurve(track)
