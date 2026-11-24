@@ -607,6 +607,8 @@ describe('placeWallSwarm (#516)', () => {
     const walls = placed.map((p) => p.wall.id)
     expect(walls[0]).toMatch(/alaska/)
     expect(walls[walls.length - 1]).not.toMatch(/alaska/)
+    // The crest (#948): over Alaska's top no wall is in frame, so a group lands on the roof the rider looks up into.
+    expect(walls).toContain('roof-alaska')
     // Every lanternfly is on the rider's screen at some point of the wave's window or the last group's second after it, as the
     // ride's profile rides it, judged in the rails' frame.
     const frames = Array.from({ length: 41 }, (_, j) =>
@@ -625,8 +627,9 @@ describe('placeWallSwarm (#516)', () => {
     expect(arrivals[0]).toBe(0)
     expect(arrivals.length).toBeGreaterThanOrEqual(5)
     for (let g = 1; g < arrivals.length; g++) expect(arrivals[g]).toBeGreaterThan(arrivals[g - 1])
-    // The last lands as the wave's window closes, for the stretch after it.
-    expect(arrivals[arrivals.length - 1]).toBeCloseTo(ride.seconds!)
+    // The last lands just after the wave's window closes, for the stretch after it.
+    expect(arrivals[arrivals.length - 1]).toBeGreaterThan(ride.seconds!)
+    expect(arrivals[arrivals.length - 1]).toBeLessThan(ride.seconds! + 1.5)
     // Each group lands in the rider's frame: some member of it is on screen within a second of its landing (#949).
     const riderIndex = indexAhead(gym, 0, rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)[wave.spawnDelay! * 10])
     const atRider = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarmSlots(wave.count, createRng(3)), ride })
@@ -646,6 +649,14 @@ describe('placeWallSwarm (#516)', () => {
 
   it('needs the level to have walls', () => {
     expect(() => placeWallSwarm({ table, riderIndex: 0, type: 'lanternfly', walls: [], slots, ride: STILL })).toThrow(/walls/)
+  })
+
+  it('never stands bystander climbers on a perch (#948), even the one in front of the rider', () => {
+    const walls = [wallAt('behind', -400), { ...wallAt('ahead', 400), perch: true }]
+    const placed = placeWallClimbers({ table, riderIndex: 0, type: 'climber', walls, slots: bystanderSlots(3, createRng(9)), ride: STILL })
+    expect(new Set(placed.map((p) => p.wall.id))).toEqual(new Set(['behind']))
+    // A swarm lands on it.
+    expect(new Set(placeWallSwarm({ table, riderIndex: 0, type: 'lanternfly', walls, slots, ride: STILL }).map((p) => p.wall.id))).toEqual(new Set(['ahead']))
   })
 
   it('stands bystander climbers (#518) in a row at the foot of the wall in front of the rider', () => {

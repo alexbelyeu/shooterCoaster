@@ -6,7 +6,10 @@ export type BiomeType = (typeof BIOME_TYPES)[number]
 export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti' | 'magmaTitan' | 'medusa'
 export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny' | 'lanternfly' | 'hoverDrone'
 
-/** A climbable wall (#453): from `origin`, its bottom-left corner, along unit `right` and `up`; it faces `right × up`. */
+/**
+ * A wall (#453), climbable unless it is a `perch`: from `origin`, its bottom-left corner, along unit `right` and `up`; it
+ * faces `right × up`.
+ */
 export interface WallSurface {
   id: string
   origin: { x: number; y: number; z: number }
@@ -14,6 +17,8 @@ export interface WallSurface {
   up: { x: number; y: number; z: number }
   width: number
   height: number
+  /** Only fliers land on it (a swarm, `placeWallSwarm`): a roof's underside, say. Nobody climbs it (#948). */
+  perch?: boolean
 }
 
 /** What every track has, whatever its curve. */

@@ -9,7 +9,8 @@ import type { Rng } from '@/utils/rng'
 import type { Vec3 } from '@/utils/vec3'
 import { maxReadableDistance } from '../enemies/enemyReadability'
 import {
-  BYSTANDER_SPACING, ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, wallNormal, wallPoint, type Surface, type SwarmSlot, type WallSlot,
+  BYSTANDER_SPACING, ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, climbableWalls, wallNormal, wallPoint,
+  type Surface, type SwarmSlot, type WallSlot,
 } from './enemyPlacement'
 import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
@@ -961,14 +962,18 @@ function horizontal(v: Vec3): Vec3 {
 const SWARM_VIEWS = 6
 /** A group is judged from the rider's views over this long from its arrival: about as long as it takes to clear. */
 const SWARM_GROUP_SECONDS = 1.5
-/** All but a swarm's last group arrive over this first share of the wave's seconds: the rider clears a small group in about a second. */
-const SWARM_ARRIVAL_SHARE = 0.8
+/**
+ * A swarm's groups land evenly from the wave's tell to this long after its window closes (#948): the rider clears a small
+ * group in about a second, so the last holds the stretch while the next wave is still arriving.
+ */
+const SWARM_LAST_LATE = 1
 /**
  * A swarm splits into groups of at least `SWARM_GROUP_MIN`, up to `SWARM_GROUPS`, each round the spot the rider sees most
  * while that group is in play (#768), from the moment it arrives (#928): on level 6, one after another on the walls beside
- * the car up Alaska, the last on the Starr past the crest, so new ones keep landing in frame through the wave, not one burst.
+ * the car up Alaska, then on the roof over its top as it rolls over (#948), the last on the Starr past the crest, so new
+ * ones keep landing in frame through the wave, not one burst.
  */
-const SWARM_GROUPS = 6
+const SWARM_GROUPS = 7
 const SWARM_GROUP_MIN = 3
 /** Candidate centres across and up each wall, about this far apart. */
 const SWARM_CANDIDATE_STEP = 80
@@ -1050,14 +1055,14 @@ export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: 
 }
 
 /**
- * Seconds after its wave activates that group `g` of a swarm lands: the first with the wave, the rest but the last over
- * `SWARM_ARRIVAL_SHARE` of its window, the last as the window closes, for the stretch after it (on level 6, the Starr past
- * the crest while the next wave, the pack, is still out of sight in the pit). No window: every group at once.
+ * Seconds after its wave activates that group `g` of a swarm lands: the first with the wave, the rest evenly after it, the
+ * last `SWARM_LAST_LATE` after the window closes, for the stretch after it (on level 6, the Starr past the crest while the
+ * next wave, the pack, is still out of sight in the pit). No window: every group at once.
  */
 function swarmArrival(ride: RideAhead, g: number, groups: number): number {
   const seconds = ride.seconds ?? 0
   if (groups < 2 || seconds <= 0) return 0
-  return g === groups - 1 ? seconds : (g * seconds * SWARM_ARRIVAL_SHARE) / (groups - 1)
+  return (g * (seconds + SWARM_LAST_LATE)) / (groups - 1)
 }
 
 /**
@@ -1072,10 +1077,11 @@ function swarmViewAhead(ride: RideAhead, g: number, groups: number, arrival: num
 
 /**
  * Bystander climbers (#518) at the foot of the wall a swarm would take (`placeWallSwarm`: the one the rider sees most over
- * the wave's window), in a row across it round that spot, closer together on a narrow wall. `slots` are `bystanderSlots`.
+ * the wave's window, never a perch), in a row across it round that spot, closer together on a narrow wall. `slots` are
+ * `bystanderSlots`.
  */
 export function placeWallClimbers(input: PlaceSwarmInput): WallSlot[] {
-  const [{ wall, u }] = placeWallSwarm({ ...input, slots: [{ du: 0, dv: 0, seed: 0 }] })
+  const [{ wall, u }] = placeWallSwarm({ ...input, walls: climbableWalls(input.walls), slots: [{ du: 0, dv: 0, seed: 0 }] })
   const n = input.slots.length
   const margin = Math.min(CLIMB.margin, wall.width / 2)
   const spacing = Math.min(BYSTANDER_SPACING, (wall.width - 2 * margin) / Math.max(1, n))

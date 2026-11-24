@@ -1,10 +1,11 @@
 /**
  * The gym's sport walls as climbable `WallSurface`s (#518, pure): Alaska, the Lagoon, the Shield and the Starr, where its
  * climbers (bystanders) go up. A surface is flat, so an overhanging profile gets the plane from its foot to its top,
- * stood off the foot far enough that no panel of the real profile comes through it.
+ * stood off the foot far enough that no panel of the real profile comes through it. Plus one perch (#948), the roof over
+ * Alaska's top, where only the lanternflies land.
  */
 import type { WallSurface } from '@/types/level'
-import { GYM_SCALE, PIECES, STAR, pieceAxes, pieceToBlockout, toWorld, type BlockoutPiece, type Panel } from './blockout'
+import { GYM_SCALE, HALL, PIECES, STAR, pieceAxes, pieceToBlockout, toWorld, type BlockoutPiece, type Panel } from './blockout'
 
 type SportWall = Extract<BlockoutPiece, { kind: 'sport' | 'boulder' }>
 
@@ -57,10 +58,33 @@ function starAlong(p: SportWall): number {
   return (STAR.centre.x - p.x) * along.x + (STAR.centre.z - p.z) * along.z
 }
 
-export const GYM_WALLS: readonly WallSurface[] = CLIMBED.flatMap((id) => {
-  const p = sportWall(id)
-  const half = p.length / 2
-  if (id !== 'w-starr') return [surface(p, -half, half)]
-  const star = starAlong(p)
-  return [surface(p, -half, star - STAR_CLEAR, '-left'), surface(p, star + STAR_CLEAR, half, '-right')]
-})
+/**
+ * The roof deck's bays (blockout metres) the car looks up into as it rolls over Alaska's top and crests toward the dyno
+ * (~24–26.5 s), where no wall is in frame: a swarm group lands there instead (#948).
+ */
+const ROOF_PERCH = { x0: 12, x1: 36, z0: 24, z1: HALL.d }
+
+/** The roof's underside over `ROOF_PERCH`, facing down. */
+function roofPerch(): WallSurface {
+  const { x0, x1, z0, z1 } = ROOF_PERCH
+  return {
+    id: 'roof-alaska',
+    origin: toWorld({ x: x0, y: HALL.h, z: z0 }),
+    right: { x: 1, y: 0, z: 0 },
+    up: { x: 0, y: 0, z: 1 },
+    width: (x1 - x0) * GYM_SCALE,
+    height: (z1 - z0) * GYM_SCALE,
+    perch: true,
+  }
+}
+
+export const GYM_WALLS: readonly WallSurface[] = [
+  ...CLIMBED.flatMap((id) => {
+    const p = sportWall(id)
+    const half = p.length / 2
+    if (id !== 'w-starr') return [surface(p, -half, half)]
+    const star = starAlong(p)
+    return [surface(p, -half, star - STAR_CLEAR, '-left'), surface(p, star + STAR_CLEAR, half, '-right')]
+  }),
+  roofPerch(),
+]
