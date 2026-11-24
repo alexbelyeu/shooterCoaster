@@ -42,7 +42,7 @@ export interface CityLayout {
 }
 
 /** The towers fill blocks out to this many track extents; the skyline ring stands beyond. */
-const CITY_REACH = 2.1
+export const CITY_REACH = 2.1
 const SKYLINE = { inner: 2500, outer: 3300, count: 64 } as const
 /** No tower this near the hero tower's centre. */
 const HERO_CLEARANCE = 380

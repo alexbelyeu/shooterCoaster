@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import type { BiomeFeaturesProps } from '@/levels/environments/shared/types'
 import StaticInstances from '@/levels/environments/shared/StaticInstances'
 import { layoutHeroTower } from './cityLayout'
-import { createNeonMaterial, createTowerGeometry, neonGeometry, towerMatrix } from './cityNeon'
+import { createNeonMaterial, createTowerGeometry, neonGeometry, towerMatrix, useNeonClock } from './cityNeon'
 import { createTowerMaterial } from './cityShaders'
 import { LANDMARK_SITE } from './config'
 
@@ -15,6 +15,7 @@ export default function CityFeatures({ groundFn }: BiomeFeaturesProps) {
   const neon = useMemo(() => neonGeometry(hero.neon), [hero])
   const ground = groundFn(LANDMARK_SITE.x, LANDMARK_SITE.z)
   const matrices = useMemo(() => hero.tiers.map((t) => towerMatrix(t, ground)), [hero, ground])
+  useNeonClock()
 
   useEffect(
     () => () => {

@@ -2,13 +2,22 @@ import { useEffect, useMemo } from 'react'
 import type { BiomeDecorationsProps } from '@/levels/environments/shared/types'
 import { trackExtent } from '@/levels/environments/shared/trackScatter'
 import StaticInstances from '@/levels/environments/shared/StaticInstances'
-import { layoutCity } from './cityLayout'
-import { createNeonMaterial, createTowerGeometry, neonGeometry, towerMatrix } from './cityNeon'
+import { CITY_REACH, layoutCity, layoutHeroTower } from './cityLayout'
+import { createNeonMaterial, createTowerGeometry, neonGeometry, towerMatrix, useNeonClock } from './cityNeon'
 import { createTowerMaterial } from './cityShaders'
+import Traffic from './Traffic'
+import { laneRuns, layoutTraffic } from './trafficPaths'
 
-/** The city (#323): every tower and the skyline as one instanced draw call with lit windows, all the neon as one more. */
+/** The city (#323): the towers and skyline in one instanced draw call, all the neon in one more, the traffic (#324) in a third. */
 export default function CityDecorations({ groundFn, track }: BiomeDecorationsProps) {
-  const layout = useMemo(() => layoutCity(track, trackExtent(track)), [track])
+  const extent = useMemo(() => trackExtent(track), [track])
+  const layout = useMemo(() => layoutCity(track, extent), [track, extent])
+  const traffic = useMemo(() => {
+    const towers = [...layout.towers, ...layout.skyline, ...layoutHeroTower().tiers]
+    // `terrainNoise`'s city is flat out past the skyline
+    return layoutTraffic(laneRuns(track, extent * CITY_REACH, towers), groundFn(0, 0))
+  }, [track, extent, layout, groundFn])
+  useNeonClock()
   const towerGeometry = useMemo(createTowerGeometry, [])
   const towerMaterial = useMemo(createTowerMaterial, [])
   const neonMaterial = useMemo(createNeonMaterial, [])
@@ -32,6 +41,7 @@ export default function CityDecorations({ groundFn, track }: BiomeDecorationsPro
     <>
       <StaticInstances matrices={matrices} geometry={towerGeometry} material={towerMaterial} />
       <mesh geometry={neon} material={neonMaterial} />
+      <Traffic traffic={traffic} />
     </>
   )
 }
