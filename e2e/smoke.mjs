@@ -410,6 +410,21 @@ async function pollUntil(page, check, { ms, frames = MIN_FRAMES, pollMs = 500 })
 }
 
 /**
+ * Why a click at the centre fired nothing (#933): the phase, the level and run, the element under the centre, the
+ * bullets, and the hook's `runLog` changes (what started each run). Two CI failures on level 5 ended in a level-1 run
+ * (a golden-balloon kill, fireworks), so the page had left the run under test.
+ */
+async function runReport(page, id, vp) {
+  return page.evaluate(([id, x, y]) => {
+    const t = window.__SC_TEST__
+    const el = document.elementFromPoint(x, y)
+    const at = el ? `<${el.tagName.toLowerCase()}${el.className ? ` class="${el.className}"` : ''}>` : 'nothing'
+    const log = t.runLog.slice(-6).map((e) => `${e.ms} ms f${e.frame} ${e.phase} ${e.level ?? '-'} from ${e.from}`).join(' | ')
+    return `expected ${id}; phase ${t.phase()}, level ${t.stats().currentLevel ?? '-'}, at centre ${at}, bullets ${JSON.stringify(t.bullets())}; run log: ${log}`
+  }, [id, vp.width / 2, vp.height / 2])
+}
+
+/**
  * Play: autofire for a few seconds, then killNearest(5) and screenshot the
  * explosions; then force results and screenshot.
  *
@@ -432,13 +447,14 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   // Desktop mouse: one real click at the screen centre must fire through pointer input.
   const beforeClick = await getStats(page)
   const vp = page.viewportSize()
+  if (beforeClick.phase !== 'playing' || beforeClick.currentLevel !== id) problems.push(`the page left the ${id} run before combat (${await runReport(page, id, vp)})`)
   await page.mouse.move(vp.width / 2, vp.height / 2)
   await page.mouse.down()
   await page.mouse.up()
   await waitFrames(page, 1, { maxMs: 4000, pollMs: 40 })
   const atStart = await getStats(page)
   const mouseShots = atStart.shotsFired - beforeClick.shotsFired
-  if (mouseShots === 0) problems.push('mouse click fired no shot')
+  if (mouseShots === 0) problems.push(`mouse click fired no shot (${await runReport(page, id, vp)})`)
   await page.evaluate(() => window.__SC_TEST__.autoFire(true))
   const fire = await waitFrames(page, COMBAT_MIN_FRAMES, { minMs: COMBAT_SECONDS * 1000, maxMs: COMBAT_SECONDS * 6000 })
   const afterFire = await getStats(page)
@@ -2450,14 +2466,14 @@ const projectileInFrame = (p) => p.onScreen && Math.abs(p.ndcX) <= PROJECTILE_IN
 /**
  * Moves the boss alone (`bossStep`, game time and the level timer frozen) in steps of 0.25 game seconds, at least
  * `seconds` and then on until `ready` holds, at most `BOSS_STEP_EXTRA_S` more: the game seconds it moved, or null if
- * never ready. The steps and the check run in the page, one step a rendered frame and `ready` checked after each, so
+ * never ready; `seconds` 0 still waits for `ready` (#905: it returned 0 unchecked). The steps and the check run in the
+ * page, one step a rendered frame and `ready` checked after each, so
  * it stops on the step that made it ready whatever the frame rate (#634: polled from here, a slow renderer took a step
  * or two more before the stop landed, and the Yeti's snowball in flight was gone by the screenshot).
  * `ready`: `{ exposed, projectiles }`, the boss's weak points on screen and thrown things inside the frame it needs
  * (`PROJECTILE_INNER_NDC`).
  */
 async function stepBoss(page, seconds, ready) {
-  if (seconds <= 0) return 0
   return page.evaluate(({ step, minSteps, maxSteps, need, inner, deadlineMs }) => new Promise((resolve) => {
     const s = window.__SC_TEST__
     const isReady = () => {
@@ -2516,21 +2532,19 @@ async function bossCheck(page, check) {
   if (!(await startLevelReady(page, level))) return { id: 'boss', problems: [NOT_LOADED(level)] }
   await waitFrames(page, 2, { minMs: 1000, maxMs: 30000 })
   const startStats = await getStats(page)
-  if (rideTo !== null) {
-    // The ride frozen before the summon, so a boss that picks its place off the rider's (the Yeti's ridge ahead) arrives
-    // in the same spot on any runner: riding on through its arrival, the car was wherever the wall clock had taken it
-    // by then, and the same step saw the Yeti 15% to 49% of the frame wide (#920). `summonAt` then steps back to `rideTo`.
-    await page.evaluate((t) => {
-      window.__SC_TEST__.rideTo = t
-      window.__SC_TEST__.setTimeScale(0)
-    }, summonAt ?? rideTo)
-    await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
-  }
+  // The ride frozen before the summon, so a boss that picks its place off the rider's arrives in the same spot against
+  // a still camera on any runner: riding on through its arrival, the car was wherever the wall clock had taken it by
+  // then, and the same step saw the Yeti 15% to 49% of the frame wide (#920) and the Golden Blimp, placed off a heading
+  // the camera had turned from by the freeze, out of the frame (#905). `summonAt` then steps back to `rideTo`.
+  await page.evaluate((t) => {
+    if (t !== null) window.__SC_TEST__.rideTo = t
+    window.__SC_TEST__.setTimeScale(0)
+  }, summonAt ?? rideTo)
+  await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   await page.evaluate(() => window.__SC_TEST__.summonBoss())
   const spawned = await pollUntil(page, async () => (await events()).spawn > 0, { ms: 20000 })
-  // A couple of frames so it is placed and drawn, then freeze it there.
+  // A couple of frames so it is placed and drawn.
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
-  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
   if (summonAt !== null) await page.evaluate((t) => { window.__SC_TEST__.rideTo = t }, rideTo)
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const settled = await stepBoss(page, settleS, { exposed: minOnScreen, projectiles: minProjectiles })
@@ -2633,7 +2647,7 @@ async function bossCheck(page, check) {
   if (!bar) problems.push('the boss bar (.hud-boss) never showed')
   if (!(result.widthFrac >= minWidthFrac)) problems.push(`the boss is ${(result.widthFrac * 100).toFixed(0)}% of the frame wide (want ≥ ${minWidthFrac * 100}%)`)
   if (settled === null || result.onScreenAtStart < minOnScreen)
-    problems.push(`${result.onScreenAtStart} first-phase weak points on screen after ${settleS} s (want ≥ ${minOnScreen})`)
+    problems.push(`${result.onScreenAtStart} first-phase weak points on screen after ${settled ?? settleS + BOSS_STEP_EXTRA_S} s (want ≥ ${minOnScreen})`)
   if (surfaced === null) problems.push(`the last phase [${lastPhase}] never came on screen within ${midSettleS} s`)
   if (!(result.fightSeconds <= BOSS_FIGHT_SECONDS))
     problems.push(`the fight takes ${result.fightSeconds.toFixed(1)} s at ${BOSS_HITS_PER_SECOND} hits a second (${hits} hp, on screen after ${settled} + ${surfaced} s): over its ${BOSS_FIGHT_SECONDS} s window`)
