@@ -43,10 +43,17 @@ const DRONE_GLOW_APPLY = /* glsl */ `{
   totalEmissiveRadiance += vColor.rgb * glow * 1.8;
 }`
 
-// Gunmetal that catches the sky's haze, under a cyan rim: a dark drone reads by its edges at night (the dark rule)
-export const DRONE_MAT = withEmissivePatch(withRim(new THREE.MeshStandardMaterial({
-  vertexColors: true,
-  metalness: 0.55,
-  roughness: 0.35,
-  flatShading: true,
-}), { color: DRONE_GLOW, intensity: 0.9, power: 2.0 }), 'drone-glow', {}, '', DRONE_GLOW_APPLY)
+/**
+ * Gunmetal that catches the sky's haze, under a rim: a dark machine reads by its edges at night (the dark rule), its
+ * bright paint burning. One program for every city machine (the drone, the Helicopter's parts): only uniforms differ.
+ */
+export function cityMachineMaterial(rim: THREE.ColorRepresentation): THREE.MeshStandardMaterial {
+  return withEmissivePatch(withRim(new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    metalness: 0.55,
+    roughness: 0.35,
+    flatShading: true,
+  }), { color: rim, intensity: 0.9, power: 2.0 }), 'drone-glow', {}, '', DRONE_GLOW_APPLY)
+}
+
+export const DRONE_MAT = cityMachineMaterial(DRONE_GLOW)

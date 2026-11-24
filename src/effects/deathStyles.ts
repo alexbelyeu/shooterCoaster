@@ -279,6 +279,34 @@ export const MEDUSA_CHALK_BURST_DEATH_STYLE: DeathStyle = {
   lifetime: 2.2, scale: 3.5, lift: 0, flash: 6, flashColor: '#ffe9a0', sound: 'chalk',
 }
 
+/** A shot-out Helicopter part: the hover drone's spray of cyan sparks and gunmetal chunks, at the boss's size. */
+export const HELI_PART_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'spark', count: 34, colors: ['#2ee8ff', '#9af4ff', '#ffffff'], glow: 4, speed: [50, 160], up: 20, drag: 2.4, gravity: 50, size: 2.2, hold: 0.1 }),
+    layer({ shape: 'chunk', count: 10, colors: ['#262b38', '#3c4354', '#1a1d26'], speed: [30, 85], up: 40, drag: 0.6, gravity: 160, size: 5, spin: 9, hold: 0.7 }),
+    layer({ shape: 'spark', count: 10, colors: ['#ff2fb0', '#ffb020'], glow: 3, speed: [40, 110], drag: 3, size: 1.8 }),
+  ],
+  lifetime: 1.6, scale: 2.4, lift: 0, flash: 6, flashColor: '#2ee8ff', sound: 'snap',
+}
+
+/** The Helicopter's smoke trail as it spins down: a dark puff off its tail every `HELI_FALL.smokeEvery` s, rising. */
+export const HELI_SMOKE_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'mote', count: 22, colors: ['#2a2c33', '#3a3d46', '#4a4e58'], glow: 0.6, speed: [5, 30], drag: 2, gravity: -12, size: 9, hold: 0.5 }),
+    layer({ shape: 'spark', count: 6, colors: ['#ffb020', '#ff6a10'], glow: 3, speed: [20, 70], drag: 3, size: 1.6 }),
+  ],
+  lifetime: 1.2, scale: 2.5, lift: 0, flash: 0, flashColor: '#ffffff', sound: 'snap',
+}
+
+/** The Helicopter hitting the street: a fountain of sparks and the last of its chunks. */
+export const HELI_CRASH_DEATH_STYLE: DeathStyle = {
+  layers: [
+    layer({ shape: 'spark', count: 40, colors: ['#ffb020', '#ffffff', '#2ee8ff', '#ff2fb0'], glow: 4, speed: [60, 200], up: 140, drag: 1.4, gravity: 220, size: 2.6, hold: 0.2 }),
+    layer({ shape: 'chunk', count: 12, colors: ['#262b38', '#3c4354', '#1a1d26'], speed: [40, 110], up: 90, drag: 0.6, gravity: 200, size: 6, spin: 9, hold: 0.7 }),
+  ],
+  lifetime: 1.8, scale: 3, lift: 0, flash: 8, flashColor: '#ffb020', sound: 'crunch',
+}
+
 export const DEATH_STYLES: Record<EnemyType, DeathStyle> = {
   balloon: {
     layers: BALLOON_POP(BALLOON_CONFETTI, ['#ffffff']),
