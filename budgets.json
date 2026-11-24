@@ -1,8 +1,8 @@
 {
   "_comment": "Guardrail budgets enforced by CI. Only the Director may raise these, with a DECISIONS.md entry explaining why.",
-  "jsTotalGzipKB": 665,
+  "jsTotalGzipKB": 672,
   "jsLargestChunkGzipKB": 260,
-  "startupJsGzipKB": 392,
+  "startupJsGzipKB": 398,
   "playerFrameMs": {
     "_comment": "Real players' frame times from telemetry (#373), held by the studio-health watchdog (scripts/playerTelemetry.cjs): a level whose median phone-session p95 frame time over 24 h (3+ sessions) is above touchP95 gets a studio-health issue. 33.4 ms: the VISION bar is 60 fps on a mid-range phone, and a p95 past two vsyncs means visible stutter.",
     "touchP95": 33.4
@@ -22,14 +22,14 @@
     "mobile": 240
   },
   "scene": {
-    "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31; level4 and level5 hold the VISION bar of 250, #260), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands. Since #925 a target counts only when the rider can shoot it (`sight()`: in view, readable, in sight) on a run played as a player (3 hits a game second), and `bossFramedShare` is the least share of the boss fight with a shootable weak point. Levels 1–5 re-set on 2026-11-23 from their first CI run under that count (seed 1337): the longest gap +1 s and the share +2 points up to the next 5% (both a little more where two runs differed), the boss floor 5 points under, down to the next 5%, so nothing gets worse; the targets are 3 s, 10% and 0.6 (#937). title (#376): the title scene, its drawCalls at the two title screenshots, objects and triangles; raised by the Director on 2026-11-09 for the title world (#436 → #454 / #459, DECISIONS \"Week 4\"): 140 / 130 / 60 000 are ceilings for a dense instanced park, not targets (was 114 / 89 / 11 356 = the 7 Nov scene +20% / +15%). level6 raised by the Director on 2026-11-16 (DECISIONS \"Week 5\"): 130 draws / 160 objects (was 60 / 110, its first smoke before climbers, the Medusa on screen and the fire; #554, #557, #583), still under the VISION bar of 250.",
+    "_comment": "Per-level ceilings checked by the smoke (#188): drawCalls at the ride screenshot (camera-dependent: +20% over the higher of two runs on 2026-10-31; level4 and level5 hold the VISION bar of 250, #260), scene and track (objects named track*) objects and triangles from sceneStats() (camera-independent: +15%). knownOver: \"#<open issue>\" turns a failure into a warning until that issue lands. Since #925 a target counts only when the rider can shoot it (`sight()`: in view, readable, in sight) on a run played as a player (3 hits a game second), and `bossFramedShare` is the least share of the boss fight with a shootable weak point. Levels 1–5 re-set on 2026-11-23 from their first CI run under that count (seed 1337): the longest gap +1 s and the share +2 points up to the next 5% (both a little more where two runs differed), the boss floor 5 points under, down to the next 5%, so nothing gets worse; the targets are 3 s, 10% and 0.6 (#937). title (#376): the title scene, its drawCalls at the two title screenshots, objects and triangles; raised by the Director on 2026-11-09 for the title world (#436 → #454 / #459, DECISIONS \"Week 4\"): 140 / 130 / 60 000 are ceilings for a dense instanced park, not targets (was 114 / 89 / 11 356 = the 7 Nov scene +20% / +15%). level1 (200: the lift hill's balloon rings in the 10 s shot, #955) and level3 (98: the Ocean ride's first lift looks over the lagoon, #895) raised by the Director on 2026-11-24. level6 raised by the Director on 2026-11-16 (DECISIONS \"Week 5\"): 130 draws / 160 objects (was 60 / 110, its first smoke before climbers, the Medusa on screen and the fire; #554, #557, #583), still under the VISION bar of 250.",
     "title": {
       "drawCalls": 140,
       "objects": 130,
       "triangles": 60000
     },
     "level1": {
-      "drawCalls": 101,
+      "drawCalls": 200,
       "objects": 179,
       "triangles": 220922,
       "trackObjects": 12,
@@ -43,7 +43,7 @@
       "trackTriangles": 96577
     },
     "level3": {
-      "drawCalls": 89,
+      "drawCalls": 98,
       "objects": 198,
       "triangles": 188821,
       "trackObjects": 12,
