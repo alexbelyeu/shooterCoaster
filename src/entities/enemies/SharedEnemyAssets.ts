@@ -289,7 +289,7 @@ const TOUCAN_TIP_OFFSET = (TOUCAN_BILL_LEN + TOUCAN_TIP_LEN) / 2 - 0.02
 export const TOUCAN_GEO = mergePainted([
   paintedAt(new THREE.LatheGeometry(TOUCAN_BODY_PROFILE, 8), TOUCAN_BODY, pose([0, 0, 0], [Math.PI / 2, 0, 0], [1, 1, 0.9])),
   // Bib: the throat and chest, below and ahead of the wings.
-  paintedAt(new THREE.SphereGeometry(1, 8, 6), TOUCAN_BIB, pose([0, -0.45, 3.6], [0, 0, 0], [1.45, 1.25, 1.35])),
+  paintedAt(new THREE.SphereGeometry(1, 8, 6), TOUCAN_BIB, pose([0, -0.4, 4], [0, 0, 0], [1.6, 1.4, 1.5])),
   // Bill: an orange frustum and a red tip, drooping a little.
   paintedAt(
     new THREE.CylinderGeometry(0.42, 1, TOUCAN_BILL_LEN, 8),

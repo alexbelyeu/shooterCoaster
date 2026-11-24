@@ -79,7 +79,11 @@
       "trackTriangles": 101568
     },
     "level8": {
-      "placeholder": "npm run new-world: set by two clean local smokes of this level (scene: the ride; pacing: --steps pacing), e2e/placeholderBudget.mjs"
+      "drawCalls": 93,
+      "objects": 90,
+      "triangles": 222907,
+      "trackObjects": 4,
+      "trackTriangles": 95869
     }
   },
   "pacing": {

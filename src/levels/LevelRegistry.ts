@@ -272,7 +272,7 @@ const LEVELS: LevelConfig[] = [
       boss: 'goldenBlimp',
     }),
     starThresholds: [0.25, 0.55, 0.85],
-    environment: { hasTrees: true, treeCount: 60 },
+    environment: { hasTrees: true, treeCount: 500 },
   },
 ]
 
