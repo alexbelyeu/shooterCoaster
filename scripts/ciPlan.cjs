@@ -7,7 +7,7 @@ const { isDocsOnly } = require('./studioHealthRules.cjs')
 const PORTAL_INPUT = /^(vite\.config\.ts|index\.html|public\/|scripts\/portal\/|package(-lock)?\.json|\.github\/workflows\/ci\.yml)/
 
 /** Each level's biome folder (`src/levels/environments/biomes/<biome>/`); `ciPlan.test.ts` holds it to the registry. */
-const BIOME_LEVEL = { themePark: 'level1', desert: 'level2', ocean: 'level3', arctic: 'level4', volcanic: 'level5', gym: 'level6' }
+const BIOME_LEVEL = { themePark: 'level1', desert: 'level2', ocean: 'level3', arctic: 'level4', volcanic: 'level5', gym: 'level6', city: 'level7' }
 /** Code every level's pacing runs through: the ride, the level configs and their spawns, and the metric itself. */
 const SHARED_PACING = /^(src\/track\/|src\/levels\/(LevelRegistry|pacing)\.ts$|src\/entities\/(spawning|bosses)\/|src\/testing\/lineOfSight\.ts$|e2e\/pacingMetric\.mjs$)/
 const isTest = (f) => /\.test\.[cm]?[jt]sx?$/.test(f)

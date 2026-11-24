@@ -7,7 +7,7 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import TrackMesh from '@/track/TrackMesh'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { buildArcTable } from '@/track/arcLength'
-import { withTunnels } from '@/track/setPieces'
+import { withDarkSections, withTunnels } from '@/track/setPieces'
 import CoasterCamera from '@/track/CoasterCamera'
 import PhotoCamera from '@/track/PhotoCamera'
 import { rideModel } from '@/track/ridePhysics'
@@ -97,8 +97,9 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
 
   const trackDims = useMemo(() => getTrackDimensions(track), [track])
   const trackTable = useMemo(
-    () => withBackwards(withTunnels(buildArcTable(curve), track.tunnels, trackDims.trackScale), track.mechanics),
-    [curve, track.tunnels, track.mechanics, trackDims],
+    () =>
+      withBackwards(withDarkSections(withTunnels(buildArcTable(curve), track.tunnels, trackDims.trackScale), track.darkSections), track.mechanics),
+    [curve, track.tunnels, track.darkSections, track.mechanics, trackDims],
   )
   const pointAt = useMemo(() => (t: number) => curve.getPointAt(t), [curve])
   const trackSamples = useMemo(() => sampleTrackPath((t) => curve.getPointAt(t)), [curve])
@@ -109,6 +110,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
   )
 
   const keepOff = useMemo(() => def.keepOff?.(groundFn, trackTable), [def, groundFn, trackTable])
+  const clearAir = useMemo(() => def.clearAir?.(groundFn, trackTable), [def, groundFn, trackTable])
   const speeds = useMemo(() => rideModel(track, trackTable), [track, trackTable])
   const hardRoute = useMemo(() => hardRouteFor(curve, track.mechanics), [curve, track.mechanics])
   useEffect(() => {
@@ -175,6 +177,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
           walls={walls}
           bounds={def.bounds}
           keepOff={keepOff}
+          clearAir={clearAir}
           hardRoute={hardRoute}
         />
         <ShootingController />

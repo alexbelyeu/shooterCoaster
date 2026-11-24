@@ -11,7 +11,7 @@ import resultsLose from './results-lose.scrim?raw'
 
 /**
  * Theme options waiting on Alex's pick (`Listen:` issue, sound bible "taste gate"): `themes/<slot>.<name>.scrim`, keyed
- * `<slot>.<name>`. Now level7's three (#868), filed before its world lands. They never play by default: `?theme=<name>` puts one in its slot's place
+ * `<slot>.<name>`. Now level7's three (#868), filed before its world landed. They never play by default: `?theme=<name>` puts one in its slot's place
  * (`themesFromQuery`). Once Alex picks, the winner replaces `<slot>.scrim` and the options are deleted.
  */
 const THEME_OPTIONS: Record<string, string> = Object.fromEntries(
@@ -20,7 +20,8 @@ const THEME_OPTIONS: Record<string, string> = Object.fromEntries(
   ),
 )
 
-export const SCORES: Record<string, string> = { title, level1, level2, level3, level4, level5, level6, 'results-win': resultsWin, 'results-lose': resultsLose, ...THEME_OPTIONS }
+// Neon Metropolis plays Inferno's score until its own theme round (#323): the same string, not a copy, so no bytes.
+export const SCORES: Record<string, string> = { title, level1, level2, level3, level4, level5, level6, level7: level5, 'results-win': resultsWin, 'results-lose': resultsLose, ...THEME_OPTIONS }
 
 /** `?theme=neon,carousel` → `{ title: 'title.neon', level1: 'level1.carousel' }`: each named option replaces its slot's score; unknown names are ignored. */
 export function themesFromQuery(search: string, options: readonly string[] = Object.keys(THEME_OPTIONS)): Record<string, string> {

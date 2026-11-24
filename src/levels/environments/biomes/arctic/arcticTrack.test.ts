@@ -12,7 +12,12 @@ import { arctic } from '.'
 import { RIBBONS } from './aurora'
 import { buildArcticRide, ARCTIC_TRACK } from './arcticTrack'
 import { FORTRESS_SITE } from './config'
-import { ICE_CAVE, iceCaveCrown } from './iceCaveGeometry'
+import { ICE_CAVE, iceCaveCrown, iceCaveSpan } from './iceCaveGeometry'
+import { withDarkSections } from '@/track/setPieces'
+import { createRng } from '@/utils/rng'
+import { buildTrackIndex, trackFrameAt } from '../../shared/trackClearance'
+import { scatterNearTrack } from '../../shared/trackScatter'
+import { arcticSites } from './decorationSites'
 
 const DEG = 180 / Math.PI
 const fortress = arctic.keepOff!(() => 0, buildArcTable(createTrackCurve(ARCTIC_TRACK)))[0]
@@ -94,5 +99,40 @@ describe.each([
       }
     }
     expect(closest).toBeGreaterThan(8 * eye)
+  })
+})
+
+describe("level 4's ice cave keeps scenery out (#911)", () => {
+  const track = getLevelConfig('level4')!.track
+  const plain = buildArcTable(createTrackCurve(track))
+  // As `LevelScene` builds it: the vault's span is on the table every prop is placed against.
+  const table = withDarkSections(plain, track.darkSections)
+  const { fromS, toS } = iceCaveSpan(table, track.darkSections![0])
+  const vault: { x: number; z: number }[] = []
+  for (let i = 0; i < table.count; i++) if (table.s[i] >= fromS && table.s[i] <= toS) vault.push({ x: table.x[i], z: table.z[i] })
+  const underVault = (p: { x: number; z: number }) => vault.some((v) => Math.hypot(p.x - v.x, p.z - v.z) < ICE_CAVE.halfWidth + ICE_CAVE.wall)
+  const flat = () => 0
+  const scatter = (t: typeof table) =>
+    scatterNearTrack({ count: 3000, track: t, heightFn: flat, minDist: 0, maxDist: 900, maxRadius: Infinity, maxSlope: Math.PI / 2, bias: 1.8, rng: createRng(911) })
+
+  it('counts the whole vault as track, so a prop of any clearance keeps out', () => {
+    const index = buildTrackIndex(table)
+    const open: number[] = []
+    for (let s = fromS; s <= toS; s += 10) {
+      const f = trackFrameAt(table, s)
+      for (let k = -1; k <= 1; k += 0.125) {
+        const across = k * ICE_CAVE.halfWidth
+        if (!index.near(f.x - f.tz * across, f.z + f.tx * across, 0)) open.push(s)
+      }
+    }
+    expect(open).toEqual([])
+  })
+
+  it('places no boulder, ice column, pond, crystal or drift under it', () => {
+    const { boulders, columns, ponds } = arcticSites(table, flat)
+    expect([...boulders, ...columns, ...ponds].filter(underVault)).toEqual([])
+    expect(scatter(table).filter(underVault)).toEqual([])
+    // Without the vault on the table the same scatter does land under it: the check above is not vacuous.
+    expect(scatter(plain).filter(underVault).length).toBeGreaterThan(0)
   })
 })

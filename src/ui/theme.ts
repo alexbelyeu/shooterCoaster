@@ -72,6 +72,12 @@ export const BIOME_UI: Record<BiomeType, BiomeUITheme> = {
     accent2: '#ff3355',
     sky: [['#27313d', 0], ['#4b5a6b', 0.6], ['#a9b6c4', 1]],
   }),
+  city: theme({
+    accent: '#2ee8ff', // the city's cyan neon (`NEON_RGB`)
+    glow: 'rgba(46, 232, 255, 0.55)',
+    accent2: '#ff2fb0', // its magenta
+    sky: [['#05061a', 0], ['#1a1434', 0.55], ['#3a2a48', 1]], // atmosphere.ts city.sky, zenith to the hazy horizon
+  }),
 }
 
 export const DEFAULT_UI_THEME: BiomeUITheme = theme({

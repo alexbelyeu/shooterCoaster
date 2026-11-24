@@ -8,6 +8,7 @@ import { ocean } from './biomes/ocean'
 import { arctic } from './biomes/arctic'
 import { volcanic } from './biomes/volcanic'
 import { gym } from './biomes/gym'
+import { city } from './biomes/city'
 
 /**
  * Every biome's environment definition (terrain colours, trees, decorations, landmarks/features), for the tests and
@@ -21,6 +22,7 @@ export const BIOMES: Record<BiomeType, BiomeDefinition> = {
   arctic,
   volcanic,
   gym,
+  city,
 }
 
 /** A biome's ground (`groundOf`), by name. */
