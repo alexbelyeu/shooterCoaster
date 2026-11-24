@@ -17,6 +17,7 @@
     "prod-check": "node e2e/prod-check.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
     "og": "node scripts/og-image.mjs",
+    "review": "node scripts/rideReview.mjs",
     "clip": "node scripts/clip.mjs",
     "new-world": "node scripts/new-world.mjs",
     "turntable": "node scripts/turntable.mjs",
