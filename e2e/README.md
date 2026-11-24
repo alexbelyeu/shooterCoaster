@@ -83,9 +83,9 @@ however long the level takes to load) and counted once its draw count has held f
 any runner): low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
 A `levelSelect` step seeds saved progress (3★ + 1★), two of the first level's medals and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
 and requires one card per level plus the Daily card, each top's initials on its card after the reload, the right locked count and `★ x / 15` total, every card
-inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move focus, Enter on a
+inside 1280×720 with no sideways scroll, exactly one medal ticket out (#978: the focused card's, its three feat lines inside the viewport, at open and after ArrowLeft), and keyboard-only play (arrows move focus, Enter on a
 locked card does nothing, Enter on an open one plays the launch transition and starts that level);
-the phone run checks its cards fit 390 px.
+the phone run checks its cards fit 390 px and every open card shows its medal ticket.
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in
 daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, New best, no Next Level and no initials entry (the campaign boards stay empty),
 send the new best once to the stubbed online board with `daily` = today and the last initials and show the day's World board it answers (#854, `data-source="today"`, `daily-results.png`); the second load's
