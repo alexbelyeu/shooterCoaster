@@ -2,16 +2,17 @@ import { useMemo, useCallback, useEffect } from 'react'
 import * as THREE from 'three'
 import type { BiomeDecorationsProps } from '../../shared/types'
 import { createRng } from '@/utils/rng'
-import { scatterPositions } from '../../shared/scatter'
 import IceCrystals from './IceCrystals'
 import SnowDrifts from './SnowDrifts'
+import { POND_MAX_RADIUS, arcticSites } from './decorationSites'
 import { roundCaster } from '../../shared/contactShadows'
 import { useContactShadows } from '../../shared/ContactShadows'
+/** The ice column's base radius (scale 1), which its contact shadow reads too. */
+const COLUMN_BASE_RADIUS = 4
 
 export default function ArcticDecorations(props: BiomeDecorationsProps) {
-  const { heightFn } = props
-
-  const boulderPositions = useMemo(() => scatterPositions(createRng(2410), 80, 150, 3500, heightFn), [heightFn])
+  const { heightFn, track } = props
+  const { boulders: boulderPositions, columns: columnPositions, ponds: pondPositions } = useMemo(() => arcticSites(track, heightFn), [track, heightFn])
   const boulderGeo = useMemo(() => new THREE.DodecahedronGeometry(1, 0), [])
   const boulderMat = useMemo(() => new THREE.MeshPhongMaterial({ color: '#d8e0e8', flatShading: true }), [])
 
@@ -41,12 +42,11 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
     mesh.instanceMatrix.needsUpdate = true
   }, [boulderPositions, boulderConfigs])
 
-  const columnPositions = useMemo(() => scatterPositions(createRng(2411), 45, 200, 3500, heightFn), [heightFn])
   const columnGeo = useMemo(() => {
     const iceColumnPoints: THREE.Vector2[] = []
     for (let i = 0; i <= 12; i++) {
       const t = i / 12
-      const r = 4 * (1 - t * 0.7) + Math.sin(t * 6) * 0.3
+      const r = COLUMN_BASE_RADIUS * (1 - t * 0.7) + Math.sin(t * 6) * 0.3
       iceColumnPoints.push(new THREE.Vector2(r, t * 60))
     }
     return new THREE.LatheGeometry(iceColumnPoints, 10)
@@ -67,7 +67,7 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
       () => [
         ...boulderPositions.map((p, i) => roundCaster(p.x, p.z, boulderConfigs[i].s * 0.85, 0.4, 0.8)),
         // Translucent ice: a lighter shadow.
-        ...columnPositions.map((p, i) => roundCaster(p.x, p.z, 4 * columnScales[i], 0.3, 1.2)),
+        ...columnPositions.map((p, i) => roundCaster(p.x, p.z, COLUMN_BASE_RADIUS * columnScales[i], 0.3, 1.2)),
       ],
       [boulderPositions, boulderConfigs, columnPositions, columnScales],
     ),
@@ -89,7 +89,6 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
     mesh.instanceMatrix.needsUpdate = true
   }, [columnPositions, columnScales])
 
-  const pondPositions = useMemo(() => scatterPositions(createRng(2412), 20, 150, 3000, heightFn, Math.PI / 6), [heightFn])
   const pondGeo = useMemo(() => new THREE.CircleGeometry(1, 24), [])
   const pondMat = useMemo(() => new THREE.MeshPhongMaterial({
     color: '#88bbdd',
@@ -109,7 +108,7 @@ export default function ArcticDecorations(props: BiomeDecorationsProps) {
     const euler = new THREE.Euler()
     for (let i = 0; i < pondPositions.length; i++) {
       const p = pondPositions[i]
-      const s = 15 + rng() * 30
+      const s = 15 + rng() * (POND_MAX_RADIUS - 15)
       euler.set(-Math.PI / 2, 0, rng() * Math.PI * 2)
       q.setFromEuler(euler)
       mat.compose(

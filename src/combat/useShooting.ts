@@ -25,6 +25,22 @@ const FIRE_INTERVAL_SLACK_MS = 5
 let lastFireAt = -Infinity
 
 /**
+ * A shot's look and sound with no colliding bullet: the view-model's recoil,
+ * muzzle flash and tracer at (x, y) in NDC, the fire sound, and `shots` counted
+ * in the run's stats. For the e2e hook's player mode, whose hits all go through
+ * processHit on the game clock, so a wall-clock-throttled bullet can't add one.
+ */
+export function showShotAtNDC(x: number, y: number, shots = 1): void {
+  const store = useGameStore.getState()
+  if (store.phase !== 'playing') return
+  const weapon = activeWeapon(store.weapon, gameTime())
+  store.registerShot(shots)
+  sfx().fire(true, weapon.id)
+  recordShot(x, y, weapon.id)
+  eventBus.emit('weapon:fire')
+}
+
+/**
  * Pull the trigger once from the camera through a point in normalized device
  * coordinates (-1..1, y up): one bullet, or the active pickup's fan.
  * Shared by pointer input and the e2e autofire hook.

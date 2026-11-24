@@ -309,4 +309,47 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     },
     heatShimmer: true,
   },
+  // Neon Metropolis (#323): a city at night. Deep indigo overhead, a faint warm sodium haze at the horizon (the
+  // fog), a few stars and no sun disc; a cool moonlit key, a low violet fill. The towers' windows and the neon
+  // signs carry the light (`biomes/city/`); the grade splits cool shadows from magenta / cyan highlights.
+  city: {
+    sky: {
+      zenith: 0x05061a,
+      horizon: 0x3a2a48,
+      ground: 0x120c1c,
+      horizonFalloff: 0.7,
+      sunColor: 0xc8d4ff,
+      sunSize: 0,
+      sunGlow: 0,
+      cloudiness: 0.25,
+      cloudColor: 0x2a1e3e,
+      cloudSpeed: 3,
+      cloudStretch: 2,
+    },
+    sunDirection: [-0.35, 0.65, -0.6],
+    sunLightColor: 0x9ab0ff,
+    sunLightIntensity: 0.8,
+    hemiSkyColor: 0x7a7ad0,
+    hemiGroundColor: 0x40284a,
+    hemiIntensity: 0.95,
+    fogNear: 300,
+    fogFar: 4600,
+    // The wet street and glossy towers pick the haze and the signs' colour out of the baked sky
+    envIntensity: 0.7,
+    grade: {
+      exposure: 1.12,
+      temperature: -0.06,
+      tint: 0.04,
+      shadowTint: 0x2a3a9a,
+      highlightTint: 0xff5ac8,
+      splitTone: 0.32,
+      contrast: 1.1,
+      saturation: 1.12,
+      vibrance: 0.35,
+      vignette: 0.44,
+    },
+    lampGlow: 1,
+    enemyRimLift: 2.5,
+    aerialFog: { strength: 0 },
+  },
 }

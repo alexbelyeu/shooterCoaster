@@ -116,7 +116,7 @@ export interface NoiseTerrainConfig {
   meshSize: number
 }
 
-/** An interior: its ground is the biome's own `BiomeDefinition.floor` (`biomeHeightFunction`), never noise; only the floor mesh's size. Exactly the biomes with a `floor` (terrainNoise.test.ts). */
+/** An interior: its ground is the biome's own `BiomeDefinition.floor` (`groundOf`, `worlds.ts`), never noise; only the floor mesh's size. Exactly the biomes with a `floor` (terrainNoise.test.ts). */
 export interface AuthoredFloorConfig {
   /** Side length of the rendered floor mesh (`getTerrainMeshSize`). */
   meshSize: number
@@ -199,6 +199,20 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     meshSize: 2560,
     authoredFloor: true,
   },
+  // Neon Metropolis: flat streets out to the skyline, only a low swell far beyond it.
+  city: {
+    frequency: 0.0008,
+    amplitude: 60,
+    octaves: 5,
+    persistence: 0.45,
+    lacunarity: 2.2,
+    exponent: 1.4,
+    ridgeMode: false,
+    baseY: 0,
+    flatRadius: 2600,
+    transitionWidth: 1200,
+    meshSize: 6000,
+  },
 }
 
 /** Desert gets an extra macro-scale mesa layer */
@@ -221,7 +235,7 @@ export interface TrackSample {
 /** Hard clamp radius — terrain is always forced below track here */
 const TRACK_HARD_RADIUS = 40
 /** Soft blend radius — terrain transitions from suppressed to natural */
-const TRACK_SOFT_RADIUS = 120
+export const TRACK_SOFT_RADIUS = 120
 /** Extra clearance below the track */
 export const TRACK_CLEARANCE = 15
 
@@ -246,14 +260,14 @@ export function sampleTrackPath(
  * Creates a height function for the given biome terrain config.
  * If trackSamples is provided, terrain is suppressed near the track path
  * so the coaster never goes underground. Throws for an interior (`authoredFloor`): a level's ground
- * comes from `biomeHeightFunction` (`biomeRegistry.ts`), which knows its floor.
+ * comes from `groundOf` (`worlds.ts`), which knows its floor.
  */
 export function createHeightFunction(
   biome: BiomeType,
   trackSamples?: TrackSample[],
 ): HeightFunction {
   const config = BIOME_TERRAIN_CONFIGS[biome]
-  if ('authoredFloor' in config) throw new Error(`${biome} has an authored floor: use biomeHeightFunction`)
+  if ('authoredFloor' in config) throw new Error(`${biome} has an authored floor: use groundOf`)
 
   return (x: number, z: number): number => {
     const dist = Math.sqrt(x * x + z * z)

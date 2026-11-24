@@ -99,6 +99,12 @@ export function withMechanics(spec: RideV2Spec, mechanics: readonly RideMechanic
   return { ...spec, zones: [...zones, ...(spec.zones ?? [])], holds: [...holds, ...(spec.holds ?? [])] }
 }
 
+/** `table` with its backwards stretches on it (wave placement looks back along them), or `table` itself when it has none. */
+export function withBackwards(table: ArcTable, mechanics: readonly RideMechanic[] | undefined): ArcTable {
+  const spans = (mechanics ?? []).flatMap((m) => (m.kind === 'backwards' ? [{ from: m.from * table.length, to: m.to * table.length }] : []))
+  return spans.length ? { ...table, backwards: spans } : table
+}
+
 /** Arc-distance spans with no rails, ties or towers: a jump's flight, a drop's shaft plus its piece at both ends. */
 export function trackGaps(mechanics: readonly RideMechanic[] | undefined, length: number, pieceLength: number): [number, number][] {
   const gaps: [number, number][] = []

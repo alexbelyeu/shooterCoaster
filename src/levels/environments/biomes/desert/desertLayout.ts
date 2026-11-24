@@ -4,7 +4,7 @@ import type { RockRing } from '../../shared/ringedRock'
 import { buildTrackIndex, trackFrameAt } from '../../shared/trackClearance'
 import { groundedBaseY, trackExtent } from '../../shared/trackScatter'
 import { createRng } from '@/utils/rng'
-import { LANDMARK_FOOTPRINTS } from './landmarks'
+import { CANYON_MESAS, LANDMARK_FOOTPRINTS } from './landmarks'
 
 /** Where the desert's mesas and dust devils go (pure, unit-tested against the level 2 track). */
 
@@ -25,7 +25,12 @@ export const MESA_RINGS: readonly RockRing[] = [
 ]
 export const MESA_JITTER = 0.08
 export const MESA_HEIGHT = 300
-export const MESA_FOOTPRINT = 140 * (1 + MESA_JITTER)
+export const MESA_FOOTPRINT = MESA_RINGS[0].r * (1 + MESA_JITTER)
+/** The cliff's foot above the talus apron and the flat top (scale 1): the sun-flare occluder's cone. */
+export const MESA_CLIFF_RADIUS = MESA_RINGS[2].r
+export const MESA_TOP_RADIUS = MESA_RINGS[MESA_RINGS.length - 1].r
+/** The contact shadow reaches halfway down the talus apron. */
+export const MESA_SHADOW_RADIUS = (MESA_RINGS[0].r + MESA_CLIFF_RADIUS) / 2
 
 export interface Mesa {
   x: number
@@ -47,13 +52,15 @@ export interface MesaOptions {
   spacing: number
   avoid: readonly Circle[]
   rng: () => number
+  /** Mesas placed by hand (the canyon's, #864): drawn first, the random ones keep `spacing` from them too. */
+  fixed?: readonly { x: number; z: number }[]
 }
 
 export function placeMesas(groundFn: HeightFunction, track: ArcTable, opts: MesaOptions): Mesa[] {
-  const { count, minRadius, maxRadius, clearance, maxGap, scaleRange, spacing, avoid, rng } = opts
+  const { count, minRadius, maxRadius, clearance, maxGap, scaleRange, spacing, avoid, rng, fixed = [] } = opts
   const index = buildTrackIndex(track)
-  const out: Mesa[] = []
-  for (let attempts = 0; out.length < count && attempts < count * 200; attempts++) {
+  const out: Mesa[] = fixed.map(({ x, z }) => ({ x, y: groundedBaseY(groundFn, x, z, MESA_FOOTPRINT, 6), z, scale: 1, yaw: 0 }))
+  for (let attempts = 0; out.length < count + fixed.length && attempts < count * 200; attempts++) {
     const theta = rng() * Math.PI * 2
     const r = minRadius + rng() * (maxRadius - minRadius)
     const x = Math.cos(theta) * r
@@ -161,6 +168,7 @@ export function layoutDesert(groundFn: HeightFunction, track: ArcTable): DesertL
     spacing: 520,
     avoid: LANDMARK_FOOTPRINTS,
     rng: createRng(23),
+    fixed: CANYON_MESAS,
   })
   const devils = placeDustDevils(track, {
     count: 4,

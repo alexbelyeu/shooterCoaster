@@ -7,6 +7,8 @@ const THIRD_PARTY = /googleapis|gstatic|googletagmanager|google-analytics/
 
 const ABSOLUTE_REF = /\b(?:src|href)\s*=\s*["']?\/|url\(\s*["']?\//
 const OTHER_ORIGIN = /https?:\/\//
+// The share link: the portal build has no Share button (#254), so ShareMenu must be tree-shaken out of it.
+const SHARE_LINK = 'go/share'
 
 /** @param {{ path: string, bytes: number, text?: string }[]} files  paths relative to the zip root; `text` for text files */
 export function portalProblems(files) {
@@ -18,6 +20,7 @@ export function portalProblems(files) {
   for (const f of files) {
     if (f.text === undefined) continue
     if (THIRD_PARTY.test(f.text)) problems.push(`${f.path}: references ${f.text.match(THIRD_PARTY)[0]}`)
+    if (f.text.includes(SHARE_LINK)) problems.push(`${f.path}: carries the share link \`${SHARE_LINK}\` (the portal build has no Share)`)
     // JS carries harmless URL strings (React error links, the GitHub link on the title); markup and styles may not.
     if (!/\.(html|css)$/.test(f.path)) continue
     const absolute = f.text.match(ABSOLUTE_REF)

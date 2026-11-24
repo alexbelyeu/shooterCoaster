@@ -1,4 +1,4 @@
-import type { ArcTable } from './arcLength'
+import { tAtDistance, type ArcTable } from './arcLength'
 import type { RideBeat, RideHold, RideV2Spec, SpeedZone } from '@/types/level'
 
 /**
@@ -349,6 +349,14 @@ export function planTimeAt(plan: RidePlan, dist: number): number {
     else hi = mid
   }
   return (lo + (dist - distance[lo]) / (distance[hi] - distance[lo])) / PLAN_RATE
+}
+
+/** Track parameter the car is at `lead` seconds before the plan first reaches its top speed (the smoke's speed step rides from there). */
+export function planFastestLeadT(plan: RidePlan, lead: number): number {
+  const top = plan.speed.indexOf(plan.maxSpeed)
+  const dist = planDistance(plan, Math.max(top / PLAN_RATE - lead, 0))
+  const length = plan.table.length
+  return tAtDistance(plan.table, ((dist % length) + length) % length)
 }
 
 /** The kind of zone the car is in `time` seconds after GO, or null between zones. */

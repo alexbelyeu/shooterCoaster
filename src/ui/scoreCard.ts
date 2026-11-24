@@ -3,7 +3,7 @@ import { runStars, shownScore } from '@/levels/scoring'
 import type { RunMode } from '@/types/game'
 import type { BiomeType } from '@/types/level'
 import { biomeTheme, FAIR, type SkyStop } from '@/ui/theme'
-import { formatAccuracy } from '@/ui/screens/resultsStats'
+import { formatAccuracy, formatBestCombo } from '@/ui/screens/resultsStats'
 import { VIEWBOX } from '@/ui/logoArt'
 import { rankLabel } from '@/ui/share'
 
@@ -326,7 +326,7 @@ export function layoutScoreCard(run: ScoreCardRun, size: CardSize, measure: Meas
   if (run.worldRank !== null) rows.push(showcardRow('rank', `World ${rankLabel(run.worldRank)}`, FAIR.cream, FAIR.oxblood, 0.06, spec.gap * 0.75))
   rows.push(textRow({ role: 'score', text: fmt.format(run.score), family: 'display', weight: 400, size: spec.score, color: FAIR.cream, paint: 'number' }, spec.gap * 0.75))
   const stats: [string, string][] = [
-    ['Best combo', run.bestCombo > 0 ? `×${run.bestCombo}` : '—'],
+    ['Best combo', formatBestCombo(run.bestCombo)],
     ['Accuracy', run.accuracy],
   ]
   rows.push({

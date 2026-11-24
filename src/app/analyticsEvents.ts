@@ -12,13 +12,14 @@ export type AnalyticsEvent =
   | { name: 'level_complete'; props: { level: string; stars: number } }
   /** `progress_pct`: share of the level timer used, floored to tens. */
   | { name: 'level_quit'; props: { level: string; progress_pct: number } }
+  /** `level` is `daily` for a Daily Run's share (#268), like `level_start`'s `from`: the day's level follows from its date. */
   | { name: 'share'; props: { level: string; method: ShareMethod } }
 
-/** Bus event the results screen emits on a completed share: `(levelId, method)`. */
+/** Bus event the results screen emits on a completed share: `(levelId, method, daily)`. */
 export const SHARED_EVENT = 'results:shared'
 
-export function shareEvent(level: string, method: ShareMethod): AnalyticsEvent {
-  return { name: 'share', props: { level, method } }
+export function shareEvent(level: string, method: ShareMethod, daily: boolean): AnalyticsEvent {
+  return { name: 'share', props: { level: daily ? 'daily' : level, method } }
 }
 
 export interface RunSnapshot {

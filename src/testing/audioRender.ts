@@ -3,14 +3,14 @@ import { renderOffline, type OfflineRenderScope } from '@/audio/offlineRender'
 import { setMusicDucked, setPauseMix } from '@/audio/AudioEngine'
 import { loadArcade, silentSfx, type Placement, type SfxEngine } from '@/audio/sfx'
 import { FIREWORK_BIOMES, KILL_SOUNDS, spatial, type KillSound } from '@/audio/sfxDesign'
-import { COMBO_TIERS, FRENZY, TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
-import { intensityForTier } from '@/audio/scrim/layers'
+import { COMBO_TIERS, FRENZY, TOP_TIER, frenzyTimeScale } from '@/combat/comboTiers'
+import { WEAPONS } from '@/combat/weapons/weaponTypes'
+import { applyCombatMix, type CombatMixTargets } from '@/audio/combatMix'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import type { BiomeType } from '@/types/level'
-import { barSection, compile } from '@/audio/scrim/score'
+import { barSection, compile, type CompiledSong } from '@/audio/scrim/score'
 import { renderOffline as renderScoreOffline, type Voicing } from '@/audio/scrim/synth'
 import { loopSeams } from '@/audio/scrim/scheduler'
-import { SCORES, scoreIdFor } from '@/audio/scores'
 import { createRng } from '@/utils/rng'
 
 export type AudioRenderRequest =
@@ -65,8 +65,8 @@ interface Plan {
   script: (scope: OfflineRenderScope) => void
 }
 
-/** A held trigger's cadence in the mix renders. */
-const AUTOFIRE_S = 0.1
+/** A held trigger's cadence: the blaster's, as `useShooting` auto-fires it. */
+const AUTOFIRE_S = WEAPONS.blaster.fireIntervalMs / 1000
 
 function biomeOf(level: string): BiomeType {
   const biome = getLevelConfig(level)?.biome
@@ -112,7 +112,7 @@ function scrimScript(p: ScrimPlayer, id: string, seconds: number, from = 0, inte
 function musicPlan(p: ScrimPlayer, track: string, seconds = 30, seam = false, layers?: number | 'ramp'): Plan {
   if (seam && layers === 'ramp') throw new Error('--layers ramp starts at the top: not with --seam')
   const start = p.SCORE_START_DELAY_S
-  const song = compile(SCORES[scoreIdFor(track)])
+  const song = p.songFor(track)
   const from = seam ? Math.max(0, song.intro.dur + song.loop.dur - SEAM_LEAD_S) : 0
   const { seams, introS, barS } = loopSeams(song, from + seconds - 0.5 - start)
   // Render time of song time s: start + s - from. A seam render's bar grid starts at its first bar line after `start`.
@@ -237,6 +237,8 @@ function sfxSheetPlan(level = 'level1', kills = false): Plan {
 }
 
 const KILL_EVERY_S = 0.75
+/** A 60 Hz frame, as often as `LevelAudio` applies the combat mix. */
+const FRAME_S = 1 / 60
 
 /** tan(half the horizontal field of view): a 60° vertical one at 16:9. */
 const TAN_HALF_HFOV = Math.tan(Math.PI / 6) * (16 / 9)
@@ -262,7 +264,7 @@ function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): 
   const place: Placement = { pan: 0, cutoffHz: 20000, wet: 1 }
   const bossAt: Placement = { pan: 0, cutoffHz: 20000, wet: 1 }
   const seams: number[] = []
-  const song = compile(SCORES[scoreIdFor(level)])
+  const song = p.songFor(level)
   const barS = barSection(song)!.barDur
   /** Asks for `section` at render time `t`, as `LevelAudio` does on the boss event, and records where it lands. */
   const switchAt = ({ at }: OfflineRenderScope, t: number, section: 'boss' | 'sting', cue: () => void, name: string) => {
@@ -288,9 +290,13 @@ function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): 
         switchAt(scope, seconds - BOSS_MIX.defeatBeforeEndS, 'sting', () => s.bossDefeat(placeAhead(BOSS_MIX.defeat.screenX, BOSS_MIX.defeat.ahead, bossAt)), 'boss:defeated: boss defeat + the sting on the next bar, then the loop')
       }
       const { at } = scope
-      // As LevelAudio: the combo lifts the intensity.
       let kills = 0
-      scrimScript(p, level, seconds, 0, () => intensityForTier(comboTierIndex(kills)))(scope)
+      /** Render time the FRENZY slow-mo starts. */
+      let frenzyAt = Infinity
+      const mix: CombatMixTargets = { duck: (on) => setMusicDucked(on), frenzyLift: (on) => s.frenzyLift(on), intensity: (n) => p.setIntensity(n) }
+      scrimScript(p, level, seconds)(scope)
+      // LevelAudio's frames: the combo and the slow-mo drive the music by the game's own rule.
+      for (let t = FRAME_S; t < seconds; t += FRAME_S) at(t, () => applyCombatMix(mix, kills, frenzyTimeScale(t - frenzyAt), true))
       void s.prepare(level, biome)
       for (let t = 0.2; t < seconds; t += 0.5) {
         // A share of top speed, around a level's median (CoasterCamera).
@@ -302,7 +308,7 @@ function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): 
       const wave = 4
       events.push({ t: wave, name: 'wave tell' })
       at(wave, () => s.waveIncoming())
-      // The 5× tier's slow-mo ducks the music and holds the FRENZY lift.
+      // The 5× tier starts the slow-mo, which ducks the music.
       let combo = 0
       for (let t = 1.6; t < seconds - 0.5; t += KILL_EVERY_S) {
         const n = ++combo
@@ -314,13 +320,11 @@ function mixPlan(level: string, seconds = 20, musicOnly = false, boss = false): 
         })
         at(t + KILL_EVERY_S / 2, () => s.hit(n, null))
         if (n === COMBO_TIERS[TOP_TIER].minCount) {
-          events.push({ t, name: `FRENZY (kill ${n}): music ducked for ${FRENZY.durationS} s` })
+          events.push({ t, name: `FRENZY (kill ${n}): slow-mo ducks the music for ${FRENZY.durationS} s` })
           at(t + 0.08, () => {
             s.frenzy()
-            s.frenzyLift(true)
-            setMusicDucked(true)
+            frenzyAt = t + 0.08
           })
-          at(t + 0.08 + FRENZY.durationS, () => setMusicDucked(false))
         }
       }
       events.push({ t: 1.6, name: `kills every ${KILL_EVERY_S} s, combo climbing` })
@@ -455,10 +459,15 @@ function toBase64(buffer: AudioBuffer): string {
   return btoa(s)
 }
 
+function compileOrThrow(text: string): CompiledSong {
+  const song = compile(text)
+  if (song.errors.length) throw new Error(`score errors:\n${song.errors.map((e) => `line ${e.line}: ${e.msg}`).join('\n')}`)
+  return song
+}
+
 /** The port on its own, seeded like the original page's render in `scripts/audio/render.mjs` (same PRNG, same call order). */
 async function renderScore(req: Extract<AudioRenderRequest, { kind: 'score' }>, seed: number): Promise<AudioRenderResult> {
-  const song = compile(req.text)
-  if (song.errors.length) throw new Error(`score errors:\n${song.errors.map((e) => `line ${e.line}: ${e.msg}`).join('\n')}`)
+  const song = compileOrThrow(req.text)
   const seconds = req.seconds ?? 20
   const random = Math.random
   Math.random = createRng(seed)
@@ -476,21 +485,19 @@ async function renderScore(req: Extract<AudioRenderRequest, { kind: 'score' }>, 
   }
 }
 
-/** Registers the text as a score for the length of one render, so the player can play it like a game score. */
-let renderedScores = 0
+/** The player plays the text like a game score for the length of one render. */
 async function renderScoreInGame(req: Extract<AudioRenderRequest, { kind: 'score' }>, seed: number): Promise<AudioRenderResult> {
-  const song = compile(req.text)
-  if (song.errors.length) throw new Error(`score errors:\n${song.errors.map((e) => `line ${e.line}: ${e.msg}`).join('\n')}`)
+  const song = compileOrThrow(req.text)
   scrim = await import('@/audio/scrim/player')
   sfx = (await loadArcade()).arcadeSfx
-  const id = `render-${++renderedScores}`
-  SCORES[id] = req.text
+  const id = 'render'
+  scrim.registerSong(id, song)
   try {
     const plan = musicPlan(scrim, id, req.seconds ?? 20, req.seam)
     const buffer = await renderOffline({ seconds: plan.seconds, seed }, plan.script, stopAll)
     return { sampleRate: buffer.sampleRate, seconds: plan.seconds, pcm: toBase64(buffer), events: plan.events, seams: plan.seams, bar: plan.bar }
   } finally {
-    delete SCORES[id]
+    scrim.unregisterSong(id)
   }
 }
 

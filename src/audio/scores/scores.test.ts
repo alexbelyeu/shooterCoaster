@@ -12,8 +12,12 @@ describe('game scores', () => {
     expect(slots.sort()).toEqual([...RESULTS_CUTS, 'title', ...getAllLevels().map((l) => l.id)].sort())
   })
 
-  it('every theme option belongs to a slot that has a score', () => {
-    for (const id of Object.keys(SCORES).filter((id) => id.includes('.'))) expect(SCORES[id.split('.')[0]]).toBeDefined()
+  /** A level's theme round can start before its world lands (level7, #868), so a `level<n>` slot needs no score yet. */
+  it('every theme option belongs to a slot that has a score, or to a level still being built', () => {
+    for (const id of Object.keys(SCORES).filter((id) => id.includes('.'))) {
+      const slot = id.split('.')[0]
+      expect(SCORES[slot] !== undefined || /^level\d+$/.test(slot), id).toBe(true)
+    }
   })
 
   it('theme option names are unique across slots (`?theme=` matches by name)', () => {
@@ -79,9 +83,11 @@ loop A`)
     })
   }
 
-  for (const level of getAllLevels()) {
-    const song = compile(SCORES[level.id])
-    it(`${level.id}'s score has a boss section on the loop's bar grid, layered like the loop, and a 2-bar sting (#598)`, () => {
+  // A level's theme options are candidates for its score, so they need the boss section too.
+  const levelScores = [...getAllLevels().map((l) => l.id), ...Object.keys(SCORES).filter((id) => /^level\d+\./.test(id))]
+  for (const id of levelScores) {
+    const song = compile(SCORES[id])
+    it(`${id}'s score has a boss section on the loop's bar grid, layered like the loop, and a 2-bar sting (#598)`, () => {
       const bar = song.loop.sections[0]
       expect(song.boss.dur).toBeGreaterThan(0)
       for (const s of [...song.boss.sections, ...song.sting.sections]) {

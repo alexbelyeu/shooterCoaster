@@ -89,6 +89,15 @@ export function paintedPolygon(corners: number[], color: THREE.ColorRepresentati
   return painted(g, color)
 }
 
+type Vec3 = [number, number, number]
+
+/** One-colour parts (fresh, disposed) placed by position / rotation / scale as their meshes were, merged into one geometry: one draw call per material. */
+export function placedParts(parts: [geo: THREE.BufferGeometry, position: Vec3, rotation?: Vec3, scale?: Vec3][]): THREE.BufferGeometry {
+  const g = mergeGeometries(parts.map(([geo, p, r, s]) => geo.applyMatrix4(pose(p, r, s))))
+  for (const [geo] of parts) geo.dispose()
+  return g
+}
+
 /** Disposes the parts. */
 export function mergePainted(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   const g = mergeGeometries(parts)

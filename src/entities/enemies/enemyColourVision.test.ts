@@ -10,6 +10,7 @@ import { COLOR_RAMP as OCEAN_RAMP } from '@/levels/environments/biomes/ocean/con
 import { COLOR_RAMP as ARCTIC_RAMP } from '@/levels/environments/biomes/arctic/config'
 import { COLOR_RAMP as VOLCANIC_RAMP } from '@/levels/environments/biomes/volcanic/config'
 import { COLOR_RAMP as GYM_RAMP, WALL_PAINT } from '@/levels/environments/biomes/gym/config'
+import { COLOR_RAMP as CITY_RAMP } from '@/levels/environments/biomes/city/config'
 import { WATER_COLOURS } from '@/levels/environments/shared/waterSurface'
 import * as A from './SharedEnemyAssets'
 import * as P from './enemyPalette'
@@ -72,7 +73,7 @@ const ENEMIES: Read[] = [
   enemy('scorpion', 'scorpion', 'desert', A.SCORPION_SHELL_MAT, P.SCORPION_BODY_COLOR, P.SCORPION_PINCER_COLOR, P.SCORPION_LEG_COLOR),
   ...P.JELLY_COLORS.map((c, i) => enemy(`jellyfish ${c}`, 'jellyfish', 'ocean', null, A.JELLY_BODY_MATS[i], A.JELLY_INNER_MATS[i])),
   enemy('shark', 'shark', 'ocean', A.SHARK_MAT, P.SHARK_TOP, P.SHARK_BELLY),
-  enemy('flyingFish', 'flyingFish', 'ocean', null, A.FFISH_BODY_MAT, A.FFISH_BELLY_MAT, A.FFISH_WING_MAT),
+  enemy('flyingFish', 'flyingFish', 'ocean', A.FFISH_MAT, P.FFISH_BODY, P.FFISH_BELLY, A.FFISH_WING_MAT),
   enemy('snowman', 'snowman', 'arctic', null, A.SNOWMAN_MAT, A.SNOWMAN_ARM_MAT, A.SNOWMAN_NOSE_MAT, A.SNOWMAN_COAL_MAT),
   enemy('snowmanBrute', 'snowmanBrute', 'arctic', null, A.SNOWMAN_MAT, A.SNOWMAN_SCARF_MAT, A.SNOWMAN_HAT_MAT, A.SNOWMAN_COAL_MAT),
   enemy('snowmanScout', 'snowmanScout', 'arctic', null, A.SNOWMAN_SCOUT_MAT, A.SNOWMAN_SCOUT_SHARD_MAT, A.SNOWMAN_NOSE_MAT, A.SNOWMAN_COAL_MAT),
@@ -83,11 +84,12 @@ const ENEMIES: Read[] = [
   enemy('rat', 'rat', 'gym', A.RAT_MAT, P.RAT_FUR, P.RAT_BELLY),
   enemy('dustBunny', 'dustBunny', 'gym', A.DUST_BUNNY_MAT, P.DUST_GREY, P.DUST_CHALK),
   enemy('lanternfly', 'lanternfly', 'gym', A.LANTERNFLY_MAT, P.LANTERNFLY_FOREWING, P.LANTERNFLY_RED, P.LANTERNFLY_BODY),
+  enemy('hoverDrone', 'hoverDrone', 'city', A.DRONE_MAT, P.DRONE_BODY, P.DRONE_DOME, glowColour(0, hex(P.DRONE_GLOW), 1.8)),
 ]
 
 const RAMPS: Record<BiomeType, ColorRamp> = {
   themePark: THEME_PARK_RAMP, desert: DESERT_RAMP, ocean: OCEAN_RAMP,
-  arctic: ARCTIC_RAMP, volcanic: VOLCANIC_RAMP, gym: GYM_RAMP,
+  arctic: ARCTIC_RAMP, volcanic: VOLCANIC_RAMP, gym: GYM_RAMP, city: CITY_RAMP,
 }
 
 /**

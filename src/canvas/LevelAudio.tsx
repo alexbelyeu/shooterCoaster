@@ -11,16 +11,14 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import { isInRun } from '@/store/startPhase'
 import { reportLoad } from '@/core/loadProgress'
 import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks'
-import { RIDE_PHOTO_EVENT } from '@/store/ridePhoto'
-import { TOP_TIER, comboTierIndex } from '@/combat/comboTiers'
-import { intensityForTier } from '@/audio/scrim/layers'
+import { RIDE_PHOTO_EVENT, tracePhoto } from '@/store/ridePhoto'
+import { applyCombatMix, type CombatMixTargets } from '@/audio/combatMix'
 import { RESULTS_CUTS, resultsCut } from '@/audio/scores/resultsCut'
 import { runStars } from '@/levels/scoring'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import type { BossDefeatedEvent, BossHitEvent, BossSpawnEvent } from '@/entities/bosses/BossBase'
 import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
 import { BYSTANDER_HIT_EVENT, type BystanderHitEvent } from '@/combat/bystanders'
-import { tracePhoto } from '@/store/ridePhoto'
 
 /** The run's stars as the results screen shows them, which pick the results score's cut (#792, #797). */
 function finishedRunStars(level: string): number {
@@ -74,6 +72,12 @@ const onPhoto = () => {
 }
 /** An unshot snowball thumps past: the snow crunch, unplaced (it is at the camera; the event carries only its side). */
 const onSnowSplat = () => sfx().kill(0, 'crunch', null)
+
+const COMBAT_MIX: CombatMixTargets = {
+  duck: (on) => setMusicDucked(on),
+  frenzyLift: (on) => sfx().frenzyLift(on),
+  intensity: (n) => scrimPlayer()?.setIntensity(n),
+}
 
 const SFX_EVENTS: [string, (e: unknown) => void][] = [
   ['enemy:hit', onHit],
@@ -158,10 +162,7 @@ export default function LevelAudio() {
 
   useFrame(() => {
     const { combo, timeScale, phase } = useGameStore.getState()
-    const tier = comboTierIndex(combo.count)
-    setMusicDucked(timeScale < 1)
-    sfx().frenzyLift(phase === 'playing' && tier === TOP_TIER)
-    scrimPlayer()?.setIntensity(intensityForTier(tier))
+    applyCombatMix(COMBAT_MIX, combo.count, timeScale, phase === 'playing')
   })
 
   return null

@@ -1,7 +1,7 @@
 /** No env vars, a paused project or any database error answer a bare 503: never a 500, a stack trace or a secret. */
 import { boardCeiling, checkSubmission, clientIp, hashIp, isCampaignLevel, MAX_BODY_BYTES, rankFrom, rateLimited, windowStart } from './rules.js'
 import { dailyError, dayLevel, isDayKey } from './daily.js'
-import { CAMPAIGN, type ScoresDb } from './scoresDb.js'
+import { CAMPAIGN, DbError, RATE_LIMITED, type ScoresDb } from './scoresDb.js'
 
 export interface Deps {
   db: ScoresDb | null
@@ -10,13 +10,15 @@ export interface Deps {
   now: () => number
 }
 
-const BOARD_CACHE = 'public, s-maxage=30, stale-while-revalidate=300'
+/** Never staler than 30 s at the edge (#384): a longer stale-while-revalidate let a quiet board's first reader see minutes-old rows. */
+const BOARD_CACHE = 'public, s-maxage=30, stale-while-revalidate=30'
 
 export function json(status: number, body: unknown, cache = 'no-store'): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': cache } })
 }
 
 export const unavailable = () => json(503, { error: 'unavailable' })
+const tooMany = () => json(429, { error: 'too many submissions' })
 
 /** The parsed JSON body, or the 400 / 413 answer to send instead. */
 export async function readJson(request: Request, maxBytes: number): Promise<{ body: unknown } | { reject: Response }> {
@@ -65,9 +67,15 @@ export async function postScore(request: Request, { db, salt, now }: Deps): Prom
   const day = typeof daily === 'string' ? daily : null
   try {
     const ipHash = await hashIp(clientIp(request.headers), salt)
+    // The count turns most repeats away cheaply; the insert's trigger (0005_rate_limit.sql) is the exact limit under parallel POSTs.
     const recent = await db.count({ ip_hash: `eq.${ipHash}`, created_at: `gte.${windowStart(now())}` })
-    if (rateLimited(recent)) return json(429, { error: 'too many submissions' })
-    await db.insert(day ? { ...run, ipHash, day } : { ...run, ipHash })
+    if (rateLimited(recent)) return tooMany()
+    try {
+      await db.insert(day ? { ...run, ipHash, day } : { ...run, ipHash })
+    } catch (e) {
+      if (e instanceof DbError && e.code === RATE_LIMITED) return tooMany()
+      throw e
+    }
     const ceiling = boardCeiling(run.level)
     const atOrAbove = await db.count({
       level_id: `eq.${run.level}`,

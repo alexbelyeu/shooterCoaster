@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HEADING_TAU, followHeading, inWindow, needsRelocate, timeToWindow, windowAmount, windowNowEpoch } from './bossCycle.hot'
+import { HEADING_TAU, followHeading, inWindow, leadHeading, type LeadHeading, needsRelocate, timeToWindow, windowAmount, windowNowEpoch } from './bossCycle.hot'
 import { TITAN_BEAT, TITAN_WADE } from './titanMotion.hot'
 import { YETI_ROAM, YETI_ROAR } from './yetiMotion.hot'
 
@@ -69,5 +69,35 @@ describe('followHeading', () => {
     const h = { x: 1, z: 0 }
     followHeading(h, -1, 0, HEADING_TAU * Math.LN2, false)
     expect(h).toEqual({ x: -1, z: 0 })
+  })
+})
+
+describe('leadHeading', () => {
+  const timing = { rateTau: 0.5, headingTau: 0.4, lead: 0.4 }
+  const dt = 1 / 60
+  /** Degrees the heading is off the view after `seconds` of turning at `rate` radians a second from +x. */
+  function offAfter(seconds: number, rate: number, follow: (h: LeadHeading, fx: number, fz: number, snap: boolean) => void): number {
+    const h = { x: 0, z: 0, rate: 0, lastX: 0, lastZ: 0 }
+    let worst = 0
+    for (let i = 0; i * dt <= seconds; i++) {
+      const a = rate * i * dt
+      follow(h, Math.cos(a), Math.sin(a), i === 0)
+      if (i * dt > 2) worst = Math.max(worst, Math.abs(Math.atan2(h.x * Math.sin(a) - h.z * Math.cos(a), h.x * Math.cos(a) + h.z * Math.sin(a))))
+    }
+    return (worst * 180) / Math.PI
+  }
+
+  it("holds the view through the park finale's steady turn, where following it trails round behind", () => {
+    expect(offAfter(8, 1, (h, fx, fz, snap) => leadHeading(h, fx, fz, dt, snap, timing))).toBeLessThan(5)
+    expect(offAfter(8, -1, (h, fx, fz, snap) => leadHeading(h, fx, fz, dt, snap, timing))).toBeLessThan(5)
+    expect(offAfter(8, 1, (h, fx, fz, snap) => followHeading(h, fx, fz, dt, snap))).toBeGreaterThan(90)
+  })
+
+  it('settles on the view on a straight and stays unit length', () => {
+    const h = { x: 0, z: 0, rate: 0, lastX: 0, lastZ: 0 }
+    leadHeading(h, 1, 0, dt, true, timing)
+    for (let i = 0; i < 300; i++) leadHeading(h, 0, 1, dt, false, timing)
+    expect(h.z).toBeCloseTo(1)
+    expect(Math.hypot(h.x, h.z)).toBeCloseTo(1)
   })
 })

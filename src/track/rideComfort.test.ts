@@ -21,3 +21,12 @@ describe('ride comfort: no level turns the rider\'s view faster than the eye can
     expect(rows.filter((r) => KNOWN_OVER[r.id] && !r.problems.length).map((r) => r.id)).toEqual([])
   })
 })
+
+describe('storyboard beats are inside the run (#925, docs/RIDE-KIT.md "What the rider must see" 6)', () => {
+  it('no level lands a beat after its run ends', () => {
+    const late = getAllLevels().flatMap((level) =>
+      (level.track.rideV2?.beats ?? []).filter((b) => b.second > RUN_SECONDS).map((b) => `${level.id} beat at ${b.second} s`),
+    )
+    expect(late).toEqual([])
+  })
+})
