@@ -95,7 +95,7 @@ import { devices } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
 import { arg, launchBrowser, startPreview, stopPreview } from '../scripts/headless.mjs'
-import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitFrames, waitVisible } from './pageChecks.mjs'
+import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitDrawsSettled, waitFrames, waitVisible } from './pageChecks.mjs'
 import { planRun, STEP_LEVELS } from './shards.mjs'
 import { growthMoments, programGateProblem, throttleReport } from './slowPass.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
@@ -3378,13 +3378,20 @@ async function settingsCheck(page) {
 async function qualityCheck(newPage, levelId) {
   const sample = async (query, png) => {
     const { ctx, page, errors } = await newPage(query, { deviceScaleFactor: 2 })
-    const ready = await startLevelReady(page, levelId)
-    await waitFrames(page, 2, { minMs: 1500, maxMs: 30000 })
+    // Held at its start from its first frame (level timer, game clock and ride at 0, as `tourShots`): however long a
+    // runner takes to load the level, no enemy flies in and no effect ages before the count (#972: 77 vs 91 draws).
+    await page.evaluate(([lid, seed]) => {
+      const t = window.__SC_TEST__
+      t.timerStep = 0
+      t.rideRate = 0
+      t.startLevel(lid, seed)
+    }, [levelId, SEED])
+    const ready = await levelReady(page)
     await page.evaluate(() => {
       window.__SC_TEST__.setTimeScale(0)
       window.__SC_TEST__.rideTo = 0.1
     })
-    await waitFrames(page, 3, { maxMs: 30000 })
+    await waitDrawsSettled(page)
     const s = await page.evaluate(() => {
       const t = window.__SC_TEST__
       return { drawCalls: t.drawCalls, dpr: t.view()?.dpr, graphics: t.graphics(), shadows: !!t.sceneStats().byName['contact-shadows'], errors: t.errors }
