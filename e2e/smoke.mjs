@@ -1937,6 +1937,37 @@ async function photoModeProblems(page, levelId) {
  * The pause menu (#36), opened through the hook: a card inside the viewport with the level name, Resume focused (pause.png);
  * ArrowDown moves focus, Esc resumes through the Ready / GO countdown, and Restart starts the level over.
  */
+/** Pause rebound to P in the pause menu's Settings (#998): P pauses mid-ride and Esc doesn't; Reset gives Esc back. */
+async function rebindPauseInRun(page) {
+  const problems = []
+  const phaseIs = (want) =>
+    page.waitForFunction((p) => window.__SC_TEST__.phase() === p, want, { timeout: 10000, polling: 100 }).then(() => true, () => false)
+  const viaSettings = async (key) => {
+    await page.evaluate(() => window.__SC_TEST__.setPhase('paused'))
+    await page.getByRole('button', { name: 'Settings', exact: true }).click({ timeout: 30000 })
+    await rebindPause(page, key)
+    await page.locator('.settings-back').click({ timeout: 30000 })
+    await page.keyboard.press('Escape')
+    return phaseIs('playing')
+  }
+  if (!(await viaSettings('p'))) return ['rebinding pause in the pause menu\'s Settings did not get back to the ride']
+  await page.keyboard.press('Escape')
+  await waitFrames(page, 3, { minMs: 500, maxMs: 5000 })
+  if ((await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') problems.push('Esc still paused with pause bound to P')
+  await page.keyboard.press('p')
+  if (!(await phaseIs('paused'))) problems.push('P did not pause with pause bound to P')
+  await waitVisible(page, '.pause-card', 30000)
+  await page.keyboard.press('p')
+  if (!(await phaseIs('playing'))) problems.push('P did not resume with pause bound to P')
+  if (!(await viaSettings(null))) problems.push('Reset in Settings did not get back to the ride')
+  await page.keyboard.press('Escape')
+  if (!(await phaseIs('paused'))) problems.push('Esc did not pause after Reset')
+  await waitVisible(page, '.pause-card', 30000)
+  await page.keyboard.press('Escape')
+  await phaseIs('playing')
+  return problems
+}
+
 async function pauseMenuCheck(page, levelId) {
   const problems = []
   if (!(await startLevelReady(page, levelId))) return { id: 'pause-menu', problems: [NOT_LOADED(levelId)] }
@@ -1962,6 +1993,7 @@ async function pauseMenuCheck(page, levelId) {
     .waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 15000, polling: 100 })
     .then(() => true, () => false)
   if (!resumed) problems.push('Esc did not resume the run')
+  problems.push(...(await rebindPauseInRun(page)))
 
   await waitFrames(page, 2, { maxMs: 10000 })
   const rideBefore = await page.evaluate(() => window.__SC_TEST__.rideProgress)
@@ -3352,6 +3384,48 @@ async function settingsLayout(page, label, { fromTitle = false } = {}) {
   return { ...r, problems: problems.map((p) => `${label}: ${p}`) }
 }
 
+const savedPauseKey = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('shootercoaster-bindings') ?? 'null')?.keys.pause ?? 'Escape')
+
+/** Rebind pause to `key` in the open Settings' Controls (#998); null clicks Reset. */
+async function rebindPause(page, key) {
+  if (key === null) await page.getByRole('button', { name: 'Reset', exact: true }).click({ timeout: 30000 })
+  else {
+    await page.getByRole('button', { name: /^Pause key:/ }).click({ timeout: 30000 })
+    await page.keyboard.press(key)
+  }
+}
+
+/**
+ * Settings' Controls (#998): Esc in the key prompt backs out of the prompt, not Settings; a pressed key binds and
+ * saves; Reset clears it; at 390 px wide (no touch, so the list shows) the card keeps to the width
+ * (settings-controls.png, settings-phone.png).
+ */
+async function controlsProblems(page) {
+  const problems = []
+  await page.getByRole('button', { name: /^Pause key:/ }).click({ timeout: 30000 })
+  await page.screenshot({ path: path.join(OUT, 'settings-controls.png'), timeout: SHOT_TIMEOUT })
+  await page.keyboard.press('Escape')
+  await waitFrames(page, 2, { maxMs: 5000 })
+  if (!(await page.locator('.settings-card').isVisible())) return ['Esc in the Controls key prompt closed Settings']
+  await rebindPause(page, 'p')
+  if ((await savedPauseKey(page)) !== 'p') problems.push(`pause bound to P saved as "${await savedPauseKey(page)}"`)
+  await rebindPause(page, null)
+  if ((await savedPauseKey(page)) !== 'Escape') problems.push('Reset left pause off Esc')
+  const viewport = page.viewportSize()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await waitFrames(page, 2, { minMs: 300, maxMs: 5000 })
+  const phone = await page.evaluate(() => {
+    const root = document.querySelector('.settings-screen')
+    const card = document.querySelector('.settings-card')?.getBoundingClientRect()
+    return { controls: !!document.querySelector('.settings-binds'), hScroll: root ? root.scrollWidth > root.clientWidth : true, right: card?.right ?? 0 }
+  })
+  await page.screenshot({ path: path.join(OUT, 'settings-phone.png'), timeout: SHOT_TIMEOUT })
+  if (!phone.controls) problems.push('no Controls list in Settings on a desktop browser')
+  if (phone.hScroll || phone.right > 390) problems.push('Settings with Controls scroll sideways at 390 px')
+  await page.setViewportSize(viewport)
+  return problems
+}
+
 /**
  * Settings from the title (settings.png): the card's layout, Esc back to the title, and the quality +
  * music volume picked there still set after a reload; the internal-device toggle (#446), last in the card,
@@ -3366,6 +3440,7 @@ async function settingsCheck(page) {
   const layout = await settingsLayout(page, 'desktop 1280x720', { fromTitle: true })
   problems.push(...layout.problems)
   await page.screenshot({ path: path.join(OUT, 'settings.png'), timeout: SHOT_TIMEOUT })
+  problems.push(...(await controlsProblems(page)))
   const internalSwitch = page.locator('.settings-card input[role="switch"]').last()
   const lastRow = await internalSwitch.evaluate((el) => {
     const rows = [...document.querySelectorAll('.settings-card .settings-row')]

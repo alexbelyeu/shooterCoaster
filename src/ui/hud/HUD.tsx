@@ -2,6 +2,7 @@ import { useEffect, useMemo, type CSSProperties } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { biomeTheme } from '@/ui/theme'
+import { bindings, matchesKey } from '@/input/bindings'
 import ScoreDisplay from './ScoreDisplay'
 import TimerBar from './TimerBar'
 import ComboMeter from './ComboMeter'
@@ -40,10 +41,10 @@ export default function HUD() {
     [theme],
   )
 
-  // Escape key to pause, backtick (`) to freeze/unfreeze for screenshots
+  // The pause key (Escape unless rebound, `bindings.ts`) pauses; the developer's backtick (`) freezes / unfreezes for screenshots
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') useGameStore.getState().setPhase('paused')
+      if (matchesKey(bindings(), 'pause', e.key)) useGameStore.getState().setPhase('paused')
       if (e.key === '`') setTimeScaleOverride(timeScaleOverride() === 0 ? null : 0)
     }
     window.addEventListener('keydown', handleKeyDown)

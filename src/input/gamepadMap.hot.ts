@@ -88,21 +88,24 @@ function inMenu(phase: GamePhase): boolean {
   return phase === 'title' || phase === 'levelSelect' || phase === 'paused' || phase === 'results' || phase === 'intro'
 }
 
+/** The pad actions a press can trigger; which button is which is the player's (`bindings.ts`). */
+export type PadCommand = 'pause' | 'confirm' | 'back'
+
 /**
- * What a button press does in a phase. Start pauses and resumes a run (the Escape key's store actions) and confirms
- * elsewhere; A confirms and B goes back on a screen. B on the title does nothing: Escape there opens the worlds,
- * which is forward, not back; with the title's Settings dialog open (`dialogOpen`) it closes it.
+ * What pressing a command's button does in a phase. The pause button (Start) pauses and resumes a run (the Escape
+ * key's store actions) and confirms elsewhere; confirm (A) confirms and back (B) goes back on a screen. Back on the
+ * title does nothing: Escape there opens the worlds, which is forward, not back; with the title's Settings dialog
+ * open (`dialogOpen`) it closes it.
  */
-export function padAction(button: number, phase: GamePhase, dialogOpen: boolean): PadAction {
-  if (button === PAD.START) {
+export function padAction(command: PadCommand, phase: GamePhase, dialogOpen: boolean): PadAction {
+  if (command === 'pause') {
     if (phase === 'playing') return 'pause'
     if (phase === 'paused') return 'resume'
     return inMenu(phase) ? 'confirm' : null
   }
   if (!inMenu(phase)) return null
-  if (button === PAD.A) return 'confirm'
-  if (button === PAD.B) return phase === 'title' && !dialogOpen ? null : 'back'
-  return null
+  if (command === 'confirm') return 'confirm'
+  return phase === 'title' && !dialogOpen ? null : 'back'
 }
 
 /**

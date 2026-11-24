@@ -13,6 +13,7 @@ import { e2eAttractIdleMs } from '@/testing/e2eHook'
 import TitleLogo from './TitleLogo'
 import { LOGO_TEXT } from '@/ui/logoArt'
 import { touchFirst } from '@/ui/touchFirst'
+import { bindings } from '@/input/bindings'
 
 const SUBTITLE_WORDS = ['Ride.', 'Aim.', 'Shoot.']
 /** The title has landed by here; PLAY and the rest follow. */
@@ -116,7 +117,7 @@ export default function TitleScreen({ onPlay, onWorlds, onSettings }: TitleScree
       }
       // Enter / Space on a focused button already click it.
       const onControl = e.target instanceof HTMLElement && e.target.closest('button, a, input') !== null
-      const action = titleAction(e)
+      const action = titleAction(e, bindings())
       if (action === 'worlds' || (action === 'play' && !onControl)) {
         e.preventDefault()
         void leave(action)

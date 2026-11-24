@@ -2,9 +2,11 @@
  * Gamepad input (#819), standard mapping only. While a pad is connected, one requestAnimationFrame poll a frame
  * reads it and feeds what the mouse and keyboard already drive, so combat, the crosshair, the HUD and the screens
  * need nothing of their own:
- * - right stick: a velocity cursor through `pointerInput`'s aim (`gamepadAim`), RT: its trigger (`gamepadTrigger`);
- * - Start: pause / resume through the store actions the Escape key uses;
- * - A: clicks the focused control (or sends Enter, the screens' "start" key), B: sends Escape, the screens' Back;
+ * - right stick: a velocity cursor through `pointerInput`'s aim (`gamepadAim`), fire (RT): its trigger (`gamepadTrigger`);
+ * - pause (Start): pause / resume through the store actions the Escape key uses;
+ * - confirm (A): clicks the focused control (or sends Enter, the screens' "start" key), back (B): sends Escape, the screens' Back;
+ * - fire, pause, confirm and back are the player's to rebind (`bindings.ts`, #998); while Settings waits for a
+ *   button (`capturePadButton`) the next press goes to it and does nothing else;
  * - photo mode (#828): the right stick orbits the camera and LT / RT zoom out / in (`track/photoInput.ts`) instead;
  * - d-pad / left stick: sends the arrow keys to the focused control (the pause menu's and level grid's own
  *   handlers), and where nothing handles them, moves focus to the next / previous control as Tab does.
@@ -15,6 +17,7 @@ import { useEffect } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { gamepadAim, gamepadTrigger, getPointerState } from './pointerInput'
 import { photoPad } from '@/track/photoInput'
+import { BINDABLE_PAD_BUTTONS, bindings } from './bindings'
 import {
   PAD,
   TRIGGER_THRESHOLD,
@@ -25,19 +28,22 @@ import {
   padAction,
   stickVelocity,
   type NavKey,
+  type PadCommand,
   type Vec2,
 } from './gamepadMap.hot'
 
 const FOCUSABLE = 'button:not([disabled]),a[href],input:not([disabled]),[tabindex="0"]'
-/** Buttons read for presses (edge-triggered); RT is read as a held value. */
-const PRESS_BUTTONS = [PAD.A, PAD.B, PAD.START] as const
+/** Commands read as presses (edge-triggered) on their bound buttons; fire is read as a held value. */
+const COMMANDS: readonly PadCommand[] = ['confirm', 'back', 'pause']
 
 const vel: Vec2 = { x: 0, y: 0 }
 const cursor: Vec2 = { x: 0, y: 0 }
 /** The menu direction held last frame: a direction moves once per press, no auto-repeat. */
 let navHeld: NavKey | null = null
-/** Which of PRESS_BUTTONS were down last frame. */
-const wasDown: boolean[] = PRESS_BUTTONS.map(() => false)
+/** Which bindable buttons were down last frame, so a rebind takes effect on the next press, not a held one. */
+const wasDown: boolean[] = new Array<boolean>(BINDABLE_PAD_BUTTONS).fill(false)
+/** Settings' "press a button" prompt: the next press is handed to it instead of doing anything. */
+let capture: ((button: number) => void) | null = null
 let raf = 0
 let lastT = 0
 
@@ -90,9 +96,9 @@ function moveFocus(key: NavKey) {
   controls[next].focus()
 }
 
-function act(button: number) {
+function act(command: PadCommand) {
   const store = useGameStore.getState()
-  switch (padAction(button, store.phase, topDialog() !== null)) {
+  switch (padAction(command, store.phase, topDialog() !== null)) {
     case 'pause':
       store.setPhase('paused')
       return
@@ -113,6 +119,20 @@ function poll(t: number) {
   lastT = t
   const pad = activePad()
   if (!pad) return
+  const binds = bindings().pad
+
+  if (capture) {
+    for (let i = 0; i < BINDABLE_PAD_BUTTONS; i++) {
+      const down = pressed(pad, i)
+      if (down && !wasDown[i] && capture) {
+        capture(i)
+        capture = null
+      }
+      wasDown[i] = down
+    }
+    gamepadTrigger(false)
+    return
+  }
 
   stickVelocity(pad.axes[2] ?? 0, pad.axes[3] ?? 0, vel)
   if (useGameStore.getState().photo) {
@@ -125,13 +145,13 @@ function poll(t: number) {
     moveCursor(cursor, vel, dt, window.innerWidth, window.innerHeight)
     gamepadAim(cursor.x, cursor.y)
   }
-  gamepadTrigger(!useGameStore.getState().photo && (pad.buttons[PAD.RT]?.value ?? 0) >= TRIGGER_THRESHOLD)
+  gamepadTrigger(!useGameStore.getState().photo && (pad.buttons[binds.fire]?.value ?? 0) >= TRIGGER_THRESHOLD)
 
-  for (let i = 0; i < PRESS_BUTTONS.length; i++) {
-    const down = pressed(pad, PRESS_BUTTONS[i])
-    if (down && !wasDown[i]) act(PRESS_BUTTONS[i])
-    wasDown[i] = down
+  for (let i = 0; i < COMMANDS.length; i++) {
+    const button = binds[COMMANDS[i]]
+    if (pressed(pad, button) && !wasDown[button]) act(COMMANDS[i])
   }
+  for (let i = 0; i < BINDABLE_PAD_BUTTONS; i++) wasDown[i] = pressed(pad, i)
 
   const dir = navActive(useGameStore.getState().phase)
     ? navDirection(pressed(pad, PAD.UP), pressed(pad, PAD.DOWN), pressed(pad, PAD.LEFT), pressed(pad, PAD.RIGHT), pad.axes[0] ?? 0, pad.axes[1] ?? 0)
@@ -158,6 +178,19 @@ function stop() {
 
 function onDisconnected() {
   if (!activePad()) stop()
+}
+
+/** Whether a standard-mapping pad is connected (Settings shows the Controls list on a phone only then). */
+export function padConnected(): boolean {
+  return typeof navigator.getGamepads === 'function' && activePad() !== null
+}
+
+/**
+ * Hand the pad's next button press to `onButton` instead of acting on it (Settings' rebind prompt); null cancels.
+ * Only one prompt waits at a time: a new one replaces the last.
+ */
+export function capturePadButton(onButton: ((button: number) => void) | null) {
+  capture = onButton
 }
 
 /** Polls the gamepad while one is connected; mounted once by the App. */

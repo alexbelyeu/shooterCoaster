@@ -1,15 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { useSettingsStore } from '@/store/useSettingsStore'
+import { bindings, keyLabel, matchesKey, subscribeBindings } from '@/input/bindings'
 
 export default function MuteButton() {
   const muted = useSettingsStore((s) => s.muted)
   const toggleMute = useSettingsStore((s) => s.toggleMute)
+  const key = keyLabel(useSyncExternalStore(subscribeBindings, bindings).keys.mute)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // A key another handler already took (the results' initials entry) is not a mute.
       if (e.defaultPrevented) return
-      if (e.key === 's' || e.key === 'S') toggleMute()
+      if (matchesKey(bindings(), 'mute', e.key)) toggleMute()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -19,7 +21,7 @@ export default function MuteButton() {
     <button
       className="mute-button"
       onClick={toggleMute}
-      title={muted ? 'Unmute (S)' : 'Mute (S)'}
+      title={muted ? `Unmute (${key})` : `Mute (${key})`}
       aria-label={muted ? 'Unmute' : 'Mute'}
     >
       {muted ? (
@@ -35,7 +37,7 @@ export default function MuteButton() {
           <path d="M15.54 8.46a5 5 0 010 7.07" />
         </svg>
       )}
-      <span className="mute-key-hint">S</span>
+      <span className="mute-key-hint">{key}</span>
     </button>
   )
 }
