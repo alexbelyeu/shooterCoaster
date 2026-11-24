@@ -1161,6 +1161,65 @@ canvas {
   height: 24px;
 }
 
+/* The medals' feats (#978) on a cream prize ticket hung from the focused board (above it in the screen's lower half);
+   on a phone it hangs under every open board (the phone rules below). */
+.level-card {
+  position: relative;
+}
+
+.level-card.is-focused {
+  z-index: 2;
+}
+
+.level-feats {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 8px;
+  right: 8px;
+  display: none;
+  gap: 0.45rem;
+  padding: 10px 12px 12px;
+  border-radius: 4px;
+  color: var(--fair-oxblood);
+  background: var(--fair-cream);
+  box-shadow: 4px 6px 0 var(--fair-tar);
+}
+
+.level-card.feats-above .level-feats {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+.level-card.is-focused .level-feats {
+  display: grid;
+}
+
+.level-feat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.45rem;
+  align-items: center;
+}
+
+.level-feat .fair-medal {
+  grid-row: span 2;
+  width: 26px;
+  height: 26px;
+}
+
+.level-feat-name {
+  font-variation-settings: 'opsz' 40;
+  font-size: 1.125rem;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.level-feat-line {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
 .level-card-initials {
   margin-left: 0.35rem;
   font-weight: 800;
@@ -1314,6 +1373,12 @@ canvas {
     display: none;
   }
 
+  /* Wider than the small board, so a feat takes two lines, not four. */
+  .level-feats {
+    left: -20px;
+    right: -20px;
+  }
+
   .level-plate {
     font-size: 1rem;
     white-space: nowrap;
@@ -1351,7 +1416,16 @@ canvas {
 
   .level-card {
     --tilt: -0.4deg;
+    flex-direction: column;
     width: 100%;
+  }
+
+  .level-feats,
+  .level-card.feats-above .level-feats {
+    position: static;
+    display: grid;
+    margin: 0 14px;
+    border-radius: 0 0 4px 4px;
   }
 
   .level-card:nth-child(3n + 2) {

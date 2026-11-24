@@ -3131,11 +3131,13 @@ async function levelSelectCheck(page, levels) {
 
   const focused = () => page.evaluate(() => document.activeElement?.dataset?.level ?? null)
   const target = levels[Math.min(2, levels.length - 1)].id
+  problems.push(...featsProblems(await page.evaluate(shownFeats), target, 'at open'))
   if (layout.focused !== target) problems.push(`initial focus on ${layout.focused}, expected ${target}`)
   let keyboard = null
   if (levels.length >= 4) {
     await page.keyboard.press('ArrowLeft')
     const left = await focused()
+    problems.push(...featsProblems(await page.evaluate(shownFeats), levels[1].id, 'after ArrowLeft'))
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('ArrowRight')
     const locked = await focused()
@@ -3161,6 +3163,27 @@ async function levelSelectCheck(page, levels) {
     if (after.phase !== 'playing' || after.level !== target) problems.push(`Enter started ${after.level} (${after.phase}), expected ${target}`)
   }
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
+}
+
+/** The level select's medal tickets on screen (#978): each shown one's card, feat count and whether it stays in the viewport. */
+function shownFeats() {
+  return [...document.querySelectorAll('.level-feats')]
+    .filter((t) => t.getBoundingClientRect().height > 0)
+    .map((t) => {
+      const r = t.getBoundingClientRect()
+      return {
+        level: t.closest('.level-card')?.dataset.level ?? null,
+        feats: [...t.querySelectorAll('.level-feat-line')].filter((l) => l.textContent.trim()).length,
+        inView: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
+      }
+    })
+}
+
+/** One ticket out, the focused card's, with its three feats on screen. */
+function featsProblems(shown, level, when) {
+  if (shown.length !== 1 || shown[0].level !== level) return [`medal tickets ${when} ${JSON.stringify(shown)}, expected only ${level}'s`]
+  const [t] = shown
+  return t.feats === 3 && t.inView ? [] : [`${level}'s medal ticket ${when} ${JSON.stringify(t)}, expected 3 feats on screen`]
 }
 
 /** Click the level select's Daily card (#184) and return the run it started and its spawnDigest(). */
@@ -4405,9 +4428,13 @@ async function runMobile(browser, base) {
       const r = c.getBoundingClientRect()
       return r.left < 0 || r.right > window.innerWidth || r.height < 44
     })
-    return { hScroll: root ? root.scrollWidth > root.clientWidth : true, bad: tooNarrow.map((c) => c.dataset.level) }
+    const open = cards.filter((c) => !c.dataset.locked && !c.classList.contains('level-card-daily'))
+    const noFeats = open.filter((c) => !(c.querySelector('.level-feats')?.getBoundingClientRect().height > 0))
+    return { hScroll: root ? root.scrollWidth > root.clientWidth : true, bad: tooNarrow.map((c) => c.dataset.level), noFeats: noFeats.map((c) => c.dataset.level) }
   })
   if (selectLayout.hScroll) problems.push('phone level select scrolls sideways')
+  // #978: a phone can't hover or focus a card without launching it, so every open board shows its medals' feats.
+  if (selectLayout.noFeats.length) problems.push(`phone level cards without their medal ticket: ${selectLayout.noFeats.join(',')}`)
   if (selectLayout.bad.length) problems.push(`phone level cards off screen or under 44 px: ${selectLayout.bad.join(',')}`)
   await page.locator(card).tap({ timeout: 30000 }).catch((e) => problems.push(`tap level: ${e.message}`))
   await waitPhase('playing', 15000)

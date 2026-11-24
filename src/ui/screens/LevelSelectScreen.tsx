@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { dailyKey, dailyLevel, msUntilNextUtcDay } from '@/levels/daily'
@@ -80,6 +80,8 @@ export default function LevelSelectScreen() {
   const [nightPicks, setNightPicks] = useState<ReadonlySet<string>>(() => new Set())
   const [focusIndex, setFocusIndex] = useState(() => nextLevelIndex(cards, useGameStore.getState().lastLevel))
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
+  /** The focused card's medal ticket hangs above it when the card sits in the screen's lower half, so it stays on screen. */
+  const [featsAbove, setFeatsAbove] = useState(false)
   const launchTimer = useRef<number | undefined>(undefined)
 
   // Mount only: start keyboard players on the next level to play.
@@ -87,6 +89,18 @@ export default function LevelSelectScreen() {
     cardRefs.current[focusIndex]?.focus({ preventScroll: true })
     void prepareSfx(null, 'themePark')
   }, [])
+
+  useLayoutEffect(() => {
+    const r = cardRefs.current[focusIndex]?.getBoundingClientRect()
+    setFeatsAbove(!!r && r.top + r.height / 2 > window.innerHeight / 2)
+  }, [focusIndex])
+
+  /** A mouse over a card selects it, as the arrow keys do, so only one card's medal ticket is ever out. */
+  function pointTo(e: PointerEvent<HTMLButtonElement>, i: number) {
+    if (e.pointerType !== 'mouse' || launching || i === focusIndex) return
+    setFocusIndex(i)
+    cardRefs.current[i]?.focus({ preventScroll: true })
+  }
 
   function back() {
     sfx().ui('back')
@@ -173,6 +187,7 @@ export default function LevelSelectScreen() {
           const classes = ['level-card']
           if (!card.unlocked) classes.push('locked')
           if (launching === card.id) classes.push('is-selected')
+          if (i === focusIndex) classes.push(featsAbove ? 'is-focused feats-above' : 'is-focused')
           const night = card.nightRide && nightPicks.has(card.id)
           const board = (
             <button
@@ -193,6 +208,7 @@ export default function LevelSelectScreen() {
                   : `${card.name}: locked${card.unlockedBy ? `, earn a star on ${card.unlockedBy}` : ''}`
               }
               onFocus={() => setFocusIndex(i)}
+              onPointerEnter={(e) => pointTo(e, i)}
               onClick={() => select(i)}
             >
               <FairBoard as="span" className="level-board" shadowClassName="level-board-shadow">
@@ -224,6 +240,18 @@ export default function LevelSelectScreen() {
                   )}
                 </span>
               </FairBoard>
+              {card.unlocked && (
+                // The medals' feats on a prize ticket (#978): under every board on a phone, under the focused one elsewhere.
+                <span className="level-feats" aria-hidden="true">
+                  {card.medals.map((m) => (
+                    <span key={m.id} className="level-feat" data-earned={m.earned}>
+                      <FairMedal earned={m.earned} />
+                      <span className="level-feat-name">{m.name}</span>
+                      <span className="level-feat-line">{m.line}</span>
+                    </span>
+                  ))}
+                </span>
+              )}
             </button>
           )
           if (!card.nightRide) return board
