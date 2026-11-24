@@ -29,6 +29,8 @@ import {
   styleCounts,
   type DeathStyle,
 } from './deathStyles'
+import { MEDUSA_DEFEAT_BURST_YS } from '@/entities/bosses/medusaMotion'
+import { TITAN_BREAK_POINTS } from '@/entities/bosses/titanMotion.hot'
 
 const ALL: [string, DeathStyle][] = [
   ...Object.entries(DEATH_STYLES),
@@ -50,8 +52,12 @@ const ALL: [string, DeathStyle][] = [
 ]
 
 describe('death styles', () => {
-  it("a boss defeat bursts in at most half the pool, so the boss's own break and the last part still fit", () => {
-    expect(BOSS_DEFEAT_BURST_OFFSETS.length).toBeLessThanOrEqual(DEATH_SLOTS / 2)
+  it("every boss's defeat fits the pool with a slot to spare: its last part, the confetti and its own bursts", () => {
+    // The confetti lives 3.2 s and every boss's own defeat bursts fire within it, so all of these overlap.
+    const ownDefeatBursts = { magmaTitan: TITAN_BREAK_POINTS.length, medusa: MEDUSA_DEFEAT_BURST_YS.length, other: 0 }
+    for (const own of Object.values(ownDefeatBursts)) {
+      expect(1 + BOSS_DEFEAT_BURST_OFFSETS.length + own + 1).toBeLessThanOrEqual(DEATH_SLOTS)
+    }
     expect(styleCounts(BOSS_DEFEAT_DEATH_STYLE).glow * BOSS_DEFEAT_BURST_OFFSETS.length).toBeGreaterThanOrEqual(180)
   })
 

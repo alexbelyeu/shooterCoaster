@@ -43,8 +43,11 @@ export interface DeathStyle {
   sound: KillSound
 }
 
-/** Concurrent explosions; unlit particles and chunks per explosion. */
-export const DEATH_SLOTS = 8
+/**
+ * Concurrent explosions; unlit particles and chunks per explosion. The Magma Titan's defeat, the busiest moment,
+ * takes 9 (its crown, 4 confetti, 4 break bursts): 10 leaves one for a kill alongside (`deathStyles.test.ts`).
+ */
+export const DEATH_SLOTS = 10
 export const GLOW_PER_SLOT = 48
 export const CHUNKS_PER_SLOT = 12
 
@@ -171,7 +174,7 @@ export const GOLDEN_BALLOON_DEATH_STYLE: DeathStyle = {
 
 /**
  * A boss's defeat: a fairground confetti shower. One slot holds 48 pieces, so `BossBase` fires it at each of
- * `BOSS_DEFEAT_BURST_OFFSETS` (4 of the pool's 8 slots) to spread ~190 pieces across the boss. No flash, no sound
+ * `BOSS_DEFEAT_BURST_OFFSETS` (4 of the pool's `DEATH_SLOTS`) to spread ~190 pieces across the boss. No flash, no sound
  * of its own: the defeat's sting plays it.
  */
 export const BOSS_DEFEAT_DEATH_STYLE: DeathStyle = {

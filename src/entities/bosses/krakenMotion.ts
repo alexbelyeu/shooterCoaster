@@ -1,7 +1,7 @@
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import type { TrackIndex } from '@/levels/environments/shared/trackClearance'
-import type { Vec3 } from '@/entities/spawning/spawnPlacement'
+import type { Vec3 } from '@/utils/vec3'
 import { smooth } from './bossCycle.hot'
 
 /** The Kraken's motion, pure and allocation-free per frame; a tentacle bends in its vertical plane, `u` along `out` (away from the rider), `y` up. */

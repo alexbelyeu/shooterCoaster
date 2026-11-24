@@ -23,8 +23,6 @@ import { EYE_HEIGHT } from '@/track/trackDimensions'
  * rider's place on the track is.
  */
 
-export type { Vec3 }
-
 export type ChoreographedFormation = Exclude<Formation, 'scatter'>
 
 interface FormationSpec {
