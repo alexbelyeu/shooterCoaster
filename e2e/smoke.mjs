@@ -99,7 +99,7 @@ import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitFr
 import { planRun, STEP_LEVELS } from './shards.mjs'
 import { growthMoments, programGateProblem, throttleReport } from './slowPass.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
-import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
 import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
@@ -2442,10 +2442,11 @@ async function pacingCheck(page, id) {
   const budget = BUDGETS.pacing?.[id]
   // A placeholder is filled by the caller once the page's errors are counted too (`fillPlaceholderBudget`).
   const placeholder = isPlaceholder(budget) ? pacing : null
-  const over = placeholder ? [] : [...pacingBudgetProblems(id, pacing, budget), ...bossFramingProblems(pacing.boss, budget)]
-  // A level whose entry names `knownOver` (an open issue fixing it) only warns, like the scene budgets.
-  if (budget?.knownOver && over.length) console.log(`     WARN pacing over budget (known, ${budget.knownOver}): ${over.join('; ')}`)
-  else problems.push(...over)
+  const { fail, warn } = placeholder
+    ? { fail: [], warn: [] }
+    : pacingGate(budget, pacingBudgetProblems(id, pacing, budget), bossFramingProblems(pacing.boss, budget))
+  if (warn.length) console.log(`     WARN pacing over budget (known, ${budget.knownOver}): ${warn.join('; ')}`)
+  problems.push(...fail)
   return { id: 'pacing', level: id, problems, placeholder, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
 }
 

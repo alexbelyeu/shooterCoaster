@@ -56,7 +56,11 @@ export function collectOccluders(scene: THREE.Object3D, camera: THREE.Camera, sk
   const out: THREE.Mesh[] = []
   const walk = (o: THREE.Object3D) => {
     if (!o.visible || skip.has(o) || o === camera) return
-    if (occludes(o, camera)) out.push(o as THREE.Mesh)
+    if (occludes(o, camera)) {
+      // InstancedMesh.raycast culls by a bounding sphere it computes once: a prop whose instances moved since would be missed.
+      if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).boundingSphere = null
+      out.push(o as THREE.Mesh)
+    }
     for (const c of o.children) walk(c)
   }
   walk(scene)

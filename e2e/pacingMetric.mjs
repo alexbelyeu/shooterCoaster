@@ -153,6 +153,19 @@ export function bossFraming(samples, end, fightSeconds = BOSS_FIGHT_SECONDS) {
 }
 
 /** Problems against the level's `budgets.json` `pacing.bossFramedShare` floor. */
+/**
+ * Which of a level's pacing problems fail and which only warn. `knownOver: "#<open issue>"` turns them into warnings until that
+ * issue lands; with `knownOverOnly: "boss"` only the boss framing floor is excused, so the gap and share still hold the level.
+ * @param {{ knownOver?: string, knownOverOnly?: 'boss' } | undefined} budget
+ * @param {string[]} ride `pacingBudgetProblems`
+ * @param {string[]} boss `bossFramingProblems`
+ */
+export function pacingGate(budget, ride, boss) {
+  if (!budget?.knownOver) return { fail: [...ride, ...boss], warn: [] }
+  if (budget.knownOverOnly === 'boss') return { fail: ride, warn: boss }
+  return { fail: [], warn: [...ride, ...boss] }
+}
+
 export function bossFramingProblems(m, budget) {
   if (!budget?.bossFramedShare) return []
   if (!m) return ['the boss never reached its fight']

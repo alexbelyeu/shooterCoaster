@@ -194,7 +194,7 @@ on the game clock (`core/gameClock.ts` `gameClockStep`), never the frame's delta
 A `pacing` step (#450) rides every level's whole run, GO to the end, in settled steps of `--pacing-step` level seconds
 (default 0.5, so the run is the same on any runner; `rideRate` 1, the ride a 60 fps player gets), the level time never held,
 played as a player (#925): `autoFire(true, PLAYER_HITS_PER_SECOND)` lands 3 hits a game second on the nearest targets
-`sight()` counts shootable, on the game clock, so a stretch a player clears goes empty as it would for them (unfired, the
+`sight()` counts shootable, on the game clock (each through `processHit`, the only path that hits; the shot's look is `showShotAtNDC`, no colliding bullet), so a stretch a player clears goes empty as it would for them (unfired, the
 leftovers of earlier waves filled the gym's empty stretches). Every step the page records level time (unrounded), `sight()` (#925, `src/testing/lineOfSight.ts`:
 the live enemies and exposed boss weak points the rider can shoot, inside the view, at least `MIN_ENEMY_PX` and with a clear
 line from the camera; those hidden behind the world and the specks too small to read are counted apart, `hidden` / `specks`),
@@ -212,7 +212,7 @@ waves` (`nextWave()` still null), and the ride step stops at that same deadline 
 holding for it. A level over
 its `budgets.json` `pacing` ceilings (`longestGapSeconds`, `noTargetShare`) fails with the gap named (`longest gap 9.0 s at
 7.0 s (track 0.03) over budget 3 s`); only the Director lowers or raises them. A level whose entry names `knownOver: "#<open issue>"` only
-prints a WARN line until that issue lands. A level whose entry has `bossFramedShare` also fails when its boss, from its arrival
+prints a WARN line until that issue lands; with `knownOverOnly: "boss"` only its boss floor warns and its gap and share still fail (`pacingGate`). A level whose entry has `bossFramedShare` also fails when its boss, from its arrival
 to the end of the run (at most `BOSS_FIGHT_SECONDS`), has a shootable weak point less than that share of the time
 (`bossFraming`: `the boss was shootable 2.0 s of its 20 s fight (10%, floor 60%), longest out of sight 16.1 s from 43.0 s`).
 The ride review (`npm run review`, `scripts/rideReview.mjs`) is the same count with screenshots, autofiring: look there for

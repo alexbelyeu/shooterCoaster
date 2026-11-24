@@ -41,7 +41,7 @@ import type { EnemyType, EnemyWave, RideBeat } from '@/types/level'
 import { levelWeather, weatherSeconds } from '@/levels/environments/shared/weatherPulse'
 import type { GamePhase, LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
-import { fireAtNDC } from '@/combat/useShooting'
+import { fireAtNDC, showShotAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
 import { startupTimings, type StartupPhase } from '@/core/startupMarks'
@@ -258,7 +258,7 @@ export interface SCTestApi {
   /** Every 100 ms (real time, at most once per rendered frame) aim at the nearest
    *  live on-screen enemy and fire a real bullet through the pool. With `hitsPerSecond` (#925: the pacing step and the
    *  ride review) it plays as a player instead, on the game clock so any runner gets the same run: that many hits a game
-   *  second on the nearest targets `sight()` counts shootable, one real shot for the look and each hit through processHit. */
+   *  second on the nearest targets `sight()` counts shootable, the shot's look with no colliding bullet (`showShotAtNDC`) and each hit through processHit, the only path that hits. */
   autoFire: (enabled: boolean, hitsPerSecond?: number) => void
   /** Kill the n nearest live enemies (on-screen ones first; never a boss weak point, see bossHit). Fires one real shot
    *  at the first on-screen victim (bullet, muzzle flash, weapon recoil; may be
@@ -1008,7 +1008,9 @@ function playerFireTick(camera: THREE.Camera, rate: number) {
     .sort((a, b) => a.d - b.d)
     .slice(0, due)
   if (!victims.length) return
-  if (onScreenNDC(victims[0].t, camera, _aim)) fireAtNDC(_aim.x, _aim.y, camera)
+  // The shot's look only: a real bullet, throttled on wall-clock time, would land extra hits
+  // that depend on the runner's speed. processHit is the one path that hits here.
+  if (onScreenNDC(victims[0].t, camera, _aim)) showShotAtNDC(_aim.x, _aim.y, victims.length)
   for (const { t } of victims) processHit(t)
 }
 

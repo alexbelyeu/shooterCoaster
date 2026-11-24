@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { bossFraming, bossFramingProblems, pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { RUN_SECONDS, pacingTimes } from '@/levels/pacing'
 
 /** One sample per `step` s from 0 to `end`, `targets(t)` on screen, track = t / end. */
 function ride(end: number, targets: (t: number) => number, step = 0.5, flags: (t: number) => object = () => ({})) {
@@ -129,5 +130,19 @@ describe('bossFraming', () => {
     expect(m?.framedShare).toBe(0.9)
     expect(bossFramingProblems(m, { bossFramedShare: 0.6 })).toEqual([])
     expect(bossFramingProblems(m, {})).toEqual([])
+  })
+})
+
+describe('BOSS_FIGHT_SECONDS', () => {
+  it('is the run left after the boss arrives (pacing.ts)', () => {
+    expect(BOSS_FIGHT_SECONDS).toBe(RUN_SECONDS - pacingTimes().bossAt)
+  })
+})
+
+describe('pacingGate', () => {
+  it('fails every problem without knownOver, warns them all with it, and only the boss floor with knownOverOnly', () => {
+    expect(pacingGate({}, ['gap'], ['boss'])).toEqual({ fail: ['gap', 'boss'], warn: [] })
+    expect(pacingGate({ knownOver: '#1' }, ['gap'], ['boss'])).toEqual({ fail: [], warn: ['gap', 'boss'] })
+    expect(pacingGate({ knownOver: '#1', knownOverOnly: 'boss' }, ['gap'], ['boss'])).toEqual({ fail: ['gap'], warn: ['boss'] })
   })
 })
