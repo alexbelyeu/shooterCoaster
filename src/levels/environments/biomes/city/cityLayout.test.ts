@@ -65,7 +65,7 @@ describe('onPavement', () => {
     const misplaced: string[] = []
     for (let k = 0; k < 400; k++) {
       const p = { x: rng.range(-extent, extent), y: 0, z: rng.range(-extent, extent) }
-      const q = onPavement(towers, index, p)
+      const q = onPavement(towers, index, p, () => [])
       // On a kerb along one street or the other (where streets cross, `streetAxis` reads the one along x)
       const kerbOff = (c: number) => Math.abs(Math.abs(c - (Math.round(c / pitch - 0.5) + 0.5) * pitch) - KERB_OFFSET)
       const onKerb = streetAxis(q.x, q.z) !== null && Math.min(kerbOff(q.x), kerbOff(q.z)) < 1e-6
@@ -75,6 +75,15 @@ describe('onPavement', () => {
       }
     }
     expect(misplaced).toEqual([])
+  })
+
+  it('picks the kerb spot the approach sees past the towers over a nearer hidden one', () => {
+    // One block's tower; the rider looks at it from the south, so the kerb north of it is hidden
+    const block = [{ x: 0, z: 0, w: 176, d: 176, h: 200 }]
+    const offRails = { near: () => false } as unknown as Parameters<typeof onPavement>[1]
+    const p = { x: 0, y: 0, z: 130 }
+    expect(onPavement(block, offRails, p, () => [])).toEqual({ x: 0, y: 0, z: STREET_GRID.pitch / 2 + KERB_OFFSET })
+    expect(onPavement(block, offRails, p, () => [{ x: 0, y: 30, z: -400 }])).toEqual({ x: 0, y: 0, z: -STREET_GRID.pitch / 2 - KERB_OFFSET })
   })
 
   it('reads the street a spot is on, null inside a block', () => {

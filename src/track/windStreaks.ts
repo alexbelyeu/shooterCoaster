@@ -1,5 +1,6 @@
 /** Wind streaks on fast sections (#27); radii and lengths are in half screen heights, so any aspect looks the same. */
 import { createRng } from '@/utils/rng'
+import { smoothstep } from '@/utils/ease'
 
 export const STREAK_COUNT = 24
 /** `RigState.speedNorm` where streaks start to fade in. */
@@ -23,8 +24,7 @@ const clamp01 = (v: number) => (Number.isFinite(v) ? Math.min(Math.max(v, 0), 1)
 /** By speed past `STREAK_SPEED_THRESHOLD`, or `tunnel` (0–1, `tunnelDepth`) if that is more, × the Screen-shake scale. */
 export function streakOpacity(speedNorm: number, motionScale: number, tunnel = 0): number {
   if (!Number.isFinite(speedNorm) || !Number.isFinite(motionScale)) return 0
-  const x = Math.min(Math.max((speedNorm - STREAK_SPEED_THRESHOLD) / (1 - STREAK_SPEED_THRESHOLD), 0), 1)
-  const opacity = Math.max(STREAK_MAX_OPACITY * x * x * (3 - 2 * x), STREAK_TUNNEL_OPACITY * clamp01(tunnel))
+  const opacity = Math.max(STREAK_MAX_OPACITY * smoothstep((speedNorm - STREAK_SPEED_THRESHOLD) / (1 - STREAK_SPEED_THRESHOLD)), STREAK_TUNNEL_OPACITY * clamp01(tunnel))
   return opacity * Math.min(Math.max(motionScale, 0), 1)
 }
 

@@ -254,23 +254,51 @@ export const KERB_OFFSET = 22
 const PAVEMENT_TRACK_CLEARANCE = 44
 const PAVEMENT_TOWER_CLEARANCE = 12
 
-/** The nearest kerb spot to a ground enemy's `p` on the nearest streets either way, clear of the rails and every tower; else `p`. */
-export function onPavement(towers: readonly Tower[], index: TrackIndex, p: Point): Point {
+/** Height over its foot of the bot's face, the point a tower must not hide from the rider. */
+const FACE_HEIGHT = 25
+
+/** Whether a tower stands across the line from `eye` to `FACE_HEIGHT` over `q` (`ground` the street's height): the line's lowest point over its footprint is under its roof. */
+function hidden(towers: readonly Tower[], eye: Point, q: Point, ground: number): boolean {
+  const dx = q.x - eye.x
+  const dy = q.y + FACE_HEIGHT - eye.y
+  const dz = q.z - eye.z
+  // The slab test: where the line enters and leaves the tower's footprint (a zero d divides to ±Infinity, as it should)
+  return towers.some((t) => {
+    const ax = (t.x - t.w / 2 - eye.x) / dx
+    const bx = (t.x + t.w / 2 - eye.x) / dx
+    const az = (t.z - t.d / 2 - eye.z) / dz
+    const bz = (t.z + t.d / 2 - eye.z) / dz
+    const t0 = Math.max(0, Math.min(ax, bx), Math.min(az, bz))
+    const t1 = Math.min(1, Math.max(ax, bx), Math.max(az, bz))
+    return t0 < t1 && eye.y + dy * (dy < 0 ? t1 : t0) - ground < t.h
+  })
+}
+
+/**
+ * The kerb spot on the nearest streets either way of a ground enemy's `p`, clear of the rails and every tower, that
+ * the most of the approach's looks see past the towers (`eyesSeeing`: the eyes whose cone holds a spot, #963); the
+ * nearest of equals; else `p`.
+ */
+export function onPavement(towers: readonly Tower[], index: TrackIndex, p: Point, eyesSeeing: (q: Point) => Point[]): Point {
   const { pitch } = STREET_GRID
-  const spots: Point[] = []
+  const clearance = { x: PAVEMENT_TOWER_CLEARANCE, y: 0, z: PAVEMENT_TOWER_CLEARANCE }
+  let best = p
+  let bestSeen = -1
+  let bestDist = Infinity
   for (const alongX of [true, false]) {
     const nearest = Math.round((alongX ? p.z : p.x) / pitch - 0.5)
     for (let k = -1; k <= 1; k++) {
       for (const side of [-1, 1]) {
         const across = (nearest + k + 0.5) * pitch + side * KERB_OFFSET
-        spots.push(alongX ? { x: p.x, y: p.y, z: across } : { x: across, y: p.y, z: p.z })
+        const q = alongX ? { x: p.x, y: p.y, z: across } : { x: across, y: p.y, z: p.z }
+        if (index.near(q.x, q.z, PAVEMENT_TRACK_CLEARANCE) || !clearOf(towers, q, p.y, clearance)) continue
+        const seen = eyesSeeing(q).filter((eye) => !hidden(towers, eye, q, p.y)).length
+        const dist = Math.hypot(q.x - p.x, q.z - p.z)
+        if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) [best, bestSeen, bestDist] = [q, seen, dist]
       }
     }
   }
-  const clearance = { x: PAVEMENT_TOWER_CLEARANCE, y: 0, z: PAVEMENT_TOWER_CLEARANCE }
-  return spots
-    .sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))
-    .find((q) => !index.near(q.x, q.z, PAVEMENT_TRACK_CLEARANCE) && clearOf(towers, q, p.y, clearance)) ?? p
+  return best
 }
 
 /** Which way the street under a spot runs (the one along x where two cross); null inside a block. */

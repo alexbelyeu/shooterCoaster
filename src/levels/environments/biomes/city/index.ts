@@ -22,11 +22,11 @@ export const city: BiomeDefinition = {
     const towers = cityTowers(track, trackExtent(track))
     return (p) => clearOfTowers(towers, p, groundFn(p.x, p.z), DRONE_CLEARANCE)
   },
-  // Its ground enemies are billboard bots (#963): each trackside spot moves onto the nearest pavement
+  // Its ground enemies are billboard bots (#963): each trackside spot moves onto the nearby pavement the rider sees best
   clearGround: (_groundFn, track) => {
     const towers = cityTowers(track, trackExtent(track))
     const index = buildTrackIndex(track)
-    return (p) => onPavement(towers, index, p)
+    return (p, eyesSeeing) => onPavement(towers, index, p, eyesSeeing)
   },
   hero: { x: LANDMARK_SITE.x, z: LANDMARK_SITE.z, focus: SPIRE_HEIGHT * 0.45, orbitRadius: 700, orbitHeight: 360 },
 }

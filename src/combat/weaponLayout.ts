@@ -1,5 +1,6 @@
 /** Screen placement, aim and recoil tuning for the first-person weapon (#65). Pure, so it runs in plain Node tests. */
 import type { WeaponId } from './weapons/weaponTypes'
+import { smoothstep } from '@/utils/ease'
 
 export interface WeaponLayout {
   /** Gun pivot, CSS px from the viewport's top-left. */
@@ -117,6 +118,5 @@ export function recoilKickAxis(barrel: Vec3, pivot: Vec3, out: Vec3): boolean {
 
 /** Recoil envelope 1 → 0 from the remaining time (smoothstep). */
 export function recoilEnvelope(remainingMs: number): number {
-  const t = Math.min(Math.max(remainingMs / WEAPON_RECOIL_MS, 0), 1)
-  return t * t * (3 - 2 * t)
+  return smoothstep(remainingMs / WEAPON_RECOIL_MS)
 }

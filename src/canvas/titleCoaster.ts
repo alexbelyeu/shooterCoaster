@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import type { TrackCurve } from '@/track/curves/TrackCurve'
 import { buildArcTable, tAtLoopDistance, type ArcTable } from '@/track/arcLength'
 import type { Vec3 } from './titleCamera.hot'
+import { smoothstep } from '@/utils/ease'
 
 /** Loop radius: outside the tents (r 120, 18 wide) and inside the orbit camera (r 180). */
 export const TRACK_RADIUS = 152
@@ -52,9 +53,8 @@ export const CROSSING_LOOP: TitleLoop = {
     const a = t * Math.PI * 2
     const x = CROSSING_CENTRE.x + Math.cos(a) * CROSSING_RADII.x
     const z = CROSSING_CENTRE.z + Math.sin(a) * CROSSING_RADII.z
-    const u = Math.min(1, Math.max(0, (Math.hypot(x, z) - CROSSING_HILLS_FROM_R) / (CROSSING_HILLS_TO_R - CROSSING_HILLS_FROM_R)))
     const hills = 18 + 8 * Math.sin(3 * a + 1)
-    return out.set(x, CROSSING_LOW_Y + hills * u * u * (3 - 2 * u), z)
+    return out.set(x, CROSSING_LOW_Y + hills * smoothstep((Math.hypot(x, z) - CROSSING_HILLS_FROM_R) / (CROSSING_HILLS_TO_R - CROSSING_HILLS_FROM_R)), z)
   },
   start: 0.55,
 }

@@ -7,7 +7,7 @@ import type { DarkSectionSpec, SeaArchSpec, WhaleBreachSpec } from '@/types/leve
 import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
 import type { FogModifiers } from './sceneFog'
-import type { KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
+import type { GroundClearer, KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
 import type { Vec3 } from '@/utils/vec3'
 import type { HeroShot } from '@/track/introCamera.hot'
 
@@ -151,7 +151,7 @@ export interface BiomeDefinition {
   /** Moves an air enemy's placed spot out of the world's buildings (the city's towers, #323): scatter and formation alike. */
   clearAir?: (groundFn: HeightFunction, track: ArcTable) => (p: Vec3) => Vec3
   /** Moves a ground enemy's trackside spot onto open ground (the city's pavements, #963): `spawnPlacement.ts` `placeTracksideWave`. */
-  clearGround?: (groundFn: HeightFunction, track: ArcTable) => (p: Vec3) => Vec3
+  clearGround?: (groundFn: HeightFunction, track: ArcTable) => GroundClearer
   /** The hero landmark the intro's tour passes (#675) and the results orbit circles (#328). */
   hero: HeroShot
 }
