@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from 'react'
 import { BOSS_RUSH, useGameStore } from '@/store/useGameStore'
-import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
-import { formatRushTime, rushStages, rushUnlocked } from '@/levels/bossRush'
+import { getAllLevels } from '@/levels/LevelRegistry'
+import { formatRushTime } from '@/levels/bossRush'
 import type { BiomeType } from '@/types/level'
 import { dailyKey, dailyLevel, msUntilNextUtcDay } from '@/levels/daily'
 import { biomeTheme } from '@/ui/theme'
@@ -13,6 +13,7 @@ import LevelPostcard from './LevelPostcard'
 import {
   STARS_PER_LEVEL,
   buildDailyCard,
+  buildRushCard,
   buildLevelCards,
   medalsLine,
   nextLevelIndex,
@@ -78,15 +79,7 @@ export default function LevelSelectScreen() {
   const rushIndex = dailyIndex + 1
   const total = totalStars(cards)
   const bossRushBest = useGameStore((s) => s.bossRushBest)
-  const rush = useMemo(() => {
-    const stages = rushStages(getAllLevels())
-    return {
-      first: stages[0].levelId,
-      biome: getLevelConfig(stages[stages.length - 1].levelId)!.biome,
-      bosses: stages.length,
-      unlocked: rushUnlocked(getAllLevels(), (id) => savedScores[id]?.stars ?? 0),
-    }
-  }, [savedScores])
+  const rush = useMemo(() => buildRushCard(getAllLevels(), (id) => savedScores[id]?.stars ?? 0), [savedScores])
 
   const [launching, setLaunching] = useState<string | null>(null)
   /** Cards whose Night Ride toggle is down (#829): their next launch rides at night. */

@@ -81,18 +81,15 @@ interface GameState {
   lastLevel: string | null
   /**
    * The one way to start a level (enters `loading`, `playing` under `?e2e=1`; `startPhase.ts`); seed precedence:
-   * `seed` > `?seed=` > the daily seed of `mode.dateKey` (daily runs) > `Date.now()`. A `replay` skips the intro, and
-   * the loading screen too when the level is still warm. A campaign run from level select unless told otherwise.
+   * `seed` > `?seed=` > the daily seed of `mode.dateKey` (daily runs) > `Date.now()`. A `replay` (and every Boss Rush stage) skips the
+   * intro, and the loading screen too when the level is still warm. A campaign run from level select unless told otherwise.
    */
   startRun: (levelId: string, options?: StartRunOptions) => void
   /** Starts the player's next level (`nextLevelIndex`, the one level select focuses first): title PLAY, #329. */
   startNextRun: (from: RunFrom) => void
   /** Restarts the current level in the same mode: a daily keeps its seed, a campaign run gets a fresh one; a Boss Rush starts over from its first stage. */
   restartRun: (from: RunFrom) => void
-  /**
-   * The run's play is over at level time `endedAt` (its boss's clear, or the timer's end): the results, or for a Boss
-   * Rush whose boss was beaten, the next stage while there is one.
-   */
+  /** Play ended at level time `endedAt`: the results, or a Boss Rush's next stage after a beaten boss. */
   endRun: (endedAt: number) => void
   /** This run's loading screen goes straight to the countdown (a restart), not the intro. */
   skipIntro: boolean
@@ -171,7 +168,6 @@ interface GameState {
   saveRunResult: (entry: ScoreEntry) => void
   /** The fastest whole Boss Rush in level seconds, persisted; null before the first. */
   bossRushBest: number | null
-  /** Keeps a finished rush's time when it is a whole rush and the fastest yet. */
   saveBossRushTime: (seconds: number, complete: boolean) => void
 
   timeScale: number
@@ -265,7 +261,9 @@ export const useGameStore = create<GameState>()(
         const s = get()
         // A new level isn't warmed up yet: the outgoing level's `sceneReady` must not end its loading screen (#597).
         const warm = levelId === s.currentLevel && s.sceneReady
-        const phase = startPhaseFor({ search: urlSearch() ?? '', warm, replay })
+        // A Boss Rush stage starts mid-ride: the intro tour from the station would end in a jump to its start.
+        const skipIntro = replay || mode.mode === 'bossRush'
+        const phase = startPhaseFor({ search: urlSearch() ?? '', warm, replay: skipIntro })
         // The same level's scene stays mounted and won't report its stages again, warm or still warming up; an
         // unmounted one was zeroed as it left (`unloadLevel`) and reports them all once it mounts.
         if (levelId !== s.currentLevel) resetLoad(levelId)
@@ -283,14 +281,14 @@ export const useGameStore = create<GameState>()(
           phase,
           resuming: false,
           photo: false,
-          skipIntro: replay,
+          skipIntro,
         })
       },
       restartRun: (from) => {
         const { currentLevel, runMode, runSeed, runVariant, startRun } = get()
         if (!currentLevel) return
         if (runMode.mode === 'bossRush') {
-          startRun(rushStages(getAllLevels())[0].levelId, { mode: BOSS_RUSH, replay: true, from })
+          startRun(rushStages(getAllLevels())[0].levelId, { mode: BOSS_RUSH, from })
           return
         }
         startRun(currentLevel, { seed: runMode.mode === 'daily' ? runSeed : undefined, mode: runMode, replay: true, from, variant: runVariant })
@@ -310,7 +308,7 @@ export const useGameStore = create<GameState>()(
         const stages = rushStages(getAllLevels())
         const seconds = mode.seconds + stageSeconds(stages[mode.stage], Math.min(endedAt, RUN_SECONDS))
         const next = s.bossSeconds !== null ? stages[mode.stage + 1] : undefined
-        if (next) s.startRun(next.levelId, { mode: { mode: 'bossRush', stage: mode.stage + 1, seconds }, replay: true, from: s.runFrom })
+        if (next) s.startRun(next.levelId, { mode: { mode: 'bossRush', stage: mode.stage + 1, seconds }, from: s.runFrom })
         else set({ runMode: { ...mode, seconds }, phase: 'results', resuming: false, photo: false })
       },
       skipIntro: false,

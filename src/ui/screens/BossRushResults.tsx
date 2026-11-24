@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
-import { formatRushTime, isNewBest, rushStages, stagesCleared } from '@/levels/bossRush'
+import { formatRushTime, isNewBest, rushComplete, rushStages, stagesCleared } from '@/levels/bossRush'
 import { FairBoard } from '@/ui/Fair'
 
 /** The finished rush, read once on mount, before its time is saved. */
@@ -9,14 +9,12 @@ function snapshotRush() {
   const s = useGameStore.getState()
   const mode = s.runMode.mode === 'bossRush' ? s.runMode : { stage: 0, seconds: 0 }
   const stages = rushStages(getAllLevels())
-  const cleared = stagesCleared(mode.stage, s.bossSeconds !== null)
-  const complete = cleared === stages.length
+  const complete = rushComplete(mode.stage, s.bossSeconds !== null, stages.length)
   return {
     seconds: mode.seconds,
-    cleared,
+    cleared: stagesCleared(mode.stage, s.bossSeconds !== null),
     total: stages.length,
     complete,
-    /** The level whose boss ended a lost rush. */
     lostOn: complete ? null : (getLevelConfig(stages[mode.stage]?.levelId ?? '')?.name ?? null),
     previousBest: s.bossRushBest,
   }
@@ -48,8 +46,8 @@ export default function BossRushResults() {
       if (e.key === 'Enter' || e.key === 'r' || e.key === 'R') leave('replay')
       else if (e.key === 'Escape') leave('levels')
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
   }, [])
 
   const best = record ? null : run.previousBest

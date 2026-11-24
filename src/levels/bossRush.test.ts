@@ -11,6 +11,7 @@ import {
   sanitizeRushBest,
   stageSeconds,
   stagesCleared,
+  rushComplete,
 } from './bossRush'
 
 describe('boss rush', () => {
@@ -55,14 +56,19 @@ describe('boss rush', () => {
     expect(stagesCleared(2, true)).toBe(3)
   })
 
-  it('keeps the fastest whole rush as the best', () => {
+  it('is complete only once the last stage\'s boss is beaten', () => {
+    expect(rushComplete(7, true, 8)).toBe(true)
+    expect(rushComplete(7, false, 8)).toBe(false)
+    expect(rushComplete(2, true, 8)).toBe(false)
+  })
+
+  it('keeps the fastest whole rush as the best, never a lost one however short', () => {
     expect(isNewBest(100, null)).toBe(true)
     expect(isNewBest(99, 100)).toBe(true)
     expect(isNewBest(100, 100)).toBe(false)
     expect(bestAfter(null, 120, true)).toBe(120)
     expect(bestAfter(100, 90, true)).toBe(90)
     expect(bestAfter(100, 110, true)).toBe(100)
-    // A rush that lost a stage sets no time, however short.
     expect(bestAfter(100, 20, false)).toBe(100)
     expect(bestAfter(null, 20, false)).toBe(null)
   })

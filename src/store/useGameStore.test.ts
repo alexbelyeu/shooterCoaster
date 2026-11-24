@@ -338,7 +338,7 @@ describe('boss rush (#1011)', () => {
   it('starts a stage a few seconds before its boss, by day, outside the campaign', () => {
     store().startRun('level2', { seed: 1 })
     store().startRun(stages[0].levelId, { mode: BOSS_RUSH, variant: 'night' })
-    expect(store()).toMatchObject({ runMode: BOSS_RUSH, runStartAt: stages[0].startAt, runVariant: 'day', lastLevel: 'level2' })
+    expect(store()).toMatchObject({ runMode: BOSS_RUSH, runStartAt: stages[0].startAt, runVariant: 'day', skipIntro: true, lastLevel: 'level2' })
     store().startRun('level1', { seed: 2 })
     expect(store().runStartAt).toBe(0)
   })

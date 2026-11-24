@@ -1,14 +1,9 @@
-/**
- * Boss Rush (#1011): every level's boss back to back in campaign order, one run against the clock. Each stage rides its
- * level from a few seconds before the boss arrives, with no waves; beating the boss moves on to the next stage, the
- * timer running out on one ends the rush. Open once every level has all its stars; the best time is kept per browser.
- */
+/** Boss Rush (#1011): every level's boss back to back in campaign order against the clock, each stage with no waves. */
 import type { BossType } from '@/types/level'
 
 /** Seconds of ride each stage starts before its boss arrives: the boss's tell and a look at the track. */
 export const STAGE_LEAD_SECONDS = 5
 
-/** Stars every level needs before the rush opens. */
 export const RUSH_STARS = 3
 
 export interface RushLevel {
@@ -22,17 +17,16 @@ export interface RushStage {
   startAt: number
 }
 
-/** Every level with a boss, in the order given (the campaign's, `getAllLevels()`). */
+/** In the order given: the campaign's, `getAllLevels()`. */
 export function rushStages(levels: readonly RushLevel[]): RushStage[] {
   return levels.flatMap((l) => (l.boss ? [{ levelId: l.id, startAt: Math.max(0, l.boss.at - STAGE_LEAD_SECONDS) }] : []))
 }
 
-/** Open once every level has `RUSH_STARS`; `stars` reads a level's saved best. */
 export function rushUnlocked(levels: readonly Pick<RushLevel, 'id'>[], stars: (levelId: string) => number): boolean {
   return levels.length > 0 && levels.every((l) => stars(l.id) >= RUSH_STARS)
 }
 
-/** Level seconds a stage took: from its start to `endedAt` (its boss's clear, or the timer's end). */
+/** `endedAt` is its boss's clear or the timer's end. */
 export function stageSeconds(stage: RushStage, endedAt: number): number {
   return Math.max(0, endedAt - stage.startAt)
 }
@@ -42,7 +36,10 @@ export function stagesCleared(stage: number, bossBeaten: boolean): number {
   return stage + (bossBeaten ? 1 : 0)
 }
 
-/** A finished rush's time beats the saved best (none yet counts as beaten). */
+export function rushComplete(stage: number, bossBeaten: boolean, total: number): boolean {
+  return stagesCleared(stage, bossBeaten) === total
+}
+
 export function isNewBest(seconds: number, best: number | null): boolean {
   return best === null || seconds < best
 }
@@ -52,7 +49,6 @@ export function bestAfter(best: number | null, seconds: number, complete: boolea
   return complete && isNewBest(seconds, best) ? seconds : best
 }
 
-/** A saved best read back from storage: a positive number of seconds, else none. */
 export function sanitizeRushBest(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
 }
