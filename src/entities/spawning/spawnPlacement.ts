@@ -1055,7 +1055,7 @@ function bestSwarmSpot(walls: readonly WallSurface[], views: readonly RiderFrame
  * stretch starts, so the wave is a stretch of shooting (#928).
  */
 export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: PlaceSwarmInput): WallSlot[] {
-  if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+  if (walls.length === 0) throw new Error("wall enemies need the ride's walls (LevelRide.walls)")
   const reach = maxReadableDistance(type)
   const groups = Math.max(1, Math.min(SWARM_GROUPS, Math.floor(slots.length / SWARM_GROUP_MIN)))
   const arrivals = Array.from({ length: groups }, (_, g) => swarmArrival(ride, g, groups))

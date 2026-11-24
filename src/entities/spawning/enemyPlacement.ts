@@ -150,7 +150,7 @@ export function climbableWalls(walls: readonly WallSurface[]): readonly WallSurf
 
 export function wallSlots(count: number, walls: readonly WallSurface[], rng: Rng): WallSlot[] {
   const climbable = climbableWalls(walls)
-  if (climbable.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+  if (climbable.length === 0) throw new Error("wall enemies need the ride's walls (LevelRide.walls)")
   return Array.from({ length: count }, () => {
     const wall = climbable[Math.floor(rng() * climbable.length)]
     const margin = Math.min(CLIMB.margin, wall.width / 2)
