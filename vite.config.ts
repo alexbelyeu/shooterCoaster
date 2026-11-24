@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
 import { minifyGlsl } from './scripts/glslMinify.mjs'
+import { minifyScrim } from './scripts/scrimMinify.mjs'
 
 /**
  * Portal pages carry their own share card, canonical URL and structured data, and the zip may
@@ -44,6 +45,19 @@ function minifyGlslPlugin(): Plugin {
   }
 }
 
+// Strips the comments, spacing and `about` notes from the score files the game imports as text (scripts/scrimMinify.mjs).
+function minifyScrimPlugin(): Plugin {
+  return {
+    name: 'minify-scrim',
+    apply: 'build',
+    enforce: 'pre',
+    load(id) {
+      if (!id.endsWith('.scrim?raw')) return null
+      return `export default ${JSON.stringify(minifyScrim(fs.readFileSync(id.slice(0, -'?raw'.length), 'utf8')))}`
+    },
+  }
+}
+
 // `vite build --mode portal` (`npm run build:portal`): relative asset URLs, so the zip plays from any sub-path.
 // `vite build --mode turntable` (`npm run turntable`): only the dev pages (the enemy turntable, the ride elements), into dist-turntable/.
 export default defineConfig(({ mode }) => {
@@ -53,7 +67,7 @@ export default defineConfig(({ mode }) => {
   const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)
   return {
     base: portal ? './' : '/',
-    plugins: portal ? [react(), stripBlockoutNotes(), minifyGlslPlugin(), portalHtml()] : [react(), stripBlockoutNotes(), minifyGlslPlugin()],
+    plugins: portal ? [react(), stripBlockoutNotes(), minifyGlslPlugin(), minifyScrimPlugin(), portalHtml()] : [react(), stripBlockoutNotes(), minifyGlslPlugin(), minifyScrimPlugin()],
     define: {
       // Vercel sets VERCEL=1 during its builds; gates Web Analytics (src/app/analyticsGate.ts). Portal builds never send it.
       __BUILT_ON_VERCEL__: JSON.stringify(process.env.VERCEL === '1' && !portal),
