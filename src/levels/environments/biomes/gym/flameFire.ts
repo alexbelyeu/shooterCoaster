@@ -11,7 +11,9 @@ import { FLAME, GYM_SCALE, HALL, blockRings, footprint, piece, toWorld, type Vec
  *
  * Each tongue is one soft flame sprite on a path of three points that hugs the Flame (its start, a point
  * halfway and its end, each held out from the faces by half the tongue's width so it never cuts into the
- * paint), rising along it over a life of its own and coming back on a new path every life.
+ * paint), rising along it over a life of its own and coming back on a new path every life. The fire burns
+ * only on what is on fire, the Flame's top and the bevel up to it from its lip (#927): nothing starts down
+ * its faces or hangs under the overhang.
  */
 
 const DEG = Math.PI / 180
@@ -21,8 +23,8 @@ export const PAD_TOP = pad.base + pad.thick
 
 /** Tongues at full quality on a desktop; `tongueCount` thins them. */
 export const MAX_TONGUES = 300
-/** Share of the tongues licking up the faces. */
-const FACE_SHARE = 0.5
+/** Share of the tongues licking up off the bevel round the Flame's top, from its lip. */
+const RIM_SHARE = 0.4
 /** Share of the tongues that are licks: torn off the plume, rising free over it; the rest rise off the Flame's top. */
 const LICK_SHARE = 0.12
 /**
@@ -52,6 +54,10 @@ function worldPoint(x: number, y: number, z: number): Vec3 {
 
 const RINGS = blockRings(FLAME.piece.profile)
 const TOP = RINGS[RINGS.length - 1]
+/** The Flame's lip: its widest ring, the overhang's edge; the fire never starts below it (#927). */
+const LIP = RINGS.reduce((a, b) => (b.f > a.f ? b : a))
+/** The lowest a tongue starts (blockout metres): just over the lip, so even its root is on the bevel above it. */
+export const FIRE_FLOOR = LIP.y + 0.25
 
 /** How far out from the foot's outline the Flame's faces are at height `y` (blockout metres). */
 function faceOffset(y: number): number {
@@ -117,18 +123,18 @@ export function buildFlameTongues(count = MAX_TONGUES, seed = 0x5f1a3e): FlameTo
     let width: number
     let heat: number
     let life: number
-    if (kind < FACE_SHARE) {
-      // Low licks at the foot to tall sheets up the flare and over the lip
-      width = rng.range(1.4, 2.6)
+    if (kind < RIM_SHARE) {
+      // Off the bevel round the top, from just over the lip, rising and drawing in over the top
+      width = rng.range(1.3, 2.4)
       const out = width * 0.55
-      const y0 = rng.range(PAD_TOP, TOP.y - 0.4)
-      const rise = rng.range(2.2, 4.4)
+      const y0 = rng.range(FIRE_FLOOR, TOP.y - 0.1)
+      const rise = rng.range(2.0, 4.0)
       put(start, i, 4, firePoint(s, y0, out))
       put(mid, i, 3, firePoint(s, y0 + rise / 2, out))
       put(end, i, 3, firePoint(s, y0 + rise, out))
       heat = rng.range(0.8, 1.0)
       life = rng.range(1.0, 1.8)
-    } else if (kind < FACE_SHARE + LICK_SHARE) {
+    } else if (kind < RIM_SHARE + LICK_SHARE) {
       // Torn off the plume's upper half, rising fast and burning out before the crest
       width = rng.range(1.05, 1.8)
       const r = rng.range(0.1, 0.7)
