@@ -677,16 +677,26 @@ describe('placeWallSwarm (#516)', () => {
 
 describe('level2: the opening climb (#494)', () => {
   const { level, table, groundFn, rideFor, trackScale, keepOff } = world(getAllLevels().find((l) => l.id === 'level2')!)
-  const wave = level.enemies[0]
+  const opening = level.enemies.filter((w) => (w.spawnDelay ?? 0) <= 12)
   const profile = rideProfile(table, rideModel(level.track, table), RUN_SECONDS)
   // The rig's frustum on the smoke's 1280×720 screen (80° vertical), looking where `trackView` does.
   const tanV = Math.tan((REFERENCE_FOV_DEG / 2) * (Math.PI / 180))
   const tanH = tanV * (1280 / 720)
 
-  it('the scorpions placed at GO (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s, the climb included', () => {
-    const camera = trackView(table, 0, trackScale).eye
-    const placed = placeTracksideWave({
-      table, riderIndex: 0, camera, type: wave.type, groundFn, slots: tracksideSlots(wave.count, 'ground', createRng(1337)), ride: rideFor(wave), keepOff,
+  it('the scorpions\' two packs and the crest\'s crow V (seed 1337): at least 3 in the rig\'s view every second from 1 s to 12 s', () => {
+    const placed = opening.flatMap((wave) => {
+      const riderIndex = indexAhead(table, 0, profile[Math.round((wave.spawnDelay ?? 0) * 10)])
+      const camera = trackView(table, riderIndex, trackScale).eye
+      const ride = rideFor(wave)
+      const spots: Vec3[] = wave.formation && wave.formation !== 'scatter'
+        ? placeFormationWave({
+          table, riderIndex, camera, formation: wave.formation, origin: wave.formationOrigin, type: wave.type, groundFn,
+          slots: formationSlots(wave.formation, wave.count, createRng(1337)), ride,
+        }).map((p) => p.position)
+        : placeTracksideWave({
+          table, riderIndex, camera, type: wave.type, groundFn, slots: tracksideSlots(wave.count, 'ground', createRng(1337)), ride, keepOff,
+        })
+      return spots.map((p) => ({ ...p, from: wave.spawnDelay ?? 0 }))
     })
     const seen: number[] = []
     for (let t = 1; t <= 12; t++) {
@@ -696,6 +706,7 @@ describe('level2: the opening climb (#494)', () => {
       const right = { x: -dir.z, y: 0, z: dir.x }
       const up = { x: (-dir.x * dir.y) / rl, y: rl, z: (-dir.z * dir.y) / rl }
       seen.push(placed.filter((p) => {
+        if (p.from > t) return false
         const d = { x: p.x - eye.x, y: p.y - eye.y, z: p.z - eye.z }
         const depth = d.x * dir.x + d.y * dir.y + d.z * dir.z
         const across = (d.x * right.x + d.z * right.z) / rl

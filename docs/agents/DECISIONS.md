@@ -2813,3 +2813,171 @@ for any level. Move the gate onto PR shards only with a Director decision on the
 **Context:** The Daily Run competed only with the player's own record. #854 asked for a per-day World board on the existing leaderboard API, with no new service.
 **Decision:** Daily rows live in `scores` with a nullable `day` (`0004_daily_board.sql`); every campaign query filters `day is null`, and retries without it while the column is missing, so the campaign board never depends on Alex running the migration (daily calls 503 until he does). The server takes a daily score only for today or yesterday on its own UTC clock (a run started before midnight still counts) and only on that day's `dailyLevel`, mirrored in `api/_lib/daily.ts` because `api/` can't import `src/`. The daily results screen opens no initials entry: a new best of the day goes up at once under the player's last initials, any other run just fetches the day's board.
 **Consequences:** A player who never signed a campaign board shows as `AAA` on the daily board. An initials entry for dailies would need a local daily board to edit in; it is a possible follow-up, not a fix. Changing `DAILY_LEVELS` or the rotation means changing `api/_lib/daily.ts` too (`daily.test.ts` fails until both agree).
+
+## 2026-11-23 — Neon Metropolis: every tower is one instanced unit box, windows in the shader (Builder, #323)
+
+**Context:** The city needs a few hundred towers with lit windows near the track and a skyline ring, inside the
+VISION per-frame bar, and a first v2 ride on a trig curve.
+**Decision:** Every tower (and the skyline, and the hero tower's tiers) is an instance of one axis-aligned unit box,
+scaled per instance; `cityShaders.ts` draws the windows from the fragment's world position and the instance's
+translation (a per-tower seed, base and top), so there is no window geometry and one program. Windows fade to the
+facade's average glow once a cell is a few pixels (`fwidth`), so the far towers don't shimmer. The asphalt paints the
+same `STREET_GRID` the layout keeps the towers inside. All neon is one merged vertex-coloured `MeshBasicMaterial` mesh
+burning past white so the bloom takes it. The ride is `ride: 'v2'` on level1's curve with a station launch at the crest
+and `crawl` / `drag` set so gravity alone never stalls it (no beats needed).
+**Consequences:** Towers must stay unrotated boxes (the shader reads the face from the object normal); a rotated or
+non-box tower needs its own material. Neon flicker, the elevated highway, traffic and the boss are follow-ups.
+
+## 2026-11-23 — Ten worlds before the first post; M4 is "Ten worlds, every ride a thrill" (Director, #610, #703)
+
+**Context:** Alex answered the Marketer's first-post question on 18 Nov (#610): "until the game is AAA.
+We need 10 levels at the highest degree." On 19 Nov he rode the gym and asked for every ride to be "way
+more fun" (#703, `docs/RIDE-KIT.md`). Week 5 also emptied the idea backlog (17 of 17 shipped or filed).
+**Decision:** No public post until the game has ten levels at the quality bar. M4 (GitHub milestone 3, due
+8 Jan) is four new worlds through the level kit and the ride kit (7 Neon Metropolis, 8 Jungle Ruins, then
+9 and 10 from `docs/LEVEL-KIT.md`'s ranking) and levels 1–5 rebuilt as ride-kit storyboards. A new world
+is built with the ride kit from its first slice; one world is scaffolded at a time (the next waits on the
+previous slice) so the registries don't conflict. The Marketer keeps measuring and preparing, not posting.
+**Consequences:** VISION v6. Night Ride variants don't count toward the ten. The share of the week that
+goes to new content rises; the bundle grows with each world, so worlds load in their own chunks (#862).
+
+## 2026-11-23 — Total JS 635 → 665 KB gz for worlds 7 and 8 (Director, #862)
+
+**Context:** Total JS sat exactly at its ceiling after five +1 KB raises in four days; levels 7 and 8
+each add a biome, enemies and a boss (~10–15 KB gz each, level 6 added about that).
+**Decision:** `jsTotalGzipKB` 665 (still under VISION's 700 ceiling). `startupJsGzipKB` stays 436 and
+#861 must lower it by 20+ KB; worlds never add to startup. Per-feature +1 raises stop: a feature that
+crosses a budget first takes the bytes back elsewhere (the startup diet, lazy screens).
+**Consequences:** the next raise comes with world 9 and is judged against #862's per-world chunks.
+
+## 2026-11-23 — Startup JS 436 → 390 KB gz: lazy screens and framer-motion's `m` (Builder, #861)
+
+**Context:** Startup JS sat at its 436 KB gz budget after five +1 KB raises in four days. framer-motion's full `motion`
+component (its whole animation engine) and every screen past the title (level select, Settings, HUD, countdown, pause,
+results with its share / score card / leaderboard) were in the entry chunk.
+**Decision:** UI code uses framer-motion's `m.*` under `<LazyMotion features={…} strict>` (App.tsx); the features
+(`domAnimation`) are a lazy chunk fetched as App mounts. Level select + Settings and the run's screens are two lazy
+chunks (`app/lazyScreens.tsx`), preloaded when the title is idle after the level chunk; the loading screen waits for
+the run's. `startupJsGzipKB` lowered to 392 (the new 390 + 2).
+**Consequences:** Writing `motion.div` throws at runtime (`strict`): use `m.div`. A new screen the title doesn't show
+belongs in `menuScreens.ts` or `playScreens.ts`, not as a static import in App. A screen whose chunk fails to load
+goes back to the title (Settings closes), where `staleReload.ts` reloads the page (#823, #888). three's chunk (173 KB) is
+`three.core` + `three.module` with no `examples/jsm` addon in it: nothing more to tree-shake there short of a renderer swap.
+
+## 2026-11-23 — One lazy chunk per world, fetched by the level core (Builder, #862)
+
+**Context:** Every level's biome, enemies and boss sat in the one `LevelScene` chunk (158 KB gz), and ten worlds (#610) would push it toward the 260 KB largest-chunk budget.
+**Decision:** Each biome has `biomes/<biome>/world.ts` (its biome, the enemies its levels spawn, its boss), a chunk of its own (`world-<biome>-*.js`) listed in `WORLD_CHUNKS` (`levels/environments/worlds.ts`). Only the level core imports `worlds.ts`: the world `import()`s then sit inside the core chunk, so Rollup keeps whatever a world shares with the core in the core instead of splitting it into shared chunks (with the imports in the startup code it made ~15 small chunks and pulled `terrainNoise` into startup). The loading screen fetches the world as soon as the core is in; `LevelScene` suspends on it. The all-biome registries (`biomeRegistry.ts`, `enemyComponents.ts`, `bossComponents.ts`) stay for tests and the turntable only, and `worlds.test.ts` fails a game module that imports one. The enemies' shared assets (`SharedEnemyAssets.ts`, `bossAssets.ts`) stay in the core, so `ShaderWarmup` still compiles every enemy and boss material.
+**Consequences:** A run loads core 95 + its world 8–24 KB gz (was 158). Total JS +14 KB gz from code no longer shared in one chunk. A new world lands in its own chunk via `npm run new-world`; a new enemy or boss goes in its world's `world.ts`.
+
+## 2026-11-23 — Generated ride data is rounded to fit the startup JS budget (builder, #863)
+
+**Context:** The level registry is startup JS, so ride-kit levels ship their tracks as generated plain numbers (`gymLevel.ts`, `parkLevel.ts`). Level 1's v2 ride did not fit the 436 KB gz startup budget at full precision.
+**Decision:** (Superseded in part: level 6's precision is the #866 entry's, 0.01 units, and both generators are now `gen-ride-levels.mjs`, #890.) `gen-park-level.mjs` rounds level 1's control points to whole world units (delta-encoded); `gen-gym-level.mjs` writes level 6's numbers to 6 significant digits (under 0.01 units in the hall). Ride tests check the shipped (rounded) track, not only the authored one, so rounding can't quietly break a drop angle or a clearance.
+**Consequences:** Every new v2 level hits the same pressure. The lasting fix is to load each level's track from its lazy chunk and keep only level 1's eager for the title; until then, a ride test against `getLevelConfig(id).track` is required for anything the rounding could move.
+
+## 2026-11-23 — Dark sections take a `look`; level 6's ride data packed harder for level 4's (builder, #866)
+
+**Context:** Level 4's ice cave is a dark section, but the gym's blacklight look (light almost out, violet) would hide the white snowmen inside it. Level 4's ride as generated numbers also put the startup JS 0.8 KB over its 436 KB budget.
+**Decision:** `DarkSectionSpec.look` names a row in `DarkSections.tsx`'s table of looks: `blacklight` (default) or `ice` (45% of the light kept, a blue hemisphere). A new look is a new row, not a new component. For the budget, the generator (`gen-gym-level.mjs` then, `gen-ride-levels.mjs` since #890) writes level 6's control points to 0.01 world units and its ups to 4 decimals (float dust to 0) instead of 6 significant digits each, which saves ~1.4 KB gz; `gymLevel.test.ts` and the gym's ride tests check the shipped numbers.
+**Consequences:** Startup JS is back at ~435.4 KB. The next kit ride (levels 2, 3, 5) will not fit without the lasting fix from #863's entry: load each level's track from its world chunk and keep only level 1's eager for the title.
+
+## 2026-11-23 — The Inferno ride's holes in the volcano are cut by the rock's shader, not the mesh (builder, #867)
+
+**Context:** Level 5's v2 ride enters the volcano through its flank, falls on a drop track inside the hollow cone and leaves through a second hole. The cone is one procedural mesh (`buildVolcanoRock`) shared with its lava streaks and glow.
+**Decision:** `Volcano.tsx` discards fragments within `CONE_HOLE.radius` of each crossing (`volcanoGeometry.ts` `coneCrossings`, fed the track by `volcanic/Features.tsx`) and draws the rock two-sided so the inside of the cone reads. One extra program (`terrain-glow-holes`), warmed like the rest (programs after warm-up +0). Cutting the mesh would have meant re-triangulating round each hole and re-deriving the streaks on the cut surface for a hole the rider sees for about a second.
+**Consequences:** The holes are round and soft-edged rather than framed; at most four. A ride that passes through other landmarks can reuse the same cut. The track inside the cone is checked by `infernoTrack.test.ts`, not by a mesh clearance test.
+
+## 2026-11-23 — No Share in the portal build; a Daily Run's share is level `daily` (Builder, #875)
+
+**Context:** The portal zip (`build:portal`, itch.io / Newgrounds / CrazyGames) shipped the results Share button, whose
+line links to `https://scoaster.com/go/share`: it sends the portal's players off the host (CrazyGames limits outbound
+links) and mixes portal shares into the site's `/go/share` attribution (#254). Daily Run shares sent the campaign line
+and an indistinguishable `share` event (#268), and the event is capped at 2 properties.
+**Decision:** Portal builds hide Share (`__PORTAL_BUILD__`, from `mode === 'portal'` in `vite.config.ts`); `smoke:portal`'s
+results step fails if it shows. A Daily Run's share line names its date, and its `share` event sends `level: 'daily'`
+(as `level_start` sends `from: 'daily'`): the day's level follows from the date (`src/levels/daily.ts` `dailyLevel`).
+**Consequences:** No share traffic from portals until a portal-safe share (no outbound link) is wanted; a daily share no
+longer names its level in the event, so per-level share counts are campaign-only from 2026-11-24.
+
+## 2026-11-23 — Night Rides for the Desert and the Ocean: night-only props mount, the moon doesn't flare (builder, #880)
+
+**Context:** #880 gives levels 2 and 3 a Night Ride through `NIGHT_ATMOSPHERES` (#829). The desert's lit props are
+new (torches on the Pyramid), and its `SunFlare` would flare and streak off the moon in the sun slot.
+**Decision:** A night-only prop mounts only when the atmosphere's `lampGlow` is above 0 (the Pyramid's `Torches`, one
+instanced draw), so the day's scene, draw calls and programs are untouched; the warm-up compiles it on a night run
+because it is in the scene from the first frame. The desert's `SunFlare` is not mounted at night. The ocean needs no
+new prop: its jellyfish already have emissive cores, the rim lift makes their bells glow, and the water's sun glint
+under a lowered moon is the moon path. The smoke's nightly `night` step runs on every level in `STEP_LEVELS.night`
+and reports programs after warm-up.
+**Consequences:** The nightly `deep` part rides two more Night Rides (~40 s each). Levels 4–6 follow the same way:
+a preset, their own lamps through `lampGlow`, and their id in `STEP_LEVELS.night`.
+
+## 2026-11-23 — A failed lazy chunk recovers by reload, not by retry (Builder, #888)
+
+**Context:** Chromium keeps a failed dynamic `import()` failed for the page's life, so `importWithRetry` (#823) never
+reached the network: one dropped request for the level chunk at startup made every PLAY fail back to the title until a
+reload. Importing a cache-busted URL (`?retry=1`) does reach the network but is no fix: Rollup reads a shared chunk's
+exports under mangled names (`import(x).then(n => n.f1)`), and the world and boss chunks import the level chunk by its
+own URL, so they would still fail (tried, #888: `forgetWorldFailures is not a function`).
+**Decision:** `importWithRetry` is gone. Any chunk failure (not only a new build) makes `app/staleReload.ts` fetch the
+page; if it still serves the game it reloads at a safe moment (title, level select, leaving results), once per session.
+**Consequences:** a same-build network blip now costs one reload instead of a dead PLAY button. Don't bring back
+same-URL retries or cache-busted imports; the smoke's `chunkRetry` step checks the reload.
+
+## 2026-11-23 — One format for generated ride data (builder, #890)
+
+**Context:** Two generators wrote ride data in two formats, each file carrying its own decoder: level 6's absolute flat lists to
+0.01 units, the kit rides' whole-unit steps. Every new ride-kit level would have added a copy.
+**Decision:** `src/levels/rideData.ts` is the one pure pack / unpack / rounding module; `scripts/gen-ride-levels.mjs [levelId…]`
+is the one generator, a `RIDES` row per level with its precision (`{ position, up }` decimals). Positions are stored as whole-number
+steps in units of 10^-position, so level 6 moved to steps too (0.01 units, as before): ~1.4 KB gz less startup JS. Rounding is
+`Math.round(v * 10^d) / 10^d` (not `toFixed`), which moved a few of level 6's points by 0.01 at a half.
+**Consequences:** A new generated ride is a `RIDES` row and a `rideLevels.test.ts` row. The precision rules of the #863 entry stand.
+
+## 2026-11-23 — Pacing counts what the rider can shoot, played as a player; budgets re-measured (Alex's session, #925)
+
+**Context:** Alex's playtest of level 6 (23 Nov) found 9 s and 16 s stretches with nothing to shoot and the Medusa on screen
+for 2 s, on a ride every gate passed. The `pacing` step counted every live enemy whose centre projected into the viewport
+(no occlusion, no size limit) on an unfired run, so enemies behind walls, specks across the hall and the leftovers of earlier
+waves all counted.
+
+**Decision:** The `pacing` step counts `__SC_TEST__.sight()` (in view, at least `MIN_ENEMY_PX`, a clear line from the camera)
+on a run played as a player (`PLAYER_HITS_PER_SECOND`, 3 hits a game second on the nearest shootable targets, on the game
+clock, every hit through `processHit`: the shot has its look but no colliding bullet, whose fire interval runs on wall-clock time), and fails a level whose boss is shootable less than its `pacing.bossFramedShare` of the fight. Each level's `pacing`
+budget was re-set from its first CI run under the new count (seed 1337) by Alex's session, so nothing gets worse: levels 1–5
+on what they measure (#937 has the targets, 3 s / 10% / boss 60%), level 6 on what it measures with its boss floor on the target, `knownOver: "#926"` with `knownOverOnly: "boss"`. Every
+PR that changes a ride, its waves, a boss or a level's effects also runs `npm run review` and posts its sheet.
+
+**Consequences:** A pacing number from before #925 is not comparable with one after it. Lowering a level's ceilings toward
+the targets, or removing level 6's `knownOver`, is part of the issue that fixes it, not a budget raise. Don't go back to counting projected centres or to an unfired run: both
+pass rides a player finds empty.
+
+## 2026-11-24 — Neon Metropolis: traffic as light rods on lane runs, signs animated per vertex (Builder, #324)
+
+**Context:** The city needed traffic and animated signage inside `scene.level7` (147k triangles of 195k at the ride
+sample before this), with no per-frame allocation and no collision with towers or the coaster's supports.
+**Decision:** Each car is a dark box run through by one light rod reaching 18 units past both ends (white ahead, red
+behind): at ride distance a lone box light was a speck, the rod reads as a headlight / tail-light streak. 32 triangles a
+car, 863 cars at high quality (~28k triangles), thinned by `particleScale` through the instance count (the cars are
+shuffled, so any prefix spreads evenly). Lanes are cut into runs that stop 10 units short of every tower footprint and 44
+units from the track's ground projection (where its support towers stand) instead of planning around the supports
+themselves (`planTowers` needs the curve and dimensions the biome never sees); a car sinks into the road over a run's
+last 26 units and rises at its start. The CPU writes the yaw-only matrices straight into the instance array
+(`traffic.hot.ts`) rather than a vertex-shader traffic, so the pure poses are unit-tested against `yawScaleMatrix`.
+Signs take their pattern (steady, chase, blink, flicker) from a hash of their index, so the seeded city layout is
+unchanged; the neon material reads it from a per-vertex `aNeon` attribute and one shared time uniform.
+**Consequences:** No car crosses under the track: the streets go dark for ~90 units where the ride passes over. The
+elevated highway (and its traffic) is still a follow-up.
+
+## 2026-11-24 — The explosion pool has 10 slots, sized by the busiest boss defeat (builder, #909)
+
+**Context:** The boss-defeat confetti (#907) takes 4 slots of the shared `ParticleExplosion` pool. The Magma Titan's defeat adds its crown's part burst and 4 break bursts: 9 live explosions, and the 8-slot pool recycled the crown's burst early.
+**Decision:** `DEATH_SLOTS` is 10: the worst boss defeat (last part + confetti + the boss's own defeat bursts) plus one slot for a kill alongside. `deathStyles.test.ts` adds that up per boss from `TITAN_BREAK_POINTS` and `MEDUSA_DEFEAT_BURST_YS`, so a boss that bursts more fails the test rather than cutting its effects short.
+**Consequences:** The pool's two InstancedMeshes (`death-glow`, `death-chunks`) hold all 10 slots but draw only up to the highest live one (`drawnSlots`; `pickDeathSlot` fills the lowest free slot first), so an idle pool draws 1 slot (~1k triangles) instead of all of them at zero scale. That cut level 6's scene count from 195,090 to 186,018 (budget 195,000), where 10 always-drawn slots had put it over. No extra draw calls. A boss given new defeat bursts must add them to the test's table.
+
+## 2026-11-24 — Budgets raised for four finished PRs, ride data to be paid back; early boss wins end the run (Director, #895, #903, #955, #937)
+
+**Context:** Four finished PRs were blocked on budgets alone: the desert ride (#892, +0.85 KB gz startup), the ocean ride (#893, +0.9 KB and 95 draws at level 3's ride shot against 89), medals (#904, ~+1.7 KB) and the on-ride photo (#887, ~+2 KB). The #861 diet set `startupJsGzipKB` to 392 the day before and `main` already measures 391.5. Level 1's pacing fix (#956) puts balloon rings up the lift hill, where the 10 s ride shot used to see an empty sky: 169 draws against 101; mid-run level 1 already draws that many.
+**Decision:** `startupJsGzipKB` 392 → 398 and `jsTotalGzipKB` 665 → 672, temporarily: #960 (P1) moves every ride's generated track data except level 1's out of the startup JS (~10 KB gz with the desert and ocean) and lowers the startup budget back to at most 392. `scene.level1.drawCalls` 101 → 200 (169 + ~20%, still under the VISION bar of 250); `scene.level3.drawCalls` 89 → 98 (95 measured, the new pieces are 2 draws). For #937's open question: when the boss falls and nothing is left to shoot or still to come, the run ends after the defeat's sting (#961), with no time bonus, so scores and stars don't change.
+**Consequences:** The next feature that needs startup JS waits for #960, not for another raise. Balloons are a draw call or more each; if level 1's ride shot creeps toward 200, instance them rather than raise again.

@@ -60,6 +60,22 @@ export async function waitFrames(page, n, { minMs = 0, maxMs = 20000, pollMs = 2
   return { frames: f - f0, ms: Date.now() - start }
 }
 
+/**
+ * Waits until the renderer's draw count (`drawCalls`, last frame's) has held for `frames` frames in a row, at most
+ * `maxMs`: a frozen scene's count once whatever mounts over its first frames has (#972). Returns the count it settled on.
+ */
+export async function waitDrawsSettled(page, { frames = 5, maxMs = 30000, pollMs = 100 } = {}) {
+  const start = Date.now()
+  let held = null
+  for (;;) {
+    const { frames: f, drawCalls } = await page.evaluate(() => ({ frames: window.__SC_TEST__.frames, drawCalls: window.__SC_TEST__.drawCalls }))
+    if (!held || held.drawCalls !== drawCalls) held = { drawCalls, since: f }
+    else if (f - held.since >= frames) return drawCalls
+    if (Date.now() - start >= maxMs) return drawCalls
+    await page.waitForTimeout(pollMs)
+  }
+}
+
 export function waitVisible(page, selector, timeout = 30000) {
   return page
     .waitForFunction(

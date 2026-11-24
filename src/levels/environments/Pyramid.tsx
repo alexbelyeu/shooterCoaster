@@ -1,7 +1,6 @@
-import { useRef, useMemo, useEffect } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { LAMP_WARM } from './shared/lampGlow'
 import StaticInstances from './shared/StaticInstances'
 import {
   PYRAMID_BASE_SIZE,
@@ -10,12 +9,19 @@ import {
   PYRAMID_LAYER_HEIGHT,
   PYRAMID_SHRINK,
 } from './landmarkDimensions'
+import { buildDotTexture, LAMP_WARM } from './shared/lampGlow'
 
 interface PyramidProps {
   position?: [number, number, number]
+  yaw?: number
+  /** A passage through tier `layer` along the Pyramid's x (#864): `width` wide, `height` up from the tier's floor, torchlit. */
+  passage?: { layer: number; width: number; height: number }
   /** The atmosphere's `lampGlow`: torches burning on every layer's corners and the stone warm under them at night (#880). */
   lampGlow?: number
 }
+
+/** Passage torches; `inset` off the wall exceeds the glow's radius, or the wall cuts its sprite square. */
+const PASSAGE_TORCH = { spacing: 110, height: 38, flame: 7, glow: 18, inset: 10 } as const
 
 /** A torch's flame: a cone standing on its base, sized to read from the ride a couple of kilometres off. */
 const TORCH_RADIUS = 10
@@ -57,9 +63,10 @@ function Torches({ glow }: { glow: number }) {
 }
 
 /** Stepped pyramid with glowing hieroglyph panels and a spinning golden capstone. */
-export default function Pyramid({ position = [800, 0, -600], lampGlow = 0 }: PyramidProps) {
+export default function Pyramid({ position = [800, 0, -600], yaw = 0, passage, lampGlow = 0 }: PyramidProps) {
   const capstoneRef = useRef<THREE.Mesh>(null)
   const glyphRefs = useRef<(THREE.Mesh | null)[]>([])
+  const torchGlow = useRef<THREE.PointsMaterial>(null)
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -67,6 +74,7 @@ export default function Pyramid({ position = [800, 0, -600], lampGlow = 0 }: Pyr
       capstoneRef.current.rotation.y = t * 0.5
     }
     const pulse = 1.2 + Math.sin(t * 1.5) * 0.8
+    if (torchGlow.current) torchGlow.current.opacity = 0.75 + Math.sin(t * 13) * 0.08 + Math.sin(t * 7.3) * 0.07
     for (const mesh of glyphRefs.current) {
       if (mesh) {
         const mat = mesh.material as THREE.MeshStandardMaterial
@@ -104,19 +112,78 @@ export default function Pyramid({ position = [800, 0, -600], lampGlow = 0 }: Pyr
       const w = layer.size * 0.3
       const h = PYRAMID_LAYER_HEIGHT * 0.6
       arr.push({ x: 0, y: layer.y, z: s, w, h, rotY: 0 })
-      arr.push({ x: s, y: layer.y, z: 0, w, h, rotY: Math.PI / 2 })
+      // Not over the passage's east door.
+      if (i !== passage?.layer) arr.push({ x: s, y: layer.y, z: 0, w, h, rotY: Math.PI / 2 })
     }
     return arr
-  }, [layers])
+  }, [layers, passage?.layer])
+
+  // The passage's tier as two side blocks and a lintel over the doorway; torches along both walls.
+  const cut = useMemo(() => {
+    if (!passage) return null
+    const layer = layers[passage.layer]
+    const side = (layer.size - passage.width) / 2
+    const lintel = PYRAMID_LAYER_HEIGHT - passage.height
+    const floor = layer.y - PYRAMID_LAYER_HEIGHT / 2
+    const blocks = [
+      { pos: [0, layer.y, -(passage.width + side) / 2], size: [layer.size, PYRAMID_LAYER_HEIGHT, side] },
+      { pos: [0, layer.y, (passage.width + side) / 2], size: [layer.size, PYRAMID_LAYER_HEIGHT, side] },
+      { pos: [0, floor + passage.height + lintel / 2, 0], size: [layer.size, lintel, passage.width] },
+    ] as { pos: [number, number, number]; size: [number, number, number] }[]
+    const torches: number[] = []
+    const run = Math.floor((layer.size - PASSAGE_TORCH.spacing) / PASSAGE_TORCH.spacing)
+    for (let k = 0; k <= run; k++) {
+      const x = (k - run / 2) * PASSAGE_TORCH.spacing
+      for (const zSide of [-1, 1]) torches.push(x, floor + PASSAGE_TORCH.height, zSide * (passage.width / 2 - PASSAGE_TORCH.inset))
+    }
+    return { blocks, torches: new Float32Array(torches), dot: buildDotTexture() }
+  }, [layers, passage])
+  useEffect(() => () => cut?.dot.dispose(), [cut])
 
   return (
-    <group position={position}>
-      {layers.map((layer, i) => (
-        <mesh key={`layer-${i}`} position={[0, layer.y, 0]}>
-          <boxGeometry args={[layer.size, PYRAMID_LAYER_HEIGHT, layer.size]} />
-          <meshPhongMaterial color={layer.color} emissive={LAMP_WARM} emissiveIntensity={0.08 * lampGlow} flatShading />
-        </mesh>
-      ))}
+    <group position={position} rotation-y={yaw}>
+      {layers.map((layer, i) =>
+        cut && i === passage?.layer ? (
+          cut.blocks.map((b, k) => (
+            <mesh key={`layer-${i}-${k}`} position={b.pos}>
+              <boxGeometry args={b.size} />
+              <meshPhongMaterial color={layer.color} emissive={LAMP_WARM} emissiveIntensity={0.08 * lampGlow} flatShading />
+            </mesh>
+          ))
+        ) : (
+          <mesh key={`layer-${i}`} position={[0, layer.y, 0]}>
+            <boxGeometry args={[layer.size, PYRAMID_LAYER_HEIGHT, layer.size]} />
+            <meshPhongMaterial color={layer.color} emissive={LAMP_WARM} emissiveIntensity={0.08 * lampGlow} flatShading />
+          </mesh>
+        ),
+      )}
+
+      {cut && (
+        <>
+          {/* Flames, and their glow round them: emissive, no lights (the dark section's muzzle flash is the only one). */}
+          <points>
+            <bufferGeometry>
+              <bufferAttribute attach="attributes-position" args={[cut.torches, 3]} />
+            </bufferGeometry>
+            <pointsMaterial map={cut.dot} color="#ffe2a0" size={PASSAGE_TORCH.flame} transparent depthWrite={false} toneMapped={false} />
+          </points>
+          <points>
+            <bufferGeometry>
+              <bufferAttribute attach="attributes-position" args={[cut.torches, 3]} />
+            </bufferGeometry>
+            <pointsMaterial
+              ref={torchGlow}
+              map={cut.dot}
+              color="#ff8a2a"
+              size={PASSAGE_TORCH.glow}
+              transparent
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+              toneMapped={false}
+            />
+          </points>
+        </>
+      )}
 
       {glyphs.map((g, i) => (
         <mesh

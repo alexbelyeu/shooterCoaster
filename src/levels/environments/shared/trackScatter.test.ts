@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { groundedBaseY, scatterNearTrack, settleOnGround, trackExtent } from './trackScatter'
 import { createRng } from '@/utils/rng'
 import { buildTrackIndex } from './trackClearance'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import type { TrigTrackParams } from '@/types/level'
 import { buildArcTable } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import {
@@ -13,9 +13,10 @@ import {
   sampleTrackPath,
 } from '@/utils/terrainNoise'
 
-const level = getLevelConfig('level2')!
-const { track } = level
-if (track.curve === 'spline') throw new Error('level2 rides a trig curve')
+// Level 2's trig loop before its ride-kit ride (#864): the desert terrain the scatter settings were tuned on.
+const track: TrigTrackParams = {
+  varA: 5, varB: 27, varC: 2, scalar: 60, rollerSpeed: 0.000004, minRollerSpeed: 0.00006, curve: 'curve1', color1: 0x51411a, color2: 0x812a2a,
+}
 const curve = createTrackCurve(track)
 const table = buildArcTable(curve)
 const index = buildTrackIndex(table)
@@ -23,14 +24,14 @@ const heightFn = createHeightFunction('desert', sampleTrackPath((t) => curve.get
 const groundFn = createTerrainSurface(heightFn, getTerrainMeshSize('desert'))
 
 describe('trackExtent', () => {
-  it('matches the varC * 13 * scalar rule for level2', () => {
+  it('matches the varC * 13 * scalar rule', () => {
     const extent = trackExtent(table)
     expect(extent).toBeLessThanOrEqual(track.varC * 13 * track.scalar * 1.01)
     expect(extent).toBeGreaterThan(track.varC * 13 * track.scalar * 0.5)
   })
 })
 
-describe('scatterNearTrack (level2)', () => {
+describe('scatterNearTrack (desert trig loop)', () => {
   const opts = {
     count: 150,
     track: table,
@@ -66,7 +67,7 @@ describe('scatterNearTrack (level2)', () => {
   })
 })
 
-describe('settleOnGround (level2, ice crystal settings)', () => {
+describe('settleOnGround (desert trig loop, ice crystal settings)', () => {
   const count = 70
   const footprint = 10
   const height = 60

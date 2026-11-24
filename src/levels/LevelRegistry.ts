@@ -1,9 +1,11 @@
 import type { LevelConfig } from '@/types/level'
 import { paceLevel } from './pacing'
 // Level 6's track and walls as plain numbers: the blockout they are built from stays out of the startup JS (#589).
-// Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS.
+// Levels 1 and 2's rides as plain numbers: the ride elements that build them stay out of the startup JS.
 import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
-// Level 4's ride too (#866), and level 5's (#867).
+import { DESERT_LEVEL_TRACK } from './environments/biomes/desert/desertLevel'
+// Level 3's ride too (#865), level 4's (#866), level 5's (#867) and level 2's (#864).
+import { OCEAN_LEVEL_TRACK, OCEAN_SEA_ARCH } from './environments/biomes/ocean/oceanLevel'
 import { ARCTIC_LEVEL_TRACK } from './environments/biomes/arctic/arcticLevel'
 import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel'
 import { GYM_LEVEL_TRACK, GYM_LEVEL_WALLS } from './environments/biomes/gym/gymLevel'
@@ -52,22 +54,19 @@ const LEVELS: LevelConfig[] = [
     maxScore: 30 * 20 + 78 * 15 + 2 * 60 + 4 * 40 + 400, // 1770 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2450
     message: 'Ready for this one?',
     nextLevel: 'level3',
-    track: {
-      varA: 5,
-      varB: 27,
-      varC: 2,
-      scalar: 60,
-      rollerSpeed: 0.000004,
-      minRollerSpeed: 0.00006,
-      curve: 'curve1',
-      color1: 0x51411a,
-      color2: 0x812a2a,
-    },
+    // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
+    track: DESERT_LEVEL_TRACK,
     ...paceLevel({
+      // Weights are seconds (45 over the wave span). Two scorpion packs so the straight run to the lift doesn't put all
+      // thirty in view (#864: draws); a first V over the lift hill's crest, where the climb pitches the view at the sky (5 s);
+      // the second pack on the sand before the door, under the drop (11 s); the sandstorm's V meets the car out of the Pyramid (16 s), the
+      // last V comes in over the climb to the airtime crest (28 s).
       waves: [
-        { type: 'scorpion', count: 30, waveLabel: 'Incoming!' },
-        { type: 'crow', count: 39, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm' },
-        { type: 'crow', count: 39, waveLabel: 'More Crows!', formation: 'v' },
+        { type: 'scorpion', count: 12, waveLabel: 'Incoming!', weight: 5 },
+        { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', weight: 6 },
+        { type: 'scorpion', count: 18, waveLabel: 'Out of the Sand!', weight: 5 },
+        { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 12 },
+        { type: 'crow', count: 39, waveLabel: 'More Crows!', formation: 'v', weight: 17 },
       ],
       boss: 'giantScorpion',
     }),
@@ -84,19 +83,11 @@ const LEVELS: LevelConfig[] = [
     maxScore: 44 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 1924 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 2624
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
-    track: {
-      varA: 3,
-      varB: 36,
-      varC: 4,
-      scalar: 20,
-      rollerSpeed: 0.00001,
-      minRollerSpeed: 0.0001,
-      curve: 'curve1',
-      color1: 0x416fa0,
-      color2: 0x31ffd5,
-    },
+    // The ride kit's (#865, `oceanTrack.ts`): a lift, a splashdown into a glass tunnel under the sea, through a sea arch.
+    track: OCEAN_LEVEL_TRACK,
     ...paceLevel({
       waves: [
+        // "Into the Deep!": the jellyfish arrive as the car dives into the glass tunnel (~14 s).
         { type: 'jellyfish', count: 20, waveLabel: 'Into the Deep!', weight: 3 },
         { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 2 },
         { type: 'jellyfish', count: 24, waveLabel: 'Jellyfish Bloom!', weight: 2 },
@@ -107,8 +98,9 @@ const LEVELS: LevelConfig[] = [
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
       hasWater: true,
-      /** Through the gap between two islands, out where the sea runs on past the drawn terrain, ~30 s in and gone before the Kraken. */
-      whale: { startSeconds: 31.25, lead: 3700, aim: 0.1 },
+      /** Out to sea down the south channel, past the drawn terrain, dead ahead as the car tips over the first drop (~12 s). */
+      whale: { startSeconds: 11, lead: 4000, aim: 0.2 },
+      seaArch: OCEAN_SEA_ARCH,
     },
   },
   {

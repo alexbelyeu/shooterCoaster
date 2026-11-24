@@ -114,10 +114,19 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   launch, a lift hill over the park, a 60° first drop past the big Ferris wheel into the tunnel, two camelbacks,
   the near miss beside the small wheel's gondolas (28 s), a second lift cresting as the blimp arrives (40 s), a slow
   helix round the carousel for the boss fight and a last hill into the brake run. The photo waits on #701.
-- **Desert (2):** the drop into the Pyramid as a dark ride (torches, the Scorpion's lair), a jump
-  gap over a canyon between mesas.
-- **Ocean (3):** a splashdown, a glass tunnel under the water with the Kraken passing overhead,
-  a corkscrew through a sea stack's arch.
+- **Desert (2):** built (#864, `desert/desertTrack.ts`, its storyboard and seconds at the top, laid out in a frame turned
+  to face the Pyramid, `landmarks.ts` `RIDE_FRAME`): a station launch and a lift hill at the Pyramid, a 62° drop at its
+  foot into a cut through the dunes, under the west door's lintel (the near miss, 13 s) and through tier 1's torchlit
+  passage in the dark (`Pyramid.tsx` `passage`: torches as emissive points, no lights), a climbing U-turn into the
+  sandstorm, a jump gap over the canyon between two fixed mesas (24 s, `CANYON_MESAS`), an airtime hill (31 s) and the
+  boss's slow wide turn round the flats into the brake run. The scorpions come in two packs (0 s, and 11 s on the sand
+  before the door) so the straight run to the lift doesn't line all thirty up in view; a first crow V (5 s) fills the lift
+  hill's crest, where the view is pitched at the sky (#925's pacing gate).
+- **Ocean (3):** built (#865, `ocean/oceanTrack.ts`, its storyboard and seconds at the top): a lift east, a crawl
+  south along its crest with the whale breaching ahead, the drop's splashdown into a glass tunnel under the sea, camelbacks,
+  a slow corkscrew through a sea arch (`environment.seaArch`), the second lift cresting as the Kraken rises, the fight run
+  east across the open lagoon facing it (40–50 s), and a quarter helix home along the north shore. No U-turns after the corkscrew: a hairpin or a half helix puts trackside
+  waves behind the rider on their approach (`spawnPlacement.test.ts`).
 - **Antarctica (4):** built (#866, `arctic/arcticTrack.ts`, its storyboard and seconds at the top): a station launch,
   a lift up the valley, a 71° first drop into the ice cave (a dark section with the `ice` look, `IceCave.tsx`, its mouth
   low over the rails), a second lift up the ridge, an airtime crest heading into the aurora (27 s), a 1.25-turn helix

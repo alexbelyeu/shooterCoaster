@@ -47,6 +47,22 @@ describe('ride data', () => {
     expect(worstUp).toBeLessThanOrEqual(0.5 * 10 ** -precision.up + 1e-12)
   })
 
+  it('packs a ride laid out in a turned frame in that frame, and turns it back', () => {
+    const precision = { position: 0, up: 2 }
+    const yaw = 0.7
+    const source = points(11)
+    const packed = packPoints(source, precision, yaw)
+    const shipped = unpackPoints(packed)
+    expect(packed.yaw).toBe(yaw)
+    expect(shipped).toEqual(roundPoints(source, precision, yaw))
+    let worst = 0
+    shipped.forEach((p, i) => (worst = Math.max(worst, Math.hypot(p.x - source[i].x, p.y - source[i].y, p.z - source[i].z))))
+    expect(worst).toBeLessThanOrEqual(Math.sqrt(3) / 2 + 1e-9)
+    // A straight along the frame's x packs as one repeated step.
+    const straight = [0, 1, 2, 3].map((k) => ({ x: 100 * k * Math.cos(yaw), y: 5, z: -100 * k * Math.sin(yaw) }))
+    expect(packPoints(straight, precision, yaw).xyz.slice(3)).toEqual([100, 0, 0, 100, 0, 0, 100, 0, 0])
+  })
+
   it('packs positions as whole-number steps', () => {
     const { xyz } = packPoints(points(3), { position: 2, up: 4 })
     expect(xyz.every(Number.isInteger)).toBe(true)
