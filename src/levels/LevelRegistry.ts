@@ -51,15 +51,16 @@ const LEVELS: LevelConfig[] = [
     // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
     ...paceLevel({
       // Weights are seconds (45 over the wave span). Two scorpion packs so the straight run to the lift doesn't put all
-      // thirty in view (#864: draws); a first V over the lift hill's crest, where the climb pitches the view at the sky (5 s);
-      // the second pack on the sand before the door, under the drop (11 s); the sandstorm's V meets the car out of the Pyramid (16 s), the
-      // last V comes in over the climb to the airtime crest (28 s).
+      // thirty in view (#864: draws); two Vs up the lift hill (2 s, 6 s), one group each, so the sky holds crows until the
+      // crest (#937); the second pack on the sand before the door, under the drop (11 s); the sandstorm's V meets the car
+      // out of the Pyramid (16 s); the last V's groups spread from the climb to the airtime crest (25 s) on to the boss.
       waves: [
-        { type: 'scorpion', count: 12, waveLabel: 'Incoming!', weight: 5 },
-        { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', weight: 6 },
+        { type: 'scorpion', count: 12, waveLabel: 'Incoming!', weight: 2 },
+        { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', weight: 4 },
+        { type: 'crow', count: 9, formation: 'v', weight: 5 },
         { type: 'scorpion', count: 18, waveLabel: 'Out of the Sand!', weight: 5 },
-        { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 12 },
-        { type: 'crow', count: 39, waveLabel: 'More Crows!', formation: 'v', weight: 17 },
+        { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 9 },
+        { type: 'crow', count: 30, waveLabel: 'More Crows!', formation: 'v', weight: 20 },
       ],
       boss: 'giantScorpion',
     }),
