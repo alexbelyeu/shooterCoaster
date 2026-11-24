@@ -140,7 +140,7 @@ export const NIGHT_ATMOSPHERES: Partial<Record<BiomeType, AtmosphereConfig>> = {
   arctic: {
     sky: {
       zenith: 0x050a1e,
-      horizon: 0x1a2a48,
+      horizon: 0x142240,
       ground: 0x121a30,
       horizonFalloff: 0.55,
       sunColor: 0xe8f0ff,
@@ -163,7 +163,7 @@ export const NIGHT_ATMOSPHERES: Partial<Record<BiomeType, AtmosphereConfig>> = {
     envIntensity: 0.3,
     // Blue snow, the aurora's green in the highlights
     grade: {
-      exposure: 1.05,
+      exposure: 0.95,
       temperature: -0.12,
       tint: 0,
       shadowTint: 0x1e3a7a,
@@ -183,14 +183,15 @@ export const NIGHT_ATMOSPHERES: Partial<Record<BiomeType, AtmosphereConfig>> = {
   volcanic: {
     sky: {
       zenith: 0x030203,
-      horizon: 0x220602,
+      // A low, deep red band, the lava's glow under the ash: the ridges and the volcano stand black against it
+      horizon: 0x380200,
       ground: 0x140402,
-      horizonFalloff: 1.8,
+      horizonFalloff: 1.2,
       sunColor: 0x000000,
       sunSize: 0,
       sunGlow: 0,
       cloudiness: 0.7,
-      cloudColor: 0x140a08,
+      cloudColor: 0x2a0c06,
       cloudSpeed: 10,
       cloudStretch: 3,
     },
