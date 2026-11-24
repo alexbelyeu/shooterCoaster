@@ -33,9 +33,7 @@ import {
   FLAME,
   GYM_SCALE,
   HALL,
-  PIT,
   STAR,
-  TREE_GAP,
   archAxial,
   archOpeningClearance,
   distanceToBox,
@@ -43,8 +41,6 @@ import {
   piece,
   toBlockout,
   toWorld,
-  treeAlong,
-  treeOut,
   type Vec3,
 } from './blockout'
 import { GYM_TRACK, RAIL_CLEARANCE } from './gymTrack'
@@ -176,8 +172,8 @@ describe('the gym track', () => {
     // Both ways fall between the burst out of the cave and the wall ride's beat.
     const forkSeconds = secondsAt(Math.round(junction.from * N))
     const mergeSeconds = secondsAt(Math.round(junction.to * N))
-    expect(forkSeconds).toBeGreaterThan(18)
-    expect(mergeSeconds).toBeLessThan(22)
+    expect(forkSeconds).toBeGreaterThan(19)
+    expect(mergeSeconds).toBeLessThan(23)
     // The switch sign stands clear of everything solid, on the branch's side.
     const sign = toBlockout(switchPose(curve, junction, dims.eyeHeight).position)
     let signClear = Infinity
@@ -215,21 +211,12 @@ describe('the gym track', () => {
     expect(near).toBeLessThan(1.2)
   })
 
-  it("rides through the Tree's gap in the run, cave to cave between its trunk and the back wall (#613, #671)", () => {
-    const inGap = track
-      .map((p, i) => ({ p, i }))
-      .filter(({ p }) => {
-        const f = treeOut(p)
-        return Math.abs(treeAlong(p)) <= TREE_GAP.halfAlong && f >= TREE_GAP.minF && f <= TREE_GAP.maxF && p.y - PIT.floorY <= TREE_GAP.height
-      })
-    const metresPerSample = table.length / GYM_SCALE / N
-    const heights = inGap.map(({ p }) => p.y - PIT.floorY)
-    // All the way through, clear of the floor's roots below and with the rider's eye clear of the gap's ceiling above.
-    expect(inGap.length * metresPerSample).toBeGreaterThan(2 * TREE_GAP.halfAlong - 0.2)
-    expect(Math.min(...heights)).toBeGreaterThanOrEqual(1.5)
-    expect(Math.max(...heights) + dims.eyeHeight / GYM_SCALE).toBeLessThanOrEqual(TREE_GAP.height - RAIL_CLEARANCE)
-    // The run rides it.
-    expect(inGap.filter(({ i }) => secondsAt(i) < RUN_SECONDS).length * metresPerSample).toBeGreaterThan(TREE_GAP.halfAlong)
+  it("lands a head-chopper beat under the Arch's lintel in the run's first seconds (#926)", () => {
+    const underArch = (GYM_TRACK.rideV2?.beats ?? []).filter((beat) => {
+      const p = toBlockout(curve.getPointAt(beat.at))
+      return Math.abs(archAxial(p)) <= ARCH.depth / 2 && archOpeningClearance(p) > 0
+    })
+    expect(underArch.map((beat) => beat.second)).toEqual([2])
   })
 
   it("tours the hall into the seat in the station clear of every piece, riding the track's turn in (#659, #675, #700)", () => {
@@ -316,12 +303,12 @@ describe('the gym track', () => {
     }
   })()
 
-  it('comes out of the helix facing the star as the Medusa rises, and runs at her for 4 s (#700)', () => {
+  it('comes out of the helix facing the star as the Medusa rises, and keeps her in view to the run\'s end (#926)', () => {
     const at = getLevelConfig('level6')!.boss!.at
     const star = toWorld(STAR.centre)
-    // Every tenth of a second from her rise to 4 s after it.
+    // Every tenth of a second from her rise to the end of the run: the finale is her fight.
     const unseen: number[] = []
-    for (let k = at * 10; k <= (at + 4) * 10; k++) {
+    for (let k = at * 10; k <= RUN_SECONDS * 10; k++) {
       view.at(k)
       if (!view.sees(star)) unseen.push(k / 10)
     }
