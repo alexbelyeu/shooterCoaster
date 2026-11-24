@@ -228,22 +228,7 @@ const LEVELS: LevelConfig[] = [
     maxScore: 83 * 15 + 5 * 65 + 400, // 1245 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 1970
     message: 'You cleared Jungle Ruins!',
     nextLevel: null,
-    // A first cut on the legacy curve1 until the ride kit's storyboard (#1009, `jungleTrack.ts`); `jungleLayout.test.ts`
-    // keeps the temple in front of the drop meanwhile.
-    ride: {
-      track: {
-        varA: 3,
-        varB: 17,
-        varC: 4,
-        scalar: 20,
-        curve: 'curve1',
-        ride: 'v2',
-        mechanics: [{ kind: 'station', from: 0, to: 0.01, speed: 120 }],
-        rideV2: { gravity: 480, crawl: 90, drag: 0.0012, zones: [{ kind: 'lift', from: 0.085, to: 0.122, speed: 60 }] },
-        color1: 0xd8c9a0,
-        color2: 0x3f8a4a,
-      },
-    },
+    // The ride kit's storyboard through the valleys (#1009, `jungleTrack.ts`), shipped in the jungle world's chunk.
     // Toucans over the canopy in Vs, rings and spirals ahead of the rider, one wave every few seconds from the
     // station to the temple, then the boss slot, held by the Golden Blimp until the guardian (#869). Each V is one
     // group of 9: on this curve a second group would sit within reading range of the rider from the wave's start.
