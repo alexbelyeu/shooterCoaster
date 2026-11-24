@@ -143,7 +143,7 @@ export interface BiomeDefinition {
   floor?: HeightFunction
   /** An interior's walls and roof, inset: enemies are placed inside them, never behind a wall. */
   bounds?: PlacementBounds
-  /** Landmarks and big props a ground enemy stood away from the track keeps out of (`spawnPlacement.ts` `whereTheApproachLooks`). */
+  /** Landmarks and big props a ground enemy stood away from the track keeps out of (`spawnPlacement.ts` `whereTheApproachLooks`), and a swimmer's circle (`swimOrbit.ts`). */
   keepOff?: (groundFn: HeightFunction, track: ArcTable) => readonly KeepOff[]
   /** The hero landmark the intro's tour passes (#675) and the results orbit circles (#328). */
   hero: HeroShot

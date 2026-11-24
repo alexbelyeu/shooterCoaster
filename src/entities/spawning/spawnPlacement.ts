@@ -16,6 +16,8 @@ import { HOP } from '../enemies/hopGlideMotion'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
 import { BASE_VERTICAL_FOV, MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import { EYE_HEIGHT } from '@/track/trackDimensions'
+import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
+import { ORBITS } from './swimOrbit'
 
 /**
  * Formation placement, pure. Slots are seeded at level load (so `spawnDigest` stays
@@ -690,7 +692,7 @@ export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, 
   return slots.map((slot) => {
     const at = { ahead: tracksideAhead(table, surface, slot, ride), side: slot.side }
     const p = surface === 'water'
-      ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale)
+      ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale, ORBITS[type] ? keepOff : null)
       : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale, bounds, keepOff, roam)
     const placed = outsideNearField(settle(p, surface, groundFn), camera)
     const out = surface === 'ground' ? groundedOutsideNearField(placed, camera, groundFn) : placed
@@ -845,23 +847,34 @@ function clearOfRails(table: ArcTable, index: number, p: Vec3, clearance: number
 }
 
 /**
- * The slot, or across the track, or nearer / further within the band: the first with sea under it
- * that is in view on its approach, else the first with sea under it, else the slot.
+ * The slot, or across the track, or nearer / further within the band: the first with water under it that is in view on
+ * its approach, else the first with water under it, else the slot. A swimmer that laps a circle (`swimOrbit.ts` `ORBITS`,
+ * given `keepOff`) takes only open sea (also `sideMin` off every rail of the lap, not just its own stretch's, and out of
+ * `keepOff`: the sea stacks, #922), out at the band's far side, its middle or near its rails if there is none at the slot's.
  */
 function wetTracksidePoint(
   table: ArcTable, riderIndex: number, slot: TracksideSlot, groundFn: HeightFunction, reach: number, trackScale: number,
+  keepOff: readonly KeepOff[] | null,
 ): Vec3 {
-  const { aheadMin, aheadMax } = TRACKSIDE.water
+  const { aheadMin, aheadMax, sideMin, sideMax } = TRACKSIDE.water
+  const index = buildTrackIndex(table)
+  const sign = Math.sign(slot.side)
   let wet: Vec3 | null = null
-  for (let k = 0; k < WATER_SEARCH_TRIES; k++) {
-    const step = (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * WATER_SEARCH_STEP
-    const ahead = Math.min(aheadMax, Math.max(aheadMin, slot.ahead + step))
-    for (const side of [slot.side, -slot.side]) {
-      const p = tracksidePoint(table, riderIndex, { ahead, side })
-      if (groundFn(p.x, p.z) >= WATER_DEPTH) continue
-      if (inViewOnApproach(table, riderIndex, ahead, { x: p.x, y: WATER_Y, z: p.z }, reach, trackScale)) return p
-      wet ??= p
+  for (const offset of [Math.abs(slot.side), sideMax, (sideMin + sideMax) / 2, 2 * sideMin]) {
+    let open: Vec3 | null = null
+    for (let k = 0; k < WATER_SEARCH_TRIES; k++) {
+      const step = (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * WATER_SEARCH_STEP
+      const ahead = Math.min(aheadMax, Math.max(aheadMin, slot.ahead + step))
+      for (const side of [sign * offset, -sign * offset]) {
+        const p = tracksidePoint(table, riderIndex, { ahead, side })
+        if (groundFn(p.x, p.z) >= WATER_DEPTH) continue
+        wet ??= p
+        if (keepOff && (index.near(p.x, p.z, sideMin) || !clearOfKeepOff(p, keepOff, 0))) continue
+        if (inViewOnApproach(table, riderIndex, ahead, { x: p.x, y: WATER_Y, z: p.z }, reach, trackScale)) return p
+        open ??= p
+      }
     }
+    if (open || !keepOff) return open ?? wet ?? tracksidePoint(table, riderIndex, slot)
   }
   return wet ?? tracksidePoint(table, riderIndex, slot)
 }

@@ -14,7 +14,7 @@ import { useWorld } from '@/levels/environments/worlds'
 import GoldenBalloon from '../enemies/GoldenBalloon'
 import BossSpawner from '../bosses/BossSpawner'
 import { GOLDEN_BALLOON, SCORE_VALUES } from '@/levels/scoring'
-import { createRng, type Rng } from '@/utils/rng'
+import { createRng, hashString, type Rng } from '@/utils/rng'
 import { recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
 import { requestSlowMo } from '@/combat/slowMo.hot'
 import type { EnemyEntry } from '../enemies/EnemyBase'
@@ -31,6 +31,8 @@ import {
 } from './enemyPlacement'
 import { enemyCounts, newWaveProgress, nextWaveDue, onRoute, tickWaves } from './waveSchedule'
 import type { HardRoute } from '@/track/mechanics'
+import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
+import { ORBITS, placeOrbit, type SwimOrbit } from './swimOrbit'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -74,6 +76,7 @@ interface Placed {
   entry?: EnemyEntry
   motion?: FormationMotion
   wall?: WallSlot
+  orbit?: SwimOrbit
 }
 
 const RADII: Record<EnemyType, number> = {
@@ -231,7 +234,13 @@ export default function EnemySpawner({
         const placed = placeTracksideWave({
           table, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff,
         })
-        return members.map((e, i) => [e.id, { position: toVector3(placed[i]) }])
+        // A shark's circle, clear of the rails, the stacks and the shore (#922): its own stream, so the placement's is unchanged.
+        const band = ORBITS[wave.type]
+        const world = { index: buildTrackIndex(table), keepOff: keepOff ?? [], groundFn }
+        return members.map((e, i) => [e.id, {
+          position: toVector3(placed[i]),
+          orbit: band && placeOrbit(placed[i], band, world, createRng(runSeed ^ hashString(`orbit:${e.id}`))),
+        }])
       }
       if (members[0]?.swarm) {
         const slots = placeWallSwarm({ table, riderIndex, type: wave.type, walls, slots: members.map((e) => e.swarm!), ride })
@@ -262,7 +271,7 @@ export default function EnemySpawner({
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [groundFn, bounds, keepOff, walls],
+    [groundFn, bounds, keepOff, walls, runSeed],
   )
 
   const placeWave = useCallback(
@@ -471,6 +480,7 @@ export default function EnemySpawner({
             radius={enemy.radius}
             onKill={onKill}
             wall={placed.wall}
+            orbit={placed.orbit}
             onEscape={enemy.bystander ? undefined : onEscape}
             bystander={enemy.bystander}
           />
