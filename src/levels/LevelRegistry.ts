@@ -52,13 +52,15 @@ const LEVELS: LevelConfig[] = [
     ...paceLevel({
       // Weights are seconds (45 over the wave span). Two scorpion packs so the straight run to the lift doesn't put all
       // thirty in view (#864: draws); two Vs up the lift hill (2 s, 6 s), one group each, so the sky holds crows until the
-      // crest (#937); the second pack on the sand before the door, under the drop (11 s); the sandstorm's V meets the car
-      // out of the Pyramid (16 s); the last V's groups spread from the climb to the airtime crest (25 s) on to the boss.
+      // crest (#937); the second pack on the sand before the door, under the drop (11 s), and its last eight on the
+      // passage's floor in the dark (13 s, #937); the sandstorm's V meets the car out of the Pyramid (16 s); the last V's
+      // groups spread from the climb to the airtime crest (25 s) on to the boss.
       waves: [
         { type: 'scorpion', count: 12, waveLabel: 'Incoming!', weight: 2 },
         { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', weight: 4 },
         { type: 'crow', count: 9, formation: 'v', weight: 5 },
-        { type: 'scorpion', count: 18, waveLabel: 'Out of the Sand!', weight: 5 },
+        { type: 'scorpion', count: 10, waveLabel: 'Out of the Sand!', weight: 2 },
+        { type: 'scorpion', count: 8, waveLabel: 'In the Tomb!', darkFloor: true, weight: 3 },
         { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 9 },
         { type: 'crow', count: 30, waveLabel: 'More Crows!', formation: 'v', weight: 20 },
       ],

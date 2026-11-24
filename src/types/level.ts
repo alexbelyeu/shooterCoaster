@@ -169,6 +169,9 @@ export interface DarkSectionSpec {
   flashReach: number
   look?: DarkLook
   reach?: number
+  /** A floor it is ridden over (level 2's passage through the Pyramid, #937), `below` the rails and `halfWidth` either side of
+   *  them: a `darkFloor` wave's walkers stand on it (`spawning/darkFloor.ts`). */
+  floor?: { below: number; halfWidth: number }
 }
 
 export type DarkLook = 'blacklight' | 'ice'
@@ -212,6 +215,12 @@ export interface EnemyWave {
    * kill count. `maxScore` counts it: the harder way is the way to three stars.
    */
   route?: 'hard'
+  /**
+   * The wave stands on the floor of the dark section the rider is in or comes to next (#937: scorpions in the Pyramid's
+   * passage), along it ahead of the rider (`spawning/darkFloor.ts`): a ground walker, no formation, on a track with a
+   * `DarkSectionSpec.floor`.
+   */
+  darkFloor?: boolean
 }
 
 /** A whale breaching across the ride (Ocean, #793), where and when the level puts it; the breach's own shape is `BREACH` in `biomes/ocean/whaleBreach.ts`. */
