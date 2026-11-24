@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { unregisterCollisionTarget } from '@/combat/CollisionManager'
+import { useGameStore } from '@/store/useGameStore'
 import { GOLDEN_BALLOON_DEATH_STYLE } from '@/effects/deathStyles'
 import {
   BALLOON_BODY_GEO, BALLOON_KNOT_GEO, BALLOON_STRING_GEO,
@@ -12,6 +13,8 @@ import {
  * Golden bonus balloon: 5x points, emissive gold, bobs up and down,
  * auto-despawns after 5 seconds of game time (a pause holds it); pops in gold confetti.
  */
+const popGolden = () => useGameStore.getState().popGolden()
+
 export default function GoldenBalloon(props: EnemyProps) {
   const [visible, setVisible] = useState(true)
   const spawnTime = useRef<number | null>(null)
@@ -38,7 +41,7 @@ export default function GoldenBalloon(props: EnemyProps) {
   if (!visible) return null
 
   return (
-    <EnemyBase {...props} updatePosition={updatePosition} deathStyle={GOLDEN_BALLOON_DEATH_STYLE}>
+    <EnemyBase {...props} updatePosition={updatePosition} onHit={popGolden} deathStyle={GOLDEN_BALLOON_DEATH_STYLE}>
       <group>
         {/* Golden balloon body */}
         <mesh scale={[1, 1.3, 1]} geometry={BALLOON_BODY_GEO} material={GOLDEN_BODY_MAT} />

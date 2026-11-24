@@ -562,11 +562,17 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
 
   // With `leaderboard`, seed nine entries so this run places 4th, in the same turn as the end so the score can't move.
   const seeding = await page.evaluate(
-    ([lid, seed, endpoint]) => {
+    ([lid, seed, endpoint, medal]) => {
       const t = window.__SC_TEST__
       t.holdLevelTime = false
       const phase = t.phase()
       if (phase !== 'playing') return { phase, rank: null }
+      // #879: for the results board, one more kill on a chain primed to the longest medal chain wins the level's combo medal.
+      let noMedalKill = false
+      if (medal) {
+        t.primeCombo(t.longestComboMedal - 1)
+        noMedalKill = t.killNearest(1) === 0
+      }
       const score = Math.round(t.stats().score)
       const seeded = seed && score > 0
       const above = [3000, 2000, 1000].map((d) => score + d)
@@ -577,12 +583,13 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
         t.setLeaderboards({ [lid]: [...above, ...below].map(row) }, 'AAA')
       }
       t.endLevel()
-      return { phase, rank: seeded ? above.length : null }
+      return { phase, rank: seeded ? above.length : null, noMedalKill }
     },
-    [id, leaderboard, online ? ONLINE_ENDPOINT : null],
+    [id, leaderboard, online ? ONLINE_ENDPOINT : null, resultsScreen],
   )
   // With the level timer held this can't happen; if it does, say so instead of failing the board checks on it.
   if (seeding.phase !== 'playing') problems.push(`level left play (${seeding.phase}) before the results checks, with the level timer held`)
+  if (seeding.noMedalKill) problems.push('no enemy left to win the combo medal (killNearest found none)')
   const seededRank = seeding.rank
   // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
   const resultsShown = await page
@@ -947,6 +954,8 @@ async function resultsScreenProblems(page, id, stats, { share }) {
       nextLevel: next ? { id: next.id, unlocked: next.unlocked } : null,
       keys: el.querySelector('.results-keys')?.textContent ?? '',
       score: el.querySelector('.results-score-value')?.textContent ?? '', text: el.textContent,
+      medals: [...el.querySelectorAll('.results-medal')].map((m) => m.dataset.medal), medalsWon: s.medalsWon(),
+      saved: Object.keys(JSON.parse(localStorage.getItem('shootercoaster-scores') ?? '{}').state?.savedMedals ?? {}),
     }
   })
   const problems = []
@@ -975,6 +984,10 @@ async function resultsScreenProblems(page, id, stats, { share }) {
     shown.scoreCards = cards.sizes
   }
   if (/NaN|undefined|Infinity/.test(text)) problems.push(`results screen shows NaN/undefined: "${text}"`)
+  // #879: the board shows the medals the run won (the run primed a medal chain, so at least one) and saves them.
+  if (screen.medals.length === 0) problems.push(`results board shows no medal (the run won ${JSON.stringify(screen.medalsWon)})`)
+  if (JSON.stringify(screen.medals) !== JSON.stringify(screen.medalsWon)) problems.push(`results medals ${JSON.stringify(screen.medals)} != won ${JSON.stringify(screen.medalsWon)}`)
+  if (screen.medals.length > 0 && !screen.saved.includes(id)) problems.push(`${id}'s medals ${JSON.stringify(screen.medals)} weren't saved`)
   for (const stat of ['hits', 'accuracy', 'combo', 'time']) {
     if (!(stat in screen.rows)) problems.push(`results screen has no "${stat}" line`)
   }
@@ -3065,10 +3078,13 @@ async function levelSelectCheck(page, levels) {
     Object.values(scores).map((e, i) => [e.level, [{ initials: champions[i], score: e.score, stars: e.stars, date: 1 }]]),
   )
   // Reloaded so the cards come back from localStorage.
-  await page.evaluate(([s, b]) => {
+  // #879: the first level has won two of its three medals.
+  const firstMedals = 2
+  await page.evaluate(([s, b, lid, n]) => {
     window.__SC_TEST__.setSavedScores(s)
     window.__SC_TEST__.setLeaderboards(b)
-  }, [scores, boards])
+    window.__SC_TEST__.setSavedMedals({ [lid]: window.__SC_TEST__.levelMedalIds(lid).slice(0, n) })
+  }, [scores, boards, levels[0].id, firstMedals])
   await page.reload({ waitUntil: 'load' })
   await page.waitForFunction(() => !!window.__SC_TEST__, null, { timeout: 30000 })
   await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
@@ -3093,6 +3109,9 @@ async function levelSelectCheck(page, levels) {
       initials: cards.filter((c) => !c.classList.contains('level-card-daily')).map((c) => c.querySelector('.level-card-initials')?.textContent ?? null),
       hScroll: root ? root.scrollWidth > root.clientWidth : true,
       focused: document.activeElement?.dataset?.level ?? null,
+      medals: cards
+        .filter((c) => !c.classList.contains('level-card-daily'))
+        .map((c) => [c.querySelectorAll('.level-medal').length, c.querySelectorAll('.level-medal[data-earned="true"]').length]),
     }
   })
   // One card per level plus the Daily Run card (#184).
@@ -3106,6 +3125,9 @@ async function levelSelectCheck(page, levels) {
   if (JSON.stringify(layout.initials) !== JSON.stringify(expectInitials))
     problems.push(`card initials ${JSON.stringify(layout.initials)} after a reload, expected ${JSON.stringify(expectInitials)}`)
   if (layout.hScroll) problems.push('level select scrolls sideways')
+  const expectMedals = levels.map((_, i) => (i >= expectOpen ? [0, 0] : [3, i === 0 ? firstMedals : 0]))
+  if (JSON.stringify(layout.medals) !== JSON.stringify(expectMedals))
+    problems.push(`card medals [shown, won] ${JSON.stringify(layout.medals)} after a reload, expected ${JSON.stringify(expectMedals)}`)
 
   const focused = () => page.evaluate(() => document.activeElement?.dataset?.level ?? null)
   const target = levels[Math.min(2, levels.length - 1)].id
