@@ -512,7 +512,7 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
     }
     const { from, spin } = entryStart(formation, f, position, groundFn)
     const placed = keepIn(outsideNearField(keepIn(position), camera))
-    // Seen from the looks that follow the group's landing, from where it is framed on
+    // Seen by the looks from where the group is framed (`formationFrame`) on
     const lands = slot.group * step + ride.entry + VIEW_LEAD
     return {
       position: surface === 'air' && clearAir ? clearAir(placed, (q) => eyesSeeing(table, riderIndex, lands, q, reach, ride.trackScale)) : placed,

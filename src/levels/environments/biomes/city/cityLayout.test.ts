@@ -5,7 +5,7 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { trackExtent } from '../../shared/trackScatter'
 import { buildTrackIndex } from '../../shared/trackClearance'
 import { createRng } from '@/utils/rng'
-import { cityTowers, footprintDistance, KERB_OFFSET, layoutCity, onPavement, streetAxis, TRACK_CLEARANCE, type Tower } from './cityLayout'
+import { cityTowers, clearOfTowers, footprintDistance, KERB_OFFSET, layoutCity, onPavement, streetAxis, TRACK_CLEARANCE, type Tower } from './cityLayout'
 import { STREET_GRID } from './config'
 
 const table = buildArcTable(createTrackCurve(shippedLevel('level7').track))
@@ -55,6 +55,24 @@ describe('layoutCity', () => {
     expect(layout.signs.length).toBeGreaterThan(30)
     expect(new Set(layout.signs.map((s) => s.color))).toEqual(new Set(['magenta', 'cyan', 'amber']))
     for (const s of layout.signs) expect(trackDistance(s.x, s.z)).toBeGreaterThan(8)
+  })
+})
+
+describe('clearOfTowers', () => {
+  // One block's tower round the spot: the streets either side of it along x are the nearest clear spots
+  const tower: Tower = { x: 0, z: 0, w: 176, d: 176, h: 300 }
+  const p = { x: 0, y: 50, z: 0 }
+  const c = { x: 60, y: 24, z: 32 }
+
+  it('without eyes, the nearest clear street', () => {
+    expect(Math.abs(clearOfTowers([tower], p, 0, c).z)).toBe(STREET_GRID.pitch / 2)
+  })
+
+  it('the street an eye sees past the tower over a nearer one it hides (#871)', () => {
+    for (const side of [-1, 1]) {
+      const eye = { x: 0, y: 50, z: side * 1000 }
+      expect(clearOfTowers([tower], p, 0, c, () => [eye])).toEqual({ x: 0, y: 50, z: (side * STREET_GRID.pitch) / 2 })
+    }
   })
 })
 
