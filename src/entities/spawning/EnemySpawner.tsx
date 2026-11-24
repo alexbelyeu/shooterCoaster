@@ -307,8 +307,9 @@ export default function EnemySpawner({
     [waves, enemies, rideAhead, placeMembers, trackTable, hardRoute, walls],
   )
 
+  // -1 with no waves (a Boss Rush stage, #1011): nothing is live from the start.
   const initialActiveWave = useMemo(
-    () => waves.reduce((max, w, i) => ((w.spawnDelay ?? 0) === 0 ? i : max), 0),
+    () => waves.reduce((max, w, i) => ((w.spawnDelay ?? 0) === 0 ? i : max), waves.length ? 0 : -1),
     [waves],
   )
   // Waves live from the start are placed for the start of the track, where every run begins.

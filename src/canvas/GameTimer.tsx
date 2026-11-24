@@ -13,8 +13,9 @@ import { gameTime } from '@/core/gameClock'
 import { getPointerState } from '@/input/pointerInput'
 
 /**
- * Counts down the level; reset when a run starts (`runId`), kept through GO, pause and resume. A boss win with nothing
- * left (`run:cleared`, #961) ends it early, after the defeat's hold.
+ * Counts down the level; reset when a run starts (`runId`), from the run's `runStartAt` (a Boss Rush stage starts near its
+ * boss, #1011), kept through GO, pause and resume. A boss win with nothing left (`run:cleared`, #961) ends it early, after
+ * the defeat's hold; either way the store's `endRun` hears when play ended.
  * Also the frame that owns the combo game clock (`tickCombo`), the slow-mo (`tickSlowMo`) and the ghost's recording (`recordGhost`).
  */
 export default function GameTimer() {
@@ -27,21 +28,29 @@ export default function GameTimer() {
   const lastCeiled = useRef(-1)
   /** Level time a boss win ends the run at, or null. */
   const endsAt = useRef<number | null>(null)
+  /** Level time of this run's `run:cleared`, or null. */
+  const clearedAt = useRef<number | null>(null)
 
   // A layout effect, so the reset lands in the same commit as the new run and no frame can tick the old run's time.
   useLayoutEffect(() => {
-    elapsed.current = 0
+    const { runStartAt, setTimeRemaining } = useGameStore.getState()
+    elapsed.current = runStartAt
     running.current = false
     lastCeiled.current = -1
     endsAt.current = null
+    clearedAt.current = null
     resetComboRuntime()
     resetSlowMo()
     resetGhostRecording()
-    useGameStore.getState().setTimeRemaining(RUN_SECONDS)
+    setTimeRemaining(RUN_SECONDS - runStartAt)
   }, [runId])
 
   useEffect(() => {
-    const onCleared = () => { endsAt.current ??= bossWinEndsAt(elapsed.current) }
+    const onCleared = () => {
+      if (clearedAt.current !== null) return
+      clearedAt.current = elapsed.current
+      endsAt.current = bossWinEndsAt(elapsed.current)
+    }
     eventBus.on('run:cleared', onCleared)
     return () => eventBus.off('run:cleared', onCleared)
   }, [])
@@ -55,8 +64,9 @@ export default function GameTimer() {
 
   useFrame((_, delta) => {
     // The rendered `phase` lags a store change by a render, so a pause from a DOM event (tab hide) is read live.
-    const { phase: livePhase, timeScale, shotsFired, setTimeRemaining, setPhase } = useGameStore.getState()
-    if (phase !== 'playing' || livePhase !== 'playing') return
+    const { phase: livePhase, runId: liveRunId, timeScale, shotsFired, setTimeRemaining, endRun } = useGameStore.getState()
+    // A Boss Rush's next stage can start playing at once (under the e2e hook): not on this run's time, before its reset.
+    if (phase !== 'playing' || livePhase !== 'playing' || liveRunId !== runId) return
     markStartup('firstPlayingFrame')
     if (timeScale === 0) return
     if (running.current) {
@@ -80,7 +90,7 @@ export default function GameTimer() {
       // A boss win ends between whole seconds: the results' "seconds to spare" reads the exact time left.
       setTimeRemaining(remaining)
       endSlowMo()
-      setPhase('results')
+      endRun(clearedAt.current ?? elapsed.current)
     }
   })
 

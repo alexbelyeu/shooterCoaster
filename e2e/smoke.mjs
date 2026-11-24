@@ -337,6 +337,7 @@ async function rideToLevelTime(page, id, seconds, minFrames, { started = false, 
       if (levelTime == null && !run.overdue) return 'hold'
       run.levelTime = levelTime
       if (!run.overdue && (levelTime < target || run.frames < minFrames)) return
+      run.stopFrame = s.frames
       s.setTimeScale(0)
       s.rideRate = null
       s.stopAtLevelTime = null
@@ -349,11 +350,15 @@ async function rideToLevelTime(page, id, seconds, minFrames, { started = false, 
   for (;;) {
     await page.waitForTimeout(250)
     const r = await page.evaluate((overdue) => {
-      const run = window.__SC_TEST__.rideRun
+      const s = window.__SC_TEST__
+      const run = s.rideRun
       run.overdue ||= overdue
-      return run
+      // The hook reads a frame's draw calls and triangles on the frame after it (#1014): the stopped frame's are in
+      // once one more frame has run; read before that, the ride stats were the frame before the stop's, which a wave
+      // mounted on the last held frame isn't in, so the same build sampled 77 or 95 draws in level 8 by the poll's timing.
+      return { ...run, sampled: overdue || s.frames > run.stopFrame }
     }, Date.now() - start >= FRAME_DEADLINE_MS)
-    if (r.done) return { frames: r.frames ?? 0, ms: Date.now() - start, levelTime: r.levelTime }
+    if (r.done && r.sampled) return { frames: r.frames ?? 0, ms: Date.now() - start, levelTime: r.levelTime }
   }
 }
 
@@ -3107,17 +3112,17 @@ async function levelSelectCheck(page, levels) {
       locked: cards.filter((c) => c.dataset.locked === 'true').length,
       total: document.querySelector('.level-select-total')?.dataset.stars ?? null,
       totalText: document.querySelector('.level-select-total')?.textContent ?? '',
-      offscreen: off.map((c) => c.dataset.level ?? (c.classList.contains('level-card-daily') ? 'daily' : '?')),
-      initials: cards.filter((c) => !c.classList.contains('level-card-daily')).map((c) => c.querySelector('.level-card-initials')?.textContent ?? null),
+      offscreen: off.map((c) => c.dataset.level ?? (c.classList.contains('level-card-daily') ? 'daily' : c.dataset.rush ? 'bossRush' : '?')),
+      initials: cards.filter((c) => c.dataset.level).map((c) => c.querySelector('.level-card-initials')?.textContent ?? null),
       hScroll: root ? root.scrollWidth > root.clientWidth : true,
       focused: document.activeElement?.dataset?.level ?? null,
       medals: cards
-        .filter((c) => !c.classList.contains('level-card-daily'))
+        .filter((c) => c.dataset.level)
         .map((c) => [c.querySelectorAll('.level-medal').length, c.querySelectorAll('.level-medal[data-earned="true"]').length]),
     }
   })
-  // One card per level plus the Daily Run card (#184).
-  if (layout.cards !== levels.length + 1) problems.push(`${layout.cards} cards for ${levels.length} levels + Daily`)
+  // One card per level plus the Daily Run (#184) and Boss Rush (#1011) tickets.
+  if (layout.cards !== levels.length + 2) problems.push(`${layout.cards} cards for ${levels.length} levels + Daily + Boss Rush`)
   if (layout.locked !== levels.length - expectOpen) problems.push(`${layout.locked} locked cards, expected ${levels.length - expectOpen}`)
   if (Number(layout.total) !== expectStars || !layout.totalText.includes(`${expectStars} / ${levels.length * 3}`)) {
     problems.push(`star total "${layout.totalText.trim()}", expected ${expectStars} / ${levels.length * 3}`)
@@ -3318,6 +3323,78 @@ async function dailyCheck(newPage) {
     errors,
     daily: { dateKey: run?.dateKey, level: run?.level, seed: run?.seed, digest: a.digest, digestAgain: b.digest, record: results.record, replaySeed: replay.runSeed, world, offline },
   }
+}
+
+/**
+ * Boss Rush (#1011): with 3 stars on every level its ticket opens; the first stage starts near its boss with no waves, beating
+ * the boss moves on to the next level's stage, the timer running out there ends the rush on its results (`bossrush-results.png`),
+ * and nothing reaches the campaign saves or boards.
+ */
+async function bossRushCheck(newPage) {
+  const problems = []
+  const { page, errors, ctx } = await newPage()
+  const stars = await page.evaluate(() => {
+    const s = window.__SC_TEST__
+    const saved = Object.fromEntries(s.levels().map((l) => [l.id, { level: l.id, score: 1, maxScore: 1, stars: 3, timestamp: 0 }]))
+    s.setSavedScores(saved)
+    s.setPhase('levelSelect')
+    return saved
+  })
+  if (!(await waitVisible(page, '.level-card-rush[data-rush="open"]'))) problems.push('no open Boss Rush ticket with 3 stars on every level')
+  await page.locator('.level-card-rush').click({ timeout: 30000 }).catch((e) => problems.push(`click Boss Rush: ${e.message}`))
+  const run = () => page.evaluate(() => {
+    const s = window.__SC_TEST__
+    const stats = s.stats()
+    return { phase: s.phase(), mode: s.daily().runMode, level: stats.currentLevel, enemies: s.enemyScreenPoints(50).length, strip: document.querySelector('[data-rush-stage]')?.textContent ?? null }
+  })
+  const ready = () => page.waitForFunction(() => window.__SC_TEST__.levelReady(), null, { timeout: 120000 }).catch(() => {})
+  await page.waitForFunction(() => window.__SC_TEST__.phase() === 'playing', null, { timeout: 30000 }).catch(() => {})
+  await ready()
+  const first = await run()
+  if (first.mode?.mode !== 'bossRush' || first.mode.stage !== 0) problems.push(`the ticket started ${JSON.stringify(first.mode)}, expected Boss Rush stage 0`)
+  if (first.enemies !== 0) problems.push(`a rush stage shows ${first.enemies} wave enemies, expected the boss alone`)
+  await page.evaluate(() => window.__SC_TEST__.summonBoss())
+  const fell = await pollUntil(page, async () => {
+    await page.evaluate(() => window.__SC_TEST__.bossHit(20))
+    return (await page.evaluate(() => window.__SC_TEST__.bossEvents.defeated)) > 0
+  }, { ms: 60000, frames: 2, pollMs: 300 })
+  if (!fell) problems.push(`stage 1 (${first.level}): the boss never fell`)
+  const moved = await pollUntil(page, async () => (await run()).mode?.stage === 1, { ms: 60000, frames: 2, pollMs: 300 })
+  await ready()
+  await waitFrames(page, 3, { maxMs: 20000 })
+  const second = await run()
+  if (!moved || second.level === first.level) problems.push(`beating the boss did not move on to stage 2: ${JSON.stringify(second)}`)
+  if (!(second.mode?.seconds > 0)) problems.push(`stage 2 carries no time from stage 1: ${JSON.stringify(second.mode)}`)
+  if (!second.strip?.startsWith('Boss 2 of')) problems.push(`the HUD's stage strip reads "${second.strip}", expected "Boss 2 of …"`)
+  // The timer runs out on stage 2: the rush ends there.
+  await page.evaluate(() => { window.__SC_TEST__.timerStep = 1 })
+  const ended = await page
+    .waitForFunction(() => document.querySelector('.results-screen')?.dataset.mode === 'bossRush', null, { timeout: 60000, polling: 250 })
+    .then(() => true, () => false)
+  await page.evaluate(() => { window.__SC_TEST__.timerStep = null })
+  await page.waitForTimeout(800)
+  await page.screenshot({ path: path.join(OUT, 'bossrush-results.png'), timeout: SHOT_TIMEOUT })
+  const results = await page.evaluate(() => {
+    const el = document.querySelector('.results-screen')
+    const saved = JSON.parse(localStorage.getItem('shootercoaster-scores') ?? '{}').state ?? {}
+    return {
+      bosses: el?.querySelector('[data-stat="bosses"]')?.textContent ?? null,
+      buttons: [...(el?.querySelectorAll('.results-actions button') ?? [])].map((b) => b.textContent),
+      savedScores: saved.savedScores ?? null,
+      boards: window.__SC_TEST__.leaderboards().boards,
+      best: saved.bossRushBest ?? null,
+    }
+  })
+  if (!ended) problems.push('the rush never reached its results when the timer ran out on stage 2')
+  else if (!results.bosses?.startsWith('1 of')) problems.push(`rush results read "${results.bosses}", expected 1 boss beaten`)
+  if (ended && !results.buttons.includes('Replay')) problems.push(`rush results offer ${JSON.stringify(results.buttons)}, no Replay`)
+  if (JSON.stringify(results.savedScores) !== JSON.stringify(stars)) problems.push('a Boss Rush changed the campaign saves')
+  if (Object.keys(results.boards).length) problems.push(`a Boss Rush entered the leaderboards: ${JSON.stringify(results.boards)}`)
+  if (results.best !== null) problems.push(`a lost rush saved a best time (${results.best})`)
+  errors.push(...(await page.evaluate(() => window.__SC_TEST__.errors)))
+  await ctx.close()
+  if (errors.length) problems.push(`${errors.length} error(s)`)
+  return { id: 'bossRush', ok: problems.length === 0, problems, errors, bossRush: { stages: [first.level, second.level], seconds: second.mode?.seconds ?? null } }
 }
 
 /** The settings card (#35): inside the viewport, no sideways scroll, every control there and ≥ 44 px tall. */
@@ -4433,7 +4510,7 @@ async function runMobile(browser, base) {
       const r = c.getBoundingClientRect()
       return r.left < 0 || r.right > window.innerWidth || r.height < 44
     })
-    const open = cards.filter((c) => !c.dataset.locked && !c.classList.contains('level-card-daily'))
+    const open = cards.filter((c) => c.dataset.level && !c.dataset.locked)
     const noFeats = open.filter((c) => !(c.querySelector('.level-feats')?.getBoundingClientRect().height > 0))
     return { hScroll: root ? root.scrollWidth > root.clientWidth : true, bad: tooNarrow.map((c) => c.dataset.level), noFeats: noFeats.map((c) => c.dataset.level) }
   })
@@ -4732,6 +4809,9 @@ async function run() {
   // 1b'. Daily Run from its card: today's seed, same spawns on a second load, daily results, campaign saves untouched
   if (has('daily')) await step(() => dailyCheck(newPage), 'daily')
 
+  // 1b''. Boss Rush (#1011): opened by 3 stars everywhere, two stages, the rush's results, campaign saves untouched
+  if (has('bossRush')) await step(() => bossRushCheck(newPage), 'bossRush')
+
   // 1c. Settings from the title (settings.png): layout, Esc, persisted across a reload
   if (has('settings')) await pageStep('settings', null, settingsCheck)
 
@@ -4968,6 +5048,8 @@ async function run() {
         ` draws=${r.drawCalls} scene objs=${r.scene?.objects} tris=${r.scene?.triangles}; poster: ${r.posterShots} load shots, off by ${JSON.stringify(r.posterOffsets ?? {})}; s: ${Object.entries(r.laps ?? {}).map(([k, v]) => `${k} ${v}`).join(', ')}`
       : r.landing
         ? ` ${r.landing.requested} -> ${r.landing.pathname}${r.landing.search} phase=${r.landing.phase} internal marker=${r.landing.marker} failed requests=${r.landing.failed}`
+      : r.bossRush
+        ? ` stages ${r.bossRush.stages.join(' -> ')}, ${r.bossRush.seconds?.toFixed(1) ?? '-'} s carried into stage 2`
       : r.daily
         ? ` ${r.daily.dateKey} ${r.daily.level} seed=${r.daily.seed} digest=${r.daily.digest} again=${r.daily.digestAgain} record=${r.daily.record} replaySeed=${r.daily.replaySeed}`
       : r.levelSelect
