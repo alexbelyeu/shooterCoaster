@@ -19,6 +19,7 @@
     "level5": 180,
     "level6": 180,
     "level7": 180,
+    "level8": 180,
     "mobile": 240
   },
   "scene": {
@@ -76,6 +77,13 @@
       "triangles": 195330,
       "trackObjects": 4,
       "trackTriangles": 101568
+    },
+    "level8": {
+      "drawCalls": 93,
+      "objects": 90,
+      "triangles": 222907,
+      "trackObjects": 4,
+      "trackTriangles": 95869
     }
   },
   "pacing": {
@@ -118,6 +126,10 @@
       "bossFramedShare": 0.35,
       "knownOver": "#989",
       "knownOverOnly": "boss"
+    },
+    "level8": {
+      "longestGapSeconds": 5,
+      "noTargetShare": 0.5
     }
   }
 }

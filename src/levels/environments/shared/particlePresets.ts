@@ -196,7 +196,34 @@ const cityDrizzle: ParticleFieldPreset = {
   secondaryShare: 0.2,
 }
 
-export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh, gymChalk, cityDrizzle } as const
+/** Jungle Ruins (#870): humid air, slow pale spores drifting down, with the odd firefly-green glint. */
+const jungleSpores: ParticleFieldPreset = {
+  count: 1300,
+  box: [400, 220, 400],
+  primary: {
+    color: 0xeef2d0,
+    opacity: 0.5,
+    size: 0.9,
+    maxPixels: 3,
+    velocity: [1, -1.2, 0.8],
+    sway: 9,
+    flicker: 0.2,
+    additive: false,
+  },
+  secondary: {
+    color: 0xc8ff7a,
+    opacity: 0.6,
+    size: 1.0,
+    maxPixels: 3,
+    velocity: [1.5, 0.5, 1],
+    sway: 12,
+    flicker: 0.9,
+    additive: false,
+  },
+  secondaryShare: 0.15,
+}
+
+export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh, gymChalk, cityDrizzle, jungleSpores } as const
 
 /** Points to draw: always-on and boost-only. Touch screens get half (as `renderBudget.ts` cuts their pixels); the graphics quality's `particleScale` thins both. */
 export function particleCounts(preset: ParticleFieldPreset, coarsePointer: boolean, qualityScale = 1): { base: number; boost: number } {

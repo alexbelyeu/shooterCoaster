@@ -92,6 +92,12 @@ export const LEVEL_MEDALS: Readonly<Record<string, readonly [Medal, Medal, Medal
     medal('neonEye', 'Neon Eye', 'Hit 3 shots in 4, firing 30 or more', { kind: 'accuracy', percent: 75, minShots: 30 }),
     medal('gridlock', 'Gridlock', 'Chain 25 hits in a row', { kind: 'combo', count: 25 }),
   ],
+  // The boss slot is a placeholder until the guardian (#869), so no boss medal yet.
+  level8: [
+    medal('birdwatcher', 'Birdwatcher', 'Hit 3 shots in 4, firing 30 or more', { kind: 'accuracy', percent: 75, minShots: 30 }),
+    medal('stillWater', 'Still Water', 'Miss nothing through a Frenzy', { kind: 'frenzyClean' }),
+    medal('canopyChain', 'Canopy Chain', 'Chain 25 hits in a row', { kind: 'combo', count: 25 }),
+  ],
 }
 
 /** The longest combo any medal asks for: a chain this long wins every combo medal (the smoke primes it). */

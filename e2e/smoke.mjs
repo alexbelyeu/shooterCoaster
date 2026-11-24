@@ -3107,7 +3107,7 @@ async function levelSelectCheck(page, levels) {
       locked: cards.filter((c) => c.dataset.locked === 'true').length,
       total: document.querySelector('.level-select-total')?.dataset.stars ?? null,
       totalText: document.querySelector('.level-select-total')?.textContent ?? '',
-      offscreen: off.map((c) => c.dataset.level),
+      offscreen: off.map((c) => c.dataset.level ?? (c.classList.contains('level-card-daily') ? 'daily' : '?')),
       initials: cards.filter((c) => !c.classList.contains('level-card-daily')).map((c) => c.querySelector('.level-card-initials')?.textContent ?? null),
       hScroll: root ? root.scrollWidth > root.clientWidth : true,
       focused: document.activeElement?.dataset?.level ?? null,

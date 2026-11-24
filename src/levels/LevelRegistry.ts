@@ -196,7 +196,7 @@ const LEVELS: LevelConfig[] = [
     biome: 'city',
     maxScore: 57 * 15 + 25 * 20 + 60 + 60 + 400, // 57 drones and 25 bots, 1355, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1875
     message: 'You cleared Neon Metropolis!',
-    nextLevel: null,
+    nextLevel: 'level8',
     // The ride kit's storyboard down the city's streets (#871, `cityTrack.ts`), shipped in the city world's chunk (#960).
     // The street and the air take turns (#963): billboard bots line the launch's avenue, where the rider is at street
     // level, hover drones patrol the canyons in a V and rings from the lift on (the towers hide the pavements from up
@@ -218,6 +218,49 @@ const LEVELS: LevelConfig[] = [
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},
+  },
+  {
+    id: 'level8',
+    name: 'Jungle Ruins',
+    description: 'Toucans over the temple ruins',
+    order: 8,
+    biome: 'jungle',
+    maxScore: 83 * 15 + 5 * 65 + 400, // 1245 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 1970
+    message: 'You cleared Jungle Ruins!',
+    nextLevel: null,
+    // A first cut on the legacy curve1 until the ride kit's storyboard (#1009, `jungleTrack.ts`); `jungleLayout.test.ts`
+    // keeps the temple in front of the drop meanwhile.
+    ride: {
+      track: {
+        varA: 3,
+        varB: 17,
+        varC: 4,
+        scalar: 20,
+        curve: 'curve1',
+        ride: 'v2',
+        mechanics: [{ kind: 'station', from: 0, to: 0.01, speed: 120 }],
+        rideV2: { gravity: 480, crawl: 90, drag: 0.0012, zones: [{ kind: 'lift', from: 0.085, to: 0.122, speed: 60 }] },
+        color1: 0xd8c9a0,
+        color2: 0x3f8a4a,
+      },
+    },
+    // Toucans over the canopy in Vs, rings and spirals ahead of the rider, one wave every few seconds from the
+    // station to the temple, then the boss slot, held by the Golden Blimp until the guardian (#869). Each V is one
+    // group of 9: on this curve a second group would sit within reading range of the rider from the wave's start.
+    ...paceLevel({
+      waves: [
+        { type: 'toucan', count: 9, waveLabel: 'Toucans!', formation: 'v', weight: 0.75 },
+        { type: 'toucan', count: 10, waveLabel: 'Over the Canopy!', formation: 'ring' },
+        { type: 'toucan', count: 9, waveLabel: 'The Flock!', formation: 'v' },
+        { type: 'toucan', count: 16, waveLabel: 'Temple Run!', formation: 'spiral' },
+        { type: 'toucan', count: 9, waveLabel: 'Bills Out!', formation: 'v' },
+        { type: 'toucan', count: 9, waveLabel: 'Down the Falls!', formation: 'v' },
+        { type: 'toucan', count: 21, waveLabel: 'The Whole Jungle!', formation: 'ring', weight: 2.5 },
+      ],
+      boss: 'goldenBlimp',
+    }),
+    starThresholds: [0.25, 0.55, 0.85],
+    environment: { hasTrees: true, treeCount: 500 },
   },
 ]
 

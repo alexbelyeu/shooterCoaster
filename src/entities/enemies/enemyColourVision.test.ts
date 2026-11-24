@@ -11,6 +11,7 @@ import { COLOR_RAMP as ARCTIC_RAMP } from '@/levels/environments/biomes/arctic/c
 import { COLOR_RAMP as VOLCANIC_RAMP } from '@/levels/environments/biomes/volcanic/config'
 import { COLOR_RAMP as GYM_RAMP, WALL_PAINT } from '@/levels/environments/biomes/gym/config'
 import { COLOR_RAMP as CITY_RAMP } from '@/levels/environments/biomes/city/config'
+import { COLOR_RAMP as JUNGLE_RAMP } from '@/levels/environments/biomes/jungle/config'
 import { WATER_COLOURS } from '@/levels/environments/shared/waterSurface'
 import * as A from './SharedEnemyAssets'
 import * as P from './enemyPalette'
@@ -69,7 +70,8 @@ const emberWisp = (): Read => {
 const ENEMIES: Read[] = [
   ...P.BALLOON_COLORS.map((c, i) => enemy(`balloon ${c}`, 'balloon', 'themePark', A.BALLOON_BODY_MATS[i], c)),
   enemy('goldenBalloon', 'balloon', 'themePark', null, A.GOLDEN_BODY_MAT),
-  enemy('crow', 'crow', 'desert', A.CROW_FEATHER_MAT, P.CROW_BODY, P.CROW_SHEEN),
+  enemy('crow', 'crow', 'desert', A.BIRD_FEATHER_MAT, P.CROW_BODY, P.CROW_SHEEN),
+  enemy('toucan', 'toucan', 'jungle', A.BIRD_FEATHER_MAT, P.TOUCAN_BODY, P.TOUCAN_BIB, P.TOUCAN_BILL),
   enemy('scorpion', 'scorpion', 'desert', A.SCORPION_SHELL_MAT, P.SCORPION_BODY_COLOR, P.SCORPION_PINCER_COLOR, P.SCORPION_LEG_COLOR),
   ...P.JELLY_COLORS.map((c, i) => enemy(`jellyfish ${c}`, 'jellyfish', 'ocean', null, A.JELLY_BODY_MATS[i], A.JELLY_INNER_MATS[i])),
   enemy('shark', 'shark', 'ocean', A.SHARK_MAT, P.SHARK_TOP, P.SHARK_BELLY),
@@ -90,7 +92,7 @@ const ENEMIES: Read[] = [
 
 const RAMPS: Record<BiomeType, ColorRamp> = {
   themePark: THEME_PARK_RAMP, desert: DESERT_RAMP, ocean: OCEAN_RAMP,
-  arctic: ARCTIC_RAMP, volcanic: VOLCANIC_RAMP, gym: GYM_RAMP, city: CITY_RAMP,
+  arctic: ARCTIC_RAMP, volcanic: VOLCANIC_RAMP, gym: GYM_RAMP, city: CITY_RAMP, jungle: JUNGLE_RAMP,
 }
 
 /**
