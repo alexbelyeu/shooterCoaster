@@ -1071,6 +1071,11 @@ export function installE2EApi() {
   // The medal table loads with the screens, not the startup JS this hook is part of; it has arrived long before a run ends.
   let medals: typeof import('@/levels/medals') | null = null
   void import('@/levels/medals').then((m) => (medals = m))
+  // Throw rather than answer "no medals" while the chunk is on its way: a slow runner's failure then says so.
+  const loadedMedals = () => {
+    if (!medals) throw new Error('the medals chunk (@/levels/medals) has not loaded yet')
+    return medals
+  }
   const api: SCTestApi = {
     frames: 0,
     avgFrameMs: 0,
@@ -1241,12 +1246,12 @@ export function installE2EApi() {
     },
     medalsWon: () => {
       const s = useGameStore.getState()
-      return s.currentLevel && medals ? medals.medalsWon(s.currentLevel, medalRun(s)) : []
+      return s.currentLevel ? loadedMedals().medalsWon(s.currentLevel, medalRun(s)) : []
     },
     get longestComboMedal() {
-      return medals?.LONGEST_COMBO_MEDAL ?? 0
+      return loadedMedals().LONGEST_COMBO_MEDAL
     },
-    levelMedalIds: (levelId) => medals?.levelMedals(levelId).map((m) => m.id) ?? [],
+    levelMedalIds: (levelId) => loadedMedals().levelMedals(levelId).map((m) => m.id),
     setSavedMedals: (medals) => useGameStore.setState({ savedMedals: medals }),
     shareText: (worldRank: number | null = null) => {
       const s = useGameStore.getState()

@@ -36,9 +36,11 @@ export interface LevelCard {
 export const STARS_PER_LEVEL = 3
 
 /** What a card's medals say aloud: "1 of 3 medals, Gold Rush". */
-export function medalsLine(medals: readonly Pick<LevelCard['medals'][number], 'name' | 'earned'>[]): string {
-  const won = medals.filter((m) => m.earned).map((m) => m.name)
-  return `${won.length} of ${medals.length} medals${won.length > 0 ? `, ${won.join(', ')}` : ''}`
+/** The card's medals for its aria-label: every one named, a won one as won and an unwon one with its feat (#904). */
+export function medalsLine(medals: readonly Pick<LevelCard['medals'][number], 'name' | 'line' | 'earned'>[]): string {
+  const won = medals.filter((m) => m.earned).length
+  const each = medals.map((m) => (m.earned ? `${m.name}, won` : `${m.name}: ${m.line}`))
+  return `${won} of ${medals.length} medals${each.length > 0 ? `. ${each.join('. ')}` : ''}`
 }
 
 export function buildLevelCards(

@@ -568,9 +568,10 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
       const phase = t.phase()
       if (phase !== 'playing') return { phase, rank: null }
       // #879: for the results board, one more kill on a chain primed to the longest medal chain wins the level's combo medal.
+      let noMedalKill = false
       if (medal) {
         t.primeCombo(t.longestComboMedal - 1)
-        t.killNearest(1)
+        noMedalKill = t.killNearest(1) === 0
       }
       const score = Math.round(t.stats().score)
       const seeded = seed && score > 0
@@ -582,12 +583,13 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
         t.setLeaderboards({ [lid]: [...above, ...below].map(row) }, 'AAA')
       }
       t.endLevel()
-      return { phase, rank: seeded ? above.length : null }
+      return { phase, rank: seeded ? above.length : null, noMedalKill }
     },
     [id, leaderboard, online ? ONLINE_ENDPOINT : null, resultsScreen],
   )
   // With the level timer held this can't happen; if it does, say so instead of failing the board checks on it.
   if (seeding.phase !== 'playing') problems.push(`level left play (${seeding.phase}) before the results checks, with the level timer held`)
+  if (seeding.noMedalKill) problems.push('no enemy left to win the combo medal (killNearest found none)')
   const seededRank = seeding.rank
   // App uses AnimatePresence mode="wait": the HUD fades out, the results fade in, then the reveal plays.
   const resultsShown = await page

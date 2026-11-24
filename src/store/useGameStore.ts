@@ -95,7 +95,8 @@ interface GameState {
   hits: number
   bestCombo: number
   registerShot: (bullets?: number) => void
-  registerHit: () => void
+  /** `inFrenzy`: the hit's shot was fired in FRENZY, so it pairs with a `frenzyShots` count (#904). */
+  registerHit: (inFrenzy: boolean) => void
   /** Shots and hits while a FRENZY's slow-mo is on (`frenzy` not 'off'), for the Frenzy medals (#879). */
   frenzyShots: number
   frenzyHits: number
@@ -283,7 +284,7 @@ export const useGameStore = create<GameState>()(
       addScore: (points) => set((s) => ({ score: s.score + points * s.combo.multiplier })),
       registerShot: (bullets = 1) =>
         set((s) => ({ shotsFired: s.shotsFired + bullets, frenzyShots: s.frenzyShots + (s.frenzy === 'off' ? 0 : bullets) })),
-      registerHit: () => set((s) => ({ hits: s.hits + 1, frenzyHits: s.frenzyHits + (s.frenzy === 'off' ? 0 : 1) })),
+      registerHit: (inFrenzy) => set((s) => ({ hits: s.hits + 1, frenzyHits: s.frenzyHits + (inFrenzy ? 1 : 0) })),
       popGolden: () => set((s) => ({ goldens: s.goldens + 1 })),
       hitBystander: (id, penalty) => {
         const s = get()

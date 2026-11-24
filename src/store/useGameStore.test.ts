@@ -121,7 +121,7 @@ describe('startRun', () => {
   it('resets the run, sets the level and the given seed, and opens on the loading screen', () => {
     store().addScore(50)
     store().registerShot()
-    store().registerHit()
+    store().registerHit(false)
     store().registerKill()
     store().startRun('level2', { seed: 42 })
     expect(store()).toMatchObject({
@@ -573,10 +573,10 @@ describe('medal stats (#879)', () => {
 
   it('counts shots and hits inside a FRENZY apart, and golden balloons', () => {
     store().registerShot(2)
-    store().registerHit()
+    store().registerHit(false)
     store().setSlowMo(0.35, 'on')
     store().registerShot(3)
-    store().registerHit()
+    store().registerHit(true)
     store().setSlowMo(1, 'off')
     store().popGolden()
     expect(store()).toMatchObject({ shotsFired: 5, hits: 2, frenzyShots: 3, frenzyHits: 1, goldens: 1 })
