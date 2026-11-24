@@ -1,6 +1,6 @@
-// node scripts/gen-ride-levels.mjs: each ride built from the ride kit (`RIDES`) as plain numbers, a `<name>Level.ts` beside
-// its `<name>Track.ts`: level 1's (#863), level 4's (#866) and level 5's (#867). The level registry is startup JS; the ride elements that
-// build the rides aren't.
+// node scripts/gen-ride-levels.mjs [levelId…]: each ride in `RIDES` (all of them, or the levels named) as plain numbers, a
+// `<name>Level.ts` beside its track module, packed by `src/levels/rideData.ts`, which also unpacks it. The level registry is
+// startup JS; the ride elements and blockouts that build the rides aren't (#589, #863, #890).
 import { build } from 'esbuild'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -8,18 +8,40 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import os from 'node:os'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-/** Each ride: its biome folder, track module and export, the level it is, and the generated module and its export. */
+/** Whole world units (the eye is 6–8 over the rails), a rail's up to 2 decimals: ~2 KB gz less startup JS a ride. */
+const KIT = { position: 0, up: 2 }
+/**
+ * Each ride: its level, biome folder, track module and export, the generated module and its export, the decimals its control
+ * points keep (`RidePrecision`) and any climbable walls it ships. Level 6's hall is small, so it keeps 0.01 units (#866).
+ */
 const RIDES = [
-  { biome: 'themePark', track: 'parkTrack', from: 'PARK_TRACK', level: 'Level 1', file: 'parkLevel', to: 'PARK_LEVEL_TRACK' },
-  { biome: 'arctic', track: 'arcticTrack', from: 'ARCTIC_TRACK', level: 'Level 4', file: 'arcticLevel', to: 'ARCTIC_LEVEL_TRACK' },
-  { biome: 'volcanic', track: 'infernoTrack', from: 'INFERNO_TRACK', level: 'Level 5', file: 'infernoLevel', to: 'INFERNO_LEVEL_TRACK' },
+  { level: 'level1', biome: 'themePark', track: 'parkTrack', from: 'PARK_TRACK', file: 'parkLevel', to: 'PARK_LEVEL_TRACK', precision: KIT },
+  { level: 'level4', biome: 'arctic', track: 'arcticTrack', from: 'ARCTIC_TRACK', file: 'arcticLevel', to: 'ARCTIC_LEVEL_TRACK', precision: KIT },
+  { level: 'level5', biome: 'volcanic', track: 'infernoTrack', from: 'INFERNO_TRACK', file: 'infernoLevel', to: 'INFERNO_LEVEL_TRACK', precision: KIT },
+  {
+    level: 'level6', biome: 'gym', track: 'gymTrack', from: 'GYM_TRACK', file: 'gymLevel', to: 'GYM_LEVEL_TRACK',
+    precision: { position: 2, up: 4 }, walls: { module: 'walls', from: 'GYM_WALLS', to: 'GYM_LEVEL_WALLS' },
+  },
 ]
+
+const wanted = process.argv.slice(2)
+const unknown = wanted.filter((id) => !RIDES.some((r) => r.level === id))
+if (unknown.length) {
+  console.error(`no generated ride for ${unknown.join(', ')}; rides: ${RIDES.map((r) => r.level).join(', ')}`)
+  process.exit(1)
+}
+const rides = wanted.length ? RIDES.filter((r) => wanted.includes(r.level)) : RIDES
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-rides-'))
 const bundle = path.join(tmp, 'rides.mjs')
-
+const biomes = '@/levels/environments/biomes'
 await build({
   stdin: {
-    contents: RIDES.map((r) => `export { ${r.from} } from '@/levels/environments/biomes/${r.biome}/${r.track}'`).join('\n'),
+    contents: [
+      "export { packPoints, roundNumbers } from '@/levels/rideData'",
+      ...rides.map((r) => `export { ${r.from} } from '${biomes}/${r.biome}/${r.track}'`),
+      ...rides.filter((r) => r.walls).map((r) => `export { ${r.walls.from} } from '${biomes}/${r.biome}/${r.walls.module}'`),
+    ].join('\n'),
     resolveDir: root,
     loader: 'ts',
   },
@@ -30,46 +52,29 @@ await build({
   outfile: bundle,
   logLevel: 'error',
 })
-const tracks = await import(pathToFileURL(bundle).href)
+const mod = await import(pathToFileURL(bundle).href)
 fs.rmSync(tmp, { recursive: true, force: true })
+const { packPoints, roundNumbers } = mod
 
-/**
- * Positions to whole world units (the eye is 6–8 over the rails), a rail's up to 2 decimals, the rest to 6 significant
- * digits: full doubles cost the startup JS ~2 KB gz more a ride. Each `<name>Level.test.ts` rounds the same way.
- */
-const round = (_key, v) => (typeof v === 'number' ? Number(v.toPrecision(6)) : v)
-const roundPoint = (p) => {
-  const q = { x: Math.round(p.x) + 0, y: Math.round(p.y) + 0, z: Math.round(p.z) + 0 }
-  return p.up ? { ...q, up: { x: Number(p.up.x.toFixed(2)) + 0, y: Number(p.up.y.toFixed(2)) + 0, z: Number(p.up.z.toFixed(2)) + 0 } } : q
-}
-
-for (const ride of RIDES) {
-  const track = tracks[ride.from]
+for (const ride of rides) {
+  const track = mod[ride.from]
   const outFile = path.join(root, 'src/levels/environments/biomes', ride.biome, `${ride.file}.ts`)
-  const rest = JSON.parse(JSON.stringify({ ...track, controlPoints: undefined }, round))
-  const controlPoints = track.controlPoints.map(roundPoint)
-  const xyz = controlPoints.flatMap((p, i) => (i ? [p.x - controlPoints[i - 1].x, p.y - controlPoints[i - 1].y, p.z - controlPoints[i - 1].z] : [p.x, p.y, p.z]))
-  const ups = controlPoints.flatMap((p, i) => (p.up ? [i, p.up.x, p.up.y, p.up.z] : []))
-  const body = `// Generated by scripts/gen-ride-levels.mjs from ${ride.track}.ts: do not edit by hand.
-// ${ride.level}'s ride as plain numbers, so the ride elements that build it stay out of the startup JS; the control points as flat
-// lists (x, y, z of the first, then each one's step from the last; index, x, y, z of each rolled one's up): the steps
-// repeat along a straight, so they gzip ~1 KB smaller than objects.
-import type { RailPoint } from '@/track/curves/SplineCurve'
-import type { TrackParams } from '@/types/level'
+  const rest = roundNumbers({ ...track, controlPoints: undefined })
+  const sources = ride.walls ? `${ride.track}.ts and ${ride.walls.module}.ts` : `${ride.track}.ts`
+  const walls = ride.walls
+    ? `\nexport const ${ride.walls.to}: readonly WallSurface[] = ${JSON.stringify(roundNumbers(mod[ride.walls.from]))}\n`
+    : ''
+  const body = `// Generated by scripts/gen-ride-levels.mjs from ${sources}: do not edit by hand.
+// Level ${ride.level.slice(5)}'s ride as plain numbers (src/levels/rideData.ts has the format), so what builds it stays out of the startup JS.
+import { unpackPoints } from '@/levels/rideData'
+import type { TrackParams${ride.walls ? ', WallSurface' : ''} } from '@/types/level'
 
-const XYZ = ${JSON.stringify(xyz)}
-const UPS = ${JSON.stringify(ups)}
-
-function controlPoints(): RailPoint[] {
-  const points: RailPoint[] = []
-  let [x, y, z] = [0, 0, 0]
-  for (let i = 0; i < XYZ.length; i += 3) points.push({ x: (x += XYZ[i]), y: (y += XYZ[i + 1]), z: (z += XYZ[i + 2]) })
-  for (let i = 0; i < UPS.length; i += 4) points[UPS[i]].up = { x: UPS[i + 1], y: UPS[i + 2], z: UPS[i + 3] }
-  return points
-}
-
-export const ${ride.to}: TrackParams = { ...${JSON.stringify(rest)}, curve: 'spline', controlPoints: controlPoints() } as TrackParams
-`
+export const ${ride.to}: TrackParams = {
+  ...${JSON.stringify(rest)},
+  curve: 'spline',
+  controlPoints: unpackPoints(${JSON.stringify(packPoints(track.controlPoints, ride.precision))}),
+} as TrackParams
+${walls}`
   fs.writeFileSync(outFile, body)
-  console.log(`wrote ${path.relative(root, outFile)}: ${track.controlPoints.length} control points`)
+  console.log(`wrote ${path.relative(root, outFile)}: ${track.controlPoints.length} control points${ride.walls ? `, ${mod[ride.walls.from].length} walls` : ''}`)
 }
